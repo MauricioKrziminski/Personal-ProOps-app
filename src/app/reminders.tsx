@@ -6,53 +6,64 @@ import { GlassCard } from '@/components/glass/glass-card';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { BottomTabInset, MaxContentWidth, Spacing } from '@/constants/theme';
-import { useNotes, type Note } from '@/hooks/use-items';
+import { useReminders, type Reminder } from '@/hooks/use-items';
 
-function NoteCard({ note, index }: { note: Note; index: number }) {
+function describeRecurrence(recurrence: string | null): string | null {
+  if (!recurrence) return null;
+  if (recurrence.includes('FREQ=DAILY')) return 'Diário';
+  if (recurrence.includes('FREQ=WEEKLY')) return 'Semanal';
+  if (recurrence.includes('FREQ=MONTHLY')) return 'Mensal';
+  if (recurrence.includes('FREQ=YEARLY')) return 'Anual';
+  return 'Recorrente';
+}
+
+function ReminderCard({ reminder, index }: { reminder: Reminder; index: number }) {
+  const recurrenceLabel = describeRecurrence(reminder.recurrence);
+  const next = new Date(reminder.next_run_at);
+
   return (
     <Animated.View entering={FadeInDown.duration(400).delay(Math.min(index * 60, 400))}>
-      <GlassCard style={styles.noteCard}>
-        <ThemedText>{note.content}</ThemedText>
-        <ThemedView style={styles.noteMeta}>
-          {note.category && (
-            <ThemedText type="small" themeColor="tint">
-              #{note.category}
+      <GlassCard style={styles.card}>
+        <ThemedText type="smallBold">{reminder.title}</ThemedText>
+        <ThemedView style={styles.meta}>
+          <ThemedText type="small" themeColor="tint">
+            ⏰ {next.toLocaleDateString('pt-BR')}{' '}
+            {next.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
+          </ThemedText>
+          {recurrenceLabel && (
+            <ThemedText type="small" themeColor="textSecondary">
+              🔁 {recurrenceLabel}
             </ThemedText>
           )}
-          <ThemedText type="small" themeColor="textSecondary">
-            {new Date(note.created_at).toLocaleDateString('pt-BR')}
-            {note.source === 'whatsapp' ? ' · via WhatsApp' : ''}
-          </ThemedText>
         </ThemedView>
       </GlassCard>
     </Animated.View>
   );
 }
 
-export default function NotesScreen() {
-  const { data: notes, isLoading } = useNotes();
+export default function RemindersScreen() {
+  const { data: reminders, isLoading } = useReminders();
 
   return (
     <ThemedView style={styles.container}>
       <SafeAreaView style={styles.safeArea}>
         <ThemedText type="subtitle" style={styles.heading}>
-          Notas
+          Lembretes
         </ThemedText>
 
         <FlatList
-          data={notes ?? []}
-          keyExtractor={(note) => note.id}
-          renderItem={({ item, index }) => <NoteCard note={item} index={index} />}
+          data={reminders ?? []}
+          keyExtractor={(reminder) => reminder.id}
+          renderItem={({ item, index }) => <ReminderCard reminder={item} index={index} />}
           contentContainerStyle={styles.list}
           showsVerticalScrollIndicator={false}
           ListEmptyComponent={
             isLoading ? null : (
               <GlassCard style={styles.empty}>
-                <ThemedText style={styles.emptyEmoji}>📝</ThemedText>
-                <ThemedText type="smallBold">Nenhuma nota ainda</ThemedText>
+                <ThemedText style={styles.emptyEmoji}>⏰</ThemedText>
+                <ThemedText type="smallBold">Nenhum lembrete ativo</ThemedText>
                 <ThemedText type="small" themeColor="textSecondary" style={styles.emptyHint}>
-                  Manda uma mensagem no WhatsApp, tipo{'\n'}
-                  “anotar: ligar pro dentista”
+                  Manda no WhatsApp:{'\n'}“me lembra de pagar o aluguel todo dia 5”
                 </ThemedText>
               </GlassCard>
             )
@@ -81,10 +92,10 @@ const styles = StyleSheet.create({
     gap: Spacing.three,
     paddingBottom: BottomTabInset + Spacing.three,
   },
-  noteCard: {
+  card: {
     gap: Spacing.two,
   },
-  noteMeta: {
+  meta: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     backgroundColor: 'transparent',

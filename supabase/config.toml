@@ -1,0 +1,15 @@
+# Configuração das Edge Functions do ProOps.
+# O webhook do WhatsApp NÃO recebe JWT (a Meta chama direto) — a segurança dele
+# é a verificação HMAC (X-Hub-Signature-256) + verify_token feita no código.
+# Todas as outras funções exigem JWT.
+
+project_id = "app-proops"
+
+[functions.whatsapp-webhook]
+verify_jwt = false
+
+[functions.process-jobs]
+verify_jwt = true
+
+[functions.send-reminders]
+verify_jwt = true
