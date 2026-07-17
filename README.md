@@ -1,56 +1,45 @@
-# Welcome to your Expo app 👋
+# Personal ProOps app
 
-This is an [Expo](https://expo.dev) project created with [`create-expo-app`](https://www.npmjs.com/package/create-expo-app).
+App mobile pessoal de **notas rápidas, lembretes e controle financeiro operado via WhatsApp**, parte do produto ProOps. Você manda uma mensagem em linguagem natural — texto ou áudio — e a IA cria e organiza tudo no app:
 
-## Get started
+> "gastei 45 no mercado" · "recebi 500 de freela" · "me lembra de pagar aluguel todo dia 5" · "quanto gastei esse mês?"
 
-1. Install dependencies
+## Como funciona
 
-   ```bash
-   npm install
-   ```
-
-2. Start the app
-
-   ```bash
-   npx expo start
-   ```
-
-In the output, you'll find options to open the app in a
-
-- [development build](https://docs.expo.dev/develop/development-builds/introduction/)
-- [Android emulator](https://docs.expo.dev/workflow/android-studio-emulator/)
-- [iOS simulator](https://docs.expo.dev/workflow/ios-simulator/)
-- [Expo Go](https://expo.dev/go), a limited sandbox for trying out app development with Expo
-
-You can start developing by editing the files inside the **app** directory. This project uses [file-based routing](https://docs.expo.dev/router/introduction).
-
-## Get a fresh project
-
-When you're ready, run:
-
-```bash
-npm run reset-project
+```
+WhatsApp → Meta Cloud API → whatsapp-webhook (HMAC, dedupe, fila) → process-jobs
+(Groq transcreve áudio → Gemini classifica em ações → grava notas/lembretes/transações
+→ confirma no WhatsApp) → Supabase Realtime atualiza o app na hora.
+send-reminders (pg_cron) dispara lembretes vencidos por push/WhatsApp.
 ```
 
-This command will move the starter code to the **app-example** directory and create a blank **app** directory where you can start developing.
+- **App:** Expo SDK 57 + expo-router + TypeScript (`src/`), design liquid glass iOS, TanStack Query, dark mode automático.
+- **Backend:** Supabase — Postgres (RLS deny-by-default), Auth Phone OTP, Edge Functions Deno (`supabase/functions/`), Realtime, pg_cron.
+- **IA:** Google Gemini (Flash + fallback Pro, saída estruturada) · **Áudio:** Groq Whisper · **WhatsApp:** Meta Cloud API oficial.
 
-### Other setup steps
+## Rodando o app
 
-- To set up ESLint for linting, run `npx expo lint`, or follow our guide on ["Using ESLint and Prettier"](https://docs.expo.dev/guides/using-eslint/)
-- If you'd like to set up unit testing, follow our guide on ["Unit Testing with Jest"](https://docs.expo.dev/develop/unit-testing/)
-- Learn more about the TypeScript setup in this template in our guide on ["Using TypeScript"](https://docs.expo.dev/guides/typescript/)
+```bash
+npm install
+cp .env.example .env   # preencher EXPO_PUBLIC_SUPABASE_URL e EXPO_PUBLIC_SUPABASE_ANON_KEY
+npx expo start         # ou: npm run android / npm run ios
+```
 
-## Learn more
+Login por telefone (OTP). Em dev (`__DEV__`) há um botão de login de teste.
 
-To learn more about developing your project with Expo, look at the following resources:
+## Backend (Supabase)
 
-- [Expo documentation](https://docs.expo.dev/): Learn fundamentals, or go into advanced topics with our [guides](https://docs.expo.dev/guides).
-- [Learn Expo tutorial](https://docs.expo.dev/tutorial/introduction/): Follow a step-by-step tutorial where you'll create a project that runs on Android, iOS, and the web.
+- Migrations: `supabase/migrations/` — aplicar com `npx supabase db push`.
+- Edge Functions: `supabase/functions/` — testar com `npx supabase functions serve`, deployar com `npx supabase functions deploy <nome>`.
+- Secrets das functions: documentados em `supabase/.env.example`, definidos com `npx supabase secrets set` (nunca commitados).
 
-## Join the community
+## Qualidade
 
-Join our community of developers creating universal apps.
+```bash
+npx tsc --noEmit   # typecheck
+npx expo lint      # lint
+```
 
-- [Expo on GitHub](https://github.com/expo/expo): View our open source platform and contribute.
-- [Discord community](https://chat.expo.dev): Chat with Expo users and ask questions.
+## Convenções e regras
+
+As regras do projeto (design system, padrões Supabase/RLS, IA, WhatsApp, domínio financeiro, workflow) estão em `CLAUDE.md` + `.claude/rules/` e valem para humanos e agentes.
