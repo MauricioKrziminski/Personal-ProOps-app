@@ -16,6 +16,8 @@ export const Colors = {
     textSecondary: '#60646C',
     tint: '#208AEF',
     danger: '#E5484D',
+    success: '#30A46C',
+    warning: '#E8A33D',
   },
   dark: {
     text: '#ffffff',
@@ -25,6 +27,8 @@ export const Colors = {
     textSecondary: '#B0B4BA',
     tint: '#4DA3FF',
     danger: '#FF6369',
+    success: '#3DD68C',
+    warning: '#FFC53D',
   },
 } as const;
 
