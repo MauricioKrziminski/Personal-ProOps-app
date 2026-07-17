@@ -4,6 +4,9 @@
  *   - push via Expo Notifications (GRÁTIS, canal preferencial)
  *   - template Utility no WhatsApp (complemento pago ~US$0,007)
  * Depois recalcula next_run_at pela recorrência (RRULE) ou desativa se for único.
+ *
+ * Também materializa lançamentos recorrentes vencidos (recurring_transactions ->
+ * transactions com source='recurring') no mesmo tick do cron.
  */
 
 import { RRule } from "https://esm.sh/rrule@2.8.1";
@@ -40,9 +43,57 @@ function nextOccurrence(recurrence: string | null, after: Date): Date | null {
   }
 }
 
+/** Materializa lançamentos recorrentes vencidos em transactions e reagenda pela RRULE. */
+async function materializeRecurring(
+  supabase: ReturnType<typeof adminClient>,
+  now: Date,
+): Promise<number> {
+  const { data: due, error } = await supabase
+    .from("recurring_transactions")
+    .select("id, user_id, kind, amount_cents, currency, category, description, account_id, rrule, next_run_at")
+    .eq("active", true)
+    .lte("next_run_at", now.toISOString())
+    .limit(100);
+  if (error) {
+    console.error("recurring_transactions fetch:", error);
+    return 0;
+  }
+
+  let created = 0;
+  for (const rec of due ?? []) {
+    try {
+      const { error: insertError } = await supabase.from("transactions").insert({
+        user_id: rec.user_id,
+        kind: rec.kind,
+        amount_cents: rec.amount_cents,
+        currency: rec.currency,
+        category: rec.category,
+        description: rec.description,
+        account_id: rec.account_id,
+        occurred_at: now.toISOString().slice(0, 10),
+        source: "recurring",
+      });
+      if (insertError) throw insertError;
+
+      const next = nextOccurrence(rec.rrule, now);
+      await supabase
+        .from("recurring_transactions")
+        .update(next ? { next_run_at: next.toISOString() } : { active: false })
+        .eq("id", rec.id);
+      created++;
+    } catch (err) {
+      console.error(`recurring ${rec.id}:`, err);
+      // mantém next_run_at: será tentado de novo no próximo tick do cron
+    }
+  }
+  return created;
+}
+
 Deno.serve(async (_req) => {
   const supabase = adminClient();
   const now = new Date();
+
+  const recurringCreated = await materializeRecurring(supabase, now);
 
   const { data: due, error } = await supabase
     .from("reminders")
@@ -94,7 +145,7 @@ Deno.serve(async (_req) => {
     }
   }
 
-  return new Response(JSON.stringify({ due: due?.length ?? 0, sent }), {
+  return new Response(JSON.stringify({ due: due?.length ?? 0, sent, recurringCreated }), {
     headers: { "Content-Type": "application/json" },
   });
 });
