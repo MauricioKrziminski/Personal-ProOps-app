@@ -1,6 +1,10 @@
 /**
  * Parsing/categorização com Google Gemini (saída estruturada via responseSchema).
  * Flash para volume; quem chama pode escalar p/ Pro quando a confiança for baixa.
+ *
+ * Multi-intent: uma mensagem pode virar VÁRIAS ações (lista de gastos, gasto +
+ * lembrete, consulta + nota...). O schema é um objeto flat único por ação —
+ * Gemini structured output lida mal com anyOf/union; campos não usados = null.
  */
 
 const GEMINI_BASE = "https://generativelanguage.googleapis.com/v1beta/models";
@@ -9,45 +13,120 @@ const GEMINI_BASE = "https://generativelanguage.googleapis.com/v1beta/models";
 export const GEMINI_FLASH = "gemini-flash-latest";
 export const GEMINI_PRO = "gemini-pro-latest";
 
-export interface ParsedItem {
-  type: "note" | "reminder" | "expense" | "unknown";
+export const SUGGESTED_CATEGORIES = [
+  "mercado", "transporte", "lazer", "contas", "saúde", "casa",
+  "educação", "assinaturas", "restaurante", "salário", "freela", "outros",
+] as const;
+
+export type AiActionType =
+  | "create_expense"
+  | "create_income"
+  | "create_transfer"
+  | "create_note"
+  | "create_reminder"
+  | "create_goal"
+  | "goal_deposit"
+  | "query_balance"
+  | "query_transactions"
+  | "query_budgets"
+  | "query_goals"
+  | "undo_last"
+  | "unknown";
+
+export interface AiAction {
+  type: AiActionType;
+  // criação
   title: string | null;
   content: string | null;
   category: string | null;
-  amount_cents: number | null;
+  amount_cents: number | null; // inteiro em centavos
   currency: string | null;
-  spent_at: string | null; // YYYY-MM-DD
+  occurred_at: string | null; // YYYY-MM-DD
   remind_at: string | null; // ISO datetime local do usuário
   recurrence: string | null; // RRULE (ex.: FREQ=MONTHLY;BYMONTHDAY=5)
-  confidence: number; // 0..1
+  account: string | null; // nome livre da conta citada
+  counterparty_account: string | null; // conta destino (transfer)
+  goal_name: string | null;
+  target_cents: number | null;
+  deadline: string | null; // YYYY-MM-DD
+  // consulta
+  query_from: string | null; // YYYY-MM-DD
+  query_to: string | null; // YYYY-MM-DD
+  query_kind: "expense" | "income" | null;
+  query_category: string | null;
 }
 
-const RESPONSE_SCHEMA = {
+export interface AiResult {
+  actions: AiAction[];
+  confidence: number; // 0..1, da mensagem inteira
+}
+
+const ACTION_SCHEMA = {
   type: "OBJECT",
   properties: {
-    type: { type: "STRING", enum: ["note", "reminder", "expense", "unknown"] },
+    type: {
+      type: "STRING",
+      enum: [
+        "create_expense", "create_income", "create_transfer", "create_note",
+        "create_reminder", "create_goal", "goal_deposit", "query_balance",
+        "query_transactions", "query_budgets", "query_goals", "undo_last", "unknown",
+      ],
+    },
     title: { type: "STRING", nullable: true },
     content: { type: "STRING", nullable: true },
     category: { type: "STRING", nullable: true },
     amount_cents: { type: "INTEGER", nullable: true },
     currency: { type: "STRING", nullable: true },
-    spent_at: { type: "STRING", nullable: true },
+    occurred_at: { type: "STRING", nullable: true },
     remind_at: { type: "STRING", nullable: true },
     recurrence: { type: "STRING", nullable: true },
+    account: { type: "STRING", nullable: true },
+    counterparty_account: { type: "STRING", nullable: true },
+    goal_name: { type: "STRING", nullable: true },
+    target_cents: { type: "INTEGER", nullable: true },
+    deadline: { type: "STRING", nullable: true },
+    query_from: { type: "STRING", nullable: true },
+    query_to: { type: "STRING", nullable: true },
+    query_kind: { type: "STRING", enum: ["expense", "income"], nullable: true },
+    query_category: { type: "STRING", nullable: true },
+  },
+  required: ["type"],
+} as const;
+
+const RESPONSE_SCHEMA = {
+  type: "OBJECT",
+  properties: {
+    actions: { type: "ARRAY", items: ACTION_SCHEMA, maxItems: 10 },
     confidence: { type: "NUMBER" },
   },
-  required: ["type", "confidence"],
+  required: ["actions", "confidence"],
 } as const;
 
 function systemPrompt(nowIso: string, timezone: string): string {
-  return `Você é o classificador do Personal ProOps app. O usuário manda mensagens informais em português pelo WhatsApp.
-Classifique em exatamente um tipo:
-- "expense": menção a gasto/compra/pagamento com valor. Extraia amount_cents (inteiro, centavos: "45 reais" -> 4500), currency (padrão BRL), category (curta e minúscula, ex.: mercado, transporte, lazer, contas, saúde) e spent_at (YYYY-MM-DD; resolva "ontem"/"hoje" pela data atual).
-- "reminder": pedido para ser lembrado. Extraia title, remind_at (próxima ocorrência, ISO, no fuso do usuário) e recurrence como RRULE quando recorrente (ex.: "todo dia 5" -> FREQ=MONTHLY;BYMONTHDAY=5; "todo dia às 8h" -> FREQ=DAILY). Sem recorrência -> recurrence null.
-- "note": anotação livre. Extraia content (texto limpo) e category curta se óbvia.
-- "unknown": não se encaixa. Use confidence baixa.
-Data/hora atual: ${nowIso} | Fuso do usuário: ${timezone}.
-confidence entre 0 e 1.`;
+  return `Você é o assistente do Personal ProOps app. O usuário manda mensagens informais em português pelo WhatsApp.
+A mensagem pode conter VÁRIOS itens — emita UMA ação por item, na ordem em que aparecem (máx. 10).
+Ex.: "mercado 200, uber 30 e recebi 500 de freela" -> 3 ações (2 create_expense + 1 create_income).
+
+Tipos de ação:
+- "create_expense": gasto/compra/pagamento com valor. amount_cents (inteiro em centavos: "45 reais" -> 4500), currency (padrão BRL), category (curta, minúscula, preferindo: ${SUGGESTED_CATEGORIES.join(", ")}), occurred_at (YYYY-MM-DD; resolva "ontem"/"hoje" pela data atual), description em content. Se citar a conta/cartão ("no nubank"), preencha account. Se for recorrente ("todo mês"), preencha recurrence como RRULE.
+- "create_income": dinheiro recebido ("recebi", "caiu o salário", "me pagaram"). Mesmos campos do expense (category ex.: salário, freela).
+- "create_transfer": mover dinheiro entre contas próprias ("passei 200 da corrente pra poupança"). account = origem, counterparty_account = destino.
+- "create_note": anotação livre. content (texto limpo) e category curta se óbvia.
+- "create_reminder": pedido para ser lembrado. title, remind_at (próxima ocorrência, ISO, no fuso do usuário) e recurrence como RRULE quando recorrente ("todo dia 5" -> FREQ=MONTHLY;BYMONTHDAY=5; "todo dia às 8h" -> FREQ=DAILY). Sem recorrência -> null.
+- "create_goal": meta de poupança ("quero juntar 5000 até dezembro pra viagem"). goal_name, target_cents, deadline (YYYY-MM-DD ou null).
+- "goal_deposit": aporte em meta existente ("coloca 200 na meta da viagem"). goal_name, amount_cents.
+- "query_balance": pergunta sobre saldo/quanto tem ("quanto tenho?", "saldo das contas").
+- "query_transactions": pergunta sobre gastos/receitas ("quanto gastei esse mês?", "gastos com mercado em junho"). query_from/query_to (YYYY-MM-DD, resolva "esse mês"/"semana passada" pela data atual), query_kind (expense/income/null p/ ambos), query_category se citada.
+- "query_budgets": pergunta sobre orçamento/limite ("como tá meu orçamento?").
+- "query_goals": pergunta sobre metas ("como tão minhas metas?").
+- "undo_last": desfazer o último lançamento ("apaga o último", "foi engano").
+- "unknown": não se encaixa em nada.
+
+Regras:
+- Dinheiro SEMPRE em centavos inteiros. "1.234,56" -> 123456.
+- Datas relativas resolvidas com a data/hora atual: ${nowIso} | Fuso do usuário: ${timezone}.
+- Campos que não se aplicam à ação: null.
+- confidence (0..1) é da interpretação da mensagem INTEIRA.`;
 }
 
 export interface GeminiUsage {
@@ -78,7 +157,7 @@ export async function parseMessage(
   text: string,
   timezone: string,
   model: string = GEMINI_FLASH,
-): Promise<{ parsed: ParsedItem; usage: GeminiUsage }> {
+): Promise<{ parsed: AiResult; usage: GeminiUsage }> {
   const apiKey = Deno.env.get("GEMINI_API_KEY");
   if (!apiKey) throw new Error("GEMINI_API_KEY ausente");
 
@@ -109,7 +188,8 @@ export async function parseMessage(
   const raw = data?.candidates?.[0]?.content?.parts?.[0]?.text;
   if (!raw) throw new Error("Gemini retornou resposta vazia");
 
-  const parsed = JSON.parse(raw) as ParsedItem;
+  const parsed = JSON.parse(raw) as AiResult;
+  if (!Array.isArray(parsed.actions)) throw new Error("Gemini retornou shape inesperado (sem actions)");
   return {
     parsed,
     usage: {
