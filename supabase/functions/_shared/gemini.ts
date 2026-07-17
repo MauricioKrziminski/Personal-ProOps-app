@@ -4,8 +4,10 @@
  */
 
 const GEMINI_BASE = "https://generativelanguage.googleapis.com/v1beta/models";
-export const GEMINI_FLASH = "gemini-2.5-flash";
-export const GEMINI_PRO = "gemini-2.5-pro";
+// Aliases "-latest" apontam sempre para o modelo atual — evitam quebra por
+// depreciação (ex.: gemini-2.5-flash ficou indisponível para chaves novas).
+export const GEMINI_FLASH = "gemini-flash-latest";
+export const GEMINI_PRO = "gemini-pro-latest";
 
 export interface ParsedItem {
   type: "note" | "reminder" | "expense" | "unknown";
@@ -38,7 +40,7 @@ const RESPONSE_SCHEMA = {
 } as const;
 
 function systemPrompt(nowIso: string, timezone: string): string {
-  return `Você é o classificador do ProOps. O usuário manda mensagens informais em português pelo WhatsApp.
+  return `Você é o classificador do Personal ProOps app. O usuário manda mensagens informais em português pelo WhatsApp.
 Classifique em exatamente um tipo:
 - "expense": menção a gasto/compra/pagamento com valor. Extraia amount_cents (inteiro, centavos: "45 reais" -> 4500), currency (padrão BRL), category (curta e minúscula, ex.: mercado, transporte, lazer, contas, saúde) e spent_at (YYYY-MM-DD; resolva "ontem"/"hoje" pela data atual).
 - "reminder": pedido para ser lembrado. Extraia title, remind_at (próxima ocorrência, ISO, no fuso do usuário) e recurrence como RRULE quando recorrente (ex.: "todo dia 5" -> FREQ=MONTHLY;BYMONTHDAY=5; "todo dia às 8h" -> FREQ=DAILY). Sem recorrência -> recurrence null.
@@ -54,6 +56,24 @@ export interface GeminiUsage {
   outputTokens: number | null;
 }
 
+/** fetch com retry + backoff para erros transitórios (503 high demand, 429 rate limit, 5xx). */
+async function fetchWithRetry(
+  url: string,
+  options: RequestInit,
+  retries = 3,
+): Promise<Response> {
+  for (let attempt = 0; ; attempt++) {
+    const res = await fetch(url, options);
+    if (res.ok) return res;
+    const transient = res.status === 429 || res.status >= 500;
+    if (transient && attempt < retries) {
+      await new Promise((r) => setTimeout(r, 500 * Math.pow(2, attempt))); // 0.5s, 1s, 2s
+      continue;
+    }
+    return res;
+  }
+}
+
 export async function parseMessage(
   text: string,
   timezone: string,
@@ -62,7 +82,7 @@ export async function parseMessage(
   const apiKey = Deno.env.get("GEMINI_API_KEY");
   if (!apiKey) throw new Error("GEMINI_API_KEY ausente");
 
-  const res = await fetch(`${GEMINI_BASE}/${model}:generateContent`, {
+  const res = await fetchWithRetry(`${GEMINI_BASE}/${model}:generateContent`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",

@@ -6,7 +6,7 @@ import { GlassCard } from '@/components/glass/glass-card';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { BottomTabInset, MaxContentWidth, Spacing } from '@/constants/theme';
-import { useNotes, type Note } from '@/hooks/use-items';
+import { formatDateBR, useNotes, type Note } from '@/hooks/use-items';
 
 function NoteCard({ note, index }: { note: Note; index: number }) {
   return (
@@ -20,7 +20,7 @@ function NoteCard({ note, index }: { note: Note; index: number }) {
             </ThemedText>
           )}
           <ThemedText type="small" themeColor="textSecondary">
-            {new Date(note.created_at).toLocaleDateString('pt-BR')}
+            {formatDateBR(note.created_at)}
             {note.source === 'whatsapp' ? ' · via WhatsApp' : ''}
           </ThemedText>
         </ThemedView>

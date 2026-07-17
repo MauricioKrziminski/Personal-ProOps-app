@@ -12,7 +12,7 @@ interface GlassCardProps {
 }
 
 /**
- * Superfície em liquid glass — diretriz de design do ProOps.
+ * Superfície em liquid glass — diretriz de design do Personal ProOps app.
  * iOS 26+: GlassView nativo (Liquid Glass real).
  * iOS antigo/Android: BlurView como fallback visualmente próximo.
  */

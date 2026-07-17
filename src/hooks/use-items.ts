@@ -93,3 +93,11 @@ export function useExpensesSummary(fromDate: string, toDate: string) {
 export function formatBRL(cents: number): string {
   return (cents / 100).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 }
+
+/** Data em dd-mm-yyyy (aceita ISO string ou Date). */
+export function formatDateBR(value: string | Date): string {
+  const d = typeof value === 'string' ? new Date(value) : value;
+  const dd = String(d.getDate()).padStart(2, '0');
+  const mm = String(d.getMonth() + 1).padStart(2, '0');
+  return `${dd}-${mm}-${d.getFullYear()}`;
+}

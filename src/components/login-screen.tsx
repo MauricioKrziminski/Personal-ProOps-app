@@ -47,11 +47,26 @@ export function LoginScreen() {
     // sucesso: onAuthStateChange troca a tela automaticamente
   };
 
+  // Atalho de desenvolvimento: entra como o usuário de teste sem SMS (só em __DEV__).
+  const devLogin = async () => {
+    setBusy(true);
+    setError(null);
+    const { error: err } = await supabase.auth.signInWithPassword({
+      email: 'dev@proops.local',
+      password: 'devtest123',
+    });
+    setBusy(false);
+    if (err) setError(err.message);
+  };
+
   return (
     <ThemedView style={styles.container}>
       <SafeAreaView style={styles.safeArea}>
         <Animated.View entering={FadeInUp.duration(600)} style={styles.hero}>
-          <ThemedText type="title">ProOps</ThemedText>
+          <ThemedText type="title">Personal</ThemedText>
+          <ThemedText type="small" themeColor="textSecondary">
+            by ProOps
+          </ThemedText>
           <ThemedText themeColor="textSecondary" style={styles.tagline}>
             Suas notas, lembretes e gastos.{'\n'}Direto do WhatsApp.
           </ThemedText>
@@ -123,6 +138,14 @@ export function LoginScreen() {
                 </ThemedText>
               </Pressable>
             )}
+
+            {__DEV__ && (
+              <Pressable onPress={devLogin} style={styles.devButton}>
+                <ThemedText type="small" themeColor="textSecondary" style={styles.backLink}>
+                  🔧 Entrar como teste (dev)
+                </ThemedText>
+              </Pressable>
+            )}
           </GlassCard>
         </Animated.View>
       </SafeAreaView>
@@ -174,5 +197,11 @@ const styles = StyleSheet.create({
   },
   backLink: {
     textAlign: 'center',
+  },
+  devButton: {
+    marginTop: Spacing.one,
+    paddingTop: Spacing.two,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: 'rgba(128,128,128,0.25)',
   },
 });

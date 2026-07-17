@@ -101,7 +101,7 @@ export default function FinanceScreen() {
               <ThemedText style={styles.emptyEmoji}>💸</ThemedText>
               <ThemedText type="smallBold">Nenhum gasto este mês</ThemedText>
               <ThemedText type="small" themeColor="textSecondary" style={styles.emptyHint}>
-                Manda no WhatsApp: “gastei 45 no mercado”{'\n'}e o ProOps registra sozinho.
+                Manda no WhatsApp: “gastei 45 no mercado”{'\n'}e o app registra sozinho.
               </ThemedText>
             </GlassCard>
           )}
