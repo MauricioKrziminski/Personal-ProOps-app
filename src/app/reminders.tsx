@@ -6,7 +6,7 @@ import { GlassCard } from '@/components/glass/glass-card';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { BottomTabInset, MaxContentWidth, Spacing } from '@/constants/theme';
-import { useReminders, type Reminder } from '@/hooks/use-items';
+import { formatDateBR, useReminders, type Reminder } from '@/hooks/use-items';
 
 function describeRecurrence(recurrence: string | null): string | null {
   if (!recurrence) return null;
@@ -27,7 +27,7 @@ function ReminderCard({ reminder, index }: { reminder: Reminder; index: number }
         <ThemedText type="smallBold">{reminder.title}</ThemedText>
         <ThemedView style={styles.meta}>
           <ThemedText type="small" themeColor="tint">
-            ⏰ {next.toLocaleDateString('pt-BR')}{' '}
+            ⏰ {formatDateBR(next)}{' '}
             {next.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
           </ThemedText>
           {recurrenceLabel && (

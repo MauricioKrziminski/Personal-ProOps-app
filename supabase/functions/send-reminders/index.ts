@@ -6,7 +6,7 @@
  * Depois recalcula next_run_at pela recorrência (RRULE) ou desativa se for único.
  */
 
-import { RRule } from "npm:rrule@2.8.1";
+import { RRule } from "https://esm.sh/rrule@2.8.1";
 import { adminClient } from "../_shared/admin.ts";
 import { sendTemplate } from "../_shared/whatsapp.ts";
 

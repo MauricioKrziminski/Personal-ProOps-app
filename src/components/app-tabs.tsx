@@ -4,7 +4,7 @@ import { Platform, useColorScheme } from 'react-native';
 import { Colors } from '@/constants/theme';
 
 // No iOS 26+ a NativeTabs renderiza a tab bar nativa em Liquid Glass —
-// diretriz central de design do ProOps. SF Symbols no iOS; PNG no Android.
+// diretriz central de design do Personal ProOps app. SF Symbols no iOS; PNG no Android.
 const TABS = [
   { name: 'index', label: 'Notas', sf: { default: 'note.text', selected: 'note.text' } },
   { name: 'reminders', label: 'Lembretes', sf: { default: 'bell', selected: 'bell.fill' } },

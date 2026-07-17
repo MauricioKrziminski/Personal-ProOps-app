@@ -91,6 +91,32 @@ export function sendTemplate(
   });
 }
 
+/**
+ * Envia um código OTP via template de AUTENTICAÇÃO do WhatsApp.
+ * Templates de categoria "Authentication" repetem o código no corpo e no
+ * botão de copiar código. O template precisa existir/aprovado na Meta.
+ */
+export function sendAuthCode(to: string, code: string, templateName: string, language = "pt_BR") {
+  return graphPost({
+    messaging_product: "whatsapp",
+    to,
+    type: "template",
+    template: {
+      name: templateName,
+      language: { code: language },
+      components: [
+        { type: "body", parameters: [{ type: "text", text: code }] },
+        {
+          type: "button",
+          sub_type: "url",
+          index: "0",
+          parameters: [{ type: "text", text: code }],
+        },
+      ],
+    },
+  });
+}
+
 /** Baixa uma mídia recebida (ex.: áudio) a partir do media id da Meta. */
 export async function downloadMedia(mediaId: string): Promise<Blob> {
   const token = Deno.env.get("WHATSAPP_TOKEN");

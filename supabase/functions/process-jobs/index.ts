@@ -5,7 +5,11 @@
  *   2. áudio -> Groq (Whisper) transcreve; texto segue direto
  *   3. Gemini classifica {note | reminder | expense} com responseSchema
  *   4. insere na tabela certa + audita em ai_events
- *   5. confirma pro usuário via WhatsApp (grátis na janela 24h)
+ *   5. confirma pro usuário via WhatsApp (best-effort, grátis na janela 24h)
+ *
+ * Regra de robustez: o job é marcado "done" assim que o dado é PERSISTIDO.
+ * O envio da confirmação é best-effort — se falhar (ex.: janela 24h fechada),
+ * NÃO reprocessa o job, evitando inserts duplicados.
  */
 
 import { adminClient } from "../_shared/admin.ts";
@@ -21,8 +25,33 @@ import {
 const MAX_ATTEMPTS = 3;
 const CONFIDENCE_ESCALATE = 0.6;
 
+/**
+ * Gera formatos possíveis do número para casar com o profile.
+ * Brasil: o WhatsApp às vezes envia o número SEM o 9º dígito (ex.: 55 51 92553295),
+ * enquanto o usuário se cadastra COM o 9 (55 51 992553295). Tenta as duas formas.
+ */
+function phoneCandidates(raw: string): string[] {
+  const digits = raw.replace(/\D/g, "");
+  const set = new Set<string>([digits]);
+  if (digits.startsWith("55")) {
+    const rest = digits.slice(2); // DDD + número
+    if (rest.length === 11 && rest[2] === "9") {
+      set.add("55" + rest.slice(0, 2) + rest.slice(3)); // remove o 9º dígito
+    } else if (rest.length === 10) {
+      set.add("55" + rest.slice(0, 2) + "9" + rest.slice(2)); // adiciona o 9º dígito
+    }
+  }
+  return [...set];
+}
+
 function centsToBRL(cents: number): string {
   return (cents / 100).toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
+}
+
+/** ISO yyyy-mm-dd -> dd-mm-yyyy */
+function formatDateBR(iso: string): string {
+  const [y, m, d] = iso.split("-");
+  return d && m && y ? `${d}-${m}-${y}` : iso;
 }
 
 function confirmationText(parsed: ParsedItem): string {
@@ -30,7 +59,7 @@ function confirmationText(parsed: ParsedItem): string {
     case "expense":
       return `💸 Gasto anotado: ${centsToBRL(parsed.amount_cents ?? 0)}` +
         (parsed.category ? ` em *${parsed.category}*` : "") +
-        (parsed.spent_at ? ` (${parsed.spent_at})` : "") + ".";
+        (parsed.spent_at ? ` (${formatDateBR(parsed.spent_at)})` : "") + ".";
     case "reminder":
       return `⏰ Lembrete criado: *${parsed.title ?? "sem título"}*` +
         (parsed.recurrence ? " (recorrente)" : "") + ".";
@@ -38,6 +67,15 @@ function confirmationText(parsed: ParsedItem): string {
       return `📝 Nota salva: ${parsed.content ?? parsed.title ?? ""}`;
     default:
       return "🤔 Não entendi bem. Tenta algo como: \"gastei 45 no mercado\" ou \"me lembra de pagar a conta dia 10\".";
+  }
+}
+
+/** Envio best-effort: nunca lança — uma falha de confirmação não deve reprocessar o job. */
+async function trySend(to: string, body: string): Promise<void> {
+  try {
+    await sendText(to, body);
+  } catch (err) {
+    console.error("confirmação WhatsApp falhou (ignorado):", err);
   }
 }
 
@@ -99,23 +137,17 @@ async function persistItem(
 Deno.serve(async (_req) => {
   const supabase = adminClient();
 
-  const { data: jobs, error } = await supabase
-    .from("jobs")
-    .select("*")
-    .eq("status", "pending")
-    .lt("attempts", MAX_ATTEMPTS)
-    .order("created_at")
-    .limit(10);
+  // reivindicação atômica: cada job vai para um único processador (SKIP LOCKED)
+  const { data: jobs, error } = await supabase.rpc("claim_jobs", { batch_size: 10 });
 
   if (error) return new Response(JSON.stringify({ error: error.message }), { status: 500 });
 
+  const markDone = (id: string) =>
+    supabase.from("jobs").update({ status: "done", processed_at: new Date().toISOString() }).eq("id", id);
+
   let done = 0;
   for (const job of jobs ?? []) {
-    await supabase
-      .from("jobs")
-      .update({ status: "processing", attempts: job.attempts + 1 })
-      .eq("id", job.id);
-
+    // job já reivindicado (status=processing, attempts incrementado pela claim_jobs)
     const { phone, message, message_raw_id } = job.payload as {
       phone: string;
       message: Record<string, unknown>;
@@ -124,26 +156,27 @@ Deno.serve(async (_req) => {
 
     try {
       // 1. resolve usuário pelo telefone
-      const { data: profile } = await supabase
+      const { data: profiles } = await supabase
         .from("profiles")
-        .select("id, timezone")
-        .eq("phone", phone)
-        .maybeSingle();
+        .select("id, timezone, phone")
+        .in("phone", phoneCandidates(phone))
+        .limit(1);
+      const profile = profiles?.[0] ?? null;
 
       if (!profile) {
-        await sendText(
+        await markDone(job.id);
+        await trySend(
           phone,
-          "👋 Ainda não encontrei sua conta. Baixe o app ProOps e cadastre-se com este número para começar!",
+          "👋 Ainda não encontrei sua conta. Baixe o Personal ProOps app e cadastre-se com este número para começar!",
         );
-        await supabase.from("jobs").update({ status: "done", processed_at: new Date().toISOString() }).eq("id", job.id);
         continue;
       }
 
       // 2. texto (transcreve áudio se preciso)
       const text = await extractText(message);
       if (!text) {
-        await sendText(phone, "🙈 Por enquanto só entendo texto e áudio. Em breve, fotos de recibo!");
-        await supabase.from("jobs").update({ status: "done", processed_at: new Date().toISOString() }).eq("id", job.id);
+        await markDone(job.id);
+        await trySend(profile.phone, "🙈 Por enquanto só entendo texto e áudio. Em breve, fotos de recibo!");
         continue;
       }
 
@@ -163,16 +196,15 @@ Deno.serve(async (_req) => {
         result: parsed,
       });
 
-      // 4. persiste
+      // 4. persiste e marca done (fonte da verdade salva) ANTES de tentar confirmar
       await persistItem(supabase, profile.id, profile.timezone, parsed);
-
-      // 5. confirma (grátis na janela 24h)
-      await sendText(phone, confirmationText(parsed));
-
-      await supabase.from("jobs").update({ status: "done", processed_at: new Date().toISOString() }).eq("id", job.id);
+      await markDone(job.id);
       done++;
+
+      // 5. confirmação best-effort no número registrado (não reprocessa se falhar)
+      await trySend(profile.phone, confirmationText(parsed));
     } catch (err) {
-      const failed = job.attempts + 1 >= MAX_ATTEMPTS;
+      const failed = job.attempts >= MAX_ATTEMPTS;
       await supabase
         .from("jobs")
         .update({ status: failed ? "failed" : "pending", last_error: String(err) })

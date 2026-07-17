@@ -36,6 +36,7 @@ Deno.serve(async (req) => {
 
   const supabase = adminClient();
 
+  let enqueued = 0;
   try {
     const body = JSON.parse(rawBody);
     const messages: unknown[] = [];
@@ -76,10 +77,27 @@ Deno.serve(async (req) => {
         payload: { message_raw_id: inserted!.id, phone, message },
       });
       if (jobError) console.error("jobs insert:", jobError);
+      else enqueued++;
     }
   } catch (err) {
     // nunca devolver erro à Meta por falha interna — logar e seguir
     console.error("webhook error:", err);
+  }
+
+  // Dispara o processamento AGORA (fire-and-forget) para resposta quase instantânea;
+  // o cron continua como rede de segurança. Não bloqueia o 200 para a Meta.
+  if (enqueued > 0) {
+    const fnUrl = Deno.env.get("SUPABASE_URL");
+    const anon = Deno.env.get("SUPABASE_ANON_KEY");
+    if (fnUrl && anon) {
+      const trigger = fetch(`${fnUrl}/functions/v1/process-jobs`, {
+        method: "POST",
+        headers: { "Authorization": `Bearer ${anon}`, "Content-Type": "application/json" },
+        body: "{}",
+      }).catch((e) => console.error("trigger process-jobs:", e));
+      const rt = (globalThis as { EdgeRuntime?: { waitUntil?: (p: Promise<unknown>) => void } }).EdgeRuntime;
+      rt?.waitUntil?.(trigger);
+    }
   }
 
   // sempre 200 rápido: reentregas são tratadas pela idempotência acima
