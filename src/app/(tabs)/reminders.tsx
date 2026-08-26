@@ -1,3 +1,4 @@
+import { router } from 'expo-router';
 import { Alert, FlatList, Pressable, StyleSheet } from 'react-native';
 import Animated, { FadeInDown } from 'react-native-reanimated';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -11,32 +12,25 @@ import { BottomTabInset, MaxContentWidth, Spacing } from '@/constants/theme';
 import {
   formatDateBR,
   useDeleteReminder,
-  usePauseReminder,
   useReminders,
+  useToggleReminder,
   type Reminder,
 } from '@/hooks/use-items';
-
-function describeRecurrence(recurrence: string | null): string | null {
-  if (!recurrence) return null;
-  if (recurrence.includes('FREQ=DAILY')) return 'Diário';
-  if (recurrence.includes('FREQ=WEEKLY')) return 'Semanal';
-  if (recurrence.includes('FREQ=MONTHLY')) return 'Mensal';
-  if (recurrence.includes('FREQ=YEARLY')) return 'Anual';
-  return 'Recorrente';
-}
+import { useTheme } from '@/hooks/use-theme';
+import { describeRRule } from '@/lib/rrule-text';
 
 function ReminderCard({
   reminder,
   index,
-  onPause,
+  onToggle,
   onDelete,
 }: {
   reminder: Reminder;
   index: number;
-  onPause: () => void;
+  onToggle: () => void;
   onDelete: () => void;
 }) {
-  const recurrenceLabel = describeRecurrence(reminder.recurrence);
+  const theme = useTheme();
   const next = new Date(reminder.next_run_at);
 
   const showActions = () => {
@@ -44,10 +38,10 @@ function ReminderCard({
     Alert.alert(reminder.title, 'O que fazer com este lembrete?', [
       { text: 'Cancelar', style: 'cancel' },
       {
-        text: 'Pausar',
+        text: reminder.active ? 'Pausar' : 'Retomar',
         onPress: () => {
           Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-          onPause();
+          onToggle();
         },
       },
       {
@@ -63,17 +57,26 @@ function ReminderCard({
 
   return (
     <Animated.View entering={FadeInDown.duration(400).delay(Math.min(index * 60, 400))}>
-      <Pressable onLongPress={showActions}>
-        <GlassCard style={styles.card}>
+      <Pressable
+        onLongPress={showActions}
+        onPress={() => {
+          Haptics.selectionAsync();
+          router.push({ pathname: '/reminder-form', params: { id: reminder.id } });
+        }}>
+        <GlassCard style={[styles.card, !reminder.active && styles.paused]}>
           <ThemedText type="smallBold">{reminder.title}</ThemedText>
           <ThemedView style={styles.meta}>
-            <ThemedText type="small" themeColor="tint">
-              ⏰ {formatDateBR(next)}{' '}
-              {next.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
+            <ThemedText type="small" style={{ color: reminder.active ? theme.tint : theme.textSecondary }}>
+              {reminder.active
+                ? `⏰ ${formatDateBR(next)} ${next.toLocaleTimeString('pt-BR', {
+                    hour: '2-digit',
+                    minute: '2-digit',
+                  })}`
+                : '⏸ Pausado'}
             </ThemedText>
-            {recurrenceLabel && (
+            {reminder.recurrence && (
               <ThemedText type="small" themeColor="textSecondary">
-                🔁 {recurrenceLabel}
+                🔁 {describeRRule(reminder.recurrence)}
               </ThemedText>
             )}
           </ThemedView>
@@ -84,8 +87,9 @@ function ReminderCard({
 }
 
 export default function RemindersScreen() {
+  const theme = useTheme();
   const { data: reminders, isLoading, isError, refetch } = useReminders();
-  const pause = usePauseReminder();
+  const toggle = useToggleReminder();
   const remove = useDeleteReminder();
 
   return (
@@ -105,7 +109,7 @@ export default function RemindersScreen() {
               <ReminderCard
                 reminder={item}
                 index={index}
-                onPause={() => pause.mutate(item.id)}
+                onToggle={() => toggle.mutate({ id: item.id, active: !item.active })}
                 onDelete={() => remove.mutate(item.id)}
               />
             )}
@@ -117,9 +121,10 @@ export default function RemindersScreen() {
               ) : (
                 <GlassCard style={styles.empty}>
                   <ThemedText style={styles.emptyEmoji}>⏰</ThemedText>
-                  <ThemedText type="smallBold">Nenhum lembrete ativo</ThemedText>
+                  <ThemedText type="smallBold">Nenhum lembrete ainda</ThemedText>
                   <ThemedText type="small" themeColor="textSecondary" style={styles.emptyHint}>
-                    Manda no WhatsApp:{'\n'}“me lembra de pagar o aluguel todo dia 5”
+                    Toque no “+” para criar{'\n'}ou manda no WhatsApp:{'\n'}“me lembra de pagar o
+                    aluguel todo dia 5”
                   </ThemedText>
                 </GlassCard>
               )
@@ -127,12 +132,25 @@ export default function RemindersScreen() {
             ListFooterComponent={
               (reminders ?? []).length > 0 ? (
                 <ThemedText type="small" themeColor="textSecondary" style={styles.footerHint}>
-                  Toque e segure um lembrete para pausar ou apagar.
+                  Toque para editar. Segure para pausar ou apagar.
                 </ThemedText>
               ) : null
             }
           />
         )}
+
+        <Pressable
+          onPress={() => {
+            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+            router.push('/reminder-form');
+          }}
+          accessibilityLabel="Novo lembrete"
+          style={({ pressed }) => [
+            styles.fab,
+            { backgroundColor: theme.tint, opacity: pressed ? 0.85 : 1 },
+          ]}>
+          <ThemedText style={styles.fabLabel}>＋</ThemedText>
+        </Pressable>
       </SafeAreaView>
     </ThemedView>
   );
@@ -154,10 +172,13 @@ const styles = StyleSheet.create({
   },
   list: {
     gap: Spacing.three,
-    paddingBottom: BottomTabInset + Spacing.three,
+    paddingBottom: BottomTabInset + Spacing.six,
   },
   card: {
     gap: Spacing.two,
+  },
+  paused: {
+    opacity: 0.6,
   },
   meta: {
     flexDirection: 'row',
@@ -178,5 +199,20 @@ const styles = StyleSheet.create({
   footerHint: {
     textAlign: 'center',
     paddingTop: Spacing.two,
+  },
+  fab: {
+    position: 'absolute',
+    right: Spacing.four,
+    bottom: BottomTabInset + Spacing.three,
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  fabLabel: {
+    color: '#fff',
+    fontSize: 28,
+    lineHeight: 32,
   },
 });
