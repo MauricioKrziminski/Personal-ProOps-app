@@ -310,6 +310,13 @@ Financinha / ZapGastos hoje: parcelamento e fatura de verdade, projeção de flu
 simulador de compra, correção conversacional com auditoria da IA visível, ingestão inteligente no
 lugar do Open Finance, patrimônio e IR, e cancelamento sem atrito.
 
+**Nota de histórico de migrations:** o remoto tem 2 entradas a mais que os arquivos —
+`import_preparation` + `import_preparation_fix` (a correção do LATERAL) foram aplicadas separadas e
+o repo guarda só a versão final, em `0019`; e a numeração local (`0026_net_worth`/
+`0027_annual_reports_and_health`) tem nome diferente da entrada remota. O SCHEMA é o mesmo: aplicar
+os arquivos do zero produz o banco atual. Continua valendo: **nunca `supabase db push` sem
+reconciliar antes**.
+
 **Pendências reais para virar produto pago:**
 1. Push (`docs/PUSH-NOTIFICATIONS.md`) — sem ele todo alerta proativo vira template pago.
 2. Gateway de pagamento + webhook de assinatura.
