@@ -24,12 +24,13 @@ import { MaxContentWidth, Spacing } from '@/constants/theme';
 import {
   SUGGESTED_CATEGORIES,
   useAccounts,
+  useCreateInstallmentPlan,
   useDeleteTransaction,
   useSaveTransaction,
   useTransactions,
   type TransactionKind,
 } from '@/hooks/use-finance';
-import { localISODate } from '@/hooks/use-items';
+import { formatBRL, localISODate } from '@/hooks/use-items';
 import { useTheme } from '@/hooks/use-theme';
 
 const KINDS: { value: TransactionKind; label: string }[] = [
@@ -46,6 +47,8 @@ const schema = z
     description: z.string().nullable(),
     account_id: z.string().nullable(),
     counterparty_account_id: z.string().nullable(),
+    // 1 = à vista; >= 2 vira plano de parcelas (RPC create_installment_plan)
+    installments: z.number().int().min(1).max(72),
     occurred_at: z
       .string()
       .regex(/^\d{2}\/\d{2}\/\d{4}$/, 'Data em dd/mm/aaaa')
@@ -54,6 +57,10 @@ const schema = z
         const date = new Date(y, m - 1, d);
         return date.getDate() === d && date.getMonth() === m - 1;
       }, 'Data inválida'),
+  })
+  .refine((data) => data.installments === 1 || (data.kind === 'expense' && !!data.account_id), {
+    message: 'Parcelamento precisa de uma conta/cartão e só vale para gastos',
+    path: ['installments'],
   })
   .refine((data) => data.kind !== 'transfer' || !!data.counterparty_account_id, {
     message: 'Escolha a conta de destino',
@@ -68,6 +75,9 @@ const schema = z
   );
 
 type FormValues = z.infer<typeof schema>;
+
+/** Opções de parcelamento mais comuns no varejo brasileiro. */
+const INSTALLMENT_OPTIONS = [1, 2, 3, 4, 6, 10, 12, 18, 24] as const;
 
 const toBR = (iso: string) => {
   const [y, m, d] = iso.split('-');
@@ -89,6 +99,7 @@ export default function TransactionFormScreen() {
   const editing = params.id ? monthTx?.find((t) => t.id === params.id) : undefined;
 
   const save = useSaveTransaction();
+  const createPlan = useCreateInstallmentPlan();
   const remove = useDeleteTransaction();
 
   const { control, handleSubmit, setValue, reset, formState } = useForm<FormValues>({
@@ -100,6 +111,7 @@ export default function TransactionFormScreen() {
       description: null,
       account_id: null,
       counterparty_account_id: null,
+      installments: 1,
       occurred_at: toBR(localISODate()),
     },
   });
@@ -113,6 +125,7 @@ export default function TransactionFormScreen() {
         description: editing.description,
         account_id: editing.account_id,
         counterparty_account_id: editing.counterparty_account_id,
+        installments: 1,
         occurred_at: toBR(editing.occurred_at),
       });
     }
@@ -127,9 +140,34 @@ export default function TransactionFormScreen() {
     today: toBR(localISODate()),
     yesterday: toBR(localISODate(new Date(Date.now() - 86_400_000))),
   }));
+  const accountId = useWatch({ control, name: 'account_id' });
+  const amountCents = useWatch({ control, name: 'amount_cents' });
   const errors = formState.errors;
+  // parcelar só faz sentido em gasto com conta escolhida (normalmente cartão)
+  const podeParcelar = kind === 'expense' && !!accountId && !editing;
 
   const onSubmit = handleSubmit((values) => {
+    // parcelado: quem cria as N transações (e resolve a fatura de cada uma) é o
+    // banco, não o app — mesma regra usada pelo WhatsApp.
+    if (!editing && values.installments > 1 && values.account_id) {
+      createPlan.mutate(
+        {
+          accountId: values.account_id,
+          totalCents: values.amount_cents,
+          installments: values.installments,
+          occurredAt: toISO(values.occurred_at),
+          description: values.description?.trim() || null,
+          category: values.category,
+        },
+        {
+          onSuccess: () => {
+            Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+            router.back();
+          },
+        },
+      );
+      return;
+    }
     save.mutate(
       {
         id: editing?.id,
@@ -244,6 +282,42 @@ export default function TransactionFormScreen() {
               )}
             />
 
+            {podeParcelar && (
+              <>
+                <ThemedText type="smallBold">Parcelas</ThemedText>
+                <Controller
+                  control={control}
+                  name="installments"
+                  render={({ field }) => (
+                    <>
+                      <View style={styles.chipRow}>
+                        {INSTALLMENT_OPTIONS.map((n) => (
+                          <Chip
+                            key={n}
+                            label={n === 1 ? 'À vista' : `${n}x`}
+                            selected={field.value === n}
+                            onPress={() => field.onChange(n)}
+                          />
+                        ))}
+                      </View>
+                      {field.value > 1 && amountCents > 0 && (
+                        <ThemedText type="small" themeColor="textSecondary">
+                          {field.value}x de {formatBRL(Math.floor(amountCents / field.value))} —
+                          o valor acima é o TOTAL da compra. As parcelas futuras já entram nas
+                          próximas faturas.
+                        </ThemedText>
+                      )}
+                    </>
+                  )}
+                />
+                {errors.installments && (
+                  <ThemedText type="small" themeColor="danger">
+                    {errors.installments.message}
+                  </ThemedText>
+                )}
+              </>
+            )}
+
             {kind === 'transfer' && (
               <>
                 <ThemedText type="smallBold">Para a conta</ThemedText>
@@ -322,16 +396,23 @@ export default function TransactionFormScreen() {
 
             <Pressable
               onPress={onSubmit}
-              disabled={save.isPending}
+              disabled={save.isPending || createPlan.isPending}
               style={({ pressed }) => [
                 styles.submit,
-                { backgroundColor: theme.tint, opacity: pressed || save.isPending ? 0.7 : 1 },
+                {
+                  backgroundColor: theme.tint,
+                  opacity: pressed || save.isPending || createPlan.isPending ? 0.7 : 1,
+                },
               ]}>
               <ThemedText type="smallBold" style={styles.submitLabel}>
-                {save.isPending ? 'Salvando…' : editing ? 'Salvar alterações' : 'Adicionar'}
+                {save.isPending || createPlan.isPending
+                  ? 'Salvando…'
+                  : editing
+                    ? 'Salvar alterações'
+                    : 'Adicionar'}
               </ThemedText>
             </Pressable>
-            {save.isError && (
+            {(save.isError || createPlan.isError) && (
               <ThemedText type="small" themeColor="danger" style={styles.centered}>
                 Não foi possível salvar. Tenta de novo.
               </ThemedText>

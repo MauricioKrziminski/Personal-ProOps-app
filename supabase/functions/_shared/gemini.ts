@@ -24,6 +24,9 @@ export type AiActionType =
   | "create_expense"
   | "create_income"
   | "create_transfer"
+  | "create_installment_purchase"
+  | "pay_invoice"
+  | "query_invoice"
   | "create_note"
   | "create_reminder"
   | "create_goal"
@@ -48,6 +51,7 @@ export interface AiAction {
   recurrence: string | null; // RRULE (ex.: FREQ=MONTHLY;BYMONTHDAY=5)
   account: string | null; // nome livre da conta citada
   counterparty_account: string | null; // conta destino (transfer)
+  installments: number | null; // nº de parcelas (compra parcelada)
   goal_name: string | null;
   target_cents: number | null;
   deadline: string | null; // YYYY-MM-DD
@@ -69,9 +73,11 @@ const ACTION_SCHEMA = {
     type: {
       type: "STRING",
       enum: [
-        "create_expense", "create_income", "create_transfer", "create_note",
-        "create_reminder", "create_goal", "goal_deposit", "query_balance",
-        "query_transactions", "query_budgets", "query_goals", "undo_last", "unknown",
+        "create_expense", "create_income", "create_transfer",
+        "create_installment_purchase", "pay_invoice", "query_invoice",
+        "create_note", "create_reminder", "create_goal", "goal_deposit",
+        "query_balance", "query_transactions", "query_budgets", "query_goals",
+        "undo_last", "unknown",
       ],
     },
     title: { type: "STRING", nullable: true },
@@ -84,6 +90,7 @@ const ACTION_SCHEMA = {
     recurrence: { type: "STRING", nullable: true },
     account: { type: "STRING", nullable: true },
     counterparty_account: { type: "STRING", nullable: true },
+    installments: { type: "INTEGER", nullable: true },
     goal_name: { type: "STRING", nullable: true },
     target_cents: { type: "INTEGER", nullable: true },
     deadline: { type: "STRING", nullable: true },
@@ -113,6 +120,9 @@ Tipos de ação:
 - "create_expense": gasto/compra/pagamento com valor. amount_cents (inteiro em centavos: "45 reais" -> 4500), currency (padrão BRL), category (curta, minúscula, preferindo: ${SUGGESTED_CATEGORIES.join(", ")}), occurred_at (YYYY-MM-DD; resolva "ontem"/"hoje" pela data atual), description em content. Se citar a conta/cartão ("no nubank"), preencha account. Se for recorrente ("todo mês"), preencha recurrence como RRULE.
 - "create_income": dinheiro recebido ("recebi", "caiu o salário", "me pagaram"). Mesmos campos do expense (category ex.: salário, freela).
 - "create_transfer": mover dinheiro entre contas próprias ("passei 200 da corrente pra poupança"). account = origem, counterparty_account = destino.
+- "create_installment_purchase": compra PARCELADA ("parcelei a geladeira em 12x", "3x de 90 no cartão", "comprei um celular de 3000 em 10 vezes"). amount_cents = valor TOTAL da compra (se o usuário falar o valor DA PARCELA, multiplique pelo número de parcelas), installments = nº de parcelas, account = cartão citado, category, occurred_at = data da compra, description em content. Uma parcela só ("1x") não é parcelamento: use create_expense.
+- "pay_invoice": pagamento da fatura do cartão ("paguei a fatura do nubank", "quitei o cartão"). account = cartão, counterparty_account = conta de onde saiu o dinheiro (se citada). NÃO use para compras no cartão.
+- "query_invoice": pergunta sobre fatura/limite do cartão ("quanto tá a fatura?", "quanto sobrou de limite no nubank", "quando vence o cartão"). account = cartão citado, ou null para todos.
 - "create_note": anotação livre. content (texto limpo) e category curta se óbvia.
 - "create_reminder": pedido para ser lembrado. title, remind_at (próxima ocorrência, ISO, no fuso do usuário) e recurrence como RRULE quando recorrente ("todo dia 5" -> FREQ=MONTHLY;BYMONTHDAY=5; "todo dia às 8h" -> FREQ=DAILY). Sem recorrência -> null.
 - "create_goal": meta de poupança ("quero juntar 5000 até dezembro pra viagem"). goal_name, target_cents, deadline (YYYY-MM-DD ou null).
@@ -128,6 +138,7 @@ Regras:
 - Dinheiro SEMPRE em centavos inteiros. "1.234,56" -> 123456.
 - Datas relativas resolvidas com a data/hora atual DO USUÁRIO (já convertida para o fuso dele, com offset): ${nowLocal} (fuso ${timezone}). Use exatamente essa data como "hoje" — não recalcule fuso.
 - Campos que não se aplicam à ação: null.
+- Compra no cartão à vista é create_expense com account = nome do cartão. Só use create_installment_purchase quando houver 2 ou mais parcelas.
 - confidence (0..1) é da interpretação da mensagem INTEIRA.`;
 }
 

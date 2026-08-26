@@ -101,5 +101,59 @@ Via Graph API v21.0 com o token de System User do app:
 - Ledger de aportes em metas (`goal_contributions`) se precisar de extrato da meta.
 - Orçamento compartilhado / família (multi-usuário por espaço).
 
+## ✅ FASE 0 — fundação multi-tenant (concluída em 26/08/2026)
+
+Decisão: o app vira **produto comercial** (conta compartilhada casal/família/PJ) e o financeiro
+cresce **sem Open Finance** — agregador custa Pluggy ~R$2,5k/mês, Belvo ~R$6k/mês, Tecnospeed
+~R$1,5k de entrada + R$540/mês. Substituto: ingestão inteligente (foto/PDF de fatura e extrato,
+OFX/CSV, print de Pix). Plano completo em `~/.claude/plans/eu-tenho-ja-essa-resilient-shamir.md`.
+
+- `0010_workspaces.sql` — `workspaces` + `workspace_members`; `workspace_id not null` em
+  notes/reminders/transactions/accounts/goals/budgets/recurring_transactions com
+  `default my_default_workspace()`; policies own-rows → workspace; uniques passam a ser por
+  workspace; `handle_new_user` cria o workspace pessoal; `categories` legada dropada.
+- `0011_workspace_rpcs.sql` — as 4 RPCs duplas + os 2 wrappers de back-compat reescritos no
+  escopo de workspace (assinaturas intactas); `updated_at` + trigger `moddatetime` em 9 tabelas;
+  índices `ai_events(user_id, created_at desc)` e `transactions(workspace_id, category)`.
+- `0012_private_scope_helpers.sql` — fecha os 2 WARN dos advisors: `my_workspace_ids` vai para o
+  schema `private` (não exposto pelo PostgREST) e `my_default_workspace` vira `security invoker`.
+  Sobraram só os INFO pré-existentes (jobs/messages_raw/ai_events service_role-only) e pg_net.
+- `process-jobs` (deployada) — resolve o workspace por `_default_workspace(uid)` e insere
+  `workspace_id` explícito: service_role não tem `auth.uid()`, então o DEFAULT da coluna não vale.
+  Contas/metas/undo filtram por workspace. `send-reminders` (deployada) idem na materialização.
+- App — cliente tipado com `src/lib/database.types.ts` (types gerados) e interfaces derivadas do
+  schema; categorias com fonte única em `src/lib/categories.ts`, travada por teste contra o prompt.
+- Verificado: isolamento entre usuários (estranho vê 0 linhas, dono vê tudo), DEFAULT de workspace
+  preenchendo insert do app, caminho service_role, `tsc`/`lint` limpos, 26 testes verdes.
+
+## ✅ FASE 1 — cartão, fatura e parcelas (concluída em 26/08/2026)
+
+É o gap nº1 da concorrência: há reclamação formal contra o Meu Assessor porque a IA não projeta
+as parcelas seguintes no dashboard nem divide compra entre cartões.
+
+- `0013_cards_and_installments.sql` — `accounts` ganha `closing_day`/`due_day`/`credit_limit_cents`/
+  `payment_account_id` (check: null quando não é cartão); tabelas `card_invoices` e
+  `installment_plans`; `transactions` ganha `status`, `due_at`, `invoice_id`,
+  `installment_plan_id`, `installment_no`, `merchant`.
+- **Regra de ciclo em um lugar só**: trigger `set_invoice` + `private.invoice_window()`. App,
+  WhatsApp e (futuramente) importação acertam a fatura sem duplicar a regra em TS.
+- RPCs: `create_installment_plan` (N transações, uma por mês, futuras `pending`, resto na última
+  parcela), `pay_invoice` (transferência + fatura paga; nunca despesa nova) e o par
+  `_card_summary`/`card_summary` (fatura aberta, total não pago, limite disponível).
+- IA: 3 ações novas no schema do Gemini — `create_installment_purchase`, `pay_invoice`,
+  `query_invoice`. `process-jobs` deployada com elas (e com o bug de narrowing de
+  `query_category` corrigido). Agora entende "parcelei 1200 em 12x no nubank",
+  "paguei a fatura do nubank", "quanto sobrou de limite?".
+- App: telas `finance/cards.tsx` e `finance/invoice/[id].tsx`; campos de ciclo/limite no form de
+  contas; chips de parcelamento (com prévia "12x de R$ 100") no form de lançamento; bloco
+  "Faturas em aberto" no dashboard.
+- Verificado em SQL (`node --test` não alcança plpgsql): 6 casos de `invoice_window` incluindo
+  fechamento dia 31 em fevereiro e virada de ano; parcelamento 100000/3 → 33333+33333+33334 com
+  cada parcela na fatura certa; `pay_invoice` rolando a fatura aberta para a próxima e devolvendo
+  limite; partida dobrada conferida em `account_balances`. `tsc`/`lint` limpos, 26 testes.
+
+**Próximo:** Fase 2 do plano — pendentes, contas a pagar e projeção de fluxo de caixa (`0014`),
+que já se apoia no `status='pending'` criado aqui.
+
 ## 📝 Como verificar o pipeline (rápido)
 Usar `/verify-whatsapp` ou manualmente: mandar mensagem → conferir `messages_raw` (inbound) → `jobs` (done) → `ai_events` (result/confidence) → tabela final (`transactions`/`notes`/...) → resposta no WhatsApp. Logs: MCP `get_logs` (edge-function).

@@ -83,13 +83,20 @@ async function extractText(message: Record<string, unknown>): Promise<string | n
   return null; // outros tipos (imagem/recibo) ficam para a v2
 }
 
+/**
+ * Escopo de uma execução: quem escreveu (autor) e onde (workspace).
+ * A partir da 0010 o dado pertence ao WORKSPACE — leituras e writes filtram por
+ * `workspace_id` para que conta compartilhada (casal/família) enxergue tudo.
+ */
+type Ctx = { userId: string; workspaceId: string; timezone: string };
+
 /** Resolve conta citada por nome (ilike). Sem match -> null: lançamento nunca falha por conta desconhecida. */
-async function resolveAccount(supabase: Admin, userId: string, name: string | null): Promise<string | null> {
+async function resolveAccount(supabase: Admin, workspaceId: string, name: string | null): Promise<string | null> {
   if (!name) return null;
   const { data } = await supabase
     .from("accounts")
     .select("id")
-    .eq("user_id", userId)
+    .eq("workspace_id", workspaceId)
     .eq("archived", false)
     .ilike("name", `%${name}%`)
     .limit(1);
@@ -101,10 +108,10 @@ const KIND_LABEL: Record<string, string> = { expense: "gasto", income: "receita"
 /** Executa uma ação e retorna a linha de resultado da confirmação. */
 async function executeAction(
   supabase: Admin,
-  userId: string,
-  timezone: string,
+  ctx: Ctx,
   action: AiAction,
 ): Promise<string> {
+  const { userId, workspaceId, timezone } = ctx;
   const now = new Date();
 
   switch (action.type) {
@@ -114,9 +121,10 @@ async function executeAction(
       if (!action.amount_cents || action.amount_cents <= 0) {
         return "❌ Não entendi o valor. Tenta de novo com o valor (ex.: \"mercado 45\").";
       }
-      const accountId = await resolveAccount(supabase, userId, action.account);
+      const accountId = await resolveAccount(supabase, workspaceId, action.account);
       const base = {
         user_id: userId,
+        workspace_id: workspaceId,
         amount_cents: action.amount_cents,
         currency: action.currency ?? "BRL",
         category: action.category?.toLowerCase() ?? null,
@@ -155,13 +163,14 @@ async function executeAction(
       if (!action.amount_cents || action.amount_cents <= 0) {
         return "❌ Não entendi o valor da transferência.";
       }
-      const fromId = await resolveAccount(supabase, userId, action.account);
-      const toId = await resolveAccount(supabase, userId, action.counterparty_account);
+      const fromId = await resolveAccount(supabase, workspaceId, action.account);
+      const toId = await resolveAccount(supabase, workspaceId, action.counterparty_account);
       if (!toId || fromId === toId) {
         return "❌ Não achei a conta de destino. Cadastre as contas no app e cite os nomes (ex.: \"da corrente pra poupança\").";
       }
       const { error } = await supabase.from("transactions").insert({
         user_id: userId,
+        workspace_id: workspaceId,
         kind: "transfer",
         amount_cents: action.amount_cents,
         currency: action.currency ?? "BRL",
@@ -175,9 +184,105 @@ async function executeAction(
       return `🔄 Transferência de ${centsToBRL(action.amount_cents)} registrada.`;
     }
 
+    case "create_installment_purchase": {
+      if (!action.amount_cents || action.amount_cents <= 0) {
+        return "❌ Não entendi o valor da compra parcelada.";
+      }
+      const parcelas = action.installments ?? 0;
+      if (parcelas < 2 || parcelas > 72) {
+        return "❌ Não entendi em quantas vezes. Tenta \"parcelei 1200 em 12x no cartão X\".";
+      }
+      const accountId = await resolveAccount(supabase, workspaceId, action.account);
+      if (!accountId) {
+        return "❌ Não achei o cartão. Cadastra o cartão no app (com fechamento e vencimento) e cita o nome dele.";
+      }
+      // toda a regra de divisão + fatura de cada parcela vive na RPC (0013)
+      const { error } = await supabase.rpc("create_installment_plan", {
+        p_account_id: accountId,
+        p_total_cents: action.amount_cents,
+        p_installments: parcelas,
+        p_occurred_at: action.occurred_at ?? localISODate(now, timezone),
+        p_description: action.content ?? action.title,
+        p_category: action.category?.toLowerCase() ?? null,
+        p_merchant: null,
+      });
+      if (error) throw error;
+      const porParcela = Math.floor(action.amount_cents / parcelas);
+      return `💳 Parcelado: ${centsToBRL(action.amount_cents)} em ${parcelas}x de ~${centsToBRL(porParcela)}` +
+        (action.category ? ` em *${action.category.toLowerCase()}*` : "") +
+        `. As ${parcelas - 1} parcelas seguintes já entraram nas próximas faturas.`;
+    }
+
+    case "pay_invoice": {
+      const cardId = await resolveAccount(supabase, workspaceId, action.account);
+      if (!cardId) return "❌ Não achei o cartão. Cita o nome dele (ex.: \"paguei a fatura do nubank\").";
+
+      const { data: invoices } = await supabase
+        .from("card_invoices")
+        .select("id, due_date")
+        .eq("account_id", cardId)
+        .neq("status", "paid")
+        .order("reference_month")
+        .limit(1);
+      const invoice = invoices?.[0];
+      if (!invoice) return "🤷 Esse cartão não tem fatura em aberto.";
+
+      // conta de origem: a citada, senão a conta de pagamento do cartão, senão a 1ª corrente
+      let payerId = await resolveAccount(supabase, workspaceId, action.counterparty_account);
+      if (!payerId) {
+        const { data: accounts } = await supabase
+          .from("accounts")
+          .select("id, type, payment_account_id")
+          .eq("workspace_id", workspaceId)
+          .eq("archived", false);
+        const card = accounts?.find((a) => a.id === cardId);
+        payerId = card?.payment_account_id ??
+          accounts?.find((a) => a.type === "checking")?.id ?? null;
+      }
+      if (!payerId) {
+        return "❌ Não sei de qual conta saiu. Cadastra a conta de pagamento do cartão no app ou diz \"paguei a fatura do X pela corrente\".";
+      }
+
+      const { error } = await supabase.rpc("pay_invoice", {
+        p_invoice_id: invoice.id,
+        p_account_id: payerId,
+        p_paid_at: action.occurred_at ?? localISODate(now, timezone),
+      });
+      if (error) return `❌ Não consegui pagar a fatura: ${error.message}`;
+      return `✅ Fatura paga (vencimento ${formatDateBR(invoice.due_date)}). O limite já voltou.`;
+    }
+
+    case "query_invoice": {
+      const { data, error } = await supabase.rpc("_card_summary", { uid: userId });
+      if (error) throw error;
+      let rows = (data ?? []) as {
+        name: string;
+        invoice_total_cents: number;
+        unpaid_total_cents: number;
+        available_limit_cents: number;
+        due_date: string | null;
+        closing_date: string | null;
+      }[];
+      if (action.account) {
+        const alvo = action.account.toLowerCase();
+        rows = rows.filter((r) => r.name.toLowerCase().includes(alvo));
+      }
+      if (!rows.length) {
+        return "💳 Você ainda não tem cartão cadastrado. Cadastra no app com o dia de fechamento e de vencimento!";
+      }
+      const lines = rows.map((r) =>
+        `  • *${r.name}*: fatura ${centsToBRL(Number(r.invoice_total_cents))}` +
+        (r.due_date ? ` — vence ${formatDateBR(r.due_date)}` : "") +
+        (r.closing_date ? ` (fecha ${formatDateBR(r.closing_date)})` : "") +
+        `\n    limite disponível: ${centsToBRL(Number(r.available_limit_cents))}`
+      );
+      return `💳 Cartões:\n${lines.join("\n")}`;
+    }
+
     case "create_note": {
       const { error } = await supabase.from("notes").insert({
         user_id: userId,
+        workspace_id: workspaceId,
         content: action.content ?? action.title ?? "",
         category: action.category?.toLowerCase() ?? null,
         source: "whatsapp",
@@ -192,6 +297,7 @@ async function executeAction(
       }
       const { error } = await supabase.from("reminders").insert({
         user_id: userId,
+        workspace_id: workspaceId,
         title: action.title ?? action.content ?? "Lembrete",
         recurrence: action.recurrence,
         next_run_at: action.remind_at
@@ -212,6 +318,7 @@ async function executeAction(
       }
       const { error } = await supabase.from("goals").insert({
         user_id: userId,
+        workspace_id: workspaceId,
         name: action.goal_name,
         target_cents: action.target_cents,
         deadline: action.deadline,
@@ -229,7 +336,7 @@ async function executeAction(
       const { data: goals } = await supabase
         .from("goals")
         .select("id, name, target_cents, saved_cents")
-        .eq("user_id", userId)
+        .eq("workspace_id", workspaceId)
         .eq("archived", false)
         .ilike("name", `%${action.goal_name}%`)
         .limit(1);
@@ -265,7 +372,8 @@ async function executeAction(
       if (error) throw error;
       let rows = (data ?? []) as { kind: string; category: string; total_cents: number; tx_count: number }[];
       if (action.query_kind) rows = rows.filter((r) => r.kind === action.query_kind);
-      if (action.query_category) rows = rows.filter((r) => r.category === action.query_category.toLowerCase());
+      const cat = action.query_category?.toLowerCase();
+      if (cat) rows = rows.filter((r) => r.category === cat);
       if (!rows.length) return `📊 Nada registrado entre ${formatDateBR(from)} e ${formatDateBR(to)}.`;
       const spent = rows.filter((r) => r.kind === "expense").reduce((s, r) => s + Number(r.total_cents), 0);
       const earned = rows.filter((r) => r.kind === "income").reduce((s, r) => s + Number(r.total_cents), 0);
@@ -299,7 +407,7 @@ async function executeAction(
       const { data, error } = await supabase
         .from("goals")
         .select("name, target_cents, saved_cents, deadline")
-        .eq("user_id", userId)
+        .eq("workspace_id", workspaceId)
         .eq("archived", false)
         .order("created_at");
       if (error) throw error;
@@ -316,7 +424,7 @@ async function executeAction(
       const { data } = await supabase
         .from("transactions")
         .select("id, kind, amount_cents, category, description")
-        .eq("user_id", userId)
+        .eq("workspace_id", workspaceId)
         .order("created_at", { ascending: false })
         .limit(1);
       const last = data?.[0];
@@ -370,6 +478,14 @@ Deno.serve(async (_req) => {
         continue;
       }
 
+      // 1b. workspace do usuário (escopo do dado desde a 0010)
+      const { data: workspaceId } = await supabase.rpc("_default_workspace", { uid: profile.id });
+      if (!workspaceId) {
+        await markDone(job.id);
+        await trySend(profile.phone, "😕 Sua conta ainda não tem um espaço criado. Abre o app uma vez e me chama de novo!");
+        continue;
+      }
+
       // 2. texto (transcreve áudio se preciso)
       const text = await extractText(message);
       if (!text) {
@@ -410,7 +526,11 @@ Deno.serve(async (_req) => {
       const lines: string[] = [];
       for (const action of parsed.actions.slice(0, 10)) {
         try {
-          lines.push(await executeAction(supabase, profile.id, profile.timezone, action));
+          lines.push(await executeAction(
+            supabase,
+            { userId: profile.id, workspaceId, timezone: profile.timezone },
+            action,
+          ));
         } catch (err) {
           console.error(`ação ${action.type} falhou:`, err);
           lines.push("❌ Deu erro ao processar uma parte da mensagem. Tenta de novo!");

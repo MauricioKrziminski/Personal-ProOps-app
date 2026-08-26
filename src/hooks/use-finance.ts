@@ -1,14 +1,13 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
 import { supabase } from '@/lib/supabase';
+import type { Database } from '@/lib/database.types';
 import { localISODate, monthBounds } from '@/lib/dates';
-import { useRealtimeInvalidate } from '@/hooks/use-items';
+import { useRealtimeInvalidate, workspaceId } from '@/hooks/use-items';
 
-/** Categorias sugeridas — mesma lista do prompt do Gemini (supabase/functions/_shared/gemini.ts). */
-export const SUGGESTED_CATEGORIES = [
-  'mercado', 'transporte', 'lazer', 'contas', 'saúde', 'casa',
-  'educação', 'assinaturas', 'restaurante', 'salário', 'freela', 'outros',
-] as const;
+// Categorias vivem em @/lib/categories (fonte única, travada por teste contra o
+// prompt do Gemini); reexportadas aqui para não quebrar os imports das telas.
+export { INCOME_CATEGORIES, SUGGESTED_CATEGORIES } from '@/lib/categories';
 
 export const ACCOUNT_TYPES = [
   { value: 'checking', label: 'Corrente' },
@@ -18,86 +17,110 @@ export const ACCOUNT_TYPES = [
   { value: 'investment', label: 'Investimento' },
 ] as const;
 
+/**
+ * Tipos derivados do schema gerado (`src/lib/database.types.ts`): renomear ou
+ * remover coluna no banco quebra o `tsc` aqui, não em runtime.
+ * As colunas de domínio são `text` + CHECK no Postgres (regra do projeto), então
+ * o gerador entrega `string` — o app estreita para union onde a UI depende disso.
+ */
+type Tables = Database['public']['Tables'];
+type Fns = Database['public']['Functions'];
+
 export type TransactionKind = 'expense' | 'income' | 'transfer';
+export type TransactionSource = 'whatsapp' | 'app' | 'import' | 'recurring';
 
-export interface Transaction {
-  id: string;
+export type Transaction = Pick<
+  Tables['transactions']['Row'],
+  | 'id'
+  | 'amount_cents'
+  | 'currency'
+  | 'category'
+  | 'description'
+  | 'account_id'
+  | 'counterparty_account_id'
+  | 'occurred_at' // YYYY-MM-DD
+  | 'created_at'
+  | 'due_at' // vencimento (fatura do cartão, conta a pagar); null = à vista
+  | 'invoice_id'
+  | 'installment_plan_id'
+  | 'installment_no'
+  | 'merchant'
+> & {
   kind: TransactionKind;
-  amount_cents: number;
-  currency: string;
-  category: string | null;
-  description: string | null;
-  account_id: string | null;
-  counterparty_account_id: string | null;
-  occurred_at: string; // YYYY-MM-DD
-  source: 'whatsapp' | 'app' | 'import' | 'recurring';
-  created_at: string;
-}
+  source: TransactionSource;
+  /** `pending` = ainda vai acontecer (parcela futura, conta a pagar). */
+  status: 'pending' | 'cleared';
+};
 
-export interface Account {
-  id: string;
-  name: string;
-  type: (typeof ACCOUNT_TYPES)[number]['value'];
-  initial_balance_cents: number;
-  archived: boolean;
-}
+export type Account = Pick<
+  Tables['accounts']['Row'],
+  | 'id'
+  | 'name'
+  | 'initial_balance_cents'
+  | 'archived'
+  // cartão de crédito: null nos demais tipos (check no banco)
+  | 'closing_day'
+  | 'due_day'
+  | 'credit_limit_cents'
+  | 'payment_account_id'
+> & { type: (typeof ACCOUNT_TYPES)[number]['value'] };
 
-export interface AccountBalance {
-  account_id: string | null;
-  name: string;
-  type: string;
-  balance_cents: number;
-}
+/**
+ * Uma linha por cartão. Os campos da fatura são nullable de verdade (left join
+ * na RPC: cartão sem nenhuma compra não tem fatura aberta) — o gerador de types
+ * não sabe disso, por isso o Omit.
+ */
+export type CardSummary = Omit<
+  Fns['card_summary']['Returns'][number],
+  'invoice_id' | 'reference_month' | 'closing_date' | 'due_date' | 'credit_limit_cents'
+> & {
+  invoice_id: string | null;
+  reference_month: string | null;
+  closing_date: string | null;
+  due_date: string | null;
+  credit_limit_cents: number | null;
+};
 
-export interface Goal {
-  id: string;
-  name: string;
-  target_cents: number;
-  saved_cents: number;
-  deadline: string | null;
-  archived: boolean;
-}
+export type CardInvoice = Pick<
+  Tables['card_invoices']['Row'],
+  'id' | 'account_id' | 'reference_month' | 'closing_date' | 'due_date' | 'status' | 'paid_at'
+> & { status: 'open' | 'closed' | 'paid' };
 
-export interface BudgetStatus {
-  category: string;
-  limit_cents: number;
-  spent_cents: number;
-}
+export type AccountBalance = Fns['account_balances']['Returns'][number];
 
-export interface Budget {
-  id: string;
-  category: string;
-  limit_cents: number;
-}
+export type Goal = Pick<
+  Tables['goals']['Row'],
+  'id' | 'name' | 'target_cents' | 'saved_cents' | 'deadline' | 'archived'
+>;
 
-export interface RecurringTransaction {
-  id: string;
+export type BudgetStatus = Fns['budgets_status']['Returns'][number];
+
+export type Budget = Pick<Tables['budgets']['Row'], 'id' | 'category' | 'limit_cents'>;
+
+export type RecurringTransaction = Pick<
+  Tables['recurring_transactions']['Row'],
+  | 'id'
+  | 'amount_cents'
+  | 'currency'
+  | 'category'
+  | 'description'
+  | 'account_id'
+  | 'rrule'
+  | 'next_run_at'
+  | 'active'
+  | 'run_attempts'
+  | 'last_error'
+  | 'created_at'
+> & { kind: 'expense' | 'income' };
+
+export type MonthlyCashflow = Fns['monthly_cashflow']['Returns'][number];
+
+export type TxSummaryRow = Omit<Fns['transactions_summary']['Returns'][number], 'kind'> & {
   kind: 'expense' | 'income';
-  amount_cents: number;
-  currency: string;
-  category: string | null;
-  description: string | null;
-  account_id: string | null;
-  rrule: string;
-  next_run_at: string;
-  active: boolean;
-  run_attempts: number;
-  last_error: string | null;
-  created_at: string;
-}
+};
 
-export interface MonthlyCashflow {
-  month: string;
-  income_cents: number;
-  expense_cents: number;
-}
-
-export interface TxSummaryRow {
-  kind: 'expense' | 'income';
-  category: string;
-  total_cents: number;
-  tx_count: number;
-}
+const TRANSACTION_COLUMNS =
+  'id, kind, amount_cents, currency, category, description, account_id, counterparty_account_id, occurred_at, source, created_at, status, due_at, invoice_id, installment_plan_id, installment_no, merchant';
 
 export interface TransactionFilters {
   month: string; // YYYY-MM
@@ -115,7 +138,7 @@ export function useTransactions(filters: TransactionFilters) {
     queryFn: async (): Promise<Transaction[]> => {
       let query = supabase
         .from('transactions')
-        .select('id, kind, amount_cents, currency, category, description, account_id, counterparty_account_id, occurred_at, source, created_at')
+        .select(TRANSACTION_COLUMNS)
         .gte('occurred_at', from)
         .lte('occurred_at', to)
         .order('occurred_at', { ascending: false })
@@ -125,7 +148,7 @@ export function useTransactions(filters: TransactionFilters) {
       if (filters.category) query = query.eq('category', filters.category);
       const { data, error } = await query;
       if (error) throw error;
-      return data;
+      return data as Transaction[];
     },
   });
 }
@@ -137,11 +160,11 @@ export function useRecentTransactions(limit = 5) {
     queryFn: async (): Promise<Transaction[]> => {
       const { data, error } = await supabase
         .from('transactions')
-        .select('id, kind, amount_cents, currency, category, description, account_id, counterparty_account_id, occurred_at, source, created_at')
+        .select(TRANSACTION_COLUMNS)
         .order('created_at', { ascending: false })
         .limit(limit);
       if (error) throw error;
-      return data;
+      return data as Transaction[];
     },
   });
 }
@@ -156,7 +179,7 @@ export function useTransactionsSummary(fromDate: string, toDate: string) {
         to_date: toDate,
       });
       if (error) throw error;
-      return data;
+      return data as TxSummaryRow[];
     },
   });
 }
@@ -192,11 +215,11 @@ export function useAccounts() {
     queryFn: async (): Promise<Account[]> => {
       const { data, error } = await supabase
         .from('accounts')
-        .select('id, name, type, initial_balance_cents, archived')
+        .select('id, name, type, initial_balance_cents, archived, closing_day, due_day, credit_limit_cents, payment_account_id')
         .eq('archived', false)
         .order('created_at');
       if (error) throw error;
-      return data;
+      return data as Account[];
     },
   });
 }
@@ -233,7 +256,7 @@ export function useRecurringTransactions() {
         .order('active', { ascending: false })
         .order('next_run_at');
       if (error) throw error;
-      return data;
+      return data as RecurringTransaction[];
     },
   });
 }
@@ -272,6 +295,7 @@ export function useBudgetsStatus() {
 const FINANCE_KEYS = [
   ['transactions'], ['tx-summary'], ['monthly-cashflow'], ['account-balances'],
   ['budgets-status'], ['accounts'], ['goals'], ['budgets'], ['recurring'],
+  ['card-summary'], ['invoice'],
 ];
 
 function useInvalidateFinance() {
@@ -285,6 +309,96 @@ async function userId(): Promise<string> {
   const { data, error } = await supabase.auth.getUser();
   if (error || !data.user) throw error ?? new Error('sem sessão');
   return data.user.id;
+}
+
+// ── cartão de crédito, fatura e parcelas ─────────────────────────────────────
+
+/** Um cartão por linha: fatura aberta, total não pago e limite disponível. */
+export function useCardSummary() {
+  useRealtimeInvalidate('card_invoices', ['card-summary']);
+  useRealtimeInvalidate('transactions', ['card-summary']);
+  return useQuery({
+    queryKey: ['card-summary'],
+    queryFn: async (): Promise<CardSummary[]> => {
+      const { data, error } = await supabase.rpc('card_summary');
+      if (error) throw error;
+      return data as CardSummary[];
+    },
+  });
+}
+
+/** Fatura + as compras dela (RLS já limita ao workspace). */
+export function useInvoice(invoiceId: string | undefined) {
+  useRealtimeInvalidate('transactions', ['invoice']);
+  return useQuery({
+    enabled: Boolean(invoiceId),
+    queryKey: ['invoice', invoiceId ?? ''],
+    queryFn: async (): Promise<{ invoice: CardInvoice; transactions: Transaction[] }> => {
+      const [invoiceRes, txRes] = await Promise.all([
+        supabase
+          .from('card_invoices')
+          .select('id, account_id, reference_month, closing_date, due_date, status, paid_at')
+          .eq('id', invoiceId!)
+          .single(),
+        supabase
+          .from('transactions')
+          .select(TRANSACTION_COLUMNS)
+          .eq('invoice_id', invoiceId!)
+          .order('occurred_at', { ascending: false }),
+      ]);
+      if (invoiceRes.error) throw invoiceRes.error;
+      if (txRes.error) throw txRes.error;
+      return {
+        invoice: invoiceRes.data as CardInvoice,
+        transactions: txRes.data as Transaction[],
+      };
+    },
+  });
+}
+
+/** Paga a fatura: a RPC cria a transferência e marca a fatura (regra no banco). */
+export function usePayInvoice() {
+  const invalidate = useInvalidateFinance();
+  return useMutation({
+    mutationFn: async (input: { invoiceId: string; accountId: string; paidAt: string }) => {
+      const { error } = await supabase.rpc('pay_invoice', {
+        p_invoice_id: input.invoiceId,
+        p_account_id: input.accountId,
+        p_paid_at: input.paidAt,
+      });
+      if (error) throw error;
+    },
+    onSuccess: invalidate,
+  });
+}
+
+/**
+ * Compra parcelada: a RPC cria N transações (uma por mês), as futuras como
+ * `pending`, e o trigger do banco resolve a fatura de cada parcela.
+ */
+export function useCreateInstallmentPlan() {
+  const invalidate = useInvalidateFinance();
+  return useMutation({
+    mutationFn: async (input: {
+      accountId: string;
+      totalCents: number;
+      installments: number;
+      occurredAt: string;
+      description: string | null;
+      category: string | null;
+    }) => {
+      const { error } = await supabase.rpc('create_installment_plan', {
+        p_account_id: input.accountId,
+        p_total_cents: input.totalCents,
+        p_installments: input.installments,
+        p_occurred_at: input.occurredAt,
+        p_description: input.description ?? undefined,
+        p_category: input.category ?? undefined,
+      });
+      if (error) throw error;
+    },
+    onSuccess: invalidate,
+  });
 }
 
 export interface TransactionInput {
@@ -338,6 +452,11 @@ export function useSaveAccount() {
       name: string;
       type: Account['type'];
       initial_balance_cents: number;
+      // só para credit_card; o check do banco exige null nos outros tipos
+      closing_day?: number | null;
+      due_day?: number | null;
+      credit_limit_cents?: number | null;
+      payment_account_id?: string | null;
     }) => {
       if (id) {
         const { error } = await supabase.from('accounts').update(input).eq('id', id);
@@ -444,7 +563,10 @@ export function useSaveBudget() {
     mutationFn: async (input: { category: string; limit_cents: number }) => {
       const { error } = await supabase
         .from('budgets')
-        .upsert({ ...input, user_id: await userId() }, { onConflict: 'user_id,category' });
+        .upsert(
+          { ...input, user_id: await userId(), workspace_id: await workspaceId() },
+          { onConflict: 'workspace_id,category' },
+        );
       if (error) throw error;
     },
     onSuccess: invalidate,

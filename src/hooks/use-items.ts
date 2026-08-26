@@ -57,7 +57,7 @@ export function useNotes() {
         .order('created_at', { ascending: false })
         .limit(100);
       if (error) throw error;
-      return data;
+      return data as Note[];
     },
   });
 }
@@ -75,7 +75,7 @@ export function useReminders() {
         .order('next_run_at')
         .limit(100);
       if (error) throw error;
-      return data;
+      return data as Reminder[];
     },
   });
 }
@@ -84,6 +84,17 @@ async function userId(): Promise<string> {
   const { data, error } = await supabase.auth.getUser();
   if (error || !data.user) throw error ?? new Error('sem sessão');
   return data.user.id;
+}
+
+/**
+ * Workspace ativo do usuário (escopo do dado desde a migration 0010).
+ * Inserts normais não precisam disso — a coluna tem DEFAULT my_default_workspace().
+ * Só é necessário quando o upsert precisa citar as colunas do conflito.
+ */
+export async function workspaceId(): Promise<string> {
+  const { data, error } = await supabase.rpc('my_default_workspace');
+  if (error || !data) throw error ?? new Error('sem workspace');
+  return data as string;
 }
 
 export function useCreateNote() {

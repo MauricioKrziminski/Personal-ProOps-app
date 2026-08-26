@@ -47,7 +47,7 @@ async function materializeRecurring(supabase: Admin, now: Date): Promise<number>
   const { data: due, error } = await supabase
     .from("recurring_transactions")
     .select(
-      "id, user_id, kind, amount_cents, currency, category, description, account_id, rrule, next_run_at, run_attempts, profiles(timezone)",
+      "id, user_id, workspace_id, kind, amount_cents, currency, category, description, account_id, rrule, next_run_at, run_attempts, profiles(timezone)",
     )
     .eq("active", true)
     .lte("next_run_at", now.toISOString())
@@ -64,6 +64,7 @@ async function materializeRecurring(supabase: Admin, now: Date): Promise<number>
     try {
       const { error: insertError } = await supabase.from("transactions").insert({
         user_id: rec.user_id,
+        workspace_id: rec.workspace_id,
         kind: rec.kind,
         amount_cents: rec.amount_cents,
         currency: rec.currency,

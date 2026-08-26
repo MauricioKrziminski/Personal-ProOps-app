@@ -49,3 +49,6 @@ example
 
 # cache do CLI do Supabase
 supabase/.temp/cli-latest
+
+# lock do deno check pontual das Edge Functions (nao usado no deploy)
+deno.lock

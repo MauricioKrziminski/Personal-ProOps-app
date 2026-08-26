@@ -14,6 +14,7 @@ import { ThemedView } from '@/components/themed-view';
 import { MaxContentWidth, Spacing } from '@/constants/theme';
 import { formatBRL } from '@/hooks/use-items';
 import {
+  INCOME_CATEGORIES,
   SUGGESTED_CATEGORIES,
   useBudgets,
   useBudgetsStatus,
@@ -42,7 +43,7 @@ export default function BudgetsScreen() {
     setLimitCents(0);
   };
 
-  /** Editar é o mesmo upsert: a identidade do orçamento é (user_id, category). */
+  /** Editar é o mesmo upsert: a identidade do orçamento é (workspace_id, category). */
   const startEdit = (cat: string, limit: number) => {
     Haptics.selectionAsync();
     setCreating(false);
@@ -140,7 +141,7 @@ export default function BudgetsScreen() {
               </ThemedText>
               <ThemedText type="smallBold">Categoria</ThemedText>
               <View style={styles.chipRow}>
-                {SUGGESTED_CATEGORIES.filter((c) => c !== 'salário' && c !== 'freela').map((cat) => (
+                {SUGGESTED_CATEGORIES.filter((c) => !INCOME_CATEGORIES.includes(c)).map((cat) => (
                   <Chip
                     key={cat}
                     label={cat}

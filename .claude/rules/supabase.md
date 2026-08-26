@@ -9,15 +9,18 @@
 ## RLS (inegociável)
 
 - **Deny-by-default em toda tabela nova**: `alter table X enable row level security;` sem exceção.
-- Tabelas do usuário: policy own-rows padrão (copiar de `notes` em `0001_init.sql`): `for all using (user_id = (select auth.uid())) with check (user_id = (select auth.uid()))`.
+- **O escopo do dado é o WORKSPACE, não o usuário** (migration `0010_workspaces.sql`): toda tabela de dado tem `workspace_id not null` com `default public.my_default_workspace()` e a policy padrão é
+  `for all using (workspace_id in (select private.my_workspace_ids())) with check (...)` — copiar de `transactions`.
+  `user_id` continua na tabela como **autor** do lançamento, nunca como filtro de visibilidade.
+- `private.my_workspace_ids()` é `security definer` (senão a policy de `workspace_members` recursaria) e mora no schema `private` **de propósito**: o PostgREST não expõe esse schema, então não vira endpoint `/rest/v1/rpc/`. Não mover para `public`.
 - Tabelas de infra (`jobs`, `messages_raw`, `ai_events`): RLS ligada **sem policies** — só service_role acessa.
 
 ## RPCs de agregação — padrão duplo
 
 Cada agregação existe como par interna + wrapper:
 
-1. **Interna** `_nome(uid uuid, ...)` — `security definer set search_path = public`, com `revoke execute ... from public, anon, authenticated`. Só as Edge Functions (service_role) chamam, passando o user_id resolvido.
-2. **Wrapper** `nome(...)` — `security invoker` com a **query inline** filtrando `user_id = (select auth.uid())`, sob RLS. É o que o app usa via `supabase.rpc()`. ⚠️ O wrapper NÃO pode chamar a interna: EXECUTE é checado contra o role do chamador (authenticated), que foi revogado da interna — chamaria permission denied. A pequena duplicação da query é intencional.
+1. **Interna** `_nome(uid uuid, ...)` — recebe o user_id resolvido do telefone e expande para os workspaces dele com `public._workspace_ids(uid)` — `security definer set search_path = public`, com `revoke execute ... from public, anon, authenticated`. Só as Edge Functions (service_role) chamam, passando o user_id resolvido.
+2. **Wrapper** `nome(...)` — `security invoker` com a **query inline** filtrando `workspace_id in (select private.my_workspace_ids())`, sob RLS. É o que o app usa via `supabase.rpc()`. ⚠️ O wrapper NÃO pode chamar a interna: EXECUTE é checado contra o role do chamador (authenticated), que foi revogado da interna — chamaria permission denied. A pequena duplicação da query é intencional.
 
 Funções `security definer` sempre com `set search_path = public` e revoke explícito (padrão do `0002_security_hardening.sql`).
 

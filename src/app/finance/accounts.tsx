@@ -43,6 +43,14 @@ export default function AccountsScreen() {
   const [name, setName] = useState('');
   const [type, setType] = useState<Account['type']>('checking');
   const [initialCents, setInitialCents] = useState(0);
+  // só valem para credit_card — o check do banco exige null nos outros tipos
+  const [closingDay, setClosingDay] = useState('');
+  const [dueDay, setDueDay] = useState('');
+  const [limitCents, setLimitCents] = useState(0);
+
+  const isCard = type === 'credit_card';
+  const diaValido = (v: string) => /^\d{1,2}$/.test(v) && Number(v) >= 1 && Number(v) <= 31;
+  const cartaoCompleto = !isCard || (diaValido(closingDay) && diaValido(dueDay));
 
   const total = (balances ?? []).reduce((sum, b) => sum + Number(b.balance_cents), 0);
   const showForm = creating || editing !== null;
@@ -53,6 +61,9 @@ export default function AccountsScreen() {
     setName('');
     setType('checking');
     setInitialCents(0);
+    setClosingDay('');
+    setDueDay('');
+    setLimitCents(0);
   };
 
   /** A linha sintética "Sem conta" (account_id null) não é editável. */
@@ -65,12 +76,24 @@ export default function AccountsScreen() {
     setName(account.name);
     setType(account.type);
     setInitialCents(account.initial_balance_cents);
+    setClosingDay(account.closing_day ? String(account.closing_day) : '');
+    setDueDay(account.due_day ? String(account.due_day) : '');
+    setLimitCents(account.credit_limit_cents ?? 0);
   };
 
   const onSubmit = () => {
     if (!name.trim()) return;
     save.mutate(
-      { id: editing?.id, name: name.trim(), type, initial_balance_cents: initialCents },
+      {
+        id: editing?.id,
+        name: name.trim(),
+        type,
+        initial_balance_cents: initialCents,
+        closing_day: isCard ? Number(closingDay) : null,
+        due_day: isCard ? Number(dueDay) : null,
+        credit_limit_cents: isCard ? limitCents : null,
+        payment_account_id: null,
+      },
       {
         onSuccess: () => {
           Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
@@ -176,14 +199,65 @@ export default function AccountsScreen() {
                   />
                 ))}
               </View>
-              <ThemedText type="smallBold">Saldo inicial</ThemedText>
-              <MoneyInput valueCents={initialCents} onChangeCents={setInitialCents} />
+              {isCard ? (
+                <>
+                  <ThemedText type="smallBold">Ciclo da fatura</ThemedText>
+                  <View style={styles.diaRow}>
+                    <View style={styles.diaCampo}>
+                      <ThemedText type="small" themeColor="textSecondary">
+                        Fecha dia
+                      </ThemedText>
+                      <TextInput
+                        value={closingDay}
+                        onChangeText={(v) => setClosingDay(v.replace(/\D/g, '').slice(0, 2))}
+                        placeholder="28"
+                        placeholderTextColor={theme.textSecondary}
+                        keyboardType="number-pad"
+                        style={[
+                          styles.input,
+                          { backgroundColor: theme.backgroundElement, color: theme.text },
+                        ]}
+                      />
+                    </View>
+                    <View style={styles.diaCampo}>
+                      <ThemedText type="small" themeColor="textSecondary">
+                        Vence dia
+                      </ThemedText>
+                      <TextInput
+                        value={dueDay}
+                        onChangeText={(v) => setDueDay(v.replace(/\D/g, '').slice(0, 2))}
+                        placeholder="5"
+                        placeholderTextColor={theme.textSecondary}
+                        keyboardType="number-pad"
+                        style={[
+                          styles.input,
+                          { backgroundColor: theme.backgroundElement, color: theme.text },
+                        ]}
+                      />
+                    </View>
+                  </View>
+                  <ThemedText type="small" themeColor="textSecondary">
+                    Compra depois do fechamento cai na fatura do mês seguinte.
+                  </ThemedText>
+                  <ThemedText type="smallBold">Limite do cartão</ThemedText>
+                  <MoneyInput valueCents={limitCents} onChangeCents={setLimitCents} />
+                </>
+              ) : (
+                <>
+                  <ThemedText type="smallBold">Saldo inicial</ThemedText>
+                  <MoneyInput valueCents={initialCents} onChangeCents={setInitialCents} />
+                </>
+              )}
               <Pressable
                 onPress={onSubmit}
-                disabled={save.isPending || !name.trim()}
+                disabled={save.isPending || !name.trim() || !cartaoCompleto}
                 style={({ pressed }) => [
                   styles.submit,
-                  { backgroundColor: theme.tint, opacity: pressed || save.isPending || !name.trim() ? 0.6 : 1 },
+                  {
+                    backgroundColor: theme.tint,
+                    opacity:
+                      pressed || save.isPending || !name.trim() || !cartaoCompleto ? 0.6 : 1,
+                  },
                 ]}>
                 <ThemedText type="smallBold" style={styles.buttonLabel}>
                   {save.isPending ? 'Salvando…' : editing ? 'Salvar' : 'Criar conta'}
@@ -257,6 +331,14 @@ const styles = StyleSheet.create({
   accountBody: {
     flex: 1,
     gap: Spacing.half,
+  },
+  diaRow: {
+    flexDirection: 'row',
+    gap: Spacing.three,
+  },
+  diaCampo: {
+    flex: 1,
+    gap: Spacing.one,
   },
   chipRow: {
     flexDirection: 'row',

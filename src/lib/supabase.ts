@@ -1,5 +1,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { createClient } from '@supabase/supabase-js';
+
+import type { Database } from '@/lib/database.types';
 import { Platform } from 'react-native';
 
 // Apenas anon key no app — service_role vive só nas Edge Functions.
@@ -8,7 +10,9 @@ const supabaseAnonKey = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY ?? '';
 
 export const isSupabaseConfigured = Boolean(supabaseUrl && supabaseAnonKey);
 
-export const supabase = createClient(
+// Tipado pelo schema gerado (`npx supabase gen types typescript`): qualquer drift
+// entre migration e app vira erro de tsc, não bug em runtime.
+export const supabase = createClient<Database>(
   supabaseUrl || 'https://placeholder.supabase.co',
   supabaseAnonKey || 'placeholder',
   {
