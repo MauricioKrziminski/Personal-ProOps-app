@@ -7,13 +7,26 @@
  *
  * Também materializa lançamentos recorrentes vencidos (recurring_transactions ->
  * transactions com source='recurring') no mesmo tick do cron.
+ *
+ * Falha de entrega NÃO repete para sempre: `send_attempts` conta as tentativas e,
+ * ao estourar MAX_SEND_ATTEMPTS, a série recorrente pula para a próxima ocorrência
+ * e o lembrete único é desativado (com o motivo em `last_error`). Sem isso, um
+ * template não aprovado na Meta fazia o cron tentar de novo a cada minuto, eternamente.
  */
 
-import { RRule } from "https://esm.sh/rrule@2.8.1";
 import { adminClient } from "../_shared/admin.ts";
 import { sendTemplate } from "../_shared/whatsapp.ts";
+import { localISODate } from "../_shared/datetime.ts";
+import { nextOccurrence } from "../_shared/recurrence.ts";
 
-const WHATSAPP_REMINDER_TEMPLATE = "proops_reminder"; // criar/aprovar no painel da Meta
+// Nome do template vem do env (igual WA_OTP_TEMPLATE): trocar template passa a ser
+// `secrets set`, não redeploy. Templates são por WABA — ao migrar para a WABA de
+// produção, recriar com o MESMO nome e nada aqui muda.
+const WHATSAPP_REMINDER_TEMPLATE = Deno.env.get("WA_REMINDER_TEMPLATE") ?? "personal_proops_reminder";
+const MAX_SEND_ATTEMPTS = 5;
+const DEFAULT_TIMEZONE = "America/Sao_Paulo";
+
+type Admin = ReturnType<typeof adminClient>;
 
 async function sendExpoPush(token: string, title: string): Promise<void> {
   const res = await fetch("https://exp.host/--/api/v2/push/send", {
@@ -29,28 +42,13 @@ async function sendExpoPush(token: string, title: string): Promise<void> {
   if (!res.ok) throw new Error(`Expo push falhou (${res.status})`);
 }
 
-/** Próxima ocorrência a partir de agora, ou null se não há recorrência. */
-function nextOccurrence(recurrence: string | null, after: Date): Date | null {
-  if (!recurrence) return null;
-  try {
-    const rule = RRule.fromString(
-      recurrence.startsWith("RRULE:") ? recurrence : `RRULE:${recurrence}`,
-    );
-    return rule.after(after, false);
-  } catch (err) {
-    console.error("RRULE inválida:", recurrence, err);
-    return null;
-  }
-}
-
 /** Materializa lançamentos recorrentes vencidos em transactions e reagenda pela RRULE. */
-async function materializeRecurring(
-  supabase: ReturnType<typeof adminClient>,
-  now: Date,
-): Promise<number> {
+async function materializeRecurring(supabase: Admin, now: Date): Promise<number> {
   const { data: due, error } = await supabase
     .from("recurring_transactions")
-    .select("id, user_id, kind, amount_cents, currency, category, description, account_id, rrule, next_run_at")
+    .select(
+      "id, user_id, kind, amount_cents, currency, category, description, account_id, rrule, next_run_at, run_attempts, profiles(timezone)",
+    )
     .eq("active", true)
     .lte("next_run_at", now.toISOString())
     .limit(100);
@@ -61,6 +59,8 @@ async function materializeRecurring(
 
   let created = 0;
   for (const rec of due ?? []) {
+    const timezone =
+      (rec.profiles as unknown as { timezone: string } | null)?.timezone ?? DEFAULT_TIMEZONE;
     try {
       const { error: insertError } = await supabase.from("transactions").insert({
         user_id: rec.user_id,
@@ -70,20 +70,41 @@ async function materializeRecurring(
         category: rec.category,
         description: rec.description,
         account_id: rec.account_id,
-        occurred_at: now.toISOString().slice(0, 10),
+        // dia no calendário do usuário — toISOString() jogaria para o dia seguinte à noite em GMT-3
+        occurred_at: localISODate(now, timezone),
         source: "recurring",
       });
       if (insertError) throw insertError;
 
-      const next = nextOccurrence(rec.rrule, now);
+      // âncora na ocorrência atual: preserva a hora original da série
+      const next = nextOccurrence(rec.rrule, now, timezone, new Date(rec.next_run_at));
       await supabase
         .from("recurring_transactions")
-        .update(next ? { next_run_at: next.toISOString() } : { active: false })
+        .update(
+          next
+            ? { next_run_at: next.toISOString(), run_attempts: 0, last_error: null }
+            : { active: false, run_attempts: 0, last_error: null },
+        )
         .eq("id", rec.id);
       created++;
     } catch (err) {
-      console.error(`recurring ${rec.id}:`, err);
-      // mantém next_run_at: será tentado de novo no próximo tick do cron
+      const attempts = (rec.run_attempts ?? 0) + 1;
+      const giveUp = attempts >= MAX_SEND_ATTEMPTS;
+      // desistiu: pula para a próxima ocorrência (não trava a série num erro persistente)
+      const next = giveUp ? nextOccurrence(rec.rrule, now, timezone, new Date(rec.next_run_at)) : null;
+      await supabase
+        .from("recurring_transactions")
+        .update({
+          run_attempts: giveUp ? 0 : attempts,
+          last_error: String(err),
+          ...(giveUp
+            ? next
+              ? { next_run_at: next.toISOString() }
+              : { active: false }
+            : {}),
+        })
+        .eq("id", rec.id);
+      console.error(`recurring ${rec.id} (tentativa ${attempts}):`, err);
     }
   }
   return created;
@@ -97,7 +118,9 @@ Deno.serve(async (_req) => {
 
   const { data: due, error } = await supabase
     .from("reminders")
-    .select("id, user_id, title, recurrence, channel, next_run_at, profiles(phone, expo_push_token)")
+    .select(
+      "id, user_id, title, recurrence, channel, next_run_at, timezone, send_attempts, profiles(phone, expo_push_token)",
+    )
     .eq("active", true)
     .lte("next_run_at", now.toISOString())
     .limit(100);
@@ -105,47 +128,89 @@ Deno.serve(async (_req) => {
   if (error) return new Response(JSON.stringify({ error: error.message }), { status: 500 });
 
   let sent = 0;
+  let givenUp = 0;
   for (const reminder of due ?? []) {
     const profile = reminder.profiles as unknown as {
       phone: string;
       expo_push_token: string | null;
     } | null;
+    const timezone = reminder.timezone ?? DEFAULT_TIMEZONE;
 
     try {
       const wantsPush = reminder.channel === "push" || reminder.channel === "both";
       const wantsWhatsApp = reminder.channel === "whatsapp" || reminder.channel === "both";
 
       let delivered = false;
+      const failures: string[] = [];
 
       if (wantsPush && profile?.expo_push_token) {
-        await sendExpoPush(profile.expo_push_token, reminder.title);
-        delivered = true;
+        try {
+          await sendExpoPush(profile.expo_push_token, reminder.title);
+          delivered = true;
+        } catch (err) {
+          // push falhou não anula o WhatsApp: tenta o outro canal antes de desistir
+          failures.push(`push: ${err}`);
+        }
       }
 
       // WhatsApp como complemento — ou fallback quando não há push token
       if (profile?.phone && (wantsWhatsApp || (!delivered && wantsPush))) {
-        await sendTemplate(profile.phone, WHATSAPP_REMINDER_TEMPLATE, [reminder.title]);
-        delivered = true;
+        try {
+          await sendTemplate(profile.phone, WHATSAPP_REMINDER_TEMPLATE, [reminder.title]);
+          delivered = true;
+        } catch (err) {
+          failures.push(`whatsapp: ${err}`);
+        }
       }
 
-      const next = nextOccurrence(reminder.recurrence, now);
+      if (!delivered) {
+        throw new Error(failures.join(" | ") || "nenhum canal disponível (sem push token nem telefone)");
+      }
+
+      const next = nextOccurrence(
+        reminder.recurrence,
+        now,
+        timezone,
+        new Date(reminder.next_run_at),
+      );
       await supabase
         .from("reminders")
-        .update(
-          next
-            ? { next_run_at: next.toISOString(), updated_at: now.toISOString() }
-            : { active: false, updated_at: now.toISOString() },
-        )
+        .update({
+          send_attempts: 0,
+          last_error: null,
+          updated_at: now.toISOString(),
+          ...(next ? { next_run_at: next.toISOString() } : { active: false }),
+        })
         .eq("id", reminder.id);
 
-      if (delivered) sent++;
+      sent++;
     } catch (err) {
-      console.error(`reminder ${reminder.id}:`, err);
-      // mantém next_run_at: será tentado de novo no próximo tick do cron
+      const attempts = (reminder.send_attempts ?? 0) + 1;
+      const giveUp = attempts >= MAX_SEND_ATTEMPTS;
+      // recorrente que desistiu pula para a próxima ocorrência; único é desativado
+      const next = giveUp
+        ? nextOccurrence(reminder.recurrence, now, timezone, new Date(reminder.next_run_at))
+        : null;
+      await supabase
+        .from("reminders")
+        .update({
+          send_attempts: giveUp ? 0 : attempts,
+          last_error: String(err),
+          updated_at: now.toISOString(),
+          ...(giveUp
+            ? next
+              ? { next_run_at: next.toISOString() }
+              : { active: false }
+            : {}),
+        })
+        .eq("id", reminder.id);
+      if (giveUp) givenUp++;
+      console.error(`reminder ${reminder.id} (tentativa ${attempts}):`, err);
     }
   }
 
-  return new Response(JSON.stringify({ due: due?.length ?? 0, sent, recurringCreated }), {
-    headers: { "Content-Type": "application/json" },
-  });
+  return new Response(
+    JSON.stringify({ due: due?.length ?? 0, sent, givenUp, recurringCreated }),
+    { headers: { "Content-Type": "application/json" } },
+  );
 });
