@@ -5,8 +5,8 @@
  *   - template Utility no WhatsApp (complemento pago ~US$0,007)
  * Depois recalcula next_run_at pela recorrência (RRULE) ou desativa se for único.
  *
- * Também materializa lançamentos recorrentes vencidos (recurring_transactions ->
- * transactions com source='recurring') no mesmo tick do cron.
+ * A materialização dos recorrentes NÃO mora mais aqui: virou a Edge Function
+ * `finance-scheduler`, que materializa 90 dias à frente para alimentar a projeção.
  *
  * Falha de entrega NÃO repete para sempre: `send_attempts` conta as tentativas e,
  * ao estourar MAX_SEND_ATTEMPTS, a série recorrente pula para a próxima ocorrência
@@ -16,7 +16,6 @@
 
 import { adminClient } from "../_shared/admin.ts";
 import { sendTemplate } from "../_shared/whatsapp.ts";
-import { localISODate } from "../_shared/datetime.ts";
 import { nextOccurrence } from "../_shared/recurrence.ts";
 
 // Nome do template vem do env (igual WA_OTP_TEMPLATE): trocar template passa a ser
@@ -25,8 +24,6 @@ import { nextOccurrence } from "../_shared/recurrence.ts";
 const WHATSAPP_REMINDER_TEMPLATE = Deno.env.get("WA_REMINDER_TEMPLATE") ?? "personal_proops_reminder";
 const MAX_SEND_ATTEMPTS = 5;
 const DEFAULT_TIMEZONE = "America/Sao_Paulo";
-
-type Admin = ReturnType<typeof adminClient>;
 
 async function sendExpoPush(token: string, title: string): Promise<void> {
   const res = await fetch("https://exp.host/--/api/v2/push/send", {
@@ -42,80 +39,9 @@ async function sendExpoPush(token: string, title: string): Promise<void> {
   if (!res.ok) throw new Error(`Expo push falhou (${res.status})`);
 }
 
-/** Materializa lançamentos recorrentes vencidos em transactions e reagenda pela RRULE. */
-async function materializeRecurring(supabase: Admin, now: Date): Promise<number> {
-  const { data: due, error } = await supabase
-    .from("recurring_transactions")
-    .select(
-      "id, user_id, workspace_id, kind, amount_cents, currency, category, description, account_id, rrule, next_run_at, run_attempts, profiles(timezone)",
-    )
-    .eq("active", true)
-    .lte("next_run_at", now.toISOString())
-    .limit(100);
-  if (error) {
-    console.error("recurring_transactions fetch:", error);
-    return 0;
-  }
-
-  let created = 0;
-  for (const rec of due ?? []) {
-    const timezone =
-      (rec.profiles as unknown as { timezone: string } | null)?.timezone ?? DEFAULT_TIMEZONE;
-    try {
-      const { error: insertError } = await supabase.from("transactions").insert({
-        user_id: rec.user_id,
-        workspace_id: rec.workspace_id,
-        kind: rec.kind,
-        amount_cents: rec.amount_cents,
-        currency: rec.currency,
-        category: rec.category,
-        description: rec.description,
-        account_id: rec.account_id,
-        // dia no calendário do usuário — toISOString() jogaria para o dia seguinte à noite em GMT-3
-        occurred_at: localISODate(now, timezone),
-        source: "recurring",
-      });
-      if (insertError) throw insertError;
-
-      // âncora na ocorrência atual: preserva a hora original da série
-      const next = nextOccurrence(rec.rrule, now, timezone, new Date(rec.next_run_at));
-      await supabase
-        .from("recurring_transactions")
-        .update(
-          next
-            ? { next_run_at: next.toISOString(), run_attempts: 0, last_error: null }
-            : { active: false, run_attempts: 0, last_error: null },
-        )
-        .eq("id", rec.id);
-      created++;
-    } catch (err) {
-      const attempts = (rec.run_attempts ?? 0) + 1;
-      const giveUp = attempts >= MAX_SEND_ATTEMPTS;
-      // desistiu: pula para a próxima ocorrência (não trava a série num erro persistente)
-      const next = giveUp ? nextOccurrence(rec.rrule, now, timezone, new Date(rec.next_run_at)) : null;
-      await supabase
-        .from("recurring_transactions")
-        .update({
-          run_attempts: giveUp ? 0 : attempts,
-          last_error: String(err),
-          ...(giveUp
-            ? next
-              ? { next_run_at: next.toISOString() }
-              : { active: false }
-            : {}),
-        })
-        .eq("id", rec.id);
-      console.error(`recurring ${rec.id} (tentativa ${attempts}):`, err);
-    }
-  }
-  return created;
-}
-
 Deno.serve(async (_req) => {
   const supabase = adminClient();
   const now = new Date();
-
-  const recurringCreated = await materializeRecurring(supabase, now);
 
   const { data: due, error } = await supabase
     .from("reminders")
@@ -211,7 +137,7 @@ Deno.serve(async (_req) => {
   }
 
   return new Response(
-    JSON.stringify({ due: due?.length ?? 0, sent, givenUp, recurringCreated }),
+    JSON.stringify({ due: due?.length ?? 0, sent, givenUp}),
     { headers: { "Content-Type": "application/json" } },
   );
 });

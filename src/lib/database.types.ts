@@ -541,13 +541,17 @@ export type Database = {
           account_id: string | null
           active: boolean
           amount_cents: number
+          auto_confirm: boolean
           category: string | null
           created_at: string
           currency: string
           description: string | null
+          dtstart: string | null
+          end_date: string | null
           id: string
           kind: string
           last_error: string | null
+          materialized_until: string | null
           next_run_at: string
           rrule: string
           run_attempts: number
@@ -559,13 +563,17 @@ export type Database = {
           account_id?: string | null
           active?: boolean
           amount_cents: number
+          auto_confirm?: boolean
           category?: string | null
           created_at?: string
           currency?: string
           description?: string | null
+          dtstart?: string | null
+          end_date?: string | null
           id?: string
           kind: string
           last_error?: string | null
+          materialized_until?: string | null
           next_run_at: string
           rrule: string
           run_attempts?: number
@@ -577,13 +585,17 @@ export type Database = {
           account_id?: string | null
           active?: boolean
           amount_cents?: number
+          auto_confirm?: boolean
           category?: string | null
           created_at?: string
           currency?: string
           description?: string | null
+          dtstart?: string | null
+          end_date?: string | null
           id?: string
           kind?: string
           last_error?: string | null
+          materialized_until?: string | null
           next_run_at?: string
           rrule?: string
           run_attempts?: number
@@ -698,6 +710,7 @@ export type Database = {
           kind: string
           merchant: string | null
           occurred_at: string
+          recurring_id: string | null
           source: string
           status: string
           updated_at: string
@@ -720,6 +733,7 @@ export type Database = {
           kind: string
           merchant?: string | null
           occurred_at?: string
+          recurring_id?: string | null
           source?: string
           status?: string
           updated_at?: string
@@ -742,6 +756,7 @@ export type Database = {
           kind?: string
           merchant?: string | null
           occurred_at?: string
+          recurring_id?: string | null
           source?: string
           status?: string
           updated_at?: string
@@ -775,6 +790,13 @@ export type Database = {
             columns: ["invoice_id"]
             isOneToOne: false
             referencedRelation: "card_invoices"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "transactions_recurring_id_fkey"
+            columns: ["recurring_id"]
+            isOneToOne: false
+            referencedRelation: "recurring_transactions"
             referencedColumns: ["id"]
           },
           {
@@ -878,6 +900,15 @@ export type Database = {
           type: string
         }[]
       }
+      _affordability: {
+        Args: { amount_cents: number; installments?: number; uid: string }
+        Returns: {
+          can_afford: boolean
+          installment_cents: number
+          worst_balance_cents: number
+          worst_day: string
+        }[]
+      }
       _budgets_status: {
         Args: { ref_month?: string; uid: string }
         Returns: {
@@ -903,6 +934,16 @@ export type Database = {
           unpaid_total_cents: number
         }[]
       }
+      _cash_flow_forecast: {
+        Args: { days?: number; uid: string }
+        Returns: {
+          balance_cents: number
+          day: string
+          in_cents: number
+          out_cents: number
+        }[]
+      }
+      _close_due_invoices: { Args: never; Returns: number }
       _default_workspace: { Args: { uid: string }; Returns: string }
       _monthly_cashflow: {
         Args: { months_back?: number; uid: string }
@@ -912,6 +953,7 @@ export type Database = {
           month: string
         }[]
       }
+      _promote_due_transactions: { Args: never; Returns: number }
       _tx_summary: {
         Args: { from_date: string; to_date: string; uid: string }
         Returns: {
@@ -919,6 +961,17 @@ export type Database = {
           kind: string
           total_cents: number
           tx_count: number
+        }[]
+      }
+      _upcoming_bills: {
+        Args: { days?: number; uid: string }
+        Returns: {
+          amount_cents: number
+          due_date: string
+          kind: string
+          overdue: boolean
+          ref_id: string
+          title: string
         }[]
       }
       _workspace_ids: { Args: { uid: string }; Returns: string[] }
@@ -929,6 +982,15 @@ export type Database = {
           balance_cents: number
           name: string
           type: string
+        }[]
+      }
+      affordability: {
+        Args: { amount_cents: number; installments?: number }
+        Returns: {
+          can_afford: boolean
+          installment_cents: number
+          worst_balance_cents: number
+          worst_day: string
         }[]
       }
       budgets_status: {
@@ -954,6 +1016,15 @@ export type Database = {
           name: string
           reference_month: string
           unpaid_total_cents: number
+        }[]
+      }
+      cash_flow_forecast: {
+        Args: { days?: number }
+        Returns: {
+          balance_cents: number
+          day: string
+          in_cents: number
+          out_cents: number
         }[]
       }
       claim_jobs: {
@@ -1023,6 +1094,17 @@ export type Database = {
           kind: string
           total_cents: number
           tx_count: number
+        }[]
+      }
+      upcoming_bills: {
+        Args: { days?: number }
+        Returns: {
+          amount_cents: number
+          due_date: string
+          kind: string
+          overdue: boolean
+          ref_id: string
+          title: string
         }[]
       }
     }

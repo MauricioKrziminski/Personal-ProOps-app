@@ -295,7 +295,7 @@ export function useBudgetsStatus() {
 const FINANCE_KEYS = [
   ['transactions'], ['tx-summary'], ['monthly-cashflow'], ['account-balances'],
   ['budgets-status'], ['accounts'], ['goals'], ['budgets'], ['recurring'],
-  ['card-summary'], ['invoice'],
+  ['card-summary'], ['invoice'], ['forecast'], ['upcoming-bills'],
 ];
 
 function useInvalidateFinance() {
@@ -395,6 +395,75 @@ export function useCreateInstallmentPlan() {
         p_description: input.description ?? undefined,
         p_category: input.category ?? undefined,
       });
+      if (error) throw error;
+    },
+    onSuccess: invalidate,
+  });
+}
+
+// ── projeção de fluxo de caixa e contas a pagar ─────────────────────────────
+
+export type ForecastDay = Fns['cash_flow_forecast']['Returns'][number];
+export type UpcomingBill = Omit<Fns['upcoming_bills']['Returns'][number], 'kind'> & {
+  kind: 'invoice' | 'transaction';
+};
+export type Affordability = Fns['affordability']['Returns'][number];
+
+/**
+ * Saldo projetado dia a dia. Sai pronto do banco somando saldo atual + o que
+ * está `pending` + faturas não pagas (cada uma na data de vencimento).
+ */
+export function useCashFlowForecast(days = 90) {
+  useRealtimeInvalidate('transactions', ['forecast']);
+  return useQuery({
+    queryKey: ['forecast', String(days)],
+    queryFn: async (): Promise<ForecastDay[]> => {
+      const { data, error } = await supabase.rpc('cash_flow_forecast', { days });
+      if (error) throw error;
+      return data;
+    },
+  });
+}
+
+/** Faturas e lançamentos previstos que vencem no período (atrasados incluídos). */
+export function useUpcomingBills(days = 30) {
+  useRealtimeInvalidate('transactions', ['upcoming-bills']);
+  useRealtimeInvalidate('card_invoices', ['upcoming-bills']);
+  return useQuery({
+    queryKey: ['upcoming-bills', String(days)],
+    queryFn: async (): Promise<UpcomingBill[]> => {
+      const { data, error } = await supabase.rpc('upcoming_bills', { days });
+      if (error) throw error;
+      return data as UpcomingBill[];
+    },
+  });
+}
+
+/** "Posso comprar isso?" — simula N parcelas sobre a projeção. Não grava nada. */
+export function useAffordability(amountCents: number, installments: number) {
+  return useQuery({
+    enabled: amountCents > 0,
+    queryKey: ['affordability', String(amountCents), String(installments)],
+    queryFn: async (): Promise<Affordability | null> => {
+      const { data, error } = await supabase.rpc('affordability', {
+        amount_cents: amountCents,
+        installments,
+      });
+      if (error) throw error;
+      return data?.[0] ?? null;
+    },
+  });
+}
+
+/** Dá baixa num lançamento previsto (pending -> cleared). */
+export function useMarkPaid() {
+  const invalidate = useInvalidateFinance();
+  return useMutation({
+    mutationFn: async (input: { id: string; paidAt: string }) => {
+      const { error } = await supabase
+        .from('transactions')
+        .update({ status: 'cleared', occurred_at: input.paidAt })
+        .eq('id', input.id);
       if (error) throw error;
     },
     onSuccess: invalidate,

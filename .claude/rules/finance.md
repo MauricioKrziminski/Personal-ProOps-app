@@ -14,7 +14,7 @@
 - **`transactions`** ganhou `status in (pending, cleared)`, `due_at`, `invoice_id`, `installment_plan_id`, `installment_no`, `merchant`. `pending` = ainda vai acontecer; é a base da projeção de fluxo de caixa.
 - **`goals`**: `target_cents` + `saved_cents` atualizado direto (sem ledger de aportes na v1).
 - **`budgets`**: limite mensal fixo por categoria, unique (workspace_id, category). Status via RPC `_budgets_status` (limite vs gasto do mês).
-- **`recurring_transactions`**: RRULE + `next_run_at`; materializadas pelo cron do `send-reminders` com `source='recurring'`.
+- **`recurring_transactions`**: RRULE + `dtstart` (âncora imutável) + `next_run_at` (próxima ocorrência FUTURA, é o que o app mostra) + `materialized_until` (controle do cron). Materializadas **90 dias à frente** pelo `finance-scheduler` como `pending`, com `source='recurring'`. Idempotência pelo unique `(recurring_id, occurred_at)`.
 
 ## Categorias
 
@@ -31,6 +31,12 @@
 - Compra **até** o dia de fechamento cai na fatura do próprio mês; depois, na do mês seguinte. Dia 31 em mês curto cai no último dia (`private.day_in_month`).
 - Cartão é conta comum em partida dobrada: a compra deixa o saldo do cartão negativo (dívida) e o **pagamento da fatura é `transfer`** da conta pagadora para o cartão (RPC `pay_invoice`). Pagamento de fatura **nunca** é despesa nova — o gasto já contou na compra.
 - Parcelamento só pela RPC `create_installment_plan` (nunca inserindo N linhas no app).
+
+## Projeção de fluxo de caixa
+
+- Modelo de caixa (não contar o mesmo gasto duas vezes): saldo inicial = contas **não-cartão**, só `cleared`; saídas futuras = (a) toda fatura não paga **na data de vencimento** + (b) `pending` sem fatura em `coalesce(due_at, occurred_at)`. Compra no cartão sai do caixa quando a fatura vence, não quando foi feita.
+- `cash_flow_forecast(days)`, `upcoming_bills(days)` e `affordability(amount_cents, installments)` — pares interna/wrapper. `affordability` **compõe** com a projeção (interna chama interna, wrapper chama wrapper): não duplicar a query grande.
+- `pending` → `cleared` só automaticamente para parcela de compra parcelada e recorrente com `auto_confirm`. Conta a pagar avulsa espera o usuário confirmar.
 
 ## Regras de negócio
 

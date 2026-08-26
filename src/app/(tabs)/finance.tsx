@@ -16,7 +16,7 @@ import {
   useBudgetsStatus,
   useGoals,
   useMonthlyCashflow,
-  useCardSummary,
+  useUpcomingBills,
   useRecentTransactions,
   useTransactionsSummary,
 } from '@/hooks/use-finance';
@@ -117,7 +117,7 @@ export default function FinanceScreen() {
   const summary = useTransactionsSummary(range.from, range.to);
   const budgets = useBudgetsStatus();
   const goals = useGoals();
-  const cards = useCardSummary();
+  const bills = useUpcomingBills(7);
   const recent = useRecentTransactions(5);
 
   const totalBalance = (balances.data ?? []).reduce((s, b) => s + Number(b.balance_cents), 0);
@@ -132,10 +132,8 @@ export default function FinanceScreen() {
   const riskyBudgets = (budgets.data ?? []).filter(
     (b) => Number(b.spent_cents) / Number(b.limit_cents) >= 0.8,
   );
-  // só cartões com fatura de verdade: o dashboard não mostra cartão zerado
-  const openInvoices = (cards.data ?? []).filter(
-    (c) => c.due_date && Number(c.invoice_total_cents) > 0,
-  );
+  // faturas + contas previstas dos próximos 7 dias, atrasadas primeiro
+  const upcoming = bills.data ?? [];
 
   const hasError =
     balances.isError || summary.isError || budgets.isError || goals.isError || recent.isError;
@@ -219,15 +217,17 @@ export default function FinanceScreen() {
                 </GlassCard>
               )}
 
-              {openInvoices.length > 0 && (
+              {upcoming.length > 0 && (
                 <GlassCard style={styles.sectionCard}>
-                  <ThemedText type="smallBold">💳 Faturas em aberto</ThemedText>
-                  {openInvoices.map((card) => (
-                    <View key={card.account_id} style={styles.categoryHeader}>
-                      <ThemedText type="small">{card.name}</ThemedText>
+                  <ThemedText type="smallBold">📅 A pagar nos próximos 7 dias</ThemedText>
+                  {upcoming.slice(0, 5).map((bill) => (
+                    <View key={`${bill.kind}-${bill.ref_id}`} style={styles.categoryHeader}>
+                      <ThemedText type="small">
+                        {bill.overdue ? '🔴 ' : ''}
+                        {bill.title}
+                      </ThemedText>
                       <ThemedText type="small" themeColor="textSecondary">
-                        {formatBRL(Number(card.invoice_total_cents))} · vence{' '}
-                        {formatDateBR(card.due_date!)}
+                        {formatBRL(Number(bill.amount_cents))} · {formatDateBR(bill.due_date)}
                       </ThemedText>
                     </View>
                   ))}
@@ -325,11 +325,12 @@ export default function FinanceScreen() {
               )}
 
               <SectionLink title="🧾 Todos os lançamentos" href="/finance/transactions" index={0} />
-              <SectionLink title="💳 Cartões e faturas" href="/finance/cards" index={1} />
-              <SectionLink title="💼 Contas e carteiras" href="/finance/accounts" index={2} />
-              <SectionLink title="🎯 Metas" href="/finance/goals" index={3} />
-              <SectionLink title="📉 Orçamentos" href="/finance/budgets" index={4} />
-              <SectionLink title="🔁 Recorrentes" href="/finance/recurring" index={5} />
+              <SectionLink title="🔮 Projeção e simulador" href="/finance/forecast" index={1} />
+              <SectionLink title="💳 Cartões e faturas" href="/finance/cards" index={2} />
+              <SectionLink title="💼 Contas e carteiras" href="/finance/accounts" index={3} />
+              <SectionLink title="🎯 Metas" href="/finance/goals" index={4} />
+              <SectionLink title="📉 Orçamentos" href="/finance/budgets" index={5} />
+              <SectionLink title="🔁 Recorrentes" href="/finance/recurring" index={6} />
             </>
           )}
         </ScrollView>

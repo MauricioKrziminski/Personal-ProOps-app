@@ -152,8 +152,34 @@ as parcelas seguintes no dashboard nem divide compra entre cartões.
   cada parcela na fatura certa; `pay_invoice` rolando a fatura aberta para a próxima e devolvendo
   limite; partida dobrada conferida em `account_balances`. `tsc`/`lint` limpos, 26 testes.
 
-**Próximo:** Fase 2 do plano — pendentes, contas a pagar e projeção de fluxo de caixa (`0014`),
-que já se apoia no `status='pending'` criado aqui.
+## ✅ FASE 2 — pendentes, contas a pagar e projeção (concluída em 26/08/2026)
+
+Gap nº2 do mercado: todo concorrente mostra só o retrovisor. Nenhum responde "quanto sobra dia 28"
+nem "posso comprar isso em 10x?".
+
+- `0014_forecast.sql` — recorrente aceita `transfer`, ganha `end_date`, `auto_confirm` e
+  `materialized_until`; `transactions.recurring_id` com unique `(recurring_id, occurred_at)`
+  (idempotência). RPCs `_promote_due_transactions`, `_close_due_invoices` e os pares
+  `cash_flow_forecast`, `upcoming_bills`, `affordability`.
+- `0015_recurring_dtstart.sql` — âncora imutável da série. Sem ela a expansão da RRULE usaria
+  `next_run_at`, que anda a cada rodada, e a hora de parede derivaria.
+- `0016_schedule_finance_scheduler.sql` — cron de hora em hora (`7 * * * *`), URL/token do Vault.
+- **Edge Function nova `finance-scheduler`**: materializa recorrentes 90 dias à frente como
+  `pending`, fecha faturas vencidas e promove pendentes que já aconteceram. A materialização
+  **saiu do `send-reminders`**, que voltou a cuidar só de lembretes.
+- IA: `query_forecast`, `simulate_purchase` e `mark_paid` (dá baixa em conta prevista, com
+  desambiguação quando acha mais de uma parecida). `process-jobs` deployada.
+- App: tela `finance/forecast.tsx` (gráfico de saldo dia a dia com linha do zero + simulador
+  "posso comprar isso?"), bloco "A pagar nos próximos 7 dias" no dashboard, filtro "⏳ Previstos"
+  e badge de previsto/parcela na lista de lançamentos.
+- Verificado no banco: projeção de um cenário real (saldo 3.000, aluguel de 900 no dia 10,
+  notebook 1.500 em 3x) devolvendo a saída do cartão **no vencimento da fatura** e não na compra;
+  `affordability` reprovando 3.000 à vista (-1.400 em 10/09) e aprovando 500; scheduler rodando de
+  verdade em produção (4 ocorrências criadas, `next_run_at` correto, segunda rodada `created: 0`)
+  e dados de teste removidos. `tsc`/`lint` limpos, 26 testes.
+
+**Próximo:** Fase 3 do plano — ingestão inteligente (foto/PDF de fatura e extrato, OFX/CSV,
+regras de categorização), que é o substituto do Open Finance.
 
 ## 📝 Como verificar o pipeline (rápido)
 Usar `/verify-whatsapp` ou manualmente: mandar mensagem → conferir `messages_raw` (inbound) → `jobs` (done) → `ai_events` (result/confidence) → tabela final (`transactions`/`notes`/...) → resposta no WhatsApp. Logs: MCP `get_logs` (edge-function).

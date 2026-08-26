@@ -279,6 +279,113 @@ async function executeAction(
       return `💳 Cartões:\n${lines.join("\n")}`;
     }
 
+    case "query_forecast": {
+      const [forecast, bills] = await Promise.all([
+        supabase.rpc("_cash_flow_forecast", { uid: userId, days: 90 }),
+        supabase.rpc("_upcoming_bills", { uid: userId, days: 30 }),
+      ]);
+      if (forecast.error) throw forecast.error;
+      let dias = (forecast.data ?? []) as { day: string; balance_cents: number }[];
+      if (action.query_to) dias = dias.filter((d) => d.day <= action.query_to!);
+      if (!dias.length) return "🔮 Ainda não tenho o que projetar. Cadastre contas e recorrentes!";
+
+      const fim = dias[dias.length - 1];
+      const pior = dias.reduce((min, d) =>
+        Number(d.balance_cents) < Number(min.balance_cents) ? d : min
+      );
+      const linhas = [
+        `🔮 Projeção até ${formatDateBR(fim.day)}: *${centsToBRL(Number(fim.balance_cents))}*`,
+      ];
+      if (Number(pior.balance_cents) < 0) {
+        linhas.push(
+          `  ⚠️ Fica negativo em ${formatDateBR(pior.day)} (${centsToBRL(Number(pior.balance_cents))})`,
+        );
+      } else {
+        linhas.push(`  Menor saldo: ${centsToBRL(Number(pior.balance_cents))} em ${formatDateBR(pior.day)}`);
+      }
+
+      const contas = (bills.data ?? []) as {
+        title: string;
+        amount_cents: number;
+        due_date: string;
+        overdue: boolean;
+      }[];
+      if (contas.length) {
+        linhas.push("", "📅 A pagar:");
+        for (const c of contas.slice(0, 6)) {
+          linhas.push(
+            `  ${c.overdue ? "🔴" : "•"} ${c.title}: ${centsToBRL(Number(c.amount_cents))} — ${formatDateBR(c.due_date)}`,
+          );
+        }
+      }
+      return linhas.join("\n");
+    }
+
+    case "simulate_purchase": {
+      if (!action.amount_cents || action.amount_cents <= 0) {
+        return "❌ Me diz o valor. Ex.: \"posso comprar um celular de 3000 em 10x?\"";
+      }
+      const parcelas = Math.min(Math.max(action.installments ?? 1, 1), 72);
+      const { data, error } = await supabase.rpc("_affordability", {
+        uid: userId,
+        amount_cents: action.amount_cents,
+        installments: parcelas,
+      });
+      if (error) throw error;
+      const sim = (data ?? [])[0] as
+        | { can_afford: boolean; worst_day: string; worst_balance_cents: number; installment_cents: number }
+        | undefined;
+      if (!sim) return "🤔 Não consegui simular. Cadastre suas contas primeiro!";
+
+      const comoPaga = parcelas > 1
+        ? `${parcelas}x de ${centsToBRL(Number(sim.installment_cents))}`
+        : `${centsToBRL(action.amount_cents)} à vista`;
+      if (sim.can_afford) {
+        return `✅ Dá sim: ${comoPaga}.\n` +
+          `Mesmo assim seu saldo mais apertado fica em ${centsToBRL(Number(sim.worst_balance_cents))} ` +
+          `(${formatDateBR(sim.worst_day)}).`;
+      }
+      return `⚠️ Aperta: com ${comoPaga} você fica em ` +
+        `${centsToBRL(Number(sim.worst_balance_cents))} no dia ${formatDateBR(sim.worst_day)}.\n` +
+        `Dá para esticar o parcelamento ou adiar um pouco?`;
+    }
+
+    case "mark_paid": {
+      // procura entre o que está PREVISTO (pending), do mais vencido para o mais novo
+      let query = supabase
+        .from("transactions")
+        .select("id, description, category, amount_cents, due_at, occurred_at")
+        .eq("workspace_id", workspaceId)
+        .eq("status", "pending")
+        .eq("kind", "expense")
+        .order("due_at", { ascending: true })
+        .limit(5);
+      const alvo = action.content ?? action.title;
+      if (alvo) query = query.or(`description.ilike.%${alvo}%,category.ilike.%${alvo}%`);
+      if (action.amount_cents) query = query.eq("amount_cents", action.amount_cents);
+
+      const { data: candidatos, error } = await query;
+      if (error) throw error;
+      if (!candidatos?.length) {
+        return "🤷 Não achei essa conta entre as previstas. Se for gasto novo, manda \"paguei X de luz\".";
+      }
+      if (candidatos.length > 1 && alvo) {
+        const opcoes = candidatos
+          .slice(0, 3)
+          .map((c) => `  • ${c.description ?? c.category}: ${centsToBRL(c.amount_cents)}`)
+          .join("\n");
+        return `🤔 Achei mais de uma conta parecida:\n${opcoes}\nMe diz o valor pra eu saber qual é.`;
+      }
+
+      const conta = candidatos[0];
+      const { error: updateError } = await supabase
+        .from("transactions")
+        .update({ status: "cleared", occurred_at: localISODate(now, timezone) })
+        .eq("id", conta.id);
+      if (updateError) throw updateError;
+      return `✅ Baixa dada: ${conta.description ?? conta.category ?? "conta"} — ${centsToBRL(conta.amount_cents)}.`;
+    }
+
     case "create_note": {
       const { error } = await supabase.from("notes").insert({
         user_id: userId,

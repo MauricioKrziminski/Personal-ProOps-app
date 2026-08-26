@@ -14,6 +14,11 @@ verify_jwt = true
 [functions.send-reminders]
 verify_jwt = true
 
+# manutencao financeira (materializa recorrentes 90 dias a frente, fecha faturas,
+# promove pendentes vencidos). Chamada por pg_cron de hora em hora.
+[functions.finance-scheduler]
+verify_jwt = true
+
 # Send SMS Auth Hook do Supabase (entrega OTP via WhatsApp). Sem JWT — a
 # segurança é a assinatura standardwebhooks (SEND_SMS_HOOK_SECRET).
 [functions.wa-send-otp]

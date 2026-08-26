@@ -12,7 +12,7 @@ import { GlassCard } from '@/components/glass/glass-card';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { MaxContentWidth, Spacing } from '@/constants/theme';
-import { formatBRL, localISODate } from '@/hooks/use-items';
+import { formatBRL, formatDateBR, localISODate } from '@/hooks/use-items';
 import { useTransactions, type Transaction, type TransactionKind } from '@/hooks/use-finance';
 import { useTheme } from '@/hooks/use-theme';
 
@@ -61,9 +61,15 @@ function TransactionRow({ tx, index, month }: { tx: Transaction; index: number; 
             </ThemedText>
             <ThemedText type="small" themeColor="textSecondary">
               dia {day}
+              {tx.installment_no ? ` · parcela ${tx.installment_no}` : ''}
               {tx.category ? ` · #${tx.category}` : ''}
               {sourceLabel ? ` · ${sourceLabel}` : ''}
             </ThemedText>
+            {tx.status === 'pending' && (
+              <ThemedText type="small" style={{ color: theme.warning }}>
+                ⏳ previsto{tx.due_at ? ` · vence ${formatDateBR(tx.due_at)}` : ''}
+              </ThemedText>
+            )}
           </View>
           <ThemedText
             type="smallBold"
@@ -81,7 +87,13 @@ export default function TransactionsScreen() {
   const theme = useTheme();
   const [month, setMonth] = useState(() => localISODate().slice(0, 7));
   const [kind, setKind] = useState<TransactionKind | undefined>(undefined);
-  const { data: transactions, isLoading, isError, refetch } = useTransactions({ month, kind });
+  // 'pending' = o que ainda vai acontecer (parcela futura, conta a pagar, recorrente)
+  const [onlyPending, setOnlyPending] = useState(false);
+  const { data: all, isLoading, isError, refetch } = useTransactions({ month, kind });
+  const transactions = useMemo(
+    () => (onlyPending ? (all ?? []).filter((t) => t.status === 'pending') : all),
+    [all, onlyPending],
+  );
 
   const totals = useMemo(() => {
     const list = transactions ?? [];
@@ -125,6 +137,11 @@ export default function TransactionsScreen() {
           <Chip label="💸 Gastos" selected={kind === 'expense'} onPress={() => setKind('expense')} />
           <Chip label="💰 Receitas" selected={kind === 'income'} onPress={() => setKind('income')} />
           <Chip label="🔄 Transfer." selected={kind === 'transfer'} onPress={() => setKind('transfer')} />
+          <Chip
+            label="⏳ Previstos"
+            selected={onlyPending}
+            onPress={() => setOnlyPending((v) => !v)}
+          />
         </View>
 
         {isError ? (

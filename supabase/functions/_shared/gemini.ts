@@ -27,6 +27,9 @@ export type AiActionType =
   | "create_installment_purchase"
   | "pay_invoice"
   | "query_invoice"
+  | "query_forecast"
+  | "simulate_purchase"
+  | "mark_paid"
   | "create_note"
   | "create_reminder"
   | "create_goal"
@@ -75,6 +78,7 @@ const ACTION_SCHEMA = {
       enum: [
         "create_expense", "create_income", "create_transfer",
         "create_installment_purchase", "pay_invoice", "query_invoice",
+        "query_forecast", "simulate_purchase", "mark_paid",
         "create_note", "create_reminder", "create_goal", "goal_deposit",
         "query_balance", "query_transactions", "query_budgets", "query_goals",
         "undo_last", "unknown",
@@ -123,6 +127,9 @@ Tipos de ação:
 - "create_installment_purchase": compra PARCELADA ("parcelei a geladeira em 12x", "3x de 90 no cartão", "comprei um celular de 3000 em 10 vezes"). amount_cents = valor TOTAL da compra (se o usuário falar o valor DA PARCELA, multiplique pelo número de parcelas), installments = nº de parcelas, account = cartão citado, category, occurred_at = data da compra, description em content. Uma parcela só ("1x") não é parcelamento: use create_expense.
 - "pay_invoice": pagamento da fatura do cartão ("paguei a fatura do nubank", "quitei o cartão"). account = cartão, counterparty_account = conta de onde saiu o dinheiro (se citada). NÃO use para compras no cartão.
 - "query_invoice": pergunta sobre fatura/limite do cartão ("quanto tá a fatura?", "quanto sobrou de limite no nubank", "quando vence o cartão"). account = cartão citado, ou null para todos.
+- "query_forecast": pergunta sobre o FUTURO do saldo ("quanto vai sobrar no fim do mês?", "vou ficar no vermelho?", "o que tenho pra pagar essa semana?"). query_to = até quando (YYYY-MM-DD), se citado.
+- "simulate_purchase": pergunta se PODE comprar algo ("posso comprar um celular de 3000 em 10x?", "dá pra gastar 800 esse mês?", "consigo pagar uma viagem de 5 mil?"). amount_cents = valor total, installments = parcelas (1 se à vista). NÃO registra nada — é só simulação.
+- "mark_paid": confirmar que uma conta prevista foi paga ("paguei a luz", "quitei o aluguel"). content/title = do que se trata, amount_cents se citado. Diferente de create_expense: aqui o lançamento JÁ EXISTE como previsto.
 - "create_note": anotação livre. content (texto limpo) e category curta se óbvia.
 - "create_reminder": pedido para ser lembrado. title, remind_at (próxima ocorrência, ISO, no fuso do usuário) e recurrence como RRULE quando recorrente ("todo dia 5" -> FREQ=MONTHLY;BYMONTHDAY=5; "todo dia às 8h" -> FREQ=DAILY). Sem recorrência -> null.
 - "create_goal": meta de poupança ("quero juntar 5000 até dezembro pra viagem"). goal_name, target_cents, deadline (YYYY-MM-DD ou null).
