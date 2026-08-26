@@ -1241,6 +1241,50 @@ export type Database = {
           },
         ]
       }
+      subscriptions: {
+        Row: {
+          canceled_at: string | null
+          created_at: string
+          current_period_end: string | null
+          external_id: string | null
+          plan: string
+          provider: string | null
+          status: string
+          updated_at: string
+          workspace_id: string
+        }
+        Insert: {
+          canceled_at?: string | null
+          created_at?: string
+          current_period_end?: string | null
+          external_id?: string | null
+          plan?: string
+          provider?: string | null
+          status?: string
+          updated_at?: string
+          workspace_id: string
+        }
+        Update: {
+          canceled_at?: string | null
+          created_at?: string
+          current_period_end?: string | null
+          external_id?: string | null
+          plan?: string
+          provider?: string | null
+          status?: string
+          updated_at?: string
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "subscriptions_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: true
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       transactions: {
         Row: {
           account_id: string | null
@@ -1369,6 +1413,54 @@ export type Database = {
           },
           {
             foreignKeyName: "transactions_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      workspace_invites: {
+        Row: {
+          accepted_at: string | null
+          created_at: string
+          id: string
+          invited_by: string
+          phone: string
+          role: string
+          status: string
+          workspace_id: string
+        }
+        Insert: {
+          accepted_at?: string | null
+          created_at?: string
+          id?: string
+          invited_by: string
+          phone: string
+          role?: string
+          status?: string
+          workspace_id: string
+        }
+        Update: {
+          accepted_at?: string | null
+          created_at?: string
+          id?: string
+          invited_by?: string
+          phone?: string
+          role?: string
+          status?: string
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "workspace_invites_invited_by_fkey"
+            columns: ["invited_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "workspace_invites_workspace_id_fkey"
             columns: ["workspace_id"]
             isOneToOne: false
             referencedRelation: "workspaces"
@@ -1552,6 +1644,19 @@ export type Database = {
           total_interest_cents: number
         }[]
       }
+      _plan_status: {
+        Args: { ws_id: string }
+        Returns: {
+          ai_messages_month: number
+          can_import: boolean
+          current_period_end: string
+          max_ai_messages_month: number
+          max_members: number
+          members: number
+          plan: string
+          status: string
+        }[]
+      }
       _prepare_import_batch: {
         Args: { p_batch_id: string }
         Returns: {
@@ -1583,6 +1688,7 @@ export type Database = {
         }[]
       }
       _workspace_ids: { Args: { uid: string }; Returns: string[] }
+      accept_pending_invites: { Args: never; Returns: number }
       account_balances: {
         Args: never
         Returns: {
@@ -1633,6 +1739,7 @@ export type Database = {
           spent_cents: number
         }[]
       }
+      cancel_subscription: { Args: never; Returns: string }
       card_summary: {
         Args: never
         Returns: {
@@ -1786,6 +1893,19 @@ export type Database = {
           priority: number
           remaining_cents: number
           total_interest_cents: number
+        }[]
+      }
+      plan_status: {
+        Args: never
+        Returns: {
+          ai_messages_month: number
+          can_import: boolean
+          current_period_end: string
+          max_ai_messages_month: number
+          max_members: number
+          members: number
+          plan: string
+          status: string
         }[]
       }
       transactions_summary: {

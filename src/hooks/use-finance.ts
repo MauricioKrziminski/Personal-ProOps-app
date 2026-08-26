@@ -990,6 +990,116 @@ export function useFinancialHealth() {
   });
 }
 
+// ── plano, família e assinatura ─────────────────────────────────────────────
+
+export const PLANS = [
+  { value: 'free', label: 'Free', price: 'grátis', pitch: '1 pessoa · 100 mensagens/mês' },
+  { value: 'pro', label: 'Pro', price: 'R$ 24,90/mês', pitch: '3 pessoas · 1.000 mensagens · importação' },
+  { value: 'family', label: 'Família', price: 'R$ 39,90/mês', pitch: '5 pessoas · 2.000 mensagens · importação' },
+] as const;
+
+export type PlanStatus = Fns['plan_status']['Returns'][number];
+
+export type WorkspaceInvite = Pick<
+  Tables['workspace_invites']['Row'],
+  'id' | 'phone' | 'created_at'
+> & { role: 'member' | 'viewer'; status: 'pending' | 'accepted' | 'revoked' };
+
+export function usePlanStatus() {
+  return useQuery({
+    queryKey: ['plan-status'],
+    queryFn: async (): Promise<PlanStatus | null> => {
+      const { data, error } = await supabase.rpc('plan_status');
+      if (error) throw error;
+      return data?.[0] ?? null;
+    },
+  });
+}
+
+export function useInvites() {
+  return useQuery({
+    queryKey: ['invites'],
+    queryFn: async (): Promise<WorkspaceInvite[]> => {
+      const { data, error } = await supabase
+        .from('workspace_invites')
+        .select('id, phone, role, status, created_at')
+        .order('created_at', { ascending: false });
+      if (error) throw error;
+      return data as WorkspaceInvite[];
+    },
+  });
+}
+
+/**
+ * O telefone gravado em `profiles.phone` vem do login (`+55` + dígitos), então o
+ * convite precisa guardar no MESMO formato — senão o match no aceite nunca casa.
+ */
+function normalizaTelefone(entrada: string): string {
+  const digitos = entrada.replace(/\D/g, '');
+  // 10 ou 11 dígitos = número BR sem DDI; qualquer coisa maior já veio com ele
+  return digitos.length <= 11 ? `55${digitos}` : digitos;
+}
+
+/** Convite é por telefone: é o mesmo vínculo que o WhatsApp usa. */
+export function useInviteMember() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (input: { phone: string; role: 'member' | 'viewer' }) => {
+      const { error } = await supabase.from('workspace_invites').insert({
+        workspace_id: await workspaceId(),
+        invited_by: await userId(),
+        phone: normalizaTelefone(input.phone),
+        role: input.role,
+      });
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['invites'] });
+      queryClient.invalidateQueries({ queryKey: ['plan-status'] });
+    },
+  });
+}
+
+export function useRevokeInvite() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (id: string) => {
+      const { error } = await supabase
+        .from('workspace_invites')
+        .update({ status: 'revoked' })
+        .eq('id', id);
+      if (error) throw error;
+    },
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['invites'] }),
+  });
+}
+
+export function useChangePlan() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (plan: (typeof PLANS)[number]['value']) => {
+      const { error } = await supabase
+        .from('subscriptions')
+        .update({ plan, status: 'active', canceled_at: null })
+        .eq('workspace_id', await workspaceId());
+      if (error) throw error;
+    },
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['plan-status'] }),
+  });
+}
+
+/** Cancelar é uma chamada, sem formulário — de propósito. */
+export function useCancelSubscription() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async () => {
+      const { error } = await supabase.rpc('cancel_subscription');
+      if (error) throw error;
+    },
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['plan-status'] }),
+  });
+}
+
 export interface TransactionInput {
   kind: TransactionKind;
   amount_cents: number;

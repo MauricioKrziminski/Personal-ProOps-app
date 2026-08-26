@@ -42,6 +42,18 @@ Deno.serve(async (req) => {
       });
     }
 
+    // importação é recurso de plano pago: checa antes de gastar parse e IA
+    const { data: planoData } = await supabase.rpc("_plan_status", { ws_id: workspace_id });
+    const plano = (planoData ?? [])[0] as { plan: string; can_import: boolean } | undefined;
+    if (plano && !plano.can_import) {
+      return new Response(
+        JSON.stringify({
+          error: `Importar extrato é do plano Pro. No ${plano.plan} dá para registrar pelo WhatsApp à vontade.`,
+        }),
+        { status: 402, headers: { "Content-Type": "application/json" } },
+      );
+    }
+
     const linhas = (source === "ofx" ? parseOFX(content) : parseCSV(content)).slice(0, MAX_ITEMS);
     if (!linhas.length) {
       return new Response(

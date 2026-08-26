@@ -918,7 +918,7 @@ Deno.serve(async (_req) => {
       }
       const { text, media } = content;
 
-      // 3. rate limit por usuário: protege custo de Gemini/Groq contra flood
+      // 3a. anti-flood por hora: protege o custo de Gemini/Groq contra rajada
       const { count: parsesLastHour } = await supabase
         .from("ai_events")
         .select("id", { count: "exact", head: true })
@@ -927,6 +927,23 @@ Deno.serve(async (_req) => {
       if ((parsesLastHour ?? 0) >= MAX_PARSES_PER_HOUR) {
         await markDone(job.id);
         await trySend(profile.phone, "😅 Muitas mensagens em pouco tempo. Aguarda um pouquinho e tenta de novo!");
+        continue;
+      }
+
+      // 3b. cota do plano (mensal). Limite vive no banco, num lugar só —
+      // espalhar número de plano pelo código é como o produto acaba cobrando de
+      // um jeito e entregando de outro.
+      const { data: planoData } = await supabase.rpc("_plan_status", { ws_id: workspaceId });
+      const plano = (planoData ?? [])[0] as
+        | { plan: string; status: string; ai_messages_month: number; max_ai_messages_month: number }
+        | undefined;
+      if (plano && plano.ai_messages_month >= plano.max_ai_messages_month) {
+        await markDone(job.id);
+        await trySend(
+          profile.phone,
+          `📊 Você usou as ${plano.max_ai_messages_month} mensagens do plano ${plano.plan} este mês. ` +
+            "No app dá para subir de plano e continuar agora mesmo — seus dados continuam todos aí.",
+        );
         continue;
       }
 

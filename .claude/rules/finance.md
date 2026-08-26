@@ -51,6 +51,13 @@
 - **Dedupe por dia** em `alerts_sent` (workspace, tipo, ref, `sent_on`), reservado ANTES do envio. Cron rodando duas vezes não pode virar spam — no WhatsApp spam é template pago.
 - Toda mensagem termina numa ação ("quer que eu remaneje?", "me manda paguei"). Alerta que só informa é o que faz o usuário desinstalar no segundo mês.
 
+## Planos e limites
+
+- **Limite de plano mora em `private.plan_limits`, num lugar só.** Espalhar número de plano pelo código é como o produto acaba cobrando de um jeito e entregando de outro.
+- `plan_status()` devolve plano + consumo do mês + limites numa chamada: serve a tela E o gate da IA no `process-jobs`.
+- Cancelamento é **uma chamada, sem formulário** (`cancel_subscription`). Dificultar cancelamento é a reclamação nº1 contra os concorrentes no Reclame Aqui — não repetir.
+- Convite de membro é por **telefone** (o mesmo vínculo do WhatsApp), normalizado com DDI para casar com `profiles.phone`.
+
 ## Regras de negócio
 
 - Transferência não conta como receita nem despesa em resumos (excluir `kind='transfer'` das agregações de fluxo).

@@ -1,4 +1,5 @@
 import Constants from 'expo-constants';
+import { router } from 'expo-router';
 import * as Device from 'expo-device';
 import * as Haptics from 'expo-haptics';
 import * as Notifications from 'expo-notifications';
@@ -92,6 +93,20 @@ export default function ProfileScreen() {
               É por esse número que suas mensagens viram notas, lembretes e lançamentos.
             </ThemedText>
           </GlassCard>
+
+          <Pressable
+            onPress={() => {
+              Haptics.selectionAsync();
+              router.push('/finance/plan');
+            }}>
+            <GlassCard style={styles.card}>
+              <ThemedText type="smallBold">👥 Plano e família</ThemedText>
+              <ThemedText type="small" themeColor="textSecondary">
+                Ver seu plano, convidar alguém para o mesmo financeiro e cancelar quando quiser —
+                sem falar com ninguém.
+              </ThemedText>
+            </GlassCard>
+          </Pressable>
 
           <GlassCard style={styles.card}>
             <ThemedText type="smallBold">🔔 Notificações push</ThemedText>

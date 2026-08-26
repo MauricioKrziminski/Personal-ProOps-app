@@ -275,8 +275,46 @@ WhatsApp. A function já prefere push quando existe token — falta só a creden
 - Verificado: patrimônio de um cenário completo (caixa + investimento + veículo − financiamento)
   batendo antes e depois da correção do caixa. 34 testes, tsc/lint limpos.
 
-**Próximo:** Fase 7 do plano — comercial (planos, limites por plano, convite de membro, onboarding
-e cancelamento self-service).
+## ✅ FASE 7 — comercial (concluída em 26/08/2026)
+
+- `0029_subscriptions_and_invites.sql` — `subscriptions` (com `provider`/`external_id` prontos
+  para o gateway), `private.plan_limits` (limites num lugar só), `plan_status` (plano + consumo do
+  mês + limites numa chamada, serve a tela E o gate da IA), `workspace_invites`,
+  `accept_pending_invites` e `cancel_subscription`. `handle_new_user` passa a criar a assinatura
+  free e a aceitar convite feito ANTES do cadastro.
+- `0030_tighten_accept_invites.sql` — fecha o WARN do advisor: a função sai do alcance do `anon`.
+- Limites aplicados de verdade: `process-jobs` corta na cota mensal do plano (mantendo o
+  anti-flood por hora) e `import-statement` devolve 402 quando o plano não tem importação.
+- App: `finance/plan.tsx` (plano, consumo, troca, convite por telefone, convites pendentes e
+  **cancelamento em um toque**), link no Perfil, e `useSession` aceitando convites no login.
+- Preços definidos: Free (1 pessoa, 100 msgs) · Pro R$ 24,90 (3 pessoas, 1.000 msgs, importação)
+  · Família R$ 39,90 (5 pessoas, 2.000 msgs). Abaixo de Meu Assessor e Financinha porque não
+  pagamos conexão de Open Finance.
+- Verificado: `plan_status` respondendo free e family com limites e consumo corretos; telefone do
+  convite normalizado para o mesmo formato de `profiles.phone` (senão o aceite nunca casaria).
+
+⚠️ **Cobrança não está ligada.** `provider`/`external_id` existem, mas falta escolher o gateway
+(Stripe/Kiwify/Hotmart) e escrever o webhook que muda `plan`/`status`/`current_period_end`. Hoje o
+plano é trocado manualmente na tela — o resto do produto já respeita os limites.
+
+⚠️ **Advisor aceito de propósito:** `accept_pending_invites` fica como `SECURITY DEFINER`
+executável por `authenticated`. Ela precisa escrever em `workspace_members` de um workspace que o
+convidado ainda não enxerga, e só age sobre o telefone do próprio `auth.uid()`.
+
+---
+
+## 🎯 Onde o produto está
+
+As 7 fases do plano de mercado estão no ar. O que diferencia de Foccum / Meu Assessor / Pierre /
+Financinha / ZapGastos hoje: parcelamento e fatura de verdade, projeção de fluxo de caixa com
+simulador de compra, correção conversacional com auditoria da IA visível, ingestão inteligente no
+lugar do Open Finance, patrimônio e IR, e cancelamento sem atrito.
+
+**Pendências reais para virar produto pago:**
+1. Push (`docs/PUSH-NOTIFICATIONS.md`) — sem ele todo alerta proativo vira template pago.
+2. Gateway de pagamento + webhook de assinatura.
+3. Número WhatsApp de produção (a janela de 90 dias do número de teste fecha ~outubro/2026).
+4. Conferir todas as telas novas no device em dark e light.
 
 ## 📝 Como verificar o pipeline (rápido)
 Usar `/verify-whatsapp` ou manualmente: mandar mensagem → conferir `messages_raw` (inbound) → `jobs` (done) → `ai_events` (result/confidence) → tabela final (`transactions`/`notes`/...) → resposta no WhatsApp. Logs: MCP `get_logs` (edge-function).

@@ -35,7 +35,7 @@ Funções `security definer` sempre com `set search_path = public` e revoke expl
 ## Segredos
 
 - Segredos (Gemini, Groq, WhatsApp, hooks) **só** em secrets das functions (`npx supabase secrets set`). Nunca no app, nunca commitados. Toda variável nova documentada em `supabase/.env.example` com comentário.
-- Crons ativos: `process-jobs` e `send-reminders` (por minuto) e `finance-scheduler` (de hora em hora: materializa recorrentes 90 dias à frente, fecha faturas, promove pendentes vencidos).
+- Crons ativos: `process-jobs` e `send-reminders` (por minuto), `finance-scheduler` (de hora em hora: materializa recorrentes 90 dias à frente, fecha faturas, promove pendentes, tira o snapshot de patrimônio) e `send-alerts` (diário, 12h UTC).
 - Os `cron.schedule` leem URL e anon key do **Supabase Vault** (`vault.decrypted_secrets`, segredos `project_url`/`anon_key`) — ver `0008_cron_token_from_vault.sql`. Nunca voltar a escrever token literal em migration (a `0003` fez isso e a chave está no histórico do git: rotacionar). Segredo novo entra por `vault.create_secret` fora do repo.
 
 ## Realtime & fila
