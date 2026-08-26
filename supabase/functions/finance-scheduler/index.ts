@@ -9,6 +9,7 @@
  *   3. PROMOVE para `cleared` o que já aconteceu (parcela de compra parcelada e
  *      ocorrência de série com auto_confirm). Conta a pagar avulsa fica pending
  *      até o usuário confirmar.
+ *   4. TIRA A FOTO do patrimônio do dia (`net_worth_snapshots`).
  *
  * Idempotente: o unique index (recurring_id, occurred_at) faz rodar duas vezes
  * não duplicar nada. Antes isso vivia no `send-reminders`, que voltou a cuidar
@@ -150,8 +151,18 @@ Deno.serve(async (_req) => {
   const { data: promoted, error: promoteError } = await supabase.rpc("_promote_due_transactions");
   if (promoteError) console.error("_promote_due_transactions:", promoteError);
 
+  // foto do patrimônio do dia: valor de imóvel/investimento/dívida não tem
+  // histórico para reconstruir depois, então a série vive de snapshot
+  const { data: snapshots, error: snapshotError } = await supabase.rpc("_snapshot_net_worth");
+  if (snapshotError) console.error("_snapshot_net_worth:", snapshotError);
+
   return new Response(
-    JSON.stringify({ created, invoicesClosed: closed ?? 0, promoted: promoted ?? 0 }),
+    JSON.stringify({
+      created,
+      invoicesClosed: closed ?? 0,
+      promoted: promoted ?? 0,
+      snapshots: snapshots ?? 0,
+    }),
     { headers: { "Content-Type": "application/json" } },
   );
 });

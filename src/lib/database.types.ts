@@ -192,6 +192,105 @@ export type Database = {
           },
         ]
       }
+      asset_valuations: {
+        Row: {
+          as_of: string
+          asset_id: string
+          created_at: string
+          id: string
+          value_cents: number
+          workspace_id: string
+        }
+        Insert: {
+          as_of?: string
+          asset_id: string
+          created_at?: string
+          id?: string
+          value_cents: number
+          workspace_id?: string
+        }
+        Update: {
+          as_of?: string
+          asset_id?: string
+          created_at?: string
+          id?: string
+          value_cents?: number
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "asset_valuations_asset_id_fkey"
+            columns: ["asset_id"]
+            isOneToOne: false
+            referencedRelation: "assets"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "asset_valuations_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      assets: {
+        Row: {
+          acquired_at: string | null
+          archived: boolean
+          class: string
+          created_at: string
+          current_value_cents: number
+          id: string
+          is_liability: boolean
+          name: string
+          updated_at: string
+          user_id: string
+          workspace_id: string
+        }
+        Insert: {
+          acquired_at?: string | null
+          archived?: boolean
+          class?: string
+          created_at?: string
+          current_value_cents: number
+          id?: string
+          is_liability?: boolean
+          name: string
+          updated_at?: string
+          user_id: string
+          workspace_id?: string
+        }
+        Update: {
+          acquired_at?: string | null
+          archived?: boolean
+          class?: string
+          created_at?: string
+          current_value_cents?: number
+          id?: string
+          is_liability?: boolean
+          name?: string
+          updated_at?: string
+          user_id?: string
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "assets_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "assets_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       budgets: {
         Row: {
           category: string
@@ -860,6 +959,50 @@ export type Database = {
           },
         ]
       }
+      net_worth_snapshots: {
+        Row: {
+          as_of: string
+          cash_cents: number
+          created_at: string
+          id: string
+          investments_cents: number
+          liabilities_cents: number
+          net_cents: number
+          other_assets_cents: number
+          workspace_id: string
+        }
+        Insert: {
+          as_of?: string
+          cash_cents: number
+          created_at?: string
+          id?: string
+          investments_cents: number
+          liabilities_cents: number
+          net_cents: number
+          other_assets_cents: number
+          workspace_id: string
+        }
+        Update: {
+          as_of?: string
+          cash_cents?: number
+          created_at?: string
+          id?: string
+          investments_cents?: number
+          liabilities_cents?: number
+          net_cents?: number
+          other_assets_cents?: number
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "net_worth_snapshots_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       notes: {
         Row: {
           category: string | null
@@ -1418,6 +1561,7 @@ export type Database = {
         }[]
       }
       _promote_due_transactions: { Args: never; Returns: number }
+      _snapshot_net_worth: { Args: never; Returns: number }
       _tx_summary: {
         Args: { from_date: string; to_date: string; uid: string }
         Returns: {
@@ -1455,6 +1599,25 @@ export type Database = {
           installment_cents: number
           worst_balance_cents: number
           worst_day: string
+        }[]
+      }
+      annual_by_category: {
+        Args: { p_year: number }
+        Returns: {
+          category: string
+          kind: string
+          total_cents: number
+          tx_count: number
+        }[]
+      }
+      annual_summary: {
+        Args: { p_year: number }
+        Returns: {
+          balance_cents: number
+          expense_cents: number
+          income_cents: number
+          savings_rate: number
+          tx_count: number
         }[]
       }
       approve_import_items: { Args: { p_item_ids: string[] }; Returns: number }
@@ -1554,6 +1717,16 @@ export type Database = {
           total_cents: number
         }[]
       }
+      financial_health: {
+        Args: never
+        Returns: {
+          budget_adherence: number
+          debt_ratio: number
+          months_of_reserve: number
+          savings_rate: number
+          score: number
+        }[]
+      }
       goal_deposit: {
         Args: {
           p_amount_cents: number
@@ -1572,6 +1745,24 @@ export type Database = {
         }[]
       }
       my_default_workspace: { Args: never; Returns: string }
+      net_worth: {
+        Args: never
+        Returns: {
+          cash_cents: number
+          investments_cents: number
+          liabilities_cents: number
+          net_cents: number
+          other_assets_cents: number
+        }[]
+      }
+      net_worth_series: {
+        Args: { months_back?: number }
+        Returns: {
+          liabilities_cents: number
+          month: string
+          net_cents: number
+        }[]
+      }
       pay_debt_installment: {
         Args: {
           p_account_id?: string
@@ -1615,6 +1806,18 @@ export type Database = {
           overdue: boolean
           ref_id: string
           title: string
+        }[]
+      }
+      update_asset_value: {
+        Args: { p_as_of?: string; p_asset_id: string; p_value_cents: number }
+        Returns: number
+      }
+      year_end_balances: {
+        Args: { p_year: number }
+        Returns: {
+          balance_cents: number
+          kind: string
+          name: string
         }[]
       }
     }

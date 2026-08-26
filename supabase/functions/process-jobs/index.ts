@@ -653,6 +653,52 @@ async function executeAction(
       return `🗑️ ${rotulo} apagad${tipo === "note" || tipo === "goal" ? "a" : "o"}: ${lista[0][campoTexto]}`;
     }
 
+    case "query_net_worth": {
+      // a foto mais recente do workspace (tirada pelo finance-scheduler)
+      const { data: patrimonio } = await supabase
+        .from("net_worth_snapshots")
+        .select("cash_cents, investments_cents, other_assets_cents, liabilities_cents, net_cents")
+        .eq("workspace_id", workspaceId)
+        .order("as_of", { ascending: false })
+        .limit(1);
+      const p = patrimonio?.[0];
+      if (!p) {
+        return "🏦 Ainda não tenho a foto do seu patrimônio (ela é tirada uma vez por dia). " +
+          "Cadastra seus bens no app que amanhã já aparece aqui!";
+      }
+      return `🏦 Patrimônio líquido: *${centsToBRL(Number(p.net_cents))}*\n` +
+        `  💵 em conta: ${centsToBRL(Number(p.cash_cents))}\n` +
+        `  📈 investido: ${centsToBRL(Number(p.investments_cents))}\n` +
+        `  🏠 outros bens: ${centsToBRL(Number(p.other_assets_cents))}\n` +
+        `  🧾 dívidas e faturas: -${centsToBRL(Number(p.liabilities_cents))}`;
+    }
+
+    case "update_asset_value": {
+      const nome = (action.content ?? action.title)?.trim();
+      if (!nome || !action.amount_cents || action.amount_cents < 0) {
+        return "❌ Não entendi. Tenta \"meu tesouro direto tá em 27 mil\".";
+      }
+      const { data: ativos } = await supabase
+        .from("assets")
+        .select("id, name")
+        .eq("workspace_id", workspaceId)
+        .eq("archived", false)
+        .ilike("name", `%${nome}%`)
+        .limit(2);
+      if (!ativos?.length) return `🤷 Não achei o bem *${nome}*. Cadastra ele no app primeiro.`;
+      if (ativos.length > 1) {
+        return `🤔 Achei mais de um: ${ativos.map((a) => a.name).join(", ")}. Qual deles?`;
+      }
+
+      const { error } = await supabase.rpc("update_asset_value", {
+        p_asset_id: ativos[0].id,
+        p_value_cents: action.amount_cents,
+        p_as_of: localISODate(now, timezone),
+      });
+      if (error) throw error;
+      return `📈 *${ativos[0].name}* atualizado para ${centsToBRL(action.amount_cents)}.`;
+    }
+
     case "create_note": {
       const { error } = await supabase.from("notes").insert({
         user_id: userId,

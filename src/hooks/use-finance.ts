@@ -296,7 +296,7 @@ export function useBudgetsStatus(month?: string) {
 const FINANCE_KEYS = [
   ['transactions'], ['tx-summary'], ['monthly-cashflow'], ['account-balances'],
   ['budgets-status'], ['accounts'], ['goals'], ['budgets'], ['recurring'],
-  ['card-summary'], ['invoice'], ['forecast'], ['upcoming-bills'], ['debts'], ['payoff'],
+  ['card-summary'], ['invoice'], ['forecast'], ['upcoming-bills'], ['debts'], ['payoff'], ['assets'], ['net-worth'], ['financial-health'],
 ];
 
 function useInvalidateFinance() {
@@ -840,6 +840,153 @@ export function useArchiveDebt() {
       if (error) throw error;
     },
     onSuccess: invalidate,
+  });
+}
+
+// ── patrimônio, investimentos e relatórios ──────────────────────────────────
+
+export const ASSET_CLASSES = [
+  { value: 'investment', label: 'Investimento' },
+  { value: 'real_estate', label: 'Imóvel' },
+  { value: 'vehicle', label: 'Veículo' },
+  { value: 'crypto', label: 'Cripto' },
+  { value: 'equity', label: 'Participação' },
+  { value: 'receivable', label: 'A receber' },
+  { value: 'other', label: 'Outro' },
+] as const;
+
+export type Asset = Pick<
+  Tables['assets']['Row'],
+  'id' | 'name' | 'is_liability' | 'current_value_cents' | 'acquired_at' | 'archived'
+> & { class: (typeof ASSET_CLASSES)[number]['value'] };
+
+export type NetWorth = Fns['net_worth']['Returns'][number];
+export type NetWorthPoint = Fns['net_worth_series']['Returns'][number];
+export type AnnualSummary = Fns['annual_summary']['Returns'][number];
+export type AnnualCategoryRow = Omit<Fns['annual_by_category']['Returns'][number], 'kind'> & {
+  kind: 'expense' | 'income';
+};
+export type YearEndBalance = Omit<Fns['year_end_balances']['Returns'][number], 'kind'> & {
+  kind: 'account' | 'asset';
+};
+export type FinancialHealth = Fns['financial_health']['Returns'][number];
+
+export function useAssets() {
+  useRealtimeInvalidate('assets', ['assets']);
+  return useQuery({
+    queryKey: ['assets'],
+    queryFn: async (): Promise<Asset[]> => {
+      const { data, error } = await supabase
+        .from('assets')
+        .select('id, name, class, is_liability, current_value_cents, acquired_at, archived')
+        .eq('archived', false)
+        .order('current_value_cents', { ascending: false });
+      if (error) throw error;
+      return data as Asset[];
+    },
+  });
+}
+
+/** Patrimônio de hoje, calculado na hora (não espera o snapshot do cron). */
+export function useNetWorth() {
+  useRealtimeInvalidate('transactions', ['net-worth']);
+  useRealtimeInvalidate('assets', ['net-worth']);
+  return useQuery({
+    queryKey: ['net-worth'],
+    queryFn: async (): Promise<NetWorth | null> => {
+      const { data, error } = await supabase.rpc('net_worth');
+      if (error) throw error;
+      return data?.[0] ?? null;
+    },
+  });
+}
+
+/** Série histórica — vem dos snapshots diários, começa quando o app começou. */
+export function useNetWorthSeries(monthsBack = 12) {
+  return useQuery({
+    queryKey: ['net-worth-series', String(monthsBack)],
+    queryFn: async (): Promise<NetWorthPoint[]> => {
+      const { data, error } = await supabase.rpc('net_worth_series', { months_back: monthsBack });
+      if (error) throw error;
+      return data;
+    },
+  });
+}
+
+export function useSaveAsset() {
+  const invalidate = useInvalidateFinance();
+  return useMutation({
+    mutationFn: async (input: {
+      id?: string;
+      name: string;
+      class: Asset['class'];
+      is_liability: boolean;
+      current_value_cents: number;
+    }) => {
+      const { id, ...resto } = input;
+      if (id) {
+        // pela RPC para o valor virar marcação no histórico, não só um update
+        const { error } = await supabase.rpc('update_asset_value', {
+          p_asset_id: id,
+          p_value_cents: resto.current_value_cents,
+          p_as_of: localISODate(),
+        });
+        if (error) throw error;
+      } else {
+        const { error } = await supabase.from('assets').insert({ ...resto, user_id: await userId() });
+        if (error) throw error;
+      }
+    },
+    onSuccess: invalidate,
+  });
+}
+
+export function useArchiveAsset() {
+  const invalidate = useInvalidateFinance();
+  return useMutation({
+    mutationFn: async (id: string) => {
+      const { error } = await supabase.from('assets').update({ archived: true }).eq('id', id);
+      if (error) throw error;
+    },
+    onSuccess: invalidate,
+  });
+}
+
+/** Relatório do ano: totais, categorias e saldos em 31/12 (o que o IR pede). */
+export function useAnnualReport(year: number) {
+  return useQuery({
+    queryKey: ['annual-report', String(year)],
+    queryFn: async (): Promise<{
+      summary: AnnualSummary | null;
+      categories: AnnualCategoryRow[];
+      yearEnd: YearEndBalance[];
+    }> => {
+      const [summary, categories, yearEnd] = await Promise.all([
+        supabase.rpc('annual_summary', { p_year: year }),
+        supabase.rpc('annual_by_category', { p_year: year }),
+        supabase.rpc('year_end_balances', { p_year: year }),
+      ]);
+      if (summary.error) throw summary.error;
+      if (categories.error) throw categories.error;
+      if (yearEnd.error) throw yearEnd.error;
+      return {
+        summary: summary.data?.[0] ?? null,
+        categories: (categories.data ?? []) as AnnualCategoryRow[],
+        yearEnd: (yearEnd.data ?? []) as YearEndBalance[],
+      };
+    },
+  });
+}
+
+export function useFinancialHealth() {
+  useRealtimeInvalidate('transactions', ['financial-health']);
+  return useQuery({
+    queryKey: ['financial-health'],
+    queryFn: async (): Promise<FinancialHealth | null> => {
+      const { data, error } = await supabase.rpc('financial_health');
+      if (error) throw error;
+      return data?.[0] ?? null;
+    },
   });
 }
 

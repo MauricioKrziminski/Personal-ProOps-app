@@ -33,6 +33,8 @@ export type AiActionType =
   | "set_rule"
   | "update_transaction"
   | "delete_item"
+  | "query_net_worth"
+  | "update_asset_value"
   | "create_note"
   | "create_reminder"
   | "create_goal"
@@ -87,7 +89,7 @@ const ACTION_SCHEMA = {
         "create_expense", "create_income", "create_transfer",
         "create_installment_purchase", "pay_invoice", "query_invoice",
         "query_forecast", "simulate_purchase", "mark_paid", "set_rule",
-        "update_transaction", "delete_item",
+        "update_transaction", "delete_item", "query_net_worth", "update_asset_value",
         "create_note", "create_reminder", "create_goal", "goal_deposit",
         "query_balance", "query_transactions", "query_budgets", "query_goals",
         "undo_last", "unknown",
@@ -150,6 +152,8 @@ Tipos de ação:
 - "set_rule": o usuário quer que algo SEMPRE caia numa categoria ("sempre que eu falar ifood põe em restaurante", "posto é transporte", "toda vez que aparecer uber, categoria transporte"). content = o texto que dispara a regra (ex.: "ifood"), category = a categoria de destino.
 - "update_transaction": corrigir um lançamento JÁ registrado ("na verdade foi 54, não 45", "muda o último pra transporte", "o mercado de ontem foi 120"). Campos de BUSCA: amount_cents (valor atual), category, content (parte da descrição) — preencha só o que o usuário citou; nada citado = o último lançamento. Campos de CORREÇÃO: new_amount_cents, new_category, new_occurred_at.
 - "delete_item": apagar um item específico ("apaga a nota do mercado", "cancela o lembrete do aluguel", "tira aquele gasto de 45"). target_type diz o tipo (transaction, note, reminder, goal, recurring) e content/amount_cents/category identificam qual. Para "apaga o último lançamento" use undo_last.
+- "query_net_worth": pergunta sobre patrimônio ("quanto eu tenho no total?", "qual meu patrimônio?", "quanto vale tudo que eu tenho?", "como tá minha saúde financeira?"). Diferente de query_balance, que é só o saldo em conta.
+- "update_asset_value": atualizar o valor de um bem/investimento ("meu tesouro direto tá em 27 mil", "o carro agora vale 38 mil"). content/title = nome do bem, amount_cents = valor novo.
 - "create_note": anotação livre. content (texto limpo) e category curta se óbvia.
 - "create_reminder": pedido para ser lembrado. title, remind_at (próxima ocorrência, ISO, no fuso do usuário) e recurrence como RRULE quando recorrente ("todo dia 5" -> FREQ=MONTHLY;BYMONTHDAY=5; "todo dia às 8h" -> FREQ=DAILY). Sem recorrência -> null.
 - "create_goal": meta de poupança ("quero juntar 5000 até dezembro pra viagem"). goal_name, target_cents, deadline (YYYY-MM-DD ou null).

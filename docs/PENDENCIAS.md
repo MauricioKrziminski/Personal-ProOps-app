@@ -254,7 +254,29 @@ categoria ou o valor? Sem conserto.
 `docs/PUSH-NOTIFICATIONS.md`), `expo_push_token` fica NULL e TODO alerta cai no template pago do
 WhatsApp. A function já prefere push quando existe token — falta só a credencial.
 
-**Próximo:** Fase 6 do plano — patrimônio, investimentos e relatórios/IR.
+## ✅ FASE 6 — patrimônio, investimentos e IR (concluída em 26/08/2026)
+
+- `0026_net_worth.sql` — `assets` + `asset_valuations` (histórico de marcação) + `net_worth()`
+  calculado na hora e `net_worth_snapshots` alimentado pelo `finance-scheduler`. **Histórico por
+  snapshot, não por reconstrução**: saldo de conta dá para reconstruir das transações, mas valor
+  de imóvel/investimento e saldo de dívida não — reconstruir seria inventar número.
+- `0027_annual_reports_and_health.sql` — `annual_summary`, `annual_by_category`,
+  `year_end_balances` (a ficha "Bens e Direitos" da declaração) e `financial_health`, com as
+  4 parcelas do score expostas para o app poder explicar cada ponto.
+- 🐛 **`0028_cash_includes_accountless.sql` — bug real encontrado testando**: o caixa (patrimônio
+  E saldo inicial da projeção da Fase 2) somava só transações ligadas a uma conta. Lançamento do
+  WhatsApp normalmente NÃO tem conta, então quem só usa o WhatsApp via caixa = soma dos saldos
+  iniciais. `_account_balances` já tratava com a linha "Sem conta"; faltava nos outros dois.
+  Corrigido com `private.cash_total()` reaproveitado pelos três.
+- IA: `query_net_worth` e `update_asset_value` ("meu tesouro direto tá em 27 mil").
+- App: `finance/net-worth.tsx` (composição, evolução, score explicado, CRUD de bens com marcação
+  no histórico) e `finance/reports.tsx` (ano em números, gastos por categoria, saldos em 31/12,
+  export CSV pelo share sheet).
+- Verificado: patrimônio de um cenário completo (caixa + investimento + veículo − financiamento)
+  batendo antes e depois da correção do caixa. 34 testes, tsc/lint limpos.
+
+**Próximo:** Fase 7 do plano — comercial (planos, limites por plano, convite de membro, onboarding
+e cancelamento self-service).
 
 ## 📝 Como verificar o pipeline (rápido)
 Usar `/verify-whatsapp` ou manualmente: mandar mensagem → conferir `messages_raw` (inbound) → `jobs` (done) → `ai_events` (result/confidence) → tabela final (`transactions`/`notes`/...) → resposta no WhatsApp. Logs: MCP `get_logs` (edge-function).

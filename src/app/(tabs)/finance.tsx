@@ -331,10 +331,12 @@ export default function FinanceScreen() {
               <SectionLink title="🎯 Metas" href="/finance/goals" index={4} />
               <SectionLink title="📉 Orçamentos" href="/finance/budgets" index={5} />
               <SectionLink title="🧾 Dívidas" href="/finance/debts" index={6} />
-              <SectionLink title="🔁 Recorrentes" href="/finance/recurring" index={7} />
-              <SectionLink title="📥 Importar extrato" href="/finance/import" index={8} />
-              <SectionLink title="📌 Regras de categoria" href="/finance/rules" index={9} />
-              <SectionLink title="🤖 Atividade da IA" href="/finance/ai-activity" index={10} />
+              <SectionLink title="🏦 Patrimônio" href="/finance/net-worth" index={7} />
+              <SectionLink title="📊 Relatórios e IR" href="/finance/reports" index={8} />
+              <SectionLink title="🔁 Recorrentes" href="/finance/recurring" index={9} />
+              <SectionLink title="📥 Importar extrato" href="/finance/import" index={10} />
+              <SectionLink title="📌 Regras de categoria" href="/finance/rules" index={11} />
+              <SectionLink title="🤖 Atividade da IA" href="/finance/ai-activity" index={12} />
             </>
           )}
         </ScrollView>

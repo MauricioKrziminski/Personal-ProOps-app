@@ -33,6 +33,8 @@ export default function RootLayout() {
             <Stack.Screen name="finance/rules" />
             <Stack.Screen name="finance/ai-activity" />
             <Stack.Screen name="finance/debts" />
+            <Stack.Screen name="finance/net-worth" />
+            <Stack.Screen name="finance/reports" />
             <Stack.Screen name="finance/invoice/[id]" />
             <Stack.Screen name="finance/transaction-form" options={{ presentation: 'modal' }} />
             <Stack.Screen name="reminder-form" options={{ presentation: 'modal' }} />
