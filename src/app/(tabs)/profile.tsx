@@ -19,6 +19,7 @@ type PushState = 'unknown' | 'off' | 'on' | 'saving' | 'error';
 
 function usePushToken(userId: string | undefined) {
   const [state, setState] = useState<PushState>('unknown');
+  const [message, setMessage] = useState<string | null>(null);
 
   useEffect(() => {
     if (!userId) return;
@@ -33,14 +34,19 @@ function usePushToken(userId: string | undefined) {
   const enable = async () => {
     if (!userId) return;
     setState('saving');
+    setMessage(null);
     try {
-      if (!Device.isDevice) throw new Error('push só funciona em aparelho físico');
+      if (!Device.isDevice) throw new Error('Push só funciona em aparelho físico, não no emulador.');
       const { status } = await Notifications.requestPermissionsAsync();
-      if (status !== 'granted') throw new Error('permissão negada');
+      if (status !== 'granted') throw new Error('Permissão de notificação negada nas configurações.');
       const projectId =
         Constants.expoConfig?.extra?.eas?.projectId ?? Constants.easConfig?.projectId;
-      const token = (await Notifications.getExpoPushTokenAsync(projectId ? { projectId } : undefined))
-        .data;
+      // sem projectId o getExpoPushTokenAsync falha com "Project ID not found" —
+      // mensagem que não diz o que fazer. Ver docs/PENDENCIAS.md (rodar `eas init`).
+      if (!projectId) {
+        throw new Error('App ainda não vinculado ao EAS (falta extra.eas.projectId no app.json).');
+      }
+      const token = (await Notifications.getExpoPushTokenAsync({ projectId })).data;
       const { error } = await supabase
         .from('profiles')
         .update({ expo_push_token: token })
@@ -50,11 +56,12 @@ function usePushToken(userId: string | undefined) {
       setState('on');
     } catch (err) {
       console.error('push register:', err);
+      setMessage(err instanceof Error ? err.message : String(err));
       setState('error');
     }
   };
 
-  return { state, enable };
+  return { state, message, enable };
 }
 
 export default function ProfileScreen() {
@@ -110,7 +117,7 @@ export default function ProfileScreen() {
                 </Pressable>
                 {push.state === 'error' && (
                   <ThemedText type="small" themeColor="danger">
-                    Não deu para ativar (permissão negada ou emulador).
+                    {push.message ?? 'Não deu para ativar as notificações.'}
                   </ThemedText>
                 )}
               </>

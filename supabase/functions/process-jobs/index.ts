@@ -13,9 +13,10 @@
  * NÃO reprocessa o job, evitando inserts duplicados.
  */
 
-import { RRule } from "https://esm.sh/rrule@2.8.1";
 import { adminClient } from "../_shared/admin.ts";
 import { downloadMedia, sendText } from "../_shared/whatsapp.ts";
+import { localISODate, toInstantISO } from "../_shared/datetime.ts";
+import { nextOccurrence } from "../_shared/recurrence.ts";
 import {
   type AiAction,
   GEMINI_FLASH,
@@ -58,19 +59,6 @@ function centsToBRL(cents: number): string {
 function formatDateBR(iso: string): string {
   const [y, m, d] = iso.split("-");
   return d && m && y ? `${d}-${m}-${y}` : iso;
-}
-
-/** Próxima ocorrência de uma RRULE a partir de `after` (inclusive hoje não). */
-function nextOccurrence(recurrence: string, after: Date): Date | null {
-  try {
-    const rule = RRule.fromString(
-      recurrence.startsWith("RRULE:") ? recurrence : `RRULE:${recurrence}`,
-    );
-    return rule.after(after, false);
-  } catch (err) {
-    console.error("RRULE inválida:", recurrence, err);
-    return null;
-  }
 }
 
 /** Envio best-effort: nunca lança — uma falha de confirmação não deve reprocessar o job. */
@@ -136,7 +124,7 @@ async function executeAction(
         account_id: accountId,
       };
       if (action.recurrence) {
-        const next = nextOccurrence(action.recurrence, now);
+        const next = nextOccurrence(action.recurrence, now, timezone);
         if (!next) return "❌ Não entendi a recorrência. Tenta \"todo dia 5\" ou \"toda segunda\".";
         const { error } = await supabase.from("recurring_transactions").insert({
           ...base,
@@ -148,12 +136,12 @@ async function executeAction(
         const emoji = kind === "expense" ? "🔁💸" : "🔁💰";
         return `${emoji} ${KIND_LABEL[kind]} recorrente: ${centsToBRL(action.amount_cents)}` +
           (base.category ? ` em *${base.category}*` : "") +
-          ` — próxima em ${formatDateBR(next.toISOString().slice(0, 10))}.`;
+          ` — próxima em ${formatDateBR(localISODate(next, timezone))}.`;
       }
       const { error } = await supabase.from("transactions").insert({
         ...base,
         kind,
-        occurred_at: action.occurred_at ?? now.toISOString().slice(0, 10),
+        occurred_at: action.occurred_at ?? localISODate(now, timezone),
         source: "whatsapp",
       });
       if (error) throw error;
@@ -180,7 +168,7 @@ async function executeAction(
         description: action.content ?? action.title,
         account_id: fromId,
         counterparty_account_id: toId,
-        occurred_at: action.occurred_at ?? now.toISOString().slice(0, 10),
+        occurred_at: action.occurred_at ?? localISODate(now, timezone),
         source: "whatsapp",
       });
       if (error) throw error;
@@ -206,7 +194,9 @@ async function executeAction(
         user_id: userId,
         title: action.title ?? action.content ?? "Lembrete",
         recurrence: action.recurrence,
-        next_run_at: action.remind_at ?? nextOccurrence(action.recurrence!, now)?.toISOString() ?? now.toISOString(),
+        next_run_at: action.remind_at
+          ? toInstantISO(action.remind_at, timezone, now)
+          : nextOccurrence(action.recurrence!, now, timezone)?.toISOString() ?? now.toISOString(),
         timezone,
         channel: "both",
         source: "whatsapp",
@@ -265,7 +255,7 @@ async function executeAction(
     }
 
     case "query_transactions": {
-      const to = action.query_to ?? now.toISOString().slice(0, 10);
+      const to = action.query_to ?? localISODate(now, timezone);
       const from = action.query_from ?? `${to.slice(0, 7)}-01`; // default: mês do fim do período
       const { data, error } = await supabase.rpc("_tx_summary", {
         uid: userId,
@@ -292,7 +282,7 @@ async function executeAction(
     case "query_budgets": {
       const { data, error } = await supabase.rpc("_budgets_status", {
         uid: userId,
-        ref_month: now.toISOString().slice(0, 10),
+        ref_month: localISODate(now, timezone),
       });
       if (error) throw error;
       const rows = (data ?? []) as { category: string; limit_cents: number; spent_cents: number }[];

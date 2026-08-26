@@ -7,6 +7,8 @@
  * Gemini structured output lida mal com anyOf/union; campos não usados = null.
  */
 
+import { localDateTimeISO } from "./datetime.ts";
+
 const GEMINI_BASE = "https://generativelanguage.googleapis.com/v1beta/models";
 // Aliases "-latest" apontam sempre para o modelo atual — evitam quebra por
 // depreciação (ex.: gemini-2.5-flash ficou indisponível para chaves novas).
@@ -102,7 +104,7 @@ const RESPONSE_SCHEMA = {
   required: ["actions", "confidence"],
 } as const;
 
-function systemPrompt(nowIso: string, timezone: string): string {
+function systemPrompt(nowLocal: string, timezone: string): string {
   return `Você é o assistente do Personal ProOps app. O usuário manda mensagens informais em português pelo WhatsApp.
 A mensagem pode conter VÁRIOS itens — emita UMA ação por item, na ordem em que aparecem (máx. 10).
 Ex.: "mercado 200, uber 30 e recebi 500 de freela" -> 3 ações (2 create_expense + 1 create_income).
@@ -124,7 +126,7 @@ Tipos de ação:
 
 Regras:
 - Dinheiro SEMPRE em centavos inteiros. "1.234,56" -> 123456.
-- Datas relativas resolvidas com a data/hora atual: ${nowIso} | Fuso do usuário: ${timezone}.
+- Datas relativas resolvidas com a data/hora atual DO USUÁRIO (já convertida para o fuso dele, com offset): ${nowLocal} (fuso ${timezone}). Use exatamente essa data como "hoje" — não recalcule fuso.
 - Campos que não se aplicam à ação: null.
 - confidence (0..1) é da interpretação da mensagem INTEIRA.`;
 }
@@ -169,7 +171,7 @@ export async function parseMessage(
     },
     body: JSON.stringify({
       systemInstruction: {
-        parts: [{ text: systemPrompt(new Date().toISOString(), timezone) }],
+        parts: [{ text: systemPrompt(localDateTimeISO(new Date(), timezone), timezone) }],
       },
       contents: [{ role: "user", parts: [{ text }] }],
       generationConfig: {

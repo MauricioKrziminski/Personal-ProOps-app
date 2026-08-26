@@ -1,7 +1,7 @@
 import { zodResolver } from '@hookform/resolvers/zod';
 import { router, useLocalSearchParams } from 'expo-router';
-import { useEffect } from 'react';
-import { Controller, useForm } from 'react-hook-form';
+import { useEffect, useState } from 'react';
+import { Controller, useForm, useWatch } from 'react-hook-form';
 import {
   KeyboardAvoidingView,
   Platform,
@@ -91,7 +91,7 @@ export default function TransactionFormScreen() {
   const save = useSaveTransaction();
   const remove = useDeleteTransaction();
 
-  const { control, handleSubmit, watch, setValue, reset, formState } = useForm<FormValues>({
+  const { control, handleSubmit, setValue, reset, formState } = useForm<FormValues>({
     resolver: zodResolver(schema),
     defaultValues: {
       kind: 'expense',
@@ -118,7 +118,15 @@ export default function TransactionFormScreen() {
     }
   }, [editing, reset]);
 
-  const kind = watch('kind');
+  // useWatch (e não watch()): watch() não é memoizável e o React Compiler pula a tela inteira
+  const kind = useWatch({ control, name: 'kind' });
+  const occurredAt = useWatch({ control, name: 'occurred_at' });
+  // "hoje"/"ontem" congelados na abertura do modal: ler o relógio durante o
+  // render é impuro (React Compiler) e o modal é efêmero.
+  const [{ today, yesterday }] = useState(() => ({
+    today: toBR(localISODate()),
+    yesterday: toBR(localISODate(new Date(Date.now() - 86_400_000))),
+  }));
   const errors = formState.errors;
 
   const onSubmit = handleSubmit((values) => {
@@ -282,17 +290,13 @@ export default function TransactionFormScreen() {
             <View style={styles.chipRow}>
               <Chip
                 label="Hoje"
-                selected={watch('occurred_at') === toBR(localISODate())}
-                onPress={() => setValue('occurred_at', toBR(localISODate()))}
+                selected={occurredAt === today}
+                onPress={() => setValue('occurred_at', today)}
               />
               <Chip
                 label="Ontem"
-                selected={
-                  watch('occurred_at') === toBR(localISODate(new Date(Date.now() - 86_400_000)))
-                }
-                onPress={() =>
-                  setValue('occurred_at', toBR(localISODate(new Date(Date.now() - 86_400_000))))
-                }
+                selected={occurredAt === yesterday}
+                onPress={() => setValue('occurred_at', yesterday)}
               />
               <Controller
                 control={control}

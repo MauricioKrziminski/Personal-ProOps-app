@@ -1,7 +1,8 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
 import { supabase } from '@/lib/supabase';
-import { localISODate, useRealtimeInvalidate } from '@/hooks/use-items';
+import { localISODate, monthBounds } from '@/lib/dates';
+import { useRealtimeInvalidate } from '@/hooks/use-items';
 
 /** Categorias sugeridas — mesma lista do prompt do Gemini (supabase/functions/_shared/gemini.ts). */
 export const SUGGESTED_CATEGORIES = [
@@ -86,13 +87,6 @@ export interface TransactionFilters {
   month: string; // YYYY-MM
   kind?: TransactionKind;
   category?: string;
-}
-
-function monthBounds(month: string): { from: string; to: string } {
-  const [y, m] = month.split('-').map(Number);
-  const from = `${month}-01`;
-  const to = localISODate(new Date(y, m, 0));
-  return { from, to };
 }
 
 // ── queries ───────────────────────────────────────────────────────────────────
@@ -240,7 +234,7 @@ export function useBudgetsStatus() {
 
 const FINANCE_KEYS = [
   ['transactions'], ['tx-summary'], ['monthly-cashflow'], ['account-balances'],
-  ['budgets-status'], ['expenses-summary'], ['accounts'], ['goals'], ['budgets'],
+  ['budgets-status'], ['accounts'], ['goals'], ['budgets'],
 ];
 
 function useInvalidateFinance() {
