@@ -1,7 +1,8 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
 import { supabase } from '@/lib/supabase';
-import { localISODate, useRealtimeInvalidate } from '@/hooks/use-items';
+import { localISODate, monthBounds } from '@/lib/dates';
+import { useRealtimeInvalidate } from '@/hooks/use-items';
 
 /** Categorias sugeridas — mesma lista do prompt do Gemini (supabase/functions/_shared/gemini.ts). */
 export const SUGGESTED_CATEGORIES = [
@@ -69,6 +70,22 @@ export interface Budget {
   limit_cents: number;
 }
 
+export interface RecurringTransaction {
+  id: string;
+  kind: 'expense' | 'income';
+  amount_cents: number;
+  currency: string;
+  category: string | null;
+  description: string | null;
+  account_id: string | null;
+  rrule: string;
+  next_run_at: string;
+  active: boolean;
+  run_attempts: number;
+  last_error: string | null;
+  created_at: string;
+}
+
 export interface MonthlyCashflow {
   month: string;
   income_cents: number;
@@ -86,13 +103,6 @@ export interface TransactionFilters {
   month: string; // YYYY-MM
   kind?: TransactionKind;
   category?: string;
-}
-
-function monthBounds(month: string): { from: string; to: string } {
-  const [y, m] = month.split('-').map(Number);
-  const from = `${month}-01`;
-  const to = localISODate(new Date(y, m, 0));
-  return { from, to };
 }
 
 // ── queries ───────────────────────────────────────────────────────────────────
@@ -207,6 +217,27 @@ export function useGoals() {
   });
 }
 
+const RECURRING_COLUMNS =
+  'id, kind, amount_cents, currency, category, description, account_id, rrule, next_run_at, active, run_attempts, last_error, created_at';
+
+/** Séries recorrentes — criadas por WhatsApp, materializadas pelo cron do send-reminders. */
+export function useRecurringTransactions() {
+  useRealtimeInvalidate('recurring_transactions', ['recurring']);
+  return useQuery({
+    queryKey: ['recurring'],
+    queryFn: async (): Promise<RecurringTransaction[]> => {
+      const { data, error } = await supabase
+        .from('recurring_transactions')
+        .select(RECURRING_COLUMNS)
+        // ativas primeiro; dentro de cada grupo, a que roda antes
+        .order('active', { ascending: false })
+        .order('next_run_at');
+      if (error) throw error;
+      return data;
+    },
+  });
+}
+
 export function useBudgets() {
   useRealtimeInvalidate('budgets', ['budgets']);
   return useQuery({
@@ -240,7 +271,7 @@ export function useBudgetsStatus() {
 
 const FINANCE_KEYS = [
   ['transactions'], ['tx-summary'], ['monthly-cashflow'], ['account-balances'],
-  ['budgets-status'], ['expenses-summary'], ['accounts'], ['goals'], ['budgets'],
+  ['budgets-status'], ['accounts'], ['goals'], ['budgets'], ['recurring'],
 ];
 
 function useInvalidateFinance() {
@@ -295,14 +326,26 @@ export function useDeleteTransaction() {
   });
 }
 
+/** Cria ou edita (mesma forma de useSaveTransaction: com `id` vira update). */
 export function useSaveAccount() {
   const invalidate = useInvalidateFinance();
   return useMutation({
-    mutationFn: async (input: { name: string; type: Account['type']; initial_balance_cents: number }) => {
-      const { error } = await supabase
-        .from('accounts')
-        .insert({ ...input, user_id: await userId() });
-      if (error) throw error;
+    mutationFn: async ({
+      id,
+      ...input
+    }: {
+      id?: string;
+      name: string;
+      type: Account['type'];
+      initial_balance_cents: number;
+    }) => {
+      if (id) {
+        const { error } = await supabase.from('accounts').update(input).eq('id', id);
+        if (error) throw error;
+      } else {
+        const { error } = await supabase.from('accounts').insert({ ...input, user_id: await userId() });
+        if (error) throw error;
+      }
     },
     onSuccess: invalidate,
   });
@@ -319,12 +362,26 @@ export function useArchiveAccount() {
   });
 }
 
+/** Cria ou edita (mesma forma de useSaveTransaction: com `id` vira update). */
 export function useSaveGoal() {
   const invalidate = useInvalidateFinance();
   return useMutation({
-    mutationFn: async (input: { name: string; target_cents: number; deadline: string | null }) => {
-      const { error } = await supabase.from('goals').insert({ ...input, user_id: await userId() });
-      if (error) throw error;
+    mutationFn: async ({
+      id,
+      ...input
+    }: {
+      id?: string;
+      name: string;
+      target_cents: number;
+      deadline: string | null;
+    }) => {
+      if (id) {
+        const { error } = await supabase.from('goals').update(input).eq('id', id);
+        if (error) throw error;
+      } else {
+        const { error } = await supabase.from('goals').insert({ ...input, user_id: await userId() });
+        if (error) throw error;
+      }
     },
     onSuccess: invalidate,
   });
@@ -349,6 +406,32 @@ export function useArchiveGoal() {
   return useMutation({
     mutationFn: async (id: string) => {
       const { error } = await supabase.from('goals').update({ archived: true }).eq('id', id);
+      if (error) throw error;
+    },
+    onSuccess: invalidate,
+  });
+}
+
+/** Pausar/retomar a série. Pausada = o cron ignora, mas o histórico fica. */
+export function useToggleRecurring() {
+  const invalidate = useInvalidateFinance();
+  return useMutation({
+    mutationFn: async ({ id, active }: { id: string; active: boolean }) => {
+      // retomar também limpa o erro anterior: a próxima tentativa começa do zero
+      const patch = active ? { active: true, run_attempts: 0, last_error: null } : { active: false };
+      const { error } = await supabase.from('recurring_transactions').update(patch).eq('id', id);
+      if (error) throw error;
+    },
+    onSuccess: invalidate,
+  });
+}
+
+/** Apaga a série. Os lançamentos já materializados continuam em transactions. */
+export function useDeleteRecurring() {
+  const invalidate = useInvalidateFinance();
+  return useMutation({
+    mutationFn: async (id: string) => {
+      const { error } = await supabase.from('recurring_transactions').delete().eq('id', id);
       if (error) throw error;
     },
     onSuccess: invalidate,

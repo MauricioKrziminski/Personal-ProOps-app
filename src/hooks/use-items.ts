@@ -3,6 +3,10 @@ import { useEffect, useId } from 'react';
 
 import { supabase } from '@/lib/supabase';
 
+// Helpers puros vivem em @/lib/dates (testáveis fora do RN); reexportados aqui
+// para não quebrar os imports existentes das telas.
+export { formatBRL, formatDateBR, localISODate } from '@/lib/dates';
+
 export interface Note {
   id: string;
   content: string;
@@ -18,12 +22,6 @@ export interface Reminder {
   next_run_at: string;
   channel: 'push' | 'whatsapp' | 'both';
   active: boolean;
-}
-
-export interface CategorySummary {
-  category: string;
-  total_cents: number;
-  expense_count: number;
 }
 
 /** Invalida a query quando a tabela muda (itens novos vindos do WhatsApp aparecem ao vivo). */
@@ -46,11 +44,6 @@ export function useRealtimeInvalidate(table: string, queryKey: string[]) {
       supabase.removeChannel(channel);
     };
   }, [table, queryClient, key, instanceId]);
-}
-
-/** Data local em YYYY-MM-DD — nunca toISOString() (UTC desloca o dia em GMT-3). */
-export function localISODate(d = new Date()): string {
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 }
 
 export function useNotes() {
@@ -77,24 +70,10 @@ export function useReminders() {
       const { data, error } = await supabase
         .from('reminders')
         .select('id, title, recurrence, next_run_at, channel, active')
-        .eq('active', true)
+        // pausados também vêm: sem eles não haveria como retomar pelo app
+        .order('active', { ascending: false })
         .order('next_run_at')
         .limit(100);
-      if (error) throw error;
-      return data;
-    },
-  });
-}
-
-export function useExpensesSummary(fromDate: string, toDate: string) {
-  useRealtimeInvalidate('transactions', ['expenses-summary']);
-  return useQuery({
-    queryKey: ['expenses-summary', fromDate, toDate],
-    queryFn: async (): Promise<CategorySummary[]> => {
-      const { data, error } = await supabase.rpc('expenses_summary', {
-        from_date: fromDate,
-        to_date: toDate,
-      });
       if (error) throw error;
       return data;
     },
@@ -131,11 +110,45 @@ export function useDeleteNote() {
   });
 }
 
-export function usePauseReminder() {
+export interface ReminderInput {
+  id?: string;
+  title: string;
+  recurrence: string | null;
+  next_run_at: string; // ISO absoluto
+  channel: Reminder['channel'];
+  timezone: string;
+}
+
+/** Cria ou edita (com `id` vira update), no mesmo formato de useSaveTransaction. */
+export function useSaveReminder() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: async (id: string) => {
-      const { error } = await supabase.from('reminders').update({ active: false }).eq('id', id);
+    mutationFn: async ({ id, ...input }: ReminderInput) => {
+      if (id) {
+        // reagendar reativa e zera o contador: a série volta a valer do zero
+        const { error } = await supabase
+          .from('reminders')
+          .update({ ...input, active: true, send_attempts: 0, last_error: null })
+          .eq('id', id);
+        if (error) throw error;
+      } else {
+        const { error } = await supabase
+          .from('reminders')
+          .insert({ ...input, user_id: await userId(), source: 'app' });
+        if (error) throw error;
+      }
+    },
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['reminders'] }),
+  });
+}
+
+/** Pausa ou retoma. Retomar limpa o erro anterior. */
+export function useToggleReminder() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ id, active }: { id: string; active: boolean }) => {
+      const patch = active ? { active: true, send_attempts: 0, last_error: null } : { active: false };
+      const { error } = await supabase.from('reminders').update(patch).eq('id', id);
       if (error) throw error;
     },
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['reminders'] }),
@@ -151,16 +164,4 @@ export function useDeleteReminder() {
     },
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['reminders'] }),
   });
-}
-
-export function formatBRL(cents: number): string {
-  return (cents / 100).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
-}
-
-/** Data em dd-mm-yyyy (aceita ISO string ou Date). */
-export function formatDateBR(value: string | Date): string {
-  const d = typeof value === 'string' ? new Date(value) : value;
-  const dd = String(d.getDate()).padStart(2, '0');
-  const mm = String(d.getMonth() + 1).padStart(2, '0');
-  return `${dd}-${mm}-${d.getFullYear()}`;
 }

@@ -12,8 +12,9 @@
 ## Custo (~zero no início)
 
 - **Texto livre (`sendText`) só é grátis dentro da janela de 24h** após a última mensagem do usuário. Confirmações de itens criados sempre cabem na janela (são resposta imediata).
-- Mensagem **proativa** (lembrete, resumo mensal) fora da janela = **template Utility pago** (`sendTemplate`, ex.: `proops_reminder`). Preferir **push (Expo Notifications)** como canal principal proativo; WhatsApp template só como complemento.
-- OTP de login: template Authentication via `wa-send-otp` (Send SMS Hook do Supabase Auth).
+- Mensagem **proativa** (lembrete, resumo mensal) fora da janela = **template Utility pago** (`sendTemplate`, nome em `WA_REMINDER_TEMPLATE`). Preferir **push (Expo Notifications)** como canal principal proativo; WhatsApp template só como complemento.
+- OTP de login: template Authentication via `wa-send-otp` (Send SMS Hook do Supabase Auth), nome em `WA_OTP_TEMPLATE`.
+- **Nomes de template sempre em env var** (`WA_OTP_TEMPLATE`, `WA_REMINDER_TEMPLATE`), nunca hardcoded: templates são objetos POR WABA, então trocar de WABA (teste → produção) significa recriar com o mesmo nome e não tocar em código. Usar templates próprios deste produto (prefixo `personal_proops_`) — não pendurar em templates do ERP, que vivem na mesma WABA de teste e podem ser editados por outra equipe.
 
 ## Envio best-effort
 

@@ -25,13 +25,14 @@ Funções `security definer` sempre com `set search_path = public` e revoke expl
 
 - `service_role` **só** aqui, via `adminClient()` de `_shared/admin.ts`.
 - `verify_jwt` por função em `config.toml`: webhooks externos (Meta) = `false` com validação própria (HMAC); funções internas de cron = `true`.
-- Módulos compartilhados em `_shared/` (`admin.ts`, `whatsapp.ts`, `gemini.ts`) — não duplicar helpers entre functions.
+- Módulos compartilhados em `_shared/` (`admin.ts`, `whatsapp.ts`, `gemini.ts`, `datetime.ts`, `recurrence.ts`) — não duplicar helpers entre functions.
+- **Datas**: o runtime roda em UTC. "Hoje" para o usuário sai de `localISODate(date, timezone)` e RRULE de `nextOccurrence(...)` (`_shared/`), nunca de `toISOString().slice(0,10)`. Datetime vindo do Gemini passa por `toInstantISO` antes de virar `timestamptz`.
 - Testar localmente com `npx supabase functions serve` antes de `functions deploy`.
 
 ## Segredos
 
 - Segredos (Gemini, Groq, WhatsApp, hooks) **só** em secrets das functions (`npx supabase secrets set`). Nunca no app, nunca commitados. Toda variável nova documentada em `supabase/.env.example` com comentário.
-- ⚠️ Dívida conhecida: a migration `0003` tem o anon JWT hardcoded no `cron.schedule` (pg_net precisa do header). Ao mexer nos crons, migrar o token para o Supabase Vault (`vault.decrypted_secrets`) em vez de repetir o padrão.
+- Os `cron.schedule` leem URL e anon key do **Supabase Vault** (`vault.decrypted_secrets`, segredos `project_url`/`anon_key`) — ver `0008_cron_token_from_vault.sql`. Nunca voltar a escrever token literal em migration (a `0003` fez isso e a chave está no histórico do git: rotacionar). Segredo novo entra por `vault.create_secret` fora do repo.
 
 ## Realtime & fila
 

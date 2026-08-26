@@ -39,22 +39,42 @@ export default function AccountsScreen() {
   const save = useSaveAccount();
   const archive = useArchiveAccount();
   const [creating, setCreating] = useState(false);
+  const [editing, setEditing] = useState<Account | null>(null);
   const [name, setName] = useState('');
   const [type, setType] = useState<Account['type']>('checking');
   const [initialCents, setInitialCents] = useState(0);
 
   const total = (balances ?? []).reduce((sum, b) => sum + Number(b.balance_cents), 0);
+  const showForm = creating || editing !== null;
 
-  const onCreate = () => {
+  const closeForm = () => {
+    setCreating(false);
+    setEditing(null);
+    setName('');
+    setType('checking');
+    setInitialCents(0);
+  };
+
+  /** A linha sintética "Sem conta" (account_id null) não é editável. */
+  const startEdit = (accountId: string | null) => {
+    const account = (accounts ?? []).find((a) => a.id === accountId);
+    if (!account) return;
+    Haptics.selectionAsync();
+    setCreating(false);
+    setEditing(account);
+    setName(account.name);
+    setType(account.type);
+    setInitialCents(account.initial_balance_cents);
+  };
+
+  const onSubmit = () => {
     if (!name.trim()) return;
     save.mutate(
-      { name: name.trim(), type, initial_balance_cents: initialCents },
+      { id: editing?.id, name: name.trim(), type, initial_balance_cents: initialCents },
       {
         onSuccess: () => {
           Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-          setCreating(false);
-          setName('');
-          setInitialCents(0);
+          closeForm();
         },
       },
     );
@@ -100,7 +120,9 @@ export default function AccountsScreen() {
             <Animated.View
               key={balance.account_id ?? 'none'}
               entering={FadeInDown.duration(400).delay(Math.min(index * 60, 400))}>
-              <Pressable onLongPress={() => confirmArchive(balance.account_id)}>
+              <Pressable
+                onLongPress={() => confirmArchive(balance.account_id)}
+                onPress={() => startEdit(balance.account_id)}>
                 <GlassCard style={styles.accountRow}>
                   <ThemedText style={styles.accountEmoji}>
                     {TYPE_EMOJI[balance.type] ?? '❔'}
@@ -131,8 +153,11 @@ export default function AccountsScreen() {
             </GlassCard>
           )}
 
-          {creating ? (
+          {showForm ? (
             <GlassCard style={styles.form}>
+              <ThemedText type="smallBold">
+                {editing ? `Editando “${editing.name}”` : 'Nova conta'}
+              </ThemedText>
               <TextInput
                 value={name}
                 onChangeText={setName}
@@ -154,19 +179,24 @@ export default function AccountsScreen() {
               <ThemedText type="smallBold">Saldo inicial</ThemedText>
               <MoneyInput valueCents={initialCents} onChangeCents={setInitialCents} />
               <Pressable
-                onPress={onCreate}
+                onPress={onSubmit}
                 disabled={save.isPending || !name.trim()}
                 style={({ pressed }) => [
                   styles.submit,
                   { backgroundColor: theme.tint, opacity: pressed || save.isPending || !name.trim() ? 0.6 : 1 },
                 ]}>
                 <ThemedText type="smallBold" style={styles.buttonLabel}>
-                  {save.isPending ? 'Criando…' : 'Criar conta'}
+                  {save.isPending ? 'Salvando…' : editing ? 'Salvar' : 'Criar conta'}
+                </ThemedText>
+              </Pressable>
+              <Pressable onPress={closeForm} hitSlop={8} style={styles.cancel}>
+                <ThemedText type="small" themeColor="textSecondary">
+                  Cancelar
                 </ThemedText>
               </Pressable>
               {save.isError && (
                 <ThemedText type="small" themeColor="danger" style={styles.centered}>
-                  Não deu para criar (nome repetido?).
+                  Não deu para salvar (nome repetido?).
                 </ThemedText>
               )}
             </GlassCard>
@@ -187,7 +217,7 @@ export default function AccountsScreen() {
           )}
 
           <ThemedText type="small" themeColor="textSecondary" style={styles.centered}>
-            Toque e segure uma conta para arquivá-la.
+            Toque numa conta para editar. Segure para arquivar.
           </ThemedText>
         </ScrollView>
       </SafeAreaView>
@@ -263,5 +293,9 @@ const styles = StyleSheet.create({
   },
   centered: {
     textAlign: 'center',
+  },
+  cancel: {
+    alignItems: 'center',
+    paddingVertical: Spacing.one,
   },
 });

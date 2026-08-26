@@ -29,19 +29,36 @@ export default function BudgetsScreen() {
   const save = useSaveBudget();
   const remove = useDeleteBudget();
   const [creating, setCreating] = useState(false);
+  const [editing, setEditing] = useState<string | null>(null);
   const [category, setCategory] = useState<string | null>(null);
   const [limitCents, setLimitCents] = useState(0);
 
-  const onCreate = () => {
+  const showForm = creating || editing !== null;
+
+  const closeForm = () => {
+    setCreating(false);
+    setEditing(null);
+    setCategory(null);
+    setLimitCents(0);
+  };
+
+  /** Editar é o mesmo upsert: a identidade do orçamento é (user_id, category). */
+  const startEdit = (cat: string, limit: number) => {
+    Haptics.selectionAsync();
+    setCreating(false);
+    setEditing(cat);
+    setCategory(cat);
+    setLimitCents(limit);
+  };
+
+  const onSubmit = () => {
     if (!category || limitCents <= 0) return;
     save.mutate(
       { category, limit_cents: limitCents },
       {
         onSuccess: () => {
           Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-          setCreating(false);
-          setCategory(null);
-          setLimitCents(0);
+          closeForm();
         },
       },
     );
@@ -79,7 +96,9 @@ export default function BudgetsScreen() {
               <Animated.View
                 key={item.category}
                 entering={FadeInDown.duration(400).delay(Math.min(index * 60, 400))}>
-                <Pressable onLongPress={() => confirmDelete(item.category)}>
+                <Pressable
+                  onLongPress={() => confirmDelete(item.category)}
+                  onPress={() => startEdit(item.category, Number(item.limit_cents))}>
                   <GlassCard style={styles.budgetCard}>
                     <View style={styles.budgetHeader}>
                       <ThemedText type="smallBold">{item.category}</ThemedText>
@@ -114,8 +133,11 @@ export default function BudgetsScreen() {
             </GlassCard>
           )}
 
-          {creating ? (
+          {showForm ? (
             <GlassCard style={styles.form}>
+              <ThemedText type="smallBold">
+                {editing ? `Editando limite de “${editing}”` : 'Novo orçamento'}
+              </ThemedText>
               <ThemedText type="smallBold">Categoria</ThemedText>
               <View style={styles.chipRow}>
                 {SUGGESTED_CATEGORIES.filter((c) => c !== 'salário' && c !== 'freela').map((cat) => (
@@ -130,7 +152,7 @@ export default function BudgetsScreen() {
               <ThemedText type="smallBold">Limite mensal</ThemedText>
               <MoneyInput valueCents={limitCents} onChangeCents={setLimitCents} />
               <Pressable
-                onPress={onCreate}
+                onPress={onSubmit}
                 disabled={save.isPending || !category || limitCents <= 0}
                 style={({ pressed }) => [
                   styles.submit,
@@ -141,6 +163,11 @@ export default function BudgetsScreen() {
                 ]}>
                 <ThemedText type="smallBold" style={styles.buttonLabel}>
                   {save.isPending ? 'Salvando…' : 'Salvar orçamento'}
+                </ThemedText>
+              </Pressable>
+              <Pressable onPress={closeForm} hitSlop={8} style={styles.cancel}>
+                <ThemedText type="small" themeColor="textSecondary">
+                  Cancelar
                 </ThemedText>
               </Pressable>
               {save.isError && (
@@ -166,7 +193,7 @@ export default function BudgetsScreen() {
           )}
 
           <ThemedText type="small" themeColor="textSecondary" style={styles.centered}>
-            Toque e segure um orçamento para removê-lo.
+            Toque num orçamento para mudar o limite. Segure para remover.
           </ThemedText>
         </ScrollView>
       </SafeAreaView>
@@ -235,5 +262,9 @@ const styles = StyleSheet.create({
   },
   centered: {
     textAlign: 'center',
+  },
+  cancel: {
+    alignItems: 'center',
+    paddingVertical: Spacing.one,
   },
 });

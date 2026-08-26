@@ -46,3 +46,6 @@ example
 # generated native folders
 /ios
 /android
+
+# cache do CLI do Supabase
+supabase/.temp/cli-latest

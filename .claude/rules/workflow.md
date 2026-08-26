@@ -10,9 +10,10 @@
 
 1. `npx tsc --noEmit` limpo.
 2. `npx expo lint` limpo.
-3. Mudou tela → conferir no device/emulador (dark E light) — nada de "deve funcionar".
-4. Mudou Edge Function → testar com `npx supabase functions serve` + payload de exemplo antes do deploy.
-5. Mudou schema → migration nova aplicada com `db push` + types regenerados.
+3. `npm test` verde (`node --test`, sem framework — helpers puros de data/dinheiro).
+4. Mudou tela → conferir no device/emulador (dark E light) — nada de "deve funcionar".
+5. Mudou Edge Function → testar com `npx supabase functions serve` + payload de exemplo antes do deploy.
+6. Mudou schema → migration nova aplicada com `db push` + types regenerados.
 
 ## Deploy
 
