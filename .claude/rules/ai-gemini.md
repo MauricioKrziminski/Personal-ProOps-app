@@ -14,9 +14,15 @@
 - Sem segunda chamada de LLM para formatar respostas de consulta — formatação de saída WhatsApp é TS puro (template literals + `centsToBRL`).
 - Retry: usar o `fetchWithRetry` existente (backoff em 429/5xx).
 
+## Correção (nunca criar para "consertar")
+
+- Corrigir item existente é `update_transaction` / `delete_item`, nunca um lançamento novo. O prompt diz isso explicitamente.
+- Campos de BUSCA (`amount_cents`, `category`, `content`, `occurred_at`) são separados dos de CORREÇÃO (`new_amount_cents`, `new_category`, `new_occurred_at`) — sem isso o modelo confunde "era 45, virou 54".
+- `resolveTransactionRef` procura na janela dos 40 mais recentes. **Empate pergunta, não chuta**: alterar o lançamento errado é pior que uma mensagem a mais.
+
 ## Auditoria e custo
 
-- **Todo** parse grava linha em `ai_events` (model, tokens, confidence, result jsonb) — é a observabilidade do produto (sem Sentry).
+- **Todo** parse grava linha em `ai_events` (model, tokens, confidence, result jsonb, `created_transaction_ids`) — é a observabilidade do produto (sem Sentry) E a tela "Atividade da IA" do app, que mostra ao usuário o que foi entendido e deixa desfazer.
 - Rate limit por usuário antes de chamar o Gemini (contagem em `ai_events` na última hora); estourou → responde "aguarde" e marca o job done.
 
 ## Prompt (convenções de conteúdo)

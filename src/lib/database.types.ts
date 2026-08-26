@@ -91,6 +91,7 @@ export type Database = {
         Row: {
           confidence: number | null
           created_at: string
+          created_transaction_ids: string[] | null
           error: string | null
           id: string
           input_tokens: number | null
@@ -103,6 +104,7 @@ export type Database = {
         Insert: {
           confidence?: number | null
           created_at?: string
+          created_transaction_ids?: string[] | null
           error?: string | null
           id?: string
           input_tokens?: number | null
@@ -115,6 +117,7 @@ export type Database = {
         Update: {
           confidence?: number | null
           created_at?: string
+          created_transaction_ids?: string[] | null
           error?: string | null
           id?: string
           input_tokens?: number | null

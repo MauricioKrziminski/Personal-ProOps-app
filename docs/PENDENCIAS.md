@@ -209,8 +209,28 @@ de fatura pelo WhatsApp + extrato OFX/CSV pelo app. Funciona até com banco fora
 (a primeira tentativa gravou os itens mas perdeu a categorização). Ao testar function que chama IA
 por pg_net, passar `timeout_milliseconds := 45000`.
 
-**Próximo:** Fase 4 do plano — correção conversacional (`update_transaction`, `delete_item`,
-resolver de referência) e a tela de auditoria da IA lendo `ai_events`.
+## ✅ FASE 4 — correção conversacional e auditoria da IA (concluída em 26/08/2026)
+
+Gap nº3: em todo concorrente (e no nosso app até aqui) só existia "desfazer o último". Errou a
+categoria ou o valor? Sem conserto.
+
+- `0020_ai_events_visibility.sql` — `ai_events` ganha leitura own-rows (era service_role-only) e
+  a coluna `created_transaction_ids`, que liga o parse ao que ele criou.
+- `0021_private_helpers_search_path.sql` — fecha os 5 WARN dos advisors nos helpers de `private`.
+- IA: `update_transaction` (campos de BUSCA separados dos de CORREÇÃO — `new_amount_cents`,
+  `new_category`, `new_occurred_at`) e `delete_item` com `target_type`
+  (transaction/note/reminder/goal/recurring).
+- **Resolver de referência** (`resolveTransactionRef`, TS puro): procura na janela dos 40
+  lançamentos recentes filtrando por valor, categoria, texto e data. Sem pista nenhuma = "o
+  último". Sobrou mais de um candidato → **pergunta em vez de chutar** e alterar o errado.
+- `process-jobs` guarda os ids criados em `ai_events.created_transaction_ids`.
+- App: tela `finance/ai-activity.tsx` — o que a IA entendeu de cada mensagem, confiança, modelo,
+  tokens e botão de desfazer. Nenhum concorrente expõe isso.
+- Verificado: policy de `ai_events` devolvendo só as linhas do dono; advisors de volta ao estado
+  pré-existente; tsc/lint limpos; 34 testes.
+
+**Próximo:** Fase 5 do plano — orçamento por mês com rollover, ledger de aportes em metas,
+dívidas com amortização e os alertas proativos (que dependem do push funcionando).
 
 ## 📝 Como verificar o pipeline (rápido)
 Usar `/verify-whatsapp` ou manualmente: mandar mensagem → conferir `messages_raw` (inbound) → `jobs` (done) → `ai_events` (result/confidence) → tabela final (`transactions`/`notes`/...) → resposta no WhatsApp. Logs: MCP `get_logs` (edge-function).

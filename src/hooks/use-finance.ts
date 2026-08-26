@@ -648,6 +648,70 @@ export function useDeleteRule() {
   });
 }
 
+// ── auditoria da IA ─────────────────────────────────────────────────────────
+
+/** Uma ação como a IA entendeu (subconjunto do que interessa mostrar). */
+export interface AiActionSummary {
+  type: string;
+  content?: string | null;
+  title?: string | null;
+  category?: string | null;
+  amount_cents?: number | null;
+}
+
+export type AiEvent = Pick<
+  Tables['ai_events']['Row'],
+  'id' | 'model' | 'confidence' | 'created_at' | 'input_tokens' | 'output_tokens' | 'error'
+> & {
+  created_transaction_ids: string[] | null;
+  actions: AiActionSummary[];
+};
+
+/**
+ * O que a IA entendeu de cada mensagem, com confiança e custo.
+ * Transparência é diferencial aqui: os concorrentes anunciam "99,9% de precisão"
+ * e não mostram nada — nem deixam desfazer.
+ */
+export function useAiEvents(limit = 30) {
+  return useQuery({
+    queryKey: ['ai-events', String(limit)],
+    queryFn: async (): Promise<AiEvent[]> => {
+      const { data, error } = await supabase
+        .from('ai_events')
+        .select(
+          'id, model, confidence, created_at, input_tokens, output_tokens, error, result, created_transaction_ids',
+        )
+        .order('created_at', { ascending: false })
+        .limit(limit);
+      if (error) throw error;
+      return (data ?? []).map((row) => {
+        const parsed = row.result as { actions?: AiActionSummary[] } | null;
+        return {
+          ...row,
+          created_transaction_ids: row.created_transaction_ids,
+          actions: Array.isArray(parsed?.actions) ? parsed.actions : [],
+        };
+      });
+    },
+  });
+}
+
+/** Desfaz um parse: apaga as transações que aquela mensagem criou. */
+export function useUndoAiEvent() {
+  const invalidate = useInvalidateFinance();
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (ids: string[]) => {
+      const { error } = await supabase.from('transactions').delete().in('id', ids);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      invalidate();
+      queryClient.invalidateQueries({ queryKey: ['ai-events'] });
+    },
+  });
+}
+
 export interface TransactionInput {
   kind: TransactionKind;
   amount_cents: number;

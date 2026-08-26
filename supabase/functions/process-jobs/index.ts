@@ -171,7 +171,13 @@ async function applyRules(
  * A partir da 0010 o dado pertence ao WORKSPACE — leituras e writes filtram por
  * `workspace_id` para que conta compartilhada (casal/família) enxergue tudo.
  */
-type Ctx = { userId: string; workspaceId: string; timezone: string };
+type Ctx = {
+  userId: string;
+  workspaceId: string;
+  timezone: string;
+  /** ids das transações criadas nesta mensagem — vão para ai_events e viram o desfazer do app. */
+  created: string[];
+};
 
 /** Resolve conta citada por nome (ilike). Sem match -> null: lançamento nunca falha por conta desconhecida. */
 async function resolveAccount(supabase: Admin, workspaceId: string, name: string | null): Promise<string | null> {
@@ -188,13 +194,91 @@ async function resolveAccount(supabase: Admin, workspaceId: string, name: string
 
 const KIND_LABEL: Record<string, string> = { expense: "gasto", income: "receita" };
 
+/** Quantos lançamentos recentes entram na janela de busca por referência. */
+const REFERENCE_WINDOW = 40;
+
+interface TxRef {
+  id: string;
+  kind: string;
+  amount_cents: number;
+  category: string | null;
+  description: string | null;
+  occurred_at: string;
+}
+
+/**
+ * Acha o lançamento que o usuário citou ("o último", "o de 45", "o mercado de
+ * ontem"). Busca na janela recente e filtra pelo que ele mencionou.
+ * Devolve `ambiguous` quando sobra mais de um: perguntar é melhor que chutar e
+ * alterar o lançamento errado.
+ */
+async function resolveTransactionRef(
+  supabase: Admin,
+  workspaceId: string,
+  action: AiAction,
+): Promise<{ found: TxRef } | { ambiguous: TxRef[] } | { none: true }> {
+  const { data } = await supabase
+    .from("transactions")
+    .select("id, kind, amount_cents, category, description, occurred_at")
+    .eq("workspace_id", workspaceId)
+    .order("created_at", { ascending: false })
+    .limit(REFERENCE_WINDOW);
+
+  let candidatos = (data ?? []) as TxRef[];
+  if (!candidatos.length) return { none: true };
+
+  const termo = (action.content ?? action.title)?.toLowerCase().trim();
+  let filtrou = false;
+
+  if (action.amount_cents) {
+    candidatos = candidatos.filter((t) => t.amount_cents === action.amount_cents);
+    filtrou = true;
+  }
+  if (action.category) {
+    const cat = action.category.toLowerCase();
+    candidatos = candidatos.filter((t) => t.category?.toLowerCase() === cat);
+    filtrou = true;
+  }
+  if (termo) {
+    const porTexto = candidatos.filter(
+      (t) =>
+        t.description?.toLowerCase().includes(termo) ||
+        t.category?.toLowerCase().includes(termo),
+    );
+    // termo que não casa com nada não pode zerar uma busca que já achou por valor
+    if (porTexto.length) {
+      candidatos = porTexto;
+      filtrou = true;
+    }
+  }
+  if (action.occurred_at) {
+    const porData = candidatos.filter((t) => t.occurred_at === action.occurred_at);
+    if (porData.length) {
+      candidatos = porData;
+      filtrou = true;
+    }
+  }
+
+  if (!candidatos.length) return { none: true };
+  // sem nenhuma pista, "o último" é a leitura certa
+  if (!filtrou) return { found: candidatos[0] };
+  if (candidatos.length > 1) return { ambiguous: candidatos.slice(0, 3) };
+  return { found: candidatos[0] };
+}
+
+function descreveTx(tx: TxRef): string {
+  return `${KIND_LABEL[tx.kind] ?? tx.kind} de ${centsToBRL(tx.amount_cents)}` +
+    (tx.category ? ` em *${tx.category}*` : "") +
+    (tx.description ? ` (${tx.description})` : "");
+}
+
 /** Executa uma ação e retorna a linha de resultado da confirmação. */
 async function executeAction(
   supabase: Admin,
   ctx: Ctx,
   action: AiAction,
 ): Promise<string> {
-  const { userId, workspaceId, timezone } = ctx;
+  const { userId, workspaceId, timezone, created } = ctx;
   const now = new Date();
 
   switch (action.type) {
@@ -229,13 +313,14 @@ async function executeAction(
           (base.category ? ` em *${base.category}*` : "") +
           ` — próxima em ${formatDateBR(localISODate(next, timezone))}.`;
       }
-      const { error } = await supabase.from("transactions").insert({
+      const { data: criada, error } = await supabase.from("transactions").insert({
         ...base,
         kind,
         occurred_at: action.occurred_at ?? localISODate(now, timezone),
         source: "whatsapp",
-      });
+      }).select("id").single();
       if (error) throw error;
+      if (criada) created.push(criada.id);
       const emoji = kind === "expense" ? "💸" : "💰";
       return `${emoji} ${KIND_LABEL[kind]} anotad${kind === "expense" ? "o" : "a"}: ${centsToBRL(action.amount_cents)}` +
         (base.category ? ` em *${base.category}*` : "") +
@@ -251,7 +336,7 @@ async function executeAction(
       if (!toId || fromId === toId) {
         return "❌ Não achei a conta de destino. Cadastre as contas no app e cite os nomes (ex.: \"da corrente pra poupança\").";
       }
-      const { error } = await supabase.from("transactions").insert({
+      const { data: transferencia, error } = await supabase.from("transactions").insert({
         user_id: userId,
         workspace_id: workspaceId,
         kind: "transfer",
@@ -262,8 +347,9 @@ async function executeAction(
         counterparty_account_id: toId,
         occurred_at: action.occurred_at ?? localISODate(now, timezone),
         source: "whatsapp",
-      });
+      }).select("id").single();
       if (error) throw error;
+      if (transferencia) created.push(transferencia.id);
       return `🔄 Transferência de ${centsToBRL(action.amount_cents)} registrada.`;
     }
 
@@ -489,6 +575,82 @@ async function executeAction(
       if (error) throw error;
       return `📌 Anotado: tudo que falar *${padrao}* vai para *${categoria}*.\n` +
         `Você pode ver e apagar suas regras no app.`;
+    }
+
+    case "update_transaction": {
+      const patch: Record<string, unknown> = {};
+      if (action.new_amount_cents && action.new_amount_cents > 0) {
+        patch.amount_cents = action.new_amount_cents;
+      }
+      if (action.new_category) patch.category = action.new_category.toLowerCase();
+      if (action.new_occurred_at) patch.occurred_at = action.new_occurred_at;
+      if (!Object.keys(patch).length) {
+        return "❌ Não entendi o que mudar. Tenta \"muda o último pra 54\" ou \"o mercado de ontem era transporte\".";
+      }
+
+      const ref = await resolveTransactionRef(supabase, workspaceId, action);
+      if ("none" in ref) return "🤷 Não achei esse lançamento nos últimos registros.";
+      if ("ambiguous" in ref) {
+        const opcoes = ref.ambiguous.map((t) => `  • ${descreveTx(t)} em ${formatDateBR(t.occurred_at)}`);
+        return `🤔 Achei mais de um parecido:\n${opcoes.join("\n")}\nMe diz o valor exato pra eu saber qual.`;
+      }
+
+      const antes = ref.found;
+      const { error } = await supabase.from("transactions").update(patch).eq("id", antes.id);
+      if (error) throw error;
+
+      const mudancas: string[] = [];
+      if (patch.amount_cents) {
+        mudancas.push(`${centsToBRL(antes.amount_cents)} → ${centsToBRL(patch.amount_cents as number)}`);
+      }
+      if (patch.category) mudancas.push(`categoria → *${patch.category}*`);
+      if (patch.occurred_at) mudancas.push(`data → ${formatDateBR(patch.occurred_at as string)}`);
+      return `✏️ Corrigido (${descreveTx(antes)}): ${mudancas.join(", ")}.`;
+    }
+
+    case "delete_item": {
+      const tipo = action.target_type ?? "transaction";
+      const termo = (action.content ?? action.title)?.trim();
+
+      if (tipo === "transaction") {
+        const ref = await resolveTransactionRef(supabase, workspaceId, action);
+        if ("none" in ref) return "🤷 Não achei esse lançamento.";
+        if ("ambiguous" in ref) {
+          const opcoes = ref.ambiguous.map((t) => `  • ${descreveTx(t)}`);
+          return `🤔 Achei mais de um parecido:\n${opcoes.join("\n")}\nMe diz o valor exato.`;
+        }
+        const { error } = await supabase.from("transactions").delete().eq("id", ref.found.id);
+        if (error) throw error;
+        return `🗑️ Apagado: ${descreveTx(ref.found)}.`;
+      }
+
+      const tabela = {
+        note: "notes",
+        reminder: "reminders",
+        goal: "goals",
+        recurring: "recurring_transactions",
+      }[tipo];
+      const campoTexto = tipo === "note" ? "content" : tipo === "reminder" ? "title" : tipo === "goal" ? "name" : "description";
+      if (!termo) return "❌ Me diz qual item apagar (ex.: \"apaga a nota do mercado\").";
+
+      const { data: achados } = await supabase
+        .from(tabela)
+        .select(`id, ${campoTexto}`)
+        .eq("workspace_id", workspaceId)
+        .ilike(campoTexto, `%${termo}%`)
+        .order("created_at", { ascending: false })
+        .limit(3);
+      const lista = (achados ?? []) as unknown as Record<string, string>[];
+      if (!lista.length) return `🤷 Não achei nada com "${termo}".`;
+      if (lista.length > 1) {
+        const opcoes = lista.map((i) => `  • ${i[campoTexto]}`).join("\n");
+        return `🤔 Achei mais de um:\n${opcoes}\nSeja mais específico.`;
+      }
+
+      const { error } = await supabase.from(tabela).delete().eq("id", lista[0].id);
+      if (error) throw error;
+      const rotulo = { note: "Nota", reminder: "Lembrete", goal: "Meta", recurring: "Recorrente" }[tipo];
+      return `🗑️ ${rotulo} apagad${tipo === "note" || tipo === "goal" ? "a" : "o"}: ${lista[0][campoTexto]}`;
     }
 
     case "create_note": {
@@ -728,7 +890,7 @@ Deno.serve(async (_req) => {
         ({ parsed, usage } = await parseMessage(text, profile.timezone, GEMINI_PRO, media));
       }
 
-      await supabase.from("ai_events").insert({
+      const { data: aiEvent } = await supabase.from("ai_events").insert({
         user_id: profile.id,
         message_raw_id,
         model: usage.model,
@@ -736,16 +898,17 @@ Deno.serve(async (_req) => {
         output_tokens: usage.outputTokens,
         confidence: parsed.confidence,
         result: parsed,
-      });
+      }).select("id").single();
 
       // 5. executa cada ação; uma linha de resultado por ação (falha isolada não derruba as demais)
       const lines: string[] = [];
+      const created: string[] = [];
       for (const action of parsed.actions.slice(0, 10)) {
         try {
           const comRegra = await applyRules(supabase, workspaceId, action);
           lines.push(await executeAction(
             supabase,
-            { userId: profile.id, workspaceId, timezone: profile.timezone },
+            { userId: profile.id, workspaceId, timezone: profile.timezone, created },
             comRegra,
           ));
         } catch (err) {
@@ -755,6 +918,14 @@ Deno.serve(async (_req) => {
       }
       if (!lines.length) {
         lines.push("🤔 Não entendi. Tenta algo como: \"gastei 45 no mercado\" ou \"me lembra de pagar a conta dia 10\".");
+      }
+
+      // liga o parse ao que ele criou: é o que permite desfazer pela tela de atividade
+      if (aiEvent && created.length) {
+        await supabase
+          .from("ai_events")
+          .update({ created_transaction_ids: created })
+          .eq("id", aiEvent.id);
       }
 
       // 6. marca done (fonte da verdade salva) ANTES de tentar confirmar

@@ -31,6 +31,8 @@ export type AiActionType =
   | "simulate_purchase"
   | "mark_paid"
   | "set_rule"
+  | "update_transaction"
+  | "delete_item"
   | "create_note"
   | "create_reminder"
   | "create_goal"
@@ -56,6 +58,11 @@ export interface AiAction {
   account: string | null; // nome livre da conta citada
   counterparty_account: string | null; // conta destino (transfer)
   installments: number | null; // nº de parcelas (compra parcelada)
+  // correção: os campos acima descrevem QUAL item; estes, o que passa a valer
+  new_amount_cents: number | null;
+  new_category: string | null;
+  new_occurred_at: string | null; // YYYY-MM-DD
+  target_type: "transaction" | "note" | "reminder" | "goal" | "recurring" | null;
   goal_name: string | null;
   target_cents: number | null;
   deadline: string | null; // YYYY-MM-DD
@@ -80,6 +87,7 @@ const ACTION_SCHEMA = {
         "create_expense", "create_income", "create_transfer",
         "create_installment_purchase", "pay_invoice", "query_invoice",
         "query_forecast", "simulate_purchase", "mark_paid", "set_rule",
+        "update_transaction", "delete_item",
         "create_note", "create_reminder", "create_goal", "goal_deposit",
         "query_balance", "query_transactions", "query_budgets", "query_goals",
         "undo_last", "unknown",
@@ -96,6 +104,14 @@ const ACTION_SCHEMA = {
     account: { type: "STRING", nullable: true },
     counterparty_account: { type: "STRING", nullable: true },
     installments: { type: "INTEGER", nullable: true },
+    new_amount_cents: { type: "INTEGER", nullable: true },
+    new_category: { type: "STRING", nullable: true },
+    new_occurred_at: { type: "STRING", nullable: true },
+    target_type: {
+      type: "STRING",
+      enum: ["transaction", "note", "reminder", "goal", "recurring"],
+      nullable: true,
+    },
     goal_name: { type: "STRING", nullable: true },
     target_cents: { type: "INTEGER", nullable: true },
     deadline: { type: "STRING", nullable: true },
@@ -132,6 +148,8 @@ Tipos de ação:
 - "simulate_purchase": pergunta se PODE comprar algo ("posso comprar um celular de 3000 em 10x?", "dá pra gastar 800 esse mês?", "consigo pagar uma viagem de 5 mil?"). amount_cents = valor total, installments = parcelas (1 se à vista). NÃO registra nada — é só simulação.
 - "mark_paid": confirmar que uma conta prevista foi paga ("paguei a luz", "quitei o aluguel"). content/title = do que se trata, amount_cents se citado. Diferente de create_expense: aqui o lançamento JÁ EXISTE como previsto.
 - "set_rule": o usuário quer que algo SEMPRE caia numa categoria ("sempre que eu falar ifood põe em restaurante", "posto é transporte", "toda vez que aparecer uber, categoria transporte"). content = o texto que dispara a regra (ex.: "ifood"), category = a categoria de destino.
+- "update_transaction": corrigir um lançamento JÁ registrado ("na verdade foi 54, não 45", "muda o último pra transporte", "o mercado de ontem foi 120"). Campos de BUSCA: amount_cents (valor atual), category, content (parte da descrição) — preencha só o que o usuário citou; nada citado = o último lançamento. Campos de CORREÇÃO: new_amount_cents, new_category, new_occurred_at.
+- "delete_item": apagar um item específico ("apaga a nota do mercado", "cancela o lembrete do aluguel", "tira aquele gasto de 45"). target_type diz o tipo (transaction, note, reminder, goal, recurring) e content/amount_cents/category identificam qual. Para "apaga o último lançamento" use undo_last.
 - "create_note": anotação livre. content (texto limpo) e category curta se óbvia.
 - "create_reminder": pedido para ser lembrado. title, remind_at (próxima ocorrência, ISO, no fuso do usuário) e recurrence como RRULE quando recorrente ("todo dia 5" -> FREQ=MONTHLY;BYMONTHDAY=5; "todo dia às 8h" -> FREQ=DAILY). Sem recorrência -> null.
 - "create_goal": meta de poupança ("quero juntar 5000 até dezembro pra viagem"). goal_name, target_cents, deadline (YYYY-MM-DD ou null).
@@ -147,6 +165,7 @@ Regras:
 - Dinheiro SEMPRE em centavos inteiros. "1.234,56" -> 123456.
 - Datas relativas resolvidas com a data/hora atual DO USUÁRIO (já convertida para o fuso dele, com offset): ${nowLocal} (fuso ${timezone}). Use exatamente essa data como "hoje" — não recalcule fuso.
 - Campos que não se aplicam à ação: null.
+- Corrigir algo que já existe é update_transaction ou delete_item — NUNCA crie um lançamento novo para "consertar" outro.
 - Compra no cartão à vista é create_expense com account = nome do cartão. Só use create_installment_purchase quando houver 2 ou mais parcelas.
 - confidence (0..1) é da interpretação da mensagem INTEIRA.
 
