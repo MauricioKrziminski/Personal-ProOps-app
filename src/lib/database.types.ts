@@ -144,12 +144,62 @@ export type Database = {
           },
         ]
       }
+      alerts_sent: {
+        Row: {
+          channel: string | null
+          created_at: string
+          id: string
+          kind: string
+          ref: string
+          sent_on: string
+          user_id: string
+          workspace_id: string
+        }
+        Insert: {
+          channel?: string | null
+          created_at?: string
+          id?: string
+          kind: string
+          ref: string
+          sent_on?: string
+          user_id: string
+          workspace_id: string
+        }
+        Update: {
+          channel?: string | null
+          created_at?: string
+          id?: string
+          kind?: string
+          ref?: string
+          sent_on?: string
+          user_id?: string
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "alerts_sent_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "alerts_sent_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       budgets: {
         Row: {
           category: string
           created_at: string
           id: string
           limit_cents: number
+          month: string | null
+          rollover: boolean
           updated_at: string
           user_id: string
           workspace_id: string
@@ -159,6 +209,8 @@ export type Database = {
           created_at?: string
           id?: string
           limit_cents: number
+          month?: string | null
+          rollover?: boolean
           updated_at?: string
           user_id: string
           workspace_id?: string
@@ -168,6 +220,8 @@ export type Database = {
           created_at?: string
           id?: string
           limit_cents?: number
+          month?: string | null
+          rollover?: boolean
           updated_at?: string
           user_id?: string
           workspace_id?: string
@@ -323,6 +377,143 @@ export type Database = {
           },
           {
             foreignKeyName: "categorization_rules_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      debts: {
+        Row: {
+          account_id: string | null
+          archived: boolean
+          created_at: string
+          due_day: number | null
+          id: string
+          installment_cents: number | null
+          installments: number | null
+          installments_paid: number
+          interest_rate_monthly: number
+          kind: string
+          name: string
+          principal_cents: number
+          remaining_cents: number
+          started_at: string
+          updated_at: string
+          user_id: string
+          workspace_id: string
+        }
+        Insert: {
+          account_id?: string | null
+          archived?: boolean
+          created_at?: string
+          due_day?: number | null
+          id?: string
+          installment_cents?: number | null
+          installments?: number | null
+          installments_paid?: number
+          interest_rate_monthly?: number
+          kind?: string
+          name: string
+          principal_cents: number
+          remaining_cents: number
+          started_at?: string
+          updated_at?: string
+          user_id: string
+          workspace_id?: string
+        }
+        Update: {
+          account_id?: string | null
+          archived?: boolean
+          created_at?: string
+          due_day?: number | null
+          id?: string
+          installment_cents?: number | null
+          installments?: number | null
+          installments_paid?: number
+          interest_rate_monthly?: number
+          kind?: string
+          name?: string
+          principal_cents?: number
+          remaining_cents?: number
+          started_at?: string
+          updated_at?: string
+          user_id?: string
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "debts_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "debts_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "debts_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      goal_contributions: {
+        Row: {
+          amount_cents: number
+          created_at: string
+          goal_id: string
+          id: string
+          note: string | null
+          occurred_at: string
+          user_id: string
+          workspace_id: string
+        }
+        Insert: {
+          amount_cents: number
+          created_at?: string
+          goal_id: string
+          id?: string
+          note?: string | null
+          occurred_at?: string
+          user_id: string
+          workspace_id?: string
+        }
+        Update: {
+          amount_cents?: number
+          created_at?: string
+          goal_id?: string
+          id?: string
+          note?: string | null
+          occurred_at?: string
+          user_id?: string
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "goal_contributions_goal_id_fkey"
+            columns: ["goal_id"]
+            isOneToOne: false
+            referencedRelation: "goals"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "goal_contributions_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "goal_contributions_workspace_id_fkey"
             columns: ["workspace_id"]
             isOneToOne: false
             referencedRelation: "workspaces"
@@ -916,6 +1107,7 @@ export type Database = {
           counterparty_account_id: string | null
           created_at: string
           currency: string
+          debt_id: string | null
           description: string | null
           due_at: string | null
           id: string
@@ -940,6 +1132,7 @@ export type Database = {
           counterparty_account_id?: string | null
           created_at?: string
           currency?: string
+          debt_id?: string | null
           description?: string | null
           due_at?: string | null
           id?: string
@@ -964,6 +1157,7 @@ export type Database = {
           counterparty_account_id?: string | null
           created_at?: string
           currency?: string
+          debt_id?: string | null
           description?: string | null
           due_at?: string | null
           id?: string
@@ -993,6 +1187,13 @@ export type Database = {
             columns: ["counterparty_account_id"]
             isOneToOne: false
             referencedRelation: "accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "transactions_debt_id_fkey"
+            columns: ["debt_id"]
+            isOneToOne: false
+            referencedRelation: "debts"
             referencedColumns: ["id"]
           },
           {
@@ -1126,11 +1327,28 @@ export type Database = {
           worst_day: string
         }[]
       }
+      _alerts_to_send: {
+        Args: never
+        Returns: {
+          body: string
+          expo_push_token: string
+          kind: string
+          phone: string
+          ref: string
+          title: string
+          user_id: string
+          workspace_id: string
+        }[]
+      }
       _budgets_status: {
         Args: { ref_month?: string; uid: string }
         Returns: {
+          base_limit_cents: number
           category: string
           limit_cents: number
+          month: string
+          rollover: boolean
+          rollover_cents: number
           spent_cents: number
         }[]
       }
@@ -1177,6 +1395,18 @@ export type Database = {
           expense_cents: number
           income_cents: number
           month: string
+        }[]
+      }
+      _payoff_strategy: {
+        Args: { estrategia?: string; uid: string }
+        Returns: {
+          debt_id: string
+          interest_rate_monthly: number
+          months_left: number
+          name: string
+          priority: number
+          remaining_cents: number
+          total_interest_cents: number
         }[]
       }
       _prepare_import_batch: {
@@ -1231,8 +1461,12 @@ export type Database = {
       budgets_status: {
         Args: { ref_month?: string }
         Returns: {
+          base_limit_cents: number
           category: string
           limit_cents: number
+          month: string
+          rollover: boolean
+          rollover_cents: number
           spent_cents: number
         }[]
       }
@@ -1294,6 +1528,17 @@ export type Database = {
         }
         Returns: string
       }
+      debt_schedule: {
+        Args: { p_debt_id: string }
+        Returns: {
+          balance_cents: number
+          due_date: string
+          installment_no: number
+          interest_cents: number
+          payment_cents: number
+          principal_cents: number
+        }[]
+      }
       expenses_monthly: {
         Args: { months_back?: number }
         Returns: {
@@ -1309,6 +1554,15 @@ export type Database = {
           total_cents: number
         }[]
       }
+      goal_deposit: {
+        Args: {
+          p_amount_cents: number
+          p_goal_id: string
+          p_note?: string
+          p_occurred_at?: string
+        }
+        Returns: number
+      }
       monthly_cashflow: {
         Args: { months_back?: number }
         Returns: {
@@ -1318,9 +1572,30 @@ export type Database = {
         }[]
       }
       my_default_workspace: { Args: never; Returns: string }
+      pay_debt_installment: {
+        Args: {
+          p_account_id?: string
+          p_amount_cents: number
+          p_debt_id: string
+          p_paid_at?: string
+        }
+        Returns: number
+      }
       pay_invoice: {
         Args: { p_account_id: string; p_invoice_id: string; p_paid_at?: string }
         Returns: string
+      }
+      payoff_strategy: {
+        Args: { estrategia?: string }
+        Returns: {
+          debt_id: string
+          interest_rate_monthly: number
+          months_left: number
+          name: string
+          priority: number
+          remaining_cents: number
+          total_interest_cents: number
+        }[]
       }
       transactions_summary: {
         Args: { from_date: string; to_date: string }

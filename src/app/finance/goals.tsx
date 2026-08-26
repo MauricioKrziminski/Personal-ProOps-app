@@ -12,7 +12,14 @@ import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { MaxContentWidth, Spacing } from '@/constants/theme';
 import { formatBRL, formatDateBR } from '@/hooks/use-items';
-import { useArchiveGoal, useGoalDeposit, useGoals, useSaveGoal, type Goal } from '@/hooks/use-finance';
+import {
+  useArchiveGoal,
+  useGoalContributions,
+  useGoalDeposit,
+  useGoals,
+  useSaveGoal,
+  type Goal,
+} from '@/hooks/use-finance';
 import { useTheme } from '@/hooks/use-theme';
 
 function GoalCard({
@@ -26,6 +33,9 @@ function GoalCard({
 }) {
   const theme = useTheme();
   const deposit = useGoalDeposit();
+  const [showLedger, setShowLedger] = useState(false);
+  // só busca o extrato quando o usuário abre — meta fechada não gasta request
+  const { data: contributions } = useGoalContributions(showLedger ? goal.id : undefined);
   const archive = useArchiveGoal();
   const [depositCents, setDepositCents] = useState(0);
   const [depositing, setDepositing] = useState(false);
@@ -114,6 +124,41 @@ function GoalCard({
             style={[styles.smallButton, { backgroundColor: theme.backgroundElement }]}>
             <ThemedText type="smallBold">＋ Aportar</ThemedText>
           </Pressable>
+        )}
+
+        <Pressable
+          hitSlop={8}
+          onPress={() => {
+            Haptics.selectionAsync();
+            setShowLedger((v) => !v);
+          }}>
+          <ThemedText type="small" themeColor="textSecondary">
+            {showLedger ? 'ocultar extrato' : 'ver extrato'}
+          </ThemedText>
+        </Pressable>
+
+        {showLedger && (
+          <View style={styles.ledger}>
+            {(contributions ?? []).length === 0 && (
+              <ThemedText type="small" themeColor="textSecondary">
+                Nenhum aporte registrado ainda.
+              </ThemedText>
+            )}
+            {(contributions ?? []).slice(0, 8).map((aporte) => (
+              <View key={aporte.id} style={styles.ledgerRow}>
+                <ThemedText type="small" themeColor="textSecondary">
+                  {formatDateBR(aporte.occurred_at)}
+                  {aporte.note ? ` · ${aporte.note}` : ''}
+                </ThemedText>
+                <ThemedText
+                  type="small"
+                  style={{ color: aporte.amount_cents >= 0 ? theme.success : theme.danger }}>
+                  {aporte.amount_cents >= 0 ? '+' : '−'}
+                  {formatBRL(Math.abs(aporte.amount_cents))}
+                </ThemedText>
+              </View>
+            ))}
+          </View>
         )}
       </GlassCard>
     </Animated.View>
@@ -293,6 +338,13 @@ const styles = StyleSheet.create({
   },
   depositInput: {
     flex: 1,
+  },
+  ledger: {
+    gap: Spacing.one,
+  },
+  ledgerRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
   },
   smallButton: {
     paddingHorizontal: Spacing.three,

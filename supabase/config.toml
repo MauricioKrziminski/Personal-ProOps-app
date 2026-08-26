@@ -19,6 +19,11 @@ verify_jwt = true
 [functions.finance-scheduler]
 verify_jwt = true
 
+# alertas proativos (orcamento, fatura, conta vencendo, saldo negativo).
+# Chamada por pg_cron uma vez por dia.
+[functions.send-alerts]
+verify_jwt = true
+
 # importacao de extrato OFX/CSV chamada pelo app (usuario autenticado)
 [functions.import-statement]
 verify_jwt = true

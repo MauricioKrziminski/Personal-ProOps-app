@@ -276,14 +276,15 @@ export function useBudgets() {
   });
 }
 
-export function useBudgetsStatus() {
+/** `month` no formato YYYY-MM; omitido = mês corrente. */
+export function useBudgetsStatus(month?: string) {
   useRealtimeInvalidate('transactions', ['budgets-status']);
+  useRealtimeInvalidate('budgets', ['budgets-status']);
+  const refMonth = month ? `${month}-01` : localISODate();
   return useQuery({
-    queryKey: ['budgets-status'],
+    queryKey: ['budgets-status', refMonth],
     queryFn: async (): Promise<BudgetStatus[]> => {
-      const { data, error } = await supabase.rpc('budgets_status', {
-        ref_month: localISODate(),
-      });
+      const { data, error } = await supabase.rpc('budgets_status', { ref_month: refMonth });
       if (error) throw error;
       return data;
     },
@@ -295,7 +296,7 @@ export function useBudgetsStatus() {
 const FINANCE_KEYS = [
   ['transactions'], ['tx-summary'], ['monthly-cashflow'], ['account-balances'],
   ['budgets-status'], ['accounts'], ['goals'], ['budgets'], ['recurring'],
-  ['card-summary'], ['invoice'], ['forecast'], ['upcoming-bills'],
+  ['card-summary'], ['invoice'], ['forecast'], ['upcoming-bills'], ['debts'], ['payoff'],
 ];
 
 function useInvalidateFinance() {
@@ -712,6 +713,136 @@ export function useUndoAiEvent() {
   });
 }
 
+// ── dívidas ─────────────────────────────────────────────────────────────────
+
+export const DEBT_KINDS = [
+  { value: 'loan', label: 'Empréstimo' },
+  { value: 'financing', label: 'Financiamento' },
+  { value: 'credit_card', label: 'Rotativo' },
+  { value: 'person', label: 'Pessoa' },
+  { value: 'other', label: 'Outro' },
+] as const;
+
+export type Debt = Pick<
+  Tables['debts']['Row'],
+  | 'id'
+  | 'name'
+  | 'principal_cents'
+  | 'remaining_cents'
+  | 'interest_rate_monthly'
+  | 'installments'
+  | 'installments_paid'
+  | 'installment_cents'
+  | 'due_day'
+  | 'archived'
+> & { kind: (typeof DEBT_KINDS)[number]['value'] };
+
+export type DebtScheduleRow = Fns['debt_schedule']['Returns'][number];
+export type PayoffRow = Fns['payoff_strategy']['Returns'][number];
+
+export function useDebts() {
+  useRealtimeInvalidate('debts', ['debts']);
+  return useQuery({
+    queryKey: ['debts'],
+    queryFn: async (): Promise<Debt[]> => {
+      const { data, error } = await supabase
+        .from('debts')
+        .select(
+          'id, name, kind, principal_cents, remaining_cents, interest_rate_monthly, installments, installments_paid, installment_cents, due_day, archived',
+        )
+        .eq('archived', false)
+        .order('remaining_cents', { ascending: false });
+      if (error) throw error;
+      return data as Debt[];
+    },
+  });
+}
+
+/** Tabela de amortização do que ainda falta pagar (Price, calculada no banco). */
+export function useDebtSchedule(debtId: string | undefined) {
+  return useQuery({
+    enabled: Boolean(debtId),
+    queryKey: ['debt-schedule', debtId ?? ''],
+    queryFn: async (): Promise<DebtScheduleRow[]> => {
+      const { data, error } = await supabase.rpc('debt_schedule', { p_debt_id: debtId! });
+      if (error) throw error;
+      return data;
+    },
+  });
+}
+
+/** Ordem de ataque: 'avalanche' (mais juros) ou 'snowball' (menor saldo). */
+export function usePayoffStrategy(estrategia: 'avalanche' | 'snowball') {
+  useRealtimeInvalidate('debts', ['payoff']);
+  return useQuery({
+    queryKey: ['payoff', estrategia],
+    queryFn: async (): Promise<PayoffRow[]> => {
+      const { data, error } = await supabase.rpc('payoff_strategy', { estrategia });
+      if (error) throw error;
+      return data;
+    },
+  });
+}
+
+export function useSaveDebt() {
+  const invalidate = useInvalidateFinance();
+  return useMutation({
+    mutationFn: async (input: {
+      id?: string;
+      name: string;
+      kind: Debt['kind'];
+      principal_cents: number;
+      remaining_cents: number;
+      interest_rate_monthly: number;
+      installments: number | null;
+      due_day: number | null;
+    }) => {
+      const { id, ...resto } = input;
+      if (id) {
+        const { error } = await supabase.from('debts').update(resto).eq('id', id);
+        if (error) throw error;
+      } else {
+        const { error } = await supabase.from('debts').insert({ ...resto, user_id: await userId() });
+        if (error) throw error;
+      }
+    },
+    onSuccess: invalidate,
+  });
+}
+
+/** Paga uma parcela: a RPC cria a despesa e abate o saldo já descontando juros. */
+export function usePayDebtInstallment() {
+  const invalidate = useInvalidateFinance();
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (input: { debtId: string; amountCents: number; accountId?: string | null }) => {
+      const { error } = await supabase.rpc('pay_debt_installment', {
+        p_debt_id: input.debtId,
+        p_amount_cents: input.amountCents,
+        p_account_id: input.accountId ?? undefined,
+        p_paid_at: localISODate(),
+      });
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      invalidate();
+      queryClient.invalidateQueries({ queryKey: ['debt-schedule'] });
+      queryClient.invalidateQueries({ queryKey: ['payoff'] });
+    },
+  });
+}
+
+export function useArchiveDebt() {
+  const invalidate = useInvalidateFinance();
+  return useMutation({
+    mutationFn: async (id: string) => {
+      const { error } = await supabase.from('debts').update({ archived: true }).eq('id', id);
+      if (error) throw error;
+    },
+    onSuccess: invalidate,
+  });
+}
+
 export interface TransactionInput {
   kind: TransactionKind;
   amount_cents: number;
@@ -817,17 +948,54 @@ export function useSaveGoal() {
   });
 }
 
+/**
+ * Aporte (ou retirada, com valor negativo) pela RPC atômica: grava no ledger e
+ * recalcula `saved_cents` a partir da soma. O += no cliente que existia aqui
+ * perdia aporte quando dois dispositivos lançavam junto.
+ */
 export function useGoalDeposit() {
   const invalidate = useInvalidateFinance();
+  const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: async ({ goal, amountCents }: { goal: Goal; amountCents: number }) => {
-      const { error } = await supabase
-        .from('goals')
-        .update({ saved_cents: goal.saved_cents + amountCents })
-        .eq('id', goal.id);
+    mutationFn: async ({ goal, amountCents, note }: {
+      goal: Goal;
+      amountCents: number;
+      note?: string;
+    }) => {
+      const { error } = await supabase.rpc('goal_deposit', {
+        p_goal_id: goal.id,
+        p_amount_cents: amountCents,
+        p_occurred_at: localISODate(),
+        p_note: note ?? undefined,
+      });
       if (error) throw error;
     },
-    onSuccess: invalidate,
+    onSuccess: () => {
+      invalidate();
+      queryClient.invalidateQueries({ queryKey: ['goal-contributions'] });
+    },
+  });
+}
+
+export type GoalContribution = Pick<
+  Tables['goal_contributions']['Row'],
+  'id' | 'amount_cents' | 'occurred_at' | 'note'
+>;
+
+/** Extrato de aportes da meta. */
+export function useGoalContributions(goalId: string | undefined) {
+  return useQuery({
+    enabled: Boolean(goalId),
+    queryKey: ['goal-contributions', goalId ?? ''],
+    queryFn: async (): Promise<GoalContribution[]> => {
+      const { data, error } = await supabase
+        .from('goal_contributions')
+        .select('id, amount_cents, occurred_at, note')
+        .eq('goal_id', goalId!)
+        .order('occurred_at', { ascending: false });
+      if (error) throw error;
+      return data;
+    },
   });
 }
 
@@ -871,13 +1039,26 @@ export function useDeleteRecurring() {
 export function useSaveBudget() {
   const invalidate = useInvalidateFinance();
   return useMutation({
-    mutationFn: async (input: { category: string; limit_cents: number }) => {
+    mutationFn: async (input: {
+      category: string;
+      limit_cents: number;
+      rollover?: boolean;
+      /** YYYY-MM para sobrescrever só aquele mês; omitido = limite padrão. */
+      month?: string | null;
+    }) => {
+      const { month, ...resto } = input;
+      const row = {
+        ...resto,
+        month: month ? `${month}-01` : null,
+        user_id: await userId(),
+        workspace_id: await workspaceId(),
+      };
+      // dois unique parciais no banco (month null vs not null) => dois alvos
       const { error } = await supabase
         .from('budgets')
-        .upsert(
-          { ...input, user_id: await userId(), workspace_id: await workspaceId() },
-          { onConflict: 'workspace_id,category' },
-        );
+        .upsert(row, {
+          onConflict: month ? 'workspace_id,category,month' : 'workspace_id,category',
+        });
       if (error) throw error;
     },
     onSuccess: invalidate,

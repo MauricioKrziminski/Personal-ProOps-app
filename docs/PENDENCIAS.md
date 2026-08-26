@@ -229,8 +229,32 @@ categoria ou o valor? Sem conserto.
 - Verificado: policy de `ai_events` devolvendo só as linhas do dono; advisors de volta ao estado
   pré-existente; tsc/lint limpos; 34 testes.
 
-**Próximo:** Fase 5 do plano — orçamento por mês com rollover, ledger de aportes em metas,
-dívidas com amortização e os alertas proativos (que dependem do push funcionando).
+## ✅ FASE 5 — orçamento por mês, metas com ledger, dívidas e alertas (concluída em 26/08/2026)
+
+- `0022_budgets_month_and_goal_ledger.sql` — `budgets.month` (null = padrão) + `rollover`, com
+  **dois unique parciais** porque NULL não colide com NULL no Postgres; `budgets_status` agora
+  devolve `base_limit_cents`/`rollover_cents`/`month` além das colunas antigas (nomes preservados,
+  app e Edge Function não mudaram). `goal_contributions` + `goal_deposit` atômica — o `+=` no
+  cliente perdia aporte quando dois dispositivos lançavam junto.
+- `0023_debts.sql` — dívidas com Tabela Price, `debt_schedule` (CTE recursiva),
+  `payoff_strategy` (avalanche/snowball) e `pay_debt_installment`, que abate o saldo **já
+  descontando os juros do mês**.
+- `0024_alerts.sql` + `0025_schedule_send_alerts.sql` + Edge Function `send-alerts` — orçamento
+  80%/100%, fatura e conta vencendo, saldo projetado negativo. Dedupe por (workspace, tipo, ref,
+  DIA), reservado ANTES do envio: rodar o cron duas vezes não vira spam (e spam no WhatsApp custa
+  template pago). Mensagem sempre acionável.
+- App: tela `finance/debts.tsx` (amortização, quanto da parcela é juro, ordem de ataque), seletor
+  de mês + toggles "acumula sobra"/"só este mês" em orçamentos, extrato de aportes na meta.
+- Verificado: rollover (base 500 + sobra 300 = 800 efetivos) e override de mês; ledger somando
+  500+300−100=700 com 3 linhas; amortização de R$10.000 em 12x a 2% a.m. fechando em R$945,60/mês
+  com saldo zerando exato na 12ª; `_alerts_to_send` disparando os 3 tipos com texto acionável.
+  34 testes, tsc/lint limpos.
+
+⚠️ **Push ainda é o gargalo dos alertas.** Sem `extra.eas.projectId` + FCM (ver
+`docs/PUSH-NOTIFICATIONS.md`), `expo_push_token` fica NULL e TODO alerta cai no template pago do
+WhatsApp. A function já prefere push quando existe token — falta só a credencial.
+
+**Próximo:** Fase 6 do plano — patrimônio, investimentos e relatórios/IR.
 
 ## 📝 Como verificar o pipeline (rápido)
 Usar `/verify-whatsapp` ou manualmente: mandar mensagem → conferir `messages_raw` (inbound) → `jobs` (done) → `ai_events` (result/confidence) → tabela final (`transactions`/`notes`/...) → resposta no WhatsApp. Logs: MCP `get_logs` (edge-function).

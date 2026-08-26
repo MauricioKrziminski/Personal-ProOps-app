@@ -12,7 +12,7 @@ import { GlassCard } from '@/components/glass/glass-card';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { MaxContentWidth, Spacing } from '@/constants/theme';
-import { formatBRL } from '@/hooks/use-items';
+import { formatBRL, localISODate } from '@/hooks/use-items';
 import {
   INCOME_CATEGORIES,
   SUGGESTED_CATEGORIES,
@@ -23,9 +23,25 @@ import {
 } from '@/hooks/use-finance';
 import { useTheme } from '@/hooks/use-theme';
 
+/** 'YYYY-MM' + n meses. */
+function shiftMonth(month: string, delta: number): string {
+  const [y, m] = month.split('-').map(Number);
+  const d = new Date(y, m - 1 + delta, 1);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+}
+
+function monthLabel(month: string): string {
+  const [y, m] = month.split('-').map(Number);
+  return new Date(y, m - 1, 1).toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' });
+}
+
 export default function BudgetsScreen() {
   const theme = useTheme();
-  const { data: status, isLoading, isError, refetch } = useBudgetsStatus();
+  const [month, setMonth] = useState(() => localISODate().slice(0, 7));
+  const [rollover, setRollover] = useState(false);
+  // limite só deste mês vs limite padrão que vale para todos
+  const [soEsteMes, setSoEsteMes] = useState(false);
+  const { data: status, isLoading, isError, refetch } = useBudgetsStatus(month);
   const { data: budgets } = useBudgets();
   const save = useSaveBudget();
   const remove = useDeleteBudget();
@@ -41,21 +57,27 @@ export default function BudgetsScreen() {
     setEditing(null);
     setCategory(null);
     setLimitCents(0);
+    setRollover(false);
+    setSoEsteMes(false);
   };
 
   /** Editar é o mesmo upsert: a identidade do orçamento é (workspace_id, category). */
   const startEdit = (cat: string, limit: number) => {
     Haptics.selectionAsync();
+    const atual = (status ?? []).find((b) => b.category === cat);
     setCreating(false);
     setEditing(cat);
     setCategory(cat);
-    setLimitCents(limit);
+    // edita o limite BASE, não o efetivo (que já inclui o rollover)
+    setLimitCents(Number(atual?.base_limit_cents ?? limit));
+    setRollover(Boolean(atual?.rollover));
+    setSoEsteMes(Boolean(atual?.month));
   };
 
   const onSubmit = () => {
     if (!category || limitCents <= 0) return;
     save.mutate(
-      { category, limit_cents: limitCents },
+      { category, limit_cents: limitCents, rollover, month: soEsteMes ? month : null },
       {
         onSuccess: () => {
           Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
@@ -87,6 +109,30 @@ export default function BudgetsScreen() {
         <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
           <ScreenHeader title="Orçamentos" />
 
+          <View style={styles.monthRow}>
+            <Pressable
+              hitSlop={12}
+              onPress={() => {
+                Haptics.selectionAsync();
+                setMonth((m) => shiftMonth(m, -1));
+              }}
+              style={[styles.monthArrow, { backgroundColor: theme.backgroundElement }]}>
+              <ThemedText type="smallBold">‹</ThemedText>
+            </Pressable>
+            <ThemedText type="smallBold" style={styles.monthLabel}>
+              {monthLabel(month)}
+            </ThemedText>
+            <Pressable
+              hitSlop={12}
+              onPress={() => {
+                Haptics.selectionAsync();
+                setMonth((m) => shiftMonth(m, 1));
+              }}
+              style={[styles.monthArrow, { backgroundColor: theme.backgroundElement }]}>
+              <ThemedText type="smallBold">›</ThemedText>
+            </Pressable>
+          </View>
+
           {isError && <ErrorCard onRetry={refetch} />}
           {isLoading && !isError && <LoadingCard />}
 
@@ -116,7 +162,11 @@ export default function BudgetsScreen() {
                       />
                     </View>
                     <ThemedText type="small" themeColor="textSecondary">
-                      {formatBRL(item.spent_cents)} de {formatBRL(item.limit_cents)} este mês
+                      {formatBRL(item.spent_cents)} de {formatBRL(item.limit_cents)}
+                      {Number(item.rollover_cents) > 0
+                        ? ` (${formatBRL(Number(item.base_limit_cents))} + ${formatBRL(Number(item.rollover_cents))} que sobrou)`
+                        : ''}
+                      {item.month ? ' · só este mês' : ''}
                     </ThemedText>
                   </GlassCard>
                 </Pressable>
@@ -152,6 +202,23 @@ export default function BudgetsScreen() {
               </View>
               <ThemedText type="smallBold">Limite mensal</ThemedText>
               <MoneyInput valueCents={limitCents} onChangeCents={setLimitCents} />
+              <View style={styles.chipRow}>
+                <Chip
+                  label="↩︎ Acumula sobra"
+                  selected={rollover}
+                  onPress={() => setRollover((v) => !v)}
+                />
+                <Chip
+                  label="📅 Só este mês"
+                  selected={soEsteMes}
+                  onPress={() => setSoEsteMes((v) => !v)}
+                />
+              </View>
+              <ThemedText type="small" themeColor="textSecondary">
+                {rollover
+                  ? 'O que sobrar do mês anterior soma neste limite.'
+                  : 'Sem acúmulo: cada mês começa do zero.'}
+              </ThemedText>
               <Pressable
                 onPress={onSubmit}
                 disabled={save.isPending || !category || limitCents <= 0}
@@ -217,6 +284,22 @@ const styles = StyleSheet.create({
   scroll: {
     gap: Spacing.three,
     paddingBottom: Spacing.six,
+  },
+  monthRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: Spacing.three,
+  },
+  monthArrow: {
+    borderRadius: Spacing.two,
+    paddingHorizontal: Spacing.three,
+    paddingVertical: Spacing.one,
+  },
+  monthLabel: {
+    flex: 1,
+    textAlign: 'center',
+    textTransform: 'capitalize',
   },
   budgetCard: {
     gap: Spacing.one,
