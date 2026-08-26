@@ -3,7 +3,7 @@
 ## Git
 
 - Commits **conventional, 1 linha, sem corpo e SEM co-autor** (`feat(finance): ...`, `fix(webhook): ...`, `chore: ...`). Único autor: Gabriel.
-- Branch por feature a partir de `main` (`<user>/<slug>`). Nunca commitar direto na `main`.
+- **Commit direto na `main` é permitido** (projeto de um dev só). Branch de feature (`<user>/<slug>`) fica opcional, para trabalho longo ou que precise de PR.
 - Nunca commitar `.env*` (só `*.example`), `android/`, `ios/`.
 
 ## Antes de commitar
