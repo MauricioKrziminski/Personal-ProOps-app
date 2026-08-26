@@ -66,7 +66,7 @@ Via Graph API v21.0 com o token de System User do app:
 
 ## 🟡 Detalhes adiados do frontend
 
-6. **Splash/branding**: `src/components/animated-icon.tsx` ainda usa o logo do Expo (`expo-logo.png`, `logo-glow.png`). Precisa de assets de marca — trocar imagens e conferir `app.json` (ícone/splash).
+6. ~~**Splash/branding**~~ — **feito em 26/08**. Marca própria em `assets/images/brand/` (par preto/branco derivado de `icons/icon-512.png`), splash com variante dark, ícone adaptativo do Android com zona de segurança, e todo o kit do template Expo removido (`expo-logo`, `logo-glow`, `react-logo*`, `expo-badge*`, `tabIcons/`, `expo.icon/`). `AnimatedIcon`, que era código morto do template, saiu junto. **Falta só** um `icon.png` 1024×1024 para publicação em loja — hoje o `app.json` aponta para o `icon-512.png`, que serve para dev.
 7. **Criar/editar lembrete pelo app**: adiado por depender de `@react-native-community/datetimepicker` (dep nativa → rebuild). Fluxo previsto: modal `src/app/reminder-form.tsx` (título + data/hora + chips de recorrência RRULE), registrar no Stack do `_layout.tsx`. Hoje: criação via WhatsApp; pausar/apagar já existem no app.
 8. **Editar meta/orçamento/conta** (nome/valores): hoje só criar/arquivar/apagar.
 9. **Transações recorrentes no app**: não há tela para listar/pausar `recurring_transactions` (só via WhatsApp). Com a `0007`, `last_error` já dá o que mostrar quando uma série falha.
