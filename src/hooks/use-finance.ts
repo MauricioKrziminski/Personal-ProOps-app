@@ -326,14 +326,26 @@ export function useDeleteTransaction() {
   });
 }
 
+/** Cria ou edita (mesma forma de useSaveTransaction: com `id` vira update). */
 export function useSaveAccount() {
   const invalidate = useInvalidateFinance();
   return useMutation({
-    mutationFn: async (input: { name: string; type: Account['type']; initial_balance_cents: number }) => {
-      const { error } = await supabase
-        .from('accounts')
-        .insert({ ...input, user_id: await userId() });
-      if (error) throw error;
+    mutationFn: async ({
+      id,
+      ...input
+    }: {
+      id?: string;
+      name: string;
+      type: Account['type'];
+      initial_balance_cents: number;
+    }) => {
+      if (id) {
+        const { error } = await supabase.from('accounts').update(input).eq('id', id);
+        if (error) throw error;
+      } else {
+        const { error } = await supabase.from('accounts').insert({ ...input, user_id: await userId() });
+        if (error) throw error;
+      }
     },
     onSuccess: invalidate,
   });
@@ -350,12 +362,26 @@ export function useArchiveAccount() {
   });
 }
 
+/** Cria ou edita (mesma forma de useSaveTransaction: com `id` vira update). */
 export function useSaveGoal() {
   const invalidate = useInvalidateFinance();
   return useMutation({
-    mutationFn: async (input: { name: string; target_cents: number; deadline: string | null }) => {
-      const { error } = await supabase.from('goals').insert({ ...input, user_id: await userId() });
-      if (error) throw error;
+    mutationFn: async ({
+      id,
+      ...input
+    }: {
+      id?: string;
+      name: string;
+      target_cents: number;
+      deadline: string | null;
+    }) => {
+      if (id) {
+        const { error } = await supabase.from('goals').update(input).eq('id', id);
+        if (error) throw error;
+      } else {
+        const { error } = await supabase.from('goals').insert({ ...input, user_id: await userId() });
+        if (error) throw error;
+      }
     },
     onSuccess: invalidate,
   });
