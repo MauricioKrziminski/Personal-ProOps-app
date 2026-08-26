@@ -70,6 +70,22 @@ export interface Budget {
   limit_cents: number;
 }
 
+export interface RecurringTransaction {
+  id: string;
+  kind: 'expense' | 'income';
+  amount_cents: number;
+  currency: string;
+  category: string | null;
+  description: string | null;
+  account_id: string | null;
+  rrule: string;
+  next_run_at: string;
+  active: boolean;
+  run_attempts: number;
+  last_error: string | null;
+  created_at: string;
+}
+
 export interface MonthlyCashflow {
   month: string;
   income_cents: number;
@@ -201,6 +217,27 @@ export function useGoals() {
   });
 }
 
+const RECURRING_COLUMNS =
+  'id, kind, amount_cents, currency, category, description, account_id, rrule, next_run_at, active, run_attempts, last_error, created_at';
+
+/** Séries recorrentes — criadas por WhatsApp, materializadas pelo cron do send-reminders. */
+export function useRecurringTransactions() {
+  useRealtimeInvalidate('recurring_transactions', ['recurring']);
+  return useQuery({
+    queryKey: ['recurring'],
+    queryFn: async (): Promise<RecurringTransaction[]> => {
+      const { data, error } = await supabase
+        .from('recurring_transactions')
+        .select(RECURRING_COLUMNS)
+        // ativas primeiro; dentro de cada grupo, a que roda antes
+        .order('active', { ascending: false })
+        .order('next_run_at');
+      if (error) throw error;
+      return data;
+    },
+  });
+}
+
 export function useBudgets() {
   useRealtimeInvalidate('budgets', ['budgets']);
   return useQuery({
@@ -234,7 +271,7 @@ export function useBudgetsStatus() {
 
 const FINANCE_KEYS = [
   ['transactions'], ['tx-summary'], ['monthly-cashflow'], ['account-balances'],
-  ['budgets-status'], ['accounts'], ['goals'], ['budgets'],
+  ['budgets-status'], ['accounts'], ['goals'], ['budgets'], ['recurring'],
 ];
 
 function useInvalidateFinance() {
@@ -343,6 +380,32 @@ export function useArchiveGoal() {
   return useMutation({
     mutationFn: async (id: string) => {
       const { error } = await supabase.from('goals').update({ archived: true }).eq('id', id);
+      if (error) throw error;
+    },
+    onSuccess: invalidate,
+  });
+}
+
+/** Pausar/retomar a série. Pausada = o cron ignora, mas o histórico fica. */
+export function useToggleRecurring() {
+  const invalidate = useInvalidateFinance();
+  return useMutation({
+    mutationFn: async ({ id, active }: { id: string; active: boolean }) => {
+      // retomar também limpa o erro anterior: a próxima tentativa começa do zero
+      const patch = active ? { active: true, run_attempts: 0, last_error: null } : { active: false };
+      const { error } = await supabase.from('recurring_transactions').update(patch).eq('id', id);
+      if (error) throw error;
+    },
+    onSuccess: invalidate,
+  });
+}
+
+/** Apaga a série. Os lançamentos já materializados continuam em transactions. */
+export function useDeleteRecurring() {
+  const invalidate = useInvalidateFinance();
+  return useMutation({
+    mutationFn: async (id: string) => {
+      const { error } = await supabase.from('recurring_transactions').delete().eq('id', id);
       if (error) throw error;
     },
     onSuccess: invalidate,
