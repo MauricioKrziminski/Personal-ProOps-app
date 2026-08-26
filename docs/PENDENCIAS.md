@@ -178,8 +178,39 @@ nem "posso comprar isso em 10x?".
   verdade em produção (4 ocorrências criadas, `next_run_at` correto, segunda rodada `created: 0`)
   e dados de teste removidos. `tsc`/`lint` limpos, 26 testes.
 
-**Próximo:** Fase 3 do plano — ingestão inteligente (foto/PDF de fatura e extrato, OFX/CSV,
-regras de categorização), que é o substituto do Open Finance.
+## ✅ FASE 3 — ingestão inteligente (concluída em 26/08/2026)
+
+O substituto do Open Finance. Em vez de R$2,5k/mês de agregador: foto de cupom, print de Pix e PDF
+de fatura pelo WhatsApp + extrato OFX/CSV pelo app. Funciona até com banco fora do Open Finance.
+
+- `0017_import_and_rules.sql` — `categorization_rules`, `import_batches`, `import_items`,
+  `transactions.attachment_path`, bucket privado `receipts` (RLS pela primeira pasta = workspace),
+  `_match_rule` e `approve_import_items`.
+- `0018_rule_hits.sql` / `0019_import_preparation.sql` — contador de uso da regra e
+  `_prepare_import_batch` (aplica regras + marca duplicatas numa chamada só).
+  ⚠️ Pegadinha registrada no arquivo: LATERAL no FROM de um UPDATE não enxerga a tabela alvo.
+- **Gemini multimodal**: `parseMessage` aceita `inline_data` e usa o MESMO `responseSchema`.
+  `process-jobs` passa a tratar `image` e `document` (8MB, MIME na allowlist), com a legenda do
+  usuário como contexto. Fim do "só entendo texto e áudio".
+- **Edge Function nova `import-statement`**: parseia OFX e CSV (parser extraído para
+  `_shared/statement-parser.ts`), aplica as regras, manda só o resto ao Gemini em UMA chamada e
+  grava tudo como `import_items` para revisão — nada entra no extrato sem o usuário confirmar.
+- Ação `set_rule` no WhatsApp ("sempre que eu falar ifood, põe em restaurante") e regra do usuário
+  sobrepondo a IA em todo lançamento.
+- App: telas `finance/import.tsx` (expo-document-picker + `new File(uri).text()` do SDK 57, revisão
+  item a item com troca de categoria e descarte) e `finance/rules.tsx` (CRUD, com contador de uso).
+- Verificado: importação real de um CSV de 5 linhas em produção — datas dd/mm/aaaa, valores BR
+  (`5.000,00` → 500000), sinal virando kind, e o Gemini categorizando os 5 corretamente em uma
+  chamada (ifood→restaurante, posto→transporte, zaffari→mercado, salário, uber→transporte);
+  `approve_import_items` gerando as transações com `source='import'`; regra "ifood" e marcação de
+  duplicata testadas em SQL. Dados de teste removidos. 34 testes (8 novos do parser), tsc/lint limpos.
+
+⚠️ **Nota de teste:** `net.http_post` tem timeout padrão de 5s e ABORTA a Edge Function no meio
+(a primeira tentativa gravou os itens mas perdeu a categorização). Ao testar function que chama IA
+por pg_net, passar `timeout_milliseconds := 45000`.
+
+**Próximo:** Fase 4 do plano — correção conversacional (`update_transaction`, `delete_item`,
+resolver de referência) e a tela de auditoria da IA lendo `ai_events`.
 
 ## 📝 Como verificar o pipeline (rápido)
 Usar `/verify-whatsapp` ou manualmente: mandar mensagem → conferir `messages_raw` (inbound) → `jobs` (done) → `ai_events` (result/confidence) → tabela final (`transactions`/`notes`/...) → resposta no WhatsApp. Logs: MCP `get_logs` (edge-function).

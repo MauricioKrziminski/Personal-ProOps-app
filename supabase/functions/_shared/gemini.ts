@@ -30,6 +30,7 @@ export type AiActionType =
   | "query_forecast"
   | "simulate_purchase"
   | "mark_paid"
+  | "set_rule"
   | "create_note"
   | "create_reminder"
   | "create_goal"
@@ -78,7 +79,7 @@ const ACTION_SCHEMA = {
       enum: [
         "create_expense", "create_income", "create_transfer",
         "create_installment_purchase", "pay_invoice", "query_invoice",
-        "query_forecast", "simulate_purchase", "mark_paid",
+        "query_forecast", "simulate_purchase", "mark_paid", "set_rule",
         "create_note", "create_reminder", "create_goal", "goal_deposit",
         "query_balance", "query_transactions", "query_budgets", "query_goals",
         "undo_last", "unknown",
@@ -130,6 +131,7 @@ Tipos de ação:
 - "query_forecast": pergunta sobre o FUTURO do saldo ("quanto vai sobrar no fim do mês?", "vou ficar no vermelho?", "o que tenho pra pagar essa semana?"). query_to = até quando (YYYY-MM-DD), se citado.
 - "simulate_purchase": pergunta se PODE comprar algo ("posso comprar um celular de 3000 em 10x?", "dá pra gastar 800 esse mês?", "consigo pagar uma viagem de 5 mil?"). amount_cents = valor total, installments = parcelas (1 se à vista). NÃO registra nada — é só simulação.
 - "mark_paid": confirmar que uma conta prevista foi paga ("paguei a luz", "quitei o aluguel"). content/title = do que se trata, amount_cents se citado. Diferente de create_expense: aqui o lançamento JÁ EXISTE como previsto.
+- "set_rule": o usuário quer que algo SEMPRE caia numa categoria ("sempre que eu falar ifood põe em restaurante", "posto é transporte", "toda vez que aparecer uber, categoria transporte"). content = o texto que dispara a regra (ex.: "ifood"), category = a categoria de destino.
 - "create_note": anotação livre. content (texto limpo) e category curta se óbvia.
 - "create_reminder": pedido para ser lembrado. title, remind_at (próxima ocorrência, ISO, no fuso do usuário) e recurrence como RRULE quando recorrente ("todo dia 5" -> FREQ=MONTHLY;BYMONTHDAY=5; "todo dia às 8h" -> FREQ=DAILY). Sem recorrência -> null.
 - "create_goal": meta de poupança ("quero juntar 5000 até dezembro pra viagem"). goal_name, target_cents, deadline (YYYY-MM-DD ou null).
@@ -146,7 +148,12 @@ Regras:
 - Datas relativas resolvidas com a data/hora atual DO USUÁRIO (já convertida para o fuso dele, com offset): ${nowLocal} (fuso ${timezone}). Use exatamente essa data como "hoje" — não recalcule fuso.
 - Campos que não se aplicam à ação: null.
 - Compra no cartão à vista é create_expense com account = nome do cartão. Só use create_installment_purchase quando houver 2 ou mais parcelas.
-- confidence (0..1) é da interpretação da mensagem INTEIRA.`;
+- confidence (0..1) é da interpretação da mensagem INTEIRA.
+
+Quando vier uma IMAGEM ou PDF junto:
+- Cupom/nota/comprovante de Pix: UMA ação create_expense (ou create_income se for recebimento) com o valor TOTAL pago, description = nome do estabelecimento, occurred_at = data do documento e category deduzida do que foi comprado.
+- Fatura de cartão: UMA ação por lançamento da fatura (respeite o limite de 10 e priorize os maiores), account = nome do cartão que aparece no documento.
+- Não conseguiu ler o valor com segurança: devolva uma ação "unknown" e confidence baixa em vez de inventar.`;
 }
 
 export interface GeminiUsage {
@@ -173,10 +180,18 @@ async function fetchWithRetry(
   }
 }
 
+/** Anexo enviado ao Gemini junto do texto (foto de cupom, PDF de fatura). */
+export interface MediaPart {
+  mimeType: string;
+  /** conteúdo em base64, sem o prefixo data: */
+  data: string;
+}
+
 export async function parseMessage(
   text: string,
   timezone: string,
   model: string = GEMINI_FLASH,
+  media?: MediaPart,
 ): Promise<{ parsed: AiResult; usage: GeminiUsage }> {
   const apiKey = Deno.env.get("GEMINI_API_KEY");
   if (!apiKey) throw new Error("GEMINI_API_KEY ausente");
@@ -191,7 +206,14 @@ export async function parseMessage(
       systemInstruction: {
         parts: [{ text: systemPrompt(localDateTimeISO(new Date(), timezone), timezone) }],
       },
-      contents: [{ role: "user", parts: [{ text }] }],
+      contents: [{
+        role: "user",
+        // multimodal: a MESMA chamada e o MESMO responseSchema servem para foto
+        // de cupom e PDF de fatura — nada de segundo prompt para imagem
+        parts: media
+          ? [{ inline_data: { mime_type: media.mimeType, data: media.data } }, { text }]
+          : [{ text }],
+      }],
       generationConfig: {
         responseMimeType: "application/json",
         responseSchema: RESPONSE_SCHEMA,
@@ -218,6 +240,63 @@ export async function parseMessage(
       outputTokens: data?.usageMetadata?.candidatesTokenCount ?? null,
     },
   };
+}
+
+/**
+ * Categoriza N descrições de extrato em UMA chamada.
+ * Importar 300 linhas com uma chamada por linha seria caro e lento; aqui o lote
+ * inteiro vai junto e volta um array na MESMA ordem (o índice é o contrato).
+ */
+export async function categorizeBatch(
+  descriptions: string[],
+  model: string = GEMINI_FLASH,
+): Promise<(string | null)[]> {
+  const apiKey = Deno.env.get("GEMINI_API_KEY");
+  if (!apiKey) throw new Error("GEMINI_API_KEY ausente");
+  if (!descriptions.length) return [];
+
+  const schema = {
+    type: "OBJECT",
+    properties: {
+      categories: { type: "ARRAY", items: { type: "STRING" } },
+    },
+    required: ["categories"],
+  } as const;
+
+  const prompt = `Você categoriza lançamentos de extrato bancário brasileiro.
+Receberá uma lista numerada de descrições. Devolva "categories": um array com EXATAMENTE ${descriptions.length} itens, na MESMA ordem da entrada.
+Cada item é uma categoria curta e minúscula, preferindo esta lista: ${SUGGESTED_CATEGORIES.join(", ")}.
+Não sabe? Use "outros". Não explique nada, não pule itens.`;
+
+  const entrada = descriptions.map((d, i) => `${i + 1}. ${d}`).join("\n");
+
+  const res = await fetchWithRetry(`${GEMINI_BASE}/${model}:generateContent`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", "x-goog-api-key": apiKey },
+    body: JSON.stringify({
+      systemInstruction: { parts: [{ text: prompt }] },
+      contents: [{ role: "user", parts: [{ text: entrada }] }],
+      generationConfig: {
+        responseMimeType: "application/json",
+        responseSchema: schema,
+        temperature: 0.1,
+      },
+    }),
+  });
+  if (!res.ok) throw new Error(`Gemini (batch) falhou (${res.status}): ${await res.text()}`);
+
+  const data = await res.json();
+  const raw = data?.candidates?.[0]?.content?.parts?.[0]?.text;
+  if (!raw) throw new Error("Gemini (batch) retornou vazio");
+  const parsed = JSON.parse(raw) as { categories?: unknown };
+  if (!Array.isArray(parsed.categories)) throw new Error("Gemini (batch) sem categories");
+
+  // o modelo pode devolver menos itens: alinhar por índice e completar com null
+  return descriptions.map((_, i) => {
+    const c = parsed.categories as unknown[];
+    const valor = typeof c[i] === "string" ? (c[i] as string).toLowerCase().trim() : null;
+    return valor || null;
+  });
 }
 
 /** Transcreve áudio com Groq (Whisper) antes de mandar o texto pro Gemini. */

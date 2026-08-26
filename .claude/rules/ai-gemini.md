@@ -26,6 +26,12 @@
 - Recorrência sempre como **RRULE** (`FREQ=MONTHLY;BYMONTHDAY=5`) — mesmo formato dos reminders.
 - Dinheiro sempre `amount_cents` inteiro ("45 reais" → 4500).
 
+## Imagem e PDF (multimodal)
+
+- Foto de cupom, print de Pix e PDF de fatura entram na **mesma** `parseMessage`, com `inline_data` e o **mesmo `responseSchema`** — nunca um segundo prompt só para imagem. Limite de 8MB e MIME na allowlist (`VISION_MIME` no process-jobs).
+- Importação de extrato (OFX/CSV) tem prompt próprio e enxuto: `categorizeBatch` manda o lote INTEIRO numa chamada e recebe um array na mesma ordem. Uma chamada por linha seria caro e lento.
+- **Regra do usuário ganha da IA**: `_match_rule` roda depois do parse (WhatsApp) e antes do Gemini (importação, economizando chamada). É a resposta à queixa de "categorizou errado e não dá para consertar".
+
 ## Áudio
 
 - `message.type === "audio"` → `downloadMedia` (Meta) → `transcribeAudio` (Groq `whisper-large-v3-turbo`, `language=pt`) → texto segue o fluxo normal do Gemini.

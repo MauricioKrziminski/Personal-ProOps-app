@@ -260,6 +260,73 @@ export type Database = {
           },
         ]
       }
+      categorization_rules: {
+        Row: {
+          account_id: string | null
+          category: string | null
+          created_at: string
+          hits: number
+          id: string
+          match_type: string
+          pattern: string
+          priority: number
+          source: string
+          updated_at: string
+          user_id: string
+          workspace_id: string
+        }
+        Insert: {
+          account_id?: string | null
+          category?: string | null
+          created_at?: string
+          hits?: number
+          id?: string
+          match_type?: string
+          pattern: string
+          priority?: number
+          source?: string
+          updated_at?: string
+          user_id: string
+          workspace_id?: string
+        }
+        Update: {
+          account_id?: string | null
+          category?: string | null
+          created_at?: string
+          hits?: number
+          id?: string
+          match_type?: string
+          pattern?: string
+          priority?: number
+          source?: string
+          updated_at?: string
+          user_id?: string
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "categorization_rules_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "categorization_rules_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "categorization_rules_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       goals: {
         Row: {
           archived: boolean
@@ -307,6 +374,150 @@ export type Database = {
           },
           {
             foreignKeyName: "goals_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      import_batches: {
+        Row: {
+          account_id: string | null
+          created_at: string
+          error: string | null
+          filename: string | null
+          id: string
+          source: string
+          status: string
+          updated_at: string
+          user_id: string
+          workspace_id: string
+        }
+        Insert: {
+          account_id?: string | null
+          created_at?: string
+          error?: string | null
+          filename?: string | null
+          id?: string
+          source: string
+          status?: string
+          updated_at?: string
+          user_id: string
+          workspace_id?: string
+        }
+        Update: {
+          account_id?: string | null
+          created_at?: string
+          error?: string | null
+          filename?: string | null
+          id?: string
+          source?: string
+          status?: string
+          updated_at?: string
+          user_id?: string
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "import_batches_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "import_batches_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "import_batches_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      import_items: {
+        Row: {
+          amount_cents: number
+          batch_id: string
+          created_at: string
+          dedupe_hash: string | null
+          description: string | null
+          id: string
+          kind: string
+          merchant: string | null
+          occurred_at: string
+          raw: Json | null
+          status: string
+          suggested_account_id: string | null
+          suggested_category: string | null
+          transaction_id: string | null
+          workspace_id: string
+        }
+        Insert: {
+          amount_cents: number
+          batch_id: string
+          created_at?: string
+          dedupe_hash?: string | null
+          description?: string | null
+          id?: string
+          kind?: string
+          merchant?: string | null
+          occurred_at: string
+          raw?: Json | null
+          status?: string
+          suggested_account_id?: string | null
+          suggested_category?: string | null
+          transaction_id?: string | null
+          workspace_id: string
+        }
+        Update: {
+          amount_cents?: number
+          batch_id?: string
+          created_at?: string
+          dedupe_hash?: string | null
+          description?: string | null
+          id?: string
+          kind?: string
+          merchant?: string | null
+          occurred_at?: string
+          raw?: Json | null
+          status?: string
+          suggested_account_id?: string | null
+          suggested_category?: string | null
+          transaction_id?: string | null
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "import_items_batch_id_fkey"
+            columns: ["batch_id"]
+            isOneToOne: false
+            referencedRelation: "import_batches"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "import_items_suggested_account_id_fkey"
+            columns: ["suggested_account_id"]
+            isOneToOne: false
+            referencedRelation: "accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "import_items_transaction_id_fkey"
+            columns: ["transaction_id"]
+            isOneToOne: false
+            referencedRelation: "transactions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "import_items_workspace_id_fkey"
             columns: ["workspace_id"]
             isOneToOne: false
             referencedRelation: "workspaces"
@@ -697,6 +908,7 @@ export type Database = {
         Row: {
           account_id: string | null
           amount_cents: number
+          attachment_path: string | null
           category: string | null
           counterparty_account_id: string | null
           created_at: string
@@ -720,6 +932,7 @@ export type Database = {
         Insert: {
           account_id?: string | null
           amount_cents: number
+          attachment_path?: string | null
           category?: string | null
           counterparty_account_id?: string | null
           created_at?: string
@@ -743,6 +956,7 @@ export type Database = {
         Update: {
           account_id?: string | null
           amount_cents?: number
+          attachment_path?: string | null
           category?: string | null
           counterparty_account_id?: string | null
           created_at?: string
@@ -917,6 +1131,7 @@ export type Database = {
           spent_cents: number
         }[]
       }
+      _bump_rule_hits: { Args: { rule_id: string }; Returns: undefined }
       _card_summary: {
         Args: { uid: string }
         Returns: {
@@ -945,12 +1160,28 @@ export type Database = {
       }
       _close_due_invoices: { Args: never; Returns: number }
       _default_workspace: { Args: { uid: string }; Returns: string }
+      _match_rule: {
+        Args: { texto: string; ws_id: string }
+        Returns: {
+          account_id: string
+          category: string
+          rule_id: string
+        }[]
+      }
       _monthly_cashflow: {
         Args: { months_back?: number; uid: string }
         Returns: {
           expense_cents: number
           income_cents: number
           month: string
+        }[]
+      }
+      _prepare_import_batch: {
+        Args: { p_batch_id: string }
+        Returns: {
+          categorizados: number
+          duplicados: number
+          total: number
         }[]
       }
       _promote_due_transactions: { Args: never; Returns: number }
@@ -993,6 +1224,7 @@ export type Database = {
           worst_day: string
         }[]
       }
+      approve_import_items: { Args: { p_item_ids: string[] }; Returns: number }
       budgets_status: {
         Args: { ref_month?: string }
         Returns: {

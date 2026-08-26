@@ -21,6 +21,7 @@ import {
   type AiAction,
   GEMINI_FLASH,
   GEMINI_PRO,
+  type MediaPart,
   parseMessage,
   transcribeAudio,
 } from "../_shared/gemini.ts";
@@ -70,17 +71,99 @@ async function trySend(to: string, body: string): Promise<void> {
   }
 }
 
-async function extractText(message: Record<string, unknown>): Promise<string | null> {
-  if (message.type === "text") {
-    return (message.text as { body?: string })?.body ?? null;
+/** Anexos que a IA consegue ler direto (Gemini multimodal). */
+const VISION_MIME = /^(image\/(jpeg|png|webp|heic|heif)|application\/pdf)$/;
+/** Limite do inline_data do Gemini (~20MB no request inteiro); 8MB é folgado. */
+const MAX_MEDIA_BYTES = 8 * 1024 * 1024;
+
+interface Extracted {
+  text: string;
+  media?: MediaPart;
+}
+
+async function blobToBase64(blob: Blob): Promise<string> {
+  const bytes = new Uint8Array(await blob.arrayBuffer());
+  // btoa direto estoura o stack com arquivo grande: converte em blocos
+  let binario = "";
+  const bloco = 8192;
+  for (let i = 0; i < bytes.length; i += bloco) {
+    binario += String.fromCharCode(...bytes.subarray(i, i + bloco));
   }
+  return btoa(binario);
+}
+
+/**
+ * Traz o conteúdo da mensagem para o formato do Gemini.
+ * Texto e áudio (via Whisper) viram texto; foto de cupom, print de Pix e PDF de
+ * fatura vão como anexo multimodal, com a legenda do usuário como contexto.
+ */
+async function extractContent(message: Record<string, unknown>): Promise<Extracted | null> {
+  if (message.type === "text") {
+    const body = (message.text as { body?: string })?.body;
+    return body ? { text: body } : null;
+  }
+
   if (message.type === "audio") {
     const mediaId = (message.audio as { id?: string })?.id;
     if (!mediaId) return null;
     const blob = await downloadMedia(mediaId);
-    return await transcribeAudio(blob);
+    const text = await transcribeAudio(blob);
+    return text ? { text } : null;
   }
-  return null; // outros tipos (imagem/recibo) ficam para a v2
+
+  if (message.type === "image" || message.type === "document") {
+    const anexo = (message.image ?? message.document) as
+      | { id?: string; caption?: string; mime_type?: string; filename?: string }
+      | undefined;
+    if (!anexo?.id) return null;
+
+    const blob = await downloadMedia(anexo.id);
+    const mimeType = anexo.mime_type ?? blob.type;
+    if (!VISION_MIME.test(mimeType)) return null;
+    if (blob.size > MAX_MEDIA_BYTES) return null;
+
+    const legenda = anexo.caption?.trim();
+    return {
+      text: legenda
+        ? `${legenda}\n\n(o usuário mandou este documento junto — extraia os lançamentos dele)`
+        : "Extraia os lançamentos deste documento (cupom, comprovante ou fatura).",
+      media: { mimeType, data: await blobToBase64(blob) },
+    };
+  }
+
+  return null;
+}
+
+/**
+ * Aplica as regras do usuário sobre a categoria sugerida pela IA.
+ * Regra do usuário GANHA da IA: é o antídoto para a queixa de "categorizou
+ * errado e não tem como consertar" que os concorrentes colecionam.
+ */
+async function applyRules(
+  supabase: Admin,
+  workspaceId: string,
+  action: AiAction,
+): Promise<AiAction> {
+  const texto = [action.content, action.title, action.category].filter(Boolean).join(" ");
+  if (!texto) return action;
+
+  const { data } = await supabase.rpc("_match_rule", { ws_id: workspaceId, texto });
+  const regra = (data ?? [])[0] as
+    | { category: string | null; account_id: string | null; rule_id: string }
+    | undefined;
+  if (!regra) return action;
+
+  // contador serve para a tela de regras mostrar quais valem a pena manter;
+  // best-effort: falhar aqui não pode derrubar o lançamento
+  try {
+    await supabase.rpc("_bump_rule_hits", { rule_id: regra.rule_id });
+  } catch (err) {
+    console.error("bump rule hits (ignorado):", err);
+  }
+  return {
+    ...action,
+    category: regra.category ?? action.category,
+  };
 }
 
 /**
@@ -386,6 +469,28 @@ async function executeAction(
       return `✅ Baixa dada: ${conta.description ?? conta.category ?? "conta"} — ${centsToBRL(conta.amount_cents)}.`;
     }
 
+    case "set_rule": {
+      const padrao = (action.content ?? action.title)?.trim();
+      const categoria = action.category?.toLowerCase().trim();
+      if (!padrao || !categoria) {
+        return "❌ Não entendi a regra. Tenta \"sempre que eu falar ifood, põe em restaurante\".";
+      }
+      const { error } = await supabase.from("categorization_rules").upsert(
+        {
+          workspace_id: workspaceId,
+          user_id: userId,
+          match_type: "contains",
+          pattern: padrao,
+          category: categoria,
+          source: "user",
+        },
+        { onConflict: "workspace_id,match_type,pattern" },
+      );
+      if (error) throw error;
+      return `📌 Anotado: tudo que falar *${padrao}* vai para *${categoria}*.\n` +
+        `Você pode ver e apagar suas regras no app.`;
+    }
+
     case "create_note": {
       const { error } = await supabase.from("notes").insert({
         user_id: userId,
@@ -593,13 +698,17 @@ Deno.serve(async (_req) => {
         continue;
       }
 
-      // 2. texto (transcreve áudio se preciso)
-      const text = await extractText(message);
-      if (!text) {
+      // 2. conteúdo: texto, áudio transcrito ou anexo (foto/PDF) para o Gemini ler
+      const content = await extractContent(message);
+      if (!content) {
         await markDone(job.id);
-        await trySend(profile.phone, "🙈 Por enquanto só entendo texto e áudio. Em breve, fotos de recibo!");
+        await trySend(
+          profile.phone,
+          "🙈 Não consegui ler isso. Mando bem com texto, áudio, foto de cupom e PDF de fatura (até 8MB).",
+        );
         continue;
       }
+      const { text, media } = content;
 
       // 3. rate limit por usuário: protege custo de Gemini/Groq contra flood
       const { count: parsesLastHour } = await supabase
@@ -614,9 +723,9 @@ Deno.serve(async (_req) => {
       }
 
       // 4. Gemini Flash; escala p/ Pro se a confiança for baixa
-      let { parsed, usage } = await parseMessage(text, profile.timezone, GEMINI_FLASH);
+      let { parsed, usage } = await parseMessage(text, profile.timezone, GEMINI_FLASH, media);
       if (parsed.confidence < CONFIDENCE_ESCALATE) {
-        ({ parsed, usage } = await parseMessage(text, profile.timezone, GEMINI_PRO));
+        ({ parsed, usage } = await parseMessage(text, profile.timezone, GEMINI_PRO, media));
       }
 
       await supabase.from("ai_events").insert({
@@ -633,10 +742,11 @@ Deno.serve(async (_req) => {
       const lines: string[] = [];
       for (const action of parsed.actions.slice(0, 10)) {
         try {
+          const comRegra = await applyRules(supabase, workspaceId, action);
           lines.push(await executeAction(
             supabase,
             { userId: profile.id, workspaceId, timezone: profile.timezone },
-            action,
+            comRegra,
           ));
         } catch (err) {
           console.error(`ação ${action.type} falhou:`, err);

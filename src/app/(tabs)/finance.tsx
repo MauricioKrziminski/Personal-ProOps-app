@@ -331,6 +331,8 @@ export default function FinanceScreen() {
               <SectionLink title="🎯 Metas" href="/finance/goals" index={4} />
               <SectionLink title="📉 Orçamentos" href="/finance/budgets" index={5} />
               <SectionLink title="🔁 Recorrentes" href="/finance/recurring" index={6} />
+              <SectionLink title="📥 Importar extrato" href="/finance/import" index={7} />
+              <SectionLink title="📌 Regras de categoria" href="/finance/rules" index={8} />
             </>
           )}
         </ScrollView>

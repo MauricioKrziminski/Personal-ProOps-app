@@ -470,6 +470,184 @@ export function useMarkPaid() {
   });
 }
 
+// ── importação de extrato e regras de categorização ─────────────────────────
+
+export type ImportItem = Pick<
+  Tables['import_items']['Row'],
+  | 'id'
+  | 'batch_id'
+  | 'amount_cents'
+  | 'occurred_at'
+  | 'description'
+  | 'merchant'
+  | 'suggested_category'
+  | 'transaction_id'
+> & {
+  kind: 'expense' | 'income';
+  status: 'pending' | 'approved' | 'discarded' | 'duplicate';
+};
+
+export type CategorizationRule = Pick<
+  Tables['categorization_rules']['Row'],
+  'id' | 'pattern' | 'category' | 'account_id' | 'priority' | 'hits'
+> & { match_type: 'contains' | 'merchant' | 'regex'; source: 'user' | 'learned' };
+
+export interface ImportResult {
+  batch_id: string;
+  items: number;
+  duplicates: number;
+  categorized: number;
+}
+
+/**
+ * Manda o extrato para a Edge Function, que parseia, aplica as regras do usuário
+ * e categoriza o resto com uma única chamada de IA. Nada vira lançamento aqui —
+ * o retorno é um lote para revisão.
+ */
+export function useImportStatement() {
+  return useMutation({
+    mutationFn: async (input: {
+      content: string;
+      source: 'ofx' | 'csv';
+      filename: string;
+      accountId: string | null;
+    }): Promise<ImportResult> => {
+      const { data, error } = await supabase.functions.invoke<ImportResult | { error: string }>(
+        'import-statement',
+        {
+          body: {
+            user_id: await userId(),
+            workspace_id: await workspaceId(),
+            account_id: input.accountId,
+            filename: input.filename,
+            content: input.content,
+            source: input.source,
+          },
+        },
+      );
+      if (error) throw error;
+      if (data && 'error' in data) throw new Error(data.error);
+      return data as ImportResult;
+    },
+  });
+}
+
+export function useImportItems(batchId: string | undefined) {
+  useRealtimeInvalidate('import_items', ['import-items']);
+  return useQuery({
+    enabled: Boolean(batchId),
+    queryKey: ['import-items', batchId ?? ''],
+    queryFn: async (): Promise<ImportItem[]> => {
+      const { data, error } = await supabase
+        .from('import_items')
+        .select(
+          'id, batch_id, kind, amount_cents, occurred_at, description, merchant, suggested_category, status, transaction_id',
+        )
+        .eq('batch_id', batchId!)
+        .order('occurred_at', { ascending: false });
+      if (error) throw error;
+      return data as ImportItem[];
+    },
+  });
+}
+
+/** Confirma os itens escolhidos: a RPC cria as transações com source='import'. */
+export function useApproveImportItems() {
+  const invalidate = useInvalidateFinance();
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (ids: string[]) => {
+      const { error } = await supabase.rpc('approve_import_items', { p_item_ids: ids });
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      invalidate();
+      queryClient.invalidateQueries({ queryKey: ['import-items'] });
+    },
+  });
+}
+
+export function useDiscardImportItems() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (ids: string[]) => {
+      const { error } = await supabase
+        .from('import_items')
+        .update({ status: 'discarded' })
+        .in('id', ids);
+      if (error) throw error;
+    },
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['import-items'] }),
+  });
+}
+
+/** Corrige a categoria sugerida antes de aprovar. */
+export function useUpdateImportItem() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (input: { id: string; category: string | null }) => {
+      const { error } = await supabase
+        .from('import_items')
+        .update({ suggested_category: input.category })
+        .eq('id', input.id);
+      if (error) throw error;
+    },
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['import-items'] }),
+  });
+}
+
+export function useRules() {
+  useRealtimeInvalidate('categorization_rules', ['rules']);
+  return useQuery({
+    queryKey: ['rules'],
+    queryFn: async (): Promise<CategorizationRule[]> => {
+      const { data, error } = await supabase
+        .from('categorization_rules')
+        .select('id, match_type, pattern, category, account_id, priority, hits, source')
+        .order('priority')
+        .order('hits', { ascending: false });
+      if (error) throw error;
+      return data as CategorizationRule[];
+    },
+  });
+}
+
+export function useSaveRule() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (input: { id?: string; pattern: string; category: string }) => {
+      if (input.id) {
+        const { error } = await supabase
+          .from('categorization_rules')
+          .update({ pattern: input.pattern, category: input.category })
+          .eq('id', input.id);
+        if (error) throw error;
+      } else {
+        const { error } = await supabase.from('categorization_rules').insert({
+          user_id: await userId(),
+          match_type: 'contains',
+          pattern: input.pattern,
+          category: input.category,
+          source: 'user',
+        });
+        if (error) throw error;
+      }
+    },
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['rules'] }),
+  });
+}
+
+export function useDeleteRule() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (id: string) => {
+      const { error } = await supabase.from('categorization_rules').delete().eq('id', id);
+      if (error) throw error;
+    },
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['rules'] }),
+  });
+}
+
 export interface TransactionInput {
   kind: TransactionKind;
   amount_cents: number;

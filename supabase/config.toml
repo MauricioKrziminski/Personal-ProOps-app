@@ -19,6 +19,10 @@ verify_jwt = true
 [functions.finance-scheduler]
 verify_jwt = true
 
+# importacao de extrato OFX/CSV chamada pelo app (usuario autenticado)
+[functions.import-statement]
+verify_jwt = true
+
 # Send SMS Auth Hook do Supabase (entrega OTP via WhatsApp). Sem JWT — a
 # segurança é a assinatura standardwebhooks (SEND_SMS_HOOK_SECRET).
 [functions.wa-send-otp]

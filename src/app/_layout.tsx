@@ -29,6 +29,8 @@ export default function RootLayout() {
             <Stack.Screen name="finance/recurring" />
             <Stack.Screen name="finance/cards" />
             <Stack.Screen name="finance/forecast" />
+            <Stack.Screen name="finance/import" />
+            <Stack.Screen name="finance/rules" />
             <Stack.Screen name="finance/invoice/[id]" />
             <Stack.Screen name="finance/transaction-form" options={{ presentation: 'modal' }} />
             <Stack.Screen name="reminder-form" options={{ presentation: 'modal' }} />
