@@ -29,3 +29,48 @@ export function formatDateBR(value: string | Date): string {
   const mm = String(d.getMonth() + 1).padStart(2, '0');
   return `${dd}-${mm}-${d.getFullYear()}`;
 }
+
+// ── entrada de data/hora em texto (evita dependência nativa de picker) ────────
+
+/** `2026-08-26` -> `26/08/2026` */
+export function isoToBR(iso: string): string {
+  const [y, m, d] = iso.split('-');
+  return d && m && y ? `${d}/${m}/${y}` : iso;
+}
+
+/** `26/08/2026` -> `2026-08-26` */
+export function brToISO(br: string): string {
+  const [d, m, y] = br.split('/');
+  return d && m && y ? `${y}-${m}-${d}` : br;
+}
+
+/** Valida formato E existência (31/02 não passa). */
+export function isValidBRDate(br: string): boolean {
+  if (!/^\d{2}\/\d{2}\/\d{4}$/.test(br)) return false;
+  const [d, m, y] = br.split('/').map(Number);
+  const date = new Date(y, m - 1, d);
+  return date.getDate() === d && date.getMonth() === m - 1 && date.getFullYear() === y;
+}
+
+/** Valida `HH:MM` em 24h. */
+export function isValidTime(hhmm: string): boolean {
+  if (!/^\d{2}:\d{2}$/.test(hhmm)) return false;
+  const [h, min] = hhmm.split(':').map(Number);
+  return h >= 0 && h <= 23 && min >= 0 && min <= 59;
+}
+
+/**
+ * Monta o instante a partir da data/hora digitadas, no fuso do aparelho — que é
+ * o do usuário. `null` se qualquer um dos dois for inválido.
+ */
+export function localDateTime(brDate: string, hhmm: string): Date | null {
+  if (!isValidBRDate(brDate) || !isValidTime(hhmm)) return null;
+  const [d, m, y] = brDate.split('/').map(Number);
+  const [h, min] = hhmm.split(':').map(Number);
+  return new Date(y, m - 1, d, h, min, 0, 0);
+}
+
+/** Date -> `HH:MM` local. */
+export function timeBR(date: Date): string {
+  return `${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}`;
+}

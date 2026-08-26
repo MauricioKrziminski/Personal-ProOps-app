@@ -70,7 +70,8 @@ export function useReminders() {
       const { data, error } = await supabase
         .from('reminders')
         .select('id, title, recurrence, next_run_at, channel, active')
-        .eq('active', true)
+        // pausados também vêm: sem eles não haveria como retomar pelo app
+        .order('active', { ascending: false })
         .order('next_run_at')
         .limit(100);
       if (error) throw error;
@@ -109,11 +110,45 @@ export function useDeleteNote() {
   });
 }
 
-export function usePauseReminder() {
+export interface ReminderInput {
+  id?: string;
+  title: string;
+  recurrence: string | null;
+  next_run_at: string; // ISO absoluto
+  channel: Reminder['channel'];
+  timezone: string;
+}
+
+/** Cria ou edita (com `id` vira update), no mesmo formato de useSaveTransaction. */
+export function useSaveReminder() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: async (id: string) => {
-      const { error } = await supabase.from('reminders').update({ active: false }).eq('id', id);
+    mutationFn: async ({ id, ...input }: ReminderInput) => {
+      if (id) {
+        // reagendar reativa e zera o contador: a série volta a valer do zero
+        const { error } = await supabase
+          .from('reminders')
+          .update({ ...input, active: true, send_attempts: 0, last_error: null })
+          .eq('id', id);
+        if (error) throw error;
+      } else {
+        const { error } = await supabase
+          .from('reminders')
+          .insert({ ...input, user_id: await userId(), source: 'app' });
+        if (error) throw error;
+      }
+    },
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['reminders'] }),
+  });
+}
+
+/** Pausa ou retoma. Retomar limpa o erro anterior. */
+export function useToggleReminder() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ id, active }: { id: string; active: boolean }) => {
+      const patch = active ? { active: true, send_attempts: 0, last_error: null } : { active: false };
+      const { error } = await supabase.from('reminders').update(patch).eq('id', id);
       if (error) throw error;
     },
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['reminders'] }),

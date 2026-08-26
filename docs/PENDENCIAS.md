@@ -67,11 +67,11 @@ Via Graph API v21.0 com o token de System User do app:
 ## 🟡 Detalhes adiados do frontend
 
 6. ~~**Splash/branding**~~ — **feito em 26/08**. Marca própria em `assets/images/brand/` (par preto/branco derivado de `icons/icon-512.png`), splash com variante dark, ícone adaptativo do Android com zona de segurança, e todo o kit do template Expo removido (`expo-logo`, `logo-glow`, `react-logo*`, `expo-badge*`, `tabIcons/`, `expo.icon/`). `AnimatedIcon`, que era código morto do template, saiu junto. **Falta só** um `icon.png` 1024×1024 para publicação em loja — hoje o `app.json` aponta para o `icon-512.png`, que serve para dev.
-7. **Criar/editar lembrete pelo app**: adiado por depender de `@react-native-community/datetimepicker` (dep nativa → rebuild). Fluxo previsto: modal `src/app/reminder-form.tsx` (título + data/hora + chips de recorrência RRULE), registrar no Stack do `_layout.tsx`. Hoje: criação via WhatsApp; pausar/apagar já existem no app.
-8. **Editar meta/orçamento/conta** (nome/valores): hoje só criar/arquivar/apagar.
-9. **Transações recorrentes no app**: não há tela para listar/pausar `recurring_transactions` (só via WhatsApp). Com a `0007`, `last_error` já dá o que mostrar quando uma série falha.
+7. ~~**Criar/editar lembrete pelo app**~~ — **feito em 26/08**, e **sem** `@react-native-community/datetimepicker`: a suposição de que precisava de dep nativa estava errada. `src/app/reminder-form.tsx` (modal) usa data/hora em texto + chips, o mesmo padrão que o form de transação já usava. Lista agora mostra pausados (antes filtrava `active=true` e não havia como retomar pelo app).
+8. ~~**Editar meta/orçamento/conta**~~ — **feito em 26/08**. Toque no card abre o mesmo bloco de criação em modo edição; segurar continua arquivando/removendo. `useSaveGoal`/`useSaveAccount` viraram create-or-update (mesma forma de `useSaveTransaction`); orçamento já era upsert por `(user_id, category)`.
+9. ~~**Transações recorrentes no app**~~ — **feito em 26/08**. `src/app/finance/recurring.tsx` lista, pausa, retoma e apaga, e mostra `last_error`/`run_attempts` quando uma série falha. Migration `0009` colocou a tabela no realtime. RRULE é traduzida para português por `src/lib/rrule-text.ts` (com testes).
 10. **Plugin `expo-notifications` no `app.json`**: configura ícone/cor/canal padrão da notificação no Android. Exige asset de ícone (96x96 branco) e rebuild nativo.
-11. **Cobertura de teste**: hoje só helpers puros. `_shared/recurrence.ts` não é testável com `node --test` (importa rrule de `https://esm.sh`) — testar com `deno test` quando o Deno estiver instalado.
+11. **Cobertura de teste**: hoje só helpers puros (`dates.ts`, `rrule-text.ts`, `_shared/datetime.ts` — 23 casos). `_shared/recurrence.ts` não é testável com `node --test` (importa rrule de `https://esm.sh`) — testar com `deno test` quando o Deno estiver instalado.
 
 ## 🔵 FASE 4 — Roadmap v2 (ordem sugerida)
 
