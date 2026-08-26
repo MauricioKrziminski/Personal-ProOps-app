@@ -317,11 +317,34 @@ o repo guarda só a versão final, em `0019`; e a numeração local (`0026_net_w
 os arquivos do zero produz o banco atual. Continua valendo: **nunca `supabase db push` sem
 reconciliar antes**.
 
-**Pendências reais para virar produto pago:**
-1. Push (`docs/PUSH-NOTIFICATIONS.md`) — sem ele todo alerta proativo vira template pago.
-2. Gateway de pagamento + webhook de assinatura.
-3. Número WhatsApp de produção (a janela de 90 dias do número de teste fecha ~outubro/2026).
-4. Conferir todas as telas novas no device em dark e light.
+**Ordem de trabalho decidida em 26/08/2026** (deixar o produto redondo antes de mexer em infra):
+
+1. **Conferir as 11 telas novas no device**, dark E light. É a única verificação que ninguém fez
+   ainda e a regra do projeto exige. Telas: `cards`, `invoice/[id]`, `forecast`, `import`,
+   `rules`, `ai-activity`, `debts`, `net-worth`, `reports`, `plan` + o dashboard alterado.
+2. **Rodar o fluxo WhatsApp ponta a ponta** com as ações novas (`/verify-whatsapp`): parcelamento,
+   pagar fatura, projeção, "posso comprar", correção de lançamento, foto de cupom, regra.
+3. **Número WhatsApp de produção** — ⏰ **único item com prazo**: a janela de 90 dias do número de
+   teste fecha por volta de **outubro/2026**.
+4. **Gateway de pagamento + webhook de assinatura** (`subscriptions.provider`/`external_id` já
+   existem; falta escolher Stripe/Kiwify/Hotmart e escrever o webhook que muda
+   `plan`/`status`/`current_period_end`).
+5. **Push, por último** (`docs/PUSH-NOTIFICATIONS.md`).
+
+**Por que push ficou por último — decisão consciente, não esquecimento:**
+
+- **Custo hoje é R$ 0.** O banco tem 1 profile e nenhum orçamento/fatura, então
+  `_alerts_to_send()` volta vazio: não há alerta disparando nem template sendo pago. O custo só
+  começa a existir quando houver usuário real com dado cadastrado.
+- **É configuração, não arquitetura.** `send-alerts` e `send-reminders` já preferem push e usam
+  template só como fallback — no dia em que `expo_push_token` existir, o código não muda.
+- **Exige rebuild nativo**, então fazer antes das telas estabilizarem é retrabalho garantido.
+- Custos confirmados nas fontes oficiais em 26/08: Expo Push **grátis** (600 notif./s por
+  projeto), FCM grátis, EAS Free com 15 builds Android + 15 iOS por ciclo. **Android sai por
+  R$ 0**; só o iOS exige US$ 99/ano (Apple Developer, sem ela não há APNs). Tabela completa e o
+  cálculo do ponto de equilíbrio estão em `docs/PUSH-NOTIFICATIONS.md`.
+- Detalhe que reduz o custo real: **template Utility dentro da janela de 24h é gratuito**, e neste
+  produto o usuário manda mensagem quase todo dia. O gasto se concentra em usuário **inativo**.
 
 ## 📝 Como verificar o pipeline (rápido)
 Usar `/verify-whatsapp` ou manualmente: mandar mensagem → conferir `messages_raw` (inbound) → `jobs` (done) → `ai_events` (result/confidence) → tabela final (`transactions`/`notes`/...) → resposta no WhatsApp. Logs: MCP `get_logs` (edge-function).

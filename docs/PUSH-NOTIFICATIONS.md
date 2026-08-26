@@ -151,14 +151,59 @@ tem nada disso — é trabalho de código, não de configuração:
   revalidar o token no boot do app.
 - **Expo Go não serve** para push.
 
-## Custos
+## Custos (verificados nas fontes oficiais em 26/08/2026)
 
-| Item | Custo |
-|---|---|
-| Expo Push Service | grátis, ilimitado |
-| Firebase (só FCM) | grátis nesse uso |
-| EAS Build | plano gratuito serve; tem fila |
-| Apple Developer | US$ 99/ano — **só se quiser iOS** |
+| Item | Custo | Fonte |
+|---|---|---|
+| Expo Push Service | **grátis** — *"There is no cost associated with sending notifications through Expo push notification service."* Limite técnico de 600 notificações/segundo por projeto. Não exige EAS pago. | [docs.expo.dev/push-notifications/faq](https://docs.expo.dev/push-notifications/faq/) |
+| Firebase (só FCM) | grátis e ilimitado nesse uso | — |
+| EAS Build | plano **Free** inclui 15 builds Android + 15 iOS por ciclo; Starter US$ 19/mês | [expo.dev/pricing](https://expo.dev/pricing) |
+| Apple Developer | US$ 99/**ano** — **só se quiser iOS** (sem conta não existe chave APNs) | — |
+| Google Play Console | US$ 25 **uma vez**, sem renovação — só para publicar na loja | — |
+
+**Android sai por R$ 0.** O custo obrigatório só aparece quando o iOS entra.
+
+### O que se economiza do outro lado
+
+Tarifas do WhatsApp no Brasil (o rate card oficial vive no **seu** WhatsApp Manager; os valores
+abaixo são de fontes de mercado e precisam ser confirmados lá antes de virar planilha):
+
+| Categoria | Brasil 2026 (aprox.) | Grátis dentro da janela de 24h? |
+|---|---|---|
+| Utility (alertas, lembretes) | R$ 0,04 – 0,05 | **Sim** |
+| Authentication (OTP de login) | R$ 0,15 – 0,19 | Sim |
+| Marketing | R$ 0,31 – 0,38 | Não |
+| Service (resposta ao cliente) | R$ 0 | — |
+
+Pior caso por usuário: 4 alertas/dia (o teto de `MAX_ALERTS_PER_USER`) × 30 dias × R$ 0,045 ≈
+**R$ 5,40/mês**.
+
+⚠️ **Mas atenção a este detalhe, que reduz muito o número real:** template Utility entregue
+**dentro da janela de 24h é gratuito**, e este produto é justamente um em que o usuário manda
+mensagem todo dia. Se ele escreveu nas últimas 24h, o alerta das 9h sai de graça **mesmo sem
+push**. O custo se concentra em **usuário inativo** — que é justamente quem você mais quer
+trazer de volta.
+
+Ponto de equilíbrio do iOS: US$ 99/ano ≈ R$ 45/mês fixos contra até R$ 5,40/mês por usuário
+inativo → compensa a partir de ~8–10 usuários inativos.
+
+Push **nunca** zera a conta da Meta: o OTP de login continua sendo Authentication a cada acesso
+novo, e quem não instalou o app ou revogou a permissão continua caindo no template.
+
+## ⏸️ Decisão de 26/08/2026: adiado de propósito, de novo
+
+Depois de entregar as 7 fases do plano de mercado, a decisão (do Mauricio) foi **deixar push por
+último**, quando o app estiver redondo e testado. O raciocínio:
+
+- **O custo hoje é R$ 0.** O banco tem 1 profile e nenhum orçamento/fatura cadastrado, então
+  `_alerts_to_send()` volta vazio — não há alerta sendo disparado nem template sendo pago.
+- **Não é dívida de arquitetura, é configuração.** `send-alerts` e `send-reminders` já preferem
+  push e caem no template só como fallback. No dia em que `expo_push_token` existir, nada muda no
+  código: eles passam a usar push sozinhos.
+- **Exige rebuild nativo**, ou seja, é retrabalho garantido se feito antes das telas estabilizarem.
+
+⚠️ **O item com relógio correndo NÃO é o push** — é a janela de 90 dias do número WhatsApp de
+teste, que fecha por volta de **outubro/2026**. Esse não pode ser adiado junto.
 
 ## Depois que funcionar
 
