@@ -45,7 +45,10 @@ Via Graph API v21.0 com o token de System User do app:
 ## 🔥 Aplicar agora (na ordem)
 
 1. **Vault + migration `0008_cron_token_from_vault.sql`** — criar os segredos fora do repo (`select vault.create_secret('https://<ref>.supabase.co','project_url')` e `select vault.create_secret('<anon key>','anon_key')`) e só então aplicar a migration; ela **falha de propósito** se os segredos não existirem. Depois: **rotacionar a anon key** (ela está no histórico do git pela `0003`) e atualizar `EXPO_PUBLIC_SUPABASE_ANON_KEY` no `.env` e o segredo `anon_key` no Vault.
-2. **`eas init`** — grava `extra.eas.projectId` no `app.json`. Sem isso o push falha em build EAS; o app agora mostra a mensagem exata em vez de "permissão negada". Depois, configurar credenciais FCM/APNs.
+2. **Push notifications (Fase 4)** — **adiada conscientemente em 26/08**. Passo a passo completo,
+   estado verificado, armadilhas e o código de recepção que ainda falta: **[docs/PUSH-NOTIFICATIONS.md](PUSH-NOTIFICATIONS.md)**.
+   Resumo: sem `extra.eas.projectId` + credenciais FCM, `expo_push_token` fica `NULL` e **todo lembrete
+   vira template Utility pago** em vez de push grátis.
 3. **Sincronizar os secrets e redeployar o send-reminders** (o nome do template saiu do código):
    ```
    npx supabase secrets set --env-file supabase/.env --project-ref kwriuifcwyvdrxtspjiz
@@ -73,7 +76,8 @@ Via Graph API v21.0 com o token de System User do app:
 ## 🔵 FASE 4 — Roadmap v2 (ordem sugerida)
 
 ### 4.1 Push notifications de verdade
-- Token já é registrado pelo perfil (`profiles.expo_push_token`) e o `send-reminders` já envia push quando há token. Falta: `eas init` + credenciais FCM/APNs (ver "aplicar agora"), alertas de **orçamento a 80%/100%** (cron diário sobre `_budgets_status`), push quando lançamento recorrente é materializado, e deep link da notificação para a tela certa (`scheme appproops`).
+- **Documento próprio: [docs/PUSH-NOTIFICATIONS.md](PUSH-NOTIFICATIONS.md)** — setup (EAS + Firebase), o código de recepção que falta (`setNotificationHandler`, listener de resposta, deep link) e armadilhas.
+- Destravado por ele: alertas de **orçamento a 80%/100%** (cron diário sobre `_budgets_status`) e push quando lançamento recorrente é materializado.
 
 ### 4.2 Foto de recibo (OCR)
 - `process-jobs/extractText`: aceitar `message.type === 'image'` → `downloadMedia` → Gemini Vision (mesma API `generateContent`, part `inline_data` com o base64) com o MESMO responseSchema multi-ação.
