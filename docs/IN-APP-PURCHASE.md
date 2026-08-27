@@ -215,6 +215,7 @@ O que conferir em `billing_events` (`result` de cada evento):
 | Auditoria e idempotência | `public.billing_events` (`0034`) |
 | Cancelamento vai para a loja | `public.cancel_subscription` (`0036`) |
 | Tela mostra trial / expirado / gerenciar na loja | `src/app/finance/plan.tsx` |
+| Aviso de fim de teste, 2 dias antes | `_alerts_to_send` (`0037`), entregue pelo `send-alerts` |
 
 ### Como o app está protegido
 

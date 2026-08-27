@@ -431,6 +431,27 @@ mesmo evento devolve `duplicado` sem reaplicar; evento de sandbox devolve
 `app_user_id` que não é uuid devolve `app_user_id_invalido`; **CANCELLATION
 mantém o acesso** (cancelar é "não vai renovar") e só EXPIRATION revoga.
 
+**Aviso de fim de teste** (`0037_trial_ending_alert.sql`) — a loja cuida da
+mecânica do trial, mas não manda a NOSSA mensagem. Novo alerta `trial_ending`
+dispara em `current_period_end - 2` (dia 5 de um teste de 7), pelo canal que já
+existe (push, com template do WhatsApp como reserva).
+
+Motivo, nesta ordem: (1) cobrança-surpresa vira pedido de reembolso, 1 estrela e
+chargeback — avisar antes custa uma mensagem e evita os três; (2) lembrar o que a
+pessoa construiu converte mais que aviso seco, por isso o corpo cita quantos
+lançamentos ela registrou na semana.
+
+A mensagem diz explicitamente COMO cancelar. Parece contraintuitivo num aviso de
+cobrança, mas é a mesma aposta do resto do produto: quem se sente preso cancela e
+xinga, quem se sente livre costuma ficar.
+
+`teste` vem PRIMEIRO no union de `_alerts_to_send` de propósito: o teto de 4
+alertas por usuário corta pelo fim da lista, e este é o único com prazo.
+
+Verificado: faltando 3 dias não dispara; faltando 2 dispara com o texto certo;
+depois de converter (`status='active'`) não dispara; trial já expirado não
+dispara; e o unique de `alerts_sent` bloqueia a segunda tentativa no mesmo dia.
+
 ⚠️ `BILLING_ALLOW_SANDBOX=true` existe para testar em sandbox e **precisa ser
 removida antes de publicar** — com ela ligada, qualquer um com StoreKit Testing
 vira Pro de graça.
