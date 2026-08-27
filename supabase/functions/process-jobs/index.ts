@@ -17,6 +17,7 @@ import { adminClient } from "../_shared/admin.ts";
 import { downloadMedia, sendText } from "../_shared/whatsapp.ts";
 import { localISODate, toInstantISO } from "../_shared/datetime.ts";
 import { nextOccurrence } from "../_shared/recurrence.ts";
+import { parseValorEmCentavos } from "../_shared/money-text.ts";
 import {
   type AiAction,
   GEMINI_ESCALATE,
@@ -175,6 +176,8 @@ type Ctx = {
   userId: string;
   workspaceId: string;
   timezone: string;
+  /** Texto original da mensagem — rede de segurança quando a IA omite o valor. */
+  texto: string;
   /** ids das transações criadas nesta mensagem — vão para ai_events e viram o desfazer do app. */
   created: string[];
 };
@@ -310,6 +313,11 @@ async function executeAction(
   action: AiAction,
 ): Promise<string> {
   const { userId, workspaceId, timezone, created } = ctx;
+  // se a IA devolveu a acao certa sem o valor, tenta tirar do texto cru
+  if (PRECISA_VALOR.has(action.type) && !action.amount_cents) {
+    const doTexto = parseValorEmCentavos(ctx.texto);
+    if (doTexto) action = { ...action, amount_cents: doTexto };
+  }
   const now = new Date();
 
   switch (action.type) {
@@ -787,7 +795,7 @@ async function executeAction(
 
     case "goal_deposit": {
       if (!action.content || !action.amount_cents || action.amount_cents <= 0) {
-        return "❌ Não entendi o aporte. Tenta \"coloca 200 na meta da viagem\".";
+        return "❌ Não achei o valor do aporte. Manda com o número junto, tipo: *coloca 200 reais na meta viagem*.";
       }
       const { data: goals } = await supabase
         .from("goals")
@@ -1015,7 +1023,7 @@ Deno.serve(async (_req) => {
           const comRegra = await applyRules(supabase, workspaceId, action);
           lines.push(await executeAction(
             supabase,
-            { userId: profile.id, workspaceId, timezone: profile.timezone, created },
+            { userId: profile.id, workspaceId, timezone: profile.timezone, texto: text, created },
             comRegra,
           ));
         } catch (err) {

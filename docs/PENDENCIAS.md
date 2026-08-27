@@ -375,6 +375,15 @@ um campo, tem que tirar outro.
 Vinte por dia não roda nem uma sessão de teste. Por isso o principal é
 **`gemini-3.5-flash-lite`** e o 3.6 Flash ficou só para escalonamento (caso raro).
 
+**Rede de segurança contra parse incompleto** (`_shared/money-text.ts`): quando a ação exige valor
+e a IA devolve sem, o executor extrai o número do **texto cru** da mensagem. Deliberadamente
+conservador — só aceita quando há **exatamente um** número plausível ("12x", "dia 5", "8h" e "20%"
+são descartados antes de contar). Com dois candidatos devolve null e o executor pede para
+reformular, porque chutar qual é o dinheiro seria pior que perguntar. 7 casos em `npm test`.
+
+Existe porque escalar para um modelo maior resolveria, mas o modelo maior tem 20 requisições/dia:
+depender dele para um caso corriqueiro é frágil.
+
 **Aprendizados que viraram código:**
 - `confidence` é sinal ruim: o Lite devolve **1.0 e ainda assim omite o valor**. A escalada agora
   dispara também por **parse incompleto** (`parseIncompleto`), olhando o resultado e não o que o

@@ -11,6 +11,7 @@
 - Endpoint `generateContent` v1beta, `temperature: 0.1`, `responseMimeType: application/json` e **sempre `responseSchema`** — nunca parsear texto livre do modelo.
 - **Modelos FIXADOS, nunca alias `-latest`** — o alias já migrou sozinho e quebrou o parse em produção. `GEMINI_PARSE` (Flash-Lite, 500 req/dia no free) primeiro; escala para `GEMINI_ESCALATE` (Flash, só 20/dia) quando `confidence < 0.6` **ou** o parse vier incompleto. `GEMINI_BATCH` para categorização de extrato.
 - Escalonamento é **best-effort**: falhou, segue com o resultado do menor.
+- **Valor de dinheiro tem rede de segurança determinística.** Se a ação exige `amount_cents` e a IA omitiu, `parseValorEmCentavos` (`_shared/money-text.ts`) tira do texto cru — mas só com UM número plausível no texto. Nunca chutar entre dois: pedir para reformular é melhor que gravar o valor errado.
 - **Teto do `responseSchema`: 15 propriedades e UM enum.** Passou disso, é `400 INVALID_ARGUMENT` sem explicação. Somar campo exige tirar outro — por isso os campos são multiuso.
 - Schema de saída: objeto flat com campos nullable (Gemini structured output lida mal com `anyOf`/union — não usar). Multi-intent = `{ actions: [...], confidence }`, uma ação por item da mensagem, máx. 10.
 - Sem segunda chamada de LLM para formatar respostas de consulta — formatação de saída WhatsApp é TS puro (template literals + `centsToBRL`).
