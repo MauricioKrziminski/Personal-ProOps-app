@@ -15,7 +15,7 @@
  */
 
 import { adminClient } from "../_shared/admin.ts";
-import { GEMINI_FLASH, categorizeBatch } from "../_shared/gemini.ts";
+import { GEMINI_BATCH, categorizeBatch } from "../_shared/gemini.ts";
 import { parseCSV, parseOFX } from "../_shared/statement-parser.ts";
 
 const MAX_ITEMS = 500;
@@ -112,7 +112,7 @@ Deno.serve(async (req) => {
       try {
         const sugeridas = await categorizeBatch(
           semCategoria.map((i) => i.description ?? ""),
-          GEMINI_FLASH,
+          GEMINI_BATCH,
         );
         for (const [i, item] of semCategoria.entries()) {
           const categoria = sugeridas[i];

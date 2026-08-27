@@ -346,5 +346,47 @@ reconciliar antes**.
 - Detalhe que reduz o custo real: **template Utility dentro da janela de 24h é gratuito**, e neste
   produto o usuário manda mensagem quase todo dia. O gasto se concentra em usuário **inativo**.
 
+## ⚠️ Gemini — cotas e limites de schema (medidos em 27/08/2026)
+
+O parse parou de funcionar sem ninguém mexer em nada. Três causas empilhadas:
+
+**1. Alias trocou de modelo.** `gemini-flash-latest` migrou para o Gemini 3.7 Flash. Os modelos
+agora são **FIXADOS** em `_shared/gemini.ts` — o preço é revisar na depreciação (que avisa com 404),
+em vez de quebrar em silêncio.
+
+**2. Dois limites NÃO documentados do `responseSchema`** na geração nova (3.1/3.5-lite, 3.6, 3.7).
+Ambos respondem `400 INVALID_ARGUMENT` sem nenhuma pista:
+
+| Limite | Valor (busca binária) |
+|---|---|
+| Propriedades por ação | **15** (16 já falha) |
+| Campos com `enum` | **1** no schema inteiro |
+
+Não depende do tamanho do prompt. Por isso os campos do `AiAction` são multiuso — antes de somar
+um campo, tem que tirar outro.
+
+**3. Cota do nível gratuito, por modelo por DIA** (painel do AI Studio):
+
+| Modelo | RPM | RPD |
+|---|---|---|
+| Gemini 3.6 / 3.7 Flash | 5 | **20** |
+| Gemini 3.1 / 3.5 Flash-Lite | 15 | **500** |
+
+Vinte por dia não roda nem uma sessão de teste. Por isso o principal é
+**`gemini-3.5-flash-lite`** e o 3.6 Flash ficou só para escalonamento (caso raro).
+
+**Aprendizados que viraram código:**
+- `confidence` é sinal ruim: o Lite devolve **1.0 e ainda assim omite o valor**. A escalada agora
+  dispara também por **parse incompleto** (`parseIncompleto`), olhando o resultado e não o que o
+  modelo diz de si.
+- Escalonamento é best-effort: se o modelo maior falhar, segue com o resultado do menor. Perder um
+  parse bom por causa do refinamento seria trocar resposta mediana por nenhuma.
+- **Não dormir dentro do worker.** Fazer o retry esperar os 13s que o 429 pede estourou o tempo da
+  Edge Function e deixou os jobs presos em `processing`. Numa fila com cron de 1 minuto, o próximo
+  tick já é o backoff.
+
+**Pendente:** com `billing` ativado, reavaliar se vale voltar para um Flash maior no parse — a
+diferença de custo é ~R$ 5 por mil mensagens.
+
 ## 📝 Como verificar o pipeline (rápido)
 Usar `/verify-whatsapp` ou manualmente: mandar mensagem → conferir `messages_raw` (inbound) → `jobs` (done) → `ai_events` (result/confidence) → tabela final (`transactions`/`notes`/...) → resposta no WhatsApp. Logs: MCP `get_logs` (edge-function).

@@ -19,8 +19,8 @@ import { localISODate, toInstantISO } from "../_shared/datetime.ts";
 import { nextOccurrence } from "../_shared/recurrence.ts";
 import {
   type AiAction,
-  GEMINI_FLASH,
-  GEMINI_PRO,
+  GEMINI_ESCALATE,
+  GEMINI_PARSE,
   type MediaPart,
   parseMessage,
   transcribeAudio,
@@ -195,6 +195,32 @@ async function resolveAccount(
     .ilike("name", `%${name}%`)
     .limit(1);
   return data?.[0]?.id ?? null;
+}
+
+/** Ações que não fazem sentido nenhum sem valor em centavos. */
+const PRECISA_VALOR = new Set<string>([
+  "create_expense",
+  "create_income",
+  "create_transfer",
+  "create_installment_purchase",
+  "create_goal",
+  "goal_deposit",
+  "simulate_purchase",
+  "update_asset_value",
+]);
+
+/**
+ * Detecta parse estruturalmente incompleto — ação que exige valor e veio sem.
+ *
+ * Existe porque `confidence` provou ser sinal ruim: o Lite devolve 1.0 e ainda
+ * assim omite o valor ("coloca 200 na meta da viagem" vira goal_deposit sem
+ * amount_cents). Confiantemente errado é pior que inseguro, e só dá para pegar
+ * olhando o resultado, não o que o modelo diz sobre si mesmo.
+ */
+function parseIncompleto(resultado: { actions: AiAction[] }): boolean {
+  return resultado.actions.some(
+    (a) => PRECISA_VALOR.has(a.type) && !a.amount_cents,
+  );
 }
 
 const KIND_LABEL: Record<string, string> = { expense: "gasto", income: "receita" };
@@ -957,15 +983,17 @@ Deno.serve(async (_req) => {
       }
 
       // 4. Gemini Flash; escala p/ Pro se a confiança for baixa
-      let { parsed, usage } = await parseMessage(text, profile.timezone, GEMINI_FLASH, media);
-      if (parsed.confidence < CONFIDENCE_ESCALATE) {
-        // best-effort: se o Pro falhar (cota, indisponibilidade), seguimos com o
+      let { parsed, usage } = await parseMessage(text, profile.timezone, GEMINI_PARSE, media);
+      // escala por confiança baixa OU por parse incompleto (o segundo pega o caso
+      // que a confiança não pega: modelo seguro de si e ainda assim sem o valor)
+      if (parsed.confidence < CONFIDENCE_ESCALATE || parseIncompleto(parsed)) {
+        // best-effort: se o modelo maior falhar (cota, indisponibilidade), seguimos com o
         // resultado do Flash. Jogar fora um parse que deu certo por causa do
         // refinamento seria trocar uma resposta mediana por nenhuma.
         try {
-          ({ parsed, usage } = await parseMessage(text, profile.timezone, GEMINI_PRO, media));
+          ({ parsed, usage } = await parseMessage(text, profile.timezone, GEMINI_ESCALATE, media));
         } catch (err) {
-          console.error("escalonamento para o Pro falhou; seguindo com o Flash:", err);
+          console.error("escalonamento falhou; seguindo com o resultado do Lite:", err);
         }
       }
 

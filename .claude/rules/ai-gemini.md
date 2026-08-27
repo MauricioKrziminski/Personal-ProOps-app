@@ -9,7 +9,9 @@
 ## Regras de chamada
 
 - Endpoint `generateContent` v1beta, `temperature: 0.1`, `responseMimeType: application/json` e **sempre `responseSchema`** — nunca parsear texto livre do modelo.
-- Custo: **Flash primeiro** (`GEMINI_FLASH`); se `confidence < 0.6`, refazer com **Pro** (`GEMINI_PRO`). Não inverter, não chamar Pro direto.
+- **Modelos FIXADOS, nunca alias `-latest`** — o alias já migrou sozinho e quebrou o parse em produção. `GEMINI_PARSE` (Flash-Lite, 500 req/dia no free) primeiro; escala para `GEMINI_ESCALATE` (Flash, só 20/dia) quando `confidence < 0.6` **ou** o parse vier incompleto. `GEMINI_BATCH` para categorização de extrato.
+- Escalonamento é **best-effort**: falhou, segue com o resultado do menor.
+- **Teto do `responseSchema`: 15 propriedades e UM enum.** Passou disso, é `400 INVALID_ARGUMENT` sem explicação. Somar campo exige tirar outro — por isso os campos são multiuso.
 - Schema de saída: objeto flat com campos nullable (Gemini structured output lida mal com `anyOf`/union — não usar). Multi-intent = `{ actions: [...], confidence }`, uma ação por item da mensagem, máx. 10.
 - Sem segunda chamada de LLM para formatar respostas de consulta — formatação de saída WhatsApp é TS puro (template literals + `centsToBRL`).
 - Retry: usar o `fetchWithRetry` existente (backoff em 429/5xx).
@@ -23,7 +25,8 @@
 ## Auditoria e custo
 
 - **Todo** parse grava linha em `ai_events` (model, tokens, confidence, result jsonb, `created_transaction_ids`) — é a observabilidade do produto (sem Sentry) E a tela "Atividade da IA" do app, que mostra ao usuário o que foi entendido e deixa desfazer.
-- Rate limit por usuário antes de chamar o Gemini (contagem em `ai_events` na última hora); estourou → responde "aguarde" e marca o job done.
+- Rate limit por usuário antes de chamar o Gemini (contagem em `ai_events` na última hora); estourou → responde "aguarde" e marca o job done. Além dele, a cota do plano (`_plan_status`) corta por mês.
+- **Nunca dormir esperando 429 dentro da function**: estoura o tempo dela e prende o job em `processing`. Falha rápido — o cron de 1 minuto é o backoff.
 
 ## Prompt (convenções de conteúdo)
 

@@ -1,14 +1,15 @@
 /**
  * Parsing/categorização com Google Gemini (saída estruturada via responseSchema).
- * Flash para volume; quem chama pode escalar p/ Pro quando a confiança for baixa.
+ * Flash-Lite para volume (cota de 500/dia); escala para o Flash maior quando a
+ * confiança fica baixa.
  *
  * Multi-intent: uma mensagem pode virar VÁRIAS ações (lista de gastos, gasto +
  * lembrete, consulta + nota...). O schema é um objeto flat único por ação —
  * Gemini structured output lida mal com anyOf/union.
  *
  * Só `type` é obrigatório: os demais campos NÃO levam `nullable` no schema, o
- * modelo simplesmente omite o que não se aplica. Marcar tudo como nullable
- * engordou o schema a ponto do Gemini 3.7 recusar com 400 INVALID_ARGUMENT.
+ * modelo simplesmente omite o que não se aplica — ver os dois limites medidos
+ * na nota do ACTION_SCHEMA antes de mexer em qualquer campo.
  */
 
 import { localDateTimeISO } from "./datetime.ts";
@@ -26,15 +27,25 @@ const GEMINI_BASE = "https://generativelanguage.googleapis.com/v1beta/models";
  * isso avisa com 404 explícito, e não silenciosamente com o comportamento
  * mudando debaixo do produto.
  *
- * 3.6 Flash em vez de um Flash-Lite porque os Lite erram o VALOR em mensagens
- * compostas ("quero juntar 5000 e me lembra do aluguel" devolve meta sem valor).
- * Errar dinheiro não é economia.
+ * Escolha do modelo é COTA, não só qualidade. No nível gratuito (verificado no
+ * painel em 27/08/2026): Flash 3.6/3.7 = 5 RPM e **20 requisições por dia**;
+ * Flash-Lite 3.1/3.5 = 15 RPM e **500 por dia**. Vinte por dia não sustenta nem
+ * uma sessão de teste, então o principal é Lite.
+ *
+ * O Lite errava o valor em mensagem composta ("quero juntar 5000 E me lembra do
+ * aluguel" devolvia meta sem valor) — e com confiança 1.0, ou seja,
+ * confiantemente errado, que escalonamento nenhum pega. Resolvido com exemplos
+ * explícitos de campo multiuso no prompt, não trocando de modelo.
  */
-export const GEMINI_FLASH = "gemini-3.6-flash";
-/** Tarefa simples e de volume (categorizar linhas de extrato): Lite dá conta. */
-export const GEMINI_FLASH_LITE = "gemini-3.5-flash-lite";
-/** Escalonamento por baixa confiança. Raro — e o chamador segue com o Flash se falhar. */
-export const GEMINI_PRO = "gemini-pro-latest";
+export const GEMINI_PARSE = "gemini-3.5-flash-lite";
+/**
+ * Escalonamento por baixa confiança. Flash "cheio" tem só 20 requisições/dia no
+ * nível gratuito — insustentável como principal, mas perfeito para o caso raro.
+ * (Antes era o Pro, que tem cota ainda menor e vivia estourado.)
+ */
+export const GEMINI_ESCALATE = "gemini-3.6-flash";
+/** Categorizar linhas de extrato é classificação simples: o Lite mais barato serve. */
+export const GEMINI_BATCH = "gemini-3.1-flash-lite";
 
 export const SUGGESTED_CATEGORIES = [
   "mercado", "transporte", "lazer", "contas", "saúde", "casa",
@@ -180,7 +191,7 @@ Tipos de ação:
 - "create_note": anotação livre. content (texto limpo) e category curta se óbvia.
 - "create_reminder": pedido para ser lembrado. content = o que lembrar, remind_at (próxima ocorrência, ISO, no fuso do usuário) e recurrence como RRULE quando recorrente ("todo dia 5" -> FREQ=MONTHLY;BYMONTHDAY=5; "todo dia às 8h" -> FREQ=DAILY). Sem recorrência -> null.
 - "create_goal": meta de poupança ("quero juntar 5000 até dezembro pra viagem"). content = nome da meta, amount_cents = valor alvo, occurred_at = prazo (YYYY-MM-DD) se houver.
-- "goal_deposit": aporte em meta existente ("coloca 200 na meta da viagem"). content = nome da meta, amount_cents = valor do aporte.
+- "goal_deposit": aporte em meta existente ("coloca 200 na meta da viagem", "guardei 500 pra viagem"). content = nome da meta. amount_cents = valor do aporte e e OBRIGATORIO: "coloca 200" -> amount_cents=20000. Sem valor, use unknown em vez de goal_deposit.
 - "query_balance": pergunta sobre saldo/quanto tem ("quanto tenho?", "saldo das contas").
 - "query_transactions": pergunta sobre gastos/receitas ("quanto gastei esse mês?", "gastos com mercado em junho"). query_from/query_to (YYYY-MM-DD, resolva "esse mês"/"semana passada" pela data atual) e category se o usuário citar uma.
 - "query_budgets": pergunta sobre orçamento/limite ("como tá meu orçamento?").
@@ -193,6 +204,14 @@ Regras:
 - Datas relativas resolvidas com a data/hora atual DO USUÁRIO (já convertida para o fuso dele, com offset): ${nowLocal} (fuso ${timezone}). Use exatamente essa data como "hoje" — não recalcule fuso.
 - Campos que não se aplicam à ação: OMITA (não mande null).
 - Os campos são MULTIUSO: o significado depende do "type". content = descrição, título do lembrete, nome da meta/bem ou gatilho da regra. amount_cents = valor, alvo da meta ou valor do bem. occurred_at = data do lançamento, prazo da meta ou data corrigida.
+
+Exemplos de campo multiuso (siga exatamente este formato):
+"quero juntar 5000 ate dezembro pra viagem" -> create_goal com content="viagem", amount_cents=500000, occurred_at="2026-12-31"
+"me lembra de pagar o aluguel todo dia 5" -> create_reminder com content="pagar o aluguel", recurrence="FREQ=MONTHLY;BYMONTHDAY=5"
+"coloca 200 na meta da viagem" -> goal_deposit com content="viagem", amount_cents=20000
+"meu tesouro direto ta em 27 mil" -> update_asset_value com content="tesouro direto", amount_cents=2700000
+"apaga a nota do mercado" -> delete_item com target_type="note", content="mercado"
+NUNCA deixe amount_cents vazio quando o usuario disser um valor.
 - Corrigir algo que já existe é update_transaction ou delete_item — NUNCA crie um lançamento novo para "consertar" outro.
 - Compra no cartão à vista é create_expense com account = nome do cartão. Só use create_installment_purchase quando houver 2 ou mais parcelas.
 - confidence (0..1) é da interpretação da mensagem INTEIRA.
@@ -246,7 +265,7 @@ export interface MediaPart {
 export async function parseMessage(
   text: string,
   timezone: string,
-  model: string = GEMINI_FLASH,
+  model: string = GEMINI_PARSE,
   media?: MediaPart,
 ): Promise<{ parsed: AiResult; usage: GeminiUsage }> {
   const apiKey = Deno.env.get("GEMINI_API_KEY");
@@ -305,7 +324,7 @@ export async function parseMessage(
  */
 export async function categorizeBatch(
   descriptions: string[],
-  model: string = GEMINI_FLASH_LITE,
+  model: string = GEMINI_BATCH,
 ): Promise<(string | null)[]> {
   const apiKey = Deno.env.get("GEMINI_API_KEY");
   if (!apiKey) throw new Error("GEMINI_API_KEY ausente");
