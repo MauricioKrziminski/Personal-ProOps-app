@@ -29,10 +29,22 @@ select
 
 Anote os números. No fim tem um script de limpeza que devolve o banco a este estado.
 
+### Onde rodar o SQL deste roteiro
+
+Todo SQL daqui vai no **SQL Editor do Supabase**:
+**https://supabase.com/dashboard/project/kwriuifcwyvdrxtspjiz/sql/new**
+
+(Ou peça para o Claude rodar — ele tem acesso ao banco pelo MCP.)
+
 ### Como disparar as Edge Functions na mão
 
 O cron roda sozinho (`finance-scheduler` no minuto 7 de cada hora, `send-alerts` às 12h UTC), mas
 para testar você quer disparar na hora:
+
+São **duas execuções separadas**. O `pg_net` é assíncrono: a primeira dispara e devolve na hora um
+número (o `request_id`), sem esperar a função responder.
+
+**1) Dispare** — devolve algo como `126389`:
 
 ```sql
 select net.http_post(
@@ -44,10 +56,16 @@ select net.http_post(
   body := '{}'::jsonb,
   timeout_milliseconds := 45000
 ) as request_id;
-
--- alguns segundos depois, com o id devolvido acima:
-select status_code, left(content, 300) from net._http_response where id = <REQUEST_ID>;
 ```
+
+**2) Espere 5–10 segundos** e leia a resposta, trocando o número pelo que veio acima (sem os
+sinais de maior/menor):
+
+```sql
+select status_code, left(content, 300) from net._http_response where id = 126389;
+```
+
+Vazio = ainda rodando. Rode de novo em alguns segundos.
 
 ⚠️ **Sempre passe `timeout_milliseconds`.** O padrão do `pg_net` é 5s e ele **aborta a função no
 meio** — foi assim que a primeira importação gravou os itens mas perdeu a categorização.
