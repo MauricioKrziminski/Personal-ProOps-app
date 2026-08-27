@@ -12,6 +12,31 @@ export type Database = {
   __InternalSupabase: {
     PostgrestVersion: "14.17"
   }
+  graphql_public: {
+    Tables: {
+      [_ in never]: never
+    }
+    Views: {
+      [_ in never]: never
+    }
+    Functions: {
+      graphql: {
+        Args: {
+          extensions?: Json
+          operationName?: string
+          query?: string
+          variables?: Json
+        }
+        Returns: Json
+      }
+    }
+    Enums: {
+      [_ in never]: never
+    }
+    CompositeTypes: {
+      [_ in never]: never
+    }
+  }
   public: {
     Tables: {
       accounts: {
@@ -284,6 +309,44 @@ export type Database = {
           },
           {
             foreignKeyName: "assets_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      billing_events: {
+        Row: {
+          id: string
+          payload: Json | null
+          provider: string | null
+          received_at: string
+          result: string | null
+          type: string | null
+          workspace_id: string | null
+        }
+        Insert: {
+          id: string
+          payload?: Json | null
+          provider?: string | null
+          received_at?: string
+          result?: string | null
+          type?: string | null
+          workspace_id?: string | null
+        }
+        Update: {
+          id?: string
+          payload?: Json | null
+          provider?: string | null
+          received_at?: string
+          result?: string | null
+          type?: string | null
+          workspace_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "billing_events_workspace_id_fkey"
             columns: ["workspace_id"]
             isOneToOne: false
             referencedRelation: "workspaces"
@@ -1246,8 +1309,11 @@ export type Database = {
           canceled_at: string | null
           created_at: string
           current_period_end: string | null
+          environment: string | null
           external_id: string | null
+          is_trial: boolean
           plan: string
+          product_id: string | null
           provider: string | null
           status: string
           updated_at: string
@@ -1257,8 +1323,11 @@ export type Database = {
           canceled_at?: string | null
           created_at?: string
           current_period_end?: string | null
+          environment?: string | null
           external_id?: string | null
+          is_trial?: boolean
           plan?: string
+          product_id?: string | null
           provider?: string | null
           status?: string
           updated_at?: string
@@ -1268,8 +1337,11 @@ export type Database = {
           canceled_at?: string | null
           created_at?: string
           current_period_end?: string | null
+          environment?: string | null
           external_id?: string | null
+          is_trial?: boolean
           plan?: string
+          product_id?: string | null
           provider?: string | null
           status?: string
           updated_at?: string
@@ -1575,6 +1647,22 @@ export type Database = {
           workspace_id: string
         }[]
       }
+      _apply_entitlement: {
+        Args: {
+          p_active: boolean
+          p_app_user_id: string
+          p_environment: string
+          p_event_id: string
+          p_expires_on: string
+          p_external_id: string
+          p_is_trial: boolean
+          p_payload: Json
+          p_plan: string
+          p_product_id: string
+          p_provider: string
+        }
+        Returns: string
+      }
       _budgets_status: {
         Args: { ref_month?: string; uid: string }
         Returns: {
@@ -1650,10 +1738,12 @@ export type Database = {
           ai_messages_month: number
           can_import: boolean
           current_period_end: string
+          is_trial: boolean
           max_ai_messages_month: number
           max_members: number
           members: number
           plan: string
+          provider: string
           status: string
         }[]
       }
@@ -1901,10 +1991,12 @@ export type Database = {
           ai_messages_month: number
           can_import: boolean
           current_period_end: string
+          is_trial: boolean
           max_ai_messages_month: number
           max_members: number
           members: number
           plan: string
+          provider: string
           status: string
         }[]
       }
@@ -2077,6 +2169,9 @@ export type CompositeTypes<
     : never
 
 export const Constants = {
+  graphql_public: {
+    Enums: {},
+  },
   public: {
     Enums: {},
   },

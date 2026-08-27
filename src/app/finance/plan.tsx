@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Alert, Pressable, ScrollView, StyleSheet, TextInput, View } from 'react-native';
+import { Alert, Linking, Platform, Pressable, ScrollView, StyleSheet, TextInput, View } from 'react-native';
 import Animated, { FadeInDown } from 'react-native-reanimated';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';
@@ -18,6 +18,8 @@ import {
   usePlanStatus,
   useRevokeInvite,
 } from '@/hooks/use-finance';
+import { formatDateBR } from '@/hooks/use-items';
+import { TRIAL_DAYS } from '@/lib/billing';
 import { useTheme } from '@/hooks/use-theme';
 
 /** 5551999998888 -> (51) 99999-8888 */
@@ -28,6 +30,26 @@ function telefoneBR(digitos: string): string {
   const resto = d.slice(2);
   const meio = resto.length === 9 ? resto.slice(0, 5) : resto.slice(0, 4);
   return `(${ddd}) ${meio}-${resto.slice(meio.length)}`;
+}
+
+/** Tela de assinaturas da loja — é lá que se cancela quem assinou por IAP. */
+const LOJA_URL = Platform.select({
+  ios: 'https://apps.apple.com/account/subscriptions',
+  android: 'https://play.google.com/store/account/subscriptions',
+  default: 'https://play.google.com/store/account/subscriptions',
+});
+
+/** Selo curto ao lado do nome do plano. Null = nada a dizer. */
+function selo(status: string, ate: string | null): { texto: string; perigo: boolean } | null {
+  if (status === 'trialing') {
+    return { texto: ate ? `teste grátis até ${formatDateBR(ate)}` : 'teste grátis', perigo: false };
+  }
+  if (status === 'expired') return { texto: 'expirou', perigo: true };
+  if (status === 'canceled') {
+    return { texto: ate ? `ativo até ${formatDateBR(ate)}` : 'cancelado', perigo: false };
+  }
+  if (status === 'past_due') return { texto: 'pagamento pendente', perigo: true };
+  return null;
 }
 
 export default function PlanScreen() {
@@ -46,7 +68,16 @@ export default function PlanScreen() {
 
   const pendentes = (convites ?? []).filter((c) => c.status === 'pending');
 
+  // Assinatura feita na loja SÓ pode ser cancelada na loja. Cancelar por aqui
+  // tiraria o acesso e deixaria a cobrança rodando — o pior dos dois mundos.
+  const naLoja = plano?.provider === 'apple' || plano?.provider === 'google';
+
   const confirmarCancelamento = () => {
+    if (naLoja) {
+      Haptics.selectionAsync();
+      Linking.openURL(LOJA_URL);
+      return;
+    }
     Alert.alert(
       'Cancelar assinatura',
       'Seu plano volta para o Free no fim do período. Nenhum dado é apagado — e dá para voltar quando quiser, aqui mesmo.',
@@ -80,11 +111,18 @@ export default function PlanScreen() {
                   <ThemedText type="smallBold">
                     Plano {PLANS.find((p) => p.value === plano.plan)?.label ?? plano.plan}
                   </ThemedText>
-                  {plano.status === 'canceled' && (
-                    <ThemedText type="small" style={{ color: theme.danger }}>
-                      cancelado
-                    </ThemedText>
-                  )}
+                  {(() => {
+                    const s = selo(plano.status, plano.current_period_end);
+                    if (!s) return null;
+                    return (
+                      <ThemedText
+                        type="small"
+                        style={s.perigo ? { color: theme.danger } : undefined}
+                        themeColor={s.perigo ? undefined : 'textSecondary'}>
+                        {s.texto}
+                      </ThemedText>
+                    );
+                  })()}
                 </View>
                 <ThemedText type="small" themeColor="textSecondary">
                   {plano.ai_messages_month} de {plano.max_ai_messages_month} mensagens usadas este
@@ -145,7 +183,8 @@ export default function PlanScreen() {
               );
             })}
             <ThemedText type="small" themeColor="textSecondary">
-              Ainda não dá para assinar por aqui — a cobrança está sendo ligada.
+              Assinatura pela App Store e pelo Google Play, com {TRIAL_DAYS} dias grátis. Ainda
+              estamos ligando — os preços finais aparecem aqui quando a loja liberar.
             </ThemedText>
           </GlassCard>
 
@@ -227,7 +266,7 @@ export default function PlanScreen() {
           {plano && plano.plan !== 'free' && plano.status !== 'canceled' && (
             <Pressable onPress={confirmarCancelamento} hitSlop={8} style={styles.cancel}>
               <ThemedText type="small" themeColor="textSecondary">
-                Cancelar assinatura
+                {naLoja ? 'Gerenciar assinatura na loja' : 'Cancelar assinatura'}
               </ThemedText>
             </Pressable>
           )}

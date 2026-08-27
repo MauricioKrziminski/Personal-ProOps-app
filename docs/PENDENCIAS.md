@@ -367,6 +367,79 @@ existe justamente para os dois conviverem.
 `workspace_members` de um workspace que o convidado ainda não enxerga; a segunda precisa cancelar
 sem a policy de escrita. Ambas agem só sobre o `auth.uid()` do chamador.
 
+⚠️ **Cobrança fechada: In-App Purchase nas duas lojas** (27/08/2026). Decisão do
+usuário depois da pesquisa de mercado: **sem checkout web**. App Store + Google
+Play, ~15% nos dois, 7 dias de trial. Landing page só informativa ("planos a
+partir de R$ 24,90 · baixe o app") — landing não é governada por App Review, só o
+binário é, então não existe link externo, entitlement nem transação a reportar.
+
+Passo a passo do que falta fazer nas contas: **`docs/IN-APP-PURCHASE.md`**.
+
+O que a pesquisa achou (para não refazer):
+
+| Concorrente | Cobrança | Evidência |
+|---|---|---|
+| Foccum | Cakto (web) | termos citam a Cakto como processadora; vende pagamento único de 24 meses |
+| Meu Assessor | Hotmart (web) | checkout em `pay.hotmart.com/D98698570Y` |
+| Pierre | Apple IAP | App Store, vendedor CloudWalk Inc. |
+| Mobills / Organizze | IAP + web | híbrido; a assinatura vale nas três plataformas |
+
+Custo por cobrança de R$ 24,90: IAP 15% (R$ 3,74) · Asaas cartão+NFS-e 6,9%
+(R$ 1,73) · Cakto 13,9% · Hotmart 13,9% · Kiwify 19,0%. O que decide em ticket
+baixo é a **taxa fixa** — Cakto/Kiwify/Hotmart são feitas para R$ 297–1.997.
+
+Regras de loja levantadas: Apple SBP = 15% (**precisa se inscrever**, senão 30%);
+Google desde 30/06/2026 = 10% + 5% se usar o billing deles; link externo clicável
+no app custa 15% (Apple) / 10% (Google) — pior que IAP; **texto estático é 0%**;
+quem chega ao site por fora do app não gera comissão nenhuma. Apple Pay e Google
+Pay **não** são alternativa ao IAP (são carteiras de cartão, proibidas para
+conteúdo digital dentro do app pela 3.1.1).
+
+⚠️ **Nem Apple nem Google aceitam Pix em assinatura recorrente** (Google aceita
+Pix só em compra avulsa). Todo assinante precisa de cartão. É a maior perda de
+conversão conhecida deste desenho — acompanhar abandono no paywall. Se doer, a
+saída é ADICIONAR web depois, não trocar de estratégia.
+
+Entregue nesta rodada:
+
+- `0034_iap_entitlements.sql` — colunas de loja em `subscriptions`
+  (`product_id`, `environment`, `is_trial`), `billing_events` (auditoria +
+  idempotência, RLS sem policies), unique parcial `(provider, external_id)`
+  (uma compra libera UM workspace) e **`private.effective_plan`**.
+- `0035_apply_entitlement_public.sql` — a função de concessão sai de `private`
+  para `public._apply_entitlement`: o PostgREST não expõe `private`, e a Edge
+  Function chama por `supabase.rpc()`.
+- `0036_cancel_goes_to_the_store.sql` — `plan_status` devolve `provider`, e
+  `cancel_subscription` **recusa** cancelar assinatura de loja (devolve
+  `cancelar_na_loja:apple|google`). Cancelar por aqui tiraria o acesso e deixaria
+  a loja cobrando — o pior dos dois mundos.
+- `supabase/functions/billing-webhook/` — webhook da RevenueCat.
+- `src/lib/billing.ts` + `_shared/billing.ts` + `billing.test.ts` (trava a
+  divergência, padrão de `categories.ts`).
+- `plan.tsx` mostra trial, expirado e "gerenciar na loja".
+
+🔒 **Buraco fechado de quebra:** `plan_status_for` lia `plan` e `status` e
+IGNORAVA `current_period_end`. Um webhook de EXPIRATION perdido deixaria a pessoa
+Pro para sempre. Agora `effective_plan` derruba para Free quando a data passou, e
+o status volta como `expired` para a tela poder explicar. Verificado: linha
+gravada como `pro`/`active` com `current_period_end` de ontem devolve
+`free`/`expired`, 100 mensagens e sem importação.
+
+Verificado também, via `_apply_entitlement`: compra legítima concede; reenvio do
+mesmo evento devolve `duplicado` sem reaplicar; evento de sandbox devolve
+`sandbox_ignorado`; produto fora do catálogo devolve `produto_desconhecido`;
+`app_user_id` que não é uuid devolve `app_user_id_invalido`; **CANCELLATION
+mantém o acesso** (cancelar é "não vai renovar") e só EXPIRATION revoga.
+
+⚠️ `BILLING_ALLOW_SANDBOX=true` existe para testar em sandbox e **precisa ser
+removida antes de publicar** — com ela ligada, qualquer um com StoreKit Testing
+vira Pro de graça.
+
+⚠️ **Advisors aceitos de propósito:** `accept_pending_invites` e
+`cancel_subscription` ficam como `SECURITY DEFINER` executáveis por
+`authenticated`; `billing_events` fica com RLS sem policies (tabela de infra, só
+service_role, igual `jobs` e `messages_raw`).
+
 ---
 
 ## 🎯 Onde o produto está

@@ -32,3 +32,8 @@ verify_jwt = true
 # segurança é a assinatura standardwebhooks (SEND_SMS_HOOK_SECRET).
 [functions.wa-send-otp]
 verify_jwt = false
+
+# webhook da RevenueCat (concede plano pago). Sem JWT — a seguranca e o segredo
+# constante-time no header Authorization (REVENUECAT_WEBHOOK_SECRET).
+[functions.billing-webhook]
+verify_jwt = false
