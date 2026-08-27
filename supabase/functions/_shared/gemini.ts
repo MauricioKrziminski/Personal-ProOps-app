@@ -4,7 +4,11 @@
  *
  * Multi-intent: uma mensagem pode virar VÁRIAS ações (lista de gastos, gasto +
  * lembrete, consulta + nota...). O schema é um objeto flat único por ação —
- * Gemini structured output lida mal com anyOf/union; campos não usados = null.
+ * Gemini structured output lida mal com anyOf/union.
+ *
+ * Só `type` é obrigatório: os demais campos NÃO levam `nullable` no schema, o
+ * modelo simplesmente omite o que não se aplica. Marcar tudo como nullable
+ * engordou o schema a ponto do Gemini 3.7 recusar com 400 INVALID_ARGUMENT.
  */
 
 import { localDateTimeISO } from "./datetime.ts";
@@ -47,32 +51,35 @@ export type AiActionType =
   | "unknown";
 
 export interface AiAction {
+  // Só `type` é obrigatório no schema. Os demais o modelo OMITE quando não se
+  // aplicam (por isso opcionais, não `| null`): tirar `nullable` do schema foi o
+  // que resolveu o 400 do Gemini 3.7 — ver a nota em fetchWithRetry.
   type: AiActionType;
   // criação
-  title: string | null;
-  content: string | null;
-  category: string | null;
-  amount_cents: number | null; // inteiro em centavos
-  currency: string | null;
-  occurred_at: string | null; // YYYY-MM-DD
-  remind_at: string | null; // ISO datetime local do usuário
-  recurrence: string | null; // RRULE (ex.: FREQ=MONTHLY;BYMONTHDAY=5)
-  account: string | null; // nome livre da conta citada
-  counterparty_account: string | null; // conta destino (transfer)
-  installments: number | null; // nº de parcelas (compra parcelada)
+  title?: string | null;
+  content?: string | null;
+  category?: string | null;
+  amount_cents?: number | null; // inteiro em centavos
+  currency?: string | null;
+  occurred_at?: string | null; // YYYY-MM-DD
+  remind_at?: string | null; // ISO datetime local do usuário
+  recurrence?: string | null; // RRULE (ex.: FREQ=MONTHLY;BYMONTHDAY=5)
+  account?: string | null; // nome livre da conta citada
+  counterparty_account?: string | null; // conta destino (transfer)
+  installments?: number | null; // nº de parcelas (compra parcelada)
   // correção: os campos acima descrevem QUAL item; estes, o que passa a valer
-  new_amount_cents: number | null;
-  new_category: string | null;
-  new_occurred_at: string | null; // YYYY-MM-DD
-  target_type: "transaction" | "note" | "reminder" | "goal" | "recurring" | null;
-  goal_name: string | null;
-  target_cents: number | null;
-  deadline: string | null; // YYYY-MM-DD
+  new_amount_cents?: number | null;
+  new_category?: string | null;
+  new_occurred_at?: string | null; // YYYY-MM-DD
+  target_type?: "transaction" | "note" | "reminder" | "goal" | "recurring" | null;
+  goal_name?: string | null;
+  target_cents?: number | null;
+  deadline?: string | null; // YYYY-MM-DD
   // consulta
-  query_from: string | null; // YYYY-MM-DD
-  query_to: string | null; // YYYY-MM-DD
-  query_kind: "expense" | "income" | null;
-  query_category: string | null;
+  query_from?: string | null; // YYYY-MM-DD
+  query_to?: string | null; // YYYY-MM-DD
+  query_kind?: "expense" | "income" | null;
+  query_category?: string | null;
 }
 
 export interface AiResult {
@@ -95,32 +102,31 @@ const ACTION_SCHEMA = {
         "undo_last", "unknown",
       ],
     },
-    title: { type: "STRING", nullable: true },
-    content: { type: "STRING", nullable: true },
-    category: { type: "STRING", nullable: true },
-    amount_cents: { type: "INTEGER", nullable: true },
-    currency: { type: "STRING", nullable: true },
-    occurred_at: { type: "STRING", nullable: true },
-    remind_at: { type: "STRING", nullable: true },
-    recurrence: { type: "STRING", nullable: true },
-    account: { type: "STRING", nullable: true },
-    counterparty_account: { type: "STRING", nullable: true },
-    installments: { type: "INTEGER", nullable: true },
-    new_amount_cents: { type: "INTEGER", nullable: true },
-    new_category: { type: "STRING", nullable: true },
-    new_occurred_at: { type: "STRING", nullable: true },
+    title: { type: "STRING" },
+    content: { type: "STRING" },
+    category: { type: "STRING" },
+    amount_cents: { type: "INTEGER" },
+    currency: { type: "STRING" },
+    occurred_at: { type: "STRING" },
+    remind_at: { type: "STRING" },
+    recurrence: { type: "STRING" },
+    account: { type: "STRING" },
+    counterparty_account: { type: "STRING" },
+    installments: { type: "INTEGER" },
+    new_amount_cents: { type: "INTEGER" },
+    new_category: { type: "STRING" },
+    new_occurred_at: { type: "STRING" },
     target_type: {
       type: "STRING",
       enum: ["transaction", "note", "reminder", "goal", "recurring"],
-      nullable: true,
     },
-    goal_name: { type: "STRING", nullable: true },
-    target_cents: { type: "INTEGER", nullable: true },
-    deadline: { type: "STRING", nullable: true },
-    query_from: { type: "STRING", nullable: true },
-    query_to: { type: "STRING", nullable: true },
-    query_kind: { type: "STRING", enum: ["expense", "income"], nullable: true },
-    query_category: { type: "STRING", nullable: true },
+    goal_name: { type: "STRING" },
+    target_cents: { type: "INTEGER" },
+    deadline: { type: "STRING" },
+    query_from: { type: "STRING" },
+    query_to: { type: "STRING" },
+    query_kind: { type: "STRING", enum: ["expense", "income"] },
+    query_category: { type: "STRING" },
   },
   required: ["type"],
 } as const;
@@ -195,11 +201,21 @@ async function fetchWithRetry(
     const res = await fetch(url, options);
     if (res.ok) return res;
     const transient = res.status === 429 || res.status >= 500;
-    if (transient && attempt < retries) {
-      await new Promise((r) => setTimeout(r, 500 * Math.pow(2, attempt))); // 0.5s, 1s, 2s
-      continue;
+    if (!transient || attempt >= retries) return res;
+
+    let espera = 500 * Math.pow(2, attempt); // 0.5s, 1s, 2s para 5xx
+
+    // 429 é cota, não congestionamento: o backoff curto nunca alcança a janela.
+    // O corpo traz "Please retry in 13.07s" — obedecer isso é o que faz o retry
+    // servir para alguma coisa em vez de queimar as 3 tentativas em 3 segundos.
+    if (res.status === 429) {
+      const corpo = await res.clone().text().catch(() => "");
+      const sugerido = corpo.match(/retry in ([\d.]+)s/i);
+      espera = sugerido ? Math.ceil(parseFloat(sugerido[1]) * 1000) + 500 : 15_000;
+      espera = Math.min(espera, 30_000);
     }
-    return res;
+
+    await new Promise((r) => setTimeout(r, espera));
   }
 }
 

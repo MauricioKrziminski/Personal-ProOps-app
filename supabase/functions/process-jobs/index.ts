@@ -180,7 +180,12 @@ type Ctx = {
 };
 
 /** Resolve conta citada por nome (ilike). Sem match -> null: lançamento nunca falha por conta desconhecida. */
-async function resolveAccount(supabase: Admin, workspaceId: string, name: string | null): Promise<string | null> {
+async function resolveAccount(
+  supabase: Admin,
+  workspaceId: string,
+  // campo opcional do schema: vem `undefined` quando o modelo omite
+  name: string | null | undefined,
+): Promise<string | null> {
   if (!name) return null;
   const { data } = await supabase
     .from("accounts")
