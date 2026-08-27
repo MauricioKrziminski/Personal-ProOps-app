@@ -144,7 +144,7 @@ async function applyRules(
   workspaceId: string,
   action: AiAction,
 ): Promise<AiAction> {
-  const texto = [action.content, action.title, action.category].filter(Boolean).join(" ");
+  const texto = [action.content, action.category].filter(Boolean).join(" ");
   if (!texto) return action;
 
   const { data } = await supabase.rpc("_match_rule", { ws_id: workspaceId, texto });
@@ -232,7 +232,7 @@ async function resolveTransactionRef(
   let candidatos = (data ?? []) as TxRef[];
   if (!candidatos.length) return { none: true };
 
-  const termo = (action.content ?? action.title)?.toLowerCase().trim();
+  const termo = action.content?.toLowerCase().trim();
   let filtrou = false;
 
   if (action.amount_cents) {
@@ -298,9 +298,9 @@ async function executeAction(
         user_id: userId,
         workspace_id: workspaceId,
         amount_cents: action.amount_cents,
-        currency: action.currency ?? "BRL",
+        currency: "BRL",
         category: action.category?.toLowerCase() ?? null,
-        description: action.content ?? action.title,
+        description: action.content,
         account_id: accountId,
       };
       if (action.recurrence) {
@@ -346,8 +346,8 @@ async function executeAction(
         workspace_id: workspaceId,
         kind: "transfer",
         amount_cents: action.amount_cents,
-        currency: action.currency ?? "BRL",
-        description: action.content ?? action.title,
+        currency: "BRL",
+        description: action.content,
         account_id: fromId,
         counterparty_account_id: toId,
         occurred_at: action.occurred_at ?? localISODate(now, timezone),
@@ -376,7 +376,7 @@ async function executeAction(
         p_total_cents: action.amount_cents,
         p_installments: parcelas,
         p_occurred_at: action.occurred_at ?? localISODate(now, timezone),
-        p_description: action.content ?? action.title,
+        p_description: action.content,
         p_category: action.category?.toLowerCase() ?? null,
         p_merchant: null,
       });
@@ -534,7 +534,7 @@ async function executeAction(
         .eq("kind", "expense")
         .order("due_at", { ascending: true })
         .limit(5);
-      const alvo = action.content ?? action.title;
+      const alvo = action.content;
       if (alvo) query = query.or(`description.ilike.%${alvo}%,category.ilike.%${alvo}%`);
       if (action.amount_cents) query = query.eq("amount_cents", action.amount_cents);
 
@@ -561,7 +561,7 @@ async function executeAction(
     }
 
     case "set_rule": {
-      const padrao = (action.content ?? action.title)?.trim();
+      const padrao = action.content?.trim();
       const categoria = action.category?.toLowerCase().trim();
       if (!padrao || !categoria) {
         return "❌ Não entendi a regra. Tenta \"sempre que eu falar ifood, põe em restaurante\".";
@@ -588,7 +588,8 @@ async function executeAction(
         patch.amount_cents = action.new_amount_cents;
       }
       if (action.new_category) patch.category = action.new_category.toLowerCase();
-      if (action.new_occurred_at) patch.occurred_at = action.new_occurred_at;
+      // occurred_at aqui é a data NOVA (o schema não cabe um campo só para isso)
+      if (action.occurred_at) patch.occurred_at = action.occurred_at;
       if (!Object.keys(patch).length) {
         return "❌ Não entendi o que mudar. Tenta \"muda o último pra 54\" ou \"o mercado de ontem era transporte\".";
       }
@@ -614,8 +615,12 @@ async function executeAction(
     }
 
     case "delete_item": {
-      const tipo = action.target_type ?? "transaction";
-      const termo = (action.content ?? action.title)?.trim();
+      // target_type nao e mais enum no schema (o modelo so aceita um enum):
+      // validar aqui e o que impede um valor inventado virar tabela inexistente
+      const TIPOS = ["transaction", "note", "reminder", "goal", "recurring"] as const;
+      const bruto = action.target_type ?? "transaction";
+      const tipo = (TIPOS as readonly string[]).includes(bruto) ? bruto as typeof TIPOS[number] : "transaction";
+      const termo = action.content?.trim();
 
       if (tipo === "transaction") {
         const ref = await resolveTransactionRef(supabase, workspaceId, action);
@@ -679,7 +684,7 @@ async function executeAction(
     }
 
     case "update_asset_value": {
-      const nome = (action.content ?? action.title)?.trim();
+      const nome = action.content?.trim();
       if (!nome || !action.amount_cents || action.amount_cents < 0) {
         return "❌ Não entendi. Tenta \"meu tesouro direto tá em 27 mil\".";
       }
@@ -708,12 +713,12 @@ async function executeAction(
       const { error } = await supabase.from("notes").insert({
         user_id: userId,
         workspace_id: workspaceId,
-        content: action.content ?? action.title ?? "",
+        content: action.content ?? "",
         category: action.category?.toLowerCase() ?? null,
         source: "whatsapp",
       });
       if (error) throw error;
-      return `📝 Nota salva: ${action.content ?? action.title ?? ""}`;
+      return `📝 Nota salva: ${action.content ?? ""}`;
     }
 
     case "create_reminder": {
@@ -723,7 +728,7 @@ async function executeAction(
       const { error } = await supabase.from("reminders").insert({
         user_id: userId,
         workspace_id: workspaceId,
-        title: action.title ?? action.content ?? "Lembrete",
+        title: action.content ?? "Lembrete",
         recurrence: action.recurrence,
         next_run_at: action.remind_at
           ? toInstantISO(action.remind_at, timezone, now)
@@ -733,29 +738,29 @@ async function executeAction(
         source: "whatsapp",
       });
       if (error) throw error;
-      return `⏰ Lembrete criado: *${action.title ?? "sem título"}*` +
+      return `⏰ Lembrete criado: *${action.content ?? "sem título"}*` +
         (action.recurrence ? " (recorrente)" : "") + ".";
     }
 
     case "create_goal": {
-      if (!action.goal_name || !action.target_cents || action.target_cents <= 0) {
+      if (!action.content || !action.amount_cents || action.amount_cents <= 0) {
         return "❌ Para criar meta preciso do nome e do valor (ex.: \"quero juntar 3000 pra viagem\").";
       }
       const { error } = await supabase.from("goals").insert({
         user_id: userId,
         workspace_id: workspaceId,
-        name: action.goal_name,
-        target_cents: action.target_cents,
-        deadline: action.deadline,
+        name: action.content,
+        target_cents: action.amount_cents,
+        deadline: action.occurred_at,
       });
-      if (error?.code === "23505") return `❌ Você já tem uma meta chamada *${action.goal_name}*.`;
+      if (error?.code === "23505") return `❌ Você já tem uma meta chamada *${action.content}*.`;
       if (error) throw error;
-      return `🎯 Meta criada: *${action.goal_name}* — ${centsToBRL(action.target_cents)}` +
-        (action.deadline ? ` até ${formatDateBR(action.deadline)}` : "") + ".";
+      return `🎯 Meta criada: *${action.content}* — ${centsToBRL(action.amount_cents)}` +
+        (action.occurred_at ? ` até ${formatDateBR(action.occurred_at)}` : "") + ".";
     }
 
     case "goal_deposit": {
-      if (!action.goal_name || !action.amount_cents || action.amount_cents <= 0) {
+      if (!action.content || !action.amount_cents || action.amount_cents <= 0) {
         return "❌ Não entendi o aporte. Tenta \"coloca 200 na meta da viagem\".";
       }
       const { data: goals } = await supabase
@@ -763,10 +768,10 @@ async function executeAction(
         .select("id, name, target_cents, saved_cents")
         .eq("workspace_id", workspaceId)
         .eq("archived", false)
-        .ilike("name", `%${action.goal_name}%`)
+        .ilike("name", `%${action.content}%`)
         .limit(1);
       const goal = goals?.[0];
-      if (!goal) return `❌ Não achei a meta *${action.goal_name}*.`;
+      if (!goal) return `❌ Não achei a meta *${action.content}*.`;
       const saved = goal.saved_cents + action.amount_cents;
       const { error } = await supabase.from("goals").update({ saved_cents: saved }).eq("id", goal.id);
       if (error) throw error;
@@ -796,8 +801,7 @@ async function executeAction(
       });
       if (error) throw error;
       let rows = (data ?? []) as { kind: string; category: string; total_cents: number; tx_count: number }[];
-      if (action.query_kind) rows = rows.filter((r) => r.kind === action.query_kind);
-      const cat = action.query_category?.toLowerCase();
+      const cat = action.category?.toLowerCase();
       if (cat) rows = rows.filter((r) => r.category === cat);
       if (!rows.length) return `📊 Nada registrado entre ${formatDateBR(from)} e ${formatDateBR(to)}.`;
       const spent = rows.filter((r) => r.kind === "expense").reduce((s, r) => s + Number(r.total_cents), 0);
@@ -955,7 +959,14 @@ Deno.serve(async (_req) => {
       // 4. Gemini Flash; escala p/ Pro se a confiança for baixa
       let { parsed, usage } = await parseMessage(text, profile.timezone, GEMINI_FLASH, media);
       if (parsed.confidence < CONFIDENCE_ESCALATE) {
-        ({ parsed, usage } = await parseMessage(text, profile.timezone, GEMINI_PRO, media));
+        // best-effort: se o Pro falhar (cota, indisponibilidade), seguimos com o
+        // resultado do Flash. Jogar fora um parse que deu certo por causa do
+        // refinamento seria trocar uma resposta mediana por nenhuma.
+        try {
+          ({ parsed, usage } = await parseMessage(text, profile.timezone, GEMINI_PRO, media));
+        } catch (err) {
+          console.error("escalonamento para o Pro falhou; seguindo com o Flash:", err);
+        }
       }
 
       const { data: aiEvent } = await supabase.from("ai_events").insert({

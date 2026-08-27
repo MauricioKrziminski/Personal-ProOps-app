@@ -14,9 +14,26 @@
 import { localDateTimeISO } from "./datetime.ts";
 
 const GEMINI_BASE = "https://generativelanguage.googleapis.com/v1beta/models";
-// Aliases "-latest" apontam sempre para o modelo atual — evitam quebra por
-// depreciação (ex.: gemini-2.5-flash ficou indisponível para chaves novas).
-export const GEMINI_FLASH = "gemini-flash-latest";
+/**
+ * Modelos FIXADOS, não alias.
+ *
+ * `gemini-flash-latest` já nos custou uma quebra em produção: o alias migrou
+ * sozinho para o Gemini 3.7 Flash, que (a) recusa o nosso responseSchema e
+ * (b) tem cota grátis de 20 requisições POR DIA. O parse parou sem ninguém
+ * mexer em nada.
+ *
+ * O preço de fixar é ter que revisar quando o modelo for descontinuado — mas
+ * isso avisa com 404 explícito, e não silenciosamente com o comportamento
+ * mudando debaixo do produto.
+ *
+ * 3.6 Flash em vez de um Flash-Lite porque os Lite erram o VALOR em mensagens
+ * compostas ("quero juntar 5000 e me lembra do aluguel" devolve meta sem valor).
+ * Errar dinheiro não é economia.
+ */
+export const GEMINI_FLASH = "gemini-3.6-flash";
+/** Tarefa simples e de volume (categorizar linhas de extrato): Lite dá conta. */
+export const GEMINI_FLASH_LITE = "gemini-3.5-flash-lite";
+/** Escalonamento por baixa confiança. Raro — e o chamador segue com o Flash se falhar. */
 export const GEMINI_PRO = "gemini-pro-latest";
 
 export const SUGGESTED_CATEGORIES = [
@@ -50,36 +67,44 @@ export type AiActionType =
   | "undo_last"
   | "unknown";
 
+/**
+ * ⚠️ DOIS LIMITES DO SCHEMA — medidos, não estimados.
+ *
+ * A geração nova de modelos (3.1/3.5-flash-lite, 3.6-flash, 3.7-flash) responde
+ * 400 INVALID_ARGUMENT, sem nenhum detalhe, se o `responseSchema` passar de:
+ *   1. **15 propriedades** por ação (16 já falha, com busca binária confirmada);
+ *   2. **UM único `enum`** no schema inteiro (o segundo derruba, mesmo com 15
+ *      campos e mesmo que o enum tenha só 5 valores).
+ * Não tem a ver com o tamanho do prompt: prompt de 200 chars falha igual.
+ *
+ * Por isso os campos são multiuso: o mesmo `content` é descrição, título do
+ * lembrete, nome da meta e gatilho da regra, conforme o `type`. Antes de somar
+ * um campo aqui, tire outro — ou o parse inteiro para de funcionar.
+ *
+ * Só `type` é obrigatório; o modelo omite o que não se aplica (nada de
+ * `nullable`, que também engorda o schema).
+ */
 export interface AiAction {
-  // Só `type` é obrigatório no schema. Os demais o modelo OMITE quando não se
-  // aplicam (por isso opcionais, não `| null`): tirar `nullable` do schema foi o
-  // que resolveu o 400 do Gemini 3.7 — ver a nota em fetchWithRetry.
   type: AiActionType;
-  // criação
-  title?: string | null;
+  /** Texto principal: descrição, título do lembrete, conteúdo da nota, nome da meta/bem, gatilho da regra. */
   content?: string | null;
+  /** Categoria do lançamento — e também a categoria filtrada nas consultas. */
   category?: string | null;
-  amount_cents?: number | null; // inteiro em centavos
-  currency?: string | null;
+  /** Valor em centavos — e também o alvo da meta, o valor da simulação e o valor novo do bem. */
+  amount_cents?: number | null;
+  /** Data do lançamento — e também o prazo da meta e a data NOVA em update_transaction. */
   occurred_at?: string | null; // YYYY-MM-DD
   remind_at?: string | null; // ISO datetime local do usuário
   recurrence?: string | null; // RRULE (ex.: FREQ=MONTHLY;BYMONTHDAY=5)
-  account?: string | null; // nome livre da conta citada
-  counterparty_account?: string | null; // conta destino (transfer)
-  installments?: number | null; // nº de parcelas (compra parcelada)
-  // correção: os campos acima descrevem QUAL item; estes, o que passa a valer
+  account?: string | null; // nome livre da conta ou cartão citado
+  counterparty_account?: string | null; // conta destino (transfer, pagamento de fatura)
+  installments?: number | null; // nº de parcelas
+  // correção: os campos acima dizem QUAL item; estes, o que passa a valer
   new_amount_cents?: number | null;
   new_category?: string | null;
-  new_occurred_at?: string | null; // YYYY-MM-DD
   target_type?: "transaction" | "note" | "reminder" | "goal" | "recurring" | null;
-  goal_name?: string | null;
-  target_cents?: number | null;
-  deadline?: string | null; // YYYY-MM-DD
-  // consulta
   query_from?: string | null; // YYYY-MM-DD
   query_to?: string | null; // YYYY-MM-DD
-  query_kind?: "expense" | "income" | null;
-  query_category?: string | null;
 }
 
 export interface AiResult {
@@ -102,11 +127,10 @@ const ACTION_SCHEMA = {
         "undo_last", "unknown",
       ],
     },
-    title: { type: "STRING" },
+    // ⚠️ 14 campos + `type` = 15, o teto do modelo. Não adicione sem remover.
     content: { type: "STRING" },
     category: { type: "STRING" },
     amount_cents: { type: "INTEGER" },
-    currency: { type: "STRING" },
     occurred_at: { type: "STRING" },
     remind_at: { type: "STRING" },
     recurrence: { type: "STRING" },
@@ -115,18 +139,11 @@ const ACTION_SCHEMA = {
     installments: { type: "INTEGER" },
     new_amount_cents: { type: "INTEGER" },
     new_category: { type: "STRING" },
-    new_occurred_at: { type: "STRING" },
-    target_type: {
-      type: "STRING",
-      enum: ["transaction", "note", "reminder", "goal", "recurring"],
-    },
-    goal_name: { type: "STRING" },
-    target_cents: { type: "INTEGER" },
-    deadline: { type: "STRING" },
+    // STRING livre de propósito: o schema aceita UM enum só (o de `type`).
+    // Os valores válidos vão no prompt e são validados no executor.
+    target_type: { type: "STRING" },
     query_from: { type: "STRING" },
     query_to: { type: "STRING" },
-    query_kind: { type: "STRING", enum: ["expense", "income"] },
-    query_category: { type: "STRING" },
   },
   required: ["type"],
 } as const;
@@ -146,7 +163,7 @@ A mensagem pode conter VÁRIOS itens — emita UMA ação por item, na ordem em 
 Ex.: "mercado 200, uber 30 e recebi 500 de freela" -> 3 ações (2 create_expense + 1 create_income).
 
 Tipos de ação:
-- "create_expense": gasto/compra/pagamento com valor. amount_cents (inteiro em centavos: "45 reais" -> 4500), currency (padrão BRL), category (curta, minúscula, preferindo: ${SUGGESTED_CATEGORIES.join(", ")}), occurred_at (YYYY-MM-DD; resolva "ontem"/"hoje" pela data atual), description em content. Se citar a conta/cartão ("no nubank"), preencha account. Se for recorrente ("todo mês"), preencha recurrence como RRULE.
+- "create_expense": gasto/compra/pagamento com valor. amount_cents (inteiro em centavos: "45 reais" -> 4500), category (curta, minúscula, preferindo: ${SUGGESTED_CATEGORIES.join(", ")}), occurred_at (YYYY-MM-DD; resolva "ontem"/"hoje" pela data atual), description em content. Se citar a conta/cartão ("no nubank"), preencha account. Se for recorrente ("todo mês"), preencha recurrence como RRULE.
 - "create_income": dinheiro recebido ("recebi", "caiu o salário", "me pagaram"). Mesmos campos do expense (category ex.: salário, freela).
 - "create_transfer": mover dinheiro entre contas próprias ("passei 200 da corrente pra poupança"). account = origem, counterparty_account = destino.
 - "create_installment_purchase": compra PARCELADA ("parcelei a geladeira em 12x", "3x de 90 no cartão", "comprei um celular de 3000 em 10 vezes"). amount_cents = valor TOTAL da compra (se o usuário falar o valor DA PARCELA, multiplique pelo número de parcelas), installments = nº de parcelas, account = cartão citado, category, occurred_at = data da compra, description em content. Uma parcela só ("1x") não é parcelamento: use create_expense.
@@ -154,18 +171,18 @@ Tipos de ação:
 - "query_invoice": pergunta sobre fatura/limite do cartão ("quanto tá a fatura?", "quanto sobrou de limite no nubank", "quando vence o cartão"). account = cartão citado, ou null para todos.
 - "query_forecast": pergunta sobre o FUTURO do saldo ("quanto vai sobrar no fim do mês?", "vou ficar no vermelho?", "o que tenho pra pagar essa semana?"). query_to = até quando (YYYY-MM-DD), se citado.
 - "simulate_purchase": pergunta se PODE comprar algo ("posso comprar um celular de 3000 em 10x?", "dá pra gastar 800 esse mês?", "consigo pagar uma viagem de 5 mil?"). amount_cents = valor total, installments = parcelas (1 se à vista). NÃO registra nada — é só simulação.
-- "mark_paid": confirmar que uma conta prevista foi paga ("paguei a luz", "quitei o aluguel"). content/title = do que se trata, amount_cents se citado. Diferente de create_expense: aqui o lançamento JÁ EXISTE como previsto.
+- "mark_paid": confirmar que uma conta prevista foi paga ("paguei a luz", "quitei o aluguel"). content = do que se trata, amount_cents se citado. Diferente de create_expense: aqui o lançamento JÁ EXISTE como previsto.
 - "set_rule": o usuário quer que algo SEMPRE caia numa categoria ("sempre que eu falar ifood põe em restaurante", "posto é transporte", "toda vez que aparecer uber, categoria transporte"). content = o texto que dispara a regra (ex.: "ifood"), category = a categoria de destino.
-- "update_transaction": corrigir um lançamento JÁ registrado ("na verdade foi 54, não 45", "muda o último pra transporte", "o mercado de ontem foi 120"). Campos de BUSCA: amount_cents (valor atual), category, content (parte da descrição) — preencha só o que o usuário citou; nada citado = o último lançamento. Campos de CORREÇÃO: new_amount_cents, new_category, new_occurred_at.
-- "delete_item": apagar um item específico ("apaga a nota do mercado", "cancela o lembrete do aluguel", "tira aquele gasto de 45"). target_type diz o tipo (transaction, note, reminder, goal, recurring) e content/amount_cents/category identificam qual. Para "apaga o último lançamento" use undo_last.
+- "update_transaction": corrigir um lançamento JÁ registrado ("na verdade foi 54, não 45", "muda o último pra transporte", "o mercado de ontem foi 120"). Campos de BUSCA: amount_cents (valor atual), category, content (parte da descrição) — preencha só o que o usuário citou; nada citado = o último lançamento. Campos de CORREÇÃO: new_amount_cents, new_category e occurred_at (que aqui significa a data NOVA, não filtro de busca).
+- "delete_item": apagar um item específico ("apaga a nota do mercado", "cancela o lembrete do aluguel", "tira aquele gasto de 45"). target_type tem que ser EXATAMENTE um destes: transaction, note, reminder, goal, recurring. content/amount_cents/category identificam qual. Para "apaga o último lançamento" use undo_last.
 - "query_net_worth": pergunta sobre patrimônio ("quanto eu tenho no total?", "qual meu patrimônio?", "quanto vale tudo que eu tenho?", "como tá minha saúde financeira?"). Diferente de query_balance, que é só o saldo em conta.
-- "update_asset_value": atualizar o valor de um bem/investimento ("meu tesouro direto tá em 27 mil", "o carro agora vale 38 mil"). content/title = nome do bem, amount_cents = valor novo.
+- "update_asset_value": atualizar o valor de um bem/investimento ("meu tesouro direto tá em 27 mil", "o carro agora vale 38 mil"). content = nome do bem, amount_cents = valor novo.
 - "create_note": anotação livre. content (texto limpo) e category curta se óbvia.
-- "create_reminder": pedido para ser lembrado. title, remind_at (próxima ocorrência, ISO, no fuso do usuário) e recurrence como RRULE quando recorrente ("todo dia 5" -> FREQ=MONTHLY;BYMONTHDAY=5; "todo dia às 8h" -> FREQ=DAILY). Sem recorrência -> null.
-- "create_goal": meta de poupança ("quero juntar 5000 até dezembro pra viagem"). goal_name, target_cents, deadline (YYYY-MM-DD ou null).
-- "goal_deposit": aporte em meta existente ("coloca 200 na meta da viagem"). goal_name, amount_cents.
+- "create_reminder": pedido para ser lembrado. content = o que lembrar, remind_at (próxima ocorrência, ISO, no fuso do usuário) e recurrence como RRULE quando recorrente ("todo dia 5" -> FREQ=MONTHLY;BYMONTHDAY=5; "todo dia às 8h" -> FREQ=DAILY). Sem recorrência -> null.
+- "create_goal": meta de poupança ("quero juntar 5000 até dezembro pra viagem"). content = nome da meta, amount_cents = valor alvo, occurred_at = prazo (YYYY-MM-DD) se houver.
+- "goal_deposit": aporte em meta existente ("coloca 200 na meta da viagem"). content = nome da meta, amount_cents = valor do aporte.
 - "query_balance": pergunta sobre saldo/quanto tem ("quanto tenho?", "saldo das contas").
-- "query_transactions": pergunta sobre gastos/receitas ("quanto gastei esse mês?", "gastos com mercado em junho"). query_from/query_to (YYYY-MM-DD, resolva "esse mês"/"semana passada" pela data atual), query_kind (expense/income/null p/ ambos), query_category se citada.
+- "query_transactions": pergunta sobre gastos/receitas ("quanto gastei esse mês?", "gastos com mercado em junho"). query_from/query_to (YYYY-MM-DD, resolva "esse mês"/"semana passada" pela data atual) e category se o usuário citar uma.
 - "query_budgets": pergunta sobre orçamento/limite ("como tá meu orçamento?").
 - "query_goals": pergunta sobre metas ("como tão minhas metas?").
 - "undo_last": desfazer o último lançamento ("apaga o último", "foi engano").
@@ -174,7 +191,8 @@ Tipos de ação:
 Regras:
 - Dinheiro SEMPRE em centavos inteiros. "1.234,56" -> 123456.
 - Datas relativas resolvidas com a data/hora atual DO USUÁRIO (já convertida para o fuso dele, com offset): ${nowLocal} (fuso ${timezone}). Use exatamente essa data como "hoje" — não recalcule fuso.
-- Campos que não se aplicam à ação: null.
+- Campos que não se aplicam à ação: OMITA (não mande null).
+- Os campos são MULTIUSO: o significado depende do "type". content = descrição, título do lembrete, nome da meta/bem ou gatilho da regra. amount_cents = valor, alvo da meta ou valor do bem. occurred_at = data do lançamento, prazo da meta ou data corrigida.
 - Corrigir algo que já existe é update_transaction ou delete_item — NUNCA crie um lançamento novo para "consertar" outro.
 - Compra no cartão à vista é create_expense com account = nome do cartão. Só use create_installment_purchase quando houver 2 ou mais parcelas.
 - confidence (0..1) é da interpretação da mensagem INTEIRA.
@@ -203,19 +221,18 @@ async function fetchWithRetry(
     const transient = res.status === 429 || res.status >= 500;
     if (!transient || attempt >= retries) return res;
 
-    let espera = 500 * Math.pow(2, attempt); // 0.5s, 1s, 2s para 5xx
-
-    // 429 é cota, não congestionamento: o backoff curto nunca alcança a janela.
-    // O corpo traz "Please retry in 13.07s" — obedecer isso é o que faz o retry
-    // servir para alguma coisa em vez de queimar as 3 tentativas em 3 segundos.
+    // 429 é cota: a janela costuma ser de 13s+, e dormir isso DENTRO da função
+    // estoura o tempo dela — o job fica preso em `processing` e some do radar.
+    // Numa fila com cron de 1 minuto, o próximo tick JÁ é o backoff: desistir
+    // rápido devolve o job para a fila e custa 1 minuto, não a execução inteira.
+    // (Aprendido na marra: com espera de 30s, dois jobs no lote mataram a função.)
     if (res.status === 429) {
-      const corpo = await res.clone().text().catch(() => "");
-      const sugerido = corpo.match(/retry in ([\d.]+)s/i);
-      espera = sugerido ? Math.ceil(parseFloat(sugerido[1]) * 1000) + 500 : 15_000;
-      espera = Math.min(espera, 30_000);
+      if (attempt >= 1) return res;
+      await new Promise((r) => setTimeout(r, 3_000));
+      continue;
     }
 
-    await new Promise((r) => setTimeout(r, espera));
+    await new Promise((r) => setTimeout(r, 500 * Math.pow(2, attempt))); // 0.5s, 1s, 2s
   }
 }
 
@@ -288,7 +305,7 @@ export async function parseMessage(
  */
 export async function categorizeBatch(
   descriptions: string[],
-  model: string = GEMINI_FLASH,
+  model: string = GEMINI_FLASH_LITE,
 ): Promise<(string | null)[]> {
   const apiKey = Deno.env.get("GEMINI_API_KEY");
   if (!apiKey) throw new Error("GEMINI_API_KEY ausente");
