@@ -22,6 +22,53 @@
 - Prompt do Gemini passou a receber a hora local do usuário com offset, em vez de UTC.
 - Migration `0008` aplicada: os dois `cron.schedule` leem URL e anon key do Vault (segredos `project_url`/`anon_key`, criados extraindo os valores do próprio cron antigo). Zero token literal em `cron.job`; ticks 200 confirmados depois da troca.
 
+## 🔴 Mudança de preço do WhatsApp em 01/10/2026 — quebra a premissa de custo
+
+Descoberto em 27/08/2026 enquanto se pesquisava custo de criar WABA. **Não é
+especulação**: anunciado pela Meta em 01/07/2026, corroborado por várias fontes
+independentes. As tarifas exatas a Meta publica até 01/09/2026.
+
+**O que muda:** a partir de **1º de outubro de 2026**, mensagem de serviço
+(resposta em texto livre dentro da janela de 24h) passa a ser **cobrada**, e
+template Utility perde a gratuidade dentro da janela. Preço igual ao de Utility —
+no Brasil, **~R$ 0,034 por mensagem** — e **sem desconto por volume**: 100 ou
+100.000, o preço unitário é o mesmo.
+
+**Por que isso importa tanto aqui:** o `CLAUDE.md` diz *"custo ~zero no início:
+respostas na janela 24h do WhatsApp são grátis"*. Essa frase deixa de ser verdade
+em ~5 semanas. E o produto INTEIRO é conversa — toda confirmação de lançamento,
+toda resposta de consulta, é uma mensagem de serviço.
+
+Conta com os limites de plano de hoje:
+
+| Plano | Msgs/mês | Custo WhatsApp | Receita líquida (após 15% da loja) | Margem |
+|---|---|---|---|---|
+| Free | 100 | R$ 3,40 | R$ 0 | **−R$ 3,40** |
+| Pro | 1.000 | R$ 34,00 | R$ 21,17 | **−R$ 12,83** |
+| Família | 2.000 | R$ 68,00 | R$ 33,92 | **−R$ 34,08** |
+
+Ou seja: **um usuário que use a cota inteira dá prejuízo em todos os planos.** Na
+prática quase ninguém usa a cota toda, então o número real depende da distribuição
+de uso — mas os limites foram desenhados quando resposta era grátis, e agora eles
+são um teto de PREJUÍZO, não de custo.
+
+**Não decidir agora**, mas as saídas na mesa:
+
+1. **Recalibrar as cotas** pelo uso real (medir em `ai_events` antes de chutar).
+   Cota de 1.000 provavelmente é generosa demais para um produto conversacional.
+2. **Push como canal principal de saída**, WhatsApp só para o que o usuário
+   iniciou. Já é a regra do produto para proativo; passaria a valer para mais coisa.
+   Reforça a prioridade de `docs/PUSH-NOTIFICATIONS.md`, hoje adiado.
+3. **Agrupar respostas.** Multi-intent já responde várias ações numa mensagem só —
+   isso vira otimização de custo, não só de UX.
+4. **Repensar o preço.** R$ 24,90 foi definido contra concorrentes, sem esse custo
+   variável na conta.
+
+⏰ Duas datas: **01/09/2026** (Meta publica as tarifas finais) e **01/10/2026** (entra
+em vigor). Vale reavaliar com o número oficial em setembro.
+
+---
+
 ## 📡 Meta / WhatsApp — o que foi verificado na conta (26/08)
 
 Via Graph API v21.0 com o token de System User do app:
