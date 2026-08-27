@@ -189,7 +189,7 @@ Data;Descricao;Valor
 ```
 
 ⚠️ Se o plano estiver **Free**, 6.5 vai retornar erro dizendo que importação é do Pro. Isso é o
-comportamento certo — troque o plano no Bloco 9 e volte aqui.
+comportamento certo — suba para Pro pelo SQL do Bloco 9 e volte aqui.
 
 ---
 
@@ -237,17 +237,29 @@ comportamento certo — troque o plano no Bloco 9 e volte aqui.
 
 ## Bloco 9 — Plano, família e limites
 
+> A tela **não troca mais de plano**: plano é escrito só pela cobrança (migration `0033`). Para
+> testar os limites, rode o SQL abaixo no **SQL Editor** do Supabase entre os passos.
+>
+> ```sql
+> -- vira Pro
+> update public.subscriptions set plan = 'pro', status = 'active', canceled_at = null
+> where workspace_id = (select id from public.workspaces limit 1);
+>
+> -- volta pra Free
+> update public.subscriptions set plan = 'free' where workspace_id = (select id from public.workspaces limit 1);
+> ```
+
 | # | Ação | Esperado |
 |---|---|---|
 | 9.1 | Perfil › **Plano e família** | Plano **Free**, consumo do mês, "sem importação de extrato" |
 | 9.2 | Tentar importar extrato | Bloqueia dizendo que é do Pro |
-| 9.3 | Tocar em **Pro** | Vira Pro; limites sobem |
+| 9.3 | SQL "vira Pro" e puxar a tela | Card de cima mostra **Pro**; na lista, "Pro · seu plano"; limites sobem |
 | 9.4 | Importar de novo | Funciona |
 | 9.5 | Convidar um telefone qualquer | Aparece em "Convites pendentes" |
 | 9.6 | **revogar** | Some |
-| 9.7 | No **Free**, tentar convidar | Botão bloqueado, com o motivo escrito |
-| 9.8 | **Cancelar assinatura** | Alerta explicando que nada é apagado; confirma e marca "cancelado" |
-| 9.9 | Tocar num plano de novo | Reativa |
+| 9.7 | SQL "volta pra Free" e tentar convidar | Botão bloqueado, com o motivo escrito |
+| 9.8 | SQL "vira Pro" › **Cancelar assinatura** | Alerta explicando que nada é apagado; confirma e marca "cancelado" |
+| 9.9 | Tentar tocar num plano da lista | **Nada acontece** — a lista é só comparativo, sem botão de compra |
 
 ---
 

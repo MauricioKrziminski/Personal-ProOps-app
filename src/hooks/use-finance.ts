@@ -1074,20 +1074,6 @@ export function useRevokeInvite() {
   });
 }
 
-export function useChangePlan() {
-  const queryClient = useQueryClient();
-  return useMutation({
-    mutationFn: async (plan: (typeof PLANS)[number]['value']) => {
-      const { error } = await supabase
-        .from('subscriptions')
-        .update({ plan, status: 'active', canceled_at: null })
-        .eq('workspace_id', await workspaceId());
-      if (error) throw error;
-    },
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['plan-status'] }),
-  });
-}
-
 /** Cancelar é uma chamada, sem formulário — de propósito. */
 export function useCancelSubscription() {
   const queryClient = useQueryClient();

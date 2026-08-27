@@ -13,7 +13,6 @@ import { MaxContentWidth, Spacing } from '@/constants/theme';
 import {
   PLANS,
   useCancelSubscription,
-  useChangePlan,
   useInviteMember,
   useInvites,
   usePlanStatus,
@@ -37,7 +36,6 @@ export default function PlanScreen() {
   const { data: convites } = useInvites();
   const convidar = useInviteMember();
   const revogar = useRevokeInvite();
-  const trocarPlano = useChangePlan();
   const cancelar = useCancelSubscription();
 
   const [telefone, setTelefone] = useState('');
@@ -120,33 +118,34 @@ export default function PlanScreen() {
 
           <GlassCard style={styles.resumo}>
             <ThemedText type="smallBold">Planos</ThemedText>
-            {PLANS.map((p) => (
-              <Pressable
-                key={p.value}
-                onPress={() => {
-                  if (plano?.plan === p.value && plano.status === 'active') return;
-                  Haptics.selectionAsync();
-                  trocarPlano.mutate(p.value);
-                }}
-                style={({ pressed }) => [
-                  styles.planoRow,
-                  {
-                    backgroundColor:
-                      plano?.plan === p.value ? theme.backgroundSelected : theme.backgroundElement,
-                    opacity: pressed ? 0.7 : 1,
-                  },
-                ]}>
-                <View style={styles.itemTexto}>
-                  <ThemedText type="smallBold">{p.label}</ThemedText>
-                  <ThemedText type="small" themeColor="textSecondary">
-                    {p.pitch}
-                  </ThemedText>
+            {PLANS.map((p) => {
+              const atual = plano?.plan === p.value;
+              return (
+                <View
+                  key={p.value}
+                  style={[
+                    styles.planoRow,
+                    {
+                      backgroundColor: atual
+                        ? theme.backgroundSelected
+                        : theme.backgroundElement,
+                    },
+                  ]}>
+                  <View style={styles.itemTexto}>
+                    <ThemedText type="smallBold">
+                      {p.label}
+                      {atual ? ' · seu plano' : ''}
+                    </ThemedText>
+                    <ThemedText type="small" themeColor="textSecondary">
+                      {p.pitch}
+                    </ThemedText>
+                  </View>
+                  <ThemedText type="smallBold">{p.price}</ThemedText>
                 </View>
-                <ThemedText type="smallBold">{p.price}</ThemedText>
-              </Pressable>
-            ))}
+              );
+            })}
             <ThemedText type="small" themeColor="textSecondary">
-              A cobrança ainda não está ligada — a troca aqui já libera os limites para testar.
+              Ainda não dá para assinar por aqui — a cobrança está sendo ligada.
             </ThemedText>
           </GlassCard>
 

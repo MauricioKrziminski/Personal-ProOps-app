@@ -285,7 +285,7 @@ WhatsApp. A function já prefere push quando existe token — falta só a creden
 - `0030_tighten_accept_invites.sql` — fecha o WARN do advisor: a função sai do alcance do `anon`.
 - Limites aplicados de verdade: `process-jobs` corta na cota mensal do plano (mantendo o
   anti-flood por hora) e `import-statement` devolve 402 quando o plano não tem importação.
-- App: `finance/plan.tsx` (plano, consumo, troca, convite por telefone, convites pendentes e
+- App: `finance/plan.tsx` (plano, consumo, comparativo de planos, convite por telefone, pendentes e
   **cancelamento em um toque**), link no Perfil, e `useSession` aceitando convites no login.
 - Preços definidos: Free (1 pessoa, 100 msgs) · Pro R$ 24,90 (3 pessoas, 1.000 msgs, importação)
   · Família R$ 39,90 (5 pessoas, 2.000 msgs). Abaixo de Meu Assessor e Financinha porque não
@@ -293,13 +293,79 @@ WhatsApp. A function já prefere push quando existe token — falta só a creden
 - Verificado: `plan_status` respondendo free e family com limites e consumo corretos; telefone do
   convite normalizado para o mesmo formato de `profiles.phone` (senão o aceite nunca casaria).
 
-⚠️ **Cobrança não está ligada.** `provider`/`external_id` existem, mas falta escolher o gateway
-(Stripe/Kiwify/Hotmart) e escrever o webhook que muda `plan`/`status`/`current_period_end`. Hoje o
-plano é trocado manualmente na tela — o resto do produto já respeita os limites.
+⚠️ **Plano agora é propriedade do backend** (`0033_subscription_is_backend_owned.sql`, 27/08/2026).
+A policy `subscriptions: owner writes` era `for all`, então o dono do workspace podia dar `update`
+na própria linha e se promover para `family` por REST, sem passar por cobrança nenhuma. **Não era
+efeito de ambiente de teste — valia em produção**, e tornava decorativos os limites que o
+`process-jobs` lê de `private.plan_limits`. Fechado com duas travas:
 
-⚠️ **Advisor aceito de propósito:** `accept_pending_invites` fica como `SECURITY DEFINER`
-executável por `authenticated`. Ela precisa escrever em `workspace_members` de um workspace que o
-convidado ainda não enxerga, e só age sobre o telefone do próprio `auth.uid()`.
+1. o cliente perdeu a policy de escrita (só `select` de membros continua);
+2. o trigger `guard_billing` recusa alteração de `plan`/`status`/`provider`/`external_id`/
+   `current_period_end` vinda de `authenticated`/`anon` — sobrevive a alguém recriar uma policy de
+   escrita um dia por um campo inofensivo.
+
+O discriminador do trigger é **`current_user`, não `auth.uid()`**: dentro de uma função
+`security definer` o `auth.uid()` continua sendo o do usuário (sai do JWT), então ele não distingue
+"app" de "backend". Já `current_user` vira o dono da função no definer e é `service_role` no
+webhook.
+
+`cancel_subscription` virou `security definer` para continuar funcionando sem a policy — travar
+plano não pode virar travar saída.
+
+Verificado com `set local role authenticated` + JWT do dono: update direto não move `plan`, leitura
+continua, `cancel_subscription` funciona; e `service_role` escreve plano normalmente.
+
+**Trocar de plano em teste agora é SQL** (a tela não tem mais botão de troca):
+
+```sql
+update public.subscriptions set plan = 'pro', status = 'active', canceled_at = null
+where workspace_id = (select id from public.workspaces limit 1);
+```
+
+⚠️ **Gateway em aberto** — pesquisado em 27/08/2026, decisão **adiada a pedido do usuário**, que vai
+pesquisar mais. O que já está levantado:
+
+| Concorrente | Cobrança | Como se sabe |
+|---|---|---|
+| Foccum | **Cakto** | termos de uso citam a Cakto como processadora; vendem pagamento único de 24 meses, não assinatura |
+| Meu Assessor | **Hotmart** | checkout em `pay.hotmart.com/D98698570Y` |
+| Pierre | **Apple IAP** | App Store, vendedor CloudWalk Inc., IAP de R$ 39 / R$ 399 / R$ 199 / R$ 1.999 |
+
+Custo por cobrança de **R$ 24,90** (nosso Pro) — a taxa **fixa** é o que decide nesse ticket:
+
+| Plataforma | Custo | Efetivo |
+|---|---|---|
+| Mercado Pago (crédito, 30 dias) | R$ 0,75 | 3,0% |
+| Asaas (crédito à vista) | R$ 1,23 | 4,9% |
+| Stripe (cartão + Billing 0,7%) | R$ 1,56 | 6,3% |
+| Cakto | R$ 3,46 | 13,9% |
+| Hotmart | R$ 3,47 | 13,9% |
+| Kiwify | R$ 4,73 | 19,0% |
+
+Cakto/Kiwify/Hotmart são feitas para ticket de R$ 297–1.997, onde os ~R$ 2,49 fixos somem. Numa
+assinatura de R$ 24,90 comem um sexto da receita todo mês. Copiar o Foccum aqui seria copiar a
+ferramenta ignorando o motivo.
+
+**Lojas de app (o que pesa mais que o gateway):**
+
+- Apple: IAP = 15% no Small Business (< US$ 1 mi/ano). Pelo TCC do CADE (dez/2025), link externo
+  clicável no Brasil paga 15% **somado à comissão-base** → ~27% efetivos; só menção em texto
+  estático é 0%. Adesão ao contrato novo até 06/07/2026.
+- Google Play: desde 30/06/2026, 10% no primeiro US$ 1 mi com faturamento externo (+5% se usar o
+  billing do Google).
+- **Apple Pay / Google Pay não são alternativa ao IAP** — são carteiras de cartão. A 3.1.1 proíbe
+  usá-las para conteúdo digital dentro do app; na **web** são liberadas e custam taxa normal de
+  cartão. Ou seja: checkout web dá Face ID em um toque **sem** comissão de loja.
+
+Desenho sugerido (não decidido): paywall real no WhatsApp, disparado no momento em que o limite
+estoura — que é onde o usuário está quando isso acontece. Android pode ter botão abrindo o checkout
+no navegador; iOS sem botão de compra até valer a pena integrar IAP. `subscriptions.provider`
+existe justamente para os dois conviverem.
+
+⚠️ **Advisors aceitos de propósito:** `accept_pending_invites` e `cancel_subscription` ficam como
+`SECURITY DEFINER` executáveis por `authenticated`. A primeira precisa escrever em
+`workspace_members` de um workspace que o convidado ainda não enxerga; a segunda precisa cancelar
+sem a policy de escrita. Ambas agem só sobre o `auth.uid()` do chamador.
 
 ---
 
