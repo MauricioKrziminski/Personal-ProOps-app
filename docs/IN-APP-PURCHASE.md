@@ -41,6 +41,18 @@ Holder, aceitar o Paid Apps Agreement (Schedule 2) e listar contas associadas.
 No Google não precisa se inscrever em nada: os 10% + 5% do primeiro US$ 1 mi
 valem automaticamente desde 30/06/2026.
 
+**0.6 — ⚠️ No Google, registre como ORGANIZAÇÃO (CNPJ), não como pessoal.**
+
+Conta pessoal criada depois de 13/11/2023 precisa passar por um **teste fechado com
+12 testadores por 14 dias corridos** antes de poder pedir acesso à produção.
+**Conta de organização, registrada com CNPJ, é isenta disso.** Como já vamos ter
+CNPJ para a Apple, usar o mesmo no Google economiza duas semanas e a caçada por
+12 pessoas dispostas a instalar.
+
+Isso não atrapalha teste: a faixa de **teste interno** (até 100 testadores, no ar
+em minutos) funciona desde o primeiro dia nos dois tipos de conta — ela só não
+conta para o requisito de produção.
+
 ---
 
 ## Fase 1 — criar os produtos
@@ -201,6 +213,41 @@ O que conferir em `billing_events` (`result` de cada evento):
 - [ ] Texto obrigatório na tela de assinatura: preço, periodicidade, renovação
       automática e como cancelar — a Apple reprova sem isso
 - [ ] Conta de teste para a revisão da Apple (eles precisam entrar no app)
+
+---
+
+---
+
+## O que dá para testar antes de ter as contas
+
+O bloqueio não é tudo ou nada — são três camadas independentes.
+
+| Camada | Precisa de quê | Testável hoje? |
+|---|---|---|
+| **Nossa metade** (webhook → plano liberado) | nada | **Sim** — POST no `billing-webhook` com um payload de exemplo, ou chamando `_apply_entitlement` direto no SQL |
+| **Compra real no Android** | conta Google (US$ 25) | **Quase** — sem D-U-N-S, sem espera; teste interno no ar em minutos |
+| **Compra real no iOS** | conta Apple (US$ 99 + D-U-N-S) | Não |
+
+**O Android destrava muito antes do iOS.** A conta do Google custa US$ 25, não
+exige D-U-N-S e a faixa de teste interno fica disponível em minutos. Dá para
+validar o fluxo inteiro — compra, trial, renovação, cancelamento, expiração e o
+nosso webhook — no Android, semanas antes de a Apple estar pronta.
+
+Não vale abrir conta Apple **individual** só para adiantar: virar organização
+depois não é um botão, é criar outra conta e transferir os apps.
+
+### Notificações: nada a ver com as lojas
+
+- **Alertas por WhatsApp** (orçamento, fatura, conta vencendo, fim do teste
+  grátis) **já funcionam hoje** e não dependem de loja nenhuma. Testam-se
+  disparando o `send-alerts` pelo SQL, como no roteiro de teste.
+- **Push (Expo)** exige **development build** — desde o SDK 53 o Expo Go não
+  recebe push remoto no Android. Com dev build + credenciais FCM (grátis, no
+  Firebase, sem conta de loja), o push funciona **no emulador Android** com Google
+  Play services. No iOS, push exige a conta Apple.
+
+Push segue adiado por decisão registrada em `docs/PUSH-NOTIFICATIONS.md`. Sem ele,
+os alertas caem para template do WhatsApp — que é pago, mas funciona.
 
 ---
 
