@@ -210,7 +210,8 @@ comportamento certo — troque o plano no Bloco 9 e volte aqui.
 | 7.11 | Dívidas › ＋: "Empréstimo", saldo **10.000**, juros **2**, parcelas **12**, vence **10** | Criada |
 | 7.12 | Tocar na dívida | Próxima parcela ≈ **R$ 945,60**, dizendo quanto é **juro** |
 | 7.13 | **Paguei esta parcela** | Saldo cai **menos** que a parcela (juros do mês) |
-| 7.14 | Alternar **Mais juros** / **Menor saldo** | A ordem de ataque muda |
+| 7.14 | Cadastrar uma **2ª dívida** em conflito: "Cartão", saldo **1.000**, juros **0,5**, 6 parcelas | Com uma dívida só o seletor de estratégia nem aparece — não há ordem para escolher |
+| 7.15 | Alternar **Mais juros** / **Menor saldo** | A ordem **inverte**: por juros o empréstimo (2%) vem primeiro; por saldo, o cartão (R$ 1.000) |
 
 ---
 

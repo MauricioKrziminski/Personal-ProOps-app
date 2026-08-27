@@ -167,33 +167,43 @@ export default function DebtsScreen() {
               <ThemedText type="subtitle" style={{ color: theme.danger }}>
                 {formatBRL(totalDevido)}
               </ThemedText>
-              <ThemedText type="smallBold">Por onde começar</ThemedText>
-              <View style={styles.chipRow}>
-                <Chip
-                  label="Mais juros"
-                  selected={estrategia === 'avalanche'}
-                  onPress={() => setEstrategia('avalanche')}
-                />
-                <Chip
-                  label="Menor saldo"
-                  selected={estrategia === 'snowball'}
-                  onPress={() => setEstrategia('snowball')}
-                />
-              </View>
-              {(ordem ?? []).map((linha) => (
-                <ThemedText key={linha.debt_id} type="small" themeColor="textSecondary">
-                  {linha.priority}. {linha.name} — {formatBRL(Number(linha.remaining_cents))} a{' '}
-                  {taxaLabel(Number(linha.interest_rate_monthly))}
-                  {linha.total_interest_cents > 0
-                    ? ` (${formatBRL(Number(linha.total_interest_cents))} de juros)`
-                    : ''}
+              {/* Com uma dívida só não existe ordem para escolher: o seletor
+                  seria um controle que não muda nada na tela. */}
+              {(debts ?? []).length > 1 ? (
+                <>
+                  <ThemedText type="smallBold">Por onde começar</ThemedText>
+                  <View style={styles.chipRow}>
+                    <Chip
+                      label="Mais juros"
+                      selected={estrategia === 'avalanche'}
+                      onPress={() => setEstrategia('avalanche')}
+                    />
+                    <Chip
+                      label="Menor saldo"
+                      selected={estrategia === 'snowball'}
+                      onPress={() => setEstrategia('snowball')}
+                    />
+                  </View>
+                  {(ordem ?? []).map((linha) => (
+                    <ThemedText key={linha.debt_id} type="small" themeColor="textSecondary">
+                      {linha.priority}. {linha.name} — {formatBRL(Number(linha.remaining_cents))} a{' '}
+                      {taxaLabel(Number(linha.interest_rate_monthly))}
+                      {linha.total_interest_cents > 0
+                        ? ` (${formatBRL(Number(linha.total_interest_cents))} de juros)`
+                        : ''}
+                    </ThemedText>
+                  ))}
+                  <ThemedText type="small" themeColor="textSecondary">
+                    {estrategia === 'avalanche'
+                      ? 'Atacar a de maior juros paga menos no total.'
+                      : 'Quitar a menor primeiro dá impulso — você vê dívida sumindo antes.'}
+                  </ThemedText>
+                </>
+              ) : (
+                <ThemedText type="small" themeColor="textSecondary">
+                  Com uma dívida só, é ela mesma. Cadastre outra para eu sugerir por onde começar.
                 </ThemedText>
-              ))}
-              <ThemedText type="small" themeColor="textSecondary">
-                {estrategia === 'avalanche'
-                  ? 'Atacar a de maior juros paga menos no total.'
-                  : 'Quitar a menor primeiro dá impulso — você vê dívida sumindo antes.'}
-              </ThemedText>
+              )}
             </GlassCard>
           )}
 
