@@ -1908,6 +1908,15 @@ export type Database = {
           status: string
         }[]
       }
+      save_budget: {
+        Args: {
+          p_category: string
+          p_limit_cents: number
+          p_month?: string
+          p_rollover?: boolean
+        }
+        Returns: string
+      }
       transactions_summary: {
         Args: { from_date: string; to_date: string }
         Returns: {

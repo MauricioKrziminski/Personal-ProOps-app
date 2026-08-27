@@ -1303,19 +1303,16 @@ export function useSaveBudget() {
       /** YYYY-MM para sobrescrever só aquele mês; omitido = limite padrão. */
       month?: string | null;
     }) => {
-      const { month, ...resto } = input;
-      const row = {
-        ...resto,
-        month: month ? `${month}-01` : null,
-        user_id: await userId(),
-        workspace_id: await workspaceId(),
-      };
-      // dois unique parciais no banco (month null vs not null) => dois alvos
-      const { error } = await supabase
-        .from('budgets')
-        .upsert(row, {
-          onConflict: month ? 'workspace_id,category,month' : 'workspace_id,category',
-        });
+      // Via RPC, não upsert: os unique de `budgets` são PARCIAIS (month null vs
+      // not null) e o Postgres só casa índice parcial se o ON CONFLICT repetir o
+      // predicado — que o PostgREST não tem como mandar. Fazia todo salvamento
+      // estourar 42P10.
+      const { error } = await supabase.rpc('save_budget', {
+        p_category: input.category,
+        p_limit_cents: input.limit_cents,
+        p_rollover: input.rollover ?? false,
+        p_month: input.month ? `${input.month}-01` : undefined,
+      });
       if (error) throw error;
     },
     onSuccess: invalidate,

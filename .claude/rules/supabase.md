@@ -15,6 +15,18 @@
 - `private.my_workspace_ids()` é `security definer` (senão a policy de `workspace_members` recursaria) e mora no schema `private` **de propósito**: o PostgREST não expõe esse schema, então não vira endpoint `/rest/v1/rpc/`. Não mover para `public`.
 - Tabelas de infra (`jobs`, `messages_raw`, `ai_events`): RLS ligada **sem policies** — só service_role acessa.
 
+## Unique parcial não funciona com upsert do PostgREST
+
+Se um `unique` for **parcial** (`where ... is null`), o `.upsert()` do supabase-js **sempre falha** com
+`42P10`: o Postgres só casa índice parcial se o `ON CONFLICT` repetir o mesmo predicado, e o
+PostgREST não tem como mandar isso pela query string. Aconteceu com `budgets` (dois parciais, porque
+NULL não colide com NULL) e travou a tela inteira com um "Não deu para salvar" genérico.
+
+**Regra:** unique parcial → o salvamento vira **RPC** (ver `save_budget` na `0031`), onde o predicado
+pode existir. Unique completo pode usar `.upsert()` normalmente.
+
+Para auditar: `select indexname, indexdef from pg_indexes where schemaname='public' and indexdef like 'CREATE UNIQUE%' and indexdef like '%WHERE%';`
+
 ## RPCs de agregação — padrão duplo
 
 Cada agregação existe como par interna + wrapper:
