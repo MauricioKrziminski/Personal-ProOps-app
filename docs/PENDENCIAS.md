@@ -37,7 +37,7 @@ Via Graph API v21.0 com o token de System User do app:
 - Token: System User, `expires_at: 0` (não expira), app = Personal ProOps app, escopos `whatsapp_business_messaging` + `whatsapp_business_management` **sem `target_ids`** — não está restrito a uma WABA específica.
 - **Templates próprios deste produto criados em 26/08** na WABA de teste:
   - `personal_proops_login_otp` (AUTHENTICATION, pt_BR) — id `1019655521065477`, **APPROVED na hora**.
-  - `personal_proops_reminder` (UTILITY, pt_BR) — id `1097041035993071`, **PENDING** (Utility passa por revisão).
+  - `personal_proops_reminder` (UTILITY, pt_BR) — id `1097041035993071`, **APPROVED** (confirmado na Graph API em 27/08/2026; Utility passa por revisão, levou ~1 dia).
   - Motivo de não reaproveitar `proops_login_otp`: ele é do **ERP** (2FA do ERP quando o WhatsApp está ativado lá) e vive na mesma WABA de teste. Objeto compartilhado — se o time do ERP editar ou apagar, o login deste app cai junto.
 - Nomes de template agora vêm de env (`WA_OTP_TEMPLATE`, `WA_REMINDER_TEMPLATE`); o hardcode em `send-reminders` saiu.
 - Templates são **por WABA**: ao migrar para uma WABA própria de produção, recriar os dois **com os mesmos nomes** — aí nenhum código ou secret muda, só o `WHATSAPP_PHONE_NUMBER_ID`.

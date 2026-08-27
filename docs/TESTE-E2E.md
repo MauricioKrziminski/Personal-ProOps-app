@@ -275,9 +275,10 @@ trocando o nome da função):
 | 10.3 | **Disparar de novo** | `enviados: 0` — dedupe do dia funcionando |
 | 10.4 | Ver o texto em `_alerts_to_send()` | Toda mensagem termina numa **ação** |
 
-⚠️ Sem push configurado (decisão registrada em `docs/PUSH-NOTIFICATIONS.md`), o envio tenta
-template WhatsApp. Se `personal_proops_reminder` ainda estiver **PENDING** na Meta, o envio falha
-e o alerta fica marcado como enviado assim mesmo — de propósito, para não virar loop.
+⚠️ Sem push configurado (decisão registrada em `docs/PUSH-NOTIFICATIONS.md`), o envio usa template
+do WhatsApp. `personal_proops_reminder` está **APPROVED** desde 27/08/2026, então a entrega
+funciona. Se ainda assim falhar, o alerta fica marcado como enviado assim mesmo — de propósito,
+para o cron não virar loop.
 
 ---
 
