@@ -131,6 +131,19 @@ tem 859 worklets transformados), cópia duplicada de `react-native-worklets` (s�
 ⚠️ **`pidof` não serve de critério de sucesso**: com o redbox o processo continua vivo. O critério
 é *zero* `isString` no logcat **e** screenshot com a tela real.
 
+### ⚙️ Metro — quem está servindo
+
+O Metro que a sessão anterior tinha deixado de pé foi **encerrado** (a purga de cache era
+necessária para destravar o Android) e o atual roda como tarefa desta sessão — ou seja, **morre
+junto com ela**. Para levantar de novo:
+
+```bash
+npx expo start --dev-client --clear
+```
+
+Se aparecer crash de worklets, aplique antes a purga completa da regra acima — `--clear` sozinho
+não limpa `$TMPDIR/metro-cache`.
+
 ### 🐞 Achado no primeiro Android que subiu: nenhum ícone aparecia
 
 `expo-symbols` **não** traduz SF Symbol para Material Symbol sozinho — a regra de design afirmava
@@ -182,11 +195,15 @@ src/components/glass/glass-card.tsx
    que considera bonitos (Copilot Money, Monarch, Things, Apple Wallet…). Sem isso o passo 2 vira
    chute de novo.
 
-   > **Status 28/08:** o MCP do Appllama também não estava conectado nesta sessão. O passe visual
-   > propriamente dito (escala tipográfica, densidade, peso de cor, tratamento de superfície)
-   > **não foi feito de propósito** — fazer de memória repetiria exatamente o erro que produziu as
-   > telas atuais. A estrutura da seção **Visual** já existe no template (`README.md`); faltam os
-   > valores, que dependem desta decisão.
+   > **Status 28/08 (madrugada):** o MCP do Appllama também não estava conectado nesta sessão.
+   > O **passe mecânico de hierarquia foi feito e validado** nos dois simuladores, light e dark —
+   > valores na tabela da seção "Visual" do [README](README.md). A causa do "telas muito simples"
+   > era concreta: **duas escalas tipográficas concorrentes** (o `ThemedText` tinha a sua, paralela
+   > à `Type`), o que achatava título e subtítulo a um passo de distância.
+   >
+   > O que **continua esperando você** é a *direção estética* — paleta própria, personalidade de
+   > marca, o que faz o app parecer *deste* produto e não "iOS bem feito". Isso ainda pede
+   > referência real (prints ou o MCP), e é o passo que não dá para inventar de memória.
 2. **Extrair o padrão, não os pixels**: escala tipográfica real, densidade (altura de linha,
    respiro entre seções), peso de cor, tratamento de card, onde mora o contraste.
 3. **Reescrever a camada visual dos 8 arquivos** e ver no catálogo (`/catalog`) nos dois temas.
