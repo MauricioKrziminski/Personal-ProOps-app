@@ -109,6 +109,7 @@ export default function ProfileScreen() {
             onPress={() => router.push('/finance/plan')}
           />
         )}
+        <Row title="Pessoas" subtitle="quem enxerga o seu financeiro" icon="person.2.fill" onPress={() => router.push('/profile/members')} />
       </Section>
 
       {/* Push desligado sobe para cima: é a ação de maior consequência da tela. */}
@@ -118,6 +119,7 @@ export default function ProfileScreen() {
         <Row title="Lixeira de notas" icon="trash" onPress={() => router.push('/notes/trash')} />
         <Row title="Regras de categoria" icon="wand.and.stars" onPress={() => router.push('/finance/rules')} />
         <Row title="Importar extrato" icon="square.and.arrow.down" onPress={() => router.push('/import')} />
+        <Row title="Importações" subtitle="histórico e revisões pendentes" icon="clock.arrow.circlepath" onPress={() => router.push('/import-history')} />
         <Row title="Atividade da IA" icon="sparkles" onPress={() => router.push('/ai-activity')} />
       </Section>
 

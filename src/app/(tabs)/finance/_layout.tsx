@@ -25,6 +25,8 @@ export default function FinanceStackLayout() {
       <Stack.Screen name="accounts" options={{ title: 'Contas' }} />
       <Stack.Screen name="cards" options={{ title: 'Cartões' }} />
       <Stack.Screen name="invoice/[id]" options={{ title: 'Fatura' }} />
+      <Stack.Screen name="invoices" options={{ title: 'Faturas' }} />
+      <Stack.Screen name="installments" options={{ title: 'Parceladas' }} />
       <Stack.Screen name="budgets" options={{ title: 'Orçamentos' }} />
       <Stack.Screen name="goals" options={{ title: 'Metas' }} />
       <Stack.Screen name="debts" options={{ title: 'Dívidas' }} />

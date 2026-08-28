@@ -60,6 +60,8 @@ const MANAGE: { title: string; icon: SymbolViewProps['name']; href: Href }[] = [
   { title: 'Todos os lançamentos', icon: 'list.bullet', href: '/finance/transactions' },
   { title: 'Contas e carteiras', icon: 'wallet.pass', href: '/finance/accounts' },
   { title: 'Cartões e faturas', icon: 'creditcard', href: '/finance/cards' },
+  { title: 'Faturas anteriores', icon: 'calendar', href: '/finance/invoices' },
+  { title: 'Compras parceladas', icon: 'creditcard.and.123', href: '/finance/installments' },
   { title: 'Orçamentos', icon: 'chart.pie', href: '/finance/budgets' },
   { title: 'Metas', icon: 'target', href: '/finance/goals' },
   { title: 'Dívidas', icon: 'dollarsign.circle', href: '/finance/debts' },

@@ -7,6 +7,7 @@ export default function ProfileStackLayout() {
   return (
     <Stack screenOptions={{ headerShadowVisible: false }}>
       <Stack.Screen name="index" options={{ title: 'Perfil', headerLargeTitle: true }} />
+      <Stack.Screen name="members" options={{ title: 'Pessoas' }} />
     </Stack>
   );
 }

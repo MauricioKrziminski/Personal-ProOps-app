@@ -1363,3 +1363,312 @@ export function useDeleteBudget() {
     onSuccess: invalidate,
   });
 }
+
+// ── parceladas, faturas antigas, importações e pessoas ──────────────────────
+//
+// Estas quatro leituras não têm RPC de agregação (ainda): a soma acontece aqui.
+// O PostgREST corta a resposta em `max_rows` (1000 por padrão) **sem erro** — um
+// `.limit(5000)` volta com 1000 linhas e o total sai errado sem ninguém perceber.
+// Por isso toda leitura que vira soma passa por `fetchPaged`.
+
+const PAGE_SIZE = 1000;
+/** Teto de segurança. Estourou, a agregação precisa virar RPC (padrão de `supabase.md`). */
+const MAX_PAGES = 5;
+
+async function fetchPaged<T>(
+  page: (from: number, to: number) => PromiseLike<{ data: unknown[] | null; error: unknown }>,
+): Promise<T[]> {
+  const rows: T[] = [];
+  for (let p = 0; p < MAX_PAGES; p++) {
+    const { data, error } = await page(p * PAGE_SIZE, (p + 1) * PAGE_SIZE - 1);
+    if (error) throw error;
+    const chunk = (data ?? []) as T[];
+    rows.push(...chunk);
+    if (chunk.length < PAGE_SIZE) return rows;
+  }
+  // Estourou o teto: devolver o que veio viraria total errado, parcela "quitada" que não foi e
+  // lote sadio marcado como "Falhou". Erro na tela (com "tentar de novo") é honesto; zero não é.
+  throw new Error('Leitura truncada: esta agregação precisa virar RPC.');
+}
+
+export interface InstallmentParcel {
+  id: string;
+  installment_no: number | null;
+  amount_cents: number;
+  occurred_at: string;
+  invoice_id: string | null;
+  status: 'pending' | 'cleared';
+}
+
+export interface InstallmentPlanSummary {
+  id: string;
+  /** `merchant` quando existe, senão `description` — nunca vazio. */
+  title: string;
+  category: string | null;
+  account_id: string | null;
+  total_cents: number;
+  installments: number;
+  paid: number;
+  /**
+   * Valor da parcela normal. A **última** fecha a conta com o resto da divisão
+   * inteira (regra da RPC `create_installment_plan`), então a soma das parcelas
+   * bate exatamente com `total_cents`.
+   */
+  installment_cents: number;
+  last_installment_cents: number;
+  remaining_cents: number;
+  first_occurred_at: string;
+  last_occurred_at: string | null;
+  active: boolean;
+  parcels: InstallmentParcel[];
+}
+
+/**
+ * Compras parceladas com quanto já foi pago e quanto falta.
+ *
+ * `installment_plans` guarda só o plano — quantas parcelas já caíram sai de
+ * `transactions.status`, uma linha por mês.
+ */
+export function useInstallmentPlans() {
+  useRealtimeInvalidate('installment_plans', ['installments']);
+  useRealtimeInvalidate('transactions', ['installments']);
+  return useQuery({
+    queryKey: ['installments', 'plans'],
+    queryFn: async (): Promise<InstallmentPlanSummary[]> => {
+      const { data: plans, error } = await supabase
+        .from('installment_plans')
+        .select('id, merchant, description, category, account_id, total_cents, installments, first_occurred_at')
+        .order('first_occurred_at', { ascending: false })
+        .limit(200);
+      if (error) throw error;
+      if (!plans?.length) return [];
+
+      const ids = plans.map((p) => p.id);
+      const rows = await fetchPaged<InstallmentParcel & { installment_plan_id: string | null }>(
+        (from, to) =>
+          supabase
+            .from('transactions')
+            .select('id, installment_plan_id, installment_no, amount_cents, occurred_at, status, invoice_id')
+            .in('installment_plan_id', ids)
+            .order('installment_no')
+            .range(from, to),
+      );
+
+      const porPlano = new Map<string, InstallmentParcel[]>();
+      for (const row of rows) {
+        if (!row.installment_plan_id) continue;
+        const lista = porPlano.get(row.installment_plan_id) ?? [];
+        lista.push(row);
+        porPlano.set(row.installment_plan_id, lista);
+      }
+
+      return plans.map((plan) => {
+        const parcels = porPlano.get(plan.id) ?? [];
+        const n = Math.max(1, plan.installments);
+        // Derivado da MESMA divisão da RPC, não da parcela 1 (que pode nem ter vindo).
+        const base = Math.floor(plan.total_cents / n);
+        const pago = parcels
+          .filter((p) => p.status === 'cleared')
+          .reduce((soma, p) => soma + p.amount_cents, 0);
+        return {
+          id: plan.id,
+          title: plan.merchant || plan.description || 'Compra parcelada',
+          category: plan.category,
+          account_id: plan.account_id,
+          total_cents: plan.total_cents,
+          installments: n,
+          paid: parcels.filter((p) => p.status === 'cleared').length,
+          installment_cents: base,
+          last_installment_cents: plan.total_cents - base * (n - 1),
+          remaining_cents: Math.max(0, plan.total_cents - pago),
+          first_occurred_at: plan.first_occurred_at,
+          last_occurred_at: parcels.reduce<string | null>(
+            (maior, p) => (maior && maior > p.occurred_at ? maior : p.occurred_at),
+            null,
+          ),
+          active: parcels.some((p) => p.status === 'pending'),
+          parcels,
+        };
+      });
+    },
+  });
+}
+
+export interface CardInvoiceHistory {
+  id: string;
+  reference_month: string;
+  closing_date: string;
+  due_date: string;
+  status: 'open' | 'closed' | 'paid';
+  paid_at: string | null;
+  payment_transaction_id: string | null;
+  total_cents: number;
+  tx_count: number;
+}
+
+/**
+ * Histórico de faturas de um cartão.
+ *
+ * `card_summary()` devolve só a fatura aberta mais antiga — paga a fatura, ela
+ * some do app. Aqui a lista vem de `card_invoices` e o total de cada uma sai da
+ * soma das compras (`invoice_id`), porque o total **nunca é materializado**.
+ */
+export function useCardInvoices(accountId: string | undefined, months = 12) {
+  useRealtimeInvalidate('card_invoices', ['card-invoices']);
+  useRealtimeInvalidate('transactions', ['card-invoices']);
+  return useQuery({
+    enabled: Boolean(accountId),
+    queryKey: ['card-invoices', accountId ?? '', String(months)],
+    queryFn: async (): Promise<CardInvoiceHistory[]> => {
+      const limite = Math.min(60, Math.max(1, months));
+      const { data: invoices, error } = await supabase
+        .from('card_invoices')
+        .select('id, reference_month, closing_date, due_date, status, paid_at, payment_transaction_id')
+        .eq('account_id', accountId!)
+        .order('reference_month', { ascending: false })
+        .limit(limite);
+      if (error) throw error;
+      if (!invoices?.length) return [];
+
+      const ids = invoices.map((i) => i.id);
+      const rows = await fetchPaged<{ invoice_id: string | null; amount_cents: number }>((from, to) =>
+        supabase
+          .from('transactions')
+          .select('invoice_id, amount_cents')
+          .in('invoice_id', ids)
+          // pagamento de fatura é transferência: entra como compra inflaria o total
+          .eq('kind', 'expense')
+          .range(from, to),
+      );
+
+      const totais = new Map<string, { cents: number; count: number }>();
+      for (const row of rows) {
+        if (!row.invoice_id) continue;
+        const atual = totais.get(row.invoice_id) ?? { cents: 0, count: 0 };
+        totais.set(row.invoice_id, {
+          cents: atual.cents + row.amount_cents,
+          count: atual.count + 1,
+        });
+      }
+
+      return invoices.map((invoice) => ({
+        ...(invoice as Omit<CardInvoiceHistory, 'total_cents' | 'tx_count'>),
+        total_cents: totais.get(invoice.id)?.cents ?? 0,
+        tx_count: totais.get(invoice.id)?.count ?? 0,
+      }));
+    },
+  });
+}
+
+export interface WorkspaceMember {
+  user_id: string;
+  role: 'owner' | 'member' | 'viewer';
+  created_at: string;
+}
+
+/**
+ * Quem tem acesso ao workspace.
+ *
+ * Só ids e papéis: `profiles` é `own row`, então o telefone das outras pessoas
+ * **não é legível** daqui — precisaria de RPC `security definer`. A tela diz isso
+ * em vez de fingir.
+ */
+export function useWorkspaceMembers() {
+  return useQuery({
+    queryKey: ['workspace-members'],
+    queryFn: async (): Promise<WorkspaceMember[]> => {
+      const ws = await workspaceId();
+      const { data, error } = await supabase
+        .from('workspace_members')
+        .select('user_id, role, created_at')
+        // sem o filtro, quem estiver em dois espaços veria linhas misturadas e a
+        // contagem discordaria de `plan_status`
+        .eq('workspace_id', ws)
+        .order('created_at');
+      if (error) throw error;
+      return data as WorkspaceMember[];
+    },
+  });
+}
+
+export interface ImportBatchSummary {
+  id: string;
+  filename: string | null;
+  source: string;
+  account_id: string | null;
+  status: string;
+  error: string | null;
+  created_at: string;
+  total: number;
+  pendentes: number;
+  aprovados: number;
+  descartados: number;
+  duplicados: number;
+}
+
+/**
+ * Histórico de importações.
+ *
+ * `import_batches.status` é gravado como `review` na criação e nunca atualizado,
+ * então o rótulo da linha sai da **contagem dos itens**, não da coluna. Lote sem
+ * item nenhum é lote fantasma (o insert dos itens estourou) e a tela mostra como
+ * falha.
+ */
+export function useImportBatches(limit = 20) {
+  useRealtimeInvalidate('import_items', ['import-batches']);
+  return useQuery({
+    queryKey: ['import-batches', String(limit)],
+    queryFn: async (): Promise<ImportBatchSummary[]> => {
+      const { data: batches, error } = await supabase
+        .from('import_batches')
+        .select('id, filename, source, account_id, status, error, created_at')
+        .order('created_at', { ascending: false })
+        .limit(limit);
+      if (error) throw error;
+      if (!batches?.length) return [];
+
+      const ids = batches.map((b) => b.id);
+      const rows = await fetchPaged<{ batch_id: string; status: string }>((from, to) =>
+        supabase.from('import_items').select('batch_id, status').in('batch_id', ids).range(from, to),
+      );
+
+      const contagem = new Map<string, Record<string, number>>();
+      for (const row of rows) {
+        const atual = contagem.get(row.batch_id) ?? {};
+        atual[row.status] = (atual[row.status] ?? 0) + 1;
+        contagem.set(row.batch_id, atual);
+      }
+
+      return batches.map((batch) => {
+        const c = contagem.get(batch.id) ?? {};
+        const pendentes = c.pending ?? 0;
+        const aprovados = c.approved ?? 0;
+        const descartados = c.discarded ?? 0;
+        const duplicados = c.duplicate ?? 0;
+        return {
+          ...batch,
+          total: pendentes + aprovados + descartados + duplicados,
+          pendentes,
+          aprovados,
+          descartados,
+          duplicados,
+        };
+      });
+    },
+  });
+}
+
+/**
+ * Apaga o registro da importação. O `on delete cascade` leva os `import_items`
+ * junto; as transações já confirmadas **continuam** (o lado delas é `set null`).
+ */
+export function useDeleteImportBatch() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (id: string) => {
+      const { error } = await supabase.from('import_batches').delete().eq('id', id);
+      if (error) throw error;
+    },
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['import-batches'] }),
+  });
+}
