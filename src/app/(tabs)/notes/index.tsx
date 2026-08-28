@@ -124,7 +124,7 @@ function NoteRow({
           ]}>
           <View style={styles.rowTitle}>
             {note.pinned ? <Icon name="pin.fill" size="sm" color="textSecondary" /> : null}
-            <ThemedText type="default" numberOfLines={1} style={styles.grow}>
+            <ThemedText type="headline" numberOfLines={1} style={styles.grow}>
               {title}
             </ThemedText>
           </View>

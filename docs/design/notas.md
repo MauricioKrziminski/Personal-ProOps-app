@@ -60,7 +60,7 @@ em português, captura instantânea e uma lixeira que perdoa. Editor de blocos n
 |---|---|---|
 | **Pasta** | `note_folders`, **um nível**, `unique (workspace_id, name)` completo, `icon` = nome de SF Symbol | Aninhamento exige breadcrumb, seletor recursivo, anti-ciclo e CTE. Unique completo mantém o `.upsert()` legal (parcial cairia no `42P10`). |
 | **Nota → pasta** | `notes.folder_id`, `on delete set null` | Apagar pasta **nunca** apaga nota. |
-| **Tag** | `notes.tags text[]` **gerado** dos `#hashtag` do próprio conteúdo, + GIN | Tabela de tags nasceria vazia: ninguém digita tag no WhatsApp. O usuário já digita `#`. Zero caminho de escrita, zero tela de gestão, zero mudança no contrato da IA. |
+| **Tag** | `notes.tags text[]` **gerado** dos `#hashtag` do próprio conteúdo, + GIN. No detalhe há chips: tocar num chip TIRA a tag, o `+ tag` abre o seletor. | Tabela de tags nasceria vazia: ninguém digita tag no WhatsApp. O usuário já digita `#`. Zero caminho de escrita, zero tela de gestão, zero mudança no contrato da IA. **O seletor edita o TEXTO** (acrescenta/remove o token `#tag`), porque a coluna é `GENERATED ALWAYS` e não aceita escrita — é o que dá chip de verdade sem quebrar o round-trip da nota para o WhatsApp. Helpers e testes em `src/lib/search.ts`. |
 | **Título** | primeira linha do conteúdo, calculada na tela | Coluna `title` viria null em 100% das notas do WhatsApp → lista com duas aparências. |
 | **Checklist** | linhas `- [ ]` / `- [x]` dentro do conteúdo | Tabela filha ou `jsonb` quebra o round-trip: a nota deixa de ser texto que volta pro WhatsApp. |
 | **Busca** | `search_tsv` gerado com config `pt_unaccent` (`portuguese` + `unaccent`) + GIN | `unaccent` faz "reuniao" achar "reunião" — sem ele metade das buscas do brasileiro falha em silêncio. O stemmer colapsa plural regular (casas→casa). **Medido:** ão/ões NÃO colapsa, nem aqui nem em `portuguese` puro — a config escolhida é estritamente melhor, mas não prometa plural irregular. |
@@ -112,6 +112,16 @@ em português, captura instantânea e uma lixeira que perdoa. Editor de blocos n
 
 Ordenação: `pinned desc, updated_at desc`. Recência bate relevância em nota pessoal, e ranking
 por `ts_rank` exigiria RPC (o PostgREST não ordena por expressão).
+
+## Header opaco não é detalhe (bug de 28/08)
+
+`headerLargeTitle` deixa a área do título transparente **enquanto o iOS rastreia o scroll**. Ele
+não rastreia a `FlashList` — então a área nunca virava opaca e as linhas subiam desenhando **por
+cima** do título e da busca. Foi exatamente o "tudo grudado em cima do outro" reportado.
+
+A correção é no `_layout.tsx` da aba: `headerLargeStyle`/`headerStyle` com
+`backgroundColor: theme.groupedBackground`. Vale para qualquer tela que junte `headerLargeTitle`
+com lista virtualizada — hoje só esta (a `transactions` usa header comum).
 
 ## Dados
 

@@ -31,6 +31,14 @@ function stripMarkup(line: string): string {
 }
 
 /**
+ * A `#tag` já é mostrada na faixa de metadados da linha. Repetida dentro da prévia ela vira
+ * ruído — e numa lista de 20 notas o olho lê o mesmo token duas vezes por linha.
+ */
+function stripTags(text: string): string {
+  return text.replace(/(^|\s)#[a-z0-9_]{2,30}\b/gi, '').replace(/\s+/g, ' ').trim();
+}
+
+/**
  * Primeira linha não vazia do conteúdo — é o "título" da nota.
  *
  * Não existe coluna `title` de propósito: viria null em 100% das notas que chegam pelo WhatsApp e
@@ -45,12 +53,14 @@ export function noteTitle(content: string): string {
 export function notePreview(content: string): string {
   const lines = content.split('\n');
   const firstIndex = lines.findIndex((line) => line.trim().length > 0);
-  return lines
+  const body = lines
     .slice(firstIndex + 1)
     .map(stripMarkup)
     .join(' ')
     .replace(/\s+/g, ' ')
     .trim();
+
+  return stripTags(body);
 }
 
 export interface ChecklistItem {
@@ -105,4 +115,52 @@ export function toIlikeTerm(input: string): string {
     .replace(/[^\p{L}\p{N}\s-]/gu, ' ')
     .replace(/\s+/g, ' ')
     .trim();
+}
+
+
+/**
+ * `#tag` sai do próprio texto — é a MESMA regra do `note_tags_of` que gera `notes.tags` no banco.
+ *
+ * A coluna é `GENERATED ALWAYS`: não dá para escrever nela. Por isso editar tag é editar TEXTO,
+ * e não um campo à parte. É o que mantém a nota sendo texto puro que volta inteiro para o
+ * WhatsApp — a decisão original do produto — enquanto a tela oferece chips de verdade.
+ */
+export const TAG_RE = /#([a-z0-9_]{2,30})/gi;
+
+export function tagsOf(content: string): string[] {
+  const found = Array.from(content.matchAll(TAG_RE), (m) => m[1].toLowerCase());
+  return Array.from(new Set(found)).sort();
+}
+
+/** Normaliza o que o usuário digitou: sem `#`, minúsculo, só o que o banco reconhece como tag. */
+export function normalizeTag(input: string): string {
+  return input.trim().replace(/^#+/, '').toLowerCase().replace(/[^a-z0-9_]/g, '');
+}
+
+/** Tag válida é a que o banco vai enxergar — senão o chip apareceria e sumiria no salvamento. */
+export function isValidTag(tag: string): boolean {
+  return /^[a-z0-9_]{2,30}$/.test(tag);
+}
+
+/** Acrescenta `#tag` no fim do texto. Já presente (em qualquer caixa) → não duplica. */
+export function addTag(content: string, tag: string): string {
+  const clean = normalizeTag(tag);
+  if (!isValidTag(clean) || tagsOf(content).includes(clean)) return content;
+  const body = content.replace(/\s+$/, '');
+  return body.length === 0 ? `#${clean}` : `${body} #${clean}`;
+}
+
+/** Tira todas as ocorrências de `#tag` do texto, sem deixar espaço duplo nem linha só de espaço. */
+export function removeTag(content: string, tag: string): string {
+  const clean = normalizeTag(tag);
+  if (!clean) return content;
+  return content
+    .split('\n')
+    .map((line) =>
+      line
+        .replace(new RegExp(`(^|\\s)#${clean}\\b`, 'gi'), '$1')
+        .replace(/[ \t]+/g, ' ')
+        .replace(/[ \t]+$/, '')
+    )
+    .join('\n');
 }

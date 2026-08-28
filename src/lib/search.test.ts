@@ -5,6 +5,11 @@ import {
   noteTitle,
   normalizeFolderName,
   notePreview,
+  addTag,
+  removeTag,
+  tagsOf,
+  normalizeTag,
+  isValidTag,
   parseChecklist,
   toTsQuery,
   toggleChecklistLine,
@@ -57,6 +62,15 @@ test('linha comum na prévia continua intacta (o strip não pode comer hífen de
   assert.equal(notePreview('Título\n- item solto\nmeia-noite'), '- item solto meia-noite');
 });
 
+test('prévia não repete a #tag, que já aparece na faixa de metadados', () => {
+  assert.equal(notePreview('Compras\nleite e pão #mercado'), 'leite e pão');
+  assert.equal(notePreview('Ideia\n#trabalho separar 10% #freela'), 'separar 10%');
+});
+
+test('prévia preserva # colado em palavra e cerquilha solta (não é tag)', () => {
+  assert.equal(notePreview('T\nligar para o 3# andar'), 'ligar para o 3# andar');
+});
+
 test('checklist: reconhece marcado e desmarcado, e ignora linha comum', () => {
   const items = parseChecklist('Compras\n- [ ] leite\n- [x] pão\ntexto solto');
   assert.deepEqual(items, [
@@ -96,4 +110,31 @@ test('ilike: acento, número e hífen sobrevivem', () => {
 
 test('ilike: só pontuação vira string vazia', () => {
   assert.equal(toIlikeTerm('()%,'), '');
+});
+
+
+test('tag: acrescenta no fim e não duplica (nem trocando a caixa)', () => {
+  assert.equal(addTag('Comprar pão', 'mercado'), 'Comprar pão #mercado');
+  assert.equal(addTag('Comprar pão #mercado', 'mercado'), 'Comprar pão #mercado');
+  assert.equal(addTag('Comprar pão #Mercado', 'mercado'), 'Comprar pão #Mercado');
+  assert.equal(addTag('', 'ideias'), '#ideias');
+});
+
+test('tag: entrada suja vira tag válida, e o que o banco não reconhece é recusado', () => {
+  assert.equal(normalizeTag('  #Mercado '), 'mercado');
+  assert.equal(normalizeTag('não-vale!'), 'novale');
+  assert.equal(isValidTag('a'), false);
+  assert.equal(isValidTag('ok'), true);
+  assert.equal(addTag('Nota', 'x'), 'Nota');
+});
+
+test('tag: remover não deixa espaço duplo nem quebra o resto do texto', () => {
+  assert.equal(removeTag('Comprar pão #mercado hoje', 'mercado'), 'Comprar pão hoje');
+  assert.equal(removeTag('Título\ncorpo #trabalho', 'trabalho'), 'Título\ncorpo');
+  assert.equal(removeTag('a #x1 b #x1 c', 'x1'), 'a b c');
+});
+
+test('tag: `#tag` colada em palavra não é tag (mesma regra do banco)', () => {
+  assert.deepEqual(tagsOf('email#interno e #real'), ['interno', 'real']);
+  assert.deepEqual(tagsOf('#a e #ok'), ['ok']);
 });

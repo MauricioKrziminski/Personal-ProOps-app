@@ -23,6 +23,7 @@ import type { SymbolViewProps } from 'expo-symbols';
 import { ThemedText } from '@/components/themed-text';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
+import { EmptyState } from '@/components/ui/empty-state';
 import { TextField } from '@/components/ui/field';
 import { Icon } from '@/components/ui/icon';
 import { Row, Section } from '@/components/ui/row';
@@ -39,10 +40,21 @@ import {
   useToggleNotePin,
   useTrashNote,
   type NoteFolder,
+  useNoteTags,
 } from '@/hooks/use-notes';
 import { useTheme } from '@/hooks/use-theme';
 import { formatDateBR } from '@/lib/dates';
-import { noteTitle, normalizeFolderName, parseChecklist, toggleChecklistLine } from '@/lib/search';
+import {
+  addTag,
+  isValidTag,
+  normalizeTag,
+  noteTitle,
+  normalizeFolderName,
+  parseChecklist,
+  removeTag,
+  tagsOf,
+  toggleChecklistLine,
+} from '@/lib/search';
 import { showItemActions } from '@/lib/item-actions';
 
 /**
@@ -59,14 +71,6 @@ import { showItemActions } from '@/lib/item-actions';
  */
 
 const AUTOSAVE_MS = 800;
-
-/** `#tag` sai do próprio texto, ao vivo — o mesmo que `note_tags_of` faz no banco na escrita. */
-const TAG_RE = /#([a-z0-9_]{2,30})/gi;
-
-function tagsOf(content: string): string[] {
-  const found = Array.from(content.matchAll(TAG_RE), (m) => m[1].toLowerCase());
-  return Array.from(new Set(found)).sort();
-}
 
 /** `note_folders.icon` é texto livre no banco; aqui vira nome de SF Symbol com queda para `folder`. */
 function symbol(icon: string | null | undefined): SymbolViewProps['name'] {
@@ -124,6 +128,7 @@ export default function NoteDetailScreen() {
   const [editing, setEditing] = useState(() => params.id === 'new');
   const [selection, setSelection] = useState<{ start: number; end: number } | undefined>();
   const [pickerOpen, setPickerOpen] = useState(false);
+  const [tagPickerOpen, setTagPickerOpen] = useState(false);
   const [savedFlash, setSavedFlash] = useState(false);
 
   /** Fonte da verdade do autosave: `null` até o primeiro insert. Não espera o `setParams`. */
@@ -164,6 +169,11 @@ export default function NoteDetailScreen() {
     if (last && last.content === text && last.folderId === folder) return;
     // Nota em branco nunca é inserida — é exatamente a "nota vazia piscando na lista".
     if (!idRef.current && text.trim() === '') return;
+    // E nunca ESVAZIA uma nota que já tinha texto. Aconteceu em 28/08: uma nota do WhatsApp
+    // voltou do detalhe com `content` vazio. O `hydrated` sozinho não bastou — qualquer caminho
+    // que chegue aqui com texto vazio e conteúdo persistido não-vazio é bug, não intenção.
+    // Apagar nota é a Lixeira, que perdoa; autosave silencioso não.
+    if (idRef.current && text.trim() === '' && (last?.content ?? '').trim() !== '') return;
     // Salvamento em voo: marca sujo e reenfileira no settle, para não inserir duas vezes.
     if (saving.current) {
       dirty.current = true;
@@ -390,10 +400,35 @@ export default function NoteDetailScreen() {
           </Pressable>
 
           {tags.map((tag) => (
-            <ThemedText key={tag} type="footnote" themeColor="textSecondary">
-              #{tag}
-            </ThemedText>
+            <Pressable
+              key={tag}
+              accessibilityRole="button"
+              accessibilityLabel={`Tag ${tag}. Toque para tirar da nota.`}
+              hitSlop={6}
+              onPress={() => {
+                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                setContent((current) => removeTag(current, tag));
+              }}
+              style={[styles.tagChip, { backgroundColor: theme.backgroundElement }]}>
+              <ThemedText type="footnote">#{tag}</ThemedText>
+              <Icon name="xmark" size={12} color="textSecondary" />
+            </Pressable>
           ))}
+
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Adicionar tag"
+            hitSlop={6}
+            onPress={() => {
+              Haptics.selectionAsync();
+              setTagPickerOpen(true);
+            }}
+            style={[styles.tagChip, { borderWidth: StyleSheet.hairlineWidth, borderColor: theme.separator }]}>
+            <Icon name="plus" size={12} color="tint" />
+            <ThemedText type="footnote" themeColor="tint">
+              tag
+            </ThemedText>
+          </Pressable>
 
           {note.data ? (
             <ThemedText type="footnote" themeColor="textSecondary">
@@ -433,6 +468,17 @@ export default function NoteDetailScreen() {
           <ReadBody content={content} onEdit={startEditing} onToggleLine={onToggleLine} />
         )}
       </KeyboardAwareScrollView>
+
+      <TagPicker
+        visible={tagPickerOpen}
+        current={tags}
+        onClose={() => setTagPickerOpen(false)}
+        onToggle={(tag) =>
+          setContent((current) =>
+            tagsOf(current).includes(tag) ? removeTag(current, tag) : addTag(current, tag)
+          )
+        }
+      />
 
       <FolderPicker
         visible={pickerOpen}
@@ -525,6 +571,109 @@ function ReadBody({
 
 /** Quando o campo de busca deixa de ser ruído e passa a ser necessário. */
 const SEARCH_FROM = 8;
+
+/**
+ * Seletor de tag.
+ *
+ * `notes.tags` é coluna GERADA do texto — não dá para escrever nela. Então escolher uma tag aqui
+ * **edita o conteúdo**, acrescentando ou tirando o token `#tag`. É o que dá chip de verdade sem
+ * quebrar a decisão de origem: a nota continua sendo texto puro que volta inteiro pro WhatsApp.
+ *
+ * Oferece as tags que já existem no workspace (evita `#mercado` e `#Mercado` virando duas coisas)
+ * e deixa criar uma na hora.
+ */
+function TagPicker({
+  visible,
+  current,
+  onClose,
+  onToggle,
+}: {
+  visible: boolean;
+  current: string[];
+  onClose: () => void;
+  onToggle: (tag: string) => void;
+}) {
+  const theme = useTheme();
+  const known = useNoteTags();
+  const [draft, setDraft] = useState('');
+
+  const typed = normalizeTag(draft);
+  const existing = (known.data ?? []).map((t) => t.tag);
+  const options = Array.from(new Set([...existing, ...current])).sort();
+  const shown = typed ? options.filter((t) => t.includes(typed)) : options;
+  const canCreate = isValidTag(typed) && !options.includes(typed);
+
+  return (
+    <Modal visible={visible} animationType="slide" presentationStyle="pageSheet" onRequestClose={onClose}>
+      <View style={[styles.sheet, { backgroundColor: theme.groupedBackground }]}>
+        <View style={styles.sheetHeader}>
+          <ThemedText type="smallBold">Tags da nota</ThemedText>
+          <Pressable accessibilityRole="button" accessibilityLabel="Fechar" hitSlop={12} onPress={onClose}>
+            <ThemedText type="smallBold" themeColor="tint">
+              Fechar
+            </ThemedText>
+          </Pressable>
+        </View>
+
+        <ScrollView
+          contentContainerStyle={styles.sheetBody}
+          keyboardShouldPersistTaps="handled"
+          showsVerticalScrollIndicator={false}>
+          <TextField
+            value={draft}
+            onChangeText={setDraft}
+            placeholder="Buscar ou criar tag"
+            autoCapitalize="none"
+            autoCorrect={false}
+            accessibilityLabel="Buscar ou criar tag"
+          />
+
+          {canCreate ? (
+            <Section>
+              <Row
+                title={`Criar #${typed}`}
+                icon="plus.circle"
+                chevron={false}
+                onPress={() => {
+                  Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+                  onToggle(typed);
+                  setDraft('');
+                }}
+              />
+            </Section>
+          ) : null}
+
+          {shown.length > 0 ? (
+            <Section title="Tags">
+              {shown.map((tag) => {
+                const on = current.includes(tag);
+                return (
+                  <Row
+                    key={tag}
+                    title={`#${tag}`}
+                    chevron={false}
+                    accessibilityState={{ selected: on }}
+                    trailing={on ? <Icon name="checkmark" size="md" color="tint" /> : null}
+                    onPress={() => {
+                      Haptics.selectionAsync();
+                      onToggle(tag);
+                    }}
+                  />
+                );
+              })}
+            </Section>
+          ) : !canCreate ? (
+            <EmptyState
+              icon="tag"
+              title="Nenhuma tag ainda"
+              hint="Escreve o nome aí em cima — ou digita #assim no corpo da nota."
+            />
+          ) : null}
+        </ScrollView>
+      </View>
+    </Modal>
+  );
+}
 
 /**
  * Seletor de pasta.
@@ -718,6 +867,15 @@ const styles = StyleSheet.create({
   },
   centered: {
     textAlign: 'center',
+  },
+  tagChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Space.xs,
+    paddingHorizontal: Space.sm,
+    paddingVertical: Space.xs,
+    borderRadius: Radius.pill,
+    borderCurve: 'continuous',
   },
   sheet: {
     flex: 1,
