@@ -74,8 +74,12 @@ o que refratar.
 A linguagem de design (tokens, glass, movimento, estados, anti-slop) mora em
 `.claude/rules/design.md`, não aqui. Os documentos assumem essa regra e não a repetem.
 
-**Próximo passo:** [PROXIMO-PASSO.md](PROXIMO-PASSO.md) — reconciliar as migrations e o passe de
-acabamento visual que ficou pela metade.
+**Comece por aqui:** [HANDOFF-ACABAMENTO.md](HANDOFF-ACABAMENTO.md) — o que está aberto no
+acabamento visual, com ambiente, armadilhas e critério de pronto. É o documento de passagem entre
+sessões.
+
+**Histórico e migrations:** [PROXIMO-PASSO.md](PROXIMO-PASSO.md) — a reconciliação das migrations
+(ainda esperando o usuário) e o registro do que já foi corrigido.
 
 **Decisões ainda abertas:** [DECISOES-PENDENTES.md](DECISOES-PENDENTES.md) — o que os documentos
 assumiram e ainda precisa de decisão humana, mais os bugs confirmados no código durante a escrita.
