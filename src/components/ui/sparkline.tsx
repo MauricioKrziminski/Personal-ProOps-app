@@ -39,8 +39,8 @@ const MIN_SPAN_RATIO = 0.05;
 export function Sparkline({ values, width, height = 56, showZero = false }: SparklineProps) {
   const theme = useTheme();
 
-  const { line, area, zeroY, zeroVisible, negative } = useMemo(() => {
-    const empty = { line: null, area: null, zeroY: 0, zeroVisible: false, negative: false };
+  const { line, area, zeroY, zeroVisible, negative, flat } = useMemo(() => {
+    const empty = { line: null, area: null, zeroY: 0, zeroVisible: false, negative: false, flat: true };
     if (values.length < 2 || width <= 0) return empty;
 
     const dataMin = Math.min(...values);
@@ -70,6 +70,9 @@ export function Sparkline({ values, width, height = 56, showZero = false }: Spar
     fill.close();
 
     return {
+      // Sem variação nenhuma, a área vira um retângulo cheio que finge ter forma. A linha sozinha
+      // diz a verdade: "não mudou".
+      flat: dataMax === dataMin,
       line: stroke.detach(),
       area: fill.detach(),
       zeroY: y(0),
@@ -84,7 +87,7 @@ export function Sparkline({ values, width, height = 56, showZero = false }: Spar
 
   return (
     <Canvas style={{ width, height }}>
-      <Path path={area!} color={color} style="fill" opacity={0.14} />
+      {flat ? null : <Path path={area!} color={color} style="fill" opacity={0.14} />}
       {showZero && zeroVisible ? (
         <Line
           p1={vec(0, zeroY)}

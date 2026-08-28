@@ -1,28 +1,45 @@
-import { Platform, StyleSheet, Text, type TextProps } from 'react-native';
+import { StyleSheet, Text, type TextProps } from 'react-native';
 
 import { Fonts, ThemeColor } from '@/constants/theme';
+import { Type } from '@/design/tokens';
 import { useTheme } from '@/hooks/use-theme';
 
 export type ThemedTextProps = TextProps & {
-  type?: 'default' | 'title' | 'small' | 'smallBold' | 'subtitle' | 'link' | 'linkPrimary' | 'code';
+  type?:
+    | 'default'
+    | 'title'
+    | 'subtitle'
+    | 'headline'
+    | 'small'
+    | 'smallBold'
+    | 'footnote'
+    | 'caption'
+    | 'link'
+    | 'linkPrimary'
+    | 'code';
   themeColor?: ThemeColor;
 };
 
+/**
+ * Texto do app. **Uma escala só.**
+ *
+ * Antes este arquivo trazia a própria escala (14/16/32/48, tudo em peso 500) — paralela e
+ * incompatível com a `Type` de `src/design/tokens.ts`, que é a régua da plataforma e a que os
+ * documentos descrevem. O efeito era o "platô": título 16/500 e subtítulo 14/500 ficavam a um
+ * passo de distância, nada dominava a tela e tudo lia como o mesmo cinza. É a causa mecânica do
+ * "telas muito simples".
+ *
+ * Agora todo tipo aponta para `Type`. Hierarquia se faz com **peso e cor**, não com 2px de
+ * diferença: corpo em 400, número e ação em 600, secundário em `footnote` + `textSecondary`.
+ */
 export function ThemedText({ style, type = 'default', themeColor, ...rest }: ThemedTextProps) {
   const theme = useTheme();
 
   return (
     <Text
       style={[
-        { color: theme[themeColor ?? 'text'] },
-        type === 'default' && styles.default,
-        type === 'title' && styles.title,
-        type === 'small' && styles.small,
-        type === 'smallBold' && styles.smallBold,
-        type === 'subtitle' && styles.subtitle,
-        type === 'link' && styles.link,
-        type === 'linkPrimary' && styles.linkPrimary,
-        type === 'code' && styles.code,
+        { color: theme[themeColor ?? (type === 'linkPrimary' ? 'tint' : 'text')] },
+        styles[type],
         style,
       ]}
       {...rest}
@@ -31,43 +48,24 @@ export function ThemedText({ style, type = 'default', themeColor, ...rest }: The
 }
 
 const styles = StyleSheet.create({
-  small: {
-    fontSize: 14,
-    lineHeight: 20,
-    fontWeight: 500,
-  },
-  smallBold: {
-    fontSize: 14,
-    lineHeight: 20,
-    fontWeight: 700,
-  },
-  default: {
-    fontSize: 16,
-    lineHeight: 24,
-    fontWeight: 500,
-  },
-  title: {
-    fontSize: 48,
-    fontWeight: 600,
-    lineHeight: 52,
-  },
-  subtitle: {
-    fontSize: 32,
-    lineHeight: 44,
-    fontWeight: 600,
-  },
-  link: {
-    lineHeight: 30,
-    fontSize: 14,
-  },
-  linkPrimary: {
-    lineHeight: 30,
-    fontSize: 14,
-    color: '#3c87f7',
-  },
-  code: {
-    fontFamily: Fonts.mono,
-    fontWeight: Platform.select({ android: 700 }) ?? 500,
-    fontSize: 12,
-  },
+  /** corpo — título de linha, parágrafo */
+  default: Type.body,
+  /** display de tela; uma por tela */
+  title: Type.largeTitle,
+  /** cabeçalho de bloco dentro da tela */
+  subtitle: Type.title2,
+  /** o que precisa ganhar da vizinhança: dinheiro na linha, rótulo de destaque */
+  headline: Type.headline,
+  /** secundário legível — o cavalo de batalha (235 usos) */
+  small: Type.subhead,
+  /** ação: rótulo de botão */
+  smallBold: { ...Type.subhead, fontWeight: '600' },
+  /** metadado — o segundo degrau de verdade, não "quase igual ao corpo" */
+  footnote: Type.footnote,
+  /** rótulo de seção, contador, unidade */
+  caption: Type.caption,
+  link: Type.subhead,
+  /** cor vem de `tint` no componente — nunca hex */
+  linkPrimary: { ...Type.subhead, fontWeight: '600' },
+  code: { ...Type.footnote, fontFamily: Fonts.mono },
 });

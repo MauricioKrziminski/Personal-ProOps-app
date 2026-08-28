@@ -2,7 +2,7 @@ import { BlurView } from 'expo-blur';
 import { GlassView, isLiquidGlassAvailable } from 'expo-glass-effect';
 import { StyleSheet, useColorScheme, View, type StyleProp, type ViewStyle } from 'react-native';
 
-import { Radius, Space } from '@/design/tokens';
+import { Elevation, Radius, Space } from '@/design/tokens';
 import { useTheme } from '@/hooks/use-theme';
 
 interface GlassCardProps {
@@ -26,7 +26,13 @@ export function GlassCard({ children, style, variant = 'regular' }: GlassCardPro
   const scheme = useColorScheme();
   const theme = useTheme();
 
-  const edge = { borderWidth: StyleSheet.hairlineWidth, borderColor: theme.separator };
+  // Hairline define a borda; a elevação tira o card do plano do fundo. Um destaque que não
+  // levanta lê como faixa de fundo, não como cartão.
+  const edge = {
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: theme.separator,
+    boxShadow: Elevation[scheme === 'dark' ? 'dark' : 'light'].raised,
+  };
 
   if (isLiquidGlassAvailable()) {
     return (

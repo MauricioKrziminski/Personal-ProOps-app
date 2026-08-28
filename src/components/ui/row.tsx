@@ -56,7 +56,7 @@ export function Row({
           {title}
         </ThemedText>
         {subtitle ? (
-          <ThemedText type="small" themeColor="textSecondary" numberOfLines={1}>
+          <ThemedText type="footnote" themeColor="textSecondary" numberOfLines={1}>
             {subtitle}
           </ThemedText>
         ) : null}
@@ -91,7 +91,7 @@ export function Section({ title, children }: { title?: string; children: ReactNo
   return (
     <View style={styles.section}>
       {title ? (
-        <ThemedText type="small" themeColor="textSecondary" style={styles.sectionTitle}>
+        <ThemedText type="caption" themeColor="textSecondary" style={styles.sectionTitle}>
           {title.toUpperCase()}
         </ThemedText>
       ) : null}
@@ -121,11 +121,12 @@ const styles = StyleSheet.create({
     gap: 2,
   },
   section: {
-    gap: Space.sm,
+    gap: Space.xs + 2,
   },
   sectionTitle: {
     paddingHorizontal: Space.lg,
-    letterSpacing: 0.5,
+    // Caixa alta pede tracking: sem ele o rótulo lê como palavra apertada, não como etiqueta.
+    letterSpacing: 0.6,
   },
   group: {
     borderRadius: Radius.md,

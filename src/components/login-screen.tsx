@@ -190,7 +190,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   buttonText: {
-    color: '#ffffff',
   },
   pressed: {
     opacity: 0.8,

@@ -141,8 +141,8 @@ export default function TodayScreen() {
         <Animated.View entering={FadeInDown.duration(Motion.duration.slow)}>
           <Pressable onPress={() => router.push('/finance/forecast')}>
             <GlassCard style={styles.hero}>
-              <ThemedText type="small" themeColor="textSecondary">
-                Sobra até o fim do mês
+              <ThemedText type="caption" themeColor="textSecondary" style={styles.heroLabel}>
+                SOBRA ATÉ O FIM DO MÊS
               </ThemedText>
               <Money cents={leftover} variant="money" tone={leftover < 0 ? 'danger' : 'text'} />
               <Sparkline values={series} width={width - Space.lg * 4} showZero />
@@ -292,6 +292,9 @@ const styles = StyleSheet.create({
   },
   hero: {
     gap: Space.sm,
+  },
+  heroLabel: {
+    letterSpacing: 0.6,
   },
   trailing: {
     alignItems: 'flex-end',
