@@ -34,11 +34,26 @@ function parseLocal(value: string): Date {
   return new Date(Number(dateOnly[1]), Number(dateOnly[2]) - 1, Number(dateOnly[3]));
 }
 
+/**
+ * Número decimal em pt-BR: vírgula, nunca ponto.
+ *
+ * Existiam três versões disso — uma em `net-worth.tsx`, uma inline em `debts.tsx`, e NENHUMA em
+ * `reports.tsx`, que por isso escrevia "Guardou 90.4% do que entrou" com ponto, ao lado de
+ * "90,4%" na tela de patrimônio. Mesmo dado, duas grafias.
+ */
+export function formatNumberBR(value: number): string {
+  return String(value).replace('.', ',');
+}
+
 export function formatDateBR(value: string | Date): string {
   const d = typeof value === 'string' ? parseLocal(value) : value;
   const dd = String(d.getDate()).padStart(2, '0');
   const mm = String(d.getMonth() + 1).padStart(2, '0');
-  return `${dd}-${mm}-${d.getFullYear()}`;
+  // Barra, não hífen: `isoToBR` (o que os formulários mostram e o que o usuário digita) sempre
+  // usou `26/08/2026`, e esta função usava `26-08-2026`. Duas grafias para a mesma data no mesmo
+  // app — e nenhuma das duas era a do Brasil na tela de leitura. Hífen aqui ainda lembrava ISO,
+  // que é como o dado é ARMAZENADO, não como se lê.
+  return `${dd}/${mm}/${d.getFullYear()}`;
 }
 
 // ── entrada de data/hora em texto (evita dependência nativa de picker) ────────

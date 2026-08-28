@@ -34,7 +34,10 @@ export function EmptyState({ icon, title, hint, action }: EmptyStateProps) {
         </ThemedText>
       ) : null}
       {action ? (
-        <Button label={action.label} onPress={action.onPress} size="sm" />
+        // `alignSelf` explícito: o wrapper do `Button` usa `flex-start` para não ser esticado por
+        // pai com `stretch`, e isso ganhava do `alignItems: center` daqui — o botão saía colado
+        // à esquerda embaixo de um título centralizado.
+        <Button label={action.label} onPress={action.onPress} size="sm" style={styles.action} />
       ) : null}
     </View>
   );
@@ -49,5 +52,8 @@ const styles = StyleSheet.create({
   },
   centered: {
     textAlign: 'center',
+  },
+  action: {
+    alignSelf: 'center',
   },
 });

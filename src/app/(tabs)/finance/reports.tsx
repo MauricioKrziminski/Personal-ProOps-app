@@ -20,6 +20,7 @@ import { ProgressBar } from '@/components/ui/sparkline';
 import { useToast } from '@/components/ui/toast';
 import { Motion, Space, tabular } from '@/design/tokens';
 import { localISODate } from '@/hooks/use-items';
+import { formatNumberBR } from '@/lib/dates';
 import { useAnnualReport, type AnnualCategoryRow, type YearEndBalance } from '@/hooks/use-finance';
 
 /** Quantas categorias de gasto aparecem antes do "ver todas". */
@@ -161,7 +162,7 @@ export default function ReportsScreen() {
               </View>
             </View>
             <ThemedText type="small" themeColor="textSecondary" style={tabular}>
-              Guardou {summary.savings_rate}% do que entrou · {summary.tx_count}{' '}
+              Guardou {formatNumberBR(Number(summary.savings_rate))}% do que entrou · {summary.tx_count}{' '}
               {Number(summary.tx_count) === 1 ? 'lançamento' : 'lançamentos'}
             </ThemedText>
           </GlassCard>

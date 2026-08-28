@@ -33,7 +33,7 @@ import {
   type Debt,
 } from '@/hooks/use-finance';
 import { useTheme } from '@/hooks/use-theme';
-import { formatBRL, isoToBR } from '@/lib/dates';
+import { formatBRL, formatNumberBR, isoToBR } from '@/lib/dates';
 import { confirmDestructive, showItemActions } from '@/lib/item-actions';
 
 /**
@@ -135,7 +135,7 @@ export default function DebtsScreen() {
       principalCents: Number(d.principal_cents),
       // sem o toFixed, 0.0199 * 100 vira 1.9900000000000002 no campo
       taxa: d.interest_rate_monthly
-        ? String(Number((d.interest_rate_monthly * 100).toFixed(4))).replace('.', ',')
+        ? formatNumberBR(Number((d.interest_rate_monthly * 100).toFixed(4)))
         : '',
       parcelas: d.installments ? String(d.installments) : '',
       diaVencimento: d.due_day ? String(d.due_day) : '',

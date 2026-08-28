@@ -18,6 +18,14 @@ e onde ele decide o que fazer com isso.*
 
 > Dois `GlassCard` na mesma tela é erro de revisão, não questão de gosto.
 
+**Card de destaque que SOMA uma lista some quando a soma não informa nada:** com a lista vazia
+(zeros em cima de um empty state) ou com UM item, quando ele repete o número da única linha
+palavra por palavra. Soma de um item não é resumo, é eco — foi o caso de Cartões. Continua
+aparecendo quando acrescenta algo que a linha não diz (juros até quitar, em Dívidas).
+
+**Rótulo do herói vem ANTES do valor**, sempre, via `HeroLabel`. Era o único jeito de Plano ficar
+igual às outras seis telas com card de destaque.
+
 `src/components/glass/glass-card.tsx` (`GlassCard`) é o único caminho para glass. Ele resolve
 `isLiquidGlassAvailable()` → `GlassView` nativo (iOS 26+) com fallback `BlurView` em iOS antigo,
 Android e web. **Nunca** usar `GlassView`/`BlurView` direto numa tela.
@@ -151,6 +159,9 @@ que "voltar" faz depois.
 - **Porta de mão única** (login, onboarding concluído, compra) sai da pilha com `Stack.Protected`
   + `replace` — voltar nunca reentra no estado antigo.
 - **Abas são pares.** Nada de slide entre abas; re-tap na aba ativa volta à raiz.
+- **Criar item de lista é `+` no header**, nunca botão de bloco no corpo — Contas, Cartões,
+  Orçamentos, Metas, Dívidas, Recorrentes, Regras e Lembretes. O botão no corpo existe só dentro
+  do `EmptyState`, onde não há lista para o `+` do header explicar.
 
 ---
 

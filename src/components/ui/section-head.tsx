@@ -1,4 +1,4 @@
-import type { ReactNode } from 'react';
+import { Children, type ReactNode } from 'react';
 import { StyleSheet, View } from 'react-native';
 
 import { ThemedText } from '@/components/themed-text';
@@ -27,9 +27,25 @@ export function HeroLabel({
       themeColor="textSecondary"
       style={styles.tracked}
       accessibilityLabel={accessibilityLabel}>
-      {typeof children === 'string' ? children.toUpperCase() : children}
+      {upper(children)}
     </ThemedText>
   );
+}
+
+/**
+ * Caixa alta que sobrevive à interpolação.
+ *
+ * `typeof children === 'string'` sozinho não bastava: `<HeroLabel>Sobrou em {ano}</HeroLabel>`
+ * entrega um ARRAY (`['Sobrou em ', 2026]`), caía no `else` e o rótulo saía em caixa mista.
+ * Em Relatórios isso deixava "Sobrou em 2026" ao lado de "RECEBIDO" e "GASTO" — três rótulos do
+ * mesmo card em duas grafias. Falha silenciosa: nada quebra, só fica torto.
+ */
+function upper(children: ReactNode): ReactNode {
+  const parts = Children.toArray(children);
+  if (parts.length > 0 && parts.every((c) => typeof c === 'string' || typeof c === 'number')) {
+    return parts.join('').toUpperCase();
+  }
+  return children;
 }
 
 /**

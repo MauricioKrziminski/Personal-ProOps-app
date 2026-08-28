@@ -12,6 +12,7 @@ import Animated, {
 } from 'react-native-reanimated';
 
 import { GlassCard } from '@/components/glass/glass-card';
+import { Card } from '@/components/ui/card';
 import { monthTitle } from '@/components/finance/month-picker';
 import { ThemedText } from '@/components/themed-text';
 import { EmptyState } from '@/components/ui/empty-state';
@@ -160,7 +161,9 @@ export default function InvoicesScreen() {
         />
       ) : null}
 
-      {atual ? (
+      {/* Com UM cartão o nome solto no topo não desambigua nada — a tela inteira é dele.
+          Vira legenda só quando existe seleção acima para legendar. */}
+      {atual && cartoes.length > 1 ? (
         <ThemedText type="footnote" themeColor="textSecondary" style={styles.rodape}>
           {atual.name}
         </ThemedText>
@@ -225,10 +228,18 @@ export default function InvoicesScreen() {
         </Animated.View>
       ) : null}
 
+      {/* Mesmo tratamento do "A curva ainda não tem história" em Patrimônio: é o estado de TODO
+          usuário novo, e explicação sem container vira parágrafo cinza flutuando na tela. */}
       {!invoices.isError && serie.length === 1 ? (
-        <ThemedText type="footnote" themeColor="textSecondary" style={styles.rodape}>
-          Comparação aparece a partir do segundo mês.
-        </ThemedText>
+        <Card>
+          <View style={styles.aviso}>
+            <ThemedText type="smallBold">Só uma fatura até agora</ThemedText>
+            <ThemedText type="small" themeColor="textSecondary">
+              A comparação entre meses aparece a partir da segunda fatura — com uma só não há o que
+              comparar.
+            </ThemedText>
+          </View>
+        </Card>
       ) : null}
 
       {lista.length > 0 ? (
@@ -291,8 +302,7 @@ export default function InvoicesScreen() {
 
       {lista.length > 0 ? (
         <ThemedText type="footnote" themeColor="textSecondary" style={styles.rodape}>
-          Faturas começam a aparecer aqui quando a primeira compra cai no cartão. O total soma as
-          compras da fatura; o pagamento é transferência e não entra na conta.
+          O total soma as compras da fatura; o pagamento é transferência e não entra na conta.
         </ThemedText>
       ) : null}
     </Screen>
@@ -300,6 +310,9 @@ export default function InvoicesScreen() {
 }
 
 const styles = StyleSheet.create({
+  aviso: {
+    gap: Space.sm,
+  },
   hero: {
     gap: Space.sm,
   },

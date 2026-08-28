@@ -156,10 +156,12 @@ export default function PlanScreen() {
               ) : null}
             </View>
 
+            {/* Rótulo ANTES do número, como em todo card de destaque do app. Aqui estava
+                invertido — valor em cima, etiqueta embaixo — e era o único assim. */}
+            <HeroLabel>mensagens da IA usadas este mês</HeroLabel>
             <ThemedText type="subtitle" style={tabular}>
               {usadas} de {teto}
             </ThemedText>
-            <HeroLabel>mensagens da IA usadas este mês</HeroLabel>
             <ProgressBar
               value={usadas}
               max={teto}

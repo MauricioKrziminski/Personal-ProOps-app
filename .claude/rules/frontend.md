@@ -20,7 +20,11 @@ Expo SDK 57 (managed), código em `src/`, paths `@/*` → `src/*` e `@/assets/*`
 
 - Sempre **react-hook-form + zod** (`zodResolver`). Schema zod colocalizado com o form.
 - **Dinheiro**: sempre `amount_cents` inteiro. Input monetário via `src/components/finance/money-input.tsx` (digita em centavos); exibição via `formatBRL` de `use-items.ts`. **Nunca float, nunca `parseFloat` em dinheiro.**
-- Datas exibidas com `formatDateBR`; armazenadas ISO.
+- Datas exibidas com `formatDateBR`; armazenadas ISO. **Uma grafia só: `28/08/2026`** — leitura
+  (`formatDateBR`) e formulário (`isoToBR`) escrevem igual, e um teste em `dates.test.ts` compara
+  as duas. Hífen (`28-08-2026`) lembra ISO, que é como o dado é ARMAZENADO, não como se lê.
+- Decimal em texto (percentual, taxa, meses) só por `formatNumberBR` — vírgula, nunca ponto.
+  Havia três cópias disso e uma tela sem nenhuma, escrevendo `90.4%` ao lado de `90,4%`.
 
 ## Estado local
 

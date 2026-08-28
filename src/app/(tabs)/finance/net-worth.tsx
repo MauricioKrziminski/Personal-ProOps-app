@@ -37,6 +37,7 @@ import {
   type Asset,
 } from '@/hooks/use-finance';
 import { formatBRL } from '@/hooks/use-items';
+import { formatNumberBR } from '@/lib/dates';
 import { useTheme } from '@/hooks/use-theme';
 import { confirmDestructive } from '@/lib/item-actions';
 
@@ -55,11 +56,6 @@ import { confirmDestructive } from '@/lib/item-actions';
 function mesLabel(iso: string): string {
   const [y, m] = iso.split('-').map(Number);
   return new Date(y, m - 1, 1).toLocaleDateString('pt-BR', { month: 'short' });
-}
-
-/** `financial_health()` arredonda em UMA casa no banco; pt-BR usa vírgula, não ponto. */
-function ptBR(n: number): string {
-  return String(n).replace('.', ',');
 }
 
 const CLASSE_ICONE: Record<string, Parameters<typeof Icon>[0]['name']> = {
@@ -360,7 +356,7 @@ export default function NetWorthScreen() {
             subtitle="peso 40 pts"
             trailing={
               <ThemedText type="small" style={tabular}>
-                {ptBR(saude.data.savings_rate)}%
+                {formatNumberBR(saude.data.savings_rate)}%
               </ThemedText>
             }
           />
@@ -369,7 +365,7 @@ export default function NetWorthScreen() {
             subtitle="peso 25 pts"
             trailing={
               <ThemedText type="small" style={tabular}>
-                {ptBR(saude.data.budget_adherence)}%
+                {formatNumberBR(saude.data.budget_adherence)}%
               </ThemedText>
             }
           />
@@ -378,7 +374,7 @@ export default function NetWorthScreen() {
             subtitle="peso 20 pts"
             trailing={
               <ThemedText type="small" style={tabular}>
-                {ptBR(saude.data.months_of_reserve)} meses
+                {formatNumberBR(saude.data.months_of_reserve)} meses
               </ThemedText>
             }
           />
@@ -387,7 +383,7 @@ export default function NetWorthScreen() {
             subtitle="peso 15 pts"
             trailing={
               <ThemedText type="small" style={tabular}>
-                {ptBR(saude.data.debt_ratio)}%
+                {formatNumberBR(saude.data.debt_ratio)}%
               </ThemedText>
             }
           />

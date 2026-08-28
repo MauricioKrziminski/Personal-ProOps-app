@@ -34,8 +34,8 @@ test('monthBounds cobre o mês inteiro, inclusive fevereiro', () => {
   assert.deepEqual(monthBounds('2026-12'), { from: '2026-12-01', to: '2026-12-31' });
 });
 
-test('formatDateBR devolve dd-mm-yyyy', () => {
-  assert.equal(formatDateBR(new Date(2026, 7, 5)), '05-08-2026');
+test('formatDateBR devolve dd/mm/yyyy — a MESMA grafia de `isoToBR`', () => {
+  assert.equal(formatDateBR(new Date(2026, 7, 5)), '05/08/2026');
 });
 
 test('formatBRL trabalha em centavos inteiros', () => {
@@ -83,11 +83,18 @@ test('localDateTime monta o instante no fuso do aparelho', () => {
 
 test('data pura não anda um dia para trás em fuso negativo', () => {
   // `new Date('2026-08-28')` é meia-noite UTC; em -03 o getDate() disso é 27.
-  assert.equal(formatDateBR('2026-08-28'), '28-08-2026');
-  assert.equal(formatDateBR('2026-01-01'), '01-01-2026');
-  assert.equal(formatDateBR('2026-12-31'), '31-12-2026');
+  assert.equal(formatDateBR('2026-08-28'), '28/08/2026');
+  assert.equal(formatDateBR('2026-01-01'), '01/01/2026');
+  assert.equal(formatDateBR('2026-12-31'), '31/12/2026');
 });
 
 test('timestamptz continua sendo lido no fuso local', () => {
-  assert.equal(formatDateBR(new Date(2026, 7, 28, 23, 30)), '28-08-2026');
+  assert.equal(formatDateBR(new Date(2026, 7, 28, 23, 30)), '28/08/2026');
+});
+
+test('data: `formatDateBR` e `isoToBR` escrevem a MESMA data igual', () => {
+  // As duas convivem (uma lê Date/ISO, a outra converte para input de texto) e já divergiram:
+  // leitura em `28-08-2026`, formulário em `28/08/2026`.
+  assert.equal(formatDateBR('2026-08-28'), isoToBR('2026-08-28'));
+  assert.equal(formatDateBR('2026-01-09'), isoToBR('2026-01-09'));
 });

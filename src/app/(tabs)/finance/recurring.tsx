@@ -354,8 +354,10 @@ export default function RecurringScreen() {
         </>
       ) : null}
 
-      {/* O único GlassCard da tela. */}
-      {proximos.isError ? (
+      {/* O único GlassCard da tela. Some quando não há série: "SAI R$ 0,00 / ENTRA R$ 0,00" em
+          cima de um empty state é cabeçalho vazio para a tela parecer cheia — exatamente o que a
+          regra da aba Hoje proíbe. */}
+      {lista.length === 0 ? null : proximos.isError ? (
         <ErrorBand
           message="Não deu para somar os próximos 30 dias. A lista abaixo continua valendo."
           onRetry={proximos.refetch}

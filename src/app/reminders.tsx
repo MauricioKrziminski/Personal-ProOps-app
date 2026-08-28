@@ -1,15 +1,14 @@
-import { StyleSheet, View } from 'react-native';
+import { StyleSheet } from 'react-native';
 import { Stack, router } from 'expo-router';
 
 import { ErrorCard } from '@/components/error-card';
 import { ThemedText } from '@/components/themed-text';
-import { Button } from '@/components/ui/button';
+import { HeaderActions } from '@/components/ui/header-actions';
 import { EmptyState } from '@/components/ui/empty-state';
 import { Row, Section } from '@/components/ui/row';
 import { Screen } from '@/components/ui/screen';
 import { SkeletonRow } from '@/components/ui/skeleton';
 import { useToast } from '@/components/ui/toast';
-import { Space } from '@/design/tokens';
 import {
   formatDateBR,
   useDeleteReminder,
@@ -85,6 +84,13 @@ export default function RemindersScreen() {
         }}
       />
 
+      {/* Criar é `+` no header, como em Contas, Cartões, Orçamentos, Metas, Dívidas, Recorrentes
+          e Regras. Aqui era um botão de bloco no CORPO, e esta era a única tela de lista do app
+          sem ação nenhuma no header — mesma intenção, dois lugares diferentes. */}
+      <HeaderActions
+        actions={[{ label: 'Novo lembrete', icon: 'plus', onPress: () => router.push('/reminder-form') }]}
+      />
+
       {isError ? <ErrorCard onRetry={refetch} /> : null}
 
       {isLoading ? (
@@ -107,22 +113,16 @@ export default function RemindersScreen() {
         />
       ) : null}
 
-      {reminders.length > 0 ? (
-        <View style={styles.footer}>
-          <Button label="Novo lembrete" icon="plus" onPress={() => router.push('/reminder-form')} block />
-          <ThemedText type="small" themeColor="textSecondary" style={styles.hint}>
-            Lembrete pausado não dispara e não gasta mensagem.
-          </ThemedText>
-        </View>
+      {paused.length > 0 ? (
+        <ThemedText type="small" themeColor="textSecondary" style={styles.hint}>
+          Lembrete pausado não dispara e não gasta mensagem.
+        </ThemedText>
       ) : null}
     </Screen>
   );
 }
 
 const styles = StyleSheet.create({
-  footer: {
-    gap: Space.md,
-  },
   hint: {
     textAlign: 'center',
   },

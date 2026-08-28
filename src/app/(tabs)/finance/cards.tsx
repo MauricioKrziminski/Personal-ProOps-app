@@ -158,8 +158,10 @@ export default function CardsScreen() {
         <ErrorBand message="Não deu para carregar seus cartões." onRetry={cards.refetch} />
       ) : null}
 
-      {/* O único GlassCard da tela: com N cartões, a pergunta da tela não tem resposta visível. */}
-      {!cards.isError && lista.length > 0 ? (
+      {/* O único GlassCard da tela: com N cartões, a pergunta da tela não tem resposta visível.
+          Com UM cartão ele repetia o mesmo número do card logo abaixo, palavra por palavra
+          (total, nome e vencimento) — soma de um item não é resumo, é eco. */}
+      {!cards.isError && lista.length > 1 ? (
         <Animated.View entering={FadeInDown.duration(Motion.duration.slow)}>
           <GlassCard style={styles.hero}>
             <HeroLabel>Total a pagar</HeroLabel>
