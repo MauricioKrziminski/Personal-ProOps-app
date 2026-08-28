@@ -1,8 +1,14 @@
 import { Link, Stack, router, type Href } from 'expo-router';
 import { useMemo, useState } from 'react';
 import { Platform, Pressable, StyleSheet, View, useWindowDimensions } from 'react-native';
-import Animated, { FadeInDown } from 'react-native-reanimated';
+import Animated, {
+  FadeInDown,
+  useAnimatedStyle,
+  useSharedValue,
+  withTiming,
+} from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import * as Haptics from 'expo-haptics';
 import type { SymbolViewProps } from 'expo-symbols';
 
 import { ErrorCard } from '@/components/error-card';
@@ -11,6 +17,7 @@ import { GlassCard } from '@/components/glass/glass-card';
 import { ThemedText } from '@/components/themed-text';
 import { Button } from '@/components/ui/button';
 import { EmptyState } from '@/components/ui/empty-state';
+import { Icon } from '@/components/ui/icon';
 import { Money } from '@/components/ui/money';
 import { Row, Section } from '@/components/ui/row';
 import { androidOverflow } from '@/components/ui/overflow-menu';
@@ -39,7 +46,7 @@ import { useTheme } from '@/hooks/use-theme';
  * Financeiro — responde "como está o meu mês?" e, no fundo, "posso gastar?".
  *
  * O topo é **projeção**, não saldo bruto: saldo bruto mente para quem tem fatura fechando.
- * Os 13 links com emoji que terminavam a tela viraram uma seção "Gerenciar" discreta no fim.
+ * Os 13 links com emoji que terminavam a tela viraram quatro atalhos no topo + `/finance/manage`.
  * Cada bloco tem query, loading e erro próprios — antes um `hasError` cobria cinco queries e
  * esquecia a de contas a pagar.
  */
@@ -57,21 +64,53 @@ const KIND_ICON: Record<Transaction['kind'], SymbolViewProps['name']> = {
   transfer: 'arrow.left.arrow.right',
 };
 
-/** O menu do fim da tela. Uma seção, ícone SF, sem emoji. */
-const MANAGE: { title: string; icon: SymbolViewProps['name']; href: Href }[] = [
-  { title: 'Todos os lançamentos', icon: 'list.bullet', href: '/finance/transactions' },
-  { title: 'Contas e carteiras', icon: 'wallet.pass', href: '/finance/accounts' },
-  { title: 'Cartões e faturas', icon: 'creditcard', href: '/finance/cards' },
-  { title: 'Faturas anteriores', icon: 'calendar', href: '/finance/invoices' },
-  { title: 'Compras parceladas', icon: 'creditcard.and.123', href: '/finance/installments' },
+/**
+ * Os quatro destinos mais abertos, em faixa logo abaixo do card de destaque.
+ *
+ * Antes eram 12 `Row`s empilhadas no RODAPÉ da tela: para chegar em "Cartões" a pessoa rolava o
+ * painel inteiro, e o fim do resumo lia como menu de configurações. O resto mora em
+ * `/finance/manage` — é o "Ver tudo" do cabeçalho da faixa.
+ */
+const SHORTCUTS: { title: string; icon: SymbolViewProps['name']; href: Href }[] = [
+  { title: 'Lançamentos', icon: 'list.bullet', href: '/finance/transactions' },
+  { title: 'Contas', icon: 'wallet.pass', href: '/finance/accounts' },
+  { title: 'Cartões', icon: 'creditcard', href: '/finance/cards' },
   { title: 'Orçamentos', icon: 'chart.pie', href: '/finance/budgets' },
-  { title: 'Metas', icon: 'target', href: '/finance/goals' },
-  { title: 'Dívidas', icon: 'dollarsign.circle', href: '/finance/debts' },
-  { title: 'Recorrentes', icon: 'arrow.triangle.2.circlepath', href: '/finance/recurring' },
-  { title: 'Patrimônio', icon: 'building.columns', href: '/finance/net-worth' },
-  { title: 'Relatórios e IR', icon: 'chart.bar', href: '/finance/reports' },
-  { title: 'Plano e família', icon: 'person.2', href: '/finance/plan' },
 ];
+
+/**
+ * Tile da faixa de atalhos. Vive aqui porque só esta tela usa (regra de `frontend.md`).
+ *
+ * Press-in com `scale` em worklet, como o `Button` — é um alvo quadrado com rótulo, não uma linha
+ * de lista, então o feedback certo é escala e não highlight de fundo.
+ */
+function Shortcut({ title, icon, href }: (typeof SHORTCUTS)[number]) {
+  const theme = useTheme();
+  const scale = useSharedValue(1);
+  const animated = useAnimatedStyle(() => ({ transform: [{ scale: scale.get() }] }));
+
+  return (
+    <Animated.View style={[styles.shortcut, animated]}>
+      <Pressable
+        accessibilityRole="button"
+        accessibilityLabel={title}
+        style={styles.shortcutPress}
+        onPressIn={() => scale.set(withTiming(Motion.pressScale, { duration: Motion.duration.fast }))}
+        onPressOut={() => scale.set(withTiming(1, { duration: Motion.duration.fast }))}
+        onPress={() => {
+          Haptics.selectionAsync();
+          router.push(href);
+        }}>
+        <View style={[styles.shortcutIcon, { backgroundColor: theme.accentSoft }]}>
+          <Icon name={icon} size="lg" color="tint" />
+        </View>
+        <ThemedText type="footnote" numberOfLines={2} style={styles.shortcutLabel}>
+          {title}
+        </ThemedText>
+      </Pressable>
+    </Animated.View>
+  );
+}
 
 /** Dias entre hoje e o último dia do mês corrente (mínimo 1). */
 function daysToMonthEnd(): number {
@@ -280,7 +319,30 @@ export default function FinanceScreen() {
           </Animated.View>
         )}
 
-        {/* Bloco 2 — o simulador estava enterrado dentro da projeção. */}
+        {/* Bloco 2 — atalhos. Fica sempre visível: sem conta cadastrada não existe dado a mostrar. */}
+        <View style={styles.block}>
+          <SectionHead
+            title="Gerenciar"
+            action={
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel="Ver tudo que dá para gerenciar"
+                hitSlop={12}
+                onPress={() => router.push('/finance/manage')}>
+                <ThemedText type="small" themeColor="tint">
+                  Ver tudo
+                </ThemedText>
+              </Pressable>
+            }
+          />
+          <View style={styles.shortcuts}>
+            {SHORTCUTS.map((item) => (
+              <Shortcut key={item.title} {...item} />
+            ))}
+          </View>
+        </View>
+
+        {/* Bloco 3 — o simulador estava enterrado dentro da projeção. */}
         <Section>
           <Row
             title="Posso comprar isso?"
@@ -290,7 +352,7 @@ export default function FinanceScreen() {
           />
         </Section>
 
-        {/* Bloco 3 — categoria sem comparação é número; com comparação é informação. */}
+        {/* Bloco 4 — categoria sem comparação é número; com comparação é informação. */}
         {summary.isError ? null : categories.length > 0 ? (
           <View style={styles.block}>
             <SectionHead
@@ -369,7 +431,7 @@ export default function FinanceScreen() {
           </View>
         ) : null}
 
-        {/* Bloco 4 — só o que já dói. Orçamento em 30% não é notícia. */}
+        {/* Bloco 5 — só o que já dói. Orçamento em 30% não é notícia. */}
         {budgets.isError ? (
           <ErrorCard onRetry={budgets.refetch} />
         ) : tight.length > 0 ? (
@@ -404,7 +466,7 @@ export default function FinanceScreen() {
           </Section>
         ) : null}
 
-        {/* Bloco 5 — cartões. */}
+        {/* Bloco 6 — cartões. */}
         {cards.isError ? (
           <ErrorCard onRetry={cards.refetch} />
         ) : (cards.data ?? []).length > 0 ? (
@@ -437,7 +499,7 @@ export default function FinanceScreen() {
           </Section>
         ) : null}
 
-        {/* Bloco 6 — confirmação do que a IA registrou, agrupada por dia. */}
+        {/* Bloco 7 — confirmação do que a IA registrou, agrupada por dia. */}
         {recent.isError ? (
           <ErrorCard onRetry={recent.refetch} />
         ) : recent.isLoading ? (
@@ -552,18 +614,6 @@ export default function FinanceScreen() {
             hint={'Manda “gastei 45 no mercado” no WhatsApp —\nou toca no + para lançar aqui'}
           />
         ) : null}
-
-        {/* Fica sempre visível: sem conta cadastrada não existe dado para mostrar. */}
-        <Section title="Gerenciar">
-          {MANAGE.map((item) => (
-            <Row
-              key={item.title}
-              title={item.title}
-              icon={item.icon}
-              onPress={() => router.push(item.href)}
-            />
-          ))}
-        </Section>
       </Screen>
 
       <Button
@@ -596,6 +646,29 @@ const styles = StyleSheet.create({
   },
   block: {
     gap: Space.md,
+  },
+  shortcuts: {
+    flexDirection: 'row',
+    gap: Space.md,
+  },
+  /** `flex: 1` divide a largura em quatro — sem largura fixa não há o que quebrar em Dynamic Type. */
+  shortcut: {
+    flex: 1,
+  },
+  shortcutPress: {
+    alignItems: 'center',
+    gap: Space.sm,
+  },
+  shortcutIcon: {
+    width: 56,
+    height: 56,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: Radius.md,
+    borderCurve: 'continuous',
+  },
+  shortcutLabel: {
+    textAlign: 'center',
   },
   blockHead: {
     flexDirection: 'row',

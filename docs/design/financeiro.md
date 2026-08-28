@@ -31,7 +31,7 @@ E o corolário imediato, que é o que realmente move comportamento: **"posso gas
 
 - **Entrada:** aba.
 - **Saída:** transações (com filtro pré-aplicado ao vir de uma categoria), projeção, orçamentos,
-  e a seção "Gerenciar" para o resto.
+  e a faixa de atalhos → `/finance/manage` para o resto.
 - **Back:** aba raiz. Re-tap volta ao topo.
 - **FAB** → `modal /finance/transaction-form`.
 
@@ -47,19 +47,22 @@ E o corolário imediato, que é o que realmente move comportamento: **"posso gas
    Projeção, não saldo bruto. Saldo bruto mente para quem tem fatura fechando. Abaixo do valor:
    `entrou · saiu · previsto`, e uma `Sparkline` do caixa projetado.
    Fonte: `cash_flow_forecast`.
-4. **"Posso comprar isso?"** — linha de ação levando ao simulador (`affordability`). É a feature
+4. **Faixa "Gerenciar"** — logo abaixo do card de destaque: `SectionHead` com "Ver tudo"
+   (→ `/finance/manage`) e **quatro atalhos** em tiles quadrados — Lançamentos · Contas ·
+   Cartões · Orçamentos. Os outros oito destinos vivem no "Ver tudo" (ver `gerenciar.md`).
+   *A faixa fica sempre visível, inclusive no empty: sem conta cadastrada não existe dado a
+   mostrar, e é daqui que o usuário sai para cadastrar.*
+5. **"Posso comprar isso?"** — linha de ação levando ao simulador (`affordability`). É a feature
    mais forte do produto e hoje está enterrada dentro de `/finance/forecast`.
-5. **"Onde o dinheiro foi"** — barras por categoria do mês **com comparação ao mês anterior**
+6. **"Onde o dinheiro foi"** — barras por categoria do mês **com comparação ao mês anterior**
    (a comparação é o que transforma número em informação). Toque na categoria → transações
    filtradas. Fonte: `transactions_summary`.
-6. **"Passando do limite"** — só orçamentos ≥ 80%. Fonte: `budgets_status`.
-7. **"Cartões"** — um `Row` por cartão: fatura atual, quanto falta fechar, limite livre.
+7. **"Passando do limite"** — só orçamentos ≥ 80%. Fonte: `budgets_status`.
+8. **"Cartões"** — um `Row` por cartão: fatura atual, quanto falta fechar, limite livre.
    Fonte: `card_summary`.
-8. **"Últimos lançamentos"** — 5 itens agrupados por dia, com fonte (`via WhatsApp`) visível e
-   correção em um toque.
-9. **"Gerenciar"** — `Section` de `Row`s nativas com ícone SF: Contas · Cartões · Orçamentos ·
-   Metas · Dívidas · Recorrentes · Parceladas · Patrimônio · Relatórios · Plano.
-   **Uma seção discreta no fim, não 13 emojis empilhados no meio da tela.**
+9. **"Últimos lançamentos"** — 5 itens agrupados por dia, com fonte (`via WhatsApp`) visível e
+   correção em um toque. **É o fim da tela** — o menu de 12 linhas que terminava aqui virou a
+   faixa de atalhos do bloco 4 (28/08/2026, a pedido do usuário).
 
 ## Dados
 
@@ -95,8 +98,8 @@ produto é o WhatsApp.
   conforme resolvem.
 - **Empty (sem nenhuma transação)** — `EmptyState` ícone `chart.pie`, título "Ainda não tem
   movimento", dica: *"Manda `gastei 45 no mercado` no WhatsApp — ou toca no + para lançar aqui"*.
-  A seção "Gerenciar" **continua visível** (o usuário precisa cadastrar conta antes de ter dado).
-- **Empty parcial** — sem orçamento, a seção some e vira um `Row` em Gerenciar. Sem cartão, idem.
+  A faixa "Gerenciar" **continua visível** (o usuário precisa cadastrar conta antes de ter dado).
+- **Empty parcial** — sem orçamento, a seção some e o destino continua na faixa. Sem cartão, idem.
 - **Error** — por bloco, inline, com retry.
 - **Conteúdo longo** — nome de categoria trunca; valor nunca.
 
@@ -109,6 +112,7 @@ produto é o WhatsApp.
 | Sparkline | mudança de estado | path anima em `Motion.slow` |
 | FAB | feedback | entra com `scale 0.9 → 1`, press-in `0.97`, haptic `impactAsync(Medium)` |
 | Blocos | continuidade | `FadeInDown`, stagger 60 ms, cap 400 ms |
+| Atalho da faixa | feedback | press-in `scale 0.97` em `Motion.fast`, haptic `selectionAsync` |
 
 ## Acessibilidade
 
