@@ -20,11 +20,12 @@ Cada item tem: o que está errado, ONDE, por quê, o caminho sugerido e como ver
   `caption` (12/400).
 - **Primitivos:** `src/components/ui/` — `card`, `row` (+`Section`), `button`, `money`,
   `sparkline`, `empty-state`, `field`, `icon`, `screen`, `segmented`, `toast`, `action-sheet`,
-  `section-head` (`HeroLabel` + `SectionHead`), `overflow-menu`. Glass em
+  `section-head` (`HeroLabel` + `SectionHead`), `header-actions` (`HeaderActions` + `HeaderMenu`,
+  o **único** caminho para ação de header — `overflow-menu.tsx` foi absorvido por ele). Glass em
   `src/components/glass/glass-card.tsx`.
-- **Estado atual:** 28 commits nesta frente, árvore limpa, `tsc`/`lint` limpos, 71 testes verdes,
-  contagem anti-slop zerada (0 hex fora do tema, 0 `fontSize` solto, 0 emoji na chrome,
-  0 `SafeAreaView` à mão, 0 `Alert` cru).
+- **Estado atual:** 33 commits nesta frente, árvore limpa, `tsc`/`lint` limpos, **84 testes**
+  verdes, contagem anti-slop zerada (0 hex fora do tema, 0 `fontSize` solto, 0 emoji na chrome,
+  0 `SafeAreaView` à mão, 0 `Alert` cru, 0 `headerRight` montado à mão).
 
 ---
 

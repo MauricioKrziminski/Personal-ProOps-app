@@ -6,6 +6,7 @@ import { ThemedText } from '@/components/themed-text';
 import { Icon } from '@/components/ui/icon';
 import { HitTarget, Space } from '@/design/tokens';
 import { showItemActions, type ItemAction } from '@/lib/item-actions';
+import { useTheme } from '@/hooks/use-theme';
 
 /** SF Symbol em string — é o que o toolbar nativo aceita; o Android sai do mapa do `Icon`. */
 type SFName = Extract<SymbolViewProps['name'], string>;
@@ -47,6 +48,8 @@ export interface HeaderAction {
  * virar botão — era o caso da aba Hoje.
  */
 export function HeaderActions({ actions }: { actions: HeaderAction[] }) {
+  const theme = useTheme();
+
   if (Platform.OS === 'ios') {
     // Toolbar sem filho ainda reclama o slot; desmontar é o que devolve o header ao padrão.
     if (actions.length === 0) return null;
@@ -59,7 +62,9 @@ export function HeaderActions({ actions }: { actions: HeaderAction[] }) {
             accessibilityLabel={action.label}
             disabled={action.disabled}
             selected={action.selected}
-            variant={action.destructive ? 'plain' : undefined}
+            // O toolbar não tem "papel destrutivo": sem `tintColor` o "Esvaziar" da lixeira
+            // sairia no accent, igualzinho a "Salvar".
+            tintColor={action.destructive ? theme.danger : undefined}
             onPress={action.onPress}>
             {action.icon ? undefined : action.label}
           </Stack.Toolbar.Button>
