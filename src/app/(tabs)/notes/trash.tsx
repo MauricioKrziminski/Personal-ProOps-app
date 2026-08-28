@@ -161,7 +161,7 @@ export default function TrashScreen() {
                 accessibilityLabel={`Esvaziar lixeira, ${notesLabel(notes.length)}`}
                 hitSlop={12}
                 onPress={confirmEmpty}>
-                <ThemedText type="small" themeColor="danger">
+                <ThemedText type="smallBold" themeColor="danger">
                   Esvaziar
                 </ThemedText>
               </Pressable>
@@ -215,7 +215,7 @@ export default function TrashScreen() {
                 icon="note.text"
                 chevron={false}
                 trailing={
-                  <ThemedText type="small" themeColor="textSecondary">
+                  <ThemedText type="footnote" themeColor="textSecondary">
                     {deadlineLabel(note)}
                   </ThemedText>
                 }

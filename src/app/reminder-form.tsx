@@ -17,10 +17,11 @@ import { Card } from '@/components/ui/card';
 import { Field, TextField } from '@/components/ui/field';
 import { Icon } from '@/components/ui/icon';
 import { Screen } from '@/components/ui/screen';
+import { HeroLabel } from '@/components/ui/section-head';
 import { Segmented } from '@/components/ui/segmented';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useToast } from '@/components/ui/toast';
-import { Fonts, MaxContentWidth } from '@/constants/theme';
+import { MaxContentWidth } from '@/constants/theme';
 import { Motion, Space, Type, tabular } from '@/design/tokens';
 import {
   useDeleteReminder,
@@ -365,7 +366,7 @@ function ReminderForm({
               hitSlop={12}
               disabled={save.isPending}
               onPress={onSubmit}>
-              <ThemedText type="default" themeColor={save.isPending ? 'textSecondary' : 'tint'}>
+              <ThemedText type="smallBold" themeColor={save.isPending ? 'textSecondary' : 'tint'}>
                 {save.isPending ? 'Salvando…' : 'Salvar'}
               </ThemedText>
             </Pressable>
@@ -538,12 +539,10 @@ function ReminderForm({
 
         {/* O único GlassCard da tela: é o resultado do formulário inteiro numa frase. */}
         <GlassCard style={styles.summary}>
-          <ThemedText type="small" themeColor="textSecondary">
-            Próximo disparo
-          </ThemedText>
+          <HeroLabel>Próximo disparo</HeroLabel>
           <ThemedText
             accessibilityLiveRegion="polite"
-            style={[Type.title2, tabular, styles.summaryValue]}>
+            style={[Type.title2, tabular]}>
             {when
               ? `${when.toLocaleDateString('pt-BR', {
                   weekday: 'long',
@@ -827,9 +826,6 @@ const styles = StyleSheet.create({
   },
   summary: {
     gap: Space.sm,
-  },
-  summaryValue: {
-    fontFamily: Fonts?.rounded,
   },
   footerActions: {
     flexDirection: 'row',

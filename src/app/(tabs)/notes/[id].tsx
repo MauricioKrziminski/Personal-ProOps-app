@@ -306,7 +306,7 @@ export default function NoteDetailScreen() {
         <Animated.View
           entering={FadeIn.duration(Motion.duration.fast)}
           exiting={FadeOut.duration(Motion.duration.exit)}>
-          <ThemedText type="small" themeColor="textSecondary">
+          <ThemedText type="footnote" themeColor="textSecondary">
             Salvo
           </ThemedText>
         </Animated.View>
@@ -384,19 +384,19 @@ export default function NoteDetailScreen() {
             }}
             style={[styles.chip, { backgroundColor: theme.accentSoft }]}>
             <Icon name={symbol(folder?.icon)} size="sm" color="tint" />
-            <ThemedText type="small" themeColor="tint">
+            <ThemedText type="smallBold" themeColor="tint">
               {folder?.name ?? 'Sem pasta'}
             </ThemedText>
           </Pressable>
 
           {tags.map((tag) => (
-            <ThemedText key={tag} type="small" themeColor="textSecondary">
+            <ThemedText key={tag} type="footnote" themeColor="textSecondary">
               #{tag}
             </ThemedText>
           ))}
 
           {note.data ? (
-            <ThemedText type="small" themeColor="textSecondary">
+            <ThemedText type="footnote" themeColor="textSecondary">
               {note.data.source === 'whatsapp' ? 'via WhatsApp' : 'no app'} ·{' '}
               {relativeBR(note.data.updated_at)}
             </ThemedText>
@@ -584,7 +584,7 @@ function FolderPicker({
         <View style={styles.sheetHeader}>
           <ThemedText type="smallBold">Mover para</ThemedText>
           <Pressable accessibilityRole="button" accessibilityLabel="Fechar" hitSlop={12} onPress={onClose}>
-            <ThemedText type="small" themeColor="tint">
+            <ThemedText type="smallBold" themeColor="tint">
               Fechar
             </ThemedText>
           </Pressable>

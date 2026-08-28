@@ -20,7 +20,7 @@ import { Row, Section } from '@/components/ui/row';
 import { Screen } from '@/components/ui/screen';
 import { SkeletonRow } from '@/components/ui/skeleton';
 import { useToast } from '@/components/ui/toast';
-import { HitTarget, Motion, Radius, Space } from '@/design/tokens';
+import { HitTarget, Motion, Radius, Space, tabular } from '@/design/tokens';
 import {
   useDeleteFolder,
   useNoteFolders,
@@ -304,7 +304,7 @@ export default function FoldersScreen() {
                 icon={symbol(folder.icon)}
                 chevron={false}
                 trailing={
-                  <ThemedText type="small" themeColor="textSecondary">
+                  <ThemedText type="footnote" themeColor="textSecondary" style={tabular}>
                     {folder.notes_count}
                   </ThemedText>
                 }
@@ -325,7 +325,7 @@ export default function FoldersScreen() {
             icon="tray"
             chevron={false}
             trailing={
-              <ThemedText type="small" themeColor="textSecondary">
+              <ThemedText type="footnote" themeColor="textSecondary" style={tabular}>
                 {loose.data ?? 0}
               </ThemedText>
             }

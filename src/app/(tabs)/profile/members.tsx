@@ -13,7 +13,7 @@ import { Row, Section } from '@/components/ui/row';
 import { Screen } from '@/components/ui/screen';
 import { SkeletonRow } from '@/components/ui/skeleton';
 import { useToast } from '@/components/ui/toast';
-import { Motion, Space, Type, tabular } from '@/design/tokens';
+import { Motion, Space, tabular } from '@/design/tokens';
 import {
   useInviteMember,
   useInvites,
@@ -230,7 +230,7 @@ export default function MembersScreen() {
             />
             {noLimite ? (
               <>
-                <ThemedText type="small" themeColor="textSecondary" style={styles.rodape}>
+                <ThemedText type="footnote" themeColor="textSecondary" style={styles.rodape}>
                   Seu plano vai até {teto} {teto === 1 ? 'pessoa' : 'pessoas'} — e convite pendente
                   já ocupa uma vaga.
                 </ThemedText>
@@ -289,11 +289,11 @@ export default function MembersScreen() {
       ) : null}
 
       <View style={styles.bloco}>
-        <ThemedText type="small" themeColor="textSecondary" style={styles.rodape}>
+        <ThemedText type="footnote" themeColor="textSecondary" style={styles.rodape}>
           Quem entra vê e lança tudo: não existe acesso só de leitura hoje. Cada lançamento guarda
           quem lançou, e tirar alguém do espaço não apaga o que essa pessoa lançou.
         </ThemedText>
-        <ThemedText type="small" themeColor="textSecondary" style={styles.rodape}>
+        <ThemedText type="footnote" themeColor="textSecondary" style={styles.rodape}>
           O telefone das outras pessoas não aparece aqui — cada perfil só é visível para o próprio
           dono. Remover alguém e renomear o espaço também ainda não existem nesta tela.
         </ThemedText>
@@ -307,7 +307,6 @@ const styles = StyleSheet.create({
     gap: Space.md,
   },
   rodape: {
-    ...Type.footnote,
     paddingHorizontal: Space.lg,
   },
 });

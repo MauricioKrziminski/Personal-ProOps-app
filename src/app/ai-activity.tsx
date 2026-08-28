@@ -12,6 +12,7 @@ import { EmptyState } from '@/components/ui/empty-state';
 import { Icon } from '@/components/ui/icon';
 import { Row, Section } from '@/components/ui/row';
 import { Screen } from '@/components/ui/screen';
+import { HeroLabel } from '@/components/ui/section-head';
 import { SkeletonRow } from '@/components/ui/skeleton';
 import { useToast } from '@/components/ui/toast';
 import { Motion, Space, Type, tabular } from '@/design/tokens';
@@ -338,9 +339,7 @@ export default function AiActivityScreen() {
       {semana.total > 0 ? (
         <Animated.View entering={FadeInDown.duration(Motion.duration.slow)}>
           <GlassCard style={styles.hero}>
-            <ThemedText type="small" themeColor="textSecondary">
-              Esta semana
-            </ThemedText>
+            <HeroLabel>Esta semana</HeroLabel>
             <ThemedText style={[Type.title2, tabular]}>
               {semana.total} {semana.total === 1 ? 'mensagem' : 'mensagens'}
             </ThemedText>
@@ -378,7 +377,7 @@ export default function AiActivityScreen() {
       ) : null}
 
       {!isLoading && !isError && lista.length > 0 ? (
-        <ThemedText type="small" themeColor="textSecondary" style={styles.rodape}>
+        <ThemedText type="footnote" themeColor="textSecondary" style={styles.rodape}>
           Também dá para corrigir conversando: “muda o último pra 54”. Nota, lembrete e meta ainda
           não guardam o id de origem, então não têm desfazer aqui.
         </ThemedText>
@@ -425,7 +424,6 @@ const styles = StyleSheet.create({
     paddingBottom: Space.md,
   },
   rodape: {
-    ...Type.footnote,
     paddingHorizontal: Space.lg,
   },
 });
