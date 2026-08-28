@@ -1,31 +1,28 @@
-import { useState } from "react";
-import { Modal, Pressable, ScrollView, StyleSheet, View } from "react-native";
-import { Stack, router, useLocalSearchParams } from "expo-router";
-import { useSafeAreaInsets } from "react-native-safe-area-context";
-import Animated, {
-  FadeInDown,
-  LinearTransition,
-} from "react-native-reanimated";
-import * as DocumentPicker from "expo-document-picker";
-import { File } from "expo-file-system";
-import * as Haptics from "expo-haptics";
+import { useState } from 'react';
+import { Modal, Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { Stack, router, useLocalSearchParams } from 'expo-router';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import Animated, { FadeInDown, LinearTransition } from 'react-native-reanimated';
+import * as DocumentPicker from 'expo-document-picker';
+import { File } from 'expo-file-system';
+import * as Haptics from 'expo-haptics';
 
-import { ErrorCard } from "@/components/error-card";
-import { Chip } from "@/components/finance/chip";
-import { GlassCard } from "@/components/glass/glass-card";
-import { ThemedText } from "@/components/themed-text";
-import { Button } from "@/components/ui/button";
-import { EmptyState } from "@/components/ui/empty-state";
-import { Icon } from "@/components/ui/icon";
-import { Money } from "@/components/ui/money";
-import { Row, Section } from "@/components/ui/row";
-import { Screen } from "@/components/ui/screen";
-import { Skeleton, SkeletonRow } from "@/components/ui/skeleton";
-import { useToast } from "@/components/ui/toast";
-import { Motion, Radius, Space, Type } from "@/design/tokens";
-import { formatDateBR } from "@/hooks/use-items";
-import { confirmDestructive, showItemActions } from "@/lib/item-actions";
-import { SUGGESTED_CATEGORIES } from "@/lib/categories";
+import { ErrorCard } from '@/components/error-card';
+import { Chip } from '@/components/finance/chip';
+import { GlassCard } from '@/components/glass/glass-card';
+import { ThemedText } from '@/components/themed-text';
+import { Button } from '@/components/ui/button';
+import { EmptyState } from '@/components/ui/empty-state';
+import { Icon } from '@/components/ui/icon';
+import { Money } from '@/components/ui/money';
+import { Row, Section } from '@/components/ui/row';
+import { Screen } from '@/components/ui/screen';
+import { Skeleton, SkeletonRow } from '@/components/ui/skeleton';
+import { useToast } from '@/components/ui/toast';
+import { Motion, Radius, Space, Type } from '@/design/tokens';
+import { formatDateBR } from '@/hooks/use-items';
+import { confirmDestructive, showItemActions } from '@/lib/item-actions';
+import { SUGGESTED_CATEGORIES } from '@/lib/categories';
 import {
   useAccounts,
   useApproveImportItems,
@@ -34,8 +31,8 @@ import {
   useImportStatement,
   useUpdateImportItem,
   type ImportItem,
-} from "@/hooks/use-finance";
-import { useTheme } from "@/hooks/use-theme";
+} from '@/hooks/use-finance';
+import { useTheme } from '@/hooks/use-theme';
 
 /**
  * O MIME curinga está na lista de propósito: banco brasileiro manda MIME errado com frequência, e
@@ -43,13 +40,13 @@ import { useTheme } from "@/hooks/use-theme";
  * verdade é a mensagem de erro amigável do 422.
  */
 const ACCEPTED = [
-  "application/x-ofx",
-  "application/vnd.intu.qfx",
-  "text/csv",
-  "text/comma-separated-values",
-  "application/csv",
-  "text/plain",
-  "*/*",
+  'application/x-ofx',
+  'application/vnd.intu.qfx',
+  'text/csv',
+  'text/comma-separated-values',
+  'application/csv',
+  'text/plain',
+  '*/*',
 ];
 
 /** Teto do `import-statement` (`MAX_ITEMS`). O corte era silencioso; agora está escrito na tela. */
@@ -69,39 +66,38 @@ interface FalhaImport {
  */
 async function traduzErro(err: unknown): Promise<FalhaImport> {
   const context = (err as { context?: Response } | null)?.context;
-  if (!context || typeof context.status !== "number") {
+  if (!context || typeof context.status !== 'number') {
     return {
-      titulo: "Não deu para importar agora",
-      detalhe: "Pode ter sido a conexão. Tenta de novo em instantes.",
+      titulo: 'Não deu para importar agora',
+      detalhe: 'Pode ter sido a conexão. Tenta de novo em instantes.',
     };
   }
 
-  let doServidor = "";
+  let doServidor = '';
   try {
     const corpo = (await context.json()) as { error?: string } | null;
-    doServidor = corpo?.error ?? "";
+    doServidor = corpo?.error ?? '';
   } catch {
     // 500 nem sempre devolve JSON — segue com a mensagem por status.
   }
 
   if (context.status === 402) {
     return {
-      titulo: "Importar extrato é do plano Pro",
-      detalhe:
-        doServidor || "No Free dá para registrar pelo WhatsApp à vontade.",
+      titulo: 'Importar extrato é do plano Pro',
+      detalhe: doServidor || 'No Free dá para registrar pelo WhatsApp à vontade.',
     };
   }
   if (context.status === 422) {
     return {
-      titulo: "Não achei lançamentos nesse arquivo",
+      titulo: 'Não achei lançamentos nesse arquivo',
       detalhe:
         doServidor ||
-        "Ele é o extrato em OFX ou CSV, e não o comprovante em PDF? Foto e PDF entram pelo WhatsApp.",
+        'Ele é o extrato em OFX ou CSV, e não o comprovante em PDF? Foto e PDF entram pelo WhatsApp.',
     };
   }
   return {
-    titulo: "Não deu para importar agora",
-    detalhe: doServidor || "Tenta de novo em instantes.",
+    titulo: 'Não deu para importar agora',
+    detalhe: doServidor || 'Tenta de novo em instantes.',
   };
 }
 
@@ -126,30 +122,22 @@ export default function ImportScreen() {
   const [editando, setEditando] = useState<ImportItem | null>(null);
   const [verRevisados, setVerRevisados] = useState(false);
 
-  const {
-    data: items,
-    isLoading,
-    isError,
-    refetch,
-    isRefetching,
-  } = useImportItems(batchId);
+  const { data: items, isLoading, isError, refetch, isRefetching } = useImportItems(batchId);
   const aprovar = useApproveImportItems();
   const descartar = useDiscardImportItems();
   const atualizar = useUpdateImportItem();
 
   const lista = items ?? [];
-  const paraRevisar = lista.filter((i) => i.status === "pending");
-  const repetidos = lista.filter((i) => i.status === "duplicate");
-  const revisados = lista.filter(
-    (i) => i.status === "approved" || i.status === "discarded",
-  );
+  const paraRevisar = lista.filter((i) => i.status === 'pending');
+  const repetidos = lista.filter((i) => i.status === 'duplicate');
+  const revisados = lista.filter((i) => i.status === 'approved' || i.status === 'discarded');
 
   // O número do botão é o número que vai entrar. O cabeçalho antigo contava as duplicatas e o
   // "confirmar todos" as ignorava: confirmar 12 importava 10 sem explicar os 2.
   const vaoEntrar = paraRevisar.length;
   const somaDespesas = paraRevisar.reduce(
-    (soma, i) => soma + (i.kind === "expense" ? i.amount_cents : 0),
-    0,
+    (soma, i) => soma + (i.kind === 'expense' ? i.amount_cents : 0),
+    0
   );
   const porRegra = paraRevisar.filter((i) => i.suggested_category).length;
   const semCategoria = paraRevisar.filter((i) => !i.suggested_category).length;
@@ -170,7 +158,7 @@ export default function ImportScreen() {
       const conteudo = await new File(arquivo.uri).text();
       const resultado = await importar.mutateAsync({
         content: conteudo,
-        source: ehOfx ? "ofx" : "csv",
+        source: ehOfx ? 'ofx' : 'csv',
         filename: arquivo.name,
         accountId,
       });
@@ -186,23 +174,22 @@ export default function ImportScreen() {
     if (!vaoEntrar) return;
     const ids = paraRevisar.map((i) => i.id);
     confirmDestructive(
-      `Lançar ${vaoEntrar} ${vaoEntrar === 1 ? "item" : "itens"} no seu financeiro?`,
+      `Lançar ${vaoEntrar} ${vaoEntrar === 1 ? 'item' : 'itens'} no seu financeiro?`,
       `Confirmar ${vaoEntrar}`,
       () =>
         aprovar.mutate(ids, {
           onSuccess: () => {
             Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
             toast({
-              message: `${vaoEntrar} ${vaoEntrar === 1 ? "lançamento importado" : "lançamentos importados"}.`,
-              tone: "success",
+              message: `${vaoEntrar} ${vaoEntrar === 1 ? 'lançamento importado' : 'lançamentos importados'}.`,
+              tone: 'success',
             });
           },
-          onError: () =>
-            toast({ message: "Não deu para importar o lote.", tone: "error" }),
+          onError: () => toast({ message: 'Não deu para importar o lote.', tone: 'error' }),
         }),
       repetidos.length
         ? `Os ${repetidos.length} possíveis repetidos ficam de fora — decida um por um.`
-        : undefined,
+        : undefined
     );
   };
 
@@ -210,11 +197,10 @@ export default function ImportScreen() {
     descartar.mutate([item.id], {
       onSuccess: () => {
         Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-        toast({ message: "Item descartado.", tone: "success" });
+        toast({ message: 'Item descartado.', tone: 'success' });
       },
       // Descartar mudava a UI sem tratar erro: o banco não mudava e ninguém ficava sabendo.
-      onError: () =>
-        toast({ message: "Não deu para descartar o item.", tone: "error" }),
+      onError: () => toast({ message: 'Não deu para descartar o item.', tone: 'error' }),
     });
 
   const trocarCategoria = (item: ImportItem, cat: string | null) => {
@@ -222,17 +208,16 @@ export default function ImportScreen() {
     atualizar.mutate(
       { id: item.id, category: cat },
       {
-        onError: () =>
-          toast({ message: "Não deu para trocar a categoria.", tone: "error" }),
-      },
+        onError: () => toast({ message: 'Não deu para trocar a categoria.', tone: 'error' }),
+      }
     );
   };
 
   const acoes = (item: ImportItem) =>
-    showItemActions(item.description ?? "Lançamento", [
-      { label: "Trocar categoria", onPress: () => setEditando(item) },
+    showItemActions(item.description ?? 'Lançamento', [
+      { label: 'Trocar categoria', onPress: () => setEditando(item) },
       {
-        label: "Descartar",
+        label: 'Descartar',
         destructive: true,
         onPress: () => descartarItem(item),
       },
@@ -243,25 +228,21 @@ export default function ImportScreen() {
       key={item.id}
       layout={LinearTransition.duration(Motion.duration.fast)}
       entering={FadeInDown.duration(Motion.duration.slow).delay(
-        Math.min(index * 30, Motion.stagger.cap),
+        Math.min(index * 30, Motion.stagger.cap)
       )}
     >
       <Row
-        title={item.description ?? "Sem descrição"}
-        subtitle={`${formatDateBR(item.occurred_at)} · ${item.suggested_category ?? "sem categoria"}`}
-        icon={
-          item.status === "duplicate" ? "exclamationmark.triangle" : undefined
-        }
+        title={item.description ?? 'Sem descrição'}
+        subtitle={`${formatDateBR(item.occurred_at)} · ${item.suggested_category ?? 'sem categoria'}`}
+        icon={item.status === 'duplicate' ? 'exclamationmark.triangle' : undefined}
         chevron={false}
-        accessibilityLabel={`${item.description ?? "Sem descrição"}, ${formatDateBR(item.occurred_at)}, ${item.suggested_category ?? "sem categoria"}${item.status === "duplicate" ? ", possível repetido" : ""}`}
+        accessibilityLabel={`${item.description ?? 'Sem descrição'}, ${formatDateBR(item.occurred_at)}, ${item.suggested_category ?? 'sem categoria'}${item.status === 'duplicate' ? ', possível repetido' : ''}`}
         onPress={() => setEditando(item)}
         onLongPress={() => acoes(item)}
         trailing={
           <View style={styles.trailing}>
             <Money
-              cents={
-                item.kind === "income" ? item.amount_cents : -item.amount_cents
-              }
+              cents={item.kind === 'income' ? item.amount_cents : -item.amount_cents}
               variant="headline"
               tone="auto"
               signed
@@ -281,27 +262,17 @@ export default function ImportScreen() {
   if (!batchId) {
     return (
       <Screen grouped>
-        <Stack.Screen
-          options={{ title: "Importar extrato", headerLargeTitle: true }}
-        />
+        <Stack.Screen options={{ title: 'Importar extrato', headerLargeTitle: true }} />
 
         {/* O único GlassCard da etapa: a instrução é o conteúdo da tela. */}
         <GlassCard style={styles.hero}>
           <Icon name="arrow.down.doc" size="xl" color="tint" />
           <ThemedText type="smallBold">Traga o extrato do seu banco</ThemedText>
-          <ThemedText
-            type="small"
-            themeColor="textSecondary"
-            style={styles.centro}
-          >
-            Exporte em OFX ou CSV no app do banco. Eu categorizo tudo e você
-            confere antes de entrar.
+          <ThemedText type="small" themeColor="textSecondary" style={styles.centro}>
+            Exporte em OFX ou CSV no app do banco. Eu categorizo tudo e você confere antes de
+            entrar.
           </ThemedText>
-          <ThemedText
-            type="small"
-            themeColor="textSecondary"
-            style={styles.centro}
-          >
+          <ThemedText type="small" themeColor="textSecondary" style={styles.centro}>
             Foto de cupom e PDF de fatura? Manda direto no WhatsApp.
           </ThemedText>
         </GlassCard>
@@ -319,11 +290,7 @@ export default function ImportScreen() {
 
         {(accounts ?? []).length > 0 ? (
           <View style={styles.bloco}>
-            <ThemedText
-              type="small"
-              themeColor="textSecondary"
-              style={styles.rotulo}
-            >
+            <ThemedText type="small" themeColor="textSecondary" style={styles.rotulo}>
               LANÇAR NA CONTA
             </ThemedText>
             <View style={styles.chips}>
@@ -332,17 +299,11 @@ export default function ImportScreen() {
                   key={conta.id}
                   label={conta.name}
                   selected={accountId === conta.id}
-                  onPress={() =>
-                    setAccountId(accountId === conta.id ? null : conta.id)
-                  }
+                  onPress={() => setAccountId(accountId === conta.id ? null : conta.id)}
                 />
               ))}
             </View>
-            <ThemedText
-              type="small"
-              themeColor="textSecondary"
-              style={styles.rodape}
-            >
+            <ThemedText type="small" themeColor="textSecondary" style={styles.rodape}>
               Opcional — sem conta escolhida o lançamento nasce sem conta.
             </ThemedText>
           </View>
@@ -358,18 +319,14 @@ export default function ImportScreen() {
         ) : null}
 
         <Button
-          label={importar.isPending ? "Lendo o arquivo…" : "Escolher arquivo"}
+          label={importar.isPending ? 'Lendo o arquivo…' : 'Escolher arquivo'}
           icon="doc.badge.plus"
           loading={importar.isPending}
           onPress={escolherArquivo}
           block
         />
 
-        <ThemedText
-          type="small"
-          themeColor="textSecondary"
-          style={styles.rodape}
-        >
+        <ThemedText type="small" themeColor="textSecondary" style={styles.rodape}>
           Até {MAX_ITENS} lançamentos por arquivo.
         </ThemedText>
       </Screen>
@@ -381,7 +338,7 @@ export default function ImportScreen() {
     <Screen grouped onRefresh={refetch} refreshing={isRefetching}>
       <Stack.Screen
         options={{
-          title: vaoEntrar > 0 ? `Revisar ${vaoEntrar}` : "Revisar lote",
+          title: vaoEntrar > 0 ? `Revisar ${vaoEntrar}` : 'Revisar lote',
           headerLargeTitle: true,
           headerRight: () =>
             lista.length > 0 ? (
@@ -389,35 +346,35 @@ export default function ImportScreen() {
                 accessibilityLabel="Ações do lote"
                 hitSlop={12}
                 onPress={() =>
-                  showItemActions("Lote de importação", [
+                  showItemActions('Lote de importação', [
                     {
-                      label: "Sair e continuar depois",
+                      label: 'Sair e continuar depois',
                       onPress: () => router.back(),
                     },
                     {
-                      label: "Descartar o lote",
+                      label: 'Descartar o lote',
                       destructive: true,
                       onPress: () =>
                         confirmDestructive(
-                          "Descartar tudo que ainda não foi confirmado?",
-                          "Descartar lote",
+                          'Descartar tudo que ainda não foi confirmado?',
+                          'Descartar lote',
                           () =>
                             descartar.mutate(
                               [...paraRevisar, ...repetidos].map((i) => i.id),
                               {
                                 onSuccess: () =>
                                   toast({
-                                    message: "Lote descartado.",
-                                    tone: "success",
+                                    message: 'Lote descartado.',
+                                    tone: 'success',
                                   }),
                                 onError: () =>
                                   toast({
-                                    message: "Não deu para descartar o lote.",
-                                    tone: "error",
+                                    message: 'Não deu para descartar o lote.',
+                                    tone: 'error',
                                   }),
-                              },
+                              }
                             ),
-                          "Nada entra no financeiro. Os já confirmados continuam lá.",
+                          'Nada entra no financeiro. Os já confirmados continuam lá.'
                         ),
                     },
                   ])
@@ -446,21 +403,17 @@ export default function ImportScreen() {
         <Animated.View entering={FadeInDown.duration(Motion.duration.slow)}>
           <GlassCard style={styles.resumo}>
             <ThemedText type="small" themeColor="textSecondary">
-              {vaoEntrar === 1
-                ? "1 lançamento entra"
-                : `${vaoEntrar} lançamentos entram`}
+              {vaoEntrar === 1 ? '1 lançamento entra' : `${vaoEntrar} lançamentos entram`}
             </ThemedText>
             <Money cents={-somaDespesas} variant="money" />
             <ThemedText type="small" themeColor="textSecondary">
               {porRegra} com categoria · {semCategoria} sem
               {repetidos.length
-                ? ` · ${repetidos.length} ${repetidos.length === 1 ? "possível repetido de fora" : "possíveis repetidos de fora"}`
-                : ""}
+                ? ` · ${repetidos.length} ${repetidos.length === 1 ? 'possível repetido de fora' : 'possíveis repetidos de fora'}`
+                : ''}
             </ThemedText>
             <Button
-              label={
-                aprovar.isPending ? "Importando…" : `Confirmar ${vaoEntrar}`
-              }
+              label={aprovar.isPending ? 'Importando…' : `Confirmar ${vaoEntrar}`}
               loading={aprovar.isPending}
               onPress={confirmarLote}
               block
@@ -473,14 +426,10 @@ export default function ImportScreen() {
       {repetidos.length > 0 ? (
         <View style={styles.bloco}>
           <Section title="Possíveis repetidos">{repetidos.map(linha)}</Section>
-          <ThemedText
-            type="small"
-            themeColor="textSecondary"
-            style={styles.rodape}
-          >
-            Parecidos com algo que já está no seu financeiro. Dois cafés iguais
-            no mesmo dia são legítimos — quem decide é você: toque para revisar,
-            segure para descartar ou confirme um por um.
+          <ThemedText type="small" themeColor="textSecondary" style={styles.rodape}>
+            Parecidos com algo que já está no seu financeiro. Dois cafés iguais no mesmo dia são
+            legítimos — quem decide é você: toque para revisar, segure para descartar ou confirme um
+            por um.
           </ThemedText>
           <Button
             label={`Importar os ${repetidos.length} assim mesmo`}
@@ -492,12 +441,11 @@ export default function ImportScreen() {
                 {
                   onSuccess: () =>
                     toast({
-                      message: "Repetidos importados.",
-                      tone: "success",
+                      message: 'Repetidos importados.',
+                      tone: 'success',
                     }),
-                  onError: () =>
-                    toast({ message: "Não deu para importar.", tone: "error" }),
-                },
+                  onError: () => toast({ message: 'Não deu para importar.', tone: 'error' }),
+                }
               )
             }
           />
@@ -512,7 +460,7 @@ export default function ImportScreen() {
         <View style={styles.bloco}>
           <Button
             label={`Já revisados (${revisados.length})`}
-            icon={verRevisados ? "chevron.up" : "chevron.down"}
+            icon={verRevisados ? 'chevron.up' : 'chevron.down'}
             variant="ghost"
             size="sm"
             onPress={() => setVerRevisados((v) => !v)}
@@ -522,23 +470,11 @@ export default function ImportScreen() {
               {revisados.map((item) => (
                 <Row
                   key={item.id}
-                  title={item.description ?? "Sem descrição"}
-                  subtitle={
-                    item.status === "approved" ? "importado" : "descartado"
-                  }
-                  icon={
-                    item.status === "approved"
-                      ? "checkmark.circle"
-                      : "xmark.circle"
-                  }
+                  title={item.description ?? 'Sem descrição'}
+                  subtitle={item.status === 'approved' ? 'importado' : 'descartado'}
+                  icon={item.status === 'approved' ? 'checkmark.circle' : 'xmark.circle'}
                   chevron={false}
-                  trailing={
-                    <Money
-                      cents={item.amount_cents}
-                      variant="headline"
-                      tone="plain"
-                    />
-                  }
+                  trailing={<Money cents={item.amount_cents} variant="headline" tone="plain" />}
                 />
               ))}
             </Section>
@@ -552,7 +488,7 @@ export default function ImportScreen() {
           title="Tudo revisado"
           hint="O lote fica salvo — dá para voltar nele depois."
           action={{
-            label: "Importar outro arquivo",
+            label: 'Importar outro arquivo',
             onPress: () => {
               setBatchId(undefined);
               setAccountId(null);
@@ -569,36 +505,21 @@ export default function ImportScreen() {
         presentationStyle="pageSheet"
         onRequestClose={() => setEditando(null)}
       >
-        <View
-          style={[styles.sheet, { backgroundColor: theme.groupedBackground }]}
-        >
-          <View
-            style={[styles.sheetHeader, { borderBottomColor: theme.separator }]}
-          >
-            <Pressable
-              accessibilityRole="button"
-              hitSlop={12}
-              onPress={() => setEditando(null)}
-            >
+        <View style={[styles.sheet, { backgroundColor: theme.groupedBackground }]}>
+          <View style={[styles.sheetHeader, { borderBottomColor: theme.separator }]}>
+            <Pressable accessibilityRole="button" hitSlop={12} onPress={() => setEditando(null)}>
               <ThemedText type="default" themeColor="tint">
                 Cancelar
               </ThemedText>
             </Pressable>
-            <ThemedText
-              type="smallBold"
-              numberOfLines={1}
-              style={styles.sheetTitulo}
-            >
-              {editando?.description ?? "Categoria"}
+            <ThemedText type="smallBold" numberOfLines={1} style={styles.sheetTitulo}>
+              {editando?.description ?? 'Categoria'}
             </ThemedText>
             <View style={styles.sheetEspaco} />
           </View>
 
           <ScrollView
-            contentContainerStyle={[
-              styles.sheetBody,
-              { paddingBottom: insets.bottom + Space.xxl },
-            ]}
+            contentContainerStyle={[styles.sheetBody, { paddingBottom: insets.bottom + Space.xxl }]}
           >
             <View style={styles.chips}>
               {SUGGESTED_CATEGORIES.map((cat) => (
@@ -608,10 +529,7 @@ export default function ImportScreen() {
                   selected={editando?.suggested_category === cat}
                   onPress={() =>
                     editando &&
-                    trocarCategoria(
-                      editando,
-                      editando.suggested_category === cat ? null : cat,
-                    )
+                    trocarCategoria(editando, editando.suggested_category === cat ? null : cat)
                   }
                 />
               ))}
@@ -625,12 +543,12 @@ export default function ImportScreen() {
 
 const styles = StyleSheet.create({
   hero: {
-    alignItems: "center",
+    alignItems: 'center',
     gap: Space.md,
     paddingVertical: Space.xl,
   },
   centro: {
-    textAlign: "center",
+    textAlign: 'center',
   },
   resumo: {
     gap: Space.sm,
@@ -647,8 +565,8 @@ const styles = StyleSheet.create({
     paddingHorizontal: Space.lg,
   },
   chips: {
-    flexDirection: "row",
-    flexWrap: "wrap",
+    flexDirection: 'row',
+    flexWrap: 'wrap',
     gap: Space.sm,
     paddingHorizontal: Space.lg,
   },
@@ -656,19 +574,19 @@ const styles = StyleSheet.create({
     gap: Space.xs,
     padding: Space.lg,
     borderRadius: Radius.md,
-    borderCurve: "continuous",
+    borderCurve: 'continuous',
   },
   trailing: {
-    alignItems: "flex-end",
+    alignItems: 'flex-end',
     gap: 2,
   },
   sheet: {
     flex: 1,
   },
   sheetHeader: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
     gap: Space.md,
     paddingHorizontal: Space.lg,
     paddingVertical: Space.lg,
@@ -676,7 +594,7 @@ const styles = StyleSheet.create({
   },
   sheetTitulo: {
     flex: 1,
-    textAlign: "center",
+    textAlign: 'center',
   },
   sheetEspaco: {
     width: 60,

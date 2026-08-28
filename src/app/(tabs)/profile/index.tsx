@@ -117,8 +117,8 @@ export default function ProfileScreen() {
       <Section title="Dados">
         <Row title="Lixeira de notas" icon="trash" onPress={() => router.push('/notes/trash')} />
         <Row title="Regras de categoria" icon="wand.and.stars" onPress={() => router.push('/finance/rules')} />
-        <Row title="Importar extrato" icon="square.and.arrow.down" onPress={() => router.push('/finance/import')} />
-        <Row title="Atividade da IA" icon="sparkles" onPress={() => router.push('/finance/ai-activity')} />
+        <Row title="Importar extrato" icon="square.and.arrow.down" onPress={() => router.push('/import')} />
+        <Row title="Atividade da IA" icon="sparkles" onPress={() => router.push('/ai-activity')} />
       </Section>
 
       {pushOn ? notifications : null}

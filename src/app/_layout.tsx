@@ -78,6 +78,8 @@ export default function RootLayout() {
                   />
                   <Stack.Screen name="reminders" options={{ title: 'Lembretes' }} />
                   <Stack.Screen name="search" options={{ title: 'Buscar' }} />
+                <Stack.Screen name="ai-activity" options={{ title: 'Atividade da IA' }} />
+                <Stack.Screen name="import" options={{ title: 'Importar extrato' }} />
                   <Stack.Screen name="onboarding" options={{ headerShown: false }} />
                   <Stack.Screen name="catalog" options={{ title: 'Catálogo' }} />
                 </Stack.Protected>

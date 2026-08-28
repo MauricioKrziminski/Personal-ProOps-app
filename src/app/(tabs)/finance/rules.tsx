@@ -1,44 +1,39 @@
-import { useState } from "react";
-import { Modal, Pressable, ScrollView, StyleSheet, View } from "react-native";
-import { Stack } from "expo-router";
-import { useSafeAreaInsets } from "react-native-safe-area-context";
-import Animated, {
-  FadeInDown,
-  LinearTransition,
-} from "react-native-reanimated";
-import * as Haptics from "expo-haptics";
+import { useState } from 'react';
+import { Modal, Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { Stack } from 'expo-router';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import Animated, { FadeInDown, LinearTransition } from 'react-native-reanimated';
+import * as Haptics from 'expo-haptics';
 
-import { ErrorCard } from "@/components/error-card";
-import { Chip } from "@/components/finance/chip";
-import { GlassCard } from "@/components/glass/glass-card";
-import { ThemedText } from "@/components/themed-text";
-import { EmptyState } from "@/components/ui/empty-state";
-import { Field, TextField } from "@/components/ui/field";
-import { Icon } from "@/components/ui/icon";
-import { Row, Section } from "@/components/ui/row";
-import { Screen } from "@/components/ui/screen";
-import { SkeletonRow } from "@/components/ui/skeleton";
-import { useToast } from "@/components/ui/toast";
-import { Motion, Space, Type, tabular } from "@/design/tokens";
-import { confirmDestructive, showItemActions } from "@/lib/item-actions";
-import { SUGGESTED_CATEGORIES } from "@/lib/categories";
+import { ErrorCard } from '@/components/error-card';
+import { Chip } from '@/components/finance/chip';
+import { GlassCard } from '@/components/glass/glass-card';
+import { ThemedText } from '@/components/themed-text';
+import { EmptyState } from '@/components/ui/empty-state';
+import { Field, TextField } from '@/components/ui/field';
+import { Icon } from '@/components/ui/icon';
+import { Row, Section } from '@/components/ui/row';
+import { Screen } from '@/components/ui/screen';
+import { SkeletonRow } from '@/components/ui/skeleton';
+import { useToast } from '@/components/ui/toast';
+import { Motion, Space, Type, tabular } from '@/design/tokens';
+import { confirmDestructive, showItemActions } from '@/lib/item-actions';
+import { SUGGESTED_CATEGORIES } from '@/lib/categories';
 import {
   useAccounts,
   useDeleteRule,
   useRules,
   useSaveRule,
   type CategorizationRule,
-} from "@/hooks/use-finance";
-import { useTheme } from "@/hooks/use-theme";
+} from '@/hooks/use-finance';
+import { useTheme } from '@/hooks/use-theme';
 
 /** Postgres: violação de unique. Aqui só pode ser `(workspace_id, match_type, pattern)` da `0017`. */
-const UNIQUE_VIOLATION = "23505";
+const UNIQUE_VIOLATION = '23505';
 
 function ehGatilhoRepetido(err: unknown): boolean {
   return (
-    typeof err === "object" &&
-    err !== null &&
-    (err as { code?: string }).code === UNIQUE_VIOLATION
+    typeof err === 'object' && err !== null && (err as { code?: string }).code === UNIQUE_VIOLATION
   );
 }
 
@@ -49,7 +44,7 @@ interface Rascunho {
   accountId: string | null;
 }
 
-const VAZIO: Rascunho = { pattern: "", category: null, accountId: null };
+const VAZIO: Rascunho = { pattern: '', category: null, accountId: null };
 
 /**
  * Regras de categoria — a resposta do produto à queixa nº1 contra os concorrentes:
@@ -74,11 +69,10 @@ export default function RulesScreen() {
   const lista = rules ?? [];
   const totalHits = lista.reduce((soma, r) => soma + (r.hits ?? 0), 0);
   const ativas = lista.filter((r) => (r.hits ?? 0) > 0).length;
-  const podeSalvar =
-    (rascunho?.pattern.trim().length ?? 0) >= 2 && Boolean(rascunho?.category);
+  const podeSalvar = (rascunho?.pattern.trim().length ?? 0) >= 2 && Boolean(rascunho?.category);
 
   const nomeConta = (id: string | null) =>
-    id ? ((accounts ?? []).find((c) => c.id === id)?.name ?? "conta") : null;
+    id ? ((accounts ?? []).find((c) => c.id === id)?.name ?? 'conta') : null;
 
   const abrir = (rule?: CategorizationRule) => {
     setErroSalvar(null);
@@ -90,7 +84,7 @@ export default function RulesScreen() {
             category: rule.category,
             accountId: rule.account_id,
           }
-        : VAZIO,
+        : VAZIO
     );
   };
 
@@ -119,68 +113,60 @@ export default function RulesScreen() {
           // `0017`, e dá para dizer QUAL regra já existe.
           if (ehGatilhoRepetido(err)) {
             const existente = lista.find(
-              (r) =>
-                r.pattern.toLowerCase() ===
-                rascunho.pattern.trim().toLowerCase(),
+              (r) => r.pattern.toLowerCase() === rascunho.pattern.trim().toLowerCase()
             );
             setErroSalvar(
               existente
-                ? `Já existe uma regra para “${existente.pattern}” → ${existente.category ?? "sem categoria"}. Edite ela em vez de criar outra.`
-                : "Já existe uma regra com esse gatilho.",
+                ? `Já existe uma regra para “${existente.pattern}” → ${existente.category ?? 'sem categoria'}. Edite ela em vez de criar outra.`
+                : 'Já existe uma regra com esse gatilho.'
             );
             return;
           }
-          setErroSalvar("Não deu para salvar. Tenta de novo.");
-          toast({ message: "Não deu para salvar a regra.", tone: "error" });
+          setErroSalvar('Não deu para salvar. Tenta de novo.');
+          toast({ message: 'Não deu para salvar a regra.', tone: 'error' });
         },
-      },
+      }
     );
   };
 
   const apagar = (rule: CategorizationRule) =>
     confirmDestructive(
       `Parar de categorizar “${rule.pattern}” automaticamente?`,
-      "Apagar regra",
+      'Apagar regra',
       () =>
         remove.mutate(rule.id, {
-          onSuccess: () =>
-            toast({ message: "Regra apagada.", tone: "success" }),
+          onSuccess: () => toast({ message: 'Regra apagada.', tone: 'success' }),
           // Hoje apagar falha em silêncio: a linha some da UI e volta na próxima query.
-          onError: () =>
-            toast({ message: "Não deu para apagar a regra.", tone: "error" }),
+          onError: () => toast({ message: 'Não deu para apagar a regra.', tone: 'error' }),
         }),
-      "Os lançamentos já categorizados continuam como estão.",
+      'Os lançamentos já categorizados continuam como estão.'
     );
 
   const acoes = (rule: CategorizationRule) =>
-    showItemActions(`${rule.pattern} → ${rule.category ?? "sem categoria"}`, [
-      { label: "Editar", onPress: () => abrir(rule) },
-      { label: "Apagar", destructive: true, onPress: () => apagar(rule) },
+    showItemActions(`${rule.pattern} → ${rule.category ?? 'sem categoria'}`, [
+      { label: 'Editar', onPress: () => abrir(rule) },
+      { label: 'Apagar', destructive: true, onPress: () => apagar(rule) },
     ]);
 
   const legenda = (rule: CategorizationRule) => {
     const conta = nomeConta(rule.account_id);
     return [
-      rule.hits > 0 ? `aplicada ${rule.hits}x` : "ainda não pegou nada",
+      rule.hits > 0 ? `aplicada ${rule.hits}x` : 'ainda não pegou nada',
       conta ? `só em ${conta}` : null,
-      rule.source === "learned" ? "aprendida" : null,
+      rule.source === 'learned' ? 'aprendida' : null,
     ]
       .filter(Boolean)
-      .join(" · ");
+      .join(' · ');
   };
 
   return (
     <Screen grouped onRefresh={refetch} refreshing={isRefetching}>
       <Stack.Screen
         options={{
-          title: "Regras",
+          title: 'Regras',
           headerLargeTitle: true,
           headerRight: () => (
-            <Pressable
-              accessibilityLabel="Nova regra"
-              hitSlop={12}
-              onPress={() => abrir()}
-            >
+            <Pressable accessibilityLabel="Nova regra" hitSlop={12} onPress={() => abrir()}>
               <Icon name="plus" size="lg" color="tint" />
             </Pressable>
           ),
@@ -193,8 +179,7 @@ export default function RulesScreen() {
           Sua regra ganha da IA. Vale no WhatsApp e na importação de extrato.
         </ThemedText>
         <ThemedText type="small" themeColor="textSecondary">
-          Dá para criar por mensagem: “sempre que eu falar ifood, põe em
-          restaurante”.
+          Dá para criar por mensagem: “sempre que eu falar ifood, põe em restaurante”.
         </ThemedText>
       </View>
 
@@ -218,11 +203,8 @@ export default function RulesScreen() {
             </ThemedText>
             <ThemedText style={[Type.title, tabular]}>{totalHits}</ThemedText>
             <ThemedText type="small" themeColor="textSecondary">
-              {totalHits === 1
-                ? "lançamento categorizado"
-                : "lançamentos categorizados"}{" "}
-              sem precisar da IA, por {ativas}{" "}
-              {ativas === 1 ? "regra" : "regras"}.
+              {totalHits === 1 ? 'lançamento categorizado' : 'lançamentos categorizados'} sem
+              precisar da IA, por {ativas} {ativas === 1 ? 'regra' : 'regras'}.
             </ThemedText>
           </GlassCard>
         </Animated.View>
@@ -235,15 +217,15 @@ export default function RulesScreen() {
               key={rule.id}
               layout={LinearTransition.duration(Motion.duration.base)}
               entering={FadeInDown.duration(Motion.duration.slow).delay(
-                Math.min(index * Motion.stagger.step, Motion.stagger.cap),
+                Math.min(index * Motion.stagger.step, Motion.stagger.cap)
               )}
             >
               <Row
-                title={`${rule.pattern}  →  ${rule.category ?? "sem categoria"}`}
+                title={`${rule.pattern}  →  ${rule.category ?? 'sem categoria'}`}
                 subtitle={legenda(rule)}
                 icon="text.badge.checkmark"
                 chevron={false}
-                accessibilityLabel={`Quando contiver ${rule.pattern}, categorizar como ${rule.category ?? "sem categoria"}, ${legenda(rule)}`}
+                accessibilityLabel={`Quando contiver ${rule.pattern}, categorizar como ${rule.category ?? 'sem categoria'}, ${legenda(rule)}`}
                 onPress={() => abrir(rule)}
                 onLongPress={() => acoes(rule)}
               />
@@ -257,9 +239,9 @@ export default function RulesScreen() {
           icon="text.badge.checkmark"
           title="Nenhuma regra ainda"
           hint={
-            "Crie uma para o que a IA sempre erra — “posto” vira transporte.\nOu manda no WhatsApp: “sempre que eu falar ifood, põe em restaurante”."
+            'Crie uma para o que a IA sempre erra — “posto” vira transporte.\nOu manda no WhatsApp: “sempre que eu falar ifood, põe em restaurante”.'
           }
-          action={{ label: "Nova regra", onPress: () => abrir() }}
+          action={{ label: 'Nova regra', onPress: () => abrir() }}
         />
       ) : null}
 
@@ -270,20 +252,14 @@ export default function RulesScreen() {
         presentationStyle="pageSheet"
         onRequestClose={fechar}
       >
-        <View
-          style={[styles.sheet, { backgroundColor: theme.groupedBackground }]}
-        >
-          <View
-            style={[styles.sheetHeader, { borderBottomColor: theme.separator }]}
-          >
+        <View style={[styles.sheet, { backgroundColor: theme.groupedBackground }]}>
+          <View style={[styles.sheetHeader, { borderBottomColor: theme.separator }]}>
             <Pressable accessibilityRole="button" hitSlop={12} onPress={fechar}>
               <ThemedText type="default" themeColor="tint">
                 Cancelar
               </ThemedText>
             </Pressable>
-            <ThemedText type="smallBold">
-              {rascunho?.id ? "Editar regra" : "Nova regra"}
-            </ThemedText>
+            <ThemedText type="smallBold">{rascunho?.id ? 'Editar regra' : 'Nova regra'}</ThemedText>
             <Pressable
               accessibilityRole="button"
               accessibilityState={{ disabled: !podeSalvar || save.isPending }}
@@ -293,20 +269,15 @@ export default function RulesScreen() {
             >
               <ThemedText
                 type="smallBold"
-                themeColor={
-                  podeSalvar && !save.isPending ? "tint" : "textSecondary"
-                }
+                themeColor={podeSalvar && !save.isPending ? 'tint' : 'textSecondary'}
               >
-                {save.isPending ? "Salvando…" : "Salvar"}
+                {save.isPending ? 'Salvando…' : 'Salvar'}
               </ThemedText>
             </Pressable>
           </View>
 
           <ScrollView
-            contentContainerStyle={[
-              styles.sheetBody,
-              { paddingBottom: insets.bottom + Space.xxl },
-            ]}
+            contentContainerStyle={[styles.sheetBody, { paddingBottom: insets.bottom + Space.xxl }]}
             keyboardShouldPersistTaps="handled"
           >
             <Field
@@ -315,11 +286,9 @@ export default function RulesScreen() {
               hint="Trecho do texto, sem diferenciar maiúscula de minúscula."
             >
               <TextField
-                value={rascunho?.pattern ?? ""}
+                value={rascunho?.pattern ?? ''}
                 onChangeText={(pattern) =>
-                  setRascunho((atual) =>
-                    atual ? { ...atual, pattern } : atual,
-                  )
+                  setRascunho((atual) => (atual ? { ...atual, pattern } : atual))
                 }
                 placeholder="ex.: ifood"
                 autoCapitalize="none"
@@ -343,7 +312,7 @@ export default function RulesScreen() {
                               ...atual,
                               category: atual.category === cat ? null : cat,
                             }
-                          : atual,
+                          : atual
                       )
                     }
                   />
@@ -367,12 +336,9 @@ export default function RulesScreen() {
                           atual
                             ? {
                                 ...atual,
-                                accountId:
-                                  atual.accountId === conta.id
-                                    ? null
-                                    : conta.id,
+                                accountId: atual.accountId === conta.id ? null : conta.id,
                               }
-                            : atual,
+                            : atual
                         )
                       }
                     />
@@ -399,9 +365,9 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   sheetHeader: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
     gap: Space.md,
     paddingHorizontal: Space.lg,
     paddingVertical: Space.lg,
@@ -412,8 +378,8 @@ const styles = StyleSheet.create({
     padding: Space.lg,
   },
   chips: {
-    flexDirection: "row",
-    flexWrap: "wrap",
+    flexDirection: 'row',
+    flexWrap: 'wrap',
     gap: Space.sm,
   },
 });

@@ -261,7 +261,7 @@ export default function TodayScreen() {
               title={e.actions.map((a) => a.content ?? a.title ?? a.type).join(' · ')}
               subtitle={formatDateBR(e.created_at)}
               icon="sparkles"
-              onPress={() => router.push('/finance/ai-activity')}
+              onPress={() => router.push('/ai-activity')}
             />
           ))}
         </Section>

@@ -33,8 +33,6 @@ export default function FinanceStackLayout() {
       <Stack.Screen name="reports" options={{ title: 'Relatórios' }} />
       <Stack.Screen name="net-worth" options={{ title: 'Patrimônio' }} />
       <Stack.Screen name="rules" options={{ title: 'Regras' }} />
-      <Stack.Screen name="import" options={{ title: 'Importar extrato' }} />
-      <Stack.Screen name="ai-activity" options={{ title: 'Atividade da IA' }} />
       <Stack.Screen name="plan" options={{ title: 'Plano e família' }} />
     </Stack>
   );

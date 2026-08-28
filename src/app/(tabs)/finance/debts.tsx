@@ -667,7 +667,7 @@ export default function DebtsScreen() {
                   />
                   <View style={styles.taxaSufixo} pointerEvents="none">
                     <ThemedText type="default" themeColor="textSecondary">
-                      % ao mês
+                      %
                     </ThemedText>
                   </View>
                 </View>
@@ -826,7 +826,7 @@ const styles = StyleSheet.create({
     gap: Space.sm,
   },
   taxaInput: {
-    paddingRight: 110,
+    paddingRight: Space.xxxl,
   },
   taxaSufixo: {
     position: 'absolute',

@@ -191,7 +191,7 @@ export default function FinanceScreen() {
           <Stack.Toolbar.Menu icon="ellipsis.circle" accessibilityLabel="Mais opções">
             <Stack.Toolbar.MenuAction
               icon="square.and.arrow.down"
-              onPress={() => router.push('/finance/import')}>
+              onPress={() => router.push('/import')}>
               Importar extrato
             </Stack.Toolbar.MenuAction>
             <Stack.Toolbar.MenuAction
@@ -201,7 +201,7 @@ export default function FinanceScreen() {
             </Stack.Toolbar.MenuAction>
             <Stack.Toolbar.MenuAction
               icon="sparkles"
-              onPress={() => router.push('/finance/ai-activity')}>
+              onPress={() => router.push('/ai-activity')}>
               Atividade da IA
             </Stack.Toolbar.MenuAction>
           </Stack.Toolbar.Menu>

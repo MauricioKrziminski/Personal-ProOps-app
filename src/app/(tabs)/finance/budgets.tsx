@@ -196,11 +196,17 @@ export default function BudgetsScreen() {
           action: {
             label: 'Desfazer',
             onPress: () =>
-              save.mutate({
-                category: row.category,
-                limit_cents: row.limit_cents,
-                month: row.month ? row.month.slice(0, 7) : null,
-              }),
+              save.mutate(
+                {
+                  category: row.category,
+                  limit_cents: row.limit_cents,
+                  month: row.month ? row.month.slice(0, 7) : null,
+                },
+                {
+                  onError: () =>
+                    toast({ message: 'Não deu para restaurar o limite.', tone: 'error' }),
+                }
+              ),
           },
         }),
       onError: () => toast({ message: 'Não deu para remover o limite.', tone: 'error' }),

@@ -280,7 +280,7 @@ export default function TransactionsScreen() {
           <Stack.Toolbar.Menu icon="ellipsis.circle" accessibilityLabel="Mais opções">
             <Stack.Toolbar.MenuAction
               icon="square.and.arrow.down"
-              onPress={() => router.push('/finance/import')}>
+              onPress={() => router.push('/import')}>
               Importar extrato
             </Stack.Toolbar.MenuAction>
             <Stack.Toolbar.MenuAction

@@ -1,29 +1,25 @@
-import { useMemo, useState } from "react";
-import { Pressable, Share, StyleSheet, View } from "react-native";
-import { Stack, router } from "expo-router";
-import Animated, { FadeInDown } from "react-native-reanimated";
-import * as Haptics from "expo-haptics";
+import { useMemo, useState } from 'react';
+import { Pressable, Share, StyleSheet, View } from 'react-native';
+import { Stack, router } from 'expo-router';
+import Animated, { FadeInDown } from 'react-native-reanimated';
+import * as Haptics from 'expo-haptics';
 
-import { ErrorCard } from "@/components/error-card";
-import { GlassCard } from "@/components/glass/glass-card";
-import { ThemedText } from "@/components/themed-text";
-import { Button } from "@/components/ui/button";
-import { EmptyState } from "@/components/ui/empty-state";
-import { Icon } from "@/components/ui/icon";
-import { Money } from "@/components/ui/money";
-import { Row, Section } from "@/components/ui/row";
-import { Screen } from "@/components/ui/screen";
-import { Skeleton, SkeletonRow } from "@/components/ui/skeleton";
-import { Segmented } from "@/components/ui/segmented";
-import { ProgressBar } from "@/components/ui/sparkline";
-import { useToast } from "@/components/ui/toast";
-import { Motion, Space, Type, tabular } from "@/design/tokens";
-import { localISODate } from "@/hooks/use-items";
-import {
-  useAnnualReport,
-  type AnnualCategoryRow,
-  type YearEndBalance,
-} from "@/hooks/use-finance";
+import { ErrorCard } from '@/components/error-card';
+import { GlassCard } from '@/components/glass/glass-card';
+import { ThemedText } from '@/components/themed-text';
+import { Button } from '@/components/ui/button';
+import { EmptyState } from '@/components/ui/empty-state';
+import { Icon } from '@/components/ui/icon';
+import { Money } from '@/components/ui/money';
+import { Row, Section } from '@/components/ui/row';
+import { Screen } from '@/components/ui/screen';
+import { Skeleton, SkeletonRow } from '@/components/ui/skeleton';
+import { Segmented } from '@/components/ui/segmented';
+import { ProgressBar } from '@/components/ui/sparkline';
+import { useToast } from '@/components/ui/toast';
+import { Motion, Space, Type, tabular } from '@/design/tokens';
+import { localISODate } from '@/hooks/use-items';
+import { useAnnualReport, type AnnualCategoryRow, type YearEndBalance } from '@/hooks/use-finance';
 
 /** Quantas categorias de gasto aparecem antes do "ver todas". */
 const TOP_CATEGORIES = 8;
@@ -36,30 +32,25 @@ const TOP_CATEGORIES = 8;
  * soma nada, que é justamente o uso da exportação.
  */
 function reais(cents: number): string {
-  return (cents / 100).toFixed(2).replace(".", ",");
+  return (cents / 100).toFixed(2).replace('.', ',');
 }
 
-function montaCsv(
-  ano: number,
-  categorias: AnnualCategoryRow[],
-  saldos: YearEndBalance[],
-): string {
+function montaCsv(ano: number, categorias: AnnualCategoryRow[], saldos: YearEndBalance[]): string {
   return [
     `Relatorio anual ${ano}`,
-    "",
-    "Tipo;Categoria;Total;Lancamentos",
+    '',
+    'Tipo;Categoria;Total;Lancamentos',
     ...categorias.map(
       (c) =>
-        `${c.kind === "income" ? "Receita" : "Despesa"};${c.category};${reais(Number(c.total_cents))};${c.tx_count}`,
+        `${c.kind === 'income' ? 'Receita' : 'Despesa'};${c.category};${reais(Number(c.total_cents))};${c.tx_count}`
     ),
-    "",
+    '',
     `Bens e direitos em 31/12/${ano}`,
-    "Tipo;Nome;Valor",
+    'Tipo;Nome;Valor',
     ...saldos.map(
-      (s) =>
-        `${s.kind === "account" ? "Conta" : "Bem"};${s.name};${reais(Number(s.balance_cents))}`,
+      (s) => `${s.kind === 'account' ? 'Conta' : 'Bem'};${s.name};${reais(Number(s.balance_cents))}`
     ),
-  ].join("\n");
+  ].join('\n');
 }
 
 /**
@@ -74,8 +65,7 @@ export default function ReportsScreen() {
   const anoAtual = Number(localISODate().slice(0, 4));
   const [ano, setAno] = useState(anoAtual);
   const [verTodas, setVerTodas] = useState(false);
-  const { data, isLoading, isError, refetch, isRefetching } =
-    useAnnualReport(ano);
+  const { data, isLoading, isError, refetch, isRefetching } = useAnnualReport(ano);
 
   const anos = useMemo(
     () =>
@@ -83,15 +73,12 @@ export default function ReportsScreen() {
         value: String(a),
         label: String(a),
       })),
-    [anoAtual],
+    [anoAtual]
   );
 
-  const receitas = (data?.categories ?? []).filter((c) => c.kind === "income");
-  const despesas = (data?.categories ?? []).filter((c) => c.kind === "expense");
-  const maiorDespesa = Math.max(
-    ...despesas.map((d) => Number(d.total_cents)),
-    1,
-  );
+  const receitas = (data?.categories ?? []).filter((c) => c.kind === 'income');
+  const despesas = (data?.categories ?? []).filter((c) => c.kind === 'expense');
+  const maiorDespesa = Math.max(...despesas.map((d) => Number(d.total_cents)), 1);
   const visiveis = verTodas ? despesas : despesas.slice(0, TOP_CATEGORIES);
 
   // `annual_summary` devolve linha zerada para ano sem movimento — o que decide se a tela tem
@@ -109,7 +96,7 @@ export default function ReportsScreen() {
         message: montaCsv(ano, data.categories, data.yearEnd),
       });
     } catch {
-      toast({ message: "Não deu para exportar agora.", tone: "error" });
+      toast({ message: 'Não deu para exportar agora.', tone: 'error' });
     }
   };
 
@@ -117,15 +104,11 @@ export default function ReportsScreen() {
     <Screen grouped onRefresh={refetch} refreshing={isRefetching}>
       <Stack.Screen
         options={{
-          title: "Relatórios",
+          title: 'Relatórios',
           headerLargeTitle: true,
           headerRight: () =>
             data && temConteudo ? (
-              <Pressable
-                accessibilityLabel="Exportar CSV do ano"
-                hitSlop={12}
-                onPress={exportar}
-              >
+              <Pressable accessibilityLabel="Exportar CSV do ano" hitSlop={12} onPress={exportar}>
                 <Icon name="square.and.arrow.up" size="lg" color="tint" />
               </Pressable>
             ) : null,
@@ -163,32 +146,25 @@ export default function ReportsScreen() {
             <Money
               cents={Number(summary.balance_cents)}
               variant="money"
-              tone={Number(summary.balance_cents) < 0 ? "danger" : "text"}
+              tone={Number(summary.balance_cents) < 0 ? 'danger' : 'text'}
             />
             <View style={styles.heroLinha}>
               <View style={styles.heroMetade}>
                 <ThemedText type="small" themeColor="textSecondary">
                   Recebido
                 </ThemedText>
-                <Money
-                  cents={Number(summary.income_cents)}
-                  variant="headline"
-                  tone="success"
-                />
+                <Money cents={Number(summary.income_cents)} variant="headline" tone="success" />
               </View>
               <View style={styles.heroMetade}>
                 <ThemedText type="small" themeColor="textSecondary">
                   Gasto
                 </ThemedText>
-                <Money
-                  cents={Number(summary.expense_cents)}
-                  variant="headline"
-                />
+                <Money cents={Number(summary.expense_cents)} variant="headline" />
               </View>
             </View>
             <ThemedText type="small" themeColor="textSecondary" style={tabular}>
-              Guardou {summary.savings_rate}% do que entrou · {summary.tx_count}{" "}
-              {Number(summary.tx_count) === 1 ? "lançamento" : "lançamentos"}
+              Guardou {summary.savings_rate}% do que entrou · {summary.tx_count}{' '}
+              {Number(summary.tx_count) === 1 ? 'lançamento' : 'lançamentos'}
             </ThemedText>
           </GlassCard>
         </Animated.View>
@@ -197,19 +173,12 @@ export default function ReportsScreen() {
       {/* Segundo lugar, e não quarto: é a ficha que a pessoa veio copiar. */}
       {!isError && !isLoading && temConteudo ? (
         <Animated.View
-          entering={FadeInDown.duration(Motion.duration.slow).delay(
-            Motion.stagger.step,
-          )}
+          entering={FadeInDown.duration(Motion.duration.slow).delay(Motion.stagger.step)}
           style={styles.bloco}
         >
-          <ThemedText
-            type="small"
-            themeColor="textSecondary"
-            style={styles.nota}
-          >
-            Contas e bens no último dia do ano — é o que a ficha “Bens e
-            Direitos” da declaração pede. Dívidas e financiamentos entram em
-            outra ficha e não aparecem aqui.
+          <ThemedText type="small" themeColor="textSecondary" style={styles.nota}>
+            Contas e bens no último dia do ano — é o que a ficha “Bens e Direitos” da declaração
+            pede. Dívidas e financiamentos entram em outra ficha e não aparecem aqui.
           </ThemedText>
 
           {(data?.yearEnd ?? []).length > 0 ? (
@@ -218,16 +187,10 @@ export default function ReportsScreen() {
                 <Row
                   key={`${s.kind}-${s.name}`}
                   title={s.name}
-                  icon={
-                    s.kind === "account"
-                      ? "banknote"
-                      : "chart.line.uptrend.xyaxis"
-                  }
+                  icon={s.kind === 'account' ? 'banknote' : 'chart.line.uptrend.xyaxis'}
                   chevron={false}
-                  accessibilityLabel={`${s.name}, ${(Number(s.balance_cents) / 100).toLocaleString("pt-BR", { style: "currency", currency: "BRL" })} em 31 de dezembro`}
-                  trailing={
-                    <Money cents={Number(s.balance_cents)} variant="headline" />
-                  }
+                  accessibilityLabel={`${s.name}, ${(Number(s.balance_cents) / 100).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })} em 31 de dezembro`}
+                  trailing={<Money cents={Number(s.balance_cents)} variant="headline" />}
                 />
               ))}
             </Section>
@@ -237,7 +200,7 @@ export default function ReportsScreen() {
                 title="Nenhuma conta cadastrada"
                 subtitle="Cadastre para o saldo de 31/12 sair aqui"
                 icon="banknote"
-                onPress={() => router.push("/finance/accounts")}
+                onPress={() => router.push('/finance/accounts')}
               />
             </Section>
           )}
@@ -246,33 +209,22 @@ export default function ReportsScreen() {
 
       {despesas.length > 0 ? (
         <Animated.View
-          entering={FadeInDown.duration(Motion.duration.slow).delay(
-            Motion.stagger.step * 2,
-          )}
+          entering={FadeInDown.duration(Motion.duration.slow).delay(Motion.stagger.step * 2)}
           style={styles.bloco}
         >
           <Section title="Para onde foi">
             {visiveis.map((c) => (
               <View key={c.category} style={styles.categoria}>
                 <View style={styles.categoriaTopo}>
-                  <ThemedText
-                    type="default"
-                    numberOfLines={1}
-                    style={styles.categoriaNome}
-                  >
+                  <ThemedText type="default" numberOfLines={1} style={styles.categoriaNome}>
                     {c.category}
                   </ThemedText>
                   <Money cents={Number(c.total_cents)} variant="headline" />
                 </View>
                 <ProgressBar value={Number(c.total_cents)} max={maiorDespesa} />
-                <ThemedText
-                  type="small"
-                  themeColor="textSecondary"
-                  style={tabular}
-                >
-                  {Math.round((Number(c.total_cents) / maiorDespesa) * 100)}% do
-                  maior · {c.tx_count}{" "}
-                  {Number(c.tx_count) === 1 ? "lançamento" : "lançamentos"}
+                <ThemedText type="small" themeColor="textSecondary" style={tabular}>
+                  {Math.round((Number(c.total_cents) / maiorDespesa) * 100)}% do maior ·{' '}
+                  {c.tx_count} {Number(c.tx_count) === 1 ? 'lançamento' : 'lançamentos'}
                 </ThemedText>
               </View>
             ))}
@@ -290,9 +242,7 @@ export default function ReportsScreen() {
 
       {receitas.length > 0 ? (
         <Animated.View
-          entering={FadeInDown.duration(Motion.duration.slow).delay(
-            Motion.stagger.step * 3,
-          )}
+          entering={FadeInDown.duration(Motion.duration.slow).delay(Motion.stagger.step * 3)}
         >
           {/* Sem barra: quem tem duas fontes de renda não precisa de gráfico para compará-las. */}
           <Section title="De onde veio">
@@ -301,13 +251,7 @@ export default function ReportsScreen() {
                 key={c.category}
                 title={c.category}
                 chevron={false}
-                trailing={
-                  <Money
-                    cents={Number(c.total_cents)}
-                    variant="headline"
-                    tone="success"
-                  />
-                }
+                trailing={<Money cents={Number(c.total_cents)} variant="headline" tone="success" />}
               />
             ))}
           </Section>
@@ -319,17 +263,13 @@ export default function ReportsScreen() {
           icon="calendar"
           title={`Nada lançado em ${ano}`}
           hint={
-            "Escolha outro ano aí em cima — ou manda “gastei 45 no mercado”\nno WhatsApp para o ano que vem já nascer pronto."
+            'Escolha outro ano aí em cima — ou manda “gastei 45 no mercado”\nno WhatsApp para o ano que vem já nascer pronto.'
           }
         />
       ) : null}
 
       {!isLoading && !isError && temConteudo ? (
-        <ThemedText
-          type="small"
-          themeColor="textSecondary"
-          style={styles.rodape}
-        >
+        <ThemedText type="small" themeColor="textSecondary" style={styles.rodape}>
           Só lançamentos confirmados, sem transferências entre suas contas.
         </ThemedText>
       ) : null}
@@ -342,7 +282,7 @@ const styles = StyleSheet.create({
     gap: Space.sm,
   },
   heroLinha: {
-    flexDirection: "row",
+    flexDirection: 'row',
     gap: Space.xl,
   },
   heroMetade: {
@@ -360,9 +300,9 @@ const styles = StyleSheet.create({
     paddingVertical: Space.md,
   },
   categoriaTopo: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
     gap: Space.md,
   },
   categoriaNome: {
