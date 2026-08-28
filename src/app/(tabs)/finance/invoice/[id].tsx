@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react';
 import {
   FlatList,
   Modal,
+  Platform,
   ScrollView,
   StyleSheet,
   View,
@@ -32,7 +33,7 @@ import {
 } from '@/hooks/use-finance';
 import { formatBRL, formatDateBR, localISODate, useRealtimeInvalidate } from '@/hooks/use-items';
 import { useTheme } from '@/hooks/use-theme';
-import { confirmDestructive } from '@/lib/item-actions';
+import { confirmDestructive, showItemActions } from '@/lib/item-actions';
 
 /**
  * Fatura — "o que tem nesta fatura, e como eu marco como paga?".
@@ -284,6 +285,20 @@ export default function InvoiceScreen() {
                           .filter(Boolean)
                           .join(' · ')}
                         accessibilityLabel={`${tx.description ?? 'Sem descrição'}, ${formatBRL(tx.amount_cents)}${prevista ? ', parcela prevista' : ''}`}
+                        // `Link.Menu` é iOS-only; sem isto o Android ficaria sem ação nenhuma na linha.
+                        onLongPress={
+                          Platform.OS === 'ios'
+                            ? undefined
+                            : () =>
+                                showItemActions(tx.description ?? tx.merchant ?? 'Sem descrição', [
+                                  {
+                                    label: 'Editar',
+                                    onPress: () =>
+                                      router.push(`/finance/transaction-form?id=${tx.id}`),
+                                  },
+                                  { label: 'Apagar', destructive: true, onPress: () => apagar(tx) },
+                                ])
+                        }
                         trailing={
                           <Money
                             cents={tx.amount_cents}

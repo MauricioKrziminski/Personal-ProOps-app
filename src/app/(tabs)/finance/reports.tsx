@@ -13,6 +13,7 @@ import { Icon } from '@/components/ui/icon';
 import { Money } from '@/components/ui/money';
 import { Row, Section } from '@/components/ui/row';
 import { Screen } from '@/components/ui/screen';
+import { HeroLabel } from '@/components/ui/section-head';
 import { Skeleton, SkeletonRow } from '@/components/ui/skeleton';
 import { Segmented } from '@/components/ui/segmented';
 import { ProgressBar } from '@/components/ui/sparkline';
@@ -140,9 +141,7 @@ export default function ReportsScreen() {
       {!isError && temMovimento && summary ? (
         <Animated.View entering={FadeInDown.duration(Motion.duration.slow)}>
           <GlassCard style={styles.hero}>
-            <ThemedText type="small" themeColor="textSecondary">
-              Sobrou em {ano}
-            </ThemedText>
+            <HeroLabel>Sobrou em {ano}</HeroLabel>
             <Money
               cents={Number(summary.balance_cents)}
               variant="money"
@@ -150,15 +149,11 @@ export default function ReportsScreen() {
             />
             <View style={styles.heroLinha}>
               <View style={styles.heroMetade}>
-                <ThemedText type="small" themeColor="textSecondary">
-                  Recebido
-                </ThemedText>
+                <HeroLabel>Recebido</HeroLabel>
                 <Money cents={Number(summary.income_cents)} variant="headline" tone="success" />
               </View>
               <View style={styles.heroMetade}>
-                <ThemedText type="small" themeColor="textSecondary">
-                  Gasto
-                </ThemedText>
+                <HeroLabel>Gasto</HeroLabel>
                 <Money cents={Number(summary.expense_cents)} variant="headline" />
               </View>
             </View>

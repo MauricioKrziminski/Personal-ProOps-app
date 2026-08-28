@@ -32,7 +32,7 @@ import {
 } from '@/hooks/use-finance';
 import { formatBRL, formatDateBR } from '@/hooks/use-items';
 import { monthBounds } from '@/lib/dates';
-import { confirmDestructive } from '@/lib/item-actions';
+import { confirmDestructive, showItemActions } from '@/lib/item-actions';
 import { useTheme } from '@/hooks/use-theme';
 
 /**
@@ -471,6 +471,38 @@ export default function FinanceScreen() {
                         subtitle={[tx.category, SOURCE_LABEL[tx.source]].filter(Boolean).join(' · ')}
                         icon={KIND_ICON[tx.kind]}
                         accessibilityLabel={`${tx.description || tx.category || 'lançamento'}, ${formatBRL(tx.amount_cents)}, ${tx.kind === 'income' ? 'receita' : tx.kind === 'expense' ? 'despesa' : 'transferência'}`}
+                        // `Link.Menu` é iOS-only; sem isto o Android ficaria sem ação nenhuma na linha.
+                        onLongPress={
+                          Platform.OS === 'ios'
+                            ? undefined
+                            : () =>
+                                showItemActions(
+                                  tx.description || tx.merchant || tx.category || 'Lançamento',
+                                  [
+                                    {
+                                      label: 'Ver detalhe',
+                                      onPress: () =>
+                                        router.push({
+                                          pathname: '/finance/[txId]',
+                                          params: { txId: tx.id, month: tx.occurred_at.slice(0, 7) },
+                                        }),
+                                    },
+                                    {
+                                      label: 'Editar',
+                                      onPress: () =>
+                                        router.push({
+                                          pathname: '/finance/transaction-form',
+                                          params: { id: tx.id, month },
+                                        }),
+                                    },
+                                    {
+                                      label: 'Apagar',
+                                      destructive: true,
+                                      onPress: () => confirmDelete(tx),
+                                    },
+                                  ]
+                                )
+                        }
                         trailing={
                           <Money
                             cents={tx.kind === 'expense' ? -tx.amount_cents : tx.amount_cents}

@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import {
   Modal,
+  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -20,6 +21,7 @@ import { Icon } from '@/components/ui/icon';
 import { Money } from '@/components/ui/money';
 import { Row, Section } from '@/components/ui/row';
 import { Screen } from '@/components/ui/screen';
+import { HeroLabel } from '@/components/ui/section-head';
 import { Segmented } from '@/components/ui/segmented';
 import { Skeleton, SkeletonRow } from '@/components/ui/skeleton';
 import { useToast } from '@/components/ui/toast';
@@ -35,7 +37,7 @@ import {
   type AccountBalance,
 } from '@/hooks/use-finance';
 import { useTheme } from '@/hooks/use-theme';
-import { confirmDestructive } from '@/lib/item-actions';
+import { confirmDestructive, showItemActions } from '@/lib/item-actions';
 
 /**
  * Contas — "quanto eu tenho, e onde?".
@@ -235,6 +237,24 @@ export default function AccountsScreen() {
             icon={ICONE[saldo.type]}
             // o valor negativo não pode ser comunicado só pela cor
             accessibilityLabel={`${saldo.name}, ${tipo}, ${negativo ? 'deve' : 'tem'} ${formatBRL(Math.abs(cents))}`}
+            // `Link.Menu` é iOS-only; sem isto o Android ficaria sem ação nenhuma na linha.
+            onLongPress={
+              Platform.OS === 'ios'
+                ? undefined
+                : () =>
+                    showItemActions(saldo.name, [
+                      {
+                        label: 'Ver extrato',
+                        onPress: () => router.push('/finance/transactions'),
+                      },
+                      { label: 'Editar', onPress: () => conta && abrirEdicao(conta) },
+                      {
+                        label: 'Arquivar',
+                        destructive: true,
+                        onPress: () => conta && arquivar(conta),
+                      },
+                    ])
+            }
             trailing={
               <Money
                 cents={cents}
@@ -302,21 +322,15 @@ export default function AccountsScreen() {
       ) : balances.data && !semDadoNenhum ? (
         <Animated.View entering={FadeInDown.duration(Motion.duration.slow)}>
           <GlassCard style={styles.hero}>
-            <ThemedText type="small" themeColor="textSecondary">
-              Dinheiro disponível
-            </ThemedText>
+            <HeroLabel>Dinheiro disponível</HeroLabel>
             <Money cents={caixa} variant="money" tone={caixa < 0 ? 'danger' : 'text'} />
             <View style={styles.heroSplit}>
               <View style={styles.heroPart}>
-                <ThemedText type="small" themeColor="textSecondary">
-                  investido
-                </ThemedText>
+                <HeroLabel>investido</HeroLabel>
                 <Money cents={investido} variant="subhead" tone="textSecondary" />
               </View>
               <View style={styles.heroPart}>
-                <ThemedText type="small" themeColor="textSecondary">
-                  dívida de cartão
-                </ThemedText>
+                <HeroLabel>dívida de cartão</HeroLabel>
                 <Money
                   cents={dividaCartao}
                   variant="subhead"

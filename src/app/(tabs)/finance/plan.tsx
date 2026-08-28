@@ -11,6 +11,7 @@ import { Button } from '@/components/ui/button';
 import { Field, TextField } from '@/components/ui/field';
 import { Row, Section } from '@/components/ui/row';
 import { Screen } from '@/components/ui/screen';
+import { HeroLabel } from '@/components/ui/section-head';
 import { Skeleton, SkeletonRow } from '@/components/ui/skeleton';
 import { ProgressBar } from '@/components/ui/sparkline';
 import { useToast } from '@/components/ui/toast';
@@ -158,9 +159,7 @@ export default function PlanScreen() {
             <ThemedText type="subtitle" style={tabular}>
               {usadas} de {teto}
             </ThemedText>
-            <ThemedText type="small" themeColor="textSecondary">
-              mensagens da IA usadas este mês
-            </ThemedText>
+            <HeroLabel>mensagens da IA usadas este mês</HeroLabel>
             <ProgressBar
               value={usadas}
               max={teto}

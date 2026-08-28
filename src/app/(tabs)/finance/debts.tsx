@@ -14,6 +14,7 @@ import { Icon } from '@/components/ui/icon';
 import { Money } from '@/components/ui/money';
 import { Row, Section } from '@/components/ui/row';
 import { Screen } from '@/components/ui/screen';
+import { HeroLabel, SectionHead } from '@/components/ui/section-head';
 import { Segmented } from '@/components/ui/segmented';
 import { Skeleton, SkeletonRow } from '@/components/ui/skeleton';
 import { ProgressBar } from '@/components/ui/sparkline';
@@ -285,9 +286,7 @@ export default function DebtsScreen() {
       ) : lista.length > 0 ? (
         <Animated.View entering={FadeInDown.duration(Motion.duration.slow)}>
           <GlassCard style={styles.hero}>
-            <ThemedText type="caption" themeColor="textSecondary" style={styles.heroLabel}>
-              Total devido
-            </ThemedText>
+            <HeroLabel>Total devido</HeroLabel>
             <Money cents={totalDevido} variant="money" tone="danger" />
             {jurosAteQuitar > 0 ? (
               <View style={styles.valores}>
@@ -447,9 +446,7 @@ export default function DebtsScreen() {
 
             {(schedule.data ?? []).length > 0 ? (
               <View style={styles.tabelaBloco}>
-                <ThemedText type="caption" themeColor="textSecondary" style={styles.secaoTitulo}>
-                  AMORTIZAÇÃO
-                </ThemedText>
+                <SectionHead title="Amortização" />
                 {/* rola dentro do próprio container, nunca empurrando o corpo do sheet */}
                 <ScrollView horizontal showsHorizontalScrollIndicator={false}>
                   <View>
@@ -744,10 +741,6 @@ const styles = StyleSheet.create({
   hero: {
     gap: Space.sm,
   },
-  heroLabel: {
-    textTransform: 'uppercase',
-    letterSpacing: 0.6,
-  },
   valores: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -790,9 +783,6 @@ const styles = StyleSheet.create({
   },
   bandText: {
     textAlign: 'center',
-  },
-  secaoTitulo: {
-    letterSpacing: 0.6,
   },
   tabelaBloco: {
     gap: Space.sm,

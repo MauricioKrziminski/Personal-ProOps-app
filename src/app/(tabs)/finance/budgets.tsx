@@ -15,6 +15,7 @@ import { Field, MoneyField } from '@/components/ui/field';
 import { Icon } from '@/components/ui/icon';
 import { Money } from '@/components/ui/money';
 import { Screen } from '@/components/ui/screen';
+import { HeroLabel, SectionHead } from '@/components/ui/section-head';
 import { Segmented } from '@/components/ui/segmented';
 import { Skeleton, SkeletonRow } from '@/components/ui/skeleton';
 import { ProgressBar } from '@/components/ui/sparkline';
@@ -370,9 +371,7 @@ export default function BudgetsScreen() {
       ) : linhas.length > 0 ? (
         <Animated.View entering={FadeInDown.duration(Motion.duration.slow)}>
           <GlassCard style={styles.hero}>
-            <ThemedText type="caption" themeColor="textSecondary" style={styles.heroLabel}>
-              Sobrou do mês
-            </ThemedText>
+            <HeroLabel>Sobrou do mês</HeroLabel>
             <Money
               cents={limite - gasto}
               variant="money"
@@ -388,9 +387,7 @@ export default function BudgetsScreen() {
 
       {apertando.length > 0 ? (
         <View style={styles.secao}>
-          <ThemedText type="caption" themeColor="textSecondary" style={styles.secaoTitulo}>
-            PASSANDO DO LIMITE
-          </ThemedText>
+          <SectionHead title="Passando do limite" />
           {apertando.map(linhaOrcamento)}
         </View>
       ) : null}
@@ -401,15 +398,16 @@ export default function BudgetsScreen() {
             accessibilityRole="button"
             accessibilityState={{ expanded: noControleAberto }}
             accessibilityLabel={`No controle, ${tranquilas.length} categorias`}
-            onPress={() => setNoControleAberto((v) => !v)}
-            style={styles.secaoCabecalho}>
-            <ThemedText type="caption" themeColor="textSecondary" style={styles.secaoTitulo}>
-              NO CONTROLE
-            </ThemedText>
-            <Icon
-              name={noControleAberto ? 'chevron.up' : 'chevron.down'}
-              size="sm"
-              color="textSecondary"
+            onPress={() => setNoControleAberto((v) => !v)}>
+            <SectionHead
+              title="No controle"
+              action={
+                <Icon
+                  name={noControleAberto ? 'chevron.up' : 'chevron.down'}
+                  size="sm"
+                  color="textSecondary"
+                />
+              }
             />
           </Pressable>
           {noControleAberto ? tranquilas.map(linhaOrcamento) : null}
@@ -423,9 +421,7 @@ export default function BudgetsScreen() {
         />
       ) : semLimite.length > 0 ? (
         <View style={styles.secao}>
-          <ThemedText type="caption" themeColor="textSecondary" style={styles.secaoTitulo}>
-            SEM LIMITE DEFINIDO
-          </ThemedText>
+          <SectionHead title="Sem limite definido" />
           {semLimite.slice(0, 5).map((r) => (
             <Card key={r.category} style={styles.linha}>
               <View style={styles.linhaTopo}>
@@ -558,22 +554,8 @@ const styles = StyleSheet.create({
   hero: {
     gap: Space.sm,
   },
-  heroLabel: {
-    textTransform: 'uppercase',
-    letterSpacing: 0.6,
-  },
   secao: {
     gap: Space.sm,
-  },
-  secaoCabecalho: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingRight: Space.lg,
-  },
-  secaoTitulo: {
-    paddingHorizontal: Space.lg,
-    letterSpacing: 0.6,
   },
   linha: {
     gap: Space.sm,

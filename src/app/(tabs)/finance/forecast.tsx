@@ -20,6 +20,7 @@ import { Icon } from '@/components/ui/icon';
 import { Money } from '@/components/ui/money';
 import { Row, Section } from '@/components/ui/row';
 import { Screen } from '@/components/ui/screen';
+import { HeroLabel } from '@/components/ui/section-head';
 import { Segmented } from '@/components/ui/segmented';
 import { Skeleton, SkeletonRow } from '@/components/ui/skeleton';
 import { Sparkline } from '@/components/ui/sparkline';
@@ -267,18 +268,11 @@ export default function ForecastScreen() {
 
             <View style={styles.heroSplit}>
               <View style={styles.heroParte}>
-                <ThemedText type="caption" themeColor="textSecondary" style={styles.heroLabel}>
-                  hoje
-                </ThemedText>
+                <HeroLabel>hoje</HeroLabel>
                 <Money cents={hoje} variant="title2" tone={hoje < 0 ? 'danger' : 'text'} />
               </View>
               <View style={styles.heroParte}>
-                <ThemedText
-                  type="caption"
-                  themeColor="textSecondary"
-                  style={[styles.heroLabel, tabular]}>
-                  em {dias} dias
-                </ThemedText>
+                <HeroLabel>em {dias} dias</HeroLabel>
                 <Money cents={fim} variant="title2" tone={fim < 0 ? 'danger' : 'text'} />
               </View>
             </View>
@@ -398,10 +392,6 @@ export default function ForecastScreen() {
 const styles = StyleSheet.create({
   hero: {
     gap: Space.md,
-  },
-  heroLabel: {
-    textTransform: 'uppercase',
-    letterSpacing: 0.6,
   },
   heroTitulo: {
     flexDirection: 'row',

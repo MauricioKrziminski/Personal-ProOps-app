@@ -10,6 +10,7 @@ import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Row, Section } from '@/components/ui/row';
 import { Screen } from '@/components/ui/screen';
+import { HeroLabel } from '@/components/ui/section-head';
 import { Skeleton } from '@/components/ui/skeleton';
 import { ProgressBar } from '@/components/ui/sparkline';
 import { Motion, Radius, Space, Type, tabular } from '@/design/tokens';
@@ -105,16 +106,12 @@ export default function PaywallScreen() {
       {plano.data ? (
         <Animated.View entering={FadeInDown.duration(Motion.duration.slow)}>
           <GlassCard style={styles.hero}>
-            <ThemedText type="small" themeColor="textSecondary">
-              Seu plano hoje
-            </ThemedText>
+            <HeroLabel>Seu plano hoje</HeroLabel>
             <ThemedText type="smallBold">{nomeAtual}</ThemedText>
             <ThemedText style={[Type.largeTitle, tabular]}>
               {usadas} de {teto}
             </ThemedText>
-            <ThemedText type="small" themeColor="textSecondary">
-              mensagens da IA usadas este mês
-            </ThemedText>
+            <HeroLabel>mensagens da IA usadas este mês</HeroLabel>
             <ProgressBar
               value={usadas}
               max={teto}

@@ -15,6 +15,7 @@ import { Money } from '@/components/ui/money';
 import { Row } from '@/components/ui/row';
 import { androidOverflow } from '@/components/ui/overflow-menu';
 import { Screen } from '@/components/ui/screen';
+import { HeroLabel } from '@/components/ui/section-head';
 import { Segmented } from '@/components/ui/segmented';
 import { Skeleton, SkeletonRow } from '@/components/ui/skeleton';
 import { useToast } from '@/components/ui/toast';
@@ -33,7 +34,7 @@ import {
 } from '@/hooks/use-finance';
 import { formatBRL, formatDateBR, localISODate } from '@/hooks/use-items';
 import { monthBounds } from '@/lib/dates';
-import { confirmDestructive } from '@/lib/item-actions';
+import { confirmDestructive, showItemActions } from '@/lib/item-actions';
 import { useTheme } from '@/hooks/use-theme';
 
 /**
@@ -206,9 +207,7 @@ export default function TransactionsScreen() {
         </View>
       ) : (
         <GlassCard style={styles.summary}>
-          <ThemedText type="small" themeColor="textSecondary">
-            Sobra de {monthTitle(month)}
-          </ThemedText>
+          <HeroLabel>Sobra de {monthTitle(month)}</HeroLabel>
           <Money cents={income - expense} variant="money" tone={income - expense < 0 ? 'danger' : 'text'} />
           <View style={styles.summaryFacts}>
             <ThemedText type="small" themeColor="textSecondary" style={tabular}>
@@ -368,6 +367,38 @@ export default function TransactionsScreen() {
                       subtitle={[...badges, ...context].join(' · ')}
                       icon={KIND_ICON[tx.kind]}
                       accessibilityLabel={`${tx.description || tx.merchant || tx.category || 'Lançamento'}, ${formatBRL(tx.amount_cents)}, ${tx.kind === 'income' ? 'receita' : tx.kind === 'expense' ? 'despesa' : 'transferência'}, ${dayTitle(tx.occurred_at)}${tx.status === 'pending' ? ', previsto' : ''}`}
+                      // `Link.Menu` é iOS-only; sem isto o Android ficaria sem ação nenhuma na linha.
+                      onLongPress={
+                        Platform.OS === 'ios'
+                          ? undefined
+                          : () =>
+                              showItemActions(
+                                tx.description || tx.merchant || tx.category || 'Lançamento',
+                                [
+                                  {
+                                    label: 'Ver detalhe',
+                                    onPress: () =>
+                                      router.push({
+                                        pathname: '/finance/[txId]',
+                                        params: { txId: tx.id, month },
+                                      }),
+                                  },
+                                  {
+                                    label: 'Editar',
+                                    onPress: () =>
+                                      router.push({
+                                        pathname: '/finance/transaction-form',
+                                        params: { id: tx.id, month },
+                                      }),
+                                  },
+                                  {
+                                    label: 'Apagar',
+                                    destructive: true,
+                                    onPress: () => confirmDelete(tx),
+                                  },
+                                ]
+                              )
+                      }
                       trailing={
                         <View style={styles.trailing}>
                           <Money

@@ -14,6 +14,7 @@ import { Field, TextField } from '@/components/ui/field';
 import { Icon } from '@/components/ui/icon';
 import { Row, Section } from '@/components/ui/row';
 import { Screen } from '@/components/ui/screen';
+import { HeroLabel } from '@/components/ui/section-head';
 import { SkeletonRow } from '@/components/ui/skeleton';
 import { useToast } from '@/components/ui/toast';
 import { Motion, Space, Type, tabular } from '@/design/tokens';
@@ -198,9 +199,7 @@ export default function RulesScreen() {
       {totalHits > 0 ? (
         <Animated.View entering={FadeInDown.duration(Motion.duration.slow)}>
           <GlassCard style={styles.hero}>
-            <ThemedText type="small" themeColor="textSecondary">
-              O que suas regras já pouparam
-            </ThemedText>
+            <HeroLabel>O que suas regras já pouparam</HeroLabel>
             <ThemedText style={[Type.title, tabular]}>{totalHits}</ThemedText>
             <ThemedText type="small" themeColor="textSecondary">
               {totalHits === 1 ? 'lançamento categorizado' : 'lançamentos categorizados'} sem

@@ -15,6 +15,7 @@ import { Icon } from '@/components/ui/icon';
 import { Money } from '@/components/ui/money';
 import { Row, Section } from '@/components/ui/row';
 import { Screen } from '@/components/ui/screen';
+import { HeroLabel, SectionHead } from '@/components/ui/section-head';
 import { Segmented } from '@/components/ui/segmented';
 import { Skeleton, SkeletonRow } from '@/components/ui/skeleton';
 import { useToast } from '@/components/ui/toast';
@@ -359,20 +360,14 @@ export default function RecurringScreen() {
       ) : proximos.data ? (
         <Animated.View entering={FadeInDown.duration(Motion.duration.slow)}>
           <GlassCard style={styles.hero}>
-            <ThemedText type="small" themeColor="textSecondary">
-              Próximos 30 dias
-            </ThemedText>
+            <HeroLabel>Próximos 30 dias</HeroLabel>
             <View style={styles.heroSplit}>
               <View style={styles.heroParte}>
-                <ThemedText type="small" themeColor="textSecondary">
-                  sai
-                </ThemedText>
+                <HeroLabel>sai</HeroLabel>
                 <Money cents={sai} variant="title2" />
               </View>
               <View style={styles.heroParte}>
-                <ThemedText type="small" themeColor="textSecondary">
-                  entra
-                </ThemedText>
+                <HeroLabel>entra</HeroLabel>
                 <Money cents={entra} variant="title2" tone="success" />
               </View>
             </View>
@@ -391,9 +386,7 @@ export default function RecurringScreen() {
       {/* Vem primeiro: série parada = conta que não vai aparecer na projeção. */}
       {comErro.length > 0 ? (
         <View style={styles.secao}>
-          <ThemedText type="caption" themeColor="textSecondary" style={styles.secaoTitulo}>
-            PRECISA DE ATENÇÃO
-          </ThemedText>
+          <SectionHead title="Precisa de atenção" />
           {comErro.map((r) => (
             <Animated.View key={r.id} entering={FadeIn.duration(Motion.duration.base)}>
               <Card
@@ -438,18 +431,14 @@ export default function RecurringScreen() {
 
       {ativas.length > 0 ? (
         <View style={styles.secao}>
-          <ThemedText type="caption" themeColor="textSecondary" style={styles.secaoTitulo}>
-            ATIVAS
-          </ThemedText>
+          <SectionHead title="Ativas" />
           {ativas.map(cartaoSerie)}
         </View>
       ) : null}
 
       {pausadas.length > 0 ? (
         <View style={styles.secao}>
-          <ThemedText type="caption" themeColor="textSecondary" style={styles.secaoTitulo}>
-            PAUSADAS
-          </ThemedText>
+          <SectionHead title="Pausadas" />
           {pausadas.map(cartaoSerie)}
         </View>
       ) : null}
@@ -656,10 +645,6 @@ const styles = StyleSheet.create({
   },
   secao: {
     gap: Space.sm,
-  },
-  secaoTitulo: {
-    paddingHorizontal: Space.lg,
-    letterSpacing: 0.6,
   },
   serie: {
     gap: Space.sm,

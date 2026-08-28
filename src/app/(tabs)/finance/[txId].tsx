@@ -14,6 +14,7 @@ import { Money } from '@/components/ui/money';
 import { Row, Section } from '@/components/ui/row';
 import { androidOverflow } from '@/components/ui/overflow-menu';
 import { Screen } from '@/components/ui/screen';
+import { HeroLabel } from '@/components/ui/section-head';
 import { Skeleton, SkeletonRow } from '@/components/ui/skeleton';
 import { useToast } from '@/components/ui/toast';
 import { Motion, Radius, Space, tabular } from '@/design/tokens';
@@ -227,7 +228,7 @@ export default function TransactionDetailScreen() {
                 showItemActions(
                   'Mudar categoria',
                   SUGGESTED_CATEGORIES.map((option) => ({
-                    label: tx.category === option ? `${option} ✓` : option,
+                    label: tx.category === option ? `${option} (atual)` : option,
                     onPress: () => patch({ category: option }),
                   }))
                 ),
@@ -269,12 +270,9 @@ export default function TransactionDetailScreen() {
       {/* O único GlassCard: é o que a pessoa veio conferir em três segundos. */}
       <Animated.View entering={FadeInDown.duration(Motion.duration.slow)}>
         <GlassCard style={styles.hero}>
-          <ThemedText
-            type="small"
-            themeColor="textSecondary"
-            accessibilityLabel={`${KIND_LABEL[tx.kind]} de ${formatBRL(tx.amount_cents)}`}>
+          <HeroLabel accessibilityLabel={`${KIND_LABEL[tx.kind]} de ${formatBRL(tx.amount_cents)}`}>
             {KIND_LABEL[tx.kind]}
-          </ThemedText>
+          </HeroLabel>
           <Money
             cents={signedAmount}
             variant="money"

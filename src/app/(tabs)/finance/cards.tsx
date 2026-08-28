@@ -16,6 +16,7 @@ import { EmptyState } from '@/components/ui/empty-state';
 import { Icon } from '@/components/ui/icon';
 import { Money } from '@/components/ui/money';
 import { Screen } from '@/components/ui/screen';
+import { HeroLabel } from '@/components/ui/section-head';
 import { Skeleton } from '@/components/ui/skeleton';
 import { ProgressBar } from '@/components/ui/sparkline';
 import { Motion, Radius, Space, tabular } from '@/design/tokens';
@@ -164,9 +165,7 @@ export default function CardsScreen() {
       {!cards.isError && lista.length > 0 ? (
         <Animated.View entering={FadeInDown.duration(Motion.duration.slow)}>
           <GlassCard style={styles.hero}>
-            <ThemedText type="caption" themeColor="textSecondary" style={styles.heroLabel}>
-              Total a pagar
-            </ThemedText>
+            <HeroLabel>Total a pagar</HeroLabel>
             <Money cents={totalAPagar} variant="money" />
             <ThemedText type="small" themeColor="textSecondary" style={tabular}>
               {proximo?.due_date
@@ -291,10 +290,6 @@ export default function CardsScreen() {
 const styles = StyleSheet.create({
   hero: {
     gap: Space.sm,
-  },
-  heroLabel: {
-    textTransform: 'uppercase',
-    letterSpacing: 0.6,
   },
   card: {
     gap: Space.sm,

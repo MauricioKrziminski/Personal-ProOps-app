@@ -18,6 +18,7 @@ import { EmptyState } from '@/components/ui/empty-state';
 import { Money } from '@/components/ui/money';
 import { Row, Section } from '@/components/ui/row';
 import { Screen } from '@/components/ui/screen';
+import { HeroLabel } from '@/components/ui/section-head';
 import { Skeleton, SkeletonRow } from '@/components/ui/skeleton';
 import { ProgressBar } from '@/components/ui/sparkline';
 import { Motion, Radius, Space, tabular } from '@/design/tokens';
@@ -298,9 +299,7 @@ export default function InstallmentsScreen() {
       {!plans.isError && lista.length > 0 ? (
         <Animated.View entering={FadeInDown.duration(Motion.duration.slow)}>
           <GlassCard style={styles.hero}>
-            <ThemedText type="small" themeColor="textSecondary">
-              Comprometido nos próximos 12 meses
-            </ThemedText>
+            <HeroLabel>Comprometido nos próximos 12 meses</HeroLabel>
             <Money cents={comprometido} variant="money" />
             <ThemedText type="small" themeColor="textSecondary" style={tabular}>
               {comprometido > 0

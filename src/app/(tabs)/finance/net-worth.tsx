@@ -20,6 +20,7 @@ import { Icon } from '@/components/ui/icon';
 import { Money } from '@/components/ui/money';
 import { Row, Section } from '@/components/ui/row';
 import { Screen } from '@/components/ui/screen';
+import { HeroLabel } from '@/components/ui/section-head';
 import { Segmented } from '@/components/ui/segmented';
 import { Skeleton, SkeletonRow } from '@/components/ui/skeleton';
 import { ProgressBar, Sparkline } from '@/components/ui/sparkline';
@@ -54,6 +55,11 @@ import { confirmDestructive } from '@/lib/item-actions';
 function mesLabel(iso: string): string {
   const [y, m] = iso.split('-').map(Number);
   return new Date(y, m - 1, 1).toLocaleDateString('pt-BR', { month: 'short' });
+}
+
+/** `financial_health()` arredonda em UMA casa no banco; pt-BR usa vírgula, não ponto. */
+function ptBR(n: number): string {
+  return String(n).replace('.', ',');
 }
 
 const CLASSE_ICONE: Record<string, Parameters<typeof Icon>[0]['name']> = {
@@ -255,9 +261,7 @@ export default function NetWorthScreen() {
       ) : hoje && !vazioAbsoluto ? (
         <Animated.View entering={FadeInDown.duration(Motion.duration.slow)}>
           <GlassCard style={styles.hero}>
-            <ThemedText type="small" themeColor="textSecondary">
-              Patrimônio líquido
-            </ThemedText>
+            <HeroLabel>Patrimônio líquido</HeroLabel>
             <Money
               cents={liquido}
               variant="money"
@@ -359,7 +363,7 @@ export default function NetWorthScreen() {
             subtitle="peso 40 pts"
             trailing={
               <ThemedText type="small" style={tabular}>
-                {saude.data.savings_rate}%
+                {ptBR(saude.data.savings_rate)}%
               </ThemedText>
             }
           />
@@ -368,7 +372,7 @@ export default function NetWorthScreen() {
             subtitle="peso 25 pts"
             trailing={
               <ThemedText type="small" style={tabular}>
-                {saude.data.budget_adherence}%
+                {ptBR(saude.data.budget_adherence)}%
               </ThemedText>
             }
           />
@@ -377,7 +381,7 @@ export default function NetWorthScreen() {
             subtitle="peso 20 pts"
             trailing={
               <ThemedText type="small" style={tabular}>
-                {saude.data.months_of_reserve} meses
+                {ptBR(saude.data.months_of_reserve)} meses
               </ThemedText>
             }
           />
@@ -386,7 +390,7 @@ export default function NetWorthScreen() {
             subtitle="peso 15 pts"
             trailing={
               <ThemedText type="small" style={tabular}>
-                {saude.data.debt_ratio}%
+                {ptBR(saude.data.debt_ratio)}%
               </ThemedText>
             }
           />

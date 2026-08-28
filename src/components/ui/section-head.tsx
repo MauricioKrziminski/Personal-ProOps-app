@@ -13,9 +13,20 @@ import { Space } from '@/design/tokens';
  * Existe como componente porque o mesmo card aparece em Hoje, Financeiro, Projeção e Patrimônio —
  * e estava escrito diferente em cada uma.
  */
-export function HeroLabel({ children }: { children: ReactNode }) {
+export function HeroLabel({
+  children,
+  accessibilityLabel,
+}: {
+  children: ReactNode;
+  /** Só quando o texto visível (sempre caixa alta) precisa soar diferente para leitor de tela. */
+  accessibilityLabel?: string;
+}) {
   return (
-    <ThemedText type="caption" themeColor="textSecondary" style={styles.tracked}>
+    <ThemedText
+      type="caption"
+      themeColor="textSecondary"
+      style={styles.tracked}
+      accessibilityLabel={accessibilityLabel}>
       {typeof children === 'string' ? children.toUpperCase() : children}
     </ThemedText>
   );

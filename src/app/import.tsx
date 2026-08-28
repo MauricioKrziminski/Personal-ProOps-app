@@ -17,6 +17,7 @@ import { Icon } from '@/components/ui/icon';
 import { Money } from '@/components/ui/money';
 import { Row, Section } from '@/components/ui/row';
 import { Screen } from '@/components/ui/screen';
+import { HeroLabel, SectionHead } from '@/components/ui/section-head';
 import { Skeleton, SkeletonRow } from '@/components/ui/skeleton';
 import { useToast } from '@/components/ui/toast';
 import { Motion, Radius, Space, Type } from '@/design/tokens';
@@ -290,9 +291,7 @@ export default function ImportScreen() {
 
         {(accounts ?? []).length > 0 ? (
           <View style={styles.bloco}>
-            <ThemedText type="caption" themeColor="textSecondary" style={styles.rotulo}>
-              LANÇAR NA CONTA
-            </ThemedText>
+            <SectionHead title="Lançar na conta" />
             <View style={styles.chips}>
               {(accounts ?? []).map((conta) => (
                 <Chip
@@ -402,9 +401,9 @@ export default function ImportScreen() {
       {vaoEntrar > 0 ? (
         <Animated.View entering={FadeInDown.duration(Motion.duration.slow)}>
           <GlassCard style={styles.resumo}>
-            <ThemedText type="small" themeColor="textSecondary">
+            <HeroLabel>
               {vaoEntrar === 1 ? '1 lançamento entra' : `${vaoEntrar} lançamentos entram`}
-            </ThemedText>
+            </HeroLabel>
             <Money cents={-somaDespesas} variant="money" />
             <ThemedText type="small" themeColor="textSecondary">
               {porRegra} com categoria · {semCategoria} sem
@@ -555,10 +554,6 @@ const styles = StyleSheet.create({
   },
   bloco: {
     gap: Space.md,
-  },
-  rotulo: {
-    paddingHorizontal: Space.lg,
-    letterSpacing: 0.6,
   },
   rodape: {
     ...Type.footnote,

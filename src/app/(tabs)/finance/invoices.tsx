@@ -18,6 +18,7 @@ import { EmptyState } from '@/components/ui/empty-state';
 import { Money } from '@/components/ui/money';
 import { Row, Section } from '@/components/ui/row';
 import { Screen } from '@/components/ui/screen';
+import { HeroLabel } from '@/components/ui/section-head';
 import { Segmented } from '@/components/ui/segmented';
 import { Skeleton, SkeletonRow } from '@/components/ui/skeleton';
 import { Motion, Radius, Space, tabular } from '@/design/tokens';
@@ -189,9 +190,7 @@ export default function InvoicesScreen() {
       {!invoices.isError && serie.length > 1 ? (
         <Animated.View entering={FadeInDown.duration(Motion.duration.slow)}>
           <GlassCard style={styles.hero}>
-            <ThemedText type="small" themeColor="textSecondary">
-              Últimas {serie.length} faturas
-            </ThemedText>
+            <HeroLabel>Últimas {serie.length} faturas</HeroLabel>
             <View
               accessibilityRole="image"
               accessibilityLabel={`Fatura entre ${formatBRL(Math.min(...serie.map((i) => i.total_cents)))} e ${formatBRL(maior)} nas últimas ${serie.length} faturas, média de ${formatBRL(media)}`}

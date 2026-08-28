@@ -13,6 +13,7 @@ import { Icon } from '@/components/ui/icon';
 import { Money } from '@/components/ui/money';
 import { Row, Section } from '@/components/ui/row';
 import { Screen } from '@/components/ui/screen';
+import { HeroLabel, SectionHead } from '@/components/ui/section-head';
 import { Skeleton, SkeletonRow } from '@/components/ui/skeleton';
 import { ProgressBar } from '@/components/ui/sparkline';
 import { useToast } from '@/components/ui/toast';
@@ -322,9 +323,7 @@ export default function GoalsScreen() {
       ) : lista.length > 0 ? (
         <Animated.View entering={FadeInDown.duration(Motion.duration.slow)}>
           <GlassCard style={styles.hero}>
-            <ThemedText type="caption" themeColor="textSecondary" style={styles.heroLabel}>
-              Guardado
-            </ThemedText>
+            <HeroLabel>Guardado</HeroLabel>
             <Money cents={guardado} variant="money" />
             <View style={styles.valores}>
               <ThemedText type="small" themeColor="textSecondary">
@@ -350,15 +349,16 @@ export default function GoalsScreen() {
             accessibilityRole="button"
             accessibilityState={{ expanded: concluidasAbertas }}
             accessibilityLabel={`Concluídas, ${concluidas.length}`}
-            onPress={() => setConcluidasAbertas((v) => !v)}
-            style={styles.secaoCabecalho}>
-            <ThemedText type="caption" themeColor="textSecondary" style={styles.secaoTitulo}>
-              CONCLUÍDAS ({concluidas.length})
-            </ThemedText>
-            <Icon
-              name={concluidasAbertas ? 'chevron.up' : 'chevron.down'}
-              size="sm"
-              color="textSecondary"
+            onPress={() => setConcluidasAbertas((v) => !v)}>
+            <SectionHead
+              title={`Concluídas (${concluidas.length})`}
+              action={
+                <Icon
+                  name={concluidasAbertas ? 'chevron.up' : 'chevron.down'}
+                  size="sm"
+                  color="textSecondary"
+                />
+              }
             />
           </Pressable>
           {concluidasAbertas ? concluidas.map(cartaoMeta) : null}
@@ -572,22 +572,8 @@ const styles = StyleSheet.create({
   hero: {
     gap: Space.sm,
   },
-  heroLabel: {
-    textTransform: 'uppercase',
-    letterSpacing: 0.6,
-  },
   secao: {
     gap: Space.sm,
-  },
-  secaoCabecalho: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingRight: Space.lg,
-  },
-  secaoTitulo: {
-    paddingHorizontal: Space.lg,
-    letterSpacing: 0.6,
   },
   meta: {
     gap: Space.sm,
