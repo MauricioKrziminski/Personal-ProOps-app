@@ -18,6 +18,21 @@ export const Colors = {
     danger: '#E5484D',
     success: '#30A46C',
     warning: '#E8A33D',
+
+    /** fundo de página de lista agrupada — o card branco descansa em cima dele */
+    groupedBackground: '#F2F2F7',
+    /** card opaco (o padrão; glass é só chrome + 1 destaque por tela) */
+    surface: '#FFFFFF',
+    /** superfície acima de um card — sheet, popover */
+    surfaceRaised: '#FFFFFF',
+    /** hairline entre linhas de lista */
+    separator: 'rgba(60, 60, 67, 0.29)',
+    /** scrim atrás de modal e sheet */
+    overlay: 'rgba(0, 0, 0, 0.40)',
+    /** fundo de estado ativo/selecionado derivado do tint */
+    accentSoft: '#E7F1FD',
+    /** rótulo sobre `tint` — substitui os 18 `#fff` hardcoded espalhados nas telas */
+    onTint: '#FFFFFF',
   },
   dark: {
     text: '#ffffff',
@@ -29,6 +44,14 @@ export const Colors = {
     danger: '#FF6369',
     success: '#3DD68C',
     warning: '#FFC53D',
+
+    groupedBackground: '#000000',
+    surface: '#1C1C1E',
+    surfaceRaised: '#2C2C2E',
+    separator: 'rgba(84, 84, 88, 0.65)',
+    overlay: 'rgba(0, 0, 0, 0.60)',
+    accentSoft: '#12283F',
+    onTint: '#FFFFFF',
   },
 } as const;
 
