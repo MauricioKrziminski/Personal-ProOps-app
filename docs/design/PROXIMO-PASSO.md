@@ -155,6 +155,31 @@ Correção: o `Stack.Toolbar` passa a existir só no iOS; no Android o "..." vem
 já manda usar para ação de item. O submenu de categoria do detalhe vira um segundo sheet, que é o
 gesto natural lá. Verificado nos dois: sheet abre no Android, menu nativo intacto no iOS.
 
+### 🎨 Segunda passada: as 30 telas que faltavam
+
+A primeira passada consertou os primitivos e verificou 6 telas. As outras 30 receberam a mudança
+de tipografia **sem ninguém ver o resultado**. Esta passada abriu todas.
+
+**Defeitos de primitivo achados olhando tela real:**
+
+| Defeito | Onde aparecia | Correção |
+|---|---|---|
+| FAB com retângulo branco atrás | `boxShadow` ia no wrapper do `Button`, que não tinha raio | wrapper ganhou `Radius.pill` |
+| Botão `ghost` lia como texto preto | `labelColor` era `text` — sem superfície e sem cor, não parece ação | `ghost` leva o accent |
+| Botão desabilitado parecia ativo | azul a 50% ainda lê como disponível | desabilitado perde a cor: `backgroundElement` + `textSecondary`. Carregando mantém o accent |
+| Ação do empty state em cinza | era a ÚNICA ação da tela, em `secondary` | virou primário |
+| Título de empty state sumia | `smallBold` 15/600 contra um ícone `xl` | virou `headline` |
+| Três tratamentos para o rótulo de destaque | cada tela inventava o seu | primitivos `HeroLabel` e `SectionHead` |
+
+**`Link.Menu` é iOS-only — e 4 telas não tinham plano B.** Em `accounts`, `transactions`,
+`finance/index` e `invoice/[id]` a linha não tinha ação NENHUMA no Android: "Editar", "Arquivar",
+"Apagar" eram inalcançáveis. Agora todas caem em `showItemActions` via `Row.onLongPress`, o mesmo
+padrão que a `notes/index` já usava.
+
+**Mais 17 ícones faltando no mapa** (os 12 de pasta — `briefcase`, `lightbulb`, `airplane`,
+`pills`… — mais `car`, `shippingbox`, `pause.circle`, `play.circle`, `bitcoinsign.circle`). Agora
+o `Icon` avisa em `__DEV__` quando um nome não está mapeado, em vez de virar `circle` calado.
+
 ### ⚙️ Metro — quem está servindo
 
 O Metro que a sessão anterior tinha deixado de pé foi **encerrado** (a purga de cache era
