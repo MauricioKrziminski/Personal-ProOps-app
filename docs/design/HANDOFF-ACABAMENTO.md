@@ -111,11 +111,10 @@ from (select workspace_id, user_id from notes limit 1) n, generate_series(1,18) 
 
 ---
 
-> **Estado em 28/08, fim da sessão seguinte:** os três defeitos da seção 2 estão **resolvidos**
-> (commits `ba4ca63`, `41499dd`, `b41be59`), verificados em iOS claro/escuro e Android
-> claro/escuro. A seção continua aqui como registro do que era e por quê. O que segue aberto é a
-> seção 3 — direção estética de marca (decisão do usuário), Dynamic Type e o passe de movimento
-> em vídeo.
+> **Estado em 28/08, fim da sessão seguinte:** os três defeitos da seção 2 estão **resolvidos** e
+> foi feita uma **varredura das 36 rotas do app**, tela por tela, com screenshot. O que ela achou
+> além da seção 2 está na seção 6. O que segue aberto é a seção 3 — direção estética de marca
+> (decisão do usuário), Dynamic Type e o passe de movimento em vídeo.
 
 ## 2. Os três defeitos que o usuário apontou (prioridade máxima) — RESOLVIDOS
 
@@ -299,3 +298,45 @@ implementada**. `conta-a-pagar` e `lembrete-recorrencia` viraram modo/seção de
 3. Contagem anti-slop medida (não afirmada):
    `hex fora do tema · fontSize solto · emoji na chrome · SafeAreaView à mão · Alert cru` = 0.
 4. Documento da tela atualizado no mesmo commit.
+
+---
+
+## 6. A varredura das 36 rotas (28/08/2026)
+
+Feita depois da seção 2, porque "os três defeitos resolvidos" não é o mesmo que "o app conferido".
+Deep link no Android para cada rota, screenshot, olhar. Doze defeitos, nenhum deles pegável por
+`tsc`, lint ou code review — todos só aparecem na tela.
+
+| # | Onde | O que era |
+|---|---|---|
+| 1 | `lib/dates.ts` | `formatDateBR` escrevia `28-08-2026` e `isoToBR` `28/08/2026`. **Duas grafias da mesma data no mesmo app**, e o hífen lembra ISO (como o dado é armazenado), não pt-BR. Um teste agora compara as duas funções. |
+| 2 | 3 telas | `ptBR(n)` duplicado em `net-worth`, inline em `debts`, **ausente** em `reports` — que por isso escrevia `Guardou 90.4%` com ponto ao lado de `90,4%` na tela vizinha. Virou `formatNumberBR`. |
+| 3 | `section-head.tsx` | `HeroLabel` só aplicava caixa alta quando `children` era string: `Sobrou em {ano}` entrega um ARRAY e saía em caixa mista, ao lado de `RECEBIDO`/`GASTO`. Falha silenciosa. |
+| 4 | `empty-state.tsx` | O botão saía **colado à esquerda** embaixo de um título centralizado: o `alignSelf: flex-start` do wrapper do `Button` ganhava do `alignItems: center` do pai. |
+| 5 | `recurring.tsx` | `SAI R$ 0,00 / ENTRA R$ 0,00` **em cima de um empty state**. |
+| 6 | `cards.tsx` | O card de destaque repetia total, nome e vencimento do único cartão logo abaixo. Agora só aparece com 2+. |
+| 7 | `plan.tsx`, `paywall.tsx` | Rótulo do herói **embaixo** do valor — as duas únicas telas assim. |
+| 8 | `invoices.tsx` | Com uma fatura, a tela era três parágrafos cinzas soltos. Viraram `Card`, como em Patrimônio. |
+| 9 | `members.tsx` | `EmptyState` "Só você por aqui" renderizado **abaixo de uma lista preenchida** (você sempre está nela) — e "Ver planos" duas vezes na mesma tela. |
+| 10 | `reminders.tsx` | Única tela de lista sem ação no header: criar era botão de bloco no corpo, contra `+` no header em outras sete. |
+| 11 | `today/index.tsx` | "Paguei" no accent; nas outras cinco telas que o mostram, `secondary`. |
+| 12 | `[txId].tsx` | `bubble.left` e `iphone` **fora do mapa** do `Icon` → círculo azul oco no Android. Agora há `icon-map.test.ts`, que varre o código e falha se um SF Symbol usado não estiver no mapa. |
+
+**A lição que fica:** o `console.warn` do `Icon` só grita quando alguém ABRE a tela. Os dois ícones
+quebrados estavam em produção de dev há semanas porque ninguém tinha aberto o detalhe do
+lançamento no Android. Guarda que depende de alguém olhar não é guarda — por isso virou teste.
+
+### Como repetir a varredura
+
+```bash
+# Android, uma rota por vez (deep link é confiável lá)
+adb shell am start -a android.intent.action.VIEW -d "appproops:///finance/budgets"
+adb exec-out screencap -p > tela.png
+adb shell cmd uimode night yes|no
+```
+
+No iOS **não use clique sintético**: além do risco de acertar outra janela (seção 1), ele não abre
+linha de `FlashList` com `Link.Trigger` nem botão de `Stack.Toolbar`. O que funciona é um
+`router.push` temporário num `useEffect` da tela anterior, marcado `// TEMP-VERIFY` e revertido
+antes do commit — trocar o alvo e esperar o Fast Refresh dá uma tela nova a cada ~9 s, sem clique
+nenhum.
