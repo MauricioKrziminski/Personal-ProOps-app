@@ -1,5 +1,5 @@
 import { zodResolver } from '@hookform/resolvers/zod';
-import { router, useLocalSearchParams } from 'expo-router';
+import { Stack, router, useLocalSearchParams } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { Controller, useForm, useWatch } from 'react-hook-form';
 import {
@@ -17,7 +17,6 @@ import { z } from 'zod';
 
 import { Chip } from '@/components/finance/chip';
 import { MoneyInput } from '@/components/finance/money-input';
-import { ScreenHeader } from '@/components/finance/screen-header';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { MaxContentWidth, Spacing } from '@/constants/theme';
@@ -205,7 +204,7 @@ export default function TransactionFormScreen() {
           style={styles.flex}
           behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
           <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
-            <ScreenHeader title={editing ? 'Editar lançamento' : 'Novo lançamento'} />
+            <Stack.Screen options={{ title: editing ? 'Editar lançamento' : 'Novo lançamento' }} />
 
             <Controller
               control={control}

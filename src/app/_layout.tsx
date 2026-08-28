@@ -1,9 +1,10 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { DarkTheme, DefaultTheme, Stack, ThemeProvider } from 'expo-router';
+import { DarkTheme, DefaultTheme, Stack, ThemeProvider, router } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
-import { useColorScheme } from 'react-native';
+import { Pressable, useColorScheme } from 'react-native';
 
 import { AnimatedSplashOverlay } from '@/components/animated-icon';
+import { ThemedText } from '@/components/themed-text';
 import { ToastProvider } from '@/components/ui/toast';
 import { useSession } from '@/hooks/use-session';
 
@@ -20,6 +21,17 @@ const queryClient = new QueryClient({
     },
   },
 });
+
+/** Modal precisa de saída explícita: arrastar para baixo não é descoberto nem acessível. */
+const modalOptions = {
+  headerLeft: () => (
+    <Pressable accessibilityRole="button" hitSlop={12} onPress={() => router.back()}>
+      <ThemedText type="default" themeColor="tint">
+        Cancelar
+      </ThemedText>
+    </Pressable>
+  ),
+};
 
 export default function RootLayout() {
   const colorScheme = useColorScheme();
@@ -45,11 +57,11 @@ export default function RootLayout() {
                 {/* Atenção total: formulário com etapas vive acima das abas. */}
                 <Stack.Screen
                   name="finance/transaction-form"
-                  options={{ presentation: 'modal', title: 'Lançamento' }}
+                  options={{ presentation: 'modal', title: 'Lançamento', ...modalOptions }}
                 />
                 <Stack.Screen
                   name="reminder-form"
-                  options={{ presentation: 'modal', title: 'Lembrete' }}
+                  options={{ presentation: 'modal', title: 'Lembrete', ...modalOptions }}
                 />
                 <Stack.Screen name="catalog" options={{ title: 'Catálogo' }} />
               </Stack.Protected>

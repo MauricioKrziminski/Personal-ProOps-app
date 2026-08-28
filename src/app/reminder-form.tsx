@@ -1,4 +1,4 @@
-import { router, useLocalSearchParams } from 'expo-router';
+import { Stack, router, useLocalSearchParams } from 'expo-router';
 import { useState } from 'react';
 import {
   KeyboardAvoidingView,
@@ -13,7 +13,6 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';
 
 import { Chip } from '@/components/finance/chip';
-import { ScreenHeader } from '@/components/finance/screen-header';
 import { GlassCard } from '@/components/glass/glass-card';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
@@ -114,7 +113,7 @@ export default function ReminderFormScreen() {
           behavior={Platform.OS === 'ios' ? 'padding' : undefined}
           style={styles.flex}>
           <ScrollView contentContainerStyle={styles.scroll} keyboardShouldPersistTaps="handled">
-            <ScreenHeader title={editing ? 'Editar lembrete' : 'Novo lembrete'} />
+            <Stack.Screen options={{ title: editing ? 'Editar lembrete' : 'Novo lembrete' }} />
 
             <GlassCard style={styles.card}>
               <ThemedText type="smallBold">O que lembrar</ThemedText>
