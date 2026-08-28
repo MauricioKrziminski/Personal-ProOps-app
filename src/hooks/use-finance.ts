@@ -120,12 +120,14 @@ export type TxSummaryRow = Omit<Fns['transactions_summary']['Returns'][number], 
 };
 
 const TRANSACTION_COLUMNS =
-  'id, kind, amount_cents, currency, category, description, account_id, counterparty_account_id, occurred_at, source, created_at, status, due_at, invoice_id, installment_plan_id, installment_no, merchant';
+  'id, kind, amount_cents, currency, category, description, account_id, counterparty_account_id, occurred_at, source, created_at, status, due_at, invoice_id, installment_plan_id, installment_no, merchant, recurring_id, debt_id';
 
 export interface TransactionFilters {
   month: string; // YYYY-MM
   kind?: TransactionKind;
   category?: string;
+  /** Ocorrências de uma série recorrente. */
+  recurringId?: string;
 }
 
 // ── queries ───────────────────────────────────────────────────────────────────
@@ -134,7 +136,13 @@ export function useTransactions(filters: TransactionFilters) {
   useRealtimeInvalidate('transactions', ['transactions']);
   const { from, to } = monthBounds(filters.month);
   return useQuery({
-    queryKey: ['transactions', filters.month, filters.kind ?? '', filters.category ?? ''],
+    queryKey: [
+      'transactions',
+      filters.month,
+      filters.kind ?? '',
+      filters.category ?? '',
+      filters.recurringId ?? '',
+    ],
     queryFn: async (): Promise<Transaction[]> => {
       let query = supabase
         .from('transactions')
@@ -146,6 +154,9 @@ export function useTransactions(filters: TransactionFilters) {
         .limit(200);
       if (filters.kind) query = query.eq('kind', filters.kind);
       if (filters.category) query = query.eq('category', filters.category);
+      // "Ver ocorrências" de uma recorrente passa por aqui; sem o filtro a tela abriria o mês
+      // inteiro sem avisar que ignorou o pedido.
+      if (filters.recurringId) query = query.eq('recurring_id', filters.recurringId);
       const { data, error } = await query;
       if (error) throw error;
       return data as Transaction[];

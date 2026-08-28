@@ -54,6 +54,7 @@ interface BudgetRow {
   id: string;
   category: string;
   limit_cents: number;
+  rollover: boolean;
   /** `YYYY-MM-01` quando a linha sobrescreve um mês; `null` no limite padrão. */
   month: string | null;
 }
@@ -73,7 +74,7 @@ function useBudgetRows() {
     queryFn: async (): Promise<BudgetRow[]> => {
       const { data, error } = await supabase
         .from('budgets')
-        .select('id, category, limit_cents, month')
+        .select('id, category, limit_cents, month, rollover')
         .order('category');
       if (error) throw error;
       return data as BudgetRow[];
@@ -200,6 +201,8 @@ export default function BudgetsScreen() {
                 {
                   category: row.category,
                   limit_cents: row.limit_cents,
+                  // sem isto o desfazer devolvia o limite SEM o acúmulo de sobra
+                  rollover: row.rollover,
                   month: row.month ? row.month.slice(0, 7) : null,
                 },
                 {
@@ -447,7 +450,7 @@ export default function BudgetsScreen() {
           icon="chart.bar.doc.horizontal"
           title={
             mesFuturo
-              ? `${nomeDoMes(month)} ainda usa seus limites padrão`
+              ? `${nomeDoMes(month).charAt(0).toUpperCase()}${nomeDoMes(month).slice(1)} ainda usa seus limites padrão`
               : 'Você ainda não tem limite nenhum'
           }
           hint={

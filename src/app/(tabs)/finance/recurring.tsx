@@ -552,7 +552,7 @@ export default function RecurringScreen() {
 
               <Field
                 label="Começa em"
-                hint="É a âncora da série e não muda depois. Para começar em outra data, crie outra série."
+                hint="É a âncora da série e não muda depois. Data no passado lança as ocorrências antigas de uma vez."
                 error={form.inicio && !inicioOk ? 'Data inválida (dd/mm/aaaa)' : undefined}>
                 <TextField
                   value={form.inicio}

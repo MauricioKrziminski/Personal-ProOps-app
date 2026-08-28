@@ -131,7 +131,10 @@ export default function DebtsScreen() {
       kind: d.kind,
       remainingCents: Number(d.remaining_cents),
       principalCents: Number(d.principal_cents),
-      taxa: d.interest_rate_monthly ? String(d.interest_rate_monthly * 100).replace('.', ',') : '',
+      // sem o toFixed, 0.0199 * 100 vira 1.9900000000000002 no campo
+      taxa: d.interest_rate_monthly
+        ? String(Number((d.interest_rate_monthly * 100).toFixed(4))).replace('.', ',')
+        : '',
       parcelas: d.installments ? String(d.installments) : '',
       diaVencimento: d.due_day ? String(d.due_day) : '',
     });

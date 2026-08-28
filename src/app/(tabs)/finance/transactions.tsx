@@ -107,7 +107,7 @@ export default function TransactionsScreen() {
   const scheme = useColorScheme() === 'dark' ? 'dark' : 'light';
   const toast = useToast();
   const insets = useSafeAreaInsets();
-  const params = useLocalSearchParams<{ month?: string; kind?: string; category?: string }>();
+  const params = useLocalSearchParams<{ month?: string; kind?: string; category?: string; recurringId?: string }>();
 
   const [month, setMonth] = useState(() => params.month ?? currentMonth());
   const [kind, setKind] = useState<TransactionKind | 'all'>(
@@ -120,7 +120,12 @@ export default function TransactionsScreen() {
   const [search, setSearch] = useState('');
 
   const range = useMemo(() => monthBounds(month), [month]);
-  const list = useTransactions({ month, kind: kind === 'all' ? undefined : kind, category });
+  const list = useTransactions({
+    month,
+    kind: kind === 'all' ? undefined : kind,
+    category,
+    recurringId: params.recurringId,
+  });
   const summary = useTransactionsSummary(range.from, range.to);
   const accounts = useAccounts();
   // Um item basta para separar "nunca teve nada" de "este mês não teve nada".

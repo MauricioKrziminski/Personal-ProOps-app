@@ -110,6 +110,8 @@ export default function ForecastScreen() {
   const nadaParaProjetar =
     !forecast.isLoading &&
     !accounts.isLoading &&
+    !bills.isLoading &&
+    !bills.isError &&
     (accounts.data ?? []).length === 0 &&
     contas.length === 0 &&
     valores.every((v) => v === 0);
