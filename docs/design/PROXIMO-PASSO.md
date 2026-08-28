@@ -142,6 +142,19 @@ tamanhos vieram para a `Type`, o `SafeAreaView` virou `useSafeAreaInsets`, o �
 Contagem agora, medida e não afirmada: **hex 0 · fontSize solto 0 · emoji na chrome 0 ·
 SafeAreaView à mão 0 · Alert cru 0 · GlassView/BlurView fora do `GlassCard` 0.**
 
+### 🐞 Segundo achado do Android: o menu "..." do header não existia
+
+O log do Metro repetia *"Stack.Toolbar.Menu on Android requires an ImageSourcePropType icon"*.
+Não era só o ícone: o `Stack.Toolbar` **reclama o slot direito do header mesmo sem desenhar nada**
+no Android, então engolia também qualquer `headerRight`. Resultado: em `Financeiro`, `Transações`
+e no detalhe do lançamento o botão simplesmente não existia — e com ele sumiam "Importar extrato",
+"Regras de categoria", "Atividade da IA", **"Duplicar" e "Apagar"**.
+
+Correção: o `Stack.Toolbar` passa a existir só no iOS; no Android o "..." vem de `headerRight` +
+`showItemActions` (`src/components/ui/overflow-menu.tsx`) — o mesmo caminho que a regra de design
+já manda usar para ação de item. O submenu de categoria do detalhe vira um segundo sheet, que é o
+gesto natural lá. Verificado nos dois: sheet abre no Android, menu nativo intacto no iOS.
+
 ### ⚙️ Metro — quem está servindo
 
 O Metro que a sessão anterior tinha deixado de pé foi **encerrado** (a purga de cache era
