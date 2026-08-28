@@ -22,6 +22,29 @@ código está errado** — os dois não podem ficar como estão.
   o documento dela.
 - **Mudando de ideia:** edite o documento no mesmo commit que muda a tela.
 
+## A seção **Visual** (obrigatória, hoje ausente em todos os 35 documentos)
+
+Os documentos nasceram fortes em **anatomia** — o que aparece, em que ordem, por quê; estados;
+navegação; movimento — e **mudos em aparência**. "Card de destaque em glass" e "`Row` com
+trailing" são estrutura, não aparência: nenhum documento diz peso tipográfico por bloco,
+densidade, contraste ou hierarquia de cor. As telas herdaram exatamente esse buraco e saíram
+corretas e sem graça.
+
+Toda tela ganha uma seção **Visual** com estes quatro campos — e só estes, porque a linguagem
+global continua morando em `.claude/rules/design.md`:
+
+| Campo | O que responde | O que NÃO é |
+|---|---|---|
+| **Hierarquia por bloco** | Quem é protagonista, quem é secundário, quem é ruído tolerado. Um protagonista por tela. | Não é a ordem dos blocos — isso já está em Anatomia. |
+| **Peso tipográfico** | Que variante de `Type` cada bloco usa e por quê o protagonista pesa mais que o vizinho. | Não é `fontSize` solto: só nomes da escala. |
+| **Densidade** | Respiro entre seções e dentro da linha; quantos itens cabem antes de rolar. | Não é padding literal em tela: é qual degrau de `Space`. |
+| **Tratamento de superfície** | Opaco, agrupado ou glass; onde mora o contraste; o que carrega elevação. | Não é cor nova: um accent, uma família de cinza. |
+
+> **Estado: estrutura definida, valores em aberto.** Preencher os quatro campos exige referência
+> real — telas de apps rankeados da categoria — e é exatamente o passo que foi pulado na primeira
+> vez (`PROXIMO-PASSO.md` §B). Preencher de memória repetiria o erro que produziu as telas atuais.
+> A decisão de direção está com o Gabriel; enquanto não vier, nenhum valor entra aqui.
+
 A linguagem de design (tokens, glass, movimento, estados, anti-slop) mora em
 `.claude/rules/design.md`, não aqui. Os documentos assumem essa regra e não a repetem.
 

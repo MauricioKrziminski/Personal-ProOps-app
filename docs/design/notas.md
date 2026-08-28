@@ -90,11 +90,25 @@ em português, captura instantânea e uma lixeira que perdoa. Editor de blocos n
    > barra de status (o header nativo não reserva altura para irmão que não rola), e ainda
    > impedia o large title de colapsar. Dentro do `ListHeaderComponent` some ao rolar — e rolar
    > é o gesto de *ler*, não o de *capturar*.
-3. **Chips de pasta e de tag** no `ListHeaderComponent` (reusa `src/components/finance/chip.tsx`).
-   Somem quando não existe pasta nem tag — usuário novo não vê estrutura vazia.
+3. **Chips de pasta e de tag em UMA faixa** no `ListHeaderComponent` (reusa
+   `src/components/finance/chip.tsx`), com filete separando os dois filtros. Somem quando não
+   existe pasta nem tag — usuário novo não vê estrutura vazia.
+
+   > Corrigido depois de ver rodando: em duas faixas empilhadas, a tela abria com **quatro**
+   > fileiras de controle (busca, quick-add, pastas, tags) antes da primeira nota — pedia
+   > configuração em vez de mostrar conteúdo. Numa faixa só, são três.
 4. **Fixadas** no topo da lista, com rótulo discreto — não com card separado.
-5. **Lista** (`FlashList`): cada `Row` traz primeira linha como título, prévia de duas linhas, e a
-   faixa de metadados — pasta, `#tags`, `3/5` quando tem checklist, `via WhatsApp`.
+5. **Lista** (`FlashList`) sobre fundo agrupado: cada linha traz primeira linha como título,
+   prévia de duas linhas, e a faixa de metadados — pasta, `#tags`, `3/5` quando tem checklist,
+   `via WhatsApp`. Tag com o mesmo nome da pasta não repete (`mercado · #mercado`).
+
+   > As linhas moram numa **superfície agrupada** — cantos arredondados nas pontas de cada grupo
+   > (Fixadas, Notas) e hairline entre irmãs, igual ao `Section` da Hoje. Soltas na margem, as
+   > duas abas pareciam de apps diferentes.
+
+   Título e prévia mostram o **texto**, nunca a marcação: `stripMarkup` em `src/lib/search.ts`
+   tira o `- [ ]` / `- [x]` antes de exibir, senão a prévia de um checklist vazava
+   `- [x] leite - [ ] pão`.
 
 Ordenação: `pinned desc, updated_at desc`. Recência bate relevância em nota pessoal, e ranking
 por `ts_rank` exigiria RPC (o PostgREST não ordena por expressão).
