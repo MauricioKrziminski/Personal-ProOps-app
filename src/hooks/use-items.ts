@@ -23,6 +23,13 @@ export interface Reminder {
   next_run_at: string;
   channel: 'push' | 'whatsapp' | 'both';
   active: boolean;
+  /**
+   * Só `useReminder` (o detalhe) traz estes dois — a lista não os usa. O `send-reminders`
+   * desativa a série ao chegar em 5 tentativas, e sem isso na UI o lembrete simplesmente
+   * parava de chegar sem ninguém saber por quê.
+   */
+  send_attempts?: number;
+  last_error?: string | null;
 }
 
 /** Invalida a query quando a tabela muda (itens novos vindos do WhatsApp aparecem ao vivo). */
@@ -211,7 +218,7 @@ export function useReminder(id: string | undefined) {
     queryFn: async (): Promise<Reminder> => {
       const { data, error } = await supabase
         .from('reminders')
-        .select('id, title, recurrence, next_run_at, channel, active')
+        .select('id, title, recurrence, next_run_at, channel, active, send_attempts, last_error')
         .eq('id', id!)
         .single();
       if (error) throw error;

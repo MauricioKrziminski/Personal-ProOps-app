@@ -1,6 +1,5 @@
-import { ActionSheetIOS, Alert, Platform, StyleSheet, View } from 'react-native';
+import { StyleSheet, View } from 'react-native';
 import { Stack, router } from 'expo-router';
-import * as Haptics from 'expo-haptics';
 
 import { ErrorCard } from '@/components/error-card';
 import { ThemedText } from '@/components/themed-text';
@@ -18,6 +17,7 @@ import {
   useToggleReminder,
   type Reminder,
 } from '@/hooks/use-items';
+import { showItemActions } from '@/lib/item-actions';
 import { describeRRule } from '@/lib/rrule-text';
 
 /**
@@ -37,7 +37,6 @@ export default function RemindersScreen() {
   const paused = reminders.filter((r) => !r.active);
 
   const actions = (r: Reminder) => {
-    Haptics.selectionAsync();
     const pauseLabel = r.active ? 'Pausar' : 'Retomar';
     const onPause = () =>
       toggle.mutate(
@@ -54,27 +53,10 @@ export default function RemindersScreen() {
         onError: () => toast({ message: 'Não deu para apagar.', tone: 'error' }),
       });
 
-    if (Platform.OS === 'ios') {
-      ActionSheetIOS.showActionSheetWithOptions(
-        {
-          title: r.title,
-          options: ['Cancelar', 'Editar', pauseLabel, 'Apagar'],
-          destructiveButtonIndex: 3,
-          cancelButtonIndex: 0,
-        },
-        (i) => {
-          if (i === 1) router.push(`/reminder-form?id=${r.id}`);
-          if (i === 2) onPause();
-          if (i === 3) onDelete();
-        }
-      );
-      return;
-    }
-    Alert.alert(r.title, undefined, [
-      { text: 'Cancelar', style: 'cancel' },
-      { text: 'Editar', onPress: () => router.push(`/reminder-form?id=${r.id}`) },
-      { text: pauseLabel, onPress: onPause },
-      { text: 'Apagar', style: 'destructive', onPress: onDelete },
+    showItemActions(r.title, [
+      { label: 'Editar', onPress: () => router.push(`/reminder-form?id=${r.id}`) },
+      { label: pauseLabel, onPress: onPause },
+      { label: 'Apagar', destructive: true, onPress: onDelete },
     ]);
   };
 

@@ -2,13 +2,9 @@ import { useQuery } from '@tanstack/react-query';
 import { Stack, router } from 'expo-router';
 import { useState } from 'react';
 import {
-  ActionSheetIOS,
-  Alert,
-  Platform,
   Pressable,
   StyleSheet,
   View,
-  type AlertButton,
 } from 'react-native';
 import Animated, { FadeInDown, LinearTransition } from 'react-native-reanimated';
 import * as Haptics from 'expo-haptics';
@@ -34,6 +30,7 @@ import {
 import { useTheme } from '@/hooks/use-theme';
 import { supabase } from '@/lib/supabase';
 import { normalizeFolderName } from '@/lib/search';
+import { showItemActions } from '@/lib/item-actions';
 
 /**
  * Pastas — criar, renomear, trocar ícone, apagar.
@@ -66,39 +63,27 @@ function notesLabel(count: number): string {
   return `${count} nota${count === 1 ? '' : 's'}`;
 }
 
-/** Action sheet nativo. `Alert` só existe como queda do Android, nunca como escolha. */
+/**
+ * Delega para o helper único do projeto (`src/lib/item-actions.ts`).
+ *
+ * A cópia local caía na armadilha do `Alert` do Android, que renderiza no máximo 3 botões e some
+ * com o resto — inclusive a ação destrutiva. O helper compartilhado usa um sheet próprio no
+ * Android, sem limite de opções.
+ */
 function actionSheet(
   config: { title?: string; message?: string; options: string[]; destructiveIndex?: number },
   onPick: (index: number) => void
 ) {
   const { title, message, options, destructiveIndex } = config;
-  const all = [...options, 'Cancelar'];
-
-  if (Platform.OS === 'ios') {
-    ActionSheetIOS.showActionSheetWithOptions(
-      {
-        title,
-        message,
-        options: all,
-        destructiveButtonIndex: destructiveIndex,
-        cancelButtonIndex: options.length,
-      },
-      (index) => {
-        if (index < options.length) onPick(index);
-      }
-    );
-    return;
-  }
-
-  // `Alert.alert` do Android renderiza no MÁXIMO 3 botões — o quarto some sem aviso, e com ele a
-  // ação destrutiva. Cancelar só entra quando cabe; `cancelable` cobre o resto.
-  const buttons: AlertButton[] = options.map((label, index) => ({
-    text: label,
-    style: index === destructiveIndex ? 'destructive' : 'default',
-    onPress: () => onPick(index),
-  }));
-  if (buttons.length < 3) buttons.push({ text: 'Cancelar', style: 'cancel' });
-  Alert.alert(title ?? '', message, buttons, { cancelable: true });
+  showItemActions(
+    title ?? '',
+    options.map((label, index) => ({
+      label,
+      destructive: index === destructiveIndex,
+      onPress: () => onPick(index),
+    })),
+    message
+  );
 }
 
 /**

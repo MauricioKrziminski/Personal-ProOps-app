@@ -1,4 +1,4 @@
-import { ActionSheetIOS, Platform, Alert, StyleSheet, Switch, View } from 'react-native';
+import { StyleSheet, Switch, View } from 'react-native';
 import { Stack, router } from 'expo-router';
 import * as Haptics from 'expo-haptics';
 
@@ -12,6 +12,7 @@ import { Space } from '@/design/tokens';
 import { usePlanStatus } from '@/hooks/use-finance';
 import { pushBlockerMessage, useRegisterPush, usePushStatus } from '@/hooks/use-push';
 import { useSession } from '@/hooks/use-session';
+import { confirmDestructive } from '@/lib/item-actions';
 import { supabase } from '@/lib/supabase';
 
 /**
@@ -38,22 +39,7 @@ export default function ProfileScreen() {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
       await supabase.auth.signOut();
     };
-    if (Platform.OS === 'ios') {
-      ActionSheetIOS.showActionSheetWithOptions(
-        {
-          title: 'Sair da conta?',
-          options: ['Cancelar', 'Sair'],
-          destructiveButtonIndex: 1,
-          cancelButtonIndex: 0,
-        },
-        (i) => i === 1 && doIt()
-      );
-    } else {
-      Alert.alert('Sair da conta?', undefined, [
-        { text: 'Cancelar', style: 'cancel' },
-        { text: 'Sair', style: 'destructive', onPress: doIt },
-      ]);
-    }
+    confirmDestructive('Sair da conta?', 'Sair', doIt);
   };
 
   const notifications = (

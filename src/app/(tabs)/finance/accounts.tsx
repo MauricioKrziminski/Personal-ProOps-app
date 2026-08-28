@@ -1,9 +1,6 @@
 import { useState } from 'react';
 import {
-  ActionSheetIOS,
-  Alert,
   Modal,
-  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -38,6 +35,7 @@ import {
   type AccountBalance,
 } from '@/hooks/use-finance';
 import { useTheme } from '@/hooks/use-theme';
+import { confirmDestructive } from '@/lib/item-actions';
 
 /**
  * Contas — "quanto eu tenho, e onde?".
@@ -95,31 +93,14 @@ const diaValido = (v: string) => /^\d{1,2}$/.test(v) && Number(v) >= 1 && Number
  * equivalente mais próximo. O que estava proibido era `onLongPress` + `Alert` como *gesto*: ação
  * escondida atrás de segurar o dedo.
  */
+/** Delega para o helper único: no Android o `Alert` cortaria opção, o sheet compartilhado não. */
 function confirmaDestrutiva(opts: {
   title: string;
-  message: string;
+  message?: string;
   confirm: string;
   onConfirm: () => void;
 }) {
-  if (Platform.OS === 'ios') {
-    ActionSheetIOS.showActionSheetWithOptions(
-      {
-        title: opts.title,
-        message: opts.message,
-        options: ['Cancelar', opts.confirm],
-        cancelButtonIndex: 0,
-        destructiveButtonIndex: 1,
-      },
-      (i) => {
-        if (i === 1) opts.onConfirm();
-      }
-    );
-    return;
-  }
-  Alert.alert(opts.title, opts.message, [
-    { text: 'Cancelar', style: 'cancel' },
-    { text: opts.confirm, style: 'destructive', onPress: opts.onConfirm },
-  ]);
+  confirmDestructive(opts.title, opts.confirm, opts.onConfirm, opts.message);
 }
 
 /** Faixa de erro por seção. Uma seção que falha DIZ que falhou — nunca some. */

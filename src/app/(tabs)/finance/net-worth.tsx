@@ -1,9 +1,6 @@
 import { useState } from 'react';
 import {
-  ActionSheetIOS,
-  Alert,
   Modal,
-  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -40,6 +37,7 @@ import {
 } from '@/hooks/use-finance';
 import { formatBRL } from '@/hooks/use-items';
 import { useTheme } from '@/hooks/use-theme';
+import { confirmDestructive } from '@/lib/item-actions';
 
 /**
  * Patrimônio — "estou ficando mais rico ou mais pobre?".
@@ -86,31 +84,14 @@ const FORM_VAZIO: FormState = {
   valorOriginal: -1,
 };
 
+/** Delega para o helper único: no Android o `Alert` cortaria opção, o sheet compartilhado não. */
 function confirmaDestrutiva(opts: {
   title: string;
-  message: string;
+  message?: string;
   confirm: string;
   onConfirm: () => void;
 }) {
-  if (Platform.OS === 'ios') {
-    ActionSheetIOS.showActionSheetWithOptions(
-      {
-        title: opts.title,
-        message: opts.message,
-        options: ['Cancelar', opts.confirm],
-        cancelButtonIndex: 0,
-        destructiveButtonIndex: 1,
-      },
-      (i) => {
-        if (i === 1) opts.onConfirm();
-      }
-    );
-    return;
-  }
-  Alert.alert(opts.title, opts.message, [
-    { text: 'Cancelar', style: 'cancel' },
-    { text: opts.confirm, style: 'destructive', onPress: opts.onConfirm },
-  ]);
+  confirmDestructive(opts.title, opts.confirm, opts.onConfirm, opts.message);
 }
 
 /** Faixa de erro por bloco: seção que falha diz que falhou em vez de sumir. */

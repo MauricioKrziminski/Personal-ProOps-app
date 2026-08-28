@@ -1,10 +1,7 @@
 import { useMemo, useState } from 'react';
 import {
-  ActionSheetIOS,
-  Alert,
   FlatList,
   Modal,
-  Platform,
   ScrollView,
   StyleSheet,
   View,
@@ -35,6 +32,7 @@ import {
 } from '@/hooks/use-finance';
 import { formatBRL, formatDateBR, localISODate, useRealtimeInvalidate } from '@/hooks/use-items';
 import { useTheme } from '@/hooks/use-theme';
+import { confirmDestructive } from '@/lib/item-actions';
 
 /**
  * Fatura — "o que tem nesta fatura, e como eu marco como paga?".
@@ -90,31 +88,9 @@ function mensagemDoErro(erro: unknown): string {
   return 'Não deu para registrar o pagamento. Tenta de novo.';
 }
 
-function confirmaDestrutiva(opts: {
-  title: string;
-  message: string;
-  confirm: string;
-  onConfirm: () => void;
-}) {
-  if (Platform.OS === 'ios') {
-    ActionSheetIOS.showActionSheetWithOptions(
-      {
-        title: opts.title,
-        message: opts.message,
-        options: ['Cancelar', opts.confirm],
-        cancelButtonIndex: 0,
-        destructiveButtonIndex: 1,
-      },
-      (i) => {
-        if (i === 1) opts.onConfirm();
-      }
-    );
-    return;
-  }
-  Alert.alert(opts.title, opts.message, [
-    { text: 'Cancelar', style: 'cancel' },
-    { text: opts.confirm, style: 'destructive', onPress: opts.onConfirm },
-  ]);
+/** Delega para o helper único: no Android o `Alert` cortaria opção, o sheet compartilhado não. */
+function confirmaDestrutiva(opts: { title: string; message?: string; confirm: string; onConfirm: () => void }) {
+  confirmDestructive(opts.title, opts.confirm, opts.onConfirm, opts.message);
 }
 
 function ErrorBand({ message, onRetry }: { message: string; onRetry: () => void }) {
