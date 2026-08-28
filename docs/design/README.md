@@ -25,6 +25,9 @@ código está errado** — os dois não podem ficar como estão.
 A linguagem de design (tokens, glass, movimento, estados, anti-slop) mora em
 `.claude/rules/design.md`, não aqui. Os documentos assumem essa regra e não a repetem.
 
+**Próximo passo:** [PROXIMO-PASSO.md](PROXIMO-PASSO.md) — reconciliar as migrations e o passe de
+acabamento visual que ficou pela metade.
+
 **Decisões ainda abertas:** [DECISOES-PENDENTES.md](DECISOES-PENDENTES.md) — o que os documentos
 assumiram e ainda precisa de decisão humana, mais os bugs confirmados no código durante a escrita.
 
