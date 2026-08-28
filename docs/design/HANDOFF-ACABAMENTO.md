@@ -82,6 +82,14 @@ cliclick -r dd:X,Y m:X,Y2 du:X,Y2   # arrastar (rolar). Movimento LENTO vira lon
 
 - `openurl` no iOS abre um diálogo do SpringBoard que **não some** e trava o simulador (só
   reboot resolve). **Não use deep link no iOS.**
+- ⚠️ **`cliclick` sem guarda clica no app errado.** `osascript … activate` não garante que o
+  Simulator veio para a frente: numa sessão cinco cliques caíram numa janela do Chrome que estava
+  por cima. Confirme o frontmost ANTES de clicar e **aborte** se não for `Simulator`:
+  `osascript -e 'tell application "System Events" to get name of first process whose frontmost is true'`.
+- Clique sintético **não abre linha de `FlashList` com `Link.Trigger`** no iOS (o context menu do
+  iOS 26 engole o clique do mouse) e também não acionou botão de `Stack.Toolbar`. Para cair numa
+  tela de detalhe, o caminho que funciona é um `router.push` temporário num `useEffect` da tela
+  anterior — marque com `// TEMP-VERIFY` e reverta antes do commit.
 - Clique na aba do iOS é instável. Para cair numa aba específica, o truque que funciona é
   remover temporariamente as outras de `src/components/app-tabs.tsx`, relançar, e **reverter**.
 - Mapa janela→device: pegue `position`/`size` da janela via AppleScript; a tela do device começa
@@ -102,7 +110,13 @@ from (select workspace_id, user_id from notes limit 1) n, generate_series(1,18) 
 
 ---
 
-## 2. Os três defeitos que o usuário apontou (prioridade máxima)
+> **Estado em 28/08, fim da sessão seguinte:** os três defeitos da seção 2 estão **resolvidos**
+> (commits `ba4ca63`, `41499dd`, `b41be59`), verificados em iOS claro/escuro e Android
+> claro/escuro. A seção continua aqui como registro do que era e por quê. O que segue aberto é a
+> seção 3 — direção estética de marca (decisão do usuário), Dynamic Type e o passe de movimento
+> em vídeo.
+
+## 2. Os três defeitos que o usuário apontou (prioridade máxima) — RESOLVIDOS
 
 ### 2.1 — "GERENCIAR": 12 links empilhados no fim do Financeiro
 
@@ -218,14 +232,41 @@ exatamente assim que a primeira leva de telas nasceu "correta e sem graça".
   mão, pelos Ajustes do simulador. `design.md` §11 exige.
 - **Passe de movimento em vídeo** (`design.md` §11): nenhuma animação foi avaliada em gravação.
   O emulador Android está com **Reduce Motion ligado** — o que se viu lá estava colapsado.
-- **Guarda de perda de dado:** existe em `flush()` no `[id].tsx` (nunca grava vazio por cima de
-  nota com texto), mas **não foi exercitada em runtime**. Duas tentativas de reproduzir o
-  gatilho falharam.
+- ~~**Guarda de perda de dado** nunca exercitada~~ — **resolvido em 28/08.** A decisão saiu do
+  componente para `skipReason` (`src/lib/notes-autosave.ts`), com 8 testes, e foi exercitada no
+  emulador: apagar todo o texto de uma nota e sair **não** grava; o `content` e o `folder_id`
+  sobrevivem, e em `__DEV__` sai `[nota] autosave bloqueado: estado vazio sobre nota com texto.`
+  no log.
 
-### 3.3 Bug de perda de dado ainda sem causa
+### 3.3 Bug de perda de dado — gatilho provável identificado
+
 Em 28/08 uma nota vinda do WhatsApp voltou do detalhe com `content` vazio **e `folder_id` nulo**.
-Restaurada à mão. A guarda impede o sintoma; **o gatilho continua desconhecido**. Se aparecer de
-novo, é prioridade — é perda de dado do usuário.
+Restaurada à mão, e o gatilho ficou sem explicação depois de duas tentativas de reproduzir.
+
+**A evidência apareceu no `logcat` do emulador**, no mesmo dia, às 13:56:
+
+```
+E ReactNativeJS: { [ReferenceError: Property 'tagsOf' doesn't exist]
+  componentStack: '\n    at NoteDetailScreen (…/notes/[id].bundle…)'
+```
+
+O Fast Refresh entregou um módulo incompleto (`tagsOf` estava sendo acrescentado ao `search.ts`
+naquele momento) enquanto a tela estava aberta; ela lançou no render e o React remontou. Nesse
+caminho o `useState` volta ao inicial — `content: ''` e `folderId: null` —, que é **exatamente o
+par de valores que foi gravado**. Os `useRef` (`hydrated`, `idRef`, `persisted`) podem sobreviver
+ao refresh, então o `hydrated` sozinho não segurava.
+
+Não é prova, é a hipótese que casa com os dois valores ao mesmo tempo. É **dev-only** — Fast
+Refresh não existe em produção —, mas o app roda em dev client no aparelho, então o risco era
+real enquanto se mexia no arquivo.
+
+**O que fecha a classe inteira, independentemente do gatilho:** `skipReason`
+(`src/lib/notes-autosave.ts`) — estado que nunca foi hidratado, ou que voltou ao inicial, não
+grava por cima de linha que tem conteúdo. Um dos testes reproduz literalmente a remontagem
+(`refs sobreviveram, useState zerou`) e exige `'would-empty'`.
+
+Se reaparecer **com a guarda no lugar**, aí sim é prioridade sobre qualquer coisa visual: quer
+dizer que existe um segundo caminho.
 
 ### 3.4 Telas documentadas que não existem
 `docs/design/conta-detalhe.md` descreve uma tela de extrato por conta que **não foi

@@ -50,6 +50,7 @@ import {
   toggleChecklistLine,
 } from '@/lib/search';
 import { showItemActions } from '@/lib/item-actions';
+import { skipReason } from '@/lib/notes-autosave';
 
 /**
  * Nota (detalhe) — e também a tela de CRIAÇÃO (`id === 'new'`).
@@ -154,20 +155,23 @@ export default function NoteDetailScreen() {
 
   /** Não memoizada de propósito: só é chamada por `flushRef`, por efeito ou por handler. */
   async function flush() {
-    if (trashed.current) return;
-    // Antes da hidratação `content` é '' — salvar aqui APAGARIA a nota que ainda está carregando.
-    // (Em modo criação `hydrated` já nasce true.)
-    if (!hydrated.current) return;
     const { content: text, folderId: folder } = latest.current;
-    const last = persisted.current;
-    if (last && last.content === text && last.folderId === folder) return;
-    // Nota em branco nunca é inserida — é exatamente a "nota vazia piscando na lista".
-    if (!idRef.current && text.trim() === '') return;
-    // E nunca ESVAZIA uma nota que já tinha texto. Aconteceu em 28/08: uma nota do WhatsApp
-    // voltou do detalhe com `content` vazio. O `hydrated` sozinho não bastou — qualquer caminho
-    // que chegue aqui com texto vazio e conteúdo persistido não-vazio é bug, não intenção.
-    // Apagar nota é a Lixeira, que perdoa; autosave silencioso não.
-    if (idRef.current && text.trim() === '' && (last?.content ?? '').trim() !== '') return;
+    // A decisão "pode gravar?" mora em `skipReason` (`src/lib/notes-autosave.ts`), com teste: é
+    // o caminho que já perdeu dado do usuário uma vez, e um `if` a menos aqui apaga uma nota.
+    const skip = skipReason({
+      hydrated: hydrated.current,
+      trashed: trashed.current,
+      id: idRef.current,
+      text,
+      folderId: folder,
+      persisted: persisted.current,
+    });
+    if (skip) {
+      if (__DEV__ && skip === 'would-empty') {
+        console.warn('[nota] autosave bloqueado: estado vazio sobre nota com texto.');
+      }
+      return;
+    }
     // Salvamento em voo: marca sujo e reenfileira no settle, para não inserir duas vezes.
     if (saving.current) {
       dirty.current = true;
