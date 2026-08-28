@@ -60,6 +60,10 @@ sujaria o financeiro compartilhado do casal.
     onboarding do lado certo: o servidor confirmando que a mensagem chegou, não o app confiando
     que o usuário tocou no botão.
 
+> **28/08/2026** — cada passo passou a ocupar a tela (`flexGrow` no conteúdo e no passo, com o
+> conteúdo centralizado). Antes tudo se amontoava no terço de cima, sobravam ~60% de branco morto
+> e o "Pular" flutuava no meio da tela em vez de ficar no rodapé.
+
 ## Anatomia
 
 Três passos. Nenhum é uma tela de features.

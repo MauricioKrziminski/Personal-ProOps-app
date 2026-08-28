@@ -171,9 +171,16 @@ export default function OnboardingScreen() {
 }
 
 const styles = StyleSheet.create({
+  /**
+   * `flexGrow` para o passo ocupar a tela.
+   *
+   * Sem isso todo o onboarding se amontoava no terço de cima e sobravam ~60% de branco morto
+   * embaixo — com o "Pular" flutuando no meio do nada, e não no rodapé onde a pessoa procura.
+   */
   content: {
     gap: Space.xxl,
     paddingTop: Space.xxxl,
+    flexGrow: 1,
   },
   progress: {
     flexDirection: 'row',
@@ -193,6 +200,8 @@ const styles = StyleSheet.create({
   step: {
     gap: Space.lg,
     alignItems: 'center',
+    flexGrow: 1,
+    justifyContent: 'center',
   },
   title: {
     textAlign: 'center',
