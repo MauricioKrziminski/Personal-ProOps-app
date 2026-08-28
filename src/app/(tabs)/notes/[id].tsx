@@ -44,7 +44,7 @@ import {
   normalizeTag,
   noteTitle,
   normalizeFolderName,
-  parseChecklist,
+  readLines,
   removeTag,
   tagsOf,
   toggleChecklistLine,
@@ -317,7 +317,9 @@ export default function NoteDetailScreen() {
     { label: 'Mais ações', icon: 'ellipsis.circle' as const, onPress: onMenu },
   ];
 
-  const screenTitle = creating ? 'Nova nota' : noteTitle(content).slice(0, 60) || 'Nota';
+  // O título da nota vive no CORPO (decisão de anatomia, ver `ReadBody`). Repeti-lo aqui era o
+  // "título duplicado" que o usuário apontou.
+  const screenTitle = creating ? 'Nova nota' : 'Nota';
 
   if (note.isError) {
     return (
@@ -347,6 +349,8 @@ export default function NoteDetailScreen() {
 
       <KeyboardAwareScrollView
         bottomOffset={Space.xxl}
+        // `flexGrow` para o corpo ocupar a tela inteira mesmo com duas linhas de texto: é o que
+        // transforma os 70% em branco de uma nota curta em área de toque, em vez de vazio morto.
         contentContainerStyle={styles.body}
         keyboardShouldPersistTaps="handled"
         showsVerticalScrollIndicator={false}
@@ -417,7 +421,7 @@ export default function NoteDetailScreen() {
 
         {note.isLoading ? (
           <View style={styles.loading}>
-            <Skeleton width="70%" height={Type.body.lineHeight} />
+            <Skeleton width="70%" height={Type.title2.lineHeight} />
             <Skeleton width="100%" height={Type.body.lineHeight} />
             <Skeleton width="90%" height={Type.body.lineHeight} />
             <Skeleton width="45%" height={Type.body.lineHeight} />
@@ -473,8 +477,16 @@ export default function NoteDetailScreen() {
 }
 
 /**
- * Modo leitura: cada linha `- [ ]` / `- [x]` ganha um toggle na margem; o resto é texto que abre
- * a edição no toque, com o cursor no fim.
+ * Modo leitura.
+ *
+ * A anatomia é a do Apple Notes e foi decidida com o usuário: **a primeira linha é o título, e
+ * ela vive no CORPO** — o header ficou com "Nota" e as ações. Antes as duas coisas apareciam:
+ * o header mostrava `noteTitle(content)` e o corpo renderizava todas as linhas, inclusive a
+ * primeira. A pessoa lia a mesma frase duas vezes, com 40px de distância.
+ *
+ * `readLines` (`src/lib/search.ts`) resolve título, `#tag` e linha vazia — com teste. Aqui só
+ * sobra desenho: hierarquia por peso (22/600 no título, 17/400 no corpo), `Space.sm` entre
+ * linhas e um alvo de toque que cobre o vazio.
  */
 function ReadBody({
   content,
@@ -486,63 +498,66 @@ function ReadBody({
   onToggleLine: (index: number) => void;
 }) {
   const theme = useTheme();
-  const lines = content.split('\n');
-  const checks = new Map(parseChecklist(content).map((item) => [item.index, item]));
-
-  if (content.trim() === '') {
-    return (
-      <Pressable accessibilityRole="button" accessibilityLabel="Conteúdo da nota" onPress={onEdit}>
-        <ThemedText type="default" themeColor="textSecondary" style={Type.body}>
-          Escreve alguma coisa…
-        </ThemedText>
-      </Pressable>
-    );
-  }
+  const lines = readLines(content);
 
   return (
-    <View>
-      {lines.map((line, index) => {
-        const item = checks.get(index);
-        if (!item) {
-          return (
-            <Pressable key={index} accessibilityRole="button" onPress={onEdit}>
-              <ThemedText style={[Type.body, { color: theme.text }]}>{line || ' '}</ThemedText>
-            </Pressable>
-          );
-        }
-        return (
-          <View key={index} style={styles.checkLine}>
-            {/* Caixinha visual pequena, alvo de toque ≥ 44 pelo hitSlop. */}
-            <Pressable
-              accessibilityRole="checkbox"
-              accessibilityState={{ checked: item.done }}
-              accessibilityLabel={item.text}
-              hitSlop={12}
-              onPress={() => onToggleLine(index)}>
-              <Animated.View
-                key={item.done ? 'on' : 'off'}
-                entering={FadeIn.duration(Motion.duration.fast)}>
-                <Icon
-                  name={item.done ? 'checkmark.circle.fill' : 'circle'}
-                  size="lg"
-                  color={item.done ? 'tint' : 'textSecondary'}
-                />
-              </Animated.View>
-            </Pressable>
-            <Pressable style={styles.grow} accessibilityRole="button" onPress={onEdit}>
+    // Um `Pressable` só, com altura mínima: nota curta deixava 70% da tela em branco sem
+    // affordance nenhuma. Agora o vazio É a área de edição — tocar em qualquer ponto do corpo
+    // abre o teclado, que é o comportamento do Apple Notes.
+    <Pressable
+      accessibilityRole="button"
+      accessibilityLabel={
+        lines.length === 0 ? 'Escrever na nota' : 'Conteúdo da nota. Toque duas vezes para editar.'
+      }
+      onPress={onEdit}
+      style={styles.readBody}>
+      {lines.length === 0 ? (
+        <ThemedText type="subtitle" themeColor="textSecondary">
+          Escreve alguma coisa…
+        </ThemedText>
+      ) : (
+        lines.map((line) =>
+          line.done === null ? (
+            <ThemedText
+              key={line.index}
+              type={line.role === 'title' ? 'subtitle' : 'default'}
+              style={line.role === 'title' ? styles.readTitle : undefined}>
+              {line.text}
+            </ThemedText>
+          ) : (
+            <View key={line.index} style={styles.checkLine}>
+              {/* Caixinha visual pequena, alvo de toque ≥ 44 pelo hitSlop. O toggle é o
+                  `Pressable` de dentro: ele ganha o gesto e o corpo NÃO entra em edição. */}
+              <Pressable
+                accessibilityRole="checkbox"
+                accessibilityState={{ checked: line.done }}
+                accessibilityLabel={line.text}
+                hitSlop={12}
+                onPress={() => onToggleLine(line.index)}>
+                <Animated.View
+                  key={line.done ? 'on' : 'off'}
+                  entering={FadeIn.duration(Motion.duration.fast)}>
+                  <Icon
+                    name={line.done ? 'checkmark.circle.fill' : 'circle'}
+                    size="lg"
+                    color={line.done ? 'tint' : 'textSecondary'}
+                  />
+                </Animated.View>
+              </Pressable>
               <ThemedText
                 style={[
                   Type.body,
-                  { color: item.done ? theme.textSecondary : theme.text },
-                  item.done && styles.done,
+                  styles.grow,
+                  { color: line.done ? theme.textSecondary : theme.text },
+                  line.done && styles.done,
                 ]}>
-                {item.text || ' '}
+                {line.text}
               </ThemedText>
-            </Pressable>
-          </View>
-        );
-      })}
-    </View>
+            </View>
+          )
+        )
+      )}
+    </Pressable>
   );
 }
 
@@ -795,12 +810,20 @@ const styles = StyleSheet.create({
     width: '100%',
     maxWidth: MaxContentWidth,
     alignSelf: 'center',
+    flexGrow: 1,
   },
+  /**
+   * `rowGap` curto de propósito: no iPhone os chips + "via WhatsApp · há 1 h" não cabem numa
+   * linha e o metadado quebra. Com o mesmo `gap` nos dois eixos ele caía no meio do caminho entre
+   * os chips e o título e lia como linha órfã — que foi a queixa. Colado nos chips (4px) ele vira
+   * a última linha do mesmo bloco; o respiro grande fica só antes do título.
+   */
   props: {
     flexDirection: 'row',
     alignItems: 'center',
     flexWrap: 'wrap',
-    gap: Space.sm,
+    columnGap: Space.sm,
+    rowGap: Space.xs,
   },
   chip: {
     flexDirection: 'row',
@@ -813,6 +836,20 @@ const styles = StyleSheet.create({
   },
   input: {
     minHeight: 280,
+    flexGrow: 1,
+  },
+  /**
+   * `minHeight` casa com o do `TextInput` da edição: sem isso o corpo "encolhe" no instante em
+   * que a nota sai de edição para leitura, e o dedo persegue o texto que se moveu.
+   */
+  readBody: {
+    gap: Space.sm,
+    minHeight: 280,
+    flexGrow: 1,
+  },
+  /** Título respira mais que a distância entre linhas do corpo — é o que o separa do texto. */
+  readTitle: {
+    marginBottom: Space.xs,
   },
   loading: {
     gap: Space.md,
@@ -821,7 +858,6 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'flex-start',
     gap: Space.md,
-    paddingVertical: Space.xs,
   },
   grow: {
     flex: 1,

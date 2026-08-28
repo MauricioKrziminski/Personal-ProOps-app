@@ -11,6 +11,7 @@ import {
   normalizeTag,
   isValidTag,
   parseChecklist,
+  readLines,
   toTsQuery,
   toggleChecklistLine,
   toIlikeTerm,
@@ -137,4 +138,49 @@ test('tag: remover não deixa espaço duplo nem quebra o resto do texto', () => 
 test('tag: `#tag` colada em palavra não é tag (mesma regra do banco)', () => {
   assert.deepEqual(tagsOf('email#interno e #real'), ['interno', 'real']);
   assert.deepEqual(tagsOf('#a e #ok'), ['ok']);
+});
+
+test('readLines: primeira linha vira título e não se repete no corpo', () => {
+  const lines = readLines('Reunião com o contador\nlevar extrato do trimestre #trabalho');
+  assert.deepEqual(lines, [
+    { index: 0, text: 'Reunião com o contador', role: 'title', done: null },
+    { index: 1, text: 'levar extrato do trimestre', role: 'body', done: null },
+  ]);
+});
+
+test('readLines: `#tag` sai do texto exibido — o chip já mostra a mesma tag', () => {
+  assert.equal(readLines('Comprar pão #mercado hoje')[0].text, 'Comprar pão hoje');
+  // …mas linha que É só tag mantém o texto: senão a nota apareceria em branco.
+  assert.equal(readLines('#trabalho')[0].text, '#trabalho');
+});
+
+test('readLines: linha vazia não vira linha (o respiro é o gap do container)', () => {
+  const lines = readLines('Título\n\n\ncorpo');
+  assert.deepEqual(
+    lines.map((l) => [l.index, l.text]),
+    [
+      [0, 'Título'],
+      [3, 'corpo'],
+    ]
+  );
+});
+
+test('readLines: índice é o do texto ORIGINAL — é o que toggleChecklistLine reescreve', () => {
+  const content = 'Compras\n\n- [ ] leite\n- [x] pão';
+  const lines = readLines(content);
+  assert.deepEqual(lines, [
+    { index: 0, text: 'Compras', role: 'title', done: null },
+    { index: 2, text: 'leite', role: 'body', done: false },
+    { index: 3, text: 'pão', role: 'body', done: true },
+  ]);
+  // O índice 2 devolvido aqui tem de casar com a linha que o toggle marca.
+  assert.equal(toggleChecklistLine(content, 2), 'Compras\n\n- [x] leite\n- [x] pão');
+});
+
+test('readLines: nota que começa em checklist não promove o to-do a título', () => {
+  const lines = readLines('- [ ] pagar aluguel\n- [x] luz');
+  assert.deepEqual(
+    lines.map((l) => l.role),
+    ['body', 'body']
+  );
 });

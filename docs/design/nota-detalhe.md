@@ -26,17 +26,38 @@ Criar e editar são **a mesma tela**: `id === 'new'` entra em modo criação.
 
 ## Anatomia
 
-1. **Header nativo** — título é a primeira linha da nota, truncado; em modo criação, "Nova nota".
-   `headerRight`: pin (`pin` / `pin.fill`) e menu (`ellipsis.circle`) com Mover para pasta ·
-   Criar lembrete · Lixeira.
-2. **Barra de propriedades** — uma linha discreta abaixo do header: pasta (com ícone SF, toca e
-   abre o picker), `#tags` derivadas, e `via WhatsApp · há 2 dias`. Somente leitura exceto pasta —
-   tag se edita digitando `#` no corpo, que é o modelo inteiro.
-3. **Corpo** — `TextInput` multiline, ocupando o resto da tela, fonte de leitura confortável
-   (Body, não Footnote). Sem toolbar de formatação: não há markdown rico.
-4. **Checklist inline** — linha que começa com `- [ ]` ou `- [x]` renderiza um toggle na margem.
-   Tocar reescreve **aquela linha** do texto. É a única "riqueza" do editor, e existe porque
-   mantém a nota sendo texto puro que volta pro WhatsApp.
+1. **Header nativo** — título **"Nota"** (em criação, "Nova nota"), fixo. Ações por
+   `HeaderActions`: pin (`pin` / `pin.fill`, com `selected`) e menu (`ellipsis.circle`) com Mover
+   para pasta · Criar lembrete · Lixeira.
+   *O header mostrava `noteTitle(content)` e o corpo renderizava a mesma primeira linha: a pessoa
+   lia a frase duas vezes, com 40px de distância. Decidido com o usuário em 28/08 — **o título
+   fica no corpo**, anatomia do Apple Notes.*
+2. **Barra de propriedades** — pasta (ícone SF, toca e abre o picker), `#tags` derivadas, o botão
+   `+ tag`, e `via WhatsApp · há 2 dias`. Somente leitura exceto pasta — tag se edita digitando
+   `#` no corpo, que é o modelo inteiro.
+   No iPhone os chips e o metadado **não cabem numa linha**; o `rowGap` é curto (`Space.xs`) de
+   propósito, para o metadado quebrar colado nos chips em vez de flutuar sozinho no meio do
+   caminho até o título.
+   Depois de cada autosave, "Salvo" **substitui** o metadado por 1,5 s. Antes ele morava no
+   header, e a pílula de vidro do iOS 26 mudava de largura a cada gravação.
+3. **Corpo, modo leitura** — `readLines` (`src/lib/search.ts`) decide o que aparece:
+   - a **primeira linha não vazia é o título**, em `subtitle` (22/600) — a mesma linha que
+     `noteTitle` usa na lista, então a nota se chama igual nos dois lugares. Exceção: se ela for
+     item de checklist, não vira título — promover um to-do a manchete custa a caixinha;
+   - o resto é `default` (body 17/400), com `Space.sm` entre linhas. Antes eram `ThemedText`
+     empilhados sem espaço nenhum, e cinco linhas viravam um bloco;
+   - **`#tag` sai do texto exibido**, porque a mesma tag já é chip logo acima. O `content` fica
+     intocado — é ele que volta inteiro para o WhatsApp e é ele que o modo edição mostra. Linha
+     que ficaria vazia sem a tag mantém o texto original;
+   - **linha vazia não vira linha**: o respiro entre parágrafos é o `gap` do container.
+   O corpo inteiro é **um** alvo de toque com `flexGrow`, então o branco de uma nota curta é a
+   área que abre a edição — antes eram 70% de tela morta.
+4. **Corpo, modo edição** — `TextInput` multiline com o texto **cru** (com `#tag` e com `- [ ]`),
+   cursor no fim. Sem toolbar de formatação: não há markdown rico.
+5. **Checklist inline** — linha que começa com `- [ ]` ou `- [x]` renderiza um toggle na margem.
+   Tocar reescreve **aquela linha** do texto (`readLines` devolve o índice no texto ORIGINAL, que
+   é o que `toggleChecklistLine` precisa). O toggle é um `Pressable` dentro do corpo: ele ganha o
+   gesto, então marcar um item **não** entra em edição.
 
 ## Dados
 

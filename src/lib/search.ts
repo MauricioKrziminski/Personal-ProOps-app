@@ -67,6 +67,51 @@ export function notePreview(content: string): string {
   return stripTags(body);
 }
 
+/**
+ * As linhas da nota como o modo LEITURA as mostra.
+ *
+ * Três decisões moram aqui, e não no componente, porque são regra de conteúdo e precisam de teste:
+ *
+ * 1. **A primeira linha não vazia é o título** — a mesma que `noteTitle` usa na lista, então a
+ *    nota se chama igual nos dois lugares. Exceção: se ela for item de checklist, NÃO vira título;
+ *    promover um to-do a manchete custa a caixinha, que é o ponto dela.
+ * 2. **`#tag` sai do texto exibido**, porque a mesma tag já é um chip logo acima. O `content`
+ *    continua intocado — é ele que volta inteiro para o WhatsApp, e é ele que o modo edição mostra.
+ *    Linha que fica vazia depois de tirar a tag mantém o texto original: nota que é só `#trabalho`
+ *    não pode aparecer em branco.
+ * 3. **Linha vazia não vira linha renderizada** — o respiro entre parágrafos passou a ser o `gap`
+ *    do container. Antes o corpo empilhava `ThemedText` sem espaço nenhum e cinco linhas viravam
+ *    um bloco.
+ *
+ * `index` é sempre o índice no texto ORIGINAL: é o que `toggleChecklistLine` reescreve.
+ */
+export interface ReadLine {
+  index: number;
+  text: string;
+  role: 'title' | 'body';
+  /** `null` quando a linha não é item de checklist. */
+  done: boolean | null;
+}
+
+export function readLines(content: string): ReadLine[] {
+  const lines = content.split('\n');
+  const firstFilled = lines.findIndex((line) => line.trim().length > 0);
+
+  return lines.flatMap((line, index) => {
+    if (line.trim().length === 0) return [];
+    const check = CHECKLIST_LINE.exec(line);
+    const raw = check ? check[3] : line.trim();
+    return [
+      {
+        index,
+        text: stripTags(raw) || raw,
+        role: index === firstFilled && !check ? ('title' as const) : ('body' as const),
+        done: check ? check[2].toLowerCase() === 'x' : null,
+      },
+    ];
+  });
+}
+
 export interface ChecklistItem {
   index: number;
   done: boolean;

@@ -126,6 +126,20 @@ export function HeaderMenu({ title, actions }: { title: string; actions: ItemAct
   );
 }
 
+/**
+ * Cor do ícone/rótulo no Android.
+ *
+ * `selected === false` (e não "falsy") é o que separa **desligado** de **sem estado**: uma ação
+ * comum não passa `selected` e continua no accent. Sem essa distinção o pin da nota ficava azul
+ * mesmo desafixado — e no Android `pin` e `pin.fill` caem no MESMO glifo Material (`push_pin`),
+ * então a cor é o único sinal de estado que sobra.
+ */
+function androidTone(action: HeaderAction): 'textSecondary' | 'danger' | 'tint' {
+  if (action.disabled) return 'textSecondary';
+  if (action.destructive) return 'danger';
+  return action.selected === false ? 'textSecondary' : 'tint';
+}
+
 /** Alvo de 44pt de verdade, não `hitSlop` — no Android o header não tem pílula para dar a forma. */
 function AndroidActions({ actions }: { actions: HeaderAction[] }) {
   return (
@@ -140,17 +154,9 @@ function AndroidActions({ actions }: { actions: HeaderAction[] }) {
           onPress={action.onPress}
           style={({ pressed }) => [styles.target, { opacity: pressed ? 0.5 : 1 }]}>
           {action.icon ? (
-            <Icon
-              name={action.icon}
-              size="lg"
-              color={
-                action.disabled ? 'textSecondary' : action.destructive ? 'danger' : action.selected ? 'tint' : 'tint'
-              }
-            />
+            <Icon name={action.icon} size="lg" color={androidTone(action)} />
           ) : (
-            <ThemedText
-              type="smallBold"
-              themeColor={action.disabled ? 'textSecondary' : action.destructive ? 'danger' : 'tint'}>
+            <ThemedText type="smallBold" themeColor={androidTone(action)}>
               {action.label}
             </ThemedText>
           )}
