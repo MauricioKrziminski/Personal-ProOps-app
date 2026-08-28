@@ -102,9 +102,13 @@ em português, captura instantânea e uma lixeira que perdoa. Editor de blocos n
    prévia de duas linhas, e a faixa de metadados — pasta, `#tags`, `3/5` quando tem checklist,
    `via WhatsApp`. Tag com o mesmo nome da pasta não repete (`mercado · #mercado`).
 
-   > As linhas moram numa **superfície agrupada** — cantos arredondados nas pontas de cada grupo
-   > (Fixadas, Notas) e hairline entre irmãs, igual ao `Section` da Hoje. Soltas na margem, as
-   > duas abas pareciam de apps diferentes.
+   > **Um cartão por nota**, com `Space.sm` de respiro entre eles — não um cartão agrupado com
+   > fio de cabelo entre as linhas. A versão agrupada foi tentada e reprovada rodando: com o
+   > título, a prévia e o metadado empilhados, três notas liam como um parágrafo contínuo. Cartão
+   > por item custa scroll e devolve legibilidade — é o que Bear, Craft e Keep fazem.
+
+   > O título também não mostra `#tag`: truncava dentro da hashtag (`…pra viagem #ide…`). Tag é
+   > metadado, e já aparece na faixa de baixo.
 
    Título e prévia mostram o **texto**, nunca a marcação: `stripMarkup` em `src/lib/search.ts`
    tira o `- [ ]` / `- [x]` antes de exibir, senão a prévia de um checklist vazava

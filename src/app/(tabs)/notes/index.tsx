@@ -439,12 +439,10 @@ export default function NotesScreen() {
                 ? 'Notas'
                 : null;
 
-          // Cantos só nas pontas do grupo: é o que faz a lista ler como o card agrupado da
-          // Hoje, e não como texto solto na margem.
-          const first = index === 0 || heading !== null;
-          const last =
-            index === notes.length - 1 || (item.pinned && !notes[index + 1].pinned);
-
+          // UM cartão por nota, com respiro entre eles. Agrupadas num cartão só, com fio de
+          // cabelo entre as linhas, três notas liam como um parágrafo contínuo — foi a
+          // reclamação do usuário ("ridiculamente feio"). Cartão por item é o que Bear, Craft e
+          // Keep fazem: custa scroll, devolve legibilidade.
           return (
             <View>
               {heading ? (
@@ -456,17 +454,12 @@ export default function NotesScreen() {
                 style={[
                   styles.group,
                   { backgroundColor: theme.surface, boxShadow: Elevation[scheme].raised },
-                  first && styles.groupTop,
-                  last && styles.groupBottom,
                 ]}>
                 <NoteRow
                   note={item}
                   folderName={folderName(item.folder_id)}
                   actions={actions}
                 />
-                {last ? null : (
-                  <View style={[styles.separator, { backgroundColor: theme.separator }]} />
-                )}
               </View>
             </View>
           );
@@ -513,15 +506,8 @@ const styles = StyleSheet.create({
   },
   group: {
     marginHorizontal: Space.lg,
-  },
-  groupTop: {
-    borderTopLeftRadius: Radius.md,
-    borderTopRightRadius: Radius.md,
-    borderCurve: 'continuous',
-  },
-  groupBottom: {
-    borderBottomLeftRadius: Radius.md,
-    borderBottomRightRadius: Radius.md,
+    marginBottom: Space.sm,
+    borderRadius: Radius.md,
     borderCurve: 'continuous',
   },
   chips: {
@@ -529,7 +515,9 @@ const styles = StyleSheet.create({
     paddingHorizontal: Space.lg,
   },
   row: {
-    gap: Space.xs,
+    // `sm` entre título, prévia e metadado: com `xs` as três linhas colavam e a nota inteira
+    // lia como um parágrafo só.
+    gap: Space.sm,
     minHeight: HitTarget,
     paddingVertical: Space.lg,
     paddingHorizontal: Space.lg,
@@ -544,9 +532,5 @@ const styles = StyleSheet.create({
     paddingTop: Space.xl,
     paddingBottom: Space.sm,
     paddingHorizontal: Space.lg,
-  },
-  separator: {
-    height: StyleSheet.hairlineWidth,
-    marginLeft: Space.lg,
   },
 });

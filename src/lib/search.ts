@@ -46,7 +46,11 @@ function stripTags(text: string): string {
  */
 export function noteTitle(content: string): string {
   const first = content.split('\n').find((line) => line.trim().length > 0);
-  return stripMarkup(first?.trim() ?? '');
+  // A `#tag` já aparece na faixa de metadados. No título ela só roubava espaço — e truncava no
+  // meio da hashtag ("…pra viagem #ide…"), que é pior que não mostrar.
+  const clean = stripTags(stripMarkup(first?.trim() ?? ''));
+  // Nota que é SÓ tags não fica sem título: aí a marcação é o conteúdo.
+  return clean || stripMarkup(first?.trim() ?? '');
 }
 
 /** Corpo sem a primeira linha, para a prévia da lista não repetir o título. */
