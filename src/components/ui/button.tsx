@@ -58,7 +58,10 @@ export function Button({
     ghost: 'transparent',
     destructive: theme.danger,
   };
-  const labelColor = variant === 'primary' || variant === 'destructive' ? 'onTint' : 'text';
+  // `ghost` sem cor de ação vira texto preto — indistinguível de um rótulo. Botão precisa
+  // parecer botão: no ghost quem faz esse trabalho é o accent, já que não há superfície.
+  const labelColor =
+    variant === 'primary' || variant === 'destructive' ? 'onTint' : variant === 'ghost' ? 'tint' : 'text';
 
   return (
     <Animated.View style={[animated, block ? styles.block : styles.hug, style]}>

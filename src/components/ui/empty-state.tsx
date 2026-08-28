@@ -25,7 +25,7 @@ export function EmptyState({ icon, title, hint, action }: EmptyStateProps) {
   return (
     <View style={styles.container}>
       <Icon name={icon} size="xl" color="textSecondary" />
-      <ThemedText type="smallBold" style={styles.centered}>
+      <ThemedText type="headline" style={styles.centered}>
         {title}
       </ThemedText>
       {hint ? (
@@ -34,7 +34,7 @@ export function EmptyState({ icon, title, hint, action }: EmptyStateProps) {
         </ThemedText>
       ) : null}
       {action ? (
-        <Button label={action.label} onPress={action.onPress} variant="secondary" size="sm" />
+        <Button label={action.label} onPress={action.onPress} size="sm" />
       ) : null}
     </View>
   );
