@@ -1,0 +1,40 @@
+import { Stack } from 'expo-router';
+
+/**
+ * Pilha da aba Financeiro.
+ *
+ * `NativeTabs` não traz header nenhum — a doc do Expo é explícita: para ter title e navegação
+ * dentro de uma aba é preciso aninhar um `<Stack>`. É isto que substitui o `ScreenHeader`
+ * caseiro (um `‹` desenhado como texto) que as 15 telas repetiam.
+ */
+export const unstable_settings = {
+  initialRouteName: 'index',
+};
+
+export default function FinanceStackLayout() {
+  return (
+    <Stack
+      screenOptions={{
+        // Large title + blur entram tela a tela na fase 4, quando cada uma migrar para o
+        // primitivo `Screen` (o colapso exige o ScrollView como primeiro filho).
+        headerShadowVisible: false,
+      }}>
+      <Stack.Screen name="index" options={{ title: 'Financeiro' }} />
+      <Stack.Screen name="transactions" options={{ title: 'Lançamentos' }} />
+      <Stack.Screen name="accounts" options={{ title: 'Contas' }} />
+      <Stack.Screen name="cards" options={{ title: 'Cartões' }} />
+      <Stack.Screen name="invoice/[id]" options={{ title: 'Fatura' }} />
+      <Stack.Screen name="budgets" options={{ title: 'Orçamentos' }} />
+      <Stack.Screen name="goals" options={{ title: 'Metas' }} />
+      <Stack.Screen name="debts" options={{ title: 'Dívidas' }} />
+      <Stack.Screen name="recurring" options={{ title: 'Recorrentes' }} />
+      <Stack.Screen name="forecast" options={{ title: 'Projeção' }} />
+      <Stack.Screen name="reports" options={{ title: 'Relatórios' }} />
+      <Stack.Screen name="net-worth" options={{ title: 'Patrimônio' }} />
+      <Stack.Screen name="rules" options={{ title: 'Regras' }} />
+      <Stack.Screen name="import" options={{ title: 'Importar extrato' }} />
+      <Stack.Screen name="ai-activity" options={{ title: 'Atividade da IA' }} />
+      <Stack.Screen name="plan" options={{ title: 'Plano e família' }} />
+    </Stack>
+  );
+}

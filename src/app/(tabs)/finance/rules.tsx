@@ -6,7 +6,6 @@ import * as Haptics from 'expo-haptics';
 
 import { ErrorCard, LoadingCard } from '@/components/error-card';
 import { Chip } from '@/components/finance/chip';
-import { ScreenHeader } from '@/components/finance/screen-header';
 import { GlassCard } from '@/components/glass/glass-card';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
@@ -67,7 +66,6 @@ export default function RulesScreen() {
     <ThemedView style={styles.container}>
       <SafeAreaView style={styles.safeArea}>
         <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
-          <ScreenHeader title="Regras" />
 
           <GlassCard style={styles.explicacao}>
             <ThemedText type="small" themeColor="textSecondary">

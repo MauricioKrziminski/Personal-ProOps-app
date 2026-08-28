@@ -4,12 +4,22 @@ import * as SplashScreen from 'expo-splash-screen';
 import { useColorScheme } from 'react-native';
 
 import { AnimatedSplashOverlay } from '@/components/animated-icon';
-import { LoginScreen } from '@/components/login-screen';
+import { ToastProvider } from '@/components/ui/toast';
 import { useSession } from '@/hooks/use-session';
 
 SplashScreen.preventAutoHideAsync();
 
-const queryClient = new QueryClient();
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      // Antes não havia opção default nenhuma: cada foco/mount podia refazer todas as RPCs.
+      staleTime: 30_000,
+      gcTime: 5 * 60_000,
+      retry: 1,
+      refetchOnWindowFocus: false,
+    },
+  },
+});
 
 export default function RootLayout() {
   const colorScheme = useColorScheme();
@@ -18,31 +28,34 @@ export default function RootLayout() {
   return (
     <QueryClientProvider client={queryClient}>
       <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
-        <AnimatedSplashOverlay />
-        {loading ? null : session ? (
-          <Stack screenOptions={{ headerShown: false }}>
-            <Stack.Screen name="(tabs)" />
-            <Stack.Screen name="finance/transactions" />
-            <Stack.Screen name="finance/goals" />
-            <Stack.Screen name="finance/budgets" />
-            <Stack.Screen name="finance/accounts" />
-            <Stack.Screen name="finance/recurring" />
-            <Stack.Screen name="finance/cards" />
-            <Stack.Screen name="finance/forecast" />
-            <Stack.Screen name="finance/import" />
-            <Stack.Screen name="finance/rules" />
-            <Stack.Screen name="finance/ai-activity" />
-            <Stack.Screen name="finance/debts" />
-            <Stack.Screen name="finance/net-worth" />
-            <Stack.Screen name="finance/reports" />
-            <Stack.Screen name="finance/plan" />
-            <Stack.Screen name="finance/invoice/[id]" />
-            <Stack.Screen name="finance/transaction-form" options={{ presentation: 'modal' }} />
-            <Stack.Screen name="reminder-form" options={{ presentation: 'modal' }} />
-          </Stack>
-        ) : (
-          <LoginScreen />
-        )}
+        <ToastProvider>
+          <AnimatedSplashOverlay />
+          {loading ? null : (
+            <Stack>
+              {/* Porta de mão única nos dois sentidos: sem sessão só existe o login; com sessão
+                  o login deixa de existir, então `back` nunca reentra nele. */}
+              <Stack.Protected guard={!session}>
+                <Stack.Screen name="login" options={{ headerShown: false }} />
+              </Stack.Protected>
+
+              <Stack.Protected guard={!!session}>
+                {/* O grupo de abas desenha os próprios headers nas pilhas aninhadas. */}
+                <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+
+                {/* Atenção total: formulário com etapas vive acima das abas. */}
+                <Stack.Screen
+                  name="finance/transaction-form"
+                  options={{ presentation: 'modal', title: 'Lançamento' }}
+                />
+                <Stack.Screen
+                  name="reminder-form"
+                  options={{ presentation: 'modal', title: 'Lembrete' }}
+                />
+                <Stack.Screen name="catalog" options={{ title: 'Catálogo' }} />
+              </Stack.Protected>
+            </Stack>
+          )}
+        </ToastProvider>
       </ThemeProvider>
     </QueryClientProvider>
   );
