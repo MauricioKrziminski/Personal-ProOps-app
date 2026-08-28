@@ -1,6 +1,6 @@
 import { Link, Stack, router, type Href } from 'expo-router';
 import { useMemo, useState } from 'react';
-import { Pressable, StyleSheet, View, useWindowDimensions } from 'react-native';
+import { Platform, Pressable, StyleSheet, View, useWindowDimensions } from 'react-native';
 import Animated, { FadeInDown } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import type { SymbolViewProps } from 'expo-symbols';
@@ -13,6 +13,7 @@ import { Button } from '@/components/ui/button';
 import { EmptyState } from '@/components/ui/empty-state';
 import { Money } from '@/components/ui/money';
 import { Row, Section } from '@/components/ui/row';
+import { androidOverflow } from '@/components/ui/overflow-menu';
 import { Screen } from '@/components/ui/screen';
 import { Skeleton, SkeletonRow } from '@/components/ui/skeleton';
 import { ProgressBar, Sparkline } from '@/components/ui/sparkline';
@@ -196,7 +197,19 @@ export default function FinanceScreen() {
           recent.refetch();
         }}
         refreshing={summary.isRefetching}>
-        <Stack.Screen options={{ title: 'Financeiro', headerLargeTitle: true }} />
+        <Stack.Screen
+          options={{
+            title: 'Financeiro',
+            headerLargeTitle: true,
+            // O toolbar nativo não desenha no Android; lá o "..." vem por aqui.
+            headerRight: androidOverflow('Mais opções', [
+              { label: 'Importar extrato', onPress: () => router.push('/import') },
+              { label: 'Regras de categoria', onPress: () => router.push('/finance/rules') },
+              { label: 'Atividade da IA', onPress: () => router.push('/ai-activity') },
+            ]),
+          }}
+        />
+{Platform.OS === 'ios' ? (
         <Stack.Toolbar placement="right">
           <Stack.Toolbar.Menu icon="ellipsis.circle" accessibilityLabel="Mais opções">
             <Stack.Toolbar.MenuAction
@@ -216,6 +229,7 @@ export default function FinanceScreen() {
             </Stack.Toolbar.MenuAction>
           </Stack.Toolbar.Menu>
         </Stack.Toolbar>
+        ) : null}
 
         <MonthPicker month={month} onChange={setMonth} />
 

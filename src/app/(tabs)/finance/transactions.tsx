@@ -1,6 +1,6 @@
 import { Link, Stack, router, useLocalSearchParams } from 'expo-router';
 import { useMemo, useState } from 'react';
-import { SectionList, StyleSheet, View } from 'react-native';
+import { Platform, SectionList, StyleSheet, View } from 'react-native';
 import Animated, { FadeInDown } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import type { SymbolViewProps } from 'expo-symbols';
@@ -13,6 +13,7 @@ import { Button } from '@/components/ui/button';
 import { EmptyState } from '@/components/ui/empty-state';
 import { Money } from '@/components/ui/money';
 import { Row } from '@/components/ui/row';
+import { androidOverflow } from '@/components/ui/overflow-menu';
 import { Screen } from '@/components/ui/screen';
 import { Segmented } from '@/components/ui/segmented';
 import { Skeleton, SkeletonRow } from '@/components/ui/skeleton';
@@ -281,6 +282,15 @@ export default function TransactionsScreen() {
           onChangeText={(event) => setSearch(event.nativeEvent.text)}
           onClose={() => setSearch('')}
         />
+        <Stack.Screen
+          options={{
+            headerRight: androidOverflow('Mais opções', [
+              { label: 'Importar extrato', onPress: () => router.push('/import') },
+              { label: 'Regras de categoria', onPress: () => router.push('/finance/rules') },
+            ]),
+          }}
+        />
+{Platform.OS === 'ios' ? (
         <Stack.Toolbar placement="right">
           <Stack.Toolbar.Menu icon="ellipsis.circle" accessibilityLabel="Mais opções">
             <Stack.Toolbar.MenuAction
@@ -295,6 +305,7 @@ export default function TransactionsScreen() {
             </Stack.Toolbar.MenuAction>
           </Stack.Toolbar.Menu>
         </Stack.Toolbar>
+        ) : null}
 
         <SectionList<Transaction, DaySection>
           sections={sections}

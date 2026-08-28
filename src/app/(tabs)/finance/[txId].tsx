@@ -1,6 +1,6 @@
 import { Stack, router, useLocalSearchParams } from 'expo-router';
 import { useMemo } from 'react';
-import { StyleSheet, View } from 'react-native';
+import { Platform, StyleSheet, View } from 'react-native';
 import Animated, { FadeInDown } from 'react-native-reanimated';
 import type { SymbolViewProps } from 'expo-symbols';
 
@@ -12,6 +12,7 @@ import { Button } from '@/components/ui/button';
 import { EmptyState } from '@/components/ui/empty-state';
 import { Money } from '@/components/ui/money';
 import { Row, Section } from '@/components/ui/row';
+import { androidOverflow } from '@/components/ui/overflow-menu';
 import { Screen } from '@/components/ui/screen';
 import { Skeleton, SkeletonRow } from '@/components/ui/skeleton';
 import { useToast } from '@/components/ui/toast';
@@ -30,7 +31,7 @@ import {
   type Transaction,
 } from '@/hooks/use-finance';
 import { formatBRL, formatDateBR, localISODate } from '@/hooks/use-items';
-import { confirmDestructive } from '@/lib/item-actions';
+import { confirmDestructive, showItemActions } from '@/lib/item-actions';
 
 /**
  * Lançamento (detalhe) — a tela que faltava.
@@ -214,7 +215,29 @@ export default function TransactionDetailScreen() {
 
   return (
     <Screen grouped>
-      <Stack.Screen options={{ title }} />
+      <Stack.Screen
+        options={{
+          title,
+          // No Android o toolbar nativo não desenha: sem isto, "Duplicar" e "Apagar" ficam
+          // inalcançáveis. O submenu de categoria vira um segundo sheet, que é o natural lá.
+          headerRight: androidOverflow('Lançamento', [
+            {
+              label: 'Mudar categoria',
+              onPress: () =>
+                showItemActions(
+                  'Mudar categoria',
+                  SUGGESTED_CATEGORIES.map((option) => ({
+                    label: tx.category === option ? `${option} ✓` : option,
+                    onPress: () => patch({ category: option }),
+                  }))
+                ),
+            },
+            { label: 'Duplicar', onPress: duplicate },
+            { label: 'Apagar', destructive: true, onPress: confirmDelete },
+          ]),
+        }}
+      />
+{Platform.OS === 'ios' ? (
       <Stack.Toolbar placement="right">
         <Stack.Toolbar.Button
           onPress={() =>
@@ -241,6 +264,7 @@ export default function TransactionDetailScreen() {
           </Stack.Toolbar.MenuAction>
         </Stack.Toolbar.Menu>
       </Stack.Toolbar>
+      ) : null}
 
       {/* O único GlassCard: é o que a pessoa veio conferir em três segundos. */}
       <Animated.View entering={FadeInDown.duration(Motion.duration.slow)}>
