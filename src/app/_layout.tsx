@@ -2,12 +2,13 @@ import { useEffect } from 'react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { DarkTheme, DefaultTheme, Stack, ThemeProvider, router } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
-import { Pressable, useColorScheme } from 'react-native';
+import { Platform, Pressable, useColorScheme } from 'react-native';
 import { KeyboardProvider } from 'react-native-keyboard-controller';
 
 import { AnimatedSplashOverlay } from '@/components/animated-icon';
 import { ThemedText } from '@/components/themed-text';
 import { AndroidActionSheet } from '@/components/ui/action-sheet';
+import { Icon } from '@/components/ui/icon';
 import { ToastProvider } from '@/components/ui/toast';
 import { useSession } from '@/hooks/use-session';
 import { attachNotificationListeners, configureNotificationHandler } from '@/lib/notifications';
@@ -27,13 +28,27 @@ const queryClient = new QueryClient({
   },
 });
 
-/** Modal precisa de saída explícita: arrastar para baixo não é descoberto nem acessível. */
+/**
+ * Modal precisa de saída explícita: arrastar para baixo não é descoberto nem acessível.
+ *
+ * A saída fala o idioma de cada plataforma. No Android o título do header é alinhado à esquerda,
+ * então a palavra "Cancelar" colidia com ele — virava `CancelarNovo lançamento`. Lá a convenção
+ * é o X, que ocupa a largura de um ícone e não disputa espaço com o título.
+ */
 const modalOptions = {
   headerLeft: () => (
-    <Pressable accessibilityRole="button" hitSlop={12} onPress={() => router.back()}>
-      <ThemedText type="default" themeColor="tint">
-        Cancelar
-      </ThemedText>
+    <Pressable
+      accessibilityRole="button"
+      accessibilityLabel="Cancelar"
+      hitSlop={12}
+      onPress={() => router.back()}>
+      {Platform.OS === 'android' ? (
+        <Icon name="xmark" size="lg" color="text" />
+      ) : (
+        <ThemedText type="default" themeColor="tint">
+          Cancelar
+        </ThemedText>
+      )}
     </Pressable>
   ),
 };
