@@ -1,10 +1,10 @@
 import { Children, Fragment, type ReactNode } from 'react';
-import { Pressable, StyleSheet, View, type AccessibilityState } from 'react-native';
+import { Pressable, StyleSheet, View, useColorScheme, type AccessibilityState } from 'react-native';
 import type { SymbolViewProps } from 'expo-symbols';
 
 import { ThemedText } from '@/components/themed-text';
 import { Icon } from '@/components/ui/icon';
-import { HitTarget, Radius, Space } from '@/design/tokens';
+import { Elevation, HitTarget, Radius, Space } from '@/design/tokens';
 import { useTheme } from '@/hooks/use-theme';
 
 interface RowProps {
@@ -86,6 +86,7 @@ export function Row({
  */
 export function Section({ title, children }: { title?: string; children: ReactNode }) {
   const theme = useTheme();
+  const scheme = useColorScheme() === 'dark' ? 'dark' : 'light';
   const items = Children.toArray(children);
 
   return (
@@ -95,7 +96,13 @@ export function Section({ title, children }: { title?: string; children: ReactNo
           {title.toUpperCase()}
         </ThemedText>
       ) : null}
-      <View style={[styles.group, { backgroundColor: theme.surface }]}>
+      {/* Mesma elevação do `Card`. Branco sobre `groupedBackground` são 3% de diferença de
+          valor: sem a sombra o agrupamento praticamente não existe no tema claro. */}
+      <View
+        style={[
+          styles.group,
+          { backgroundColor: theme.surface, boxShadow: Elevation[scheme].raised },
+        ]}>
         {items.map((child, i) => (
           <Fragment key={i}>
             {i > 0 ? <View style={[styles.separator, { backgroundColor: theme.separator }]} /> : null}

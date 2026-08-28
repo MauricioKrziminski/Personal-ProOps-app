@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Platform, Pressable, ScrollView, StyleSheet, View, useWindowDimensions } from 'react-native';
+import { Platform, Pressable, ScrollView, StyleSheet, View, useColorScheme, useWindowDimensions } from 'react-native';
 import { FlashList } from '@shopify/flash-list';
 import { Link, Stack, router } from 'expo-router';
 import * as Haptics from 'expo-haptics';
@@ -12,7 +12,7 @@ import { Icon } from '@/components/ui/icon';
 import { Screen } from '@/components/ui/screen';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useToast } from '@/components/ui/toast';
-import { HitTarget, Radius, Space, Type } from '@/design/tokens';
+import { Elevation, HitTarget, Radius, Space, Type } from '@/design/tokens';
 import {
   useNoteFolders,
   useNoteTags,
@@ -187,6 +187,7 @@ function NoteSkeleton() {
 
 export default function NotesScreen() {
   const theme = useTheme();
+  const scheme = useColorScheme() === 'dark' ? 'dark' : 'light';
   const toast = useToast();
 
   const [draft, setDraft] = useState('');
@@ -454,7 +455,7 @@ export default function NotesScreen() {
               <View
                 style={[
                   styles.group,
-                  { backgroundColor: theme.surface },
+                  { backgroundColor: theme.surface, boxShadow: Elevation[scheme].raised },
                   first && styles.groupTop,
                   last && styles.groupBottom,
                 ]}>

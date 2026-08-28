@@ -40,10 +40,36 @@ global continua morando em `.claude/rules/design.md`:
 | **Densidade** | Respiro entre seções e dentro da linha; quantos itens cabem antes de rolar. | Não é padding literal em tela: é qual degrau de `Space`. |
 | **Tratamento de superfície** | Opaco, agrupado ou glass; onde mora o contraste; o que carrega elevação. | Não é cor nova: um accent, uma família de cinza. |
 
-> **Estado: estrutura definida, valores em aberto.** Preencher os quatro campos exige referência
-> real — telas de apps rankeados da categoria — e é exatamente o passo que foi pulado na primeira
-> vez (`PROXIMO-PASSO.md` §B). Preencher de memória repetiria o erro que produziu as telas atuais.
-> A decisão de direção está com o Gabriel; enquanto não vier, nenhum valor entra aqui.
+### Os valores globais (decididos em 28/08, validados nos dois simuladores)
+
+A causa mecânica do "telas muito simples" não era falta de enfeite: era **duas escalas
+tipográficas concorrentes**. O `ThemedText` trazia a sua (14/16/32/48, tudo em peso 500), paralela
+à `Type` de `src/design/tokens.ts`. Título 16/500 contra subtítulo 14/500 é um passo — nada
+dominava, tudo lia como o mesmo cinza. Hoje `ThemedText` inteiro aponta para `Type`: **uma escala
+só**, e a hierarquia se faz com peso e cor.
+
+| Papel | Token | Por quê |
+|---|---|---|
+| Número herói | `money` 40/700 `Fonts.rounded` | Protagonista absoluto da tela. |
+| Rótulo do herói | `caption` 12, caixa alta, `letterSpacing 0.6`, `textSecondary` | Contraste de escala de 3,3× contra o número. Rótulo grande rouba do valor. |
+| Rótulo de seção | `caption` 12, caixa alta, `letterSpacing 0.6`, `textSecondary` | É etiqueta, não título: some do caminho. |
+| Título de linha | `default` (body 17/400) | Régua da plataforma. |
+| Secundário da linha | `footnote` 13 + `textSecondary` | **O degrau que faltava.** Em 15/500 empatava com o título. |
+| Dinheiro na linha | `headline` 17/600 + `tabular` | Num app de dinheiro o valor ganha a linha — por peso, não por cor. |
+| Ação | `smallBold` 15/600 | Botão primário leva o accent; secundário nunca disputa. |
+
+**Densidade** (tiers de ritmo vertical 16/24/32/48): dentro da linha `Space.md`; rótulo colado no
+seu cartão (`Space.xs + 2`); entre seções `Space.xl`; respiro do card de destaque `Space.lg`.
+
+**Superfície:** todo agrupamento (`Section`, `Card`, linha de nota) leva `Elevation.raised`.
+Branco sobre `groupedBackground` são ~3% de diferença de valor — sem a sombra o agrupamento não
+existe no tema claro. O `GlassCard` leva hairline **e** elevação: vidro sobre cor chapada não tem
+o que refratar.
+
+> **O que continua em aberto:** estes valores vieram das regras de app nativo (`ui-ux-pro-max`,
+> `references/pro-rules.md`) + a régua iOS, **não** de estudo de telas reais de apps rankeados — o
+> MCP do Appllama segue desconectado. Eles consertam a hierarquia, que era o defeito mecânico.
+> Direção estética (paleta própria, personalidade de marca) ainda pede referência real.
 
 A linguagem de design (tokens, glass, movimento, estados, anti-slop) mora em
 `.claude/rules/design.md`, não aqui. Os documentos assumem essa regra e não a repetem.
