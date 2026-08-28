@@ -489,8 +489,8 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: Space.sm,
     paddingHorizontal: Space.lg,
-    paddingTop: Space.sm,
-    paddingBottom: Space.md,
+    paddingTop: Space.md,
+    paddingBottom: Space.lg,
   },
   send: {
     width: HitTarget,
@@ -504,7 +504,7 @@ const styles = StyleSheet.create({
     paddingBottom: Space.xxxl,
   },
   filters: {
-    paddingBottom: Space.md,
+    paddingBottom: Space.lg,
   },
   chipDivider: {
     width: StyleSheet.hairlineWidth,
@@ -531,7 +531,7 @@ const styles = StyleSheet.create({
   row: {
     gap: Space.xs,
     minHeight: HitTarget,
-    paddingVertical: Space.md,
+    paddingVertical: Space.lg,
     paddingHorizontal: Space.lg,
   },
   rowTitle: {
@@ -540,9 +540,9 @@ const styles = StyleSheet.create({
     gap: Space.sm,
   },
   heading: {
-    letterSpacing: 0.5,
-    paddingTop: Space.lg,
-    paddingBottom: Space.xs,
+    letterSpacing: 0.6,
+    paddingTop: Space.xl,
+    paddingBottom: Space.sm,
     paddingHorizontal: Space.lg,
   },
   separator: {
