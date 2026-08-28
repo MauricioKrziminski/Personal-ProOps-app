@@ -80,3 +80,14 @@ test('localDateTime monta o instante no fuso do aparelho', () => {
   assert.equal(localDateTime('31/02/2026', '09:00'), null);
   assert.equal(localDateTime('26/08/2026', '25:00'), null);
 });
+
+test('data pura não anda um dia para trás em fuso negativo', () => {
+  // `new Date('2026-08-28')` é meia-noite UTC; em -03 o getDate() disso é 27.
+  assert.equal(formatDateBR('2026-08-28'), '28-08-2026');
+  assert.equal(formatDateBR('2026-01-01'), '01-01-2026');
+  assert.equal(formatDateBR('2026-12-31'), '31-12-2026');
+});
+
+test('timestamptz continua sendo lido no fuso local', () => {
+  assert.equal(formatDateBR(new Date(2026, 7, 28, 23, 30)), '28-08-2026');
+});

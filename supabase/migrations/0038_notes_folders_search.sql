@@ -68,8 +68,14 @@ as $$
   from regexp_matches(coalesce(txt, ''), '#([[:alnum:]_]{2,30})', 'g') m;
 $$;
 
--- portuguese_stem faz "reuniões" achar "reunião"; unaccent faz "reuniao" (como se digita no
--- celular) achar "reunião". Sem unaccent metade das buscas falha em silêncio.
+-- `unaccent` faz "reuniao" (como se digita no celular) achar "reunião" — sem ele metade das
+-- buscas do brasileiro falha em silêncio. `portuguese_stem` colapsa plural regular
+-- (casas→casa, mercados→mercado).
+--
+-- MEDIDO no Postgres, não suposto: o stemmer NÃO colapsa a alternância ão/ões — "reuniões" não
+-- acha "reunião". Isso não é efeito do unaccent: `portuguese` puro erra igual, e ainda por cima
+-- sem insensibilidade a acento. Ou seja, `pt_unaccent` é estritamente melhor; só não prometa
+-- plural irregular.
 create extension if not exists unaccent with schema extensions;
 
 do $$

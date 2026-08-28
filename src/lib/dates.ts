@@ -23,8 +23,19 @@ export function formatBRL(cents: number): string {
 }
 
 /** Data em dd-mm-yyyy (aceita ISO string ou Date). */
+/**
+ * `new Date('2026-08-28')` é parseado como meia-noite **UTC**. No fuso do Brasil (-03), o
+ * `getDate()` disso devolve **27** — toda data do app aparecia um dia mais cedo: vencimento,
+ * lançamento, fechamento de fatura. Data pura (`YYYY-MM-DD`) precisa virar data LOCAL.
+ */
+function parseLocal(value: string): Date {
+  const dateOnly = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value);
+  if (!dateOnly) return new Date(value);
+  return new Date(Number(dateOnly[1]), Number(dateOnly[2]) - 1, Number(dateOnly[3]));
+}
+
 export function formatDateBR(value: string | Date): string {
-  const d = typeof value === 'string' ? new Date(value) : value;
+  const d = typeof value === 'string' ? parseLocal(value) : value;
   const dd = String(d.getDate()).padStart(2, '0');
   const mm = String(d.getMonth() + 1).padStart(2, '0');
   return `${dd}-${mm}-${d.getFullYear()}`;

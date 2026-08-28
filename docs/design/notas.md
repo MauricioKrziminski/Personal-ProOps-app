@@ -63,7 +63,7 @@ em português, captura instantânea e uma lixeira que perdoa. Editor de blocos n
 | **Tag** | `notes.tags text[]` **gerado** dos `#hashtag` do próprio conteúdo, + GIN | Tabela de tags nasceria vazia: ninguém digita tag no WhatsApp. O usuário já digita `#`. Zero caminho de escrita, zero tela de gestão, zero mudança no contrato da IA. |
 | **Título** | primeira linha do conteúdo, calculada na tela | Coluna `title` viria null em 100% das notas do WhatsApp → lista com duas aparências. |
 | **Checklist** | linhas `- [ ]` / `- [x]` dentro do conteúdo | Tabela filha ou `jsonb` quebra o round-trip: a nota deixa de ser texto que volta pro WhatsApp. |
-| **Busca** | `search_tsv` gerado com config `pt_unaccent` (`portuguese` + `unaccent`) + GIN | `portuguese_stem` faz "reuniões" achar "reunião"; `unaccent` faz "reuniao" achar "reunião". Sem isso metade das buscas do brasileiro falha em silêncio. |
+| **Busca** | `search_tsv` gerado com config `pt_unaccent` (`portuguese` + `unaccent`) + GIN | `unaccent` faz "reuniao" achar "reunião" — sem ele metade das buscas do brasileiro falha em silêncio. O stemmer colapsa plural regular (casas→casa). **Medido:** ão/ões NÃO colapsa, nem aqui nem em `portuguese` puro — a config escolhida é estritamente melhor, mas não prometa plural irregular. |
 | **Apagar** | `deleted_at` + cron de purga aos 30 dias | Delete direto é o jeito mais rápido de perder confiança. |
 | **Fixar** | `pinned boolean` | — |
 

@@ -89,14 +89,22 @@ function dayTitle(iso: string): string {
 }
 
 /** Agrupa preservando a ordem (os dados já vêm ordenados do banco). */
+/**
+ * Agrupa por dia com `Map`, não comparando com o último elemento.
+ *
+ * A versão anterior só juntava linhas **consecutivas** do mesmo dia — ou seja, assumia a lista
+ * ordenada por `occurred_at`. Bastavam dois lançamentos do mesmo dia não adjacentes para nascerem
+ * dois grupos com a MESMA chave, e o React reclamava de chave duplicada (visto rodando).
+ * Agrupamento não pode depender da ordenação de quem chama.
+ */
 function groupByDay(rows: Transaction[]): [string, Transaction[]][] {
-  const groups: [string, Transaction[]][] = [];
+  const groups = new Map<string, Transaction[]>();
   for (const tx of rows) {
-    const last = groups[groups.length - 1];
-    if (last && last[0] === tx.occurred_at) last[1].push(tx);
-    else groups.push([tx.occurred_at, [tx]]);
+    const day = groups.get(tx.occurred_at);
+    if (day) day.push(tx);
+    else groups.set(tx.occurred_at, [tx]);
   }
-  return groups;
+  return [...groups.entries()];
 }
 
 export default function FinanceScreen() {
