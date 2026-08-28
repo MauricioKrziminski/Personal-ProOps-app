@@ -1,6 +1,7 @@
 import { StyleSheet, TextInput, View } from 'react-native';
 
 import { ThemedText } from '@/components/themed-text';
+import { Type } from '@/design/tokens';
 import { Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 
@@ -54,12 +55,10 @@ const styles = StyleSheet.create({
     paddingHorizontal: Spacing.four,
   },
   prefix: {
-    fontSize: 24,
-    lineHeight: 32,
+    ...Type.title2,
   },
   input: {
-    fontSize: 36,
-    lineHeight: 44,
+    ...Type.money,
     fontWeight: '600',
     minWidth: 120,
     textAlign: 'center',

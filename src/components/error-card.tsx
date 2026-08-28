@@ -2,6 +2,7 @@ import { ActivityIndicator, Pressable, StyleSheet } from 'react-native';
 import * as Haptics from 'expo-haptics';
 
 import { GlassCard } from '@/components/glass/glass-card';
+import { Icon } from '@/components/ui/icon';
 import { ThemedText } from '@/components/themed-text';
 import { Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
@@ -24,7 +25,7 @@ export function ErrorCard({ onRetry }: { onRetry: () => void }) {
   const theme = useTheme();
   return (
     <GlassCard style={styles.card}>
-      <ThemedText style={styles.emoji}>😵</ThemedText>
+      <Icon name="exclamationmark.triangle" size="xl" color="warning" />
       <ThemedText type="smallBold">Algo deu errado</ThemedText>
       <ThemedText type="small" themeColor="textSecondary" style={styles.hint}>
         Não conseguimos carregar os dados agora.
@@ -38,7 +39,7 @@ export function ErrorCard({ onRetry }: { onRetry: () => void }) {
           styles.button,
           { backgroundColor: theme.tint, opacity: pressed ? 0.8 : 1 },
         ]}>
-        <ThemedText type="smallBold" style={styles.buttonLabel}>
+        <ThemedText type="smallBold" themeColor="onTint">
           Tentar de novo
         </ThemedText>
       </Pressable>
@@ -52,9 +53,6 @@ const styles = StyleSheet.create({
     gap: Spacing.two,
     paddingVertical: Spacing.five,
   },
-  emoji: {
-    fontSize: 40,
-  },
   hint: {
     textAlign: 'center',
   },
@@ -63,8 +61,5 @@ const styles = StyleSheet.create({
     paddingHorizontal: Spacing.four,
     paddingVertical: Spacing.two,
     borderRadius: Spacing.three,
-  },
-  buttonLabel: {
-    color: '#fff',
   },
 });

@@ -131,6 +131,17 @@ tem 859 worklets transformados), cópia duplicada de `react-native-worklets` (s�
 ⚠️ **`pidof` não serve de critério de sucesso**: com o redbox o processo continua vivo. O critério
 é *zero* `isString` no logcat **e** screenshot com a tela real.
 
+### 🧹 A contagem anti-slop não estava zerada
+
+O handoff dizia "0 hex, 0 fontSize solto, 0 SafeAreaView à mão, 0 Alert cru". Medindo de novo:
+**3 hex** (`#fff` em `error-card`, `chip`, `login-screen`), **4 `fontSize` soltos**
+(`login-screen`, `error-card`, `money-input` ×2), **1 `SafeAreaView`** à mão e **2 emojis na
+chrome** (o 😵 do `ErrorCard` e o 🔧 do botão dev). Todos corrigidos — hex viraram `onTint`,
+tamanhos vieram para a `Type`, o `SafeAreaView` virou `useSafeAreaInsets`, o 😵 virou `Icon`.
+
+Contagem agora, medida e não afirmada: **hex 0 · fontSize solto 0 · emoji na chrome 0 ·
+SafeAreaView à mão 0 · Alert cru 0 · GlassView/BlurView fora do `GlassCard` 0.**
+
 ### ⚙️ Metro — quem está servindo
 
 O Metro que a sessão anterior tinha deixado de pé foi **encerrado** (a purga de cache era

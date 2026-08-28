@@ -1,18 +1,20 @@
 import * as Haptics from 'expo-haptics';
 import { useState } from 'react';
-import { ActivityIndicator, Pressable, StyleSheet, TextInput } from 'react-native';
+import { ActivityIndicator, Pressable, StyleSheet, TextInput, View } from 'react-native';
 import Animated, { FadeInDown, FadeInUp } from 'react-native-reanimated';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { GlassCard } from '@/components/glass/glass-card';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { Fonts, Spacing } from '@/constants/theme';
+import { Type } from '@/design/tokens';
 import { useTheme } from '@/hooks/use-theme';
 import { isSupabaseConfigured, supabase } from '@/lib/supabase';
 
 // Login por Phone OTP: o telefone verificado é a mesma chave que vincula o WhatsApp.
 export function LoginScreen() {
+  const insets = useSafeAreaInsets();
   const theme = useTheme();
   const [phone, setPhone] = useState('');
   const [code, setCode] = useState('');
@@ -61,7 +63,7 @@ export function LoginScreen() {
 
   return (
     <ThemedView style={styles.container}>
-      <SafeAreaView style={styles.safeArea}>
+      <View style={[styles.safeArea, { paddingTop: insets.top, paddingBottom: insets.bottom }]}>
         <Animated.View entering={FadeInUp.duration(600)} style={styles.hero}>
           <ThemedText type="title">Personal</ThemedText>
           <ThemedText type="small" themeColor="textSecondary">
@@ -123,7 +125,7 @@ export function LoginScreen() {
                 pressed && styles.pressed,
               ]}>
               {busy ? (
-                <ActivityIndicator color="#fff" />
+                <ActivityIndicator color={theme.onTint} />
               ) : (
                 <ThemedText type="smallBold" themeColor="onTint">
                   {step === 'phone' ? 'Receber código' : 'Entrar'}
@@ -142,13 +144,13 @@ export function LoginScreen() {
             {__DEV__ && (
               <Pressable onPress={devLogin} style={styles.devButton}>
                 <ThemedText type="small" themeColor="textSecondary" style={styles.backLink}>
-                  🔧 Entrar como teste (dev)
+                  Entrar como teste (dev)
                 </ThemedText>
               </Pressable>
             )}
           </GlassCard>
         </Animated.View>
-      </SafeAreaView>
+      </View>
     </ThemedView>
   );
 }
@@ -181,7 +183,7 @@ const styles = StyleSheet.create({
     borderRadius: Spacing.three,
     paddingHorizontal: Spacing.three,
     paddingVertical: Spacing.two + Spacing.one,
-    fontSize: 18,
+    ...Type.body,
     fontFamily: Fonts.rounded,
   },
   button: {
