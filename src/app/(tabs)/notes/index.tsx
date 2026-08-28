@@ -314,7 +314,7 @@ export default function NotesScreen() {
   );
 
   return (
-    <Screen scroll={false}>
+    <Screen scroll={false} grouped>
       <Stack.Screen
         options={{
           headerRight: () => (
@@ -351,9 +351,6 @@ export default function NotesScreen() {
         contentInsetAdjustmentBehavior="automatic"
         keyboardDismissMode="on-drag"
         contentContainerStyle={styles.list}
-        ItemSeparatorComponent={() => (
-          <View style={[styles.separator, { backgroundColor: theme.separator }]} />
-        )}
         ListHeaderComponent={
           <View>
       {/* A captura de dois segundos. Fica fixa: é o coração do produto, não vai atrás de FAB. */}
@@ -384,41 +381,41 @@ export default function NotesScreen() {
 
             {/* Usuário novo não vê estrutura vazia. */}
             {hasChips ? (
-            <View style={styles.filters}>
-              {folders.length > 0 ? (
-                <ScrollView
-                  horizontal
-                  showsHorizontalScrollIndicator={false}
-                  contentContainerStyle={styles.chips}>
-                  <Chip label="Todas" selected={!folderId} onPress={() => setFolderId(undefined)} />
-                  {folders.map((folder) => (
-                    <Chip
-                      key={folder.id}
-                      label={`${folder.name} · ${folder.notes_count}`}
-                      selected={folderId === folder.id}
-                      onPress={() =>
-                        setFolderId(folderId === folder.id ? undefined : folder.id)
-                      }
-                    />
-                  ))}
-                </ScrollView>
-              ) : null}
-              {tags.length > 0 ? (
-                <ScrollView
-                  horizontal
-                  showsHorizontalScrollIndicator={false}
-                  contentContainerStyle={styles.chips}>
-                  {tags.map((t) => (
-                    <Chip
-                      key={t.tag}
-                      label={`#${t.tag}`}
-                      selected={tag === t.tag}
-                      onPress={() => setTag(tag === t.tag ? null : t.tag)}
-                    />
-                  ))}
-                </ScrollView>
-              ) : null}
-            </View>
+              // Pasta e tag dividem UMA faixa. Empilhadas, somavam a quarta fileira de controle
+              // antes de qualquer nota — a tela abria pedindo configuração em vez de mostrar
+              // conteúdo. O filete separa os dois filtros sem gastar uma linha inteira.
+              <ScrollView
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                contentContainerStyle={styles.chips}
+                style={styles.filters}>
+                {folders.length > 0 ? (
+                  <>
+                    <Chip label="Todas" selected={!folderId} onPress={() => setFolderId(undefined)} />
+                    {folders.map((folder) => (
+                      <Chip
+                        key={folder.id}
+                        label={`${folder.name} · ${folder.notes_count}`}
+                        selected={folderId === folder.id}
+                        onPress={() =>
+                          setFolderId(folderId === folder.id ? undefined : folder.id)
+                        }
+                      />
+                    ))}
+                  </>
+                ) : null}
+                {folders.length > 0 && tags.length > 0 ? (
+                  <View style={[styles.chipDivider, { backgroundColor: theme.separator }]} />
+                ) : null}
+                {tags.map((t) => (
+                  <Chip
+                    key={t.tag}
+                    label={`#${t.tag}`}
+                    selected={tag === t.tag}
+                    onPress={() => setTag(tag === t.tag ? null : t.tag)}
+                  />
+                ))}
+              </ScrollView>
             ) : null}
           </View>
         }
@@ -437,6 +434,12 @@ export default function NotesScreen() {
                 ? 'Notas'
                 : null;
 
+          // Cantos só nas pontas do grupo: é o que faz a lista ler como o card agrupado da
+          // Hoje, e não como texto solto na margem.
+          const first = index === 0 || heading !== null;
+          const last =
+            index === notes.length - 1 || (item.pinned && !notes[index + 1].pinned);
+
           return (
             <View>
               {heading ? (
@@ -444,11 +447,22 @@ export default function NotesScreen() {
                   {heading.toUpperCase()}
                 </ThemedText>
               ) : null}
-              <NoteRow
-                note={item}
-                folderName={folderName(item.folder_id)}
-                actions={actions}
-              />
+              <View
+                style={[
+                  styles.group,
+                  { backgroundColor: theme.surface },
+                  first && styles.groupTop,
+                  last && styles.groupBottom,
+                ]}>
+                <NoteRow
+                  note={item}
+                  folderName={folderName(item.folder_id)}
+                  actions={actions}
+                />
+                {last ? null : (
+                  <View style={[styles.separator, { backgroundColor: theme.separator }]} />
+                )}
+              </View>
             </View>
           );
         }}
@@ -485,8 +499,25 @@ const styles = StyleSheet.create({
     paddingBottom: Space.xxxl,
   },
   filters: {
-    gap: Space.sm,
     paddingBottom: Space.md,
+  },
+  chipDivider: {
+    width: StyleSheet.hairlineWidth,
+    alignSelf: 'stretch',
+    marginHorizontal: Space.xs,
+  },
+  group: {
+    marginHorizontal: Space.lg,
+  },
+  groupTop: {
+    borderTopLeftRadius: Radius.md,
+    borderTopRightRadius: Radius.md,
+    borderCurve: 'continuous',
+  },
+  groupBottom: {
+    borderBottomLeftRadius: Radius.md,
+    borderBottomRightRadius: Radius.md,
+    borderCurve: 'continuous',
   },
   chips: {
     gap: Space.sm,
