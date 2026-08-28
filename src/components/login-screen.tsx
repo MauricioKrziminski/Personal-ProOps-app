@@ -125,7 +125,7 @@ export function LoginScreen() {
               {busy ? (
                 <ActivityIndicator color="#fff" />
               ) : (
-                <ThemedText type="smallBold" style={styles.buttonText}>
+                <ThemedText type="smallBold" themeColor="onTint">
                   {step === 'phone' ? 'Receber código' : 'Entrar'}
                 </ThemedText>
               )}
@@ -188,8 +188,6 @@ const styles = StyleSheet.create({
     borderRadius: Spacing.three,
     paddingVertical: Spacing.three,
     alignItems: 'center',
-  },
-  buttonText: {
   },
   pressed: {
     opacity: 0.8,

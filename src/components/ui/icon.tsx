@@ -52,6 +52,16 @@ const MATERIAL: Record<string, MaterialName> = {
   'checkmark.circle.fill': 'check_circle',
   'checkmark.seal.fill': 'verified',
   'chevron.right': 'chevron_right',
+  'arrow.down.circle': 'arrow_circle_down',
+  'arrow.down.left': 'south_west',
+  'arrow.down.right': 'south_east',
+  'arrow.left.arrow.right': 'swap_horiz',
+  'arrow.left.arrow.right.circle': 'swap_horizontal_circle',
+  'arrow.up.circle': 'arrow_circle_up',
+  'arrow.up.right': 'north_east',
+  'chevron.down': 'expand_more',
+  'chevron.left': 'chevron_left',
+  'chevron.up': 'expand_less',
   clock: 'schedule',
   'clock.arrow.circlepath': 'history',
   creditcard: 'credit_card',
@@ -124,6 +134,12 @@ const MATERIAL: Record<string, MaterialName> = {
 export function Icon({ name, size = 'md', color = 'text', weight = 'regular' }: IconProps) {
   const theme = useTheme();
   const px = typeof size === 'number' ? size : IconSize[size];
+
+  // Ícone fora do mapa vira `circle` silencioso no Android — foi assim que a `chevron.left` da
+  // navegação de mês virou um círculo vazio. Em dev isso grita.
+  if (__DEV__ && typeof name === 'string' && !MATERIAL[name]) {
+    console.warn(`[Icon] "${name}" não está no mapa SF → Material; vai cair em "circle" no Android.`);
+  }
 
   // Nome já no formato objeto (o caller escolheu o glyph de cada plataforma) passa direto.
   const resolved: IconName =
