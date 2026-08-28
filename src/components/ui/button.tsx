@@ -113,11 +113,17 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: Space.sm,
   },
+  // O wrapper precisa do MESMO raio do miolo: `boxShadow` passado por `style` (o FAB do
+  // Financeiro faz isso) desenhava um retângulo claro atrás da pílula — o "fundo branco".
   block: {
     alignSelf: 'stretch',
+    borderRadius: Radius.pill,
+    borderCurve: 'continuous',
   },
   /** Sem `block`, o botão abraça o rótulo — senão o pai com `alignItems: stretch` o estica. */
   hug: {
     alignSelf: 'flex-start',
+    borderRadius: Radius.pill,
+    borderCurve: 'continuous',
   },
 });
