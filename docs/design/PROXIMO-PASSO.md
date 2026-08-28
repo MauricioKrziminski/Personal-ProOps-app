@@ -71,7 +71,50 @@ próprio repertório. A regra da skill de design é literal: *"nunca desenhe uma
 quando você pode estudar como os melhores apps resolveram a mesma tela"*. Eu pulei esse passo e
 tratei como se tivesse feito.
 
-### Defeitos concretos vistos rodando (28/08)
+### Feito na madrugada de 28/08 — os defeitos objetivos
+
+Tudo abaixo foi **verificado rodando** no iPhone 17 Pro, light e dark. Nenhuma decisão estética
+foi tomada: só se consertou o que contraria uma regra escrita ou um documento de tela.
+
+| Defeito | Causa raiz | Commit |
+|---|---|---|
+| Prévia vazava `- [x] leite - [ ] pão` | `notePreview`/`noteTitle` exibiam a linha crua; `stripMarkup` agora tira a marcação em UM lugar (8 chamadas dependiam disso) | `76e1aef` |
+| `mercado · #mercado` | tag igual ao nome da pasta não vira metadado | `76e1aef` |
+| Sparkline achatada, lia como divisor | domínio vertical era forçado a incluir zero: série de R$ 2.500–2.800 desenhava em 6px de 56. Domínio agora sai dos dados + área preenchida + span mínimo | `fe5d69e` |
+| GlassCard sumia no tema claro | vidro sobre cor chapada não tem o que refratar; hairline dá a borda | `fe5d69e` |
+| "Paguei" cinza não parecia ação | virou `Button` primário (regra §2: o accent é gasto na ação primária) | `fe5d69e` |
+| Barra de orçamento saltava | anima com `scaleX`/`transformOrigin: left` em worklet (regra §5 exigia e ninguém tinha feito) | `fe5d69e` |
+| Notas: 4 fileiras de controle | pasta e tag agora dividem UMA faixa → 3 | `54dcf65` |
+| Notas: linhas soltas na margem | superfície agrupada com cantos nas pontas do grupo, igual ao `Section` da Hoje | `54dcf65` |
+| Pontas do grupo na paginação | `extraData` na `FlashList` (a ponta depende do vizinho, não do item) | `d49d252` |
+
+### Dois "defeitos" que NÃO eram defeito
+
+- **Conteúdo passando por baixo da tab bar.** Não reproduz. Verificado com sonda de
+  `contentOffset`: a Hoje rola até o fim e sobra folga acima da tab bar. O que se viu foi
+  conteúdo rolando ATRÁS do Liquid Glass — comportamento correto do iOS. `screen.tsx` intacto.
+- **"Busca é um `TextField` à mão".** Falso: a Notas já usa `<Stack.SearchBar placement="automatic">`.
+  O campo que aparece abaixo do large title É a busca nativa.
+
+### 🔴 Bloqueador achado: o app NÃO SOBE no Android
+
+`npx expo run:android` compila e instala, mas o processo morre no primeiro render:
+
+```
+F libc: jsi.h:1987: String facebook::jsi::Value::getString(IRuntime &) const &:
+        assertion "isString()" failed
+F libc: Fatal signal 6 (SIGABRT) in tid (mqt_v_js)
+```
+
+Morre logo depois de `Running "main"` — os módulos Expo já inicializaram. **É anterior a este
+trabalho:** confirmado servindo o bundle do commit `27ca30c` (antes da sessão) por uma worktree
+num segundo Metro — crasha idêntico. Uma hipótese já foi descartada: não são as props de cor da
+`NativeTabs`.
+
+Consequência: **nenhuma tela foi verificada no Android**, e não dá para verificar enquanto isso
+não cair. Fica como decisão do Gabriel se isso vira a próxima prioridade.
+
+### Defeitos concretos vistos rodando (28/08) — histórico, já endereçados acima
 
 **Hoje**
 - O card de destaque é um retângulo cinza com um número. O `Sparkline` desenha, mas tão achatado
@@ -110,6 +153,12 @@ src/components/glass/glass-card.tsx
 1. **Referência primeiro** — conectar o MCP do Appllama, **ou** você me passar 5–10 prints de apps
    que considera bonitos (Copilot Money, Monarch, Things, Apple Wallet…). Sem isso o passo 2 vira
    chute de novo.
+
+   > **Status 28/08:** o MCP do Appllama também não estava conectado nesta sessão. O passe visual
+   > propriamente dito (escala tipográfica, densidade, peso de cor, tratamento de superfície)
+   > **não foi feito de propósito** — fazer de memória repetiria exatamente o erro que produziu as
+   > telas atuais. A estrutura da seção **Visual** já existe no template (`README.md`); faltam os
+   > valores, que dependem desta decisão.
 2. **Extrair o padrão, não os pixels**: escala tipográfica real, densidade (altura de linha,
    respiro entre seções), peso de cor, tratamento de card, onde mora o contraste.
 3. **Reescrever a camada visual dos 8 arquivos** e ver no catálogo (`/catalog`) nos dois temas.
