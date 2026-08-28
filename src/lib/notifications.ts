@@ -42,7 +42,10 @@ function routeFor(data: unknown): string | null {
   if (!data || typeof data !== 'object') return null;
   const target = (data as { target?: unknown }).target;
   if (typeof target !== 'string') return null;
-  return target in ALLOWED ? ALLOWED[target as Target] : null;
+  // `in` anda pela cadeia de protótipos: `'toString' in ALLOWED` é true e devolveria uma FUNÇÃO
+  // para o `router.push`. A allowlist continuaria impedindo rota arbitrária, mas o app crasharia
+  // ao tocar na notificação.
+  return Object.hasOwn(ALLOWED, target) ? ALLOWED[target as Target] : null;
 }
 
 function open(response: Notifications.NotificationResponse) {

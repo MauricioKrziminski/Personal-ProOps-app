@@ -77,3 +77,20 @@ export function toggleChecklistLine(content: string, lineIndex: number): string 
 export function normalizeFolderName(name: string): string {
   return name.toLowerCase().trim().slice(0, 40);
 }
+
+/**
+ * Termo seguro para dentro de um filtro `or=(col.ilike.%termo%,…)` do PostgREST.
+ *
+ * `URLSearchParams` percent-encoda o valor, então não há como escapar para outro parâmetro, e a
+ * RLS continua limitando ao workspace — **não é brecha de segurança**. Mas os metacaracteres do
+ * PostgREST (`,` separa condições, `()` agrupam) e os curingas do `ilike` (`%`, `_`) quebram a
+ * query com 400: buscar `compra (mercado)` hoje falha.
+ *
+ * Por isso é allowlist, não blocklist: letra, número, espaço e hífen passam; o resto vira espaço.
+ */
+export function toIlikeTerm(input: string): string {
+  return input
+    .replace(/[^\p{L}\p{N}\s-]/gu, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}

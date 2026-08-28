@@ -1,6 +1,6 @@
 import { useQueries } from '@tanstack/react-query';
 
-import { toTsQuery } from '@/lib/search';
+import { toIlikeTerm, toTsQuery } from '@/lib/search';
 import { supabase } from '@/lib/supabase';
 
 /**
@@ -74,7 +74,9 @@ export function useGlobalSearch(q: string) {
         placeholderData: (prev: TransactionHit[] | undefined) => prev,
         queryFn: async (): Promise<TransactionHit[]> => {
           // `transactions` não tem índice full-text — é ilike honesto, não busca semântica.
-          const like = `%${term.replace(/[%_,]/g, '')}%`;
+          const safe = toIlikeTerm(term);
+          if (!safe) return [];
+          const like = `%${safe}%`;
           const { data, error } = await supabase
             .from('transactions')
             .select('id, description, merchant, category, amount_cents, kind, occurred_at')
@@ -90,7 +92,9 @@ export function useGlobalSearch(q: string) {
         enabled,
         placeholderData: (prev: ReminderHit[] | undefined) => prev,
         queryFn: async (): Promise<ReminderHit[]> => {
-          const like = `%${term.replace(/[%_,]/g, '')}%`;
+          const safe = toIlikeTerm(term);
+          if (!safe) return [];
+          const like = `%${safe}%`;
           const { data, error } = await supabase
             .from('reminders')
             .select('id, title, recurrence, next_run_at, active')

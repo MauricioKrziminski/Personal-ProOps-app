@@ -99,6 +99,33 @@ Cada item aqui é migration ou Edge Function, não tela.
 - **Push virou `src/hooks/use-push.ts`** com uma mensagem por causa (simulador, permissão negada,
   EAS não vinculado). O hook antigo engolia o erro do fetch: falha de rede virava "push desativado".
 
+## 4c. Auditoria de segurança (fase 6) — resultado
+
+**Nenhum achado HIGH ou MEDIUM.** A superfície de backend nova é uma migration e quatro Edge
+Functions; o resto é cliente, onde a fronteira de confiança é a RLS, não o app.
+
+Verificado e correto: RLS + policy de workspace em `note_folders`; as duas RPCs novas são
+`security invoker` com `private.my_workspace_ids()` inline; `toTsQuery` não consegue injetar
+operador de `tsquery` (o split só deixa passar letra, dígito e `_`); `query_notes` usa
+`plainto_tsquery`, que escapa a entrada; `ensureFolder` grava `workspace_id` e `user_id`
+explícitos (correto sob `service_role`, onde `auth.uid()` é null); o deep link de push é
+allowlist fechada e o payload não carrega dado do usuário.
+
+Corrigido durante a auditoria:
+- `toIlikeTerm` (allowlist testada) no filtro `or=` do PostgREST. **Não era brecha** —
+  `URLSearchParams` percent-encoda e a RLS limita ao workspace — mas `compra (mercado)` quebrava
+  a busca com 400.
+- `Object.hasOwn` no lugar de `in` na allowlist de deep link: `'toString' in ALLOWED` é `true` e
+  devolveria uma **função** ao `router.push`, crashando ao tocar na notificação.
+
+**Ficou aberto, com decisão sua:**
+1. `dev@proops.local` / `devtest123` no bundle (gate é de UI, não de servidor) — **a conta não
+   pode existir no Supabase de produção**.
+2. `notes.folder_id` não tem FK composta com `workspace_id`: um usuário poderia apontar a própria
+   nota para um UUID de pasta de outro workspace e ver o nome dela (40 caracteres) na resposta do
+   WhatsApp. Exige adivinhar um UUID v4 — não explorável. Fechar exigiria unique
+   `(workspace_id, id)` em `note_folders` + FK composta.
+
 ## 5. Bugs confirmados no código (não são decisão, são conserto)
 
 Estão detalhados no plano; ficam aqui só para não se perderem.

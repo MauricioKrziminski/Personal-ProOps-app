@@ -1165,6 +1165,16 @@ export interface TransactionInput {
   account_id: string | null;
   counterparty_account_id: string | null;
   occurred_at: string;
+  /**
+   * Os três campos abaixo são OPCIONAIS de propósito. `update` recebe o objeto espalhado, então
+   * chave ausente = coluna intocada — telas que só corrigem categoria (o detalhe do lançamento)
+   * não podem zerar o vencimento de uma conta a pagar sem saber.
+   */
+  /** `pending` = ainda vai acontecer (conta a pagar); default do banco é `cleared`. */
+  status?: 'pending' | 'cleared';
+  /** Vencimento YYYY-MM-DD. É o que alimenta `upcoming_bills` e a projeção de caixa. */
+  due_at?: string | null;
+  merchant?: string | null;
 }
 
 export function useSaveTransaction() {

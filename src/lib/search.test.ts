@@ -8,6 +8,7 @@ import {
   parseChecklist,
   toTsQuery,
   toggleChecklistLine,
+  toIlikeTerm,
 } from './search.ts';
 
 test('tsquery: prefixo só no último termo (é o que faz buscar enquanto digita)', () => {
@@ -68,4 +69,19 @@ test('toggle em linha que não é checklist não muda nada', () => {
 test('nome de pasta respeita o check do banco: lower, trim e 40 chars', () => {
   assert.equal(normalizeFolderName('  Mercado  '), 'mercado');
   assert.equal(normalizeFolderName('A'.repeat(60)).length, 40);
+});
+
+test('ilike: metacaractere do PostgREST vira espaço (`compra (mercado)` quebrava a query)', () => {
+  assert.equal(toIlikeTerm('compra (mercado)'), 'compra mercado');
+  assert.equal(toIlikeTerm('a,b'), 'a b');
+  assert.equal(toIlikeTerm('100%'), '100');
+  assert.equal(toIlikeTerm('a_b'), 'a b');
+});
+
+test('ilike: acento, número e hífen sobrevivem', () => {
+  assert.equal(toIlikeTerm('café  são-paulo 45'), 'café são-paulo 45');
+});
+
+test('ilike: só pontuação vira string vazia', () => {
+  assert.equal(toIlikeTerm('()%,'), '');
 });
