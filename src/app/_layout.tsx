@@ -57,6 +57,10 @@ export default function RootLayout() {
           <AndroidActionSheet />
             {loading ? null : (
               <Stack>
+              {/* `/` é a URL inicial: renderiza antes de qualquer guard, por isso fica FORA dos
+                  `Stack.Protected` e decide o destino por conta própria. */}
+              <Stack.Screen name="index" options={{ headerShown: false }} />
+
                 {/* Porta de mão única nos dois sentidos: sem sessão só existe o login; com sessão
                   o login deixa de existir, então `back` nunca reentra nele. */}
                 <Stack.Protected guard={!session}>
