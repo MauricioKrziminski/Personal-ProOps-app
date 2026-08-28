@@ -61,8 +61,13 @@ nunca "Confirmar" na tela seguinte.
 
 ## 4. Ícones e ilustração
 
-- `Icon` usa **`expo-symbols`**, que já resolve SF Symbols no iOS e Material Symbols no Android
-  e web. Nenhuma outra biblioteca de ícone entra no projeto.
+- `Icon` (`src/components/ui/icon.tsx`) é o único caminho. Nenhuma outra biblioteca de ícone
+  entra no projeto.
+- **`expo-symbols` NÃO traduz nome sozinho** — esta regra afirmava que sim, e por isso *todo*
+  ícone do app ficou invisível no Android até 28/08. No Android o `SymbolView` só resolve o nome
+  no formato objeto (`{ ios, android }`); recebendo a string de um SF Symbol ele devolve o
+  `fallback`. O mapa SF → Material vive dentro do `Icon`. **Ícone novo = entrada nova no mapa**,
+  senão ele cai no glyph genérico `circle` no Android.
 - **Emoji não é ícone.** Emoji só aparece em *conteúdo* — texto que o usuário escreveu, mensagem
   que veio do WhatsApp. Nunca em botão, aba, empty state, linha de lista ou título.
 

@@ -96,23 +96,51 @@ foi tomada: só se consertou o que contraria uma regra escrita ou um documento d
 - **"Busca é um `TextField` à mão".** Falso: a Notas já usa `<Stack.SearchBar placement="automatic">`.
   O campo que aparece abaixo do large title É a busca nativa.
 
-### 🔴 Bloqueador achado: o app NÃO SOBE no Android
+### ✅ Resolvido: o app não subia no Android — era cache do Metro
 
-`npx expo run:android` compila e instala, mas o processo morre no primeiro render:
+O app morria no primeiro render, em **todo** cold start:
 
 ```
-F libc: jsi.h:1987: String facebook::jsi::Value::getString(IRuntime &) const &:
-        assertion "isString()" failed
-F libc: Fatal signal 6 (SIGABRT) in tid (mqt_v_js)
+F libc: jsi.h:1987: String facebook::jsi::Value::getString(IRuntime&) const&:
+        assertion "isString()" failed        (SIGABRT em mqt_v_js)
 ```
 
-Morre logo depois de `Running "main"` — os módulos Expo já inicializaram. **É anterior a este
-trabalho:** confirmado servindo o bundle do commit `27ca30c` (antes da sessão) por uma worktree
-num segundo Metro — crasha idêntico. Uma hipótese já foi descartada: não são as props de cor da
-`NativeTabs`.
+`ndk-stack` apontou o culpado que o log cru escondia: os frames são de **`libworklets.so`**, não
+do app. E o mecanismo é o de sempre, só que sem mensagem: o Metro estava servindo JS transformado
+por uma versão do plugin Babel do `react-native-worklets` **diferente** da versão nativa linkada
+no APK. O `0.10.1` não checa isso — aborta no C++. O `0.10.4` checa e mostra
+`[Worklets] Mismatch between JavaScript code version and Worklets Babel plugin version`, que foi
+como o mecanismo apareceu.
 
-Consequência: **nenhuma tela foi verificada no Android**, e não dá para verificar enquanto isso
-não cair. Fica como decisão do Gabriel se isso vira a próxima prioridade.
+**A correção é operacional, não de código.** Nada no app estava errado; `package.json` continua em
+`reanimated 4.5.1` / `worklets 0.10.1`.
+
+> **Regra:** mexeu na versão de `react-native-reanimated` ou `react-native-worklets` — ou pegou um
+> crash de worklets sem explicação:
+> ```bash
+> pkill -f "expo start"
+> rm -rf node_modules/.cache "$TMPDIR/metro-cache"
+> npx expo start --dev-client --clear      # --clear SOZINHO não bastou: não limpa $TMPDIR/metro-cache
+> npx expo run:ios / run:android           # o dev client precisa renascer junto
+> ```
+
+Descartados no caminho, para ninguém refazer: props de cor da `NativeTabs`, o `Keyframe` do splash,
+`KeyboardProvider`, `Easing.bezier` em escopo de módulo, plugin Babel ausente (não está: o bundle
+tem 859 worklets transformados), cópia duplicada de `react-native-worklets` (só existe uma).
+
+⚠️ **`pidof` não serve de critério de sucesso**: com o redbox o processo continua vivo. O critério
+é *zero* `isString` no logcat **e** screenshot com a tela real.
+
+### 🐞 Achado no primeiro Android que subiu: nenhum ícone aparecia
+
+`expo-symbols` **não** traduz SF Symbol para Material Symbol sozinho — a regra de design afirmava
+que sim. No Android o `SymbolView` só resolve nome no formato objeto (`{ ios, android }`); com a
+string de um SF Symbol ele renderiza o `fallback`, que era `undefined`. Os 84 ícones do app
+simplesmente não existiam lá (só a tab bar tinha, porque a `NativeTabs` já recebia `sf` e `md`
+separados).
+
+Corrigido com um mapa SF → Material dentro do próprio `Icon` — um arquivo, 36 telas. `design.md`
+§4 foi corrigida junto.
 
 ### Defeitos concretos vistos rodando (28/08) — histórico, já endereçados acima
 
