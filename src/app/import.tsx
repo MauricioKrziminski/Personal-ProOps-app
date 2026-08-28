@@ -343,38 +343,44 @@ export default function ImportScreen() {
         }}
       />
 
-      {lista.length > 0 ? (
-        <HeaderMenu
-          title="Lote de importação"
-          actions={[
-            {
-              label: 'Sair e continuar depois',
-              icon: 'arrow.uturn.backward',
-              onPress: () => router.back(),
-            },
-            {
-              label: 'Descartar o lote',
-              icon: 'trash',
-              destructive: true,
-              onPress: () =>
-                confirmDestructive(
-                  'Descartar tudo que ainda não foi confirmado?',
-                  'Descartar lote',
-                  () =>
-                    descartar.mutate(
-                      [...paraRevisar, ...repetidos].map((i) => i.id),
-                      {
-                        onSuccess: () => toast({ message: 'Lote descartado.', tone: 'success' }),
-                        onError: () =>
-                          toast({ message: 'Não deu para descartar o lote.', tone: 'error' }),
-                      }
+      {/* Montado SEMPRE, com a lista condicional: `Stack.Screen` não desfaz `setOptions` no
+          unmount, então `{cond ? <HeaderMenu/> : null}` deixaria o "…" no header do Android
+          depois que o lote esvaziasse, apontando para ações de um lote que não existe mais. */}
+      <HeaderMenu
+        title="Lote de importação"
+        actions={
+          lista.length === 0
+            ? []
+            : [
+                {
+                  label: 'Sair e continuar depois',
+                  icon: 'arrow.uturn.backward',
+                  onPress: () => router.back(),
+                },
+                {
+                  label: 'Descartar o lote',
+                  icon: 'trash',
+                  destructive: true,
+                  onPress: () =>
+                    confirmDestructive(
+                      'Descartar tudo que ainda não foi confirmado?',
+                      'Descartar lote',
+                      () =>
+                        descartar.mutate(
+                          [...paraRevisar, ...repetidos].map((i) => i.id),
+                          {
+                            onSuccess: () =>
+                              toast({ message: 'Lote descartado.', tone: 'success' }),
+                            onError: () =>
+                              toast({ message: 'Não deu para descartar o lote.', tone: 'error' }),
+                          }
+                        ),
+                      'Nada entra no financeiro. Os já confirmados continuam lá.'
                     ),
-                  'Nada entra no financeiro. Os já confirmados continuam lá.'
-                ),
-            },
-          ]}
-        />
-      ) : null}
+                },
+              ]
+        }
+      />
 
       {isError ? <ErrorCard onRetry={refetch} /> : null}
 

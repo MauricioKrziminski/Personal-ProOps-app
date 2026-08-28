@@ -286,7 +286,7 @@ function TransactionForm({ editing }: { editing?: Transaction }) {
       />
 
       <HeaderActions
-        actions={[{ label: saving ? 'Salvando…' : 'Salvar', disabled: saving, onPress: onSubmit }]}
+        actions={[{ label: saving ? 'Salvando…' : 'Salvar', disabled: saving, primary: true, onPress: onSubmit }]}
       />
 
       <KeyboardAwareScrollView

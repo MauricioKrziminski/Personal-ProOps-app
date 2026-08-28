@@ -364,7 +364,7 @@ function ReminderForm({
 
       <HeaderActions
         actions={[
-          { label: save.isPending ? 'Salvando…' : 'Salvar', disabled: save.isPending, onPress: onSubmit },
+          { label: save.isPending ? 'Salvando…' : 'Salvar', disabled: save.isPending, primary: true, onPress: onSubmit },
         ]}
       />
 

@@ -51,9 +51,10 @@ botão fica desabilitado. **Salvar nunca pode acontecer antes de saber se é edi
 ## Anatomia
 
 1. **Header do modal** — `<Stack.Title>` "Novo lançamento" / "Editar lançamento", `headerLeft`
-   Cancelar, `headerRight` **Salvar** (o rótulo é sempre "Salvar" — hoje alterna entre "Adicionar" e
-   "Salvar alterações", linhas 410-412, duas palavras para a mesma intenção). Hoje o cabeçalho é um
-   `ScreenHeader` desenhado à mão dentro do `ScrollView` (linha 208).
+   Cancelar, e **Salvar** por `HeaderActions` com `primary` (o rótulo é sempre "Salvar" — nunca
+   alterna com "Adicionar"/"Salvar alterações": duas palavras para a mesma intenção).
+   `primary` vira `variant: 'done'` no toolbar do iOS, que é o negrito do sistema — sem ele o
+   Salvar sai na cor de rótulo e fica menos proeminente que o Cancelar azul ao lado.
 2. **Valor** — `MoneyInput` grande, `autoFocus` na criação (linha 231). É o primeiro campo porque é
    o único obrigatório e porque o teclado numérico já abre com ele.
 3. **Tipo** — segmented control: Gasto · Receita · Transferência. **Sem emoji** (hoje `💸 Gasto`,

@@ -140,7 +140,11 @@ que "voltar" faz depois.
   faz o respiro interno ser o nosso `gap`, e cada tela escolhia um — foi assim que a pílula ficou
   com padding e raio diferentes entre telas. O primitivo usa `Stack.Toolbar` no iOS (o sistema
   resolve pílula, espaçamento e large title) e `headerRight` no Android, onde o toolbar nativo
-  reclama o slot sem desenhar nada.
+  reclama o slot sem desenhar nada. Ação condicional passa **array vazio**, nunca
+  `{cond ? <HeaderActions/> : null}`: `Stack.Screen` só chama `setOptions` e o expo-router não
+  desfaz no unmount — desmontar deixaria o botão velho no header do Android. Submit de form modal
+  leva `primary` (vira `variant: 'done'`, o negrito do sistema); sem ele o "Salvar" fica menos
+  proeminente que o "Cancelar" ao lado.
 - **Presentation é significado**: tarefa com etapas → `modal` com Cancelar/Salvar próprios;
   escolha curta → `formSheet` com detents; confirmação destrutiva → action sheet; ação de item →
   context menu nativo.

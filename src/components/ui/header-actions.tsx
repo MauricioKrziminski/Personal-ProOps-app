@@ -24,6 +24,14 @@ export interface HeaderAction {
   selected?: boolean;
   /** Ação destrutiva: "Esvaziar" da lixeira. */
   destructive?: boolean;
+  /**
+   * Ação que confirma a tela — o "Salvar" de um form modal.
+   *
+   * No iOS vira `variant: 'done'` (negrito), que é como o sistema separa confirmar de cancelar.
+   * Sem isso o "Salvar" saía na cor de rótulo e ficava MENOS proeminente que o "Cancelar" azul
+   * do lado esquerdo: hierarquia invertida no único botão que fecha a tarefa.
+   */
+  primary?: boolean;
 }
 
 /**
@@ -65,6 +73,7 @@ export function HeaderActions({ actions }: { actions: HeaderAction[] }) {
             // O toolbar não tem "papel destrutivo": sem `tintColor` o "Esvaziar" da lixeira
             // sairia no accent, igualzinho a "Salvar".
             tintColor={action.destructive ? theme.danger : undefined}
+            variant={action.primary ? 'done' : undefined}
             onPress={action.onPress}>
             {action.icon ? undefined : action.label}
           </Stack.Toolbar.Button>
@@ -95,6 +104,7 @@ export function HeaderActions({ actions }: { actions: HeaderAction[] }) {
  */
 export function HeaderMenu({ title, actions }: { title: string; actions: ItemAction[] }) {
   if (Platform.OS === 'ios') {
+    if (actions.length === 0) return null;
     return (
       <Stack.Toolbar placement="right">
         <Stack.Toolbar.Menu icon="ellipsis.circle" accessibilityLabel="Mais opções">
@@ -112,20 +122,27 @@ export function HeaderMenu({ title, actions }: { title: string; actions: ItemAct
     );
   }
 
+  // Mesmo contrato do `HeaderActions`: lista vazia devolve o slot. Montar/desmontar o componente
+  // NÃO limpa nada — `Stack.Screen` só chama `setOptions` e o expo-router não desfaz no unmount.
+  // Com `{cond ? <HeaderMenu/> : null}` o "…" continuava no header do Android depois que o lote
+  // esvaziava, apontando para ações de um lote que não existe mais.
   return (
     <Stack.Screen
       options={{
-        headerRight: () => (
-          <AndroidActions
-            actions={[
-              {
-                label: 'Mais opções',
-                icon: 'ellipsis.circle',
-                onPress: () => showItemActions(title, actions),
-              },
-            ]}
-          />
-        ),
+        headerRight:
+          actions.length === 0
+            ? undefined
+            : () => (
+                <AndroidActions
+                  actions={[
+                    {
+                      label: 'Mais opções',
+                      icon: 'ellipsis.circle',
+                      onPress: () => showItemActions(title, actions),
+                    },
+                  ]}
+                />
+              ),
       }}
     />
   );
