@@ -123,6 +123,18 @@ A correção é no `_layout.tsx` da aba: `headerLargeStyle`/`headerStyle` com
 `backgroundColor: theme.groupedBackground`. Vale para qualquer tela que junte `headerLargeTitle`
 com lista virtualizada — hoje só esta (a `transactions` usa header comum).
 
+**Trade-off aceito, não descuido:** pelo mesmo motivo (o iOS não rastreia a `FlashList`), o large
+title **não colapsa** ao rolar — ele e a busca ficam fixos. A anatomia acima ainda diz "large
+title com colapso"; na prática a escolha foi *header fixo opaco* em vez de *colapso com o
+conteúdo desenhando por cima do título*. Quem for "consertar" o colapso reintroduz o bug: só
+mexa nisso junto com uma forma de tornar a lista rastreável (ou trocando a `FlashList` por um
+`ScrollView`, que é o que faz a Hoje colapsar direito).
+
+**Perda de dado (28/08):** uma nota vinda do WhatsApp voltou do detalhe com `content` vazio **e
+`folder_id` nulo** — saiu da pasta em silêncio. O gatilho não foi reproduzido; a guarda em
+`flush()` (`[id].tsx`) impede gravar vazio por cima de nota com texto. **A guarda é defensiva e
+não foi exercitada em runtime** — apagar nota é a Lixeira, não o autosave.
+
 ## Dados
 
 `src/hooks/use-notes.ts` (arquivo novo). **Todo queryKey sob o prefixo `['notes', …]`** — assim um
