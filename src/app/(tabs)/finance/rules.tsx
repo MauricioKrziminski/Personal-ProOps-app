@@ -172,14 +172,18 @@ export default function RulesScreen() {
       <HeaderActions actions={[{ label: 'Nova regra', icon: 'plus', onPress: () => abrir() }]} />
 
       {/* Texto, não card: a explicação não pode competir de tamanho com o dado. */}
-      <View style={styles.faixa}>
-        <ThemedText type="small" themeColor="textSecondary">
-          Sua regra ganha da IA. Vale no WhatsApp e na importação de extrato.
-        </ThemedText>
-        <ThemedText type="small" themeColor="textSecondary">
-          Dá para criar por mensagem: “sempre que eu falar ifood, põe em restaurante”.
-        </ThemedText>
-      </View>
+      {/* Só com regras na lista: no vazio, o `EmptyState` abaixo já diz as duas coisas — e a
+          frase do WhatsApp aparecia LITERALMENTE duas vezes na mesma tela. */}
+      {lista.length > 0 ? (
+        <View style={styles.faixa}>
+          <ThemedText type="small" themeColor="textSecondary">
+            Sua regra ganha da IA. Vale no WhatsApp e na importação de extrato.
+          </ThemedText>
+          <ThemedText type="small" themeColor="textSecondary">
+            Dá para criar por mensagem: “sempre que eu falar ifood, põe em restaurante”.
+          </ThemedText>
+        </View>
+      ) : null}
 
       {isError ? <ErrorCard onRetry={refetch} /> : null}
 

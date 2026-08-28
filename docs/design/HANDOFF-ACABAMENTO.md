@@ -112,8 +112,8 @@ from (select workspace_id, user_id from notes limit 1) n, generate_series(1,18) 
 ---
 
 > **Estado em 28/08, fim da sessão seguinte:** os três defeitos da seção 2 estão **resolvidos** e
-> foi feita uma **varredura das 36 rotas do app**, tela por tela, com screenshot. O que ela achou
-> além da seção 2 está na seção 6. O que segue aberto é a seção 3 — direção estética de marca
+> foi feita uma **varredura de 34 das 36 rotas**, tela por tela, com screenshot aberto e olhado
+> (as duas exceções estão nomeadas na seção 6). O que ela achou além da seção 2 está lá. O que segue aberto é a seção 3 — direção estética de marca
 > (decisão do usuário), Dynamic Type e o passe de movimento em vídeo.
 
 ## 2. Os três defeitos que o usuário apontou (prioridade máxima) — RESOLVIDOS
@@ -321,6 +321,20 @@ Deep link no Android para cada rota, screenshot, olhar. Doze defeitos, nenhum de
 | 10 | `reminders.tsx` | Única tela de lista sem ação no header: criar era botão de bloco no corpo, contra `+` no header em outras sete. |
 | 11 | `today/index.tsx` | "Paguei" no accent; nas outras cinco telas que o mostram, `secondary`. |
 | 12 | `[txId].tsx` | `bubble.left` e `iphone` **fora do mapa** do `Icon` → círculo azul oco no Android. Agora há `icon-map.test.ts`, que varre o código e falha se um SF Symbol usado não estiver no mapa. |
+| 13 | `rules.tsx` | *"Ou manda no WhatsApp: «sempre que eu falar ifood, põe em restaurante»"* aparecia **literalmente duas vezes na mesma tela** — na faixa do topo e no `EmptyState`. A faixa agora só existe com regras na lista. |
+| 14 | `import-history.tsx` | Nota de rodapé órfã 200px abaixo do empty state, explicando o "Tentar de novo" de uma linha que não existe. Idem: só com histórico. |
+
+### As duas rotas NÃO conferidas — e por quê
+
+- **`login`** — inalcançável estando logado: o gate do `_layout.tsx` raiz troca a tela, e o deep
+  link `appproops:///login` cai na aba Hoje (confirmado, não suposto). Conferir exige deslogar,
+  o que derruba o workspace de teste. **Fica aberto.**
+- **`catalog`** — tela de catálogo de componentes, ferramenta de desenvolvimento, não faz parte
+  do produto. Pulada de propósito.
+
+Além disso, `notes/new` foi vista mas **só em modo leitura**: pelo deep link o `autoFocus` perde o
+foco na navegação e a tela não entra em edição. O caminho real (tocar em "Nova nota" na lista)
+não foi exercitado nesta passada.
 
 **A lição que fica:** o `console.warn` do `Icon` só grita quando alguém ABRE a tela. Os dois ícones
 quebrados estavam em produção de dev há semanas porque ninguém tinha aberto o detalhe do

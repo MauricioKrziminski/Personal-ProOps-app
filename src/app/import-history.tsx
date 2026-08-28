@@ -236,10 +236,14 @@ export default function ImportHistoryScreen() {
         />
       ) : null}
 
-      <ThemedText type="small" themeColor="textSecondary" style={styles.rodape}>
-        Os arquivos não ficam guardados — só os lançamentos que você confirmou. “Tentar de novo”
-        pede o arquivo outra vez.
-      </ThemedText>
+      {/* Só com histórico: sem nenhuma importação a nota ficava órfã 200px abaixo do empty
+          state, explicando o "Tentar de novo" de uma linha que não existe na tela. */}
+      {lista.length > 0 ? (
+        <ThemedText type="small" themeColor="textSecondary" style={styles.rodape}>
+          Os arquivos não ficam guardados — só os lançamentos que você confirmou. “Tentar de novo”
+          pede o arquivo outra vez.
+        </ThemedText>
+      ) : null}
     </Screen>
   );
 }
