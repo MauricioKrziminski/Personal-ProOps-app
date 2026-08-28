@@ -613,14 +613,35 @@ export function useRules() {
   });
 }
 
+/**
+ * Cria ou edita uma regra.
+ *
+ * `account_id` existe em `categorization_rules` desde a `0017` e ficava de fora do input: dava
+ * para criar a regra por SQL e não pela tela. Ele entra aqui como campo opcional — `null` é
+ * "vale em qualquer conta", e o update precisa mandá-lo explicitamente para conseguir LIMPAR o
+ * vínculo de uma regra que já tinha conta.
+ *
+ * `match_type` continua fixo em `contains` de propósito (`docs/design/regras.md` § Fora de
+ * escopo): regex mal escrita categoriza errado em massa e em silêncio, que é a dor que esta tela
+ * existe para curar.
+ */
 export function useSaveRule() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: async (input: { id?: string; pattern: string; category: string }) => {
+    mutationFn: async (input: {
+      id?: string;
+      pattern: string;
+      category: string;
+      accountId?: string | null;
+    }) => {
       if (input.id) {
         const { error } = await supabase
           .from('categorization_rules')
-          .update({ pattern: input.pattern, category: input.category })
+          .update({
+            pattern: input.pattern,
+            category: input.category,
+            account_id: input.accountId ?? null,
+          })
           .eq('id', input.id);
         if (error) throw error;
       } else {
@@ -629,6 +650,7 @@ export function useSaveRule() {
           match_type: 'contains',
           pattern: input.pattern,
           category: input.category,
+          account_id: input.accountId ?? null,
           source: 'user',
         });
         if (error) throw error;

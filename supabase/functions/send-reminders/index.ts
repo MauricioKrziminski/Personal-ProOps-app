@@ -34,6 +34,9 @@ async function sendExpoPush(token: string, title: string): Promise<void> {
       title: "⏰ Lembrete",
       body: title,
       sound: "default",
+      // `target` é chave de uma allowlist no app (src/lib/notifications.ts), não rota livre:
+      // payload externo não pode escolher para onde o app navega.
+      data: { target: "reminders" },
     }),
   });
   if (!res.ok) throw new Error(`Expo push falhou (${res.status})`);

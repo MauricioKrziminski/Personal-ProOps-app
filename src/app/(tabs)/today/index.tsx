@@ -3,7 +3,6 @@ import { Stack, router } from 'expo-router';
 import { Pressable, StyleSheet, View, useWindowDimensions } from 'react-native';
 import Animated, { FadeInDown } from 'react-native-reanimated';
 
-import { ErrorCard } from '@/components/error-card';
 import { GlassCard } from '@/components/glass/glass-card';
 import { ThemedText } from '@/components/themed-text';
 import { Button } from '@/components/ui/button';
@@ -64,7 +63,11 @@ export default function TodayScreen() {
   const recent = (ai.data ?? []).filter((e) => e.actions.length > 0);
 
   const loading = forecast.isLoading && bills.isLoading;
+  const anyError = forecast.isError || bills.isError || reminders.isError || budgets.isError;
+  // Empty e erro são coisas diferentes: "não tem nada" não pode aparecer quando na verdade
+  // é "não consegui carregar".
   const allEmpty =
+    !anyError &&
     !forecast.isLoading &&
     leftover === 0 &&
     overdue.length === 0 &&
@@ -126,7 +129,14 @@ export default function TodayScreen() {
 
       {/* O único GlassCard da tela: é a pergunta que mais gente tem ao abrir o app. */}
       {forecast.isError ? (
-        <ErrorCard onRetry={forecast.refetch} />
+        <Section title="Sobra do mês">
+          <Row
+            title="Não deu para calcular sua sobra"
+            subtitle="Toque para tentar de novo"
+            icon="exclamationmark.triangle"
+            onPress={() => forecast.refetch()}
+          />
+        </Section>
       ) : forecast.data ? (
         <Animated.View entering={FadeInDown.duration(Motion.duration.slow)}>
           <Pressable onPress={() => router.push('/finance/forecast')}>
@@ -145,7 +155,16 @@ export default function TodayScreen() {
       ) : null}
 
       {/* Vem em segundo porque é a única coisa da tela com consequência se ignorada. */}
-      {bills.isError ? <ErrorCard onRetry={bills.refetch} /> : null}
+      {bills.isError ? (
+        <Section title="O que vence">
+          <Row
+            title="Não deu para carregar o que vence"
+            subtitle="Toque para tentar de novo"
+            icon="exclamationmark.triangle"
+            onPress={() => bills.refetch()}
+          />
+        </Section>
+      ) : null}
       {overdue.length > 0 ? (
         <Section title="Atrasado">
           {overdue.map((b) => (
@@ -256,7 +275,8 @@ export default function TodayScreen() {
         />
       ) : null}
 
-      {!allEmpty && !loading && overdue.length === 0 && dueSoon.length === 0 ? (
+      {/* Só afirma "nada vence" quando a consulta REALMENTE respondeu — senão é palpite. */}
+      {!allEmpty && !loading && !bills.isError && bills.isSuccess && overdue.length === 0 && dueSoon.length === 0 ? (
         <ThemedText type="small" themeColor="textSecondary" style={styles.calm}>
           Nada vence hoje.
         </ThemedText>

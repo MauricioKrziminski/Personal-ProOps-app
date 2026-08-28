@@ -1,3 +1,4 @@
+import { useEffect } from 'react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { DarkTheme, DefaultTheme, Stack, ThemeProvider, router } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
@@ -9,8 +10,10 @@ import { ThemedText } from '@/components/themed-text';
 import { AndroidActionSheet } from '@/components/ui/action-sheet';
 import { ToastProvider } from '@/components/ui/toast';
 import { useSession } from '@/hooks/use-session';
+import { attachNotificationListeners, configureNotificationHandler } from '@/lib/notifications';
 
 SplashScreen.preventAutoHideAsync();
+configureNotificationHandler();
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -37,6 +40,10 @@ const modalOptions = {
 
 export default function RootLayout() {
   const colorScheme = useColorScheme();
+
+  // Tocar numa notificação precisa levar a algum lugar — inclusive em cold start.
+  useEffect(attachNotificationListeners, []);
+
   const { session, loading } = useSession();
 
   return (

@@ -280,7 +280,12 @@ export default function TransactionDetailScreen() {
                   markPaid.mutate(
                     { id: tx.id, paidAt: localISODate() },
                     {
-                      onSuccess: () => toast({ message: 'Dei baixa.', tone: 'success' }),
+                      // A baixa move `occurred_at` para hoje: se o lançamento era de outro mês,
+                      // ficar aqui mostraria "esse lançamento não existe mais" logo após dar certo.
+                      onSuccess: () => {
+                        router.back();
+                        toast({ message: 'Dei baixa.', tone: 'success' });
+                      },
                       onError: () =>
                         toast({ message: 'Não deu para dar baixa. Tenta de novo.', tone: 'error' }),
                     }

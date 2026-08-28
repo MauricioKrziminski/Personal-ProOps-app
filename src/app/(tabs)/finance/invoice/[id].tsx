@@ -59,6 +59,14 @@ function mesLabel(iso: string): string {
   return new Date(y, m - 1, 1).toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' });
 }
 
+/** Máscara `dd/mm/aaaa`: o number-pad não tem a tecla `/`, então ela entra sozinha. */
+function mascaraData(valor: string): string {
+  const d = valor.replace(/\D/g, '').slice(0, 8);
+  if (d.length <= 2) return d;
+  if (d.length <= 4) return `${d.slice(0, 2)}/${d.slice(2)}`;
+  return `${d.slice(0, 2)}/${d.slice(2, 4)}/${d.slice(4)}`;
+}
+
 /** `dd/mm/aaaa` → ISO, ou null se a data não existe no calendário. */
 function isoDeBR(valor: string): string | null {
   const m = /^(\d{2})\/(\d{2})\/(\d{4})$/.exec(valor);
@@ -167,9 +175,13 @@ export default function InvoiceScreen() {
   const pagadora = pagadoras.find((a) => a.id === payerId);
 
   const abrirPagamento = () => {
+    // o erro do pagamento é mostrado DENTRO do sheet (toast fica atrás do Modal nativo)
+    pay.reset();
     // pré-seleciona a conta cadastrada como pagadora do cartão — sem isso o usuário escolhe
-    // a mesma conta todo mês
-    setPayerId(cartao?.payment_account_id ?? null);
+    // a mesma conta todo mês. Só vale se ela ainda for uma pagadora válida (pode ter sido
+    // arquivada ou virado cartão), senão o banco recusaria e o usuário não saberia por quê.
+    const sugerida = pagadoras.find((a) => a.id === cartao?.payment_account_id);
+    setPayerId(sugerida?.id ?? null);
     setDataBR(formatDateBR(localISODate()));
     setPagando(true);
   };
@@ -261,6 +273,7 @@ export default function InvoiceScreen() {
 
       <FlatList
         data={dias}
+        style={styles.flex}
         keyExtractor={(g) => g.data}
         contentContainerStyle={[styles.lista, { paddingBottom: insets.bottom + Space.xxxl }]}
         contentInsetAdjustmentBehavior="automatic"
@@ -400,7 +413,7 @@ export default function InvoiceScreen() {
               hint="Pagou ontem e está registrando hoje? Corrija aqui.">
               <TextField
                 value={dataBR}
-                onChangeText={setDataBR}
+                onChangeText={(v) => setDataBR(mascaraData(v))}
                 placeholder="dd/mm/aaaa"
                 keyboardType="number-pad"
                 invalid={!dataISO}
@@ -422,6 +435,12 @@ export default function InvoiceScreen() {
               onPress={registrar}
             />
 
+            {pay.isError ? (
+              <ThemedText type="small" themeColor="danger" style={styles.centered}>
+                {mensagemDoErro(pay.error)}
+              </ThemedText>
+            ) : null}
+
             <ThemedText type="small" themeColor="textSecondary" style={styles.centered}>
               Entra como transferência — o gasto já contou na compra.
             </ThemedText>
@@ -433,6 +452,9 @@ export default function InvoiceScreen() {
 }
 
 const styles = StyleSheet.create({
+  flex: {
+    flex: 1,
+  },
   lista: {
     gap: Space.xl,
     paddingHorizontal: Space.lg,

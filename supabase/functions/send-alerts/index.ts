@@ -31,11 +31,30 @@ interface Alert {
   body: string;
 }
 
-async function sendExpoPush(token: string, title: string, body: string): Promise<void> {
+/** Cada alerta abre a tela que resolve o problema dele. Chave de allowlist, não rota livre. */
+function targetFor(kind: string): string {
+  if (kind.startsWith("budget")) return "budgets";
+  if (kind.startsWith("invoice") || kind.startsWith("card")) return "cards";
+  if (kind.startsWith("balance") || kind.startsWith("forecast")) return "forecast";
+  return "today";
+}
+
+async function sendExpoPush(
+  token: string,
+  title: string,
+  body: string,
+  kind: string,
+): Promise<void> {
   const res = await fetch("https://exp.host/--/api/v2/push/send", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ to: token, title, body, sound: "default" }),
+    body: JSON.stringify({
+      to: token,
+      title,
+      body,
+      sound: "default",
+      data: { target: targetFor(kind) },
+    }),
   });
   if (!res.ok) throw new Error(`Expo push falhou (${res.status})`);
 }
@@ -78,7 +97,7 @@ Deno.serve(async (_req) => {
 
     try {
       if (alerta.expo_push_token) {
-        await sendExpoPush(alerta.expo_push_token, alerta.title, alerta.body);
+        await sendExpoPush(alerta.expo_push_token, alerta.title, alerta.body, alerta.kind);
       } else if (alerta.phone) {
         // fora da janela de 24h texto livre não passa: template Utility
         await sendTemplate(alerta.phone, WHATSAPP_REMINDER_TEMPLATE, [

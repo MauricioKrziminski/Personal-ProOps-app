@@ -341,32 +341,6 @@ export default function NotesScreen() {
         onCancelButtonPress={() => setTyped('')}
       />
 
-      {/* A captura de dois segundos. Fica fixa: é o coração do produto, não vai atrás de FAB. */}
-      <View style={styles.quickAdd}>
-        <TextField
-          value={draft}
-          onChangeText={setDraft}
-          placeholder="Anotar rápido…"
-          returnKeyType="done"
-          submitBehavior="submit"
-          onSubmitEditing={submitDraft}
-          accessibilityLabel="Nova nota rápida"
-          style={styles.grow}
-        />
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel="Salvar nota"
-          accessibilityState={{ disabled: !draft.trim(), busy: save.isPending }}
-          disabled={!draft.trim() || save.isPending}
-          onPress={submitDraft}
-          style={({ pressed }) => [
-            styles.send,
-            { backgroundColor: theme.backgroundElement, opacity: !draft.trim() || pressed ? 0.5 : 1 },
-          ]}>
-          <Icon name="arrow.up" size="md" color="tint" weight="semibold" />
-        </Pressable>
-      </View>
-
       <FlashList
         data={notes}
         keyExtractor={(note) => note.id}
@@ -377,8 +351,35 @@ export default function NotesScreen() {
           <View style={[styles.separator, { backgroundColor: theme.separator }]} />
         )}
         ListHeaderComponent={
-          // Usuário novo não vê estrutura vazia.
-          hasChips ? (
+          <View>
+      {/* A captura de dois segundos. Fica fixa: é o coração do produto, não vai atrás de FAB. */}
+            <View style={styles.quickAdd}>
+              <TextField
+                value={draft}
+                onChangeText={setDraft}
+                placeholder="Anotar rápido…"
+                returnKeyType="done"
+                submitBehavior="submit"
+                onSubmitEditing={submitDraft}
+                accessibilityLabel="Nova nota rápida"
+                style={styles.grow}
+              />
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel="Salvar nota"
+                accessibilityState={{ disabled: !draft.trim(), busy: save.isPending }}
+                disabled={!draft.trim() || save.isPending}
+                onPress={submitDraft}
+                style={({ pressed }) => [
+                  styles.send,
+                  { backgroundColor: theme.backgroundElement, opacity: !draft.trim() || pressed ? 0.5 : 1 },
+                ]}>
+                <Icon name="arrow.up" size="md" color="tint" weight="semibold" />
+              </Pressable>
+            </View>
+
+            {/* Usuário novo não vê estrutura vazia. */}
+            {hasChips ? (
             <View style={styles.filters}>
               {folders.length > 0 ? (
                 <ScrollView
@@ -414,7 +415,8 @@ export default function NotesScreen() {
                 </ScrollView>
               ) : null}
             </View>
-          ) : null
+            ) : null}
+          </View>
         }
         ListEmptyComponent={empty}
         ListFooterComponent={list.isFetchingNextPage ? <NoteSkeleton /> : null}

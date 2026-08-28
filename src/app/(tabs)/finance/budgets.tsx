@@ -1,352 +1,625 @@
 import { useState } from 'react';
-import { Alert, Pressable, ScrollView, StyleSheet, View } from 'react-native';
-import Animated, { FadeInDown } from 'react-native-reanimated';
-import { SafeAreaView } from 'react-native-safe-area-context';
-import * as Haptics from 'expo-haptics';
+import { Modal, Pressable, ScrollView, StyleSheet, Switch, View } from 'react-native';
+import Animated, { FadeInDown, LinearTransition } from 'react-native-reanimated';
+import { Stack, router } from 'expo-router';
+import { useQuery } from '@tanstack/react-query';
 
-import { ErrorCard, LoadingCard } from '@/components/error-card';
 import { Chip } from '@/components/finance/chip';
-import { MoneyInput } from '@/components/finance/money-input';
+import { MonthPicker, currentMonth } from '@/components/finance/month-picker';
 import { GlassCard } from '@/components/glass/glass-card';
 import { ThemedText } from '@/components/themed-text';
-import { ThemedView } from '@/components/themed-view';
-import { MaxContentWidth, Spacing } from '@/constants/theme';
-import { formatBRL, localISODate } from '@/hooks/use-items';
+import { Button } from '@/components/ui/button';
+import { Card } from '@/components/ui/card';
+import { EmptyState } from '@/components/ui/empty-state';
+import { Field, MoneyField } from '@/components/ui/field';
+import { Icon } from '@/components/ui/icon';
+import { Money } from '@/components/ui/money';
+import { Screen } from '@/components/ui/screen';
+import { Segmented } from '@/components/ui/segmented';
+import { Skeleton, SkeletonRow } from '@/components/ui/skeleton';
+import { ProgressBar } from '@/components/ui/sparkline';
+import { useToast } from '@/components/ui/toast';
+import { Motion, Radius, Space, tabular } from '@/design/tokens';
 import {
   INCOME_CATEGORIES,
   SUGGESTED_CATEGORIES,
-  useBudgets,
   useBudgetsStatus,
   useDeleteBudget,
   useSaveBudget,
+  useTransactionsSummary,
+  type BudgetStatus,
 } from '@/hooks/use-finance';
+import { useRealtimeInvalidate } from '@/hooks/use-items';
 import { useTheme } from '@/hooks/use-theme';
+import { formatBRL, monthBounds } from '@/lib/dates';
+import { showItemActions, type ItemAction } from '@/lib/item-actions';
+import { supabase } from '@/lib/supabase';
 
-/** 'YYYY-MM' + n meses. */
-function shiftMonth(month: string, delta: number): string {
-  const [y, m] = month.split('-').map(Number);
-  const d = new Date(y, m - 1 + delta, 1);
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+/**
+ * Orçamentos — "quanto ainda posso gastar em cada categoria este mês?".
+ *
+ * A resposta é o que SOBRA do limite, não o que já foi gasto (isso é a aba Financeiro). Por isso
+ * o destaque é a sobra do mês e a primeira seção é a das categorias que já apertam.
+ *
+ * Três decisões que valem comentário:
+ * - **Salvar é sempre a RPC `save_budget`.** Os dois unique de `budgets` são parciais
+ *   (`month is null` / `month is not null`), e o PostgREST não manda o predicado no `ON CONFLICT`:
+ *   todo `.upsert()` morre com `42P10`.
+ * - **Remover distingue "só este mês" do "padrão"** (ver `useBudgetRows` abaixo).
+ * - **O form é um `Modal` `pageSheet` da própria tela**, não uma rota nova: criar rota exigiria
+ *   mexer no `_layout` da pilha, fora do escopo desta entrega.
+ */
+
+interface BudgetRow {
+  id: string;
+  category: string;
+  limit_cents: number;
+  /** `YYYY-MM-01` quando a linha sobrescreve um mês; `null` no limite padrão. */
+  month: string | null;
 }
 
-function monthLabel(month: string): string {
+/**
+ * `useBudgets()` (`use-finance.ts`) seleciona só `id, category, limit_cents` — sem `month` não dá
+ * para saber qual linha é o limite padrão e qual é o override do mês, e a tela apagava "a primeira
+ * com aquela categoria". Enquanto a coluna não entra no select do hook, a consulta mora aqui.
+ *
+ * A `queryKey` começa em `['budgets']` de propósito: o invalidate das mutations de finanças casa
+ * por prefixo, então salvar/remover continua atualizando esta lista sem nenhum fio extra.
+ */
+function useBudgetRows() {
+  useRealtimeInvalidate('budgets', ['budgets']);
+  return useQuery({
+    queryKey: ['budgets', 'with-month'],
+    queryFn: async (): Promise<BudgetRow[]> => {
+      const { data, error } = await supabase
+        .from('budgets')
+        .select('id, category, limit_cents, month')
+        .order('category');
+      if (error) throw error;
+      return data as BudgetRow[];
+    },
+  });
+}
+
+interface FormState {
+  category: string | null;
+  limitCents: number;
+  scope: 'default' | 'month';
+  rollover: boolean;
+  /** Em edição a categoria é a identidade do orçamento: fixa, não editável. */
+  editing: boolean;
+}
+
+const CATEGORIAS_DESPESA = SUGGESTED_CATEGORIES.filter(
+  (c) => !(INCOME_CATEGORIES as readonly string[]).includes(c)
+);
+
+/** `2026-08` → `agosto` (para o rótulo da ação de remover e das legendas). */
+function nomeDoMes(month: string): string {
   const [y, m] = month.split('-').map(Number);
-  return new Date(y, m - 1, 1).toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' });
+  return new Date(y, m - 1, 1).toLocaleDateString('pt-BR', { month: 'long' });
+}
+
+/** Faixa de erro por seção. Seção que falha DIZ que falhou — nunca some. */
+function ErrorBand({ message, onRetry }: { message: string; onRetry: () => void }) {
+  return (
+    <Card style={styles.band}>
+      <Icon name="exclamationmark.triangle.fill" size="lg" color="danger" />
+      <ThemedText type="small" style={styles.bandText}>
+        {message}
+      </ThemedText>
+      <Button label="Tentar de novo" variant="secondary" size="sm" onPress={onRetry} />
+    </Card>
+  );
 }
 
 export default function BudgetsScreen() {
   const theme = useTheme();
-  const [month, setMonth] = useState(() => localISODate().slice(0, 7));
-  const [rollover, setRollover] = useState(false);
-  // limite só deste mês vs limite padrão que vale para todos
-  const [soEsteMes, setSoEsteMes] = useState(false);
-  const { data: status, isLoading, isError, refetch } = useBudgetsStatus(month);
-  const { data: budgets } = useBudgets();
+  const toast = useToast();
+  const [month, setMonth] = useState(currentMonth);
+  const [form, setForm] = useState<FormState | null>(null);
+  const [noControleAberto, setNoControleAberto] = useState(true);
+
+  const status = useBudgetsStatus(month);
+  const rows = useBudgetRows();
+  const { from, to } = monthBounds(month);
+  const resumo = useTransactionsSummary(from, to);
   const save = useSaveBudget();
   const remove = useDeleteBudget();
-  const [creating, setCreating] = useState(false);
-  const [editing, setEditing] = useState<string | null>(null);
-  const [category, setCategory] = useState<string | null>(null);
-  const [limitCents, setLimitCents] = useState(0);
 
-  const showForm = creating || editing !== null;
+  const linhas = status.data ?? [];
+  const limite = linhas.reduce((s, b) => s + Number(b.limit_cents), 0);
+  const gasto = linhas.reduce((s, b) => s + Number(b.spent_cents), 0);
+  const noLimite = linhas.filter((b) => Number(b.spent_cents) <= Number(b.limit_cents)).length;
 
-  const closeForm = () => {
-    setCreating(false);
-    setEditing(null);
-    setCategory(null);
-    setLimitCents(0);
-    setRollover(false);
-    setSoEsteMes(false);
-  };
+  const pctDe = (b: BudgetStatus) =>
+    Number(b.limit_cents) > 0 ? Number(b.spent_cents) / Number(b.limit_cents) : 0;
 
-  /** Editar é o mesmo upsert: a identidade do orçamento é (workspace_id, category). */
-  const startEdit = (cat: string, limit: number) => {
-    Haptics.selectionAsync();
-    const atual = (status ?? []).find((b) => b.category === cat);
-    setCreating(false);
-    setEditing(cat);
-    setCategory(cat);
-    // edita o limite BASE, não o efetivo (que já inclui o rollover)
-    setLimitCents(Number(atual?.base_limit_cents ?? limit));
-    setRollover(Boolean(atual?.rollover));
-    setSoEsteMes(Boolean(atual?.month));
-  };
+  const apertando = linhas.filter((b) => pctDe(b) >= 0.8).sort((a, b) => pctDe(b) - pctDe(a));
+  const tranquilas = linhas.filter((b) => pctDe(b) < 0.8);
 
-  const onSubmit = () => {
-    if (!category || limitCents <= 0) return;
-    save.mutate(
-      { category, limit_cents: limitCents, rollover, month: soEsteMes ? month : null },
-      {
-        onSuccess: () => {
-          Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-          closeForm();
-        },
+  // Categorias com gasto no mês e sem limite nenhum: a conversão mais natural da tela.
+  const semLimite = (resumo.data ?? [])
+    .filter((r) => r.kind === 'expense' && !linhas.some((b) => b.category === r.category))
+    .sort((a, b) => Number(b.total_cents) - Number(a.total_cents));
+
+  const mesFuturo = month > currentMonth();
+
+  const abrirNovo = (categoria?: string) =>
+    setForm({
+      category: categoria ?? null,
+      limitCents: 0,
+      scope: mesFuturo ? 'month' : 'default',
+      rollover: false,
+      editing: false,
+    });
+
+  const abrirEdicao = (b: BudgetStatus) =>
+    setForm({
+      category: b.category,
+      // o limite BASE, nunca o efetivo — este já vem com o rollover somado
+      limitCents: Number(b.base_limit_cents),
+      scope: b.month ? 'month' : 'default',
+      rollover: Boolean(b.rollover),
+      editing: true,
+    });
+
+  const verLancamentos = (category: string) =>
+    router.push({ pathname: '/finance/transactions', params: { month, category } });
+
+  const salvar = () => {
+    if (!form?.category || form.limitCents <= 0) return;
+    const entrada = {
+      category: form.category,
+      limit_cents: form.limitCents,
+      rollover: form.rollover,
+      month: form.scope === 'month' ? month : null,
+    };
+    save.mutate(entrada, {
+      onSuccess: () => {
+        toast({ message: `Limite de ${entrada.category} salvo.`, tone: 'success' });
+        setForm(null);
       },
+      // o banco explica o motivo (limite ≤ 0, categoria vazia, sem workspace); esconder isso
+      // atrás de "não deu para salvar" é jogar fora a única informação útil
+      onError: (erro: Error) =>
+        toast({ message: `Não deu para salvar. ${erro.message}`, tone: 'error' }),
+    });
+  };
+
+  const remover = (row: BudgetRow, rotulo: string) =>
+    remove.mutate(row.id, {
+      onSuccess: () =>
+        toast({
+          message: `${rotulo} removido.`,
+          tone: 'success',
+          action: {
+            label: 'Desfazer',
+            onPress: () =>
+              save.mutate({
+                category: row.category,
+                limit_cents: row.limit_cents,
+                month: row.month ? row.month.slice(0, 7) : null,
+              }),
+          },
+        }),
+      onError: () => toast({ message: 'Não deu para remover o limite.', tone: 'error' }),
+    });
+
+  const acoes = (b: BudgetStatus) => {
+    const daCategoria = (rows.data ?? []).filter((r) => r.category === b.category);
+    const doMes = daCategoria.find((r) => r.month === `${month}-01`);
+    const padrao = daCategoria.find((r) => r.month === null);
+
+    const acoesDaLinha: ItemAction[] = [
+      { label: 'Editar limite', onPress: () => abrirEdicao(b) },
+      { label: 'Ver lançamentos', onPress: () => verLancamentos(b.category) },
+    ];
+
+    // Sem a lista de linhas não dá para saber o que se está apagando: melhor não oferecer.
+    if (rows.isError || rows.isLoading) {
+      acoesDaLinha.push({ label: 'Recarregue para poder remover', onPress: () => rows.refetch() });
+    } else {
+      if (doMes) {
+        acoesDaLinha.push({
+          label: `Remover só o limite de ${nomeDoMes(month)}`,
+          destructive: true,
+          onPress: () => remover(doMes, `Limite de ${nomeDoMes(month)}`),
+        });
+      }
+      if (padrao) {
+        acoesDaLinha.push({
+          label: 'Remover o limite padrão',
+          destructive: true,
+          onPress: () => remover(padrao, 'Limite padrão'),
+        });
+      }
+    }
+
+    showItemActions(b.category, acoesDaLinha);
+  };
+
+  const linhaOrcamento = (b: BudgetStatus, index: number) => {
+    const gastoCents = Number(b.spent_cents);
+    const limiteCents = Number(b.limit_cents);
+    const pct = pctDe(b);
+    const estourou = gastoCents > limiteCents;
+    const tom = estourou ? 'danger' : pct >= 0.8 ? 'warning' : 'success';
+    const sobra = limiteCents - gastoCents;
+
+    return (
+      <Animated.View
+        key={b.category}
+        layout={LinearTransition.duration(Motion.duration.base)}
+        entering={FadeInDown.duration(Motion.duration.slow).delay(
+          Math.min(index * Motion.stagger.step, Motion.stagger.cap)
+        )}>
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel={`${b.category}, gastou ${formatBRL(gastoCents)} de ${formatBRL(limiteCents)}, ${Math.round(pct * 100)} por cento${estourou ? ', estourou' : ''}`}
+          onPress={() => verLancamentos(b.category)}
+          onLongPress={() => acoes(b)}>
+          <Card style={styles.linha}>
+            <View style={styles.linhaTopo}>
+              <View style={styles.linhaTitulo}>
+                {estourou ? (
+                  <Icon name="exclamationmark.triangle" size="sm" color="danger" />
+                ) : null}
+                <ThemedText type="default" numberOfLines={1}>
+                  {b.category}
+                </ThemedText>
+              </View>
+              <ThemedText type="smallBold" themeColor={tom} style={tabular}>
+                {Math.round(pct * 100)}%
+              </ThemedText>
+            </View>
+
+            <ProgressBar value={gastoCents} max={limiteCents} tone={tom} />
+
+            <View style={styles.valores}>
+              <Money cents={gastoCents} variant="subhead" tone="textSecondary" />
+              <ThemedText type="small" themeColor="textSecondary">
+                de
+              </ThemedText>
+              <Money cents={limiteCents} variant="subhead" tone="textSecondary" />
+              <ThemedText type="small" themeColor="textSecondary">
+                ·
+              </ThemedText>
+              <ThemedText type="small" themeColor={estourou ? 'danger' : 'textSecondary'}>
+                {estourou ? 'estourou em' : 'faltam'}
+              </ThemedText>
+              <Money
+                cents={Math.abs(sobra)}
+                variant="subhead"
+                tone={estourou ? 'danger' : 'textSecondary'}
+              />
+            </View>
+
+            {/* De onde o limite vem — sem isso o número parece arbitrário. */}
+            {Number(b.rollover_cents) > 0 || b.month ? (
+              <View style={styles.origem}>
+                {Number(b.rollover_cents) > 0 ? (
+                  <>
+                    <Money cents={Number(b.base_limit_cents)} variant="footnote" tone="textSecondary" />
+                    <ThemedText type="small" themeColor="textSecondary">
+                      +
+                    </ThemedText>
+                    <Money cents={Number(b.rollover_cents)} variant="footnote" tone="textSecondary" />
+                    <ThemedText type="small" themeColor="textSecondary">
+                      que sobrou
+                    </ThemedText>
+                  </>
+                ) : null}
+                {b.month ? (
+                  <ThemedText type="small" themeColor="textSecondary">
+                    só este mês
+                  </ThemedText>
+                ) : null}
+              </View>
+            ) : null}
+          </Card>
+        </Pressable>
+      </Animated.View>
     );
   };
 
-  const confirmDelete = (cat: string) => {
-    const budget = (budgets ?? []).find((b) => b.category === cat);
-    if (!budget) return;
-    Alert.alert('Remover orçamento', `Remover o limite de "${cat}"?`, [
-      { text: 'Cancelar', style: 'cancel' },
-      {
-        text: 'Remover',
-        style: 'destructive',
-        onPress: () => {
-          Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
-          remove.mutate(budget.id);
-        },
-      },
-    ]);
-  };
-
   return (
-    <ThemedView style={styles.container}>
-      <SafeAreaView style={styles.safeArea}>
-        <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
+    <Screen
+      grouped
+      onRefresh={() => {
+        status.refetch();
+        rows.refetch();
+        resumo.refetch();
+      }}
+      refreshing={status.isRefetching}>
+      <Stack.Screen
+        options={{
+          title: 'Orçamentos',
+          headerLargeTitle: true,
+          headerRight: () => (
+            <Pressable accessibilityLabel="Novo orçamento" hitSlop={12} onPress={() => abrirNovo()}>
+              <Icon name="plus.circle.fill" size="lg" color="tint" />
+            </Pressable>
+          ),
+        }}
+      />
 
-          <View style={styles.monthRow}>
-            <Pressable
-              hitSlop={12}
-              onPress={() => {
-                Haptics.selectionAsync();
-                setMonth((m) => shiftMonth(m, -1));
-              }}
-              style={[styles.monthArrow, { backgroundColor: theme.backgroundElement }]}>
-              <ThemedText type="smallBold">‹</ThemedText>
-            </Pressable>
-            <ThemedText type="smallBold" style={styles.monthLabel}>
-              {monthLabel(month)}
+      <MonthPicker month={month} onChange={setMonth} />
+
+      {status.isLoading ? (
+        <>
+          <Skeleton height={120} radius={Radius.lg} />
+          <SkeletonRow />
+          <SkeletonRow />
+          <SkeletonRow />
+        </>
+      ) : null}
+
+      {/* O único GlassCard da tela: é o número que decide o comportamento de hoje à noite. */}
+      {status.isError ? (
+        <ErrorBand message="Não deu para carregar os orçamentos." onRetry={status.refetch} />
+      ) : linhas.length > 0 ? (
+        <Animated.View entering={FadeInDown.duration(Motion.duration.slow)}>
+          <GlassCard style={styles.hero}>
+            <ThemedText type="small" themeColor="textSecondary">
+              Sobrou do mês
             </ThemedText>
-            <Pressable
-              hitSlop={12}
-              onPress={() => {
-                Haptics.selectionAsync();
-                setMonth((m) => shiftMonth(m, 1));
-              }}
-              style={[styles.monthArrow, { backgroundColor: theme.backgroundElement }]}>
-              <ThemedText type="smallBold">›</ThemedText>
-            </Pressable>
+            <Money
+              cents={limite - gasto}
+              variant="money"
+              tone={limite - gasto < 0 ? 'danger' : 'text'}
+            />
+            <ThemedText type="small" themeColor="textSecondary" style={tabular}>
+              {noLimite} de {linhas.length}{' '}
+              {linhas.length === 1 ? 'categoria no limite' : 'categorias no limite'}
+            </ThemedText>
+          </GlassCard>
+        </Animated.View>
+      ) : null}
+
+      {apertando.length > 0 ? (
+        <View style={styles.secao}>
+          <ThemedText type="small" themeColor="textSecondary" style={styles.secaoTitulo}>
+            PASSANDO DO LIMITE
+          </ThemedText>
+          {apertando.map(linhaOrcamento)}
+        </View>
+      ) : null}
+
+      {tranquilas.length > 0 ? (
+        <View style={styles.secao}>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityState={{ expanded: noControleAberto }}
+            accessibilityLabel={`No controle, ${tranquilas.length} categorias`}
+            onPress={() => setNoControleAberto((v) => !v)}
+            style={styles.secaoCabecalho}>
+            <ThemedText type="small" themeColor="textSecondary" style={styles.secaoTitulo}>
+              NO CONTROLE
+            </ThemedText>
+            <Icon
+              name={noControleAberto ? 'chevron.up' : 'chevron.down'}
+              size="sm"
+              color="textSecondary"
+            />
+          </Pressable>
+          {noControleAberto ? tranquilas.map(linhaOrcamento) : null}
+        </View>
+      ) : null}
+
+      {resumo.isError ? (
+        <ErrorBand
+          message="Não deu para ver em que você gastou sem limite."
+          onRetry={resumo.refetch}
+        />
+      ) : semLimite.length > 0 ? (
+        <View style={styles.secao}>
+          <ThemedText type="small" themeColor="textSecondary" style={styles.secaoTitulo}>
+            SEM LIMITE DEFINIDO
+          </ThemedText>
+          {semLimite.slice(0, 5).map((r) => (
+            <Card key={r.category} style={styles.linha}>
+              <View style={styles.linhaTopo}>
+                <ThemedText type="default" numberOfLines={1}>
+                  {r.category}
+                </ThemedText>
+                <Money cents={Number(r.total_cents)} variant="headline" tone="textSecondary" />
+              </View>
+              <Button
+                label="Definir limite"
+                variant="secondary"
+                size="sm"
+                onPress={() => abrirNovo(r.category)}
+              />
+            </Card>
+          ))}
+        </View>
+      ) : null}
+
+      {!status.isLoading && !status.isError && linhas.length === 0 ? (
+        <EmptyState
+          icon="chart.bar.doc.horizontal"
+          title={
+            mesFuturo
+              ? `${nomeDoMes(month)} ainda usa seus limites padrão`
+              : 'Você ainda não tem limite nenhum'
+          }
+          hint={
+            mesFuturo
+              ? 'Toque em + para sobrescrever só este mês.'
+              : 'Comece pelo que mais aperta: mercado. Toque em + e defina quanto quer gastar por mês.'
+          }
+          action={{
+            label: 'Definir limite',
+            onPress: () => abrirNovo(semLimite[0]?.category),
+          }}
+        />
+      ) : null}
+
+      <Modal
+        visible={form !== null}
+        animationType="slide"
+        presentationStyle="pageSheet"
+        onRequestClose={() => setForm(null)}>
+        <View style={[styles.sheet, { backgroundColor: theme.groupedBackground }]}>
+          <View style={styles.sheetHead}>
+            <Button label="Cancelar" variant="ghost" size="sm" onPress={() => setForm(null)} />
+            <ThemedText type="smallBold">
+              {form?.editing ? 'Editar limite' : 'Novo orçamento'}
+            </ThemedText>
+            <Button
+              label="Salvar"
+              size="sm"
+              loading={save.isPending}
+              disabled={!form?.category || (form?.limitCents ?? 0) <= 0}
+              onPress={salvar}
+            />
           </View>
 
-          {isError && <ErrorCard onRetry={refetch} />}
-          {isLoading && !isError && <LoadingCard />}
-
-          {(status ?? []).map((item, index) => {
-            const pct = Math.round((item.spent_cents / item.limit_cents) * 100);
-            const color = pct >= 100 ? theme.danger : pct >= 80 ? theme.warning : theme.success;
-            return (
-              <Animated.View
-                key={item.category}
-                entering={FadeInDown.duration(400).delay(Math.min(index * 60, 400))}>
-                <Pressable
-                  onLongPress={() => confirmDelete(item.category)}
-                  onPress={() => startEdit(item.category, Number(item.limit_cents))}>
-                  <GlassCard style={styles.budgetCard}>
-                    <View style={styles.budgetHeader}>
-                      <ThemedText type="smallBold">{item.category}</ThemedText>
-                      <ThemedText type="small" style={{ color }}>
-                        {pct}%
-                      </ThemedText>
-                    </View>
-                    <View style={[styles.track, { backgroundColor: theme.backgroundElement }]}>
-                      <View
-                        style={[
-                          styles.fill,
-                          { backgroundColor: color, width: `${Math.min(Math.max(pct, 3), 100)}%` },
-                        ]}
+          {form ? (
+            <ScrollView contentContainerStyle={styles.sheetBody} keyboardShouldPersistTaps="handled">
+              <Field
+                label="Categoria"
+                hint={
+                  form.editing ? 'A categoria é a identidade do orçamento e não muda.' : undefined
+                }>
+                {form.editing ? (
+                  <ThemedText type="default">{form.category}</ThemedText>
+                ) : (
+                  <View style={styles.chips}>
+                    {CATEGORIAS_DESPESA.map((c) => (
+                      <Chip
+                        key={c}
+                        label={c}
+                        selected={form.category === c}
+                        onPress={() => setForm({ ...form, category: form.category === c ? null : c })}
                       />
-                    </View>
-                    <ThemedText type="small" themeColor="textSecondary">
-                      {formatBRL(item.spent_cents)} de {formatBRL(item.limit_cents)}
-                      {Number(item.rollover_cents) > 0
-                        ? ` (${formatBRL(Number(item.base_limit_cents))} + ${formatBRL(Number(item.rollover_cents))} que sobrou)`
-                        : ''}
-                      {item.month ? ' · só este mês' : ''}
-                    </ThemedText>
-                  </GlassCard>
-                </Pressable>
-              </Animated.View>
-            );
-          })}
+                    ))}
+                  </View>
+                )}
+              </Field>
 
-          {!isLoading && !isError && (status ?? []).length === 0 && (
-            <GlassCard style={styles.empty}>
-              <ThemedText style={styles.emptyEmoji}>📉</ThemedText>
-              <ThemedText type="smallBold">Nenhum orçamento definido</ThemedText>
-              <ThemedText type="small" themeColor="textSecondary" style={styles.emptyHint}>
-                Defina um limite mensal por categoria{'\n'}e acompanhe quanto já foi.
-              </ThemedText>
-            </GlassCard>
-          )}
+              <Field label="Limite">
+                <MoneyField
+                  valueCents={form.limitCents}
+                  onChangeCents={(limitCents) => setForm({ ...form, limitCents })}
+                />
+              </Field>
 
-          {showForm ? (
-            <GlassCard style={styles.form}>
-              <ThemedText type="smallBold">
-                {editing ? `Editando limite de “${editing}”` : 'Novo orçamento'}
-              </ThemedText>
-              <ThemedText type="smallBold">Categoria</ThemedText>
-              <View style={styles.chipRow}>
-                {SUGGESTED_CATEGORIES.filter((c) => !INCOME_CATEGORIES.includes(c)).map((cat) => (
-                  <Chip
-                    key={cat}
-                    label={cat}
-                    selected={category === cat}
-                    onPress={() => setCategory(category === cat ? null : cat)}
+              <Field
+                label="Escopo"
+                hint={`Só este mês sobrescreve o limite padrão em ${nomeDoMes(month)} e não mexe nos outros.`}>
+                <Segmented
+                  options={[
+                    { value: 'default', label: 'Todo mês' },
+                    { value: 'month', label: 'Só este mês' },
+                  ]}
+                  value={form.scope}
+                  onChange={(scope) => setForm({ ...form, scope })}
+                />
+              </Field>
+
+              <Field
+                label="Acumular sobra"
+                hint={
+                  form.rollover
+                    ? 'O que sobrar de um mês soma no limite do mês seguinte. Um mês só — a sobra não empilha. E vale a partir do primeiro mês inteiro depois de você criar o orçamento.'
+                    : 'Sem acúmulo: cada mês começa do zero.'
+                }>
+                <View style={styles.switchRow}>
+                  <ThemedText type="small" themeColor="textSecondary">
+                    Somar a sobra do mês anterior
+                  </ThemedText>
+                  <Switch
+                    accessibilityLabel="Acumular a sobra do mês anterior"
+                    value={form.rollover}
+                    onValueChange={(rollover) => setForm({ ...form, rollover })}
                   />
-                ))}
-              </View>
-              <ThemedText type="smallBold">Limite mensal</ThemedText>
-              <MoneyInput valueCents={limitCents} onChangeCents={setLimitCents} />
-              <View style={styles.chipRow}>
-                <Chip
-                  label="↩︎ Acumula sobra"
-                  selected={rollover}
-                  onPress={() => setRollover((v) => !v)}
-                />
-                <Chip
-                  label="📅 Só este mês"
-                  selected={soEsteMes}
-                  onPress={() => setSoEsteMes((v) => !v)}
-                />
-              </View>
-              <ThemedText type="small" themeColor="textSecondary">
-                {rollover
-                  ? 'O que sobrar do mês anterior soma neste limite.'
-                  : 'Sem acúmulo: cada mês começa do zero.'}
-              </ThemedText>
-              <Pressable
-                onPress={onSubmit}
-                disabled={save.isPending || !category || limitCents <= 0}
-                style={({ pressed }) => [
-                  styles.submit,
-                  {
-                    backgroundColor: theme.tint,
-                    opacity: pressed || save.isPending || !category || limitCents <= 0 ? 0.6 : 1,
-                  },
-                ]}>
-                <ThemedText type="smallBold" style={styles.buttonLabel}>
-                  {save.isPending ? 'Salvando…' : 'Salvar orçamento'}
-                </ThemedText>
-              </Pressable>
-              <Pressable onPress={closeForm} hitSlop={8} style={styles.cancel}>
-                <ThemedText type="small" themeColor="textSecondary">
-                  Cancelar
-                </ThemedText>
-              </Pressable>
-              {save.isError && (
-                <ThemedText type="small" themeColor="danger" style={styles.centered}>
-                  Não deu para salvar. Tenta de novo.
-                </ThemedText>
-              )}
-            </GlassCard>
-          ) : (
-            <Pressable
-              onPress={() => {
-                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                setCreating(true);
-              }}
-              style={({ pressed }) => [
-                styles.submit,
-                { backgroundColor: theme.tint, opacity: pressed ? 0.85 : 1 },
-              ]}>
-              <ThemedText type="smallBold" style={styles.buttonLabel}>
-                ＋ Novo orçamento
-              </ThemedText>
-            </Pressable>
-          )}
-
-          <ThemedText type="small" themeColor="textSecondary" style={styles.centered}>
-            Toque num orçamento para mudar o limite. Segure para remover.
-          </ThemedText>
-        </ScrollView>
-      </SafeAreaView>
-    </ThemedView>
+                </View>
+              </Field>
+            </ScrollView>
+          ) : null}
+        </View>
+      </Modal>
+    </Screen>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    flexDirection: 'row',
-    justifyContent: 'center',
+  hero: {
+    gap: Space.sm,
   },
-  safeArea: {
-    flex: 1,
-    maxWidth: MaxContentWidth,
-    paddingHorizontal: Spacing.four,
-    width: '100%',
+  secao: {
+    gap: Space.sm,
   },
-  scroll: {
-    gap: Spacing.three,
-    paddingBottom: Spacing.six,
-  },
-  monthRow: {
+  secaoCabecalho: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    gap: Spacing.three,
+    paddingRight: Space.lg,
   },
-  monthArrow: {
-    borderRadius: Spacing.two,
-    paddingHorizontal: Spacing.three,
-    paddingVertical: Spacing.one,
+  secaoTitulo: {
+    paddingHorizontal: Space.lg,
+    letterSpacing: 0.5,
   },
-  monthLabel: {
-    flex: 1,
-    textAlign: 'center',
-    textTransform: 'capitalize',
+  linha: {
+    gap: Space.sm,
   },
-  budgetCard: {
-    gap: Spacing.one,
-  },
-  budgetHeader: {
+  linhaTopo: {
     flexDirection: 'row',
+    alignItems: 'center',
     justifyContent: 'space-between',
+    gap: Space.sm,
   },
-  track: {
-    height: 10,
-    borderRadius: 5,
-    overflow: 'hidden',
+  linhaTitulo: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Space.xs,
+    flexShrink: 1,
   },
-  fill: {
-    height: '100%',
-    borderRadius: 5,
+  valores: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flexWrap: 'wrap',
+    gap: Space.xs,
   },
-  chipRow: {
+  origem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flexWrap: 'wrap',
+    gap: Space.xs,
+  },
+  band: {
+    alignItems: 'center',
+    gap: Space.sm,
+  },
+  bandText: {
+    textAlign: 'center',
+  },
+  sheet: {
+    flex: 1,
+  },
+  sheetHead: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: Space.lg,
+    paddingVertical: Space.md,
+  },
+  sheetBody: {
+    gap: Space.xl,
+    padding: Space.lg,
+    paddingBottom: Space.xxxl,
+  },
+  chips: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: Spacing.two,
+    gap: Space.sm,
   },
-  form: {
-    gap: Spacing.three,
-  },
-  submit: {
-    borderRadius: Spacing.three,
-    paddingVertical: Spacing.three,
+  switchRow: {
+    flexDirection: 'row',
     alignItems: 'center',
-  },
-  buttonLabel: {
-    color: '#fff',
-  },
-  empty: {
-    alignItems: 'center',
-    gap: Spacing.two,
-    paddingVertical: Spacing.five,
-  },
-  emptyEmoji: {
-    fontSize: 40,
-  },
-  emptyHint: {
-    textAlign: 'center',
-  },
-  centered: {
-    textAlign: 'center',
-  },
-  cancel: {
-    alignItems: 'center',
-    paddingVertical: Spacing.one,
+    justifyContent: 'space-between',
+    gap: Space.md,
   },
 });

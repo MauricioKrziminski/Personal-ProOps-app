@@ -162,11 +162,22 @@ export default function AccountsScreen() {
     (a) => a.type !== 'credit_card' && a.id !== form?.id
   );
 
-  const semNadaCadastrado = !accounts.isLoading && (accounts.data ?? []).length === 0;
+  // erro de contas NÃO é lista vazia: sem esta guarda a tela mandava cadastrar conta para quem
+  // já tem cinco cadastradas e só perdeu a rede
+  const semNadaCadastrado =
+    !accounts.isLoading && !accounts.isError && (accounts.data ?? []).length === 0;
   const soTemSemConta = semNadaCadastrado && Number(semConta?.balance_cents ?? 0) !== 0;
+  /** Nada cadastrado E nada lançado: aí nem o card de destaque tem o que dizer. */
+  const semDadoNenhum = semNadaCadastrado && !soTemSemConta;
 
-  const abrirNova = () => setForm({ ...FORM_VAZIO });
-  const abrirEdicao = (a: Account) =>
+  // o erro fica DENTRO do sheet (toast aparece atrás de um Modal nativo); sem o reset, o erro
+  // da tentativa anterior receberia o usuário na próxima abertura
+  const abrirNova = () => {
+    save.reset();
+    setForm({ ...FORM_VAZIO });
+  };
+  const abrirEdicao = (a: Account) => {
+    save.reset();
     setForm({
       id: a.id,
       name: a.name,
@@ -177,6 +188,7 @@ export default function AccountsScreen() {
       limitCents: a.credit_limit_cents ?? 0,
       payerId: a.payment_account_id,
     });
+  };
 
   const ehCartao = form?.type === 'credit_card';
   const nomeOk = (form?.name.trim().length ?? 0) >= 1;
@@ -189,7 +201,7 @@ export default function AccountsScreen() {
         id: form.id,
         name: form.name.trim(),
         type: form.type,
-        initial_balance_cents: form.type === 'credit_card' ? 0 : form.initialCents,
+        initial_balance_cents: form.initialCents,
         closing_day: ehCartao ? Number(form.closingDay) : null,
         due_day: ehCartao ? Number(form.dueDay) : null,
         credit_limit_cents: ehCartao ? form.limitCents : null,
@@ -306,7 +318,7 @@ export default function AccountsScreen() {
       {/* O único GlassCard da tela. */}
       {balances.isError ? (
         <ErrorBand message="Não deu para carregar seus saldos." onRetry={balances.refetch} />
-      ) : balances.data ? (
+      ) : balances.data && !semDadoNenhum ? (
         <Animated.View entering={FadeInDown.duration(Motion.duration.slow)}>
           <GlassCard style={styles.hero}>
             <ThemedText type="small" themeColor="textSecondary">
@@ -498,6 +510,12 @@ export default function AccountsScreen() {
                   />
                 </Field>
               )}
+
+              {save.isError ? (
+                <ThemedText type="small" themeColor="danger" style={styles.bandText}>
+                  Não deu para salvar. Já existe uma conta com esse nome?
+                </ThemedText>
+              ) : null}
             </ScrollView>
           ) : null}
         </View>

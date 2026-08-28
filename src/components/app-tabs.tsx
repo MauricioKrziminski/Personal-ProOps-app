@@ -6,7 +6,7 @@ import { Colors } from '@/constants/theme';
 // No iOS 26+ a NativeTabs renderiza a tab bar nativa em Liquid Glass —
 // diretriz central de design do Personal ProOps app. SF Symbols no iOS; Material glyphs no Android.
 const TABS = [
-  { name: 'index', label: 'Hoje', sf: { default: 'sun.max', selected: 'sun.max.fill' }, md: 'today' },
+  { name: 'today', label: 'Hoje', sf: { default: 'sun.max', selected: 'sun.max.fill' }, md: 'today' },
   { name: 'notes', label: 'Notas', sf: { default: 'note.text', selected: 'note.text' }, md: 'description' },
   { name: 'finance', label: 'Financeiro', sf: { default: 'chart.pie', selected: 'chart.pie.fill' }, md: 'pie_chart' },
   { name: 'profile', label: 'Perfil', sf: { default: 'person', selected: 'person.fill' }, md: 'person' },

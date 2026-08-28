@@ -1,273 +1,419 @@
-import { useState } from 'react';
-import { Alert, Pressable, ScrollView, StyleSheet, TextInput, View } from 'react-native';
-import Animated, { FadeInDown } from 'react-native-reanimated';
-import { SafeAreaView } from 'react-native-safe-area-context';
-import * as Haptics from 'expo-haptics';
+import { useState } from "react";
+import { Modal, Pressable, ScrollView, StyleSheet, View } from "react-native";
+import { Stack } from "expo-router";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
+import Animated, {
+  FadeInDown,
+  LinearTransition,
+} from "react-native-reanimated";
+import * as Haptics from "expo-haptics";
 
-import { ErrorCard, LoadingCard } from '@/components/error-card';
-import { Chip } from '@/components/finance/chip';
-import { GlassCard } from '@/components/glass/glass-card';
-import { ThemedText } from '@/components/themed-text';
-import { ThemedView } from '@/components/themed-view';
-import { MaxContentWidth, Spacing } from '@/constants/theme';
-import { SUGGESTED_CATEGORIES } from '@/lib/categories';
-import { useDeleteRule, useRules, useSaveRule } from '@/hooks/use-finance';
-import { useTheme } from '@/hooks/use-theme';
+import { ErrorCard } from "@/components/error-card";
+import { Chip } from "@/components/finance/chip";
+import { GlassCard } from "@/components/glass/glass-card";
+import { ThemedText } from "@/components/themed-text";
+import { EmptyState } from "@/components/ui/empty-state";
+import { Field, TextField } from "@/components/ui/field";
+import { Icon } from "@/components/ui/icon";
+import { Row, Section } from "@/components/ui/row";
+import { Screen } from "@/components/ui/screen";
+import { SkeletonRow } from "@/components/ui/skeleton";
+import { useToast } from "@/components/ui/toast";
+import { Motion, Space, Type, tabular } from "@/design/tokens";
+import { confirmDestructive, showItemActions } from "@/lib/item-actions";
+import { SUGGESTED_CATEGORIES } from "@/lib/categories";
+import {
+  useAccounts,
+  useDeleteRule,
+  useRules,
+  useSaveRule,
+  type CategorizationRule,
+} from "@/hooks/use-finance";
+import { useTheme } from "@/hooks/use-theme";
 
+/** Postgres: violação de unique. Aqui só pode ser `(workspace_id, match_type, pattern)` da `0017`. */
+const UNIQUE_VIOLATION = "23505";
+
+function ehGatilhoRepetido(err: unknown): boolean {
+  return (
+    typeof err === "object" &&
+    err !== null &&
+    (err as { code?: string }).code === UNIQUE_VIOLATION
+  );
+}
+
+interface Rascunho {
+  id?: string;
+  pattern: string;
+  category: string | null;
+  accountId: string | null;
+}
+
+const VAZIO: Rascunho = { pattern: "", category: null, accountId: null };
+
+/**
+ * Regras de categoria — a resposta do produto à queixa nº1 contra os concorrentes:
+ * *"categorizou errado e não dá para consertar"*.
+ *
+ * A regra do usuário **ganha da IA**, e a tela diz isso em texto: `_match_rule` roda depois do
+ * parse no WhatsApp e antes do Gemini na importação. `hits` é a única métrica de valor aqui —
+ * regra com zero acerto é lixo, e o usuário precisa ver isso para limpar.
+ */
 export default function RulesScreen() {
   const theme = useTheme();
-  const { data: rules, isLoading, isError, refetch } = useRules();
+  const toast = useToast();
+  const insets = useSafeAreaInsets();
+  const { data: rules, isLoading, isError, refetch, isRefetching } = useRules();
+  const { data: accounts } = useAccounts();
   const save = useSaveRule();
   const remove = useDeleteRule();
 
-  const [editando, setEditando] = useState<string | null>(null);
-  const [criando, setCriando] = useState(false);
-  const [pattern, setPattern] = useState('');
-  const [category, setCategory] = useState<string | null>(null);
+  const [rascunho, setRascunho] = useState<Rascunho | null>(null);
+  const [erroSalvar, setErroSalvar] = useState<string | null>(null);
 
-  const showForm = criando || editando !== null;
-  const podeSalvar = pattern.trim().length >= 2 && Boolean(category);
+  const lista = rules ?? [];
+  const totalHits = lista.reduce((soma, r) => soma + (r.hits ?? 0), 0);
+  const ativas = lista.filter((r) => (r.hits ?? 0) > 0).length;
+  const podeSalvar =
+    (rascunho?.pattern.trim().length ?? 0) >= 2 && Boolean(rascunho?.category);
 
-  const fechar = () => {
-    setCriando(false);
-    setEditando(null);
-    setPattern('');
-    setCategory(null);
+  const nomeConta = (id: string | null) =>
+    id ? ((accounts ?? []).find((c) => c.id === id)?.name ?? "conta") : null;
+
+  const abrir = (rule?: CategorizationRule) => {
+    setErroSalvar(null);
+    setRascunho(
+      rule
+        ? {
+            id: rule.id,
+            pattern: rule.pattern,
+            category: rule.category,
+            accountId: rule.account_id,
+          }
+        : VAZIO,
+    );
   };
 
-  const onSubmit = () => {
-    if (!podeSalvar) return;
+  const fechar = () => {
+    setRascunho(null);
+    setErroSalvar(null);
+  };
+
+  const salvar = () => {
+    if (!rascunho || !podeSalvar) return;
+    setErroSalvar(null);
     save.mutate(
-      { id: editando ?? undefined, pattern: pattern.trim(), category: category! },
+      {
+        id: rascunho.id,
+        pattern: rascunho.pattern.trim(),
+        category: rascunho.category!,
+        accountId: rascunho.accountId,
+      },
       {
         onSuccess: () => {
           Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
           fechar();
         },
+        onError: (err) => {
+          // Erro adivinhado ("regra repetida?") é o app chutando. O motivo real é o unique da
+          // `0017`, e dá para dizer QUAL regra já existe.
+          if (ehGatilhoRepetido(err)) {
+            const existente = lista.find(
+              (r) =>
+                r.pattern.toLowerCase() ===
+                rascunho.pattern.trim().toLowerCase(),
+            );
+            setErroSalvar(
+              existente
+                ? `Já existe uma regra para “${existente.pattern}” → ${existente.category ?? "sem categoria"}. Edite ela em vez de criar outra.`
+                : "Já existe uma regra com esse gatilho.",
+            );
+            return;
+          }
+          setErroSalvar("Não deu para salvar. Tenta de novo.");
+          toast({ message: "Não deu para salvar a regra.", tone: "error" });
+        },
       },
     );
   };
 
-  const confirmarRemocao = (id: string, texto: string) => {
-    Alert.alert('Remover regra', `Parar de categorizar "${texto}" automaticamente?`, [
-      { text: 'Cancelar', style: 'cancel' },
-      {
-        text: 'Remover',
-        style: 'destructive',
-        onPress: () => {
-          Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
-          remove.mutate(id);
-        },
-      },
+  const apagar = (rule: CategorizationRule) =>
+    confirmDestructive(
+      `Parar de categorizar “${rule.pattern}” automaticamente?`,
+      "Apagar regra",
+      () =>
+        remove.mutate(rule.id, {
+          onSuccess: () =>
+            toast({ message: "Regra apagada.", tone: "success" }),
+          // Hoje apagar falha em silêncio: a linha some da UI e volta na próxima query.
+          onError: () =>
+            toast({ message: "Não deu para apagar a regra.", tone: "error" }),
+        }),
+      "Os lançamentos já categorizados continuam como estão.",
+    );
+
+  const acoes = (rule: CategorizationRule) =>
+    showItemActions(`${rule.pattern} → ${rule.category ?? "sem categoria"}`, [
+      { label: "Editar", onPress: () => abrir(rule) },
+      { label: "Apagar", destructive: true, onPress: () => apagar(rule) },
     ]);
+
+  const legenda = (rule: CategorizationRule) => {
+    const conta = nomeConta(rule.account_id);
+    return [
+      rule.hits > 0 ? `aplicada ${rule.hits}x` : "ainda não pegou nada",
+      conta ? `só em ${conta}` : null,
+      rule.source === "learned" ? "aprendida" : null,
+    ]
+      .filter(Boolean)
+      .join(" · ");
   };
 
   return (
-    <ThemedView style={styles.container}>
-      <SafeAreaView style={styles.safeArea}>
-        <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
+    <Screen grouped onRefresh={refetch} refreshing={isRefetching}>
+      <Stack.Screen
+        options={{
+          title: "Regras",
+          headerLargeTitle: true,
+          headerRight: () => (
+            <Pressable
+              accessibilityLabel="Nova regra"
+              hitSlop={12}
+              onPress={() => abrir()}
+            >
+              <Icon name="plus" size="lg" color="tint" />
+            </Pressable>
+          ),
+        }}
+      />
 
-          <GlassCard style={styles.explicacao}>
+      {/* Texto, não card: a explicação não pode competir de tamanho com o dado. */}
+      <View style={styles.faixa}>
+        <ThemedText type="small" themeColor="textSecondary">
+          Sua regra ganha da IA. Vale no WhatsApp e na importação de extrato.
+        </ThemedText>
+        <ThemedText type="small" themeColor="textSecondary">
+          Dá para criar por mensagem: “sempre que eu falar ifood, põe em
+          restaurante”.
+        </ThemedText>
+      </View>
+
+      {isError ? <ErrorCard onRetry={refetch} /> : null}
+
+      {isLoading && !isError ? (
+        <>
+          <SkeletonRow />
+          <SkeletonRow />
+          <SkeletonRow />
+          <SkeletonRow />
+        </>
+      ) : null}
+
+      {/* O único GlassCard da tela — e só quando existe número para mostrar. */}
+      {totalHits > 0 ? (
+        <Animated.View entering={FadeInDown.duration(Motion.duration.slow)}>
+          <GlassCard style={styles.hero}>
             <ThemedText type="small" themeColor="textSecondary">
-              Regra sua sempre ganha da IA. Quando o texto do lançamento contém o gatilho, a
-              categoria é aplicada — no WhatsApp e na importação de extrato.
-              {'\n\n'}
-              Você também pode criar por mensagem: “sempre que eu falar ifood, põe em restaurante”.
+              O que suas regras já pouparam
+            </ThemedText>
+            <ThemedText style={[Type.title, tabular]}>{totalHits}</ThemedText>
+            <ThemedText type="small" themeColor="textSecondary">
+              {totalHits === 1
+                ? "lançamento categorizado"
+                : "lançamentos categorizados"}{" "}
+              sem precisar da IA, por {ativas}{" "}
+              {ativas === 1 ? "regra" : "regras"}.
             </ThemedText>
           </GlassCard>
+        </Animated.View>
+      ) : null}
 
-          {isError && <ErrorCard onRetry={refetch} />}
-          {isLoading && !isError && <LoadingCard />}
-
-          {(rules ?? []).map((rule, index) => (
+      {lista.length > 0 ? (
+        <Section title="Suas regras">
+          {lista.map((rule, index) => (
             <Animated.View
               key={rule.id}
-              entering={FadeInDown.duration(400).delay(Math.min(index * 60, 400))}>
-              <Pressable
-                onPress={() => {
-                  Haptics.selectionAsync();
-                  setCriando(false);
-                  setEditando(rule.id);
-                  setPattern(rule.pattern);
-                  setCategory(rule.category);
-                }}
-                onLongPress={() => confirmarRemocao(rule.id, rule.pattern)}>
-                <GlassCard style={styles.rule}>
-                  <View style={styles.ruleLinha}>
-                    <ThemedText type="smallBold" numberOfLines={1} style={styles.rulePattern}>
-                      {rule.pattern}
-                    </ThemedText>
-                    <ThemedText type="small">→ {rule.category ?? 'sem categoria'}</ThemedText>
-                  </View>
-                  <ThemedText type="small" themeColor="textSecondary">
-                    {rule.hits > 0 ? `aplicada ${rule.hits}x` : 'ainda não pegou nenhum lançamento'}
-                    {rule.source === 'learned' ? ' · aprendida' : ''}
-                  </ThemedText>
-                </GlassCard>
-              </Pressable>
+              layout={LinearTransition.duration(Motion.duration.base)}
+              entering={FadeInDown.duration(Motion.duration.slow).delay(
+                Math.min(index * Motion.stagger.step, Motion.stagger.cap),
+              )}
+            >
+              <Row
+                title={`${rule.pattern}  →  ${rule.category ?? "sem categoria"}`}
+                subtitle={legenda(rule)}
+                icon="text.badge.checkmark"
+                chevron={false}
+                accessibilityLabel={`Quando contiver ${rule.pattern}, categorizar como ${rule.category ?? "sem categoria"}, ${legenda(rule)}`}
+                onPress={() => abrir(rule)}
+                onLongPress={() => acoes(rule)}
+              />
             </Animated.View>
           ))}
+        </Section>
+      ) : null}
 
-          {!isLoading && !isError && (rules ?? []).length === 0 && (
-            <GlassCard style={styles.empty}>
-              <ThemedText style={styles.emptyEmoji}>📌</ThemedText>
-              <ThemedText type="smallBold">Nenhuma regra ainda</ThemedText>
-              <ThemedText type="small" themeColor="textSecondary" style={styles.centered}>
-                Crie uma para o que a IA sempre erra.{'\n'}
-                Ex.: “posto” → transporte.
-              </ThemedText>
-            </GlassCard>
-          )}
+      {!isLoading && !isError && lista.length === 0 ? (
+        <EmptyState
+          icon="text.badge.checkmark"
+          title="Nenhuma regra ainda"
+          hint={
+            "Crie uma para o que a IA sempre erra — “posto” vira transporte.\nOu manda no WhatsApp: “sempre que eu falar ifood, põe em restaurante”."
+          }
+          action={{ label: "Nova regra", onPress: () => abrir() }}
+        />
+      ) : null}
 
-          {showForm ? (
-            <GlassCard style={styles.form}>
-              <ThemedText type="smallBold">
-                {editando ? 'Editando regra' : 'Nova regra'}
+      {/* Form sheet: o formulário deixa de empurrar a lista para baixo quando abre. */}
+      <Modal
+        visible={rascunho !== null}
+        animationType="slide"
+        presentationStyle="pageSheet"
+        onRequestClose={fechar}
+      >
+        <View
+          style={[styles.sheet, { backgroundColor: theme.groupedBackground }]}
+        >
+          <View
+            style={[styles.sheetHeader, { borderBottomColor: theme.separator }]}
+          >
+            <Pressable accessibilityRole="button" hitSlop={12} onPress={fechar}>
+              <ThemedText type="default" themeColor="tint">
+                Cancelar
               </ThemedText>
-              <ThemedText type="small" themeColor="textSecondary">
-                Quando o lançamento contiver
+            </Pressable>
+            <ThemedText type="smallBold">
+              {rascunho?.id ? "Editar regra" : "Nova regra"}
+            </ThemedText>
+            <Pressable
+              accessibilityRole="button"
+              accessibilityState={{ disabled: !podeSalvar || save.isPending }}
+              disabled={!podeSalvar || save.isPending}
+              hitSlop={12}
+              onPress={salvar}
+            >
+              <ThemedText
+                type="smallBold"
+                themeColor={
+                  podeSalvar && !save.isPending ? "tint" : "textSecondary"
+                }
+              >
+                {save.isPending ? "Salvando…" : "Salvar"}
               </ThemedText>
-              <TextInput
-                value={pattern}
-                onChangeText={setPattern}
+            </Pressable>
+          </View>
+
+          <ScrollView
+            contentContainerStyle={[
+              styles.sheetBody,
+              { paddingBottom: insets.bottom + Space.xxl },
+            ]}
+            keyboardShouldPersistTaps="handled"
+          >
+            <Field
+              label="Quando o lançamento contiver"
+              error={erroSalvar ?? undefined}
+              hint="Trecho do texto, sem diferenciar maiúscula de minúscula."
+            >
+              <TextField
+                value={rascunho?.pattern ?? ""}
+                onChangeText={(pattern) =>
+                  setRascunho((atual) =>
+                    atual ? { ...atual, pattern } : atual,
+                  )
+                }
                 placeholder="ex.: ifood"
-                placeholderTextColor={theme.textSecondary}
                 autoCapitalize="none"
+                autoCorrect={false}
                 autoFocus
-                style={[
-                  styles.input,
-                  { backgroundColor: theme.backgroundElement, color: theme.text },
-                ]}
+                invalid={Boolean(erroSalvar)}
               />
-              <ThemedText type="small" themeColor="textSecondary">
-                categorizar como
-              </ThemedText>
-              <View style={styles.chipRow}>
+            </Field>
+
+            <Field label="Categorizar como">
+              <View style={styles.chips}>
                 {SUGGESTED_CATEGORIES.map((cat) => (
                   <Chip
                     key={cat}
                     label={cat}
-                    selected={category === cat}
-                    onPress={() => setCategory(category === cat ? null : cat)}
+                    selected={rascunho?.category === cat}
+                    onPress={() =>
+                      setRascunho((atual) =>
+                        atual
+                          ? {
+                              ...atual,
+                              category: atual.category === cat ? null : cat,
+                            }
+                          : atual,
+                      )
+                    }
                   />
                 ))}
               </View>
-              <Pressable
-                onPress={onSubmit}
-                disabled={!podeSalvar || save.isPending}
-                style={({ pressed }) => [
-                  styles.submit,
-                  {
-                    backgroundColor: theme.tint,
-                    opacity: pressed || !podeSalvar || save.isPending ? 0.6 : 1,
-                  },
-                ]}>
-                <ThemedText type="smallBold" style={styles.buttonLabel}>
-                  {save.isPending ? 'Salvando…' : 'Salvar regra'}
-                </ThemedText>
-              </Pressable>
-              <Pressable onPress={fechar} hitSlop={8} style={styles.cancel}>
-                <ThemedText type="small" themeColor="textSecondary">
-                  Cancelar
-                </ThemedText>
-              </Pressable>
-              {save.isError && (
-                <ThemedText type="small" themeColor="danger" style={styles.centered}>
-                  Não deu para salvar (regra repetida?).
-                </ThemedText>
-              )}
-            </GlassCard>
-          ) : (
-            <Pressable
-              onPress={() => {
-                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                setCriando(true);
-              }}
-              style={({ pressed }) => [
-                styles.submit,
-                { backgroundColor: theme.tint, opacity: pressed ? 0.85 : 1 },
-              ]}>
-              <ThemedText type="smallBold" style={styles.buttonLabel}>
-                ＋ Nova regra
-              </ThemedText>
-            </Pressable>
-          )}
+            </Field>
 
-          <ThemedText type="small" themeColor="textSecondary" style={styles.centered}>
-            Toque para editar. Segure para remover.
-          </ThemedText>
-        </ScrollView>
-      </SafeAreaView>
-    </ThemedView>
+            {(accounts ?? []).length > 0 ? (
+              <Field
+                label="Só nesta conta"
+                hint="Opcional. Sem conta escolhida, a regra vale em todas."
+              >
+                <View style={styles.chips}>
+                  {(accounts ?? []).map((conta) => (
+                    <Chip
+                      key={conta.id}
+                      label={conta.name}
+                      selected={rascunho?.accountId === conta.id}
+                      onPress={() =>
+                        setRascunho((atual) =>
+                          atual
+                            ? {
+                                ...atual,
+                                accountId:
+                                  atual.accountId === conta.id
+                                    ? null
+                                    : conta.id,
+                              }
+                            : atual,
+                        )
+                      }
+                    />
+                  ))}
+                </View>
+              </Field>
+            ) : null}
+          </ScrollView>
+        </View>
+      </Modal>
+    </Screen>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    flexDirection: 'row',
-    justifyContent: 'center',
+  faixa: {
+    gap: Space.xs,
+    paddingHorizontal: Space.lg,
   },
-  safeArea: {
-    flex: 1,
-    maxWidth: MaxContentWidth,
-    paddingHorizontal: Spacing.four,
-    width: '100%',
+  hero: {
+    gap: Space.xs,
   },
-  scroll: {
-    gap: Spacing.three,
-    paddingBottom: Spacing.six,
-  },
-  explicacao: {
-    gap: Spacing.two,
-  },
-  rule: {
-    gap: Spacing.half,
-  },
-  ruleLinha: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    gap: Spacing.two,
-  },
-  rulePattern: {
+  sheet: {
     flex: 1,
   },
-  form: {
-    gap: Spacing.two,
+  sheetHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: Space.md,
+    paddingHorizontal: Space.lg,
+    paddingVertical: Space.lg,
+    borderBottomWidth: StyleSheet.hairlineWidth,
   },
-  input: {
-    borderRadius: Spacing.two,
-    paddingHorizontal: Spacing.three,
-    paddingVertical: Spacing.two,
-    fontSize: 16,
+  sheetBody: {
+    gap: Space.xl,
+    padding: Space.lg,
   },
-  chipRow: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: Spacing.two,
-  },
-  submit: {
-    borderRadius: Spacing.three,
-    paddingVertical: Spacing.three,
-    alignItems: 'center',
-  },
-  buttonLabel: {
-    color: '#fff',
-  },
-  cancel: {
-    alignItems: 'center',
-    paddingVertical: Spacing.one,
-  },
-  empty: {
-    alignItems: 'center',
-    gap: Spacing.two,
-    paddingVertical: Spacing.five,
-  },
-  emptyEmoji: {
-    fontSize: 40,
-  },
-  centered: {
-    textAlign: 'center',
+  chips: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: Space.sm,
   },
 });

@@ -1,22 +1,42 @@
-import { useMemo, useState } from 'react';
-import { Pressable, ScrollView, Share, StyleSheet, View } from 'react-native';
-import Animated, { FadeInDown } from 'react-native-reanimated';
-import { SafeAreaView } from 'react-native-safe-area-context';
-import * as Haptics from 'expo-haptics';
+import { useMemo, useState } from "react";
+import { Pressable, Share, StyleSheet, View } from "react-native";
+import { Stack, router } from "expo-router";
+import Animated, { FadeInDown } from "react-native-reanimated";
+import * as Haptics from "expo-haptics";
 
-import { ErrorCard, LoadingCard } from '@/components/error-card';
-import { Chip } from '@/components/finance/chip';
-import { GlassCard } from '@/components/glass/glass-card';
-import { ThemedText } from '@/components/themed-text';
-import { ThemedView } from '@/components/themed-view';
-import { MaxContentWidth, Spacing } from '@/constants/theme';
-import { formatBRL, localISODate } from '@/hooks/use-items';
-import { useAnnualReport, type AnnualCategoryRow, type YearEndBalance } from '@/hooks/use-finance';
-import { useTheme } from '@/hooks/use-theme';
+import { ErrorCard } from "@/components/error-card";
+import { GlassCard } from "@/components/glass/glass-card";
+import { ThemedText } from "@/components/themed-text";
+import { Button } from "@/components/ui/button";
+import { EmptyState } from "@/components/ui/empty-state";
+import { Icon } from "@/components/ui/icon";
+import { Money } from "@/components/ui/money";
+import { Row, Section } from "@/components/ui/row";
+import { Screen } from "@/components/ui/screen";
+import { Skeleton, SkeletonRow } from "@/components/ui/skeleton";
+import { Segmented } from "@/components/ui/segmented";
+import { ProgressBar } from "@/components/ui/sparkline";
+import { useToast } from "@/components/ui/toast";
+import { Motion, Space, Type, tabular } from "@/design/tokens";
+import { localISODate } from "@/hooks/use-items";
+import {
+  useAnnualReport,
+  type AnnualCategoryRow,
+  type YearEndBalance,
+} from "@/hooks/use-finance";
 
-/** Valor em reais com ponto decimal — formato que planilha e IR aceitam. */
+/** Quantas categorias de gasto aparecem antes do "ver todas". */
+const TOP_CATEGORIES = 8;
+
+/**
+ * Valor em reais com **vírgula** decimal.
+ *
+ * O CSV usa `;` como separador de coluna, que é o dialeto pt-BR — e nesse dialeto o decimal é
+ * vírgula. Com ponto (o que a tela fazia antes) o Excel em português lê a coluna como texto e não
+ * soma nada, que é justamente o uso da exportação.
+ */
 function reais(cents: number): string {
-  return (cents / 100).toFixed(2);
+  return (cents / 100).toFixed(2).replace(".", ",");
 }
 
 function montaCsv(
@@ -24,247 +44,332 @@ function montaCsv(
   categorias: AnnualCategoryRow[],
   saldos: YearEndBalance[],
 ): string {
-  const linhas = [
+  return [
     `Relatorio anual ${ano}`,
-    '',
-    'Tipo;Categoria;Total;Lancamentos',
+    "",
+    "Tipo;Categoria;Total;Lancamentos",
     ...categorias.map(
       (c) =>
-        `${c.kind === 'income' ? 'Receita' : 'Despesa'};${c.category};${reais(Number(c.total_cents))};${c.tx_count}`,
+        `${c.kind === "income" ? "Receita" : "Despesa"};${c.category};${reais(Number(c.total_cents))};${c.tx_count}`,
     ),
-    '',
-    `Saldos em 31/12/${ano}`,
-    'Tipo;Nome;Valor',
+    "",
+    `Bens e direitos em 31/12/${ano}`,
+    "Tipo;Nome;Valor",
     ...saldos.map(
-      (s) => `${s.kind === 'account' ? 'Conta' : 'Bem'};${s.name};${reais(Number(s.balance_cents))}`,
+      (s) =>
+        `${s.kind === "account" ? "Conta" : "Bem"};${s.name};${reais(Number(s.balance_cents))}`,
     ),
-  ];
-  return linhas.join('\n');
+  ].join("\n");
 }
 
+/**
+ * Relatórios — o ano fechado.
+ *
+ * A pergunta que faz alguém abrir esta tela em março não é "gastei mais com o quê?", é **"o que
+ * eu escrevo na declaração?"**. Por isso *Bens e Direitos* (`year_end_balances`) sobe para logo
+ * abaixo do card de destaque, e não fica em quarto lugar embaixo de duas listas de categoria.
+ */
 export default function ReportsScreen() {
-  const theme = useTheme();
+  const toast = useToast();
   const anoAtual = Number(localISODate().slice(0, 4));
   const [ano, setAno] = useState(anoAtual);
-  const { data, isLoading, isError, refetch } = useAnnualReport(ano);
+  const [verTodas, setVerTodas] = useState(false);
+  const { data, isLoading, isError, refetch, isRefetching } =
+    useAnnualReport(ano);
 
   const anos = useMemo(
-    () => [anoAtual, anoAtual - 1, anoAtual - 2],
+    () =>
+      [anoAtual - 2, anoAtual - 1, anoAtual].map((a) => ({
+        value: String(a),
+        label: String(a),
+      })),
     [anoAtual],
   );
 
-  const receitas = (data?.categories ?? []).filter((c) => c.kind === 'income');
-  const despesas = (data?.categories ?? []).filter((c) => c.kind === 'expense');
-  const maiorDespesa = Math.max(...despesas.map((d) => Number(d.total_cents)), 1);
+  const receitas = (data?.categories ?? []).filter((c) => c.kind === "income");
+  const despesas = (data?.categories ?? []).filter((c) => c.kind === "expense");
+  const maiorDespesa = Math.max(
+    ...despesas.map((d) => Number(d.total_cents)),
+    1,
+  );
+  const visiveis = verTodas ? despesas : despesas.slice(0, TOP_CATEGORIES);
+
+  // `annual_summary` devolve linha zerada para ano sem movimento — o que decide se a tela tem
+  // conteúdo é a contagem, não a existência do registro.
+  const summary = data?.summary ?? null;
+  const temMovimento = Number(summary?.tx_count ?? 0) > 0;
+  const temConteudo = temMovimento || (data?.yearEnd ?? []).length > 0;
 
   const exportar = async () => {
     if (!data) return;
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    // share sheet com o CSV inline: sem servidor, sem arquivo temporário
-    await Share.share({
-      title: `Relatorio ${ano}`,
-      message: montaCsv(ano, data.categories, data.yearEnd),
-    });
+    try {
+      await Share.share({
+        title: `Relatorio ${ano}`,
+        message: montaCsv(ano, data.categories, data.yearEnd),
+      });
+    } catch {
+      toast({ message: "Não deu para exportar agora.", tone: "error" });
+    }
   };
 
   return (
-    <ThemedView style={styles.container}>
-      <SafeAreaView style={styles.safeArea}>
-        <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
+    <Screen grouped onRefresh={refetch} refreshing={isRefetching}>
+      <Stack.Screen
+        options={{
+          title: "Relatórios",
+          headerLargeTitle: true,
+          headerRight: () =>
+            data && temConteudo ? (
+              <Pressable
+                accessibilityLabel="Exportar CSV do ano"
+                hitSlop={12}
+                onPress={exportar}
+              >
+                <Icon name="square.and.arrow.up" size="lg" color="tint" />
+              </Pressable>
+            ) : null,
+        }}
+      />
 
-          <View style={styles.chipRow}>
-            {anos.map((a) => (
-              <Chip key={a} label={String(a)} selected={ano === a} onPress={() => setAno(a)} />
-            ))}
-          </View>
+      {/* Antes de qualquer número: sem saber o ano, o resto não quer dizer nada. */}
+      <Segmented
+        options={anos}
+        value={String(ano)}
+        onChange={(v) => {
+          setAno(Number(v));
+          setVerTodas(false);
+        }}
+      />
 
-          {isError && <ErrorCard onRetry={refetch} />}
-          {isLoading && !isError && <LoadingCard />}
+      {isError ? <ErrorCard onRetry={refetch} /> : null}
 
-          {data?.summary && (
-            <Animated.View entering={FadeInDown.duration(400)}>
-              <GlassCard style={styles.resumo}>
-                <ThemedText type="smallBold">{ano} em números</ThemedText>
-                <View style={styles.linha}>
-                  <ThemedText type="small" themeColor="textSecondary">
-                    💰 Recebido
-                  </ThemedText>
-                  <ThemedText type="small" style={{ color: theme.success }}>
-                    {formatBRL(Number(data.summary.income_cents))}
-                  </ThemedText>
-                </View>
-                <View style={styles.linha}>
-                  <ThemedText type="small" themeColor="textSecondary">
-                    💸 Gasto
-                  </ThemedText>
-                  <ThemedText type="small" style={{ color: theme.danger }}>
-                    {formatBRL(Number(data.summary.expense_cents))}
-                  </ThemedText>
-                </View>
-                <View style={styles.linha}>
-                  <ThemedText type="smallBold">Sobrou</ThemedText>
-                  <ThemedText
-                    type="smallBold"
-                    style={{
-                      color: Number(data.summary.balance_cents) < 0 ? theme.danger : theme.text,
-                    }}>
-                    {formatBRL(Number(data.summary.balance_cents))}
-                  </ThemedText>
-                </View>
+      {isLoading && !isError ? (
+        <>
+          <Skeleton height={132} />
+          <SkeletonRow />
+          <SkeletonRow />
+          <SkeletonRow />
+        </>
+      ) : null}
+
+      {/* O único GlassCard da tela: responde a pergunta do ano em um olhar. */}
+      {!isError && temMovimento && summary ? (
+        <Animated.View entering={FadeInDown.duration(Motion.duration.slow)}>
+          <GlassCard style={styles.hero}>
+            <ThemedText type="small" themeColor="textSecondary">
+              Sobrou em {ano}
+            </ThemedText>
+            <Money
+              cents={Number(summary.balance_cents)}
+              variant="money"
+              tone={Number(summary.balance_cents) < 0 ? "danger" : "text"}
+            />
+            <View style={styles.heroLinha}>
+              <View style={styles.heroMetade}>
                 <ThemedText type="small" themeColor="textSecondary">
-                  Taxa de poupança: {data.summary.savings_rate}% · {data.summary.tx_count}{' '}
-                  lançamentos
+                  Recebido
                 </ThemedText>
-              </GlassCard>
-            </Animated.View>
-          )}
+                <Money
+                  cents={Number(summary.income_cents)}
+                  variant="headline"
+                  tone="success"
+                />
+              </View>
+              <View style={styles.heroMetade}>
+                <ThemedText type="small" themeColor="textSecondary">
+                  Gasto
+                </ThemedText>
+                <Money
+                  cents={Number(summary.expense_cents)}
+                  variant="headline"
+                />
+              </View>
+            </View>
+            <ThemedText type="small" themeColor="textSecondary" style={tabular}>
+              Guardou {summary.savings_rate}% do que entrou · {summary.tx_count}{" "}
+              {Number(summary.tx_count) === 1 ? "lançamento" : "lançamentos"}
+            </ThemedText>
+          </GlassCard>
+        </Animated.View>
+      ) : null}
 
-          {despesas.length > 0 && (
-            <GlassCard style={styles.resumo}>
-              <ThemedText type="smallBold">Gastos por categoria</ThemedText>
-              {despesas.slice(0, 12).map((c) => (
-                <View key={c.category} style={styles.categoria}>
-                  <View style={styles.linha}>
-                    <ThemedText type="small">{c.category}</ThemedText>
-                    <ThemedText type="small" themeColor="textSecondary">
-                      {formatBRL(Number(c.total_cents))}
-                    </ThemedText>
-                  </View>
-                  <View style={[styles.track, { backgroundColor: theme.backgroundElement }]}>
-                    <View
-                      style={[
-                        styles.fill,
-                        {
-                          backgroundColor: theme.tint,
-                          width: `${Math.max((Number(c.total_cents) / maiorDespesa) * 100, 3)}%`,
-                        },
-                      ]}
-                    />
-                  </View>
-                </View>
-              ))}
-            </GlassCard>
+      {/* Segundo lugar, e não quarto: é a ficha que a pessoa veio copiar. */}
+      {!isError && !isLoading && temConteudo ? (
+        <Animated.View
+          entering={FadeInDown.duration(Motion.duration.slow).delay(
+            Motion.stagger.step,
           )}
+          style={styles.bloco}
+        >
+          <ThemedText
+            type="small"
+            themeColor="textSecondary"
+            style={styles.nota}
+          >
+            Contas e bens no último dia do ano — é o que a ficha “Bens e
+            Direitos” da declaração pede. Dívidas e financiamentos entram em
+            outra ficha e não aparecem aqui.
+          </ThemedText>
 
-          {receitas.length > 0 && (
-            <GlassCard style={styles.resumo}>
-              <ThemedText type="smallBold">Receitas por origem</ThemedText>
-              {receitas.map((c) => (
-                <View key={c.category} style={styles.linha}>
-                  <ThemedText type="small">{c.category}</ThemedText>
-                  <ThemedText type="small" style={{ color: theme.success }}>
-                    {formatBRL(Number(c.total_cents))}
-                  </ThemedText>
-                </View>
-              ))}
-            </GlassCard>
-          )}
-
-          {(data?.yearEnd ?? []).length > 0 && (
-            <GlassCard style={styles.resumo}>
-              <ThemedText type="smallBold">Saldos em 31/12/{ano}</ThemedText>
-              <ThemedText type="small" themeColor="textSecondary">
-                É o que a ficha “Bens e Direitos” da declaração pede.
-              </ThemedText>
+          {(data?.yearEnd ?? []).length > 0 ? (
+            <Section title={`Bens e direitos em 31/12/${ano}`}>
               {(data?.yearEnd ?? []).map((s) => (
-                <View key={`${s.kind}-${s.name}`} style={styles.linha}>
-                  <ThemedText type="small">
-                    {s.kind === 'account' ? '🏦' : '📈'} {s.name}
-                  </ThemedText>
-                  <ThemedText type="small" themeColor="textSecondary">
-                    {formatBRL(Number(s.balance_cents))}
-                  </ThemedText>
-                </View>
+                <Row
+                  key={`${s.kind}-${s.name}`}
+                  title={s.name}
+                  icon={
+                    s.kind === "account"
+                      ? "banknote"
+                      : "chart.line.uptrend.xyaxis"
+                  }
+                  chevron={false}
+                  accessibilityLabel={`${s.name}, ${(Number(s.balance_cents) / 100).toLocaleString("pt-BR", { style: "currency", currency: "BRL" })} em 31 de dezembro`}
+                  trailing={
+                    <Money cents={Number(s.balance_cents)} variant="headline" />
+                  }
+                />
               ))}
-            </GlassCard>
+            </Section>
+          ) : (
+            <Section title={`Bens e direitos em 31/12/${ano}`}>
+              <Row
+                title="Nenhuma conta cadastrada"
+                subtitle="Cadastre para o saldo de 31/12 sair aqui"
+                icon="banknote"
+                onPress={() => router.push("/finance/accounts")}
+              />
+            </Section>
           )}
+        </Animated.View>
+      ) : null}
 
-          {data && (data.categories.length > 0 || data.yearEnd.length > 0) && (
-            <Pressable
-              onPress={exportar}
-              style={({ pressed }) => [
-                styles.submit,
-                { backgroundColor: theme.tint, opacity: pressed ? 0.85 : 1 },
-              ]}>
-              <ThemedText type="smallBold" style={styles.buttonLabel}>
-                Exportar CSV
-              </ThemedText>
-            </Pressable>
+      {despesas.length > 0 ? (
+        <Animated.View
+          entering={FadeInDown.duration(Motion.duration.slow).delay(
+            Motion.stagger.step * 2,
           )}
+          style={styles.bloco}
+        >
+          <Section title="Para onde foi">
+            {visiveis.map((c) => (
+              <View key={c.category} style={styles.categoria}>
+                <View style={styles.categoriaTopo}>
+                  <ThemedText
+                    type="default"
+                    numberOfLines={1}
+                    style={styles.categoriaNome}
+                  >
+                    {c.category}
+                  </ThemedText>
+                  <Money cents={Number(c.total_cents)} variant="headline" />
+                </View>
+                <ProgressBar value={Number(c.total_cents)} max={maiorDespesa} />
+                <ThemedText
+                  type="small"
+                  themeColor="textSecondary"
+                  style={tabular}
+                >
+                  {Math.round((Number(c.total_cents) / maiorDespesa) * 100)}% do
+                  maior · {c.tx_count}{" "}
+                  {Number(c.tx_count) === 1 ? "lançamento" : "lançamentos"}
+                </ThemedText>
+              </View>
+            ))}
+          </Section>
+          {despesas.length > TOP_CATEGORIES && !verTodas ? (
+            <Button
+              label={`Ver todas as ${despesas.length}`}
+              variant="secondary"
+              size="sm"
+              onPress={() => setVerTodas(true)}
+            />
+          ) : null}
+        </Animated.View>
+      ) : null}
 
-          {!isLoading && !isError && data?.categories.length === 0 && (
-            <GlassCard style={styles.empty}>
-              <ThemedText style={styles.emptyEmoji}>📊</ThemedText>
-              <ThemedText type="smallBold">Sem lançamentos em {ano}</ThemedText>
-              <ThemedText type="small" themeColor="textSecondary" style={styles.centered}>
-                Escolha outro ano ou comece a registrar{'\n'}pelo WhatsApp.
-              </ThemedText>
-            </GlassCard>
+      {receitas.length > 0 ? (
+        <Animated.View
+          entering={FadeInDown.duration(Motion.duration.slow).delay(
+            Motion.stagger.step * 3,
           )}
-        </ScrollView>
-      </SafeAreaView>
-    </ThemedView>
+        >
+          {/* Sem barra: quem tem duas fontes de renda não precisa de gráfico para compará-las. */}
+          <Section title="De onde veio">
+            {receitas.map((c) => (
+              <Row
+                key={c.category}
+                title={c.category}
+                chevron={false}
+                trailing={
+                  <Money
+                    cents={Number(c.total_cents)}
+                    variant="headline"
+                    tone="success"
+                  />
+                }
+              />
+            ))}
+          </Section>
+        </Animated.View>
+      ) : null}
+
+      {!isLoading && !isError && !temConteudo ? (
+        <EmptyState
+          icon="calendar"
+          title={`Nada lançado em ${ano}`}
+          hint={
+            "Escolha outro ano aí em cima — ou manda “gastei 45 no mercado”\nno WhatsApp para o ano que vem já nascer pronto."
+          }
+        />
+      ) : null}
+
+      {!isLoading && !isError && temConteudo ? (
+        <ThemedText
+          type="small"
+          themeColor="textSecondary"
+          style={styles.rodape}
+        >
+          Só lançamentos confirmados, sem transferências entre suas contas.
+        </ThemedText>
+      ) : null}
+    </Screen>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    flexDirection: 'row',
-    justifyContent: 'center',
+  hero: {
+    gap: Space.sm,
   },
-  safeArea: {
-    flex: 1,
-    maxWidth: MaxContentWidth,
-    paddingHorizontal: Spacing.four,
-    width: '100%',
+  heroLinha: {
+    flexDirection: "row",
+    gap: Space.xl,
   },
-  scroll: {
-    gap: Spacing.three,
-    paddingBottom: Spacing.six,
+  heroMetade: {
+    gap: 2,
   },
-  resumo: {
-    gap: Spacing.one,
+  bloco: {
+    gap: Space.md,
   },
-  linha: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
+  nota: {
+    paddingHorizontal: Space.lg,
   },
   categoria: {
-    gap: Spacing.half,
+    gap: Space.sm,
+    paddingHorizontal: Space.lg,
+    paddingVertical: Space.md,
   },
-  track: {
-    height: 6,
-    borderRadius: 3,
-    overflow: 'hidden',
+  categoriaTopo: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: Space.md,
   },
-  fill: {
-    height: '100%',
-    borderRadius: 3,
+  categoriaNome: {
+    flex: 1,
   },
-  chipRow: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: Spacing.two,
-  },
-  submit: {
-    borderRadius: Spacing.three,
-    paddingVertical: Spacing.three,
-    alignItems: 'center',
-  },
-  buttonLabel: {
-    color: '#fff',
-  },
-  empty: {
-    alignItems: 'center',
-    gap: Spacing.two,
-    paddingVertical: Spacing.five,
-  },
-  emptyEmoji: {
-    fontSize: 40,
-  },
-  centered: {
-    textAlign: 'center',
+  rodape: {
+    ...Type.footnote,
+    paddingHorizontal: Space.lg,
   },
 });

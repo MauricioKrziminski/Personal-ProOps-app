@@ -83,8 +83,13 @@ em português, captura instantânea e uma lixeira que perdoa. Editor de blocos n
 
 1. **Header nativo** — large title "Notas", `<Stack.SearchBar placement="automatic">`.
    `headerRight`: nota longa (abre `/notes/new`) e menu com Pastas.
-2. **Quick-add de uma linha, fixo no topo.** É a captura de dois segundos e o coração do produto
-   — não vai atrás de FAB nenhum.
+2. **Quick-add de uma linha, no topo da lista** (`ListHeaderComponent`). É a captura de dois
+   segundos e o coração do produto — não vai atrás de FAB nenhum.
+
+   > Corrigido depois de ver no simulador: fixo **fora** do scroller ele renderizava por cima da
+   > barra de status (o header nativo não reserva altura para irmão que não rola), e ainda
+   > impedia o large title de colapsar. Dentro do `ListHeaderComponent` some ao rolar — e rolar
+   > é o gesto de *ler*, não o de *capturar*.
 3. **Chips de pasta e de tag** no `ListHeaderComponent` (reusa `src/components/finance/chip.tsx`).
    Somem quando não existe pasta nem tag — usuário novo não vê estrutura vazia.
 4. **Fixadas** no topo da lista, com rótulo discreto — não com card separado.

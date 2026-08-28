@@ -1,17 +1,33 @@
 import { useState } from 'react';
-import { Alert, Pressable, ScrollView, StyleSheet, TextInput, View } from 'react-native';
+import {
+  ActionSheetIOS,
+  Alert,
+  Modal,
+  Platform,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  View,
+  useWindowDimensions,
+} from 'react-native';
 import Animated, { FadeInDown } from 'react-native-reanimated';
-import { SafeAreaView } from 'react-native-safe-area-context';
-import * as Haptics from 'expo-haptics';
+import { Stack, router } from 'expo-router';
 
-import { ErrorCard, LoadingCard } from '@/components/error-card';
-import { Chip } from '@/components/finance/chip';
-import { MoneyInput } from '@/components/finance/money-input';
 import { GlassCard } from '@/components/glass/glass-card';
 import { ThemedText } from '@/components/themed-text';
-import { ThemedView } from '@/components/themed-view';
-import { MaxContentWidth, Spacing } from '@/constants/theme';
-import { formatBRL } from '@/hooks/use-items';
+import { Button } from '@/components/ui/button';
+import { Card } from '@/components/ui/card';
+import { EmptyState } from '@/components/ui/empty-state';
+import { Field, MoneyField, TextField } from '@/components/ui/field';
+import { Icon } from '@/components/ui/icon';
+import { Money } from '@/components/ui/money';
+import { Row, Section } from '@/components/ui/row';
+import { Screen } from '@/components/ui/screen';
+import { Segmented } from '@/components/ui/segmented';
+import { Skeleton, SkeletonRow } from '@/components/ui/skeleton';
+import { ProgressBar, Sparkline } from '@/components/ui/sparkline';
+import { useToast } from '@/components/ui/toast';
+import { Motion, Radius, Space, Type, tabular } from '@/design/tokens';
 import {
   ASSET_CLASSES,
   useArchiveAsset,
@@ -22,404 +38,545 @@ import {
   useSaveAsset,
   type Asset,
 } from '@/hooks/use-finance';
+import { formatBRL } from '@/hooks/use-items';
 import { useTheme } from '@/hooks/use-theme';
+
+/**
+ * Patrimônio — "estou ficando mais rico ou mais pobre?".
+ *
+ * É a única tela do app cuja resposta é uma TENDÊNCIA. Por isso o destaque traz a variação, e não
+ * só o valor de hoje.
+ *
+ * **Histórico é SNAPSHOT.** `net_worth_series` lê as fotos diárias de `net_worth_snapshots`: não
+ * existe histórico do valor de um imóvel ou de um investimento, e reconstruir seria inventar
+ * número. A série começa quando o usuário começou a usar — e a tela DIZ isso, em vez de esconder
+ * o bloco (era o que acontecia antes, justo com quem mais precisa da explicação).
+ */
 
 function mesLabel(iso: string): string {
   const [y, m] = iso.split('-').map(Number);
   return new Date(y, m - 1, 1).toLocaleDateString('pt-BR', { month: 'short' });
 }
 
+const CLASSE_ICONE: Record<string, Parameters<typeof Icon>[0]['name']> = {
+  investment: 'chart.line.uptrend.xyaxis',
+  real_estate: 'house',
+  vehicle: 'car',
+  crypto: 'bitcoinsign.circle',
+  equity: 'chart.pie',
+  receivable: 'clock.arrow.circlepath',
+  other: 'shippingbox',
+};
+
+interface FormState {
+  id?: string;
+  name: string;
+  classe: Asset['class'];
+  passivo: boolean;
+  valor: number;
+  /** Valor com que o bem foi aberto: se não mudar, não vira marcação nova no histórico. */
+  valorOriginal: number;
+}
+
+const FORM_VAZIO: FormState = {
+  name: '',
+  classe: 'investment',
+  passivo: false,
+  valor: 0,
+  valorOriginal: -1,
+};
+
+function confirmaDestrutiva(opts: {
+  title: string;
+  message: string;
+  confirm: string;
+  onConfirm: () => void;
+}) {
+  if (Platform.OS === 'ios') {
+    ActionSheetIOS.showActionSheetWithOptions(
+      {
+        title: opts.title,
+        message: opts.message,
+        options: ['Cancelar', opts.confirm],
+        cancelButtonIndex: 0,
+        destructiveButtonIndex: 1,
+      },
+      (i) => {
+        if (i === 1) opts.onConfirm();
+      }
+    );
+    return;
+  }
+  Alert.alert(opts.title, opts.message, [
+    { text: 'Cancelar', style: 'cancel' },
+    { text: opts.confirm, style: 'destructive', onPress: opts.onConfirm },
+  ]);
+}
+
+/** Faixa de erro por bloco: seção que falha diz que falhou em vez de sumir. */
+function ErrorBand({ message, onRetry }: { message: string; onRetry: () => void }) {
+  return (
+    <Card style={styles.band}>
+      <Icon name="exclamationmark.triangle.fill" size="lg" color="danger" />
+      <ThemedText type="small" style={styles.centered}>
+        {message}
+      </ThemedText>
+      <Button label="Tentar de novo" variant="secondary" size="sm" onPress={onRetry} />
+    </Card>
+  );
+}
+
 export default function NetWorthScreen() {
   const theme = useTheme();
-  const { data: patrimonio, isLoading, isError, refetch } = useNetWorth();
-  const { data: serie } = useNetWorthSeries(12);
-  const { data: saude } = useFinancialHealth();
-  const { data: ativos } = useAssets();
+  const toast = useToast();
+  const { width } = useWindowDimensions();
+  const patrimonio = useNetWorth();
+  const serie = useNetWorthSeries(12);
+  const saude = useFinancialHealth();
+  const bens = useAssets();
   const save = useSaveAsset();
   const archive = useArchiveAsset();
+  const [form, setForm] = useState<FormState | null>(null);
 
-  const [criando, setCriando] = useState(false);
-  const [editando, setEditando] = useState<Asset | null>(null);
-  const [name, setName] = useState('');
-  const [classe, setClasse] = useState<Asset['class']>('investment');
-  const [valor, setValor] = useState(0);
-  const [ehPassivo, setEhPassivo] = useState(false);
+  const hoje = patrimonio.data;
+  const pontos = serie.data ?? [];
+  const valores = pontos.map((p) => Number(p.net_cents));
+  const liquido = Number(hoje?.net_cents ?? 0);
+  // variação contra a foto mais antiga que existe — é o que responde "subindo ou descendo?"
+  const variacao = pontos.length > 1 ? liquido - Number(pontos[0].net_cents) : null;
+  const mesesDeSerie = Math.max(pontos.length - 1, 1);
 
-  const showForm = criando || editando !== null;
-  const podeSalvar = name.trim().length >= 2 && valor >= 0;
-  const maxSerie = Math.max(...(serie ?? []).map((p) => Math.abs(Number(p.net_cents))), 1);
+  const ativos = (bens.data ?? []).filter((b) => !b.is_liability);
+  const passivos = (bens.data ?? []).filter((b) => b.is_liability);
+  // erro em `bens` não pode virar "você não tem nada" — são telas diferentes
+  const vazioAbsoluto =
+    !patrimonio.isLoading &&
+    !bens.isError &&
+    liquido === 0 &&
+    Number(hoje?.cash_cents ?? 0) === 0 &&
+    (bens.data ?? []).length === 0;
 
-  const fechar = () => {
-    setCriando(false);
-    setEditando(null);
-    setName('');
-    setClasse('investment');
-    setValor(0);
-    setEhPassivo(false);
+  // erro fica dentro do sheet: toast aparece ATRÁS de um Modal nativo e o usuário não veria nada
+  const abrirNovo = () => {
+    save.reset();
+    archive.reset();
+    setForm({ ...FORM_VAZIO });
+  };
+  const abrirEdicao = (b: Asset) => {
+    save.reset();
+    archive.reset();
+    setForm({
+      id: b.id,
+      name: b.name,
+      classe: b.class,
+      passivo: b.is_liability,
+      valor: b.current_value_cents,
+      valorOriginal: b.current_value_cents,
+    });
   };
 
-  const onSubmit = () => {
-    if (!podeSalvar) return;
+  const nomeOk = (form?.name.trim().length ?? 0) >= 2;
+
+  const salvar = () => {
+    if (!form || !nomeOk) return;
     save.mutate(
       {
-        id: editando?.id,
-        name: name.trim(),
-        class: classe,
-        is_liability: ehPassivo,
-        current_value_cents: valor,
+        id: form.id,
+        name: form.name.trim(),
+        class: form.classe,
+        is_liability: form.passivo,
+        current_value_cents: form.valor,
+        // marcação nova só quando o valor mudou de verdade: renomear não é remarcar
+        revalue: !form.id || form.valor !== form.valorOriginal,
       },
       {
         onSuccess: () => {
-          Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-          fechar();
+          toast({
+            message: form.id ? `${form.name.trim()} atualizado.` : 'Bem cadastrado.',
+            tone: 'success',
+          });
+          setForm(null);
         },
-      },
+        onError: () =>
+          toast({ message: 'Não deu para salvar. Já existe um bem com esse nome?', tone: 'error' }),
+      }
     );
   };
 
+  const arquivar = (b: Asset) =>
+    confirmaDestrutiva({
+      title: `Arquivar "${b.name}"?`,
+      message: 'O histórico de marcações é mantido.',
+      confirm: 'Arquivar',
+      onConfirm: () =>
+        archive.mutate(b.id, {
+          onSuccess: () => {
+            setForm(null);
+            toast({ message: `${b.name} arquivado.`, tone: 'success' });
+          },
+          onError: () => toast({ message: `Não deu para arquivar ${b.name}.`, tone: 'error' }),
+        }),
+    });
+
+  const linhaBem = (b: Asset) => (
+    <Row
+      key={b.id}
+      title={b.name}
+      subtitle={ASSET_CLASSES.find((c) => c.value === b.class)?.label}
+      icon={CLASSE_ICONE[b.class]}
+      onPress={() => abrirEdicao(b)}
+      accessibilityLabel={`${b.name}, ${b.is_liability ? 'dívida de' : 'vale'} ${formatBRL(b.current_value_cents)}. Toque para atualizar o valor.`}
+      trailing={
+        <Money
+          cents={b.is_liability ? -b.current_value_cents : b.current_value_cents}
+          variant="headline"
+          tone={b.is_liability ? 'danger' : 'text'}
+          signed={b.is_liability}
+        />
+      }
+    />
+  );
+
   return (
-    <ThemedView style={styles.container}>
-      <SafeAreaView style={styles.safeArea}>
-        <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
-
-          {isError && <ErrorCard onRetry={refetch} />}
-          {isLoading && !isError && <LoadingCard />}
-
-          {patrimonio && (
-            <Animated.View entering={FadeInDown.duration(400)}>
-              <GlassCard style={styles.resumo}>
-                <ThemedText type="small" themeColor="textSecondary">
-                  Patrimônio líquido
-                </ThemedText>
-                <ThemedText
-                  type="title"
-                  style={{ color: Number(patrimonio.net_cents) < 0 ? theme.danger : theme.text }}>
-                  {formatBRL(Number(patrimonio.net_cents))}
-                </ThemedText>
-
-                <View style={styles.linha}>
-                  <ThemedText type="small" themeColor="textSecondary">
-                    💵 Em conta
-                  </ThemedText>
-                  <ThemedText type="small">{formatBRL(Number(patrimonio.cash_cents))}</ThemedText>
-                </View>
-                <View style={styles.linha}>
-                  <ThemedText type="small" themeColor="textSecondary">
-                    📈 Investimentos
-                  </ThemedText>
-                  <ThemedText type="small">
-                    {formatBRL(Number(patrimonio.investments_cents))}
-                  </ThemedText>
-                </View>
-                <View style={styles.linha}>
-                  <ThemedText type="small" themeColor="textSecondary">
-                    🏠 Outros bens
-                  </ThemedText>
-                  <ThemedText type="small">
-                    {formatBRL(Number(patrimonio.other_assets_cents))}
-                  </ThemedText>
-                </View>
-                <View style={styles.linha}>
-                  <ThemedText type="small" themeColor="textSecondary">
-                    🧾 Dívidas e faturas
-                  </ThemedText>
-                  <ThemedText type="small" style={{ color: theme.danger }}>
-                    −{formatBRL(Number(patrimonio.liabilities_cents))}
-                  </ThemedText>
-                </View>
-              </GlassCard>
-            </Animated.View>
-          )}
-
-          {(serie ?? []).length > 1 && (
-            <GlassCard style={styles.resumo}>
-              <ThemedText type="smallBold">Evolução</ThemedText>
-              <View style={styles.chart}>
-                {(serie ?? []).map((ponto) => {
-                  const valorPonto = Number(ponto.net_cents);
-                  const altura = (Math.abs(valorPonto) / maxSerie) * 100;
-                  return (
-                    <View key={ponto.month} style={styles.chartCol}>
-                      <View
-                        style={[
-                          styles.chartBar,
-                          {
-                            height: `${Math.max(altura, 2)}%`,
-                            backgroundColor: valorPonto < 0 ? theme.danger : theme.tint,
-                          },
-                        ]}
-                      />
-                      <ThemedText type="small" themeColor="textSecondary" style={styles.chartLabel}>
-                        {mesLabel(ponto.month)}
-                      </ThemedText>
-                    </View>
-                  );
-                })}
-              </View>
-              <ThemedText type="small" themeColor="textSecondary">
-                O histórico começa no dia em que você começou a usar — não dá para reconstruir o
-                valor de um bem no passado sem inventar número.
-              </ThemedText>
-            </GlassCard>
-          )}
-
-          {saude && (
-            <GlassCard style={styles.resumo}>
-              <View style={styles.linha}>
-                <ThemedText type="smallBold">Saúde financeira</ThemedText>
-                <ThemedText
-                  type="subtitle"
-                  style={{
-                    color:
-                      saude.score >= 70
-                        ? theme.success
-                        : saude.score >= 40
-                          ? theme.warning
-                          : theme.danger,
-                  }}>
-                  {saude.score}
-                </ThemedText>
-              </View>
-              <ThemedText type="small" themeColor="textSecondary">
-                Poupa {saude.savings_rate}% do que ganha · reserva de {saude.months_of_reserve}{' '}
-                meses · {saude.budget_adherence}% dos orçamentos respeitados · dívida em{' '}
-                {saude.debt_ratio}% da renda.
-              </ThemedText>
-            </GlassCard>
-          )}
-
-          {(ativos ?? []).map((ativo, index) => (
-            <Animated.View
-              key={ativo.id}
-              entering={FadeInDown.duration(400).delay(Math.min(index * 50, 400))}>
-              <Pressable
-                onPress={() => {
-                  Haptics.selectionAsync();
-                  setCriando(false);
-                  setEditando(ativo);
-                  setName(ativo.name);
-                  setClasse(ativo.class);
-                  setValor(ativo.current_value_cents);
-                  setEhPassivo(ativo.is_liability);
-                }}
-                onLongPress={() =>
-                  Alert.alert('Arquivar', `Arquivar "${ativo.name}"?`, [
-                    { text: 'Cancelar', style: 'cancel' },
-                    {
-                      text: 'Arquivar',
-                      style: 'destructive',
-                      onPress: () => archive.mutate(ativo.id),
-                    },
-                  ])
-                }>
-                <GlassCard style={styles.item}>
-                  <View style={styles.itemTexto}>
-                    <ThemedText type="smallBold">{ativo.name}</ThemedText>
-                    <ThemedText type="small" themeColor="textSecondary">
-                      {ASSET_CLASSES.find((c) => c.value === ativo.class)?.label}
-                      {ativo.is_liability ? ' · passivo' : ''}
-                    </ThemedText>
-                  </View>
-                  <ThemedText
-                    type="smallBold"
-                    style={{ color: ativo.is_liability ? theme.danger : theme.text }}>
-                    {ativo.is_liability ? '−' : ''}
-                    {formatBRL(ativo.current_value_cents)}
-                  </ThemedText>
-                </GlassCard>
-              </Pressable>
-            </Animated.View>
-          ))}
-
-          {!isLoading && (ativos ?? []).length === 0 && !showForm && (
-            <GlassCard style={styles.empty}>
-              <ThemedText style={styles.emptyEmoji}>🏦</ThemedText>
-              <ThemedText type="smallBold">Nenhum bem cadastrado</ThemedText>
-              <ThemedText type="small" themeColor="textSecondary" style={styles.centered}>
-                Cadastre investimentos, imóveis e veículos{'\n'}para ver seu patrimônio completo.
-              </ThemedText>
-            </GlassCard>
-          )}
-
-          {showForm ? (
-            <GlassCard style={styles.form}>
-              <ThemedText type="smallBold">
-                {editando ? `Atualizar “${editando.name}”` : 'Novo bem'}
-              </ThemedText>
-              {editando ? (
-                <ThemedText type="small" themeColor="textSecondary">
-                  O valor novo entra como marcação de hoje no histórico.
-                </ThemedText>
-              ) : (
-                <TextInput
-                  value={name}
-                  onChangeText={setName}
-                  placeholder="Nome (ex.: Tesouro Selic)"
-                  placeholderTextColor={theme.textSecondary}
-                  autoFocus
-                  style={[
-                    styles.input,
-                    { backgroundColor: theme.backgroundElement, color: theme.text },
-                  ]}
-                />
-              )}
-              {!editando && (
-                <>
-                  <View style={styles.chipRow}>
-                    {ASSET_CLASSES.map((c) => (
-                      <Chip
-                        key={c.value}
-                        label={c.label}
-                        selected={classe === c.value}
-                        onPress={() => setClasse(c.value)}
-                      />
-                    ))}
-                  </View>
-                  <Chip
-                    label="É um passivo (dívida)"
-                    selected={ehPassivo}
-                    onPress={() => setEhPassivo((v) => !v)}
-                  />
-                </>
-              )}
-              <ThemedText type="smallBold">Valor atual</ThemedText>
-              <MoneyInput valueCents={valor} onChangeCents={setValor} />
-              <Pressable
-                onPress={onSubmit}
-                disabled={!podeSalvar || save.isPending}
-                style={({ pressed }) => [
-                  styles.submit,
-                  {
-                    backgroundColor: theme.tint,
-                    opacity: pressed || !podeSalvar || save.isPending ? 0.6 : 1,
-                  },
-                ]}>
-                <ThemedText type="smallBold" style={styles.buttonLabel}>
-                  {save.isPending ? 'Salvando…' : editando ? 'Atualizar valor' : 'Cadastrar'}
-                </ThemedText>
-              </Pressable>
-              <Pressable onPress={fechar} hitSlop={8} style={styles.cancel}>
-                <ThemedText type="small" themeColor="textSecondary">
-                  Cancelar
-                </ThemedText>
-              </Pressable>
-              {save.isError && (
-                <ThemedText type="small" themeColor="danger" style={styles.centered}>
-                  Não deu para salvar (nome repetido?).
-                </ThemedText>
-              )}
-            </GlassCard>
-          ) : (
-            <Pressable
-              onPress={() => {
-                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                setCriando(true);
-              }}
-              style={({ pressed }) => [
-                styles.submit,
-                { backgroundColor: theme.tint, opacity: pressed ? 0.85 : 1 },
-              ]}>
-              <ThemedText type="smallBold" style={styles.buttonLabel}>
-                ＋ Novo bem
-              </ThemedText>
+    <Screen
+      grouped
+      onRefresh={() => {
+        patrimonio.refetch();
+        serie.refetch();
+        saude.refetch();
+        bens.refetch();
+      }}
+      refreshing={patrimonio.isRefetching}>
+      <Stack.Screen
+        options={{
+          title: 'Patrimônio',
+          headerLargeTitle: true,
+          headerRight: () => (
+            <Pressable accessibilityLabel="Novo bem" hitSlop={12} onPress={abrirNovo}>
+              <Icon name="plus.circle.fill" size="lg" color="tint" />
             </Pressable>
-          )}
-        </ScrollView>
-      </SafeAreaView>
-    </ThemedView>
+          ),
+        }}
+      />
+
+      {patrimonio.isLoading ? (
+        <>
+          <Skeleton height={140} radius={Radius.lg} />
+          <Skeleton height={120} radius={Radius.md} />
+          <SkeletonRow />
+          <SkeletonRow />
+        </>
+      ) : null}
+
+      {/* O único GlassCard da tela. */}
+      {patrimonio.isError ? (
+        <ErrorBand message="Não deu para calcular seu patrimônio." onRetry={patrimonio.refetch} />
+      ) : hoje && !vazioAbsoluto ? (
+        <Animated.View entering={FadeInDown.duration(Motion.duration.slow)}>
+          <GlassCard style={styles.hero}>
+            <ThemedText type="small" themeColor="textSecondary">
+              Patrimônio líquido
+            </ThemedText>
+            <Money
+              cents={liquido}
+              variant="money"
+              tone={liquido < 0 ? 'danger' : 'text'}
+              signed={liquido < 0}
+            />
+            {variacao === null ? (
+              <ThemedText type="small" themeColor="textSecondary">
+                A variação aparece quando houver mais de uma foto do seu patrimônio.
+              </ThemedText>
+            ) : (
+              <View style={styles.variacao}>
+                <Icon
+                  name={variacao >= 0 ? 'arrow.up.right' : 'arrow.down.right'}
+                  size="sm"
+                  color={variacao >= 0 ? 'success' : 'danger'}
+                />
+                <Money
+                  cents={variacao}
+                  variant="subhead"
+                  tone={variacao >= 0 ? 'success' : 'danger'}
+                  signed
+                />
+                <ThemedText type="small" themeColor="textSecondary">
+                  em {mesesDeSerie} {mesesDeSerie === 1 ? 'mês' : 'meses'}
+                </ThemedText>
+              </View>
+            )}
+          </GlassCard>
+        </Animated.View>
+      ) : null}
+
+      {serie.isError ? (
+        <ErrorBand message="Não deu para carregar a evolução." onRetry={serie.refetch} />
+      ) : pontos.length > 1 ? (
+        <Card style={styles.bloco}>
+          <ThemedText type="smallBold">Evolução</ThemedText>
+          <Sparkline values={valores} width={width - Space.lg * 4} height={80} showZero />
+          <View style={styles.eixo}>
+            <ThemedText type="small" themeColor="textSecondary">
+              {mesLabel(pontos[0].month)}
+            </ThemedText>
+            <View style={styles.eixoFim}>
+              <ThemedText type="small" themeColor="textSecondary">
+                {mesLabel(pontos[pontos.length - 1].month)}
+              </ThemedText>
+              <Money
+                cents={Number(pontos[pontos.length - 1].net_cents)}
+                variant="footnote"
+                tone="textSecondary"
+              />
+            </View>
+          </View>
+          <ThemedText type="small" themeColor="textSecondary">
+            A linha do zero é a de referência: abaixo dela o patrimônio é negativo.
+          </ThemedText>
+        </Card>
+      ) : !serie.isLoading ? (
+        /* O estado mais importante da tela: é o de TODO usuário novo. */
+        <Card style={styles.bloco}>
+          <ThemedText type="smallBold">A curva ainda não tem história</ThemedText>
+          <ThemedText type="small" themeColor="textSecondary">
+            A foto do seu patrimônio é tirada todo dia. A curva aparece a partir do segundo mês —
+            não dá para reconstruir o valor de um bem no passado sem inventar número.
+          </ThemedText>
+        </Card>
+      ) : null}
+
+      {saude.isError ? (
+        <ErrorBand message="Não deu para calcular sua saúde financeira." onRetry={saude.refetch} />
+      ) : saude.data ? (
+        <Section title="Saúde financeira">
+          <Row
+            title="Score"
+            subtitle="de 0 a 100"
+            trailing={
+              <ThemedText
+                themeColor={
+                  saude.data.score >= 70 ? 'success' : saude.data.score >= 40 ? 'warning' : 'danger'
+                }
+                style={[Type.title2, tabular]}>
+                {saude.data.score}
+              </ThemedText>
+            }
+          />
+          <View style={styles.scoreBar}>
+            <ProgressBar
+              value={saude.data.score}
+              max={100}
+              tone={
+                saude.data.score >= 70 ? 'success' : saude.data.score >= 40 ? 'warning' : 'danger'
+              }
+            />
+          </View>
+          {/* Os pesos são o que diz ao usuário O QUE MEXER — antes era um parágrafo corrido. */}
+          <Row
+            title="Poupança"
+            subtitle="peso 40 pts"
+            trailing={<ThemedText style={tabular}>{saude.data.savings_rate}%</ThemedText>}
+          />
+          <Row
+            title="Orçamentos respeitados"
+            subtitle="peso 25 pts"
+            trailing={<ThemedText style={tabular}>{saude.data.budget_adherence}%</ThemedText>}
+          />
+          <Row
+            title="Reserva"
+            subtitle="peso 20 pts"
+            trailing={
+              <ThemedText style={tabular}>{saude.data.months_of_reserve} meses</ThemedText>
+            }
+          />
+          <Row
+            title="Dívida sobre a renda"
+            subtitle="peso 15 pts"
+            trailing={<ThemedText style={tabular}>{saude.data.debt_ratio}%</ThemedText>}
+          />
+          <Row
+            title="Ver relatórios"
+            icon="chart.bar"
+            onPress={() => router.push('/finance/reports')}
+          />
+        </Section>
+      ) : null}
+
+      {bens.isError ? (
+        <ErrorBand message="Não deu para carregar seus bens." onRetry={bens.refetch} />
+      ) : null}
+
+      {ativos.length > 0 ? <Section title="Bens">{ativos.map(linhaBem)}</Section> : null}
+      {passivos.length > 0 ? (
+        <Section title="Passivos">{passivos.map(linhaBem)}</Section>
+      ) : null}
+
+      <Section>
+        <Row
+          title="Dívidas"
+          subtitle="financiamentos e empréstimos entram no passivo"
+          icon="banknote"
+          onPress={() => router.push('/finance/debts')}
+        />
+      </Section>
+
+      {!bens.isLoading && !bens.isError && (bens.data ?? []).length === 0 ? (
+        <EmptyState
+          icon="chart.line.uptrend.xyaxis"
+          title={vazioAbsoluto ? 'Seu patrimônio começa aqui' : 'Nenhum bem cadastrado'}
+          hint={
+            vazioAbsoluto
+              ? 'Cadastre o que você tem — investimento, imóvel, carro. O dinheiro em conta e as faturas já entram sozinhos.'
+              : 'O dinheiro em conta já está contado acima. Cadastre investimento, imóvel ou carro para completar a conta.'
+          }
+          action={{ label: 'Cadastrar bem', onPress: abrirNovo }}
+        />
+      ) : null}
+
+      <Modal
+        visible={form !== null}
+        animationType="slide"
+        presentationStyle="pageSheet"
+        onRequestClose={() => setForm(null)}>
+        <View style={[styles.sheet, { backgroundColor: theme.groupedBackground }]}>
+          <View style={styles.sheetHead}>
+            <Button label="Cancelar" variant="ghost" size="sm" onPress={() => setForm(null)} />
+            <ThemedText type="smallBold">{form?.id ? 'Editar bem' : 'Novo bem'}</ThemedText>
+            <Button
+              label="Salvar"
+              size="sm"
+              loading={save.isPending}
+              disabled={!nomeOk}
+              onPress={salvar}
+            />
+          </View>
+
+          {form ? (
+            <ScrollView contentContainerStyle={styles.sheetBody} keyboardShouldPersistTaps="handled">
+              <Field label="Nome">
+                <TextField
+                  value={form.name}
+                  onChangeText={(name) => setForm({ ...form, name })}
+                  placeholder="Tesouro Selic"
+                  autoFocus={!form.id}
+                  invalid={form.name.length > 0 && !nomeOk}
+                />
+              </Field>
+
+              <Field label="É bem ou dívida?">
+                <Segmented
+                  options={[
+                    { value: 'bem', label: 'Bem' },
+                    { value: 'divida', label: 'Dívida' },
+                  ]}
+                  value={form.passivo ? 'divida' : 'bem'}
+                  onChange={(v) => setForm({ ...form, passivo: v === 'divida' })}
+                />
+              </Field>
+
+              <Field label="Tipo">
+                <Section>
+                  {ASSET_CLASSES.map((c) => (
+                    <Row
+                      key={c.value}
+                      title={c.label}
+                      icon={CLASSE_ICONE[c.value]}
+                      onPress={() => setForm({ ...form, classe: c.value })}
+                      trailing={
+                        form.classe === c.value ? (
+                          <Icon name="checkmark" size="sm" color="tint" />
+                        ) : undefined
+                      }
+                    />
+                  ))}
+                </Section>
+              </Field>
+
+              <Field
+                label="Valor atual"
+                hint={
+                  form.id
+                    ? 'Valor novo entra como marcação de hoje no histórico. Igual ao anterior, nada é marcado.'
+                    : undefined
+                }>
+                <MoneyField
+                  valueCents={form.valor}
+                  onChangeCents={(valor) => setForm({ ...form, valor })}
+                  autoFocus={Boolean(form.id)}
+                />
+              </Field>
+
+              {form.id ? (
+                <Button
+                  block
+                  variant="destructive"
+                  label="Arquivar bem"
+                  onPress={() => {
+                    const alvo = (bens.data ?? []).find((b) => b.id === form.id);
+                    if (alvo) arquivar(alvo);
+                  }}
+                />
+              ) : null}
+
+              {save.isError || archive.isError ? (
+                <ThemedText type="small" themeColor="danger" style={styles.centered}>
+                  {archive.isError
+                    ? 'Não deu para arquivar este bem.'
+                    : 'Não deu para salvar. Já existe um bem com esse nome?'}
+                </ThemedText>
+              ) : null}
+            </ScrollView>
+          ) : null}
+        </View>
+      </Modal>
+    </Screen>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    flexDirection: 'row',
-    justifyContent: 'center',
+  hero: {
+    gap: Space.sm,
   },
-  safeArea: {
-    flex: 1,
-    maxWidth: MaxContentWidth,
-    paddingHorizontal: Spacing.four,
-    width: '100%',
-  },
-  scroll: {
-    gap: Spacing.three,
-    paddingBottom: Spacing.six,
-  },
-  resumo: {
-    gap: Spacing.one,
-  },
-  linha: {
+  variacao: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
+    gap: Space.sm,
   },
-  chart: {
+  bloco: {
+    gap: Space.md,
+  },
+  eixo: {
     flexDirection: 'row',
+    justifyContent: 'space-between',
     alignItems: 'flex-end',
-    height: 110,
-    gap: Spacing.one,
-    marginVertical: Spacing.two,
   },
-  chartCol: {
-    flex: 1,
-    height: '100%',
-    justifyContent: 'flex-end',
+  eixoFim: {
+    alignItems: 'flex-end',
+  },
+  scoreBar: {
+    paddingHorizontal: Space.lg,
+    paddingBottom: Space.md,
+  },
+  band: {
     alignItems: 'center',
-    gap: Spacing.half,
-  },
-  chartBar: {
-    width: '70%',
-    borderRadius: Spacing.half,
-  },
-  chartLabel: {
-    fontSize: 10,
-  },
-  item: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    gap: Spacing.three,
-  },
-  itemTexto: {
-    flex: 1,
-    gap: Spacing.half,
-  },
-  form: {
-    gap: Spacing.two,
-  },
-  input: {
-    borderRadius: Spacing.two,
-    paddingHorizontal: Spacing.three,
-    paddingVertical: Spacing.two,
-    fontSize: 16,
-  },
-  chipRow: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: Spacing.two,
-  },
-  submit: {
-    borderRadius: Spacing.three,
-    paddingVertical: Spacing.three,
-    alignItems: 'center',
-  },
-  buttonLabel: {
-    color: '#fff',
-  },
-  cancel: {
-    alignItems: 'center',
-    paddingVertical: Spacing.one,
-  },
-  empty: {
-    alignItems: 'center',
-    gap: Spacing.two,
-    paddingVertical: Spacing.five,
-  },
-  emptyEmoji: {
-    fontSize: 40,
+    gap: Space.md,
   },
   centered: {
     textAlign: 'center',
+  },
+  sheet: {
+    flex: 1,
+  },
+  sheetHead: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: Space.lg,
+    paddingVertical: Space.md,
+  },
+  sheetBody: {
+    gap: Space.xl,
+    padding: Space.lg,
+    paddingBottom: Space.xxxl,
   },
 });

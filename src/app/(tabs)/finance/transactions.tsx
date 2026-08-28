@@ -220,7 +220,8 @@ export default function TransactionsScreen() {
         <Segmented options={STATUS_OPTIONS} value={status} onChange={setStatus} />
         {category ? (
           <Button
-            label={`categoria: ${category} ✕`}
+            label={`categoria: ${category}`}
+            icon="xmark"
             size="sm"
             variant="secondary"
             onPress={() => setCategory(undefined)}

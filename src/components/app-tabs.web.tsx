@@ -19,7 +19,7 @@ export default function AppTabs() {
       <TabSlot style={{ height: '100%' }} />
       <TabList asChild>
         <CustomTabList>
-          <TabTrigger name="index" href="/(tabs)" asChild>
+          <TabTrigger name="today" href="/(tabs)/today" asChild>
             <TabButton>Hoje</TabButton>
           </TabTrigger>
           <TabTrigger name="notes" href="/(tabs)/notes" asChild>
