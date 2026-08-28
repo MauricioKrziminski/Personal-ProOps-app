@@ -1,19 +1,52 @@
-import { useState } from 'react';
-import { Alert, Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { useMemo, useState } from 'react';
+import {
+  ActionSheetIOS,
+  Alert,
+  FlatList,
+  Modal,
+  Platform,
+  ScrollView,
+  StyleSheet,
+  View,
+} from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Animated, { FadeInDown } from 'react-native-reanimated';
-import { SafeAreaView } from 'react-native-safe-area-context';
-import { useLocalSearchParams } from 'expo-router';
-import * as Haptics from 'expo-haptics';
+import { Link, Stack, router, useLocalSearchParams } from 'expo-router';
 
-import { ErrorCard, LoadingCard } from '@/components/error-card';
-import { Chip } from '@/components/finance/chip';
 import { GlassCard } from '@/components/glass/glass-card';
 import { ThemedText } from '@/components/themed-text';
-import { ThemedView } from '@/components/themed-view';
-import { MaxContentWidth, Spacing } from '@/constants/theme';
-import { formatBRL, formatDateBR, localISODate } from '@/hooks/use-items';
-import { useAccounts, useInvoice, usePayInvoice } from '@/hooks/use-finance';
+import { Button } from '@/components/ui/button';
+import { Card } from '@/components/ui/card';
+import { EmptyState } from '@/components/ui/empty-state';
+import { Field, TextField } from '@/components/ui/field';
+import { Icon } from '@/components/ui/icon';
+import { Money } from '@/components/ui/money';
+import { Row, Section } from '@/components/ui/row';
+import { Screen } from '@/components/ui/screen';
+import { Skeleton, SkeletonRow } from '@/components/ui/skeleton';
+import { useToast } from '@/components/ui/toast';
+import { Motion, Radius, Space, tabular } from '@/design/tokens';
+import {
+  useAccounts,
+  useDeleteTransaction,
+  useInvoice,
+  usePayInvoice,
+  type Transaction,
+} from '@/hooks/use-finance';
+import { formatBRL, formatDateBR, localISODate, useRealtimeInvalidate } from '@/hooks/use-items';
 import { useTheme } from '@/hooks/use-theme';
+
+/**
+ * Fatura — "o que tem nesta fatura, e como eu marco como paga?".
+ *
+ * A ação daqui é a de maior consequência do app: `pay_invoice` cria uma transferência de verdade
+ * e mexe no patrimônio. Por isso o valor e a conta aparecem escritos no botão, o erro do banco é
+ * traduzido em vez de virar "tenta de novo", e o pagamento acontece num sheet, não num `Alert`.
+ *
+ * **O total nunca é materializado** — sai da soma das compras da fatura. A soma ainda é feita no
+ * cliente sobre `useInvoice` (o doc pede uma RPC `invoice_total`, que não existe): os filtros são
+ * os mesmos do banco (`kind='expense'`), mas o dia em que a lista for paginada essa soma encolhe.
+ */
 
 const STATUS_LABEL: Record<string, string> = {
   open: 'Aberta',
@@ -21,221 +54,437 @@ const STATUS_LABEL: Record<string, string> = {
   paid: 'Paga',
 };
 
+function mesLabel(iso: string): string {
+  const [y, m] = iso.split('-').map(Number);
+  return new Date(y, m - 1, 1).toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' });
+}
+
+/** `dd/mm/aaaa` → ISO, ou null se a data não existe no calendário. */
+function isoDeBR(valor: string): string | null {
+  const m = /^(\d{2})\/(\d{2})\/(\d{4})$/.exec(valor);
+  if (!m) return null;
+  const [, d, mes, ano] = m;
+  const data = new Date(Number(ano), Number(mes) - 1, Number(d));
+  if (data.getDate() !== Number(d) || data.getMonth() !== Number(mes) - 1) return null;
+  return `${ano}-${mes}-${d}`;
+}
+
+/**
+ * `pay_invoice` levanta quatro exceções diferentes e três delas NÃO se resolvem tentando de novo.
+ * Dizer "erro, tenta de novo" para "fatura já paga" é mandar o usuário repetir o que não falhou.
+ */
+function mensagemDoErro(erro: unknown): string {
+  const texto = (erro as { message?: string })?.message ?? '';
+  if (texto.includes('já paga')) return 'Esta fatura já consta como paga.';
+  if (texto.includes('sem lançamentos')) return 'Esta fatura não tem compras para pagar.';
+  if (texto.includes('próprio cartão')) return 'O cartão não pode pagar a si mesmo. Escolha outra conta.';
+  if (texto.includes('não encontrada')) return 'Não encontrei esta fatura. Volte e abra de novo.';
+  return 'Não deu para registrar o pagamento. Tenta de novo.';
+}
+
+function confirmaDestrutiva(opts: {
+  title: string;
+  message: string;
+  confirm: string;
+  onConfirm: () => void;
+}) {
+  if (Platform.OS === 'ios') {
+    ActionSheetIOS.showActionSheetWithOptions(
+      {
+        title: opts.title,
+        message: opts.message,
+        options: ['Cancelar', opts.confirm],
+        cancelButtonIndex: 0,
+        destructiveButtonIndex: 1,
+      },
+      (i) => {
+        if (i === 1) opts.onConfirm();
+      }
+    );
+    return;
+  }
+  Alert.alert(opts.title, opts.message, [
+    { text: 'Cancelar', style: 'cancel' },
+    { text: opts.confirm, style: 'destructive', onPress: opts.onConfirm },
+  ]);
+}
+
+function ErrorBand({ message, onRetry }: { message: string; onRetry: () => void }) {
+  return (
+    <Card style={styles.band}>
+      <Icon name="exclamationmark.triangle.fill" size="lg" color="danger" />
+      <ThemedText type="small" style={styles.centered}>
+        {message}
+      </ThemedText>
+      <Button label="Tentar de novo" variant="secondary" size="sm" onPress={onRetry} />
+    </Card>
+  );
+}
+
 export default function InvoiceScreen() {
   const theme = useTheme();
+  const toast = useToast();
+  const insets = useSafeAreaInsets();
   const { id } = useLocalSearchParams<{ id: string }>();
-  const { data, isLoading, isError, refetch } = useInvoice(id);
-  const { data: accounts } = useAccounts();
+  const invoice = useInvoice(id);
+  const accounts = useAccounts();
   const pay = usePayInvoice();
-  const [payerId, setPayerId] = useState<string | null>(null);
+  const remove = useDeleteTransaction();
 
-  const invoice = data?.invoice;
-  const transactions = data?.transactions ?? [];
-  // o pagamento é uma transferência: só entram contas que guardam dinheiro
-  const payers = (accounts ?? []).filter(
-    (a) => a.type !== 'credit_card' && a.id !== invoice?.account_id,
+  // `useInvoice` só escuta `transactions`: o fechamento da fatura vem do finance-scheduler e
+  // mudaria só `card_invoices` — sem isto, o status ficaria velho na tela até um refetch manual.
+  useRealtimeInvalidate('card_invoices', ['invoice']);
+
+  const [pagando, setPagando] = useState(false);
+  const [payerId, setPayerId] = useState<string | null>(null);
+  const [dataBR, setDataBR] = useState(() => formatDateBR(localISODate()));
+
+  const fatura = invoice.data?.invoice;
+  const compras = useMemo(() => invoice.data?.transactions ?? [], [invoice.data]);
+  const cartao = (accounts.data ?? []).find((a) => a.id === fatura?.account_id);
+  // o pagamento é transferência: só entram contas que guardam dinheiro, nunca o próprio cartão
+  const pagadoras = (accounts.data ?? []).filter(
+    (a) => a.type !== 'credit_card' && a.id !== fatura?.account_id
   );
-  const total = transactions
+
+  const total = compras
     .filter((t) => t.kind === 'expense')
     .reduce((soma, t) => soma + t.amount_cents, 0);
 
-  const confirmPay = () => {
-    if (!invoice || !payerId) return;
-    const conta = payers.find((a) => a.id === payerId);
-    Alert.alert(
-      'Pagar fatura',
-      `Registrar ${formatBRL(total)} saindo de "${conta?.name}"?`,
-      [
-        { text: 'Cancelar', style: 'cancel' },
-        {
-          text: 'Paguei',
-          onPress: () =>
-            pay.mutate(
-              { invoiceId: invoice.id, accountId: payerId, paidAt: localISODate() },
-              {
-                onSuccess: () => {
-                  Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-                  setPayerId(null);
-                },
-                onError: () => Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error),
-              },
-            ),
+  const dias = useMemo(() => {
+    const mapa = new Map<string, Transaction[]>();
+    for (const t of compras) {
+      const lista = mapa.get(t.occurred_at) ?? [];
+      lista.push(t);
+      mapa.set(t.occurred_at, lista);
+    }
+    return [...mapa.entries()].map(([data, itens]) => ({ data, itens }));
+  }, [compras]);
+
+  const paga = fatura?.status === 'paid';
+  const podePagar = Boolean(fatura) && !paga && total > 0;
+  const dataISO = isoDeBR(dataBR);
+  const pagadora = pagadoras.find((a) => a.id === payerId);
+
+  const abrirPagamento = () => {
+    // pré-seleciona a conta cadastrada como pagadora do cartão — sem isso o usuário escolhe
+    // a mesma conta todo mês
+    setPayerId(cartao?.payment_account_id ?? null);
+    setDataBR(formatDateBR(localISODate()));
+    setPagando(true);
+  };
+
+  const registrar = () => {
+    if (!fatura || !payerId || !dataISO) return;
+    pay.mutate(
+      { invoiceId: fatura.id, accountId: payerId, paidAt: dataISO },
+      {
+        onSuccess: () => {
+          setPagando(false);
+          toast({ message: `Fatura paga com ${pagadora?.name ?? 'a conta escolhida'}.`, tone: 'success' });
         },
-      ],
+        onError: (erro) => toast({ message: mensagemDoErro(erro), tone: 'error' }),
+      }
     );
   };
 
-  return (
-    <ThemedView style={styles.container}>
-      <SafeAreaView style={styles.safeArea}>
-        <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
+  const apagar = (tx: Transaction) =>
+    confirmaDestrutiva({
+      title: 'Apagar esta compra?',
+      message: `${tx.description ?? 'Sem descrição'} · ${formatBRL(tx.amount_cents)}`,
+      confirm: 'Apagar',
+      onConfirm: () =>
+        remove.mutate(tx.id, {
+          onSuccess: () => toast({ message: 'Compra apagada.', tone: 'success' }),
+          onError: () => toast({ message: 'Não deu para apagar a compra.', tone: 'error' }),
+        }),
+    });
 
-          {isError && <ErrorCard onRetry={refetch} />}
-          {isLoading && !isError && <LoadingCard />}
+  const cabecalho = (
+    <View style={styles.header}>
+      {invoice.isLoading ? (
+        <>
+          <Skeleton height={140} radius={Radius.lg} />
+          <SkeletonRow />
+          <SkeletonRow />
+        </>
+      ) : null}
 
-          {invoice && (
-            <>
-              <GlassCard style={styles.resumo}>
-                <View style={styles.linha}>
-                  <ThemedText type="small" themeColor="textSecondary">
-                    {STATUS_LABEL[invoice.status] ?? invoice.status}
-                  </ThemedText>
-                  <ThemedText type="small" themeColor="textSecondary">
-                    {transactions.length} {transactions.length === 1 ? 'lançamento' : 'lançamentos'}
-                  </ThemedText>
-                </View>
-                <ThemedText type="title">{formatBRL(total)}</ThemedText>
-                <ThemedText type="small" themeColor="textSecondary">
-                  Fecha {formatDateBR(invoice.closing_date)} · vence{' '}
-                  {formatDateBR(invoice.due_date)}
+      {invoice.isError ? (
+        <ErrorBand message="Não deu para carregar esta fatura." onRetry={invoice.refetch} />
+      ) : null}
+
+      {/* O único GlassCard da tela. */}
+      {fatura ? (
+        <Animated.View entering={FadeInDown.duration(Motion.duration.slow)}>
+          <GlassCard style={styles.hero}>
+            <View style={styles.heroTop}>
+              <ThemedText type="small" themeColor="textSecondary">
+                {STATUS_LABEL[fatura.status] ?? fatura.status}
+                {cartao ? ` · ${cartao.name}` : ''}
+              </ThemedText>
+              <ThemedText type="small" themeColor="textSecondary" style={tabular}>
+                {compras.length} {compras.length === 1 ? 'lançamento' : 'lançamentos'}
+              </ThemedText>
+            </View>
+            <Money cents={total} variant="money" />
+            <ThemedText type="small" themeColor="textSecondary" style={tabular}>
+              fecha {formatDateBR(fatura.closing_date)} · vence {formatDateBR(fatura.due_date)}
+            </ThemedText>
+            {paga && fatura.paid_at ? (
+              <View style={styles.pagaLinha}>
+                <Icon name="checkmark.circle.fill" size="md" color="success" />
+                <ThemedText type="small" themeColor="success">
+                  Paga em {formatDateBR(fatura.paid_at)}
                 </ThemedText>
-                {invoice.status === 'paid' && invoice.paid_at && (
-                  <ThemedText type="small" style={{ color: theme.success }}>
-                    ✅ Paga em {formatDateBR(invoice.paid_at)}
-                  </ThemedText>
-                )}
-              </GlassCard>
+              </View>
+            ) : null}
+          </GlassCard>
+        </Animated.View>
+      ) : null}
+    </View>
+  );
 
-              {invoice.status !== 'paid' && total > 0 && (
-                <GlassCard style={styles.pagar}>
-                  <ThemedText type="smallBold">Pagar com</ThemedText>
-                  {payers.length === 0 ? (
-                    <ThemedText type="small" themeColor="textSecondary">
-                      Cadastre uma conta corrente para registrar o pagamento.
-                    </ThemedText>
-                  ) : (
-                    <View style={styles.chipRow}>
-                      {payers.map((conta) => (
-                        <Chip
-                          key={conta.id}
-                          label={conta.name}
-                          selected={payerId === conta.id}
-                          onPress={() => setPayerId(payerId === conta.id ? null : conta.id)}
-                        />
-                      ))}
-                    </View>
-                  )}
-                  <Pressable
-                    onPress={confirmPay}
-                    disabled={!payerId || pay.isPending}
-                    style={({ pressed }) => [
-                      styles.submit,
-                      {
-                        backgroundColor: theme.tint,
-                        opacity: pressed || !payerId || pay.isPending ? 0.6 : 1,
-                      },
-                    ]}>
-                    <ThemedText type="smallBold" style={styles.buttonLabel}>
-                      {pay.isPending ? 'Registrando…' : `Paguei ${formatBRL(total)}`}
-                    </ThemedText>
-                  </Pressable>
-                  <ThemedText type="small" themeColor="textSecondary" style={styles.centered}>
-                    O pagamento entra como transferência — as compras já contaram como gasto
-                    quando foram feitas.
-                  </ThemedText>
-                  {pay.isError && (
-                    <ThemedText type="small" themeColor="danger" style={styles.centered}>
-                      Não deu para registrar. Tenta de novo.
-                    </ThemedText>
-                  )}
-                </GlassCard>
-              )}
+  const rodape = fatura ? (
+    <ThemedText type="small" themeColor="textSecondary" style={styles.rodape}>
+      O pagamento entra como transferência: as compras já contaram como gasto quando foram feitas.
+    </ThemedText>
+  ) : null;
 
-              {transactions.map((tx, index) => (
-                <Animated.View
-                  key={tx.id}
-                  entering={FadeInDown.duration(400).delay(Math.min(index * 40, 400))}>
-                  <GlassCard style={styles.item}>
-                    <View style={styles.itemTexto}>
-                      <ThemedText type="smallBold" numberOfLines={1}>
-                        {tx.description ?? 'Sem descrição'}
-                      </ThemedText>
-                      <ThemedText type="small" themeColor="textSecondary">
-                        {formatDateBR(tx.occurred_at)}
-                        {tx.category ? ` · #${tx.category}` : ''}
-                        {tx.status === 'pending' ? ' · parcela futura' : ''}
-                      </ThemedText>
-                    </View>
-                    <ThemedText type="smallBold">{formatBRL(tx.amount_cents)}</ThemedText>
-                  </GlassCard>
-                </Animated.View>
-              ))}
+  return (
+    <Screen scroll={false} grouped>
+      <Stack.Screen
+        options={{
+          title: fatura ? `Fatura de ${mesLabel(fatura.reference_month)}` : 'Fatura',
+        }}
+      />
 
-              {transactions.length === 0 && (
-                <GlassCard style={styles.empty}>
-                  <ThemedText style={styles.emptyEmoji}>🧾</ThemedText>
-                  <ThemedText type="smallBold">Fatura sem lançamentos</ThemedText>
-                  <ThemedText type="small" themeColor="textSecondary" style={styles.centered}>
-                    Nenhuma compra caiu neste ciclo ainda.
-                  </ThemedText>
-                </GlassCard>
-              )}
-            </>
-          )}
-        </ScrollView>
-      </SafeAreaView>
-    </ThemedView>
+      <FlatList
+        data={dias}
+        keyExtractor={(g) => g.data}
+        contentContainerStyle={[styles.lista, { paddingBottom: insets.bottom + Space.xxxl }]}
+        contentInsetAdjustmentBehavior="automatic"
+        showsVerticalScrollIndicator={false}
+        ListHeaderComponent={cabecalho}
+        ListFooterComponent={rodape}
+        ListEmptyComponent={
+          fatura && !invoice.isLoading ? (
+            <EmptyState
+              icon="doc.text"
+              title="Nenhuma compra nesta fatura"
+              hint="Compras no cartão caem aqui sozinhas — é só mandar “paguei 80 no mercado no Nubank” no WhatsApp."
+            />
+          ) : null
+        }
+        renderItem={({ item, index }) => (
+          <Animated.View
+            entering={FadeInDown.duration(Motion.duration.slow).delay(
+              Math.min(index * Motion.stagger.step, Motion.stagger.cap)
+            )}>
+            <Section title={formatDateBR(item.data)}>
+              {item.itens.map((tx) => {
+                const prevista = tx.status === 'pending';
+                const parcela =
+                  tx.installment_no && tx.installment_plan_id ? `${tx.installment_no}ª parcela` : null;
+                return (
+                  <Link key={tx.id} href={`/finance/transaction-form?id=${tx.id}`} asChild>
+                    <Link.Trigger>
+                      <Row
+                        title={tx.description ?? tx.merchant ?? 'Sem descrição'}
+                        subtitle={[tx.category, parcela, prevista ? 'prevista' : null]
+                          .filter(Boolean)
+                          .join(' · ')}
+                        accessibilityLabel={`${tx.description ?? 'Sem descrição'}, ${formatBRL(tx.amount_cents)}${prevista ? ', parcela prevista' : ''}`}
+                        trailing={
+                          <Money
+                            cents={tx.amount_cents}
+                            variant="headline"
+                            tone={prevista ? 'textSecondary' : 'text'}
+                          />
+                        }
+                      />
+                    </Link.Trigger>
+                    <Link.Menu>
+                      <Link.MenuAction
+                        icon="pencil"
+                        onPress={() => router.push(`/finance/transaction-form?id=${tx.id}`)}>
+                        Editar
+                      </Link.MenuAction>
+                      <Link.MenuAction icon="trash" destructive onPress={() => apagar(tx)}>
+                        Apagar
+                      </Link.MenuAction>
+                    </Link.Menu>
+                  </Link>
+                );
+              })}
+            </Section>
+          </Animated.View>
+        )}
+      />
+
+      {/* Ancorado fora do scroll: a ação primária não some quando a fatura tem 200 linhas. */}
+      {podePagar ? (
+        <View
+          style={[
+            styles.ancora,
+            { backgroundColor: theme.groupedBackground, paddingBottom: insets.bottom + Space.md },
+          ]}>
+          <Button
+            block
+            size="lg"
+            label={`Paguei ${formatBRL(total)}`}
+            onPress={abrirPagamento}
+          />
+        </View>
+      ) : null}
+
+      <Modal
+        visible={pagando}
+        animationType="slide"
+        presentationStyle="pageSheet"
+        onRequestClose={() => setPagando(false)}>
+        <View style={[styles.sheet, { backgroundColor: theme.groupedBackground }]}>
+          <View style={styles.sheetHead}>
+            <Button label="Cancelar" variant="ghost" size="sm" onPress={() => setPagando(false)} />
+            <ThemedText type="smallBold">Pagar fatura</ThemedText>
+            <View style={styles.sheetSpacer} />
+          </View>
+
+          <ScrollView contentContainerStyle={styles.sheetBody} keyboardShouldPersistTaps="handled">
+            <Field label="Valor" hint="Pagamento parcial não existe: a fatura é quitada inteira.">
+              <Money cents={total} variant="title2" />
+            </Field>
+
+            {/* Erro de rede e "não tem conta" são coisas diferentes e não podem ter o mesmo texto. */}
+            {accounts.isError ? (
+              <ErrorBand
+                message="Não deu para carregar suas contas."
+                onRetry={accounts.refetch}
+              />
+            ) : pagadoras.length === 0 && !accounts.isLoading ? (
+              <EmptyState
+                icon="building.columns"
+                title="Nenhuma conta para pagar"
+                hint="Cadastre a conta de onde o dinheiro sai para registrar o pagamento."
+                action={{
+                  label: 'Cadastrar conta',
+                  onPress: () => {
+                    setPagando(false);
+                    router.push('/finance/accounts');
+                  },
+                }}
+              />
+            ) : (
+              <Field label="Pagar com">
+                <Section>
+                  {pagadoras.map((a) => (
+                    <Row
+                      key={a.id}
+                      title={a.name}
+                      icon="building.columns"
+                      onPress={() => setPayerId(a.id)}
+                      trailing={
+                        payerId === a.id ? (
+                          <Icon name="checkmark" size="sm" color="tint" />
+                        ) : undefined
+                      }
+                    />
+                  ))}
+                </Section>
+              </Field>
+            )}
+
+            <Field
+              label="Data do pagamento"
+              error={dataISO ? undefined : 'Data em dd/mm/aaaa'}
+              hint="Pagou ontem e está registrando hoje? Corrija aqui.">
+              <TextField
+                value={dataBR}
+                onChangeText={setDataBR}
+                placeholder="dd/mm/aaaa"
+                keyboardType="number-pad"
+                invalid={!dataISO}
+              />
+            </Field>
+
+            <Button
+              block
+              size="lg"
+              // rótulo COMPLETO de propósito: é a ação irreversível da tela, e "Paguei" sozinho
+              // não descreve o que vai acontecer (nem na tela, nem no leitor de tela)
+              label={
+                pay.isPending
+                  ? 'Registrando…'
+                  : `Paguei ${formatBRL(total)}${pagadora ? ` com ${pagadora.name}` : ''}`
+              }
+              loading={pay.isPending}
+              disabled={!payerId || !dataISO}
+              onPress={registrar}
+            />
+
+            <ThemedText type="small" themeColor="textSecondary" style={styles.centered}>
+              Entra como transferência — o gasto já contou na compra.
+            </ThemedText>
+          </ScrollView>
+        </View>
+      </Modal>
+    </Screen>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    flexDirection: 'row',
-    justifyContent: 'center',
+  lista: {
+    gap: Space.xl,
+    paddingHorizontal: Space.lg,
+    paddingTop: Space.md,
   },
-  safeArea: {
-    flex: 1,
-    maxWidth: MaxContentWidth,
-    paddingHorizontal: Spacing.four,
-    width: '100%',
+  header: {
+    gap: Space.lg,
   },
-  scroll: {
-    gap: Spacing.three,
-    paddingBottom: Spacing.six,
+  hero: {
+    gap: Space.sm,
   },
-  resumo: {
-    gap: Spacing.one,
-  },
-  pagar: {
-    gap: Spacing.three,
-  },
-  linha: {
+  heroTop: {
     flexDirection: 'row',
     justifyContent: 'space-between',
+    gap: Space.sm,
   },
-  chipRow: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: Spacing.two,
-  },
-  item: {
+  pagaLinha: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
-    gap: Spacing.three,
+    gap: Space.sm,
   },
-  itemTexto: {
-    flex: 1,
-    gap: Spacing.half,
+  rodape: {
+    paddingHorizontal: Space.lg,
+    paddingTop: Space.md,
   },
-  submit: {
-    borderRadius: Spacing.three,
-    paddingVertical: Spacing.three,
+  band: {
     alignItems: 'center',
-  },
-  buttonLabel: {
-    color: '#fff',
+    gap: Space.md,
   },
   centered: {
     textAlign: 'center',
   },
-  empty: {
-    alignItems: 'center',
-    gap: Spacing.two,
-    paddingVertical: Spacing.five,
+  ancora: {
+    paddingHorizontal: Space.lg,
+    paddingTop: Space.md,
   },
-  emptyEmoji: {
-    fontSize: 40,
+  sheet: {
+    flex: 1,
+  },
+  sheetHead: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: Space.lg,
+    paddingVertical: Space.md,
+  },
+  sheetSpacer: {
+    width: Space.xxxl,
+  },
+  sheetBody: {
+    gap: Space.xl,
+    padding: Space.lg,
+    paddingBottom: Space.xxxl,
   },
 });

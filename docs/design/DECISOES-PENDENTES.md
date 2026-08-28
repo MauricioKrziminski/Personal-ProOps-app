@@ -86,6 +86,19 @@ Cada item aqui é migration ou Edge Function, não tela.
 
 ---
 
+## 4b. Resolvido durante a implementação
+
+- **Menu de item no Android.** `Link.Menu` do expo-router é **iOS-only**; usar só ele deixava a
+  linha sem ação nenhuma no Android. Resolvido com `showItemActions`/`confirmDestructive`
+  (`src/lib/item-actions.ts`): `ActionSheetIOS` no iOS, diálogo de opções no Android. A regra de
+  design foi atualizada para dizer isso explicitamente.
+- **`ai_events.created_refs` continua pendente e agora tem consequência medida:** o undo do app faz
+  `from('transactions').delete().in('id', ids)`, então gravar id de nota ali **inflaria a contagem
+  e não apagaria nada, em silêncio**. Por isso `create_note`/`create_reminder` seguem sem desfazer
+  — decisão consciente, não esquecimento.
+- **Push virou `src/hooks/use-push.ts`** com uma mensagem por causa (simulador, permissão negada,
+  EAS não vinculado). O hook antigo engolia o erro do fetch: falha de rede virava "push desativado".
+
 ## 5. Bugs confirmados no código (não são decisão, são conserto)
 
 Estão detalhados no plano; ficam aqui só para não se perderem.

@@ -21,6 +21,7 @@ export default function FinanceStackLayout() {
       }}>
       <Stack.Screen name="index" options={{ title: 'Financeiro' }} />
       <Stack.Screen name="transactions" options={{ title: 'Lançamentos' }} />
+      <Stack.Screen name="[txId]" options={{ title: 'Lançamento' }} />
       <Stack.Screen name="accounts" options={{ title: 'Contas' }} />
       <Stack.Screen name="cards" options={{ title: 'Cartões' }} />
       <Stack.Screen name="invoice/[id]" options={{ title: 'Fatura' }} />

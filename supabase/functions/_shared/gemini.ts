@@ -68,6 +68,7 @@ export type AiActionType =
   | "query_net_worth"
   | "update_asset_value"
   | "create_note"
+  | "update_note"
   | "create_reminder"
   | "create_goal"
   | "goal_deposit"
@@ -75,6 +76,7 @@ export type AiActionType =
   | "query_transactions"
   | "query_budgets"
   | "query_goals"
+  | "query_notes"
   | "undo_last"
   | "unknown";
 
@@ -97,9 +99,13 @@ export type AiActionType =
  */
 export interface AiAction {
   type: AiActionType;
-  /** Texto principal: descrição, título do lembrete, conteúdo da nota, nome da meta/bem, gatilho da regra. */
+  /**
+   * Texto principal: descrição, título do lembrete, conteúdo da nota, nome da
+   * meta/bem, gatilho da regra — e o trecho que ACHA a nota em update_note /
+   * query_notes.
+   */
   content?: string | null;
-  /** Categoria do lançamento — e também a categoria filtrada nas consultas. */
+  /** Categoria do lançamento, a categoria filtrada nas consultas — e a PASTA da nota. */
   category?: string | null;
   /** Valor em centavos — e também o alvo da meta, o valor da simulação e o valor novo do bem. */
   amount_cents?: number | null;
@@ -112,6 +118,7 @@ export interface AiAction {
   installments?: number | null; // nº de parcelas
   // correção: os campos acima dizem QUAL item; estes, o que passa a valer
   new_amount_cents?: number | null;
+  /** Categoria nova em update_transaction — e o texto a ACRESCENTAR em update_note. */
   new_category?: string | null;
   target_type?: "transaction" | "note" | "reminder" | "goal" | "recurring" | null;
   query_from?: string | null; // YYYY-MM-DD
@@ -133,12 +140,16 @@ const ACTION_SCHEMA = {
         "create_installment_purchase", "pay_invoice", "query_invoice",
         "query_forecast", "simulate_purchase", "mark_paid", "set_rule",
         "update_transaction", "delete_item", "query_net_worth", "update_asset_value",
-        "create_note", "create_reminder", "create_goal", "goal_deposit",
+        "create_note", "update_note", "create_reminder", "create_goal", "goal_deposit",
         "query_balance", "query_transactions", "query_budgets", "query_goals",
-        "undo_last", "unknown",
+        "query_notes", "undo_last", "unknown",
       ],
     },
     // ⚠️ 14 campos + `type` = 15, o teto do modelo. Não adicione sem remover.
+    // Valor novo no enum de `type` NÃO conta como propriedade — foi assim que
+    // `update_note` e `query_notes` entraram sem campo novo: reaproveitam
+    // `content` (termo de busca), `category` (pasta), `new_category` (texto a
+    // acrescentar) e `query_from`/`query_to` (período).
     content: { type: "STRING" },
     category: { type: "STRING" },
     amount_cents: { type: "INTEGER" },
@@ -188,7 +199,8 @@ Tipos de ação:
 - "delete_item": apagar um item específico ("apaga a nota do mercado", "cancela o lembrete do aluguel", "tira aquele gasto de 45"). target_type tem que ser EXATAMENTE um destes: transaction, note, reminder, goal, recurring. content/amount_cents/category identificam qual. Para "apaga o último lançamento" use undo_last.
 - "query_net_worth": pergunta sobre patrimônio ("quanto eu tenho no total?", "qual meu patrimônio?", "quanto vale tudo que eu tenho?", "como tá minha saúde financeira?"). Diferente de query_balance, que é só o saldo em conta.
 - "update_asset_value": atualizar o valor de um bem/investimento ("meu tesouro direto tá em 27 mil", "o carro agora vale 38 mil"). content = nome do bem, amount_cents = valor novo.
-- "create_note": anotação livre. content (texto limpo) e category curta se óbvia.
+- "create_note": anotação livre NOVA. content (texto limpo) e category curta se óbvia (vira a PASTA da nota).
+- "update_note": ACRESCENTAR texto a uma nota que JÁ EXISTE ("adiciona pão na nota do mercado", "põe leite na lista de compras", "coloca também levar o carro na nota da viagem"). content = trecho que ACHA a nota (ex.: "mercado"), new_category = o texto a ACRESCENTAR (ex.: "pão"). NUNCA crie nota nova para completar uma existente — acrescentar é sempre update_note.
 - "create_reminder": pedido para ser lembrado. content = o que lembrar, remind_at (próxima ocorrência, ISO, no fuso do usuário) e recurrence como RRULE quando recorrente ("todo dia 5" -> FREQ=MONTHLY;BYMONTHDAY=5; "todo dia às 8h" -> FREQ=DAILY). Sem recorrência -> null.
 - "create_goal": meta de poupança ("quero juntar 5000 até dezembro pra viagem"). content = nome da meta, amount_cents = valor alvo, occurred_at = prazo (YYYY-MM-DD) se houver.
 - "goal_deposit": aporte em meta existente ("coloca 200 na meta da viagem", "guardei 500 pra viagem"). content = nome da meta. amount_cents = valor do aporte e e OBRIGATORIO: "coloca 200" -> amount_cents=20000. Sem valor, use unknown em vez de goal_deposit.
@@ -196,6 +208,7 @@ Tipos de ação:
 - "query_transactions": pergunta sobre gastos/receitas ("quanto gastei esse mês?", "gastos com mercado em junho"). query_from/query_to (YYYY-MM-DD, resolva "esse mês"/"semana passada" pela data atual) e category se o usuário citar uma.
 - "query_budgets": pergunta sobre orçamento/limite ("como tá meu orçamento?").
 - "query_goals": pergunta sobre metas ("como tão minhas metas?").
+- "query_notes": consultar o que foi anotado ("o que anotei sobre a viagem?", "minhas notas de trabalho", "o que eu anotei semana passada?"). content = termo buscado, category = pasta se citada, query_from/query_to (YYYY-MM-DD) se houver período.
 - "undo_last": desfazer o último lançamento ("apaga o último", "foi engano").
 - "unknown": não se encaixa em nada.
 
@@ -211,6 +224,8 @@ Exemplos de campo multiuso (siga exatamente este formato):
 "coloca 200 na meta da viagem" -> goal_deposit com content="viagem", amount_cents=20000
 "meu tesouro direto ta em 27 mil" -> update_asset_value com content="tesouro direto", amount_cents=2700000
 "apaga a nota do mercado" -> delete_item com target_type="note", content="mercado"
+"adiciona pao na nota do mercado" -> update_note com content="mercado", new_category="pão"
+"o que anotei sobre a viagem?" -> query_notes com content="viagem"
 NUNCA deixe amount_cents vazio quando o usuario disser um valor.
 - Corrigir algo que já existe é update_transaction ou delete_item — NUNCA crie um lançamento novo para "consertar" outro.
 - Compra no cartão à vista é create_expense com account = nome do cartão. Só use create_installment_purchase quando houver 2 ou mais parcelas.

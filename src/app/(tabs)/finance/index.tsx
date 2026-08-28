@@ -1,493 +1,570 @@
-import { router, type Href } from 'expo-router';
-import { useMemo } from 'react';
-import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { Link, Stack, router, type Href } from 'expo-router';
+import { useMemo, useState } from 'react';
+import { Pressable, StyleSheet, View, useWindowDimensions } from 'react-native';
 import Animated, { FadeInDown } from 'react-native-reanimated';
-import { SafeAreaView } from 'react-native-safe-area-context';
-import * as Haptics from 'expo-haptics';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import type { SymbolViewProps } from 'expo-symbols';
 
-import { ErrorCard, LoadingCard } from '@/components/error-card';
+import { ErrorCard } from '@/components/error-card';
+import { MonthPicker, currentMonth, monthLabel, monthTitle, shiftMonth } from '@/components/finance/month-picker';
 import { GlassCard } from '@/components/glass/glass-card';
 import { ThemedText } from '@/components/themed-text';
-import { ThemedView } from '@/components/themed-view';
-import { BottomTabInset, MaxContentWidth, Spacing } from '@/constants/theme';
-import { formatBRL, formatDateBR, localISODate } from '@/hooks/use-items';
+import { Button } from '@/components/ui/button';
+import { EmptyState } from '@/components/ui/empty-state';
+import { Money } from '@/components/ui/money';
+import { Row, Section } from '@/components/ui/row';
+import { Screen } from '@/components/ui/screen';
+import { Skeleton, SkeletonRow } from '@/components/ui/skeleton';
+import { ProgressBar, Sparkline } from '@/components/ui/sparkline';
+import { useToast } from '@/components/ui/toast';
+import { Elevation, Motion, Radius, Space, tabular } from '@/design/tokens';
+import { useColorScheme } from '@/hooks/use-color-scheme';
 import {
-  useAccountBalances,
   useBudgetsStatus,
-  useGoals,
-  useMonthlyCashflow,
-  useUpcomingBills,
+  useCardSummary,
+  useCashFlowForecast,
+  useDeleteTransaction,
   useRecentTransactions,
   useTransactionsSummary,
+  type Transaction,
 } from '@/hooks/use-finance';
+import { formatBRL, formatDateBR } from '@/hooks/use-items';
+import { monthBounds } from '@/lib/dates';
+import { confirmDestructive } from '@/lib/item-actions';
 import { useTheme } from '@/hooks/use-theme';
 
-function monthRange(): { from: string; to: string; label: string } {
+/**
+ * Financeiro — responde "como está o meu mês?" e, no fundo, "posso gastar?".
+ *
+ * O topo é **projeção**, não saldo bruto: saldo bruto mente para quem tem fatura fechando.
+ * Os 13 links com emoji que terminavam a tela viraram uma seção "Gerenciar" discreta no fim.
+ * Cada bloco tem query, loading e erro próprios — antes um `hasError` cobria cinco queries e
+ * esquecia a de contas a pagar.
+ */
+
+const SOURCE_LABEL: Record<Transaction['source'], string> = {
+  whatsapp: 'via WhatsApp',
+  app: 'lançado no app',
+  import: 'importado',
+  recurring: 'recorrente',
+};
+
+const KIND_ICON: Record<Transaction['kind'], SymbolViewProps['name']> = {
+  expense: 'arrow.up.right',
+  income: 'arrow.down.left',
+  transfer: 'arrow.left.arrow.right',
+};
+
+/** O menu do fim da tela. Uma seção, ícone SF, sem emoji. */
+const MANAGE: { title: string; icon: SymbolViewProps['name']; href: Href }[] = [
+  { title: 'Todos os lançamentos', icon: 'list.bullet', href: '/finance/transactions' },
+  { title: 'Contas e carteiras', icon: 'wallet.pass', href: '/finance/accounts' },
+  { title: 'Cartões e faturas', icon: 'creditcard', href: '/finance/cards' },
+  { title: 'Orçamentos', icon: 'chart.pie', href: '/finance/budgets' },
+  { title: 'Metas', icon: 'target', href: '/finance/goals' },
+  { title: 'Dívidas', icon: 'dollarsign.circle', href: '/finance/debts' },
+  { title: 'Recorrentes', icon: 'arrow.triangle.2.circlepath', href: '/finance/recurring' },
+  { title: 'Patrimônio', icon: 'building.columns', href: '/finance/net-worth' },
+  { title: 'Relatórios e IR', icon: 'chart.bar', href: '/finance/reports' },
+  { title: 'Plano e família', icon: 'person.2', href: '/finance/plan' },
+];
+
+/** Dias entre hoje e o último dia do mês corrente (mínimo 1). */
+function daysToMonthEnd(): number {
   const now = new Date();
-  return {
-    from: localISODate(new Date(now.getFullYear(), now.getMonth(), 1)),
-    to: localISODate(new Date(now.getFullYear(), now.getMonth() + 1, 0)),
-    label: now.toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' }),
-  };
+  const last = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+  return Math.max(1, Math.ceil((last.getTime() - now.getTime()) / 86_400_000));
 }
 
-function SectionLink({ title, href, index }: { title: string; href: Href; index: number }) {
-  return (
-    <Animated.View entering={FadeInDown.duration(400).delay(Math.min(index * 60, 400))}>
-      <Pressable
-        onPress={() => {
-          Haptics.selectionAsync();
-          router.push(href);
-        }}>
-        <GlassCard style={styles.linkCard}>
-          <ThemedText type="smallBold">{title}</ThemedText>
-          <ThemedText type="smallBold" themeColor="textSecondary">
-            ›
-          </ThemedText>
-        </GlassCard>
-      </Pressable>
-    </Animated.View>
-  );
+/** `2026-08-23` → `sáb, 23 de agosto`. */
+function dayTitle(iso: string): string {
+  const [y, m, d] = iso.split('-').map(Number);
+  return new Date(y, m - 1, d).toLocaleDateString('pt-BR', {
+    weekday: 'short',
+    day: '2-digit',
+    month: 'long',
+  });
 }
 
-/** Barras pareadas receita x gasto por mês (Views puras — consistente com o resto do app). */
-function CashflowChart() {
-  const theme = useTheme();
-  const { data: cashflow } = useMonthlyCashflow(6);
-  const rows = cashflow ?? [];
-  if (rows.length === 0) return null;
-
-  const max = Math.max(...rows.flatMap((r) => [Number(r.income_cents), Number(r.expense_cents)]), 1);
-
-  return (
-    <GlassCard style={styles.sectionCard}>
-      <ThemedText type="smallBold">Receitas x Gastos</ThemedText>
-      <View style={styles.chartRow}>
-        {rows.map((row) => {
-          const monthLabel = new Date(`${row.month}T12:00:00`).toLocaleDateString('pt-BR', {
-            month: 'short',
-          });
-          return (
-            <View key={row.month} style={styles.chartColumn}>
-              <View style={styles.chartBars}>
-                <View
-                  style={[
-                    styles.chartBar,
-                    {
-                      backgroundColor: theme.success,
-                      height: `${Math.max((Number(row.income_cents) / max) * 100, 2)}%`,
-                    },
-                  ]}
-                />
-                <View
-                  style={[
-                    styles.chartBar,
-                    {
-                      backgroundColor: theme.danger,
-                      height: `${Math.max((Number(row.expense_cents) / max) * 100, 2)}%`,
-                    },
-                  ]}
-                />
-              </View>
-              <ThemedText type="small" themeColor="textSecondary" style={styles.chartLabel}>
-                {monthLabel.replace('.', '')}
-              </ThemedText>
-            </View>
-          );
-        })}
-      </View>
-      <View style={styles.legend}>
-        <View style={[styles.legendDot, { backgroundColor: theme.success }]} />
-        <ThemedText type="small" themeColor="textSecondary">
-          receitas
-        </ThemedText>
-        <View style={[styles.legendDot, { backgroundColor: theme.danger }]} />
-        <ThemedText type="small" themeColor="textSecondary">
-          gastos
-        </ThemedText>
-      </View>
-    </GlassCard>
-  );
+/** Agrupa preservando a ordem (os dados já vêm ordenados do banco). */
+function groupByDay(rows: Transaction[]): [string, Transaction[]][] {
+  const groups: [string, Transaction[]][] = [];
+  for (const tx of rows) {
+    const last = groups[groups.length - 1];
+    if (last && last[0] === tx.occurred_at) last[1].push(tx);
+    else groups.push([tx.occurred_at, [tx]]);
+  }
+  return groups;
 }
 
 export default function FinanceScreen() {
   const theme = useTheme();
-  const range = useMemo(() => monthRange(), []);
-  const balances = useAccountBalances();
+  const scheme = useColorScheme() === 'dark' ? 'dark' : 'light';
+  const toast = useToast();
+  const { width } = useWindowDimensions();
+  const insets = useSafeAreaInsets();
+  const [month, setMonth] = useState(currentMonth);
+
+  const range = useMemo(() => monthBounds(month), [month]);
+  const previousMonth = useMemo(() => shiftMonth(month, -1), [month]);
+  const previousRange = useMemo(() => monthBounds(previousMonth), [previousMonth]);
+  const isCurrent = month === currentMonth();
+  const daysLeft = useMemo(() => daysToMonthEnd(), []);
+
+  const forecast = useCashFlowForecast(daysLeft);
   const summary = useTransactionsSummary(range.from, range.to);
-  const budgets = useBudgetsStatus();
-  const goals = useGoals();
-  const bills = useUpcomingBills(7);
+  const previous = useTransactionsSummary(previousRange.from, previousRange.to);
+  const budgets = useBudgetsStatus(month);
+  const cards = useCardSummary();
   const recent = useRecentTransactions(5);
+  const remove = useDeleteTransaction();
 
-  const totalBalance = (balances.data ?? []).reduce((s, b) => s + Number(b.balance_cents), 0);
-  const monthExpenses = (summary.data ?? [])
-    .filter((r) => r.kind === 'expense')
-    .reduce((s, r) => s + Number(r.total_cents), 0);
-  const monthIncome = (summary.data ?? [])
-    .filter((r) => r.kind === 'income')
-    .reduce((s, r) => s + Number(r.total_cents), 0);
-  const expenseRows = (summary.data ?? []).filter((r) => r.kind === 'expense');
-  const maxCategory = Math.max(...expenseRows.map((r) => Number(r.total_cents)), 0);
-  const riskyBudgets = (budgets.data ?? []).filter(
-    (b) => Number(b.spent_cents) / Number(b.limit_cents) >= 0.8,
+  const totalOf = (rows: typeof summary.data, kind: 'expense' | 'income') =>
+    (rows ?? []).filter((r) => r.kind === kind).reduce((s, r) => s + Number(r.total_cents), 0);
+
+  const income = totalOf(summary.data, 'income');
+  const expense = totalOf(summary.data, 'expense');
+  const upcomingOut = (forecast.data ?? []).reduce((s, d) => s + Number(d.out_cents), 0);
+  const projected = forecast.data?.at(-1)?.balance_cents ?? 0;
+  const leftover = isCurrent ? Number(projected) : income - expense;
+  const series = (forecast.data ?? []).map((d) => Number(d.balance_cents));
+
+  const categories = useMemo(() => {
+    const rows = (summary.data ?? []).filter((r) => r.kind === 'expense');
+    return [...rows].sort((a, b) => Number(b.total_cents) - Number(a.total_cents));
+  }, [summary.data]);
+  const maxCategory = Math.max(...categories.map((r) => Number(r.total_cents)), 1);
+  const previousByCategory = useMemo(() => {
+    const map = new Map<string, number>();
+    for (const r of previous.data ?? []) {
+      if (r.kind === 'expense') map.set(r.category, Number(r.total_cents));
+    }
+    return map;
+  }, [previous.data]);
+
+  const tight = (budgets.data ?? []).filter(
+    (b) => Number(b.limit_cents) > 0 && Number(b.spent_cents) / Number(b.limit_cents) >= 0.8
   );
-  // faturas + contas previstas dos próximos 7 dias, atrasadas primeiro
-  const upcoming = bills.data ?? [];
+  const recentGroups = useMemo(() => groupByDay(recent.data ?? []), [recent.data]);
 
-  const hasError =
-    balances.isError || summary.isError || budgets.isError || goals.isError || recent.isError;
-  const isLoading = balances.isLoading || summary.isLoading;
+  const heroLoading = summary.isLoading || (isCurrent && forecast.isLoading);
+  const heroError = summary.isError || (isCurrent && forecast.isError);
   const isEmpty =
-    !isLoading &&
-    totalBalance === 0 &&
+    !summary.isLoading &&
+    !recent.isLoading &&
     (summary.data ?? []).length === 0 &&
     (recent.data ?? []).length === 0;
 
+  /** Destrutivo = action sheet nativo (`confirmDestructive`), nunca `Alert` de long press. */
+  const confirmDelete = (tx: Transaction) => {
+    const what = `${formatBRL(tx.amount_cents)}${tx.category ? ` em ${tx.category}` : ''}`;
+    confirmDestructive(
+      'Apagar este lançamento?',
+      'Apagar',
+      () =>
+        remove.mutate(tx.id, {
+          onSuccess: () => toast({ message: `Apaguei ${what}.`, tone: 'success' }),
+          onError: () => toast({ message: 'Não deu para apagar. Tenta de novo.', tone: 'error' }),
+        }),
+      `${what}. Isso não volta.`
+    );
+  };
+
+  const openTransactions = (params: Record<string, string>) =>
+    router.push({ pathname: '/finance/transactions', params: { month, ...params } });
+
   return (
-    <ThemedView style={styles.container}>
-      <SafeAreaView style={styles.safeArea}>
-        <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
-          <ThemedText type="subtitle" style={styles.heading}>
-            Financeiro
-          </ThemedText>
+    <View style={styles.root}>
+      <Screen
+        grouped
+        onRefresh={() => {
+          forecast.refetch();
+          summary.refetch();
+          previous.refetch();
+          budgets.refetch();
+          cards.refetch();
+          recent.refetch();
+        }}
+        refreshing={summary.isRefetching}>
+        <Stack.Screen options={{ title: 'Financeiro', headerLargeTitle: true }} />
+        <Stack.Toolbar placement="right">
+          <Stack.Toolbar.Menu icon="ellipsis.circle" accessibilityLabel="Mais opções">
+            <Stack.Toolbar.MenuAction
+              icon="square.and.arrow.down"
+              onPress={() => router.push('/finance/import')}>
+              Importar extrato
+            </Stack.Toolbar.MenuAction>
+            <Stack.Toolbar.MenuAction
+              icon="line.3.horizontal.decrease"
+              onPress={() => router.push('/finance/rules')}>
+              Regras de categoria
+            </Stack.Toolbar.MenuAction>
+            <Stack.Toolbar.MenuAction
+              icon="sparkles"
+              onPress={() => router.push('/finance/ai-activity')}>
+              Atividade da IA
+            </Stack.Toolbar.MenuAction>
+          </Stack.Toolbar.Menu>
+        </Stack.Toolbar>
 
-          {hasError ? (
-            <ErrorCard
-              onRetry={() => {
-                balances.refetch();
-                summary.refetch();
-                budgets.refetch();
-                goals.refetch();
-                recent.refetch();
-              }}
-            />
-          ) : isLoading ? (
-            <LoadingCard />
-          ) : (
-            <>
-              <Animated.View entering={FadeInDown.duration(400)}>
-                <GlassCard style={styles.totalCard}>
-                  <ThemedText type="small" themeColor="textSecondary">
-                    Saldo total
+        <MonthPicker month={month} onChange={setMonth} />
+
+        {/* Bloco 1 — o único GlassCard da tela. Projeção, não saldo bruto. */}
+        {heroError ? (
+          <ErrorCard
+            onRetry={() => {
+              summary.refetch();
+              forecast.refetch();
+            }}
+          />
+        ) : heroLoading ? (
+          <View style={styles.heroSkeleton}>
+            <Skeleton width="55%" height={14} />
+            <Skeleton width="70%" height={46} />
+            <Skeleton height={56} radius={Radius.sm} />
+          </View>
+        ) : (
+          <Animated.View entering={FadeInDown.duration(Motion.duration.slow)}>
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel={`${isCurrent ? 'Sobra até o fim do mês' : `Sobrou em ${monthTitle(month)}`}, ${formatBRL(leftover)}. Abrir projeção.`}
+              onPress={() => router.push('/finance/forecast')}>
+              <GlassCard style={styles.hero}>
+                <ThemedText type="small" themeColor="textSecondary">
+                  {isCurrent ? 'Sobra até o fim do mês' : `Sobrou em ${monthTitle(month)}`}
+                </ThemedText>
+                <Money cents={leftover} variant="money" tone={leftover < 0 ? 'danger' : 'text'} />
+                {isCurrent && series.length > 1 ? (
+                  <Sparkline values={series} width={width - Space.lg * 4} showZero />
+                ) : null}
+                <View style={styles.heroFacts}>
+                  <ThemedText type="small" themeColor="textSecondary" style={tabular}>
+                    entrou {formatBRL(income)}
                   </ThemedText>
-                  <ThemedText type="title" style={styles.totalValue}>
-                    {formatBRL(totalBalance)}
+                  <ThemedText type="small" themeColor="textSecondary" style={tabular}>
+                    saiu {formatBRL(expense)}
                   </ThemedText>
-                  <View style={styles.monthSummary}>
-                    <ThemedText type="small" style={{ color: theme.success }}>
-                      ↑ {formatBRL(monthIncome)}
+                  {isCurrent ? (
+                    <ThemedText type="small" themeColor="textSecondary" style={tabular}>
+                      previsto {formatBRL(upcomingOut)}
                     </ThemedText>
-                    <ThemedText type="small" style={{ color: theme.danger }}>
-                      ↓ {formatBRL(monthExpenses)}
-                    </ThemedText>
-                    <ThemedText type="small" themeColor="textSecondary" style={styles.monthLabel}>
-                      {range.label}
-                    </ThemedText>
-                  </View>
-                </GlassCard>
-              </Animated.View>
+                  ) : null}
+                </View>
+              </GlassCard>
+            </Pressable>
+          </Animated.View>
+        )}
 
-              <CashflowChart />
+        {/* Bloco 2 — o simulador estava enterrado dentro da projeção. */}
+        <Section>
+          <Row
+            title="Posso comprar isso?"
+            subtitle="Simula o parcelado em cima da projeção"
+            icon="cart"
+            onPress={() => router.push('/finance/forecast')}
+          />
+        </Section>
 
-              {expenseRows.length > 0 && (
-                <GlassCard style={styles.sectionCard}>
-                  <ThemedText type="smallBold">Gastos por categoria</ThemedText>
-                  {expenseRows.map((row) => (
-                    <View key={row.category} style={styles.categoryRow}>
-                      <View style={styles.categoryHeader}>
-                        <ThemedText type="smallBold">{row.category}</ThemedText>
-                        <ThemedText type="small" themeColor="textSecondary">
-                          {formatBRL(Number(row.total_cents))}
-                        </ThemedText>
-                      </View>
-                      <View style={[styles.barTrack, { backgroundColor: theme.backgroundElement }]}>
+        {/* Bloco 3 — categoria sem comparação é número; com comparação é informação. */}
+        {summary.isError ? null : categories.length > 0 ? (
+          <View style={styles.block}>
+            <View style={styles.blockHead}>
+              <ThemedText type="smallBold">Onde o dinheiro foi</ThemedText>
+              <Pressable
+                accessibilityRole="button"
+                hitSlop={12}
+                onPress={() => openTransactions({ kind: 'expense' })}>
+                <ThemedText type="small" themeColor="tint">
+                  Ver tudo
+                </ThemedText>
+              </Pressable>
+            </View>
+            <Section>
+              {categories.slice(0, 6).map((row, index) => {
+                const total = Number(row.total_cents);
+                const before = previousByCategory.get(row.category) ?? 0;
+                const share = expense > 0 ? Math.round((total / expense) * 100) : 0;
+                // Sem o mês anterior carregado a comparação não existe — inventar "novo" seria mentira.
+                const delta =
+                  previous.isSuccess && before > 0
+                    ? Math.round(((total - before) / before) * 100)
+                    : null;
+                const comparison = !previous.isSuccess
+                  ? null
+                  : delta === null
+                    ? `não teve em ${monthLabel(previousMonth)}`
+                    : delta === 0
+                      ? `igual a ${monthLabel(previousMonth)}`
+                      : `${delta > 0 ? '+' : '−'}${Math.abs(delta)}% vs ${monthLabel(previousMonth)}`;
+
+                return (
+                  <Animated.View
+                    key={row.category}
+                    entering={FadeInDown.duration(Motion.duration.base).delay(
+                      Math.min(index * Motion.stagger.step, Motion.stagger.cap)
+                    )}>
+                    <Pressable
+                      accessibilityRole="button"
+                      accessibilityLabel={`${row.category}, ${formatBRL(total)}, ${share}% dos gastos do mês${comparison ? `, ${comparison}` : ''}`}
+                      onPress={() => openTransactions({ category: row.category })}>
+                      {({ pressed }) => (
                         <View
                           style={[
-                            styles.barFill,
-                            {
-                              backgroundColor: theme.tint,
-                              width: `${Math.max((Number(row.total_cents) / maxCategory) * 100, 4)}%`,
-                            },
-                          ]}
-                        />
-                      </View>
-                    </View>
-                  ))}
-                </GlassCard>
-              )}
-
-              {upcoming.length > 0 && (
-                <GlassCard style={styles.sectionCard}>
-                  <ThemedText type="smallBold">📅 A pagar nos próximos 7 dias</ThemedText>
-                  {upcoming.slice(0, 5).map((bill) => (
-                    <View key={`${bill.kind}-${bill.ref_id}`} style={styles.categoryHeader}>
-                      <ThemedText type="small">
-                        {bill.overdue ? '🔴 ' : ''}
-                        {bill.title}
-                      </ThemedText>
-                      <ThemedText type="small" themeColor="textSecondary">
-                        {formatBRL(Number(bill.amount_cents))} · {formatDateBR(bill.due_date)}
-                      </ThemedText>
-                    </View>
-                  ))}
-                </GlassCard>
-              )}
-
-              {riskyBudgets.length > 0 && (
-                <GlassCard style={styles.sectionCard}>
-                  <ThemedText type="smallBold">⚠️ Orçamentos no limite</ThemedText>
-                  {riskyBudgets.map((b) => {
-                    const pct = Math.round((Number(b.spent_cents) / Number(b.limit_cents)) * 100);
-                    return (
-                      <View key={b.category} style={styles.categoryHeader}>
-                        <ThemedText type="small">
-                          {pct >= 100 ? '🔴' : '🟡'} {b.category}
-                        </ThemedText>
-                        <ThemedText type="small" themeColor="textSecondary">
-                          {pct}% de {formatBRL(Number(b.limit_cents))}
-                        </ThemedText>
-                      </View>
-                    );
-                  })}
-                </GlassCard>
-              )}
-
-              {(goals.data ?? []).length > 0 && (
-                <GlassCard style={styles.sectionCard}>
-                  <ThemedText type="smallBold">Metas</ThemedText>
-                  {(goals.data ?? []).slice(0, 3).map((goal) => {
-                    const pct = Math.min(
-                      100,
-                      Math.round((goal.saved_cents / goal.target_cents) * 100),
-                    );
-                    return (
-                      <View key={goal.id} style={styles.categoryRow}>
-                        <View style={styles.categoryHeader}>
-                          <ThemedText type="small">🎯 {goal.name}</ThemedText>
-                          <ThemedText type="small" themeColor="textSecondary">
-                            {pct}%
+                            styles.category,
+                            { backgroundColor: pressed ? theme.backgroundSelected : 'transparent' },
+                          ]}>
+                          <View style={styles.categoryHead}>
+                            <ThemedText type="default" numberOfLines={1} style={styles.categoryName}>
+                              {row.category}
+                            </ThemedText>
+                            <Money cents={total} variant="headline" />
+                          </View>
+                          <ProgressBar value={total} max={maxCategory} />
+                          <ThemedText
+                            type="small"
+                            themeColor={
+                              delta !== null && delta >= 10
+                                ? 'warning'
+                                : delta !== null && delta <= -10
+                                  ? 'success'
+                                  : 'textSecondary'
+                            }
+                            style={tabular}>
+                            {share}% do mês{comparison ? ` · ${comparison}` : ''}
                           </ThemedText>
                         </View>
-                        <View style={[styles.barTrack, { backgroundColor: theme.backgroundElement }]}>
-                          <View
-                            style={[
-                              styles.barFill,
-                              {
-                                backgroundColor: pct >= 100 ? theme.success : theme.tint,
-                                width: `${Math.max(pct, 3)}%`,
-                              },
-                            ]}
-                          />
-                        </View>
-                      </View>
-                    );
-                  })}
-                </GlassCard>
-              )}
+                      )}
+                    </Pressable>
+                  </Animated.View>
+                );
+              })}
+            </Section>
+          </View>
+        ) : null}
 
-              {(recent.data ?? []).length > 0 && (
-                <GlassCard style={styles.sectionCard}>
-                  <ThemedText type="smallBold">Últimos lançamentos</ThemedText>
-                  {(recent.data ?? []).map((tx) => (
-                    <View key={tx.id} style={styles.categoryHeader}>
-                      <ThemedText type="small" numberOfLines={1} style={styles.recentLabel}>
-                        {tx.kind === 'income' ? '💰' : tx.kind === 'transfer' ? '🔄' : '💸'}{' '}
-                        {tx.description || tx.category || 'Sem descrição'}
-                      </ThemedText>
+        {/* Bloco 4 — só o que já dói. Orçamento em 30% não é notícia. */}
+        {budgets.isError ? (
+          <ErrorCard onRetry={budgets.refetch} />
+        ) : tight.length > 0 ? (
+          <Section title="Passando do limite">
+            {tight.map((b) => {
+              const pct = Number(b.spent_cents) / Number(b.limit_cents);
+              return (
+                <Pressable
+                  key={b.category}
+                  accessibilityRole="button"
+                  accessibilityLabel={`${b.category}, ${Math.round(pct * 100)}% de ${formatBRL(Number(b.limit_cents))} usados`}
+                  onPress={() => router.push('/finance/budgets')}>
+                  <View style={styles.budget}>
+                    <View style={styles.categoryHead}>
+                      <ThemedText type="default">{b.category}</ThemedText>
                       <ThemedText
                         type="small"
-                        style={{
-                          color:
-                            tx.kind === 'income'
-                              ? theme.success
-                              : tx.kind === 'expense'
-                                ? theme.danger
-                                : theme.textSecondary,
-                        }}>
-                        {tx.kind === 'income' ? '+' : tx.kind === 'expense' ? '-' : ''}
-                        {formatBRL(tx.amount_cents)}
+                        themeColor={pct >= 1 ? 'danger' : 'warning'}
+                        style={tabular}>
+                        {Math.round(pct * 100)}% de {formatBRL(Number(b.limit_cents))}
                       </ThemedText>
                     </View>
-                  ))}
-                </GlassCard>
-              )}
+                    <ProgressBar
+                      value={Number(b.spent_cents)}
+                      max={Number(b.limit_cents)}
+                      tone={pct >= 1 ? 'danger' : 'warning'}
+                    />
+                  </View>
+                </Pressable>
+              );
+            })}
+          </Section>
+        ) : null}
 
-              {isEmpty && (
-                <GlassCard style={styles.empty}>
-                  <ThemedText style={styles.emptyEmoji}>💸</ThemedText>
-                  <ThemedText type="smallBold">Seu financeiro começa aqui</ThemedText>
-                  <ThemedText type="small" themeColor="textSecondary" style={styles.emptyHint}>
-                    Manda no WhatsApp: “gastei 45 no mercado”{'\n'}ou toque no “+” para lançar por
-                    aqui.
-                  </ThemedText>
-                </GlassCard>
-              )}
+        {/* Bloco 5 — cartões. */}
+        {cards.isError ? (
+          <ErrorCard onRetry={cards.refetch} />
+        ) : (cards.data ?? []).length > 0 ? (
+          <Section title="Cartões">
+            {(cards.data ?? []).map((card) => (
+              <Row
+                key={card.account_id}
+                title={card.name}
+                subtitle={[
+                  card.due_date ? `vence ${formatDateBR(card.due_date)}` : 'sem fatura aberta',
+                  card.available_limit_cents != null
+                    ? `livre ${formatBRL(Number(card.available_limit_cents))}`
+                    : null,
+                ]
+                  .filter(Boolean)
+                  .join(' · ')}
+                icon="creditcard"
+                accessibilityLabel={`${card.name}, fatura de ${formatBRL(Number(card.invoice_total_cents))}`}
+                trailing={<Money cents={Number(card.invoice_total_cents)} variant="headline" />}
+                onPress={() =>
+                  card.invoice_id
+                    ? router.push({
+                        pathname: '/finance/invoice/[id]',
+                        params: { id: card.invoice_id },
+                      })
+                    : router.push('/finance/cards')
+                }
+              />
+            ))}
+          </Section>
+        ) : null}
 
-              <SectionLink title="🧾 Todos os lançamentos" href="/finance/transactions" index={0} />
-              <SectionLink title="🔮 Projeção e simulador" href="/finance/forecast" index={1} />
-              <SectionLink title="💳 Cartões e faturas" href="/finance/cards" index={2} />
-              <SectionLink title="💼 Contas e carteiras" href="/finance/accounts" index={3} />
-              <SectionLink title="🎯 Metas" href="/finance/goals" index={4} />
-              <SectionLink title="📉 Orçamentos" href="/finance/budgets" index={5} />
-              <SectionLink title="🧾 Dívidas" href="/finance/debts" index={6} />
-              <SectionLink title="🏦 Patrimônio" href="/finance/net-worth" index={7} />
-              <SectionLink title="📊 Relatórios e IR" href="/finance/reports" index={8} />
-              <SectionLink title="🔁 Recorrentes" href="/finance/recurring" index={9} />
-              <SectionLink title="📥 Importar extrato" href="/finance/import" index={10} />
-              <SectionLink title="📌 Regras de categoria" href="/finance/rules" index={11} />
-              <SectionLink title="🤖 Atividade da IA" href="/finance/ai-activity" index={12} />
-            </>
-          )}
-        </ScrollView>
+        {/* Bloco 6 — confirmação do que a IA registrou, agrupada por dia. */}
+        {recent.isError ? (
+          <ErrorCard onRetry={recent.refetch} />
+        ) : recent.isLoading ? (
+          <Section>
+            <SkeletonRow />
+            <SkeletonRow />
+          </Section>
+        ) : recentGroups.length > 0 ? (
+          <View style={styles.block}>
+            <View style={styles.blockHead}>
+              <ThemedText type="smallBold">Últimos lançamentos</ThemedText>
+              <Pressable accessibilityRole="button" hitSlop={12} onPress={() => openTransactions({})}>
+                <ThemedText type="small" themeColor="tint">
+                  Ver todos
+                </ThemedText>
+              </Pressable>
+            </View>
+            {recentGroups.map(([day, rows]) => (
+              <Section key={day} title={dayTitle(day)}>
+                {rows.map((tx) => (
+                  <Link
+                    key={tx.id}
+                    asChild
+                    href={{
+                      pathname: '/finance/[txId]',
+                      params: { txId: tx.id, month: tx.occurred_at.slice(0, 7) },
+                    }}>
+                    <Link.Trigger>
+                      <Row
+                        title={tx.description || tx.merchant || tx.category || 'Sem descrição'}
+                        subtitle={[tx.category, SOURCE_LABEL[tx.source]].filter(Boolean).join(' · ')}
+                        icon={KIND_ICON[tx.kind]}
+                        accessibilityLabel={`${tx.description || tx.category || 'lançamento'}, ${formatBRL(tx.amount_cents)}, ${tx.kind === 'income' ? 'receita' : tx.kind === 'expense' ? 'despesa' : 'transferência'}`}
+                        trailing={
+                          <Money
+                            cents={tx.kind === 'expense' ? -tx.amount_cents : tx.amount_cents}
+                            variant="headline"
+                            tone={tx.kind === 'income' ? 'success' : 'text'}
+                            signed={tx.kind !== 'transfer'}
+                          />
+                        }
+                      />
+                    </Link.Trigger>
+                    <Link.Menu>
+                      <Link.MenuAction
+                        icon="doc.text.magnifyingglass"
+                        onPress={() =>
+                          router.push({
+                            pathname: '/finance/[txId]',
+                            params: { txId: tx.id, month: tx.occurred_at.slice(0, 7) },
+                          })
+                        }>
+                        Ver detalhe
+                      </Link.MenuAction>
+                      <Link.MenuAction
+                        icon="pencil"
+                        onPress={() =>
+                          router.push({
+                            pathname: '/finance/transaction-form',
+                            params: { id: tx.id, month },
+                          })
+                        }>
+                        Editar
+                      </Link.MenuAction>
+                      <Link.MenuAction icon="trash" destructive onPress={() => confirmDelete(tx)}>
+                        Apagar
+                      </Link.MenuAction>
+                    </Link.Menu>
+                  </Link>
+                ))}
+              </Section>
+            ))}
+          </View>
+        ) : null}
 
-        <Pressable
-          onPress={() => {
-            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-            router.push('/finance/transaction-form');
-          }}
-          accessibilityLabel="Novo lançamento"
-          style={({ pressed }) => [
-            styles.fab,
-            { backgroundColor: theme.tint, opacity: pressed ? 0.85 : 1 },
-          ]}>
-          <ThemedText style={styles.fabLabel}>＋</ThemedText>
-        </Pressable>
-      </SafeAreaView>
-    </ThemedView>
+        {isEmpty ? (
+          <EmptyState
+            icon="chart.pie"
+            title="Ainda não tem movimento"
+            hint={'Manda “gastei 45 no mercado” no WhatsApp —\nou toca no + para lançar aqui'}
+          />
+        ) : null}
+
+        {/* Fica sempre visível: sem conta cadastrada não existe dado para mostrar. */}
+        <Section title="Gerenciar">
+          {MANAGE.map((item) => (
+            <Row
+              key={item.title}
+              title={item.title}
+              icon={item.icon}
+              onPress={() => router.push(item.href)}
+            />
+          ))}
+        </Section>
+      </Screen>
+
+      <Button
+        label="Lançar"
+        icon="plus"
+        onPress={() => router.push({ pathname: '/finance/transaction-form', params: { month } })}
+        style={[
+          styles.fab,
+          { bottom: insets.bottom + Space.xxl, boxShadow: Elevation[scheme].floating },
+        ]}
+      />
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
+  root: {
     flex: 1,
+  },
+  hero: {
+    gap: Space.sm,
+  },
+  heroSkeleton: {
+    gap: Space.md,
+  },
+  heroFacts: {
     flexDirection: 'row',
-    justifyContent: 'center',
+    flexWrap: 'wrap',
+    gap: Space.md,
   },
-  safeArea: {
-    flex: 1,
-    maxWidth: MaxContentWidth,
-    paddingHorizontal: Spacing.four,
-    width: '100%',
+  block: {
+    gap: Space.md,
   },
-  scroll: {
-    gap: Spacing.three,
-    paddingBottom: BottomTabInset + Spacing.six,
-  },
-  heading: {
-    paddingVertical: Spacing.three,
-  },
-  totalCard: {
+  blockHead: {
+    flexDirection: 'row',
     alignItems: 'center',
-    gap: Spacing.one,
-    paddingVertical: Spacing.four,
-  },
-  totalValue: {
-    fontSize: 40,
-    lineHeight: 48,
-  },
-  monthSummary: {
-    flexDirection: 'row',
-    gap: Spacing.three,
-    alignItems: 'center',
-  },
-  monthLabel: {
-    textTransform: 'capitalize',
-  },
-  sectionCard: {
-    gap: Spacing.three,
-  },
-  chartRow: {
-    flexDirection: 'row',
     justifyContent: 'space-between',
-    gap: Spacing.two,
-    height: 120,
+    paddingHorizontal: Space.lg,
   },
-  chartColumn: {
-    flex: 1,
-    alignItems: 'center',
-    gap: Spacing.one,
+  category: {
+    gap: Space.sm,
+    paddingHorizontal: Space.lg,
+    paddingVertical: Space.md,
   },
-  chartBars: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'flex-end',
-    gap: 3,
-  },
-  chartBar: {
-    width: 10,
-    borderRadius: 5,
-  },
-  chartLabel: {
-    fontSize: 11,
-  },
-  legend: {
+  categoryHead: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: Spacing.two,
-    justifyContent: 'center',
-  },
-  legendDot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-  },
-  categoryRow: {
-    gap: Spacing.one,
-  },
-  categoryHeader: {
-    flexDirection: 'row',
     justifyContent: 'space-between',
-    alignItems: 'center',
-    gap: Spacing.two,
+    gap: Space.md,
   },
-  recentLabel: {
+  categoryName: {
     flex: 1,
   },
-  barTrack: {
-    height: 10,
-    borderRadius: 5,
-    overflow: 'hidden',
-  },
-  barFill: {
-    height: '100%',
-    borderRadius: 5,
-  },
-  linkCard: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingVertical: Spacing.three,
-  },
-  empty: {
-    alignItems: 'center',
-    gap: Spacing.two,
-    paddingVertical: Spacing.five,
-  },
-  emptyEmoji: {
-    fontSize: 40,
-  },
-  emptyHint: {
-    textAlign: 'center',
+  budget: {
+    gap: Space.sm,
+    paddingHorizontal: Space.lg,
+    paddingVertical: Space.md,
   },
   fab: {
     position: 'absolute',
-    right: Spacing.four,
-    bottom: BottomTabInset + Spacing.three,
-    width: 56,
-    height: 56,
-    borderRadius: 28,
-    alignItems: 'center',
-    justifyContent: 'center',
-    shadowColor: '#000',
-    shadowOpacity: 0.25,
-    shadowRadius: 8,
-    shadowOffset: { width: 0, height: 4 },
-    elevation: 6,
-  },
-  fabLabel: {
-    color: '#fff',
-    fontSize: 26,
-    lineHeight: 30,
+    right: Space.lg,
   },
 });

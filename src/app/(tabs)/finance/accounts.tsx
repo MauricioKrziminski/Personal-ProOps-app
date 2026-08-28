@@ -1,16 +1,32 @@
 import { useState } from 'react';
-import { Alert, Pressable, ScrollView, StyleSheet, TextInput, View } from 'react-native';
+import {
+  ActionSheetIOS,
+  Alert,
+  Modal,
+  Platform,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  View,
+} from 'react-native';
 import Animated, { FadeInDown } from 'react-native-reanimated';
-import { SafeAreaView } from 'react-native-safe-area-context';
-import * as Haptics from 'expo-haptics';
+import { Link, Stack, router } from 'expo-router';
+import type { SymbolViewProps } from 'expo-symbols';
 
-import { ErrorCard, LoadingCard } from '@/components/error-card';
-import { Chip } from '@/components/finance/chip';
-import { MoneyInput } from '@/components/finance/money-input';
 import { GlassCard } from '@/components/glass/glass-card';
 import { ThemedText } from '@/components/themed-text';
-import { ThemedView } from '@/components/themed-view';
-import { MaxContentWidth, Spacing } from '@/constants/theme';
+import { Button } from '@/components/ui/button';
+import { Card } from '@/components/ui/card';
+import { EmptyState } from '@/components/ui/empty-state';
+import { Field, MoneyField, TextField } from '@/components/ui/field';
+import { Icon } from '@/components/ui/icon';
+import { Money } from '@/components/ui/money';
+import { Row, Section } from '@/components/ui/row';
+import { Screen } from '@/components/ui/screen';
+import { Segmented } from '@/components/ui/segmented';
+import { Skeleton, SkeletonRow } from '@/components/ui/skeleton';
+import { useToast } from '@/components/ui/toast';
+import { Motion, Radius, Space } from '@/design/tokens';
 import { formatBRL } from '@/hooks/use-items';
 import {
   ACCOUNT_TYPES,
@@ -19,363 +35,515 @@ import {
   useArchiveAccount,
   useSaveAccount,
   type Account,
+  type AccountBalance,
 } from '@/hooks/use-finance';
 import { useTheme } from '@/hooks/use-theme';
 
-const TYPE_EMOJI: Record<string, string> = {
-  checking: '🏦',
-  savings: '🐷',
-  credit_card: '💳',
-  cash: '💵',
-  investment: '📈',
-  none: '❔',
+/**
+ * Contas — "quanto eu tenho, e onde?".
+ *
+ * É uma tela de LEITURA: o sucesso é o usuário bater o número com o extrato do banco. Cadastrar
+ * conta é frequência 1 e por isso saiu do corpo da tela para um sheet.
+ *
+ * Duas decisões que valem comentário:
+ * - **O destaque é "dinheiro disponível", não "saldo total".** A versão anterior somava todas as
+ *   linhas de `account_balances()`, cartão incluído (saldo negativo), e chamava o resultado de
+ *   saldo. Aqui o cartão sai da soma e aparece como dívida, separado.
+ * - **O form é um `Modal` `pageSheet` dentro da própria tela**, não a rota
+ *   `/finance/account-form` que o doc pede: criar rota exigiria mexer no `_layout` da pilha, fora
+ *   do escopo desta entrega. A apresentação e o par Cancelar/Salvar são os mesmos.
+ */
+
+const ICONE: Record<string, SymbolViewProps['name']> = {
+  checking: 'building.columns',
+  savings: 'banknote',
+  cash: 'dollarsign.circle',
+  investment: 'chart.line.uptrend.xyaxis',
+  credit_card: 'creditcard',
+  none: 'questionmark.circle',
 };
+
+const GUARDA_DINHEIRO = ['checking', 'savings', 'cash'];
+
+interface FormState {
+  id?: string;
+  name: string;
+  type: Account['type'];
+  initialCents: number;
+  closingDay: string;
+  dueDay: string;
+  limitCents: number;
+  payerId: string | null;
+}
+
+const FORM_VAZIO: FormState = {
+  name: '',
+  type: 'checking',
+  initialCents: 0,
+  closingDay: '',
+  dueDay: '',
+  limitCents: 0,
+  payerId: null,
+};
+
+const diaValido = (v: string) => /^\d{1,2}$/.test(v) && Number(v) >= 1 && Number(v) <= 31;
+
+/**
+ * Confirmação de ação destrutiva.
+ *
+ * Action sheet nativo no iOS; no Android o RN não expõe action sheet, então o diálogo nativo é o
+ * equivalente mais próximo. O que estava proibido era `onLongPress` + `Alert` como *gesto*: ação
+ * escondida atrás de segurar o dedo.
+ */
+function confirmaDestrutiva(opts: {
+  title: string;
+  message: string;
+  confirm: string;
+  onConfirm: () => void;
+}) {
+  if (Platform.OS === 'ios') {
+    ActionSheetIOS.showActionSheetWithOptions(
+      {
+        title: opts.title,
+        message: opts.message,
+        options: ['Cancelar', opts.confirm],
+        cancelButtonIndex: 0,
+        destructiveButtonIndex: 1,
+      },
+      (i) => {
+        if (i === 1) opts.onConfirm();
+      }
+    );
+    return;
+  }
+  Alert.alert(opts.title, opts.message, [
+    { text: 'Cancelar', style: 'cancel' },
+    { text: opts.confirm, style: 'destructive', onPress: opts.onConfirm },
+  ]);
+}
+
+/** Faixa de erro por seção. Uma seção que falha DIZ que falhou — nunca some. */
+function ErrorBand({ message, onRetry }: { message: string; onRetry: () => void }) {
+  return (
+    <Card style={styles.band}>
+      <Icon name="exclamationmark.triangle.fill" size="lg" color="danger" />
+      <ThemedText type="small" style={styles.bandText}>
+        {message}
+      </ThemedText>
+      <Button label="Tentar de novo" variant="secondary" size="sm" onPress={onRetry} />
+    </Card>
+  );
+}
 
 export default function AccountsScreen() {
   const theme = useTheme();
-  const { data: balances, isLoading, isError, refetch } = useAccountBalances();
-  const { data: accounts } = useAccounts();
+  const toast = useToast();
+  const balances = useAccountBalances();
+  const accounts = useAccounts();
   const save = useSaveAccount();
   const archive = useArchiveAccount();
-  const [creating, setCreating] = useState(false);
-  const [editing, setEditing] = useState<Account | null>(null);
-  const [name, setName] = useState('');
-  const [type, setType] = useState<Account['type']>('checking');
-  const [initialCents, setInitialCents] = useState(0);
-  // só valem para credit_card — o check do banco exige null nos outros tipos
-  const [closingDay, setClosingDay] = useState('');
-  const [dueDay, setDueDay] = useState('');
-  const [limitCents, setLimitCents] = useState(0);
+  const [form, setForm] = useState<FormState | null>(null);
 
-  const isCard = type === 'credit_card';
-  const diaValido = (v: string) => /^\d{1,2}$/.test(v) && Number(v) >= 1 && Number(v) <= 31;
-  const cartaoCompleto = !isCard || (diaValido(closingDay) && diaValido(dueDay));
+  const linhas = balances.data ?? [];
+  const semConta = linhas.find((l) => l.account_id === null);
+  const dinheiro = linhas.filter((l) => l.account_id && GUARDA_DINHEIRO.includes(l.type));
+  const investimentos = linhas.filter((l) => l.account_id && l.type === 'investment');
+  const cartoes = linhas.filter((l) => l.account_id && l.type === 'credit_card');
 
-  const total = (balances ?? []).reduce((sum, b) => sum + Number(b.balance_cents), 0);
-  const showForm = creating || editing !== null;
+  const caixa =
+    dinheiro.reduce((s, l) => s + Number(l.balance_cents), 0) +
+    Number(semConta?.balance_cents ?? 0);
+  const investido = investimentos.reduce((s, l) => s + Number(l.balance_cents), 0);
+  // saldo de cartão é negativo quando há fatura em aberto; aqui vira dívida positiva
+  const dividaCartao = cartoes.reduce((s, l) => s + Math.min(0, Number(l.balance_cents)), 0);
 
-  const closeForm = () => {
-    setCreating(false);
-    setEditing(null);
-    setName('');
-    setType('checking');
-    setInitialCents(0);
-    setClosingDay('');
-    setDueDay('');
-    setLimitCents(0);
-  };
+  const contaDe = (id: string | null) => (accounts.data ?? []).find((a) => a.id === id);
+  const pagadoras = (accounts.data ?? []).filter(
+    (a) => a.type !== 'credit_card' && a.id !== form?.id
+  );
 
-  /** A linha sintética "Sem conta" (account_id null) não é editável. */
-  const startEdit = (accountId: string | null) => {
-    const account = (accounts ?? []).find((a) => a.id === accountId);
-    if (!account) return;
-    Haptics.selectionAsync();
-    setCreating(false);
-    setEditing(account);
-    setName(account.name);
-    setType(account.type);
-    setInitialCents(account.initial_balance_cents);
-    setClosingDay(account.closing_day ? String(account.closing_day) : '');
-    setDueDay(account.due_day ? String(account.due_day) : '');
-    setLimitCents(account.credit_limit_cents ?? 0);
-  };
+  const semNadaCadastrado = !accounts.isLoading && (accounts.data ?? []).length === 0;
+  const soTemSemConta = semNadaCadastrado && Number(semConta?.balance_cents ?? 0) !== 0;
 
-  const onSubmit = () => {
-    if (!name.trim()) return;
+  const abrirNova = () => setForm({ ...FORM_VAZIO });
+  const abrirEdicao = (a: Account) =>
+    setForm({
+      id: a.id,
+      name: a.name,
+      type: a.type,
+      initialCents: a.initial_balance_cents,
+      closingDay: a.closing_day ? String(a.closing_day) : '',
+      dueDay: a.due_day ? String(a.due_day) : '',
+      limitCents: a.credit_limit_cents ?? 0,
+      payerId: a.payment_account_id,
+    });
+
+  const ehCartao = form?.type === 'credit_card';
+  const nomeOk = (form?.name.trim().length ?? 0) >= 1;
+  const cicloOk = !ehCartao || (diaValido(form!.closingDay) && diaValido(form!.dueDay));
+
+  const salvar = () => {
+    if (!form || !nomeOk || !cicloOk) return;
     save.mutate(
       {
-        id: editing?.id,
-        name: name.trim(),
-        type,
-        initial_balance_cents: initialCents,
-        closing_day: isCard ? Number(closingDay) : null,
-        due_day: isCard ? Number(dueDay) : null,
-        credit_limit_cents: isCard ? limitCents : null,
-        payment_account_id: null,
+        id: form.id,
+        name: form.name.trim(),
+        type: form.type,
+        initial_balance_cents: form.type === 'credit_card' ? 0 : form.initialCents,
+        closing_day: ehCartao ? Number(form.closingDay) : null,
+        due_day: ehCartao ? Number(form.dueDay) : null,
+        credit_limit_cents: ehCartao ? form.limitCents : null,
+        // sem isto o cartão nunca sabe qual conta paga a fatura dele (bug antigo: null fixo)
+        payment_account_id: ehCartao ? form.payerId : null,
       },
       {
         onSuccess: () => {
-          Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-          closeForm();
+          toast({ message: form.id ? 'Conta atualizada.' : 'Conta criada.', tone: 'success' });
+          setForm(null);
         },
-      },
+        onError: () =>
+          toast({
+            message: 'Não deu para salvar. Já existe uma conta com esse nome?',
+            tone: 'error',
+          }),
+      }
     );
   };
 
-  const confirmArchive = (accountId: string | null) => {
-    const account = (accounts ?? []).find((a) => a.id === accountId);
-    if (!account) return;
-    Alert.alert('Arquivar conta', `Arquivar "${account.name}"? Os lançamentos são mantidos.`, [
-      { text: 'Cancelar', style: 'cancel' },
-      {
-        text: 'Arquivar',
-        style: 'destructive',
-        onPress: () => {
-          Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
-          archive.mutate(account.id);
-        },
-      },
-    ]);
+  const arquivar = (a: Account) =>
+    confirmaDestrutiva({
+      title: `Arquivar "${a.name}"?`,
+      message: 'Os lançamentos são mantidos.',
+      confirm: 'Arquivar',
+      onConfirm: () =>
+        archive.mutate(a.id, {
+          onSuccess: () => toast({ message: `${a.name} arquivada.`, tone: 'success' }),
+          onError: () =>
+            toast({ message: `Não deu para arquivar ${a.name}.`, tone: 'error' }),
+        }),
+    });
+
+  const linhaConta = (saldo: AccountBalance) => {
+    const conta = contaDe(saldo.account_id);
+    const cents = Number(saldo.balance_cents);
+    const negativo = cents < 0;
+    const tipo = ACCOUNT_TYPES.find((t) => t.value === saldo.type)?.label ?? '';
+    const ciclo =
+      conta?.closing_day && conta.due_day
+        ? `fecha dia ${conta.closing_day} · vence dia ${conta.due_day}`
+        : null;
+
+    return (
+      <Link key={saldo.account_id} href="/finance/transactions" asChild>
+        <Link.Trigger>
+          <Row
+            title={saldo.name}
+            subtitle={ciclo ?? tipo}
+            icon={ICONE[saldo.type]}
+            // o valor negativo não pode ser comunicado só pela cor
+            accessibilityLabel={`${saldo.name}, ${tipo}, ${negativo ? 'deve' : 'tem'} ${formatBRL(Math.abs(cents))}`}
+            trailing={
+              <Money
+                cents={cents}
+                variant="headline"
+                tone={negativo ? 'danger' : 'text'}
+                signed={negativo}
+              />
+            }
+          />
+        </Link.Trigger>
+        <Link.Menu>
+          <Link.MenuAction icon="list.bullet" onPress={() => router.push('/finance/transactions')}>
+            Ver extrato
+          </Link.MenuAction>
+          <Link.MenuAction
+            icon="pencil"
+            disabled={!conta}
+            onPress={() => conta && abrirEdicao(conta)}>
+            Editar
+          </Link.MenuAction>
+          <Link.MenuAction
+            icon="archivebox"
+            destructive
+            disabled={!conta}
+            onPress={() => conta && arquivar(conta)}>
+            Arquivar
+          </Link.MenuAction>
+        </Link.Menu>
+      </Link>
+    );
   };
 
   return (
-    <ThemedView style={styles.container}>
-      <SafeAreaView style={styles.safeArea}>
-        <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
+    <Screen
+      grouped
+      onRefresh={() => {
+        balances.refetch();
+        accounts.refetch();
+      }}
+      refreshing={balances.isRefetching}>
+      <Stack.Screen
+        options={{
+          title: 'Contas',
+          headerLargeTitle: true,
+          headerRight: () => (
+            <Pressable accessibilityLabel="Nova conta" hitSlop={12} onPress={abrirNova}>
+              <Icon name="plus.circle.fill" size="lg" color="tint" />
+            </Pressable>
+          ),
+        }}
+      />
 
-          {isError && <ErrorCard onRetry={refetch} />}
-          {isLoading && !isError && <LoadingCard />}
+      {balances.isLoading ? (
+        <>
+          <Skeleton height={120} radius={Radius.lg} />
+          <SkeletonRow />
+          <SkeletonRow />
+          <SkeletonRow />
+        </>
+      ) : null}
 
-          {(balances ?? []).length > 0 && (
-            <Animated.View entering={FadeInDown.duration(400)}>
-              <GlassCard style={styles.totalCard}>
+      {/* O único GlassCard da tela. */}
+      {balances.isError ? (
+        <ErrorBand message="Não deu para carregar seus saldos." onRetry={balances.refetch} />
+      ) : balances.data ? (
+        <Animated.View entering={FadeInDown.duration(Motion.duration.slow)}>
+          <GlassCard style={styles.hero}>
+            <ThemedText type="small" themeColor="textSecondary">
+              Dinheiro disponível
+            </ThemedText>
+            <Money cents={caixa} variant="money" tone={caixa < 0 ? 'danger' : 'text'} />
+            <View style={styles.heroSplit}>
+              <View style={styles.heroPart}>
                 <ThemedText type="small" themeColor="textSecondary">
-                  Saldo total
+                  investido
                 </ThemedText>
-                <ThemedText type="subtitle">{formatBRL(total)}</ThemedText>
-              </GlassCard>
-            </Animated.View>
-          )}
-
-          {(balances ?? []).map((balance, index) => (
-            <Animated.View
-              key={balance.account_id ?? 'none'}
-              entering={FadeInDown.duration(400).delay(Math.min(index * 60, 400))}>
-              <Pressable
-                onLongPress={() => confirmArchive(balance.account_id)}
-                onPress={() => startEdit(balance.account_id)}>
-                <GlassCard style={styles.accountRow}>
-                  <ThemedText style={styles.accountEmoji}>
-                    {TYPE_EMOJI[balance.type] ?? '❔'}
-                  </ThemedText>
-                  <View style={styles.accountBody}>
-                    <ThemedText>{balance.name}</ThemedText>
-                    <ThemedText type="small" themeColor="textSecondary">
-                      {ACCOUNT_TYPES.find((t) => t.value === balance.type)?.label ?? 'Sem conta'}
-                    </ThemedText>
-                  </View>
-                  <ThemedText
-                    type="smallBold"
-                    style={{ color: Number(balance.balance_cents) < 0 ? theme.danger : theme.text }}>
-                    {formatBRL(Number(balance.balance_cents))}
-                  </ThemedText>
-                </GlassCard>
-              </Pressable>
-            </Animated.View>
-          ))}
-
-          {!isLoading && !isError && (balances ?? []).length === 0 && (
-            <GlassCard style={styles.empty}>
-              <ThemedText style={styles.emptyEmoji}>💼</ThemedText>
-              <ThemedText type="smallBold">Nenhuma conta cadastrada</ThemedText>
-              <ThemedText type="small" themeColor="textSecondary" style={styles.emptyHint}>
-                Cadastre suas contas e carteiras para{'\n'}acompanhar o saldo de cada uma.
-              </ThemedText>
-            </GlassCard>
-          )}
-
-          {showForm ? (
-            <GlassCard style={styles.form}>
-              <ThemedText type="smallBold">
-                {editing ? `Editando “${editing.name}”` : 'Nova conta'}
-              </ThemedText>
-              <TextInput
-                value={name}
-                onChangeText={setName}
-                placeholder="Nome (ex.: Nubank)"
-                placeholderTextColor={theme.textSecondary}
-                autoFocus
-                style={[styles.input, { backgroundColor: theme.backgroundElement, color: theme.text }]}
-              />
-              <View style={styles.chipRow}>
-                {ACCOUNT_TYPES.map((t) => (
-                  <Chip
-                    key={t.value}
-                    label={t.label}
-                    selected={type === t.value}
-                    onPress={() => setType(t.value)}
-                  />
-                ))}
+                <Money cents={investido} variant="subhead" tone="textSecondary" />
               </View>
-              {isCard ? (
+              <View style={styles.heroPart}>
+                <ThemedText type="small" themeColor="textSecondary">
+                  dívida de cartão
+                </ThemedText>
+                <Money
+                  cents={dividaCartao}
+                  variant="subhead"
+                  tone={dividaCartao < 0 ? 'danger' : 'textSecondary'}
+                  signed={dividaCartao < 0}
+                />
+              </View>
+            </View>
+            <ThemedText type="small" themeColor="textSecondary">
+              Cartão fica de fora do disponível: fatura é dívida, não saldo. Parcela futura já
+              lançada entra na conta.
+            </ThemedText>
+          </GlassCard>
+        </Animated.View>
+      ) : null}
+
+      {accounts.isError ? (
+        <ErrorBand
+          message="Não deu para carregar suas contas. Os saldos acima continuam valendo; editar e arquivar voltam quando a lista carregar."
+          onRetry={accounts.refetch}
+        />
+      ) : null}
+
+      {dinheiro.length > 0 ? <Section title="Dinheiro">{dinheiro.map(linhaConta)}</Section> : null}
+      {investimentos.length > 0 ? (
+        <Section title="Investimentos">{investimentos.map(linhaConta)}</Section>
+      ) : null}
+      {cartoes.length > 0 ? <Section title="Cartões">{cartoes.map(linhaConta)}</Section> : null}
+
+      {/* Fora do agrupamento de propósito: quem só usa o WhatsApp tem quase tudo aqui. */}
+      {semConta && Number(semConta.balance_cents) !== 0 ? (
+        <Section>
+          <Row
+            title="Sem conta"
+            subtitle="lançamentos que não citam conta"
+            icon="questionmark.circle"
+            onPress={() => router.push('/finance/transactions')}
+            trailing={<Money cents={Number(semConta.balance_cents)} variant="headline" />}
+          />
+        </Section>
+      ) : null}
+
+      {semNadaCadastrado && !balances.isLoading && !balances.isError ? (
+        <EmptyState
+          icon="wallet.bifold"
+          title={soTemSemConta ? 'Seus lançamentos estão em “Sem conta”' : 'Nenhuma conta ainda'}
+          hint={
+            soTemSemConta
+              ? 'Cadastre suas contas para saber quanto tem em cada uma. O que já foi lançado continua valendo.'
+              : 'Cadastre onde o dinheiro fica — corrente, poupança, dinheiro, cartão. Depois é só mandar “gastei 45 no mercado no Nubank” no WhatsApp.'
+          }
+          action={{ label: 'Cadastrar conta', onPress: abrirNova }}
+        />
+      ) : null}
+
+      <Modal
+        visible={form !== null}
+        animationType="slide"
+        presentationStyle="pageSheet"
+        onRequestClose={() => setForm(null)}>
+        <View style={[styles.sheet, { backgroundColor: theme.groupedBackground }]}>
+          <View style={styles.sheetHead}>
+            <Button label="Cancelar" variant="ghost" size="sm" onPress={() => setForm(null)} />
+            <ThemedText type="smallBold">{form?.id ? 'Editar conta' : 'Nova conta'}</ThemedText>
+            <Button
+              label="Salvar"
+              size="sm"
+              loading={save.isPending}
+              disabled={!nomeOk || !cicloOk}
+              onPress={salvar}
+            />
+          </View>
+
+          {form ? (
+            <ScrollView contentContainerStyle={styles.sheetBody} keyboardShouldPersistTaps="handled">
+              <Field label="Nome">
+                <TextField
+                  value={form.name}
+                  onChangeText={(name) => setForm({ ...form, name })}
+                  placeholder="Nubank"
+                  autoFocus
+                  invalid={form.name.length > 0 && !nomeOk}
+                />
+              </Field>
+
+              <Field label="Tipo">
+                <Segmented
+                  options={ACCOUNT_TYPES.map((t) => ({ value: t.value, label: t.label }))}
+                  value={form.type}
+                  onChange={(type) => setForm({ ...form, type })}
+                />
+              </Field>
+
+              {form.type === 'credit_card' ? (
                 <>
-                  <ThemedText type="smallBold">Ciclo da fatura</ThemedText>
                   <View style={styles.diaRow}>
                     <View style={styles.diaCampo}>
-                      <ThemedText type="small" themeColor="textSecondary">
-                        Fecha dia
-                      </ThemedText>
-                      <TextInput
-                        value={closingDay}
-                        onChangeText={(v) => setClosingDay(v.replace(/\D/g, '').slice(0, 2))}
-                        placeholder="28"
-                        placeholderTextColor={theme.textSecondary}
-                        keyboardType="number-pad"
-                        style={[
-                          styles.input,
-                          { backgroundColor: theme.backgroundElement, color: theme.text },
-                        ]}
-                      />
+                      <Field
+                        label="Fecha dia"
+                        error={form.closingDay && !diaValido(form.closingDay) ? 'De 1 a 31' : undefined}>
+                        <TextField
+                          value={form.closingDay}
+                          onChangeText={(v) =>
+                            setForm({ ...form, closingDay: v.replace(/\D/g, '').slice(0, 2) })
+                          }
+                          placeholder="28"
+                          keyboardType="number-pad"
+                        />
+                      </Field>
                     </View>
                     <View style={styles.diaCampo}>
-                      <ThemedText type="small" themeColor="textSecondary">
-                        Vence dia
-                      </ThemedText>
-                      <TextInput
-                        value={dueDay}
-                        onChangeText={(v) => setDueDay(v.replace(/\D/g, '').slice(0, 2))}
-                        placeholder="5"
-                        placeholderTextColor={theme.textSecondary}
-                        keyboardType="number-pad"
-                        style={[
-                          styles.input,
-                          { backgroundColor: theme.backgroundElement, color: theme.text },
-                        ]}
-                      />
+                      <Field
+                        label="Vence dia"
+                        error={form.dueDay && !diaValido(form.dueDay) ? 'De 1 a 31' : undefined}>
+                        <TextField
+                          value={form.dueDay}
+                          onChangeText={(v) =>
+                            setForm({ ...form, dueDay: v.replace(/\D/g, '').slice(0, 2) })
+                          }
+                          placeholder="5"
+                          keyboardType="number-pad"
+                        />
+                      </Field>
                     </View>
                   </View>
+
                   <ThemedText type="small" themeColor="textSecondary">
                     Compra depois do fechamento cai na fatura do mês seguinte.
                   </ThemedText>
-                  <ThemedText type="smallBold">Limite do cartão</ThemedText>
-                  <MoneyInput valueCents={limitCents} onChangeCents={setLimitCents} />
+
+                  <Field label="Limite do cartão">
+                    <MoneyField
+                      valueCents={form.limitCents}
+                      onChangeCents={(limitCents) => setForm({ ...form, limitCents })}
+                    />
+                  </Field>
+
+                  <Field
+                    label="Conta que paga a fatura"
+                    hint="A fatura já vem com ela sugerida quando você for registrar o pagamento.">
+                    <Section>
+                      <Row
+                        title="Escolher na hora de pagar"
+                        onPress={() => setForm({ ...form, payerId: null })}
+                        trailing={
+                          form.payerId === null ? (
+                            <Icon name="checkmark" size="sm" color="tint" />
+                          ) : undefined
+                        }
+                      />
+                      {pagadoras.map((a) => (
+                        <Row
+                          key={a.id}
+                          title={a.name}
+                          icon={ICONE[a.type]}
+                          onPress={() => setForm({ ...form, payerId: a.id })}
+                          trailing={
+                            form.payerId === a.id ? (
+                              <Icon name="checkmark" size="sm" color="tint" />
+                            ) : undefined
+                          }
+                        />
+                      ))}
+                    </Section>
+                  </Field>
                 </>
               ) : (
-                <>
-                  <ThemedText type="smallBold">Saldo inicial</ThemedText>
-                  <MoneyInput valueCents={initialCents} onChangeCents={setInitialCents} />
-                </>
+                <Field label="Saldo inicial" hint="O que já estava na conta antes de você usar o app.">
+                  <MoneyField
+                    valueCents={form.initialCents}
+                    onChangeCents={(initialCents) => setForm({ ...form, initialCents })}
+                  />
+                </Field>
               )}
-              <Pressable
-                onPress={onSubmit}
-                disabled={save.isPending || !name.trim() || !cartaoCompleto}
-                style={({ pressed }) => [
-                  styles.submit,
-                  {
-                    backgroundColor: theme.tint,
-                    opacity:
-                      pressed || save.isPending || !name.trim() || !cartaoCompleto ? 0.6 : 1,
-                  },
-                ]}>
-                <ThemedText type="smallBold" style={styles.buttonLabel}>
-                  {save.isPending ? 'Salvando…' : editing ? 'Salvar' : 'Criar conta'}
-                </ThemedText>
-              </Pressable>
-              <Pressable onPress={closeForm} hitSlop={8} style={styles.cancel}>
-                <ThemedText type="small" themeColor="textSecondary">
-                  Cancelar
-                </ThemedText>
-              </Pressable>
-              {save.isError && (
-                <ThemedText type="small" themeColor="danger" style={styles.centered}>
-                  Não deu para salvar (nome repetido?).
-                </ThemedText>
-              )}
-            </GlassCard>
-          ) : (
-            <Pressable
-              onPress={() => {
-                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                setCreating(true);
-              }}
-              style={({ pressed }) => [
-                styles.submit,
-                { backgroundColor: theme.tint, opacity: pressed ? 0.85 : 1 },
-              ]}>
-              <ThemedText type="smallBold" style={styles.buttonLabel}>
-                ＋ Nova conta
-              </ThemedText>
-            </Pressable>
-          )}
-
-          <ThemedText type="small" themeColor="textSecondary" style={styles.centered}>
-            Toque numa conta para editar. Segure para arquivar.
-          </ThemedText>
-        </ScrollView>
-      </SafeAreaView>
-    </ThemedView>
+            </ScrollView>
+          ) : null}
+        </View>
+      </Modal>
+    </Screen>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
+  hero: {
+    gap: Space.sm,
+  },
+  heroSplit: {
     flexDirection: 'row',
-    justifyContent: 'center',
+    gap: Space.xl,
   },
-  safeArea: {
-    flex: 1,
-    maxWidth: MaxContentWidth,
-    paddingHorizontal: Spacing.four,
-    width: '100%',
+  heroPart: {
+    gap: Space.xs,
   },
-  scroll: {
-    gap: Spacing.three,
-    paddingBottom: Spacing.six,
-  },
-  totalCard: {
+  band: {
     alignItems: 'center',
-    gap: Spacing.one,
-    paddingVertical: Spacing.four,
+    gap: Space.md,
   },
-  accountRow: {
+  bandText: {
+    textAlign: 'center',
+  },
+  sheet: {
+    flex: 1,
+  },
+  sheetHead: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: Spacing.three,
+    justifyContent: 'space-between',
+    paddingHorizontal: Space.lg,
+    paddingVertical: Space.md,
   },
-  accountEmoji: {
-    fontSize: 22,
-  },
-  accountBody: {
-    flex: 1,
-    gap: Spacing.half,
+  sheetBody: {
+    gap: Space.xl,
+    padding: Space.lg,
+    paddingBottom: Space.xxxl,
   },
   diaRow: {
     flexDirection: 'row',
-    gap: Spacing.three,
+    gap: Space.lg,
   },
   diaCampo: {
     flex: 1,
-    gap: Spacing.one,
-  },
-  chipRow: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: Spacing.two,
-  },
-  form: {
-    gap: Spacing.three,
-  },
-  input: {
-    borderRadius: Spacing.three,
-    paddingHorizontal: Spacing.three,
-    paddingVertical: Spacing.three,
-    fontSize: 16,
-  },
-  submit: {
-    borderRadius: Spacing.three,
-    paddingVertical: Spacing.three,
-    alignItems: 'center',
-  },
-  buttonLabel: {
-    color: '#fff',
-  },
-  empty: {
-    alignItems: 'center',
-    gap: Spacing.two,
-    paddingVertical: Spacing.five,
-  },
-  emptyEmoji: {
-    fontSize: 40,
-  },
-  emptyHint: {
-    textAlign: 'center',
-  },
-  centered: {
-    textAlign: 'center',
-  },
-  cancel: {
-    alignItems: 'center',
-    paddingVertical: Spacing.one,
   },
 });

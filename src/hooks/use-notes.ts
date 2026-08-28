@@ -19,7 +19,8 @@ import { supabase } from '@/lib/supabase';
 
 /** Nunca `select('*')`: `tags` e `search_tsv` são colunas geradas e grandes — numa lista de 30 o
  *  payload triplica. */
-const NOTE_COLUMNS = 'id, content, folder_id, pinned, source, tags, created_at, updated_at';
+const NOTE_COLUMNS =
+  'id, content, folder_id, pinned, source, tags, created_at, updated_at, deleted_at';
 
 const PAGE = 30;
 
@@ -32,6 +33,8 @@ export interface Note {
   tags: string[];
   created_at: string;
   updated_at: string;
+  /** A lixeira precisa dele para o "apaga em N dias". */
+  deleted_at: string | null;
 }
 
 export interface NoteFolder {

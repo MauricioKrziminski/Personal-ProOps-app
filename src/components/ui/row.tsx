@@ -1,5 +1,5 @@
 import { Children, Fragment, type ReactNode } from 'react';
-import { Pressable, StyleSheet, View } from 'react-native';
+import { Pressable, StyleSheet, View, type AccessibilityState } from 'react-native';
 import type { SymbolViewProps } from 'expo-symbols';
 
 import { ThemedText } from '@/components/themed-text';
@@ -14,7 +14,16 @@ interface RowProps {
   /** Valor, badge ou qualquer coisa à direita. Chevron é automático quando há `onPress`. */
   trailing?: ReactNode;
   onPress?: () => void;
+  /** Menu de contexto do item (action sheet nativo). */
+  onLongPress?: () => void;
   destructive?: boolean;
+  /**
+   * Chevron só quando a linha NAVEGA. Linha que restaura, seleciona ou abre menu passa `false` —
+   * chevron ali é promessa de tela nova que não existe.
+   */
+  chevron?: boolean;
+  /** `selected` / `checked` — o check do picker não pode ser só cor. */
+  accessibilityState?: AccessibilityState;
   /** Rótulo de acessibilidade completo. Sem ele, cai em `title` + `subtitle`. */
   accessibilityLabel?: string;
 }
@@ -31,7 +40,10 @@ export function Row({
   icon,
   trailing,
   onPress,
+  onLongPress,
   destructive = false,
+  chevron,
+  accessibilityState,
   accessibilityLabel,
 }: RowProps) {
   const theme = useTheme();
@@ -50,16 +62,18 @@ export function Row({
         ) : null}
       </View>
       {trailing}
-      {onPress ? <Icon name="chevron.right" size="sm" color="textSecondary" /> : null}
+      {(chevron ?? !!onPress) ? <Icon name="chevron.right" size="sm" color="textSecondary" /> : null}
     </View>
   );
 
-  if (!onPress) return content(false);
+  if (!onPress && !onLongPress) return content(false);
 
   return (
     <Pressable
       onPress={onPress}
+      onLongPress={onLongPress}
       accessibilityRole="button"
+      accessibilityState={accessibilityState}
       accessibilityLabel={accessibilityLabel ?? [title, subtitle].filter(Boolean).join(', ')}>
       {({ pressed }) => content(pressed)}
     </Pressable>

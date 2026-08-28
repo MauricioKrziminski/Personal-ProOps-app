@@ -98,8 +98,12 @@ Barra de progresso e gráfico **animam** quando o valor muda — valor que salta
   scroll, nunca em loop, nunca como único feedback.
 - **Mutation que falha precisa aparecer.** Toast + rollback visível. Falha silenciosa é
   reprovação — vale para delete, toggle, arquivar e pagar, não só para salvar.
-- Confirmação destrutiva é **action sheet nativo**. Ação de item é **context menu nativo**
-  (`Link.Menu`), não `onLongPress` + `Alert`.
+- Confirmação destrutiva é **action sheet nativo**. Ação de item é **context menu nativo**.
+  `Link.Menu` do expo-router é **iOS-only** — usar só ele deixa o Android sem ação nenhuma na
+  linha. O caminho único é `showItemActions` / `confirmDestructive` (`src/lib/item-actions.ts`),
+  que fala o idioma de cada plataforma: `ActionSheetIOS` no iOS, diálogo de opções no Android.
+  `Alert` cru escrito na tela continua proibido; como **fallback de plataforma dentro do helper**,
+  é o certo.
 
 ---
 

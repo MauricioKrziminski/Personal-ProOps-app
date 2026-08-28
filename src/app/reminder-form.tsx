@@ -53,7 +53,8 @@ const deviceTimezone = () => {
 
 export default function ReminderFormScreen() {
   const theme = useTheme();
-  const params = useLocalSearchParams<{ id?: string }>();
+  // `title` chega do menu "Criar lembrete" do detalhe de nota — pré-preenche e nada mais.
+  const params = useLocalSearchParams<{ id?: string; title?: string }>();
   const { data: reminders } = useReminders();
   const editing = params.id ? reminders?.find((r) => r.id === params.id) : undefined;
   const save = useSaveReminder();
@@ -62,7 +63,7 @@ export default function ReminderFormScreen() {
   const [initial] = useState(() => {
     const base = editing ? new Date(editing.next_run_at) : new Date(Date.now() + 60 * 60 * 1000);
     return {
-      title: editing?.title ?? '',
+      title: editing?.title ?? params.title ?? '',
       date: isoToBR(localISODate(base)),
       time: timeBR(base),
       recurrence: editing?.recurrence ?? null,

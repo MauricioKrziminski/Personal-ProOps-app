@@ -1,0 +1,106 @@
+import Constants from 'expo-constants';
+import * as Device from 'expo-device';
+import * as Notifications from 'expo-notifications';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+
+import { supabase } from '@/lib/supabase';
+
+/**
+ * Registro de push.
+ *
+ * Antes isto era `useState` + `useEffect` cru dentro de `profile.tsx`, fora do padrão do projeto,
+ * e o fetch **ignorava o erro** (`.then(({ data }) => ...)`) — falha de rede virava "push
+ * desativado" em silêncio.
+ *
+ * Por que importa tanto: sem `expo_push_token`, **todo** lembrete e **todo** alerta sai por
+ * template PAGO do WhatsApp. A partir de 01/10/2026 nem a janela de 24h é grátis.
+ */
+
+export type PushBlocker =
+  | 'ok'
+  | 'simulator'
+  | 'denied'
+  | 'no-eas-project'
+  | 'unknown';
+
+export interface PushStatus {
+  registered: boolean;
+  blocker: PushBlocker;
+}
+
+function easProjectId(): string | undefined {
+  return (
+    (Constants.expoConfig?.extra as { eas?: { projectId?: string } } | undefined)?.eas?.projectId ??
+    Constants.easConfig?.projectId
+  );
+}
+
+export function usePushStatus(userId: string | undefined) {
+  return useQuery({
+    queryKey: ['push', userId],
+    enabled: !!userId,
+    queryFn: async (): Promise<PushStatus> => {
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('expo_push_token')
+        .eq('id', userId!)
+        .single();
+      // O erro sobe: "não consegui verificar" é uma resposta diferente de "está desligado".
+      if (error) throw error;
+
+      if (data?.expo_push_token) return { registered: true, blocker: 'ok' };
+      if (!Device.isDevice) return { registered: false, blocker: 'simulator' };
+      if (!easProjectId()) return { registered: false, blocker: 'no-eas-project' };
+
+      const perm = await Notifications.getPermissionsAsync();
+      return {
+        registered: false,
+        blocker: perm.status === 'denied' ? 'denied' : 'ok',
+      };
+    },
+  });
+}
+
+export function useRegisterPush(userId: string | undefined) {
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: async () => {
+      if (!userId) throw new Error('sem sessão');
+      if (!Device.isDevice) {
+        throw new Error('Push só funciona em aparelho físico, não no simulador.');
+      }
+      const { status } = await Notifications.requestPermissionsAsync();
+      if (status !== 'granted') {
+        throw new Error('Permissão negada. Dá para liberar nos Ajustes do sistema.');
+      }
+      const projectId = easProjectId();
+      // Sem projectId, `getExpoPushTokenAsync` falha com "Project ID not found" — mensagem que
+      // não diz o que fazer. Ver docs/PENDENCIAS.md: falta rodar `eas init`.
+      if (!projectId) {
+        throw new Error('App ainda não vinculado ao EAS (falta extra.eas.projectId no app.json).');
+      }
+      const token = (await Notifications.getExpoPushTokenAsync({ projectId })).data;
+      const { error } = await supabase
+        .from('profiles')
+        .update({ expo_push_token: token })
+        .eq('id', userId);
+      if (error) throw error;
+      return token;
+    },
+    onSuccess: () => client.invalidateQueries({ queryKey: ['push'] }),
+  });
+}
+
+/** Mensagem por causa — "desativado" genérico não diz o que fazer. */
+export function pushBlockerMessage(blocker: PushBlocker): string | null {
+  switch (blocker) {
+    case 'simulator':
+      return 'Push não funciona no simulador — precisa de um aparelho físico.';
+    case 'denied':
+      return 'Você negou a permissão. Libere em Ajustes › Notificações.';
+    case 'no-eas-project':
+      return 'O app ainda não foi vinculado ao EAS (`eas init`).';
+    default:
+      return null;
+  }
+}

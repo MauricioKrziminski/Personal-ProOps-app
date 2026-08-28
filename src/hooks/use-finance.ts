@@ -922,20 +922,35 @@ export function useSaveAsset() {
       class: Asset['class'];
       is_liability: boolean;
       current_value_cents: number;
+      /**
+       * Edição: só marca valor novo quando ele mudou de verdade. Sem isso um rename
+       * grava uma marcação de hoje no histórico com o valor antigo — dado inventado.
+       */
+      revalue?: boolean;
     }) => {
-      const { id, ...resto } = input;
-      if (id) {
-        // pela RPC para o valor virar marcação no histórico, não só um update
-        const { error } = await supabase.rpc('update_asset_value', {
-          p_asset_id: id,
-          p_value_cents: resto.current_value_cents,
-          p_as_of: localISODate(),
-        });
-        if (error) throw error;
-      } else {
+      const { id, revalue = true, ...resto } = input;
+      if (!id) {
         const { error } = await supabase.from('assets').insert({ ...resto, user_id: await userId() });
         if (error) throw error;
+        return;
       }
+      // Nome, classe e passivo só existem em `assets` e a RPC de valor não os toca — antes
+      // eram descartados em silêncio no modo edição (não havia como renomear nem reclassificar).
+      // O valor NUNCA entra por aqui: coluna de valor só muda via update_asset_value.
+      const { error: erroAtributos } = await supabase
+        .from('assets')
+        .update({ name: resto.name, class: resto.class, is_liability: resto.is_liability })
+        .eq('id', id);
+      if (erroAtributos) throw erroAtributos;
+
+      if (!revalue) return;
+      // pela RPC para o valor virar marcação no histórico, não só um update
+      const { error } = await supabase.rpc('update_asset_value', {
+        p_asset_id: id,
+        p_value_cents: resto.current_value_cents,
+        p_as_of: localISODate(),
+      });
+      if (error) throw error;
     },
     onSuccess: invalidate,
   });

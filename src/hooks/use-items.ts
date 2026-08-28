@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useEffect, useId } from 'react';
 
+import { localISODate } from '@/lib/dates';
 import { supabase } from '@/lib/supabase';
 
 // Helpers puros vivem em @/lib/dates (testáveis fora do RN); reexportados aqui
@@ -174,5 +175,30 @@ export function useDeleteReminder() {
       if (error) throw error;
     },
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['reminders'] }),
+  });
+}
+
+/**
+ * Lembretes que vencem hoje (no fuso do usuário) — o bloco "o que vence" da aba Hoje.
+ *
+ * A aba Lembretes deixou de existir: lembrete não é um destino, é algo que vence.
+ */
+export function useTodayReminders() {
+  useRealtimeInvalidate('reminders', ['reminders', 'today']);
+  const today = localISODate();
+  return useQuery({
+    queryKey: ['reminders', 'today', today],
+    queryFn: async (): Promise<Reminder[]> => {
+      const end = new Date(`${today}T23:59:59`);
+      const { data, error } = await supabase
+        .from('reminders')
+        .select('id, title, recurrence, next_run_at, channel, active')
+        .eq('active', true)
+        .lte('next_run_at', end.toISOString())
+        .order('next_run_at')
+        .limit(20);
+      if (error) throw error;
+      return data as Reminder[];
+    },
   });
 }

@@ -200,6 +200,68 @@ async function resolveAccount(
   return data?.[0]?.id ?? null;
 }
 
+/**
+ * Normaliza o nome da pasta para o formato que o banco EXIGE (0038):
+ * `check (name = lower(trim(name)) and char_length(name) between 1 and 40)`.
+ * O `trim` do fim NÃO é redundante — o slice pode parar num espaço e o check cairia.
+ */
+function nomePasta(bruto: string | null | undefined): string | null {
+  return bruto?.toLowerCase().trim().slice(0, 40).trim() || null;
+}
+
+/**
+ * Resolve (criando se preciso) a pasta da nota. Best-effort como `resolveAccount`:
+ * falhar aqui devolve null e a nota nasce sem pasta — nota perdida seria pior.
+ *
+ * `user_id` explícito e obrigatório: `note_folders` NÃO tem `default auth.uid()`
+ * de propósito (sob service_role isso viraria null e estouraria o not null).
+ * O upsert é legal porque o unique `(workspace_id, name)` é COMPLETO — unique
+ * parcial cairia no 42P10 do PostgREST.
+ */
+async function ensureFolder(
+  supabase: Admin,
+  workspaceId: string,
+  userId: string,
+  nome: string | null | undefined,
+): Promise<{ id: string; name: string } | null> {
+  const name = nomePasta(nome);
+  if (!name) return null;
+  const { data, error } = await supabase
+    .from("note_folders")
+    .upsert(
+      { workspace_id: workspaceId, user_id: userId, name },
+      { onConflict: "workspace_id,name" },
+    )
+    .select("id")
+    .single();
+  if (error || !data) {
+    console.error("ensureFolder falhou (nota fica sem pasta):", error);
+    return null;
+  }
+  return { id: data.id, name };
+}
+
+/** Título de uma nota = primeira linha não vazia (a mesma regra da tela de Notas). */
+function primeiraLinha(content: string | null | undefined, max = 60): string {
+  const linha = (content ?? "").split("\n").find((l) => l.trim())?.trim() ?? "";
+  if (!linha) return "(nota vazia)";
+  return linha.length > max ? `${linha.slice(0, max - 1)}…` : linha;
+}
+
+interface NotaRow {
+  id: string;
+  content: string | null;
+  updated_at?: string;
+  // embed do PostgREST: objeto na relação por FK, mas já veio array em outras versões
+  note_folders?: { name: string } | { name: string }[] | null;
+}
+
+function pastaDaNota(nota: NotaRow): string | null {
+  const f = nota.note_folders;
+  if (!f) return null;
+  return (Array.isArray(f) ? f[0]?.name : f.name) ?? null;
+}
+
 /** Ações que não fazem sentido nenhum sem valor em centavos. */
 const PRECISA_VALOR = new Set<string>([
   "create_expense",
@@ -227,6 +289,14 @@ function parseIncompleto(resultado: { actions: AiAction[] }): boolean {
 }
 
 const KIND_LABEL: Record<string, string> = { expense: "gasto", income: "receita" };
+
+/**
+ * Ações que NÃO passam por `applyRules`. Regra de categorização é do financeiro;
+ * em ação de nota `category` é PASTA e `content` é termo de busca — deixar a
+ * regra reescrever isso trocaria a pasta pedida por outra e a consulta voltaria
+ * vazia, em silêncio.
+ */
+const SEM_REGRA = new Set<string>(["update_note", "query_notes"]);
 
 /** Quantos lançamentos recentes entram na janela de busca por referência. */
 const REFERENCE_WINDOW = 40;
@@ -677,11 +747,15 @@ async function executeAction(
       const campoTexto = tipo === "note" ? "content" : tipo === "reminder" ? "title" : tipo === "goal" ? "name" : "description";
       if (!termo) return "❌ Me diz qual item apagar (ex.: \"apaga a nota do mercado\").";
 
-      const { data: achados } = await supabase
+      let busca = supabase
         .from(tabela)
         .select(`id, ${campoTexto}`)
         .eq("workspace_id", workspaceId)
-        .ilike(campoTexto, `%${termo}%`)
+        .ilike(campoTexto, `%${termo}%`);
+      // nota já na lixeira (0038) não pode voltar como candidata
+      if (tipo === "note") busca = busca.is("deleted_at", null);
+
+      const { data: achados } = await busca
         .order("created_at", { ascending: false })
         .limit(3);
       const lista = (achados ?? []) as unknown as Record<string, string>[];
@@ -691,10 +765,22 @@ async function executeAction(
         return `🤔 Achei mais de um:\n${opcoes}\nSeja mais específico.`;
       }
 
+      if (tipo === "note") {
+        // nota NUNCA some na hora: lixeira de 30 dias (cron `purge-trashed-notes`).
+        // Apagar de vez é o jeito mais rápido de perder a confiança do usuário.
+        const { error } = await supabase
+          .from("notes")
+          .update({ deleted_at: new Date().toISOString() })
+          .eq("id", lista[0].id);
+        if (error) throw error;
+        return "🗑️ Nota na lixeira — 30 dias para restaurar.";
+      }
+
       const { error } = await supabase.from(tabela).delete().eq("id", lista[0].id);
       if (error) throw error;
-      const rotulo = { note: "Nota", reminder: "Lembrete", goal: "Meta", recurring: "Recorrente" }[tipo];
-      return `🗑️ ${rotulo} apagad${tipo === "note" || tipo === "goal" ? "a" : "o"}: ${lista[0][campoTexto]}`;
+      // "note" já saiu pelo ramo da lixeira acima — aqui sobram os que apagam de vez
+      const rotulo = { reminder: "Lembrete", goal: "Meta", recurring: "Recorrente" }[tipo];
+      return `🗑️ ${rotulo} apagad${tipo === "goal" ? "a" : "o"}: ${lista[0][campoTexto]}`;
     }
 
     case "query_net_worth": {
@@ -744,15 +830,57 @@ async function executeAction(
     }
 
     case "create_note": {
+      const categoria = nomePasta(action.category);
+      const pasta = await ensureFolder(supabase, workspaceId, userId, categoria);
       const { error } = await supabase.from("notes").insert({
         user_id: userId,
         workspace_id: workspaceId,
         content: action.content ?? "",
-        category: action.category?.toLowerCase() ?? null,
+        // grava os DOIS durante a transição da 0038: o binário instalado ainda lê
+        // `notes.category` nominalmente e a aba Notas quebraria sem ela.
+        category: categoria,
+        folder_id: pasta?.id ?? null,
         source: "whatsapp",
       });
       if (error) throw error;
-      return `📝 Nota salva: ${action.content ?? ""}`;
+      return `📝 Nota salva${pasta ? ` em *${pasta.name}*` : ""}: ${action.content ?? ""}`;
+    }
+
+    case "update_note": {
+      const termo = action.content?.trim();
+      // multiuso: em nota, `new_category` é o TEXTO a acrescentar (o schema está
+      // no teto de 15 propriedades — não cabe um campo próprio).
+      const trecho = action.new_category?.trim();
+      if (!termo || !trecho) {
+        return "❌ Não entendi. Tenta \"adiciona pão na nota do mercado\".";
+      }
+      const { data, error: buscaError } = await supabase
+        .from("notes")
+        .select("id, content")
+        .eq("workspace_id", workspaceId)
+        .is("deleted_at", null)
+        .ilike("content", `%${termo}%`)
+        .order("updated_at", { ascending: false })
+        .limit(3);
+      if (buscaError) throw buscaError;
+      const notas = (data ?? []) as NotaRow[];
+      if (!notas.length) {
+        return `🤷 Não achei nota com "${termo}". Se for nova, manda "anotar: ${trecho}".`;
+      }
+      // empate PERGUNTA, não chuta: escrever na nota errada é o modo de falha que importa
+      if (notas.length > 1) {
+        const opcoes = notas.map((n) => `  • ${primeiraLinha(n.content)}`).join("\n");
+        return `🤔 Achei mais de uma nota com "${termo}":\n${opcoes}\nQual delas?`;
+      }
+      const nota = notas[0];
+      // SEMPRE acrescenta uma linha, nunca substitui — a nota não tem histórico,
+      // sobrescrever seria perda irrecuperável.
+      const { error } = await supabase
+        .from("notes")
+        .update({ content: nota.content ? `${nota.content}\n${trecho}` : trecho })
+        .eq("id", nota.id);
+      if (error) throw error;
+      return `📝 Acrescentei em *${primeiraLinha(nota.content)}*: ${trecho}`;
     }
 
     case "create_reminder": {
@@ -881,6 +1009,55 @@ async function executeAction(
           (g.deadline ? ` — até ${formatDateBR(g.deadline)}` : "");
       });
       return `🎯 Suas metas:\n${lines.join("\n")}`;
+    }
+
+    case "query_notes": {
+      const termo = action.content?.trim();
+      const pasta = nomePasta(action.category);
+      // `!inner` só quando a pasta é filtro: com join à esquerda o .eq no embed
+      // não filtraria nota nenhuma.
+      const embed = pasta ? "note_folders!inner(name)" : "note_folders(name)";
+      let q = supabase
+        .from("notes")
+        .select(`id, content, updated_at, ${embed}`)
+        .eq("workspace_id", workspaceId)
+        .is("deleted_at", null);
+      // plainto_tsquery já escapa a entrada: termo do usuário nunca vira sintaxe
+      // de tsquery. `pt_unaccent` (0038) faz "reuniao" achar "reunião".
+      if (termo) q = q.textSearch("search_tsv", termo, { type: "plain", config: "pt_unaccent" });
+      if (pasta) q = q.eq("note_folders.name", pasta);
+      // limites do período no fuso do usuário: `.lte(created_at, "2026-08-27")`
+      // compararia com a meia-noite UTC e cortaria o dia inteiro de hoje.
+      if (action.query_from) {
+        q = q.gte("created_at", toInstantISO(action.query_from, timezone, now));
+      }
+      if (action.query_to) {
+        q = q.lte("created_at", toInstantISO(`${action.query_to}T23:59:59`, timezone, now));
+      }
+
+      const { data, error } = await q.order("updated_at", { ascending: false }).limit(5);
+      if (error) throw error;
+      const notas = (data ?? []) as unknown as NotaRow[];
+      if (!notas.length) {
+        const alvo = termo || pasta;
+        return alvo
+          ? `🤷 Não achei nota sobre *${alvo}*.`
+          : "📝 Você ainda não anotou nada. Manda \"anotar: ligar pro dentista\"!";
+      }
+
+      // formatação em TS puro — nada de segunda chamada de LLM só para escrever
+      if (notas.length === 1) {
+        const nome = pastaDaNota(notas[0]);
+        const corpo = (notas[0].content ?? "").trim();
+        return `📝 ${nome ? `*${nome}* — ` : ""}` +
+          (corpo.length > 600 ? `${corpo.slice(0, 600)}…` : corpo);
+      }
+      const linhas = notas.map((n) => {
+        const nome = pastaDaNota(n);
+        return `  • ${primeiraLinha(n.content)}${nome ? ` _(${nome})_` : ""}`;
+      });
+      const cabecalho = notas.length === 5 ? "As 5 notas mais recentes" : `Achei ${notas.length} notas`;
+      return `📝 ${cabecalho}:\n${linhas.join("\n")}`;
     }
 
     case "undo_last": {
@@ -1020,7 +1197,9 @@ Deno.serve(async (_req) => {
       const created: string[] = [];
       for (const action of parsed.actions.slice(0, 10)) {
         try {
-          const comRegra = await applyRules(supabase, workspaceId, action);
+          const comRegra = SEM_REGRA.has(action.type)
+            ? action
+            : await applyRules(supabase, workspaceId, action);
           lines.push(await executeAction(
             supabase,
             { userId: profile.id, workspaceId, timezone: profile.timezone, texto: text, created },
