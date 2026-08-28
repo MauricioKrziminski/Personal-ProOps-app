@@ -5,6 +5,7 @@ import Animated, { FadeInDown, LinearTransition } from 'react-native-reanimated'
 
 import { monthTitle } from '@/components/finance/month-picker';
 import { ThemedText } from '@/components/themed-text';
+import { HeaderActions } from '@/components/ui/header-actions';
 import { Card } from '@/components/ui/card';
 import { EmptyState } from '@/components/ui/empty-state';
 import { Icon } from '@/components/ui/icon';
@@ -119,15 +120,11 @@ export default function ImportHistoryScreen() {
         options={{
           title: 'Importações',
           headerLargeTitle: true,
-          headerRight: () => (
-            <Pressable
-              accessibilityLabel="Nova importação"
-              hitSlop={12}
-              onPress={() => router.push('/import')}>
-              <Icon name="plus.circle.fill" size="lg" color="tint" />
-            </Pressable>
-          ),
         }}
+      />
+
+      <HeaderActions
+        actions={[{ label: 'Nova importação', icon: 'plus', onPress: () => router.push('/import') }]}
       />
 
       {batches.isLoading ? (

@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { Pressable, Share, StyleSheet, View } from 'react-native';
+import { Share, StyleSheet, View } from 'react-native';
 import { Stack, router } from 'expo-router';
 import Animated, { FadeInDown } from 'react-native-reanimated';
 import * as Haptics from 'expo-haptics';
@@ -7,9 +7,9 @@ import * as Haptics from 'expo-haptics';
 import { ErrorCard } from '@/components/error-card';
 import { GlassCard } from '@/components/glass/glass-card';
 import { ThemedText } from '@/components/themed-text';
+import { HeaderActions } from '@/components/ui/header-actions';
 import { Button } from '@/components/ui/button';
 import { EmptyState } from '@/components/ui/empty-state';
-import { Icon } from '@/components/ui/icon';
 import { Money } from '@/components/ui/money';
 import { Row, Section } from '@/components/ui/row';
 import { Screen } from '@/components/ui/screen';
@@ -107,13 +107,16 @@ export default function ReportsScreen() {
         options={{
           title: 'Relatórios',
           headerLargeTitle: true,
-          headerRight: () =>
-            data && temConteudo ? (
-              <Pressable accessibilityLabel="Exportar CSV do ano" hitSlop={12} onPress={exportar}>
-                <Icon name="square.and.arrow.up" size="lg" color="tint" />
-              </Pressable>
-            ) : null,
         }}
+      />
+
+      {/* Ação some quando não há o que exportar — array vazio, não botão desabilitado. */}
+      <HeaderActions
+        actions={
+          data && temConteudo
+            ? [{ label: 'Exportar CSV do ano', icon: 'square.and.arrow.up', onPress: exportar }]
+            : []
+        }
       />
 
       {/* Antes de qualquer número: sem saber o ano, o resto não quer dizer nada. */}

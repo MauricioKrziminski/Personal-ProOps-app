@@ -5,6 +5,7 @@ import { Stack } from 'expo-router';
 
 import { GlassCard } from '@/components/glass/glass-card';
 import { ThemedText } from '@/components/themed-text';
+import { HeaderActions } from '@/components/ui/header-actions';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { EmptyState } from '@/components/ui/empty-state';
@@ -300,13 +301,10 @@ export default function GoalsScreen() {
         options={{
           title: 'Metas',
           headerLargeTitle: true,
-          headerRight: () => (
-            <Pressable accessibilityLabel="Nova meta" hitSlop={12} onPress={abrirNova}>
-              <Icon name="plus.circle.fill" size="lg" color="tint" />
-            </Pressable>
-          ),
         }}
       />
+
+      <HeaderActions actions={[{ label: 'Nova meta', icon: 'plus', onPress: abrirNova }]} />
 
       {goals.isLoading ? (
         <>

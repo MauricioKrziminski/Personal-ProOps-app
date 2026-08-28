@@ -8,6 +8,7 @@ import { Chip } from '@/components/finance/chip';
 import { MonthPicker, currentMonth } from '@/components/finance/month-picker';
 import { GlassCard } from '@/components/glass/glass-card';
 import { ThemedText } from '@/components/themed-text';
+import { HeaderActions } from '@/components/ui/header-actions';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { EmptyState } from '@/components/ui/empty-state';
@@ -346,13 +347,10 @@ export default function BudgetsScreen() {
         options={{
           title: 'Orçamentos',
           headerLargeTitle: true,
-          headerRight: () => (
-            <Pressable accessibilityLabel="Novo orçamento" hitSlop={12} onPress={() => abrirNovo()}>
-              <Icon name="plus.circle.fill" size="lg" color="tint" />
-            </Pressable>
-          ),
         }}
       />
+
+      <HeaderActions actions={[{ label: 'Novo orçamento', icon: 'plus', onPress: () => abrirNovo() }]} />
 
       <MonthPicker month={month} onChange={setMonth} />
 

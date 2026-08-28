@@ -7,7 +7,7 @@ import { GlassCard } from '@/components/glass/glass-card';
 import { ThemedText } from '@/components/themed-text';
 import { Button } from '@/components/ui/button';
 import { EmptyState } from '@/components/ui/empty-state';
-import { Icon } from '@/components/ui/icon';
+import { HeaderActions } from '@/components/ui/header-actions';
 import { Money } from '@/components/ui/money';
 import { Row, Section } from '@/components/ui/row';
 import { HeroLabel } from '@/components/ui/section-head';
@@ -101,23 +101,18 @@ export default function TodayScreen() {
         options={{
           title: 'Hoje',
           headerLargeTitle: true,
-          headerRight: () => (
-            <View style={styles.headerActions}>
-              <Pressable
-                accessibilityLabel="Buscar"
-                hitSlop={12}
-                onPress={() => router.push('/search')}>
-                <Icon name="magnifyingglass" size="lg" color="tint" />
-              </Pressable>
-              <Pressable
-                accessibilityLabel="Nova nota"
-                hitSlop={12}
-                onPress={() => router.push('/notes/new')}>
-                <Icon name="plus.circle.fill" size="lg" color="tint" />
-              </Pressable>
-            </View>
-          ),
         }}
+      />
+
+      {/* Os dois ícones eram uma `View` à mão com `gap: 16` — e o iOS 26 desenhava a pílula de
+          vidro em volta dela, com o nosso respiro em vez do do sistema. `plus.circle.fill` ao
+          lado de `magnifyingglass` ainda misturava preenchido com contorno no mesmo header
+          (`design.md` §4); "Nova nota" agora usa o MESMO ícone da aba Notas. */}
+      <HeaderActions
+        actions={[
+          { label: 'Buscar', icon: 'magnifyingglass', onPress: () => router.push('/search') },
+          { label: 'Nova nota', icon: 'square.and.pencil', onPress: () => router.push('/notes/new') },
+        ]}
       />
 
       {loading ? (
@@ -285,10 +280,6 @@ export default function TodayScreen() {
 }
 
 const styles = StyleSheet.create({
-  headerActions: {
-    flexDirection: 'row',
-    gap: Space.lg,
-  },
   hero: {
     gap: Space.sm,
   },

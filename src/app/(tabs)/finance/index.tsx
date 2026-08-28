@@ -15,12 +15,12 @@ import { ErrorCard } from '@/components/error-card';
 import { MonthPicker, currentMonth, monthLabel, monthTitle, shiftMonth } from '@/components/finance/month-picker';
 import { GlassCard } from '@/components/glass/glass-card';
 import { ThemedText } from '@/components/themed-text';
+import { HeaderMenu } from '@/components/ui/header-actions';
 import { Button } from '@/components/ui/button';
 import { EmptyState } from '@/components/ui/empty-state';
 import { Icon } from '@/components/ui/icon';
 import { Money } from '@/components/ui/money';
 import { Row, Section } from '@/components/ui/row';
-import { androidOverflow } from '@/components/ui/overflow-menu';
 import { HeroLabel, SectionHead } from '@/components/ui/section-head';
 import { Screen } from '@/components/ui/screen';
 import { Skeleton, SkeletonRow } from '@/components/ui/skeleton';
@@ -241,35 +241,25 @@ export default function FinanceScreen() {
           options={{
             title: 'Financeiro',
             headerLargeTitle: true,
-            // O toolbar nativo não desenha no Android; lá o "..." vem por aqui.
-            headerRight: androidOverflow('Mais opções', [
-              { label: 'Importar extrato', onPress: () => router.push('/import') },
-              { label: 'Regras de categoria', onPress: () => router.push('/finance/rules') },
-              { label: 'Atividade da IA', onPress: () => router.push('/ai-activity') },
-            ]),
           }}
         />
-{Platform.OS === 'ios' ? (
-        <Stack.Toolbar placement="right">
-          <Stack.Toolbar.Menu icon="ellipsis.circle" accessibilityLabel="Mais opções">
-            <Stack.Toolbar.MenuAction
-              icon="square.and.arrow.down"
-              onPress={() => router.push('/import')}>
-              Importar extrato
-            </Stack.Toolbar.MenuAction>
-            <Stack.Toolbar.MenuAction
-              icon="line.3.horizontal.decrease"
-              onPress={() => router.push('/finance/rules')}>
-              Regras de categoria
-            </Stack.Toolbar.MenuAction>
-            <Stack.Toolbar.MenuAction
-              icon="sparkles"
-              onPress={() => router.push('/ai-activity')}>
-              Atividade da IA
-            </Stack.Toolbar.MenuAction>
-          </Stack.Toolbar.Menu>
-        </Stack.Toolbar>
-        ) : null}
+
+        <HeaderMenu
+          title="Mais opções"
+          actions={[
+            {
+              label: 'Importar extrato',
+              icon: 'square.and.arrow.down',
+              onPress: () => router.push('/import'),
+            },
+            {
+              label: 'Regras de categoria',
+              icon: 'line.3.horizontal.decrease',
+              onPress: () => router.push('/finance/rules'),
+            },
+            { label: 'Atividade da IA', icon: 'sparkles', onPress: () => router.push('/ai-activity') },
+          ]}
+        />
 
         <MonthPicker month={month} onChange={setMonth} />
 

@@ -12,7 +12,7 @@ import { Button } from '@/components/ui/button';
 import { EmptyState } from '@/components/ui/empty-state';
 import { Money } from '@/components/ui/money';
 import { Row, Section } from '@/components/ui/row';
-import { androidOverflow } from '@/components/ui/overflow-menu';
+import { androidOverflow } from '@/components/ui/header-actions';
 import { Screen } from '@/components/ui/screen';
 import { HeroLabel } from '@/components/ui/section-head';
 import { Skeleton, SkeletonRow } from '@/components/ui/skeleton';

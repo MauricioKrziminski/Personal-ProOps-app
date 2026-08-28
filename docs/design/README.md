@@ -96,6 +96,7 @@ assumiram e ainda precisa de decisão humana, mais os bugs confirmados no códig
 | [hoje](hoje.md) | O que eu preciso saber agora? |
 | [notas](notas.md) | Onde está aquilo que eu anotei? |
 | [financeiro](financeiro.md) | Como está o meu mês? |
+| [gerenciar](gerenciar.md) | Onde fica aquela tela? |
 | [perfil](perfil.md) | Como está a minha conta, e como eu mexo nas configurações? |
 
 ### Notas

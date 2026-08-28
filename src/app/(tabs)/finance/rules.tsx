@@ -9,9 +9,9 @@ import { ErrorCard } from '@/components/error-card';
 import { Chip } from '@/components/finance/chip';
 import { GlassCard } from '@/components/glass/glass-card';
 import { ThemedText } from '@/components/themed-text';
+import { HeaderActions } from '@/components/ui/header-actions';
 import { EmptyState } from '@/components/ui/empty-state';
 import { Field, TextField } from '@/components/ui/field';
-import { Icon } from '@/components/ui/icon';
 import { Row, Section } from '@/components/ui/row';
 import { Screen } from '@/components/ui/screen';
 import { HeroLabel } from '@/components/ui/section-head';
@@ -166,13 +166,10 @@ export default function RulesScreen() {
         options={{
           title: 'Regras',
           headerLargeTitle: true,
-          headerRight: () => (
-            <Pressable accessibilityLabel="Nova regra" hitSlop={12} onPress={() => abrir()}>
-              <Icon name="plus" size="lg" color="tint" />
-            </Pressable>
-          ),
         }}
       />
+
+      <HeaderActions actions={[{ label: 'Nova regra', icon: 'plus', onPress: () => abrir() }]} />
 
       {/* Texto, não card: a explicação não pode competir de tamanho com o dado. */}
       <View style={styles.faixa}>

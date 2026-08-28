@@ -6,6 +6,7 @@ import { Stack } from 'expo-router';
 import { Chip } from '@/components/finance/chip';
 import { GlassCard } from '@/components/glass/glass-card';
 import { ThemedText } from '@/components/themed-text';
+import { HeaderActions } from '@/components/ui/header-actions';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { EmptyState } from '@/components/ui/empty-state';
@@ -263,13 +264,10 @@ export default function DebtsScreen() {
         options={{
           title: 'Dívidas',
           headerLargeTitle: true,
-          headerRight: () => (
-            <Pressable accessibilityLabel="Nova dívida" hitSlop={12} onPress={abrirNova}>
-              <Icon name="plus.circle.fill" size="lg" color="tint" />
-            </Pressable>
-          ),
         }}
       />
+
+      <HeaderActions actions={[{ label: 'Nova dívida', icon: 'plus', onPress: abrirNova }]} />
 
       {debts.isLoading ? (
         <>

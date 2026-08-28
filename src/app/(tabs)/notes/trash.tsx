@@ -1,7 +1,6 @@
 import { Stack, router } from 'expo-router';
 import { useMemo } from 'react';
 import {
-  Pressable,
   StyleSheet,
   View,
 } from 'react-native';
@@ -9,6 +8,7 @@ import Animated, { FadeInDown, LinearTransition } from 'react-native-reanimated'
 import * as Haptics from 'expo-haptics';
 
 import { ThemedText } from '@/components/themed-text';
+import { HeaderActions } from '@/components/ui/header-actions';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { EmptyState } from '@/components/ui/empty-state';
@@ -154,19 +154,15 @@ export default function TrashScreen() {
       <Stack.Screen
         options={{
           title: 'Lixeira',
-          headerRight: () =>
-            notes.length === 0 ? null : (
-              <Pressable
-                accessibilityRole="button"
-                accessibilityLabel={`Esvaziar lixeira, ${notesLabel(notes.length)}`}
-                hitSlop={12}
-                onPress={confirmEmpty}>
-                <ThemedText type="smallBold" themeColor="danger">
-                  Esvaziar
-                </ThemedText>
-              </Pressable>
-            ),
         }}
+      />
+
+      <HeaderActions
+        actions={
+          notes.length === 0
+            ? []
+            : [{ label: 'Esvaziar', destructive: true, onPress: confirmEmpty }]
+        }
       />
 
       {/* Antes da lista: a pessoa precisa saber o prazo ANTES de decidir se corre. */}

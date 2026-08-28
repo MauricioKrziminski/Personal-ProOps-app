@@ -1,7 +1,6 @@
 import { useState } from 'react';
 import {
   Modal,
-  Pressable,
   ScrollView,
   StyleSheet,
   View,
@@ -12,6 +11,7 @@ import { Stack, router } from 'expo-router';
 
 import { GlassCard } from '@/components/glass/glass-card';
 import { ThemedText } from '@/components/themed-text';
+import { HeaderActions } from '@/components/ui/header-actions';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { EmptyState } from '@/components/ui/empty-state';
@@ -238,13 +238,10 @@ export default function NetWorthScreen() {
         options={{
           title: 'Patrimônio',
           headerLargeTitle: true,
-          headerRight: () => (
-            <Pressable accessibilityLabel="Novo bem" hitSlop={12} onPress={abrirNovo}>
-              <Icon name="plus.circle.fill" size="lg" color="tint" />
-            </Pressable>
-          ),
         }}
       />
+
+      <HeaderActions actions={[{ label: 'Novo bem', icon: 'plus', onPress: abrirNovo }]} />
 
       {patrimonio.isLoading ? (
         <>

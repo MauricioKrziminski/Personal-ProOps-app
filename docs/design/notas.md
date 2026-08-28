@@ -81,7 +81,8 @@ em português, captura instantânea e uma lixeira que perdoa. Editor de blocos n
 
 ## Anatomia
 
-1. **Header nativo** — large title "Notas", `<Stack.SearchBar placement="automatic">`.
+1. **Header nativo** — large title "Notas", `<Stack.SearchBar placement="automatic">`. Ações por
+   `HeaderActions`: pastas (`folder`) e nova nota (`square.and.pencil`), ambas em contorno.
    `headerRight`: nota longa (abre `/notes/new`) e menu com Pastas.
 2. **Quick-add de uma linha, no topo da lista** (`ListHeaderComponent`). É a captura de dois
    segundos e o coração do produto — não vai atrás de FAB nenhum.

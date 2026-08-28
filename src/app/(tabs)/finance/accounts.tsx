@@ -2,7 +2,6 @@ import { useState } from 'react';
 import {
   Modal,
   Platform,
-  Pressable,
   ScrollView,
   StyleSheet,
   View,
@@ -13,6 +12,7 @@ import type { SymbolViewProps } from 'expo-symbols';
 
 import { GlassCard } from '@/components/glass/glass-card';
 import { ThemedText } from '@/components/themed-text';
+import { HeaderActions } from '@/components/ui/header-actions';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { EmptyState } from '@/components/ui/empty-state';
@@ -299,13 +299,10 @@ export default function AccountsScreen() {
         options={{
           title: 'Contas',
           headerLargeTitle: true,
-          headerRight: () => (
-            <Pressable accessibilityLabel="Nova conta" hitSlop={12} onPress={abrirNova}>
-              <Icon name="plus.circle.fill" size="lg" color="tint" />
-            </Pressable>
-          ),
         }}
       />
+
+      <HeaderActions actions={[{ label: 'Nova conta', icon: 'plus', onPress: abrirNova }]} />
 
       {balances.isLoading ? (
         <>

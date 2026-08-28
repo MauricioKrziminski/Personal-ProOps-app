@@ -2,7 +2,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { Stack, router, useLocalSearchParams } from 'expo-router';
 import { useState } from 'react';
 import { Controller, useForm, useWatch } from 'react-hook-form';
-import { Pressable, StyleSheet, View } from 'react-native';
+import { StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Animated, { FadeIn, LinearTransition } from 'react-native-reanimated';
 import { KeyboardAwareScrollView } from 'react-native-keyboard-controller';
@@ -12,6 +12,7 @@ import { z } from 'zod';
 import { Chip } from '@/components/finance/chip';
 import { GlassCard } from '@/components/glass/glass-card';
 import { ThemedText } from '@/components/themed-text';
+import { HeaderActions } from '@/components/ui/header-actions';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Field, TextField } from '@/components/ui/field';
@@ -358,20 +359,13 @@ function ReminderForm({
       <Stack.Screen
         options={{
           title: editing ? 'Editar lembrete' : 'Novo lembrete',
-          headerRight: () => (
-            <Pressable
-              accessibilityRole="button"
-              accessibilityLabel="Salvar"
-              accessibilityState={{ disabled: save.isPending, busy: save.isPending }}
-              hitSlop={12}
-              disabled={save.isPending}
-              onPress={onSubmit}>
-              <ThemedText type="smallBold" themeColor={save.isPending ? 'textSecondary' : 'tint'}>
-                {save.isPending ? 'Salvando…' : 'Salvar'}
-              </ThemedText>
-            </Pressable>
-          ),
         }}
+      />
+
+      <HeaderActions
+        actions={[
+          { label: save.isPending ? 'Salvando…' : 'Salvar', disabled: save.isPending, onPress: onSubmit },
+        ]}
       />
 
       <KeyboardAwareScrollView

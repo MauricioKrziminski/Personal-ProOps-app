@@ -9,11 +9,11 @@ import { ErrorCard } from '@/components/error-card';
 import { MonthPicker, currentMonth, monthTitle, shiftMonth } from '@/components/finance/month-picker';
 import { GlassCard } from '@/components/glass/glass-card';
 import { ThemedText } from '@/components/themed-text';
+import { HeaderMenu } from '@/components/ui/header-actions';
 import { Button } from '@/components/ui/button';
 import { EmptyState } from '@/components/ui/empty-state';
 import { Money } from '@/components/ui/money';
 import { Row } from '@/components/ui/row';
-import { androidOverflow } from '@/components/ui/overflow-menu';
 import { Screen } from '@/components/ui/screen';
 import { HeroLabel } from '@/components/ui/section-head';
 import { Segmented } from '@/components/ui/segmented';
@@ -281,30 +281,21 @@ export default function TransactionsScreen() {
           onChangeText={(event) => setSearch(event.nativeEvent.text)}
           onClose={() => setSearch('')}
         />
-        <Stack.Screen
-          options={{
-            headerRight: androidOverflow('Mais opções', [
-              { label: 'Importar extrato', onPress: () => router.push('/import') },
-              { label: 'Regras de categoria', onPress: () => router.push('/finance/rules') },
-            ]),
-          }}
+        <HeaderMenu
+          title="Mais opções"
+          actions={[
+            {
+              label: 'Importar extrato',
+              icon: 'square.and.arrow.down',
+              onPress: () => router.push('/import'),
+            },
+            {
+              label: 'Regras de categoria',
+              icon: 'line.3.horizontal.decrease',
+              onPress: () => router.push('/finance/rules'),
+            },
+          ]}
         />
-{Platform.OS === 'ios' ? (
-        <Stack.Toolbar placement="right">
-          <Stack.Toolbar.Menu icon="ellipsis.circle" accessibilityLabel="Mais opções">
-            <Stack.Toolbar.MenuAction
-              icon="square.and.arrow.down"
-              onPress={() => router.push('/import')}>
-              Importar extrato
-            </Stack.Toolbar.MenuAction>
-            <Stack.Toolbar.MenuAction
-              icon="line.3.horizontal.decrease"
-              onPress={() => router.push('/finance/rules')}>
-              Regras de categoria
-            </Stack.Toolbar.MenuAction>
-          </Stack.Toolbar.Menu>
-        </Stack.Toolbar>
-        ) : null}
 
         <SectionList<Transaction, DaySection>
           sections={sections}

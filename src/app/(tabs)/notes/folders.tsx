@@ -11,6 +11,7 @@ import * as Haptics from 'expo-haptics';
 import type { SymbolViewProps } from 'expo-symbols';
 
 import { ThemedText } from '@/components/themed-text';
+import { HeaderActions } from '@/components/ui/header-actions';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { EmptyState } from '@/components/ui/empty-state';
@@ -198,17 +199,10 @@ export default function FoldersScreen() {
       <Stack.Screen
         options={{
           title: 'Pastas',
-          headerRight: () => (
-            <Pressable
-              accessibilityRole="button"
-              accessibilityLabel="Lixeira"
-              hitSlop={12}
-              onPress={() => router.push('/notes/trash')}>
-              <Icon name="trash" size="lg" color="tint" />
-            </Pressable>
-          ),
         }}
       />
+
+      <HeaderActions actions={[{ label: 'Lixeira', icon: 'trash', onPress: () => router.push('/notes/trash') }]} />
 
       {/* Ação primária: criar. Campo no topo, sem modal. */}
       <Card>

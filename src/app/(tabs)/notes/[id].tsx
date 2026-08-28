@@ -8,14 +8,7 @@ import {
   TextInput,
   View,
 } from 'react-native';
-import Animated, {
-  FadeIn,
-  FadeOut,
-  useAnimatedStyle,
-  useSharedValue,
-  withSequence,
-  withTiming,
-} from 'react-native-reanimated';
+import Animated, { FadeIn, FadeOut } from 'react-native-reanimated';
 import { KeyboardAwareScrollView } from 'react-native-keyboard-controller';
 import * as Haptics from 'expo-haptics';
 import type { SymbolViewProps } from 'expo-symbols';
@@ -24,6 +17,7 @@ import { ThemedText } from '@/components/themed-text';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { EmptyState } from '@/components/ui/empty-state';
+import { HeaderActions, type HeaderAction } from '@/components/ui/header-actions';
 import { TextField } from '@/components/ui/field';
 import { Icon } from '@/components/ui/icon';
 import { Row, Section } from '@/components/ui/row';
@@ -232,19 +226,12 @@ export default function NoteDetailScreen() {
   const tags = useMemo(() => tagsOf(content), [content]);
   const folder = folders.data?.find((f) => f.id === folderId);
 
-  const pinScale = useSharedValue(1);
-  const pinStyle = useAnimatedStyle(() => ({ transform: [{ scale: pinScale.get() }] }));
-
   const onTogglePin = () => {
     const id = savedId;
     if (!id || !note.data) return;
+    // O botão do toolbar nativo tem o próprio press-in; a mola que existia aqui animava um
+    // `Pressable` nosso que não existe mais.
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    pinScale.set(
-      withSequence(
-        withTiming(1.25, { duration: Motion.duration.fast }),
-        withTiming(1, { duration: Motion.duration.fast })
-      )
-    );
     togglePin.mutate(
       { id, pinned: !note.data.pinned },
       { onError: () => toast({ message: 'Não deu para fixar a nota.', tone: 'error' }) }
@@ -310,44 +297,25 @@ export default function NoteDetailScreen() {
     setContent((current) => toggleChecklistLine(current, lineIndex));
   };
 
-  const headerRight = () => (
-    <View style={styles.headerRight}>
-      {savedFlash ? (
-        <Animated.View
-          entering={FadeIn.duration(Motion.duration.fast)}
-          exiting={FadeOut.duration(Motion.duration.exit)}>
-          <ThemedText type="footnote" themeColor="textSecondary">
-            Salvo
-          </ThemedText>
-        </Animated.View>
-      ) : null}
-
-      {creating ? null : (
-        <Animated.View style={pinStyle}>
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel={note.data?.pinned ? 'Desafixar nota' : 'Fixar nota'}
-            accessibilityState={{ selected: !!note.data?.pinned }}
-            hitSlop={12}
-            onPress={onTogglePin}>
-            <Icon
-              name={note.data?.pinned ? 'pin.fill' : 'pin'}
-              size="lg"
-              color={note.data?.pinned ? 'tint' : 'textSecondary'}
-            />
-          </Pressable>
-        </Animated.View>
-      )}
-
-      <Pressable
-        accessibilityRole="button"
-        accessibilityLabel="Mais ações"
-        hitSlop={12}
-        onPress={onMenu}>
-        <Icon name="ellipsis.circle" size="lg" color="tint" />
-      </Pressable>
-    </View>
-  );
+  /**
+   * Só AÇÃO fica no header. O "Salvo" era um texto que aparecia e sumia dentro da pílula de
+   * vidro do iOS 26 — a pílula mudava de largura sozinha a cada autosave. Ele desceu para a
+   * barra de propriedades, junto do resto do metadado.
+   */
+  const pinned = !!note.data?.pinned;
+  const headerActions: HeaderAction[] = [
+    ...(creating
+      ? []
+      : [
+          {
+            label: pinned ? 'Desafixar nota' : 'Fixar nota',
+            icon: pinned ? ('pin.fill' as const) : ('pin' as const),
+            selected: pinned,
+            onPress: onTogglePin,
+          },
+        ]),
+    { label: 'Mais ações', icon: 'ellipsis.circle' as const, onPress: onMenu },
+  ];
 
   const screenTitle = creating ? 'Nova nota' : noteTitle(content).slice(0, 60) || 'Nota';
 
@@ -374,7 +342,8 @@ export default function NoteDetailScreen() {
 
   return (
     <Screen scroll={false}>
-      <Stack.Screen options={{ title: screenTitle, headerRight }} />
+      <Stack.Screen options={{ title: screenTitle }} />
+      <HeaderActions actions={headerActions} />
 
       <KeyboardAwareScrollView
         bottomOffset={Space.xxl}
@@ -430,7 +399,15 @@ export default function NoteDetailScreen() {
             </ThemedText>
           </Pressable>
 
-          {note.data ? (
+          {savedFlash ? (
+            <Animated.View
+              entering={FadeIn.duration(Motion.duration.fast)}
+              exiting={FadeOut.duration(Motion.duration.exit)}>
+              <ThemedText type="footnote" themeColor="textSecondary">
+                Salvo
+              </ThemedText>
+            </Animated.View>
+          ) : note.data ? (
             <ThemedText type="footnote" themeColor="textSecondary">
               {note.data.source === 'whatsapp' ? 'via WhatsApp' : 'no app'} ·{' '}
               {relativeBR(note.data.updated_at)}
@@ -818,11 +795,6 @@ const styles = StyleSheet.create({
     width: '100%',
     maxWidth: MaxContentWidth,
     alignSelf: 'center',
-  },
-  headerRight: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: Space.lg,
   },
   props: {
     flexDirection: 'row',

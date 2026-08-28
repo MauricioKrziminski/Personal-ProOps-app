@@ -7,6 +7,7 @@ import * as Haptics from 'expo-haptics';
 import { Chip } from '@/components/finance/chip';
 import { ThemedText } from '@/components/themed-text';
 import { EmptyState } from '@/components/ui/empty-state';
+import { HeaderActions } from '@/components/ui/header-actions';
 import { TextField } from '@/components/ui/field';
 import { Icon } from '@/components/ui/icon';
 import { Screen } from '@/components/ui/screen';
@@ -316,27 +317,11 @@ export default function NotesScreen() {
 
   return (
     <Screen scroll={false} grouped>
-      <Stack.Screen
-        options={{
-          headerRight: () => (
-            <View style={styles.headerActions}>
-              <Pressable
-                accessibilityRole="button"
-                accessibilityLabel="Pastas"
-                hitSlop={12}
-                onPress={() => router.push('/notes/folders')}>
-                <Icon name="folder" size="lg" color="tint" />
-              </Pressable>
-              <Pressable
-                accessibilityRole="button"
-                accessibilityLabel="Nova nota"
-                hitSlop={12}
-                onPress={() => router.push('/notes/new')}>
-                <Icon name="square.and.pencil" size="lg" color="tint" />
-              </Pressable>
-            </View>
-          ),
-        }}
+      <HeaderActions
+        actions={[
+          { label: 'Pastas', icon: 'folder', onPress: () => router.push('/notes/folders') },
+          { label: 'Nova nota', icon: 'square.and.pencil', onPress: () => router.push('/notes/new') },
+        ]}
       />
       <Stack.SearchBar
         placement="automatic"
@@ -472,10 +457,6 @@ export default function NotesScreen() {
 const styles = StyleSheet.create({
   grow: {
     flex: 1,
-  },
-  headerActions: {
-    flexDirection: 'row',
-    gap: Space.lg,
   },
   quickAdd: {
     flexDirection: 'row',

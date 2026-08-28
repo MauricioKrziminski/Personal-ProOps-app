@@ -12,6 +12,7 @@ import * as Haptics from 'expo-haptics';
 
 import { GlassCard } from '@/components/glass/glass-card';
 import { ThemedText } from '@/components/themed-text';
+import { HeaderActions } from '@/components/ui/header-actions';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { EmptyState } from '@/components/ui/empty-state';
@@ -219,15 +220,17 @@ export default function ForecastScreen() {
         options={{
           title: 'Projeção',
           headerLargeTitle: true,
-          headerRight: () => (
-            <Pressable
-              accessibilityLabel={`Horizonte da projeção, ${HORIZONTES.find((h) => h.dias === dias)?.label}`}
-              hitSlop={12}
-              onPress={escolherHorizonte}>
-              <Icon name="calendar" size="lg" color="tint" />
-            </Pressable>
-          ),
         }}
+      />
+
+      <HeaderActions
+        actions={[
+          {
+            label: `Horizonte da projeção, ${HORIZONTES.find((h) => h.dias === dias)?.label}`,
+            icon: 'calendar',
+            onPress: escolherHorizonte,
+          },
+        ]}
       />
 
       {forecast.isLoading ? (

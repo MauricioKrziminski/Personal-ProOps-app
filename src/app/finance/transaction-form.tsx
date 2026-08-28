@@ -2,7 +2,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { Stack, router, useLocalSearchParams } from 'expo-router';
 import { useState } from 'react';
 import { Controller, useForm, useWatch } from 'react-hook-form';
-import { Pressable, StyleSheet, View } from 'react-native';
+import { StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Animated, { FadeIn, LinearTransition } from 'react-native-reanimated';
 import { KeyboardAwareScrollView } from 'react-native-keyboard-controller';
@@ -11,6 +11,7 @@ import { z } from 'zod';
 
 import { Chip } from '@/components/finance/chip';
 import { ThemedText } from '@/components/themed-text';
+import { HeaderActions } from '@/components/ui/header-actions';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Field, MoneyField, TextField } from '@/components/ui/field';
@@ -281,20 +282,11 @@ function TransactionForm({ editing }: { editing?: Transaction }) {
       <Stack.Screen
         options={{
           title: editing ? 'Editar lançamento' : 'Novo lançamento',
-          headerRight: () => (
-            <Pressable
-              accessibilityRole="button"
-              accessibilityLabel="Salvar"
-              accessibilityState={{ disabled: saving, busy: saving }}
-              hitSlop={12}
-              disabled={saving}
-              onPress={onSubmit}>
-              <ThemedText type="default" themeColor={saving ? 'textSecondary' : 'tint'}>
-                {saving ? 'Salvando…' : 'Salvar'}
-              </ThemedText>
-            </Pressable>
-          ),
         }}
+      />
+
+      <HeaderActions
+        actions={[{ label: saving ? 'Salvando…' : 'Salvar', disabled: saving, onPress: onSubmit }]}
       />
 
       <KeyboardAwareScrollView

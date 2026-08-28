@@ -11,6 +11,7 @@ import { ErrorCard } from '@/components/error-card';
 import { Chip } from '@/components/finance/chip';
 import { GlassCard } from '@/components/glass/glass-card';
 import { ThemedText } from '@/components/themed-text';
+import { HeaderMenu } from '@/components/ui/header-actions';
 import { Button } from '@/components/ui/button';
 import { EmptyState } from '@/components/ui/empty-state';
 import { Icon } from '@/components/ui/icon';
@@ -339,51 +340,41 @@ export default function ImportScreen() {
         options={{
           title: vaoEntrar > 0 ? `Revisar ${vaoEntrar}` : 'Revisar lote',
           headerLargeTitle: true,
-          headerRight: () =>
-            lista.length > 0 ? (
-              <Pressable
-                accessibilityLabel="Ações do lote"
-                hitSlop={12}
-                onPress={() =>
-                  showItemActions('Lote de importação', [
-                    {
-                      label: 'Sair e continuar depois',
-                      onPress: () => router.back(),
-                    },
-                    {
-                      label: 'Descartar o lote',
-                      destructive: true,
-                      onPress: () =>
-                        confirmDestructive(
-                          'Descartar tudo que ainda não foi confirmado?',
-                          'Descartar lote',
-                          () =>
-                            descartar.mutate(
-                              [...paraRevisar, ...repetidos].map((i) => i.id),
-                              {
-                                onSuccess: () =>
-                                  toast({
-                                    message: 'Lote descartado.',
-                                    tone: 'success',
-                                  }),
-                                onError: () =>
-                                  toast({
-                                    message: 'Não deu para descartar o lote.',
-                                    tone: 'error',
-                                  }),
-                              }
-                            ),
-                          'Nada entra no financeiro. Os já confirmados continuam lá.'
-                        ),
-                    },
-                  ])
-                }
-              >
-                <Icon name="ellipsis.circle" size="lg" color="tint" />
-              </Pressable>
-            ) : null,
         }}
       />
+
+      {lista.length > 0 ? (
+        <HeaderMenu
+          title="Lote de importação"
+          actions={[
+            {
+              label: 'Sair e continuar depois',
+              icon: 'arrow.uturn.backward',
+              onPress: () => router.back(),
+            },
+            {
+              label: 'Descartar o lote',
+              icon: 'trash',
+              destructive: true,
+              onPress: () =>
+                confirmDestructive(
+                  'Descartar tudo que ainda não foi confirmado?',
+                  'Descartar lote',
+                  () =>
+                    descartar.mutate(
+                      [...paraRevisar, ...repetidos].map((i) => i.id),
+                      {
+                        onSuccess: () => toast({ message: 'Lote descartado.', tone: 'success' }),
+                        onError: () =>
+                          toast({ message: 'Não deu para descartar o lote.', tone: 'error' }),
+                      }
+                    ),
+                  'Nada entra no financeiro. Os já confirmados continuam lá.'
+                ),
+            },
+          ]}
+        />
+      ) : null}
 
       {isError ? <ErrorCard onRetry={refetch} /> : null}
 

@@ -1,10 +1,13 @@
 import { ActionSheetIOS, Alert, Platform } from 'react-native';
 import * as Haptics from 'expo-haptics';
+import type { SFSymbol } from 'sf-symbols-typescript';
 
 export interface ItemAction {
   label: string;
   onPress: () => void;
   destructive?: boolean;
+  /** SF Symbol — só o menu nativo do iOS desenha; sheet e `Alert` ignoram. */
+  icon?: SFSymbol;
 }
 
 interface SheetRequest {

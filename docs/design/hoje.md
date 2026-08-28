@@ -49,9 +49,11 @@ Uma tela, três segundos, e o usuário sabe se pode relaxar ou se tem algo para 
 
 Ordem vertical, e o porquê de cada posição:
 
-1. **Header nativo** — large title "Hoje" com colapso no scroll. `headerRight`: busca global
-   (`magnifyingglass` → `/today/search`, ver `busca-global.md`) e captura rápida
-   (`plus.circle.fill`) que abre o compositor. Dois botões é o teto — o terceiro vira menu.
+1. **Header nativo** — large title "Hoje" com colapso no scroll. Ações por `HeaderActions`:
+   busca global (`magnifyingglass` → `/search`, ver `busca-global.md`) e nova nota
+   (`square.and.pencil`, o MESMO ícone da aba Notas — mesma intenção, mesmo ícone). Dois botões é
+   o teto: o terceiro vira menu. *Era `plus.circle.fill` ao lado do `magnifyingglass` — preenchido
+   contra contorno no mesmo header, o que `design.md` §4 proíbe.*
 2. **Card de destaque (o único `GlassCard` da tela) — "Sobra até dia 31"**
    Valor grande em `Fonts.rounded` com `tabular-nums`, linha secundária com entradas e saídas
    previstas, e uma `Sparkline` da projeção. É o card porque é a pergunta que mais gente tem, e

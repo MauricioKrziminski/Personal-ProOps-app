@@ -7,6 +7,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Chip } from '@/components/finance/chip';
 import { GlassCard } from '@/components/glass/glass-card';
 import { ThemedText } from '@/components/themed-text';
+import { HeaderActions } from '@/components/ui/header-actions';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { EmptyState } from '@/components/ui/empty-state';
@@ -331,15 +332,17 @@ export default function RecurringScreen() {
         options={{
           title: 'Recorrentes',
           headerLargeTitle: true,
-          headerRight: () => (
-            <Pressable
-              accessibilityLabel="Nova recorrência"
-              hitSlop={12}
-              onPress={() => setForm({ ...FORM_VAZIO, inicio: isoToBR(localISODate()) })}>
-              <Icon name="plus.circle.fill" size="lg" color="tint" />
-            </Pressable>
-          ),
         }}
+      />
+
+      <HeaderActions
+        actions={[
+          {
+            label: 'Nova recorrência',
+            icon: 'plus',
+            onPress: () => setForm({ ...FORM_VAZIO, inicio: isoToBR(localISODate()) }),
+          },
+        ]}
       />
 
       {series.isLoading ? (

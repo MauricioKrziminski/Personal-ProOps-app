@@ -134,6 +134,13 @@ que "voltar" faz depois.
 - **Header é do navegador.** `<Stack.Title>` + large title com colapso no scroll. Nada de barra
   desenhada à mão dentro do `ScrollView`.
 - **Busca é nativa** — `<Stack.SearchBar>`.
+- **Ação de header tem um caminho só**: `HeaderActions` (botões) e `HeaderMenu` (menu "…"), em
+  `src/components/ui/header-actions.tsx`. **Nunca montar `headerRight` à mão.** No iOS 26 o header
+  desenha uma pílula de vidro em volta do conteúdo do `headerRight`: entregar uma `View` própria
+  faz o respiro interno ser o nosso `gap`, e cada tela escolhia um — foi assim que a pílula ficou
+  com padding e raio diferentes entre telas. O primitivo usa `Stack.Toolbar` no iOS (o sistema
+  resolve pílula, espaçamento e large title) e `headerRight` no Android, onde o toolbar nativo
+  reclama o slot sem desenhar nada.
 - **Presentation é significado**: tarefa com etapas → `modal` com Cancelar/Salvar próprios;
   escolha curta → `formSheet` com detents; confirmação destrutiva → action sheet; ação de item →
   context menu nativo.
