@@ -310,17 +310,17 @@ export default function BudgetsScreen() {
                 {Number(b.rollover_cents) > 0 ? (
                   <>
                     <Money cents={Number(b.base_limit_cents)} variant="footnote" tone="textSecondary" />
-                    <ThemedText type="small" themeColor="textSecondary">
+                    <ThemedText type="footnote" themeColor="textSecondary">
                       +
                     </ThemedText>
                     <Money cents={Number(b.rollover_cents)} variant="footnote" tone="textSecondary" />
-                    <ThemedText type="small" themeColor="textSecondary">
+                    <ThemedText type="footnote" themeColor="textSecondary">
                       que sobrou
                     </ThemedText>
                   </>
                 ) : null}
                 {b.month ? (
-                  <ThemedText type="small" themeColor="textSecondary">
+                  <ThemedText type="footnote" themeColor="textSecondary">
                     só este mês
                   </ThemedText>
                 ) : null}
@@ -370,7 +370,7 @@ export default function BudgetsScreen() {
       ) : linhas.length > 0 ? (
         <Animated.View entering={FadeInDown.duration(Motion.duration.slow)}>
           <GlassCard style={styles.hero}>
-            <ThemedText type="small" themeColor="textSecondary">
+            <ThemedText type="caption" themeColor="textSecondary" style={styles.heroLabel}>
               Sobrou do mês
             </ThemedText>
             <Money
@@ -388,7 +388,7 @@ export default function BudgetsScreen() {
 
       {apertando.length > 0 ? (
         <View style={styles.secao}>
-          <ThemedText type="small" themeColor="textSecondary" style={styles.secaoTitulo}>
+          <ThemedText type="caption" themeColor="textSecondary" style={styles.secaoTitulo}>
             PASSANDO DO LIMITE
           </ThemedText>
           {apertando.map(linhaOrcamento)}
@@ -403,7 +403,7 @@ export default function BudgetsScreen() {
             accessibilityLabel={`No controle, ${tranquilas.length} categorias`}
             onPress={() => setNoControleAberto((v) => !v)}
             style={styles.secaoCabecalho}>
-            <ThemedText type="small" themeColor="textSecondary" style={styles.secaoTitulo}>
+            <ThemedText type="caption" themeColor="textSecondary" style={styles.secaoTitulo}>
               NO CONTROLE
             </ThemedText>
             <Icon
@@ -423,7 +423,7 @@ export default function BudgetsScreen() {
         />
       ) : semLimite.length > 0 ? (
         <View style={styles.secao}>
-          <ThemedText type="small" themeColor="textSecondary" style={styles.secaoTitulo}>
+          <ThemedText type="caption" themeColor="textSecondary" style={styles.secaoTitulo}>
             SEM LIMITE DEFINIDO
           </ThemedText>
           {semLimite.slice(0, 5).map((r) => (
@@ -558,6 +558,10 @@ const styles = StyleSheet.create({
   hero: {
     gap: Space.sm,
   },
+  heroLabel: {
+    textTransform: 'uppercase',
+    letterSpacing: 0.6,
+  },
   secao: {
     gap: Space.sm,
   },
@@ -569,7 +573,7 @@ const styles = StyleSheet.create({
   },
   secaoTitulo: {
     paddingHorizontal: Space.lg,
-    letterSpacing: 0.5,
+    letterSpacing: 0.6,
   },
   linha: {
     gap: Space.sm,

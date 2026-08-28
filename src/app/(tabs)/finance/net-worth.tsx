@@ -24,7 +24,7 @@ import { Segmented } from '@/components/ui/segmented';
 import { Skeleton, SkeletonRow } from '@/components/ui/skeleton';
 import { ProgressBar, Sparkline } from '@/components/ui/sparkline';
 import { useToast } from '@/components/ui/toast';
-import { Motion, Radius, Space, Type, tabular } from '@/design/tokens';
+import { Motion, Radius, Space, tabular } from '@/design/tokens';
 import {
   ASSET_CLASSES,
   useArchiveAsset,
@@ -335,10 +335,11 @@ export default function NetWorthScreen() {
             subtitle="de 0 a 100"
             trailing={
               <ThemedText
+                type="subtitle"
                 themeColor={
                   saude.data.score >= 70 ? 'success' : saude.data.score >= 40 ? 'warning' : 'danger'
                 }
-                style={[Type.title2, tabular]}>
+                style={tabular}>
                 {saude.data.score}
               </ThemedText>
             }
@@ -356,24 +357,38 @@ export default function NetWorthScreen() {
           <Row
             title="Poupança"
             subtitle="peso 40 pts"
-            trailing={<ThemedText style={tabular}>{saude.data.savings_rate}%</ThemedText>}
+            trailing={
+              <ThemedText type="small" style={tabular}>
+                {saude.data.savings_rate}%
+              </ThemedText>
+            }
           />
           <Row
             title="Orçamentos respeitados"
             subtitle="peso 25 pts"
-            trailing={<ThemedText style={tabular}>{saude.data.budget_adherence}%</ThemedText>}
+            trailing={
+              <ThemedText type="small" style={tabular}>
+                {saude.data.budget_adherence}%
+              </ThemedText>
+            }
           />
           <Row
             title="Reserva"
             subtitle="peso 20 pts"
             trailing={
-              <ThemedText style={tabular}>{saude.data.months_of_reserve} meses</ThemedText>
+              <ThemedText type="small" style={tabular}>
+                {saude.data.months_of_reserve} meses
+              </ThemedText>
             }
           />
           <Row
             title="Dívida sobre a renda"
             subtitle="peso 15 pts"
-            trailing={<ThemedText style={tabular}>{saude.data.debt_ratio}%</ThemedText>}
+            trailing={
+              <ThemedText type="small" style={tabular}>
+                {saude.data.debt_ratio}%
+              </ThemedText>
+            }
           />
           <Row
             title="Ver relatórios"

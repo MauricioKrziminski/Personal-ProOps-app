@@ -20,7 +20,7 @@ import { Row, Section } from '@/components/ui/row';
 import { Screen } from '@/components/ui/screen';
 import { Segmented } from '@/components/ui/segmented';
 import { Skeleton, SkeletonRow } from '@/components/ui/skeleton';
-import { Motion, Radius, Space, Type, tabular } from '@/design/tokens';
+import { Motion, Radius, Space, tabular } from '@/design/tokens';
 import { useAccounts, useCardInvoices, type CardInvoiceHistory } from '@/hooks/use-finance';
 import { formatBRL, formatDateBR, localISODate } from '@/hooks/use-items';
 import { showItemActions } from '@/lib/item-actions';
@@ -160,7 +160,7 @@ export default function InvoicesScreen() {
       ) : null}
 
       {atual ? (
-        <ThemedText type="small" themeColor="textSecondary" style={styles.rodape}>
+        <ThemedText type="footnote" themeColor="textSecondary" style={styles.rodape}>
           {atual.name}
         </ThemedText>
       ) : null}
@@ -227,7 +227,7 @@ export default function InvoicesScreen() {
       ) : null}
 
       {!invoices.isError && serie.length === 1 ? (
-        <ThemedText type="small" themeColor="textSecondary" style={styles.rodape}>
+        <ThemedText type="footnote" themeColor="textSecondary" style={styles.rodape}>
           Comparação aparece a partir do segundo mês.
         </ThemedText>
       ) : null}
@@ -291,7 +291,7 @@ export default function InvoicesScreen() {
       ) : null}
 
       {lista.length > 0 ? (
-        <ThemedText type="small" themeColor="textSecondary" style={styles.rodape}>
+        <ThemedText type="footnote" themeColor="textSecondary" style={styles.rodape}>
           Faturas começam a aparecer aqui quando a primeira compra cai no cartão. O total soma as
           compras da fatura; o pagamento é transferência e não entra na conta.
         </ThemedText>
@@ -323,7 +323,6 @@ const styles = StyleSheet.create({
     borderCurve: 'continuous',
   },
   rodape: {
-    ...Type.footnote,
     paddingHorizontal: Space.lg,
   },
 });

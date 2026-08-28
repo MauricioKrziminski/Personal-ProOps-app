@@ -261,11 +261,11 @@ export default function GoalsScreen() {
 
             {porMes && g.deadline ? (
               <View style={styles.valores}>
-                <ThemedText type="small" themeColor="textSecondary">
+                <ThemedText type="footnote" themeColor="textSecondary">
                   precisa de
                 </ThemedText>
                 <Money cents={porMes} variant="footnote" tone="textSecondary" />
-                <ThemedText type="small" themeColor="textSecondary">
+                <ThemedText type="footnote" themeColor="textSecondary">
                   por mês para chegar em {mesDoPrazo(g.deadline)}
                 </ThemedText>
               </View>
@@ -322,7 +322,7 @@ export default function GoalsScreen() {
       ) : lista.length > 0 ? (
         <Animated.View entering={FadeInDown.duration(Motion.duration.slow)}>
           <GlassCard style={styles.hero}>
-            <ThemedText type="small" themeColor="textSecondary">
+            <ThemedText type="caption" themeColor="textSecondary" style={styles.heroLabel}>
               Guardado
             </ThemedText>
             <Money cents={guardado} variant="money" />
@@ -352,7 +352,7 @@ export default function GoalsScreen() {
             accessibilityLabel={`Concluídas, ${concluidas.length}`}
             onPress={() => setConcluidasAbertas((v) => !v)}
             style={styles.secaoCabecalho}>
-            <ThemedText type="small" themeColor="textSecondary" style={styles.secaoTitulo}>
+            <ThemedText type="caption" themeColor="textSecondary" style={styles.secaoTitulo}>
               CONCLUÍDAS ({concluidas.length})
             </ThemedText>
             <Icon
@@ -572,6 +572,10 @@ const styles = StyleSheet.create({
   hero: {
     gap: Space.sm,
   },
+  heroLabel: {
+    textTransform: 'uppercase',
+    letterSpacing: 0.6,
+  },
   secao: {
     gap: Space.sm,
   },
@@ -583,7 +587,7 @@ const styles = StyleSheet.create({
   },
   secaoTitulo: {
     paddingHorizontal: Space.lg,
-    letterSpacing: 0.5,
+    letterSpacing: 0.6,
   },
   meta: {
     gap: Space.sm,

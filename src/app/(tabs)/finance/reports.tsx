@@ -17,7 +17,7 @@ import { Skeleton, SkeletonRow } from '@/components/ui/skeleton';
 import { Segmented } from '@/components/ui/segmented';
 import { ProgressBar } from '@/components/ui/sparkline';
 import { useToast } from '@/components/ui/toast';
-import { Motion, Space, Type, tabular } from '@/design/tokens';
+import { Motion, Space, tabular } from '@/design/tokens';
 import { localISODate } from '@/hooks/use-items';
 import { useAnnualReport, type AnnualCategoryRow, type YearEndBalance } from '@/hooks/use-finance';
 
@@ -269,7 +269,7 @@ export default function ReportsScreen() {
       ) : null}
 
       {!isLoading && !isError && temConteudo ? (
-        <ThemedText type="small" themeColor="textSecondary" style={styles.rodape}>
+        <ThemedText type="footnote" themeColor="textSecondary" style={styles.rodape}>
           Só lançamentos confirmados, sem transferências entre suas contas.
         </ThemedText>
       ) : null}
@@ -309,7 +309,6 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   rodape: {
-    ...Type.footnote,
     paddingHorizontal: Space.lg,
   },
 });

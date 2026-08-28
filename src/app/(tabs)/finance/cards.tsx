@@ -164,7 +164,7 @@ export default function CardsScreen() {
       {!cards.isError && lista.length > 0 ? (
         <Animated.View entering={FadeInDown.duration(Motion.duration.slow)}>
           <GlassCard style={styles.hero}>
-            <ThemedText type="small" themeColor="textSecondary">
+            <ThemedText type="caption" themeColor="textSecondary" style={styles.heroLabel}>
               Total a pagar
             </ThemedText>
             <Money cents={totalAPagar} variant="money" />
@@ -206,7 +206,7 @@ export default function CardsScreen() {
                     <Icon name="exclamationmark.triangle.fill" size="sm" color="danger" />
                   ) : null}
                   <ThemedText
-                    type="small"
+                    type="footnote"
                     themeColor={estado === 'Atrasada' ? 'danger' : 'textSecondary'}>
                     {estado ?? 'Sem fatura aberta'}
                   </ThemedText>
@@ -219,7 +219,7 @@ export default function CardsScreen() {
                 tone={estado === 'Atrasada' ? 'danger' : 'text'}
               />
 
-              <ThemedText type="small" themeColor="textSecondary" style={tabular}>
+              <ThemedText type="footnote" themeColor="textSecondary" style={tabular}>
                 {card.invoice_id && card.closing_date && card.due_date
                   ? `${prazoLabel(card.closing_date, 'fecha')} · vence ${formatDateBR(card.due_date)}`
                   : `Nenhuma compra neste ciclo${card.closing_date ? ` · ${prazoLabel(card.closing_date, 'fecha')}` : ''}`}
@@ -233,18 +233,18 @@ export default function CardsScreen() {
                     tone={pct >= 1 ? 'danger' : pct >= 0.7 ? 'warning' : 'tint'}
                   />
                   <View style={styles.limitLine}>
-                    <ThemedText type="small" themeColor="textSecondary" style={tabular}>
+                    <ThemedText type="footnote" themeColor="textSecondary" style={tabular}>
                       usado {formatBRL(naoPago)} de {formatBRL(limite)}
                     </ThemedText>
                     {livre < 0 ? (
                       <View style={styles.badge}>
                         <Icon name="exclamationmark.triangle.fill" size="sm" color="danger" />
-                        <ThemedText type="small" themeColor="danger" style={tabular}>
+                        <ThemedText type="footnote" themeColor="danger" style={tabular}>
                           {formatBRL(Math.abs(livre))} acima do limite
                         </ThemedText>
                       </View>
                     ) : (
-                      <ThemedText type="small" themeColor="textSecondary" style={tabular}>
+                      <ThemedText type="footnote" themeColor="textSecondary" style={tabular}>
                         livre {formatBRL(livre)}
                       </ThemedText>
                     )}
@@ -258,7 +258,7 @@ export default function CardsScreen() {
 
               {/* "usado" soma TODAS as faturas não pagas; o número grande é só a desta. */}
               {anterior > 0 ? (
-                <ThemedText type="small" themeColor="textSecondary">
+                <ThemedText type="footnote" themeColor="textSecondary">
                   Inclui {formatBRL(anterior)} de fatura anterior em aberto.
                 </ThemedText>
               ) : null}
@@ -291,6 +291,10 @@ export default function CardsScreen() {
 const styles = StyleSheet.create({
   hero: {
     gap: Space.sm,
+  },
+  heroLabel: {
+    textTransform: 'uppercase',
+    letterSpacing: 0.6,
   },
   card: {
     gap: Space.sm,

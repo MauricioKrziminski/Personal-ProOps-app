@@ -267,13 +267,16 @@ export default function ForecastScreen() {
 
             <View style={styles.heroSplit}>
               <View style={styles.heroParte}>
-                <ThemedText type="small" themeColor="textSecondary">
+                <ThemedText type="caption" themeColor="textSecondary" style={styles.heroLabel}>
                   hoje
                 </ThemedText>
                 <Money cents={hoje} variant="title2" tone={hoje < 0 ? 'danger' : 'text'} />
               </View>
               <View style={styles.heroParte}>
-                <ThemedText type="small" themeColor="textSecondary" style={tabular}>
+                <ThemedText
+                  type="caption"
+                  themeColor="textSecondary"
+                  style={[styles.heroLabel, tabular]}>
                   em {dias} dias
                 </ThemedText>
                 <Money cents={fim} variant="title2" tone={fim < 0 ? 'danger' : 'text'} />
@@ -395,6 +398,10 @@ export default function ForecastScreen() {
 const styles = StyleSheet.create({
   hero: {
     gap: Space.md,
+  },
+  heroLabel: {
+    textTransform: 'uppercase',
+    letterSpacing: 0.6,
   },
   heroTitulo: {
     flexDirection: 'row',

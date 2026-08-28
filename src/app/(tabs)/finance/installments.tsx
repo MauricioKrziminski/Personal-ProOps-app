@@ -20,7 +20,7 @@ import { Row, Section } from '@/components/ui/row';
 import { Screen } from '@/components/ui/screen';
 import { Skeleton, SkeletonRow } from '@/components/ui/skeleton';
 import { ProgressBar } from '@/components/ui/sparkline';
-import { Motion, Radius, Space, Type, tabular } from '@/design/tokens';
+import { Motion, Radius, Space, tabular } from '@/design/tokens';
 import {
   useAccounts,
   useInstallmentPlans,
@@ -259,7 +259,7 @@ export default function InstallmentsScreen() {
               </Pressable>
             ))}
             {plano.last_installment_cents !== plano.installment_cents ? (
-              <ThemedText type="small" themeColor="textSecondary" style={styles.nota}>
+              <ThemedText type="footnote" themeColor="textSecondary" style={styles.nota}>
                 A última parcela fecha a conta com os centavos da divisão.
               </ThemedText>
             ) : null}
@@ -433,7 +433,6 @@ const styles = StyleSheet.create({
     gap: Space.sm,
   },
   nota: {
-    ...Type.footnote,
     paddingHorizontal: Space.xl,
     paddingTop: Space.xs,
   },

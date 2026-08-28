@@ -391,7 +391,7 @@ export default function RecurringScreen() {
       {/* Vem primeiro: série parada = conta que não vai aparecer na projeção. */}
       {comErro.length > 0 ? (
         <View style={styles.secao}>
-          <ThemedText type="small" themeColor="textSecondary" style={styles.secaoTitulo}>
+          <ThemedText type="caption" themeColor="textSecondary" style={styles.secaoTitulo}>
             PRECISA DE ATENÇÃO
           </ThemedText>
           {comErro.map((r) => (
@@ -438,7 +438,7 @@ export default function RecurringScreen() {
 
       {ativas.length > 0 ? (
         <View style={styles.secao}>
-          <ThemedText type="small" themeColor="textSecondary" style={styles.secaoTitulo}>
+          <ThemedText type="caption" themeColor="textSecondary" style={styles.secaoTitulo}>
             ATIVAS
           </ThemedText>
           {ativas.map(cartaoSerie)}
@@ -447,7 +447,7 @@ export default function RecurringScreen() {
 
       {pausadas.length > 0 ? (
         <View style={styles.secao}>
-          <ThemedText type="small" themeColor="textSecondary" style={styles.secaoTitulo}>
+          <ThemedText type="caption" themeColor="textSecondary" style={styles.secaoTitulo}>
             PAUSADAS
           </ThemedText>
           {pausadas.map(cartaoSerie)}
@@ -659,7 +659,7 @@ const styles = StyleSheet.create({
   },
   secaoTitulo: {
     paddingHorizontal: Space.lg,
-    letterSpacing: 0.5,
+    letterSpacing: 0.6,
   },
   serie: {
     gap: Space.sm,

@@ -240,7 +240,7 @@ export default function DebtsScreen() {
               <Money cents={restante} variant="headline" tone="danger" />
             </View>
             <ProgressBar value={pago} max={original} tone="success" />
-            <ThemedText type="small" themeColor="textSecondary">
+            <ThemedText type="footnote" themeColor="textSecondary">
               {tipo} · juros {juros}
               {parcelas ? ` · ${parcelas}` : ''}
             </ThemedText>
@@ -285,7 +285,7 @@ export default function DebtsScreen() {
       ) : lista.length > 0 ? (
         <Animated.View entering={FadeInDown.duration(Motion.duration.slow)}>
           <GlassCard style={styles.hero}>
-            <ThemedText type="small" themeColor="textSecondary">
+            <ThemedText type="caption" themeColor="textSecondary" style={styles.heroLabel}>
               Total devido
             </ThemedText>
             <Money cents={totalDevido} variant="money" tone="danger" />
@@ -337,7 +337,7 @@ export default function DebtsScreen() {
                 <ThemedText type="small" numberOfLines={1}>
                   {p.name}
                 </ThemedText>
-                <ThemedText type="small" themeColor="textSecondary">
+                <ThemedText type="footnote" themeColor="textSecondary">
                   juros {taxaLabel(Number(p.interest_rate_monthly))} · {p.months_left} meses
                 </ThemedText>
               </View>
@@ -447,7 +447,7 @@ export default function DebtsScreen() {
 
             {(schedule.data ?? []).length > 0 ? (
               <View style={styles.tabelaBloco}>
-                <ThemedText type="small" themeColor="textSecondary" style={styles.secaoTitulo}>
+                <ThemedText type="caption" themeColor="textSecondary" style={styles.secaoTitulo}>
                   AMORTIZAÇÃO
                 </ThemedText>
                 {/* rola dentro do próprio container, nunca empurrando o corpo do sheet */}
@@ -457,8 +457,9 @@ export default function DebtsScreen() {
                       {['nº', 'vencimento', 'parcela', 'juros', 'amortiza', 'saldo'].map((h) => (
                         <ThemedText
                           key={h}
-                          type="small"
+                          type="footnote"
                           themeColor="textSecondary"
+                          numberOfLines={1}
                           style={[styles.celula, h === 'nº' ? styles.celulaEstreita : null]}>
                           {h}
                         </ThemedText>
@@ -469,11 +470,12 @@ export default function DebtsScreen() {
                         key={p.installment_no}
                         style={[styles.tabelaLinha, { borderTopColor: theme.separator }]}>
                         <ThemedText
-                          type="small"
+                          type="footnote"
+                          numberOfLines={1}
                           style={[styles.celula, styles.celulaEstreita, tabular]}>
                           {p.installment_no}
                         </ThemedText>
-                        <ThemedText type="small" style={[styles.celula, tabular]}>
+                        <ThemedText type="footnote" numberOfLines={1} style={[styles.celula, tabular]}>
                           {isoToBR(p.due_date)}
                         </ThemedText>
                         <View style={styles.celula}>
@@ -742,6 +744,10 @@ const styles = StyleSheet.create({
   hero: {
     gap: Space.sm,
   },
+  heroLabel: {
+    textTransform: 'uppercase',
+    letterSpacing: 0.6,
+  },
   valores: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -786,7 +792,7 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   secaoTitulo: {
-    letterSpacing: 0.5,
+    letterSpacing: 0.6,
   },
   tabelaBloco: {
     gap: Space.sm,

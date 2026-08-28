@@ -14,7 +14,7 @@ import { Screen } from '@/components/ui/screen';
 import { Skeleton, SkeletonRow } from '@/components/ui/skeleton';
 import { ProgressBar } from '@/components/ui/sparkline';
 import { useToast } from '@/components/ui/toast';
-import { Motion, Radius, Space, Type, tabular } from '@/design/tokens';
+import { Motion, Radius, Space, tabular } from '@/design/tokens';
 import { confirmDestructive } from '@/lib/item-actions';
 import {
   PLANS,
@@ -155,7 +155,7 @@ export default function PlanScreen() {
               ) : null}
             </View>
 
-            <ThemedText style={[Type.title2, tabular]}>
+            <ThemedText type="subtitle" style={tabular}>
               {usadas} de {teto}
             </ThemedText>
             <ThemedText type="small" themeColor="textSecondary">
@@ -309,7 +309,7 @@ export default function PlanScreen() {
           block
         />
         {noLimite ? (
-          <ThemedText type="small" themeColor="textSecondary" style={styles.rodape}>
+          <ThemedText type="footnote" themeColor="textSecondary">
             Seu plano já está no limite de pessoas.
           </ThemedText>
         ) : null}
@@ -372,9 +372,6 @@ const styles = StyleSheet.create({
   },
   bloco: {
     gap: Space.md,
-  },
-  rodape: {
-    ...Type.footnote,
   },
   aviso: {
     alignItems: 'flex-start',
