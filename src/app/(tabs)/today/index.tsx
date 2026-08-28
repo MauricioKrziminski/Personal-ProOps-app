@@ -178,7 +178,7 @@ export default function TodayScreen() {
                 <View style={styles.trailing}>
                   <Money cents={Number(b.amount_cents)} variant="headline" tone="danger" />
                   {b.kind === 'transaction' ? (
-                    <Button label="Paguei" size="sm" variant="secondary" onPress={() => pay(b.ref_id, b.title)} />
+                    <Button label="Paguei" size="sm" onPress={() => pay(b.ref_id, b.title)} />
                   ) : null}
                 </View>
               }
@@ -199,7 +199,7 @@ export default function TodayScreen() {
                 <View style={styles.trailing}>
                   <Money cents={Number(b.amount_cents)} variant="headline" />
                   {b.kind === 'transaction' ? (
-                    <Button label="Paguei" size="sm" variant="secondary" onPress={() => pay(b.ref_id, b.title)} />
+                    <Button label="Paguei" size="sm" onPress={() => pay(b.ref_id, b.title)} />
                   ) : null}
                 </View>
               }

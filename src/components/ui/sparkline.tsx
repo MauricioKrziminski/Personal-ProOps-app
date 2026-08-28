@@ -1,8 +1,9 @@
-import { useMemo } from 'react';
+import { useEffect, useMemo } from 'react';
 import { View } from 'react-native';
+import Animated, { useAnimatedStyle, useSharedValue, withTiming } from 'react-native-reanimated';
 import { Canvas, Line, Path, Skia, vec } from '@shopify/react-native-skia';
 
-import { Radius } from '@/design/tokens';
+import { Motion, Radius } from '@/design/tokens';
 import { useTheme } from '@/hooks/use-theme';
 
 interface SparklineProps {
@@ -14,11 +15,23 @@ interface SparklineProps {
   showZero?: boolean;
 }
 
+/** Metade do traço + folga, para a linha não ser cortada no topo e no fundo do canvas. */
+const PAD = 3;
+/**
+ * Span mínimo, como fração da magnitude da série.
+ *
+ * Sem ele, uma série que oscila R$ 2 vira uma onda dramática de 56px — o gráfico passa a
+ * desenhar ruído de arredondamento como se fosse notícia.
+ */
+const MIN_SPAN_RATIO = 0.05;
+
 /**
  * Linha de tendência.
  *
- * Primeiro uso real de `@shopify/react-native-skia`, que estava no `package.json` sem um único
- * import. Substitui as barras de `View` com `width` em `%` que mudavam de valor sem transição.
+ * O domínio vertical sai dos DADOS, não de zero. Forçar zero dentro do domínio (como antes)
+ * esmagava uma série de R$ 2.500–2.800 em 6px de 56: a linha lia como divisor, não como gráfico.
+ * Zero volta ao domínio sozinho quando a série realmente fica negativa — que é exatamente quando
+ * ele informa alguma coisa.
  *
  * A cor segue o sinal do último ponto: verde acima de zero, `danger` abaixo. É a leitura que a
  * pessoa faz em meio segundo — "vou ficar no vermelho?".
@@ -26,31 +39,53 @@ interface SparklineProps {
 export function Sparkline({ values, width, height = 56, showZero = false }: SparklineProps) {
   const theme = useTheme();
 
-  const { path, zeroY, negative } = useMemo(() => {
-    if (values.length < 2 || width <= 0) {
-      return { path: null, zeroY: 0, negative: false };
-    }
+  const { line, area, zeroY, zeroVisible, negative } = useMemo(() => {
+    const empty = { line: null, area: null, zeroY: 0, zeroVisible: false, negative: false };
+    if (values.length < 2 || width <= 0) return empty;
 
-    const min = Math.min(...values, 0);
-    const max = Math.max(...values, 0);
-    // Série constante não pode virar divisão por zero — vira uma linha no meio.
-    const span = max - min || 1;
-    const y = (v: number) => height - ((v - min) / span) * height;
+    const dataMin = Math.min(...values);
+    const dataMax = Math.max(...values);
+    // Série constante não pode virar divisão por zero, nem ruído virar onda.
+    const span = Math.max(dataMax - dataMin, Math.abs(dataMax) * MIN_SPAN_RATIO, 1);
+    const mid = (dataMin + dataMax) / 2;
+    const lo = mid - span / 2;
+    const hi = mid + span / 2;
+
+    const plot = height - PAD * 2;
+    const y = (v: number) => PAD + ((hi - v) / (hi - lo)) * plot;
     const step = width / (values.length - 1);
 
     // `Skia.Path.Make()` + `moveTo/lineTo` está depreciado no Skia 2.6 e some numa versão futura.
-    const builder = Skia.PathBuilder.Make();
-    builder.moveTo(0, y(values[0]));
-    for (let i = 1; i < values.length; i++) builder.lineTo(i * step, y(values[i]));
+    const stroke = Skia.PathBuilder.Make();
+    stroke.moveTo(0, y(values[0]));
+    for (let i = 1; i < values.length; i++) stroke.lineTo(i * step, y(values[i]));
 
-    return { path: builder.detach(), zeroY: y(0), negative: values[values.length - 1] < 0 };
+    // Área preenchida: é ela que dá corpo ao gráfico. Uma linha de 2px sozinha, na largura de um
+    // card, lê como régua.
+    const fill = Skia.PathBuilder.Make();
+    fill.moveTo(0, height);
+    fill.lineTo(0, y(values[0]));
+    for (let i = 1; i < values.length; i++) fill.lineTo(i * step, y(values[i]));
+    fill.lineTo(width, height);
+    fill.close();
+
+    return {
+      line: stroke.detach(),
+      area: fill.detach(),
+      zeroY: y(0),
+      zeroVisible: lo <= 0 && hi >= 0,
+      negative: values[values.length - 1] < 0,
+    };
   }, [values, width, height]);
 
-  if (!path) return <View style={{ width, height }} />;
+  if (!line) return <View style={{ width, height }} />;
+
+  const color = negative ? theme.danger : theme.success;
 
   return (
     <Canvas style={{ width, height }}>
-      {showZero ? (
+      <Path path={area!} color={color} style="fill" opacity={0.14} />
+      {showZero && zeroVisible ? (
         <Line
           p1={vec(0, zeroY)}
           p2={vec(width, zeroY)}
@@ -60,8 +95,8 @@ export function Sparkline({ values, width, height = 56, showZero = false }: Spar
         />
       ) : null}
       <Path
-        path={path}
-        color={negative ? theme.danger : theme.success}
+        path={line}
+        color={color}
         style="stroke"
         strokeWidth={2}
         strokeCap="round"
@@ -71,7 +106,12 @@ export function Sparkline({ values, width, height = 56, showZero = false }: Spar
   );
 }
 
-/** Barra de progresso — usa a mesma escala de raio do resto do app. */
+/**
+ * Barra de progresso.
+ *
+ * Anima com `scaleX` (não com `width`) para o movimento ficar no worklet e não disparar layout —
+ * regra de movimento §5, que também é a que exige a animação: valor que salta é bug visual.
+ */
 export function ProgressBar({
   value,
   max,
@@ -83,6 +123,13 @@ export function ProgressBar({
 }) {
   const theme = useTheme();
   const pct = max > 0 ? Math.min(1, Math.max(0, value / max)) : 0;
+  const progress = useSharedValue(pct);
+
+  useEffect(() => {
+    progress.set(withTiming(pct, { duration: Motion.duration.slow, easing: Motion.easing.out }));
+  }, [pct, progress]);
+
+  const animated = useAnimatedStyle(() => ({ transform: [{ scaleX: progress.get() }] }));
 
   return (
     <View
@@ -95,13 +142,17 @@ export function ProgressBar({
         backgroundColor: theme.backgroundElement,
         overflow: 'hidden',
       }}>
-      <View
-        style={{
-          width: `${pct * 100}%`,
-          height: '100%',
-          borderRadius: Radius.xs,
-          backgroundColor: theme[tone],
-        }}
+      <Animated.View
+        style={[
+          {
+            width: '100%',
+            height: '100%',
+            borderRadius: Radius.xs,
+            backgroundColor: theme[tone],
+            transformOrigin: 'left',
+          },
+          animated,
+        ]}
       />
     </View>
   );
