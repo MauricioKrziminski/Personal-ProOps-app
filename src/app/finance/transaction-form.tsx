@@ -26,7 +26,7 @@ import {
   useCreateInstallmentPlan,
   useDeleteTransaction,
   useSaveTransaction,
-  useTransactions,
+  useTransaction,
   type TransactionKind,
 } from '@/hooks/use-finance';
 import { formatBRL, localISODate } from '@/hooks/use-items';
@@ -91,11 +91,10 @@ export default function TransactionFormScreen() {
   const theme = useTheme();
   const params = useLocalSearchParams<{ id?: string; month?: string }>();
   const { data: accounts } = useAccounts();
-  // Edição: a transação vem da lista do mês já em cache (mesma queryKey).
-  const { data: monthTx } = useTransactions({
-    month: params.month ?? localISODate().slice(0, 7),
-  });
-  const editing = params.id ? monthTx?.find((t) => t.id === params.id) : undefined;
+  // Busca por id, não garimpo no cache da lista: com cache frio o modal de edição virava um
+  // modal de criação em silêncio e duplicava o lançamento.
+  const editingQuery = useTransaction(params.id);
+  const editing = editingQuery.data;
 
   const save = useSaveTransaction();
   const createPlan = useCreateInstallmentPlan();

@@ -202,3 +202,20 @@ export function useTodayReminders() {
     },
   });
 }
+
+/** Um lembrete por id — mesmo motivo do `useTransaction`: cache de lista não é fonte de verdade. */
+export function useReminder(id: string | undefined) {
+  return useQuery({
+    queryKey: ['reminders', 'item', id],
+    enabled: !!id,
+    queryFn: async (): Promise<Reminder> => {
+      const { data, error } = await supabase
+        .from('reminders')
+        .select('id, title, recurrence, next_run_at, channel, active')
+        .eq('id', id!)
+        .single();
+      if (error) throw error;
+      return data as Reminder;
+    },
+  });
+}

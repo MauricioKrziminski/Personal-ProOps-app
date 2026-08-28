@@ -287,6 +287,29 @@ export function useBudgets() {
   });
 }
 
+/**
+ * Uma transação por id.
+ *
+ * Existe para consertar um bug real: o form de edição garimpava o item no cache da lista do mês.
+ * Cache frio ou query com erro → `editing` ficava `undefined` e o modal de EDIÇÃO virava um modal
+ * de CRIAÇÃO em silêncio, gerando um lançamento duplicado.
+ */
+export function useTransaction(id: string | undefined) {
+  return useQuery({
+    queryKey: ['transactions', 'item', id],
+    enabled: !!id,
+    queryFn: async (): Promise<Transaction> => {
+      const { data, error } = await supabase
+        .from('transactions')
+        .select(TRANSACTION_COLUMNS)
+        .eq('id', id!)
+        .single();
+      if (error) throw error;
+      return data as Transaction;
+    },
+  });
+}
+
 /** `month` no formato YYYY-MM; omitido = mês corrente. */
 export function useBudgetsStatus(month?: string) {
   useRealtimeInvalidate('transactions', ['budgets-status']);

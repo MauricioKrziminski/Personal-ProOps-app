@@ -17,7 +17,7 @@ import { GlassCard } from '@/components/glass/glass-card';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { MaxContentWidth, Spacing } from '@/constants/theme';
-import { useReminders, useSaveReminder, type Reminder } from '@/hooks/use-items';
+import { useReminder, useSaveReminder, type Reminder } from '@/hooks/use-items';
 import { useTheme } from '@/hooks/use-theme';
 import { isValidBRDate, isValidTime, isoToBR, localDateTime, localISODate, timeBR } from '@/lib/dates';
 
@@ -55,8 +55,9 @@ export default function ReminderFormScreen() {
   const theme = useTheme();
   // `title` chega do menu "Criar lembrete" do detalhe de nota — pré-preenche e nada mais.
   const params = useLocalSearchParams<{ id?: string; title?: string }>();
-  const { data: reminders } = useReminders();
-  const editing = params.id ? reminders?.find((r) => r.id === params.id) : undefined;
+  // Busca por id, não garimpo no cache da lista — mesmo bug do form de lançamento.
+  const editingQuery = useReminder(params.id);
+  const editing = editingQuery.data;
   const save = useSaveReminder();
 
   // Estado inicial calculado uma vez: ler o relógio a cada render é impuro.
