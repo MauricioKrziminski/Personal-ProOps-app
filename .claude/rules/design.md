@@ -1,40 +1,175 @@
-# Design — Liquid Glass estilo iOS (obrigatório)
+# Design — fidelidade nativa iOS 26 / Material 3 (obrigatório)
 
-O app deve ser **totalmente moderno e bonito, estilo iOS**. Nenhuma tela é entregue "crua".
+O app senta na tela ao lado do Apple Wallet e do Things. É assim que ele é julgado, em segundos.
+Nenhuma tela é entregue "crua", e nenhuma tela é entregue "quase nativa".
 
-## Superfícies
+**Uma frase:** *o app é o lugar calmo onde o que o usuário jogou no WhatsApp aparece organizado —
+e onde ele decide o que fazer com isso.*
 
-- **Liquid Glass** em cards, headers e sheets: componente central `src/components/glass/glass-card.tsx` (`GlassCard`). Ele já resolve `isLiquidGlassAvailable()` → `GlassView` nativo (iOS 26+) com fallback `BlurView` (`expo-blur`) em iOS antigo/Android/web. **Nunca** usar `GlassView`/`BlurView` direto numa tela — sempre via `GlassCard` (variants: `regular` | `clear`).
-- **Tab bar**: `NativeTabs` do expo-router (`src/components/app-tabs.tsx`), liquid glass nativa no iOS 26. Ícones por nome: SF Symbols no iOS (`sf`) e glyphs Material no Android (`md`) — sem PNG por aba.
+---
 
-## Tokens (fonte única: `src/constants/theme.ts`)
+## 1. Superfícies — glass é destaque, não papel de parede
 
-- **Cores**: sempre via `useTheme()` (`src/hooks/use-theme.ts`) → `Colors[scheme]`. Nunca hardcodar hex em telas. Chaves: `text, textSecondary, background, backgroundElement, backgroundSelected, tint, danger`.
-- **Dark mode**: automático (`userInterfaceStyle: automatic`). Toda cor nova precisa das variantes light e dark.
-- **Tipografia**: `Fonts` por plataforma (iOS `ui-rounded` para display, `system-ui` texto). Escala em `src/components/themed-text.tsx` (`title` 48, `subtitle` 32, `default` 16, `small` 14) — usar `ThemedText type=...`, não `fontSize` solto.
-- **Spacing**: escala `Spacing.half..six` (2..64). `BottomTabInset` no padding inferior de toda tela com tabs. `MaxContentWidth` (800) para web/tablet.
+- **Glass fica na chrome**: tab bar nativa (`NativeTabs`), header, sheet e FAB.
+- **Mais um único card de destaque por tela** — o card que responde a pergunta principal daquela
+  tela (sobra do mês, patrimônio líquido, total da fatura, progresso da meta).
+- **Todo o resto é opaco.** Card de lista, linha, formulário: superfície sólida, hierarquia por
+  **elevação e espaço**, nunca por blur.
 
-## Movimento e feedback
+> Dois `GlassCard` na mesma tela é erro de revisão, não questão de gosto.
 
-- Animações com **react-native-reanimated v4** (entradas `FadeInDown` com stagger por índice em listas — padrão já usado nas telas atuais) e **moti** para micro-interações (press, aparição de FAB, progresso).
-- **expo-haptics** em toda ação importante: submit de form, delete, login/logout, complete de meta.
-- Transições de navegação suaves; modais como sheet (`presentation: 'modal'`).
+`src/components/glass/glass-card.tsx` (`GlassCard`) é o único caminho para glass. Ele resolve
+`isLiquidGlassAvailable()` → `GlassView` nativo (iOS 26+) com fallback `BlurView` em iOS antigo,
+Android e web. **Nunca** usar `GlassView`/`BlurView` direto numa tela.
 
-## Estados obrigatórios em TODA tela nova
+Card comum é `Card` (`src/components/ui/card.tsx`): opaco, `Elevation`, `Radius.md`.
 
-1. **Loading** — skeleton ou spinner discreto dentro de GlassCard.
-2. **Empty** — emoji grande + título + dica acionável (padrão das telas atuais, ex.: dica de mandar mensagem no WhatsApp).
-3. **Error** — GlassCard de erro com mensagem amigável + botão "Tentar de novo" (refetch). Nunca falhar silenciosamente para o empty state.
+---
 
-## Marca
+## 2. Tokens — fonte única, sem exceção
 
-A marca é **monocromática**: preta sobre fundo claro, branca sobre fundo escuro. Fontes em
-`assets/images/brand/` (`mark-black.png` / `mark-white.png`, derivadas de `icons/icon-512.png`).
-Nunca colorir a marca nem colocá-la sobre fundo de baixo contraste. O lockup horizontal com o
-nome fica em `assets/images/logo/` e não é usado dentro do app hoje.
+`src/constants/theme.ts` (cores e fontes) + `src/design/tokens.ts` (o resto).
 
-Splash e overlay animado precisam usar **o mesmo par cor de fundo + variante da marca**
-(`app.json` → plugin `expo-splash-screen` e `src/components/animated-icon.tsx`), senão aparece um
-flash de cor errada na transição.
+| Token | Regra |
+|---|---|
+| **Cor** | Sempre via `useTheme()`. **Zero hex em tela.** Toda cor nova precisa de par light **e** dark. |
+| **Raio** | `Radius`: `xs 8` (nada menor), `sm 12` inputs e linhas, `md 16` cards, `lg 20`, `xl 28` sheets, `pill` ações. Sempre com `borderCurve: 'continuous'`. |
+| **Espaço** | Escala `Spacing`. Preferir `gap` do flexbox a empilhar margem. Padding de scroll vai em `contentContainerStyle`, nunca no `ScrollView`. |
+| **Elevação** | `Elevation` via `boxShadow`. **Nunca** `shadow*`/`elevation` legado. Um sistema de elevação só. |
+| **Movimento** | `Motion` (durações e curvas). Nada de `400` literal espalhado. |
+| **Tipografia** | `ThemedText type=...`. **Zero `fontSize` solto.** |
+| **Ícone** | `Icon` (`expo-symbols`). Zero emoji na chrome, zero glyph de texto (`‹`, `＋`) fazendo papel de ícone. |
 
-Cantos generosos (radius ≥ 16), profundidade e translucidez. Textos de UI em pt-BR.
+**Um accent só** (`tint`), gasto em ação primária, estado ativo e progresso. `danger`, `success`
+e `warning` são semânticos — nunca decoração. Uma família de cinza no app inteiro.
+
+Dark mode é automático (`userInterfaceStyle: automatic`) e **não é opcional na verificação**.
+
+---
+
+## 3. Tipografia
+
+Ramp da plataforma, **uma display por tela**. `Fonts.rounded` só em dinheiro em destaque.
+
+**`fontVariant: ['tabular-nums']` em todo número que conta, mede ou custa** — dinheiro, data,
+percentual, contador. Sem isso o valor "pula" quando muda.
+
+Texto de UI em **pt-BR**, informal e direto. Uma intenção, um rótulo: "Salvar" é sempre "Salvar",
+nunca "Confirmar" na tela seguinte.
+
+---
+
+## 4. Ícones e ilustração
+
+- `Icon` usa **`expo-symbols`**, que já resolve SF Symbols no iOS e Material Symbols no Android
+  e web. Nenhuma outra biblioteca de ícone entra no projeto.
+- **Emoji não é ícone.** Emoji só aparece em *conteúdo* — texto que o usuário escreveu, mensagem
+  que veio do WhatsApp. Nunca em botão, aba, empty state, linha de lista ou título.
+
+---
+
+## 5. Movimento
+
+Decidir nesta ordem:
+
+1. **Frequência.** Ação feita 100× por dia (trocar de aba, teclado, scroll, voltar) → **o padrão
+   da plataforma e nada mais**. Dezenas de vezes (press, selecionar linha) → imperceptível,
+   < 150 ms. Ocasional (sheet, modal, toast) → movimento padrão. Delight só em momento raro.
+2. **Propósito em uma palavra** — feedback, continuidade espacial, mudança de estado, explicação.
+   Não achou a palavra? Não anima. **Dado que o usuário está lendo não se move por estética.**
+3. **Teve dedo envolvido → mola.** `Motion.spring.sheet` para sheet, `Motion.spring.settle` para
+   assentar. Sem dedo → timing < 300 ms com ease-out forte (`Motion.easing.out`). Nunca ease-in
+   numa entrada. Saída é mais rápida que entrada.
+
+Press-in de 100–150 ms: `scale 0.97` em botão e card; **highlight de fundo (não scale) em linha
+de lista**; opacidade em botão de header.
+
+Animação roda em **worklet** (`useSharedValue` + `useAnimatedStyle`), só `transform` e `opacity`.
+Nunca animar altura de header. `Reduce Motion` colapsa movimento espacial em cross-fade.
+
+Barra de progresso e gráfico **animam** quando o valor muda — valor que salta é bug visual.
+
+---
+
+## 6. Feedback
+
+- **Haptics é pontuação**, um por ação do usuário, no mesmo frame do visual: `selectionAsync` ao
+  passar de opção, `impactAsync(Light)` ao encaixar, `notificationAsync` no resultado. Nunca em
+  scroll, nunca em loop, nunca como único feedback.
+- **Mutation que falha precisa aparecer.** Toast + rollback visível. Falha silenciosa é
+  reprovação — vale para delete, toggle, arquivar e pagar, não só para salvar.
+- Confirmação destrutiva é **action sheet nativo**. Ação de item é **context menu nativo**
+  (`Link.Menu`), não `onLongPress` + `Alert`.
+
+---
+
+## 7. Estados obrigatórios em TODA tela
+
+1. **Loading** — `Skeleton` com **a forma do conteúdo final**. Nunca spinner de tela cheia para
+   atualização parcial.
+2. **Empty** — `EmptyState`: ícone SF, título, e uma **dica acionável** (normalmente o atalho do
+   WhatsApp). Composto, não um parágrafo cinza.
+3. **Error** — inline e específico, com "Tentar de novo" que refaz a query.
+4. **Conteúdo longo** — texto que trunca sem quebrar layout.
+
+**Cada seção da tela tem o seu.** Tela com 4 queries não pode esconder o erro de 3 delas atrás do
+estado da primeira: seção que falha diz que falhou, não some.
+
+---
+
+## 8. Navegação
+
+Toda transição responde três perguntas: o que é o destino, o usuário precisa poder voltar, e o
+que "voltar" faz depois.
+
+- **Header é do navegador.** `<Stack.Title>` + large title com colapso no scroll. Nada de barra
+  desenhada à mão dentro do `ScrollView`.
+- **Busca é nativa** — `<Stack.SearchBar>`.
+- **Presentation é significado**: tarefa com etapas → `modal` com Cancelar/Salvar próprios;
+  escolha curta → `formSheet` com detents; confirmação destrutiva → action sheet; ação de item →
+  context menu nativo.
+- **Porta de mão única** (login, onboarding concluído, compra) sai da pilha com `Stack.Protected`
+  + `replace` — voltar nunca reentra no estado antigo.
+- **Abas são pares.** Nada de slide entre abas; re-tap na aba ativa volta à raiz.
+
+---
+
+## 9. Marca
+
+Monocromática: preta sobre fundo claro, branca sobre fundo escuro. Fontes em
+`assets/images/brand/` (`mark-black.png` / `mark-white.png`). Nunca colorir a marca nem colocá-la
+sobre fundo de baixo contraste. O lockup horizontal fica em `assets/images/logo/` e não é usado
+dentro do app.
+
+Splash e overlay animado usam **o mesmo par cor de fundo + variante da marca** (`app.json` →
+plugin `expo-splash-screen` e `src/components/animated-icon.tsx`), senão aparece um flash de cor
+errada na transição.
+
+---
+
+## 10. Contagem anti-slop (mecânica, antes de dar qualquer tela como pronta)
+
+Contar, não julgar:
+
+- accents distintos na tela: **1**
+- famílias de cinza: **1**
+- raios fora da escala `Radius`: **0**
+- emoji na chrome: **0**
+- gradiente sem razão de marca: **0**
+- rótulos diferentes para a mesma intenção: **0**
+- `GlassCard` na tela: **1 de destaque** (+ chrome)
+- hex hardcoded: **0**
+- `fontSize` solto: **0**
+
+Contagem que falha é correção, não discussão.
+
+---
+
+## 11. Pronto significa
+
+- [ ] Verificada **no simulador iOS e no emulador Android**, em light **e** dark
+- [ ] Loading, empty, error e conteúdo longo desenhados — não caídos no default
+- [ ] Fluxo gravado em vídeo e assistido: zero frame de cor errada, zero salto de layout
+- [ ] Dynamic Type XL não quebra o layout
+- [ ] Alvos de toque ≥ 44pt; `accessibilityLabel` em todo botão só-ícone
+- [ ] Contagem anti-slop zerada
