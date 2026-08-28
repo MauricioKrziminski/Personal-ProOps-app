@@ -47,6 +47,10 @@ Não "quanto gastei" — isso é o Financeiro. É **compromisso futuro**: valor 
 
 ## Anatomia
 
+> **28/08/2026** — o card de destaque "Total a pagar" agora só aparece **com mais de um cartão**.
+> Com um só ele repetia, palavra por palavra, o total, o nome e o vencimento do card logo abaixo.
+> Soma de um item não é resumo.
+
 1. **Header nativo** — large title "Cartões". `headerRight`: `plus` → form de conta já com
    `type='credit_card'` pré-selecionado.
 2. **Card de destaque (o único `GlassCard`) — "Total a pagar"**

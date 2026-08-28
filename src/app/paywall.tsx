@@ -106,12 +106,14 @@ export default function PaywallScreen() {
       {plano.data ? (
         <Animated.View entering={FadeInDown.duration(Motion.duration.slow)}>
           <GlassCard style={styles.hero}>
+            {/* Um rótulo por valor, e sempre ANTES dele — havia dois `HeroLabel` sanduichando o
+                número, "Seu plano hoje" em cima e "mensagens da IA…" embaixo. */}
             <HeroLabel>Seu plano hoje</HeroLabel>
             <ThemedText type="smallBold">{nomeAtual}</ThemedText>
+            <HeroLabel>mensagens da IA usadas este mês</HeroLabel>
             <ThemedText style={[Type.largeTitle, tabular]}>
               {usadas} de {teto}
             </ThemedText>
-            <HeroLabel>mensagens da IA usadas este mês</HeroLabel>
             <ProgressBar
               value={usadas}
               max={teto}

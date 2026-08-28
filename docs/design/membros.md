@@ -47,6 +47,11 @@ E o corolário do casal, que é o motivo real de a tela existir: *"quem lançou 
     `useTransactions`)**
 - **Back:** `pop` para o Perfil.
 
+> **28/08/2026** — "Só você por aqui" deixou de ser `EmptyState` e virou `Card` de explicação: a
+> lista **nunca** está vazia (você sempre está nela), e um "nada aqui" logo abaixo de uma linha
+> preenchida se contradiz. O botão "Ver planos" ficou só embaixo do "Convidar" desabilitado, que
+> é onde a pessoa esbarra no limite — antes o mesmo rótulo aparecia duas vezes na mesma tela.
+
 ## Anatomia
 
 Lista agrupada estilo Ajustes, igual ao Perfil — mesma linguagem, porque é a mesma pilha.

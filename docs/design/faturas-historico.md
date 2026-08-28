@@ -34,6 +34,11 @@ Duas leituras: a **série** (a fatura está subindo?) e o **arquivo** (achar a c
   `status='paid'`); a barra do gráfico é o mesmo alvo que a linha.
 - **Back:** pop. Nada muda de estado aqui — é uma tela de leitura pura.
 
+> **28/08/2026** — com uma fatura só, a tela era três parágrafos cinzas soltos. A explicação
+> virou `Card` ("Só uma fatura até agora"), o mesmo tratamento de "A curva ainda não tem
+> história" em Patrimônio, e o nome do cartão no topo só aparece quando há mais de um para
+> desambiguar.
+
 ## Anatomia
 
 1. **Header nativo** — large title "Faturas", subtítulo com o nome do cartão.

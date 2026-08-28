@@ -7,7 +7,7 @@ import Animated, { FadeInDown, LinearTransition } from 'react-native-reanimated'
 import { monthLabel } from '@/components/finance/month-picker';
 import { ThemedText } from '@/components/themed-text';
 import { Button } from '@/components/ui/button';
-import { EmptyState } from '@/components/ui/empty-state';
+import { Card } from '@/components/ui/card';
 import { Field, TextField } from '@/components/ui/field';
 import { Row, Section } from '@/components/ui/row';
 import { Screen } from '@/components/ui/screen';
@@ -156,24 +156,23 @@ export default function MembersScreen() {
         </Section>
       ) : null}
 
+      {/* NÃO é `EmptyState`: a lista nunca está vazia — você sempre está nela, e a seção logo
+          acima acabou de mostrar isso. "Nada aqui" embaixo de uma linha preenchida se contradiz.
+          É um card de explicação, o mesmo tratamento de "A curva ainda não tem história". */}
       {!membros.isLoading && !membros.isError && lista.length <= 1 ? (
-        <EmptyState
-          icon="person.2"
-          title="Só você por aqui"
-          hint={
-            teto <= 1
-              ? 'O Free é para uma pessoa. Um plano pago abre o espaço para mais gente.'
-              : 'Convide pelo telefone — a pessoa entra usando o mesmo número no WhatsApp e vocês compartilham o mesmo financeiro.'
-          }
-          action={
-            teto <= 1
-              ? {
-                  label: 'Ver planos',
-                  onPress: () => router.push({ pathname: '/paywall', params: { from: 'members' } }),
-                }
-              : undefined
-          }
-        />
+        <Card>
+          <View style={styles.sozinho}>
+            <ThemedText type="smallBold">Só você por aqui</ThemedText>
+            <ThemedText type="small" themeColor="textSecondary">
+              {teto <= 1
+                ? 'O Free é para uma pessoa. Um plano pago abre o espaço para mais gente.'
+                : 'Convide pelo telefone — a pessoa entra usando o mesmo número no WhatsApp e vocês compartilham o mesmo financeiro.'}
+            </ThemedText>
+            {/* Sem botão aqui de propósito: o "Ver planos" mora embaixo do "Convidar"
+                desabilitado, que é onde a pessoa esbarra no limite. Dois botões com o MESMO
+                rótulo e o MESMO destino na mesma tela é pior que rótulo divergente. */}
+          </View>
+        </Card>
       ) : null}
 
       {/* Sem plano lido, nada de afirmar limite: falhar aqui não pode virar "você é Free". */}
@@ -303,6 +302,9 @@ export default function MembersScreen() {
 }
 
 const styles = StyleSheet.create({
+  sozinho: {
+    gap: Space.sm,
+  },
   bloco: {
     gap: Space.md,
   },

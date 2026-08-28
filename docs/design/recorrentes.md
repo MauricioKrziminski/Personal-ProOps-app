@@ -68,6 +68,10 @@ ficam com o valor antigo pelos próximos 90 dias.
 reescreve os `transactions` da série com `status = 'pending'` e `occurred_at >= hoje`. `cleared`
 nunca é tocado: o que já aconteceu, aconteceu.
 
+> **28/08/2026** — o card "Próximos 30 dias" **some quando não há nenhuma série**. Antes ele
+> mostrava `SAI R$ 0,00 / ENTRA R$ 0,00` em cima do empty state: cabeçalho vazio para a tela
+> parecer cheia, que é justamente o que a regra da aba Hoje proíbe.
+
 ## Anatomia
 
 1. **Header nativo** — large title "Recorrentes". `headerRight` = `plus` (`Icon`), abre o sheet de

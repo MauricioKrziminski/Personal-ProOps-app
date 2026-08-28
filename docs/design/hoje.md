@@ -45,6 +45,10 @@ Uma tela, três segundos, e o usuário sabe se pode relaxar ou se tem algo para 
     nota, lembrete e meta, não só dinheiro, e é alcançada de três abas — ver `atividade-ia.md`)
 - **Back:** é aba raiz. Android back sai do app. Re-tap na aba volta ao topo do scroll.
 
+> **28/08/2026** — o botão "Paguei" passou a `variant="secondary"`, como nas outras cinco telas
+> que o mostram (Projeção, Lançamentos, Cartões, detalhe do lançamento). Aqui era o único no
+> accent, e uma lista de pílulas azuis gasta o accent que o card de destaque precisa.
+
 ## Anatomia
 
 Ordem vertical, e o porquê de cada posição:
