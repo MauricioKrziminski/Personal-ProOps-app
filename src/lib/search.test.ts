@@ -45,6 +45,18 @@ test('prévia não repete o título', () => {
   assert.equal(notePreview('só o título'), '');
 });
 
+test('prévia não vaza a marcação do checklist (aparecia `- [x] leite - [ ] pão`)', () => {
+  assert.equal(notePreview('Compras\n- [x] leite\n- [ ] pão\n- [ ] café'), 'leite pão café');
+});
+
+test('título de nota que começa com checklist mostra o texto, não a marcação', () => {
+  assert.equal(noteTitle('- [ ] pagar aluguel\n- [x] luz'), 'pagar aluguel');
+});
+
+test('linha comum na prévia continua intacta (o strip não pode comer hífen de texto)', () => {
+  assert.equal(notePreview('Título\n- item solto\nmeia-noite'), '- item solto meia-noite');
+});
+
 test('checklist: reconhece marcado e desmarcado, e ignora linha comum', () => {
   const items = parseChecklist('Compras\n- [ ] leite\n- [x] pão\ntexto solto');
   assert.deepEqual(items, [

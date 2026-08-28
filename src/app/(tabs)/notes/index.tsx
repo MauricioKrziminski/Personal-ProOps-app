@@ -68,7 +68,11 @@ function NoteRow({
   const preview = notePreview(note.content);
   const checklist = parseChecklist(note.content);
   const done = checklist.filter((item) => item.done).length;
-  const tags = note.tags ?? [];
+  // Tag com o mesmo nome da pasta não vira metadado: `mercado · #mercado` gasta a linha
+  // inteira para dizer a mesma coisa duas vezes.
+  const tags = (note.tags ?? []).filter(
+    (tag) => tag.toLowerCase() !== folderName?.toLowerCase()
+  );
 
   const meta = [
     folderName,

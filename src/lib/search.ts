@@ -17,6 +17,19 @@ export function toTsQuery(input: string): string {
   return terms.map((term, i) => (i === terms.length - 1 ? `${term}:*` : term)).join(' & ');
 }
 
+const CHECKLIST_LINE = /^(\s*)-\s\[( |x|X)\]\s?(.*)$/;
+
+/**
+ * Linha como ela é LIDA, sem a marcação que só existe para o texto voltar inteiro ao WhatsApp.
+ *
+ * Título e prévia mostram conteúdo, não fonte: sem isto a lista exibia `- [x] leite - [ ] pão`.
+ * Mora aqui, e não em cada tela, porque `noteTitle` alimenta título de tela, action sheet e
+ * rótulo de acessibilidade — oito chamadas que teriam o mesmo vazamento.
+ */
+function stripMarkup(line: string): string {
+  return CHECKLIST_LINE.exec(line)?.[3] ?? line;
+}
+
 /**
  * Primeira linha não vazia do conteúdo — é o "título" da nota.
  *
@@ -25,7 +38,7 @@ export function toTsQuery(input: string): string {
  */
 export function noteTitle(content: string): string {
   const first = content.split('\n').find((line) => line.trim().length > 0);
-  return first?.trim() ?? '';
+  return stripMarkup(first?.trim() ?? '');
 }
 
 /** Corpo sem a primeira linha, para a prévia da lista não repetir o título. */
@@ -34,12 +47,11 @@ export function notePreview(content: string): string {
   const firstIndex = lines.findIndex((line) => line.trim().length > 0);
   return lines
     .slice(firstIndex + 1)
+    .map(stripMarkup)
     .join(' ')
     .replace(/\s+/g, ' ')
     .trim();
 }
-
-const CHECKLIST_LINE = /^(\s*)-\s\[( |x|X)\]\s?(.*)$/;
 
 export interface ChecklistItem {
   index: number;
