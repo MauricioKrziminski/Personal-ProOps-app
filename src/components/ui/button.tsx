@@ -6,6 +6,7 @@ import { Icon } from '@/components/ui/icon';
 import { ThemedText } from '@/components/themed-text';
 import { HitTarget, Motion, Radius, Space } from '@/design/tokens';
 import { useTheme } from '@/hooks/use-theme';
+import type { ThemeColor } from '@/constants/theme';
 import type { SymbolViewProps } from 'expo-symbols';
 
 type Variant = 'primary' | 'secondary' | 'ghost' | 'destructive';
@@ -58,10 +59,20 @@ export function Button({
     ghost: 'transparent',
     destructive: theme.danger,
   };
+
+  // Desabilitado NÃO é "o mesmo botão mais claro": azul a 50% continua lendo como ação
+  // disponível. Perde a cor e o peso — em carregamento, ao contrário, a ação segue sendo
+  // aquela, então o accent fica.
+  const off = disabled && !loading;
   // `ghost` sem cor de ação vira texto preto — indistinguível de um rótulo. Botão precisa
   // parecer botão: no ghost quem faz esse trabalho é o accent, já que não há superfície.
-  const labelColor =
-    variant === 'primary' || variant === 'destructive' ? 'onTint' : variant === 'ghost' ? 'tint' : 'text';
+  const labelColor: ThemeColor = off
+    ? 'textSecondary'
+    : variant === 'primary' || variant === 'destructive'
+      ? 'onTint'
+      : variant === 'ghost'
+        ? 'tint'
+        : 'text';
 
   return (
     <Animated.View style={[animated, block ? styles.block : styles.hug, style]}>
@@ -84,8 +95,8 @@ export function Button({
           styles.base,
           {
             height: HEIGHT[size],
-            backgroundColor: surface[variant],
-            opacity: inert ? 0.5 : 1,
+            backgroundColor: off ? theme.backgroundElement : surface[variant],
+            opacity: loading ? 0.7 : 1,
             paddingHorizontal: size === 'sm' ? Space.md : Space.xl,
           },
         ]}>
