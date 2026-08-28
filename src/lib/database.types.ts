@@ -1,3 +1,7 @@
+// ⚠️ `note_folders`, as colunas novas de `notes` e as RPCs de contagem foram escritas À MÃO
+// enquanto a migration 0038 não é aplicada (o histórico de migrations precisa ser reconciliado
+// antes de `db push`). Depois do push, regenerar com:
+//   npx supabase gen types typescript
 export type Json =
   | string
   | number
@@ -1066,13 +1070,55 @@ export type Database = {
           },
         ]
       }
+      note_folders: {
+        Row: {
+          created_at: string
+          icon: string | null
+          id: string
+          name: string
+          updated_at: string
+          user_id: string
+          workspace_id: string
+        }
+        Insert: {
+          created_at?: string
+          icon?: string | null
+          id?: string
+          name: string
+          updated_at?: string
+          user_id: string
+          workspace_id?: string
+        }
+        Update: {
+          created_at?: string
+          icon?: string | null
+          id?: string
+          name?: string
+          updated_at?: string
+          user_id?: string
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "note_folders_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       notes: {
         Row: {
           category: string | null
           content: string
           created_at: string
+          deleted_at: string | null
+          folder_id: string | null
           id: string
+          pinned: boolean
           source: string
+          tags: string[]
           updated_at: string
           user_id: string
           workspace_id: string
@@ -1081,7 +1127,10 @@ export type Database = {
           category?: string | null
           content: string
           created_at?: string
+          deleted_at?: string | null
+          folder_id?: string | null
           id?: string
+          pinned?: boolean
           source?: string
           updated_at?: string
           user_id: string
@@ -1091,7 +1140,10 @@ export type Database = {
           category?: string | null
           content?: string
           created_at?: string
+          deleted_at?: string | null
+          folder_id?: string | null
           id?: string
+          pinned?: boolean
           source?: string
           updated_at?: string
           user_id?: string
@@ -1939,6 +1991,20 @@ export type Database = {
           expense_cents: number
           income_cents: number
           month: string
+        }[]
+      }
+      note_folder_counts: {
+        Args: Record<PropertyKey, never>
+        Returns: {
+          folder_id: string
+          notes_count: number
+        }[]
+      }
+      note_tag_counts: {
+        Args: Record<PropertyKey, never>
+        Returns: {
+          tag: string
+          notes_count: number
         }[]
       }
       my_default_workspace: { Args: never; Returns: string }
