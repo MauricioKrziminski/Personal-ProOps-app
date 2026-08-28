@@ -348,6 +348,10 @@ export default function NotesScreen() {
       <FlashList
         data={notes}
         keyExtractor={(note) => note.id}
+        // As pontas do grupo dependem do VIZINHO, não só do item. Sem isto a `FlashList` não
+        // redesenha a última linha da página anterior quando a próxima chega: ela guardava o
+        // canto arredondado e a hairline entre as páginas nunca aparecia.
+        extraData={notes.length}
         contentInsetAdjustmentBehavior="automatic"
         keyboardDismissMode="on-drag"
         contentContainerStyle={styles.list}

@@ -56,10 +56,20 @@ Ordem vertical, e o porquê de cada posição:
    Valor grande em `Fonts.rounded` com `tabular-nums`, linha secundária com entradas e saídas
    previstas, e uma `Sparkline` da projeção. É o card porque é a pergunta que mais gente tem, e
    porque é o único número que muda o comportamento de quem lê.
+
+   > O `GlassCard` leva **hairline** (`theme.separator`). Vidro mostra o que está atrás; sobre o
+   > `groupedBackground`, que é cor chapada, não há o que refratar e o card sumia por completo no
+   > tema claro — o número de destaque ficava boiando no fundo da tela.
+
+   > A `Sparkline` tira o domínio vertical **dos dados**, não de zero. Com zero forçado dentro do
+   > domínio, uma série de R$ 2.500–2.800 desenhava em 6px de 56 e lia como divisor. Zero volta
+   > sozinho quando a série fica negativa — que é quando ele informa algo. Área preenchida por
+   > baixo: uma linha de 2px na largura de um card lê como régua.
    Fonte: `cash_flow_forecast(days até o fim do mês)`.
 3. **"Vence hoje" / "Atrasado"** — `Section` de `Row`s. Atrasado vem primeiro, em `danger`.
    Cada linha: ícone (fatura vs conta), título, valor com `tabular-nums`, e ação **"Paguei"**
-   direto na linha (swipe ou botão trailing). Fonte: `upcoming_bills(7)`.
+   direto na linha (swipe ou botão trailing), no `Button` **primário** — é a ação mais importante
+   da tela e em cinza não parecia ação. Fonte: `upcoming_bills(7)`.
    *Vem em segundo porque é a única coisa da tela com consequência se ignorada.*
 4. **"Lembretes de hoje"** — `Row`s com hora, título e recorrência resumida. Ações: concluir,
    adiar (`snooze`), editar. Fonte: `reminders` com `next_run_at` dentro do dia local do usuário
@@ -118,6 +128,7 @@ caber num toque, sem abrir tela. Confirmação otimista + toast com desfazer.
 |---|---|---|
 | Valor do card de destaque | mudança de estado | conta de/para em `Motion.base`, `tabular-nums` evita salto de largura |
 | Sparkline | mudança de estado | path anima em `Motion.slow` |
+| Barra de orçamento | mudança de estado | `scaleX` com `transformOrigin: left` em `Motion.slow`; nunca `width` (dispara layout fora do worklet) |
 | Linha "Paguei" | feedback | some com `LinearTransition`, `Motion.fast`; haptic `notificationAsync(Success)` |
 | Entrada dos blocos | continuidade | `FadeInDown` com stagger de 60 ms, cap 400 ms |
 | Press em `Row` | feedback | highlight de fundo (não scale), 120 ms |
