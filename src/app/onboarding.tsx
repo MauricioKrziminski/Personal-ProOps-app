@@ -91,7 +91,7 @@ export default function OnboardingScreen() {
       {step === 0 ? (
         <Animated.View entering={FadeIn.duration(Motion.duration.slow)} style={styles.step}>
           <Icon name="checkmark.seal.fill" size="xl" color="success" />
-          <ThemedText type="subtitle" style={styles.title}>
+          <ThemedText type="title" style={styles.title}>
             Pronto, {phone} está vinculado.
           </ThemedText>
           <ThemedText type="default" themeColor="textSecondary" style={styles.body}>
@@ -115,7 +115,7 @@ export default function OnboardingScreen() {
       {step === 1 ? (
         <Animated.View entering={FadeInDown.duration(Motion.duration.slow)} style={styles.step}>
           <Icon name="bell.badge" size="xl" color="tint" />
-          <ThemedText type="subtitle" style={styles.title}>
+          <ThemedText type="title" style={styles.title}>
             Lembrete só serve se chegar.
           </ThemedText>
           <ThemedText type="default" themeColor="textSecondary" style={styles.body}>
@@ -140,7 +140,7 @@ export default function OnboardingScreen() {
       {step === 2 ? (
         <Animated.View entering={FadeInDown.duration(Motion.duration.slow)} style={styles.step}>
           <Icon name="paperplane.fill" size="xl" color="tint" />
-          <ThemedText type="subtitle" style={styles.title}>
+          <ThemedText type="title" style={styles.title}>
             Manda a primeira mensagem.
           </ThemedText>
           <ThemedText type="default" themeColor="textSecondary" style={styles.body}>
@@ -195,7 +195,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   title: {
-    ...Type.title2,
     textAlign: 'center',
   },
   body: {

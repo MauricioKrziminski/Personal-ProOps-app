@@ -14,6 +14,7 @@ import { EmptyState } from '@/components/ui/empty-state';
 import { Money } from '@/components/ui/money';
 import { Row, Section } from '@/components/ui/row';
 import { androidOverflow } from '@/components/ui/overflow-menu';
+import { HeroLabel, SectionHead } from '@/components/ui/section-head';
 import { Screen } from '@/components/ui/screen';
 import { Skeleton, SkeletonRow } from '@/components/ui/skeleton';
 import { ProgressBar, Sparkline } from '@/components/ui/sparkline';
@@ -254,9 +255,9 @@ export default function FinanceScreen() {
               accessibilityLabel={`${isCurrent ? 'Sobra até o fim do mês' : `Sobrou em ${monthTitle(month)}`}, ${formatBRL(leftover)}. Abrir projeção.`}
               onPress={() => router.push('/finance/forecast')}>
               <GlassCard style={styles.hero}>
-                <ThemedText type="small" themeColor="textSecondary">
+                <HeroLabel>
                   {isCurrent ? 'Sobra até o fim do mês' : `Sobrou em ${monthTitle(month)}`}
-                </ThemedText>
+                </HeroLabel>
                 <Money cents={leftover} variant="money" tone={leftover < 0 ? 'danger' : 'text'} />
                 {isCurrent && series.length > 1 ? (
                   <Sparkline values={series} width={width - Space.lg * 4} showZero />
@@ -292,17 +293,19 @@ export default function FinanceScreen() {
         {/* Bloco 3 — categoria sem comparação é número; com comparação é informação. */}
         {summary.isError ? null : categories.length > 0 ? (
           <View style={styles.block}>
-            <View style={styles.blockHead}>
-              <ThemedText type="smallBold">Onde o dinheiro foi</ThemedText>
-              <Pressable
-                accessibilityRole="button"
-                hitSlop={12}
-                onPress={() => openTransactions({ kind: 'expense' })}>
-                <ThemedText type="small" themeColor="tint">
-                  Ver tudo
-                </ThemedText>
-              </Pressable>
-            </View>
+            <SectionHead
+              title="Onde o dinheiro foi"
+              action={
+                <Pressable
+                  accessibilityRole="button"
+                  hitSlop={12}
+                  onPress={() => openTransactions({ kind: 'expense' })}>
+                  <ThemedText type="small" themeColor="tint">
+                    Ver tudo
+                  </ThemedText>
+                </Pressable>
+              }
+            />
             <Section>
               {categories.slice(0, 6).map((row, index) => {
                 const total = Number(row.total_cents);

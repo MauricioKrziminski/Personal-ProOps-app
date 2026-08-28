@@ -10,6 +10,7 @@ import { EmptyState } from '@/components/ui/empty-state';
 import { Icon } from '@/components/ui/icon';
 import { Money } from '@/components/ui/money';
 import { Row, Section } from '@/components/ui/row';
+import { HeroLabel } from '@/components/ui/section-head';
 import { Screen } from '@/components/ui/screen';
 import { SkeletonRow } from '@/components/ui/skeleton';
 import { ProgressBar, Sparkline } from '@/components/ui/sparkline';
@@ -141,9 +142,7 @@ export default function TodayScreen() {
         <Animated.View entering={FadeInDown.duration(Motion.duration.slow)}>
           <Pressable onPress={() => router.push('/finance/forecast')}>
             <GlassCard style={styles.hero}>
-              <ThemedText type="caption" themeColor="textSecondary" style={styles.heroLabel}>
-                SOBRA ATÉ O FIM DO MÊS
-              </ThemedText>
+              <HeroLabel>Sobra até o fim do mês</HeroLabel>
               <Money cents={leftover} variant="money" tone={leftover < 0 ? 'danger' : 'text'} />
               <Sparkline values={series} width={width - Space.lg * 4} showZero />
               <ThemedText type="small" themeColor="textSecondary" style={tabular}>
@@ -292,9 +291,6 @@ const styles = StyleSheet.create({
   },
   hero: {
     gap: Space.sm,
-  },
-  heroLabel: {
-    letterSpacing: 0.6,
   },
   trailing: {
     alignItems: 'flex-end',

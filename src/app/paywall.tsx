@@ -75,7 +75,7 @@ export default function PaywallScreen() {
       <Stack.Screen options={{ title: 'Assinar' }} />
 
       <View style={styles.bloco}>
-        <ThemedText type="subtitle">{motivo.titulo}</ThemedText>
+        <ThemedText type="title">{motivo.titulo}</ThemedText>
         <ThemedText type="small" themeColor="textSecondary">
           {motivo.linha}
         </ThemedText>
@@ -109,7 +109,7 @@ export default function PaywallScreen() {
               Seu plano hoje
             </ThemedText>
             <ThemedText type="smallBold">{nomeAtual}</ThemedText>
-            <ThemedText style={[Type.title2, tabular]}>
+            <ThemedText style={[Type.largeTitle, tabular]}>
               {usadas} de {teto}
             </ThemedText>
             <ThemedText type="small" themeColor="textSecondary">
@@ -203,7 +203,7 @@ const styles = StyleSheet.create({
     gap: Space.md,
   },
   hero: {
-    gap: Space.sm,
+    gap: Space.md,
   },
   opcao: {
     gap: Space.xs,

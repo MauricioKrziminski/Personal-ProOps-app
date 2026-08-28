@@ -290,7 +290,7 @@ export default function ImportScreen() {
 
         {(accounts ?? []).length > 0 ? (
           <View style={styles.bloco}>
-            <ThemedText type="small" themeColor="textSecondary" style={styles.rotulo}>
+            <ThemedText type="caption" themeColor="textSecondary" style={styles.rotulo}>
               LANÇAR NA CONTA
             </ThemedText>
             <View style={styles.chips}>
@@ -551,14 +551,14 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   resumo: {
-    gap: Space.sm,
+    gap: Space.md,
   },
   bloco: {
     gap: Space.md,
   },
   rotulo: {
     paddingHorizontal: Space.lg,
-    letterSpacing: 0.5,
+    letterSpacing: 0.6,
   },
   rodape: {
     ...Type.footnote,
@@ -578,7 +578,7 @@ const styles = StyleSheet.create({
   },
   trailing: {
     alignItems: 'flex-end',
-    gap: 2,
+    gap: Space.xs,
   },
   sheet: {
     flex: 1,

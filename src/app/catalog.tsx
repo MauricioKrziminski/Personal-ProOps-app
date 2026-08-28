@@ -33,7 +33,7 @@ export default function CatalogScreen() {
 
   return (
     <Screen grouped>
-      <ThemedText type="subtitle">Catálogo</ThemedText>
+      <ThemedText type="title">Catálogo</ThemedText>
 
       <Section title="Botões">
         <View style={{ gap: Space.md, padding: Space.lg }}>
