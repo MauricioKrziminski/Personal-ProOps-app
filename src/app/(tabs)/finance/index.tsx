@@ -21,7 +21,7 @@ import { Icon } from '@/components/ui/icon';
 import { Money } from '@/components/ui/money';
 import { Row, Section } from '@/components/ui/row';
 import { SectionHead } from '@/components/ui/section-head';
-import { HeroPanel } from '@/components/ui/hero-panel';
+import { HeroPanel, heroHeaderOptions } from '@/components/ui/hero-panel';
 import { Screen } from '@/components/ui/screen';
 import { Skeleton, SkeletonRow } from '@/components/ui/skeleton';
 import { ProgressBar, Sparkline } from '@/components/ui/sparkline';
@@ -41,6 +41,7 @@ import { formatBRL, formatDateBR } from '@/hooks/use-items';
 import { monthBounds } from '@/lib/dates';
 import { confirmDestructive, showItemActions } from '@/lib/item-actions';
 import { useTheme } from '@/hooks/use-theme';
+import { StatusBar } from 'expo-status-bar';
 
 /**
  * Financeiro — responde "como está o meu mês?" e, no fundo, "posso gastar?".
@@ -280,14 +281,14 @@ export default function FinanceScreen() {
           recent.refetch();
         }}
         refreshing={summary.isRefetching}>
+        {/* Cabeçalho na cor do painel — ver `heroHeaderOptions`. */}
         <Stack.Screen
-          options={{
-            title: 'Financeiro',
-            headerLargeTitle: true,
-          }}
+          options={{ title: 'Financeiro', headerLargeTitle: true, ...heroHeaderOptions(theme) }}
         />
+        <StatusBar style="light" />
 
         <HeaderMenu
+          onHero
           title="Mais opções"
           actions={[
             {

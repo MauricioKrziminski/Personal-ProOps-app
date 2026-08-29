@@ -4,6 +4,7 @@ import type { SymbolViewProps } from 'expo-symbols';
 
 import { ThemedText } from '@/components/themed-text';
 import { Icon } from '@/components/ui/icon';
+import type { ThemeColor } from '@/constants/theme';
 import { HitTarget, Space } from '@/design/tokens';
 import { showItemActions, type ItemAction } from '@/lib/item-actions';
 import { useTheme } from '@/hooks/use-theme';
@@ -55,7 +56,14 @@ export interface HeaderAction {
  * mesmo header. Misturar `magnifyingglass` com `plus.circle.fill` faz um virar glifo e o outro
  * virar botão — era o caso da aba Hoje.
  */
-export function HeaderActions({ actions }: { actions: HeaderAction[] }) {
+export function HeaderActions({
+  actions,
+  onHero = false,
+}: {
+  actions: HeaderAction[];
+  /** O header desta tela veste a cor do painel — ver `heroHeaderOptions`. */
+  onHero?: boolean;
+}) {
   const theme = useTheme();
 
   if (Platform.OS === 'ios') {
@@ -87,7 +95,7 @@ export function HeaderActions({ actions }: { actions: HeaderAction[] }) {
   return (
     <Stack.Screen
       options={{
-        headerRight: actions.length === 0 ? undefined : () => <AndroidActions actions={actions} />,
+        headerRight: actions.length === 0 ? undefined : () => <AndroidActions actions={actions} onHero={onHero} />,
       }}
     />
   );
@@ -102,7 +110,16 @@ export function HeaderActions({ actions }: { actions: HeaderAction[] }) {
  * existia, então "Importar extrato", "Regras de categoria", "Duplicar" e "Apagar" ficavam
  * **inalcançáveis** no Android. Lá o menu vira `showItemActions`, que fala o idioma da plataforma.
  */
-export function HeaderMenu({ title, actions }: { title: string; actions: ItemAction[] }) {
+export function HeaderMenu({
+  title,
+  actions,
+  onHero = false,
+}: {
+  title: string;
+  actions: ItemAction[];
+  /** O header desta tela veste a cor do painel — ver `heroHeaderOptions`. */
+  onHero?: boolean;
+}) {
   if (Platform.OS === 'ios') {
     if (actions.length === 0) return null;
     return (
@@ -134,6 +151,7 @@ export function HeaderMenu({ title, actions }: { title: string; actions: ItemAct
             ? undefined
             : () => (
                 <AndroidActions
+                  onHero={onHero}
                   actions={[
                     {
                       label: 'Mais opções',
@@ -156,14 +174,17 @@ export function HeaderMenu({ title, actions }: { title: string; actions: ItemAct
  * mesmo desafixado — e no Android `pin` e `pin.fill` caem no MESMO glifo Material (`push_pin`),
  * então a cor é o único sinal de estado que sobra.
  */
-function androidTone(action: HeaderAction): 'textSecondary' | 'danger' | 'tint' {
-  if (action.disabled) return 'textSecondary';
+function androidTone(action: HeaderAction, onHero: boolean): ThemeColor {
+  if (action.disabled) return onHero ? 'onHeroMuted' : 'textSecondary';
   if (action.destructive) return 'danger';
-  return action.selected === false ? 'textSecondary' : 'tint';
+  if (action.selected === false) return onHero ? 'onHeroMuted' : 'textSecondary';
+  // Sobre o painel de tinta o `tint` é preto no tema claro — o ícone sumiria dentro do
+  // cabeçalho. No iOS quem resolve isso é o `headerTintColor`; no Android, aqui.
+  return onHero ? 'onHero' : 'tint';
 }
 
 /** Alvo de 44pt de verdade, não `hitSlop` — no Android o header não tem pílula para dar a forma. */
-function AndroidActions({ actions }: { actions: HeaderAction[] }) {
+function AndroidActions({ actions, onHero }: { actions: HeaderAction[]; onHero: boolean }) {
   return (
     <View style={styles.row}>
       {actions.map((action) => (
@@ -176,9 +197,9 @@ function AndroidActions({ actions }: { actions: HeaderAction[] }) {
           onPress={action.onPress}
           style={({ pressed }) => [styles.target, { opacity: pressed ? 0.5 : 1 }]}>
           {action.icon ? (
-            <Icon name={action.icon} size="lg" color={androidTone(action)} />
+            <Icon name={action.icon} size="lg" color={androidTone(action, onHero)} />
           ) : (
-            <ThemedText type="smallBold" themeColor={androidTone(action)}>
+            <ThemedText type="smallBold" themeColor={androidTone(action, onHero)}>
               {action.label}
             </ThemedText>
           )}
@@ -216,6 +237,7 @@ export function androidOverflow(title: string, actions: ItemAction[]) {
   function OverflowButton() {
     return (
       <AndroidActions
+        onHero={false}
         actions={[
           { label: 'Mais opções', icon: 'ellipsis.circle', onPress: () => showItemActions(title, actions) },
         ]}

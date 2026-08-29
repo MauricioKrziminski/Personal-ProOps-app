@@ -1,5 +1,5 @@
 import { useMemo } from 'react';
-import { Stack, router } from 'expo-router';
+import { router } from 'expo-router';
 import { StyleSheet, View, useWindowDimensions } from 'react-native';
 
 import { ThemedText } from '@/components/themed-text';
@@ -14,6 +14,7 @@ import { Screen } from '@/components/ui/screen';
 import { SkeletonRow } from '@/components/ui/skeleton';
 import { ProgressBar, Sparkline } from '@/components/ui/sparkline';
 import { useToast } from '@/components/ui/toast';
+import { StatusBar } from 'expo-status-bar';
 import { Space, Type, tabular } from '@/design/tokens';
 import {
   useAiEvents,
@@ -171,18 +172,15 @@ export default function TodayScreen() {
         ai.refetch();
       }}
       refreshing={forecast.isRefetching}>
-      <Stack.Screen
-        options={{
-          title: 'Hoje',
-          headerLargeTitle: true,
-        }}
-      />
+      {/* Título e cores do cabeçalho moram no `_layout` da aba. */}
+      <StatusBar style="light" />
 
       {/* Os dois ícones eram uma `View` à mão com `gap: 16` — e o iOS 26 desenhava a pílula de
           vidro em volta dela, com o nosso respiro em vez do do sistema. `plus.circle.fill` ao
           lado de `magnifyingglass` ainda misturava preenchido com contorno no mesmo header
           (`design.md` §4); "Nova nota" agora usa o MESMO ícone da aba Notas. */}
       <HeaderActions
+        onHero
         actions={[
           { label: 'Buscar', icon: 'magnifyingglass', onPress: () => router.push('/search') },
           { label: 'Nova nota', icon: 'square.and.pencil', onPress: () => router.push('/notes/new') },
