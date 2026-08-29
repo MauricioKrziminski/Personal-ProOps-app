@@ -37,32 +37,16 @@ import { relativeBR } from '@/lib/dates';
 
 
 /**
- * Pele da lista de notas — direção "Produto", refinada em cima das referências.
+ * A lista de notas TINHA uma paleta própria (`NOTE_SKIN`): fundo `#0F0F12`, superfície `#1C1C26`
+ * e um accent violeta `#8B5CF6` que não existe em `Colors`.
  *
- * Os números NÃO são gosto, são a spec do Material 3 para Card: **padding interno 16, raio 12,
- * 8 entre cards empilhados**. A versão anterior tinha raio 20 com padding 16 — raio maior que o
- * padding é o que faz o texto brigar com a curva e o cartão parecer sem respiro. Aqui o raio
- * (14) fica abaixo do padding (16), que é a relação que as referências mantêm.
+ * Ela forçava dark mesmo no tema claro — a aba inteira lia como se fosse de outro app — e
+ * violava duas contagens da regra §10 de uma vez (hex hardcoded e um segundo accent). O cartão
+ * outlined e a densidade que ela introduziu eram bons e ficam; o que sai é a cor inventada.
  *
- * O fundo é NEUTRO e só a superfície é levemente tingida. Tingir o fundo inteiro (o que a
- * versão anterior fazia) gasta o violeta na tela toda e ele deixa de ser acento — a regra é
- * gastar a ousadia num lugar só e manter o resto quieto. É também o que Nubank faz: cinza quase
- * preto de fundo, roxo só no que importa.
+ * Agora tudo vem de `useTheme()`. Raio e padding vêm da escala (`Radius.md`, `Space.lg`): o 14
+ * de antes estava fora dela.
  */
-const NOTE_SKIN = {
-  ground: '#0F0F12',
-  surface: '#1C1C26',
-  surfacePressed: '#232330',
-  text: '#F4F3F7',
-  textSecondary: '#9C99AB',
-  accent: '#8B5CF6',
-  accentSoft: 'rgba(139,92,246,0.18)',
-  line: 'rgba(255,255,255,0.07)',
-  /** M3: padding 16 · raio 12 (aqui 14, entre o M3 e o arredondado do iOS) · gap 8. */
-  pad: 16,
-  radius: 14,
-  gap: 8,
-} as const;
 
 interface RowActions {
   folders: NoteFolder[];
@@ -90,6 +74,7 @@ function NoteRow({
 }) {
   // Dynamic Type XL: a prévia cai para uma linha para os metadados não sumirem da tela.
   const { fontScale } = useWindowDimensions();
+  const theme = useTheme();
 
   const title = noteTitle(note.content) || 'Sem título';
   const preview = notePreview(note.content);
@@ -146,19 +131,25 @@ function NoteRow({
           <View
             style={[
               styles.card,
-              { backgroundColor: pressed ? NOTE_SKIN.surfacePressed : NOTE_SKIN.surface },
+              {
+                backgroundColor: pressed ? theme.backgroundSelected : theme.surface,
+                borderColor: theme.separator,
+              },
             ]}>
           {/* Título e pin dividem a primeira linha: o pin fica no canto do cartão (padrão do
               Keep), não como bullet antes do texto — ali ele lia como marcador de lista. */}
           <View style={styles.cardHead}>
-            <ThemedText numberOfLines={2} style={[styles.cardTitle, styles.grow]}>
+            <ThemedText type="headline" numberOfLines={2} style={styles.grow}>
               {title}
             </ThemedText>
             {note.pinned ? <Icon name="pin.fill" size="sm" color="tint" /> : null}
           </View>
 
           {preview ? (
-            <ThemedText numberOfLines={fontScale >= 1.4 ? 1 : 2} style={styles.cardPreview}>
+            <ThemedText
+              type="small"
+              themeColor="textSecondary"
+              numberOfLines={fontScale >= 1.4 ? 1 : 2}>
               {preview}
             </ThemedText>
           ) : null}
@@ -168,8 +159,11 @@ function NoteRow({
               onde o "quando" é o segundo campo mais consultado depois do título. */}
           <View style={styles.cardMeta}>
             {folderName ? (
-              <View style={styles.folderPill}>
-                <ThemedText numberOfLines={1} style={styles.folderPillText}>
+              <View style={[styles.folderPill, { backgroundColor: theme.accentSoft }]}>
+                <ThemedText
+                  numberOfLines={1}
+                  themeColor="tint"
+                  style={styles.folderPillText}>
                   {folderName}
                 </ThemedText>
               </View>
@@ -178,18 +172,27 @@ function NoteRow({
             {checklistLabel ? (
               <View style={styles.metaBit}>
                 <Icon name="checkmark.circle" size={13} color="textSecondary" />
-                <ThemedText style={[styles.metaText, tabular]}>{checklistLabel}</ThemedText>
+                <ThemedText type="caption" themeColor="textSecondary" style={tabular}>
+                  {checklistLabel}
+                </ThemedText>
               </View>
             ) : null}
 
             {note.source === 'whatsapp' ? (
               <View style={styles.metaBit}>
                 <Icon name="bubble.left" size={13} color="textSecondary" />
-                <ThemedText style={styles.metaText}>WhatsApp</ThemedText>
+                <ThemedText type="caption" themeColor="textSecondary">
+                  WhatsApp
+                </ThemedText>
               </View>
             ) : null}
 
-            <ThemedText style={[styles.metaText, styles.quando, tabular]}>{quando}</ThemedText>
+            <ThemedText
+              type="caption"
+              themeColor="textSecondary"
+              style={[styles.quando, tabular]}>
+              {quando}
+            </ThemedText>
           </View>
           </View>
           )}
@@ -366,7 +369,7 @@ export default function NotesScreen() {
   );
 
   return (
-    <Screen scroll={false} grouped contentStyle={{ backgroundColor: NOTE_SKIN.ground }}>
+    <Screen scroll={false} grouped>
       <HeaderActions
         actions={[
           { label: 'Pastas', icon: 'folder', onPress: () => router.push('/notes/folders') },
@@ -414,7 +417,7 @@ export default function NotesScreen() {
                 style={({ pressed }) => [
                   styles.send,
                   {
-                    backgroundColor: draft.trim() ? NOTE_SKIN.accent : NOTE_SKIN.line,
+                    backgroundColor: draft.trim() ? theme.tint : theme.backgroundElement,
                     opacity: !draft.trim() || pressed ? 0.5 : 1,
                   },
                 ]}>
@@ -487,7 +490,7 @@ export default function NotesScreen() {
           return (
             <View style={styles.item}>
               {heading ? (
-                <ThemedText style={[Type.caption, styles.heading]}>
+                <ThemedText type="caption" themeColor="textSecondary" style={styles.heading}>
                   {heading.toUpperCase()}
                 </ThemedText>
               ) : null}
@@ -510,7 +513,7 @@ const styles = StyleSheet.create({
   /** M3: 8 entre cards empilhados. O recuo lateral é o mesmo do resto da tela. */
   item: {
     paddingHorizontal: Space.lg,
-    paddingBottom: NOTE_SKIN.gap,
+    paddingBottom: Space.sm,
   },
   /**
    * O cartão é uma `View` DENTRO do `Pressable`, não o próprio `Pressable`.
@@ -523,31 +526,19 @@ const styles = StyleSheet.create({
     minHeight: HitTarget,
   },
   card: {
-    gap: 6,
-    padding: NOTE_SKIN.pad,
-    borderRadius: NOTE_SKIN.radius,
+    gap: Space.xs + 2,
+    padding: Space.lg,
+    borderRadius: Radius.md,
     borderCurve: 'continuous',
-    // Sombra não existe em fundo escuro — o que desenha a borda do cartão aqui é a hairline.
-    // É o que Linear, Notion e o modo escuro do Nubank fazem: `outlined card`, não `elevated`.
+    // Cartão OUTLINED, não elevated: quem desenha a borda é a hairline, não a sombra.
+    // É o que Linear e Notion fazem, e funciona nos dois temas — a cor vem do `theme.separator`
+    // aplicado inline, porque `StyleSheet.create` não enxerga o tema.
     borderWidth: StyleSheet.hairlineWidth,
-    borderColor: NOTE_SKIN.line,
   },
   cardHead: {
     flexDirection: 'row',
     alignItems: 'flex-start',
     gap: Space.sm,
-  },
-  cardTitle: {
-    fontSize: 17,
-    lineHeight: 23,
-    fontWeight: '600',
-    color: NOTE_SKIN.text,
-  },
-  cardPreview: {
-    fontSize: 15,
-    lineHeight: 21,
-    fontWeight: '400',
-    color: NOTE_SKIN.textSecondary,
   },
   cardMeta: {
     flexDirection: 'row',
@@ -561,24 +552,16 @@ const styles = StyleSheet.create({
     paddingVertical: 3,
     borderRadius: Radius.xs,
     borderCurve: 'continuous',
-    backgroundColor: NOTE_SKIN.accentSoft,
     maxWidth: 130,
   },
   folderPillText: {
-    fontSize: 12,
-    lineHeight: 15,
+    ...Type.caption,
     fontWeight: '600',
-    color: NOTE_SKIN.accent,
   },
   metaBit: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 4,
-  },
-  metaText: {
-    fontSize: 12,
-    lineHeight: 16,
-    color: NOTE_SKIN.textSecondary,
+    gap: Space.xs,
   },
   /** Encostada à direita: a data é a âncora que faz as linhas lerem como coluna. */
   quando: {
@@ -643,7 +626,6 @@ const styles = StyleSheet.create({
     gap: Space.sm,
   },
   heading: {
-    color: NOTE_SKIN.textSecondary,
     letterSpacing: 0.6,
     marginTop: Space.xl,
     marginBottom: Space.sm,

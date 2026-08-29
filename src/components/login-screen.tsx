@@ -142,7 +142,9 @@ export function LoginScreen() {
             )}
 
             {__DEV__ && (
-              <Pressable onPress={devLogin} style={styles.devButton}>
+              <Pressable
+                onPress={devLogin}
+                style={[styles.devButton, { borderTopColor: theme.separator }]}>
                 <ThemedText type="small" themeColor="textSecondary" style={styles.backLink}>
                   Entrar como teste (dev)
                 </ThemedText>
@@ -201,6 +203,5 @@ const styles = StyleSheet.create({
     marginTop: Spacing.one,
     paddingTop: Spacing.two,
     borderTopWidth: StyleSheet.hairlineWidth,
-    borderTopColor: 'rgba(128,128,128,0.25)',
   },
 });
