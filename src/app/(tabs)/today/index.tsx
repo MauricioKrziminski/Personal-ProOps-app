@@ -1,21 +1,20 @@
 import { useMemo } from 'react';
 import { Stack, router } from 'expo-router';
-import { Pressable, StyleSheet, View, useWindowDimensions } from 'react-native';
-import Animated, { FadeInDown } from 'react-native-reanimated';
+import { StyleSheet, View, useWindowDimensions } from 'react-native';
 
-import { GlassCard } from '@/components/glass/glass-card';
 import { ThemedText } from '@/components/themed-text';
 import { Button } from '@/components/ui/button';
 import { EmptyState } from '@/components/ui/empty-state';
 import { HeaderActions } from '@/components/ui/header-actions';
 import { Money } from '@/components/ui/money';
 import { Row, Section } from '@/components/ui/row';
-import { HeroLabel } from '@/components/ui/section-head';
+import { HeroPanel } from '@/components/ui/hero-panel';
+import type { QuickAction } from '@/components/ui/quick-actions';
 import { Screen } from '@/components/ui/screen';
 import { SkeletonRow } from '@/components/ui/skeleton';
 import { ProgressBar, Sparkline } from '@/components/ui/sparkline';
 import { useToast } from '@/components/ui/toast';
-import { Motion, Space, Type, tabular } from '@/design/tokens';
+import { Space, Type, tabular } from '@/design/tokens';
 import {
   useAiEvents,
   useBudgetsStatus,
@@ -55,6 +54,21 @@ export default function TodayScreen() {
   const leftover = forecast.data?.at(-1)?.balance_cents ?? 0;
   const series = (forecast.data ?? []).map((d) => Number(d.balance_cents));
 
+  /**
+   * A sparkline só entra quando a série DIZ alguma coisa.
+   *
+   * Perto da virada do mês a projeção tem dois ou três pontos praticamente iguais, e o gráfico
+   * vira uma **linha reta** — que não lê como gráfico, lê como divisor no meio do painel. É o
+   * mesmo princípio que já vale para o card que soma uma lista de um item: desenho que não
+   * acrescenta informação é ruído, e some.
+   *
+   * O corte é 1% de amplitude sobre o maior valor absoluto da série — abaixo disso a linha é
+   * visualmente horizontal de qualquer jeito.
+   */
+  const spread = series.length > 1 ? Math.max(...series) - Math.min(...series) : 0;
+  const escala = Math.max(...series.map(Math.abs), 1);
+  const serieInforma = series.length > 2 && spread / escala > 0.01;
+
   const overdue = (bills.data ?? []).filter((b) => b.overdue);
   const dueSoon = (bills.data ?? []).filter((b) => !b.overdue);
   const tight = (budgets.data ?? []).filter(
@@ -85,9 +99,70 @@ export default function TodayScreen() {
       }
     );
 
+  /**
+   * Os atalhos do painel são **decisões pendentes**, não destinos.
+   *
+   * A referência que inspirou o painel (app de banco) põe aqui verbos de dinheiro — Pix, pagar,
+   * transferir. Aqui isso não cabe: o app não movimenta dinheiro, ele mostra o que a IA
+   * registrou a partir do WhatsApp. Repetir aquele grid daria quatro botões que navegam para
+   * onde a tab bar já leva.
+   *
+   * Então cada tile carrega a contagem do que espera decisão — e **tile com zero não aparece**.
+   */
+  const atalhos: QuickAction[] = [
+    {
+      label: 'Vencendo',
+      icon: 'calendar',
+      count: overdue.length + dueSoon.length,
+      onPress: () => router.push('/finance/transactions'),
+    },
+    {
+      label: 'Lembretes',
+      icon: 'bell',
+      count: (reminders.data ?? []).length,
+      onPress: () => router.push('/reminders'),
+    },
+    {
+      label: 'Orçamento',
+      icon: 'chart.pie',
+      count: tight.length,
+      onPress: () => router.push('/finance/budgets'),
+    },
+    {
+      label: 'Revisar IA',
+      icon: 'sparkles',
+      count: recent.length,
+      onPress: () => router.push('/ai-activity'),
+    },
+  ];
+
   return (
     <Screen
       grouped
+      header={
+        forecast.data ? (
+          <HeroPanel
+            label="Sobra até o fim do mês"
+            value={
+              <Money
+                cents={leftover}
+                variant="heroMoney"
+                tone={leftover < 0 ? 'danger' : 'onHero'}
+                concealable
+              />
+            }
+            secondary={`${daysLeft} ${daysLeft === 1 ? 'dia' : 'dias'} até virar o mês`}
+            chart={
+              serieInforma ? (
+                <Sparkline values={series} width={width - Space.lg * 2} showZero />
+              ) : undefined
+            }
+            actions={atalhos}
+            concealable
+            onPress={() => router.push('/finance/forecast')}
+          />
+        ) : undefined
+      }
       onRefresh={() => {
         forecast.refetch();
         bills.refetch();
@@ -122,7 +197,6 @@ export default function TodayScreen() {
         </>
       ) : null}
 
-      {/* O único GlassCard da tela: é a pergunta que mais gente tem ao abrir o app. */}
       {forecast.isError ? (
         <Section title="Sobra do mês">
           <Row
@@ -132,19 +206,6 @@ export default function TodayScreen() {
             onPress={() => forecast.refetch()}
           />
         </Section>
-      ) : forecast.data ? (
-        <Animated.View entering={FadeInDown.duration(Motion.duration.slow)}>
-          <Pressable onPress={() => router.push('/finance/forecast')}>
-            <GlassCard style={styles.hero}>
-              <HeroLabel>Sobra até o fim do mês</HeroLabel>
-              <Money cents={leftover} variant="money" tone={leftover < 0 ? 'danger' : 'text'} />
-              <Sparkline values={series} width={width - Space.lg * 4} showZero />
-              <ThemedText type="small" themeColor="textSecondary" style={tabular}>
-                {daysLeft} {daysLeft === 1 ? 'dia' : 'dias'} até virar o mês
-              </ThemedText>
-            </GlassCard>
-          </Pressable>
-        </Animated.View>
       ) : null}
 
       {/* Vem em segundo porque é a única coisa da tela com consequência se ignorada. */}
@@ -279,9 +340,6 @@ export default function TodayScreen() {
 }
 
 const styles = StyleSheet.create({
-  hero: {
-    gap: Space.sm,
-  },
   trailing: {
     alignItems: 'flex-end',
     gap: Space.xs,

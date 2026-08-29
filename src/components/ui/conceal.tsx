@@ -69,10 +69,14 @@ export function useConceal() {
 /**
  * O texto que substitui o valor quando está oculto.
  *
- * Blocos cheios, **não** asteriscos nem "•••": o objetivo é ocupar largura parecida com a do
- * número para o layout não pular na alternância — valor que muda de largura faz a linha inteira
- * remontar, e aí o esconder vira um solavanco em vez de um estado.
+ * **Ponto, não bloco cheio.** A primeira versão usava `█` para ocupar largura parecida com a do
+ * número e evitar salto de layout. Visto rodando, no tamanho do painel (56px) os blocos se
+ * encostam e viram uma **barra branca sólida** — lê como tarja de censura ou como elemento
+ * quebrado, não como "seu saldo está oculto".
+ *
+ * O ponto é a convenção que todo mundo já leu em campo de senha, e mantém a largura aproximada
+ * sem virar um retângulo.
  */
 export function concealText(chars = 6) {
-  return '█'.repeat(chars);
+  return '•'.repeat(Math.max(3, chars));
 }

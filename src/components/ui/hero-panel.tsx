@@ -1,6 +1,5 @@
 import { Pressable, StyleSheet, View } from 'react-native';
 import Animated, { FadeIn } from 'react-native-reanimated';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { ThemedText } from '@/components/themed-text';
 import { Icon } from '@/components/ui/icon';
@@ -65,7 +64,6 @@ export function HeroPanel({
   onPress,
 }: HeroPanelProps) {
   const theme = useTheme();
-  const insets = useSafeAreaInsets();
   const { concealed, toggle } = useConceal();
 
   return (
@@ -73,12 +71,7 @@ export function HeroPanel({
       entering={FadeIn.duration(Motion.duration.slow)}
       style={[
         styles.panel,
-        {
-          backgroundColor: theme.heroSurface,
-          // O painel sobe ATRÁS do header nativo; o respiro do topo vem do inset, não de um
-          // número fixo, senão ele encosta no relógio em aparelho com notch.
-          paddingTop: insets.top + Space.md,
-        },
+        { backgroundColor: theme.heroSurface },
       ]}>
       {/* A espiral da marca, recortada na borda. Marca monocromática ganha presença repetindo a
           FORMA em papéis utilitários — é o que faz a tela ser reconhecível sem logotipo. */}
@@ -127,6 +120,14 @@ export function HeroPanel({
 const styles = StyleSheet.create({
   panel: {
     paddingHorizontal: Space.lg,
+    /**
+     * `Space.lg` no topo, e **não** `insets.top`.
+     *
+     * O painel mora dentro do scroll, ABAIXO do header nativo — que já resolveu a safe area.
+     * Somar o inset de novo abria ~48 px de nada entre o header e o rótulo, e o painel ficava
+     * com um vazio no topo que lia como erro de layout.
+     */
+    paddingTop: Space.lg,
     paddingBottom: Space.lg,
     borderBottomLeftRadius: Radius.xl,
     borderBottomRightRadius: Radius.xl,

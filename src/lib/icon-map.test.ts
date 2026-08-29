@@ -16,6 +16,29 @@ import { join } from 'node:path';
  */
 const SRC = join(import.meta.dirname, '..');
 
+/**
+ * Os literais em posição de RESULTADO de uma expressão de ícone.
+ *
+ * `b.kind === 'invoice' ? 'creditcard' : 'exclamationmark.circle'` tem três literais e só dois
+ * são ícones — `'invoice'` é o valor comparado. Varrer a expressão inteira faz o teste cobrar
+ * um ícone chamado "invoice" que nunca existiu, e um teste que acusa o que não é defeito é
+ * abandonado na primeira vez que atrapalha.
+ *
+ * Heurística: o que interessa vem **depois do primeiro `?`**. Cobre ternário e `??`; expressão
+ * sem `?` nenhum (uma variável, um `.map`) não tem literal a cobrar.
+ *
+ * Duas exceções que apareceram na prática, em
+ * `icon={ACTION_ICON[primeira?.type ?? 'unknown'] ?? 'magnifyingglass'}`:
+ * - **subscrito**: `'unknown'` ali é CHAVE de mapa, não ícone — `[...]` sai antes da varredura;
+ * - **encadeamento opcional**: o `?` de `primeira?.type` não abre ternário nenhum.
+ */
+function results(expr: string): string[] {
+  const semSubscrito = expr.replace(/\[[^\]]*\]/g, '');
+  const q = semSubscrito.search(/\?(?!\.)/);
+  if (q === -1) return [];
+  return [...semSubscrito.slice(q).matchAll(/'([a-z][a-zA-Z0-9.]*)'/g)].map((m) => m[1]);
+}
+
 function walk(dir: string): string[] {
   return readdirSync(dir).flatMap((entry) => {
     const full = join(dir, entry);
@@ -24,7 +47,13 @@ function walk(dir: string): string[] {
   });
 }
 
-/** Nome de SF Symbol: minúsculo, com pontos. Um `.` é o que separa de rótulo comum. */
+/**
+ * Nome de SF Symbol: minúsculo, com pontos. Um `.` é o que separa de rótulo comum.
+ *
+ * Usado só nos mapas tipados, onde o literal pode ser qualquer coisa. No `name=` de um `<Icon>`
+ * e no `icon:` de uma ação **todo** valor é nome de ícone, com ponto ou sem — e é por isso que
+ * eles são checados sem este filtro (ver `NAMES_ALWAYS` abaixo).
+ */
 const SF_LIKE = /^[a-z][a-z0-9]*(\.[a-z0-9]+)+$/;
 
 test('Icon: todo SF Symbol usado no app está no mapa SF → Material', () => {
@@ -40,9 +69,32 @@ test('Icon: todo SF Symbol usado no app está no mapa SF → Material', () => {
   for (const file of walk(SRC)) {
     if (file === iconFile) continue;
     const text = readFileSync(file, 'utf8');
-    const names = [
+
+    /**
+     * Valores em posição de ÍCONE — checados sempre, sem o filtro de ponto.
+     *
+     * Duas cegueiras que deixaram `eye` e `eye.slash` passarem até aparecerem como círculo oco
+     * no painel de destaque:
+     *
+     * 1. **Nome sem ponto.** O filtro `SF_LIKE` exige pelo menos um `.`, então `eye`, `bell`,
+     *    `calendar` e `house` nunca eram checados — só os pontilhados. Metade dos ícones do app
+     *    estava fora do teste que existe para cobri-los.
+     * 2. **Ternário.** `name={cond ? 'eye.slash' : 'eye'}` não casava: o regex esperava a aspa
+     *    logo depois do `{`. Agora o conteúdo entre chaves é varrido inteiro.
+     */
+    const NAMES_ALWAYS = [
       ...[...text.matchAll(/\bicon[=:]\s*['"]([a-z][a-zA-Z0-9.]*)['"]/g)].map((m) => m[1]),
-      ...[...text.matchAll(/<Icon\b[^>]*?\bname=\{?['"]([a-z][a-zA-Z0-9.]*)['"]/gs)].map((m) => m[1]),
+      ...[...text.matchAll(/<Icon\b[^>]*?\bname=['"]([a-z][a-zA-Z0-9.]*)['"]/gs)].map((m) => m[1]),
+      // `name={...}` e `icon={...}`: expressão inteira (ternário, `??`, default).
+      ...[...text.matchAll(/<Icon\b[^>]*?\bname=\{([^}]*)\}/gs)].flatMap((m) => results(m[1])),
+      ...[...text.matchAll(/\bicon[=:]\s*\{([^}]*)\}/g)].flatMap((m) => results(m[1])),
+    ];
+
+    for (const name of NAMES_ALWAYS) {
+      if (!mapped.has(name)) missing.set(name, file.replace(SRC, 'src'));
+    }
+
+    const names = [
       // mapas tipados (`Record<..., SymbolViewProps['name']>`): pega os literais do bloco
       ...[
         ...text.matchAll(

@@ -9,6 +9,7 @@ import { AnimatedSplashOverlay } from '@/components/animated-icon';
 import { ThemedText } from '@/components/themed-text';
 import { AndroidActionSheet } from '@/components/ui/action-sheet';
 import { Icon } from '@/components/ui/icon';
+import { ConcealProvider } from '@/components/ui/conceal';
 import { ToastProvider } from '@/components/ui/toast';
 import { useSession } from '@/hooks/use-session';
 import { attachNotificationListeners, configureNotificationHandler } from '@/lib/notifications';
@@ -67,6 +68,7 @@ export default function RootLayout() {
         {/* Requisito do `react-native-keyboard-controller`: sem o provider os componentes de
             teclado (o editor de nota) não recebem evento nenhum. */}
         <KeyboardProvider>
+          <ConcealProvider>
           <ToastProvider>
             <AnimatedSplashOverlay />
           <AndroidActionSheet />
@@ -111,6 +113,7 @@ export default function RootLayout() {
               </Stack>
             )}
           </ToastProvider>
+          </ConcealProvider>
         </KeyboardProvider>
       </ThemeProvider>
     </QueryClientProvider>
