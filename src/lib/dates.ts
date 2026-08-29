@@ -45,6 +45,26 @@ export function formatNumberBR(value: number): string {
   return String(value).replace('.', ',');
 }
 
+/**
+ * Data relativa curta: `agora`, `há 12 min`, `há 3 h`, `ontem`, `há 5 dias`, e depois de 30 dias
+ * a data completa.
+ *
+ * Toda lista de notas de referência (Apple Notes, Bear, Keep) mostra QUANDO — é o segundo campo
+ * mais consultado depois do título, e é o que dá noção de "o que é recente". Existia uma cópia
+ * privada disto no detalhe da nota; agora é uma só.
+ */
+export function relativeBR(iso: string, now = new Date()): string {
+  const minutes = Math.floor((now.getTime() - new Date(iso).getTime()) / 60_000);
+  if (minutes < 1) return 'agora';
+  if (minutes < 60) return `há ${minutes} min`;
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return `há ${hours} h`;
+  const days = Math.floor(hours / 24);
+  if (days === 1) return 'ontem';
+  if (days < 30) return `há ${days} dias`;
+  return formatDateBR(iso);
+}
+
 export function formatDateBR(value: string | Date): string {
   const d = typeof value === 'string' ? parseLocal(value) : value;
   const dd = String(d.getDate()).padStart(2, '0');

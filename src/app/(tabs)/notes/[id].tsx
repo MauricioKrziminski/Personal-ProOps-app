@@ -37,7 +37,7 @@ import {
   useNoteTags,
 } from '@/hooks/use-notes';
 import { useTheme } from '@/hooks/use-theme';
-import { formatDateBR } from '@/lib/dates';
+import { relativeBR } from '@/lib/dates';
 import {
   addTag,
   isValidTag,
@@ -70,18 +70,6 @@ const AUTOSAVE_MS = 800;
 /** `note_folders.icon` é texto livre no banco; aqui vira nome de SF Symbol com queda para `folder`. */
 function symbol(icon: string | null | undefined): SymbolViewProps['name'] {
   return (icon ?? 'folder') as SymbolViewProps['name'];
-}
-
-function relativeBR(iso: string): string {
-  const minutes = Math.floor((Date.now() - new Date(iso).getTime()) / 60_000);
-  if (minutes < 1) return 'agora';
-  if (minutes < 60) return `há ${minutes} min`;
-  const hours = Math.floor(minutes / 60);
-  if (hours < 24) return `há ${hours} h`;
-  const days = Math.floor(hours / 24);
-  if (days === 1) return 'ontem';
-  if (days < 30) return `há ${days} dias`;
-  return formatDateBR(iso);
 }
 
 /**

@@ -42,7 +42,7 @@ export function Screen({
   const padding = [styles.content, { paddingBottom: insets.bottom + Space.xxl }, contentStyle];
 
   if (!scroll) {
-    return <View style={[styles.root, { backgroundColor: background }]}>{children}</View>;
+    return <View style={[styles.root, { backgroundColor: background }, contentStyle]}>{children}</View>;
   }
 
   return (

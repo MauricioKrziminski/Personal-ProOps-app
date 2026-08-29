@@ -13,6 +13,7 @@ import {
   localDateTime,
   localISODate,
   monthBounds,
+  relativeBR,
   timeBR,
 } from './dates.ts';
 
@@ -97,4 +98,16 @@ test('data: `formatDateBR` e `isoToBR` escrevem a MESMA data igual', () => {
   // leitura em `28-08-2026`, formulário em `28/08/2026`.
   assert.equal(formatDateBR('2026-08-28'), isoToBR('2026-08-28'));
   assert.equal(formatDateBR('2026-01-09'), isoToBR('2026-01-09'));
+});
+
+test('relativeBR: os degraus que a lista de notas mostra', () => {
+  const agora = new Date('2026-08-28T12:00:00Z');
+  const atras = (min: number) => new Date(agora.getTime() - min * 60_000).toISOString();
+  assert.equal(relativeBR(atras(0), agora), 'agora');
+  assert.equal(relativeBR(atras(12), agora), 'há 12 min');
+  assert.equal(relativeBR(atras(60 * 3), agora), 'há 3 h');
+  assert.equal(relativeBR(atras(60 * 30), agora), 'ontem');
+  assert.equal(relativeBR(atras(60 * 24 * 5), agora), 'há 5 dias');
+  // Passou de 30 dias vira data cheia — e na MESMA grafia do resto do app.
+  assert.equal(relativeBR('2026-01-09T12:00:00Z', agora), '09/01/2026');
 });

@@ -1,4 +1,4 @@
-import { useMemo } from 'react';
+import { useEffect, useMemo } from 'react';
 import { Stack, router } from 'expo-router';
 import { Pressable, StyleSheet, View, useWindowDimensions } from 'react-native';
 import Animated, { FadeInDown } from 'react-native-reanimated';
@@ -36,6 +36,11 @@ import { describeRRule } from '@/lib/rrule-text';
  * cinco cabeçalhos vazios para parecer cheia.
  */
 export default function TodayScreen() {
+  // TEMP-VERIFY
+  useEffect(() => {
+    const t = setTimeout(() => router.push('/notes'), 500);
+    return () => clearTimeout(t);
+  }, []);
 
   const toast = useToast();
   const { width } = useWindowDimensions();

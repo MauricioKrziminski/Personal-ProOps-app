@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Platform, Pressable, ScrollView, StyleSheet, View, useColorScheme, useWindowDimensions } from 'react-native';
+import { Platform, Pressable, ScrollView, StyleSheet, View, useWindowDimensions } from 'react-native';
 import { FlashList } from '@shopify/flash-list';
 import { Link, Stack, router } from 'expo-router';
 import * as Haptics from 'expo-haptics';
@@ -13,7 +13,7 @@ import { Icon } from '@/components/ui/icon';
 import { Screen } from '@/components/ui/screen';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useToast } from '@/components/ui/toast';
-import { Elevation, HitTarget, Radius, Space, Type } from '@/design/tokens';
+import { HitTarget, Radius, Space, Type, tabular } from '@/design/tokens';
 import {
   useNoteFolders,
   useNoteTags,
@@ -28,14 +28,41 @@ import {
 import { useTheme } from '@/hooks/use-theme';
 import { showItemActions } from '@/lib/item-actions';
 import { noteTitle, notePreview, parseChecklist } from '@/lib/search';
+import { relativeBR } from '@/lib/dates';
 
 /**
  * `typedRoutes`: `trash.tsx` ainda não existe como arquivo, então o typegen não conhece a rota
  * (o `_layout` já a declara). Cast pontual e greppável — some quando o arquivo nascer.
  */
 
-/** Quantas tags cabem na faixa de metadados antes de virar `+N`. */
-const TAGS_SHOWN = 3;
+
+/**
+ * Pele da lista de notas — direção "Produto", refinada em cima das referências.
+ *
+ * Os números NÃO são gosto, são a spec do Material 3 para Card: **padding interno 16, raio 12,
+ * 8 entre cards empilhados**. A versão anterior tinha raio 20 com padding 16 — raio maior que o
+ * padding é o que faz o texto brigar com a curva e o cartão parecer sem respiro. Aqui o raio
+ * (14) fica abaixo do padding (16), que é a relação que as referências mantêm.
+ *
+ * O fundo é NEUTRO e só a superfície é levemente tingida. Tingir o fundo inteiro (o que a
+ * versão anterior fazia) gasta o violeta na tela toda e ele deixa de ser acento — a regra é
+ * gastar a ousadia num lugar só e manter o resto quieto. É também o que Nubank faz: cinza quase
+ * preto de fundo, roxo só no que importa.
+ */
+const NOTE_SKIN = {
+  ground: '#0F0F12',
+  surface: '#1C1C26',
+  surfacePressed: '#232330',
+  text: '#F4F3F7',
+  textSecondary: '#9C99AB',
+  accent: '#8B5CF6',
+  accentSoft: 'rgba(139,92,246,0.18)',
+  line: 'rgba(255,255,255,0.07)',
+  /** M3: padding 16 · raio 12 (aqui 14, entre o M3 e o arredondado do iOS) · gap 8. */
+  pad: 16,
+  radius: 14,
+  gap: 8,
+} as const;
 
 interface RowActions {
   folders: NoteFolder[];
@@ -61,7 +88,6 @@ function NoteRow({
   folderName?: string;
   actions: RowActions;
 }) {
-  const theme = useTheme();
   // Dynamic Type XL: a prévia cai para uma linha para os metadados não sumirem da tela.
   const { fontScale } = useWindowDimensions();
 
@@ -75,20 +101,16 @@ function NoteRow({
     (tag) => tag.toLowerCase() !== folderName?.toLowerCase()
   );
 
-  const meta = [
-    folderName,
-    ...tags.slice(0, TAGS_SHOWN).map((tag) => `#${tag}`),
-    tags.length > TAGS_SHOWN ? `+${tags.length - TAGS_SHOWN}` : null,
-    checklist.length > 0 ? `${done}/${checklist.length}` : null,
-    note.source === 'whatsapp' ? 'via WhatsApp' : null,
-  ]
-    .filter(Boolean)
-    .join(' · ');
+  const checklistLabel = checklist.length > 0 ? `${done}/${checklist.length}` : null;
+  const quando = relativeBR(note.updated_at);
 
   const label = [
     title,
     folderName ? `pasta ${folderName}` : null,
     tags.length > 0 ? `${tags.length} ${tags.length === 1 ? 'tag' : 'tags'}` : null,
+    checklistLabel ? `${done} de ${checklist.length} itens feitos` : null,
+    note.source === 'whatsapp' ? 'via WhatsApp' : null,
+    `atualizada ${quando}`,
     note.pinned ? 'fixada' : null,
   ]
     .filter(Boolean)
@@ -119,29 +141,58 @@ function NoteRow({
                     { label: 'Lixeira', destructive: true, onPress: () => actions.onTrash(note) },
                   ])
           }
-          style={({ pressed }) => [
-            styles.row,
-            { backgroundColor: pressed ? theme.backgroundSelected : 'transparent' },
-          ]}>
-          <View style={styles.rowTitle}>
-            {note.pinned ? <Icon name="pin.fill" size="sm" color="textSecondary" /> : null}
-            <ThemedText type="headline" numberOfLines={1} style={styles.grow}>
+          style={styles.press}>
+          {({ pressed }) => (
+          <View
+            style={[
+              styles.card,
+              { backgroundColor: pressed ? NOTE_SKIN.surfacePressed : NOTE_SKIN.surface },
+            ]}>
+          {/* Título e pin dividem a primeira linha: o pin fica no canto do cartão (padrão do
+              Keep), não como bullet antes do texto — ali ele lia como marcador de lista. */}
+          <View style={styles.cardHead}>
+            <ThemedText numberOfLines={2} style={[styles.cardTitle, styles.grow]}>
               {title}
             </ThemedText>
+            {note.pinned ? <Icon name="pin.fill" size="sm" color="tint" /> : null}
           </View>
+
           {preview ? (
-            <ThemedText
-              type="small"
-              themeColor="textSecondary"
-              numberOfLines={fontScale >= 1.4 ? 1 : 2}>
+            <ThemedText numberOfLines={fontScale >= 1.4 ? 1 : 2} style={styles.cardPreview}>
               {preview}
             </ThemedText>
           ) : null}
-          {meta ? (
-            <ThemedText themeColor="textSecondary" numberOfLines={1} style={Type.caption}>
-              {meta}
-            </ThemedText>
-          ) : null}
+
+          {/* Faixa de metadados com FORMA, não string corrida: pasta é pill, checklist é ícone
+              + contagem, origem é ícone, e a data vai encostada à direita — como em Apple Notes,
+              onde o "quando" é o segundo campo mais consultado depois do título. */}
+          <View style={styles.cardMeta}>
+            {folderName ? (
+              <View style={styles.folderPill}>
+                <ThemedText numberOfLines={1} style={styles.folderPillText}>
+                  {folderName}
+                </ThemedText>
+              </View>
+            ) : null}
+
+            {checklistLabel ? (
+              <View style={styles.metaBit}>
+                <Icon name="checkmark.circle" size={13} color="textSecondary" />
+                <ThemedText style={[styles.metaText, tabular]}>{checklistLabel}</ThemedText>
+              </View>
+            ) : null}
+
+            {note.source === 'whatsapp' ? (
+              <View style={styles.metaBit}>
+                <Icon name="bubble.left" size={13} color="textSecondary" />
+                <ThemedText style={styles.metaText}>WhatsApp</ThemedText>
+              </View>
+            ) : null}
+
+            <ThemedText style={[styles.metaText, styles.quando, tabular]}>{quando}</ThemedText>
+          </View>
+          </View>
+          )}
         </Pressable>
       </Link.Trigger>
 
@@ -188,7 +239,6 @@ function NoteSkeleton() {
 
 export default function NotesScreen() {
   const theme = useTheme();
-  const scheme = useColorScheme() === 'dark' ? 'dark' : 'light';
   const toast = useToast();
 
   const [draft, setDraft] = useState('');
@@ -316,7 +366,7 @@ export default function NotesScreen() {
   );
 
   return (
-    <Screen scroll={false} grouped>
+    <Screen scroll={false} grouped contentStyle={{ backgroundColor: NOTE_SKIN.ground }}>
       <HeaderActions
         actions={[
           { label: 'Pastas', icon: 'folder', onPress: () => router.push('/notes/folders') },
@@ -363,9 +413,12 @@ export default function NotesScreen() {
                 onPress={submitDraft}
                 style={({ pressed }) => [
                   styles.send,
-                  { backgroundColor: theme.backgroundElement, opacity: !draft.trim() || pressed ? 0.5 : 1 },
+                  {
+                    backgroundColor: draft.trim() ? NOTE_SKIN.accent : NOTE_SKIN.line,
+                    opacity: !draft.trim() || pressed ? 0.5 : 1,
+                  },
                 ]}>
-                <Icon name="arrow.up" size="md" color="tint" weight="semibold" />
+                <Icon name="arrow.up" size="md" color="text" weight="semibold" />
               </Pressable>
             </View>
 
@@ -424,28 +477,25 @@ export default function NotesScreen() {
                 ? 'Notas'
                 : null;
 
-          // UM cartão por nota, com respiro entre eles. Agrupadas num cartão só, com fio de
-          // cabelo entre as linhas, três notas liam como um parágrafo contínuo — foi a
-          // reclamação do usuário ("ridiculamente feio"). Cartão por item é o que Bear, Craft e
-          // Keep fazem: custa scroll, devolve legibilidade.
+          // UM cartão por nota. Agrupadas num cartão só, com fio de cabelo entre as linhas,
+          // três notas liam como um parágrafo contínuo. Cartão por item é o que Keep e Bear
+          // fazem: custa scroll, devolve legibilidade.
+          //
+          // O cartão é o PRÓPRIO `NoteRow` (o padding vive lá dentro): pôr o padding aqui e o
+          // Pressable lá dentro deixava a área de toque menor que o cartão — dava para tocar na
+          // borda e nada acontecer.
           return (
-            <View>
+            <View style={styles.item}>
               {heading ? (
-                <ThemedText themeColor="textSecondary" style={[Type.caption, styles.heading]}>
+                <ThemedText style={[Type.caption, styles.heading]}>
                   {heading.toUpperCase()}
                 </ThemedText>
               ) : null}
-              <View
-                style={[
-                  styles.group,
-                  { backgroundColor: theme.surface, boxShadow: Elevation[scheme].raised },
-                ]}>
-                <NoteRow
-                  note={item}
-                  folderName={folderName(item.folder_id)}
-                  actions={actions}
-                />
-              </View>
+              <NoteRow
+                note={item}
+                folderName={folderName(item.folder_id)}
+                actions={actions}
+              />
             </View>
           );
         }}
@@ -455,8 +505,92 @@ export default function NotesScreen() {
 }
 
 const styles = StyleSheet.create({
+  /** M3: padding 16 · raio 14 · 8 entre cards. `gap` 6 dentro — título, prévia e metadado são
+      três degraus da MESMA nota, não três blocos. */
+  /** M3: 8 entre cards empilhados. O recuo lateral é o mesmo do resto da tela. */
+  item: {
+    paddingHorizontal: Space.lg,
+    paddingBottom: NOTE_SKIN.gap,
+  },
+  /**
+   * O cartão é uma `View` DENTRO do `Pressable`, não o próprio `Pressable`.
+   *
+   * `<Link asChild>` + `<Link.Trigger>` engolem o `style` do filho: padding e fundo postos no
+   * `Pressable` simplesmente não aparecem — foi assim que o cartão ficou invisível e o texto
+   * colado na borda. A `View` interna está fora do alcance disso.
+   */
+  press: {
+    minHeight: HitTarget,
+  },
+  card: {
+    gap: 6,
+    padding: NOTE_SKIN.pad,
+    borderRadius: NOTE_SKIN.radius,
+    borderCurve: 'continuous',
+    // Sombra não existe em fundo escuro — o que desenha a borda do cartão aqui é a hairline.
+    // É o que Linear, Notion e o modo escuro do Nubank fazem: `outlined card`, não `elevated`.
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: NOTE_SKIN.line,
+  },
+  cardHead: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: Space.sm,
+  },
+  cardTitle: {
+    fontSize: 17,
+    lineHeight: 23,
+    fontWeight: '600',
+    color: NOTE_SKIN.text,
+  },
+  cardPreview: {
+    fontSize: 15,
+    lineHeight: 21,
+    fontWeight: '400',
+    color: NOTE_SKIN.textSecondary,
+  },
+  cardMeta: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Space.md,
+    marginTop: 2,
+  },
+  /** Pasta é LUGAR: ganha pill no accent suave. Origem e checklist são fatos: ficam em texto. */
+  folderPill: {
+    paddingHorizontal: Space.sm,
+    paddingVertical: 3,
+    borderRadius: Radius.xs,
+    borderCurve: 'continuous',
+    backgroundColor: NOTE_SKIN.accentSoft,
+    maxWidth: 130,
+  },
+  folderPillText: {
+    fontSize: 12,
+    lineHeight: 15,
+    fontWeight: '600',
+    color: NOTE_SKIN.accent,
+  },
+  metaBit: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  metaText: {
+    fontSize: 12,
+    lineHeight: 16,
+    color: NOTE_SKIN.textSecondary,
+  },
+  /** Encostada à direita: a data é a âncora que faz as linhas lerem como coluna. */
+  quando: {
+    marginLeft: 'auto',
+  },
   grow: {
     flex: 1,
+  },
+  pinDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
   },
   quickAdd: {
     flexDirection: 'row',
@@ -509,9 +643,9 @@ const styles = StyleSheet.create({
     gap: Space.sm,
   },
   heading: {
+    color: NOTE_SKIN.textSecondary,
     letterSpacing: 0.6,
-    paddingTop: Space.xl,
-    paddingBottom: Space.sm,
-    paddingHorizontal: Space.lg,
+    marginTop: Space.xl,
+    marginBottom: Space.sm,
   },
 });
