@@ -115,6 +115,21 @@ export function Sparkline({ values, width, height = 56, showZero = false }: Spar
  * Anima com `scaleX` (não com `width`) para o movimento ficar no worklet e não disparar layout —
  * regra de movimento §5, que também é a que exige a animação: valor que salta é bug visual.
  */
+/**
+ * Barra de progresso.
+ *
+ * `tone` separa duas coisas que ANTES eram a mesma cor e não são a mesma informação:
+ *
+ * - **`tint`** é *estado* — quanto do orçamento já foi, quanto falta para a meta. Merece o
+ *   accent, e `warning`/`danger` sobrescrevem quando o número passa do limite.
+ * - **`data`** é *comparação* — "casa foi 44% do mês". Não há nada a fazer a respeito, é só a
+ *   forma de ler a proporção.
+ *
+ * A distinção não existia enquanto o accent era azul: barra de dado em azul claro era discreta.
+ * Com o accent monocromático ela virou **preto sólido de ponta a ponta**, e a lista de categorias
+ * passou a ler como uma pilha de traços pesados que competia com os próprios valores. Dado não
+ * grita; estado pode.
+ */
 export function ProgressBar({
   value,
   max,
@@ -122,7 +137,7 @@ export function ProgressBar({
 }: {
   value: number;
   max: number;
-  tone?: 'tint' | 'success' | 'warning' | 'danger';
+  tone?: 'tint' | 'data' | 'success' | 'warning' | 'danger';
 }) {
   const theme = useTheme();
   const pct = max > 0 ? Math.min(1, Math.max(0, value / max)) : 0;
@@ -151,7 +166,7 @@ export function ProgressBar({
             width: '100%',
             height: '100%',
             borderRadius: Radius.xs,
-            backgroundColor: theme[tone],
+            backgroundColor: tone === 'data' ? theme.textSecondary : theme[tone],
             transformOrigin: 'left',
           },
           animated,

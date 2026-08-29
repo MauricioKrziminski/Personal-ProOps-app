@@ -37,6 +37,14 @@ export function monthTitle(month: string): string {
 interface MonthPickerProps {
   month: string;
   onChange: (month: string) => void;
+  /**
+   * Sobre o painel de destaque (tinta), em vez de sobre o fundo da tela.
+   *
+   * O seletor é o **controle do número do painel** — quem muda o mês muda o valor grande. Fora
+   * dele, flutuando entre o header e a faixa preta, ele lia como um filtro solto e a relação
+   * com o valor sumia. Aqui só troca as cores; a mecânica é a mesma.
+   */
+  onHero?: boolean;
 }
 
 /**
@@ -46,7 +54,7 @@ interface MonthPickerProps {
  * acessibilidade diferentes (setas desenhadas como texto `‹`/`›`, sem label). Aqui a seta é
  * `Icon` (SF Symbol) e cada uma diz para onde vai.
  */
-export function MonthPicker({ month, onChange }: MonthPickerProps) {
+export function MonthPicker({ month, onChange, onHero = false }: MonthPickerProps) {
   const theme = useTheme();
 
   const step = (delta: number) => () => {
@@ -64,9 +72,15 @@ export function MonthPicker({ month, onChange }: MonthPickerProps) {
       onPress={step(delta)}
       style={({ pressed }) => [
         styles.arrow,
-        { backgroundColor: pressed ? theme.backgroundSelected : theme.backgroundElement },
+        onHero
+          ? { borderWidth: StyleSheet.hairlineWidth, borderColor: theme.heroSeparator }
+          : { backgroundColor: pressed ? theme.backgroundSelected : theme.backgroundElement },
       ]}>
-      <Icon name={delta < 0 ? 'chevron.left' : 'chevron.right'} size="sm" color="tint" />
+      <Icon
+        name={delta < 0 ? 'chevron.left' : 'chevron.right'}
+        size="sm"
+        color={onHero ? 'onHero' : 'tint'}
+      />
     </Pressable>
   );
 
@@ -75,6 +89,7 @@ export function MonthPicker({ month, onChange }: MonthPickerProps) {
       {arrow(-1)}
       <ThemedText
         type="smallBold"
+        themeColor={onHero ? 'onHeroMuted' : 'text'}
         accessibilityRole="header"
         accessibilityLabel={monthTitle(month)}
         style={styles.label}>

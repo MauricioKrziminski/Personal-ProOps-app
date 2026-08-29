@@ -10,6 +10,13 @@ import { Motion, Radius, Space, Type } from '@/design/tokens';
 import { useTheme } from '@/hooks/use-theme';
 
 interface HeroPanelProps {
+  /**
+   * Controle que ESCOPA o número — hoje, o seletor de mês do Financeiro.
+   *
+   * Fica dentro do painel de propósito: quem muda o mês muda o valor grande, e fora dali o
+   * controle flutuava entre o header e a faixa de tinta sem dizer sobre o que ele manda.
+   */
+  top?: React.ReactNode;
   /** Rótulo curto, caixa alta — **sempre antes do valor**. */
   label: string;
   /** O número. Normalmente um `<Money variant="heroMoney" concealable />`. */
@@ -55,6 +62,7 @@ interface HeroPanelProps {
  * atual, e fica dentro da mesma área de toque.
  */
 export function HeroPanel({
+  top,
   label,
   value,
   secondary,
@@ -78,6 +86,8 @@ export function HeroPanel({
       <View style={styles.watermark} pointerEvents="none">
         <Mark size={200} color="onHero" watermark />
       </View>
+
+      {top ? <View style={styles.top}>{top}</View> : null}
 
       <Pressable
         accessibilityRole={onPress ? 'button' : undefined}
@@ -134,6 +144,9 @@ const styles = StyleSheet.create({
     borderCurve: 'continuous',
     overflow: 'hidden',
   },
+  top: {
+    marginBottom: Space.lg,
+  },
   body: {
     gap: Space.xs,
   },
@@ -148,9 +161,17 @@ const styles = StyleSheet.create({
   actions: {
     marginTop: Space.lg,
   },
+  /**
+   * Ancorada embaixo à direita e quase toda fora do quadro.
+   *
+   * Estava no topo à direita e funcionava na Hoje — mas no Financeiro, onde o painel ganhou o
+   * seletor de mês, a seta do "próximo mês" caía **em cima** da espiral e as duas viravam uma
+   * mancha só. O canto inferior direito é o único que nenhum dos dois painéis usa: em cima moram
+   * rótulo e controle, à esquerda o valor, e a faixa de atalhos não chega na borda.
+   */
   watermark: {
     position: 'absolute',
-    right: -56,
-    top: -24,
+    right: -64,
+    bottom: -56,
   },
 });

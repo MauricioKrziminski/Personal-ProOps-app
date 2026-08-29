@@ -13,7 +13,6 @@ import type { SymbolViewProps } from 'expo-symbols';
 
 import { ErrorCard } from '@/components/error-card';
 import { MonthPicker, currentMonth, monthLabel, monthTitle, shiftMonth } from '@/components/finance/month-picker';
-import { GlassCard } from '@/components/glass/glass-card';
 import { ThemedText } from '@/components/themed-text';
 import { HeaderMenu } from '@/components/ui/header-actions';
 import { Button } from '@/components/ui/button';
@@ -21,7 +20,8 @@ import { EmptyState } from '@/components/ui/empty-state';
 import { Icon } from '@/components/ui/icon';
 import { Money } from '@/components/ui/money';
 import { Row, Section } from '@/components/ui/row';
-import { HeroLabel, SectionHead } from '@/components/ui/section-head';
+import { SectionHead } from '@/components/ui/section-head';
+import { HeroPanel } from '@/components/ui/hero-panel';
 import { Screen } from '@/components/ui/screen';
 import { Skeleton, SkeletonRow } from '@/components/ui/skeleton';
 import { ProgressBar, Sparkline } from '@/components/ui/sparkline';
@@ -179,6 +179,10 @@ export default function FinanceScreen() {
   const projected = forecast.data?.at(-1)?.balance_cents ?? 0;
   const leftover = isCurrent ? Number(projected) : income - expense;
   const series = (forecast.data ?? []).map((d) => Number(d.balance_cents));
+  /** Amplitude relativa da série — abaixo de 1% a linha é horizontal e não informa nada. */
+  const varia =
+    series.length > 1 &&
+    (Math.max(...series) - Math.min(...series)) / Math.max(...series.map(Math.abs), 1) > 0.01;
 
   const categories = useMemo(() => {
     const rows = (summary.data ?? []).filter((r) => r.kind === 'expense');
@@ -228,6 +232,45 @@ export default function FinanceScreen() {
     <View style={styles.root}>
       <Screen
         grouped
+        header={
+          heroError ? undefined : heroLoading ? (
+            <View style={styles.heroSkeleton}>
+              <Skeleton width="55%" height={14} />
+              <Skeleton width="70%" height={46} />
+            </View>
+          ) : (
+            <HeroPanel
+              top={<MonthPicker month={month} onChange={setMonth} onHero />}
+              label={isCurrent ? 'Sobra até o fim do mês' : `Sobrou em ${monthTitle(month)}`}
+              value={
+                <Money
+                  cents={leftover}
+                  variant="heroMoney"
+                  tone={leftover < 0 ? 'danger' : 'onHero'}
+                  concealable
+                />
+              }
+              secondary={[
+                `entrou ${formatBRL(income)}`,
+                `saiu ${formatBRL(expense)}`,
+                // "previsto R$ 0,00" não é informação, é um campo vazio ocupando a linha —
+                // mesmo princípio do bloco sem dado que não aparece.
+                isCurrent && upcomingOut > 0 ? `previsto ${formatBRL(upcomingOut)}` : null,
+              ]
+                .filter(Boolean)
+                .join('  ·  ')}
+              chart={
+                // Mesmo critério da Hoje: série que não varia desenha uma reta, e reta no meio
+                // do painel lê como divisor, não como gráfico.
+                isCurrent && series.length > 2 && varia ? (
+                  <Sparkline values={series} width={width - Space.lg * 2} showZero />
+                ) : undefined
+              }
+              concealable
+              onPress={() => router.push('/finance/forecast')}
+            />
+          )
+        }
         onRefresh={() => {
           forecast.refetch();
           summary.refetch();
@@ -261,9 +304,6 @@ export default function FinanceScreen() {
           ]}
         />
 
-        <MonthPicker month={month} onChange={setMonth} />
-
-        {/* Bloco 1 — o único GlassCard da tela. Projeção, não saldo bruto. */}
         {heroError ? (
           <ErrorCard
             onRetry={() => {
@@ -271,43 +311,7 @@ export default function FinanceScreen() {
               forecast.refetch();
             }}
           />
-        ) : heroLoading ? (
-          <View style={styles.heroSkeleton}>
-            <Skeleton width="55%" height={14} />
-            <Skeleton width="70%" height={46} />
-            <Skeleton height={56} radius={Radius.sm} />
-          </View>
-        ) : (
-          <Animated.View entering={FadeInDown.duration(Motion.duration.slow)}>
-            <Pressable
-              accessibilityRole="button"
-              accessibilityLabel={`${isCurrent ? 'Sobra até o fim do mês' : `Sobrou em ${monthTitle(month)}`}, ${formatBRL(leftover)}. Abrir projeção.`}
-              onPress={() => router.push('/finance/forecast')}>
-              <GlassCard style={styles.hero}>
-                <HeroLabel>
-                  {isCurrent ? 'Sobra até o fim do mês' : `Sobrou em ${monthTitle(month)}`}
-                </HeroLabel>
-                <Money cents={leftover} variant="money" tone={leftover < 0 ? 'danger' : 'text'} />
-                {isCurrent && series.length > 1 ? (
-                  <Sparkline values={series} width={width - Space.lg * 4} showZero />
-                ) : null}
-                <View style={styles.heroFacts}>
-                  <ThemedText type="small" themeColor="textSecondary" style={tabular}>
-                    entrou {formatBRL(income)}
-                  </ThemedText>
-                  <ThemedText type="small" themeColor="textSecondary" style={tabular}>
-                    saiu {formatBRL(expense)}
-                  </ThemedText>
-                  {isCurrent ? (
-                    <ThemedText type="small" themeColor="textSecondary" style={tabular}>
-                      previsto {formatBRL(upcomingOut)}
-                    </ThemedText>
-                  ) : null}
-                </View>
-              </GlassCard>
-            </Pressable>
-          </Animated.View>
-        )}
+        ) : null}
 
         {/* Bloco 2 — atalhos. Fica sempre visível: sem conta cadastrada não existe dado a mostrar. */}
         <View style={styles.block}>
@@ -398,7 +402,9 @@ export default function FinanceScreen() {
                             </ThemedText>
                             <Money cents={total} variant="headline" />
                           </View>
-                          <ProgressBar value={total} max={maxCategory} />
+                          {/* `data`, não `tint`: a barra aqui é comparação entre categorias,
+                              não estado a resolver. Ver o docblock do ProgressBar. */}
+                          <ProgressBar value={total} max={maxCategory} tone="data" />
                           <ThemedText
                             type="small"
                             themeColor={
