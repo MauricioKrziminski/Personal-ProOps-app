@@ -218,9 +218,52 @@ lado, iOS claro e escuro. É uma inconsistência que só aparece comparando tela
 
 ---
 
+## 2.5 Frame preto entre o splash nativo e a abertura animada (29/08/2026) — **aberto**
+
+Achado gravando o cold start no emulador, que é a verificação que a §11 exige e que nunca tinha
+sido feita.
+
+**A sequência observada:** splash nativo branco → **~1 s de preto** → overlay animado (branco, com
+a marca). O preto aparece com bundle frio E com bundle quente, então **não é tempo de carga**.
+
+**O que já foi descartado, para ninguém refazer:**
+- `SplashScreen.preventAutoHideAsync()` está no escopo do módulo (`_layout.tsx:17`), correto.
+- `hideAsync()` está no `onLayout` do overlay, não num `useEffect` — correto.
+- `setOptions({ fade: false })` já está no overlay.
+- O splash nativo tem variante dark **correta**: `values-night/colors.xml` = `#000000` e há
+  `drawable-night-*` com a marca branca. Não é flash de tema.
+
+**A causa provável, e como fechar:** `AppTheme` (`android/app/src/main/res/values/styles.xml`)
+**não define `android:windowBackground`**. Entre o splash sumir e o React pintar o primeiro frame,
+o que aparece é o fundo da Activity.
+
+⚠️ Mas isso pode ser **artefato do dev client**: ele tem activity e ciclo próprios e pode dispensar
+o splash antes do React montar. Em build de release o JS vem embutido e o `preventAutoHideAsync`
+segura de verdade.
+
+**O próximo passo é medir, não consertar:** rodar um build de release e gravar o cold start de
+novo. Se o preto sumir, era o dev client e não há nada a fazer. Se persistir, o conserto é um
+**config plugin** injetando `android:windowBackground` day/night no `AppTheme` — não dá para
+editar `styles.xml` à mão, `android/` é regenerado pelo prebuild. Confirmado na doc do SDK 57:
+`expo-system-ui` **não** expõe isso por `app.json` (só `userInterfaceStyle` no Android).
+
+---
+
 ## 3. Pendências que já estavam anotadas
 
-### 3.1 Direção estética de marca — **decisão do usuário, não sua**
+### 3.1 Direção estética de marca — ✅ **decidida em 29/08/2026**
+
+**Monocromática: preto e branco, sem cor de marca.** `tint` deixou de ser o azul do iOS e virou
+tinta; a cor que sobra é só a semântica. O que substitui o accent está em `design.md` §2b — ação
+por superfície, link sublinhado, barra de dado separada de estado, e a **forma da marca repetida
+em papéis utilitários** (spinner, empty state, marcador da IA, marca d'água do painel), que é a
+alavanca de personalidade de sistemas sem cor própria.
+
+O destaque das telas principais virou `HeroPanel` (tinta chapada, sangrando), aplicado em Hoje e
+Financeiro. As outras telas herdaram a paleta e os primitivos, mas **não foram varridas uma a uma**
+— é o que continua aberto, junto com a seção `Visual` dos 36 documentos.
+
+### 3.1b O texto original desta seção, para contexto
 O que foi feito até aqui é **sistema e consistência** (escala, hierarquia, densidade, superfície).
 O que NÃO foi feito é identidade: paleta própria, personalidade, o que faz o app parecer *deste*
 produto e não "iOS bem feito". Isso exige **referência real** (prints que ele goste, ou o MCP do
