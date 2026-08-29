@@ -41,13 +41,24 @@ E o corolário imediato, que é o que realmente move comportamento: **"posso gas
    Importar extrato · Regras · Atividade da IA (`/ai-activity`, no Stack raiz — a tela deixa de
    morar em `finance/` porque registra nota e lembrete também). *Ferramenta de manutenção não
    ocupa corpo de tela.*
-2. **Seletor de mês** — segmented/stepper no topo, um só componente (hoje existem duas
-   implementações visualmente diferentes, em `transactions.tsx` e `budgets.tsx`).
-3. **Card de destaque (único `GlassCard`) — "Sobra até o fim do mês"**
+2. **Painel de destaque (`HeroPanel`) — "Sobra até o fim do mês"**
    Projeção, não saldo bruto. Saldo bruto mente para quem tem fatura fechando. Abaixo do valor:
    `entrou · saiu · previsto`, e uma `Sparkline` do caixa projetado.
    Fonte: `cash_flow_forecast`.
-4. **Faixa "Gerenciar"** — logo abaixo do card de destaque: `SectionHead` com "Ver tudo"
+
+   **O seletor de mês mora DENTRO do painel** (slot `top`, `MonthPicker onHero`). Ele é o
+   controle do número grande: fora dali, flutuando entre o header e a faixa de tinta, lia como um
+   filtro solto sem dizer sobre o que mandava.
+
+   > **29/08/2026 — era `GlassCard`.** Mesma correção da Hoje: tinta sólida sangrando até as
+   > bordas, pelo slot `header` do `Screen`. Ver `hoje.md` e `design.md` §1.
+
+   > `previsto` só entra quando é maior que zero — "previsto R$ 0,00" não é informação, é um campo
+   > vazio ocupando a linha.
+4. **Faixa "Gerenciar"** — logo abaixo do painel, e **fora dele de propósito**: aqui os atalhos
+   são navegação legítima (esta é a tela-hub, é o que `gerenciar.md` resolve), enquanto o painel
+   da Hoje carrega decisões pendentes. Misturar os dois faria os tiles competirem com a tab bar.
+   `SectionHead` com "Ver tudo"
    (→ `/finance/manage`) e **quatro atalhos** em tiles quadrados — Lançamentos · Contas ·
    Cartões · Orçamentos. Os outros oito destinos vivem no "Ver tudo" (ver `gerenciar.md`).
    *A faixa fica sempre visível, inclusive no empty: sem conta cadastrada não existe dado a

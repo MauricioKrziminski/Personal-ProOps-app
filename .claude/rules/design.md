@@ -11,8 +11,15 @@ e onde ele decide o que fazer com isso.*
 ## 1. Superfícies — glass é destaque, não papel de parede
 
 - **Glass fica na chrome**: tab bar nativa (`NativeTabs`), header, sheet e FAB.
-- **Mais um único card de destaque por tela** — o card que responde a pergunta principal daquela
-  tela (sobra do mês, patrimônio líquido, total da fatura, progresso da meta).
+- **Mais um único destaque por tela** — o bloco que responde a pergunta principal daquela tela
+  (sobra do mês, patrimônio líquido, total da fatura, progresso da meta).
+
+**O destaque das telas principais é `HeroPanel`, não glass** (29/08/2026). Vidro precisa de algo
+atrás para refratar; sobre o fundo chapado do app ele virava um retângulo cinza com um número
+dentro — a causa concreta do diagnóstico "corretas e sem graça". `HeroPanel`
+(`src/components/ui/hero-panel.tsx`) é **tinta sólida**, sangra até as bordas pelo slot `header`
+do `Screen`, e resolve por contraste em vez de textura. `GlassCard` continua na chrome e no
+destaque de telas secundárias. A contagem não mudou: **um destaque por tela**.
 - **Todo o resto é opaco.** Card de lista, linha, formulário: superfície sólida, hierarquia por
   **elevação e espaço**, nunca por blur.
 
@@ -188,11 +195,35 @@ Contar, não julgar:
 - emoji na chrome: **0**
 - gradiente sem razão de marca: **0**
 - rótulos diferentes para a mesma intenção: **0**
-- `GlassCard` na tela: **1 de destaque** (+ chrome)
+- blocos de destaque na tela (`HeroPanel` **ou** `GlassCard`): **1** (+ chrome)
 - hex hardcoded: **0**
 - `fontSize` solto: **0**
 
 Contagem que falha é correção, não discussão.
+
+**Três dessas linhas agora são teste, não vistoria:** `src/lib/anti-slop.test.ts` quebra o build em
+hex, `rgba()` e `fontSize` soltos fora dos dois arquivos de token. A lição é a mesma do
+`icon-map.test.ts`: contagem que depende de alguém medir volta a subir sozinha — esta já foi dada
+como zerada duas vezes sem estar.
+
+## 2b. A marca é monocromática — e é ela que faz o papel do accent
+
+Não existe cor de marca no ProOps: `tint` é **tinta** (quase-preto no claro, quase-branco no
+escuro). Isso muda como as coisas se comunicam:
+
+- **Ação primária lê por superfície**, não por matiz: pílula preenchida de `tint` com rótulo em
+  `onTint` (que **inverte** com o tema). Secundário leva borda; ghost é texto puro ao lado do
+  preenchido, como o par Cancelar/Salvar do iOS.
+- **Link é sublinhado**, nunca colorido — accent da cor do texto não distingue nada.
+- **Barra de progresso separa dado de estado**: `tone="data"` (cinza) para comparação —
+  categoria, proporção; `tint` para estado que o usuário resolve — orçamento, meta. Barra de dado
+  em preto sólido domina a lista e come o valor que estava do lado.
+- **A forma da marca é o accent que sobrou.** A espiral trabalha como spinner (`Button loading`),
+  glyph de estado vazio, marcador do que veio da IA e marca d'água do `HeroPanel` — geometria em
+  `src/design/mark-path.ts`, componente em `src/components/ui/mark.tsx`, a MESMA fonte usada pela
+  abertura. É o que dá personalidade sem cor; sem isso o app fica "iOS bem feito" de novo.
+- **Cor semântica é a única cor da tela** e por isso grita mais do que gritaria num app colorido.
+  Gastar `danger`/`success`/`warning` como decoração queima a última alavanca de cor que existe.
 
 ---
 

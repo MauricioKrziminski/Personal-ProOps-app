@@ -58,10 +58,35 @@ Ordem vertical, e o porquê de cada posição:
    (`square.and.pencil`, o MESMO ícone da aba Notas — mesma intenção, mesmo ícone). Dois botões é
    o teto: o terceiro vira menu. *Era `plus.circle.fill` ao lado do `magnifyingglass` — preenchido
    contra contorno no mesmo header, o que `design.md` §4 proíbe.*
-2. **Card de destaque (o único `GlassCard` da tela) — "Sobra até dia 31"**
-   Valor grande em `Fonts.rounded` com `tabular-nums`, linha secundária com entradas e saídas
-   previstas, e uma `Sparkline` da projeção. É o card porque é a pergunta que mais gente tem, e
-   porque é o único número que muda o comportamento de quem lê.
+2. **Painel de destaque (`HeroPanel`) — "Sobra até o fim do mês"**
+   Tinta sólida sangrando até as bordas, pelo slot `header` do `Screen`. Valor em `heroMoney`
+   (56/700, `Fonts.rounded`, `tabular-nums`), linha secundária, `Sparkline` da projeção e a faixa
+   de atalhos. É o painel porque é a pergunta que mais gente tem, e porque é o único número que
+   muda o comportamento de quem lê.
+
+   > **29/08/2026 — era um `GlassCard` e virou painel opaco.** Vidro sobre o fundo chapado da
+   > tela não tem o que refratar: o destaque era um retângulo cinza com um número dentro. A
+   > correção não é mais textura, é **contraste** — a área mais escura da tela é a que carrega a
+   > resposta. `design.md` §1 foi atualizada junto.
+
+   > **Toque no número esconde o valor** (`concealable`). O estado é **global e persistido**
+   > (`ConcealProvider`): esconder aqui esconde em todo valor monetário do app. Esconder num lugar
+   > e vazar no extrato é teatro, não privacidade. Falta biometria para *revelar* — depende de
+   > `expo-local-authentication`, ainda não aprovada.
+
+   > **A `Sparkline` só aparece quando a série varia** (>1% de amplitude). Perto da virada do mês
+   > a projeção tem dois ou três pontos quase iguais e o gráfico desenha uma reta — que lê como
+   > divisor no meio do painel, não como gráfico. Mesmo princípio do card que soma um item só.
+
+2b. **Faixa de atalhos — decisões, não destinos**
+   Quatro tiles com **contagem**: Vencendo · Lembretes · Orçamento · Revisar IA. **Tile com zero
+   não aparece**, e sem nenhum pendente a faixa inteira some.
+
+   > A referência (app de banco) põe aqui verbos de dinheiro — Pix, pagar, transferir. Não cabe:
+   > este app **não movimenta dinheiro**, ele mostra o que a IA registrou a partir do WhatsApp.
+   > Repetir aquele grid daria quatro botões que ou abrem formulário manual, competindo com a
+   > proposta do produto, ou navegam para onde a tab bar já leva. Atalho sem número é botão morto
+   > ocupando o espaço mais caro do app.
 
    > O `GlassCard` leva **hairline** (`theme.separator`). Vidro mostra o que está atrás; sobre o
    > `groupedBackground`, que é cor chapada, não há o que refratar e o card sumia por completo no

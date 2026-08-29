@@ -70,7 +70,7 @@ export default function RootLayout() {
         <KeyboardProvider>
           <ConcealProvider>
           <ToastProvider>
-            <AnimatedSplashOverlay />
+            <AnimatedSplashOverlay ready={!loading} />
           <AndroidActionSheet />
             {loading ? null : (
               <Stack>

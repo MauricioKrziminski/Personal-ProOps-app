@@ -65,7 +65,26 @@ export function markPath(size: number): SkPath {
   const m = Skia.Matrix();
   m.translate(-VB.x * k + dx, (G_TRANSLATE_Y - VB.y) * k);
   m.scale(G_SCALE * k, -G_SCALE * k);
+  path.transform(m);
 
+  return center(path, size);
+}
+
+/**
+ * Centraliza pelos limites REAIS do desenho, não pelo `viewBox`.
+ *
+ * O `viewBox` do arquivo veio de um recorte automático e **não é simétrico em volta da tinta**:
+ * confiando nele, a marca nasceu ~18 px à direita do centro na abertura — pouco para parecer
+ * defeito no catálogo, muito para uma marca sozinha no meio da tela, onde o olho compara com as
+ * duas bordas.
+ *
+ * `getBounds()` devolve a caixa justa do que será pintado; a partir dela o centro é aritmética,
+ * não confiança no arquivo. Vale para qualquer reexportação futura do SVG.
+ */
+function center(path: SkPath, size: number): SkPath {
+  const b = path.getBounds();
+  const m = Skia.Matrix();
+  m.translate((size - b.width) / 2 - b.x, (size - b.height) / 2 - b.y);
   path.transform(m);
   return path;
 }
@@ -87,7 +106,7 @@ export function markDotPath(size: number): SkPath {
   const m = Skia.Matrix();
   m.translate(-VB.x * k + dx, (G_TRANSLATE_Y - VB.y) * k);
   m.scale(G_SCALE * k, -G_SCALE * k);
-
   path.transform(m);
+
   return path;
 }
