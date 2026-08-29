@@ -47,8 +47,9 @@ example
 /ios
 /android
 
-# cache do CLI do Supabase
-supabase/.temp/cli-latest
+# Supabase CLI local
+supabase/.temp/
+supabase/.branches/
 
 # lock do deno check pontual das Edge Functions (nao usado no deploy)
 deno.lock
