@@ -11,7 +11,6 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Animated, { FadeInDown } from 'react-native-reanimated';
 import { Link, Stack, router, useLocalSearchParams } from 'expo-router';
 
-import { GlassCard } from '@/components/glass/glass-card';
 import { ThemedText } from '@/components/themed-text';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
@@ -203,10 +202,10 @@ export default function InvoiceScreen() {
         <ErrorBand message="Não deu para carregar esta fatura." onRetry={invoice.refetch} />
       ) : null}
 
-      {/* O único GlassCard da tela. */}
+      {/* O único destaque da tela. */}
       {fatura ? (
         <Animated.View entering={FadeInDown.duration(Motion.duration.slow)}>
-          <GlassCard style={styles.hero}>
+          <Card style={styles.hero}>
             <View style={styles.heroTop}>
               <ThemedText type="small" themeColor="textSecondary">
                 {STATUS_LABEL[fatura.status] ?? fatura.status}
@@ -228,7 +227,7 @@ export default function InvoiceScreen() {
                 </ThemedText>
               </View>
             ) : null}
-          </GlassCard>
+          </Card>
         </Animated.View>
       ) : null}
     </View>
@@ -356,7 +355,10 @@ export default function InvoiceScreen() {
 
           <ScrollView contentContainerStyle={styles.sheetBody} keyboardShouldPersistTaps="handled">
             <Field label="Valor" hint="Pagamento parcial não existe: a fatura é quitada inteira.">
-              <Money cents={total} variant="title2" />
+              {/* Superfície de DECISÃO: este é o valor que a pessoa está confirmando pagar, e
+                  por isso ele ignora o "esconder saldo". Confirmar no escuro é pior que ser
+                  visto. */}
+              <Money cents={total} variant="title2" concealable={false} />
             </Field>
 
             {/* Erro de rede e "não tem conta" são coisas diferentes e não podem ter o mesmo texto. */}

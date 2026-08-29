@@ -10,7 +10,6 @@ import Animated, { FadeIn, FadeInDown } from 'react-native-reanimated';
 import { Stack, router, useLocalSearchParams } from 'expo-router';
 import * as Haptics from 'expo-haptics';
 
-import { GlassCard } from '@/components/glass/glass-card';
 import { ThemedText } from '@/components/themed-text';
 import { HeaderActions } from '@/components/ui/header-actions';
 import { Button } from '@/components/ui/button';
@@ -242,12 +241,12 @@ export default function ForecastScreen() {
         </>
       ) : null}
 
-      {/* O único GlassCard da tela: o título é a resposta, não o rótulo. */}
+      {/* O único destaque da tela: o título é a resposta, não o rótulo. */}
       {forecast.isError ? (
         <ErrorBand message="Não deu para carregar a projeção." onRetry={forecast.refetch} />
       ) : serie.length > 0 && !nadaParaProjetar ? (
         <Animated.View entering={FadeInDown.duration(Motion.duration.slow)}>
-          <GlassCard style={styles.hero}>
+          <Card style={styles.hero}>
             <View style={styles.heroTitulo}>
               {primeiroNegativo ? (
                 <Icon name="exclamationmark.triangle" size="md" color="danger" />
@@ -279,7 +278,7 @@ export default function ForecastScreen() {
                 <Money cents={fim} variant="title2" tone={fim < 0 ? 'danger' : 'text'} />
               </View>
             </View>
-          </GlassCard>
+          </Card>
         </Animated.View>
       ) : null}
 

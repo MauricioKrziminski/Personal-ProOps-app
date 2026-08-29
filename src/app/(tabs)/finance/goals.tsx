@@ -3,7 +3,6 @@ import { Modal, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import Animated, { FadeInDown, LinearTransition } from 'react-native-reanimated';
 import { Stack } from 'expo-router';
 
-import { GlassCard } from '@/components/glass/glass-card';
 import { ThemedText } from '@/components/themed-text';
 import { HeaderActions } from '@/components/ui/header-actions';
 import { Button } from '@/components/ui/button';
@@ -315,12 +314,12 @@ export default function GoalsScreen() {
         </>
       ) : null}
 
-      {/* O único GlassCard da tela: é o número que o usuário guarda na cabeça. */}
+      {/* O único destaque da tela: é o número que o usuário guarda na cabeça. */}
       {goals.isError ? (
         <ErrorBand message="Não deu para carregar suas metas." onRetry={goals.refetch} />
       ) : lista.length > 0 ? (
         <Animated.View entering={FadeInDown.duration(Motion.duration.slow)}>
-          <GlassCard style={styles.hero}>
+          <Card style={styles.hero}>
             <HeroLabel>Guardado</HeroLabel>
             <Money cents={guardado} variant="money" />
             <View style={styles.valores}>
@@ -335,7 +334,7 @@ export default function GoalsScreen() {
             <ThemedText type="small" themeColor="textSecondary">
               Aporte não entra como gasto do mês — o dinheiro só mudou de lugar.
             </ThemedText>
-          </GlassCard>
+          </Card>
         </Animated.View>
       ) : null}
 

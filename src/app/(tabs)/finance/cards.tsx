@@ -8,7 +8,6 @@ import Animated, {
 import { Stack, router } from 'expo-router';
 import * as Haptics from 'expo-haptics';
 
-import { GlassCard } from '@/components/glass/glass-card';
 import { ThemedText } from '@/components/themed-text';
 import { HeaderActions } from '@/components/ui/header-actions';
 import { Button } from '@/components/ui/button';
@@ -69,7 +68,7 @@ function estadoFatura(card: CardSummary): 'Aberta' | 'Fechada' | 'Atrasada' | nu
   return 'Aberta';
 }
 
-/** Faixa de erro da tela. Não é `GlassCard` — o destaque é o único vidro daqui. */
+/** Faixa de erro da tela. Não é o destaque — a tela já tem o dela. */
 function ErrorBand({ message, onRetry }: { message: string; onRetry: () => void }) {
   return (
     <Card style={styles.band}>
@@ -158,12 +157,12 @@ export default function CardsScreen() {
         <ErrorBand message="Não deu para carregar seus cartões." onRetry={cards.refetch} />
       ) : null}
 
-      {/* O único GlassCard da tela: com N cartões, a pergunta da tela não tem resposta visível.
+      {/* O único destaque da tela: com N cartões, a pergunta da tela não tem resposta visível.
           Com UM cartão ele repetia o mesmo número do card logo abaixo, palavra por palavra
           (total, nome e vencimento) — soma de um item não é resumo, é eco. */}
       {!cards.isError && lista.length > 1 ? (
         <Animated.View entering={FadeInDown.duration(Motion.duration.slow)}>
-          <GlassCard style={styles.hero}>
+          <Card style={styles.hero}>
             <HeroLabel>Total a pagar</HeroLabel>
             <Money cents={totalAPagar} variant="money" />
             <ThemedText type="small" themeColor="textSecondary" style={tabular}>
@@ -171,7 +170,7 @@ export default function CardsScreen() {
                 ? `${proximo.name} ${prazoLabel(proximo.due_date, 'vence')} · ${formatDateBR(proximo.due_date)}`
                 : 'Nenhuma fatura em aberto'}
             </ThemedText>
-          </GlassCard>
+          </Card>
         </Animated.View>
       ) : null}
 

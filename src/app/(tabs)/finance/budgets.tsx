@@ -6,7 +6,6 @@ import { useQuery } from '@tanstack/react-query';
 
 import { Chip } from '@/components/finance/chip';
 import { MonthPicker, currentMonth } from '@/components/finance/month-picker';
-import { GlassCard } from '@/components/glass/glass-card';
 import { ThemedText } from '@/components/themed-text';
 import { HeaderActions } from '@/components/ui/header-actions';
 import { Button } from '@/components/ui/button';
@@ -363,12 +362,12 @@ export default function BudgetsScreen() {
         </>
       ) : null}
 
-      {/* O único GlassCard da tela: é o número que decide o comportamento de hoje à noite. */}
+      {/* O único destaque da tela: é o número que decide o comportamento de hoje à noite. */}
       {status.isError ? (
         <ErrorBand message="Não deu para carregar os orçamentos." onRetry={status.refetch} />
       ) : linhas.length > 0 ? (
         <Animated.View entering={FadeInDown.duration(Motion.duration.slow)}>
-          <GlassCard style={styles.hero}>
+          <Card style={styles.hero}>
             <HeroLabel>Sobrou do mês</HeroLabel>
             <Money
               cents={limite - gasto}
@@ -379,7 +378,7 @@ export default function BudgetsScreen() {
               {noLimite} de {linhas.length}{' '}
               {linhas.length === 1 ? 'categoria no limite' : 'categorias no limite'}
             </ThemedText>
-          </GlassCard>
+          </Card>
         </Animated.View>
       ) : null}
 

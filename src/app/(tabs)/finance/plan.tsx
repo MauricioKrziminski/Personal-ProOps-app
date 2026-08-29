@@ -5,7 +5,7 @@ import Animated, { FadeInDown } from 'react-native-reanimated';
 import * as Haptics from 'expo-haptics';
 
 import { ErrorCard } from '@/components/error-card';
-import { GlassCard } from '@/components/glass/glass-card';
+import { Card } from '@/components/ui/card';
 import { ThemedText } from '@/components/themed-text';
 import { Button } from '@/components/ui/button';
 import { Field, TextField } from '@/components/ui/field';
@@ -143,10 +143,10 @@ export default function PlanScreen() {
         </>
       ) : null}
 
-      {/* O único GlassCard da tela: a cota é o único número aqui que muda comportamento. */}
+      {/* O único destaque da tela: a cota é o único número aqui que muda comportamento. */}
       {plano ? (
         <Animated.View entering={FadeInDown.duration(Motion.duration.slow)}>
-          <GlassCard style={styles.hero}>
+          <Card style={styles.hero}>
             <View style={styles.heroTopo}>
               <ThemedText type="smallBold">{nomePlano}</ThemedText>
               {estado ? (
@@ -187,7 +187,7 @@ export default function PlanScreen() {
                 A loja não conseguiu cobrar. Atualize a forma de pagamento por lá.
               </ThemedText>
             ) : null}
-          </GlassCard>
+          </Card>
         </Animated.View>
       ) : null}
 

@@ -10,7 +10,6 @@ import * as Haptics from 'expo-haptics';
 import { z } from 'zod';
 
 import { Chip } from '@/components/finance/chip';
-import { GlassCard } from '@/components/glass/glass-card';
 import { ThemedText } from '@/components/themed-text';
 import { HeaderActions } from '@/components/ui/header-actions';
 import { Button } from '@/components/ui/button';
@@ -531,8 +530,8 @@ function ReminderForm({
           </View>
         </Card>
 
-        {/* O único GlassCard da tela: é o resultado do formulário inteiro numa frase. */}
-        <GlassCard style={styles.summary}>
+        {/* O único destaque da tela: é o resultado do formulário inteiro numa frase. */}
+        <Card style={styles.summary}>
           <HeroLabel>Próximo disparo</HeroLabel>
           <ThemedText
             accessibilityLiveRegion="polite"
@@ -549,7 +548,7 @@ function ReminderForm({
             {describeRRule(recurrence)} ·{' '}
             {channel === 'both' ? 'push e WhatsApp' : channel === 'push' ? 'push' : 'WhatsApp'}
           </ThemedText>
-        </GlassCard>
+        </Card>
 
         {editing ? (
           <View style={styles.footerActions}>

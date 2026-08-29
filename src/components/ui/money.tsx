@@ -16,10 +16,15 @@ interface MoneyProps {
   /** Mostra `+`/`−` na frente. Útil em extrato, ruído em saldo. */
   signed?: boolean;
   /**
-   * Obedece ao "esconder saldo" global.
+   * Obedece ao "esconder saldo" global. **Ligado por padrão.**
    *
-   * Opt-in de propósito: valor de **entrada de formulário** e de confirmação ("você vai pagar
-   * R$ 1.800") não pode sumir junto, senão o usuário confirma no escuro.
+   * Nasceu opt-in e isso estava errado: com 96 `<Money>` no app, marcar um a um garante que
+   * metade fica de fora, e um esconder que vaza no extrato, na conta e no patrimônio é teatro —
+   * a falha nº 1 documentada desse padrão. Ocultar é a regra; aparecer é a exceção.
+   *
+   * `concealable={false}` fica para **superfície de decisão**: o valor que a pessoa está
+   * digitando, e o valor que ela confirma ("você vai pagar R$ 1.800"). Ali esconder faria alguém
+   * confirmar no escuro, que é pior do que qualquer risco de alguém olhar por cima do ombro.
    */
   concealable?: boolean;
 }
@@ -33,7 +38,7 @@ export function Money({
   variant = 'body',
   tone = 'plain',
   signed = false,
-  concealable = false,
+  concealable = true,
 }: MoneyProps) {
   const { concealed } = useConceal();
   const oculto = concealable && concealed;
@@ -57,7 +62,7 @@ export function Money({
         tabular,
         isMoneyDisplay && { fontFamily: Fonts?.rounded },
       ]}>
-      {oculto ? concealText(texto.length - 3) : `${prefix}${texto}`}
+      {oculto ? concealText() : `${prefix}${texto}`}
     </ThemedText>
   );
 }

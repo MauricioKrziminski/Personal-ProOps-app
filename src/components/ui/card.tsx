@@ -13,7 +13,8 @@ interface CardProps {
 /**
  * Card opaco — a superfície PADRÃO do app.
  *
- * `GlassCard` fica reservado para a chrome e para o único card de destaque de cada tela
+ * `GlassCard` fica reservado para a CHROME. O destaque de uma raiz de aba é o `HeroPanel`
+ * (tinta chapada); o de uma tela secundária é este `Card`
  * (`.claude/rules/design.md` §1). Card de lista é este aqui.
  */
 export function Card({ children, elevation = 'raised', style }: CardProps) {

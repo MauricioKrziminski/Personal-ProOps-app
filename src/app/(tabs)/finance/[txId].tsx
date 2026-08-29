@@ -6,7 +6,7 @@ import type { SymbolViewProps } from 'expo-symbols';
 
 import { ErrorCard } from '@/components/error-card';
 import { currentMonth, monthTitle } from '@/components/finance/month-picker';
-import { GlassCard } from '@/components/glass/glass-card';
+import { Card } from '@/components/ui/card';
 import { ThemedText } from '@/components/themed-text';
 import { Button } from '@/components/ui/button';
 import { EmptyState } from '@/components/ui/empty-state';
@@ -267,9 +267,9 @@ export default function TransactionDetailScreen() {
       </Stack.Toolbar>
       ) : null}
 
-      {/* O único GlassCard: é o que a pessoa veio conferir em três segundos. */}
+      {/* O único destaque: é o que a pessoa veio conferir em três segundos. */}
       <Animated.View entering={FadeInDown.duration(Motion.duration.slow)}>
-        <GlassCard style={styles.hero}>
+        <Card style={styles.hero}>
           <HeroLabel accessibilityLabel={`${KIND_LABEL[tx.kind]} de ${formatBRL(tx.amount_cents)}`}>
             {KIND_LABEL[tx.kind]}
           </HeroLabel>
@@ -282,7 +282,7 @@ export default function TransactionDetailScreen() {
           <ThemedText type="small" themeColor="textSecondary" style={tabular}>
             {[longDate(tx.occurred_at), tx.category, accountLabel].filter(Boolean).join(' · ')}
           </ThemedText>
-        </GlassCard>
+        </Card>
       </Animated.View>
 
       {/* Previsto: a única faixa de status. `cleared` não precisa de rótulo. */}

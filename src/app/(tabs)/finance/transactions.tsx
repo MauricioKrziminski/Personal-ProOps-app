@@ -7,7 +7,7 @@ import type { SymbolViewProps } from 'expo-symbols';
 
 import { ErrorCard } from '@/components/error-card';
 import { MonthPicker, currentMonth, monthTitle, shiftMonth } from '@/components/finance/month-picker';
-import { GlassCard } from '@/components/glass/glass-card';
+import { Card } from '@/components/ui/card';
 import { ThemedText } from '@/components/themed-text';
 import { HeaderMenu } from '@/components/ui/header-actions';
 import { Button } from '@/components/ui/button';
@@ -41,7 +41,7 @@ import { useTheme } from '@/hooks/use-theme';
  * Lançamentos — "cadê aquele lançamento, e o que entrou e saiu neste mês?".
  *
  * Mudanças estruturais em relação à versão anterior: busca no header nativo, navegador de mês
- * compartilhado (`MonthPicker`), lista agrupada por dia com cabeçalho sticky, UMA `GlassCard`
+ * compartilhado (`MonthPicker`), lista agrupada por dia com cabeçalho sticky, UM destaque
  * (era uma por linha, vinte glass na mesma tela) e totais vindos de `transactions_summary` —
  * `reduce` no cliente passa a mentir assim que a lista for paginada.
  */
@@ -206,7 +206,7 @@ export default function TransactionsScreen() {
           <Skeleton width="65%" height={40} />
         </View>
       ) : (
-        <GlassCard style={styles.summary}>
+        <Card style={styles.summary}>
           <HeroLabel>Sobra de {monthTitle(month)}</HeroLabel>
           <Money cents={income - expense} variant="money" tone={income - expense < 0 ? 'danger' : 'text'} />
           <View style={styles.summaryFacts}>
@@ -217,7 +217,7 @@ export default function TransactionsScreen() {
               saiu {formatBRL(expense)}
             </ThemedText>
           </View>
-        </GlassCard>
+        </Card>
       )}
 
       <View style={styles.filters}>

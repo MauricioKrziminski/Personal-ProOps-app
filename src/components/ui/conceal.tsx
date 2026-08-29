@@ -77,6 +77,19 @@ export function useConceal() {
  * O ponto é a convenção que todo mundo já leu em campo de senha, e mantém a largura aproximada
  * sem virar um retângulo.
  */
-export function concealText(chars = 6) {
-  return '•'.repeat(Math.max(3, chars));
+export function concealText() {
+  return MASK;
 }
+
+/**
+ * **Largura fixa, e é de propósito.**
+ *
+ * A primeira versão repetia o ponto conforme o tamanho do número, para o layout não pular. Visto
+ * rodando numa lista de contas, o efeito foi outro: dá para **contar as bolinhas** e distinguir
+ * R$ 132,10 de R$ 2.700,00. Uma máscara que revela a ordem de grandeza entrega justamente o que
+ * a pessoa quis esconder de quem olha por cima do ombro.
+ *
+ * Máscara igual para todo valor custa um salto de largura na alternância — e esse é o lado certo
+ * de errar numa feature de privacidade.
+ */
+const MASK = '••••••';

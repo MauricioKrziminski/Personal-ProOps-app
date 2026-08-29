@@ -4,7 +4,6 @@ import Animated, { FadeInDown, LinearTransition } from 'react-native-reanimated'
 import { Stack } from 'expo-router';
 
 import { Chip } from '@/components/finance/chip';
-import { GlassCard } from '@/components/glass/glass-card';
 import { ThemedText } from '@/components/themed-text';
 import { HeaderActions } from '@/components/ui/header-actions';
 import { Button } from '@/components/ui/button';
@@ -278,12 +277,12 @@ export default function DebtsScreen() {
         </>
       ) : null}
 
-      {/* O único GlassCard da tela: o juro total é o número que faz o usuário agir. */}
+      {/* O único destaque da tela: o juro total é o número que faz o usuário agir. */}
       {debts.isError ? (
         <ErrorBand message="Não deu para carregar suas dívidas." onRetry={debts.refetch} />
       ) : lista.length > 0 ? (
         <Animated.View entering={FadeInDown.duration(Motion.duration.slow)}>
-          <GlassCard style={styles.hero}>
+          <Card style={styles.hero}>
             <HeroLabel>Total devido</HeroLabel>
             <Money cents={totalDevido} variant="money" tone="danger" />
             {jurosAteQuitar > 0 ? (
@@ -294,7 +293,7 @@ export default function DebtsScreen() {
                 </ThemedText>
               </View>
             ) : null}
-          </GlassCard>
+          </Card>
         </Animated.View>
       ) : null}
 
@@ -522,15 +521,23 @@ export default function DebtsScreen() {
 
               {/* A conta é a metade do valor da tela: parcela NÃO abate o saldo pelo valor cheio. */}
               {proxima ? (
+                /* Superfície de DECISÃO: a conta que explica o pagamento em curso não pode
+                   sumir com o "esconder saldo" — é ela que justifica o valor digitado. */
                 <Card style={styles.explica}>
                   <View style={styles.valores}>
-                    <Money cents={Number(proxima.interest_cents)} variant="subhead" tone="danger" />
+                    <Money
+                      cents={Number(proxima.interest_cents)}
+                      variant="subhead"
+                      tone="danger"
+                      concealable={false}
+                    />
                     <ThemedText type="small" themeColor="textSecondary">
                       vão para o juro do mês,
                     </ThemedText>
                     <Money
                       cents={Math.max(0, pagoCents - Number(proxima.interest_cents))}
                       variant="subhead"
+                      concealable={false}
                     />
                     <ThemedText type="small" themeColor="textSecondary">
                       abatem o saldo.
@@ -547,6 +554,7 @@ export default function DebtsScreen() {
                           Math.max(0, pagoCents - Number(proxima.interest_cents))
                       )}
                       variant="subhead"
+                      concealable={false}
                       tone="danger"
                     />
                   </View>

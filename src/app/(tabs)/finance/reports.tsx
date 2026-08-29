@@ -5,7 +5,7 @@ import Animated, { FadeInDown } from 'react-native-reanimated';
 import * as Haptics from 'expo-haptics';
 
 import { ErrorCard } from '@/components/error-card';
-import { GlassCard } from '@/components/glass/glass-card';
+import { Card } from '@/components/ui/card';
 import { ThemedText } from '@/components/themed-text';
 import { HeaderActions } from '@/components/ui/header-actions';
 import { Button } from '@/components/ui/button';
@@ -141,10 +141,10 @@ export default function ReportsScreen() {
         </>
       ) : null}
 
-      {/* O único GlassCard da tela: responde a pergunta do ano em um olhar. */}
+      {/* O único destaque da tela: responde a pergunta do ano em um olhar. */}
       {!isError && temMovimento && summary ? (
         <Animated.View entering={FadeInDown.duration(Motion.duration.slow)}>
-          <GlassCard style={styles.hero}>
+          <Card style={styles.hero}>
             <HeroLabel>Sobrou em {ano}</HeroLabel>
             <Money
               cents={Number(summary.balance_cents)}
@@ -165,7 +165,7 @@ export default function ReportsScreen() {
               Guardou {formatNumberBR(Number(summary.savings_rate))}% do que entrou · {summary.tx_count}{' '}
               {Number(summary.tx_count) === 1 ? 'lançamento' : 'lançamentos'}
             </ThemedText>
-          </GlassCard>
+          </Card>
         </Animated.View>
       ) : null}
 

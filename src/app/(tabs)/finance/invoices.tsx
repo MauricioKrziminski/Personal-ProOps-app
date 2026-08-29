@@ -11,7 +11,6 @@ import Animated, {
   withTiming,
 } from 'react-native-reanimated';
 
-import { GlassCard } from '@/components/glass/glass-card';
 import { Card } from '@/components/ui/card';
 import { monthTitle } from '@/components/finance/month-picker';
 import { ThemedText } from '@/components/themed-text';
@@ -189,10 +188,10 @@ export default function InvoicesScreen() {
         </Section>
       ) : null}
 
-      {/* O único GlassCard da tela: doze números em coluna não respondem "está subindo?". */}
+      {/* O único destaque da tela: doze números em coluna não respondem "está subindo?". */}
       {!invoices.isError && serie.length > 1 ? (
         <Animated.View entering={FadeInDown.duration(Motion.duration.slow)}>
-          <GlassCard style={styles.hero}>
+          <Card style={styles.hero}>
             <HeroLabel>Últimas {serie.length} faturas</HeroLabel>
             <View
               accessibilityRole="image"
@@ -224,7 +223,7 @@ export default function InvoicesScreen() {
               média de {formatBRL(media)} nas últimas {ultimos.length}{' '}
               {ultimos.length === 1 ? 'fatura' : 'faturas'}
             </ThemedText>
-          </GlassCard>
+          </Card>
         </Animated.View>
       ) : null}
 

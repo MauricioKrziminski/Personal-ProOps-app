@@ -10,7 +10,6 @@ import Animated, {
   withSpring,
 } from 'react-native-reanimated';
 
-import { GlassCard } from '@/components/glass/glass-card';
 import { monthLabel, shiftMonth } from '@/components/finance/month-picker';
 import { ThemedText } from '@/components/themed-text';
 import { Card } from '@/components/ui/card';
@@ -295,10 +294,10 @@ export default function InstallmentsScreen() {
         </Section>
       ) : null}
 
-      {/* O único GlassCard da tela: é o número que muda a decisão de parcelar de novo. */}
+      {/* O único destaque da tela: é o número que muda a decisão de parcelar de novo. */}
       {!plans.isError && lista.length > 0 ? (
         <Animated.View entering={FadeInDown.duration(Motion.duration.slow)}>
-          <GlassCard style={styles.hero}>
+          <Card style={styles.hero}>
             <HeroLabel>Comprometido nos próximos 12 meses</HeroLabel>
             <Money cents={comprometido} variant="money" />
             <ThemedText type="small" themeColor="textSecondary" style={tabular}>
@@ -306,7 +305,7 @@ export default function InstallmentsScreen() {
                 ? `${formatBRL(media)} por mês em média${ultimaParcela ? ` · última parcela em ${monthLabel(ultimaParcela)}` : ''}`
                 : 'Nada parcelado em aberto.'}
             </ThemedText>
-          </GlassCard>
+          </Card>
         </Animated.View>
       ) : null}
 

@@ -4,7 +4,6 @@ import { Stack, useLocalSearchParams } from 'expo-router';
 import * as Haptics from 'expo-haptics';
 import Animated, { FadeInDown } from 'react-native-reanimated';
 
-import { GlassCard } from '@/components/glass/glass-card';
 import { ThemedText } from '@/components/themed-text';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
@@ -102,10 +101,10 @@ export default function PaywallScreen() {
         </Section>
       ) : null}
 
-      {/* O único GlassCard da tela: os limites de verdade, do banco, não da propaganda. */}
+      {/* O único destaque da tela: os limites de verdade, do banco, não da propaganda. */}
       {plano.data ? (
         <Animated.View entering={FadeInDown.duration(Motion.duration.slow)}>
-          <GlassCard style={styles.hero}>
+          <Card style={styles.hero}>
             {/* Um rótulo por valor, e sempre ANTES dele — havia dois `HeroLabel` sanduichando o
                 número, "Seu plano hoje" em cima e "mensagens da IA…" embaixo. */}
             <HeroLabel>Seu plano hoje</HeroLabel>
@@ -124,7 +123,7 @@ export default function PaywallScreen() {
               {plano.data.max_members === 1 ? 'pessoa' : 'pessoas'} ·{' '}
               {plano.data.can_import ? 'importação liberada' : 'importação bloqueada'}
             </ThemedText>
-          </GlassCard>
+          </Card>
         </Animated.View>
       ) : null}
 

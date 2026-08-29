@@ -6,7 +6,7 @@ import type { SymbolViewProps } from 'expo-symbols';
 
 import { ErrorCard } from '@/components/error-card';
 import { Chip } from '@/components/finance/chip';
-import { GlassCard } from '@/components/glass/glass-card';
+import { Card } from '@/components/ui/card';
 import { ThemedText } from '@/components/themed-text';
 import { EmptyState } from '@/components/ui/empty-state';
 import { Icon } from '@/components/ui/icon';
@@ -335,10 +335,10 @@ export default function AiActivityScreen() {
         </>
       ) : null}
 
-      {/* O único GlassCard da tela: um número que resume merece o destaque; um parágrafo, não. */}
+      {/* O único destaque da tela: um número que resume merece o destaque; um parágrafo, não. */}
       {semana.total > 0 ? (
         <Animated.View entering={FadeInDown.duration(Motion.duration.slow)}>
-          <GlassCard style={styles.hero}>
+          <Card style={styles.hero}>
             <HeroLabel>Esta semana</HeroLabel>
             <ThemedText style={[Type.title2, tabular]}>
               {semana.total} {semana.total === 1 ? 'mensagem' : 'mensagens'}
@@ -347,7 +347,7 @@ export default function AiActivityScreen() {
               {semana.criaram} viraram lançamento ·{' '}
               {semana.falharam === 0 ? 'entendi todas' : `${semana.falharam} não entendi`}
             </ThemedText>
-          </GlassCard>
+          </Card>
         </Animated.View>
       ) : null}
 

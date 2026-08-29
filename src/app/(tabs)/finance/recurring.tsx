@@ -5,7 +5,6 @@ import { Stack, router } from 'expo-router';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
 import { Chip } from '@/components/finance/chip';
-import { GlassCard } from '@/components/glass/glass-card';
 import { ThemedText } from '@/components/themed-text';
 import { HeaderActions } from '@/components/ui/header-actions';
 import { Button } from '@/components/ui/button';
@@ -354,7 +353,7 @@ export default function RecurringScreen() {
         </>
       ) : null}
 
-      {/* O único GlassCard da tela. Some quando não há série: "SAI R$ 0,00 / ENTRA R$ 0,00" em
+      {/* O único destaque da tela. Some quando não há série: "SAI R$ 0,00 / ENTRA R$ 0,00" em
           cima de um empty state é cabeçalho vazio para a tela parecer cheia — exatamente o que a
           regra da aba Hoje proíbe. */}
       {lista.length === 0 ? null : proximos.isError ? (
@@ -364,7 +363,7 @@ export default function RecurringScreen() {
         />
       ) : proximos.data ? (
         <Animated.View entering={FadeInDown.duration(Motion.duration.slow)}>
-          <GlassCard style={styles.hero}>
+          <Card style={styles.hero}>
             <HeroLabel>Próximos 30 dias</HeroLabel>
             <View style={styles.heroSplit}>
               <View style={styles.heroParte}>
@@ -380,7 +379,7 @@ export default function RecurringScreen() {
               Só o que já foi materializado pelas suas séries — os lançamentos ainda não confirmados
               dos próximos 30 dias.
             </ThemedText>
-          </GlassCard>
+          </Card>
         </Animated.View>
       ) : null}
 

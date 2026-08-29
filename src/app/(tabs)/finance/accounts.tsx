@@ -10,7 +10,6 @@ import Animated, { FadeInDown } from 'react-native-reanimated';
 import { Link, Stack, router } from 'expo-router';
 import type { SymbolViewProps } from 'expo-symbols';
 
-import { GlassCard } from '@/components/glass/glass-card';
 import { ThemedText } from '@/components/themed-text';
 import { HeaderActions } from '@/components/ui/header-actions';
 import { Button } from '@/components/ui/button';
@@ -313,12 +312,12 @@ export default function AccountsScreen() {
         </>
       ) : null}
 
-      {/* O único GlassCard da tela. */}
+      {/* O único destaque da tela. */}
       {balances.isError ? (
         <ErrorBand message="Não deu para carregar seus saldos." onRetry={balances.refetch} />
       ) : balances.data && !semDadoNenhum ? (
         <Animated.View entering={FadeInDown.duration(Motion.duration.slow)}>
-          <GlassCard style={styles.hero}>
+          <Card style={styles.hero}>
             <HeroLabel>Dinheiro disponível</HeroLabel>
             <Money cents={caixa} variant="money" tone={caixa < 0 ? 'danger' : 'text'} />
             <View style={styles.heroSplit}>
@@ -340,7 +339,7 @@ export default function AccountsScreen() {
               Cartão fica de fora do disponível: fatura é dívida, não saldo. Parcela futura já
               lançada entra na conta.
             </ThemedText>
-          </GlassCard>
+          </Card>
         </Animated.View>
       ) : null}
 

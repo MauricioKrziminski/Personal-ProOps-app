@@ -1,65 +1,55 @@
-import { ActivityIndicator, Pressable, StyleSheet } from 'react-native';
-import * as Haptics from 'expo-haptics';
+import { StyleSheet } from 'react-native';
 
-import { GlassCard } from '@/components/glass/glass-card';
+import { Button } from '@/components/ui/button';
+import { Card } from '@/components/ui/card';
 import { Icon } from '@/components/ui/icon';
+import { Mark } from '@/components/ui/mark';
 import { ThemedText } from '@/components/themed-text';
-import { Spacing } from '@/constants/theme';
-import { useTheme } from '@/hooks/use-theme';
+import { Space } from '@/design/tokens';
+
+/**
+ * Loading e erro padrão das telas.
+ *
+ * Passou a usar os primitivos em vez de reimplementá-los: o botão era um `Pressable` estilizado à
+ * mão (sem o press-in, sem a altura de alvo, com `Spacing` legado e raio fora da escala) e o
+ * spinner era o `ActivityIndicator` do sistema. Componente de estado padrão que não usa o design
+ * system é o lugar mais fácil de a inconsistência entrar, porque ele aparece em dezenas de telas.
+ */
 
 /** Estado de loading padrão das telas. */
 export function LoadingCard() {
-  const theme = useTheme();
   return (
-    <GlassCard style={styles.card}>
-      <ActivityIndicator color={theme.tint} />
+    <Card style={styles.card}>
+      {/* A espiral da marca, não o spinner do sistema — o mesmo carregamento do `Button`. */}
+      <Mark size={28} color="textSecondary" spinning />
       <ThemedText type="small" themeColor="textSecondary">
         Carregando…
       </ThemedText>
-    </GlassCard>
+    </Card>
   );
 }
 
 /** Estado de erro padrão das telas — obrigatório junto com loading/empty. */
 export function ErrorCard({ onRetry }: { onRetry: () => void }) {
-  const theme = useTheme();
   return (
-    <GlassCard style={styles.card}>
+    <Card style={styles.card}>
       <Icon name="exclamationmark.triangle" size="xl" color="warning" />
-      <ThemedText type="smallBold">Algo deu errado</ThemedText>
+      <ThemedText type="headline">Algo deu errado</ThemedText>
       <ThemedText type="small" themeColor="textSecondary" style={styles.hint}>
         Não conseguimos carregar os dados agora.
       </ThemedText>
-      <Pressable
-        onPress={() => {
-          Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-          onRetry();
-        }}
-        style={({ pressed }) => [
-          styles.button,
-          { backgroundColor: theme.tint, opacity: pressed ? 0.8 : 1 },
-        ]}>
-        <ThemedText type="smallBold" themeColor="onTint">
-          Tentar de novo
-        </ThemedText>
-      </Pressable>
-    </GlassCard>
+      <Button label="Tentar de novo" onPress={onRetry} size="sm" />
+    </Card>
   );
 }
 
 const styles = StyleSheet.create({
   card: {
     alignItems: 'center',
-    gap: Spacing.two,
-    paddingVertical: Spacing.five,
+    gap: Space.sm,
+    paddingVertical: Space.xxl,
   },
   hint: {
     textAlign: 'center',
-  },
-  button: {
-    marginTop: Spacing.two,
-    paddingHorizontal: Spacing.four,
-    paddingVertical: Spacing.two,
-    borderRadius: Spacing.three,
   },
 });

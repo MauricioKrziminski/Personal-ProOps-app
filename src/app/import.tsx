@@ -9,7 +9,7 @@ import * as Haptics from 'expo-haptics';
 
 import { ErrorCard } from '@/components/error-card';
 import { Chip } from '@/components/finance/chip';
-import { GlassCard } from '@/components/glass/glass-card';
+import { Card } from '@/components/ui/card';
 import { ThemedText } from '@/components/themed-text';
 import { HeaderMenu } from '@/components/ui/header-actions';
 import { Button } from '@/components/ui/button';
@@ -266,8 +266,8 @@ export default function ImportScreen() {
       <Screen grouped>
         <Stack.Screen options={{ title: 'Importar extrato', headerLargeTitle: true }} />
 
-        {/* O único GlassCard da etapa: a instrução é o conteúdo da tela. */}
-        <GlassCard style={styles.hero}>
+        {/* O único destaque da etapa: a instrução é o conteúdo da tela. */}
+        <Card style={styles.hero}>
           <Icon name="arrow.down.doc" size="xl" color="tint" />
           <ThemedText type="smallBold">Traga o extrato do seu banco</ThemedText>
           <ThemedText type="small" themeColor="textSecondary" style={styles.centro}>
@@ -277,7 +277,7 @@ export default function ImportScreen() {
           <ThemedText type="small" themeColor="textSecondary" style={styles.centro}>
             Foto de cupom e PDF de fatura? Manda direto no WhatsApp.
           </ThemedText>
-        </GlassCard>
+        </Card>
 
         {falha ? (
           <View style={[styles.falha, { backgroundColor: theme.surface }]}>
@@ -394,10 +394,10 @@ export default function ImportScreen() {
         </>
       ) : null}
 
-      {/* O único GlassCard da etapa: o resumo do lote, com o número de verdade no botão. */}
+      {/* O único destaque da etapa: o resumo do lote, com o número de verdade no botão. */}
       {vaoEntrar > 0 ? (
         <Animated.View entering={FadeInDown.duration(Motion.duration.slow)}>
-          <GlassCard style={styles.resumo}>
+          <Card style={styles.resumo}>
             <HeroLabel>
               {vaoEntrar === 1 ? '1 lançamento entra' : `${vaoEntrar} lançamentos entram`}
             </HeroLabel>
@@ -414,7 +414,7 @@ export default function ImportScreen() {
               onPress={confirmarLote}
               block
             />
-          </GlassCard>
+          </Card>
         </Animated.View>
       ) : null}
 

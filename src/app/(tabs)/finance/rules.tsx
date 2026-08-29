@@ -7,7 +7,7 @@ import * as Haptics from 'expo-haptics';
 
 import { ErrorCard } from '@/components/error-card';
 import { Chip } from '@/components/finance/chip';
-import { GlassCard } from '@/components/glass/glass-card';
+import { Card } from '@/components/ui/card';
 import { ThemedText } from '@/components/themed-text';
 import { HeaderActions } from '@/components/ui/header-actions';
 import { EmptyState } from '@/components/ui/empty-state';
@@ -196,17 +196,17 @@ export default function RulesScreen() {
         </>
       ) : null}
 
-      {/* O único GlassCard da tela — e só quando existe número para mostrar. */}
+      {/* O único destaque da tela — e só quando existe número para mostrar. */}
       {totalHits > 0 ? (
         <Animated.View entering={FadeInDown.duration(Motion.duration.slow)}>
-          <GlassCard style={styles.hero}>
+          <Card style={styles.hero}>
             <HeroLabel>O que suas regras já pouparam</HeroLabel>
             <ThemedText style={[Type.title, tabular]}>{totalHits}</ThemedText>
             <ThemedText type="small" themeColor="textSecondary">
               {totalHits === 1 ? 'lançamento categorizado' : 'lançamentos categorizados'} sem
               precisar da IA, por {ativas} {ativas === 1 ? 'regra' : 'regras'}.
             </ThemedText>
-          </GlassCard>
+          </Card>
         </Animated.View>
       ) : null}
 

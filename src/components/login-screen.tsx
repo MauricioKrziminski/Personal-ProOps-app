@@ -4,7 +4,7 @@ import { ActivityIndicator, Pressable, StyleSheet, TextInput, View } from 'react
 import Animated, { FadeInDown, FadeInUp } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { GlassCard } from '@/components/glass/glass-card';
+import { Card } from '@/components/ui/card';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { Fonts, Spacing } from '@/constants/theme';
@@ -75,7 +75,7 @@ export function LoginScreen() {
         </Animated.View>
 
         <Animated.View entering={FadeInDown.duration(600).delay(150)} style={styles.formWrap}>
-          <GlassCard style={styles.card}>
+          <Card style={styles.card}>
             {step === 'phone' ? (
               <>
                 <ThemedText type="smallBold">Seu WhatsApp</ThemedText>
@@ -150,7 +150,7 @@ export function LoginScreen() {
                 </ThemedText>
               </Pressable>
             )}
-          </GlassCard>
+          </Card>
         </Animated.View>
       </View>
     </ThemedView>
