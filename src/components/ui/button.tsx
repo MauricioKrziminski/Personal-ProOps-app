@@ -1,8 +1,9 @@
 import * as Haptics from 'expo-haptics';
-import { ActivityIndicator, Pressable, StyleSheet, View, type StyleProp, type ViewStyle } from 'react-native';
+import { Pressable, StyleSheet, View, type StyleProp, type ViewStyle } from 'react-native';
 import Animated, { useAnimatedStyle, useSharedValue, withTiming } from 'react-native-reanimated';
 
 import { Icon } from '@/components/ui/icon';
+import { Mark } from '@/components/ui/mark';
 import { ThemedText } from '@/components/themed-text';
 import { HitTarget, Motion, Radius, Space } from '@/design/tokens';
 import { useTheme } from '@/hooks/use-theme';
@@ -64,15 +65,19 @@ export function Button({
   // disponível. Perde a cor e o peso — em carregamento, ao contrário, a ação segue sendo
   // aquela, então o accent fica.
   const off = disabled && !loading;
-  // `ghost` sem cor de ação vira texto preto — indistinguível de um rótulo. Botão precisa
-  // parecer botão: no ghost quem faz esse trabalho é o accent, já que não há superfície.
+  // `ghost` levava o accent, porque sem superfície e sem cor ele não parecia ação. Com o `tint`
+  // monocromático isso deixou de funcionar: accent = cor do texto, então o ghost voltaria a ler
+  // como rótulo — e pior, calado.
+  //
+  // A correção não é dar cor de volta, é olhar o PAR: ghost é sempre "Cancelar"/"Fechar" ao
+  // lado de um primário, e o primário virou uma pílula preta sólida. Texto puro contra pílula
+  // preenchida é exatamente como o iOS desenha esse par. O contraste entre os dois é a
+  // affordance; pintar os dois seria duas ações disputando.
   const labelColor: ThemeColor = off
     ? 'textSecondary'
     : variant === 'primary' || variant === 'destructive'
       ? 'onTint'
-      : variant === 'ghost'
-        ? 'tint'
-        : 'text';
+      : 'text';
 
   return (
     <Animated.View style={[animated, block ? styles.block : styles.hug, style]}>
@@ -98,10 +103,20 @@ export function Button({
             backgroundColor: off ? theme.backgroundElement : surface[variant],
             opacity: loading ? 0.7 : 1,
             paddingHorizontal: size === 'sm' ? Space.md : Space.xl,
+            // Secundário ganha borda porque o primário deixou de ser colorido: com o `tint`
+            // monocromático a distância entre primário e secundário aumentou, e a de secundário
+            // para DESABILITADO encolheu (os dois eram `backgroundElement` liso). A borda é o
+            // que separa "posso tocar" de "não posso" — desabilitado continua sem ela.
+            borderWidth: variant === 'secondary' && !off ? StyleSheet.hairlineWidth : 0,
+            borderColor: theme.separator,
           },
         ]}>
         {loading ? (
-          <ActivityIndicator color={theme[labelColor]} />
+          // A espiral da marca no lugar do `ActivityIndicator`. Não é enfeite: com marca
+          // monocromática, a personalidade vem de **repetir a forma** em papéis utilitários —
+          // é o que torna a Vercel reconhecível pelo ▲ no prompt e no loading. Um spinner do
+          // sistema é de todo mundo; este é deste app.
+          <Mark size={20} color={labelColor} spinning />
         ) : (
           <View style={styles.content}>
             {icon ? <Icon name={icon} size="md" color={labelColor} /> : null}

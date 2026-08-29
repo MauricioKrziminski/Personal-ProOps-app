@@ -15,7 +15,9 @@ import { Segmented } from '@/components/ui/segmented';
 import { Skeleton, SkeletonRow } from '@/components/ui/skeleton';
 import { ProgressBar, Sparkline } from '@/components/ui/sparkline';
 import { useToast } from '@/components/ui/toast';
-import { Space } from '@/design/tokens';
+import { Mark } from '@/components/ui/mark';
+import { useTheme } from '@/hooks/use-theme';
+import { Radius, Space } from '@/design/tokens';
 
 /**
  * Catálogo dos primitivos — rota de desenvolvimento.
@@ -25,6 +27,7 @@ import { Space } from '@/design/tokens';
  */
 export default function CatalogScreen() {
   const toast = useToast();
+  const theme = useTheme();
   const [filtro, setFiltro] = useState('tudo');
   const [valor, setValor] = useState(4500);
 
@@ -34,6 +37,22 @@ export default function CatalogScreen() {
   return (
     <Screen grouped>
       <ThemedText type="title">Catálogo</ThemedText>
+
+      <Section title="Marca">
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: Space.xl, padding: Space.lg }}>
+          <Mark size={64} />
+          <Mark size={32} color="textSecondary" />
+          <Mark size={28} spinning />
+          <View
+            style={{
+              backgroundColor: theme.heroSurface,
+              padding: Space.md,
+              borderRadius: Radius.sm,
+            }}>
+            <Mark size={40} color="onHero" />
+          </View>
+        </View>
+      </Section>
 
       <Section title="Botões">
         <View style={{ gap: Space.md, padding: Space.lg }}>

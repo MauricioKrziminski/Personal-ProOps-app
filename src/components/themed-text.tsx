@@ -64,8 +64,15 @@ const styles = StyleSheet.create({
   footnote: Type.footnote,
   /** rótulo de seção, contador, unidade */
   caption: Type.caption,
-  link: Type.subhead,
+  /**
+   * Link é **sublinhado**, não colorido.
+   *
+   * Com o `tint` monocromático (a cor da marca é preto e branco), link pintado de accent fica
+   * exatamente da cor do texto ao redor — ou seja, deixa de existir. A distinção passa a ser
+   * sublinhado + peso, que é o que sistemas sem cor de marca usam.
+   */
+  link: { ...Type.subhead, textDecorationLine: 'underline' },
   /** cor vem de `tint` no componente — nunca hex */
-  linkPrimary: { ...Type.subhead, fontWeight: '600' },
+  linkPrimary: { ...Type.subhead, fontWeight: '600', textDecorationLine: 'underline' },
   code: { ...Type.footnote, fontFamily: Fonts.mono },
 });

@@ -92,8 +92,15 @@ export const Motion = {
     sheet: { duration: 300, dampingRatio: 0.8 },
     settle: { duration: 400, dampingRatio: 1 },
   },
-  /** Escalonamento de entrada em lista: `delay = min(index * step, cap)`. */
-  stagger: { step: 60, cap: 400 },
+  /**
+   * Escalonamento de entrada em lista: `delay = min(index * step, cap)`.
+   *
+   * O passo era **60 ms** e desceu para 30. Acima de ~30 ms por item — ou aplicado a mais de
+   * meia dúzia deles — abrir uma tela deixa de ser "o conteúdo chegou" e vira "assista a esta
+   * animação": com 60 ms o sexto bloco só aparecia 360 ms depois do primeiro, e o usuário que
+   * abre o app para ver um número esperava a coreografia terminar.
+   */
+  stagger: { step: 30, cap: 400 },
   /** Escala do press-in. Linha de lista NÃO usa scale — usa highlight de fundo. */
   pressScale: 0.97,
 } as const;
@@ -114,8 +121,25 @@ export const Type = {
   subhead: { fontSize: 15, lineHeight: 20, fontWeight: '400' },
   footnote: { fontSize: 13, lineHeight: 18, fontWeight: '400' },
   caption: { fontSize: 12, lineHeight: 16, fontWeight: '400' },
-  /** display de dinheiro — único lugar onde `Fonts.rounded` entra */
+  /** display de dinheiro — `Fonts.rounded` entra aqui e no `heroMoney` */
   money: { fontSize: 40, lineHeight: 46, fontWeight: '700' },
+  /**
+   * O valor dentro do painel de destaque.
+   *
+   * Maior que o `money` porque ali ele não disputa com nada: o painel é uma superfície própria,
+   * e o contraste de escala contra o rótulo (12) passa de 3,3× para 4,7×. `letterSpacing`
+   * negativo porque display grande em peso 700 abre demais — é o mesmo ajuste que sistemas
+   * tipográficos sem cor de marca usam para dar voz ao display.
+   */
+  heroMoney: { fontSize: 56, lineHeight: 60, fontWeight: '700', letterSpacing: -1.2 },
+  /**
+   * Metadado e etiqueta: data, categoria, origem ("via WhatsApp"), unidade.
+   *
+   * O par com o `heroMoney`/`money` é o que dá personalidade a um sistema **sem cor de marca** —
+   * um tipo para o valor, outro para carimbar o contexto. É a regra que torna Vercel e Linear
+   * reconhecíveis sem que nenhum deles tenha uma cor própria em tela.
+   */
+  meta: { fontSize: 12, lineHeight: 16, fontWeight: '600', letterSpacing: 0.8 },
 } as const;
 
 export type TypeVariant = keyof typeof Type;
