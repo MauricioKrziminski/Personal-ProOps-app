@@ -166,6 +166,14 @@ que "voltar" faz depois.
 - **Porta de mão única** (login, onboarding concluído, compra) sai da pilha com `Stack.Protected`
   + `replace` — voltar nunca reentra no estado antigo.
 - **Abas são pares.** Nada de slide entre abas; re-tap na aba ativa volta à raiz.
+- **`backgroundColor` na `NativeTabs` é proibido no iOS.** Dar cor de fundo torna a barra opaca e
+  **desliga o Liquid Glass** — o material que é diretriz do projeto. Cor de fundo, indicador e
+  ripple entram por `Platform.select` só no Android; no iOS quem desenha é o sistema, mais
+  `minimizeBehavior: 'onScrollDown'` (iOS 26), que é comportamento nativo, não animação nossa.
+  Isso ficou meses ligado sem ninguém notar, porque a barra *parecia* certa no Android.
+- **Badge de aba é contagem real ou não existe.** Mesma régua dos atalhos do painel: número que
+  não muda decisão é enfeite. Hoje leva o que vence + lembrete do dia + orçamento estourado, e
+  some com zero.
 - **Criar item de lista é `+` no header**, nunca botão de bloco no corpo — Contas, Cartões,
   Orçamentos, Metas, Dívidas, Recorrentes, Regras e Lembretes. O botão no corpo existe só dentro
   do `EmptyState`, onde não há lista para o `+` do header explicar.
