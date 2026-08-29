@@ -1,7 +1,6 @@
 import { useState } from 'react';
 import { Stack, router } from 'expo-router';
 import * as Linking from 'expo-linking';
-import * as Notifications from 'expo-notifications';
 import { Pressable, StyleSheet, View } from 'react-native';
 import Animated, { FadeIn, FadeInDown } from 'react-native-reanimated';
 
@@ -14,6 +13,7 @@ import { useToast } from '@/components/ui/toast';
 import { Motion, Space, Type, tabular } from '@/design/tokens';
 import { useSession } from '@/hooks/use-session';
 import { useTheme } from '@/hooks/use-theme';
+import { notifications } from '@/lib/push-module';
 
 /**
  * Onboarding em três passos — nenhum deles é uma tela de features.
@@ -50,8 +50,10 @@ export default function OnboardingScreen() {
     try {
       // A pergunta de permissão vem DEPOIS da razão. O prompt do sistema aparece uma vez na vida
       // do app: gastá-lo sem contexto é gastar a única chance.
-      const { status } = await Notifications.requestPermissionsAsync();
-      if (status !== 'granted') {
+      // No Expo Go do Android não há a quem perguntar (ver `push-module.ts`): seguir sem prompt é
+      // melhor que um erro que o usuário não pode resolver dali.
+      const status = notifications ? (await notifications.requestPermissionsAsync()).status : null;
+      if (status && status !== 'granted') {
         toast({
           message: 'Sem problema — dá para ativar depois no Perfil.',
           tone: 'info',

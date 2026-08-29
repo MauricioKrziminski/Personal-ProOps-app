@@ -1,8 +1,8 @@
 import Constants from 'expo-constants';
 import * as Device from 'expo-device';
-import * as Notifications from 'expo-notifications';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
+import { notifications } from '@/lib/push-module';
 import { supabase } from '@/lib/supabase';
 
 /**
@@ -18,6 +18,7 @@ import { supabase } from '@/lib/supabase';
 
 export type PushBlocker =
   | 'ok'
+  | 'expo-go'
   | 'simulator'
   | 'denied'
   | 'no-eas-project'
@@ -49,10 +50,12 @@ export function usePushStatus(userId: string | undefined) {
       if (error) throw error;
 
       if (data?.expo_push_token) return { registered: true, blocker: 'ok' };
+      // Expo Go do Android nem carrega o `expo-notifications` (ver `push-module.ts`).
+      if (!notifications) return { registered: false, blocker: 'expo-go' };
       if (!Device.isDevice) return { registered: false, blocker: 'simulator' };
       if (!easProjectId()) return { registered: false, blocker: 'no-eas-project' };
 
-      const perm = await Notifications.getPermissionsAsync();
+      const perm = await notifications.getPermissionsAsync();
       return {
         registered: false,
         blocker: perm.status === 'denied' ? 'denied' : 'ok',
@@ -66,10 +69,13 @@ export function useRegisterPush(userId: string | undefined) {
   return useMutation({
     mutationFn: async () => {
       if (!userId) throw new Error('sem sessão');
+      if (!notifications) {
+        throw new Error('Push não funciona no Expo Go do Android — precisa de um development build.');
+      }
       if (!Device.isDevice) {
         throw new Error('Push só funciona em aparelho físico, não no simulador.');
       }
-      const { status } = await Notifications.requestPermissionsAsync();
+      const { status } = await notifications.requestPermissionsAsync();
       if (status !== 'granted') {
         throw new Error('Permissão negada. Dá para liberar nos Ajustes do sistema.');
       }
@@ -79,7 +85,7 @@ export function useRegisterPush(userId: string | undefined) {
       if (!projectId) {
         throw new Error('App ainda não vinculado ao EAS (falta extra.eas.projectId no app.json).');
       }
-      const token = (await Notifications.getExpoPushTokenAsync({ projectId })).data;
+      const token = (await notifications.getExpoPushTokenAsync({ projectId })).data;
       const { error } = await supabase
         .from('profiles')
         .update({ expo_push_token: token })
@@ -94,6 +100,8 @@ export function useRegisterPush(userId: string | undefined) {
 /** Mensagem por causa — "desativado" genérico não diz o que fazer. */
 export function pushBlockerMessage(blocker: PushBlocker): string | null {
   switch (blocker) {
+    case 'expo-go':
+      return 'O Expo Go do Android não suporta push — precisa de um development build.';
     case 'simulator':
       return 'Push não funciona no simulador — precisa de um aparelho físico.';
     case 'denied':

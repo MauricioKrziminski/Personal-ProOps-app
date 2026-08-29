@@ -1,5 +1,7 @@
-import * as Notifications from 'expo-notifications';
+import type { NotificationResponse } from 'expo-notifications';
 import { router } from 'expo-router';
+
+import { notifications } from '@/lib/push-module';
 
 /**
  * Recepção de push.
@@ -7,11 +9,14 @@ import { router } from 'expo-router';
  * Antes disto não existia **nada** do lado do app: sem `setNotificationHandler` a notificação com
  * o app aberto não aparecia, e sem listener tocar nela não levava a lugar nenhum. O lembrete
  * chegava e morria na bandeja.
+ *
+ * Tudo passa por `notifications` (`push-module.ts`), que é `null` no Expo Go do Android — lá o
+ * pacote nem pode ser importado. Sem push nesse ambiente as duas funções viram no-op.
  */
 
 /** Com o app em primeiro plano a notificação também precisa aparecer — senão ela some. */
 export function configureNotificationHandler() {
-  Notifications.setNotificationHandler({
+  notifications?.setNotificationHandler({
     handleNotification: async () => ({
       shouldShowBanner: true,
       shouldShowList: true,
@@ -48,7 +53,7 @@ function routeFor(data: unknown): string | null {
   return Object.hasOwn(ALLOWED, target) ? ALLOWED[target as Target] : null;
 }
 
-function open(response: Notifications.NotificationResponse) {
+function open(response: NotificationResponse) {
   const href = routeFor(response.notification.request.content.data);
   if (!href) return;
   // @ts-expect-error — a allowlist acima é a garantia; typedRoutes não estreita string.
@@ -60,9 +65,12 @@ function open(response: Notifications.NotificationResponse) {
  * Sem o segundo, tocar numa notificação com o app fechado abre a Home e perde o destino.
  */
 export function attachNotificationListeners() {
-  const sub = Notifications.addNotificationResponseReceivedListener(open);
+  if (!notifications) return;
 
-  Notifications.getLastNotificationResponseAsync()
+  const sub = notifications.addNotificationResponseReceivedListener(open);
+
+  notifications
+    .getLastNotificationResponseAsync()
     .then((last) => {
       if (last) open(last);
     })
