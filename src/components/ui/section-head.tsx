@@ -2,7 +2,7 @@ import { Children, type ReactNode } from 'react';
 import { StyleSheet, View } from 'react-native';
 
 import { ThemedText } from '@/components/themed-text';
-import { Space } from '@/design/tokens';
+import { Space, Type } from '@/design/tokens';
 
 /**
  * Rótulo do card de destaque.
@@ -66,9 +66,8 @@ export function SectionHead({ title, action }: { title: string; action?: ReactNo
 }
 
 const styles = StyleSheet.create({
-  tracked: {
-    letterSpacing: 0.6,
-  },
+  /** Mesma etiqueta do `Section` — sai do token `Type.meta`, não de tracking à mão. */
+  tracked: Type.meta,
   head: {
     flexDirection: 'row',
     alignItems: 'center',

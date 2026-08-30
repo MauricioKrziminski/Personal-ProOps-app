@@ -4,7 +4,7 @@ import type { SymbolViewProps } from 'expo-symbols';
 
 import { ThemedText } from '@/components/themed-text';
 import { Icon } from '@/components/ui/icon';
-import { Elevation, HitTarget, Radius, Space } from '@/design/tokens';
+import { Elevation, HitTarget, Radius, Space, Type } from '@/design/tokens';
 import { useTheme } from '@/hooks/use-theme';
 
 interface RowProps {
@@ -130,10 +130,18 @@ const styles = StyleSheet.create({
   section: {
     gap: Space.xs + 2,
   },
+  /**
+   * O rótulo de seção é `Type.meta`, não um `caption` com tracking à mão.
+   *
+   * `meta` existe no sistema exatamente para isto (etiqueta, metadado, unidade) — 12/600 com
+   * `letterSpacing: 0.8` — e estava sendo usado em UM lugar, o rótulo do painel. Aqui, no
+   * `SectionHead` e na Notas, três cópias reimplementavam a mesma ideia em peso 400 e tracking
+   * 0.6: a etiqueta lia como texto pequeno em vez de ler como etiqueta, e o app perdia o degrau
+   * tipográfico que substitui a cor num sistema sem accent colorido.
+   */
   sectionTitle: {
     paddingHorizontal: Space.lg,
-    // Caixa alta pede tracking: sem ele o rótulo lê como palavra apertada, não como etiqueta.
-    letterSpacing: 0.6,
+    ...Type.meta,
   },
   group: {
     borderRadius: Radius.md,

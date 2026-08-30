@@ -24,6 +24,42 @@ import { Platform } from 'react-native';
  * Por isso a regra §2 (semântica nunca é decoração) fica mais séria, não menos: gastar vermelho
  * como enfeite queima a única alavanca de cor que sobrou.
  */
+/**
+ * ## O roxo foi testado e devolvido (30/08/2026)
+ *
+ * A marca do ProOps é monocromática de verdade — todos os assets são preto ou branco puro. Ainda
+ * assim o app lia como "iOS bem feito genérico", e a queixa era legítima.
+ *
+ * Foram prototipados roxo como `tint` inteiro e roxo só no `HeroPanel`. Os dois ficaram bonitos.
+ * Os dois foram descartados, por dois motivos independentes:
+ *
+ * 1. **Medição.** Contando matiz por pixel no conteúdo da tela Hoje (abaixo do painel, acima da
+ *    tab bar), o accent roxo derrubava o vermelho do "estourou o orçamento" de 53% para 44% da
+ *    cor da tela — e ia parar em ícone de linha e tag de categoria, que não são ação nem estado.
+ * 2. **Mercado.** Roxo, em finanças no Brasil, é o Nubank: o apelido da empresa é "roxinho", o
+ *    ticker é ROXO34 e eles atendem 61% da população adulta. Um bloco roxo com o saldo do mês
+ *    tinha chance real de ler como Nubank antes de ler como ProOps.
+ *
+ * A chatice era real, mas a causa não era matiz — era **amplitude**. No tema escuro havia três
+ * superfícies dentro de 36/255 (fundo `#000000`, card `#1C1C1E`, painel `#141416`): tudo
+ * acontecia num intervalo estreito demais para haver hierarquia.
+ *
+ * ## A escada do tema escuro, agora explícita
+ *
+ * | superfície | valor | degrau sobre o fundo |
+ * |---|---|---|
+ * | `background` / `groupedBackground` | `#000000` | — |
+ * | `surface` (card) | `#1C1C1E` | 28 |
+ * | `backgroundElement` (input, chip) | `#212225` | 33 |
+ * | `heroSurface` (painel) | `#2C2C34` | 44 |
+ * | `surfaceRaised` (sheet, popover) | `#35353B` | 53 |
+ *
+ * O elo quebrado era card → painel, que valia **8** e agora vale 16: o painel encostava no card e
+ * a tela perdia o bloco que deveria dominar. `surfaceRaised` subiu junto porque estava em
+ * `#2C2C2E` e passaria a empatar com o painel — sheet precisa continuar lendo acima de tudo.
+ *
+ * Em UI escura, mais claro = mais importante; é assim que se diz "isto é o principal" sem cor.
+ */
 export const Colors = {
   light: {
     text: '#000000',
@@ -54,8 +90,17 @@ export const Colors = {
     /**
      * O painel de destaque do topo (`HeroPanel`). Cor chapada, não vidro.
      *
-     * No tema ESCURO ele é um degrau ACIMA do fundo (`#141416` sobre `#000000`): preto sobre
-     * preto não é hero, é buraco.
+     * No tema ESCURO ele é um degrau ACIMA do fundo: preto sobre preto não é hero, é buraco.
+     *
+     * O valor era `#141416` — **um degrau de 20/255 sobre o preto**, o que na prática é nenhum:
+     * o painel encostava no fundo e a tela perdia o bloco que devia dominar. Subiu para
+     * `#242428`, que fica acima do fundo (`#000000`) E acima do card (`#1C1C1E`), então ele é a
+     * maior superfície clara da tela — que é como um UI escuro diz "isto é o principal".
+     *
+     * A alternativa considerada e recusada foi **inverter** (painel branco no escuro): num
+     * sistema monocromático inverter já significa "ação primária / selecionado" (é o que `tint`
+     * faz), o painel ocupa ~30% da tela e viraria uma lanterna, e o app passaria a ter duas
+     * caras diferentes entre os temas.
      */
     heroSurface: '#0A0A0B',
     /** conteúdo sobre o hero */
@@ -78,14 +123,14 @@ export const Colors = {
 
     groupedBackground: '#000000',
     surface: '#1C1C1E',
-    surfaceRaised: '#2C2C2E',
+    surfaceRaised: '#35353B',
     separator: 'rgba(84, 84, 88, 0.65)',
     overlay: 'rgba(0, 0, 0, 0.60)',
     accentSoft: '#1A1A1D',
     /** inverte: sobre tinta clara o rótulo é escuro */
     onTint: '#0A0A0B',
 
-    heroSurface: '#141416',
+    heroSurface: '#2C2C34',
     onHero: '#F5F5F7',
     onHeroMuted: 'rgba(245, 245, 247, 0.58)',
     heroSeparator: 'rgba(255, 255, 255, 0.10)',

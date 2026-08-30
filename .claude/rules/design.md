@@ -148,7 +148,16 @@ que "voltar" faz depois.
 
 - **Header é do navegador.** `<Stack.Title>` + large title com colapso no scroll. Nada de barra
   desenhada à mão dentro do `ScrollView`.
-- **Busca é nativa** — `<Stack.SearchBar>`.
+- **Busca é `<Search>`** (`src/components/ui/search-field.tsx`), em Notas, Lançamentos e
+  `/search`. Um componente, dois desenhos: no **iOS** ele renderiza o `<Stack.SearchBar>` nativo,
+  que integra com o large title e some no scroll; no **Android** renderiza uma pílula
+  (`SearchField`) no corpo da tela. A divisão existe porque no Android o nativo desenha uma laje
+  de **canto 0** — o único elemento fora da escala `Radius`, encostado num input de raio 12 e numa
+  fileira de chips em pílula — e a API expõe cor (`barTintColor`, `textColor`, `hintTextColor`,
+  `headerIconColor`) e **não expõe forma**. O mesmo `<Search>` pode ficar onde o campo deve
+  aparecer no Android sem abrir buraco no iOS: `Stack.SearchBar` escreve opções por hook e
+  **retorna `null`**, não é filho posicional. O recuo lateral é da TELA, não do componente — cada
+  uma já tem a própria calha.
 - **Ação de header tem um caminho só**: `HeaderActions` (botões) e `HeaderMenu` (menu "…"), em
   `src/components/ui/header-actions.tsx`. **Nunca montar `headerRight` à mão.** No iOS 26 o header
   desenha uma pílula de vidro em volta do conteúdo do `headerRight`: entregar uma `View` própria
@@ -191,8 +200,6 @@ Splash e overlay animado usam **o mesmo par cor de fundo + variante da marca** (
 plugin `expo-splash-screen` e `src/components/animated-icon.tsx`), senão aparece um flash de cor
 errada na transição.
 
----
-
 ## 10. Contagem anti-slop (mecânica, antes de dar qualquer tela como pronta)
 
 Contar, não julgar:
@@ -216,8 +223,10 @@ como zerada duas vezes sem estar.
 
 ## 2b. A marca é monocromática — e é ela que faz o papel do accent
 
-Não existe cor de marca no ProOps: `tint` é **tinta** (quase-preto no claro, quase-branco no
-escuro). Isso muda como as coisas se comunicam:
+**A marca não tem cor, e isso é fato verificável, não estilo:** todos os assets são preto ou
+branco puro — `mark-black.png`, `mark-white.png`, os dois lockups de `assets/images/logo/` e o
+ícone Android. `tint` é **tinta** (quase-preto no claro, quase-branco no escuro). Isso muda como
+as coisas se comunicam:
 
 - **Ação primária lê por superfície**, não por matiz: pílula preenchida de `tint` com rótulo em
   `onTint` (que **inverte** com o tema). Secundário leva borda; ghost é texto puro ao lado do
@@ -232,6 +241,48 @@ escuro). Isso muda como as coisas se comunicam:
   abertura. É o que dá personalidade sem cor; sem isso o app fica "iOS bem feito" de novo.
 - **Cor semântica é a única cor da tela** e por isso grita mais do que gritaria num app colorido.
   Gastar `danger`/`success`/`warning` como decoração queima a última alavanca de cor que existe.
+
+### O roxo foi testado e devolvido (30/08/2026)
+
+O app lia como "iOS bem feito genérico" e a queixa era legítima. Foram prototipados **roxo como
+`tint` inteiro** e **roxo só no `HeroPanel`**. Os dois ficaram bonitos. Os dois voltaram, por dois
+motivos independentes:
+
+**1. Medição.** Contando matiz por pixel no conteúdo da tela Hoje (abaixo do painel, acima da tab
+bar):
+
+| | pixels coloridos | famílias de matiz |
+|---|---|---|
+| tinta | 1,48% | 2 — vermelho 53%, laranja 47% |
+| roxo como `tint` | 1,77% | 3 — vermelho 44%, laranja 39%, roxo 16% |
+
+O accent colorido derrubava o vermelho do "estourou o orçamento" de 53% para 44% da cor da tela, e
+ia parar em **ícone de linha e tag de categoria** — que não são ação nem estado. O accent mais
+forte do app gasto em ornamento.
+
+**2. Mercado.** Roxo, em finanças no Brasil, é o Nubank: o apelido da empresa é "roxinho", o ticker
+é ROXO34 e eles atendem 61% da população adulta. Um bloco roxo com o saldo do mês tinha chance real
+de ler como Nubank antes de ler como ProOps. **Se um dia a cor voltar, que não seja roxo.**
+
+### A chatice era amplitude, não matiz
+
+O diagnóstico certo estava na escada de superfícies do tema escuro: fundo `#000000`, card
+`#1C1C1E`, painel `#141416` — **três superfícies dentro de 36/255**. Não havia hierarquia porque
+não havia distância. A escada agora é explícita (a tabela mora em `constants/theme.ts`), e o elo
+quebrado era card → painel, que valia 8 e passou a valer 16.
+
+As duas outras alavancas, que são as que marcas sem cor usam:
+
+- **Tipografia carrega o peso.** É a tese da Vercel — monocromática pura, "a tinta É a marca", e
+  por isso a hierarquia sai de tamanho, peso e espaço. Aqui o token `Type.meta` (12/600,
+  `letterSpacing 0.8`) existia e era usado em **um** lugar; três outros reimplementavam a mesma
+  etiqueta à mão em peso 400 e tracking 0,6. Todo rótulo de seção do app sai de `Type.meta` agora.
+- **A forma da marca, repetida.** Os cinco papéis da lista acima estavam em três. O estado vazio
+  genérico e o marcador do que veio da IA passaram a usar a espiral — `EmptyState` sem `icon`
+  desenha a marca, e `icon` fica para quando o símbolo carrega a CAUSA (lixeira, busca sem
+  resultado). Contraponto útil: a Linear é quase-preta e gasta **um** accent pequeno e de alto
+  contraste como lanterna, para sinalizar ação — nunca como superfície grande. Se um accent
+  colorido voltar a este app, é esse o modelo, não um bloco.
 
 ---
 

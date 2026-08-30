@@ -2,7 +2,7 @@ import { RefreshControl, ScrollView, StyleSheet, View, type StyleProp, type View
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { MaxContentWidth } from '@/constants/theme';
-import { Space } from '@/design/tokens';
+import { Radius, Space } from '@/design/tokens';
 import { useTheme } from '@/hooks/use-theme';
 
 interface ScreenProps {
@@ -55,7 +55,7 @@ export function Screen({
     return <View style={[styles.root, { backgroundColor: background }, contentStyle]}>{children}</View>;
   }
 
-  return (
+  const scroller = (
     <ScrollView
       style={[styles.root, { backgroundColor: background }]}
       contentContainerStyle={header ? styles.bleedRoot : padding}
@@ -66,13 +66,49 @@ export function Screen({
       }>
       {header ? (
         <>
-          {header}
+          {/*
+            O `paddingTop` RESERVA a altura da aba fixa (`styles.joint`), que desenha por cima
+            daqui. Sem ele a aba tapava a primeira linha do painel — o rótulo "SOBRA ATÉ O FIM DO
+            MÊS" ficava cortado ao meio no topo da tela. A cor é a mesma do painel, então a faixa
+            reservada não aparece como faixa: ela só engorda o preto entre o header e o rótulo.
+          */}
+          <View style={[styles.headerSlot, { backgroundColor: theme.heroSurface }]}>{header}</View>
           <View style={padding}>{children}</View>
         </>
       ) : (
         children
       )}
     </ScrollView>
+  );
+
+  if (!header) return scroller;
+
+  return (
+    <View style={[styles.root, { backgroundColor: background }]}>
+      {scroller}
+
+      {/*
+        A aba do painel que NÃO rola.
+
+        O `HeroPanel` mora dentro do scroll, então ele saía inteiro de cena — e junto ia o
+        arredondado que costura o painel com a página. Rolado, sobrava a barra preta do header
+        encostando na lista numa linha reta, com a primeira linha **fatiada ao meio** por ela.
+        Parecia recorte, não sobreposição.
+
+        Esta faixa fica presa embaixo do header nativo, na mesma cor e no mesmo raio do painel.
+        No topo ela é invisível (preto sobre o preto do painel, e os cantos vazados revelam o
+        próprio painel atrás). Rolando, é ela que segura o encaixe: o conteúdo passa por baixo de
+        uma borda arredondada em vez de ser cortado por uma reta.
+
+        Sem listener de scroll e sem `Animated` de propósito — não há estado para animar, a peça
+        simplesmente está sempre lá. Rolar é a interação mais frequente do app (`design.md` §5:
+        100× por dia → o padrão da plataforma e nada mais), e um worklet por frame para desenhar
+        algo que não muda seria custo sem retorno.
+      */}
+      <View pointerEvents="none" style={styles.jointRow}>
+        <View style={[styles.joint, { backgroundColor: theme.heroSurface }]} />
+      </View>
+    </View>
   );
 }
 
@@ -89,6 +125,30 @@ const styles = StyleSheet.create({
     width: '100%',
     maxWidth: MaxContentWidth,
     alignSelf: 'center',
+  },
+  headerSlot: {
+    paddingTop: Radius.xl,
+    // O MESMO arredondado do painel: o slot é pintado de `heroSurface` e, quadrado, preenchia
+    // por trás os cantos vazados do `HeroPanel` — o encaixe sumia justamente no topo da tela.
+    borderBottomLeftRadius: Radius.xl,
+    borderBottomRightRadius: Radius.xl,
+    borderCurve: 'continuous',
+  },
+  /** Segue o `maxWidth` do conteúdo: em tablet a aba não pode ser mais larga que o painel. */
+  jointRow: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    alignItems: 'center',
+  },
+  joint: {
+    width: '100%',
+    maxWidth: MaxContentWidth,
+    height: Radius.xl,
+    borderBottomLeftRadius: Radius.xl,
+    borderBottomRightRadius: Radius.xl,
+    borderCurve: 'continuous',
   },
   content: {
     gap: Space.xl,
