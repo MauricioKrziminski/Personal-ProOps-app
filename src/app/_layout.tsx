@@ -1,6 +1,6 @@
 import { useEffect } from 'react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { DarkTheme, DefaultTheme, Stack, ThemeProvider, router } from 'expo-router';
+import { DarkTheme, DefaultTheme, Stack, ThemeProvider, router, useSegments } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
 import { Platform, Pressable, useColorScheme } from 'react-native';
 import { KeyboardProvider } from 'react-native-keyboard-controller';
@@ -11,6 +11,7 @@ import { AndroidActionSheet } from '@/components/ui/action-sheet';
 import { Icon } from '@/components/ui/icon';
 import { ConcealProvider } from '@/components/ui/conceal';
 import { ToastProvider } from '@/components/ui/toast';
+import { useBarStyle } from '@/hooks/use-theme';
 import { useSession } from '@/hooks/use-session';
 import { attachNotificationListeners, configureNotificationHandler } from '@/lib/notifications';
 
@@ -61,19 +62,59 @@ export default function RootLayout() {
   useEffect(attachNotificationListeners, []);
 
   const { session, loading } = useSession();
+  const barStyle = useBarStyle();
+  /**
+   * As duas telas de `HeroPanel` — fundo escuro nos DOIS temas, então ícone claro.
+   *
+   * Por SEGMENTO, não por `usePathname()`: a aba Hoje não mora em `/` (lá fica o `index` que
+   * decide o destino), e comparar string levava a um casamento silenciosamente falso. O
+   * `length === 2` é o que exclui as telas EMPURRADAS dentro da aba — Orçamentos e Fatura têm
+   * cabeçalho claro e precisam do ícone escuro.
+   */
+  const segments = useSegments();
+  const onHeroScreen =
+    segments.length === 2 &&
+    segments[0] === '(tabs)' &&
+    (segments[1] === 'today' || segments[1] === 'finance');
+  const statusBarStyle = onHeroScreen ? ('light' as const) : barStyle;
 
   return (
     <QueryClientProvider client={queryClient}>
       <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
         {/* Requisito do `react-native-keyboard-controller`: sem o provider os componentes de
             teclado (o editor de nota) não recebem evento nenhum. */}
-        <KeyboardProvider>
+        <KeyboardProvider statusBarTranslucent navigationBarTranslucent>
           <ConcealProvider>
           <ToastProvider>
             <AnimatedSplashOverlay ready={!loading} />
           <AndroidActionSheet />
             {loading ? null : (
-              <Stack>
+              /*
+               * `statusBarStyle` mora AQUI, e só aqui.
+               *
+               * No Android o padrão do `react-native-screens` é `light` — a doc é explícita:
+               * "`auto` e `inverted` são suportados só no iOS; no Android caem para `light`".
+               * Sem declarar nada, relógio e bateria saíam brancos sobre fundo branco no app
+               * inteiro (invisível enquanto havia uma faixa branca cobrindo o topo).
+               *
+               * Por que a decisão sobe até a raiz em vez de ficar em cada tela: a `NativeTabs`
+               * corta a coordenação do `react-native-screens` entre as pilhas, e a declaração da
+               * pilha RAIZ ganha sempre. Medido no emulador — `statusBarStyle: 'light'` na pilha
+               * da aba Hoje saiu ESCURO sobre o painel preto. E `setStatusBarStyle` no foco perde
+               * a corrida com a opção nativa, que é reaplicada a cada troca de tela: voltando
+               * pelo botão de voltar, o ícone ficava escuro no preto.
+               *
+               * Uma declaração só, no lugar que manda, é o que torna isto previsível.
+               *
+               * ⚠️ FURO CONHECIDO: **voltar** de uma subtela clara para a raiz de uma aba com
+               * painel (Orçamentos → Financeiro) deixa o ícone escuro sobre o preto até trocar de
+               * aba — na volta nada relê a config. Tentados e medidos sem sucesso:
+               * `statusBarStyle` na pilha da aba, em `heroHeaderOptions`, `setStatusBarStyle` num
+               * `useEffect` da raiz e num `useFocusEffect` da tela. Parece limitação da
+               * `NativeTabs`; a próxima parada é o repo do `react-native-screens`, não mais uma
+               * quinta declaração aqui.
+               */
+              <Stack screenOptions={{ statusBarStyle }}>
               {/* `/` é a URL inicial: renderiza antes de qualquer guard, por isso fica FORA dos
                   `Stack.Protected` e decide o destino por conta própria. */}
               <Stack.Screen name="index" options={{ headerShown: false }} />
@@ -99,7 +140,6 @@ export default function RootLayout() {
                   />
                   <Stack.Screen name="reminders" options={{ title: 'Lembretes' }} />
                   <Stack.Screen name="search" options={{ title: 'Buscar' }} />
-                <Stack.Screen name="ai-activity" options={{ title: 'Atividade da IA' }} />
                 <Stack.Screen name="import" options={{ title: 'Importar extrato' }} />
                 <Stack.Screen name="import-history" options={{ title: 'Importações' }} />
                   {/* Paywall é modal fechável SEMPRE: paywall que não fecha é reprovação na App Review. */}
