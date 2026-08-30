@@ -24,7 +24,7 @@ const ToastContext = createContext<(t: Toast) => void>(() => {});
  * Mensagem transitória.
  *
  * Existe por um motivo concreto: hoje 15 mutations do app falham em **silêncio total**
- * (`useDeleteNote`, `useToggleReminder`, `useArchive*`, `useMarkPaid`, `useUndoAiEvent`,
+ * (`useDeleteNote`, `useToggleReminder`, `useArchive*`, `useMarkPaid`,
  * `usePayDebtInstallment`…). Nenhuma delas tem tratamento de erro.
  *
  * Regra: toda mutation que pode falhar chama `toast` no `onError`. Ação destrutiva reversível

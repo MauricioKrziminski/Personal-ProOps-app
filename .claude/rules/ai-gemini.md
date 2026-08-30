@@ -25,7 +25,7 @@
 
 ## Auditoria e custo
 
-- **Todo** parse grava linha em `ai_events` (model, tokens, confidence, result jsonb, `created_transaction_ids`) — é a observabilidade do produto (sem Sentry) E a tela "Atividade da IA" do app, que mostra ao usuário o que foi entendido e deixa desfazer.
+- **Todo** parse grava linha em `ai_events` (model, tokens, confidence, result jsonb, `created_transaction_ids`) — é a observabilidade do produto (sem Sentry). **Só isso: `ai_events` não é tela.** Havia uma "Atividade da IA" listando modelo, confiança em % e as ações geradas, mais um bloco igual no detalhe do lançamento; os dois foram removidos em 30/08/2026. Nome de modelo e confiança são telemetria de quem CONSTRÓI o produto, e mostrar isso pede ao usuário que audite a IA em vez de confiar nela. O que o usuário precisa é ver o item certo e poder corrigi-lo onde ele mora — o que já existe no próprio item e no `undo_last` do WhatsApp.
 - Rate limit por usuário antes de chamar o Gemini (contagem em `ai_events` na última hora); estourou → responde "aguarde" e marca o job done. Além dele, a cota do plano (`_plan_status`) corta por mês.
 - **Nunca dormir esperando 429 dentro da function**: estoura o tempo dela e prende o job em `processing`. Falha rápido — o cron de 1 minuto é o backoff.
 
