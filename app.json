@@ -9,7 +9,8 @@
     "userInterfaceStyle": "automatic",
     "ios": {
       "bundleIdentifier": "com.proops.personal",
-      "supportsTablet": true
+      "supportsTablet": true,
+      "infoPlist": { "UIViewControllerBasedStatusBarAppearance": true }
     },
     "android": {
       "adaptiveIcon": {
