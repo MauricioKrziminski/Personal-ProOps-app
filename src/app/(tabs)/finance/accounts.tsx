@@ -1,17 +1,12 @@
 import { useState } from 'react';
-import {
-  Modal,
-  Platform,
-  ScrollView,
-  StyleSheet,
-  View,
-} from 'react-native';
+import { Modal, ScrollView, StyleSheet, View } from 'react-native';
 import Animated, { FadeInDown } from 'react-native-reanimated';
-import { Link, Stack, router } from 'expo-router';
+import { Stack, router } from 'expo-router';
 import type { SymbolViewProps } from 'expo-symbols';
 
 import { ThemedText } from '@/components/themed-text';
 import { HeaderActions } from '@/components/ui/header-actions';
+import { ItemLink } from '@/components/ui/item-link';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { EmptyState } from '@/components/ui/empty-state';
@@ -36,7 +31,7 @@ import {
   type AccountBalance,
 } from '@/hooks/use-finance';
 import { useTheme } from '@/hooks/use-theme';
-import { confirmDestructive, showItemActions } from '@/lib/item-actions';
+import { confirmDestructive } from '@/lib/item-actions';
 
 /**
  * Contas — "quanto eu tenho, e onde?".
@@ -228,32 +223,38 @@ export default function AccountsScreen() {
         : null;
 
     return (
-      <Link key={saldo.account_id} href="/finance/transactions" asChild>
-        <Link.Trigger>
+      <ItemLink
+        key={saldo.account_id}
+        href="/finance/transactions"
+        title={saldo.name}
+        actions={[
+          {
+            label: 'Ver extrato',
+            icon: 'list.bullet',
+            onPress: () => router.push('/finance/transactions'),
+          },
+          {
+            label: 'Editar',
+            icon: 'pencil',
+            disabled: !conta,
+            onPress: () => conta && abrirEdicao(conta),
+          },
+          {
+            label: 'Arquivar',
+            icon: 'archivebox',
+            destructive: true,
+            disabled: !conta,
+            onPress: () => conta && arquivar(conta),
+          },
+        ]}>
+        {({ onLongPress }) => (
           <Row
             title={saldo.name}
             subtitle={ciclo ?? tipo}
             icon={ICONE[saldo.type]}
             // o valor negativo não pode ser comunicado só pela cor
             accessibilityLabel={`${saldo.name}, ${tipo}, ${negativo ? 'deve' : 'tem'} ${formatBRL(Math.abs(cents))}`}
-            // `Link.Menu` é iOS-only; sem isto o Android ficaria sem ação nenhuma na linha.
-            onLongPress={
-              Platform.OS === 'ios'
-                ? undefined
-                : () =>
-                    showItemActions(saldo.name, [
-                      {
-                        label: 'Ver extrato',
-                        onPress: () => router.push('/finance/transactions'),
-                      },
-                      { label: 'Editar', onPress: () => conta && abrirEdicao(conta) },
-                      {
-                        label: 'Arquivar',
-                        destructive: true,
-                        onPress: () => conta && arquivar(conta),
-                      },
-                    ])
-            }
+            onLongPress={onLongPress}
             trailing={
               <Money
                 cents={cents}
@@ -263,26 +264,8 @@ export default function AccountsScreen() {
               />
             }
           />
-        </Link.Trigger>
-        <Link.Menu>
-          <Link.MenuAction icon="list.bullet" onPress={() => router.push('/finance/transactions')}>
-            Ver extrato
-          </Link.MenuAction>
-          <Link.MenuAction
-            icon="pencil"
-            disabled={!conta}
-            onPress={() => conta && abrirEdicao(conta)}>
-            Editar
-          </Link.MenuAction>
-          <Link.MenuAction
-            icon="archivebox"
-            destructive
-            disabled={!conta}
-            onPress={() => conta && arquivar(conta)}>
-            Arquivar
-          </Link.MenuAction>
-        </Link.Menu>
-      </Link>
+        )}
+      </ItemLink>
     );
   };
 

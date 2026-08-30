@@ -7,6 +7,7 @@ import { EmptyState } from '@/components/ui/empty-state';
 import { Money } from '@/components/ui/money';
 import { Row, Section } from '@/components/ui/row';
 import { Screen } from '@/components/ui/screen';
+import { Search } from '@/components/ui/search';
 import { SkeletonRow } from '@/components/ui/skeleton';
 import { Space } from '@/design/tokens';
 import { useGlobalSearch } from '@/hooks/use-search';
@@ -65,10 +66,12 @@ export default function SearchScreen() {
           headerLargeTitle: false,
         }}
       />
-      <Stack.SearchBar
+      <Search
         autoFocus
+        value={text}
+        onChangeText={setText}
         placeholder="Buscar em tudo"
-        onChangeText={(e) => setText(e.nativeEvent.text)}
+        accessibilityLabel="Buscar em notas, lançamentos e lembretes"
       />
 
       <View style={styles.chips}>

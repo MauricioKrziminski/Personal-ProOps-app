@@ -3,9 +3,10 @@ import { Modal, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { ThemedText } from '@/components/themed-text';
+import { Icon } from '@/components/ui/icon';
 import { Radius, Space } from '@/design/tokens';
 import { useTheme } from '@/hooks/use-theme';
-import { registerAndroidSheet, type ItemAction } from '@/lib/item-actions';
+import { registerAndroidSheet, showItemActions, type ItemAction } from '@/lib/item-actions';
 
 interface SheetState {
   title: string;
@@ -64,17 +65,29 @@ export function AndroidActionSheet() {
             <Pressable
               key={action.label}
               accessibilityRole="button"
+              accessibilityState={{ disabled: !!action.disabled }}
+              disabled={action.disabled}
               onPress={() => {
                 close();
-                action.onPress();
+                // Submenu abre um segundo sheet; entrada normal executa. O `close()` antes é o
+                // que deixa o segundo entrar sem os dois empilhados na tela.
+                if (action.actions?.length) showItemActions(action.label, action.actions);
+                else action.onPress?.();
               }}
               style={({ pressed }) => [
                 styles.option,
                 { backgroundColor: pressed ? theme.backgroundSelected : 'transparent' },
               ]}>
-              <ThemedText type="default" themeColor={action.destructive ? 'danger' : 'text'}>
-                {action.label}
+              <ThemedText
+                type="default"
+                themeColor={
+                  action.disabled ? 'textSecondary' : action.destructive ? 'danger' : 'text'
+                }
+                style={styles.optionLabel}>
+                {action.actions?.length ? `${action.label}…` : action.label}
               </ThemedText>
+              {/* Estado ligado é ÍCONE, não glyph de texto (`design.md` §4). */}
+              {action.selected ? <Icon name="checkmark" size="sm" color="tint" /> : null}
             </Pressable>
           ))}
         </ScrollView>
@@ -113,9 +126,15 @@ const styles = StyleSheet.create({
     maxHeight: 320,
   },
   option: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Space.md,
     paddingHorizontal: Space.xl,
     paddingVertical: Space.lg,
     minHeight: 52,
-    justifyContent: 'center',
+  },
+  /** O rótulo empurra o check para a direita. */
+  optionLabel: {
+    flex: 1,
   },
 });

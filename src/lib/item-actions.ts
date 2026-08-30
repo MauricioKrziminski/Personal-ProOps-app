@@ -4,10 +4,20 @@ import type { SFSymbol } from 'sf-symbols-typescript';
 
 export interface ItemAction {
   label: string;
-  onPress: () => void;
+  /** Opcional só quando a entrada é um submenu (`actions`) — aí ela abre, não executa. */
+  onPress?: () => void;
   destructive?: boolean;
+  /** Ação visível mas indisponível — some do `Alert` de emergência, que só cabe duas. */
+  disabled?: boolean;
+  /** Estado ligado: a pasta em que a nota já está. `isOn` no iOS, check no sheet do Android. */
+  selected?: boolean;
   /** SF Symbol — só o menu nativo do iOS desenha; sheet e `Alert` ignoram. */
   icon?: SFSymbol;
+  /**
+   * Submenu. No iOS vira `Link.Menu` aninhado; no Android, **um segundo sheet** — que é o
+   * natural lá, e melhor do que despejar dez pastas na lista principal.
+   */
+  actions?: ItemAction[];
 }
 
 interface SheetRequest {
@@ -39,6 +49,16 @@ export function registerAndroidSheet(setter: (request: SheetRequest | null) => v
  * `Link.Menu` do expo-router (o context menu com preview) é **iOS-only**; usar só ele deixaria o
  * Android sem ação nenhuma na linha.
  */
+/** Entrada com submenu abre outro menu; entrada normal executa. */
+function press(title: string, action?: ItemAction) {
+  if (!action) return;
+  if (action.actions?.length) {
+    showItemActions(action.label, action.actions);
+    return;
+  }
+  action.onPress?.();
+}
+
 export function showItemActions(title: string, actions: ItemAction[], message?: string) {
   Haptics.selectionAsync();
 
@@ -53,7 +73,7 @@ export function showItemActions(title: string, actions: ItemAction[], message?: 
         destructiveButtonIndex: destructiveIndex >= 0 ? destructiveIndex + 1 : undefined,
       },
       (index) => {
-        if (index > 0) actions[index - 1]?.onPress();
+        if (index > 0) press(title, actions[index - 1]);
       }
     );
     return;
@@ -67,10 +87,10 @@ export function showItemActions(title: string, actions: ItemAction[], message?: 
   // Rede de segurança: melhor duas ações honestas do que quatro com a última sumindo.
   Alert.alert(title, message, [
     { text: 'Cancelar', style: 'cancel' },
-    ...actions.slice(0, 2).map((a) => ({
+    ...actions.filter((a) => !a.disabled).slice(0, 2).map((a) => ({
       text: a.label,
       style: a.destructive ? ('destructive' as const) : ('default' as const),
-      onPress: a.onPress,
+      onPress: () => press(title, a),
     })),
   ]);
 }

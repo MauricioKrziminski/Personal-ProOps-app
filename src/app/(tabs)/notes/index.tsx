@@ -1,15 +1,18 @@
 import { useEffect, useState } from 'react';
-import { Platform, Pressable, ScrollView, StyleSheet, View, useWindowDimensions } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, View, useWindowDimensions } from 'react-native';
 import { FlashList } from '@shopify/flash-list';
-import { Link, Stack, router } from 'expo-router';
+import { router } from 'expo-router';
 import * as Haptics from 'expo-haptics';
 
 import { Chip } from '@/components/finance/chip';
 import { ThemedText } from '@/components/themed-text';
 import { EmptyState } from '@/components/ui/empty-state';
 import { HeaderActions } from '@/components/ui/header-actions';
+import { ItemLink } from '@/components/ui/item-link';
+import { Search } from '@/components/ui/search';
 import { TextField } from '@/components/ui/field';
 import { Icon } from '@/components/ui/icon';
+import { Mark } from '@/components/ui/mark';
 import { Screen } from '@/components/ui/screen';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useToast } from '@/components/ui/toast';
@@ -26,7 +29,6 @@ import {
   type NoteFolder,
 } from '@/hooks/use-notes';
 import { useTheme } from '@/hooks/use-theme';
-import { showItemActions } from '@/lib/item-actions';
 import { noteTitle, notePreview, parseChecklist } from '@/lib/search';
 import { relativeBR } from '@/lib/dates';
 
@@ -102,30 +104,39 @@ function NoteRow({
     .join(', ');
 
   return (
-    <Link href={`/notes/${note.id}`} asChild>
-      <Link.Trigger>
+    <ItemLink
+      href={`/notes/${note.id}`}
+      title={title}
+      actions={[
+        {
+          label: note.pinned ? 'Desafixar' : 'Fixar',
+          icon: note.pinned ? 'pin.slash' : 'pin',
+          onPress: () => actions.onPin(note),
+        },
+        {
+          label: 'Mover para pasta',
+          icon: 'folder',
+          actions: [
+            {
+              label: 'Sem pasta',
+              icon: 'tray',
+              selected: !note.folder_id,
+              onPress: () => actions.onMove(note, null),
+            },
+            ...actions.folders.map((folder) => ({
+              label: folder.name,
+              selected: note.folder_id === folder.id,
+              onPress: () => actions.onMove(note, folder.id),
+            })),
+          ],
+        },
+        { label: 'Lixeira', icon: 'trash', destructive: true, onPress: () => actions.onTrash(note) },
+      ]}>
+      {({ onLongPress }) => (
         <Pressable
           accessibilityRole="button"
           accessibilityLabel={label}
-          // `Link.Menu` é iOS-only; sem isto o Android ficaria sem ação nenhuma na linha.
-          onLongPress={
-            Platform.OS === 'ios'
-              ? undefined
-              : () =>
-                  showItemActions(title, [
-                    {
-                      label: note.pinned ? 'Desafixar' : 'Fixar',
-                      onPress: () => actions.onPin(note),
-                    },
-                    ...[{ id: null as string | null, name: 'Sem pasta' }, ...actions.folders].map(
-                      (f) => ({
-                        label: `Mover para ${f.name}`,
-                        onPress: () => actions.onMove(note, f.id),
-                      })
-                    ),
-                    { label: 'Lixeira', destructive: true, onPress: () => actions.onTrash(note) },
-                  ])
-          }
+          onLongPress={onLongPress}
           style={styles.press}>
           {({ pressed }) => (
           <View
@@ -178,9 +189,17 @@ function NoteRow({
               </View>
             ) : null}
 
+            {/*
+              A espiral marca o que a IA registrou — o quinto papel previsto em `design.md` §2b,
+              e o que estava faltando desde que a tela de Atividade saiu.
+
+              Era um balão de conversa genérico. O balão diz "veio de um chat"; a marca diz "isto
+              entrou pelo ProOps", que é a informação que importa e a única que ninguém mais pode
+              desenhar. Mesma forma da abertura, do spinner e do estado vazio.
+            */}
             {note.source === 'whatsapp' ? (
               <View style={styles.metaBit}>
-                <Icon name="bubble.left" size={13} color="textSecondary" />
+                <Mark size={13} color="textSecondary" />
                 <ThemedText type="caption" themeColor="textSecondary">
                   WhatsApp
                 </ThemedText>
@@ -197,35 +216,8 @@ function NoteRow({
           </View>
           )}
         </Pressable>
-      </Link.Trigger>
-
-      <Link.Menu>
-        <Link.MenuAction
-          icon={note.pinned ? 'pin.slash' : 'pin'}
-          onPress={() => actions.onPin(note)}>
-          {note.pinned ? 'Desafixar' : 'Fixar'}
-        </Link.MenuAction>
-        <Link.Menu title="Mover para pasta" icon="folder">
-          <Link.MenuAction
-            icon="tray"
-            isOn={!note.folder_id}
-            onPress={() => actions.onMove(note, null)}>
-            Sem pasta
-          </Link.MenuAction>
-          {actions.folders.map((folder) => (
-            <Link.MenuAction
-              key={folder.id}
-              isOn={note.folder_id === folder.id}
-              onPress={() => actions.onMove(note, folder.id)}>
-              {folder.name}
-            </Link.MenuAction>
-          ))}
-        </Link.Menu>
-        <Link.MenuAction icon="trash" destructive onPress={() => actions.onTrash(note)}>
-          Lixeira
-        </Link.MenuAction>
-      </Link.Menu>
-    </Link>
+      )}
+    </ItemLink>
   );
 }
 
@@ -362,7 +354,6 @@ export default function NotesScreen() {
     />
   ) : (
     <EmptyState
-      icon="note.text"
       title="Nada anotado ainda"
       hint="Escreve aqui em cima — ou manda «anotar: ligar pro dentista» no WhatsApp."
     />
@@ -376,14 +367,6 @@ export default function NotesScreen() {
           { label: 'Nova nota', icon: 'square.and.pencil', onPress: () => router.push('/notes/new') },
         ]}
       />
-      <Stack.SearchBar
-        placement="automatic"
-        placeholder="Buscar nas notas"
-        autoCapitalize="none"
-        onChangeText={(e) => setTyped(e.nativeEvent.text)}
-        onCancelButtonPress={() => setTyped('')}
-      />
-
       <FlashList
         data={notes}
         keyExtractor={(note) => note.id}
@@ -397,6 +380,16 @@ export default function NotesScreen() {
         ListHeaderComponent={
           <View>
       {/* A captura de dois segundos. Fica fixa: é o coração do produto, não vai atrás de FAB. */}
+            {/* No Android o campo mora aqui, acima da captura rápida; no iOS o `Search` não
+                desenha nada e a busca vai para o header nativo. */}
+            <Search
+              gutter
+              value={typed}
+              onChangeText={setTyped}
+              placeholder="Buscar nas notas"
+              accessibilityLabel="Buscar nas notas"
+            />
+
             <View style={styles.quickAdd}>
               <TextField
                 value={draft}
@@ -418,10 +411,21 @@ export default function NotesScreen() {
                   styles.send,
                   {
                     backgroundColor: draft.trim() ? theme.tint : theme.backgroundElement,
-                    opacity: !draft.trim() || pressed ? 0.5 : 1,
+                    opacity: pressed ? 0.5 : 1,
                   },
                 ]}>
-                <Icon name="arrow.up" size="md" color="text" weight="semibold" />
+                {/*
+                  `onTint`, nunca `text`: a pílula é pintada de `tint`, que é TINTA (quase-preto
+                  no claro). Com `text` a seta saía preta sobre preto — o botão virava um disco
+                  cego no tema claro. Desabilitado perde a cor em vez de perder opacidade, que é
+                  a mesma régua do `Button`.
+                */}
+                <Icon
+                  name="arrow.up"
+                  size="md"
+                  color={draft.trim() ? 'onTint' : 'textSecondary'}
+                  weight="semibold"
+                />
               </Pressable>
             </View>
 
@@ -625,8 +629,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: Space.sm,
   },
+  /** Mesma etiqueta do `Section` — token `Type.meta`, não tracking à mão. */
   heading: {
-    letterSpacing: 0.6,
+    ...Type.meta,
     marginTop: Space.xl,
     marginBottom: Space.sm,
   },

@@ -1,6 +1,6 @@
 import { Stack, router, useLocalSearchParams } from 'expo-router';
 import { useMemo } from 'react';
-import { Platform, StyleSheet, View } from 'react-native';
+import { StyleSheet, View } from 'react-native';
 import Animated, { FadeInDown } from 'react-native-reanimated';
 import type { SymbolViewProps } from 'expo-symbols';
 
@@ -12,7 +12,7 @@ import { Button } from '@/components/ui/button';
 import { EmptyState } from '@/components/ui/empty-state';
 import { Money } from '@/components/ui/money';
 import { Row, Section } from '@/components/ui/row';
-import { androidOverflow } from '@/components/ui/header-actions';
+import { HeaderActions, HeaderMenu } from '@/components/ui/header-actions';
 import { Screen } from '@/components/ui/screen';
 import { HeroLabel } from '@/components/ui/section-head';
 import { Skeleton, SkeletonRow } from '@/components/ui/skeleton';
@@ -21,18 +21,15 @@ import { Motion, Radius, Space, tabular } from '@/design/tokens';
 import {
   SUGGESTED_CATEGORIES,
   useAccounts,
-  useAiEvents,
   useDeleteTransaction,
   useInvoice,
   useMarkPaid,
   useSaveTransaction,
   useTransactions,
-  useUndoAiEvent,
-  type AiActionSummary,
   type Transaction,
 } from '@/hooks/use-finance';
 import { formatBRL, formatDateBR, localISODate } from '@/hooks/use-items';
-import { confirmDestructive, showItemActions } from '@/lib/item-actions';
+import { confirmDestructive } from '@/lib/item-actions';
 
 /**
  * Lançamento (detalhe) — a tela que faltava.
@@ -72,16 +69,6 @@ function longDate(iso: string): string {
   });
 }
 
-/** Confiança nunca é só cor: vira número E palavra. */
-function confidenceWord(value: number): string {
-  return value >= 0.8 ? 'alta' : value >= 0.6 ? 'média' : 'baixa';
-}
-
-function describeAction(action: AiActionSummary): string {
-  const what = action.content ?? action.title ?? action.category ?? action.type;
-  return action.amount_cents ? `${what} — ${formatBRL(action.amount_cents)}` : what;
-}
-
 export default function TransactionDetailScreen() {
   const toast = useToast();
   const params = useLocalSearchParams<{ txId: string; month?: string }>();
@@ -95,17 +82,9 @@ export default function TransactionDetailScreen() {
 
   const accounts = useAccounts();
   const invoice = useInvoice(tx?.invoice_id ?? undefined);
-  // `ai_event_for_transaction` não existe: varremos os eventos recentes procurando o id.
-  const aiEvents = useAiEvents(50);
-  const aiEvent = useMemo(
-    () => (aiEvents.data ?? []).find((e) => (e.created_transaction_ids ?? []).includes(txId)),
-    [aiEvents.data, txId]
-  );
-
   const save = useSaveTransaction();
   const remove = useDeleteTransaction();
   const markPaid = useMarkPaid();
-  const undo = useUndoAiEvent();
 
   const accountLabel = tx?.account_id
     ? ((accounts.data ?? []).find((a) => a.id === tx.account_id)?.name ?? null)
@@ -216,56 +195,38 @@ export default function TransactionDetailScreen() {
 
   return (
     <Screen grouped>
-      <Stack.Screen
-        options={{
-          title,
-          // No Android o toolbar nativo não desenha: sem isto, "Duplicar" e "Apagar" ficam
-          // inalcançáveis. O submenu de categoria vira um segundo sheet, que é o natural lá.
-          headerRight: androidOverflow('Lançamento', [
-            {
-              label: 'Mudar categoria',
-              onPress: () =>
-                showItemActions(
-                  'Mudar categoria',
-                  SUGGESTED_CATEGORIES.map((option) => ({
-                    label: tx.category === option ? `${option} (atual)` : option,
-                    onPress: () => patch({ category: option }),
-                  }))
-                ),
-            },
-            { label: 'Duplicar', onPress: duplicate },
-            { label: 'Apagar', destructive: true, onPress: confirmDelete },
-          ]),
-        }}
+      <Stack.Screen options={{ title }} />
+
+      {/*
+        As ações do header saem de UM array, nos dois sistemas. Antes elas eram escritas duas
+        vezes nesta tela — como `Stack.Toolbar` (iOS) e como `androidOverflow` — e o
+        `Platform.OS === 'ios' ? ... : null` em volta do toolbar era o sintoma.
+      */}
+      <HeaderActions
+        actions={[
+          {
+            label: 'Editar',
+            onPress: () =>
+              router.push({ pathname: '/finance/transaction-form', params: { id: tx.id, month } }),
+          },
+        ]}
       />
-{Platform.OS === 'ios' ? (
-      <Stack.Toolbar placement="right">
-        <Stack.Toolbar.Button
-          onPress={() =>
-            router.push({ pathname: '/finance/transaction-form', params: { id: tx.id, month } })
-          }>
-          Editar
-        </Stack.Toolbar.Button>
-        <Stack.Toolbar.Menu icon="ellipsis.circle" accessibilityLabel="Mais opções">
-          <Stack.Toolbar.Menu title="Mudar categoria" icon="tag">
-            {SUGGESTED_CATEGORIES.map((option) => (
-              <Stack.Toolbar.MenuAction
-                key={option}
-                isOn={tx.category === option}
-                onPress={() => patch({ category: option })}>
-                {option}
-              </Stack.Toolbar.MenuAction>
-            ))}
-          </Stack.Toolbar.Menu>
-          <Stack.Toolbar.MenuAction icon="plus.square.on.square" onPress={duplicate}>
-            Duplicar
-          </Stack.Toolbar.MenuAction>
-          <Stack.Toolbar.MenuAction icon="trash" destructive onPress={confirmDelete}>
-            Apagar
-          </Stack.Toolbar.MenuAction>
-        </Stack.Toolbar.Menu>
-      </Stack.Toolbar>
-      ) : null}
+      <HeaderMenu
+        title="Lançamento"
+        actions={[
+          {
+            label: 'Mudar categoria',
+            icon: 'tag',
+            actions: SUGGESTED_CATEGORIES.map((option) => ({
+              label: option,
+              selected: tx.category === option,
+              onPress: () => patch({ category: option }),
+            })),
+          },
+          { label: 'Duplicar', icon: 'plus.square.on.square', onPress: duplicate },
+          { label: 'Apagar', icon: 'trash', destructive: true, onPress: confirmDelete },
+        ]}
+      />
 
       {/* O único destaque: é o que a pessoa veio conferir em três segundos. */}
       <Animated.View entering={FadeInDown.duration(Motion.duration.slow)}>
@@ -326,46 +287,6 @@ export default function TransactionDetailScreen() {
           <Row title={formatDateBR(created)} subtitle="Registrado em" icon="calendar" />
         ) : null}
       </Section>
-
-      {/* Só faz sentido para o que veio do WhatsApp. */}
-      {tx.source === 'whatsapp' ? (
-        aiEvents.isError ? (
-          <Section title="O que a IA entendeu">
-            <Row
-              title="Não deu para carregar o que a IA entendeu"
-              subtitle="O resto do lançamento continua válido"
-              icon="exclamationmark.triangle"
-              onPress={() => aiEvents.refetch()}
-            />
-          </Section>
-        ) : aiEvent ? (
-          <Section title="O que a IA entendeu">
-            <Row
-              title={`Confiança ${confidenceWord(aiEvent.confidence ?? 0)} — ${Math.round((aiEvent.confidence ?? 0) * 100)}%`}
-              subtitle={aiEvent.model ?? undefined}
-              icon="sparkles"
-            />
-            {aiEvent.actions.map((action, i) => (
-              <Row key={`${aiEvent.id}-${i}`} title={describeAction(action)} subtitle="Ação gerada" icon="text.quote" />
-            ))}
-            <Row
-              title="Desfazer o que essa mensagem criou"
-              icon="arrow.uturn.backward"
-              destructive
-              onPress={() =>
-                undo.mutate(aiEvent.created_transaction_ids ?? [], {
-                  onSuccess: () => {
-                    router.back();
-                    toast({ message: 'Desfeito.', tone: 'success' });
-                  },
-                  onError: () =>
-                    toast({ message: 'Não deu para desfazer. Tenta de novo.', tone: 'error' }),
-                })
-              }
-            />
-          </Section>
-        ) : null
-      ) : null}
 
       {(tx.invoice_id || tx.installment_plan_id) && (
         <Section title="Faz parte de">

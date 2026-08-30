@@ -1,6 +1,6 @@
-import { Link, Stack, router, useLocalSearchParams } from 'expo-router';
+import { Stack, router, useLocalSearchParams } from 'expo-router';
 import { useMemo, useState } from 'react';
-import { Platform, SectionList, StyleSheet, View } from 'react-native';
+import { SectionList, StyleSheet, View } from 'react-native';
 import Animated, { FadeInDown } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import type { SymbolViewProps } from 'expo-symbols';
@@ -10,6 +10,8 @@ import { MonthPicker, currentMonth, monthTitle, shiftMonth } from '@/components/
 import { Card } from '@/components/ui/card';
 import { ThemedText } from '@/components/themed-text';
 import { HeaderMenu } from '@/components/ui/header-actions';
+import { ItemLink } from '@/components/ui/item-link';
+import { Search } from '@/components/ui/search';
 import { Button } from '@/components/ui/button';
 import { EmptyState } from '@/components/ui/empty-state';
 import { Money } from '@/components/ui/money';
@@ -34,7 +36,7 @@ import {
 } from '@/hooks/use-finance';
 import { formatBRL, formatDateBR, localISODate } from '@/hooks/use-items';
 import { monthBounds } from '@/lib/dates';
-import { confirmDestructive, showItemActions } from '@/lib/item-actions';
+import { confirmDestructive } from '@/lib/item-actions';
 import { useTheme } from '@/hooks/use-theme';
 
 /**
@@ -275,11 +277,13 @@ export default function TransactionsScreen() {
     <View style={styles.root}>
       <Screen scroll={false} grouped>
         <Stack.Screen options={{ title: 'Lançamentos', headerLargeTitle: true }} />
-        <Stack.SearchBar
-          placeholder="Buscar por descrição, lugar ou categoria"
+        <Search
+          gutter
+          value={search}
+          onChangeText={setSearch}
           hideWhenScrolling={false}
-          onChangeText={(event) => setSearch(event.nativeEvent.text)}
-          onClose={() => setSearch('')}
+          placeholder="Buscar por descrição, lugar ou categoria"
+          accessibilityLabel="Buscar lançamentos"
         />
         <HeaderMenu
           title="Mais opções"
@@ -349,47 +353,34 @@ export default function TransactionsScreen() {
                   index === 0 && styles.groupTop,
                   index === section.data.length - 1 && styles.groupBottom,
                 ]}>
-                <Link
-                  asChild
-                  href={{ pathname: '/finance/[txId]', params: { txId: tx.id, month } }}>
-                  <Link.Trigger>
+                <ItemLink
+                  href={{ pathname: '/finance/[txId]', params: { txId: tx.id, month } }}
+                  title={tx.description || tx.merchant || tx.category || 'Lançamento'}
+                  actions={[
+                    {
+                      label: 'Ver detalhe',
+                      icon: 'doc.text.magnifyingglass',
+                      onPress: () =>
+                        router.push({ pathname: '/finance/[txId]', params: { txId: tx.id, month } }),
+                    },
+                    {
+                      label: 'Editar',
+                      icon: 'pencil',
+                      onPress: () =>
+                        router.push({
+                          pathname: '/finance/transaction-form',
+                          params: { id: tx.id, month },
+                        }),
+                    },
+                    { label: 'Apagar', icon: 'trash', destructive: true, onPress: () => confirmDelete(tx) },
+                  ]}>
+                  {({ onLongPress }) => (
                     <Row
                       title={tx.description || tx.merchant || tx.category || 'Sem descrição'}
                       subtitle={[...badges, ...context].join(' · ')}
                       icon={KIND_ICON[tx.kind]}
                       accessibilityLabel={`${tx.description || tx.merchant || tx.category || 'Lançamento'}, ${formatBRL(tx.amount_cents)}, ${tx.kind === 'income' ? 'receita' : tx.kind === 'expense' ? 'despesa' : 'transferência'}, ${dayTitle(tx.occurred_at)}${tx.status === 'pending' ? ', previsto' : ''}`}
-                      // `Link.Menu` é iOS-only; sem isto o Android ficaria sem ação nenhuma na linha.
-                      onLongPress={
-                        Platform.OS === 'ios'
-                          ? undefined
-                          : () =>
-                              showItemActions(
-                                tx.description || tx.merchant || tx.category || 'Lançamento',
-                                [
-                                  {
-                                    label: 'Ver detalhe',
-                                    onPress: () =>
-                                      router.push({
-                                        pathname: '/finance/[txId]',
-                                        params: { txId: tx.id, month },
-                                      }),
-                                  },
-                                  {
-                                    label: 'Editar',
-                                    onPress: () =>
-                                      router.push({
-                                        pathname: '/finance/transaction-form',
-                                        params: { id: tx.id, month },
-                                      }),
-                                  },
-                                  {
-                                    label: 'Apagar',
-                                    destructive: true,
-                                    onPress: () => confirmDelete(tx),
-                                  },
-                                ]
-                              )
-                      }
+                      onLongPress={onLongPress}
                       trailing={
                         <View style={styles.trailing}>
                           <Money
@@ -409,33 +400,8 @@ export default function TransactionsScreen() {
                         </View>
                       }
                     />
-                  </Link.Trigger>
-                  <Link.Menu>
-                    <Link.MenuAction
-                      icon="doc.text.magnifyingglass"
-                      onPress={() =>
-                        router.push({
-                          pathname: '/finance/[txId]',
-                          params: { txId: tx.id, month },
-                        })
-                      }>
-                      Ver detalhe
-                    </Link.MenuAction>
-                    <Link.MenuAction
-                      icon="pencil"
-                      onPress={() =>
-                        router.push({
-                          pathname: '/finance/transaction-form',
-                          params: { id: tx.id, month },
-                        })
-                      }>
-                      Editar
-                    </Link.MenuAction>
-                    <Link.MenuAction icon="trash" destructive onPress={() => confirmDelete(tx)}>
-                      Apagar
-                    </Link.MenuAction>
-                  </Link.Menu>
-                </Link>
+                  )}
+                </ItemLink>
               </Animated.View>
             );
           }}

@@ -1,6 +1,6 @@
-import { Link, Stack, router, type Href } from 'expo-router';
+import { Stack, router, type Href } from 'expo-router';
 import { useMemo, useState } from 'react';
-import { Platform, Pressable, StyleSheet, View, useWindowDimensions } from 'react-native';
+import { Pressable, StyleSheet, View, useWindowDimensions } from 'react-native';
 import Animated, {
   FadeInDown,
   useAnimatedStyle,
@@ -15,6 +15,7 @@ import { ErrorCard } from '@/components/error-card';
 import { MonthPicker, currentMonth, monthLabel, monthTitle, shiftMonth } from '@/components/finance/month-picker';
 import { ThemedText } from '@/components/themed-text';
 import { HeaderMenu } from '@/components/ui/header-actions';
+import { ItemLink } from '@/components/ui/item-link';
 import { Button } from '@/components/ui/button';
 import { EmptyState } from '@/components/ui/empty-state';
 import { Icon } from '@/components/ui/icon';
@@ -39,9 +40,8 @@ import {
 } from '@/hooks/use-finance';
 import { formatBRL, formatDateBR } from '@/hooks/use-items';
 import { monthBounds } from '@/lib/dates';
-import { confirmDestructive, showItemActions } from '@/lib/item-actions';
+import { confirmDestructive } from '@/lib/item-actions';
 import { useTheme } from '@/hooks/use-theme';
-import { StatusBar } from 'expo-status-bar';
 
 /**
  * Financeiro — responde "como está o meu mês?" e, no fundo, "posso gastar?".
@@ -285,7 +285,6 @@ export default function FinanceScreen() {
         <Stack.Screen
           options={{ title: 'Financeiro', headerLargeTitle: true, ...heroHeaderOptions(theme) }}
         />
-        <StatusBar style="light" />
 
         <HeaderMenu
           onHero
@@ -301,7 +300,6 @@ export default function FinanceScreen() {
               icon: 'line.3.horizontal.decrease',
               onPress: () => router.push('/finance/rules'),
             },
-            { label: 'Atividade da IA', icon: 'sparkles', onPress: () => router.push('/ai-activity') },
           ]}
         />
 
@@ -517,51 +515,46 @@ export default function FinanceScreen() {
             {recentGroups.map(([day, rows]) => (
               <Section key={day} title={dayTitle(day)}>
                 {rows.map((tx) => (
-                  <Link
+                  <ItemLink
                     key={tx.id}
-                    asChild
                     href={{
                       pathname: '/finance/[txId]',
                       params: { txId: tx.id, month: tx.occurred_at.slice(0, 7) },
-                    }}>
-                    <Link.Trigger>
+                    }}
+                    title={tx.description || tx.merchant || tx.category || 'Lançamento'}
+                    actions={[
+                      {
+                        label: 'Ver detalhe',
+                        icon: 'doc.text.magnifyingglass',
+                        onPress: () =>
+                          router.push({
+                            pathname: '/finance/[txId]',
+                            params: { txId: tx.id, month: tx.occurred_at.slice(0, 7) },
+                          }),
+                      },
+                      {
+                        label: 'Editar',
+                        icon: 'pencil',
+                        onPress: () =>
+                          router.push({
+                            pathname: '/finance/transaction-form',
+                            params: { id: tx.id, month },
+                          }),
+                      },
+                      {
+                        label: 'Apagar',
+                        icon: 'trash',
+                        destructive: true,
+                        onPress: () => confirmDelete(tx),
+                      },
+                    ]}>
+                    {({ onLongPress }) => (
                       <Row
                         title={tx.description || tx.merchant || tx.category || 'Sem descrição'}
                         subtitle={[tx.category, SOURCE_LABEL[tx.source]].filter(Boolean).join(' · ')}
                         icon={KIND_ICON[tx.kind]}
                         accessibilityLabel={`${tx.description || tx.category || 'lançamento'}, ${formatBRL(tx.amount_cents)}, ${tx.kind === 'income' ? 'receita' : tx.kind === 'expense' ? 'despesa' : 'transferência'}`}
-                        // `Link.Menu` é iOS-only; sem isto o Android ficaria sem ação nenhuma na linha.
-                        onLongPress={
-                          Platform.OS === 'ios'
-                            ? undefined
-                            : () =>
-                                showItemActions(
-                                  tx.description || tx.merchant || tx.category || 'Lançamento',
-                                  [
-                                    {
-                                      label: 'Ver detalhe',
-                                      onPress: () =>
-                                        router.push({
-                                          pathname: '/finance/[txId]',
-                                          params: { txId: tx.id, month: tx.occurred_at.slice(0, 7) },
-                                        }),
-                                    },
-                                    {
-                                      label: 'Editar',
-                                      onPress: () =>
-                                        router.push({
-                                          pathname: '/finance/transaction-form',
-                                          params: { id: tx.id, month },
-                                        }),
-                                    },
-                                    {
-                                      label: 'Apagar',
-                                      destructive: true,
-                                      onPress: () => confirmDelete(tx),
-                                    },
-                                  ]
-                                )
-                        }
+                        onLongPress={onLongPress}
                         trailing={
                           <Money
                             cents={tx.kind === 'expense' ? -tx.amount_cents : tx.amount_cents}
@@ -571,33 +564,8 @@ export default function FinanceScreen() {
                           />
                         }
                       />
-                    </Link.Trigger>
-                    <Link.Menu>
-                      <Link.MenuAction
-                        icon="doc.text.magnifyingglass"
-                        onPress={() =>
-                          router.push({
-                            pathname: '/finance/[txId]',
-                            params: { txId: tx.id, month: tx.occurred_at.slice(0, 7) },
-                          })
-                        }>
-                        Ver detalhe
-                      </Link.MenuAction>
-                      <Link.MenuAction
-                        icon="pencil"
-                        onPress={() =>
-                          router.push({
-                            pathname: '/finance/transaction-form',
-                            params: { id: tx.id, month },
-                          })
-                        }>
-                        Editar
-                      </Link.MenuAction>
-                      <Link.MenuAction icon="trash" destructive onPress={() => confirmDelete(tx)}>
-                        Apagar
-                      </Link.MenuAction>
-                    </Link.Menu>
-                  </Link>
+                    )}
+                  </ItemLink>
                 ))}
               </Section>
             ))}
@@ -606,7 +574,6 @@ export default function FinanceScreen() {
 
         {isEmpty ? (
           <EmptyState
-            icon="chart.pie"
             title="Ainda não tem movimento"
             hint={'Manda “gastei 45 no mercado” no WhatsApp —\nou toca no + para lançar aqui'}
           />

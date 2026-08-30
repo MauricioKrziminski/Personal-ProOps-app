@@ -14,10 +14,8 @@ import { Screen } from '@/components/ui/screen';
 import { SkeletonRow } from '@/components/ui/skeleton';
 import { ProgressBar, Sparkline } from '@/components/ui/sparkline';
 import { useToast } from '@/components/ui/toast';
-import { StatusBar } from 'expo-status-bar';
 import { Space, Type, tabular } from '@/design/tokens';
 import {
-  useAiEvents,
   useBudgetsStatus,
   useCashFlowForecast,
   useMarkPaid,
@@ -49,7 +47,6 @@ export default function TodayScreen() {
   const bills = useUpcomingBills(7);
   const reminders = useTodayReminders();
   const budgets = useBudgetsStatus();
-  const ai = useAiEvents(5);
   const markPaid = useMarkPaid();
 
   const leftover = forecast.data?.at(-1)?.balance_cents ?? 0;
@@ -75,7 +72,6 @@ export default function TodayScreen() {
   const tight = (budgets.data ?? []).filter(
     (b) => Number(b.limit_cents) > 0 && Number(b.spent_cents) / Number(b.limit_cents) >= 0.8
   );
-  const recent = (ai.data ?? []).filter((e) => e.actions.length > 0);
 
   const loading = forecast.isLoading && bills.isLoading;
   const anyError = forecast.isError || bills.isError || reminders.isError || budgets.isError;
@@ -88,8 +84,7 @@ export default function TodayScreen() {
     overdue.length === 0 &&
     dueSoon.length === 0 &&
     (reminders.data ?? []).length === 0 &&
-    tight.length === 0 &&
-    recent.length === 0;
+    tight.length === 0;
 
   const pay = (id: string, title: string) =>
     markPaid.mutate(
@@ -129,12 +124,6 @@ export default function TodayScreen() {
       count: tight.length,
       onPress: () => router.push('/finance/budgets'),
     },
-    {
-      label: 'Revisar IA',
-      icon: 'sparkles',
-      count: recent.length,
-      onPress: () => router.push('/ai-activity'),
-    },
   ];
 
   return (
@@ -169,12 +158,9 @@ export default function TodayScreen() {
         bills.refetch();
         reminders.refetch();
         budgets.refetch();
-        ai.refetch();
       }}
       refreshing={forecast.isRefetching}>
-      {/* Título e cores do cabeçalho moram no `_layout` da aba. */}
-      <StatusBar style="light" />
-
+      {/* Título, cores do cabeçalho e estilo da status bar moram no `_layout` da aba. */}
       {/* Os dois ícones eram uma `View` à mão com `gap: 16` — e o iOS 26 desenhava a pílula de
           vidro em volta dela, com o nosso respiro em vez do do sistema. `plus.circle.fill` ao
           lado de `magnifyingglass` ainda misturava preenchido com contorno no mesmo header
@@ -304,24 +290,10 @@ export default function TodayScreen() {
         </Section>
       ) : null}
 
-      {/* Por último: é confirmação, não decisão. */}
-      {recent.length > 0 ? (
-        <Section title="A IA registrou">
-          {recent.map((e) => (
-            <Row
-              key={e.id}
-              title={e.actions.map((a) => a.content ?? a.title ?? a.type).join(' · ')}
-              subtitle={formatDateBR(e.created_at)}
-              icon="sparkles"
-              onPress={() => router.push('/ai-activity')}
-            />
-          ))}
-        </Section>
-      ) : null}
-
+      {/* Sem `icon`: vazio genérico usa a espiral (`design.md` §2b). O `sparkles` que estava
+          aqui era uma referência à IA, sobra da tela de Atividade removida. */}
       {allEmpty ? (
         <EmptyState
-          icon="sparkles"
           title="Tudo começa no WhatsApp"
           hint={'Manda “gastei 45 no mercado” ou\n“me lembra de pagar aluguel dia 5”'}
         />

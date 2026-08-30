@@ -1,20 +1,14 @@
 import { useMemo, useState } from 'react';
-import {
-  FlatList,
-  Modal,
-  Platform,
-  ScrollView,
-  StyleSheet,
-  View,
-} from 'react-native';
+import { FlatList, Modal, ScrollView, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Animated, { FadeInDown } from 'react-native-reanimated';
-import { Link, Stack, router, useLocalSearchParams } from 'expo-router';
+import { Stack, router, useLocalSearchParams } from 'expo-router';
 
 import { ThemedText } from '@/components/themed-text';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { EmptyState } from '@/components/ui/empty-state';
+import { ItemLink } from '@/components/ui/item-link';
 import { Field, TextField } from '@/components/ui/field';
 import { Icon } from '@/components/ui/icon';
 import { Money } from '@/components/ui/money';
@@ -32,7 +26,7 @@ import {
 } from '@/hooks/use-finance';
 import { formatBRL, formatDateBR, localISODate, useRealtimeInvalidate } from '@/hooks/use-items';
 import { useTheme } from '@/hooks/use-theme';
-import { confirmDestructive, showItemActions } from '@/lib/item-actions';
+import { confirmDestructive } from '@/lib/item-actions';
 
 /**
  * Fatura — "o que tem nesta fatura, e como eu marco como paga?".
@@ -276,28 +270,26 @@ export default function InvoiceScreen() {
                 const parcela =
                   tx.installment_no && tx.installment_plan_id ? `${tx.installment_no}ª parcela` : null;
                 return (
-                  <Link key={tx.id} href={`/finance/transaction-form?id=${tx.id}`} asChild>
-                    <Link.Trigger>
+                  <ItemLink
+                    key={tx.id}
+                    href={`/finance/transaction-form?id=${tx.id}`}
+                    title={tx.description ?? tx.merchant ?? 'Sem descrição'}
+                    actions={[
+                      {
+                        label: 'Editar',
+                        icon: 'pencil',
+                        onPress: () => router.push(`/finance/transaction-form?id=${tx.id}`),
+                      },
+                      { label: 'Apagar', icon: 'trash', destructive: true, onPress: () => apagar(tx) },
+                    ]}>
+                    {({ onLongPress }) => (
                       <Row
                         title={tx.description ?? tx.merchant ?? 'Sem descrição'}
                         subtitle={[tx.category, parcela, prevista ? 'prevista' : null]
                           .filter(Boolean)
                           .join(' · ')}
                         accessibilityLabel={`${tx.description ?? 'Sem descrição'}, ${formatBRL(tx.amount_cents)}${prevista ? ', parcela prevista' : ''}`}
-                        // `Link.Menu` é iOS-only; sem isto o Android ficaria sem ação nenhuma na linha.
-                        onLongPress={
-                          Platform.OS === 'ios'
-                            ? undefined
-                            : () =>
-                                showItemActions(tx.description ?? tx.merchant ?? 'Sem descrição', [
-                                  {
-                                    label: 'Editar',
-                                    onPress: () =>
-                                      router.push(`/finance/transaction-form?id=${tx.id}`),
-                                  },
-                                  { label: 'Apagar', destructive: true, onPress: () => apagar(tx) },
-                                ])
-                        }
+                        onLongPress={onLongPress}
                         trailing={
                           <Money
                             cents={tx.amount_cents}
@@ -306,18 +298,8 @@ export default function InvoiceScreen() {
                           />
                         }
                       />
-                    </Link.Trigger>
-                    <Link.Menu>
-                      <Link.MenuAction
-                        icon="pencil"
-                        onPress={() => router.push(`/finance/transaction-form?id=${tx.id}`)}>
-                        Editar
-                      </Link.MenuAction>
-                      <Link.MenuAction icon="trash" destructive onPress={() => apagar(tx)}>
-                        Apagar
-                      </Link.MenuAction>
-                    </Link.Menu>
-                  </Link>
+                    )}
+                  </ItemLink>
                 );
               })}
             </Section>

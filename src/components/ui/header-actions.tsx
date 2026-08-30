@@ -110,6 +110,27 @@ export function HeaderActions({
  * existia, então "Importar extrato", "Regras de categoria", "Duplicar" e "Apagar" ficavam
  * **inalcançáveis** no Android. Lá o menu vira `showItemActions`, que fala o idioma da plataforma.
  */
+/** Submenu vira `Stack.Toolbar.Menu` aninhado — o "Mudar categoria" do detalhe do lançamento. */
+function renderToolbarAction(action: ItemAction) {
+  if (action.actions?.length) {
+    return (
+      <Stack.Toolbar.Menu key={action.label} title={action.label} icon={action.icon}>
+        {action.actions.map(renderToolbarAction)}
+      </Stack.Toolbar.Menu>
+    );
+  }
+  return (
+    <Stack.Toolbar.MenuAction
+      key={action.label}
+      icon={action.icon}
+      destructive={action.destructive}
+      isOn={action.selected}
+      onPress={() => action.onPress?.()}>
+      {action.label}
+    </Stack.Toolbar.MenuAction>
+  );
+}
+
 export function HeaderMenu({
   title,
   actions,
@@ -125,15 +146,7 @@ export function HeaderMenu({
     return (
       <Stack.Toolbar placement="right">
         <Stack.Toolbar.Menu icon="ellipsis.circle" accessibilityLabel="Mais opções">
-          {actions.map((action) => (
-            <Stack.Toolbar.MenuAction
-              key={action.label}
-              icon={action.icon}
-              destructive={action.destructive}
-              onPress={action.onPress}>
-              {action.label}
-            </Stack.Toolbar.MenuAction>
-          ))}
+          {actions.map(renderToolbarAction)}
         </Stack.Toolbar.Menu>
       </Stack.Toolbar>
     );

@@ -26,6 +26,46 @@ Expo SDK 57 (managed), código em `src/`, paths `@/*` → `src/*` e `@/assets/*`
 - Decimal em texto (percentual, taxa, meses) só por `formatNumberBR` — vírgula, nunca ponto.
   Havia três cópias disso e uma tela sem nenhuma, escrevendo `90.4%` ao lado de `90,4%`.
 
+## Plataforma — a decisão mora no primitivo, nunca na tela
+
+**iOS e Android não têm que ficar iguais.** Tela é onde o produto acontece; ela declara *o quê*
+(as ações, o destino, o rótulo). *Como* aquilo vira interface em cada sistema é responsabilidade
+do primitivo — e é ali que a diferença entre as duas plataformas é decidida de propósito, uma vez
+só, com o motivo escrito.
+
+### Os três mecanismos, na ordem de preferência
+
+1. **Arquivo por plataforma** (`foo.tsx` + `foo.ios.tsx` / `foo.android.tsx`) — quando a
+   IMPLEMENTAÇÃO diverge: componentes diferentes, árvore diferente, gesto diferente. O Metro
+   resolve sozinho e o código da outra plataforma nem entra no bundle.
+   - `foo.types.ts` carrega o **contrato** (as props) e os três importam dele. O TypeScript
+     resolve `./foo` pelo **arquivo-base**, então sem o tipo compartilhado uma das implementações
+     poderia divergir de props sem ninguém perceber até rodar no device.
+   - O arquivo-base é a implementação PADRÃO (a que vale onde não houver override), não um
+     esqueleto vazio.
+   - Exemplos: `search.tsx` + `search.ios.tsx`, `item-link.tsx` + `item-link.ios.tsx`.
+2. **`Platform.select` / `Platform.OS` dentro do primitivo** — quando o que muda é um VALOR
+   (uma cor, um `behavior` de teclado, um inset) e a árvore é a mesma. Ex.: `app-tabs.tsx`,
+   `header-actions.tsx`, `theme.ts`.
+3. **`Platform.OS` na tela** — só para regra de NEGÓCIO, não de layout. Ex.: `paywall.tsx`, onde a
+   loja não existe na web.
+
+### Por que a regra existe
+
+O app tinha `Platform.OS === 'ios'` em **seis telas**, cinco delas com o mesmo comentário
+copiado — `Link.Menu` é iOS-only, então cada tela remendava o Android por conta. E as ações eram
+declaradas **duas vezes** por tela: como `<Link.MenuAction>` para o iOS e como array para o
+`showItemActions`. Duas sintaxes para o mesmo conteúdo é duas coisas que divergem, e uma tela nova
+copia a de antes ou esquece e nasce sem ação no Android.
+
+Hoje isso é `<ItemLink href actions title>`: a tela declara `ItemAction[]` **uma vez** e o
+primitivo escolhe o desenho — context menu nativo no iOS, toque longo + sheet no Android.
+`ItemAction` carrega `icon`, `destructive`, `disabled`, `selected` e `actions` (submenu), que é o
+vocabulário comum das duas plataformas.
+
+**Sintoma de que a regra foi violada:** `Platform.OS` dentro de `src/app/`. Se apareceu ali e não
+é regra de negócio, o lugar certo é um primitivo em `src/components/ui/`.
+
 ## Estado local
 
 - Preferir estado de servidor (Query) + `useState`. Zustand só se estado global de UI real aparecer (hoje não há nenhum) — não criar store "por via das dúvidas".
