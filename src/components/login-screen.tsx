@@ -1,55 +1,136 @@
 import * as Haptics from 'expo-haptics';
-import { useState } from 'react';
-import { ActivityIndicator, Pressable, StyleSheet, TextInput, View } from 'react-native';
-import Animated, { FadeInDown, FadeInUp } from 'react-native-reanimated';
+import { useEffect, useState } from 'react';
+import { KeyboardAvoidingView, Platform, ScrollView, StyleSheet, View } from 'react-native';
+import Animated, {
+  FadeIn,
+  FadeInDown,
+  FadeInLeft,
+  FadeInRight,
+} from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { Card } from '@/components/ui/card';
+import { OtpInput } from '@/components/auth/otp-input';
+import { PhoneField } from '@/components/auth/phone-field';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
-import { Fonts, Spacing } from '@/constants/theme';
-import { Type } from '@/design/tokens';
-import { useTheme } from '@/hooks/use-theme';
+import { Button } from '@/components/ui/button';
+import { Field } from '@/components/ui/field';
+import { Icon } from '@/components/ui/icon';
+import { Mark } from '@/components/ui/mark';
+import { Motion, Space } from '@/design/tokens';
+import { authErrorMessage } from '@/lib/auth-errors';
+import { displayPhoneBR, isValidPhoneBR, phoneDigits, toE164BR } from '@/lib/phone-br';
 import { isSupabaseConfigured, supabase } from '@/lib/supabase';
 
-// Login por Phone OTP: o telefone verificado é a mesma chave que vincula o WhatsApp.
+/** Janela antes de liberar o reenvio. Curta o bastante para não parecer castigo. */
+const RESEND_SECONDS = 45;
+
+/**
+ * Login por Phone OTP — o telefone verificado é a mesma chave que vincula o WhatsApp.
+ *
+ * ## Por que esta tela foi refeita
+ *
+ * A arquitetura de dois passos (número → código) estava certa e continua igual. O que mudou foi
+ * a execução, que era a única tela do app fora do próprio design system: `Pressable` e
+ * `TextInput` estilizados à mão em vez de `Button`/`Field`, raio fora da escala `Radius`, e o
+ * erro do Supabase impresso cru — `Token has expired or is invalid` era literalmente a única
+ * frase que o usuário lia ao errar o código, em inglês, num app em pt-BR.
+ *
+ * Faltavam também as três peças sem as quais um fluxo de OTP não fecha:
+ *
+ * - **Reenviar.** Sem isso, "o código não chegou" é um beco sem saída.
+ * - **O número de volta.** O `+55` era colado em silêncio; agora ele aparece na digitação e é
+ *   repetido no passo 2, com "Trocar número" ao lado.
+ * - **Autofill de verdade.** `autoComplete="sms-otp"` cobre só o Android — ver `OtpInput`.
+ *
+ * ## Continuidade com a abertura
+ *
+ * A espiral no topo é a **mesma geometria** (`@/design/mark-path`) que a animação de abertura
+ * deixa na tela. É o que emenda splash e login: antes a abertura desenhava a marca em Skia por
+ * 2 s e entregava uma tela que escrevia "Personal / by ProOps" em texto puro.
+ *
+ * ## O foco
+ *
+ * O passo 1 não abre o teclado na primeira vez (ver `returning`); o passo 2 abre sempre — nesse
+ * ponto o usuário já decidiu e o código está a caminho.
+ */
 export function LoginScreen() {
   const insets = useSafeAreaInsets();
-  const theme = useTheme();
   const [phone, setPhone] = useState('');
   const [code, setCode] = useState('');
   const [step, setStep] = useState<'phone' | 'code'>('phone');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [cooldown, setCooldown] = useState(0);
+  /**
+   * O passo 1 só abre o teclado sozinho na VOLTA.
+   *
+   * Na primeira vez há uma frase ali explicando por que pedimos o telefone, e o teclado a
+   * empurraria para fora antes de ser lida. Quem tocou "Trocar número" já leu tudo isso e tem
+   * exatamente uma coisa a fazer.
+   */
+  const [returning, setReturning] = useState(false);
 
-  const sendCode = async () => {
+  // Contagem do reenvio. Um `setInterval` só, derrubado quando zera ou quando a tela sai.
+  useEffect(() => {
+    if (cooldown <= 0) return;
+    const id = setInterval(() => setCooldown((s) => Math.max(0, s - 1)), 1000);
+    return () => clearInterval(id);
+  }, [cooldown]);
+
+  const valid = isValidPhoneBR(phone);
+
+  const requestCode = async (resend = false) => {
+    if (!valid || busy) return;
     setBusy(true);
     setError(null);
-    const e164 = phone.startsWith('+') ? phone : `+55${phone.replace(/\D/g, '')}`;
-    const { error: err } = await supabase.auth.signInWithOtp({ phone: e164 });
+    const { error: err } = await supabase.auth.signInWithOtp({ phone: toE164BR(phone) });
     setBusy(false);
+
     if (err) {
-      setError(err.message);
+      setError(authErrorMessage(err));
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
       return;
     }
+
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-    setStep('code');
+    setCooldown(RESEND_SECONDS);
+    if (!resend) {
+      setCode('');
+      setStep('code');
+    }
   };
 
-  const verifyCode = async () => {
+  /** Recebe o código por parâmetro: no auto-submit o `useState` ainda não assentou. */
+  const verifyCode = async (submitted?: string) => {
+    const token = submitted ?? code;
+    if (token.length < 6 || busy) return;
     setBusy(true);
     setError(null);
-    const e164 = phone.startsWith('+') ? phone : `+55${phone.replace(/\D/g, '')}`;
-    const { error: err } = await supabase.auth.verifyOtp({ phone: e164, token: code, type: 'sms' });
+    const { error: err } = await supabase.auth.verifyOtp({
+      phone: toE164BR(phone),
+      token,
+      type: 'sms',
+    });
     setBusy(false);
+
     if (err) {
-      setError(err.message);
+      setError(authErrorMessage(err));
+      setCode('');
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
     }
-    // sucesso: onAuthStateChange troca a tela automaticamente
+    // Sucesso: `onAuthStateChange` troca a tela — o `Stack.Protected` do layout raiz cuida disso.
   };
 
-  // Atalho de desenvolvimento: entra como o usuário de teste sem SMS (só em __DEV__).
+  const changeNumber = () => {
+    setReturning(true);
+    setStep('phone');
+    setCode('');
+    setError(null);
+    setCooldown(0);
+  };
+
+  // Atalho de desenvolvimento: entra como o usuário de teste sem OTP (só em __DEV__).
   const devLogin = async () => {
     setBusy(true);
     setError(null);
@@ -58,150 +139,179 @@ export function LoginScreen() {
       password: 'devtest123',
     });
     setBusy(false);
-    if (err) setError(err.message);
+    if (err) setError(authErrorMessage(err));
   };
 
+  const onPhone = step === 'phone';
+
   return (
-    <ThemedView style={styles.container}>
-      <View style={[styles.safeArea, { paddingTop: insets.top, paddingBottom: insets.bottom }]}>
-        <Animated.View entering={FadeInUp.duration(600)} style={styles.hero}>
-          <ThemedText type="title">Personal</ThemedText>
-          <ThemedText type="small" themeColor="textSecondary">
-            by ProOps
-          </ThemedText>
-          <ThemedText themeColor="textSecondary" style={styles.tagline}>
-            Suas notas, lembretes e gastos.{'\n'}Direto do WhatsApp.
-          </ThemedText>
-        </Animated.View>
+    <ThemedView style={styles.root}>
+      <KeyboardAvoidingView
+        style={styles.flex}
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+        <ScrollView
+          style={styles.flex}
+          contentContainerStyle={[styles.content, { paddingTop: insets.top + Space.xxxl }]}
+          keyboardShouldPersistTaps="handled"
+          keyboardDismissMode="interactive"
+          showsVerticalScrollIndicator={false}>
+          <Animated.View entering={FadeIn.duration(Motion.duration.slow)} style={styles.brand}>
+            <Mark size={44} />
+          </Animated.View>
 
-        <Animated.View entering={FadeInDown.duration(600).delay(150)} style={styles.formWrap}>
-          <Card style={styles.card}>
-            {step === 'phone' ? (
-              <>
-                <ThemedText type="smallBold">Seu WhatsApp</ThemedText>
-                <TextInput
-                  style={[styles.input, { color: theme.text, borderColor: theme.backgroundSelected }]}
-                  placeholder="(11) 99999-9999"
-                  placeholderTextColor={theme.textSecondary}
-                  keyboardType="phone-pad"
-                  autoComplete="tel"
+          {onPhone ? (
+            <Animated.View
+              key="phone"
+              entering={FadeInLeft.duration(Motion.duration.slow).easing(Motion.easing.out)}
+              style={styles.step}>
+              <View style={styles.copy}>
+                <ThemedText type="title">Entrar com o WhatsApp</ThemedText>
+                <ThemedText type="small" themeColor="textSecondary">
+                  Use o mesmo número do seu WhatsApp — é por ele que suas notas, lembretes e
+                  gastos chegam aqui.
+                </ThemedText>
+              </View>
+
+              <Field
+                label="Número com DDD"
+                error={error ?? undefined}
+                hint={
+                  isSupabaseConfigured
+                    ? undefined
+                    : 'Configure EXPO_PUBLIC_SUPABASE_URL e EXPO_PUBLIC_SUPABASE_ANON_KEY no .env.'
+                }>
+                <PhoneField
+                  autoFocus={returning}
                   value={phone}
-                  onChangeText={setPhone}
+                  onChange={(text) => {
+                    setPhone(phoneDigits(text));
+                    if (error) setError(null);
+                  }}
+                  onSubmit={() => requestCode()}
+                  invalid={!!error}
+                  editable={!busy}
                 />
-              </>
-            ) : (
-              <>
-                <ThemedText type="smallBold">Código enviado por SMS</ThemedText>
-                <TextInput
-                  style={[styles.input, { color: theme.text, borderColor: theme.backgroundSelected }]}
-                  placeholder="000000"
-                  placeholderTextColor={theme.textSecondary}
-                  keyboardType="number-pad"
-                  autoComplete="sms-otp"
+              </Field>
+
+              <View style={styles.note}>
+                <Icon name="bubble.left" size="sm" color="textSecondary" />
+                <ThemedText type="footnote" themeColor="textSecondary" style={styles.noteText}>
+                  Você recebe um código de 6 dígitos no WhatsApp. Sem senha.
+                </ThemedText>
+              </View>
+            </Animated.View>
+          ) : (
+            <Animated.View
+              key="code"
+              entering={FadeInRight.duration(Motion.duration.slow).easing(Motion.easing.out)}
+              style={styles.step}>
+              <View style={styles.copy}>
+                <ThemedText type="title">Confira o WhatsApp</ThemedText>
+                <ThemedText type="small" themeColor="textSecondary">
+                  Mandamos um código de 6 dígitos para {displayPhoneBR(phone)}.
+                </ThemedText>
+                <Button
+                  label="Trocar número"
+                  variant="ghost"
+                  size="sm"
+                  onPress={changeNumber}
+                  style={styles.changeNumber}
+                />
+              </View>
+
+              <Field label="Código" error={error ?? undefined}>
+                <OtpInput
                   value={code}
-                  onChangeText={setCode}
+                  onChange={(next) => {
+                    setCode(next);
+                    if (error) setError(null);
+                  }}
+                  onComplete={(next) => verifyCode(next)}
+                  invalid={!!error}
+                  editable={!busy}
+                  autoFocus
                 />
-              </>
-            )}
+              </Field>
 
-            {error && (
-              <ThemedText type="small" themeColor="danger">
-                {error}
-              </ThemedText>
-            )}
-            {!isSupabaseConfigured && (
-              <ThemedText type="small" themeColor="textSecondary">
-                Configure EXPO_PUBLIC_SUPABASE_URL e EXPO_PUBLIC_SUPABASE_ANON_KEY no .env para
-                ativar o login.
-              </ThemedText>
-            )}
+              <View style={styles.note}>
+                {cooldown > 0 ? (
+                  <ThemedText type="footnote" themeColor="textSecondary">
+                    Não chegou? Você pode reenviar em {cooldown}s
+                  </ThemedText>
+                ) : (
+                  <Button
+                    label="Reenviar código"
+                    variant="ghost"
+                    size="sm"
+                    onPress={() => requestCode(true)}
+                    disabled={busy}
+                  />
+                )}
+              </View>
+            </Animated.View>
+          )}
+        </ScrollView>
 
-            <Pressable
-              disabled={busy}
-              onPress={step === 'phone' ? sendCode : verifyCode}
-              style={({ pressed }) => [
-                styles.button,
-                { backgroundColor: theme.tint },
-                pressed && styles.pressed,
-              ]}>
-              {busy ? (
-                <ActivityIndicator color={theme.onTint} />
-              ) : (
-                <ThemedText type="smallBold" themeColor="onTint">
-                  {step === 'phone' ? 'Receber código' : 'Entrar'}
-                </ThemedText>
-              )}
-            </Pressable>
+        <Animated.View
+          entering={FadeInDown.duration(Motion.duration.slow).delay(Motion.stagger.step * 2)}
+          style={[styles.footer, { paddingBottom: insets.bottom + Space.lg }]}>
+          <Button
+            label={onPhone ? 'Continuar' : 'Entrar'}
+            onPress={onPhone ? () => requestCode() : () => verifyCode()}
+            loading={busy}
+            disabled={onPhone ? !valid : code.length < 6}
+            size="lg"
+            block
+          />
 
-            {step === 'code' && (
-              <Pressable onPress={() => setStep('phone')}>
-                <ThemedText type="small" themeColor="textSecondary" style={styles.backLink}>
-                  Usar outro número
-                </ThemedText>
-              </Pressable>
-            )}
-
-            {__DEV__ && (
-              <Pressable
-                onPress={devLogin}
-                style={[styles.devButton, { borderTopColor: theme.separator }]}>
-                <ThemedText type="small" themeColor="textSecondary" style={styles.backLink}>
-                  Entrar como teste (dev)
-                </ThemedText>
-              </Pressable>
-            )}
-          </Card>
+          {__DEV__ && (
+            <Button label="Entrar como teste (dev)" variant="ghost" size="sm" onPress={devLogin} />
+          )}
         </Animated.View>
-      </View>
+      </KeyboardAvoidingView>
     </ThemedView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
+  root: {
     flex: 1,
   },
-  safeArea: {
+  flex: {
     flex: 1,
-    paddingHorizontal: Spacing.four,
+  },
+  content: {
+    flexGrow: 1,
     justifyContent: 'center',
-    gap: Spacing.five,
+    paddingHorizontal: Space.xl,
+    paddingBottom: Space.xl,
+    gap: Space.xxl,
   },
-  hero: {
+  brand: {
+    alignItems: 'flex-start',
+  },
+  /** Cada passo é um bloco só, para entrar e sair inteiro. */
+  step: {
+    gap: Space.xl,
+  },
+  copy: {
+    gap: Space.sm,
+  },
+  /** Cancela o padding da pílula: o rótulo do ghost alinha com o texto acima dele. */
+  changeNumber: {
+    marginLeft: -Space.md,
+  },
+  note: {
+    flexDirection: 'row',
     alignItems: 'center',
-    gap: Spacing.two,
+    gap: Space.sm,
   },
-  tagline: {
-    textAlign: 'center',
+  noteText: {
+    flex: 1,
   },
-  formWrap: {
-    alignSelf: 'stretch',
-  },
-  card: {
-    gap: Spacing.three,
-  },
-  input: {
-    borderWidth: 1,
-    borderRadius: Spacing.three,
-    paddingHorizontal: Spacing.three,
-    paddingVertical: Spacing.two + Spacing.one,
-    ...Type.body,
-    fontFamily: Fonts.rounded,
-  },
-  button: {
-    borderRadius: Spacing.three,
-    paddingVertical: Spacing.three,
-    alignItems: 'center',
-  },
-  pressed: {
-    opacity: 0.8,
-  },
-  backLink: {
-    textAlign: 'center',
-  },
-  devButton: {
-    marginTop: Spacing.one,
-    paddingTop: Spacing.two,
-    borderTopWidth: StyleSheet.hairlineWidth,
+  footer: {
+    paddingHorizontal: Space.xl,
+    gap: Space.sm,
+    alignItems: 'stretch',
   },
 });
