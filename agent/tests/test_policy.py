@@ -67,3 +67,21 @@ def test_frase_de_confirmacao_descreve_o_efeito():
     )
     assert "apagar" in frase and "45,00" in frase
     assert "delete_transaction" not in frase
+
+
+def test_frase_de_empate_nao_ecoa_o_modelo():
+    """Com empate, a frase diz o EFEITO; as opções reais vão na lista.
+
+    Caindo no texto do modelo aqui, o usuário voltava a ler "apagar a nota sobre
+    esse item" — o eco que originou todo este trabalho.
+    """
+    from app.graph.policy import describe_for_confirmation
+    from app.graph.schemas import NotesAction, NotesActionType
+
+    acao = NotesAction(type=NotesActionType.DELETE_NOTE)
+    alvo = {"status": "ambiguous", "candidates": [{"id": "a", "label": "x"}, {"id": "b", "label": "y"}]}
+
+    frase = describe_for_confirmation(acao, alvo)
+
+    assert "apagar" in frase
+    assert "esse item" not in frase

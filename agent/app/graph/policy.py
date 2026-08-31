@@ -85,9 +85,14 @@ def describe_for_confirmation(
     campos crus do modelo, e o usuário lia "apagar a nota sobre última mensagem"
     — confirmando o eco do modelo, não o que ia acontecer de verdade.
     """
-    if target and target.get("status") == "found" and target.get("candidates"):
+    if target and target.get("candidates"):
         verbo = _VERBO.get(action.type.value, "mexer em")
-        return f"{verbo} {target['candidates'][0]['label']}"
+        if target.get("status") == "found":
+            return f"{verbo} {target['candidates'][0]['label']}"
+        # Empate: as opções REAIS vão na lista, então a frase só precisa dizer o
+        # que vai acontecer. Cair no texto do modelo aqui reintroduzia o eco que
+        # este desenho existe para eliminar ("apagar a nota sobre esse item").
+        return f"{verbo} qual?"
 
     tipo = action.type.value
     if isinstance(action, FinanceAction):
