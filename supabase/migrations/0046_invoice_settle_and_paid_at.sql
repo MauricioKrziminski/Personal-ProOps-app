@@ -20,7 +20,7 @@ alter table public.transactions
   add column if not exists paid_at date;
 
 comment on column public.transactions.paid_at is
-  'Quando o dinheiro saiu. `occurred_at` continua sendo quando a despesa aconteceu — perguntas diferentes (competência vs caixa). ATENCAO: so settle_invoice e a baixa manual preenchem; despesa criada ja cleared nasce NULL. Quem le precisa de coalesce(paid_at, occurred_at).';
+  'Quando o dinheiro saiu. `occurred_at` continua sendo quando a despesa aconteceu — perguntas diferentes (competência vs caixa). Nunca nulo em linha cleared: o trigger set_paid_at preenche com occurred_at quando ninguem informa, e limpa quando a linha volta a pending.';
 
 -- Backfill: o que já está liquidado foi pago na data em que está registrado. É a
 -- única suposição possível, e é a que preserva os relatórios como estão hoje.
@@ -28,7 +28,46 @@ update public.transactions
    set paid_at = occurred_at
  where status = 'cleared' and paid_at is null;
 
+-- O backfill sozinho deixaria a coluna INCONSISTENTE a partir de amanhã: despesa
+-- criada já `cleared` (o caso comum — "gastei 45 no mercado") nasceria com
+-- `paid_at` nulo, e todo leitor precisaria lembrar de `coalesce`. Convenção que
+-- depende de alguém lembrar é convenção que quebra. O trigger fecha na origem.
+create or replace function private.set_paid_at()
+returns trigger
+language plpgsql
+set search_path = public
+as $$
+begin
+  if new.status = 'cleared' and new.paid_at is null then
+    -- sem data explícita, o dinheiro saiu quando a despesa aconteceu
+    new.paid_at := new.occurred_at;
+  elsif new.status = 'pending' then
+    -- voltar para previsto apaga a data: lançamento que ainda vai acontecer não
+    -- tem quando o dinheiro saiu
+    new.paid_at := null;
+  end if;
+  return new;
+end;
+$$;
+
+drop trigger if exists set_paid_at on public.transactions;
+create trigger set_paid_at
+  before insert or update of status, paid_at, occurred_at
+  on public.transactions
+  for each row execute function private.set_paid_at();
+
 -- ── 2. quitar sem movimentar caixa ─────────────────────────────────────────
+--
+-- Marcador EXPLÍCITO, e não "não tem transferência". `payment_transaction_id` é
+-- `on delete set null` (0013:99): apagar a transferência de um `pay_invoice`
+-- deixaria a fatura indistinguível de uma quitada à mão, e o saldo do cartão
+-- passaria a excluir as compras dela — o cartão zerava em vez de voltar a dever.
+alter table public.card_invoices
+  add column if not exists settled_manually boolean not null default false;
+
+comment on column public.card_invoices.settled_manually is
+  'Quitada sem movimentar dinheiro (settle_invoice), para dado histórico. NÃO inferir isso da ausência de payment_transaction_id, que some se a transferência for apagada.';
+
 create or replace function public.settle_invoice(
   p_invoice_id uuid,
   p_paid_at date default current_date
@@ -67,7 +106,8 @@ begin
   -- `payment_transaction_id` fica NULL, e é isso que distingue esta operação de
   -- `pay_invoice`: não existe transferência, então nenhum saldo se move.
   update public.card_invoices
-     set status = 'paid', paid_at = p_paid_at, payment_transaction_id = null
+     set status = 'paid', paid_at = p_paid_at,
+         payment_transaction_id = null, settled_manually = true
    where id = p_invoice_id;
 
   return p_invoice_id;
@@ -248,10 +288,10 @@ $$;
 -- enquanto a tela de Cartões mostra "limite livre", ou seja, o app se
 -- contradizendo em duas telas.
 --
--- ⚠️ O filtro é `paid` **E** `payment_transaction_id is null` — não basta
--- `status = 'paid'`. Fatura quitada por `pay_invoice` TEM a transferência
--- compensando, e excluir as compras dela também faria o cartão ficar POSITIVO.
--- A ausência do pagamento é justamente o que distingue as duas operações.
+-- ⚠️ O filtro lê `settled_manually`, não "não tem transferência". Fatura quitada
+-- por `pay_invoice` TEM a transferência compensando, e excluir as compras dela
+-- também faria o cartão ficar POSITIVO — por isso o marcador precisa ser explícito
+-- e não pode sumir quando a transferência é apagada.
 
 create or replace function public._account_balances(uid uuid)
 returns table(account_id uuid, name text, type text, balance_cents bigint)
@@ -273,8 +313,7 @@ as $$
    and (t.account_id = a.id or t.counterparty_account_id = a.id)
    and not exists (
      select 1 from public.card_invoices ci
-     where ci.id = t.invoice_id
-       and ci.status = 'paid' and ci.payment_transaction_id is null
+     where ci.id = t.invoice_id and ci.settled_manually
    )
   where a.workspace_id in (select public._workspace_ids(uid)) and not a.archived
   group by a.id
@@ -308,8 +347,7 @@ as $$
    and (t.account_id = a.id or t.counterparty_account_id = a.id)
    and not exists (
      select 1 from public.card_invoices ci
-     where ci.id = t.invoice_id
-       and ci.status = 'paid' and ci.payment_transaction_id is null
+     where ci.id = t.invoice_id and ci.settled_manually
    )
   where a.workspace_id in (select private.my_workspace_ids()) and not a.archived
   group by a.id

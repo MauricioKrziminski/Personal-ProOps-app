@@ -158,3 +158,48 @@ class TestBaixaRetroativa:
         )
         assert "já constavam pagas" in r.message
         assert "Marquei" not in r.message
+
+
+class TestBaixaEmLancamentoUnico:
+    """"Paguei a luz" também não pode mover a data.
+
+    O app parou de reescrever `occurred_at` na 0046; o agente continuava. Ficava
+    a divergência: a mesma ação, pelo WhatsApp, migrava o lançamento de mês — e
+    numa parcela de cartão o trigger `set_invoice` ainda a arrancava da fatura em
+    que nasceu, que é exatamente a armadilha que o ramo de plano já evitava.
+    """
+
+    @pytest.fixture
+    def sql(self, monkeypatch):
+        executados = []
+
+        async def fetch_one(query, *args):
+            return {"id": "tx-1", "description": "luz", "category": "casa",
+                    "amount_cents": 12000}
+
+        async def execute(query, *args):
+            executados.append((" ".join(query.split()), args))
+            return 1
+
+        monkeypatch.setattr(db, "fetch_one", fetch_one)
+        monkeypatch.setattr(db, "execute", execute)
+        return executados
+
+    @pytest.mark.asyncio
+    async def test_grava_paid_at_e_NAO_occurred_at(self, sql):
+        r = await finance.mark_paid(
+            _ctx("transactions", "tx-1"),
+            FinanceAction(type=FinanceActionType.MARK_PAID),
+        )
+        query, _ = sql[0]
+        assert "paid_at = %s" in query
+        assert "occurred_at" not in query
+        assert "Baixa dada" in r.message
+
+    @pytest.mark.asyncio
+    async def test_escopo_de_workspace_no_where(self, sql):
+        await finance.mark_paid(
+            _ctx("transactions", "tx-1"),
+            FinanceAction(type=FinanceActionType.MARK_PAID),
+        )
+        assert "workspace_id = %s" in sql[0][0]

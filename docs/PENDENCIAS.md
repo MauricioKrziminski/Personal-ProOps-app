@@ -183,21 +183,20 @@ Achados ainda abertos, em ordem de dor:
   série diária de 5 componentes e o app mostra uma linha mensal de um.
 - **Recorte temporal fixo ou de passo 1** em todas as telas.
 
-## ⚠️ Divergências abertas depois da Fase 1 (31/08/2026)
+## ✅ Divergências da Fase 1 — todas fechadas (31/08/2026)
 
-- **O `mark_paid` do AGENTE ainda reescreve `occurred_at`.** O app parou (passou a
-  gravar `paid_at`), o WhatsApp não: "paguei a luz" pelo WhatsApp continua movendo o
-  lançamento de mês, e numa parcela de cartão o trigger `set_invoice` ainda a
-  remaneja para a fatura de hoje — a mesma armadilha que a 2.9 fechou para planos.
-  Ele também não grava `paid_at`. Conserto é o ramo de transação única em
-  `agent/app/tools/finance.py`.
-- **`payment_transaction_id` é `on delete set null`** (`0013:99`). Apagar a
-  transferência de um `pay_invoice` faz a fatura ficar indistinguível de uma
-  quitada por `settle_invoice`: somem a transferência **e** as compras do saldo, e
-  o cartão zera em vez de voltar a dever.
-- **`paid_at` nasce NULL** em toda despesa criada já `cleared` — só `settle_invoice`
-  e a baixa manual preenchem. Quem ler a coluna precisa de
-  `coalesce(paid_at, occurred_at)`.
+Estavam abertas por algumas horas; foram corrigidas antes de seguir para a Fase 2.
+
+- **`mark_paid` do agente reescrevia `occurred_at`** — agora grava `paid_at`, igual
+  ao app. Coberto por `agent/tests/test_plano_alvo.py::TestBaixaEmLancamentoUnico`.
+- **`payment_transaction_id` é `on delete set null`**, então apagar a transferência
+  de um `pay_invoice` deixava a fatura indistinguível de uma quitada à mão.
+  Resolvido com marcador EXPLÍCITO `card_invoices.settled_manually`.
+- **`paid_at` nascia NULL** em despesa criada já `cleared`. Resolvido no banco pelo
+  trigger `private.set_paid_at`, que preenche com `occurred_at` quando ninguém
+  informa e limpa quando a linha volta a `pending`. Nenhum leitor precisa de
+  `coalesce`.
+
 
 ## 🔵 FASE 4 — Roadmap v2 (ordem sugerida)
 

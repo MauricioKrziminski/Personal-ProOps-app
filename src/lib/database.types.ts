@@ -418,6 +418,7 @@ export type Database = {
           id: string
           paid_at: string | null
           payment_transaction_id: string | null
+          settled_manually: boolean
           reference_month: string
           status: string
           updated_at: string
@@ -432,6 +433,7 @@ export type Database = {
           id?: string
           paid_at?: string | null
           payment_transaction_id?: string | null
+          settled_manually?: boolean
           reference_month: string
           status?: string
           updated_at?: string
@@ -446,6 +448,7 @@ export type Database = {
           id?: string
           paid_at?: string | null
           payment_transaction_id?: string | null
+          settled_manually?: boolean
           reference_month?: string
           status?: string
           updated_at?: string

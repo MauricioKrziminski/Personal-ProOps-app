@@ -387,8 +387,15 @@ async def mark_paid(ctx: ExecContext, action: FinanceAction) -> ToolResult:
     if not conta:
         return ToolResult("🤷 Não achei essa conta em aberto.", read_only=True)
 
+    # `paid_at`, NUNCA `occurred_at`. Reescrever a data do lançamento fazia a
+    # conta de agosto paga em setembro migrar de mês em todo relatório — o mês
+    # fechado encolhia sozinho. E numa parcela de cartão era pior: o trigger
+    # `set_invoice` é `before update of account_id, occurred_at` e arrancava a
+    # parcela da fatura em que ela nasceu, que é a mesma armadilha que o ramo de
+    # plano acima já evitava. O app parou de fazer isso na 0046; aqui é o outro
+    # lado da mesma decisão.
     await db.execute(
-        "update public.transactions set status = 'cleared', occurred_at = %s "
+        "update public.transactions set status = 'cleared', paid_at = %s "
         "where id = %s and workspace_id = %s",
         local_iso_date(ctx.timezone),
         conta["id"],
