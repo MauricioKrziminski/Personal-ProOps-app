@@ -264,6 +264,27 @@ Edge Function de PRODUÇÃO → Cloud Run de staging → `messages_queue` do sta
 `done`, com **zero** linhas em `messages_raw` de produção (o fluxo Deno não foi
 tocado).
 
+### ⚠️ O staging NÃO tem sweep — mensagem pode ficar presa
+
+O modo `staging` do `setup-gcp.sh` pula `criar_crons` de propósito (para não
+repontar os jobs de produção). Consequência: **não existe Cloud Scheduler no
+staging, logo `/worker/sweep` nunca roda sozinho.**
+
+Isso importa porque `claim_thread_batch` recusa thread com `processing` recente
+(um worker por conversa, por desenho). Se você mandar a segunda mensagem
+enquanto a primeira ainda está sendo processada — o que é fácil, já que um turno
+com Gemini + cold start leva ~35s —, a segunda fica `pending` **para sempre**.
+
+Em produção o sweep do cron de lembretes recupera em até 1 minuto. No staging,
+destrave na mão:
+
+```bash
+SEC=$(grep '^INTERNAL_SECRET=' agent/.env.staging | cut -d= -f2- | sed 's/[[:space:]]*#.*$//' | xargs)
+curl -X POST https://agente-staging-wwm7xruoyq-rj.a.run.app/worker/sweep -H "X-Internal-Secret: $SEC"
+```
+
+Sintoma: a mensagem aparece `pending` em `messages_queue`, sem erro nenhum.
+
 ### Três coisas que confundem durante o teste
 
 **1. O número de teste da Meta só ENVIA para destinatários cadastrados.** Quem
