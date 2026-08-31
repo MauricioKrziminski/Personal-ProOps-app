@@ -4,23 +4,34 @@
 
 - Commits **conventional, 1 linha, sem corpo e SEM co-autor** (`feat(finance): ...`, `fix(webhook): ...`, `chore: ...`). Único autor: Gabriel.
 - **Commit direto na `main` é permitido** (projeto de um dev só). Branch de feature (`<user>/<slug>`) fica opcional, para trabalho longo ou que precise de PR.
-- Nunca commitar `.env*` (só `*.example`), `android/`, `ios/`.
+- Nunca commitar `.env*` (só `*.example`), `android/`, `ios/`, `agent/.venv/`.
 
 ## Antes de commitar
 
 1. `npx tsc --noEmit` limpo.
 2. `npx expo lint` limpo.
-3. `npm test` verde (`node --test`, sem framework — helpers puros de data/dinheiro).
-4. Mudou tela → conferir no device/emulador (dark E light) — nada de "deve funcionar".
-5. Mudou Edge Function → testar com `npx supabase functions serve` + payload de exemplo antes do deploy.
-6. Mudou schema → migration nova aplicada com `db push` + types regenerados.
+3. `npm test` verde (`node --test`, sem framework — helpers puros de data/dinheiro do app).
+4. **Mudou `agent/` → `.venv/bin/pytest` verde.** Teste que fala com rede ou banco não entra: os
+   nós que falam com o mundo viram dublê.
+5. Mudou tela → conferir no device/emulador (dark E light) — nada de "deve funcionar".
+6. Mudou o agente → subir local (`docker compose up`) e mandar `scripts/fake_meta.py` com payload
+   ASSINADO. Testar com o HMAC desligado esconderia justamente o erro mais caro daquele endpoint.
+7. Mudou schema → migration nova aplicada com `db push` + types regenerados. Mexeu em `0040`/`0041`
+   ou nas tabelas do agente → rodar `supabase/tests/agent_migrations.sql` contra o Postgres local
+   (as asserções cobrem upsert de sessão, claim do lote, HITL e idempotência).
 
 ## Deploy
 
-- Edge Functions: `npx supabase functions deploy <nome>` (conferir `verify_jwt` em `supabase/config.toml` e secrets necessários — `supabase/.env.example` é a lista).
+- Agente: `./scripts/setup-gcp.sh` (idempotente — projeto, APIs, service account, segredos, fila do
+  Cloud Tasks, deploy e crons). `deploy` sozinho para redeploy. Secrets no GCP Secret Manager;
+  `agent/.env.example` é a lista.
+- Edge Functions (legado): `npx supabase functions deploy <nome>`. Hoje só o `whatsapp-webhook`,
+  que é o roteador do corte.
 - App: builds via EAS (`eas.json`: development/preview/production).
 - Fluxo WhatsApp ponta-a-ponta: usar o checklist do comando `/verify-whatsapp`.
 
 ## Observabilidade
 
-- Debug do pipeline: `messages_raw` (entrada), `jobs` (fila/erros em `last_error`), `ai_events` (o que a IA entendeu, custo, confidence) + logs nativos das functions. Sem Sentry — não adicionar serviço externo.
+- Debug do pipeline: `messages_queue` (entrada, fila e erro em `last_error`), `pending_actions` (o
+  que espera confirmação), `executed_actions` (o que já rodou), `ai_events` (o que a IA entendeu +
+  a contagem que a cota do plano usa), **Langfuse** (trace por nó e tool) e Cloud Logging.

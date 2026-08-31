@@ -1,5 +1,11 @@
 # Pendências e próximas fases
 
+> **31/08/2026 — migração para o agente Python/LangGraph em andamento.**
+> O backend de IA saiu das Edge Functions para um serviço FastAPI + LangGraph no
+> Cloud Run. O agente está no ar e inerte; o que falta para ele receber a
+> primeira mensagem está em [`docs/AGENTE-CUTOVER.md`](AGENTE-CUTOVER.md).
+> A arquitetura vigente está no `CLAUDE.md` e em `.claude/rules/agent.md`.
+
 > Estado em 26/08/2026, após a auditoria do repositório e a rodada de correções de fuso/retry.
 > Este arquivo é a lista viva do que falta — riscar/remover conforme for entregue.
 

@@ -1,5 +1,10 @@
 # Supabase — schema, RLS, functions
 
+> **O Supabase é BANCO e FILA, não onde a lógica roda** (desde 30/08/2026). Quem processa é o
+> serviço Python em `agent/` — ver `.claude/rules/agent.md`. As Edge Functions em
+> `supabase/functions/` são legado em desmonte; a seção sobre elas, mais abaixo, vale só enquanto
+> o corte Strangler não terminar.
+
 ## Migrations
 
 - **Toda** mudança de schema via migration numerada em `supabase/migrations/` (`NNNN_descricao.sql`). Nunca SQL direto no banco de produção; nunca editar migration já aplicada — criar a próxima.
@@ -13,7 +18,14 @@
   `for all using (workspace_id in (select private.my_workspace_ids())) with check (...)` — copiar de `transactions`.
   `user_id` continua na tabela como **autor** do lançamento, nunca como filtro de visibilidade.
 - `private.my_workspace_ids()` é `security definer` (senão a policy de `workspace_members` recursaria) e mora no schema `private` **de propósito**: o PostgREST não expõe esse schema, então não vira endpoint `/rest/v1/rpc/`. Não mover para `public`.
-- Tabelas de infra (`jobs`, `messages_raw`, `ai_events`): RLS ligada **sem policies** — só service_role acessa.
+- Tabelas de infra (`messages_queue`, `user_sessions`, `pending_actions`, `executed_actions`,
+  `agent_routing`, `ai_events`, e as legadas `jobs`/`messages_raw`): RLS ligada **sem policies**.
+- **O schema `langgraph` fica FORA do `public`** e sem grant para `anon`/`authenticated`: as
+  tabelas de checkpoint guardam o conteúdo das conversas (valores, contas, notas), e em `public`
+  elas seriam legíveis pelo PostgREST com a anon key. Mesmo motivo do schema `private`.
+- ⚠️ **O serviço Python conecta com papel que IGNORA RLS.** A RLS continua protegendo o APP;
+  para o agente, escopo de workspace virou código (`ensure_owned`, filtro obrigatório). Ver
+  `agent.md`.
 
 ## Unique parcial não funciona com upsert do PostgREST
 
@@ -31,12 +43,16 @@ Para auditar: `select indexname, indexdef from pg_indexes where schemaname='publ
 
 Cada agregação existe como par interna + wrapper:
 
-1. **Interna** `_nome(uid uuid, ...)` — recebe o user_id resolvido do telefone e expande para os workspaces dele com `public._workspace_ids(uid)` — `security definer set search_path = public`, com `revoke execute ... from public, anon, authenticated`. Só as Edge Functions (service_role) chamam, passando o user_id resolvido.
+1. **Interna** `_nome(uid uuid, ...)` — recebe o user_id resolvido do telefone e expande para os workspaces dele com `public._workspace_ids(uid)` — `security definer set search_path = public`, com `revoke execute ... from public, anon, authenticated`. É a que o **serviço Python** chama, passando o user_id resolvido. O wrapper `security invoker` depende de `auth.uid()`, que é null lá — chamá-lo do agente devolveria vazio, em silêncio.
 2. **Wrapper** `nome(...)` — `security invoker` com a **query inline** filtrando `workspace_id in (select private.my_workspace_ids())`, sob RLS. É o que o app usa via `supabase.rpc()`. ⚠️ O wrapper NÃO pode chamar a interna: EXECUTE é checado contra o role do chamador (authenticated), que foi revogado da interna — chamaria permission denied. A pequena duplicação da query é intencional.
 
 Funções `security definer` sempre com `set search_path = public` e revoke explícito (padrão do `0002_security_hardening.sql`).
 
-## Edge Functions (Deno, `supabase/functions/`)
+## Edge Functions (Deno, `supabase/functions/`) — LEGADO
+
+Em desmonte. Só o `whatsapp-webhook` tem função ativa nova: ele é o **roteador do corte
+Strangler** (lê `agent_routing.use_python_agent` e repassa para o Cloud Run). Não adicionar
+função nem lógica aqui — o lugar é `agent/`.
 
 - `service_role` **só** aqui, via `adminClient()` de `_shared/admin.ts`.
 - `verify_jwt` por função em `config.toml`: webhooks externos (Meta) = `false` com validação própria (HMAC); funções internas de cron = `true`.
@@ -46,11 +62,23 @@ Funções `security definer` sempre com `set search_path = public` e revoke expl
 
 ## Segredos
 
-- Segredos (Gemini, Groq, WhatsApp, hooks) **só** em secrets das functions (`npx supabase secrets set`). Nunca no app, nunca commitados. Toda variável nova documentada em `supabase/.env.example` com comentário.
-- Crons ativos: `process-jobs` e `send-reminders` (por minuto), `finance-scheduler` (de hora em hora: materializa recorrentes 90 dias à frente, fecha faturas, promove pendentes, tira o snapshot de patrimônio) e `send-alerts` (diário, 12h UTC).
-- Os `cron.schedule` leem URL e anon key do **Supabase Vault** (`vault.decrypted_secrets`, segredos `project_url`/`anon_key`) — ver `0008_cron_token_from_vault.sql`. Nunca voltar a escrever token literal em migration (a `0003` fez isso e a chave está no histórico do git: rotacionar). Segredo novo entra por `vault.create_secret` fora do repo.
+- Segredos (Gemini, Groq, WhatsApp, hooks, DATABASE_URL, THREAD_SALT) no **GCP Secret Manager**,
+  injetados por `gcloud run deploy --set-secrets`. Nunca no app, nunca commitados. Toda variável
+  nova documentada em `agent/.env.example` com comentário. (`supabase/.env.example` cobre só o que
+  as Edge Functions legadas ainda usam.)
+- **Os crons saíram do pg_cron para o Cloud Scheduler** (`/cron/reminders` a cada minuto, levando
+  junto o sweep da fila; `/cron/finance-scheduler` de hora em hora; `/cron/alerts` diário). O
+  Scheduler autentica com OIDC: não há mais token para vazar.
+- A chave anon literal da `0003` continua no histórico do git — **rotacionar**. Nunca voltar a
+  escrever token em migration.
 
 ## Realtime & fila
 
 - Tabela nova que o app exibe → adicionar à publicação `supabase_realtime` na mesma migration.
-- Fila: `jobs` + RPC `claim_jobs` (FOR UPDATE SKIP LOCKED, incrementa attempts, recupera órfãos). Idempotência de entrada por `messages_raw.wa_message_id` unique. Job marcado `done` **antes** da confirmação WhatsApp (envio é best-effort; falha de envio nunca reprocessa).
+- Fila: **`messages_queue` + RPC `claim_thread_batch`**. Ela reivindica o LOTE inteiro da conversa
+  (o debounce), recusa thread com `processing` recente (um worker por conversa) e não mistura
+  retentativa com mensagem nova (a chave de idempotência mudaria). `jobs`/`claim_jobs` são legado.
+- Idempotência de entrada por `messages_queue.wa_message_id` unique; de execução por
+  `executed_actions`, reservada ANTES de executar.
+- Mensagem marcada `done` **antes** da confirmação no WhatsApp — envio é best-effort e falha de
+  envio nunca pode reprocessar (reprocessar duplicaria escrita).

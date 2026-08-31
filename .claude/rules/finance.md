@@ -19,7 +19,11 @@
 
 ## Categorias
 
-- **Texto livre, minúsculo, curto** — sem FK. Fonte única da lista de sugestões: `src/lib/categories.ts`. O prompt do Gemini (`_shared/gemini.ts`) mantém uma cópia literal porque roda em Deno e não importa de `src/`; `src/lib/categories.test.ts` falha se as duas divergirem — mexeu numa, mexe na outra. A tabela `categories` legada foi dropada na `0010_workspaces.sql`.
+- **Texto livre, minúsculo, curto** — sem FK. Fonte única da lista de sugestões:
+  `src/lib/categories.ts`. Existem DUAS cópias literais, porque nem o Deno nem o Python importam de
+  `src/`: `agent/app/domain/categories.py` (a que vale hoje) e `_shared/gemini.ts` (legado).
+  `src/lib/categories.test.ts` falha se qualquer uma divergir — mexeu numa, mexe nas outras. A
+  tabela `categories` legada foi dropada na `0010_workspaces.sql`.
 
 ## Agregações
 
@@ -47,14 +51,17 @@
 
 ## Alertas proativos
 
-- Quem decide o que alertar é `_alerts_to_send()`; quem entrega é a Edge Function `send-alerts` (cron diário).
+- Quem decide o que alertar é `_alerts_to_send()`; quem entrega é `POST /cron/alerts`
+  (`agent/app/jobs/alerts.py`, Cloud Scheduler diário).
 - **Dedupe por dia** em `alerts_sent` (workspace, tipo, ref, `sent_on`), reservado ANTES do envio. Cron rodando duas vezes não pode virar spam — no WhatsApp spam é template pago.
 - Toda mensagem termina numa ação ("quer que eu remaneje?", "me manda paguei"). Alerta que só informa é o que faz o usuário desinstalar no segundo mês.
 
 ## Planos e limites
 
 - **Limite de plano mora em `private.plan_limits`, num lugar só.** Espalhar número de plano pelo código é como o produto acaba cobrando de um jeito e entregando de outro.
-- `plan_status()` devolve plano + consumo do mês + limites numa chamada: serve a tela E o gate da IA no `process-jobs`.
+- `plan_status()` devolve plano + consumo do mês + limites numa chamada: serve a tela E o gate da
+  IA em `_check_limits` (`agent/app/worker.py`). ⚠️ O consumo do mês é `count(*)` de `ai_events` —
+  o agente que não gravar lá derruba o paywall em silêncio.
 - Cancelamento é **uma chamada, sem formulário** (`cancel_subscription`). Dificultar cancelamento é a reclamação nº1 contra os concorrentes no Reclame Aqui — não repetir.
 - Convite de membro é por **telefone** (o mesmo vínculo do WhatsApp), normalizado com DDI para casar com `profiles.phone`.
 
