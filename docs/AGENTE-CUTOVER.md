@@ -289,6 +289,43 @@ Depois é abrir o WhatsApp: *"gastei 45 no mercado"*, *"quanto gastei esse mês?
 Passar para produção depois é só apontar o `PYTHON_AGENT_URL` para o serviço de
 produção — sem mexer no roteamento nem no número.
 
+## Testar o APP contra o staging
+
+O WhatsApp escrevendo em staging só é metade do fluxo. Para VER isso no app, ele
+precisa apontar para o mesmo banco — senão você digita no WhatsApp e olha uma
+tela de produção, vazia.
+
+**1. `.env.local` sobrepõe o `.env`** (verificado com `@expo/env` nesta versão;
+o `.env` continua em produção, intocado):
+
+```bash
+EXPO_PUBLIC_SUPABASE_URL=https://utkqoiigimqzeenxkxdl.supabase.co
+EXPO_PUBLIC_SUPABASE_ANON_KEY=<publishable do staging>
+```
+
+⚠️ **Apague o `.env.local` antes de qualquer build de produção/EAS.** Esquecer
+publica um app lendo o banco descartável. Voltar: `rm .env.local && npx expo start -c`
+— sem rebuild, porque `EXPO_PUBLIC_*` é inlinado no BUNDLE, não no binário.
+
+A sessão salva no device vai ser recusada (o emissor do JWT é outro projeto):
+cair na tela de login é o comportamento certo.
+
+**2. O provider de telefone nasce DESLIGADO no projeto novo.** Conferir sem
+adivinhar:
+
+```bash
+curl -s https://<ref>.supabase.co/auth/v1/settings -H "apikey: <anon>" | jq .external.phone
+```
+
+Produção devolve `true`; um projeto recém-criado devolve `false`, e o login falha
+com `phone_provider_disabled`. Ligar no staging exige DUAS coisas — o provider
+**e** o Send SMS Hook apontando para o `/hooks/otp` do Cloud Run de staging, com
+o mesmo `SEND_SMS_HOOK_SECRET` (os segredos do staging são cópia dos de produção,
+então o segredo já casa).
+
+**3. Realtime já está de pé:** as 15 tabelas da publicação `supabase_realtime`
+vieram nas migrations, então o que o WhatsApp grava aparece no app sem refresh.
+
 ## O script, e para que ele serve
 
 `scripts/fake_meta.py` **não é mock**: monta o payload no formato da Meta,
