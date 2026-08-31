@@ -36,6 +36,24 @@ type Admin = ReturnType<typeof adminClient>;
 /** Timeout do repasse. Curto de propósito: a Meta corta em 5s. */
 const PROXY_TIMEOUT_MS = 3_000;
 
+/**
+ * O fallback só é seguro quando o agente Python escreve NESTE MESMO banco.
+ *
+ * `fallbackSeguro` decide olhando `messages_queue` e `pending_actions` pelo
+ * admin client DESTA function — ou seja, o banco de produção. Apontando
+ * `PYTHON_AGENT_URL` para o serviço de STAGING, o Python grava no banco de
+ * staging e as duas checagens consultam o lugar errado: elas nunca encontram
+ * nada e sempre respondem "pode cair para o fluxo antigo". Resultado: qualquer
+ * falha do repasse (timeout de cold start, deploy, 5xx) manda a mensagem para o
+ * fluxo Deno, que a grava em PRODUÇÃO — exatamente a corrupção que o fallback
+ * existe para evitar, com o agravante de ser silenciosa.
+ *
+ * Por isso, enquanto o alvo for staging: PYTHON_AGENT_FALLBACK=off.
+ * Aí falha de repasse vira 503 e a Meta reentrega, que é lento e correto.
+ * Sem a variável, o comportamento é o de produção (fallback condicional ligado).
+ */
+const FALLBACK_LIGADO = Deno.env.get("PYTHON_AGENT_FALLBACK") !== "off";
+
 interface Mensagem {
   id?: string;
   from?: string;
@@ -119,7 +137,7 @@ async function rotearParaPython(
     console.error("repasse para o agente Python falhou:", err);
   }
 
-  if (await fallbackSeguro(supabase, telefone, waMessageId)) {
+  if (FALLBACK_LIGADO && await fallbackSeguro(supabase, telefone, waMessageId)) {
     console.warn(`fallback para o fluxo antigo: ${waMessageId}`);
     return null;
   }

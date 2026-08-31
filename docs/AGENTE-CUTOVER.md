@@ -224,8 +224,16 @@ curl -X POST 'https://utkqoiigimqzeenxkxdl.supabase.co/auth/v1/admin/users' \
   -d '{"phone":"55DDD9XXXXXXXX","phone_confirm":true}'
 #    telefone SÓ DÍGITOS, com o 55 (ver agent/app/domain/phone.py)
 
-# 2. a Edge Function de produção passa a repassar para o staging
-npx supabase secrets set PYTHON_AGENT_URL=https://agente-staging-942030719023.southamerica-east1.run.app/whatsapp-inbound
+# 2. a Edge Function de produção passa a repassar para o staging.
+#    PYTHON_AGENT_FALLBACK=off é OBRIGATÓRIO enquanto o alvo for staging:
+#    o fallback decide olhando messages_queue/pending_actions do banco DESTA
+#    function (produção), mas o Python está gravando no de staging — as duas
+#    checagens consultam o lugar errado, sempre respondem "pode cair", e um
+#    timeout de repasse mandaria sua mensagem para o fluxo Deno, que a grava
+#    em PRODUÇÃO. Com "off", falha de repasse vira 503 e a Meta reentrega.
+npx supabase secrets set \
+  PYTHON_AGENT_URL=https://agente-staging-942030719023.southamerica-east1.run.app/whatsapp-inbound \
+  PYTHON_AGENT_FALLBACK=off
 npx supabase functions deploy whatsapp-webhook
 
 # 3. seu número no fluxo novo — esta linha vai no banco de PRODUÇÃO
@@ -352,8 +360,11 @@ Fora disso, devolve **503** e a Meta reentrega. É mais lento e nunca corrompe.
 ## Passo 3 · Ligar o canário
 
 ```bash
-# 1. apontar a Edge Function para o Cloud Run
+# 1. apontar a Edge Function para o Cloud Run de PRODUÇÃO.
+#    Aqui o fallback condicional VOLTA a ser correto (o Python passa a gravar
+#    no mesmo banco que a function consulta), então tire o PYTHON_AGENT_FALLBACK.
 npx supabase secrets set PYTHON_AGENT_URL=https://agente-wwm7xruoyq-rj.a.run.app/whatsapp-inbound
+npx supabase secrets unset PYTHON_AGENT_FALLBACK
 npx supabase functions deploy whatsapp-webhook
 
 # 2. só o seu número no fluxo novo
