@@ -56,7 +56,9 @@ class TestPorTransacao:
         estado, cands = await resolve.por_transacao("ws", acao, quer_recente=False)
 
         assert estado == "ambiguous", "sem pista nenhuma não pode eleger ninguém"
-        assert len(cands) == 3, "mostra as 3 mais recentes para o usuário escolher"
+        # mostra os recentes para o usuário escolher; o teto é `MOSTRAR`, que
+        # existe para caber na Lista Interativa (10 linhas, a última é "nenhuma")
+        assert 1 < len(cands) <= resolve.MOSTRAR
 
     @pytest.mark.asyncio
     async def test_sem_pista_COM_recencia_pega_a_mais_recente(self, linhas):

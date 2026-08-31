@@ -233,6 +233,39 @@ async def resolve_node(state: AgentState) -> dict:
     return {"targets": alvos}
 
 
+async def safe_node(state: AgentState) -> dict:
+    """Executa AGORA o que não precisa de confirmação. Fase segura do lote.
+
+    "gastei 45 no mercado e apaga o último" não pode segurar o gasto de 45
+    esperando decisão sobre OUTRA coisa — e um NÃO na deleção não pode desfazer
+    um lançamento que era legítimo.
+
+    Repetir estas ações depois do SIM é inofensivo: a reserva
+    `(wa_message_id, action_index)` em `executed_actions` já as marca, e o
+    `wa_message_id` do checkpoint é o do turno ORIGINAL. Elas simplesmente são
+    puladas na segunda passada.
+    """
+    if state.get("halted"):
+        return {}
+    acoes = _actions(state)
+    if not acoes:
+        return {}
+
+    confidence = state.get("confidence", 1.0)
+    alvos = (list(state.get("targets") or []) + [{}] * len(acoes))[: len(acoes)]
+    seguras = [
+        (i, a) for i, (a, t) in enumerate(zip(acoes, alvos))
+        if not needs_confirmation(a, confidence, t or None)
+    ]
+    if not seguras or len(seguras) == len(acoes):
+        # nada sensível no lote: deixa tudo para o `executar` de sempre, para
+        # não ter duas execuções fazendo a mesma coisa no caminho comum
+        return {}
+
+    linhas = await _executar(state, seguras)
+    return {"results": [*state.get("results", []), *linhas]}
+
+
 async def gate(state: AgentState) -> dict:
     """Decide se executa direto ou pausa esperando confirmação.
 
@@ -269,16 +302,29 @@ async def gate(state: AgentState) -> dict:
                 }
             )
             validos = {c["id"] for c in alvo["candidates"]}
+            # O worker manda dict ({"approved", "candidate_id"}); os testes de
+            # grafo mandam a string crua. Aceitar só a string deixava o caminho
+            # REAL morto: todo clique e todo "2" digitado caíam no cancelamento.
+            escolhido = (
+                escolha.get("candidate_id") if isinstance(escolha, dict) else escolha
+            )
             # Só um id que ESTAVA na lista aprova. "sim" num empate não escolhe
             # nada, e aprovar sem escolher voltaria a ser adivinhação.
-            if isinstance(escolha, str) and escolha in validos:
+            if isinstance(escolhido, str) and escolhido in validos:
                 congelado = [dict(t) for t in alvos]
                 congelado[i] = {**alvo, "status": "found",
-                                "candidates": [c for c in alvo["candidates"] if c["id"] == escolha]}
-                return {"approved": True, "chosen_id": escolha, "targets": congelado}
+                                "candidates": [c for c in alvo["candidates"] if c["id"] == escolhido]}
+                return {"approved": True, "chosen_id": escolhido, "targets": congelado}
+            # SOMA em vez de substituir: `results` tem reducer `_replace`, e
+            # sobrescrever aqui apagaria o que a fase segura já gravou — o
+            # usuário leria "não mexi em nada" depois de um gasto ter sido
+            # criado de verdade.
             return {
                 "approved": False,
-                "results": ["👌 Beleza, não mexi em nada. Me diz de outro jeito qual era — pelo valor ou pela data."],
+                "results": [
+                    *state.get("results", []),
+                    "👌 Beleza, não mexi em nada. Me diz de outro jeito qual era — pelo valor ou pela data.",
+                ],
                 "halted": True,
             }
 
@@ -318,7 +364,12 @@ async def gate(state: AgentState) -> dict:
         return {"approved": True}
     if isinstance(resposta, dict) and resposta.get("approved"):
         return {"approved": True, "chosen_id": resposta.get("candidate_id") or ""}
-    return {"approved": False, "results": ["👍 Ok, não fiz nada."], "halted": True}
+    # idem: preserva o que a fase segura executou antes da pergunta
+    return {
+        "approved": False,
+        "results": [*state.get("results", []), "👍 Ok, não fiz nada."],
+        "halted": True,
+    }
 
 
 def after_gate(state: AgentState) -> str:
@@ -330,7 +381,13 @@ def after_gate(state: AgentState) -> str:
 # ---------------------------------------------------------------------------
 
 
-async def execute_node(state: AgentState) -> dict:
+async def _executar(state: AgentState, indexadas: list[tuple[int, object]]) -> list[str]:
+    """Roda as ações dadas, preservando o `action_index` ORIGINAL.
+
+    O índice é a chave de idempotência junto com o `wa_message_id`; renumerar
+    aqui faria a fase segura e a pós-SIM reservarem vagas diferentes para a
+    mesma ação, e a execução duplicaria.
+    """
     ctx = ExecContext(
         user_id=state["user_id"],
         workspace_id=state["workspace_id"],
@@ -339,27 +396,32 @@ async def execute_node(state: AgentState) -> dict:
         texto=state.get("text", ""),
         wa_message_id=state["wa_message_id"],
     )
-
-    linhas: list[str] = list(state.get("results", []))
     acoes = _actions(state)
     alvos = (list(state.get("targets") or []) + [{}] * len(acoes))[: len(acoes)]
-    for indice, acao in enumerate(acoes):
+
+    linhas: list[str] = []
+    for indice, acao in indexadas:
         ctx.action_index = indice
         # o alvo CONGELADO na Fase Cognitiva viaja até a tool por aqui
         ctx.target = alvos[indice] or None
         # regra do usuário GANHA da IA — mas só em CRIAÇÃO. Em consulta,
         # `category` é filtro: deixar a regra reescrevê-lo devolveria o total de
-        # outra categoria, em silêncio. Em nota, `folder` é pasta e
-        # `search_term` é busca, mesmo problema. E em correção/deleção é PIOR:
-        # `category` ali é campo de BUSCA, então uma regra do usuário podia
-        # mudar QUAL lançamento seria apagado.
+        # outra categoria, em silêncio. Em correção/deleção é PIOR: `category`
+        # ali é campo de BUSCA, então a regra podia mudar QUAL lançamento morre.
         if isinstance(acao, FinanceAction) and acao.type in RULE_APPLIES:
             acao = await apply_rules(ctx.workspace_id, acao)
         resultado = await execute(ctx, acao)
         if resultado.message:
             linhas.append(resultado.message)
+    return linhas
 
-    return {"results": linhas}
+
+async def execute_node(state: AgentState) -> dict:
+    acoes = list(enumerate(_actions(state)))
+    linhas = await _executar(state, acoes)
+    # `results` tem reducer `_replace`: somar ao que já veio da fase segura é o
+    # que preserva o "já fiz X" na resposta consolidada.
+    return {"results": [*state.get("results", []), *linhas]}
 
 
 async def compose(state: AgentState) -> dict:

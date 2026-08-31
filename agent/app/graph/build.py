@@ -28,6 +28,7 @@ from app.graph.nodes import (
     pick_domains,
     resolve_node,
     route,
+    safe_node,
 )
 from app.graph.state import AgentState
 
@@ -47,6 +48,8 @@ def build(checkpointer: AsyncPostgresSaver):
     builder.add_node("geral", general_node)
     # Fase Cognitiva: resolve e CONGELA os alvos antes de qualquer decisão
     builder.add_node("alvos", resolve_node)
+    # fase segura: o que não precisa de confirmação grava ANTES da pergunta
+    builder.add_node("seguras", safe_node)
     builder.add_node("gate", gate)
     builder.add_node("executar", execute_node)
     builder.add_node("compor", compose)
@@ -62,7 +65,8 @@ def build(checkpointer: AsyncPostgresSaver):
     # notas juntas) para decidir com todas as ações na mesa, igual ao gate.
     for dominio in ("financas", "financas_consulta", "notas", "geral"):
         builder.add_edge(dominio, "alvos")
-    builder.add_edge("alvos", "gate")
+    builder.add_edge("alvos", "seguras")
+    builder.add_edge("seguras", "gate")
     builder.add_conditional_edges("gate", after_gate, ["executar", "compor"])
     builder.add_edge("executar", "compor")
     builder.add_edge("compor", END)

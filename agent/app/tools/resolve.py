@@ -28,8 +28,10 @@ Status = Literal["found", "ambiguous", "none"]
 
 # Janela de busca das transações: além dela, nada é alcançável.
 REFERENCE_WINDOW = 40
-# Quantos candidatos mostrar num empate.
-MOSTRAR = 3
+# Quantos candidatos mostrar num empate. 9 porque a Lista Interativa da Meta
+# cabe 10 linhas e a última é sempre "Nenhuma dessas". Com 3 (o valor
+# anterior) as faixas de 3-10 e >10 do formato híbrido eram inalcançáveis.
+MOSTRAR = 9
 
 # Que ação mira um registro que JÁ EXISTE -> qual fonte resolve o alvo dela.
 TARGETS: dict[Any, str] = {
@@ -195,7 +197,16 @@ async def for_actions(workspace_id, acoes: list, texto_cru: str) -> list[dict]:
             saida.append({})
             continue
 
-        bruto = getattr(acao, "search_term", None) or getattr(acao, "content", None)
+        # `target_ref` é onde o nome da meta/bem vem em FinanceAction (ela não
+        # tem search_term nem content). Sem ele, goal_deposit e update_asset_value
+        # resolviam com termo vazio — ou seja, listavam TODAS as metas em vez de
+        # achar "viagem".
+        bruto = (
+            getattr(acao, "search_term", None)
+            or getattr(acao, "content", None)
+            or getattr(acao, "target_ref", None)
+            or getattr(acao, "description", None)
+        )
         termo = clean_term(bruto)
         # a recência só é lida do texto cru quando NÃO sobrou termo de busca
         recente = wants_latest(bruto, getattr(acao, "description", None)) or (

@@ -40,8 +40,18 @@ def grafo(monkeypatch):
         # o plano já vem pronto no estado inicial: o dublê só não chama o modelo
         return {}
 
-    async def executar_falso(state):
+    async def executar_falso(state, *a, **k):
         return {"results": [*state.get("results", []), "EXECUTOU"]}
+
+    async def _executar_falso(state, indexadas):
+        """Dublê no ponto onde as DUAS fases passam (segura e pós-SIM).
+
+        Dublar só `execute_node` deixava a fase segura chamando o banco de
+        verdade — que é justamente o caminho novo que precisa de cobertura.
+        """
+        return ["EXECUTOU" for _ in indexadas]
+
+    monkeypatch.setattr(nodes, "_executar", _executar_falso)
 
     async def alvos_falso(workspace_id, acoes, texto_cru):
         """Dublê da Fase Cognitiva: alvo único e resolvido, salvo se o teste
@@ -249,3 +259,128 @@ async def test_id_inventado_no_resume_nao_executa(monkeypatch, grafo):
     final = await grafo.ainvoke(Command(resume="id-que-nao-existe"), config=cfg)
 
     assert "EXECUTOU" not in final.get("results", [])
+
+
+# ---------------------------------------------------------------------------
+# Execução dividida: o que é seguro grava NA HORA, o sensível espera confirmação
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.asyncio
+async def test_lote_misto_grava_o_seguro_e_pergunta_o_sensivel(monkeypatch, grafo):
+    """"gastei 45 no mercado e apaga o último" não pode segurar o gasto de 45
+    esperando uma decisão sobre OUTRA coisa — e um NÃO não pode desfazê-lo."""
+    from app.graph import nodes
+
+    async def alvos(workspace_id, acoes, texto_cru):
+        from app.tools import resolve as _r
+
+        return [
+            {"table": "transactions", "status": "found",
+             "candidates": [{"id": "tx-1", "label": "gasto de R$ 80,00"}]}
+            if a.type in _r.TARGETS else {}
+            for a in acoes
+        ]
+
+    monkeypatch.setattr(nodes.resolve, "for_actions", alvos)
+    cfg = {"configurable": {"thread_id": "split-1"}}
+
+    estado = await grafo.ainvoke(
+        _estado([
+            {"type": FinanceActionType.CREATE_EXPENSE.value, "amount_cents": 4500},
+            {"type": "delete_transaction"},
+        ]),
+        config=cfg,
+    )
+
+    # a criação JÁ rodou — está no estado ANTES de qualquer pergunta
+    assert "EXECUTOU" in estado.get("results", []), estado.get("results")
+    # e a deleção está esperando
+    assert "__interrupt__" in estado
+
+
+@pytest.mark.asyncio
+async def test_nao_no_lote_misto_preserva_o_que_ja_foi_gravado(monkeypatch, grafo):
+    from app.graph import nodes
+
+    async def alvos(workspace_id, acoes, texto_cru):
+        from app.tools import resolve as _r
+
+        return [
+            {"table": "transactions", "status": "found",
+             "candidates": [{"id": "tx-1", "label": "gasto de R$ 80,00"}]}
+            if a.type in _r.TARGETS else {}
+            for a in acoes
+        ]
+
+    monkeypatch.setattr(nodes.resolve, "for_actions", alvos)
+    cfg = {"configurable": {"thread_id": "split-2"}}
+
+    await grafo.ainvoke(
+        _estado([
+            {"type": FinanceActionType.CREATE_EXPENSE.value, "amount_cents": 4500},
+            {"type": "delete_transaction"},
+        ]),
+        config=cfg,
+    )
+    final = await grafo.ainvoke(Command(resume=False), config=cfg)
+
+    # cancelar a deleção não pode apagar o gasto que já foi gravado
+    assert "EXECUTOU" in final.get("results", []), final.get("results")
+    assert "não fiz nada" in " ".join(final.get("results", []))
+
+
+@pytest.mark.asyncio
+async def test_o_que_o_WORKER_manda_no_resume_o_gate_entende(monkeypatch, grafo):
+    """A costura entre worker e gate, que quase passou batido.
+
+    Os outros testes chamam `Command(resume="b")` na mão. O worker NUNCA manda
+    isso: ele manda o dict que sai de `_congelado(decide(...))`. O gate aceitava
+    só a string, então todo clique e todo "2" digitado caíam no cancelamento —
+    o caminho feliz estava morto ponta a ponta e a suíte inteira passava.
+    """
+    from app.domain import confirm
+    from app.graph import nodes
+    from app.worker import _congelado
+
+    async def dois(workspace_id, acoes, texto_cru):
+        return [{"table": "transactions", "status": "ambiguous",
+                 "candidates": [{"id": "a", "label": "R$ 45"}, {"id": "b", "label": "R$ 80"}]}
+                for _ in acoes]
+
+    monkeypatch.setattr(nodes.resolve, "for_actions", dois)
+    cfg = {"configurable": {"thread_id": "costura-1"}}
+    await grafo.ainvoke(_estado([{"type": "delete_transaction"}]), config=cfg)
+
+    pendente = {"id": "11111111-2222-3333-4444-555555555555",
+                "action": {"candidates": [{"id": "a"}, {"id": "b"}]}}
+
+    # 1) clique no botão do segundo candidato
+    decisao = confirm.decide({"clicked_id": f"pa:{pendente['id']}:c:b"}, pendente)
+    final = await grafo.ainvoke(Command(resume=_congelado(decisao, pendente)), config=cfg)
+    assert "EXECUTOU" in final.get("results", []), final.get("results")
+    assert final["targets"][0]["candidates"] == [{"id": "b", "label": "R$ 80"}]
+
+
+@pytest.mark.asyncio
+async def test_numero_digitado_tambem_chega_inteiro_no_gate(monkeypatch, grafo):
+    from app.domain import confirm
+    from app.graph import nodes
+    from app.worker import _congelado
+
+    async def dois(workspace_id, acoes, texto_cru):
+        return [{"table": "transactions", "status": "ambiguous",
+                 "candidates": [{"id": "a", "label": "R$ 45"}, {"id": "b", "label": "R$ 80"}]}
+                for _ in acoes]
+
+    monkeypatch.setattr(nodes.resolve, "for_actions", dois)
+    cfg = {"configurable": {"thread_id": "costura-2"}}
+    await grafo.ainvoke(_estado([{"type": "delete_transaction"}]), config=cfg)
+
+    pendente = {"id": "11111111-2222-3333-4444-555555555555",
+                "action": {"candidates": [{"id": "a"}, {"id": "b"}]}}
+    decisao = confirm.decide({"text": "1"}, pendente)   # quem não clica, digita
+    final = await grafo.ainvoke(Command(resume=_congelado(decisao, pendente)), config=cfg)
+
+    assert "EXECUTOU" in final.get("results", [])
+    assert final["chosen_id"] == "a"
