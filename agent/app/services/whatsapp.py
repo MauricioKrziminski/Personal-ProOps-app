@@ -11,6 +11,7 @@ import logging
 import httpx
 
 from app.config import get_settings
+from app.domain.phone import candidates
 
 log = logging.getLogger(__name__)
 
@@ -34,18 +35,41 @@ async def close_client() -> None:
 
 
 async def _graph_post(payload: dict) -> httpx.Response:
+    """POST na Graph API, tentando as duas formas do telefone brasileiro.
+
+    A Meta ENTREGA o `from` sem o 9º dígito (`553598744200`) e ACEITA envio para
+    a forma com o 9 (`5535998744200`), devolvendo o wa_id sem o 9 — ou seja, ela
+    normaliza na entrada mas não na saída. Responder cegamente ao `from` recebido
+    quebra sempre que o outro lado casa pela forma cadastrada; medido em
+    31/08/2026 contra o número de teste, cuja allowed list guarda a forma COM o 9
+    e recusa a sem, com `(#131030) Recipient phone number not in allowed list`.
+    O envio falhava em silêncio (try_send engole) e a conversa ficava muda.
+
+    Tenta primeiro o número como veio (é o que a Meta documenta) e só depois o
+    candidato alternativo. Só troca em erro 4xx, que significa REJEITADO — nada
+    foi entregue, então não há risco de mandar duas vezes. 5xx não troca: o
+    problema é do servidor, não do número.
+    """
     settings = get_settings()
     if not settings.whatsapp_token or not settings.whatsapp_phone_number_id:
         raise RuntimeError("WHATSAPP_TOKEN / WHATSAPP_PHONE_NUMBER_ID ausentes")
 
-    res = await client().post(
-        f"{GRAPH_BASE}/{settings.whatsapp_phone_number_id}/messages",
-        headers={"Authorization": f"Bearer {settings.whatsapp_token}"},
-        json=payload,
-    )
-    if res.status_code >= 400:
-        raise RuntimeError(f"WhatsApp send falhou ({res.status_code}): {res.text}")
-    return res
+    destinos = candidates(str(payload.get("to", ""))) or [str(payload.get("to", ""))]
+    res: httpx.Response | None = None
+    for i, destino in enumerate(destinos):
+        res = await client().post(
+            f"{GRAPH_BASE}/{settings.whatsapp_phone_number_id}/messages",
+            headers={"Authorization": f"Bearer {settings.whatsapp_token}"},
+            json={**payload, "to": destino},
+        )
+        if res.status_code < 400:
+            if i:
+                log.info("WhatsApp aceitou a forma alternativa do telefone")
+            return res
+        if res.status_code >= 500:
+            break
+    assert res is not None
+    raise RuntimeError(f"WhatsApp send falhou ({res.status_code}): {res.text}")
 
 
 async def send_text(to: str, body: str) -> None:

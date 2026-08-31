@@ -438,6 +438,24 @@ Vale na mensagem seguinte, sem deploy.
 
 ---
 
+## O 9º dígito quebra a RESPOSTA, não só a busca
+
+Medido em 31/08/2026 contra o número de teste:
+
+| envio para | resultado |
+|---|---|
+| `5535998744200` (com o 9) | **aceito** — e a Meta devolve `wa_id: 553598744200` |
+| `553598744200` (sem o 9) | **recusado**, `(#131030) Recipient phone number not in allowed list` |
+
+A Meta ENTREGA o `from` sem o 9 e casa a allowed list pela forma COM o 9: ela
+normaliza na entrada e não na saída. O agente respondia ao `from` como veio, o
+envio falhava, e `try_send` engolia — a conversa ficava **muda**, com a
+transação criada corretamente no banco. Sintoma: "mandei e ele não respondeu".
+
+`_graph_post` (`app/services/whatsapp.py`) agora tenta as duas formas, nessa
+ordem, e só troca em **4xx** (rejeitado = nada entregue, então não duplica).
+Coberto por `tests/test_whatsapp_send.py`.
+
 # Quando o número real da ProOps entrar
 
 Hoje existe **um** número (o de teste da Meta), e por isso o roteamento é pelo
@@ -479,6 +497,19 @@ Não foi implementado agora de propósito: o número real ainda não existe, o
 usam a **legada**, porque é o que `status.url` devolve. Precisam continuar todos
 iguais: o Cloud Tasks assina o token com essa audiência e o serviço valida
 contra ela. Misturar as duas gera 401 em `/worker`.
+
+**O `setup-gcp.sh` usa a conta ATIVA do gcloud, e ela muda.** Com outra conta
+ativa, `criar_projeto` não consegue nem descrever o projeto, cai no `create` e
+morre com `PERMISSION_DENIED ... resourcemanager.projects.create` — mensagem que
+parece falta de papel na organização, mas é conta errada. Não troque a
+configuração global só para rodar o script; prefixe a chamada:
+
+```bash
+CLOUDSDK_CORE_ACCOUNT=gestao.proops@gmail.com ./scripts/setup-gcp.sh staging
+```
+
+O mesmo vale para `gcloud logging read` e qualquer leitura: `--account
+gestao.proops@gmail.com`.
 
 **A SA precisa de `actAs` sobre SI MESMA — e faltava.** Para criar uma task com
 token OIDC assinado como `agente-runner`, o Cloud Tasks exige
