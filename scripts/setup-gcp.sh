@@ -8,9 +8,20 @@
 #   ./scripts/setup-gcp.sh              # cria/configura tudo
 #   ./scripts/setup-gcp.sh preflight    # só confere conta/componente, não cria nada
 #   ./scripts/setup-gcp.sh deploy       # só o deploy do Cloud Run
+#   ./scripts/setup-gcp.sh staging      # serviço/fila/segredos de STAGING (sem crons)
 #   ./scripts/setup-gcp.sh secrets      # só (re)grava os segredos
 #
 set -euo pipefail
+
+# Os defaults de staging precisam vir ANTES dos de produção, logo abaixo: quando
+# `main()` roda, SERVICE já vale "agente" e um `${SERVICE:-agente-staging}` lá
+# embaixo nunca dispararia — o "staging" faria deploy EM CIMA da produção.
+if [[ "${1:-}" == staging ]]; then
+  : "${SERVICE:=agente-staging}"
+  : "${QUEUE:=whatsapp-debounce-staging}"
+  : "${ENV_FILE:=agent/.env.staging}"
+  : "${SECRET_SUFFIX:=-staging}"
+fi
 
 PROJECT_ID="${PROJECT_ID:-personal-proops-agent}"
 REGION="${REGION:-southamerica-east1}"   # São Paulo: perto do Supabase e dos usuários
@@ -28,12 +39,24 @@ SA_EMAIL="${SA_NAME}@${PROJECT_ID}.iam.gserviceaccount.com"
 # texto no console nem no histórico de deploy.
 ENV_FILE="${ENV_FILE:-agent/.env}"
 
+# Sufixo dos IDs no Secret Manager. Os segredos são POR PROJETO GCP, e staging e
+# produção dividem o mesmo projeto — sem sufixo, o serviço de staging receberia
+# o `database-url` de PRODUÇÃO e escreveria no banco real, que é exatamente o
+# que staging existe para impedir. O nome da env var no container não muda:
+#   --set-secrets DATABASE_URL=database-url-staging:latest
+SECRET_SUFFIX="${SECRET_SUFFIX:-}"
+
 SEGREDOS=(
   DATABASE_URL GEMINI_API_KEY GROQ_API_KEY
   WHATSAPP_TOKEN WHATSAPP_APP_SECRET WHATSAPP_VERIFY_TOKEN WHATSAPP_PHONE_NUMBER_ID
   THREAD_SALT SEND_SMS_HOOK_SECRET REVENUECAT_WEBHOOK_SECRET SUPABASE_JWT_SECRET
   LANGFUSE_PUBLIC_KEY LANGFUSE_SECRET_KEY INTERNAL_SECRET
 )
+
+# Lê UMA variável do $ENV_FILE sem dar `source` (o arquivo tem comentários, e
+# source executaria conteúdo). Corta comentário de fim de linha e espaço.
+ler_env() { grep -E "^$1=" "$ENV_FILE" 2>/dev/null | head -1 | cut -d= -f2- \
+  | sed 's/[[:space:]]*#.*$//' | xargs || true; }
 
 log()  { printf '\n\033[1m▸ %s\033[0m\n' "$*"; }
 skip() { printf '  · %s\n' "$*"; }
@@ -158,6 +181,19 @@ criar_sa() {
       --member="serviceAccount:${SA_EMAIL}" --role="$papel" \
       --condition=None --quiet >/dev/null
   done
+
+  # ...e serviceAccountUser SOBRE SI MESMA. Para criar uma task com token OIDC
+  # assinado como esta SA, o Cloud Tasks exige `iam.serviceAccounts.actAs` do
+  # CHAMADOR sobre a SA do token — e aqui os dois são a mesma conta. Sem isso o
+  # `create_task` devolve 403 e o debounce nunca é agendado: a mensagem entra na
+  # messages_queue e fica lá. O código degrada para o /worker/sweep e responde
+  # 200 ("o sweep recupera"), mas o sweep vive no cron de lembretes, que nasce
+  # PAUSADO — então o efeito real é mensagem enfileirada e nunca processada.
+  # A org desliga os grants automáticos, então este binding não vem de graça.
+  gcloud iam service-accounts add-iam-policy-binding "$SA_EMAIL" \
+    --member="serviceAccount:${SA_EMAIL}" --role=roles/iam.serviceAccountUser \
+    --project "$PROJECT_ID" --quiet >/dev/null
+  ok "actAs sobre si mesma (Cloud Tasks assina o OIDC com esta SA)"
 }
 
 # ---------------------------------------------------------------------------
@@ -192,15 +228,13 @@ gravar_segredos() {
   [[ -f "$ENV_FILE" ]] || { echo "  ✗ $ENV_FILE não existe" >&2; exit 1; }
 
   for nome in "${SEGREDOS[@]}"; do
-    # lê a variável do .env sem dar `source` (o arquivo tem comentários e '#'
-    # dentro de valores; source executaria conteúdo)
     local valor
-    valor="$(grep -E "^${nome}=" "$ENV_FILE" | head -1 | cut -d= -f2- | sed 's/[[:space:]]*#.*$//' | xargs || true)"
+    valor="$(ler_env "$nome")"
     if [[ -z "$valor" ]]; then
       skip "$nome vazio no .env — pulando"
       continue
     fi
-    local id="${nome//_/-}"; id="$(echo "$id" | tr '[:upper:]' '[:lower:]')"
+    local id="${nome//_/-}"; id="$(echo "$id" | tr '[:upper:]' '[:lower:]')""${SECRET_SUFFIX}"
     if ! gcloud secrets describe "$id" --project "$PROJECT_ID" &>/dev/null; then
       gcloud secrets create "$id" --replication-policy=automatic --project "$PROJECT_ID" >/dev/null
     fi
@@ -272,7 +306,7 @@ deploy() {
   # debounce mora no Cloud Tasks e não em timer de memória.
   local secrets=""
   for nome in "${SEGREDOS[@]}"; do
-    local id="${nome//_/-}"; id="$(echo "$id" | tr '[:upper:]' '[:lower:]')"
+    local id="${nome//_/-}"; id="$(echo "$id" | tr '[:upper:]' '[:lower:]')""${SECRET_SUFFIX}"
     gcloud secrets describe "$id" --project "$PROJECT_ID" &>/dev/null || continue
     secrets+="${nome}=${id}:latest,"
   done
@@ -282,6 +316,14 @@ deploy() {
   # próprio serviço — que só existiria depois de um deploy saudável. A saída é
   # que a URL do Cloud Run é DETERMINÍSTICA a partir do número do projeto, então
   # dá para passá-la já no primeiro deploy. Confirmada contra a real logo abaixo.
+  # SUPABASE_URL não é segredo (é URL pública), mas SEM ela `current_user()`
+  # devolve 401 em toda rota autenticada do app — dela sai o JWKS que valida o
+  # JWT. Ficou de fora do primeiro deploy e a rota /internal/import-statement
+  # respondia 401 achando que era permissão.
+  local supabase_url
+  supabase_url="$(ler_env SUPABASE_URL)"
+  [[ -n "$supabase_url" ]] || warn "SUPABASE_URL vazio em $ENV_FILE — /internal/* vai devolver 401"
+
   local numero url_prevista
   numero="$(gcloud projects describe "$PROJECT_ID" --format='value(projectNumber)')"
   url_prevista="https://${SERVICE}-${numero}.${REGION}.run.app"
@@ -299,7 +341,7 @@ deploy() {
     --timeout 300 \
     --quiet \
     --set-secrets "$secrets" \
-    --set-env-vars "GCP_PROJECT=${PROJECT_ID},GCP_LOCATION=${REGION},TASKS_QUEUE=${QUEUE},TASKS_SA_EMAIL=${SA_EMAIL},DEBOUNCE_BACKEND=cloud_tasks,DEBOUNCE_SECONDS=3,WORKER_URL=${url_prevista}/worker/process-thread,OIDC_AUDIENCE=${url_prevista}"
+    --set-env-vars "GCP_PROJECT=${PROJECT_ID},GCP_LOCATION=${REGION},TASKS_QUEUE=${QUEUE},TASKS_SA_EMAIL=${SA_EMAIL},DEBOUNCE_BACKEND=cloud_tasks,DEBOUNCE_SECONDS=3,WORKER_URL=${url_prevista}/worker/process-thread,OIDC_AUDIENCE=${url_prevista},SUPABASE_URL=${supabase_url}"
 
   URL="$(gcloud run services describe "$SERVICE" --project "$PROJECT_ID" \
           --region "$REGION" --format='value(status.url)')"
@@ -365,8 +407,14 @@ criar_cron() {
 main() {
   case "${1:-tudo}" in
     deploy)  criar_projeto; deploy; criar_crons ;;
+    # Staging: mesmo projeto GCP, tudo o mais separado. Sem `criar_crons` DE
+    # PROPÓSITO — os jobs do Scheduler têm nome fixo (reminders, finance-scheduler,
+    # alerts) e `criar_cron` faz `update` quando já existem: rodar staging
+    # repontaria os crons de PRODUÇÃO para a URL de staging, em silêncio.
+    staging) criar_projeto; gravar_segredos; criar_fila; deploy ;;
     preflight) preflight ;;
     build-iam) criar_projeto; permitir_build ;;
+    sa) criar_projeto; criar_sa ;;
     secrets) criar_projeto; gravar_segredos ;;
     tudo)
       preflight
@@ -380,7 +428,7 @@ main() {
       criar_crons
       log "Pronto. Aponte o webhook da Meta para a URL acima."
       ;;
-    *) echo "uso: $0 [tudo|deploy|secrets|preflight|build-iam]" >&2; exit 1 ;;
+    *) echo "uso: $0 [tudo|deploy|staging|secrets|preflight|build-iam|sa]" >&2; exit 1 ;;
   esac
 }
 main "$@"
