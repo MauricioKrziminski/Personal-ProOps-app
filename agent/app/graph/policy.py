@@ -108,7 +108,12 @@ def describe_for_confirmation(
     if target and target.get("candidates"):
         verbo = _VERBO.get(action.type.value, "mexer em")
         if target.get("status") == "found":
-            return f"{verbo} {target['candidates'][0]['label']}"
+            escolhido = target["candidates"][0]
+            # O detalhe (valor, data) só existe onde o rótulo não coube — hoje o
+            # plano de parcelamento. Numa confirmação DESTRUTIVA o usuário precisa
+            # ver o dinheiro antes de dizer sim, não só o nome.
+            extra = f" ({escolhido['when']})" if escolhido.get("when") else ""
+            return f"{verbo} {escolhido['label']}{extra}"
         # Empate: as opções REAIS vão na lista, então a frase só precisa dizer o
         # que vai acontecer. Cair no texto do modelo aqui reintroduzia o eco que
         # este desenho existe para eliminar ("apagar a nota sobre esse item").

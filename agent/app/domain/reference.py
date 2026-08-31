@@ -35,6 +35,29 @@ _RECENCIA_SOLTA = re.compile(
 )
 
 
+# "apaga a TV" e "apaga a TV por completo" pedem coisas diferentes: uma parcela
+# ou a compra inteira. Sem âncora, igual ao _RECENCIA_SOLTA — é intenção de
+# ESCOPO dita no meio da frase, não termo de busca.
+_ESCOPO_TOTAL = re.compile(
+    r"\b(por\s+completo|complet[oa]|inteir[oa]s?|"
+    r"tod[oa]s?\s+as?\s+parcelas?|"
+    r"a\s+compra\s+(toda|inteira)|o\s+parcelamento\s+(todo|inteiro)|"
+    r"tudo)\b",
+    re.IGNORECASE,
+)
+
+
+def wants_whole_plan(*textos: str | None) -> bool:
+    """O usuário pediu a COMPRA INTEIRA, não uma parcela?
+
+    Quando é sim, o alvo vira a linha de `installment_plans` — e a busca vai
+    direto nessa tabela, nunca por dedução a partir das transações: a janela de
+    resolução são os 40 lançamentos mais recentes, e as parcelas de uma compra
+    antiga estão fora dela justamente quando alguém quer apagar tudo.
+    """
+    return any(t and _ESCOPO_TOTAL.search(t) for t in textos)
+
+
 def clean_term(valor: str | None) -> str | None:
     """O termo utilizável para busca, ou None se for só um ponteiro."""
     if not valor:

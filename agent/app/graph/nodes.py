@@ -414,8 +414,14 @@ async def gate(state: AgentState) -> dict:
             # nada, e aprovar sem escolher voltaria a ser adivinhação.
             if isinstance(escolhido, str) and escolhido in validos:
                 congelado = [dict(t) for t in alvos]
-                congelado[i] = {**alvo, "status": "found",
-                                "candidates": [c for c in alvo["candidates"] if c["id"] == escolhido]}
+                escolhidos = [c for c in alvo["candidates"] if c["id"] == escolhido]
+                # A TABELA vem do candidato, não do alvo. Uma mesma pergunta pode
+                # misturar "a compra inteira" (installment_plans) com "a parcela
+                # 3/10" (transactions); herdar a do alvo mandaria o id do plano
+                # para `ensure_owned("transactions", ...)`, que não acharia nada —
+                # depois de o usuário já ter confirmado.
+                congelado[i] = {**alvo, "status": "found", "candidates": escolhidos,
+                                "table": escolhidos[0].get("table", alvo.get("table"))}
                 return {"approved": True, "chosen_id": escolhido, "targets": congelado}
             # SOMA em vez de substituir: `results` tem reducer `_replace`, e
             # sobrescrever aqui apagaria o que a fase segura já gravou — o

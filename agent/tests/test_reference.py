@@ -9,7 +9,7 @@ A recusa é CÓDIGO e não prompt porque é a única forma do comportamento não
 quando o modelo mudar (mesma lição de guards.py).
 """
 
-from app.domain.reference import clean_term, wants_latest
+from app.domain.reference import clean_term, wants_latest, wants_whole_plan
 
 
 class TestCleanTerm:
@@ -41,3 +41,38 @@ class TestWantsLatest:
     def test_texto_comum_nao_pede_recencia(self):
         assert not wants_latest("gastei 45 no mercado")
         assert not wants_latest(None, None)
+
+
+class TestEscopoDaCompraInteira:
+    """"apaga a TV" e "apaga a TV por completo" pedem coisas diferentes.
+
+    Uma é uma parcela; a outra são as dez. Sem separar isso, o teste ponta a
+    ponta de 31/08/2026 só conseguia apagar uma parcela por vez e deixava o
+    plano órfão mentindo `installments = 10` com nove parcelas vivas.
+    """
+
+    def test_pede_a_compra_inteira(self):
+        for frase in (
+            "exclua a TV por completo",
+            "apaga a tv inteira",
+            "remove todas as parcelas da tv",
+            "apaga a compra toda",
+            "apaga tudo da tv",
+            "cancela o parcelamento inteiro",
+        ):
+            assert wants_whole_plan(frase), frase
+
+    def test_pedido_simples_NAO_assume_o_plano(self):
+        """Sem a palavra de escopo, a ambiguidade é real e vira pergunta — chutar
+        o plano apagaria dez lançamentos por causa de um pedido de um."""
+        for frase in ("apaga a tv", "exclui o lançamento da tv", "apaga o último"):
+            assert not wants_whole_plan(frase), frase
+
+    def test_aceita_varias_fontes_como_o_wants_latest(self):
+        assert wants_whole_plan(None, "", "por completo")
+        assert not wants_whole_plan(None, "")
+
+    def test_nao_estraga_o_termo_de_busca(self):
+        """`clean_term` e `wants_whole_plan` são perguntas diferentes: a palavra
+        de escopo não pode sumir com o nome do que se busca."""
+        assert clean_term("TV por completo") == "TV por completo"

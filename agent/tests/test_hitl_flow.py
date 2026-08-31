@@ -473,3 +473,57 @@ async def test_rascunho_completado_NAO_passa_pelo_roteador():
     assert await nodes.route(semeado) == {}
     assert await nodes.finance_node(semeado) == {}
     assert await nodes.notes_node(semeado) == {}
+
+
+@pytest.mark.asyncio
+async def test_escolher_a_compra_inteira_troca_a_TABELA_do_alvo(monkeypatch, grafo):
+    """A mesma pergunta mistura a compra inteira e uma parcela.
+
+    O alvo nasce com `table = transactions` (a fonte que resolveu), mas o
+    candidato "Tudo (10x)" é uma linha de `installment_plans`. Se o congelamento
+    herdasse a tabela do ALVO, `registry.execute` chamaria
+    `ensure_owned("transactions", <id de plano>)`, não acharia nada, e a ação
+    morreria — depois de o usuário já ter confirmado a exclusão.
+    """
+    from app.graph import nodes
+
+    async def plano_e_parcela(workspace_id, acoes, texto_cru):
+        return [{"table": "transactions", "status": "ambiguous",
+                 "candidates": [
+                     {"id": "p1", "label": "Tudo (10x) — TV",
+                      "table": "installment_plans"},
+                     {"id": "tx1", "label": "TV (3/10)", "table": "transactions"},
+                 ]}
+                for _ in acoes]
+
+    monkeypatch.setattr(nodes.resolve, "for_actions", plano_e_parcela)
+    cfg = {"configurable": {"thread_id": "plano-1"}}
+
+    await grafo.ainvoke(_estado([{"type": "delete_transaction"}]), config=cfg)
+    final = await grafo.ainvoke(Command(resume="p1"), config=cfg)
+
+    assert final["targets"][0]["table"] == "installment_plans"
+    assert final["targets"][0]["candidates"][0]["id"] == "p1"
+
+
+@pytest.mark.asyncio
+async def test_escolher_a_parcela_mantem_a_tabela_de_transacoes(monkeypatch, grafo):
+    """O outro lado da mesma pergunta: escolher a parcela não pode virar plano."""
+    from app.graph import nodes
+
+    async def plano_e_parcela(workspace_id, acoes, texto_cru):
+        return [{"table": "transactions", "status": "ambiguous",
+                 "candidates": [
+                     {"id": "p1", "label": "Tudo (10x) — TV",
+                      "table": "installment_plans"},
+                     {"id": "tx1", "label": "TV (3/10)", "table": "transactions"},
+                 ]}
+                for _ in acoes]
+
+    monkeypatch.setattr(nodes.resolve, "for_actions", plano_e_parcela)
+    cfg = {"configurable": {"thread_id": "plano-2"}}
+
+    await grafo.ainvoke(_estado([{"type": "delete_transaction"}]), config=cfg)
+    final = await grafo.ainvoke(Command(resume="tx1"), config=cfg)
+
+    assert final["targets"][0]["table"] == "transactions"

@@ -73,6 +73,7 @@ async def ensure_owned(table: str, row_id, workspace_id) -> None:
         "accounts",
         "assets",
         "card_invoices",
+        "installment_plans",
     }:
         raise ValueError(f"tabela fora da allowlist: {table}")
 

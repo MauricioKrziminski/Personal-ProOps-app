@@ -672,6 +672,46 @@ em silêncio — o estado que a regra "cartão obrigatório em parcelado" existe
 impedir. E como mudar os dias depois **não** reprocessa lançamento já gravado, o
 usuário precisa saber agora em que ciclo a compra dele entrou.
 
+### A compra parcelada vira ALVO (31/08/2026)
+
+"Exclua a TV por completo" apagava UMA parcela de dez — o resolver achava as dez,
+cortava em nove, e cada "sim" matava uma, deixando o plano órfão dizendo
+`installments = 10` com nove parcelas vivas. "Já paguei a terceira" marcava uma
+transação **e reescrevia `occurred_at = hoje`**, o que dispara `set_invoice`
+(`0013:211`) e arranca a parcela da fatura em que ela nasceu.
+
+O pedido original era trocar o grafo por um agente ReAct. A medição disse outra
+coisa: **as duas falhas eram capacidade faltando, não raciocínio faltando** — um
+agente ReAct raciocinaria certo e não teria o que chamar.
+
+**Nada foi somado ao enum, e não por elegância:** `FinanceAction` está em
+14×14 = 196 e o teto provado é 198; um tipo novo daria 210 e quebraria o build.
+Os dois casos reusam `delete_transaction` e `mark_paid` — o que mudou é que o
+ALVO pode ser uma linha de `installment_plans`.
+
+- **`veredito` dá uma `table` a CADA candidato.** É isso que deixa uma mesma
+  pergunta misturar "Tudo (10x) — TV" (um plano) com "TV (3/10)" (uma transação).
+  O gate herda a tabela do candidato ESCOLHIDO (`nodes.py`); herdar a do alvo
+  mandaria o id do plano para `ensure_owned("transactions", ...)`, que não acharia
+  nada — depois de o usuário já ter confirmado.
+- **O rótulo põe o escopo na FRENTE** (`Tudo (10x) — TV`). O título da linha tem 24
+  caracteres e `_cut` corta no fim: com o nome primeiro, "Televisão da sala — tudo
+  (10x)" virava "Televisão da sala — tud…" e as duas opções da mesma pergunta
+  ficavam quase idênticas.
+- **Apagar é um `delete` só**: `installment_plan_id` tem `on delete cascade`
+  (`0013:142`), então as N parcelas caem junto. Sem RPC nova, sem migration.
+- **`wants_whole_plan`** (`domain/reference.py`, no molde do `wants_latest`) manda
+  "por completo" buscar na tabela de PLANOS **direto**. Nunca por dedução a partir
+  das transações: `por_transacao` só enxerga os 40 lançamentos mais recentes, e as
+  parcelas de uma compra antiga estão fora dessa janela justamente quando alguém
+  quer apagar tudo.
+- **A baixa retroativa NÃO toca em `occurred_at`.** É o ponto mais delicado do
+  arquivo. Status não dispara `set_invoice`, e o total da fatura nem olha para
+  status — ele soma por `invoice_id`.
+- **`rowcount = 0` é desfecho nomeado.** `_promote_due_transactions` (`0014:50`) já
+  promove parcela vencida, então num plano com datas certas o update não afeta
+  nada. Responder "marquei 1, 2 e 3 como pagas" ali seria mentira.
+
 **Custo do turno:** os fast-paths que classificam TEXTO (resposta de rascunho,
 SIM/NÃO digitado) passaram a gravar em `ai_events` — eles chamam o Gemini desde
 que o SIM/NÃO deixou de ser regex, e não estavam sendo contados, então o paywall

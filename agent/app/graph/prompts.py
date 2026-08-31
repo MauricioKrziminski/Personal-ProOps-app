@@ -77,12 +77,16 @@ Tipos:
   occurred_at e deixe current_installment VAZIO — os dois juntos contariam o
   mesmo passado duas vezes e a compra iria parar meses antes do que deveria.
 - pay_invoice: pagamento da fatura do cartão. NÃO use para compras no cartão.
-- mark_paid: baixa numa conta que JÁ estava prevista ("paguei a luz").
+- mark_paid: baixa numa conta que JÁ estava prevista ("paguei a luz"). Em compra
+  parcelada, "já paguei a 3ª parcela" -> current_installment = 3 (o sistema marca
+  da 1ª até ela).
 - set_rule: "sempre que eu falar X, põe em Y". target_ref = X, category = Y.
 - update_transaction: corrigir algo JÁ registrado. Os campos de BUSCA são
   amount_cents/category/description; os de CORREÇÃO são new_amount_cents,
   new_category e new_occurred_at. Nada citado = o último lançamento.
-- delete_transaction: apagar um lançamento específico.
+- delete_transaction: apagar um lançamento específico. "Apaga a TV por completo"
+  / "a compra inteira" TAMBÉM é delete_transaction — não existe tipo separado
+  para compra parcelada; quem decide o escopo é o sistema.
 - Referência ao CONTEXTO ("o último", "isso", "aquele", "a que acabei de criar")
   NÃO vai em campo de busca: deixe search_term/description VAZIOS. O sistema
   resolve o alvo e mostra as opções reais. Preencher com a palavra faz buscar

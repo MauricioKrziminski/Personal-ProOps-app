@@ -154,6 +154,18 @@ Junto disso: a retroação de parcela (`current_installment`) recua `occurred_at
 DEPOIS de `require_date` já ter checado a janela de ±5 anos. Um parcelamento longo
 começando muito atrás pode sair da janela sem ninguém verificar de novo.
 
+## ⚠️ Dívidas achadas ao tornar o plano de parcelamento um alvo (31/08/2026)
+
+- **Fatura vazia sobrevive.** Apagar todas as parcelas de uma fatura deixa a linha
+  de `card_invoices` viva e sem lançamentos; `pay_invoice` nela levanta
+  `'fatura sem lançamentos'` (`0013:325`). Não há trigger de delete em nenhuma das
+  45 migrations — o total da fatura é 100% derivado, então ele encolhe sozinho,
+  mas a linha fica.
+- **`groq.transcribe` é invisível para o paywall.** A transcrição de áudio é
+  chamada de modelo e **não** entra em `llm_calls`, logo não vira linha em
+  `ai_events` — que é o que `private.plan_status_for` conta. Mensagem de áudio
+  custa mais e é cobrada como se custasse menos.
+
 ## 🔵 FASE 4 — Roadmap v2 (ordem sugerida)
 
 ### 4.1 Push notifications de verdade

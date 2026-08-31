@@ -1,0 +1,160 @@
+"""Compra parcelada como ALVO — apagar inteira e dar baixa retroativa.
+
+Dois pedidos do teste ponta a ponta de 31/08/2026 não tinham como funcionar:
+
+- "exclua a TV por completo": `delete_transaction` apaga UMA linha por id. Com 10
+  parcelas o resolver devolvia empate, e cada "sim" matava uma parcela — deixando
+  o plano órfão dizendo `installments = 10` com nove parcelas vivas.
+- "já paguei a terceira parcela": `mark_paid` marcava uma transação E reescrevia
+  `occurred_at = hoje`, o que dispara `set_invoice` (0013:211) e arranca a parcela
+  da fatura em que ela nasceu.
+
+A correção não somou tipo nenhum ao enum (`FinanceAction` está em 14×14 = 196 e o
+teto provado é 198): o ALVO é que passou a poder ser uma linha de
+`installment_plans`.
+"""
+
+from uuid import UUID
+
+import pytest
+
+from app import db
+from app.graph.schemas import FinanceAction, FinanceActionType
+from app.tools import finance
+from app.tools.base import ExecContext
+
+WS = UUID("22222222-2222-2222-2222-222222222222")
+
+PLANO = {
+    "id": "plano-1",
+    "description": "TV",
+    "installments": 10,
+    "total_cents": 840000,
+    "parcelas": 10,
+}
+
+
+def _ctx(tabela: str, alvo_id: str = "plano-1") -> ExecContext:
+    return ExecContext(
+        user_id=UUID("11111111-1111-1111-1111-111111111111"),
+        workspace_id=WS,
+        phone="5551999999999",
+        timezone="America/Sao_Paulo",
+        texto="",
+        wa_message_id="w1",
+        target={"table": tabela, "status": "found",
+                "candidates": [{"id": alvo_id, "label": "TV — tudo (10x)", "table": tabela}]},
+    )
+
+
+@pytest.fixture
+def sql(monkeypatch):
+    """Captura o SQL emitido, que é o que decide o efeito no banco."""
+    executados = []
+
+    async def fetch_one(query, *args):
+        if "installment_plans" in query:
+            return dict(PLANO)
+        return None
+
+    async def execute(query, *args):
+        executados.append((" ".join(query.split()), args))
+        return 3  # linhas afetadas
+
+    monkeypatch.setattr(db, "fetch_one", fetch_one)
+    monkeypatch.setattr(db, "execute", execute)
+    return executados
+
+
+class TestApagarCompraInteira:
+    @pytest.mark.asyncio
+    async def test_apaga_o_PLANO_e_deixa_o_cascade_trabalhar(self, sql):
+        r = await finance.delete_transaction(
+            _ctx("installment_plans"),
+            FinanceAction(type=FinanceActionType.DELETE_TRANSACTION),
+        )
+        query, args = sql[0]
+        assert query.startswith("delete from public.installment_plans")
+        # escopo de workspace no where, como toda mutação do projeto
+        assert "workspace_id = %s" in query
+        assert args == ("plano-1", WS)
+        assert "10 parcelas" in r.message
+
+    @pytest.mark.asyncio
+    async def test_alvo_de_transacao_continua_apagando_UMA(self, monkeypatch):
+        """A regressão que este arquivo não pode causar: quem pede uma parcela
+        continua apagando uma parcela."""
+        executados = []
+
+        async def fetch_one(query, *args):
+            return {"id": "tx-1", "kind": "expense", "amount_cents": 8400,
+                    "category": None, "description": "TV (3/10)"}
+
+        async def execute(query, *args):
+            executados.append(" ".join(query.split()))
+            return 1
+
+        monkeypatch.setattr(db, "fetch_one", fetch_one)
+        monkeypatch.setattr(db, "execute", execute)
+
+        await finance.delete_transaction(
+            _ctx("transactions", "tx-1"),
+            FinanceAction(type=FinanceActionType.DELETE_TRANSACTION),
+        )
+        assert executados[0].startswith("delete from public.transactions")
+
+
+class TestBaixaRetroativa:
+    @pytest.mark.asyncio
+    async def test_marca_da_primeira_ate_a_informada(self, sql):
+        r = await finance.mark_paid(
+            _ctx("installment_plans"),
+            FinanceAction(type=FinanceActionType.MARK_PAID, current_installment=3),
+        )
+        query, args = sql[0]
+        assert "update public.transactions set status = 'cleared'" in query
+        assert "installment_no <= %s" in query
+        assert args == ("plano-1", WS, 3)
+        assert "3 parcelas" in r.message
+
+    @pytest.mark.asyncio
+    async def test_NAO_toca_em_occurred_at(self, sql):
+        """A asserção mais importante do arquivo. `set_invoice` é
+        `before update of account_id, occurred_at`: escrever a data arrancaria a
+        parcela da fatura de maio e a jogaria na fatura de hoje."""
+        await finance.mark_paid(
+            _ctx("installment_plans"),
+            FinanceAction(type=FinanceActionType.MARK_PAID, current_installment=3),
+        )
+        assert "occurred_at" not in sql[0][0]
+
+    @pytest.mark.asyncio
+    async def test_parcela_fora_da_faixa_nao_vira_update_maluco(self, sql):
+        """"já paguei a 30ª de 10" é o modelo errando; o guard clampa para 1."""
+        await finance.mark_paid(
+            _ctx("installment_plans"),
+            FinanceAction(type=FinanceActionType.MARK_PAID, current_installment=30),
+        )
+        assert sql[0][1][2] == 1
+
+    @pytest.mark.asyncio
+    async def test_nada_mudou_e_um_desfecho_NOMEADO(self, monkeypatch):
+        """`_promote_due_transactions` já promove parcela vencida, então num plano
+        com datas certas o update não afeta nada. Dizer "marquei 1, 2 e 3" aí
+        seria mentira."""
+
+        async def fetch_one(query, *args):
+            return dict(PLANO)
+
+        async def execute(query, *args):
+            return 0
+
+        monkeypatch.setattr(db, "fetch_one", fetch_one)
+        monkeypatch.setattr(db, "execute", execute)
+
+        r = await finance.mark_paid(
+            _ctx("installment_plans"),
+            FinanceAction(type=FinanceActionType.MARK_PAID, current_installment=3),
+        )
+        assert "já constavam pagas" in r.message
+        assert "Marquei" not in r.message

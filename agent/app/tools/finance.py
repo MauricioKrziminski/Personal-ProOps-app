@@ -327,8 +327,53 @@ async def pay_invoice(ctx: ExecContext, action: FinanceAction) -> ToolResult:
     )
 
 
+async def _baixa_em_parcelas(ctx: ExecContext, action: FinanceAction) -> ToolResult:
+    """"Já paguei a terceira" -> parcelas 1..3 viram `cleared`.
+
+    ⚠️ **NÃO toca em `occurred_at`.** O trigger `set_invoice` é
+    `before insert or update of account_id, occurred_at` (0013:211): escrever a
+    data arrancaria a parcela da fatura em que ela nasceu e a jogaria na fatura de
+    hoje. Status não dispara o trigger, e o total da fatura nem olha para status —
+    ele soma por `invoice_id`.
+    """
+    plano = await db.fetch_one(
+        """
+        select id, description, installments from public.installment_plans
+        where id = %s and workspace_id = %s
+        """,
+        ctx.target["candidates"][0]["id"], ctx.workspace_id,
+    )
+    if not plano:
+        return ToolResult("🤷 Essa compra parcelada não está mais aqui.", read_only=True)
+
+    ate = guards.require_current_installment(action.current_installment, plano["installments"])
+    mudadas = await db.execute(
+        """
+        update public.transactions set status = 'cleared'
+        where installment_plan_id = %s and workspace_id = %s
+          and installment_no <= %s and status = 'pending'
+        """,
+        plano["id"], ctx.workspace_id, ate,
+    )
+    nome = plano["description"] or "compra parcelada"
+    if not mudadas:
+        # Desfecho legítimo, e comum: `_promote_due_transactions` (0014:50) já
+        # promove toda parcela vencida. Dizer "marquei 1, 2 e 3" aqui seria mentir.
+        return ToolResult(
+            f"👍 As parcelas até a {ate}ª de *{nome}* já constavam pagas — não mudei nada.",
+            result_id=plano["id"],
+        )
+    plural = "parcela" if mudadas == 1 else "parcelas"
+    return ToolResult(
+        f"✅ Marquei {mudadas} {plural} de *{nome}* como pagas (até a {ate}ª).",
+        result_id=plano["id"],
+    )
+
+
 async def mark_paid(ctx: ExecContext, action: FinanceAction) -> ToolResult:
     """Baixa numa conta PREVISTA. Diferente de create_expense: o lançamento já existe."""
+    if _alvo_e_plano(ctx):
+        return await _baixa_em_parcelas(ctx, action)
     # Antes havia um `limit 1` ordenado por vencimento: com duas contas em aberto
     # parecidas, ele dava baixa na mais antiga EM SILÊNCIO. Agora o empate vira
     # pergunta como todo o resto — quem resolve é a Fase Cognitiva.
@@ -428,7 +473,50 @@ async def update_transaction(ctx: ExecContext, action: FinanceAction) -> ToolRes
     )
 
 
+def _alvo_e_plano(ctx: ExecContext) -> bool:
+    """O usuário escolheu a COMPRA INTEIRA, não uma parcela.
+
+    A tabela vem do candidato congelado no checkpoint — é o mesmo id que ele LEU
+    quando confirmou.
+    """
+    return (ctx.target or {}).get("table") == "installment_plans"
+
+
+async def _apagar_plano(ctx: ExecContext) -> ToolResult:
+    """Apaga a compra parcelada inteira.
+
+    Um `delete` só: `transactions.installment_plan_id` tem `on delete cascade`
+    (0013:142), então as N parcelas caem junto. Contar antes é o que permite dizer
+    quantas foram — e apagar uma de cada vez deixaria o plano órfão mentindo
+    `installments = 10` com 9 parcelas vivas, que era o estado anterior.
+    """
+    plano = await db.fetch_one(
+        """
+        select p.id, p.description, p.installments, p.total_cents,
+               (select count(*) from public.transactions t
+                 where t.installment_plan_id = p.id) as parcelas
+        from public.installment_plans p
+        where p.id = %s and p.workspace_id = %s
+        """,
+        ctx.target["candidates"][0]["id"], ctx.workspace_id,
+    )
+    if not plano:
+        return ToolResult("🤷 Essa compra parcelada não está mais aqui.", read_only=True)
+    await db.execute(
+        "delete from public.installment_plans where id = %s and workspace_id = %s",
+        plano["id"], ctx.workspace_id,
+    )
+    nome = plano["description"] or "compra parcelada"
+    return ToolResult(
+        f"🗑️ Apaguei *{nome}* por completo — {plano['parcelas']} parcelas, "
+        f"{cents_to_brl(plano['total_cents'])}.",
+        result_id=plano["id"],
+    )
+
+
 async def delete_transaction(ctx: ExecContext, action: FinanceAction) -> ToolResult:
+    if _alvo_e_plano(ctx):
+        return await _apagar_plano(ctx)
     alvo = await db.fetch_one(
         """
         select id, kind, amount_cents, category, description
