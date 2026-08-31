@@ -238,7 +238,9 @@ def _estado_base(sessao: dict, lote: list[dict], conteudo: dict, thread: str) ->
         "targets": [],
         "chosen_id": "",
         "draft": {},
+        "preset": False,
         "draft": {},
+        "preset": False,
         "confidence": 1.0,
         "llm_calls": 0,
         "approved": False,
@@ -448,6 +450,7 @@ async def _rodar_com_acoes(sessao, lote, conteudo, acoes, thread, config):
     estado_inicial = _estado_base(sessao, lote, conteudo, thread)
     estado_inicial["finance_actions"] = acoes
     estado_inicial["domains"] = ["financas"]
+    estado_inicial["preset"] = True
     with telemetry.trace(thread_id=thread, user_id=sessao["user_id"]):
         estado = await graph().ainvoke(estado_inicial, config=config)
     await _audit(sessao, estado)

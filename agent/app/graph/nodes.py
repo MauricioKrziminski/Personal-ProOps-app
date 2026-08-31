@@ -55,6 +55,12 @@ AJUDA_GERAL = (
 
 
 async def route(state: AgentState) -> dict:
+    # ações já prontas (rascunho completado): nada a rotear, e reclassificar
+    # gastaria uma chamada para chegar a um resultado PIOR — a frase original
+    # ("comprei um mac em 12x") sem o valor que só apareceu agora.
+    if state.get("preset"):
+        return {}
+
     """Classifica a mensagem em um ou mais domínios.
 
     Fast-path determinístico ANTES do modelo: mensagem curta de saudação não
@@ -107,6 +113,9 @@ def pick_domains(state: AgentState) -> list[str]:
 
 
 async def finance_node(state: AgentState) -> dict:
+    if state.get("preset"):
+        return {}  # ações semeadas: não reextrair
+
     modelo = gemini.structured(FinancePlan, gemini.GEMINI_PARSE)
     plano: FinancePlan = await modelo.ainvoke(
         [
@@ -131,6 +140,9 @@ async def finance_node(state: AgentState) -> dict:
 
 
 async def finance_query_node(state: AgentState) -> dict:
+    if state.get("preset"):
+        return {}  # ações semeadas: não reextrair
+
     """Consultas. Schema próprio (7 × 9) porque o de escrita não cabia junto —
     ver o orçamento medido em schemas.py."""
     modelo = gemini.structured(FinanceQueryPlan, gemini.GEMINI_PARSE)
@@ -156,6 +168,9 @@ async def finance_query_node(state: AgentState) -> dict:
 
 
 async def notes_node(state: AgentState) -> dict:
+    if state.get("preset"):
+        return {}  # ações semeadas: não reextrair
+
     modelo = gemini.structured(NotesPlan, gemini.GEMINI_PARSE)
     plano: NotesPlan = await modelo.ainvoke(
         [

@@ -81,6 +81,12 @@ class AgentState(TypedDict, total=False):
     # extração incompleta a guardar como rascunho (o worker é quem grava)
     draft: Annotated[dict, _replace]
 
+    # True quando as ações JÁ vêm prontas (rascunho completado) e não há o que
+    # extrair. O grafo sempre entra pelo START -> router; sem esta marca, o
+    # roteador reclassificaria a frase antiga e o nó de domínio sobrescreveria
+    # as ações semeadas — que foi exatamente o que aconteceu no staging.
+    preset: bool
+
     # execução
     approved: bool
     # id escolhido pelo usuário num empate — congelado, vem do pendente

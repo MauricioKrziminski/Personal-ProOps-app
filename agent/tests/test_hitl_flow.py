@@ -448,3 +448,28 @@ async def test_escolher_o_dominio_REESCREVE_a_rota(grafo):
 
     assert final["domains"] == ["notas"]
     assert final["confidence"] == 1.0     # quem decidiu foi o usuário
+
+
+@pytest.mark.asyncio
+async def test_rascunho_completado_NAO_passa_pelo_roteador():
+    """Ações semeadas atravessam o grafo intactas.
+
+    O grafo sempre entra pelo START → router. Sem a marca `preset`, o roteador
+    reclassificava a frase ANTIGA (sem o valor, que só apareceu no turno
+    seguinte) e o nó de domínio sobrescrevia as ações — no staging isso virou
+    uma pergunta "Como você quer registrar isso?" em cima de um rascunho que já
+    estava completo.
+
+    Testa as funções REAIS: dublar o roteador aqui testaria o dublê, que é o
+    erro que a primeira versão deste teste cometeu.
+    """
+    from app.graph import nodes
+
+    semeado = {**_estado([{"type": FinanceActionType.CREATE_EXPENSE.value,
+                           "amount_cents": 4500, "category": "mercado"}]),
+               "preset": True, "domains": ["financas"]}
+
+    # nenhum dos dois toca no estado quando as ações já vieram prontas
+    assert await nodes.route(semeado) == {}
+    assert await nodes.finance_node(semeado) == {}
+    assert await nodes.notes_node(semeado) == {}
