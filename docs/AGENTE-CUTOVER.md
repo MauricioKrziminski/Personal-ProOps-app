@@ -546,6 +546,26 @@ transação criada corretamente no banco. Sintoma: "mandei e ele não respondeu"
 ordem, e só troca em **4xx** (rejeitado = nada entregue, então não duplica).
 Coberto por `tests/test_whatsapp_send.py`.
 
+## Rascunho (draft) — lançamento pela metade
+
+`draft_actions` guarda uma extração incompleta com o SLOT que ela espera
+(`amount` ou `account`). É o que permite três coisas ao mesmo tempo: pedir o dado
+que falta, deixar o usuário mudar de assunto sem perder nada, e retomar depois.
+
+Máquina de estados: pede o valor → recebe → descobre que falta o cartão → pede o
+cartão → valida contra `accounts` → executa (com HITL se for valor alto).
+
+**Cartão é obrigatório em compra parcelada** (`installments > 1`): parcelamento
+vira fatura, e o trigger `set_invoice` precisa de dono. Compra à vista continua
+aceitando conta nula, que é a regra escrita do projeto.
+
+**Cartão inexistente NÃO quebra a sessão.** Lista os cartões reais e mantém o
+rascunho `awaiting` — jogar no fallback genérico aqui apagaria de vista um
+lançamento que está a um dado de ficar pronto.
+
+⚠️ **O rascunho é chaveado por TELEFONE, não por thread** (0044). O thread
+efetivo carrega o epoch da sessão, que gira em 6h; o rascunho vive 24h.
+
 # Quando o número real da ProOps entrar
 
 Hoje existe **um** número (o de teste da Meta), e por isso o roteamento é pelo
