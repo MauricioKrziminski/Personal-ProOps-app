@@ -366,6 +366,28 @@ E  a mensagem não está em messages_queue
 
 Fora disso, devolve **503** e a Meta reentrega. É mais lento e nunca corrompe.
 
+## Antes do Passo 3: medir o cold start
+
+`PROXY_TIMEOUT_MS` na Edge Function é **3s**, e o Cloud Run roda com
+`min-instances=0`. Se o container frio demorar mais que isso, o repasse expira.
+
+Em **staging** isso é inofensivo, porque `PYTHON_AGENT_FALLBACK=off` transforma a
+falha em 503 e a Meta reentrega (na reentrega o container já está quente). Em
+**produção** o fallback volta a ficar ligado, e aí um timeout de cold start manda
+a mensagem para o fluxo Deno — `fallbackSeguro` protege (ele consulta o banco
+certo em produção), mas a proteção depende de o insert do Python já ter
+commitado, o que numa partida fria é justamente o que ainda não aconteceu.
+
+Medir com o serviço parado de verdade (≥15 min sem tráfego — **qualquer**
+requisição sua reaquece e invalida a medida):
+
+```bash
+curl -s -o /dev/null -w 'cold=%{time_total}s\n' https://agente-wwm7xruoyq-rj.a.run.app/health
+```
+
+Se passar de ~2s, subir `PROXY_TIMEOUT_MS` não resolve (a Meta corta em 5s): o
+caminho é `min-instances=1` no serviço de produção durante o canário.
+
 ## Passo 3 · Ligar o canário
 
 ```bash
