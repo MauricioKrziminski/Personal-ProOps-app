@@ -1,0 +1,14 @@
+# Dev local. Aponta para o Postgres do Supabase (o mesmo banco) — não sobe um
+# Postgres próprio de propósito: testar contra um schema diferente do de produção
+# é como a gente descobre bug só depois do deploy.
+services:
+  api:
+    build: .
+    env_file: .env
+    ports:
+      - "8080:8080"
+    volumes:
+      - ./app:/srv/app        # reload manual: docker compose restart api
+    environment:
+      # sem Cloud Tasks no local: o webhook chama o worker direto (ver tasks.py)
+      DEBOUNCE_BACKEND: inline
