@@ -78,6 +78,9 @@ class AgentState(TypedDict, total=False):
     # Só strings: o checkpointer serializa isto, e UUID/date crus não sobrevivem.
     targets: Annotated[list[dict], _replace]
 
+    # extração incompleta a guardar como rascunho (o worker é quem grava)
+    draft: Annotated[dict, _replace]
+
     # execução
     approved: bool
     # id escolhido pelo usuário num empate — congelado, vem do pendente

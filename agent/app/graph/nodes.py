@@ -269,12 +269,14 @@ async def resolve_node(state: AgentState) -> dict:
     esclarecimentos = _esclarecimentos(state, acoes)
 
     if not any(getattr(a, "type", None) in resolve.TARGETS for a in acoes):
-        return {"targets": [{} for _ in acoes], "results": esclarecimentos}
+        return {"targets": [{} for _ in acoes], "results": esclarecimentos,
+            "draft": _rascunho(state, acoes)}
 
     alvos = await resolve.for_actions(
         state["workspace_id"], acoes, state.get("text", "")
     )
-    return {"targets": alvos, "results": esclarecimentos}
+    return {"targets": alvos, "results": esclarecimentos,
+            "draft": _rascunho(state, acoes)}
 
 
 def _incompletas(state: AgentState, acoes: list) -> dict[int, str]:
@@ -294,6 +296,22 @@ def _incompletas(state: AgentState, acoes: list) -> dict[int, str]:
 
 def _esclarecimentos(state: AgentState, acoes: list) -> list[str]:
     return [*state.get("results", []), *_incompletas(state, acoes).values()]
+
+
+def _rascunho(state: AgentState, acoes: list) -> dict:
+    """A extração incompleta que vale guardar, ou {}.
+
+    Só a PRIMEIRA: dois rascunhos abertos tornariam "foi 5000" ambíguo, do mesmo
+    jeito que duas perguntas abertas tornariam "sim" ambíguo. O grafo só monta o
+    objeto — quem grava é o worker, como já faz com `pending_actions`.
+    """
+    for i, pergunta in _incompletas(state, acoes).items():
+        return {
+            "action": acoes[i].model_dump(mode="json"),
+            "raw_text": state.get("text", ""),
+            "missing": pergunta,
+        }
+    return {}
 
 
 async def safe_node(state: AgentState) -> dict:

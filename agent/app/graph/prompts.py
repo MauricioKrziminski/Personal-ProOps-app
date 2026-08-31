@@ -46,6 +46,12 @@ Uma mensagem pode ter VÁRIOS domínios: "gastei 45 no mercado e me lembra do
 aluguel" é ["financas", "notas"]; "paguei 45 no mercado, quanto sobrou?" é
 ["financas", "financas_consulta"]. Não escolha só um nesses casos.
 
+O DOMÍNIO vem do verbo e do contexto, NUNCA de haver ou não um número na frase.
+"comprei um mac em 12x", "paguei o dentista", "vendi a bicicleta" e "recebi do
+freela" são "financas" com confiança ALTA mesmo sem preço nenhum — quem cobra o
+valor que falta é a etapa seguinte, não você. Baixar a confiança porque o preço
+não veio faz a mensagem cair no lugar errado e o usuário levar "não entendi".
+
 A diferença entre "financas" e "financas_consulta" é registrar × perguntar. Na
 dúvida entre as duas, mande as duas.
 

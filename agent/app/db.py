@@ -455,3 +455,60 @@ async def record_ai_event(
         )
     except Exception:  # noqa: BLE001
         log.exception("ai_events não gravado — a cota do mês vai contar a menos")
+
+
+# ---------------------------------------------------------------------------
+# rascunhos (extração incompleta esperando o dado que falta)
+# ---------------------------------------------------------------------------
+# Tabela SEPARADA de `pending_actions` de propósito: lá o índice único
+# "uma pergunta aberta por thread" faria um rascunho bloquear toda confirmação
+# real — o oposto da troca livre de contexto que ele existe para permitir.
+
+
+async def save_draft(
+    *,
+    thread_id: str,
+    phone: str,
+    user_id: UUID,
+    workspace_id: UUID,
+    action: dict,
+    raw_text: str,
+    missing: str,
+) -> None:
+    """Grava (ou substitui) o rascunho da conversa.
+
+    Substitui em vez de acumular: dois rascunhos abertos tornariam "foi 5000"
+    ambíguo, pelo mesmo motivo que duas perguntas abertas tornariam "sim".
+    """
+    await execute(
+        """
+        insert into public.draft_actions
+          (thread_id, phone, user_id, workspace_id, action, raw_text, missing)
+        values (%s, %s, %s, %s, %s, %s, %s)
+        on conflict (thread_id) do update
+          set action = excluded.action,
+              raw_text = excluded.raw_text,
+              missing = excluded.missing,
+              expires_at = now() + interval '24 hours',
+              created_at = now()
+        """,
+        thread_id, phone, user_id, workspace_id, Jsonb(action), raw_text, missing,
+    )
+
+
+async def open_draft(thread_id: str) -> dict[str, Any] | None:
+    return await fetch_one(
+        """
+        select * from public.draft_actions
+        where thread_id = %s and expires_at > now()
+        """,
+        thread_id,
+    )
+
+
+async def delete_draft(thread_id: str) -> None:
+    await execute("delete from public.draft_actions where thread_id = %s", thread_id)
+
+
+async def expire_drafts() -> None:
+    await execute("select public.expire_draft_actions()")

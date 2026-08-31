@@ -36,13 +36,16 @@ def _chaves_do_estado_inicial() -> set[str]:
     """
     arvore = ast.parse((RAIZ / "app" / "worker.py").read_text())
     for no in ast.walk(arvore):
-        if (
-            isinstance(no, ast.Assign)
-            and any(getattr(t, "id", None) == "estado_inicial" for t in no.targets)
-            and isinstance(no.value, ast.Dict)
-        ):
-            return {k.value for k in no.value.keys if isinstance(k, ast.Constant)}
-    raise AssertionError("não achei `estado_inicial = {...}` em app/worker.py")
+        # o dicionário mora no `return` de `_estado_base` (extraído para o
+        # fast-path de rascunho reusar). Procurar pela função, e não pelo nome
+        # da variável, é o que faz este teste sobreviver a refactor.
+        if isinstance(no, ast.FunctionDef) and no.name == "_estado_base":
+            for interno in ast.walk(no):
+                if isinstance(interno, ast.Return) and isinstance(interno.value, ast.Dict):
+                    return {
+                        k.value for k in interno.value.keys if isinstance(k, ast.Constant)
+                    }
+    raise AssertionError("não achei o dicionário de estado em `_estado_base`")
 
 
 def test_todo_campo_do_estado_e_reiniciado_no_turno():

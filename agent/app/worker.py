@@ -26,7 +26,7 @@ from langgraph.types import Command
 
 from app import db
 from app.config import get_settings
-from app.domain import confirm
+from app.domain import confirm, draft
 from app.security import effective_thread_id, sanitize_untrusted
 from app.services import gemini, groq, telemetry, whatsapp
 
@@ -210,12 +210,67 @@ def _interactive_reply(mensagem: dict) -> dict | None:
 # ---------------------------------------------------------------------------
 
 
+def _estado_base(sessao: dict, lote: list[dict], conteudo: dict, thread: str) -> dict:
+    """O estado zerado de um turno. Extraído para o fast-path de rascunho poder
+    reusá-lo sem duplicar a lista de chaves — duplicá-la é como uma delas deixa
+    de ser reiniciada e volta a vazar entre turnos."""
+    return {
+        "thread_id": thread,
+        "phone": sessao["phone"],
+        "user_id": sessao["user_id"],
+        "workspace_id": sessao["workspace_id"],
+        "timezone": sessao["timezone"] or "America/Sao_Paulo",
+        "wa_message_id": lote[-1]["wa_message_id"],
+        "text": conteudo["text"],
+        "media": conteudo["media"],
+        "raw_texts": conteudo["raw_texts"],
+        # Zerar TUDO é obrigatório, não zelo: o thread do checkpointer é o
+        # mesmo a conversa inteira, então chave não reiniciada vaza para a
+        # mensagem seguinte. `finance_queries` esquecido aqui fez uma consulta
+        # antiga ser re-executada e o agente repetir a resposta anterior.
+        # `tests/test_state_reset.py` quebra o build se sobrar chave nova.
+        "results": [],
+        "domains": [],
+        "finance_actions": [],
+        "finance_queries": [],
+        "notes_actions": [],
+        "reply": "",
+        "targets": [],
+        "chosen_id": "",
+        "draft": {},
+        "draft": {},
+        "confidence": 1.0,
+        "llm_calls": 0,
+        "approved": False,
+        "halted": False,
+    }
+
+
 async def _run_graph(sessao: dict, lote: list[dict], conteudo: dict) -> str | dict:
     from app.graph.build import graph
 
     # o epoch já foi resolvido (e girado, se era o caso) no ensure_session
     thread = effective_thread_id(sessao["thread_id"], sessao["session_epoch"])
     config = {"configurable": {"thread_id": thread}, "callbacks": telemetry.callbacks()}
+
+    # --- fast-path: a mensagem completa um rascunho aberto? ---
+    # Vem ANTES da pendência porque são coisas diferentes: pendência é uma
+    # pergunta de SIM/NÃO travando a conversa; rascunho é um lançamento pela
+    # metade que ficou inerte enquanto o usuário fazia outra coisa.
+    await db.expire_drafts()
+    rascunho = await db.open_draft(thread)
+    if rascunho and not conteudo.get("clicked_id"):
+        decidido = await draft.interpretar(conteudo.get("text", ""), rascunho)
+        if decidido and decidido["acao"] == "descartar":
+            await db.delete_draft(thread)
+            return "👍 Beleza, esqueci aquele lançamento."
+        if decidido and decidido["acao"] == "completar":
+            acao = draft.mesclar(rascunho["action"], decidido["amount_cents"])
+            await db.delete_draft(thread)
+            # segue o fluxo normal com a ação COMPLETA: as validações de
+            # segurança (HITL de valor alto, alvo, propriedade) valem igual
+            conteudo = {**conteudo, "text": rascunho["raw_text"]}
+            return await _rodar_com_acoes(sessao, lote, conteudo, [acao], thread, config)
 
     # --- fast-path: a mensagem é resposta a uma pergunta? ---
     await db.expire_pending(thread)
@@ -248,38 +303,44 @@ async def _run_graph(sessao: dict, lote: list[dict], conteudo: dict) -> str | di
                 estado = await graph().ainvoke(entrada, config=retomada)
             return estado.get("reply", "")
 
-    estado_inicial = {
-        "thread_id": thread,
-        "phone": sessao["phone"],
-        "user_id": sessao["user_id"],
-        "workspace_id": sessao["workspace_id"],
-        "timezone": sessao["timezone"] or "America/Sao_Paulo",
-        "wa_message_id": lote[-1]["wa_message_id"],
-        "text": conteudo["text"],
-        "media": conteudo["media"],
-        "raw_texts": conteudo["raw_texts"],
-        # Zerar TUDO é obrigatório, não zelo: o thread do checkpointer é o
-        # mesmo a conversa inteira, então chave não reiniciada vaza para a
-        # mensagem seguinte. `finance_queries` esquecido aqui fez uma consulta
-        # antiga ser re-executada e o agente repetir a resposta anterior.
-        # `tests/test_state_reset.py` quebra o build se sobrar chave nova.
-        "results": [],
-        "domains": [],
-        "finance_actions": [],
-        "finance_queries": [],
-        "notes_actions": [],
-        "reply": "",
-        "targets": [],
-        "chosen_id": "",
-        "confidence": 1.0,
-        "llm_calls": 0,
-        "approved": False,
-        "halted": False,
-    }
+    estado_inicial = _estado_base(sessao, lote, conteudo, thread)
     with telemetry.trace(thread_id=thread, user_id=sessao["user_id"]):
         estado = await graph().ainvoke(estado_inicial, config=config)
 
     await _audit(sessao, estado)
+    return await _resposta_do_estado(sessao, estado, thread)
+
+
+async def _resposta_do_estado(sessao: dict, estado: dict, thread: str) -> str | dict:
+    """A resposta do turno: a pergunta pendente, ou o texto composto.
+
+    Extraído para o fast-path de rascunho reusar — ele também precisa gravar
+    `pending_actions` quando a ação completada exigir confirmação (valor alto,
+    por exemplo). Duplicar isso deixaria o rascunho fora do HITL.
+    """
+    rascunho = estado.get("draft") or {}
+    if not rascunho:
+        # Nada novo pela metade — mas pode haver um rascunho ANTIGO esperando.
+        # Lembrar dele aqui é o que permite trocar de assunto sem perder nada:
+        # a nota de café é salva e o mac continua ali, mencionado de leve.
+        antigo = await db.open_draft(thread)
+        if antigo:
+            estado = {
+                **estado,
+                "reply": f"{estado.get('reply', '')}\n\n{draft.lembrete(antigo)}".strip(),
+            }
+    if rascunho:
+        # a extração ficou pela metade: guarda para o usuário poder mudar de
+        # assunto e voltar, em vez de ter que repetir a frase inteira
+        await db.save_draft(
+            thread_id=thread,
+            phone=sessao["phone"],
+            user_id=UUID(str(sessao["user_id"])),
+            workspace_id=UUID(str(sessao["workspace_id"])),
+            action=rascunho["action"],
+            raw_text=rascunho["raw_text"],
+            missing=rascunho["missing"],
+        )
 
     # --- o grafo pausou pedindo confirmação? ---
     pausa = _interrupt_payload(estado)
@@ -373,6 +434,24 @@ async def _audit(sessao: dict, estado: dict) -> None:
             "llm_calls": estado.get("llm_calls", 0),
         },
     )
+
+
+async def _rodar_com_acoes(sessao, lote, conteudo, acoes, thread, config):
+    """Roda o grafo pulando o modelo: as ações já estão prontas.
+
+    O rascunho já foi extraído por um turno anterior; reextrair gastaria uma
+    chamada para chegar no mesmo lugar — e correria o risco de o modelo
+    interpretar diferente da segunda vez.
+    """
+    from app.graph.build import graph
+
+    estado_inicial = _estado_base(sessao, lote, conteudo, thread)
+    estado_inicial["finance_actions"] = acoes
+    estado_inicial["domains"] = ["financas"]
+    with telemetry.trace(thread_id=thread, user_id=sessao["user_id"]):
+        estado = await graph().ainvoke(estado_inicial, config=config)
+    await _audit(sessao, estado)
+    return await _resposta_do_estado(sessao, estado, thread)
 
 
 def _congelado(decisao: dict, pendente: dict) -> dict | bool:

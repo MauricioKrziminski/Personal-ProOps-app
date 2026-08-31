@@ -197,3 +197,15 @@ class ConfirmDecision(BaseModel):
     decision: Literal["approve", "reject", "unclear"] = Field(
         description="approve, reject ou unclear"
     )
+
+
+class DraftDecision(BaseModel):
+    """O que a mensagem faz com um rascunho aberto.
+
+    `unrelated` existe para o modelo não ser forçado a escolher entre completar e
+    descartar quando o usuário simplesmente mudou de assunto.
+    """
+
+    decision: Literal["answer", "discard", "unrelated"] = Field(
+        description="answer, discard ou unrelated"
+    )
