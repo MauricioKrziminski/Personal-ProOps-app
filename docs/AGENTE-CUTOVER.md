@@ -264,6 +264,25 @@ Edge Function de PRODUÇÃO → Cloud Run de staging → `messages_queue` do sta
 `done`, com **zero** linhas em `messages_raw` de produção (o fluxo Deno não foi
 tocado).
 
+### Três coisas que confundem durante o teste
+
+**1. O número de teste da Meta só ENVIA para destinatários cadastrados.** Quem
+não estiver na lista (Meta → WhatsApp → API Setup → campo "To") manda mensagem
+normalmente, ela é processada, e a **resposta não chega** — `try_send` engole a
+falha de envio de propósito (envio é best-effort e nunca reprocessa). Sintoma:
+"o agente ignorou meu sócio". Cadastre os dois números antes.
+
+**2. Os lembretes continuam vindo do banco de PRODUÇÃO.** O `pg_cron` de
+produção segue com `send-reminders` ativo a cada minuto, e ele lê os lembretes de
+**produção** — que chegam no MESMO chat onde você está testando o staging. Não é
+bug do agente novo. Para silenciar durante o teste:
+`select cron.unschedule('send-reminders');` no banco de produção (e reagendar
+depois com a `0008`) — mas aí você perde os lembretes reais no período.
+
+**3. Responder a um lembrete antigo não reagenda nada.** A mensagem "responda
+aqui para reagendar" veio de produção, mas a sua resposta agora vai para
+**staging**, que não conhece aquele lembrete.
+
 Depois é abrir o WhatsApp: *"gastei 45 no mercado"*, *"quanto gastei esse mês?"*,
 *"apaga o último"* → ele pergunta → *"sim"*.
 
