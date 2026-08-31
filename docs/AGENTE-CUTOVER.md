@@ -215,9 +215,11 @@ como qualquer usuário e tudo cai no banco descartável.
 #    "não encontrei sua conta". Criar pelo Auth (o trigger on_auth_user_created
 #    cria profile + workspace + assinatura); um insert direto em profiles pularia
 #    os três.
-#    STG_SERVICE_KEY = a chave SECRETA do projeto de staging (`sb_secret_...`,
-#    ou o service_role legado) — a rota /auth/v1/admin/* recusa a publishable.
-#    npx supabase projects api-keys --project-ref utkqoiigimqzeenxkxdl
+#    STG_SERVICE_KEY = o **service_role legado** (JWT, começa com eyJ...).
+#    Medido em 31/08/2026: a chave nova `sb_secret_...` é RECUSADA por
+#    /auth/v1/admin/* com {"message":"Invalid API key"}. Pegue assim:
+#      npx supabase projects api-keys --project-ref utkqoiigimqzeenxkxdl -o json \
+#        | jq -r '.[]|select(.name=="service_role").api_key'
 curl -X POST 'https://utkqoiigimqzeenxkxdl.supabase.co/auth/v1/admin/users' \
   -H "apikey: $STG_SERVICE_KEY" -H "Authorization: Bearer $STG_SERVICE_KEY" \
   -H 'Content-Type: application/json' \
@@ -254,6 +256,13 @@ update public.agent_routing set use_python_agent = false where phone = '55DDD9XX
 ```
 
 Vale na mensagem seguinte, sem deploy.
+
+**Ligado em 31/08/2026** para `5535998744200` (Gabriel) e `5551992553295`
+(sócio), cada um com workspace próprio no staging. O caminho foi provado
+ponta a ponta com um número inválido roteado temporariamente: POST assinado na
+Edge Function de PRODUÇÃO → Cloud Run de staging → `messages_queue` do staging →
+`done`, com **zero** linhas em `messages_raw` de produção (o fluxo Deno não foi
+tocado).
 
 Depois é abrir o WhatsApp: *"gastei 45 no mercado"*, *"quanto gastei esse mês?"*,
 *"apaga o último"* → ele pergunta → *"sim"*.
