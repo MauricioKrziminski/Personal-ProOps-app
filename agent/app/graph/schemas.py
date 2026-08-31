@@ -201,12 +201,24 @@ class ConfirmDecision(BaseModel):
 
 
 class DraftDecision(BaseModel):
-    """O que a mensagem faz com um rascunho aberto.
+    """O que a mensagem faz com um rascunho aberto — e QUAL é a entidade citada.
 
     `unrelated` existe para o modelo não ser forçado a escolher entre completar e
     descartar quando o usuário simplesmente mudou de assunto.
+
+    `extracted_value` cabe na MESMA chamada de propósito: separar em duas
+    dobraria a latência e comeria duas das 500 requisições diárias do Flash-Lite
+    para chegar no mesmo lugar. É `str` com default `""` e não `Optional[str]`
+    porque união vira `anyOf`, que o structured output do Gemini lida mal.
     """
 
     decision: Literal["answer", "discard", "unrelated"] = Field(
         description="answer, discard ou unrelated"
+    )
+    extracted_value: str = Field(
+        default="",
+        description=(
+            "Só quando decision=answer: o nome próprio da conta/cartão citado, "
+            "limpo, sem o resto da frase. Vazio se não houver."
+        ),
     )

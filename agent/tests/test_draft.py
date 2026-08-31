@@ -18,7 +18,7 @@ class TestClassificacao:
     @pytest.mark.asyncio
     async def test_valor_solto_completa_o_rascunho(self, monkeypatch):
         async def falso(texto, pergunta):
-            return "answer"
+            return "answer", ""
 
         monkeypatch.setattr(draft, "_classificar", falso)
         r = await draft.interpretar("foi 5000", {"missing": "qual o valor?"})
@@ -27,7 +27,7 @@ class TestClassificacao:
     @pytest.mark.asyncio
     async def test_desistir_apaga_o_rascunho(self, monkeypatch):
         async def falso(texto, pergunta):
-            return "discard"
+            return "discard", ""
 
         monkeypatch.setattr(draft, "_classificar", falso)
         r = await draft.interpretar("esquece o mac", {"missing": "qual o valor?"})
@@ -36,7 +36,7 @@ class TestClassificacao:
     @pytest.mark.asyncio
     async def test_assunto_novo_nao_toca_no_rascunho(self, monkeypatch):
         async def falso(texto, pergunta):
-            return "unrelated"
+            return "unrelated", ""
 
         monkeypatch.setattr(draft, "_classificar", falso)
         assert await draft.interpretar("anota: comprar café", {"missing": "x"}) is None
@@ -49,7 +49,7 @@ class TestClassificacao:
         exatamente o bug do "registrar None em 12x" voltando por outra porta.
         """
         async def falso(texto, pergunta):
-            return "answer"
+            return "answer", ""
 
         monkeypatch.setattr(draft, "_classificar", falso)
         assert await draft.interpretar("foi caro", {"missing": "x"}) is None
@@ -121,7 +121,7 @@ class TestSlotDeCartao:
     @pytest.mark.asyncio
     async def test_nome_de_cartao_preenche_o_slot(self, monkeypatch):
         async def falso(texto, pergunta):
-            return "answer"
+            return "answer", ""
 
         monkeypatch.setattr(draft, "_classificar", falso)
         r = await draft.interpretar("nubank", {"slot": "account", "missing": "qual cartão?"})
@@ -130,7 +130,7 @@ class TestSlotDeCartao:
     @pytest.mark.asyncio
     async def test_slot_de_valor_continua_exigindo_numero(self, monkeypatch):
         async def falso(texto, pergunta):
-            return "answer"
+            return "answer", ""
 
         monkeypatch.setattr(draft, "_classificar", falso)
         assert await draft.interpretar("nubank", {"slot": "amount", "missing": "?"}) is None
@@ -142,13 +142,94 @@ class TestSlotDeCartao:
         assert junto["account"] == "nubank"
 
 
-class TestCartaoInvalido:
-    def test_lista_os_cartoes_reais_e_oferece_saida(self):
-        msg = draft.cartao_invalido("nubank", ["Itaú", "Inter"])
-        assert "nubank" in msg and "Itaú" in msg and "Inter" in msg
-        assert "cancelar" in msg.lower()
+class TestExtracaoDoNome:
+    """A queixa do teste de usabilidade: a frase inteira virava o nome do cartão.
 
-    def test_sem_nenhum_cartao_oferece_criar(self):
-        msg = draft.cartao_invalido("nubank", [])
-        assert "criar" in msg.lower()
-        assert "sem cartão" in msg.lower()
+    "acabei de criar um pelo app, chama nubank cartao" ia para o banco como nome,
+    não casava com nada, e o usuário ficava preso na mesma pergunta.
+    """
+
+    @pytest.mark.asyncio
+    async def test_usa_a_entidade_extraida_e_nao_a_frase(self, monkeypatch):
+        async def falso(texto, pergunta):
+            return "answer", "nubank"
+
+        monkeypatch.setattr(draft, "_classificar", falso)
+        r = await draft.interpretar(
+            "acabei de criar um pelo app, chama nubank cartao",
+            {"slot": "account", "missing": "qual cartão?"},
+        )
+        assert r == {"acao": "completar", "slot": "account", "account": "nubank"}
+
+    @pytest.mark.asyncio
+    async def test_sem_extracao_cai_no_texto_cru(self, monkeypatch):
+        """Rede, não regressão: modelo que não extraiu nada não pode zerar uma
+        resposta que já é o nome do cartão."""
+
+        async def falso(texto, pergunta):
+            return "answer", ""
+
+        monkeypatch.setattr(draft, "_classificar", falso)
+        r = await draft.interpretar("nubank", {"slot": "account", "missing": "?"})
+        assert r["account"] == "nubank"
+
+    @pytest.mark.asyncio
+    async def test_o_valor_NAO_sai_do_modelo(self, monkeypatch):
+        """O número continua determinístico. Deixar o modelo escolher reabriria a
+        porta que `parse_valor_em_centavos` fechou — ele só aceita UM número."""
+
+        async def falso(texto, pergunta):
+            return "answer", "9999"
+
+        monkeypatch.setattr(draft, "_classificar", falso)
+        r = await draft.interpretar("foi 5000", {"slot": "amount", "missing": "?"})
+        assert r == {"acao": "completar", "slot": "amount", "amount_cents": 500000}
+
+    @pytest.mark.asyncio
+    async def test_conta_a_chamada_de_modelo(self, monkeypatch):
+        """Sem esta contagem o fast-path chama o Gemini sem aparecer em
+        `ai_events` — e é essa contagem que o paywall mensal usa."""
+
+        async def falso(texto, pergunta):
+            return "answer", "nubank"
+
+        monkeypatch.setattr(draft, "_classificar", falso)
+        uso = {}
+        await draft.interpretar("nubank", {"slot": "account", "missing": "?"}, uso)
+        assert uso == {"llm_calls": 1}
+
+
+class TestCliqueNaLista:
+    """O clique é igualdade exata, como o do HITL: o payload é escrito por nós."""
+
+    def test_escolha_devolve_o_id_do_cartao(self):
+        assert draft.parse_slot_click("ds:abc:c:cartao-1", "abc") == {
+            "acao": "completar", "slot": "account", "account_id": "cartao-1"
+        }
+
+    def test_cancelar_descarta(self):
+        assert draft.parse_slot_click("ds:abc:no", "abc") == {"acao": "descartar"}
+
+    def test_clique_de_OUTRO_rascunho_nao_vale(self):
+        """Botão do WhatsApp continua clicável para sempre: um toque na lista de
+        ontem escolheria o cartão de uma compra que não é mais essa."""
+        assert draft.parse_slot_click("ds:antigo:c:cartao-1", "abc") is None
+
+    def test_prefixo_do_hitl_nao_e_confundido(self):
+        assert draft.parse_slot_click("pa:abc:ok", "abc") is None
+
+    def test_sufixo_desconhecido_nao_vira_acao(self):
+        assert draft.parse_slot_click("ds:abc:seila", "abc") is None
+        assert draft.parse_slot_click("ds:abc:c:", "abc") is None
+
+
+class TestSemCartoes:
+    def test_nao_promete_o_que_nao_tem_handler(self):
+        """A mensagem antiga oferecia *criar* e *sem cartão*, e nenhuma das duas
+        tinha implementação: quem respondia isso era classificado `answer`,
+        virava nome de cartão, falhava a validação e recebia a mesma mensagem em
+        loop."""
+        msg = draft.sem_cartoes("nubank")
+        assert "nubank" in msg
+        assert "cancelar" in msg.lower()
+        assert "sem cartão" not in msg.lower()

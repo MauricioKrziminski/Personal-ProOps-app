@@ -13,6 +13,7 @@ from uuid import UUID
 
 from app import db
 from app.domain.dates import format_date_br, local_iso_date, now_utc
+from app.domain import matching
 from app.domain.money import cents_to_brl, parse_valor_em_centavos
 from app.domain.recurrence import next_occurrence
 from app.graph.schemas import FinanceAction, FinanceActionType
@@ -36,19 +37,31 @@ async def resolve_account(workspace_id: UUID, name: str | None) -> UUID | None:
 
     De propósito: o lançamento NUNCA falha por conta desconhecida. Perder o
     registro do gasto é pior do que registrá-lo sem conta.
+
+    Era `ilike '%nome%' limit 1` **sem `order by`** — ou seja, com duas contas
+    parecidas quem escolhia era a ordem que o Postgres devolvesse, e "itau"
+    nunca achava "Itaú". Agora o casamento é normalizado e o desempate é
+    ranqueado, então o mesmo nome sempre resolve para a mesma conta.
+
+    ⚠️ **O tier de semelhança só vale quando é único aqui.** Este caminho resolve
+    em SILÊNCIO, inclusive para `pay_invoice` e transferência; escolher a conta
+    pagadora por parecença, sozinho, seria um modo de falha que o `ilike` antigo
+    não tinha. Quem tem como perguntar (o rascunho) usa a lista inteira.
     """
     if not name:
         return None
-    row = await db.fetch_one(
-        """
-        select id from public.accounts
-        where workspace_id = %s and archived = false and name ilike %s
-        limit 1
-        """,
-        workspace_id,
-        f"%{name}%",
-    )
-    return row["id"] if row else None
+    # ponytail: busca as contas do workspace por chamada (dezenas de linhas, não
+    # milhares). Cache por turno se aparecer no perfil.
+    linhas = await db.accounts(workspace_id)
+
+    certos = matching.match_accounts(name, linhas, semelhanca=False)
+    if certos:
+        return certos[0]["id"]
+
+    # Só typo sobrou. Um é conserto; dois é chute — e sem ninguém para perguntar,
+    # chutar a conta é pior que lançar sem conta (que é um estado previsto).
+    por_semelhanca = matching.match_accounts(name, linhas)
+    return por_semelhanca[0]["id"] if len(por_semelhanca) == 1 else None
 
 
 async def resolve_transaction(

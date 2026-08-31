@@ -26,7 +26,7 @@ from langgraph.types import Command
 
 from app import db
 from app.config import get_settings
-from app.domain import confirm, draft
+from app.domain import confirm, draft, matching
 from app.security import effective_thread_id, sanitize_untrusted
 from app.services import gemini, groq, telemetry, whatsapp
 
@@ -239,8 +239,6 @@ def _estado_base(sessao: dict, lote: list[dict], conteudo: dict, thread: str) ->
         "chosen_id": "",
         "draft": {},
         "preset": False,
-        "draft": {},
-        "preset": False,
         "confidence": 1.0,
         "llm_calls": 0,
         "approved": False,
@@ -255,27 +253,46 @@ async def _run_graph(sessao: dict, lote: list[dict], conteudo: dict) -> str | di
     thread = effective_thread_id(sessao["thread_id"], sessao["session_epoch"])
     config = {"configurable": {"thread_id": thread}, "callbacks": telemetry.callbacks()}
 
+    # Quantas vezes o modelo foi chamado FORA do grafo neste turno. Os fast-paths
+    # que classificam texto (rascunho, SIM/NÃO digitado) gastam token e retornam
+    # antes do `_audit` — e é a contagem de `ai_events` que o paywall mensal usa.
+    # Sem este contador o consumo é subcontado em silêncio.
+    uso: dict = {}
+
     # --- fast-path: a mensagem completa um rascunho aberto? ---
     # Vem ANTES da pendência porque são coisas diferentes: pendência é uma
     # pergunta de SIM/NÃO travando a conversa; rascunho é um lançamento pela
     # metade que ficou inerte enquanto o usuário fazia outra coisa.
     await db.expire_drafts()
     rascunho = await db.open_draft(sessao["phone"])
-    if rascunho and not conteudo.get("clicked_id"):
-        decidido = await draft.interpretar(conteudo.get("text", ""), rascunho)
+    clique = conteudo.get("clicked_id") or ""
+    # clique `pa:` é do HITL e nunca é do rascunho; `ds:` é o oposto. Sem esta
+    # separação, um clique na lista de cartões cairia em `confirm.decide` sem
+    # pendência aberta e viraria "essa confirmação expirou".
+    if rascunho and (not clique or clique.startswith(draft.CLICK_PREFIX)):
+        decidido = (
+            draft.parse_slot_click(clique, rascunho["id"])
+            if clique
+            else await draft.interpretar(conteudo.get("text", ""), rascunho, uso)
+        )
+        if clique and decidido is None:
+            # clique de uma lista que não é mais esta. NUNCA deixar seguir para o
+            # grafo: o rótulo da linha ("Nubank Cartão") viraria mensagem nova.
+            return await _fechar(
+                sessao, uso,
+                "⏰ Essa pergunta já expirou. Me manda de novo o que você quer.",
+            )
         if decidido and decidido["acao"] == "descartar":
             await db.delete_draft(sessao["phone"])
-            return "👍 Beleza, esqueci aquele lançamento."
+            return await _fechar(sessao, uso, "👍 Beleza, esqueci aquele lançamento.")
         if decidido and decidido["acao"] == "completar":
             if decidido.get("slot") == "account":
-                # Valida o cartão ANTES de consumir o rascunho. Falhar aqui e
+                # Resolve o cartão ANTES de consumir o rascunho. Falhar aqui e
                 # apagar deixaria o usuário a um dado do fim e obrigado a
                 # repetir a compra inteira — foi essa a queixa.
-                nome = decidido["account"]
-                cartoes = await db.credit_cards(sessao["workspace_id"])
-                if not any(nome.lower() in c.lower() or c.lower() in nome.lower()
-                           for c in cartoes):
-                    return draft.cartao_invalido(nome, cartoes)
+                decidido, resposta = await _cartao_do_rascunho(sessao, rascunho, decidido)
+                if resposta is not None:
+                    return await _fechar(sessao, uso, resposta)
 
             acao = draft.mesclar(rascunho["action"], decidido)
             # Ainda falta outro slot? Guarda de novo e pergunta o próximo, em vez
@@ -286,30 +303,34 @@ async def _run_graph(sessao: dict, lote: list[dict], conteudo: dict) -> str | di
             resta = faltando(FinanceAction.model_validate(acao), rascunho["raw_text"])
             if resta:
                 slot, pergunta = resta
-                await db.save_draft(
+                novo_id = await db.save_draft(
                     thread_id=thread, phone=sessao["phone"],
                     user_id=UUID(str(sessao["user_id"])),
                     workspace_id=UUID(str(sessao["workspace_id"])),
                     action=acao, raw_text=rascunho["raw_text"],
                     missing=pergunta, slot=slot,
                 )
-                return pergunta
+                return await _fechar(
+                    sessao, uso, await _perguntar_slot(sessao, novo_id, slot, pergunta)
+                )
             await db.delete_draft(sessao["phone"])
             # segue o fluxo normal com a ação COMPLETA: as validações de
             # segurança (HITL de valor alto, alvo, propriedade) valem igual
             conteudo = {**conteudo, "text": rascunho["raw_text"]}
-            return await _rodar_com_acoes(sessao, lote, conteudo, [acao], thread, config)
+            return await _rodar_com_acoes(sessao, lote, conteudo, [acao], thread, config, uso)
 
     # --- fast-path: a mensagem é resposta a uma pergunta? ---
     await db.expire_pending(thread)
     pendente = await db.open_pending(sessao["phone"])
-    decisao = await confirm.decide(conteudo, pendente)
+    decisao = await confirm.decide(conteudo, pendente, uso)
 
     if decisao is confirm.STALE:
         # clique de uma pergunta que não está mais aberta. NUNCA deixar seguir
         # para o grafo: o rótulo do botão ("1) R$45 mercado") seria lido como
         # mensagem nova e viraria um lançamento de verdade.
-        return "⏰ Essa confirmação já expirou. Me manda de novo o que você quer."
+        return await _fechar(
+            sessao, uso, "⏰ Essa confirmação já expirou. Me manda de novo o que você quer."
+        )
 
     if pendente:
         if decisao is None:
@@ -329,14 +350,129 @@ async def _run_graph(sessao: dict, lote: list[dict], conteudo: dict) -> str | di
             retomada = {**config, "configurable": {"thread_id": pendente["thread_id"]}}
             with telemetry.trace(thread_id=pendente["thread_id"], user_id=sessao["user_id"]):
                 estado = await graph().ainvoke(entrada, config=retomada)
+            # SÓ o que este turno gastou. O estado que volta do checkpoint ainda
+            # carrega o `llm_calls` do turno da PERGUNTA, que já virou linha em
+            # `ai_events` lá atrás — somá-lo aqui cobraria de novo, e um CLIQUE
+            # (que não chama modelo nenhum) passaria a consumir mensagem da cota.
+            # Depois do gate ninguém chama o modelo: `executar` e `compor` são
+            # código puro.
+            await _audit(sessao, {}, uso)
             return estado.get("reply", "")
 
     estado_inicial = _estado_base(sessao, lote, conteudo, thread)
     with telemetry.trace(thread_id=thread, user_id=sessao["user_id"]):
         estado = await graph().ainvoke(estado_inicial, config=config)
 
-    await _audit(sessao, estado)
+    await _audit(sessao, estado, uso)
     return await _resposta_do_estado(sessao, estado, thread)
+
+
+async def _fechar(sessao: dict, uso: dict, resposta: str | dict) -> str | dict:
+    """Fecha um turno que terminou num fast-path, gravando o que ele gastou.
+
+    Só existe porque estes caminhos não passam pelo grafo: sem esta linha, uma
+    resposta de slot ou um "pode mandar" digitado chamariam o Gemini sem
+    aparecer em `ai_events`, e `private.plan_status_for` conta exatamente essas
+    linhas para saber quanto o workspace consumiu no mês.
+    """
+    await _audit(sessao, {}, uso)
+    return resposta
+
+
+async def _perguntar_slot(sessao: dict, draft_id: str, slot: str, pergunta: str) -> str | dict:
+    """A pergunta do slot: menu quando dá para listar, texto quando não dá."""
+    if slot != "account":
+        return pergunta
+    cartoes = await db.accounts(sessao["workspace_id"], only_cards=True)
+    return _pergunta_cartao(draft_id, cartoes, pergunta)
+
+
+async def _cartao_do_rascunho(
+    sessao: dict, rascunho: dict, decidido: dict
+) -> tuple[dict | None, str | dict | None]:
+    """Troca o que o usuário disse pelo cartão REAL. `(decidido, resposta)`.
+
+    Depois daqui `decidido["account"]` é o nome CANÔNICO do banco. Gravar o texto
+    digitado era o defeito silencioso do fluxo: mesmo quando a validação passava,
+    o `resolve_account` lá embaixo não achava a conta pelo que o usuário escreveu,
+    devolvia None, e a compra parcelada nascia SEM cartão — exatamente o que a
+    regra "cartão obrigatório em parcelado" existe para impedir.
+    """
+    cartoes = await db.accounts(sessao["workspace_id"], only_cards=True)
+    if not cartoes:
+        return None, draft.sem_cartoes(decidido.get("account", ""))
+
+    if decidido.get("account_id"):
+        # O id veio de um clique DO USUÁRIO e por isso nunca é usado direto: ele é
+        # procurado na lista de cartões DO WORKSPACE, e o nome sai de lá. Sem
+        # isso, um id de outro workspace entraria como argumento — o mesmo IDOR
+        # que `ensure_owned` fecha nos outros caminhos.
+        escolhido = next(
+            (c for c in cartoes if str(c["id"]) == str(decidido["account_id"])), None
+        )
+        if escolhido is None:
+            return None, _pergunta_cartao(
+                rascunho["id"], cartoes, "🤔 Esse cartão não é seu. Qual deles?"
+            )
+        return {**decidido, "account": escolhido["name"]}, None
+
+    nome = decidido.get("account", "")
+    achados = matching.match_accounts(nome, cartoes)
+    if len(achados) == 1:
+        return {**decidido, "account": achados[0]["name"]}, None
+
+    # Nada casou -> mostra todos. Empatou -> mostra só os candidatos. Empate NUNCA
+    # vira escolha nossa: lançar no cartão errado é pior que uma pergunta a mais.
+    corpo = (
+        f"🤔 Achei mais de um parecido com *{nome}*. Qual deles?"
+        if achados
+        else f"❌ Não achei o cartão *{nome}*. É algum destes?"
+    )
+    return None, _pergunta_cartao(rascunho["id"], achados or cartoes, corpo)
+
+
+def _pergunta_cartao(draft_id: str, cartoes: list[dict], corpo: str) -> str | dict:
+    """A pergunta do cartão como MENU. Mesma divisão de forma que `_pergunta`.
+
+    Até 2 cabem em botões (2 + cancelar = os 3 que a Meta aceita); 3+ viram Lista
+    Interativa (9 + cancelar = as 10 linhas). O clique carrega o id do cartão, ou
+    seja, executa sem passar por IA nenhuma — o texto livre vira o plano B.
+    """
+    if not cartoes:
+        return draft.sem_cartoes()
+
+    mostrar = cartoes[:9]
+    cancelar = f"{draft.CLICK_PREFIX}{draft_id}:no"
+    # O fallback pede o NOME, não o número: o rascunho não congela candidatos
+    # (`pending_actions` congela porque o resume depende do id), então um número
+    # digitado não teria a que se ancorar. Nome digitado a extração + o
+    # casamento normalizado resolvem.
+    texto = (
+        f"{corpo}\n"
+        + "\n".join(f"• {c['name']}" for c in mostrar)
+        + "\nDigita o nome de um deles, ou *cancelar*."
+    )
+
+    if len(mostrar) <= 2:
+        return {
+            "ui": "buttons",
+            "body": corpo,
+            "buttons": [
+                *[(f"{draft.CLICK_PREFIX}{draft_id}:c:{c['id']}", c["name"]) for c in mostrar],
+                (cancelar, "Cancelar"),
+            ],
+            "text": texto,
+        }
+    return {
+        "ui": "list",
+        "body": corpo,
+        "label": "Escolher cartão",
+        "rows": [
+            *[(f"{draft.CLICK_PREFIX}{draft_id}:c:{c['id']}", c["name"], "") for c in mostrar],
+            (cancelar, "Cancelar", "Esquecer essa compra"),
+        ],
+        "text": texto,
+    }
 
 
 async def _resposta_do_estado(sessao: dict, estado: dict, thread: str) -> str | dict:
@@ -357,10 +493,11 @@ async def _resposta_do_estado(sessao: dict, estado: dict, thread: str) -> str | 
                 **estado,
                 "reply": f"{estado.get('reply', '')}\n\n{draft.lembrete(antigo)}".strip(),
             }
+    draft_id = ""
     if rascunho:
         # a extração ficou pela metade: guarda para o usuário poder mudar de
         # assunto e voltar, em vez de ter que repetir a frase inteira
-        await db.save_draft(
+        draft_id = await db.save_draft(
             thread_id=thread,
             phone=sessao["phone"],
             user_id=UUID(str(sessao["user_id"])),
@@ -391,6 +528,19 @@ async def _resposta_do_estado(sessao: dict, estado: dict, thread: str) -> str | 
             summary=pausa["summary"],
         )
         return _pergunta(pausa, candidatos, linha)
+
+    # A pergunta do cartão vira MENU aqui, e não logo depois do `save_draft`, por
+    # uma razão de correção: rascunho e `interrupt()` coexistem no mesmo turno
+    # ("comprei um mac em 12x e apaga o último" — a irmã destrutiva completa pausa
+    # o grafo do mesmo jeito). Interceptar antes do bloco acima pularia o
+    # `create_pending` e deixaria o grafo parado num checkpoint que nenhum resume
+    # alcança. Com pausa, a pergunta pendente vence e o rascunho volta pelo
+    # `lembrete`, como já era.
+    if rascunho.get("slot") == "account" and draft_id:
+        cartoes = await db.accounts(sessao["workspace_id"], only_cards=True)
+        # o corpo leva a resposta INTEIRA, não só a pergunta: o lote pode ter
+        # salvo uma nota junto, e perder isso seria pior que o menu
+        return _pergunta_cartao(draft_id, cartoes, estado.get("reply", ""))
 
     return estado.get("reply", "")
 
@@ -444,13 +594,19 @@ def _pergunta(pausa: dict, candidatos: list[dict], pendente: dict | None) -> dic
     }
 
 
-async def _audit(sessao: dict, estado: dict) -> None:
-    """Uma linha em `ai_events` por execução que REALMENTE chamou o modelo.
+async def _audit(sessao: dict, estado: dict, uso: dict | None = None) -> None:
+    """Uma linha em `ai_events` por TURNO que realmente chamou o modelo.
 
-    Fast-path (saudação, SIM/NÃO, anexo direto) não gasta token e por isso não
-    pode consumir mensagem da cota do usuário — é `llm_calls` que separa os dois.
+    Fast-path que não gasta token (saudação, clique, anexo direto) continua sem
+    consumir mensagem da cota — é `llm_calls` que separa os dois.
+
+    `uso` são as chamadas feitas FORA do grafo (classificador de rascunho,
+    SIM/NÃO digitado). Elas entram somadas aqui, e não como semente do estado,
+    porque o reducer `_soma_no_turno` trata `0` na entrada como RESET: semear com
+    1 num thread que já rodou somaria em cima do turno anterior em vez de zerar.
     """
-    if not estado.get("llm_calls"):
+    total = (estado.get("llm_calls") or 0) + ((uso or {}).get("llm_calls") or 0)
+    if not total:
         return
     await db.record_ai_event(
         user_id=sessao["user_id"],
@@ -460,12 +616,12 @@ async def _audit(sessao: dict, estado: dict) -> None:
             "domains": estado.get("domains", []),
             "finance_actions": estado.get("finance_actions", []),
             "notes_actions": estado.get("notes_actions", []),
-            "llm_calls": estado.get("llm_calls", 0),
+            "llm_calls": total,
         },
     )
 
 
-async def _rodar_com_acoes(sessao, lote, conteudo, acoes, thread, config):
+async def _rodar_com_acoes(sessao, lote, conteudo, acoes, thread, config, uso=None):
     """Roda o grafo pulando o modelo: as ações já estão prontas.
 
     O rascunho já foi extraído por um turno anterior; reextrair gastaria uma
@@ -480,7 +636,7 @@ async def _rodar_com_acoes(sessao, lote, conteudo, acoes, thread, config):
     estado_inicial["preset"] = True
     with telemetry.trace(thread_id=thread, user_id=sessao["user_id"]):
         estado = await graph().ainvoke(estado_inicial, config=config)
-    await _audit(sessao, estado)
+    await _audit(sessao, estado, uso)
     return await _resposta_do_estado(sessao, estado, thread)
 
 

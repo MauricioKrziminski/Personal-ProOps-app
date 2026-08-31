@@ -118,8 +118,15 @@ async def _classificar(texto: str, resumo: str) -> str:
     return resposta.decision
 
 
-async def interpret_text(texto: str | None, resumo: str = "") -> bool | None:
-    """True aprova, False recusa, None = não é confirmação (vira intenção nova)."""
+async def interpret_text(
+    texto: str | None, resumo: str = "", uso: dict | None = None
+) -> bool | None:
+    """True aprova, False recusa, None = não é confirmação (vira intenção nova).
+
+    `uso` conta a chamada de modelo: este caminho roda fora do grafo, e desde que
+    o SIM/NÃO deixou de ser regex ele gasta token de verdade — sem contar aqui,
+    o consumo não chega em `ai_events` e o paywall mensal subconta.
+    """
     if not texto or not texto.strip():
         return None
     try:
@@ -128,6 +135,8 @@ async def interpret_text(texto: str | None, resumo: str = "") -> bool | None:
         log.warning("classificador de confirmação falhou — tratando como não-confirmação",
                     exc_info=True)
         return None
+    if uso is not None:
+        uso["llm_calls"] = uso.get("llm_calls", 0) + 1
     if decisao == "approve":
         return True
     if decisao == "reject":
@@ -158,7 +167,9 @@ def interpret_choice(texto: str | None, n: int) -> int | None:
     return None
 
 
-async def decide(conteudo: dict, pendente: dict | None) -> dict | str | None:
+async def decide(
+    conteudo: dict, pendente: dict | None, uso: dict | None = None
+) -> dict | str | None:
     """dict = decisão · STALE = clique de outra pergunta · None = intenção nova."""
     clique = conteudo.get("clicked_id")
     if clique:
@@ -184,5 +195,5 @@ async def decide(conteudo: dict, pendente: dict | None) -> dict | str | None:
     if not pendente:
         return None
 
-    decisao = await interpret_text(texto, (pendente or {}).get("summary", ""))
+    decisao = await interpret_text(texto, (pendente or {}).get("summary", ""), uso)
     return None if decisao is None else {"approved": decisao}

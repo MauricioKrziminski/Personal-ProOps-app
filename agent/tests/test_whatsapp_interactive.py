@@ -103,3 +103,42 @@ async def test_falha_no_interativo_cai_para_texto_com_a_lista(monkeypatch):
     assert ultimo["type"] == "text"
     assert "1) x" in ultimo["text"]["body"]
     get_settings.cache_clear()
+
+
+@pytest.mark.asyncio
+async def test_menu_de_cartoes_sai_como_lista_de_verdade(cliente):
+    """A Lista Interativa do rascunho passa pelo MESMO envio das confirmações.
+
+    Ela nasceu depois (31/08/2026), e o risco era montar uma spec que o
+    `try_send_interactive` não reconhecesse e caísse em texto sem ninguém notar —
+    que é justamente a queixa que o menu existe para resolver.
+    """
+    from app import worker
+
+    cartoes = [{"id": f"c{i}", "name": f"Cartão {i}"} for i in range(4)]
+    spec = worker._pergunta_cartao("d1", cartoes, "Qual cartão?")
+    await whatsapp.try_send_interactive("5511", spec)
+
+    inter = cliente.enviados[0]["interactive"]
+    assert inter["type"] == "list"
+    linhas = inter["action"]["sections"][0]["rows"]
+    assert [l["id"] for l in linhas][:2] == ["ds:d1:c:c0", "ds:d1:c:c1"]
+    assert linhas[-1]["id"] == "ds:d1:no"
+    assert all(len(l["title"]) <= whatsapp.ROW_TITLE_MAX for l in linhas)
+
+
+@pytest.mark.asyncio
+async def test_menu_de_cartoes_cai_para_texto_com_os_nomes(cliente, monkeypatch):
+    from app import worker
+
+    async def falha(*a, **k):
+        raise RuntimeError("400")
+
+    monkeypatch.setattr(whatsapp, "send_list", falha)
+    cartoes = [{"id": f"c{i}", "name": f"Cartão {i}"} for i in range(4)]
+    await whatsapp.try_send_interactive(
+        "5511", worker._pergunta_cartao("d1", cartoes, "Qual cartão?")
+    )
+
+    corpo = cliente.enviados[0]["text"]["body"]
+    assert "Cartão 0" in corpo and "nome" in corpo.lower()

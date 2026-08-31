@@ -81,18 +81,20 @@ class TestSemantico:
 
 
 class _RespostaFalsa:
-    def __init__(self, decision):
+    def __init__(self, decision, extracted_value=""):
         self.decision = decision
+        self.extracted_value = extracted_value
 
 
 class _ModeloFalso:
-    def __init__(self, decision="unclear"):
+    def __init__(self, decision="unclear", extracted_value=""):
         self.decision = decision
+        self.extracted_value = extracted_value
         self.mensagens = None
 
     async def ainvoke(self, mensagens):
         self.mensagens = mensagens
-        return _RespostaFalsa(self.decision)
+        return _RespostaFalsa(self.decision, self.extracted_value)
 
 
 @pytest.mark.asyncio
@@ -119,5 +121,23 @@ async def test_classificar_de_rascunho_monta_a_chamada_de_verdade(monkeypatch):
     falso = _ModeloFalso("answer")
     monkeypatch.setattr(gemini, "structured", lambda schema: falso)
 
-    assert await draft._classificar("foi 5000", "qual o valor?") == "answer"
+    assert await draft._classificar("foi 5000", "qual o valor?") == ("answer", "")
     assert "<user_input>" in falso.mensagens[1][1]
+
+
+@pytest.mark.asyncio
+async def test_classificar_de_rascunho_extrai_na_MESMA_chamada(monkeypatch):
+    """Classificar e extrair juntos não é economia de linha, é de cota: separar
+    dobraria a latência e comeria duas das 500 requisições diárias do Flash-Lite
+    para chegar no mesmo lugar."""
+    from app.domain import draft
+    from app.services import gemini
+
+    falso = _ModeloFalso("answer", extracted_value="nubank")
+    monkeypatch.setattr(gemini, "structured", lambda schema: falso)
+
+    assert await draft._classificar(
+        "acabei de criar um pelo app, chama nubank cartao", "qual cartão?"
+    ) == ("answer", "nubank")
+    # uma chamada, não duas
+    assert len(falso.mensagens) == 2

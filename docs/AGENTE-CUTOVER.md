@@ -566,6 +566,49 @@ lançamento que está a um dado de ficar pronto.
 ⚠️ **O rascunho é chaveado por TELEFONE, não por thread** (0044). O thread
 efetivo carrega o epoch da sessão, que gira em 6h; o rascunho vive 24h.
 
+### Coleta robusta (31/08/2026)
+
+O teste de usabilidade com cartões pegou o agente literal demais. Três defeitos
+encadeados, e um quarto que só apareceu na leitura do código:
+
+- **A pergunta do cartão é MENU**, não texto livre: Lista Interativa (ou botões,
+  com até 2 cartões) com os cartões reais, payload `ds:<id do rascunho>:c:<id do
+  cartão>` e `ds:<id>:no` para desistir. O clique executa sem chamar IA nenhuma.
+  Prefixo próprio, e não `pa:`, porque um rascunho em `pending_actions` ocuparia
+  o índice de "uma pergunta aberta por conversa" (o motivo está na 0043).
+- **O modelo extrai a entidade na MESMA chamada que classifica**
+  (`DraftDecision.extracted_value`). "acabei de criar um pelo app, chama nubank
+  cartao" devolve `nubank`. Duas chamadas dobrariam a latência e comeriam duas
+  das 500 requisições diárias do Flash-Lite para chegar no mesmo lugar.
+  **O VALOR continua determinístico** — `parse_valor_em_centavos`, que só aceita
+  um número plausível. Só o slot de conta usa a extração.
+- **O casamento é normalizado e mora em UM lugar** (`domain/matching.py`):
+  sem acento, minúsculo, sem pontuação; exato → substring bidirecional →
+  semelhança (typo). Antes eram TRÊS matchers diferentes — a validação do
+  rascunho, o `resolve_account` da execução e o filtro de fatura —, então
+  validar e executar podiam discordar sobre qual cartão o usuário quis dizer.
+  Empate devolve a lista: quem tem como perguntar pergunta, e `resolve_account`,
+  que resolve em silêncio, só aceita semelhança quando é única.
+- **O nome gravado é o CANÔNICO do banco.** Era o defeito silencioso: mesmo com
+  a validação passando, `mesclar` gravava o texto digitado, o `ilike` de baixo
+  não achava, e a compra parcelada nascia SEM cartão — exatamente o que a regra
+  "cartão obrigatório em parcelado" existe para impedir.
+
+O menu é emitido **depois** do bloco de pausa em `_resposta_do_estado`: rascunho
+e `interrupt()` coexistem no mesmo turno ("comprei um mac em 12x e apaga o
+último"), e interceptar antes pularia o `create_pending`, deixando o grafo parado
+num checkpoint que nenhum resume alcança.
+
+`scripts/fake_meta.py --click "<id>"` manda um `list_reply` assinado — sem ele
+nenhum clique era testável localmente, nem os botões de confirmação.
+
+**Custo do turno:** os fast-paths que classificam TEXTO (resposta de rascunho,
+SIM/NÃO digitado) passaram a gravar em `ai_events` — eles chamam o Gemini desde
+que o SIM/NÃO deixou de ser regex, e não estavam sendo contados, então o paywall
+mensal subcontava. O **clique continua custando zero**: o estado que volta do
+checkpoint carrega o `llm_calls` do turno da PERGUNTA, que já virou linha lá
+atrás, e somá-lo no resume cobraria a mesma chamada duas vezes.
+
 # Quando o número real da ProOps entrar
 
 Hoje existe **um** número (o de teste da Meta), e por isso o roteamento é pelo

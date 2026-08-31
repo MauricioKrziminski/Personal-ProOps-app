@@ -475,13 +475,17 @@ async def save_draft(
     raw_text: str,
     missing: str,
     slot: str = "amount",
-) -> None:
-    """Grava (ou substitui) o rascunho da conversa.
+) -> str:
+    """Grava (ou substitui) o rascunho da conversa e devolve o id dele.
 
     Substitui em vez de acumular: dois rascunhos abertos tornariam "foi 5000"
     ambíguo, pelo mesmo motivo que duas perguntas abertas tornariam "sim".
+
+    O id sai daqui porque é ele que vai dentro do payload do botão da lista de
+    cartões (`ds:<id>:c:<account_id>`) — sem ele, um clique de ontem escolheria
+    o cartão da compra de hoje.
     """
-    await execute(
+    linha = await fetch_one(
         """
         insert into public.draft_actions
           (thread_id, phone, user_id, workspace_id, action, raw_text, missing, slot)
@@ -493,9 +497,11 @@ async def save_draft(
               slot = excluded.slot,
               expires_at = now() + interval '24 hours',
               created_at = now()
+        returning id
         """,
         thread_id, phone, user_id, workspace_id, Jsonb(action), raw_text, missing, slot,
     )
+    return str(linha["id"])
 
 
 async def open_draft(phone: str) -> dict[str, Any] | None:
@@ -519,14 +525,27 @@ async def expire_drafts() -> None:
     await execute("select public.expire_draft_actions()")
 
 
-async def credit_cards(workspace_id) -> list[str]:
-    """Nomes dos cartões ativos — para o erro amigável poder listar os de verdade."""
-    linhas = await fetch(
+async def accounts(workspace_id, *, only_cards: bool = False) -> list[dict[str, Any]]:
+    """Contas ativas do workspace: `id`, `name`, `type`.
+
+    Fonte ÚNICA para casar conta por nome. Antes eram três consultas com três
+    matchers diferentes (a validação do rascunho, o `resolve_account` da
+    execução e o filtro de fatura), e elas podiam discordar sobre qual conta o
+    usuário quis dizer.
+
+    Devolve as linhas, não só os nomes: a Lista Interativa precisa do `id` e a
+    gravação precisa do nome CANÔNICO — escrever o que o usuário digitou é como
+    o `ilike` de baixo deixava de achar a conta que a validação tinha aprovado.
+    """
+    # o filtro vai como PARÂMETRO, não interpolado: SQL montada com f-string é
+    # como injeção entra, mesmo quando hoje a variável é um bool nosso
+    return await fetch(
         """
-        select name from public.accounts
-        where workspace_id = %s and archived = false and type = 'credit_card'
+        select id, name, type from public.accounts
+        where workspace_id = %s and archived = false
+          and (%s = false or type = 'credit_card')
         order by name
         """,
         workspace_id,
+        only_cards,
     )
-    return [l["name"] for l in linhas]

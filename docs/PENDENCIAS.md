@@ -126,6 +126,23 @@ Via Graph API v21.0 com o token de System User do app:
 10. **Plugin `expo-notifications` no `app.json`**: configura ícone/cor/canal padrão da notificação no Android. Exige asset de ícone (96x96 branco) e rebuild nativo.
 11. **Cobertura de teste**: hoje só helpers puros (`dates.ts`, `rrule-text.ts`, `_shared/datetime.ts` — 23 casos). `_shared/recurrence.ts` não é testável com `node --test` (importa rrule de `https://esm.sh`) — testar com `deno test` quando o Deno estiver instalado.
 
+## ⚠️ Rascunho: o slot de IDENTIFICAÇÃO não tem onde encaixar (achado em 31/08/2026)
+
+`required.py:76-77` devolve o slot **`amount`** para a pergunta de identificação
+(*"Entendi o valor, mas não o que foi. Isso foi com o quê?"*). Quem responder
+*"no mercado"* cai em `parse_valor_em_centavos`, que devolve `None` — e o rascunho
+fica preso pedindo a identificação sem nunca conseguir aceitar uma.
+
+Corrigir exige um slot `description`, e o check da `0045` só admite
+`('amount','account')`: é migration nova. Ficou de fora da etapa de coleta robusta
+de propósito, para não misturar mudança de schema com mudança de UX.
+
+**Efeito de produto ligado em 31/08:** os fast-paths que classificam texto
+(resposta de rascunho e SIM/NÃO digitado) passaram a gravar em `ai_events`. Eles
+chamam o Gemini desde que o SIM/NÃO deixou de ser regex, e não estavam sendo
+contados — ou seja, o paywall mensal subcontava. Agora cada uma dessas respostas
+consome 1 mensagem da cota.
+
 ## 🔵 FASE 4 — Roadmap v2 (ordem sugerida)
 
 ### 4.1 Push notifications de verdade

@@ -13,6 +13,7 @@ extra de custo.
 from __future__ import annotations
 
 from app import db
+from app.domain import matching
 from app.domain.dates import format_date_br, local_iso_date
 from app.domain.money import cents_to_brl
 from app.graph.schemas import FinanceQuery
@@ -121,8 +122,10 @@ async def query_goals(ctx: ExecContext, action: FinanceQuery) -> ToolResult:
 async def query_invoice(ctx: ExecContext, action: FinanceQuery) -> ToolResult:
     rows = await db.fetch("select * from public._card_summary(%s)", ctx.user_id)
     if action.account:
-        alvo = action.account.lower()
-        rows = [r for r in rows if alvo in (r["name"] or "").lower()]
+        # mesmo casamento da execução e da validação do rascunho: "itau" tem que
+        # achar "Itaú" aqui também, senão a consulta de fatura responde "não
+        # achei esse cartão" para um cartão que existe
+        rows = matching.match_accounts(action.account, rows) or []
     if not rows:
         return ToolResult("💳 Não achei esse cartão. Cadastra ele no app!", read_only=True)
 
