@@ -303,15 +303,33 @@ EXPO_PUBLIC_SUPABASE_URL=https://utkqoiigimqzeenxkxdl.supabase.co
 EXPO_PUBLIC_SUPABASE_ANON_KEY=<publishable do staging>
 ```
 
-⚠️ **Apague o `.env.local` antes de qualquer build de produção/EAS.** Esquecer
-publica um app lendo o banco descartável. Voltar: `rm .env.local && npx expo start -c`
-— sem rebuild, porque `EXPO_PUBLIC_*` é inlinado no BUNDLE, não no binário.
+**Não há troca automática: o arquivo existir É o switch.** Medido com
+`@expo/env` em 31/08/2026:
+
+| | aponta para |
+|---|---|
+| `.env.local` presente, `NODE_ENV=development` | **staging** |
+| `.env.local` presente, `NODE_ENV=production` | **staging** |
+| `.env.local` presente, `NODE_ENV=test` | produção |
+| sem `.env.local` | produção |
+
+Isso corta dos dois lados. Apagar o arquivo no meio do teste devolve o app para
+produção — e a tela fica vazia enquanto o WhatsApp segue escrevendo no staging.
+E ele **não** se desliga sozinho num build de produção: vence com
+`NODE_ENV=production` também.
+
+⚠️ **`rm .env.local` na mão antes de qualquer build EAS de produção.** Esquecer
+publica um app lendo o banco descartável. Voltar para produção no dev não exige
+rebuild — `rm .env.local && npx expo start -c` basta, porque `EXPO_PUBLIC_*` é
+inlinado no BUNDLE, não no binário.
 
 A sessão salva no device vai ser recusada (o emissor do JWT é outro projeto):
 cair na tela de login é o comportamento certo.
 
-**2. O provider de telefone nasce DESLIGADO no projeto novo.** Conferir sem
-adivinhar:
+**2. O provider de telefone nasce DESLIGADO no projeto novo** — e o app mostra
+isso como *"Não deu para continuar agora"*, o fallback genérico de
+`src/lib/auth-errors.ts` (a política é nunca vazar inglês técnico para a tela).
+O erro de verdade é `phone_provider_disabled`. Conferir sem adivinhar:
 
 ```bash
 curl -s https://<ref>.supabase.co/auth/v1/settings -H "apikey: <anon>" | jq .external.phone
@@ -322,6 +340,20 @@ com `phone_provider_disabled`. Ligar no staging exige DUAS coisas — o provider
 **e** o Send SMS Hook apontando para o `/hooks/otp` do Cloud Run de staging, com
 o mesmo `SEND_SMS_HOOK_SECRET` (os segredos do staging são cópia dos de produção,
 então o segredo já casa).
+
+**2b. Atalho que dispensa configurar o OTP:** o botão *"Entrar como teste (dev)"*
+(só em `__DEV__`) faz `signInWithPassword` com `dev@proops.local`, e o provider de
+email já vem habilitado. Cole email e senha **no usuário do telefone existente**,
+nunca crie um usuário novo — o trigger `on_auth_user_created` daria a ele um
+workspace próprio, e o app abriria numa conta vazia, parecendo que o WhatsApp não
+escreveu:
+
+```bash
+curl -X PUT "https://utkqoiigimqzeenxkxdl.supabase.co/auth/v1/admin/users/<id-do-usuario-do-telefone>" \
+  -H "apikey: $STG_SERVICE_KEY" -H "Authorization: Bearer $STG_SERVICE_KEY" \
+  -H 'Content-Type: application/json' \
+  -d '{"email":"dev@proops.local","password":"devtest123","email_confirm":true}'
+```
 
 **3. Realtime já está de pé:** as 15 tabelas da publicação `supabase_realtime`
 vieram nas migrations, então o que o WhatsApp grava aparece no app sem refresh.
