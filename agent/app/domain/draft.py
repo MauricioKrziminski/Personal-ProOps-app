@@ -44,7 +44,7 @@ async def _classificar(texto: str, pergunta: str) -> str:
     resposta = await modelo.ainvoke(
         [
             ("system", _PROMPT.format(pergunta=pergunta or "o valor")),
-            ("human", wrap_untrusted(texto)),
+            ("human", wrap_untrusted("user_input", texto)),
         ]
     )
     return resposta.decision

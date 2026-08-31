@@ -69,3 +69,55 @@ class TestSemantico:
 
         monkeypatch.setattr(confirm, "_classificar", esquisito)
         assert (await confirm.interpret_text("sim", "apagar X")) is None
+
+
+# ---------------------------------------------------------------------------
+# integração das duas pontas: o dublê não pode esconder a chamada real
+# ---------------------------------------------------------------------------
+# Três bugs de produção nesta sessão passaram pela suíte porque os testes
+# dublavam `_classificar` — justamente a função que quebrava (`Literal` não
+# importado, `wrap_untrusted` com assinatura errada). Estes testes exercitam o
+# corpo real de `_classificar`, dublando só o CLIENTE do modelo.
+
+
+class _RespostaFalsa:
+    def __init__(self, decision):
+        self.decision = decision
+
+
+class _ModeloFalso:
+    def __init__(self, decision="unclear"):
+        self.decision = decision
+        self.mensagens = None
+
+    async def ainvoke(self, mensagens):
+        self.mensagens = mensagens
+        return _RespostaFalsa(self.decision)
+
+
+@pytest.mark.asyncio
+async def test_classificar_de_confirmacao_monta_a_chamada_de_verdade(monkeypatch):
+    from app.services import gemini
+
+    falso = _ModeloFalso("approve")
+    monkeypatch.setattr(gemini, "structured", lambda schema: falso)
+
+    assert await confirm._classificar("manda bala", "apagar X") == "approve"
+
+    papeis = [m[0] for m in falso.mensagens]
+    assert papeis == ["system", "human"]
+    # o texto do usuário vai ENVELOPADO como dado, nunca solto no system
+    assert "<user_input>" in falso.mensagens[1][1]
+    assert "manda bala" in falso.mensagens[1][1]
+
+
+@pytest.mark.asyncio
+async def test_classificar_de_rascunho_monta_a_chamada_de_verdade(monkeypatch):
+    from app.domain import draft
+    from app.services import gemini
+
+    falso = _ModeloFalso("answer")
+    monkeypatch.setattr(gemini, "structured", lambda schema: falso)
+
+    assert await draft._classificar("foi 5000", "qual o valor?") == "answer"
+    assert "<user_input>" in falso.mensagens[1][1]

@@ -112,7 +112,7 @@ async def _classificar(texto: str, resumo: str) -> str:
         [
             ("system", _PROMPT_CONFIRMACAO.format(resumo=resumo or "uma ação")),
             # o texto do usuário é DADO, nunca instrução — mesmo envelope do resto
-            ("human", wrap_untrusted(texto)),
+            ("human", wrap_untrusted("user_input", texto)),
         ]
     )
     return resposta.decision
