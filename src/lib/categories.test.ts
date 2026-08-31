@@ -6,16 +6,25 @@ import { test } from 'node:test';
 
 import { INCOME_CATEGORIES, SUGGESTED_CATEGORIES } from './categories.ts';
 
-/** Extrai a lista literal declarada em `export const SUGGESTED_CATEGORIES = [...]`. */
+/**
+ * Extrai a lista literal de `SUGGESTED_CATEGORIES` de um arquivo, seja ele TS
+ * (`= [...]`) ou Python (`: tuple[str, ...] = (...)`).
+ */
 function parseListFrom(path: string): string[] {
   const source = readFileSync(path, 'utf8');
-  const match = source.match(/export const SUGGESTED_CATEGORIES = \[([\s\S]*?)\]/);
+  const match = source.match(/SUGGESTED_CATEGORIES[^=]*=\s*[[(]([\s\S]*?)[\])]/);
   assert.ok(match, `não achei SUGGESTED_CATEGORIES em ${path}`);
   return [...match[1].matchAll(/["']([^"']+)["']/g)].map((m) => m[1]);
 }
 
-test('o prompt do Gemini usa exatamente as mesmas categorias do app', () => {
-  // Duplicação inevitável (Deno não importa de src/) — este teste é a trava.
+test('o agente Python usa exatamente as mesmas categorias do app', () => {
+  // Duplicação inevitável (Python não importa de src/) — este teste é a trava.
+  // Divergir aqui faz o modelo sugerir categoria que a tela não conhece.
+  const doAgente = parseListFrom('agent/app/domain/categories.py');
+  assert.deepEqual(doAgente, [...SUGGESTED_CATEGORIES]);
+});
+
+test('o prompt legado do Deno ainda bate (enquanto ele existir)', () => {
   const doPrompt = parseListFrom('supabase/functions/_shared/gemini.ts');
   assert.deepEqual(doPrompt, [...SUGGESTED_CATEGORIES]);
 });

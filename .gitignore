@@ -53,3 +53,10 @@ supabase/.branches/
 
 # lock do deno check pontual das Edge Functions (nao usado no deploy)
 deno.lock
+
+# serviço Python (agente)
+agent/.venv/
+agent/.env
+agent/__pycache__/
+agent/**/__pycache__/
+agent/.pytest_cache/
