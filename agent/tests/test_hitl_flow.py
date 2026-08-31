@@ -129,11 +129,15 @@ async def test_fast_path_nao_consome_mensagem_da_cota(grafo):
     assert estado.get("llm_calls", 0) == 0
 
 
-@pytest.mark.asyncio
-async def test_chamadas_de_modelo_somam_no_fan_out():
+def test_chamadas_de_modelo_somam_no_fan_out():
     """Router + dois domínios em paralelo = 3. Reducer errado aqui perderia
-    contagem (o `_replace` das outras chaves manteria só a última)."""
-    import operator
+    contagem (o `_replace` das outras chaves manteria só a última).
+
+    Assere COMPORTAMENTO, não identidade da função: a versão anterior exigia
+    `is operator.add`, e por isso quebrou quando o reducer passou a também zerar
+    entre turnos — uma correção de bug, não uma regressão. Teste que prende a
+    implementação transforma conserto em falha vermelha.
+    """
     import typing
 
     from app.graph.state import AgentState
@@ -141,4 +145,8 @@ async def test_chamadas_de_modelo_somam_no_fan_out():
     # `from __future__ import annotations` deixa a anotação como string:
     # get_type_hints resolve, include_extras preserva o Annotated
     hints = typing.get_type_hints(AgentState, include_extras=True)
-    assert hints["llm_calls"].__metadata__[0] is operator.add
+    soma = hints["llm_calls"].__metadata__[0]
+
+    # router (1) e depois os dois domínios do fan-out (1 + 1) = 3
+    assert soma(soma(0, 1), 1) == 2
+    assert soma(soma(soma(0, 1), 1), 1) == 3

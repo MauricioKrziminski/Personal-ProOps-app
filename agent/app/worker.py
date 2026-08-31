@@ -219,10 +219,17 @@ async def _run_graph(sessao: dict, lote: list[dict], conteudo: dict) -> str:
         "text": conteudo["text"],
         "media": conteudo["media"],
         "raw_texts": conteudo["raw_texts"],
+        # Zerar TUDO é obrigatório, não zelo: o thread do checkpointer é o
+        # mesmo a conversa inteira, então chave não reiniciada vaza para a
+        # mensagem seguinte. `finance_queries` esquecido aqui fez uma consulta
+        # antiga ser re-executada e o agente repetir a resposta anterior.
+        # `tests/test_state_reset.py` quebra o build se sobrar chave nova.
         "results": [],
         "domains": [],
         "finance_actions": [],
+        "finance_queries": [],
         "notes_actions": [],
+        "reply": "",
         "confidence": 1.0,
         "llm_calls": 0,
         "approved": False,

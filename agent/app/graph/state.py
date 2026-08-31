@@ -11,8 +11,27 @@ falha na validação em vez de virar escrita torta no banco.
 
 from __future__ import annotations
 
-import operator
 from typing import Annotated, Any, TypedDict
+
+
+def _soma_no_turno(antigo: int, novo: int) -> int:
+    """Soma dentro do turno; `0` na entrada é RESET, não soma.
+
+    `operator.add` puro estava errado por um motivo que só aparece na segunda
+    mensagem: o checkpointer guarda o estado por `thread_id`, e o thread é o
+    mesmo durante toda a conversa. O worker manda `llm_calls: 0` a cada turno
+    achando que zera, mas o reducer fazia `anterior + 0 = anterior` — medido em
+    staging, a contagem foi 2, 4, 6, 8, 10 em cinco mensagens.
+
+    Isso não é cosmético: `llm_calls > 0` é o que decide gravar em `ai_events`, e
+    `ai_events` é o que a cota do plano CONTA. Acumulando, todo fast-path depois
+    da primeira chamada de modelo (saudação, SIM/NÃO) cobrava mensagem sem ter
+    gasto token.
+
+    Nenhum nó soma 0 — quem não chamou modelo devolve `llm_calls: 0` justamente
+    para dizer "não gastei", e o único 0 que importa é o da entrada do turno.
+    """
+    return novo if not novo else (antigo or 0) + novo
 
 
 def _replace(_antigo: Any, novo: Any) -> Any:
@@ -45,7 +64,7 @@ class AgentState(TypedDict, total=False):
     # notas em paralelo) soma as duas. É o que alimenta `ai_events`, e `ai_events`
     # é o que a cota do plano conta — fast-path que não chamou modelo não pode
     # consumir mensagem do usuário.
-    llm_calls: Annotated[int, operator.add]
+    llm_calls: Annotated[int, _soma_no_turno]
 
     # planos por domínio (chaves distintas: fan-out sem conflito)
     finance_actions: Annotated[list[dict], _replace]
