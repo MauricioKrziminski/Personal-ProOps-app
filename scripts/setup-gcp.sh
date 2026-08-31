@@ -245,9 +245,14 @@ gravar_segredos() {
     # Desativa as anteriores. Versão antiga fica ATIVA e cobrando (US$ 0,06 por
     # versão/mês, 6 grátis) — rodar o script 3 vezes já triplicaria a conta sem
     # que nada mudasse. E versão velha ativa é credencial velha ainda válida.
+    # ⚠️ Ordenar por `~name` era um BUG e ele só aparece na 10ª versão: `name` é
+    # STRING, então "9" > "11" e o script destruía a versão que acabara de criar.
+    # O Cloud Run referencia `:latest`, então a revisão nova subia apontando para
+    # uma versão DESTROYED e nem iniciava — o tráfego ficava na revisão velha e o
+    # deploy "passava" com exit 0. Ordenar por createTime não tem esse problema.
     local destruidas=0
     for v in $(gcloud secrets versions list "$id" --project "$PROJECT_ID" \
-                 --filter='state:ENABLED' --format='value(name)' --sort-by='~name' \
+                 --filter='state:ENABLED' --format='value(name)' --sort-by='~createTime' \
                  2>/dev/null | tail -n +2); do
       gcloud secrets versions destroy "$v" --secret="$id" --project "$PROJECT_ID" \
         --quiet >/dev/null 2>&1 && destruidas=$((destruidas+1))
