@@ -22,7 +22,7 @@ class TestClassificacao:
 
         monkeypatch.setattr(draft, "_classificar", falso)
         r = await draft.interpretar("foi 5000", {"missing": "qual o valor?"})
-        assert r == {"acao": "completar", "amount_cents": 500000}
+        assert r == {"acao": "completar", "slot": "amount", "amount_cents": 500000}
 
     @pytest.mark.asyncio
     async def test_desistir_apaga_o_rascunho(self, monkeypatch):
@@ -68,11 +68,11 @@ class TestMescla:
     def test_valor_entra_na_acao_guardada(self):
         guardado = {"type": "create_installment_purchase", "installments": 12,
                     "description": "mac", "amount_cents": None}
-        assert draft.mesclar(guardado, 500000)["amount_cents"] == 500000
+        assert draft.mesclar(guardado, {"slot": "amount", "amount_cents": 500000})["amount_cents"] == 500000
 
     def test_nao_sobrescreve_o_que_ja_existia(self):
         guardado = {"type": "create_expense", "amount_cents": 100, "description": "x"}
-        assert draft.mesclar(guardado, 999)["amount_cents"] == 100
+        assert draft.mesclar(guardado, {"slot": "amount", "amount_cents": 999})["amount_cents"] == 100
 
 
 class TestLembrete:
@@ -109,3 +109,46 @@ class TestTrocaDeContexto:
         assert len(trecho) <= 60
         assert trecho.endswith("…")
         assert frase.endswith(")")
+
+
+class TestSlotDeCartao:
+    """"nubank" é resposta perfeitamente sensata — só não era número.
+
+    O bug real: o rascunho só sabia esperar VALOR, então "nubank" não tinha onde
+    encaixar, escapava para o roteador global e voltava como "não entendi".
+    """
+
+    @pytest.mark.asyncio
+    async def test_nome_de_cartao_preenche_o_slot(self, monkeypatch):
+        async def falso(texto, pergunta):
+            return "answer"
+
+        monkeypatch.setattr(draft, "_classificar", falso)
+        r = await draft.interpretar("nubank", {"slot": "account", "missing": "qual cartão?"})
+        assert r == {"acao": "completar", "slot": "account", "account": "nubank"}
+
+    @pytest.mark.asyncio
+    async def test_slot_de_valor_continua_exigindo_numero(self, monkeypatch):
+        async def falso(texto, pergunta):
+            return "answer"
+
+        monkeypatch.setattr(draft, "_classificar", falso)
+        assert await draft.interpretar("nubank", {"slot": "amount", "missing": "?"}) is None
+
+    def test_mesclar_preenche_a_conta(self):
+        guardado = {"type": "create_installment_purchase", "amount_cents": 500000,
+                    "installments": 12, "account": None}
+        junto = draft.mesclar(guardado, {"slot": "account", "account": "nubank"})
+        assert junto["account"] == "nubank"
+
+
+class TestCartaoInvalido:
+    def test_lista_os_cartoes_reais_e_oferece_saida(self):
+        msg = draft.cartao_invalido("nubank", ["Itaú", "Inter"])
+        assert "nubank" in msg and "Itaú" in msg and "Inter" in msg
+        assert "cancelar" in msg.lower()
+
+    def test_sem_nenhum_cartao_oferece_criar(self):
+        msg = draft.cartao_invalido("nubank", [])
+        assert "criar" in msg.lower()
+        assert "sem cartão" in msg.lower()

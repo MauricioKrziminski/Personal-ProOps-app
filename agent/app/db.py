@@ -474,6 +474,7 @@ async def save_draft(
     action: dict,
     raw_text: str,
     missing: str,
+    slot: str = "amount",
 ) -> None:
     """Grava (ou substitui) o rascunho da conversa.
 
@@ -483,16 +484,17 @@ async def save_draft(
     await execute(
         """
         insert into public.draft_actions
-          (thread_id, phone, user_id, workspace_id, action, raw_text, missing)
-        values (%s, %s, %s, %s, %s, %s, %s)
+          (thread_id, phone, user_id, workspace_id, action, raw_text, missing, slot)
+        values (%s, %s, %s, %s, %s, %s, %s, %s)
         on conflict (phone) do update
           set action = excluded.action,
               raw_text = excluded.raw_text,
               missing = excluded.missing,
+              slot = excluded.slot,
               expires_at = now() + interval '24 hours',
               created_at = now()
         """,
-        thread_id, phone, user_id, workspace_id, Jsonb(action), raw_text, missing,
+        thread_id, phone, user_id, workspace_id, Jsonb(action), raw_text, missing, slot,
     )
 
 
@@ -515,3 +517,16 @@ async def delete_draft(phone: str) -> None:
 
 async def expire_drafts() -> None:
     await execute("select public.expire_draft_actions()")
+
+
+async def credit_cards(workspace_id) -> list[str]:
+    """Nomes dos cartões ativos — para o erro amigável poder listar os de verdade."""
+    linhas = await fetch(
+        """
+        select name from public.accounts
+        where workspace_id = %s and archived = false and type = 'credit_card'
+        order by name
+        """,
+        workspace_id,
+    )
+    return [l["name"] for l in linhas]

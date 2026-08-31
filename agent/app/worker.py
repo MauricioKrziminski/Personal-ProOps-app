@@ -267,7 +267,33 @@ async def _run_graph(sessao: dict, lote: list[dict], conteudo: dict) -> str | di
             await db.delete_draft(sessao["phone"])
             return "👍 Beleza, esqueci aquele lançamento."
         if decidido and decidido["acao"] == "completar":
-            acao = draft.mesclar(rascunho["action"], decidido["amount_cents"])
+            if decidido.get("slot") == "account":
+                # Valida o cartão ANTES de consumir o rascunho. Falhar aqui e
+                # apagar deixaria o usuário a um dado do fim e obrigado a
+                # repetir a compra inteira — foi essa a queixa.
+                nome = decidido["account"]
+                cartoes = await db.credit_cards(sessao["workspace_id"])
+                if not any(nome.lower() in c.lower() or c.lower() in nome.lower()
+                           for c in cartoes):
+                    return draft.cartao_invalido(nome, cartoes)
+
+            acao = draft.mesclar(rascunho["action"], decidido)
+            # Ainda falta outro slot? Guarda de novo e pergunta o próximo, em vez
+            # de executar pela metade.
+            from app.graph.schemas import FinanceAction
+            from app.domain.required import faltando
+
+            resta = faltando(FinanceAction.model_validate(acao), rascunho["raw_text"])
+            if resta:
+                slot, pergunta = resta
+                await db.save_draft(
+                    thread_id=thread, phone=sessao["phone"],
+                    user_id=UUID(str(sessao["user_id"])),
+                    workspace_id=UUID(str(sessao["workspace_id"])),
+                    action=acao, raw_text=rascunho["raw_text"],
+                    missing=pergunta, slot=slot,
+                )
+                return pergunta
             await db.delete_draft(sessao["phone"])
             # segue o fluxo normal com a ação COMPLETA: as validações de
             # segurança (HITL de valor alto, alvo, propriedade) valem igual
@@ -342,6 +368,7 @@ async def _resposta_do_estado(sessao: dict, estado: dict, thread: str) -> str | 
             action=rascunho["action"],
             raw_text=rascunho["raw_text"],
             missing=rascunho["missing"],
+            slot=rascunho.get("slot", "amount"),
         )
 
     # --- o grafo pausou pedindo confirmação? ---

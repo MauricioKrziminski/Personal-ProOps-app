@@ -69,20 +69,51 @@ async def interpretar(texto: str, rascunho: dict) -> dict | None:
     if decisao != "answer":
         return None
 
+    slot = rascunho.get("slot") or "amount"
+    if slot == "account":
+        # texto é o nome do cartão; quem valida contra o banco é o worker, que
+        # tem o workspace. Aqui só se reconhece que É a resposta.
+        nome = texto.strip()
+        return {"acao": "completar", "slot": "account", "account": nome} if nome else None
+
     valor = parse_valor_em_centavos(texto)
     if valor is None:
         # O modelo achou que é resposta, mas não há número extraível ("foi caro").
         # Completar assim recriaria o "registrar None em 12x" por outra porta.
         return None
-    return {"acao": "completar", "amount_cents": valor}
+    return {"acao": "completar", "slot": "amount", "amount_cents": valor}
 
 
-def mesclar(acao_guardada: dict, amount_cents: int) -> dict:
-    """Põe o valor no rascunho, sem sobrescrever o que já estava preenchido."""
+def mesclar(acao_guardada: dict, decidido: dict) -> dict:
+    """Preenche o slot respondido, sem sobrescrever o que já estava lá."""
     juntado = dict(acao_guardada)
-    if not juntado.get("amount_cents"):
-        juntado["amount_cents"] = amount_cents
+    if decidido.get("slot") == "account":
+        if not juntado.get("account"):
+            juntado["account"] = decidido["account"]
+    elif not juntado.get("amount_cents"):
+        juntado["amount_cents"] = decidido["amount_cents"]
     return juntado
+
+
+def cartao_invalido(nome: str, cartoes: list[str]) -> str:
+    """A mensagem do caminho infeliz. Mantém o rascunho vivo, de propósito.
+
+    Jogar o usuário no fallback genérico aqui apagaria de vista um rascunho que
+    está a UM dado de ficar pronto — e ele teria que repetir a compra inteira.
+    """
+    if not cartoes:
+        return (
+            f"❌ Não achei o cartão *{nome}* — na verdade você ainda não tem "
+            "nenhum cartão cadastrado.\n"
+            "Responde *criar* que eu abro um chamado \"Principal\", *sem cartão* "
+            "para lançar assim mesmo, ou *cancelar* para desistir."
+        )
+    lista = ", ".join(f"*{c}*" for c in cartoes)
+    return (
+        f"❌ O cartão *{nome}* não está cadastrado.\n"
+        f"Os seus são: {lista}.\n"
+        "Digita um deles, ou responde *cancelar* para desistir."
+    )
 
 
 def lembrete(rascunho: dict) -> str:

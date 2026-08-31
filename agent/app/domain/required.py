@@ -50,12 +50,15 @@ def _tem_valor(action: FinanceAction, texto_cru: str) -> bool:
     return parse_valor_em_centavos(texto_cru or "") is not None
 
 
-def faltando(action, texto_cru: str = "") -> str | None:
-    """A pergunta a fazer ao usuário, ou None se a ação está completa.
+def faltando(action, texto_cru: str = "") -> tuple[str, str] | None:
+    """`(slot, pergunta)` do primeiro dado que falta, ou None se está completa.
 
-    Devolve TEXTO para o usuário, não código de erro: quem chama só precisa
-    repassar. É o "Esclarecimento Ativo" — em vez de recusar, o agente pede
+    Devolve TEXTO pronto para o usuário, não código de erro: quem chama só
+    repassa. É o "Esclarecimento Ativo" — em vez de recusar, o agente pede
     exatamente o que falta.
+
+    A ORDEM importa: valor primeiro, cartão depois. Perguntar o cartão de uma
+    compra cujo valor não se sabe é pedir na ordem errada.
     """
     if not isinstance(action, FinanceAction):
         return None
@@ -64,13 +67,23 @@ def faltando(action, texto_cru: str = "") -> str | None:
     if tipo in EXIGEM_VALOR and not _tem_valor(action, texto_cru):
         if tipo is FinanceActionType.CREATE_INSTALLMENT_PURCHASE:
             parcelas = f" em {action.installments}x" if action.installments else ""
-            return (
+            return "amount", (
                 f"💸 Entendi a compra parcelada{parcelas}, mas faltou o valor. "
                 "Quanto foi no total (ou quanto é cada parcela)?"
             )
-        return "💸 Faltou o valor. Quanto foi?"
+        return "amount", "💸 Faltou o valor. Quanto foi?"
 
     if tipo in EXIGEM_IDENTIFICACAO and not (action.description or action.category):
-        return "🤔 Entendi o valor, mas não o que foi. Isso foi com o quê?"
+        return "amount", "🤔 Entendi o valor, mas não o que foi. Isso foi com o quê?"
+
+    # Parcelamento vira fatura, e fatura tem dono: sem cartão o lançamento nasce
+    # solto e o ciclo de fatura (o trigger `set_invoice`) não tem em que se
+    # apoiar. Só para parcelado — compra à vista sem conta continua válida.
+    if (
+        tipo is FinanceActionType.CREATE_INSTALLMENT_PURCHASE
+        and (action.installments or 0) > 1
+        and not action.account
+    ):
+        return "account", "💳 Em qual cartão foi essa compra?"
 
     return None

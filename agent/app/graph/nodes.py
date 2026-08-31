@@ -303,14 +303,15 @@ def _incompletas(state: AgentState, acoes: list) -> dict[int, str]:
     """
     texto = state.get("text", "")
     return {
-        i: pergunta
+        i: faltou
         for i, acao in enumerate(acoes)
-        if (pergunta := faltando(acao, texto)) is not None
+        if (faltou := faltando(acao, texto)) is not None
     }
 
 
 def _esclarecimentos(state: AgentState, acoes: list) -> list[str]:
-    return [*state.get("results", []), *_incompletas(state, acoes).values()]
+    return [*state.get("results", []),
+            *(pergunta for _, pergunta in _incompletas(state, acoes).values())]
 
 
 def _rascunho(state: AgentState, acoes: list) -> dict:
@@ -320,11 +321,12 @@ def _rascunho(state: AgentState, acoes: list) -> dict:
     jeito que duas perguntas abertas tornariam "sim" ambíguo. O grafo só monta o
     objeto — quem grava é o worker, como já faz com `pending_actions`.
     """
-    for i, pergunta in _incompletas(state, acoes).items():
+    for i, (slot, pergunta) in _incompletas(state, acoes).items():
         return {
             "action": acoes[i].model_dump(mode="json"),
             "raw_text": state.get("text", ""),
             "missing": pergunta,
+            "slot": slot,
         }
     return {}
 
