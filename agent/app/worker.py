@@ -27,6 +27,7 @@ from langgraph.types import Command
 from app import db
 from app.config import get_settings
 from app.domain import confirm, draft, matching
+from app.domain.money import cents_to_brl
 from app.security import effective_thread_id, sanitize_untrusted
 from app.services import gemini, groq, telemetry, whatsapp
 
@@ -282,6 +283,19 @@ async def _run_graph(sessao: dict, lote: list[dict], conteudo: dict) -> str | di
                 sessao, uso,
                 "⏰ Essa pergunta já expirou. Me manda de novo o que você quer.",
             )
+        # "700 cada" em 12x é R$ 8.400, não R$ 700. Ponto ÚNICO da multiplicação:
+        # digitar e clicar chegam os dois aqui.
+        decidido = draft.com_total(decidido, rascunho["action"])
+        if decidido and decidido["acao"] == "perguntar_tipo":
+            # o rascunho fica exatamente como está: quem responder por texto
+            # ("700 no total") é reclassificado, e o clique traz o valor no
+            # próprio payload. Nada novo para guardar, nada novo para expirar.
+            return await _fechar(
+                sessao, uso,
+                _pergunta_tipo_valor(
+                    rascunho["id"], decidido["amount_cents"], decidido["installments"]
+                ),
+            )
         if decidido and decidido["acao"] == "descartar":
             await db.delete_draft(sessao["phone"])
             return await _fechar(sessao, uso, "👍 Beleza, esqueci aquele lançamento.")
@@ -431,6 +445,29 @@ async def _cartao_do_rascunho(
     return None, _pergunta_cartao(rascunho["id"], achados or cartoes, corpo)
 
 
+def _pergunta_tipo_valor(draft_id: str, cents: int, parcelas: int) -> dict:
+    """Total ou parcela? A pergunta que evita errar por um fator de 12.
+
+    Os dois números aparecem no CORPO, não no rótulo: botão da Meta tem 20
+    caracteres, e "R$ 12.345,67 no total" já não cabe — truncado, as duas opções
+    ficariam parecidas justamente na parte que as distingue.
+    """
+    total = cents * parcelas
+    corpo = (
+        f"🤔 {cents_to_brl(cents)} é o total da compra ou o valor de cada parcela?\n"
+        f"Se for cada parcela, {parcelas}x dá {cents_to_brl(total)} no total."
+    )
+    return {
+        "ui": "buttons",
+        "body": corpo,
+        "buttons": [
+            (f"{draft.CLICK_PREFIX}{draft_id}:t:{cents}", "É o total"),
+            (f"{draft.CLICK_PREFIX}{draft_id}:p:{cents}", "É cada parcela"),
+        ],
+        "text": f"{corpo}\nResponde *no total* ou *cada parcela*.",
+    }
+
+
 def _pergunta_cartao(draft_id: str, cartoes: list[dict], corpo: str) -> str | dict:
     """A pergunta do cartão como MENU. Mesma divisão de forma que `_pergunta`.
 
@@ -442,6 +479,13 @@ def _pergunta_cartao(draft_id: str, cartoes: list[dict], corpo: str) -> str | di
         return draft.sem_cartoes()
 
     mostrar = cartoes[:9]
+    # A Meta aceita 10 linhas e uma é sempre a saída, então do 10º cartão em
+    # diante ninguém cabe. Truncar em silêncio seria o pior dos mundos: o cartão
+    # existe, não aparece, e o usuário conclui que não está cadastrado. Digitar o
+    # nome continua alcançando TODOS — o casamento roda sobre a lista inteira.
+    sobraram = len(cartoes) - len(mostrar)
+    aviso = f"\n(+{sobraram} que não coube na lista — é só digitar o nome.)" if sobraram else ""
+    corpo = f"{corpo}{aviso}"
     cancelar = f"{draft.CLICK_PREFIX}{draft_id}:no"
     # O fallback pede o NOME, não o número: o rascunho não congela candidatos
     # (`pending_actions` congela porque o resume depende do id), então um número

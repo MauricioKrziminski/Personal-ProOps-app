@@ -12,13 +12,14 @@ confirmação.
 import pytest
 
 from app.domain import draft
+from app.graph.schemas import DraftDecision
 
 
 class TestClassificacao:
     @pytest.mark.asyncio
     async def test_valor_solto_completa_o_rascunho(self, monkeypatch):
         async def falso(texto, pergunta):
-            return "answer", ""
+            return DraftDecision(decision="answer", extracted_value="")
 
         monkeypatch.setattr(draft, "_classificar", falso)
         r = await draft.interpretar("foi 5000", {"missing": "qual o valor?"})
@@ -27,7 +28,7 @@ class TestClassificacao:
     @pytest.mark.asyncio
     async def test_desistir_apaga_o_rascunho(self, monkeypatch):
         async def falso(texto, pergunta):
-            return "discard", ""
+            return DraftDecision(decision="discard", extracted_value="")
 
         monkeypatch.setattr(draft, "_classificar", falso)
         r = await draft.interpretar("esquece o mac", {"missing": "qual o valor?"})
@@ -36,7 +37,7 @@ class TestClassificacao:
     @pytest.mark.asyncio
     async def test_assunto_novo_nao_toca_no_rascunho(self, monkeypatch):
         async def falso(texto, pergunta):
-            return "unrelated", ""
+            return DraftDecision(decision="unrelated", extracted_value="")
 
         monkeypatch.setattr(draft, "_classificar", falso)
         assert await draft.interpretar("anota: comprar café", {"missing": "x"}) is None
@@ -49,7 +50,7 @@ class TestClassificacao:
         exatamente o bug do "registrar None em 12x" voltando por outra porta.
         """
         async def falso(texto, pergunta):
-            return "answer", ""
+            return DraftDecision(decision="answer", extracted_value="")
 
         monkeypatch.setattr(draft, "_classificar", falso)
         assert await draft.interpretar("foi caro", {"missing": "x"}) is None
@@ -121,7 +122,7 @@ class TestSlotDeCartao:
     @pytest.mark.asyncio
     async def test_nome_de_cartao_preenche_o_slot(self, monkeypatch):
         async def falso(texto, pergunta):
-            return "answer", ""
+            return DraftDecision(decision="answer", extracted_value="")
 
         monkeypatch.setattr(draft, "_classificar", falso)
         r = await draft.interpretar("nubank", {"slot": "account", "missing": "qual cartão?"})
@@ -130,7 +131,7 @@ class TestSlotDeCartao:
     @pytest.mark.asyncio
     async def test_slot_de_valor_continua_exigindo_numero(self, monkeypatch):
         async def falso(texto, pergunta):
-            return "answer", ""
+            return DraftDecision(decision="answer", extracted_value="")
 
         monkeypatch.setattr(draft, "_classificar", falso)
         assert await draft.interpretar("nubank", {"slot": "amount", "missing": "?"}) is None
@@ -152,7 +153,7 @@ class TestExtracaoDoNome:
     @pytest.mark.asyncio
     async def test_usa_a_entidade_extraida_e_nao_a_frase(self, monkeypatch):
         async def falso(texto, pergunta):
-            return "answer", "nubank"
+            return DraftDecision(decision="answer", extracted_value="nubank")
 
         monkeypatch.setattr(draft, "_classificar", falso)
         r = await draft.interpretar(
@@ -167,7 +168,7 @@ class TestExtracaoDoNome:
         resposta que já é o nome do cartão."""
 
         async def falso(texto, pergunta):
-            return "answer", ""
+            return DraftDecision(decision="answer", extracted_value="")
 
         monkeypatch.setattr(draft, "_classificar", falso)
         r = await draft.interpretar("nubank", {"slot": "account", "missing": "?"})
@@ -179,7 +180,7 @@ class TestExtracaoDoNome:
         porta que `parse_valor_em_centavos` fechou — ele só aceita UM número."""
 
         async def falso(texto, pergunta):
-            return "answer", "9999"
+            return DraftDecision(decision="answer", extracted_value="9999")
 
         monkeypatch.setattr(draft, "_classificar", falso)
         r = await draft.interpretar("foi 5000", {"slot": "amount", "missing": "?"})
@@ -191,7 +192,7 @@ class TestExtracaoDoNome:
         `ai_events` — e é essa contagem que o paywall mensal usa."""
 
         async def falso(texto, pergunta):
-            return "answer", "nubank"
+            return DraftDecision(decision="answer", extracted_value="nubank")
 
         monkeypatch.setattr(draft, "_classificar", falso)
         uso = {}
@@ -233,3 +234,95 @@ class TestSemCartoes:
         assert "nubank" in msg
         assert "cancelar" in msg.lower()
         assert "sem cartão" not in msg.lower()
+
+
+class TestSemanticaDoValor:
+    """"700 cada" numa compra de 12x é R$ 8.400, não R$ 700.
+
+    O bug do teste ponta a ponta de 31/08/2026: o "cada" era ignorado, o agente
+    gravava R$ 700 como TOTAL e a compra virava 12 parcelas de R$ 58,33 —
+    errado por um fator de 12, e em silêncio.
+
+    A divisão de trabalho não mudou: o modelo diz o que o número SIGNIFICA, o
+    `parse_valor_em_centavos` diz QUANTO ele é.
+    """
+
+    RASCUNHO_12X = {
+        "slot": "amount",
+        "missing": "faltou o valor",
+        "action": {"type": "create_installment_purchase", "installments": 12},
+    }
+
+    def _modelo(self, monkeypatch, tipo):
+        async def falso(texto, pergunta):
+            return DraftDecision(decision="answer", amount_type=tipo)
+
+        monkeypatch.setattr(draft, "_classificar", falso)
+
+    @pytest.mark.asyncio
+    async def test_cada_parcela_vira_o_total(self, monkeypatch):
+        self._modelo(monkeypatch, "per_installment")
+        r = await draft.interpretar("700 cada", self.RASCUNHO_12X)
+        assert r["amount_cents"] == 70000 and r["por_parcela"] is True
+        # a multiplicação é do `com_total`, que é o ponto único dos dois caminhos
+        assert draft.com_total(r, self.RASCUNHO_12X["action"])["amount_cents"] == 840000
+
+    @pytest.mark.asyncio
+    async def test_total_explicito_nao_multiplica(self, monkeypatch):
+        self._modelo(monkeypatch, "total")
+        r = await draft.interpretar("8400 no total", self.RASCUNHO_12X)
+        assert draft.com_total(r, self.RASCUNHO_12X["action"])["amount_cents"] == 840000
+
+    @pytest.mark.asyncio
+    async def test_numero_solto_PERGUNTA_em_vez_de_chutar(self, monkeypatch):
+        """R$ 700 ou R$ 8.400 são contas muito diferentes. Perguntar custa uma
+        mensagem; errar custa o mês do usuário."""
+        self._modelo(monkeypatch, "ambiguous")
+        r = await draft.interpretar("700", self.RASCUNHO_12X)
+        assert r == {"acao": "perguntar_tipo", "amount_cents": 70000, "installments": 12}
+
+    @pytest.mark.asyncio
+    async def test_sem_parcelamento_nao_ha_ambiguidade(self, monkeypatch):
+        """"gastei 700" à vista não tem segunda leitura — perguntar seria ruído."""
+        self._modelo(monkeypatch, "ambiguous")
+        r = await draft.interpretar(
+            "700", {"slot": "amount", "missing": "?", "action": {"type": "create_expense"}}
+        )
+        assert r == {"acao": "completar", "slot": "amount", "amount_cents": 70000}
+
+    @pytest.mark.asyncio
+    async def test_cada_sem_parcelamento_nao_multiplica(self, monkeypatch):
+        """"cada" numa compra à vista não quer dizer nada. Multiplicar por 0 ou
+        por 1 seria pior que ignorar."""
+        self._modelo(monkeypatch, "per_installment")
+        acao = {"type": "create_expense"}
+        r = await draft.interpretar("700 cada", {"slot": "amount", "missing": "?", "action": acao})
+        assert draft.com_total(r, acao)["amount_cents"] == 70000
+
+    @pytest.mark.asyncio
+    async def test_o_numero_continua_saindo_do_parse(self, monkeypatch):
+        """Mesmo com o modelo qualificando, ele nunca fornece o dígito."""
+        self._modelo(monkeypatch, "total")
+        assert await draft.interpretar("foi caro", self.RASCUNHO_12X) is None
+
+
+class TestCliqueDoTipoDeValor:
+    """O valor viaja no payload; nada novo é gravado no banco."""
+
+    ACAO = {"installments": 12}
+
+    def test_total_nao_multiplica(self):
+        d = draft.parse_slot_click("ds:d1:t:70000", "d1")
+        assert draft.com_total(d, self.ACAO)["amount_cents"] == 70000
+
+    def test_cada_parcela_multiplica(self):
+        d = draft.parse_slot_click("ds:d1:p:70000", "d1")
+        assert draft.com_total(d, self.ACAO)["amount_cents"] == 840000
+
+    def test_payload_adulterado_nao_vira_dinheiro(self):
+        """Quem devolve o payload é o cliente do usuário. Número fora da faixa é
+        adulteração ou bug nosso, e nos dois casos não pode virar lançamento."""
+        assert draft.parse_slot_click("ds:d1:p:abc", "d1") is None
+        assert draft.parse_slot_click("ds:d1:t:0", "d1") is None
+        assert draft.parse_slot_click("ds:d1:t:-5", "d1") is None
+        assert draft.parse_slot_click("ds:d1:t:999999999999", "d1") is None

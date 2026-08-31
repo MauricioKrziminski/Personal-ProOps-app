@@ -431,3 +431,61 @@ class TestCustoDoTurno:
         )
         assert r == "apagado"
         assert eventos == []
+
+
+class TestPerguntaDoTipoDeValor:
+    """A ambiguidade vira botão, e o valor viaja no payload."""
+
+    def test_os_dois_numeros_aparecem_no_corpo(self):
+        """Botão da Meta tem 20 caracteres: "R$ 12.345,67 no total" já não cabe,
+        e truncado as duas opções ficariam parecidas justamente na parte que as
+        distingue. Os números vão no corpo, que tem 1024."""
+        spec = worker._pergunta_tipo_valor("d1", 70000, 12)
+        assert "R$ 700,00" in spec["body"] and "R$ 8.400,00" in spec["body"]
+        assert [b[0] for b in spec["buttons"]] == ["ds:d1:t:70000", "ds:d1:p:70000"]
+        assert all(len(b[1]) <= 20 for b in spec["buttons"])
+
+    @pytest.mark.asyncio
+    async def test_clique_em_cada_parcela_grava_o_total(self, monkeypatch):
+        async def nada(*a, **k):
+            return None
+
+        async def rascunho(phone):
+            return {**RASCUNHO, "slot": "amount",
+                    "action": {**RASCUNHO["action"], "amount_cents": None, "account": "Itaú"}}
+
+        visto = {}
+
+        async def rodar(sessao, lote, conteudo, acoes, thread, config, uso=None):
+            visto["acoes"] = acoes
+            return "feito"
+
+        for nome in ("expire_drafts", "expire_pending", "open_pending", "delete_draft",
+                     "record_ai_event"):
+            monkeypatch.setattr(db, nome, nada)
+        monkeypatch.setattr(db, "open_draft", rascunho)
+        monkeypatch.setattr(worker, "_rodar_com_acoes", rodar)
+
+        await worker._run_graph(
+            SESSAO, [{"wa_message_id": "w1"}],
+            {"clicked_id": "ds:d1:p:70000", "text": "É cada parcela"},
+        )
+        # 700 x 12 = 8.400, não 700
+        assert visto["acoes"][0]["amount_cents"] == 840000
+
+
+class TestMuitosCartoes:
+    def test_cartao_que_nao_coube_nao_some_em_silencio(self):
+        """O cartão existe, não aparece, e o usuário conclui que não está
+        cadastrado — o pior dos mundos. Digitar o nome alcança todos, porque o
+        casamento roda sobre a lista inteira."""
+        muitos = [{"id": f"c{i}", "name": f"Cartão {i}"} for i in range(14)]
+        spec = worker._pergunta_cartao("d1", muitos, "Qual cartão?")
+        assert len(spec["rows"]) == 10  # 9 + a saída, o limite da Meta
+        assert "+5" in spec["body"]
+        assert "+5" in spec["text"]
+
+    def test_lista_que_cabe_nao_ganha_aviso(self):
+        poucos = [{"id": f"c{i}", "name": f"Cartão {i}"} for i in range(4)]
+        spec = worker._pergunta_cartao("d1", poucos, "Qual cartão?")
+        assert "+" not in spec["body"]

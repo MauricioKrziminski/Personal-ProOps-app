@@ -222,3 +222,14 @@ class DraftDecision(BaseModel):
             "limpo, sem o resto da frase. Vazio se não houver."
         ),
     )
+    amount_type: Literal["total", "per_installment", "ambiguous", "none"] = Field(
+        default="none",
+        description=(
+            "O que o número da mensagem SIGNIFICA numa compra parcelada. "
+            "per_installment quando ele disser que é o valor de cada parcela "
+            "('700 cada', 'por mês', 'a parcela', 'cada uma sai'); "
+            "total quando disser que é o preço cheio ('no total', 'ao todo', "
+            "'saiu por'); ambiguous quando for um número solto e as duas "
+            "leituras couberem; none quando não houver número."
+        ),
+    )

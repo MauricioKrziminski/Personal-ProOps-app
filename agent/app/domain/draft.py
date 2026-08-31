@@ -41,34 +41,49 @@ Quando for `answer` e a pergunta for sobre CONTA ou CARTÃO, preencha também
 
 Não invente nome: se ele não citou nenhum, deixe `extracted_value` vazio.
 
-Na dúvida, responda unrelated: mexer no rascunho errado é pior que não mexer."""
+Quando for `answer` e houver um NÚMERO, diga em `amount_type` o que ele significa
+(o número em si não é seu — não repita nem calcule nada):
+
+- "700 cada", "700 por mês", "700 a parcela"  -> per_installment
+- "8400 no total", "saiu 8400", "ao todo"     -> total
+- "700" (número solto, cabem as duas leituras) -> ambiguous
+
+Na dúvida entre total e per_installment, responda ambiguous: perguntar custa uma
+mensagem, e registrar 12x errado custa o mês inteiro do usuário.
+
+Na dúvida entre answer/discard/unrelated, responda unrelated: mexer no rascunho
+errado é pior que não mexer."""
 
 
-async def _classificar(texto: str, pergunta: str) -> tuple[str, str]:
-    """`(decisão, entidade extraída)` numa chamada só.
+async def _classificar(texto: str, pergunta: str):
+    """A `DraftDecision` inteira, numa chamada só.
 
-    Classificar e extrair juntos não é economia de linha, é de cota: separar
-    dobraria a latência de toda resposta de slot e comeria duas das 500
-    requisições diárias do Flash-Lite para chegar no mesmo resultado.
+    Classificar, extrair a entidade e qualificar o número juntos não é economia
+    de linha, é de cota: cada campo separado dobraria a latência de toda resposta
+    de slot e comeria mais uma das 500 requisições diárias do Flash-Lite para
+    chegar no mesmo resultado.
+
+    Devolve o objeto, e não uma tupla, porque o schema já cresceu duas vezes —
+    tupla obriga toda chamadora e todo dublê a mudar de forma junto.
     """
     from app.graph.schemas import DraftDecision
     from app.security import wrap_untrusted
     from app.services.gemini import structured
 
     modelo = structured(DraftDecision)
-    resposta = await modelo.ainvoke(
+    return await modelo.ainvoke(
         [
             ("system", _PROMPT.format(pergunta=pergunta or "o valor")),
             ("human", wrap_untrusted("user_input", texto)),
         ]
     )
-    return resposta.decision, (resposta.extracted_value or "").strip()
 
 
 async def interpretar(texto: str, rascunho: dict, uso: dict | None = None) -> dict | None:
     """O que fazer com o rascunho, ou None para deixá-lo intacto.
 
-    `{"acao": "completar", "amount_cents": N}` · `{"acao": "descartar"}` · None.
+    `{"acao": "completar", ...}` · `{"acao": "descartar"}` ·
+    `{"acao": "perguntar_tipo", ...}` · None.
 
     `uso` é o contador de chamadas de modelo do turno: este fast-path roda FORA
     do grafo, então ninguém somaria por ele — e é a contagem de `ai_events` que
@@ -77,7 +92,7 @@ async def interpretar(texto: str, rascunho: dict, uso: dict | None = None) -> di
     if not texto or not texto.strip():
         return None
     try:
-        decisao, entidade = await _classificar(texto, rascunho.get("missing", ""))
+        decisao = await _classificar(texto, rascunho.get("missing", ""))
     except Exception:  # noqa: BLE001
         # falha fechada: sem classificação, o rascunho fica onde está
         log.warning("classificador de rascunho falhou — mantendo o rascunho", exc_info=True)
@@ -85,9 +100,9 @@ async def interpretar(texto: str, rascunho: dict, uso: dict | None = None) -> di
     if uso is not None:
         uso["llm_calls"] = uso.get("llm_calls", 0) + 1
 
-    if decisao == "discard":
+    if decisao.decision == "discard":
         return {"acao": "descartar"}
-    if decisao != "answer":
+    if decisao.decision != "answer":
         return None
 
     slot = rascunho.get("slot") or "amount"
@@ -96,18 +111,61 @@ async def interpretar(texto: str, rascunho: dict, uso: dict | None = None) -> di
         # fazia "acabei de criar um pelo app, chama nubank cartao" virar o nome
         # do cartão. O texto cru fica só como rede quando o modelo não extraiu.
         # Quem casa contra o banco é o worker, que tem o workspace.
-        nome = entidade or texto.strip()
+        nome = (decisao.extracted_value or "").strip() or texto.strip()
         return {"acao": "completar", "slot": "account", "account": nome} if nome else None
 
-    # O NÚMERO continua sendo determinístico, sempre. Deixar o modelo escolher o
-    # valor reabriria a porta que o `parse` fechou: ele só aceita UM número
-    # plausível, e chutar entre dois é como o valor errado entra no banco.
+    # O NÚMERO continua sendo determinístico, sempre. O modelo diz o que ele
+    # SIGNIFICA, nunca quanto ele é — medido em 31/08/2026, `parse` acerta
+    # inclusive "12x de 700", então dar o número ao modelo só somaria um jeito
+    # novo de gravar valor errado.
     valor = parse_valor_em_centavos(texto)
     if valor is None:
         # O modelo achou que é resposta, mas não há número extraível ("foi caro").
         # Completar assim recriaria o "registrar None em 12x" por outra porta.
         return None
+
+    parcelas = _parcelas(rascunho.get("action") or {})
+    if parcelas >= 2:
+        if decisao.amount_type == "per_installment":
+            return {"acao": "completar", "slot": "amount",
+                    "amount_cents": valor, "por_parcela": True}
+        if decisao.amount_type == "ambiguous":
+            # "700" numa compra de 12x são duas contas MUITO diferentes
+            # (R$ 700 ou R$ 8.400). Perguntar custa uma mensagem; errar custa o
+            # mês inteiro do usuário.
+            return {"acao": "perguntar_tipo", "amount_cents": valor, "installments": parcelas}
     return {"acao": "completar", "slot": "amount", "amount_cents": valor}
+
+
+def _parcelas(acao: dict) -> int:
+    try:
+        return int(acao.get("installments") or 0)
+    except (TypeError, ValueError):
+        return 0
+
+
+def com_total(decidido: dict | None, acao: dict) -> dict | None:
+    """Valor POR PARCELA vira TOTAL. Ponto único, e é por isso que ele existe.
+
+    `create_installment_plan` recebe o total e divide (o resto vai na última
+    parcela). Quem responde "700 cada" numa compra de 12x está dizendo
+    R$ 8.400 — e era isso que o agente gravava como R$ 700, virando parcelas de
+    R$ 58,33.
+
+    A multiplicação não mora em `interpretar` nem no `parse_slot_click` porque
+    os DOIS caminhos (digitar e clicar) precisam dela: em dois lugares, um dia
+    um deles deixa de multiplicar.
+    """
+    if not decidido or not decidido.get("por_parcela"):
+        return decidido
+    parcelas = _parcelas(acao)
+    if parcelas < 2:
+        # sem parcelamento, "cada" não quer dizer nada — o valor é o valor
+        return {k: v for k, v in decidido.items() if k != "por_parcela"}
+    return {
+        **{k: v for k, v in decidido.items() if k != "por_parcela"},
+        "amount_cents": decidido["amount_cents"] * parcelas,
+    }
 
 
 def mesclar(acao_guardada: dict, decidido: dict) -> dict:
@@ -155,6 +213,24 @@ def sem_cartoes(nome: str = "") -> str:
 CLICK_PREFIX = "ds:"
 _CANCELAR = "no"
 _ESCOLHA = "c:"
+# O valor viaja DENTRO do payload (`t:70000`), em vez de virar estado no banco:
+# `draft_actions.slot` só admite 'amount' e 'account' (check da 0045), e guardar
+# um qualificador dentro de `action` sujaria o dict que depois passa por
+# `FinanceAction.model_validate`. Sem estado novo, não há estado para expirar.
+_TOTAL = "t:"
+_POR_PARCELA = "p:"
+
+# Teto de sanidade do que volta de um clique. O payload é escrito por nós, mas
+# quem devolve é o cliente do usuário — número fora da faixa é payload adulterado
+# ou bug nosso, e nos dois casos não pode virar dinheiro.
+_MAX_CENTS = 10**11
+
+
+def _cents_do_clique(bruto: str) -> int | None:
+    if not bruto.isdigit():
+        return None
+    valor = int(bruto)
+    return valor if 0 < valor <= _MAX_CENTS else None
 
 
 def parse_slot_click(clicked_id: str, draft_id: str) -> dict | None:
@@ -178,6 +254,14 @@ def parse_slot_click(clicked_id: str, draft_id: str) -> dict | None:
     if sufixo.startswith(_ESCOLHA):
         escolhido = sufixo[len(_ESCOLHA):]
         return {"acao": "completar", "slot": "account", "account_id": escolhido} if escolhido else None
+    for marca, por_parcela in ((_TOTAL, False), (_POR_PARCELA, True)):
+        if sufixo.startswith(marca):
+            valor = _cents_do_clique(sufixo[len(marca):])
+            if valor is None:
+                return None
+            decidido = {"acao": "completar", "slot": "amount", "amount_cents": valor}
+            # `com_total` faz a multiplicação, aqui e no caminho digitado
+            return {**decidido, "por_parcela": True} if por_parcela else decidido
     return None
 
 

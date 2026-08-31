@@ -602,6 +602,38 @@ num checkpoint que nenhum resume alcança.
 `scripts/fake_meta.py --click "<id>"` manda um `list_reply` assinado — sem ele
 nenhum clique era testável localmente, nem os botões de confirmação.
 
+### Semântica do valor (31/08/2026)
+
+"700 cada" numa compra de 12x era gravado como R$ 700 no TOTAL — 12 parcelas de
+R$ 58,33, errado por um fator de 12 e em silêncio. `DraftDecision.amount_type`
+(`total` | `per_installment` | `ambiguous` | `none`) resolve isso **sem dar o
+número ao modelo**: ele diz o que o valor SIGNIFICA, `parse_valor_em_centavos`
+diz quanto ele é. Medido: o parse acerta os 8 casos testados, inclusive
+"12x de 700" — dar o dígito ao modelo só somaria um jeito novo de errar dinheiro,
+e `float` para dinheiro é proibido no projeto.
+
+`draft.com_total` é o **ponto único** da multiplicação (por parcela → total, que
+é o que `create_installment_plan` espera). Não mora em `interpretar` nem em
+`parse_slot_click` porque os dois caminhos — digitar e clicar — precisam dela; em
+dois lugares, um dia um deles deixa de multiplicar. Sem parcelamento (`< 2`),
+"cada" não quer dizer nada e o valor passa intacto.
+
+**Número solto pergunta**, com botões `ds:<id>:t:<cents>` e `ds:<id>:p:<cents>`.
+O valor viaja no PAYLOAD: `draft_actions.slot` só admite `amount`/`account` (check
+da 0045), então um qualificador viraria migration, e guardá-lo dentro de `action`
+sujaria o dict que depois passa por `FinanceAction.model_validate`. Sem estado
+novo, não há estado para expirar. O que volta de um clique é validado como
+dinheiro (dígitos, faixa) antes de virar lançamento — quem devolve o payload é o
+cliente do usuário.
+
+Rede de segurança de graça: 700 × 12 = R$ 8.400 cruza o `HITL_AMOUNT_THRESHOLD`,
+então mesmo uma classificação errada é confirmada antes de escrever.
+
+**Cartão que não cabe na lista não some.** A Meta aceita 10 linhas e uma é a
+saída, então do 10º cartão em diante ninguém apareceria — e o usuário concluiria
+que o cartão não está cadastrado. O menu avisa "+N que não coube"; digitar o nome
+alcança todos, porque o casamento roda sobre a lista inteira.
+
 **Custo do turno:** os fast-paths que classificam TEXTO (resposta de rascunho,
 SIM/NÃO digitado) passaram a gravar em `ai_events` — eles chamam o Gemini desde
 que o SIM/NÃO deixou de ser regex, e não estavam sendo contados, então o paywall

@@ -121,7 +121,7 @@ async def test_classificar_de_rascunho_monta_a_chamada_de_verdade(monkeypatch):
     falso = _ModeloFalso("answer")
     monkeypatch.setattr(gemini, "structured", lambda schema: falso)
 
-    assert await draft._classificar("foi 5000", "qual o valor?") == ("answer", "")
+    assert (await draft._classificar("foi 5000", "qual o valor?")).decision == "answer"
     assert "<user_input>" in falso.mensagens[1][1]
 
 
@@ -136,8 +136,9 @@ async def test_classificar_de_rascunho_extrai_na_MESMA_chamada(monkeypatch):
     falso = _ModeloFalso("answer", extracted_value="nubank")
     monkeypatch.setattr(gemini, "structured", lambda schema: falso)
 
-    assert await draft._classificar(
+    decisao = await draft._classificar(
         "acabei de criar um pelo app, chama nubank cartao", "qual cartão?"
-    ) == ("answer", "nubank")
+    )
+    assert (decisao.decision, decisao.extracted_value) == ("answer", "nubank")
     # uma chamada, não duas
     assert len(falso.mensagens) == 2
