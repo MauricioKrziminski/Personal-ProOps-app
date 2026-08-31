@@ -525,6 +525,30 @@ async def expire_drafts() -> None:
     await execute("select public.expire_draft_actions()")
 
 
+# Ciclo assumido quando o cartão nasce pelo WhatsApp. NÃO é enfeite: o trigger
+# `set_invoice` (0013) só associa fatura quando `closing_day` e `due_day` existem
+# — com os dois nulos a compra ficaria fora de QUALQUER fatura, em silêncio, que
+# é exatamente o estado que a regra "cartão obrigatório em parcelado" existe para
+# impedir. A suposição é dita ao usuário na confirmação, porque mudar os dias
+# depois NÃO reprocessa lançamento já gravado.
+CARTAO_FECHAMENTO_PADRAO = 1
+CARTAO_VENCIMENTO_PADRAO = 10
+
+
+async def create_credit_card(*, workspace_id, user_id, name: str) -> dict[str, Any] | None:
+    """Cartão novo, criado no meio da conversa. Devolve a linha (id + name)."""
+    return await fetch_one(
+        """
+        insert into public.accounts
+          (workspace_id, user_id, name, type, closing_day, due_day)
+        values (%s, %s, %s, 'credit_card', %s, %s)
+        returning id, name, type
+        """,
+        workspace_id, user_id, name,
+        CARTAO_FECHAMENTO_PADRAO, CARTAO_VENCIMENTO_PADRAO,
+    )
+
+
 async def accounts(workspace_id, *, only_cards: bool = False) -> list[dict[str, Any]]:
     """Contas ativas do workspace: `id`, `name`, `type`.
 

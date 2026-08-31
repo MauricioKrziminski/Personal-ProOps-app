@@ -219,6 +219,23 @@ _ESCOLHA = "c:"
 # `FinanceAction.model_validate`. Sem estado novo, não há estado para expirar.
 _TOTAL = "t:"
 _POR_PARCELA = "p:"
+_CRIAR_CARTAO = "create_card:"
+_OUTRO_CARTAO = "retry_card"
+
+# `accounts.name` não tem limite no banco, mas o id do botão da Meta tem 256
+# caracteres e o nome viaja DENTRO dele. Cortar aqui é melhor que o envio
+# falhar em silêncio e a pergunta não chegar.
+MAX_NOME_CARTAO = 40
+
+
+def nome_de_cartao(bruto: str | None) -> str:
+    """O nome que pode virar cartão, ou "" se não der.
+
+    Vem da extração do modelo, então passa por corte e limpeza antes de virar
+    linha no banco E antes de entrar no payload de um botão.
+    """
+    limpo = " ".join((bruto or "").split())[:MAX_NOME_CARTAO].strip()
+    return limpo
 
 # Teto de sanidade do que volta de um clique. O payload é escrito por nós, mas
 # quem devolve é o cliente do usuário — número fora da faixa é payload adulterado
@@ -254,6 +271,11 @@ def parse_slot_click(clicked_id: str, draft_id: str) -> dict | None:
     if sufixo.startswith(_ESCOLHA):
         escolhido = sufixo[len(_ESCOLHA):]
         return {"acao": "completar", "slot": "account", "account_id": escolhido} if escolhido else None
+    if sufixo == _OUTRO_CARTAO:
+        return {"acao": "escolher_cartao"}
+    if sufixo.startswith(_CRIAR_CARTAO):
+        nome = nome_de_cartao(sufixo[len(_CRIAR_CARTAO):])
+        return {"acao": "criar_cartao", "name": nome} if nome else None
     for marca, por_parcela in ((_TOTAL, False), (_POR_PARCELA, True)):
         if sufixo.startswith(marca):
             valor = _cents_do_clique(sufixo[len(marca):])

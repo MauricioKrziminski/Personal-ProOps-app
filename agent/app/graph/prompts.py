@@ -70,6 +70,9 @@ Tipos:
   account = origem, counterparty_account = destino.
 - create_installment_purchase: 2 ou mais parcelas. amount_cents = valor TOTAL
   (se o usuário disser o valor DA PARCELA, multiplique), installments = nº.
+  current_installment = em qual parcela ele JÁ ESTÁ, quando a compra é antiga:
+  "tô na 4ª parcela de 10" -> installments 10, current_installment 4.
+  Compra feita agora deixa current_installment vazio.
 - pay_invoice: pagamento da fatura do cartão. NÃO use para compras no cartão.
 - mark_paid: baixa numa conta que JÁ estava prevista ("paguei a luz").
 - set_rule: "sempre que eu falar X, põe em Y". target_ref = X, category = Y.

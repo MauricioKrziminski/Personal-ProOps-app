@@ -77,6 +77,13 @@ class FinanceAction(BaseModel):
         None, description="Conta destino (transferência, pagamento de fatura)."
     )
     installments: int | None = Field(None, description="Número de parcelas.")
+    current_installment: int | None = Field(
+        None,
+        description=(
+            "Em qual parcela ele JÁ ESTÁ, quando a compra é antiga "
+            "('tô na 4ª de 10' -> 4). Vazio se a compra é de agora."
+        ),
+    )
     recurrence: str | None = Field(None, description="RRULE, ex.: FREQ=MONTHLY;BYMONTHDAY=5.")
     new_amount_cents: int | None = Field(None, description="Valor CORRIGIDO.")
     new_category: str | None = Field(None, description="Categoria CORRIGIDA.")

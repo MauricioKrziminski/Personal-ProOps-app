@@ -634,6 +634,44 @@ saída, então do 10º cartão em diante ninguém apareceria — e o usuário co
 que o cartão não está cadastrado. O menu avisa "+N que não coube"; digitar o nome
 alcança todos, porque o casamento roda sobre a lista inteira.
 
+### Compra que começou no passado (31/08/2026)
+
+"Estou na 4ª parcela de 10" virava uma compra de HOJE em 10x: as dez parcelas no
+futuro, três meses de histórico sumindo e a projeção de caixa carregando dívida
+já paga.
+
+A correção **não é regra nova** — é a regra que já estava no banco. A `0013` gera
+cada parcela em `add_months(occurred_at, i-1)` e marca `cleared` toda data que não
+é futura (`0013:269,278`). Faltava só recuar a data da PRIMEIRA parcela em
+`(current_installment - 1)` meses. Com isso, 1..3 nascem pagas, a 4ª cai no mês
+corrente e 5..10 ficam pendentes, com o `set_invoice` distribuindo cada uma na
+fatura certa. Zero SQL novo, zero cálculo duplicado em Python.
+
+`dates.add_months` espelha `private.add_months` de propósito: as duas pontas
+precisam concordar sobre em que MÊS cada parcela cai. O dia pode driftar quando
+clampa (31/05 → -3m → 28/02 → +3m → 28/05); o mês, nunca — e é o mês que decide a
+fatura.
+
+⚠️ **`current_installment` gastou a última vaga de `FinanceAction`.** Medido:
+13×14 = 182 hoje, 14×14 = **196** com ele, e 15×14 = 210 estouraria o teto de 198.
+`total_installments` NÃO entrou porque `installments` já é isso. Campo novo aqui
+agora exige tirar outro.
+
+### Cartão criado no meio da compra
+
+Cartão que não existe deixou de ser beco sem saída ("cadastra no app e me fala o
+nome" — o usuário saía, cadastrava, voltava e repetia a compra inteira). Agora vem
+`[Sim, cadastrar]` / `[Escolher outro]` / `[Cancelar]`, com o nome dentro do
+payload (`ds:<id>:create_card:<nome>`), cortado em 40 chars porque o id do botão
+da Meta tem 256.
+
+**O cartão nasce com fechamento dia 1 e vencimento dia 10, e isso é DITO na
+confirmação.** Não é enfeite: `set_invoice` só associa fatura quando os dois dias
+existem, então um cartão com eles nulos deixaria a compra fora de QUALQUER fatura,
+em silêncio — o estado que a regra "cartão obrigatório em parcelado" existe para
+impedir. E como mudar os dias depois **não** reprocessa lançamento já gravado, o
+usuário precisa saber agora em que ciclo a compra dele entrou.
+
 **Custo do turno:** os fast-paths que classificam TEXTO (resposta de rascunho,
 SIM/NÃO digitado) passaram a gravar em `ai_events` — eles chamam o Gemini desde
 que o SIM/NÃO deixou de ser regex, e não estavam sendo contados, então o paywall

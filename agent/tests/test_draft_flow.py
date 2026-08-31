@@ -150,17 +150,24 @@ class TestCartaoDoRascunho:
         ]
 
     @pytest.mark.asyncio
-    async def test_cartao_inexistente_mostra_os_reais_e_mantem_o_rascunho(self):
+    async def test_cartao_inexistente_OFERECE_CADASTRO(self):
+        """Era um beco: listava os cartões existentes e mandava cadastrar no app.
+        Agora o cadastro acontece sem sair da compra."""
         decidido, resposta = await worker._cartao_do_rascunho(
             SESSAO, RASCUNHO,
             {"acao": "completar", "slot": "account", "account": "banco do brasil"},
         )
         assert decidido is None
         assert "banco do brasil" in resposta["body"]
-        assert "Itaú" in resposta["text"]
+        ids = [b[0] for b in resposta["buttons"]]
+        assert ids[0] == "ds:d1:create_card:banco do brasil"
+        assert "ds:d1:retry_card" in ids  # há outros cartões para escolher
 
     @pytest.mark.asyncio
-    async def test_sem_cartao_nenhum_vira_texto(self, monkeypatch):
+    async def test_sem_cartao_nenhum_tambem_oferece_cadastro(self, monkeypatch):
+        """O caso mais duro: nenhum cartão existe. Sem a oferta, o usuário
+        precisaria abrir o app e recomeçar a compra."""
+
         async def vazio(workspace_id, *, only_cards=False):
             return []
 
@@ -169,7 +176,9 @@ class TestCartaoDoRascunho:
             SESSAO, RASCUNHO, {"acao": "completar", "slot": "account", "account": "nubank"}
         )
         assert decidido is None
-        assert isinstance(resposta, str)
+        ids = [b[0] for b in resposta["buttons"]]
+        # sem outros cartões, "escolher outro" não faz sentido e não aparece
+        assert ids == ["ds:d1:create_card:nubank", "ds:d1:no"]
 
 
 class TestRoteamentoDoClique:
@@ -489,3 +498,75 @@ class TestMuitosCartoes:
         poucos = [{"id": f"c{i}", "name": f"Cartão {i}"} for i in range(4)]
         spec = worker._pergunta_cartao("d1", poucos, "Qual cartão?")
         assert "+" not in spec["body"]
+
+
+class TestCadastroDeCartaoNaHora:
+    """Cartão que não existe deixou de ser beco sem saída.
+
+    Antes: "cadastra no app e me fala o nome" — o usuário saía do WhatsApp,
+    cadastrava, voltava e repetia a compra inteira.
+    """
+
+    @pytest.fixture(autouse=True)
+    def _banco(self, monkeypatch):
+        self.criados = []
+
+        async def contas(workspace_id, *, only_cards=False):
+            return CARTOES
+
+        async def criar(*, workspace_id, user_id, name):
+            self.criados.append(name)
+            return {"id": "novo", "name": name, "type": "credit_card"}
+
+        monkeypatch.setattr(db, "accounts", contas)
+        monkeypatch.setattr(db, "create_credit_card", criar)
+
+    @pytest.mark.asyncio
+    async def test_clique_cria_e_devolve_o_nome_do_BANCO(self):
+        decidido, resposta = await worker._cartao_do_rascunho(
+            SESSAO, RASCUNHO, {"acao": "criar_cartao", "name": "Banco do Brasil"}
+        )
+        assert resposta is None
+        assert self.criados == ["Banco do Brasil"]
+        # o nome que segue é o que o banco gravou, não o que o usuário digitou
+        assert decidido["account"] == "Banco do Brasil"
+        assert decidido["cartao_criado"] == "Banco do Brasil"
+
+    @pytest.mark.asyncio
+    async def test_escolher_outro_volta_para_a_lista(self):
+        decidido, resposta = await worker._cartao_do_rascunho(
+            SESSAO, RASCUNHO, {"acao": "escolher_cartao"}
+        )
+        assert decidido is None
+        assert [b[1] for b in resposta["buttons"]] == ["Itaú", "Nubank Cartão", "Cancelar"]
+
+    @pytest.mark.asyncio
+    async def test_falha_ao_criar_nao_derruba_a_conversa(self, monkeypatch):
+        async def falhou(*, workspace_id, user_id, name):
+            return None
+
+        monkeypatch.setattr(db, "create_credit_card", falhou)
+        decidido, resposta = await worker._cartao_do_rascunho(
+            SESSAO, RASCUNHO, {"acao": "criar_cartao", "name": "Inter"}
+        )
+        assert decidido is None
+        assert isinstance(resposta, str) and "tenta de novo" in resposta.lower()
+
+    def test_o_ciclo_assumido_e_DITO_ao_usuario(self):
+        """`set_invoice` precisa de fechamento e vencimento, e mudar os dias
+        depois não reprocessa lançamento já gravado — então a suposição não pode
+        ficar muda."""
+        texto = worker._com_aviso_de_cartao("🧾 Parcelado: R$ 8.400,00", "Nubank")
+        assert "Criei o cartão *Nubank*" in texto
+        assert f"dia {db.CARTAO_FECHAMENTO_PADRAO}" in texto
+        assert f"dia {db.CARTAO_VENCIMENTO_PADRAO}" in texto
+        assert "R$ 8.400,00" in texto
+
+    def test_sem_cartao_criado_a_resposta_passa_intacta(self):
+        assert worker._com_aviso_de_cartao("ok", None) == "ok"
+
+    def test_nome_longo_nao_estoura_o_id_do_botao(self):
+        """O id do botão da Meta tem 256 caracteres e o nome viaja dentro dele."""
+        longo = "Cartão " + "muito " * 40
+        spec = worker._pergunta_criar_cartao("d1", draft.nome_de_cartao(longo), [])
+        assert all(len(b[0]) <= 256 for b in spec["buttons"])

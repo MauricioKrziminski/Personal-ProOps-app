@@ -139,3 +139,29 @@ class TestResolveAccount:
 
         contas.append({"id": "c1", "name": "Itaú", "type": "checking"})
         assert await resolve_account("ws", "banco do brasil") is None
+
+
+class TestAddMonths:
+    """Espelha `private.add_months` da 0013 — as duas pontas precisam concordar
+    sobre em que MÊS cada parcela cai, senão a retroação erra a fatura."""
+
+    def test_recua_preservando_o_dia(self):
+        from app.domain.dates import add_months
+
+        assert add_months("2026-08-31", -3) == "2026-05-31"
+        assert add_months("2026-03-31", -3) == "2025-12-31"
+
+    def test_clampa_no_ultimo_dia_do_mes_curto(self):
+        from app.domain.dates import add_months
+
+        assert add_months("2026-05-31", -3) == "2026-02-28"
+        assert add_months("2026-01-31", 1) == "2026-02-28"
+
+    def test_o_mes_sempre_volta_certo(self):
+        """O dia pode driftar quando clampa; o mês, nunca — e é o mês que decide
+        a fatura."""
+        from app.domain.dates import add_months
+
+        for dia in ("2026-05-31", "2026-08-15", "2026-01-31"):
+            volta = add_months(add_months(dia, -3), 3)
+            assert volta[:7] == dia[:7]

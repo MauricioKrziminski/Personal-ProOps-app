@@ -106,6 +106,19 @@ def require_installments(n: int | None) -> int:
     return n
 
 
+def require_current_installment(atual: int | None, total: int) -> int:
+    """Em que parcela a compra já está. 1 = compra de agora.
+
+    Fora de 1..total é o modelo entendendo errado ("tô na 12ª de 10"), e aí a
+    retroação jogaria o histórico para um passado que não existe. Cair para 1
+    perde a informação mas não inventa nenhuma — e o usuário corrige numa
+    mensagem.
+    """
+    if not isinstance(atual, int) or isinstance(atual, bool):
+        return 1
+    return atual if 1 <= atual <= total else 1
+
+
 def clean_rrule(value: str | None) -> str | None:
     """RRULE inválida vira None em vez de erro.
 

@@ -12,7 +12,7 @@ import logging
 from uuid import UUID
 
 from app import db
-from app.domain.dates import format_date_br, local_iso_date, now_utc
+from app.domain.dates import add_months, format_date_br, local_iso_date, now_utc
 from app.domain import matching
 from app.domain.money import cents_to_brl, parse_valor_em_centavos
 from app.domain.recurrence import next_occurrence
@@ -252,11 +252,21 @@ async def create_transfer(ctx: ExecContext, action: FinanceAction) -> ToolResult
 async def create_installment_purchase(ctx: ExecContext, action: FinanceAction) -> ToolResult:
     total = guards.require_amount(_amount_with_fallback(ctx, action), o_que="o valor total")
     parcelas = guards.require_installments(action.installments)
+    atual = guards.require_current_installment(action.current_installment, parcelas)
     quando = guards.require_date(action.occurred_at, ctx.timezone)
     conta = await resolve_account(ctx.workspace_id, action.account)
     if not conta:
         raise Level1Error("❌ Em qual cartão foi? Cadastra ele no app e me fala o nome.")
     await ensure_owned("accounts", conta, ctx.workspace_id)
+
+    # "Tô na 4ª parcela de 10" é uma compra de TRÊS MESES ATRÁS, não uma compra
+    # de hoje em 10x — e era assim que ela era gravada, com as 10 parcelas no
+    # futuro. Recuar a data da 1ª parcela é tudo o que falta: a RPC gera cada
+    # parcela em `add_months(occurred_at, i-1)` e marca `cleared` toda data que
+    # não é futura (0013:269,278). As 1..3 nascem pagas, a 4ª cai no mês
+    # corrente e as 5..10 ficam pendentes — sem nenhuma regra nova em Python.
+    if atual > 1:
+        quando = add_months(quando, -(atual - 1))
 
     row = await db.fetch_one(
         """
@@ -266,9 +276,14 @@ async def create_installment_purchase(ctx: ExecContext, action: FinanceAction) -
         action.description, guards.clean_category(action.category),
     )
     por_parcela = guards.split_installment_total(total, parcelas)[0]
+    historico = (
+        f"\nAs {atual - 1} anteriores entraram como pagas; você está na {atual}ª."
+        if atual > 1
+        else ""
+    )
     return ToolResult(
         f"🧾 Parcelado: *{cents_to_brl(total)}* em {parcelas}x de "
-        f"{cents_to_brl(por_parcela)} (a última acerta os centavos).",
+        f"{cents_to_brl(por_parcela)} (a última acerta os centavos).{historico}",
         result_id=row["id"] if row else None,
     )
 

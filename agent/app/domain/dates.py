@@ -10,6 +10,7 @@ com Intl que o Deno exigia.
 
 from __future__ import annotations
 
+from calendar import monthrange
 from datetime import date, datetime, timezone
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
@@ -88,3 +89,21 @@ def format_date_br(value: str | date | None) -> str:
         return str(value)
     ano, mes, dia = partes
     return f"{dia}/{mes}/{ano}"
+
+
+def add_months(value: str | date, n: int) -> str:
+    """Soma (ou subtrai) meses preservando o dia quando ele couber.
+
+    Espelha `private.add_months` da `0013` de propósito: é ela que gera as datas
+    das parcelas, e as duas pontas precisam concordar sobre em que MÊS cada
+    parcela cai. 31/01 + 1 mês = 28/02, como no banco.
+
+    Não é perfeitamente reversível quando o dia é clampado (31/05 → -3 meses →
+    28/02 → +3 meses → 28/05), mas o MÊS sempre volta certo — e é o mês que
+    decide a fatura.
+    """
+    d = value if isinstance(value, date) else date.fromisoformat(str(value))
+    total = d.year * 12 + (d.month - 1) + n
+    ano, mes = divmod(total, 12)
+    ultimo = monthrange(ano, mes + 1)[1]
+    return date(ano, mes + 1, min(d.day, ultimo)).isoformat()

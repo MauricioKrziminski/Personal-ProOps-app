@@ -299,15 +299,20 @@ async def _run_graph(sessao: dict, lote: list[dict], conteudo: dict) -> str | di
         if decidido and decidido["acao"] == "descartar":
             await db.delete_draft(sessao["phone"])
             return await _fechar(sessao, uso, "👍 Beleza, esqueci aquele lançamento.")
-        if decidido and decidido["acao"] == "completar":
-            if decidido.get("slot") == "account":
-                # Resolve o cartão ANTES de consumir o rascunho. Falhar aqui e
-                # apagar deixaria o usuário a um dado do fim e obrigado a
-                # repetir a compra inteira — foi essa a queixa.
-                decidido, resposta = await _cartao_do_rascunho(sessao, rascunho, decidido)
-                if resposta is not None:
-                    return await _fechar(sessao, uso, resposta)
+        # Resolve o cartão ANTES de consumir o rascunho. Falhar aqui e apagar
+        # deixaria o usuário a um dado do fim e obrigado a repetir a compra
+        # inteira — foi essa a queixa. `criar_cartao` e `escolher_cartao` entram
+        # aqui como não-cartão ainda e SAEM como `completar`, ou como pergunta.
+        if decidido and (
+            decidido["acao"] in ("criar_cartao", "escolher_cartao")
+            or (decidido["acao"] == "completar" and decidido.get("slot") == "account")
+        ):
+            decidido, resposta = await _cartao_do_rascunho(sessao, rascunho, decidido)
+            if resposta is not None:
+                return await _fechar(sessao, uso, resposta)
 
+        if decidido and decidido["acao"] == "completar":
+            cartao_novo = decidido.get("cartao_criado")
             acao = draft.mesclar(rascunho["action"], decidido)
             # Ainda falta outro slot? Guarda de novo e pergunta o próximo, em vez
             # de executar pela metade.
@@ -331,7 +336,10 @@ async def _run_graph(sessao: dict, lote: list[dict], conteudo: dict) -> str | di
             # segue o fluxo normal com a ação COMPLETA: as validações de
             # segurança (HITL de valor alto, alvo, propriedade) valem igual
             conteudo = {**conteudo, "text": rascunho["raw_text"]}
-            return await _rodar_com_acoes(sessao, lote, conteudo, [acao], thread, config, uso)
+            resposta = await _rodar_com_acoes(
+                sessao, lote, conteudo, [acao], thread, config, uso
+            )
+            return _com_aviso_de_cartao(resposta, cartao_novo)
 
     # --- fast-path: a mensagem é resposta a uma pergunta? ---
     await db.expire_pending(thread)
@@ -413,8 +421,24 @@ async def _cartao_do_rascunho(
     regra "cartão obrigatório em parcelado" existe para impedir.
     """
     cartoes = await db.accounts(sessao["workspace_id"], only_cards=True)
-    if not cartoes:
-        return None, draft.sem_cartoes(decidido.get("account", ""))
+    draft_id = rascunho["id"]
+
+    if decidido["acao"] == "escolher_cartao":
+        if not cartoes:
+            return None, draft.sem_cartoes()
+        return None, _pergunta_cartao(draft_id, cartoes, "💳 Então me diz: qual cartão?")
+
+    if decidido["acao"] == "criar_cartao":
+        linha = await db.create_credit_card(
+            workspace_id=UUID(str(sessao["workspace_id"])),
+            user_id=UUID(str(sessao["user_id"])),
+            name=decidido["name"],
+        )
+        if not linha:
+            return None, "❌ Não consegui criar o cartão agora. Tenta de novo?"
+        # o cartão novo entra no rascunho pelo nome que o BANCO gravou
+        return {"acao": "completar", "slot": "account", "account": linha["name"],
+                "cartao_criado": linha["name"]}, None
 
     if decidido.get("account_id"):
         # O id veio de um clique DO USUÁRIO e por isso nunca é usado direto: ele é
@@ -426,23 +450,62 @@ async def _cartao_do_rascunho(
         )
         if escolhido is None:
             return None, _pergunta_cartao(
-                rascunho["id"], cartoes, "🤔 Esse cartão não é seu. Qual deles?"
+                draft_id, cartoes, "🤔 Esse cartão não é seu. Qual deles?"
             )
         return {**decidido, "account": escolhido["name"]}, None
 
-    nome = decidido.get("account", "")
+    nome = draft.nome_de_cartao(decidido.get("account"))
     achados = matching.match_accounts(nome, cartoes)
     if len(achados) == 1:
         return {**decidido, "account": achados[0]["name"]}, None
+    if achados:
+        # Empate NUNCA vira escolha nossa: lançar no cartão errado é pior que uma
+        # pergunta a mais.
+        return None, _pergunta_cartao(
+            draft_id, achados, f"🤔 Achei mais de um parecido com *{nome}*. Qual deles?"
+        )
+    if not nome:
+        return None, draft.sem_cartoes()
+    # Nada casou. Antes isto era um beco: listava os cartões existentes e, se não
+    # houvesse nenhum, mandava o usuário cadastrar no app e voltar. Agora o
+    # cadastro acontece aqui mesmo, sem sair da compra.
+    return None, _pergunta_criar_cartao(draft_id, nome, cartoes)
 
-    # Nada casou -> mostra todos. Empatou -> mostra só os candidatos. Empate NUNCA
-    # vira escolha nossa: lançar no cartão errado é pior que uma pergunta a mais.
-    corpo = (
-        f"🤔 Achei mais de um parecido com *{nome}*. Qual deles?"
-        if achados
-        else f"❌ Não achei o cartão *{nome}*. É algum destes?"
+
+def _com_aviso_de_cartao(resposta: str | dict, nome: str | None) -> str | dict:
+    """Diz que criou o cartão E com que ciclo — a suposição não pode ficar muda.
+
+    `set_invoice` precisa de fechamento e vencimento para associar a fatura, e
+    mudar esses dias depois NÃO reprocessa lançamento já gravado. Então o usuário
+    tem que saber AGORA em que ciclo a compra dele entrou.
+    """
+    if not nome or not isinstance(resposta, str):
+        return resposta
+    return (
+        f"💳 Criei o cartão *{nome}* — assumi fechamento dia "
+        f"{db.CARTAO_FECHAMENTO_PADRAO} e vencimento dia {db.CARTAO_VENCIMENTO_PADRAO}. "
+        "Se for diferente, ajusta no app.\n\n"
+        f"{resposta}"
     )
-    return None, _pergunta_cartao(rascunho["id"], achados or cartoes, corpo)
+
+
+def _pergunta_criar_cartao(draft_id: str, nome: str, cartoes: list[dict]) -> dict:
+    """Cartão que não existe vira oferta de cadastro, não beco sem saída."""
+    corpo = (
+        f"❌ Não achei o cartão *{nome}* cadastrado.\n"
+        "Quer que eu crie um cartão com esse nome agora mesmo?"
+    )
+    botoes = [(f"{draft.CLICK_PREFIX}{draft_id}:create_card:{nome}", "Sim, cadastrar")]
+    if cartoes:
+        # só faz sentido oferecer "escolher outro" se houver outro
+        botoes.append((f"{draft.CLICK_PREFIX}{draft_id}:retry_card", "Escolher outro"))
+    botoes.append((f"{draft.CLICK_PREFIX}{draft_id}:no", "Cancelar"))
+    return {
+        "ui": "buttons",
+        "body": corpo,
+        "buttons": botoes,
+        "text": f"{corpo}\nResponde *criar*, o nome de outro cartão, ou *cancelar*.",
+    }
 
 
 def _pergunta_tipo_valor(draft_id: str, cents: int, parcelas: int) -> dict:
