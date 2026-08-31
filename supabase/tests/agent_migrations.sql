@@ -205,3 +205,36 @@ begin
     raise exception 'checkpoints voltou para o schema public — ver app/db.py::_isolar_checkpointer';
   end if;
 end $$;
+
+-- ---------------------------------------------------------------------------
+-- 8. rascunho: um por TELEFONE, e expiração funciona
+-- ---------------------------------------------------------------------------
+-- O índice nasceu em `thread_id` na 0043 e foi corrigido na 0044: o thread
+-- carrega o epoch, que gira em 6h, e o rascunho vive 24h.
+do $$
+declare
+  n int;
+begin
+  if to_regclass('public.draft_actions') is null then
+    raise notice 'draft_actions ausente — pulando'; return;
+  end if;
+
+  if not exists (
+    select 1 from pg_indexes
+    where schemaname = 'public' and indexname = 'draft_actions_one_per_phone'
+  ) then
+    raise exception 'draft_actions precisa do unique por phone (ver 0044)';
+  end if;
+
+  if exists (
+    select 1 from pg_indexes
+    where schemaname = 'public' and indexname = 'draft_actions_one_per_thread'
+  ) then
+    raise exception 'o unique por thread_id voltou — ele quebra na rotação de epoch';
+  end if;
+
+  -- expiração remove o vencido e só ele
+  update public.draft_actions set expires_at = now() - interval '1 hour';
+  select public.expire_draft_actions() into n;
+  raise notice 'rascunhos expirados: %', n;
+end $$;

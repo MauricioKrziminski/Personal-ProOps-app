@@ -258,15 +258,15 @@ async def _run_graph(sessao: dict, lote: list[dict], conteudo: dict) -> str | di
     # pergunta de SIM/NÃO travando a conversa; rascunho é um lançamento pela
     # metade que ficou inerte enquanto o usuário fazia outra coisa.
     await db.expire_drafts()
-    rascunho = await db.open_draft(thread)
+    rascunho = await db.open_draft(sessao["phone"])
     if rascunho and not conteudo.get("clicked_id"):
         decidido = await draft.interpretar(conteudo.get("text", ""), rascunho)
         if decidido and decidido["acao"] == "descartar":
-            await db.delete_draft(thread)
+            await db.delete_draft(sessao["phone"])
             return "👍 Beleza, esqueci aquele lançamento."
         if decidido and decidido["acao"] == "completar":
             acao = draft.mesclar(rascunho["action"], decidido["amount_cents"])
-            await db.delete_draft(thread)
+            await db.delete_draft(sessao["phone"])
             # segue o fluxo normal com a ação COMPLETA: as validações de
             # segurança (HITL de valor alto, alvo, propriedade) valem igual
             conteudo = {**conteudo, "text": rascunho["raw_text"]}
@@ -323,7 +323,7 @@ async def _resposta_do_estado(sessao: dict, estado: dict, thread: str) -> str | 
         # Nada novo pela metade — mas pode haver um rascunho ANTIGO esperando.
         # Lembrar dele aqui é o que permite trocar de assunto sem perder nada:
         # a nota de café é salva e o mac continua ali, mencionado de leve.
-        antigo = await db.open_draft(thread)
+        antigo = await db.open_draft(sessao["phone"])
         if antigo:
             estado = {
                 **estado,

@@ -485,7 +485,7 @@ async def save_draft(
         insert into public.draft_actions
           (thread_id, phone, user_id, workspace_id, action, raw_text, missing)
         values (%s, %s, %s, %s, %s, %s, %s)
-        on conflict (thread_id) do update
+        on conflict (phone) do update
           set action = excluded.action,
               raw_text = excluded.raw_text,
               missing = excluded.missing,
@@ -496,18 +496,21 @@ async def save_draft(
     )
 
 
-async def open_draft(thread_id: str) -> dict[str, Any] | None:
+async def open_draft(phone: str) -> dict[str, Any] | None:
+    """Busca por TELEFONE, não por thread: o thread efetivo carrega o epoch, que
+    gira em 6h de silêncio — e o rascunho vive 24h. Buscar por thread perderia
+    de vista o rascunho da própria pessoa depois de uma noite."""
     return await fetch_one(
         """
         select * from public.draft_actions
-        where thread_id = %s and expires_at > now()
+        where phone = %s and expires_at > now()
         """,
-        thread_id,
+        phone,
     )
 
 
-async def delete_draft(thread_id: str) -> None:
-    await execute("delete from public.draft_actions where thread_id = %s", thread_id)
+async def delete_draft(phone: str) -> None:
+    await execute("delete from public.draft_actions where phone = %s", phone)
 
 
 async def expire_drafts() -> None:

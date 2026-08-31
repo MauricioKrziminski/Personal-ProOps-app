@@ -15,6 +15,7 @@ responseSchema cru e não vale a pena descobrir na produção que o limite mudou
 from __future__ import annotations
 
 from enum import Enum
+from typing import Literal
 
 from pydantic import BaseModel, Field
 

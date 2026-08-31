@@ -85,3 +85,22 @@ def test_escrita_e_consulta_nao_se_sobrepoem():
     escrita = {t.value for t in FinanceActionType} - {"unknown"}
     consulta = {t.value for t in FinanceQueryType} - {"unknown"}
     assert not (escrita & consulta), f"tipos em ambos: {escrita & consulta}"
+
+
+def test_schemas_de_decisao_constroem_de_verdade():
+    """Os schemas dos classificadores precisam gerar JSON Schema.
+
+    Eles quebraram em produção com `class-not-fully-defined` (faltava importar
+    `Literal` num módulo com `from __future__ import annotations`) e a suíte
+    passou mesmo assim, porque os testes dublavam justamente a função que os
+    constrói. Teste que dubla a peça quebrada não testa a peça.
+    """
+    from app.graph.schemas import ConfirmDecision, DraftDecision
+
+    for modelo, valores in (
+        (ConfirmDecision, {"approve", "reject", "unclear"}),
+        (DraftDecision, {"answer", "discard", "unrelated"}),
+    ):
+        esquema = modelo.model_json_schema()          # levantava PydanticUserError
+        campo = esquema["properties"]["decision"]
+        assert set(campo.get("enum", [])) == valores, modelo.__name__

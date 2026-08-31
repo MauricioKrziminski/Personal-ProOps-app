@@ -34,6 +34,10 @@ alter table public.draft_actions enable row level security;
 
 -- Um rascunho ativo por conversa. Dois tornariam "foi 5000" ambíguo, pelo mesmo
 -- motivo que duas perguntas abertas tornariam "sim" ambíguo.
+--
+-- ⚠️ ESTE ÍNDICE ESTÁ ERRADO, e a 0044 o corrige: `thread_id` carrega o epoch da
+-- sessão, que gira em 6h enquanto o rascunho vive 24h. Fica aqui COMO FOI
+-- APLICADO — editar migration já aplicada faz o arquivo mentir sobre o banco.
 create unique index if not exists draft_actions_one_per_thread
   on public.draft_actions (thread_id);
 
