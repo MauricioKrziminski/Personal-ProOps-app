@@ -388,6 +388,39 @@ Vale na mensagem seguinte, sem deploy.
 
 ---
 
+# Quando o número real da ProOps entrar
+
+Hoje existe **um** número (o de teste da Meta), e por isso o roteamento é pelo
+telefone de QUEM MANDA (`agent_routing`) e o ambiente é o secret global
+`PYTHON_AGENT_URL`. Quando o número real entrar, o discriminador natural passa a
+ser **para qual número você mandou** — mas isso NÃO acontece sozinho:
+
+- **A Meta entrega os dois no mesmo webhook.** O webhook é configurado por App,
+  não por número: números da mesma WABA/App caem na MESMA URL. (Se o número real
+  nascer em outro App, aí sim são webhooks distintos — e o mais simples é apontar
+  o webhook do App novo direto para o Cloud Run de produção, sem Edge Function.)
+- **O código ignora o destino.** O payload traz `value.metadata.phone_number_id`,
+  que diz qual dos SEUS números recebeu a mensagem. Nem
+  `supabase/functions/whatsapp-webhook/index.ts` nem
+  `agent/app/routes/inbound.py` leem esse campo — os dois roteiam só pelo
+  `messages[0].from`. Com `PYTHON_AGENT_URL` em staging, mandar para o número
+  real cairia no banco de **staging** do mesmo jeito.
+
+**O caminho certo, quando chegar a hora** (~10 linhas na Edge Function, sem
+migration): escolher a URL por `phone_number_id` — número de teste → staging,
+número real → produção. É melhor que uma coluna em `agent_routing` porque:
+
+- vale para todo mundo de uma vez, sem uma linha por telefone;
+- a resposta volta **do número para o qual você escreveu** (cada serviço manda
+  pelo seu próprio `WHATSAPP_PHONE_NUMBER_ID`, ver `services/whatsapp.py`), então
+  as duas conversas ficam em threads separadas no WhatsApp — dá para saber qual
+  ambiente respondeu só de olhar, sem consultar banco nenhum;
+- o `PYTHON_AGENT_FALLBACK` deixa de ser um knob e vira regra estrutural:
+  fallback só quando o alvo é produção.
+
+Não foi implementado agora de propósito: o número real ainda não existe, o
+`phone_number_id` dele é desconhecido, e não daria para testar.
+
 # Armadilhas conhecidas
 
 **Duas URLs do Cloud Run.** O serviço responde na nova
