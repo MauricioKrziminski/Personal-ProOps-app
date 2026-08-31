@@ -38,6 +38,23 @@ def _kwargs() -> dict[str, Any]:
     return kw
 
 
+async def _isolar_checkpointer(conn: Any) -> None:
+    """Põe a conexão do checkpointer no schema `langgraph`, por `SET`.
+
+    NÃO dá para fazer isso pelo conninfo: o pooler do Supabase **ignora em
+    silêncio** o `options=-csearch_path%3Dlanggraph` — a conexão sobe normal e o
+    search_path continua `"$user", public, extensions`. Medido em 31/08/2026,
+    e o efeito foi o `checkpointer.setup()` criar `checkpoints`,
+    `checkpoint_writes` e `checkpoint_blobs` em **public**, onde o PostgREST as
+    serve com a ANON KEY — e elas guardam o conteúdo das conversas (valores,
+    contas, notas). Exatamente o que a 0040 existe para evitar.
+
+    O `SET` roda na conexão já estabelecida, então não depende de o pooler
+    repassar parâmetro de startup nenhum.
+    """
+    await conn.execute("set search_path to langgraph")
+
+
 async def open_pools() -> None:
     global _pool, _graph_pool
     settings = get_settings()
@@ -54,10 +71,11 @@ async def open_pools() -> None:
         open=False,
     )
     _graph_pool = AsyncConnectionPool(
-        settings.checkpointer_url,
+        settings.database_url,
         min_size=1,
         max_size=2,
         kwargs=_kwargs(),
+        configure=_isolar_checkpointer,
         open=False,
     )
     await _pool.open()

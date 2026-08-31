@@ -101,15 +101,6 @@ class Settings(BaseSettings):
     def jwks_url(self) -> str:
         return f"{self.supabase_url.rstrip('/')}/auth/v1/.well-known/jwks.json"
 
-    @property
-    def checkpointer_url(self) -> str:
-        """Mesma conexão, com o search_path no schema isolado.
-
-        As tabelas de checkpoint guardam o conteúdo das conversas; em `public`
-        elas seriam legíveis pelo PostgREST com a anon key (ver 0040).
-        """
-        sep = "&" if "?" in self.database_url else "?"
-        return f"{self.database_url}{sep}options=-csearch_path%3Dlanggraph"
 
 
 @lru_cache

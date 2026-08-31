@@ -191,3 +191,17 @@ end $$;
 
 rollback;
 \echo '✓ 0040/0041 verificadas'
+
+-- ---------------------------------------------------------------------------
+-- 7. o checkpointer NÃO pode voltar para o public
+-- ---------------------------------------------------------------------------
+-- Em 31/08/2026 as tabelas do LangGraph foram parar em `public` porque o pooler
+-- do Supabase ignora em silêncio o `options=-csearch_path` do conninfo. Lá elas
+-- são servidas pelo PostgREST com a ANON KEY — e guardam o conteúdo das
+-- conversas. A regressão não dá erro nenhum: só reaparece.
+do $$
+begin
+  if to_regclass('public.checkpoints') is not null then
+    raise exception 'checkpoints voltou para o schema public — ver app/db.py::_isolar_checkpointer';
+  end if;
+end $$;
