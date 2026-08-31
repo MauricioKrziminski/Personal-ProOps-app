@@ -27,7 +27,6 @@ from langgraph.types import Command
 from app import db
 from app.config import get_settings
 from app.domain import confirm
-from app.domain.confirm import interpret
 from app.security import effective_thread_id, sanitize_untrusted
 from app.services import gemini, groq, telemetry, whatsapp
 
@@ -221,7 +220,7 @@ async def _run_graph(sessao: dict, lote: list[dict], conteudo: dict) -> str | di
     # --- fast-path: a mensagem é resposta a uma pergunta? ---
     await db.expire_pending(thread)
     pendente = await db.open_pending(sessao["phone"])
-    decisao = confirm.decide(conteudo, pendente)
+    decisao = await confirm.decide(conteudo, pendente)
 
     if decisao is confirm.STALE:
         # clique de uma pergunta que não está mais aberta. NUNCA deixar seguir
@@ -388,12 +387,6 @@ def _congelado(decisao: dict, pendente: dict) -> dict | bool:
     if decisao.get("none_of_these"):
         return {"approved": False, "none_of_these": True}
     return bool(decisao.get("approved"))
-
-
-def _resume_command_legado(texto: str, pendente: dict) -> Command | None:
-    """SIM/NÃO por regra pura — zero token na resposta mais comum do fluxo."""
-    decisao = interpret(texto)
-    return None if decisao is None else Command(resume=decisao)
 
 
 def _interrupt_payload(estado: dict) -> dict | None:

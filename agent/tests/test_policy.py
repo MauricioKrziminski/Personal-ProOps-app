@@ -85,3 +85,25 @@ def test_frase_de_empate_nao_ecoa_o_modelo():
 
     assert "apagar" in frase
     assert "esse item" not in frase
+
+
+# ---------------------------------------------------------------------------
+# roteador inseguro pergunta o DOMÍNIO, antes de extrair
+# ---------------------------------------------------------------------------
+
+
+def test_confianca_baixa_do_roteador_pergunta_o_dominio():
+    """Abaixo de 0,8 o agente não adivinha se é despesa ou nota.
+
+    É uma pergunta DIFERENTE da confirmação de ação (0,6): esta acontece antes
+    de extrair, e evita que "paguei o dentista" vire nota quando era gasto.
+    """
+    from app.graph.policy import dominio_incerto
+
+    assert dominio_incerto(["financas"], 0.7)
+    assert not dominio_incerto(["financas"], 0.95)
+    # multi-intent explícito não é incerteza: o router disse que são os dois
+    assert not dominio_incerto(["financas", "notas"], 0.7)
+    # domínio sem ambiguidade de registro não pergunta
+    assert not dominio_incerto(["geral"], 0.5)
+    assert not dominio_incerto(["financas_consulta"], 0.5)

@@ -46,9 +46,14 @@ O serviço que recebe do WhatsApp, decide e escreve. Substituiu o par
 - O grafo **para**; quem fala com o mundo é o worker — manda a pergunta e grava `pending_actions`.
   A retomada usa `Command(resume=...)` **no mesmo `thread_id`** (o gravado no pendente, nunca um
   recalculado).
-- **SIM/NÃO é regex** (`app/domain/confirm.py`), zero token. O que não casa não é confirmação:
-  vira intenção nova. Interpretar "acho que sim" como aprovação para apagar é o erro que o HITL
-  existe para evitar.
+- **Confirmação: clique por IGUALDADE EXATA, texto digitado por SEMÂNTICA** (31/08/2026). O
+  payload do botão (`pa:<uuid do pendente>:ok|no|none|c:<id>`) é escrito por nós e comparado
+  campo a campo — não há o que interpretar. Texto livre ("manda bala", "cancela isso") vai para
+  o modelo, porque a lista de padrões que fazia isso antes era frágil demais.
+  **A trava não mudou:** só `approve` aprova. Ambíguo ("acho que sim"), resposta fora do enum,
+  cota estourada ou modelo fora do ar devolvem None, que vira intenção NOVA — nunca aprovação.
+  Um portão que abre quando o classificador falha não é portão. Custo: uma chamada por
+  confirmação digitada; o clique continua custando zero.
 - A pergunta descreve o **efeito**, não o nome interno da ação. Ninguém confirma
   "delete_transaction"; todo mundo entende "apagar o gasto de R$ 45".
 

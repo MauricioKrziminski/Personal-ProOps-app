@@ -64,7 +64,11 @@ def grafo(monkeypatch):
 
     monkeypatch.setattr(nodes.resolve, "for_actions", alvos_falso)
     monkeypatch.setattr(nodes, "route", router_falso)
+    async def notas_falso(state):
+        return {}
+
     monkeypatch.setattr(nodes, "finance_node", financas_falso)
+    monkeypatch.setattr(nodes, "notes_node", notas_falso)
     # o build resolve os nós no momento da montagem
     import importlib
 
@@ -357,7 +361,7 @@ async def test_o_que_o_WORKER_manda_no_resume_o_gate_entende(monkeypatch, grafo)
                 "action": {"candidates": [{"id": "a"}, {"id": "b"}]}}
 
     # 1) clique no botão do segundo candidato
-    decisao = confirm.decide({"clicked_id": f"pa:{pendente['id']}:c:b"}, pendente)
+    decisao = await confirm.decide({"clicked_id": f"pa:{pendente['id']}:c:b"}, pendente)
     final = await grafo.ainvoke(Command(resume=_congelado(decisao, pendente)), config=cfg)
     assert "EXECUTOU" in final.get("results", []), final.get("results")
     assert final["targets"][0]["candidates"] == [{"id": "b", "label": "R$ 80"}]
@@ -380,7 +384,7 @@ async def test_numero_digitado_tambem_chega_inteiro_no_gate(monkeypatch, grafo):
 
     pendente = {"id": "11111111-2222-3333-4444-555555555555",
                 "action": {"candidates": [{"id": "a"}, {"id": "b"}]}}
-    decisao = confirm.decide({"text": "1"}, pendente)   # quem não clica, digita
+    decisao = await confirm.decide({"text": "1"}, pendente)   # quem não clica, digita
     final = await grafo.ainvoke(Command(resume=_congelado(decisao, pendente)), config=cfg)
 
     assert "EXECUTOU" in final.get("results", [])
@@ -406,3 +410,41 @@ async def test_acao_sem_valor_pede_o_dado_e_NAO_vira_pergunta(grafo):
     assert "valor" in estado["reply"].lower()
     assert "12x" in estado["reply"]
     assert "EXECUTOU" not in estado.get("results", [])
+
+
+@pytest.mark.asyncio
+async def test_roteador_inseguro_pergunta_o_dominio_antes_de_gravar(grafo):
+    """Confiança 0,7: o agente não escolhe entre gasto e nota — ele pergunta."""
+    estado = await grafo.ainvoke(
+        {**_estado([{"type": FinanceActionType.CREATE_EXPENSE.value,
+                     "amount_cents": 4500, "category": "dentista"}]),
+         "confidence": 0.7},
+        config={"configurable": {"thread_id": "dominio-1"}},
+    )
+    pausa = estado["__interrupt__"][0]
+    valor = getattr(pausa, "value", pausa)
+
+    assert valor["kind"] == "domain"
+    assert [o["id"] for o in valor["options"]] == ["financas", "notas"]
+    assert "EXECUTOU" not in estado.get("results", [])
+
+
+@pytest.mark.asyncio
+async def test_escolher_o_dominio_REESCREVE_a_rota(grafo):
+    """A prova de que a pergunta está no lugar certo.
+
+    Se ela morasse no gate (depois da extração), responder "nota" não teria
+    efeito: não existiria `notes_actions` para executar, porque quem rodou foi o
+    nó de finanças. Aqui a escolha reescreve `domains` ANTES do fan-out.
+    """
+    cfg = {"configurable": {"thread_id": "dominio-2"}}
+    await grafo.ainvoke(
+        {**_estado([{"type": FinanceActionType.CREATE_EXPENSE.value,
+                     "amount_cents": 4500, "category": "dentista"}]),
+         "confidence": 0.7},
+        config=cfg,
+    )
+    final = await grafo.ainvoke(Command(resume="notas"), config=cfg)
+
+    assert final["domains"] == ["notas"]
+    assert final["confidence"] == 1.0     # quem decidiu foi o usuário

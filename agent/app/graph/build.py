@@ -17,6 +17,7 @@ from langgraph.graph import END, START, StateGraph
 
 from app import db
 from app.graph.nodes import (
+    domain_gate,
     after_gate,
     compose,
     execute_node,
@@ -42,6 +43,8 @@ def build(checkpointer: AsyncPostgresSaver):
     builder = StateGraph(AgentState)
 
     builder.add_node("router", route)
+    # pergunta o domínio ANTES de extrair, quando o router hesitou
+    builder.add_node("dominio", domain_gate)
     builder.add_node("financas", finance_node)
     builder.add_node("financas_consulta", finance_query_node)
     builder.add_node("notas", notes_node)
@@ -55,11 +58,12 @@ def build(checkpointer: AsyncPostgresSaver):
     builder.add_node("compor", compose)
 
     builder.add_edge(START, "router")
+    builder.add_edge("router", "dominio")
     # fan-out: a aresta condicional devolve uma LISTA, e o LangGraph roda os nós
     # escolhidos em paralelo. Eles escrevem chaves diferentes do estado, então
     # não há conflito de escrita concorrente.
     builder.add_conditional_edges(
-        "router", pick_domains, ["financas", "financas_consulta", "notas", "geral"]
+        "dominio", pick_domains, ["financas", "financas_consulta", "notas", "geral"]
     )
     # fan-in dos domínios no `alvos`: ele precisa ver o lote INTEIRO (finanças e
     # notas juntas) para decidir com todas as ações na mesa, igual ao gate.

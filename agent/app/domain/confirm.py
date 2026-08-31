@@ -11,37 +11,25 @@ para apagar um lançamento é exatamente o erro que o HITL existe para evitar.
 
 from __future__ import annotations
 
+import logging
 import re
 
-_SIM = re.compile(
-    r"^(sim|s|isso|isso a[ií]|pode|pode sim|confirma|confirmar|confirmado|manda|"
-    r"ok|okay|okey|claro|beleza|blz|bora|👍|✅)\W*$",
-    re.IGNORECASE,
-)
-_NAO = re.compile(
-    r"^(n[ãa]o|n|nop|nao pode|cancela|cancelar|deixa|deixa pra l[áa]|para|"
-    r"esquece|melhor n[ãa]o|❌|🚫)\W*$",
-    re.IGNORECASE,
-)
-
-
-def interpret(texto: str | None) -> bool | None:
-    """True = aprovou, False = recusou, None = falou outra coisa."""
-    limpo = (texto or "").strip()
-    if not limpo:
-        return None
-    if _SIM.match(limpo):
-        return True
-    if _NAO.match(limpo):
-        return False
-    return None
-
+# O SIM/NÃO por regex saiu em 31/08/2026, por decisão explícita: "sim, pode
+# fazer", "manda bala", "cancela isso" são variações demais para uma lista de
+# padrões. Quem classifica texto digitado agora é o modelo (`interpret_text`
+# abaixo), e o clique no botão é igualdade exata (`parse_click`).
+#
+# A troca custa uma chamada por confirmação digitada e ~2s de latência. Em
+# compensação, falha FECHADA: modelo fora do ar, cota estourada ou resposta
+# ambígua devolvem None, que o worker trata como intenção nova — nunca aprovação.
 
 # ---------------------------------------------------------------------------
 # clique de botão / lista
 # ---------------------------------------------------------------------------
 # `interpret` acima NÃO é tocado: o caminho de texto é o mesmo de sempre, e é ele
 # que atende quem digita "sim" ou está num cliente que não renderiza interativo.
+
+log = logging.getLogger(__name__)
 
 STALE = "stale"
 
@@ -50,7 +38,12 @@ STALE = "stale"
 # dias atrás, com outra pergunta aberta agora, aprovaria a ação errada. O índice
 # único "uma pergunta aberta por thread" não protege disso — ele garante uma
 # aberta, não que o clique se refira a ela.
-_CLIQUE = re.compile(r"^pa:([0-9a-f-]{36}):(ok|no|none|c:(?P<cand>.+))$", re.IGNORECASE)
+# Sufixos válidos, comparados por IGUALDADE EXATA. Sem regex: o payload do
+# botão é estruturado e escrito por nós, então casar padrão nele seria inventar
+# ambiguidade onde não existe.
+_PREFIXO = "pa:"
+_SUFIXOS = {"ok", "no", "none"}
+_ESCOLHA = "c:"
 
 _ORDINAL = {
     "primeira": 1, "primeiro": 1, "segunda": 2, "segundo": 2,
@@ -59,16 +52,87 @@ _ORDINAL = {
 
 
 def parse_click(clicked_id: str, pending_id: str) -> dict | None:
-    """Decisão do clique, ou None se o id não se refere a ESTE pendente."""
-    m = _CLIQUE.match(clicked_id or "")
-    if not m or m.group(1).lower() != str(pending_id).lower():
+    """Decisão do clique, ou None se o id não se refere a ESTE pendente.
+
+    Igualdade exata, campo a campo. O id tem a forma `pa:<uuid>:<sufixo>` e foi
+    ESCRITO por nós — não há nada a interpretar. O uuid do pendente vai dentro
+    porque botão do WhatsApp continua clicável para sempre: um toque num
+    "Confirmar" de três dias atrás aprovaria a pergunta aberta agora.
+    """
+    if not clicked_id or not clicked_id.startswith(_PREFIXO):
         return None
-    if m.group("cand"):
-        return {"approved": True, "candidate_id": m.group("cand")}
-    sufixo = m.group(2).lower()
+    partes = clicked_id[len(_PREFIXO):].split(":", 1)
+    if len(partes) != 2:
+        return None
+    uuid_do_clique, sufixo = partes
+    if uuid_do_clique.lower() != str(pending_id).lower():
+        return None
+
+    if sufixo.startswith(_ESCOLHA):
+        escolhido = sufixo[len(_ESCOLHA):]
+        return {"approved": True, "candidate_id": escolhido} if escolhido else None
+    if sufixo not in _SUFIXOS:
+        return None
     if sufixo == "ok":
         return {"approved": True}
     return {"approved": False, "none_of_these": sufixo == "none"}
+
+
+# ---------------------------------------------------------------------------
+# resposta DIGITADA: semântica, não regex
+# ---------------------------------------------------------------------------
+# Decisão de 31/08/2026: "sim, pode fazer", "manda bala", "cancela isso" são
+# variações demais para uma lista de padrões. Quem classifica é o modelo.
+#
+# A trava que não pode cair: só "approve" aprova. Ambíguo, resposta fora do
+# enum, cota estourada ou modelo fora do ar caem todos em None — que o worker
+# trata como intenção NOVA, não como aprovação. Um portão que abre quando o
+# classificador falha não é portão.
+
+_PROMPT_CONFIRMACAO = """Você classifica a resposta de um usuário a uma pergunta de confirmação.
+
+A pergunta feita foi: {resumo}
+
+Responda com UMA palavra:
+- approve  — o usuário concordou claramente ("sim", "pode", "manda bala", "isso aí")
+- reject   — o usuário recusou claramente ("não", "cancela", "deixa pra lá")
+- unclear  — qualquer outra coisa: dúvida ("acho que sim"), condição
+             ("sim, mas muda pra 50"), ou assunto novo ("gastei 45 no mercado")
+
+Na dúvida, responda unclear. Aprovar por engano apaga dado do usuário."""
+
+
+async def _classificar(texto: str, resumo: str) -> str:
+    from app.graph.schemas import ConfirmDecision
+    from app.security import wrap_untrusted
+    from app.services.gemini import structured
+
+    modelo = structured(ConfirmDecision)
+    resposta = await modelo.ainvoke(
+        [
+            ("system", _PROMPT_CONFIRMACAO.format(resumo=resumo or "uma ação")),
+            # o texto do usuário é DADO, nunca instrução — mesmo envelope do resto
+            ("human", wrap_untrusted(texto)),
+        ]
+    )
+    return resposta.decision
+
+
+async def interpret_text(texto: str | None, resumo: str = "") -> bool | None:
+    """True aprova, False recusa, None = não é confirmação (vira intenção nova)."""
+    if not texto or not texto.strip():
+        return None
+    try:
+        decisao = await _classificar(texto, resumo)
+    except Exception:  # noqa: BLE001
+        log.warning("classificador de confirmação falhou — tratando como não-confirmação",
+                    exc_info=True)
+        return None
+    if decisao == "approve":
+        return True
+    if decisao == "reject":
+        return False
+    return None
 
 
 def interpret_choice(texto: str | None, n: int) -> int | None:
@@ -94,7 +158,7 @@ def interpret_choice(texto: str | None, n: int) -> int | None:
     return None
 
 
-def decide(conteudo: dict, pendente: dict | None) -> dict | str | None:
+async def decide(conteudo: dict, pendente: dict | None) -> dict | str | None:
     """dict = decisão · STALE = clique de outra pergunta · None = intenção nova."""
     clique = conteudo.get("clicked_id")
     if clique:
@@ -115,5 +179,10 @@ def decide(conteudo: dict, pendente: dict | None) -> dict | str | None:
             if k:
                 return {"approved": True, "candidate_id": candidatos[k - 1]["id"]}
 
-    decisao = interpret(texto)
+    # Sem pendência aberta não há o que confirmar — e classificar aqui gastaria
+    # uma chamada de modelo em toda mensagem comum do usuário.
+    if not pendente:
+        return None
+
+    decisao = await interpret_text(texto, (pendente or {}).get("summary", ""))
     return None if decisao is None else {"approved": decisao}

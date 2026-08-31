@@ -12,7 +12,11 @@ import logging
 from langgraph.types import interrupt
 
 from app.domain.dates import local_datetime_iso
-from app.graph.policy import describe_for_confirmation, needs_confirmation
+from app.graph.policy import (
+    describe_for_confirmation,
+    dominio_incerto,
+    needs_confirmation,
+)
 from app.graph.prompts import FINANCE, FINANCE_QUERY, NOTES, ROUTER, user_turn
 from app.graph.schemas import (
     RULE_APPLIES,
@@ -206,6 +210,40 @@ def _actions(state: AgentState) -> list[FinanceAction | FinanceQuery | NotesActi
     return saida
 
 
+async def domain_gate(state: AgentState) -> dict:
+    """Pergunta QUAL registro quando o roteador não tem certeza — antes de extrair.
+
+    Fica entre o router e o fan-out de domínio de propósito. No gate, depois da
+    extração, a escolha não teria efeito: se o usuário respondesse "nota" e quem
+    tinha rodado fosse o nó de finanças, não existiria `notes_actions` nenhuma
+    para executar. Aqui, a escolha REESCREVE `domains` e o fan-out manda a
+    mensagem para o nó certo — que é a única forma de a resposta valer.
+
+    De quebra, economiza a chamada de extração do domínio errado.
+    """
+    if state.get("halted"):
+        return {}
+    if not dominio_incerto(state.get("domains") or [], state.get("confidence", 1.0)):
+        return {}
+
+    escolha = interrupt(
+        {
+            "kind": "domain",
+            "action_type": "router",
+            "summary": "Como você quer registrar isso?",
+            "options": [
+                {"id": "financas", "label": "Como gasto/receita"},
+                {"id": "notas", "label": "Como nota"},
+            ],
+        }
+    )
+    escolhido = escolha.get("candidate_id") if isinstance(escolha, dict) else escolha
+    if escolhido in {"financas", "notas"}:
+        # confiança 1.0: quem decidiu foi o usuário, não o modelo
+        return {"domains": [escolhido], "confidence": 1.0}
+    return {"results": ["👍 Ok, não registrei nada."], "halted": True}
+
+
 async def resolve_node(state: AgentState) -> dict:
     """Fase Cognitiva: resolve o ALVO de toda ação que mira registro existente.
 
@@ -310,6 +348,7 @@ async def gate(state: AgentState) -> dict:
         return {}
 
     confidence = state.get("confidence", 1.0)
+
     alvos = state.get("targets") or [{}] * len(acoes)
     # zip defensivo: comprimento diferente = não resolvido = não executa
     alvos = (alvos + [{}] * len(acoes))[: len(acoes)]

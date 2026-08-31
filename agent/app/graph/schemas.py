@@ -184,3 +184,16 @@ MONEY_WRITES = {
 # Só leem. Nunca pedem confirmação, nunca gravam em executed_actions.
 # Todo FinanceQueryType é leitura por construção — é o ganho de ter separado.
 READ_ONLY = {*FinanceQueryType, NotesActionType.QUERY_NOTES}
+
+
+class ConfirmDecision(BaseModel):
+    """Classificação de uma resposta digitada a uma pergunta de confirmação.
+
+    Enum de três valores de propósito: sem `unclear`, o modelo seria forçado a
+    escolher entre aprovar e recusar quando o usuário disse "acho que sim" — e a
+    escolha errada apaga dado.
+    """
+
+    decision: Literal["approve", "reject", "unclear"] = Field(
+        description="approve, reject ou unclear"
+    )

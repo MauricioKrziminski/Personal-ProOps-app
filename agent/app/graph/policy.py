@@ -30,6 +30,26 @@ CONFIDENCE_MINIMA = 0.6
 ALWAYS_CONFIRM = {FinanceActionType.PAY_INVOICE}
 
 
+# Abaixo disto o roteador não tem certeza do DOMÍNIO, e a pergunta certa é
+# "como você quer registrar isso?" — antes de extrair qualquer campo. É outra
+# pergunta, em outro momento, que a de confirmar uma ação (CONFIDENCE_MINIMA).
+DOMINIO_MINIMO = 0.8
+
+# Só entre estes dois faz sentido perguntar: são as duas formas de REGISTRAR a
+# mesma frase. "geral" (saudação) e consulta não gravam nada.
+_AMBIGUOS = {"financas", "notas"}
+
+
+def dominio_incerto(domains: list[str], confidence: float) -> bool:
+    """O roteador ficou em cima do muro entre gasto e nota?"""
+    if confidence >= DOMINIO_MINIMO:
+        return False
+    if len(domains) != 1:
+        # multi-intent é o router afirmando os dois, não hesitando entre eles
+        return False
+    return domains[0] in _AMBIGUOS
+
+
 def needs_confirmation(
     action: FinanceAction | FinanceQuery | NotesAction,
     confidence: float,
