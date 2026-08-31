@@ -298,14 +298,18 @@ export function useTransaction(id: string | undefined) {
   return useQuery({
     queryKey: ['transactions', 'item', id],
     enabled: !!id,
-    queryFn: async (): Promise<Transaction> => {
+    queryFn: async (): Promise<Transaction | null> => {
+      // `maybeSingle`, não `single`: linha apagada é um estado NORMAL desta tela
+      // (o usuário acabou de apagar e o realtime invalidou antes do `back()`).
+      // Com `single` isso virava erro, e o detalhe piscava "não deu para carregar"
+      // no lugar do "esse lançamento não existe mais".
       const { data, error } = await supabase
         .from('transactions')
         .select(TRANSACTION_COLUMNS)
         .eq('id', id!)
-        .single();
+        .maybeSingle();
       if (error) throw error;
-      return data as Transaction;
+      return (data as Transaction) ?? null;
     },
   });
 }
@@ -408,6 +412,28 @@ export function usePayInvoice() {
 }
 
 /**
+ * Marca a fatura como paga **sem mexer no saldo**.
+ *
+ * Diferente de `usePayInvoice`: aqui não nasce transferência nenhuma. É para
+ * dado histórico — a fatura de junho já foi paga na vida real, antes de o app
+ * existir, e "pagá-la" agora tiraria do caixa de hoje um dinheiro que saiu há
+ * meses. A RPC também fecha as parcelas `pending` de dentro.
+ */
+export function useSettleInvoice() {
+  const invalidate = useInvalidateFinance();
+  return useMutation({
+    mutationFn: async (input: { invoiceId: string; paidAt: string }) => {
+      const { error } = await supabase.rpc('settle_invoice', {
+        p_invoice_id: input.invoiceId,
+        p_paid_at: input.paidAt,
+      });
+      if (error) throw error;
+    },
+    onSuccess: invalidate,
+  });
+}
+
+/**
  * Compra parcelada: a RPC cria N transações (uma por mês), as futuras como
  * `pending`, e o trigger do banco resolve a fatura de cada parcela.
  */
@@ -490,14 +516,21 @@ export function useAffordability(amountCents: number, installments: number) {
   });
 }
 
-/** Dá baixa num lançamento previsto (pending -> cleared). */
+/**
+ * Dá baixa num lançamento previsto (pending -> cleared).
+ *
+ * Escreve `paid_at`, **não** `occurred_at`. Reescrever a data do lançamento fazia
+ * um boleto de agosto pago em setembro migrar de mês em todo relatório — o mês
+ * fechado encolhia sozinho depois de fechado. As duas datas respondem perguntas
+ * diferentes: quando a despesa aconteceu, e quando o dinheiro saiu.
+ */
 export function useMarkPaid() {
   const invalidate = useInvalidateFinance();
   return useMutation({
     mutationFn: async (input: { id: string; paidAt: string }) => {
       const { error } = await supabase
         .from('transactions')
-        .update({ status: 'cleared', occurred_at: input.paidAt })
+        .update({ status: 'cleared', paid_at: input.paidAt })
         .eq('id', input.id);
       if (error) throw error;
     },
@@ -1142,6 +1175,27 @@ export function useDeleteTransaction() {
   });
 }
 
+/**
+ * Apaga a compra parcelada INTEIRA.
+ *
+ * Um `delete` só: `transactions.installment_plan_id` tem `on delete cascade`,
+ * então as N parcelas caem junto. Antes disso, cancelar uma compra em 12x
+ * significava apagar doze lançamentos um por um, navegando doze meses.
+ *
+ * Não tem "Desfazer": o cascade não volta. Por isso quem chama precisa
+ * confirmar nomeando o estrago (`confirmDestructive`).
+ */
+export function useDeleteInstallmentPlan() {
+  const invalidate = useInvalidateFinance();
+  return useMutation({
+    mutationFn: async (planId: string) => {
+      const { error } = await supabase.from('installment_plans').delete().eq('id', planId);
+      if (error) throw error;
+    },
+    onSuccess: invalidate,
+  });
+}
+
 /** Cria ou edita (mesma forma de useSaveTransaction: com `id` vira update). */
 export function useSaveAccount() {
   const invalidate = useInvalidateFinance();
@@ -1478,11 +1532,15 @@ export interface CardInvoiceHistory {
 /**
  * Histórico de faturas de um cartão.
  *
- * `card_summary()` devolve só a fatura aberta mais antiga — paga a fatura, ela
- * some do app. Aqui a lista vem de `card_invoices` e o total de cada uma sai da
- * soma das compras (`invoice_id`), porque o total **nunca é materializado**.
+ * `card_summary()` devolve UMA fatura por cartão (a corrente). Aqui a lista vem de
+ * `card_invoices` e o total de cada uma sai da soma das compras (`invoice_id`),
+ * porque o total **nunca é materializado**.
+ *
+ * Default 60 (o teto), não 12: é esta lista que diz ao navegador de faturas quem
+ * é o mês vizinho. Com janela curta, quem tem três anos de cartão pararia de
+ * navegar num ponto arbitrário — sem erro e sem aviso.
  */
-export function useCardInvoices(accountId: string | undefined, months = 12) {
+export function useCardInvoices(accountId: string | undefined, months = 60) {
   useRealtimeInvalidate('card_invoices', ['card-invoices']);
   useRealtimeInvalidate('transactions', ['card-invoices']);
   return useQuery({

@@ -1428,6 +1428,7 @@ export type Database = {
           kind: string
           merchant: string | null
           occurred_at: string
+          paid_at: string | null
           recurring_id: string | null
           source: string
           status: string
@@ -1453,6 +1454,7 @@ export type Database = {
           kind: string
           merchant?: string | null
           occurred_at?: string
+          paid_at?: string | null
           recurring_id?: string | null
           source?: string
           status?: string
@@ -1478,6 +1480,7 @@ export type Database = {
           kind?: string
           merchant?: string | null
           occurred_at?: string
+          paid_at?: string | null
           recurring_id?: string | null
           source?: string
           status?: string
@@ -1741,6 +1744,9 @@ export type Database = {
           invoice_id: string
           invoice_total_cents: number
           name: string
+          oldest_overdue_invoice_id: string | null
+          overdue_count: number
+          overdue_total_cents: number
           reference_month: string
           unpaid_total_cents: number
         }[]
@@ -1895,6 +1901,9 @@ export type Database = {
           invoice_id: string
           invoice_total_cents: number
           name: string
+          oldest_overdue_invoice_id: string | null
+          overdue_count: number
+          overdue_total_cents: number
           reference_month: string
           unpaid_total_cents: number
         }[]
@@ -2037,6 +2046,10 @@ export type Database = {
       }
       pay_invoice: {
         Args: { p_account_id: string; p_invoice_id: string; p_paid_at?: string }
+        Returns: string
+      }
+      settle_invoice: {
+        Args: { p_invoice_id: string; p_paid_at?: string }
         Returns: string
       }
       payoff_strategy: {

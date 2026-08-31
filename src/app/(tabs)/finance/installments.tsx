@@ -23,11 +23,13 @@ import { ProgressBar } from '@/components/ui/sparkline';
 import { Motion, Radius, Space, tabular } from '@/design/tokens';
 import {
   useAccounts,
+  useDeleteInstallmentPlan,
   useInstallmentPlans,
   type InstallmentPlanSummary,
 } from '@/hooks/use-finance';
 import { formatBRL, formatDateBR, localISODate } from '@/hooks/use-items';
-import { showItemActions } from '@/lib/item-actions';
+import { useToast } from '@/components/ui/toast';
+import { confirmDestructive, showItemActions } from '@/lib/item-actions';
 import { useTheme } from '@/hooks/use-theme';
 
 /**
@@ -76,7 +78,9 @@ function Bar({ ratio, index, destaque }: { ratio: number; index: number; destaqu
 
 export default function InstallmentsScreen() {
   const theme = useTheme();
+  const toast = useToast();
   const plans = useInstallmentPlans();
+  const removePlan = useDeleteInstallmentPlan();
   const accounts = useAccounts();
   const [aberto, setAberto] = useState<string | null>(null);
   const [verTerminadas, setVerTerminadas] = useState(false);
@@ -161,7 +165,37 @@ export default function InstallmentsScreen() {
       ...(plano.account_id
         ? [{ label: 'Ver o cartão', onPress: () => router.push('/finance/cards') }]
         : []),
+      {
+        label: 'Apagar a compra inteira',
+        icon: 'trash' as const,
+        destructive: true,
+        onPress: () => apagarPlano(plano),
+      },
     ]);
+  };
+
+  /**
+   * Apagar o plano some com TODAS as parcelas (cascade em `installment_plan_id`).
+   *
+   * Esta tela documentava a ausência como decisão — "não se apaga, porque apagar
+   * o plano faz cascade nas dez linhas do extrato". A decisão mudou: o cascade é
+   * exatamente o que se quer quando a compra foi cancelada ou lançada errada, e a
+   * alternativa era apagar dez lançamentos um por um, navegando dez meses.
+   *
+   * Sem "Desfazer" (o cascade não volta), então a confirmação nomeia o estrago.
+   */
+  const apagarPlano = (plano: InstallmentPlanSummary) => {
+    confirmDestructive(
+      'Apagar a compra parcelada inteira?',
+      'Apagar tudo',
+      () =>
+        removePlan.mutate(plano.id, {
+          onSuccess: () => toast({ message: `Apaguei ${plano.title} e as parcelas.`, tone: 'success' }),
+          onError: () =>
+            toast({ message: 'Não deu para apagar a compra. Tenta de novo.', tone: 'error' }),
+        }),
+      `Some as ${plano.installments} parcelas de ${plano.title}, ${formatBRL(plano.total_cents)} no total — de todos os meses. Isso não volta.`,
+    );
   };
 
   const bloco = (plano: InstallmentPlanSummary, index: number) => {

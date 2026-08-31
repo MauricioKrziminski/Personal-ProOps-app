@@ -148,7 +148,10 @@ export default function TransactionFormScreen() {
     );
   }
 
-  return <TransactionForm editing={query.data} />;
+  // `?? undefined`: `useTransaction` devolve null quando a linha não existe mais
+  // (maybeSingle), e "não achei" e "não estou editando" são o mesmo caso aqui —
+  // o form abre em branco, que é o comportamento de criar.
+  return <TransactionForm editing={query.data ?? undefined} />;
 }
 
 function TransactionForm({ editing }: { editing?: Transaction }) {

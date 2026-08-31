@@ -13,15 +13,19 @@ import { Field, TextField } from '@/components/ui/field';
 import { Icon } from '@/components/ui/icon';
 import { Money } from '@/components/ui/money';
 import { Row, Section } from '@/components/ui/row';
+import { HeaderMenu } from '@/components/ui/header-actions';
+import { InvoicePager } from '@/components/finance/invoice-pager';
 import { Screen } from '@/components/ui/screen';
 import { Skeleton, SkeletonRow } from '@/components/ui/skeleton';
 import { useToast } from '@/components/ui/toast';
 import { Motion, Radius, Space, tabular } from '@/design/tokens';
 import {
   useAccounts,
+  useCardInvoices,
   useDeleteTransaction,
   useInvoice,
   usePayInvoice,
+  useSettleInvoice,
   type Transaction,
 } from '@/hooks/use-finance';
 import { formatBRL, formatDateBR, localISODate, useRealtimeInvalidate } from '@/hooks/use-items';
@@ -107,6 +111,7 @@ export default function InvoiceScreen() {
   const invoice = useInvoice(id);
   const accounts = useAccounts();
   const pay = usePayInvoice();
+  const settle = useSettleInvoice();
   const remove = useDeleteTransaction();
 
   // `useInvoice` só escuta `transactions`: o fechamento da fatura vem do finance-scheduler e
@@ -138,6 +143,10 @@ export default function InvoiceScreen() {
     }
     return [...mapa.entries()].map(([data, itens]) => ({ data, itens }));
   }, [compras]);
+
+  // Quem são as faturas vizinhas. A janela default do hook é o teto (60): com
+  // janela curta, quem tem anos de cartão pararia de navegar num ponto arbitrário.
+  const vizinhas = useCardInvoices(fatura?.account_id);
 
   const paga = fatura?.status === 'paid';
   const podePagar = Boolean(fatura) && !paga && total > 0;
@@ -182,8 +191,47 @@ export default function InvoiceScreen() {
         }),
     });
 
+  /**
+   * Quitar SEM movimentar dinheiro.
+   *
+   * O caso é dado histórico: as parcelas retroativas criam faturas de meses
+   * passados que, na vida real, já foram pagas antes de o app existir. Pagá-las
+   * pelo botão normal criaria uma transferência e tiraria do saldo de HOJE um
+   * dinheiro que saiu há meses.
+   */
+  const quitarSemCaixa = () => {
+    if (!fatura) return;
+    confirmDestructive(
+      'Marcar como paga sem mexer no saldo?',
+      'Marcar como paga',
+      () => {
+        settle.mutate(
+          { invoiceId: fatura.id, paidAt: localISODate() },
+          {
+            onSuccess: () => toast({ message: 'Fatura marcada como paga.', tone: 'success' }),
+            onError: () =>
+              toast({ message: 'Não deu para marcar a fatura. Tenta de novo?', tone: 'error' }),
+          },
+        );
+      },
+      `A fatura fica quitada e nenhum lançamento de pagamento é criado — seu saldo não muda. Use quando ela já foi paga fora do app.`,
+    );
+  };
+
   const cabecalho = (
     <View style={styles.header}>
+      {/* Andar entre meses. Antes o mês só existia como TÍTULO: para ver a fatura
+          passada não havia caminho nenhum a partir daqui. */}
+      {fatura && (vizinhas.data?.length ?? 0) > 1 ? (
+        <InvoicePager
+          invoices={vizinhas.data ?? []}
+          currentId={fatura.id}
+          onChange={(destino) =>
+            router.setParams({ id: destino })
+          }
+        />
+      ) : null}
+
       {invoice.isLoading ? (
         <>
           <Skeleton height={140} radius={Radius.lg} />
@@ -239,6 +287,27 @@ export default function InvoiceScreen() {
         options={{
           title: fatura ? `Fatura de ${mesLabel(fatura.reference_month)}` : 'Fatura',
         }}
+      />
+
+      <HeaderMenu
+        title="Mais opções"
+        actions={
+          fatura
+            ? [
+                {
+                  label: 'Ver todas as faturas',
+                  icon: 'calendar',
+                  onPress: () => router.push('/finance/invoices'),
+                },
+                {
+                  label: 'Marcar como paga (sem mexer no saldo)',
+                  icon: 'checkmark.circle',
+                  disabled: paga,
+                  onPress: quitarSemCaixa,
+                },
+              ]
+            : []
+        }
       />
 
       <FlatList

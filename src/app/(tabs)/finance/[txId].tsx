@@ -1,5 +1,4 @@
 import { Stack, router, useLocalSearchParams } from 'expo-router';
-import { useMemo } from 'react';
 import { StyleSheet, View } from 'react-native';
 import Animated, { FadeInDown } from 'react-native-reanimated';
 import type { SymbolViewProps } from 'expo-symbols';
@@ -24,8 +23,10 @@ import {
   useDeleteTransaction,
   useInvoice,
   useMarkPaid,
+  useDeleteInstallmentPlan,
+  useInstallmentPlans,
   useSaveTransaction,
-  useTransactions,
+  useTransaction,
   type Transaction,
 } from '@/hooks/use-finance';
 import { formatBRL, formatDateBR, localISODate } from '@/hooks/use-items';
@@ -73,15 +74,20 @@ export default function TransactionDetailScreen() {
   const toast = useToast();
   const params = useLocalSearchParams<{ txId: string; month?: string }>();
   const txId = params.txId;
-  // Sem `useTransaction(id)` no projeto, o detalhe reaproveita a query do mês (mesma queryKey,
-  // então normalmente é acerto de cache). O mês vem por parâmetro de quem navegou.
+  // O mês só serve para voltar ao formulário no contexto certo.
   const month = params.month ?? currentMonth();
 
-  const list = useTransactions({ month });
-  const tx = useMemo(() => (list.data ?? []).find((t) => t.id === txId), [list.data, txId]);
+  // Busca por ID, não dentro da lista do mês. Procurar na lista fazia lançamento
+  // antigo — ou além do `limit(200)` do mês — cair em "não existe mais", que é a
+  // mesma tela de um registro apagado de verdade.
+  const list = useTransaction(txId);
+  const tx = list.data;
 
   const accounts = useAccounts();
   const invoice = useInvoice(tx?.invoice_id ?? undefined);
+  const plans = useInstallmentPlans();
+  const plano = (plans.data ?? []).find((p) => p.id === tx?.installment_plan_id);
+  const removePlan = useDeleteInstallmentPlan();
   const save = useSaveTransaction();
   const remove = useDeleteTransaction();
   const markPaid = useMarkPaid();
@@ -128,6 +134,37 @@ export default function TransactionDetailScreen() {
         onSuccess: () => toast({ message: 'Dupliquei para hoje.', tone: 'success' }),
         onError: () => toast({ message: 'Não deu para duplicar. Tenta de novo.', tone: 'error' }),
       }
+    );
+  };
+
+  /**
+   * Apagar a compra parcelada INTEIRA.
+   *
+   * Cancelar uma compra em 12x significava apagar doze lançamentos um por um,
+   * navegando doze meses. Aqui é um `delete` no plano e o cascade leva as
+   * parcelas.
+   *
+   * Não existe "Desfazer" — o cascade não volta —, então a confirmação nomeia o
+   * estrago inteiro: quantas parcelas e quanto dinheiro.
+   */
+  const confirmDeletePlan = () => {
+    if (!tx?.installment_plan_id) return;
+    const planId = tx.installment_plan_id;
+    const quantas = plano?.installments ?? tx.installment_no ?? 0;
+    const nome = plano?.title ?? tx.description ?? 'esta compra';
+    confirmDestructive(
+      'Apagar a compra parcelada inteira?',
+      'Apagar tudo',
+      () =>
+        removePlan.mutate(planId, {
+          onSuccess: () => {
+            router.back();
+            toast({ message: `Apaguei ${nome} e as parcelas.`, tone: 'success' });
+          },
+          onError: () =>
+            toast({ message: 'Não deu para apagar a compra. Tenta de novo.', tone: 'error' }),
+        }),
+      `Some ${quantas > 0 ? `${quantas} parcelas` : 'todas as parcelas'}${plano ? `, ${formatBRL(plano.total_cents)} no total` : ''} — de todos os meses. Isso não volta.`,
     );
   };
 
@@ -224,7 +261,22 @@ export default function TransactionDetailScreen() {
             })),
           },
           { label: 'Duplicar', icon: 'plus.square.on.square', onPress: duplicate },
-          { label: 'Apagar', icon: 'trash', destructive: true, onPress: confirmDelete },
+          {
+            label: tx.installment_plan_id ? 'Apagar só esta parcela' : 'Apagar',
+            icon: 'trash',
+            destructive: true,
+            onPress: confirmDelete,
+          },
+          ...(tx.installment_plan_id
+            ? [
+                {
+                  label: 'Apagar a compra inteira',
+                  icon: 'trash' as const,
+                  destructive: true,
+                  onPress: confirmDeletePlan,
+                },
+              ]
+            : []),
         ]}
       />
 
@@ -309,9 +361,21 @@ export default function TransactionDetailScreen() {
           ) : null}
           {tx.installment_plan_id ? (
             <Row
-              title={tx.installment_no ? `Parcela ${tx.installment_no}` : 'Compra parcelada'}
-              subtitle="As outras parcelas aparecem no mês de cada uma"
+              title={
+                tx.installment_no && plano
+                  ? `Parcela ${tx.installment_no} de ${plano.installments}`
+                  : tx.installment_no
+                    ? `Parcela ${tx.installment_no}`
+                    : 'Compra parcelada'
+              }
+              subtitle={
+                plano
+                  ? `${formatBRL(plano.total_cents)} no total · ver todas as parcelas`
+                  : 'Ver todas as parcelas'
+              }
               icon="rectangle.split.3x1"
+              accessibilityLabel="Ver a compra parcelada inteira"
+              onPress={() => router.push('/finance/installments')}
             />
           ) : null}
         </Section>

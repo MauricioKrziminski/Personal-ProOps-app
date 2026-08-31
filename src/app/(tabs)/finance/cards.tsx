@@ -15,6 +15,7 @@ import { Card } from '@/components/ui/card';
 import { EmptyState } from '@/components/ui/empty-state';
 import { Icon } from '@/components/ui/icon';
 import { Money } from '@/components/ui/money';
+import { Row, Section } from '@/components/ui/row';
 import { Screen } from '@/components/ui/screen';
 import { HeroLabel } from '@/components/ui/section-head';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -176,6 +177,7 @@ export default function CardsScreen() {
 
       {lista.map((card, index) => {
         const estado = estadoFatura(card);
+        const atrasadas = Number(card.overdue_count ?? 0);
         const totalFatura = Number(card.invoice_total_cents ?? 0);
         const naoPago = Number(card.unpaid_total_cents ?? 0);
         const limite = Number(card.credit_limit_cents ?? 0);
@@ -190,6 +192,29 @@ export default function CardsScreen() {
             entering={FadeInDown.duration(Motion.duration.slow).delay(
               Math.min(index * Motion.stagger.step, Motion.stagger.cap)
             )}>
+            {/* O card mostra a fatura CORRENTE. Fatura vencida não pode sumir por
+                causa disso — ela vira a faixa acima, que leva direto à mais antiga. */}
+            {atrasadas > 0 && card.oldest_overdue_invoice_id ? (
+              <Section>
+                <Row
+                  icon="exclamationmark.triangle.fill"
+                  destructive
+                  title={
+                    atrasadas === 1
+                      ? 'Fatura atrasada'
+                      : `${atrasadas} faturas atrasadas`
+                  }
+                  subtitle={formatBRL(Number(card.overdue_total_cents ?? 0))}
+                  onPress={() =>
+                    router.push({
+                      pathname: '/finance/invoice/[id]',
+                      params: { id: card.oldest_overdue_invoice_id! },
+                    })
+                  }
+                />
+              </Section>
+            ) : null}
+
             <PressCard
               onPress={() => irParaFatura(card)}
               accessibilityLabel={`${card.name}, ${estado ? `fatura ${estado.toLowerCase()}` : 'sem fatura aberta'}, ${formatBRL(totalFatura)}${card.due_date ? `, ${prazoLabel(card.due_date, 'vence')}` : ''}`}>
@@ -272,6 +297,19 @@ export default function CardsScreen() {
           </Animated.View>
         );
       })}
+
+      {/* A tela de histórico existia e a única porta era Financeiro > Gerenciar >
+          "Faturas anteriores" — longe de quem está olhando o cartão. */}
+      {!cards.isLoading && !cards.isError && lista.length > 0 ? (
+        <Section>
+          <Row
+            icon="calendar"
+            title="Faturas anteriores"
+            subtitle="Ver as faturas fechadas e pagas"
+            onPress={() => router.push('/finance/invoices')}
+          />
+        </Section>
+      ) : null}
 
       {!cards.isLoading && !cards.isError && lista.length === 0 ? (
         <EmptyState
