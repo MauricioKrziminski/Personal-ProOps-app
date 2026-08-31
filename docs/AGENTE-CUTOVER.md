@@ -7,6 +7,26 @@
 > Contexto arquitetural em `CLAUDE.md` e `.claude/rules/agent.md`.
 > Plano completo da migração em `~/.claude/plans/voc-um-engenheiro-glittery-pike.md`.
 
+## Onde o código está (leia antes de qualquer coisa)
+
+**Tudo vive na branch `gabriel/agente-python`, já enviada para o remoto e NÃO
+mesclada.** Na `main` o diretório `agent/` não existe — um `git checkout main`
+remove os 64 arquivos do serviço, e eles voltam ao trocar de volta.
+
+```bash
+git checkout gabriel/agente-python   # obrigatório para mexer no agente
+cd agent && .venv/bin/python -m pytest -q   # 64 verdes
+```
+
+O `.venv` e o `.env` não são versionados e sobrevivem à troca de branch. As
+regras que ignoram bytecode do Python estão no `.gitignore` **da branch** e
+também em `.git/info/exclude` (local) — sem o segundo, todo `.pyc` aparecia como
+arquivo novo ao voltar para a `main`.
+
+**O contexto do ERP não está aqui.** Aquela migração (transferência de posse dos
+projetos Firebase) tem runbook próprio no repositório do ERP, em
+`docs/gcp-ownership-runbook.md`. São produtos diferentes; não misture.
+
 ## O que já está de pé
 
 | | |
@@ -83,12 +103,58 @@ ENV_FILE=agent/.env.staging ./scripts/setup-gcp.sh deploy
 Mesmo projeto GCP, serviço e fila separados. Custo adicional ~zero
 (`min-instances=0`).
 
-## Como se testa, na prática
+## Como se testa: pelo WhatsApp de verdade
+
+O caminho principal **não** é script. É conversar pelo app, com o backend de
+staging atrás:
 
 ```
-scripts/fake_meta.py  →  Cloud Run staging  →  banco de staging
-                                            →  WhatsApp REAL (sua resposta chega)
+seu WhatsApp → Meta → Edge Function (Deno)
+                        ↓ routes_to_python(seu número) = true
+                      Cloud Run STAGING → banco de STAGING
+                        ↓
+                      resposta no seu WhatsApp
 ```
+
+O truque é `PYTHON_AGENT_URL` apontar para o serviço de **staging**. Você digita
+como qualquer usuário e tudo cai no banco descartável.
+
+```bash
+npx supabase secrets set PYTHON_AGENT_URL=https://agente-staging-942030719023.southamerica-east1.run.app/whatsapp-inbound
+npx supabase functions deploy whatsapp-webhook
+
+psql "$SUPABASE_DB_URL" -c "insert into public.agent_routing (phone, use_python_agent)
+  values ('55DDD9XXXXXXXX', true)"
+```
+
+Depois é abrir o WhatsApp: *"gastei 45 no mercado"*, *"quanto gastei esse mês?"*,
+*"apaga o último"* → ele pergunta → *"sim"*.
+
+Ciclo de mudança: editar → `SERVICE=agente-staging ENV_FILE=agent/.env.staging
+./scripts/setup-gcp.sh deploy` → testar de novo pelo WhatsApp. Um comando entre
+uma versão e outra.
+
+⚠️ **`agent_routing` fica no banco de PRODUÇÃO** (é a Edge Function de produção
+que consulta), mas o agente escreve no de **staging**. Então seu telefone precisa
+existir em `profiles` **no staging** também, senão a resposta é "não encontrei
+sua conta".
+
+Passar para produção depois é só apontar o `PYTHON_AGENT_URL` para o serviço de
+produção — sem mexer no roteamento nem no número.
+
+## O script, e para que ele serve
+
+`scripts/fake_meta.py` **não é mock**: monta o payload no formato da Meta,
+assina com o `WHATSAPP_APP_SECRET` real e faz POST no Cloud Run que está no ar.
+HMAC, fila, debounce, grafo, Gemini, banco e a resposta pela Graph API — tudo
+real. Só "a Meta enviou isto" é simulado.
+
+Ele resolve três coisas que o WhatsApp não faz bem:
+
+- **rajada** — três mensagens em menos de 3s para testar o debounce
+- **repetição** — a mesma bateria depois de cada mudança, sempre igual
+- **independência da Meta** — testa o Cloud Run direto se o webhook estiver mal
+  configurado
 
 ```bash
 cd agent
@@ -96,19 +162,8 @@ export WHATSAPP_APP_SECRET=$(grep '^WHATSAPP_APP_SECRET=' .env.staging | cut -d=
 export AGENT_URL=https://agente-staging-942030719023.southamerica-east1.run.app
 export TEST_PHONE=55DDD9XXXXXXXX      # SEU número, cadastrado no staging
 
-python scripts/fake_meta.py "gastei 45 no mercado"
 python scripts/fake_meta.py --burst "mercado 45" "uber 30" "recebi 500 de freela"
-python scripts/fake_meta.py "apaga o último"      # deve PERGUNTAR antes
-python scripts/fake_meta.py "sim"                 # e só então apagar
 ```
-
-Você **recebe a resposta no WhatsApp de verdade** — o agente responde pela Graph
-API com o token real. O que é simulado é apenas "a Meta enviou isto"; o resto do
-caminho é produção.
-
-**Pré-requisito:** seu telefone precisa existir em `profiles` no banco de
-staging, senão o agente responde "não encontrei sua conta". Crie a conta pelo
-app apontado para staging, ou insira a linha à mão.
 
 ---
 
