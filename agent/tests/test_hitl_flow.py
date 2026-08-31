@@ -40,9 +40,6 @@ def grafo(monkeypatch):
         # o plano já vem pronto no estado inicial: o dublê só não chama o modelo
         return {}
 
-    async def executar_falso(state, *a, **k):
-        return {"results": [*state.get("results", []), "EXECUTOU"]}
-
     async def _executar_falso(state, indexadas):
         """Dublê no ponto onde as DUAS fases passam (segura e pós-SIM).
 
@@ -68,7 +65,6 @@ def grafo(monkeypatch):
     monkeypatch.setattr(nodes.resolve, "for_actions", alvos_falso)
     monkeypatch.setattr(nodes, "route", router_falso)
     monkeypatch.setattr(nodes, "finance_node", financas_falso)
-    monkeypatch.setattr(nodes, "execute_node", executar_falso)
     # o build resolve os nós no momento da montagem
     import importlib
 
@@ -91,7 +87,8 @@ def _estado(acoes):
 async def test_gasto_comum_executa_sem_perguntar(grafo):
     config = {"configurable": {"thread_id": "sem-pergunta"}}
     estado = await grafo.ainvoke(
-        _estado([{"type": FinanceActionType.CREATE_EXPENSE.value, "amount_cents": 4500}]),
+        _estado([{"type": FinanceActionType.CREATE_EXPENSE.value, "amount_cents": 4500,
+             "category": "mercado"}]),
         config=config,
     )
     assert "__interrupt__" not in estado
@@ -129,7 +126,8 @@ async def test_nao_cancela_sem_executar(grafo):
 async def test_valor_alto_tambem_para(grafo):
     config = {"configurable": {"thread_id": "valor-alto"}}
     estado = await grafo.ainvoke(
-        _estado([{"type": FinanceActionType.CREATE_EXPENSE.value, "amount_cents": 480_000}]),
+        _estado([{"type": FinanceActionType.CREATE_EXPENSE.value, "amount_cents": 480_000,
+                  "category": "reforma"}]),
         config=config,
     )
     valor = getattr(estado["__interrupt__"][0], "value", estado["__interrupt__"][0])
@@ -145,7 +143,8 @@ async def test_fast_path_nao_consome_mensagem_da_cota(grafo):
 
     config = {"configurable": {"thread_id": "fast-path"}}
     estado = await grafo.ainvoke(
-        _estado([{"type": FinanceActionType.CREATE_EXPENSE.value, "amount_cents": 4500}]),
+        _estado([{"type": FinanceActionType.CREATE_EXPENSE.value, "amount_cents": 4500,
+             "category": "mercado"}]),
         config=config,
     )
     # o dublê de router devolve o fast-path (sem llm_calls); nada a cobrar
@@ -287,7 +286,8 @@ async def test_lote_misto_grava_o_seguro_e_pergunta_o_sensivel(monkeypatch, graf
 
     estado = await grafo.ainvoke(
         _estado([
-            {"type": FinanceActionType.CREATE_EXPENSE.value, "amount_cents": 4500},
+            {"type": FinanceActionType.CREATE_EXPENSE.value, "amount_cents": 4500,
+             "category": "mercado"},
             {"type": "delete_transaction"},
         ]),
         config=cfg,
@@ -318,7 +318,8 @@ async def test_nao_no_lote_misto_preserva_o_que_ja_foi_gravado(monkeypatch, graf
 
     await grafo.ainvoke(
         _estado([
-            {"type": FinanceActionType.CREATE_EXPENSE.value, "amount_cents": 4500},
+            {"type": FinanceActionType.CREATE_EXPENSE.value, "amount_cents": 4500,
+             "category": "mercado"},
             {"type": "delete_transaction"},
         ]),
         config=cfg,
@@ -384,3 +385,24 @@ async def test_numero_digitado_tambem_chega_inteiro_no_gate(monkeypatch, grafo):
 
     assert "EXECUTOU" in final.get("results", [])
     assert final["chosen_id"] == "a"
+
+
+@pytest.mark.asyncio
+async def test_acao_sem_valor_pede_o_dado_e_NAO_vira_pergunta(grafo):
+    """O bug do "Confirma registrar None em 12x?", no grafo inteiro.
+
+    Duas coisas têm que valer ao mesmo tempo: nenhum `interrupt` (não dá para
+    confirmar uma ação sem valor) e uma resposta que PEDE o valor — recusar em
+    silêncio seria só outra forma de falhar.
+    """
+    estado = await grafo.ainvoke(
+        _estado([{"type": FinanceActionType.CREATE_INSTALLMENT_PURCHASE.value,
+                  "installments": 12}]),
+        config={"configurable": {"thread_id": "sem-valor"}},
+    )
+
+    assert "__interrupt__" not in estado
+    assert "None" not in estado["reply"]
+    assert "valor" in estado["reply"].lower()
+    assert "12x" in estado["reply"]
+    assert "EXECUTOU" not in estado.get("results", [])

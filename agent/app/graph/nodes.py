@@ -25,6 +25,7 @@ from app.graph.schemas import (
     NotesPlan,
     RouterDecision,
 )
+from app.domain.required import faltando
 from app.graph.state import AgentState
 from app.tools import resolve
 from app.services import gemini
@@ -224,13 +225,37 @@ async def resolve_node(state: AgentState) -> dict:
     acoes = _actions(state)
     if not acoes:
         return {}
+    # A validação vale para TODO lote, inclusive o que não mira registro
+    # existente — o bug do "registrar None em 12x" era exatamente uma criação,
+    # que não passa pelo resolver. Sair antes daqui pulava o esclarecimento.
+    esclarecimentos = _esclarecimentos(state, acoes)
+
     if not any(getattr(a, "type", None) in resolve.TARGETS for a in acoes):
-        return {"targets": [{} for _ in acoes]}
+        return {"targets": [{} for _ in acoes], "results": esclarecimentos}
 
     alvos = await resolve.for_actions(
         state["workspace_id"], acoes, state.get("text", "")
     )
-    return {"targets": alvos}
+    return {"targets": alvos, "results": esclarecimentos}
+
+
+def _incompletas(state: AgentState, acoes: list) -> dict[int, str]:
+    """Índice -> pergunta, para toda ação que não tem o que precisa.
+
+    Determinístico e puro: o modelo pode mudar, "lançamento precisa de valor"
+    não muda. Roda ANTES do gate — é o que impede uma ação sem valor de virar
+    `pending_actions` e produzir "Confirma registrar None em 12x?".
+    """
+    texto = state.get("text", "")
+    return {
+        i: pergunta
+        for i, acao in enumerate(acoes)
+        if (pergunta := faltando(acao, texto)) is not None
+    }
+
+
+def _esclarecimentos(state: AgentState, acoes: list) -> list[str]:
+    return [*state.get("results", []), *_incompletas(state, acoes).values()]
 
 
 async def safe_node(state: AgentState) -> dict:
@@ -253,9 +278,10 @@ async def safe_node(state: AgentState) -> dict:
 
     confidence = state.get("confidence", 1.0)
     alvos = (list(state.get("targets") or []) + [{}] * len(acoes))[: len(acoes)]
+    bloqueadas = _incompletas(state, acoes)
     seguras = [
         (i, a) for i, (a, t) in enumerate(zip(acoes, alvos))
-        if not needs_confirmation(a, confidence, t or None)
+        if i not in bloqueadas and not needs_confirmation(a, confidence, t or None)
     ]
     if not seguras or len(seguras) == len(acoes):
         # nada sensível no lote: deixa tudo para o `executar` de sempre, para
@@ -291,6 +317,8 @@ async def gate(state: AgentState) -> dict:
     # 1) Empate tem precedência: escolher o alvo JÁ É o consentimento explícito,
     #    numa ida e volta só. Perguntar "qual?" e depois "confirma?" seria duas.
     for i, (acao, alvo) in enumerate(zip(acoes, alvos)):
+        if i in _incompletas(state, acoes):
+            continue
         if alvo.get("status") == "ambiguous":
             escolha = interrupt(
                 {
@@ -328,9 +356,13 @@ async def gate(state: AgentState) -> dict:
                 "halted": True,
             }
 
+    # Ação incompleta não vira pergunta: o usuário já recebeu o pedido do que
+    # falta, e confirmar "registrar None" não é uma decisão que dá para tomar.
+    bloqueadas = _incompletas(state, acoes)
     motivos = [
         (a, alvo, needs_confirmation(a, confidence, alvo or None))
-        for a, alvo in zip(acoes, alvos)
+        for i, (a, alvo) in enumerate(zip(acoes, alvos))
+        if i not in bloqueadas
     ]
     pendentes = [(a, t, m) for a, t, m in motivos if m]
     if not pendentes:
@@ -417,7 +449,8 @@ async def _executar(state: AgentState, indexadas: list[tuple[int, object]]) -> l
 
 
 async def execute_node(state: AgentState) -> dict:
-    acoes = list(enumerate(_actions(state)))
+    bloqueadas = _incompletas(state, _actions(state))
+    acoes = [(i, a) for i, a in enumerate(_actions(state)) if i not in bloqueadas]
     linhas = await _executar(state, acoes)
     # `results` tem reducer `_replace`: somar ao que já veio da fase segura é o
     # que preserva o "já fiz X" na resposta consolidada.
