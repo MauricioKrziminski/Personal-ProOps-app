@@ -43,6 +43,19 @@ def grafo(monkeypatch):
     async def executar_falso(state):
         return {"results": [*state.get("results", []), "EXECUTOU"]}
 
+    async def alvos_falso(workspace_id, acoes, texto_cru):
+        """Dublê da Fase Cognitiva: alvo único e resolvido, salvo se o teste
+        tiver pré-carregado `targets` no estado inicial."""
+        from app.tools import resolve as _r
+
+        return [
+            {"table": "transactions", "status": "found",
+             "candidates": [{"id": "tx-1", "label": "gasto de R$ 45,00 em *mercado*"}]}
+            if getattr(a, "type", None) in _r.TARGETS else {}
+            for a in acoes
+        ]
+
+    monkeypatch.setattr(nodes.resolve, "for_actions", alvos_falso)
     monkeypatch.setattr(nodes, "route", router_falso)
     monkeypatch.setattr(nodes, "finance_node", financas_falso)
     monkeypatch.setattr(nodes, "execute_node", executar_falso)
@@ -150,3 +163,89 @@ def test_chamadas_de_modelo_somam_no_fan_out():
     # router (1) e depois os dois domínios do fan-out (1 + 1) = 3
     assert soma(soma(0, 1), 1) == 2
     assert soma(soma(soma(0, 1), 1), 1) == 3
+
+
+# ---------------------------------------------------------------------------
+# Freeze Frame: o alvo é resolvido ANTES da pergunta e congelado no checkpoint
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.asyncio
+async def test_pergunta_cita_a_linha_real_e_nao_o_eco_do_modelo(grafo):
+    """O bug que originou tudo: o usuário lia "apagar a nota sobre última
+    mensagem" — o texto que o MODELO escreveu — em vez do registro de verdade."""
+    estado = await grafo.ainvoke(
+        _estado(
+            [{"type": "delete_transaction", "description": "última mensagem"}]
+        ),
+        config={"configurable": {"thread_id": "freeze-1"}},
+    )
+    pausa = estado["__interrupt__"][0]
+    valor = pausa.value if hasattr(pausa, "value") else pausa
+
+    assert "R$ 45,00" in valor["summary"], valor["summary"]
+    assert "última mensagem" not in valor["summary"]
+
+
+@pytest.mark.asyncio
+async def test_alvo_ambiguo_vira_escolha_e_so_id_da_lista_aprova(monkeypatch, grafo):
+    from app.graph import nodes
+
+    async def dois_candidatos(workspace_id, acoes, texto_cru):
+        return [{"table": "transactions", "status": "ambiguous",
+                 "candidates": [{"id": "a", "label": "gasto de R$ 45"},
+                                {"id": "b", "label": "gasto de R$ 80"}]}
+                for _ in acoes]
+
+    monkeypatch.setattr(nodes.resolve, "for_actions", dois_candidatos)
+    cfg = {"configurable": {"thread_id": "freeze-2"}}
+
+    estado = await grafo.ainvoke(_estado([{"type": "delete_transaction"}]), config=cfg)
+    pausa = estado["__interrupt__"][0]
+    valor = pausa.value if hasattr(pausa, "value") else pausa
+    assert valor["kind"] == "choice"
+    assert [o["id"] for o in valor["options"]] == ["a", "b"]
+
+    # um "sim" NÃO escolhe nada: aprovar sem escolher é voltar a adivinhar
+    final = await grafo.ainvoke(Command(resume=True), config=cfg)
+    assert "EXECUTOU" not in final.get("results", [])
+
+
+@pytest.mark.asyncio
+async def test_escolha_valida_congela_o_id_e_executa(monkeypatch, grafo):
+    from app.graph import nodes
+
+    async def dois_candidatos(workspace_id, acoes, texto_cru):
+        return [{"table": "transactions", "status": "ambiguous",
+                 "candidates": [{"id": "a", "label": "gasto de R$ 45"},
+                                {"id": "b", "label": "gasto de R$ 80"}]}
+                for _ in acoes]
+
+    monkeypatch.setattr(nodes.resolve, "for_actions", dois_candidatos)
+    cfg = {"configurable": {"thread_id": "freeze-3"}}
+
+    await grafo.ainvoke(_estado([{"type": "delete_transaction"}]), config=cfg)
+    final = await grafo.ainvoke(Command(resume="b"), config=cfg)
+
+    assert "EXECUTOU" in final.get("results", [])
+    assert final.get("chosen_id") == "b"
+    # o alvo ficou CONGELADO no id escolhido, não em "o mais recente"
+    assert final["targets"][0]["candidates"] == [{"id": "b", "label": "gasto de R$ 80"}]
+
+
+@pytest.mark.asyncio
+async def test_id_inventado_no_resume_nao_executa(monkeypatch, grafo):
+    from app.graph import nodes
+
+    async def dois_candidatos(workspace_id, acoes, texto_cru):
+        return [{"table": "transactions", "status": "ambiguous",
+                 "candidates": [{"id": "a", "label": "x"}, {"id": "b", "label": "y"}]}
+                for _ in acoes]
+
+    monkeypatch.setattr(nodes.resolve, "for_actions", dois_candidatos)
+    cfg = {"configurable": {"thread_id": "freeze-4"}}
+
+    await grafo.ainvoke(_estado([{"type": "delete_transaction"}]), config=cfg)
+    final = await grafo.ainvoke(Command(resume="id-que-nao-existe"), config=cfg)
+
+    assert "EXECUTOU" not in final.get("results", [])

@@ -26,6 +26,7 @@ from langgraph.types import Command
 
 from app import db
 from app.config import get_settings
+from app.domain import confirm
 from app.domain.confirm import interpret
 from app.security import effective_thread_id, sanitize_untrusted
 from app.services import gemini, groq, telemetry, whatsapp
@@ -84,7 +85,11 @@ async def process_thread(thread_id: str) -> dict:
 
         # done ANTES do envio: a fonte da verdade já está salva
         await db.mark_done(ids)
-        if resposta:
+        if isinstance(resposta, dict):
+            # pergunta interativa; o `mark_done` acima continua vindo ANTES do
+            # envio, que é a ordem que impede reprocessar por falha de envio
+            await whatsapp.try_send_interactive(phone, resposta)
+        elif resposta:
             await whatsapp.try_send(phone, resposta)
         return {"claimed": len(ids), "status": "ok"}
 
@@ -138,12 +143,22 @@ async def _extract_batch(lote: list[dict]) -> dict | None:
     """
     textos: list[str] = []
     media: dict[str, str] | None = None
+    clicked_id: str | None = None
 
     for item in lote:
         mensagem = item["payload"]
         tipo = mensagem.get("type")
 
-        if tipo == "text":
+        if tipo == "interactive":
+            # Sem este ramo, o clique caía no `return None` lá embaixo e o
+            # usuário recebia "não consegui ler isso" — com a pendência presa até
+            # o TTL de 10 min. Botão sem tratar a entrada é PIOR que não ter botão.
+            escolha = _interactive_reply(mensagem)
+            if escolha:
+                clicked_id = escolha["id"]      # o último clique do lote vence
+                textos.append(escolha["title"])
+
+        elif tipo == "text":
             corpo = (mensagem.get("text") or {}).get("body")
             if corpo:
                 textos.append(corpo)
@@ -174,7 +189,21 @@ async def _extract_batch(lote: list[dict]) -> dict | None:
     texto = sanitize_untrusted("\n".join(textos))
     if media and not texto:
         texto = "Extraia os lançamentos deste documento (cupom, comprovante ou fatura)."
-    return {"text": texto, "media": media, "raw_texts": textos}
+    return {"text": texto, "media": media, "raw_texts": textos, "clicked_id": clicked_id}
+
+
+def _interactive_reply(mensagem: dict) -> dict | None:
+    """`{id, title}` do botão/linha clicado, ou None para o resto.
+
+    Só `button_reply` e `list_reply`. `nfm_reply` (Flows) não é usado aqui e cai
+    fora de propósito: tratar como texto deixaria payload de formulário entrar no
+    modelo.
+    """
+    inter = mensagem.get("interactive") or {}
+    escolha = inter.get("button_reply") or inter.get("list_reply")
+    if not escolha or not escolha.get("id"):
+        return None
+    return {"id": escolha["id"], "title": escolha.get("title") or ""}
 
 
 # ---------------------------------------------------------------------------
@@ -182,7 +211,7 @@ async def _extract_batch(lote: list[dict]) -> dict | None:
 # ---------------------------------------------------------------------------
 
 
-async def _run_graph(sessao: dict, lote: list[dict], conteudo: dict) -> str:
+async def _run_graph(sessao: dict, lote: list[dict], conteudo: dict) -> str | dict:
     from app.graph.build import graph
 
     # o epoch já foi resolvido (e girado, se era o caso) no ensure_session
@@ -192,16 +221,27 @@ async def _run_graph(sessao: dict, lote: list[dict], conteudo: dict) -> str:
     # --- fast-path: a mensagem é resposta a uma pergunta? ---
     await db.expire_pending(thread)
     pendente = await db.open_pending(sessao["phone"])
+    decisao = confirm.decide(conteudo, pendente)
+
+    if decisao is confirm.STALE:
+        # clique de uma pergunta que não está mais aberta. NUNCA deixar seguir
+        # para o grafo: o rótulo do botão ("1) R$45 mercado") seria lido como
+        # mensagem nova e viraria um lançamento de verdade.
+        return "⏰ Essa confirmação já expirou. Me manda de novo o que você quer."
+
     if pendente:
-        entrada = _resume_command(conteudo["text"], pendente)
-        if entrada is None:
-            # não foi sim nem não: a intenção mudou. Cancela a pergunta e trata
-            # como mensagem nova — insistir na confirmação prenderia a conversa.
+        if decisao is None:
+            # não foi sim, não, nem escolha: a intenção mudou. Cancela a pergunta
+            # e trata como mensagem nova — insistir prenderia a conversa.
             await db.resolve_pending(pendente["id"], "expired")
         else:
             await db.resolve_pending(
-                pendente["id"], "approved" if entrada.resume else "rejected"
+                pendente["id"], "approved" if decisao.get("approved") else "rejected"
             )
+            # O id CONGELADO vem de `pending_actions`, não de uma busca nova: é o
+            # que garante que o SIM execute o registro que o usuário LEU, mesmo
+            # que outro lançamento tenha entrado entre a pergunta e a resposta.
+            entrada = Command(resume=_congelado(decisao, pendente))
             # retomar exige o thread EXATO em que o interrupt() aconteceu — é o
             # que está gravado no pendente, não o recalculado agora
             retomada = {**config, "configurable": {"thread_id": pendente["thread_id"]}}
@@ -230,6 +270,8 @@ async def _run_graph(sessao: dict, lote: list[dict], conteudo: dict) -> str:
         "finance_queries": [],
         "notes_actions": [],
         "reply": "",
+        "targets": [],
+        "chosen_id": "",
         "confidence": 1.0,
         "llm_calls": 0,
         "approved": False,
@@ -243,18 +285,74 @@ async def _run_graph(sessao: dict, lote: list[dict], conteudo: dict) -> str:
     # --- o grafo pausou pedindo confirmação? ---
     pausa = _interrupt_payload(estado)
     if pausa:
-        pergunta = f"⚠️ Confirma {pausa['summary']}?\nResponde *SIM* ou *NÃO*."
-        await db.create_pending(
+        candidatos = pausa.get("options") or []
+        # O ALVO CONGELADO vai para `pending_actions`: é de lá que o resume lê o
+        # id, e é o que torna a mutação imune ao que entrar no banco no meio.
+        linha = await db.create_pending(
             thread_id=thread,
             phone=sessao["phone"],
             user_id=UUID(str(sessao["user_id"])),
             workspace_id=UUID(str(sessao["workspace_id"])),
-            action={"reason": pausa.get("reason"), "action_type": pausa.get("action_type")},
+            action={
+                "reason": pausa.get("reason"),
+                "action_type": pausa.get("action_type"),
+                "kind": pausa.get("kind"),
+                "candidates": candidatos,
+            },
             summary=pausa["summary"],
         )
-        return pergunta
+        return _pergunta(pausa, candidatos, linha)
 
     return estado.get("reply", "")
+
+
+def _pergunta(pausa: dict, candidatos: list[dict], pendente: dict | None) -> dict | str:
+    """A pergunta, no formato que o número de candidatos pede.
+
+    O texto numerado vai SEMPRE junto (`text`): é o fallback de quem não
+    renderiza interativo e de quem prefere digitar. Sem pendente gravado
+    (corrida com outra pergunta aberta), devolve só texto — os ids dos botões
+    dependem do uuid do pendente.
+    """
+    itens = pausa.get("items") or [pausa["summary"]]
+    if pendente is None:
+        return f"⚠️ Confirma {pausa['summary']}?\nResponde *SIM* ou *NÃO*."
+
+    pid = pendente["id"]
+    numerado = "\n".join(f"{i}) {c['label']}" for i, c in enumerate(candidatos, 1))
+
+    if not candidatos:
+        corpo = "⚠️ Confirma " + ("; ".join(itens) if len(itens) > 1 else pausa["summary"]) + "?"
+        return {
+            "ui": "buttons", "body": corpo,
+            "buttons": [(f"pa:{pid}:ok", "Confirmar"), (f"pa:{pid}:no", "Cancelar")],
+            "text": f"{corpo}\nResponde *SIM* ou *NÃO*.",
+        }
+
+    corpo = f"🤔 {pausa['summary']} — qual deles?"
+    if len(candidatos) <= 2:
+        # 2 opções + "nenhuma dessas" = os 3 botões que a Meta permite
+        return {
+            "ui": "buttons", "body": f"{corpo}\n{numerado}",
+            "buttons": [
+                *[(f"pa:{pid}:c:{c['id']}", f"{i}) {c['label']}")
+                  for i, c in enumerate(candidatos, 1)],
+                (f"pa:{pid}:none", "Nenhuma dessas"),
+            ],
+            "text": f"{corpo}\n{numerado}\nResponde com o número, ou *NENHUMA*.",
+        }
+
+    # 3..10 -> lista. Acima de 10, os 9 mais recentes + a saída.
+    mostrar = candidatos[:9]
+    return {
+        "ui": "list", "body": corpo, "label": "Escolher",
+        "rows": [
+            *[(f"pa:{pid}:c:{c['id']}", f"{i}) {c['label']}", c.get("when", ""))
+              for i, c in enumerate(mostrar, 1)],
+            (f"pa:{pid}:none", "Nenhuma dessas", "Buscar de outro jeito"),
+        ],
+        "text": f"{corpo}\n{numerado}\nResponde com o número, ou *NENHUMA*.",
+    }
 
 
 async def _audit(sessao: dict, estado: dict) -> None:
@@ -278,7 +376,21 @@ async def _audit(sessao: dict, estado: dict) -> None:
     )
 
 
-def _resume_command(texto: str, pendente: dict) -> Command | None:
+def _congelado(decisao: dict, pendente: dict) -> dict | bool:
+    """A decisão, com o alvo congelado que está gravado no pendente.
+
+    Quando o usuário escolheu um candidato, é o id DELE que volta. Quando só
+    confirmou, devolve o booleano — que é a forma que os ramos antigos do gate
+    entendem, e por isso os testes de SIM/NÃO continuam valendo.
+    """
+    if decisao.get("candidate_id"):
+        return {"approved": True, "candidate_id": decisao["candidate_id"]}
+    if decisao.get("none_of_these"):
+        return {"approved": False, "none_of_these": True}
+    return bool(decisao.get("approved"))
+
+
+def _resume_command_legado(texto: str, pendente: dict) -> Command | None:
     """SIM/NÃO por regra pura — zero token na resposta mais comum do fluxo."""
     decisao = interpret(texto)
     return None if decisao is None else Command(resume=decisao)

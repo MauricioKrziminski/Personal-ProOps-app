@@ -153,6 +153,16 @@ class NotesPlan(BaseModel):
 
 
 # Ações que apagam ou alteram dado de forma difícil de desfazer.
+# Regra de categorização do usuário só se aplica a CRIAÇÃO. Em correção e
+# deleção, `category` é campo de BUSCA — deixar a regra reescrevê-lo mudaria
+# QUAL registro é apagado, em silêncio. Em `new_category` também não: ali o
+# usuário ditou a categoria explicitamente, e regra não sobrepõe humano.
+RULE_APPLIES = {
+    FinanceActionType.CREATE_EXPENSE,
+    FinanceActionType.CREATE_INCOME,
+    FinanceActionType.CREATE_INSTALLMENT_PURCHASE,
+}
+
 DESTRUCTIVE = {
     FinanceActionType.DELETE_TRANSACTION,
     FinanceActionType.UNDO_LAST,

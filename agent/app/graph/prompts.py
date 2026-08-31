@@ -71,6 +71,10 @@ Tipos:
   amount_cents/category/description; os de CORREÇÃO são new_amount_cents,
   new_category e new_occurred_at. Nada citado = o último lançamento.
 - delete_transaction: apagar um lançamento específico.
+- Referência ao CONTEXTO ("o último", "isso", "aquele", "a que acabei de criar")
+  NÃO vai em campo de busca: deixe search_term/description VAZIOS. O sistema
+  resolve o alvo e mostra as opções reais. Preencher com a palavra faz buscar
+  literalmente por ela, e não acha nada.
 - undo_last: "apaga o último", "foi engano".
 - create_goal: meta de poupança. target_ref = nome, amount_cents = alvo.
 - goal_deposit: aporte numa meta existente. target_ref = nome da meta.
@@ -138,6 +142,10 @@ Tipos:
   quando (ISO, na hora local do usuário), recurrence = RRULE quando se repete
   ("todo dia 5" -> FREQ=MONTHLY;BYMONTHDAY=5; "todo dia às 8h" -> FREQ=DAILY).
 - delete_reminder: cancelar um lembrete. search_term identifica qual.
+- Referência ao CONTEXTO ("essa última", "a que acabei de mandar", "isso") NÃO é
+  texto de busca: deixe search_term VAZIO. O sistema resolve o alvo e pergunta
+  mostrando as opções reais. Escrever a referência faz buscar literalmente por
+  ela — foi assim que "apagar essa última mensagem" não achou nada.
 - unknown: não é nota nem lembrete.
 
 Regras:

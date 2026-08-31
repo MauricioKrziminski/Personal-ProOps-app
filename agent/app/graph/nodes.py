@@ -15,6 +15,7 @@ from app.domain.dates import local_datetime_iso
 from app.graph.policy import describe_for_confirmation, needs_confirmation
 from app.graph.prompts import FINANCE, FINANCE_QUERY, NOTES, ROUTER, user_turn
 from app.graph.schemas import (
+    RULE_APPLIES,
     Domain,
     FinanceAction,
     FinancePlan,
@@ -25,6 +26,7 @@ from app.graph.schemas import (
     RouterDecision,
 )
 from app.graph.state import AgentState
+from app.tools import resolve
 from app.services import gemini
 from app.tools.base import ExecContext
 from app.tools.finance import apply_rules
@@ -203,6 +205,34 @@ def _actions(state: AgentState) -> list[FinanceAction | FinanceQuery | NotesActi
     return saida
 
 
+async def resolve_node(state: AgentState) -> dict:
+    """Fase Cognitiva: resolve o ALVO de toda ação que mira registro existente.
+
+    Roda ANTES do gate e só LÊ. É o que permite duas coisas que não dá para ter
+    resolvendo depois:
+
+    1. A pergunta cita a LINHA REAL ("apagar o gasto de R$ 45 em mercado, 30/08")
+       em vez do eco do modelo ("apagar a nota sobre última mensagem").
+    2. O id fica CONGELADO no checkpoint. O `gate` reinicia do zero no resume
+       (é o comportamento do interrupt); se a resolução morasse lá, ela rodaria
+       duas vezes e o SIM poderia apagar uma linha diferente da que o usuário leu.
+
+    Sai barato no caso comum: nenhuma query quando o turno só cria ou consulta.
+    """
+    if state.get("halted"):
+        return {}
+    acoes = _actions(state)
+    if not acoes:
+        return {}
+    if not any(getattr(a, "type", None) in resolve.TARGETS for a in acoes):
+        return {"targets": [{} for _ in acoes]}
+
+    alvos = await resolve.for_actions(
+        state["workspace_id"], acoes, state.get("text", "")
+    )
+    return {"targets": alvos}
+
+
 async def gate(state: AgentState) -> dict:
     """Decide se executa direto ou pausa esperando confirmação.
 
@@ -221,23 +251,73 @@ async def gate(state: AgentState) -> dict:
         return {}
 
     confidence = state.get("confidence", 1.0)
-    motivos = [(a, needs_confirmation(a, confidence)) for a in acoes]
-    pendentes = [(a, m) for a, m in motivos if m]
+    alvos = state.get("targets") or [{}] * len(acoes)
+    # zip defensivo: comprimento diferente = não resolvido = não executa
+    alvos = (alvos + [{}] * len(acoes))[: len(acoes)]
+
+    # 1) Empate tem precedência: escolher o alvo JÁ É o consentimento explícito,
+    #    numa ida e volta só. Perguntar "qual?" e depois "confirma?" seria duas.
+    for i, (acao, alvo) in enumerate(zip(acoes, alvos)):
+        if alvo.get("status") == "ambiguous":
+            escolha = interrupt(
+                {
+                    "kind": "choice",
+                    "action_index": i,
+                    "action_type": acao.type.value,
+                    "summary": describe_for_confirmation(acao),
+                    "options": alvo["candidates"],
+                }
+            )
+            validos = {c["id"] for c in alvo["candidates"]}
+            # Só um id que ESTAVA na lista aprova. "sim" num empate não escolhe
+            # nada, e aprovar sem escolher voltaria a ser adivinhação.
+            if isinstance(escolha, str) and escolha in validos:
+                congelado = [dict(t) for t in alvos]
+                congelado[i] = {**alvo, "status": "found",
+                                "candidates": [c for c in alvo["candidates"] if c["id"] == escolha]}
+                return {"approved": True, "chosen_id": escolha, "targets": congelado}
+            return {
+                "approved": False,
+                "results": ["👌 Beleza, não mexi em nada. Me diz de outro jeito qual era — pelo valor ou pela data."],
+                "halted": True,
+            }
+
+    motivos = [
+        (a, alvo, needs_confirmation(a, confidence, alvo or None))
+        for a, alvo in zip(acoes, alvos)
+    ]
+    pendentes = [(a, t, m) for a, t, m in motivos if m]
     if not pendentes:
         return {"approved": True}
 
-    acao, motivo = pendentes[0]
+    # 2) UMA pergunta por execução, enumerando TUDO que o SIM vai executar.
+    #    Um laço de perguntas cansaria; e o bug antigo era o oposto — perguntava
+    #    sobre a primeira ação e o SIM liberava o lote inteiro, calado.
+    #    Ação com alvo `none` fica de fora: confirmar "apagar o lançamento" e
+    #    receber "não achei" é pior que não ter perguntado.
+    itens = [
+        describe_for_confirmation(a, t or None)
+        for a, t, _ in pendentes
+        if (t or {}).get("status") != "none"
+    ]
+    if not itens:
+        return {"approved": True}
+
+    acao, alvo, motivo = pendentes[0]
     resposta = interrupt(
         {
             "kind": "confirmation",
             "reason": motivo,
-            "summary": describe_for_confirmation(acao),
+            "summary": itens[0] if len(itens) == 1 else "; ".join(itens[:5]),
+            "items": itens[:5],
             "action_type": acao.type.value,
         }
     )
 
     if resposta is True or (isinstance(resposta, str) and resposta.lower() in {"sim", "s", "true"}):
         return {"approved": True}
+    if isinstance(resposta, dict) and resposta.get("approved"):
+        return {"approved": True, "chosen_id": resposta.get("candidate_id") or ""}
     return {"approved": False, "results": ["👍 Ok, não fiz nada."], "halted": True}
 
 
@@ -261,13 +341,19 @@ async def execute_node(state: AgentState) -> dict:
     )
 
     linhas: list[str] = list(state.get("results", []))
-    for indice, acao in enumerate(_actions(state)):
+    acoes = _actions(state)
+    alvos = (list(state.get("targets") or []) + [{}] * len(acoes))[: len(acoes)]
+    for indice, acao in enumerate(acoes):
         ctx.action_index = indice
-        # regra do usuário GANHA da IA — mas só em ESCRITA. Em consulta,
+        # o alvo CONGELADO na Fase Cognitiva viaja até a tool por aqui
+        ctx.target = alvos[indice] or None
+        # regra do usuário GANHA da IA — mas só em CRIAÇÃO. Em consulta,
         # `category` é filtro: deixar a regra reescrevê-lo devolveria o total de
         # outra categoria, em silêncio. Em nota, `folder` é pasta e
-        # `search_term` é busca, mesmo problema.
-        if isinstance(acao, FinanceAction):
+        # `search_term` é busca, mesmo problema. E em correção/deleção é PIOR:
+        # `category` ali é campo de BUSCA, então uma regra do usuário podia
+        # mudar QUAL lançamento seria apagado.
+        if isinstance(acao, FinanceAction) and acao.type in RULE_APPLIES:
             acao = await apply_rules(ctx.workspace_id, acao)
         resultado = await execute(ctx, acao)
         if resultado.message:

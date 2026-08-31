@@ -14,6 +14,7 @@ from app.graph.schemas import (
     MONEY_WRITES,
     READ_ONLY,
     FinanceAction,
+    FinanceActionType,
     FinanceQuery,
     NotesAction,
 )
@@ -21,16 +22,39 @@ from app.graph.schemas import (
 CONFIDENCE_MINIMA = 0.6
 
 
+# Altera registro existente mas NÃO passa pelo resolver (tem forma de duas
+# etapas: conta -> fatura em aberto). Por isso entra explícito.
+#
+# `set_rule` fica FORA de propósito: é upsert com a chave que o próprio usuário
+# acabou de ditar, não tem como acertar a linha errada, e é editável na tela.
+ALWAYS_CONFIRM = {FinanceActionType.PAY_INVOICE}
+
+
 def needs_confirmation(
-    action: FinanceAction | FinanceQuery | NotesAction, confidence: float
+    action: FinanceAction | FinanceQuery | NotesAction,
+    confidence: float,
+    target: dict | None = None,
 ) -> str | None:
-    """Motivo pelo qual esta ação precisa de um SIM, ou None."""
+    """Motivo pelo qual esta ação precisa de um SIM, ou None.
+
+    `target` vem por último para os testes existentes seguirem chamando com dois
+    argumentos.
+
+    A regra "teve alvo resolvido -> confirma" é DERIVADA, não uma lista: ela
+    cobre update, delete, undo, mark_paid, goal_deposit, update_asset_value,
+    append_note e delete_reminder de uma vez — e cobre o que for acrescentado
+    depois sem ninguém precisar lembrar de atualizar um conjunto.
+    """
     settings = get_settings()
 
     if action.type in READ_ONLY:
         return None
     if action.type in DESTRUCTIVE:
         return "destrutiva"
+    if target:
+        return "alterar item existente"
+    if action.type in ALWAYS_CONFIRM:
+        return "alterar item existente"
     if action.type in MONEY_WRITES:
         valor = getattr(action, "new_amount_cents", None) or getattr(action, "amount_cents", None)
         if valor and valor > settings.hitl_amount_threshold_cents:
@@ -40,12 +64,31 @@ def needs_confirmation(
     return None
 
 
-def describe_for_confirmation(action: FinanceAction | FinanceQuery | NotesAction) -> str:
+_VERBO = {
+    "delete_transaction": "apagar", "undo_last": "apagar",
+    "delete_note": "apagar", "delete_reminder": "cancelar",
+    "update_transaction": "corrigir", "append_note": "acrescentar em",
+    "mark_paid": "dar baixa em", "goal_deposit": "aportar em",
+    "update_asset_value": "atualizar o valor de",
+}
+
+
+def describe_for_confirmation(
+    action: FinanceAction | FinanceQuery | NotesAction, target: dict | None = None
+) -> str:
     """A frase que o usuário LÊ antes de dizer sim.
 
     Tem que descrever o efeito, não o nome interno da ação: ninguém confirma
     "delete_transaction", mas todo mundo entende "apagar o gasto de R$45".
+
+    Com `target` resolvido, o alvo é a LINHA REAL. Sem ele a frase caía nos
+    campos crus do modelo, e o usuário lia "apagar a nota sobre última mensagem"
+    — confirmando o eco do modelo, não o que ia acontecer de verdade.
     """
+    if target and target.get("status") == "found" and target.get("candidates"):
+        verbo = _VERBO.get(action.type.value, "mexer em")
+        return f"{verbo} {target['candidates'][0]['label']}"
+
     tipo = action.type.value
     if isinstance(action, FinanceAction):
         valor = cents_to_brl(action.amount_cents) if action.amount_cents else None

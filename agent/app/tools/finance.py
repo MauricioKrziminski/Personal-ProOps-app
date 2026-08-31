@@ -292,25 +292,25 @@ async def pay_invoice(ctx: ExecContext, action: FinanceAction) -> ToolResult:
 
 async def mark_paid(ctx: ExecContext, action: FinanceAction) -> ToolResult:
     """Baixa numa conta PREVISTA. Diferente de create_expense: o lançamento já existe."""
-    termo = action.description or action.category
+    # Antes havia um `limit 1` ordenado por vencimento: com duas contas em aberto
+    # parecidas, ele dava baixa na mais antiga EM SILÊNCIO. Agora o empate vira
+    # pergunta como todo o resto — quem resolve é a Fase Cognitiva.
     conta = await db.fetch_one(
         """
         select id, description, category, amount_cents
-        from public.transactions
-        where workspace_id = %s and status = 'pending'
-          and (%s is null or description ilike %s or category ilike %s)
-        order by coalesce(due_at, occurred_at)
-        limit 1
+        from public.transactions where id = %s and workspace_id = %s
         """,
-        ctx.workspace_id, termo, f"%{termo or ''}%", f"%{termo or ''}%",
+        ctx.target["candidates"][0]["id"], ctx.workspace_id,
     )
     if not conta:
         return ToolResult("🤷 Não achei essa conta em aberto.", read_only=True)
 
     await db.execute(
-        "update public.transactions set status = 'cleared', occurred_at = %s where id = %s",
+        "update public.transactions set status = 'cleared', occurred_at = %s "
+        "where id = %s and workspace_id = %s",
         local_iso_date(ctx.timezone),
         conta["id"],
+        ctx.workspace_id,
     )
     nome = conta["description"] or conta["category"] or "conta"
     return ToolResult(
@@ -357,19 +357,20 @@ async def update_transaction(ctx: ExecContext, action: FinanceAction) -> ToolRes
             "ou \"o mercado de ontem era transporte\"."
         )
 
-    estado, achados = await resolve_transaction(ctx.workspace_id, action)
-    if estado == "none":
-        return ToolResult("🤷 Não achei esse lançamento nos últimos registros.", read_only=True)
-    if estado == "ambiguous":
-        opcoes = "\n".join(
-            f"  • {describe(t)} em {format_date_br(t['occurred_at'])}" for t in achados
-        )
-        return ToolResult(
-            f"🤔 Achei mais de um parecido:\n{opcoes}\nMe diz o valor exato pra eu saber qual.",
-            read_only=True,
-        )
-
-    antes = achados[0]
+    # O alvo já veio resolvido e CONGELADO pela Fase Cognitiva; o registry barrou
+    # antes de chegar aqui se não estivesse `found`. Buscar de novo aqui abriria a
+    # janela que este desenho existe para fechar: entre a pergunta e o SIM o
+    # usuário pode ter lançado outra coisa, e o "último" mudaria de dono.
+    alvo_id = ctx.target["candidates"][0]["id"]
+    antes = await db.fetch_one(
+        """
+        select id, kind, amount_cents, category, description, occurred_at
+        from public.transactions where id = %s and workspace_id = %s
+        """,
+        alvo_id, ctx.workspace_id,
+    )
+    if not antes:
+        return ToolResult("🤷 Esse lançamento não está mais aqui.", read_only=True)
     colunas = ", ".join(f"{c} = %s" for c in patch)
     await db.execute(
         f"update public.transactions set {colunas} where id = %s and workspace_id = %s",  # noqa: S608
@@ -391,16 +392,15 @@ async def update_transaction(ctx: ExecContext, action: FinanceAction) -> ToolRes
 
 
 async def delete_transaction(ctx: ExecContext, action: FinanceAction) -> ToolResult:
-    estado, achados = await resolve_transaction(ctx.workspace_id, action)
-    if estado == "none":
-        return ToolResult("🤷 Não achei esse lançamento.", read_only=True)
-    if estado == "ambiguous":
-        opcoes = "\n".join(f"  • {describe(t)}" for t in achados)
-        return ToolResult(
-            f"🤔 Achei mais de um parecido:\n{opcoes}\nMe diz o valor exato.", read_only=True
-        )
-
-    alvo = achados[0]
+    alvo = await db.fetch_one(
+        """
+        select id, kind, amount_cents, category, description
+        from public.transactions where id = %s and workspace_id = %s
+        """,
+        ctx.target["candidates"][0]["id"], ctx.workspace_id,
+    )
+    if not alvo:
+        return ToolResult("🤷 Esse lançamento não está mais aqui.", read_only=True)
     await db.execute(
         "delete from public.transactions where id = %s and workspace_id = %s",
         alvo["id"], ctx.workspace_id,
@@ -409,19 +409,24 @@ async def delete_transaction(ctx: ExecContext, action: FinanceAction) -> ToolRes
 
 
 async def undo_last(ctx: ExecContext, action: FinanceAction) -> ToolResult:
+    # O "último" também vem congelado: se o usuário lançar algo entre a pergunta
+    # e o SIM, apagar é o que ele LEU, não o que virou último no meio do caminho.
     alvo = await db.fetch_one(
         """
         select id, kind, amount_cents, category, description
-        from public.transactions
-        where workspace_id = %s
-        order by created_at desc limit 1
+        from public.transactions where id = %s and workspace_id = %s
         """,
-        ctx.workspace_id,
+        ctx.target["candidates"][0]["id"], ctx.workspace_id,
     )
     if not alvo:
         return ToolResult("🤷 Não achei nenhum lançamento para apagar.", read_only=True)
 
-    await db.execute("delete from public.transactions where id = %s", alvo["id"])
+    # `workspace_id` no DELETE: o id já vem de um select escopado, mas depender
+    # disso é depender de quem chama. Aqui a garantia é local.
+    await db.execute(
+        "delete from public.transactions where id = %s and workspace_id = %s",
+        alvo["id"], ctx.workspace_id,
+    )
     return ToolResult(f"🗑️ Apagado: {describe(alvo)}.", result_id=alvo["id"])
 
 
@@ -452,21 +457,9 @@ async def goal_deposit(ctx: ExecContext, action: FinanceAction) -> ToolResult:
     nome = guards.require_text(action.target_ref or action.description, o_que="em qual meta")
     valor = guards.require_amount(_amount_with_fallback(ctx, action), o_que="o valor do aporte")
 
-    metas = await db.fetch(
-        """
-        select id, name from public.goals
-        where workspace_id = %s and archived = false and name ilike %s
-        limit 2
-        """,
-        ctx.workspace_id, f"%{nome}%",
-    )
-    if not metas:
-        return ToolResult(f"🤷 Não achei a meta *{nome}*.", read_only=True)
-    if len(metas) > 1:
-        nomes = ", ".join(m["name"] for m in metas)
-        return ToolResult(f"🤔 Achei mais de uma: {nomes}. Qual delas?", read_only=True)
-
-    await ensure_owned("goals", metas[0]["id"], ctx.workspace_id)
+    # alvo congelado; `ensure_owned` já rodou no registry, num ponto só
+    metas = [{"id": ctx.target["candidates"][0]["id"],
+              "name": ctx.target["candidates"][0]["label"]}]
     row = await db.fetch_one(
         "select public.goal_deposit(%s, %s, %s) as saved",
         metas[0]["id"], valor, guards.require_date(action.occurred_at, ctx.timezone),
@@ -482,23 +475,9 @@ async def update_asset_value(ctx: ExecContext, action: FinanceAction) -> ToolRes
     nome = guards.require_text(action.target_ref or action.description, o_que="qual bem")
     valor = guards.require_amount(_amount_with_fallback(ctx, action), o_que="o valor novo")
 
-    ativos = await db.fetch(
-        """
-        select id, name from public.assets
-        where workspace_id = %s and archived = false and name ilike %s
-        limit 2
-        """,
-        ctx.workspace_id, f"%{nome}%",
-    )
-    if not ativos:
-        return ToolResult(f"🤷 Não achei o bem *{nome}*. Cadastra ele no app primeiro.", read_only=True)
-    if len(ativos) > 1:
-        return ToolResult(
-            f"🤔 Achei mais de um: {', '.join(a['name'] for a in ativos)}. Qual deles?",
-            read_only=True,
-        )
-
-    await ensure_owned("assets", ativos[0]["id"], ctx.workspace_id)
+    # alvo congelado; `ensure_owned` já rodou no registry, num ponto só
+    ativos = [{"id": ctx.target["candidates"][0]["id"],
+               "name": ctx.target["candidates"][0]["label"]}]
     await db.execute(
         "select public.update_asset_value(%s, %s, %s)",
         ativos[0]["id"], valor, local_iso_date(ctx.timezone),

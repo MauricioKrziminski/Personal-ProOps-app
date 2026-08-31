@@ -81,36 +81,22 @@ async def create_note(ctx: ExecContext, action: NotesAction) -> ToolResult:
 
 
 async def append_note(ctx: ExecContext, action: NotesAction) -> ToolResult:
-    termo = guards.require_text(action.search_term or action.content, o_que="em qual nota")
     trecho = guards.require_text(action.append_text, o_que="o que acrescentar")
 
-    achadas = await db.fetch(
-        """
-        select id, content from public.notes
-        where workspace_id = %s and deleted_at is null and content ilike %s
-        order by updated_at desc
-        limit 2
-        """,
-        ctx.workspace_id, f"%{termo}%",
-    )
-    if not achadas:
-        return ToolResult(
-            f"🤷 Não achei nota sobre *{termo}*. Quer que eu crie uma?", read_only=True
-        )
-    if len(achadas) > 1:
-        opcoes = "\n".join(f"  • {first_line(n['content'])}" for n in achadas)
-        return ToolResult(f"🤔 Achei mais de uma:\n{opcoes}\nQual delas?", read_only=True)
+    # alvo congelado pela Fase Cognitiva
+    nota_id = ctx.target["candidates"][0]["id"]
+    rotulo = ctx.target["candidates"][0]["label"]
 
-    nota = achadas[0]
-    await db.execute(
-        "update public.notes set content = %s, updated_at = now() where id = %s and workspace_id = %s",
-        f"{(nota['content'] or '').rstrip()}\n{trecho}",
-        nota["id"],
-        ctx.workspace_id,
+    # Concatenação no SQL, não read-modify-write: entre o SELECT e o UPDATE a
+    # nota pode ter sido editada no app, e a versão lida sobrescreveria a nova.
+    linhas = await db.fetch(
+        "update public.notes set content = rtrim(content) || E'\n' || %s, "
+        "updated_at = now() where id = %s and workspace_id = %s returning id",
+        trecho, nota_id, ctx.workspace_id,
     )
-    return ToolResult(
-        f"📝 Acrescentei *{trecho}* em: {first_line(nota['content'])}", result_id=nota["id"]
-    )
+    if not linhas:
+        return ToolResult("🤷 Essa nota não está mais aqui.", read_only=True)
+    return ToolResult(f"📝 Acrescentei *{trecho}* em: {rotulo}", result_id=nota_id)
 
 
 async def query_notes(ctx: ExecContext, action: NotesAction) -> ToolResult:
@@ -168,20 +154,11 @@ async def query_notes(ctx: ExecContext, action: NotesAction) -> ToolResult:
 
 
 async def delete_note(ctx: ExecContext, action: NotesAction) -> ToolResult:
-    termo = guards.require_text(action.search_term or action.content, o_que="qual nota apagar")
-    achadas = await db.fetch(
-        """
-        select id, content from public.notes
-        where workspace_id = %s and deleted_at is null and content ilike %s
-        order by updated_at desc limit 2
-        """,
-        ctx.workspace_id, f"%{termo}%",
-    )
-    if not achadas:
-        return ToolResult(f"🤷 Não achei nada com \"{termo}\".", read_only=True)
-    if len(achadas) > 1:
-        opcoes = "\n".join(f"  • {first_line(n['content'])}" for n in achadas)
-        return ToolResult(f"🤔 Achei mais de uma:\n{opcoes}\nSeja mais específico.", read_only=True)
+    # Alvo congelado pela Fase Cognitiva. Antes daqui saía um
+    # `content ilike '%termo%'` com o que o modelo tivesse escrito — e foi assim
+    # que "apagar essa última mensagem" virou uma busca literal por
+    # "última mensagem", que não casa com nada.
+    achadas = [{"id": ctx.target["candidates"][0]["id"]}]
 
     # lixeira de 30 dias, nunca delete físico
     await db.execute(
@@ -222,20 +199,9 @@ async def create_reminder(ctx: ExecContext, action: NotesAction) -> ToolResult:
 
 async def delete_reminder(ctx: ExecContext, action: NotesAction) -> ToolResult:
     termo = guards.require_text(action.search_term or action.content, o_que="qual lembrete")
-    achados = await db.fetch(
-        """
-        select id, title from public.reminders
-        where workspace_id = %s and title ilike %s
-        order by created_at desc limit 2
-        """,
-        ctx.workspace_id, f"%{termo}%",
-    )
-    if not achados:
-        return ToolResult(f"🤷 Não achei lembrete com \"{termo}\".", read_only=True)
-    if len(achados) > 1:
-        opcoes = "\n".join(f"  • {r['title']}" for r in achados)
-        return ToolResult(f"🤔 Achei mais de um:\n{opcoes}\nSeja mais específico.", read_only=True)
-
+    # alvo congelado pela Fase Cognitiva (ver delete_note)
+    achados = [{"id": ctx.target["candidates"][0]["id"],
+                "title": ctx.target["candidates"][0]["label"]}]
     await db.execute(
         "delete from public.reminders where id = %s and workspace_id = %s",
         achados[0]["id"], ctx.workspace_id,

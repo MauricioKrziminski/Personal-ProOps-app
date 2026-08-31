@@ -23,8 +23,8 @@ from app.graph.schemas import (
     NotesAction,
     NotesActionType,
 )
-from app.tools import finance, notes, queries
-from app.tools.base import ExecContext, ToolResult
+from app.tools import finance, notes, queries, resolve
+from app.tools.base import ExecContext, ToolResult, ensure_owned
 from app.tools.guards import Level1Error
 
 log = logging.getLogger(__name__)
@@ -79,6 +79,14 @@ def _tool(action: FinanceAction | FinanceQuery | NotesAction):
     return NOTES_TOOLS.get(action.type)
 
 
+def _sem_alvo(alvo: dict) -> str:
+    """Mensagem para alvo que não resolveu. Nunca executa, nunca reserva vaga."""
+    if alvo.get("status") == "ambiguous":
+        opcoes = "\n".join(f"  • {c['label']}" for c in alvo.get("candidates", []))
+        return f"🤔 Achei mais de um:\n{opcoes}\nMe diz qual."
+    return "🤷 Não achei esse item por aqui. Me diz o valor ou a data?"
+
+
 async def execute(ctx: ExecContext, action: FinanceAction | FinanceQuery | NotesAction) -> ToolResult:
     """Executa UMA ação. Nunca levanta: a linha de erro é a resposta.
 
@@ -90,6 +98,23 @@ async def execute(ctx: ExecContext, action: FinanceAction | FinanceQuery | Notes
         return ToolResult(AJUDA, read_only=True)
 
     somente_leitura = action.type in READ_ONLY
+
+    # ---------------------------------------------------------------------
+    # Alvo não resolvido NUNCA executa. Ponto de imposição único: seis tools
+    # checando isso cada uma do seu jeito é como uma delas esquece.
+    # ---------------------------------------------------------------------
+    if action.type in resolve.TARGETS:
+        alvo = ctx.target or {}
+        if alvo.get("status") != "found" or not alvo.get("candidates"):
+            return ToolResult(_sem_alvo(alvo), read_only=True)
+        # `ensure_owned` ANTES de reservar a vaga de idempotência: id de outro
+        # workspace não pode nem consumir a vaga. Roda dentro do try de baixo?
+        # Não — aqui, para que a recusa seja explícita e não vire "erro ao
+        # processar". A linha apagada entre a pergunta e o SIM cai aqui.
+        try:
+            await ensure_owned(alvo["table"], alvo["candidates"][0]["id"], ctx.workspace_id)
+        except Level1Error as err:
+            return ToolResult(err.mensagem_usuario, read_only=True)
 
     # Consulta pode repetir à vontade; escrita RESERVA a vaga antes de rodar.
     if not somente_leitura:

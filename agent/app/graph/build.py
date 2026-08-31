@@ -26,6 +26,7 @@ from app.graph.nodes import (
     general_node,
     notes_node,
     pick_domains,
+    resolve_node,
     route,
 )
 from app.graph.state import AgentState
@@ -44,6 +45,8 @@ def build(checkpointer: AsyncPostgresSaver):
     builder.add_node("financas_consulta", finance_query_node)
     builder.add_node("notas", notes_node)
     builder.add_node("geral", general_node)
+    # Fase Cognitiva: resolve e CONGELA os alvos antes de qualquer decisão
+    builder.add_node("alvos", resolve_node)
     builder.add_node("gate", gate)
     builder.add_node("executar", execute_node)
     builder.add_node("compor", compose)
@@ -55,8 +58,11 @@ def build(checkpointer: AsyncPostgresSaver):
     builder.add_conditional_edges(
         "router", pick_domains, ["financas", "financas_consulta", "notas", "geral"]
     )
+    # fan-in dos domínios no `alvos`: ele precisa ver o lote INTEIRO (finanças e
+    # notas juntas) para decidir com todas as ações na mesa, igual ao gate.
     for dominio in ("financas", "financas_consulta", "notas", "geral"):
-        builder.add_edge(dominio, "gate")
+        builder.add_edge(dominio, "alvos")
+    builder.add_edge("alvos", "gate")
     builder.add_conditional_edges("gate", after_gate, ["executar", "compor"])
     builder.add_edge("executar", "compor")
     builder.add_edge("compor", END)

@@ -71,8 +71,17 @@ class AgentState(TypedDict, total=False):
     finance_queries: Annotated[list[dict], _replace]
     notes_actions: Annotated[list[dict], _replace]
 
+    # alvos resolvidos na Fase Cognitiva, ALINHADOS POR POSIÇÃO com _actions().
+    # Entrada: {} para ação que não mira registro existente, ou
+    # {"table": "transactions", "status": "found|ambiguous|none",
+    #  "candidates": [{"id": "...", "label": "..."}]}.
+    # Só strings: o checkpointer serializa isto, e UUID/date crus não sobrevivem.
+    targets: Annotated[list[dict], _replace]
+
     # execução
     approved: bool
+    # id escolhido pelo usuário num empate — congelado, vem do pendente
+    chosen_id: str
     results: Annotated[list[str], _replace]
     reply: str
     halted: bool                # True = sai sem executar (usuário desconhecido, etc.)

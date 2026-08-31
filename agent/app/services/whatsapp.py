@@ -79,6 +79,101 @@ async def send_text(to: str, body: str) -> None:
     )
 
 
+# Limites físicos da Cloud API. Estourar não dá erro bonito: vira 400 que o
+# `try_send` engole, e a pergunta simplesmente não chega.
+BTN_MAX, BTN_TITLE_MAX = 3, 20
+ROW_MAX, ROW_TITLE_MAX, ROW_DESC_MAX = 10, 24, 72
+BODY_MAX = 1024
+
+
+def _cut(texto: str, n: int) -> str:
+    texto = (texto or "").strip()
+    return texto if len(texto) <= n else texto[: n - 1] + "…"
+
+
+async def send_buttons(to: str, body: str, buttons: list[tuple[str, str]]) -> None:
+    """Até 3 botões de resposta rápida. `buttons` é [(id, título)].
+
+    Os rótulos chegam aqui já prefixados por número ("1) ", "2) ") e o corte é
+    sempre NO FIM — o número nunca é cortado, então duas opções truncadas
+    continuam distinguíveis, e o número é a mesma chave que o fallback de texto
+    entende. Truncar no meio ou no começo criaria duas opções idênticas na tela.
+    """
+    if not 1 <= len(buttons) <= BTN_MAX:
+        raise ValueError(f"WhatsApp aceita 1..{BTN_MAX} botões, recebi {len(buttons)}")
+    await _graph_post(
+        {
+            "messaging_product": "whatsapp",
+            "to": to,
+            "type": "interactive",
+            "interactive": {
+                "type": "button",
+                "body": {"text": _cut(body, BODY_MAX)},
+                "action": {
+                    "buttons": [
+                        {"type": "reply",
+                         "reply": {"id": bid, "title": _cut(titulo, BTN_TITLE_MAX)}}
+                        for bid, titulo in buttons
+                    ]
+                },
+            },
+        }
+    )
+
+
+async def send_list(to: str, body: str, label: str, rows: list[tuple[str, str, str]]) -> None:
+    """Até 10 linhas. `rows` é [(id, título, descrição)].
+
+    Valor e data vão na DESCRIÇÃO (72 chars), não no título (24): é onde cabe
+    informação sem competir com o número que identifica a opção.
+    """
+    if not 1 <= len(rows) <= ROW_MAX:
+        raise ValueError(f"WhatsApp aceita 1..{ROW_MAX} linhas, recebi {len(rows)}")
+    await _graph_post(
+        {
+            "messaging_product": "whatsapp",
+            "to": to,
+            "type": "interactive",
+            "interactive": {
+                "type": "list",
+                "body": {"text": _cut(body, BODY_MAX)},
+                "action": {
+                    "button": _cut(label, BTN_TITLE_MAX),
+                    "sections": [
+                        {
+                            "title": "Opções",
+                            "rows": [
+                                {"id": rid,
+                                 "title": _cut(titulo, ROW_TITLE_MAX),
+                                 "description": _cut(desc, ROW_DESC_MAX)}
+                                for rid, titulo, desc in rows
+                            ],
+                        }
+                    ],
+                },
+            },
+        }
+    )
+
+
+async def try_send_interactive(to: str, spec: dict) -> None:
+    """Manda a pergunta interativa; cai para TEXTO se qualquer coisa falhar.
+
+    O texto de fallback contém a MESMA lista numerada, então cliente que não
+    renderiza interativo (ou envio que falhou) ainda mostra a pergunta inteira e
+    o usuário responde pelo número. Best-effort como todo envio: nunca levanta.
+    """
+    try:
+        if spec.get("ui") == "list":
+            await send_list(to, spec["body"], spec.get("label", "Escolher"), spec["rows"])
+        else:
+            await send_buttons(to, spec["body"], spec["buttons"])
+        return
+    except Exception:  # noqa: BLE001
+        log.warning("envio interativo falhou; caindo para texto", exc_info=True)
+    await try_send(to, spec.get("text") or spec.get("body", ""))
+
+
 async def send_template(
     to: str, template_name: str, body_params: list[str], language: str = "pt_BR"
 ) -> None:

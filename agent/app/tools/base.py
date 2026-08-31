@@ -26,6 +26,10 @@ class ExecContext:
     # idempotência: (wa_message_id, action_index) impede que reprocessar duplique
     wa_message_id: str
     action_index: int = 0
+    # alvo RESOLVIDO na Fase Cognitiva, congelado no checkpoint. As tools leem
+    # daqui em vez de fazer o próprio SELECT — é o que garante que o registro
+    # mutado seja o MESMO que o usuário leu na pergunta.
+    target: dict | None = None
     # ids criados nesta mensagem (auditoria e desfazer)
     created: list[str] = field(default_factory=list)
 
