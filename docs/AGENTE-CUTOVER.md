@@ -580,6 +580,28 @@ CLOUDSDK_CORE_ACCOUNT=gestao.proops@gmail.com ./scripts/setup-gcp.sh staging
 O mesmo vale para `gcloud logging read` e qualquer leitura: `--account
 gestao.proops@gmail.com`.
 
+**O pooler do Supabase IGNORA `options=-csearch_path` — em silêncio.** O
+isolamento do checkpointer do LangGraph era feito assim, pelo conninfo. A conexão
+sobe sem erro nenhum e o `search_path` continua `"$user", public, extensions`, de
+modo que `checkpointer.setup()` criou `checkpoints`, `checkpoint_writes` e
+`checkpoint_blobs` em **public** — onde o PostgREST as serve com a **anon key**.
+Elas guardam o CONTEÚDO das conversas (valores, contas, notas), que é exatamente
+o que a `0040` criou o schema `langgraph` para proteger. Confirmado com
+`GET /rest/v1/checkpoints` → HTTP 200 usando a chave publishable.
+
+O isolamento agora é `set search_path to langgraph` no callback `configure` do
+pool (`app/db.py::_isolar_checkpointer`), que roda DEPOIS do handshake e não
+depende de o pooler repassar parâmetro de startup. A `0042` remove as tabelas
+órfãs de `public`, com guard que aborta se houver conversa viva. Conferir a
+qualquer momento:
+
+```sql
+select to_regclass('public.checkpoints');  -- tem que ser null
+```
+
+**Ordem importa no corte:** deploy do código primeiro, `db push` depois. Um
+container antigo recriaria as tabelas em `public` no `setup()` seguinte.
+
 **A SA precisa de `actAs` sobre SI MESMA — e faltava.** Para criar uma task com
 token OIDC assinado como `agente-runner`, o Cloud Tasks exige
 `iam.serviceAccounts.actAs` do chamador sobre a SA do token; aqui o chamador *é*
