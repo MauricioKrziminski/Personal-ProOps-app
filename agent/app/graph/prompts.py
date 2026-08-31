@@ -73,6 +73,9 @@ Tipos:
   current_installment = em qual parcela ele JÁ ESTÁ, quando a compra é antiga:
   "tô na 4ª parcela de 10" -> installments 10, current_installment 4.
   Compra feita agora deixa current_installment vazio.
+  Se ele disser QUANDO comprou ("comprei em maio, tô na 4ª"), preencha
+  occurred_at e deixe current_installment VAZIO — os dois juntos contariam o
+  mesmo passado duas vezes e a compra iria parar meses antes do que deveria.
 - pay_invoice: pagamento da fatura do cartão. NÃO use para compras no cartão.
 - mark_paid: baixa numa conta que JÁ estava prevista ("paguei a luz").
 - set_rule: "sempre que eu falar X, põe em Y". target_ref = X, category = Y.

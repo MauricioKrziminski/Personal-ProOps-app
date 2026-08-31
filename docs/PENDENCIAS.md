@@ -143,6 +143,17 @@ chamam o Gemini desde que o SIM/NÃO deixou de ser regex, e não estavam sendo
 contados — ou seja, o paywall mensal subcontava. Agora cada uma dessas respostas
 consome 1 mensagem da cota.
 
+## ⚠️ Teto de parcelas: 99 no guard, 72 no banco (achado em 31/08/2026)
+
+`guards.require_installments` aceita até **99**; a RPC `create_installment_plan`
+recusa acima de **72** (`0013:244`). Entre 73 e 99 o usuário recebe erro cru do
+Postgres em vez de uma mensagem em português. Pré-existente — a 2.8 só encostou
+no assunto.
+
+Junto disso: a retroação de parcela (`current_installment`) recua `occurred_at`
+DEPOIS de `require_date` já ter checado a janela de ±5 anos. Um parcelamento longo
+começando muito atrás pode sair da janela sem ninguém verificar de novo.
+
 ## 🔵 FASE 4 — Roadmap v2 (ordem sugerida)
 
 ### 4.1 Push notifications de verdade

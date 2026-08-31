@@ -32,7 +32,9 @@ REFERENCE_WINDOW = 40
 # ---------------------------------------------------------------------------
 
 
-async def resolve_account(workspace_id: UUID, name: str | None) -> UUID | None:
+async def resolve_account(
+    workspace_id: UUID, name: str | None, *, only_cards: bool = False
+) -> UUID | None:
     """Conta citada por nome. Sem match -> None.
 
     De propósito: o lançamento NUNCA falha por conta desconhecida. Perder o
@@ -47,12 +49,19 @@ async def resolve_account(workspace_id: UUID, name: str | None) -> UUID | None:
     em SILÊNCIO, inclusive para `pay_invoice` e transferência; escolher a conta
     pagadora por parecença, sozinho, seria um modo de falha que o `ilike` antigo
     não tinha. Quem tem como perguntar (o rascunho) usa a lista inteira.
+
+    `only_cards` existe porque nome de banco vira nome dos DOIS: quem tem a conta
+    corrente "Itaú" e cria o cartão "Itaú" pelo WhatsApp passa a ter duas linhas
+    que normalizam igual. Sem o filtro, o parcelamento podia cair na conta
+    corrente — e aí `set_invoice` grava `invoice_id := null` em silêncio, que é
+    exatamente o estado que "cartão obrigatório em parcelado" existe para
+    impedir. Quem PRECISA de cartão pede cartão.
     """
     if not name:
         return None
     # ponytail: busca as contas do workspace por chamada (dezenas de linhas, não
     # milhares). Cache por turno se aparecer no perfil.
-    linhas = await db.accounts(workspace_id)
+    linhas = await db.accounts(workspace_id, only_cards=only_cards)
 
     certos = matching.match_accounts(name, linhas, semelhanca=False)
     if certos:
@@ -254,7 +263,7 @@ async def create_installment_purchase(ctx: ExecContext, action: FinanceAction) -
     parcelas = guards.require_installments(action.installments)
     atual = guards.require_current_installment(action.current_installment, parcelas)
     quando = guards.require_date(action.occurred_at, ctx.timezone)
-    conta = await resolve_account(ctx.workspace_id, action.account)
+    conta = await resolve_account(ctx.workspace_id, action.account, only_cards=True)
     if not conta:
         raise Level1Error("❌ Em qual cartão foi? Cadastra ele no app e me fala o nome.")
     await ensure_owned("accounts", conta, ctx.workspace_id)
@@ -289,7 +298,7 @@ async def create_installment_purchase(ctx: ExecContext, action: FinanceAction) -
 
 
 async def pay_invoice(ctx: ExecContext, action: FinanceAction) -> ToolResult:
-    cartao = await resolve_account(ctx.workspace_id, action.account)
+    cartao = await resolve_account(ctx.workspace_id, action.account, only_cards=True)
     if not cartao:
         raise Level1Error("❌ Qual cartão? Me fala o nome dele (ex.: \"paguei a fatura do nubank\").")
 

@@ -165,3 +165,41 @@ class TestAddMonths:
         for dia in ("2026-05-31", "2026-08-15", "2026-01-31"):
             volta = add_months(add_months(dia, -3), 3)
             assert volta[:7] == dia[:7]
+
+
+class TestColisaoDeNome:
+    """Nome de banco vira nome dos DOIS — e o cadastro na hora torna isso comum.
+
+    Quem tem a conta corrente "Itaú" e cria o cartão "Itaú" pelo WhatsApp passa a
+    ter duas linhas que normalizam igual. Sem filtro de tipo, o parcelamento podia
+    cair na conta corrente, e aí `set_invoice` grava `invoice_id := null` em
+    silêncio — o estado que "cartão obrigatório em parcelado" existe para impedir.
+    """
+
+    @pytest.fixture
+    def duas_contas(self, monkeypatch):
+        from app import db
+
+        linhas = [
+            {"id": "conta", "name": "Itaú", "type": "checking"},
+            {"id": "cartao", "name": "Itaú", "type": "credit_card"},
+        ]
+
+        async def falso(workspace_id, *, only_cards=False):
+            return [l for l in linhas if not only_cards or l["type"] == "credit_card"]
+
+        monkeypatch.setattr(db, "accounts", falso)
+
+    @pytest.mark.asyncio
+    async def test_parcelado_resolve_para_o_CARTAO(self, duas_contas):
+        from app.tools.finance import resolve_account
+
+        assert await resolve_account("ws", "itau", only_cards=True) == "cartao"
+
+    @pytest.mark.asyncio
+    async def test_sem_filtro_o_empate_volta_a_existir(self, duas_contas):
+        """Documenta por que o filtro precisa existir: sem ele as duas linhas
+        casam e quem decide é a ordem."""
+        from app.tools.finance import resolve_account
+
+        assert await resolve_account("ws", "itau") in ("conta", "cartao")

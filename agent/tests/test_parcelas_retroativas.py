@@ -40,7 +40,9 @@ def rpc(monkeypatch):
         chamadas.append(args)
         return {"id": "plano-1"}
 
-    async def conta(workspace_id, name):
+    async def conta(workspace_id, name, *, only_cards=False):
+        # o parcelado exige CARTÃO: pedir outra coisa aqui é regressão
+        assert only_cards is True
         return UUID("33333333-3333-3333-3333-333333333333")
 
     async def owned(*a, **k):

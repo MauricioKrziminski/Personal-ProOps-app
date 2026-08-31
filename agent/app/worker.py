@@ -479,14 +479,25 @@ def _com_aviso_de_cartao(resposta: str | dict, nome: str | None) -> str | dict:
     mudar esses dias depois NÃO reprocessa lançamento já gravado. Então o usuário
     tem que saber AGORA em que ciclo a compra dele entrou.
     """
-    if not nome or not isinstance(resposta, str):
+    if not nome:
         return resposta
-    return (
+    aviso = (
         f"💳 Criei o cartão *{nome}* — assumi fechamento dia "
         f"{db.CARTAO_FECHAMENTO_PADRAO} e vencimento dia {db.CARTAO_VENCIMENTO_PADRAO}. "
-        "Se for diferente, ajusta no app.\n\n"
-        f"{resposta}"
+        "Se for diferente, ajusta no app."
     )
+    if isinstance(resposta, str):
+        return f"{aviso}\n\n{resposta}"
+    # Compra parcelada de valor alto vira PERGUNTA de confirmação, não texto — e
+    # é o caso mais comum aqui (o pedido fala em Mac e TV). Devolver o dict
+    # intacto engolia o aviso justamente na compra grande, que é onde a fatura
+    # errada dói mais. Depois do SIM a resposta vem do checkpoint, onde o aviso
+    # nunca existiu: ou entra agora, ou não entra nunca.
+    return {
+        **resposta,
+        "body": f"{aviso}\n\n{resposta.get('body', '')}".strip(),
+        "text": f"{aviso}\n\n{resposta.get('text', '')}".strip(),
+    }
 
 
 def _pergunta_criar_cartao(draft_id: str, nome: str, cartoes: list[dict]) -> dict:
@@ -504,7 +515,9 @@ def _pergunta_criar_cartao(draft_id: str, nome: str, cartoes: list[dict]) -> dic
         "ui": "buttons",
         "body": corpo,
         "buttons": botoes,
-        "text": f"{corpo}\nResponde *criar*, o nome de outro cartão, ou *cancelar*.",
+        # promete só o que TEM handler: "criar" digitado viraria um cartão
+        # chamado *criar*, que é o loop de promessa morta que a 2.6 deletou
+        "text": f"{corpo}\nToca num botão, digita o nome de outro cartão, ou *cancelar*.",
     }
 
 

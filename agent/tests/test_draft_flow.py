@@ -570,3 +570,49 @@ class TestCadastroDeCartaoNaHora:
         longo = "Cartão " + "muito " * 40
         spec = worker._pergunta_criar_cartao("d1", draft.nome_de_cartao(longo), [])
         assert all(len(b[0]) <= 256 for b in spec["buttons"])
+
+
+class TestAvisoDoCicloSobreviveAConfirmacao:
+    """O aviso sumia justamente na compra cara.
+
+    Achado em 31/08/2026, depois da 2.8 já commitada: `_com_aviso_de_cartao`
+    devolvia a resposta intacta quando ela era `dict` — e `dict` é o que volta
+    quando o parcelado cruza o `HITL_AMOUNT_THRESHOLD`. Cria cartão → Mac de
+    R$ 8.400 → botões de confirmação SEM o aviso → o usuário clica SIM → o resume
+    lê o `reply` do checkpoint, onde o aviso nunca existiu.
+
+    Ou seja, "criar com ciclo padrão E avisar" degradava sozinho para "avisar
+    nunca" exatamente quando a fatura errada dói mais.
+    """
+
+    CONFIRMACAO = {
+        "ui": "buttons",
+        "body": "⚠️ Confirma registrar R$ 8.400,00 em 10x?",
+        "buttons": [("pa:p1:ok", "Confirmar"), ("pa:p1:no", "Cancelar")],
+        "text": "⚠️ Confirma registrar R$ 8.400,00 em 10x?\nResponde *SIM* ou *NÃO*.",
+    }
+
+    def test_a_pergunta_de_confirmacao_carrega_o_aviso(self):
+        spec = worker._com_aviso_de_cartao(self.CONFIRMACAO, "Nubank")
+        assert "Criei o cartão *Nubank*" in spec["body"]
+        assert f"dia {db.CARTAO_FECHAMENTO_PADRAO}" in spec["body"]
+        # o fallback de texto também: quem não renderiza interativo lê só ele
+        assert "Criei o cartão *Nubank*" in spec["text"]
+
+    def test_a_pergunta_em_si_nao_se_perde(self):
+        spec = worker._com_aviso_de_cartao(self.CONFIRMACAO, "Nubank")
+        assert "R$ 8.400,00 em 10x" in spec["body"]
+        assert [b[0] for b in spec["buttons"]] == ["pa:p1:ok", "pa:p1:no"]
+
+    def test_sem_cartao_criado_o_spec_passa_intacto(self):
+        assert worker._com_aviso_de_cartao(self.CONFIRMACAO, None) == self.CONFIRMACAO
+
+
+class TestFallbackSemPromessaMorta:
+    def test_criar_digitado_nao_e_prometido(self):
+        """"Responde *criar*" não tinha handler: o texto ia para o classificador,
+        virava nome de cartão, não casava, e o bot oferecia criar um cartão
+        chamado *criar*. É o loop que a 2.6 deletou do `cartao_invalido`."""
+        spec = worker._pergunta_criar_cartao("d1", "Nubank", CARTOES)
+        assert "*criar*" not in spec["text"]
+        assert "cancelar" in spec["text"].lower()
