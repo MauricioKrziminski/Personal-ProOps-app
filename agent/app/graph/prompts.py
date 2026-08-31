@@ -95,7 +95,10 @@ Regras:
 - Corrigir algo que já existe é update_transaction ou delete_transaction —
   NUNCA crie um lançamento novo para "consertar" outro.
 - Campo que não se aplica: omita.
-- Não invente valor. Se não conseguir ler com segurança, use unknown.
+- Não invente valor. Mas se o valor simplesmente NÃO ESTIVER na mensagem
+  ("comprei um mac em 12x"), devolva a ação assim mesmo com amount_cents vazio —
+  o sistema pergunta o preço e guarda o rascunho. Devolver "unknown" ou ação
+  nenhuma faz o usuário levar "não entendi" numa frase que estava clara.
 
 Documento anexo (cupom, comprovante, PDF de fatura):
 - Cupom ou comprovante: UMA ação com o valor TOTAL, description = estabelecimento,
