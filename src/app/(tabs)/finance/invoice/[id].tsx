@@ -18,7 +18,7 @@ import { InvoicePager } from '@/components/finance/invoice-pager';
 import { Screen } from '@/components/ui/screen';
 import { Skeleton, SkeletonRow } from '@/components/ui/skeleton';
 import { useToast } from '@/components/ui/toast';
-import { Motion, Radius, Space, tabular } from '@/design/tokens';
+import { HitTarget, Motion, Radius, Space, tabular } from '@/design/tokens';
 import {
   useAccounts,
   useCardInvoices,
@@ -222,6 +222,11 @@ export default function InvoiceScreen() {
     <View style={styles.header}>
       {/* Andar entre meses. Antes o mês só existia como TÍTULO: para ver a fatura
           passada não havia caminho nenhum a partir daqui. */}
+      {fatura && vizinhas.isLoading ? (
+        /* reserva a altura da linha: sem isto o pager aparece depois da lista e
+           empurra tudo para baixo — "zero salto de layout" é item do checklist */
+        <Skeleton height={HitTarget} radius={Radius.pill} />
+      ) : null}
       {fatura && (vizinhas.data?.length ?? 0) > 1 ? (
         <InvoicePager
           invoices={vizinhas.data ?? []}

@@ -166,6 +166,39 @@ começando muito atrás pode sair da janela sem ninguém verificar de novo.
   `ai_events` — que é o que `private.plan_status_for` conta. Mensagem de áudio
   custa mais e é cobrada como se custasse menos.
 
+## ⚠️ Auditoria do app financeiro — fases 2 a 4 (31/08/2026)
+
+Documento completo: [docs/design/AUDITORIA-FINANCEIRO.md](design/AUDITORIA-FINANCEIRO.md).
+A **Fase 1** (navegar entre faturas, quitar sem mexer no caixa, apagar compra
+parcelada inteira) saiu em `13dceaf` e **depende da migration 0046 ser aplicada**.
+
+Achados ainda abertos, em ordem de dor:
+
+- **Não existe extrato por conta nem por cartão.** `useTransactions` não aceita
+  `account_id`, e "Ver extrato" em `accounts.tsx:234` empurra a lista global do mês.
+- **Busca global quebrada para lançamentos**: `search.tsx:143` navega sem `txId`
+  nem `month`, então o resultado leva a uma tela onde ele não está.
+- **`monthly_cashflow` tem RPC e hook prontos e zero telas** (`use-finance.ts:198`).
+- **`net_worth()` devolve 5 números e a tela usa 1**; `net_worth_snapshots` guarda
+  série diária de 5 componentes e o app mostra uma linha mensal de um.
+- **Recorte temporal fixo ou de passo 1** em todas as telas.
+
+## ⚠️ Divergências abertas depois da Fase 1 (31/08/2026)
+
+- **O `mark_paid` do AGENTE ainda reescreve `occurred_at`.** O app parou (passou a
+  gravar `paid_at`), o WhatsApp não: "paguei a luz" pelo WhatsApp continua movendo o
+  lançamento de mês, e numa parcela de cartão o trigger `set_invoice` ainda a
+  remaneja para a fatura de hoje — a mesma armadilha que a 2.9 fechou para planos.
+  Ele também não grava `paid_at`. Conserto é o ramo de transação única em
+  `agent/app/tools/finance.py`.
+- **`payment_transaction_id` é `on delete set null`** (`0013:99`). Apagar a
+  transferência de um `pay_invoice` faz a fatura ficar indistinguível de uma
+  quitada por `settle_invoice`: somem a transferência **e** as compras do saldo, e
+  o cartão zera em vez de voltar a dever.
+- **`paid_at` nasce NULL** em toda despesa criada já `cleared` — só `settle_invoice`
+  e a baixa manual preenchem. Quem ler a coluna precisa de
+  `coalesce(paid_at, occurred_at)`.
+
 ## 🔵 FASE 4 — Roadmap v2 (ordem sugerida)
 
 ### 4.1 Push notifications de verdade
