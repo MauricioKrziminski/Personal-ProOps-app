@@ -80,6 +80,7 @@ const MATERIAL: Record<string, MaterialName> = {
   'arrow.down.right': 'south_east',
   'arrow.left.arrow.right': 'swap_horiz',
   'arrow.left.arrow.right.circle': 'swap_horizontal_circle',
+  'arrow.triangle.branch': 'call_split',
   'arrow.up.circle': 'arrow_circle_up',
   'arrow.up.right': 'north_east',
   'chevron.down': 'expand_more',

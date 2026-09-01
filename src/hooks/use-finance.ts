@@ -1,8 +1,9 @@
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
 import { supabase } from '@/lib/supabase';
 import type { Database } from '@/lib/database.types';
 import { localISODate, monthBounds } from '@/lib/dates';
+import { toIlikeTerm } from '@/lib/search';
 import { useRealtimeInvalidate, workspaceId } from '@/hooks/use-items';
 
 // Categorias vivem em @/lib/categories (fonte única, travada por teste contra o
@@ -28,6 +29,8 @@ type Fns = Database['public']['Functions'];
 
 export type TransactionKind = 'expense' | 'income' | 'transfer';
 export type TransactionSource = 'whatsapp' | 'app' | 'import' | 'recurring';
+/** `pending` = ainda vai acontecer (parcela futura, conta a pagar). */
+export type TransactionStatus = 'pending' | 'cleared';
 
 export type Transaction = Pick<
   Tables['transactions']['Row'],
@@ -48,8 +51,7 @@ export type Transaction = Pick<
 > & {
   kind: TransactionKind;
   source: TransactionSource;
-  /** `pending` = ainda vai acontecer (parcela futura, conta a pagar). */
-  status: 'pending' | 'cleared';
+  status: TransactionStatus;
 };
 
 export type Account = Pick<
@@ -128,22 +130,32 @@ export interface TransactionFilters {
   category?: string;
   /** Ocorrências de uma série recorrente. */
   recurringId?: string;
+  /** Extrato de uma conta ou cartão. `null` = lançamentos sem conta; `undefined` = todas. */
+  accountId?: string | null;
+  status?: TransactionStatus;
+  source?: TransactionSource;
+  /** Busca em descrição, lugar e categoria. */
+  q?: string;
 }
+
+/**
+ * "Sem conta" como parâmetro de rota — `null` não viaja por URL, e duas cópias literais de
+ * `'none'` (a tela que navega e a que lê) divergiriam na primeira renomeação.
+ */
+export const NO_ACCOUNT = 'none';
+
+const TRANSACTION_PAGE = 50;
 
 // ── queries ───────────────────────────────────────────────────────────────────
 
+/** Lista paginada. Antes era `limit(200)` fixo, que sumia com o resto do mês sem avisar. */
 export function useTransactions(filters: TransactionFilters) {
   useRealtimeInvalidate('transactions', ['transactions']);
   const { from, to } = monthBounds(filters.month);
-  return useQuery({
-    queryKey: [
-      'transactions',
-      filters.month,
-      filters.kind ?? '',
-      filters.category ?? '',
-      filters.recurringId ?? '',
-    ],
-    queryFn: async (): Promise<Transaction[]> => {
+  return useInfiniteQuery({
+    queryKey: ['transactions', 'list', filters],
+    initialPageParam: 0,
+    queryFn: async ({ pageParam }): Promise<Transaction[]> => {
       let query = supabase
         .from('transactions')
         .select(TRANSACTION_COLUMNS)
@@ -151,16 +163,44 @@ export function useTransactions(filters: TransactionFilters) {
         .lte('occurred_at', to)
         .order('occurred_at', { ascending: false })
         .order('created_at', { ascending: false })
-        .limit(200);
+        // Desempate estável. Duas linhas com a mesma data E o mesmo `created_at` (lote de
+        // importação, parcelas criadas juntas) podem trocar de ordem entre uma página e a
+        // seguinte — e aí uma some da lista enquanto outra aparece duas vezes.
+        .order('id', { ascending: false })
+        .range(pageParam, pageParam + TRANSACTION_PAGE - 1);
       if (filters.kind) query = query.eq('kind', filters.kind);
       if (filters.category) query = query.eq('category', filters.category);
+      if (filters.status) query = query.eq('status', filters.status);
+      if (filters.source) query = query.eq('source', filters.source);
       // "Ver ocorrências" de uma recorrente passa por aqui; sem o filtro a tela abriria o mês
       // inteiro sem avisar que ignorou o pedido.
       if (filters.recurringId) query = query.eq('recurring_id', filters.recurringId);
+      if (filters.accountId !== undefined) {
+        query =
+          filters.accountId === null
+            ? query.is('account_id', null)
+            : // Transferência RECEBIDA guarda a conta em `counterparty_account_id`: filtrar só
+              // `account_id` esconderia do extrato o dinheiro que ENTROU na conta.
+              query.or(
+                `account_id.eq.${filters.accountId},counterparty_account_id.eq.${filters.accountId}`
+              );
+      }
+      // Mesmas três colunas e o mesmo saneamento da busca global (`use-search.ts`): sem
+      // `toIlikeTerm`, uma vírgula digitada vira separador de condição do PostgREST e a query
+      // volta 400. Duas telas buscando lançamento têm que achar a mesma coisa.
+      const safe = toIlikeTerm(filters.q ?? '');
+      if (safe) {
+        const like = `%${safe}%`;
+        query = query.or(
+          `description.ilike.${like},merchant.ilike.${like},category.ilike.${like}`
+        );
+      }
       const { data, error } = await query;
       if (error) throw error;
       return data as Transaction[];
     },
+    getNextPageParam: (last, all) =>
+      last.length < TRANSACTION_PAGE ? undefined : all.length * TRANSACTION_PAGE,
   });
 }
 

@@ -139,7 +139,9 @@ export default function SearchScreen() {
                     tone={t.kind === 'income' ? 'success' : 'text'}
                   />
                 }
-                onPress={() => router.push('/finance/transactions')}
+                onPress={() =>
+                  router.push({ pathname: '/finance/[txId]', params: { txId: t.id } })
+                }
               />
             ))
           )}

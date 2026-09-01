@@ -23,6 +23,7 @@ import { Motion, Radius, Space } from '@/design/tokens';
 import { formatBRL } from '@/hooks/use-items';
 import {
   ACCOUNT_TYPES,
+  NO_ACCOUNT,
   useAccountBalances,
   useAccounts,
   useArchiveAccount,
@@ -225,13 +226,17 @@ export default function AccountsScreen() {
     return (
       <ItemLink
         key={saldo.account_id}
-        href="/finance/transactions"
+        href={{ pathname: '/finance/transactions', params: { accountId: saldo.account_id } }}
         title={saldo.name}
         actions={[
           {
             label: 'Ver extrato',
             icon: 'list.bullet',
-            onPress: () => router.push('/finance/transactions'),
+            onPress: () =>
+              router.push({
+                pathname: '/finance/transactions',
+                params: { accountId: saldo.account_id },
+              }),
           },
           {
             label: 'Editar',
@@ -346,7 +351,9 @@ export default function AccountsScreen() {
             title="Sem conta"
             subtitle="lançamentos que não citam conta"
             icon="questionmark.circle"
-            onPress={() => router.push('/finance/transactions')}
+            onPress={() =>
+              router.push({ pathname: '/finance/transactions', params: { accountId: NO_ACCOUNT } })
+            }
             trailing={<Money cents={Number(semConta.balance_cents)} variant="headline" />}
           />
         </Section>

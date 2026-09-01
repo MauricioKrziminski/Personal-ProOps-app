@@ -88,7 +88,7 @@ de import) com teto de 5.000 linhas que **lança exceção** em vez de mostrar d
 | Fase | Tema | Estado |
 |---|---|---|
 | **1** | O passado do cartão: fatura atual em destaque, `‹ ›` entre faturas, quitar sem mexer no caixa, apagar plano inteiro, `3/8` com link | **implementada e validada**; `0046` aplicada em staging |
-| 2 | Extrato de verdade: filtro por conta/cartão, status e origem; paginação no lugar do `limit(200)`; busca que abre o lançamento certo | pendente |
+| **2** | Extrato de verdade: filtro por conta/cartão, status e origem; paginação no lugar do `limit(200)`; busca que abre o lançamento certo | **implementada**; validação no simulador pendente |
 | 3 | Visões que existem no banco: `monthly_cashflow` na home; patrimônio com os 5 componentes; janelas ajustáveis | pendente |
 | 4 | Período livre: seletor com salto de ano; relatórios além de 3 anos; passado na projeção e nas parceladas | pendente |
 
@@ -234,3 +234,56 @@ com "Tentar de novo", a fatura continuou `Aberta`, e o banco ficou intacto
 - O botão de menu do header não aparece na árvore de acessibilidade do `idb` no
   iOS — não determinado se é limitação da ferramenta ou se o leitor de tela também
   não alcança.
+
+---
+
+## Fase 2 — o que mudou, e as decisões que não são óbvias
+
+**Achados 1 e 3 fechados.** `accounts.tsx` passa `accountId` (a linha inteira e a ação "Ver
+extrato"), e a busca global abre `/finance/[txId]` em vez de despejar o usuário na lista do mês
+corrente. O detalhe por id já funcionava desde a Fase 1 — foi o que o deep link de abril provou.
+
+**O extrato de uma conta inclui a transferência RECEBIDA.** Uma transferência A→B guarda
+`account_id = A` e `counterparty_account_id = B`. Filtrar só `account_id` deixaria o extrato de B
+sem o dinheiro que ENTROU — um extrato que esconde entrada não é extrato. O filtro é
+`or=(account_id.eq.X,counterparty_account_id.eq.X)`.
+
+**"Sem conta" é `NO_ACCOUNT = 'none'`, exportado de `use-finance.ts`.** `null` não viaja por
+parâmetro de rota, e a sentinela literal escrita nas duas pontas (quem navega e quem lê) diverge
+na primeira renomeação.
+
+**A busca da tela saiu do cliente e foi para o banco.** Ela filtrava o array já carregado; com
+paginação isso ficaria PIOR que antes — buscaria dentro de uma página de 50 em vez das 200 linhas
+de então. Usa `toIlikeTerm` (`src/lib/search.ts`), o mesmo saneamento da busca global: sem ele uma
+vírgula digitada vira separador de condição do PostgREST e a query volta **400
+`failed to parse logic tree`** — confirmado contra o staging. Duas telas que buscam lançamento
+precisam achar a mesma coisa; agora é o mesmo código nas duas.
+
+**Dois `.or()` na mesma query são AND entre si.** `supabase-js` faz `append` no `searchParams`, e
+o PostgREST combina parâmetros repetidos com AND — conferido no endpoint real (a query completa
+volta 401 da RLS, ou seja, foi PARSEADA; a versão com vírgula crua volta 400 de sintaxe).
+
+**A ordenação ganhou `id` como desempate.** `(occurred_at, created_at)` empata em lote de
+importação e em parcelas criadas juntas. Sem terceiro critério a ordem pode mudar entre a página 1
+e a 2, e aí uma linha some da lista enquanto outra aparece duas vezes.
+
+**O card de sobra do mês SOME quando há filtro de conta.** `transactions_summary` não recebe conta:
+o número seria do mês inteiro, de todas as contas, em cima de uma lista de uma conta só — o app se
+contradizendo dentro da mesma tela. Preferi esconder a acrescentar `account_id` no par
+interna/wrapper da RPC; se a Fase 3 precisar do total por conta, é ali que ele entra. O título da
+tela vira o nome da conta, então o recorte fica dito em algum lugar.
+
+**Conta e origem são SUBMENU do `…`, não chips no corpo.** Com oito contas cadastradas uma fileira
+de chips vira o conteúdo da tela. `ItemAction` já suporta submenu nas duas plataformas (menu
+aninhado no iOS, segundo sheet no Android) — é o mesmo desenho do "mudar de pasta" das notas. O
+filtro ATIVO aparece como pílula limpável no corpo, junto da de categoria que já existia.
+
+**`arrow.triangle.branch` (ícone de "Origem") entrou no mapa SF → Material** como `call_split`.
+O `icon-map.test.ts` pegou a falta antes de o Android renderizar um `circle` genérico — é a
+terceira vez que esse teste paga o próprio custo.
+
+### O que ainda não foi verificado
+
+- **Simulador e emulador**, light e dark: a Fase 2 é código verde (`tsc`, `expo lint`, 103 testes)
+  e query validada contra o staging, mas **nenhuma tela foi vista rodando**.
+- Segue valendo o que a Fase 1 deixou aberto: **VoiceOver de verdade** e **Dynamic Type**.

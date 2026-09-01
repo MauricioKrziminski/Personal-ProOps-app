@@ -25,6 +25,7 @@ import { MaxContentWidth } from '@/constants/theme';
 import { Elevation, Motion, Radius, Space, tabular } from '@/design/tokens';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import {
+  NO_ACCOUNT,
   useAccounts,
   useDeleteTransaction,
   useMarkPaid,
@@ -33,10 +34,12 @@ import {
   useTransactionsSummary,
   type Transaction,
   type TransactionKind,
+  type TransactionSource,
 } from '@/hooks/use-finance';
 import { formatBRL, formatDateBR, localISODate } from '@/hooks/use-items';
 import { monthBounds } from '@/lib/dates';
 import { confirmDestructive } from '@/lib/item-actions';
+import { useDebounced } from '@/hooks/use-debounced';
 import { useTheme } from '@/hooks/use-theme';
 
 /**
@@ -68,9 +71,18 @@ const KIND_OPTIONS: { value: TransactionKind | 'all'; label: string }[] = [
   { value: 'transfer', label: 'Transf.' },
 ];
 
-const STATUS_OPTIONS: { value: 'all' | 'pending'; label: string }[] = [
+const STATUS_OPTIONS: { value: 'all' | 'pending' | 'cleared'; label: string }[] = [
   { value: 'all', label: 'Todos' },
   { value: 'pending', label: 'Previstos' },
+  { value: 'cleared', label: 'Efetivados' },
+];
+
+/** Rótulo da ORIGEM como filtro. `SOURCE_LABEL` é o subtítulo da linha e deixa `app` vazio. */
+const SOURCE_FILTER: { value: TransactionSource; label: string }[] = [
+  { value: 'whatsapp', label: 'WhatsApp' },
+  { value: 'app', label: 'No app' },
+  { value: 'import', label: 'Importado' },
+  { value: 'recurring', label: 'Recorrente' },
 ];
 
 interface DaySection {
@@ -111,7 +123,14 @@ export default function TransactionsScreen() {
   const scheme = useColorScheme() === 'dark' ? 'dark' : 'light';
   const toast = useToast();
   const insets = useSafeAreaInsets();
-  const params = useLocalSearchParams<{ month?: string; kind?: string; category?: string; recurringId?: string }>();
+  const params = useLocalSearchParams<{
+    month?: string;
+    kind?: string;
+    category?: string;
+    recurringId?: string;
+    /** Id da conta/cartão, ou `none` para os lançamentos sem conta. */
+    accountId?: string;
+  }>();
 
   const [month, setMonth] = useState(() => params.month ?? currentMonth());
   const [kind, setKind] = useState<TransactionKind | 'all'>(
@@ -119,9 +138,13 @@ export default function TransactionsScreen() {
       ? params.kind
       : 'all'
   );
-  const [status, setStatus] = useState<'all' | 'pending'>('all');
+  const [status, setStatus] = useState<'all' | 'pending' | 'cleared'>('all');
   const [category, setCategory] = useState<string | undefined>(params.category);
+  const [accountId, setAccountId] = useState<string | undefined>(params.accountId);
+  const [source, setSource] = useState<TransactionSource | undefined>(undefined);
   const [search, setSearch] = useState('');
+  // Busca-enquanto-digita sem uma requisição por tecla — agora ela vai ao banco.
+  const term = useDebounced(search.trim(), 250);
 
   const range = useMemo(() => monthBounds(month), [month]);
   const list = useTransactions({
@@ -129,6 +152,10 @@ export default function TransactionsScreen() {
     kind: kind === 'all' ? undefined : kind,
     category,
     recurringId: params.recurringId,
+    accountId: accountId === undefined ? undefined : accountId === NO_ACCOUNT ? null : accountId,
+    status: status === 'all' ? undefined : status,
+    source,
+    q: term,
   });
   const summary = useTransactionsSummary(range.from, range.to);
   const accounts = useAccounts();
@@ -150,25 +177,33 @@ export default function TransactionsScreen() {
     .filter((r) => r.kind === 'expense')
     .reduce((s, r) => s + Number(r.total_cents), 0);
 
-  const filtered = useMemo(() => {
-    const term = search.trim().toLowerCase();
-    return (list.data ?? []).filter((tx) => {
-      if (status === 'pending' && tx.status !== 'pending') return false;
-      if (!term) return true;
-      return [tx.description, tx.merchant, tx.category].some((field) =>
-        (field ?? '').toLowerCase().includes(term)
-      );
-    });
-  }, [list.data, status, search]);
+  // `toSections` agrupa em varredura linear, então o dia que atravessa a fronteira de duas
+  // páginas continua sendo uma seção só depois do `flat()`.
+  const rows = useMemo(() => list.data?.pages.flat() ?? [], [list.data]);
+  const sections = useMemo(() => toSections(rows), [rows]);
 
-  const sections = useMemo(() => toSections(filtered), [filtered]);
-  const hasFilters = kind !== 'all' || status !== 'all' || Boolean(category) || search.trim() !== '';
+  const accountLabel =
+    accountId === undefined
+      ? undefined
+      : accountId === NO_ACCOUNT
+        ? 'Sem conta'
+        : (accountName.get(accountId) ?? 'Extrato');
+
+  const hasFilters =
+    kind !== 'all' ||
+    status !== 'all' ||
+    Boolean(category) ||
+    accountId !== undefined ||
+    source !== undefined ||
+    search.trim() !== '';
   const neverHadAnything = (anyEver.data ?? []).length === 0 && !anyEver.isLoading;
 
   const clearFilters = () => {
     setKind('all');
     setStatus('all');
     setCategory(undefined);
+    setAccountId(undefined);
+    setSource(undefined);
     setSearch('');
   };
 
@@ -200,7 +235,7 @@ export default function TransactionsScreen() {
     <View style={styles.header}>
       <MonthPicker month={month} onChange={setMonth} />
 
-      {summary.isError ? (
+      {accountId !== undefined ? null : summary.isError ? (
         <ErrorCard onRetry={summary.refetch} />
       ) : summary.isLoading ? (
         <View style={styles.summarySkeleton}>
@@ -232,6 +267,24 @@ export default function TransactionsScreen() {
             size="sm"
             variant="secondary"
             onPress={() => setCategory(undefined)}
+          />
+        ) : null}
+        {accountLabel ? (
+          <Button
+            label={`conta: ${accountLabel}`}
+            icon="xmark"
+            size="sm"
+            variant="secondary"
+            onPress={() => setAccountId(undefined)}
+          />
+        ) : null}
+        {source ? (
+          <Button
+            label={`origem: ${SOURCE_FILTER.find((o) => o.value === source)?.label ?? source}`}
+            icon="xmark"
+            size="sm"
+            variant="secondary"
+            onPress={() => setSource(undefined)}
           />
         ) : null}
       </View>
@@ -276,7 +329,9 @@ export default function TransactionsScreen() {
   return (
     <View style={styles.root}>
       <Screen scroll={false} grouped>
-        <Stack.Screen options={{ title: 'Lançamentos', headerLargeTitle: true }} />
+        <Stack.Screen
+          options={{ title: accountLabel ?? 'Lançamentos', headerLargeTitle: true }}
+        />
         <Search
           gutter
           value={search}
@@ -288,6 +343,41 @@ export default function TransactionsScreen() {
         <HeaderMenu
           title="Mais opções"
           actions={[
+            // Submenu, não uma fileira de chips: com oito contas cadastradas o corpo da tela
+            // viraria filtro. É o mesmo desenho do "mudar de pasta" das notas.
+            {
+              label: 'Conta',
+              icon: 'wallet.bifold',
+              actions: [
+                {
+                  label: 'Todas',
+                  selected: accountId === undefined,
+                  onPress: () => setAccountId(undefined),
+                },
+                ...(accounts.data ?? []).map((a) => ({
+                  label: a.name,
+                  selected: accountId === a.id,
+                  onPress: () => setAccountId(a.id),
+                })),
+                {
+                  label: 'Sem conta',
+                  selected: accountId === NO_ACCOUNT,
+                  onPress: () => setAccountId(NO_ACCOUNT),
+                },
+              ],
+            },
+            {
+              label: 'Origem',
+              icon: 'arrow.triangle.branch',
+              actions: [
+                { label: 'Todas', selected: source === undefined, onPress: () => setSource(undefined) },
+                ...SOURCE_FILTER.map((o) => ({
+                  label: o.label,
+                  selected: source === o.value,
+                  onPress: () => setSource(o.value),
+                })),
+              ],
+            },
             {
               label: 'Importar extrato',
               icon: 'square.and.arrow.down',
@@ -311,7 +401,12 @@ export default function TransactionsScreen() {
           contentContainerStyle={[styles.list, { paddingBottom: insets.bottom + Space.xxxl * 2 }]}
           ListHeaderComponent={header}
           ListEmptyComponent={empty}
-          refreshing={list.isRefetching}
+          ListFooterComponent={list.isFetchingNextPage ? <SkeletonRow /> : null}
+          onEndReachedThreshold={0.5}
+          onEndReached={() => {
+            if (list.hasNextPage && !list.isFetchingNextPage) list.fetchNextPage();
+          }}
+          refreshing={list.isRefetching && !list.isFetchingNextPage}
           onRefresh={() => {
             list.refetch();
             summary.refetch();
