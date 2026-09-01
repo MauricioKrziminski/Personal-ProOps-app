@@ -358,8 +358,15 @@ export default function ForecastScreen() {
         <ErrorBand message="Não deu para carregar o que vence." onRetry={bills.refetch} />
       ) : null}
 
-      {atrasadas.length > 0 ? <Section title="Atrasado">{atrasadas.map(linhaConta)}</Section> : null}
-      {aVencer.length > 0 ? <Section title="O que vence">{aVencer.map(linhaConta)}</Section> : null}
+      {/* `!bills.isError`: o `data` do TanStack sobrevive ao erro de refetch, e sem isso a lista
+          de "Atrasado" continuava oferecendo "Pagar fatura" logo abaixo da faixa que acabou de
+          dizer que não conseguiu carregar o que vence — com um botão que escreve no banco. */}
+      {!bills.isError && atrasadas.length > 0 ? (
+        <Section title="Atrasado">{atrasadas.map(linhaConta)}</Section>
+      ) : null}
+      {!bills.isError && aVencer.length > 0 ? (
+        <Section title="O que vence">{aVencer.map(linhaConta)}</Section>
+      ) : null}
 
       {!bills.isLoading && !bills.isError && contas.length === 0 && !nadaParaProjetar ? (
         <ThemedText type="small" themeColor="textSecondary" style={styles.calmo}>

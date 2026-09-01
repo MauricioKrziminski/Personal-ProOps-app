@@ -225,7 +225,7 @@ export default function ReportsScreen() {
         </Animated.View>
       ) : null}
 
-      {despesas.length > 0 ? (
+      {!isError && despesas.length > 0 ? (
         <Animated.View
           entering={FadeInDown.duration(Motion.duration.slow).delay(Motion.stagger.step * 2)}
           style={styles.bloco}
@@ -258,7 +258,7 @@ export default function ReportsScreen() {
         </Animated.View>
       ) : null}
 
-      {receitas.length > 0 ? (
+      {!isError && receitas.length > 0 ? (
         <Animated.View
           entering={FadeInDown.duration(Motion.duration.slow).delay(Motion.stagger.step * 3)}
         >
