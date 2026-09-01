@@ -1,10 +1,12 @@
 import { Stack, router, type Href } from 'expo-router';
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Pressable, StyleSheet, View, useWindowDimensions } from 'react-native';
 import Animated, {
   FadeInDown,
   useAnimatedStyle,
   useSharedValue,
+  withDelay,
+  withSpring,
   withTiming,
 } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -22,6 +24,7 @@ import { Icon } from '@/components/ui/icon';
 import { Money } from '@/components/ui/money';
 import { Row, Section } from '@/components/ui/row';
 import { SectionHead } from '@/components/ui/section-head';
+import { Segmented } from '@/components/ui/segmented';
 import { HeroPanel, heroHeaderOptions } from '@/components/ui/hero-panel';
 import { Screen } from '@/components/ui/screen';
 import { Skeleton, SkeletonRow } from '@/components/ui/skeleton';
@@ -34,6 +37,7 @@ import {
   useCardSummary,
   useCashFlowForecast,
   useDeleteTransaction,
+  useMonthlyCashflow,
   useRecentTransactions,
   useTransactionsSummary,
   type Transaction,
@@ -113,6 +117,48 @@ function Shortcut({ title, icon, href }: (typeof SHORTCUTS)[number]) {
   );
 }
 
+/**
+ * Janela da tendência. NÃO segue o `MonthPicker`: `monthly_cashflow` ancora no mês corrente e
+ * anda para trás, então o rótulo diz "últimos N meses" em vez de fingir acompanhar o seletor.
+ */
+const JANELAS_CASHFLOW = [
+  { value: '6', label: '6 meses' },
+  { value: '12', label: '12 meses' },
+];
+
+const ALTURA_BARRA = 72;
+
+/**
+ * Barra da tendência mensal.
+ *
+ * Duas por mês (entrou e saiu) porque a pergunta é comparativa: a resposta é qual das duas é mais
+ * alta. Por isso NÃO leva `success`/`danger` — cor semântica aqui seria decoração, e é a última
+ * alavanca de cor que o app tem. O par é o mesmo de `invoices.tsx`: `tint` cheio contra
+ * `backgroundElement`, mais a legenda em PALAVRA, que é o que funciona sem enxergar cor.
+ */
+function CashBar({ ratio, index, forte }: { ratio: number; index: number; forte: boolean }) {
+  const theme = useTheme();
+  const grow = useSharedValue(0);
+
+  useEffect(() => {
+    grow.set(withDelay(index * Motion.stagger.step, withSpring(ratio, Motion.spring.settle)));
+  }, [grow, ratio, index]);
+
+  const animado = useAnimatedStyle(() => ({
+    height: Math.max(Space.xs, grow.get() * ALTURA_BARRA),
+  }));
+
+  return (
+    <Animated.View
+      style={[
+        styles.cashBar,
+        animado,
+        { backgroundColor: forte ? theme.tint : theme.backgroundElement },
+      ]}
+    />
+  );
+}
+
 /** Dias entre hoje e o último dia do mês corrente (mínimo 1). */
 function daysToMonthEnd(): number {
   const now = new Date();
@@ -168,6 +214,8 @@ export default function FinanceScreen() {
   const previous = useTransactionsSummary(previousRange.from, previousRange.to);
   const budgets = useBudgetsStatus(month);
   const cards = useCardSummary();
+  const [janelaCashflow, setJanelaCashflow] = useState('6');
+  const cashflow = useMonthlyCashflow(Number(janelaCashflow));
   const recent = useRecentTransactions(5);
   const remove = useDeleteTransaction();
 
@@ -202,6 +250,14 @@ export default function FinanceScreen() {
     (b) => Number(b.limit_cents) > 0 && Number(b.spent_cents) / Number(b.limit_cents) >= 0.8
   );
   const recentGroups = useMemo(() => groupByDay(recent.data ?? []), [recent.data]);
+
+  const meses = cashflow.data ?? [];
+  // A escala é COMUM às duas barras: escalas separadas fariam "entrou" e "saiu" parecerem iguais
+  // num mês em que um é o dobro do outro — que é exatamente a leitura que o bloco existe para dar.
+  const tetoCashflow = Math.max(
+    ...meses.map((m) => Math.max(Number(m.income_cents), Number(m.expense_cents))),
+    1
+  );
 
   const heroLoading = summary.isLoading || (isCurrent && forecast.isLoading);
   const heroError = summary.isError || (isCurrent && forecast.isError);
@@ -422,6 +478,79 @@ export default function FinanceScreen() {
                   </Animated.View>
                 );
               })}
+            </Section>
+          </View>
+        ) : null}
+
+        {/* Bloco 4b — a tendência. Os outros blocos são todos do MÊS; este é o único que
+            responde "e ao longo do tempo?". Sai de `monthly_cashflow`, que existe desde a 0012
+            com hook pronto e nenhuma tela lendo. */}
+        {cashflow.isError ? (
+          <ErrorCard onRetry={cashflow.refetch} />
+        ) : cashflow.isLoading ? (
+          <View style={styles.block}>
+            <SectionHead title="Entrou e saiu" />
+            <Skeleton height={140} radius={Radius.md} />
+          </View>
+        ) : meses.length > 1 ? (
+          <View style={styles.block}>
+            <SectionHead title="Entrou e saiu" />
+            <Section>
+              <View style={styles.cashflow}>
+                <Segmented
+                  options={JANELAS_CASHFLOW}
+                  value={janelaCashflow}
+                  onChange={setJanelaCashflow}
+                />
+
+                <View style={styles.cashBars}>
+                  {meses.map((m, index) => {
+                    const entrou = Number(m.income_cents);
+                    const saiu = Number(m.expense_cents);
+                    return (
+                      <View
+                        key={m.month}
+                        style={styles.cashSlot}
+                        accessible
+                        accessibilityLabel={`${monthTitle(m.month.slice(0, 7))}: entrou ${formatBRL(entrou)}, saiu ${formatBRL(saiu)}`}>
+                        <View style={styles.cashPair}>
+                          <View style={styles.cashTrack}>
+                            <CashBar ratio={entrou / tetoCashflow} index={index} forte />
+                          </View>
+                          <View style={styles.cashTrack}>
+                            <CashBar ratio={saiu / tetoCashflow} index={index} forte={false} />
+                          </View>
+                        </View>
+                        <ThemedText type="small" themeColor="textSecondary" style={styles.cashMes}>
+                          {monthLabel(m.month.slice(0, 7))}
+                        </ThemedText>
+                      </View>
+                    );
+                  })}
+                </View>
+
+                {/* Legenda em PALAVRA: a diferença entre as duas barras não pode depender de
+                    enxergar cor. */}
+                <View style={styles.cashLegenda}>
+                  <View style={styles.cashChave}>
+                    <View style={[styles.cashSwatch, { backgroundColor: theme.tint }]} />
+                    <ThemedText type="small" themeColor="textSecondary">
+                      entrou
+                    </ThemedText>
+                  </View>
+                  <View style={styles.cashChave}>
+                    <View
+                      style={[styles.cashSwatch, { backgroundColor: theme.backgroundElement }]}
+                    />
+                    <ThemedText type="small" themeColor="textSecondary">
+                      saiu
+                    </ThemedText>
+                  </View>
+                  <ThemedText type="small" themeColor="textSecondary">
+                    últimos {meses.length} meses
+                  </ThemedText>
+                </View>
+              </View>
             </Section>
           </View>
         ) : null}
@@ -653,6 +782,56 @@ const styles = StyleSheet.create({
   },
   categoryName: {
     flex: 1,
+  },
+  cashflow: {
+    gap: Space.lg,
+    padding: Space.lg,
+  },
+  cashBars: {
+    flexDirection: 'row',
+    alignItems: 'flex-end',
+    gap: Space.md,
+  },
+  cashSlot: {
+    flex: 1,
+    gap: Space.xs,
+  },
+  cashPair: {
+    flexDirection: 'row',
+    alignItems: 'flex-end',
+    // Respiro INTERNO menor que o `gap` entre meses (`cashBars`): é o que faz as duas barras
+    // lerem como um par, e não como doze barras soltas.
+    gap: Space.xs,
+  },
+  cashTrack: {
+    flex: 1,
+    height: ALTURA_BARRA,
+    justifyContent: 'flex-end',
+  },
+  cashBar: {
+    width: '100%',
+    borderRadius: Radius.xs,
+    borderCurve: 'continuous',
+  },
+  cashMes: {
+    textAlign: 'center',
+  },
+  cashLegenda: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Space.lg,
+  },
+  cashChave: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Space.xs,
+  },
+  cashSwatch: {
+    width: 10,
+    height: 10,
+    // Ponto redondo: `Radius.xs` (8) é o menor raio da escala e num quadrado de 10 já viraria
+    // quase círculo — então é círculo de propósito, não um raio fora da régua.
+    borderRadius: Radius.pill,
   },
   budget: {
     gap: Space.sm,

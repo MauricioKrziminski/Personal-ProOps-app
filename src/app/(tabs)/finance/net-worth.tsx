@@ -67,6 +67,54 @@ const CLASSE_ICONE: Record<string, Parameters<typeof Icon>[0]['name']> = {
   other: 'shippingbox',
 };
 
+/**
+ * Janelas da curva. Mesma ideia dos `HORIZONTES` da projeção: opção fixa e curta, não um
+ * seletor de data — quem quer recorte fino vai em Relatórios.
+ */
+const JANELAS = [
+  { value: '6', label: '6 meses' },
+  { value: '12', label: '12 meses' },
+  { value: '24', label: '24 meses' },
+];
+
+/**
+ * O que forma o patrimônio líquido, na ordem em que `private.net_worth_now` soma:
+ * caixa + investimentos + outros bens − passivos.
+ */
+const COMPONENTES: {
+  key: 'cash_cents' | 'investments_cents' | 'other_assets_cents' | 'liabilities_cents';
+  title: string;
+  subtitle: string;
+  icon: Parameters<typeof Icon>[0]['name'];
+  passivo?: boolean;
+}[] = [
+  {
+    key: 'cash_cents',
+    title: 'Dinheiro em conta',
+    subtitle: 'contas e lançamentos sem conta — cartão fica de fora',
+    icon: 'wallet.bifold',
+  },
+  {
+    key: 'investments_cents',
+    title: 'Investimentos',
+    subtitle: 'investimento, cripto e participação',
+    icon: 'chart.line.uptrend.xyaxis',
+  },
+  {
+    key: 'other_assets_cents',
+    title: 'Outros bens',
+    subtitle: 'imóvel, veículo, a receber',
+    icon: 'house',
+  },
+  {
+    key: 'liabilities_cents',
+    title: 'Passivos',
+    subtitle: 'fatura em aberto, dívidas e o que você deve',
+    icon: 'creditcard',
+    passivo: true,
+  },
+];
+
 interface FormState {
   id?: string;
   name: string;
@@ -113,7 +161,8 @@ export default function NetWorthScreen() {
   const toast = useToast();
   const { width } = useWindowDimensions();
   const patrimonio = useNetWorth();
-  const serie = useNetWorthSeries(12);
+  const [janela, setJanela] = useState('12');
+  const serie = useNetWorthSeries(Number(janela));
   const saude = useFinancialHealth();
   const bens = useAssets();
   const save = useSaveAsset();
@@ -286,11 +335,41 @@ export default function NetWorthScreen() {
         </Animated.View>
       ) : null}
 
+      {/* A conta por trás do número: os quatro somam (passivo entra negativo) o valor do herói.
+          Linha com R$ 0,00 FICA — é ela que diz "você não cadastrou investimento nenhum", e
+          esconder uma parcela faria a soma não fechar aos olhos de quem confere. */}
+      {hoje && !vazioAbsoluto ? (
+        <Section title="O que forma esse número">
+          {COMPONENTES.map((c) => {
+            const bruto = Number(hoje[c.key] ?? 0);
+            const cents = c.passivo ? -bruto : bruto;
+            return (
+              <Row
+                key={c.key}
+                title={c.title}
+                subtitle={c.subtitle}
+                icon={c.icon}
+                accessibilityLabel={`${c.title}, ${c.passivo ? 'menos' : 'mais'} ${formatBRL(bruto)}`}
+                trailing={
+                  <Money
+                    cents={cents}
+                    variant="headline"
+                    tone={c.passivo && bruto > 0 ? 'danger' : 'text'}
+                    signed={c.passivo && bruto > 0}
+                  />
+                }
+              />
+            );
+          })}
+        </Section>
+      ) : null}
+
       {serie.isError ? (
         <ErrorBand message="Não deu para carregar a evolução." onRetry={serie.refetch} />
       ) : pontos.length > 1 ? (
         <Card style={styles.bloco}>
           <ThemedText type="smallBold">Evolução</ThemedText>
+          <Segmented options={JANELAS} value={janela} onChange={setJanela} />
           <Sparkline values={valores} width={width - Space.lg * 4} height={80} showZero />
           <View style={styles.eixo}>
             <ThemedText type="small" themeColor="textSecondary">
