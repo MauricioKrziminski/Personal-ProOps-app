@@ -198,6 +198,14 @@ export default function TransactionsScreen() {
     search.trim() !== '';
   const neverHadAnything = (anyEver.data ?? []).length === 0 && !anyEver.isLoading;
 
+  // Estado vazio que oferece BOTÃO ("Ver fevereiro", "Limpar filtros") cai exatamente na faixa
+  // do FAB, que é desenhado por cima e come metade do alvo — visto no simulador com
+  // "Ver Fevereiro de 2025" cortado ao meio pelo "Lançar". Nesses dois estados o FAB sai: não há
+  // lista para completar, e a oferta da tela é a do estado vazio. Ele fica no
+  // `neverHadAnything`, cuja dica manda tocar justamente nele.
+  const vazioComAcao =
+    sections.length === 0 && !list.isLoading && !list.isError && !neverHadAnything;
+
   const clearFilters = () => {
     setKind('all');
     setStatus('all');
@@ -506,15 +514,17 @@ export default function TransactionsScreen() {
         />
       </Screen>
 
-      <Button
-        label="Lançar"
-        icon="plus"
-        onPress={() => router.push({ pathname: '/finance/transaction-form', params: { month } })}
-        style={[
-          styles.fab,
-          { bottom: insets.bottom + Space.xxl, boxShadow: Elevation[scheme].floating },
-        ]}
-      />
+      {vazioComAcao ? null : (
+        <Button
+          label="Lançar"
+          icon="plus"
+          onPress={() => router.push({ pathname: '/finance/transaction-form', params: { month } })}
+          style={[
+            styles.fab,
+            { bottom: insets.bottom + Space.xxl, boxShadow: Elevation[scheme].floating },
+          ]}
+        />
+      )}
     </View>
   );
 }
