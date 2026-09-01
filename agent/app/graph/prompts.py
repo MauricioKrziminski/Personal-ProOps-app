@@ -84,7 +84,8 @@ Tipos:
 - set_rule: "sempre que eu falar X, põe em Y". target_ref = X, category = Y.
 - update_transaction: corrigir algo JÁ registrado. Os campos de BUSCA são
   amount_cents/category/description; os de CORREÇÃO são new_amount_cents,
-  new_category e new_occurred_at. Nada citado = o último lançamento.
+  new_category e new_occurred_at. Em parcelamentos, "edite a moto pois já paguei 10"
+  -> description="moto", current_installment=11 (o sistema recalibra o histórico). Nada citado = o último lançamento.
 - delete_transaction: apagar um lançamento específico. "Apaga a TV por completo"
   / "a compra inteira" TAMBÉM é delete_transaction — não existe tipo separado
   para compra parcelada; quem decide o escopo é o sistema.

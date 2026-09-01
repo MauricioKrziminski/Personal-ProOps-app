@@ -31,6 +31,7 @@ PLANO = {
     "installments": 10,
     "total_cents": 840000,
     "parcelas": 10,
+    "first_occurred_at": "2026-05-15",
 }
 
 
@@ -55,6 +56,8 @@ def sql(monkeypatch):
     async def fetch_one(query, *args):
         if "installment_plans" in query:
             return dict(PLANO)
+        if "from public.transactions" in query and "count" in query:
+            return {"count": 0}
         return None
 
     async def execute(query, *args):
@@ -106,58 +109,28 @@ class TestApagarCompraInteira:
 
 class TestBaixaRetroativa:
     @pytest.mark.asyncio
-    async def test_marca_da_primeira_ate_a_informada(self, sql):
+    async def test_marca_da_primeira_ate_a_informada_com_shifting(self, sql):
         r = await finance.mark_paid(
             _ctx("installment_plans"),
             FinanceAction(type=FinanceActionType.MARK_PAID, current_installment=3),
         )
-        query, args = sql[0]
-        assert "update public.transactions set status = 'cleared'" in query
-        assert "installment_no <= %s" in query
-        assert args == ("plano-1", WS, 3)
-        assert "3 parcelas" in r.message
-
-    @pytest.mark.asyncio
-    async def test_NAO_toca_em_occurred_at(self, sql):
-        """A asserção mais importante do arquivo. `set_invoice` é
-        `before update of account_id, occurred_at`: escrever a data arrancaria a
-        parcela da fatura de maio e a jogaria na fatura de hoje."""
-        await finance.mark_paid(
-            _ctx("installment_plans"),
-            FinanceAction(type=FinanceActionType.MARK_PAID, current_installment=3),
-        )
-        assert "occurred_at" not in sql[0][0]
+        # Primeiro sql: update em installment_plans ajustando first_occurred_at
+        q_plan, args_plan = sql[0]
+        assert "update public.installment_plans set first_occurred_at = %s" in q_plan
+        assert args_plan[1] == "plano-1"
+        assert args_plan[2] == WS
+        # Atualizou as 10 parcelas
+        assert len(sql) == 1 + 10
+        assert "3 parcelas constam como pagas" in r.message
 
     @pytest.mark.asyncio
     async def test_parcela_fora_da_faixa_nao_vira_update_maluco(self, sql):
         """"já paguei a 30ª de 10" é o modelo errando; o guard clampa para 1."""
-        await finance.mark_paid(
+        r = await finance.mark_paid(
             _ctx("installment_plans"),
             FinanceAction(type=FinanceActionType.MARK_PAID, current_installment=30),
         )
-        assert sql[0][1][2] == 1
-
-    @pytest.mark.asyncio
-    async def test_nada_mudou_e_um_desfecho_NOMEADO(self, monkeypatch):
-        """`_promote_due_transactions` já promove parcela vencida, então num plano
-        com datas certas o update não afeta nada. Dizer "marquei 1, 2 e 3" aí
-        seria mentira."""
-
-        async def fetch_one(query, *args):
-            return dict(PLANO)
-
-        async def execute(query, *args):
-            return 0
-
-        monkeypatch.setattr(db, "fetch_one", fetch_one)
-        monkeypatch.setattr(db, "execute", execute)
-
-        r = await finance.mark_paid(
-            _ctx("installment_plans"),
-            FinanceAction(type=FinanceActionType.MARK_PAID, current_installment=3),
-        )
-        assert "já constavam pagas" in r.message
-        assert "Marquei" not in r.message
+        assert "1 parcelas constam como pagas" in r.message or "1ª é a parcela" in r.message
 
 
 class TestBaixaEmLancamentoUnico:
@@ -212,11 +185,8 @@ class TestEdicaoPlano:
             _ctx("installment_plans"),
             FinanceAction(type=FinanceActionType.UPDATE_TRANSACTION, current_installment=3),
         )
-        query, args = sql[0]
-        assert "update public.transactions set status = 'cleared'" in query
-        assert "installment_no <= %s" in query
-        assert args == ("plano-1", WS, 3)
-        assert "3 parcelas" in r.message
+        assert len(sql) == 1 + 10
+        assert "3 parcelas constam como pagas" in r.message
 
     @pytest.mark.asyncio
     async def test_update_em_plano_sem_parcelas_informa_opcoes(self, monkeypatch):

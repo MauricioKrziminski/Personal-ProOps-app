@@ -327,15 +327,171 @@ async def pay_invoice(ctx: ExecContext, action: FinanceAction) -> ToolResult:
     )
 
 
-async def _baixa_em_parcelas(ctx: ExecContext, action: FinanceAction) -> ToolResult:
-    """"Já paguei a terceira" -> parcelas 1..3 viram `cleared`.
+async def verificar_limite_disponivel(
+    workspace_id: UUID | str, account_id: UUID | str | None, valor_total_centavos: int
+) -> dict:
+    """Verifica se a compra excede o limite disponível do cartão de crédito (Soft Warning)."""
+    if not account_id:
+        return {
+            "excedeu": False,
+            "limite_centavos": None,
+            "disponivel_centavos": None,
+            "card_name": "",
+            "account_id": None,
+        }
 
-    ⚠️ **NÃO toca em `occurred_at`.** O trigger `set_invoice` é
-    `before insert or update of account_id, occurred_at` (0013:211): escrever a
-    data arrancaria a parcela da fatura em que ela nasceu e a jogaria na fatura de
-    hoje. Status não dispara o trigger, e o total da fatura nem olha para status —
-    ele soma por `invoice_id`.
+    acc = await db.fetch_one(
+        """
+        select id, name, type, credit_limit_cents
+        from public.accounts
+        where id = %s and workspace_id = %s
+        """,
+        account_id,
+        workspace_id,
+    )
+    if not acc or acc.get("type") != "credit_card" or not acc.get("credit_limit_cents"):
+        return {
+            "excedeu": False,
+            "limite_centavos": None,
+            "disponivel_centavos": None,
+            "card_name": acc.get("name", "") if acc else "",
+            "account_id": str(account_id),
+        }
+
+    limite = int(acc["credit_limit_cents"])
+    if limite <= 0:
+        return {
+            "excedeu": False,
+            "limite_centavos": limite,
+            "disponivel_centavos": None,
+            "card_name": acc.get("name", ""),
+            "account_id": str(account_id),
+        }
+
+    aberto_row = await db.fetch_one(
+        """
+        select coalesce(sum(t.amount_cents), 0) as total
+        from public.transactions t
+        join public.card_invoices ci on ci.id = t.invoice_id
+        where ci.account_id = %s and ci.status <> 'paid' and t.workspace_id = %s
+        """,
+        account_id,
+        workspace_id,
+    )
+    aberto_cents = int(aberto_row["total"] or 0) if aberto_row else 0
+    disponivel = limite - aberto_cents
+    excedeu = valor_total_centavos > disponivel
+
+    return {
+        "excedeu": excedeu,
+        "limite_centavos": limite,
+        "disponivel_centavos": disponivel,
+        "card_name": acc.get("name", "Cartão"),
+        "account_id": str(account_id),
+    }
+
+
+async def shift_installment_plan(
+    ctx: ExecContext, plano_id: str | UUID, new_paid_count: int
+) -> ToolResult:
+    """Recalibra o calendário de um plano de parcelamento (Shifting de Datas).
+
+    Quando o usuário atualiza o número de parcelas já pagas (de A para B):
+    1. Calcula a diferença de meses (shift = B - A).
+    2. Recua a data inicial (first_occurred_at) do plano em shift meses.
+    3. Reajusta as N parcelas no banco:
+       - Parcelas 1..B ficam nos meses passados com status 'cleared'.
+       - Parcela B+1 (atual) cai no mês corrente com status 'pending'.
+       - Parcelas subsequentes ficam agendadas abertas com status 'pending'.
     """
+    plano = await db.fetch_one(
+        """
+        select id, description, installments, total_cents, first_occurred_at
+        from public.installment_plans
+        where id = %s and workspace_id = %s
+        """,
+        plano_id,
+        ctx.workspace_id,
+    )
+    if not plano:
+        return ToolResult("🤷 Essa compra parcelada não está mais aqui.", read_only=True)
+
+    installments = int(plano["installments"])
+    B = max(0, min(int(new_paid_count), installments))
+
+    # Conta quantas parcelas constavam pagas atualmente (A)
+    pagas_row = await db.fetch_one(
+        """
+        select count(*) as count
+        from public.transactions
+        where installment_plan_id = %s and workspace_id = %s and status = 'cleared'
+        """,
+        plano["id"],
+        ctx.workspace_id,
+    )
+    A = 0
+    if pagas_row:
+        if isinstance(pagas_row, dict):
+            A = int(pagas_row.get("count") or pagas_row.get("count(*)") or 0)
+        else:
+            try:
+                A = int(pagas_row["count"])
+            except Exception:
+                A = 0
+
+    first_dt = plano.get("first_occurred_at") or local_iso_date(ctx.timezone)
+    shift = B - A
+    new_first_occurred_at = (
+        add_months(str(first_dt), -shift)
+        if shift != 0
+        else str(first_dt)
+    )
+
+    # Atualiza a data inicial do plano
+    await db.execute(
+        """
+        update public.installment_plans
+        set first_occurred_at = %s
+        where id = %s and workspace_id = %s
+        """,
+        new_first_occurred_at,
+        plano["id"],
+        ctx.workspace_id,
+    )
+
+    # Reajusta cada uma das N parcelas
+    for i in range(1, installments + 1):
+        data_i = add_months(new_first_occurred_at, i - 1)
+        is_paga = i <= B
+        status_i = "cleared" if is_paga else "pending"
+        paid_at_i = data_i if is_paga else None
+
+        await db.execute(
+            """
+            update public.transactions
+            set occurred_at = %s, status = %s, paid_at = %s
+            where installment_plan_id = %s and installment_no = %s and workspace_id = %s
+            """,
+            data_i,
+            status_i,
+            paid_at_i,
+            plano["id"],
+            i,
+            ctx.workspace_id,
+        )
+
+    nome = plano["description"] or "compra parcelada"
+    if B == 0:
+        msg = f"✅ Atualizei o plano de *{nome}* ({installments}x): nenhuma parcela consta como paga; a 1ª é a parcela deste mês."
+    elif B < installments:
+        msg = f"✅ Atualizei o plano de *{nome}* ({installments}x): {B} parcelas constam como pagas no histórico e a {B + 1}ª é a parcela deste mês."
+    else:
+        msg = f"✅ Atualizei o plano de *{nome}* ({installments}x): todas as {B} parcelas foram marcadas como pagas."
+
+    return ToolResult(msg, result_id=plano["id"])
+
+
+async def _baixa_em_parcelas(ctx: ExecContext, action: FinanceAction) -> ToolResult:
     cands = (ctx.target or {}).get("candidates") or []
     if not cands:
         return ToolResult("🤷 Essa compra parcelada não está mais aqui.", read_only=True)
@@ -351,27 +507,7 @@ async def _baixa_em_parcelas(ctx: ExecContext, action: FinanceAction) -> ToolRes
         return ToolResult("🤷 Essa compra parcelada não está mais aqui.", read_only=True)
 
     ate = guards.require_current_installment(action.current_installment, plano["installments"])
-    mudadas = await db.execute(
-        """
-        update public.transactions set status = 'cleared'
-        where installment_plan_id = %s and workspace_id = %s
-          and installment_no <= %s and status = 'pending'
-        """,
-        plano["id"], ctx.workspace_id, ate,
-    )
-    nome = plano["description"] or "compra parcelada"
-    if not mudadas:
-        # Desfecho legítimo, e comum: `_promote_due_transactions` (0014:50) já
-        # promove toda parcela vencida. Dizer "marquei 1, 2 e 3" aqui seria mentir.
-        return ToolResult(
-            f"👍 As parcelas até a {ate}ª de *{nome}* já constavam pagas — não mudei nada.",
-            result_id=plano["id"],
-        )
-    plural = "parcela" if mudadas == 1 else "parcelas"
-    return ToolResult(
-        f"✅ Marquei {mudadas} {plural} de *{nome}* como pagas (até a {ate}ª).",
-        result_id=plano["id"],
-    )
+    return await shift_installment_plan(ctx, plano["id"], ate)
 
 
 async def mark_paid(ctx: ExecContext, action: FinanceAction) -> ToolResult:

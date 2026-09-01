@@ -31,6 +31,7 @@ from app.graph.schemas import (
     RouterDecision,
 )
 from app.domain.required import faltando
+from app.domain.money import cents_to_brl
 from app.graph.state import AgentState
 from app.tools import resolve
 from app.services import gemini
@@ -538,6 +539,63 @@ async def gate(state: AgentState) -> dict:
                 "results": [*state.get("results", []), "👍 Beleza, não mexi em nada."],
                 "halted": True,
             }
+
+    # 1.2) Checagem de limite disponível do cartão (Soft Warning)
+    for i, acao in enumerate(acoes):
+        if i in _incompletas(state, acoes):
+            continue
+        if (
+            acao.type in {FinanceActionType.CREATE_EXPENSE, FinanceActionType.CREATE_INSTALLMENT_PURCHASE}
+            and acao.account
+            and acao.amount_cents
+        ):
+            from app.tools.finance import resolve_account, verificar_limite_disponivel
+            acc_id = await resolve_account(state["workspace_id"], acao.account, only_cards=True)
+            if acc_id:
+                limite_res = await verificar_limite_disponivel(state["workspace_id"], acc_id, acao.amount_cents)
+                if limite_res.get("excedeu"):
+                    card_name = limite_res.get("card_name") or acao.account
+                    limite_str = cents_to_brl(limite_res["limite_centavos"])
+                    disp_str = cents_to_brl(limite_res["disponivel_centavos"])
+                    aviso = (
+                        f"⚠️ **Aviso:** Esta compra excede o limite disponível do seu {card_name} "
+                        f"(Limite: {limite_str}, Disponível: {disp_str}). "
+                        "Deseja registrar mesmo assim ou prefere trocar de cartão?"
+                    )
+                    escolha = interrupt(
+                        {
+                            "kind": "soft_warning",
+                            "action_index": i,
+                            "action_type": acao.type.value,
+                            "summary": aviso,
+                            "options": [
+                                {"id": "confirm", "label": "Confirmar mesmo assim"},
+                                {"id": "change_card", "label": "Trocar de Cartão"},
+                            ],
+                        }
+                    )
+                    escolhido = (
+                        escolha.get("candidate_id") if isinstance(escolha, dict) else escolha
+                    )
+                    if isinstance(escolhido, str) and (
+                        escolhido in {"confirm", "yes", "sim", "1", "ok"}
+                        or (isinstance(escolha, dict) and escolha.get("approved"))
+                    ):
+                        return {"approved": True}
+                    if isinstance(escolhido, str) and (escolhido in {"change_card", "trocar", "2"}):
+                        return {
+                            "approved": False,
+                            "results": [
+                                *state.get("results", []),
+                                f"💳 Qual outro cartão você prefere usar para esta compra de {cents_to_brl(acao.amount_cents)}?",
+                            ],
+                            "halted": True,
+                        }
+                    return {
+                        "approved": False,
+                        "results": [*state.get("results", []), "👍 Beleza, não registrei a compra."],
+                        "halted": True,
+                    }
 
     # Ação incompleta não vira pergunta: o usuário já recebeu o pedido do que
     # falta, e confirmar "registrar None" não é uma decisão que dá para tomar.

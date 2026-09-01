@@ -21,9 +21,9 @@ from pydantic import BaseModel
 
 from app.config import get_settings
 
-GEMINI_ROUTER = "gemini-3.5-flash-lite"
-GEMINI_PARSE = "gemini-3.5-flash-lite"
-GEMINI_ESCALATE = "gemini-3.6-flash"
+GEMINI_ROUTER = "gemini-3.7-flash"
+GEMINI_PARSE = "gemini-3.7-flash"
+GEMINI_ESCALATE = "gemini-3.7-flash"
 GEMINI_BATCH = "gemini-3.1-flash-lite"
 
 # Sobre prompt caching: NÃO ativar nem reestruturar prompt por causa disso.
@@ -36,20 +36,16 @@ _cache: dict[tuple[str, float], ChatGoogleGenerativeAI] = {}
 T = TypeVar("T", bound=BaseModel)
 
 
-def llm(model: str = GEMINI_PARSE, temperature: float = 0.1) -> ChatGoogleGenerativeAI:
-    """Cliente por (modelo, temperatura). Reusar evita reconstruir o transporte.
-
-    ⚠️ `temperature` é IGNORADA pelo Flash-Lite 3.5 — a lib avisa em toda chamada
-    ("uses fixed sampling defaults"). O parâmetro continua aqui porque vale para
-    outros modelos e porque tirar sugeriria que a escolha foi abandonada. O que
-    garante saída estável é o schema estrito, não a temperatura.
-    """
-    chave = (model, temperature)
+def llm(model: str | None = None, temperature: float = 0.1) -> ChatGoogleGenerativeAI:
+    """Cliente por (modelo, temperatura). Reusar evita reconstruir o transporte."""
+    settings = get_settings()
+    nome_modelo = model or settings.gemini_model or GEMINI_PARSE
+    chave = (nome_modelo, temperature)
     if chave not in _cache:
         _cache[chave] = ChatGoogleGenerativeAI(
-            model=model,
+            model=nome_modelo,
             temperature=temperature,
-            google_api_key=get_settings().gemini_api_key,
+            google_api_key=settings.gemini_api_key,
             max_retries=2,          # 429/5xx transitório
             timeout=30,
         )

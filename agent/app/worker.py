@@ -678,6 +678,20 @@ def _pergunta(pausa: dict, candidatos: list[dict], pendente: dict | None) -> dic
         return f"⚠️ Confirma {pausa['summary']}?\nResponde *SIM* ou *NÃO*."
 
     pid = pendente["id"]
+
+    if pausa.get("kind") == "soft_warning":
+        corpo = pausa["summary"]
+        return {
+            "ui": "buttons",
+            "body": corpo,
+            "buttons": [
+                (f"pa:{pid}:c:confirm", "Confirmar"),
+                (f"pa:{pid}:c:change_card", "Trocar de Cartão"),
+                (f"pa:{pid}:no", "Cancelar"),
+            ],
+            "text": f"{corpo}\n1) Confirmar mesmo assim\n2) Trocar de Cartão\n3) Cancelar\nResponde com o número ou SIM/NÃO.",
+        }
+
     numerado = "\n".join(f"{i}) {c['label']}" for i, c in enumerate(candidatos, 1))
 
     if not candidatos:

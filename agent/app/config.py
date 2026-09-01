@@ -33,6 +33,7 @@ class Settings(BaseSettings):
 
     # --- IA ---
     gemini_api_key: str = ""
+    gemini_model: str = "gemini-3.7-flash"
     groq_api_key: str = ""
 
     # --- Cloud Tasks ---
