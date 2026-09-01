@@ -90,7 +90,7 @@ de import) com teto de 5.000 linhas que **lança exceção** em vez de mostrar d
 | **1** | O passado do cartão: fatura atual em destaque, `‹ ›` entre faturas, quitar sem mexer no caixa, apagar plano inteiro, `3/8` com link | **implementada e validada**; `0046` aplicada em staging |
 | **2** | Extrato de verdade: filtro por conta/cartão, status e origem; paginação no lugar do `limit(200)`; busca que abre o lançamento certo | **implementada e validada** (iOS + Android, claro e escuro) |
 | **3** | Visões que existem no banco: `monthly_cashflow` na home; patrimônio com os 5 componentes; janelas ajustáveis | **implementada e validada** (iOS + Android, claro e escuro); `0047` e `0048` em staging |
-| 4 | Período livre: seletor com salto de ano; relatórios além de 3 anos; passado na projeção e nas parceladas | pendente |
+| **4** | Período livre: seletor com salto de ano; relatórios além de 3 anos; passado na projeção e nas parceladas | **implementada e validada** (iOS + Android, claro e escuro) |
 
 Cada fase é uma rodada: implementa → personas → valida.
 
@@ -454,3 +454,120 @@ nasce nessa mesma migration, e a limpeza da `0044` roda sobre `draft_actions`, c
 ⚠️ O `supabase link` do repo aponta para **PRODUÇÃO**: `db push --linked` vai para lá, e staging
 exige `--db-url` com a `DATABASE_URL` do `agent/.env.staging`. Conferir o alvo antes de empurrar
 continua sendo obrigação de quem empurra.
+
+---
+
+## Fase 4 — o que mudou, e as decisões que não são óbvias
+
+Fecha o achado 5 ("todo recorte temporal é fixo ou de passo 1") e os dois itens cosméticos que as
+fases anteriores estacionaram aqui. **Nenhuma migration:** é tudo tela.
+
+### O salto de ano mora no `MonthPicker`, e as três telas herdam
+
+O título do mês virou a porta: toca e abre um sheet com passo de ANO e grade de 12 meses. Voltar
+catorze meses passou de **catorze toques para três** — medido no simulador, de agosto/2026 para
+março/2025. Como a decisão está no primitivo, Lançamentos, Orçamentos e o painel do Financeiro
+ganharam junto, sem uma linha de tela.
+
+Sheet feito à mão em vez de biblioteca de picker: nenhuma está aprovada no projeto — a mesma
+decisão que o `Segmented` já registra. **Sem teto de ano**, igual às setas, que sempre andaram sem
+trava; um limite aqui seria a única fronteira do app que o usuário descobre batendo nela.
+
+### Relatórios: os anos vêm do dado
+
+Eram três fixos (`anoAtual - 2`), então quem usa o app há mais tempo não alcançava o próprio
+passado e quem começou ontem via dois anos vazios oferecidos como se tivessem conteúdo. Agora saem
+do lançamento mais antigo. Viraram **chips roláveis**, não `Segmented`: o segmentado divide a
+largura em partes iguais e quebra a partir de ~4 opções, e a lista agora cresce com o uso. **Com um
+ano só a fileira some** — seletor de uma opção não seleciona nada, e o ano já está escrito no
+destaque e no título de Bens e Direitos. Mesma régua do badge de aba.
+
+### Parceladas: a faixa cobre o plano inteiro
+
+Este é o caso que originou a auditoria — compra em 8x lançada JÁ na 5ª parcela — e a tela ainda
+não mostrava as quatro parcelas passadas. **A causa não era o gráfico, era o dado:** `porMes`
+nascia com dois filtros (`status = 'pending'` e `mes >= hoje`), então o passado saía antes de
+chegar na faixa. Agora o mapa carrega o plano inteiro, a faixa rola e abre no mês corrente, e as
+parcelas pagas aparecem mais fracas.
+
+`comprometido` e a média **continuam olhando só para a frente** — passaram a ler as parcelas
+direto em vez de herdar o mapa, porque esse número tem dois recortes que a faixa não tem. Os dois
+valores da tela não mudaram depois da mudança, que era o resultado desejado.
+
+### O bloco preto sólido era o EMPATE, não a escala
+
+O achado cosmético parado desde a Fase 1 ("barras de valor igual viram um bloco preto") tinha uma
+causa diferente da suposta. Não é falta de `MIN_SPAN_RATIO`: em barra medida a partir do zero,
+valores iguais **devem** dar barras iguais — encolher isso faria o gráfico mentir. O que produzia o
+bloco era o destaque: parcela é o total dividido igual, então três meses empatavam no máximo e os
+três saíam em `tint`. Agora o accent só marca o mês mais pesado quando existe **um**.
+
+### Transferência ganha sinal no extrato de uma conta
+
+Na lista global transferência não tem sinal — não é entrada nem saída do conjunto. No extrato de
+UMA conta tem: sai da origem, ENTRA no destino. As mesmas duas transferências de R$ 900,00 agora
+aparecem **−R$ 900,00 no Nubank e +R$ 900,00 no cartão**, e o total do dia continua ignorando
+transferência.
+
+### A projeção mostra o passado antes do dia de hoje
+
+Sai de `net_worth_snapshots`, cujo `cash_cents` é o mesmo `private.cash_total` em que a projeção se
+ancora — por isso as duas pontas se encontram em vez de dar um degrau. A foto de HOJE é descartada
+(o cron a tirou de madrugada; o dia 0 da projeção já é o valor de agora). A soma por dia é
+obrigatória: dois workspaces têm duas fotos por data, e é exatamente o defeito que a `0047`
+corrigiu no banco — não vale reintroduzi-lo no cliente.
+
+No `Sparkline`, `pastCount` divide a linha: passado a 35%, futuro cheio, marcador vertical no hoje.
+`0` (padrão) desenha exatamente o que desenhava antes, então as outras três telas não mudaram.
+
+### O FAB cobria o botão do estado vazio
+
+Visto no simulador: "Ver Fevereiro de 2025" cortado ao meio pelo "Lançar". Nos dois estados vazios
+que oferecem BOTÃO o FAB sai — não há lista para completar e a oferta da tela é a do estado vazio.
+Ele fica no "nenhum lançamento ainda", cuja dica manda tocar justamente nele.
+
+### Validação (31/08/2026)
+
+iPhone 16 e emulador `s26`, claro e escuro, contra o staging.
+
+**Passou:** salto de agosto/2026 → março/2025 em três toques; grade com o mês corrente marcado, nas
+duas plataformas e nos dois temas; faixa das parceladas cobrindo abril/2026 → maio/2027 com as
+quatro passadas rotuladas "já passou" e rolagem abrindo no mês corrente; empate sem bloco preto;
+transferência com sinal oposto nas duas pontas; ano único escondendo a fileira de chips; FAB
+liberando o botão do estado vazio.
+
+**Verificado com série sintética:** o corte passado/futuro do `Sparkline`. O staging tem UMA foto
+de patrimônio, então o trecho passado não aparece com dado real — o caminho de desenho foi
+exercitado injetando 30 pontos temporariamente, como o teto de página foi na Fase 2.
+
+### Três defeitos que o teste offline encontrou (e um sistêmico)
+
+Pelo terceiro ciclo seguido, a passada offline achou bug — e sempre o MESMO: **o `data` do TanStack
+sobrevive ao erro de refetch**, então a seção continua afirmando números embaixo da faixa que
+acabou de dizer que falhou. Na Fase 3 foi a composição do patrimônio; aqui foram **Relatórios**
+("Para onde foi" e "De onde veio" intactos sob "Algo deu errado") e **Projeção** ("Atrasado"
+oferecendo "Pagar fatura" — um botão que ESCREVE no banco — sob a faixa de erro). Os dois
+corrigidos.
+
+> **Isto virou padrão, não coincidência.** Toda seção que lê uma query precisa checar `isError`,
+> não só `data`. Vale uma varredura própria: o app tem dezenas de blocos com essa forma e só três
+> foram auditados. O teste offline de Relatórios foi conferido depois do conserto; o da Projeção
+> pegou a tela no meio do refetch e ficou **inconclusivo** — o código é o mesmo dos outros dois.
+
+### Achado sistêmico: sheet sob a status bar no Android
+
+`presentationStyle="pageSheet"` desce sozinho no iOS; no Android o `Modal` ocupa a tela inteira e o
+cabeçalho nasce **por cima do relógio e dos ícones de bateria**. Em Patrimônio isso deixava o
+**"Salvar" atrás do ícone de wifi** — ação primária inalcançável. Corrigido no sheet novo e em
+Patrimônio.
+
+**Faltam oito telas com o mesmo padrão:** `import`, `notes/[id]`, `goals`, `rules`, `budgets`,
+`debts`, `accounts`, `recurring` e `invoice/[id]`. Não foram tocadas porque nenhuma entrou nesta
+rodada e o conserto certo é um primitivo `Sheet` compartilhado, não nove cópias de
+`paddingTop` — é trabalho próprio, com validação própria.
+
+### O que segue aberto no app inteiro
+
+- **VoiceOver de verdade** e **Dynamic Type**, herdados da Fase 1.
+- Deep link não reaplica filtro em tela já montada (backlog da Fase 2).
+- As duas varreduras acima: `isError` nas seções e o primitivo de sheet.
