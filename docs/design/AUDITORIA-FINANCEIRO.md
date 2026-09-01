@@ -124,3 +124,47 @@ paga agora, e o bug original continua resolvido.
 **O rótulo do pager e o histórico** — `InvoicePager` anda sobre a LISTA de faturas,
 não sobre o calendário: fatura é lista esparsa (mês sem compra não gera fatura, e
 parcelamento gera fatura futura), então somar ±1 mês cairia num vazio.
+
+---
+
+## Validação da Fase 1 no simulador (31/08/2026)
+
+iPhone 16 contra o banco de **staging** (`.env.local`), com a `0046` aplicada.
+Navegação por deep link (`appproops:///...`), que de quebra exercitou o roteamento.
+
+**Passou:** fatura corrente em destaque com a faixa "2 faturas atrasadas" acima;
+`InvoicePager` com as duas setas; na fatura mais antiga a seta de voltar **some**
+em vez de virar botão morto; fatura **paga** de maio finalmente alcançável;
+"Parcela 1 de 8 · R$ 7.200,00 no total" pressável; dark mode com os tokens certos.
+
+**O deep link para o detalhe de uma parcela de ABRIL funcionou sem `month`** — sob
+o código antigo cairia em "esse lançamento não existe mais", porque a tela
+procurava dentro da lista do mês corrente. É a prova do reparo em `useTransaction`.
+
+### Dois defeitos encontrados PELO teste, e corrigidos
+
+1. **`invoices.tsx` mostrava só o futuro.** Ela pedia `useCardInvoices(id, 12)` e
+   as 12 mais novas eram todas faturas futuras de parcelamento (até 2027): o
+   histórico inteiro — o motivo de a tela existir — ficava de fora, sem erro e sem
+   aviso. Mudar só o default do hook não bastou; a tela passava 12 explicitamente.
+2. **O gráfico mentia e a média estava errada.** "Últimas 12 faturas" desenhava
+   2027, e "média das últimas 6" era calculada sobre faturas futuras de R$ 0,00.
+   Agora gráfico e média usam só o passado, e as futuras ganharam seção própria —
+   não somem (esconder dado é o problema que esta rodada ataca), mas também não
+   são "anteriores".
+
+### Não verificado
+
+- **Toques**: "Marcar como paga", duplo toque, apagar plano e desfazer não são
+  automatizáveis por deep link. A lógica correspondente foi validada em SQL contra
+  o banco real (commit `03c3339`).
+- **Dynamic Type**: `simctl ui content-size` não surtiu efeito visível nem após
+  relaunch, e nada no código desliga o escalonamento — a conclusão honesta é
+  *não verificado*, não *quebrado*.
+- **Offline, VoiceOver e Android**: pendentes.
+
+### Achado cosmético, não corrigido
+
+Com faturas de valor igual, as barras do gráfico ficam todas cheias e viram um
+bloco preto sólido — o `Sparkline` tem `MIN_SPAN_RATIO` para isso, o gráfico de
+barras não. Pré-existente; cabe na Fase 4 (polimento e gráficos).
