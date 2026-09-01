@@ -568,6 +568,99 @@ rodada e o conserto certo é um primitivo `Sheet` compartilhado, não nove cópi
 
 ### O que segue aberto no app inteiro
 
-- **VoiceOver de verdade** e **Dynamic Type**, herdados da Fase 1.
-- Deep link não reaplica filtro em tela já montada (backlog da Fase 2).
-- As duas varreduras acima: `isError` nas seções e o primitivo de sheet.
+Tudo o que esta seção listava foi fechado na rodada de limpeza logo abaixo.
+
+---
+
+## Rodada de limpeza — as pendências das quatro fases (01/09/2026)
+
+Fechou o que as fases deixaram em aberto. Duas varreduras, um backlog e as duas verificações de
+acessibilidade que nunca tinham sido feitas.
+
+### `Sheet`: treze cópias viraram um primitivo
+
+`presentationStyle="pageSheet"` desce sozinho no iOS; no Android o `Modal` ocupa a tela inteira e
+o cabeçalho nasce **por cima do relógio**. Em Patrimônio isso deixava o **"Salvar" atrás do ícone
+de wifi** — ação primária inalcançável num sheet que grava no banco.
+
+Existiam TREZE cópias do mesmo par `<Modal><View style={[styles.sheet, …]}>`, uma por tela, todas
+com o mesmo defeito. Consertar treze vezes era garantir que a décima quarta tela nascesse errada.
+Agora é `src/components/ui/sheet.tsx`, e a migração **deletou 142 linhas líquidas**. O primitivo
+envolve só a moldura: cabeçalho, rolagem e teclado continuam sendo decisão de cada tela, porque
+são diferentes de verdade entre um form de conta e uma lista de tags.
+
+Verificação: `presentationStyle` só existe dentro de `sheet.tsx`; um sheet conferido no Android
+(cabeçalho abaixo do relógio) e um no iOS (idêntico ao de antes, sem respiro dobrado).
+
+### `isError`: onze telas mostravam dado velho sob a faixa de erro
+
+O bug que apareceu em três fases seguidas, agora varrido de ponta a ponta. **O `data` do TanStack
+sobrevive ao erro de refetch**, então a seção continuava afirmando números embaixo da faixa que
+acabou de dizer que falhou.
+
+Corrigido em **Cartões, Metas, Dívidas, Recorrentes, Orçamentos, Plano, Regras, Lembretes,
+Importar, Contas e Fatura**. O conserto é uma linha por query — zerar a lista derivada quando a
+query falha —, o que cobre lista, contadores e destaque de uma vez; os estados vazios já checavam
+`isError` e continuam calados.
+
+**O caso grave era a Fatura**: junto do total vinha o botão **"Paguei R$ 1.700,00"**, que ESCREVE
+no banco, em cima de um número que o app não conseguia mais confirmar. Verificado offline no
+Android: hoje sobra só a faixa de erro com "Tentar de novo".
+
+O que NÃO foi mexido: o padrão em cadeia (`isError ? erro : isLoading ? … : conteúdo`) já é
+seguro, e o silêncio deliberado de quem mostra o erro em outra faixa da mesma tela é decisão de
+desenho, não este bug.
+
+### Deep link aplica filtro em tela já montada
+
+Os filtros nasciam de `useState(params.x)`, que só lê na primeira renderização — então
+`?accountId=…` caía na instância aberta e era ignorado em silêncio. Agora é **ajuste durante a
+renderização** (o padrão do próprio React para "estado que muda quando a prop muda"): `setState`
+dentro de `useEffect` é erro de lint aqui, porque dispara renderização em cascata. Só aplica o que
+veio no link — parâmetro ausente não desfaz escolha que o usuário fez na tela.
+
+### Dynamic Type: verificado, e o "não verificado" era erro de FERRAMENTA
+
+`simctl ui <udid> content_size` — com **underscore**, não hífen. As fases anteriores usaram
+`content-size`, que o `simctl` recusa imprimindo o texto de uso; ninguém leu a mensagem e a
+conclusão virou "não surtiu efeito".
+
+Conferido nos dois lados: iOS em `extra-extra-extra-large` e Android em `font_scale 1.3`. **O
+layout aguenta**: título, composição, segmented, chips, grade do sheet de mês e estado vazio
+escalam e refluem, com truncagem limpa e nenhum valor cortado. Nada no código desliga
+`allowFontScaling` (conferido por grep).
+
+**Um defeito real apareceu por causa do teste:** no eixo do gráfico de Patrimônio, uma série de 12
+meses mostrava `set. … set.` nas duas pontas — doze meses lendo como se nada tivesse acontecido.
+`monthShort` ganhou o ano quando as pontas caem em anos diferentes: `set./25 … set./26`.
+
+### As duas validações que o staging não permitia
+
+O `net_worth_snapshots` do staging estava **vazio** — o cron de foto nunca rodou lá (em produção
+rodou: 11 fotos desde 26/08). Sem foto não há curva, e por isso o seletor 6/12/24 do Patrimônio e
+o trecho passado da projeção nunca tinham sido vistos com dado real.
+
+Inseri 44 fotos descartáveis (mensais de 14 meses + diárias de 30 dias), validei e **apaguei
+tudo** — o staging voltou a zero. Com elas:
+
+- **Seletor de janela**: 12 meses → `+R$ 25.200,00`, 6 meses → `+R$ 11.550,00`. A query refaz e o
+  gráfico encurta.
+- **Passado da projeção**: o trecho fraco à esquerda, o marcador vertical no hoje e a projeção
+  cheia à direita, **com a emenda sem degrau** — que era o ponto do desenho (as duas pontas saem
+  do mesmo `cash_total`). Na Fase 4 isso só tinha sido exercitado com série sintética.
+
+### VoiceOver: até onde deu, e o que sobra
+
+O simulador **não sobe o VoiceOver de verdade** (`defaults write VoiceOverTouchEnabled` grava a
+preferência e nada mais acontece). Mas a dúvida registrada desde a Fase 1 — "o `…` do header é
+alcançável?" — ficou bem menor:
+
+- **No Android, a árvore REAL (`uiautomator dump`) expõe tudo**: `Mais opções`, `Navigate up`,
+  `Buscar lançamentos`, `Lançar`, `Paguei`, `Setembro de 2026`, `Mês anterior, Agosto de 2026` e
+  as linhas inteiras (`pc gamer (6/8), R$ 900,00, despesa, qua., 30 de setembro, previsto`).
+- **No iOS o `idb` não enxerga a barra de navegação INTEIRA** — some o `…`, o título grande, a
+  busca **e o botão voltar**, em todas as telas. Voltar é controle de prateleira do UIKit,
+  acessível por construção; se ele some junto, quem não percorre é a ferramenta.
+
+**Continua sendo inferência, não medição.** Fechar de verdade pede VoiceOver ligado à mão num
+device — é a única pendência que sobra desta rodada.
