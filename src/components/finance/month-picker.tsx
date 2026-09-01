@@ -1,6 +1,7 @@
 import * as Haptics from 'expo-haptics';
 import { useState } from 'react';
-import { Modal, Pressable, StyleSheet, View } from 'react-native';
+import { Modal, Platform, Pressable, StyleSheet, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { ThemedText } from '@/components/themed-text';
 import { Button } from '@/components/ui/button';
@@ -162,6 +163,7 @@ function MonthSheet({
   onClose: () => void;
 }) {
   const theme = useTheme();
+  const insets = useSafeAreaInsets();
 
   return (
     <Modal
@@ -169,7 +171,17 @@ function MonthSheet({
       animationType="slide"
       presentationStyle="pageSheet"
       onRequestClose={onClose}>
-      <View style={[styles.sheet, { backgroundColor: theme.groupedBackground }]}>
+      {/* No iOS o `pageSheet` já desce abaixo da status bar; no Android o Modal ocupa a tela
+          inteira e o "Cancelar" nascia POR CIMA do relógio. Valor por plataforma dentro do
+          primitivo, que é onde essa diferença deve ser decidida. */}
+      <View
+        style={[
+          styles.sheet,
+          {
+            backgroundColor: theme.groupedBackground,
+            paddingTop: Platform.OS === 'android' ? insets.top : 0,
+          },
+        ]}>
         <View style={styles.sheetHead}>
           <Button label="Cancelar" variant="ghost" size="sm" onPress={onClose} />
           <ThemedText type="smallBold">Escolher mês</ThemedText>

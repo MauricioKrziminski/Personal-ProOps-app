@@ -1,11 +1,13 @@
 import { useState } from 'react';
 import {
   Modal,
+  Platform,
   ScrollView,
   StyleSheet,
   View,
   useWindowDimensions,
 } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Animated, { FadeInDown } from 'react-native-reanimated';
 import { Stack, router } from 'expo-router';
 
@@ -156,6 +158,7 @@ export default function NetWorthScreen() {
   const theme = useTheme();
   const toast = useToast();
   const { width } = useWindowDimensions();
+  const insets = useSafeAreaInsets();
   const patrimonio = useNetWorth();
   const [janela, setJanela] = useState('12');
   const serie = useNetWorthSeries(Number(janela));
@@ -509,7 +512,17 @@ export default function NetWorthScreen() {
         animationType="slide"
         presentationStyle="pageSheet"
         onRequestClose={() => setForm(null)}>
-        <View style={[styles.sheet, { backgroundColor: theme.groupedBackground }]}>
+        {/* No Android o Modal ocupa a tela inteira e este cabeçalho nascia POR CIMA da status
+            bar — o "Salvar" ficava atrás dos ícones de wifi e bateria. No iOS o `pageSheet` já
+            desce sozinho. */}
+        <View
+          style={[
+            styles.sheet,
+            {
+              backgroundColor: theme.groupedBackground,
+              paddingTop: Platform.OS === 'android' ? insets.top : 0,
+            },
+          ]}>
           <View style={styles.sheetHead}>
             <Button label="Cancelar" variant="ghost" size="sm" onPress={() => setForm(null)} />
             <ThemedText type="smallBold">{form?.id ? 'Editar bem' : 'Novo bem'}</ThemedText>
