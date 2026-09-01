@@ -76,7 +76,12 @@ function selo(status: string, ate: string | null): { texto: string; perigo: bool
 export default function PlanScreen() {
   const theme = useTheme();
   const toast = useToast();
-  const { data: plano, isLoading, isError, refetch, isRefetching } = usePlanStatus();
+  const { data, isLoading, isError, refetch, isRefetching } = usePlanStatus();
+  // `isError` e não só `data`: o TanStack GUARDA o resultado anterior quando o refetch
+  // falha, e sem este corte o cartão seguia afirmando números embaixo da faixa que acabou
+  // de dizer que não conseguiu carregar. Zerar aqui cobre destaque, cota e limites de
+  // uma vez; os estados vazios já checam `isError` e continuam calados.
+  const plano = isError ? undefined : data;
   const convites = useInvites();
   const convidar = useInviteMember();
   const revogar = useRevokeInvite();

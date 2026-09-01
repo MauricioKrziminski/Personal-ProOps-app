@@ -98,7 +98,11 @@ export default function GoalsScreen() {
   // Lazy de propósito: com 8 metas na tela isso é a diferença entre 1 e 9 requisições.
   const contribuicoes = useGoalContributions(extrato?.id);
 
-  const lista = goals.data ?? [];
+  // `isError` e não só `data`: o TanStack GUARDA o resultado anterior quando o refetch
+  // falha, e sem este corte a lista seguia afirmando números embaixo da faixa que acabou
+  // de dizer que não conseguiu carregar. Zerar aqui cobre lista, contadores e destaque de
+  // uma vez; os estados vazios já checam `isError` e continuam calados.
+  const lista = goals.isError ? [] : (goals.data ?? []);
   const abertas = lista.filter((g) => Number(g.saved_cents) < Number(g.target_cents));
   const concluidas = lista.filter((g) => Number(g.saved_cents) >= Number(g.target_cents));
   const guardado = lista.reduce((s, g) => s + Number(g.saved_cents), 0);

@@ -128,7 +128,11 @@ export default function BudgetsScreen() {
   const save = useSaveBudget();
   const remove = useDeleteBudget();
 
-  const linhas = status.data ?? [];
+  // `isError` e não só `data`: o TanStack GUARDA o resultado anterior quando o refetch
+  // falha, e sem este corte a lista seguia afirmando números embaixo da faixa que acabou
+  // de dizer que não conseguiu carregar. Zerar aqui cobre lista, contadores e destaque de
+  // uma vez; os estados vazios já checam `isError` e continuam calados.
+  const linhas = status.isError ? [] : (status.data ?? []);
   const limite = linhas.reduce((s, b) => s + Number(b.limit_cents), 0);
   const gasto = linhas.reduce((s, b) => s + Number(b.spent_cents), 0);
   const noLimite = linhas.filter((b) => Number(b.spent_cents) <= Number(b.limit_cents)).length;

@@ -116,7 +116,11 @@ export default function DebtsScreen() {
   // Lazy: só a dívida aberta (detalhe ou pagamento) puxa a tabela Price.
   const schedule = useDebtSchedule(detalhe?.id ?? pagando?.id);
 
-  const lista = debts.data ?? [];
+  // `isError` e não só `data`: o TanStack GUARDA o resultado anterior quando o refetch
+  // falha, e sem este corte a lista seguia afirmando números embaixo da faixa que acabou
+  // de dizer que não conseguiu carregar. Zerar aqui cobre lista, contadores e destaque de
+  // uma vez; os estados vazios já checam `isError` e continuam calados.
+  const lista = debts.isError ? [] : (debts.data ?? []);
   const totalDevido = lista.reduce((s, d) => s + Number(d.remaining_cents), 0);
   const jurosAteQuitar = (payoff.data ?? []).reduce(
     (s, p) => s + Number(p.total_interest_cents),

@@ -68,7 +68,9 @@ export default function RulesScreen() {
   const [rascunho, setRascunho] = useState<Rascunho | null>(null);
   const [erroSalvar, setErroSalvar] = useState<string | null>(null);
 
-  const lista = rules ?? [];
+  // `isError` e não só `data`: o TanStack guarda o resultado anterior quando o refetch
+  // falha, e sem este corte a tela seguia afirmando números embaixo da faixa de erro.
+  const lista = isError ? [] : (rules ?? []);
   const totalHits = lista.reduce((soma, r) => soma + (r.hits ?? 0), 0);
   const ativas = lista.filter((r) => (r.hits ?? 0) > 0).length;
   const podeSalvar = (rascunho?.pattern.trim().length ?? 0) >= 2 && Boolean(rascunho?.category);

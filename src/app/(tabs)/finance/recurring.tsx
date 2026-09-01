@@ -183,7 +183,11 @@ export default function RecurringScreen() {
 
   const [form, setForm] = useState<FormState | null>(null);
 
-  const lista = series.data ?? [];
+  // `isError` e não só `data`: o TanStack GUARDA o resultado anterior quando o refetch
+  // falha, e sem este corte a lista seguia afirmando números embaixo da faixa que acabou
+  // de dizer que não conseguiu carregar. Zerar aqui cobre lista, contadores e destaque de
+  // uma vez; os estados vazios já checam `isError` e continuam calados.
+  const lista = series.isError ? [] : (series.data ?? []);
   const comErro = lista.filter((r) => r.last_error);
   const ativas = lista.filter((r) => r.active && !r.last_error);
   const pausadas = lista.filter((r) => !r.active && !r.last_error);

@@ -121,7 +121,9 @@ export default function AccountsScreen() {
   const archive = useArchiveAccount();
   const [form, setForm] = useState<FormState | null>(null);
 
-  const linhas = balances.data ?? [];
+  // `isError` e não só `data`: o TanStack guarda o resultado anterior quando o refetch
+  // falha, e sem este corte a tela seguia afirmando números embaixo da faixa de erro.
+  const linhas = balances.isError ? [] : (balances.data ?? []);
   const semConta = linhas.find((l) => l.account_id === null);
   const dinheiro = linhas.filter((l) => l.account_id && GUARDA_DINHEIRO.includes(l.type));
   const investimentos = linhas.filter((l) => l.account_id && l.type === 'investment');

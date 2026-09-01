@@ -31,7 +31,9 @@ export default function RemindersScreen() {
   const remove = useDeleteReminder();
   const toast = useToast();
 
-  const reminders = data ?? [];
+  // `isError` e não só `data`: o TanStack guarda o resultado anterior quando o refetch
+  // falha, e sem este corte a tela seguia afirmando números embaixo da faixa de erro.
+  const reminders = isError ? [] : (data ?? []);
   const active = reminders.filter((r) => r.active);
   const paused = reminders.filter((r) => !r.active);
 

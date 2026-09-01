@@ -123,7 +123,10 @@ export default function InvoiceScreen() {
   const [payerId, setPayerId] = useState<string | null>(null);
   const [dataBR, setDataBR] = useState(() => formatDateBR(localISODate()));
 
-  const fatura = invoice.data?.invoice;
+  // `isError` e não só `data`: o TanStack guarda o resultado anterior quando o refetch
+  // falha, e sem este corte a tela seguia afirmando números embaixo da faixa de erro.
+  // Aqui é o caso grave: junto do herói vem o botão que PAGA a fatura.
+  const fatura = invoice.isError ? undefined : invoice.data?.invoice;
   const compras = useMemo(() => invoice.data?.transactions ?? [], [invoice.data]);
   const cartao = (accounts.data ?? []).find((a) => a.id === fatura?.account_id);
   // o pagamento é transferência: só entram contas que guardam dinheiro, nunca o próprio cartão

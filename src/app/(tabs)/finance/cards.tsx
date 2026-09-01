@@ -116,7 +116,11 @@ export default function CardsScreen() {
   const cards = useCardSummary();
 
   // Ordem de urgência, não alfabética: atrasada primeiro, depois quem vence antes.
-  const lista = [...(cards.data ?? [])].sort((a, b) => {
+  // `isError` e não só `data`: o TanStack GUARDA o resultado anterior quando o refetch
+  // falha, e sem este corte a lista seguia afirmando números embaixo da faixa que acabou
+  // de dizer que não conseguiu carregar. Zerar aqui cobre lista, contadores e destaque de
+  // uma vez; os estados vazios já checam `isError` e continuam calados.
+  const lista = (cards.isError ? [] : [...(cards.data ?? [])]).sort((a, b) => {
     const da = a.due_date ? daysUntil(a.due_date) : Number.MAX_SAFE_INTEGER;
     const db = b.due_date ? daysUntil(b.due_date) : Number.MAX_SAFE_INTEGER;
     return da - db;

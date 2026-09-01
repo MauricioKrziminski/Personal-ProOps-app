@@ -130,7 +130,9 @@ export default function ImportScreen() {
   const descartar = useDiscardImportItems();
   const atualizar = useUpdateImportItem();
 
-  const lista = items ?? [];
+  // `isError` e não só `data`: o TanStack guarda o resultado anterior quando o refetch
+  // falha, e sem este corte a tela seguia afirmando números embaixo da faixa de erro.
+  const lista = isError ? [] : (items ?? []);
   const paraRevisar = lista.filter((i) => i.status === 'pending');
   const repetidos = lista.filter((i) => i.status === 'duplicate');
   const revisados = lista.filter((i) => i.status === 'approved' || i.status === 'discarded');
