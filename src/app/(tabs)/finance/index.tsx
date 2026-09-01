@@ -49,7 +49,7 @@ import {
   useTransactionsSummary,
   type Transaction,
 } from '@/hooks/use-finance';
-import { formatBRL, formatDateBR } from '@/hooks/use-items';
+import { formatBRL, formatDateBR, localISODate } from '@/hooks/use-items';
 import { monthBounds } from '@/lib/dates';
 import { confirmDestructive } from '@/lib/item-actions';
 import { useTheme } from '@/hooks/use-theme';
@@ -152,7 +152,10 @@ function CashBar({ ratio, index, forte }: { ratio: number; index: number; forte:
   }, [grow, ratio, index]);
 
   const animado = useAnimatedStyle(() => ({
-    height: Math.max(Space.xs, grow.get() * ALTURA_BARRA),
+    // Piso de `Space.xs` só para valor que EXISTE — mês sem receita tem que desenhar nada.
+    // Com o piso aplicado ao zero, todo mês sem entrada ganhava um traço, e um traço lê como
+    // "entrou um pouquinho": é o mesmo "previsto R$ 0,00" que o painel já não escreve.
+    height: ratio <= 0 ? 0 : Math.max(Space.xs, grow.get() * ALTURA_BARRA),
   }));
 
   return (
@@ -160,7 +163,9 @@ function CashBar({ ratio, index, forte }: { ratio: number; index: number; forte:
       style={[
         styles.cashBar,
         animado,
-        { backgroundColor: forte ? theme.tint : theme.backgroundElement },
+        // UMA cor, duas intensidades — a mesma solução do gráfico de faturas. Duas matizes aqui
+        // gastariam `success`/`danger` como enfeite, e cor semântica é a última alavanca do app.
+        { backgroundColor: theme.tint, opacity: forte ? 1 : 0.35 },
       ]}
     />
   );
@@ -258,7 +263,13 @@ export default function FinanceScreen() {
   );
   const recentGroups = useMemo(() => groupByDay(recent.data ?? []), [recent.data]);
 
-  const meses = cashflow.data ?? [];
+  // O corte do futuro é feito DUAS vezes de propósito. A `0048` fecha a janela no banco, mas o
+  // Postgres roda em UTC: às 22h de Brasília o `current_date` do servidor já virou o dia seguinte,
+  // e no fim do mês isso deixa passar um balde do mês QUE VEM — com barra e tudo, num gráfico
+  // cujo título é sobre o passado. Mesma defesa que `invoices.tsx` usa, pelo mesmo motivo, com a
+  // data LOCAL do usuário.
+  const mesAtual = localISODate().slice(0, 7);
+  const meses = (cashflow.data ?? []).filter((m) => m.month.slice(0, 7) <= mesAtual);
   // A escala é COMUM às duas barras: escalas separadas fariam "entrou" e "saiu" parecerem iguais
   // num mês em que um é o dobro do outro — que é exatamente a leitura que o bloco existe para dar.
   const tetoCashflow = Math.max(
@@ -553,15 +564,12 @@ export default function FinanceScreen() {
                   </View>
                   <View style={styles.cashChave}>
                     <View
-                      style={[styles.cashSwatch, { backgroundColor: theme.backgroundElement }]}
+                      style={[styles.cashSwatch, { backgroundColor: theme.tint, opacity: 0.35 }]}
                     />
                     <ThemedText type="small" themeColor="textSecondary">
                       saiu
                     </ThemedText>
                   </View>
-                  <ThemedText type="small" themeColor="textSecondary">
-                    últimos {meses.length} meses
-                  </ThemedText>
                 </View>
               </View>
             </Section>
