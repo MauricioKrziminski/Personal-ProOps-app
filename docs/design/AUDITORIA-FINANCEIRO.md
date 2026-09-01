@@ -88,7 +88,7 @@ de import) com teto de 5.000 linhas que **lança exceção** em vez de mostrar d
 | Fase | Tema | Estado |
 |---|---|---|
 | **1** | O passado do cartão: fatura atual em destaque, `‹ ›` entre faturas, quitar sem mexer no caixa, apagar plano inteiro, `3/8` com link | **implementada e validada**; `0046` aplicada em staging |
-| **2** | Extrato de verdade: filtro por conta/cartão, status e origem; paginação no lugar do `limit(200)`; busca que abre o lançamento certo | **implementada**; validação no simulador pendente |
+| **2** | Extrato de verdade: filtro por conta/cartão, status e origem; paginação no lugar do `limit(200)`; busca que abre o lançamento certo | **implementada e validada** (iOS + Android, claro e escuro) |
 | 3 | Visões que existem no banco: `monthly_cashflow` na home; patrimônio com os 5 componentes; janelas ajustáveis | pendente |
 | 4 | Período livre: seletor com salto de ano; relatórios além de 3 anos; passado na projeção e nas parceladas | pendente |
 
@@ -282,8 +282,45 @@ filtro ATIVO aparece como pílula limpável no corpo, junto da de categoria que 
 O `icon-map.test.ts` pegou a falta antes de o Android renderizar um `circle` genérico — é a
 terceira vez que esse teste paga o próprio custo.
 
+### Validação da Fase 2 (31/08/2026)
+
+iPhone 16 (iOS 26.5) e emulador `s26` (Android 16), mesmo bundle, banco de staging.
+
+**Extrato por conta** — "Ver extrato" do Nubank abre com o nome da conta no título, o card de
+sobra do mês AUSENTE e a pílula "conta: Nubank". Trocando para o cartão pelo submenu, as duas
+`Pagamento da fatura` continuam aparecendo: elas têm `account_id = Nubank` e
+`counterparty_account_id = cartão`, ou seja, **é o ramo do `.or()` que está sendo exercido** — o
+filtro ingênuo teria escondido as duas. O total do dia (−R$ 800,00) ignora as transferências,
+como manda a regra.
+
+**"Sem conta"** (a sentinela `NO_ACCOUNT`) devolveu exatamente os dois lançamentos de WhatsApp sem
+conta, +R$ 250 e −R$ 45 — que somam os R$ 205,00 que a tela Contas mostra. O ramo
+`is('account_id', null)` está certo.
+
+**Busca no banco** — "gamer" achou `pc gamer (5/8)` com o filtro de conta ATIVO, o que prova os
+dois `.or()` convivendo numa query só. **"gamer, tv" (com vírgula) devolveu estado vazio, não
+erro** — `toIlikeTerm` fez o trabalho; sem ele seria 400.
+
+**Busca global** — tocar em `pc gamer (7/8)` (30/10/2026, mês FUTURO) abriu o detalhe do
+lançamento. Sob o código antigo isso caía na lista de agosto, onde o item não está. Achado 3
+fechado.
+
+**Paginação** — não há mês com mais de 50 lançamentos no staging, então o teto foi baixado para 2
+temporariamente: rolar carregou as páginas seguintes na ordem certa, **sem repetir e sem pular
+linha**, e o total do dia se corrigiu conforme as linhas chegaram. Com o teto de volta em 50 e o
+app reiniciado, o mês inteiro volta numa página só. (Detalhe do teste: trocar a constante com o
+Fast Refresh ligado NÃO refaz a query — as páginas em cache continuam com o tamanho antigo e a
+lista parece completa com 2 linhas. É preciso reiniciar o app.)
+
+**Android** — os dois caminhos que só existem lá: o `HeaderMenu` virou sheet "Mais opções" com
+`Conta…` e `Origem…`, e cada um abriu um SEGUNDO sheet com o check na opção ativa. Ícones nas
+variantes Material, nenhum `circle` genérico.
+
+**Dark mode** conferido nas duas plataformas: pílulas, segmented, linhas e FAB com os tokens do
+tema escuro.
+
 ### O que ainda não foi verificado
 
-- **Simulador e emulador**, light e dark: a Fase 2 é código verde (`tsc`, `expo lint`, 103 testes)
-  e query validada contra o staging, mas **nenhuma tela foi vista rodando**.
 - Segue valendo o que a Fase 1 deixou aberto: **VoiceOver de verdade** e **Dynamic Type**.
+- Com dois filtros ativos e lista vazia, o botão "Limpar filtros" fica **encostado no FAB
+  "Lançar"**. Não se sobrepõem, mas é o mesmo canto. Cabe na Fase 4.
