@@ -127,7 +127,10 @@ export default function InvoiceScreen() {
   // falha, e sem este corte a tela seguia afirmando números embaixo da faixa de erro.
   // Aqui é o caso grave: junto do herói vem o botão que PAGA a fatura.
   const fatura = invoice.isError ? undefined : invoice.data?.invoice;
-  const compras = useMemo(() => invoice.data?.transactions ?? [], [invoice.data]);
+  const compras = useMemo(
+    () => (invoice.isError ? [] : (invoice.data?.transactions ?? [])),
+    [invoice.data, invoice.isError]
+  );
   const cartao = (accounts.data ?? []).find((a) => a.id === fatura?.account_id);
   // o pagamento é transferência: só entram contas que guardam dinheiro, nunca o próprio cartão
   const pagadoras = (accounts.data ?? []).filter(
