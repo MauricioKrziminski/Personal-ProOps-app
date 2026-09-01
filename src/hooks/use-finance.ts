@@ -204,6 +204,30 @@ export function useTransactions(filters: TransactionFilters) {
   });
 }
 
+/**
+ * Ano do lançamento MAIS ANTIGO — o começo real da história do usuário.
+ *
+ * Relatórios oferecia três anos fixos (`anoAtual - 2`), então quem usa o app há mais tempo não
+ * alcançava o próprio passado, e quem começou ontem via dois anos vazios oferecidos como se
+ * tivessem conteúdo. Uma linha do banco resolve os dois.
+ */
+export function useFirstTransactionYear() {
+  useRealtimeInvalidate('transactions', ['transactions']);
+  return useQuery({
+    queryKey: ['transactions', 'first-year'],
+    queryFn: async (): Promise<number | null> => {
+      const { data, error } = await supabase
+        .from('transactions')
+        .select('occurred_at')
+        .order('occurred_at', { ascending: true })
+        .limit(1)
+        .maybeSingle();
+      if (error) throw error;
+      return data ? Number((data.occurred_at as string).slice(0, 4)) : null;
+    },
+  });
+}
+
 export function useRecentTransactions(limit = 5) {
   useRealtimeInvalidate('transactions', ['transactions']);
   return useQuery({

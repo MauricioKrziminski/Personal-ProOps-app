@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { Share, StyleSheet, View } from 'react-native';
+import { ScrollView, Share, StyleSheet, View } from 'react-native';
 import { Stack, router } from 'expo-router';
 import Animated, { FadeInDown } from 'react-native-reanimated';
 import * as Haptics from 'expo-haptics';
@@ -15,13 +15,18 @@ import { Row, Section } from '@/components/ui/row';
 import { Screen } from '@/components/ui/screen';
 import { HeroLabel } from '@/components/ui/section-head';
 import { Skeleton, SkeletonRow } from '@/components/ui/skeleton';
-import { Segmented } from '@/components/ui/segmented';
+import { Chip } from '@/components/finance/chip';
 import { ProgressBar } from '@/components/ui/sparkline';
 import { useToast } from '@/components/ui/toast';
 import { Motion, Space, tabular } from '@/design/tokens';
 import { localISODate } from '@/hooks/use-items';
 import { formatNumberBR } from '@/lib/dates';
-import { useAnnualReport, type AnnualCategoryRow, type YearEndBalance } from '@/hooks/use-finance';
+import {
+  useAnnualReport,
+  useFirstTransactionYear,
+  type AnnualCategoryRow,
+  type YearEndBalance,
+} from '@/hooks/use-finance';
 
 /** Quantas categorias de gasto aparecem antes do "ver todas". */
 const TOP_CATEGORIES = 8;
@@ -69,14 +74,13 @@ export default function ReportsScreen() {
   const [verTodas, setVerTodas] = useState(false);
   const { data, isLoading, isError, refetch, isRefetching } = useAnnualReport(ano);
 
-  const anos = useMemo(
-    () =>
-      [anoAtual - 2, anoAtual - 1, anoAtual].map((a) => ({
-        value: String(a),
-        label: String(a),
-      })),
-    [anoAtual]
-  );
+  const primeiroAno = useFirstTransactionYear();
+  // Do ano corrente para TRÁS: o padrão é o ano corrente, e ele precisa estar visível sem rolar.
+  // Enquanto a consulta não volta, um ano só — melhor oferecer de menos que oferecer vazio.
+  const anos = useMemo(() => {
+    const inicio = Math.min(primeiroAno.data ?? anoAtual, anoAtual);
+    return Array.from({ length: anoAtual - inicio + 1 }, (_, i) => anoAtual - i);
+  }, [primeiroAno.data, anoAtual]);
 
   const receitas = (data?.categories ?? []).filter((c) => c.kind === 'income');
   const despesas = (data?.categories ?? []).filter((c) => c.kind === 'expense');
@@ -121,14 +125,29 @@ export default function ReportsScreen() {
       />
 
       {/* Antes de qualquer número: sem saber o ano, o resto não quer dizer nada. */}
-      <Segmented
-        options={anos}
-        value={String(ano)}
-        onChange={(v) => {
-          setAno(Number(v));
-          setVerTodas(false);
-        }}
-      />
+      {/* Fileira rolável, não `Segmented`: o segmentado divide a largura em partes iguais e
+          quebra a partir de ~4 opções — e o número de anos agora cresce com o uso do app.
+          Com UM ano só ela some: seletor de uma opção não seleciona nada, e o ano já está escrito
+          no destaque ("Sobrou em 2026") e no título de Bens e Direitos. Mesma régua do badge de
+          aba e do card que soma uma lista de um item. */}
+      {anos.length > 1 ? (
+      <ScrollView
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        contentContainerStyle={styles.anos}>
+        {anos.map((a) => (
+          <Chip
+            key={a}
+            label={String(a)}
+            selected={a === ano}
+            onPress={() => {
+              setAno(a);
+              setVerTodas(false);
+            }}
+          />
+        ))}
+      </ScrollView>
+      ) : null}
 
       {isError ? <ErrorCard onRetry={refetch} /> : null}
 
@@ -277,6 +296,10 @@ export default function ReportsScreen() {
 }
 
 const styles = StyleSheet.create({
+  anos: {
+    flexDirection: 'row',
+    gap: Space.sm,
+  },
   hero: {
     gap: Space.sm,
   },
