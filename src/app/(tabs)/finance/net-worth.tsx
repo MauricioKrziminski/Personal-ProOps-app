@@ -170,6 +170,9 @@ export default function NetWorthScreen() {
   // variação contra a foto mais antiga que existe — é o que responde "subindo ou descendo?"
   const variacao = pontos.length > 1 ? liquido - Number(pontos[0].net_cents) : null;
   const mesesDeSerie = Math.max(pontos.length - 1, 1);
+  // Eixo com ano quando as pontas caem em anos diferentes.
+  const atravessaAno =
+    pontos.length > 1 && pontos[0].month.slice(0, 4) !== pontos[pontos.length - 1].month.slice(0, 4);
 
   const ativos = (bens.data ?? []).filter((b) => !b.is_liability);
   const passivos = (bens.data ?? []).filter((b) => b.is_liability);
@@ -371,11 +374,11 @@ export default function NetWorthScreen() {
           <Sparkline values={valores} width={width - Space.lg * 4} height={80} showZero />
           <View style={styles.eixo}>
             <ThemedText type="small" themeColor="textSecondary">
-              {monthShort(pontos[0].month)}
+              {monthShort(pontos[0].month, atravessaAno)}
             </ThemedText>
             <View style={styles.eixoFim}>
               <ThemedText type="small" themeColor="textSecondary">
-                {monthShort(pontos[pontos.length - 1].month)}
+                {monthShort(pontos[pontos.length - 1].month, atravessaAno)}
               </ThemedText>
               <Money
                 cents={Number(pontos[pontos.length - 1].net_cents)}

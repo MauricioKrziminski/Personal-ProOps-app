@@ -35,9 +35,12 @@ export function monthLabel(month: string): string {
  * este arquivo não tinha), e a quarta ia nascer com a tendência da home. Mora aqui porque é a
  * mesma família de `monthLabel`/`monthTitle`: um mês, três comprimentos.
  */
-export function monthShort(month: string): string {
+export function monthShort(month: string, comAno = false): string {
   const [y, m] = month.split('-').map(Number);
-  return new Date(y, m - 1, 1).toLocaleDateString('pt-BR', { month: 'short' });
+  const curto = new Date(y, m - 1, 1).toLocaleDateString('pt-BR', { month: 'short' });
+  // `set./25` só quando o eixo atravessa o ano. Uma série de 12 meses tem o MESMO mês nas duas
+  // pontas, e "set. … set." lê como se nada tivesse acontecido — visto no gráfico de Patrimônio.
+  return comAno ? `${curto}/${String(y).slice(2)}` : curto;
 }
 
 /**
