@@ -182,6 +182,9 @@ export default function TransactionsScreen() {
   const rows = useMemo(() => list.data?.pages.flat() ?? [], [list.data]);
   const sections = useMemo(() => toSections(rows), [rows]);
 
+  /** Id da conta filtrada; `undefined` na lista global e também em "Sem conta". */
+  const contaFiltrada = accountId === undefined || accountId === NO_ACCOUNT ? undefined : accountId;
+
   const accountLabel =
     accountId === undefined
       ? undefined
@@ -439,6 +442,21 @@ export default function TransactionsScreen() {
               tx.installment_no ? `parcela ${tx.installment_no}` : null,
               tx.invoice_id ? 'fatura' : null,
             ].filter(Boolean);
+            // Transferência não tem sinal na lista global — ela não é entrada nem saída do
+            // conjunto. No extrato de UMA conta ela tem: sai da conta de origem e ENTRA na de
+            // destino. Sem isso o extrato do Nubank mostrava duas saídas de R$ 900,00 sem o "−",
+            // e o extrato do cartão mostrava as mesmas duas como se também tivessem saído dele.
+            const transferenciaRecebida =
+              tx.kind === 'transfer' &&
+              contaFiltrada !== undefined &&
+              tx.counterparty_account_id === contaFiltrada;
+            const assinado =
+              tx.kind !== 'transfer' || (contaFiltrada !== undefined && tx.account_id !== null);
+            const valor =
+              tx.kind === 'expense' || (tx.kind === 'transfer' && assinado && !transferenciaRecebida)
+                ? -tx.amount_cents
+                : tx.amount_cents;
+
             const context = [
               tx.category,
               tx.account_id ? accountName.get(tx.account_id) : null,
@@ -487,10 +505,10 @@ export default function TransactionsScreen() {
                       trailing={
                         <View style={styles.trailing}>
                           <Money
-                            cents={tx.kind === 'expense' ? -tx.amount_cents : tx.amount_cents}
+                            cents={valor}
                             variant="headline"
                             tone={tx.kind === 'income' ? 'success' : 'text'}
-                            signed={tx.kind !== 'transfer'}
+                            signed={assinado}
                           />
                           {tx.status === 'pending' ? (
                             <Button
