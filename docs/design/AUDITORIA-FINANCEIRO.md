@@ -319,8 +319,27 @@ variantes Material, nenhum `circle` genérico.
 **Dark mode** conferido nas duas plataformas: pílulas, segmented, linhas e FAB com os tokens do
 tema escuro.
 
+**Offline (persona da Bia)** — app carregado, DEPOIS wifi e dados desligados: o extrato mostra
+skeleton enquanto o TanStack retenta e então assenta em **"Algo deu errado · Não conseguimos
+carregar os dados agora"** com "Tentar de novo". Nada de lista vazia se passando por "esse mês não
+teve nada", nada de dado velho, nenhuma escrita. Religando a rede, "Tentar de novo" trouxe o
+extrato de volta. (Desligar a rede ANTES de abrir o app não testa nada: derruba o Metro e o build
+de desenvolvimento nem carrega o bundle.)
+
 ### O que ainda não foi verificado
 
 - Segue valendo o que a Fase 1 deixou aberto: **VoiceOver de verdade** e **Dynamic Type**.
 - Com dois filtros ativos e lista vazia, o botão "Limpar filtros" fica **encostado no FAB
   "Lançar"**. Não se sobrepõem, mas é o mesmo canto. Cabe na Fase 4.
+
+### Para o backlog (visto no teste, fora do escopo da Fase 2)
+
+- **Deep link não reaplica filtro em tela já montada.** `appproops:///finance/transactions` caiu
+  na instância que já estava filtrada por conta, porque os filtros nascem de
+  `useState(params.X)` — o mesmo padrão que `month`, `kind` e `category` já usavam. `router.push`
+  de dentro do app monta tela nova, então nada quebrou; só passa a importar se
+  `notifications.ts:41` um dia levar parâmetro.
+- **Transferência aparece sem sinal no extrato de UMA conta.** `signed={tx.kind !== 'transfer'}` é
+  regra da lista global, onde transferência não é entrada nem saída. No extrato do Nubank as duas
+  saídas de R$ 900,00 aparecem sem o "−", com total do dia R$ 0,00. Direção relativa à conta é
+  assunto de Fase 3/4, não do achado 1.
