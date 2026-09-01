@@ -14,7 +14,14 @@ import * as Haptics from 'expo-haptics';
 import type { SymbolViewProps } from 'expo-symbols';
 
 import { ErrorCard } from '@/components/error-card';
-import { MonthPicker, currentMonth, monthLabel, monthTitle, shiftMonth } from '@/components/finance/month-picker';
+import {
+  MonthPicker,
+  currentMonth,
+  monthLabel,
+  monthShort,
+  monthTitle,
+  shiftMonth,
+} from '@/components/finance/month-picker';
 import { ThemedText } from '@/components/themed-text';
 import { HeaderMenu } from '@/components/ui/header-actions';
 import { ItemLink } from '@/components/ui/item-link';
@@ -521,8 +528,14 @@ export default function FinanceScreen() {
                             <CashBar ratio={saiu / tetoCashflow} index={index} forte={false} />
                           </View>
                         </View>
-                        <ThemedText type="small" themeColor="textSecondary" style={styles.cashMes}>
-                          {monthLabel(m.month.slice(0, 7))}
+                        {/* `monthShort`, não `monthLabel`: "agosto de 2026" numa fatia de 40pt
+                            quebrava uma letra por linha e o eixo virava sopa de letrinhas. */}
+                        <ThemedText
+                          type="small"
+                          themeColor="textSecondary"
+                          numberOfLines={1}
+                          style={styles.cashMes}>
+                          {monthShort(m.month.slice(0, 7))}
                         </ThemedText>
                       </View>
                     );

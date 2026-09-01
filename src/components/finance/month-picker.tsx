@@ -26,6 +26,18 @@ export function monthLabel(month: string): string {
 }
 
 /**
+ * `2026-08` → `ago.` — o rótulo de EIXO de gráfico, onde só cabem 3 letras.
+ *
+ * Existia em três cópias literais (`mesLabel` em Patrimônio, `mesCurto` em Parceladas, e a que
+ * este arquivo não tinha), e a quarta ia nascer com a tendência da home. Mora aqui porque é a
+ * mesma família de `monthLabel`/`monthTitle`: um mês, três comprimentos.
+ */
+export function monthShort(month: string): string {
+  const [y, m] = month.split('-').map(Number);
+  return new Date(y, m - 1, 1).toLocaleDateString('pt-BR', { month: 'short' });
+}
+
+/**
  * Igual, com inicial maiúscula. `textTransform: 'capitalize'` não serve: viraria
  * "Agosto De 2026".
  */

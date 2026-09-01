@@ -9,6 +9,7 @@ import {
 import Animated, { FadeInDown } from 'react-native-reanimated';
 import { Stack, router } from 'expo-router';
 
+import { monthShort } from '@/components/finance/month-picker';
 import { ThemedText } from '@/components/themed-text';
 import { HeaderActions } from '@/components/ui/header-actions';
 import { Button } from '@/components/ui/button';
@@ -51,11 +52,6 @@ import { confirmDestructive } from '@/lib/item-actions';
  * número. A série começa quando o usuário começou a usar — e a tela DIZ isso, em vez de esconder
  * o bloco (era o que acontecia antes, justo com quem mais precisa da explicação).
  */
-
-function mesLabel(iso: string): string {
-  const [y, m] = iso.split('-').map(Number);
-  return new Date(y, m - 1, 1).toLocaleDateString('pt-BR', { month: 'short' });
-}
 
 const CLASSE_ICONE: Record<string, Parameters<typeof Icon>[0]['name']> = {
   investment: 'chart.line.uptrend.xyaxis',
@@ -373,11 +369,11 @@ export default function NetWorthScreen() {
           <Sparkline values={valores} width={width - Space.lg * 4} height={80} showZero />
           <View style={styles.eixo}>
             <ThemedText type="small" themeColor="textSecondary">
-              {mesLabel(pontos[0].month)}
+              {monthShort(pontos[0].month)}
             </ThemedText>
             <View style={styles.eixoFim}>
               <ThemedText type="small" themeColor="textSecondary">
-                {mesLabel(pontos[pontos.length - 1].month)}
+                {monthShort(pontos[pontos.length - 1].month)}
               </ThemedText>
               <Money
                 cents={Number(pontos[pontos.length - 1].net_cents)}

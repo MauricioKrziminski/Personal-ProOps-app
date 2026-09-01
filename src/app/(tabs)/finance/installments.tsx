@@ -10,7 +10,7 @@ import Animated, {
   withSpring,
 } from 'react-native-reanimated';
 
-import { monthLabel, shiftMonth } from '@/components/finance/month-picker';
+import { monthLabel, monthShort, shiftMonth } from '@/components/finance/month-picker';
 import { ThemedText } from '@/components/themed-text';
 import { Card } from '@/components/ui/card';
 import { EmptyState } from '@/components/ui/empty-state';
@@ -45,12 +45,6 @@ import { useTheme } from '@/hooks/use-theme';
 const MESES_NA_FAIXA = 6;
 const MESES_COMPROMETIDOS = 12;
 const ALTURA_BARRA = 88;
-
-/** `2026-08` → `ago.` */
-function mesCurto(month: string): string {
-  const [y, m] = month.split('-').map(Number);
-  return new Date(y, m - 1, 1).toLocaleDateString('pt-BR', { month: 'short' });
-}
 
 /** Barra de um mês. Cresce da base com mola — valor que salta é bug visual. */
 function Bar({ ratio, index, destaque }: { ratio: number; index: number; destaque: boolean }) {
@@ -364,7 +358,7 @@ export default function InstallmentsScreen() {
                   />
                 </View>
                 <ThemedText type="small" themeColor="textSecondary">
-                  {mesCurto(mes.month)}
+                  {monthShort(mes.month)}
                 </ThemedText>
               </Pressable>
             ))}
