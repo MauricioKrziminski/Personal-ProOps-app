@@ -1,7 +1,3 @@
-// ⚠️ `note_folders`, as colunas novas de `notes` e as RPCs de contagem foram escritas À MÃO
-// enquanto a migration 0038 não é aplicada (o histórico de migrations precisa ser reconciliado
-// antes de `db push`). Depois do push, regenerar com:
-//   npx supabase gen types typescript
 export type Json =
   | string
   | number
@@ -11,11 +7,6 @@ export type Json =
   | Json[]
 
 export type Database = {
-  // Allows to automatically instantiate createClient with right options
-  // instead of createClient<Database, { PostgrestVersion: 'XX' }>(URL, KEY)
-  __InternalSupabase: {
-    PostgrestVersion: "14.17"
-  }
   graphql_public: {
     Tables: {
       [_ in never]: never
@@ -115,6 +106,27 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      agent_routing: {
+        Row: {
+          note: string | null
+          phone: string
+          updated_at: string
+          use_python_agent: boolean
+        }
+        Insert: {
+          note?: string | null
+          phone: string
+          updated_at?: string
+          use_python_agent?: boolean
+        }
+        Update: {
+          note?: string | null
+          phone?: string
+          updated_at?: string
+          use_python_agent?: boolean
+        }
+        Relationships: []
       }
       ai_events: {
         Row: {
@@ -418,8 +430,8 @@ export type Database = {
           id: string
           paid_at: string | null
           payment_transaction_id: string | null
-          settled_manually: boolean
           reference_month: string
+          settled_manually: boolean
           status: string
           updated_at: string
           user_id: string
@@ -433,8 +445,8 @@ export type Database = {
           id?: string
           paid_at?: string | null
           payment_transaction_id?: string | null
-          settled_manually?: boolean
           reference_month: string
+          settled_manually?: boolean
           status?: string
           updated_at?: string
           user_id: string
@@ -448,8 +460,8 @@ export type Database = {
           id?: string
           paid_at?: string | null
           payment_transaction_id?: string | null
-          settled_manually?: boolean
           reference_month?: string
+          settled_manually?: boolean
           status?: string
           updated_at?: string
           user_id?: string
@@ -634,6 +646,80 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      draft_actions: {
+        Row: {
+          action: Json
+          created_at: string
+          expires_at: string
+          id: string
+          missing: string
+          phone: string
+          raw_text: string
+          slot: string
+          thread_id: string
+          user_id: string
+          workspace_id: string
+        }
+        Insert: {
+          action: Json
+          created_at?: string
+          expires_at?: string
+          id?: string
+          missing: string
+          phone: string
+          raw_text: string
+          slot?: string
+          thread_id: string
+          user_id: string
+          workspace_id: string
+        }
+        Update: {
+          action?: Json
+          created_at?: string
+          expires_at?: string
+          id?: string
+          missing?: string
+          phone?: string
+          raw_text?: string
+          slot?: string
+          thread_id?: string
+          user_id?: string
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "draft_actions_phone_fkey"
+            columns: ["phone"]
+            isOneToOne: false
+            referencedRelation: "user_sessions"
+            referencedColumns: ["phone"]
+          },
+        ]
+      }
+      executed_actions: {
+        Row: {
+          action_index: number
+          action_type: string
+          executed_at: string
+          result_id: string | null
+          wa_message_id: string
+        }
+        Insert: {
+          action_index: number
+          action_type: string
+          executed_at?: string
+          result_id?: string | null
+          wa_message_id: string
+        }
+        Update: {
+          action_index?: number
+          action_type?: string
+          executed_at?: string
+          result_id?: string | null
+          wa_message_id?: string
+        }
+        Relationships: []
       }
       goal_contributions: {
         Row: {
@@ -988,6 +1074,75 @@ export type Database = {
         }
         Relationships: []
       }
+      messages_queue: {
+        Row: {
+          batch_id: string | null
+          claimed_at: string | null
+          created_at: string
+          id: string
+          last_error: string | null
+          message_type: string | null
+          payload: Json
+          phone: string
+          processed_at: string | null
+          retry_count: number
+          status: string
+          thread_id: string
+          user_id: string | null
+          wa_message_id: string
+          workspace_id: string | null
+        }
+        Insert: {
+          batch_id?: string | null
+          claimed_at?: string | null
+          created_at?: string
+          id?: string
+          last_error?: string | null
+          message_type?: string | null
+          payload: Json
+          phone: string
+          processed_at?: string | null
+          retry_count?: number
+          status?: string
+          thread_id: string
+          user_id?: string | null
+          wa_message_id: string
+          workspace_id?: string | null
+        }
+        Update: {
+          batch_id?: string | null
+          claimed_at?: string | null
+          created_at?: string
+          id?: string
+          last_error?: string | null
+          message_type?: string | null
+          payload?: Json
+          phone?: string
+          processed_at?: string | null
+          retry_count?: number
+          status?: string
+          thread_id?: string
+          user_id?: string | null
+          wa_message_id?: string
+          workspace_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "messages_queue_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "messages_queue_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       messages_raw: {
         Row: {
           created_at: string
@@ -1103,6 +1258,13 @@ export type Database = {
         }
         Relationships: [
           {
+            foreignKeyName: "note_folders_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "note_folders_workspace_id_fkey"
             columns: ["workspace_id"]
             isOneToOne: false
@@ -1120,8 +1282,9 @@ export type Database = {
           folder_id: string | null
           id: string
           pinned: boolean
+          search_tsv: unknown
           source: string
-          tags: string[]
+          tags: string[] | null
           updated_at: string
           user_id: string
           workspace_id: string
@@ -1134,7 +1297,9 @@ export type Database = {
           folder_id?: string | null
           id?: string
           pinned?: boolean
+          search_tsv?: unknown
           source?: string
+          tags?: string[] | null
           updated_at?: string
           user_id: string
           workspace_id?: string
@@ -1147,12 +1312,21 @@ export type Database = {
           folder_id?: string | null
           id?: string
           pinned?: boolean
+          search_tsv?: unknown
           source?: string
+          tags?: string[] | null
           updated_at?: string
           user_id?: string
           workspace_id?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "notes_folder_id_fkey"
+            columns: ["folder_id"]
+            isOneToOne: false
+            referencedRelation: "note_folders"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "notes_user_id_fkey"
             columns: ["user_id"]
@@ -1166,6 +1340,56 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "workspaces"
             referencedColumns: ["id"]
+          },
+        ]
+      }
+      pending_actions: {
+        Row: {
+          action: Json
+          created_at: string
+          expires_at: string
+          id: string
+          phone: string
+          resolved_at: string | null
+          status: string
+          summary: string
+          thread_id: string
+          user_id: string
+          workspace_id: string
+        }
+        Insert: {
+          action: Json
+          created_at?: string
+          expires_at?: string
+          id?: string
+          phone: string
+          resolved_at?: string | null
+          status?: string
+          summary: string
+          thread_id: string
+          user_id: string
+          workspace_id: string
+        }
+        Update: {
+          action?: Json
+          created_at?: string
+          expires_at?: string
+          id?: string
+          phone?: string
+          resolved_at?: string | null
+          status?: string
+          summary?: string
+          thread_id?: string
+          user_id?: string
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "pending_actions_phone_fkey"
+            columns: ["phone"]
+            isOneToOne: false
+            referencedRelation: "user_sessions"
+            referencedColumns: ["phone"]
           },
         ]
       }
@@ -1550,6 +1774,57 @@ export type Database = {
           },
         ]
       }
+      user_sessions: {
+        Row: {
+          created_at: string
+          debounce_task_name: string | null
+          last_message_at: string | null
+          phone: string
+          session_epoch: number
+          thread_id: string
+          timezone: string
+          user_id: string | null
+          workspace_id: string | null
+        }
+        Insert: {
+          created_at?: string
+          debounce_task_name?: string | null
+          last_message_at?: string | null
+          phone: string
+          session_epoch?: number
+          thread_id: string
+          timezone?: string
+          user_id?: string | null
+          workspace_id?: string | null
+        }
+        Update: {
+          created_at?: string
+          debounce_task_name?: string | null
+          last_message_at?: string | null
+          phone?: string
+          session_epoch?: number
+          thread_id?: string
+          timezone?: string
+          user_id?: string | null
+          workspace_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "user_sessions_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "user_sessions_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       workspace_invites: {
         Row: {
           accepted_at: string | null
@@ -1747,7 +2022,7 @@ export type Database = {
           invoice_id: string
           invoice_total_cents: number
           name: string
-          oldest_overdue_invoice_id: string | null
+          oldest_overdue_invoice_id: string
           overdue_count: number
           overdue_total_cents: number
           reference_month: string
@@ -1904,7 +2179,7 @@ export type Database = {
           invoice_id: string
           invoice_total_cents: number
           name: string
-          oldest_overdue_invoice_id: string | null
+          oldest_overdue_invoice_id: string
           overdue_count: number
           overdue_total_cents: number
           reference_month: string
@@ -1936,6 +2211,32 @@ export type Database = {
         SetofOptions: {
           from: "*"
           to: "jobs"
+          isOneToOne: false
+          isSetofReturn: true
+        }
+      }
+      claim_thread_batch: {
+        Args: { p_thread_id: string }
+        Returns: {
+          batch_id: string | null
+          claimed_at: string | null
+          created_at: string
+          id: string
+          last_error: string | null
+          message_type: string | null
+          payload: Json
+          phone: string
+          processed_at: string | null
+          retry_count: number
+          status: string
+          thread_id: string
+          user_id: string | null
+          wa_message_id: string
+          workspace_id: string | null
+        }[]
+        SetofOptions: {
+          from: "*"
+          to: "messages_queue"
           isOneToOne: false
           isSetofReturn: true
         }
@@ -1978,6 +2279,11 @@ export type Database = {
           total_cents: number
         }[]
       }
+      expire_draft_actions: { Args: never; Returns: number }
+      expire_pending_actions: {
+        Args: { p_thread_id?: string }
+        Returns: number
+      }
       financial_health: {
         Args: never
         Returns: {
@@ -2005,20 +2311,6 @@ export type Database = {
           month: string
         }[]
       }
-      note_folder_counts: {
-        Args: Record<PropertyKey, never>
-        Returns: {
-          folder_id: string
-          notes_count: number
-        }[]
-      }
-      note_tag_counts: {
-        Args: Record<PropertyKey, never>
-        Returns: {
-          tag: string
-          notes_count: number
-        }[]
-      }
       my_default_workspace: { Args: never; Returns: string }
       net_worth: {
         Args: never
@@ -2033,11 +2325,29 @@ export type Database = {
       net_worth_series: {
         Args: { months_back?: number }
         Returns: {
+          cash_cents: number
+          investments_cents: number
           liabilities_cents: number
           month: string
           net_cents: number
+          other_assets_cents: number
         }[]
       }
+      note_folder_counts: {
+        Args: never
+        Returns: {
+          folder_id: string
+          notes_count: number
+        }[]
+      }
+      note_tag_counts: {
+        Args: never
+        Returns: {
+          notes_count: number
+          tag: string
+        }[]
+      }
+      note_tags_of: { Args: { txt: string }; Returns: string[] }
       pay_debt_installment: {
         Args: {
           p_account_id?: string
@@ -2049,10 +2359,6 @@ export type Database = {
       }
       pay_invoice: {
         Args: { p_account_id: string; p_invoice_id: string; p_paid_at?: string }
-        Returns: string
-      }
-      settle_invoice: {
-        Args: { p_invoice_id: string; p_paid_at?: string }
         Returns: string
       }
       payoff_strategy: {
@@ -2082,6 +2388,7 @@ export type Database = {
           status: string
         }[]
       }
+      routes_to_python: { Args: { p_phone: string }; Returns: boolean }
       save_budget: {
         Args: {
           p_category: string
@@ -2089,6 +2396,10 @@ export type Database = {
           p_month?: string
           p_rollover?: boolean
         }
+        Returns: string
+      }
+      settle_invoice: {
+        Args: { p_invoice_id: string; p_paid_at?: string }
         Returns: string
       }
       transactions_summary: {
@@ -2258,3 +2569,4 @@ export const Constants = {
     Enums: {},
   },
 } as const
+
