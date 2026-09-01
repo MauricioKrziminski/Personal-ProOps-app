@@ -240,3 +240,11 @@ class DraftDecision(BaseModel):
             "leituras couberem; none quando não houver número."
         ),
     )
+    already_paid_count: int | None = Field(
+        default=None,
+        description=(
+            "Quantidade de parcelas que o usuário disse que JÁ PAGOU "
+            "('já paguei 2 parcelas', 'já foram 2', 'paguei duas' -> 2). "
+            "Vazio se não mencionou parcelas já pagas."
+        ),
+    )

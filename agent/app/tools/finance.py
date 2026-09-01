@@ -336,12 +336,16 @@ async def _baixa_em_parcelas(ctx: ExecContext, action: FinanceAction) -> ToolRes
     hoje. Status não dispara o trigger, e o total da fatura nem olha para status —
     ele soma por `invoice_id`.
     """
+    cands = (ctx.target or {}).get("candidates") or []
+    if not cands:
+        return ToolResult("🤷 Essa compra parcelada não está mais aqui.", read_only=True)
+
     plano = await db.fetch_one(
         """
         select id, description, installments from public.installment_plans
         where id = %s and workspace_id = %s
         """,
-        ctx.target["candidates"][0]["id"], ctx.workspace_id,
+        cands[0]["id"], ctx.workspace_id,
     )
     if not plano:
         return ToolResult("🤷 Essa compra parcelada não está mais aqui.", read_only=True)
@@ -374,6 +378,9 @@ async def mark_paid(ctx: ExecContext, action: FinanceAction) -> ToolResult:
     """Baixa numa conta PREVISTA. Diferente de create_expense: o lançamento já existe."""
     if _alvo_e_plano(ctx):
         return await _baixa_em_parcelas(ctx, action)
+    cands = (ctx.target or {}).get("candidates") or []
+    if not cands:
+        return ToolResult("🤷 Não achei essa conta em aberto.", read_only=True)
     # Antes havia um `limit 1` ordenado por vencimento: com duas contas em aberto
     # parecidas, ele dava baixa na mais antiga EM SILÊNCIO. Agora o empate vira
     # pergunta como todo o resto — quem resolve é a Fase Cognitiva.
@@ -382,7 +389,7 @@ async def mark_paid(ctx: ExecContext, action: FinanceAction) -> ToolResult:
         select id, description, category, amount_cents
         from public.transactions where id = %s and workspace_id = %s
         """,
-        ctx.target["candidates"][0]["id"], ctx.workspace_id,
+        cands[0]["id"], ctx.workspace_id,
     )
     if not conta:
         return ToolResult("🤷 Não achei essa conta em aberto.", read_only=True)
@@ -433,6 +440,18 @@ async def set_rule(ctx: ExecContext, action: FinanceAction) -> ToolResult:
 
 
 async def update_transaction(ctx: ExecContext, action: FinanceAction) -> ToolResult:
+    cands = (ctx.target or {}).get("candidates") or []
+    if not cands:
+        return ToolResult("🤷 Esse lançamento não está mais aqui.", read_only=True)
+
+    if _alvo_e_plano(ctx):
+        if action.current_installment:
+            return await _baixa_em_parcelas(ctx, action)
+        return ToolResult(
+            "🤷 Para compras parceladas, você pode mudar as parcelas pagas ou excluir o plano.",
+            read_only=True,
+        )
+
     patch: dict = {}
     if action.new_amount_cents:
         patch["amount_cents"] = guards.require_amount(action.new_amount_cents, o_que="o valor novo")
@@ -450,7 +469,7 @@ async def update_transaction(ctx: ExecContext, action: FinanceAction) -> ToolRes
     # antes de chegar aqui se não estivesse `found`. Buscar de novo aqui abriria a
     # janela que este desenho existe para fechar: entre a pergunta e o SIM o
     # usuário pode ter lançado outra coisa, e o "último" mudaria de dono.
-    alvo_id = ctx.target["candidates"][0]["id"]
+    alvo_id = cands[0]["id"]
     antes = await db.fetch_one(
         """
         select id, kind, amount_cents, category, description, occurred_at
@@ -497,6 +516,10 @@ async def _apagar_plano(ctx: ExecContext) -> ToolResult:
     quantas foram — e apagar uma de cada vez deixaria o plano órfão mentindo
     `installments = 10` com 9 parcelas vivas, que era o estado anterior.
     """
+    cands = (ctx.target or {}).get("candidates") or []
+    if not cands:
+        return ToolResult("🤷 Essa compra parcelada não está mais aqui.", read_only=True)
+
     plano = await db.fetch_one(
         """
         select p.id, p.description, p.installments, p.total_cents,
@@ -505,7 +528,7 @@ async def _apagar_plano(ctx: ExecContext) -> ToolResult:
         from public.installment_plans p
         where p.id = %s and p.workspace_id = %s
         """,
-        ctx.target["candidates"][0]["id"], ctx.workspace_id,
+        cands[0]["id"], ctx.workspace_id,
     )
     if not plano:
         return ToolResult("🤷 Essa compra parcelada não está mais aqui.", read_only=True)
@@ -524,12 +547,16 @@ async def _apagar_plano(ctx: ExecContext) -> ToolResult:
 async def delete_transaction(ctx: ExecContext, action: FinanceAction) -> ToolResult:
     if _alvo_e_plano(ctx):
         return await _apagar_plano(ctx)
+    cands = (ctx.target or {}).get("candidates") or []
+    if not cands:
+        return ToolResult("🤷 Esse lançamento não está mais aqui.", read_only=True)
+
     alvo = await db.fetch_one(
         """
         select id, kind, amount_cents, category, description
         from public.transactions where id = %s and workspace_id = %s
         """,
-        ctx.target["candidates"][0]["id"], ctx.workspace_id,
+        cands[0]["id"], ctx.workspace_id,
     )
     if not alvo:
         return ToolResult("🤷 Esse lançamento não está mais aqui.", read_only=True)

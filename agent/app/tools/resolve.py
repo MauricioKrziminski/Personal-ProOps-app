@@ -230,49 +230,60 @@ async def por_transacao(
     return veredito(linhas, _rotulo_tx, "transactions")
 
 
-# Ações em que "a compra inteira" é uma resposta possível. Fora daqui, plano nunca
-# entra na lista: corrigir o valor de UMA parcela é uma coisa, e mexer no plano
-# inteiro é outra.
-_ACEITA_PLANO = {FinanceActionType.DELETE_TRANSACTION, FinanceActionType.MARK_PAID}
+# Ações em que "a compra inteira" é uma resposta possível.
+_ACEITA_PLANO = {
+    FinanceActionType.DELETE_TRANSACTION,
+    FinanceActionType.UPDATE_TRANSACTION,
+    FinanceActionType.MARK_PAID,
+}
 
 
 async def _com_plano(workspace_id, candidatos: list[dict]) -> list[dict]:
-    """Põe a COMPRA INTEIRA como primeira opção, quando ela existe.
+    """Agrupa transações de compras parceladas em seus respectivos planos.
 
-    `TARGETS` mapeia uma fonte por tipo de ação, então o plano não vem da
-    resolução normal — ele é acrescentado depois. Só quando as linhas casadas
-    pertencem a UM plano só: com duas compras parceladas no meio, "a compra
-    inteira" não teria significado único, e adivinhar qual é o erro que a
-    Fase Cognitiva existe para não cometer.
+    Substitui as parcelas individuais pelo Plano de Parcelamento correspondente.
+    Se o termo de busca casar com parcelas de um ou mais planos, não lista as
+    parcelas soltas no menu do WhatsApp — agrupa no plano.
     """
     if not candidatos:
         return candidatos
-    linha = await db.fetch_one(
+
+    tx_ids = [c["id"] for c in candidatos if c.get("table", "transactions") == "transactions"]
+    if not tx_ids:
+        return candidatos
+
+    rows = await db.fetch(
         """
-        select p.id, p.description, p.total_cents, p.installments, p.first_occurred_at
-        from public.installment_plans p
-        where p.workspace_id = %s
-          and p.id = (
-            select distinct t.installment_plan_id
-            from public.transactions t
-            where t.id = any(%s) and t.workspace_id = %s
-              and t.installment_plan_id is not null
-          )
+        select t.id as tx_id, p.id as plan_id, p.description, p.total_cents, p.installments, p.first_occurred_at
+        from public.transactions t
+        join public.installment_plans p on p.id = t.installment_plan_id
+        where t.id = any(%s) and t.workspace_id = %s and p.workspace_id = %s
+        order by p.created_at desc
         """,
+        tx_ids,
         workspace_id,
-        [c["id"] for c in candidatos],
         workspace_id,
     )
-    if not linha:
+    if not rows:
         return candidatos
-    cabeca = {
-        "id": str(linha["id"]),
-        "label": _rotulo_plano(linha),
-        "table": "installment_plans",
-        "when": _detalhe_plano(linha),
-    }
-    # o plano ocupa uma vaga; o resto continua cabendo no limite da Meta
-    return [cabeca, *candidatos][:MOSTRAR]
+
+    planos_unicos: dict[str, dict] = {}
+    txs_em_planos = set()
+    for r in rows:
+        p_id = str(r["plan_id"])
+        txs_em_planos.add(str(r["tx_id"]))
+        if p_id not in planos_unicos:
+            planos_unicos[p_id] = {
+                "id": p_id,
+                "label": _rotulo_plano(r),
+                "table": "installment_plans",
+                "when": _detalhe_plano(r),
+            }
+
+    plan_cands = list(planos_unicos.values())
+    outras_txs = [c for c in candidatos if str(c["id"]) not in txs_em_planos]
+
+    return [*plan_cands, *outras_txs][:MOSTRAR]
 
 
 async def for_actions(workspace_id, acoes: list, texto_cru: str) -> list[dict]:
@@ -330,14 +341,15 @@ async def for_actions(workspace_id, acoes: list, texto_cru: str) -> list[dict]:
             if estado == "found" and not recente:
                 estado = "ambiguous"
 
-        # A compra inteira vira a PRIMEIRA opção quando as parcelas casadas são de
-        # um plano só. Isso transforma "apaga a TV" numa pergunta honesta em vez
-        # de um empate entre dez parcelas iguais.
+        # A compra inteira vira a opção principal quando as parcelas casadas são de
+        # um plano. Isso transforma "apaga a TV" / "editar o mac" numa ação no nível do plano.
         if acao.type in _ACEITA_PLANO and tabela == "transactions":
             com_plano = await _com_plano(workspace_id, cands)
-            if len(com_plano) != len(cands):
+            if any(c.get("table") == "installment_plans" for c in com_plano):
                 cands = com_plano
                 estado = "found" if len(cands) == 1 else "ambiguous"
+                if len(cands) == 1 and cands[0].get("table") == "installment_plans":
+                    tabela = "installment_plans"
 
         saida.append({"table": tabela, "status": estado, "candidates": cands})
     return saida

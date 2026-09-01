@@ -203,3 +203,53 @@ class TestBaixaEmLancamentoUnico:
             FinanceAction(type=FinanceActionType.MARK_PAID),
         )
         assert "workspace_id = %s" in sql[0][0]
+
+
+class TestEdicaoPlano:
+    @pytest.mark.asyncio
+    async def test_update_em_plano_com_current_installment_atualiza_parcelas_pagas(self, sql):
+        r = await finance.update_transaction(
+            _ctx("installment_plans"),
+            FinanceAction(type=FinanceActionType.UPDATE_TRANSACTION, current_installment=3),
+        )
+        query, args = sql[0]
+        assert "update public.transactions set status = 'cleared'" in query
+        assert "installment_no <= %s" in query
+        assert args == ("plano-1", WS, 3)
+        assert "3 parcelas" in r.message
+
+    @pytest.mark.asyncio
+    async def test_update_em_plano_sem_parcelas_informa_opcoes(self, monkeypatch):
+        r = await finance.update_transaction(
+            _ctx("installment_plans"),
+            FinanceAction(type=FinanceActionType.UPDATE_TRANSACTION, new_amount_cents=5000),
+        )
+        assert "mudar as parcelas pagas ou excluir" in r.message
+
+
+class TestAlvoDefensivo:
+    @pytest.mark.asyncio
+    async def test_candidatos_vazios_nao_causam_index_error(self):
+        ctx_vazio = ExecContext(
+            user_id=UUID("11111111-1111-1111-1111-111111111111"),
+            workspace_id=WS,
+            phone="5551999999999",
+            timezone="America/Sao_Paulo",
+            texto="",
+            wa_message_id="w1",
+            target={"table": "installment_plans", "status": "none", "candidates": []},
+        )
+        r_del = await finance.delete_transaction(
+            ctx_vazio, FinanceAction(type=FinanceActionType.DELETE_TRANSACTION)
+        )
+        assert "não está mais aqui" in r_del.message
+
+        r_mark = await finance.mark_paid(
+            ctx_vazio, FinanceAction(type=FinanceActionType.MARK_PAID)
+        )
+        assert "não está mais aqui" in r_mark.message or "Não achei" in r_mark.message
+
+        r_up = await finance.update_transaction(
+            ctx_vazio, FinanceAction(type=FinanceActionType.UPDATE_TRANSACTION, new_amount_cents=100)
+        )
+        assert "não está mais aqui" in r_up.message

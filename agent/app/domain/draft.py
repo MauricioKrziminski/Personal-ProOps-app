@@ -48,6 +48,8 @@ Quando for `answer` e houver um NÚMERO, diga em `amount_type` o que ele signifi
 - "8400 no total", "saiu 8400", "ao todo"     -> total
 - "700" (número solto, cabem as duas leituras) -> ambiguous
 
+Quando o usuário disser quantas parcelas já pagou ("já paguei 2 parcelas", "já foram 2", "paguei duas"), preencha `already_paid_count` com essa quantidade inteira (ex: 2). Se ele não citou parcelas já pagas, deixe vazio.
+
 Na dúvida entre total e per_installment, responda ambiguous: perguntar custa uma
 mensagem, e registrar 12x errado custa o mês inteiro do usuário.
 
@@ -105,6 +107,12 @@ async def interpretar(texto: str, rascunho: dict, uso: dict | None = None) -> di
     if decisao.decision != "answer":
         return None
 
+    current_inst = (
+        (decisao.already_paid_count or 0) + 1
+        if decisao.already_paid_count is not None
+        else None
+    )
+
     slot = rascunho.get("slot") or "amount"
     if slot == "account":
         # A entidade extraída pelo modelo, não a frase inteira: era isso que
@@ -112,7 +120,12 @@ async def interpretar(texto: str, rascunho: dict, uso: dict | None = None) -> di
         # do cartão. O texto cru fica só como rede quando o modelo não extraiu.
         # Quem casa contra o banco é o worker, que tem o workspace.
         nome = (decisao.extracted_value or "").strip() or texto.strip()
-        return {"acao": "completar", "slot": "account", "account": nome} if nome else None
+        if not nome:
+            return None
+        res = {"acao": "completar", "slot": "account", "account": nome}
+        if current_inst is not None:
+            res["current_installment"] = current_inst
+        return res
 
     # O NÚMERO continua sendo determinístico, sempre. O modelo diz o que ele
     # SIGNIFICA, nunca quanto ele é — medido em 31/08/2026, `parse` acerta
@@ -127,14 +140,27 @@ async def interpretar(texto: str, rascunho: dict, uso: dict | None = None) -> di
     parcelas = _parcelas(rascunho.get("action") or {})
     if parcelas >= 2:
         if decisao.amount_type == "per_installment":
-            return {"acao": "completar", "slot": "amount",
-                    "amount_cents": valor, "por_parcela": True}
+            res = {
+                "acao": "completar",
+                "slot": "amount",
+                "amount_cents": valor,
+                "por_parcela": True,
+            }
+            if current_inst is not None:
+                res["current_installment"] = current_inst
+            return res
         if decisao.amount_type == "ambiguous":
             # "700" numa compra de 12x são duas contas MUITO diferentes
             # (R$ 700 ou R$ 8.400). Perguntar custa uma mensagem; errar custa o
             # mês inteiro do usuário.
-            return {"acao": "perguntar_tipo", "amount_cents": valor, "installments": parcelas}
-    return {"acao": "completar", "slot": "amount", "amount_cents": valor}
+            res = {"acao": "perguntar_tipo", "amount_cents": valor, "installments": parcelas}
+            if current_inst is not None:
+                res["current_installment"] = current_inst
+            return res
+    res = {"acao": "completar", "slot": "amount", "amount_cents": valor}
+    if current_inst is not None:
+        res["current_installment"] = current_inst
+    return res
 
 
 def _parcelas(acao: dict) -> int:
@@ -176,6 +202,8 @@ def mesclar(acao_guardada: dict, decidido: dict) -> dict:
             juntado["account"] = decidido["account"]
     elif not juntado.get("amount_cents"):
         juntado["amount_cents"] = decidido["amount_cents"]
+    if decidido.get("current_installment") is not None:
+        juntado["current_installment"] = decidido["current_installment"]
     return juntado
 
 

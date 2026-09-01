@@ -134,35 +134,61 @@ class TestPlanoComoAlvo:
         assert _cut(rotulo, ROW_TITLE_MAX).startswith("Tudo (10x)")
 
     @pytest.mark.asyncio
-    async def test_compra_inteira_vira_a_primeira_opcao(self, monkeypatch):
-        async def fetch_one(query, *args):
-            return {"id": "p1", "description": "TV", "installments": 10,
-                    "total_cents": 840000, "first_occurred_at": "2026-05-31"}
+    async def test_compra_parcelada_agrupa_no_plano_sem_listar_parcelas(self, monkeypatch):
+        async def fake_fetch(query, *args):
+            return [{
+                "tx_id": "tx-1",
+                "plan_id": "p1",
+                "description": "TV",
+                "installments": 10,
+                "total_cents": 840000,
+                "first_occurred_at": "2026-05-31",
+            }]
 
-        monkeypatch.setattr(resolve.db, "fetch_one", fetch_one)
+        monkeypatch.setattr(resolve.db, "fetch", fake_fetch)
         cands = await resolve._com_plano(
             "ws", [{"id": "tx-1", "label": "TV (1/10)", "table": "transactions"}]
         )
+        assert len(cands) == 1
         assert cands[0]["table"] == "installment_plans"
-        assert cands[1]["id"] == "tx-1"
+        assert cands[0]["id"] == "p1"
 
     @pytest.mark.asyncio
-    async def test_parcelas_de_planos_DIFERENTES_nao_ganham_cabeca(self, monkeypatch):
-        """Com duas compras parceladas no meio, "a compra inteira" não tem
-        significado único — e adivinhar qual é o erro que a Fase Cognitiva existe
-        para não cometer."""
+    async def test_parcelas_de_planos_diferentes_agrupam_em_seus_planos(self, monkeypatch):
+        async def fake_fetch(query, *args):
+            return [
+                {
+                    "tx_id": "tx-1",
+                    "plan_id": "p1",
+                    "description": "TV",
+                    "installments": 10,
+                    "total_cents": 840000,
+                    "first_occurred_at": "2026-05-31",
+                },
+                {
+                    "tx_id": "tx-2",
+                    "plan_id": "p2",
+                    "description": "Mac",
+                    "installments": 12,
+                    "total_cents": 1200000,
+                    "first_occurred_at": "2026-06-30",
+                },
+            ]
 
-        async def fetch_one(query, *args):
-            return None  # o `distinct` do SQL não devolve linha única
-
-        monkeypatch.setattr(resolve.db, "fetch_one", fetch_one)
-        original = [{"id": "tx-1", "label": "TV (1/10)", "table": "transactions"}]
-        assert await resolve._com_plano("ws", original) == original
+        monkeypatch.setattr(resolve.db, "fetch", fake_fetch)
+        original = [
+            {"id": "tx-1", "label": "TV (1/10)", "table": "transactions"},
+            {"id": "tx-2", "label": "Mac (2/12)", "table": "transactions"},
+        ]
+        cands = await resolve._com_plano("ws", original)
+        assert len(cands) == 2
+        assert {c["id"] for c in cands} == {"p1", "p2"}
+        assert all(c["table"] == "installment_plans" for c in cands)
 
     @pytest.mark.asyncio
     async def test_sem_candidato_nao_inventa_plano(self, monkeypatch):
         async def explode(*a, **k):
             raise AssertionError("não devia consultar o banco sem candidatos")
 
-        monkeypatch.setattr(resolve.db, "fetch_one", explode)
+        monkeypatch.setattr(resolve.db, "fetch", explode)
         assert await resolve._com_plano("ws", []) == []

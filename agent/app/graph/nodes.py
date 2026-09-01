@@ -22,6 +22,7 @@ from app.graph.schemas import (
     RULE_APPLIES,
     Domain,
     FinanceAction,
+    FinanceActionType,
     FinancePlan,
     FinanceQuery,
     FinanceQueryPlan,
@@ -420,8 +421,52 @@ async def gate(state: AgentState) -> dict:
                 # 3/10" (transactions); herdar a do alvo mandaria o id do plano
                 # para `ensure_owned("transactions", ...)`, que não acharia nada —
                 # depois de o usuário já ter confirmado.
+                cand_table = escolhidos[0].get("table", alvo.get("table"))
                 congelado[i] = {**alvo, "status": "found", "candidates": escolhidos,
-                                "table": escolhidos[0].get("table", alvo.get("table"))}
+                                "table": cand_table}
+                if cand_table == "installment_plans" and acao.type == FinanceActionType.UPDATE_TRANSACTION:
+                    p_id = escolhido
+                    p_label = escolhidos[0]["label"]
+                    mut_escolha = interrupt(
+                        {
+                            "kind": "choice",
+                            "action_index": i,
+                            "action_type": acao.type.value,
+                            "summary": f"O que você deseja fazer com {p_label}?",
+                            "options": [
+                                {"id": f"change_paid:{p_id}", "label": "Mudar parcelas pagas"},
+                                {"id": f"delete_plan:{p_id}", "label": "Excluir plano completo"},
+                            ],
+                        }
+                    )
+                    mut_id = mut_escolha.get("candidate_id") if isinstance(mut_escolha, dict) else mut_escolha
+                    if isinstance(mut_id, str):
+                        if mut_id.startswith("delete_plan") or mut_id in {"delete_plan", "excluir", "apagar", "2"}:
+                            acoes_mutadas = list(state.get("finance_actions") or [])
+                            acoes_mutadas[i] = FinanceAction(type=FinanceActionType.DELETE_TRANSACTION).model_dump()
+                            return {"approved": True, "targets": congelado, "finance_actions": acoes_mutadas}
+                        if mut_id.startswith("change_paid") or mut_id in {"change_paid", "mudar", "pagas", "1"}:
+                            if acao.current_installment:
+                                acoes_mutadas = list(state.get("finance_actions") or [])
+                                acoes_mutadas[i] = FinanceAction(
+                                    type=FinanceActionType.MARK_PAID,
+                                    current_installment=acao.current_installment,
+                                ).model_dump()
+                                return {"approved": True, "targets": congelado, "finance_actions": acoes_mutadas}
+                            return {
+                                "approved": False,
+                                "results": [
+                                    *state.get("results", []),
+                                    f"📝 Quantas parcelas de *{p_label}* você já pagou? (Ex: 'já paguei 3' ou me diz o número)",
+                                ],
+                                "halted": True,
+                            }
+                    return {
+                        "approved": False,
+                        "results": [*state.get("results", []), "👍 Beleza, não mexi em nada."],
+                        "halted": True,
+                    }
+
                 return {"approved": True, "chosen_id": escolhido, "targets": congelado}
             # SOMA em vez de substituir: `results` tem reducer `_replace`, e
             # sobrescrever aqui apagaria o que a fase segura já gravou — o
@@ -433,6 +478,64 @@ async def gate(state: AgentState) -> dict:
                     *state.get("results", []),
                     "👌 Beleza, não mexi em nada. Me diz de outro jeito qual era — pelo valor ou pela data.",
                 ],
+                "halted": True,
+            }
+
+    # 1.1) Mutação direta de plano de parcelamento em UPDATE_TRANSACTION
+    for i, (acao, alvo) in enumerate(zip(acoes, alvos)):
+        if i in _incompletas(state, acoes):
+            continue
+        if (
+            alvo.get("status") == "found"
+            and alvo.get("table") == "installment_plans"
+            and acao.type == FinanceActionType.UPDATE_TRANSACTION
+        ):
+            cand = alvo["candidates"][0]
+            p_id = cand["id"]
+            p_label = cand["label"]
+            escolha = interrupt(
+                {
+                    "kind": "choice",
+                    "action_index": i,
+                    "action_type": acao.type.value,
+                    "summary": f"O que você deseja fazer com {p_label}?",
+                    "options": [
+                        {"id": f"change_paid:{p_id}", "label": "Mudar parcelas pagas"},
+                        {"id": f"delete_plan:{p_id}", "label": "Excluir plano completo"},
+                    ],
+                }
+            )
+            escolhido = (
+                escolha.get("candidate_id") if isinstance(escolha, dict) else escolha
+            )
+            if isinstance(escolhido, str):
+                if escolhido.startswith("delete_plan") or escolhido in {"delete_plan", "excluir", "apagar", "2"}:
+                    congelado = [dict(t) for t in alvos]
+                    congelado[i] = {**alvo, "status": "found", "table": "installment_plans"}
+                    acoes_mutadas = list(state.get("finance_actions") or [])
+                    acoes_mutadas[i] = FinanceAction(type=FinanceActionType.DELETE_TRANSACTION).model_dump()
+                    return {"approved": True, "targets": congelado, "finance_actions": acoes_mutadas}
+                if escolhido.startswith("change_paid") or escolhido in {"change_paid", "mudar", "pagas", "1"}:
+                    congelado = [dict(t) for t in alvos]
+                    congelado[i] = {**alvo, "status": "found", "table": "installment_plans"}
+                    if acao.current_installment:
+                        acoes_mutadas = list(state.get("finance_actions") or [])
+                        acoes_mutadas[i] = FinanceAction(
+                            type=FinanceActionType.MARK_PAID,
+                            current_installment=acao.current_installment,
+                        ).model_dump()
+                        return {"approved": True, "targets": congelado, "finance_actions": acoes_mutadas}
+                    return {
+                        "approved": False,
+                        "results": [
+                            *state.get("results", []),
+                            f"📝 Quantas parcelas de *{p_label}* você já pagou? (Ex: 'já paguei 3' ou me diz o número)",
+                        ],
+                        "halted": True,
+                    }
+            return {
+                "approved": False,
+                "results": [*state.get("results", []), "👍 Beleza, não mexi em nada."],
                 "halted": True,
             }
 

@@ -527,3 +527,108 @@ async def test_escolher_a_parcela_mantem_a_tabela_de_transacoes(monkeypatch, gra
     final = await grafo.ainvoke(Command(resume="tx1"), config=cfg)
 
     assert final["targets"][0]["table"] == "transactions"
+
+
+@pytest.mark.asyncio
+async def test_update_em_plano_mostra_menu_interativo_e_exclui_se_selecionado(monkeypatch, grafo):
+    from app.graph import nodes
+
+    async def plano_alvo(workspace_id, acoes, texto_cru):
+        return [
+            {
+                "table": "installment_plans",
+                "status": "found",
+                "candidates": [
+                    {"id": "p1", "label": "Tudo (12x) — Macbook", "table": "installment_plans"}
+                ],
+            }
+        ]
+
+    monkeypatch.setattr(nodes.resolve, "for_actions", plano_alvo)
+    cfg = {"configurable": {"thread_id": "mut-plano-1"}}
+
+    estado = await grafo.ainvoke(
+        _estado([{"type": FinanceActionType.UPDATE_TRANSACTION.value, "description": "mac"}]),
+        config=cfg,
+    )
+    assert "__interrupt__" in estado
+    interrupt_val = estado["__interrupt__"][0].value
+    assert interrupt_val["kind"] == "choice"
+    assert "Macbook" in interrupt_val["summary"]
+    assert any("Excluir plano" in opt["label"] for opt in interrupt_val["options"])
+    assert any("Mudar parcelas" in opt["label"] for opt in interrupt_val["options"])
+
+    # Usuário seleciona excluir plano
+    final = await grafo.ainvoke(Command(resume="delete_plan:p1"), config=cfg)
+    assert final["approved"] is True
+    assert final["finance_actions"][0]["type"] == FinanceActionType.DELETE_TRANSACTION.value
+    assert final["targets"][0]["table"] == "installment_plans"
+
+
+@pytest.mark.asyncio
+async def test_update_em_plano_mudar_parcelas_com_current_installment_atualiza_para_mark_paid(
+    monkeypatch, grafo
+):
+    from app.graph import nodes
+
+    async def plano_alvo(workspace_id, acoes, texto_cru):
+        return [
+            {
+                "table": "installment_plans",
+                "status": "found",
+                "candidates": [
+                    {"id": "p1", "label": "Tudo (12x) — Macbook", "table": "installment_plans"}
+                ],
+            }
+        ]
+
+    monkeypatch.setattr(nodes.resolve, "for_actions", plano_alvo)
+    cfg = {"configurable": {"thread_id": "mut-plano-2"}}
+
+    estado = await grafo.ainvoke(
+        _estado(
+            [
+                {
+                    "type": FinanceActionType.UPDATE_TRANSACTION.value,
+                    "description": "mac",
+                    "current_installment": 3,
+                }
+            ]
+        ),
+        config=cfg,
+    )
+    assert "__interrupt__" in estado
+
+    final = await grafo.ainvoke(Command(resume="change_paid:p1"), config=cfg)
+    assert final["approved"] is True
+    assert final["finance_actions"][0]["type"] == FinanceActionType.MARK_PAID.value
+    assert final["finance_actions"][0]["current_installment"] == 3
+
+
+@pytest.mark.asyncio
+async def test_update_em_plano_mudar_parcelas_sem_numero_pede_quantidade(monkeypatch, grafo):
+    from app.graph import nodes
+
+    async def plano_alvo(workspace_id, acoes, texto_cru):
+        return [
+            {
+                "table": "installment_plans",
+                "status": "found",
+                "candidates": [
+                    {"id": "p1", "label": "Tudo (12x) — Macbook", "table": "installment_plans"}
+                ],
+            }
+        ]
+
+    monkeypatch.setattr(nodes.resolve, "for_actions", plano_alvo)
+    cfg = {"configurable": {"thread_id": "mut-plano-3"}}
+
+    await grafo.ainvoke(
+        _estado([{"type": FinanceActionType.UPDATE_TRANSACTION.value, "description": "mac"}]),
+        config=cfg,
+    )
+
+    final = await grafo.ainvoke(Command(resume="change_paid:p1"), config=cfg)
+    assert final["approved"] is False
+    assert final["halted"] is True
+    assert "Quantas parcelas" in " ".join(final.get("results", []))

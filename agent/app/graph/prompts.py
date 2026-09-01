@@ -72,6 +72,7 @@ Tipos:
   (se o usuário disser o valor DA PARCELA, multiplique), installments = nº.
   current_installment = em qual parcela ele JÁ ESTÁ, quando a compra é antiga:
   "tô na 4ª parcela de 10" -> installments 10, current_installment 4.
+  "já paguei 2 parcelas de 10" -> installments 10, current_installment 3 (se já pagou 2, agora está na 3ª).
   Compra feita agora deixa current_installment vazio.
   Se ele disser QUANDO comprou ("comprei em maio, tô na 4ª"), preencha
   occurred_at e deixe current_installment VAZIO — os dois juntos contariam o

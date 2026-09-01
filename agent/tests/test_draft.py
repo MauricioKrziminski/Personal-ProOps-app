@@ -64,12 +64,37 @@ class TestClassificacao:
         # falha fechada: sem classificação, o rascunho fica onde está
         assert await draft.interpretar("5000", {"missing": "x"}) is None
 
+    @pytest.mark.asyncio
+    async def test_ja_paguei_parcelas_extrai_already_paid_count_e_calcula_current_installment(
+        self, monkeypatch
+    ):
+        async def falso(texto, pergunta):
+            return DraftDecision(decision="answer", already_paid_count=2)
+
+        monkeypatch.setattr(draft, "_classificar", falso)
+        r = await draft.interpretar("foi 5000 e já paguei 2 parcelas", {"missing": "qual o valor?"})
+        assert r == {
+            "acao": "completar",
+            "slot": "amount",
+            "amount_cents": 500000,
+            "current_installment": 3,
+        }
+
 
 class TestMescla:
     def test_valor_entra_na_acao_guardada(self):
         guardado = {"type": "create_installment_purchase", "installments": 12,
                     "description": "mac", "amount_cents": None}
         assert draft.mesclar(guardado, {"slot": "amount", "amount_cents": 500000})["amount_cents"] == 500000
+
+    def test_current_installment_entra_na_acao_guardada(self):
+        guardado = {"type": "create_installment_purchase", "installments": 12,
+                    "description": "mac", "amount_cents": None}
+        mesclado = draft.mesclar(
+            guardado, {"slot": "amount", "amount_cents": 500000, "current_installment": 3}
+        )
+        assert mesclado["amount_cents"] == 500000
+        assert mesclado["current_installment"] == 3
 
     def test_nao_sobrescreve_o_que_ja_existia(self):
         guardado = {"type": "create_expense", "amount_cents": 100, "description": "x"}

@@ -12,11 +12,14 @@ import re
 
 # Números que claramente não são dinheiro numa mensagem de WhatsApp.
 _RUIDO = [
-    re.compile(r"\b\d{1,2}\s*x\b", re.IGNORECASE),          # "12x", "3 x" — parcelas
-    re.compile(r"\bdia\s+\d{1,2}\b", re.IGNORECASE),        # "dia 5" — recorrência
-    re.compile(r"\b\d{1,2}[/:]\d{1,2}(?:[/:]\d{2,4})?\b"),  # 05/09, 14:30
-    re.compile(r"\b\d{1,2}h(?:\d{2})?\b", re.IGNORECASE),   # 8h, 8h30
-    re.compile(r"\b\d{1,2}%"),                              # 20%
+    re.compile(r"\b\d{1,2}\s*x\b", re.IGNORECASE),                         # "12x", "3 x" — parcelas
+    re.compile(r"\b\d{1,2}(?:ª|º|\.ª|\.º)?\s*parcelas?\b", re.IGNORECASE), # "2 parcelas", "3ª parcela"
+    re.compile(r"\b(?:paguei|foram|faltam|são)\s+\d{1,2}\b", re.IGNORECASE), # "paguei 2", "foram 3"
+    re.compile(r"\b\d{1,2}\s+(?:pagas|restantes)\b", re.IGNORECASE),       # "2 pagas"
+    re.compile(r"\bdia\s+\d{1,2}\b", re.IGNORECASE),                       # "dia 5" — recorrência
+    re.compile(r"\b\d{1,2}[/:]\d{1,2}(?:[/:]\d{2,4})?\b"),                 # 05/09, 14:30
+    re.compile(r"\b\d{1,2}h(?:\d{2})?\b", re.IGNORECASE),                  # 8h, 8h30
+    re.compile(r"\b\d{1,2}%"),                                             # 20%
 ]
 
 _MULTIPLICADORES = [

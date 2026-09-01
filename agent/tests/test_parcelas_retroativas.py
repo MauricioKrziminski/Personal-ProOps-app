@@ -110,3 +110,30 @@ class TestRetroacao:
         r = await finance.create_installment_purchase(CTX, _acao(current_installment=4))
         assert "3 anteriores entraram como pagas" in r.message
         assert "4ª" in r.message
+
+    @pytest.mark.asyncio
+    async def test_ja_paguei_duas_parcelas_cai_na_terceira_e_retroage_dois_meses(self, rpc):
+        """Ao dizer 'já paguei 2 parcelas', current_installment=3 e retroage 2 meses."""
+        # Se ocorreu em 2026-09-01 e já pagou 2 (current=3): começa em 2026-07-01
+        ctx_setembro = ExecContext(
+            user_id=CTX.user_id,
+            workspace_id=CTX.workspace_id,
+            phone=CTX.phone,
+            timezone=CTX.timezone,
+            texto="",
+            wa_message_id="w1",
+        )
+        acao_set = FinanceAction(
+            type=FinanceActionType.CREATE_INSTALLMENT_PURCHASE,
+            amount_cents=1200000,
+            installments=12,
+            description="macbook",
+            account="Nubank",
+            occurred_at="2026-09-01",
+            current_installment=3,
+        )
+        r = await finance.create_installment_purchase(ctx_setembro, acao_set)
+        # Começa 2 meses atrás (Julho/2026)
+        assert rpc[0][3] == "2026-07-01"
+        assert "2 anteriores entraram como pagas" in r.message
+        assert "3ª" in r.message
