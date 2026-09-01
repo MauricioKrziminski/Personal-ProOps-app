@@ -444,6 +444,13 @@ tempo é assunto de outra fase.
 
 ### Nota de deploy
 
-**Produção está atrás:** as migrations `0038`..`0048` só foram aplicadas no staging. O
-`supabase link` do repo aponta para PRODUÇÃO, então `db push --linked` empurraria dez migrations
-de uma vez lá. As desta fase foram aplicadas com `db push --db-url` contra o staging, de propósito.
+**Produção e staging estão em dia** (31/08/2026). Produção estava na `0042` — não na `0037`, como
+a suposição anterior dizia —, então o que faltava era `0043`..`0048`, aplicadas depois da
+validação. Tudo aditivo: coluna nova anulável, tabela nova e troca de função. As duas únicas
+escritas em tempo de migration são inofensivas — o backfill da `0046` escreve só em `paid_at`, que
+nasce nessa mesma migration, e a limpeza da `0044` roda sobre `draft_actions`, criada vazia na
+`0043` do mesmo push.
+
+⚠️ O `supabase link` do repo aponta para **PRODUÇÃO**: `db push --linked` vai para lá, e staging
+exige `--db-url` com a `DATABASE_URL` do `agent/.env.staging`. Conferir o alvo antes de empurrar
+continua sendo obrigação de quem empurra.
