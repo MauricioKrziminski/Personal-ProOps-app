@@ -1,11 +1,12 @@
 import { useMemo, useState } from 'react';
-import { FlatList, Modal, ScrollView, StyleSheet, View } from 'react-native';
+import { FlatList, ScrollView, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Animated, { FadeInDown } from 'react-native-reanimated';
 import { Stack, router, useLocalSearchParams } from 'expo-router';
 
 import { ThemedText } from '@/components/themed-text';
 import { Button } from '@/components/ui/button';
+import { Sheet } from '@/components/ui/sheet';
 import { Card } from '@/components/ui/card';
 import { EmptyState } from '@/components/ui/empty-state';
 import { ItemLink } from '@/components/ui/item-link';
@@ -397,12 +398,8 @@ export default function InvoiceScreen() {
         </View>
       ) : null}
 
-      <Modal
-        visible={pagando}
-        animationType="slide"
-        presentationStyle="pageSheet"
-        onRequestClose={() => setPagando(false)}>
-        <View style={[styles.sheet, { backgroundColor: theme.groupedBackground }]}>
+      <Sheet visible={pagando} onClose={() => setPagando(false)}>
+
           <View style={styles.sheetHead}>
             <Button label="Cancelar" variant="ghost" size="sm" onPress={() => setPagando(false)} />
             <ThemedText type="smallBold">Pagar fatura</ThemedText>
@@ -494,8 +491,7 @@ export default function InvoiceScreen() {
               Entra como transferência — o gasto já contou na compra.
             </ThemedText>
           </ScrollView>
-        </View>
-      </Modal>
+      </Sheet>
     </Screen>
   );
 }
@@ -539,9 +535,6 @@ const styles = StyleSheet.create({
   ancora: {
     paddingHorizontal: Space.lg,
     paddingTop: Space.md,
-  },
-  sheet: {
-    flex: 1,
   },
   sheetHead: {
     flexDirection: 'row',

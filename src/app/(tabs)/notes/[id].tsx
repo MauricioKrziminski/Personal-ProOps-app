@@ -1,7 +1,6 @@
 import { Stack, router, useLocalSearchParams } from 'expo-router';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import {
-  Modal,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -15,6 +14,7 @@ import type { SymbolViewProps } from 'expo-symbols';
 
 import { ThemedText } from '@/components/themed-text';
 import { Button } from '@/components/ui/button';
+import { Sheet } from '@/components/ui/sheet';
 import { Card } from '@/components/ui/card';
 import { EmptyState } from '@/components/ui/empty-state';
 import { HeaderActions, type HeaderAction } from '@/components/ui/header-actions';
@@ -577,7 +577,6 @@ function TagPicker({
   onClose: () => void;
   onToggle: (tag: string) => void;
 }) {
-  const theme = useTheme();
   const known = useNoteTags();
   const [draft, setDraft] = useState('');
 
@@ -588,8 +587,7 @@ function TagPicker({
   const canCreate = isValidTag(typed) && !options.includes(typed);
 
   return (
-    <Modal visible={visible} animationType="slide" presentationStyle="pageSheet" onRequestClose={onClose}>
-      <View style={[styles.sheet, { backgroundColor: theme.groupedBackground }]}>
+    <Sheet visible={visible} onClose={onClose}>
         <View style={styles.sheetHeader}>
           <ThemedText type="smallBold">Tags da nota</ThemedText>
           <Pressable accessibilityRole="button" accessibilityLabel="Fechar" hitSlop={12} onPress={onClose}>
@@ -654,8 +652,7 @@ function TagPicker({
             />
           ) : null}
         </ScrollView>
-      </View>
-    </Modal>
+    </Sheet>
   );
 }
 
@@ -679,7 +676,6 @@ function FolderPicker({
   onClose: () => void;
   onPick: (id: string | null) => void;
 }) {
-  const theme = useTheme();
   const toast = useToast();
   const saveFolder = useSaveFolder();
   const [query, setQuery] = useState('');
@@ -708,12 +704,7 @@ function FolderPicker({
   };
 
   return (
-    <Modal
-      visible={visible}
-      animationType="slide"
-      presentationStyle="pageSheet"
-      onRequestClose={onClose}>
-      <View style={[styles.sheet, { backgroundColor: theme.groupedBackground }]}>
+    <Sheet visible={visible} onClose={onClose}>
         <View style={styles.sheetHeader}>
           <ThemedText type="smallBold">Mover para</ThemedText>
           <Pressable accessibilityRole="button" accessibilityLabel="Fechar" hitSlop={12} onPress={onClose}>
@@ -788,8 +779,7 @@ function FolderPicker({
             )}
           </Section>
         </ScrollView>
-      </View>
-    </Modal>
+    </Sheet>
   );
 }
 
@@ -876,9 +866,6 @@ const styles = StyleSheet.create({
     paddingVertical: Space.xs,
     borderRadius: Radius.pill,
     borderCurve: 'continuous',
-  },
-  sheet: {
-    flex: 1,
   },
   sheetHeader: {
     flexDirection: 'row',

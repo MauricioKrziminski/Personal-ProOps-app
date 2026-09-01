@@ -1,10 +1,11 @@
 import { useState } from 'react';
-import { Modal, Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import Animated, { FadeInDown, LinearTransition } from 'react-native-reanimated';
 import { Stack } from 'expo-router';
 
 import { ThemedText } from '@/components/themed-text';
 import { HeaderActions } from '@/components/ui/header-actions';
+import { Sheet } from '@/components/ui/sheet';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { EmptyState } from '@/components/ui/empty-state';
@@ -26,7 +27,6 @@ import {
   useSaveGoal,
   type Goal,
 } from '@/hooks/use-finance';
-import { useTheme } from '@/hooks/use-theme';
 import { brToISO, formatBRL, isValidBRDate, isoToBR, localISODate } from '@/lib/dates';
 import { confirmDestructive, showItemActions } from '@/lib/item-actions';
 
@@ -82,7 +82,6 @@ function ErrorBand({ message, onRetry }: { message: string; onRetry: () => void 
 }
 
 export default function GoalsScreen() {
-  const theme = useTheme();
   const toast = useToast();
   const goals = useGoals();
   const save = useSaveGoal();
@@ -372,12 +371,7 @@ export default function GoalsScreen() {
       ) : null}
 
       {/* Aportar — detent pequeno: um valor, uma nota, dois botões de intenção. */}
-      <Modal
-        visible={aporte !== null}
-        animationType="slide"
-        presentationStyle="pageSheet"
-        onRequestClose={() => setAporte(null)}>
-        <View style={[styles.sheet, { backgroundColor: theme.groupedBackground }]}>
+      <Sheet visible={aporte !== null} onClose={() => setAporte(null)}>
           <View style={styles.sheetHead}>
             <Button label="Cancelar" variant="ghost" size="sm" onPress={() => setAporte(null)} />
             <ThemedText type="smallBold" numberOfLines={1}>
@@ -425,16 +419,10 @@ export default function GoalsScreen() {
               </ThemedText>
             </ScrollView>
           ) : null}
-        </View>
-      </Modal>
+      </Sheet>
 
       {/* Extrato — sheet próprio, lista completa (não o acordeão truncado em 8 linhas). */}
-      <Modal
-        visible={extrato !== null}
-        animationType="slide"
-        presentationStyle="pageSheet"
-        onRequestClose={() => setExtrato(null)}>
-        <View style={[styles.sheet, { backgroundColor: theme.groupedBackground }]}>
+      <Sheet visible={extrato !== null} onClose={() => setExtrato(null)}>
           <View style={styles.sheetHead}>
             <Button label="Fechar" variant="ghost" size="sm" onPress={() => setExtrato(null)} />
             <ThemedText type="smallBold" numberOfLines={1}>
@@ -505,16 +493,10 @@ export default function GoalsScreen() {
               />
             ) : null}
           </ScrollView>
-        </View>
-      </Modal>
+      </Sheet>
 
       {/* Criar / editar */}
-      <Modal
-        visible={form !== null}
-        animationType="slide"
-        presentationStyle="pageSheet"
-        onRequestClose={() => setForm(null)}>
-        <View style={[styles.sheet, { backgroundColor: theme.groupedBackground }]}>
+      <Sheet visible={form !== null} onClose={() => setForm(null)}>
           <View style={styles.sheetHead}>
             <Button label="Cancelar" variant="ghost" size="sm" onPress={() => setForm(null)} />
             <ThemedText type="smallBold">{form?.id ? 'Editar meta' : 'Nova meta'}</ThemedText>
@@ -559,8 +541,7 @@ export default function GoalsScreen() {
               </Field>
             </ScrollView>
           ) : null}
-        </View>
-      </Modal>
+      </Sheet>
     </Screen>
   );
 }
@@ -600,9 +581,6 @@ const styles = StyleSheet.create({
   },
   bandText: {
     textAlign: 'center',
-  },
-  sheet: {
-    flex: 1,
   },
   sheetHead: {
     flexDirection: 'row',

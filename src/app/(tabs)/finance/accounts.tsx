@@ -1,11 +1,12 @@
 import { useState } from 'react';
-import { Modal, ScrollView, StyleSheet, View } from 'react-native';
+import { ScrollView, StyleSheet, View } from 'react-native';
 import Animated, { FadeInDown } from 'react-native-reanimated';
 import { Stack, router } from 'expo-router';
 import type { SymbolViewProps } from 'expo-symbols';
 
 import { ThemedText } from '@/components/themed-text';
 import { HeaderActions } from '@/components/ui/header-actions';
+import { Sheet } from '@/components/ui/sheet';
 import { ItemLink } from '@/components/ui/item-link';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
@@ -31,7 +32,6 @@ import {
   type Account,
   type AccountBalance,
 } from '@/hooks/use-finance';
-import { useTheme } from '@/hooks/use-theme';
 import { confirmDestructive } from '@/lib/item-actions';
 
 /**
@@ -114,7 +114,6 @@ function ErrorBand({ message, onRetry }: { message: string; onRetry: () => void 
 }
 
 export default function AccountsScreen() {
-  const theme = useTheme();
   const toast = useToast();
   const balances = useAccountBalances();
   const accounts = useAccounts();
@@ -372,12 +371,8 @@ export default function AccountsScreen() {
         />
       ) : null}
 
-      <Modal
-        visible={form !== null}
-        animationType="slide"
-        presentationStyle="pageSheet"
-        onRequestClose={() => setForm(null)}>
-        <View style={[styles.sheet, { backgroundColor: theme.groupedBackground }]}>
+      <Sheet visible={form !== null} onClose={() => setForm(null)}>
+
           <View style={styles.sheetHead}>
             <Button label="Cancelar" variant="ghost" size="sm" onPress={() => setForm(null)} />
             <ThemedText type="smallBold">{form?.id ? 'Editar conta' : 'Nova conta'}</ThemedText>
@@ -499,8 +494,7 @@ export default function AccountsScreen() {
               ) : null}
             </ScrollView>
           ) : null}
-        </View>
-      </Modal>
+      </Sheet>
     </Screen>
   );
 }
@@ -522,9 +516,6 @@ const styles = StyleSheet.create({
   },
   bandText: {
     textAlign: 'center',
-  },
-  sheet: {
-    flex: 1,
   },
   sheetHead: {
     flexDirection: 'row',

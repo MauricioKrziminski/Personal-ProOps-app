@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Modal, Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { Stack, router, useLocalSearchParams } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Animated, { FadeInDown, LinearTransition } from 'react-native-reanimated';
@@ -10,6 +10,7 @@ import * as Haptics from 'expo-haptics';
 import { ErrorCard } from '@/components/error-card';
 import { Chip } from '@/components/finance/chip';
 import { Card } from '@/components/ui/card';
+import { Sheet } from '@/components/ui/sheet';
 import { ThemedText } from '@/components/themed-text';
 import { HeaderMenu } from '@/components/ui/header-actions';
 import { Button } from '@/components/ui/button';
@@ -495,13 +496,7 @@ export default function ImportScreen() {
       ) : null}
 
       {/* Trocar categoria: sheet, não accordion que empurra a lista. */}
-      <Modal
-        visible={editando !== null}
-        animationType="slide"
-        presentationStyle="pageSheet"
-        onRequestClose={() => setEditando(null)}
-      >
-        <View style={[styles.sheet, { backgroundColor: theme.groupedBackground }]}>
+      <Sheet visible={editando !== null} onClose={() => setEditando(null)}>
           <View style={[styles.sheetHeader, { borderBottomColor: theme.separator }]}>
             <Pressable accessibilityRole="button" hitSlop={12} onPress={() => setEditando(null)}>
               <ThemedText type="default" themeColor="tint">
@@ -531,8 +526,7 @@ export default function ImportScreen() {
               ))}
             </View>
           </ScrollView>
-        </View>
-      </Modal>
+      </Sheet>
     </Screen>
   );
 }

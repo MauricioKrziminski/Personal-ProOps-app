@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Modal, Pressable, ScrollView, StyleSheet, Switch, View } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, Switch, View } from 'react-native';
 import Animated, { FadeInDown, LinearTransition } from 'react-native-reanimated';
 import { Stack, router } from 'expo-router';
 import { useQuery } from '@tanstack/react-query';
@@ -8,6 +8,7 @@ import { Chip } from '@/components/finance/chip';
 import { MonthPicker, currentMonth } from '@/components/finance/month-picker';
 import { ThemedText } from '@/components/themed-text';
 import { HeaderActions } from '@/components/ui/header-actions';
+import { Sheet } from '@/components/ui/sheet';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { EmptyState } from '@/components/ui/empty-state';
@@ -31,7 +32,6 @@ import {
   type BudgetStatus,
 } from '@/hooks/use-finance';
 import { useRealtimeInvalidate } from '@/hooks/use-items';
-import { useTheme } from '@/hooks/use-theme';
 import { formatBRL, monthBounds } from '@/lib/dates';
 import { showItemActions, type ItemAction } from '@/lib/item-actions';
 import { supabase } from '@/lib/supabase';
@@ -116,7 +116,6 @@ function ErrorBand({ message, onRetry }: { message: string; onRetry: () => void 
 }
 
 export default function BudgetsScreen() {
-  const theme = useTheme();
   const toast = useToast();
   const [month, setMonth] = useState(currentMonth);
   const [form, setForm] = useState<FormState | null>(null);
@@ -458,12 +457,8 @@ export default function BudgetsScreen() {
         />
       ) : null}
 
-      <Modal
-        visible={form !== null}
-        animationType="slide"
-        presentationStyle="pageSheet"
-        onRequestClose={() => setForm(null)}>
-        <View style={[styles.sheet, { backgroundColor: theme.groupedBackground }]}>
+      <Sheet visible={form !== null} onClose={() => setForm(null)}>
+
           <View style={styles.sheetHead}>
             <Button label="Cancelar" variant="ghost" size="sm" onPress={() => setForm(null)} />
             <ThemedText type="smallBold">
@@ -541,8 +536,7 @@ export default function BudgetsScreen() {
               </Field>
             </ScrollView>
           ) : null}
-        </View>
-      </Modal>
+      </Sheet>
     </Screen>
   );
 }
@@ -587,9 +581,6 @@ const styles = StyleSheet.create({
   },
   bandText: {
     textAlign: 'center',
-  },
-  sheet: {
-    flex: 1,
   },
   sheetHead: {
     flexDirection: 'row',

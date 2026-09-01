@@ -1,11 +1,12 @@
 import { useState } from 'react';
-import { Modal, Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import Animated, { FadeInDown, LinearTransition } from 'react-native-reanimated';
 import { Stack } from 'expo-router';
 
 import { Chip } from '@/components/finance/chip';
 import { ThemedText } from '@/components/themed-text';
 import { HeaderActions } from '@/components/ui/header-actions';
+import { Sheet } from '@/components/ui/sheet';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { EmptyState } from '@/components/ui/empty-state';
@@ -358,12 +359,7 @@ export default function DebtsScreen() {
       ) : null}
 
       {/* Amortização — sheet, não acordeão: um financiamento em 60x tem 60 linhas. */}
-      <Modal
-        visible={detalhe !== null}
-        animationType="slide"
-        presentationStyle="pageSheet"
-        onRequestClose={() => setDetalhe(null)}>
-        <View style={[styles.sheet, { backgroundColor: theme.groupedBackground }]}>
+      <Sheet visible={detalhe !== null} onClose={() => setDetalhe(null)}>
           <View style={styles.sheetHead}>
             <Button label="Fechar" variant="ghost" size="sm" onPress={() => setDetalhe(null)} />
             <ThemedText type="smallBold" numberOfLines={1}>
@@ -495,16 +491,10 @@ export default function DebtsScreen() {
               </View>
             ) : null}
           </ScrollView>
-        </View>
-      </Modal>
+      </Sheet>
 
       {/* Pagar parcela — sheet com a conta explicada ANTES de confirmar. */}
-      <Modal
-        visible={pagando !== null}
-        animationType="slide"
-        presentationStyle="pageSheet"
-        onRequestClose={() => setPagando(null)}>
-        <View style={[styles.sheet, { backgroundColor: theme.groupedBackground }]}>
+      <Sheet visible={pagando !== null} onClose={() => setPagando(null)}>
           <View style={styles.sheetHead}>
             <Button label="Cancelar" variant="ghost" size="sm" onPress={() => setPagando(null)} />
             <ThemedText type="smallBold" numberOfLines={1}>
@@ -594,16 +584,10 @@ export default function DebtsScreen() {
               />
             </ScrollView>
           ) : null}
-        </View>
-      </Modal>
+      </Sheet>
 
       {/* Criar / editar */}
-      <Modal
-        visible={form !== null}
-        animationType="slide"
-        presentationStyle="pageSheet"
-        onRequestClose={() => setForm(null)}>
-        <View style={[styles.sheet, { backgroundColor: theme.groupedBackground }]}>
+      <Sheet visible={form !== null} onClose={() => setForm(null)}>
           <View style={styles.sheetHead}>
             <Button label="Cancelar" variant="ghost" size="sm" onPress={() => setForm(null)} />
             <ThemedText type="smallBold">{form?.id ? 'Editar dívida' : 'Nova dívida'}</ThemedText>
@@ -737,8 +721,7 @@ export default function DebtsScreen() {
               </View>
             </ScrollView>
           ) : null}
-        </View>
-      </Modal>
+      </Sheet>
     </Screen>
   );
 }
@@ -806,9 +789,6 @@ const styles = StyleSheet.create({
   },
   celulaEstreita: {
     width: 32,
-  },
-  sheet: {
-    flex: 1,
   },
   sheetHead: {
     flexDirection: 'row',

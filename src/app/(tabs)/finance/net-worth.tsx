@@ -1,19 +1,17 @@
 import { useState } from 'react';
 import {
-  Modal,
-  Platform,
   ScrollView,
   StyleSheet,
   View,
   useWindowDimensions,
 } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Animated, { FadeInDown } from 'react-native-reanimated';
 import { Stack, router } from 'expo-router';
 
 import { monthShort } from '@/components/finance/month-picker';
 import { ThemedText } from '@/components/themed-text';
 import { HeaderActions } from '@/components/ui/header-actions';
+import { Sheet } from '@/components/ui/sheet';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { EmptyState } from '@/components/ui/empty-state';
@@ -40,7 +38,6 @@ import {
 } from '@/hooks/use-finance';
 import { formatBRL } from '@/hooks/use-items';
 import { formatNumberBR } from '@/lib/dates';
-import { useTheme } from '@/hooks/use-theme';
 import { confirmDestructive } from '@/lib/item-actions';
 
 /**
@@ -155,10 +152,8 @@ function ErrorBand({ message, onRetry }: { message: string; onRetry: () => void 
 }
 
 export default function NetWorthScreen() {
-  const theme = useTheme();
   const toast = useToast();
   const { width } = useWindowDimensions();
-  const insets = useSafeAreaInsets();
   const patrimonio = useNetWorth();
   const [janela, setJanela] = useState('12');
   const serie = useNetWorthSeries(Number(janela));
@@ -507,22 +502,7 @@ export default function NetWorthScreen() {
         />
       ) : null}
 
-      <Modal
-        visible={form !== null}
-        animationType="slide"
-        presentationStyle="pageSheet"
-        onRequestClose={() => setForm(null)}>
-        {/* No Android o Modal ocupa a tela inteira e este cabeçalho nascia POR CIMA da status
-            bar — o "Salvar" ficava atrás dos ícones de wifi e bateria. No iOS o `pageSheet` já
-            desce sozinho. */}
-        <View
-          style={[
-            styles.sheet,
-            {
-              backgroundColor: theme.groupedBackground,
-              paddingTop: Platform.OS === 'android' ? insets.top : 0,
-            },
-          ]}>
+      <Sheet visible={form !== null} onClose={() => setForm(null)}>
           <View style={styles.sheetHead}>
             <Button label="Cancelar" variant="ghost" size="sm" onPress={() => setForm(null)} />
             <ThemedText type="smallBold">{form?.id ? 'Editar bem' : 'Novo bem'}</ThemedText>
@@ -611,8 +591,7 @@ export default function NetWorthScreen() {
               ) : null}
             </ScrollView>
           ) : null}
-        </View>
-      </Modal>
+      </Sheet>
     </Screen>
   );
 }
@@ -647,9 +626,6 @@ const styles = StyleSheet.create({
   },
   centered: {
     textAlign: 'center',
-  },
-  sheet: {
-    flex: 1,
   },
   sheetHead: {
     flexDirection: 'row',
