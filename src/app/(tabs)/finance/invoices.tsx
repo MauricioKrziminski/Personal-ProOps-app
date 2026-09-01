@@ -37,7 +37,11 @@ import { useTheme } from '@/hooks/use-theme';
  * Tela de leitura pura: não se apaga fatura, ela é consequência das compras.
  */
 
-const MESES = 12;
+// A janela é o TETO do hook, não 12. Compra parcelada cria uma fatura FUTURA por
+// mês até a última parcela: com 12, as doze mais novas eram todas de 2027 e o
+// histórico inteiro — o motivo de a tela existir — ficava de fora, sem erro e sem
+// aviso. Foi assim que a tela abriu mostrando só 2027.
+const MESES = 60;
 const ALTURA_BARRA = 76;
 
 /** Estado como PALAVRA — cor sozinha não informa. */
@@ -93,9 +97,22 @@ export default function InvoicesScreen() {
   const invoices = useCardInvoices(atual?.id, MESES);
 
   const hoje = localISODate();
-  const lista = invoices.data ?? [];
+  const lista = useMemo(() => invoices.data ?? [], [invoices.data]);
+
+  // "Últimas" é sobre o PASSADO. Compra parcelada cria fatura FUTURA (uma por mês
+  // até a última parcela), então sem este corte o gráfico mostrava 2027, as
+  // primeiras barras eram faturas de R$ 0,00 que ainda não existiram, e a "média
+  // das últimas 6" saía delas. O rótulo mentia e o número estava errado.
+  const passadas = useMemo(
+    () => lista.filter((i) => i.reference_month.slice(0, 7) <= hoje.slice(0, 7)),
+    [lista, hoje],
+  );
+  const futuras = useMemo(
+    () => [...lista.filter((i) => i.reference_month.slice(0, 7) > hoje.slice(0, 7))].reverse(),
+    [lista, hoje],
+  );
   // A série lê da esquerda (mais antiga) para a direita (mês corrente).
-  const serie = useMemo(() => [...(invoices.data ?? [])].reverse(), [invoices.data]);
+  const serie = useMemo(() => [...passadas].reverse(), [passadas]);
   const maior = Math.max(...serie.map((i) => i.total_cents), 0);
   const ultimos = serie.slice(-6);
   const media =
@@ -241,9 +258,9 @@ export default function InvoicesScreen() {
         </Card>
       ) : null}
 
-      {lista.length > 0 ? (
-        <Section title="Todas as faturas">
-          {lista.map((invoice, index) => {
+      {passadas.length > 0 ? (
+        <Section title="Faturas anteriores">
+          {passadas.map((invoice, index) => {
             const situacao = estado(invoice, hoje);
             const mes = invoice.reference_month.slice(0, 7);
             return (
@@ -279,6 +296,28 @@ export default function InvoicesScreen() {
               </Animated.View>
             );
           })}
+        </Section>
+      ) : null}
+
+      {/* Fatura futura existe de verdade — parcelamento cria uma por mês até a
+          última parcela. Ela não pode sumir da tela (esconder dado é o problema
+          que esta rodada inteira ataca), mas também não é "anterior": vive numa
+          seção própria, depois do passado, e da mais próxima para a mais distante. */}
+      {futuras.length > 0 ? (
+        <Section title="Próximas faturas">
+          {futuras.map((invoice) => (
+            <Row
+              key={invoice.id}
+              title={monthTitle(invoice.reference_month.slice(0, 7))}
+              subtitle={`vence ${formatDateBR(invoice.due_date)}`}
+              icon="calendar"
+              trailing={<Money cents={invoice.total_cents} variant="headline" tone="textSecondary" />}
+              onPress={() =>
+                router.push({ pathname: '/finance/invoice/[id]', params: { id: invoice.id } })
+              }
+              onLongPress={() => acoes(invoice)}
+            />
+          ))}
         </Section>
       ) : null}
 
