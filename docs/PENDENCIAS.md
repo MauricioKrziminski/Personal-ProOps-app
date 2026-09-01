@@ -166,22 +166,53 @@ começando muito atrás pode sair da janela sem ninguém verificar de novo.
   `ai_events` — que é o que `private.plan_status_for` conta. Mensagem de áudio
   custa mais e é cobrada como se custasse menos.
 
-## ⚠️ Auditoria do app financeiro — fases 2 a 4 (31/08/2026)
+## ✅ Auditoria do app financeiro — fases 1 a 4 concluídas (01/09/2026)
 
 Documento completo: [docs/design/AUDITORIA-FINANCEIRO.md](design/AUDITORIA-FINANCEIRO.md).
-A **Fase 1** (navegar entre faturas, quitar sem mexer no caixa, apagar compra
-parcelada inteira) saiu em `13dceaf` e **depende da migration 0046 ser aplicada**.
+**Os cinco achados estão fechados** e as migrations `0043`..`0048` estão em produção.
 
-Achados ainda abertos, em ordem de dor:
+| Fase | O que entregou |
+|---|---|
+| 1 | Navegar entre faturas, quitar sem mexer no caixa, apagar a compra parcelada inteira, `3/8` com link |
+| 2 | Extrato por conta/cartão, filtro de status e origem, paginação no lugar do `limit(200)`, busca que abre o lançamento certo |
+| 3 | `monthly_cashflow` na home, patrimônio com os 5 componentes, janelas ajustáveis |
+| 4 | Salto de ano no seletor de mês, anos de Relatórios vindos do dado, passado nas parceladas e na projeção, transferência com sinal no extrato |
 
-- **Não existe extrato por conta nem por cartão.** `useTransactions` não aceita
-  `account_id`, e "Ver extrato" em `accounts.tsx:234` empurra a lista global do mês.
-- **Busca global quebrada para lançamentos**: `search.tsx:143` navega sem `txId`
-  nem `month`, então o resultado leva a uma tela onde ele não está.
-- **`monthly_cashflow` tem RPC e hook prontos e zero telas** (`use-finance.ts:198`).
-- **`net_worth()` devolve 5 números e a tela usa 1**; `net_worth_snapshots` guarda
-  série diária de 5 componentes e o app mostra uma linha mensal de um.
-- **Recorte temporal fixo ou de passo 1** em todas as telas.
+Uma rodada de limpeza depois fechou o que as fases deixaram para trás: primitivo
+`Sheet` único (o cabeçalho não nasce mais sob a status bar do Android, em 13 sheets),
+`isError` em 12 telas que mostravam dado velho sob a faixa de erro, e o deep link que
+não reaplicava filtro em tela já montada.
+
+### 🔲 Único item aberto: VoiceOver com o leitor LIGADO
+
+Nunca foi testado com o VoiceOver de verdade — só lendo árvore de acessibilidade por
+ferramenta. A dúvida específica é **se o `…` do header é alcançável no iOS**, porque é
+por ele que passam "Marcar como paga", "Ver todas as faturas", "Importar extrato" e os
+filtros de conta e origem.
+
+**O que já se sabe** (não fecha, mas reduz muito o risco):
+
+- No **Android** a árvore REAL (`adb shell uiautomator dump`) expõe tudo: `Mais opções`,
+  `Navigate up`, `Buscar lançamentos`, `Paguei`, `Setembro de 2026` e as linhas inteiras
+  (`pc gamer (6/8), R$ 900,00, despesa, qua., 30 de setembro, previsto`).
+- No **iOS** o `idb` não percorre a barra de navegação inteira — somem o `…`, o título
+  grande, a busca **e o botão voltar**, em toda tela. Voltar é controle de prateleira do
+  UIKit, acessível por construção; se ele some junto, quem não percorre é a ferramenta.
+
+**Como fechar** (10 minutos, no simulador ou num iPhone):
+
+1. Simulador rodando o app → **Settings → Accessibility → VoiceOver → ligar**.
+   (`xcrun simctl spawn <udid> defaults write … VoiceOverTouchEnabled` **não** serve:
+   grava a preferência e o serviço não sobe.)
+2. Abrir Contas → tocar numa conta (abre o extrato dela).
+3. Deslizar o foco pelo topo da tela e conferir se ele **para no `…`** e anuncia
+   *"Mais opções"*. Ativar com toque duplo e ver se o menu abre.
+4. Repetir no detalhe da fatura, onde o mesmo menu leva a "Marcar como paga".
+5. Se o foco pular o `…`: o conserto é em `HeaderMenu`
+   (`src/components/ui/header-actions.tsx`), no ramo iOS que usa `Stack.Toolbar.Menu`.
+
+Se estiver tudo certo, riscar este item — a acessibilidade do app passa a estar
+verificada nas duas plataformas.
 
 ## ✅ Divergências da Fase 1 — todas fechadas (31/08/2026)
 
