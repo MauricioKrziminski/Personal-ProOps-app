@@ -87,7 +87,7 @@ de import) com teto de 5.000 linhas que **lança exceção** em vez de mostrar d
 
 | Fase | Tema | Estado |
 |---|---|---|
-| **1** | O passado do cartão: fatura atual em destaque, `‹ ›` entre faturas, quitar sem mexer no caixa, apagar plano inteiro, `3/8` com link | **implementada** (`13dceaf`), aguardando a `0046` ser aplicada |
+| **1** | O passado do cartão: fatura atual em destaque, `‹ ›` entre faturas, quitar sem mexer no caixa, apagar plano inteiro, `3/8` com link | **implementada e validada**; `0046` aplicada em staging |
 | 2 | Extrato de verdade: filtro por conta/cartão, status e origem; paginação no lugar do `limit(200)`; busca que abre o lançamento certo | pendente |
 | 3 | Visões que existem no banco: `monthly_cashflow` na home; patrimônio com os 5 componentes; janelas ajustáveis | pendente |
 | 4 | Período livre: seletor com salto de ano; relatórios além de 3 anos; passado na projeção e nas parceladas | pendente |
@@ -108,9 +108,11 @@ dentro — sem isso a fatura ficaria "paga" com lançamentos previstos alimentan
 transação do cartão; funcionava porque o único jeito de quitar criava uma
 transferência que compensava as compras. Sem transferência, o cartão ficaria
 negativo para sempre enquanto Cartões mostrava limite livre — o app se
-contradizendo em duas telas. O filtro exclui compras de fatura `paid` **com
-`payment_transaction_id` nulo**: só `status = 'paid'` também excluiria as do
-`pay_invoice`, e aí o cartão ficaria positivo.
+contradizendo em duas telas. O filtro lê o marcador explícito
+`card_invoices.settled_manually`: só `status = 'paid'` também excluiria as compras
+do `pay_invoice`, e aí o cartão ficaria POSITIVO. E inferir pela ausência de
+`payment_transaction_id` não servia — a coluna é `on delete set null`, então
+apagar a transferência faria um pagamento de verdade virar um settle.
 
 **`paid_at` separado de `occurred_at`.** Dar baixa reescrevia a data do
 lançamento, então boleto de agosto pago em setembro migrava de mês em todo
