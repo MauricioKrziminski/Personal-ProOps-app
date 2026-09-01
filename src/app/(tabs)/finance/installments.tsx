@@ -1,5 +1,5 @@
-import { useEffect, useMemo, useState } from 'react';
-import { Pressable, StyleSheet, View } from 'react-native';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { Stack, router } from 'expo-router';
 import Animated, {
   FadeInDown,
@@ -42,12 +42,23 @@ import { useTheme } from '@/hooks/use-theme';
  * por isso "por mês" é a parcela normal e a última pode ter alguns centavos a mais.
  */
 
-const MESES_NA_FAIXA = 6;
 const MESES_COMPROMETIDOS = 12;
 const ALTURA_BARRA = 88;
+/** Largura fixa de cada mês na faixa rolável. */
+const LARGURA_MES = 48;
 
 /** Barra de um mês. Cresce da base com mola — valor que salta é bug visual. */
-function Bar({ ratio, index, destaque }: { ratio: number; index: number; destaque: boolean }) {
+function Bar({
+  ratio,
+  index,
+  destaque,
+  passado,
+}: {
+  ratio: number;
+  index: number;
+  destaque: boolean;
+  passado: boolean;
+}) {
   const theme = useTheme();
   const grow = useSharedValue(0);
 
@@ -56,7 +67,9 @@ function Bar({ ratio, index, destaque }: { ratio: number; index: number; destaqu
   }, [grow, ratio, index]);
 
   const animado = useAnimatedStyle(() => ({
-    height: Math.max(Space.xs, grow.get() * ALTURA_BARRA),
+    // Mês sem parcela desenha NADA — o piso é para valor que existe. Com a faixa cobrindo o
+    // plano inteiro, buraco no meio virou caso comum.
+    height: ratio <= 0 ? 0 : Math.max(Space.xs, grow.get() * ALTURA_BARRA),
   }));
 
   return (
@@ -64,7 +77,12 @@ function Bar({ ratio, index, destaque }: { ratio: number; index: number; destaqu
       style={[
         styles.bar,
         animado,
-        { backgroundColor: destaque ? theme.tint : theme.backgroundElement },
+        {
+          backgroundColor: destaque ? theme.tint : theme.backgroundElement,
+          // Parcela já paga fica mais fraca — mesma convenção da tendência da home: uma cor,
+          // duas intensidades. O que o usuário decide é o que vem pela frente.
+          opacity: passado ? 0.4 : 1,
+        },
       ]}
     />
   );
@@ -95,36 +113,71 @@ export default function InstallmentsScreen() {
   );
   const terminadas = useMemo(() => (plans.data ?? []).filter((p) => !p.active), [plans.data]);
 
-  /** Parcelas previstas por mês, do mês corrente para a frente. */
+  /**
+   * Parcelas por mês — TODAS, inclusive as já pagas e as de meses passados.
+   *
+   * Antes este mapa nascia com dois filtros (`status = pending` e `mes >= hoje`), e por isso a
+   * faixa não tinha como mostrar passado nenhum: o dado saía antes de chegar no gráfico. O
+   * recorte "só o que ainda vai sair" continua existindo, mas em `comprometido`, que é o número
+   * que precisa dele.
+   */
   const porMes = useMemo(() => {
     const mapa = new Map<string, number>();
-    const hoje = localISODate().slice(0, 7);
     for (const plano of plans.data ?? []) {
       for (const parcela of plano.parcels) {
-        if (parcela.status !== 'pending') continue;
         const mes = parcela.occurred_at.slice(0, 7);
-        if (mes < hoje) continue;
         mapa.set(mes, (mapa.get(mes) ?? 0) + parcela.amount_cents);
       }
     }
     return mapa;
   }, [plans.data]);
 
+  const mesAtual = localISODate().slice(0, 7);
+
+  // A faixa cobre o plano INTEIRO — da primeira parcela à última —, não seis meses para a
+  // frente. O caso que originou a auditoria é exatamente este: compra em 8x lançada JÁ na 5ª
+  // parcela, com quatro meses de passado que a tela não tinha como mostrar.
   const faixa = useMemo(() => {
-    const inicio = localISODate().slice(0, 7);
-    return Array.from({ length: MESES_NA_FAIXA }, (_, i) => {
-      const mes = shiftMonth(inicio, i);
-      return { month: mes, cents: porMes.get(mes) ?? 0 };
-    });
+    const meses = Array.from(porMes.keys()).sort();
+    if (meses.length === 0) return [];
+    const fim = meses[meses.length - 1];
+    const out: { month: string; cents: number }[] = [];
+    // Teto de segurança: `porMes` vem do banco e um `first_occurred_at` absurdo não pode
+    // virar laço infinito.
+    for (let mes = meses[0]; mes <= fim && out.length < 240; mes = shiftMonth(mes, 1)) {
+      out.push({ month: mes, cents: porMes.get(mes) ?? 0 });
+    }
+    return out;
   }, [porMes]);
 
-  const comprometido = useMemo(() => {
-    const inicio = localISODate().slice(0, 7);
-    const fim = shiftMonth(inicio, MESES_COMPROMETIDOS - 1);
+  // Abre no mês corrente, não no começo do histórico: a pergunta padrão é "quanto cai daqui
+  // para a frente". `contentOffset` não é confiável nas duas plataformas — daí o `scrollTo`.
+  const faixaRef = useRef<ScrollView>(null);
+  const indexAtual = faixa.findIndex((f) => f.month >= mesAtual);
+
+  /**
+   * O que ainda vai SAIR do bolso nos próximos 12 meses.
+   *
+   * Lê as parcelas direto, e não o `porMes`, porque este número tem dois recortes que a faixa
+   * não tem: só parcela `pending` (a já paga não é compromisso) e só do mês corrente para a
+   * frente. Junto vem quantos meses da janela têm parcela — é o divisor da média, e contar mês
+   * passado ali faria a média encolher sozinha.
+   */
+  const { comprometido, mesesNaJanela } = useMemo(() => {
+    const fim = shiftMonth(mesAtual, MESES_COMPROMETIDOS - 1);
+    const meses = new Set<string>();
     let total = 0;
-    for (const [mes, cents] of porMes) if (mes >= inicio && mes <= fim) total += cents;
-    return total;
-  }, [porMes]);
+    for (const plano of plans.data ?? []) {
+      for (const parcela of plano.parcels) {
+        if (parcela.status !== 'pending') continue;
+        const mes = parcela.occurred_at.slice(0, 7);
+        if (mes < mesAtual || mes > fim) continue;
+        total += parcela.amount_cents;
+        meses.add(mes);
+      }
+    }
+    return { comprometido: total, mesesNaJanela: meses.size };
+  }, [plans.data, mesAtual]);
 
   const ultimaParcela = useMemo(() => {
     let maior: string | null = null;
@@ -132,9 +185,13 @@ export default function InstallmentsScreen() {
     return maior;
   }, [porMes]);
 
-  const mesesComParcela = Array.from(porMes.values()).filter((c) => c > 0).length;
-  const media = mesesComParcela > 0 ? Math.round(comprometido / Math.min(mesesComParcela, MESES_COMPROMETIDOS)) : 0;
+  const media = mesesNaJanela > 0 ? Math.round(comprometido / mesesNaJanela) : 0;
   const maiorDaFaixa = Math.max(...faixa.map((f) => f.cents), 0);
+  // "Mês mais pesado" só ganha o accent quando existe UM. Com parcelas iguais — o caso comum,
+  // porque parcela é o total dividido igual — três meses empatavam no máximo e os três saíam em
+  // `tint`: três retângulos pretos colados viram um bloco, que era o achado cosmético parado
+  // desde a Fase 1. Empate agora não destaca ninguém; o valor continua escrito embaixo.
+  const maiorEhUnico = faixa.filter((f) => f.cents === maiorDaFaixa).length === 1;
   const temFaixa = maiorDaFaixa > 0;
 
   const acoes = (plano: InstallmentPlanSummary) => {
@@ -340,12 +397,23 @@ export default function InstallmentsScreen() {
       {temFaixa ? (
         <Card style={styles.faixa}>
           <ThemedText type="smallBold">Quanto cai por mês</ThemedText>
-          <View style={styles.bars}>
+          <ScrollView
+            ref={faixaRef}
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            onContentSizeChange={() =>
+              faixaRef.current?.scrollTo({
+                // Um mês de folga à esquerda para o corrente não colar na borda.
+                x: Math.max(0, (indexAtual - 1) * (LARGURA_MES + Space.sm)),
+                animated: false,
+              })
+            }
+            contentContainerStyle={styles.bars}>
             {faixa.map((mes, index) => (
               <Pressable
                 key={mes.month}
                 accessibilityRole="button"
-                accessibilityLabel={`${monthLabel(mes.month)}, ${formatBRL(mes.cents)} em parcelas`}
+                accessibilityLabel={`${monthLabel(mes.month)}, ${formatBRL(mes.cents)} em parcelas${mes.month < mesAtual ? ', já passou' : ''}`}
                 style={styles.barSlot}
                 onPress={() =>
                   router.push({ pathname: '/finance/transactions', params: { month: mes.month } })
@@ -354,7 +422,8 @@ export default function InstallmentsScreen() {
                   <Bar
                     ratio={maiorDaFaixa > 0 ? mes.cents / maiorDaFaixa : 0}
                     index={index}
-                    destaque={mes.cents === maiorDaFaixa && mes.cents > 0}
+                    destaque={maiorEhUnico && mes.cents === maiorDaFaixa && mes.cents > 0}
+                    passado={mes.month < mesAtual}
                   />
                 </View>
                 <ThemedText type="small" themeColor="textSecondary">
@@ -362,7 +431,7 @@ export default function InstallmentsScreen() {
                 </ThemedText>
               </Pressable>
             ))}
-          </View>
+          </ScrollView>
           <ThemedText type="small" themeColor="textSecondary" style={tabular}>
             {`Mês mais pesado: ${formatBRL(maiorDaFaixa)}`}
           </ThemedText>
@@ -411,7 +480,7 @@ const styles = StyleSheet.create({
     gap: Space.sm,
   },
   barSlot: {
-    flex: 1,
+    width: LARGURA_MES,
     alignItems: 'center',
     gap: Space.xs,
   },
