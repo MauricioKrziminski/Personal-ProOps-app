@@ -17,12 +17,21 @@ from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 UTC = timezone.utc
 
 
-def tz(name: str) -> ZoneInfo:
-    """Fuso do profile, com queda para UTC — timezone inválido não derruba o job."""
+DEFAULT_TZ = "America/Sao_Paulo"
+
+
+def tz(name: str | None = None) -> ZoneInfo:
+    """Fuso do profile, com queda para America/Sao_Paulo (e depois UTC).
+
+    Evita que timezone vazio ou container em UTC gere data do dia anterior
+    em lançamentos perto da meia-noite.
+    """
+    if not name or name == "UTC":
+        return ZoneInfo(DEFAULT_TZ)
     try:
         return ZoneInfo(name)
     except (ZoneInfoNotFoundError, ValueError):
-        return ZoneInfo("UTC")
+        return ZoneInfo(DEFAULT_TZ)
 
 
 def now_utc() -> datetime:

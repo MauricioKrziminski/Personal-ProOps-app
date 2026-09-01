@@ -79,6 +79,34 @@ async def send_text(to: str, body: str) -> None:
     )
 
 
+async def mark_as_read(wa_message_id: str) -> None:
+    """Marca mensagem como lida na Graph API (feedback visual instantâneo)."""
+    settings = get_settings()
+    if not settings.whatsapp_token or not settings.whatsapp_phone_number_id or not wa_message_id:
+        return
+    await client().post(
+        f"{GRAPH_BASE}/{settings.whatsapp_phone_number_id}/messages",
+        headers={"Authorization": f"Bearer {settings.whatsapp_token}"},
+        json={
+            "messaging_product": "whatsapp",
+            "status": "read",
+            "message_id": wa_message_id,
+        },
+    )
+
+
+async def try_mark_read(wa_message_id: str) -> bool:
+    """Best-effort: não derruba o fluxo se a Meta falhar."""
+    if not wa_message_id:
+        return False
+    try:
+        await mark_as_read(wa_message_id)
+        return True
+    except Exception as err:  # noqa: BLE001
+        log.debug("marcar lido no WhatsApp falhou (ignorado): %s", err)
+        return False
+
+
 # Limites físicos da Cloud API. Estourar não dá erro bonito: vira 400 que o
 # `try_send` engole, e a pergunta simplesmente não chega.
 BTN_MAX, BTN_TITLE_MAX = 3, 20

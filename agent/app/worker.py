@@ -81,6 +81,12 @@ async def process_thread(thread_id: str) -> dict:
             await whatsapp.try_send(phone, NAO_LI)
             return {"claimed": len(ids), "status": "ilegivel"}
 
+        # Feedback visual instantâneo: marca mensagens como lidas na Meta
+        for m in lote:
+            wa_mid = (m.get("payload") or {}).get("id") or m.get("wa_message_id")
+            if wa_mid:
+                await whatsapp.try_mark_read(str(wa_mid))
+
         resposta = await _run_graph(sessao, lote, conteudo)
 
         # done ANTES do envio: a fonte da verdade já está salva

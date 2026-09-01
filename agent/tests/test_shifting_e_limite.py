@@ -151,3 +151,13 @@ class TestVerificarLimiteCartao:
         res = await finance.verificar_limite_disponivel(WS, CARD_ID, 500000)
         assert res["excedeu"] is False
         assert res["limite_centavos"] is None
+
+
+class TestTimezoneBlindagem:
+    def test_tz_fallback_sempre_sao_paulo(self):
+        from app.domain.dates import tz, DEFAULT_TZ
+        assert str(tz(None)) == DEFAULT_TZ
+        assert str(tz("")) == DEFAULT_TZ
+        assert str(tz("UTC")) == DEFAULT_TZ
+        assert str(tz("invalido/xyz")) == DEFAULT_TZ
+        assert str(tz("America/Sao_Paulo")) == "America/Sao_Paulo"
