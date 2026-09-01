@@ -203,3 +203,34 @@ O app sobe no emulador (`s26`, Android 16) com o bundle atual e renderiza o logi
 mas entrar exige o OTP no WhatsApp do dono da conta. **Android segue não testado** —
 e é o gap mais relevante que resta, porque `HeaderMenu` e `ItemLink` têm caminhos
 de código diferentes lá (context menu do iOS vs. sheet do Android).
+
+### Android — validado (31/08/2026)
+
+Emulador `s26` (Android 16), mesmo bundle, mesmo banco de staging. Os dois caminhos
+que **só existem no Android** foram exercitados:
+
+- **`HeaderMenu` via `headerRight`** (no iOS é `Stack.Toolbar`): o menu abre sheet
+  com "Ver todas as faturas" e "Marcar como paga (sem mexer no saldo)", mais título
+  e "Cancelar" — o desenho da plataforma, não uma cópia do iOS.
+- **`ItemLink` com toque longo → sheet** (no iOS é context menu nativo): abriu com
+  as quatro ações do plano, incluindo "Apagar a compra inteira".
+- **`confirmDestructive` → diálogo nativo** com botões em CAIXA ALTA, como manda o
+  Material. Cancelar não escreveu nada (conferido no banco); confirmar apagou o
+  plano e as 3 parcelas por cascade.
+- **Ícones**: as variantes Material renderizaram (nenhum `circle` genérico), o que
+  exercita o mapa SF → Material do `Icon`.
+- **Dark mode**: correto, com os tokens do tema escuro.
+
+### Offline (persona da Bia) — validado
+
+Com wifi e dados desligados, a tela mostrou **"Não deu para carregar esta fatura."**
+com "Tentar de novo", a fatura continuou `Aberta`, e o banco ficou intacto
+(`open`, `settled_manually=false`, `paid_at=null`). Nenhuma escrita silenciosa.
+
+### O que segue sem verificação
+
+- **VoiceOver de verdade** (só o rótulo das setas do pager foi conferido, via idb).
+- **Dynamic Type**: `simctl ui content-size` não surtiu efeito nem após relaunch.
+- O botão de menu do header não aparece na árvore de acessibilidade do `idb` no
+  iOS — não determinado se é limitação da ferramenta ou se o leitor de tela também
+  não alcança.
