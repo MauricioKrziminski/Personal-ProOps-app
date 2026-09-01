@@ -2,6 +2,7 @@ import { useEffect } from 'react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { DarkTheme, DefaultTheme, Stack, ThemeProvider, router, useSegments } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
+import { StatusBar } from 'expo-status-bar';
 import { Platform, Pressable, useColorScheme } from 'react-native';
 import { KeyboardProvider } from 'react-native-keyboard-controller';
 
@@ -114,10 +115,15 @@ export default function RootLayout() {
                * `NativeTabs`; a próxima parada é o repo do `react-native-screens`, não mais uma
                * quinta declaração aqui.
                */
-              <Stack screenOptions={{ statusBarStyle }}>
-              {/* `/` é a URL inicial: renderiza antes de qualquer guard, por isso fica FORA dos
-                  `Stack.Protected` e decide o destino por conta própria. */}
-              <Stack.Screen name="index" options={{ headerShown: false }} />
+              <>
+                <StatusBar style={statusBarStyle} />
+                <Stack
+                  screenOptions={{
+                    statusBarStyle: Platform.OS === 'android' ? statusBarStyle : undefined,
+                  }}>
+                  {/* `/` é a URL inicial: renderiza antes de qualquer guard, por isso fica FORA dos
+                      `Stack.Protected` e decide o destino por conta própria. */}
+                  <Stack.Screen name="index" options={{ headerShown: false }} />
 
                 {/* Porta de mão única nos dois sentidos: sem sessão só existe o login; com sessão
                   o login deixa de existir, então `back` nunca reentra nele. */}
@@ -151,7 +157,8 @@ export default function RootLayout() {
                   <Stack.Screen name="catalog" options={{ title: 'Catálogo' }} />
                 </Stack.Protected>
               </Stack>
-            )}
+            </>
+          )}
           </ToastProvider>
           </ConcealProvider>
         </KeyboardProvider>
