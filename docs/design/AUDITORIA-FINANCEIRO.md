@@ -89,7 +89,7 @@ de import) com teto de 5.000 linhas que **lança exceção** em vez de mostrar d
 |---|---|---|
 | **1** | O passado do cartão: fatura atual em destaque, `‹ ›` entre faturas, quitar sem mexer no caixa, apagar plano inteiro, `3/8` com link | **implementada e validada**; `0046` aplicada em staging |
 | **2** | Extrato de verdade: filtro por conta/cartão, status e origem; paginação no lugar do `limit(200)`; busca que abre o lançamento certo | **implementada e validada** (iOS + Android, claro e escuro) |
-| 3 | Visões que existem no banco: `monthly_cashflow` na home; patrimônio com os 5 componentes; janelas ajustáveis | pendente |
+| **3** | Visões que existem no banco: `monthly_cashflow` na home; patrimônio com os 5 componentes; janelas ajustáveis | **implementada e validada** (iOS + Android, claro e escuro); `0047` e `0048` em staging |
 | 4 | Período livre: seletor com salto de ano; relatórios além de 3 anos; passado na projeção e nas parceladas | pendente |
 
 Cada fase é uma rodada: implementa → personas → valida.
@@ -343,3 +343,96 @@ de desenvolvimento nem carrega o bundle.)
   regra da lista global, onde transferência não é entrada nem saída. No extrato do Nubank as duas
   saídas de R$ 900,00 aparecem sem o "−", com total do dia R$ 0,00. Direção relativa à conta é
   assunto de Fase 3/4, não do achado 1.
+
+---
+
+## Fase 3 — o que mudou, e as decisões que não são óbvias
+
+A fase existia para gastar dado que o banco já guardava e nenhuma tela lia. Ligar esse dado
+revelou que ele estava **errado** em dois lugares — os dois invisíveis enquanto ninguém desenhava
+o resultado. Foi o achado mais caro da rodada, e é o argumento contra deixar RPC pronta sem
+consumidor: função sem tela não é função pronta, é função não testada.
+
+### `monthly_cashflow` estava com escopo e janela errados (`0048`)
+
+Três defeitos numa função de 2005 linhas de idade que a auditoria já tinha marcado como "zero
+consumidores":
+
+1. **Não havia limite SUPERIOR** — só `occurred_at >= início`. Toda parcela FUTURA entrava:
+   `monthly_cashflow(6)` devolvia **14 meses**, até 2027, porque compra em 8x cria uma linha por
+   mês à frente. É literalmente o mesmo defeito que a Fase 1 corrigiu em `invoices.tsx`
+   ("últimas 12 faturas" desenhando 2027). Parcelamento sempre povoa o futuro, e **todo gráfico
+   de passado precisa dizer isso na query** — não no rótulo.
+2. **O escopo era `user_id`, não `workspace_id`.** `user_id` é o AUTOR do lançamento; desde a
+   `0010` o dado pertence ao workspace. Num workspace compartilhado esta função mostraria só o
+   que VOCÊ lançou enquanto `transactions_summary`, na MESMA tela, soma o workspace inteiro —
+   dois números do mesmo mês que não batem.
+3. **`months_back` sem trava**, diferente de todas as outras janelas do schema (1..60).
+
+### `net_worth_series` ignorava workspace e escondia 3 das 5 métricas (`0047`)
+
+`distinct on (mês)` escolhia UMA linha por mês entre TODOS os workspaces do usuário. Quem
+participa de dois via a curva de um deles enquanto o número de hoje — que sai de `net_worth()`,
+que SOMA — trazia os dois. Agora é a última foto de cada `(workspace, mês)` e `sum()` por mês, a
+mesma conta do herói.
+
+Junto, as 3 colunas que a tabela guardava desde a `0026` e a função não devolvia
+(`cash_cents`, `investments_cents`, `other_assets_cents`). `create or replace` **não muda coluna
+de retorno** ("cannot change return type"), então foi drop + create, com as colunas antigas no
+mesmo nome e na mesma posição — bundle velho em campo ignora as novas.
+
+### O corte do futuro é feito DUAS vezes, de propósito
+
+A `0048` fecha a janela no banco, mas o **Postgres roda em UTC**: às 22h de Brasília o
+`current_date` do servidor já virou o dia seguinte, e no fim do mês isso deixa passar um balde do
+mês QUE VEM — com barra e tudo, num gráfico cujo título é sobre o passado. Foi visto acontecendo
+no simulador às 22:30 de 31/08. A segunda trava é no cliente, com `localISODate()`, exatamente a
+defesa que `invoices.tsx` já usava. **A convenção `current_date` é do schema inteiro** (projeção,
+patrimônio, alertas): trocar isso é decisão de outra rodada, não conserto de um bloco.
+
+### A composição do patrimônio mostra as quatro parcelas, inclusive as zeradas
+
+Caixa + investimentos + outros bens − passivos. Linha com R$ 0,00 **fica**: é ela que diz "você
+não cadastrou investimento nenhum", e esconder uma parcela faria a soma não fechar aos olhos de
+quem confere. Validado no simulador: `10.405 + 0 + 0 − 13.400 = −2.995`, o valor do herói.
+
+### As barras são uma cor com duas intensidades, não duas cores
+
+`entrou`/`saiu` é comparação, não estado a resolver. Gastar `success`/`danger` ali queimaria a
+última alavanca de cor que um app monocromático tem, para decorar. O par é `tint` cheio contra
+`tint` a 35% — a mesma solução do gráfico de faturas — mais **legenda em palavra**, que é o que
+funciona sem enxergar cor.
+
+**Barra de valor ZERO desenha nada.** O piso de `Space.xs` (herdado do gráfico de faturas) vale só
+para valor que existe: com o piso aplicado ao zero, todo mês sem receita ganhava um tracinho, e um
+tracinho lê como "entrou um pouquinho". Mesmo princípio do "previsto R$ 0,00" que o painel não
+escreve.
+
+### Um rótulo de mês, não quatro
+
+`mesLabel` (Patrimônio) e `mesCurto` (Parceladas) eram a mesma função copiada, e a tendência ia
+criar a terceira cópia. Viraram `monthShort`, ao lado de `monthLabel`/`monthTitle` — um mês, três
+comprimentos. O primeiro desenho da tendência usava `monthLabel` e o eixo saiu com
+"agosto de 2026" quebrando **uma letra por linha**.
+
+### Validação (31/08/2026)
+
+iPhone 16 e emulador `s26`, claro e escuro, contra o staging com `0047` e `0048` aplicadas.
+
+**Passou:** composição somando o herói exatamente; tendência com 5 meses reais (abr–ago), rótulos
+curtos, mês sem receita sem barra preta, legenda legível; alternância 6/12 meses refazendo a
+query; ícones em variante Material no Android (nenhum `circle` genérico); dark mode nos dois.
+
+**Não observável no staging:** o seletor de janela do Patrimônio (6/12/24). Ele mora DENTRO do
+cartão da curva, que só existe com 2+ fotos, e o staging tem uma só. A fiação é idêntica à da
+tendência da home, que foi exercitada.
+
+**Escritas mas ainda não desenhadas:** as 3 colunas novas de `net_worth_series`. A `0047` as expõe
+porque a assinatura já estava aberta — abrir de novo custaria outro drop. Componente ao longo do
+tempo é assunto de outra fase.
+
+### Nota de deploy
+
+**Produção está atrás:** as migrations `0038`..`0048` só foram aplicadas no staging. O
+`supabase link` do repo aponta para PRODUÇÃO, então `db push --linked` empurraria dez migrations
+de uma vez lá. As desta fase foram aplicadas com `db push --db-url` contra o staging, de propósito.
