@@ -146,6 +146,32 @@ export default function TransactionsScreen() {
   // Busca-enquanto-digita sem uma requisição por tecla — agora ela vai ao banco.
   const term = useDebounced(search.trim(), 250);
 
+  /**
+   * Deep link para uma tela JÁ montada.
+   *
+   * Os filtros nascem de `useState(params.x)`, que só lê o valor na primeira renderização —
+   * então `appproops:///finance/transactions?accountId=…` caía na instância aberta e o filtro
+   * era ignorado em silêncio (visto no teste da Fase 2). `router.push` de dentro do app monta
+   * tela nova e nunca passou por aqui; quem chega assim é notificação e link externo.
+   *
+   * Ajuste DURANTE a renderização, não em `useEffect`: é o padrão do próprio React para "estado
+   * que precisa mudar quando a prop muda", e `setState` dentro de efeito é erro de lint aqui
+   * (dispara renderização em cascata). Só aplica o que VEIO no link — parâmetro ausente não
+   * desfaz escolha que o usuário fez na tela. `recurringId` fica de fora: é lido direto de
+   * `params`, sem estado.
+   */
+  const link = `${params.month ?? ''}|${params.kind ?? ''}|${params.category ?? ''}|${params.accountId ?? ''}`;
+  const [linkAplicado, setLinkAplicado] = useState(link);
+  if (link !== linkAplicado) {
+    setLinkAplicado(link);
+    if (params.month) setMonth(params.month);
+    if (params.kind === 'expense' || params.kind === 'income' || params.kind === 'transfer') {
+      setKind(params.kind);
+    }
+    if (params.category) setCategory(params.category);
+    if (params.accountId) setAccountId(params.accountId);
+  }
+
   const range = useMemo(() => monthBounds(month), [month]);
   const list = useTransactions({
     month,
