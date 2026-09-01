@@ -87,7 +87,7 @@ const COMPONENTES: {
   {
     key: 'cash_cents',
     title: 'Dinheiro em conta',
-    subtitle: 'contas e lançamentos sem conta — cartão fica de fora',
+    subtitle: 'sem contar o cartão',
     icon: 'wallet.bifold',
   },
   {
@@ -105,7 +105,7 @@ const COMPONENTES: {
   {
     key: 'liabilities_cents',
     title: 'Passivos',
-    subtitle: 'fatura em aberto, dívidas e o que você deve',
+    subtitle: 'fatura aberta e dívidas',
     icon: 'creditcard',
     passivo: true,
   },
