@@ -334,7 +334,11 @@ export default function NetWorthScreen() {
       {/* A conta por trás do número: os quatro somam (passivo entra negativo) o valor do herói.
           Linha com R$ 0,00 FICA — é ela que diz "você não cadastrou investimento nenhum", e
           esconder uma parcela faria a soma não fechar aos olhos de quem confere. */}
-      {hoje && !vazioAbsoluto ? (
+      {/* `patrimonio.isError` também some com o bloco: `data` do TanStack SOBREVIVE ao erro de
+          refetch, então offline a faixa "Não deu para calcular seu patrimônio" ficava em cima de
+          quatro linhas exibindo o patrimônio com toda a confiança. A seção que falhou já diz que
+          falhou — quem depende da MESMA query não repete o aviso nem finge que tem número. */}
+      {hoje && !vazioAbsoluto && !patrimonio.isError ? (
         <Section title="O que forma esse número">
           {COMPONENTES.map((c) => {
             const bruto = Number(hoje[c.key] ?? 0);

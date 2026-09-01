@@ -423,9 +423,20 @@ iPhone 16 e emulador `s26`, claro e escuro, contra o staging com `0047` e `0048`
 curtos, mês sem receita sem barra preta, legenda legível; alternância 6/12 meses refazendo a
 query; ícones em variante Material no Android (nenhum `circle` genérico); dark mode nos dois.
 
+**Offline (persona da Bia) — e um defeito encontrado por ele.** Com o app carregado e a rede
+derrubada depois, a composição continuava exibindo os quatro valores com toda a confiança
+LOGO ABAIXO da faixa "Não deu para calcular seu patrimônio". Causa: o `data` do TanStack
+**sobrevive ao erro de refetch**, e o bloco só checava `hoje`, não `patrimonio.isError`. A tela se
+contradizia em dois blocos que leem a MESMA query. Corrigido — a seção que falhou já diz que
+falhou, e quem depende dela some em vez de fingir que tem número. Religando a rede, "Tentar de
+novo" traz herói e composição juntos. (A tendência da home já estava certa: ela testa `isError`
+antes de desenhar.) Detalhe do teste: derrubar a rede ANTES de abrir o app não serve — cai o
+Metro, e o Fast Refresh de uma correção também não chega ao device offline.
+
 **Não observável no staging:** o seletor de janela do Patrimônio (6/12/24). Ele mora DENTRO do
-cartão da curva, que só existe com 2+ fotos, e o staging tem uma só. A fiação é idêntica à da
-tendência da home, que foi exercitada.
+cartão da curva, que só existe com 2+ fotos, e o staging tem uma só. A `queryKey` do
+`useNetWorthSeries` inclui `monthsBack` (conferido no código), que é o que faz a troca refazer a
+query — a mesma fiação exercitada na tendência da home.
 
 **Escritas mas ainda não desenhadas:** as 3 colunas novas de `net_worth_series`. A `0047` as expõe
 porque a assinatura já estava aberta — abrir de novo custaria outro drop. Componente ao longo do
