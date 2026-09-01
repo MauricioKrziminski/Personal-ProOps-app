@@ -170,3 +170,36 @@ procurava dentro da lista do mês corrente. É a prova do reparo em `useTransact
 Com faturas de valor igual, as barras do gráfico ficam todas cheias e viram um
 bloco preto sólido — o `Sparkline` tem `MIN_SPAN_RATIO` para isso, o gráfico de
 barras não. Pré-existente; cabe na Fase 4 (polimento e gráficos).
+
+### Segunda rodada de validação — toques reais (31/08/2026)
+
+Feita com `idb` (toque em coordenadas de dispositivo), no iPhone 16 contra staging.
+
+**Apagar a compra inteira** — plano descartável criado em staging, toque longo abriu
+o menu com a ação, a confirmação nomeou o estrago ("Some as 6 parcelas … R$ 600,00
+no total — de todos os meses. Isso não volta."), **Cancelar não apagou nada**, e
+confirmar apagou o plano e as 6 parcelas por cascade. Verificado no banco.
+
+**Marcar como paga (sem mexer no saldo)** — menu do header abriu com as duas ações;
+a confirmação explicou o efeito; o resultado no banco foi `status=paid`,
+`settled_manually=true`, `payment_transaction_id=null`, e a dívida saiu do saldo do
+cartão (−1.340.000 → −1.250.000). A tela virou "Paga em 31/08/2026" e o botão
+"Paguei" sumiu. **Revertido depois** — quitar a fatura do usuário é decisão dele.
+
+**VoiceOver (parcial)** — as setas do pager anunciam o destino: "Fatura anterior,
+Junho de 2026" / "Próxima fatura, Agosto de 2026".
+
+### Achado de acessibilidade a investigar
+
+O botão `…` do header **não aparece na árvore de acessibilidade** lida pelo `idb`,
+embora o botão "voltar" apareça em outras telas — tive que tocar por coordenada.
+Pode ser limitação do `idb` com a barra de navegação nativa, ou o leitor de tela
+também não alcançar, e aí "Marcar como paga" seria inacessível por VoiceOver.
+**Não determinado.** Vale um teste com o VoiceOver de verdade antes da Fase 2.
+
+### Bloqueado por login: Android
+
+O app sobe no emulador (`s26`, Android 16) com o bundle atual e renderiza o login,
+mas entrar exige o OTP no WhatsApp do dono da conta. **Android segue não testado** —
+e é o gap mais relevante que resta, porque `HeaderMenu` e `ItemLink` têm caminhos
+de código diferentes lá (context menu do iOS vs. sheet do Android).
