@@ -991,6 +991,39 @@ export function useNetWorth() {
 }
 
 /** Série histórica — vem dos snapshots diários, começa quando o app começou. */
+/**
+ * Saldo em caixa nos últimos N dias — o PASSADO da projeção.
+ *
+ * Sai das fotos diárias de `net_worth_snapshots`, cujo `cash_cents` é o mesmo
+ * `private.cash_total` em que a projeção se ancora (`finance.md`: fonte única) — por isso as
+ * duas pontas se encontram no valor de hoje em vez de dar um degrau.
+ *
+ * A soma por dia é obrigatória: quem participa de dois workspaces tem duas fotos por data, e
+ * pegar "a linha do dia" traria só uma delas. É exatamente o defeito que a `0047` corrigiu na
+ * série do patrimônio — não vale reintroduzi-lo aqui, no cliente.
+ */
+export function useCashHistory(days: number) {
+  return useQuery({
+    queryKey: ['cash-history', String(days)],
+    queryFn: async (): Promise<{ day: string; cents: number }[]> => {
+      const desde = new Date(Date.now() - days * 86_400_000).toISOString().slice(0, 10);
+      const { data, error } = await supabase
+        .from('net_worth_snapshots')
+        .select('as_of, cash_cents')
+        .gte('as_of', desde)
+        .order('as_of');
+      if (error) throw error;
+      const porDia = new Map<string, number>();
+      for (const row of data ?? []) {
+        porDia.set(row.as_of, (porDia.get(row.as_of) ?? 0) + Number(row.cash_cents));
+      }
+      return Array.from(porDia, ([day, cents]) => ({ day, cents })).sort((a, b) =>
+        a.day < b.day ? -1 : 1
+      );
+    },
+  });
+}
+
 export function useNetWorthSeries(monthsBack = 12) {
   return useQuery({
     queryKey: ['net-worth-series', String(monthsBack)],

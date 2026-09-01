@@ -13,6 +13,16 @@ interface SparklineProps {
   height?: number;
   /** Desenha a linha do zero — essencial quando a projeção fica negativa. */
   showZero?: boolean;
+  /**
+   * Quantos valores do INÍCIO da série já aconteceram.
+   *
+   * O trecho passado sai mais fraco e o futuro fica cheio — uma cor, duas intensidades, a mesma
+   * convenção das barras. Sem essa separação a projeção e o histórico virariam a mesma linha, e
+   * o gráfico passaria a afirmar sobre o futuro com a confiança de um extrato.
+   *
+   * `0` (padrão) desenha exatamente o que desenhava antes.
+   */
+  pastCount?: number;
 }
 
 /** Metade do traço + folga, para a linha não ser cortada no topo e no fundo do canvas. */
@@ -36,11 +46,26 @@ const MIN_SPAN_RATIO = 0.05;
  * A cor segue o sinal do último ponto: verde acima de zero, `danger` abaixo. É a leitura que a
  * pessoa faz em meio segundo — "vou ficar no vermelho?".
  */
-export function Sparkline({ values, width, height = 56, showZero = false }: SparklineProps) {
+export function Sparkline({
+  values,
+  width,
+  height = 56,
+  showZero = false,
+  pastCount = 0,
+}: SparklineProps) {
   const theme = useTheme();
 
-  const { line, area, zeroY, zeroVisible, negative, flat } = useMemo(() => {
-    const empty = { line: null, area: null, zeroY: 0, zeroVisible: false, negative: false, flat: true };
+  const { line, past, splitX, area, zeroY, zeroVisible, negative, flat } = useMemo(() => {
+    const empty = {
+      line: null,
+      past: null,
+      splitX: null as number | null,
+      area: null,
+      zeroY: 0,
+      zeroVisible: false,
+      negative: false,
+      flat: true,
+    };
     if (values.length < 2 || width <= 0) return empty;
 
     const dataMin = Math.min(...values);
@@ -55,10 +80,26 @@ export function Sparkline({ values, width, height = 56, showZero = false }: Spar
     const y = (v: number) => PAD + ((hi - v) / (hi - lo)) * plot;
     const step = width / (values.length - 1);
 
+    // Índice do "hoje": último ponto do passado e PRIMEIRO do futuro ao mesmo tempo. Os dois
+    // traços compartilham esse ponto, senão a emenda ficaria com um buraco de um passo.
+    const corte = Math.min(Math.max(pastCount, 0), values.length);
+    const temPassado = corte >= 2 && corte < values.length;
+    const inicioFuturo = temPassado ? corte - 1 : 0;
+
     // `Skia.Path.Make()` + `moveTo/lineTo` está depreciado no Skia 2.6 e some numa versão futura.
+    // O traço cheio começa no HOJE: desenhar a série inteira e repintar o passado por cima só
+    // deixaria o passado mais escuro, nunca mais fraco.
     const stroke = Skia.PathBuilder.Make();
-    stroke.moveTo(0, y(values[0]));
-    for (let i = 1; i < values.length; i++) stroke.lineTo(i * step, y(values[i]));
+    stroke.moveTo(inicioFuturo * step, y(values[inicioFuturo]));
+    for (let i = inicioFuturo + 1; i < values.length; i++) stroke.lineTo(i * step, y(values[i]));
+
+    let passado = null;
+    if (temPassado) {
+      const p = Skia.PathBuilder.Make();
+      p.moveTo(0, y(values[0]));
+      for (let i = 1; i < corte; i++) p.lineTo(i * step, y(values[i]));
+      passado = p.detach();
+    }
 
     // Área preenchida: é ela que dá corpo ao gráfico. Uma linha de 2px sozinha, na largura de um
     // card, lê como régua.
@@ -74,12 +115,14 @@ export function Sparkline({ values, width, height = 56, showZero = false }: Spar
       // diz a verdade: "não mudou".
       flat: dataMax === dataMin,
       line: stroke.detach(),
+      past: passado,
+      splitX: temPassado ? (corte - 1) * step : null,
       area: fill.detach(),
       zeroY: y(0),
       zeroVisible: lo <= 0 && hi >= 0,
       negative: values[values.length - 1] < 0,
     };
-  }, [values, width, height]);
+  }, [values, width, height, pastCount]);
 
   if (!line) return <View style={{ width, height }} />;
 
@@ -105,6 +148,27 @@ export function Sparkline({ values, width, height = 56, showZero = false }: Spar
         strokeCap="round"
         strokeJoin="round"
       />
+      {/* Histórico: mesma cor, mais fraco. O futuro é o que a tela afirma; o passado é contexto. */}
+      {past ? (
+        <Path
+          path={past}
+          color={color}
+          style="stroke"
+          strokeWidth={2}
+          strokeCap="round"
+          strokeJoin="round"
+          opacity={0.35}
+        />
+      ) : null}
+      {splitX !== null ? (
+        <Line
+          p1={vec(splitX, 0)}
+          p2={vec(splitX, height)}
+          color={theme.separator}
+          strokeWidth={1}
+          style="stroke"
+        />
+      ) : null}
     </Canvas>
   );
 }

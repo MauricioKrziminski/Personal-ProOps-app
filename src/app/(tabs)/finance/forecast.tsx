@@ -30,6 +30,7 @@ import {
   useAccounts,
   useAffordability,
   useCashFlowForecast,
+  useCashHistory,
   useMarkPaid,
   useUpcomingBills,
 } from '@/hooks/use-finance';
@@ -95,9 +96,20 @@ export default function ForecastScreen() {
   const markPaid = useMarkPaid();
 
   const serie = forecast.data ?? [];
-  const valores = serie.map((d) => Number(d.balance_cents));
-  const hoje = valores[0] ?? 0;
-  const fim = valores[valores.length - 1] ?? 0;
+  const projetados = serie.map((d) => Number(d.balance_cents));
+  const hoje = projetados[0] ?? 0;
+  const fim = projetados[projetados.length - 1] ?? 0;
+
+  // O passado entra ANTES do dia 0 e no mesmo eixo. A foto de HOJE é descartada: ela foi tirada
+  // pelo cron de madrugada e o dia 0 da projeção já é o valor de agora — manter as duas criaria
+  // um degrau na emenda entre histórico e projeção.
+  const historico = useCashHistory(dias);
+  // Sem `useMemo`: são duas listas de no máximo ~180 números, e memoizar em cima de
+  // `projetados` (que nasce novo a cada render) faz o React Compiler desistir da tela inteira.
+  const passado = (historico.data ?? [])
+    .filter((p) => p.day < localISODate())
+    .map((p) => p.cents);
+  const valores = [...passado, ...projetados];
   const primeiroNegativo = serie.find((d) => Number(d.balance_cents) < 0);
   const contas = bills.data ?? [];
   const atrasadas = contas.filter((b) => b.overdue);
@@ -265,7 +277,13 @@ export default function ForecastScreen() {
             <View
               accessible
               accessibilityLabel={`Saldo hoje ${formatBRL(hoje)}, no fim do período ${formatBRL(fim)}${primeiroNegativo ? `, negativo a partir de ${isoToBR(primeiroNegativo.day)}` : ''}`}>
-              <Sparkline values={valores} width={width - Space.lg * 4} height={96} showZero />
+              <Sparkline
+                values={valores}
+                width={width - Space.lg * 4}
+                height={96}
+                showZero
+                pastCount={passado.length + 1}
+              />
             </View>
 
             <View style={styles.heroSplit}>
