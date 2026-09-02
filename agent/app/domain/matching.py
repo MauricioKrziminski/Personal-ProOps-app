@@ -46,14 +46,42 @@ def normalize(texto: str | None) -> str:
     return _NAO_ALFANUM.sub(" ", sem_acento.lower()).strip()
 
 
+def infer_account_type(texto: str | None) -> str | None:
+    """Infere o subtipo de conta (credit_card vs checking) a partir de modificadores na frase."""
+    if not texto:
+        return None
+    norm = normalize(texto)
+    termos_cartao = [
+        "cartao", "cartoes", "credito", "fatura", "limite", "parcela",
+        "parcelas", "parcelado", "parcelamento", "vencimento", "fechamento",
+    ]
+    termos_conta = [
+        "conta", "corrente", "debito", "saldo", "extrato", "pix",
+        "transferencia", "ted", "doc", "salario", "receita", "rendimento",
+    ]
+
+    tem_cartao = any(re.search(rf"\b{t}\b", norm) for t in termos_cartao)
+    tem_conta = any(re.search(rf"\b{t}\b", norm) for t in termos_conta)
+
+    if tem_cartao and not tem_conta:
+        return "credit_card"
+    if tem_conta and not tem_cartao:
+        return "checking"
+    return None
+
+
 def match_accounts(
     termo: str | None,
     linhas: list[dict],
     *,
     key: str = "name",
     semelhanca: bool = True,
+    account_type: str | None = None,
 ) -> list[dict]:
     """As contas que casam com o termo, em ordem de confiança. `[]` se nenhuma.
+
+    Se `account_type` for especificado ('credit_card' ou 'checking'), prioriza
+    as contas do subtipo correspondente.
 
     Três camadas, e a primeira que produzir resultado ganha — não se misturam:
     um acerto exato não pode ficar atrás de três parciais.
@@ -67,6 +95,20 @@ def match_accounts(
     (`resolve_account`) poder tratá-la separado: acertar um typo é ótimo quando
     há como perguntar, e é um jeito novo de escolher a conta errada quando não há.
     """
+    if account_type:
+        if account_type == "credit_card":
+            filtradas = [l for l in linhas if l.get("type") == "credit_card"]
+        else:
+            filtradas = [
+                l for l in linhas
+                if l.get("type") in ("checking", "checking_account", "savings", "cash", "other")
+            ]
+        if filtradas:
+            achados_tipo = match_accounts(
+                termo, filtradas, key=key, semelhanca=semelhanca, account_type=None
+            )
+            if achados_tipo:
+                return achados_tipo
     alvo = normalize(termo)
     if not alvo or not linhas:
         return []

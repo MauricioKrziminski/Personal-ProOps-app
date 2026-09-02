@@ -565,7 +565,7 @@ async def accounts(workspace_id, *, only_cards: bool = False) -> list[dict[str, 
     # como injeção entra, mesmo quando hoje a variável é um bool nosso
     return await fetch(
         """
-        select id, name, type from public.accounts
+        select id, name, type, closing_day, due_day, credit_limit_cents from public.accounts
         where workspace_id = %s and archived = false
           and (%s = false or type = 'credit_card')
         order by name

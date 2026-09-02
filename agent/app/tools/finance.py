@@ -33,43 +33,31 @@ REFERENCE_WINDOW = 40
 
 
 async def resolve_account(
-    workspace_id: UUID, name: str | None, *, only_cards: bool = False
+    workspace_id: UUID,
+    name: str | None,
+    *,
+    only_cards: bool = False,
+    account_type: str | None = None,
 ) -> UUID | None:
-    """Conta citada por nome. Sem match -> None.
+    """Acha a conta ou cartão pelo nome livre vindo da IA.
 
     De propósito: o lançamento NUNCA falha por conta desconhecida. Perder o
     registro do gasto é pior do que registrá-lo sem conta.
-
-    Era `ilike '%nome%' limit 1` **sem `order by`** — ou seja, com duas contas
-    parecidas quem escolhia era a ordem que o Postgres devolvesse, e "itau"
-    nunca achava "Itaú". Agora o casamento é normalizado e o desempate é
-    ranqueado, então o mesmo nome sempre resolve para a mesma conta.
-
-    ⚠️ **O tier de semelhança só vale quando é único aqui.** Este caminho resolve
-    em SILÊNCIO, inclusive para `pay_invoice` e transferência; escolher a conta
-    pagadora por parecença, sozinho, seria um modo de falha que o `ilike` antigo
-    não tinha. Quem tem como perguntar (o rascunho) usa a lista inteira.
-
-    `only_cards` existe porque nome de banco vira nome dos DOIS: quem tem a conta
-    corrente "Itaú" e cria o cartão "Itaú" pelo WhatsApp passa a ter duas linhas
-    que normalizam igual. Sem o filtro, o parcelamento podia cair na conta
-    corrente — e aí `set_invoice` grava `invoice_id := null` em silêncio, que é
-    exatamente o estado que "cartão obrigatório em parcelado" existe para
-    impedir. Quem PRECISA de cartão pede cartão.
     """
     if not name:
         return None
-    # ponytail: busca as contas do workspace por chamada (dezenas de linhas, não
-    # milhares). Cache por turno se aparecer no perfil.
     linhas = await db.accounts(workspace_id, only_cards=only_cards)
+    tipo = "credit_card" if only_cards else account_type
 
-    certos = matching.match_accounts(name, linhas, semelhanca=False)
+    certos = matching.match_accounts(
+        name, linhas, semelhanca=False, account_type=tipo
+    )
     if certos:
         return certos[0]["id"]
 
-    # Só typo sobrou. Um é conserto; dois é chute — e sem ninguém para perguntar,
-    # chutar a conta é pior que lançar sem conta (que é um estado previsto).
-    por_semelhanca = matching.match_accounts(name, linhas)
+    por_semelhanca = matching.match_accounts(
+        name, linhas, account_type=tipo
+    )
     return por_semelhanca[0]["id"] if len(por_semelhanca) == 1 else None
 
 

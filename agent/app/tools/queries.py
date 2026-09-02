@@ -41,17 +41,34 @@ async def query_transactions(ctx: ExecContext, action: FinanceQuery) -> ToolResu
     account_type = None
     achados = []
 
+    inferred_type = matching.infer_account_type(f"{ctx.texto} {action.account or ''}")
+
     if action.account:
         linhas = await db.accounts(ctx.workspace_id)
-        achados = matching.match_accounts(action.account, linhas)
+        achados = matching.match_accounts(
+            action.account, linhas, account_type=inferred_type
+        )
         if achados:
             acc = achados[0]
             account_id = acc["id"]
             account_name = acc["name"]
             account_type = acc.get("type")
 
+    texto_norm = matching.normalize(ctx.texto)
+    termos_todos = [
+        "todos", "todas", "tudo", "historico", "completo",
+        "tudo que tem", "desde o inicio",
+    ]
+    is_all_history = any(t in texto_norm for t in termos_todos)
+    is_today_explicit = any(
+        t in texto_norm for t in ["hoje", "de hoje", "agora", "neste dia", "nesse dia"]
+    )
+
     # Janela temporal inteligente
-    if action.query_from and action.query_to:
+    if is_all_history:
+        de = add_months(hoje, -12)
+        ate = hoje
+    elif action.query_from and action.query_to:
         de = action.query_from
         ate = action.query_to
     elif action.query_from:
@@ -59,7 +76,10 @@ async def query_transactions(ctx: ExecContext, action: FinanceQuery) -> ToolResu
         ate = hoje
     elif action.query_to:
         ate = action.query_to
-        de = f"{ate[:7]}-01"
+        de = add_months(ate, -1)
+    elif is_today_explicit:
+        de = hoje
+        ate = hoje
     else:
         # Sem datas explícitas
         if account_type == "credit_card" and achados and achados[0].get("closing_day"):
@@ -74,8 +94,8 @@ async def query_transactions(ctx: ExecContext, action: FinanceQuery) -> ToolResu
             de = f"{add_months(hoje, -1)[:7]}-25"
             ate = hoje
         else:
-            # Geral / Conta corrente: mês atual
-            de = f"{hoje[:7]}-01"
+            # Geral / Conta corrente: últimos 30 dias por padrão
+            de = add_months(hoje, -1)
             ate = hoje
 
     # Busca registros puros no banco
