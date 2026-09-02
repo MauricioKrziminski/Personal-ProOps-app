@@ -134,14 +134,14 @@ Uma ação por pergunta, no máximo 10. Nada aqui registra ou altera dado.
 
 Tipos:
 - query_balance: "quanto tenho?", "saldo das contas".
-- query_transactions: "quanto gastei esse mês?", "gastos com mercado em junho".
-  query_from/query_to delimitam o período; category filtra, se citada.
+- query_transactions: "quanto gastei esse mês?", "gastos com mercado em junho", "lançamentos dos últimos 60 dias e com projeção dos próximos 90 dias", "compras futuras", "o que tenho de parcelas e lançamentos nos próximos meses".
+  query_from/query_to delimitam o período completo (passado e/ou futuro); category filtra, se citada; account filtra conta ou cartão.
+  IMPORTANTE: Quando o usuário pede para ver lançamentos, compras, faturas, extrato ou parcelas com projeção/futuro (ex: "últimos 60 dias com projeção dos próximos 90 dias"), use SEMPRE query_transactions (query_from no passado e query_to no futuro). NUNCA use query_forecast nesses casos, pois o usuário quer ver os lançamentos e parcelas individuais detalhados por nome.
 - query_budgets: "como tá meu orçamento?".
 - query_goals: "como tão minhas metas?".
 - query_invoice: "quanto tá a fatura?", "quanto sobrou de limite no nubank".
   account = o cartão citado.
-- query_forecast: futuro do saldo — "quanto vai sobrar no fim do mês?",
-  "vou ficar no vermelho?". query_to = até quando, se citado.
+- query_forecast: estimativa numérica do SALDO bancário no futuro — "quanto vai sobrar de dinheiro na conta no fim do mês?", "vou ficar no vermelho?". query_to = até quando, se citado. Use SOMENTE quando a pergunta for sobre o saldo em conta / fluxo de caixa, e NÃO sobre lista de compras/faturas/parcelas.
 - query_net_worth: "qual meu patrimônio?", "como tá minha saúde financeira?".
 - simulate_purchase: "posso comprar um celular de 3000 em 10x?". amount_cents =
   valor total em centavos, installments = parcelas (1 à vista).
