@@ -42,6 +42,10 @@ Devolva TODOS os domínios presentes na mensagem, na ordem em que aparecem:
   perguntas sobre o que foi anotado.
 - "geral": saudação, agradecimento, dúvida sobre o próprio app, ou nada dos dois.
 
+Contexto e Mensagens Curtas / Deíticas:
+Sempre que o usuário enviar mensagens curtas, deíticas ou de continuação (ex: "me mostre todos", "mostra todas", "apague", "sim", "mude aquilo", "ver mais", "qual o total?"), analise o histórico recente de mensagens para entender a que entidade, conta ou domínio ele está se referindo.
+Se a conversa anterior tratava de consulta de transações/fatura e o usuário mandou "me mostre todos", classifique como "financas_consulta".
+
 Uma mensagem pode ter VÁRIOS domínios: "gastei 45 no mercado e me lembra do
 aluguel" é ["financas", "notas"]; "paguei 45 no mercado, quanto sobrou?" é
 ["financas", "financas_consulta"]. Não escolha só um nesses casos.
@@ -99,6 +103,9 @@ Tipos:
 - update_asset_value: valor novo de um bem/investimento. target_ref = nome.
 - unknown: não é registro nem correção financeira.
 
+Contexto e Referências Deíticas:
+Se o usuário mandar referências relativas como "apaga essa última", "muda para 50", "troca a data para ontem", analise as mensagens anteriores no histórico para identificar a ação ou transação correspondente.
+
 Regras:
 - Dinheiro SEMPRE em centavos inteiros: "45 reais" -> 4500, "1.234,56" -> 123456.
 - Datas em YYYY-MM-DD. Resolva "ontem"/"hoje" pela data atual do usuário
@@ -140,6 +147,12 @@ Tipos:
   valor total em centavos, installments = parcelas (1 à vista).
 - unknown: não é pergunta sobre dinheiro.
 
+Contexto e Continuação de Consultas:
+Se o usuário enviar uma mensagem de continuação, refinamento ou expansão (ex: "me mostre todos", "mostra todas", "ver mais", "filtrar por mês", "e no outro cartão?"):
+- Analise o histórico recente de mensagens.
+- Herde a conta ('account'), categoria ('category') ou período ('query_from'/'query_to') da consulta anterior.
+- Se o usuário pedir "me mostre todos" após ver uma lista com compras ocultas, gere query_transactions com a conta citada anteriormente.
+
 Regras:
 - Datas em YYYY-MM-DD, resolvidas pela data atual do usuário informada na
   mensagem. "esse mês" -> do dia 1 até hoje. "semana passada" -> os 7 dias.
@@ -178,14 +191,33 @@ Regras:
 """.strip()
 
 
-def user_turn(texto: str, agora_local: str, timezone: str, tem_anexo: bool = False) -> str:
+def user_turn(
+    texto: str,
+    agora_local: str,
+    timezone: str,
+    tem_anexo: bool = False,
+    history: list[dict] | None = None,
+) -> str:
     """Monta o turno do usuário: contexto confiável FORA do envelope, texto DENTRO."""
     from app.security import wrap_untrusted
 
     partes = [
         f"Data e hora atual do usuário: {agora_local} (fuso {timezone}).",
-        wrap_untrusted("user_input", texto),
     ]
+    if history:
+        historico_linhas = []
+        for msg in history[-6:]:
+            papel = "Usuário" if msg.get("role") == "user" else "Assistente"
+            conteudo = (msg.get("content") or "").strip()
+            if conteudo:
+                historico_linhas.append(f"{papel}: {conteudo}")
+        if historico_linhas:
+            partes.append(
+                "Histórico recente de mensagens anteriores da conversa:\n"
+                + "\n".join(historico_linhas)
+            )
+
+    partes.append(wrap_untrusted("user_input", texto))
     if tem_anexo:
         partes.append(
             "O usuário anexou um documento junto desta mensagem. "

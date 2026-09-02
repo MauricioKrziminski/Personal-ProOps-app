@@ -229,7 +229,7 @@ async def query_transactions(ctx: ExecContext, action: FinanceQuery) -> ToolResu
             "text": f"{msg}\n\nResponda 'ver mais', 'ver parcelas' ou escolha uma opção.",
         }
 
-    return ToolResult(msg, read_only=True, interactive_spec=spec)
+    return ToolResult(msg, read_only=True, interactive_spec=spec, data=data)
 
 
 async def query_budgets(ctx: ExecContext, action: FinanceQuery) -> ToolResult:

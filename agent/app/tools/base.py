@@ -45,6 +45,8 @@ class ToolResult:
     read_only: bool = False
     # Especificação interativa para WhatsApp (botões/listas de paginação/filtros)
     interactive_spec: dict | None = None
+    # Dados brutos estruturados (para cache de estado de consultas)
+    data: dict | None = None
 
 
 # ---------------------------------------------------------------------------

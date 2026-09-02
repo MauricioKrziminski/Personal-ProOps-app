@@ -239,6 +239,8 @@ def _estado_base(sessao: dict, lote: list[dict], conteudo: dict, thread: str) ->
         "text": conteudo["text"],
         "media": conteudo["media"],
         "raw_texts": conteudo["raw_texts"],
+        "messages": [{"role": "user", "content": conteudo["text"]}],
+        "last_query_data": {},
         # Zerar TUDO é obrigatório, não zelo: o thread do checkpointer é o
         # mesmo a conversa inteira, então chave não reiniciada vaza para a
         # mensagem seguinte. `finance_queries` esquecido aqui fez uma consulta

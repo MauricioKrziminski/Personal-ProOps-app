@@ -82,11 +82,20 @@ async def route(state: AgentState) -> dict:
     if state.get("media"):
         return {"domains": [Domain.FINANCAS.value], "confidence": 1.0, "llm_calls": 0}
 
+    historico = state.get("messages")[:-1] if state.get("messages") else None
     modelo = gemini.structured(RouterDecision, gemini.GEMINI_ROUTER)
     decisao: RouterDecision = await modelo.ainvoke(
         [
             ("system", ROUTER),
-            ("human", user_turn(texto, local_datetime_iso(state["timezone"]), state["timezone"])),
+            (
+                "human",
+                user_turn(
+                    texto,
+                    local_datetime_iso(state["timezone"]),
+                    state["timezone"],
+                    history=historico,
+                ),
+            ),
         ]
     )
     dominios = [d.value for d in decisao.domains] or [Domain.GERAL.value]
@@ -118,6 +127,7 @@ async def finance_node(state: AgentState) -> dict:
     if state.get("preset"):
         return {}  # ações semeadas: não reextrair
 
+    historico = state.get("messages")[:-1] if state.get("messages") else None
     modelo = gemini.structured(FinancePlan, gemini.GEMINI_PARSE)
     plano: FinancePlan = await modelo.ainvoke(
         [
@@ -129,6 +139,7 @@ async def finance_node(state: AgentState) -> dict:
                     local_datetime_iso(state["timezone"]),
                     state["timezone"],
                     tem_anexo=bool(state.get("media")),
+                    history=historico,
                 ),
             ),
         ]
@@ -147,6 +158,7 @@ async def finance_query_node(state: AgentState) -> dict:
 
     """Consultas. Schema próprio (7 × 9) porque o de escrita não cabia junto —
     ver o orçamento medido em schemas.py."""
+    historico = state.get("messages")[:-1] if state.get("messages") else None
     modelo = gemini.structured(FinanceQueryPlan, gemini.GEMINI_PARSE)
     plano: FinanceQueryPlan = await modelo.ainvoke(
         [
@@ -157,6 +169,7 @@ async def finance_query_node(state: AgentState) -> dict:
                     state.get("text", ""),
                     local_datetime_iso(state["timezone"]),
                     state["timezone"],
+                    history=historico,
                 ),
             ),
         ]
@@ -173,6 +186,7 @@ async def notes_node(state: AgentState) -> dict:
     if state.get("preset"):
         return {}  # ações semeadas: não reextrair
 
+    historico = state.get("messages")[:-1] if state.get("messages") else None
     modelo = gemini.structured(NotesPlan, gemini.GEMINI_PARSE)
     plano: NotesPlan = await modelo.ainvoke(
         [
@@ -183,6 +197,7 @@ async def notes_node(state: AgentState) -> dict:
                     state.get("text", ""),
                     local_datetime_iso(state["timezone"]),
                     state["timezone"],
+                    history=historico,
                 ),
             ),
         ]
@@ -355,10 +370,13 @@ async def safe_node(state: AgentState) -> dict:
 
     res = await _executar(state, seguras)
     linhas = res[0] if isinstance(res, tuple) else res
-    spec = res[1] if isinstance(res, tuple) else None
+    spec = res[1] if isinstance(res, tuple) and len(res) > 1 else None
+    query_data = res[2] if isinstance(res, tuple) and len(res) > 2 else None
     ret = {"results": [*state.get("results", []), *linhas]}
     if spec and len(seguras) == 1 and len(state.get("results", [])) == 0:
         ret["reply"] = spec
+    if query_data:
+        ret["last_query_data"] = query_data
     return ret
 
 
@@ -651,7 +669,7 @@ def after_gate(state: AgentState) -> str:
 
 async def _executar(
     state: AgentState, indexadas: list[tuple[int, object]]
-) -> tuple[list[str], dict | None]:
+) -> tuple[list[str], dict | None, dict | None]:
     """Roda as ações dadas, preservando o `action_index` ORIGINAL."""
     ctx = ExecContext(
         user_id=state["user_id"],
@@ -666,6 +684,7 @@ async def _executar(
 
     linhas: list[str] = []
     spec_interativo: dict | None = None
+    ultimo_data: dict | None = None
     for indice, acao in indexadas:
         ctx.action_index = indice
         ctx.target = alvos[indice] or None
@@ -676,7 +695,9 @@ async def _executar(
             linhas.append(resultado.message)
         if resultado.interactive_spec:
             spec_interativo = resultado.interactive_spec
-    return linhas, spec_interativo
+        if resultado.data:
+            ultimo_data = resultado.data
+    return linhas, spec_interativo, ultimo_data
 
 
 async def execute_node(state: AgentState) -> dict:
@@ -684,18 +705,30 @@ async def execute_node(state: AgentState) -> dict:
     acoes = [(i, a) for i, a in enumerate(_actions(state)) if i not in bloqueadas]
     res = await _executar(state, acoes)
     linhas = res[0] if isinstance(res, tuple) else res
-    spec = res[1] if isinstance(res, tuple) else None
+    spec = res[1] if isinstance(res, tuple) and len(res) > 1 else None
+    query_data = res[2] if isinstance(res, tuple) and len(res) > 2 else None
     ret = {"results": [*state.get("results", []), *linhas]}
     if spec and len(acoes) == 1 and len(state.get("results", [])) == 0:
         ret["reply"] = spec
+    if query_data:
+        ret["last_query_data"] = query_data
     return ret
 
 
 async def compose(state: AgentState) -> dict:
     """Uma mensagem consolidada. Template puro, zero LLM."""
     if isinstance(state.get("reply"), dict):
-        return {}  # já veio spec interativo montado por consulta de paginação/filtros
+        spec = state["reply"]
+        texto = spec.get("text") or spec.get("body") or ""
+        ret = {}
+        if texto:
+            ret["messages"] = [{"role": "assistant", "content": texto}]
+        return ret
     linhas = [l for l in state.get("results", []) if l]
     if not linhas:
         linhas = [AJUDA]
-    return {"reply": "\n".join(linhas)}
+    texto_reply = "\n".join(linhas)
+    return {
+        "reply": texto_reply,
+        "messages": [{"role": "assistant", "content": texto_reply}],
+    }
