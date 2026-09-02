@@ -173,12 +173,14 @@ async def decide(
     """dict = decisão · STALE = clique de outra pergunta · None = intenção nova."""
     clique = conteudo.get("clicked_id")
     if clique:
-        # Clique NUNCA entra no grafo. Sem pendência aberta, o rótulo do botão
-        # ("1) R$45 mercado") seria parseado como um lançamento de verdade —
-        # a mesma classe do clique cruzado, e a pior, porque escreve dinheiro.
-        if not pendente:
-            return STALE
-        return parse_click(clique, pendente["id"]) or STALE
+        # Se for clique de confirmação HITL ("pa:") ou de seleção de rascunho ("ds:"):
+        # Sem a pendência ou rascunho correspondente aberto, é STALE (expirado).
+        if clique.startswith(("pa:", "ds:")):
+            if not pendente:
+                return STALE
+            return parse_click(clique, pendente["id"]) or STALE
+        # Outros cliques interativos (ex: "qpage:", "qfilter:") seguem para o grafo
+        return None
 
     texto = conteudo.get("text")
     if pendente:

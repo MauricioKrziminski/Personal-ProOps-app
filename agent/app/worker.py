@@ -235,11 +235,11 @@ def _estado_base(sessao: dict, lote: list[dict], conteudo: dict, thread: str) ->
         "user_id": sessao["user_id"],
         "workspace_id": sessao["workspace_id"],
         "timezone": sessao["timezone"] or "America/Sao_Paulo",
-        "wa_message_id": lote[-1]["wa_message_id"],
-        "text": conteudo["text"],
-        "media": conteudo["media"],
-        "raw_texts": conteudo["raw_texts"],
-        "messages": [{"role": "user", "content": conteudo["text"]}],
+        "wa_message_id": lote[-1]["wa_message_id"] if lote else "",
+        "text": conteudo.get("text", ""),
+        "media": conteudo.get("media"),
+        "raw_texts": conteudo.get("raw_texts") or [conteudo.get("text", "")],
+        "messages": [{"role": "user", "content": conteudo.get("text", "")}],
         "last_query_data": {},
         # Zerar TUDO é obrigatório, não zelo: o thread do checkpointer é o
         # mesmo a conversa inteira, então chave não reiniciada vaza para a
