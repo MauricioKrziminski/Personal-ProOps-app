@@ -143,3 +143,39 @@ def split_installment_total(total_cents: int, parcelas: int) -> list[int]:
     valores = [base] * parcelas
     valores[-1] += total_cents - base * parcelas
     return valores
+
+
+_NOUN_EXTRACTOR = re.compile(
+    r"\b(?:comprei|compramos|paguei|pagamos|gastei|gastamos|lancei|anota(?: aí)?|compra(?: de)?)\s+(?:um|uma|uns|umas|o|a|os|as)?\s*([a-zA-Z0-9_\-áéíóúâêîôûãõçÁÉÍÓÚÂÊÎÔÛÃÕÇ]{2,30})",
+    re.IGNORECASE,
+)
+_IGNORE_NOUNS = {"em", "no", "na", "para", "pra", "de", "com", "por", "ontem", "hoje", "reais", "parcelado", "parcelada"}
+
+_ACCOUNT_EXTRACTOR = re.compile(
+    r"\b(?:no|na|pelo|pela|via|com o|com a)\s+([a-zA-Z0-9_\-áéíóúâêîôûãõçÁÉÍÓÚÂÊÎÔÛÃÕÇ]{3,30})",
+    re.IGNORECASE,
+)
+_IGNORE_ACCOUNTS = {"cartao", "credito", "debito", "dinheiro", "pix", "mes", "ano", "dia", "total", "mercado"}
+
+
+def extract_description_fallback(texto: str) -> str | None:
+    if not texto:
+        return None
+    m = _NOUN_EXTRACTOR.search(texto)
+    if m:
+        candidato = m.group(1).strip()
+        if candidato.lower() not in _IGNORE_NOUNS and not candidato.isdigit():
+            return candidato
+    return None
+
+
+def extract_account_fallback(texto: str) -> str | None:
+    if not texto:
+        return None
+    m = _ACCOUNT_EXTRACTOR.search(texto)
+    if m:
+        candidato = m.group(1).strip()
+        if candidato.lower() not in _IGNORE_ACCOUNTS and not candidato.isdigit():
+            return candidato
+    return None
+

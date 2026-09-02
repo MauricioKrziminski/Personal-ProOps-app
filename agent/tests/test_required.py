@@ -54,7 +54,8 @@ class TestFinancas:
     def test_valor_sem_nenhuma_identificacao_pergunta(self):
         acao = FinanceAction(type=FinanceActionType.CREATE_EXPENSE, amount_cents=4500)
         slot, p = faltando(acao, texto_cru="gastei 45")
-        assert slot == "amount" and "foi" in p.lower()
+        assert slot == "description" and "identifiquei" in p.lower()
+
 
 
 class TestNaoBloqueiaOQueNaoPrecisa:

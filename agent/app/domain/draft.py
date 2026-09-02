@@ -127,6 +127,15 @@ async def interpretar(texto: str, rascunho: dict, uso: dict | None = None) -> di
             res["current_installment"] = current_inst
         return res
 
+    if slot in ("description", "identification"):
+        item = (decisao.extracted_value or "").strip() or texto.strip()
+        if not item:
+            return None
+        res = {"acao": "completar", "slot": "description", "description": item}
+        if current_inst is not None:
+            res["current_installment"] = current_inst
+        return res
+
     # O NÚMERO continua sendo determinístico, sempre. O modelo diz o que ele
     # SIGNIFICA, nunca quanto ele é — medido em 31/08/2026, `parse` acerta
     # inclusive "12x de 700", então dar o número ao modelo só somaria um jeito
@@ -200,6 +209,9 @@ def mesclar(acao_guardada: dict, decidido: dict) -> dict:
     if decidido.get("slot") == "account":
         if not juntado.get("account"):
             juntado["account"] = decidido["account"]
+    elif decidido.get("slot") == "description":
+        if not juntado.get("description"):
+            juntado["description"] = decidido["description"]
     elif not juntado.get("amount_cents"):
         juntado["amount_cents"] = decidido["amount_cents"]
     if decidido.get("current_installment") is not None:
@@ -320,4 +332,14 @@ def lembrete(rascunho: dict) -> str:
     trecho = (rascunho.get("raw_text") or "").strip()
     if len(trecho) > 60:
         trecho = trecho[:59] + "…"
-    return f"(Ainda tenho seu rascunho — *{trecho}*. É só me mandar o valor quando quiser.)"
+    slot = rascunho.get("slot")
+    if slot == "account":
+        oque = "o cartão"
+    elif slot in ("description", "identification"):
+        oque = "o que foi comprado"
+    elif slot == "category":
+        oque = "a categoria"
+    else:
+        oque = "o valor"
+    return f"(Ainda tenho seu rascunho — *{trecho}*. É só me mandar {oque} quando quiser.)"
+

@@ -74,7 +74,7 @@ def faltando(action, texto_cru: str = "") -> tuple[str, str] | None:
         return "amount", "💸 Faltou o valor. Quanto foi?"
 
     if tipo in EXIGEM_IDENTIFICACAO and not (action.description or action.category):
-        return "amount", "🤔 Entendi o valor, mas não o que foi. Isso foi com o quê?"
+        return "description", "🛍️ Entendi os detalhes da compra, mas não identifiquei o que você comprou. Do que se trata? (ex: 'tv', 'mercado', 'almoço')"
 
     # Parcelamento vira fatura, e fatura tem dono: sem cartão o lançamento nasce
     # solto e o ciclo de fatura (o trigger `set_invoice`) não tem em que se

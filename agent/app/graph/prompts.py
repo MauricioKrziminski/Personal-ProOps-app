@@ -72,8 +72,11 @@ Tipos:
 - create_expense / create_income: gasto ou dinheiro recebido, com valor.
 - create_transfer: mover dinheiro entre contas do próprio usuário.
   account = origem, counterparty_account = destino.
-- create_installment_purchase: 2 ou mais parcelas. amount_cents = valor TOTAL
-  (se o usuário disser o valor DA PARCELA, multiplique), installments = nº.
+- create_installment_purchase: 2 ou mais parcelas.
+  description = item/serviço comprado (ex: "comprei uma tv em 10x de 300 no nubank" -> description="tv", installments=10, amount_cents=300000, account="nubank").
+  amount_cents = valor TOTAL (se o usuário disser o valor DA PARCELA, multiplique pela quantidade de parcelas).
+  installments = nº de parcelas.
+  account = nome do cartão citado ("no nubank" -> account="nubank").
   current_installment = em qual parcela ele JÁ ESTÁ, quando a compra é antiga:
   "tô na 4ª parcela de 10" -> installments 10, current_installment 4.
   "já paguei 2 parcelas de 10" -> installments 10, current_installment 3 (se já pagou 2, agora está na 3ª).

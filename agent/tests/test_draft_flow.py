@@ -616,3 +616,57 @@ class TestFallbackSemPromessaMorta:
         spec = worker._pergunta_criar_cartao("d1", "Nubank", CARTOES)
         assert "*criar*" not in spec["text"]
         assert "cancelar" in spec["text"].lower()
+
+
+class TestDescriptionSlotAndFallback:
+    def test_extracao_fallback_de_descricao_e_conta(self):
+        from app.tools import guards
+
+        texto = "comprei uma tv em 10x de 300 no nubank"
+        assert guards.extract_description_fallback(texto) == "tv"
+        assert guards.extract_account_fallback(texto) == "nubank"
+
+    def test_lembrete_de_rascunho_com_slot_de_descricao(self):
+        rascunho = {
+            "raw_text": "comprei em 10x de 300 no nubank",
+            "slot": "description",
+        }
+        texto = draft.lembrete(rascunho)
+        assert "o que foi comprado" in texto
+
+    @pytest.mark.asyncio
+    async def test_completar_rascunho_de_descricao(self, monkeypatch):
+        class MockDecision:
+            decision = "answer"
+            extracted_value = "tv samsung"
+            already_paid_count = None
+            amount_type = "total"
+
+        async def fake_classificar(texto, pergunta):
+            return MockDecision()
+
+        monkeypatch.setattr(draft, "_classificar", fake_classificar)
+
+        rascunho = {
+            "id": "d2",
+            "slot": "description",
+            "missing": "Do que se trata?",
+            "raw_text": "gastei 500 no nubank",
+            "action": {
+                "type": "create_installment_purchase",
+                "amount_cents": 50000,
+                "installments": 2,
+                "description": None,
+                "account": "nubank",
+            },
+        }
+
+        decidido = await draft.interpretar("foi uma tv samsung", rascunho)
+        assert decidido["acao"] == "completar"
+        assert decidido["slot"] == "description"
+        assert decidido["description"] == "tv samsung"
+
+        mesclado = draft.mesclar(rascunho["action"], decidido)
+        assert mesclado["description"] == "tv samsung"
+        assert mesclado["amount_cents"] == 50000
+

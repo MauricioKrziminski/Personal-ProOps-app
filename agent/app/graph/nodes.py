@@ -145,6 +145,17 @@ async def finance_node(state: AgentState) -> dict:
         ]
     )
     acoes = [a for a in plano.actions if a.type.value != "unknown"]
+    texto_orig = state.get("text", "")
+    for a in acoes:
+        if a.type in (
+            FinanceActionType.CREATE_EXPENSE,
+            FinanceActionType.CREATE_INCOME,
+            FinanceActionType.CREATE_INSTALLMENT_PURCHASE,
+        ):
+            if not a.description:
+                a.description = guards.extract_description_fallback(texto_orig)
+            if a.type == FinanceActionType.CREATE_INSTALLMENT_PURCHASE and not a.account:
+                a.account = guards.extract_account_fallback(texto_orig)
     return {
         "finance_actions": [a.model_dump() for a in acoes],
         "confidence": min(state.get("confidence", 1.0), plano.confidence),
