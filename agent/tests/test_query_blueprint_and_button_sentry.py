@@ -267,3 +267,43 @@ class TestQueryBlueprintAndButtonSentry:
         assert ret["last_query_data"]["total_geral_itens"] == 7
         assert ret["last_query_data"]["total_exibidos"] == 3
 
+    @pytest.mark.asyncio
+    async def test_projecao_com_query_to_truncada_pelo_llm_expande_para_futuro(self, monkeypatch):
+        """Mesmo que o LLM extraia query_to como hoje, pedidos de projeção expandem até o futuro."""
+        queries_feitas = []
+
+        async def accounts(workspace_id, only_cards=False):
+            return [{"id": CARD_ID, "name": "Nubank Cartão", "type": "credit_card", "closing_day": 25}]
+
+        async def fetch(query, *args):
+            queries_feitas.append((query, args))
+            return []
+
+        monkeypatch.setattr(db, "accounts", accounts)
+        monkeypatch.setattr(db, "fetch", fetch)
+
+        # LLM extraiu query_from = 2026-06-03 e query_to = 2026-09-01 (hoje), mas texto pede projeção futura dos próximos 90 dias
+        ctx = ExecContext(
+            user_id=USER_ID,
+            workspace_id=WS,
+            phone="5551999999999",
+            timezone="America/Sao_Paulo",
+            texto="me mostre dos ultimos 90 dias com projecao dos proximos 90 dias",
+            wa_message_id="w1",
+        )
+        action = FinanceQuery(
+            type=FinanceQueryType.QUERY_TRANSACTIONS,
+            query_from="2026-06-03",
+            query_to="2026-09-01",
+        )
+        res = await queries.query_transactions(ctx, action)
+
+        assert len(queries_feitas) == 1
+        _, params = queries_feitas[0]
+        # params: (workspace_id, account_id, account_id, category, category, de, ate)
+        assert params[5] == "2026-06-03"
+        assert params[6] > "2026-09-01"  # Data futura expandida (ex: 2026-11-30 ou 2026-12-01)
+        assert res.data["blueprint"]["include_projection"] is True
+        assert res.data["blueprint"]["end_date"] > "2026-09-01"
+
+

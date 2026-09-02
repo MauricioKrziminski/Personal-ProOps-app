@@ -142,3 +142,24 @@ async def test_menu_de_cartoes_cai_para_texto_com_os_nomes(cliente, monkeypatch)
 
     corpo = cliente.enviados[0]["text"]["body"]
     assert "Cartão 0" in corpo and "nome" in corpo.lower()
+
+
+@pytest.mark.asyncio
+async def test_corpo_longo_divide_em_texto_e_botoes(cliente):
+    """Corpo > 800 bytes envia o texto completo primeiro e depois os botões com prompt conciso."""
+    corpo_gigante = "📊 Extrato Detalhado:\n" + ("• Gasto em restaurante: R$ 150,00\n" * 25)
+    assert len(corpo_gigante.encode("utf-8")) > 800
+
+    await whatsapp.send_buttons("5511", corpo_gigante, [("qpage:3", "Ver mais")])
+
+    assert len(cliente.enviados) == 2
+    # 1ª mensagem: Texto completo sem corte
+    assert cliente.enviados[0]["type"] == "text"
+    assert cliente.enviados[0]["text"]["body"] == corpo_gigante.strip()
+    # 2ª mensagem: Botão interativo com prompt curto
+    assert cliente.enviados[1]["type"] == "interactive"
+    inter = cliente.enviados[1]["interactive"]
+    assert inter["type"] == "button"
+    assert inter["body"]["text"] == "Deseja ver mais detalhes ou opções?"
+    assert inter["action"]["buttons"][0]["reply"]["title"] == "Ver mais"
+

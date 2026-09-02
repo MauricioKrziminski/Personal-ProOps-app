@@ -116,7 +116,11 @@ BODY_MAX = 1024
 
 def _cut(texto: str, n: int) -> str:
     texto = (texto or "").strip()
-    return texto if len(texto) <= n else texto[: n - 1] + "…"
+    encoded = texto.encode("utf-8")
+    if len(encoded) <= n:
+        return texto
+    cuted = encoded[: max(0, n - 3)].decode("utf-8", errors="ignore")
+    return cuted.strip() + "…"
 
 
 async def send_buttons(to: str, body: str, buttons: list[tuple[str, str]]) -> None:
@@ -129,6 +133,16 @@ async def send_buttons(to: str, body: str, buttons: list[tuple[str, str]]) -> No
     """
     if not 1 <= len(buttons) <= BTN_MAX:
         raise ValueError(f"WhatsApp aceita 1..{BTN_MAX} botões, recebi {len(buttons)}")
+
+    body_str = (body or "").strip()
+    # Se o corpo for longo (> 800 bytes em UTF-8), envia o texto principal completo primeiro
+    # e manda os botões em seguida com prompt conciso para evitar rejeição 400 da Meta (limite 1024 bytes).
+    if len(body_str.encode("utf-8")) > 800:
+        await send_text(to, body_str)
+        prompt_botoes = "Deseja ver mais detalhes ou opções?"
+    else:
+        prompt_botoes = _cut(body_str, BODY_MAX)
+
     await _graph_post(
         {
             "messaging_product": "whatsapp",
@@ -136,11 +150,13 @@ async def send_buttons(to: str, body: str, buttons: list[tuple[str, str]]) -> No
             "type": "interactive",
             "interactive": {
                 "type": "button",
-                "body": {"text": _cut(body, BODY_MAX)},
+                "body": {"text": prompt_botoes},
                 "action": {
                     "buttons": [
-                        {"type": "reply",
-                         "reply": {"id": bid, "title": _cut(titulo, BTN_TITLE_MAX)}}
+                        {
+                            "type": "reply",
+                            "reply": {"id": bid, "title": _cut(titulo, BTN_TITLE_MAX)},
+                        }
                         for bid, titulo in buttons
                     ]
                 },
@@ -157,6 +173,14 @@ async def send_list(to: str, body: str, label: str, rows: list[tuple[str, str, s
     """
     if not 1 <= len(rows) <= ROW_MAX:
         raise ValueError(f"WhatsApp aceita 1..{ROW_MAX} linhas, recebi {len(rows)}")
+
+    body_str = (body or "").strip()
+    if len(body_str.encode("utf-8")) > 800:
+        await send_text(to, body_str)
+        prompt_lista = "Escolha uma opção na lista abaixo:"
+    else:
+        prompt_lista = _cut(body_str, BODY_MAX)
+
     await _graph_post(
         {
             "messaging_product": "whatsapp",
@@ -164,16 +188,18 @@ async def send_list(to: str, body: str, label: str, rows: list[tuple[str, str, s
             "type": "interactive",
             "interactive": {
                 "type": "list",
-                "body": {"text": _cut(body, BODY_MAX)},
+                "body": {"text": prompt_lista},
                 "action": {
                     "button": _cut(label, BTN_TITLE_MAX),
                     "sections": [
                         {
                             "title": "Opções",
                             "rows": [
-                                {"id": rid,
-                                 "title": _cut(titulo, ROW_TITLE_MAX),
-                                 "description": _cut(desc, ROW_DESC_MAX)}
+                                {
+                                    "id": rid,
+                                    "title": _cut(titulo, ROW_TITLE_MAX),
+                                    "description": _cut(desc, ROW_DESC_MAX),
+                                }
                                 for rid, titulo, desc in rows
                             ],
                         }
@@ -197,8 +223,8 @@ async def try_send_interactive(to: str, spec: dict) -> None:
         else:
             await send_buttons(to, spec["body"], spec["buttons"])
         return
-    except Exception:  # noqa: BLE001
-        log.warning("envio interativo falhou; caindo para texto", exc_info=True)
+    except Exception as err:  # noqa: BLE001
+        log.error("envio interativo falhou (spec=%s): %s", spec, err, exc_info=True)
     await try_send(to, spec.get("text") or spec.get("body", ""))
 
 

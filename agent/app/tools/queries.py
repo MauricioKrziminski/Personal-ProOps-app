@@ -172,20 +172,37 @@ async def query_transactions(ctx: ExecContext, action: FinanceQuery) -> ToolResu
         de = last_blueprint.get("start_date") or (last_query.get("periodo") or {}).get("de")
         ate = last_blueprint.get("end_date") or (last_query.get("periodo") or {}).get("ate")
         include_projection = bool(last_blueprint.get("include_projection", False)) or (bool(ate) and ate > hoje)
+    elif is_projection_requested and not is_refinement:
+        # Consulta com projeção futura pedida (ex: próximos 90 dias / últimos 90 dias com projeção)
+        if action.query_from:
+            de = action.query_from
+        elif any(t in texto_norm for t in ["ultimos 90 dias", "ultimos 3 meses", "ultimos 60 dias", "ultimos 30 dias", "passados", "ultimos", "mes passado", "ano passado"]):
+            if "180 dias" in texto_norm or "6 meses" in texto_norm:
+                de = add_months(hoje, -6)
+            elif "60 dias" in texto_norm or "2 meses" in texto_norm:
+                de = add_months(hoje, -2)
+            elif "30 dias" in texto_norm or "1 mes" in texto_norm or "mes passado" in texto_norm:
+                de = add_months(hoje, -1)
+            else:
+                de = add_months(hoje, -3)
+        else:
+            de = hoje
+
+        if action.query_to and action.query_to > hoje:
+            ate = action.query_to
+        elif "180 dias" in texto_norm or "6 meses" in texto_norm:
+            ate = add_months(hoje, 6)
+        elif "60 dias" in texto_norm or "2 meses" in texto_norm:
+            ate = add_months(hoje, 2)
+        elif "30 dias" in texto_norm or "1 mes" in texto_norm:
+            ate = add_months(hoje, 1)
+        else:
+            ate = add_months(hoje, 3)
+        include_projection = True
     elif action.query_from and action.query_to:
         de = action.query_from
         ate = action.query_to
         include_projection = ate > hoje
-    elif is_projection_requested and not is_refinement:
-        # Consulta com projeção futura pedida (ex: próximos 90 dias / últimos 90 dias com projeção)
-        if any(t in texto_norm for t in ["ultimos 90 dias", "ultimos 3 meses", "ultimos 60 dias", "ultimos 30 dias", "passados"]):
-            de = add_months(hoje, -3)
-        elif action.query_from:
-            de = action.query_from
-        else:
-            de = hoje
-        ate = action.query_to if action.query_to and action.query_to > hoje else add_months(hoje, 3)
-        include_projection = True
     elif action.query_from:
         de = action.query_from
         ate = hoje
@@ -239,7 +256,8 @@ async def query_transactions(ctx: ExecContext, action: FinanceQuery) -> ToolResu
                t.installment_no as current_installment,
                p.installments as total_installments,
                a.name as account_name,
-               a.type as account_type
+               a.type as account_type,
+               t.installment_plan_id
         from public.transactions t
         left join public.accounts a on a.id = t.account_id
         left join public.installment_plans p on p.id = t.installment_plan_id
@@ -258,7 +276,6 @@ async def query_transactions(ctx: ExecContext, action: FinanceQuery) -> ToolResu
         de,
         ate,
     )
-
     total_items = len(rows)
 
     # 5. Fatiamento por Paginação / Expansão Unificada (Acumulativa)
