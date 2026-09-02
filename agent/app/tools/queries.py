@@ -14,7 +14,7 @@ from __future__ import annotations
 
 from app import db
 from app.domain import matching
-from app.domain.dates import format_date_br, local_iso_date
+from app.domain.dates import add_months, format_date_br, invoice_cycle_window, local_iso_date
 from app.domain.money import cents_to_brl
 from app.graph.schemas import FinanceQuery
 from app.tools.base import ExecContext, ToolResult
@@ -34,40 +34,122 @@ async def query_balance(ctx: ExecContext, action: FinanceQuery) -> ToolResult:
 
 
 async def query_transactions(ctx: ExecContext, action: FinanceQuery) -> ToolResult:
-    ate = action.query_to or local_iso_date(ctx.timezone)
-    de = action.query_from or f"{ate[:7]}-01"
+    """Consulta lançamentos com filtro estrito de conta e janela inteligente de fatura."""
+    hoje = local_iso_date(ctx.timezone)
+    account_id = None
+    account_name = None
+    account_type = None
+    achados = []
 
+    if action.account:
+        linhas = await db.accounts(ctx.workspace_id)
+        achados = matching.match_accounts(action.account, linhas)
+        if achados:
+            acc = achados[0]
+            account_id = acc["id"]
+            account_name = acc["name"]
+            account_type = acc.get("type")
+
+    # Janela temporal inteligente
+    if action.query_from and action.query_to:
+        de = action.query_from
+        ate = action.query_to
+    elif action.query_from:
+        de = action.query_from
+        ate = hoje
+    elif action.query_to:
+        ate = action.query_to
+        de = f"{ate[:7]}-01"
+    else:
+        # Sem datas explícitas
+        if account_type == "credit_card" and achados and achados[0].get("closing_day"):
+            # Janela dinâmica da fatura ativa do cartão
+            de, ate = invoice_cycle_window(
+                achados[0]["closing_day"],
+                achados[0].get("due_day"),
+                hoje,
+            )
+        elif account_type == "credit_card":
+            # Cartão sem dia de fechamento: fatura do mês atual / últimos 30 dias
+            de = f"{add_months(hoje, -1)[:7]}-25"
+            ate = hoje
+        else:
+            # Geral / Conta corrente: mês atual
+            de = f"{hoje[:7]}-01"
+            ate = hoje
+
+    # Busca registros puros no banco
     rows = await db.fetch(
-        "select * from public._tx_summary(%s, %s, %s)", ctx.user_id, de, ate
+        """
+        select t.id, t.description, t.amount_cents, t.category as category_name,
+               t.kind, t.occurred_at, t.status,
+               t.installment_no as current_installment,
+               p.installments as total_installments,
+               a.name as account_name,
+               a.type as account_type
+        from public.transactions t
+        left join public.accounts a on a.id = t.account_id
+        left join public.installment_plans p on p.id = t.installment_plan_id
+        where t.workspace_id = %s
+          and (%s::uuid is null or t.account_id = %s)
+          and (%s::text is null or lower(t.category) = lower(%s))
+          and t.occurred_at >= %s and t.occurred_at <= %s
+        order by t.occurred_at desc, t.created_at desc
+        limit 50
+        """,
+        ctx.workspace_id,
+        account_id,
+        account_id,
+        action.category,
+        action.category,
+        de,
+        ate,
     )
-    if action.category:
-        alvo = action.category.lower()
-        rows = [r for r in rows if (r["category"] or "").lower() == alvo]
-    if not rows:
-        return ToolResult(
-            f"📊 Nada registrado entre {format_date_br(de)} e {format_date_br(ate)}.",
-            read_only=True,
-        )
 
-    gasto = sum(int(r["total_cents"]) for r in rows if r["kind"] == "expense")
-    recebido = sum(int(r["total_cents"]) for r in rows if r["kind"] == "income")
-    cabecalho = " | ".join(
-        p
-        for p in (
-            f"Gastos: *{cents_to_brl(gasto)}*" if gasto else None,
-            f"Receitas: *{cents_to_brl(recebido)}*" if recebido else None,
-        )
-        if p
+    data = {
+        "periodo": {
+            "de": de,
+            "ate": ate,
+            "de_br": format_date_br(de),
+            "ate_br": format_date_br(ate),
+        },
+        "filtro_conta": account_name,
+        "total_gastos_centavos": sum(
+            int(r["amount_cents"]) for r in rows if r["kind"] == "expense"
+        ),
+        "total_receitas_centavos": sum(
+            int(r["amount_cents"]) for r in rows if r["kind"] == "income"
+        ),
+        "lancamentos": [
+            {
+                "id": str(r["id"]),
+                "description": r["description"] or r["category_name"] or "Lançamento",
+                "amount_cents": int(r["amount_cents"]),
+                "amount_brl": cents_to_brl(r["amount_cents"]),
+                "category_name": r["category_name"] or "outros",
+                "kind": r["kind"],
+                "occurred_at": format_date_br(r["occurred_at"]),
+                "account_name": r["account_name"] or "Sem conta",
+                "current_installment": r["current_installment"],
+                "total_installments": r["total_installments"],
+                "installment_label": (
+                    f"{r['current_installment']}/{r['total_installments']}"
+                    if r["current_installment"] and r["total_installments"]
+                    else None
+                ),
+            }
+            for r in rows
+        ],
+    }
+
+    from app.services.gemini import format_query_response
+
+    msg = await format_query_response(
+        user_prompt=ctx.texto,
+        data=data,
+        timezone_name=ctx.timezone,
     )
-    linhas = [
-        f"  • {KIND_EMOJI.get(r['kind'], '•')} {r['category']}: "
-        f"{cents_to_brl(r['total_cents'])} ({r['tx_count']}x)"
-        for r in rows[:8]
-    ]
-    return ToolResult(
-        f"📊 {format_date_br(de)} a {format_date_br(ate)} — {cabecalho}\n" + "\n".join(linhas),
-        read_only=True,
-    )
+    return ToolResult(msg, read_only=True)
 
 
 async def query_budgets(ctx: ExecContext, action: FinanceQuery) -> ToolResult:

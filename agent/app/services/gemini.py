@@ -101,3 +101,87 @@ async def categorize_batch(descriptions: list[str]) -> list[str | None]:
         valor = resposta.categories[i] if i < len(resposta.categories) else None
         saida.append(valor.strip().lower() if isinstance(valor, str) and valor.strip() else None)
     return saida
+
+
+class _QueryResponse(BaseModel):
+    formatted_reply: str
+
+
+def _fallback_format_query(data: dict) -> str:
+    lancamentos = data.get("lancamentos") or []
+    periodo = data.get("periodo") or {}
+    de = periodo.get("de_br") or periodo.get("de") or ""
+    ate = periodo.get("ate_br") or periodo.get("ate") or ""
+    conta = data.get("filtro_conta")
+    conta_txt = f" no *{conta}*" if conta else ""
+
+    if not lancamentos:
+        return f"📊 Nenhum lançamento encontrado{conta_txt} no período ({de} a {ate})."
+
+    total_gasto = data.get("total_gastos_centavos") or 0
+    total_receita = data.get("total_receitas_centavos") or 0
+
+    from app.domain.money import cents_to_brl
+    header_parts = []
+    if total_gasto:
+        header_parts.append(f"Gastos: *{cents_to_brl(total_gasto)}*")
+    if total_receita:
+        header_parts.append(f"Receitas: *{cents_to_brl(total_receita)}*")
+    header = " | ".join(header_parts) or f"Total: *{cents_to_brl(total_gasto)}*"
+
+    linhas = []
+    for l in lancamentos[:15]:
+        desc = l.get("description") or l.get("category_name") or "Lançamento"
+        val = l.get("amount_brl") or cents_to_brl(l.get("amount_cents") or 0)
+        parc = f" ({l['installment_label']})" if l.get("installment_label") else ""
+        emoji = "💸" if l.get("kind") == "expense" else "💰"
+        linhas.append(f"  • {emoji} {desc}: *{val}*{parc}")
+
+    return f"📊 {de} a {ate}{conta_txt} — {header}\n" + "\n".join(linhas)
+
+
+async def format_query_response(
+    user_prompt: str, data: dict, timezone_name: str = "America/Sao_Paulo"
+) -> str:
+    """Formata dados financeiros estruturados em texto de WhatsApp de forma conversacional.
+
+    O modelo lê os dados reais e adapta a resposta ao estilo pedido pelo usuário
+    (por nome, por categoria, etc.), sem inventar dados nem despesas.
+    """
+    import json
+    import logging
+
+    log = logging.getLogger(__name__)
+
+    prompt = (
+        "Você é o assistente financeiro inteligente do aplicativo Personal ProOps.\n"
+        "Sua tarefa é formatar os DADOS FINANCEIROS REAIS fornecidos em uma resposta de WhatsApp "
+        "extremamente amigável, clara, concisa e bonita.\n\n"
+        "Regras fundamentais:\n"
+        "1. Fidelidade total aos dados: NUNCA invente números, lançamentos ou valores que não estejam no JSON.\n"
+        "2. Adapte-se estritamente ao estilo pedido pelo usuário no <user_prompt>:\n"
+        "   - Se o usuário pediu 'pelo nome do lançamento' ou 'listar compras', use o campo 'description'.\n"
+        "   - Se pediu por categoria, agrupe ou use 'category_name'.\n"
+        "3. Compras parceladas: mostre a indicação da parcela no formato 'R$ X,XX (1/12)' ou '(3/10)' usando 'installment_label'.\n"
+        "4. Cartão de crédito: NUNCA liste receitas (salários) sob gastos do cartão.\n"
+        "5. Se a lista de lançamentos estiver vazia, informe com simpatia o período consultado.\n"
+        "6. Use emojis pontuais (📊, 💳, 💸, 💰) e formatação WhatsApp (*negrito* para valores)."
+    )
+
+    dados_str = json.dumps(data, ensure_ascii=False, indent=2)
+    corpo = (
+        f"<user_prompt>\n{user_prompt}\n</user_prompt>\n\n"
+        f"<dados_financeiros>\n{dados_str}\n</dados_financeiros>"
+    )
+
+    try:
+        modelo = structured(_QueryResponse, GEMINI_PARSE)
+        resp: _QueryResponse = await modelo.ainvoke(
+            [("system", prompt), ("human", corpo)]
+        )
+        if resp and resp.formatted_reply and resp.formatted_reply.strip():
+            return resp.formatted_reply.strip()
+    except Exception as err:
+        log.warning("format_query_response LLM falhou, usando fallback: %s", err)
+
+    return _fallback_format_query(data)

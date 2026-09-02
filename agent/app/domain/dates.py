@@ -11,7 +11,7 @@ com Intl que o Deno exigia.
 from __future__ import annotations
 
 from calendar import monthrange
-from datetime import date, datetime, timezone
+from datetime import date, datetime, timedelta, timezone
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 UTC = timezone.utc
@@ -116,3 +116,47 @@ def add_months(value: str | date, n: int) -> str:
     ano, mes = divmod(total, 12)
     ultimo = monthrange(ano, mes + 1)[1]
     return date(ano, mes + 1, min(d.day, ultimo)).isoformat()
+
+
+def invoice_cycle_window(
+    closing_day: int, due_day: int | None = None, occurred_date: date | str | None = None
+) -> tuple[str, str]:
+    """Calcula a janela de início e fim da fatura ativa do cartão.
+
+    Exemplo: closing_day = 25, occurred = 2026-09-01
+    -> closing_date = 2026-09-25
+    -> prev_closing = 2026-08-25
+    -> start_date = 2026-08-26
+    -> end_date = 2026-09-25
+    """
+    if occurred_date is None:
+        d = date.today()
+    elif isinstance(occurred_date, str):
+        d = date.fromisoformat(occurred_date[:10])
+    else:
+        d = occurred_date
+
+    # Dia de fechamento neste mês
+    max_days_current = monthrange(d.year, d.month)[1]
+    cl_day_clamped = min(closing_day, max_days_current)
+    cl_date_this_month = date(d.year, d.month, cl_day_clamped)
+
+    if d <= cl_date_this_month:
+        # A fatura fecha no closing_day deste mês
+        end_date = cl_date_this_month
+        # Início é o dia após o fechamento do mês anterior
+        prev_month_str = add_months(str(d), -1)
+        prev_y, prev_m = int(prev_month_str[:4]), int(prev_month_str[5:7])
+        prev_max_days = monthrange(prev_y, prev_m)[1]
+        prev_cl_day = min(closing_day, prev_max_days)
+        start_date = date(prev_y, prev_m, prev_cl_day) + timedelta(days=1)
+    else:
+        # A fatura fecha no closing_day do próximo mês
+        next_month_str = add_months(str(d), 1)
+        next_y, next_m = int(next_month_str[:4]), int(next_month_str[5:7])
+        next_max_days = monthrange(next_y, next_m)[1]
+        next_cl_day = min(closing_day, next_max_days)
+        end_date = date(next_y, next_m, next_cl_day)
+        start_date = cl_date_this_month + timedelta(days=1)
+
+    return start_date.isoformat(), end_date.isoformat()
