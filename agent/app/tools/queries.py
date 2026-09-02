@@ -201,7 +201,7 @@ async def query_transactions(ctx: ExecContext, action: FinanceQuery) -> ToolResu
                     else None
                 ),
             }
-            for r in mostrados_rows
+            for r in rows[:30]
         ],
     }
 
