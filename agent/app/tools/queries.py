@@ -36,22 +36,74 @@ async def query_balance(ctx: ExecContext, action: FinanceQuery) -> ToolResult:
 
 
 async def query_transactions(ctx: ExecContext, action: FinanceQuery) -> ToolResult:
-    """Consulta lançamentos com filtro estrito de conta e janela inteligente de fatura."""
+    """Consulta lançamentos com blueprint completo, State Cache Locking e Button Sentry."""
     hoje = local_iso_date(ctx.timezone)
     account_id = None
     account_name = None
     account_type = None
+    category = action.category
     achados = []
 
     last_query = ctx.last_query_data or {}
-    has_last_query = bool(last_query and last_query.get("account_id"))
+    last_blueprint = last_query.get("blueprint") or {}
+    has_last_query = bool(
+        last_query
+        and (
+            last_query.get("account_id")
+            or last_blueprint.get("account_id")
+            or last_query.get("periodo")
+        )
+    )
     texto_norm = matching.normalize(ctx.texto)
+    clicked_id = getattr(ctx, "clicked_id", None) or ""
 
-    # 1. State Cache Locking (Herança estrita de conta)
+    is_qpage = clicked_id.startswith("qpage:")
+    is_pagination_text = any(
+        t in texto_norm
+        for t in [
+            "ver mais",
+            "mais lancamentos",
+            "proxima pagina",
+            "proximos",
+            "mostrar mais",
+            "mais compras",
+        ]
+    )
+
+    offset = 0
+    if is_qpage:
+        partes = clicked_id.split(":")
+        if len(partes) >= 3 and partes[2].isdigit():
+            offset = int(partes[2])
+        elif last_blueprint.get("offset"):
+            offset = int(last_blueprint["offset"])
+    elif is_pagination_text and last_blueprint.get("offset"):
+        offset = int(last_blueprint["offset"])
+
+    termos_ano_todo = [
+        "ano todo", "do ano", "desde o inicio", "historico completo",
+        "de 1 ano", "12 meses", "ano passado", "todo o ano",
+    ]
+    is_explicit_broad_history = any(t in texto_norm for t in termos_ano_todo)
+    is_all_items = any(
+        t in texto_norm
+        for t in [
+            "todos", "todas", "tudo", "resto", "outras", "completa", "completo",
+            "todas as compras", "mostrar tudo",
+        ]
+    )
+    is_today_explicit = any(
+        t in texto_norm for t in ["hoje", "de hoje", "agora", "neste dia", "nesse dia"]
+    )
+
+    # 1. State Cache Locking e Herança de Blueprint
     is_refinement = False
-    if has_last_query:
-        last_acc_norm = matching.normalize(last_query.get("account_name") or "")
-        # Se action.account for nulo OU igual/subtermo da conta anterior OU o comando for continuação
+    if is_qpage or is_pagination_text:
+        is_refinement = True
+    elif has_last_query:
+        last_acc_norm = matching.normalize(
+            last_blueprint.get("account_name") or last_query.get("account_name") or ""
+        )
         termos_continuacao = [
             "todos", "todas", "tudo", "resto", "mais", "parcelas",
             "mes", "meses", "outras", "detalha", "completo", "fatura",
@@ -61,13 +113,16 @@ async def query_transactions(ctx: ExecContext, action: FinanceQuery) -> ToolResu
             or (action.account and matching.normalize(action.account) in last_acc_norm)
             or any(w in texto_norm for w in termos_continuacao)
         ):
-            # Trava a conta e o tipo anteriores sem nova busca fuzzy desnecessária
-            account_id = UUID(str(last_query["account_id"]))
-            account_name = last_query["account_name"]
-            account_type = last_query.get("account_type")
             is_refinement = True
 
-    # 2. Resolução normal de conta se não for refinamento travado
+    if is_refinement and (last_blueprint or last_query):
+        ref_acc_id = last_blueprint.get("account_id") or last_query.get("account_id")
+        account_id = UUID(str(ref_acc_id)) if ref_acc_id else None
+        account_name = last_blueprint.get("account_name") or last_query.get("account_name")
+        account_type = last_blueprint.get("account_type") or last_query.get("account_type")
+        category = last_blueprint.get("category") or action.category
+
+    # 2. Resolução normal de conta se não for refinamento
     if not is_refinement and action.account:
         inferred_type = matching.infer_account_type(f"{ctx.texto} {action.account or ''}")
         linhas = await db.accounts(ctx.workspace_id)
@@ -80,26 +135,18 @@ async def query_transactions(ctx: ExecContext, action: FinanceQuery) -> ToolResu
             account_name = acc["name"]
             account_type = acc.get("type")
 
-    # 3. Resolução da Janela Temporal
-    termos_ano_todo = [
-        "ano todo", "do ano", "desde o inicio", "historico completo",
-        "de 1 ano", "12 meses", "ano passado", "todo o ano",
-    ]
-    is_explicit_broad_history = any(t in texto_norm for t in termos_ano_todo)
-    is_all_items = any(
-        t in texto_norm for t in ["todos", "todas", "tudo", "resto", "outras", "completa", "completo"]
-    )
-    is_today_explicit = any(
-        t in texto_norm for t in ["hoje", "de hoje", "agora", "neste dia", "nesse dia"]
-    )
-
+    # 3. Resolução da Janela Temporal com Blueprint
     if is_explicit_broad_history:
         de = add_months(hoje, -12)
         ate = hoje
-    elif is_refinement and is_all_items and last_query.get("periodo"):
-        # Expansão de paginação sobre o MESMO período que estava na tela
-        de = last_query["periodo"]["de"]
-        ate = last_query["periodo"]["ate"]
+    elif (is_qpage or is_pagination_text) and (last_blueprint or last_query.get("periodo")):
+        # Paginando: PRESERVA rigorosamente a janela do blueprint original (incluindo projeção futura)
+        de = last_blueprint.get("start_date") or last_query["periodo"]["de"]
+        ate = last_blueprint.get("end_date") or last_query["periodo"]["ate"]
+    elif is_refinement and is_all_items and (last_blueprint or last_query.get("periodo")):
+        # Expansão de itens sobre o MESMO período
+        de = last_blueprint.get("start_date") or last_query["periodo"]["de"]
+        ate = last_blueprint.get("end_date") or last_query["periodo"]["ate"]
     elif action.query_from and action.query_to:
         de = action.query_from
         ate = action.query_to
@@ -136,7 +183,18 @@ async def query_transactions(ctx: ExecContext, action: FinanceQuery) -> ToolResu
             de = add_months(hoje, -1)
             ate = hoje
 
-    # Busca registros puros no banco
+    is_explicit_full_request = (
+        is_refinement and is_all_items
+    ) or any(
+        t in texto_norm
+        for t in [
+            "quero ver as", "ver todas", "mostra todas", "me mostre todas",
+            "me mostre todos", "mostra todos", "mostrar tudo", "mostrar todas",
+            "lista completa", "todas as compras", "detalha todas",
+        ]
+    )
+
+    # 4. Busca registros no banco (com limite de segurança de 100 itens)
     rows = await db.fetch(
         """
         select t.id, t.description, t.amount_cents, t.category as category_name,
@@ -153,22 +211,36 @@ async def query_transactions(ctx: ExecContext, action: FinanceQuery) -> ToolResu
           and (%s::text is null or lower(t.category) = lower(%s))
           and t.occurred_at >= %s and t.occurred_at <= %s
         order by t.occurred_at desc, t.created_at desc
-        limit 50
+        limit 100
         """,
         ctx.workspace_id,
         account_id,
         account_id,
-        action.category,
-        action.category,
+        category,
+        category,
         de,
         ate,
     )
 
     total_items = len(rows)
-    limite_display = 5 if total_items <= 5 else 3
-    mostrados_rows = rows[:limite_display]
-    ocultos_rows = rows[limite_display:]
 
+    # 5. Fatiamento por Paginação / Expansão
+    if is_explicit_full_request:
+        mostrados_rows = rows
+        total_exibidos = total_items
+        ocultos_rows = []
+    elif offset > 0:
+        page_size = 5
+        mostrados_rows = rows[offset : offset + page_size]
+        total_exibidos = min(total_items, offset + len(mostrados_rows))
+        ocultos_rows = rows[total_exibidos:]
+    else:
+        limite_display = 5 if total_items <= 5 else 3
+        mostrados_rows = rows[:limite_display]
+        total_exibidos = len(mostrados_rows)
+        ocultos_rows = rows[limite_display:]
+
+    ocultos_restantes = max(0, total_items - total_exibidos)
     ocultos_total_gastos = sum(
         int(r["amount_cents"]) for r in ocultos_rows if r["kind"] == "expense"
     )
@@ -200,7 +272,20 @@ async def query_transactions(ctx: ExecContext, action: FinanceQuery) -> ToolResu
             agrupamento_meses[m_key]["total_receitas_centavos"] += int(r["amount_cents"])
         agrupamento_meses[m_key]["contagem"] += 1
 
+    blueprint = {
+        "account_id": str(account_id) if account_id else None,
+        "account_name": account_name,
+        "account_type": account_type,
+        "start_date": de,
+        "end_date": ate,
+        "category": category,
+        "include_projection": ate > hoje if ate else False,
+        "limit": 5,
+        "offset": total_exibidos,
+    }
+
     data = {
+        "blueprint": blueprint,
         "periodo": {
             "de": de,
             "ate": ate,
@@ -212,6 +297,7 @@ async def query_transactions(ctx: ExecContext, action: FinanceQuery) -> ToolResu
         "account_type": account_type,
         "filtro_conta": account_name,
         "total_geral_itens": total_items,
+        "total_exibidos": total_exibidos,
         "total_gastos_centavos": sum(
             int(r["amount_cents"]) for r in rows if r["kind"] == "expense"
         ),
@@ -219,10 +305,10 @@ async def query_transactions(ctx: ExecContext, action: FinanceQuery) -> ToolResu
             int(r["amount_cents"]) for r in rows if r["kind"] == "income"
         ),
         "resumo_ocultos": {
-            "quantidade_oculta": len(ocultos_rows),
+            "quantidade_oculta": ocultos_restantes,
             "total_gastos_ocultos_centavos": ocultos_total_gastos,
             "total_receitas_ocultas_centavos": ocultos_total_receitas,
-        } if ocultos_rows else None,
+        } if ocultos_restantes > 0 else None,
         "agrupamento_meses": list(agrupamento_meses.values()) if len(agrupamento_meses) > 1 else None,
         "lancamentos": [
             {
@@ -242,7 +328,7 @@ async def query_transactions(ctx: ExecContext, action: FinanceQuery) -> ToolResu
                     else None
                 ),
             }
-            for r in rows[:30]
+            for r in mostrados_rows
         ],
     }
 
@@ -254,15 +340,21 @@ async def query_transactions(ctx: ExecContext, action: FinanceQuery) -> ToolResu
         timezone_name=ctx.timezone,
     )
 
+    # 6. Button Sentry: Condição de Parada Rígida de Botões
     spec = None
-    if total_items > limite_display:
-        acc_tag = str(account_id) if account_id else "all"
-        botoes = [(f"qpage:{acc_tag}:5", "Ver mais")]
-        if any(r.get("current_installment") for r in rows):
-            botoes.append((f"qfilter:parcelas:{acc_tag}", "Ver Parcelas"))
-        if len(agrupamento_meses) > 1:
-            botoes.append((f"qfilter:meses:{acc_tag}", "Filtrar por Mês"))
+    botoes = []
+    acc_tag = str(account_id) if account_id else "all"
 
+    # Regra de Ouro: Só gera o botão [Ver mais] se ainda houver itens ocultos no banco
+    if total_exibidos < total_items and ocultos_restantes > 0:
+        botoes.append((f"qpage:{acc_tag}:{total_exibidos}", "Ver mais"))
+
+    if any(r.get("current_installment") for r in rows):
+        botoes.append((f"qfilter:parcelas:{acc_tag}", "Ver Parcelas"))
+    if len(agrupamento_meses) > 1:
+        botoes.append((f"qfilter:meses:{acc_tag}", "Filtrar por Mês"))
+
+    if botoes:
         spec = {
             "ui": "buttons",
             "body": msg,

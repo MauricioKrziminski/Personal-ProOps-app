@@ -34,6 +34,8 @@ class ExecContext:
     created: list[str] = field(default_factory=list)
     # cache da última consulta executada (para herança de contexto e trava de entidade)
     last_query_data: dict | None = None
+    # id do botão ou linha clicada (para paginação determinística e filtros)
+    clicked_id: str | None = None
 
 
 @dataclass

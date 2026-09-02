@@ -239,6 +239,7 @@ def _estado_base(sessao: dict, lote: list[dict], conteudo: dict, thread: str) ->
         "text": conteudo.get("text", ""),
         "media": conteudo.get("media"),
         "raw_texts": conteudo.get("raw_texts") or [conteudo.get("text", "")],
+        "clicked_id": conteudo.get("clicked_id") or "",
         "messages": [{"role": "user", "content": conteudo.get("text", "")}],
         "last_query_data": {},
         # Zerar TUDO é obrigatório, não zelo: o thread do checkpointer é o
