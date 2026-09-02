@@ -367,5 +367,76 @@ class TestQueryBlueprintAndButtonSentry:
         assert "🔮" in ret["reply"]["body"]
         assert "Extrato" in ret["reply"]["body"] or "Lançamentos" in ret["reply"]["body"] or "Gastos" in ret["reply"]["body"]
 
+    @pytest.mark.asyncio
+    async def test_refinamento_com_novas_datas_e_projecao_reseta_janela_e_mostra_botoes(self, monkeypatch):
+        """Nova consulta com 'ultimos 60 dias e com projecao dos proximos 90 dias' não herda janela passada."""
+        queries_feitas = []
+
+        async def accounts(workspace_id, only_cards=False):
+            return [{"id": CARD_ID, "name": "Nubank Cartão", "type": "credit_card", "closing_day": 25}]
+
+        fake_rows = [
+            {
+                "id": UUID(f"00000000-0000-0000-0000-{i:012d}"),
+                "description": f"Compra {i}",
+                "amount_cents": 5000,
+                "category_name": "outros",
+                "kind": "expense",
+                "occurred_at": date(2026, 7 + (i // 3), (i % 28) + 1),
+                "status": "cleared",
+                "current_installment": None,
+                "total_installments": None,
+                "account_name": "Nubank Cartão",
+                "account_type": "credit_card",
+            }
+            for i in range(1, 12)
+        ]
+
+        async def fetch(query, *args):
+            queries_feitas.append((query, args))
+            return fake_rows
+
+        monkeypatch.setattr(db, "accounts", accounts)
+        monkeypatch.setattr(db, "fetch", fetch)
+
+        # Contexto já continha uma consulta anterior (last_query_data dos últimos 90 dias)
+        ctx = ExecContext(
+            user_id=USER_ID,
+            workspace_id=WS,
+            phone="5551999999999",
+            timezone="America/Sao_Paulo",
+            texto="ta agora, me mostre os lançamentos dos ultimos 60 dias e com projeçao dos proximos 90 dias",
+            wa_message_id="w3",
+            last_query_data={
+                "blueprint": {
+                    "start_date": "2026-06-03",
+                    "end_date": "2026-09-01",
+                    "account_name": "Nubank Cartão",
+                    "account_id": str(CARD_ID),
+                    "include_projection": False,
+                }
+            },
+        )
+        action = FinanceQuery(
+            type=FinanceQueryType.QUERY_TRANSACTIONS,
+            account="nubank",
+            query_from="2026-07-03",
+        )
+        res = await queries.query_transactions(ctx, action)
+
+        assert len(queries_feitas) == 1
+        _, params = queries_feitas[0]
+        # params: (workspace_id, account_id, account_id, category, category, de, ate)
+        assert params[5] == "2026-07-03"  # 60 dias atrás
+        assert params[6] > "2026-09-01"   # 90 dias no futuro (ex: 2026-11-30 ou 2026-12-01)
+        assert res.data["blueprint"]["include_projection"] is True
+        assert res.data["total_geral_itens"] == 11
+        assert res.data["total_exibidos"] == 3
+        assert res.data["resumo_ocultos"]["quantidade_oculta"] == 8
+        assert res.interactive_spec is not None
+        assert res.interactive_spec["ui"] == "buttons"
+        assert any(b[1] == "Ver mais" for b in res.interactive_spec["buttons"])
+
+
 
 

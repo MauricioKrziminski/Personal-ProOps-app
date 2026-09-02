@@ -157,6 +157,32 @@ async def query_transactions(ctx: ExecContext, action: FinanceQuery) -> ToolResu
     if is_explicit_broad_history:
         de = add_months(hoje, -12)
         ate = hoje
+    elif is_projection_requested and not (is_qpage or is_pagination_text or (is_all_items and not any(t in texto_norm for t in termos_projecao))):
+        # Pedido de projeção futura explícito (ex: "últimos 60 dias e projeção dos próximos 90 dias", "próximos 90 dias", etc.)
+        if action.query_from:
+            de = action.query_from
+        elif any(t in texto_norm for t in ["ultimos 180 dias", "ultimos 6 meses", "180 dias", "6 meses"]):
+            de = add_months(hoje, -6)
+        elif any(t in texto_norm for t in ["ultimos 60 dias", "ultimos 2 meses", "60 dias", "2 meses"]):
+            de = add_months(hoje, -2)
+        elif any(t in texto_norm for t in ["ultimos 30 dias", "ultimos 1 mes", "30 dias", "1 mes", "mes passado"]):
+            de = add_months(hoje, -1)
+        elif any(t in texto_norm for t in ["ultimos 90 dias", "ultimos 3 meses", "90 dias", "3 meses", "passados", "ultimos"]):
+            de = add_months(hoje, -3)
+        else:
+            de = hoje
+
+        if action.query_to and action.query_to > hoje:
+            ate = action.query_to
+        elif any(t in texto_norm for t in ["proximos 180 dias", "proximos 6 meses", "180 dias", "6 meses"]):
+            ate = add_months(hoje, 6)
+        elif any(t in texto_norm for t in ["proximos 60 dias", "proximos 2 meses", "60 dias", "2 meses"]):
+            ate = add_months(hoje, 2)
+        elif any(t in texto_norm for t in ["proximos 30 dias", "proximos 1 mes", "30 dias", "1 mes", "proximo mes"]):
+            ate = add_months(hoje, 1)
+        else:
+            ate = add_months(hoje, 3)
+        include_projection = True
     elif (is_qpage or is_pagination_text) and (last_blueprint or last_query.get("periodo")):
         # Paginando: PRESERVA rigorosamente a janela do blueprint original (incluindo projeção futura)
         de = last_blueprint.get("start_date") or (last_query.get("periodo") or {}).get("de")
@@ -167,38 +193,6 @@ async def query_transactions(ctx: ExecContext, action: FinanceQuery) -> ToolResu
         de = last_blueprint.get("start_date") or (last_query.get("periodo") or {}).get("de")
         ate = last_blueprint.get("end_date") or (last_query.get("periodo") or {}).get("ate")
         include_projection = bool(last_blueprint.get("include_projection", False)) or (bool(ate) and ate > hoje)
-    elif is_refinement and (last_blueprint.get("start_date") or (last_query.get("periodo") and last_query["periodo"].get("de"))) and not (action.query_from and action.query_to and not is_all_items):
-        # Continuação/Refinamento preserva o blueprint original se não houver novas datas explícitas
-        de = last_blueprint.get("start_date") or (last_query.get("periodo") or {}).get("de")
-        ate = last_blueprint.get("end_date") or (last_query.get("periodo") or {}).get("ate")
-        include_projection = bool(last_blueprint.get("include_projection", False)) or (bool(ate) and ate > hoje)
-    elif is_projection_requested and not is_refinement:
-        # Consulta com projeção futura pedida (ex: próximos 90 dias / últimos 90 dias com projeção)
-        if action.query_from:
-            de = action.query_from
-        elif any(t in texto_norm for t in ["ultimos 90 dias", "ultimos 3 meses", "ultimos 60 dias", "ultimos 30 dias", "passados", "ultimos", "mes passado", "ano passado"]):
-            if "180 dias" in texto_norm or "6 meses" in texto_norm:
-                de = add_months(hoje, -6)
-            elif "60 dias" in texto_norm or "2 meses" in texto_norm:
-                de = add_months(hoje, -2)
-            elif "30 dias" in texto_norm or "1 mes" in texto_norm or "mes passado" in texto_norm:
-                de = add_months(hoje, -1)
-            else:
-                de = add_months(hoje, -3)
-        else:
-            de = hoje
-
-        if action.query_to and action.query_to > hoje:
-            ate = action.query_to
-        elif "180 dias" in texto_norm or "6 meses" in texto_norm:
-            ate = add_months(hoje, 6)
-        elif "60 dias" in texto_norm or "2 meses" in texto_norm:
-            ate = add_months(hoje, 2)
-        elif "30 dias" in texto_norm or "1 mes" in texto_norm:
-            ate = add_months(hoje, 1)
-        else:
-            ate = add_months(hoje, 3)
-        include_projection = True
     elif action.query_from and action.query_to:
         de = action.query_from
         ate = action.query_to
