@@ -334,17 +334,7 @@ def _rascunho(state: AgentState, acoes: list) -> dict:
 
 
 async def safe_node(state: AgentState) -> dict:
-    """Executa AGORA o que não precisa de confirmação. Fase segura do lote.
-
-    "gastei 45 no mercado e apaga o último" não pode segurar o gasto de 45
-    esperando decisão sobre OUTRA coisa — e um NÃO na deleção não pode desfazer
-    um lançamento que era legítimo.
-
-    Repetir estas ações depois do SIM é inofensivo: a reserva
-    `(wa_message_id, action_index)` em `executed_actions` já as marca, e o
-    `wa_message_id` do checkpoint é o do turno ORIGINAL. Elas simplesmente são
-    puladas na segunda passada.
-    """
+    """Executa AGORA o que não precisa de confirmação. Fase segura do lote."""
     if state.get("halted"):
         return {}
     acoes = _actions(state)
@@ -363,8 +353,13 @@ async def safe_node(state: AgentState) -> dict:
         # não ter duas execuções fazendo a mesma coisa no caminho comum
         return {}
 
-    linhas = await _executar(state, seguras)
-    return {"results": [*state.get("results", []), *linhas]}
+    res = await _executar(state, seguras)
+    linhas = res[0] if isinstance(res, tuple) else res
+    spec = res[1] if isinstance(res, tuple) else None
+    ret = {"results": [*state.get("results", []), *linhas]}
+    if spec and len(seguras) == 1 and len(state.get("results", [])) == 0:
+        ret["reply"] = spec
+    return ret
 
 
 async def gate(state: AgentState) -> dict:
@@ -654,13 +649,10 @@ def after_gate(state: AgentState) -> str:
 # ---------------------------------------------------------------------------
 
 
-async def _executar(state: AgentState, indexadas: list[tuple[int, object]]) -> list[str]:
-    """Roda as ações dadas, preservando o `action_index` ORIGINAL.
-
-    O índice é a chave de idempotência junto com o `wa_message_id`; renumerar
-    aqui faria a fase segura e a pós-SIM reservarem vagas diferentes para a
-    mesma ação, e a execução duplicaria.
-    """
+async def _executar(
+    state: AgentState, indexadas: list[tuple[int, object]]
+) -> tuple[list[str], dict | None]:
+    """Roda as ações dadas, preservando o `action_index` ORIGINAL."""
     ctx = ExecContext(
         user_id=state["user_id"],
         workspace_id=state["workspace_id"],
@@ -673,33 +665,36 @@ async def _executar(state: AgentState, indexadas: list[tuple[int, object]]) -> l
     alvos = (list(state.get("targets") or []) + [{}] * len(acoes))[: len(acoes)]
 
     linhas: list[str] = []
+    spec_interativo: dict | None = None
     for indice, acao in indexadas:
         ctx.action_index = indice
-        # o alvo CONGELADO na Fase Cognitiva viaja até a tool por aqui
         ctx.target = alvos[indice] or None
-        # regra do usuário GANHA da IA — mas só em CRIAÇÃO. Em consulta,
-        # `category` é filtro: deixar a regra reescrevê-lo devolveria o total de
-        # outra categoria, em silêncio. Em correção/deleção é PIOR: `category`
-        # ali é campo de BUSCA, então a regra podia mudar QUAL lançamento morre.
         if isinstance(acao, FinanceAction) and acao.type in RULE_APPLIES:
             acao = await apply_rules(ctx.workspace_id, acao)
         resultado = await execute(ctx, acao)
         if resultado.message:
             linhas.append(resultado.message)
-    return linhas
+        if resultado.interactive_spec:
+            spec_interativo = resultado.interactive_spec
+    return linhas, spec_interativo
 
 
 async def execute_node(state: AgentState) -> dict:
     bloqueadas = _incompletas(state, _actions(state))
     acoes = [(i, a) for i, a in enumerate(_actions(state)) if i not in bloqueadas]
-    linhas = await _executar(state, acoes)
-    # `results` tem reducer `_replace`: somar ao que já veio da fase segura é o
-    # que preserva o "já fiz X" na resposta consolidada.
-    return {"results": [*state.get("results", []), *linhas]}
+    res = await _executar(state, acoes)
+    linhas = res[0] if isinstance(res, tuple) else res
+    spec = res[1] if isinstance(res, tuple) else None
+    ret = {"results": [*state.get("results", []), *linhas]}
+    if spec and len(acoes) == 1 and len(state.get("results", [])) == 0:
+        ret["reply"] = spec
+    return ret
 
 
 async def compose(state: AgentState) -> dict:
     """Uma mensagem consolidada. Template puro, zero LLM."""
+    if isinstance(state.get("reply"), dict):
+        return {}  # já veio spec interativo montado por consulta de paginação/filtros
     linhas = [l for l in state.get("results", []) if l]
     if not linhas:
         linhas = [AJUDA]

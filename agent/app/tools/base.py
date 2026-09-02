@@ -43,6 +43,8 @@ class ToolResult:
     # True quando nada foi escrito (consulta, erro tratado, nada encontrado):
     # não gasta linha em executed_actions nem entra no desfazer.
     read_only: bool = False
+    # Especificação interativa para WhatsApp (botões/listas de paginação/filtros)
+    interactive_spec: dict | None = None
 
 
 # ---------------------------------------------------------------------------

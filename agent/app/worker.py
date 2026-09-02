@@ -162,7 +162,15 @@ async def _extract_batch(lote: list[dict]) -> dict | None:
             escolha = _interactive_reply(mensagem)
             if escolha:
                 clicked_id = escolha["id"]      # o último clique do lote vence
-                textos.append(escolha["title"])
+                title = escolha["title"]
+                if clicked_id.startswith("qpage:"):
+                    textos.append("ver mais lançamentos anteriores")
+                elif clicked_id.startswith("qfilter:parcelas"):
+                    textos.append("ver lançamentos e parcelas")
+                elif clicked_id.startswith("qfilter:meses"):
+                    textos.append("ver resumo de gastos por mês")
+                else:
+                    textos.append(title)
 
         elif tipo == "text":
             corpo = (mensagem.get("text") or {}).get("body")

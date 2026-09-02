@@ -126,6 +126,42 @@ async def query_transactions(ctx: ExecContext, action: FinanceQuery) -> ToolResu
         ate,
     )
 
+    total_items = len(rows)
+    limite_display = 5 if total_items <= 5 else 3
+    mostrados_rows = rows[:limite_display]
+    ocultos_rows = rows[limite_display:]
+
+    ocultos_total_gastos = sum(
+        int(r["amount_cents"]) for r in ocultos_rows if r["kind"] == "expense"
+    )
+    ocultos_total_receitas = sum(
+        int(r["amount_cents"]) for r in ocultos_rows if r["kind"] == "income"
+    )
+
+    # Agrupamento semântico por mês
+    agrupamento_meses: dict[str, dict] = {}
+    meses_pt = {
+        "01": "Janeiro", "02": "Fevereiro", "03": "Março", "04": "Abril",
+        "05": "Maio", "06": "Junho", "07": "Julho", "08": "Agosto",
+        "09": "Setembro", "10": "Outubro", "11": "Novembro", "12": "Dezembro",
+    }
+    for r in rows:
+        m_key = str(r["occurred_at"])[:7]  # YYYY-MM
+        if m_key not in agrupamento_meses:
+            ano, mes = m_key.split("-") if "-" in m_key else (m_key, "")
+            mes_label = f"{meses_pt.get(mes, mes)}/{ano}" if mes else m_key
+            agrupamento_meses[m_key] = {
+                "mes_label": mes_label,
+                "total_gastos_centavos": 0,
+                "total_receitas_centavos": 0,
+                "contagem": 0,
+            }
+        if r["kind"] == "expense":
+            agrupamento_meses[m_key]["total_gastos_centavos"] += int(r["amount_cents"])
+        else:
+            agrupamento_meses[m_key]["total_receitas_centavos"] += int(r["amount_cents"])
+        agrupamento_meses[m_key]["contagem"] += 1
+
     data = {
         "periodo": {
             "de": de,
@@ -134,12 +170,19 @@ async def query_transactions(ctx: ExecContext, action: FinanceQuery) -> ToolResu
             "ate_br": format_date_br(ate),
         },
         "filtro_conta": account_name,
+        "total_geral_itens": total_items,
         "total_gastos_centavos": sum(
             int(r["amount_cents"]) for r in rows if r["kind"] == "expense"
         ),
         "total_receitas_centavos": sum(
             int(r["amount_cents"]) for r in rows if r["kind"] == "income"
         ),
+        "resumo_ocultos": {
+            "quantidade_oculta": len(ocultos_rows),
+            "total_gastos_ocultos_centavos": ocultos_total_gastos,
+            "total_receitas_ocultas_centavos": ocultos_total_receitas,
+        } if ocultos_rows else None,
+        "agrupamento_meses": list(agrupamento_meses.values()) if len(agrupamento_meses) > 1 else None,
         "lancamentos": [
             {
                 "id": str(r["id"]),
@@ -158,7 +201,7 @@ async def query_transactions(ctx: ExecContext, action: FinanceQuery) -> ToolResu
                     else None
                 ),
             }
-            for r in rows
+            for r in mostrados_rows
         ],
     }
 
@@ -169,7 +212,24 @@ async def query_transactions(ctx: ExecContext, action: FinanceQuery) -> ToolResu
         data=data,
         timezone_name=ctx.timezone,
     )
-    return ToolResult(msg, read_only=True)
+
+    spec = None
+    if total_items > limite_display:
+        acc_tag = str(account_id) if account_id else "all"
+        botoes = [(f"qpage:{acc_tag}:5", "Ver mais")]
+        if any(r.get("current_installment") for r in rows):
+            botoes.append((f"qfilter:parcelas:{acc_tag}", "Ver Parcelas"))
+        if len(agrupamento_meses) > 1:
+            botoes.append((f"qfilter:meses:{acc_tag}", "Filtrar por Mês"))
+
+        spec = {
+            "ui": "buttons",
+            "body": msg,
+            "buttons": botoes[:3],
+            "text": f"{msg}\n\nResponda 'ver mais', 'ver parcelas' ou escolha uma opção.",
+        }
+
+    return ToolResult(msg, read_only=True, interactive_spec=spec)
 
 
 async def query_budgets(ctx: ExecContext, action: FinanceQuery) -> ToolResult:

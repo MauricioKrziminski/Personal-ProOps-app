@@ -130,12 +130,19 @@ def _fallback_format_query(data: dict) -> str:
     header = " | ".join(header_parts) or f"Total: *{cents_to_brl(total_gasto)}*"
 
     linhas = []
-    for l in lancamentos[:15]:
+    for l in lancamentos[:5]:
         desc = l.get("description") or l.get("category_name") or "Lançamento"
         val = l.get("amount_brl") or cents_to_brl(l.get("amount_cents") or 0)
         parc = f" ({l['installment_label']})" if l.get("installment_label") else ""
         emoji = "💸" if l.get("kind") == "expense" else "💰"
-        linhas.append(f"  • {emoji} {desc}: *{val}*{parc}")
+        data_str = f"{l['occurred_at']} - " if l.get("occurred_at") else ""
+        linhas.append(f"  • {emoji} {data_str}{desc}: *{val}*{parc}")
+
+    resumo = data.get("resumo_ocultos")
+    if resumo and resumo.get("quantidade_oculta", 0) > 0:
+        qtd = resumo["quantidade_oculta"]
+        val_oculto = cents_to_brl(resumo.get("total_gastos_ocultos_centavos", 0))
+        linhas.append(f"\n📌 *Além dessas, você tem outras {qtd} compras neste período que totalizam {val_oculto}.*")
 
     return f"📊 {de} a {ate}{conta_txt} — {header}\n" + "\n".join(linhas)
 
@@ -143,7 +150,7 @@ def _fallback_format_query(data: dict) -> str:
 async def format_query_response(
     user_prompt: str, data: dict, timezone_name: str = "America/Sao_Paulo"
 ) -> str:
-    """Formata dados financeiros estruturados em texto de WhatsApp de forma conversacional.
+    """Formata dados financeiros estruturados em texto de WhatsApp aplicando Progressive Disclosure.
 
     O modelo lê os dados reais e adapta a resposta ao estilo pedido pelo usuário
     (por nome, por categoria, etc.), sem inventar dados nem despesas.
@@ -156,16 +163,18 @@ async def format_query_response(
     prompt = (
         "Você é o assistente financeiro inteligente do aplicativo Personal ProOps.\n"
         "Sua tarefa é formatar os DADOS FINANCEIROS REAIS fornecidos em uma resposta de WhatsApp "
-        "extremamente amigável, clara, concisa e bonita.\n\n"
+        "extremamente amigável, clara, concisa e bonita, aplicando rigorosamente o princípio da Revelação Progressiva (Progressive Disclosure).\n\n"
         "Regras fundamentais:\n"
-        "1. Fidelidade total aos dados: NUNCA invente números, lançamentos ou valores que não estejam no JSON.\n"
-        "2. Adapte-se estritamente ao estilo pedido pelo usuário no <user_prompt>:\n"
-        "   - Se o usuário pediu 'pelo nome do lançamento' ou 'listar compras', use o campo 'description'.\n"
-        "   - Se pediu por categoria, agrupe ou use 'category_name'.\n"
-        "3. Compras parceladas: mostre a indicação da parcela no formato 'R$ X,XX (1/12)' ou '(3/10)' usando 'installment_label'.\n"
-        "4. Cartão de crédito: NUNCA liste receitas (salários) sob gastos do cartão.\n"
-        "5. Se a lista de lançamentos estiver vazia, informe com simpatia o período consultado.\n"
-        "6. Use emojis pontuais (📊, 💳, 💸, 💰) e formatação WhatsApp (*negrito* para valores)."
+        "1. LIMITE ESTRITO DE EXIBIÇÃO: Sob nenhuma hipótese liste mais do que 5 lançamentos individuais na mensagem.\n"
+        "2. SE HOUVER <= 5 LANÇAMENTOS NO TOTAL: liste todos de forma limpa pelo nome (ou categoria/preferência do usuário), com data e valor em negrito.\n"
+        "3. SE HOUVER MAIS DE 5 LANÇAMENTOS (ou período longo):\n"
+        "   - Exiba apenas os 3 a 5 mais recentes (ou da fatura ativa).\n"
+        "   - Apresente um Resumo Consolidado elegante das compras adicionais usando os dados de 'resumo_ocultos' (ex: '📌 *Além dessas, você tem outras X compras neste período que totalizam R$ Y.*').\n"
+        "   - Se 'agrupamento_meses' estiver presente, mencione a consolidação dos meses anteriores de forma sucinta.\n"
+        "4. Compras parceladas: mostre a indicação da parcela no formato 'R$ X,XX (1/12)' ou '(3/10)' usando 'installment_label'.\n"
+        "5. Cartão de crédito: NUNCA liste receitas (salários) sob gastos do cartão.\n"
+        "6. Fidelidade total aos dados: NUNCA invente números, lançamentos ou valores que não estejam no JSON.\n"
+        "7. Use emojis pontuais (📊, 💳, 💸, 💰) e formatação WhatsApp (*negrito* para valores)."
     )
 
     dados_str = json.dumps(data, ensure_ascii=False, indent=2)
