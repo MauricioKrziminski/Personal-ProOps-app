@@ -582,9 +582,10 @@ async def gate(state: AgentState) -> dict:
                     card_name = limite_res.get("card_name") or acao.account
                     limite_str = cents_to_brl(limite_res["limite_centavos"])
                     disp_str = cents_to_brl(limite_res["disponivel_centavos"])
+                    novo_disp = cents_to_brl(limite_res["disponivel_centavos"] - acao.amount_cents)
                     aviso = (
-                        f"⚠️ **Aviso:** Esta compra excede o limite disponível do seu {card_name} "
-                        f"(Limite: {limite_str}, Disponível: {disp_str}). "
+                        f"⚠️ *Aviso:* Esta compra excede o limite disponível do seu {card_name} "
+                        f"(Limite: {limite_str}, Disponível atual: {disp_str} → ficaria {novo_disp}). "
                         "Deseja registrar mesmo assim ou prefere trocar de cartão?"
                     )
                     escolha = interrupt(

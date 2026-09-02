@@ -380,6 +380,7 @@ async def _run_graph(sessao: dict, lote: list[dict], conteudo: dict) -> str | di
             await db.resolve_pending(
                 pendente["id"], "approved" if decisao.get("approved") else "rejected"
             )
+            await db.delete_draft(sessao["phone"])
             # O id CONGELADO vem de `pending_actions`, não de uma busca nova: é o
             # que garante que o SIM execute o registro que o usuário LEU, mesmo
             # que outro lançamento tenha entrado entre a pergunta e a resposta.
@@ -626,10 +627,16 @@ async def _resposta_do_estado(sessao: dict, estado: dict, thread: str) -> str | 
         # a nota de café é salva e o mac continua ali, mencionado de leve.
         antigo = await db.open_draft(sessao["phone"])
         if antigo:
-            estado = {
-                **estado,
-                "reply": f"{estado.get('reply', '')}\n\n{draft.lembrete(antigo)}".strip(),
-            }
+            rep = estado.get("reply")
+            lembr = draft.lembrete(antigo)
+            if isinstance(rep, dict):
+                rep["body"] = f"{rep.get('body', '')}\n\n{lembr}".strip()
+                rep["text"] = f"{rep.get('text', '')}\n\n{lembr}".strip()
+                estado = {**estado, "reply": rep}
+            elif isinstance(rep, str) and rep:
+                estado = {**estado, "reply": f"{rep}\n\n{lembr}".strip()}
+            elif not rep:
+                estado = {**estado, "reply": lembr}
     draft_id = ""
     if rascunho:
         # a extração ficou pela metade: guarda para o usuário poder mudar de
