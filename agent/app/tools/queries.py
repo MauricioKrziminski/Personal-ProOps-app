@@ -52,6 +52,7 @@ async def query_transactions(ctx: ExecContext, action: FinanceQuery) -> ToolResu
             last_query.get("account_id")
             or last_blueprint.get("account_id")
             or last_query.get("periodo")
+            or last_blueprint.get("start_date")
         )
     )
     texto_norm = matching.normalize(ctx.texto)
@@ -69,6 +70,9 @@ async def query_transactions(ctx: ExecContext, action: FinanceQuery) -> ToolResu
             "mais compras",
             "proximos lancamentos",
             "proximas compras",
+            "outras compras",
+            "mais gastos",
+            "outros gastos",
         ]
     )
 
@@ -109,6 +113,7 @@ async def query_transactions(ctx: ExecContext, action: FinanceQuery) -> ToolResu
         termos_continuacao = [
             "todos", "todas", "tudo", "resto", "mais", "parcelas",
             "mes", "meses", "outras", "detalha", "completo", "fatura",
+            "expandir", "continua", "continuacao", "anteriores", "proximos",
         ]
         if (
             not action.account
@@ -139,7 +144,7 @@ async def query_transactions(ctx: ExecContext, action: FinanceQuery) -> ToolResu
 
     termos_projecao = [
         "projecao", "proximos", "futuros", "futuras", "proximas faturas",
-        "previsao", "proximos 90 dias", "proximos 3 meses",
+        "previsao", "proximos 90 dias", "proximos 3 meses", "proximos 60 dias", "proximos 30 dias",
     ]
     is_projection_requested = (
         any(t in texto_norm for t in termos_projecao)
@@ -154,18 +159,33 @@ async def query_transactions(ctx: ExecContext, action: FinanceQuery) -> ToolResu
         ate = hoje
     elif (is_qpage or is_pagination_text) and (last_blueprint or last_query.get("periodo")):
         # Paginando: PRESERVA rigorosamente a janela do blueprint original (incluindo projeção futura)
-        de = last_blueprint.get("start_date") or last_query["periodo"]["de"]
-        ate = last_blueprint.get("end_date") or last_query["periodo"]["ate"]
-        include_projection = bool(last_blueprint.get("include_projection", False))
+        de = last_blueprint.get("start_date") or (last_query.get("periodo") or {}).get("de")
+        ate = last_blueprint.get("end_date") or (last_query.get("periodo") or {}).get("ate")
+        include_projection = bool(last_blueprint.get("include_projection", False)) or (bool(ate) and ate > hoje)
     elif is_refinement and is_all_items and (last_blueprint or last_query.get("periodo")):
         # Expansão de itens sobre o MESMO período
-        de = last_blueprint.get("start_date") or last_query["periodo"]["de"]
-        ate = last_blueprint.get("end_date") or last_query["periodo"]["ate"]
-        include_projection = bool(last_blueprint.get("include_projection", False))
+        de = last_blueprint.get("start_date") or (last_query.get("periodo") or {}).get("de")
+        ate = last_blueprint.get("end_date") or (last_query.get("periodo") or {}).get("ate")
+        include_projection = bool(last_blueprint.get("include_projection", False)) or (bool(ate) and ate > hoje)
+    elif is_refinement and (last_blueprint.get("start_date") or (last_query.get("periodo") and last_query["periodo"].get("de"))) and not (action.query_from and action.query_to and not is_all_items):
+        # Continuação/Refinamento preserva o blueprint original se não houver novas datas explícitas
+        de = last_blueprint.get("start_date") or (last_query.get("periodo") or {}).get("de")
+        ate = last_blueprint.get("end_date") or (last_query.get("periodo") or {}).get("ate")
+        include_projection = bool(last_blueprint.get("include_projection", False)) or (bool(ate) and ate > hoje)
     elif action.query_from and action.query_to:
         de = action.query_from
         ate = action.query_to
         include_projection = ate > hoje
+    elif is_projection_requested and not is_refinement:
+        # Consulta com projeção futura pedida (ex: próximos 90 dias / últimos 90 dias com projeção)
+        if any(t in texto_norm for t in ["ultimos 90 dias", "ultimos 3 meses", "ultimos 60 dias", "ultimos 30 dias", "passados"]):
+            de = add_months(hoje, -3)
+        elif action.query_from:
+            de = action.query_from
+        else:
+            de = hoje
+        ate = action.query_to if action.query_to and action.query_to > hoje else add_months(hoje, 3)
+        include_projection = True
     elif action.query_from:
         de = action.query_from
         ate = hoje
@@ -173,11 +193,6 @@ async def query_transactions(ctx: ExecContext, action: FinanceQuery) -> ToolResu
         ate = action.query_to
         de = add_months(ate, -1)
         include_projection = ate > hoje
-    elif is_projection_requested and not is_refinement:
-        # Consulta com projeção futura pedida (ex: próximos 90 dias)
-        de = hoje
-        ate = add_months(hoje, 3)
-        include_projection = True
     elif is_today_explicit:
         de = hoje
         ate = hoje
@@ -305,7 +320,7 @@ async def query_transactions(ctx: ExecContext, action: FinanceQuery) -> ToolResu
         "start_date": de,
         "end_date": ate,
         "category": category,
-        "include_projection": ate > hoje if ate else False,
+        "include_projection": bool(include_projection) or (bool(ate) and ate > hoje),
         "limit": 5,
         "offset": total_exibidos,
     }
@@ -325,6 +340,7 @@ async def query_transactions(ctx: ExecContext, action: FinanceQuery) -> ToolResu
         "is_expanded_view": is_expanded_view,
         "total_geral_itens": total_items,
         "total_exibidos": total_exibidos,
+        "offset": total_exibidos,
         "total_gastos_centavos": sum(
             int(r["amount_cents"]) for r in rows if r["kind"] == "expense"
         ),

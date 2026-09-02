@@ -373,7 +373,7 @@ async def safe_node(state: AgentState) -> dict:
     spec = res[1] if isinstance(res, tuple) and len(res) > 1 else None
     query_data = res[2] if isinstance(res, tuple) and len(res) > 2 else None
     ret = {"results": [*state.get("results", []), *linhas]}
-    if spec and len(seguras) == 1 and len(state.get("results", [])) == 0:
+    if spec and len(seguras) == 1:
         ret["reply"] = spec
     if query_data:
         ret["last_query_data"] = query_data
@@ -710,7 +710,7 @@ async def execute_node(state: AgentState) -> dict:
     spec = res[1] if isinstance(res, tuple) and len(res) > 1 else None
     query_data = res[2] if isinstance(res, tuple) and len(res) > 2 else None
     ret = {"results": [*state.get("results", []), *linhas]}
-    if spec and len(acoes) == 1 and len(state.get("results", [])) == 0:
+    if spec and len(acoes) == 1:
         ret["reply"] = spec
     if query_data:
         ret["last_query_data"] = query_data

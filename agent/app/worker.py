@@ -164,7 +164,7 @@ async def _extract_batch(lote: list[dict]) -> dict | None:
                 clicked_id = escolha["id"]      # o último clique do lote vence
                 title = escolha["title"]
                 if clicked_id.startswith("qpage:"):
-                    textos.append("ver mais lançamentos anteriores")
+                    textos.append("ver mais")
                 elif clicked_id.startswith("qfilter:parcelas"):
                     textos.append("ver lançamentos e parcelas")
                 elif clicked_id.startswith("qfilter:meses"):

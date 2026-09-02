@@ -144,7 +144,10 @@ def _fallback_format_query(data: dict) -> str:
         val_oculto = cents_to_brl(resumo.get("total_gastos_ocultos_centavos", 0))
         linhas.append(f"\n📌 *Além dessas, você tem outras {qtd} compras neste período que totalizam {val_oculto}.*")
 
-    titulo = "💳 Lançamentos (Lista Expandida)" if data.get("is_expanded_view") else "📊"
+    if data.get("is_expanded_view"):
+        titulo = f"💳 Lançamentos - {conta} (Lista Expandida)" if conta else "💳 Lançamentos (Lista Expandida)"
+    else:
+        titulo = "📊"
     return f"{titulo} {de} a {ate}{conta_txt} — {header}\n" + "\n".join(linhas)
 
 
