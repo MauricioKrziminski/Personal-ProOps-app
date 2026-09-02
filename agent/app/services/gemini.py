@@ -130,7 +130,7 @@ def _fallback_format_query(data: dict) -> str:
     header = " | ".join(header_parts) or f"Total: *{cents_to_brl(total_gasto)}*"
 
     linhas = []
-    for l in lancamentos[:5]:
+    for l in lancamentos:
         desc = l.get("description") or l.get("category_name") or "Lançamento"
         val = l.get("amount_brl") or cents_to_brl(l.get("amount_cents") or 0)
         parc = f" ({l['installment_label']})" if l.get("installment_label") else ""
@@ -144,7 +144,8 @@ def _fallback_format_query(data: dict) -> str:
         val_oculto = cents_to_brl(resumo.get("total_gastos_ocultos_centavos", 0))
         linhas.append(f"\n📌 *Além dessas, você tem outras {qtd} compras neste período que totalizam {val_oculto}.*")
 
-    return f"📊 {de} a {ate}{conta_txt} — {header}\n" + "\n".join(linhas)
+    titulo = "💳 Lançamentos (Lista Expandida)" if data.get("is_expanded_view") else "📊"
+    return f"{titulo} {de} a {ate}{conta_txt} — {header}\n" + "\n".join(linhas)
 
 
 async def format_query_response(
@@ -165,18 +166,16 @@ async def format_query_response(
         "Sua tarefa é formatar os DADOS FINANCEIROS REAIS fornecidos em uma resposta de WhatsApp "
         "extremamente amigável, clara, concisa e bonita, aplicando o princípio da Revelação Progressiva (Progressive Disclosure).\n\n"
         "Regras fundamentais de exibição:\n"
-        "1. SE O USUÁRIO PEDIU EXPLICITAMENTE PARA VER TODAS / LISTAR TUDO / VER AS RESTANTES (ex: 'quero ver as 8 compras', 'mostra todas', 'detalha as compras', 'ver mais', 'lista completa'):\n"
-        "   - Atenda diretamente ao comando do usuário e liste todos os lançamentos individuais fornecidos em 'lancamentos', de forma limpa pelo nome e valor em negrito.\n"
-        "2. CONSULTA GERAL OU PADRÃO COM <= 5 LANÇAMENTOS NO TOTAL:\n"
-        "   - Liste todos os lançamentos normalmente pelo nome (ou preferência do usuário), com data e valor em negrito.\n"
-        "3. CONSULTA GERAL OU PADRÃO COM > 5 LANÇAMENTOS (ou período muito longo):\n"
-        "   - Exiba apenas os 3 lançamentos mais recentes (ou da fatura ativa).\n"
-        "   - Apresente um Resumo Consolidado elegante das compras adicionais usando os dados de 'resumo_ocultos' (ex: '📌 *Além dessas, você tem outras X compras neste período que totalizam R$ Y.*').\n"
-        "   - Se 'agrupamento_meses' estiver presente, mencione a consolidação dos meses anteriores de forma sucinta.\n"
-        "4. Compras parceladas: mostre a indicação da parcela no formato 'R$ X,XX (1/12)' ou '(3/10)' usando 'installment_label'.\n"
-        "5. Cartão de crédito: NUNCA liste receitas (salários) sob gastos do cartão.\n"
-        "6. Fidelidade total aos dados: NUNCA invente números, lançamentos ou valores que não estejam no JSON.\n"
-        "7. Use emojis pontuais (📊, 💳, 💸, 💰) e formatação WhatsApp (*negrito* para valores)."
+        "1. EXIBIÇÃO DE LANÇAMENTOS (INCLUINDO 'VER MAIS' / LISTA EXPANDIDA / TODOS):\n"
+        "   - Liste TODOS os lançamentos individuais fornecidos na lista 'lancamentos'. Quando for uma expansão ou 'Ver mais', a lista 'lancamentos' já vem acumulada desde o início até a página atual — apresente todos os itens em uma lista única, contínua e consolidada, sem omitir os anteriores.\n"
+        "   - Se 'is_expanded_view' for True ou se o usuário pediu para expandir/ver mais, use o cabeçalho '💳 Lançamentos - {conta} (Lista Expandida)' ou similar.\n"
+        "2. RESUMO DE COMPRAS OCULTAS:\n"
+        "   - Se 'resumo_ocultos' estiver presente e com quantidade_oculta > 0, inclua ao final a linha de consolidação elegante das compras restantes que ainda não foram exibidas (ex: '📌 *Além dessas, você tem outras X compras neste período que totalizam R$ Y.*').\n"
+        "   - Se 'resumo_ocultos' for nulo (ou quantidade_oculta = 0), NÃO adicione aviso de compras ocultas (todos os lançamentos do período já estão exibidos).\n"
+        "3. Compras parceladas: mostre a indicação da parcela no formato 'R$ X,XX (1/12)' ou '(5/8)' usando 'installment_label'.\n"
+        "4. Cartão de crédito: NUNCA liste receitas (salários) sob gastos do cartão.\n"
+        "5. Fidelidade total aos dados: NUNCA invente números, lançamentos ou valores que não estejam no JSON.\n"
+        "6. Use emojis pontuais (📊, 💳, 💸, 💰) e formatação WhatsApp (*negrito* para valores)."
     )
 
     dados_str = json.dumps(data, ensure_ascii=False, indent=2)

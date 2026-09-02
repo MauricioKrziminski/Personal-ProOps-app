@@ -64,9 +64,11 @@ async def query_transactions(ctx: ExecContext, action: FinanceQuery) -> ToolResu
             "ver mais",
             "mais lancamentos",
             "proxima pagina",
-            "proximos",
+            "pagina seguinte",
             "mostrar mais",
             "mais compras",
+            "proximos lancamentos",
+            "proximas compras",
         ]
     )
 
@@ -135,7 +137,18 @@ async def query_transactions(ctx: ExecContext, action: FinanceQuery) -> ToolResu
             account_name = acc["name"]
             account_type = acc.get("type")
 
+    termos_projecao = [
+        "projecao", "proximos", "futuros", "futuras", "proximas faturas",
+        "previsao", "proximos 90 dias", "proximos 3 meses",
+    ]
+    is_projection_requested = (
+        any(t in texto_norm for t in termos_projecao)
+        or bool(last_blueprint.get("include_projection"))
+        or (bool(action.query_to) and action.query_to > hoje)
+    )
+
     # 3. Resolução da Janela Temporal com Blueprint
+    include_projection = False
     if is_explicit_broad_history:
         de = add_months(hoje, -12)
         ate = hoje
@@ -143,19 +156,28 @@ async def query_transactions(ctx: ExecContext, action: FinanceQuery) -> ToolResu
         # Paginando: PRESERVA rigorosamente a janela do blueprint original (incluindo projeção futura)
         de = last_blueprint.get("start_date") or last_query["periodo"]["de"]
         ate = last_blueprint.get("end_date") or last_query["periodo"]["ate"]
+        include_projection = bool(last_blueprint.get("include_projection", False))
     elif is_refinement and is_all_items and (last_blueprint or last_query.get("periodo")):
         # Expansão de itens sobre o MESMO período
         de = last_blueprint.get("start_date") or last_query["periodo"]["de"]
         ate = last_blueprint.get("end_date") or last_query["periodo"]["ate"]
+        include_projection = bool(last_blueprint.get("include_projection", False))
     elif action.query_from and action.query_to:
         de = action.query_from
         ate = action.query_to
+        include_projection = ate > hoje
     elif action.query_from:
         de = action.query_from
         ate = hoje
     elif action.query_to:
         ate = action.query_to
         de = add_months(ate, -1)
+        include_projection = ate > hoje
+    elif is_projection_requested and not is_refinement:
+        # Consulta com projeção futura pedida (ex: próximos 90 dias)
+        de = hoje
+        ate = add_months(hoje, 3)
+        include_projection = True
     elif is_today_explicit:
         de = hoje
         ate = hoje
@@ -224,21 +246,25 @@ async def query_transactions(ctx: ExecContext, action: FinanceQuery) -> ToolResu
 
     total_items = len(rows)
 
-    # 5. Fatiamento por Paginação / Expansão
+    # 5. Fatiamento por Paginação / Expansão Unificada (Acumulativa)
     if is_explicit_full_request:
-        mostrados_rows = rows
         total_exibidos = total_items
+        mostrados_rows = rows
         ocultos_rows = []
+        is_expanded_view = True
     elif offset > 0:
         page_size = 5
-        mostrados_rows = rows[offset : offset + page_size]
-        total_exibidos = min(total_items, offset + len(mostrados_rows))
+        total_exibidos = min(total_items, offset + page_size)
+        # Visualização Unificada: exibe cumulativamente os itens do início até total_exibidos!
+        mostrados_rows = rows[:total_exibidos]
         ocultos_rows = rows[total_exibidos:]
+        is_expanded_view = True
     else:
         limite_display = 5 if total_items <= 5 else 3
-        mostrados_rows = rows[:limite_display]
-        total_exibidos = len(mostrados_rows)
-        ocultos_rows = rows[limite_display:]
+        total_exibidos = min(total_items, limite_display)
+        mostrados_rows = rows[:total_exibidos]
+        ocultos_rows = rows[total_exibidos:]
+        is_expanded_view = False
 
     ocultos_restantes = max(0, total_items - total_exibidos)
     ocultos_total_gastos = sum(
@@ -296,6 +322,7 @@ async def query_transactions(ctx: ExecContext, action: FinanceQuery) -> ToolResu
         "account_name": account_name,
         "account_type": account_type,
         "filtro_conta": account_name,
+        "is_expanded_view": is_expanded_view,
         "total_geral_itens": total_items,
         "total_exibidos": total_exibidos,
         "total_gastos_centavos": sum(
