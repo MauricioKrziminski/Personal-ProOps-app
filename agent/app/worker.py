@@ -622,11 +622,15 @@ async def _resposta_do_estado(sessao: dict, estado: dict, thread: str) -> str | 
     """
     rascunho = estado.get("draft") or {}
     if not rascunho:
-        # Nada novo pela metade — mas pode haver um rascunho ANTIGO esperando.
-        # Lembrar dele aqui é o que permite trocar de assunto sem perder nada:
-        # a nota de café é salva e o mac continua ali, mencionado de leve.
-        antigo = await db.open_draft(sessao["phone"])
-        if antigo:
+        # Se uma ação financeira completa foi processada, descarta rascunho antigo residual
+        if estado.get("finance_actions"):
+            await db.delete_draft(sessao["phone"])
+            antigo = None
+        else:
+            antigo = await db.open_draft(sessao["phone"])
+
+        # Nunca anexa lembrete de rascunho a consultas financeiras/extratos
+        if antigo and not estado.get("finance_queries"):
             rep = estado.get("reply")
             lembr = draft.lembrete(antigo)
             if isinstance(rep, dict):
