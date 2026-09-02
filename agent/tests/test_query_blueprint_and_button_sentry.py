@@ -306,4 +306,66 @@ class TestQueryBlueprintAndButtonSentry:
         assert res.data["blueprint"]["include_projection"] is True
         assert res.data["blueprint"]["end_date"] > "2026-09-01"
 
+    @pytest.mark.asyncio
+    async def test_multiplas_acoes_query_transactions_e_forecast_preservam_spec_de_botoes(self, monkeypatch):
+        """Quando o LLM gera 2 ações (query_transactions + query_forecast), spec de botões é preservado."""
+        from app.graph.nodes import execute_node
+
+        async def accounts(workspace_id, only_cards=False):
+            return [{"id": CARD_ID, "name": "Nubank Cartão", "type": "credit_card", "closing_day": 25}]
+
+        fake_rows = [
+            {
+                "id": UUID(f"00000000-0000-0000-0000-{i:012d}"),
+                "description": f"Compra {i}",
+                "amount_cents": 5000,
+                "category_name": "outros",
+                "kind": "expense",
+                "occurred_at": date(2026, 9, i),
+                "status": "cleared",
+                "current_installment": None,
+                "total_installments": None,
+                "account_name": "Nubank Cartão",
+                "account_type": "credit_card",
+            }
+            for i in range(1, 8)
+        ]
+
+        async def fetch(query, *args):
+            if "_cash_flow_forecast" in query:
+                return [{"day": date(2026, 11, 30), "balance_cents": 2131500}]
+            return fake_rows
+
+        monkeypatch.setattr(db, "accounts", accounts)
+        monkeypatch.setattr(db, "fetch", fetch)
+
+        state = {
+            "user_id": str(USER_ID),
+            "workspace_id": str(WS),
+            "phone": "5551999999999",
+            "timezone": "America/Sao_Paulo",
+            "wa_message_id": "w1",
+            "text": "me mostre dos ultimos 90 dias e com projecao dos proximos 90 dias",
+            "finance_queries": [
+                {"type": "query_transactions", "account": "nubank", "query_from": "2026-06-03", "query_to": "2026-09-01"},
+                {"type": "query_forecast", "query_to": "2026-11-30"},
+            ],
+            "finance_actions": [],
+            "notes_actions": [],
+            "targets": [{}, {}],
+            "results": [],
+            "last_query_data": {},
+        }
+
+        ret = await execute_node(state)
+        assert "reply" in ret
+        assert isinstance(ret["reply"], dict)
+        assert ret["reply"]["ui"] == "buttons"
+        botoes = ret["reply"]["buttons"]
+        assert any("Ver mais" in b[1] for b in botoes)
+        # O texto contém ambas as mensagens (extrato + projeção)
+        assert "🔮" in ret["reply"]["body"]
+        assert "Extrato" in ret["reply"]["body"] or "Lançamentos" in ret["reply"]["body"] or "Gastos" in ret["reply"]["body"]
+
+
 
