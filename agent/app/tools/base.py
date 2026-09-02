@@ -32,6 +32,8 @@ class ExecContext:
     target: dict | None = None
     # ids criados nesta mensagem (auditoria e desfazer)
     created: list[str] = field(default_factory=list)
+    # cache da última consulta executada (para herança de contexto e trava de entidade)
+    last_query_data: dict | None = None
 
 
 @dataclass

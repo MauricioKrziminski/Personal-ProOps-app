@@ -12,6 +12,8 @@ extra de custo.
 
 from __future__ import annotations
 
+from uuid import UUID
+
 from app import db
 from app.domain import matching
 from app.domain.dates import add_months, format_date_br, invoice_cycle_window, local_iso_date
@@ -41,9 +43,33 @@ async def query_transactions(ctx: ExecContext, action: FinanceQuery) -> ToolResu
     account_type = None
     achados = []
 
-    inferred_type = matching.infer_account_type(f"{ctx.texto} {action.account or ''}")
+    last_query = ctx.last_query_data or {}
+    has_last_query = bool(last_query and last_query.get("account_id"))
+    texto_norm = matching.normalize(ctx.texto)
 
-    if action.account:
+    # 1. State Cache Locking (Herança estrita de conta)
+    is_refinement = False
+    if has_last_query:
+        last_acc_norm = matching.normalize(last_query.get("account_name") or "")
+        # Se action.account for nulo OU igual/subtermo da conta anterior OU o comando for continuação
+        termos_continuacao = [
+            "todos", "todas", "tudo", "resto", "mais", "parcelas",
+            "mes", "meses", "outras", "detalha", "completo", "fatura",
+        ]
+        if (
+            not action.account
+            or (action.account and matching.normalize(action.account) in last_acc_norm)
+            or any(w in texto_norm for w in termos_continuacao)
+        ):
+            # Trava a conta e o tipo anteriores sem nova busca fuzzy desnecessária
+            account_id = UUID(str(last_query["account_id"]))
+            account_name = last_query["account_name"]
+            account_type = last_query.get("account_type")
+            is_refinement = True
+
+    # 2. Resolução normal de conta se não for refinamento travado
+    if not is_refinement and action.account:
+        inferred_type = matching.infer_account_type(f"{ctx.texto} {action.account or ''}")
         linhas = await db.accounts(ctx.workspace_id)
         achados = matching.match_accounts(
             action.account, linhas, account_type=inferred_type
@@ -54,20 +80,26 @@ async def query_transactions(ctx: ExecContext, action: FinanceQuery) -> ToolResu
             account_name = acc["name"]
             account_type = acc.get("type")
 
-    texto_norm = matching.normalize(ctx.texto)
-    termos_todos = [
-        "todos", "todas", "tudo", "historico", "completo",
-        "tudo que tem", "desde o inicio",
+    # 3. Resolução da Janela Temporal
+    termos_ano_todo = [
+        "ano todo", "do ano", "desde o inicio", "historico completo",
+        "de 1 ano", "12 meses", "ano passado", "todo o ano",
     ]
-    is_all_history = any(t in texto_norm for t in termos_todos)
+    is_explicit_broad_history = any(t in texto_norm for t in termos_ano_todo)
+    is_all_items = any(
+        t in texto_norm for t in ["todos", "todas", "tudo", "resto", "outras", "completa", "completo"]
+    )
     is_today_explicit = any(
         t in texto_norm for t in ["hoje", "de hoje", "agora", "neste dia", "nesse dia"]
     )
 
-    # Janela temporal inteligente
-    if is_all_history:
+    if is_explicit_broad_history:
         de = add_months(hoje, -12)
         ate = hoje
+    elif is_refinement and is_all_items and last_query.get("periodo"):
+        # Expansão de paginação sobre o MESMO período que estava na tela
+        de = last_query["periodo"]["de"]
+        ate = last_query["periodo"]["ate"]
     elif action.query_from and action.query_to:
         de = action.query_from
         ate = action.query_to
@@ -80,19 +112,25 @@ async def query_transactions(ctx: ExecContext, action: FinanceQuery) -> ToolResu
     elif is_today_explicit:
         de = hoje
         ate = hoje
+    elif is_all_items and not has_last_query:
+        de = add_months(hoje, -12)
+        ate = hoje
     else:
         # Sem datas explícitas
-        if account_type == "credit_card" and achados and achados[0].get("closing_day"):
-            # Janela dinâmica da fatura ativa do cartão
-            de, ate = invoice_cycle_window(
-                achados[0]["closing_day"],
-                achados[0].get("due_day"),
-                hoje,
+        if account_type == "credit_card":
+            linhas = await db.accounts(ctx.workspace_id, only_cards=True)
+            card_acc = (
+                next((a for a in linhas if str(a["id"]) == str(account_id)), None)
+                if account_id
+                else (achados[0] if achados else None)
             )
-        elif account_type == "credit_card":
-            # Cartão sem dia de fechamento: fatura do mês atual / últimos 30 dias
-            de = f"{add_months(hoje, -1)[:7]}-25"
-            ate = hoje
+            closing = card_acc.get("closing_day") if card_acc else None
+            due = card_acc.get("due_day") if card_acc else None
+            if closing:
+                de, ate = invoice_cycle_window(closing, due, hoje)
+            else:
+                de = f"{add_months(hoje, -1)[:7]}-25"
+                ate = hoje
         else:
             # Geral / Conta corrente: últimos 30 dias por padrão
             de = add_months(hoje, -1)
@@ -169,6 +207,9 @@ async def query_transactions(ctx: ExecContext, action: FinanceQuery) -> ToolResu
             "de_br": format_date_br(de),
             "ate_br": format_date_br(ate),
         },
+        "account_id": str(account_id) if account_id else None,
+        "account_name": account_name,
+        "account_type": account_type,
         "filtro_conta": account_name,
         "total_geral_itens": total_items,
         "total_gastos_centavos": sum(

@@ -678,6 +678,7 @@ async def _executar(
         timezone=state["timezone"],
         texto=state.get("text", ""),
         wa_message_id=state["wa_message_id"],
+        last_query_data=state.get("last_query_data"),
     )
     acoes = _actions(state)
     alvos = (list(state.get("targets") or []) + [{}] * len(acoes))[: len(acoes)]
