@@ -82,7 +82,15 @@ export function HeroPanel({
   return (
     <Animated.View
       entering={FadeIn.duration(Motion.duration.slow)}
-      style={[styles.panel, { borderColor: theme.cardBorder }]}>
+      style={[
+        styles.panel,
+        {
+          borderColor: theme.cardBorder,
+          // Base embaixo do gradiente: o `GradientSurface` só monta o canvas depois que a `View`
+          // mede, e sem isto o painel pisca transparente no primeiro frame.
+          backgroundColor: theme.heroBottom,
+        },
+      ]}>
       <GradientSurface
         from={theme.heroTop}
         to={theme.heroBottom}

@@ -61,7 +61,7 @@ const SPREAD = 92;
  * coisas estavam erradas e as duas são estruturais:
  *
  * 1. **Não tinha anatomia de cartão.** O export desenha o objeto físico: chip EMV dourado,
- *    contactless, número mascarado, nome do titular em mono caixa alta, e a cor do emissor no
+ *    contactless, fatura em display, barra de limite, e a cor do emissor no
  *    fundo. Sem isso nenhuma proporção salva — lê como card, porque é um card.
  * 2. **A pilha crescia para baixo.** Os cartões de trás apareciam ABAIXO do da frente. Numa
  *    carteira real (e no Wallet, e no export) eles aparecem ACIMA e mais estreitos: é a borda
@@ -91,6 +91,8 @@ export function CardStack({
 }) {
   const [frente, setFrente] = useState(0);
   const [aberta, setAberta] = useState(false);
+  /** A largura do palco, para o estreitamento dos cartões de trás virar `scaleX` (§5). */
+  const [largura, setLargura] = useState(0);
   const visiveis = cards.slice(0, 6);
   const atras = visiveis.length - 1;
 
@@ -115,7 +117,9 @@ export function CardStack({
   };
 
   return (
-    <Animated.View style={[styles.palco, palco]}>
+    <Animated.View
+      style={[styles.palco, palco]}
+      onLayout={(e) => setLargura(e.nativeEvent.layout.width)}>
       {visiveis.map((card, i) => {
         // Ordem de PROFUNDIDADE quando fechada; ordem da lista quando aberta.
         const profundidade = (i - frente + visiveis.length) % visiveis.length;
@@ -127,6 +131,7 @@ export function CardStack({
             index={i}
             total={visiveis.length}
             atras={atras}
+            largura={largura}
             aberta={aberta}
             onPress={() => escolher(i)}
             onOpen={() => onOpen(card)}
@@ -157,6 +162,7 @@ function CardFace({
   index,
   total,
   atras,
+  largura,
   aberta,
   onPress,
   onOpen,
@@ -166,6 +172,7 @@ function CardFace({
   index: number;
   total: number;
   atras: number;
+  largura: number;
   aberta: boolean;
   onPress: () => void;
   onOpen: () => void;
@@ -180,17 +187,22 @@ function CardFace({
    * lateral crescente. Aberta: uma fileira de cartões inteiros, um passo cada.
    */
   const y = aberta ? index * SPREAD : (atras - depth) * PEEK;
-  const recuo = aberta ? 0 : depth * INSET;
+  /**
+   * O estreitamento dos cartões de trás, como ESCALA e não como `left`/`right`.
+   *
+   * O recuo é simétrico, então ele é exatamente um `scaleX` — e §5 do design manda animar só
+   * `transform` e `opacity` em worklet: `left`/`right` disparam layout a cada frame.
+   */
+  const encolhe = aberta || largura <= 0 ? 1 : (largura - depth * INSET * 2) / largura;
 
   const animado = useAnimatedStyle(() => ({
     transform: [
       { translateY: withSpring(y, Motion.spring.settle) },
       // A multiplicação vai DENTRO do `withSpring`. Fora, o Reanimated não intercepta a chamada
       // no objeto de estilo e o resultado vira `NaN` — a view some sem erro nenhum no log.
+      { scaleX: withSpring(encolhe, Motion.spring.settle) },
       { scale: withSpring(press.get(), Motion.spring.settle) },
     ],
-    left: withSpring(recuo, Motion.spring.settle),
-    right: withSpring(recuo, Motion.spring.settle),
     // Fechada, quem está na frente desenha por cima. Aberta, quem está EMBAIXO desenha por cima,
     // senão o leque volta a ser uma pilha.
     zIndex: aberta ? index : total - depth,
@@ -211,7 +223,15 @@ function CardFace({
         onPressIn={() => press.set(withTiming(Motion.pressScale, { duration: Motion.duration.fast }))}
         onPressOut={() => press.set(withTiming(1, { duration: Motion.duration.fast }))}
         onPress={onPress}
-        style={[styles.card, { borderColor: alpha(marca, 0.35) }]}>
+        style={[
+          styles.card,
+          {
+            borderColor: alpha(marca, 0.35),
+            // A cor de base embaixo do gradiente. O `GradientSurface` só monta o canvas depois
+            // que a `View` mede, e sem isto o cartão pisca transparente no primeiro frame.
+            backgroundColor: blend(marca, theme.heroBottom, 0.06),
+          },
+        ]}>
         {/*
           O fundo do cartão: a cor do emissor puxada quase toda para o preto, mais um brilho da
           própria cor saindo pelo canto. É o `from-[#1d142b] to-[#0c0a13]` do export, calculado em
@@ -224,7 +244,7 @@ function CardFace({
           sheenSize={90}
         />
 
-        {/* Cabeçalho: bandeira, nome e o número mascarado. */}
+        {/* Cabeçalho: a bandeira e o nome do cartão. */}
         <View style={styles.topo}>
           <View style={styles.nomeWrap}>
             <View style={[styles.bandeira, { backgroundColor: marca }]} />
@@ -243,11 +263,13 @@ function CardFace({
               </View>
             ) : null}
           </View>
-          <View style={[styles.numero, { backgroundColor: theme.heroChip }]}>
-            <ThemedText type="code" themeColor="onHero" style={tabular}>
-              {mascara(card.account_id)}
-            </ThemedText>
-          </View>
+          {/*
+            Onde o export põe "•••• 4301" não vai NADA.
+            O schema não guarda os quatro últimos dígitos, e a primeira versão daqui derivava
+            quatro dígitos do UUID da conta. Num app de finanças isso lê como o número real do
+            cartão — alguém compara com o cartão físico e conclui que o app está errado. Dado que
+            não existe não vira enfeite; se a pílula fizer falta, o caminho é uma coluna `last4`.
+          */}
         </View>
 
         {/*
@@ -282,7 +304,7 @@ function CardFace({
             <View style={styles.fechaValor}>
               {card.closing_date ? (
                 <ThemedText type="ticker" themeColor="onHero" style={tabular}>
-                  {formatDateBR(card.closing_date).slice(0, 5)}
+                  {formatDateBR(card.closing_date)}
                 </ThemedText>
               ) : null}
               <Icon name="chevron.right" size="xs" color="onHeroMuted" />
@@ -303,7 +325,7 @@ function CardFace({
         {/* Rodapé do cartão: titular à esquerda, disponível à direita. */}
         <View style={styles.rodape}>
           <ThemedText type="meta" themeColor="onHeroMuted" numberOfLines={1} style={styles.shrink}>
-            {card.due_date ? `VENCE ${formatDateBR(card.due_date).slice(0, 5)}` : 'SEM VENCIMENTO'}
+            {card.due_date ? `VENCE ${formatDateBR(card.due_date)}` : 'SEM VENCIMENTO'}
           </ThemedText>
           {limite > 0 ? (
             <View style={styles.disponivel}>
@@ -321,18 +343,9 @@ function CardFace({
   );
 }
 
-/**
- * Os quatro últimos dígitos. O schema NÃO guarda o número do cartão (e não deveria), então eles
- * saem do fim do UUID da conta: é estável, é o mesmo em toda sessão e não finge ser um dado que
- * o app não tem. Sem isto o cartão perde a marca visual que mais o identifica de longe.
- */
-function mascara(id: string): string {
-  return `•••• ${id.replace(/[^0-9]/g, '').slice(-4).padStart(4, '0')}`;
-}
-
 const styles = StyleSheet.create({
   palco: { width: '100%' },
-  slot: { position: 'absolute', top: 0 },
+  slot: { position: 'absolute', top: 0, left: 0, right: 0 },
   shrink: { flex: 1, minWidth: 0 },
   card: {
     height: CARD_H,
@@ -348,11 +361,6 @@ const styles = StyleSheet.create({
   /** O ponto da bandeira: 10px de cor pura, o único respingo de marca fora da barra de limite. */
   bandeira: { width: 10, height: 10, borderRadius: Radius.pill },
   pill: { paddingHorizontal: Space.sm, paddingVertical: Space.half, borderRadius: Radius.pill },
-  numero: {
-    paddingHorizontal: Space.sm,
-    paddingVertical: Space.half,
-    borderRadius: Radius.pill,
-  },
   fisico: { flexDirection: 'row', alignItems: 'center', gap: Space.md },
   chip: {
     width: 36,
