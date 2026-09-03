@@ -121,8 +121,17 @@ export function CardStack({
       style={[styles.palco, palco]}
       onLayout={(e) => setLargura(e.nativeEvent.layout.width)}>
       {visiveis.map((card, i) => {
-        // Ordem de PROFUNDIDADE quando fechada; ordem da lista quando aberta.
-        const profundidade = (i - frente + visiveis.length) % visiveis.length;
+        /*
+          O escolhido vai para a frente e **o resto NÃO se mexe**.
+
+          Antes isto era uma rotação (`(i - frente + n) % n`), que é o que uma pilha de baralho
+          faz: escolher o segundo cartão jogava o primeiro lá para trás e a ordem inteira
+          embaralhava a cada toque. Numa carteira o usuário memoriza a posição — "o laranja é o
+          do meio" — e reordenar sozinho apaga essa memória.
+
+          Agora a profundidade é: o escolhido em 0, e os outros na ORDEM ORIGINAL logo abaixo.
+        */
+        const profundidade = i === frente ? 0 : 1 + (i < frente ? i : i - 1);
         return (
           <CardFace
             key={card.account_id}
@@ -186,7 +195,14 @@ function CardFace({
    * Fechada: o da frente encosta no fundo do palco e cada um de trás sobe uma faixa, com recuo
    * lateral crescente. Aberta: uma fileira de cartões inteiros, um passo cada.
    */
-  const y = aberta ? index * SPREAD : (atras - depth) * PEEK;
+  /*
+    Aberta e fechada usam a MESMA ordem (`depth`), nunca o índice do array.
+
+    Com `index` no leque, abrir a carteira reordenava a pilha na cara do usuário: o cartão da
+    frente saltava para a posição dele na lista e os outros se reorganizavam em volta. Uma
+    carteira que se embaralha ao abrir não é uma carteira.
+  */
+  const y = aberta ? depth * SPREAD : (atras - depth) * PEEK;
   /**
    * O estreitamento dos cartões de trás, como ESCALA e não como `left`/`right`.
    *
@@ -205,7 +221,7 @@ function CardFace({
     ],
     // Fechada, quem está na frente desenha por cima. Aberta, quem está EMBAIXO desenha por cima,
     // senão o leque volta a ser uma pilha.
-    zIndex: aberta ? index : total - depth,
+    zIndex: aberta ? depth : total - depth,
   }));
 
   const limite = Number(card.credit_limit_cents ?? 0);

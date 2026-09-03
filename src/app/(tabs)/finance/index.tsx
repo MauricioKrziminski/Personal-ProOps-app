@@ -1,6 +1,6 @@
 import { router, type Href } from 'expo-router';
 import { useEffect, useMemo, useState } from 'react';
-import { Platform, Pressable, StyleSheet, View, useWindowDimensions } from 'react-native';
+import { Platform, Pressable, StyleSheet, View } from 'react-native';
 import Animated, {
   FadeInDown,
   useAnimatedStyle,
@@ -37,7 +37,7 @@ import { Segmented } from '@/components/ui/segmented';
 import { HeroPanel } from '@/components/ui/hero-panel';
 import { Screen } from '@/components/ui/screen';
 import { Skeleton, SkeletonRow } from '@/components/ui/skeleton';
-import { ProgressBar, Sparkline } from '@/components/ui/sparkline';
+import { ProgressBar } from '@/components/ui/sparkline';
 import { useToast } from '@/components/ui/toast';
 import { Elevation, Motion, Radius, Space, tabular } from '@/design/tokens';
 import {
@@ -215,7 +215,6 @@ export default function FinanceScreen() {
   const theme = useTheme();
   const scheme = useScheme();
   const toast = useToast();
-  const { width } = useWindowDimensions();
   const insets = useSafeAreaInsets();
   const [month, setMonth] = useState(currentMonth);
 
@@ -249,11 +248,6 @@ export default function FinanceScreen() {
   const upcomingOut = (forecast.data ?? []).reduce((s, d) => s + Number(d.out_cents), 0);
   const projected = forecast.data?.at(-1)?.balance_cents ?? 0;
   const leftover = isCurrent ? Number(projected) : income - expense;
-  const series = (forecast.data ?? []).map((d) => Number(d.balance_cents));
-  /** Amplitude relativa da série — abaixo de 1% a linha é horizontal e não informa nada. */
-  const varia =
-    series.length > 1 &&
-    (Math.max(...series) - Math.min(...series)) / Math.max(...series.map(Math.abs), 1) > 0.01;
 
   const categories = useMemo(() => {
     const rows = (summary.data ?? []).filter((r) => r.kind === 'expense');
@@ -374,13 +368,12 @@ export default function FinanceScreen() {
                   ? `entrou ${formatBRL(income)} · saiu ${formatBRL(expense)} · previsto ${formatBRL(upcomingOut)}`
                   : `entrou ${formatBRL(income)} · saiu ${formatBRL(expense)}`,
             }}
-            chart={
-              // Mesmo critério da Hoje: série que não varia desenha uma reta, e reta no meio
-              // do painel lê como divisor, não como gráfico.
-              isCurrent && series.length > 2 && varia ? (
-                <Sparkline values={series} width={width - Space.lg * 2 - Space.gutter * 2} height={48} showZero />
-              ) : undefined
-            }
+            /*
+              **Sem gráfico aqui.** O herói do Financeiro no export é só rótulo, valor e a faixa
+              de comparação — quem tem sparkline é o da Hoje. Dois gráficos a uma rolagem de
+              distância (este e a Tendência Mensal) também diziam a mesma coisa duas vezes, com
+              recortes diferentes: um de 30 dias, outro de 6 meses.
+            */
             trend={
               diffExpense !== null
                 ? {
