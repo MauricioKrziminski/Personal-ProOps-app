@@ -15,6 +15,12 @@ interface ScreenProps {
   /** Fundo agrupado (cinza) para telas de lista; `background` para telas de conteúdo. */
   grouped?: boolean;
   /**
+   * ⚠️ **SEM USUÁRIOS desde 03/09/2026.** O `HeroPanel` virou card flutuante dentro do corpo
+   * (design Stitch) e nenhuma tela sangra mais o topo. O slot e a aba de costura (`joint`)
+   * continuam aqui só enquanto a decisão de dark-only e do `AppHeader` não estiver confirmada —
+   * **não voltar a usar**: sob o `AppHeader` o painel sangrado empilha duas superfícies escuras
+   * sem costura, que é o defeito que o card resolve.
+   *
    * Conteúdo colado no topo, **sem o recuo lateral** — o painel de destaque (`HeroPanel`), que
    * sangra até as bordas.
    *

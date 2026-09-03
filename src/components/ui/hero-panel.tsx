@@ -9,32 +9,6 @@ import { useConceal } from '@/components/ui/conceal';
 import { Motion, Radius, Space, Type } from '@/design/tokens';
 import { useTheme } from '@/hooks/use-theme';
 
-/**
- * As opções de header das telas que têm painel — **o cabeçalho veste a mesma cor**.
- *
- * Com cabeçalho branco em cima do painel de tinta, a faixa preta lia como um bloco colado no
- * meio da tela em vez do topo dela: apareciam duas superfícies disputando o alto, e a costura
- * entre as duas era a primeira coisa que o olho achava. Bancos que usam esse padrão pintam o
- * cabeçalho junto — é o que dá o "topo é uma coisa só".
- *
- * O large title, os ícones de ação e o botão de voltar vão para `onHero`. Vale só nas telas com
- * painel; o resto do app segue com o cabeçalho padrão do sistema.
- *
- * ⚠️ Não é `headerTransparent`. Transparente faria o conteúdo rolar por baixo do título, e o
- * projeto já pagou esse preço uma vez na Notas — a área do large title precisa ser opaca, senão
- * a lista desenha por cima dela.
- */
-export function heroHeaderOptions(theme: ReturnType<typeof useTheme>) {
-  return {
-    headerStyle: { backgroundColor: theme.heroSurface },
-    headerLargeStyle: { backgroundColor: theme.heroSurface },
-    headerTintColor: theme.onHero,
-    headerTitleStyle: { color: theme.onHero },
-    headerLargeTitleStyle: { color: theme.onHero },
-    headerShadowVisible: false,
-  } as const;
-}
-
 interface HeroPanelProps {
   /**
    * Controle que ESCOPA o número — hoje, o seletor de mês do Financeiro.
