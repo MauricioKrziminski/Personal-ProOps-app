@@ -233,6 +233,27 @@ export default function FinanceScreen() {
   const [janelaCashflow, setJanelaCashflow] = useState('6');
   /** O cartão que a carteira está mostrando — rotula a saída logo abaixo dela. */
   const [cartaoFrente, setCartaoFrente] = useState<StackedCard | null>(null);
+
+  /**
+   * Memoizado: montado inline no JSX, o array nascia novo a cada render e a carteira inteira
+   * remontava junto — inclusive o efeito que reporta o cartão da frente.
+   */
+  const cartoesDaCarteira = useMemo<StackedCard[]>(
+    () =>
+      (cards.data ?? []).map((c) => ({
+        account_id: c.account_id,
+        name: c.name,
+        invoice_id: c.invoice_id,
+        invoice_total_cents: Number(c.invoice_total_cents ?? 0),
+        credit_limit_cents: c.credit_limit_cents == null ? null : Number(c.credit_limit_cents),
+        available_limit_cents:
+          c.available_limit_cents == null ? null : Number(c.available_limit_cents),
+        closing_date: c.closing_date,
+        due_date: c.due_date,
+        overdue_count: Number(c.overdue_count ?? 0),
+      })),
+    [cards.data]
+  );
   const cashflow = useMonthlyCashflow(Number(janelaCashflow));
   const recent = useRecentTransactions(5);
   const remove = useDeleteTransaction();
@@ -506,18 +527,7 @@ export default function FinanceScreen() {
               }
             />
             <CardStack
-              cards={(cards.data ?? []).map((c) => ({
-                account_id: c.account_id,
-                name: c.name,
-                invoice_id: c.invoice_id,
-                invoice_total_cents: Number(c.invoice_total_cents ?? 0),
-                credit_limit_cents: c.credit_limit_cents == null ? null : Number(c.credit_limit_cents),
-                available_limit_cents:
-                  c.available_limit_cents == null ? null : Number(c.available_limit_cents),
-                closing_date: c.closing_date,
-                due_date: c.due_date,
-                overdue_count: Number(c.overdue_count ?? 0),
-              }))}
+              cards={cartoesDaCarteira}
               onFrontChange={setCartaoFrente}
               onOpen={(card) => abrirFatura(card)}
             />

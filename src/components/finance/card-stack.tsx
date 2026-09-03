@@ -101,12 +101,22 @@ export function CardStack({
   const [largura, setLargura] = useState(0);
 
   const naFrente = cards[frente];
+  /**
+   * ⚠️ A dependência é o **ID**, nunca o objeto.
+   *
+   * A tela monta `cards` com um `.map()` inline, então `cards[frente]` é um objeto NOVO a cada
+   * render. Dependendo dele, o efeito rodava sempre → `setCartaoFrente` → novo render → efeito
+   * de novo: laço infinito. No iOS isso derrubava a tela com "Maximum update depth exceeded";
+   * no Android o emulador lento mascarava, o que é pior — o defeito existia nos dois.
+   *
+   * `onFrontChange` fica fora das dependências pelo mesmo motivo: a seta também nasce a cada
+   * render.
+   */
+  const idFrente = naFrente?.account_id;
   useEffect(() => {
     if (naFrente) onFrontChange?.(naFrente);
-    // `onFrontChange` fora das dependências de propósito: a tela costuma passar uma seta nova a
-    // cada render, e incluí-la aqui faria o efeito rodar em loop.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [naFrente]);
+  }, [idFrente]);
   const visiveis = cards.slice(0, 6);
   const atras = visiveis.length - 1;
 
