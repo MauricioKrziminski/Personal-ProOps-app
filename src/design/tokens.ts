@@ -104,7 +104,7 @@ export const Motion = {
      * movimento chega ao fim tarde demais e sem nenhuma vida. Aqui a régua é a de trocar de aba:
      * rápida, com um overshoot mínimo que diz "chegou".
      */
-    snap: { duration: 260, dampingRatio: 0.82 },
+    snap: { duration: 340, dampingRatio: 0.78 },
   },
   /**
    * Escalonamento de entrada em lista: `delay = min(index * step, cap)`.

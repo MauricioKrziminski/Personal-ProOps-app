@@ -87,7 +87,16 @@ export function Screen({
       <ScrollView
         style={styles.root}
         contentContainerStyle={padding}
-        contentInsetAdjustmentBehavior="never"
+        /*
+          `never` só onde o header é NOSSO (`topBar`), porque ali a altura já entra no
+          `paddingTop` acima — deixar o iOS ajustar por cima disso soma duas vezes.
+
+          Nas telas EMPURRADAS quem desenha o topo é o header nativo, e é o `automatic` que faz o
+          conteúdo começar embaixo do large title em vez de correr por baixo dele. Trocar isso por
+          `never` para todo mundo (o que eu tinha feito) enfiava a primeira linha de Contas,
+          Cartões, Orçamentos e companhia debaixo da barra de navegação.
+        */
+        contentInsetAdjustmentBehavior={topBar ? 'never' : 'automatic'}
         showsVerticalScrollIndicator={false}
         refreshControl={
           onRefresh ? <RefreshControl refreshing={refreshing} onRefresh={onRefresh} /> : undefined

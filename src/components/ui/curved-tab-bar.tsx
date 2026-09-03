@@ -1,4 +1,4 @@
-import { useEffect, useMemo } from 'react';
+import { useCallback, useEffect, useMemo } from 'react';
 import * as Haptics from 'expo-haptics';
 import { Pressable, StyleSheet, View, useWindowDimensions } from 'react-native';
 import { Canvas, Circle, Group, Path, Skia } from '@shopify/react-native-skia';
@@ -139,11 +139,34 @@ export function CurvedTabBar({
 
   const progresso = useSharedValue(activeIndex);
 
+  /**
+   * ⚠️ **A mola começa no DEDO, não na rota.**
+   *
+   * `activeIndex` vem dos segmentos da URL, então ele só muda depois que o expo-router monta a
+   * tela de destino. Nessa janela o JS fica ocupado e o app não entrega frame nenhum — a mola era
+   * disparada no fim dela e o resultado, gravado em vídeo, era um DEGRAU: a bolha em x=240 por
+   * N frames e em x=35 no frame seguinte, sem nenhum quadro intermediário. Não era mola rápida
+   * demais; era mola que rodava enquanto ninguém estava olhando.
+   *
+   * Começando no toque, a animação corre na UI thread ao mesmo tempo em que a tela nova monta na
+   * JS thread — que é justamente para isso que o Reanimated existe. O efeito abaixo continua,
+   * porque navegação que vem de FORA da barra (notificação, deep link, `router.push` de uma
+   * tela) também precisa mover o berço.
+   */
+  const animarPara = useCallback(
+    (destino: number) => {
+      'worklet';
+      progresso.set(withSpring(destino, Motion.spring.snap));
+    },
+    [progresso]
+  );
+
   useEffect(() => {
-    // A mola é disparada em efeito, nunca no corpo do componente: escrever num shared value
-    // durante o render reinicia a animação a cada re-render do pai.
-    progresso.set(withSpring(activeIndex, Motion.spring.snap));
-  }, [activeIndex, progresso]);
+    // Disparo em efeito, nunca no corpo do componente: escrever num shared value durante o
+    // render reinicia a animação a cada re-render do pai. Mirar no valor que a mola já persegue
+    // é inofensivo — o Reanimated continua o movimento em curso.
+    animarPara(activeIndex);
+  }, [activeIndex, animarPara]);
 
   /** O centro do berço e da bolha — UMA posição para os dois, senão eles dessincronizam. */
   const centro = useDerivedValue(() => slot * (progresso.get() + 0.5));
@@ -247,7 +270,11 @@ export function CurvedTabBar({
                 accessibilityState={{ selected: ativo }}
                 accessibilityLabel={tab.label}
                 onPress={() => {
-                  if (!ativo) Haptics.selectionAsync();
+                  if (ativo) return;
+                  Haptics.selectionAsync();
+                  // A ordem importa: a mola primeiro, a navegação depois. Invertido, o
+                  // `router.navigate` bloqueia a JS thread antes de a animação existir.
+                  animarPara(i);
                   onSelect(i);
                 }}
                 style={[styles.slot, { width: slot }]}>
