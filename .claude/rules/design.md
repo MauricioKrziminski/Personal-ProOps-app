@@ -260,10 +260,17 @@ que "voltar" faz depois.
   **Tela EMPURRADA continua com `<Stack.Title>` + large title** — lá o título e o "voltar" são a
   informação. Barra desenhada à mão dentro do `ScrollView` continua proibida: o `AppHeader` fica
   FORA dele.
-- **Ponto piscando é proibido.** O desenho de referência trazia um ponto verde em `animate-pulse`
-  no header e nos cabeçalhos de seção. Movimento permanente no canto do olho não tem propósito
-  (§5) e some do radar em um dia — vira ruído que custa bateria. Ponto de status **estático** com
-  cor semântica continua valendo (`SectionHead dot`), e apaga quando a contagem é zero.
+- **Ponto de status não existe mais — nem piscando, nem parado** (03/09/2026, decisão do dono do
+  produto). Primeiro caiu a pulsação: movimento permanente no canto do olho não tem propósito
+  (§5), some do radar em um dia e custa bateria. Depois caiu o ponto inteiro, e por um motivo
+  melhor: **no header ele era sempre verde** — não havia estado em que ficasse vermelho, ou seja,
+  era cor decorativa no lugar mais nobre da tela, num app cuja única alavanca de cor é a
+  semântica. Nos cabeçalhos de seção o rótulo já diz o que o ponto diria ("ATRASADO / ATENÇÃO"),
+  e nos contadores da Hoje a cor passou para o NÚMERO — um ponto ao lado de um número é o mesmo
+  dado dito duas vezes, e o número é a metade que se lê.
+  O prop `dot` do `SectionHead` foi REMOVIDO para não voltar por descuido. Continuam válidos: o
+  separador de 3px entre metadados (é pontuação) e a bolinha da bandeira no cartão de crédito
+  (identifica o emissor).
 - **Busca é `<Search>`** (`src/components/ui/search-field.tsx`), em Notas, Lançamentos e
   `/search`. Um componente, dois desenhos: no **iOS** ele renderiza o `<Stack.SearchBar>` nativo,
   que integra com o large title e some no scroll; no **Android** renderiza uma pílula

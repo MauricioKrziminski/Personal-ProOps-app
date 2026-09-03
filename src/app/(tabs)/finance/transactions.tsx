@@ -13,6 +13,7 @@ import { HeaderMenu } from '@/components/ui/header-actions';
 import { ItemLink } from '@/components/ui/item-link';
 import { Search } from '@/components/ui/search';
 import { Button } from '@/components/ui/button';
+import { Chip } from '@/components/finance/chip';
 import { EmptyState } from '@/components/ui/empty-state';
 import { Money } from '@/components/ui/money';
 import { Row } from '@/components/ui/row';
@@ -288,9 +289,31 @@ export default function TransactionsScreen() {
         </Card>
       )}
 
+      {/*
+        **Um `Segmented` e uma fileira de chips, não dois `Segmented`.**
+
+        Os dois filtros vinham empilhados, do mesmo tamanho e com a mesma forma — duas lajes
+        idênticas em que nada dizia qual mandava em quê. É o mesmo defeito dos dois campos de
+        texto que a aba Notas tinha, e a correção é a mesma: dar forma diferente a papéis
+        diferentes.
+
+        `kind` é o filtro PRIMÁRIO (é o que muda a resposta da tela: gastei ou recebi) e fica no
+        segmentado, que é o controle de escolha única do sistema. `status` é um recorte
+        secundário sobre o resultado, e recorte secundário é chip — a mesma gramática dos filtros
+        de pasta e tag em Notas. De quebra, a fileira de chips ocupa metade da altura.
+      */}
       <View style={styles.filters}>
         <Segmented options={KIND_OPTIONS} value={kind} onChange={setKind} />
-        <Segmented options={STATUS_OPTIONS} value={status} onChange={setStatus} />
+        <View style={styles.statusChips}>
+          {STATUS_OPTIONS.map((o) => (
+            <Chip
+              key={o.value}
+              label={o.label}
+              selected={status === o.value}
+              onPress={() => setStatus(o.value)}
+            />
+          ))}
+        </View>
         {category ? (
           <Button
             label={`categoria: ${category}`}
@@ -598,6 +621,7 @@ const styles = StyleSheet.create({
   filters: {
     gap: Space.sm,
   },
+  statusChips: { flexDirection: 'row', gap: Space.sm },
   dayHeader: {
     flexDirection: 'row',
     alignItems: 'center',
