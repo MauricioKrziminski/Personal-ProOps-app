@@ -143,8 +143,6 @@ export default function ProfileScreen() {
       </View>
 
       <Section title="Conta">
-        <Row title="WhatsApp" subtitle="o número é a chave de tudo" icon="phone" chevron={false}
-          trailing={<ThemedText type="small" themeColor="textSecondary" selectable>{phone}</ThemedText>} />
         {plan.isLoading ? (
           <SkeletonRow />
         ) : plan.isError ? (
@@ -160,8 +158,14 @@ export default function ProfileScreen() {
         <Row title="Pessoas" subtitle="quem enxerga o seu financeiro" icon="person.2.fill" onPress={() => router.push('/profile/members')} />
       </Section>
 
-      {/* Push desligado sobe para cima: é a ação de maior consequência da tela. */}
-      {!pushOn ? notifications : null}
+      {/*
+        Notificações tem UM lugar, logo abaixo de Conta.
+        Antes ela era renderizada em duas posições diferentes conforme o push estivesse ligado ou
+        não — o bloco "subia" quando desligado. Um bloco que muda de lugar conforme o estado
+        obriga a pessoa a procurá-lo, e a promoção rendia pouco: aqui ele já é a segunda seção de
+        cinco. O alerta de push desligado é a LINHA, não a posição dela.
+      */}
+      {notifications}
 
       <Section title="Dados">
         <Row title="Lixeira de notas" icon="trash" onPress={() => router.push('/notes/trash')} />
@@ -169,8 +173,6 @@ export default function ProfileScreen() {
         <Row title="Importar extrato" icon="square.and.arrow.down" onPress={() => router.push('/import')} />
         <Row title="Importações" subtitle="histórico e revisões pendentes" icon="clock.arrow.circlepath" onPress={() => router.push('/import-history')} />
       </Section>
-
-      {pushOn ? notifications : null}
 
       {aparencia}
 

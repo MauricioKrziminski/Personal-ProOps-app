@@ -41,7 +41,6 @@ const BY_CATEGORY: [RegExp, IconName][] = [
   [/salario|pagamento|holerite/, 'banknote'],
   [/freela|servico|consultoria|projeto/, 'briefcase'],
   [/presente|doacao/, 'gift'],
-  [/pet|animal/, 'heart'],
   [/academia|esporte|treino/, 'dumbbell'],
   [/investimento|aplicacao|renda/, 'chart.line.uptrend.xyaxis'],
   [/imposto|taxa|tarifa|juros|multa/, 'exclamationmark.triangle'],

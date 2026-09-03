@@ -368,11 +368,18 @@ export default function NotesScreen() {
         <AppHeader
           title="Notas"
           action={
-            <HeaderIconButton
-              icon="folder"
-              label="Pastas"
-              onPress={() => router.push('/notes/folders')}
-            />
+            <>
+              <HeaderIconButton
+                icon="square.and.pencil"
+                label="Nova nota"
+                onPress={() => router.push('/notes/new')}
+              />
+              <HeaderIconButton
+                icon="folder"
+                label="Pastas"
+                onPress={() => router.push('/notes/folders')}
+              />
+            </>
           }
         />
       }>
@@ -388,35 +395,21 @@ export default function NotesScreen() {
         contentContainerStyle={styles.list}
         ListHeaderComponent={
           <View>
-      {/* A captura de dois segundos. Fica fixa: é o coração do produto, não vai atrás de FAB. */}
             {/*
-              A pílula do desenho, nas DUAS plataformas — e por isso `SearchField` direto, não
-              `<Search>`.
-              `<Search>` escolhe entre a barra nativa (iOS) e a pílula (Android), e a barra nativa
-              exige o header do navegador. A raiz de Notas não tem mais header (é o `AppHeader`),
-              então no iOS o `<Search>` não desenharia nada e a tela ficaria SEM busca. As telas
-              empurradas — Lançamentos e `/search` — continuam com `<Search>` e com a barra nativa.
+              ## A ordem: AÇÃO, depois FILTRO, depois conteúdo (03/09/2026)
 
-              À direita ficam as duas ações que moravam no `headerRight`: pastas e nota nova.
+              A tela abria com três fileiras de controle quase idênticas — busca, captura e chips
+              — e só então a primeira nota. Duas caixas de texto de uma linha, empilhadas e com um
+              botão redondo cada, não se distinguem de relance: a pessoa não sabia em qual estava
+              digitando.
+
+              A captura subiu para o topo porque é o que este app É: "anotar rápido" é a razão de
+              o produto existir, e busca só acontece depois de já haver o que buscar. Abaixo dela,
+              busca e chips passam a ler como UM grupo de filtro, que é o que os dois são.
+
+              O botão de nota longa saiu daqui e foi para o `action` do header: ao lado do campo
+              de captura ele oferecia dois jeitos de criar a mesma coisa, um do lado do outro.
             */}
-            <View style={styles.searchRow}>
-              <View style={styles.searchSlot}>
-                <SearchField
-                  value={typed}
-                  onChangeText={setTyped}
-                  placeholder="Buscar nas notas"
-                  accessibilityLabel="Buscar nas notas"
-                />
-              </View>
-              <Pressable
-                accessibilityRole="button"
-                accessibilityLabel="Nova nota"
-                onPress={() => router.push('/notes/new')}
-                style={[styles.searchAction, { backgroundColor: theme.backgroundElement, borderColor: theme.cardBorder }]}>
-                <Icon name="square.and.pencil" size="md" color="text" />
-              </Pressable>
-            </View>
-
             <View style={styles.quickAdd}>
               <TextField
                 value={draft}
@@ -454,6 +447,15 @@ export default function NotesScreen() {
                   weight="semibold"
                 />
               </Pressable>
+            </View>
+
+            <View style={styles.searchRow}>
+              <SearchField
+                value={typed}
+                onChangeText={setTyped}
+                placeholder="Buscar nas notas"
+                accessibilityLabel="Buscar nas notas"
+              />
             </View>
 
             {/* Usuário novo não vê estrutura vazia. */}
@@ -547,15 +549,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: Space.lg,
     marginTop: Space.md,
     marginBottom: Space.md,
-  },
-  searchSlot: { flex: 1, minWidth: 0 },
-  searchAction: {
-    width: HitTarget,
-    height: HitTarget,
-    borderRadius: Radius.pill,
-    borderWidth: StyleSheet.hairlineWidth,
-    alignItems: 'center',
-    justifyContent: 'center',
   },
   /** M3: padding 16 · raio 14 · 8 entre cards. `gap` 6 dentro — título, prévia e metadado são
       três degraus da MESMA nota, não três blocos. */

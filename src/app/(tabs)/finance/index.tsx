@@ -52,7 +52,7 @@ import {
   type Transaction,
 } from '@/hooks/use-finance';
 import { categoryIcon } from '@/design/category-icons';
-import { formatBRL, localISODate } from '@/hooks/use-items';
+import { formatBRL, formatDateBR, localISODate } from '@/hooks/use-items';
 import { monthBounds } from '@/lib/dates';
 import { confirmDestructive } from '@/lib/item-actions';
 import { useTheme, useScheme } from '@/hooks/use-theme';
@@ -61,9 +61,28 @@ import { useTheme, useScheme } from '@/hooks/use-theme';
  * Financeiro — responde "como está o meu mês?" e, no fundo, "posso gastar?".
  *
  * O topo é **projeção**, não saldo bruto: saldo bruto mente para quem tem fatura fechando.
- * Os 13 links com emoji que terminavam a tela viraram quatro atalhos no topo + `/finance/manage`.
  * Cada bloco tem query, loading e erro próprios — antes um `hasError` cobria cinco queries e
  * esquecia a de contas a pagar.
+ *
+ * ## A ordem dos blocos é uma decisão, não o acaso da implementação (03/09/2026)
+ *
+ * Ela vai de **o que exige ação** para **o que exige reflexão**:
+ *
+ * | # | bloco | por que aqui |
+ * |---|---|---|
+ * | 1 | saldo projetado | a pergunta que trouxe a pessoa |
+ * | 2 | atalhos | as quatro portas para o resto do domínio |
+ * | 3 | passando do limite | alerta; só existe quando já dói |
+ * | 4 | carteira | a fatura é a maior saída isolada do mês |
+ * | 5 | últimos lançamentos | o que aconteceu desde ontem — a checagem diária |
+ * | 6 | tendência mensal | o primeiro bloco de ANÁLISE |
+ * | 7 | onde o dinheiro foi | análise mais funda, seis linhas |
+ * | 8 | posso comprar isso? | ferramenta; ninguém abre o app para simular |
+ *
+ * Antes, o simulador e as categorias vinham em 4º e 5º — uma ferramenta e um bloco de seis
+ * barras empurravam a carteira e o extrato para baixo de duas rolagens. É o que os apps de banco
+ * grandes fazem ao contrário: saldo, ações, **atividade recente**, e só então análise. Rever esta
+ * tabela antes de inserir bloco novo no meio.
  */
 
 const SOURCE_LABEL: Record<Transaction['source'], string> = {
@@ -192,35 +211,6 @@ function daysToMonthEnd(): number {
   return Math.max(1, Math.ceil((last.getTime() - now.getTime()) / 86_400_000));
 }
 
-/** `2026-08-23` → `sáb, 23 de agosto`. */
-function dayTitle(iso: string): string {
-  const [y, m, d] = iso.split('-').map(Number);
-  return new Date(y, m - 1, d).toLocaleDateString('pt-BR', {
-    weekday: 'short',
-    day: '2-digit',
-    month: 'long',
-  });
-}
-
-/** Agrupa preservando a ordem (os dados já vêm ordenados do banco). */
-/**
- * Agrupa por dia com `Map`, não comparando com o último elemento.
- *
- * A versão anterior só juntava linhas **consecutivas** do mesmo dia — ou seja, assumia a lista
- * ordenada por `occurred_at`. Bastavam dois lançamentos do mesmo dia não adjacentes para nascerem
- * dois grupos com a MESMA chave, e o React reclamava de chave duplicada (visto rodando).
- * Agrupamento não pode depender da ordenação de quem chama.
- */
-function groupByDay(rows: Transaction[]): [string, Transaction[]][] {
-  const groups = new Map<string, Transaction[]>();
-  for (const tx of rows) {
-    const day = groups.get(tx.occurred_at);
-    if (day) day.push(tx);
-    else groups.set(tx.occurred_at, [tx]);
-  }
-  return [...groups.entries()];
-}
-
 export default function FinanceScreen() {
   const theme = useTheme();
   const scheme = useScheme();
@@ -281,7 +271,6 @@ export default function FinanceScreen() {
   const tight = (budgets.data ?? []).filter(
     (b) => Number(b.limit_cents) > 0 && Number(b.spent_cents) / Number(b.limit_cents) >= 0.8
   );
-  const recentGroups = useMemo(() => groupByDay(recent.data ?? []), [recent.data]);
 
   // O corte do futuro é feito DUAS vezes de propósito. A `0048` fecha a janela no banco, mas o
   // Postgres roda em UTC: às 22h de Brasília o `current_date` do servidor já virou o dia seguinte,
@@ -406,7 +395,7 @@ export default function FinanceScreen() {
           />
         )}
 
-        {/* Bloco 2 — atalhos. Fica sempre visível: sem conta cadastrada não existe dado a mostrar. */}
+        {/* 2. Atalhos. Sempre visível: sem conta cadastrada não existe dado a mostrar. */}
         <View style={styles.block}>
           <SectionHead
             title="Gerenciar"
@@ -462,100 +451,176 @@ export default function FinanceScreen() {
           </View>
         </View>
 
-        {/* Bloco 3 — o simulador estava enterrado dentro da projeção. */}
-        <Section>
-          <Row
-            title="Posso comprar isso?"
-            subtitle="Simula o parcelado em cima da projeção"
-            icon="cart"
-            onPress={() => router.push('/finance/forecast')}
-          />
-        </Section>
+        {/* 3. Só o que já dói. Orçamento em 30% não é notícia — e alerta vem antes de análise. */}
+        {budgets.isError ? (
+          <ErrorCard onRetry={budgets.refetch} />
+        ) : tight.length > 0 ? (
+          <Section title="Passando do limite">
+            {tight.map((b) => {
+              const pct = Number(b.spent_cents) / Number(b.limit_cents);
+              return (
+                <Pressable
+                  key={b.category}
+                  accessibilityRole="button"
+                  accessibilityLabel={`${b.category}, ${Math.round(pct * 100)}% de ${formatBRL(Number(b.limit_cents))} usados`}
+                  onPress={() => router.push('/finance/budgets')}>
+                  <View style={styles.budget}>
+                    <View style={styles.categoryHead}>
+                      <ThemedText type="default">{b.category}</ThemedText>
+                      <ThemedText
+                        type="small"
+                        themeColor={pct >= 1 ? 'danger' : 'warning'}
+                        style={tabular}>
+                        {Math.round(pct * 100)}% de {formatBRL(Number(b.limit_cents))}
+                      </ThemedText>
+                    </View>
+                    <ProgressBar
+                      value={Number(b.spent_cents)}
+                      max={Number(b.limit_cents)}
+                      tone={pct >= 1 ? 'danger' : 'warning'}
+                    />
+                  </View>
+                </Pressable>
+              );
+            })}
+          </Section>
+        ) : null}
 
-        {/* Bloco 4 — categoria sem comparação é número; com comparação é informação. */}
-        {summary.isError ? null : categories.length > 0 ? (
+        {/* 4. A carteira. A fatura é a maior saída isolada do mês. */}
+        {cards.isError ? (
+          <ErrorCard onRetry={cards.refetch} />
+        ) : (cards.data ?? []).length > 0 ? (
           <View style={styles.block}>
             <SectionHead
-              title="Onde o dinheiro foi"
+              title="Cartões"
               action={
                 <Pressable
                   accessibilityRole="button"
+                  accessibilityLabel="Ver todos os cartões"
                   hitSlop={12}
-                  onPress={() => openTransactions({ kind: 'expense' })}>
+                  onPress={() => router.push('/finance/cards')}>
                   <ThemedText type="small" themeColor="tint">
-                    Ver tudo
+                    Ver todos
                   </ThemedText>
                 </Pressable>
               }
             />
-            <Section>
-              {categories.slice(0, 6).map((row, index) => {
-                const total = Number(row.total_cents);
-                const before = previousByCategory.get(row.category) ?? 0;
-                const share = expense > 0 ? Math.round((total / expense) * 100) : 0;
-                // Sem o mês anterior carregado a comparação não existe — inventar "novo" seria mentira.
-                const delta =
-                  previous.isSuccess && before > 0
-                    ? Math.round(((total - before) / before) * 100)
-                    : null;
-                const comparison = !previous.isSuccess
-                  ? null
-                  : delta === null
-                    ? `não teve em ${monthLabel(previousMonth)}`
-                    : delta === 0
-                      ? `igual a ${monthLabel(previousMonth)}`
-                      : `${delta > 0 ? '+' : '−'}${Math.abs(delta)}% vs ${monthLabel(previousMonth)}`;
+            <CardStack
+              cards={(cards.data ?? []).map((c) => ({
+                account_id: c.account_id,
+                name: c.name,
+                invoice_id: c.invoice_id,
+                invoice_total_cents: Number(c.invoice_total_cents ?? 0),
+                credit_limit_cents: c.credit_limit_cents == null ? null : Number(c.credit_limit_cents),
+                available_limit_cents:
+                  c.available_limit_cents == null ? null : Number(c.available_limit_cents),
+                closing_date: c.closing_date,
+                due_date: c.due_date,
+                overdue_count: Number(c.overdue_count ?? 0),
+              }))}
+              onOpen={(card) =>
+                card.invoice_id
+                  ? router.push({ pathname: '/finance/invoice/[id]', params: { id: card.invoice_id } })
+                  : router.push('/finance/cards')
+              }
+            />
+          </View>
+        ) : null}
 
-                return (
-                  <Animated.View
-                    key={row.category}
-                    entering={FadeInDown.duration(Motion.duration.base).delay(
-                      Math.min(index * Motion.stagger.step, Motion.stagger.cap)
-                    )}>
-                    <Pressable
-                      accessibilityRole="button"
-                      accessibilityLabel={`${row.category}, ${formatBRL(total)}, ${share}% dos gastos do mês${comparison ? `, ${comparison}` : ''}`}
-                      onPress={() => openTransactions({ category: row.category })}>
-                      {({ pressed }) => (
-                        <View
-                          style={[
-                            styles.category,
-                            { backgroundColor: pressed ? theme.backgroundSelected : 'transparent' },
-                          ]}>
-                          <View style={styles.categoryHead}>
-                            <ThemedText type="default" numberOfLines={1} style={styles.categoryName}>
-                              {row.category}
+        {/*
+          5. O extrato recente — a confirmação do que a IA registrou.
+
+          **Lista CHAPADA, sem cabeçalho de dia.** Ela era agrupada por `occurred_at` e ganhava um
+          cabeçalho por data, mas a query ordena por `created_at` (a ordem em que as coisas foram
+          REGISTRADAS, que é o que "últimos lançamentos" quer dizer e o que a Hoje precisa para
+          provar que o WhatsApp funcionou). As duas coisas juntas produziam cabeçalhos fora de
+          ordem — 04/09, depois 11/09, depois 02/09 — e uma tela que se contradiz sozinha.
+
+          O export resolve do jeito certo: nenhuma cabeça de dia, a data vai na própria linha.
+        */}
+        {recent.isError ? (
+          <ErrorCard onRetry={recent.refetch} />
+        ) : recent.isLoading ? (
+          <Section>
+            <SkeletonRow />
+            <SkeletonRow />
+          </Section>
+        ) : (recent.data ?? []).length > 0 ? (
+          <View style={styles.block}>
+            <View style={styles.blockHead}>
+              <ThemedText type="smallBold">Últimos lançamentos</ThemedText>
+              <Pressable accessibilityRole="button" hitSlop={12} onPress={() => openTransactions({})}>
+                <ThemedText type="small" themeColor="tint">
+                  Ver todos
+                </ThemedText>
+              </Pressable>
+            </View>
+            <Section>
+              {(recent.data ?? []).map((tx) => (
+                  <ItemLink
+                    key={tx.id}
+                    href={{
+                      pathname: '/finance/[txId]',
+                      params: { txId: tx.id, month: tx.occurred_at.slice(0, 7) },
+                    }}
+                    title={tx.description || tx.merchant || tx.category || 'Lançamento'}
+                    actions={[
+                      {
+                        label: 'Ver detalhe',
+                        icon: 'doc.text.magnifyingglass',
+                        onPress: () =>
+                          router.push({
+                            pathname: '/finance/[txId]',
+                            params: { txId: tx.id, month: tx.occurred_at.slice(0, 7) },
+                          }),
+                      },
+                      {
+                        label: 'Editar',
+                        icon: 'pencil',
+                        onPress: () =>
+                          router.push({
+                            pathname: '/finance/transaction-form',
+                            params: { id: tx.id, month },
+                          }),
+                      },
+                      {
+                        label: 'Apagar',
+                        icon: 'trash',
+                        destructive: true,
+                        onPress: () => confirmDelete(tx),
+                      },
+                    ]}>
+                    {({ onLongPress }) => (
+                      <Row
+                        title={tx.description || tx.merchant || tx.category || 'Sem descrição'}
+                        subtitle={[tx.category, SOURCE_LABEL[tx.source]].filter(Boolean).join(' · ')}
+                        icon={categoryIcon(tx.category, tx.kind)}
+                        accessibilityLabel={`${tx.description || tx.category || 'lançamento'}, ${formatBRL(tx.amount_cents)}, ${tx.kind === 'income' ? 'receita' : tx.kind === 'expense' ? 'despesa' : 'transferência'}`}
+                        onLongPress={onLongPress}
+                        trailing={
+                          /* Valor e data empilhados à direita — o cabeçalho de dia saiu daqui. */
+                          <View style={styles.trailing}>
+                            <Money
+                              cents={tx.kind === 'expense' ? -tx.amount_cents : tx.amount_cents}
+                              variant="ticker"
+                              tone={tx.kind === 'income' ? 'success' : 'text'}
+                              signed={tx.kind !== 'transfer'}
+                            />
+                            <ThemedText type="caption" themeColor="textSecondary" style={tabular}>
+                              {formatDateBR(tx.occurred_at)}
                             </ThemedText>
-                            <Money cents={total} variant="ticker" />
                           </View>
-                          {/* `data`, não `tint`: a barra aqui é comparação entre categorias,
-                              não estado a resolver. Ver o docblock do ProgressBar. */}
-                          <ProgressBar value={total} max={maxCategory} tone="data" />
-                          <ThemedText
-                            type="small"
-                            themeColor={
-                              delta !== null && delta >= 10
-                                ? 'warning'
-                                : delta !== null && delta <= -10
-                                  ? 'success'
-                                  : 'textSecondary'
-                            }
-                            style={tabular}>
-                            {share}% do mês{comparison ? ` · ${comparison}` : ''}
-                          </ThemedText>
-                        </View>
-                      )}
-                    </Pressable>
-                  </Animated.View>
-                );
-              })}
+                        }
+                      />
+                    )}
+                </ItemLink>
+              ))}
             </Section>
           </View>
         ) : null}
 
-        {/* Bloco 4b — a tendência. Os outros blocos são todos do MÊS; este é o único que
-            responde "e ao longo do tempo?". Sai de `monthly_cashflow`, que existe desde a 0012
-            com hook pronto e nenhuma tela lendo. */}
+        {/* 6. A tendência. Os outros blocos são todos do MÊS; este é o único que responde
+            "e ao longo do tempo?". Sai de `monthly_cashflow`. */}
         {cashflow.isError ? (
           <ErrorCard onRetry={cashflow.refetch} />
         ) : cashflow.isLoading ? (
@@ -663,159 +728,96 @@ export default function FinanceScreen() {
           </View>
         ) : null}
 
-        {/* Bloco 5 — só o que já dói. Orçamento em 30% não é notícia. */}
-        {budgets.isError ? (
-          <ErrorCard onRetry={budgets.refetch} />
-        ) : tight.length > 0 ? (
-          <Section title="Passando do limite">
-            {tight.map((b) => {
-              const pct = Number(b.spent_cents) / Number(b.limit_cents);
-              return (
-                <Pressable
-                  key={b.category}
-                  accessibilityRole="button"
-                  accessibilityLabel={`${b.category}, ${Math.round(pct * 100)}% de ${formatBRL(Number(b.limit_cents))} usados`}
-                  onPress={() => router.push('/finance/budgets')}>
-                  <View style={styles.budget}>
-                    <View style={styles.categoryHead}>
-                      <ThemedText type="default">{b.category}</ThemedText>
-                      <ThemedText
-                        type="small"
-                        themeColor={pct >= 1 ? 'danger' : 'warning'}
-                        style={tabular}>
-                        {Math.round(pct * 100)}% de {formatBRL(Number(b.limit_cents))}
-                      </ThemedText>
-                    </View>
-                    <ProgressBar
-                      value={Number(b.spent_cents)}
-                      max={Number(b.limit_cents)}
-                      tone={pct >= 1 ? 'danger' : 'warning'}
-                    />
-                  </View>
-                </Pressable>
-              );
-            })}
-          </Section>
-        ) : null}
-
-        {/* Bloco 6 — cartões. */}
-        {cards.isError ? (
-          <ErrorCard onRetry={cards.refetch} />
-        ) : (cards.data ?? []).length > 0 ? (
+        {/* 7. Categoria sem comparação é número; com comparação é informação. */}
+        {summary.isError ? null : categories.length > 0 ? (
           <View style={styles.block}>
             <SectionHead
-              title="Cartões"
+              title="Onde o dinheiro foi"
               action={
                 <Pressable
                   accessibilityRole="button"
-                  accessibilityLabel="Ver todos os cartões"
                   hitSlop={12}
-                  onPress={() => router.push('/finance/cards')}>
+                  onPress={() => openTransactions({ kind: 'expense' })}>
                   <ThemedText type="small" themeColor="tint">
-                    Ver todos
+                    Ver tudo
                   </ThemedText>
                 </Pressable>
               }
             />
-            <CardStack
-              cards={(cards.data ?? []).map((c) => ({
-                account_id: c.account_id,
-                name: c.name,
-                invoice_id: c.invoice_id,
-                invoice_total_cents: Number(c.invoice_total_cents ?? 0),
-                credit_limit_cents: c.credit_limit_cents == null ? null : Number(c.credit_limit_cents),
-                available_limit_cents:
-                  c.available_limit_cents == null ? null : Number(c.available_limit_cents),
-                closing_date: c.closing_date,
-                due_date: c.due_date,
-                overdue_count: Number(c.overdue_count ?? 0),
-              }))}
-              onOpen={(card) =>
-                card.invoice_id
-                  ? router.push({ pathname: '/finance/invoice/[id]', params: { id: card.invoice_id } })
-                  : router.push('/finance/cards')
-              }
-            />
+            <Section>
+              {categories.slice(0, 6).map((row, index) => {
+                const total = Number(row.total_cents);
+                const before = previousByCategory.get(row.category) ?? 0;
+                const share = expense > 0 ? Math.round((total / expense) * 100) : 0;
+                // Sem o mês anterior carregado a comparação não existe — inventar "novo" seria mentira.
+                const delta =
+                  previous.isSuccess && before > 0
+                    ? Math.round(((total - before) / before) * 100)
+                    : null;
+                const comparison = !previous.isSuccess
+                  ? null
+                  : delta === null
+                    ? `não teve em ${monthLabel(previousMonth)}`
+                    : delta === 0
+                      ? `igual a ${monthLabel(previousMonth)}`
+                      : `${delta > 0 ? '+' : '−'}${Math.abs(delta)}% vs ${monthLabel(previousMonth)}`;
+
+                return (
+                  <Animated.View
+                    key={row.category}
+                    entering={FadeInDown.duration(Motion.duration.base).delay(
+                      Math.min(index * Motion.stagger.step, Motion.stagger.cap)
+                    )}>
+                    <Pressable
+                      accessibilityRole="button"
+                      accessibilityLabel={`${row.category}, ${formatBRL(total)}, ${share}% dos gastos do mês${comparison ? `, ${comparison}` : ''}`}
+                      onPress={() => openTransactions({ category: row.category })}>
+                      {({ pressed }) => (
+                        <View
+                          style={[
+                            styles.category,
+                            { backgroundColor: pressed ? theme.backgroundSelected : 'transparent' },
+                          ]}>
+                          <View style={styles.categoryHead}>
+                            <ThemedText type="default" numberOfLines={1} style={styles.categoryName}>
+                              {row.category}
+                            </ThemedText>
+                            <Money cents={total} variant="ticker" />
+                          </View>
+                          {/* `data`, não `tint`: a barra aqui é comparação entre categorias,
+                              não estado a resolver. Ver o docblock do ProgressBar. */}
+                          <ProgressBar value={total} max={maxCategory} tone="data" />
+                          <ThemedText
+                            type="small"
+                            themeColor={
+                              delta !== null && delta >= 10
+                                ? 'warning'
+                                : delta !== null && delta <= -10
+                                  ? 'success'
+                                  : 'textSecondary'
+                            }
+                            style={tabular}>
+                            {share}% do mês{comparison ? ` · ${comparison}` : ''}
+                          </ThemedText>
+                        </View>
+                      )}
+                    </Pressable>
+                  </Animated.View>
+                );
+              })}
+            </Section>
           </View>
         ) : null}
 
-        {/* Bloco 7 — confirmação do que a IA registrou, agrupada por dia. */}
-        {recent.isError ? (
-          <ErrorCard onRetry={recent.refetch} />
-        ) : recent.isLoading ? (
-          <Section>
-            <SkeletonRow />
-            <SkeletonRow />
-          </Section>
-        ) : recentGroups.length > 0 ? (
-          <View style={styles.block}>
-            <View style={styles.blockHead}>
-              <ThemedText type="smallBold">Últimos lançamentos</ThemedText>
-              <Pressable accessibilityRole="button" hitSlop={12} onPress={() => openTransactions({})}>
-                <ThemedText type="small" themeColor="tint">
-                  Ver todos
-                </ThemedText>
-              </Pressable>
-            </View>
-            {recentGroups.map(([day, rows]) => (
-              <Section key={day} title={dayTitle(day)}>
-                {rows.map((tx) => (
-                  <ItemLink
-                    key={tx.id}
-                    href={{
-                      pathname: '/finance/[txId]',
-                      params: { txId: tx.id, month: tx.occurred_at.slice(0, 7) },
-                    }}
-                    title={tx.description || tx.merchant || tx.category || 'Lançamento'}
-                    actions={[
-                      {
-                        label: 'Ver detalhe',
-                        icon: 'doc.text.magnifyingglass',
-                        onPress: () =>
-                          router.push({
-                            pathname: '/finance/[txId]',
-                            params: { txId: tx.id, month: tx.occurred_at.slice(0, 7) },
-                          }),
-                      },
-                      {
-                        label: 'Editar',
-                        icon: 'pencil',
-                        onPress: () =>
-                          router.push({
-                            pathname: '/finance/transaction-form',
-                            params: { id: tx.id, month },
-                          }),
-                      },
-                      {
-                        label: 'Apagar',
-                        icon: 'trash',
-                        destructive: true,
-                        onPress: () => confirmDelete(tx),
-                      },
-                    ]}>
-                    {({ onLongPress }) => (
-                      <Row
-                        title={tx.description || tx.merchant || tx.category || 'Sem descrição'}
-                        subtitle={[tx.category, SOURCE_LABEL[tx.source]].filter(Boolean).join(' · ')}
-                        icon={categoryIcon(tx.category, tx.kind)}
-                        accessibilityLabel={`${tx.description || tx.category || 'lançamento'}, ${formatBRL(tx.amount_cents)}, ${tx.kind === 'income' ? 'receita' : tx.kind === 'expense' ? 'despesa' : 'transferência'}`}
-                        onLongPress={onLongPress}
-                        trailing={
-                          <Money
-                            cents={tx.kind === 'expense' ? -tx.amount_cents : tx.amount_cents}
-                            variant="ticker"
-                            tone={tx.kind === 'income' ? 'success' : 'text'}
-                            signed={tx.kind !== 'transfer'}
-                          />
-                        }
-                      />
-                    )}
-                  </ItemLink>
-                ))}
-              </Section>
-            ))}
-          </View>
-        ) : null}
+        {/* 8. A ferramenta. Fica por último de propósito — ver o docblock da tela. */}
+        <Section>
+          <Row
+            title="Posso comprar isso?"
+            subtitle="Simula o parcelado em cima da projeção"
+            icon="cart"
+            onPress={() => router.push('/finance/forecast')}
+          />
+        </Section>
 
         {isEmpty ? (
           <EmptyState
@@ -914,6 +916,7 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   shrink: { flex: 1, minWidth: 0 },
+  trailing: { alignItems: 'flex-end', gap: Space.half },
   cashHead: { flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between', gap: Space.md },
   cashRodape: {
     flexDirection: 'row',
