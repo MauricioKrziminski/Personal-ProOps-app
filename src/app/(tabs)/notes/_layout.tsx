@@ -1,5 +1,7 @@
 import { Stack } from 'expo-router';
 
+import { stackHeaderFonts } from '@/components/ui/app-header';
+
 
 /**
  * Pilha da aba Notas.
@@ -15,7 +17,7 @@ export const unstable_settings = {
 
 export default function NotesStackLayout() {
   return (
-    <Stack screenOptions={{ headerShadowVisible: false }}>
+    <Stack screenOptions={{ headerShadowVisible: false, ...stackHeaderFonts }}>
       {/*
         A raiz desenha o `AppHeader` (design Stitch): sem título de tela e sem large title — e,
         com ele, sem o `<Stack.SearchBar>` nativo, que exigia este header. A busca da raiz virou

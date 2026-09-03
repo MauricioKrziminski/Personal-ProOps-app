@@ -25,6 +25,7 @@ import {
 } from '@/hooks/use-finance';
 import { formatBRL, formatDateBR, localISODate, useTodayReminders } from '@/hooks/use-items';
 import { useTheme } from '@/hooks/use-theme';
+import { Fonts } from '@/constants/theme';
 
 /** Um orçamento entra na seção "passando do orçamento" a partir de 80% consumido. */
 const TIGHT = 0.8;
@@ -548,7 +549,7 @@ const styles = StyleSheet.create({
   budgetFoot: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
 
   captureTop: { flexDirection: 'row', alignItems: 'center', gap: Space.md, padding: Space.lg },
-  quote: { fontStyle: 'italic' },
+  quote: { fontFamily: Fonts.italic },
   amountBadge: {
     paddingHorizontal: Space.sm,
     paddingVertical: Space.xs,

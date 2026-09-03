@@ -377,7 +377,7 @@ export default function FinanceScreen() {
               // Mesmo critério da Hoje: série que não varia desenha uma reta, e reta no meio
               // do painel lê como divisor, não como gráfico.
               isCurrent && series.length > 2 && varia ? (
-                <Sparkline values={series} width={width - Space.lg * 4} showZero />
+                <Sparkline values={series} width={width - Space.lg * 2 - Space.gutter * 2} showZero />
               ) : undefined
             }
             trend={

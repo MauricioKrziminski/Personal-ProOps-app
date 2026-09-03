@@ -155,6 +155,13 @@ export type ThemeColor = keyof typeof Colors.light & keyof typeof Colors.dark;
  */
 export const Fonts = {
   regular: 'HankenGrotesk_400Regular',
+  /**
+   * Itálico é FACE, não `fontStyle` — mesma regra do peso.
+   *
+   * Com `fontStyle: 'italic'` o iOS sintetiza uma oblíqua e o Android troca pela itálica do
+   * SISTEMA: a citação do WhatsApp sairia numa fonte diferente do resto do card.
+   */
+  italic: 'HankenGrotesk_400Regular_Italic',
   medium: 'HankenGrotesk_500Medium',
   semibold: 'HankenGrotesk_600SemiBold',
   bold: 'HankenGrotesk_700Bold',

@@ -1,6 +1,7 @@
 import { useEffect } from 'react';
 import {
   HankenGrotesk_400Regular,
+  HankenGrotesk_400Regular_Italic,
   HankenGrotesk_500Medium,
   HankenGrotesk_600SemiBold,
   HankenGrotesk_700Bold,
@@ -21,6 +22,7 @@ import { KeyboardProvider } from 'react-native-keyboard-controller';
 import { AnimatedSplashOverlay } from '@/components/animated-icon';
 import { ThemedText } from '@/components/themed-text';
 import { AndroidActionSheet } from '@/components/ui/action-sheet';
+import { stackHeaderFonts } from '@/components/ui/app-header';
 import { Icon } from '@/components/ui/icon';
 import { ConcealProvider } from '@/components/ui/conceal';
 import { ToastProvider } from '@/components/ui/toast';
@@ -82,6 +84,7 @@ export default function RootLayout() {
    */
   const [fontsLoaded] = useFonts({
     HankenGrotesk_400Regular,
+    HankenGrotesk_400Regular_Italic,
     HankenGrotesk_500Medium,
     HankenGrotesk_600SemiBold,
     HankenGrotesk_700Bold,
@@ -148,6 +151,7 @@ export default function RootLayout() {
                 <Stack
                   screenOptions={{
                     statusBarStyle: Platform.OS === 'android' ? statusBarStyle : undefined,
+                    ...stackHeaderFonts,
                   }}>
                   {/* `/` é a URL inicial: renderiza antes de qualquer guard, por isso fica FORA dos
                       `Stack.Protected` e decide o destino por conta própria. */}

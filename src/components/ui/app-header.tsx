@@ -4,6 +4,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { ThemedText } from '@/components/themed-text';
 import { Icon } from '@/components/ui/icon';
+import { Fonts } from '@/constants/theme';
 import { HitTarget, Radius, Space, Type } from '@/design/tokens';
 import { useTheme } from '@/hooks/use-theme';
 
@@ -24,6 +25,21 @@ import { useTheme } from '@/hooks/use-theme';
  * schema não guarda nome — só o telefone (`profiles.phone`). Inventar iniciais a partir do
  * número seria escrever um dado que não existe.
  */
+/**
+ * As opções de `<Stack>` que vestem o header NATIVO com a fonte do app.
+ *
+ * Sem isto o título das telas empurradas (Lançamentos, Contas, Cartões, Gerenciar, Pastas…) sai
+ * em SF Pro sobre um corpo em Hanken Grotesk — duas famílias na mesma tela, que é exatamente o
+ * "quase nativo" que o design proíbe. `headerTitleStyle`/`headerLargeTitleStyle` viram
+ * `titleFontFamily`/`largeTitleFontFamily` no `react-native-screens`.
+ *
+ * Vai no `screenOptions` de cada pilha, não tela a tela: uma tela nova nasce certa.
+ */
+export const stackHeaderFonts = {
+  headerTitleStyle: { fontFamily: Fonts.semibold },
+  headerLargeTitleStyle: { fontFamily: Fonts.bold },
+} as const;
+
 export function AppHeader({ online = true }: { online?: boolean }) {
   const theme = useTheme();
   const insets = useSafeAreaInsets();

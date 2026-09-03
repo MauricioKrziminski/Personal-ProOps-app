@@ -1,5 +1,7 @@
 import { Stack } from 'expo-router';
 
+import { stackHeaderFonts } from '@/components/ui/app-header';
+
 /**
  * Pilha da aba Financeiro.
  *
@@ -18,6 +20,7 @@ export default function FinanceStackLayout() {
         // Large title + blur entram tela a tela na fase 4, quando cada uma migrar para o
         // primitivo `Screen` (o colapso exige o ScrollView como primeiro filho).
         headerShadowVisible: false,
+        ...stackHeaderFonts,
       }}>
       {/* A raiz desenha o `AppHeader` (design Stitch): sem título de tela, sem large title. */}
       <Stack.Screen name="index" options={{ headerShown: false }} />
