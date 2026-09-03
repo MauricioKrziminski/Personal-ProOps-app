@@ -1412,6 +1412,7 @@ export type Database = {
         Row: {
           alerts_enabled: boolean
           created_at: string
+          display_name: string | null
           expo_push_token: string | null
           id: string
           locale: string
@@ -1423,6 +1424,7 @@ export type Database = {
         Insert: {
           alerts_enabled?: boolean
           created_at?: string
+          display_name?: string | null
           expo_push_token?: string | null
           id: string
           locale?: string
@@ -1434,6 +1436,7 @@ export type Database = {
         Update: {
           alerts_enabled?: boolean
           created_at?: string
+          display_name?: string | null
           expo_push_token?: string | null
           id?: string
           locale?: string

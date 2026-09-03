@@ -1,4 +1,5 @@
-import { StyleSheet, Switch, View } from 'react-native';
+import { useState } from 'react';
+import { ScrollView, StyleSheet, Switch, View } from 'react-native';
 import { router } from 'expo-router';
 import * as Haptics from 'expo-haptics';
 
@@ -13,6 +14,8 @@ import { SkeletonRow } from '@/components/ui/skeleton';
 import { useToast } from '@/components/ui/toast';
 import { GradientSurface } from '@/components/ui/gradient';
 import { Button } from '@/components/ui/button';
+import { Field, TextField } from '@/components/ui/field';
+import { Sheet } from '@/components/ui/sheet';
 import { Radius, Space, tabular } from '@/design/tokens';
 import { currentMonth } from '@/components/finance/month-picker';
 import { useAiMonthStats, usePlanStatus } from '@/hooks/use-finance';
@@ -25,6 +28,7 @@ import {
   useUnregisterPush,
 } from '@/hooks/use-push';
 import { formatDateBR } from '@/hooks/use-items';
+import { useProfile, useUpdateProfile } from '@/hooks/use-profile';
 import { useSession } from '@/hooks/use-session';
 import { useTheme, useThemeMode } from '@/hooks/use-theme';
 import { confirmDestructive } from '@/lib/item-actions';
@@ -50,6 +54,12 @@ export default function ProfileScreen() {
   const setAlerts = useSetAlertsEnabled(userId);
   const plan = usePlanStatus();
   const ia = useAiMonthStats(currentMonth());
+  const profile = useProfile(userId);
+  const saveName = useUpdateProfile(userId);
+
+  /** `null` = sheet fechado. String vazia é um estado válido (apagar o nome). */
+  const [nameDraft, setNameDraft] = useState<string | null>(null);
+  const nome = profile.data?.display_name?.trim() || null;
 
   const phone = session?.user?.phone ? `+${session.user.phone}` : '—';
   const pushOn = push.data?.registered ?? false;
@@ -184,9 +194,10 @@ export default function ProfileScreen() {
         perfil de uma lista de configurações. Fundo em gradiente com brilho, como o painel de
         destaque: é o único bloco de destaque desta tela (§1, um por tela).
 
-        O nome não existe no schema — `profiles` guarda só o telefone —, então o card mostra o
-        número, que é a chave de tudo no produto. O selo verde no avatar diz o que o número
-        significa aqui: está vinculado ao WhatsApp.
+        O nome vem de `profiles.display_name` (migration 0050) e o telefone desce para baixo dele,
+        em mono, porque é DADO (§3). Sem nome preenchido — o caso de quem entrou por Phone OTP —
+        o número volta a ser a linha principal: o card nunca fica com um vazio no lugar do nome.
+        O selo verde no avatar diz o que o número significa aqui: está vinculado ao WhatsApp.
       */}
       <View style={[styles.idCard, { borderColor: theme.cardBorder, backgroundColor: theme.heroBottom }]}>
         <GradientSurface from={theme.heroTop} to={theme.heroBottom} sheen={`${theme.tint}1F`} />
@@ -202,9 +213,20 @@ export default function ProfileScreen() {
           </View>
 
           <View style={styles.idInfo}>
-            <ThemedText type="ticker" themeColor="onHero" selectable>
-              {phone}
-            </ThemedText>
+            {nome ? (
+              <>
+                <ThemedText type="headline" themeColor="onHero" numberOfLines={1}>
+                  {nome}
+                </ThemedText>
+                <ThemedText type="code" themeColor="onHeroMuted" style={tabular} selectable>
+                  {phone}
+                </ThemedText>
+              </>
+            ) : (
+              <ThemedText type="ticker" themeColor="onHero" selectable>
+                {phone}
+              </ThemedText>
+            )}
             <View style={styles.idMeta}>
               <Icon name="bubble.left" size="xs" color="onHeroSuccess" />
               <ThemedText type="caption" themeColor="onHeroMuted">
@@ -312,6 +334,19 @@ export default function ProfileScreen() {
       */}
       {notifications}
 
+      {/*
+        Conta — hoje só o nome. Ele é o que a saudação da Hoje lê, e a única coisa desta tela que
+        o usuário ESCREVE; por isso a linha diz o valor atual em vez de repetir "Nome".
+      */}
+      <Section title="Conta">
+        <Row
+          title="Nome"
+          subtitle={nome ?? 'Ninguém te chama pelo nome ainda'}
+          icon="person"
+          onPress={() => setNameDraft(nome ?? '')}
+        />
+      </Section>
+
       <Section title="Dados">
         <Row title="Lixeira de notas" icon="trash" onPress={() => router.push('/notes/trash')} />
         <Row title="Regras de categoria" icon="wand.and.stars" onPress={() => router.push('/finance/rules')} />
@@ -328,6 +363,46 @@ export default function ProfileScreen() {
       {!session ? (
         <EmptyState icon="person.crop.circle.badge.questionmark" title="Sem sessão" hint="Entre para ver seu perfil." />
       ) : null}
+
+      {/*
+        Um campo só, no mesmo desenho de sheet que Contas, Metas e Orçamentos já usam — nada de
+        rota modal nova para uma linha de texto.
+      */}
+      <Sheet visible={nameDraft !== null} onClose={() => setNameDraft(null)}>
+        <View style={styles.sheetHead}>
+          <Button label="Cancelar" variant="ghost" size="sm" onPress={() => setNameDraft(null)} />
+          <ThemedText type="smallBold">Seu nome</ThemedText>
+          <Button
+            label="Salvar"
+            size="sm"
+            loading={saveName.isPending}
+            onPress={() =>
+              saveName.mutate(
+                { display_name: (nameDraft ?? '').trim() || null },
+                {
+                  onSuccess: () => {
+                    setNameDraft(null);
+                    toast({ message: 'Nome salvo.', tone: 'success' });
+                  },
+                  onError: () => toast({ message: 'Não deu para salvar.', tone: 'error' }),
+                }
+              )
+            }
+          />
+        </View>
+        <ScrollView contentContainerStyle={styles.sheetBody} keyboardShouldPersistTaps="handled">
+          <Field label="Nome" hint="É como o app vai te cumprimentar na Hoje.">
+            <TextField
+              value={nameDraft ?? ''}
+              onChangeText={(v) => setNameDraft(v.slice(0, 60))}
+              placeholder="Gabriel"
+              autoFocus
+              autoCapitalize="words"
+              returnKeyType="done"
+            />
+          </Field>
+        </ScrollView>
+      </Sheet>
 
       <View style={styles.footer}>
         <ThemedText type="small" themeColor="textSecondary">
@@ -437,6 +512,18 @@ const styles = StyleSheet.create({
     borderRadius: Radius.pill,
   },
   planoAcoes: { flexDirection: 'row', alignItems: 'center', gap: Space.sm },
+  sheetHead: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: Space.lg,
+    paddingVertical: Space.md,
+  },
+  sheetBody: {
+    gap: Space.xl,
+    padding: Space.lg,
+    paddingBottom: Space.xxxl,
+  },
   footer: {
     alignItems: 'center',
     paddingVertical: Space.xl,

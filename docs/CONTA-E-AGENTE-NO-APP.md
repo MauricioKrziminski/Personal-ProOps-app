@@ -29,7 +29,7 @@ Levantado antes de decidir qualquer coisa. Cada linha aqui muda o custo de algum
 | Fato | Onde | Por que importa |
 |---|---|---|
 | `profiles.phone` é `text unique not null` | `0001_init.sql:12` | Telefone opcional exige migration. `unique` aceita vários `NULL` no Postgres, então **tirar o `not null` basta** — não precisa de índice parcial. |
-| `handle_new_user` grava `coalesce(new.phone, '')` | `0001_init.sql:33` | ⚠️ **Bug latente.** Cadastro por e-mail tem `new.phone` nulo → grava `''`. O **segundo** cadastro por e-mail colide no `unique` e o signup falha com 23505. Tem que ser corrigido na MESMA migration que abre o e-mail, senão o app quebra no segundo usuário. |
+| `handle_new_user` grava `coalesce(new.phone, '')` | ⚠️ a definição VIVA é a `0029_subscriptions_and_invites.sql:218-262`, **não** a `0001_init.sql:33` — a função foi redefinida duas vezes, e `create or replace` sobre o corpo errado apagaria o que a 0029 acrescentou | ⚠️ **Bug latente.** Cadastro por e-mail tem `new.phone` nulo → grava `''`. O **segundo** cadastro por e-mail colide no `unique` e o signup falha com 23505. Tem que ser corrigido na MESMA migration que abre o e-mail, senão o app quebra no segundo usuário. |
 | `profiles` não tem nome | types | Saudação e Perfil precisam de `display_name`. |
 | O agente acha o usuário por `profiles.phone = any(...)` | `agent/app/db.py:176` | Quem não tem telefone simplesmente não é alcançável pelo WhatsApp — o comportamento correto, sem código novo. |
 | `user_sessions` tem **árbitro em `phone`** | `agent/app/db.py:133-147` | A sessão do agente é chaveada por telefone. Uma conversa no app **não tem telefone** — é a maior adaptação da Fase 5. |
@@ -85,7 +85,11 @@ foi gasta. Não separa nada — responde "por que já acabou?", que hoje é uma 
 Ordem escolhida para que **cada fase seja utilizável sozinha** e nenhuma dependa da seguinte para
 fazer sentido. Da menor para a maior.
 
-### Fase 1 — Nome e saudação  ·  pequena
+### Fase 1 — Nome e saudação  ·  pequena  ·  ✅ FEITA E VALIDADA (03/09/2026)
+
+Migration `0050`. `greetingBR` mora em `src/lib/dates.ts` com teste de fronteira; a saudação lê o
+PRIMEIRO nome. Validada no emulador Android (preencher, salvar, ver na Hoje) e no simulador iOS
+(leitura), nos temas claro e escuro.
 
 **Fazer**
 - Migration: `profiles.display_name text`.
@@ -111,7 +115,11 @@ o nome; conferir a virada de manhã/tarde/noite mudando o relógio do aparelho.
   - `alter table profiles alter column phone drop not null;`
   - **corrigir `handle_new_user`** para gravar `new.phone` sem o `coalesce(...,'')` — senão o
     segundo cadastro por e-mail colide no `unique`;
-  - garantir que `display_name` também é preenchido no signup (metadata do Supabase).
+  - garantir que `display_name` também é preenchido no signup (metadata do Supabase);
+  - `check (display_name is null or btrim(display_name) <> '')` — a Fase 1 já grava `null` para
+    campo vazio, mas a partir da Fase 3 quem escreve o nome é o TRIGGER, com metadata que pode vir
+    `''`. A trava tem que existir antes do primeiro escritor que não é a tela do Perfil;
+  - `comment on column public.profiles.display_name`.
 - Tela de cadastro: nome, e-mail, senha (+ confirmação), telefone **opcional**.
 - Tela de login: e-mail e senha, com "esqueci minha senha".
 - Manter o **Phone OTP funcionando** durante a transição: quem já tem conta por telefone continua

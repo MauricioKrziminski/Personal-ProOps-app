@@ -26,7 +26,10 @@ import {
 } from '@/hooks/use-finance';
 import { categoryIcon } from '@/design/category-icons';
 import { formatBRL, formatDateBR, localISODate, useTodayReminders } from '@/hooks/use-items';
+import { useProfile } from '@/hooks/use-profile';
+import { useSession } from '@/hooks/use-session';
 import { useTheme } from '@/hooks/use-theme';
+import { greetingBR } from '@/lib/dates';
 import { Fonts } from '@/constants/theme';
 
 /** Um orçamento entra na seção "passando do orçamento" a partir de 80% consumido. */
@@ -56,6 +59,11 @@ export default function TodayScreen() {
       monthEndDay: last.getDate(),
     };
   }, []);
+
+  const { session } = useSession();
+  const profile = useProfile(session?.user?.id);
+  /** Só o primeiro nome: "Bom dia, Gabriel Almeida Dias" é um crachá, não um cumprimento. */
+  const firstName = profile.data?.display_name?.trim().split(/\s+/)[0];
 
   const forecast = useCashFlowForecast(daysLeft);
   const bills = useUpcomingBills(7);
@@ -112,6 +120,16 @@ export default function TodayScreen() {
           },
         ]}
         showsVerticalScrollIndicator={false}>
+        {/*
+          0. A saudação. Sem nome preenchido ela NÃO aparece — nem como "Bom dia," sozinho, nem
+          como um espaço reservado: quem entrou por Phone OTP nunca informou nome, e um
+          cumprimento pela metade é pior que nenhum. Em `subtitle` porque a display da tela já é
+          o valor do painel logo abaixo (§3, uma por tela).
+        */}
+        {firstName ? (
+          <ThemedText type="subtitle">{`${greetingBR()}, ${firstName}`}</ThemedText>
+        ) : null}
+
         {/*
           1. O painel de destaque. É o `HeroPanel` compartilhado, não uma cópia local: esta tela
           reimplementava o card inteiro à mão, e por isso não ganhou o gradiente, o brilho e o
