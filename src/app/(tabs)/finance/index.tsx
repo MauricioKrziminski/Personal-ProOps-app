@@ -324,7 +324,8 @@ export default function FinanceScreen() {
     <View style={styles.root}>
       <Screen
         grouped
-        topBar={<AppHeader title="Financeiro" eyebrow={monthTitle(month)} />}
+        // Sem etiqueta: o seletor de mês fica logo abaixo e diria a mesma coisa duas vezes.
+        topBar={<AppHeader title="Financeiro" />}
         onRefresh={() => {
           forecast.refetch();
           summary.refetch();
