@@ -8,7 +8,7 @@ import {
   View,
 } from 'react-native';
 import Animated, { FadeIn, FadeOut } from 'react-native-reanimated';
-import { KeyboardAwareScrollView } from 'react-native-keyboard-controller';
+import { KeyboardAwareScrollView, KeyboardStickyView } from 'react-native-keyboard-controller';
 import * as Haptics from 'expo-haptics';
 import type { SymbolViewProps } from 'expo-symbols';
 
@@ -467,13 +467,24 @@ export default function NoteDetailScreen() {
           <ReadBody content={content} onEdit={startEditing} onToggleLine={onToggleLine} />
         )}
 
-        {/*
-          A barra fica DENTRO do scroll, logo abaixo do texto, e não presa acima do teclado.
-          Presa, ela cobriria a última linha justamente enquanto a pessoa digita nela — e o
-          `KeyboardAwareScrollView` já mantém o cursor visível, então aqui ela sobe junto.
-        */}
-        {editing ? <BlockBar onPick={aplicarBloco} /> : null}
       </KeyboardAwareScrollView>
+
+      {/*
+        A barra fica GRUDADA no teclado, não dentro do scroll.
+
+        Dentro do scroll ela nunca aparecia: o `TextInput` de edição tem `flexGrow: 1`, então ele
+        come toda a altura disponível e empurra a barra para fora da tela — verificado no
+        emulador, a barra existia na árvore e ficava abaixo da dobra. `KeyboardStickyView` a
+        prende logo acima do teclado, que é onde Apple Notes, Bear e Things põem a mesma coisa;
+        o `KeyboardAwareScrollView` continua responsável por manter o cursor visível acima dela.
+      */}
+      {editing ? (
+        <KeyboardStickyView>
+          <View style={styles.blockBarWrap}>
+            <BlockBar onPick={aplicarBloco} />
+          </View>
+        </KeyboardStickyView>
+      ) : null}
 
       <TagPicker
         visible={tagPickerOpen}
@@ -969,6 +980,7 @@ const styles = StyleSheet.create({
   quoteBar: { width: 3, borderRadius: Radius.xs },
   quoteText: { fontStyle: undefined },
   divider: { height: StyleSheet.hairlineWidth, marginVertical: Space.sm },
+  blockBarWrap: { paddingHorizontal: Space.lg, paddingBottom: Space.sm },
   blockBar: {
     flexDirection: 'row',
     alignItems: 'center',

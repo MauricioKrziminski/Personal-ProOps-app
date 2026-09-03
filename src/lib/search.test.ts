@@ -51,6 +51,14 @@ test('prévia não repete o título', () => {
   assert.equal(notePreview('só o título'), '');
 });
 
+test('prévia e título não vazam a marcação de NENHUM bloco', () => {
+  // Vazou duas vezes na vida deste arquivo: primeiro com checklist, depois com cabeçalho, quando
+  // os blocos nasceram e `stripMarkup` só conhecia `- [ ]`.
+  assert.equal(noteTitle('# Feira do mês'), 'Feira do mês');
+  assert.equal(noteTitle('> citação de abertura'), 'citação de abertura');
+  assert.equal(notePreview('titulo\n## sub\n- item\n1. um\n---'), 'sub item um');
+});
+
 test('prévia não vaza a marcação do checklist (aparecia `- [x] leite - [ ] pão`)', () => {
   assert.equal(notePreview('Compras\n- [x] leite\n- [ ] pão\n- [ ] café'), 'leite pão café');
 });
@@ -59,8 +67,12 @@ test('título de nota que começa com checklist mostra o texto, não a marcaçã
   assert.equal(noteTitle('- [ ] pagar aluguel\n- [x] luz'), 'pagar aluguel');
 });
 
-test('linha comum na prévia continua intacta (o strip não pode comer hífen de texto)', () => {
-  assert.equal(notePreview('Título\n- item solto\nmeia-noite'), '- item solto meia-noite');
+test('o strip come a MARCAÇÃO, nunca o hífen que é texto', () => {
+  // Mudou de propósito em 03/09/2026: `- item` deixou de ser texto solto e passou a ser um bloco
+  // de lista, então a prévia mostra o conteúdo sem o traço — que é o trabalho desta função.
+  // O que o teste guarda de verdade continua guardado: hífen DENTRO da palavra não é marcação.
+  assert.equal(notePreview('Título\n- item solto\nmeia-noite'), 'item solto meia-noite');
+  assert.equal(notePreview('Título\nsegunda-feira às 9h'), 'segunda-feira às 9h');
 });
 
 test('prévia não repete a #tag, que já aparece na faixa de metadados', () => {

@@ -1,3 +1,5 @@
+import { classify } from './note-blocks.ts';
+
 /**
  * Termo de busca do usuário → `tsquery` do Postgres.
  *
@@ -27,7 +29,11 @@ const CHECKLIST_LINE = /^(\s*)-\s\[( |x|X)\]\s?(.*)$/;
  * rótulo de acessibilidade — oito chamadas que teriam o mesmo vazamento.
  */
 function stripMarkup(line: string): string {
-  return CHECKLIST_LINE.exec(line)?.[3] ?? line;
+  // Delega para o classificador de blocos: ele já devolve o texto limpo de TODOS os tipos.
+  // A versão anterior conhecia só checklist, e por isso a lista passou a exibir `# Feira` com o
+  // jogo-da-velha à mostra assim que os blocos nasceram — a marcação vazava de novo, exatamente
+  // o defeito que esta função existe para impedir.
+  return classify(line).text;
 }
 
 /**

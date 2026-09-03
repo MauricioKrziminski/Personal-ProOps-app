@@ -2,6 +2,10 @@
   "extends": "expo/tsconfig.base",
   "compilerOptions": {
     "strict": true,
+    // Fonte que o `node --test` carrega direto precisa da extensão no import (ESM do Node
+    // não resolve `./x` para `./x.ts`). O bundler do Metro e o `moduleResolution: "bundler"`
+    // aceitam; sem esta flag o tsc recusa.
+    "allowImportingTsExtensions": true,
     "paths": {
       "@/*": [
         "./src/*"
