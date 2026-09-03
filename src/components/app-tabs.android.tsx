@@ -2,6 +2,7 @@ import { router, useSegments } from 'expo-router';
 import { TabList, TabSlot, TabTrigger, Tabs } from 'expo-router/ui';
 import { StyleSheet } from 'react-native';
 
+import { ThemedText } from '@/components/themed-text';
 import { CurvedTabBar, type CurvedTab } from '@/components/ui/curved-tab-bar';
 import { useBudgetsStatus, useUpcomingBills } from '@/hooks/use-finance';
 import { useTodayReminders } from '@/hooks/use-items';
@@ -56,7 +57,9 @@ export default function AppTabs() {
   const tabs = TABS.map((t) => (t.name === 'today' ? { ...t, badge: pendentes } : t));
 
   return (
-    <Tabs style={{ backgroundColor: theme.background }}>
+    /* `flex: 1` explícito: `style` SOBRESCREVE o do componente, e sem ele a árvore de abas
+       colapsa para altura zero — a tela fica em branco, sem erro nenhum no log. */
+    <Tabs style={{ flex: 1, backgroundColor: theme.background }}>
       <TabSlot />
 
       <CurvedTabBar
@@ -67,7 +70,9 @@ export default function AppTabs() {
 
       <TabList style={styles.hidden}>
         {TABS.map((tab, i) => (
-          <TabTrigger key={tab.name} name={tab.name} href={HREFS[i]} />
+          <TabTrigger key={tab.name} name={tab.name} href={HREFS[i]}>
+            <ThemedText type="caption">{tab.label}</ThemedText>
+          </TabTrigger>
         ))}
       </TabList>
     </Tabs>

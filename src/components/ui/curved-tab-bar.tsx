@@ -1,12 +1,8 @@
+import { useEffect, useMemo } from 'react';
 import { Canvas, Path, Skia } from '@shopify/react-native-skia';
 import * as Haptics from 'expo-haptics';
 import { Pressable, StyleSheet, View, useWindowDimensions } from 'react-native';
-import Animated, {
-  useAnimatedStyle,
-  useDerivedValue,
-  useSharedValue,
-  withSpring,
-} from 'react-native-reanimated';
+import Animated, { useAnimatedStyle, useSharedValue, withSpring } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { ThemedText } from '@/components/themed-text';
@@ -101,13 +97,33 @@ export function CurvedTabBar({
 
   // Uma posição só governa a curva E a bolha — se fossem duas molas, elas dessincronizariam e a
   // bolha sairia do berço no meio do caminho.
+  //
+  // A mola é disparada em `useEffect`, nunca no corpo do componente: escrever num shared value
+  // durante o render é erro que o Reanimated avisa em dev e que, em produção, faz a animação
+  // reiniciar a cada re-render do pai.
   const cx = useSharedValue(alvo);
-  cx.set(withSpring(alvo, Motion.spring.settle));
+  useEffect(() => {
+    cx.set(withSpring(alvo, Motion.spring.settle));
+  }, [alvo, cx]);
 
-  const path = useDerivedValue(() => {
-    const x = cx.get();
+  const mouth = barW * K.mouth;
+  const depth = BAR_H * K.depth;
+
+  /**
+   * O berço é uma LENTE: a região entre a reta do topo da barra e a curva que mergulha.
+   *
+   * Pintada na cor do fundo por cima da barra, ela lê exatamente como um recorte — e como a
+   * forma nunca muda, o caminho é construído UMA vez, no `useMemo`, e quem anima é o
+   * `translateX` da View que a carrega.
+   *
+   * A primeira versão remontava o caminho inteiro da barra a cada frame dentro de um
+   * `useDerivedValue`. O worklet rodava (os avisos de API depreciada saíam no logcat), mas o
+   * canvas não pintava nada: a barra ficava invisível e a tela aparecia por baixo dos rótulos.
+   * Caminho estático + View animada não depende de o Skia aceitar objetos criados em worklet.
+   */
+  const berco = useMemo(() => {
     const p = Skia.Path.Make();
-    const mouth = barW * K.mouth;
+    const w = mouth * 2;
     const c1 = barW * K.c1;
     const c2 = barW * K.c2;
     const c3 = barW * K.c3;
@@ -116,25 +132,20 @@ export function CurvedTabBar({
     const y1 = BAR_H * K.y1;
     const y2 = BAR_H * K.y2;
     const y3 = BAR_H * K.y3;
-    const depth = BAR_H * K.depth;
-    const r = Math.min(BAR_H * K.corner, BAR_H / 2);
+    const meio = w / 2;
 
-    p.moveTo(0, r);
-    p.cubicTo(0, r / 2.2, r / 2.2, 0, r, 0);
-    p.lineTo(x - mouth, 0);
-    p.cubicTo(x - c1, 0, x - c2, y1, x - c3, y2);
-    p.cubicTo(x - c4, y3, x - c5, depth, x, depth);
-    p.cubicTo(x + c5, depth, x + c4, y3, x + c3, y2);
-    p.cubicTo(x + c2, y1, x + c1, 0, x + mouth, 0);
-    p.lineTo(barW - r, 0);
-    p.cubicTo(barW - r / 2.2, 0, barW, r / 2.2, barW, r);
-    p.lineTo(barW, BAR_H - r);
-    p.cubicTo(barW, BAR_H - r / 2.2, barW - r / 2.2, BAR_H, barW - r, BAR_H);
-    p.lineTo(r, BAR_H);
-    p.cubicTo(r / 2.2, BAR_H, 0, BAR_H - r / 2.2, 0, BAR_H - r);
+    p.moveTo(0, 0);
+    p.cubicTo(meio - c1, 0, meio - c2, y1, meio - c3, y2);
+    p.cubicTo(meio - c4, y3, meio - c5, depth, meio, depth);
+    p.cubicTo(meio + c5, depth, meio + c4, y3, meio + c3, y2);
+    p.cubicTo(meio + c2, y1, meio + c1, 0, w, 0);
     p.close();
     return p;
-  });
+  }, [barW, mouth, depth]);
+
+  const bercoStyle = useAnimatedStyle(() => ({
+    transform: [{ translateX: cx.get() - mouth }],
+  }));
 
   const bolha = useAnimatedStyle(() => ({
     transform: [{ translateX: cx.get() - BUBBLE / 2 }],
@@ -145,13 +156,21 @@ export function CurvedTabBar({
       pointerEvents="box-none"
       style={[styles.raiz, { paddingBottom: insets.bottom + Space.sm, paddingHorizontal: SIDE }]}>
       <View style={{ width: barW, height: BAR_H + LIFT }}>
-        {/* A barra desenhada. O berço é a única razão de existir um canvas aqui. */}
-        <Canvas style={[styles.canvas, { width: barW, height: BAR_H }]}>
-          <Path path={path} color={theme.surface} />
-        </Canvas>
+        <View
+          style={[
+            styles.barra,
+            { height: BAR_H, backgroundColor: theme.surface, borderColor: theme.cardBorder },
+          ]}
+        />
 
-        {/* O contorno de 1px do sistema não sobrevive a um path com recorte; o degrau de
-            superfície (`surface` sobre `background`) é o que separa a barra da tela. */}
+        {/* O berço, pintado na cor do fundo por cima da barra. */}
+        <Animated.View
+          pointerEvents="none"
+          style={[styles.berco, { width: mouth * 2, height: depth }, bercoStyle]}>
+          <Canvas style={{ width: mouth * 2, height: depth }}>
+            <Path path={berco} color={theme.background} />
+          </Canvas>
+        </Animated.View>
 
         <Animated.View
           pointerEvents="none"
@@ -201,8 +220,29 @@ export function CurvedTabBar({
 }
 
 const styles = StyleSheet.create({
-  raiz: { position: 'absolute', left: 0, right: 0, bottom: 0, alignItems: 'center' },
-  canvas: { position: 'absolute', left: 0, top: LIFT },
+  raiz: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    bottom: 0,
+    alignItems: 'center',
+    /**
+     * No Android o cartão da tela tem `elevation` (vem do `boxShadow` do `Card`), e elevação
+     * ganha de ordem de irmãos: sem declarar a nossa, a lista desenhava POR CIMA da barra e ela
+     * sumia — só a bolha e os rótulos apareciam, flutuando sobre o conteúdo.
+     */
+    zIndex: 10,
+    elevation: 10,
+  },
+  barra: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    top: LIFT,
+    borderRadius: Radius.pill,
+    borderWidth: StyleSheet.hairlineWidth,
+  },
+  berco: { position: 'absolute', left: 0, top: LIFT },
   bolha: {
     position: 'absolute',
     left: 0,

@@ -1,6 +1,6 @@
 import { router, type Href } from 'expo-router';
 import { useEffect, useMemo, useState } from 'react';
-import { Pressable, StyleSheet, View, useWindowDimensions } from 'react-native';
+import { Platform, Pressable, StyleSheet, View, useWindowDimensions } from 'react-native';
 import Animated, {
   FadeInDown,
   useAnimatedStyle,
@@ -24,6 +24,7 @@ import {
 } from '@/components/finance/month-picker';
 import { ThemedText } from '@/components/themed-text';
 import { CardStack } from '@/components/finance/card-stack';
+import { CURVED_BAR_SPACE } from '@/components/ui/curved-tab-bar';
 import { AppHeader } from '@/components/ui/app-header';
 import { ItemLink } from '@/components/ui/item-link';
 import { Button } from '@/components/ui/button';
@@ -795,7 +796,16 @@ export default function FinanceScreen() {
         onPress={() => router.push({ pathname: '/finance/transaction-form', params: { month } })}
         style={[
           styles.fab,
-          { bottom: insets.bottom + Space.xxl, boxShadow: Elevation[scheme].floating },
+          {
+            // No Android o FAB tem que subir acima da `CurvedTabBar`, que é mais alta que a barra
+            // nativa e flutua: com o cálculo antigo ele pousava EM CIMA da pílula.
+            bottom:
+              insets.bottom +
+              (Platform.OS === 'android' ? CURVED_BAR_SPACE + Space.md : Space.xxl),
+            boxShadow: Elevation[scheme].floating,
+            zIndex: 11,
+            elevation: 11,
+          },
         ]}
       />
     </View>

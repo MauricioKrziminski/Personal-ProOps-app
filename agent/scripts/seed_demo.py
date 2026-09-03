@@ -168,7 +168,7 @@ def main() -> None:
             (ws,),
         )
         # ~93% no maior (estoura o alerta), ~78% no segundo, folgado no terceiro.
-        fracoes = (0.93, 0.78, 0.45)
+        fracoes = (0.93, 0.78, 0.45)  # estoura o alerta, aperta, folgado
         tetos = [
             (cat, max(1000, int(round(float(total) / fracoes[i] / 1000) * 1000)))
             for i, (cat, total) in enumerate(cur.fetchall())
@@ -186,6 +186,28 @@ def main() -> None:
                 (ws, uid, categoria, teto),
             )
             print(f"  + orçamento {categoria}")
+
+        # Calibra os tetos pelo `_budgets_status` — a MESMA fonte que a tela lê.
+        #
+        # A soma crua de `transactions` não bate com ela (a RPC tem regras próprias sobre o que
+        # entra), e foi por isso que a primeira tentativa nasceu com todo orçamento em 0%: o teto
+        # tinha sido calculado sobre um número que a tela não usa. Regra que vale para qualquer
+        # dado de demonstração: calibre pela função de leitura, nunca pela tabela.
+        cur.execute("select * from public._budgets_status(%s, current_date)", (uid,))
+        colunas = [d.name for d in cur.description]
+        linhas = [dict(zip(colunas, r)) for r in cur.fetchall()]
+        linhas.sort(key=lambda r: -int(r["spent_cents"]))
+        for i, linha in enumerate(linhas[:3]):
+            gasto = int(linha["spent_cents"])
+            if gasto <= 0:
+                continue
+            novo = max(1000, int(round(gasto / fracoes[i] / 1000) * 1000))
+            cur.execute(
+                """update public.budgets set limit_cents = %s
+                   where workspace_id = %s and category = %s and month is null""",
+                (novo, ws, linha["category"]),
+            )
+            print(f"  ~ teto de {linha['category']}: {novo} ({gasto * 100 // novo}%)")
 
         # --- metas, com aporte pelo LEDGER (nunca `+=` na coluna) ---------------------------
         def meta(nome: str, alvo: int, guardado: int, prazo: date) -> None:
