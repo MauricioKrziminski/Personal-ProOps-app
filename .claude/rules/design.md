@@ -58,13 +58,47 @@ Card comum é `Card` (`src/components/ui/card.tsx`): opaco, `Elevation`, `Radius
 **Um accent só** (`tint`), gasto em ação primária, estado ativo e progresso. `danger`, `success`
 e `warning` são semânticos — nunca decoração. Uma família de cinza no app inteiro.
 
-Dark mode é automático (`userInterfaceStyle: automatic`) e **não é opcional na verificação**.
+**A escala de raio virou a do Stitch** (03/09/2026): `xs 4` badge e barra, `sm 8` input e linha,
+`md 12` card — o raio mais usado do design inteiro —, `lg 16` card de destaque, `xl 20` sheet,
+`pill` ação. Os nomes não mudaram, só os valores; cards de 16 liam macios demais ao lado do
+desenho.
+
+**Todo card leva contorno de 1px em `cardBorder`.** É a assinatura do design e não é enfeite: no
+fundo quase-preto a sombra desaparece, e sem o contorno o card não tem onde terminar — a tela
+inteira lia como um bloco só. `Card` já aplica; superfície escrita à mão também precisa.
+
+⚠️ **O app está TRAVADO em dark** (`useTheme` devolve `Colors.dark`) desde 02/09/2026, porque o
+desenho do Stitch é OLED e o tema claro o desmonta. `Colors.light` continua completo e a volta é
+uma linha em `use-theme.ts`. Enquanto a trava existir, "verificar em light e dark" não se aplica —
+mas **toda cor nova continua exigindo o par**, senão destravar vira um dia de trabalho.
 
 ---
 
-## 3. Tipografia
+## 3. Tipografia — Hanken Grotesk + JetBrains Mono (03/09/2026)
 
-Ramp da plataforma, **uma display por tela**. `Fonts.rounded` só em dinheiro em destaque.
+**Duas famílias, e a régua da plataforma saiu.** O app usava `system-ui` e por isso lia como "iOS
+bem feito genérico" mesmo com o layout certo — era a queixa, e a causa era esta linha.
+
+| papel | família | onde |
+|---|---|---|
+| texto | **Hanken Grotesk** 400/500/600/700 | tudo que se lê |
+| dado | **JetBrains Mono** 400/500/600 | hora, contador, unidade, badge, percentual, dinheiro em linha |
+
+O par é o que dá voz a um sistema **sem cor de marca**: um tipo para ler, outro para carimbar
+dado. Sem o mono o app volta a ser uma escala de cinza com uma fonte só.
+
+**Peso é FAMÍLIA, nunca `fontWeight`.** Fonte custom no Android ignora `fontWeight` e cai no
+regular com bold sintético. Quem escolhe a face é a variante de `Type`, que aponta para o nome
+exato (`HankenGrotesk_600SemiBold`). `fontWeight` numa tela é bug, não estilo.
+
+A escala é a do Stitch, medida do export, não inventada: 11 / 13 / 15 / 17 / 20 / 26 / 32, com
+`letterSpacing` negativo do 15 para cima e positivo no 11. O tracking faz parte do desenho —
+copiar só o `fontSize` não reproduz a tipografia.
+
+As faces carregam por `useFonts` no `_layout.tsx` raiz e o splash segura até terminarem: `Type`
+aponta pelo NOME, e face ausente não cai no system font — ela some.
+
+**Uma display por tela** continua valendo.
 
 **`fontVariant: ['tabular-nums']` em todo número que conta, mede ou custa** — dinheiro, data,
 percentual, contador. Sem isso o valor "pula" quando muda.
@@ -146,8 +180,13 @@ estado da primeira: seção que falha diz que falhou, não some.
 Toda transição responde três perguntas: o que é o destino, o usuário precisa poder voltar, e o
 que "voltar" faz depois.
 
-- **Header é do navegador.** `<Stack.Title>` + large title com colapso no scroll. Nada de barra
-  desenhada à mão dentro do `ScrollView`.
+- **Header é do navegador — exceto nas quatro RAÍZES de aba.** Ali quem desenha é o `AppHeader`
+  (`src/components/ui/app-header.tsx`): marca + ponto de estado à esquerda, atalho de perfil à
+  direita, igual nas quatro. O desenho não tem título de tela porque quem diz onde a pessoa está
+  é a aba acesa embaixo. **Tela EMPURRADA continua com `<Stack.Title>` + large title** — lá o
+  título e o "voltar" são a informação, e trocá-los por uma marca tiraria a única pista de
+  localização. Barra desenhada à mão dentro do `ScrollView` continua proibida: o `AppHeader` fica
+  FORA dele.
 - **Busca é `<Search>`** (`src/components/ui/search-field.tsx`), em Notas, Lançamentos e
   `/search`. Um componente, dois desenhos: no **iOS** ele renderiza o `<Stack.SearchBar>` nativo,
   que integra com o large title e some no scroll; no **Android** renderiza uma pílula
