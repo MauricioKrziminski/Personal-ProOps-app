@@ -1796,3 +1796,47 @@ export function useDeleteImportBatch() {
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['import-batches'] }),
   });
 }
+
+/** Uma linha de `alerts_sent` — o que o cron JÁ mandou, não o que ele mandaria. */
+export interface AlertSent {
+  id: string;
+  kind: string;
+  ref: string;
+  sent_on: string;
+  channel: string | null;
+  created_at: string;
+}
+
+/**
+ * O histórico de alertas proativos.
+ *
+ * A tabela existe desde a `0024` com a policy de leitura já pronta ("own-rows read para uma
+ * futura tela de histórico", diz o comentário da migration) — e ficou três meses sem ninguém
+ * lendo, com a linha do Perfil respondendo "Em breve.".
+ *
+ * ⚠️ **A linha guarda `kind` + `ref`, nunca o texto enviado.** Título e corpo são montados em SQL
+ * na hora do envio (`_alerts_to_send`) e descartados; a tela remonta um rótulo a partir do
+ * `kind`. Isso é de propósito: gravar o texto duplicaria a regra e as duas cópias divergiriam no
+ * primeiro ajuste de redação.
+ *
+ * Sem realtime e sem `useRealtimeInvalidate`: o cron escreve **uma vez por dia**, e um canal
+ * aberto para isso custaria mais do que vale. O refetch ao focar a tela basta.
+ */
+export function useAlertsSent(limit = 60) {
+  return useQuery({
+    queryKey: ['alerts-sent', String(limit)],
+    queryFn: async (): Promise<AlertSent[]> => {
+      const { data, error } = await supabase
+        .from('alerts_sent')
+        .select('id, kind, ref, sent_on, channel, created_at')
+        // `sent_on` primeiro porque é por ele que a tela agrupa: ordenar só por `created_at`
+        // produziria cabeçalhos de dia fora de ordem — o mesmo defeito que os "Últimos
+        // lançamentos" do Financeiro tinham.
+        .order('sent_on', { ascending: false })
+        .order('created_at', { ascending: false })
+        .limit(limit);
+      if (error) throw error;
+      return data as AlertSent[];
+    },
+  });
+}

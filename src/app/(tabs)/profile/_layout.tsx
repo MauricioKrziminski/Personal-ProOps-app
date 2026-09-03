@@ -11,6 +11,7 @@ export default function ProfileStackLayout() {
       {/* A raiz desenha o `AppHeader` (design Stitch): sem título de tela, sem large title. */}
       <Stack.Screen name="index" options={{ headerShown: false }} />
       <Stack.Screen name="members" options={{ title: 'Pessoas' }} />
+      <Stack.Screen name="alerts" options={{ title: 'Histórico de alertas' }} />
     </Stack>
   );
 }

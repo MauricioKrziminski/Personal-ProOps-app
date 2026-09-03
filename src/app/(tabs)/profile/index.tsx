@@ -101,7 +101,7 @@ export default function ProfileScreen() {
       <Row
         title="Histórico de alertas"
         icon="clock.arrow.circlepath"
-        onPress={() => toast({ message: 'Em breve.', tone: 'info' })}
+        onPress={() => router.push('/profile/alerts')}
       />
     </Section>
   );
