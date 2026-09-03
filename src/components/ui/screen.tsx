@@ -1,7 +1,16 @@
-import { RefreshControl, ScrollView, StyleSheet, View, type StyleProp, type ViewStyle } from 'react-native';
+import {
+  Platform,
+  RefreshControl,
+  ScrollView,
+  StyleSheet,
+  View,
+  type StyleProp,
+  type ViewStyle,
+} from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { MaxContentWidth } from '@/constants/theme';
+import { CURVED_BAR_SPACE } from '@/components/ui/curved-tab-bar';
 import { Radius, Space } from '@/design/tokens';
 import { useTheme } from '@/hooks/use-theme';
 
@@ -64,7 +73,17 @@ export function Screen({
   const insets = useSafeAreaInsets();
 
   const background = grouped ? theme.groupedBackground : theme.background;
-  const padding = [styles.content, { paddingBottom: insets.bottom + Space.xxl }, contentStyle];
+  /**
+   * No Android a raiz de aba precisa reservar a altura da `CurvedTabBar`, que é absoluta e
+   * desenha POR CIMA do conteúdo. `topBar` é o sinal de que esta é uma raiz de aba — telas
+   * empurradas não têm barra e não devem ganhar o respiro.
+   */
+  const tabBarSpace = topBar && Platform.OS === 'android' ? CURVED_BAR_SPACE : 0;
+  const padding = [
+    styles.content,
+    { paddingBottom: insets.bottom + Space.xxl + tabBarSpace },
+    contentStyle,
+  ];
 
   if (!scroll) {
     return (

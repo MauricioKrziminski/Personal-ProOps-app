@@ -156,8 +156,24 @@ def main() -> None:
             )
             print("  + conta a vencer Energia")
 
-        # --- orçamentos: um estourando (é o que a Hoje mostra), um folgado -------------------
-        for categoria, teto in (("alimentação", 200000), ("transporte", 60000), ("lazer", 40000)):
+        # --- orçamentos ---------------------------------------------------------------------
+        # Os tetos são calculados sobre o que a base JÁ TEM gasto no mês, senão o orçamento nasce
+        # em 0% e as duas telas que dependem dele (a seção "passando do orçamento" da Hoje e o
+        # contador do topo) ficam vazias — que é exatamente o que este script existe para evitar.
+        cur.execute(
+            """select category, sum(amount_cents) from public.transactions
+               where workspace_id=%s and kind='expense' and category is not null
+                 and occurred_at >= date_trunc('month', current_date)
+               group by 1 order by 2 desc limit 3""",
+            (ws,),
+        )
+        # ~93% no maior (estoura o alerta), ~78% no segundo, folgado no terceiro.
+        fracoes = (0.93, 0.78, 0.45)
+        tetos = [
+            (cat, max(1000, int(round(float(total) / fracoes[i] / 1000) * 1000)))
+            for i, (cat, total) in enumerate(cur.fetchall())
+        ]
+        for categoria, teto in tetos:
             cur.execute(
                 "select 1 from public.budgets where workspace_id=%s and category=%s and month is null",
                 (ws, categoria),

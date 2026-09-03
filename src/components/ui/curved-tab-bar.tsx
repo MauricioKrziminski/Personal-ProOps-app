@@ -25,6 +25,14 @@ const LIFT = 22;
 const SIDE = Space.lg;
 
 /**
+ * Quanto a barra ocupa por cima do conteúdo — **fora** da safe area.
+ *
+ * A barra é `position: absolute`, então nada reserva esse espaço sozinho: sem somar isto ao
+ * padding inferior das raízes de aba, a última linha de toda lista fica embaixo dela.
+ */
+export const CURVED_BAR_SPACE = BAR_H + LIFT + Space.sm;
+
+/**
  * O berço, em proporções do desenho original (viewBox 580×88), para escalar sem deformar.
  *
  * Os números vieram do path exportado pelo Stitch, lidos par a par em torno do centro: a boca

@@ -1,11 +1,12 @@
 import { useMemo } from 'react';
 import { router } from 'expo-router';
-import { Pressable, ScrollView, StyleSheet, View, useWindowDimensions } from 'react-native';
+import { Platform, Pressable, ScrollView, StyleSheet, View, useWindowDimensions } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { ThemedText } from '@/components/themed-text';
 import { ErrorCard } from '@/components/error-card';
 import { AppHeader } from '@/components/ui/app-header';
+import { CURVED_BAR_SPACE } from '@/components/ui/curved-tab-bar';
 import { Button } from '@/components/ui/button';
 import { useConceal } from '@/components/ui/conceal';
 import { EmptyState } from '@/components/ui/empty-state';
@@ -99,7 +100,16 @@ export default function TodayScreen() {
       <AppHeader title="Hoje" eyebrow={hojePorExtenso()} />
 
       <ScrollView
-        contentContainerStyle={[styles.scroll, { paddingBottom: insets.bottom + Space.xxxl * 2 }]}
+        contentContainerStyle={[
+          styles.scroll,
+          {
+            // A barra do Android é absoluta e desenha por cima; a do iOS reserva o próprio espaço.
+            paddingBottom:
+              insets.bottom +
+              Space.xxxl +
+              (Platform.OS === 'android' ? CURVED_BAR_SPACE : Space.xxl),
+          },
+        ]}
         showsVerticalScrollIndicator={false}>
         {/* 1. Painel de destaque — a sobra projetada até o fim do mês. */}
         <View style={[styles.hero, { backgroundColor: theme.heroSurface, borderColor: theme.cardBorder }]}>
