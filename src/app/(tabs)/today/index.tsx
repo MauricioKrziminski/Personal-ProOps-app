@@ -228,19 +228,25 @@ export default function TodayScreen() {
                 key={b.ref_id}
                 style={[styles.card, styles.billCard, { backgroundColor: theme.surface, borderColor: theme.cardBorder }]}>
                 <View style={styles.billInfo}>
-                  <View style={styles.billTitleRow}>
-                    <ThemedText type="headline" numberOfLines={1} style={styles.shrink}>
-                      {b.title}
+                  {/*
+                    O título tem a linha inteira. A pílula de vencimento morava ao lado dele e,
+                    com um título real ("Fatura Nubank Cartão 09/2026"), sobrava "Fatura…" — a
+                    pílula tem largura fixa e comia todo o espaço do `flex`. Ela desceu para a
+                    linha do valor, onde é curta e onde o olho já está lendo números.
+                  */}
+                  <ThemedText type="headline" numberOfLines={1}>
+                    {b.title}
+                  </ThemedText>
+                  <View style={styles.billMoneyRow}>
+                    <ThemedText type="ticker" themeColor="danger" style={tabular}>
+                      {formatBRL(Number(b.amount_cents))}
                     </ThemedText>
                     <View style={[styles.duePill, { backgroundColor: theme.dangerSoft }]}>
                       <ThemedText type="caption" themeColor="danger">
-                        {`VENCEU EM ${formatDateBR(b.due_date)}`}
+                        {`venceu ${formatDateBR(b.due_date)}`}
                       </ThemedText>
                     </View>
                   </View>
-                  <ThemedText type="ticker" themeColor="danger" style={tabular}>
-                    {formatBRL(Number(b.amount_cents))}
-                  </ThemedText>
                 </View>
 
                 <Button
@@ -532,7 +538,7 @@ const styles = StyleSheet.create({
   },
   billCard: { flexDirection: 'row', alignItems: 'center', gap: Space.md },
   billInfo: { flex: 1, minWidth: 0, gap: Space.xs },
-  billTitleRow: { flexDirection: 'row', alignItems: 'center', gap: Space.sm },
+  billMoneyRow: { flexDirection: 'row', alignItems: 'center', gap: Space.sm, flexWrap: 'wrap' },
   duePill: {
     paddingHorizontal: Space.sm,
     paddingVertical: Space.half,

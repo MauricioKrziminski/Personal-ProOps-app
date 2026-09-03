@@ -472,7 +472,8 @@ export default function NotesScreen() {
                     {folders.map((folder) => (
                       <Chip
                         key={folder.id}
-                        label={`${folder.name} · ${folder.notes_count}`}
+                        label={folder.name}
+                        count={folder.notes_count}
                         selected={folderId === folder.id}
                         onPress={() =>
                           setFolderId(folderId === folder.id ? undefined : folder.id)
