@@ -44,6 +44,18 @@ const GROUPS: { title: string; items: ManageItem[] }[] = [
     ],
   },
   {
+    /**
+     * Vieram do menu "…" do header do resumo, que sumiu quando a raiz passou a usar o
+     * `AppHeader` do design Stitch. É o lugar certo: são ações de manutenção, e os irmãos
+     * delas já moravam aqui.
+     */
+    title: 'Entrada de dados',
+    items: [
+      { title: 'Importar extrato', icon: 'square.and.arrow.down', href: '/import' },
+      { title: 'Regras de categoria', icon: 'line.3.horizontal.decrease', href: '/finance/rules' },
+    ],
+  },
+  {
     title: 'Conta',
     items: [{ title: 'Plano e família', icon: 'person.2', href: '/finance/plan' }],
   },

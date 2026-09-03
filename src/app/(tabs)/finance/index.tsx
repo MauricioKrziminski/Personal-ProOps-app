@@ -1,4 +1,4 @@
-import { Stack, router, type Href } from 'expo-router';
+import { router, type Href } from 'expo-router';
 import { useEffect, useMemo, useState } from 'react';
 import { Pressable, StyleSheet, View, useWindowDimensions } from 'react-native';
 import Animated, {
@@ -23,7 +23,7 @@ import {
   shiftMonth,
 } from '@/components/finance/month-picker';
 import { ThemedText } from '@/components/themed-text';
-import { HeaderMenu } from '@/components/ui/header-actions';
+import { AppHeader } from '@/components/ui/app-header';
 import { ItemLink } from '@/components/ui/item-link';
 import { Button } from '@/components/ui/button';
 import { EmptyState } from '@/components/ui/empty-state';
@@ -32,7 +32,7 @@ import { Money } from '@/components/ui/money';
 import { Row, Section } from '@/components/ui/row';
 import { SectionHead } from '@/components/ui/section-head';
 import { Segmented } from '@/components/ui/segmented';
-import { HeroPanel, heroHeaderOptions } from '@/components/ui/hero-panel';
+import { HeroPanel } from '@/components/ui/hero-panel';
 import { Screen } from '@/components/ui/screen';
 import { Skeleton, SkeletonRow } from '@/components/ui/skeleton';
 import { ProgressBar, Sparkline } from '@/components/ui/sparkline';
@@ -323,54 +323,7 @@ export default function FinanceScreen() {
     <View style={styles.root}>
       <Screen
         grouped
-        header={
-          heroError ? undefined : heroLoading ? (
-            <View style={styles.heroSkeleton}>
-              <Skeleton width="55%" height={14} />
-              <Skeleton width="70%" height={46} />
-            </View>
-          ) : (
-            <HeroPanel
-              top={<MonthPicker month={month} onChange={setMonth} onHero />}
-              label={isCurrent ? 'Sobra até o fim do mês' : `Sobrou em ${monthTitle(month)}`}
-              value={
-                <Money
-                  cents={leftover}
-                  variant="heroMoney"
-                  tone={leftover < 0 ? 'danger' : 'onHero'}
-                  concealable
-                />
-              }
-              secondary={[
-                `entrou ${formatBRL(income)}`,
-                `saiu ${formatBRL(expense)}`,
-                // "previsto R$ 0,00" não é informação, é um campo vazio ocupando a linha —
-                // mesmo princípio do bloco sem dado que não aparece.
-                isCurrent && upcomingOut > 0 ? `previsto ${formatBRL(upcomingOut)}` : null,
-              ]
-                .filter(Boolean)
-                .join('  ·  ')}
-              chart={
-                // Mesmo critério da Hoje: série que não varia desenha uma reta, e reta no meio
-                // do painel lê como divisor, não como gráfico.
-                isCurrent && series.length > 2 && varia ? (
-                  <Sparkline values={series} width={width - Space.lg * 2} showZero />
-                ) : undefined
-              }
-              trend={
-                diffExpense !== null
-                  ? {
-                      value: `${diffExpense > 0 ? '+' : ''}${diffExpense}% gastos`,
-                      positive: diffExpense <= 0,
-                      label: `vs ${monthLabel(previousMonth)}`,
-                    }
-                  : undefined
-              }
-              concealable
-              onPress={() => router.push('/finance/forecast')}
-            />
-          )
-        }
+        topBar={<AppHeader />}
         onRefresh={() => {
           forecast.refetch();
           summary.refetch();
@@ -381,36 +334,65 @@ export default function FinanceScreen() {
           recent.refetch();
         }}
         refreshing={summary.isRefetching}>
-        {/* Cabeçalho na cor do painel — ver `heroHeaderOptions`. */}
-        <Stack.Screen
-          options={{ title: 'Financeiro', headerLargeTitle: true, ...heroHeaderOptions(theme) }}
-        />
-
-        <HeaderMenu
-          onHero
-          title="Mais opções"
-          actions={[
-            {
-              label: 'Importar extrato',
-              icon: 'square.and.arrow.down',
-              onPress: () => router.push('/import'),
-            },
-            {
-              label: 'Regras de categoria',
-              icon: 'line.3.horizontal.decrease',
-              onPress: () => router.push('/finance/rules'),
-            },
-          ]}
-        />
-
-        {heroError ? (
+        {/*
+          O painel deixou de sangrar até as bordas e virou CARD FLUTUANTE (design Stitch,
+          03/09/2026). Com o `AppHeader` no topo, a faixa de tinta colada embaixo dele empilhava
+          duas superfícies escuras sem costura entre elas; o card resolve por contorno e respiro,
+          que é como o desenho faz.
+        */}
+        {heroLoading ? (
+          <View style={styles.heroSkeleton}>
+            <Skeleton width="55%" height={14} />
+            <Skeleton width="70%" height={46} />
+          </View>
+        ) : heroError ? (
           <ErrorCard
             onRetry={() => {
               summary.refetch();
               forecast.refetch();
             }}
           />
-        ) : null}
+        ) : (
+          <HeroPanel
+            top={<MonthPicker month={month} onChange={setMonth} onHero />}
+            label={isCurrent ? 'Sobra até o fim do mês' : `Sobrou em ${monthTitle(month)}`}
+            value={
+              <Money
+                cents={leftover}
+                variant="heroMoney"
+                tone={leftover < 0 ? 'danger' : 'onHero'}
+                concealable
+              />
+            }
+            secondary={[
+              `entrou ${formatBRL(income)}`,
+              `saiu ${formatBRL(expense)}`,
+              // "previsto R$ 0,00" não é informação, é um campo vazio ocupando a linha —
+              // mesmo princípio do bloco sem dado que não aparece.
+              isCurrent && upcomingOut > 0 ? `previsto ${formatBRL(upcomingOut)}` : null,
+            ]
+              .filter(Boolean)
+              .join('  ·  ')}
+            chart={
+              // Mesmo critério da Hoje: série que não varia desenha uma reta, e reta no meio
+              // do painel lê como divisor, não como gráfico.
+              isCurrent && series.length > 2 && varia ? (
+                <Sparkline values={series} width={width - Space.lg * 4} showZero />
+              ) : undefined
+            }
+            trend={
+              diffExpense !== null
+                ? {
+                    value: `${diffExpense > 0 ? '+' : ''}${diffExpense}% gastos`,
+                    positive: diffExpense <= 0,
+                    label: `vs ${monthLabel(previousMonth)}`,
+                  }
+                : undefined
+            }
+            concealable
+            onPress={() => router.push('/finance/forecast')}
+          />
+        )}
 
         {/* Bloco 2 — atalhos. Fica sempre visível: sem conta cadastrada não existe dado a mostrar. */}
         <View style={styles.block}>

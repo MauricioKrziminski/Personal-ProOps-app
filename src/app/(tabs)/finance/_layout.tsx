@@ -19,7 +19,8 @@ export default function FinanceStackLayout() {
         // primitivo `Screen` (o colapso exige o ScrollView como primeiro filho).
         headerShadowVisible: false,
       }}>
-      <Stack.Screen name="index" options={{ title: 'Financeiro' }} />
+      {/* A raiz desenha o `AppHeader` (design Stitch): sem título de tela, sem large title. */}
+      <Stack.Screen name="index" options={{ headerShown: false }} />
       <Stack.Screen name="transactions" options={{ title: 'Lançamentos' }} />
       <Stack.Screen name="[txId]" options={{ title: 'Lançamento' }} />
       <Stack.Screen name="accounts" options={{ title: 'Contas' }} />
