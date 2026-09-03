@@ -5,13 +5,13 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { ThemedText } from '@/components/themed-text';
 import { ErrorCard } from '@/components/error-card';
-import { AppHeader } from '@/components/ui/app-header';
+import { AppHeader, useAppHeaderHeight } from '@/components/ui/app-header';
 import { CURVED_BAR_SPACE } from '@/components/ui/curved-tab-bar';
 import { Button } from '@/components/ui/button';
-import { useConceal } from '@/components/ui/conceal';
 import { EmptyState } from '@/components/ui/empty-state';
 import { Icon } from '@/components/ui/icon';
 import { Money } from '@/components/ui/money';
+import { HeroPanel } from '@/components/ui/hero-panel';
 import { SectionHead } from '@/components/ui/section-head';
 import { Skeleton } from '@/components/ui/skeleton';
 import { ProgressBar, Sparkline } from '@/components/ui/sparkline';
@@ -44,8 +44,8 @@ export default function TodayScreen() {
   const theme = useTheme();
   const toast = useToast();
   const insets = useSafeAreaInsets();
+  const headerHeight = useAppHeaderHeight();
   const { width } = useWindowDimensions();
-  const { concealed, toggle } = useConceal();
 
   const { daysLeft, monthEndDay } = useMemo(() => {
     const now = new Date();
@@ -97,13 +97,13 @@ export default function TodayScreen() {
 
   return (
     <View style={[styles.root, { backgroundColor: theme.background }]}>
-      <AppHeader title="Hoje" eyebrow={hojePorExtenso()} />
-
       <ScrollView
         contentContainerStyle={[
           styles.scroll,
           {
-            // A barra do Android é absoluta e desenha por cima; a do iOS reserva o próprio espaço.
+            // A faixa de marca é sobreposta (ela desfoca o que passa por baixo) e a barra do
+            // Android é absoluta: nenhuma das duas reserva o próprio espaço.
+            paddingTop: headerHeight + Space.md,
             paddingBottom:
               insets.bottom +
               Space.xxxl +
@@ -111,54 +111,44 @@ export default function TodayScreen() {
           },
         ]}
         showsVerticalScrollIndicator={false}>
-        {/* 1. Painel de destaque — a sobra projetada até o fim do mês. */}
-        <View style={[styles.hero, { backgroundColor: theme.heroSurface, borderColor: theme.cardBorder }]}>
-          {/* O fio de luz no topo do painel: é o `via-primary/20` do Stitch, e é ele que dá a
-              impressão de superfície curva sem precisar de gradiente de verdade. */}
-          <View style={[styles.specular, { backgroundColor: theme.heroSeparator }]} />
-
-          <View style={styles.heroTop}>
-            <ThemedText type="meta" themeColor="onHeroMuted">
-              SOBRA ATÉ O FIM DO MÊS
-            </ThemedText>
-            <Pressable
-              accessibilityRole="button"
-              accessibilityLabel={concealed ? 'Mostrar valores' : 'Ocultar valores'}
-              hitSlop={Space.sm}
-              onPress={toggle}
-              style={[styles.eye, { backgroundColor: theme.heroChip }]}>
-              <Icon name={concealed ? 'eye.slash' : 'eye'} size="sm" color="onHero" />
-            </Pressable>
+        {/*
+          1. O painel de destaque. É o `HeroPanel` compartilhado, não uma cópia local: esta tela
+          reimplementava o card inteiro à mão, e por isso não ganhou o gradiente, o brilho e o
+          alfinete do gráfico quando o primitivo ganhou.
+        */}
+        {forecast.isLoading ? (
+          <View style={styles.heroSkeleton}>
+            <Skeleton width="55%" height={14} />
+            <Skeleton width="70%" height={38} />
           </View>
-
-          {forecast.isLoading ? (
-            <Skeleton width={220} height={38} />
-          ) : forecast.isError ? (
-            <ErrorCard onRetry={() => forecast.refetch()} />
-          ) : (
-            <>
+        ) : forecast.isError ? (
+          <ErrorCard onRetry={() => forecast.refetch()} />
+        ) : (
+          <HeroPanel
+            label="Sobra até o fim do mês"
+            concealable
+            value={
               <Money
                 cents={leftover}
                 variant="heroMoney"
                 tone={leftover < 0 ? 'onHeroDanger' : 'onHero'}
                 concealable
               />
-
-              <View style={styles.trend}>
-                <Icon
-                  name={leftover < 0 ? 'chart.line.downtrend.xyaxis' : 'chart.line.uptrend.xyaxis'}
-                  size="sm"
-                  color={leftover < 0 ? 'onHeroDanger' : 'onHeroSuccess'}
-                />
-                <ThemedText type="code" themeColor={leftover < 0 ? 'onHeroDanger' : 'onHeroSuccess'}>
-                  {`${daysLeft} ${daysLeft === 1 ? 'dia' : 'dias'} até virar o mês · Projeção ${
-                    leftover < 0 ? 'negativa' : 'positiva'
-                  }`}
-                </ThemedText>
-              </View>
-
-              {series.length > 1 ? (
-                <View style={styles.chart}>
+            }
+            secondary={{
+              icon: leftover < 0 ? 'chart.line.downtrend.xyaxis' : 'chart.line.uptrend.xyaxis',
+              negative: leftover < 0,
+              text: `${daysLeft} ${daysLeft === 1 ? 'dia' : 'dias'} até virar o mês · Projeção ${
+                leftover < 0 ? 'negativa' : 'positiva'
+              }`,
+            }}
+            chart={
+              series.length > 1 ? (
+                <>
+                  {/*
+                    O eixo do desenho: onde a série começa, o que ela projeta, onde ela termina.
+                    Sem os extremos o gráfico é uma curva sem escala — bonita e muda.
+                  */}
                   <View style={styles.legend}>
                     <ThemedText type="caption" themeColor="onHeroMuted">
                       Hoje
@@ -172,12 +162,13 @@ export default function TodayScreen() {
                       {`Dia ${monthEndDay}`}
                     </ThemedText>
                   </View>
-                  <Sparkline values={series} width={chartWidth} showZero={false} />
-                </View>
-              ) : null}
-            </>
-          )}
-        </View>
+                  <Sparkline values={series} width={chartWidth} height={48} />
+                </>
+              ) : undefined
+            }
+            onPress={() => router.push('/finance/forecast')}
+          />
+        )}
 
         {/* 2. Os três contadores. Número real — zero é informação, não motivo para esconder. */}
         <View style={styles.triad}>
@@ -434,6 +425,9 @@ export default function TodayScreen() {
           </View>
         ) : null}
       </ScrollView>
+
+      {/* Depois do scroll na árvore: a faixa precisa desenhar POR CIMA para o desfoque existir. */}
+      <AppHeader title="Hoje" />
     </View>
   );
 }
@@ -476,20 +470,6 @@ function Counter({
   );
 }
 
-/**
- * "quarta-feira, 3 de setembro" — a etiqueta do cabeçalho.
- *
- * É a informação que a tela Hoje tem e as outras não: o dia. Repetir a marca ali seria gastar a
- * linha com algo que não muda.
- */
-function hojePorExtenso(): string {
-  return new Date().toLocaleDateString('pt-BR', {
-    weekday: 'long',
-    day: 'numeric',
-    month: 'long',
-  });
-}
-
 /** `HH:MM` local a partir de um timestamp ISO. Vazio vira travessão, nunca "Invalid Date". */
 function timeOf(iso: string | null | undefined): string {
   if (!iso) return '—';
@@ -503,26 +483,13 @@ const styles = StyleSheet.create({
   scroll: { padding: Space.lg, gap: Space.xl },
   shrink: { flex: 1, minWidth: 0 },
 
-  hero: {
-    borderRadius: Radius.lg,
-    borderCurve: 'continuous',
-    borderWidth: StyleSheet.hairlineWidth,
-    padding: Space.gutter,
-    gap: Space.sm,
-    overflow: 'hidden',
-  },
-  specular: { position: 'absolute', top: 0, left: 0, right: 0, height: StyleSheet.hairlineWidth },
-  heroTop: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  eye: {
-    width: 28,
-    height: 28,
-    borderRadius: Radius.pill,
+  heroSkeleton: { gap: Space.md, paddingVertical: Space.md },
+  legend: {
+    flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
+    justifyContent: 'space-between',
+    marginBottom: Space.xs,
   },
-  trend: { flexDirection: 'row', alignItems: 'center', gap: Space.xs },
-  chart: { marginTop: Space.md, gap: Space.xs },
-  legend: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
 
   triad: { flexDirection: 'row', gap: Space.sm },
   counter: {

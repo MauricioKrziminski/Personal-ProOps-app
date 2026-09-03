@@ -37,6 +37,8 @@ const MATERIAL: Record<string, MaterialName> = {
   briefcase: 'work',
   car: 'directions_car',
   circle: 'circle',
+  /** Contactless do cartão de crédito — as ondas de NFC. */
+  'wave.3.right': 'contactless',
   dumbbell: 'fitness_center',
   gift: 'card_giftcard',
   graduationcap: 'school',

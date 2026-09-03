@@ -1,9 +1,10 @@
 import { useEffect, useMemo, useState } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { Pressable, StyleSheet, View, useWindowDimensions } from 'react-native';
+import { Platform, Pressable, StyleSheet, View, useWindowDimensions } from 'react-native';
 
 import { ThemedText } from '@/components/themed-text';
+import { CurvedTabBar, type CurvedTab } from '@/components/ui/curved-tab-bar';
 import { Radius, Space } from '@/design/tokens';
 import { localISODate } from '@/hooks/use-items';
 import { useTheme } from '@/hooks/use-theme';
@@ -43,6 +44,25 @@ const ABAS = ['Hoje', 'Finanças', 'Notas', 'Perfil'] as const;
  * `terminate` + `launch` + `screenshot` é uma sequência determinística, sem corrida com o relógio.
  */
 const PASSO_KEY = 'design-preview-step';
+/**
+ * A tab bar do Android desenhada JUNTO da tela.
+ *
+ * Ela é o único pedaço de chrome que esta vitrine não mostrava — as raízes são montadas fora do
+ * navegador de abas, então a `CurvedTabBar` nunca aparecia aqui. Era o buraco de verificação que
+ * deixou o berço passar 26px fora do lugar sem ninguém notar: o desenho da barra só existia no
+ * app logado, que é exatamente o que esta rota existe para evitar.
+ *
+ * As mesmas entradas de `app-tabs.android.tsx` — copiar rótulo e ícone aqui faria a vitrine
+ * mostrar uma barra que não é a de produção.
+ */
+const TABS_ANDROID: CurvedTab[] = [
+  { name: 'today', label: 'Hoje', icon: 'sun.max' },
+  { name: 'notes', label: 'Notas', icon: 'note.text' },
+  { name: 'finance', label: 'Financeiro', icon: 'chart.pie' },
+  { name: 'profile', label: 'Perfil', icon: 'person' },
+];
+/** `ABAS` está na ordem da vitrine; a barra está na ordem do app. Este é o de-para. */
+const ABA_PARA_TAB: Record<string, number> = { Hoje: 0, 'Finanças': 2, Notas: 1, Perfil: 3 };
 /** Quantas alturas de tela cada aba ocupa — medido, para não gastar frame em preto. */
 const FAIXAS: Record<(typeof ABAS)[number], number> = {
   Hoje: 2,
@@ -99,6 +119,22 @@ export default function DesignPreviewScreen() {
             {aba === 'Notas' ? <NotesScreen /> : null}
             {aba === 'Perfil' ? <ProfileScreen /> : null}
           </View>
+
+          {/*
+            A barra do Android por cima da faixa, exatamente como no app: ela é absoluta e
+            desenha sobre o conteúdo. Fica DENTRO da janela recortada para não brigar com o
+            seletor da vitrine, que é ferramenta e não produto.
+          */}
+          {Platform.OS === 'android' ? (
+            <CurvedTabBar
+              tabs={TABS_ANDROID}
+              activeIndex={ABA_PARA_TAB[aba] ?? 0}
+              onSelect={(i) => {
+                const alvo = ABAS.find((nome) => ABA_PARA_TAB[nome] === i);
+                if (alvo) setAba(alvo);
+              }}
+            />
+          ) : null}
         </View>
 
         <View style={[styles.switcher, { borderTopColor: theme.cardBorder }]}>
@@ -281,7 +317,7 @@ function seedClient() {
   client.setQueryData(['card-summary'], [
     {
       account_id: 'prev-c1',
-      name: 'Cartão principal',
+      name: 'Nubank Ultravioleta',
       invoice_id: 'prev-i1',
       invoice_total_cents: 324010,
       unpaid_total_cents: 324010,
@@ -298,7 +334,7 @@ function seedClient() {
     },
     {
       account_id: 'prev-c2',
-      name: 'Cartão da viagem',
+      name: 'Itaú Personnalité',
       invoice_id: 'prev-i2',
       invoice_total_cents: 89050,
       unpaid_total_cents: 89050,

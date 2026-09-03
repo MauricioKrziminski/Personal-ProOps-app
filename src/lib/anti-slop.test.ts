@@ -24,6 +24,15 @@ const SRC = join(import.meta.dirname, '..');
 const ALLOWED = new Set([
   join(SRC, 'constants', 'theme.ts'),
   join(SRC, 'design', 'tokens.ts'),
+  /**
+   * A cor do BANCO não é cor do app.
+   *
+   * A regra existe porque cor nossa precisa de par light/dark; o roxo do Nubank não tem par —
+   * ele é roxo nos dois temas ou deixa de ser o roxo do Nubank. Ele também nunca pinta texto ou
+   * superfície do app: só o fundo do cartão de crédito, misturado com preto. Allowlistar o
+   * arquivo é mais honesto do que empurrar 26 marcas de terceiros para dentro da paleta.
+   */
+  join(SRC, 'design', 'card-brands.ts'),
 ]);
 
 function walk(dir: string): string[] {

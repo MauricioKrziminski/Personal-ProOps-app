@@ -1,12 +1,14 @@
 import { router } from 'expo-router';
-import { Pressable, StyleSheet, View } from 'react-native';
+import { BlurView } from 'expo-blur';
+import { Platform, Pressable, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { ThemedText } from '@/components/themed-text';
 import { Icon } from '@/components/ui/icon';
+import { Mark } from '@/components/ui/mark';
 import { Fonts } from '@/constants/theme';
-import { HitTarget, Radius, Space } from '@/design/tokens';
-import { useTheme } from '@/hooks/use-theme';
+import { HitTarget, Radius, Space, Type } from '@/design/tokens';
+import { useScheme, useTheme } from '@/hooks/use-theme';
 
 /**
  * As opções de `<Stack>` que vestem o header NATIVO com a fonte do app.
@@ -23,68 +25,118 @@ export const stackHeaderFonts = {
   headerLargeTitleStyle: { fontFamily: Fonts.bold },
 } as const;
 
+/** A altura da faixa, sem a safe area. O `h-14` do Stitch. */
+export const APP_HEADER_BAR = 56;
+
+/**
+ * Quanto a barra ocupa no topo, safe area inclusa.
+ *
+ * A barra é **sobreposta** (ela desfoca o conteúdo que passa por baixo), então nada reserva esse
+ * espaço sozinho: toda raiz de aba soma isto ao `paddingTop` do seu scroll.
+ */
+export function useAppHeaderHeight(): number {
+  return useSafeAreaInsets().top + APP_HEADER_BAR;
+}
+
 interface AppHeaderProps {
-  /** O nome da tela, em display. É a única palavra grande do topo. */
+  /**
+   * O nome da tela. Vai para o leitor de tela e para o `accessibilityLabel` da barra — a faixa
+   * do Stitch não escreve o título, ele é dito pelo conteúdo logo abaixo.
+   */
   title: string;
   /**
-   * A linha de cima, em caixa alta.
+   * Ponto de status ao lado da marca. Cor SEMÂNTICA e **estática**.
    *
-   * Ela carrega CONTEXTO que muda — a data de hoje, o mês em foco, quantos itens existem. Rótulo
-   * fixo aqui é ruído: repetir "ProOps" em cima de "Hoje" gasta a faixa mais valiosa da tela
-   * dizendo o que o ícone do app já disse na tela inicial.
+   * No export ele é `animate-pulse`. Movimento permanente no canto do olho não tem propósito
+   * (§5), some do radar em um dia e custa bateria — o ponto fica, a pulsação não.
    */
-  eyebrow?: string;
+  status?: 'success' | 'warning' | 'danger';
   /** Controles à direita, antes do avatar (ex.: nova nota). */
   action?: React.ReactNode;
 }
 
 /**
- * A barra de topo das quatro raízes de aba.
+ * A barra de topo das quatro raízes de aba — **a faixa de marca do Stitch**.
  *
- * ## Por que não é mais a barra de marca do Stitch (03/09/2026)
+ * ## Anatomia (medida do export, não estimada)
  *
- * O desenho original trazia um logotipo com um ponto verde pulsando e um avatar — uma faixa que
- * gastava o lugar mais nobre da tela dizendo em que app a pessoa está, que é a única coisa que ela
- * já sabe. E o ponto piscava para sempre, contra a regra de movimento (§5: nada anima sem
- * propósito, e dado que o usuário está lendo não se move).
+ * `h-14` (56px) sobre a safe area, calha de 16, fundo do app a 85% com `backdrop-blur-xl` e um
+ * fio de 1px embaixo. À esquerda: um quadrado de 28 com raio 8 carregando a marca, a palavra
+ * "ProOps" em 16/700 e um ponto de 6px. À direita: o avatar de 32 em pílula.
  *
- * A referência agora é a dos apps que se destacam por respiro — Copilot, Monzo, Things: uma
- * **micro-etiqueta de contexto** em cima e um **display grande** embaixo, com um único controle à
- * direita. A hierarquia sai de escala e espaço, não de moldura: sem caixa em volta de ícone, sem
- * fio embaixo, sem cor. É a mesma alavanca que o resto do sistema usa desde que a marca virou
- * monocromática.
+ * ## Por que ela voltou (03/09/2026)
  *
- * O avatar traz o ícone de pessoa, e não iniciais: o schema guarda só o telefone
- * (`profiles.phone`), e tirar iniciais de um número seria escrever um dado que não existe.
+ * Uma versão anterior trocou esta faixa por uma etiqueta de contexto + display grande, com o
+ * argumento de que a marca no topo gasta a faixa mais nobre da tela. O argumento continua de pé
+ * em abstrato — mas o desenho é do dono do produto, as quatro telas do export têm esta barra, e
+ * ela é o que dá continuidade entre as abas. Decisão dele, registrada aqui para a próxima sessão
+ * não "corrigir" de novo.
+ *
+ * ## O avatar não tem iniciais
+ *
+ * O export escreve "GS". O schema guarda só `profiles.phone` — não há nome de onde tirar
+ * iniciais, e inventá-las seria escrever um dado que não existe. Fica o ícone de pessoa.
  */
-export function AppHeader({ title, eyebrow, action }: AppHeaderProps) {
+export function AppHeader({ title, status = 'success', action }: AppHeaderProps) {
   const theme = useTheme();
+  const scheme = useScheme();
   const insets = useSafeAreaInsets();
 
   return (
     <View
-      style={[styles.bar, { paddingTop: insets.top + Space.md, backgroundColor: theme.background }]}>
-      <View style={styles.titles}>
-        {eyebrow ? (
-          <ThemedText type="meta" themeColor="textSecondary" numberOfLines={1}>
-            {eyebrow.toUpperCase()}
-          </ThemedText>
-        ) : null}
-        <ThemedText type="title" numberOfLines={1}>
-          {title}
-        </ThemedText>
-      </View>
+      accessibilityRole="header"
+      accessibilityLabel={title}
+      style={[styles.bar, { paddingTop: insets.top, borderBottomColor: theme.cardBorder }]}>
+      {/*
+        Glass de CHROME, que é onde o material é permitido (§1). Não passa pelo `GlassCard`
+        porque aquele primitivo é um card — raio, padding e sombra próprios; aqui a faixa é reta,
+        encosta nas bordas e não tem elevação.
+      */}
+      <BlurView
+        intensity={Platform.OS === 'android' ? 0 : 40}
+        tint={scheme === 'dark' ? 'systemChromeMaterialDark' : 'systemChromeMaterialLight'}
+        style={StyleSheet.absoluteFill}
+      />
+      {/*
+        A camada de cor por cima do blur. No Android o `BlurView` é caro e impreciso, então lá ela
+        é opaca (intensity 0 acima) — mesma decisão que a tab bar já toma por plataforma.
+      */}
+      <View
+        style={[
+          StyleSheet.absoluteFill,
+          { backgroundColor: theme.background, opacity: Platform.OS === 'android' ? 1 : 0.85 },
+        ]}
+      />
 
-      <View style={styles.right}>
-        {action}
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel="Abrir perfil"
-          hitSlop={Space.sm}
-          onPress={() => router.push('/(tabs)/profile')}
-          style={[styles.round, { backgroundColor: theme.surface, borderColor: theme.cardBorder }]}>
-          <Icon name="person.crop.circle" size="md" color="textSecondary" />
-        </Pressable>
+      <View style={styles.row}>
+        <View style={styles.brand}>
+          <View
+            style={[
+              styles.markBox,
+              { backgroundColor: theme.backgroundSelected, borderColor: theme.cardBorder },
+            ]}>
+            <Mark size={16} color="text" />
+          </View>
+          <ThemedText type="caption" style={styles.wordmark}>
+            ProOps
+          </ThemedText>
+          <View style={[styles.dot, { backgroundColor: theme[status] }]} />
+        </View>
+
+        <View style={styles.right}>
+          {action}
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Abrir perfil"
+            hitSlop={Space.sm}
+            onPress={() => router.push('/(tabs)/profile')}
+            style={[
+              styles.round,
+              { backgroundColor: theme.backgroundSelected, borderColor: theme.cardBorder },
+            ]}>
+            <Icon name="person.crop.circle" size="md" color="textSecondary" />
+          </Pressable>
+        </View>
       </View>
     </View>
   );
@@ -108,27 +160,54 @@ export function HeaderIconButton({
       accessibilityLabel={label}
       hitSlop={Space.sm}
       onPress={onPress}
-      style={[styles.round, { backgroundColor: theme.surface, borderColor: theme.cardBorder }]}>
+      style={[
+        styles.round,
+        { backgroundColor: theme.backgroundSelected, borderColor: theme.cardBorder },
+      ]}>
       <Icon name={icon} size="md" color="text" />
     </Pressable>
   );
 }
 
 const styles = StyleSheet.create({
+  /**
+   * Sobreposta, não em fluxo: o desfoque só significa alguma coisa se houver conteúdo passando
+   * por baixo. Quem reserva a altura é a tela, por `useAppHeaderHeight()`.
+   */
   bar: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    zIndex: 20,
+    elevation: 20,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+  },
+  row: {
+    height: APP_HEADER_BAR,
     flexDirection: 'row',
-    alignItems: 'flex-end',
+    alignItems: 'center',
     justifyContent: 'space-between',
     gap: Space.md,
     paddingHorizontal: Space.lg,
-    paddingBottom: Space.lg,
   },
-  /** `flex: 1` para o display truncar em vez de empurrar os controles para fora. */
-  titles: { flex: 1, minWidth: 0, gap: Space.xs },
+  brand: { flexDirection: 'row', alignItems: 'center', gap: Space.sm },
+  markBox: {
+    width: 28,
+    height: 28,
+    borderRadius: Radius.sm,
+    borderCurve: 'continuous',
+    borderWidth: StyleSheet.hairlineWidth,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  /** 16/700 com tracking negativo — o único uso de `Type.wordmark` no app. */
+  wordmark: Type.wordmark,
+  dot: { width: 6, height: 6, borderRadius: Radius.pill },
   right: { flexDirection: 'row', alignItems: 'center', gap: Space.sm },
   round: {
-    width: HitTarget - 6,
-    height: HitTarget - 6,
+    width: HitTarget - 12,
+    height: HitTarget - 12,
     borderRadius: Radius.pill,
     borderWidth: StyleSheet.hairlineWidth,
     alignItems: 'center',

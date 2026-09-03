@@ -16,22 +16,52 @@ e onde ele decide o que fazer com isso.*
 
 **O destaque das telas principais é `HeroPanel`, não glass** (29/08/2026). Vidro precisa de algo
 atrás para refratar; sobre o fundo chapado do app ele virava um retângulo cinza com um número
-dentro — a causa concreta do diagnóstico "corretas e sem graça". `HeroPanel`
-(`src/components/ui/hero-panel.tsx`) é **tinta sólida**, sangra até as bordas pelo slot `header`
-do `Screen`, e resolve por contraste em vez de textura. `GlassCard` continua na chrome e no
-destaque de telas secundárias. A contagem não mudou: **um destaque por tela**.
+dentro — a causa concreta do diagnóstico "corretas e sem graça". `GlassCard` continua na chrome e
+no destaque de telas secundárias. A contagem não mudou: **um destaque por tela**.
+
+**E o `HeroPanel` deixou de ser tinta chapada** (03/09/2026). Ele é um card de raio 12 com
+**gradiente vertical** (`heroTop` → `heroBottom`), um **brilho verde difuso** saindo pelo canto
+superior direito e um fio especular de 1px no topo — `GradientSurface`
+(`src/components/ui/gradient.tsx`), em Skia, porque não há gradiente em `StyleSheet` e
+`expo-linear-gradient` seria dependência nova para dois nós. Chapado ele ainda lia como retângulo
+escuro com um número dentro; o export resolve o mesmo problema com LUZ, não com contraste.
+
+O brilho ocupa o canto onde ficava a marca d'água da espiral, então ela saiu do painel — a forma
+da marca continua nos outros quatro papéis.
+
+⚠️ **`Canvas` do Skia NÃO aceita `onLayout`** (avisa "is not supported" em runtime e o gradiente
+não posiciona). Quem mede é uma `View` em volta; o canvas só preenche.
+
+**A faixa de rodapé que SANGRA até as bordas** é o segundo padrão repetido do export (painel de
+destaque e card de tendência): superfície um degrau mais escura (`heroFooter`), pílula com o delta
+à esquerda, comparação em texto à direita. Ela existe para o número grande não ter que carregar
+contexto. Em card comum sai por `marginHorizontal/-Bottom` negativos + `overflow: 'hidden'`.
 - **Todo o resto é opaco.** Card de lista, linha, formulário: superfície sólida, hierarquia por
   **elevação e espaço**, nunca por blur.
 
 > Dois `GlassCard` na mesma tela é erro de revisão, não questão de gosto.
 
-**Cartão de crédito é CARTEIRA, não lista** (`src/components/finance/card-stack.tsx`): fechada,
-o da frente abre com fatura, fechamento e limite e os outros aparecem por uma faixa ABAIXO dele
-(atrás, um cartão de 46px some inteiro atrás de um de 178px); ao toque ela **abre em leque**, cada
-cartão vira um cabeçalho e escolher um fecha a pilha com ele na frente. O corpo do cartão abre a
+**Cartão de crédito é um CARTÃO, não um card** (`src/components/finance/card-stack.tsx`).
+Anatomia obrigatória, medida do export: chip EMV dourado, contactless, número mascarado, fatura
+atual em display, data de fechamento, barra de limite e rodapé com vencimento e disponível. Sem
+essas peças o bloco lê como card de conteúdo — foi a queixa de 03/09/2026 ("ele fez em formato de
+card ao expandir, ficando muito feio").
+
+Fechada, os cartões de trás aparecem **ACIMA** do da frente e mais estreitos (`inset-x-2`,
+`inset-x-4`), que é como uma carteira de verdade e como o Wallet fazem: para BAIXO a pilha lê como
+lista. Ao toque ela abre em leque e **cada cartão continua sendo um cartão inteiro**, só deslocado
+por um passo de 92px; escolher um fecha a pilha com ele na frente. O corpo do cartão abre a
 carteira e a fatura tem botão próprio — um toque só não pode decidir entre "ver os outros" e
-"abrir a fatura". Sem cor de bandeira: pintar o cartão de roxo traria a marca de outra empresa
-para o lugar de maior destaque da tela.
+"abrir a fatura".
+
+⚠️ **A cor DO BANCO voltou** (03/09/2026, decisão do dono do produto, contra a regra anterior).
+O mapa nome → cor mora em `src/design/card-brands.ts`, que é allowlisted no `anti-slop.test.ts`:
+a cor de um emissor não tem par light/dark porque não é nossa. Ela entra **misturada com a
+superfície** (`blend`, nunca com preto puro — misturar com preto sumia o cartão no fundo escuro),
+mais o ponto da bandeira e a barra de limite. Fora do cartão, cor de terceiro continua proibida.
+A objeção antiga (roxo lê como Nubank) continua verdadeira e continua valendo em qualquer outro
+lugar da tela — o que mudou é que DENTRO da forma de um cartão de crédito o usuário já espera a
+marca do emissor.
 
 ⚠️ **`withSpring` só é interceptado quando é o valor DIRETO da propriedade de estilo.**
 `withSpring(a) * b` devolve `NaN` e a view some sem um único erro no log — foi assim que a
@@ -210,13 +240,23 @@ Toda transição responde três perguntas: o que é o destino, o usuário precis
 que "voltar" faz depois.
 
 - **Header é do navegador — exceto nas quatro RAÍZES de aba.** Ali quem desenha é o `AppHeader`
-  (`src/components/ui/app-header.tsx`): **micro-etiqueta de contexto em cima, display grande
-  embaixo, um controle à direita**. A etiqueta carrega o que MUDA — a data em Hoje, a contagem em
-  Notas — e nunca um rótulo fixo: o desenho do Stitch punha a marca ali, gastando a faixa mais
-  nobre da tela para dizer em que app a pessoa está, que é a única coisa que ela já sabe.
-  A hierarquia sai de escala e espaço; **sem caixa em volta de ícone, sem fio embaixo, sem cor** —
-  a referência é Copilot / Monzo / Things. Ação de raiz vai no slot `action` (`HeaderIconButton`),
-  não numa fileira própria.
+  (`src/components/ui/app-header.tsx`): **a faixa de marca do Stitch** — 56px sobre a safe area,
+  fundo do app a 85% com desfoque, fio de 1px embaixo, e dentro dela a marca num quadrado de 28,
+  a palavra "ProOps" em `Type.wordmark`, um ponto de status e o avatar de 32 à direita. Ação de
+  raiz vai no slot `action` (`HeaderIconButton`), antes do avatar.
+
+  A barra é **sobreposta**, não em fluxo: o desfoque só significa algo com conteúdo passando por
+  baixo. Quem reserva a altura é a tela, por `useAppHeaderHeight()` — o `Screen` já faz isso
+  quando recebe `topBar`, e as raízes com scroll próprio somam à mão.
+
+  ⚠️ **Isto já foi decidido nos dois sentidos.** Entre 30/08 e 03/09/2026 a faixa foi trocada por
+  uma micro-etiqueta de contexto + display grande, com o argumento de que a marca no topo gasta a
+  faixa mais nobre da tela dizendo o que a pessoa já sabe. O argumento continua de pé em abstrato;
+  o desenho é do dono do produto e as quatro telas do export têm esta barra. **Não "corrigir" de
+  novo.** O custo aceito é a perda da etiqueta (a data em Hoje, a contagem em Notas).
+
+  O avatar leva o ícone de pessoa, não iniciais: `profiles` guarda só o telefone, e tirar iniciais
+  de um número seria escrever um dado que não existe.
   **Tela EMPURRADA continua com `<Stack.Title>` + large title** — lá o título e o "voltar" são a
   informação. Barra desenhada à mão dentro do `ScrollView` continua proibida: o `AppHeader` fica
   FORA dele.
@@ -259,6 +299,29 @@ que "voltar" faz depois.
   paga. O berço **anima em mola**, porque o que ele comunica é continuidade espacial; um recorte
   fixo seria só enfeite. Uma posição só governa a curva e a bolha: duas molas dessincronizariam e
   a bolha sairia do berço no meio do caminho.
+
+  **O berço é um CÍRCULO SUBTRAÍDO, concêntrico com a bolha** (03/09/2026): raio `BUBBLE/2 + 7`,
+  então a folga é a mesma em volta inteira — foi exatamente o pedido ("a borda interna atrás do
+  ícone seguir o border radius do círculo"). No Skia: pinta a pílula, pinta o traço dela, e por
+  cima um disco da cor do FUNDO mais o traço do berço, os dois dentro de `Group clip={pílula}`.
+  O disco apaga o traço da barra onde a mordida passa (a antiga "linha em cima do ícone") e a
+  metade de cima do círculo some sozinha no clip. O que anda é o `cx` do círculo, um shared value
+  que o Skia aceita direto — nada é montado dentro de worklet.
+
+  ⚠️ **Duas construções anteriores falharam, e as duas eram invisíveis na leitura do código:**
+  1. `View` circular pintada da cor do fundo, com o centro em `LIFT + BUBBLE/2` enquanto o da
+     bolha estava em `LIFT` — **26px fora do lugar**, a bolha empoleirada na borda de um buraco
+     de 66px. O comentário dizia "concêntrico"; os números diziam outra coisa. Foi o que ficou
+     "muito diferente do que eu pedi".
+  2. Path único com o berço tecido no contorno e ombros tangentes. Quebrava na PRIMEIRA e na
+     ÚLTIMA aba, onde o berço cai dentro do canto arredondado: o `Math.max(..., r)` punha o
+     início do ombro DEPOIS do fim dele e o contorno se cruzava, apagando a mordida. (O export
+     tem o mesmo defeito: `C 0 19.7 19.7 0 44 0` seguido de `L 32.7 0`, andando para trás.)
+
+  A bolha é da **cor da barra um degrau acima** (`backgroundSelected`) com o ícone no accent, mais
+  sombra — é o desenho do export. Preenchê-la de `tint` com o ícone invertido gastava o accent
+  inteiro num controle tocado 100× por dia. No escuro, barra, bolha e fundo ficam todos dentro de
+  20/255: **quem separa os três é o traço em `separator`**, não a diferença de superfície.
 - **`backgroundColor` na `NativeTabs` é proibido no iOS.** Dar cor de fundo torna a barra opaca e
   **desliga o Liquid Glass** — o material que é diretriz do projeto. Cor de fundo, indicador e
   ripple entram por `Platform.select` só no Android; no iOS quem desenha é o sistema, mais

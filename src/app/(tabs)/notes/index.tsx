@@ -366,7 +366,6 @@ export default function NotesScreen() {
       topBar={
         <AppHeader
           title="Notas"
-          eyebrow={notes.length > 0 ? `${notes.length} ${notes.length === 1 ? 'nota' : 'notas'}` : undefined}
           action={
             <HeaderIconButton
               icon="folder"

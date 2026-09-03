@@ -93,6 +93,17 @@ export const Colors = {
     onTint: '#FFFFFF',
 
     heroSurface: '#17181A',
+    /**
+     * O gradiente do painel de destaque, medido do export
+     * (`from-surface-container-high via-surface-container to-surface-container-low`).
+     *
+     * Ele é sutil de propósito — 15/255 entre topo e base. O que o olho lê não é "gradiente", é
+     * uma superfície que tem CIMA e BAIXO; chapada, ela lê como um retângulo colado na tela.
+     */
+    heroTop: '#26272A',
+    heroBottom: '#141517',
+    /** A faixa do rodapé do card, que sangra até as bordas. `surface-container-lowest/50`. */
+    heroFooter: 'rgba(0, 0, 0, 0.22)',
     onHero: '#FFFFFF',
     onHeroMuted: 'rgba(255, 255, 255, 0.64)',
     heroSeparator: 'rgba(255, 255, 255, 0.16)',
@@ -155,6 +166,9 @@ export const Colors = {
     onTint: '#003920',
 
     heroSurface: '#201F21',
+    heroTop: '#2A2A2C',
+    heroBottom: '#1B1B1D',
+    heroFooter: 'rgba(0, 0, 0, 0.30)',
     onHero: '#E5E1E4',
     onHeroMuted: 'rgba(229, 225, 228, 0.60)',
     heroSeparator: 'rgba(255, 255, 255, 0.10)',

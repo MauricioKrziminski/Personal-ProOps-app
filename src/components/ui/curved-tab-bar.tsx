@@ -1,8 +1,10 @@
-import { useEffect } from 'react';
+import { useEffect, useMemo } from 'react';
 import * as Haptics from 'expo-haptics';
 import { Pressable, StyleSheet, View, useWindowDimensions } from 'react-native';
+import { Canvas, Circle, Group, Path, Skia } from '@shopify/react-native-skia';
 import Animated, {
   useAnimatedStyle,
+  useDerivedValue,
   useSharedValue,
   withSequence,
   withSpring,
@@ -12,8 +14,8 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { ThemedText } from '@/components/themed-text';
 import { Icon } from '@/components/ui/icon';
-import { Motion, Radius, Space } from '@/design/tokens';
-import { useTheme } from '@/hooks/use-theme';
+import { Elevation, Motion, Radius, Space } from '@/design/tokens';
+import { useScheme, useTheme } from '@/hooks/use-theme';
 import type { SymbolViewProps } from 'expo-symbols';
 
 /** Altura da barra, sem a bolha e sem a safe area. */
@@ -21,18 +23,16 @@ const BAR_H = 64;
 /** A bolha que carrega o ícone da aba ativa. */
 const BUBBLE = 52;
 /**
- * O respiro entre a bolha e a borda do recorte — a mesma folga em volta inteira.
+ * O respiro entre a bolha e a borda do berço — a mesma folga em volta inteira.
  *
- * É ele que faz o recorte "seguir o raio do ícone": a boca é um CÍRCULO concêntrico com a bolha,
+ * É ele que faz o recorte "seguir o raio do ícone": a boca é um arco **concêntrico** com a bolha,
  * de raio `BUBBLE/2 + GAP`. Qualquer outra forma (um vale desenhado à mão, uma lente) deixa a
  * distância variando ao longo da curva, e o olho lê isso como erro mesmo sem saber nomear.
  */
 const GAP = 7;
 const CUT = BUBBLE / 2 + GAP;
-/** Quanto a bolha sobe acima da barra. */
-const LIFT = Math.round(BUBBLE * 0.42);
-/** Calha lateral: a barra flutua, não encosta nas bordas. */
-const SIDE = Space.lg;
+/** Quanto a bolha sobe acima da aresta da barra. Metade dela fica de fora, como no export. */
+const TOP = BUBBLE / 2;
 
 /**
  * Quanto a barra ocupa por cima do conteúdo — **fora** da safe area.
@@ -40,7 +40,9 @@ const SIDE = Space.lg;
  * A barra é `position: absolute`, então nada reserva esse espaço sozinho: sem somar isto ao
  * padding inferior das raízes de aba, a última linha de toda lista fica embaixo dela.
  */
-export const CURVED_BAR_SPACE = BAR_H + LIFT + Space.sm;
+export const CURVED_BAR_SPACE = TOP + BAR_H + Space.sm;
+/** Calha lateral: a barra flutua, não encosta nas bordas. */
+const SIDE = Space.lg;
 
 export interface CurvedTab {
   name: string;
@@ -50,7 +52,26 @@ export interface CurvedTab {
 }
 
 /**
- * A barra de abas do **Android**: uma pílula com a boca vazada seguindo a aba ativa.
+ * A pílula da barra. **Sem o berço** — ele é subtraído por cima, não tecido no contorno.
+ *
+ * A primeira tentativa desenhava um path único com a mordida e ombros tangentes. Ela quebrava
+ * justamente onde mais aparece: na PRIMEIRA e na ÚLTIMA aba o berço cai dentro do canto
+ * arredondado, e o ombro tinha que começar antes do canto — o `Math.max(..., r)` empurrava o
+ * início do ombro para DEPOIS do fim dele e o contorno se cruzava, apagando a mordida. (O próprio
+ * export tem esse defeito: no estado "Home Active" o path faz `C 0 19.7 19.7 0 44 0` e em seguida
+ * `L 32.7 0`, andando para trás.)
+ *
+ * Subtrair resolve todas as posições de uma vez e é menos código.
+ */
+function pillPath(w: number, h: number) {
+  const r = h / 2;
+  const b = Skia.PathBuilder.Make();
+  b.addRRect(Skia.RRectXY(Skia.XYWHRect(0, 0, w, h), r, r));
+  return b.build();
+}
+
+/**
+ * A barra de abas do **Android**: uma pílula com um berço que segue a aba ativa.
  *
  * ## Por que só no Android
  *
@@ -59,25 +80,34 @@ export interface CurvedTab {
  * existe equivalente: a barra do Material 3 é uma laje reta, e é ali que um desenho próprio paga.
  * A divisão mora no PRIMITIVO (`app-tabs.android.tsx`), nunca numa tela — regra de `frontend.md`.
  *
- * ## Como o recorte é feito, e por que NÃO é um path
+ * ## O recorte é um PATH (03/09/2026)
  *
- * A boca é uma `View` circular pintada com a cor do FUNDO, por cima da barra. Como as duas
- * superfícies são opacas, o círculo lê como um furo — e como é a mesma primitiva do resto do app,
- * ele anima com `translateX` sem custo e sem depender de o Skia aceitar objetos criados dentro de
- * worklet.
+ * A versão anterior fazia a boca com uma `View` circular pintada da cor do fundo, por cima da
+ * barra. Ela tinha três defeitos, e o primeiro era invisível na leitura do código:
  *
- * Duas versões anteriores falharam, e as duas deixaram marca visível:
- * 1. **Path inteiro remontado por frame** num `useDerivedValue`: o worklet rodava (os avisos de
- *    API depreciada saíam no logcat), mas o canvas não pintava nada — a barra ficava invisível e
- *    a lista aparecia por baixo dos rótulos.
- * 2. **Path estático em Skia + borda de 1px na `View` da barra**: a borda desenha o retângulo
- *    INTEIRO, inclusive atravessando a boca — era a "linha em cima do ícone". Barra com recorte
- *    não pode ter borda; quem separa a barra do fundo é o degrau de superfície.
+ * 1. **A boca estava 26px fora do lugar.** O comentário prometia um círculo concêntrico com a
+ *    bolha, mas o centro dela caía em `LIFT + BUBBLE/2` e o da bolha em `LIFT` — a bolha ficava
+ *    empoleirada na borda de cima de um buraco de 66px, com um vazio embaixo do ícone. Foi isso
+ *    que ficou "muito diferente do que eu pedi".
+ * 2. **Um círculo encontrando uma reta faz quina.** Sem ombro tangente não existe "clean".
+ * 3. **Furo pintado não aceita contorno nem sombra.** A borda de 1px atravessava a boca (era a
+ *    "linha em cima do ícone"), e no tema escuro é justamente o contorno que define onde a barra
+ *    termina.
+ *
+ * Agora o berço é um CÍRCULO subtraído no Skia, recortado pela própria pílula: pinta-se a barra,
+ * pinta-se o traço dela, e por cima vai um disco da cor do FUNDO com o traço do berço, ambos
+ * dentro de um `Group clip={pílula}`. O disco apaga o traço da barra exatamente onde a mordida
+ * passa — que era a "linha em cima do ícone" — e o arco resultante é, por construção, concêntrico
+ * com a bolha.
+ *
+ * Isso também dispensa interpolar path: o que anda é o `cx` do círculo, um shared value que o
+ * Skia aceita direto na prop. Nada é montado dentro de worklet (o erro que deixou a barra
+ * invisível na tentativa mais antiga) e não há N caminhos para manter em sincronia.
  *
  * ## O movimento
  *
- * Uma posição só governa a boca E a bolha: com duas molas elas dessincronizariam e a bolha sairia
- * do furo no meio do caminho. Mola porque teve dedo envolvido (§5), e um agacho curto de escala
+ * Uma posição só governa o berço E a bolha: com duas molas elas dessincronizariam e a bolha sairia
+ * do berço no meio do caminho. Mola porque teve dedo envolvido (§5), e um agacho curto de escala
  * no toque — é o que dá a sensação de a bolha se TRANSFORMAR de um lugar no outro em vez de
  * simplesmente escorregar.
  */
@@ -91,53 +121,83 @@ export function CurvedTabBar({
   onSelect: (index: number) => void;
 }) {
   const theme = useTheme();
+  const scheme = useScheme();
   const insets = useSafeAreaInsets();
   const { width: screenW } = useWindowDimensions();
 
   const barW = screenW - SIDE * 2;
   const slot = barW / tabs.length;
-  const alvo = slot * (activeIndex + 0.5);
 
-  const cx = useSharedValue(alvo);
+  /** A pílula. Não depende da aba ativa, então é calculada uma vez e nunca mais. */
+  const pilula = useMemo(() => pillPath(barW, BAR_H), [barW]);
+
+  const progresso = useSharedValue(activeIndex);
   const squash = useSharedValue(1);
 
   useEffect(() => {
     // A mola é disparada em efeito, nunca no corpo do componente: escrever num shared value
     // durante o render reinicia a animação a cada re-render do pai.
-    cx.set(withSpring(alvo, Motion.spring.settle));
+    progresso.set(withSpring(activeIndex, Motion.spring.settle));
     squash.set(
       withSequence(
         withTiming(0.86, { duration: Motion.duration.fast }),
         withSpring(1, Motion.spring.settle)
       )
     );
-  }, [alvo, cx, squash]);
+  }, [activeIndex, progresso, squash]);
 
-  const boca = useAnimatedStyle(() => ({ transform: [{ translateX: cx.get() - CUT }] }));
+  /** O centro do berço e da bolha — UMA posição para os dois, senão eles dessincronizam. */
+  const centro = useDerivedValue(() => slot * (progresso.get() + 0.5));
+
   const bolha = useAnimatedStyle(() => ({
-    transform: [{ translateX: cx.get() - BUBBLE / 2 }, { scale: squash.get() }],
+    transform: [
+      { translateX: slot * (progresso.get() + 0.5) - BUBBLE / 2 },
+      { scale: squash.get() },
+    ],
   }));
 
   return (
     <View
       pointerEvents="box-none"
       style={[styles.raiz, { paddingBottom: insets.bottom + Space.sm, paddingHorizontal: SIDE }]}>
-      <View style={{ width: barW, height: BAR_H + LIFT }}>
-        <View style={[styles.barra, { height: BAR_H, backgroundColor: theme.backgroundElement }]} />
+      <View style={{ width: barW, height: TOP + BAR_H }}>
+        {/*
+          O canvas é deslocado `TOP` para baixo: a pílula é desenhada com a aresta em y=0, e a
+          metade de cima da bolha vive fora dele.
+        */}
+        <Canvas style={[StyleSheet.absoluteFill, { top: TOP }]} pointerEvents="none">
+          <Path path={pilula} color={theme.backgroundElement} style="fill" />
+          <Path path={pilula} color={theme.separator} style="stroke" strokeWidth={1} />
+          {/*
+            A mordida, recortada pela própria pílula: fora dela o disco não existe, então a metade
+            de cima do círculo (que fica acima da barra) some sozinha.
+          */}
+          <Group clip={pilula}>
+            <Circle cx={centro} cy={0} r={CUT} color={theme.background} />
+            <Circle cx={centro} cy={0} r={CUT} color={theme.separator} style="stroke" strokeWidth={1} />
+          </Group>
+        </Canvas>
 
-        {/* O furo. Cor do fundo, raio concêntrico com a bolha. */}
         <Animated.View
           pointerEvents="none"
-          style={[styles.boca, { backgroundColor: theme.background }, boca]}
-        />
-
-        <Animated.View
-          pointerEvents="none"
-          style={[styles.bolha, { backgroundColor: theme.tint }, bolha]}>
-          <Icon name={tabs[activeIndex]?.icon ?? 'circle'} size="md" color="onTint" />
+          style={[
+            styles.bolha,
+            {
+              backgroundColor: theme.backgroundSelected,
+              borderColor: theme.separator,
+              boxShadow: Elevation[scheme].floating,
+            },
+            bolha,
+          ]}>
+          {/*
+            A bolha é da COR DA BARRA com o ícone no accent — é o desenho do export. Preenchê-la
+            de `tint` com o ícone invertido punha o accent inteiro num controle que a pessoa toca
+            100× por dia, e queimava a única alavanca de cor que o app tem em ornamento de chrome.
+          */}
+          <Icon name={tabs[activeIndex]?.icon ?? 'circle'} size="md" color="tint" />
           {/*
             O badge da aba ATIVA anda com a bolha.
-            Deixado no slot, ele caía dentro do furo — em cima do nada — e encostava no rótulo.
+            Deixado no slot, ele caía dentro do berço — em cima do nada — e encostava no rótulo.
           */}
           {tabs[activeIndex]?.badge ? (
             <View style={[styles.badge, styles.badgeBolha, { backgroundColor: theme.danger }]}>
@@ -148,7 +208,7 @@ export function CurvedTabBar({
           ) : null}
         </Animated.View>
 
-        <View style={[styles.linha, { height: BAR_H, top: LIFT }]}>
+        <View style={[styles.linha, { height: BAR_H, top: TOP }]}>
           {tabs.map((tab, i) => {
             const ativo = i === activeIndex;
             return (
@@ -162,7 +222,7 @@ export function CurvedTabBar({
                   onSelect(i);
                 }}
                 style={[styles.slot, { width: slot }]}>
-                {/* A aba ativa não desenha ícone na barra: ele está na bolha, dentro do furo. */}
+                {/* A aba ativa não desenha ícone na barra: ele está na bolha, dentro do berço. */}
                 <View style={styles.iconeSlot}>
                   {ativo ? null : <Icon name={tab.icon} size="md" color="textSecondary" />}
                   {tab.badge && !ativo ? (
@@ -203,30 +263,14 @@ const styles = StyleSheet.create({
     zIndex: 10,
     elevation: 10,
   },
-  /** Sem borda: ela atravessaria o furo. Ver o cabeçalho do arquivo. */
-  barra: {
-    position: 'absolute',
-    left: 0,
-    right: 0,
-    top: LIFT,
-    borderRadius: Radius.pill,
-    borderCurve: 'continuous',
-  },
-  boca: {
-    position: 'absolute',
-    left: 0,
-    top: LIFT + BUBBLE / 2 - CUT,
-    width: CUT * 2,
-    height: CUT * 2,
-    borderRadius: CUT,
-  },
   bolha: {
     position: 'absolute',
     left: 0,
-    top: LIFT - BUBBLE / 2,
+    top: 0,
     width: BUBBLE,
     height: BUBBLE,
     borderRadius: Radius.pill,
+    borderWidth: StyleSheet.hairlineWidth,
     alignItems: 'center',
     justifyContent: 'center',
   },

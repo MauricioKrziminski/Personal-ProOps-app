@@ -2,7 +2,7 @@ import { Pressable, StyleSheet, View } from 'react-native';
 import * as Haptics from 'expo-haptics';
 
 import { ThemedText } from '@/components/themed-text';
-import { Spacing } from '@/constants/theme';
+import { Radius, Space } from '@/design/tokens';
 import { useTheme } from '@/hooks/use-theme';
 
 interface ChipProps {
@@ -33,6 +33,9 @@ export function Chip({ label, selected, onPress, count }: ChipProps) {
         styles.chip,
         {
           backgroundColor: selected ? theme.tint : theme.backgroundElement,
+          // O chip inativo leva contorno; o ativo não precisa, porque a cor já o separa. É o par
+          // `bg-secondary text-black` / `bg-surface border-white/6` do export.
+          borderColor: selected ? 'transparent' : theme.cardBorder,
           opacity: pressed ? 0.8 : 1,
         },
       ]}>
@@ -43,9 +46,11 @@ export function Chip({ label, selected, onPress, count }: ChipProps) {
         <View
           style={[
             styles.badge,
-            { backgroundColor: selected ? theme.onTint : theme.backgroundSelected },
+            // Dentro do chip ativo o badge é um VÉU sobre o accent (`bg-black/15`), não um
+            // disco sólido: sólido ele virava um segundo botão dentro do botão.
+            { backgroundColor: selected ? theme.overlay : theme.backgroundSelected },
           ]}>
-          <ThemedText type="code" themeColor={selected ? 'tint' : 'textSecondary'}>
+          <ThemedText type="code" themeColor={selected ? 'onTint' : 'textSecondary'}>
             {count}
           </ThemedText>
         </View>
@@ -58,16 +63,18 @@ const styles = StyleSheet.create({
   chip: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: Spacing.two,
-    paddingHorizontal: Spacing.three,
-    paddingVertical: Spacing.two,
-    borderRadius: Spacing.four,
+    gap: Space.sm,
+    paddingHorizontal: Space.md + 2,
+    paddingVertical: Space.xs + 2,
+    // Pílula, como todo controle do design — `Spacing.four` (24) era um raio fora da escala.
+    borderRadius: Radius.pill,
+    borderWidth: StyleSheet.hairlineWidth,
   },
   badge: {
     minWidth: 20,
-    paddingHorizontal: Spacing.one,
+    paddingHorizontal: Space.xs,
     paddingVertical: 1,
-    borderRadius: Spacing.four,
+    borderRadius: Radius.pill,
     alignItems: 'center',
     justifyContent: 'center',
   },

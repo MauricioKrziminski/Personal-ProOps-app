@@ -10,7 +10,9 @@ import Animated, {
 
 import { ThemedText } from '@/components/themed-text';
 import { Icon } from '@/components/ui/icon';
+import { GradientSurface } from '@/components/ui/gradient';
 import { Money } from '@/components/ui/money';
+import { alpha, blend, brandColor, CHIP_GOLD } from '@/design/card-brands';
 import { Motion, Radius, Space, tabular } from '@/design/tokens';
 import { formatBRL, formatDateBR } from '@/hooks/use-items';
 import { useTheme } from '@/hooks/use-theme';
@@ -28,38 +30,57 @@ export interface StackedCard {
   overdue_count: number;
 }
 
-/** Altura do cartão da frente, aberto. */
-const CARD_H = 178;
-/** A faixa de cada cartão de trás que aparece ABAIXO do da frente, com a pilha fechada. */
-const PEEK = 16;
-/** Altura da tira: o bastante para o nome e o valor caberem numa linha. */
-const STRIP = 46;
-/** E quanto o cartão de trás encolhe, para a pilha ler como profundidade e não como lista. */
-const SHRINK = 0.03;
-/** O passo da pilha ABERTA — o suficiente para o cabeçalho de cada cartão respirar. */
-const SPREAD = 84;
+/**
+ * Altura do cartão.
+ *
+ * Numa calha de 16 a face fica com 358 de largura, o que dá ~1,75:1 — a proporção que o export
+ * usa. Um cartão de crédito real é 1,586:1; o desenho é um tico mais largo de propósito, porque
+ * o conteúdo (fatura + fechamento + limite + titular) não cabe na proporção exata sem apertar.
+ */
+const CARD_H = 202;
+/** Quanto de cada cartão de trás aparece ACIMA do da frente, com a pilha fechada. */
+const PEEK = 14;
+/** Quanto cada cartão de trás recua de cada lado — é o `inset-x-2` / `inset-x-4` do export. */
+const INSET = 8;
+/**
+ * O passo da pilha ABERTA.
+ *
+ * O bastante para o cabeçalho de cada cartão (bandeira, nome, número) e a fileira do chip
+ * aparecerem inteiros. Menor que isso e o leque vira uma pilha de listras; maior e a carteira
+ * ocupa a tela toda.
+ */
+const SPREAD = 92;
 
 /**
- * A carteira: cartões empilhados que **abrem em leque ao toque**, como o Apple Wallet.
+ * A carteira: cartões DE VERDADE empilhados, que abrem em leque ao toque.
  *
- * ## Os dois estados
+ * ## O que mudou em 03/09/2026
  *
- * **Fechada** — o cartão da frente aberto (fatura, fechamento, limite) e os outros aparecendo por
- * uma faixa atrás. Responde "quanto vou pagar e quando" sem cobrar uma linha de altura por
- * cartão, e ainda assim diz quantos existem.
+ * A versão anterior desenhava um card de conteúdo (chip redondo com um ícone, nome, fatura) e,
+ * ao abrir, virava uma pilha de tiras de 46px — "abriu em formato de card, ficou feio". Duas
+ * coisas estavam erradas e as duas são estruturais:
  *
- * **Aberta** — os cartões se afastam e cada um mostra o próprio cabeçalho: nome, bandeira do
- * vencimento e o valor da fatura. Tocar em um deles fecha a pilha com ele na frente.
+ * 1. **Não tinha anatomia de cartão.** O export desenha o objeto físico: chip EMV dourado,
+ *    contactless, número mascarado, nome do titular em mono caixa alta, e a cor do emissor no
+ *    fundo. Sem isso nenhuma proporção salva — lê como card, porque é um card.
+ * 2. **A pilha crescia para baixo.** Os cartões de trás apareciam ABAIXO do da frente. Numa
+ *    carteira real (e no Wallet, e no export) eles aparecem ACIMA e mais estreitos: é a borda
+ *    superior de cada um saindo por trás do de cima. Para baixo, a pilha lê como lista.
  *
- * O leque abre para BAIXO e a pilha simplesmente fica mais alta, sem scroll próprio: a página já
- * rola, e uma área rolável dentro de outra rouba o gesto de quem só queria continuar descendo a
- * tela. É a mesma razão de o Wallet abrir o leque na página inteira em vez de numa janelinha.
+ * Aberta, cada cartão continua sendo um CARTÃO inteiro, só deslocado — o leque mostra o topo de
+ * cada um e o último por completo.
  *
- * ## Sem cor de bandeira
+ * ## A cor
  *
- * O desenho de referência pinta cada cartão com a cor do banco. Aqui a cor é do sistema, e trazer
- * o roxo do Nubank para dentro da tela seria trazer a marca de outra empresa para o lugar de
- * maior destaque do app. Quem separa um cartão do outro é a posição e o nome.
+ * Vem do emissor (`design/card-brands.ts`), misturada com preto para o fundo e pura no ponto da
+ * bandeira e na barra de limite. Decisão do dono do produto em 03/09/2026, contra a regra
+ * anterior — o histórico está no cabeçalho daquele arquivo.
+ *
+ * ## O toque
+ *
+ * Fechada, tocar em qualquer cartão ABRE o leque. Aberta, tocar num cartão fecha a pilha com ele
+ * na frente. O botão da fatura é SEPARADO: um toque só não pode decidir entre "ver os outros" e
+ * "abrir a fatura".
  */
 export function CardStack({
   cards,
@@ -71,15 +92,11 @@ export function CardStack({
   const [frente, setFrente] = useState(0);
   const [aberta, setAberta] = useState(false);
   const visiveis = cards.slice(0, 6);
+  const atras = visiveis.length - 1;
 
-  // Aberta, o ÚLTIMO cartão também é um cabeçalho (não o cartão grande): reservar `CARD_H` no fim
-  // deixava um buraco do tamanho de um cartão entre a carteira e a seção seguinte.
-  const altura = aberta
-    ? (visiveis.length - 1) * SPREAD + (SPREAD - Space.sm)
-    : CARD_H + (visiveis.length - 1) * PEEK;
-  // ⚠️ A pilha fechada mostra os de trás ABAIXO do da frente, não atrás dele: empilhados no
-  // mesmo topo, um cartão de 46px sumia inteiro atrás de um de 178px e a pilha parecia ter um
-  // cartão só. É também como o Wallet faz — a borda superior arredondada de cada um aparecendo.
+  // Fechada, a pilha é o cartão da frente mais a faixa de cada um dos de trás EM CIMA dele.
+  // Aberta, é um passo por cartão mais a altura do último, que aparece inteiro.
+  const altura = aberta ? atras * SPREAD + CARD_H : CARD_H + atras * PEEK;
 
   const palco = useAnimatedStyle(() => ({
     height: withSpring(altura, Motion.spring.settle),
@@ -88,8 +105,8 @@ export function CardStack({
   const escolher = (i: number) => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     if (!aberta) {
-      // Tocar no cartão da frente ABRE o leque; tocar num de trás também, porque na pilha fechada
-      // eles são alvos de 15px e mirar neles é loteria.
+      // Fechada, os cartões de trás são alvos de 14px — mirar neles seria loteria. Qualquer
+      // toque abre, e a escolha acontece no leque, onde cada alvo tem 92px.
       setAberta(true);
       return;
     }
@@ -109,6 +126,7 @@ export function CardStack({
             depth={profundidade}
             index={i}
             total={visiveis.length}
+            atras={atras}
             aberta={aberta}
             onPress={() => escolher(i)}
             onOpen={() => onOpen(card)}
@@ -138,6 +156,7 @@ function CardFace({
   depth,
   index,
   total,
+  atras,
   aberta,
   onPress,
   onOpen,
@@ -146,6 +165,7 @@ function CardFace({
   depth: number;
   index: number;
   total: number;
+  atras: number;
   aberta: boolean;
   onPress: () => void;
   onOpen: () => void;
@@ -153,33 +173,29 @@ function CardFace({
   const theme = useTheme();
   const press = useSharedValue(1);
 
-  const frente = depth === 0;
-  const y = aberta
-    ? index * SPREAD
-    : frente
-      ? 0
-      : CARD_H - STRIP + depth * PEEK;
-  const escala = aberta || frente ? 1 : 1 - depth * SHRINK;
-  // 0.75 apagava a tira no tema CLARO — cinza sobre branco já é pouco contraste, e a opacidade
-  // levava o texto para baixo do mínimo legível. A profundidade vem da escala e da posição.
-  const opacidade = aberta || frente ? 1 : 0.94;
+  const marca = brandColor(card.name);
+
+  /**
+   * Fechada: o da frente encosta no fundo do palco e cada um de trás sobe uma faixa, com recuo
+   * lateral crescente. Aberta: uma fileira de cartões inteiros, um passo cada.
+   */
+  const y = aberta ? index * SPREAD : (atras - depth) * PEEK;
+  const recuo = aberta ? 0 : depth * INSET;
 
   const animado = useAnimatedStyle(() => ({
     transform: [
       { translateY: withSpring(y, Motion.spring.settle) },
       // A multiplicação vai DENTRO do `withSpring`. Fora, o Reanimated não intercepta a chamada
       // no objeto de estilo e o resultado vira `NaN` — a view some sem erro nenhum no log.
-      { scale: withSpring(escala * press.get(), Motion.spring.settle) },
+      { scale: withSpring(press.get(), Motion.spring.settle) },
     ],
-    // Aberta, quem está EMBAIXO tem que desenhar por cima — senão o cartão de baixo some atrás
-    // do de cima e o leque vira uma pilha again.
+    left: withSpring(recuo, Motion.spring.settle),
+    right: withSpring(recuo, Motion.spring.settle),
+    // Fechada, quem está na frente desenha por cima. Aberta, quem está EMBAIXO desenha por cima,
+    // senão o leque volta a ser uma pilha.
     zIndex: aberta ? index : total - depth,
-    opacity: withTiming(opacidade, { duration: Motion.duration.fast }),
   }));
 
-  const detalhado = !aberta && frente;
-  /** Fechado e atrás: só a tira. Aberto: o cabeçalho inteiro. */
-  const altura = detalhado ? CARD_H : aberta ? SPREAD - Space.sm : STRIP;
   const limite = Number(card.credit_limit_cents ?? 0);
   const usado = Number(card.invoice_total_cents ?? 0);
   const proporcao = limite > 0 ? Math.min(1, usado / limite) : 0;
@@ -189,156 +205,174 @@ function CardFace({
       <Pressable
         accessibilityRole="button"
         accessibilityLabel={
-          detalhado
-            ? `${card.name}, fatura de ${formatBRL(usado)}. Toque para abrir a carteira.`
-            : `${card.name}, fatura de ${formatBRL(usado)}. Toque para trazer para a frente.`
+          `${card.name}, fatura de ${formatBRL(usado)}. ` +
+          (aberta ? 'Toque para trazer para a frente.' : 'Toque para abrir a carteira.')
         }
         onPressIn={() => press.set(withTiming(Motion.pressScale, { duration: Motion.duration.fast }))}
         onPressOut={() => press.set(withTiming(1, { duration: Motion.duration.fast }))}
         onPress={onPress}
-        style={[
-          styles.card,
-          {
-            minHeight: altura,
-            paddingVertical: detalhado ? Space.gutter : Space.md,
-            backgroundColor: detalhado ? theme.heroSurface : theme.surface,
-            borderColor: theme.cardBorder,
-          },
-        ]}>
+        style={[styles.card, { borderColor: alpha(marca, 0.35) }]}>
+        {/*
+          O fundo do cartão: a cor do emissor puxada quase toda para o preto, mais um brilho da
+          própria cor saindo pelo canto. É o `from-[#1d142b] to-[#0c0a13]` do export, calculado em
+          vez de digitado — assim um banco novo entra no mapa e ganha o cartão certo de graça.
+        */}
+        <GradientSurface
+          from={blend(marca, theme.heroTop, 0.14)}
+          to={blend(marca, theme.heroBottom, 0.06)}
+          sheen={alpha(marca, 0.22)}
+          sheenSize={90}
+        />
+
+        {/* Cabeçalho: bandeira, nome e o número mascarado. */}
         <View style={styles.topo}>
           <View style={styles.nomeWrap}>
-            {/* Dentro do cartão aberto vale a paleta DO PAINEL: ele é escuro nos dois temas. */}
-            <View
-              style={[
-                styles.chip,
-                { backgroundColor: detalhado ? theme.heroChip : theme.backgroundElement },
-              ]}>
-              <Icon name="creditcard" size="sm" color={detalhado ? 'onHero' : 'text'} />
-            </View>
+            <View style={[styles.bandeira, { backgroundColor: marca }]} />
             <ThemedText
-              type="headline"
+              type="small"
+              themeColor="onHero"
               numberOfLines={1}
-              themeColor={detalhado ? 'onHero' : 'text'}
               style={styles.shrink}>
               {card.name}
             </ThemedText>
             {card.overdue_count > 0 ? (
-              <View
-                style={[
-                  styles.pill,
-                  { backgroundColor: detalhado ? theme.heroChip : theme.dangerSoft },
-                ]}>
-                <ThemedText type="meta" themeColor={detalhado ? 'onHeroDanger' : 'danger'}>
+              <View style={[styles.pill, { backgroundColor: theme.heroChip }]}>
+                <ThemedText type="meta" themeColor="onHeroDanger">
                   ATRASADA
                 </ThemedText>
               </View>
             ) : null}
           </View>
-          {detalhado ? (
-            /*
-              O corpo do cartão ABRE a carteira; a fatura tem botão próprio.
-              Sem essa separação, um toque no cartão da frente teria que decidir sozinho entre
-              "quero ver os outros cartões" e "quero abrir a fatura" — e escolheria errado metade
-              das vezes.
-            */
-            <Pressable
-              accessibilityRole="button"
-              accessibilityLabel={`Abrir a fatura de ${card.name}`}
-              hitSlop={Space.sm}
-              onPress={onOpen}
-              style={[styles.verFatura, { backgroundColor: theme.heroChip }]}>
-              <Icon name="chevron.right" size="sm" color="onHero" />
-            </Pressable>
-          ) : (
-            <ThemedText type="ticker" style={tabular}>
-              {formatBRL(usado)}
+          <View style={[styles.numero, { backgroundColor: theme.heroChip }]}>
+            <ThemedText type="code" themeColor="onHero" style={tabular}>
+              {mascara(card.account_id)}
             </ThemedText>
-          )}
+          </View>
         </View>
 
-        {detalhado ? (
-          <>
-            <View style={styles.faturaRow}>
-              <View style={styles.faturaWrap}>
-                <ThemedText type="meta" themeColor="onHeroMuted">
-                  FATURA ATUAL
-                </ThemedText>
-                <Money cents={usado} variant="money" tone="onHero" concealable />
-              </View>
-              <View style={styles.fechaWrap}>
-                <ThemedText type="meta" themeColor="onHeroMuted">
-                  {card.closing_date ? 'FECHA EM' : 'SEM FATURA'}
-                </ThemedText>
-                {card.closing_date ? (
-                  <ThemedText type="ticker" themeColor="onHero" style={tabular}>
-                    {formatDateBR(card.closing_date)}
-                  </ThemedText>
-                ) : null}
-              </View>
-            </View>
+        {/*
+          Chip EMV e contactless. É a fileira que faz o objeto ser lido como cartão antes de
+          qualquer número ser lido — e é exatamente o que faltava na versão anterior.
+        */}
+        <View style={styles.fisico}>
+          <View style={styles.chip}>
+            <GradientSurface from={CHIP_GOLD.top} to={CHIP_GOLD.bottom} />
+            <View style={[styles.chipGrade, { borderColor: theme.overlay }]} />
+          </View>
+          <Icon name="wave.3.right" size="md" color="onHeroMuted" />
+        </View>
 
-            {limite > 0 ? (
-              <>
-                <View style={[styles.trilho, { backgroundColor: theme.heroSeparator }]}>
-                  <View
-                    style={[
-                      styles.preenchido,
-                      { width: `${Math.round(proporcao * 100)}%`, backgroundColor: theme.onHeroSuccess },
-                    ]}
-                  />
-                </View>
-                <View style={styles.rodape}>
-                  <ThemedText type="caption" themeColor="onHeroMuted">
-                    {card.due_date ? `vence ${formatDateBR(card.due_date)}` : 'sem vencimento'}
-                  </ThemedText>
-                  <ThemedText type="code" themeColor="onHeroMuted" style={tabular}>
-                    {`livre ${formatBRL(Number(card.available_limit_cents ?? 0))}`}
-                  </ThemedText>
-                </View>
-              </>
-            ) : null}
-          </>
-        ) : null}
+        {/* Fatura e fechamento. */}
+        <View style={styles.faturaRow}>
+          <View style={styles.faturaWrap}>
+            <ThemedText type="meta" themeColor="onHeroMuted">
+              FATURA ATUAL
+            </ThemedText>
+            <Money cents={usado} variant="title" tone="onHero" concealable />
+          </View>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel={`Abrir a fatura de ${card.name}`}
+            hitSlop={Space.sm}
+            onPress={onOpen}
+            style={styles.fechaWrap}>
+            <ThemedText type="meta" themeColor="onHeroMuted">
+              {card.closing_date ? 'FECHA EM' : 'SEM FATURA'}
+            </ThemedText>
+            <View style={styles.fechaValor}>
+              {card.closing_date ? (
+                <ThemedText type="ticker" themeColor="onHero" style={tabular}>
+                  {formatDateBR(card.closing_date).slice(0, 5)}
+                </ThemedText>
+              ) : null}
+              <Icon name="chevron.right" size="xs" color="onHeroMuted" />
+            </View>
+          </Pressable>
+        </View>
+
+        {/* Barra de limite, na cor da marca. É o único lugar em que ela aparece pura e larga. */}
+        <View style={[styles.trilho, { backgroundColor: theme.heroSeparator }]}>
+          <View
+            style={[
+              styles.preenchido,
+              { width: `${Math.round(proporcao * 100)}%`, backgroundColor: marca },
+            ]}
+          />
+        </View>
+
+        {/* Rodapé do cartão: titular à esquerda, disponível à direita. */}
+        <View style={styles.rodape}>
+          <ThemedText type="meta" themeColor="onHeroMuted" numberOfLines={1} style={styles.shrink}>
+            {card.due_date ? `VENCE ${formatDateBR(card.due_date).slice(0, 5)}` : 'SEM VENCIMENTO'}
+          </ThemedText>
+          {limite > 0 ? (
+            <View style={styles.disponivel}>
+              <ThemedText type="caption" themeColor="onHeroMuted">
+                Disponível:
+              </ThemedText>
+              <ThemedText type="code" themeColor="onHeroSuccess" style={tabular}>
+                {formatBRL(Number(card.available_limit_cents ?? 0))}
+              </ThemedText>
+            </View>
+          ) : null}
+        </View>
       </Pressable>
     </Animated.View>
   );
 }
 
+/**
+ * Os quatro últimos dígitos. O schema NÃO guarda o número do cartão (e não deveria), então eles
+ * saem do fim do UUID da conta: é estável, é o mesmo em toda sessão e não finge ser um dado que
+ * o app não tem. Sem isto o cartão perde a marca visual que mais o identifica de longe.
+ */
+function mascara(id: string): string {
+  return `•••• ${id.replace(/[^0-9]/g, '').slice(-4).padStart(4, '0')}`;
+}
+
 const styles = StyleSheet.create({
   palco: { width: '100%' },
-  slot: { position: 'absolute', left: 0, right: 0, top: 0 },
+  slot: { position: 'absolute', top: 0 },
   shrink: { flex: 1, minWidth: 0 },
   card: {
-    paddingHorizontal: Space.gutter,
-    borderRadius: Radius.lg,
+    height: CARD_H,
+    padding: Space.gutter,
+    borderRadius: Radius.md,
     borderCurve: 'continuous',
     borderWidth: StyleSheet.hairlineWidth,
-    gap: Space.md,
+    justifyContent: 'space-between',
+    overflow: 'hidden',
   },
   topo: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: Space.sm },
   nomeWrap: { flexDirection: 'row', alignItems: 'center', gap: Space.sm, flex: 1, minWidth: 0 },
-  chip: {
-    width: 32,
-    height: 32,
-    borderRadius: Radius.pill,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
+  /** O ponto da bandeira: 10px de cor pura, o único respingo de marca fora da barra de limite. */
+  bandeira: { width: 10, height: 10, borderRadius: Radius.pill },
   pill: { paddingHorizontal: Space.sm, paddingVertical: Space.half, borderRadius: Radius.pill },
-  verFatura: {
-    width: 30,
-    height: 30,
+  numero: {
+    paddingHorizontal: Space.sm,
+    paddingVertical: Space.half,
     borderRadius: Radius.pill,
-    alignItems: 'center',
-    justifyContent: 'center',
   },
+  fisico: { flexDirection: 'row', alignItems: 'center', gap: Space.md },
+  chip: {
+    width: 36,
+    height: 28,
+    borderRadius: Radius.xs,
+    borderCurve: 'continuous',
+    overflow: 'hidden',
+    padding: 4,
+  },
+  /** O quadrado interno do chip — o desenho de contato, resolvido com uma borda só. */
+  chipGrade: { flex: 1, borderWidth: StyleSheet.hairlineWidth, borderRadius: 2, opacity: 0.6 },
   faturaRow: { flexDirection: 'row', alignItems: 'flex-end', justifyContent: 'space-between', gap: Space.md },
-  faturaWrap: { flex: 1, minWidth: 0, gap: Space.xs },
-  fechaWrap: { alignItems: 'flex-end', gap: Space.xs },
-  trilho: { height: 4, borderRadius: Radius.xs, overflow: 'hidden' },
+  faturaWrap: { flex: 1, minWidth: 0, gap: Space.half },
+  fechaWrap: { alignItems: 'flex-end', gap: Space.half },
+  fechaValor: { flexDirection: 'row', alignItems: 'center', gap: Space.xs },
+  trilho: { height: 6, borderRadius: Radius.xs, overflow: 'hidden' },
   preenchido: { height: '100%', borderRadius: Radius.xs },
   rodape: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: Space.sm },
-  /** A alça de abrir/fechar, no canto — alvo explícito para quem não descobre o toque no cartão. */
+  disponivel: { flexDirection: 'row', alignItems: 'center', gap: Space.xs },
+  /** A alça de abrir/fechar — alvo explícito para quem não descobre o toque no cartão. */
   alca: {
     position: 'absolute',
     right: Space.md,

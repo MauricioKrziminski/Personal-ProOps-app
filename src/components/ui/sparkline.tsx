@@ -1,7 +1,7 @@
 import { useEffect, useMemo } from 'react';
 import { View } from 'react-native';
 import Animated, { useAnimatedStyle, useSharedValue, withTiming } from 'react-native-reanimated';
-import { Canvas, Line, Path, Skia, vec } from '@shopify/react-native-skia';
+import { Canvas, Circle, Line, LinearGradient, Path, Skia, vec } from '@shopify/react-native-skia';
 
 import { Motion, Radius } from '@/design/tokens';
 import { useTheme } from '@/hooks/use-theme';
@@ -55,7 +55,7 @@ export function Sparkline({
 }: SparklineProps) {
   const theme = useTheme();
 
-  const { line, past, splitX, area, zeroY, zeroVisible, negative, flat } = useMemo(() => {
+  const { line, past, splitX, area, zeroY, zeroVisible, negative, flat, pinY, endY } = useMemo(() => {
     const empty = {
       line: null,
       past: null,
@@ -65,6 +65,8 @@ export function Sparkline({
       zeroVisible: false,
       negative: false,
       flat: true,
+      pinY: 0,
+      endY: 0,
     };
     if (values.length < 2 || width <= 0) return empty;
 
@@ -121,16 +123,45 @@ export function Sparkline({
       zeroY: y(0),
       zeroVisible: lo <= 0 && hi >= 0,
       negative: values[values.length - 1] < 0,
+      // A altura do alfinete tem que sair da MESMA escala da curva: recalcular `y` fora daqui
+      // daria um ponto flutuando ao lado da linha assim que o domínio mudasse.
+      pinY: y(values[inicioFuturo]),
+      endY: y(values[values.length - 1]),
     };
   }, [values, width, height, pastCount]);
 
   if (!line) return <View style={{ width, height }} />;
 
   const color = negative ? theme.danger : theme.success;
+  /**
+   * O ponto de "hoje". Sem passado marcado, é a ponta da série — que é onde o olho já vai.
+   *
+   * O `x` é preso dentro do canvas pelo raio do disco: na ponta exata o Skia corta o alfinete ao
+   * meio, e meia bolinha na borda lê como defeito de render, não como marcador.
+   */
+  const R = 4.5;
+  const pinX = Math.min(Math.max(splitX ?? width, R), width - R);
+  const pinY2 = splitX !== null ? pinY : endY;
+  /** O degradê do traço começa no alfinete; sem passado marcado ele atravessa o gráfico todo. */
+  const gradStart = splitX ?? 0;
 
   return (
     <Canvas style={{ width, height }}>
-      {flat ? null : <Path path={area!} color={color} style="fill" opacity={0.14} />}
+      {/*
+        A área é um GRADIENTE, não um preenchimento chapado (`from secondary/0.35 to /0`).
+        Chapada com 14% ela lia como uma sombra retangular embaixo da linha; com a queda para
+        transparente ela lê como luz saindo da curva — que é o que faz o gráfico do export ter
+        volume num card de 48px de altura.
+      */}
+      {flat ? null : (
+        <Path path={area!} style="fill">
+          <LinearGradient
+            start={vec(0, 0)}
+            end={vec(0, height)}
+            colors={[`${color}59`, `${color}00`]}
+          />
+        </Path>
+      )}
       {showZero && zeroVisible ? (
         <Line
           p1={vec(0, zeroY)}
@@ -140,35 +171,29 @@ export function Sparkline({
           style="stroke"
         />
       ) : null}
-      <Path
-        path={line}
-        color={color}
-        style="stroke"
-        strokeWidth={2}
-        strokeCap="round"
-        strokeJoin="round"
-      />
-      {/* Histórico: mesma cor, mais fraco. O futuro é o que a tela afirma; o passado é contexto. */}
+      {/* Histórico: mesma forma, sem cor. O futuro é o que a tela afirma; o passado é contexto. */}
       {past ? (
         <Path
           path={past}
-          color={color}
+          color={theme.textSecondary}
           style="stroke"
-          strokeWidth={2}
+          strokeWidth={2.25}
           strokeCap="round"
           strokeJoin="round"
-          opacity={0.35}
+          opacity={0.45}
         />
       ) : null}
-      {splitX !== null ? (
-        <Line
-          p1={vec(splitX, 0)}
-          p2={vec(splitX, height)}
-          color={theme.separator}
-          strokeWidth={1}
-          style="stroke"
-        />
-      ) : null}
+      {/*
+        O traço do futuro sai do cinza do texto e CHEGA no accent — o `strokeGradient` do export.
+        Uma cor só faz a linha inteira afirmar com a mesma confiança; o degradê diz onde a
+        projeção está indo.
+      */}
+      <Path path={line} style="stroke" strokeWidth={2.25} strokeCap="round" strokeJoin="round">
+        <LinearGradient start={vec(gradStart, 0)} end={vec(width, 0)} colors={[theme.text, color]} />
+      </Path>
+      {/* O alfinete do dia de hoje: disco na cor do texto com o miolo vazado na cor do fundo. */}
+      <Circle cx={pinX} cy={pinY2} r={R} color={theme.text} />
+      <Circle cx={pinX} cy={pinY2} r={1.75} color={theme.heroBottom} />
     </Canvas>
   );
 }

@@ -114,11 +114,13 @@ function Shortcut({ title, count, icon, href }: ShortcutProps) {
           Haptics.selectionAsync();
           router.push(href);
         }}>
+        {/*
+          Sem caixa em volta do ícone: o export põe o símbolo solto no canto. A caixa de 36px
+          disputava peso com o rótulo e transformava quatro atalhos em quatro cards de ícone.
+        */}
         <View style={styles.shortcutTop}>
-          <View style={[styles.shortcutIcon, { backgroundColor: theme.backgroundElement }]}>
-            <Icon name={icon} size="md" color="text" />
-          </View>
-          <Icon name="chevron.right" size="sm" color="textSecondary" />
+          <Icon name={icon} size="md" color="text" />
+          <Icon name="chevron.right" size="xs" color="textSecondary" />
         </View>
         <View style={styles.shortcutBottom}>
           <ThemedText type="headline" numberOfLines={1}>
@@ -145,7 +147,10 @@ const JANELAS_CASHFLOW = [
   { value: '12', label: '12 meses' },
 ];
 
-const ALTURA_BARRA = 72;
+/** A altura útil da barra. O `h-24` do export. */
+const ALTURA_BARRA = 96;
+/** A largura da barra. O `w-2.5` do export — traço fino, não bloco. */
+const LARGURA_BARRA = 10;
 
 /**
  * Barra da tendência mensal.
@@ -175,9 +180,10 @@ function CashBar({ ratio, index, forte }: { ratio: number; index: number; forte:
       style={[
         styles.cashBar,
         animado,
-        // UMA cor, duas intensidades — a mesma solução do gráfico de faturas. Duas matizes aqui
-        // gastariam `success`/`danger` como enfeite, e cor semântica é a última alavanca do app.
-        { backgroundColor: theme.tint, opacity: forte ? 1 : 0.35 },
+        // O par do export: `primary` (a cor do texto) contra `surface-bright` (cinza claro).
+        // Sem matiz nenhuma — o accent fica reservado para ação e estado, e a comparação entre
+        // "entrou" e "saiu" se resolve por CLARIDADE, que é o que funciona sem enxergar cor.
+        { backgroundColor: forte ? theme.text : theme.surfaceRaised },
       ]}
     />
   );
@@ -375,16 +381,19 @@ export default function FinanceScreen() {
                 concealable
               />
             }
-            secondary={
-              isCurrent && upcomingOut > 0
-                ? `entrou ${formatBRL(income)}  ·  saiu ${formatBRL(expense)}  ·  previsto ${formatBRL(upcomingOut)}`
-                : `entrou ${formatBRL(income)}  ·  saiu ${formatBRL(expense)}`
-            }
+            secondary={{
+              icon: leftover < 0 ? 'chart.line.downtrend.xyaxis' : 'chart.line.uptrend.xyaxis',
+              negative: leftover < 0,
+              text:
+                isCurrent && upcomingOut > 0
+                  ? `entrou ${formatBRL(income)} · saiu ${formatBRL(expense)} · previsto ${formatBRL(upcomingOut)}`
+                  : `entrou ${formatBRL(income)} · saiu ${formatBRL(expense)}`,
+            }}
             chart={
               // Mesmo critério da Hoje: série que não varia desenha uma reta, e reta no meio
               // do painel lê como divisor, não como gráfico.
               isCurrent && series.length > 2 && varia ? (
-                <Sparkline values={series} width={width - Space.lg * 2 - Space.gutter * 2} showZero />
+                <Sparkline values={series} width={width - Space.lg * 2 - Space.gutter * 2} height={48} showZero />
               ) : undefined
             }
             trend={
@@ -576,15 +585,13 @@ export default function FinanceScreen() {
                   </View>
                   <View style={styles.cashLegenda}>
                     <View style={styles.cashChave}>
-                      <View style={[styles.cashSwatch, { backgroundColor: theme.tint }]} />
+                      <View style={[styles.cashSwatch, { backgroundColor: theme.text }]} />
                       <ThemedText type="caption" themeColor="textSecondary">
                         entrou
                       </ThemedText>
                     </View>
                     <View style={styles.cashChave}>
-                      <View
-                        style={[styles.cashSwatch, { backgroundColor: theme.tint, opacity: 0.35 }]}
-                      />
+                      <View style={[styles.cashSwatch, { backgroundColor: theme.surfaceRaised }]} />
                       <ThemedText type="caption" themeColor="textSecondary">
                         saiu
                       </ThemedText>
@@ -635,9 +642,14 @@ export default function FinanceScreen() {
                   Um gráfico de barras responde "como foi variando"; ninguém subtrai duas barras
                   de cabeça para saber se guardou dinheiro.
                 */}
-                <View style={[styles.cashFio, { backgroundColor: theme.separator }]} />
-                <View style={styles.cashRodape}>
-                  <ThemedText type="small" themeColor="textSecondary">
+                {/*
+                  A faixa que sangra até as bordas do card — o mesmo padrão do rodapé do painel de
+                  destaque, e um dos dois elementos que o export repete de tela em tela. Ela
+                  carrega a conta que o gráfico não faz sozinho: um gráfico de barras responde
+                  "como foi variando", e ninguém subtrai duas barras de cabeça.
+                */}
+                <View style={[styles.cashRodape, { backgroundColor: theme.heroFooter }]}>
+                  <ThemedText type="footnote" themeColor="textSecondary">
                     {`Sobrou em ${monthShort(meses[meses.length - 1].month.slice(0, 7))}`}
                   </ThemedText>
                   <Money
@@ -646,6 +658,7 @@ export default function FinanceScreen() {
                       Number(meses[meses.length - 1].expense_cents)
                     }
                     variant="ticker"
+                    tone="auto"
                     signed
                   />
                 </View>
@@ -867,27 +880,21 @@ const styles = StyleSheet.create({
     width: '48.5%',
   },
   shortcutPress: {
-    padding: Space.md,
+    // `h-24` do export: o atalho é um quadrado com o ícone em cima e o rótulo apoiado embaixo.
+    height: 96,
+    justifyContent: 'space-between',
+    padding: Space.lg,
     borderRadius: Radius.md,
     borderCurve: 'continuous',
     borderWidth: StyleSheet.hairlineWidth,
-    gap: Space.md,
   },
   shortcutTop: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
   },
-  shortcutIcon: {
-    width: 36,
-    height: 36,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderRadius: Radius.sm,
-    borderCurve: 'continuous',
-  },
   shortcutBottom: {
-    gap: Space.xs,
+    gap: Space.half,
   },
   blockHead: {
     flexDirection: 'row',
@@ -911,11 +918,23 @@ const styles = StyleSheet.create({
   },
   shrink: { flex: 1, minWidth: 0 },
   cashHead: { flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between', gap: Space.md },
-  cashFio: { height: StyleSheet.hairlineWidth, marginTop: Space.sm },
-  cashRodape: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: Space.sm },
+  cashRodape: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: Space.sm,
+    // Negativo nas laterais e embaixo: é assim que a faixa alcança a borda do card sem o card
+    // precisar abrir mão do próprio respiro (`-mx-gutter-lg -mb-gutter-lg` do export).
+    marginHorizontal: -Space.lg,
+    marginBottom: -Space.lg,
+    marginTop: Space.sm,
+    paddingHorizontal: Space.lg,
+    paddingVertical: Space.sm + 2,
+  },
   cashflow: {
     gap: Space.lg,
     padding: Space.lg,
+    overflow: 'hidden',
   },
   cashBars: {
     flexDirection: 'row',
@@ -929,18 +948,22 @@ const styles = StyleSheet.create({
   cashPair: {
     flexDirection: 'row',
     alignItems: 'flex-end',
+    justifyContent: 'center',
     // Respiro INTERNO menor que o `gap` entre meses (`cashBars`): é o que faz as duas barras
     // lerem como um par, e não como doze barras soltas.
     gap: Space.xs,
   },
   cashTrack: {
-    flex: 1,
+    width: LARGURA_BARRA,
     height: ALTURA_BARRA,
     justifyContent: 'flex-end',
   },
   cashBar: {
     width: '100%',
-    borderRadius: Radius.xs,
+    // Só o topo é arredondado (`rounded-t-sm`): a base da barra tem que assentar numa linha reta,
+    // senão o eixo do gráfico fica ondulado.
+    borderTopLeftRadius: Radius.xs,
+    borderTopRightRadius: Radius.xs,
     borderCurve: 'continuous',
   },
   cashMes: {
