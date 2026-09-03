@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import * as Haptics from 'expo-haptics';
 import { Pressable, StyleSheet, View } from 'react-native';
 import Animated, {
@@ -85,14 +85,28 @@ const SPREAD = 92;
 export function CardStack({
   cards,
   onOpen,
+  onFrontChange,
 }: {
   cards: StackedCard[];
   onOpen: (card: StackedCard) => void;
+  /**
+   * Qual cartão está na frente. A tela usa para rotular a saída do cartão logo abaixo da
+   * carteira — sem isso ela teria que adivinhar, e adivinharia o primeiro do array.
+   */
+  onFrontChange?: (card: StackedCard) => void;
 }) {
   const [frente, setFrente] = useState(0);
   const [aberta, setAberta] = useState(false);
   /** A largura do palco, para o estreitamento dos cartões de trás virar `scaleX` (§5). */
   const [largura, setLargura] = useState(0);
+
+  const naFrente = cards[frente];
+  useEffect(() => {
+    if (naFrente) onFrontChange?.(naFrente);
+    // `onFrontChange` fora das dependências de propósito: a tela costuma passar uma seta nova a
+    // cada render, e incluí-la aqui faria o efeito rodar em loop.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [naFrente]);
   const visiveis = cards.slice(0, 6);
   const atras = visiveis.length - 1;
 

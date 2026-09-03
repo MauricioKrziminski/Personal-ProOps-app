@@ -23,7 +23,7 @@ import {
   shiftMonth,
 } from '@/components/finance/month-picker';
 import { ThemedText } from '@/components/themed-text';
-import { CardStack } from '@/components/finance/card-stack';
+import { CardStack, type StackedCard } from '@/components/finance/card-stack';
 import { CURVED_BAR_CLEARANCE } from '@/components/ui/curved-tab-bar';
 import { AppHeader } from '@/components/ui/app-header';
 import { ItemLink } from '@/components/ui/item-link';
@@ -39,7 +39,7 @@ import { Screen } from '@/components/ui/screen';
 import { Skeleton, SkeletonRow } from '@/components/ui/skeleton';
 import { ProgressBar } from '@/components/ui/sparkline';
 import { useToast } from '@/components/ui/toast';
-import { Elevation, Motion, Radius, Space, tabular } from '@/design/tokens';
+import { Elevation, Motion, Radius, Space, Type, tabular } from '@/design/tokens';
 import {
   useAccounts,
   useBudgetsStatus,
@@ -231,6 +231,8 @@ export default function FinanceScreen() {
   const accounts = useAccounts();
   const cards = useCardSummary();
   const [janelaCashflow, setJanelaCashflow] = useState('6');
+  /** O cartão que a carteira está mostrando — rotula a saída logo abaixo dela. */
+  const [cartaoFrente, setCartaoFrente] = useState<StackedCard | null>(null);
   const cashflow = useMonthlyCashflow(Number(janelaCashflow));
   const recent = useRecentTransactions(5);
   const remove = useDeleteTransaction();
@@ -302,6 +304,11 @@ export default function FinanceScreen() {
       `${what}. Isso não volta.`
     );
   };
+
+  const abrirFatura = (card: StackedCard) =>
+    card.invoice_id
+      ? router.push({ pathname: '/finance/invoice/[id]', params: { id: card.invoice_id } })
+      : router.push('/finance/cards');
 
   const openTransactions = (params: Record<string, string>) =>
     router.push({ pathname: '/finance/transactions', params: { month, ...params } });
@@ -511,12 +518,35 @@ export default function FinanceScreen() {
                 due_date: c.due_date,
                 overdue_count: Number(c.overdue_count ?? 0),
               }))}
-              onOpen={(card) =>
-                card.invoice_id
-                  ? router.push({ pathname: '/finance/invoice/[id]', params: { id: card.invoice_id } })
-                  : router.push('/finance/cards')
-              }
+              onFrontChange={setCartaoFrente}
+              onOpen={(card) => abrirFatura(card)}
             />
+
+            {/*
+              A saída DO CARTÃO, colada na carteira.
+
+              Sem ela, a primeira coisa abaixo do cartão era "Últimos lançamentos" — e
+              proximidade sugere posse: a lista parecia ser daquele cartão, sendo que ela é de
+              tudo. Esta linha responde a pergunta que o cartão levanta ("e os gastos DELE?")
+              no lugar onde ela nasce, e por isso a seção seguinte pode começar do zero.
+            */}
+            {cartaoFrente ? (
+              <Section>
+                <Row
+                  title={`Fatura do ${cartaoFrente.name}`}
+                  subtitle={
+                    cartaoFrente.closing_date
+                      ? `fecha ${formatDateBR(cartaoFrente.closing_date)}`
+                      : 'sem fatura aberta'
+                  }
+                  icon="creditcard"
+                  onPress={() => abrirFatura(cartaoFrente)}
+                  trailing={
+                    <Money cents={Number(cartaoFrente.invoice_total_cents ?? 0)} variant="ticker" />
+                  }
+                />
+              </Section>
+            ) : null}
           </View>
         ) : null}
 
@@ -541,7 +571,14 @@ export default function FinanceScreen() {
         ) : (recent.data ?? []).length > 0 ? (
           <View style={styles.block}>
             <View style={styles.blockHead}>
-              <ThemedText type="smallBold">Últimos lançamentos</ThemedText>
+              <View style={styles.shrink}>
+                <ThemedText type="smallBold">Últimos lançamentos</ThemedText>
+                {/* O escopo, escrito. É a metade textual da correção — a outra é a linha da
+                    fatura acima, que tira do cartão a expectativa de "isto é meu". */}
+                <ThemedText type="caption" themeColor="textSecondary" style={Type.meta}>
+                  TODAS AS CONTAS
+                </ThemedText>
+              </View>
               <Pressable accessibilityRole="button" hitSlop={12} onPress={() => openTransactions({})}>
                 <ThemedText type="small" themeColor="tint">
                   Ver todos
