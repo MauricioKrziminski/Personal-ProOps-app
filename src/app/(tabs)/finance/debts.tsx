@@ -243,7 +243,7 @@ export default function DebtsScreen() {
               <ThemedText type="default" numberOfLines={1} style={styles.dividaNome}>
                 {d.name}
               </ThemedText>
-              <Money cents={restante} variant="headline" tone="danger" />
+              <Money cents={restante} variant="ticker" tone="danger" />
             </View>
             <ProgressBar value={pago} max={original} tone="success" />
             <ThemedText type="footnote" themeColor="textSecondary">

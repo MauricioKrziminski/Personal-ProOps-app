@@ -525,7 +525,7 @@ export default function FinanceScreen() {
                             <ThemedText type="default" numberOfLines={1} style={styles.categoryName}>
                               {row.category}
                             </ThemedText>
-                            <Money cents={total} variant="headline" />
+                            <Money cents={total} variant="ticker" />
                           </View>
                           {/* `data`, não `tint`: a barra aqui é comparação entre categorias,
                               não estado a resolver. Ver o docblock do ProgressBar. */}
@@ -768,7 +768,7 @@ export default function FinanceScreen() {
                         trailing={
                           <Money
                             cents={tx.kind === 'expense' ? -tx.amount_cents : tx.amount_cents}
-                            variant="headline"
+                            variant="ticker"
                             tone={tx.kind === 'income' ? 'success' : 'text'}
                             signed={tx.kind !== 'transfer'}
                           />

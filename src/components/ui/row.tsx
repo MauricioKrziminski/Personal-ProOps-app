@@ -50,7 +50,19 @@ export function Row({
 
   const content = (pressed: boolean) => (
     <View style={[styles.row, { backgroundColor: pressed ? theme.backgroundSelected : 'transparent' }]}>
-      {icon ? <Icon name={icon} size="lg" color={destructive ? 'danger' : 'tint'} /> : null}
+      {/*
+        O ícone mora num CHIP redondo, como no desenho: um glifo solto ao lado do texto flutua e
+        as linhas perdem a coluna da esquerda. O chip dá a âncora e o alvo visual.
+      */}
+      {icon ? (
+        <View
+          style={[
+            styles.iconChip,
+            { backgroundColor: destructive ? theme.dangerSoft : theme.backgroundElement },
+          ]}>
+          <Icon name={icon} size="md" color={destructive ? 'danger' : 'text'} />
+        </View>
+      ) : null}
       <View style={styles.labels}>
         <ThemedText type="default" themeColor={destructive ? 'danger' : 'text'} numberOfLines={1}>
           {title}
@@ -126,6 +138,13 @@ const styles = StyleSheet.create({
   labels: {
     flex: 1,
     gap: 2,
+  },
+  iconChip: {
+    width: 38,
+    height: 38,
+    borderRadius: Radius.pill,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   section: {
     gap: Space.xs + 2,

@@ -70,14 +70,14 @@ export default function CatalogScreen() {
           title="Aluguel"
           subtitle="vence hoje"
           icon="house"
-          trailing={<Money cents={180000} variant="headline" />}
+          trailing={<Money cents={180000} variant="ticker" />}
           onPress={() => {}}
         />
         <Row
           title="Fatura Nubank"
           subtitle="vence em 3 dias"
           icon="creditcard"
-          trailing={<Money cents={89050} variant="headline" />}
+          trailing={<Money cents={89050} variant="ticker" />}
           onPress={() => {}}
         />
         <Row title="Sair da conta" icon="rectangle.portrait.and.arrow.right" destructive onPress={() => {}} />

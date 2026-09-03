@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import * as Haptics from 'expo-haptics';
 import { Pressable, StyleSheet, View } from 'react-native';
 import Animated, {
   useAnimatedStyle,
@@ -14,7 +15,7 @@ import { Motion, Radius, Space, tabular } from '@/design/tokens';
 import { formatBRL, formatDateBR } from '@/hooks/use-items';
 import { useTheme } from '@/hooks/use-theme';
 
-/** O que a pilha precisa de um cartão. Um subconjunto do `card_summary`, não a linha inteira. */
+/** O que a carteira precisa de um cartão. Um subconjunto do `card_summary`, não a linha inteira. */
 export interface StackedCard {
   account_id: string;
   name: string;
@@ -27,27 +28,36 @@ export interface StackedCard {
   overdue_count: number;
 }
 
-/** Quanto cada cartão de trás aparece por baixo do da frente. */
-const PEEK = 14;
+/** Altura do cartão da frente, aberto. */
+const CARD_H = 178;
+/** Quanto cada cartão de trás aparece quando a pilha está FECHADA. */
+const PEEK = 15;
 /** E quanto ele encolhe, para o empilhamento ler como profundidade e não como lista. */
-const SHRINK = 0.04;
+const SHRINK = 0.045;
+/** O passo da pilha ABERTA — o suficiente para o nome e o valor de cada cartão respirarem. */
+const SPREAD = 84;
 
 /**
- * A carteira: os cartões empilhados, o da frente aberto.
+ * A carteira: cartões empilhados que **abrem em leque ao toque**, como o Apple Wallet.
  *
- * Substitui uma lista de `Row`s — que respondia "quantos cartões existem" quando a pergunta real
- * é "quanto vou pagar e quando". Empilhados, os de trás continuam presentes (a pessoa vê que tem
- * três) sem cobrar três linhas de altura, e o da frente tem espaço para o que importa: o total
- * da fatura, a data de fechamento e quanto de limite sobrou.
+ * ## Os dois estados
  *
- * Tocar em um cartão de trás traz ele para a frente. É a interação que o gesto físico sugere, e
- * é a razão de a pilha existir em vez de um carrossel: não há o que descobrir, os outros cartões
- * estão à vista.
+ * **Fechada** — o cartão da frente aberto (fatura, fechamento, limite) e os outros aparecendo por
+ * uma faixa atrás. Responde "quanto vou pagar e quando" sem cobrar uma linha de altura por
+ * cartão, e ainda assim diz quantos existem.
  *
- * **Sem cor de bandeira.** O desenho de referência pinta cada cartão com a cor do banco; aqui a
- * paleta é monocromática e a única cor é semântica, então quem separa um cartão do outro é a
- * posição na pilha e o nome. Pintar de roxo o cartão do Nubank traria a cor de outra marca para
- * dentro de uma tela que não tem cor própria.
+ * **Aberta** — os cartões se afastam e cada um mostra o próprio cabeçalho: nome, bandeira do
+ * vencimento e o valor da fatura. Tocar em um deles fecha a pilha com ele na frente.
+ *
+ * O leque abre para BAIXO e a pilha simplesmente fica mais alta, sem scroll próprio: a página já
+ * rola, e uma área rolável dentro de outra rouba o gesto de quem só queria continuar descendo a
+ * tela. É a mesma razão de o Wallet abrir o leque na página inteira em vez de numa janelinha.
+ *
+ * ## Sem cor de bandeira
+ *
+ * O desenho de referência pinta cada cartão com a cor do banco. Aqui a cor é do sistema, e trazer
+ * o roxo do Nubank para dentro da tela seria trazer a marca de outra empresa para o lugar de
+ * maior destaque do app. Quem separa um cartão do outro é a posição e o nome.
  */
 export function CardStack({
   cards,
@@ -57,53 +67,101 @@ export function CardStack({
   onOpen: (card: StackedCard) => void;
 }) {
   const [frente, setFrente] = useState(0);
-  const visiveis = cards.slice(0, 3);
+  const [aberta, setAberta] = useState(false);
+  const visiveis = cards.slice(0, 6);
+
+  const altura = aberta
+    ? (visiveis.length - 1) * SPREAD + CARD_H
+    : CARD_H + (visiveis.length - 1) * PEEK;
+
+  const palco = useAnimatedStyle(() => ({
+    height: withSpring(altura, Motion.spring.settle),
+  }));
+
+  const escolher = (i: number) => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    if (!aberta) {
+      // Tocar no cartão da frente ABRE o leque; tocar num de trás também, porque na pilha fechada
+      // eles são alvos de 15px e mirar neles é loteria.
+      setAberta(true);
+      return;
+    }
+    setFrente(i);
+    setAberta(false);
+  };
 
   return (
-    <View style={[styles.palco, { height: 176 + (visiveis.length - 1) * PEEK }]}>
+    <Animated.View style={[styles.palco, palco]}>
       {visiveis.map((card, i) => {
-        // A ordem de desenho é a de PROFUNDIDADE: quem está na frente é o último da lista.
+        // Ordem de PROFUNDIDADE quando fechada; ordem da lista quando aberta.
         const profundidade = (i - frente + visiveis.length) % visiveis.length;
         return (
           <CardFace
             key={card.account_id}
             card={card}
             depth={profundidade}
+            index={i}
             total={visiveis.length}
-            onPress={() => (profundidade === 0 ? onOpen(card) : setFrente(i))}
+            aberta={aberta}
+            onPress={() => (aberta || profundidade !== 0 ? escolher(i) : onOpen(card))}
+            onLongPress={() => (aberta ? undefined : setAberta(true))}
           />
         );
       })}
-    </View>
+
+      {visiveis.length > 1 ? (
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel={aberta ? 'Fechar a carteira' : 'Abrir a carteira'}
+          hitSlop={Space.sm}
+          onPress={() => {
+            Haptics.selectionAsync();
+            setAberta((v) => !v);
+          }}
+          style={styles.alca}>
+          <Icon name={aberta ? 'chevron.up' : 'chevron.down'} size="sm" color="textSecondary" />
+        </Pressable>
+      ) : null}
+    </Animated.View>
   );
 }
 
 function CardFace({
   card,
   depth,
+  index,
   total,
+  aberta,
   onPress,
+  onLongPress,
 }: {
   card: StackedCard;
   depth: number;
+  index: number;
   total: number;
+  aberta: boolean;
   onPress: () => void;
+  onLongPress: () => void;
 }) {
   const theme = useTheme();
   const press = useSharedValue(1);
 
+  const y = aberta ? index * SPREAD : depth * PEEK;
+  const escala = aberta ? 1 : 1 - depth * SHRINK;
+  const opacidade = aberta ? 1 : depth === 0 ? 1 : 0.6;
+
   const animado = useAnimatedStyle(() => ({
-    // Mola porque teve dedo envolvido (regra de movimento §5): a troca de carta é um gesto, e
-    // timing linear faria a pilha parecer um slideshow.
     transform: [
-      { translateY: withSpring(depth * PEEK, Motion.spring.settle) },
-      { scale: withSpring((1 - depth * SHRINK) * press.get(), Motion.spring.settle) },
+      { translateY: withSpring(y, Motion.spring.settle) },
+      { scale: withSpring(escala, Motion.spring.settle) * press.get() },
     ],
-    zIndex: total - depth,
-    opacity: withSpring(depth === 0 ? 1 : 0.55, Motion.spring.settle),
+    // Aberta, quem está EMBAIXO tem que desenhar por cima — senão o cartão de baixo some atrás
+    // do de cima e o leque vira uma pilha again.
+    zIndex: aberta ? index : total - depth,
+    opacity: withTiming(opacidade, { duration: Motion.duration.fast }),
   }));
 
-  const aberto = depth === 0;
+  const detalhado = !aberta && depth === 0;
   const limite = Number(card.credit_limit_cents ?? 0);
   const usado = Number(card.invoice_total_cents ?? 0);
   const proporcao = limite > 0 ? Math.min(1, usado / limite) : 0;
@@ -113,20 +171,32 @@ function CardFace({
       <Pressable
         accessibilityRole="button"
         accessibilityLabel={
-          aberto
-            ? `${card.name}, fatura de ${formatBRL(usado)}`
-            : `Trazer ${card.name} para a frente`
+          detalhado
+            ? `${card.name}, fatura de ${formatBRL(usado)}. Toque para abrir a carteira.`
+            : `${card.name}, fatura de ${formatBRL(usado)}`
         }
         onPressIn={() => press.set(withTiming(Motion.pressScale, { duration: Motion.duration.fast }))}
         onPressOut={() => press.set(withTiming(1, { duration: Motion.duration.fast }))}
         onPress={onPress}
+        onLongPress={onLongPress}
         style={[
           styles.card,
-          { backgroundColor: aberto ? theme.heroSurface : theme.surface, borderColor: theme.cardBorder },
+          {
+            minHeight: detalhado ? CARD_H : SPREAD + Space.md,
+            backgroundColor: detalhado ? theme.heroSurface : theme.surface,
+            borderColor: theme.cardBorder,
+          },
         ]}>
         <View style={styles.topo}>
           <View style={styles.nomeWrap}>
-            <ThemedText type="headline" numberOfLines={1} themeColor="onHero">
+            <View style={[styles.chip, { backgroundColor: theme.backgroundSelected }]}>
+              <Icon name="creditcard" size="sm" color={detalhado ? 'onHero' : 'text'} />
+            </View>
+            <ThemedText
+              type="headline"
+              numberOfLines={1}
+              themeColor={detalhado ? 'onHero' : 'text'}
+              style={styles.shrink}>
               {card.name}
             </ThemedText>
             {card.overdue_count > 0 ? (
@@ -137,10 +207,14 @@ function CardFace({
               </View>
             ) : null}
           </View>
-          <Icon name="creditcard" size="md" color="onHeroMuted" />
+          {!detalhado ? (
+            <ThemedText type="ticker" style={tabular}>
+              {formatBRL(usado)}
+            </ThemedText>
+          ) : null}
         </View>
 
-        {aberto ? (
+        {detalhado ? (
           <>
             <View style={styles.faturaRow}>
               <View style={styles.faturaWrap}>
@@ -167,7 +241,7 @@ function CardFace({
                   <View
                     style={[
                       styles.preenchido,
-                      { width: `${Math.round(proporcao * 100)}%`, backgroundColor: theme.onHero },
+                      { width: `${Math.round(proporcao * 100)}%`, backgroundColor: theme.tint },
                     ]}
                   />
                 </View>
@@ -191,8 +265,8 @@ function CardFace({
 const styles = StyleSheet.create({
   palco: { width: '100%' },
   slot: { position: 'absolute', left: 0, right: 0, top: 0 },
+  shrink: { flex: 1, minWidth: 0 },
   card: {
-    minHeight: 176,
     padding: Space.gutter,
     borderRadius: Radius.lg,
     borderCurve: 'continuous',
@@ -201,6 +275,13 @@ const styles = StyleSheet.create({
   },
   topo: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: Space.sm },
   nomeWrap: { flexDirection: 'row', alignItems: 'center', gap: Space.sm, flex: 1, minWidth: 0 },
+  chip: {
+    width: 32,
+    height: 32,
+    borderRadius: Radius.pill,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   pill: { paddingHorizontal: Space.sm, paddingVertical: Space.half, borderRadius: Radius.pill },
   faturaRow: { flexDirection: 'row', alignItems: 'flex-end', justifyContent: 'space-between', gap: Space.md },
   faturaWrap: { flex: 1, minWidth: 0, gap: Space.xs },
@@ -208,4 +289,14 @@ const styles = StyleSheet.create({
   trilho: { height: 4, borderRadius: Radius.xs, overflow: 'hidden' },
   preenchido: { height: '100%', borderRadius: Radius.xs },
   rodape: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: Space.sm },
+  /** A alça de abrir/fechar, no canto — alvo explícito para quem não descobre o toque no cartão. */
+  alca: {
+    position: 'absolute',
+    right: Space.md,
+    bottom: -Space.xl,
+    width: 32,
+    height: 32,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
 });

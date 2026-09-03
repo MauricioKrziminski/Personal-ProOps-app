@@ -302,7 +302,7 @@ export default function RecurringScreen() {
                   {r.description ?? 'sem descrição'}
                 </ThemedText>
               </View>
-              <Money cents={cents} variant="headline" tone={receita ? 'success' : 'text'} />
+              <Money cents={cents} variant="ticker" tone={receita ? 'success' : 'text'} />
               {/* ação primária da tela: um toque, alvo próprio de 44pt */}
               <Pressable
                 accessibilityRole="button"
@@ -410,7 +410,7 @@ export default function RecurringScreen() {
                       {r.description ?? 'sem descrição'}
                     </ThemedText>
                   </View>
-                  <Money cents={Number(r.amount_cents)} variant="headline" />
+                  <Money cents={Number(r.amount_cents)} variant="ticker" />
                 </View>
                 <ThemedText type="small" themeColor="textSecondary" numberOfLines={3}>
                   {r.last_error}

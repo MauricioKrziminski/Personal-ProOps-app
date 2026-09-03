@@ -531,7 +531,7 @@ export default function TransactionsScreen() {
                         <View style={styles.trailing}>
                           <Money
                             cents={valor}
-                            variant="headline"
+                            variant="ticker"
                             tone={tx.kind === 'income' ? 'success' : 'text'}
                             signed={assinado}
                           />

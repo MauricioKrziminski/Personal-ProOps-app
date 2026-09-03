@@ -135,7 +135,7 @@ export default function SearchScreen() {
                 trailing={
                   <Money
                     cents={Number(t.amount_cents)}
-                    variant="headline"
+                    variant="ticker"
                     tone={t.kind === 'income' ? 'success' : 'text'}
                   />
                 }

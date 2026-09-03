@@ -248,7 +248,7 @@ export default function ImportScreen() {
           <View style={styles.trailing}>
             <Money
               cents={item.kind === 'income' ? item.amount_cents : -item.amount_cents}
-              variant="headline"
+              variant="ticker"
               tone="auto"
               signed
             />
@@ -473,7 +473,7 @@ export default function ImportScreen() {
                   subtitle={item.status === 'approved' ? 'importado' : 'descartado'}
                   icon={item.status === 'approved' ? 'checkmark.circle' : 'xmark.circle'}
                   chevron={false}
-                  trailing={<Money cents={item.amount_cents} variant="headline" tone="plain" />}
+                  trailing={<Money cents={item.amount_cents} variant="ticker" tone="plain" />}
                 />
               ))}
             </Section>

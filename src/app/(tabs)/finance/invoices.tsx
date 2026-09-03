@@ -284,7 +284,7 @@ export default function InvoicesScreen() {
                   trailing={
                     <Money
                       cents={invoice.total_cents}
-                      variant="headline"
+                      variant="ticker"
                       tone={situacao.atrasada ? 'danger' : 'text'}
                     />
                   }
@@ -311,7 +311,7 @@ export default function InvoicesScreen() {
               title={monthTitle(invoice.reference_month.slice(0, 7))}
               subtitle={`vence ${formatDateBR(invoice.due_date)}`}
               icon="calendar"
-              trailing={<Money cents={invoice.total_cents} variant="headline" tone="textSecondary" />}
+              trailing={<Money cents={invoice.total_cents} variant="ticker" tone="textSecondary" />}
               onPress={() =>
                 router.push({ pathname: '/finance/invoice/[id]', params: { id: invoice.id } })
               }

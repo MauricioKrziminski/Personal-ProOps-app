@@ -264,7 +264,7 @@ export default function AccountsScreen() {
             trailing={
               <Money
                 cents={cents}
-                variant="headline"
+                variant="ticker"
                 tone={negativo ? 'danger' : 'text'}
                 signed={negativo}
               />
@@ -355,7 +355,7 @@ export default function AccountsScreen() {
             onPress={() =>
               router.push({ pathname: '/finance/transactions', params: { accountId: NO_ACCOUNT } })
             }
-            trailing={<Money cents={Number(semConta.balance_cents)} variant="headline" />}
+            trailing={<Money cents={Number(semConta.balance_cents)} variant="ticker" />}
           />
         </Section>
       ) : null}

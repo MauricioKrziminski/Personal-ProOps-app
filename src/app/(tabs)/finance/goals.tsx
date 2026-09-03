@@ -472,7 +472,7 @@ export default function GoalsScreen() {
                       ])
                     }
                     trailing={
-                      <Money cents={Number(c.amount_cents)} variant="headline" tone="auto" signed />
+                      <Money cents={Number(c.amount_cents)} variant="ticker" tone="auto" signed />
                     }
                   />
                 ))}

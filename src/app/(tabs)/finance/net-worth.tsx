@@ -257,7 +257,7 @@ export default function NetWorthScreen() {
       trailing={
         <Money
           cents={b.is_liability ? -b.current_value_cents : b.current_value_cents}
-          variant="headline"
+          variant="ticker"
           tone={b.is_liability ? 'danger' : 'text'}
           signed={b.is_liability}
         />
@@ -354,7 +354,7 @@ export default function NetWorthScreen() {
                 trailing={
                   <Money
                     cents={cents}
-                    variant="headline"
+                    variant="ticker"
                     tone={c.passivo && bruto > 0 ? 'danger' : 'text'}
                     signed={c.passivo && bruto > 0}
                   />

@@ -289,7 +289,7 @@ export default function InstallmentsScreen() {
                   </ThemedText>
                   <Money
                     cents={plano.active ? plano.remaining_cents : plano.total_cents}
-                    variant="headline"
+                    variant="ticker"
                   />
                 </View>
               </View>
