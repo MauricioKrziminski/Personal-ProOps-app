@@ -25,6 +25,11 @@ destaque de telas secundárias. A contagem não mudou: **um destaque por tela**.
 
 > Dois `GlassCard` na mesma tela é erro de revisão, não questão de gosto.
 
+**Cartão de crédito é PILHA, não lista** (`src/components/finance/card-stack.tsx`): os de trás
+aparecem por uma faixa, o da frente abre com fatura, fechamento e limite. Uma lista respondia
+"quantos cartões existem" quando a pergunta é "quanto vou pagar e quando". Sem cor de bandeira —
+a paleta é monocromática e pintar o cartão de roxo traria a cor de outra marca para dentro da tela.
+
 **Card de destaque que SOMA uma lista some quando a soma não informa nada:** com a lista vazia
 (zeros em cima de um empty state) ou com UM item, quando ele repete o número da única linha
 palavra por palavra. Soma de um item não é resumo, é eco — foi o caso de Cartões. Continua
@@ -67,10 +72,15 @@ desenho.
 fundo quase-preto a sombra desaparece, e sem o contorno o card não tem onde terminar — a tela
 inteira lia como um bloco só. `Card` já aplica; superfície escrita à mão também precisa.
 
-⚠️ **O app está TRAVADO em dark** (`useTheme` devolve `Colors.dark`) desde 02/09/2026, porque o
-desenho do Stitch é OLED e o tema claro o desmonta. `Colors.light` continua completo e a volta é
-uma linha em `use-theme.ts`. Enquanto a trava existir, "verificar em light e dark" não se aplica —
-mas **toda cor nova continua exigindo o par**, senão destravar vira um dia de trabalho.
+**O tema é ESCOLHA do usuário** (`ThemeProvider` em `src/hooks/use-theme.tsx`): `system` por
+padrão, mais `light` e `dark` explícitos, gravados no `AsyncStorage` e trocados no Perfil. Esteve
+travado em dark entre 02 e 03/09/2026 — o desenho do Stitch é OLED e o claro o desmontava —, e a
+trava cobrou caro: metade da paleta ficou sem ninguém olhando.
+
+⚠️ **`useColorScheme` do `react-native` é PROIBIDO em componente.** Quem responde qual esquema
+vale é `useScheme()` do provider; o hook da plataforma ignora a escolha do usuário e o componente
+que o usar fica com a elevação do tema errado — em silêncio, porque a cor ainda existe.
+`Card`, `Row`, `Toast`, `GlassCard` e `Segmented` já foram corrigidos.
 
 ---
 
@@ -181,12 +191,20 @@ Toda transição responde três perguntas: o que é o destino, o usuário precis
 que "voltar" faz depois.
 
 - **Header é do navegador — exceto nas quatro RAÍZES de aba.** Ali quem desenha é o `AppHeader`
-  (`src/components/ui/app-header.tsx`): marca + ponto de estado à esquerda, atalho de perfil à
-  direita, igual nas quatro. O desenho não tem título de tela porque quem diz onde a pessoa está
-  é a aba acesa embaixo. **Tela EMPURRADA continua com `<Stack.Title>` + large title** — lá o
-  título e o "voltar" são a informação, e trocá-los por uma marca tiraria a única pista de
-  localização. Barra desenhada à mão dentro do `ScrollView` continua proibida: o `AppHeader` fica
+  (`src/components/ui/app-header.tsx`): **micro-etiqueta de contexto em cima, display grande
+  embaixo, um controle à direita**. A etiqueta carrega o que MUDA — a data em Hoje, a contagem em
+  Notas — e nunca um rótulo fixo: o desenho do Stitch punha a marca ali, gastando a faixa mais
+  nobre da tela para dizer em que app a pessoa está, que é a única coisa que ela já sabe.
+  A hierarquia sai de escala e espaço; **sem caixa em volta de ícone, sem fio embaixo, sem cor** —
+  a referência é Copilot / Monzo / Things. Ação de raiz vai no slot `action` (`HeaderIconButton`),
+  não numa fileira própria.
+  **Tela EMPURRADA continua com `<Stack.Title>` + large title** — lá o título e o "voltar" são a
+  informação. Barra desenhada à mão dentro do `ScrollView` continua proibida: o `AppHeader` fica
   FORA dele.
+- **Ponto piscando é proibido.** O desenho de referência trazia um ponto verde em `animate-pulse`
+  no header e nos cabeçalhos de seção. Movimento permanente no canto do olho não tem propósito
+  (§5) e some do radar em um dia — vira ruído que custa bateria. Ponto de status **estático** com
+  cor semântica continua valendo (`SectionHead dot`), e apaga quando a contagem é zero.
 - **Busca é `<Search>`** (`src/components/ui/search-field.tsx`), em Notas, Lançamentos e
   `/search`. Um componente, dois desenhos: no **iOS** ele renderiza o `<Stack.SearchBar>` nativo,
   que integra com o large title e some no scroll; no **Android** renderiza uma pílula
@@ -214,6 +232,14 @@ que "voltar" faz depois.
 - **Porta de mão única** (login, onboarding concluído, compra) sai da pilha com `Stack.Protected`
   + `replace` — voltar nunca reentra no estado antigo.
 - **Abas são pares.** Nada de slide entre abas; re-tap na aba ativa volta à raiz.
+- **A tab bar tem DUAS implementações, uma por plataforma.** No iOS é a `NativeTabs`
+  (`app-tabs.tsx`) em Liquid Glass, que o sistema desenha melhor do que qualquer coisa nossa —
+  inclusive o encolhimento ao rolar. No Android é o `CurvedTabBar` (`app-tabs.android.tsx`): uma
+  pílula com um **berço que desliza** até a aba ativa, com a bolha do ícone encaixada nele. Lá não
+  existe equivalente nativo — a barra do Material 3 é uma laje reta —, e é onde um desenho próprio
+  paga. O berço **anima em mola**, porque o que ele comunica é continuidade espacial; um recorte
+  fixo seria só enfeite. Uma posição só governa a curva e a bolha: duas molas dessincronizariam e
+  a bolha sairia do berço no meio do caminho.
 - **`backgroundColor` na `NativeTabs` é proibido no iOS.** Dar cor de fundo torna a barra opaca e
   **desliga o Liquid Glass** — o material que é diretriz do projeto. Cor de fundo, indicador e
   ripple entram por `Platform.select` só no Android; no iOS quem desenha é o sistema, mais
