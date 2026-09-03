@@ -115,8 +115,8 @@ function Shortcut({ title, count, icon, href }: ShortcutProps) {
           router.push(href);
         }}>
         <View style={styles.shortcutTop}>
-          <View style={[styles.shortcutIcon, { backgroundColor: theme.accentSoft }]}>
-            <Icon name={icon} size="md" color="tint" />
+          <View style={[styles.shortcutIcon, { backgroundColor: theme.backgroundElement }]}>
+            <Icon name={icon} size="md" color="text" />
           </View>
           <Icon name="chevron.right" size="sm" color="textSecondary" />
         </View>
@@ -375,15 +375,11 @@ export default function FinanceScreen() {
                 concealable
               />
             }
-            secondary={[
-              `entrou ${formatBRL(income)}`,
-              `saiu ${formatBRL(expense)}`,
-              // "previsto R$ 0,00" não é informação, é um campo vazio ocupando a linha —
-              // mesmo princípio do bloco sem dado que não aparece.
-              isCurrent && upcomingOut > 0 ? `previsto ${formatBRL(upcomingOut)}` : null,
-            ]
-              .filter(Boolean)
-              .join('  ·  ')}
+            secondary={
+              isCurrent && upcomingOut > 0
+                ? `entrou ${formatBRL(income)}  ·  saiu ${formatBRL(expense)}  ·  previsto ${formatBRL(upcomingOut)}`
+                : `entrou ${formatBRL(income)}  ·  saiu ${formatBRL(expense)}`
+            }
             chart={
               // Mesmo critério da Hoje: série que não varia desenha uma reta, e reta no meio
               // do painel lê como divisor, não como gráfico.
@@ -564,9 +560,38 @@ export default function FinanceScreen() {
           </View>
         ) : meses.length > 1 ? (
           <View style={styles.block}>
-            <SectionHead title="Entrou e saiu" />
             <Section>
               <View style={styles.cashflow}>
+                {/*
+                  O título mora DENTRO do card, com a legenda na mesma linha — é o desenho da
+                  "Tendência Mensal". Como `SectionHead` por fora, o card ficava sem cabeça e a
+                  legenda sobrava solta no rodapé, longe do que ela explica.
+                */}
+                <View style={styles.cashHead}>
+                  <View style={styles.shrink}>
+                    <ThemedText type="subtitle">Tendência mensal</ThemedText>
+                    <ThemedText type="footnote" themeColor="textSecondary">
+                      {`fluxo de caixa dos últimos ${janelaCashflow} meses`}
+                    </ThemedText>
+                  </View>
+                  <View style={styles.cashLegenda}>
+                    <View style={styles.cashChave}>
+                      <View style={[styles.cashSwatch, { backgroundColor: theme.tint }]} />
+                      <ThemedText type="caption" themeColor="textSecondary">
+                        entrou
+                      </ThemedText>
+                    </View>
+                    <View style={styles.cashChave}>
+                      <View
+                        style={[styles.cashSwatch, { backgroundColor: theme.tint, opacity: 0.35 }]}
+                      />
+                      <ThemedText type="caption" themeColor="textSecondary">
+                        saiu
+                      </ThemedText>
+                    </View>
+                  </View>
+                </View>
+
                 <Segmented
                   options={JANELAS_CASHFLOW}
                   value={janelaCashflow}
@@ -605,23 +630,24 @@ export default function FinanceScreen() {
                   })}
                 </View>
 
-                {/* Legenda em PALAVRA: a diferença entre as duas barras não pode depender de
-                    enxergar cor. */}
-                <View style={styles.cashLegenda}>
-                  <View style={styles.cashChave}>
-                    <View style={[styles.cashSwatch, { backgroundColor: theme.tint }]} />
-                    <ThemedText type="small" themeColor="textSecondary">
-                      entrou
-                    </ThemedText>
-                  </View>
-                  <View style={styles.cashChave}>
-                    <View
-                      style={[styles.cashSwatch, { backgroundColor: theme.tint, opacity: 0.35 }]}
-                    />
-                    <ThemedText type="small" themeColor="textSecondary">
-                      saiu
-                    </ThemedText>
-                  </View>
+                {/*
+                  A conta que o gráfico não faz sozinho: o que sobrou no mês em foco.
+                  Um gráfico de barras responde "como foi variando"; ninguém subtrai duas barras
+                  de cabeça para saber se guardou dinheiro.
+                */}
+                <View style={[styles.cashFio, { backgroundColor: theme.separator }]} />
+                <View style={styles.cashRodape}>
+                  <ThemedText type="small" themeColor="textSecondary">
+                    {`Sobrou em ${monthShort(meses[meses.length - 1].month.slice(0, 7))}`}
+                  </ThemedText>
+                  <Money
+                    cents={
+                      Number(meses[meses.length - 1].income_cents) -
+                      Number(meses[meses.length - 1].expense_cents)
+                    }
+                    variant="ticker"
+                    signed
+                  />
                 </View>
               </View>
             </Section>
@@ -883,6 +909,10 @@ const styles = StyleSheet.create({
   categoryName: {
     flex: 1,
   },
+  shrink: { flex: 1, minWidth: 0 },
+  cashHead: { flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between', gap: Space.md },
+  cashFio: { height: StyleSheet.hairlineWidth, marginTop: Space.sm },
+  cashRodape: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: Space.sm },
   cashflow: {
     gap: Space.lg,
     padding: Space.lg,
