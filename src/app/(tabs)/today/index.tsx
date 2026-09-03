@@ -212,14 +212,13 @@ export default function TodayScreen() {
         {/* 3. O que já venceu. */}
         {bills.isError ? (
           <View style={styles.section}>
-            <SectionHead title="Atrasado / atenção" dot="danger" inset={false} />
+            <SectionHead title="Atrasado / atenção" inset={false} />
             <ErrorCard onRetry={() => bills.refetch()} />
           </View>
         ) : overdue.length > 0 ? (
           <View style={styles.section}>
             <SectionHead
               title="Atrasado / atenção"
-              dot="danger"
               inset={false}
               action={
                 <ThemedText type="caption" themeColor="textSecondary">
@@ -266,14 +265,13 @@ export default function TodayScreen() {
         {/* 4. Os lembretes de hoje, agrupados numa superfície só, como no desenho. */}
         {reminders.isError ? (
           <View style={styles.section}>
-            <SectionHead title="Lembretes de hoje" dot="text" inset={false} />
+            <SectionHead title="Lembretes de hoje" inset={false} />
             <ErrorCard onRetry={() => reminders.refetch()} />
           </View>
         ) : todayReminders.length > 0 ? (
           <View style={styles.section}>
             <SectionHead
               title="Lembretes de hoje"
-              dot="text"
               inset={false}
               action={
                 <ThemedText type="caption" themeColor="textSecondary">
@@ -324,7 +322,7 @@ export default function TodayScreen() {
         {/* 5. Orçamento apertado — barra em `warning`/`danger`, que é ESTADO a resolver. */}
         {tight.length > 0 ? (
           <View style={styles.section}>
-            <SectionHead title="Passando do orçamento" dot="warning" inset={false} />
+            <SectionHead title="Passando do orçamento" inset={false} />
             {tight.map((b) => {
               const spent = Number(b.spent_cents);
               const limit = Number(b.limit_cents);
@@ -376,7 +374,6 @@ export default function TodayScreen() {
           <View style={styles.section}>
             <SectionHead
               title="Capturado no WhatsApp"
-              dot="success"
               inset={false}
               action={
                 <ThemedText type="code" themeColor="success" style={tabular}>
@@ -460,11 +457,14 @@ function Counter({
         <ThemedText type="caption" themeColor="textSecondary" numberOfLines={1}>
           {label}
         </ThemedText>
-        <ThemedText type="headline" style={tabular}>
+        {/*
+          A contagem carrega a cor que o ponto carregava. Um ponto ao lado de um número é o
+          mesmo dado dito duas vezes — e o número é a metade que se lê.
+        */}
+        <ThemedText type="headline" themeColor={value > 0 ? tone : 'text'} style={tabular}>
           {value}
         </ThemedText>
       </View>
-      {value > 0 ? <View style={[styles.counterDot, { backgroundColor: theme[tone] }]} /> : null}
     </Pressable>
   );
 }
@@ -502,7 +502,6 @@ const styles = StyleSheet.create({
     borderCurve: 'continuous',
     borderWidth: StyleSheet.hairlineWidth,
   },
-  counterDot: { width: 8, height: 8, borderRadius: Radius.pill },
 
   section: { gap: Space.sm },
   empty: { paddingVertical: Space.xl },

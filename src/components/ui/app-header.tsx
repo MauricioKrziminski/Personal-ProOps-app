@@ -44,13 +44,6 @@ interface AppHeaderProps {
    * do Stitch não escreve o título, ele é dito pelo conteúdo logo abaixo.
    */
   title: string;
-  /**
-   * Ponto de status ao lado da marca. Cor SEMÂNTICA e **estática**.
-   *
-   * No export ele é `animate-pulse`. Movimento permanente no canto do olho não tem propósito
-   * (§5), some do radar em um dia e custa bateria — o ponto fica, a pulsação não.
-   */
-  status?: 'success' | 'warning' | 'danger';
   /** Controles à direita, antes do avatar (ex.: nova nota). */
   action?: React.ReactNode;
 }
@@ -61,8 +54,13 @@ interface AppHeaderProps {
  * ## Anatomia (medida do export, não estimada)
  *
  * `h-14` (56px) sobre a safe area, calha de 16, fundo do app a 85% com `backdrop-blur-xl` e um
- * fio de 1px embaixo. À esquerda: um quadrado de 28 com raio 8 carregando a marca, a palavra
- * "ProOps" em 16/700 e um ponto de 6px. À direita: o avatar de 32 em pílula.
+ * fio de 1px embaixo. À esquerda: um quadrado de 28 com raio 8 carregando a marca e a palavra
+ * "ProOps" em 16/700. À direita: o avatar de 32 em pílula.
+ *
+ * **Sem o ponto de status** (03/09/2026, a pedido do dono do produto). O export punha um ponto
+ * verde ao lado da marca e ele era sempre verde: não existia estado em que ficasse vermelho, ou
+ * seja, era cor decorativa gastando o lugar mais nobre da tela — e num app cuja única alavanca
+ * de cor é a semântica, um verde que não significa nada custa caro.
  *
  * ## Por que ela voltou (03/09/2026)
  *
@@ -77,7 +75,7 @@ interface AppHeaderProps {
  * O export escreve "GS". O schema guarda só `profiles.phone` — não há nome de onde tirar
  * iniciais, e inventá-las seria escrever um dado que não existe. Fica o ícone de pessoa.
  */
-export function AppHeader({ title, status = 'success', action }: AppHeaderProps) {
+export function AppHeader({ title, action }: AppHeaderProps) {
   const theme = useTheme();
   const scheme = useScheme();
   const insets = useSafeAreaInsets();
@@ -129,7 +127,6 @@ export function AppHeader({ title, status = 'success', action }: AppHeaderProps)
           <ThemedText type="caption" style={styles.wordmark}>
             ProOps
           </ThemedText>
-          <View style={[styles.dot, { backgroundColor: theme[status] }]} />
         </View>
 
         <View pointerEvents="box-none" style={styles.right}>
@@ -212,7 +209,6 @@ const styles = StyleSheet.create({
   },
   /** 16/700 com tracking negativo — o único uso de `Type.wordmark` no app. */
   wordmark: Type.wordmark,
-  dot: { width: 6, height: 6, borderRadius: Radius.pill },
   right: { flexDirection: 'row', alignItems: 'center', gap: Space.sm },
   round: {
     width: HitTarget - 12,

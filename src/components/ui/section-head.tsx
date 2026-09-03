@@ -2,9 +2,7 @@ import { Children, type ReactNode } from 'react';
 import { StyleSheet, View } from 'react-native';
 
 import { ThemedText } from '@/components/themed-text';
-import { Radius, Space, Type } from '@/design/tokens';
-import { useTheme } from '@/hooks/use-theme';
-import type { ThemeColor } from '@/constants/theme';
+import { Space, Type } from '@/design/tokens';
 
 /**
  * Rótulo do card de destaque.
@@ -59,31 +57,18 @@ function upper(children: ReactNode): ReactNode {
 export function SectionHead({
   title,
   action,
-  dot,
   inset = true,
 }: {
   title: string;
   action?: ReactNode;
-  /**
-   * Ponto de status antes do rótulo — a assinatura de seção do design Stitch.
-   *
-   * É COR SEMÂNTICA, nunca decoração: `danger` para o que venceu, `warning` para o que está
-   * apertado, `success` para o que chegou. Seção sem estado a comunicar não leva ponto.
-   */
-  dot?: ThemeColor;
   /** Desliga a calha lateral quando a tela já tem a sua (`Screen` com padding próprio). */
   inset?: boolean;
 }) {
-  const theme = useTheme();
-
   return (
     <View style={[styles.head, !inset && styles.flush]}>
-      <View style={styles.titleWrap}>
-        {dot ? <View style={[styles.dot, { backgroundColor: theme[dot] }]} /> : null}
-        <ThemedText type="caption" themeColor="textSecondary" style={styles.tracked}>
-          {title.toUpperCase()}
-        </ThemedText>
-      </View>
+      <ThemedText type="caption" themeColor="textSecondary" style={styles.tracked}>
+        {title.toUpperCase()}
+      </ThemedText>
       {action}
     </View>
   );
@@ -99,6 +84,4 @@ const styles = StyleSheet.create({
     paddingHorizontal: Space.lg,
   },
   flush: { paddingHorizontal: 0 },
-  titleWrap: { flexDirection: 'row', alignItems: 'center', gap: Space.sm },
-  dot: { width: 6, height: 6, borderRadius: Radius.pill },
 });
