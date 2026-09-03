@@ -145,6 +145,8 @@ const MATERIAL: Record<string, MaterialName> = {
   'wallet.bifold': 'account_balance_wallet',
   'wallet.pass': 'wallet',
   'wand.and.stars': 'auto_fix_high',
+  waveform: 'graphic_eq',
+  mic: 'mic',
   xmark: 'close',
   'xmark.circle': 'cancel',
 };

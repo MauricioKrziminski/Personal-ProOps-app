@@ -1,11 +1,12 @@
 import { useMemo } from 'react';
 import { router } from 'expo-router';
-import { StyleSheet, View, useWindowDimensions } from 'react-native';
+import { Pressable, StyleSheet, View, useWindowDimensions } from 'react-native';
 
 import { ThemedText } from '@/components/themed-text';
 import { Button } from '@/components/ui/button';
 import { EmptyState } from '@/components/ui/empty-state';
 import { HeaderActions } from '@/components/ui/header-actions';
+import { Icon } from '@/components/ui/icon';
 import { Money } from '@/components/ui/money';
 import { Row, Section } from '@/components/ui/row';
 import { HeroPanel } from '@/components/ui/hero-panel';
@@ -14,14 +15,16 @@ import { Screen } from '@/components/ui/screen';
 import { SkeletonRow } from '@/components/ui/skeleton';
 import { ProgressBar, Sparkline } from '@/components/ui/sparkline';
 import { useToast } from '@/components/ui/toast';
-import { Space, Type, tabular } from '@/design/tokens';
+import { Radius, Space, Type, tabular } from '@/design/tokens';
 import {
   useBudgetsStatus,
   useCashFlowForecast,
   useMarkPaid,
+  useRecentTransactions,
   useUpcomingBills,
 } from '@/hooks/use-finance';
 import { formatDateBR, localISODate, useTodayReminders } from '@/hooks/use-items';
+import { useTheme } from '@/hooks/use-theme';
 import { describeRRule } from '@/lib/rrule-text';
 
 /**
@@ -34,6 +37,7 @@ import { describeRRule } from '@/lib/rrule-text';
  * cinco cabeçalhos vazios para parecer cheia.
  */
 export default function TodayScreen() {
+  const theme = useTheme();
   const toast = useToast();
   const { width } = useWindowDimensions();
 
@@ -47,7 +51,11 @@ export default function TodayScreen() {
   const bills = useUpcomingBills(7);
   const reminders = useTodayReminders();
   const budgets = useBudgetsStatus();
+  const recent = useRecentTransactions(5);
   const markPaid = useMarkPaid();
+
+  const recentWhatsApp =
+    (recent.data ?? []).find((tx) => tx.source === 'whatsapp') ?? recent.data?.[0];
 
   const leftover = forecast.data?.at(-1)?.balance_cents ?? 0;
   const series = (forecast.data ?? []).map((d) => Number(d.balance_cents));
@@ -84,7 +92,8 @@ export default function TodayScreen() {
     overdue.length === 0 &&
     dueSoon.length === 0 &&
     (reminders.data ?? []).length === 0 &&
-    tight.length === 0;
+    tight.length === 0 &&
+    !recentWhatsApp;
 
   const pay = (id: string, title: string) =>
     markPaid.mutate(
@@ -142,6 +151,13 @@ export default function TodayScreen() {
               />
             }
             secondary={`${daysLeft} ${daysLeft === 1 ? 'dia' : 'dias'} até virar o mês`}
+            trend={
+              leftover > 0
+                ? { value: 'Projeção positiva', positive: true, label: `${daysLeft}d restantes` }
+                : leftover < 0
+                  ? { value: 'Atenção ao saldo', positive: false, label: 'ritmo acima do teto' }
+                  : undefined
+            }
             chart={
               serieInforma ? (
                 <Sparkline values={series} width={width - Space.lg * 2} showZero />
@@ -158,6 +174,7 @@ export default function TodayScreen() {
         bills.refetch();
         reminders.refetch();
         budgets.refetch();
+        recent.refetch();
       }}
       refreshing={forecast.isRefetching}>
       {/* Título, cores do cabeçalho e estilo da status bar moram no `_layout` da aba. */}
@@ -290,6 +307,52 @@ export default function TodayScreen() {
         </Section>
       ) : null}
 
+      {/* Capturado no WhatsApp — o selo do produto, mostrando em tempo real o que a IA registrou */}
+      {recentWhatsApp ? (
+        <Section title="Capturado no WhatsApp">
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel={`Última captura: ${recentWhatsApp.description || recentWhatsApp.merchant || 'Lançamento'}, ${recentWhatsApp.category}`}
+            onPress={() => router.push(`/finance/${recentWhatsApp.id}`)}>
+            {({ pressed }) => (
+              <View
+                style={[
+                  styles.captureCard,
+                  { backgroundColor: pressed ? theme.backgroundSelected : theme.surface },
+                ]}>
+                <View style={styles.captureHead}>
+                  <View style={[styles.captureBadge, { backgroundColor: theme.accentSoft }]}>
+                    <Icon name="waveform" size="sm" color="success" />
+                    <ThemedText type="caption" themeColor="success" style={styles.captureSync}>
+                      IA Sync WhatsApp
+                    </ThemedText>
+                  </View>
+                  <ThemedText type="caption" themeColor="textSecondary" style={tabular}>
+                    {formatDateBR(recentWhatsApp.occurred_at)}
+                  </ThemedText>
+                </View>
+
+                <View style={styles.captureBody}>
+                  <View style={styles.captureTextCol}>
+                    <ThemedText type="defaultSemiBold" numberOfLines={1}>
+                      {recentWhatsApp.description || recentWhatsApp.merchant || 'Lançamento via WhatsApp'}
+                    </ThemedText>
+                    <ThemedText type="caption" themeColor="textSecondary">
+                      {recentWhatsApp.category} · IA ProOps
+                    </ThemedText>
+                  </View>
+                  <Money
+                    cents={Number(recentWhatsApp.amount_cents)}
+                    variant="headline"
+                    tone={recentWhatsApp.kind === 'expense' ? 'danger' : 'success'}
+                  />
+                </View>
+              </View>
+            )}
+          </Pressable>
+        </Section>
+      ) : null}
+
       {/* Sem `icon`: vazio genérico usa a espiral (`design.md` §2b). O `sparkles` que estava
           aqui era uma referência à IA, sobra da tela de Atividade removida. */}
       {allEmpty ? (
@@ -327,5 +390,35 @@ const styles = StyleSheet.create({
   calm: {
     ...Type.footnote,
     paddingHorizontal: Space.lg,
+  },
+  captureCard: {
+    padding: Space.lg,
+    gap: Space.md,
+  },
+  captureHead: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  captureBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Space.xs,
+    paddingHorizontal: Space.sm,
+    paddingVertical: Space.half,
+    borderRadius: Radius.pill,
+  },
+  captureSync: {
+    fontWeight: '600',
+  },
+  captureBody: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    gap: Space.md,
+  },
+  captureTextCol: {
+    flex: 1,
+    gap: Space.half,
   },
 });

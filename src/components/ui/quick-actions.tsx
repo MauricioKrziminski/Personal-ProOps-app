@@ -39,7 +39,14 @@ function Tile({ action }: { action: QuickAction }) {
         Haptics.selectionAsync();
         action.onPress();
       }}
-      style={[styles.tile, { borderColor: theme.heroSeparator }, animated]}>
+      style={[
+        styles.tile,
+        {
+          borderColor: theme.heroSeparator,
+          backgroundColor: theme.heroSeparator,
+        },
+        animated,
+      ]}>
       <View style={styles.head}>
         <Icon name={action.icon} size="md" color="onHero" />
         <ThemedText type="caption" themeColor="onHero" style={[styles.count, tabular]}>

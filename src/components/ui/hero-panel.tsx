@@ -43,12 +43,20 @@ interface HeroPanelProps {
    * controle flutuava entre o header e a faixa de tinta sem dizer sobre o que ele manda.
    */
   top?: React.ReactNode;
+  /** Badge ou pílula de status opcional no topo do painel. */
+  badge?: React.ReactNode;
   /** Rótulo curto, caixa alta — **sempre antes do valor**. */
   label: string;
   /** O número. Normalmente um `<Money variant="heroMoney" concealable />`. */
   value: React.ReactNode;
   /** Uma linha de contexto: "entrou X · saiu Y". */
   secondary?: string;
+  /** Indicador de variação ou tendência (ex: +14.2% vs mês anterior). */
+  trend?: {
+    value: string;
+    positive?: boolean;
+    label?: string;
+  };
   /** Sparkline ou barra. Opcional. */
   chart?: React.ReactNode;
   /** Atalhos de decisão. Somem sozinhos quando não há nada pendente. */
@@ -89,9 +97,11 @@ interface HeroPanelProps {
  */
 export function HeroPanel({
   top,
+  badge,
   label,
   value,
   secondary,
+  trend,
   chart,
   actions,
   concealable = false,
@@ -119,9 +129,12 @@ export function HeroPanel({
         accessibilityRole={onPress ? 'button' : undefined}
         onPress={onPress}
         style={styles.body}>
-        <ThemedText type="caption" themeColor="onHeroMuted" style={Type.meta}>
-          {label.toUpperCase()}
-        </ThemedText>
+        <View style={styles.labelRow}>
+          <ThemedText type="caption" themeColor="onHeroMuted" style={Type.meta}>
+            {label.toUpperCase()}
+          </ThemedText>
+          {badge ? <View style={styles.badgeWrap}>{badge}</View> : null}
+        </View>
 
         <Pressable
           accessibilityRole={concealable ? 'button' : undefined}
@@ -134,6 +147,29 @@ export function HeroPanel({
             <Icon name={concealed ? 'eye.slash' : 'eye'} size="md" color="onHeroMuted" />
           ) : null}
         </Pressable>
+
+        {trend ? (
+          <View style={styles.trendRow}>
+            <View style={[styles.trendPill, { backgroundColor: theme.heroSeparator }]}>
+              <Icon
+                name={trend.positive ? 'arrow.up.right' : 'arrow.down.right'}
+                size="sm"
+                color={trend.positive ? 'success' : 'danger'}
+              />
+              <ThemedText
+                type="caption"
+                themeColor={trend.positive ? 'success' : 'danger'}
+                style={styles.trendValue}>
+                {trend.value}
+              </ThemedText>
+            </View>
+            {trend.label ? (
+              <ThemedText type="caption" themeColor="onHeroMuted">
+                {trend.label}
+              </ThemedText>
+            ) : null}
+          </View>
+        ) : null}
 
         {secondary ? (
           <ThemedText type="footnote" themeColor="onHeroMuted">
@@ -176,10 +212,37 @@ const styles = StyleSheet.create({
   body: {
     gap: Space.xs,
   },
+  labelRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  badgeWrap: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
   valueRow: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: Space.md,
+  },
+  trendRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Space.sm,
+    marginTop: Space.xs,
+    marginBottom: Space.xs,
+  },
+  trendPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Space.xs,
+    paddingHorizontal: Space.sm,
+    paddingVertical: Space.half,
+    borderRadius: Radius.pill,
+  },
+  trendValue: {
+    fontWeight: '600',
   },
   chart: {
     marginTop: Space.md,

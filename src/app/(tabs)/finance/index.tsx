@@ -40,6 +40,7 @@ import { useToast } from '@/components/ui/toast';
 import { Elevation, Motion, Radius, Space, tabular } from '@/design/tokens';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import {
+  useAccounts,
   useBudgetsStatus,
   useCardSummary,
   useCashFlowForecast,
@@ -96,7 +97,14 @@ const SHORTCUTS: { title: string; icon: SymbolViewProps['name']; href: Href }[] 
  * Press-in com `scale` em worklet, como o `Button` — é um alvo quadrado com rótulo, não uma linha
  * de lista, então o feedback certo é escala e não highlight de fundo.
  */
-function Shortcut({ title, icon, href }: (typeof SHORTCUTS)[number]) {
+interface ShortcutProps {
+  title: string;
+  count?: string;
+  icon: SymbolViewProps['name'];
+  href: Href;
+}
+
+function Shortcut({ title, count, icon, href }: ShortcutProps) {
   const theme = useTheme();
   const scale = useSharedValue(1);
   const animated = useAnimatedStyle(() => ({ transform: [{ scale: scale.get() }] }));
@@ -105,20 +113,36 @@ function Shortcut({ title, icon, href }: (typeof SHORTCUTS)[number]) {
     <Animated.View style={[styles.shortcut, animated]}>
       <Pressable
         accessibilityRole="button"
-        accessibilityLabel={title}
-        style={styles.shortcutPress}
+        accessibilityLabel={`${title}${count ? `, ${count}` : ''}`}
+        style={[
+          styles.shortcutPress,
+          {
+            backgroundColor: theme.surface,
+            borderColor: theme.separator,
+          },
+        ]}
         onPressIn={() => scale.set(withTiming(Motion.pressScale, { duration: Motion.duration.fast }))}
         onPressOut={() => scale.set(withTiming(1, { duration: Motion.duration.fast }))}
         onPress={() => {
           Haptics.selectionAsync();
           router.push(href);
         }}>
-        <View style={[styles.shortcutIcon, { backgroundColor: theme.accentSoft }]}>
-          <Icon name={icon} size="lg" color="tint" />
+        <View style={styles.shortcutTop}>
+          <View style={[styles.shortcutIcon, { backgroundColor: theme.accentSoft }]}>
+            <Icon name={icon} size="md" color="tint" />
+          </View>
+          <Icon name="chevron.right" size="sm" color="textSecondary" />
         </View>
-        <ThemedText type="footnote" numberOfLines={2} style={styles.shortcutLabel}>
-          {title}
-        </ThemedText>
+        <View style={styles.shortcutBottom}>
+          <ThemedText type="defaultSemiBold" numberOfLines={1}>
+            {title}
+          </ThemedText>
+          {count ? (
+            <ThemedText type="caption" themeColor="textSecondary" style={tabular}>
+              {count}
+            </ThemedText>
+          ) : null}
+        </View>
       </Pressable>
     </Animated.View>
   );
@@ -225,6 +249,7 @@ export default function FinanceScreen() {
   const summary = useTransactionsSummary(range.from, range.to);
   const previous = useTransactionsSummary(previousRange.from, previousRange.to);
   const budgets = useBudgetsStatus(month);
+  const accounts = useAccounts();
   const cards = useCardSummary();
   const [janelaCashflow, setJanelaCashflow] = useState('6');
   const cashflow = useMonthlyCashflow(Number(janelaCashflow));
@@ -236,6 +261,11 @@ export default function FinanceScreen() {
 
   const income = totalOf(summary.data, 'income');
   const expense = totalOf(summary.data, 'expense');
+  const previousExpense = totalOf(previous.data, 'expense');
+  const diffExpense =
+    previous.isSuccess && previousExpense > 0
+      ? Math.round(((expense - previousExpense) / previousExpense) * 100)
+      : null;
   const upcomingOut = (forecast.data ?? []).reduce((s, d) => s + Number(d.out_cents), 0);
   const projected = forecast.data?.at(-1)?.balance_cents ?? 0;
   const leftover = isCurrent ? Number(projected) : income - expense;
@@ -341,6 +371,15 @@ export default function FinanceScreen() {
                   <Sparkline values={series} width={width - Space.lg * 2} showZero />
                 ) : undefined
               }
+              trend={
+                diffExpense !== null
+                  ? {
+                      value: `${diffExpense > 0 ? '+' : ''}${diffExpense}% gastos`,
+                      positive: diffExpense <= 0,
+                      label: `vs ${monthLabel(previousMonth)}`,
+                    }
+                  : undefined
+              }
               concealable
               onPress={() => router.push('/finance/forecast')}
             />
@@ -351,6 +390,7 @@ export default function FinanceScreen() {
           summary.refetch();
           previous.refetch();
           budgets.refetch();
+          accounts.refetch();
           cards.refetch();
           recent.refetch();
         }}
@@ -403,9 +443,42 @@ export default function FinanceScreen() {
             }
           />
           <View style={styles.shortcuts}>
-            {SHORTCUTS.map((item) => (
-              <Shortcut key={item.title} {...item} />
-            ))}
+            <Shortcut
+              title="Lançamentos"
+              icon="list.bullet"
+              href="/finance/transactions"
+              count={summary.data ? `${(summary.data ?? []).length} itens` : undefined}
+            />
+            <Shortcut
+              title="Contas"
+              icon="wallet.pass"
+              href="/finance/accounts"
+              count={
+                accounts.data
+                  ? `${accounts.data.length} ${accounts.data.length === 1 ? 'conta' : 'contas'}`
+                  : undefined
+              }
+            />
+            <Shortcut
+              title="Cartões"
+              icon="creditcard"
+              href="/finance/cards"
+              count={
+                cards.data
+                  ? `${cards.data.length} ${cards.data.length === 1 ? 'ativo' : 'ativos'}`
+                  : undefined
+              }
+            />
+            <Shortcut
+              title="Orçamentos"
+              icon="chart.pie"
+              href="/finance/budgets"
+              count={
+                budgets.data
+                  ? `${budgets.data.length} ${budgets.data.length === 1 ? 'teto' : 'tetos'}`
+                  : undefined
+              }
+            />
           </View>
         </View>
 
@@ -763,26 +836,35 @@ const styles = StyleSheet.create({
   },
   shortcuts: {
     flexDirection: 'row',
-    gap: Space.md,
+    flexWrap: 'wrap',
+    justifyContent: 'space-between',
+    rowGap: Space.sm,
   },
-  /** `flex: 1` divide a largura em quatro — sem largura fixa não há o que quebrar em Dynamic Type. */
   shortcut: {
-    flex: 1,
+    width: '48.5%',
   },
   shortcutPress: {
-    alignItems: 'center',
-    gap: Space.sm,
-  },
-  shortcutIcon: {
-    width: 56,
-    height: 56,
-    alignItems: 'center',
-    justifyContent: 'center',
+    padding: Space.md,
     borderRadius: Radius.md,
     borderCurve: 'continuous',
+    borderWidth: StyleSheet.hairlineWidth,
+    gap: Space.md,
   },
-  shortcutLabel: {
-    textAlign: 'center',
+  shortcutTop: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  shortcutIcon: {
+    width: 36,
+    height: 36,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: Radius.sm,
+    borderCurve: 'continuous',
+  },
+  shortcutBottom: {
+    gap: Space.xs,
   },
   blockHead: {
     flexDirection: 'row',
