@@ -140,6 +140,8 @@ export const Type = {
   code: { fontFamily: Fonts.monoMedium, fontSize: 12, lineHeight: 16, letterSpacing: 0.24 },
   /** mono um degrau acima: valor de dinheiro dentro de card e linha */
   ticker: { fontFamily: Fonts.monoSemibold, fontSize: 14, lineHeight: 18, letterSpacing: -0.14 },
+  /** a palavra "ProOps" na barra de topo — só o `AppHeader` usa */
+  wordmark: { fontFamily: Fonts.bold, fontSize: 16, lineHeight: 20, letterSpacing: -0.4 },
 } as const;
 
 export type TypeVariant = keyof typeof Type;

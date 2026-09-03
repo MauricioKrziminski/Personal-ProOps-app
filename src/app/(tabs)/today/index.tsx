@@ -4,10 +4,15 @@ import { Pressable, ScrollView, StyleSheet, View, useWindowDimensions } from 're
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { ThemedText } from '@/components/themed-text';
+import { ErrorCard } from '@/components/error-card';
+import { AppHeader } from '@/components/ui/app-header';
 import { Button } from '@/components/ui/button';
 import { useConceal } from '@/components/ui/conceal';
+import { EmptyState } from '@/components/ui/empty-state';
 import { Icon } from '@/components/ui/icon';
 import { Money } from '@/components/ui/money';
+import { SectionHead } from '@/components/ui/section-head';
+import { Skeleton } from '@/components/ui/skeleton';
 import { ProgressBar, Sparkline } from '@/components/ui/sparkline';
 import { useToast } from '@/components/ui/toast';
 import { Radius, Space, tabular } from '@/design/tokens';
@@ -21,6 +26,18 @@ import {
 import { formatBRL, formatDateBR, localISODate, useTodayReminders } from '@/hooks/use-items';
 import { useTheme } from '@/hooks/use-theme';
 
+/** Um orçamento entra na seção "passando do orçamento" a partir de 80% consumido. */
+const TIGHT = 0.8;
+
+/**
+ * A raiz da aba Hoje, no desenho do Stitch.
+ *
+ * A ordem das seções é a do design e é uma ordem de URGÊNCIA: o número que responde "dá para
+ * gastar?", os três contadores, o que já venceu, o que acontece hoje, o que está estourando e,
+ * por último, o que acabou de chegar do WhatsApp. Cada seção só existe se tiver conteúdo — o
+ * desenho mostra as cinco cheias porque é uma composição, não porque a tela deva inventar
+ * linha quando não há dado. Sem nada, a tela é um `EmptyState` com o atalho do WhatsApp.
+ */
 export default function TodayScreen() {
   const theme = useTheme();
   const toast = useToast();
@@ -28,10 +45,13 @@ export default function TodayScreen() {
   const { width } = useWindowDimensions();
   const { concealed, toggle } = useConceal();
 
-  const daysLeft = useMemo(() => {
+  const { daysLeft, monthEndDay } = useMemo(() => {
     const now = new Date();
     const last = new Date(now.getFullYear(), now.getMonth() + 1, 0);
-    return Math.max(1, Math.ceil((last.getTime() - now.getTime()) / 86_400_000));
+    return {
+      daysLeft: Math.max(1, last.getDate() - now.getDate()),
+      monthEndDay: last.getDate(),
+    };
   }, []);
 
   const forecast = useCashFlowForecast(daysLeft);
@@ -41,17 +61,25 @@ export default function TodayScreen() {
   const recent = useRecentTransactions(5);
   const markPaid = useMarkPaid();
 
-  const recentWhatsApp =
-    (recent.data ?? []).find((tx) => tx.source === 'whatsapp') ?? recent.data?.[0];
-
-  const leftover = forecast.data?.at(-1)?.balance_cents ?? 245000;
   const series = (forecast.data ?? []).map((d) => Number(d.balance_cents));
+  const leftover = series.at(-1) ?? 0;
 
   const overdue = (bills.data ?? []).filter((b) => b.overdue);
   const dueSoon = (bills.data ?? []).filter((b) => !b.overdue);
+  const todayReminders = reminders.data ?? [];
   const tight = (budgets.data ?? []).filter(
-    (b) => Number(b.limit_cents) > 0 && Number(b.spent_cents) / Number(b.limit_cents) >= 0.8
+    (b) => Number(b.limit_cents) > 0 && Number(b.spent_cents) / Number(b.limit_cents) >= TIGHT
   );
+  const captured = (recent.data ?? []).find((tx) => tx.source === 'whatsapp');
+
+  const loading = forecast.isLoading || bills.isLoading || reminders.isLoading;
+  const nothing =
+    !loading &&
+    overdue.length === 0 &&
+    dueSoon.length === 0 &&
+    todayReminders.length === 0 &&
+    tight.length === 0 &&
+    !captured;
 
   const pay = (id: string, title: string) =>
     markPaid.mutate(
@@ -62,215 +90,156 @@ export default function TodayScreen() {
       }
     );
 
-  const chartSeries = series.length > 1 ? series : [180000, 210000, 245000];
+  /** Largura útil do gráfico: tela menos a calha da tela menos a calha do painel. */
+  const chartWidth = width - Space.lg * 2 - Space.gutter * 2;
 
   return (
     <View style={[styles.root, { backgroundColor: theme.background }]}>
-      {/* 1. Header Fixo Minimalista Estilo Stitch */}
-      <View style={[styles.topHeader, { paddingTop: insets.top + Space.sm }]}>
-        <View style={styles.topHeaderLeft}>
-          <View
-            style={[
-              styles.brandIconBox,
-              { backgroundColor: theme.surfaceRaised, borderColor: theme.separator },
-            ]}>
-            <Icon name="clock" size="sm" color="tint" />
-          </View>
-          <ThemedText type="headline" style={styles.brandTitle}>
-            ProOps
-          </ThemedText>
-          <View style={[styles.pulsingDot, { backgroundColor: theme.success }]} />
-        </View>
-
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel="Perfil"
-          onPress={() => router.push('/profile')}
-          style={[
-            styles.avatarCircle,
-            { backgroundColor: theme.surfaceRaised, borderColor: theme.separator },
-          ]}>
-          <ThemedText type="caption" style={styles.avatarText}>
-            GS
-          </ThemedText>
-        </Pressable>
-      </View>
+      <AppHeader />
 
       <ScrollView
-        contentContainerStyle={[styles.scrollContent, { paddingBottom: insets.bottom + Space.xxl * 2 }]}
+        contentContainerStyle={[styles.scroll, { paddingBottom: insets.bottom + Space.xxxl * 2 }]}
         showsVerticalScrollIndicator={false}>
-        {/* 2. Top Hero Card: Liquid Glass Financial Velocity */}
-        <View
-          style={[
-            styles.heroCard,
-            { backgroundColor: theme.surface, borderColor: theme.separator },
-          ]}>
-          <View style={styles.heroTopRow}>
-            <ThemedText type="caption" themeColor="textSecondary" style={styles.heroLabel}>
+        {/* 1. Painel de destaque — a sobra projetada até o fim do mês. */}
+        <View style={[styles.hero, { backgroundColor: theme.heroSurface, borderColor: theme.cardBorder }]}>
+          {/* O fio de luz no topo do painel: é o `via-primary/20` do Stitch, e é ele que dá a
+              impressão de superfície curva sem precisar de gradiente de verdade. */}
+          <View style={[styles.specular, { backgroundColor: theme.heroSeparator }]} />
+
+          <View style={styles.heroTop}>
+            <ThemedText type="meta" themeColor="onHeroMuted">
               SOBRA ATÉ O FIM DO MÊS
             </ThemedText>
             <Pressable
               accessibilityRole="button"
-              accessibilityLabel="Alternar visibilidade do saldo"
+              accessibilityLabel={concealed ? 'Mostrar valores' : 'Ocultar valores'}
+              hitSlop={Space.sm}
               onPress={toggle}
-              style={[
-                styles.eyeButton,
-                { backgroundColor: theme.surfaceRaised, borderColor: theme.separator },
-              ]}>
-              <Icon name={concealed ? 'eye.slash' : 'eye'} size="sm" color="textSecondary" />
+              style={[styles.eye, { backgroundColor: theme.surfaceRaised }]}>
+              <Icon name={concealed ? 'eye.slash' : 'eye'} size="sm" color="onHero" />
             </Pressable>
           </View>
 
-          <Pressable onPress={toggle} style={styles.balanceRow}>
-            <Money
-              cents={leftover}
-              variant="heroMoney"
-              tone={leftover < 0 ? 'danger' : 'onHero'}
-              concealable
-            />
-          </Pressable>
+          {forecast.isLoading ? (
+            <Skeleton width={220} height={38} />
+          ) : forecast.isError ? (
+            <ErrorCard onRetry={() => forecast.refetch()} />
+          ) : (
+            <>
+              <Money
+                cents={leftover}
+                variant="heroMoney"
+                tone={leftover < 0 ? 'danger' : 'onHero'}
+                concealable
+              />
 
-          <View style={styles.trendRow}>
-            <Icon name="chart.line.uptrend.xyaxis" size="sm" color="success" />
-            <ThemedText type="caption" themeColor="success" style={styles.trendText}>
-              {`${daysLeft} dias até virar o mês · Projeção positiva`}
-            </ThemedText>
-          </View>
+              <View style={styles.trend}>
+                <Icon
+                  name={leftover < 0 ? 'chart.line.downtrend.xyaxis' : 'chart.line.uptrend.xyaxis'}
+                  size="sm"
+                  color={leftover < 0 ? 'danger' : 'success'}
+                />
+                <ThemedText type="code" themeColor={leftover < 0 ? 'danger' : 'success'}>
+                  {`${daysLeft} ${daysLeft === 1 ? 'dia' : 'dias'} até virar o mês · Projeção ${
+                    leftover < 0 ? 'negativa' : 'positiva'
+                  }`}
+                </ThemedText>
+              </View>
 
-          <View style={styles.graphLegend}>
-            <ThemedText type="caption" themeColor="textSecondary">
-              Dia 01
-            </ThemedText>
-            <ThemedText type="caption" themeColor="success" style={styles.graphTarget}>
-              {formatBRL(leftover)} alvo
-            </ThemedText>
-            <ThemedText type="caption" themeColor="textSecondary">
-              Dia 30
-            </ThemedText>
-          </View>
-
-          <View style={styles.chartWrap}>
-            <Sparkline
-              values={chartSeries}
-              width={width - Space.lg * 2 - Space.md * 2}
-              showZero={false}
-            />
-          </View>
+              {series.length > 1 ? (
+                <View style={styles.chart}>
+                  <View style={styles.legend}>
+                    <ThemedText type="caption" themeColor="onHeroMuted">
+                      Hoje
+                    </ThemedText>
+                    <ThemedText type="caption" themeColor={leftover < 0 ? 'danger' : 'success'}>
+                      {`${formatBRL(leftover)} projetado`}
+                    </ThemedText>
+                    <ThemedText type="caption" themeColor="onHeroMuted">
+                      {`Dia ${monthEndDay}`}
+                    </ThemedText>
+                  </View>
+                  <Sparkline values={series} width={chartWidth} showZero={false} />
+                </View>
+              ) : null}
+            </>
+          )}
         </View>
 
-        {/* 3. Triad Quick-Action Status Pills */}
-        <View style={styles.triadGrid}>
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel={`Vencendo: ${overdue.length + dueSoon.length}`}
+        {/* 2. Os três contadores. Número real — zero é informação, não motivo para esconder. */}
+        <View style={styles.triad}>
+          <Counter
+            label="Vencendo"
+            value={overdue.length + dueSoon.length}
+            tone={overdue.length > 0 ? 'danger' : 'textSecondary'}
             onPress={() => router.push('/finance/transactions')}
-            style={[
-              styles.triadPill,
-              { backgroundColor: theme.surface, borderColor: theme.separator },
-            ]}>
-            <View style={styles.triadText}>
-              <ThemedText type="caption" themeColor="textSecondary">
-                Vencendo
-              </ThemedText>
-              <ThemedText type="headline" style={tabular}>
-                {overdue.length + dueSoon.length > 0 ? overdue.length + dueSoon.length : 2}
-              </ThemedText>
-            </View>
-            <View style={[styles.triadDot, { backgroundColor: theme.danger }]} />
-          </Pressable>
-
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel={`Lembretes: ${(reminders.data ?? []).length}`}
+          />
+          <Counter
+            label="Lembretes"
+            value={todayReminders.length}
+            tone={todayReminders.length > 0 ? 'warning' : 'textSecondary'}
             onPress={() => router.push('/reminders')}
-            style={[
-              styles.triadPill,
-              { backgroundColor: theme.surface, borderColor: theme.separator },
-            ]}>
-            <View style={styles.triadText}>
-              <ThemedText type="caption" themeColor="textSecondary">
-                Lembretes
-              </ThemedText>
-              <ThemedText type="headline" style={tabular}>
-                {(reminders.data ?? []).length > 0 ? (reminders.data ?? []).length : 1}
-              </ThemedText>
-            </View>
-            <View style={[styles.triadDot, { backgroundColor: theme.warning }]} />
-          </Pressable>
-
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel={`Orçamento: ${tight.length}`}
+          />
+          <Counter
+            label="Orçamento"
+            value={tight.length}
+            tone={tight.length > 0 ? 'warning' : 'textSecondary'}
             onPress={() => router.push('/finance/budgets')}
-            style={[
-              styles.triadPill,
-              { backgroundColor: theme.surface, borderColor: theme.separator },
-            ]}>
-            <View style={styles.triadText}>
-              <ThemedText type="caption" themeColor="textSecondary">
-                Orçamento
-              </ThemedText>
-              <ThemedText type="headline" style={tabular}>
-                {tight.length > 0 ? tight.length : 1}
-              </ThemedText>
-            </View>
-            <View style={[styles.triadDot, { backgroundColor: theme.textSecondary }]} />
-          </Pressable>
+          />
         </View>
 
-        {/* 4. Section: Atrasado / Atenção */}
-        <View style={styles.sectionBlock}>
-          <View style={styles.sectionHeader}>
-            <View style={styles.sectionTitleWrap}>
-              <View style={[styles.statusDot, { backgroundColor: theme.danger }]} />
-              <ThemedText type="caption" themeColor="textSecondary" style={styles.sectionTitle}>
-                ATRASADO / ATENÇÃO
-              </ThemedText>
-            </View>
-            <ThemedText type="caption" themeColor="textSecondary">
-              {`${overdue.length > 0 ? overdue.length : 1} pendência`}
-            </ThemedText>
+        {loading ? (
+          <View style={styles.section}>
+            <Skeleton width="100%" height={92} radius={Radius.md} />
+            <Skeleton width="100%" height={140} radius={Radius.md} />
           </View>
+        ) : null}
 
-          <View style={styles.cardList}>
-            {(overdue.length > 0
-              ? overdue
-              : [
-                  {
-                    ref_id: 'mock-aluguel',
-                    title: 'Aluguel',
-                    due_date: '2026-09-01',
-                    amount_cents: 180000,
-                    kind: 'expense' as const,
-                  },
-                ]
-            ).map((b) => (
+        {nothing ? (
+          <View style={styles.empty}>
+            <EmptyState
+              title="Nada para hoje"
+              hint="Mande um áudio ou uma mensagem no WhatsApp e o que você contar aparece aqui organizado."
+            />
+          </View>
+        ) : null}
+
+        {/* 3. O que já venceu. */}
+        {bills.isError ? (
+          <View style={styles.section}>
+            <SectionHead title="Atrasado / atenção" dot="danger" inset={false} />
+            <ErrorCard onRetry={() => bills.refetch()} />
+          </View>
+        ) : overdue.length > 0 ? (
+          <View style={styles.section}>
+            <SectionHead
+              title="Atrasado / atenção"
+              dot="danger"
+              inset={false}
+              action={
+                <ThemedText type="caption" themeColor="textSecondary">
+                  {`${overdue.length} ${overdue.length === 1 ? 'pendência' : 'pendências'}`}
+                </ThemedText>
+              }
+            />
+            {overdue.map((b) => (
               <View
                 key={b.ref_id}
-                style={[
-                  styles.urgentCard,
-                  { backgroundColor: theme.surface, borderColor: theme.separator },
-                ]}>
-                <View style={styles.urgentCardLeft}>
-                  <View style={styles.urgentTitleRow}>
-                    <ThemedText type="headline" numberOfLines={1} style={styles.urgentTitle}>
+                style={[styles.card, styles.billCard, { backgroundColor: theme.surface, borderColor: theme.cardBorder }]}>
+                <View style={styles.billInfo}>
+                  <View style={styles.billTitleRow}>
+                    <ThemedText type="headline" numberOfLines={1} style={styles.shrink}>
                       {b.title}
                     </ThemedText>
                     <View style={[styles.duePill, { backgroundColor: theme.accentSoft }]}>
-                      <ThemedText type="caption" themeColor="danger" style={styles.duePillText}>
+                      <ThemedText type="caption" themeColor="danger">
                         {`VENCEU EM ${formatDateBR(b.due_date)}`}
                       </ThemedText>
                     </View>
                   </View>
-
-                  <View style={styles.urgentSubRow}>
-                    <ThemedText type="headline" themeColor="danger" style={tabular}>
-                      {formatBRL(Number(b.amount_cents))}
-                    </ThemedText>
-                    <ThemedText type="caption" themeColor="textSecondary">
-                      · Débito Imobiliário
-                    </ThemedText>
-                  </View>
+                  <ThemedText type="ticker" themeColor="danger" style={tabular}>
+                    {formatBRL(Number(b.amount_cents))}
+                  </ThemedText>
                 </View>
 
                 <Button
@@ -279,546 +248,316 @@ export default function TodayScreen() {
                   size="sm"
                   variant="secondary"
                   onPress={() => pay(b.ref_id, b.title)}
-                  style={styles.payBtn}
                 />
               </View>
             ))}
           </View>
-        </View>
+        ) : null}
 
-        {/* 5. Section: Lembretes de Hoje */}
-        <View style={styles.sectionBlock}>
-          <View style={styles.sectionHeader}>
-            <View style={styles.sectionTitleWrap}>
-              <View style={[styles.statusDot, { backgroundColor: theme.text }]} />
-              <ThemedText type="caption" themeColor="textSecondary" style={styles.sectionTitle}>
-                LEMBRETES DE HOJE
-              </ThemedText>
-            </View>
-            <ThemedText type="caption" themeColor="textSecondary">
-              {`${(reminders.data ?? []).length > 0 ? (reminders.data ?? []).length : 2} agendados`}
-            </ThemedText>
+        {/* 4. Os lembretes de hoje, agrupados numa superfície só, como no desenho. */}
+        {reminders.isError ? (
+          <View style={styles.section}>
+            <SectionHead title="Lembretes de hoje" dot="text" inset={false} />
+            <ErrorCard onRetry={() => reminders.refetch()} />
           </View>
+        ) : todayReminders.length > 0 ? (
+          <View style={styles.section}>
+            <SectionHead
+              title="Lembretes de hoje"
+              dot="text"
+              inset={false}
+              action={
+                <ThemedText type="caption" themeColor="textSecondary">
+                  {`${todayReminders.length} ${todayReminders.length === 1 ? 'agendado' : 'agendados'}`}
+                </ThemedText>
+              }
+            />
+            <View style={[styles.group, { backgroundColor: theme.surface, borderColor: theme.cardBorder }]}>
+              {todayReminders.map((r, i) => (
+                <View key={r.id}>
+                  {i > 0 ? <View style={[styles.divider, { backgroundColor: theme.cardBorder }]} /> : null}
+                  <Pressable
+                    accessibilityRole="button"
+                    onPress={() => router.push({ pathname: '/reminder-form', params: { id: r.id } })}
+                    style={styles.taskRow}>
+                    <View style={[styles.check, { borderColor: theme.separator }]} />
+                    <View style={styles.shrink}>
+                      <ThemedText type="small" numberOfLines={1}>
+                        {r.title}
+                      </ThemedText>
+                      <View style={styles.taskMeta}>
+                        <ThemedText type="code" themeColor="textSecondary">
+                          {timeOf(r.next_run_at)}
+                        </ThemedText>
+                        <View style={[styles.metaDot, { backgroundColor: theme.separator }]} />
+                        {r.channel === 'whatsapp' ? (
+                          <View style={styles.tag}>
+                            <Icon name="bubble.left" size="xs" color="success" />
+                            <ThemedText type="caption" themeColor="success">
+                              via WhatsApp
+                            </ThemedText>
+                          </View>
+                        ) : (
+                          <ThemedText type="caption" themeColor="textSecondary">
+                            no app
+                          </ThemedText>
+                        )}
+                      </View>
+                    </View>
+                    <Icon name={r.recurrence ? 'arrow.clockwise' : 'bell'} size="sm" color="textSecondary" />
+                  </Pressable>
+                </View>
+              ))}
+            </View>
+          </View>
+        ) : null}
 
-          <View
-            style={[
-              styles.groupCard,
-              { backgroundColor: theme.surface, borderColor: theme.separator },
-            ]}>
-            <View style={styles.taskRow}>
-              <View style={styles.taskLeft}>
-                <View style={[styles.checkCircle, { borderColor: theme.separator }]} />
-                <View style={styles.taskInfo}>
-                  <ThemedText type="headline" numberOfLines={1}>
-                    Ligar para o contador sobre IRPF
-                  </ThemedText>
-                  <View style={styles.taskMeta}>
-                    <ThemedText type="caption" themeColor="textSecondary">
-                      15:00
-                    </ThemedText>
-                    <View style={[styles.metaDot, { backgroundColor: theme.separator }]} />
-                    <View style={styles.whatsappTag}>
-                      <Icon name="bubble.left" size="xs" color="success" />
-                      <ThemedText type="caption" themeColor="success" style={styles.whatsappText}>
-                        via WhatsApp
+        {/* 5. Orçamento apertado — barra em `warning`/`danger`, que é ESTADO a resolver. */}
+        {tight.length > 0 ? (
+          <View style={styles.section}>
+            <SectionHead title="Passando do orçamento" dot="warning" inset={false} />
+            {tight.map((b) => {
+              const spent = Number(b.spent_cents);
+              const limit = Number(b.limit_cents);
+              const pct = Math.round((spent / limit) * 100);
+              const left = limit - spent;
+
+              return (
+                <View
+                  key={b.category}
+                  style={[styles.card, { backgroundColor: theme.surface, borderColor: theme.cardBorder }]}>
+                  <View style={styles.budgetTop}>
+                    <View style={[styles.iconCircle, { backgroundColor: theme.surfaceRaised }]}>
+                      <Icon name="fork.knife" size="sm" color="text" />
+                    </View>
+                    <View style={styles.shrink}>
+                      <ThemedText type="headline" numberOfLines={1}>
+                        {b.category}
+                      </ThemedText>
+                      <ThemedText type="caption" themeColor="textSecondary">
+                        {`Teto do mês: ${formatBRL(limit)}`}
                       </ThemedText>
                     </View>
-                  </View>
-                </View>
-              </View>
-              <Icon name="bell" size="sm" color="textSecondary" />
-            </View>
-
-            <View style={[styles.itemDivider, { backgroundColor: theme.separator }]} />
-
-            <View style={styles.taskRow}>
-              <View style={styles.taskLeft}>
-                <View style={[styles.checkCircle, { borderColor: theme.separator }]} />
-                <View style={styles.taskInfo}>
-                  <ThemedText type="headline" numberOfLines={1}>
-                    Comprar filtro de água
-                  </ThemedText>
-                  <View style={styles.taskMeta}>
-                    <ThemedText type="caption" themeColor="textSecondary">
-                      18:30
+                    <ThemedText type="ticker" themeColor={left < 0 ? 'danger' : 'text'} style={tabular}>
+                      {`${pct}%`}
                     </ThemedText>
-                    <View style={[styles.metaDot, { backgroundColor: theme.separator }]} />
+                  </View>
+
+                  <ProgressBar value={spent} max={limit} tone={left < 0 ? 'danger' : 'warning'} />
+
+                  <View style={styles.budgetFoot}>
+                    <View style={styles.tag}>
+                      <Icon name="exclamationmark.triangle" size="xs" color={left < 0 ? 'danger' : 'warning'} />
+                      <ThemedText type="caption" themeColor={left < 0 ? 'danger' : 'warning'}>
+                        {left < 0 ? `${formatBRL(-left)} acima` : `${formatBRL(left)} restantes`}
+                      </ThemedText>
+                    </View>
                     <ThemedText type="caption" themeColor="textSecondary">
-                      Casa & Utilidades
+                      {`${daysLeft} ${daysLeft === 1 ? 'dia' : 'dias'} até fechar`}
                     </ThemedText>
                   </View>
                 </View>
-              </View>
-              <Icon name="clock" size="sm" color="textSecondary" />
-            </View>
+              );
+            })}
           </View>
-        </View>
+        ) : null}
 
-        {/* 6. Section: Passando do Orçamento */}
-        <View style={styles.sectionBlock}>
-          <View style={styles.sectionHeader}>
-            <View style={styles.sectionTitleWrap}>
-              <View style={[styles.statusDot, { backgroundColor: theme.warning }]} />
-              <ThemedText type="caption" themeColor="textSecondary" style={styles.sectionTitle}>
-                PASSANDO DO ORÇAMENTO
-              </ThemedText>
-            </View>
-            <ThemedText type="caption" themeColor="warning">
-              88% atingido
-            </ThemedText>
-          </View>
-
-          <View
-            style={[
-              styles.budgetCard,
-              { backgroundColor: theme.surface, borderColor: theme.separator },
-            ]}>
-            <View style={styles.budgetTop}>
-              <View style={styles.budgetTitleWrap}>
-                <View style={[styles.budgetIconCircle, { backgroundColor: theme.surfaceRaised }]}>
-                  <Icon name="fork.knife" size="sm" color="tint" />
-                </View>
-                <View style={styles.budgetInfo}>
-                  <ThemedText type="headline">Alimentação & Mercado</ThemedText>
-                  <ThemedText type="caption" themeColor="textSecondary">
-                    Teto Mensal: R$ 2.000,00
-                  </ThemedText>
-                </View>
-              </View>
-              <ThemedText type="headline">
-                R$ 1.760{' '}
-                <ThemedText type="caption" themeColor="textSecondary">
-                  / R$ 2.000
+        {/* 6. O que acabou de chegar pelo WhatsApp — a prova de que o canal funcionou. */}
+        {captured ? (
+          <View style={styles.section}>
+            <SectionHead
+              title="Capturado no WhatsApp"
+              dot="success"
+              inset={false}
+              action={
+                <ThemedText type="code" themeColor="success" style={tabular}>
+                  {timeOf(captured.created_at)}
                 </ThemedText>
-              </ThemedText>
-            </View>
-
-            <ProgressBar value={1760} max={2000} tone="warning" />
-
-            <View style={styles.budgetBottom}>
-              <View style={styles.warningTag}>
-                <Icon name="exclamationmark.triangle" size="xs" color="warning" />
-                <ThemedText type="caption" themeColor="warning">
-                  R$ 240 restantes
-                </ThemedText>
-              </View>
-              <ThemedText type="caption" themeColor="textSecondary">
-                12 dias úteis
-              </ThemedText>
-            </View>
-          </View>
-        </View>
-
-        {/* 7. Section: Capturado Recentemente no WhatsApp */}
-        <View style={styles.sectionBlock}>
-          <View style={styles.sectionHeader}>
-            <View style={styles.sectionTitleWrap}>
-              <View style={[styles.statusDot, { backgroundColor: theme.success }]} />
-              <ThemedText type="caption" themeColor="textSecondary" style={styles.sectionTitle}>
-                CAPTURADO RECENTEMENTE NO WHATSAPP
-              </ThemedText>
-            </View>
-            <View style={styles.syncStatusWrap}>
-              <Icon name="arrow.clockwise" size="xs" color="success" />
-              <ThemedText type="caption" themeColor="success" style={tabular}>
-                12:44
-              </ThemedText>
-            </View>
-          </View>
-
-          <View
-            style={[
-              styles.captureCard,
-              { backgroundColor: theme.surface, borderColor: theme.separator },
-            ]}>
-            <View style={styles.captureTop}>
-              <View style={styles.captureLeft}>
-                <View style={[styles.micCircle, { backgroundColor: theme.accentSoft }]}>
+              }
+            />
+            <View style={[styles.group, { backgroundColor: theme.surface, borderColor: theme.cardBorder }]}>
+              <View style={styles.captureTop}>
+                <View style={[styles.iconCircle, { backgroundColor: theme.accentSoft }]}>
                   <Icon name="mic" size="sm" color="success" />
                 </View>
-                <View style={styles.captureInfo}>
-                  <ThemedText type="headline" numberOfLines={1} style={styles.captureQuote}>
-                    {recentWhatsApp?.description
-                      ? `"${recentWhatsApp.description}"`
-                      : '"Gastei 45 no almoço do R..."'}
+                <View style={styles.shrink}>
+                  <ThemedText type="small" numberOfLines={1} style={styles.quote}>
+                    {`“${captured.description ?? 'Lançamento por mensagem'}”`}
                   </ThemedText>
                   <ThemedText type="caption" themeColor="textSecondary">
-                    Transcrição por IA ProOps
+                    Registrado pela IA do ProOps
+                  </ThemedText>
+                </View>
+                <View style={[styles.amountBadge, { backgroundColor: theme.surfaceRaised }]}>
+                  <ThemedText type="code" themeColor="textSecondary" style={tabular}>
+                    {`${captured.kind === 'income' ? '+' : '−'} ${formatBRL(Number(captured.amount_cents))}`}
                   </ThemedText>
                 </View>
               </View>
-              <View style={[styles.amountBadge, { backgroundColor: theme.surfaceRaised }]}>
-                <ThemedText
-                  type="caption"
-                  themeColor="textSecondary"
-                  style={styles.amountBadgeText}>
-                  {recentWhatsApp
-                    ? `- ${formatBRL(Number(recentWhatsApp.amount_cents))}`
-                    : '- R$ 45,00'}
-                </ThemedText>
-              </View>
-            </View>
 
-            <View style={[styles.itemDivider, { backgroundColor: theme.separator }]} />
+              <View style={[styles.divider, { backgroundColor: theme.cardBorder }]} />
 
-            <View style={styles.captureBottom}>
-              <View style={styles.processedRow}>
-                <Icon name="checkmark.circle" size="xs" color="success" />
-                <ThemedText type="caption" themeColor="textSecondary">
-                  Processado como{' '}
-                  <ThemedText type="caption" themeColor="text">
-                    {recentWhatsApp?.category ?? 'Despesa Alimentação'}
+              <View style={styles.captureFoot}>
+                <View style={styles.tag}>
+                  <Icon name="checkmark.circle" size="xs" color="success" />
+                  <ThemedText type="caption" themeColor="textSecondary">
+                    {`Lançado em ${captured.category ?? 'sem categoria'}`}
                   </ThemedText>
-                </ThemedText>
+                </View>
+                <Pressable
+                  accessibilityRole="button"
+                  hitSlop={Space.sm}
+                  onPress={() => router.push(`/finance/${captured.id}`)}>
+                  <ThemedText type="link">Editar</ThemedText>
+                </Pressable>
               </View>
-              <Pressable
-                onPress={() =>
-                  router.push(
-                    recentWhatsApp ? `/finance/${recentWhatsApp.id}` : '/finance/transactions'
-                  )
-                }>
-                <ThemedText type="caption" themeColor="tint" style={styles.editText}>
-                  Editar
-                </ThemedText>
-              </Pressable>
             </View>
           </View>
-        </View>
+        ) : null}
       </ScrollView>
     </View>
   );
 }
 
+/**
+ * Um dos três contadores da faixa. Vive aqui porque só esta tela usa (regra de `frontend.md`).
+ *
+ * O ponto à direita é cor SEMÂNTICA e apaga quando a contagem é zero — mesma régua do badge de
+ * aba: sinal que está sempre aceso deixa de ser sinal.
+ */
+function Counter({
+  label,
+  value,
+  tone,
+  onPress,
+}: {
+  label: string;
+  value: number;
+  tone: 'danger' | 'warning' | 'textSecondary';
+  onPress: () => void;
+}) {
+  const theme = useTheme();
+
+  return (
+    <Pressable
+      accessibilityRole="button"
+      accessibilityLabel={`${label}: ${value}`}
+      onPress={onPress}
+      style={[styles.counter, { backgroundColor: theme.surface, borderColor: theme.cardBorder }]}>
+      <View style={styles.shrink}>
+        <ThemedText type="caption" themeColor="textSecondary" numberOfLines={1}>
+          {label}
+        </ThemedText>
+        <ThemedText type="headline" style={tabular}>
+          {value}
+        </ThemedText>
+      </View>
+      {value > 0 ? <View style={[styles.counterDot, { backgroundColor: theme[tone] }]} /> : null}
+    </Pressable>
+  );
+}
+
+/** `HH:MM` local a partir de um timestamp ISO. Vazio vira travessão, nunca "Invalid Date". */
+function timeOf(iso: string | null | undefined): string {
+  if (!iso) return '—';
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return '—';
+  return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
+}
+
 const styles = StyleSheet.create({
-  root: {
-    flex: 1,
-  },
-  topHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: Space.lg,
-    paddingBottom: Space.md,
-  },
-  topHeaderLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
+  root: { flex: 1 },
+  scroll: { padding: Space.lg, gap: Space.xl },
+  shrink: { flex: 1, minWidth: 0 },
+
+  hero: {
+    borderRadius: Radius.lg,
+    borderCurve: 'continuous',
+    borderWidth: StyleSheet.hairlineWidth,
+    padding: Space.gutter,
     gap: Space.sm,
-  },
-  brandIconBox: {
-    width: 28,
-    height: 28,
-    borderRadius: Radius.sm,
-    borderCurve: 'continuous',
-    borderWidth: StyleSheet.hairlineWidth,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  brandTitle: {
-    letterSpacing: -0.5,
-  },
-  pulsingDot: {
-    width: 6,
-    height: 6,
-    borderRadius: Radius.pill,
-  },
-  avatarCircle: {
-    width: 32,
-    height: 32,
-    borderRadius: Radius.pill,
-    borderWidth: StyleSheet.hairlineWidth,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  avatarText: {
-    fontWeight: '600',
-  },
-  scrollContent: {
-    paddingTop: Space.xs,
-    gap: Space.lg,
-  },
-  heroCard: {
-    marginHorizontal: Space.lg,
-    borderRadius: Radius.xl,
-    borderCurve: 'continuous',
-    borderWidth: StyleSheet.hairlineWidth,
-    padding: Space.lg,
-    gap: Space.md,
-  },
-  heroTopRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-  },
-  heroLabel: {
-    fontWeight: '600',
-    letterSpacing: 1.2,
-  },
-  eyeButton: {
-    width: 28,
-    height: 28,
-    borderRadius: Radius.pill,
-    borderWidth: StyleSheet.hairlineWidth,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  balanceRow: {
-    marginTop: Space.xs,
-  },
-  trendRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: Space.xs,
-  },
-  trendText: {
-    fontWeight: '600',
-  },
-  graphLegend: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginTop: Space.sm,
-  },
-  graphTarget: {
-    fontWeight: '600',
-  },
-  chartWrap: {
-    marginTop: Space.xs,
     overflow: 'hidden',
   },
-  triadGrid: {
-    flexDirection: 'row',
-    gap: Space.sm,
-    paddingHorizontal: Space.lg,
+  specular: { position: 'absolute', top: 0, left: 0, right: 0, height: StyleSheet.hairlineWidth },
+  heroTop: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  eye: {
+    width: 28,
+    height: 28,
+    borderRadius: Radius.pill,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
-  triadPill: {
+  trend: { flexDirection: 'row', alignItems: 'center', gap: Space.xs },
+  chart: { marginTop: Space.md, gap: Space.xs },
+  legend: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+
+  triad: { flexDirection: 'row', gap: Space.sm },
+  counter: {
     flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
+    gap: Space.xs,
     padding: Space.md,
     borderRadius: Radius.md,
     borderCurve: 'continuous',
     borderWidth: StyleSheet.hairlineWidth,
   },
-  triadText: {
-    gap: Space.half,
-  },
-  triadDot: {
-    width: 8,
-    height: 8,
-    borderRadius: Radius.pill,
-  },
-  sectionBlock: {
-    gap: Space.sm,
-    paddingHorizontal: Space.lg,
-  },
-  sectionHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: Space.xs,
-  },
-  sectionTitleWrap: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: Space.xs,
-  },
-  statusDot: {
-    width: 6,
-    height: 6,
-    borderRadius: Radius.pill,
-  },
-  sectionTitle: {
-    fontWeight: '600',
-    letterSpacing: 0.8,
-  },
-  cardList: {
-    gap: Space.sm,
-  },
-  urgentCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
+  counterDot: { width: 8, height: 8, borderRadius: Radius.pill },
+
+  section: { gap: Space.sm },
+  empty: { paddingVertical: Space.xl },
+
+  card: {
     padding: Space.lg,
-    borderRadius: Radius.lg,
+    borderRadius: Radius.md,
     borderCurve: 'continuous',
     borderWidth: StyleSheet.hairlineWidth,
     gap: Space.md,
   },
-  urgentCardLeft: {
-    flex: 1,
-    gap: Space.xs,
-  },
-  urgentTitleRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: Space.sm,
-    flexWrap: 'wrap',
-  },
-  urgentTitle: {
-    flexShrink: 1,
-  },
+  billCard: { flexDirection: 'row', alignItems: 'center', gap: Space.md },
+  billInfo: { flex: 1, minWidth: 0, gap: Space.xs },
+  billTitleRow: { flexDirection: 'row', alignItems: 'center', gap: Space.sm },
   duePill: {
     paddingHorizontal: Space.sm,
     paddingVertical: Space.half,
     borderRadius: Radius.pill,
   },
-  duePillText: {
-    fontWeight: '700',
-    letterSpacing: 0.5,
-  },
-  urgentSubRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: Space.xs,
-  },
-  payBtn: {
-    paddingHorizontal: Space.md,
-  },
-  groupCard: {
-    borderRadius: Radius.lg,
+
+  group: {
+    borderRadius: Radius.md,
     borderCurve: 'continuous',
     borderWidth: StyleSheet.hairlineWidth,
     overflow: 'hidden',
   },
-  taskRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    padding: Space.lg,
-  },
-  taskLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: Space.md,
-    flex: 1,
-  },
-  checkCircle: {
-    width: 20,
-    height: 20,
-    borderRadius: Radius.pill,
-    borderWidth: 1.5,
-  },
-  taskInfo: {
-    flex: 1,
-    gap: Space.half,
-  },
-  taskMeta: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: Space.xs,
-  },
-  metaDot: {
-    width: 3,
-    height: 3,
-    borderRadius: Radius.pill,
-  },
-  whatsappTag: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: Space.half,
-  },
-  whatsappText: {
-    fontWeight: '600',
-  },
-  itemDivider: {
-    height: StyleSheet.hairlineWidth,
-    width: '100%',
-  },
-  budgetCard: {
-    borderRadius: Radius.lg,
-    borderCurve: 'continuous',
-    borderWidth: StyleSheet.hairlineWidth,
-    padding: Space.lg,
-    gap: Space.md,
-  },
-  budgetTop: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-  },
-  budgetTitleWrap: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: Space.sm,
-  },
-  budgetIconCircle: {
+  divider: { height: StyleSheet.hairlineWidth },
+  taskRow: { flexDirection: 'row', alignItems: 'center', gap: Space.md, padding: Space.lg },
+  check: { width: 20, height: 20, borderRadius: Radius.pill, borderWidth: 1.5 },
+  taskMeta: { flexDirection: 'row', alignItems: 'center', gap: Space.sm, marginTop: Space.half },
+  metaDot: { width: 3, height: 3, borderRadius: Radius.pill },
+  tag: { flexDirection: 'row', alignItems: 'center', gap: Space.xs },
+
+  budgetTop: { flexDirection: 'row', alignItems: 'center', gap: Space.md },
+  iconCircle: {
     width: 32,
     height: 32,
     borderRadius: Radius.pill,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  budgetInfo: {
-    gap: Space.half,
-  },
-  budgetBottom: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-  },
-  warningTag: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: Space.xs,
-  },
-  syncStatusWrap: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: Space.xs,
-  },
-  captureCard: {
-    borderRadius: Radius.lg,
-    borderCurve: 'continuous',
-    borderWidth: StyleSheet.hairlineWidth,
-    padding: Space.lg,
-    gap: Space.md,
-  },
-  captureTop: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-  },
-  captureLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: Space.sm,
-    flex: 1,
-  },
-  micCircle: {
-    width: 36,
-    height: 36,
-    borderRadius: Radius.pill,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  captureInfo: {
-    flex: 1,
-    gap: Space.half,
-  },
-  captureQuote: {
-    fontStyle: 'italic',
-  },
+  budgetFoot: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+
+  captureTop: { flexDirection: 'row', alignItems: 'center', gap: Space.md, padding: Space.lg },
+  quote: { fontStyle: 'italic' },
   amountBadge: {
     paddingHorizontal: Space.sm,
-    paddingVertical: Space.half,
+    paddingVertical: Space.xs,
     borderRadius: Radius.pill,
   },
-  amountBadgeText: {
-    fontWeight: '600',
-  },
-  captureBottom: {
+  captureFoot: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-  },
-  processedRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: Space.xs,
-  },
-  editText: {
-    fontWeight: '600',
+    padding: Space.lg,
   },
 });
