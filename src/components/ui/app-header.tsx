@@ -86,6 +86,13 @@ export function AppHeader({ title, status = 'success', action }: AppHeaderProps)
     <View
       accessibilityRole="header"
       accessibilityLabel={title}
+      /*
+        `box-none`: a faixa é SOBREPOSTA e cobre ~100px do topo da tela. Capturando toque na área
+        inteira, ela engolia o começo de qualquer arraste que nascesse ali — a tela parecia
+        "presa em cima" e não rolava. Só os `Pressable` de dentro é que recebem toque; o resto
+        (desfoque, véu de cor, marca) é `none` e deixa o gesto passar para o scroll.
+      */
+      pointerEvents="box-none"
       style={[styles.bar, { paddingTop: insets.top, borderBottomColor: theme.cardBorder }]}>
       {/*
         Glass de CHROME, que é onde o material é permitido (§1). Não passa pelo `GlassCard`
@@ -93,6 +100,7 @@ export function AppHeader({ title, status = 'success', action }: AppHeaderProps)
         encosta nas bordas e não tem elevação.
       */}
       <BlurView
+        pointerEvents="none"
         intensity={Platform.OS === 'android' ? 0 : 40}
         tint={scheme === 'dark' ? 'systemChromeMaterialDark' : 'systemChromeMaterialLight'}
         style={StyleSheet.absoluteFill}
@@ -102,14 +110,15 @@ export function AppHeader({ title, status = 'success', action }: AppHeaderProps)
         é opaca (intensity 0 acima) — mesma decisão que a tab bar já toma por plataforma.
       */}
       <View
+        pointerEvents="none"
         style={[
           StyleSheet.absoluteFill,
           { backgroundColor: theme.background, opacity: Platform.OS === 'android' ? 1 : 0.85 },
         ]}
       />
 
-      <View style={styles.row}>
-        <View style={styles.brand}>
+      <View pointerEvents="box-none" style={styles.row}>
+        <View pointerEvents="none" style={styles.brand}>
           <View
             style={[
               styles.markBox,
@@ -123,7 +132,7 @@ export function AppHeader({ title, status = 'success', action }: AppHeaderProps)
           <View style={[styles.dot, { backgroundColor: theme[status] }]} />
         </View>
 
-        <View style={styles.right}>
+        <View pointerEvents="box-none" style={styles.right}>
           {action}
           <Pressable
             accessibilityRole="button"

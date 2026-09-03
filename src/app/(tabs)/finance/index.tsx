@@ -24,7 +24,7 @@ import {
 } from '@/components/finance/month-picker';
 import { ThemedText } from '@/components/themed-text';
 import { CardStack } from '@/components/finance/card-stack';
-import { CURVED_BAR_SPACE } from '@/components/ui/curved-tab-bar';
+import { CURVED_BAR_CLEARANCE } from '@/components/ui/curved-tab-bar';
 import { AppHeader } from '@/components/ui/app-header';
 import { ItemLink } from '@/components/ui/item-link';
 import { Button } from '@/components/ui/button';
@@ -836,11 +836,12 @@ export default function FinanceScreen() {
         style={[
           styles.fab,
           {
-            // No Android o FAB tem que subir acima da `CurvedTabBar`, que é mais alta que a barra
-            // nativa e flutua: com o cálculo antigo ele pousava EM CIMA da pílula.
+            // No Android o FAB tem que subir ACIMA da `CurvedTabBar`, não encostar nela: a barra
+            // flutua e o FAB tem `elevation` maior, então qualquer sobreposição vira o botão
+            // desenhado por cima da pílula. `CURVED_BAR_CLEARANCE` já embute o respiro.
             bottom:
               insets.bottom +
-              (Platform.OS === 'android' ? CURVED_BAR_SPACE + Space.md : Space.xxl),
+              (Platform.OS === 'android' ? CURVED_BAR_CLEARANCE : Space.xxl),
             boxShadow: Elevation[scheme].floating,
             zIndex: 11,
             elevation: 11,

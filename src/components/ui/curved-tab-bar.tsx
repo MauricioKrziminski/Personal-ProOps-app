@@ -41,6 +41,14 @@ const TOP = BUBBLE / 2;
  * padding inferior das raízes de aba, a última linha de toda lista fica embaixo dela.
  */
 export const CURVED_BAR_SPACE = TOP + BAR_H + Space.sm;
+/**
+ * O piso de qualquer coisa FLUTUANTE sobre a barra (FAB, toast, sheet ancorado).
+ *
+ * `CURVED_BAR_SPACE` é só a altura ocupada — encostar nele deixa o botão colado na aresta da
+ * pílula, e no Android o FAB tem `elevation` maior, então ele desenhava POR CIMA da barra em vez
+ * de acima dela. Conteúdo de tela pode passar por baixo da barra; controle flutuante, não.
+ */
+export const CURVED_BAR_CLEARANCE = CURVED_BAR_SPACE + Space.lg;
 /** Calha lateral: a barra flutua, não encosta nas bordas. */
 const SIDE = Space.lg;
 
@@ -149,6 +157,27 @@ export function CurvedTabBar({
   /** O centro do berço e da bolha — UMA posição para os dois, senão eles dessincronizam. */
   const centro = useDerivedValue(() => slot * (progresso.get() + 0.5));
 
+  /**
+   * O disco do berço como PATH, para servir de recorte invertido no traço da pílula.
+   *
+   * Sem ele, nas abas das PONTAS o canto arredondado da pílula passa por dentro do berço e o
+   * traço dele aparece como um risco atrás do ícone — a mordida deixa de ler como vazada.
+   *
+   * O contorno correto de `pílula − disco` são duas peças: o traço da pílula FORA do disco, mais
+   * o arco do disco DENTRO da pílula. Cada uma sai do seu `Group`, uma com `invertClip` e a outra
+   * sem — desenhar a pílula inteira e tapar depois não funciona, porque o preenchimento do berço
+   * para na borda da pílula e é justamente ali que o traço sobrevive.
+   *
+   * Construído em worklet de propósito (`useDerivedValue` + `PathBuilder`, o padrão documentado):
+   * o centro é um shared value, e recalcular no JS traria a posição um frame atrasada — o risco
+   * voltaria a piscar durante a animação.
+   */
+  const disco = useDerivedValue(() => {
+    const b = Skia.PathBuilder.Make();
+    b.addCircle(centro.get(), 0, CUT);
+    return b.build();
+  });
+
   const bolha = useAnimatedStyle(() => ({
     transform: [
       { translateX: slot * (progresso.get() + 0.5) - BUBBLE / 2 },
@@ -167,7 +196,10 @@ export function CurvedTabBar({
         */}
         <Canvas style={[StyleSheet.absoluteFill, { top: TOP }]} pointerEvents="none">
           <Path path={pilula} color={theme.backgroundElement} style="fill" />
-          <Path path={pilula} color={theme.separator} style="stroke" strokeWidth={1} />
+          {/* O traço da pílula, MENOS o pedaço que cai dentro do berço. */}
+          <Group clip={disco} invertClip>
+            <Path path={pilula} color={theme.separator} style="stroke" strokeWidth={1} />
+          </Group>
           {/*
             A mordida, recortada pela própria pílula: fora dela o disco não existe, então a metade
             de cima do círculo (que fica acima da barra) some sozinha.
