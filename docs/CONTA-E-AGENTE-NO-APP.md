@@ -101,7 +101,15 @@ PRIMEIRO nome. Validada no emulador Android (preencher, salvar, ver na Hoje) e n
 **Validar** — abrir a Hoje sem nome (nenhuma saudação), preencher no Perfil, voltar à Hoje e ver
 o nome; conferir a virada de manhã/tarde/noite mudando o relógio do aparelho.
 
-### Fase 2 — Header sem a palavra  ·  pequena
+### Fase 2 — Header sem a palavra  ·  pequena  ·  ✅ FEITA E VALIDADA (03/09/2026)
+
+A palavra e o token `Type.wordmark` saíram (o token não tinha outro uso). Validada nas raízes Hoje,
+Notas e Financeiro, no claro e no escuro, nas duas plataformas.
+
+⚠️ **Pendente de aprovação do dono:** `.claude/rules/design.md` §8 ainda descreve a faixa com "a
+palavra 'ProOps' em `Type.wordmark`", e o comentário do avatar sem iniciais. Regra desatualizada é
+o que faz a próxima sessão desfazer a mudança — mesmo motivo pelo qual a Fase 3 precisa reescrever
+`CLAUDE.md`.
 
 **Fazer** — tirar `ProOps` e o `Type.wordmark` do `AppHeader`; ajustar o espaçamento à esquerda.
 

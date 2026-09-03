@@ -3,11 +3,10 @@ import { BlurView } from 'expo-blur';
 import { Platform, Pressable, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { ThemedText } from '@/components/themed-text';
 import { Icon } from '@/components/ui/icon';
 import { Mark } from '@/components/ui/mark';
 import { Fonts } from '@/constants/theme';
-import { HitTarget, Radius, Space, Type } from '@/design/tokens';
+import { HitTarget, Radius, Space } from '@/design/tokens';
 import { useScheme, useTheme } from '@/hooks/use-theme';
 
 /**
@@ -54,8 +53,13 @@ interface AppHeaderProps {
  * ## Anatomia (medida do export, não estimada)
  *
  * `h-14` (56px) sobre a safe area, calha de 16, fundo do app a 85% com `backdrop-blur-xl` e um
- * fio de 1px embaixo. À esquerda: um quadrado de 28 com raio 8 carregando a marca e a palavra
- * "ProOps" em 16/700. À direita: o avatar de 32 em pílula.
+ * fio de 1px embaixo. À esquerda: um quadrado de 28 com raio 8 carregando a marca. À direita: o
+ * avatar de 32 em pílula.
+ *
+ * **Sem a palavra "ProOps"** (03/09/2026). O export do Stitch escrevia o símbolo E a palavra a
+ * 8px um do outro — duas afirmações da mesma identidade gastando a faixa mais nobre da tela. A
+ * saudação da Hoje ("Bom dia, Gabriel") passou a ocupar esse peso logo abaixo, e ela diz algo que
+ * o usuário não sabia; o nome do app, que ele acabou de tocar para abrir, não.
  *
  * **Sem o ponto de status** (03/09/2026, a pedido do dono do produto). O export punha um ponto
  * verde ao lado da marca e ele era sempre verde: não existia estado em que ficasse vermelho, ou
@@ -72,8 +76,9 @@ interface AppHeaderProps {
  *
  * ## O avatar não tem iniciais
  *
- * O export escreve "GS". O schema guarda só `profiles.phone` — não há nome de onde tirar
- * iniciais, e inventá-las seria escrever um dado que não existe. Fica o ícone de pessoa.
+ * O export escreve "GS". `profiles.display_name` existe desde a 0050, mas é ANULÁVEL — quem entrou
+ * por Phone OTP não tem nome —, e um avatar que às vezes é letra e às vezes é ícone muda de forma
+ * conforme o cadastro do usuário. Fica o ícone de pessoa, um só, para todo mundo.
  */
 export function AppHeader({ title, action }: AppHeaderProps) {
   const theme = useTheme();
@@ -116,17 +121,13 @@ export function AppHeader({ title, action }: AppHeaderProps) {
       />
 
       <View pointerEvents="box-none" style={styles.row}>
-        <View pointerEvents="none" style={styles.brand}>
-          <View
-            style={[
-              styles.markBox,
-              { backgroundColor: theme.backgroundSelected, borderColor: theme.cardBorder },
-            ]}>
-            <Mark size={16} color="text" />
-          </View>
-          <ThemedText type="caption" style={styles.wordmark}>
-            ProOps
-          </ThemedText>
+        <View
+          pointerEvents="none"
+          style={[
+            styles.markBox,
+            { backgroundColor: theme.backgroundSelected, borderColor: theme.cardBorder },
+          ]}>
+          <Mark size={16} color="text" />
         </View>
 
         <View pointerEvents="box-none" style={styles.right}>
@@ -197,7 +198,6 @@ const styles = StyleSheet.create({
     gap: Space.md,
     paddingHorizontal: Space.lg,
   },
-  brand: { flexDirection: 'row', alignItems: 'center', gap: Space.sm },
   markBox: {
     width: 28,
     height: 28,
@@ -207,8 +207,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  /** 16/700 com tracking negativo — o único uso de `Type.wordmark` no app. */
-  wordmark: Type.wordmark,
   right: { flexDirection: 'row', alignItems: 'center', gap: Space.sm },
   round: {
     width: HitTarget - 12,
