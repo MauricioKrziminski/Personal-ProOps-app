@@ -126,7 +126,7 @@ export default function TodayScreen() {
               accessibilityLabel={concealed ? 'Mostrar valores' : 'Ocultar valores'}
               hitSlop={Space.sm}
               onPress={toggle}
-              style={[styles.eye, { backgroundColor: theme.surfaceRaised }]}>
+              style={[styles.eye, { backgroundColor: theme.heroChip }]}>
               <Icon name={concealed ? 'eye.slash' : 'eye'} size="sm" color="onHero" />
             </Pressable>
           </View>
@@ -140,7 +140,7 @@ export default function TodayScreen() {
               <Money
                 cents={leftover}
                 variant="heroMoney"
-                tone={leftover < 0 ? 'danger' : 'onHero'}
+                tone={leftover < 0 ? 'onHeroDanger' : 'onHero'}
                 concealable
               />
 
@@ -148,9 +148,9 @@ export default function TodayScreen() {
                 <Icon
                   name={leftover < 0 ? 'chart.line.downtrend.xyaxis' : 'chart.line.uptrend.xyaxis'}
                   size="sm"
-                  color={leftover < 0 ? 'danger' : 'success'}
+                  color={leftover < 0 ? 'onHeroDanger' : 'onHeroSuccess'}
                 />
-                <ThemedText type="code" themeColor={leftover < 0 ? 'danger' : 'success'}>
+                <ThemedText type="code" themeColor={leftover < 0 ? 'onHeroDanger' : 'onHeroSuccess'}>
                   {`${daysLeft} ${daysLeft === 1 ? 'dia' : 'dias'} até virar o mês · Projeção ${
                     leftover < 0 ? 'negativa' : 'positiva'
                   }`}
@@ -163,7 +163,9 @@ export default function TodayScreen() {
                     <ThemedText type="caption" themeColor="onHeroMuted">
                       Hoje
                     </ThemedText>
-                    <ThemedText type="caption" themeColor={leftover < 0 ? 'danger' : 'success'}>
+                    <ThemedText
+                      type="caption"
+                      themeColor={leftover < 0 ? 'onHeroDanger' : 'onHeroSuccess'}>
                       {`${formatBRL(leftover)} projetado`}
                     </ThemedText>
                     <ThemedText type="caption" themeColor="onHeroMuted">

@@ -120,7 +120,7 @@ export function HeroPanel({
               accessibilityLabel={concealed ? 'Mostrar valor' : 'Ocultar valor'}
               onPress={toggle}
               hitSlop={Space.sm}
-              style={[styles.eye, { backgroundColor: theme.surfaceRaised }]}>
+              style={[styles.eye, { backgroundColor: theme.heroChip }]}>
               <Icon name={concealed ? 'eye.slash' : 'eye'} size="sm" color="onHero" />
             </Pressable>
           ) : null}
@@ -141,15 +141,15 @@ export function HeroPanel({
         <>
           <View style={[styles.hairline, { backgroundColor: theme.heroSeparator }]} />
           <View style={styles.trendRow}>
-            <View style={[styles.trendPill, { backgroundColor: theme.heroSeparator }]}>
+            <View style={[styles.trendPill, { backgroundColor: theme.heroChip }]}>
               <Icon
                 name={trend.positive ? 'arrow.up.right' : 'arrow.down.right'}
                 size="sm"
-                color={trend.positive ? 'success' : 'danger'}
+                color={trend.positive ? 'onHeroSuccess' : 'onHeroDanger'}
               />
               <ThemedText
                 type="caption"
-                themeColor={trend.positive ? 'success' : 'danger'}
+                themeColor={trend.positive ? 'onHeroSuccess' : 'onHeroDanger'}
                 style={styles.trendValue}>
                 {trend.value}
               </ThemedText>

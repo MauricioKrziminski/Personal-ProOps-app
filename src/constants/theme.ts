@@ -96,6 +96,18 @@ export const Colors = {
     onHero: '#FFFFFF',
     onHeroMuted: 'rgba(255, 255, 255, 0.64)',
     heroSeparator: 'rgba(255, 255, 255, 0.16)',
+    /**
+     * Cores DE DENTRO do painel — iguais nos dois temas, de propósito.
+     *
+     * O painel é escuro no claro e no escuro. Pintando os controles dele com os tokens do tema
+     * ativo, o modo claro entregava um botão BRANCO SÓLIDO (`surfaceRaised` = `#FFFFFF`) com um
+     * ícone branco dentro — invisível — e o vermelho escuro do `danger` claro numa pílula
+     * translúcida sobre preto. Superfície escura pede cor clara, e isso não depende do tema.
+     */
+    heroChip: 'rgba(255, 255, 255, 0.14)',
+    onHeroSuccess: '#6DDC9E',
+    onHeroDanger: '#FFB4AB',
+    onHeroWarning: '#FFB95F',
     cardBorder: 'rgba(19, 19, 21, 0.09)',
     dangerSoft: 'rgba(186, 26, 26, 0.10)',
     successSoft: 'rgba(13, 143, 91, 0.10)',
@@ -146,6 +158,10 @@ export const Colors = {
     onHero: '#E5E1E4',
     onHeroMuted: 'rgba(229, 225, 228, 0.60)',
     heroSeparator: 'rgba(255, 255, 255, 0.10)',
+    heroChip: 'rgba(255, 255, 255, 0.12)',
+    onHeroSuccess: '#6DDC9E',
+    onHeroDanger: '#FFB4AB',
+    onHeroWarning: '#FFB95F',
     cardBorder: 'rgba(255, 255, 255, 0.07)',
     dangerSoft: 'rgba(255, 180, 171, 0.14)',
     successSoft: 'rgba(109, 220, 158, 0.14)',

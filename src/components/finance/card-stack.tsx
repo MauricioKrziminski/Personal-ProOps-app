@@ -189,7 +189,12 @@ function CardFace({
         ]}>
         <View style={styles.topo}>
           <View style={styles.nomeWrap}>
-            <View style={[styles.chip, { backgroundColor: theme.backgroundSelected }]}>
+            {/* Dentro do cartão aberto vale a paleta DO PAINEL: ele é escuro nos dois temas. */}
+            <View
+              style={[
+                styles.chip,
+                { backgroundColor: detalhado ? theme.heroChip : theme.backgroundElement },
+              ]}>
               <Icon name="creditcard" size="sm" color={detalhado ? 'onHero' : 'text'} />
             </View>
             <ThemedText
@@ -200,8 +205,12 @@ function CardFace({
               {card.name}
             </ThemedText>
             {card.overdue_count > 0 ? (
-              <View style={[styles.pill, { backgroundColor: theme.dangerSoft }]}>
-                <ThemedText type="meta" themeColor="danger">
+              <View
+                style={[
+                  styles.pill,
+                  { backgroundColor: detalhado ? theme.heroChip : theme.dangerSoft },
+                ]}>
+                <ThemedText type="meta" themeColor={detalhado ? 'onHeroDanger' : 'danger'}>
                   ATRASADA
                 </ThemedText>
               </View>
@@ -241,7 +250,7 @@ function CardFace({
                   <View
                     style={[
                       styles.preenchido,
-                      { width: `${Math.round(proporcao * 100)}%`, backgroundColor: theme.tint },
+                      { width: `${Math.round(proporcao * 100)}%`, backgroundColor: theme.onHeroSuccess },
                     ]}
                   />
                 </View>
