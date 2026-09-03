@@ -1,8 +1,9 @@
 import { StyleSheet, Switch, View } from 'react-native';
-import { Stack, router } from 'expo-router';
+import { router } from 'expo-router';
 import * as Haptics from 'expo-haptics';
 
 import { ThemedText } from '@/components/themed-text';
+import { AppHeader } from '@/components/ui/app-header';
 import { EmptyState } from '@/components/ui/empty-state';
 import { Row, Section } from '@/components/ui/row';
 import { Screen } from '@/components/ui/screen';
@@ -77,8 +78,11 @@ export default function ProfileScreen() {
   );
 
   return (
-    <Screen grouped onRefresh={() => { push.refetch(); plan.refetch(); }} refreshing={push.isRefetching}>
-      <Stack.Screen options={{ title: 'Perfil', headerLargeTitle: true }} />
+    <Screen
+      grouped
+      topBar={<AppHeader />}
+      onRefresh={() => { push.refetch(); plan.refetch(); }}
+      refreshing={push.isRefetching}>
 
       <Section title="Conta">
         <Row title="WhatsApp" subtitle="o número é a chave de tudo" icon="phone" chevron={false}

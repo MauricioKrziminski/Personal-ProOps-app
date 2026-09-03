@@ -23,6 +23,14 @@ interface ScreenProps {
    * que a pílula de ação do header ficou com respiro diferente entre telas.
    */
   header?: React.ReactNode;
+  /**
+   * Barra fixa acima do scroll — o `AppHeader` das raízes de aba.
+   *
+   * Fica FORA do `ScrollView` de propósito: barra desenhada dentro dele rola junto e some, que é
+   * exatamente o "header caseiro" que a regra de navegação proíbe. A tela que usa este slot
+   * desliga o header do navegador (`headerShown: false`) na sua entrada do `<Stack>`.
+   */
+  topBar?: React.ReactNode;
   contentStyle?: StyleProp<ViewStyle>;
 }
 
@@ -43,6 +51,7 @@ export function Screen({
   refreshing = false,
   grouped = false,
   header,
+  topBar,
   contentStyle,
 }: ScreenProps) {
   const theme = useTheme();
@@ -52,7 +61,12 @@ export function Screen({
   const padding = [styles.content, { paddingBottom: insets.bottom + Space.xxl }, contentStyle];
 
   if (!scroll) {
-    return <View style={[styles.root, { backgroundColor: background }, contentStyle]}>{children}</View>;
+    return (
+      <View style={[styles.root, { backgroundColor: background }]}>
+        {topBar}
+        <View style={[styles.root, contentStyle]}>{children}</View>
+      </View>
+    );
   }
 
   const scroller = (
@@ -80,6 +94,15 @@ export function Screen({
       )}
     </ScrollView>
   );
+
+  if (topBar) {
+    return (
+      <View style={[styles.root, { backgroundColor: background }]}>
+        {topBar}
+        {scroller}
+      </View>
+    );
+  }
 
   if (!header) return scroller;
 

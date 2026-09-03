@@ -6,7 +6,8 @@ export const unstable_settings = { initialRouteName: 'index' };
 export default function ProfileStackLayout() {
   return (
     <Stack screenOptions={{ headerShadowVisible: false }}>
-      <Stack.Screen name="index" options={{ title: 'Perfil', headerLargeTitle: true }} />
+      {/* A raiz desenha o `AppHeader` (design Stitch): sem título de tela, sem large title. */}
+      <Stack.Screen name="index" options={{ headerShown: false }} />
       <Stack.Screen name="members" options={{ title: 'Pessoas' }} />
     </Stack>
   );
