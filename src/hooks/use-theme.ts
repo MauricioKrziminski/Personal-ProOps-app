@@ -4,13 +4,10 @@
  */
 
 import { Colors } from '@/constants/theme';
-import { useColorScheme } from '@/hooks/use-color-scheme';
 
+/** Tema travado em dark (OLED, fiel ao Stitch) — `Colors.light` fica só como referência. */
 export function useTheme() {
-  const scheme = useColorScheme();
-  const theme = scheme === 'light' ? 'dark' : (scheme ?? 'dark');
-
-  return Colors[theme];
+  return Colors.dark;
 }
 
 /**

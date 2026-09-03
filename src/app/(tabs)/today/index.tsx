@@ -10,7 +10,7 @@ import { Icon } from '@/components/ui/icon';
 import { Money } from '@/components/ui/money';
 import { ProgressBar, Sparkline } from '@/components/ui/sparkline';
 import { useToast } from '@/components/ui/toast';
-import { Radius, Space, Type, tabular } from '@/design/tokens';
+import { Radius, Space, tabular } from '@/design/tokens';
 import {
   useBudgetsStatus,
   useCashFlowForecast,
@@ -76,7 +76,7 @@ export default function TodayScreen() {
             ]}>
             <Icon name="clock" size="sm" color="tint" />
           </View>
-          <ThemedText type="defaultSemiBold" style={styles.brandTitle}>
+          <ThemedText type="headline" style={styles.brandTitle}>
             ProOps
           </ThemedText>
           <View style={[styles.pulsingDot, { backgroundColor: theme.success }]} />
@@ -264,7 +264,7 @@ export default function TodayScreen() {
                   </View>
 
                   <View style={styles.urgentSubRow}>
-                    <ThemedText type="defaultSemiBold" themeColor="danger" style={tabular}>
+                    <ThemedText type="headline" themeColor="danger" style={tabular}>
                       {formatBRL(Number(b.amount_cents))}
                     </ThemedText>
                     <ThemedText type="caption" themeColor="textSecondary">
@@ -309,7 +309,7 @@ export default function TodayScreen() {
               <View style={styles.taskLeft}>
                 <View style={[styles.checkCircle, { borderColor: theme.separator }]} />
                 <View style={styles.taskInfo}>
-                  <ThemedText type="defaultSemiBold" numberOfLines={1}>
+                  <ThemedText type="headline" numberOfLines={1}>
                     Ligar para o contador sobre IRPF
                   </ThemedText>
                   <View style={styles.taskMeta}>
@@ -335,7 +335,7 @@ export default function TodayScreen() {
               <View style={styles.taskLeft}>
                 <View style={[styles.checkCircle, { borderColor: theme.separator }]} />
                 <View style={styles.taskInfo}>
-                  <ThemedText type="defaultSemiBold" numberOfLines={1}>
+                  <ThemedText type="headline" numberOfLines={1}>
                     Comprar filtro de água
                   </ThemedText>
                   <View style={styles.taskMeta}>
@@ -379,13 +379,13 @@ export default function TodayScreen() {
                   <Icon name="fork.knife" size="sm" color="tint" />
                 </View>
                 <View style={styles.budgetInfo}>
-                  <ThemedText type="defaultSemiBold">Alimentação & Mercado</ThemedText>
+                  <ThemedText type="headline">Alimentação & Mercado</ThemedText>
                   <ThemedText type="caption" themeColor="textSecondary">
                     Teto Mensal: R$ 2.000,00
                   </ThemedText>
                 </View>
               </View>
-              <ThemedText type="defaultSemiBold">
+              <ThemedText type="headline">
                 R$ 1.760{' '}
                 <ThemedText type="caption" themeColor="textSecondary">
                   / R$ 2.000

@@ -78,20 +78,6 @@ const KIND_ICON: Record<Transaction['kind'], SymbolViewProps['name']> = {
 };
 
 /**
- * Os quatro destinos mais abertos, em faixa logo abaixo do card de destaque.
- *
- * Antes eram 12 `Row`s empilhadas no RODAPÉ da tela: para chegar em "Cartões" a pessoa rolava o
- * painel inteiro, e o fim do resumo lia como menu de configurações. O resto mora em
- * `/finance/manage` — é o "Ver tudo" do cabeçalho da faixa.
- */
-const SHORTCUTS: { title: string; icon: SymbolViewProps['name']; href: Href }[] = [
-  { title: 'Lançamentos', icon: 'list.bullet', href: '/finance/transactions' },
-  { title: 'Contas', icon: 'wallet.pass', href: '/finance/accounts' },
-  { title: 'Cartões', icon: 'creditcard', href: '/finance/cards' },
-  { title: 'Orçamentos', icon: 'chart.pie', href: '/finance/budgets' },
-];
-
-/**
  * Tile da faixa de atalhos. Vive aqui porque só esta tela usa (regra de `frontend.md`).
  *
  * Press-in com `scale` em worklet, como o `Button` — é um alvo quadrado com rótulo, não uma linha
@@ -134,7 +120,7 @@ function Shortcut({ title, count, icon, href }: ShortcutProps) {
           <Icon name="chevron.right" size="sm" color="textSecondary" />
         </View>
         <View style={styles.shortcutBottom}>
-          <ThemedText type="defaultSemiBold" numberOfLines={1}>
+          <ThemedText type="headline" numberOfLines={1}>
             {title}
           </ThemedText>
           {count ? (

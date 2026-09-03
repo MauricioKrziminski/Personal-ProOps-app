@@ -148,7 +148,6 @@ const MATERIAL: Record<string, MaterialName> = {
   waveform: 'graphic_eq',
   mic: 'mic',
   'fork.knife': 'restaurant',
-  'bubble.left': 'chat',
   'arrow.clockwise': 'sync',
   xmark: 'close',
   'xmark.circle': 'cancel',

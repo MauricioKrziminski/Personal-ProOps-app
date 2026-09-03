@@ -32,6 +32,7 @@ export const Radius = {
 
 /** Espaçamento em base 4. Substitui a escala ordinal de `theme.ts`, que não tinha 12 nem 48. */
 export const Space = {
+  half: 2,
   xs: 4,
   sm: 8,
   md: 12,
@@ -152,6 +153,7 @@ export const HitTarget = 44;
 
 /** Tamanhos de ícone, atrelados à escala de texto que acompanham. */
 export const IconSize = {
+  xs: 12,
   sm: 16,
   md: 20,
   lg: 24,
