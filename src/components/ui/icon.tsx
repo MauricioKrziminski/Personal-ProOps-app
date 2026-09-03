@@ -147,6 +147,9 @@ const MATERIAL: Record<string, MaterialName> = {
   'wand.and.stars': 'auto_fix_high',
   waveform: 'graphic_eq',
   mic: 'mic',
+  'fork.knife': 'restaurant',
+  'bubble.left': 'chat',
+  'arrow.clockwise': 'sync',
   xmark: 'close',
   'xmark.circle': 'cancel',
 };

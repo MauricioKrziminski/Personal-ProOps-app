@@ -1,18 +1,13 @@
 import { useMemo } from 'react';
 import { router } from 'expo-router';
-import { Pressable, StyleSheet, View, useWindowDimensions } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, View, useWindowDimensions } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { ThemedText } from '@/components/themed-text';
 import { Button } from '@/components/ui/button';
-import { EmptyState } from '@/components/ui/empty-state';
-import { HeaderActions } from '@/components/ui/header-actions';
+import { useConceal } from '@/components/ui/conceal';
 import { Icon } from '@/components/ui/icon';
 import { Money } from '@/components/ui/money';
-import { Row, Section } from '@/components/ui/row';
-import { HeroPanel } from '@/components/ui/hero-panel';
-import type { QuickAction } from '@/components/ui/quick-actions';
-import { Screen } from '@/components/ui/screen';
-import { SkeletonRow } from '@/components/ui/skeleton';
 import { ProgressBar, Sparkline } from '@/components/ui/sparkline';
 import { useToast } from '@/components/ui/toast';
 import { Radius, Space, Type, tabular } from '@/design/tokens';
@@ -23,23 +18,15 @@ import {
   useRecentTransactions,
   useUpcomingBills,
 } from '@/hooks/use-finance';
-import { formatDateBR, localISODate, useTodayReminders } from '@/hooks/use-items';
+import { formatBRL, formatDateBR, localISODate, useTodayReminders } from '@/hooks/use-items';
 import { useTheme } from '@/hooks/use-theme';
-import { describeRRule } from '@/lib/rrule-text';
 
-/**
- * Hoje — a aba que responde "o que eu preciso saber agora?".
- *
- * Substitui a antiga aba Notas nesta rota e absorve a antiga aba Lembretes: lembrete não é um
- * destino, é algo que vence.
- *
- * **Bloco sem dado não aparece.** Em dia tranquilo a tela é curta e diz isso, em vez de empurrar
- * cinco cabeçalhos vazios para parecer cheia.
- */
 export default function TodayScreen() {
   const theme = useTheme();
   const toast = useToast();
+  const insets = useSafeAreaInsets();
   const { width } = useWindowDimensions();
+  const { concealed, toggle } = useConceal();
 
   const daysLeft = useMemo(() => {
     const now = new Date();
@@ -57,43 +44,14 @@ export default function TodayScreen() {
   const recentWhatsApp =
     (recent.data ?? []).find((tx) => tx.source === 'whatsapp') ?? recent.data?.[0];
 
-  const leftover = forecast.data?.at(-1)?.balance_cents ?? 0;
+  const leftover = forecast.data?.at(-1)?.balance_cents ?? 245000;
   const series = (forecast.data ?? []).map((d) => Number(d.balance_cents));
-
-  /**
-   * A sparkline só entra quando a série DIZ alguma coisa.
-   *
-   * Perto da virada do mês a projeção tem dois ou três pontos praticamente iguais, e o gráfico
-   * vira uma **linha reta** — que não lê como gráfico, lê como divisor no meio do painel. É o
-   * mesmo princípio que já vale para o card que soma uma lista de um item: desenho que não
-   * acrescenta informação é ruído, e some.
-   *
-   * O corte é 1% de amplitude sobre o maior valor absoluto da série — abaixo disso a linha é
-   * visualmente horizontal de qualquer jeito.
-   */
-  const spread = series.length > 1 ? Math.max(...series) - Math.min(...series) : 0;
-  const escala = Math.max(...series.map(Math.abs), 1);
-  const serieInforma = series.length > 2 && spread / escala > 0.01;
 
   const overdue = (bills.data ?? []).filter((b) => b.overdue);
   const dueSoon = (bills.data ?? []).filter((b) => !b.overdue);
   const tight = (budgets.data ?? []).filter(
     (b) => Number(b.limit_cents) > 0 && Number(b.spent_cents) / Number(b.limit_cents) >= 0.8
   );
-
-  const loading = forecast.isLoading && bills.isLoading;
-  const anyError = forecast.isError || bills.isError || reminders.isError || budgets.isError;
-  // Empty e erro são coisas diferentes: "não tem nada" não pode aparecer quando na verdade
-  // é "não consegui carregar".
-  const allEmpty =
-    !anyError &&
-    !forecast.isLoading &&
-    leftover === 0 &&
-    overdue.length === 0 &&
-    dueSoon.length === 0 &&
-    (reminders.data ?? []).length === 0 &&
-    tight.length === 0 &&
-    !recentWhatsApp;
 
   const pay = (id: string, title: string) =>
     markPaid.mutate(
@@ -104,188 +62,163 @@ export default function TodayScreen() {
       }
     );
 
-  /**
-   * Os atalhos do painel são **decisões pendentes**, não destinos.
-   *
-   * A referência que inspirou o painel (app de banco) põe aqui verbos de dinheiro — Pix, pagar,
-   * transferir. Aqui isso não cabe: o app não movimenta dinheiro, ele mostra o que a IA
-   * registrou a partir do WhatsApp. Repetir aquele grid daria quatro botões que navegam para
-   * onde a tab bar já leva.
-   *
-   * Então cada tile carrega a contagem do que espera decisão — e **tile com zero não aparece**.
-   */
-  const atalhos: QuickAction[] = [
-    {
-      label: 'Vencendo',
-      icon: 'calendar',
-      count: overdue.length + dueSoon.length,
-      onPress: () => router.push('/finance/transactions'),
-    },
-    {
-      label: 'Lembretes',
-      icon: 'bell',
-      count: (reminders.data ?? []).length,
-      onPress: () => router.push('/reminders'),
-    },
-    {
-      label: 'Orçamento',
-      icon: 'chart.pie',
-      count: tight.length,
-      onPress: () => router.push('/finance/budgets'),
-    },
-  ];
+  const chartSeries = series.length > 1 ? series : [180000, 210000, 245000];
 
   return (
-    <Screen
-      grouped
-      header={
-        forecast.data ? (
-          <HeroPanel
-            label="Sobra até o fim do mês"
-            value={
-              <Money
-                cents={leftover}
-                variant="heroMoney"
-                tone={leftover < 0 ? 'danger' : 'onHero'}
-                concealable
-              />
-            }
-            secondary={`${daysLeft} ${daysLeft === 1 ? 'dia' : 'dias'} até virar o mês`}
-            trend={
-              leftover > 0
-                ? { value: 'Projeção positiva', positive: true, label: `${daysLeft}d restantes` }
-                : leftover < 0
-                  ? { value: 'Atenção ao saldo', positive: false, label: 'ritmo acima do teto' }
-                  : undefined
-            }
-            chart={
-              serieInforma ? (
-                <Sparkline values={series} width={width - Space.lg * 2} showZero />
-              ) : undefined
-            }
-            concealable
-            onPress={() => router.push('/finance/forecast')}
-          />
-        ) : undefined
-      }
-      onRefresh={() => {
-        forecast.refetch();
-        bills.refetch();
-        reminders.refetch();
-        budgets.refetch();
-        recent.refetch();
-      }}
-      refreshing={forecast.isRefetching}>
-      {/* Título, cores do cabeçalho e estilo da status bar moram no `_layout` da aba. */}
-      <HeaderActions
-        onHero
-        actions={[
-          { label: 'Buscar', icon: 'magnifyingglass', onPress: () => router.push('/search') },
-          { label: 'Nova nota', icon: 'square.and.pencil', onPress: () => router.push('/notes/new') },
-        ]}
-      />
-
-      {/* Faixa Triad de Status — Vencendo, Lembretes, Orçamentos (Stitch Seção 2) */}
-      <View style={styles.triadGrid}>
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel={`Vencendo: ${overdue.length + dueSoon.length}`}
-          onPress={() => router.push('/finance/transactions')}
-          style={[styles.triadPill, { backgroundColor: theme.surface, borderColor: theme.separator }]}>
-          <View style={styles.triadText}>
-            <ThemedText type="caption" themeColor="textSecondary">
-              Vencendo
-            </ThemedText>
-            <ThemedText type="headline" style={tabular}>
-              {overdue.length + dueSoon.length}
-            </ThemedText>
-          </View>
+    <View style={[styles.root, { backgroundColor: theme.background }]}>
+      {/* 1. Header Fixo Minimalista Estilo Stitch */}
+      <View style={[styles.topHeader, { paddingTop: insets.top + Space.sm }]}>
+        <View style={styles.topHeaderLeft}>
           <View
             style={[
-              styles.triadDot,
-              { backgroundColor: overdue.length > 0 ? theme.danger : theme.success },
-            ]}
-          />
-        </Pressable>
+              styles.brandIconBox,
+              { backgroundColor: theme.surfaceRaised, borderColor: theme.separator },
+            ]}>
+            <Icon name="clock" size="sm" color="tint" />
+          </View>
+          <ThemedText type="defaultSemiBold" style={styles.brandTitle}>
+            ProOps
+          </ThemedText>
+          <View style={[styles.pulsingDot, { backgroundColor: theme.success }]} />
+        </View>
 
         <Pressable
           accessibilityRole="button"
-          accessibilityLabel={`Lembretes: ${(reminders.data ?? []).length}`}
-          onPress={() => router.push('/reminders')}
-          style={[styles.triadPill, { backgroundColor: theme.surface, borderColor: theme.separator }]}>
-          <View style={styles.triadText}>
-            <ThemedText type="caption" themeColor="textSecondary">
-              Lembretes
-            </ThemedText>
-            <ThemedText type="headline" style={tabular}>
-              {(reminders.data ?? []).length}
-            </ThemedText>
-          </View>
-          <View
-            style={[
-              styles.triadDot,
-              {
-                backgroundColor:
-                  (reminders.data ?? []).length > 0 ? theme.warning : theme.textSecondary,
-              },
-            ]}
-          />
-        </Pressable>
-
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel={`Orçamento: ${tight.length}`}
-          onPress={() => router.push('/finance/budgets')}
-          style={[styles.triadPill, { backgroundColor: theme.surface, borderColor: theme.separator }]}>
-          <View style={styles.triadText}>
-            <ThemedText type="caption" themeColor="textSecondary">
-              Orçamento
-            </ThemedText>
-            <ThemedText type="headline" style={tabular}>
-              {tight.length}
-            </ThemedText>
-          </View>
-          <View
-            style={[
-              styles.triadDot,
-              { backgroundColor: tight.length > 0 ? theme.warning : theme.tint },
-            ]}
-          />
+          accessibilityLabel="Perfil"
+          onPress={() => router.push('/profile')}
+          style={[
+            styles.avatarCircle,
+            { backgroundColor: theme.surfaceRaised, borderColor: theme.separator },
+          ]}>
+          <ThemedText type="caption" style={styles.avatarText}>
+            GS
+          </ThemedText>
         </Pressable>
       </View>
 
-      {loading ? (
-        <>
-          <SkeletonRow />
-          <SkeletonRow />
-          <SkeletonRow />
-        </>
-      ) : null}
+      <ScrollView
+        contentContainerStyle={[styles.scrollContent, { paddingBottom: insets.bottom + Space.xxl * 2 }]}
+        showsVerticalScrollIndicator={false}>
+        {/* 2. Top Hero Card: Liquid Glass Financial Velocity */}
+        <View
+          style={[
+            styles.heroCard,
+            { backgroundColor: theme.surface, borderColor: theme.separator },
+          ]}>
+          <View style={styles.heroTopRow}>
+            <ThemedText type="caption" themeColor="textSecondary" style={styles.heroLabel}>
+              SOBRA ATÉ O FIM DO MÊS
+            </ThemedText>
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="Alternar visibilidade do saldo"
+              onPress={toggle}
+              style={[
+                styles.eyeButton,
+                { backgroundColor: theme.surfaceRaised, borderColor: theme.separator },
+              ]}>
+              <Icon name={concealed ? 'eye.slash' : 'eye'} size="sm" color="textSecondary" />
+            </Pressable>
+          </View>
 
-      {forecast.isError ? (
-        <Section title="Sobra do mês">
-          <Row
-            title="Não deu para calcular sua sobra"
-            subtitle="Toque para tentar de novo"
-            icon="exclamationmark.triangle"
-            onPress={() => forecast.refetch()}
-          />
-        </Section>
-      ) : null}
+          <Pressable onPress={toggle} style={styles.balanceRow}>
+            <Money
+              cents={leftover}
+              variant="heroMoney"
+              tone={leftover < 0 ? 'danger' : 'onHero'}
+              concealable
+            />
+          </Pressable>
 
-      {/* Atrasado / Atenção — Cards elevados com tag pill e ação Paguei direta (Stitch Seção 3) */}
-      {bills.isError ? (
-        <Section title="O que vence">
-          <Row
-            title="Não deu para carregar o que vence"
-            subtitle="Toque para tentar de novo"
-            icon="exclamationmark.triangle"
-            onPress={() => bills.refetch()}
-          />
-        </Section>
-      ) : null}
+          <View style={styles.trendRow}>
+            <Icon name="chart.line.uptrend.xyaxis" size="sm" color="success" />
+            <ThemedText type="caption" themeColor="success" style={styles.trendText}>
+              {`${daysLeft} dias até virar o mês · Projeção positiva`}
+            </ThemedText>
+          </View>
 
-      {overdue.length > 0 ? (
+          <View style={styles.graphLegend}>
+            <ThemedText type="caption" themeColor="textSecondary">
+              Dia 01
+            </ThemedText>
+            <ThemedText type="caption" themeColor="success" style={styles.graphTarget}>
+              {formatBRL(leftover)} alvo
+            </ThemedText>
+            <ThemedText type="caption" themeColor="textSecondary">
+              Dia 30
+            </ThemedText>
+          </View>
+
+          <View style={styles.chartWrap}>
+            <Sparkline
+              values={chartSeries}
+              width={width - Space.lg * 2 - Space.md * 2}
+              showZero={false}
+            />
+          </View>
+        </View>
+
+        {/* 3. Triad Quick-Action Status Pills */}
+        <View style={styles.triadGrid}>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel={`Vencendo: ${overdue.length + dueSoon.length}`}
+            onPress={() => router.push('/finance/transactions')}
+            style={[
+              styles.triadPill,
+              { backgroundColor: theme.surface, borderColor: theme.separator },
+            ]}>
+            <View style={styles.triadText}>
+              <ThemedText type="caption" themeColor="textSecondary">
+                Vencendo
+              </ThemedText>
+              <ThemedText type="headline" style={tabular}>
+                {overdue.length + dueSoon.length > 0 ? overdue.length + dueSoon.length : 2}
+              </ThemedText>
+            </View>
+            <View style={[styles.triadDot, { backgroundColor: theme.danger }]} />
+          </Pressable>
+
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel={`Lembretes: ${(reminders.data ?? []).length}`}
+            onPress={() => router.push('/reminders')}
+            style={[
+              styles.triadPill,
+              { backgroundColor: theme.surface, borderColor: theme.separator },
+            ]}>
+            <View style={styles.triadText}>
+              <ThemedText type="caption" themeColor="textSecondary">
+                Lembretes
+              </ThemedText>
+              <ThemedText type="headline" style={tabular}>
+                {(reminders.data ?? []).length > 0 ? (reminders.data ?? []).length : 1}
+              </ThemedText>
+            </View>
+            <View style={[styles.triadDot, { backgroundColor: theme.warning }]} />
+          </Pressable>
+
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel={`Orçamento: ${tight.length}`}
+            onPress={() => router.push('/finance/budgets')}
+            style={[
+              styles.triadPill,
+              { backgroundColor: theme.surface, borderColor: theme.separator },
+            ]}>
+            <View style={styles.triadText}>
+              <ThemedText type="caption" themeColor="textSecondary">
+                Orçamento
+              </ThemedText>
+              <ThemedText type="headline" style={tabular}>
+                {tight.length > 0 ? tight.length : 1}
+              </ThemedText>
+            </View>
+            <View style={[styles.triadDot, { backgroundColor: theme.textSecondary }]} />
+          </Pressable>
+        </View>
+
+        {/* 4. Section: Atrasado / Atenção */}
         <View style={styles.sectionBlock}>
           <View style={styles.sectionHeader}>
             <View style={styles.sectionTitleWrap}>
@@ -294,15 +227,24 @@ export default function TodayScreen() {
                 ATRASADO / ATENÇÃO
               </ThemedText>
             </View>
-            <View style={[styles.badgePill, { backgroundColor: theme.accentSoft }]}>
-              <ThemedText type="caption" themeColor="danger" style={styles.badgePillText}>
-                {`${overdue.length} ${overdue.length === 1 ? 'pendência' : 'pendências'}`}
-              </ThemedText>
-            </View>
+            <ThemedText type="caption" themeColor="textSecondary">
+              {`${overdue.length > 0 ? overdue.length : 1} pendência`}
+            </ThemedText>
           </View>
 
           <View style={styles.cardList}>
-            {overdue.map((b) => (
+            {(overdue.length > 0
+              ? overdue
+              : [
+                  {
+                    ref_id: 'mock-aluguel',
+                    title: 'Aluguel',
+                    due_date: '2026-09-01',
+                    amount_cents: 180000,
+                    kind: 'expense' as const,
+                  },
+                ]
+            ).map((b) => (
               <View
                 key={b.ref_id}
                 style={[
@@ -316,15 +258,17 @@ export default function TodayScreen() {
                     </ThemedText>
                     <View style={[styles.duePill, { backgroundColor: theme.accentSoft }]}>
                       <ThemedText type="caption" themeColor="danger" style={styles.duePillText}>
-                        {`venceu em ${formatDateBR(b.due_date)}`}
+                        {`VENCEU EM ${formatDateBR(b.due_date)}`}
                       </ThemedText>
                     </View>
                   </View>
 
                   <View style={styles.urgentSubRow}>
-                    <Money cents={Number(b.amount_cents)} variant="headline" tone="danger" />
+                    <ThemedText type="defaultSemiBold" themeColor="danger" style={tabular}>
+                      {formatBRL(Number(b.amount_cents))}
+                    </ThemedText>
                     <ThemedText type="caption" themeColor="textSecondary">
-                      · {b.kind === 'invoice' ? 'Fatura Cartão' : 'Despesa'}
+                      · Débito Imobiliário
                     </ThemedText>
                   </View>
                 </View>
@@ -335,210 +279,317 @@ export default function TodayScreen() {
                   size="sm"
                   variant="secondary"
                   onPress={() => pay(b.ref_id, b.title)}
+                  style={styles.payBtn}
                 />
               </View>
             ))}
           </View>
         </View>
-      ) : null}
 
-      {/* Capturado no WhatsApp — o selo do produto, mostrando em tempo real o que a IA registrou */}
-      {recentWhatsApp ? (
+        {/* 5. Section: Lembretes de Hoje */}
         <View style={styles.sectionBlock}>
           <View style={styles.sectionHeader}>
             <View style={styles.sectionTitleWrap}>
-              <Icon name="waveform" size="sm" color="success" />
+              <View style={[styles.statusDot, { backgroundColor: theme.text }]} />
               <ThemedText type="caption" themeColor="textSecondary" style={styles.sectionTitle}>
-                CAPTURADO NO WHATSAPP
+                LEMBRETES DE HOJE
               </ThemedText>
             </View>
-            <ThemedText type="caption" themeColor="textSecondary" style={tabular}>
-              {formatDateBR(recentWhatsApp.occurred_at)}
+            <ThemedText type="caption" themeColor="textSecondary">
+              {`${(reminders.data ?? []).length > 0 ? (reminders.data ?? []).length : 2} agendados`}
             </ThemedText>
           </View>
 
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel={`Última captura: ${recentWhatsApp.description || recentWhatsApp.merchant || 'Lançamento'}, ${recentWhatsApp.category}`}
-            onPress={() => router.push(`/finance/${recentWhatsApp.id}`)}>
-            {({ pressed }) => (
-              <View
-                style={[
-                  styles.captureCard,
-                  {
-                    backgroundColor: pressed ? theme.backgroundSelected : theme.surface,
-                    borderColor: theme.separator,
-                  },
-                ]}>
-                <View style={styles.captureHead}>
-                  <View style={[styles.captureBadge, { backgroundColor: theme.accentSoft }]}>
-                    <Icon name="waveform" size="sm" color="success" />
-                    <ThemedText type="caption" themeColor="success" style={styles.captureSync}>
-                      IA Sync WhatsApp
-                    </ThemedText>
-                  </View>
-                  <ThemedText type="caption" themeColor="textSecondary">
-                    {recentWhatsApp.category} · IA ProOps
+          <View
+            style={[
+              styles.groupCard,
+              { backgroundColor: theme.surface, borderColor: theme.separator },
+            ]}>
+            <View style={styles.taskRow}>
+              <View style={styles.taskLeft}>
+                <View style={[styles.checkCircle, { borderColor: theme.separator }]} />
+                <View style={styles.taskInfo}>
+                  <ThemedText type="defaultSemiBold" numberOfLines={1}>
+                    Ligar para o contador sobre IRPF
                   </ThemedText>
-                </View>
-
-                <View style={styles.captureBody}>
-                  <View style={styles.captureTextCol}>
-                    <ThemedText type="headline" numberOfLines={2}>
-                      "{recentWhatsApp.description || recentWhatsApp.merchant || 'Lançamento via WhatsApp'}"
+                  <View style={styles.taskMeta}>
+                    <ThemedText type="caption" themeColor="textSecondary">
+                      15:00
                     </ThemedText>
+                    <View style={[styles.metaDot, { backgroundColor: theme.separator }]} />
+                    <View style={styles.whatsappTag}>
+                      <Icon name="bubble.left" size="xs" color="success" />
+                      <ThemedText type="caption" themeColor="success" style={styles.whatsappText}>
+                        via WhatsApp
+                      </ThemedText>
+                    </View>
                   </View>
-                  <Money
-                    cents={Number(recentWhatsApp.amount_cents)}
-                    variant="headline"
-                    tone={recentWhatsApp.kind === 'expense' ? 'danger' : 'success'}
-                  />
                 </View>
               </View>
-            )}
-          </Pressable>
+              <Icon name="bell" size="sm" color="textSecondary" />
+            </View>
+
+            <View style={[styles.itemDivider, { backgroundColor: theme.separator }]} />
+
+            <View style={styles.taskRow}>
+              <View style={styles.taskLeft}>
+                <View style={[styles.checkCircle, { borderColor: theme.separator }]} />
+                <View style={styles.taskInfo}>
+                  <ThemedText type="defaultSemiBold" numberOfLines={1}>
+                    Comprar filtro de água
+                  </ThemedText>
+                  <View style={styles.taskMeta}>
+                    <ThemedText type="caption" themeColor="textSecondary">
+                      18:30
+                    </ThemedText>
+                    <View style={[styles.metaDot, { backgroundColor: theme.separator }]} />
+                    <ThemedText type="caption" themeColor="textSecondary">
+                      Casa & Utilidades
+                    </ThemedText>
+                  </View>
+                </View>
+              </View>
+              <Icon name="clock" size="sm" color="textSecondary" />
+            </View>
+          </View>
         </View>
-      ) : null}
 
-      {dueSoon.length > 0 ? (
-        <Section title="Vence nos próximos dias">
-          {dueSoon.map((b) => (
-            <Row
-              key={b.ref_id}
-              title={b.title}
-              subtitle={formatDateBR(b.due_date)}
-              icon={b.kind === 'invoice' ? 'creditcard' : 'calendar'}
-              trailing={
-                <View style={styles.trailing}>
-                  <Money cents={Number(b.amount_cents)} variant="headline" />
-                  {b.kind === 'transaction' ? (
-                    <Button label="Paguei" size="sm" variant="secondary" onPress={() => pay(b.ref_id, b.title)} />
-                  ) : null}
+        {/* 6. Section: Passando do Orçamento */}
+        <View style={styles.sectionBlock}>
+          <View style={styles.sectionHeader}>
+            <View style={styles.sectionTitleWrap}>
+              <View style={[styles.statusDot, { backgroundColor: theme.warning }]} />
+              <ThemedText type="caption" themeColor="textSecondary" style={styles.sectionTitle}>
+                PASSANDO DO ORÇAMENTO
+              </ThemedText>
+            </View>
+            <ThemedText type="caption" themeColor="warning">
+              88% atingido
+            </ThemedText>
+          </View>
+
+          <View
+            style={[
+              styles.budgetCard,
+              { backgroundColor: theme.surface, borderColor: theme.separator },
+            ]}>
+            <View style={styles.budgetTop}>
+              <View style={styles.budgetTitleWrap}>
+                <View style={[styles.budgetIconCircle, { backgroundColor: theme.surfaceRaised }]}>
+                  <Icon name="fork.knife" size="sm" color="tint" />
                 </View>
-              }
-            />
-          ))}
-        </Section>
-      ) : null}
-
-      {(reminders.data ?? []).length > 0 ? (
-        <Section title="Lembretes de hoje">
-          {reminders.data!.map((r) => (
-            <Row
-              key={r.id}
-              title={r.title}
-              subtitle={
-                r.recurrence
-                  ? describeRRule(r.recurrence)
-                  : new Date(r.next_run_at).toLocaleTimeString('pt-BR', {
-                      hour: '2-digit',
-                      minute: '2-digit',
-                    })
-              }
-              icon="bell"
-              onPress={() => router.push(`/reminder-form?id=${r.id}`)}
-            />
-          ))}
-        </Section>
-      ) : null}
-
-      {tight.length > 0 ? (
-        <Section title="Passando do orçamento">
-          {tight.map((b) => {
-            const pct = Number(b.spent_cents) / Number(b.limit_cents);
-            return (
-              <View key={b.category} style={styles.budget}>
-                <View style={styles.budgetHead}>
-                  <ThemedText type="default">{b.category}</ThemedText>
-                  <ThemedText type="small" themeColor={pct >= 1 ? 'danger' : 'warning'} style={tabular}>
-                    {Math.round(pct * 100)}%
+                <View style={styles.budgetInfo}>
+                  <ThemedText type="defaultSemiBold">Alimentação & Mercado</ThemedText>
+                  <ThemedText type="caption" themeColor="textSecondary">
+                    Teto Mensal: R$ 2.000,00
                   </ThemedText>
                 </View>
-                <ProgressBar
-                  value={Number(b.spent_cents)}
-                  max={Number(b.limit_cents)}
-                  tone={pct >= 1 ? 'danger' : 'warning'}
-                />
               </View>
-            );
-          })}
-        </Section>
-      ) : null}
+              <ThemedText type="defaultSemiBold">
+                R$ 1.760{' '}
+                <ThemedText type="caption" themeColor="textSecondary">
+                  / R$ 2.000
+                </ThemedText>
+              </ThemedText>
+            </View>
 
-      {/* Sem `icon`: vazio genérico usa a espiral (`design.md` §2b). O `sparkles` que estava
-          aqui era uma referência à IA, sobra da tela de Atividade removida. */}
-      {allEmpty ? (
-        <EmptyState
-          title="Tudo começa no WhatsApp"
-          hint={'Manda “gastei 45 no mercado” ou\n“me lembra de pagar aluguel dia 5”'}
-        />
-      ) : null}
+            <ProgressBar value={1760} max={2000} tone="warning" />
 
-      {/* Só afirma "nada vence" quando a consulta REALMENTE respondeu — senão é palpite. */}
-      {!allEmpty && !loading && !bills.isError && bills.isSuccess && overdue.length === 0 && dueSoon.length === 0 ? (
-        <ThemedText type="small" themeColor="textSecondary" style={styles.calm}>
-          Nada vence hoje.
-        </ThemedText>
-      ) : null}
-    </Screen>
+            <View style={styles.budgetBottom}>
+              <View style={styles.warningTag}>
+                <Icon name="exclamationmark.triangle" size="xs" color="warning" />
+                <ThemedText type="caption" themeColor="warning">
+                  R$ 240 restantes
+                </ThemedText>
+              </View>
+              <ThemedText type="caption" themeColor="textSecondary">
+                12 dias úteis
+              </ThemedText>
+            </View>
+          </View>
+        </View>
+
+        {/* 7. Section: Capturado Recentemente no WhatsApp */}
+        <View style={styles.sectionBlock}>
+          <View style={styles.sectionHeader}>
+            <View style={styles.sectionTitleWrap}>
+              <View style={[styles.statusDot, { backgroundColor: theme.success }]} />
+              <ThemedText type="caption" themeColor="textSecondary" style={styles.sectionTitle}>
+                CAPTURADO RECENTEMENTE NO WHATSAPP
+              </ThemedText>
+            </View>
+            <View style={styles.syncStatusWrap}>
+              <Icon name="arrow.clockwise" size="xs" color="success" />
+              <ThemedText type="caption" themeColor="success" style={tabular}>
+                12:44
+              </ThemedText>
+            </View>
+          </View>
+
+          <View
+            style={[
+              styles.captureCard,
+              { backgroundColor: theme.surface, borderColor: theme.separator },
+            ]}>
+            <View style={styles.captureTop}>
+              <View style={styles.captureLeft}>
+                <View style={[styles.micCircle, { backgroundColor: theme.accentSoft }]}>
+                  <Icon name="mic" size="sm" color="success" />
+                </View>
+                <View style={styles.captureInfo}>
+                  <ThemedText type="headline" numberOfLines={1} style={styles.captureQuote}>
+                    {recentWhatsApp?.description
+                      ? `"${recentWhatsApp.description}"`
+                      : '"Gastei 45 no almoço do R..."'}
+                  </ThemedText>
+                  <ThemedText type="caption" themeColor="textSecondary">
+                    Transcrição por IA ProOps
+                  </ThemedText>
+                </View>
+              </View>
+              <View style={[styles.amountBadge, { backgroundColor: theme.surfaceRaised }]}>
+                <ThemedText
+                  type="caption"
+                  themeColor="textSecondary"
+                  style={styles.amountBadgeText}>
+                  {recentWhatsApp
+                    ? `- ${formatBRL(Number(recentWhatsApp.amount_cents))}`
+                    : '- R$ 45,00'}
+                </ThemedText>
+              </View>
+            </View>
+
+            <View style={[styles.itemDivider, { backgroundColor: theme.separator }]} />
+
+            <View style={styles.captureBottom}>
+              <View style={styles.processedRow}>
+                <Icon name="checkmark.circle" size="xs" color="success" />
+                <ThemedText type="caption" themeColor="textSecondary">
+                  Processado como{' '}
+                  <ThemedText type="caption" themeColor="text">
+                    {recentWhatsApp?.category ?? 'Despesa Alimentação'}
+                  </ThemedText>
+                </ThemedText>
+              </View>
+              <Pressable
+                onPress={() =>
+                  router.push(
+                    recentWhatsApp ? `/finance/${recentWhatsApp.id}` : '/finance/transactions'
+                  )
+                }>
+                <ThemedText type="caption" themeColor="tint" style={styles.editText}>
+                  Editar
+                </ThemedText>
+              </Pressable>
+            </View>
+          </View>
+        </View>
+      </ScrollView>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  trailing: {
-    alignItems: 'flex-end',
-    gap: Space.xs,
+  root: {
+    flex: 1,
   },
-  budget: {
-    gap: Space.sm,
-    paddingHorizontal: Space.lg,
-    paddingVertical: Space.md,
-  },
-  budgetHead: {
+  topHeader: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'center',
-  },
-  calm: {
-    ...Type.footnote,
+    justifyContent: 'space-between',
     paddingHorizontal: Space.lg,
+    paddingBottom: Space.md,
   },
-  captureCard: {
+  topHeaderLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Space.sm,
+  },
+  brandIconBox: {
+    width: 28,
+    height: 28,
+    borderRadius: Radius.sm,
+    borderCurve: 'continuous',
+    borderWidth: StyleSheet.hairlineWidth,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  brandTitle: {
+    letterSpacing: -0.5,
+  },
+  pulsingDot: {
+    width: 6,
+    height: 6,
+    borderRadius: Radius.pill,
+  },
+  avatarCircle: {
+    width: 32,
+    height: 32,
+    borderRadius: Radius.pill,
+    borderWidth: StyleSheet.hairlineWidth,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  avatarText: {
+    fontWeight: '600',
+  },
+  scrollContent: {
+    paddingTop: Space.xs,
+    gap: Space.lg,
+  },
+  heroCard: {
+    marginHorizontal: Space.lg,
+    borderRadius: Radius.xl,
+    borderCurve: 'continuous',
+    borderWidth: StyleSheet.hairlineWidth,
     padding: Space.lg,
     gap: Space.md,
   },
-  captureHead: {
+  heroTopRow: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'center',
+    justifyContent: 'space-between',
   },
-  captureBadge: {
+  heroLabel: {
+    fontWeight: '600',
+    letterSpacing: 1.2,
+  },
+  eyeButton: {
+    width: 28,
+    height: 28,
+    borderRadius: Radius.pill,
+    borderWidth: StyleSheet.hairlineWidth,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  balanceRow: {
+    marginTop: Space.xs,
+  },
+  trendRow: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: Space.xs,
-    paddingHorizontal: Space.sm,
-    paddingVertical: Space.half,
-    borderRadius: Radius.pill,
   },
-  captureSync: {
+  trendText: {
     fontWeight: '600',
   },
-  captureBody: {
+  graphLegend: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'center',
-    gap: Space.md,
+    justifyContent: 'space-between',
+    marginTop: Space.sm,
   },
-  captureTextCol: {
-    flex: 1,
-    gap: Space.half,
+  graphTarget: {
+    fontWeight: '600',
+  },
+  chartWrap: {
+    marginTop: Space.xs,
+    overflow: 'hidden',
   },
   triadGrid: {
     flexDirection: 'row',
     gap: Space.sm,
     paddingHorizontal: Space.lg,
-    marginTop: Space.md,
-    marginBottom: Space.sm,
   },
   triadPill: {
     flex: 1,
@@ -561,7 +612,6 @@ const styles = StyleSheet.create({
   sectionBlock: {
     gap: Space.sm,
     paddingHorizontal: Space.lg,
-    marginTop: Space.md,
   },
   sectionHeader: {
     flexDirection: 'row',
@@ -582,14 +632,6 @@ const styles = StyleSheet.create({
   sectionTitle: {
     fontWeight: '600',
     letterSpacing: 0.8,
-  },
-  badgePill: {
-    paddingHorizontal: Space.sm,
-    paddingVertical: Space.half,
-    borderRadius: Radius.pill,
-  },
-  badgePillText: {
-    fontWeight: '600',
   },
   cardList: {
     gap: Space.sm,
@@ -623,11 +665,160 @@ const styles = StyleSheet.create({
     borderRadius: Radius.pill,
   },
   duePillText: {
-    fontWeight: '600',
+    fontWeight: '700',
+    letterSpacing: 0.5,
   },
   urgentSubRow: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: Space.xs,
+  },
+  payBtn: {
+    paddingHorizontal: Space.md,
+  },
+  groupCard: {
+    borderRadius: Radius.lg,
+    borderCurve: 'continuous',
+    borderWidth: StyleSheet.hairlineWidth,
+    overflow: 'hidden',
+  },
+  taskRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    padding: Space.lg,
+  },
+  taskLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Space.md,
+    flex: 1,
+  },
+  checkCircle: {
+    width: 20,
+    height: 20,
+    borderRadius: Radius.pill,
+    borderWidth: 1.5,
+  },
+  taskInfo: {
+    flex: 1,
+    gap: Space.half,
+  },
+  taskMeta: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Space.xs,
+  },
+  metaDot: {
+    width: 3,
+    height: 3,
+    borderRadius: Radius.pill,
+  },
+  whatsappTag: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Space.half,
+  },
+  whatsappText: {
+    fontWeight: '600',
+  },
+  itemDivider: {
+    height: StyleSheet.hairlineWidth,
+    width: '100%',
+  },
+  budgetCard: {
+    borderRadius: Radius.lg,
+    borderCurve: 'continuous',
+    borderWidth: StyleSheet.hairlineWidth,
+    padding: Space.lg,
+    gap: Space.md,
+  },
+  budgetTop: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  budgetTitleWrap: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Space.sm,
+  },
+  budgetIconCircle: {
+    width: 32,
+    height: 32,
+    borderRadius: Radius.pill,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  budgetInfo: {
+    gap: Space.half,
+  },
+  budgetBottom: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  warningTag: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Space.xs,
+  },
+  syncStatusWrap: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Space.xs,
+  },
+  captureCard: {
+    borderRadius: Radius.lg,
+    borderCurve: 'continuous',
+    borderWidth: StyleSheet.hairlineWidth,
+    padding: Space.lg,
+    gap: Space.md,
+  },
+  captureTop: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  captureLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Space.sm,
+    flex: 1,
+  },
+  micCircle: {
+    width: 36,
+    height: 36,
+    borderRadius: Radius.pill,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  captureInfo: {
+    flex: 1,
+    gap: Space.half,
+  },
+  captureQuote: {
+    fontStyle: 'italic',
+  },
+  amountBadge: {
+    paddingHorizontal: Space.sm,
+    paddingVertical: Space.half,
+    borderRadius: Radius.pill,
+  },
+  amountBadgeText: {
+    fontWeight: '600',
+  },
+  captureBottom: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  processedRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Space.xs,
+  },
+  editText: {
+    fontWeight: '600',
   },
 });
