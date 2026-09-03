@@ -6,9 +6,7 @@ import Animated, {
   useAnimatedStyle,
   useDerivedValue,
   useSharedValue,
-  withSequence,
   withSpring,
-  withTiming,
 } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -140,19 +138,12 @@ export function CurvedTabBar({
   const pilula = useMemo(() => pillPath(barW, BAR_H), [barW]);
 
   const progresso = useSharedValue(activeIndex);
-  const squash = useSharedValue(1);
 
   useEffect(() => {
     // A mola é disparada em efeito, nunca no corpo do componente: escrever num shared value
     // durante o render reinicia a animação a cada re-render do pai.
-    progresso.set(withSpring(activeIndex, Motion.spring.settle));
-    squash.set(
-      withSequence(
-        withTiming(0.86, { duration: Motion.duration.fast }),
-        withSpring(1, Motion.spring.settle)
-      )
-    );
-  }, [activeIndex, progresso, squash]);
+    progresso.set(withSpring(activeIndex, Motion.spring.snap));
+  }, [activeIndex, progresso]);
 
   /** O centro do berço e da bolha — UMA posição para os dois, senão eles dessincronizam. */
   const centro = useDerivedValue(() => slot * (progresso.get() + 0.5));
@@ -178,11 +169,17 @@ export function CurvedTabBar({
     return b.build();
   });
 
+  /**
+   * A bolha anda com o MESMO valor do berço, sem agacho de escala.
+   *
+   * O agacho era `withSequence(withTiming(0.86, 120), withSpring(1, settle))` — duas animações
+   * em série numa terceira propriedade, enquanto o berço corria numa mola de 400 ms
+   * criticamente amortecida. As duas linhas do tempo não coincidiam e o conjunto lia como uma
+   * travada no meio do caminho. Uma mola, uma propriedade: o deslizamento fica liso e é ele que
+   * comunica a continuidade espacial (§5) — a escala não acrescentava informação nenhuma.
+   */
   const bolha = useAnimatedStyle(() => ({
-    transform: [
-      { translateX: slot * (progresso.get() + 0.5) - BUBBLE / 2 },
-      { scale: squash.get() },
-    ],
+    transform: [{ translateX: slot * (progresso.get() + 0.5) - BUBBLE / 2 }],
   }));
 
   return (

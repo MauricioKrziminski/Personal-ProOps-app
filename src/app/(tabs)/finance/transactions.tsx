@@ -3,8 +3,8 @@ import { useMemo, useState } from 'react';
 import { SectionList, StyleSheet, View } from 'react-native';
 import Animated, { FadeInDown } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import type { SymbolViewProps } from 'expo-symbols';
 
+import { categoryIcon } from '@/design/category-icons';
 import { ErrorCard } from '@/components/error-card';
 import { MonthPicker, currentMonth, monthTitle, shiftMonth } from '@/components/finance/month-picker';
 import { Card } from '@/components/ui/card';
@@ -50,11 +50,6 @@ import { useTheme, useScheme } from '@/hooks/use-theme';
  * `reduce` no cliente passa a mentir assim que a lista for paginada.
  */
 
-const KIND_ICON: Record<TransactionKind, SymbolViewProps['name']> = {
-  expense: 'arrow.up.right',
-  income: 'arrow.down.left',
-  transfer: 'arrow.left.arrow.right',
-};
 
 const SOURCE_LABEL: Record<Transaction['source'], string> = {
   whatsapp: 'via WhatsApp',
@@ -524,7 +519,7 @@ export default function TransactionsScreen() {
                     <Row
                       title={tx.description || tx.merchant || tx.category || 'Sem descrição'}
                       subtitle={[...badges, ...context].join(' · ')}
-                      icon={KIND_ICON[tx.kind]}
+                      icon={categoryIcon(tx.category, tx.kind)}
                       accessibilityLabel={`${tx.description || tx.merchant || tx.category || 'Lançamento'}, ${formatBRL(tx.amount_cents)}, ${tx.kind === 'income' ? 'receita' : tx.kind === 'expense' ? 'despesa' : 'transferência'}, ${dayTitle(tx.occurred_at)}${tx.status === 'pending' ? ', previsto' : ''}`}
                       onLongPress={onLongPress}
                       trailing={

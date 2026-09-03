@@ -96,6 +96,15 @@ export const Motion = {
   spring: {
     sheet: { duration: 300, dampingRatio: 0.8 },
     settle: { duration: 400, dampingRatio: 1 },
+    /**
+     * Mola de CHROME — o berço da tab bar, o indicador de um segmented.
+     *
+     * `settle` é criticamente amortecida (ratio 1) e dura 400 ms: ela existe para um valor
+     * ASSENTAR sem oscilar, e num controle tocado 100× por dia isso lê como travada — o
+     * movimento chega ao fim tarde demais e sem nenhuma vida. Aqui a régua é a de trocar de aba:
+     * rápida, com um overshoot mínimo que diz "chegou".
+     */
+    snap: { duration: 260, dampingRatio: 0.82 },
   },
   /**
    * Escalonamento de entrada em lista: `delay = min(index * step, cap)`.

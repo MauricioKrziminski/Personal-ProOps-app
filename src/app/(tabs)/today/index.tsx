@@ -24,6 +24,7 @@ import {
   useRecentTransactions,
   useUpcomingBills,
 } from '@/hooks/use-finance';
+import { categoryIcon } from '@/design/category-icons';
 import { formatBRL, formatDateBR, localISODate, useTodayReminders } from '@/hooks/use-items';
 import { useTheme } from '@/hooks/use-theme';
 import { Fonts } from '@/constants/theme';
@@ -232,24 +233,22 @@ export default function TodayScreen() {
                 style={[styles.card, styles.billCard, { backgroundColor: theme.surface, borderColor: theme.cardBorder }]}>
                 <View style={styles.billInfo}>
                   {/*
-                    O título tem a linha inteira. A pílula de vencimento morava ao lado dele e,
-                    com um título real ("Fatura Nubank Cartão 09/2026"), sobrava "Fatura…" — a
-                    pílula tem largura fixa e comia todo o espaço do `flex`. Ela desceu para a
-                    linha do valor, onde é curta e onde o olho já está lendo números.
+                    Título e pílula na MESMA linha, como no export — o título encolhe e trunca,
+                    a pílula não. A versão anterior empurrava a pílula para a linha do valor e
+                    ali as duas juntas estouravam a largura e QUEBRAVAM, que foi a queixa de
+                    "tem uns que pulam para a linha de baixo".
                   */}
-                  <ThemedText type="headline" numberOfLines={1}>
-                    {b.title}
-                  </ThemedText>
-                  <View style={styles.billMoneyRow}>
-                    <ThemedText type="ticker" themeColor="danger" style={tabular}>
-                      {formatBRL(Number(b.amount_cents))}
+                  <View style={styles.billTitleRow}>
+                    <ThemedText type="small" numberOfLines={1} style={styles.shrink}>
+                      {b.title}
                     </ThemedText>
                     <View style={[styles.duePill, { backgroundColor: theme.dangerSoft }]}>
-                      <ThemedText type="caption" themeColor="danger">
+                      <ThemedText type="caption" themeColor="danger" numberOfLines={1}>
                         {`venceu ${formatDateBR(b.due_date)}`}
                       </ThemedText>
                     </View>
                   </View>
+                  <Money cents={Number(b.amount_cents)} variant="ticker" tone="danger" />
                 </View>
 
                 <Button
@@ -338,7 +337,7 @@ export default function TodayScreen() {
                   style={[styles.card, { backgroundColor: theme.surface, borderColor: theme.cardBorder }]}>
                   <View style={styles.budgetTop}>
                     <View style={[styles.iconCircle, { backgroundColor: theme.surfaceRaised }]}>
-                      <Icon name="fork.knife" size="sm" color="text" />
+                      <Icon name={categoryIcon(b.category)} size="sm" color="text" />
                     </View>
                     <View style={styles.shrink}>
                       <ThemedText type="headline" numberOfLines={1}>
@@ -517,8 +516,9 @@ const styles = StyleSheet.create({
   },
   billCard: { flexDirection: 'row', alignItems: 'center', gap: Space.md },
   billInfo: { flex: 1, minWidth: 0, gap: Space.xs },
-  billMoneyRow: { flexDirection: 'row', alignItems: 'center', gap: Space.sm, flexWrap: 'wrap' },
+  billTitleRow: { flexDirection: 'row', alignItems: 'center', gap: Space.sm },
   duePill: {
+    flexShrink: 0,
     paddingHorizontal: Space.sm,
     paddingVertical: Space.half,
     borderRadius: Radius.pill,

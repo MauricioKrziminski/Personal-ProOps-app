@@ -26,7 +26,17 @@ interface ButtonProps {
   style?: StyleProp<ViewStyle>;
 }
 
-const HEIGHT: Record<Size, number> = { sm: HitTarget, md: 48, lg: 54 };
+/**
+ * Altura VISUAL. `sm` desceu de 44 para 36 (03/09/2026).
+ *
+ * 44 é o alvo mínimo de toque, não a altura mínima de um botão — e usar o alvo como altura
+ * deixava "Paguei" com a mesma presença de um submit de formulário dentro de uma linha de lista.
+ * O alvo continua em 44 pelo `hitSlop`, que é como o iOS resolve o mesmo problema em toda barra
+ * de ferramentas. É o `h-10` do export, com o rótulo um degrau menor.
+ */
+const HEIGHT: Record<Size, number> = { sm: 36, md: 48, lg: 54 };
+/** Quanto falta para o alvo chegar em 44 quando o botão é menor que isso. */
+const SLOP: Record<Size, number> = { sm: (HitTarget - HEIGHT.sm) / 2, md: 0, lg: 0 };
 
 /**
  * O único botão do app.
@@ -86,6 +96,7 @@ export function Button({
         accessibilityLabel={label}
         accessibilityState={{ disabled: inert, busy: loading }}
         disabled={inert}
+        hitSlop={SLOP[size]}
         onPressIn={() => {
           scale.set(withTiming(Motion.pressScale, { duration: Motion.duration.fast }));
         }}
@@ -102,7 +113,7 @@ export function Button({
             height: HEIGHT[size],
             backgroundColor: off ? theme.backgroundElement : surface[variant],
             opacity: loading ? 0.7 : 1,
-            paddingHorizontal: size === 'sm' ? Space.md : Space.xl,
+            paddingHorizontal: size === 'sm' ? Space.md + 2 : Space.xl,
             // Secundário ganha borda porque o primário deixou de ser colorido: com o `tint`
             // monocromático a distância entre primário e secundário aumentou, e a de secundário
             // para DESABILITADO encolheu (os dois eram `backgroundElement` liso). A borda é o
@@ -118,9 +129,13 @@ export function Button({
           // sistema é de todo mundo; este é deste app.
           <Mark size={20} color={labelColor} spinning />
         ) : (
-          <View style={styles.content}>
-            {icon ? <Icon name={icon} size="md" color={labelColor} /> : null}
-            <ThemedText type="smallBold" themeColor={labelColor}>
+          <View style={[styles.content, size === 'sm' && styles.contentSm]}>
+            {/* No `sm` o ícone acompanha o rótulo: 20px ao lado de um texto de 13 pesa demais. */}
+            {icon ? <Icon name={icon} size={size === 'sm' ? 'sm' : 'md'} color={labelColor} /> : null}
+            <ThemedText
+              type={size === 'sm' ? 'caption' : 'smallBold'}
+              themeColor={labelColor}
+              numberOfLines={1}>
               {label}
             </ThemedText>
           </View>
@@ -142,6 +157,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: Space.sm,
   },
+  contentSm: { gap: Space.xs },
   // O wrapper precisa do MESMO raio do miolo: `boxShadow` passado por `style` (o FAB do
   // Financeiro faz isso) desenhava um retângulo claro atrás da pílula — o "fundo branco".
   block: {

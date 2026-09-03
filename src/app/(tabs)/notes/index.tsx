@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, View, useWindowDimensions } from 'react-native';
+import { Platform, Pressable, ScrollView, StyleSheet, View, useWindowDimensions } from 'react-native';
 import { FlashList } from '@shopify/flash-list';
 import { router } from 'expo-router';
 import * as Haptics from 'expo-haptics';
@@ -13,6 +13,7 @@ import { SearchField } from '@/components/ui/search-field';
 import { TextField } from '@/components/ui/field';
 import { Icon } from '@/components/ui/icon';
 import { Mark } from '@/components/ui/mark';
+import { CURVED_BAR_SPACE } from '@/components/ui/curved-tab-bar';
 import { Screen } from '@/components/ui/screen';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useToast } from '@/components/ui/toast';
@@ -640,7 +641,13 @@ const styles = StyleSheet.create({
     borderCurve: 'continuous',
   },
   list: {
-    paddingBottom: Space.xxxl,
+    /**
+     * A barra do Android é ABSOLUTA e desenha por cima da lista; a `FlashList` rola sozinha e o
+     * `Screen` (aqui com `scroll={false}`) não tem como acrescentar padding nela. Sem isto a
+     * última nota ficava escondida atrás da pílula — não dava para ler nem tocar.
+     */
+    paddingBottom:
+      Space.xxxl + (Platform.OS === 'android' ? CURVED_BAR_SPACE : 0),
   },
   filters: {
     paddingBottom: Space.lg,

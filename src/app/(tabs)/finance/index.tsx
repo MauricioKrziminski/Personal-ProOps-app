@@ -51,6 +51,7 @@ import {
   useTransactionsSummary,
   type Transaction,
 } from '@/hooks/use-finance';
+import { categoryIcon } from '@/design/category-icons';
 import { formatBRL, localISODate } from '@/hooks/use-items';
 import { monthBounds } from '@/lib/dates';
 import { confirmDestructive } from '@/lib/item-actions';
@@ -72,11 +73,6 @@ const SOURCE_LABEL: Record<Transaction['source'], string> = {
   recurring: 'recorrente',
 };
 
-const KIND_ICON: Record<Transaction['kind'], SymbolViewProps['name']> = {
-  expense: 'arrow.up.right',
-  income: 'arrow.down.left',
-  transfer: 'arrow.left.arrow.right',
-};
 
 /**
  * Tile da faixa de atalhos. Vive aqui porque só esta tela usa (regra de `frontend.md`).
@@ -801,7 +797,7 @@ export default function FinanceScreen() {
                       <Row
                         title={tx.description || tx.merchant || tx.category || 'Sem descrição'}
                         subtitle={[tx.category, SOURCE_LABEL[tx.source]].filter(Boolean).join(' · ')}
-                        icon={KIND_ICON[tx.kind]}
+                        icon={categoryIcon(tx.category, tx.kind)}
                         accessibilityLabel={`${tx.description || tx.category || 'lançamento'}, ${formatBRL(tx.amount_cents)}, ${tx.kind === 'income' ? 'receita' : tx.kind === 'expense' ? 'despesa' : 'transferência'}`}
                         onLongPress={onLongPress}
                         trailing={
