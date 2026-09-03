@@ -10,7 +10,7 @@
     "ios": {
       "bundleIdentifier": "com.proops.personal",
       "supportsTablet": true,
-      "infoPlist": { "UIViewControllerBasedStatusBarAppearance": true }
+      "infoPlist": { "UIViewControllerBasedStatusBarAppearance": false }
     },
     "android": {
       "adaptiveIcon": {
