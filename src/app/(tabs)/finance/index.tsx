@@ -50,7 +50,7 @@ import {
   useTransactionsSummary,
   type Transaction,
 } from '@/hooks/use-finance';
-import { formatBRL, formatDateBR, localISODate } from '@/hooks/use-items';
+import { formatBRL, localISODate } from '@/hooks/use-items';
 import { monthBounds } from '@/lib/dates';
 import { confirmDestructive } from '@/lib/item-actions';
 import { useTheme, useScheme } from '@/hooks/use-theme';
