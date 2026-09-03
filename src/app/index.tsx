@@ -15,5 +15,5 @@ import { useSession } from '@/hooks/use-session';
 export default function Index() {
   const { session, loading } = useSession();
   if (loading) return null;
-  return <Redirect href="/design-preview" />;  // TEMP-PREVIEW
+  return <Redirect href={session ? '/today' : '/login'} />;
 }

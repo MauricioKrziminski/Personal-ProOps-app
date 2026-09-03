@@ -56,6 +56,10 @@ const PASSOS = ABAS.flatMap((aba) =>
 
 export default function DesignPreviewScreen() {
   const theme = useTheme();
+  // Ferramenta de desenvolvimento. Em build de produção a rota existe mas não desenha nada:
+  // ela fica FORA do portão de sessão, e uma tela do app aberta sem login não é aceitável nem
+  // com dado falso.
+  const dev = __DEV__;
   const { height } = useWindowDimensions();
   const [aba, setAba] = useState<(typeof ABAS)[number]>('Hoje');
   const [passo, setPasso] = useState<number | null>(null);
@@ -78,6 +82,8 @@ export default function DesignPreviewScreen() {
   const alturaTotal = height * FAIXAS[aba];
 
   const client = useMemo(() => seedClient(), []);
+
+  if (!dev) return <View style={{ flex: 1, backgroundColor: theme.background }} />;
 
   return (
     <QueryClientProvider client={client}>
