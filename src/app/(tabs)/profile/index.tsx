@@ -11,9 +11,13 @@ import { Segmented } from '@/components/ui/segmented';
 import { Screen } from '@/components/ui/screen';
 import { SkeletonRow } from '@/components/ui/skeleton';
 import { useToast } from '@/components/ui/toast';
-import { Radius, Space } from '@/design/tokens';
-import { usePlanStatus } from '@/hooks/use-finance';
+import { GradientSurface } from '@/components/ui/gradient';
+import { Button } from '@/components/ui/button';
+import { Radius, Space, tabular } from '@/design/tokens';
+import { currentMonth } from '@/components/finance/month-picker';
+import { useAiMonthStats, usePlanStatus } from '@/hooks/use-finance';
 import { pushBlockerMessage, useRegisterPush, usePushStatus } from '@/hooks/use-push';
+import { formatDateBR } from '@/hooks/use-items';
 import { useSession } from '@/hooks/use-session';
 import { useTheme, useThemeMode } from '@/hooks/use-theme';
 import { confirmDestructive } from '@/lib/item-actions';
@@ -35,6 +39,7 @@ export default function ProfileScreen() {
   const push = usePushStatus(userId);
   const register = useRegisterPush(userId);
   const plan = usePlanStatus();
+  const ia = useAiMonthStats(currentMonth());
 
   const phone = session?.user?.phone ? `+${session.user.phone}` : '—';
   const pushOn = push.data?.registered ?? false;
@@ -113,50 +118,130 @@ export default function ProfileScreen() {
       onRefresh={() => { push.refetch(); plan.refetch(); }}
       refreshing={push.isRefetching}>
       {/*
-        Cartão de identidade — o topo da tela no desenho.
-        Ele responde "de quem é esta conta" antes de qualquer ajuste, e é o que separa uma tela
-        de perfil de uma lista de configurações. O nome não existe no schema (só o telefone), e
-        por isso o card mostra o número, que é a chave de tudo no produto.
+        Cartão de identidade — o topo da tela no desenho do Stitch.
+
+        Responde "de quem é esta conta" antes de qualquer ajuste, e é o que separa uma tela de
+        perfil de uma lista de configurações. Fundo em gradiente com brilho, como o painel de
+        destaque: é o único bloco de destaque desta tela (§1, um por tela).
+
+        O nome não existe no schema — `profiles` guarda só o telefone —, então o card mostra o
+        número, que é a chave de tudo no produto. O selo verde no avatar diz o que o número
+        significa aqui: está vinculado ao WhatsApp.
       */}
-      <View style={[styles.idCard, { backgroundColor: theme.surface, borderColor: theme.cardBorder }]}>
-        <View style={[styles.idAvatar, { backgroundColor: theme.surfaceRaised, borderColor: theme.success }]}>
-          <Icon name="person.crop.circle" size="xl" color="textSecondary" />
-        </View>
-        <View style={styles.idInfo}>
-          <ThemedText type="ticker" selectable>
-            {phone}
-          </ThemedText>
-          <View style={styles.idMeta}>
-            <Icon name="bubble.left" size="xs" color="success" />
-            <ThemedText type="caption" themeColor="textSecondary">
-              conectado ao WhatsApp
-            </ThemedText>
+      <View style={[styles.idCard, { borderColor: theme.cardBorder, backgroundColor: theme.heroBottom }]}>
+        <GradientSurface from={theme.heroTop} to={theme.heroBottom} sheen={`${theme.tint}1F`} />
+
+        <View style={styles.idTop}>
+          <View>
+            <View style={[styles.idAvatar, { backgroundColor: theme.heroChip }]}>
+              <Icon name="person.crop.circle" size="xl" color="onHero" />
+            </View>
+            <View style={[styles.idSelo, { backgroundColor: theme.tint, borderColor: theme.heroBottom }]}>
+              <Icon name="checkmark" size="xs" color="onTint" />
+            </View>
           </View>
-        </View>
-        {plan.data?.plan ? (
-          <View style={[styles.idPlan, { borderColor: theme.success }]}>
-            <ThemedText type="meta" themeColor="success">
-              {plan.data.plan.toUpperCase()}
+
+          <View style={styles.idInfo}>
+            <ThemedText type="ticker" themeColor="onHero" selectable>
+              {phone}
             </ThemedText>
+            <View style={styles.idMeta}>
+              <Icon name="bubble.left" size="xs" color="onHeroSuccess" />
+              <ThemedText type="caption" themeColor="onHeroMuted">
+                conectado ao WhatsApp
+              </ThemedText>
+            </View>
           </View>
-        ) : null}
+
+          {plan.data?.plan ? (
+            <View style={[styles.idPlan, { backgroundColor: theme.heroChip }]}>
+              <ThemedText type="meta" themeColor="onHeroSuccess">
+                {plan.data.plan.toUpperCase()}
+              </ThemedText>
+            </View>
+          ) : null}
+        </View>
+
+        {/*
+          A grade de estatísticas do desenho — três números, **todos medidos**.
+
+          O Stitch põe "99,8% de acurácia da LLM" na terceira coluna. Não existe dado nenhum que
+          sustente isso: `ai_events` conta CHAMADAS, não acertos. No lugar vai o consumo de
+          mensagens de IA do mês, que é medido de verdade e ainda é o número que decide se o
+          plano vai estourar.
+        */}
+        <View style={styles.idStats}>
+          <Stat
+            valor={ia.data ? String(ia.data.lancamentos) : '—'}
+            rotulo="lançamentos por mensagem"
+          />
+          <Stat valor={ia.data ? String(ia.data.notas) : '—'} rotulo="notas capturadas" />
+          <Stat
+            valor={plan.data ? String(plan.data.ai_messages_month) : '—'}
+            rotulo="mensagens de IA no mês"
+            limite={plan.data ? plan.data.max_ai_messages_month : null}
+          />
+        </View>
       </View>
 
-      <Section title="Conta">
-        {plan.isLoading ? (
+      {/*
+        Assinatura — card próprio, não uma linha perdida em "Conta".
+        É o segundo motivo pelo qual alguém abre o Perfil (o primeiro é desligar notificação), e
+        como `Row` ele competia em peso com "Lixeira de notas".
+      */}
+      {plan.isLoading ? (
+        <Section>
           <SkeletonRow />
-        ) : plan.isError ? (
-          <Row title="Plano" subtitle="Não deu para carregar" icon="exclamationmark.triangle" onPress={() => plan.refetch()} />
-        ) : (
+        </Section>
+      ) : plan.isError ? (
+        <Section>
           <Row
-            title="Plano e família"
-            subtitle={plan.data?.plan ? `${plan.data.plan} · ${plan.data.members} de ${plan.data.max_members}` : undefined}
-            icon="person.2"
-            onPress={() => router.push('/finance/plan')}
+            title="Plano"
+            subtitle="Não deu para carregar"
+            icon="exclamationmark.triangle"
+            onPress={() => plan.refetch()}
           />
-        )}
-        <Row title="Pessoas" subtitle="quem enxerga o seu financeiro" icon="person.2.fill" onPress={() => router.push('/profile/members')} />
-      </Section>
+        </Section>
+      ) : plan.data ? (
+        <View style={[styles.planoCard, { backgroundColor: theme.surface, borderColor: theme.cardBorder }]}>
+          <View style={styles.planoTopo}>
+            <View style={styles.shrink}>
+              <ThemedText type="smallBold">{`Plano ${plan.data.plan}`}</ThemedText>
+              <ThemedText type="caption" themeColor="textSecondary">
+                {plan.data.is_trial
+                  ? `Teste até ${formatDateBR(plan.data.current_period_end)}`
+                  : `${plan.data.members} de ${plan.data.max_members} ${plan.data.max_members === 1 ? 'pessoa' : 'pessoas'}`}
+              </ThemedText>
+            </View>
+            <View
+              style={[
+                styles.planoBadge,
+                { backgroundColor: plan.data.is_trial ? theme.warningSoft : theme.successSoft },
+              ]}>
+              <ThemedText type="meta" themeColor={plan.data.is_trial ? 'warning' : 'success'}>
+                {plan.data.is_trial ? 'TESTE' : 'ATIVO'}
+              </ThemedText>
+            </View>
+          </View>
+
+          <View style={styles.planoAcoes}>
+            <Button
+              label="Gerenciar plano"
+              icon="creditcard"
+              variant="secondary"
+              size="sm"
+              onPress={() => router.push('/finance/plan')}
+            />
+            <Button
+              label="Pessoas"
+              icon="person.2"
+              variant="ghost"
+              size="sm"
+              onPress={() => router.push('/profile/members')}
+            />
+          </View>
+        </View>
+      ) : null}
 
       {/*
         Notificações tem UM lugar, logo abaixo de Conta.
@@ -193,6 +278,34 @@ export default function ProfileScreen() {
   );
 }
 
+/**
+ * Uma coluna da grade de estatísticas do cartão de perfil.
+ *
+ * Número grande em cima, rótulo pequeno embaixo — o contraste de escala é o que faz o número ser
+ * lido primeiro. `limite` só aparece quando existe: escrever "de ∞" para plano ilimitado seria
+ * ruído, e escrever "de 0" seria mentira.
+ */
+function Stat({ valor, rotulo, limite }: { valor: string; rotulo: string; limite?: number | null }) {
+  const theme = useTheme();
+  return (
+    <View style={[styles.stat, { backgroundColor: theme.heroChip }]}>
+      <View style={styles.statValor}>
+        <ThemedText type="subtitle" themeColor="onHero" style={tabular}>
+          {valor}
+        </ThemedText>
+        {limite && limite > 0 ? (
+          <ThemedText type="code" themeColor="onHeroMuted" style={tabular}>
+            {`/${limite}`}
+          </ThemedText>
+        ) : null}
+      </View>
+      <ThemedText type="caption" themeColor="onHeroMuted" numberOfLines={2}>
+        {rotulo}
+      </ThemedText>
+    </View>
+  );
+}
+
 const styles = StyleSheet.create({
   temaRow: {
     flexDirection: 'row',
@@ -205,20 +318,32 @@ const styles = StyleSheet.create({
   temaText: { flex: 1, minWidth: 0 },
   /** Largura fixa: com `flex` o segmentado encolhia até o rótulo "Sistema" truncar. */
   temaControl: { width: 200 },
+  shrink: { flex: 1, minWidth: 0 },
   idCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: Space.md,
-    padding: Space.lg,
+    gap: Space.lg,
+    padding: Space.gutter,
     borderRadius: Radius.md,
     borderCurve: 'continuous',
     borderWidth: StyleSheet.hairlineWidth,
+    overflow: 'hidden',
   },
+  idTop: { flexDirection: 'row', alignItems: 'center', gap: Space.md },
   idAvatar: {
     width: 56,
     height: 56,
     borderRadius: Radius.pill,
-    borderWidth: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  /** O selo do avatar. A borda é da COR DO CARD, para ele parecer recortado por cima. */
+  idSelo: {
+    position: 'absolute',
+    right: -2,
+    bottom: -2,
+    width: 20,
+    height: 20,
+    borderRadius: Radius.pill,
+    borderWidth: 2,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -228,8 +353,30 @@ const styles = StyleSheet.create({
     paddingHorizontal: Space.sm,
     paddingVertical: Space.xs,
     borderRadius: Radius.pill,
-    borderWidth: 1,
   },
+  idStats: { flexDirection: 'row', gap: Space.sm },
+  stat: {
+    flex: 1,
+    gap: Space.xs,
+    padding: Space.md,
+    borderRadius: Radius.sm,
+    borderCurve: 'continuous',
+  },
+  statValor: { flexDirection: 'row', alignItems: 'baseline', gap: Space.half },
+  planoCard: {
+    gap: Space.lg,
+    padding: Space.lg,
+    borderRadius: Radius.md,
+    borderCurve: 'continuous',
+    borderWidth: StyleSheet.hairlineWidth,
+  },
+  planoTopo: { flexDirection: 'row', alignItems: 'center', gap: Space.md },
+  planoBadge: {
+    paddingHorizontal: Space.sm,
+    paddingVertical: Space.half,
+    borderRadius: Radius.pill,
+  },
+  planoAcoes: { flexDirection: 'row', alignItems: 'center', gap: Space.sm },
   footer: {
     alignItems: 'center',
     paddingVertical: Space.xl,

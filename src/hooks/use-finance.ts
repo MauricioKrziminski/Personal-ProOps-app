@@ -1840,3 +1840,58 @@ export function useAlertsSent(limit = 60) {
     },
   });
 }
+
+/** O que a IA fez neste mês. Três números, todos reais. */
+export interface AiMonthStats {
+  /** Lançamentos criados a partir de mensagem do WhatsApp. */
+  lancamentos: number;
+  /** Notas capturadas pelo mesmo caminho. */
+  notas: number;
+}
+
+/**
+ * Contagem do que chegou pelo WhatsApp no mês corrente.
+ *
+ * Existe para a grade de estatísticas do Perfil. É a prova, em número, de que o canal funcionou —
+ * que é o que o produto vende.
+ *
+ * **Duas contagens `head: true`, não duas listas.** `count: 'exact'` com `head` devolve só o
+ * total no cabeçalho, sem trafegar linha nenhuma; carregar 300 transações para chamar `.length`
+ * seria pagar rede por um inteiro.
+ *
+ * ⚠️ **A terceira coluna do desenho ("acurácia da IA") não existe aqui de propósito.** O Stitch
+ * mostra "99,8%", e não há dado nenhum no banco que sustente esse número — só `ai_events`, que
+ * conta chamadas, não acertos. Inventá-lo seria escrever no Perfil uma métrica que ninguém
+ * mediu; o terceiro número vem de `plan_status.ai_messages_month`, que é medido de verdade.
+ */
+export function useAiMonthStats(month: string) {
+  return useQuery({
+    queryKey: ['ai-month-stats', month],
+    queryFn: async (): Promise<AiMonthStats> => {
+      const { from, to } = monthBounds(month);
+      const ws = await workspaceId();
+
+      const [tx, notas] = await Promise.all([
+        supabase
+          .from('transactions')
+          .select('id', { count: 'exact', head: true })
+          .eq('workspace_id', ws)
+          .eq('source', 'whatsapp')
+          .gte('occurred_at', from)
+          .lte('occurred_at', to),
+        supabase
+          .from('notes')
+          .select('id', { count: 'exact', head: true })
+          .eq('workspace_id', ws)
+          .eq('source', 'whatsapp')
+          .is('deleted_at', null)
+          .gte('created_at', `${from}T00:00:00`)
+          .lte('created_at', `${to}T23:59:59`),
+      ]);
+
+      if (tx.error) throw tx.error;
+      if (notas.error) throw notas.error;
+      return { lancamentos: tx.count ?? 0, notas: notas.count ?? 0 };
+    },
+  });
+}
