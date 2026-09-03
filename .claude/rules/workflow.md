@@ -13,7 +13,23 @@
 3. `npm test` verde (`node --test`, sem framework — helpers puros de data/dinheiro do app).
 4. **Mudou `agent/` → `.venv/bin/pytest` verde.** Teste que fala com rede ou banco não entra: os
    nós que falam com o mundo viram dublê.
-5. Mudou tela → conferir no device/emulador (dark E light) — nada de "deve funcionar".
+5. Mudou tela → conferir no device/emulador — nada de "deve funcionar".
+
+   **As quatro raízes de aba se olham sem login**, pela rota `design-preview`: ela monta as telas
+   REAIS com o cache do TanStack pré-semeado, então nenhum `queryFn` roda. Sem ela, ver a Hoje ou
+   o Financeiro exigia o OTP que chega no WhatsApp do dono do número — e foi por isso que essas
+   telas já foram entregues erradas duas vezes.
+
+   O caminho é temporário de propósito (a rota não tem link em lugar nenhum e desenha vazio fora
+   do `__DEV__`): trocar o destino do `Redirect` em `src/app/index.tsx` por `/design-preview`,
+   olhar, e desfazer. Cada `terminate` + `launch` avança um passo (aba × faixa vertical), o que
+   torna `xcrun simctl io booted screenshot` uma sequência determinística — não existe gesto de
+   rolagem por linha de comando, então a tela é montada inteira e deslocada por `translateY`.
+
+   ⚠️ Fixture nova precisa casar a chave EXATA do hook: `useNotesList` é `useInfiniteQuery` (o
+   cache guarda `{pages, pageParams}`) e `budgets_status` é consultada com duas chaves diferentes
+   (o DIA na Hoje, o MÊS no Financeiro). Chave errada não quebra — cai no estado de erro, em
+   silêncio.
 6. Mudou o agente → subir local (`docker compose up`) e mandar `scripts/fake_meta.py` com payload
    ASSINADO. Testar com o HMAC desligado esconderia justamente o erro mais caro daquele endpoint.
 7. Mudou schema → migration nova aplicada com `db push` + types regenerados. Mexeu em `0040`/`0041`
