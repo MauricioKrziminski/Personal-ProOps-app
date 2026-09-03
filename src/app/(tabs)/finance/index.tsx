@@ -23,6 +23,7 @@ import {
   shiftMonth,
 } from '@/components/finance/month-picker';
 import { ThemedText } from '@/components/themed-text';
+import { CardStack } from '@/components/finance/card-stack';
 import { AppHeader } from '@/components/ui/app-header';
 import { ItemLink } from '@/components/ui/item-link';
 import { Button } from '@/components/ui/button';
@@ -664,33 +665,41 @@ export default function FinanceScreen() {
         {cards.isError ? (
           <ErrorCard onRetry={cards.refetch} />
         ) : (cards.data ?? []).length > 0 ? (
-          <Section title="Cartões">
-            {(cards.data ?? []).map((card) => (
-              <Row
-                key={card.account_id}
-                title={card.name}
-                subtitle={[
-                  card.due_date ? `vence ${formatDateBR(card.due_date)}` : 'sem fatura aberta',
-                  card.available_limit_cents != null
-                    ? `livre ${formatBRL(Number(card.available_limit_cents))}`
-                    : null,
-                ]
-                  .filter(Boolean)
-                  .join(' · ')}
-                icon="creditcard"
-                accessibilityLabel={`${card.name}, fatura de ${formatBRL(Number(card.invoice_total_cents))}`}
-                trailing={<Money cents={Number(card.invoice_total_cents)} variant="headline" />}
-                onPress={() =>
-                  card.invoice_id
-                    ? router.push({
-                        pathname: '/finance/invoice/[id]',
-                        params: { id: card.invoice_id },
-                      })
-                    : router.push('/finance/cards')
-                }
-              />
-            ))}
-          </Section>
+          <View style={styles.block}>
+            <SectionHead
+              title="Cartões"
+              action={
+                <Pressable
+                  accessibilityRole="button"
+                  accessibilityLabel="Ver todos os cartões"
+                  hitSlop={12}
+                  onPress={() => router.push('/finance/cards')}>
+                  <ThemedText type="small" themeColor="tint">
+                    Ver todos
+                  </ThemedText>
+                </Pressable>
+              }
+            />
+            <CardStack
+              cards={(cards.data ?? []).map((c) => ({
+                account_id: c.account_id,
+                name: c.name,
+                invoice_id: c.invoice_id,
+                invoice_total_cents: Number(c.invoice_total_cents ?? 0),
+                credit_limit_cents: c.credit_limit_cents == null ? null : Number(c.credit_limit_cents),
+                available_limit_cents:
+                  c.available_limit_cents == null ? null : Number(c.available_limit_cents),
+                closing_date: c.closing_date,
+                due_date: c.due_date,
+                overdue_count: Number(c.overdue_count ?? 0),
+              }))}
+              onOpen={(card) =>
+                card.invoice_id
+                  ? router.push({ pathname: '/finance/invoice/[id]', params: { id: card.invoice_id } })
+                  : router.push('/finance/cards')
+              }
+            />
+          </View>
         ) : null}
 
         {/* Bloco 7 — confirmação do que a IA registrou, agrupada por dia. */}
