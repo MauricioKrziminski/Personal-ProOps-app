@@ -13,10 +13,10 @@ import {
 } from '@expo-google-fonts/jetbrains-mono';
 import { useFonts } from 'expo-font';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { DarkTheme, DefaultTheme, Stack, ThemeProvider, router, useSegments } from 'expo-router';
+import { DarkTheme, DefaultTheme, Stack, ThemeProvider, router } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
 import { StatusBar } from 'expo-status-bar';
-import { Platform, Pressable, useColorScheme } from 'react-native';
+import { Platform, Pressable } from 'react-native';
 import { KeyboardProvider } from 'react-native-keyboard-controller';
 
 import { AnimatedSplashOverlay } from '@/components/animated-icon';
@@ -26,7 +26,7 @@ import { stackHeaderFonts } from '@/components/ui/app-header';
 import { Icon } from '@/components/ui/icon';
 import { ConcealProvider } from '@/components/ui/conceal';
 import { ToastProvider } from '@/components/ui/toast';
-import { useBarStyle } from '@/hooks/use-theme';
+import { ThemeProvider as AppThemeProvider, useBarStyle, useScheme } from '@/hooks/use-theme';
 import { useSession } from '@/hooks/use-session';
 import { attachNotificationListeners, configureNotificationHandler } from '@/lib/notifications';
 
@@ -70,8 +70,20 @@ const modalOptions = {
   ),
 };
 
+/**
+ * O provider de tema envolve TUDO, e por isso a árvore do app mora num componente separado:
+ * `useScheme()` e `useBarStyle()` só existem dentro dele.
+ */
 export default function RootLayout() {
-  const colorScheme = useColorScheme();
+  return (
+    <AppThemeProvider>
+      <AppTree />
+    </AppThemeProvider>
+  );
+}
+
+function AppTree() {
+  const scheme = useScheme();
 
   // Tocar numa notificação precisa levar a algum lugar — inclusive em cold start.
   useEffect(attachNotificationListeners, []);
@@ -96,23 +108,18 @@ export default function RootLayout() {
   const { session, loading } = useSession();
   const barStyle = useBarStyle();
   /**
-   * As duas telas de `HeroPanel` — fundo escuro nos DOIS temas, então ícone claro.
+   * A barra de status segue o TEMA e nada mais.
    *
-   * Por SEGMENTO, não por `usePathname()`: a aba Hoje não mora em `/` (lá fica o `index` que
-   * decide o destino), e comparar string levava a um casamento silenciosamente falso. O
-   * `length === 2` é o que exclui as telas EMPURRADAS dentro da aba — Orçamentos e Fatura têm
-   * cabeçalho claro e precisam do ícone escuro.
+   * Havia uma exceção para Hoje e Financeiro, de quando o painel de destaque sangrava até o topo
+   * e o fundo atrás do relógio era sempre escuro. O painel virou card flutuante e o topo dessas
+   * telas passou a ser o fundo normal do app — a exceção passou a forçar ícone claro sobre fundo
+   * claro no tema light, que é o bug que ela existia para evitar.
    */
-  const segments = useSegments();
-  const onHeroScreen =
-    segments.length === 2 &&
-    segments[0] === '(tabs)' &&
-    (segments[1] === 'today' || segments[1] === 'finance');
-  const statusBarStyle = onHeroScreen ? ('light' as const) : barStyle;
+  const statusBarStyle = barStyle;
 
   return (
     <QueryClientProvider client={queryClient}>
-      <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
+      <ThemeProvider value={scheme === 'dark' ? DarkTheme : DefaultTheme}>
         {/* Requisito do `react-native-keyboard-controller`: sem o provider os componentes de
             teclado (o editor de nota) não recebem evento nenhum. */}
         <KeyboardProvider statusBarTranslucent navigationBarTranslucent>

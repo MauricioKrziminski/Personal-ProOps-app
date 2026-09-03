@@ -38,7 +38,6 @@ import { Skeleton, SkeletonRow } from '@/components/ui/skeleton';
 import { ProgressBar, Sparkline } from '@/components/ui/sparkline';
 import { useToast } from '@/components/ui/toast';
 import { Elevation, Motion, Radius, Space, tabular } from '@/design/tokens';
-import { useColorScheme } from '@/hooks/use-color-scheme';
 import {
   useAccounts,
   useBudgetsStatus,
@@ -53,7 +52,7 @@ import {
 import { formatBRL, formatDateBR, localISODate } from '@/hooks/use-items';
 import { monthBounds } from '@/lib/dates';
 import { confirmDestructive } from '@/lib/item-actions';
-import { useTheme } from '@/hooks/use-theme';
+import { useTheme, useScheme } from '@/hooks/use-theme';
 
 /**
  * Financeiro — responde "como está o meu mês?" e, no fundo, "posso gastar?".
@@ -220,7 +219,7 @@ function groupByDay(rows: Transaction[]): [string, Transaction[]][] {
 
 export default function FinanceScreen() {
   const theme = useTheme();
-  const scheme = useColorScheme() === 'dark' ? 'dark' : 'light';
+  const scheme = useScheme();
   const toast = useToast();
   const { width } = useWindowDimensions();
   const insets = useSafeAreaInsets();
@@ -324,7 +323,7 @@ export default function FinanceScreen() {
     <View style={styles.root}>
       <Screen
         grouped
-        topBar={<AppHeader />}
+        topBar={<AppHeader title="Financeiro" eyebrow={monthTitle(month)} />}
         onRefresh={() => {
           forecast.refetch();
           summary.refetch();

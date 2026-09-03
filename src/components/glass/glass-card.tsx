@@ -1,9 +1,9 @@
 import { BlurView } from 'expo-blur';
 import { GlassView, isLiquidGlassAvailable } from 'expo-glass-effect';
-import { StyleSheet, useColorScheme, View, type StyleProp, type ViewStyle } from 'react-native';
+import { StyleSheet, View, type StyleProp, type ViewStyle } from 'react-native';
 
 import { Elevation, Radius, Space } from '@/design/tokens';
-import { useTheme } from '@/hooks/use-theme';
+import { useTheme, useScheme } from '@/hooks/use-theme';
 
 interface GlassCardProps {
   children: React.ReactNode;
@@ -23,7 +23,7 @@ interface GlassCardProps {
  * borda que define a superfície sem inventar cor: é o mínimo para o card existir nos dois temas.
  */
 export function GlassCard({ children, style, variant = 'regular' }: GlassCardProps) {
-  const scheme = useColorScheme();
+  const scheme = useScheme();
   const theme = useTheme();
 
   // Hairline define a borda; a elevação tira o card do plano do fundo. Um destaque que não

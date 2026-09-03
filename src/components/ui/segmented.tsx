@@ -5,8 +5,7 @@ import * as Haptics from 'expo-haptics';
 
 import { ThemedText } from '@/components/themed-text';
 import { Elevation, Motion, Radius, Space } from '@/design/tokens';
-import { useColorScheme } from '@/hooks/use-color-scheme';
-import { useTheme } from '@/hooks/use-theme';
+import { useTheme, useScheme } from '@/hooks/use-theme';
 
 interface SegmentedProps<T extends string> {
   options: { value: T; label: string }[];
@@ -24,7 +23,7 @@ interface SegmentedProps<T extends string> {
  */
 export function Segmented<T extends string>({ options, value, onChange }: SegmentedProps<T>) {
   const theme = useTheme();
-  const scheme = useColorScheme() === 'dark' ? 'dark' : 'light';
+  const scheme = useScheme();
   const [width, setWidth] = useState(0);
 
   const index = Math.max(0, options.findIndex((o) => o.value === value));

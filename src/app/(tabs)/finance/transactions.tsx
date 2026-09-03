@@ -23,7 +23,6 @@ import { Skeleton, SkeletonRow } from '@/components/ui/skeleton';
 import { useToast } from '@/components/ui/toast';
 import { MaxContentWidth } from '@/constants/theme';
 import { Elevation, Motion, Radius, Space, tabular } from '@/design/tokens';
-import { useColorScheme } from '@/hooks/use-color-scheme';
 import {
   NO_ACCOUNT,
   useAccounts,
@@ -40,7 +39,7 @@ import { formatBRL, formatDateBR, localISODate } from '@/hooks/use-items';
 import { monthBounds } from '@/lib/dates';
 import { confirmDestructive } from '@/lib/item-actions';
 import { useDebounced } from '@/hooks/use-debounced';
-import { useTheme } from '@/hooks/use-theme';
+import { useTheme, useScheme } from '@/hooks/use-theme';
 
 /**
  * Lançamentos — "cadê aquele lançamento, e o que entrou e saiu neste mês?".
@@ -120,7 +119,7 @@ function toSections(rows: Transaction[]): DaySection[] {
 
 export default function TransactionsScreen() {
   const theme = useTheme();
-  const scheme = useColorScheme() === 'dark' ? 'dark' : 'light';
+  const scheme = useScheme();
   const toast = useToast();
   const insets = useSafeAreaInsets();
   const params = useLocalSearchParams<{

@@ -7,8 +7,7 @@ import * as Haptics from 'expo-haptics';
 import { ThemedText } from '@/components/themed-text';
 import { Icon } from '@/components/ui/icon';
 import { Elevation, Motion, Radius, Space } from '@/design/tokens';
-import { useTheme } from '@/hooks/use-theme';
-import { useColorScheme } from '@/hooks/use-color-scheme';
+import { useTheme, useScheme } from '@/hooks/use-theme';
 
 type Tone = 'info' | 'success' | 'error';
 
@@ -68,7 +67,7 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
 function ToastView({ toast, onDismiss }: { toast: Toast; onDismiss: () => void }) {
   const theme = useTheme();
   const insets = useSafeAreaInsets();
-  const scheme = useColorScheme() === 'dark' ? 'dark' : 'light';
+  const scheme = useScheme();
 
   const icon = {
     info: 'info.circle.fill',

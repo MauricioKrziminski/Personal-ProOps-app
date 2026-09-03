@@ -96,7 +96,7 @@ export default function TodayScreen() {
 
   return (
     <View style={[styles.root, { backgroundColor: theme.background }]}>
-      <AppHeader />
+      <AppHeader title="Hoje" eyebrow={hojePorExtenso()} />
 
       <ScrollView
         contentContainerStyle={[styles.scroll, { paddingBottom: insets.bottom + Space.xxxl * 2 }]}
@@ -456,6 +456,20 @@ function Counter({
       {value > 0 ? <View style={[styles.counterDot, { backgroundColor: theme[tone] }]} /> : null}
     </Pressable>
   );
+}
+
+/**
+ * "quarta-feira, 3 de setembro" — a etiqueta do cabeçalho.
+ *
+ * É a informação que a tela Hoje tem e as outras não: o dia. Repetir a marca ali seria gastar a
+ * linha com algo que não muda.
+ */
+function hojePorExtenso(): string {
+  return new Date().toLocaleDateString('pt-BR', {
+    weekday: 'long',
+    day: 'numeric',
+    month: 'long',
+  });
 }
 
 /** `HH:MM` local a partir de um timestamp ISO. Vazio vira travessão, nunca "Invalid Date". */

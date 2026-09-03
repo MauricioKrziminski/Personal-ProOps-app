@@ -1,11 +1,11 @@
 import { Children, Fragment, type ReactNode } from 'react';
-import { Pressable, StyleSheet, View, useColorScheme, type AccessibilityState } from 'react-native';
+import { Pressable, StyleSheet, View, type AccessibilityState } from 'react-native';
 import type { SymbolViewProps } from 'expo-symbols';
 
 import { ThemedText } from '@/components/themed-text';
 import { Icon } from '@/components/ui/icon';
 import { Elevation, HitTarget, Radius, Space, Type } from '@/design/tokens';
-import { useTheme } from '@/hooks/use-theme';
+import { useTheme, useScheme } from '@/hooks/use-theme';
 
 interface RowProps {
   title: string;
@@ -86,7 +86,7 @@ export function Row({
  */
 export function Section({ title, children }: { title?: string; children: ReactNode }) {
   const theme = useTheme();
-  const scheme = useColorScheme() === 'dark' ? 'dark' : 'light';
+  const scheme = useScheme();
   const items = Children.toArray(children);
 
   return (

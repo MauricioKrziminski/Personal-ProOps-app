@@ -6,7 +6,7 @@ import * as Haptics from 'expo-haptics';
 
 import { Chip } from '@/components/finance/chip';
 import { ThemedText } from '@/components/themed-text';
-import { AppHeader } from '@/components/ui/app-header';
+import { AppHeader, HeaderIconButton } from '@/components/ui/app-header';
 import { EmptyState } from '@/components/ui/empty-state';
 import { ItemLink } from '@/components/ui/item-link';
 import { SearchField } from '@/components/ui/search-field';
@@ -360,7 +360,22 @@ export default function NotesScreen() {
   );
 
   return (
-    <Screen scroll={false} grouped topBar={<AppHeader />}>
+    <Screen
+      scroll={false}
+      grouped
+      topBar={
+        <AppHeader
+          title="Notas"
+          eyebrow={notes.length > 0 ? `${notes.length} ${notes.length === 1 ? 'nota' : 'notas'}` : undefined}
+          action={
+            <HeaderIconButton
+              icon="folder"
+              label="Pastas"
+              onPress={() => router.push('/notes/folders')}
+            />
+          }
+        />
+      }>
       <FlashList
         data={notes}
         keyExtractor={(note) => note.id}
@@ -393,13 +408,6 @@ export default function NotesScreen() {
                   accessibilityLabel="Buscar nas notas"
                 />
               </View>
-              <Pressable
-                accessibilityRole="button"
-                accessibilityLabel="Pastas"
-                onPress={() => router.push('/notes/folders')}
-                style={[styles.searchAction, { backgroundColor: theme.backgroundElement, borderColor: theme.cardBorder }]}>
-                <Icon name="folder" size="md" color="textSecondary" />
-              </Pressable>
               <Pressable
                 accessibilityRole="button"
                 accessibilityLabel="Nova nota"

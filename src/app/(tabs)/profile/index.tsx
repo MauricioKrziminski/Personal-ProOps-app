@@ -7,6 +7,7 @@ import { AppHeader } from '@/components/ui/app-header';
 import { EmptyState } from '@/components/ui/empty-state';
 import { Icon } from '@/components/ui/icon';
 import { Row, Section } from '@/components/ui/row';
+import { Segmented } from '@/components/ui/segmented';
 import { Screen } from '@/components/ui/screen';
 import { SkeletonRow } from '@/components/ui/skeleton';
 import { useToast } from '@/components/ui/toast';
@@ -14,7 +15,7 @@ import { Radius, Space } from '@/design/tokens';
 import { usePlanStatus } from '@/hooks/use-finance';
 import { pushBlockerMessage, useRegisterPush, usePushStatus } from '@/hooks/use-push';
 import { useSession } from '@/hooks/use-session';
-import { useTheme } from '@/hooks/use-theme';
+import { useTheme, useThemeMode } from '@/hooks/use-theme';
 import { confirmDestructive } from '@/lib/item-actions';
 import { supabase } from '@/lib/supabase';
 
@@ -26,6 +27,7 @@ import { supabase } from '@/lib/supabase';
  */
 export default function ProfileScreen() {
   const theme = useTheme();
+  const { mode, setMode } = useThemeMode();
   const { session } = useSession();
   const toast = useToast();
   const userId = session?.user?.id;
@@ -45,6 +47,30 @@ export default function ProfileScreen() {
     };
     confirmDestructive('Sair da conta?', 'Sair', doIt);
   };
+
+  const aparencia = (
+    <Section title="Aparência">
+      <View style={styles.temaRow}>
+        <View style={styles.temaText}>
+          <ThemedText type="default">Tema</ThemedText>
+          <ThemedText type="footnote" themeColor="textSecondary">
+            {mode === 'system' ? 'seguindo o aparelho' : mode === 'dark' ? 'sempre escuro' : 'sempre claro'}
+          </ThemedText>
+        </View>
+        <View style={styles.temaControl}>
+          <Segmented
+            value={mode}
+            onChange={setMode}
+            options={[
+              { value: 'system', label: 'Sistema' },
+              { value: 'light', label: 'Claro' },
+              { value: 'dark', label: 'Escuro' },
+            ]}
+          />
+        </View>
+      </View>
+    </Section>
+  );
 
   const notifications = (
     <Section title="Notificações">
@@ -83,7 +109,7 @@ export default function ProfileScreen() {
   return (
     <Screen
       grouped
-      topBar={<AppHeader />}
+      topBar={<AppHeader title="Perfil" />}
       onRefresh={() => { push.refetch(); plan.refetch(); }}
       refreshing={push.isRefetching}>
       {/*
@@ -146,6 +172,8 @@ export default function ProfileScreen() {
 
       {pushOn ? notifications : null}
 
+      {aparencia}
+
       <Section>
         <Row title="Sair da conta" icon="rectangle.portrait.and.arrow.right" destructive chevron={false} onPress={confirmSignOut} />
       </Section>
@@ -164,6 +192,17 @@ export default function ProfileScreen() {
 }
 
 const styles = StyleSheet.create({
+  temaRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: Space.md,
+    paddingHorizontal: Space.lg,
+    paddingVertical: Space.md,
+  },
+  temaText: { flex: 1, minWidth: 0 },
+  /** Largura fixa: com `flex` o segmentado encolhia até o rótulo "Sistema" truncar. */
+  temaControl: { width: 200 },
   idCard: {
     flexDirection: 'row',
     alignItems: 'center',

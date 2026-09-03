@@ -1,7 +1,7 @@
-import { StyleSheet, View, useColorScheme, type StyleProp, type ViewStyle } from 'react-native';
+import { StyleSheet, View, type StyleProp, type ViewStyle } from 'react-native';
 
 import { Elevation, Radius, Space, type ElevationLevel } from '@/design/tokens';
-import { useTheme } from '@/hooks/use-theme';
+import { useTheme, useScheme } from '@/hooks/use-theme';
 
 interface CardProps {
   children: React.ReactNode;
@@ -19,7 +19,7 @@ interface CardProps {
  */
 export function Card({ children, elevation = 'raised', style }: CardProps) {
   const theme = useTheme();
-  const scheme = useColorScheme() === 'dark' ? 'dark' : 'light';
+  const scheme = useScheme();
 
   return (
     <View
