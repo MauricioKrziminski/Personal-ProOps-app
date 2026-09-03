@@ -16,7 +16,9 @@ export type ThemedTextProps = TextProps & {
     | 'caption'
     | 'link'
     | 'linkPrimary'
-    | 'code';
+    | 'code'
+    | 'ticker'
+    | 'meta';
   themeColor?: ThemeColor;
 };
 
@@ -59,7 +61,7 @@ const styles = StyleSheet.create({
   /** secundário legível — o cavalo de batalha (235 usos) */
   small: Type.subhead,
   /** ação: rótulo de botão */
-  smallBold: { ...Type.subhead, fontWeight: '600' },
+  smallBold: { ...Type.subhead, fontFamily: Fonts.semibold },
   /** metadado — o segundo degrau de verdade, não "quase igual ao corpo" */
   footnote: Type.footnote,
   /** rótulo de seção, contador, unidade */
@@ -73,6 +75,11 @@ const styles = StyleSheet.create({
    */
   link: { ...Type.subhead, textDecorationLine: 'underline' },
   /** cor vem de `tint` no componente — nunca hex */
-  linkPrimary: { ...Type.subhead, fontWeight: '600', textDecorationLine: 'underline' },
-  code: { ...Type.footnote, fontFamily: Fonts.mono },
+  linkPrimary: { ...Type.subhead, fontFamily: Fonts.semibold, textDecorationLine: 'underline' },
+  /** mono: hora, contador, unidade — o segundo tipo do sistema */
+  code: Type.code,
+  /** mono um degrau acima: dinheiro dentro de card e linha */
+  ticker: Type.ticker,
+  /** rótulo de seção em caixa alta */
+  meta: Type.meta,
 });

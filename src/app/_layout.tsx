@@ -1,4 +1,16 @@
 import { useEffect } from 'react';
+import {
+  HankenGrotesk_400Regular,
+  HankenGrotesk_500Medium,
+  HankenGrotesk_600SemiBold,
+  HankenGrotesk_700Bold,
+} from '@expo-google-fonts/hanken-grotesk';
+import {
+  JetBrainsMono_400Regular,
+  JetBrainsMono_500Medium,
+  JetBrainsMono_600SemiBold,
+} from '@expo-google-fonts/jetbrains-mono';
+import { useFonts } from 'expo-font';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { DarkTheme, DefaultTheme, Stack, ThemeProvider, router, useSegments } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
@@ -62,6 +74,22 @@ export default function RootLayout() {
   // Tocar numa notificação precisa levar a algum lugar — inclusive em cold start.
   useEffect(attachNotificationListeners, []);
 
+  /**
+   * As duas famílias do design (Hanken Grotesk + JetBrains Mono).
+   *
+   * O app segura o splash até carregarem: `Type` aponta para as faces pelo NOME, e uma face
+   * ausente não cai no system font — ela some, deixando a tela em branco por um frame.
+   */
+  const [fontsLoaded] = useFonts({
+    HankenGrotesk_400Regular,
+    HankenGrotesk_500Medium,
+    HankenGrotesk_600SemiBold,
+    HankenGrotesk_700Bold,
+    JetBrainsMono_400Regular,
+    JetBrainsMono_500Medium,
+    JetBrainsMono_600SemiBold,
+  });
+
   const { session, loading } = useSession();
   const barStyle = useBarStyle();
   /**
@@ -87,7 +115,7 @@ export default function RootLayout() {
         <KeyboardProvider statusBarTranslucent navigationBarTranslucent>
           <ConcealProvider>
           <ToastProvider>
-            <AnimatedSplashOverlay ready={!loading} />
+            <AnimatedSplashOverlay ready={!loading && fontsLoaded} />
           <AndroidActionSheet />
             {loading ? null : (
               /*

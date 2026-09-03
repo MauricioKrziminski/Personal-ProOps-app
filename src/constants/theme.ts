@@ -109,6 +109,8 @@ export const Colors = {
     onHeroMuted: 'rgba(255, 255, 255, 0.62)',
     /** hairline entre os tiles de ação dentro do hero */
     heroSeparator: 'rgba(255, 255, 255, 0.14)',
+    /** contorno de 1px do card — a assinatura do Stitch, e o que separa card de fundo sem sombra */
+    cardBorder: 'rgba(0, 0, 0, 0.08)',
   },
   dark: {
     text: '#ffffff',
@@ -134,35 +136,32 @@ export const Colors = {
     onHero: '#F5F5F7',
     onHeroMuted: 'rgba(245, 245, 247, 0.58)',
     heroSeparator: 'rgba(255, 255, 255, 0.10)',
+    cardBorder: 'rgba(255, 255, 255, 0.06)',
   },
 } as const;
 
 export type ThemeColor = keyof typeof Colors.light & keyof typeof Colors.dark;
 
-export const Fonts = Platform.select({
-  ios: {
-    /** iOS `UIFontDescriptorSystemDesignDefault` */
-    sans: 'system-ui',
-    /** iOS `UIFontDescriptorSystemDesignSerif` */
-    serif: 'ui-serif',
-    /** iOS `UIFontDescriptorSystemDesignRounded` */
-    rounded: 'ui-rounded',
-    /** iOS `UIFontDescriptorSystemDesignMonospaced` */
-    mono: 'ui-monospace',
-  },
-  default: {
-    sans: 'normal',
-    serif: 'serif',
-    rounded: 'normal',
-    mono: 'monospace',
-  },
-  web: {
-    sans: 'var(--font-display)',
-    serif: 'var(--font-serif)',
-    rounded: 'var(--font-rounded)',
-    mono: 'var(--font-mono)',
-  },
-});
+/**
+ * As famílias do design Stitch: **Hanken Grotesk** no texto, **JetBrains Mono** no número.
+ *
+ * O par é o que dá voz a um sistema sem cor de marca — um tipo para ler, outro para carimbar
+ * dado (hora, valor, percentual, telefone, badge). Era a régua da plataforma (`system-ui`), e
+ * por isso o app lia como "iOS bem feito genérico" mesmo com o layout certo.
+ *
+ * **Nome por PESO, nunca `fontWeight`.** Fonte custom no Android ignora `fontWeight` e cai no
+ * regular com bold sintético; no iOS a família também é resolvida pelo nome do arquivo. Quem
+ * escolhe o peso é a variante de `Type`, apontando para a face exata.
+ */
+export const Fonts = {
+  regular: 'HankenGrotesk_400Regular',
+  medium: 'HankenGrotesk_500Medium',
+  semibold: 'HankenGrotesk_600SemiBold',
+  bold: 'HankenGrotesk_700Bold',
+  mono: 'JetBrainsMono_400Regular',
+  monoMedium: 'JetBrainsMono_500Medium',
+  monoSemibold: 'JetBrainsMono_600SemiBold',
+} as const;
 
 export const Spacing = {
   half: 2,

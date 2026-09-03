@@ -1,5 +1,5 @@
 import { ThemedText } from '@/components/themed-text';
-import { Fonts, type ThemeColor } from '@/constants/theme';
+import { type ThemeColor } from '@/constants/theme';
 import { Type, tabular, type TypeVariant } from '@/design/tokens';
 import { concealText, useConceal } from '@/components/ui/conceal';
 import { formatBRL } from '@/hooks/use-items';
@@ -47,7 +47,6 @@ export function Money({
     tone === 'auto' ? (cents >= 0 ? 'success' : 'text') : tone === 'plain' ? 'text' : tone;
 
   const prefix = signed ? (cents > 0 ? '+' : cents < 0 ? '−' : '') : '';
-  const isMoneyDisplay = variant === 'money' || variant === 'heroMoney';
   const texto = formatBRL(Math.abs(cents));
 
   return (
@@ -57,11 +56,8 @@ export function Money({
       // baixo da máscara derrotaria o propósito.
       selectable={!oculto}
       accessibilityLabel={oculto ? 'Valor oculto' : undefined}
-      style={[
-        Type[variant],
-        tabular,
-        isMoneyDisplay && { fontFamily: Fonts?.rounded },
-      ]}>
+      // `Type[variant]` já carrega a família certa (Hanken no display, JetBrains no `ticker`).
+      style={[Type[variant], tabular]}>
       {oculto ? concealText() : `${prefix}${texto}`}
     </ThemedText>
   );

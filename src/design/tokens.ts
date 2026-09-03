@@ -9,6 +9,8 @@
  */
 
 import type { TextStyle } from 'react-native';
+
+import { Fonts } from '@/constants/theme';
 import { Easing } from 'react-native-reanimated';
 
 /**
@@ -16,17 +18,17 @@ import { Easing } from 'react-native-reanimated';
  * barato que faz a superfície parecer iOS.
  */
 export const Radius = {
-  /** menor raio permitido — badge, barra de progresso */
-  xs: 8,
-  /** input, linha de lista */
-  sm: 12,
-  /** card */
-  md: 16,
-  /** card de destaque */
-  lg: 20,
+  /** menor raio permitido — badge, barra de progresso (`rounded` do Stitch) */
+  xs: 4,
+  /** input, linha de lista (`rounded-lg`) */
+  sm: 8,
+  /** card — o raio mais usado do design (`rounded-xl`, 46 ocorrências) */
+  md: 12,
+  /** card de destaque (`rounded-2xl`) */
+  lg: 16,
   /** sheet */
-  xl: 28,
-  /** botão, chip, FAB */
+  xl: 20,
+  /** botão, chip, FAB, avatar (`rounded-full`, 113 ocorrências: o Stitch é feito de pílulas) */
   pill: 999,
 } as const;
 
@@ -40,6 +42,8 @@ export const Space = {
   xl: 24,
   xxl: 32,
   xxxl: 48,
+  /** calha do painel de destaque — o `gutter-lg` do Stitch, o único degrau que faltava */
+  gutter: 20,
 } as const;
 
 /**
@@ -113,34 +117,29 @@ export const Motion = {
  * ou custa — sem ele o valor muda de largura enquanto anima.
  */
 export const Type = {
-  largeTitle: { fontSize: 34, lineHeight: 41, fontWeight: '700' },
-  title: { fontSize: 28, lineHeight: 34, fontWeight: '700' },
-  title2: { fontSize: 22, lineHeight: 28, fontWeight: '600' },
-  headline: { fontSize: 17, lineHeight: 22, fontWeight: '600' },
-  body: { fontSize: 17, lineHeight: 22, fontWeight: '400' },
-  callout: { fontSize: 16, lineHeight: 21, fontWeight: '400' },
-  subhead: { fontSize: 15, lineHeight: 20, fontWeight: '400' },
-  footnote: { fontSize: 13, lineHeight: 18, fontWeight: '400' },
-  caption: { fontSize: 12, lineHeight: 16, fontWeight: '400' },
-  /** display de dinheiro — `Fonts.rounded` entra aqui e no `heroMoney` */
-  money: { fontSize: 40, lineHeight: 46, fontWeight: '700' },
+  largeTitle: { fontFamily: Fonts.bold, fontSize: 32, lineHeight: 38, letterSpacing: -0.8 },
+  title: { fontFamily: Fonts.semibold, fontSize: 26, lineHeight: 32, letterSpacing: -0.52 },
+  title2: { fontFamily: Fonts.semibold, fontSize: 20, lineHeight: 26, letterSpacing: -0.3 },
+  headline: { fontFamily: Fonts.semibold, fontSize: 17, lineHeight: 22, letterSpacing: -0.17 },
+  body: { fontFamily: Fonts.regular, fontSize: 17, lineHeight: 24, letterSpacing: -0.09 },
+  callout: { fontFamily: Fonts.regular, fontSize: 15, lineHeight: 21, letterSpacing: -0.05 },
+  subhead: { fontFamily: Fonts.regular, fontSize: 15, lineHeight: 21, letterSpacing: -0.05 },
+  footnote: { fontFamily: Fonts.regular, fontSize: 13, lineHeight: 18, letterSpacing: 0 },
+  caption: { fontFamily: Fonts.medium, fontSize: 11, lineHeight: 14, letterSpacing: 0.44 },
+  /** dinheiro em linha e no painel — o Stitch usa UM tamanho de display (`display-hero-mobile`) */
+  money: { fontFamily: Fonts.bold, fontSize: 32, lineHeight: 38, letterSpacing: -0.8 },
+  heroMoney: { fontFamily: Fonts.bold, fontSize: 32, lineHeight: 38, letterSpacing: -0.8 },
+  /** rótulo de seção em caixa alta — `caption-xs` + `tracking-widest` */
+  meta: { fontFamily: Fonts.semibold, fontSize: 11, lineHeight: 14, letterSpacing: 1.1 },
   /**
-   * O valor dentro do painel de destaque.
+   * Mono, o segundo tipo do sistema. Hora, data, contador, unidade, badge de status.
    *
-   * Maior que o `money` porque ali ele não disputa com nada: o painel é uma superfície própria,
-   * e o contraste de escala contra o rótulo (12) passa de 3,3× para 4,7×. `letterSpacing`
-   * negativo porque display grande em peso 700 abre demais — é o mesmo ajuste que sistemas
-   * tipográficos sem cor de marca usam para dar voz ao display.
+   * É o que carimba "isto é dado" sem gastar cor, e é metade da personalidade do design —
+   * sem ele o app volta a ser uma escala de cinza só com Hanken Grotesk.
    */
-  heroMoney: { fontSize: 56, lineHeight: 60, fontWeight: '700', letterSpacing: -1.2 },
-  /**
-   * Metadado e etiqueta: data, categoria, origem ("via WhatsApp"), unidade.
-   *
-   * O par com o `heroMoney`/`money` é o que dá personalidade a um sistema **sem cor de marca** —
-   * um tipo para o valor, outro para carimbar o contexto. É a regra que torna Vercel e Linear
-   * reconhecíveis sem que nenhum deles tenha uma cor própria em tela.
-   */
-  meta: { fontSize: 12, lineHeight: 16, fontWeight: '600', letterSpacing: 0.8 },
+  code: { fontFamily: Fonts.monoMedium, fontSize: 12, lineHeight: 16, letterSpacing: 0.24 },
+  /** mono um degrau acima: valor de dinheiro dentro de card e linha */
+  ticker: { fontFamily: Fonts.monoSemibold, fontSize: 14, lineHeight: 18, letterSpacing: -0.14 },
 } as const;
 
 export type TypeVariant = keyof typeof Type;
