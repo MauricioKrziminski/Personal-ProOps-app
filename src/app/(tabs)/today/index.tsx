@@ -163,7 +163,6 @@ export default function TodayScreen() {
                 <Sparkline values={series} width={width - Space.lg * 2} showZero />
               ) : undefined
             }
-            actions={atalhos}
             concealable
             onPress={() => router.push('/finance/forecast')}
           />
@@ -178,10 +177,6 @@ export default function TodayScreen() {
       }}
       refreshing={forecast.isRefetching}>
       {/* Título, cores do cabeçalho e estilo da status bar moram no `_layout` da aba. */}
-      {/* Os dois ícones eram uma `View` à mão com `gap: 16` — e o iOS 26 desenhava a pílula de
-          vidro em volta dela, com o nosso respiro em vez do do sistema. `plus.circle.fill` ao
-          lado de `magnifyingglass` ainda misturava preenchido com contorno no mesmo header
-          (`design.md` §4); "Nova nota" agora usa o MESMO ícone da aba Notas. */}
       <HeaderActions
         onHero
         actions={[
@@ -189,6 +184,75 @@ export default function TodayScreen() {
           { label: 'Nova nota', icon: 'square.and.pencil', onPress: () => router.push('/notes/new') },
         ]}
       />
+
+      {/* Faixa Triad de Status — Vencendo, Lembretes, Orçamentos (Stitch Seção 2) */}
+      <View style={styles.triadGrid}>
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel={`Vencendo: ${overdue.length + dueSoon.length}`}
+          onPress={() => router.push('/finance/transactions')}
+          style={[styles.triadPill, { backgroundColor: theme.surface, borderColor: theme.separator }]}>
+          <View style={styles.triadText}>
+            <ThemedText type="caption" themeColor="textSecondary">
+              Vencendo
+            </ThemedText>
+            <ThemedText type="headline" style={tabular}>
+              {overdue.length + dueSoon.length}
+            </ThemedText>
+          </View>
+          <View
+            style={[
+              styles.triadDot,
+              { backgroundColor: overdue.length > 0 ? theme.danger : theme.success },
+            ]}
+          />
+        </Pressable>
+
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel={`Lembretes: ${(reminders.data ?? []).length}`}
+          onPress={() => router.push('/reminders')}
+          style={[styles.triadPill, { backgroundColor: theme.surface, borderColor: theme.separator }]}>
+          <View style={styles.triadText}>
+            <ThemedText type="caption" themeColor="textSecondary">
+              Lembretes
+            </ThemedText>
+            <ThemedText type="headline" style={tabular}>
+              {(reminders.data ?? []).length}
+            </ThemedText>
+          </View>
+          <View
+            style={[
+              styles.triadDot,
+              {
+                backgroundColor:
+                  (reminders.data ?? []).length > 0 ? theme.warning : theme.textSecondary,
+              },
+            ]}
+          />
+        </Pressable>
+
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel={`Orçamento: ${tight.length}`}
+          onPress={() => router.push('/finance/budgets')}
+          style={[styles.triadPill, { backgroundColor: theme.surface, borderColor: theme.separator }]}>
+          <View style={styles.triadText}>
+            <ThemedText type="caption" themeColor="textSecondary">
+              Orçamento
+            </ThemedText>
+            <ThemedText type="headline" style={tabular}>
+              {tight.length}
+            </ThemedText>
+          </View>
+          <View
+            style={[
+              styles.triadDot,
+              { backgroundColor: tight.length > 0 ? theme.warning : theme.tint },
+            ]}
+          />
+        </Pressable>
+      </View>
 
       {loading ? (
         <>
@@ -209,7 +273,7 @@ export default function TodayScreen() {
         </Section>
       ) : null}
 
-      {/* Vem em segundo porque é a única coisa da tela com consequência se ignorada. */}
+      {/* Atrasado / Atenção — Cards elevados com tag pill e ação Paguei direta (Stitch Seção 3) */}
       {bills.isError ? (
         <Section title="O que vence">
           <Row
@@ -220,26 +284,120 @@ export default function TodayScreen() {
           />
         </Section>
       ) : null}
+
       {overdue.length > 0 ? (
-        <Section title="Atrasado">
-          {overdue.map((b) => (
-            <Row
-              key={b.ref_id}
-              title={b.title}
-              subtitle={`venceu em ${formatDateBR(b.due_date)}`}
-              icon={b.kind === 'invoice' ? 'creditcard' : 'exclamationmark.circle'}
-              accessibilityLabel={`${b.title}, atrasado, vencia em ${formatDateBR(b.due_date)}`}
-              trailing={
-                <View style={styles.trailing}>
-                  <Money cents={Number(b.amount_cents)} variant="headline" tone="danger" />
-                  {b.kind === 'transaction' ? (
-                    <Button label="Paguei" size="sm" variant="secondary" onPress={() => pay(b.ref_id, b.title)} />
-                  ) : null}
+        <View style={styles.sectionBlock}>
+          <View style={styles.sectionHeader}>
+            <View style={styles.sectionTitleWrap}>
+              <View style={[styles.statusDot, { backgroundColor: theme.danger }]} />
+              <ThemedText type="caption" themeColor="textSecondary" style={styles.sectionTitle}>
+                ATRASADO / ATENÇÃO
+              </ThemedText>
+            </View>
+            <View style={[styles.badgePill, { backgroundColor: theme.accentSoft }]}>
+              <ThemedText type="caption" themeColor="danger" style={styles.badgePillText}>
+                {`${overdue.length} ${overdue.length === 1 ? 'pendência' : 'pendências'}`}
+              </ThemedText>
+            </View>
+          </View>
+
+          <View style={styles.cardList}>
+            {overdue.map((b) => (
+              <View
+                key={b.ref_id}
+                style={[
+                  styles.urgentCard,
+                  { backgroundColor: theme.surface, borderColor: theme.separator },
+                ]}>
+                <View style={styles.urgentCardLeft}>
+                  <View style={styles.urgentTitleRow}>
+                    <ThemedText type="headline" numberOfLines={1} style={styles.urgentTitle}>
+                      {b.title}
+                    </ThemedText>
+                    <View style={[styles.duePill, { backgroundColor: theme.accentSoft }]}>
+                      <ThemedText type="caption" themeColor="danger" style={styles.duePillText}>
+                        {`venceu em ${formatDateBR(b.due_date)}`}
+                      </ThemedText>
+                    </View>
+                  </View>
+
+                  <View style={styles.urgentSubRow}>
+                    <Money cents={Number(b.amount_cents)} variant="headline" tone="danger" />
+                    <ThemedText type="caption" themeColor="textSecondary">
+                      · {b.kind === 'invoice' ? 'Fatura Cartão' : 'Despesa'}
+                    </ThemedText>
+                  </View>
                 </View>
-              }
-            />
-          ))}
-        </Section>
+
+                <Button
+                  label="Paguei"
+                  icon="checkmark"
+                  size="sm"
+                  variant="secondary"
+                  onPress={() => pay(b.ref_id, b.title)}
+                />
+              </View>
+            ))}
+          </View>
+        </View>
+      ) : null}
+
+      {/* Capturado no WhatsApp — o selo do produto, mostrando em tempo real o que a IA registrou */}
+      {recentWhatsApp ? (
+        <View style={styles.sectionBlock}>
+          <View style={styles.sectionHeader}>
+            <View style={styles.sectionTitleWrap}>
+              <Icon name="waveform" size="sm" color="success" />
+              <ThemedText type="caption" themeColor="textSecondary" style={styles.sectionTitle}>
+                CAPTURADO NO WHATSAPP
+              </ThemedText>
+            </View>
+            <ThemedText type="caption" themeColor="textSecondary" style={tabular}>
+              {formatDateBR(recentWhatsApp.occurred_at)}
+            </ThemedText>
+          </View>
+
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel={`Última captura: ${recentWhatsApp.description || recentWhatsApp.merchant || 'Lançamento'}, ${recentWhatsApp.category}`}
+            onPress={() => router.push(`/finance/${recentWhatsApp.id}`)}>
+            {({ pressed }) => (
+              <View
+                style={[
+                  styles.captureCard,
+                  {
+                    backgroundColor: pressed ? theme.backgroundSelected : theme.surface,
+                    borderColor: theme.separator,
+                  },
+                ]}>
+                <View style={styles.captureHead}>
+                  <View style={[styles.captureBadge, { backgroundColor: theme.accentSoft }]}>
+                    <Icon name="waveform" size="sm" color="success" />
+                    <ThemedText type="caption" themeColor="success" style={styles.captureSync}>
+                      IA Sync WhatsApp
+                    </ThemedText>
+                  </View>
+                  <ThemedText type="caption" themeColor="textSecondary">
+                    {recentWhatsApp.category} · IA ProOps
+                  </ThemedText>
+                </View>
+
+                <View style={styles.captureBody}>
+                  <View style={styles.captureTextCol}>
+                    <ThemedText type="headline" numberOfLines={2}>
+                      "{recentWhatsApp.description || recentWhatsApp.merchant || 'Lançamento via WhatsApp'}"
+                    </ThemedText>
+                  </View>
+                  <Money
+                    cents={Number(recentWhatsApp.amount_cents)}
+                    variant="headline"
+                    tone={recentWhatsApp.kind === 'expense' ? 'danger' : 'success'}
+                  />
+                </View>
+              </View>
+            )}
+          </Pressable>
+        </View>
       ) : null}
 
       {dueSoon.length > 0 ? (
@@ -304,52 +462,6 @@ export default function TodayScreen() {
               </View>
             );
           })}
-        </Section>
-      ) : null}
-
-      {/* Capturado no WhatsApp — o selo do produto, mostrando em tempo real o que a IA registrou */}
-      {recentWhatsApp ? (
-        <Section title="Capturado no WhatsApp">
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel={`Última captura: ${recentWhatsApp.description || recentWhatsApp.merchant || 'Lançamento'}, ${recentWhatsApp.category}`}
-            onPress={() => router.push(`/finance/${recentWhatsApp.id}`)}>
-            {({ pressed }) => (
-              <View
-                style={[
-                  styles.captureCard,
-                  { backgroundColor: pressed ? theme.backgroundSelected : theme.surface },
-                ]}>
-                <View style={styles.captureHead}>
-                  <View style={[styles.captureBadge, { backgroundColor: theme.accentSoft }]}>
-                    <Icon name="waveform" size="sm" color="success" />
-                    <ThemedText type="caption" themeColor="success" style={styles.captureSync}>
-                      IA Sync WhatsApp
-                    </ThemedText>
-                  </View>
-                  <ThemedText type="caption" themeColor="textSecondary" style={tabular}>
-                    {formatDateBR(recentWhatsApp.occurred_at)}
-                  </ThemedText>
-                </View>
-
-                <View style={styles.captureBody}>
-                  <View style={styles.captureTextCol}>
-                    <ThemedText type="defaultSemiBold" numberOfLines={1}>
-                      {recentWhatsApp.description || recentWhatsApp.merchant || 'Lançamento via WhatsApp'}
-                    </ThemedText>
-                    <ThemedText type="caption" themeColor="textSecondary">
-                      {recentWhatsApp.category} · IA ProOps
-                    </ThemedText>
-                  </View>
-                  <Money
-                    cents={Number(recentWhatsApp.amount_cents)}
-                    variant="headline"
-                    tone={recentWhatsApp.kind === 'expense' ? 'danger' : 'success'}
-                  />
-                </View>
-              </View>
-            )}
-          </Pressable>
         </Section>
       ) : null}
 
@@ -420,5 +532,102 @@ const styles = StyleSheet.create({
   captureTextCol: {
     flex: 1,
     gap: Space.half,
+  },
+  triadGrid: {
+    flexDirection: 'row',
+    gap: Space.sm,
+    paddingHorizontal: Space.lg,
+    marginTop: Space.md,
+    marginBottom: Space.sm,
+  },
+  triadPill: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    padding: Space.md,
+    borderRadius: Radius.md,
+    borderCurve: 'continuous',
+    borderWidth: StyleSheet.hairlineWidth,
+  },
+  triadText: {
+    gap: Space.half,
+  },
+  triadDot: {
+    width: 8,
+    height: 8,
+    borderRadius: Radius.pill,
+  },
+  sectionBlock: {
+    gap: Space.sm,
+    paddingHorizontal: Space.lg,
+    marginTop: Space.md,
+  },
+  sectionHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: Space.xs,
+  },
+  sectionTitleWrap: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Space.xs,
+  },
+  statusDot: {
+    width: 6,
+    height: 6,
+    borderRadius: Radius.pill,
+  },
+  sectionTitle: {
+    fontWeight: '600',
+    letterSpacing: 0.8,
+  },
+  badgePill: {
+    paddingHorizontal: Space.sm,
+    paddingVertical: Space.half,
+    borderRadius: Radius.pill,
+  },
+  badgePillText: {
+    fontWeight: '600',
+  },
+  cardList: {
+    gap: Space.sm,
+  },
+  urgentCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    padding: Space.lg,
+    borderRadius: Radius.lg,
+    borderCurve: 'continuous',
+    borderWidth: StyleSheet.hairlineWidth,
+    gap: Space.md,
+  },
+  urgentCardLeft: {
+    flex: 1,
+    gap: Space.xs,
+  },
+  urgentTitleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Space.sm,
+    flexWrap: 'wrap',
+  },
+  urgentTitle: {
+    flexShrink: 1,
+  },
+  duePill: {
+    paddingHorizontal: Space.sm,
+    paddingVertical: Space.half,
+    borderRadius: Radius.pill,
+  },
+  duePillText: {
+    fontWeight: '600',
+  },
+  urgentSubRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Space.xs,
   },
 });

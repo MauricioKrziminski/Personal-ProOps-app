@@ -6,7 +6,7 @@
     "orientation": "portrait",
     "icon": "./assets/images/icons/icon-512.png",
     "scheme": "appproops",
-    "userInterfaceStyle": "automatic",
+    "userInterfaceStyle": "dark",
     "ios": {
       "bundleIdentifier": "com.proops.personal",
       "supportsTablet": true,
