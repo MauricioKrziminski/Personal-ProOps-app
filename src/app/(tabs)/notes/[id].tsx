@@ -25,7 +25,7 @@ import { Screen } from '@/components/ui/screen';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useToast } from '@/components/ui/toast';
 import { MaxContentWidth } from '@/constants/theme';
-import { Motion, Radius, Space, Type } from '@/design/tokens';
+import { HitTarget, Motion, Radius, Space, Type } from '@/design/tokens';
 import {
   useNote,
   useNoteFolders,
@@ -44,12 +44,12 @@ import {
   normalizeTag,
   noteTitle,
   normalizeFolderName,
-  readLines,
   removeTag,
   tagsOf,
   toggleChecklistLine,
 } from '@/lib/search';
 import { showItemActions } from '@/lib/item-actions';
+import { noteBlocks, setBlockKind, lineAt, type BlockKind } from '@/lib/note-blocks';
 import { skipReason } from '@/lib/notes-autosave';
 
 /**
@@ -109,6 +109,9 @@ export default function NoteDetailScreen() {
   const [content, setContent] = useState('');
   const [folderId, setFolderId] = useState<string | null>(null);
   const [editing, setEditing] = useState(() => params.id === 'new');
+  /** Onde o cursor está, em caracteres. Só a barra de blocos lê — não precisa re-renderizar. */
+  const cursorRef = useRef(0);
+  const inputRef = useRef<TextInput>(null);
   const [selection, setSelection] = useState<{ start: number; end: number } | undefined>();
   const [pickerOpen, setPickerOpen] = useState(false);
   const [tagPickerOpen, setTagPickerOpen] = useState(false);
@@ -334,6 +337,22 @@ export default function NoteDetailScreen() {
     );
   }
 
+  /**
+   * Converte a linha do cursor no tipo escolhido.
+   *
+   * Mantém o foco no campo: perder o teclado a cada toque na barra transformaria "formatar
+   * enquanto escrevo" em "formatar, reabrir, continuar" — que é a diferença entre uma barra de
+   * blocos e um menu.
+   */
+  const aplicarBloco = (kind: BlockKind) => {
+    Haptics.selectionAsync();
+    setContent((atual) => {
+      const linha = lineAt(atual, cursorRef.current);
+      return linha < 0 ? atual : setBlockKind(atual, linha, kind);
+    });
+    inputRef.current?.focus();
+  };
+
   return (
     <Screen scroll={false}>
       <Stack.Screen options={{ title: screenTitle }} />
@@ -420,13 +439,20 @@ export default function NoteDetailScreen() {
           </View>
         ) : editing ? (
           <TextInput
+            ref={inputRef}
             value={content}
             onChangeText={setContent}
             multiline
             autoFocus
             scrollEnabled={false}
             selection={selection}
-            onSelectionChange={() => setSelection(undefined)}
+            onSelectionChange={(e) => {
+              // O cursor é guardado para a barra de blocos saber em QUE linha aplicar. Sem isto
+              // ela só poderia agir na última linha, e converter um bloco do meio da nota
+              // exigiria descer até o fim e voltar.
+              cursorRef.current = e.nativeEvent.selection.start;
+              setSelection(undefined);
+            }}
             onBlur={() => {
               setEditing(false);
               void flushRef.current();
@@ -440,6 +466,13 @@ export default function NoteDetailScreen() {
         ) : (
           <ReadBody content={content} onEdit={startEditing} onToggleLine={onToggleLine} />
         )}
+
+        {/*
+          A barra fica DENTRO do scroll, logo abaixo do texto, e não presa acima do teclado.
+          Presa, ela cobriria a última linha justamente enquanto a pessoa digita nela — e o
+          `KeyboardAwareScrollView` já mantém o cursor visível, então aqui ela sobe junto.
+        */}
+        {editing ? <BlockBar onPick={aplicarBloco} /> : null}
       </KeyboardAwareScrollView>
 
       <TagPicker
@@ -480,6 +513,19 @@ export default function NoteDetailScreen() {
  * sobra desenho: hierarquia por peso (22/600 no título, 17/400 no corpo), `Space.sm` entre
  * linhas e um alvo de toque que cobre o vazio.
  */
+/**
+ * O corpo da nota em modo LEITURA, bloco a bloco.
+ *
+ * Antes ele conhecia dois tipos — título e item marcável — e mandava todo o resto para parágrafo.
+ * Agora desenha os oito de `lib/note-blocks.ts`: cabeçalho, subtítulo, item marcável, item de
+ * lista, item numerado, citação, divisória e parágrafo. A marcação (`#`, `- [ ]`, `>`) some da
+ * tela; ela continua existindo só no texto, que é o que volta para o WhatsApp.
+ *
+ * Um `Pressable` só por fora, com altura mínima: nota curta deixava 70% da tela em branco sem
+ * affordance nenhuma. O vazio É a área de edição — tocar em qualquer ponto abre o teclado, que é
+ * o comportamento do Apple Notes. A exceção é a caixinha do item marcável, que ganha o gesto para
+ * si e NÃO entra em edição.
+ */
 function ReadBody({
   content,
   onEdit,
@@ -490,66 +536,141 @@ function ReadBody({
   onToggleLine: (index: number) => void;
 }) {
   const theme = useTheme();
-  const lines = readLines(content);
+  const blocos = noteBlocks(content);
 
   return (
-    // Um `Pressable` só, com altura mínima: nota curta deixava 70% da tela em branco sem
-    // affordance nenhuma. Agora o vazio É a área de edição — tocar em qualquer ponto do corpo
-    // abre o teclado, que é o comportamento do Apple Notes.
     <Pressable
       accessibilityRole="button"
       accessibilityLabel={
-        lines.length === 0 ? 'Escrever na nota' : 'Conteúdo da nota. Toque duas vezes para editar.'
+        blocos.length === 0 ? 'Escrever na nota' : 'Conteúdo da nota. Toque para editar.'
       }
       onPress={onEdit}
       style={styles.readBody}>
-      {lines.length === 0 ? (
+      {blocos.length === 0 ? (
         <ThemedText type="subtitle" themeColor="textSecondary">
           Escreve alguma coisa…
         </ThemedText>
       ) : (
-        lines.map((line) =>
-          line.done === null ? (
+        blocos.map((b) => {
+          if (b.kind === 'divider') {
+            return (
+              <View
+                key={b.index}
+                style={[styles.divider, { backgroundColor: theme.separator }]}
+              />
+            );
+          }
+
+          if (b.kind === 'todo') {
+            return (
+              <View key={b.index} style={styles.checkLine}>
+                {/* Caixinha pequena, alvo de toque ≥ 44 pelo hitSlop. */}
+                <Pressable
+                  accessibilityRole="checkbox"
+                  accessibilityState={{ checked: !!b.done }}
+                  accessibilityLabel={b.text}
+                  hitSlop={12}
+                  onPress={() => onToggleLine(b.index)}>
+                  <Animated.View
+                    key={b.done ? 'on' : 'off'}
+                    entering={FadeIn.duration(Motion.duration.fast)}>
+                    <Icon
+                      name={b.done ? 'checkmark.circle.fill' : 'circle'}
+                      size="lg"
+                      color={b.done ? 'tint' : 'textSecondary'}
+                    />
+                  </Animated.View>
+                </Pressable>
+                <ThemedText
+                  style={[
+                    Type.body,
+                    styles.grow,
+                    { color: b.done ? theme.textSecondary : theme.text },
+                    b.done && styles.done,
+                  ]}>
+                  {b.text}
+                </ThemedText>
+              </View>
+            );
+          }
+
+          if (b.kind === 'bullet' || b.kind === 'numbered') {
+            return (
+              <View key={b.index} style={styles.listLine}>
+                {/* Marcador em mono para os números ficarem na mesma coluna. */}
+                <ThemedText type="code" themeColor="textSecondary" style={styles.marker}>
+                  {b.kind === 'numbered' ? `${b.order ?? 1}.` : '•'}
+                </ThemedText>
+                <ThemedText style={[Type.body, styles.grow]}>{b.text}</ThemedText>
+              </View>
+            );
+          }
+
+          if (b.kind === 'quote') {
+            return (
+              <View key={b.index} style={styles.quoteLine}>
+                <View style={[styles.quoteBar, { backgroundColor: theme.tint }]} />
+                <ThemedText
+                  themeColor="textSecondary"
+                  style={[Type.body, styles.grow, styles.quoteText]}>
+                  {b.text}
+                </ThemedText>
+              </View>
+            );
+          }
+
+          return (
             <ThemedText
-              key={line.index}
-              type={line.role === 'title' ? 'subtitle' : 'default'}
-              style={line.role === 'title' ? styles.readTitle : undefined}>
-              {line.text}
+              key={b.index}
+              type={b.kind === 'title' || b.kind === 'h1' ? 'subtitle' : b.kind === 'h2' ? 'headline' : 'default'}
+              style={b.kind === 'title' || b.kind === 'h1' ? styles.readTitle : undefined}>
+              {b.text}
             </ThemedText>
-          ) : (
-            <View key={line.index} style={styles.checkLine}>
-              {/* Caixinha visual pequena, alvo de toque ≥ 44 pelo hitSlop. O toggle é o
-                  `Pressable` de dentro: ele ganha o gesto e o corpo NÃO entra em edição. */}
-              <Pressable
-                accessibilityRole="checkbox"
-                accessibilityState={{ checked: line.done }}
-                accessibilityLabel={line.text}
-                hitSlop={12}
-                onPress={() => onToggleLine(line.index)}>
-                <Animated.View
-                  key={line.done ? 'on' : 'off'}
-                  entering={FadeIn.duration(Motion.duration.fast)}>
-                  <Icon
-                    name={line.done ? 'checkmark.circle.fill' : 'circle'}
-                    size="lg"
-                    color={line.done ? 'tint' : 'textSecondary'}
-                  />
-                </Animated.View>
-              </Pressable>
-              <ThemedText
-                style={[
-                  Type.body,
-                  styles.grow,
-                  { color: line.done ? theme.textSecondary : theme.text },
-                  line.done && styles.done,
-                ]}>
-                {line.text}
-              </ThemedText>
-            </View>
-          )
-        )
+          );
+        })
       )}
     </Pressable>
+  );
+}
+
+/**
+ * A barra de blocos — o "digite / para inserir" do Notion, em forma de barra.
+ *
+ * Ela existe porque a marcação sozinha exige que a pessoa **saiba** markdown. O toque converte a
+ * linha em que o cursor está, e tocar de novo no mesmo tipo desfaz (`setBlockKind` trata isso) —
+ * sem o desfazer, virar citação seria beco sem saída.
+ *
+ * Só aparece em edição, e some junto com o teclado: em leitura ela seria uma fileira de botões
+ * sobre um texto que ninguém está editando.
+ */
+const BLOCOS: { kind: BlockKind; icon: React.ComponentProps<typeof Icon>['name']; label: string }[] = [
+  { kind: 'h1', icon: 'textformat.size', label: 'Título' },
+  { kind: 'todo', icon: 'checkmark.circle', label: 'Item marcável' },
+  { kind: 'bullet', icon: 'list.bullet', label: 'Lista' },
+  { kind: 'numbered', icon: 'list.number', label: 'Lista numerada' },
+  { kind: 'quote', icon: 'text.quote', label: 'Citação' },
+  { kind: 'divider', icon: 'minus', label: 'Divisória' },
+];
+
+function BlockBar({ onPick }: { onPick: (kind: BlockKind) => void }) {
+  const theme = useTheme();
+  return (
+    <View style={[styles.blockBar, { backgroundColor: theme.surface, borderColor: theme.cardBorder }]}>
+      {BLOCOS.map((b) => (
+        <Pressable
+          key={b.kind}
+          accessibilityRole="button"
+          accessibilityLabel={b.label}
+          hitSlop={6}
+          onPress={() => onPick(b.kind)}
+          style={({ pressed }) => [
+            styles.blockButton,
+            { backgroundColor: pressed ? theme.backgroundSelected : 'transparent' },
+          ]}>
+          <Icon name={b.icon} size="md" color="text" />
+        </Pressable>
+      ))}
+    </View>
   );
 }
 
@@ -840,6 +961,29 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'flex-start',
     gap: Space.md,
+  },
+  listLine: { flexDirection: 'row', alignItems: 'flex-start', gap: Space.sm },
+  /** Largura fixa: sem ela "1." e "10." desalinham o texto da lista. */
+  marker: { width: 22, textAlign: 'right', lineHeight: Type.body.lineHeight },
+  quoteLine: { flexDirection: 'row', alignItems: 'stretch', gap: Space.md },
+  quoteBar: { width: 3, borderRadius: Radius.xs },
+  quoteText: { fontStyle: undefined },
+  divider: { height: StyleSheet.hairlineWidth, marginVertical: Space.sm },
+  blockBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-around',
+    gap: Space.xs,
+    padding: Space.xs,
+    borderRadius: Radius.pill,
+    borderWidth: StyleSheet.hairlineWidth,
+  },
+  blockButton: {
+    width: HitTarget - 4,
+    height: HitTarget - 8,
+    borderRadius: Radius.pill,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   grow: {
     flex: 1,

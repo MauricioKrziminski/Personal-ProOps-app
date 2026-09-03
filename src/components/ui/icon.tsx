@@ -106,6 +106,10 @@ const MATERIAL: Record<string, MaterialName> = {
   house: 'home',
   'line.3.horizontal.decrease': 'filter_list',
   'list.bullet': 'list',
+  /* Barra de blocos da nota. */
+  'list.number': 'format_list_numbered',
+  'textformat.size': 'format_size',
+  minus: 'horizontal_rule',
   lock: 'lock',
   magnifyingglass: 'search',
   'note.text': 'description',

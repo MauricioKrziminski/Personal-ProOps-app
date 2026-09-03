@@ -24,6 +24,7 @@ import { useToast } from '@/components/ui/toast';
 import { HitTarget, Motion, Radius, Space, tabular } from '@/design/tokens';
 import {
   useDeleteFolder,
+  folderTree,
   useNoteFolders,
   useSaveFolder,
   type NoteFolder,
@@ -181,18 +182,65 @@ export default function FoldersScreen() {
     );
   };
 
-  const showActions = (folder: NoteFolder) => {
-    Haptics.selectionAsync();
+  /**
+   * Escolhe a pasta-mãe. As opções excluem a própria pasta (não pode ser mãe de si mesma) e as
+   * DESCENDENTES dela — mover "Trabalho" para dentro de "Trabalho / 2026" faria as duas sumirem
+   * da árvore, cada uma esperando a outra aparecer primeiro.
+   */
+  const moverPara = (folder: NoteFolder) => {
+    const descendentes = new Set<string>([folder.id]);
+    let cresceu = true;
+    while (cresceu) {
+      cresceu = false;
+      for (const f of list) {
+        if (f.parent_id && descendentes.has(f.parent_id) && !descendentes.has(f.id)) {
+          descendentes.add(f.id);
+          cresceu = true;
+        }
+      }
+    }
+    const destinos = list.filter((f) => !descendentes.has(f.id));
+
     actionSheet(
-      { title: folder.name, options: ['Renomear', 'Trocar ícone', 'Apagar'], destructiveIndex: 2 },
+      {
+        title: `Mover «${folder.name}» para`,
+        options: ['Raiz (nenhuma pasta)', ...destinos.map((f) => f.name)],
+      },
       (index) => {
-        if (index === 0 || index === 1) startEdit(folder);
-        if (index === 2) confirmDelete(folder);
+        if (index === undefined) return;
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+        saveFolder.mutate({
+          id: folder.id,
+          name: folder.name,
+          icon: folder.icon,
+          parentId: index === 0 ? null : destinos[index - 1].id,
+        });
       }
     );
   };
 
+  const showActions = (folder: NoteFolder) => {
+    Haptics.selectionAsync();
+    actionSheet(
+      {
+        title: folder.name,
+        options: ['Renomear', 'Trocar ícone', 'Mover para dentro de…', 'Apagar'],
+        destructiveIndex: 3,
+      },
+      (index) => {
+        if (index === 0 || index === 1) startEdit(folder);
+        if (index === 2) moverPara(folder);
+        if (index === 3) confirmDelete(folder);
+      }
+    );
+  };
+
+  /**
+   * Em ÁRVORE, não em ordem alfabética plana: sem isto "Trabalho / 2026" apareceria a três telas
+   * de distância de "Trabalho", e a hierarquia existiria só no banco.
+   */
   const list = folders.data ?? [];
+  const arvore = folderTree(list);
 
   return (
     <Screen grouped>
@@ -286,7 +334,7 @@ export default function FoldersScreen() {
         />
       ) : (
         <Section>
-          {list.map((folder, index) => (
+          {arvore.map((folder, index) => (
             <Animated.View
               key={folder.id}
               layout={LinearTransition.duration(Motion.duration.base)}
@@ -296,6 +344,8 @@ export default function FoldersScreen() {
               <Row
                 title={folder.name}
                 icon={symbol(folder.icon)}
+                /* O recuo é o que faz a hierarquia existir na tela. */
+                indent={folder.depth}
                 chevron={false}
                 trailing={
                   <ThemedText type="footnote" themeColor="textSecondary" style={tabular}>

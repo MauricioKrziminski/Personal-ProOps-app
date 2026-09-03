@@ -26,6 +26,14 @@ interface RowProps {
   accessibilityState?: AccessibilityState;
   /** Rótulo de acessibilidade completo. Sem ele, cai em `title` + `subtitle`. */
   accessibilityLabel?: string;
+  /**
+   * Nível de aninhamento (0 = raiz). Recua a linha inteira, em degraus de `Space.lg`.
+   *
+   * Mora AQUI e não num `<View>` em volta porque o realce de press precisa continuar cobrindo a
+   * largura toda: recuando por fora, a faixa clara pararia antes da margem e a linha filha
+   * pareceria um card dentro da lista.
+   */
+  indent?: number;
 }
 
 /**
@@ -45,11 +53,17 @@ export function Row({
   chevron,
   accessibilityState,
   accessibilityLabel,
+  indent = 0,
 }: RowProps) {
   const theme = useTheme();
 
   const content = (pressed: boolean) => (
-    <View style={[styles.row, { backgroundColor: pressed ? theme.backgroundSelected : 'transparent' }]}>
+    <View
+      style={[
+        styles.row,
+        { backgroundColor: pressed ? theme.backgroundSelected : 'transparent' },
+        indent > 0 && { paddingLeft: Space.lg + indent * Space.lg },
+      ]}>
       {/*
         O ícone mora num CHIP redondo, como no desenho: um glifo solto ao lado do texto flutua e
         as linhas perdem a coluna da esquerda. O chip dá a âncora e o alvo visual.

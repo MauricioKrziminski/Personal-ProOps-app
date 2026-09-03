@@ -41,7 +41,40 @@ export interface NoteFolder {
   id: string;
   name: string;
   icon: string | null;
+  /** Pasta-mãe. `null` = está na raiz. */
+  parent_id: string | null;
   notes_count: number;
+}
+
+/**
+ * Ordena as pastas em ÁRVORE, achatada para lista, com o nível de cada uma.
+ *
+ * A lista vem plana do banco e ordenada por nome; assim "Trabalho / 2026" apareceria longe de
+ * "Trabalho". Aqui as filhas ficam logo abaixo da mãe, e `depth` diz quanto recuar.
+ *
+ * Pasta cuja mãe não está na lista (mãe apagada entre um fetch e outro) é tratada como raiz —
+ * some da árvore é pior do que aparecer no lugar errado por um instante.
+ */
+export function folderTree(folders: NoteFolder[]): (NoteFolder & { depth: number })[] {
+  const filhas = new Map<string | null, NoteFolder[]>();
+  const ids = new Set(folders.map((f) => f.id));
+  for (const f of folders) {
+    const mae = f.parent_id && ids.has(f.parent_id) ? f.parent_id : null;
+    filhas.set(mae, [...(filhas.get(mae) ?? []), f]);
+  }
+
+  const saida: (NoteFolder & { depth: number })[] = [];
+  const desce = (mae: string | null, depth: number) => {
+    // Teto de profundidade: `parent_id` não impede um ciclo (A mãe de B, B mãe de A) e sem o
+    // corte isto seria recursão infinita — tela branca, sem erro no log.
+    if (depth > 4) return;
+    for (const f of filhas.get(mae) ?? []) {
+      saida.push({ ...f, depth });
+      desce(f.id, depth + 1);
+    }
+  };
+  desce(null, 0);
+  return saida;
 }
 
 export interface NoteFilters {
@@ -206,7 +239,7 @@ export function useNoteFolders() {
     queryKey: ['notes', 'folders'],
     queryFn: async (): Promise<NoteFolder[]> => {
       const [folders, counts] = await Promise.all([
-        supabase.from('note_folders').select('id, name, icon').order('name'),
+        supabase.from('note_folders').select('id, name, icon, parent_id').order('name'),
         supabase.rpc('note_folder_counts'),
       ]);
       if (folders.error) throw folders.error;
@@ -232,16 +265,30 @@ export function useNoteTags() {
 export function useSaveFolder() {
   const invalidate = useInvalidateNotes();
   return useMutation({
-    mutationFn: async (input: { id?: string; name: string; icon?: string | null }) => {
+    mutationFn: async (input: {
+      id?: string;
+      name: string;
+      icon?: string | null;
+      /** Pasta-mãe. `undefined` = não mexe; `null` = move para a raiz. */
+      parentId?: string | null;
+    }) => {
       // `name` normalizado é constraint no banco (check `name = lower(trim(name))`), e é o que
       // mantém o unique COMPLETO — que por sua vez é o que deixa o .upsert() do PostgREST legal.
       const name = normalizeFolderName(input.name);
       if (!name) throw new Error('nome vazio');
 
       if (input.id) {
+        // ⚠️ Uma pasta não pode ser mãe de si mesma. O banco não tem como impedir (a FK só
+        // exige que o id exista), e o resultado seria uma pasta que some da árvore inteira —
+        // ela nunca apareceria na raiz nem dentro de ninguém.
+        const parent = input.parentId === input.id ? null : input.parentId;
         const { error } = await supabase
           .from('note_folders')
-          .update({ name, icon: input.icon ?? null })
+          .update({
+            name,
+            icon: input.icon ?? null,
+            ...(input.parentId !== undefined ? { parent_id: parent } : {}),
+          })
           .eq('id', input.id);
         if (error) throw error;
         return input.id;
@@ -249,7 +296,12 @@ export function useSaveFolder() {
       const { data, error } = await supabase
         .from('note_folders')
         .upsert(
-          { name, icon: input.icon ?? null, user_id: await currentUserId() },
+          {
+            name,
+            icon: input.icon ?? null,
+            parent_id: input.parentId ?? null,
+            user_id: await currentUserId(),
+          },
           { onConflict: 'workspace_id,name' }
         )
         .select('id')
@@ -261,7 +313,13 @@ export function useSaveFolder() {
   });
 }
 
-/** Apagar pasta NUNCA apaga nota — a FK é `on delete set null`. */
+/**
+ * Apagar pasta NUNCA apaga nota — a FK de `notes.folder_id` é `on delete set null`.
+ *
+ * E, desde a `0049`, também não apaga SUBPASTA: `note_folders.parent_id` é `on delete set null`,
+ * então as filhas sobem para a raiz em vez de sumirem junto. Perder nota por causa de arrumação
+ * é o tipo de coisa que faz alguém parar de confiar no app.
+ */
 export function useDeleteFolder() {
   const invalidate = useInvalidateNotes();
   return useMutation({
