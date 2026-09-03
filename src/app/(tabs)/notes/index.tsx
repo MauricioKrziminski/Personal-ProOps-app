@@ -6,10 +6,10 @@ import * as Haptics from 'expo-haptics';
 
 import { Chip } from '@/components/finance/chip';
 import { ThemedText } from '@/components/themed-text';
+import { AppHeader } from '@/components/ui/app-header';
 import { EmptyState } from '@/components/ui/empty-state';
-import { HeaderActions } from '@/components/ui/header-actions';
 import { ItemLink } from '@/components/ui/item-link';
-import { Search } from '@/components/ui/search';
+import { SearchField } from '@/components/ui/search-field';
 import { TextField } from '@/components/ui/field';
 import { Icon } from '@/components/ui/icon';
 import { Mark } from '@/components/ui/mark';
@@ -360,13 +360,7 @@ export default function NotesScreen() {
   );
 
   return (
-    <Screen scroll={false} grouped>
-      <HeaderActions
-        actions={[
-          { label: 'Pastas', icon: 'folder', onPress: () => router.push('/notes/folders') },
-          { label: 'Nova nota', icon: 'square.and.pencil', onPress: () => router.push('/notes/new') },
-        ]}
-      />
+    <Screen scroll={false} grouped topBar={<AppHeader />}>
       <FlashList
         data={notes}
         keyExtractor={(note) => note.id}
@@ -380,15 +374,40 @@ export default function NotesScreen() {
         ListHeaderComponent={
           <View>
       {/* A captura de dois segundos. Fica fixa: é o coração do produto, não vai atrás de FAB. */}
-            {/* No Android o campo mora aqui, acima da captura rápida; no iOS o `Search` não
-                desenha nada e a busca vai para o header nativo. */}
-            <Search
-              gutter
-              value={typed}
-              onChangeText={setTyped}
-              placeholder="Buscar nas notas"
-              accessibilityLabel="Buscar nas notas"
-            />
+            {/*
+              A pílula do desenho, nas DUAS plataformas — e por isso `SearchField` direto, não
+              `<Search>`.
+              `<Search>` escolhe entre a barra nativa (iOS) e a pílula (Android), e a barra nativa
+              exige o header do navegador. A raiz de Notas não tem mais header (é o `AppHeader`),
+              então no iOS o `<Search>` não desenharia nada e a tela ficaria SEM busca. As telas
+              empurradas — Lançamentos e `/search` — continuam com `<Search>` e com a barra nativa.
+
+              À direita ficam as duas ações que moravam no `headerRight`: pastas e nota nova.
+            */}
+            <View style={styles.searchRow}>
+              <View style={styles.searchSlot}>
+                <SearchField
+                  value={typed}
+                  onChangeText={setTyped}
+                  placeholder="Buscar nas notas"
+                  accessibilityLabel="Buscar nas notas"
+                />
+              </View>
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel="Pastas"
+                onPress={() => router.push('/notes/folders')}
+                style={[styles.searchAction, { backgroundColor: theme.backgroundElement, borderColor: theme.cardBorder }]}>
+                <Icon name="folder" size="md" color="textSecondary" />
+              </Pressable>
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel="Nova nota"
+                onPress={() => router.push('/notes/new')}
+                style={[styles.searchAction, { backgroundColor: theme.backgroundElement, borderColor: theme.cardBorder }]}>
+                <Icon name="square.and.pencil" size="md" color="text" />
+              </Pressable>
+            </View>
 
             <View style={styles.quickAdd}>
               <TextField
@@ -512,6 +531,23 @@ export default function NotesScreen() {
 }
 
 const styles = StyleSheet.create({
+  searchRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Space.sm,
+    paddingHorizontal: Space.lg,
+    marginTop: Space.md,
+    marginBottom: Space.md,
+  },
+  searchSlot: { flex: 1, minWidth: 0 },
+  searchAction: {
+    width: HitTarget,
+    height: HitTarget,
+    borderRadius: Radius.pill,
+    borderWidth: StyleSheet.hairlineWidth,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   /** M3: padding 16 · raio 14 · 8 entre cards. `gap` 6 dentro — título, prévia e metadado são
       três degraus da MESMA nota, não três blocos. */
   /** M3: 8 entre cards empilhados. O recuo lateral é o mesmo do resto da tela. */

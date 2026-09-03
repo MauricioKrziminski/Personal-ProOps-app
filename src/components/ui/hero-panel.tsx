@@ -115,6 +115,7 @@ export function HeroPanel({
       entering={FadeIn.duration(Motion.duration.slow)}
       style={[
         styles.panel,
+        { borderColor: theme.cardBorder },
         { backgroundColor: theme.heroSurface },
       ]}>
       {/* A espiral da marca, recortada na borda. Marca monocromática ganha presença repetindo a
@@ -190,20 +191,20 @@ export function HeroPanel({
 }
 
 const styles = StyleSheet.create({
+  /**
+   * **Card flutuante, não faixa sangrada** (design Stitch, 03/09/2026).
+   *
+   * Ele nascia colado no header nativo, com raio só embaixo e uma peça de costura (`joint`) no
+   * `Screen` para o conteúdo não ser cortado por uma reta ao rolar. Com o `AppHeader` no topo
+   * isso virava duas superfícies escuras empilhadas sem separação nenhuma — o desenho resolve
+   * com um card de raio inteiro, contorno de 1px e ar em volta, e a costura deixa de ser
+   * necessária porque não há mais o que costurar.
+   */
   panel: {
-    paddingHorizontal: Space.lg,
-    /**
-     * `Space.lg` no topo, e **não** `insets.top`.
-     *
-     * O painel mora dentro do scroll, ABAIXO do header nativo — que já resolveu a safe area.
-     * Somar o inset de novo abria ~48 px de nada entre o header e o rótulo, e o painel ficava
-     * com um vazio no topo que lia como erro de layout.
-     */
-    paddingTop: Space.lg,
-    paddingBottom: Space.lg,
-    borderBottomLeftRadius: Radius.xl,
-    borderBottomRightRadius: Radius.xl,
+    padding: Space.gutter,
+    borderRadius: Radius.lg,
     borderCurve: 'continuous',
+    borderWidth: StyleSheet.hairlineWidth,
     overflow: 'hidden',
   },
   top: {
