@@ -25,10 +25,17 @@ destaque de telas secundárias. A contagem não mudou: **um destaque por tela**.
 
 > Dois `GlassCard` na mesma tela é erro de revisão, não questão de gosto.
 
-**Cartão de crédito é PILHA, não lista** (`src/components/finance/card-stack.tsx`): os de trás
-aparecem por uma faixa, o da frente abre com fatura, fechamento e limite. Uma lista respondia
-"quantos cartões existem" quando a pergunta é "quanto vou pagar e quando". Sem cor de bandeira —
-a paleta é monocromática e pintar o cartão de roxo traria a cor de outra marca para dentro da tela.
+**Cartão de crédito é CARTEIRA, não lista** (`src/components/finance/card-stack.tsx`): fechada,
+o da frente abre com fatura, fechamento e limite e os outros aparecem por uma faixa ABAIXO dele
+(atrás, um cartão de 46px some inteiro atrás de um de 178px); ao toque ela **abre em leque**, cada
+cartão vira um cabeçalho e escolher um fecha a pilha com ele na frente. O corpo do cartão abre a
+carteira e a fatura tem botão próprio — um toque só não pode decidir entre "ver os outros" e
+"abrir a fatura". Sem cor de bandeira: pintar o cartão de roxo traria a marca de outra empresa
+para o lugar de maior destaque da tela.
+
+⚠️ **`withSpring` só é interceptado quando é o valor DIRETO da propriedade de estilo.**
+`withSpring(a) * b` devolve `NaN` e a view some sem um único erro no log — foi assim que a
+carteira inteira ficou invisível. A conta vai DENTRO: `withSpring(a * b)`.
 
 **Card de destaque que SOMA uma lista some quando a soma não informa nada:** com a lista vazia
 (zeros em cima de um empty state) ou com UM item, quando ele repete o número da única linha
@@ -62,6 +69,18 @@ Card comum é `Card` (`src/components/ui/card.tsx`): opaco, `Elevation`, `Radius
 
 **Um accent só** (`tint`), gasto em ação primária, estado ativo e progresso. `danger`, `success`
 e `warning` são semânticos — nunca decoração. Uma família de cinza no app inteiro.
+
+**O accent é VERDE desde 03/09/2026** — `#6DDC9E` no escuro, `#0D8F5B` no claro. É o `secondary`
+do Stitch, adotado por decisão do dono do produto junto com a paleta inteira. A seção "o roxo foi
+testado e devolvido", mais abaixo, continua valendo como registro do que NÃO fazer (roxo lê como
+Nubank em finanças no Brasil); o que mudou é que o accent deixou de ser tinta monocromática. Ação
+primária agora se comunica por superfície **e** matiz.
+
+⚠️ **Superfície escura tem paleta PRÓPRIA: `heroChip`, `onHeroSuccess`, `onHeroDanger`,
+`onHeroWarning`.** O painel de destaque e o cartão de crédito aberto são escuros nos DOIS temas.
+Pintados com os tokens do tema ativo, o modo claro entregava um botão branco sólido com ícone
+branco dentro — invisível — e vermelho escuro sobre preto. Dentro de superfície escura, use os
+tokens `onHero*`; fora dela, os normais.
 
 **A escala de raio virou a do Stitch** (03/09/2026): `xs 4` badge e barra, `sm 8` input e linha,
 `md 12` card — o raio mais usado do design inteiro —, `lg 16` card de destaque, `xl 20` sheet,

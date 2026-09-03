@@ -160,7 +160,9 @@ function CardFace({
       ? 0
       : CARD_H - STRIP + depth * PEEK;
   const escala = aberta || frente ? 1 : 1 - depth * SHRINK;
-  const opacidade = aberta || frente ? 1 : 0.75;
+  // 0.75 apagava a tira no tema CLARO — cinza sobre branco já é pouco contraste, e a opacidade
+  // levava o texto para baixo do mínimo legível. A profundidade vem da escala e da posição.
+  const opacidade = aberta || frente ? 1 : 0.94;
 
   const animado = useAnimatedStyle(() => ({
     transform: [
