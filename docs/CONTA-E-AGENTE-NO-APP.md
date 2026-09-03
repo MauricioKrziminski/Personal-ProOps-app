@@ -106,10 +106,7 @@ o nome; conferir a virada de manhã/tarde/noite mudando o relógio do aparelho.
 A palavra e o token `Type.wordmark` saíram (o token não tinha outro uso). Validada nas raízes Hoje,
 Notas e Financeiro, no claro e no escuro, nas duas plataformas.
 
-⚠️ **Pendente de aprovação do dono:** `.claude/rules/design.md` §8 ainda descreve a faixa com "a
-palavra 'ProOps' em `Type.wordmark`", e o comentário do avatar sem iniciais. Regra desatualizada é
-o que faz a próxima sessão desfazer a mudança — mesmo motivo pelo qual a Fase 3 precisa reescrever
-`CLAUDE.md`.
+`.claude/rules/design.md` §8 foi reescrita junto (a regra descrevia a palavra e o token).
 
 **Fazer** — tirar `ProOps` e o `Type.wordmark` do `AppHeader`; ajustar o espaçamento à esquerda.
 

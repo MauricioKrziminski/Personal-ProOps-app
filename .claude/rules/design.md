@@ -241,9 +241,15 @@ que "voltar" faz depois.
 
 - **Header é do navegador — exceto nas quatro RAÍZES de aba.** Ali quem desenha é o `AppHeader`
   (`src/components/ui/app-header.tsx`): **a faixa de marca do Stitch** — 56px sobre a safe area,
-  fundo do app a 85% com desfoque, fio de 1px embaixo, e dentro dela a marca num quadrado de 28,
-  a palavra "ProOps" em `Type.wordmark`, um ponto de status e o avatar de 32 à direita. Ação de
-  raiz vai no slot `action` (`HeaderIconButton`), antes do avatar.
+  fundo do app a 85% com desfoque, fio de 1px embaixo, e dentro dela a marca num quadrado de 28 à
+  esquerda e o avatar de 32 à direita. Ação de raiz vai no slot `action` (`HeaderIconButton`),
+  antes do avatar.
+
+  **A palavra "ProOps" saiu, e o token `Type.wordmark` com ela** (03/09/2026). O export escrevia o
+  símbolo E a palavra a 8px um do outro: duas afirmações da mesma identidade na faixa mais nobre da
+  tela. Quem passou a ocupar esse peso é a **saudação da Hoje** ("Bom dia, Gabriel"), que diz algo
+  que o usuário não sabia — o nome do app, que ele acabou de tocar para abrir, não. O token foi
+  REMOVIDO de `tokens.ts` para não voltar por descuido; ele não tinha outro uso.
 
   A barra é **sobreposta**, não em fluxo: o desfoque só significa algo com conteúdo passando por
   baixo. Quem reserva a altura é a tela, por `useAppHeaderHeight()` — o `Screen` já faz isso
@@ -255,8 +261,9 @@ que "voltar" faz depois.
   o desenho é do dono do produto e as quatro telas do export têm esta barra. **Não "corrigir" de
   novo.** O custo aceito é a perda da etiqueta (a data em Hoje, a contagem em Notas).
 
-  O avatar leva o ícone de pessoa, não iniciais: `profiles` guarda só o telefone, e tirar iniciais
-  de um número seria escrever um dado que não existe.
+  O avatar leva o ícone de pessoa, não iniciais. `profiles.display_name` existe desde a `0050`, mas
+  é ANULÁVEL — quem entrou por Phone OTP não tem nome —, e um avatar que às vezes é letra e às
+  vezes é ícone muda de forma conforme o cadastro. Um desenho só, para todo mundo.
   **Tela EMPURRADA continua com `<Stack.Title>` + large title** — lá o título e o "voltar" são a
   informação. Barra desenhada à mão dentro do `ScrollView` continua proibida: o `AppHeader` fica
   FORA dele.
