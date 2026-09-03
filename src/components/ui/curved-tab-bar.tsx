@@ -1,8 +1,13 @@
-import { useEffect, useMemo } from 'react';
-import { Canvas, Path, Skia } from '@shopify/react-native-skia';
+import { useEffect } from 'react';
 import * as Haptics from 'expo-haptics';
 import { Pressable, StyleSheet, View, useWindowDimensions } from 'react-native';
-import Animated, { useAnimatedStyle, useSharedValue, withSpring } from 'react-native-reanimated';
+import Animated, {
+  useAnimatedStyle,
+  useSharedValue,
+  withSequence,
+  withSpring,
+  withTiming,
+} from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { ThemedText } from '@/components/themed-text';
@@ -11,12 +16,21 @@ import { Motion, Radius, Space } from '@/design/tokens';
 import { useTheme } from '@/hooks/use-theme';
 import type { SymbolViewProps } from 'expo-symbols';
 
-/** Altura da barra, sem o berço e sem a safe area. */
-const BAR_H = 68;
-/** A bolha que carrega o ícone da aba ativa, encaixada no berço. */
+/** Altura da barra, sem a bolha e sem a safe area. */
+const BAR_H = 64;
+/** A bolha que carrega o ícone da aba ativa. */
 const BUBBLE = 52;
-/** Quanto a bolha sobe acima da barra. O berço tem que ser fundo o bastante para ela caber. */
-const LIFT = 22;
+/**
+ * O respiro entre a bolha e a borda do recorte — a mesma folga em volta inteira.
+ *
+ * É ele que faz o recorte "seguir o raio do ícone": a boca é um CÍRCULO concêntrico com a bolha,
+ * de raio `BUBBLE/2 + GAP`. Qualquer outra forma (um vale desenhado à mão, uma lente) deixa a
+ * distância variando ao longo da curva, e o olho lê isso como erro mesmo sem saber nomear.
+ */
+const GAP = 7;
+const CUT = BUBBLE / 2 + GAP;
+/** Quanto a bolha sobe acima da barra. */
+const LIFT = Math.round(BUBBLE * 0.42);
 /** Calha lateral: a barra flutua, não encosta nas bordas. */
 const SIDE = Space.lg;
 
@@ -28,28 +42,6 @@ const SIDE = Space.lg;
  */
 export const CURVED_BAR_SPACE = BAR_H + LIFT + Space.sm;
 
-/**
- * O berço, em proporções do desenho original (viewBox 580×88), para escalar sem deformar.
- *
- * Os números vieram do path exportado pelo Stitch, lidos par a par em torno do centro: a boca
- * abre em ±64, os controles em ±49/±38/±32/±24/±13, e o fundo desce 47 de 88. Reproduzi-los é o
- * que faz a curva ter a MESMA tensão do desenho — copiar "um vale no meio" a olho dá um U, não
- * este ombro suave.
- */
-const K = {
-  mouth: 64 / 580,
-  c1: 49 / 580,
-  c2: 38 / 580,
-  c3: 32 / 580,
-  c4: 24 / 580,
-  c5: 13 / 580,
-  y1: 8.5 / 88,
-  y2: 21 / 88,
-  y3: 37.5 / 88,
-  depth: 47 / 88,
-  corner: 44 / 88,
-};
-
 export interface CurvedTab {
   name: string;
   label: string;
@@ -58,7 +50,7 @@ export interface CurvedTab {
 }
 
 /**
- * A barra de abas do **Android**: uma pílula com um berço que desliza até a aba ativa.
+ * A barra de abas do **Android**: uma pílula com a boca vazada seguindo a aba ativa.
  *
  * ## Por que só no Android
  *
@@ -67,16 +59,27 @@ export interface CurvedTab {
  * existe equivalente: a barra do Material 3 é uma laje reta, e é ali que um desenho próprio paga.
  * A divisão mora no PRIMITIVO (`app-tabs.android.tsx`), nunca numa tela — regra de `frontend.md`.
  *
- * ## O berço anima, e é por isso que ele existe
+ * ## Como o recorte é feito, e por que NÃO é um path
  *
- * Um recorte fixo seria só um enfeite. O que comunica é o berço **viajando** até o destino: o
- * movimento carrega o olho de onde a pessoa estava para onde ela chegou, que é continuidade
- * espacial — o único propósito que justifica animar algo que ela vai ler em seguida (§5).
- * Mola, e não timing, porque teve dedo envolvido.
+ * A boca é uma `View` circular pintada com a cor do FUNDO, por cima da barra. Como as duas
+ * superfícies são opacas, o círculo lê como um furo — e como é a mesma primitiva do resto do app,
+ * ele anima com `translateX` sem custo e sem depender de o Skia aceitar objetos criados dentro de
+ * worklet.
  *
- * O caminho é reconstruído por frame dentro de um `useDerivedValue`: é uma dúzia de operações de
- * ponto flutuante na UI thread, mais barato que interpolar entre quatro paths prontos e sem o
- * borrão que um cross-fade entre formas produz.
+ * Duas versões anteriores falharam, e as duas deixaram marca visível:
+ * 1. **Path inteiro remontado por frame** num `useDerivedValue`: o worklet rodava (os avisos de
+ *    API depreciada saíam no logcat), mas o canvas não pintava nada — a barra ficava invisível e
+ *    a lista aparecia por baixo dos rótulos.
+ * 2. **Path estático em Skia + borda de 1px na `View` da barra**: a borda desenha o retângulo
+ *    INTEIRO, inclusive atravessando a boca — era a "linha em cima do ícone". Barra com recorte
+ *    não pode ter borda; quem separa a barra do fundo é o degrau de superfície.
+ *
+ * ## O movimento
+ *
+ * Uma posição só governa a boca E a bolha: com duas molas elas dessincronizariam e a bolha sairia
+ * do furo no meio do caminho. Mola porque teve dedo envolvido (§5), e um agacho curto de escala
+ * no toque — é o que dá a sensação de a bolha se TRANSFORMAR de um lugar no outro em vez de
+ * simplesmente escorregar.
  */
 export function CurvedTabBar({
   tabs,
@@ -95,60 +98,24 @@ export function CurvedTabBar({
   const slot = barW / tabs.length;
   const alvo = slot * (activeIndex + 0.5);
 
-  // Uma posição só governa a curva E a bolha — se fossem duas molas, elas dessincronizariam e a
-  // bolha sairia do berço no meio do caminho.
-  //
-  // A mola é disparada em `useEffect`, nunca no corpo do componente: escrever num shared value
-  // durante o render é erro que o Reanimated avisa em dev e que, em produção, faz a animação
-  // reiniciar a cada re-render do pai.
   const cx = useSharedValue(alvo);
+  const squash = useSharedValue(1);
+
   useEffect(() => {
+    // A mola é disparada em efeito, nunca no corpo do componente: escrever num shared value
+    // durante o render reinicia a animação a cada re-render do pai.
     cx.set(withSpring(alvo, Motion.spring.settle));
-  }, [alvo, cx]);
+    squash.set(
+      withSequence(
+        withTiming(0.86, { duration: Motion.duration.fast }),
+        withSpring(1, Motion.spring.settle)
+      )
+    );
+  }, [alvo, cx, squash]);
 
-  const mouth = barW * K.mouth;
-  const depth = BAR_H * K.depth;
-
-  /**
-   * O berço é uma LENTE: a região entre a reta do topo da barra e a curva que mergulha.
-   *
-   * Pintada na cor do fundo por cima da barra, ela lê exatamente como um recorte — e como a
-   * forma nunca muda, o caminho é construído UMA vez, no `useMemo`, e quem anima é o
-   * `translateX` da View que a carrega.
-   *
-   * A primeira versão remontava o caminho inteiro da barra a cada frame dentro de um
-   * `useDerivedValue`. O worklet rodava (os avisos de API depreciada saíam no logcat), mas o
-   * canvas não pintava nada: a barra ficava invisível e a tela aparecia por baixo dos rótulos.
-   * Caminho estático + View animada não depende de o Skia aceitar objetos criados em worklet.
-   */
-  const berco = useMemo(() => {
-    const p = Skia.Path.Make();
-    const w = mouth * 2;
-    const c1 = barW * K.c1;
-    const c2 = barW * K.c2;
-    const c3 = barW * K.c3;
-    const c4 = barW * K.c4;
-    const c5 = barW * K.c5;
-    const y1 = BAR_H * K.y1;
-    const y2 = BAR_H * K.y2;
-    const y3 = BAR_H * K.y3;
-    const meio = w / 2;
-
-    p.moveTo(0, 0);
-    p.cubicTo(meio - c1, 0, meio - c2, y1, meio - c3, y2);
-    p.cubicTo(meio - c4, y3, meio - c5, depth, meio, depth);
-    p.cubicTo(meio + c5, depth, meio + c4, y3, meio + c3, y2);
-    p.cubicTo(meio + c2, y1, meio + c1, 0, w, 0);
-    p.close();
-    return p;
-  }, [barW, mouth, depth]);
-
-  const bercoStyle = useAnimatedStyle(() => ({
-    transform: [{ translateX: cx.get() - mouth }],
-  }));
-
+  const boca = useAnimatedStyle(() => ({ transform: [{ translateX: cx.get() - CUT }] }));
   const bolha = useAnimatedStyle(() => ({
-    transform: [{ translateX: cx.get() - BUBBLE / 2 }],
+    transform: [{ translateX: cx.get() - BUBBLE / 2 }, { scale: squash.get() }],
   }));
 
   return (
@@ -156,63 +123,65 @@ export function CurvedTabBar({
       pointerEvents="box-none"
       style={[styles.raiz, { paddingBottom: insets.bottom + Space.sm, paddingHorizontal: SIDE }]}>
       <View style={{ width: barW, height: BAR_H + LIFT }}>
-        <View
-          style={[
-            styles.barra,
-            { height: BAR_H, backgroundColor: theme.surface, borderColor: theme.cardBorder },
-          ]}
+        <View style={[styles.barra, { height: BAR_H, backgroundColor: theme.backgroundElement }]} />
+
+        {/* O furo. Cor do fundo, raio concêntrico com a bolha. */}
+        <Animated.View
+          pointerEvents="none"
+          style={[styles.boca, { backgroundColor: theme.background }, boca]}
         />
 
-        {/* O berço, pintado na cor do fundo por cima da barra. */}
         <Animated.View
           pointerEvents="none"
-          style={[styles.berco, { width: mouth * 2, height: depth }, bercoStyle]}>
-          <Canvas style={{ width: mouth * 2, height: depth }}>
-            <Path path={berco} color={theme.background} />
-          </Canvas>
-        </Animated.View>
-
-        <Animated.View
-          pointerEvents="none"
-          style={[
-            styles.bolha,
-            { backgroundColor: theme.tint, top: 0, width: BUBBLE, height: BUBBLE },
-            bolha,
-          ]}>
+          style={[styles.bolha, { backgroundColor: theme.tint }, bolha]}>
           <Icon name={tabs[activeIndex]?.icon ?? 'circle'} size="md" color="onTint" />
+          {/*
+            O badge da aba ATIVA anda com a bolha.
+            Deixado no slot, ele caía dentro do furo — em cima do nada — e encostava no rótulo.
+          */}
+          {tabs[activeIndex]?.badge ? (
+            <View style={[styles.badge, styles.badgeBolha, { backgroundColor: theme.danger }]}>
+              <ThemedText type="meta" themeColor="onTint">
+                {tabs[activeIndex].badge > 9 ? '9+' : String(tabs[activeIndex].badge)}
+              </ThemedText>
+            </View>
+          ) : null}
         </Animated.View>
 
         <View style={[styles.linha, { height: BAR_H, top: LIFT }]}>
-          {tabs.map((tab, i) => (
-            <Pressable
-              key={tab.name}
-              accessibilityRole="tab"
-              accessibilityState={{ selected: i === activeIndex }}
-              accessibilityLabel={tab.label}
-              onPress={() => {
-                if (i !== activeIndex) Haptics.selectionAsync();
-                onSelect(i);
-              }}
-              style={[styles.slot, { width: slot }]}>
-              {i === activeIndex ? null : (
-                <Icon name={tab.icon} size="md" color="textSecondary" />
-              )}
-              <ThemedText
-                type="caption"
-                themeColor={i === activeIndex ? 'text' : 'textSecondary'}
-                numberOfLines={1}
-                style={i === activeIndex ? styles.rotuloAtivo : undefined}>
-                {tab.label}
-              </ThemedText>
-              {tab.badge ? (
-                <View style={[styles.badge, { backgroundColor: theme.danger }]}>
-                  <ThemedText type="meta" themeColor="onTint">
-                    {tab.badge > 9 ? '9+' : String(tab.badge)}
-                  </ThemedText>
+          {tabs.map((tab, i) => {
+            const ativo = i === activeIndex;
+            return (
+              <Pressable
+                key={tab.name}
+                accessibilityRole="tab"
+                accessibilityState={{ selected: ativo }}
+                accessibilityLabel={tab.label}
+                onPress={() => {
+                  if (!ativo) Haptics.selectionAsync();
+                  onSelect(i);
+                }}
+                style={[styles.slot, { width: slot }]}>
+                {/* A aba ativa não desenha ícone na barra: ele está na bolha, dentro do furo. */}
+                <View style={styles.iconeSlot}>
+                  {ativo ? null : <Icon name={tab.icon} size="md" color="textSecondary" />}
+                  {tab.badge && !ativo ? (
+                    <View style={[styles.badge, styles.badgeIcone, { backgroundColor: theme.danger }]}>
+                      <ThemedText type="meta" themeColor="onTint">
+                        {tab.badge > 9 ? '9+' : String(tab.badge)}
+                      </ThemedText>
+                    </View>
+                  ) : null}
                 </View>
-              ) : null}
-            </Pressable>
-          ))}
+                <ThemedText
+                  type="caption"
+                  themeColor={ativo ? 'tint' : 'textSecondary'}
+                  numberOfLines={1}>
+                  {tab.label}
+                </ThemedText>
+              </Pressable>
+            );
+          })}
         </View>
       </View>
     </View>
@@ -234,30 +203,38 @@ const styles = StyleSheet.create({
     zIndex: 10,
     elevation: 10,
   },
+  /** Sem borda: ela atravessaria o furo. Ver o cabeçalho do arquivo. */
   barra: {
     position: 'absolute',
     left: 0,
     right: 0,
     top: LIFT,
     borderRadius: Radius.pill,
-    borderWidth: StyleSheet.hairlineWidth,
+    borderCurve: 'continuous',
   },
-  berco: { position: 'absolute', left: 0, top: LIFT },
+  boca: {
+    position: 'absolute',
+    left: 0,
+    top: LIFT + BUBBLE / 2 - CUT,
+    width: CUT * 2,
+    height: CUT * 2,
+    borderRadius: CUT,
+  },
   bolha: {
     position: 'absolute',
     left: 0,
+    top: LIFT - BUBBLE / 2,
+    width: BUBBLE,
+    height: BUBBLE,
     borderRadius: Radius.pill,
     alignItems: 'center',
     justifyContent: 'center',
   },
   linha: { position: 'absolute', left: 0, right: 0, flexDirection: 'row', alignItems: 'flex-end' },
   slot: { alignItems: 'center', justifyContent: 'flex-end', gap: Space.xs, paddingBottom: Space.md },
-  /** A aba ativa não desenha ícone na barra (ele está na bolha), então o rótulo sobe sozinho. */
-  rotuloAtivo: { marginBottom: 0 },
+  iconeSlot: { width: 24, height: 24, alignItems: 'center', justifyContent: 'center' },
   badge: {
     position: 'absolute',
-    top: Space.xs,
-    right: '22%',
     minWidth: 16,
     height: 16,
     borderRadius: Radius.pill,
@@ -265,4 +242,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
+  badgeIcone: { top: -4, right: -8 },
+  badgeBolha: { top: 0, right: 0 },
 });

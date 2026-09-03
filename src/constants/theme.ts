@@ -61,95 +61,95 @@ import { Platform } from 'react-native';
  * Em UI escura, mais claro = mais importante; é assim que se diz "isto é o principal" sem cor.
  */
 export const Colors = {
+  /**
+   * ## Claro — derivado do escuro, não copiado dele
+   *
+   * O Stitch só exportou o tema OLED. O claro foi construído mantendo os PAPÉIS e refazendo os
+   * valores para contraste: o verde do escuro (`#6ddc9e`) sobre branco dá 1,7:1 e some, então o
+   * accent aqui é o mesmo verde escurecido até passar em texto (`#0d8f5b`, ~4,6:1). Mesma coisa
+   * para vermelho e âmbar — âmbar claro é o pior caso e por isso ele é marrom-dourado, não
+   * amarelo.
+   *
+   * O painel de destaque continua ESCURO no tema claro: é o bloco que domina a tela e, chapado de
+   * branco sobre fundo branco, ele deixaria de ser destaque.
+   */
   light: {
-    text: '#000000',
-    background: '#ffffff',
-    backgroundElement: '#F0F0F3',
-    backgroundSelected: '#E0E1E6',
-    textSecondary: '#60646C',
-    tint: '#0A0A0B',
-    danger: '#E5484D',
-    success: '#30A46C',
-    warning: '#E8A33D',
+    text: '#131315',
+    background: '#F7F8F8',
+    backgroundElement: '#EDEFEF',
+    backgroundSelected: '#E1E5E4',
+    textSecondary: '#5B6060',
+    tint: '#0D8F5B',
+    danger: '#BA1A1A',
+    success: '#0D8F5B',
+    warning: '#8A5300',
 
-    /** fundo de página de lista agrupada — o card branco descansa em cima dele */
-    groupedBackground: '#F2F2F7',
-    /** card opaco (o padrão; glass é só chrome + 1 destaque por tela) */
+    groupedBackground: '#F2F3F4',
     surface: '#FFFFFF',
-    /** superfície acima de um card — sheet, popover */
     surfaceRaised: '#FFFFFF',
-    /** hairline entre linhas de lista */
-    separator: 'rgba(60, 60, 67, 0.29)',
-    /** scrim atrás de modal e sheet */
+    separator: 'rgba(19, 19, 21, 0.14)',
     overlay: 'rgba(0, 0, 0, 0.40)',
-    /** fundo de estado ativo/selecionado derivado do tint — agora lavagem neutra, não azul */
-    accentSoft: '#F0F0F2',
-    /** rótulo sobre `tint` — substitui os 18 `#fff` hardcoded espalhados nas telas */
+    accentSoft: '#E4F4EC',
     onTint: '#FFFFFF',
 
-    /**
-     * O painel de destaque do topo (`HeroPanel`). Cor chapada, não vidro.
-     *
-     * No tema ESCURO ele é um degrau ACIMA do fundo: preto sobre preto não é hero, é buraco.
-     *
-     * O valor era `#141416` — **um degrau de 20/255 sobre o preto**, o que na prática é nenhum:
-     * o painel encostava no fundo e a tela perdia o bloco que devia dominar. Subiu para
-     * `#242428`, que fica acima do fundo (`#000000`) E acima do card (`#1C1C1E`), então ele é a
-     * maior superfície clara da tela — que é como um UI escuro diz "isto é o principal".
-     *
-     * A alternativa considerada e recusada foi **inverter** (painel branco no escuro): num
-     * sistema monocromático inverter já significa "ação primária / selecionado" (é o que `tint`
-     * faz), o painel ocupa ~30% da tela e viraria uma lanterna, e o app passaria a ter duas
-     * caras diferentes entre os temas.
-     */
-    heroSurface: '#0A0A0B',
-    /** conteúdo sobre o hero */
+    heroSurface: '#17181A',
     onHero: '#FFFFFF',
-    /** rótulo e secundário do hero — o degrau de hierarquia lá dentro */
-    onHeroMuted: 'rgba(255, 255, 255, 0.62)',
-    /** hairline entre os tiles de ação dentro do hero */
-    heroSeparator: 'rgba(255, 255, 255, 0.14)',
-    /** contorno de 1px do card — a assinatura do Stitch, e o que separa card de fundo sem sombra */
-    cardBorder: 'rgba(0, 0, 0, 0.08)',
-    /**
-     * Superfícies TINGIDAS de semântica — o `error-container`/`secondary-container` do desenho.
-     *
-     * Existem porque badge e ícone de estado ficavam sobre cinza neutro: a cor aparecia só no
-     * glifo, de 12px, e o bloco inteiro lia morto ao lado do desenho. É a mesma alavanca de cor
-     * de sempre (semântica, nunca decoração), agora também na superfície.
-     */
-    dangerSoft: 'rgba(255, 99, 105, 0.12)',
-    successSoft: 'rgba(61, 214, 140, 0.12)',
-    warningSoft: 'rgba(255, 197, 61, 0.12)',
+    onHeroMuted: 'rgba(255, 255, 255, 0.64)',
+    heroSeparator: 'rgba(255, 255, 255, 0.16)',
+    cardBorder: 'rgba(19, 19, 21, 0.09)',
+    dangerSoft: 'rgba(186, 26, 26, 0.10)',
+    successSoft: 'rgba(13, 143, 91, 0.10)',
+    warningSoft: 'rgba(138, 83, 0, 0.10)',
   },
+  /**
+   * ## Escuro — a paleta do Stitch, lida do `tailwind.config` exportado
+   *
+   * | papel | Stitch | aqui |
+   * |---|---|---|
+   * | fundo | `background` `#131315` | `background` |
+   * | card | `surface-container-low` `#1b1b1d` | `surface` |
+   * | input, chip | `surface-container` `#201f21` | `backgroundElement` |
+   * | selecionado | `surface-container-high` `#2a2a2c` | `backgroundSelected` |
+   * | sheet, popover | `surface-bright` `#39393b` | `surfaceRaised` |
+   * | texto | `on-surface` `#e5e1e4` | `text` |
+   * | secundário | `on-surface-variant` `#c4c7c8` | `textSecondary` |
+   * | **accent** | `secondary` `#6ddc9e` | `tint` **e** `success` |
+   * | sobre o accent | `on-secondary` `#003920` | `onTint` |
+   * | erro | `error` `#ffb4ab` | `danger` |
+   * | contorno | `outline-variant` `#444748` | `separator` |
+   *
+   * **O accent voltou a ter matiz** (03/09/2026, decisão do dono do produto): era tinta
+   * monocromática e agora é o verde do desenho. Isso muda como ação se comunica — antes era só
+   * superfície (pílula preenchida de tinta), agora é superfície **e** matiz. `danger` e `warning`
+   * continuam semânticos e continuam sendo os únicos outros matizes da tela.
+   */
   dark: {
-    text: '#ffffff',
-    background: '#000000',
-    backgroundElement: '#212225',
-    backgroundSelected: '#2E3135',
-    textSecondary: '#B0B4BA',
-    tint: '#F5F5F7',
-    danger: '#FF6369',
-    success: '#3DD68C',
-    warning: '#FFC53D',
+    text: '#E5E1E4',
+    background: '#131315',
+    backgroundElement: '#201F21',
+    backgroundSelected: '#2A2A2C',
+    textSecondary: '#A9AEAF',
+    tint: '#6DDC9E',
+    danger: '#FFB4AB',
+    success: '#6DDC9E',
+    warning: '#FFB95F',
 
-    groupedBackground: '#000000',
-    surface: '#1C1C1E',
-    surfaceRaised: '#35353B',
-    separator: 'rgba(84, 84, 88, 0.65)',
+    groupedBackground: '#131315',
+    surface: '#1B1B1D',
+    surfaceRaised: '#39393B',
+    separator: '#444748',
     overlay: 'rgba(0, 0, 0, 0.60)',
-    accentSoft: '#1A1A1D',
-    /** inverte: sobre tinta clara o rótulo é escuro */
-    onTint: '#0A0A0B',
+    accentSoft: '#173226',
+    onTint: '#003920',
 
-    heroSurface: '#2C2C34',
-    onHero: '#F5F5F7',
-    onHeroMuted: 'rgba(245, 245, 247, 0.58)',
+    heroSurface: '#201F21',
+    onHero: '#E5E1E4',
+    onHeroMuted: 'rgba(229, 225, 228, 0.60)',
     heroSeparator: 'rgba(255, 255, 255, 0.10)',
-    cardBorder: 'rgba(255, 255, 255, 0.06)',
-    dangerSoft: 'rgba(255, 99, 105, 0.16)',
-    successSoft: 'rgba(61, 214, 140, 0.14)',
-    warningSoft: 'rgba(255, 197, 61, 0.14)',
+    cardBorder: 'rgba(255, 255, 255, 0.07)',
+    dangerSoft: 'rgba(255, 180, 171, 0.14)',
+    successSoft: 'rgba(109, 220, 158, 0.14)',
+    warningSoft: 'rgba(255, 185, 95, 0.14)',
   },
 } as const;
 
