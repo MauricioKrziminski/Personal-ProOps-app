@@ -16,7 +16,14 @@ import { Button } from '@/components/ui/button';
 import { Radius, Space, tabular } from '@/design/tokens';
 import { currentMonth } from '@/components/finance/month-picker';
 import { useAiMonthStats, usePlanStatus } from '@/hooks/use-finance';
-import { pushBlockerMessage, useRegisterPush, usePushStatus } from '@/hooks/use-push';
+import {
+  pushBlockerMessage,
+  useAlertsEnabled,
+  useRegisterPush,
+  usePushStatus,
+  useSetAlertsEnabled,
+  useUnregisterPush,
+} from '@/hooks/use-push';
 import { formatDateBR } from '@/hooks/use-items';
 import { useSession } from '@/hooks/use-session';
 import { useTheme, useThemeMode } from '@/hooks/use-theme';
@@ -38,6 +45,9 @@ export default function ProfileScreen() {
 
   const push = usePushStatus(userId);
   const register = useRegisterPush(userId);
+  const unregister = useUnregisterPush(userId);
+  const alerts = useAlertsEnabled(userId);
+  const setAlerts = useSetAlertsEnabled(userId);
   const plan = usePlanStatus();
   const ia = useAiMonthStats(currentMonth());
 
@@ -77,28 +87,78 @@ export default function ProfileScreen() {
     </Section>
   );
 
+  const alertsOn = alerts.data ?? true;
+
+  /**
+   * Duas chaves, e elas NÃO são a mesma coisa — a tela precisa deixar isso explícito.
+   *
+   * - **"Avisos do ProOps"** decide SE o app te interrompe (orçamento estourando, fatura
+   *   vencendo, projeção no vermelho). É o interruptor que não existia: até a `0049` não havia
+   *   coluna de preferência nenhuma e `_alerts_to_send` varria todo mundo.
+   * - **"Avisos no celular"** decide POR ONDE. Com push, é notificação e é grátis; sem push, o
+   *   cron cai no template do WhatsApp, que é PAGO.
+   *
+   * Por isso o push deixou de ser porta de mão única (era `disabled={pushOn}`) e por isso o
+   * subtítulo dele muda conforme a outra chave: com os alertas desligados, o canal não decide
+   * mais nada, e prometer "vai por WhatsApp" seria mentira.
+   */
   const notifications = (
     <Section title="Notificações">
+      <Row
+        title="Avisos do ProOps"
+        subtitle={
+          alertsOn
+            ? 'Orçamento estourando, fatura vencendo, saldo no vermelho'
+            : 'Desligado — o app não te procura'
+        }
+        icon="bell"
+        chevron={false}
+        trailing={
+          <Switch
+            value={alertsOn}
+            disabled={setAlerts.isPending || alerts.isLoading}
+            accessibilityLabel="Receber avisos do ProOps"
+            onValueChange={(v) =>
+              setAlerts.mutate(v, {
+                onSuccess: () =>
+                  toast({
+                    message: v ? 'Avisos ligados.' : 'Não te procuro mais.',
+                    tone: 'success',
+                  }),
+                onError: () => toast({ message: 'Não deu para salvar.', tone: 'error' }),
+              })
+            }
+          />
+        }
+      />
       <Row
         title="Avisos no celular"
         subtitle={
           push.isError
             ? 'Não deu para verificar'
-            : blocker ?? (pushOn ? 'Ligado' : 'Lembretes vão por WhatsApp, que é pago')
+            : !alertsOn
+              ? 'Só vale quando os avisos estão ligados'
+              : (blocker ?? (pushOn ? 'Chegam como notificação' : 'Vão por WhatsApp, que é pago'))
         }
         icon="bell.badge"
         chevron={false}
         trailing={
           <Switch
             value={pushOn}
-            disabled={pushOn || register.isPending}
-            accessibilityLabel="Ativar avisos no celular"
-            onValueChange={() =>
-              register.mutate(undefined, {
-                onSuccess: () => toast({ message: 'Avisos ligados.', tone: 'success' }),
-                onError: (e) =>
-                  toast({ message: e instanceof Error ? e.message : 'Falhou.', tone: 'error' }),
-              })
+            disabled={register.isPending || unregister.isPending || (!pushOn && !!blocker)}
+            accessibilityLabel="Receber avisos como notificação no celular"
+            onValueChange={(v) =>
+              v
+                ? register.mutate(undefined, {
+                    onSuccess: () => toast({ message: 'Avisos ligados.', tone: 'success' }),
+                    onError: (e) =>
+                      toast({ message: e instanceof Error ? e.message : 'Falhou.', tone: 'error' }),
+                  })
+                : unregister.mutate(undefined, {
+                    onSuccess: () =>
+                      toast({ message: 'Agora os avisos vão pelo WhatsApp.', tone: 'info' }),
+                    onError: () => toast({ message: 'Não deu para desligar.', tone: 'error' }),
+                  })
             }
           />
         }

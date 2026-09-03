@@ -97,6 +97,71 @@ export function useRegisterPush(userId: string | undefined) {
   });
 }
 
+/**
+ * **Desliga** o push: apaga o token do perfil.
+ *
+ * Existe porque o Switch do Perfil era `disabled={pushOn}` — porta de mão única. Ligar era
+ * possível, desligar não, e a única saída era revogar a permissão no sistema operacional.
+ *
+ * ⚠️ **Desligar o push NÃO silencia o app.** Sem `expo_push_token`, `jobs/alerts.py` cai no
+ * `send_template` do WhatsApp, que é PAGO — desligar aqui deixa o app mais caro, não mais quieto.
+ * Quem silencia é `profiles.alerts_enabled` (`useAlertsEnabled`). A tela precisa dizer isso, e
+ * diz.
+ */
+export function useUnregisterPush(userId: string | undefined) {
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: async () => {
+      if (!userId) throw new Error('Sem sessão.');
+      const { error } = await supabase
+        .from('profiles')
+        .update({ expo_push_token: null })
+        .eq('id', userId);
+      if (error) throw error;
+    },
+    onSuccess: () => client.invalidateQueries({ queryKey: ['push'] }),
+  });
+}
+
+/**
+ * Os alertas proativos: orçamento estourando, fatura vencendo, projeção no vermelho, teste
+ * acabando.
+ *
+ * `profiles.alerts_enabled` é o interruptor que **não existia** — `_alerts_to_send` varria todo
+ * dono de workspace sem filtro nenhum, e não havia coluna de preferência em lugar nenhum. O
+ * usuário não tinha como pedir silêncio; só podia escolher por qual canal ser interrompido.
+ */
+export function useAlertsEnabled(userId: string | undefined) {
+  return useQuery({
+    queryKey: ['alerts-enabled', userId],
+    enabled: !!userId,
+    queryFn: async (): Promise<boolean> => {
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('alerts_enabled')
+        .eq('id', userId!)
+        .single();
+      if (error) throw error;
+      return data?.alerts_enabled ?? true;
+    },
+  });
+}
+
+export function useSetAlertsEnabled(userId: string | undefined) {
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: async (enabled: boolean) => {
+      if (!userId) throw new Error('Sem sessão.');
+      const { error } = await supabase
+        .from('profiles')
+        .update({ alerts_enabled: enabled })
+        .eq('id', userId);
+      if (error) throw error;
+    },
+    onSuccess: () => client.invalidateQueries({ queryKey: ['alerts-enabled'] }),
+  });
+}
+
 /** Mensagem por causa — "desativado" genérico não diz o que fazer. */
 export function pushBlockerMessage(blocker: PushBlocker): string | null {
   switch (blocker) {

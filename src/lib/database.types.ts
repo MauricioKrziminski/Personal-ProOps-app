@@ -1234,6 +1234,7 @@ export type Database = {
           icon: string | null
           id: string
           name: string
+          parent_id: string | null
           updated_at: string
           user_id: string
           workspace_id: string
@@ -1243,6 +1244,7 @@ export type Database = {
           icon?: string | null
           id?: string
           name: string
+          parent_id?: string | null
           updated_at?: string
           user_id: string
           workspace_id?: string
@@ -1252,6 +1254,7 @@ export type Database = {
           icon?: string | null
           id?: string
           name?: string
+          parent_id?: string | null
           updated_at?: string
           user_id?: string
           workspace_id?: string
@@ -1395,6 +1398,7 @@ export type Database = {
       }
       profiles: {
         Row: {
+          alerts_enabled: boolean
           created_at: string
           expo_push_token: string | null
           id: string
@@ -1405,6 +1409,7 @@ export type Database = {
           whatsapp_verified: boolean
         }
         Insert: {
+          alerts_enabled?: boolean
           created_at?: string
           expo_push_token?: string | null
           id: string
@@ -1415,6 +1420,7 @@ export type Database = {
           whatsapp_verified?: boolean
         }
         Update: {
+          alerts_enabled?: boolean
           created_at?: string
           expo_push_token?: string | null
           id?: string
