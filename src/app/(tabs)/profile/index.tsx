@@ -5,14 +5,16 @@ import * as Haptics from 'expo-haptics';
 import { ThemedText } from '@/components/themed-text';
 import { AppHeader } from '@/components/ui/app-header';
 import { EmptyState } from '@/components/ui/empty-state';
+import { Icon } from '@/components/ui/icon';
 import { Row, Section } from '@/components/ui/row';
 import { Screen } from '@/components/ui/screen';
 import { SkeletonRow } from '@/components/ui/skeleton';
 import { useToast } from '@/components/ui/toast';
-import { Space } from '@/design/tokens';
+import { Radius, Space } from '@/design/tokens';
 import { usePlanStatus } from '@/hooks/use-finance';
 import { pushBlockerMessage, useRegisterPush, usePushStatus } from '@/hooks/use-push';
 import { useSession } from '@/hooks/use-session';
+import { useTheme } from '@/hooks/use-theme';
 import { confirmDestructive } from '@/lib/item-actions';
 import { supabase } from '@/lib/supabase';
 
@@ -23,6 +25,7 @@ import { supabase } from '@/lib/supabase';
  * consequência econômica do produto (sem token, todo lembrete vira template pago do WhatsApp).
  */
 export default function ProfileScreen() {
+  const theme = useTheme();
   const { session } = useSession();
   const toast = useToast();
   const userId = session?.user?.id;
@@ -83,6 +86,35 @@ export default function ProfileScreen() {
       topBar={<AppHeader />}
       onRefresh={() => { push.refetch(); plan.refetch(); }}
       refreshing={push.isRefetching}>
+      {/*
+        Cartão de identidade — o topo da tela no desenho.
+        Ele responde "de quem é esta conta" antes de qualquer ajuste, e é o que separa uma tela
+        de perfil de uma lista de configurações. O nome não existe no schema (só o telefone), e
+        por isso o card mostra o número, que é a chave de tudo no produto.
+      */}
+      <View style={[styles.idCard, { backgroundColor: theme.surface, borderColor: theme.cardBorder }]}>
+        <View style={[styles.idAvatar, { backgroundColor: theme.surfaceRaised, borderColor: theme.success }]}>
+          <Icon name="person.crop.circle" size="xl" color="textSecondary" />
+        </View>
+        <View style={styles.idInfo}>
+          <ThemedText type="ticker" selectable>
+            {phone}
+          </ThemedText>
+          <View style={styles.idMeta}>
+            <Icon name="bubble.left" size="xs" color="success" />
+            <ThemedText type="caption" themeColor="textSecondary">
+              conectado ao WhatsApp
+            </ThemedText>
+          </View>
+        </View>
+        {plan.data?.plan ? (
+          <View style={[styles.idPlan, { borderColor: theme.success }]}>
+            <ThemedText type="meta" themeColor="success">
+              {plan.data.plan.toUpperCase()}
+            </ThemedText>
+          </View>
+        ) : null}
+      </View>
 
       <Section title="Conta">
         <Row title="WhatsApp" subtitle="o número é a chave de tudo" icon="phone" chevron={false}
@@ -132,6 +164,31 @@ export default function ProfileScreen() {
 }
 
 const styles = StyleSheet.create({
+  idCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Space.md,
+    padding: Space.lg,
+    borderRadius: Radius.md,
+    borderCurve: 'continuous',
+    borderWidth: StyleSheet.hairlineWidth,
+  },
+  idAvatar: {
+    width: 56,
+    height: 56,
+    borderRadius: Radius.pill,
+    borderWidth: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  idInfo: { flex: 1, minWidth: 0, gap: Space.xs },
+  idMeta: { flexDirection: 'row', alignItems: 'center', gap: Space.xs },
+  idPlan: {
+    paddingHorizontal: Space.sm,
+    paddingVertical: Space.xs,
+    borderRadius: Radius.pill,
+    borderWidth: 1,
+  },
   footer: {
     alignItems: 'center',
     paddingVertical: Space.xl,

@@ -246,8 +246,8 @@ const styles = StyleSheet.create({
   row: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
-    gap: Space.md,
+    alignSelf: 'flex-start',
+    gap: Space.xs,
   },
   arrow: {
     width: HitTarget,
@@ -257,11 +257,17 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
+  /**
+   * Sem `flex: 1`: o seletor é uma PÍLULA, não uma barra.
+   *
+   * Esticado, os dois chevrons iam parar nas pontas da tela e o controle lia como navegação de
+   * página — no desenho ele é um chip compacto que diz apenas de que mês a tela está falando.
+   */
   label: {
-    flex: 1,
     minHeight: HitTarget,
     alignItems: 'center',
     justifyContent: 'center',
+    paddingHorizontal: Space.sm,
   },
   sheetHead: {
     flexDirection: 'row',

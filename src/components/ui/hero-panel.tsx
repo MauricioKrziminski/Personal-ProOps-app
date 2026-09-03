@@ -109,21 +109,37 @@ export function HeroPanel({
             {label.toUpperCase()}
           </ThemedText>
           {badge ? <View style={styles.badgeWrap}>{badge}</View> : null}
+          {/*
+            O olho é um BOTÃO REDONDO na linha do rótulo, não um ícone colado no número.
+            Ao lado do valor ele disputava a leitura justamente com o que a tela existe para
+            mostrar, e mudava de posição conforme o valor ficava mais curto ou mais longo.
+          */}
+          {concealable ? (
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel={concealed ? 'Mostrar valor' : 'Ocultar valor'}
+              onPress={toggle}
+              hitSlop={Space.sm}
+              style={[styles.eye, { backgroundColor: theme.surfaceRaised }]}>
+              <Icon name={concealed ? 'eye.slash' : 'eye'} size="sm" color="onHero" />
+            </Pressable>
+          ) : null}
         </View>
 
-        <Pressable
-          accessibilityRole={concealable ? 'button' : undefined}
-          accessibilityLabel={concealable ? (concealed ? 'Mostrar valor' : 'Ocultar valor') : undefined}
-          onPress={concealable ? toggle : undefined}
-          style={styles.valueRow}
-          hitSlop={Space.md}>
-          {value}
-          {concealable ? (
-            <Icon name={concealed ? 'eye.slash' : 'eye'} size="md" color="onHeroMuted" />
-          ) : null}
-        </Pressable>
+        <View style={styles.valueRow}>{value}</View>
 
-        {trend ? (
+        {secondary ? (
+          <ThemedText type="footnote" themeColor="onHeroMuted">
+            {secondary}
+          </ThemedText>
+        ) : null}
+
+        {chart ? <View style={styles.chart}>{chart}</View> : null}
+      </Pressable>
+
+      {trend ? (
+        <>
+          <View style={[styles.hairline, { backgroundColor: theme.heroSeparator }]} />
           <View style={styles.trendRow}>
             <View style={[styles.trendPill, { backgroundColor: theme.heroSeparator }]}>
               <Icon
@@ -144,16 +160,8 @@ export function HeroPanel({
               </ThemedText>
             ) : null}
           </View>
-        ) : null}
-
-        {secondary ? (
-          <ThemedText type="footnote" themeColor="onHeroMuted">
-            {secondary}
-          </ThemedText>
-        ) : null}
-
-        {chart ? <View style={styles.chart}>{chart}</View> : null}
-      </Pressable>
+        </>
+      ) : null}
 
       {actions ? (
         <View style={styles.actions}>
@@ -174,6 +182,14 @@ const styles = StyleSheet.create({
    * com um card de raio inteiro, contorno de 1px e ar em volta, e a costura deixa de ser
    * necessária porque não há mais o que costurar.
    */
+  eye: {
+    width: 28,
+    height: 28,
+    borderRadius: Radius.pill,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  hairline: { height: StyleSheet.hairlineWidth, marginTop: Space.lg },
   panel: {
     padding: Space.gutter,
     borderRadius: Radius.lg,
@@ -205,8 +221,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: Space.sm,
-    marginTop: Space.xs,
-    marginBottom: Space.xs,
+    marginTop: Space.md,
   },
   trendPill: {
     flexDirection: 'row',

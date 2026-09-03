@@ -124,7 +124,8 @@ function Shortcut({ title, count, icon, href }: ShortcutProps) {
             {title}
           </ThemedText>
           {count ? (
-            <ThemedText type="caption" themeColor="textSecondary" style={tabular}>
+            /* Mono: contagem é DADO, e o segundo tipo do sistema é o que carimba dado. */
+            <ThemedText type="code" themeColor="textSecondary" style={tabular}>
               {count}
             </ThemedText>
           ) : null}
@@ -340,6 +341,15 @@ export default function FinanceScreen() {
           duas superfícies escuras sem costura entre elas; o card resolve por contorno e respiro,
           que é como o desenho faz.
         */}
+        {/*
+          A fileira que ESCOPA a tela: o mês à esquerda, o estado à direita. Ficava dentro do
+          painel, e ali um controle no topo de um card lia como parte do número — além de
+          empurrar o rótulo para baixo e desalinhar o painel do resto das telas.
+        */}
+        <View style={styles.escopo}>
+          <MonthPicker month={month} onChange={setMonth} />
+        </View>
+
         {heroLoading ? (
           <View style={styles.heroSkeleton}>
             <Skeleton width="55%" height={14} />
@@ -354,7 +364,6 @@ export default function FinanceScreen() {
           />
         ) : (
           <HeroPanel
-            top={<MonthPicker month={month} onChange={setMonth} onHero />}
             label={isCurrent ? 'Sobra até o fim do mês' : `Sobrou em ${monthTitle(month)}`}
             value={
               <Money
@@ -785,6 +794,7 @@ export default function FinanceScreen() {
 }
 
 const styles = StyleSheet.create({
+  escopo: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   root: {
     flex: 1,
   },

@@ -157,6 +157,11 @@ export default function RootLayout() {
                       `Stack.Protected` e decide o destino por conta própria. */}
                   <Stack.Screen name="index" options={{ headerShown: false }} />
 
+                  {/* Vitrine de design com dados de exemplo — FORA do portão de sessão de
+                      propósito: sem ela não há como olhar as telas sem o OTP do WhatsApp. Não
+                      tem link em lugar nenhum; chega-se por `com.proops.personal://design-preview`. */}
+                  <Stack.Screen name="design-preview" options={{ headerShown: false }} />
+
                 {/* Porta de mão única nos dois sentidos: sem sessão só existe o login; com sessão
                   o login deixa de existir, então `back` nunca reentra nele. */}
                 <Stack.Protected guard={!session}>

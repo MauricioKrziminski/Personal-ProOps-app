@@ -232,7 +232,7 @@ export default function TodayScreen() {
                     <ThemedText type="headline" numberOfLines={1} style={styles.shrink}>
                       {b.title}
                     </ThemedText>
-                    <View style={[styles.duePill, { backgroundColor: theme.accentSoft }]}>
+                    <View style={[styles.duePill, { backgroundColor: theme.dangerSoft }]}>
                       <ThemedText type="caption" themeColor="danger">
                         {`VENCEU EM ${formatDateBR(b.due_date)}`}
                       </ThemedText>
@@ -378,7 +378,7 @@ export default function TodayScreen() {
             />
             <View style={[styles.group, { backgroundColor: theme.surface, borderColor: theme.cardBorder }]}>
               <View style={styles.captureTop}>
-                <View style={[styles.iconCircle, { backgroundColor: theme.accentSoft }]}>
+                <View style={[styles.iconCircle, { backgroundColor: theme.successSoft }]}>
                   <Icon name="mic" size="sm" color="success" />
                 </View>
                 <View style={styles.shrink}>

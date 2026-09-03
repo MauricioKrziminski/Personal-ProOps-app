@@ -111,6 +111,16 @@ export const Colors = {
     heroSeparator: 'rgba(255, 255, 255, 0.14)',
     /** contorno de 1px do card — a assinatura do Stitch, e o que separa card de fundo sem sombra */
     cardBorder: 'rgba(0, 0, 0, 0.08)',
+    /**
+     * Superfícies TINGIDAS de semântica — o `error-container`/`secondary-container` do desenho.
+     *
+     * Existem porque badge e ícone de estado ficavam sobre cinza neutro: a cor aparecia só no
+     * glifo, de 12px, e o bloco inteiro lia morto ao lado do desenho. É a mesma alavanca de cor
+     * de sempre (semântica, nunca decoração), agora também na superfície.
+     */
+    dangerSoft: 'rgba(255, 99, 105, 0.12)',
+    successSoft: 'rgba(61, 214, 140, 0.12)',
+    warningSoft: 'rgba(255, 197, 61, 0.12)',
   },
   dark: {
     text: '#ffffff',
@@ -137,6 +147,9 @@ export const Colors = {
     onHeroMuted: 'rgba(245, 245, 247, 0.58)',
     heroSeparator: 'rgba(255, 255, 255, 0.10)',
     cardBorder: 'rgba(255, 255, 255, 0.06)',
+    dangerSoft: 'rgba(255, 99, 105, 0.16)',
+    successSoft: 'rgba(61, 214, 140, 0.14)',
+    warningSoft: 'rgba(255, 197, 61, 0.14)',
   },
 } as const;
 

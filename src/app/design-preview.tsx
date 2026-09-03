@@ -1,0 +1,385 @@
+import { useEffect, useMemo, useState } from 'react';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { Pressable, StyleSheet, View, useWindowDimensions } from 'react-native';
+
+import { ThemedText } from '@/components/themed-text';
+import { Radius, Space } from '@/design/tokens';
+import { localISODate } from '@/hooks/use-items';
+import { useTheme } from '@/hooks/use-theme';
+
+import FinanceScreen from './(tabs)/finance/index';
+import NotesScreen from './(tabs)/notes/index';
+import ProfileScreen from './(tabs)/profile/index';
+import TodayScreen from './(tabs)/today/index';
+
+/**
+ * Vitrine das quatro raízes de aba com dados de exemplo, **fora do portão de sessão**.
+ *
+ * Existe porque a única forma de olhar essas telas era logar, e logar exige o OTP que chega no
+ * WhatsApp do dono do número. Sem isto, "conferir no simulador" (regra de workflow §5) virava
+ * "deve funcionar" — que é exatamente como a tela Hoje foi entregue errada duas vezes.
+ *
+ * O truque é o cache do TanStack, não um mock dentro dos hooks: um `QueryClient` próprio nasce
+ * com as chaves já preenchidas e `staleTime: Infinity`, então nenhum `queryFn` chega a rodar e
+ * as telas montam o código REAL de produção — mesmos componentes, mesmos estados, mesma
+ * tipografia. Hook novo que a tela use e que não esteja semeado aqui aparece no estado de
+ * carregando, que também é informação.
+ *
+ * Não é tela de produto: não tem link para ela em lugar nenhum e o caminho é o deep link
+ * `com.proops.personal://design-preview`.
+ */
+const ABAS = ['Hoje', 'Finanças', 'Notas', 'Perfil'] as const;
+
+/**
+ * A tela é montada numa caixa ALTA e deslocada para cima, em vez de rolada.
+ *
+ * Screenshot de simulador (`simctl io`) não tem como rolar nada — não existe gesto por linha de
+ * comando — e a alternativa seria automatizar cliques na janela do Simulator, que depende de
+ * escala de janela e quebra em qualquer monitor diferente. Montando o conteúdo inteiro e
+ * empurrando por `translateY`, cada passo é uma faixa exata da tela.
+ *
+ * O passo avança a cada LANÇAMENTO do app (guardado no `AsyncStorage`), não por timer: assim
+ * `terminate` + `launch` + `screenshot` é uma sequência determinística, sem corrida com o relógio.
+ */
+const PASSO_KEY = 'design-preview-step';
+/** Quantas alturas de tela cada aba ocupa — medido, para não gastar frame em preto. */
+const FAIXAS: Record<(typeof ABAS)[number], number> = {
+  Hoje: 2,
+  'Finanças': 3,
+  Notas: 3,
+  Perfil: 3,
+};
+const PASSOS = ABAS.flatMap((aba) =>
+  Array.from({ length: FAIXAS[aba] }, (_, faixa) => ({ aba, faixa }))
+);
+
+export default function DesignPreviewScreen() {
+  const theme = useTheme();
+  const { height } = useWindowDimensions();
+  const [aba, setAba] = useState<(typeof ABAS)[number]>('Hoje');
+  const [passo, setPasso] = useState<number | null>(null);
+
+  useEffect(() => {
+    let vivo = true;
+    AsyncStorage.getItem(PASSO_KEY).then((raw) => {
+      if (!vivo) return;
+      const atual = Number(raw ?? 0) % PASSOS.length;
+      setPasso(atual);
+      setAba(PASSOS[atual].aba);
+      AsyncStorage.setItem(PASSO_KEY, String(atual + 1));
+    });
+    return () => {
+      vivo = false;
+    };
+  }, []);
+
+  const faixa = passo === null ? 0 : PASSOS[passo].faixa;
+  const alturaTotal = height * FAIXAS[aba];
+
+  const client = useMemo(() => seedClient(), []);
+
+  return (
+    <QueryClientProvider client={client}>
+      <View style={[styles.root, { backgroundColor: theme.background }]}>
+        <View style={styles.janela}>
+          <View
+            style={{
+              height: alturaTotal,
+              transform: [{ translateY: -faixa * height }],
+            }}>
+            {aba === 'Hoje' ? <TodayScreen /> : null}
+            {aba === 'Finanças' ? <FinanceScreen /> : null}
+            {aba === 'Notas' ? <NotesScreen /> : null}
+            {aba === 'Perfil' ? <ProfileScreen /> : null}
+          </View>
+        </View>
+
+        <View style={[styles.switcher, { borderTopColor: theme.cardBorder }]}>
+          {ABAS.map((nome) => (
+            <Pressable
+              key={nome}
+              accessibilityRole="button"
+              onPress={() => setAba(nome)}
+              style={[
+                styles.chip,
+                {
+                  backgroundColor: aba === nome ? theme.tint : theme.surface,
+                  borderColor: theme.cardBorder,
+                },
+              ]}>
+              <ThemedText type="caption" themeColor={aba === nome ? 'onTint' : 'textSecondary'}>
+                {nome === aba ? `${nome} ${faixa + 1}/${FAIXAS[aba]}` : nome}
+              </ThemedText>
+            </Pressable>
+          ))}
+        </View>
+      </View>
+    </QueryClientProvider>
+  );
+}
+
+/** Hoje é 03/09/2026 no ambiente de desenvolvimento; as chaves que levam data usam o dia local. */
+function seedClient() {
+  const hoje = localISODate();
+  const agora = new Date();
+  const mes = hoje.slice(0, 7);
+  const ultimoDia = localISODate(new Date(agora.getFullYear(), agora.getMonth() + 1, 0));
+  const anterior = new Date(agora.getFullYear(), agora.getMonth() - 1, 1);
+  const mesAnterior = localISODate(anterior).slice(0, 7);
+  const ultimoDiaAnterior = localISODate(
+    new Date(anterior.getFullYear(), anterior.getMonth() + 1, 0)
+  );
+  const fimDoMes = new Date(agora.getFullYear(), agora.getMonth() + 1, 0);
+  const diasRestantes = Math.max(1, fimDoMes.getDate() - agora.getDate());
+
+  const client = new QueryClient({
+    defaultOptions: { queries: { staleTime: Infinity, gcTime: Infinity, retry: false } },
+  });
+
+  const at = (hora: number, minuto: number) =>
+    new Date(agora.getFullYear(), agora.getMonth(), agora.getDate(), hora, minuto).toISOString();
+
+  // Curva de saldo do mês: começa em 3.910 e desce até 2.450, para o sparkline ter o que desenhar.
+  const forecast = Array.from({ length: diasRestantes + 1 }, (_, i) => ({
+    day: `2026-09-${String(agora.getDate() + i).padStart(2, '0')}`,
+    balance_cents: 391000 - Math.round((i / diasRestantes) * 146000),
+  }));
+
+  client.setQueryData(['forecast', String(diasRestantes)], forecast);
+
+  client.setQueryData(
+    ['upcoming-bills', '7'],
+    [
+      {
+        ref_id: 'prev-aluguel',
+        title: 'Aluguel',
+        due_date: '2026-09-01',
+        amount_cents: 180000,
+        kind: 'expense',
+        overdue: true,
+      },
+      {
+        ref_id: 'prev-energia',
+        title: 'Energia',
+        due_date: '2026-09-08',
+        amount_cents: 21430,
+        kind: 'expense',
+        overdue: false,
+      },
+    ]
+  );
+
+  client.setQueryData(
+    ['reminders', 'today', hoje],
+    [
+      {
+        id: 'prev-r1',
+        title: 'Ligar para o contador sobre IRPF',
+        recurrence: null,
+        next_run_at: at(15, 0),
+        channel: 'whatsapp',
+        active: true,
+      },
+      {
+        id: 'prev-r2',
+        title: 'Comprar filtro de água',
+        recurrence: null,
+        next_run_at: at(18, 30),
+        channel: 'push',
+        active: true,
+      },
+    ]
+  );
+
+  // Hoje chama `useBudgetsStatus()` (chave = o DIA) e Financeiro chama com o mês (`YYYY-MM-01`).
+  // São duas chaves diferentes para a mesma RPC — as duas precisam de dado aqui.
+  const statusOrcamento = 
+    [
+      {
+        category: 'alimentação',
+        base_limit_cents: 200000,
+        limit_cents: 200000,
+        spent_cents: 176000,
+        rollover: false,
+        rollover_cents: 0,
+      },
+      {
+        category: 'transporte',
+        base_limit_cents: 60000,
+        limit_cents: 60000,
+        spent_cents: 18700,
+        rollover: false,
+        rollover_cents: 0,
+      },
+    ];
+  client.setQueryData(['budgets-status', hoje], statusOrcamento);
+  client.setQueryData(['budgets-status', `${mes}-01`], statusOrcamento);
+
+  const tx = (over: Record<string, unknown>) => ({
+    id: 'prev-tx',
+    kind: 'expense',
+    amount_cents: 4500,
+    currency: 'BRL',
+    category: 'alimentação',
+    description: 'Gastei 45 no almoço do Rangão',
+    account_id: null,
+    counterparty_account_id: null,
+    occurred_at: hoje,
+    source: 'whatsapp',
+    created_at: at(12, 44),
+    status: 'cleared',
+    due_at: null,
+    invoice_id: null,
+    installment_plan_id: null,
+    installment_no: null,
+    merchant: null,
+    recurring_id: null,
+    debt_id: null,
+    ...over,
+  });
+
+  const recentes = [
+    tx({}),
+    tx({ id: 'prev-tx2', description: 'Supermercado Pão de Açúcar', amount_cents: 14250 }),
+    tx({
+      id: 'prev-tx3',
+      kind: 'income',
+      description: 'Pix recebido — consultoria',
+      amount_cents: 120000,
+      category: 'receita',
+    }),
+  ];
+
+  client.setQueryData(['transactions', 'recent', '5'], recentes);
+  client.setQueryData(['transactions', 'list', { month: mes }], recentes);
+
+  // `transactions_summary` devolve UMA linha por (categoria, tipo), não a transação.
+  const resumo = (fim: string, gasto: number, receita: number) => [
+    { category: 'alimentação', kind: 'expense', total_cents: gasto, tx_count: 12 },
+    { category: 'transporte', kind: 'expense', total_cents: Math.round(gasto * 0.3), tx_count: 5 },
+    { category: 'salário', kind: 'income', total_cents: receita, tx_count: 1 },
+    { category: 'freela', kind: 'income', total_cents: 120000, tx_count: 2 },
+  ];
+  client.setQueryData(['tx-summary', `${mes}-01`, ultimoDia], resumo(ultimoDia, 412000, 900000));
+  client.setQueryData(['tx-summary', `${mesAnterior}-01`, ultimoDiaAnterior], resumo(ultimoDiaAnterior, 468000, 900000));
+
+  client.setQueryData(['account-balances'], [
+    { account_id: 'prev-a1', name: 'Conta corrente', type: 'checking', balance_cents: 892040 },
+    { account_id: 'prev-a2', name: 'Carteira', type: 'cash', balance_cents: 12000 },
+  ]);
+  client.setQueryData(['accounts'], [
+    { id: 'prev-a1', name: 'Conta corrente', type: 'checking', initial_balance_cents: 0 },
+    { id: 'prev-a2', name: 'Carteira', type: 'cash', initial_balance_cents: 0 },
+  ]);
+  client.setQueryData(['card-summary'], [
+    {
+      account_id: 'prev-c1',
+      name: 'Cartão principal',
+      invoice_id: 'prev-i1',
+      invoice_total_cents: 324010,
+      unpaid_total_cents: 324010,
+      credit_limit_cents: 1500000,
+      available_limit_cents: 1175000,
+      closing_day: 15,
+      due_day: 22,
+      closing_date: `${mes}-15`,
+      due_date: `${mes}-22`,
+      reference_month: `${mes}-01`,
+      overdue_count: 0,
+      overdue_total_cents: 0,
+      oldest_overdue_invoice_id: null,
+    },
+  ]);
+  client.setQueryData(
+    ['monthly-cashflow', '6'],
+    ['2026-04', '2026-05', '2026-06', '2026-07', '2026-08', '2026-09'].map((m, i) => ({
+      month: `${m}-01`,
+      income_cents: 780000 + i * 40000,
+      expense_cents: 520000 - i * 18000,
+    }))
+  );
+  client.setQueryData(['budgets'], []);
+
+  const nota = (over: Record<string, unknown>) => ({
+    id: 'prev-n1',
+    content: 'Lista do supermercado & feira\nazeite extravirgem · café · filtro de água',
+    folder_id: 'prev-f1',
+    pinned: true,
+    source: 'whatsapp',
+    tags: ['mercado'],
+    created_at: at(9, 12),
+    updated_at: at(9, 12),
+    deleted_at: null,
+    ...over,
+  });
+
+  // `useNotesList` é `useInfiniteQuery`: o cache guarda `{ pages, pageParams }`, não o array.
+  client.setQueryData(['notes', 'list', {}], {
+    pageParams: [0],
+    pages: [
+      [
+        nota({}),
+        nota({
+          id: 'prev-n2',
+          content: 'Ideias para o app\nresumo semanal por áudio no domingo à noite',
+          folder_id: 'prev-f2',
+          pinned: false,
+          source: 'app',
+          tags: ['ideias'],
+        }),
+        nota({
+          id: 'prev-n3',
+          content: 'Reunião com o contador — levar notas fiscais de agosto',
+          folder_id: 'prev-f2',
+          pinned: false,
+          source: 'whatsapp',
+          tags: ['trabalho'],
+          updated_at: at(8, 5),
+        }),
+      ],
+    ],
+  });
+
+  client.setQueryData(['notes', 'folders'], [
+    { id: 'prev-f1', name: 'Mercado', icon: 'cart', notes_count: 4 },
+    { id: 'prev-f2', name: 'Trabalho', icon: 'briefcase', notes_count: 6 },
+    { id: 'prev-f3', name: 'Ideias', icon: 'lightbulb', notes_count: 8 },
+  ]);
+  client.setQueryData(['notes', 'tags'], [
+    { tag: 'mercado', count: 4 },
+    { tag: 'trabalho', count: 6 },
+  ]);
+
+  client.setQueryData(['plan-status'], {
+    plan: 'pro',
+    members: 2,
+    max_members: 5,
+    ai_messages_month: 143,
+    max_ai_messages_month: 1000,
+  });
+  client.setQueryData(['reminders'], []);
+  client.setQueryData(['goals'], []);
+  client.setQueryData(['recurring'], []);
+
+  return client;
+}
+
+const styles = StyleSheet.create({
+  root: { flex: 1 },
+  janela: { flex: 1, overflow: 'hidden' },
+  switcher: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: Space.sm,
+    padding: Space.sm,
+    borderTopWidth: StyleSheet.hairlineWidth,
+  },
+  chip: {
+    paddingHorizontal: Space.md,
+    paddingVertical: Space.sm,
+    borderRadius: Radius.pill,
+    borderWidth: StyleSheet.hairlineWidth,
+  },
+});
