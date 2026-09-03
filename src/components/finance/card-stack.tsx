@@ -50,6 +50,8 @@ const INSET = 8;
  * ocupa a tela toda.
  */
 const SPREAD = 92;
+/** Espaço reservado no fim do palco para a alça de abrir/fechar. */
+const ALCA = 34;
 
 /**
  * A carteira: cartões DE VERDADE empilhados, que abrem em leque ao toque.
@@ -122,7 +124,8 @@ export function CardStack({
 
   // Fechada, a pilha é o cartão da frente mais a faixa de cada um dos de trás EM CIMA dele.
   // Aberta, é um passo por cartão mais a altura do último, que aparece inteiro.
-  const altura = aberta ? atras * SPREAD + CARD_H : CARD_H + atras * PEEK;
+  const altura =
+    (aberta ? atras * SPREAD : atras * PEEK) + CARD_H + (visiveis.length > 1 ? ALCA : 0);
 
   const palco = useAnimatedStyle(() => ({
     height: withSpring(altura, Motion.spring.settle),
@@ -220,13 +223,19 @@ function CardFace({
    * lateral crescente. Aberta: uma fileira de cartões inteiros, um passo cada.
    */
   /*
-    Aberta e fechada usam a MESMA ordem (`depth`), nunca o índice do array.
+    A MESMA fórmula nos dois estados — muda só o passo.
 
-    Com `index` no leque, abrir a carteira reordenava a pilha na cara do usuário: o cartão da
-    frente saltava para a posição dele na lista e os outros se reorganizavam em volta. Uma
-    carteira que se embaralha ao abrir não é uma carteira.
+    Duas correções moram nesta linha, e a primeira sozinha não bastava:
+
+    1. Usar `depth` e não `index`. Com o índice do array, abrir a carteira punha cada cartão na
+       posição dele na LISTA, não na pilha.
+    2. Manter o **sentido** do eixo. Fechada, o cartão da frente fica EMBAIXO (é o que aparece
+       inteiro) e os de trás espiam por cima; aberta, eu invertia — o da frente ia para o topo e
+       os de trás desciam. Quem estava em cima aparecia embaixo, que é exatamente "reordenou ao
+       clicar". Agora `(atras - depth)` vale para os dois: abrir é só trocar `PEEK` por `SPREAD`,
+       ou seja, a mesma pilha respirando.
   */
-  const y = aberta ? depth * SPREAD : (atras - depth) * PEEK;
+  const y = (atras - depth) * (aberta ? SPREAD : PEEK);
   /**
    * O estreitamento dos cartões de trás, como ESCALA e não como `left`/`right`.
    *
@@ -243,9 +252,9 @@ function CardFace({
       { scaleX: withSpring(encolhe, Motion.spring.settle) },
       { scale: withSpring(press.get(), Motion.spring.settle) },
     ],
-    // Fechada, quem está na frente desenha por cima. Aberta, quem está EMBAIXO desenha por cima,
-    // senão o leque volta a ser uma pilha.
-    zIndex: aberta ? depth : total - depth,
+    // Um só, porque a ordem no eixo agora é uma só: quem está mais embaixo desenha por cima, e
+    // quem está mais embaixo é sempre o de menor `depth`.
+    zIndex: total - depth,
   }));
 
   const limite = Number(card.credit_limit_cents ?? 0);
@@ -421,10 +430,17 @@ const styles = StyleSheet.create({
   rodape: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: Space.sm },
   disponivel: { flexDirection: 'row', alignItems: 'center', gap: Space.xs },
   /** A alça de abrir/fechar — alvo explícito para quem não descobre o toque no cartão. */
+  /**
+   * DENTRO do palco, não pendurada para fora.
+   *
+   * Ela ficava em `bottom: -24`, fora da altura do componente — e quando a carteira ganhou a
+   * linha "Fatura do cartão" logo abaixo, a seta passou a encostar nela. Reservar `ALCA` na
+   * altura do palco resolve na origem: o bloco seguinte começa depois da seta, não em cima dela.
+   */
   alca: {
     position: 'absolute',
     right: Space.md,
-    bottom: -Space.xl,
+    bottom: 0,
     width: 32,
     height: 32,
     alignItems: 'center',
