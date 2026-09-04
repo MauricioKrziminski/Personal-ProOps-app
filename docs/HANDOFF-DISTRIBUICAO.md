@@ -3,6 +3,10 @@
 > Escrito em 03/09/2026 para quem for continuar (outra sessão, outra ferramenta). É
 > **auto-contido**: não depende de nenhuma conversa anterior. Leia inteiro antes de escrever
 > código — a ordem das tarefas importa mais que o conteúdo delas, e a seção 4 explica por quê.
+>
+> **Status em 04/09/2026:** implementação e deploy concluídos. O APK `v1.0.0` e o canal EAS
+> `production` estão publicados. Falta somente a validação no aparelho físico, adiada pelo Gabriel
+> até o fim das demais fases.
 
 ---
 
@@ -32,8 +36,10 @@ refeita lá quando promover.
 
 ### Estado do git
 
-Branch `feat/conta-e-agente`, ~18 commits, **não empurrada**. Commits em uma linha, conventional,
-**sem co-autor**.
+Branch `feat/conta-e-agente`, publicada no repositório fonte
+`MauricioKrziminski/Personal-ProOps-app` por autorização explícita do Gabriel. Commits em uma
+linha, conventional, **sem co-autor**. A tag fonte `v1.0.0` aponta para
+`dd06b6bc584357741925191c2372bc3bdea77528`, o commit usado na build distribuída.
 
 ---
 
@@ -212,16 +218,46 @@ telas de conta finalmente serão vistas no iOS, fechando a pendência 2 da seç�
 - **Não julgue animação no emulador Android** — ele entrega ~100% de frames janky. Só aparelho
   físico serve para isso. Mas defeito de ESTADO (ícone errado, rótulo errado) o emulador mostra
   bem: toque e capture um quadro logo em seguida.
-- **Portões antes de commitar:** `npx tsc --noEmit`, `npx expo lint`, `npm test` (119 testes).
+- **Portões antes de commitar:** `npx tsc --noEmit`, `npx expo lint`, `npm test` (147 testes).
   Mexeu em `agent/` → `.venv/bin/pytest`.
 - **Ícone novo** exige entrada no mapa de `src/components/ui/icon.tsx`, senão `icon-map.test.ts`
   quebra e o Android cai num glyph genérico. **Cor nova** exige par claro+escuro em
   `constants/theme.ts`, senão `anti-slop.test.ts` quebra. Nome de SF Symbol inválido só aparece
   no `tsc` — confira antes de assumir que existe.
 
+### Resultado executado em 04/09/2026
+
+- Dependências nativas, config plugin, `FileProvider`, permissão de instalação e o módulo Android
+  local `proops-apk-installer` entraram **antes** do primeiro APK. O build nativo e a interface do
+  atualizador foram validados no emulador; a instalação em aparelho físico continua pendente por
+  escolha do Gabriel.
+- Projeto EAS: `@solutions.proops/app-ProOps`, ID
+  `8313579c-3979-4ecd-ba6a-4dc0bf702f05`. A chave de assinatura tem backup fora do repositório e
+  SHA-256 `B3:1D:4D:8D:59:AC:82:F5:58:BD:5B:22:FE:C8:9A:1C:37:64:91:CF:1B:5F:17:D8:B9:EF:C4:09:8B:6F:BD:DA`.
+- `com.proops.personal` foi registrado e a impressão acima foi verificada no Android Developer
+  Console.
+- Repositório público de distribuição:
+  `almeidagabriel01/Personal-ProOps-app-releases`. A release `v1.0.0` contém somente
+  `personal-proops-1.0.0.apk` e `update.json`.
+- Build EAS `a3b78e54-741c-4ace-8b81-f0b3f0c21774`: Android `1.0.0`, `versionCode 2`, runtime
+  `45fe29691e4bf3768c1902730ff93c5a444b13e5`. O APK público foi baixado novamente e passou por
+  conferência de pacote, versão, signer e SHA-256
+  `e670e1f6585919b724dbdb15b51ce569522416931b3bf8aeb3f448903b2928f4`.
+- A primeira execução do GitHub Actions (`33876944826`) passou typecheck, lint e 143 testes, mas
+  excedeu 90 minutos porque ficou cerca de 68 minutos na fila externa do EAS. A build continuou
+  e terminou na Expo; os artefatos foram validados e publicados manualmente. O timeout do
+  workflow ficou em 180 minutos para as próximas tags.
+- O `apkanalyzer` local recusou um metadado gerado pelo Expo com erro SAX, embora o manifesto seja
+  válido para o Android. O CI agora lê a linha `package` com `aapt2 dump badging` e um parser
+  próprio coberto por testes.
+- EAS Update publicado por último: canal e branch `production`, grupo
+  `b7c6b563-66ab-444d-978d-2d4e77d6a04b`, update Android
+  `01a06ce9-4bd2-7e96-9393-0de8ad931831`, com o mesmo runtime do APK.
+- Nenhuma escrita foi feita em nenhum projeto Supabase nesta fase.
+
 ---
 
-## 7. Decisão de modelo de negócio, PENDENTE do dono
+## 7. Decisão de modelo de negócio, CONFIRMADA pelo dono em 04/09/2026
 
 ### O que o mercado faz (levantado em 03/09/2026)
 
@@ -243,8 +279,12 @@ prometer **retenção de dados**: o YNAB guarda tudo por 30 dias e restaura inta
 assinar nesse prazo. É o que evita o problema de "sequestro de dados" sem dar produto de graça.
 Somente leitura não é o padrão e não precisa ser inventado aqui.
 
-O Gabriel levantou trocar o **plano gratuito permanente** por **teste grátis e depois pagar**.
-Isto está **em aberto** — não implemente sem confirmação dele. O que já se sabe:
+O Gabriel confirmou trocar o **plano gratuito permanente** por **teste grátis e depois pagar**,
+usando uma **oferta introdutória de 7 dias da App Store / Play Store**. A pessoa assina no dia
+zero, não é cobrada durante os sete primeiros dias e a loja cobra no oitavo dia se ela não
+cancelar. Esta decisão foi registrada aqui, mas **não faz parte da implementação da Fase 7**.
+
+O que já se sabe:
 
 - Hoje o código tem plano `free` com teto mensal de mensagens de IA, mais `pro` e `family`.
   Limites em `private.plan_limits`, produtos em `src/lib/billing.ts` (e uma cópia literal em
@@ -253,10 +293,10 @@ Isto está **em aberto** — não implemente sem confirmação dele. O que já s
 - Cobrança é **só In-App Purchase** (App Store + Play) via RevenueCat. Isso é decisão firme e não
   está em discussão.
 
-Se a mudança for aprovada, ela toca: `plan_limits`, `plan_status`, o gate de IA em
+Quando essa mudança for implementada, ela toca: `plan_limits`, `plan_status`, o gate de IA em
 `_check_limits` (`agent/app/worker.py`), a tela de paywall e o Perfil.
 
-### O ponto que falta o dono decidir, e que precisa ser explicado a ele
+### Alternativas explicadas antes da decisão
 
 Existem dois jeitos de rodar o teste grátis, e a diferença é grande:
 
@@ -266,12 +306,13 @@ Existem dois jeitos de rodar o teste grátis, e a diferença é grande:
   primeiros dias grátis. O cartão já fica registrado e a cobrança acontece sozinha no oitavo dia,
   a menos que ela cancele. Menos gente começa, muito mais gente converte.
 
-**Recomendação: oferta introdutória**, e o motivo aqui não é só conversão. Neste app **usuário
+**Decisão: oferta introdutória**, e o motivo aqui não é só conversão. Neste app **usuário
 gratuito custa dinheiro todo mês** (Gemini, Cloud Run, WhatsApp). Sem cartão, qualquer um queima
 7 dias de custo e recomeça com outro e-mail, quantas vezes quiser. Com cartão, esse abuso some.
 
-⚠️ **O Codex deve explicar isso ao Gabriel em português claro antes de implementar** — ele pediu
-explicitamente essa explicação e ainda não confirmou.
+⚠️ A configuração dos produtos, elegibilidade da oferta, RevenueCat e bloqueio pós-teste ainda
+precisa de uma fase própria e validação nas duas lojas. Não inferir que esta decisão já está no
+aplicativo.
 
 ---
 

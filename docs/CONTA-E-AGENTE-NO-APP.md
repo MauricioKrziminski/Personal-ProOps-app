@@ -7,6 +7,10 @@
 > Status (03/09/2026): Fases 1, 2 e 3 feitas e validadas na branch `feat/conta-e-agente`.
 > Cada fase abaixo tem o seu próprio "como validar", e a fase só está pronta quando ela passa —
 > não quando o código compila.
+>
+> Status (04/09/2026): Fase 7 implementada e publicada. A validação no aparelho físico foi
+> adiada pelo Gabriel até todas as fases e deploys estarem prontos; ela continua explicitamente
+> pendente, não presumida.
 
 ---
 
@@ -303,7 +307,7 @@ conferir que o **WhatsApp também recusa** (é o teste que prova que a cota é u
 
 ---
 
-### Fase 7 — Distribuir e atualizar fora da loja (proposta, 03/09/2026)
+### Fase 7 — Distribuir e atualizar fora da loja · concluída (04/09/2026)
 
 **O prazo manda no cronograma.** A verificação de desenvolvedor do Android passa a valer no
 **Brasil em 30/09/2026**: app de desenvolvedor não verificado deixa de instalar em aparelho
@@ -317,10 +321,9 @@ dispositivos** — e `com.proops.personal` precisa ser registrado lá antes da d
 | só JavaScript (a maioria) | `expo-updates` + EAS Update | não |
 | código nativo, dependência, permissão | APK novo | não, se for por fora |
 
-O `eas.json` **já tem os canais** (`development`/`preview`/`production`), mas `expo-updates`
-nunca foi instalado — eles estão inertes. Ligar isso é o passo mais barato e cobre quase tudo:
-o nível grátis do EAS Update dá 1.000 usuários ativos/mês. Só o que mexe em nativo precisa do
-fluxo de APK abaixo.
+O `expo-updates` foi instalado junto com o restante do suporte nativo antes do primeiro APK. O
+canal e a branch `production` estão ativos no EAS; mudanças JavaScript compatíveis com o runtime
+podem seguir por OTA. Só o que mexe em nativo precisa do fluxo de APK abaixo.
 
 #### O fluxo de APK
 
@@ -365,6 +368,29 @@ Arquitetura validada em produção noutro app Android e portada para cá **sem r
 Este fluxo é Android. No iOS não existe instalar APK: teste em aparelho é TestFlight, e é por lá
 que as quatro telas de conta finalmente serão vistas no iOS.
 
+#### Evidência da execução
+
+- Projeto `@solutions.proops/app-ProOps`, ID
+  `8313579c-3979-4ecd-ba6a-4dc0bf702f05`; pacote `com.proops.personal` registrado no Android
+  Developer Console com a mesma chave usada pelo EAS.
+- Build Android `a3b78e54-741c-4ace-8b81-f0b3f0c21774`: versão `1.0.0`, `versionCode 2`, runtime
+  `45fe29691e4bf3768c1902730ff93c5a444b13e5`.
+- Release pública `v1.0.0` em `almeidagabriel01/Personal-ProOps-app-releases`, contendo somente o
+  APK e o manifesto. O APK publicado foi baixado de volta e teve pacote, versão, assinatura e
+  SHA-256 conferidos.
+- EAS Update Android publicado por último no canal/branch `production`: grupo
+  `b7c6b563-66ab-444d-978d-2d4e77d6a04b`, update
+  `01a06ce9-4bd2-7e96-9393-0de8ad931831`, com runtime idêntico ao binário.
+- O run `33876944826` do GitHub Actions passou typecheck, lint e testes, mas atingiu o timeout de
+  90 minutos depois de esperar cerca de 68 minutos na fila da Expo. A build EAS continuou e foi
+  concluída; a primeira release foi terminada de forma manual e verificada. O pipeline agora usa
+  timeout de 180 minutos.
+- O manifesto do APK é inspecionado por `aapt2 dump badging`: o `apkanalyzer` usado localmente
+  gerou um erro SAX em metadado válido do Expo SDK 57. O parser substituto tem testes próprios.
+- Validação automatizada e emulador concluídos. Instalação, permissão de fontes desconhecidas e
+  atualização no aparelho físico continuam pendentes pela decisão explícita do Gabriel de testar
+  tudo junto no fim.
+
 ---
 
 ### Fase 8 — Controle dos avisos proativos automáticos · pendente (04/09/2026)
@@ -391,6 +417,19 @@ ser lembrado disso”; essa frase é incorreta quando foi o sistema que decidiu 
 **Validar ponta a ponta:** ligar e receber um aviso; desligar e confirmar ausência no push e no
 WhatsApp; criar um lembrete pessoal e confirmar que ele continua chegando; ligar novamente e
 confirmar que os avisos automáticos voltam.
+
+### Decisão de produto — teste grátis pela oferta introdutória da loja · aprovada (04/09/2026)
+
+O plano gratuito permanente será substituído, em uma fase própria de cobrança, por uma oferta
+introdutória de 7 dias da App Store / Play Store: a pessoa assina no dia zero, não é cobrada nos
+sete primeiros dias e passa a ser cobrada no oitavo se não cancelar. O Gabriel escolheu esse
+modelo depois de comparar com o teste sem cartão. A decisão está registrada; **nenhuma regra de
+cobrança foi implementada na Fase 7**.
+
+Razão da escolha: o teste sem cartão reduz a barreira para começar, mas exige uma nova decisão de
+compra no final e permite repetir o período com outras contas. A oferta da loja começa com menos
+pessoas, porém tende a converter melhor e vincula o teste à elegibilidade controlada pela loja,
+o que reduz abuso de custos recorrentes de Gemini, Cloud Run e WhatsApp.
 
 ## 5. O que este plano NÃO faz
 
