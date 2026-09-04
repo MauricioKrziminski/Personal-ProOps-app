@@ -11,6 +11,10 @@
 > Status (04/09/2026): Fase 7 implementada e publicada. A validação no aparelho físico foi
 > adiada pelo Gabriel até todas as fases e deploys estarem prontos; ela continua explicitamente
 > pendente, não presumida.
+>
+> Status (04/09/2026): Fase 4 implementada, validada ponta a ponta contra o Auth local e com a
+> migration `0053` aplicada no staging. O teste com OTP/WhatsApp real e aparelho físico continua
+> pendente; produção não foi alterada.
 
 ---
 
@@ -249,18 +253,47 @@ aí diariamente.
   não conectado" em cinza, e o "—" saiu. Cinza e não `danger`: não ter WhatsApp é estado normal
   de conta de e-mail, não é erro.
 
-### Fase 4 — Vincular o telefone depois  ·  média
+### Fase 4 — Vincular o telefone depois · CÓDIGO PRONTO, SCHEMA EM STAGING (04/09/2026)
 
-**Fazer**
-- Perfil → "Conectar o WhatsApp": pede o telefone e verifica por OTP (o fluxo do OTP já existe,
-  muda só a entrada).
-- Enquanto não houver telefone, o Perfil explica o que está desligado — e o restante do app
-  funciona normalmente.
-- Trocar o telefone precisa invalidar a sessão do agente (`user_sessions` é chaveada por
-  telefone) para o "sim" de uma confirmação pendente não cair na conversa errada.
+**Comportamento implementado:**
 
-**Validar** — conta sem telefone: mandar mensagem daquele número no WhatsApp e **não** ser
-reconhecido; vincular; mandar de novo e ser reconhecido; conferir `user_sessions`.
+- Perfil → **Conectar o WhatsApp** abre um fluxo autenticado de telefone + OTP; quem já tem
+  número vê **Trocar número do WhatsApp** e o telefone atual.
+- O pedido usa `updateUser({ phone })` e a confirmação usa `verifyOtp` com
+  `type: 'phone_change'`. `signInWithOtp` não é usado aqui, pois ele entraria ou criaria outra
+  conta em vez de vincular a sessão aberta.
+- `profiles.phone` e `whatsapp_verified` só mudam depois de o Auth gravar o telefone confirmado.
+  Digitar um número, sozinho, não concede identidade do WhatsApp.
+- A migration `0053_phone_link.sql` impede duas tentativas de `phone_change` ativas para o mesmo
+  número. A tentativa abandonada deixa de reservar o alvo depois da janela de uma hora do OTP.
+- Ao trocar o telefone, sessões do agente, confirmações, rascunhos, mensagens ainda em fila e
+  checkpoints/epochs da conversa aposentada são removidos. Um "sim" antigo não pode executar no
+  novo vínculo, e um telefone reciclado não herda memória de outra pessoa.
+- A resposta da confirmação ainda é conferida no cliente: ID e telefone precisam pertencer à
+  mesma sessão; qualquer divergência encerra a sessão local.
+- O Supabase local tem dois números/OTPs fixos exclusivamente para teste. Eles não chamam a Meta
+  nem a Twilio. No Expo Web, botões em carregamento usam o indicador do sistema porque o CanvasKit
+  do Skia não inicializa nesse bundle; Android/iOS preservam a animação da marca.
+
+**Evidência até aqui:**
+
+- teste SQL transacional cobre login Phone OTP legado, privilégios dos triggers, conflito entre
+  duas contas, liberação de tentativa vencida, sincronização e limpeza integral da conversa;
+- Auth local real: conta de e-mail pediu o primeiro número, confirmou o OTP, trocou para o segundo
+  e permaneceu com o mesmo `user.id`; outro ensaio provou que a segunda conta é bloqueada enquanto
+  a primeira ainda consegue confirmar;
+- fluxo da interface executado em 402×874: tela inicial, máscara, estado de código, OTP e tela de
+  troca. Depois da confirmação, `auth.users.phone`, `profiles.phone` e
+  `profiles.whatsapp_verified=true` foram conferidos; a conta descartável foi apagada;
+- `0053` aplicada no staging `utkqoiigimqzeenxkxdl`; o histórico remoto vai até `0053` e os tipos
+  gerados do staging são idênticos a `src/lib/database.types.ts`;
+- 159 testes Node, 323 testes Python, TypeScript, Expo lint e lint do schema passaram. O único
+  aviso do schema é o anterior em `create_installment_plan`.
+
+**Ainda pendente:** instalar/abrir o app em aparelho físico, receber o OTP pelo template real da
+Meta, provar que o número não é reconhecido antes do vínculo e passa a ser depois, trocar para
+outro número e conferir `user_sessions` no ambiente remoto. Promover `0049`–`0053` para produção
+exige uma decisão separada.
 
 ### Fase 5 — O agente dentro do app  ·  grande
 
@@ -476,19 +509,20 @@ Registrado para não virar escopo por engano:
 - **Não** faz o agente do app falar por voz nem receber áudio na Fase 5 — o STT existe no worker
   e pode entrar depois, sem mexer no grafo.
 
-## 5b. Estado dos dois bancos (03/09/2026)
+## 5b. Estado dos dois bancos (04/09/2026)
 
 | ambiente | ref | migration |
 |---|---|---|
 | produção | `kwriuifcwyvdrxtspjiz` | **0048** |
-| staging | `utkqoiigimqzeenxkxdl` | 0052 |
+| staging | `utkqoiigimqzeenxkxdl` | 0053 |
 
-Produção está **quatro migrations atrás**: `0049` (alertas/pastas), `0050` (nome), `0051` (conta
-por e-mail) e `0052` (canais dos avisos). Promover é decisão do Gabriel — nenhuma delas foi para lá.
+Produção está **cinco migrations atrás**: `0049` (alertas/pastas), `0050` (nome), `0051` (conta
+por e-mail), `0052` (canais dos avisos) e `0053` (vínculo verificado de telefone). Promover é
+decisão do Gabriel — nenhuma delas foi para lá.
 
 ## 6. Ordem de execução
 
-1 → 2 → 3 → 4 → 6 → 5.
+1 → 2 → 3 → 4 → 6 → 5. As Fases 1–4 já foram executadas; a próxima desta sequência é a Fase 6.
 
 A Fase 6 vem **antes** da 5 de propósito: `ai_events.channel` e o medidor são o instrumento que
 mostra se o agente do app está funcionando e quanto ele custa. Construir o chat sem o medidor é

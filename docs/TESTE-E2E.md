@@ -13,7 +13,8 @@ npx tsc --noEmit && npx expo lint && npm test   # tem que estar limpo
 npx expo start                                   # ou o build no device
 ```
 
-Confira no app que você está logado e que o telefone do perfil é o mesmo que vai usar no WhatsApp.
+Confira no app que você está logado. Se a conta ainda não tiver telefone, faça primeiro o Bloco 0;
+caso já tenha, confirme que é o mesmo número que vai usar no WhatsApp.
 
 ### Estado inicial do banco
 
@@ -69,6 +70,39 @@ Vazio = ainda rodando. Rode de novo em alguns segundos.
 
 ⚠️ **Sempre passe `timeout_milliseconds`.** O padrão do `pg_net` é 5s e ele **aborta a função no
 meio** — foi assim que a primeira importação gravou os itens mas perdeu a categorização.
+
+---
+
+## Bloco 0 — Conta por e-mail e vínculo do WhatsApp
+
+Execute este bloco em staging antes de qualquer promoção. Ele precisa de aparelho físico e do
+template real de OTP; o teste automatizado local não substitui essa entrega.
+
+| # | Ação | Esperado |
+|---|---|---|
+| 0.1 | Criar/entrar numa conta por e-mail sem telefone | Perfil mostra **WhatsApp não conectado**; o restante do app funciona |
+| 0.2 | Enviar uma mensagem desse número ao WhatsApp do produto | A conta de e-mail não é reconhecida nem recebe acesso por número digitado |
+| 0.3 | Perfil › **Conectar o WhatsApp** › informar o número | Código de 6 dígitos chega pelo template de autenticação |
+| 0.4 | Confirmar o código | Volta ao Perfil; telefone e selo de verificação aparecem |
+| 0.5 | Enviar nova mensagem pelo mesmo WhatsApp | Agora o agente reconhece a conta e cria uma nova `user_sessions` |
+| 0.6 | Deixar uma confirmação ou rascunho pendente e trocar o telefone pelo Perfil | O novo OTP confirma na mesma conta; contexto, fila e checkpoints da conversa anterior somem |
+| 0.7 | Responder “sim” na conversa antiga | Nada antigo é executado na conta já vinculada ao número novo |
+
+Conferência no SQL Editor do **mesmo ambiente** usado pelo app:
+
+```sql
+select id, phone, whatsapp_verified
+from public.profiles
+where id = '<USER_UUID>';
+
+select thread_id, phone, user_id, last_message_at
+from public.user_sessions
+where user_id = '<USER_UUID>'
+order by last_message_at desc;
+```
+
+Use o UUID mostrado em Authentication → Users; o SQL Editor não recebe o JWT do app, portanto
+`auth.uid()` seria nulo ali.
 
 ---
 

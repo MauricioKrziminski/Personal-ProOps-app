@@ -45,6 +45,9 @@ export function authErrorMessage(err: AuthLike | null | undefined): string | nul
   if (code === 'user_already_exists' || code === 'email_exists') {
     return 'Já existe uma conta com esse e-mail. Entre ou recupere a senha.';
   }
+  if (code === 'phone_exists') {
+    return 'Esse número já está vinculado a outra conta. Entre com o WhatsApp para acessar os dados dela.';
+  }
   if (code === 'weak_password' || msg.includes('password should')) {
     return 'Senha fraca. Use pelo menos 8 caracteres.';
   }

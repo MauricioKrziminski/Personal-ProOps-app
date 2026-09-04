@@ -17,10 +17,13 @@ import { Motion, Space } from '@/design/tokens';
 export function AuthScreen({
   children,
   footer,
+  showBrand = true,
 }: {
   children: React.ReactNode;
   /** O submit e os links secundários. Fica fora do scroll, colado ao rodapé. */
   footer: React.ReactNode;
+  /** Fluxos internos de uma conta aberta não repetem a marca da porta de entrada. */
+  showBrand?: boolean;
 }) {
   const insets = useSafeAreaInsets();
 
@@ -35,9 +38,11 @@ export function AuthScreen({
           keyboardShouldPersistTaps="handled"
           keyboardDismissMode="interactive"
           showsVerticalScrollIndicator={false}>
-          <Animated.View entering={FadeIn.duration(Motion.duration.slow)} style={styles.brand}>
-            <Mark size={44} />
-          </Animated.View>
+          {showBrand ? (
+            <Animated.View entering={FadeIn.duration(Motion.duration.slow)} style={styles.brand}>
+              <Mark size={44} />
+            </Animated.View>
+          ) : null}
           {children}
         </ScrollView>
 

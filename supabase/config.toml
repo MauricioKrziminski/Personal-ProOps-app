@@ -55,6 +55,28 @@ content_path = "./supabase/templates/confirmation.html"
 subject = "Trocar a senha do Personal ProOps app"
 content_path = "./supabase/templates/recovery.html"
 
+# O projeto hospedado entrega este OTP pelo Send SMS Hook/WhatsApp. Localmente não há Meta nem
+# custo: estes dois números aceitam códigos fixos e deixam login + phone_change testáveis de ponta
+# a ponta. `enable_confirmations` precisa ser true; false mudaria o telefone sem passar pelo código.
+[auth.sms]
+enable_signup = true
+enable_confirmations = true
+template = "Seu código do Personal ProOps app é {{ .Code }}"
+max_frequency = "1s"
+
+[auth.sms.test_otp]
+5511999990002 = "123456"
+5511999990003 = "654321"
+
+# A CLI exige um provider habilitado até para os números de test_otp. Os valores abaixo são
+# marcadores locais: para esses dois números o GoTrue valida o mapa acima e não chama a Twilio.
+[auth.sms.twilio]
+enabled = true
+account_sid = "local-test"
+message_service_sid = "local-test"
+auth_token = "local-test"
+
 # Só local: o padrão de 2 e-mails/hora derruba qualquer teste de fluxo com Mailpit.
 [auth.rate_limit]
 email_sent = 1000
+sms_sent = 1000

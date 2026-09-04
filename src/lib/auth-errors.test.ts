@@ -65,3 +65,10 @@ test('cadastro por e-mail: confirmado, repetido e senha fraca têm frases própr
     'Senha fraca. Use pelo menos 8 caracteres.'
   );
 });
+
+test('telefone já vinculado orienta entrar pela conta existente', () => {
+  assert.equal(
+    authErrorMessage({ code: 'phone_exists', message: 'A user with this phone number has already been registered' }),
+    'Esse número já está vinculado a outra conta. Entre com o WhatsApp para acessar os dados dela.'
+  );
+});

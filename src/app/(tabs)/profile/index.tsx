@@ -282,6 +282,17 @@ export default function ProfileScreen() {
       */}
       <Section title="Conta">
         <Row
+          title={phone ? 'Trocar número do WhatsApp' : 'Conectar o WhatsApp'}
+          subtitle={
+            phone
+              ? phone
+              : 'Libera o agente e os avisos neste canal depois da confirmação'
+          }
+          subtitleLines={2}
+          icon="bubble.left"
+          onPress={() => router.push('/link-phone')}
+        />
+        <Row
           title="Nome"
           subtitle={nome ?? 'Ninguém te chama pelo nome ainda'}
           icon="person"

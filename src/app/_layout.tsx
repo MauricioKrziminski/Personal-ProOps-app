@@ -203,6 +203,7 @@ function AppTree() {
                     options={{ presentation: 'modal', title: 'Assinar', ...modalOptions }}
                   />
                   <Stack.Screen name="onboarding" options={{ headerShown: false }} />
+                  <Stack.Screen name="link-phone" options={{ headerShown: false }} />
                   <Stack.Screen name="catalog" options={{ title: 'Catálogo' }} />
                 </Stack.Protected>
               </Stack>
