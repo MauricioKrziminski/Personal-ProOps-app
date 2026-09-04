@@ -137,10 +137,16 @@ a senha nova.
 
 ⚠️ **Pré-requisitos no dashboard, sem os quais as telas não funcionam — não dá para fazer pelo
 CLI. Fazer primeiro no STAGING (`utkqoiigimqzeenxkxdl`) e de novo em produção quando promover:**
-- Authentication → Providers → Email: **Confirm email ligado** (decisão do dono, 03/09/2026).
-- Authentication → Email Templates → **Confirm signup** e **Reset password**: corpo com
-  `{{ .Token }}` (os arquivos em `supabase/templates/` são exatamente o que colar). O padrão da
-  Supabase só tem `{{ .ConfirmationURL }}`, e com ele o e-mail chega SEM o código.
+- Authentication → **Sign In / Providers** (seção CONFIGURATION) → linha do provedor Email:
+  **Confirm email ligado** (decisão do dono, 03/09/2026).
+- Authentication → **Emails** (seção NOTIFICATIONS) → **Confirm signup** e **Reset password**:
+  corpo com `{{ .Token }}` (os arquivos em `supabase/templates/` são exatamente o que colar). O
+  padrão da Supabase só tem `{{ .ConfirmationURL }}`, e com ele o e-mail chega SEM o código.
+
+  ⚠️ O menu foi renomeado (conferido no dashboard em 03/09/2026): o que a documentação da Supabase
+  ainda chama de "Providers" é **Sign In / Providers**, e "Email Templates" é **Emails**. Se um
+  passo daqui não existir com esse nome, é o menu que mudou de novo — procure pela seção, não pelo
+  nome exato.
 - Senha mínima: o app exige 8; o dashboard pode ficar em 6 (o app é mais estrito, não menos).
 - O remetente padrão da Supabase tem cota baixa; SMTP próprio quando o produto abrir.
 
