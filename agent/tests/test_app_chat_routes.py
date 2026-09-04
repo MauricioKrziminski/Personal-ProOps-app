@@ -324,12 +324,30 @@ def test_erro_nunca_carrega_sql_nem_segredo(cliente, falso):
     assert "senha" not in r.text and "transactions" not in r.text
 
 
-def test_conversa_de_outro_dono_e_404_indistinguivel(cliente, falso):
-    """404, não 403: um 403 confirmaria que a conversa EXISTE."""
+@pytest.mark.parametrize(
+    "motivo",
+    ["conversa de outro dono", "id de uma sessão de WhatsApp",
+     "usuário tirado do workspace", "conversa já excluída"],
+)
+def test_os_quatro_jeitos_de_nao_achar_dao_a_MESMA_resposta(cliente, falso, motivo):
+    """404 em todos, e o mesmo 404.
+
+    Um 403 num deles confirmaria que a conversa EXISTE — e a diferença entre as
+    respostas contaria qual dos quatro motivos foi. O filtro que garante isso é
+    `_VISIVEL` em `db.py`: id, dono, canal, `deleting_at` e membership atual, na
+    mesma cláusula.
+    """
     falso["erro"] = app_chat.ConversationNotFound()
-    r = cliente.get(f"/internal/chat/conversations/{SID}/messages")
-    assert r.status_code == 404
-    assert r.json()["code"] == "conversation_not_found"
+    respostas = [
+        cliente.get(f"/internal/chat/conversations/{SID}/messages"),
+        cliente.patch(f"/internal/chat/conversations/{SID}", json={"title": "x"}),
+        cliente.post(f"/internal/chat/conversations/{SID}/messages",
+                     json={"client_message_id": str(uuid4()), "content": "oi"}),
+    ]
+    for r in respostas:
+        assert r.status_code == 404, motivo
+        assert r.json() == {"code": "conversation_not_found",
+                            "message": respostas[0].json()["message"]}, motivo
 
 
 # ---------------------------------------------------------------------------

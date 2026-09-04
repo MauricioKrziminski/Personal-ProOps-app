@@ -604,6 +604,24 @@ async def accounts(workspace_id, *, only_cards: bool = False) -> list[dict[str, 
 # qualquer autenticado importar para o workspace de outro.
 
 
+# O mesmo predicado em toda lookup de conversa do app, num lugar só. Escrever
+# seis vezes à mão é como uma delas perde o `channel` ou o membership e vira o
+# buraco que ninguém procura.
+#
+# `workspace_members` entra porque o `workspace_id` foi resolvido no dia em que a
+# conversa nasceu: quem é tirado do workspace depois continuaria conversando —
+# e ESCREVENDO — num espaço que já não é dele. O serviço ignora RLS, então esta
+# linha é a única coisa entre ele e o dado alheio.
+_VISIVEL = """
+      and s.channel = 'app'
+      and s.deleting_at is null
+      and exists (
+        select 1 from public.workspace_members wm
+        where wm.workspace_id = s.workspace_id and wm.user_id = s.user_id
+      )
+"""
+
+
 async def chat_profile(user_id: UUID) -> dict[str, Any] | None:
     """Workspace padrão e fuso do dono da conversa, direto do banco."""
     return await fetch_one(
@@ -652,9 +670,9 @@ async def create_chat_session(
 
 async def chat_session(session_id: UUID, user_id: UUID) -> dict[str, Any] | None:
     return await fetch_one(
-        """
-        select * from public.user_sessions
-        where id = %s and user_id = %s and channel = 'app' and deleting_at is null
+        f"""
+        select s.* from public.user_sessions s
+        where s.id = %s and s.user_id = %s {_VISIVEL}
         """,
         session_id,
         user_id,
@@ -671,20 +689,20 @@ async def chat_sessions(
     """
     if cursor:
         return await fetch(
-            """
-            select * from public.user_sessions
-            where user_id = %s and channel = 'app' and deleting_at is null
-              and (last_message_at, id) < (%s, %s)
-            order by last_message_at desc, id desc
+            f"""
+            select s.* from public.user_sessions s
+            where s.user_id = %s {_VISIVEL}
+              and (s.last_message_at, s.id) < (%s, %s)
+            order by s.last_message_at desc, s.id desc
             limit %s
             """,
             user_id, cursor[0], cursor[1], limit,
         )
     return await fetch(
-        """
-        select * from public.user_sessions
-        where user_id = %s and channel = 'app' and deleting_at is null
-        order by last_message_at desc, id desc
+        f"""
+        select s.* from public.user_sessions s
+        where s.user_id = %s {_VISIVEL}
+        order by s.last_message_at desc, s.id desc
         limit %s
         """,
         user_id, limit,
@@ -695,10 +713,10 @@ async def rename_chat_session(
     session_id: UUID, user_id: UUID, title: str
 ) -> dict[str, Any] | None:
     return await fetch_one(
-        """
-        update public.user_sessions set title = %s
-        where id = %s and user_id = %s and channel = 'app' and deleting_at is null
-        returning *
+        f"""
+        update public.user_sessions as s set title = %s
+        where s.id = %s and s.user_id = %s {_VISIVEL}
+        returning s.*
         """,
         title, session_id, user_id,
     )
@@ -714,11 +732,10 @@ async def chat_messages(
     a mesma regra escrita em dois lugares.
     """
     linhas = await fetch(
-        """
+        f"""
         select m.* from public.app_chat_messages m
         join public.user_sessions s on s.id = m.session_id
-        where m.session_id = %s and s.user_id = %s and s.channel = 'app'
-          and s.deleting_at is null
+        where m.session_id = %s and s.user_id = %s {_VISIVEL}
           and (%s::bigint is null or m.sequence < %s)
         order by m.sequence desc
         limit %s
@@ -765,12 +782,12 @@ async def claim_chat_turn(
             # variar com o drift entre container e Postgres, e o erro apareceria
             # como conversa presa, sem nada no log.
             cur = await conn.execute(
-                """
-                select *,
-                       (lease_expires_at is not null and lease_expires_at > now())
+                f"""
+                select s.*,
+                       (s.lease_expires_at is not null and s.lease_expires_at > now())
                          as lease_vivo
-                from public.user_sessions
-                where id = %s and user_id = %s and channel = 'app' and deleting_at is null
+                from public.user_sessions s
+                where s.id = %s and s.user_id = %s {_VISIVEL}
                 for update
                 """,
                 (session_id, user_id),
@@ -958,12 +975,12 @@ async def mark_chat_deleting(session_id: UUID, user_id: UUID) -> dict[str, Any] 
     async with pool().connection() as conn:
         async with conn.transaction():
             cur = await conn.execute(
-                """
-                select id,
-                       (lease_expires_at is not null and lease_expires_at > now())
+                f"""
+                select s.id,
+                       (s.lease_expires_at is not null and s.lease_expires_at > now())
                          as lease_vivo
-                from public.user_sessions
-                where id = %s and user_id = %s and channel = 'app' and deleting_at is null
+                from public.user_sessions s
+                where s.id = %s and s.user_id = %s {_VISIVEL}
                 for update
                 """,
                 (session_id, user_id),

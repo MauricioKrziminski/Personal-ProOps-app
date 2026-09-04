@@ -97,6 +97,42 @@ async def main():
     assert not await db.fetch("select 1 from public.app_chat_messages where session_id = %s", sid)
     print("exclusão               ok (cascade levou as mensagens)")
 
+    # --- 404 indistinguível: canal errado, dono errado, workspace perdido ---
+    # Os três precisam responder a MESMA coisa por fora. Um 403 no lugar de um
+    # 404 confirmaria que a conversa existe.
+    async with conn_pool.connection() as c:
+        await c.execute(
+            "insert into public.user_sessions (thread_id, phone, user_id, workspace_id, last_message_at)"
+            " values (%s, %s, %s, %s, now())",
+            (f"wa-{uuid.uuid4()}", f"5511{uuid.uuid4().int % 10**9:09d}", uid, perfil["workspace_id"]))
+    wa = await db.fetch_one(
+        "select id from public.user_sessions where user_id = %s and channel = 'whatsapp'", uid)
+    assert await db.chat_session(wa["id"], uid) is None, "sessão de WhatsApp alcançável pela API do app"
+    r = await db.claim_chat_turn(session_id=wa["id"], user_id=uid,
+                                 client_message_id=uuid.uuid4(), content="x")
+    assert r["kind"] == "missing", f"turno do app entrou numa conversa de WhatsApp: {r}"
+    print("canal errado           ok (missing)")
+
+    cid2 = uuid.uuid4()
+    s2, _ = await db.create_chat_session(
+        user_id=uid, workspace_id=perfil["workspace_id"], title="Segunda",
+        first_client_message_id=cid2, thread_id=f"app-{uuid.uuid4()}", timezone_="America/Sao_Paulo")
+    assert await db.chat_session(s2["id"], uid) is not None
+
+    # Tirado do workspace, o dono da conversa para de alcançá-la. Sem esta trava
+    # ele continuaria conversando — e ESCREVENDO — num espaço que já não é dele.
+    async with conn_pool.connection() as c:
+        await c.execute("delete from public.workspace_members where user_id = %s", (uid,))
+    assert await db.chat_session(s2["id"], uid) is None, "ex-membro ainda lê a conversa"
+    assert await db.chat_sessions(uid) == [], "ex-membro ainda lista conversas"
+    assert await db.chat_messages(s2["id"], uid) == [], "ex-membro ainda lê o histórico"
+    assert await db.rename_chat_session(s2["id"], uid, "x") is None, "ex-membro ainda renomeia"
+    r = await db.claim_chat_turn(session_id=s2["id"], user_id=uid,
+                                 client_message_id=uuid.uuid4(), content="x")
+    assert r["kind"] == "missing", f"ex-membro ainda escreve: {r}"
+    assert await db.mark_chat_deleting(s2["id"], uid) is None, "ex-membro ainda exclui"
+    print("workspace perdido      ok (missing nas 6 lookups)")
+
     async with conn_pool.connection() as c:
         await c.execute("delete from auth.users where id = %s", (uid,))
     await db.close_pools()
