@@ -42,8 +42,9 @@ const ALLOWED = {
 } as const;
 
 type Target = keyof typeof ALLOWED;
+type AllowedHref = (typeof ALLOWED)[Target];
 
-function routeFor(data: unknown): string | null {
+function routeFor(data: unknown): AllowedHref | null {
   if (!data || typeof data !== 'object') return null;
   const target = (data as { target?: unknown }).target;
   if (typeof target !== 'string') return null;
@@ -56,7 +57,6 @@ function routeFor(data: unknown): string | null {
 function open(response: NotificationResponse) {
   const href = routeFor(response.notification.request.content.data);
   if (!href) return;
-  // @ts-expect-error — a allowlist acima é a garantia; typedRoutes não estreita string.
   router.push(href);
 }
 
