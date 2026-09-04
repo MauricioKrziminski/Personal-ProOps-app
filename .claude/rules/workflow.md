@@ -32,7 +32,9 @@
    silêncio.
 6. Mudou o agente → subir local (`docker compose up`) e mandar `scripts/fake_meta.py` com payload
    ASSINADO. Testar com o HMAC desligado esconderia justamente o erro mais caro daquele endpoint.
-7. Mudou schema → migration nova aplicada com `db push` + types regenerados. Mexeu em `0040`/`0041`
+7. Mudou schema → **`scripts/supabase-target.sh` para confirmar o alvo**, migration nova aplicada
+   no STAGING com `db push` + types regenerados. Produção (`kwriuifcwyvdrxtspjiz`) só com pedido
+   explícito do Gabriel. Mexeu em `0040`/`0041`
    ou nas tabelas do agente → rodar `supabase/tests/agent_migrations.sql` contra o Postgres local
    (as asserções cobrem upsert de sessão, claim do lote, HITL e idempotência).
 

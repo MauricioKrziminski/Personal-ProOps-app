@@ -14,6 +14,21 @@ App mobile pessoal de **notas rápidas, lembretes e controle financeiro operado 
   saída estruturada e caching. **Não usar Claude API.**
 - **Banco e fila:** **Supabase Postgres** (camada gratuita) — `messages_queue` com controle de
   concorrência. O Supabase é banco e fila; deixou de ser onde a lógica roda.
+
+  ⚠️ **São DOIS projetos, e os nomes se parecem. O que vale é o ref:**
+
+  | ref | nome no dashboard | o que é |
+  |---|---|---|
+  | `kwriuifcwyvdrxtspjiz` | Personal ProOps app | **PRODUÇÃO** |
+  | `utkqoiigimqzeenxkxdl` | Personal ProOps app - staging | staging — é o do `.env.local` |
+
+  Todo trabalho do dia a dia acontece no **staging**. Escrever em produção (`db push`, `db reset`,
+  `migration up`) é **pedido explícito do Gabriel**, nunca consequência de uma tarefa. O hook
+  `PreToolUse` em `.claude/settings.json` chama `scripts/supabase-target.sh` e **bloqueia** esses
+  comandos quando o alvo é produção; para liberar de propósito, `PROOPS_PROD_OK=1`.
+
+  Isso já falhou **duas vezes** (03/09/2026): a `0049` e depois as `0050`/`0051` foram anunciadas
+  como "aplicadas em produção" quando foram para o staging. Produção está em **0048**.
 - **Observabilidade:** **Langfuse**, integrado por middleware/tracing do LangGraph.
 - **WhatsApp:** Meta Cloud API **oficial** (nunca Baileys/não-oficial).
 - **Áudio (STT):** **Groq** (Whisper).

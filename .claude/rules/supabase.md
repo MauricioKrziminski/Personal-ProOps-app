@@ -8,7 +8,15 @@
 ## Migrations
 
 - **Toda** mudança de schema via migration numerada em `supabase/migrations/` (`NNNN_descricao.sql`). Nunca SQL direto no banco de produção; nunca editar migration já aplicada — criar a próxima.
+- **Antes de qualquer `db push`, confirme o alvo: `scripts/supabase-target.sh`.** Ele imprime o
+  ref linkado e o ref do `.env.local` e sai 1 se discordarem. São dois projetos de nome parecido
+  (`kwriuifcwyvdrxtspjiz` = produção, `utkqoiigimqzeenxkxdl` = staging) e a confusão já custou
+  duas migrations anunciadas no lugar errado. O mesmo script roda como hook `PreToolUse` e
+  bloqueia escrita em produção sem `PROOPS_PROD_OK=1`.
 - Aplicar com `npx supabase db push` (ou MCP `apply_migration`). Depois de mudar schema consumido pelo app, regenerar types: `npx supabase gen types typescript`.
+- **Staging vai na frente; produção só por pedido explícito.** Uma migration nova nasce aplicada
+  no staging. Promover para produção é uma decisão do Gabriel, com o número da migration dito em
+  voz alta — não um passo silencioso no fim de uma tarefa.
 - Migrations devem ser idempotentes onde possível (`create or replace function`, `if not exists`).
 
 ## RLS (inegociável)

@@ -116,7 +116,7 @@ Notas e Financeiro, no claro e no escuro, nas duas plataformas.
 
 ### Fase 3 — Conta por e-mail e senha  ·  **a maior, e a de maior risco**  ·  ✅ FEITA (03/09/2026)
 
-Migration `0051` aplicada em produção (trigger copiado da 0029, `phone` anulável, check em
+Migration `0051` aplicada no **staging** (trigger copiado da 0029, `phone` anulável, check em
 `display_name`). Telas: `login` (e-mail e senha), `signup`, `forgot-password`, `login-whatsapp`
 (a tela de OTP antiga, inteira), moldura `AuthScreen`. Validado **contra o Supabase LOCAL com
 Mailpit**, sem tocar em produção: cadastro sem telefone, SEGUNDO cadastro sem telefone (o caso do
@@ -135,8 +135,8 @@ a senha nova.
    `OtpInput`. Na recuperação a senha nova é pedida ANTES do código, porque `verifyOtp` já
    devolve sessão e o portão desmonta a tela (ver `frontend.md`).
 
-⚠️ **Pré-requisitos no dashboard do projeto (`utkqoiigimqzeenxkxdl`), sem os quais as telas não
-funcionam em produção — não dá para fazer pelo CLI:**
+⚠️ **Pré-requisitos no dashboard, sem os quais as telas não funcionam — não dá para fazer pelo
+CLI. Fazer primeiro no STAGING (`utkqoiigimqzeenxkxdl`) e de novo em produção quando promover:**
 - Authentication → Providers → Email: **Confirm email ligado** (decisão do dono, 03/09/2026).
 - Authentication → Email Templates → **Confirm signup** e **Reset password**: corpo com
   `{{ .Token }}` (os arquivos em `supabase/templates/` são exatamente o que colar). O padrão da
@@ -172,8 +172,9 @@ aí diariamente.
 4. recuperar senha ponta a ponta;
 5. conferir no banco que `profiles` tem `phone` nulo e `display_name` preenchido.
 
-> ⚠️ Fase 3 mexe em `auth` e em trigger de produção. Aplicar a migration com o banco do app
-> **confirmado** (`utkqoiigimqzeenxkxdl`) — o CLI já apontou para o projeto errado uma vez.
+> ⚠️ Fase 3 mexe em `auth` e em trigger. **`utkqoiigimqzeenxkxdl` é o STAGING**, não produção —
+> esta linha dizia o contrário e induziu ao erro. Produção é `kwriuifcwyvdrxtspjiz`. Confirme com
+> `scripts/supabase-target.sh` antes de qualquer `db push`.
 
 ### Fase 4 — Vincular o telefone depois  ·  média
 
@@ -242,6 +243,16 @@ Registrado para não virar escopo por engano:
 - **Não** põe login social (Google/Apple). É outra decisão, com outra fila de trabalho.
 - **Não** faz o agente do app falar por voz nem receber áudio na Fase 5 — o STT existe no worker
   e pode entrar depois, sem mexer no grafo.
+
+## 5b. Estado dos dois bancos (03/09/2026)
+
+| ambiente | ref | migration |
+|---|---|---|
+| produção | `kwriuifcwyvdrxtspjiz` | **0048** |
+| staging | `utkqoiigimqzeenxkxdl` | 0051 |
+
+Produção está **três migrations atrás**: `0049` (alertas/pastas, da sessão anterior), `0050`
+(nome) e `0051` (conta por e-mail). Promover é decisão do Gabriel — nenhuma delas foi para lá.
 
 ## 6. Ordem de execução
 
