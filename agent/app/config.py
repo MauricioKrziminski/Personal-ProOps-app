@@ -68,6 +68,9 @@ class Settings(BaseSettings):
     max_parses_per_hour: int = 60
     pending_ttl_minutes: int = 10
     session_idle_hours: int = 6
+    # Quanto tempo um turno do app segura a conversa. Vencido, outro turno pode
+    # tomar — senão um container que morre no meio prende a conversa para sempre.
+    app_turn_lease_seconds: int = 300
 
     # --- Langfuse ---
     langfuse_public_key: str = ""
