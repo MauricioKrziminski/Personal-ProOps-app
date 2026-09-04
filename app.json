@@ -10,7 +10,9 @@
     "ios": {
       "bundleIdentifier": "com.proops.personal",
       "supportsTablet": true,
-      "infoPlist": { "UIViewControllerBasedStatusBarAppearance": false }
+      "infoPlist": {
+        "UIViewControllerBasedStatusBarAppearance": false
+      }
     },
     "android": {
       "adaptiveIcon": {
@@ -48,6 +50,19 @@
     "experiments": {
       "typedRoutes": true,
       "reactCompiler": true
+    },
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "8313579c-3979-4ecd-ba6a-4dc0bf702f05"
+      }
+    },
+    "owner": "solutions.proops",
+    "runtimeVersion": {
+      "policy": "fingerprint"
+    },
+    "updates": {
+      "url": "https://u.expo.dev/8313579c-3979-4ecd-ba6a-4dc0bf702f05"
     }
   }
 }
