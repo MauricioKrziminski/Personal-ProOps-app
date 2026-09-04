@@ -231,6 +231,18 @@ aí diariamente.
 > esta linha dizia o contrário e induziu ao erro. Produção é `kwriuifcwyvdrxtspjiz`. Confirme com
 > `scripts/supabase-target.sh` antes de qualquer `db push`.
 
+#### O que da Fase 3 ficou EM ABERTO (03/09/2026)
+
+- **Recuperação de senha no aparelho, com e-mail real.** Validada localmente com Mailpit; no
+  staging só o cadastro foi até o fim.
+- **iOS não viu nenhuma das quatro telas de conta.** O simulador não tem toque e sair da conta lá
+  custaria a sessão. A moldura é a mesma da tela de WhatsApp, que já rodava no iOS.
+- **Segundo cadastro por e-mail no staging.** O caso do 23505 está provado no Postgres local
+  (`supabase/tests/profiles_email_signup.sql`), não contra o staging.
+- ⚠️ **O cartão do Perfil mente para quem entrou por e-mail:** mostra selo verde e "conectado ao
+  WhatsApp" com o telefone em "—". Visto no staging depois do primeiro cadastro real. É a
+  primeira coisa a corrigir na Fase 4.
+
 ### Fase 4 — Vincular o telefone depois  ·  média
 
 **Fazer**
