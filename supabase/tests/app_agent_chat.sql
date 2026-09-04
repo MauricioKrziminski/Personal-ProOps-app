@@ -351,7 +351,11 @@ begin
   select count(*) into n from public.user_sessions where thread_id = 'app-conv-2';
   assert n = 1, 'a troca de telefone apagou a conversa do app';
 
-  select count(*) into n from public.app_chat_messages;
+  -- Escopo na conversa, não na tabela: `n >= 1` global passaria mesmo se ESTA
+  -- conversa tivesse sido apagada, desde que sobrasse mensagem de qualquer outra.
+  select count(*) into n from public.app_chat_messages m
+    join public.user_sessions s on s.id = m.session_id
+   where s.thread_id = 'app-conv-2';
   assert n >= 1, 'a troca de telefone apagou o histórico do app';
 
   select count(*) into n from langgraph.checkpoints where thread_id = 'app-conv-2';
@@ -410,7 +414,11 @@ begin
   insert into public.executed_actions (source_message_id, action_index, action_type)
   values ('wamid.TESTE', 0, 'create_transaction'),
          ('app:00000000-0000-0000-0000-0000000000a1', 0, 'create_transaction');
-  select count(*) into n from public.executed_actions;
+  -- Conta SÓ as duas reservas desta asserção. `count(*)` da tabela inteira
+  -- assumia banco vazio e quebrava em qualquer base que já tivesse rodado uma
+  -- mensagem de verdade — o teste falhava por dado alheio, não por regressão.
+  select count(*) into n from public.executed_actions
+   where source_message_id in ('wamid.TESTE', 'app:00000000-0000-0000-0000-0000000000a1');
   assert n = 2, format('reserva por canal falhou, achou %s linhas', n);
 
   begin
