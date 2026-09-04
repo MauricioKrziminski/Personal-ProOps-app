@@ -109,24 +109,39 @@ insert into public.user_sessions
 select 'hash-antigo', '5511999990001', p.id, public._default_workspace(p.id), now()
 from public.profiles p where p.id = '00000000-0000-0000-0000-00000000b001';
 
-insert into public.pending_actions (thread_id, phone, user_id, workspace_id, action, summary)
-select 'hash-antigo:2', s.phone, s.user_id, s.workspace_id, '{"type":"delete"}'::jsonb,
+insert into public.pending_actions
+  (session_id, thread_id, phone, user_id, workspace_id, action, summary)
+select s.id, 'hash-antigo:2', s.phone, s.user_id, s.workspace_id, '{"type":"delete"}'::jsonb,
        'apagar o lançamento'
 from public.user_sessions s where s.thread_id = 'hash-antigo';
 
 insert into public.draft_actions
-  (thread_id, phone, user_id, workspace_id, action, raw_text, missing)
-select 'hash-antigo:2', s.phone, s.user_id, s.workspace_id, '{}'::jsonb, 'comprei um mac',
+  (session_id, thread_id, phone, user_id, workspace_id, action, raw_text, missing)
+select s.id, 'hash-antigo:2', s.phone, s.user_id, s.workspace_id, '{}'::jsonb, 'comprei um mac',
        'qual foi o valor?'
 from public.user_sessions s where s.thread_id = 'hash-antigo';
 
 insert into public.messages_queue (wa_message_id, thread_id, phone, message_type, payload)
 values ('phone-link-pendente', 'hash-antigo', '5511999990001', 'text', '{"text":"sim"}');
 
+-- A mesma pessoa tem uma conversa aberta na aba Agente. Ela não fala com o número, e por isso
+-- precisa sobreviver inteira à troca — histórico, checkpoint e tudo.
+insert into public.user_sessions
+  (thread_id, channel, user_id, workspace_id, title, first_client_message_id, last_message_at)
+select 'app-do-mesmo-dono', 'app', p.id, public._default_workspace(p.id), 'Orçamento',
+       '00000000-0000-0000-0000-0000000000f1', now()
+from public.profiles p where p.id = '00000000-0000-0000-0000-00000000b001';
+
+insert into public.app_chat_messages
+  (session_id, client_message_id, role, content, status)
+select s.id, '00000000-0000-0000-0000-0000000000f1', 'user', 'quanto sobrou?', 'completed'
+from public.user_sessions s where s.thread_id = 'app-do-mesmo-dono';
+
 insert into langgraph.checkpoints
   (thread_id, checkpoint_id, type, checkpoint, metadata)
 values
   ('hash-antigo', 'cp-0', 'json', '{}', '{}'),
+  ('app-do-mesmo-dono', 'cp-app', 'json', '{}', '{}'),
   ('hash-antigo:2', 'cp-2', 'json', '{}', '{}'),
   ('hash-outro', 'cp-x', 'json', '{}', '{}');
 insert into langgraph.checkpoint_blobs
@@ -164,6 +179,15 @@ begin
   assert n = 0, 'write antigo sobreviveu';
   select count(*) into n from langgraph.checkpoints where thread_id = 'hash-outro';
   assert n = 1, 'checkpoint de outra conversa foi apagado';
+
+  -- A limpeza existe para o "sim" não ser lido com o contexto do número antigo. A aba Agente
+  -- não tem número, então trocar de telefone não pode apagar o que a pessoa escreveu no app.
+  select count(*) into n from public.user_sessions where thread_id = 'app-do-mesmo-dono';
+  assert n = 1, 'a troca de telefone apagou a conversa do app';
+  select count(*) into n from public.app_chat_messages;
+  assert n = 1, 'a troca de telefone apagou o histórico do app';
+  select count(*) into n from langgraph.checkpoints where thread_id = 'app-do-mesmo-dono';
+  assert n = 1, 'a troca de telefone apagou o checkpoint da conversa do app';
 end $$;
 
 rollback;
