@@ -92,8 +92,8 @@ Via Graph API v21.0 com o token de System User do app:
   - `personal_proops_login_otp` (AUTHENTICATION, pt_BR) — id `1019655521065477`, **APPROVED na hora**.
   - `personal_proops_reminder` (UTILITY, pt_BR) — id `1097041035993071`, **APPROVED** (confirmado na Graph API em 27/08/2026; Utility passa por revisão, levou ~1 dia).
   - `personal_proops_alert` (UTILITY, pt_BR) — id `1052311597692142`, submetido em
-    04/09/2026; status no envio: **PENDING**. É exclusivo dos avisos financeiros inferidos pelo
-    sistema e não afirma que a pessoa pediu um lembrete.
+    04/09/2026 e depois confirmado pela Graph API como **APPROVED**. É exclusivo dos avisos
+    financeiros inferidos pelo sistema e não afirma que a pessoa pediu um lembrete.
   - Motivo de não reaproveitar `proops_login_otp`: ele é do **ERP** (2FA do ERP quando o WhatsApp está ativado lá) e vive na mesma WABA de teste. Objeto compartilhado — se o time do ERP editar ou apagar, o login deste app cai junto.
 - Nomes de template agora vêm de env (`WA_OTP_TEMPLATE`, `WA_REMINDER_TEMPLATE`,
   `WA_ALERT_TEMPLATE`); lembrete pessoal e aviso inferido nunca compartilham texto.

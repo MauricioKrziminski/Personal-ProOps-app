@@ -1184,6 +1184,8 @@ Deno.serve(async (_req) => {
 
       const { data: aiEvent } = await supabase.from("ai_events").insert({
         user_id: profile.id,
+        workspace_id: workspaceId,
+        channel: "whatsapp",
         message_raw_id,
         model: usage.model,
         input_tokens: usage.inputTokens,

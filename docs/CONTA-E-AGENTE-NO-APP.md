@@ -43,7 +43,7 @@ Levantado antes de decidir qualquer coisa. Cada linha aqui muda o custo de algum
 | O agente acha o usuário por `profiles.phone = any(...)` | `agent/app/db.py:176` | Quem não tem telefone simplesmente não é alcançável pelo WhatsApp — o comportamento correto, sem código novo. |
 | `user_sessions` tem **árbitro em `phone`** | `agent/app/db.py:133-147` | A sessão do agente é chaveada por telefone. Uma conversa no app **não tem telefone** — é a maior adaptação da Fase 5. |
 | `thread_id` sai do telefone canônico | `.claude/rules/whatsapp.md` | Idem. O app precisa da própria regra de thread. |
-| `ai_events` **não tem coluna de canal** | types | O limite mensal conta linhas dessa tabela (`plan_status`). Um canal novo **já compartilha a cota** por construção; separar é que daria trabalho. |
+| `ai_events` não tinha canal nem workspace | migrations até `0053` | A Fase 6 precisou congelar os dois. Só `user_id` dupla-contava o mesmo membro em espaços diferentes. |
 | `current_user` (JWT → `sub`) já existe | `agent/app/routes/internal.py:51` | É o padrão pronto para uma rota do agente chamada pelo app. Não precisa inventar autenticação. |
 | "Auth: Supabase Auth **Phone OTP**" está listado como **decisão imutável** | `CLAUDE.md` | Esta mudança altera uma decisão marcada como imutável. Precisa ser reescrita lá, com a data e o motivo — senão a próxima sessão "corrige" de volta. |
 
@@ -75,8 +75,8 @@ Motivos, em ordem de força:
 1. **É uma assistente só.** O usuário não pensa "gastei 12 no WhatsApp e 4 no app" — ele pensa
    "usei 16". Cota por canal cria a pergunta "estou gastando no lugar errado?", que é trabalho
    que o produto empurra para o usuário sem lhe dar nada em troca.
-2. **É o que já acontece.** `plan_status` conta `ai_events`, que não distingue canal. Compartilhar
-   é o comportamento atual; separar exigiria coluna, dois contadores e duas mensagens de recusa.
+2. **Já era uma cota única.** `plan_status` sempre contou linhas de `ai_events`; a `0054` só passou
+   a atribuir corretamente workspace e canal, sem criar limites separados.
 3. **É o que o mercado faz.** O ChatGPT no WhatsApp não tem login próprio: herda conta,
    permissões e limites de quem você já é. Onde há cota por canal (o limite de ~30 mensagens/dia
    do ChatGPT no WhatsApp), ela existe para quem **não tem conta** — o oposto do nosso caso.
@@ -84,8 +84,9 @@ Motivos, em ordem de força:
    (`max_parses_per_hour`, por `user_id`) já protege o custo independentemente de onde a mensagem
    entrou.
 
-O que **muda**: acrescentar `ai_events.channel` (`whatsapp` | `app`) para **mostrar** onde a cota
-foi gasta. Não separa nada — responde "por que já acabou?", que hoje é uma pergunta sem resposta.
+O que **mudou**: `ai_events.channel` (`whatsapp` | `app`) agora mostra onde a cota foi gasta, e
+`workspace_id` impede dupla contagem entre espaços. Não separa nada — responde "por que já
+acabou?" sem alterar o teto compartilhado.
 
 ---
 
@@ -326,17 +327,34 @@ ao trocar de canal, que é exatamente o que ele não espera de "a mesma assisten
 4. HITL: pedir para apagar algo e confirmar pelos botões da tela;
 5. **teste cruzado**: começar no WhatsApp, continuar no app, e a conversa saber do que se falava.
 
-### Fase 6 — Cota compartilhada e medidor  ·  pequena
+### Fase 6 — Cota compartilhada e medidor · CÓDIGO PRONTO, SCHEMA EM STAGING (04/09/2026)
 
-**Fazer**
-- `ai_events.channel` (`whatsapp` | `app`), preenchida nos dois caminhos.
-- `_check_limits` continua exatamente como está — **é isto que faz a cota ser compartilhada**, e
-  não código novo.
-- Perfil: a estatística de mensagens de IA passa a mostrar a divisão por canal.
-- A mensagem de recusa cita o canal certo ("você usou as N mensagens do plano").
+**Implementado:**
 
-**Validar** — gastar mensagens no app e ver o contador do Perfil subir; estourar a cota no app e
-conferir que o **WhatsApp também recusa** (é o teste que prova que a cota é uma só).
+- `ai_events.channel` aceita somente `whatsapp` ou `app`; os dois escritores atuais registram
+  explicitamente `whatsapp`, e a Fase 5 terá de registrar `app`.
+- `ai_events.workspace_id` congela qual cota consumiu a chamada. A ideia inicial de juntar
+  eventos por `user_id` estava errada para família: todo membro também tem workspace próprio, e o
+  mesmo uso podia aparecer nos dois espaços.
+- eventos históricos foram classificados como WhatsApp e associados ao workspace padrão que era
+  possível reconstruir; antes da `0054` não existia informação para inferir outro espaço.
+- `plan_status` devolve total, WhatsApp e app numa única leitura. A RPC visível ao usuário escolhe
+  o workspace pelo próprio JWT e só então lê o agregado como `security definer`; `_plan_status`
+  continua restrita ao backend.
+- o terceiro número do Perfil preserva total/limite e mostra duas linhas: uso no WhatsApp e uso no
+  app. Até a Fase 5 existir, o segundo valor permanece zero.
+
+**Evidência até aqui:** o teste SQL cria dois usuários, coloca um deles também no workspace do
+outro e grava eventos nos dois espaços. O agregado retorna 2 (1 WhatsApp + 1 app) no compartilhado
+e 1 no workspace próprio, sem dupla contagem. Ele também recusa canal inválido, canal ausente e
+evento ativo sem workspace. Os testes Python e de contrato verificam os dois escritores. A
+migration `0054` está no staging `utkqoiigimqzeenxkxdl`, e os tipos gerados de lá são idênticos ao
+arquivo versionado.
+
+**Ainda pendente:** conferir o novo rótulo do Perfil em aparelho físico; depois da Fase 5, gastar
+mensagens pelo app, ver o contador `app` subir e estourar a cota por um canal para confirmar que o
+outro também recusa. O código do Python e da Edge Function legada ainda depende de deploy para
+gravar as novas colunas no ambiente remoto.
 
 ---
 
@@ -426,11 +444,11 @@ que as quatro telas de conta finalmente serão vistas no iOS.
 
 ---
 
-### Fase 8 — Canais dos avisos proativos automáticos · CÓDIGO PRONTO, SCHEMA EM STAGING (04/09/2026)
+### Fase 8 — Canais dos avisos proativos automáticos · CÓDIGO/SCHEMA PRONTOS, TEMPLATE APROVADO (04/09/2026)
 
 Código e schema estão implementados; a liberação remota dos canais ainda não está concluída.
-O template Utility foi submetido na WABA de teste e segue em revisão, então app, Cloud Run e Edge
-Function não devem ser publicados com esta fase até o status virar `APPROVED`.
+O template Utility foi aprovado na WABA de teste. App, Cloud Run, secrets e Edge Function ainda
+não foram publicados/configurados com esta fase porque esses deploys exigem autorização separada.
 
 **Decisão do Gabriel:** avisos inferidos pelo sistema — por exemplo saldo projetado negativo,
 orçamento estourando, fatura/conta vencendo e fim de teste — não podem interromper o usuário sem
@@ -475,12 +493,12 @@ cron e os lembretes pessoais em `public.reminders` foram preservados.
 - histórico combina push + WhatsApp numa única linha visível, sem misturar workspaces;
 - tipos gerados diretamente do staging são idênticos a `src/lib/database.types.ts`;
 - template `personal_proops_alert`, ID `1052311597692142`, submetido como `UTILITY`/`pt_BR` na WABA
-  de teste `1280843510763871`; status no envio: `PENDING`.
+  de teste `1280843510763871`; status confirmado depois na Graph API: `APPROVED`.
 
-**Ainda pendente:** aprovação do template; deploy do Python no Cloud Run de staging; deploy da
-Edge Function legada onde ainda for necessária; publicação do app; teste real dos quatro estados
-em aparelho, duas entregas com “ambos” e regressão de lembrete pessoal. Produção exige pedido
-explícito separado.
+**Ainda pendente:** configurar `WA_ALERT_TEMPLATE`, fazer o deploy do Python no Cloud Run de
+staging e da Edge Function legada onde ainda for necessária, publicar o app e testar os quatro
+estados em aparelho, duas entregas com “ambos” e regressão de lembrete pessoal. Produção exige
+pedido explícito separado.
 
 **Validar ponta a ponta:** testar os quatro estados de canal; confirmar que nenhum aviso sai com
 ambos desligados; confirmar duas entregas com ambos ligados; verificar o texto do template real no
@@ -514,19 +532,19 @@ Registrado para não virar escopo por engano:
 | ambiente | ref | migration |
 |---|---|---|
 | produção | `kwriuifcwyvdrxtspjiz` | **0048** |
-| staging | `utkqoiigimqzeenxkxdl` | 0053 |
+| staging | `utkqoiigimqzeenxkxdl` | 0054 |
 
-Produção está **cinco migrations atrás**: `0049` (alertas/pastas), `0050` (nome), `0051` (conta
-por e-mail), `0052` (canais dos avisos) e `0053` (vínculo verificado de telefone). Promover é
-decisão do Gabriel — nenhuma delas foi para lá.
+Produção está **seis migrations atrás**: `0049` (alertas/pastas), `0050` (nome), `0051` (conta
+por e-mail), `0052` (canais dos avisos), `0053` (vínculo verificado de telefone) e `0054` (consumo
+de IA por workspace/canal). Promover é decisão do Gabriel — nenhuma delas foi para lá.
 
 ## 6. Ordem de execução
 
-1 → 2 → 3 → 4 → 6 → 5. As Fases 1–4 já foram executadas; a próxima desta sequência é a Fase 6.
+1 → 2 → 3 → 4 → 6 → 5. As Fases 1–4 e 6 já foram executadas; a próxima desta sequência é a Fase 5.
 
-A Fase 6 vem **antes** da 5 de propósito: `ai_events.channel` e o medidor são o instrumento que
+A Fase 6 veio **antes** da 5 de propósito: `ai_events.channel` e o medidor são o instrumento que
 mostra se o agente do app está funcionando e quanto ele custa. Construir o chat sem o medidor é
 ficar sem o número justamente na fase em que ele mais importa.
 
 A Fase 8 fica fora desta sequência e já foi implementada antes da Fase 4 por ser uma correção de
-consentimento. Só falta concluir sua validação remota depois da aprovação do template da Meta.
+consentimento. O template foi aprovado; faltam os deploys autorizados e a validação remota.

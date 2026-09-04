@@ -135,6 +135,7 @@ export type Database = {
       }
       ai_events: {
         Row: {
+          channel: string
           confidence: number | null
           created_at: string
           created_transaction_ids: string[] | null
@@ -146,8 +147,10 @@ export type Database = {
           output_tokens: number | null
           result: Json | null
           user_id: string | null
+          workspace_id: string | null
         }
         Insert: {
+          channel: string
           confidence?: number | null
           created_at?: string
           created_transaction_ids?: string[] | null
@@ -159,8 +162,10 @@ export type Database = {
           output_tokens?: number | null
           result?: Json | null
           user_id?: string | null
+          workspace_id?: string | null
         }
         Update: {
+          channel?: string
           confidence?: number | null
           created_at?: string
           created_transaction_ids?: string[] | null
@@ -172,6 +177,7 @@ export type Database = {
           output_tokens?: number | null
           result?: Json | null
           user_id?: string | null
+          workspace_id?: string | null
         }
         Relationships: [
           {
@@ -186,6 +192,13 @@ export type Database = {
             columns: ["user_id"]
             isOneToOne: false
             referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ai_events_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
             referencedColumns: ["id"]
           },
         ]
@@ -2100,7 +2113,9 @@ export type Database = {
       _plan_status: {
         Args: { ws_id: string }
         Returns: {
+          ai_messages_app: number
           ai_messages_month: number
+          ai_messages_whatsapp: number
           can_import: boolean
           current_period_end: string
           is_trial: boolean
@@ -2405,7 +2420,9 @@ export type Database = {
       plan_status: {
         Args: never
         Returns: {
+          ai_messages_app: number
           ai_messages_month: number
+          ai_messages_whatsapp: number
           can_import: boolean
           current_period_end: string
           is_trial: boolean

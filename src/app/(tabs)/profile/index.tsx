@@ -198,7 +198,11 @@ export default function ProfileScreen() {
           <Stat valor={ia.data ? String(ia.data.notas) : '—'} rotulo="notas capturadas" />
           <Stat
             valor={plan.data ? String(plan.data.ai_messages_month) : '—'}
-            rotulo="mensagens de IA no mês"
+            rotulo={
+              plan.data
+                ? `${plan.data.ai_messages_whatsapp} WhatsApp\n${plan.data.ai_messages_app} no app`
+                : 'mensagens de IA no mês'
+            }
             limite={plan.data ? plan.data.max_ai_messages_month : null}
           />
         </View>

@@ -11,7 +11,7 @@ no schema isolado, e não em `public` (onde o PostgREST as exporia com a anon ke
 from __future__ import annotations
 
 import logging
-from typing import Any
+from typing import Any, Literal
 from uuid import UUID
 
 from psycopg.rows import dict_row
@@ -433,6 +433,8 @@ async def plan_status(workspace_id: UUID) -> dict[str, Any] | None:
 async def record_ai_event(
     *,
     user_id: UUID,
+    workspace_id: UUID,
+    channel: Literal["whatsapp", "app"],
     model: str,
     confidence: float | None,
     result: dict[str, Any],
@@ -444,10 +446,13 @@ async def record_ai_event(
         await execute(
             """
             insert into public.ai_events
-              (user_id, model, confidence, result, created_transaction_ids)
-            values (%s, %s, %s, %s, %s)
+              (user_id, workspace_id, channel, model, confidence, result,
+               created_transaction_ids)
+            values (%s, %s, %s, %s, %s, %s, %s)
             """,
             user_id,
+            workspace_id,
+            channel,
             model,
             confidence,
             Jsonb(result),

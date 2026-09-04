@@ -772,6 +772,8 @@ async def _audit(sessao: dict, estado: dict, uso: dict | None = None) -> None:
         return
     await db.record_ai_event(
         user_id=sessao["user_id"],
+        workspace_id=sessao["workspace_id"],
+        channel="whatsapp",
         model=gemini.GEMINI_PARSE,
         confidence=estado.get("confidence"),
         result={

@@ -294,6 +294,7 @@ comportamento certo — suba para Pro pelo SQL do Bloco 9 e volte aqui.
 | 9.7 | SQL "volta pra Free" e tentar convidar | Botão bloqueado, com o motivo escrito |
 | 9.8 | SQL "vira Pro" › **Cancelar assinatura** | Alerta explicando que nada é apagado; confirma e marca "cancelado" |
 | 9.9 | Tentar tocar num plano da lista | **Nada acontece** — a lista é só comparativo, sem botão de compra |
+| 9.10 | Perfil › cartão de identidade | Total da IA bate com o plano; abaixo aparecem as parcelas **WhatsApp** e **no app**, cuja soma dá o total |
 
 ---
 

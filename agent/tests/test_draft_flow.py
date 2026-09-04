@@ -389,6 +389,8 @@ class TestCustoDoTurno:
         assert "esqueci" in r
         assert len(eventos) == 1
         assert eventos[0]["result"]["llm_calls"] == 1
+        assert eventos[0]["workspace_id"] == SESSAO["workspace_id"]
+        assert eventos[0]["channel"] == "whatsapp"
 
     @pytest.mark.asyncio
     async def test_clique_no_cartao_nao_gasta_modelo(self, eventos, monkeypatch):
@@ -669,4 +671,3 @@ class TestDescriptionSlotAndFallback:
         mesclado = draft.mesclar(rascunho["action"], decidido)
         assert mesclado["description"] == "tv samsung"
         assert mesclado["amount_cents"] == 50000
-
