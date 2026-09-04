@@ -1,0 +1,165 @@
+name: Publish Android release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: android-release-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  DISTRIBUTION_REPOSITORY: almeidagabriel01/Personal-ProOps-app-releases
+  EXPECTED_SIGNER_SHA256: B3:1D:4D:8D:59:AC:82:F5:58:BD:5B:22:FE:C8:9A:1C:37:64:91:CF:1B:5F:17:D8:B9:EF:C4:09:8B:6F:BD:DA
+
+jobs:
+  publish:
+    name: Build, verify and publish APK
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v5
+
+      - name: Set up Node
+        uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Typecheck
+        run: npx tsc --noEmit
+
+      - name: Lint
+        run: npx expo lint
+
+      - name: Test
+        run: npm test
+
+      - name: Set up Expo and EAS
+        uses: expo/expo-github-action@v8
+        with:
+          eas-version: 23.2.0
+          token: ${{ secrets.EXPO_TOKEN }}
+
+      - name: Build signed APK on EAS
+        run: >-
+          eas build
+          --platform android
+          --profile distribution
+          --non-interactive
+          --wait
+          --freeze-credentials
+          --json
+          > "$RUNNER_TEMP/eas-build.json"
+
+      - name: Download APK
+        id: download
+        run: |
+          release_dir="$RUNNER_TEMP/personal-proops-release"
+          mkdir -p "$release_dir"
+          artifact_url="$(node scripts/release/extract-eas-artifact.mjs --input "$RUNNER_TEMP/eas-build.json")"
+          apk_path="$release_dir/personal-proops.apk"
+          curl --fail --location --retry 3 --retry-all-errors --output "$apk_path" "$artifact_url"
+          echo "apk_path=$apk_path" >> "$GITHUB_OUTPUT"
+          echo "release_dir=$release_dir" >> "$GITHUB_OUTPUT"
+
+      - name: Set up Android inspection tools
+        uses: android-actions/setup-android@v4
+        with:
+          packages: 'platform-tools build-tools;36.0.0'
+
+      - name: Verify APK identity, version and signature
+        id: apk
+        env:
+          APK_PATH: ${{ steps.download.outputs.apk_path }}
+        run: |
+          application_id="$(apkanalyzer manifest application-id "$APK_PATH")"
+          version_code="$(apkanalyzer manifest version-code "$APK_PATH")"
+          version_name="$(apkanalyzer manifest version-name "$APK_PATH")"
+
+          if [ "$application_id" != 'com.proops.personal' ]; then
+            echo "Unexpected application id: $application_id" >&2
+            exit 1
+          fi
+          if [ "$GITHUB_REF_NAME" != "v$version_name" ]; then
+            echo "Tag $GITHUB_REF_NAME does not match APK version $version_name" >&2
+            exit 1
+          fi
+          case "$version_code" in
+            ''|*[!0-9]*)
+              echo "Invalid Android versionCode: $version_code" >&2
+              exit 1
+              ;;
+          esac
+
+          node scripts/release/verify-apk-signature.mjs \
+            --apk "$APK_PATH" \
+            --expected-sha256 "$EXPECTED_SIGNER_SHA256" \
+            --apksigner "$ANDROID_SDK_ROOT/build-tools/36.0.0/apksigner"
+
+          release_name="personal-proops-$version_name.apk"
+          release_path="${{ steps.download.outputs.release_dir }}/$release_name"
+          mv "$APK_PATH" "$release_path"
+          apk_sha256="$(sha256sum "$release_path" | cut -d ' ' -f 1)"
+
+          echo "version_code=$version_code" >> "$GITHUB_OUTPUT"
+          echo "version_name=$version_name" >> "$GITHUB_OUTPUT"
+          echo "release_name=$release_name" >> "$GITHUB_OUTPUT"
+          echo "release_path=$release_path" >> "$GITHUB_OUTPUT"
+          echo "apk_sha256=$apk_sha256" >> "$GITHUB_OUTPUT"
+
+      - name: Generate and validate update manifest
+        id: manifest
+        env:
+          APK_SHA256: ${{ steps.apk.outputs.apk_sha256 }}
+          RELEASE_NAME: ${{ steps.apk.outputs.release_name }}
+          VERSION_CODE: ${{ steps.apk.outputs.version_code }}
+          VERSION_NAME: ${{ steps.apk.outputs.version_name }}
+        run: |
+          manifest_path="${{ steps.download.outputs.release_dir }}/update.json"
+          apk_url="https://github.com/$DISTRIBUTION_REPOSITORY/releases/download/$GITHUB_REF_NAME/$RELEASE_NAME"
+          node scripts/release/create-update-manifest.mjs \
+            --version-code "$VERSION_CODE" \
+            --version-name "$VERSION_NAME" \
+            --url "$apk_url" \
+            --sha256 "$APK_SHA256" \
+            --notes "Atualização $VERSION_NAME do Personal ProOps." \
+            --output "$manifest_path"
+          node -e 'JSON.parse(require("node:fs").readFileSync(process.argv[1], "utf8"))' "$manifest_path"
+          echo "manifest_path=$manifest_path" >> "$GITHUB_OUTPUT"
+
+      - name: Publish release assets
+        env:
+          GH_TOKEN: ${{ secrets.DISTRIBUTION_REPO_TOKEN }}
+          MANIFEST_PATH: ${{ steps.manifest.outputs.manifest_path }}
+          RELEASE_PATH: ${{ steps.apk.outputs.release_path }}
+          VERSION_NAME: ${{ steps.apk.outputs.version_name }}
+        run: |
+          title="Personal ProOps $VERSION_NAME"
+          notes="Atualização $VERSION_NAME do Personal ProOps."
+
+          if gh release view "$GITHUB_REF_NAME" --repo "$DISTRIBUTION_REPOSITORY" >/dev/null 2>&1; then
+            gh release upload "$GITHUB_REF_NAME" "$RELEASE_PATH" --clobber --repo "$DISTRIBUTION_REPOSITORY"
+            gh release upload "$GITHUB_REF_NAME" "$MANIFEST_PATH" --clobber --repo "$DISTRIBUTION_REPOSITORY"
+            gh release edit "$GITHUB_REF_NAME" \
+              --repo "$DISTRIBUTION_REPOSITORY" \
+              --title "$title" \
+              --notes "$notes" \
+              --latest
+          else
+            gh release create "$GITHUB_REF_NAME" "$RELEASE_PATH" "$MANIFEST_PATH" \
+              --repo "$DISTRIBUTION_REPOSITORY" \
+              --target main \
+              --title "$title" \
+              --notes "$notes" \
+              --latest
+          fi
