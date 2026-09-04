@@ -303,14 +303,67 @@ conferir que o **WhatsApp também recusa** (é o teste que prova que a cota é u
 
 ---
 
-### Candidatas a fases novas (levantadas em 03/09/2026, ainda sem escopo fechado)
+### Fase 7 — Distribuir e atualizar fora da loja (proposta, 03/09/2026)
 
-- **Distribuição e teste em aparelho.** Registrar o app na conta de desenvolvedor existente e
-  conseguir instalar no celular do dono para teste real. Depende de esclarecer qual é o limite de
-  20 dispositivos citado (não é o do Play Console nem o do TestFlight, que são 100).
-- **Atualização dentro do app.** Em projeto Expo isso é `expo-updates` + EAS Update para o bundle
-  JS, e a API de in-app update do Play para quando o binário nativo muda. São dois mecanismos
-  diferentes e só o primeiro dispensa passar pela loja.
+**O prazo manda no cronograma.** A verificação de desenvolvedor do Android passa a valer no
+**Brasil em 30/09/2026**: app de desenvolvedor não verificado deixa de instalar em aparelho
+certificado. A conta gratuita de distribuição limitada resolve — **apps ilimitados, até 20
+dispositivos** — e `com.proops.personal` precisa ser registrado lá antes da data.
+
+#### São DOIS mecanismos, e confundi-los é o erro comum
+
+| muda o quê | como atualiza | passa pela loja? |
+|---|---|---|
+| só JavaScript (a maioria) | `expo-updates` + EAS Update | não |
+| código nativo, dependência, permissão | APK novo | não, se for por fora |
+
+O `eas.json` **já tem os canais** (`development`/`preview`/`production`), mas `expo-updates`
+nunca foi instalado — eles estão inertes. Ligar isso é o passo mais barato e cobre quase tudo:
+o nível grátis do EAS Update dá 1.000 usuários ativos/mês. Só o que mexe em nativo precisa do
+fluxo de APK abaixo.
+
+#### O fluxo de APK
+
+Arquitetura validada em produção noutro app Android e portada para cá **sem reaproveitar código**
+(aquele é Kotlin nativo; aqui é Expo). O que se leva é o desenho:
+
+1. **Manifesto estático como asset de release**, num repositório público separado só para
+   distribuição. O app lê sempre a MESMA url — `releases/latest/download/update.json` — e o
+   manifesto aponta a url versionada do APK.
+   ⚠️ **Não usar a API do GitHub**: ela tem cota por IP e derrubaria vários aparelhos atrás do
+   mesmo NAT. O caminho `latest/download` sai pelo CDN, sem cota e sem autenticação — e por isso
+   o repositório de distribuição **precisa ser público**, mesmo com o fonte privado.
+2. **Manifesto** com `versionCode`, `versionName`, `url`, `sha256` e notas. Parse validado
+   (recusar HTML é caso de teste real: um 404 devolve página, não JSON) e corpo limitado, para um
+   endpoint errado não servir um corpo gigante.
+3. **CI no push de tag** `v*`: testes, build, **verificar a assinatura do APK**, calcular o
+   sha256, gerar o manifesto, validar que é JSON e publicar os dois.
+4. **No app:** baixar em streaming calculando o sha256 no mesmo laço, apagar o parcial em falha,
+   e instalar por `FileProvider` + intent. O sha256 protege contra download truncado, **não**
+   contra adulteração: quem garante autenticidade é a assinatura, porque o Android só instala por
+   cima se a chave for a mesma.
+5. **Comparação por `versionCode` inteiro, estritamente maior.** Igual é o que já está instalado;
+   menor o Android recusa sozinho.
+
+#### O que o port precisa que o original não precisava
+
+- `expo-updates`, `expo-intent-launcher` e `expo-application` (todos existem no SDK 57);
+  `expo-file-system` já está instalado.
+- Um **config plugin** para o `FileProvider` e a permissão `REQUEST_INSTALL_PACKAGES` — em Expo
+  managed não há `AndroidManifest.xml` para editar à mão.
+- `versionCode` vindo do **`autoIncrement` do EAS** (`appVersionSource: remote`, já configurado) e
+  não de contagem de commits, que quebra ao lançar de branch antiga.
+
+#### Duas melhorias sobre o original, apontadas pelo próprio levantamento
+
+- **Verificar sozinho.** Lá a checagem só acontece se alguém abrir Configurações e tocar, então um
+  aparelho pode ficar meses parado. Aqui a checagem entra no foreground do app.
+- **Mostrar as notas da versão.** O campo existe no manifesto e nunca é exibido.
+
+#### iOS fica de fora
+
+Este fluxo é Android. No iOS não existe instalar APK: teste em aparelho é TestFlight, e é por lá
+que as quatro telas de conta finalmente serão vistas no iOS.
 
 ## 5. O que este plano NÃO faz
 
