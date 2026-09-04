@@ -343,8 +343,11 @@ grafo, tools, guards, prompts — e a cota.
   o clique `pa:<id>:ok` retomou o mesmo thread, executou uma vez e não cobrou mensagem da cota.
 - **Conferido no emulador Android** (claro e escuro), no fluxo autenticado contra o Supabase local:
   criar pela primeira mensagem com `router.replace`, `Pensando…`, resposta, título automático,
-  renomear, HITL respondido virando "Confirmado", isolamento entre conversas e o medidor do Perfil
-  mostrando **2 WhatsApp + 4 no app** na mesma cota.
+  renomear pelo menu do header, HITL respondido virando "Confirmado", teclado aberto com a barra de
+  escrita acima dele e as mensagens ainda visíveis, e o medidor do Perfil mostrando
+  **2 WhatsApp + 4 no app** na mesma cota. (O isolamento entre conversas quem prova é a suíte
+  `test_app_whatsapp_isolation.py`, verificada por mutação — na tela ele não seria distinguível de
+  o agente simplesmente não ter respondido.)
 
 Quatro defeitos reais saíram dessa conferência e estão corrigidos: o `paddingTop` do header contado
 duas vezes na lista, a marcação `*negrito*` do WhatsApp aparecendo como asterisco no app, o sheet de
@@ -365,10 +368,13 @@ produção a ordem tem de ser respeitada: `0055`, deploy, e só então `0056`.
 
 - **Deploy do Cloud Run** com a revisão nova (sem ele o agente remoto não conhece o schema);
 - **`EXPO_PUBLIC_AGENT_URL` e `APP_CORS_ORIGINS`** configurados nos ambientes;
-- **app publicado** e testado em **aparelho físico**, com o teclado real — o emulador não
-  redimensiona a janela em edge-to-edge e a tela de Notas, que é anterior a esta fase, tem o mesmo
-  comportamento, então o ponto não pôde ser decidido ali;
-- **iOS**: a conferência visual foi feita no Android; falta o simulador;
+- **app publicado** e testado em **aparelho físico**;
+- **iOS**: a conferência visual inteira foi feita no Android; falta o simulador, claro e escuro;
+- **Dynamic Type XL, TalkBack/VoiceOver e alvos de 44pt** não foram medidos em nenhuma plataforma;
+- **fluxos da interface ainda não exercitados na tela** (alguns provados só pela API): retry offline
+  com o mesmo UUID, rolagem para páginas antigas, o botão "Ir para a mensagem mais recente",
+  `reject` e `choose` pelos botões, `402` abrindo o `/paywall`, e excluir pelo menu do header
+  (inclusive o caminho 409);
 - **cota real entre canais** em produção e o paywall abrindo pelo app;
 - **produção**: `0049`–`0056` continuam sendo decisão separada do Gabriel.
 
@@ -396,9 +402,13 @@ evento ativo sem workspace. Os testes Python e de contrato verificam os dois esc
 migration `0054` está no staging `utkqoiigimqzeenxkxdl`, e os tipos gerados de lá são idênticos ao
 arquivo versionado.
 
-**Ainda pendente:** conferir o novo rótulo do Perfil em aparelho físico; depois da Fase 5, gastar
-mensagens pelo app, ver o contador `app` subir e estourar a cota por um canal para confirmar que o
-outro também recusa. O código do Python e da Edge Function legada ainda depende de deploy para
+**Medido em 04/09/2026, com a Fase 5 no ar localmente:** o Perfil mostrou **6/100 · 2 WhatsApp ·
+4 no app** depois de mensagens reais pelos dois canais. O medidor por canal funciona e a cota é uma
+só — isto fecha a parte central do que estava pendente aqui.
+
+**Ainda pendente:** conferir o novo rótulo do Perfil em aparelho físico e estourar a cota por um
+canal para confirmar que o outro também recusa (a recusa cruzada está provada em teste, não em
+ambiente real). O código do Python e da Edge Function legada ainda depende de deploy para
 gravar as novas colunas no ambiente remoto.
 
 ---

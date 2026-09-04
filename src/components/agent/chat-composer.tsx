@@ -3,11 +3,12 @@ import { Platform, Pressable, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { ThemedText } from '@/components/themed-text';
+import { KeyboardStickyView } from 'react-native-keyboard-controller';
+
 import { TextField } from '@/components/ui/field';
 import { CURVED_BAR_SPACE } from '@/components/ui/curved-tab-bar';
 import { Icon } from '@/components/ui/icon';
 import { HitTarget, Radius, Space, Type, tabular } from '@/design/tokens';
-import { useKeyboardHeight } from '@/hooks/use-keyboard-height';
 import { useTheme } from '@/hooks/use-theme';
 import { MAX_MESSAGE_LENGTH, canSubmitMessage } from '@/lib/agent-chat';
 
@@ -29,22 +30,18 @@ const AVISO = 200;
 /**
  * A barra de escrita, presa acima do teclado.
  *
- * ⚠️ **Esta barra não sobe sozinha.** Quem cede a altura do teclado é a TELA,
- * num `paddingBottom` na raiz (`ConversationScreen`) — a coluna inteira encolhe,
- * então a lista encolhe junto e a barra acompanha.
+ * `KeyboardStickyView` e não `KeyboardAvoidingView`: é a mesma peça que a barra
+ * de blocos da nota usa, e foi conferida levantando esta barra no emulador.
  *
- * Foram tentados e devolvidos, os dois conferidos no emulador em 04/09/2026:
- * `KeyboardStickyView` (sobe só a barra, e as mensagens recém-enviadas ficam
- * atrás dela; aqui ele nem chegou a levantar, porque o `KeyboardProvider` roda
- * edge-to-edge e o `adjustResize` do manifest não redimensiona nesse modo) e
- * `KeyboardAvoidingView` (mesma ideia, uma camada a mais, mesmo resultado). Um
- * `paddingBottom` de um número que o próprio `useKeyboardState` dá é menos
- * código e não depende de nenhum dos dois se comportar.
+ * **A barra subir não basta.** A lista não encolhe junto, então as mensagens
+ * recém-enviadas ficavam ATRÁS dela — quem devolve a altura do teclado é o
+ * rodapé do `contentContainerStyle` em `ConversationScreen`. As duas metades
+ * são necessárias; nenhuma sozinha resolve.
  *
- * O respiro de baixo existe só com o teclado FECHADO: no Android a
- * `CurvedTabBar` é absoluta e passaria por cima do campo. Com o teclado aberto
- * ela está atrás dele, e manter o respiro deixaria uma faixa vazia do tamanho
- * de uma tab bar invisível.
+ * O respiro de baixo é reservado com o teclado FECHADO (no Android a
+ * `CurvedTabBar` é absoluta e passaria por cima do campo) e devolvido com ele
+ * ABERTO pelo `offset.opened` — senão sobraria uma faixa vazia entre o campo e
+ * o teclado, do tamanho exato de uma tab bar que nem está visível.
  */
 export function ChatComposer({
   value,
@@ -56,16 +53,16 @@ export function ChatComposer({
   const theme = useTheme();
   const insets = useSafeAreaInsets();
   const [altura, setAltura] = useState(0);
-  const tecladoAberto = useKeyboardHeight() > 0;
 
-  const reservado = tecladoAberto
-    ? 0
-    : insets.bottom + (Platform.OS === 'android' ? CURVED_BAR_SPACE : 0);
+
+  const reservado =
+    insets.bottom + (Platform.OS === 'android' ? CURVED_BAR_SPACE : 0);
   const pode = canSubmitMessage(value, { sending, awaitingAction });
   const restantes = MAX_MESSAGE_LENGTH - value.trim().length;
 
   return (
-    <View
+    <KeyboardStickyView offset={{ opened: reservado }}>
+      <View
         style={[
           styles.barra,
           {
@@ -114,7 +111,8 @@ export function ChatComposer({
             />
           </Pressable>
         </View>
-    </View>
+      </View>
+    </KeyboardStickyView>
   );
 }
 

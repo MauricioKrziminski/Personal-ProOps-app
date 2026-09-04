@@ -11,12 +11,12 @@ import { useKeyboardState } from 'react-native-keyboard-controller';
  * (é o que a barra de blocos da nota precisa), e este hook serve para uma conta
  * de layout — quanto tirar do fim de uma coluna.
  *
- * **Duas fontes, e vale a maior.** Medido em 04/09/2026: no emulador Android 16
- * com o `KeyboardProvider` em edge-to-edge, NENHUMA das duas reagiu — e a tela
- * de Notas, que é anterior a este código, se comporta igual, o que mostra que a
- * causa é o ambiente e não a tela. Não dá para escolher uma fonte sem apostar em
- * qual delas funciona no aparelho real, e as duas juntas custam uma linha. Onde
- * as duas responderem, elas respondem o mesmo número.
+ * **Duas fontes, e vale a maior.** O par foi verificado funcionando no emulador
+ * Android 16 em 04/09/2026 — a lista cede a altura certa e a barra de escrita
+ * fica acima do teclado. O que NÃO foi possível determinar é qual das duas
+ * dispara ali: isolar cada uma exigia um ciclo de recarga que apagava o cache da
+ * conversa. Manter as duas custa uma linha e não muda nada onde ambas respondem,
+ * porque elas respondem o mesmo número; escolher uma seria apostar sem medida.
  *
  * `Will` no iOS e `Did` no Android é a diferença que importa: só o iOS emite os
  * eventos `Will*`, e usar `Did*` lá faria o layout pular DEPOIS da animação do

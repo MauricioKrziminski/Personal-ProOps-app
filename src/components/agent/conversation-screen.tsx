@@ -98,10 +98,9 @@ export function ConversationScreen({ conversationId, initialText = '', title }: 
    *
    * `windowSoftInputMode="adjustResize"` está no manifest, mas o
    * `KeyboardProvider` roda edge-to-edge e nesse modo o Android não redimensiona.
-   * Então a coluna encolhe AQUI, por padding: a lista (que é `flex: 1`) cede a
-   * altura junto e a barra de escrita acompanha, sem nenhuma peça subindo por
-   * conta própria — ver o comentário em `ChatComposer` para as duas que foram
-   * tentadas e devolvidas.
+   * O `KeyboardStickyView` do `ChatComposer` levanta a BARRA; a lista, que não
+   * sabe disso, precisa devolver a mesma altura no rodapé do conteúdo. Sem esta
+   * linha o campo cobre exatamente as mensagens recém-enviadas.
    */
   const alturaDoTeclado = useKeyboardHeight();
 
@@ -353,11 +352,7 @@ export function ConversationScreen({ conversationId, initialText = '', title }: 
     : [];
 
   return (
-    <View
-      style={[
-        styles.raiz,
-        { backgroundColor: theme.background, paddingBottom: alturaDoTeclado },
-      ]}>
+    <View style={[styles.raiz, { backgroundColor: theme.background }]}>
       <Stack.Screen options={{ title: title ?? '' }} />
       <HeaderMenu title={title ?? 'Conversa'} actions={acoesDoHeader} />
 
@@ -386,7 +381,11 @@ export function ConversationScreen({ conversationId, initialText = '', title }: 
           keyExtractor={(i) => i.key}
           getItemType={(i) => i.kind}
           renderItem={desenharLinha}
-          contentContainerStyle={styles.conteudo}
+          contentContainerStyle={{
+            paddingHorizontal: Space.lg,
+            paddingVertical: Space.md,
+            paddingBottom: Space.md + alturaDoTeclado,
+          }}
           onScroll={aoRolar}
           scrollEventThrottle={64}
           /*
@@ -521,7 +520,6 @@ const Linha = memo(function Linha({
 const styles = StyleSheet.create({
   raiz: { flex: 1 },
   lista: { flex: 1 },
-  conteudo: { paddingHorizontal: Space.lg, paddingVertical: Space.md },
   item: { paddingVertical: Space.sm },
   status: { paddingVertical: Space.sm, gap: Space.sm, alignItems: 'flex-start' },
   esqueleto: { padding: Space.lg, gap: Space.md },
