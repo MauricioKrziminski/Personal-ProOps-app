@@ -15,6 +15,11 @@
 > Status (04/09/2026): Fase 4 implementada, validada ponta a ponta contra o Auth local e com a
 > migration `0053` aplicada no staging. O teste com OTP/WhatsApp real e aparelho físico continua
 > pendente; produção não foi alterada.
+>
+> Status (04/09/2026): Fase 5 implementada, provada ponta a ponta contra o Postgres local (webhook
+> com HMAC real e fluxo autenticado no emulador Android) e com as migrations `0055`/`0056`
+> aplicadas no staging. Falta deploy do Cloud Run, aparelho físico e iOS. Produção continua na
+> `0048`.
 
 ---
 
@@ -296,29 +301,76 @@ Meta, provar que o número não é reconhecido antes do vínculo e passa a ser d
 outro número e conferir `user_sessions` no ambiente remoto. Promover `0049`–`0053` para produção
 exige uma decisão separada.
 
-### Fase 5 — O agente dentro do app · DESENHO APROVADO, IMPLEMENTAÇÃO PENDENTE (04/09/2026)
+### Fase 5 — O agente dentro do app · CÓDIGO PRONTO, SCHEMA EM STAGING (04/09/2026)
 
 A especificação aprovada está em
-[`docs/superpowers/specs/2026-09-04-agente-no-app-design.md`](superpowers/specs/2026-09-04-agente-no-app-design.md).
+[`docs/superpowers/specs/2026-09-04-agente-no-app-design.md`](superpowers/specs/2026-09-04-agente-no-app-design.md)
+e o plano de execução, com as onze tarefas, em
+[`docs/superpowers/plans/2026-09-04-agente-no-app.md`](superpowers/plans/2026-09-04-agente-no-app.md).
 
-O agente será a quinta aba. Ela terá lista, histórico persistente, nova conversa, títulos, renomear,
-excluir, retry e HITL com botões. Cada conversa do app terá sua própria sessão e memória.
+O agente é a quinta aba, entre Financeiro e Perfil. Cada conversa do app tem sessão e memória
+próprias; o app não vê o WhatsApp e o WhatsApp não vê o app. O que é compartilhado é o motor —
+grafo, tools, guards, prompts — e a cota.
 
-Gabriel decidiu isolar os canais: o app não verá mensagens nem contexto do WhatsApp, e o WhatsApp
-não verá conversas do app. O compartilhamento fica na implementação do grafo, das tools, dos guards,
-dos prompts e da cota. `user_sessions`, `pending_actions` e `draft_actions` serão generalizadas por
-sessão para sustentar os dois canais sem copiar o motor.
+#### Implementado e provado localmente
 
-O histórico do app será completo na interface. O prompt receberá até 10 turnos recentes no app e
-5 no WhatsApp, ambos com orçamento de tamanho. O app começa com texto e resposta final persistida,
-sem streaming. O áudio, as imagens e os documentos que o WhatsApp já processa serão preservados.
+- **O motor virou canal-neutro.** `agent/app/conversation.py` é o motor; `worker.py` ficou sendo o
+  adaptador do WhatsApp (fila, mídia, Groq) e `app_chat.py` o do app. `run_turn` recebe o
+  `prompt_history` já cortado pela borda — 10 turnos no app, 5 no WhatsApp —, e o `messages` do
+  estado passou a ser vetor de SUBSTITUIÇÃO. Havia duas janelas escondidas (um reducer de 6
+  mensagens dentro do grafo e um `history[-6:]` no prompt) que tornariam os 10 turnos do app
+  inalcançáveis, em silêncio.
+- **Schema por sessão, em expand/contract.** `0055` generaliza `user_sessions`, `pending_actions` e
+  `draft_actions` para dois canais e cria `app_chat_messages`; `0056` faz o contract e renomeia
+  `executed_actions.wa_message_id` para `source_message_id`. A ordem é `0055` → deploy → `0056`, e
+  `supabase/tests/app_agent_chat_expand.sql` roda as queries do agente ANTERIOR contra o schema
+  novo — é ele que prova que a janela entre as duas é segura.
+- **API autenticada** (`agent/app/routes/chat.py`) com JWT ES256 pelo JWKS do Supabase, issuer,
+  audience e `exp`/`iss`/`aud`/`sub` obrigatórios. O serviço ignora RLS, então toda leitura confere
+  canal, `deleting_at` **e membership atual** no workspace — um membro removido para de ler e de
+  escrever na mesma hora.
+- **Serialização por lease** (300s) e idempotência pelo UUID do cliente (`app:<uuid>`). Um turno
+  que rodou e não conseguiu gravar é RECUPERADO do checkpoint em vez de reexecutado; as tools não
+  rodam duas vezes.
+- **App:** quinta aba com lista, preview da última mensagem, nova conversa, renomear, excluir,
+  histórico paginado, `Pensando…`, retry manual com o MESMO UUID e HITL com botões nativos.
+- **Provas automatizadas:** 464 testes Python e 213 Node. `test_app_whatsapp_isolation.py` usa um
+  dublê de grafo **com memória por thread** e foi verificado por mutação — três mutações diferentes
+  (thread compartilhado entre conversas, app herdando o thread do WhatsApp, motor ignorando o
+  histórico da borda) quebram os testes.
+- **Ponta a ponta com HMAC real** contra o Postgres local: `registre R$ 45 no mercado` gravou o
+  lançamento; `gastei 1500 reais num notebook` criou EXATAMENTE uma pendência e nenhum lançamento;
+  o clique `pa:<id>:ok` retomou o mesmo thread, executou uma vez e não cobrou mensagem da cota.
+- **Conferido no emulador Android** (claro e escuro), no fluxo autenticado contra o Supabase local:
+  criar pela primeira mensagem com `router.replace`, `Pensando…`, resposta, título automático,
+  renomear, HITL respondido virando "Confirmado", isolamento entre conversas e o medidor do Perfil
+  mostrando **2 WhatsApp + 4 no app** na mesma cota.
 
-**Validar, em etapas:**
-1. migration preservando as sessões atuais do WhatsApp e permitindo vários chats do app;
-2. rotas autenticadas, idempotência, concorrência e isolamento adversarial;
-3. grafo e HITL iguais nos dois canais, sem memória cruzada;
-4. quinta aba com lista, histórico, nova conversa, retry e exclusão completa;
-5. consumo `app` e `whatsapp` somando na mesma cota, além da regressão de áudio no WhatsApp.
+Quatro defeitos reais saíram dessa conferência e estão corrigidos: o `paddingTop` do header contado
+duas vezes na lista, a marcação `*negrito*` do WhatsApp aparecendo como asterisco no app, o sheet de
+renomear sem o cabeçalho e a calha do padrão da casa, e duas asserções SQL que contavam a tabela
+inteira e falhavam em banco com dado real.
+
+#### Schema aplicado no staging
+
+`0055` e `0056` aplicadas em `utkqoiigimqzeenxkxdl` em 04/09/2026. O histórico remoto do staging
+termina em **0056** e os tipos gerados de lá estão em `src/lib/database.types.ts`. O CLI nunca saiu
+do staging: o `--dry-run` e o `push` listaram só essas duas migrations.
+
+⚠️ **O `agente-staging` fica inerte até um deploy do Cloud Run.** A `0056` é o contract e quebra a
+revisão antiga de propósito. Gabriel aceitou isso explicitamente — staging é ambiente de teste. Em
+produção a ordem tem de ser respeitada: `0055`, deploy, e só então `0056`.
+
+#### Ainda pendente
+
+- **Deploy do Cloud Run** com a revisão nova (sem ele o agente remoto não conhece o schema);
+- **`EXPO_PUBLIC_AGENT_URL` e `APP_CORS_ORIGINS`** configurados nos ambientes;
+- **app publicado** e testado em **aparelho físico**, com o teclado real — o emulador não
+  redimensiona a janela em edge-to-edge e a tela de Notas, que é anterior a esta fase, tem o mesmo
+  comportamento, então o ponto não pôde ser decidido ali;
+- **iOS**: a conferência visual foi feita no Android; falta o simulador;
+- **cota real entre canais** em produção e o paywall abrindo pelo app;
+- **produção**: `0049`–`0056` continuam sendo decisão separada do Gabriel.
 
 ### Fase 6 — Cota compartilhada e medidor · CÓDIGO PRONTO, SCHEMA EM STAGING (04/09/2026)
 
