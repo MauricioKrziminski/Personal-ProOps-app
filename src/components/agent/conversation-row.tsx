@@ -10,6 +10,9 @@ import { relativeBR } from '@/lib/dates';
 interface Props {
   id: string;
   title: string;
+  /** Trecho da última mensagem. Sem ele, duas conversas sobre o mesmo assunto
+   *  ficam indistinguíveis na lista. */
+  preview: string | null;
   updatedAt: string | null;
   onOpen: (id: string) => void;
   onLongPress: (id: string) => void;
@@ -26,6 +29,7 @@ interface Props {
 export const ConversationRow = memo(function ConversationRow({
   id,
   title,
+  preview,
   updatedAt,
   onOpen,
   onLongPress,
@@ -37,7 +41,7 @@ export const ConversationRow = memo(function ConversationRow({
       onPress={() => onOpen(id)}
       onLongPress={() => onLongPress(id)}
       accessibilityRole="button"
-      accessibilityLabel={title}
+      accessibilityLabel={preview ? `${title}. ${preview}` : title}
       accessibilityHint="Abre a conversa"
       style={({ pressed }) => [
         styles.row,
@@ -58,8 +62,13 @@ export const ConversationRow = memo(function ConversationRow({
         <ThemedText type="default" numberOfLines={1} style={styles.title}>
           {title}
         </ThemedText>
+        {preview ? (
+          <ThemedText type="caption" themeColor="textSecondary" numberOfLines={1}>
+            {preview}
+          </ThemedText>
+        ) : null}
         {updatedAt ? (
-          <ThemedText type="caption" themeColor="textSecondary" style={tabular}>
+          <ThemedText type="meta" themeColor="textSecondary" style={tabular}>
             {relativeBR(updatedAt)}
           </ThemedText>
         ) : null}

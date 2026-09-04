@@ -141,6 +141,7 @@ export default function AgentScreen() {
             <ConversationRow
               id={item.id}
               title={item.title}
+              preview={item.preview ?? null}
               updatedAt={item.last_message_at}
               onOpen={abrir}
               onLongPress={pedirAcao}

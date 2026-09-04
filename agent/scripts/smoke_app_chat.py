@@ -83,6 +83,11 @@ async def main():
 
     lista = await db.chat_sessions(uid)
     assert any(s["id"] == sid for s in lista)
+    # O trecho é a ÚLTIMA mensagem completa, qualquer que seja o papel: é o que a
+    # pessoa vê no fim da conversa e o que faz ela reconhecer qual é qual.
+    atual = next(s for s in lista if s["id"] == sid)
+    assert atual["preview"] == "R$ 1.234,00", f"trecho errado: {atual['preview']!r}"
+    print("preview da lista       ok", repr(atual["preview"]))
     pag = await db.chat_sessions(uid, cursor=(lista[0]["last_message_at"], lista[0]["id"]))
     print("chat_sessions          ok", len(lista), "→ página seguinte", len(pag))
 

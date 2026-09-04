@@ -690,7 +690,16 @@ async def chat_sessions(
     if cursor:
         return await fetch(
             f"""
-            select s.* from public.user_sessions s
+            select s.*,
+       -- O trecho da última mensagem, qualquer que seja o papel: é o que a
+       -- pessoa vê no fim da conversa e o que faz ela reconhecer qual é qual.
+       -- `completed` só: turno em processamento ou falho não tem o que mostrar.
+       (
+         select m.content from public.app_chat_messages m
+         where m.session_id = s.id and m.status = 'completed'
+         order by m.sequence desc limit 1
+       ) as preview
+            from public.user_sessions s
             where s.user_id = %s {_VISIVEL}
               and (s.last_message_at, s.id) < (%s, %s)
             order by s.last_message_at desc, s.id desc
@@ -700,7 +709,16 @@ async def chat_sessions(
         )
     return await fetch(
         f"""
-        select s.* from public.user_sessions s
+        select s.*,
+       -- O trecho da última mensagem, qualquer que seja o papel: é o que a
+       -- pessoa vê no fim da conversa e o que faz ela reconhecer qual é qual.
+       -- `completed` só: turno em processamento ou falho não tem o que mostrar.
+       (
+         select m.content from public.app_chat_messages m
+         where m.session_id = s.id and m.status = 'completed'
+         order by m.sequence desc limit 1
+       ) as preview
+        from public.user_sessions s
         where s.user_id = %s {_VISIVEL}
         order by s.last_message_at desc, s.id desc
         limit %s

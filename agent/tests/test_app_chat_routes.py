@@ -40,6 +40,7 @@ def _sessao(**extra):
         "first_client_message_id": uuid4(), "lease_message_id": None,
         "lease_expires_at": None, "deleting_at": None, "session_epoch": 0,
         "timezone": "America/Bahia", "debounce_task_name": None,
+        "preview": "R$ 1.234,00 gastos este mês",
         **extra,
     }
 
@@ -153,6 +154,35 @@ def test_criar_nao_devolve_telefone_thread_nem_lease(cliente, falso):
     assert r.status_code == 200
     _sem_interno(r.json())
     assert "app-segredo" not in r.text, "o thread_id do checkpoint saiu na resposta"
+
+
+def test_a_lista_leva_o_trecho_da_ultima_mensagem(cliente, falso):
+    """O desenho pede título, TRECHO e horário. Sem o trecho, duas conversas
+    sobre o mesmo assunto ficam indistinguíveis na lista."""
+    falso["conversas"] = [_sessao()]
+    item = cliente.get("/internal/chat/conversations").json()["items"][0]
+    assert item["preview"] == "R$ 1.234,00 gastos este mês"
+
+
+def test_trecho_longo_e_cortado_no_SERVIDOR(cliente, falso):
+    """Mandar 4.000 caracteres por conversa para o aparelho descartar é pagar
+    banda por nada — em 20 conversas, 80 KB de texto que ninguém lê."""
+    falso["conversas"] = [_sessao(preview="x" * 4000)]
+    item = cliente.get("/internal/chat/conversations").json()["items"][0]
+    assert len(item["preview"]) <= 120
+
+
+def test_trecho_de_varias_linhas_vira_uma(cliente, falso):
+    """Quebra de linha numa lista muda a altura da linha item a item."""
+    falso["conversas"] = [_sessao(preview="primeira\nsegunda")]
+    item = cliente.get("/internal/chat/conversations").json()["items"][0]
+    assert "\n" not in item["preview"]
+
+
+def test_conversa_sem_mensagem_completa_nao_inventa_trecho(cliente, falso):
+    falso["conversas"] = [_sessao(preview=None), _sessao(id=uuid4(), preview="   ")]
+    itens = cliente.get("/internal/chat/conversations").json()["items"]
+    assert all(i["preview"] is None for i in itens)
 
 
 def test_lista_nao_devolve_estado_interno(cliente, falso):

@@ -114,17 +114,26 @@ class Decisao(Corpo):
 # ---------------------------------------------------------------------------
 
 
+# O trecho da última mensagem é cortado AQUI, não na tela: a lista mostra uma
+# linha, e mandar 4.000 caracteres por conversa para o aparelho descartar é
+# pagar banda por nada — em 20 conversas, 80 KB de texto que ninguém lê.
+PREVIEW_MAX = 120
+
+
 class ConversaOut(BaseModel):
     id: UUID
     title: str
+    preview: str | None = None
     last_message_at: datetime | None
     created_at: datetime | None = None
 
     @staticmethod
     def de(linha: dict) -> "ConversaOut":
+        trecho = (linha.get("preview") or "").strip().replace("\n", " ") or None
         return ConversaOut(
             id=linha["id"],
             title=linha.get("title") or "",
+            preview=trecho[:PREVIEW_MAX] if trecho else None,
             last_message_at=linha.get("last_message_at"),
             created_at=linha.get("created_at"),
         )

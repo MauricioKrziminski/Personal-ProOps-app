@@ -24,6 +24,8 @@ export { appendConversationPage, prependMessagePage };
 export interface AgentConversation {
   id: string;
   title: string;
+  /** Trecho da última mensagem, já cortado e numa linha só pelo servidor. */
+  preview?: string | null;
   last_message_at: string | null;
   created_at?: string | null;
 }

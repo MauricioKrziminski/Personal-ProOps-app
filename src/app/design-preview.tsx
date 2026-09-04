@@ -418,16 +418,19 @@ function seedClient() {
           {
             id: 'prev-c1',
             title: 'Quanto gastei este mês?',
+            preview: 'Você gastou R$ 3.482,10 este mês — 12% a menos que em agosto.',
             last_message_at: new Date(Date.now() - 12 * 60 * 1000).toISOString(),
           },
           {
             id: 'prev-c2',
             title: 'Registrar as compras do mercado',
+            preview: 'Anotei: R$ 245,80 em mercado, no cartão Nubank.',
             last_message_at: new Date(Date.now() - 5 * 60 * 60 * 1000).toISOString(),
           },
           {
             id: 'prev-c3',
             title: 'Planejar a viagem de dezembro',
+            preview: 'Criei a meta "Viagem dezembro" com R$ 4.000 até 01/12/2026.',
             last_message_at: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString(),
           },
         ],
