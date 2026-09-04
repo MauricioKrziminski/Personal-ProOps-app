@@ -137,8 +137,10 @@ a senha nova.
 
 ⚠️ **Pré-requisitos no dashboard, sem os quais as telas não funcionam — não dá para fazer pelo
 CLI. Fazer primeiro no STAGING (`utkqoiigimqzeenxkxdl`) e de novo em produção quando promover:**
-- Authentication → **Sign In / Providers** (seção CONFIGURATION) → linha do provedor Email:
-  **Confirm email ligado** (decisão do dono, 03/09/2026).
+- ~~Confirm email~~ — **nada a fazer.** O toggle não existe mais nesta versão do dashboard porque
+  exigir confirmação virou o padrão. Confirmado contra a API, não contra a documentação:
+  `GET /auth/v1/settings` devolve `mailer_autoconfirm: false`, ou seja, confirmação EXIGIDA.
+  Esse endpoint é público (só precisa da anon key) e é a forma de checar sem procurar menu.
 - Authentication → **Emails** (seção NOTIFICATIONS) → **Confirm signup** e **Reset password**:
   corpo com `{{ .Token }}` (os arquivos em `supabase/templates/` são exatamente o que colar). O
   padrão da Supabase só tem `{{ .ConfirmationURL }}`, e com ele o e-mail chega SEM o código.
@@ -155,9 +157,14 @@ CLI. Fazer primeiro no STAGING (`utkqoiigimqzeenxkxdl`) e de novo em produção 
 - ⚠️ **SMTP → "Minimum interval per user" = 30s.** O padrão é 60 e o app libera "Reenviar" aos
   **45** (`RESEND_SECONDS`). Com 60 no servidor, o botão aparece habilitado e o reenvio é recusado
   por rate limit. 30 mantém o app como o lado mais restritivo.
-- SMTP próprio: o domínio é do **Zoho** (MX `mx.zoho.com`), host `smtp.zoho.com` ou
-  `smtppro.zoho.com` conforme o plano, porta 465. A senha tem que ser **app-specific password**
-  do Zoho, não a senha da conta. O SPF do domínio já inclui `zohomail.com`.
+- SMTP próprio: o domínio é do **Zoho** (MX `mx.zoho.com`). Endereço de domínio próprio conta
+  como conta de organização, então o host é **`smtppro.zoho.com`** na porta 465, não o
+  `smtp.zoho.com` (esse é para `@zoho.com`). Os dois respondem, o que torna o erro difícil de
+  diagnosticar: falha de autenticação com host errado parece senha errada.
+  A senha tem que ser **app-specific password** (accounts.zoho.com → Security → App passwords),
+  nunca a senha da conta. O SPF já inclui `zohomail.com`; o DMARC está em `p=none`, só monitorando.
+  ⚠️ O plano gratuito do Zoho não dá IMAP/POP e possivelmente nem SMTP. Se a autenticação falhar
+  com o host e a senha certos, é o plano — Mail Lite resolve.
 
 Achado do revisor para a Fase 4: `agent/app/jobs/alerts.py:39-46` reserva a vaga de dedupe do
 dia em `alerts_sent` com canal `whatsapp` quando não há push, e depois pula se `phone` é nulo —
