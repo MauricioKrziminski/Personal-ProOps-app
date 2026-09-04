@@ -195,7 +195,7 @@ export default function SignupScreen() {
             control={control}
             name="email"
             render={({ field }) => (
-              <Field label="E-mail" error={errors.email?.message}>
+              <Field label="E-mail" error={errors.email?.message ?? error ?? undefined}>
                 <TextField
                   ref={emailRef}
                   value={field.value}
@@ -208,7 +208,7 @@ export default function SignupScreen() {
                   textContentType="emailAddress"
                   returnKeyType="next"
                   onSubmitEditing={() => passwordRef.current?.focus()}
-                  invalid={!!errors.email}
+                  invalid={!!errors.email || !!error}
                   editable={!busy}
                 />
               </Field>
@@ -241,7 +241,7 @@ export default function SignupScreen() {
             control={control}
             name="confirm"
             render={({ field }) => (
-              <Field label="Repita a senha" error={errors.confirm?.message ?? error ?? undefined}>
+              <Field label="Repita a senha" error={errors.confirm?.message}>
                 <TextField
                   ref={confirmRef}
                   value={field.value}
@@ -252,7 +252,7 @@ export default function SignupScreen() {
                   textContentType="newPassword"
                   returnKeyType="go"
                   onSubmitEditing={() => submit()}
-                  invalid={!!errors.confirm || !!error}
+                  invalid={!!errors.confirm}
                   editable={!busy}
                 />
               </Field>
