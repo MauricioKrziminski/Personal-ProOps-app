@@ -42,7 +42,8 @@
       "expo-secure-store",
       "expo-image",
       "expo-status-bar",
-      "expo-web-browser"
+      "expo-web-browser",
+      "./plugins/with-apk-installer"
     ],
     "experiments": {
       "typedRoutes": true,
