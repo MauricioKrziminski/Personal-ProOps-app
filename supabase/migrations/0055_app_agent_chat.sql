@@ -8,20 +8,18 @@
 -- O que NÃO muda: `messages_queue` continua exclusiva do WhatsApp e mantém `wa_message_id`
 -- com o nome da Meta; o upsert de sessão continua com árbitro em `phone` (ver 0040).
 --
--- ⚠️ ESTA MIGRATION É CUTOVER DURO, NÃO expand/contract. Depois dela, o código ANTERIOR do
--- agente quebra em três pontos — rascunho (`on conflict (phone)` sem o índice), pendência
--- (`session_id not null`) e reserva (`wa_message_id` renomeado) — e o código NOVO não roda no
--- schema anterior. Não há ordem de deploy segura entre os dois.
+-- ⚠️ ESTA É A FASE **EXPAND** DE UM PAR. A `0056` é a fase contract e só pode ser aplicada
+-- DEPOIS que o Cloud Run estiver na revisão nova. A ordem é:
 --
--- O custo de errar não é atraso: cada falha vira `mark_retry`, e na 3ª a mensagem do usuário
--- fica `failed` para sempre. Com o retry do Cloud Tasks e o sweep de 1 minuto, três tentativas
--- queimam em minutos.
+--     0055  →  deploy do agente  →  0056
 --
--- Portanto, em QUALQUER ambiente com tráfego real (produção), aplicar e fazer o deploy do Cloud
--- Run como um passo só, com a fila `whatsapp-debounce` do Cloud Tasks e os jobs do Cloud
--- Scheduler PAUSADOS durante a janela. Se essa janela não for aceitável, quebre esta migration
--- em duas antes de aplicar: a 0055 sem `set not null`, sem `drop index draft_actions_one_per_phone`
--- e sem o rename; uma 0056 depois do deploy fechando os três. É o precedente 0043 → 0044.
+-- Aqui tudo que a 0055 acrescenta é OPCIONAL para o código antigo: `session_id` nasce anulável,
+-- `draft_actions_one_per_phone` continua de pé e `executed_actions.wa_message_id` ainda tem o
+-- nome antigo. O agente que já está no ar segue funcionando sem tocar em nada.
+--
+-- O motivo é o custo de errar: uma falha no worker vira `mark_retry`, e na 3ª a mensagem do
+-- usuário fica `failed` para sempre. Com o retry do Cloud Tasks e o sweep de 1 minuto, três
+-- tentativas queimam em minutos — não é atraso, é mensagem perdida. Precedente: 0043 → 0044.
 
 -- ===========================================================================
 -- 1. Identidade estável e canal em user_sessions
@@ -131,22 +129,51 @@ end $$;
 alter table public.pending_actions drop constraint if exists pending_actions_phone_fkey;
 alter table public.draft_actions drop constraint if exists draft_actions_phone_fkey;
 
+-- `session_id` fica ANULÁVEL nesta fase: o agente antigo não sabe preenchê-lo, e um `not null`
+-- aqui derrubaria todo HITL até o deploy. Quem fecha é a 0056.
 alter table public.pending_actions drop constraint if exists pending_actions_session_id_fkey;
 alter table public.pending_actions
-  alter column session_id set not null,
   alter column phone drop not null,
   add constraint pending_actions_session_id_fkey
     foreign key (session_id) references public.user_sessions(id) on delete cascade;
 
 alter table public.draft_actions drop constraint if exists draft_actions_session_id_fkey;
 alter table public.draft_actions
-  alter column session_id set not null,
   alter column phone drop not null,
   add constraint draft_actions_session_id_fkey
     foreign key (session_id) references public.user_sessions(id) on delete cascade;
 
--- O rascunho é um por CONVERSA. Era um por telefone porque o telefone era a conversa.
-drop index if exists public.draft_actions_one_per_phone;
+-- Preenche `session_id` para quem ainda não sabe preenchê-lo. Existe SÓ na janela entre esta
+-- migration e o deploy, e a 0056 remove.
+--
+-- Sem isto a janela teria um buraco estreito e real: o agente antigo gravaria um rascunho com
+-- `session_id` nulo, e o agente novo, ao completar aquele mesmo rascunho, tentaria
+-- `on conflict (session_id)` — que não casa com NULL — e cairia no unique por telefone como
+-- 23505 cru. Uma mensagem perdida por causa de um índice é caro demais para 12 linhas.
+create or replace function private.fill_action_session_id()
+returns trigger language plpgsql security definer set search_path = '' as $$
+begin
+  if new.session_id is null and new.phone is not null then
+    select s.id into new.session_id
+    from public.user_sessions s
+    where s.phone = new.phone and s.channel = 'whatsapp';
+  end if;
+  return new;
+end;
+$$;
+
+revoke execute on function private.fill_action_session_id() from public, anon, authenticated;
+
+drop trigger if exists fill_session_id on public.pending_actions;
+create trigger fill_session_id before insert on public.pending_actions
+for each row execute function private.fill_action_session_id();
+
+drop trigger if exists fill_session_id on public.draft_actions;
+create trigger fill_session_id before insert on public.draft_actions
+for each row execute function private.fill_action_session_id();
+
+-- O rascunho passa a ser um por CONVERSA. O unique por TELEFONE continua de pé nesta fase —
+-- é dele que o `on conflict (phone)` do agente antigo depende. A 0056 derruba.
 create unique index if not exists draft_actions_one_per_session
   on public.draft_actions (session_id);
 
@@ -172,24 +199,8 @@ where p.status = 'awaiting'
 create unique index if not exists pending_actions_one_open_per_session
   on public.pending_actions (session_id) where status = 'awaiting';
 
--- ===========================================================================
--- 3. A reserva de execução serve aos dois canais
--- ===========================================================================
-
--- Guarda porque reaplicar a migration é o caminho normal quando um passo anterior aborta.
-do $$
-begin
-  if exists (
-    select 1 from information_schema.columns
-    where table_schema = 'public' and table_name = 'executed_actions'
-      and column_name = 'wa_message_id'
-  ) then
-    alter table public.executed_actions rename column wa_message_id to source_message_id;
-  end if;
-end $$;
-
-comment on column public.executed_actions.source_message_id is
-  'Chave de idempotência do turno: id da Meta no WhatsApp, app:<uuid do cliente> no app.';
+-- (A reserva de execução é renomeada na 0056: o nome da coluna quebra o agente antigo
+--  no primeiro lançamento, e por isso espera o deploy.)
 
 -- ===========================================================================
 -- 4. Mensagens do app

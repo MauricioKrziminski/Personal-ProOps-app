@@ -35,7 +35,7 @@
 
 | Responsabilidade | Arquivo atual | Mudança planejada |
 |---|---|---|
-| Sessão, pending, draft e idempotência | `supabase/migrations/0040_python_agent.sql`, `0043`, `0044`, `0053` | Nova `0055_app_agent_chat.sql`; migrations antigas não mudam |
+| Sessão, pending, draft e idempotência | `supabase/migrations/0040_python_agent.sql`, `0043`, `0044`, `0053` | Par novo `0055_app_agent_chat.sql` (expand) + `0056_app_agent_chat_contract.sql` (contract, só depois do deploy); migrations antigas não mudam |
 | Acesso PostgreSQL | `agent/app/db.py` | Consultas por `session_id`, chave genérica de execução e primitives transacionais do chat |
 | Motor do turno | `agent/app/worker.py` | Extrair para `agent/app/conversation.py`; worker fica como adaptador WhatsApp |
 | Estado e prompt | `agent/app/graph/state.py`, `nodes.py`, `prompts.py` | Identidade/canal genéricos e janela de histórico parametrizada |
@@ -200,6 +200,7 @@ Adicione checks para: mensagem `user` ter `client_message_id` e `in_reply_to is 
 ```bash
 SUPABASE_TELEMETRY_DISABLED=1 npx supabase migration up --local
 docker exec -i supabase_db_app-proops psql -U postgres -d postgres -v ON_ERROR_STOP=1 -f - < supabase/tests/app_agent_chat.sql
+docker exec -i supabase_db_app-proops psql -U postgres -d postgres -v ON_ERROR_STOP=1 -f - < supabase/tests/app_agent_chat_expand.sql
 docker exec -i supabase_db_app-proops psql -U postgres -d postgres -v ON_ERROR_STOP=1 -f - < supabase/tests/agent_migrations.sql
 docker exec -i supabase_db_app-proops psql -U postgres -d postgres -v ON_ERROR_STOP=1 -f - < supabase/tests/phone_link.sql
 ```
@@ -798,6 +799,7 @@ git commit -m "test(agent): cobre canais e recuperacao"
 
 ```bash
 docker exec -i supabase_db_app-proops psql -U postgres -d postgres -v ON_ERROR_STOP=1 -f - < supabase/tests/app_agent_chat.sql
+docker exec -i supabase_db_app-proops psql -U postgres -d postgres -v ON_ERROR_STOP=1 -f - < supabase/tests/app_agent_chat_expand.sql
 docker exec -i supabase_db_app-proops psql -U postgres -d postgres -v ON_ERROR_STOP=1 -f - < supabase/tests/agent_migrations.sql
 docker exec -i supabase_db_app-proops psql -U postgres -d postgres -v ON_ERROR_STOP=1 -f - < supabase/tests/phone_link.sql
 docker exec -i supabase_db_app-proops psql -U postgres -d postgres -v ON_ERROR_STOP=1 -f - < supabase/tests/ai_usage_channels.sql
@@ -821,13 +823,16 @@ npx expo export --platform web --output-dir /tmp/personal-proops-agent-web
 
 - [ ] No fluxo autenticado local, prove manualmente: abrir/voltar de `new` sem criar; enviar primeira mensagem; criar segunda conversa; memória separada; renomear; excluir; retry offline com mesmo UUID; scroll com páginas antigas; chegada de resposta estando longe do fim; approve/reject/candidate HITL; cota abrindo paywall.
 
-- [ ] **Antes do push, decida a janela de cutover.** A `0055` não é expand/contract: aplicada
-  sozinha, o agente Python anterior quebra em rascunho, pendência e reserva de execução, e cada
-  falha consome uma retentativa até a mensagem virar `failed` de vez. No staging isso só derruba
-  o `agente-staging` até o próximo deploy, o que é aceitável dentro desta fase. Para produção,
-  aplicar e fazer deploy como passo único com a fila do Cloud Tasks e os jobs do Cloud Scheduler
-  pausados — ou quebrar em `0055`/`0056` (precedente `0043` → `0044`). O cabeçalho da migration
-  registra as duas saídas.
+- [ ] **O schema é um PAR, e a ordem é `0055` → deploy → `0056`.** A `0055` é a fase expand: tudo
+  que ela acrescenta é opcional para o agente que já está no ar (`session_id` anulável, unique por
+  telefone de pé, `wa_message_id` com o nome antigo, e um trigger temporário preenchendo
+  `session_id` para quem não sabe preenchê-lo). A `0056` é o contract e quebra o agente antigo de
+  propósito — só depois do deploy do Cloud Run. `supabase/tests/app_agent_chat_expand.sql` roda as
+  queries do agente ANTERIOR contra o schema novo e é o que prova que a janela é segura.
+
+  Nesta execução as duas vão para o staging (o `agente-staging` fica inerte até um deploy futuro,
+  o que é aceitável: staging é ambiente de teste). Em produção, `0056` só depois da revisão nova
+  no ar.
 
 - [ ] Confirme staging antes de qualquer escrita:
 
@@ -836,7 +841,7 @@ scripts/supabase-target.sh
 SUPABASE_TELEMETRY_DISABLED=1 npx supabase db push --dry-run
 ```
 
-Esperado: linked ref e `.env.local` apontam ambos para `utkqoiigimqzeenxkxdl`, e o dry-run lista somente `0055_app_agent_chat.sql`. Se aparecer produção ou outra migration, pare.
+Esperado: linked ref e `.env.local` apontam ambos para `utkqoiigimqzeenxkxdl`, e o dry-run lista somente `0055_app_agent_chat.sql` e `0056_app_agent_chat_contract.sql`. Se aparecer produção ou outra migration, pare.
 
 - [ ] Aplique a migration somente no staging e regenere tipos a partir dele:
 
@@ -845,7 +850,7 @@ SUPABASE_TELEMETRY_DISABLED=1 npx supabase db push
 SUPABASE_TELEMETRY_DISABLED=1 npx supabase gen types typescript --linked > src/lib/database.types.ts
 ```
 
-- [ ] Rode novamente `npx tsc --noEmit`, `npm test` e `scripts/supabase-target.sh`. Confira no histórico remoto que staging termina em `0055` e produção permanece em `0048`.
+- [ ] Rode novamente `npx tsc --noEmit`, `npm test` e `scripts/supabase-target.sh`. Confira no histórico remoto que staging termina em `0056` e produção permanece em `0048`.
 
 - [ ] Atualize `docs/CONTA-E-AGENTE-NO-APP.md` com três blocos separados:
 
