@@ -169,6 +169,54 @@ export function isNearChatEnd(m: {
 }
 
 // ---------------------------------------------------------------------------
+// texto do agente
+// ---------------------------------------------------------------------------
+
+export interface TrechoDeTexto {
+  text: string;
+  bold: boolean;
+}
+
+/**
+ * Quebra o texto do agente nos trechos em negrito do WhatsApp (`*assim*`).
+ *
+ * O motor é COMPARTILHADO e os templates dele nasceram para o WhatsApp, onde
+ * `*R$ 2.300,00*` é negrito. No app isso apareceria como asterisco literal em
+ * volta de todo valor — foi o que a validação local mostrou. Traduzir aqui é
+ * mais barato que manter dois jogos de template, e o destaque é intencional: o
+ * que vem entre asteriscos é sempre o número ou a categoria da resposta.
+ *
+ * Um `*` solto não vira nada: "2 * 3" continua sendo "2 * 3", e um par não pode
+ * atravessar quebra de linha — senão duas listas com asterisco no começo se
+ * "casariam" e engoliriam o meio do texto.
+ */
+export function parseInlineBold(texto: string): TrechoDeTexto[] {
+  const partes: TrechoDeTexto[] = [];
+  const re = /\*([^*\n]+)\*/g;
+  let fim = 0;
+  for (let m = re.exec(texto); m; m = re.exec(texto)) {
+    if (m.index > fim) partes.push({ text: texto.slice(fim, m.index), bold: false });
+    partes.push({ text: m[1], bold: true });
+    fim = m.index + m[0].length;
+  }
+  if (fim < texto.length) partes.push({ text: texto.slice(fim), bold: false });
+  return partes.length ? partes : [{ text: texto, bold: false }];
+}
+
+/**
+ * O mesmo texto sem a marcação — para onde negrito não cabe.
+ *
+ * A linha da lista de conversas é UMA linha de resumo: ali o `*R$ 45,00*` do
+ * WhatsApp apareceria com os asteriscos, e destacar um pedaço de um preview
+ * truncado não ajuda ninguém a escolher a conversa.
+ */
+export function plainText(texto: string): string {
+  return parseInlineBold(texto)
+    .map((t) => t.text)
+    .join('');
+}
+
+// ---------------------------------------------------------------------------
 // erros
 // ---------------------------------------------------------------------------
 

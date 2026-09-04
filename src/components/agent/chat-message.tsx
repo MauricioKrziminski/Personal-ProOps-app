@@ -1,9 +1,11 @@
 import { memo } from 'react';
-import { StyleSheet, View } from 'react-native';
+import { StyleSheet, Text, View } from 'react-native';
 
 import { ThemedText } from '@/components/themed-text';
+import { Fonts } from '@/constants/theme';
 import { Radius, Space } from '@/design/tokens';
 import { useTheme } from '@/hooks/use-theme';
+import { parseInlineBold } from '@/lib/agent-chat';
 
 interface Props {
   role: 'user' | 'assistant';
@@ -41,7 +43,17 @@ export const ChatMessage = memo(function ChatMessage({ role, content }: Props) {
           ],
         ]}>
         <ThemedText type="default" selectable>
-          {content}
+          {/*
+            O motor é compartilhado com o WhatsApp e escreve `*R$ 45,00*`. Sem
+            esta tradução o app mostraria o asterisco em volta de todo valor.
+            Peso é FAMÍLIA, nunca `fontWeight` (`design.md` §3): fonte custom no
+            Android ignora `fontWeight` e cai no regular com bold sintético.
+          */}
+          {parseInlineBold(content).map((t, i) => (
+            <Text key={i} style={t.bold ? styles.forte : undefined}>
+              {t.text}
+            </Text>
+          ))}
         </ThemedText>
       </View>
     </View>
@@ -58,6 +70,7 @@ const styles = StyleSheet.create({
     conversa perde o lado que diz quem falou.
   */
   corpo: { maxWidth: '86%', flexShrink: 1 },
+  forte: { fontFamily: Fonts.semibold },
   balao: {
     paddingHorizontal: Space.lg,
     paddingVertical: Space.md,

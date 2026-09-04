@@ -12,7 +12,9 @@ import {
   canSubmitMessage,
   conversationRoute,
   markResolved,
+  parseInlineBold,
   parseUiActions,
+  plainText,
   defaultRandomBytes,
   hitlControlsDisabled,
   isNearChatEnd,
@@ -421,4 +423,38 @@ test('resolvido e expirado deixam os controles inertes', () => {
   // carimba é a tela, senão os botões da pergunta morta seguiriam vivos.
   assert.equal(hitlControlsDisabled(markResolved(aberta, 'expired')), true);
   assert.equal(markResolved(aberta, 'expired').pending_id, PID, 'o resumo continua');
+});
+
+// ---------------------------------------------------------------------------
+// negrito do WhatsApp
+// ---------------------------------------------------------------------------
+
+test('o negrito do WhatsApp vira trecho, não asterisco na tela', () => {
+  // O caso real: a resposta do motor compartilhado chega assim.
+  assert.deepEqual(parseInlineBold('💸 Gasto de *R$ 2.300,00* em *casa* em 04/09/2026.'), [
+    { text: '💸 Gasto de ', bold: false },
+    { text: 'R$ 2.300,00', bold: true },
+    { text: ' em ', bold: false },
+    { text: 'casa', bold: true },
+    { text: ' em 04/09/2026.', bold: false },
+  ]);
+});
+
+test('asterisco solto continua sendo asterisco', () => {
+  assert.deepEqual(parseInlineBold('2 * 3 = 6'), [{ text: '2 * 3 = 6', bold: false }]);
+  assert.deepEqual(parseInlineBold('sem marcação'), [{ text: 'sem marcação', bold: false }]);
+  assert.deepEqual(parseInlineBold(''), [{ text: '', bold: false }]);
+});
+
+test('o par não atravessa quebra de linha', () => {
+  // Duas linhas começando com `*` casariam entre si e engoliriam o meio.
+  const r = parseInlineBold('* item um\n* item dois');
+  assert.deepEqual(r, [{ text: '* item um\n* item dois', bold: false }]);
+});
+
+test('o preview da lista sai sem a marcação', () => {
+  assert.equal(
+    plainText('💸 Gasto de *R$ 2.300,00* em *casa* em 04/09/2026.'),
+    '💸 Gasto de R$ 2.300,00 em casa em 04/09/2026.',
+  );
 });

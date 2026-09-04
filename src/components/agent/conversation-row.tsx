@@ -5,6 +5,7 @@ import { ThemedText } from '@/components/themed-text';
 import { Icon } from '@/components/ui/icon';
 import { Radius, Space, tabular } from '@/design/tokens';
 import { useTheme } from '@/hooks/use-theme';
+import { plainText } from '@/lib/agent-chat';
 import { relativeBR } from '@/lib/dates';
 
 interface Props {
@@ -35,13 +36,16 @@ export const ConversationRow = memo(function ConversationRow({
   onLongPress,
 }: Props) {
   const theme = useTheme();
+  // O motor escreve `*R$ 45,00*` (negrito do WhatsApp). Numa linha de resumo
+  // truncada isso vira asterisco na tela — e no rótulo do leitor de tela.
+  const resumo = preview ? plainText(preview) : null;
 
   return (
     <Pressable
       onPress={() => onOpen(id)}
       onLongPress={() => onLongPress(id)}
       accessibilityRole="button"
-      accessibilityLabel={preview ? `${title}. ${preview}` : title}
+      accessibilityLabel={resumo ? `${title}. ${resumo}` : title}
       accessibilityHint="Abre a conversa"
       style={({ pressed }) => [
         styles.row,
@@ -62,9 +66,9 @@ export const ConversationRow = memo(function ConversationRow({
         <ThemedText type="default" numberOfLines={1} style={styles.title}>
           {title}
         </ThemedText>
-        {preview ? (
+        {resumo ? (
           <ThemedText type="caption" themeColor="textSecondary" numberOfLines={1}>
-            {preview}
+            {resumo}
           </ThemedText>
         ) : null}
         {updatedAt ? (

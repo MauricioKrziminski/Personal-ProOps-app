@@ -6,7 +6,7 @@ import { Pressable, StyleSheet, View } from 'react-native';
 import { ConversationRow } from '@/components/agent/conversation-row';
 import { RenameConversationSheet } from '@/components/agent/rename-conversation-sheet';
 import { ThemedText } from '@/components/themed-text';
-import { AppHeader, HeaderIconButton, useAppHeaderHeight } from '@/components/ui/app-header';
+import { AppHeader, HeaderIconButton } from '@/components/ui/app-header';
 import { CURVED_BAR_SPACE } from '@/components/ui/curved-tab-bar';
 import { EmptyState } from '@/components/ui/empty-state';
 import { Screen } from '@/components/ui/screen';
@@ -39,7 +39,6 @@ const PROMPTS = [
 export default function AgentScreen() {
   const theme = useTheme();
   const toast = useToast();
-  const headerHeight = useAppHeaderHeight();
 
   const lista = useAgentConversations();
   const renomear = useRenameAgentConversation();
@@ -90,7 +89,7 @@ export default function AgentScreen() {
   return (
     <Screen scroll={false} grouped topBar={<AppHeader title="Agente" action={<NovaConversa />} />}>
       {lista.isPending ? (
-        <View style={[styles.lista, { paddingTop: headerHeight }]}>
+        <View style={styles.lista}>
           {/* Seis esqueletos com a FORMA da linha, não um spinner: a tela que
               aparece precisa ser a que vai ficar. */}
           {Array.from({ length: 6 }, (_, i) => (
@@ -98,7 +97,7 @@ export default function AgentScreen() {
           ))}
         </View>
       ) : lista.isError ? (
-        <View style={{ paddingTop: headerHeight }}>
+        <View>
           <EmptyState
             icon="exclamationmark.triangle"
             title="Não consegui carregar suas conversas"
@@ -107,7 +106,7 @@ export default function AgentScreen() {
           />
         </View>
       ) : conversas.length === 0 ? (
-        <View style={{ paddingTop: headerHeight }}>
+        <View>
           <EmptyState
             title="Comece uma conversa"
             hint="Peça o que quiser em português — eu anoto, lanço e respondo."
@@ -148,8 +147,16 @@ export default function AgentScreen() {
             />
           )}
           ItemSeparatorComponent={() => <View style={styles.separador} />}
+          /*
+            Sem `paddingTop`: o `Screen` com `topBar` JÁ reserva a altura do
+            `AppHeader` — somar de novo aqui abria uma faixa vazia do tamanho do
+            header entre a barra e a primeira conversa. É o mesmo contrato que
+            `notes/index.tsx` documenta: a raiz de lista só acrescenta o rodapé,
+            porque a `CurvedTabBar` do Android é absoluta e o `Screen` não
+            alcança o `contentContainerStyle` de uma `FlashList`.
+          */
           contentContainerStyle={{
-            paddingTop: headerHeight + Space.md,
+            paddingTop: Space.md,
             paddingHorizontal: Space.lg,
             paddingBottom: CURVED_BAR_SPACE,
           }}

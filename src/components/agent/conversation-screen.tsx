@@ -24,6 +24,7 @@ import {
   useSendAgentMessage,
   useTurnoLocal,
 } from '@/hooks/use-agent-chat';
+import { useKeyboardHeight } from '@/hooks/use-keyboard-height';
 import { useTheme } from '@/hooks/use-theme';
 import {
   AgentApiError,
@@ -39,6 +40,7 @@ import {
   type UiOption,
 } from '@/lib/agent-chat';
 import { confirmDestructive } from '@/lib/item-actions';
+
 
 interface Props {
   /** `undefined` na tela `new`: a conversa ainda não existe. */
@@ -91,6 +93,17 @@ export function ConversationScreen({ conversationId, initialText = '', title }: 
   const [desistiu, setDesistiu] = useState(false);
   const [perto, setPerto] = useState(true);
   const [renomeando, setRenomeando] = useState(false);
+  /**
+   * O teclado não encolhe a janela deste app.
+   *
+   * `windowSoftInputMode="adjustResize"` está no manifest, mas o
+   * `KeyboardProvider` roda edge-to-edge e nesse modo o Android não redimensiona.
+   * Então a coluna encolhe AQUI, por padding: a lista (que é `flex: 1`) cede a
+   * altura junto e a barra de escrita acompanha, sem nenhuma peça subindo por
+   * conta própria — ver o comentário em `ChatComposer` para as duas que foram
+   * tentadas e devolvidas.
+   */
+  const alturaDoTeclado = useKeyboardHeight();
 
   const turno = useTurnoLocal();
   const criar = useCreateAgentConversation();
@@ -340,14 +353,20 @@ export function ConversationScreen({ conversationId, initialText = '', title }: 
     : [];
 
   return (
-    <View style={[styles.raiz, { backgroundColor: theme.background }]}>
+    <View
+      style={[
+        styles.raiz,
+        { backgroundColor: theme.background, paddingBottom: alturaDoTeclado },
+      ]}>
       <Stack.Screen options={{ title: title ?? '' }} />
       <HeaderMenu title={title ?? 'Conversa'} actions={acoesDoHeader} />
 
       {historico.isPending && conversationId ? (
         <View style={styles.esqueleto}>
-          {[70, 44, 90].map((h, i) => (
-            <Skeleton key={i} height={h} radius={Radius.md} />
+          {/* Alturas diferentes de propósito: o esqueleto tem a FORMA da
+              conversa (pergunta curta, resposta longa), não três barras iguais. */}
+          {[70, 44, 90].map((h) => (
+            <Skeleton key={h} height={h} radius={Radius.md} />
           ))}
         </View>
       ) : historico.isError ? (
@@ -360,6 +379,9 @@ export function ConversationScreen({ conversationId, initialText = '', title }: 
       ) : (
         <FlashList
           ref={lista}
+          // `flex: 1` explícito: sem ele a lista cresce com o conteúdo e o
+          // composer sai da tela em vez de a lista rolar por dentro.
+          style={styles.lista}
           data={itens}
           keyExtractor={(i) => i.key}
           getItemType={(i) => i.kind}
@@ -498,6 +520,7 @@ const Linha = memo(function Linha({
 
 const styles = StyleSheet.create({
   raiz: { flex: 1 },
+  lista: { flex: 1 },
   conteudo: { paddingHorizontal: Space.lg, paddingVertical: Space.md },
   item: { paddingVertical: Space.sm },
   status: { paddingVertical: Space.sm, gap: Space.sm, alignItems: 'flex-start' },

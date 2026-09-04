@@ -46,9 +46,26 @@ export function RenameConversationSheet({
 
   return (
     <Sheet visible={visible} onClose={onClose}>
-      <View style={styles.corpo}>
-        <ThemedText type="subtitle">Renomear conversa</ThemedText>
+      {/*
+        Cabeçalho Cancelar · título · Salvar, igual ao sheet de nome do Perfil.
+        No Android o `Sheet` é um `Modal` de tela CHEIA (está escrito lá dentro):
+        sem esse cabeçalho e sem calha lateral, o título nascia colado na borda
+        esquerda e a ação primária ficava perdida no meio do corpo — foi o que a
+        conferência no emulador mostrou.
+      */}
+      <View style={styles.cabecalho}>
+        <Button label="Cancelar" variant="ghost" size="sm" onPress={onClose} />
+        <ThemedText type="smallBold">Renomear conversa</ThemedText>
+        <Button
+          label="Salvar"
+          size="sm"
+          onPress={() => onSave(titulo.trim())}
+          disabled={!podeSalvar}
+          loading={saving}
+        />
+      </View>
 
+      <View style={styles.corpo}>
         <TextField
           value={titulo}
           onChangeText={setTitulo}
@@ -68,22 +85,18 @@ export function RenameConversationSheet({
             {restantes} caracteres restantes
           </ThemedText>
         ) : null}
-
-        <View style={styles.acoes}>
-          <Button label="Cancelar" variant="ghost" onPress={onClose} />
-          <Button
-            label="Salvar"
-            onPress={() => onSave(titulo.trim())}
-            disabled={!podeSalvar}
-            loading={saving}
-          />
-        </View>
       </View>
     </Sheet>
   );
 }
 
 const styles = StyleSheet.create({
-  corpo: { gap: Space.md, paddingBottom: Space.md },
-  acoes: { flexDirection: 'row', justifyContent: 'flex-end', gap: Space.sm },
+  cabecalho: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: Space.lg,
+    paddingVertical: Space.md,
+  },
+  corpo: { gap: Space.md, paddingHorizontal: Space.lg },
 });
