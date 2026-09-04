@@ -82,6 +82,7 @@ const MATERIAL: Record<string, MaterialName> = {
   'checkmark.circle.fill': 'check_circle',
   'checkmark.seal.fill': 'verified',
   'chevron.right': 'chevron_right',
+  'arrow.down': 'arrow_downward',
   'arrow.down.circle': 'arrow_circle_down',
   'arrow.down.left': 'south_west',
   'arrow.down.right': 'south_east',

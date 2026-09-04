@@ -9,6 +9,10 @@ import {
   appendConversationPage,
   canSendMessage,
   canSaveTitle,
+  canSubmitMessage,
+  conversationRoute,
+  markResolved,
+  parseUiActions,
   defaultRandomBytes,
   hitlControlsDisabled,
   isNearChatEnd,
@@ -302,4 +306,119 @@ test('erro que não é 401 passa direto, sem renovar', async () => {
     assert.equal(r.kind, 'response');
     assert.deepEqual(log, ['send:antigo'], `status ${status} renovou sessão à toa`);
   }
+});
+
+// ---------------------------------------------------------------------------
+// composer
+// ---------------------------------------------------------------------------
+
+test('composer bloqueia vazio, acima do limite, turno ativo e pergunta aberta', () => {
+  assert.equal(canSubmitMessage('oi'), true);
+  assert.equal(canSubmitMessage('   '), false, 'só espaço não é mensagem');
+  assert.equal(canSubmitMessage('a'.repeat(MAX_MESSAGE_LENGTH + 1)), false);
+  // As duas travas que evitam um 409 que a tela já sabia que viria: a conversa
+  // é serializada por lease no servidor.
+  assert.equal(canSubmitMessage('oi', { sending: true }), false);
+  assert.equal(canSubmitMessage('oi', { awaitingAction: true }), false);
+});
+
+// ---------------------------------------------------------------------------
+// rota depois de criar
+// ---------------------------------------------------------------------------
+
+test('a conversa criada vira a rota do id, não uma tela nova', () => {
+  assert.equal(conversationRoute('c1'), '/agent/c1');
+});
+
+// ---------------------------------------------------------------------------
+// HITL — tradução do payload do motor
+// ---------------------------------------------------------------------------
+
+const PID = 'e0a1b2c3-0000-4000-8000-000000000001';
+
+test('confirmação simples vira approve e reject', () => {
+  const { body, options } = parseUiActions({
+    pending_id: PID,
+    body: '⚠️ Confirma apagar o gasto de R$ 45?',
+    buttons: [
+      [`pa:${PID}:ok`, 'Confirmar'],
+      [`pa:${PID}:no`, 'Cancelar'],
+    ],
+  });
+  assert.equal(body, '⚠️ Confirma apagar o gasto de R$ 45?');
+  assert.deepEqual(
+    options.map((o) => [o.label, o.decision, o.candidateId]),
+    [
+      ['Confirmar', 'approve', undefined],
+      ['Cancelar', 'reject', undefined],
+    ],
+  );
+});
+
+test('candidatos viram choose com o id que o servidor congelou', () => {
+  const { options } = parseUiActions({
+    pending_id: PID,
+    body: '🤔 qual deles?',
+    buttons: [
+      [`pa:${PID}:c:tx-1`, '1) Mercado R$ 45'],
+      [`pa:${PID}:c:tx-2`, '2) Mercado R$ 54'],
+      [`pa:${PID}:none`, 'Nenhuma dessas'],
+    ],
+  });
+  assert.deepEqual(
+    options.map((o) => [o.decision, o.candidateId]),
+    [
+      ['choose', 'tx-1'],
+      ['choose', 'tx-2'],
+      // "nenhuma dessas" é um cancelamento para a API do app.
+      ['reject', undefined],
+    ],
+  );
+});
+
+test('lista longa vira linhas com descrição', () => {
+  const { options } = parseUiActions({
+    pending_id: PID,
+    body: 'qual deles?',
+    rows: [
+      [`pa:${PID}:c:tx-9`, '1) Uber', '28/08/2026'],
+      [`pa:${PID}:none`, 'Nenhuma dessas', 'Buscar de outro jeito'],
+    ],
+  });
+  assert.equal(options[0].description, '28/08/2026');
+  assert.equal(options[1].description, 'Buscar de outro jeito');
+});
+
+test('opção de OUTRA pergunta é descartada', () => {
+  // A trava que importa: um payload velho ainda na tela não pode responder à
+  // pergunta nova — seria apagar o registro errado com um toque.
+  const { options } = parseUiActions({
+    pending_id: PID,
+    buttons: [
+      [`pa:${PID}:ok`, 'Confirmar'],
+      ['pa:00000000-0000-4000-8000-0000000000ff:ok', 'Confirmar (outra)'],
+      ['lixo', 'Sem prefixo'],
+      [`pa:${PID}:c:`, 'Choose sem candidato'],
+    ],
+  });
+  assert.deepEqual(options.map((o) => o.label), ['Confirmar']);
+});
+
+test('payload sem pendente não rende botão nenhum', () => {
+  // Sem `pending_id` não há a que responder: o balão é só texto.
+  const r = parseUiActions({ body: 'oi', buttons: [['pa:x:ok', 'Confirmar']] });
+  assert.deepEqual(r.options, []);
+  assert.equal(r.body, 'oi');
+  assert.deepEqual(parseUiActions(null).options, []);
+});
+
+test('resolvido e expirado deixam os controles inertes', () => {
+  const aberta = { pending_id: PID };
+  assert.equal(hitlControlsDisabled(aberta), false);
+  assert.equal(hitlControlsDisabled(aberta, { busy: true }), true);
+  assert.equal(hitlControlsDisabled(markResolved(aberta, 'approve')), true);
+  // `pending_invalid` (422) não vem do servidor como estado da mensagem: quem
+  // carimba é a tela, senão os botões da pergunta morta seguiriam vivos.
+  assert.equal(hitlControlsDisabled(markResolved(aberta, 'expired')), true);
+  assert.equal(markResolved(aberta, 'expired').pending_id, PID, 'o resumo continua');
 });

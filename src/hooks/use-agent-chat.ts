@@ -16,6 +16,7 @@ import {
 import { useCallback, useState } from 'react';
 
 import {
+  type AgentApiError,
   type AgentConversation,
   type AgentDecision,
   type AgentMessage,
@@ -30,7 +31,7 @@ import {
   resolvePending,
   sendMessage,
 } from '@/lib/agent-api';
-import { newClientMessageId } from '@/lib/agent-chat';
+import { markResolved, newClientMessageId } from '@/lib/agent-chat';
 
 export const agentKeys = {
   conversations: ['agent', 'conversations'] as const,
@@ -54,10 +55,39 @@ export function useAgentConversations() {
   });
 }
 
+/** De quanto em quanto tempo o histórico é relido enquanto um turno roda. */
+const POLL_MS = 3_000;
+/**
+ * O lease do turno no servidor (`app_turn_lease_seconds`). Passado disso,
+ * ninguém está rodando aquela mensagem — e continuar relendo seria acordar o
+ * rádio do aparelho de 3 em 3 segundos para sempre.
+ */
+const LEASE_MS = 300_000;
+
+/**
+ * O histórico da conversa.
+ *
+ * Ele se relê sozinho enquanto existir mensagem `processing`, porque esta aba
+ * não tem Realtime — as tabelas de conversa são infraestrutura sem policy — e
+ * porque o turno pode terminar num worker que NÃO é o que esta tela está
+ * esperando (outra aba, ou o mesmo turno reivindicado antes). **Releitura não é
+ * reenvio**: nada de conteúdo volta para o servidor por tempo; quem manda de
+ * novo é o dedo do usuário em "Tentar novamente".
+ *
+ * A condição sai do CACHE e não de um sinalizador da tela porque assim ela vale
+ * também para quem reabre o app com um turno pendente de ontem.
+ */
 export function useAgentMessages(conversationId: string | undefined) {
   return useInfiniteQuery({
     queryKey: agentKeys.messages(conversationId ?? ''),
     enabled: isAgentConfigured && Boolean(conversationId),
+    refetchInterval: (query) => {
+      const itens = (query.state.data?.pages ?? []).flatMap((p) => p.items);
+      const rodando = itens.find((m) => m.status === 'processing');
+      if (!rodando) return false;
+      const desde = rodando.created_at ? Date.parse(rodando.created_at) : Date.now();
+      return Date.now() - desde < LEASE_MS ? POLL_MS : false;
+    },
     initialPageParam: null as number | null,
     queryFn: ({ pageParam }) => listMessages(conversationId!, pageParam),
     // A paginação anda para TRÁS: o cursor é o `sequence` mais antigo já
@@ -163,7 +193,32 @@ export function useResolveAgentPending(conversationId: string) {
       // Sem este refetch os botões da pergunta respondida seguiriam vivos.
       qc.invalidateQueries({ queryKey: agentKeys.messages(conversationId) });
     },
+    onError: (erro, v) => {
+      // `pending_invalid` (422) é o único erro que a tela precisa GRAVAR: a
+      // pergunta morreu (foi respondida em outro lugar, ou o turno expirou) e o
+      // servidor não tem estado para isso na mensagem. Sem o carimbo local os
+      // botões seguiriam vivos convidando ao mesmo erro.
+      if ((erro as AgentApiError).status !== 422) return;
+      qc.setQueryData<CacheMensagens>(agentKeys.messages(conversationId), (cache) =>
+        cache ? carimbarExpirada(cache, v.pendingId) : cache,
+      );
+    },
   });
+}
+
+/** Marca como expirada a pergunta que o servidor acabou de recusar. */
+function carimbarExpirada(cache: CacheMensagens, pendingId: string): CacheMensagens {
+  return {
+    ...cache,
+    pages: cache.pages.map((p) => ({
+      ...p,
+      items: p.items.map((m) =>
+        m.ui_payload?.pending_id === pendingId
+          ? { ...m, ui_payload: markResolved(m.ui_payload, 'expired') }
+          : m,
+      ),
+    })),
+  };
 }
 
 export function useRenameAgentConversation() {
@@ -218,20 +273,13 @@ export function useTurnoLocal() {
 
   const concluir = useCallback(() => setTurno(null), []);
 
-  return { turno, iniciar, retentar, concluir };
-}
+  /**
+   * Um UUID avulso, sem virar o turno local.
+   *
+   * É o caso do HITL: o toque no botão é um turno novo, mas ele não precisa de
+   * retry manual — se falhar, a pergunta continua aberta e o botão continua ali.
+   */
+  const novoId = useCallback(() => newClientMessageId(), []);
 
-/**
- * `processing`: o turno está rodando no servidor, ainda sem resposta.
- *
- * A tela NÃO reenvia a instrução — reenviar é o que duplica. Ela só volta a
- * buscar o histórico enquanto estiver montada, e a nova tentativa de escrita só
- * acontece quando a pessoa tocar em "Tentar novamente".
- */
-export function useRefetchEnquantoProcessa(conversationId: string | undefined, ativo: boolean) {
-  const qc = useQueryClient();
-  return useCallback(() => {
-    if (!ativo || !conversationId) return;
-    qc.invalidateQueries({ queryKey: agentKeys.messages(conversationId) });
-  }, [qc, conversationId, ativo]);
+  return { turno, iniciar, retentar, concluir, novoId };
 }

@@ -7,6 +7,7 @@
  */
 
 import {
+  type ChatDecision,
   appendConversationPage,
   authorizedRequest,
   prependMessagePage,
@@ -32,14 +33,22 @@ export interface AgentConversation {
 
 export type AgentMessageStatus = 'processing' | 'completed' | 'failed';
 
+/**
+ * O `ui_payload` como o motor grava — que é a língua do WhatsApp.
+ *
+ * `buttons` e `rows` são TUPLAS (`[id, título]`, `[id, título, descrição]`), não
+ * objetos: elas nascem no `_pergunta` do serviço, que foi escrito para a Meta, e
+ * a rota do app devolve o payload cru. Quem traduz para o que a tela e a API de
+ * resolução entendem é `parseUiActions`.
+ */
 export interface AgentUiPayload {
   pending_id?: string;
   resolved?: string;
   summary?: string;
   text?: string;
   body?: string;
-  buttons?: { id: string; title: string }[];
-  rows?: { id: string; title: string; description?: string }[];
+  buttons?: string[][];
+  rows?: string[][];
   [key: string]: unknown;
 }
 
@@ -68,7 +77,8 @@ export interface Page<T> {
   next_cursor: string | null;
 }
 
-export type AgentDecision = 'approve' | 'reject' | 'choose';
+/** A tradução dos botões mora em `agent-chat.ts`, onde ela é testável. */
+export type AgentDecision = ChatDecision;
 
 // ---------------------------------------------------------------------------
 // erros

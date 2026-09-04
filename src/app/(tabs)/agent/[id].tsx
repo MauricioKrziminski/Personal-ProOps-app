@@ -1,14 +1,21 @@
-import { Stack } from 'expo-router';
+import { useLocalSearchParams } from 'expo-router';
 
-import { ThemedText } from '@/components/themed-text';
-import { Screen } from '@/components/ui/screen';
+import { ConversationScreen } from '@/components/agent/conversation-screen';
+import { useAgentConversations } from '@/hooks/use-agent-chat';
 
-/** Placeholder da Task 8 — ver `new.tsx`. */
-export default function ConversationScreen() {
-  return (
-    <Screen>
-      <Stack.Screen options={{ title: '' }} />
-      <ThemedText type="default">Em construção.</ThemedText>
-    </Screen>
-  );
+/**
+ * Uma conversa existente.
+ *
+ * O título sai da LISTA já em cache — a rota de mensagens não devolve o nome da
+ * conversa, e uma requisição a mais só para escrever o header faria a barra
+ * piscar de vazia para preenchida em toda abertura.
+ */
+export default function ConversationRoute() {
+  const { id } = useLocalSearchParams<{ id: string }>();
+  const lista = useAgentConversations();
+  const titulo = lista.data?.pages
+    .flatMap((p) => p.items)
+    .find((c) => c.id === id)?.title;
+
+  return <ConversationScreen conversationId={id} title={titulo} />;
 }

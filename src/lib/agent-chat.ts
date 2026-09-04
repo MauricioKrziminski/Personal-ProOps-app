@@ -75,9 +75,40 @@ export function canSendMessage(text: string): boolean {
   return limpo.length > 0 && limpo.length <= MAX_MESSAGE_LENGTH;
 }
 
+/**
+ * O composer pode enviar agora?
+ *
+ * Três travas além do tamanho: enquanto um turno roda (`sending`), enquanto uma
+ * pergunta espera resposta (`awaitingAction`) e com texto vazio. As duas
+ * primeiras existem pela mesma razão — a conversa é serializada por lease no
+ * servidor, então uma segunda escrita voltaria 409; barrar aqui evita mostrar
+ * um erro que a tela já sabia que ia acontecer.
+ */
+export function canSubmitMessage(
+  text: string,
+  estado: { sending?: boolean; awaitingAction?: boolean } = {},
+): boolean {
+  return canSendMessage(text) && !estado.sending && !estado.awaitingAction;
+}
+
 export function canSaveTitle(title: string): boolean {
   const limpo = title.trim();
   return limpo.length > 0 && limpo.length <= MAX_TITLE_LENGTH;
+}
+
+// ---------------------------------------------------------------------------
+// rota
+// ---------------------------------------------------------------------------
+
+/**
+ * Para onde `new` vai depois que a conversa nasce.
+ *
+ * `replace`, e não `push`: a tela `new` não existe mais depois do primeiro
+ * envio — voltar para ela reabriria um campo vazio que já virou conversa, e um
+ * segundo envio ali criaria uma segunda conversa com a mesma pergunta.
+ */
+export function conversationRoute(id: string): `/agent/${string}` {
+  return `/agent/${id}`;
 }
 
 // ---------------------------------------------------------------------------
@@ -183,6 +214,103 @@ export function retryPolicyFor(erro: { status: number; code?: string }): RetryPo
 // ---------------------------------------------------------------------------
 // HITL
 // ---------------------------------------------------------------------------
+
+export type ChatDecision = 'approve' | 'reject' | 'choose';
+
+/** Uma opção da pergunta, já traduzida para o que a API de resolução aceita. */
+export interface UiOption {
+  /** O id CRU do servidor (`pa:<pendente>:ok`). Serve de `key` e de rastro. */
+  id: string;
+  label: string;
+  description?: string;
+  decision: ChatDecision;
+  /** Só em `choose`. É o id que o servidor confere contra a lista congelada. */
+  candidateId?: string;
+}
+
+export interface UiPayloadShape {
+  pending_id?: string;
+  resolved?: string;
+  body?: string;
+  summary?: string;
+  text?: string;
+  buttons?: unknown;
+  rows?: unknown;
+}
+
+/**
+ * Traduz o `ui_payload` do motor para botões da tela.
+ *
+ * O motor foi escrito para o WhatsApp e fala a língua de lá: `buttons` é uma
+ * lista de tuplas `[id, título]` e `rows` de `[id, título, descrição]`, com o id
+ * no formato `pa:<pendente>:<sufixo>`. A tela precisa de `decision` +
+ * `candidate_id`, que é o que a API de resolução aceita — a tradução é aqui, num
+ * lugar só, e não espalhada pelo componente.
+ *
+ * **Duas travas de segurança**, e é por elas que esta função existe:
+ *
+ * 1. opção cujo `pending_id` não é o desta pergunta é DESCARTADA — sem isso um
+ *    payload antigo ainda na tela poderia responder à pergunta nova;
+ * 2. o `candidateId` sai do próprio payload, nunca de digitação. O servidor
+ *    revalida contra a lista congelada, e esta é a primeira das duas cercas.
+ *
+ * ponytail: `none` ("nenhuma dessas") vira `reject`, porque a API do app só
+ * conhece approve/reject/choose. A diferença — `none_of_these` faz o motor
+ * sugerir outra busca em vez de só cancelar — só existe no WhatsApp hoje;
+ * quando alguém sentir falta, é um quarto valor de `decision` no endpoint.
+ */
+export function parseUiActions(payload: UiPayloadShape | null | undefined): {
+  body: string;
+  options: UiOption[];
+} {
+  const body = payload?.body ?? payload?.summary ?? payload?.text ?? '';
+  const pendingId = payload?.pending_id;
+  if (!pendingId) return { body, options: [] };
+
+  const linhas = [
+    ...(Array.isArray(payload?.buttons) ? payload.buttons : []),
+    ...(Array.isArray(payload?.rows) ? payload.rows : []),
+  ];
+
+  const options: UiOption[] = [];
+  for (const linha of linhas) {
+    if (!Array.isArray(linha)) continue;
+    const [id, label, description] = linha as unknown[];
+    if (typeof id !== 'string' || typeof label !== 'string') continue;
+
+    const partes = id.split(':');
+    // `pa` + o uuid do pendente + o sufixo. O uuid TEM que ser o desta pergunta.
+    if (partes[0] !== 'pa' || partes[1] !== pendingId) continue;
+
+    const sufixo = partes[2];
+    // O id do candidato pode ter `:` no meio — junta o resto de volta.
+    const candidateId = partes.slice(3).join(':');
+
+    let opcao: UiOption | null = null;
+    if (sufixo === 'ok') opcao = { id, label, decision: 'approve' };
+    else if (sufixo === 'no' || sufixo === 'none') opcao = { id, label, decision: 'reject' };
+    else if (sufixo === 'c' && candidateId) opcao = { id, label, decision: 'choose', candidateId };
+    if (!opcao) continue;
+
+    // A descrição pertence à opção DESTA linha. Carimbar "a última empurrada"
+    // colaria a descrição de uma linha recusada na opção anterior.
+    if (typeof description === 'string' && description) opcao.description = description;
+    options.push(opcao);
+  }
+  return { body, options };
+}
+
+/**
+ * Carimba a pergunta como respondida no cache local.
+ *
+ * O servidor carimba `resolved` na mensagem quando a resolução dá certo, e o
+ * refetch traz isso. Falta o caso em que ela NÃO dá certo por já ter passado:
+ * `pending_invalid` (422) significa que aquela pergunta morreu, e sem carimbo
+ * local os botões seguiriam vivos convidando o usuário a errar de novo.
+ */
+export function markResolved<T extends UiPayloadShape>(payload: T, resolution: string): T {
+  return { ...payload, resolved: resolution };
+}
 
 /**
  * Os botões de uma pergunta estão desabilitados?

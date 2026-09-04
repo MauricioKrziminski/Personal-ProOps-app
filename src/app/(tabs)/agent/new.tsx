@@ -1,18 +1,16 @@
-import { Stack } from 'expo-router';
+import { useLocalSearchParams } from 'expo-router';
 
-import { ThemedText } from '@/components/themed-text';
-import { Screen } from '@/components/ui/screen';
+import { ConversationScreen } from '@/components/agent/conversation-screen';
 
 /**
- * Placeholder da Task 8 — a conversa em si (composer, histórico e HITL) é a
- * próxima tarefa do plano. Existe agora porque `typedRoutes` deriva as rotas dos
- * ARQUIVOS: sem ele, `router.push('/agent/new')` não compila.
+ * Conversa nova.
+ *
+ * A tela não grava NADA antes do primeiro envio: abrir e voltar não deixa
+ * conversa vazia na lista, e é por isso que quem cria a conversa é a própria
+ * primeira mensagem. `prompt` chega das frases prontas do estado vazio e só
+ * semeia o campo — nem elas criam conversa sozinhas.
  */
 export default function NewConversationScreen() {
-  return (
-    <Screen>
-      <Stack.Screen options={{ title: '' }} />
-      <ThemedText type="default">Em construção.</ThemedText>
-    </Screen>
-  );
+  const { prompt } = useLocalSearchParams<{ prompt?: string }>();
+  return <ConversationScreen initialText={prompt ?? ''} />;
 }
