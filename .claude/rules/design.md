@@ -239,7 +239,7 @@ estado da primeira: seção que falha diz que falhou, não some.
 Toda transição responde três perguntas: o que é o destino, o usuário precisa poder voltar, e o
 que "voltar" faz depois.
 
-- **Header é do navegador — exceto nas quatro RAÍZES de aba.** Ali quem desenha é o `AppHeader`
+- **Header é do navegador — exceto nas cinco RAÍZES de aba.** Ali quem desenha é o `AppHeader`
   (`src/components/ui/app-header.tsx`): **a faixa de marca do Stitch** — 56px sobre a safe area,
   fundo do app a 85% com desfoque, fio de 1px embaixo, e dentro dela a marca num quadrado de 28 à
   esquerda e o avatar de 32 à direita. Ação de raiz vai no slot `action` (`HeaderIconButton`),
@@ -353,6 +353,12 @@ que "voltar" faz depois.
   ripple entram por `Platform.select` só no Android; no iOS quem desenha é o sistema, mais
   `minimizeBehavior: 'onScrollDown'` (iOS 26), que é comportamento nativo, não animação nossa.
   Isso ficou meses ligado sem ninguém notar, porque a barra *parecia* certa no Android.
+- **A quinta aba é o Agente** (04/09/2026), entre Financeiro e Perfil: ela é uso, não
+  configuração. A ordem é a mesma nas TRÊS implementações de tab bar, e
+  `src/lib/agent-navigation.test.ts` quebra o build se divergirem — no Android o índice do slot
+  vem da POSIÇÃO, então uma aba fora de ordem manda a pessoa para a tela errada enquanto o berço
+  anima para o lugar certo. A matemática do `CurvedTabBar` não mudou: ela já derivava o slot de
+  `tabs.length`.
 - **Badge de aba é contagem real ou não existe.** Mesma régua dos atalhos do painel: número que
   não muda decisão é enfeite. Hoje leva o que vence + lembrete do dia + orçamento estourado, e
   some com zero.

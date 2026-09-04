@@ -15,7 +15,7 @@
    nós que falam com o mundo viram dublê.
 5. Mudou tela → conferir no device/emulador — nada de "deve funcionar".
 
-   **As quatro raízes de aba se olham sem login**, pela rota `design-preview`: ela monta as telas
+   **As cinco raízes de aba se olham sem login**, pela rota `design-preview`: ela monta as telas
    REAIS com o cache do TanStack pré-semeado, então nenhum `queryFn` roda. Sem ela, ver a Hoje ou
    o Financeiro exigia o OTP que chega no WhatsApp do dono do número — e foi por isso que essas
    telas já foram entregues erradas duas vezes.

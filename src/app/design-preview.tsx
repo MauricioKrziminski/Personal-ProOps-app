@@ -9,13 +9,14 @@ import { Radius, Space } from '@/design/tokens';
 import { localISODate } from '@/hooks/use-items';
 import { useTheme } from '@/hooks/use-theme';
 
+import AgentScreen from './(tabs)/agent/index';
 import FinanceScreen from './(tabs)/finance/index';
 import NotesScreen from './(tabs)/notes/index';
 import ProfileScreen from './(tabs)/profile/index';
 import TodayScreen from './(tabs)/today/index';
 
 /**
- * Vitrine das quatro raízes de aba com dados de exemplo, **fora do portão de sessão**.
+ * Vitrine das cinco raízes de aba com dados de exemplo, **fora do portão de sessão**.
  *
  * Existe porque a única forma de olhar essas telas era logar, e logar exige o OTP que chega no
  * WhatsApp do dono do número. Sem isto, "conferir no simulador" (regra de workflow §5) virava
@@ -30,7 +31,7 @@ import TodayScreen from './(tabs)/today/index';
  * Não é tela de produto: não tem link para ela em lugar nenhum e o caminho é o deep link
  * `com.proops.personal://design-preview`.
  */
-const ABAS = ['Hoje', 'Finanças', 'Notas', 'Perfil'] as const;
+const ABAS = ['Hoje', 'Finanças', 'Notas', 'Agente', 'Perfil'] as const;
 
 /**
  * A tela é montada numa caixa ALTA e deslocada para cima, em vez de rolada.
@@ -59,15 +60,24 @@ const TABS_ANDROID: CurvedTab[] = [
   { name: 'today', label: 'Hoje', icon: 'sun.max' },
   { name: 'notes', label: 'Notas', icon: 'note.text' },
   { name: 'finance', label: 'Financeiro', icon: 'chart.pie' },
+  { name: 'agent', label: 'Agente', icon: 'bubble.left.and.bubble.right' },
   { name: 'profile', label: 'Perfil', icon: 'person' },
 ];
 /** `ABAS` está na ordem da vitrine; a barra está na ordem do app. Este é o de-para. */
-const ABA_PARA_TAB: Record<string, number> = { Hoje: 0, 'Finanças': 2, Notas: 1, Perfil: 3 };
+const ABA_PARA_TAB: Record<string, number> = {
+  Hoje: 0,
+  'Finanças': 2,
+  Notas: 1,
+  Agente: 3,
+  Perfil: 4,
+};
 /** Quantas alturas de tela cada aba ocupa — medido, para não gastar frame em preto. */
 const FAIXAS: Record<(typeof ABAS)[number], number> = {
   Hoje: 2,
   'Finanças': 3,
   Notas: 3,
+  // Uma faixa: a lista de conversas cabe inteira numa tela.
+  Agente: 1,
   Perfil: 3,
 };
 const PASSOS = ABAS.flatMap((aba) =>
@@ -117,6 +127,7 @@ export default function DesignPreviewScreen() {
             {aba === 'Hoje' ? <TodayScreen /> : null}
             {aba === 'Finanças' ? <FinanceScreen /> : null}
             {aba === 'Notas' ? <NotesScreen /> : null}
+            {aba === 'Agente' ? <AgentScreen /> : null}
             {aba === 'Perfil' ? <ProfileScreen /> : null}
           </View>
 
@@ -391,6 +402,40 @@ function seedClient() {
   });
 
   // `useNotesList` é `useInfiniteQuery`: o cache guarda `{ pages, pageParams }`, não o array.
+  /**
+   * A aba Agente.
+   *
+   * ⚠️ A chave e o FORMATO precisam bater exatamente com `useAgentConversations`
+   * (`['agent','conversations']`, `useInfiniteQuery` → `{pages, pageParams}`).
+   * Chave errada não quebra: a tela cai no estado de erro, em silêncio — foi o
+   * que já aconteceu com `budgets_status`, consultada com duas chaves diferentes.
+   */
+  client.setQueryData(['agent', 'conversations'], {
+    pageParams: [null],
+    pages: [
+      {
+        items: [
+          {
+            id: 'prev-c1',
+            title: 'Quanto gastei este mês?',
+            last_message_at: new Date(Date.now() - 12 * 60 * 1000).toISOString(),
+          },
+          {
+            id: 'prev-c2',
+            title: 'Registrar as compras do mercado',
+            last_message_at: new Date(Date.now() - 5 * 60 * 60 * 1000).toISOString(),
+          },
+          {
+            id: 'prev-c3',
+            title: 'Planejar a viagem de dezembro',
+            last_message_at: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString(),
+          },
+        ],
+        next_cursor: null,
+      },
+    ],
+  });
+
   client.setQueryData(['notes', 'list', {}], {
     pageParams: [0],
     pages: [

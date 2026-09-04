@@ -11,6 +11,7 @@ const TABS = [
   { name: 'today', label: 'Hoje', sf: { default: 'sun.max', selected: 'sun.max.fill' }, md: 'today' },
   { name: 'notes', label: 'Notas', sf: { default: 'note.text', selected: 'note.text' }, md: 'description' },
   { name: 'finance', label: 'Financeiro', sf: { default: 'chart.pie', selected: 'chart.pie.fill' }, md: 'pie_chart' },
+  { name: 'agent', label: 'Agente', sf: { default: 'bubble.left.and.bubble.right', selected: 'bubble.left.and.bubble.right.fill' }, md: 'forum' },
   { name: 'profile', label: 'Perfil', sf: { default: 'person', selected: 'person.fill' }, md: 'person' },
 ] as const;
 
@@ -37,6 +38,13 @@ const TABS = [
  * - **`labelVisibilityMode: 'labeled'`** (Android): o padrão do Material 3 esconde o rótulo das
  *   abas não selecionadas. Com quatro destinos e ícones que não são universais ("pie_chart" para
  *   Financeiro), esconder o texto obriga a decorar ícone.
+ *
+ * ## Cinco destinos desde 04/09/2026
+ *
+ * O Agente entrou entre Financeiro e Perfil: ele é uso, não configuração. A ordem é a mesma nas
+ * TRÊS implementações, e `agent-navigation.test.ts` quebra o build se divergirem — no Android o
+ * índice do slot vem da posição, então uma aba fora de ordem manda a pessoa para a tela errada
+ * enquanto a barra anima para o lugar certo.
  */
 export default function AppTabs() {
   const theme = useTheme();

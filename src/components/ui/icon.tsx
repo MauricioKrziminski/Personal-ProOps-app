@@ -73,6 +73,8 @@ const MATERIAL: Record<string, MaterialName> = {
   'chart.bar.doc.horizontal': 'assessment',
   'chart.line.uptrend.xyaxis': 'trending_up',
   'chart.line.downtrend.xyaxis': 'trending_down',
+  'bubble.left.and.bubble.right': 'forum',
+  'bubble.left.and.bubble.right.fill': 'forum',
   'chart.pie': 'pie_chart',
   'chart.pie.fill': 'pie_chart',
   checkmark: 'check',

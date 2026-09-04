@@ -48,7 +48,7 @@ interface AppHeaderProps {
 }
 
 /**
- * A barra de topo das quatro raízes de aba — **a faixa de marca do Stitch**.
+ * A barra de topo das cinco raízes de aba — **a faixa de marca do Stitch**.
  *
  * ## Anatomia (medida do export, não estimada)
  *
