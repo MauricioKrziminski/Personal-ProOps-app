@@ -51,6 +51,19 @@ interface Props {
 /** O lease do turno no servidor dura 300s. Depois disso ninguém está rodando. */
 const LEASE_MS = 300_000;
 
+/**
+ * O que a tela diz de um turno que o SERVIDOR marcou como falho.
+ *
+ * `plan_limit` é o único que não oferece retry: repetir daria 402 de novo. Os
+ * outros são transitórios — o retry reusa o mesmo UUID e o servidor recupera o
+ * turno pelo checkpoint em vez de reexecutar.
+ */
+const FALHA: Record<string, { texto: string; retryable: boolean }> = {
+  plan_limit: { texto: 'Você usou todas as mensagens do plano este mês.', retryable: false },
+  rate_limit: { texto: 'Muitas mensagens seguidas. Espera um pouco.', retryable: true },
+  internal: { texto: 'Não consegui processar essa mensagem.', retryable: true },
+};
+
 type Item =
   | { key: string; kind: 'user' | 'assistant'; message: AgentMessage }
   | { key: string; kind: 'processing' }
@@ -99,6 +112,13 @@ export function ConversationScreen({ conversationId, initialText = '', title }: 
   );
 
   const local = turno.turno;
+
+  /** A última coisa que o usuário mandou — a âncora do turno em aberto. */
+  const ultimaDoUsuario = useMemo(
+    () => [...mensagens].reverse().find((m) => m.role === 'user'),
+    [mensagens],
+  );
+
   /**
    * A mesma mensagem, já gravada pelo servidor.
    *
@@ -111,7 +131,30 @@ export function ConversationScreen({ conversationId, initialText = '', title }: 
   const espelho = local
     ? mensagens.find((m) => m.client_message_id === local.clientMessageId)
     : undefined;
-  const noServidor = espelho?.status === 'processing';
+
+  /**
+   * O turno que ainda não terminou, venha de onde vier.
+   *
+   * `local` cobre o envio desta sessão da tela. O segundo ramo cobre o caso que
+   * um estado em memória NUNCA cobriria: a pessoa fechou o app com a mensagem
+   * `processing` (lease morto) ou `failed` e voltou depois. O UUID que torna o
+   * retry idempotente está gravado na própria linha — sem lê-lo de volta, o
+   * "Tentar novamente" sumiria justamente quando ele é mais necessário.
+   */
+  const emVoo = useMemo(
+    () =>
+      local ??
+      (ultimaDoUsuario?.status !== 'completed' && ultimaDoUsuario?.client_message_id
+        ? {
+            clientMessageId: ultimaDoUsuario.client_message_id,
+            content: ultimaDoUsuario.content,
+          }
+        : null),
+    [local, ultimaDoUsuario],
+  );
+
+  const noBanco = local ? espelho : ultimaDoUsuario;
+  const noServidor = noBanco?.status === 'processing';
   const rodando =
     criar.isPending || enviar.isPending || resolver.isPending || noServidor;
 
@@ -121,12 +164,16 @@ export function ConversationScreen({ conversationId, initialText = '', title }: 
   const esperandoAcao = Boolean(pergunta?.pending_id && !pergunta.resolved);
 
   // O teto do lease. Sem ele, um turno que morreu no servidor deixaria a tela
-  // com "Pensando..." para sempre, e ele nunca viraria um botão.
+  // com "Pensando..." para sempre, e ele nunca viraria um botão. A contagem sai
+  // do `created_at` da mensagem, não da montagem: quem reabre o app com um turno
+  // travado de ontem não espera mais cinco minutos para ver o botão.
+  const desde = noBanco?.created_at ?? null;
   useEffect(() => {
     if (!rodando) return;
-    const t = setTimeout(() => setDesistiu(true), LEASE_MS);
+    const inicio = desde ? Date.parse(desde) : Date.now();
+    const t = setTimeout(() => setDesistiu(true), Math.max(0, LEASE_MS - (Date.now() - inicio)));
     return () => clearTimeout(t);
-  }, [rodando]);
+  }, [rodando, desde]);
 
   const disparar = useCallback(
     (t: { clientMessageId: string; content: string }) => {
@@ -164,10 +211,10 @@ export function ConversationScreen({ conversationId, initialText = '', title }: 
 
   const tentarDeNovo = useCallback(() => {
     // O MESMO UUID de antes. Gerar um novo criaria um segundo lançamento do que
-    // talvez já tenha rodado no servidor — a idempotência mora nessa chave.
-    const t = turno.retentar();
-    if (t) disparar(t);
-  }, [disparar, turno]);
+    // talvez já tenha rodado no servidor — a idempotência mora nessa chave, e o
+    // servidor responde a ela com `recover_turn` em vez de reexecutar.
+    if (emVoo) disparar(emVoo);
+  }, [disparar, emVoo]);
 
   const decidir = useCallback(
     (mensagem: AgentMessage, opcao: UiOption) => {
@@ -220,25 +267,27 @@ export function ConversationScreen({ conversationId, initialText = '', title }: 
         },
       });
     }
-    if (erro) {
+
+    const falha = erro
+      ? { texto: erro.message, retryable: erro.policy.retryable }
+      : desistiu
+        ? { texto: 'Essa mensagem demorou demais.', retryable: true }
+        : noBanco?.status === 'failed'
+          ? FALHA[noBanco.error_code ?? ''] ?? FALHA.internal
+          : null;
+
+    if (falha) {
       out.push({
         key: 'falhou',
         kind: 'failed',
-        texto: erro.message,
-        retryable: erro.policy.retryable && Boolean(local),
-      });
-    } else if (desistiu) {
-      out.push({
-        key: 'falhou',
-        kind: 'failed',
-        texto: 'Essa mensagem demorou demais.',
-        retryable: Boolean(local),
+        texto: falha.texto,
+        retryable: falha.retryable && Boolean(emVoo),
       });
     } else if (rodando) {
       out.push({ key: 'pensando', kind: 'processing' });
     }
     return out;
-  }, [mensagens, local, espelho, erro, desistiu, rodando]);
+  }, [mensagens, local, espelho, erro, desistiu, noBanco, emVoo, rodando]);
 
   const desenharLinha = useCallback(
     ({ item }: { item: Item }) => (
@@ -398,8 +447,6 @@ const Linha = memo(function Linha({
   onDecide: (m: AgentMessage, o: UiOption) => void;
   onRetry: () => void;
 }) {
-  const theme = useTheme();
-
   if (item.kind === 'processing') {
     return (
       // Uma linha ESTÁVEL, sem bolha entrando e saindo: o que muda é o texto, e
@@ -444,11 +491,6 @@ const Linha = memo(function Linha({
           busy={busy}
           onDecide={(o) => onDecide(item.message, o)}
         />
-      ) : null}
-      {item.message.status === 'failed' ? (
-        <ThemedText type="footnote" style={{ color: theme.danger }}>
-          Essa mensagem não foi processada.
-        </ThemedText>
       ) : null}
     </View>
   );
