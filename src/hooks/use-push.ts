@@ -97,68 +97,55 @@ export function useRegisterPush(userId: string | undefined) {
   });
 }
 
-/**
- * **Desliga** o push: apaga o token do perfil.
- *
- * Existe porque o Switch do Perfil era `disabled={pushOn}` — porta de mão única. Ligar era
- * possível, desligar não, e a única saída era revogar a permissão no sistema operacional.
- *
- * ⚠️ **Desligar o push NÃO silencia o app.** Sem `expo_push_token`, `jobs/alerts.py` cai no
- * `send_template` do WhatsApp, que é PAGO — desligar aqui deixa o app mais caro, não mais quieto.
- * Quem silencia é `profiles.alerts_enabled` (`useAlertsEnabled`). A tela precisa dizer isso, e
- * diz.
- */
-export function useUnregisterPush(userId: string | undefined) {
-  const client = useQueryClient();
-  return useMutation({
-    mutationFn: async () => {
-      if (!userId) throw new Error('Sem sessão.');
-      const { error } = await supabase
-        .from('profiles')
-        .update({ expo_push_token: null })
-        .eq('id', userId);
-      if (error) throw error;
-    },
-    onSuccess: () => client.invalidateQueries({ queryKey: ['push'] }),
-  });
+export interface AlertPreferences {
+  push: boolean;
+  whatsapp: boolean;
 }
 
-/**
- * Os alertas proativos: orçamento estourando, fatura vencendo, projeção no vermelho, teste
- * acabando.
- *
- * `profiles.alerts_enabled` é o interruptor que **não existia** — `_alerts_to_send` varria todo
- * dono de workspace sem filtro nenhum, e não havia coluna de preferência em lugar nenhum. O
- * usuário não tinha como pedir silêncio; só podia escolher por qual canal ser interrompido.
- */
-export function useAlertsEnabled(userId: string | undefined) {
+export type AlertPreferenceChannel = keyof AlertPreferences;
+
+/** Preferências de avisos automáticos; token e telefone ficam fora deste contrato. */
+export function useAlertPreferences(userId: string | undefined) {
   return useQuery({
-    queryKey: ['alerts-enabled', userId],
+    queryKey: ['alert-preferences', userId],
     enabled: !!userId,
-    queryFn: async (): Promise<boolean> => {
+    queryFn: async (): Promise<AlertPreferences> => {
       const { data, error } = await supabase
         .from('profiles')
-        .select('alerts_enabled')
+        .select('alerts_push_enabled, alerts_whatsapp_enabled')
         .eq('id', userId!)
         .single();
       if (error) throw error;
-      return data?.alerts_enabled ?? true;
+      return {
+        push: data?.alerts_push_enabled ?? false,
+        whatsapp: data?.alerts_whatsapp_enabled ?? false,
+      };
     },
   });
 }
 
-export function useSetAlertsEnabled(userId: string | undefined) {
+export function useSetAlertPreference(userId: string | undefined) {
   const client = useQueryClient();
   return useMutation({
-    mutationFn: async (enabled: boolean) => {
+    mutationFn: async ({
+      channel,
+      enabled,
+    }: {
+      channel: AlertPreferenceChannel;
+      enabled: boolean;
+    }) => {
       if (!userId) throw new Error('Sem sessão.');
+      const patch =
+        channel === 'push'
+          ? { alerts_push_enabled: enabled }
+          : { alerts_whatsapp_enabled: enabled };
       const { error } = await supabase
         .from('profiles')
-        .update({ alerts_enabled: enabled })
+        .update(patch)
         .eq('id', userId);
       if (error) throw error;
     },
-    onSuccess: () => client.invalidateQueries({ queryKey: ['alerts-enabled'] }),
+    onSuccess: () => client.invalidateQueries({ queryKey: ['alert-preferences'] }),
   });
 }
 

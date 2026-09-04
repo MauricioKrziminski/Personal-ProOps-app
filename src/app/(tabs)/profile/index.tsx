@@ -1,9 +1,10 @@
 import { useState } from 'react';
-import { Platform, ScrollView, StyleSheet, Switch, View } from 'react-native';
+import { Platform, ScrollView, StyleSheet, View } from 'react-native';
 import { router } from 'expo-router';
 import * as Haptics from 'expo-haptics';
 
 import { ThemedText } from '@/components/themed-text';
+import { AlertPreferencesSection } from '@/components/profile/alert-preferences-section';
 import { AppHeader } from '@/components/ui/app-header';
 import { EmptyState } from '@/components/ui/empty-state';
 import { Icon } from '@/components/ui/icon';
@@ -20,14 +21,6 @@ import { Radius, Space, tabular } from '@/design/tokens';
 import { currentMonth } from '@/components/finance/month-picker';
 import { useAiMonthStats, usePlanStatus } from '@/hooks/use-finance';
 import { useAppUpdate } from '@/hooks/use-app-update';
-import {
-  pushBlockerMessage,
-  useAlertsEnabled,
-  useRegisterPush,
-  usePushStatus,
-  useSetAlertsEnabled,
-  useUnregisterPush,
-} from '@/hooks/use-push';
 import { formatDateBR } from '@/hooks/use-items';
 import { useProfile, useUpdateProfile } from '@/hooks/use-profile';
 import { useSession } from '@/hooks/use-session';
@@ -45,9 +38,6 @@ const APP_UPDATE_ICON: Partial<
 
 /**
  * Perfil — tela de manutenção. O sucesso dela é a pessoa achar o que veio buscar e sair.
- *
- * A seção de Notificações **sobe para o topo enquanto o push está desligado**: é a ação com maior
- * consequência econômica do produto (sem token, todo lembrete vira template pago do WhatsApp).
  */
 export default function ProfileScreen() {
   const theme = useTheme();
@@ -56,11 +46,6 @@ export default function ProfileScreen() {
   const toast = useToast();
   const userId = session?.user?.id;
 
-  const push = usePushStatus(userId);
-  const register = useRegisterPush(userId);
-  const unregister = useUnregisterPush(userId);
-  const alerts = useAlertsEnabled(userId);
-  const setAlerts = useSetAlertsEnabled(userId);
   const plan = usePlanStatus();
   const ia = useAiMonthStats(currentMonth());
   const profile = useProfile(userId);
@@ -68,6 +53,7 @@ export default function ProfileScreen() {
 
   /** `null` = sheet fechado. String vazia é um estado válido (apagar o nome). */
   const [nameDraft, setNameDraft] = useState<string | null>(null);
+  const [notificationRefreshKey, setNotificationRefreshKey] = useState(0);
   const nome = profile.data?.display_name?.trim() || null;
 
   /**
@@ -77,8 +63,6 @@ export default function ProfileScreen() {
    * construção. Conta criada por e-mail não tem nenhum, e o cartão precisa dizer isso.
    */
   const phone = session?.user?.phone ? `+${session.user.phone}` : null;
-  const pushOn = push.data?.registered ?? false;
-  const blocker = pushBlockerMessage(push.data?.blocker ?? 'unknown');
 
   const confirmSignOut = () => {
     const doIt = async () => {
@@ -112,96 +96,16 @@ export default function ProfileScreen() {
     </Section>
   );
 
-  const alertsOn = alerts.data ?? true;
-
-  /**
-   * Duas chaves, e elas NÃO são a mesma coisa — a tela precisa deixar isso explícito.
-   *
-   * - **"Avisos do ProOps"** decide SE o app te interrompe (orçamento estourando, fatura
-   *   vencendo, projeção no vermelho). É o interruptor que não existia: até a `0049` não havia
-   *   coluna de preferência nenhuma e `_alerts_to_send` varria todo mundo.
-   * - **"Avisos no celular"** decide POR ONDE. Com push, é notificação e é grátis; sem push, o
-   *   cron cai no template do WhatsApp, que é PAGO.
-   *
-   * Por isso o push deixou de ser porta de mão única (era `disabled={pushOn}`) e por isso o
-   * subtítulo dele muda conforme a outra chave: com os alertas desligados, o canal não decide
-   * mais nada, e prometer "vai por WhatsApp" seria mentira.
-   */
-  const notifications = (
-    <Section title="Notificações">
-      <Row
-        title="Avisos do ProOps"
-        subtitle={
-          alertsOn
-            ? 'Orçamento estourando, fatura vencendo, saldo no vermelho'
-            : 'Desligado — o app não te procura'
-        }
-        icon="bell"
-        chevron={false}
-        trailing={
-          <Switch
-            value={alertsOn}
-            disabled={setAlerts.isPending || alerts.isLoading}
-            accessibilityLabel="Receber avisos do ProOps"
-            onValueChange={(v) =>
-              setAlerts.mutate(v, {
-                onSuccess: () =>
-                  toast({
-                    message: v ? 'Avisos ligados.' : 'Não te procuro mais.',
-                    tone: 'success',
-                  }),
-                onError: () => toast({ message: 'Não deu para salvar.', tone: 'error' }),
-              })
-            }
-          />
-        }
-      />
-      <Row
-        title="Avisos no celular"
-        subtitle={
-          push.isError
-            ? 'Não deu para verificar'
-            : !alertsOn
-              ? 'Só vale quando os avisos estão ligados'
-              : (blocker ?? (pushOn ? 'Chegam como notificação' : 'Vão por WhatsApp, que é pago'))
-        }
-        icon="bell.badge"
-        chevron={false}
-        trailing={
-          <Switch
-            value={pushOn}
-            disabled={register.isPending || unregister.isPending || (!pushOn && !!blocker)}
-            accessibilityLabel="Receber avisos como notificação no celular"
-            onValueChange={(v) =>
-              v
-                ? register.mutate(undefined, {
-                    onSuccess: () => toast({ message: 'Avisos ligados.', tone: 'success' }),
-                    onError: (e) =>
-                      toast({ message: e instanceof Error ? e.message : 'Falhou.', tone: 'error' }),
-                  })
-                : unregister.mutate(undefined, {
-                    onSuccess: () =>
-                      toast({ message: 'Agora os avisos vão pelo WhatsApp.', tone: 'info' }),
-                    onError: () => toast({ message: 'Não deu para desligar.', tone: 'error' }),
-                  })
-            }
-          />
-        }
-      />
-      <Row
-        title="Histórico de alertas"
-        icon="clock.arrow.circlepath"
-        onPress={() => router.push('/profile/alerts')}
-      />
-    </Section>
-  );
-
   return (
     <Screen
       grouped
       topBar={<AppHeader title="Perfil" />}
-      onRefresh={() => { push.refetch(); plan.refetch(); }}
-      refreshing={push.isRefetching}>
+      onRefresh={() => {
+        setNotificationRefreshKey((current) => current + 1);
+        profile.refetch();
+        plan.refetch();
+      }}
+      refreshing={profile.isRefetching || plan.isRefetching}>
       {/*
         Cartão de identidade — o topo da tela no desenho do Stitch.
 
@@ -366,7 +270,11 @@ export default function ProfileScreen() {
         obriga a pessoa a procurá-lo, e a promoção rendia pouco: aqui ele já é a segunda seção de
         cinco. O alerta de push desligado é a LINHA, não a posição dela.
       */}
-      {notifications}
+      <AlertPreferencesSection
+        key={notificationRefreshKey}
+        userId={userId}
+        hasVerifiedPhone={!!phone}
+      />
 
       {/*
         Conta — hoje só o nome. Ele é o que a saudação da Hoje lê, e a única coisa desta tela que

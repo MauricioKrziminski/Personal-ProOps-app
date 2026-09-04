@@ -25,12 +25,12 @@ mudou muito e memória de modelo erra aqui.
 | ref | nome no dashboard | o que é |
 |---|---|---|
 | `kwriuifcwyvdrxtspjiz` | Personal ProOps app | **PRODUÇÃO** — migration **0048** |
-| `utkqoiigimqzeenxkxdl` | Personal ProOps app - staging | staging — migration 0051, é o do `.env.local` |
+| `utkqoiigimqzeenxkxdl` | Personal ProOps app - staging | staging — migration 0052, é o do `.env.local` |
 
 Rode `scripts/supabase-target.sh` antes de qualquer escrita. Um hook `PreToolUse` já bloqueia
 `db push` em produção; escrever lá é **pedido explícito do Gabriel**, nunca consequência de tarefa.
 
-Produção está **três migrations atrás** (falta 0049, 0050, 0051) e a configuração do dashboard
+Produção está **quatro migrations atrás** (falta 0049, 0050, 0051, 0052) e a configuração do dashboard
 (OTP de 6 dígitos, SMTP, templates de e-mail) **não viaja com as migrations** — tem que ser
 refeita lá quando promover.
 

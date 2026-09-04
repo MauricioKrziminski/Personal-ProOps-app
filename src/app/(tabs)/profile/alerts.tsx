@@ -1,4 +1,3 @@
-import { useMemo } from 'react';
 import { Stack } from 'expo-router';
 import { StyleSheet, View } from 'react-native';
 
@@ -11,9 +10,14 @@ import { Screen } from '@/components/ui/screen';
 import { SkeletonRow } from '@/components/ui/skeleton';
 import { categoryIcon } from '@/design/category-icons';
 import { Radius, Space, tabular } from '@/design/tokens';
-import { useAlertsSent, type AlertSent } from '@/hooks/use-finance';
+import { useAlertsSent } from '@/hooks/use-finance';
 import { formatDateBR } from '@/hooks/use-items';
 import { useTheme } from '@/hooks/use-theme';
+import {
+  alertChannelLabel,
+  combineAlertDeliveries,
+  type AlertHistoryItem,
+} from '@/lib/alert-history';
 import type { SymbolViewProps } from 'expo-symbols';
 
 /**
@@ -53,19 +57,16 @@ const ALERTA: Record<string, { titulo: string; icone: SymbolViewProps['name']; t
   trial_ending: { titulo: 'Teste acabando', icone: 'clock', tom: 'text' },
 };
 
-/** `whatsapp` / `push` — o canal por onde saiu. Nulo em linha antiga. */
-const CANAL: Record<string, string> = { whatsapp: 'WhatsApp', push: 'notificação' };
-
 /** Só o orçamento tem `ref` legível; nos outros o `ref` é um UUID e não vira legenda. */
-function detalhe(a: AlertSent): string | undefined {
-  const canal = a.channel ? CANAL[a.channel] ?? a.channel : null;
+function detalhe(a: AlertHistoryItem): string | undefined {
+  const canal = alertChannelLabel(a.channels);
   const alvo = a.kind.startsWith('budget_') ? a.ref : null;
   return [alvo, canal ? `via ${canal}` : null].filter(Boolean).join(' · ') || undefined;
 }
 
 /** Agrupa por `sent_on` preservando a ordem — a query já vem ordenada por ele. */
-function porDia(rows: AlertSent[]): [string, AlertSent[]][] {
-  const dias = new Map<string, AlertSent[]>();
+function porDia(rows: AlertHistoryItem[]): [string, AlertHistoryItem[]][] {
+  const dias = new Map<string, AlertHistoryItem[]>();
   for (const a of rows) {
     const dia = dias.get(a.sent_on);
     if (dia) dia.push(a);
@@ -77,7 +78,7 @@ function porDia(rows: AlertSent[]): [string, AlertSent[]][] {
 export default function AlertsScreen() {
   const theme = useTheme();
   const alertas = useAlertsSent();
-  const dias = useMemo(() => porDia(alertas.data ?? []), [alertas.data]);
+  const dias = porDia(combineAlertDeliveries(alertas.data ?? []));
 
   return (
     <Screen grouped>
@@ -94,7 +95,7 @@ export default function AlertsScreen() {
       ) : dias.length === 0 ? (
         <EmptyState
           title="Nenhum alerta ainda"
-          hint="Quando um orçamento estourar, uma fatura vencer ou a projeção virar negativa, o aviso aparece aqui — e chega no seu WhatsApp."
+          hint="Quando você ativar um canal e houver algo importante, o aviso aparece aqui."
         />
       ) : (
         dias.map(([dia, doDia]) => (
@@ -134,7 +135,7 @@ export default function AlertsScreen() {
         <View style={styles.rodape}>
           <Icon name="bell" size="sm" color="textSecondary" />
           <ThemedText type="footnote" themeColor="textSecondary" style={styles.shrink}>
-            Um alerta por dia, por assunto — o ProOps não repete o mesmo aviso.
+            Se o mesmo aviso sair nos dois canais, ele aparece uma vez só aqui.
           </ThemedText>
         </View>
       ) : null}

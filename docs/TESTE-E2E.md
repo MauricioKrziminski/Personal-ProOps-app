@@ -265,20 +265,25 @@ comportamento certo — suba para Pro pelo SQL do Bloco 9 e volte aqui.
 
 ## Bloco 10 — Alertas proativos
 
-Com orçamento estourado (7.4) e fatura em aberto, dispare o `send-alerts` (mesmo SQL do topo,
-trocando o nome da função):
+Pré-requisitos: `personal_proops_alert` em `APPROVED`, Python/Edge Function publicados com
+`WA_ALERT_TEMPLATE` e um aparelho físico com token de push. Com orçamento estourado (7.4) e
+fatura em aberto, dispare `/cron/alerts` no ambiente cujo alvo foi conferido.
 
 | # | Verificação | Esperado |
 |---|---|---|
-| 10.1 | Resposta da função | `{ candidatos: N, enviados: X, pulados: Y }` |
-| 10.2 | `select kind, ref, sent_on from public.alerts_sent order by created_at desc;` | Uma linha por alerta |
-| 10.3 | **Disparar de novo** | `enviados: 0` — dedupe do dia funcionando |
-| 10.4 | Ver o texto em `_alerts_to_send()` | Toda mensagem termina numa **ação** |
+| 10.1 | Push e WhatsApp desligados no Perfil | `candidatos: 0`; nada em `alerts_sent` |
+| 10.2 | Somente push ligado | Uma notificação; nenhuma mensagem WhatsApp |
+| 10.3 | Somente WhatsApp ligado | Uma mensagem com `personal_proops_alert`; nenhuma notificação |
+| 10.4 | Ambos ligados | Duas entregas e duas linhas, uma por canal |
+| 10.5 | `select kind, ref, sent_on, channel from public.alerts_sent order by created_at desc;` | `channel` real em cada linha |
+| 10.6 | **Disparar de novo** | `enviados: 0` — dedupe por canal funcionando |
+| 10.7 | Abrir Histórico de alertas | O aviso entregue duas vezes aparece uma vez, “via notificação e WhatsApp” |
+| 10.8 | Criar lembrete pessoal em cada canal e desligar os avisos financeiros | O lembrete continua chegando pelo canal escolhido |
+| 10.9 | Ver o texto em `_alerts_to_send()` | Toda mensagem termina numa **ação** |
 
-⚠️ Sem push configurado (decisão registrada em `docs/PUSH-NOTIFICATIONS.md`), o envio usa template
-do WhatsApp. `personal_proops_reminder` está **APPROVED** desde 27/08/2026, então a entrega
-funciona. Se ainda assim falhar, o alerta fica marcado como enviado assim mesmo — de propósito,
-para o cron não virar loop.
+Falha depois da reserva mantém a linha daquele canal para o cron não virar loop. Falha ou
+duplicata em um canal não pode impedir a tentativa do outro. Telefone e token sem preferência
+ativa não autorizam fallback.
 
 ---
 

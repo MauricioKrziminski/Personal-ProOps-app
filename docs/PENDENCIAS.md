@@ -91,8 +91,12 @@ Via Graph API v21.0 com o token de System User do app:
 - **Templates próprios deste produto criados em 26/08** na WABA de teste:
   - `personal_proops_login_otp` (AUTHENTICATION, pt_BR) — id `1019655521065477`, **APPROVED na hora**.
   - `personal_proops_reminder` (UTILITY, pt_BR) — id `1097041035993071`, **APPROVED** (confirmado na Graph API em 27/08/2026; Utility passa por revisão, levou ~1 dia).
+  - `personal_proops_alert` (UTILITY, pt_BR) — id `1052311597692142`, submetido em
+    04/09/2026; status no envio: **PENDING**. É exclusivo dos avisos financeiros inferidos pelo
+    sistema e não afirma que a pessoa pediu um lembrete.
   - Motivo de não reaproveitar `proops_login_otp`: ele é do **ERP** (2FA do ERP quando o WhatsApp está ativado lá) e vive na mesma WABA de teste. Objeto compartilhado — se o time do ERP editar ou apagar, o login deste app cai junto.
-- Nomes de template agora vêm de env (`WA_OTP_TEMPLATE`, `WA_REMINDER_TEMPLATE`); o hardcode em `send-reminders` saiu.
+- Nomes de template agora vêm de env (`WA_OTP_TEMPLATE`, `WA_REMINDER_TEMPLATE`,
+  `WA_ALERT_TEMPLATE`); lembrete pessoal e aviso inferido nunca compartilham texto.
 - Templates são **por WABA**: ao migrar para uma WABA própria de produção, recriar os dois **com os mesmos nomes** — aí nenhum código ou secret muda, só o `WHATSAPP_PHONE_NUMBER_ID`.
 
 ## 🔥 Aplicar agora (na ordem)
@@ -588,9 +592,9 @@ mesmo evento devolve `duplicado` sem reaplicar; evento de sandbox devolve
 mantém o acesso** (cancelar é "não vai renovar") e só EXPIRATION revoga.
 
 **Aviso de fim de teste** (`0037_trial_ending_alert.sql`) — a loja cuida da
-mecânica do trial, mas não manda a NOSSA mensagem. Novo alerta `trial_ending`
-dispara em `current_period_end - 2` (dia 5 de um teste de 7), pelo canal que já
-existe (push, com template do WhatsApp como reserva).
+mecânica do trial, mas não manda a NOSSA mensagem. O alerta `trial_ending`
+dispara em `current_period_end - 2` (dia 5 de um teste de 7) somente pelos canais
+proativos que a pessoa ativou em `profiles`; não há fallback implícito.
 
 Motivo, nesta ordem: (1) cobrança-surpresa vira pedido de reembolso, 1 estrela e
 chargeback — avisar antes custa uma mensagem e evita os três; (2) lembrar o que a
@@ -606,7 +610,8 @@ alertas por usuário corta pelo fim da lista, e este é o único com prazo.
 
 Verificado: faltando 3 dias não dispara; faltando 2 dispara com o texto certo;
 depois de converter (`status='active'`) não dispara; trial já expirado não
-dispara; e o unique de `alerts_sent` bloqueia a segunda tentativa no mesmo dia.
+dispara; e o unique de `alerts_sent` bloqueia a repetição no mesmo canal sem
+impedir uma entrega simultânea no outro.
 
 ⚠️ `BILLING_ALLOW_SANDBOX=true` existe para testar em sandbox e **precisa ser
 removida antes de publicar** — com ela ligada, qualquer um com StoreKit Testing

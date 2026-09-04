@@ -393,7 +393,11 @@ que as quatro telas de conta finalmente serão vistas no iOS.
 
 ---
 
-### Fase 8 — Controle dos avisos proativos automáticos · pendente (04/09/2026)
+### Fase 8 — Canais dos avisos proativos automáticos · CÓDIGO PRONTO, SCHEMA EM STAGING (04/09/2026)
+
+Código e schema estão implementados; a liberação remota dos canais ainda não está concluída.
+O template Utility foi submetido na WABA de teste e segue em revisão, então app, Cloud Run e Edge
+Function não devem ser publicados com esta fase até o status virar `APPROVED`.
 
 **Decisão do Gabriel:** avisos inferidos pelo sistema — por exemplo saldo projetado negativo,
 orçamento estourando, fatura/conta vencendo e fim de teste — não podem interromper o usuário sem
@@ -403,20 +407,51 @@ Eles são diferentes dos lembretes que a própria pessoa criou em `public.remind
 observada, “Saldo vai ficar negativo”, era um aviso proativo, mas usava a frase “Você pediu para
 ser lembrado disso”; essa frase é incorreta quando foi o sistema que decidiu avisar.
 
-**Requisitos mínimos antes de reativar qualquer aviso proativo:**
+**Comportamento implementado:**
 
-- oferecer uma chave geral que liga/desliga **todos** os avisos automáticos; a granularidade por
-  tipo pode ser decidida na implementação, mas nunca pode substituir esse desligamento total;
-- desligar precisa silenciar todos os canais, inclusive push e WhatsApp — não pode apenas trocar
-  um canal pelo outro;
+- oferecer duas preferências independentes no Perfil: **avisos financeiros por push** e **avisos
+  financeiros pelo WhatsApp**;
+- aceitar os quatro estados: somente push, somente WhatsApp, ambos ou nenhum. Com os dois canais
+  desligados, nenhum aviso automático pode sair;
+- iniciar os dois canais desligados para perfis atuais e novos. Cada pessoa escolhe os canais no
+  app antes de receber avisos automáticos;
+- tratar `expo_push_token` como capacidade do aparelho, não como preferência de alertas.
+  Desligar avisos financeiros por push não pode apagar o token nem interromper um lembrete pessoal
+  configurado para push;
+- quando os dois canais estiverem ligados, entregar o mesmo aviso nos dois e registrar o canal
+  real em `alerts_sent`;
 - a preferência precisa ser respeitada no produtor/cron, antes de criar ou enviar a mensagem;
 - desligar avisos automáticos não pode apagar nem impedir lembretes pessoais criados pelo usuário;
-- o texto deve identificar que é uma sugestão do ProOps, sem afirmar que a pessoa pediu aquele
-  lembrete quando ela não pediu.
+- os avisos pelo WhatsApp precisam usar um template Utility próprio, configurado por
+  `WA_ALERT_TEMPLATE`, como `personal_proops_alert`. Nunca reutilizar `WA_REMINDER_TEMPLATE`, pois
+  ele afirma que a pessoa pediu o lembrete;
+- criar e aprovar o novo template na Meta antes de liberar a chave do WhatsApp no app.
 
-**Validar ponta a ponta:** ligar e receber um aviso; desligar e confirmar ausência no push e no
-WhatsApp; criar um lembrete pessoal e confirmar que ele continua chegando; ligar novamente e
-confirmar que os avisos automáticos voltam.
+**Escopo técnico entregue:** a migration `0052_alert_channels.sql` mantém o booleano antigo apenas
+para compatibilidade com o APK `v1.0.0` e adiciona as duas preferências. `_alerts_to_send()`, os
+emissores Deno/Python, o Perfil e o histórico usam os canais explícitos. Os tipos de alerta, o
+cron e os lembretes pessoais em `public.reminders` foram preservados.
+
+**Evidência até aqui:**
+
+- `0052` aplicada no local e no staging `utkqoiigimqzeenxkxdl`; produção permaneceu em `0048`;
+- teste SQL transacional cobre defaults desligados, os quatro estados, capacidade ausente e
+  dedupe independente por canal;
+- testes Python cobrem ambos, nenhum, canal sem capacidade, falha independente, ausência de
+  histórico fantasma e teto de quatro alertas lógicos;
+- histórico combina push + WhatsApp numa única linha visível, sem misturar workspaces;
+- tipos gerados diretamente do staging são idênticos a `src/lib/database.types.ts`;
+- template `personal_proops_alert`, ID `1052311597692142`, submetido como `UTILITY`/`pt_BR` na WABA
+  de teste `1280843510763871`; status no envio: `PENDING`.
+
+**Ainda pendente:** aprovação do template; deploy do Python no Cloud Run de staging; deploy da
+Edge Function legada onde ainda for necessária; publicação do app; teste real dos quatro estados
+em aparelho, duas entregas com “ambos” e regressão de lembrete pessoal. Produção exige pedido
+explícito separado.
+
+**Validar ponta a ponta:** testar os quatro estados de canal; confirmar que nenhum aviso sai com
+ambos desligados; confirmar duas entregas com ambos ligados; verificar o texto do template real no
+WhatsApp; criar um lembrete pessoal e confirmar que ele continua chegando pelo canal escolhido.
 
 ### Decisão de produto — teste grátis pela oferta introdutória da loja · aprovada (04/09/2026)
 
@@ -446,10 +481,10 @@ Registrado para não virar escopo por engano:
 | ambiente | ref | migration |
 |---|---|---|
 | produção | `kwriuifcwyvdrxtspjiz` | **0048** |
-| staging | `utkqoiigimqzeenxkxdl` | 0051 |
+| staging | `utkqoiigimqzeenxkxdl` | 0052 |
 
-Produção está **três migrations atrás**: `0049` (alertas/pastas, da sessão anterior), `0050`
-(nome) e `0051` (conta por e-mail). Promover é decisão do Gabriel — nenhuma delas foi para lá.
+Produção está **quatro migrations atrás**: `0049` (alertas/pastas), `0050` (nome), `0051` (conta
+por e-mail) e `0052` (canais dos avisos). Promover é decisão do Gabriel — nenhuma delas foi para lá.
 
 ## 6. Ordem de execução
 
@@ -458,3 +493,6 @@ Produção está **três migrations atrás**: `0049` (alertas/pastas, da sessão
 A Fase 6 vem **antes** da 5 de propósito: `ai_events.channel` e o medidor são o instrumento que
 mostra se o agente do app está funcionando e quanto ele custa. Construir o chat sem o medidor é
 ficar sem o número justamente na fase em que ele mais importa.
+
+A Fase 8 fica fora desta sequência e já foi implementada antes da Fase 4 por ser uma correção de
+consentimento. Só falta concluir sua validação remota depois da aprovação do template da Meta.

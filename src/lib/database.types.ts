@@ -192,7 +192,7 @@ export type Database = {
       }
       alerts_sent: {
         Row: {
-          channel: string | null
+          channel: string
           created_at: string
           id: string
           kind: string
@@ -202,7 +202,7 @@ export type Database = {
           workspace_id: string
         }
         Insert: {
-          channel?: string | null
+          channel: string
           created_at?: string
           id?: string
           kind: string
@@ -212,7 +212,7 @@ export type Database = {
           workspace_id: string
         }
         Update: {
-          channel?: string | null
+          channel?: string
           created_at?: string
           id?: string
           kind?: string
@@ -1411,6 +1411,8 @@ export type Database = {
       profiles: {
         Row: {
           alerts_enabled: boolean
+          alerts_push_enabled: boolean
+          alerts_whatsapp_enabled: boolean
           created_at: string
           display_name: string | null
           expo_push_token: string | null
@@ -1423,6 +1425,8 @@ export type Database = {
         }
         Insert: {
           alerts_enabled?: boolean
+          alerts_push_enabled?: boolean
+          alerts_whatsapp_enabled?: boolean
           created_at?: string
           display_name?: string | null
           expo_push_token?: string | null
@@ -1435,6 +1439,8 @@ export type Database = {
         }
         Update: {
           alerts_enabled?: boolean
+          alerts_push_enabled?: boolean
+          alerts_whatsapp_enabled?: boolean
           created_at?: string
           display_name?: string | null
           expo_push_token?: string | null
@@ -1991,6 +1997,8 @@ export type Database = {
       _alerts_to_send: {
         Args: never
         Returns: {
+          alerts_push_enabled: boolean
+          alerts_whatsapp_enabled: boolean
           body: string
           expo_push_token: string
           kind: string

@@ -77,3 +77,15 @@ def test_producao_completa_passa(monkeypatch):
     _cfg(monkeypatch)
     _checa_producao()
     get_settings.cache_clear()
+
+
+def test_template_de_alerta_e_independente_do_lembrete(monkeypatch):
+    _cfg(
+        monkeypatch,
+        WA_ALERT_TEMPLATE="alerta_aprovado",
+        WA_REMINDER_TEMPLATE="lembrete_aprovado",
+    )
+    settings = get_settings()
+    assert settings.wa_alert_template == "alerta_aprovado"
+    assert settings.wa_reminder_template == "lembrete_aprovado"
+    get_settings.cache_clear()

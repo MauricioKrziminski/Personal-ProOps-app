@@ -30,3 +30,9 @@ def test_ordenar_por_nome_realmente_inverte_a_partir_da_decima():
     por_string = sorted(versoes, reverse=True)
     assert por_string[0] == "9", por_string      # a mais nova NÃO fica em primeiro
     assert "11" in por_string[1:], "a 11 cairia na lista de destruição"
+
+
+def test_deploy_injeta_template_exclusivo_dos_alertas():
+    texto = SCRIPT.read_text()
+    assert "WA_ALERT_TEMPLATE=${wa_alert_template}" in texto
+    assert 'wa_alert_template="$(ler_env WA_ALERT_TEMPLATE)"' in texto

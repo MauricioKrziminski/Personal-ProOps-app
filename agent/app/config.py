@@ -30,6 +30,7 @@ class Settings(BaseSettings):
     whatsapp_verify_token: str = ""
     wa_otp_template: str = "personal_proops_login_otp"
     wa_reminder_template: str = "personal_proops_reminder"
+    wa_alert_template: str = "personal_proops_alert"
 
     # --- IA ---
     gemini_api_key: str = ""
