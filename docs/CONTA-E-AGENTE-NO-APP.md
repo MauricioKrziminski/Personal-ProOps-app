@@ -162,9 +162,19 @@ CLI. Fazer primeiro no STAGING (`utkqoiigimqzeenxkxdl`) e de novo em produção 
   `smtp.zoho.com` (esse é para `@zoho.com`). Os dois respondem, o que torna o erro difícil de
   diagnosticar: falha de autenticação com host errado parece senha errada.
   A senha tem que ser **app-specific password** (accounts.zoho.com → Security → App passwords),
-  nunca a senha da conta. O SPF já inclui `zohomail.com`; o DMARC está em `p=none`, só monitorando.
+  nunca a senha da conta.
+  ⚠️ **O usuário do SMTP tem que ser o MESMO endereço do remetente.** O Zoho exige que o From
+  case com a conta autenticada ou um alias dela. `noreply@proops.com.br` existe como USUÁRIO
+  separado (não alias de `gestao@`), então autenticar como `gestao@` e enviar como `noreply@`
+  é recusado. Autentique como `noreply@`.
   ⚠️ O plano gratuito do Zoho não dá IMAP/POP e possivelmente nem SMTP. Se a autenticação falhar
   com o host e a senha certos, é o plano — Mail Lite resolve.
+
+  **DNS do domínio, verificado em 03/09/2026 — nada a fazer:** SPF inclui `zohomail.com`; DKIM já
+  publicado no seletor `zoho._domainkey.proops.com.br` (RSA 1024, registro íntegro); DMARC em
+  `p=none` com relatório para `gestao@`. O DNS mora no **Registro.br** (`a.sec.dns.br`), que é
+  onde qualquer registro novo teria que entrar. DKIM em 2048 bits seria um degrau melhor que o
+  1024 atual, mas não é bloqueio.
 
 Achado do revisor para a Fase 4: `agent/app/jobs/alerts.py:39-46` reserva a vaga de dedupe do
 dia em `alerts_sent` com canal `whatsapp` quando não há push, e depois pula se `phone` é nulo —
