@@ -223,6 +223,26 @@ telas de conta finalmente serão vistas no iOS, fechando a pendência 2 da seç�
 
 ## 7. Decisão de modelo de negócio, PENDENTE do dono
 
+### O que o mercado faz (levantado em 03/09/2026)
+
+| app | teste | plano gratuito permanente |
+|---|---|---|
+| Organizze (BR) | 7 dias, **sem pedir cartão** | não existe |
+| Mobills (BR) | 7 dias | sim, limitado |
+| Monarch (EUA) | 7 dias | não existe |
+| Copilot (EUA) | ~30 dias | não existe |
+| YNAB (EUA) | 34 dias | não existe |
+
+**7 dias é o padrão do Brasil**, que é o mercado deste app. Os 30 dias aparecem só em apps
+americanos de sincronização bancária, onde o valor leva um ciclo inteiro para aparecer. Aqui não:
+o momento de "entendi" é mandar uma mensagem no WhatsApp e ver o lançamento aparecer organizado,
+e isso acontece em trinta segundos, não em trinta dias. **7 dias.**
+
+**Depois do teste, o mercado TRANCA**, não deixa em somente leitura. O que os bons fazem é
+prometer **retenção de dados**: o YNAB guarda tudo por 30 dias e restaura intacto se a pessoa
+assinar nesse prazo. É o que evita o problema de "sequestro de dados" sem dar produto de graça.
+Somente leitura não é o padrão e não precisa ser inventado aqui.
+
 O Gabriel levantou trocar o **plano gratuito permanente** por **teste grátis e depois pagar**.
 Isto está **em aberto** — não implemente sem confirmação dele. O que já se sabe:
 
@@ -235,6 +255,23 @@ Isto está **em aberto** — não implemente sem confirmação dele. O que já s
 
 Se a mudança for aprovada, ela toca: `plan_limits`, `plan_status`, o gate de IA em
 `_check_limits` (`agent/app/worker.py`), a tela de paywall e o Perfil.
+
+### O ponto que falta o dono decidir, e que precisa ser explicado a ele
+
+Existem dois jeitos de rodar o teste grátis, e a diferença é grande:
+
+- **Sem cartão** (o que o Organizze faz): a pessoa usa 7 dias e, no fim, aparece a tela de
+  assinatura. Ela precisa decidir e agir. Mais gente começa o teste, menos gente converte.
+- **Oferta introdutória da loja**: a pessoa assina no dia zero pela App Store / Play com os 7
+  primeiros dias grátis. O cartão já fica registrado e a cobrança acontece sozinha no oitavo dia,
+  a menos que ela cancele. Menos gente começa, muito mais gente converte.
+
+**Recomendação: oferta introdutória**, e o motivo aqui não é só conversão. Neste app **usuário
+gratuito custa dinheiro todo mês** (Gemini, Cloud Run, WhatsApp). Sem cartão, qualquer um queima
+7 dias de custo e recomeça com outro e-mail, quantas vezes quiser. Com cartão, esse abuso some.
+
+⚠️ **O Codex deve explicar isso ao Gabriel em português claro antes de implementar** — ele pediu
+explicitamente essa explicação e ainda não confirmou.
 
 ---
 
