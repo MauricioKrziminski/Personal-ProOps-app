@@ -382,7 +382,8 @@ export default function TransactionsScreen() {
 
   return (
     <View style={styles.root}>
-      <Screen scroll={false} grouped>
+      <Screen
+      floatingAction scroll={false} grouped>
         <Stack.Screen
           options={{ title: accountLabel ?? 'Lançamentos', headerLargeTitle: true }}
         />

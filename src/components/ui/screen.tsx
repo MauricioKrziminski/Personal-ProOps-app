@@ -12,13 +12,28 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { MaxContentWidth } from '@/constants/theme';
 import { useAppHeaderHeight } from '@/components/ui/app-header';
 import { CURVED_BAR_SPACE } from '@/components/ui/curved-tab-bar';
+
 import { Space } from '@/design/tokens';
 import { useTheme } from '@/hooks/use-theme';
+
+/**
+ * Quanto um FAB come do fim do conteúdo: a altura do botão `md` (48) mais um respiro.
+ * Não é `CURVED_BAR_CLEARANCE` — aquele é onde o FAB COMEÇA; este é o que ele OCUPA.
+ */
+const FAB_CLEARANCE = 48 + 16;
 
 interface ScreenProps {
   children: React.ReactNode;
   /** `false` quando a tela é uma lista virtualizada que rola sozinha. */
   scroll?: boolean;
+  /**
+   * A tela tem um botão FLUTUANTE (FAB) por cima do conteúdo.
+   *
+   * Conteúdo pode passar por baixo da tab bar — o desfoque dela depende disso. Por baixo do FAB,
+   * não: ele é opaco e tem sombra, então o que passar embaixo fica ILEGÍVEL. Era o que acontecia
+   * no Financeiro vazio, com o "Lançar" cobrindo a última linha do estado vazio.
+   */
+  floatingAction?: boolean;
   /** Liga pull-to-refresh. */
   onRefresh?: () => void;
   refreshing?: boolean;
@@ -49,6 +64,7 @@ export function Screen({
   refreshing = false,
   grouped = false,
   topBar,
+  floatingAction = false,
   contentStyle,
 }: ScreenProps) {
   const theme = useTheme();
@@ -62,11 +78,13 @@ export function Screen({
    * empurradas não têm barra e não devem ganhar o respiro.
    */
   const tabBarSpace = topBar && Platform.OS === 'android' ? CURVED_BAR_SPACE : 0;
+  /** A altura do FAB mais o respiro dele, para nenhum conteúdo terminar embaixo do botão. */
+  const fabSpace = floatingAction ? FAB_CLEARANCE : 0;
   const padding = [
     styles.content,
     {
       paddingTop: topBar ? headerHeight + Space.md : Space.md,
-      paddingBottom: insets.bottom + Space.xxl + tabBarSpace,
+      paddingBottom: insets.bottom + Space.xxl + tabBarSpace + fabSpace,
     },
     contentStyle,
   ];
