@@ -284,6 +284,38 @@ def _as_claim(bruto) -> TurnClaim:
 
 
 # ---------------------------------------------------------------------------
+# leitura
+# ---------------------------------------------------------------------------
+
+
+async def list_conversations(
+    *, user_id: UUID, cursor: tuple | None = None, limit: int = 20
+) -> list[dict]:
+    return await repo.chat_sessions(user_id, cursor=cursor, limit=limit)
+
+
+async def list_messages(
+    *, user_id: UUID, session_id: UUID, before: int | None = None, limit: int = 40
+) -> list[dict]:
+    """O histórico, já em ordem cronológica.
+
+    A conversa é conferida ANTES: sem linha nenhuma seria impossível distinguir
+    "conversa de outra pessoa" de "conversa vazia", e as duas precisam responder
+    a mesma coisa por fora (404) mas por caminhos diferentes por dentro.
+    """
+    if await repo.chat_session(session_id, user_id) is None:
+        raise ConversationNotFound()
+    return await repo.chat_messages(session_id, user_id, before=before, limit=limit)
+
+
+async def rename_conversation(*, user_id: UUID, session_id: UUID, title: str) -> dict:
+    linha = await repo.rename_chat_session(session_id, user_id, title.strip())
+    if linha is None:
+        raise ConversationNotFound()
+    return linha
+
+
+# ---------------------------------------------------------------------------
 # HITL
 # ---------------------------------------------------------------------------
 

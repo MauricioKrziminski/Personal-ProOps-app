@@ -71,6 +71,9 @@ class Settings(BaseSettings):
     # Quanto tempo um turno do app segura a conversa. Vencido, outro turno pode
     # tomar — senão um container que morre no meio prende a conversa para sempre.
     app_turn_lease_seconds: int = 300
+    # Origens permitidas na aba Agente, separadas por vírgula. Vazio = nenhuma
+    # (o app nativo não manda Origin; isto é para o Expo web e o dev server).
+    app_cors_origins: str = ""
 
     # --- Langfuse ---
     langfuse_public_key: str = ""
@@ -105,6 +108,18 @@ class Settings(BaseSettings):
     @property
     def jwks_url(self) -> str:
         return f"{self.supabase_url.rstrip('/')}/auth/v1/.well-known/jwks.json"
+
+    @property
+    def jwt_issuer(self) -> str:
+        """Quem emitiu o token. `aud` é `authenticated` em TODO projeto Supabase
+        do mundo — sem conferir o issuer, um token de outro projeto entra."""
+        return f"{self.supabase_url.rstrip('/')}/auth/v1"
+
+    @property
+    def cors_origins(self) -> list[str]:
+        """Origens do app que podem chamar a API. Lista fechada, nunca `*`:
+        com credencial no header, `*` é a porta aberta para qualquer página."""
+        return [o.strip() for o in self.app_cors_origins.split(",") if o.strip()]
 
 
 
