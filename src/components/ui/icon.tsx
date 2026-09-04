@@ -34,6 +34,8 @@ const MATERIAL: Record<string, MaterialName> = {
   'bitcoinsign.circle': 'currency_bitcoin',
   book: 'menu_book',
   'bubble.left': 'chat_bubble',
+  /** WhatsApp ainda não vinculado — o par de `bubble.left`, no cartão do Perfil. */
+  'exclamationmark.bubble': 'speaker_notes_off',
   briefcase: 'work',
   car: 'directions_car',
   circle: 'circle',

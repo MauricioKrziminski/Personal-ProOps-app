@@ -61,7 +61,13 @@ export default function ProfileScreen() {
   const [nameDraft, setNameDraft] = useState<string | null>(null);
   const nome = profile.data?.display_name?.trim() || null;
 
-  const phone = session?.user?.phone ? `+${session.user.phone}` : '—';
+  /**
+   * O telefone verificado — e a única coisa que autoriza dizer "conectado ao WhatsApp".
+   *
+   * Ele mora na SESSÃO, não em `profiles`: só entra ali por Phone OTP, que é verificado por
+   * construção. Conta criada por e-mail não tem nenhum, e o cartão precisa dizer isso.
+   */
+  const phone = session?.user?.phone ? `+${session.user.phone}` : null;
   const pushOn = push.data?.registered ?? false;
   const blocker = pushBlockerMessage(push.data?.blocker ?? 'unknown');
 
@@ -207,9 +213,17 @@ export default function ProfileScreen() {
             <View style={[styles.idAvatar, { backgroundColor: theme.heroChip }]}>
               <Icon name="person.crop.circle" size="xl" color="onHero" />
             </View>
-            <View style={[styles.idSelo, { backgroundColor: theme.tint, borderColor: theme.heroBottom }]}>
-              <Icon name="checkmark" size="xs" color="onTint" />
-            </View>
+            {/*
+              O selo é uma AFIRMAÇÃO: "este número está ligado ao WhatsApp". Ele era verde
+              incondicional, então uma conta de e-mail — que não tem telefone nenhum — exibia
+              selo de verificado e "conectado ao WhatsApp" com o número em "—". Cor semântica
+              mentindo é pior que ausência de cor (§2): sem telefone, sem selo.
+            */}
+            {phone ? (
+              <View style={[styles.idSelo, { backgroundColor: theme.tint, borderColor: theme.heroBottom }]}>
+                <Icon name="checkmark" size="xs" color="onTint" />
+              </View>
+            ) : null}
           </View>
 
           <View style={styles.idInfo}>
@@ -218,19 +232,30 @@ export default function ProfileScreen() {
                 <ThemedText type="headline" themeColor="onHero" numberOfLines={1}>
                   {nome}
                 </ThemedText>
-                <ThemedText type="code" themeColor="onHeroMuted" style={tabular} selectable>
-                  {phone}
-                </ThemedText>
+                {phone ? (
+                  <ThemedText type="code" themeColor="onHeroMuted" style={tabular} selectable>
+                    {phone}
+                  </ThemedText>
+                ) : null}
               </>
             ) : (
               <ThemedText type="ticker" themeColor="onHero" selectable>
-                {phone}
+                {phone ?? 'Sua conta'}
               </ThemedText>
             )}
+            {/*
+              A linha de estado do WhatsApp. Sem telefone ela não vira um erro em vermelho: não
+              ter WhatsApp ligado é um estado NORMAL de quem entrou por e-mail, e pintar de
+              `danger` transformaria uma escolha em problema. Cinza, dizendo o que falta.
+            */}
             <View style={styles.idMeta}>
-              <Icon name="bubble.left" size="xs" color="onHeroSuccess" />
+              <Icon
+                name={phone ? 'bubble.left' : 'exclamationmark.bubble'}
+                size="xs"
+                color={phone ? 'onHeroSuccess' : 'onHeroMuted'}
+              />
               <ThemedText type="caption" themeColor="onHeroMuted">
-                conectado ao WhatsApp
+                {phone ? 'conectado ao WhatsApp' : 'WhatsApp não conectado'}
               </ThemedText>
             </View>
           </View>

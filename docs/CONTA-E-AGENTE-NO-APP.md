@@ -239,9 +239,11 @@ aí diariamente.
   custaria a sessão. A moldura é a mesma da tela de WhatsApp, que já rodava no iOS.
 - **Segundo cadastro por e-mail no staging.** O caso do 23505 está provado no Postgres local
   (`supabase/tests/profiles_email_signup.sql`), não contra o staging.
-- ⚠️ **O cartão do Perfil mente para quem entrou por e-mail:** mostra selo verde e "conectado ao
-  WhatsApp" com o telefone em "—". Visto no staging depois do primeiro cadastro real. É a
-  primeira coisa a corrigir na Fase 4.
+- ✅ **O cartão do Perfil não mente mais** (03/09/2026). Ele mostrava selo verde de verificado e
+  "conectado ao WhatsApp" com o telefone em "—" para quem entrou por e-mail. Agora o selo só
+  aparece com telefone verificado (que só entra por Phone OTP, na sessão), a linha diz "WhatsApp
+  não conectado" em cinza, e o "—" saiu. Cinza e não `danger`: não ter WhatsApp é estado normal
+  de conta de e-mail, não é erro.
 
 ### Fase 4 — Vincular o telefone depois  ·  média
 
@@ -300,6 +302,15 @@ ao trocar de canal, que é exatamente o que ele não espera de "a mesma assisten
 conferir que o **WhatsApp também recusa** (é o teste que prova que a cota é uma só).
 
 ---
+
+### Candidatas a fases novas (levantadas em 03/09/2026, ainda sem escopo fechado)
+
+- **Distribuição e teste em aparelho.** Registrar o app na conta de desenvolvedor existente e
+  conseguir instalar no celular do dono para teste real. Depende de esclarecer qual é o limite de
+  20 dispositivos citado (não é o do Play Console nem o do TestFlight, que são 100).
+- **Atualização dentro do app.** Em projeto Expo isso é `expo-updates` + EAS Update para o bundle
+  JS, e a API de in-app update do Play para quando o binário nativo muda. São dois mecanismos
+  diferentes e só o primeiro dispensa passar pela loja.
 
 ## 5. O que este plano NÃO faz
 
