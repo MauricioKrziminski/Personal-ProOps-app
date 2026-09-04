@@ -10,6 +10,8 @@ import { useTheme, useScheme } from '@/hooks/use-theme';
 interface RowProps {
   title: string;
   subtitle?: string;
+  /** Quantas linhas o subtítulo pode ocupar. Linhas comuns continuam compactas por padrão. */
+  subtitleLines?: number;
   icon?: SymbolViewProps['name'];
   /** Valor, badge ou qualquer coisa à direita. Chevron é automático quando há `onPress`. */
   trailing?: ReactNode;
@@ -45,6 +47,7 @@ interface RowProps {
 export function Row({
   title,
   subtitle,
+  subtitleLines = 1,
   icon,
   trailing,
   onPress,
@@ -82,7 +85,7 @@ export function Row({
           {title}
         </ThemedText>
         {subtitle ? (
-          <ThemedText type="footnote" themeColor="textSecondary" numberOfLines={1}>
+          <ThemedText type="footnote" themeColor="textSecondary" numberOfLines={subtitleLines}>
             {subtitle}
           </ThemedText>
         ) : null}

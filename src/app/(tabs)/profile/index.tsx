@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { ScrollView, StyleSheet, Switch, View } from 'react-native';
+import { Platform, ScrollView, StyleSheet, Switch, View } from 'react-native';
 import { router } from 'expo-router';
 import * as Haptics from 'expo-haptics';
 
@@ -19,6 +19,7 @@ import { Sheet } from '@/components/ui/sheet';
 import { Radius, Space, tabular } from '@/design/tokens';
 import { currentMonth } from '@/components/finance/month-picker';
 import { useAiMonthStats, usePlanStatus } from '@/hooks/use-finance';
+import { useAppUpdate } from '@/hooks/use-app-update';
 import {
   pushBlockerMessage,
   useAlertsEnabled,
@@ -32,7 +33,15 @@ import { useProfile, useUpdateProfile } from '@/hooks/use-profile';
 import { useSession } from '@/hooks/use-session';
 import { useTheme, useThemeMode } from '@/hooks/use-theme';
 import { confirmDestructive } from '@/lib/item-actions';
+import { appUpdateAction, appUpdateSubtitle, type AppUpdateState } from '@/lib/app-update';
 import { supabase } from '@/lib/supabase';
+
+const APP_UPDATE_ICON: Partial<
+  Record<AppUpdateState['status'], Parameters<typeof Icon>[0]['name']>
+> = {
+  error: 'exclamationmark.circle',
+  upToDate: 'checkmark.circle',
+};
 
 /**
  * Perfil — tela de manutenção. O sucesso dela é a pessoa achar o que veio buscar e sair.
@@ -381,6 +390,8 @@ export default function ProfileScreen() {
 
       {aparencia}
 
+      <AppUpdateSection />
+
       <Section>
         <Row title="Sair da conta" icon="rectangle.portrait.and.arrow.right" destructive chevron={false} onPress={confirmSignOut} />
       </Section>
@@ -435,6 +446,32 @@ export default function ProfileScreen() {
         </ThemedText>
       </View>
     </Screen>
+  );
+}
+
+/** Só esta linha renderiza de novo a cada percentual; o Perfil inteiro fica fora desse ciclo. */
+function AppUpdateSection() {
+  const appUpdate = useAppUpdate();
+  if (Platform.OS !== 'android') return null;
+
+  const action = appUpdateAction(appUpdate.state);
+  return (
+    <Section title="App">
+      <Row
+        title="Atualização do app"
+        subtitle={appUpdateSubtitle(appUpdate.state, appUpdate.installedVersionName)}
+        subtitleLines={3}
+        icon={APP_UPDATE_ICON[appUpdate.state.status] ?? 'arrow.down.circle'}
+        chevron={false}
+        onPress={
+          action
+            ? () => {
+                void appUpdate.runNextStep();
+              }
+            : undefined
+        }
+      />
+    </Section>
   );
 }
 

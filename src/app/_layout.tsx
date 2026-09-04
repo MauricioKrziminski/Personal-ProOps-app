@@ -26,6 +26,7 @@ import { stackHeaderFonts } from '@/components/ui/app-header';
 import { Icon } from '@/components/ui/icon';
 import { ConcealProvider } from '@/components/ui/conceal';
 import { ToastProvider } from '@/components/ui/toast';
+import { AppUpdateProvider } from '@/hooks/use-app-update';
 import { ThemeProvider as AppThemeProvider, useBarStyle, useScheme } from '@/hooks/use-theme';
 import { useSession } from '@/hooks/use-session';
 import { attachNotificationListeners, configureNotificationHandler } from '@/lib/notifications';
@@ -125,9 +126,10 @@ function AppTree() {
         <KeyboardProvider statusBarTranslucent navigationBarTranslucent>
           <ConcealProvider>
           <ToastProvider>
-            <AnimatedSplashOverlay ready={!loading && fontsLoaded} />
-          <AndroidActionSheet />
-            {loading ? null : (
+            <AppUpdateProvider>
+              <AnimatedSplashOverlay ready={!loading && fontsLoaded} />
+              <AndroidActionSheet />
+              {loading ? null : (
               /*
                * `statusBarStyle` mora AQUI, e só aqui.
                *
@@ -205,7 +207,8 @@ function AppTree() {
                 </Stack.Protected>
               </Stack>
             </>
-          )}
+              )}
+            </AppUpdateProvider>
           </ToastProvider>
           </ConcealProvider>
         </KeyboardProvider>
