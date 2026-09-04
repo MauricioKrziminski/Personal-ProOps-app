@@ -821,6 +821,14 @@ npx expo export --platform web --output-dir /tmp/personal-proops-agent-web
 
 - [ ] No fluxo autenticado local, prove manualmente: abrir/voltar de `new` sem criar; enviar primeira mensagem; criar segunda conversa; memória separada; renomear; excluir; retry offline com mesmo UUID; scroll com páginas antigas; chegada de resposta estando longe do fim; approve/reject/candidate HITL; cota abrindo paywall.
 
+- [ ] **Antes do push, decida a janela de cutover.** A `0055` não é expand/contract: aplicada
+  sozinha, o agente Python anterior quebra em rascunho, pendência e reserva de execução, e cada
+  falha consome uma retentativa até a mensagem virar `failed` de vez. No staging isso só derruba
+  o `agente-staging` até o próximo deploy, o que é aceitável dentro desta fase. Para produção,
+  aplicar e fazer deploy como passo único com a fila do Cloud Tasks e os jobs do Cloud Scheduler
+  pausados — ou quebrar em `0055`/`0056` (precedente `0043` → `0044`). O cabeçalho da migration
+  registra as duas saídas.
+
 - [ ] Confirme staging antes de qualquer escrita:
 
 ```bash

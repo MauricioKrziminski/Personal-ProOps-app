@@ -7,6 +7,21 @@
 --
 -- O que NÃO muda: `messages_queue` continua exclusiva do WhatsApp e mantém `wa_message_id`
 -- com o nome da Meta; o upsert de sessão continua com árbitro em `phone` (ver 0040).
+--
+-- ⚠️ ESTA MIGRATION É CUTOVER DURO, NÃO expand/contract. Depois dela, o código ANTERIOR do
+-- agente quebra em três pontos — rascunho (`on conflict (phone)` sem o índice), pendência
+-- (`session_id not null`) e reserva (`wa_message_id` renomeado) — e o código NOVO não roda no
+-- schema anterior. Não há ordem de deploy segura entre os dois.
+--
+-- O custo de errar não é atraso: cada falha vira `mark_retry`, e na 3ª a mensagem do usuário
+-- fica `failed` para sempre. Com o retry do Cloud Tasks e o sweep de 1 minuto, três tentativas
+-- queimam em minutos.
+--
+-- Portanto, em QUALQUER ambiente com tráfego real (produção), aplicar e fazer o deploy do Cloud
+-- Run como um passo só, com a fila `whatsapp-debounce` do Cloud Tasks e os jobs do Cloud
+-- Scheduler PAUSADOS durante a janela. Se essa janela não for aceitável, quebre esta migration
+-- em duas antes de aplicar: a 0055 sem `set not null`, sem `drop index draft_actions_one_per_phone`
+-- e sem o rename; uma 0056 depois do deploy fechando os três. É o precedente 0043 → 0044.
 
 -- ===========================================================================
 -- 1. Identidade estável e canal em user_sessions
