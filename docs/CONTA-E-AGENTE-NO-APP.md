@@ -170,8 +170,11 @@ CLI. Fazer primeiro no STAGING (`utkqoiigimqzeenxkxdl`) e de novo em produção 
   case com a conta autenticada ou um alias dela. `noreply@proops.com.br` existe como USUÁRIO
   separado (não alias de `gestao@`), então autenticar como `gestao@` e enviar como `noreply@`
   é recusado. Autentique como `noreply@`.
-  ⚠️ O plano gratuito do Zoho não dá IMAP/POP e possivelmente nem SMTP. Se a autenticação falhar
-  com o host e a senha certos, é o plano — Mail Lite resolve.
+  ⚠️ **O host depende do PLANO, não do formato do endereço.** A doc do Zoho tabela por endereço
+  ("Organization/Paid Accounts (you@yourdomain.com) → smtppro"), e isso induz ao erro: o plano
+  GRATUITO também aceita domínio próprio, e nele o host é **`smtp.zoho.com`**. Foi o caso aqui
+  (03/09/2026): com `smtppro` a autenticação falhava, e com `smtp` funcionou de primeira.
+  Registrado também que o gratuito **dá SMTP** — só IMAP/POP é que são pagos.
 
   **DNS do domínio, verificado em 03/09/2026 — nada a fazer:** SPF inclui `zohomail.com`; DKIM já
   publicado no seletor `zoho._domainkey.proops.com.br` (RSA 1024, registro íntegro); DMARC em
@@ -179,23 +182,22 @@ CLI. Fazer primeiro no STAGING (`utkqoiigimqzeenxkxdl`) e de novo em produção 
   onde qualquer registro novo teria que entrar. DKIM em 2048 bits seria um degrau melhor que o
   1024 atual, mas não é bloqueio.
 
-#### ⚠️ Bloqueio externo em 03/09/2026 — não é bug nosso
+#### ⚠️ SMTP que falha NÃO dá erro — cai no remetente da Supabase (03/09/2026)
 
-Configuração salva no dashboard **não estava sendo aplicada** ao serviço de autenticação: o
-e-mail chegava do remetente padrão (`noreply@mail.app.supabase.io`) e com código de **8** dígitos,
-mesmo com o custom SMTP salvo e o OTP salvo em 6.
+O e-mail chegava do remetente padrão (`noreply@mail.app.supabase.io`) mesmo com o custom SMTP
+salvo e correto na tela. **Causa: host errado** (`smtppro.zoho.com` numa conta do plano gratuito,
+que usa `smtp.zoho.com`).
 
-A causa é um incidente da Supabase, aberto em 04/09/2026 00:15 UTC: *"Project Lifecycle Actions —
-Increased Error Rates"*, que **desabilita configuration changes e restarts**. O dashboard aceita e
-devolve os valores, mas o serviço continua rodando a configuração velha.
+O que torna isso caro de diagnosticar: **a Supabase não devolve erro quando o SMTP customizado
+falha — ela envia pelo servidor dela.** O cadastro funciona, o e-mail chega, o template novo
+aparece certinho, e o único sinal é o endereço do remetente. Quem não olhar o "de:" conclui que
+está tudo certo.
 
-**O sintoma que identifica esse caso** e o distingue de erro de configuração: o **template novo
-funciona** (ele é lido do banco a cada envio) enquanto **remetente e comprimento do código não**
-(esses vêm da config carregada na memória do GoTrue). Se um dia isso repetir, olhe
-`status.supabase.com` antes de mexer em qualquer coisa.
-
-Quando o incidente fechar: **salvar de novo** o SMTP e o Email OTP length, para forçar a aplicação,
-e refazer o teste. Nada no repositório precisa mudar.
+⚠️ **Registro de um diagnóstico ERRADO, para não se repetir:** a hipótese inicial foi um incidente
+aberto na Supabase naquela hora ("Project Lifecycle Actions", que desabilita configuration
+changes), porque o template pegava e a config não. A hipótese era coerente e era falsa — trocar o
+host aplicou na hora. **Incidente concomitante não é causa.** O teste que teria matado a dúvida em
+um minuto: mudar UM campo da config e ver se o efeito aparece.
 
 Achado do revisor para a Fase 4: `agent/app/jobs/alerts.py:39-46` reserva a vaga de dedupe do
 dia em `alerts_sent` com canal `whatsapp` quando não há push, e depois pula se `phone` é nulo —
