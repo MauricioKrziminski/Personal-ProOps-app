@@ -137,10 +137,11 @@ a senha nova.
 
 ⚠️ **Pré-requisitos no dashboard, sem os quais as telas não funcionam — não dá para fazer pelo
 CLI. Fazer primeiro no STAGING (`utkqoiigimqzeenxkxdl`) e de novo em produção quando promover:**
-- ~~Confirm email~~ — **nada a fazer.** O toggle não existe mais nesta versão do dashboard porque
-  exigir confirmação virou o padrão. Confirmado contra a API, não contra a documentação:
-  `GET /auth/v1/settings` devolve `mailer_autoconfirm: false`, ou seja, confirmação EXIGIDA.
-  Esse endpoint é público (só precisa da anon key) e é a forma de checar sem procurar menu.
+- **Confirm email** fica em Authentication → Sign In / Providers, na seção **User Signups** da
+  página principal — NÃO dentro do painel do provedor Email, que é onde a documentação da Supabase
+  manda procurar. Já vem ligado.
+  A forma de conferir sem caçar menu: `GET /auth/v1/settings` (público, só precisa da anon key)
+  devolve `mailer_autoconfirm: false` quando a confirmação está exigida.
 - Authentication → **Emails** (seção NOTIFICATIONS) → **Confirm signup** e **Reset password**:
   corpo com `{{ .Token }}` (os arquivos em `supabase/templates/` são exatamente o que colar). O
   padrão da Supabase só tem `{{ .ConfirmationURL }}`, e com ele o e-mail chega SEM o código.
@@ -149,9 +150,11 @@ CLI. Fazer primeiro no STAGING (`utkqoiigimqzeenxkxdl`) e de novo em produção 
   ainda chama de "Providers" é **Sign In / Providers**, e "Email Templates" é **Emails**. Se um
   passo daqui não existir com esse nome, é o menu que mudou de novo — procure pela seção, não pelo
   nome exato.
-- ⚠️ **Email OTP length = 6.** O padrão do projeto estava em **8** e o `OtpInput` do app tem
-  SEIS caixas (`LENGTH = 6` em `otp-input.tsx`, e as três telas checam `length < 6`). Com 8 a
-  pessoa recebe um código que não cabe no campo e o cadastro trava sem mensagem de erro.
+- ⚠️ **Email OTP length = 6** (feito no staging em 03/09/2026). O padrão do projeto era **8** e o
+  `OtpInput` do app tem SEIS caixas (`LENGTH = 6` em `otp-input.tsx`, e as três telas checam
+  `length < 6`). Com 8 a pessoa recebe um código que não cabe no campo e o cadastro trava sem
+  mensagem de erro. **Ao promover para produção, este ajuste tem que ser refeito lá** — é
+  configuração de projeto, não migration, então não viaja com o `db push`.
 - Senha mínima: o app exige 8; o dashboard estava em 6. Subir para 8 alinha os dois (o app já é
   o mais estrito, então 6 no servidor não é falha de segurança, é só divergência).
 - ⚠️ **SMTP → "Minimum interval per user" = 30s.** O padrão é 60 e o app libera "Reenviar" aos
