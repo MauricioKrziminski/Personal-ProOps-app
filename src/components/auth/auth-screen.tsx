@@ -62,7 +62,12 @@ const styles = StyleSheet.create({
     flexGrow: 1,
     justifyContent: 'center',
     paddingHorizontal: Space.xl,
-    paddingBottom: Space.xl,
+    /*
+      O rodapé é irmão do scroll, não sobreposto — mas com o conteúdo mais alto
+      que a tela (o cadastro tem quatro campos) o último campo terminava rente ao
+      botão, sem respiro nenhum. Conferido no simulador iOS em 04/09/2026.
+    */
+    paddingBottom: Space.xxl,
     gap: Space.xxl,
   },
   brand: { alignItems: 'flex-start' },

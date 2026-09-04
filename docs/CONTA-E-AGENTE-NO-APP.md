@@ -249,8 +249,17 @@ aí diariamente.
 
 - **Recuperação de senha no aparelho, com e-mail real.** Validada localmente com Mailpit; no
   staging só o cadastro foi até o fim.
-- **iOS não viu nenhuma das quatro telas de conta.** O simulador não tem toque e sair da conta lá
-  custaria a sessão. A moldura é a mesma da tela de WhatsApp, que já rodava no iOS.
+- ✅ **Entrar e Criar conta foram vistas no iOS** (04/09/2026) e **duas correções saíram daí**:
+  em `Entrar`, "Esqueci minha senha" e "Entrar com o WhatsApp" ficavam **encostados** (um terminava
+  em y=570 e o outro começava em y=570, medido na árvore de acessibilidade do simulador) e, como o
+  `Button` `sm` chega aos 44pt por `hitSlop` de 4, as duas **áreas de toque se sobrepunham em 8pt**
+  — tocar na beira levava para a tela errada. Em `Criar conta`, o último campo terminava rente ao
+  botão do rodapé. Faltam ainda `forgot-password` e `login-whatsapp` no iOS.
+
+  ⚠️ O simulador **tem** toque: `System Events` clica na janela do Simulator, e a árvore de
+  acessibilidade dá a posição exata de cada elemento (a tela do device fica em (165,135), 1:1).
+  Linha de `FlashList` não reage a clique sintético — para essas, `xcrun simctl openurl` com o
+  deep link resolve.
 - **Segundo cadastro por e-mail no staging.** O caso do 23505 está provado no Postgres local
   (`supabase/tests/profiles_email_signup.sql`), não contra o staging.
 - ✅ **O cartão do Perfil não mente mais** (03/09/2026). Ele mostrava selo verde de verificado e
@@ -369,7 +378,11 @@ produção a ordem tem de ser respeitada: `0055`, deploy, e só então `0056`.
 - **Deploy do Cloud Run** com a revisão nova (sem ele o agente remoto não conhece o schema);
 - **`EXPO_PUBLIC_AGENT_URL` e `APP_CORS_ORIGINS`** configurados nos ambientes;
 - **app publicado** e testado em **aparelho físico**;
-- **iOS**: a conferência visual inteira foi feita no Android; falta o simulador, claro e escuro;
+- **iOS, tema claro**: o fluxo inteiro foi conferido no simulador em ESCURO (empty state, prompts,
+  `new`, envio, `Pensando…`, `router.replace`, resposta com negrito, HITL com botões, "Confirmado",
+  medidor do Perfil). O claro não deu para conferir lá: `xcrun simctl ui appearance` não chega ao
+  app rodando e não há gesto de rolagem para alcançar o seletor de tema no Perfil. A paleta clara
+  das telas do agente está conferida no Android;
 - **Dynamic Type XL, TalkBack/VoiceOver e alvos de 44pt** não foram medidos em nenhuma plataforma;
 - **fluxos da interface ainda não exercitados na tela** (alguns provados só pela API): retry offline
   com o mesmo UUID, rolagem para páginas antigas, o botão "Ir para a mensagem mais recente",

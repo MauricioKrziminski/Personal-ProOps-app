@@ -160,6 +160,14 @@ export default function AgentScreen() {
             paddingHorizontal: Space.lg,
             paddingBottom: CURVED_BAR_SPACE,
           }}
+          /*
+            Puxar para atualizar. Esta aba não tem Realtime — as tabelas de
+            conversa são infraestrutura sem policy —, então uma conversa criada
+            em OUTRO aparelho só aparece quando alguém pede. Sem isto não havia
+            gesto nenhum para buscar de novo.
+          */
+          refreshing={lista.isRefetching && !lista.isFetchingNextPage}
+          onRefresh={() => lista.refetch()}
           onEndReachedThreshold={0.5}
           onEndReached={() => {
             // `isFetchingNextPage` no guarda: sem ele o `onEndReached` dispara

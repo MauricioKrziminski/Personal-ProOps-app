@@ -16,7 +16,19 @@ export const unstable_settings = {
 
 export default function AgentStackLayout() {
   return (
-    <Stack screenOptions={{ headerShadowVisible: false, ...stackHeaderFonts }}>
+    /*
+      `headerBackTitle` é iOS: lá o botão "voltar" carrega o TÍTULO da tela
+      anterior, e a raiz desta pilha esconde o header — então ela não tem título e
+      o sistema caía no nome do ARQUIVO da rota. O botão dizia "index", que é o
+      tipo de coisa que só aparece quando alguém abre o simulador. No Android o
+      voltar é uma seta sem texto e a opção é ignorada.
+    */
+    <Stack
+      screenOptions={{
+        headerShadowVisible: false,
+        headerBackTitle: 'Agente',
+        ...stackHeaderFonts,
+      }}>
       <Stack.Screen name="index" options={{ headerShown: false }} />
       {/*
         Sem título nas duas: em `new` o conteúdo é o campo de texto vazio e um título

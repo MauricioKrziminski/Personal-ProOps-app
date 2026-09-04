@@ -154,6 +154,13 @@ export function EmailLoginScreen() {
 const styles = StyleSheet.create({
   step: { gap: Space.xl },
   copy: { gap: Space.sm },
-  /** Cancela o padding da pílula: o rótulo do ghost alinha com o campo acima. */
-  links: { alignItems: 'flex-start', marginLeft: -Space.md },
+  /**
+   * Cancela o padding da pílula: o rótulo do ghost alinha com o campo acima.
+   *
+   * O `gap` NÃO é enfeite. Medido no simulador iOS em 04/09/2026: sem ele os dois
+   * botões ficavam encostados (um terminava em y=570 e o outro começava em y=570),
+   * e como o `sm` do `Button` chega aos 44pt por `hitSlop` de 4, as duas ÁREAS DE
+   * TOQUE se sobrepunham em 8pt. Tocar na beira levava para a tela errada.
+   */
+  links: { alignItems: 'flex-start', marginLeft: -Space.md, gap: Space.sm },
 });
