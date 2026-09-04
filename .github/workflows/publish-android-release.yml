@@ -20,7 +20,7 @@ jobs:
   publish:
     name: Build, verify and publish APK
     runs-on: ubuntu-latest
-    timeout-minutes: 90
+    timeout-minutes: 180
 
     steps:
       - name: Check out source
@@ -82,9 +82,11 @@ jobs:
         env:
           APK_PATH: ${{ steps.download.outputs.apk_path }}
         run: |
-          application_id="$(apkanalyzer manifest application-id "$APK_PATH")"
-          version_code="$(apkanalyzer manifest version-code "$APK_PATH")"
-          version_name="$(apkanalyzer manifest version-name "$APK_PATH")"
+          badging_path="$RUNNER_TEMP/apk-badging.txt"
+          "$ANDROID_SDK_ROOT/build-tools/36.0.0/aapt2" dump badging "$APK_PATH" > "$badging_path"
+          IFS=$'\t' read -r application_id version_code version_name < <(
+            node scripts/release/parse-aapt2-badging.mjs --input "$badging_path"
+          )
 
           if [ "$application_id" != 'com.proops.personal' ]; then
             echo "Unexpected application id: $application_id" >&2
@@ -100,6 +102,10 @@ jobs:
               exit 1
               ;;
           esac
+          if [ "$version_code" -le 0 ]; then
+            echo "Invalid Android versionCode: $version_code" >&2
+            exit 1
+          fi
 
           node scripts/release/verify-apk-signature.mjs \
             --apk "$APK_PATH" \
