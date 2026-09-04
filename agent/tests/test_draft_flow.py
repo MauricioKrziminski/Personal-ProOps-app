@@ -12,7 +12,7 @@ Este arquivo cobre o fast-path inteiro, que até aqui não tinha teste nenhum.
 
 import pytest
 
-from app import db, worker
+from app import db, conversation, worker
 from app.domain import confirm, draft
 
 CARTOES = [
@@ -51,7 +51,7 @@ class TestPerguntaCartao:
     """A pergunta vira MENU. O clique executa sem passar por IA nenhuma."""
 
     def test_ate_dois_cartoes_viram_botoes(self):
-        spec = worker._pergunta_cartao("d1", CARTOES, "Qual cartão?")
+        spec = conversation._pergunta_cartao("d1", CARTOES, "Qual cartão?")
         assert spec["ui"] == "buttons"
         # 2 cartões + cancelar = os 3 que a Meta aceita
         assert len(spec["buttons"]) == 3
@@ -60,14 +60,14 @@ class TestPerguntaCartao:
 
     def test_tres_ou_mais_viram_lista(self):
         muitos = [{"id": f"c{i}", "name": f"Cartão {i}"} for i in range(5)]
-        spec = worker._pergunta_cartao("d1", muitos, "Qual cartão?")
+        spec = conversation._pergunta_cartao("d1", muitos, "Qual cartão?")
         assert spec["ui"] == "list"
         assert len(spec["rows"]) == 6
         assert spec["rows"][0][0] == "ds:d1:c:c0"
 
     def test_lista_longa_respeita_o_limite_da_meta(self):
         muitos = [{"id": f"c{i}", "name": f"Cartão {i}"} for i in range(30)]
-        spec = worker._pergunta_cartao("d1", muitos, "Qual cartão?")
+        spec = conversation._pergunta_cartao("d1", muitos, "Qual cartão?")
         # 9 cartões + a saída = as 10 linhas que a Meta aceita
         assert len(spec["rows"]) == 10
 
@@ -75,12 +75,12 @@ class TestPerguntaCartao:
         """O rascunho não congela candidatos (`pending_actions` congela porque o
         resume depende do id), então um número digitado não teria a que se
         ancorar. Nome digitado a extração + o casamento normalizado resolvem."""
-        spec = worker._pergunta_cartao("d1", CARTOES, "Qual cartão?")
+        spec = conversation._pergunta_cartao("d1", CARTOES, "Qual cartão?")
         assert "nome" in spec["text"].lower()
         assert "Itaú" in spec["text"] and "Nubank Cartão" in spec["text"]
 
     def test_sem_cartao_nenhum_nao_finge_um_menu(self):
-        msg = worker._pergunta_cartao("d1", [], "Qual cartão?")
+        msg = conversation._pergunta_cartao("d1", [], "Qual cartão?")
         assert isinstance(msg, str)
         assert "cadastra" in msg.lower()
 
@@ -97,7 +97,7 @@ class TestCartaoDoRascunho:
     async def test_grava_o_nome_CANONICO_e_nao_o_digitado(self):
         """O defeito silencioso: "nubank" era gravado como veio, e o `ilike` de
         baixo não achava "Nubank Cartão"."""
-        decidido, resposta = await worker._cartao_do_rascunho(
+        decidido, resposta = await conversation._cartao_do_rascunho(
             SESSAO, RASCUNHO, {"acao": "completar", "slot": "account", "account": "nubank"}
         )
         assert resposta is None
@@ -105,14 +105,14 @@ class TestCartaoDoRascunho:
 
     @pytest.mark.asyncio
     async def test_acento_errado_ainda_acha(self):
-        decidido, _ = await worker._cartao_do_rascunho(
+        decidido, _ = await conversation._cartao_do_rascunho(
             SESSAO, RASCUNHO, {"acao": "completar", "slot": "account", "account": "itau"}
         )
         assert decidido["account"] == "Itaú"
 
     @pytest.mark.asyncio
     async def test_clique_resolve_o_id_DENTRO_do_workspace(self):
-        decidido, resposta = await worker._cartao_do_rascunho(
+        decidido, resposta = await conversation._cartao_do_rascunho(
             SESSAO, RASCUNHO,
             {"acao": "completar", "slot": "account", "account_id": "c1"},
         )
@@ -123,7 +123,7 @@ class TestCartaoDoRascunho:
     async def test_id_de_outro_workspace_nao_vira_argumento(self):
         """O id vem de um clique DO USUÁRIO. Usá-lo direto seria o IDOR que
         `ensure_owned` fecha nos outros caminhos."""
-        decidido, resposta = await worker._cartao_do_rascunho(
+        decidido, resposta = await conversation._cartao_do_rascunho(
             SESSAO, RASCUNHO,
             {"acao": "completar", "slot": "account", "account_id": "de-outro-workspace"},
         )
@@ -141,7 +141,7 @@ class TestCartaoDoRascunho:
             ]
 
         monkeypatch.setattr(db, "accounts", dois_nubanks)
-        decidido, resposta = await worker._cartao_do_rascunho(
+        decidido, resposta = await conversation._cartao_do_rascunho(
             SESSAO, RASCUNHO,
             {"acao": "completar", "slot": "account", "account": "nubank"},
         )
@@ -155,7 +155,7 @@ class TestCartaoDoRascunho:
     async def test_cartao_inexistente_OFERECE_CADASTRO(self):
         """Era um beco: listava os cartões existentes e mandava cadastrar no app.
         Agora o cadastro acontece sem sair da compra."""
-        decidido, resposta = await worker._cartao_do_rascunho(
+        decidido, resposta = await conversation._cartao_do_rascunho(
             SESSAO, RASCUNHO,
             {"acao": "completar", "slot": "account", "account": "banco do brasil"},
         )
@@ -174,7 +174,7 @@ class TestCartaoDoRascunho:
             return []
 
         monkeypatch.setattr(db, "accounts", vazio)
-        decidido, resposta = await worker._cartao_do_rascunho(
+        decidido, resposta = await conversation._cartao_do_rascunho(
             SESSAO, RASCUNHO, {"acao": "completar", "slot": "account", "account": "nubank"}
         )
         assert decidido is None
@@ -210,14 +210,14 @@ class TestRoteamentoDoClique:
 
         visto = {}
 
-        async def rodar(sessao, lote, conteudo, acoes, thread, config, uso=None):
+        async def rodar(sessao, lote, conteudo, acoes, thread, config, uso=None, **_):
             visto["acoes"] = acoes
             return "feito"
 
-        monkeypatch.setattr(worker, "_rodar_com_acoes", rodar)
+        monkeypatch.setattr(conversation, "_rodar_com_acoes", rodar)
 
-        r = await worker._run_graph(
-            SESSAO, [{"wa_message_id": "w1"}], {"clicked_id": "ds:d1:c:c2", "text": "Nubank Cartão"}
+        r = await conversation.run_turn(
+            SESSAO, source_message_id="w1", conteudo={"clicked_id": "ds:d1:c:c2", "text": "Nubank Cartão"}
         )
         assert r == "feito"
         assert visto["acoes"][0]["account"] == "Nubank Cartão"
@@ -235,11 +235,10 @@ class TestRoteamentoDoClique:
         async def explode(*a, **k):
             raise AssertionError("clique velho não pode chegar no grafo")
 
-        monkeypatch.setattr(worker, "_rodar_com_acoes", explode)
+        monkeypatch.setattr(conversation, "_rodar_com_acoes", explode)
 
-        r = await worker._run_graph(
-            SESSAO, [{"wa_message_id": "w1"}],
-            {"clicked_id": "ds:rascunho-de-ontem:c:c2", "text": "Nubank Cartão"},
+        r = await conversation.run_turn(
+            SESSAO, source_message_id="w1", conteudo={"clicked_id": "ds:rascunho-de-ontem:c:c2", "text": "Nubank Cartão"},
         )
         assert "expirou" in r
 
@@ -253,8 +252,8 @@ class TestRoteamentoDoClique:
 
         monkeypatch.setattr(db, "open_draft", sem_rascunho)
 
-        r = await worker._run_graph(
-            SESSAO, [{"wa_message_id": "w1"}], {"clicked_id": "ds:d1:c:c2", "text": "x"}
+        r = await conversation.run_turn(
+            SESSAO, source_message_id="w1", conteudo={"clicked_id": "ds:d1:c:c2", "text": "x"}
         )
         assert "expirou" in r
 
@@ -270,8 +269,8 @@ class TestRoteamentoDoClique:
 
         monkeypatch.setattr(draft, "interpretar", explode)
 
-        r = await worker._run_graph(
-            SESSAO, [{"wa_message_id": "w1"}], {"clicked_id": "pa:p1:ok", "text": "Confirmar"}
+        r = await conversation.run_turn(
+            SESSAO, source_message_id="w1", conteudo={"clicked_id": "pa:p1:ok", "text": "Confirmar"}
         )
         assert r is confirm.STALE or "expirou" in r
 
@@ -320,7 +319,7 @@ class TestRascunhoComPergunta:
     @pytest.mark.asyncio
     async def test_a_primeira_pergunta_ja_sai_como_menu(self):
         """Era ela que o teste de usabilidade pegou saindo como texto livre."""
-        spec = await worker._resposta_do_estado(SESSAO, self._estado(False), "t:1")
+        spec = await conversation._resposta_do_estado(SESSAO, self._estado(False), "t:1")
         assert spec["ui"] == "buttons"
         assert spec["buttons"][0] == ("ds:d-novo:c:c1", "Itaú")
         # o corpo leva a resposta inteira, não só a pergunta
@@ -336,7 +335,7 @@ class TestRascunhoComPergunta:
 
         monkeypatch.setattr(db, "create_pending", create_pending)
 
-        spec = await worker._resposta_do_estado(SESSAO, self._estado(True), "t:1")
+        spec = await conversation._resposta_do_estado(SESSAO, self._estado(True), "t:1")
         # o `create_pending` aconteceu: o interrupt tem como ser retomado
         assert criado["summary"] == "apagar o gasto de R$ 45"
         # e a mensagem é a confirmação, não o menu de cartão
@@ -385,8 +384,8 @@ class TestCustoDoTurno:
         monkeypatch.setattr(db, "open_draft", rascunho)
         monkeypatch.setattr(draft, "interpretar", interpretar)
 
-        r = await worker._run_graph(
-            SESSAO, [{"wa_message_id": "w1"}], {"text": "esquece aquilo"}
+        r = await conversation.run_turn(
+            SESSAO, source_message_id="w1", conteudo={"text": "esquece aquilo"}
         )
         assert "esqueci" in r
         assert len(eventos) == 1
@@ -399,15 +398,15 @@ class TestCustoDoTurno:
         async def rascunho(phone):
             return RASCUNHO
 
-        async def rodar(sessao, lote, conteudo, acoes, thread, config, uso=None):
-            await worker._audit(sessao, {"llm_calls": 0}, uso)
+        async def rodar(sessao, lote, conteudo, acoes, thread, config, uso=None, **_):
+            await conversation._audit(sessao, {"llm_calls": 0}, uso)
             return "feito"
 
         monkeypatch.setattr(db, "open_draft", rascunho)
-        monkeypatch.setattr(worker, "_rodar_com_acoes", rodar)
+        monkeypatch.setattr(conversation, "_rodar_com_acoes", rodar)
 
-        await worker._run_graph(
-            SESSAO, [{"wa_message_id": "w1"}], {"clicked_id": "ds:d1:c:c1", "text": "Itaú"}
+        await conversation.run_turn(
+            SESSAO, source_message_id="w1", conteudo={"clicked_id": "ds:d1:c:c1", "text": "Itaú"}
         )
         assert eventos == []
 
@@ -439,8 +438,8 @@ class TestCustoDoTurno:
 
         monkeypatch.setattr(build, "graph", lambda: _Grafo())
 
-        r = await worker._run_graph(
-            SESSAO, [{"wa_message_id": "w1"}], {"clicked_id": "pa:p1:ok", "text": "Confirmar"}
+        r = await conversation.run_turn(
+            SESSAO, source_message_id="w1", conteudo={"clicked_id": "pa:p1:ok", "text": "Confirmar"}
         )
         assert r == "apagado"
         assert eventos == []
@@ -453,7 +452,7 @@ class TestPerguntaDoTipoDeValor:
         """Botão da Meta tem 20 caracteres: "R$ 12.345,67 no total" já não cabe,
         e truncado as duas opções ficariam parecidas justamente na parte que as
         distingue. Os números vão no corpo, que tem 1024."""
-        spec = worker._pergunta_tipo_valor("d1", 70000, 12)
+        spec = conversation._pergunta_tipo_valor("d1", 70000, 12)
         assert "R$ 700,00" in spec["body"] and "R$ 8.400,00" in spec["body"]
         assert [b[0] for b in spec["buttons"]] == ["ds:d1:t:70000", "ds:d1:p:70000"]
         assert all(len(b[1]) <= 20 for b in spec["buttons"])
@@ -469,7 +468,7 @@ class TestPerguntaDoTipoDeValor:
 
         visto = {}
 
-        async def rodar(sessao, lote, conteudo, acoes, thread, config, uso=None):
+        async def rodar(sessao, lote, conteudo, acoes, thread, config, uso=None, **_):
             visto["acoes"] = acoes
             return "feito"
 
@@ -477,11 +476,10 @@ class TestPerguntaDoTipoDeValor:
                      "record_ai_event"):
             monkeypatch.setattr(db, nome, nada)
         monkeypatch.setattr(db, "open_draft", rascunho)
-        monkeypatch.setattr(worker, "_rodar_com_acoes", rodar)
+        monkeypatch.setattr(conversation, "_rodar_com_acoes", rodar)
 
-        await worker._run_graph(
-            SESSAO, [{"wa_message_id": "w1"}],
-            {"clicked_id": "ds:d1:p:70000", "text": "É cada parcela"},
+        await conversation.run_turn(
+            SESSAO, source_message_id="w1", conteudo={"clicked_id": "ds:d1:p:70000", "text": "É cada parcela"},
         )
         # 700 x 12 = 8.400, não 700
         assert visto["acoes"][0]["amount_cents"] == 840000
@@ -493,14 +491,14 @@ class TestMuitosCartoes:
         cadastrado — o pior dos mundos. Digitar o nome alcança todos, porque o
         casamento roda sobre a lista inteira."""
         muitos = [{"id": f"c{i}", "name": f"Cartão {i}"} for i in range(14)]
-        spec = worker._pergunta_cartao("d1", muitos, "Qual cartão?")
+        spec = conversation._pergunta_cartao("d1", muitos, "Qual cartão?")
         assert len(spec["rows"]) == 10  # 9 + a saída, o limite da Meta
         assert "+5" in spec["body"]
         assert "+5" in spec["text"]
 
     def test_lista_que_cabe_nao_ganha_aviso(self):
         poucos = [{"id": f"c{i}", "name": f"Cartão {i}"} for i in range(4)]
-        spec = worker._pergunta_cartao("d1", poucos, "Qual cartão?")
+        spec = conversation._pergunta_cartao("d1", poucos, "Qual cartão?")
         assert "+" not in spec["body"]
 
 
@@ -527,7 +525,7 @@ class TestCadastroDeCartaoNaHora:
 
     @pytest.mark.asyncio
     async def test_clique_cria_e_devolve_o_nome_do_BANCO(self):
-        decidido, resposta = await worker._cartao_do_rascunho(
+        decidido, resposta = await conversation._cartao_do_rascunho(
             SESSAO, RASCUNHO, {"acao": "criar_cartao", "name": "Banco do Brasil"}
         )
         assert resposta is None
@@ -538,7 +536,7 @@ class TestCadastroDeCartaoNaHora:
 
     @pytest.mark.asyncio
     async def test_escolher_outro_volta_para_a_lista(self):
-        decidido, resposta = await worker._cartao_do_rascunho(
+        decidido, resposta = await conversation._cartao_do_rascunho(
             SESSAO, RASCUNHO, {"acao": "escolher_cartao"}
         )
         assert decidido is None
@@ -550,7 +548,7 @@ class TestCadastroDeCartaoNaHora:
             return None
 
         monkeypatch.setattr(db, "create_credit_card", falhou)
-        decidido, resposta = await worker._cartao_do_rascunho(
+        decidido, resposta = await conversation._cartao_do_rascunho(
             SESSAO, RASCUNHO, {"acao": "criar_cartao", "name": "Inter"}
         )
         assert decidido is None
@@ -560,19 +558,19 @@ class TestCadastroDeCartaoNaHora:
         """`set_invoice` precisa de fechamento e vencimento, e mudar os dias
         depois não reprocessa lançamento já gravado — então a suposição não pode
         ficar muda."""
-        texto = worker._com_aviso_de_cartao("🧾 Parcelado: R$ 8.400,00", "Nubank")
+        texto = conversation._com_aviso_de_cartao("🧾 Parcelado: R$ 8.400,00", "Nubank")
         assert "Criei o cartão *Nubank*" in texto
         assert f"dia {db.CARTAO_FECHAMENTO_PADRAO}" in texto
         assert f"dia {db.CARTAO_VENCIMENTO_PADRAO}" in texto
         assert "R$ 8.400,00" in texto
 
     def test_sem_cartao_criado_a_resposta_passa_intacta(self):
-        assert worker._com_aviso_de_cartao("ok", None) == "ok"
+        assert conversation._com_aviso_de_cartao("ok", None) == "ok"
 
     def test_nome_longo_nao_estoura_o_id_do_botao(self):
         """O id do botão da Meta tem 256 caracteres e o nome viaja dentro dele."""
         longo = "Cartão " + "muito " * 40
-        spec = worker._pergunta_criar_cartao("d1", draft.nome_de_cartao(longo), [])
+        spec = conversation._pergunta_criar_cartao("d1", draft.nome_de_cartao(longo), [])
         assert all(len(b[0]) <= 256 for b in spec["buttons"])
 
 
@@ -597,19 +595,19 @@ class TestAvisoDoCicloSobreviveAConfirmacao:
     }
 
     def test_a_pergunta_de_confirmacao_carrega_o_aviso(self):
-        spec = worker._com_aviso_de_cartao(self.CONFIRMACAO, "Nubank")
+        spec = conversation._com_aviso_de_cartao(self.CONFIRMACAO, "Nubank")
         assert "Criei o cartão *Nubank*" in spec["body"]
         assert f"dia {db.CARTAO_FECHAMENTO_PADRAO}" in spec["body"]
         # o fallback de texto também: quem não renderiza interativo lê só ele
         assert "Criei o cartão *Nubank*" in spec["text"]
 
     def test_a_pergunta_em_si_nao_se_perde(self):
-        spec = worker._com_aviso_de_cartao(self.CONFIRMACAO, "Nubank")
+        spec = conversation._com_aviso_de_cartao(self.CONFIRMACAO, "Nubank")
         assert "R$ 8.400,00 em 10x" in spec["body"]
         assert [b[0] for b in spec["buttons"]] == ["pa:p1:ok", "pa:p1:no"]
 
     def test_sem_cartao_criado_o_spec_passa_intacto(self):
-        assert worker._com_aviso_de_cartao(self.CONFIRMACAO, None) == self.CONFIRMACAO
+        assert conversation._com_aviso_de_cartao(self.CONFIRMACAO, None) == self.CONFIRMACAO
 
 
 class TestFallbackSemPromessaMorta:
@@ -617,7 +615,7 @@ class TestFallbackSemPromessaMorta:
         """"Responde *criar*" não tinha handler: o texto ia para o classificador,
         virava nome de cartão, não casava, e o bot oferecia criar um cartão
         chamado *criar*. É o loop que a 2.6 deletou do `cartao_invalido`."""
-        spec = worker._pergunta_criar_cartao("d1", "Nubank", CARTOES)
+        spec = conversation._pergunta_criar_cartao("d1", "Nubank", CARTOES)
         assert "*criar*" not in spec["text"]
         assert "cancelar" in spec["text"].lower()
 

@@ -346,7 +346,7 @@ async def test_o_que_o_WORKER_manda_no_resume_o_gate_entende(monkeypatch, grafo)
     """
     from app.domain import confirm
     from app.graph import nodes
-    from app.worker import _congelado
+    from app.conversation import _congelado
 
     async def dois(workspace_id, acoes, texto_cru):
         return [{"table": "transactions", "status": "ambiguous",
@@ -371,7 +371,7 @@ async def test_o_que_o_WORKER_manda_no_resume_o_gate_entende(monkeypatch, grafo)
 async def test_numero_digitado_tambem_chega_inteiro_no_gate(monkeypatch, grafo):
     from app.domain import confirm
     from app.graph import nodes
-    from app.worker import _congelado
+    from app.conversation import _congelado
 
     async def dois(workspace_id, acoes, texto_cru):
         return [{"table": "transactions", "status": "ambiguous",
