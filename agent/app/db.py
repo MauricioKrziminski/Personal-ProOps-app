@@ -317,7 +317,11 @@ async def create_pending(
     summary: str,
 ) -> dict[str, Any] | None:
     settings = get_settings()
-    return await fetch_one(
+    # `do nothing` devolve NADA quando já existe pendência aberta na conversa
+    # (índice parcial da 0055). Isso acontece em corrida e em recovery — e
+    # devolver None ali faria a pergunta sair SEM BOTÃO, deixando o usuário com
+    # um texto que pede confirmação e nada em que tocar.
+    linha = await fetch_one(
         """
         insert into public.pending_actions
           (session_id, thread_id, phone, user_id, workspace_id, action, summary, expires_at)
@@ -334,6 +338,7 @@ async def create_pending(
         summary,
         settings.pending_ttl_minutes,
     )
+    return linha or await open_pending(session_id)
 
 
 async def resolve_pending(pending_id: UUID, status: str) -> None:
@@ -705,10 +710,10 @@ async def chat_messages(
     """Página do histórico, em ordem CRONOLÓGICA.
 
     A paginação anda para trás (`sequence < before`) porque é assim que se lê um
-    chat, mas a lista volta na ordem em que foi escrita — inverter na tela seria
-    a mesma regra escrita duas vezes.
+    chat, mas a lista volta na ordem em que foi escrita — inverter na rota seria
+    a mesma regra escrita em dois lugares.
     """
-    return await fetch(
+    linhas = await fetch(
         """
         select m.* from public.app_chat_messages m
         join public.user_sessions s on s.id = m.session_id
@@ -720,6 +725,7 @@ async def chat_messages(
         """,
         session_id, user_id, before, before, limit,
     )
+    return list(reversed(linhas))
 
 
 async def chat_prompt_history(session_id: UUID, limit: int = 40) -> list[dict[str, Any]]:
@@ -921,6 +927,25 @@ async def fail_chat_turn(
                 """,
                 (session_id,),
             )
+
+
+async def resolve_chat_ui_payload(
+    *, session_id: UUID, pending_id: UUID, resolution: str
+) -> None:
+    """Carimba a resolução no balão que trouxe os botões.
+
+    Sem isso a tela não distingue uma pergunta já respondida de uma viva, e um
+    toque numa bolha antiga tentaria resolver de novo — o servidor recusaria,
+    mas o usuário veria um erro por ter tocado no que a tela mostrava.
+    """
+    await execute(
+        """
+        update public.app_chat_messages
+        set ui_payload = ui_payload || jsonb_build_object('resolved', %s::text)
+        where session_id = %s and ui_payload->>'pending_id' = %s
+        """,
+        resolution, session_id, str(pending_id),
+    )
 
 
 async def mark_chat_deleting(session_id: UUID, user_id: UUID) -> dict[str, Any] | None:

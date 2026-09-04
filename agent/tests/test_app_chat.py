@@ -168,6 +168,12 @@ class RepoFalso:
         s["deleting_at"] = self.agora
         return s
 
+    async def resolve_chat_ui_payload(self, *, session_id, pending_id, resolution):
+        for m in self.mensagens:
+            payload = m.get("ui_payload") or {}
+            if m["session_id"] == session_id and payload.get("pending_id") == str(pending_id):
+                m["ui_payload"] = {**payload, "resolved": resolution}
+
     async def drop_chat_session(self, session_id):
         self.sessoes.pop(session_id, None)
         self.mensagens = [m for m in self.mensagens if m["session_id"] != session_id]
@@ -685,3 +691,81 @@ async def test_conversa_de_outro_usuario_nao_existe(repo):
         )
     with pytest.raises(app_chat.ConversationNotFound):
         await app_chat.delete_conversation(user_id=OUTRO_USER, session_id=sid)
+
+
+# ---------------------------------------------------------------------------
+# o que a revisão da migration e a leitura do db.py acharam
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.asyncio
+async def test_resposta_estruturada_sem_texto_nao_viola_o_check(repo, monkeypatch):
+    """`app_chat_messages.content` tem `check (btrim(content) <> '')`.
+
+    Espaço em branco não é fallback: `btrim(' ') = ''` e o insert vira 23514 no
+    meio de um turno que JÁ executou as tools. O lançamento estaria gravado e o
+    usuário veria erro.
+    """
+    inicial = await app_chat.create_conversation(
+        user_id=USER, client_message_id=uuid4(), content="oi"
+    )
+    sid = inicial.conversation["id"]
+
+    async def so_botoes(sessao, **kwargs):
+        return {"buttons": [{"id": "pa:1:ok", "title": "Confirmar"}],
+                "summary": "apagar o gasto de R$ 45"}
+
+    monkeypatch.setattr(app_chat.conversation, "run_turn", so_botoes)
+
+    r = await app_chat.send_message(
+        user_id=USER, session_id=sid, client_message_id=uuid4(), content="apaga"
+    )
+    assert r.assistant_message["content"].strip(), "content vazio estoura o check do banco"
+
+
+@pytest.mark.asyncio
+async def test_pergunta_respondida_para_de_parecer_viva(repo):
+    """Sem o carimbo, a tela não distingue botão vivo de botão já usado — e um
+    toque na bolha antiga viraria um erro por tocar no que a tela mostrava."""
+    inicial = await app_chat.create_conversation(
+        user_id=USER, client_message_id=uuid4(), content="oi"
+    )
+    sid = inicial.conversation["id"]
+    p = _pendencia(repo, sid)
+
+    # o balão com os botões daquela pergunta
+    repo.mensagens.append(
+        {"id": uuid4(), "session_id": sid, "client_message_id": None, "role": "assistant",
+         "content": "Confirma apagar?", "in_reply_to": repo.mensagens[0]["id"],
+         "status": "completed", "error_code": None,
+         "ui_payload": {"pending_id": str(p["id"]), "buttons": []}, "sequence": 5}
+    )
+
+    await app_chat.resolve_pending(
+        user_id=USER, session_id=sid, pending_id=p["id"],
+        client_message_id=uuid4(), decision="approve",
+    )
+
+    balao = next(m for m in repo.mensagens
+                 if (m.get("ui_payload") or {}).get("pending_id") == str(p["id"]))
+    assert balao["ui_payload"]["resolved"] == "approve"
+
+
+@pytest.mark.asyncio
+async def test_exclusao_apaga_o_thread_EFETIVO(repo):
+    """Hoje o efetivo e o cru coincidem no app (`session_epoch = 0` é travado
+    pelo check da 0055). Passar pelo helper é o que mantém isso correto se o app
+    um dia girar epoch — a alternativa é um checkpoint órfão em silêncio."""
+    from app.security import effective_thread_id
+
+    inicial = await app_chat.create_conversation(
+        user_id=USER, client_message_id=uuid4(), content="oi"
+    )
+    sid = inicial.conversation["id"]
+    repo.sessoes[sid]["session_epoch"] = 4
+
+    await app_chat.delete_conversation(user_id=USER, session_id=sid)
+
+    esperado = effective_thread_id(repo.threads_apagadas and
+                                   inicial.conversation["thread_id"], 4)
+    assert repo.threads_apagadas == [esperado]

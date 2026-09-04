@@ -28,6 +28,7 @@ from uuid import UUID
 
 from app import conversation, db
 from app.graph.build import delete_thread
+from app.security import effective_thread_id
 
 log = logging.getLogger(__name__)
 
@@ -35,8 +36,6 @@ repo = db  # trocável nos testes
 
 TITLE_MAX = 48
 SEM_TITULO = "Nova conversa"
-HISTORY_LIMIT = CHARS = 40  # quantas mensagens são lidas antes do corte por janela
-
 # O prefixo separa os dois canais dentro de `executed_actions`: um id da Meta
 # nunca colide com um UUID do app, mas o prefixo torna a origem legível quando
 # alguém for depurar um lançamento duplicado às 3 da manhã.
@@ -124,6 +123,11 @@ def _split_reply(resposta: str | dict | None) -> tuple[str, dict | None]:
         texto = resposta.get("text") or resposta.get("body") or ""
         return texto, resposta
     return (resposta or ""), None
+
+
+# `app_chat_messages.content` tem `check (btrim(content) <> '')`: espaço em
+# branco não é fallback, é 23514 no meio de um turno que já executou.
+SEM_TEXTO = "…"
 
 
 # ---------------------------------------------------------------------------
@@ -255,7 +259,7 @@ async def _execute_turn(
     assistente = await repo.finish_chat_turn(
         session_id=session_id,
         user_message_id=mensagem["id"],
-        content=texto or " ",
+        content=texto.strip() or (payload or {}).get("summary") or SEM_TEXTO,
         ui_payload=payload,
     )
     return TurnResult("completed", sessao, mensagem, assistente)
@@ -325,13 +329,18 @@ async def resolve_pending(
 
     # O rótulo visível vira mensagem do usuário: quem reabrir a conversa amanhã
     # precisa ver o que respondeu, não um payload de botão.
-    return await _execute_turn(
+    resultado = await _execute_turn(
         user_id=user_id,
         session_id=session_id,
         client_message_id=client_message_id,
         content=rotulo,
         clicked_id=clique,
     )
+    if resultado.status == "completed":
+        await repo.resolve_chat_ui_payload(
+            session_id=session_id, pending_id=pending_id, resolution=decision
+        )
+    return resultado
 
 
 # ---------------------------------------------------------------------------
@@ -353,5 +362,11 @@ async def delete_conversation(*, user_id: UUID, session_id: UUID) -> None:
     if isinstance(marcada, dict) and marcada.get("busy"):
         raise ConversationBusy()
 
-    await delete_thread(marcada["thread_id"])
+    # Pelo `effective_thread_id`, não pelo id cru. Hoje eles coincidem (a forma
+    # da sessão do app prende `session_epoch = 0`, e o efetivo só ganha sufixo a
+    # partir do 1), e é justamente por coincidirem que a chamada direta passaria
+    # despercebida no dia em que o app girar epoch.
+    await delete_thread(
+        effective_thread_id(marcada["thread_id"], marcada.get("session_epoch") or 0)
+    )
     await repo.drop_chat_session(session_id)
