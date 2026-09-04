@@ -332,6 +332,18 @@ que "voltar" faz depois.
      início do ombro DEPOIS do fim dele e o contorno se cruzava, apagando a mordida. (O export
      tem o mesmo defeito: `C 0 19.7 19.7 0 44 0` seguido de `L 32.7 0`, andando para trás.)
 
+  ⚠️ **O CONTEÚDO da barra segue a POSIÇÃO, nunca a rota** (03/09/2026). A mola parte do dedo, na
+  UI thread; `activeIndex` vem do expo-router e só chega quando a tela de destino monta. Tudo que
+  lia `activeIndex` para desenhar ficava, por isso, um pedaço da animação atrasado: a bolha
+  chegava no destino **carregando o ícone da origem**, com o rótulo errado ainda em verde e um
+  buraco no slot de onde ela saiu. Ícone da bolha, ícone do slot e cor do rótulo derivam de
+  `progresso` (`IconeDaBolha`, `IconeDoSlot`, `Rotulo`) — é a mesma regra do berço e da bolha,
+  estendida ao que está dentro delas. `activeIndex` fica só para a mola, o guarda do toque e a
+  acessibilidade.
+
+  O jeito de VER isso: toque numa aba e capture um quadro imediatamente. Se a tela ainda é a
+  antiga e a barra já é a nova, está certo — a barra deve LIDERAR a navegação, não segui-la.
+
   A bolha é da **cor da barra um degrau acima** (`backgroundSelected`) com o ícone no accent, mais
   sombra — é o desenho do export. Preenchê-la de `tint` com o ícone invertido gastava o accent
   inteiro num controle tocado 100× por dia. No escuro, barra, bolha e fundo ficam todos dentro de
