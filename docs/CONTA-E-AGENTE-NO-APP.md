@@ -179,6 +179,24 @@ CLI. Fazer primeiro no STAGING (`utkqoiigimqzeenxkxdl`) e de novo em produção 
   onde qualquer registro novo teria que entrar. DKIM em 2048 bits seria um degrau melhor que o
   1024 atual, mas não é bloqueio.
 
+#### ⚠️ Bloqueio externo em 03/09/2026 — não é bug nosso
+
+Configuração salva no dashboard **não estava sendo aplicada** ao serviço de autenticação: o
+e-mail chegava do remetente padrão (`noreply@mail.app.supabase.io`) e com código de **8** dígitos,
+mesmo com o custom SMTP salvo e o OTP salvo em 6.
+
+A causa é um incidente da Supabase, aberto em 04/09/2026 00:15 UTC: *"Project Lifecycle Actions —
+Increased Error Rates"*, que **desabilita configuration changes e restarts**. O dashboard aceita e
+devolve os valores, mas o serviço continua rodando a configuração velha.
+
+**O sintoma que identifica esse caso** e o distingue de erro de configuração: o **template novo
+funciona** (ele é lido do banco a cada envio) enquanto **remetente e comprimento do código não**
+(esses vêm da config carregada na memória do GoTrue). Se um dia isso repetir, olhe
+`status.supabase.com` antes de mexer em qualquer coisa.
+
+Quando o incidente fechar: **salvar de novo** o SMTP e o Email OTP length, para forçar a aplicação,
+e refazer o teste. Nada no repositório precisa mudar.
+
 Achado do revisor para a Fase 4: `agent/app/jobs/alerts.py:39-46` reserva a vaga de dedupe do
 dia em `alerts_sent` com canal `whatsapp` quando não há push, e depois pula se `phone` é nulo —
 a vaga é consumida sem envio. Já acontecia com `''`; agora todo usuário de e-mail sem push cai
