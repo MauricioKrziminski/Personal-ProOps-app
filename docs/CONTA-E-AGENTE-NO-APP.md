@@ -18,8 +18,9 @@
 >
 > Status (04/09/2026): Fase 5 implementada, provada ponta a ponta contra o Postgres local (webhook
 > com HMAC real e fluxo autenticado no emulador Android) e com as migrations `0055`/`0056`
-> aplicadas no staging. Falta deploy do Cloud Run, aparelho físico e iOS. Produção continua na
-> `0048`.
+> aplicadas no staging. Conferida no **simulador iOS**, nos dois temas, junto com as quatro telas
+> de conta — de onde saíram cinco correções. Falta **deploy do Cloud Run** e **aparelho físico**,
+> que são os dois bloqueios comuns às fases 3, 4, 6, 7 e 8. Produção continua na `0048`.
 
 ---
 
@@ -254,7 +255,25 @@ aí diariamente.
   em y=570 e o outro começava em y=570, medido na árvore de acessibilidade do simulador) e, como o
   `Button` `sm` chega aos 44pt por `hitSlop` de 4, as duas **áreas de toque se sobrepunham em 8pt**
   — tocar na beira levava para a tela errada. Em `Criar conta`, o último campo terminava rente ao
-  botão do rodapé. Faltam ainda `forgot-password` e `login-whatsapp` no iOS.
+  botão do rodapé. **As quatro telas foram vistas no iOS em 04/09/2026**, e a segunda passada
+  achou o defeito que o dono do produto tinha relatado ("botões grudados, tudo em cima do outro"):
+  **com o TECLADO aberto**, o `AuthScreen` colapsava. A `KeyboardAvoidingView` com
+  `behavior="padding"` encolhe o container INTEIRO, então o scroll perdia de uma vez a altura do
+  teclado E a do rodapé irmão — no `Entrar` sobravam ~258pt para um formulário de ~400pt, o botão
+  "Entrar" ficava a **2pt** do campo de e-mail e o campo de senha mais os dois links sumiam atrás
+  dele, sem nenhuma pista de que havia mais tela.
+
+  A moldura agora é a do sistema: **o rodapé é conteúdo do `ScrollView`** e o teclado entra por
+  `automaticallyAdjustKeyboardInsets`, que insere o inset e rola o campo focado para a área
+  visível. Um espaçador de `flex: 1` prende o rodapé embaixo quando sobra tela e colapsa quando
+  falta. O botão principal pode ficar abaixo da dobra enquanto se digita, e isso é o padrão do
+  iOS — as quatro telas encadeiam `returnKeyType` `next` → `next` → `go`, então o teclado sozinho
+  completa todos os fluxos.
+
+  `login-screen.tsx` (o Phone OTP) tinha a **própria cópia** desse andaime — exatamente a
+  divergência que o docstring do `AuthScreen` avisa que ia acontecer — e passou a usar a moldura
+  compartilhada. De quebra ganhou o **"Voltar"** que as outras três já tinham: ela é sempre
+  empurrada a partir do `Entrar`, tem `headerShown: false`, e não havia nenhuma volta visível.
 
   ⚠️ O simulador **tem** toque: `System Events` clica na janela do Simulator, e a árvore de
   acessibilidade dá a posição exata de cada elemento (a tela do device fica em (165,135), 1:1).
@@ -378,11 +397,21 @@ produção a ordem tem de ser respeitada: `0055`, deploy, e só então `0056`.
 - **Deploy do Cloud Run** com a revisão nova (sem ele o agente remoto não conhece o schema);
 - **`EXPO_PUBLIC_AGENT_URL` e `APP_CORS_ORIGINS`** configurados nos ambientes;
 - **app publicado** e testado em **aparelho físico**;
-- **iOS, tema claro**: o fluxo inteiro foi conferido no simulador em ESCURO (empty state, prompts,
-  `new`, envio, `Pensando…`, `router.replace`, resposta com negrito, HITL com botões, "Confirmado",
-  medidor do Perfil). O claro não deu para conferir lá: `xcrun simctl ui appearance` não chega ao
-  app rodando e não há gesto de rolagem para alcançar o seletor de tema no Perfil. A paleta clara
-  das telas do agente está conferida no Android;
+- ✅ **iOS, tema claro — conferido em 04/09/2026, e achou dois defeitos.** A afirmação anterior
+  aqui ("`xcrun simctl ui appearance` não chega ao app rodando") **estava errada**: o que segurava
+  o tema era `theme-mode: dark` gravado no AsyncStorage, a escolha do usuário ganhando do sistema,
+  como deve ser. Pondo a chave em `"system"` com o app fechado, o comando passa a valer.
+
+  1. **A linha da lista de conversas usava `backgroundElement`** — que é a cor do CHIP de ícone
+     DENTRO de uma linha, não a da linha. No escuro passava; no claro (`#EDEFEF` sobre `#F7F8F8`)
+     a linha inteira sumia no fundo. Agora é `surface`, como `Card` e `Row`.
+  2. **O badge da aba Hoje desenhava um "0" vermelho** no iOS. O código dizia
+     `hidden={pendentes === 0}` e o `hidden` do `Badge` não desliga nada — o certo é não renderizar
+     o elemento, que é o padrão da doc do Expo e o que o `CurvedTabBar` do Android já fazia. Era
+     enfeite no lugar mais nobre da tela, contra `design.md` §8.
+
+  Conferidos no claro depois disso: lista de conversas, conversa com negrito, HITL resolvido,
+  composer, tab bar e as quatro telas de conta;
 - **Dynamic Type XL, TalkBack/VoiceOver e alvos de 44pt** não foram medidos em nenhuma plataforma;
 - **fluxos da interface ainda não exercitados na tela** (alguns provados só pela API): retry offline
   com o mesmo UUID, rolagem para páginas antigas, o botão "Ir para a mensagem mais recente",
@@ -484,8 +513,11 @@ Arquitetura validada em produção noutro app Android e portada para cá **sem r
 
 #### iOS fica de fora
 
-Este fluxo é Android. No iOS não existe instalar APK: teste em aparelho é TestFlight, e é por lá
-que as quatro telas de conta finalmente serão vistas no iOS.
+Este fluxo é Android: no iOS não existe instalar APK, e teste em APARELHO é TestFlight.
+
+O que o TestFlight NÃO precisa mais cobrir são as telas de conta — as quatro foram vistas no
+**simulador** iOS em 04/09/2026 (ver Fase 3), com teclado aberto e fechado, e três defeitos
+saíram daí. Falta o que só um aparelho dá: OTP real da Meta, notificação push e desempenho.
 
 #### Evidência da execução
 

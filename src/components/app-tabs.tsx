@@ -84,9 +84,18 @@ export default function AppTabs() {
         <NativeTabs.Trigger key={tab.name} name={tab.name}>
           <NativeTabs.Trigger.Label>{tab.label}</NativeTabs.Trigger.Label>
           <NativeTabs.Trigger.Icon sf={tab.sf} md={tab.md} />
-          {tab.name === 'today' ? (
-            <NativeTabs.Trigger.Badge hidden={pendentes === 0}>
-              {String(pendentes)}
+          {/*
+            Renderiza CONDICIONALMENTE, não `hidden={pendentes === 0}`: o `hidden`
+            do `Badge` não desliga nada — o iOS desenhava uma bolinha vermelha com
+            "0" dentro, que é exatamente o enfeite que `design.md` §8 proíbe
+            ("badge de aba é contagem real ou não existe"). Visto no simulador em
+            04/09/2026. O `CurvedTabBar` do Android já fazia assim.
+            O teto de "9+" é o mesmo do Android: contagem de dois dígitos deforma
+            a bolha e ninguém age sobre "12" diferente de "9+".
+          */}
+          {tab.name === 'today' && pendentes > 0 ? (
+            <NativeTabs.Trigger.Badge>
+              {pendentes > 9 ? '9+' : String(pendentes)}
             </NativeTabs.Trigger.Badge>
           ) : null}
         </NativeTabs.Trigger>

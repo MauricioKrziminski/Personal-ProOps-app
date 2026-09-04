@@ -50,7 +50,10 @@ export const ConversationRow = memo(function ConversationRow({
       style={({ pressed }) => [
         styles.row,
         {
-          backgroundColor: pressed ? theme.backgroundSelected : theme.backgroundElement,
+          // `surface`, como `Card` e `Row`: `backgroundElement` é a cor do CHIP de
+          // ícone dentro de uma linha, não a da linha. No tema claro a diferença
+          // aparece — a linha inteira sumia no fundo da tela.
+          backgroundColor: pressed ? theme.backgroundSelected : theme.surface,
           // O contorno é a assinatura do design e não é enfeite: no fundo
           // quase-preto a sombra some, e sem ele a lista lê como um bloco só.
           borderColor: theme.cardBorder,

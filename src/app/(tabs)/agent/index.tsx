@@ -45,6 +45,7 @@ export default function AgentScreen() {
   const excluir = useDeleteAgentConversation();
 
   const [renomeando, setRenomeando] = useState<AgentConversation | null>(null);
+  const [puxando, setPuxando] = useState(false);
 
   const conversas = useMemo(
     () => lista.data?.pages.flatMap((p) => p.items) ?? [],
@@ -166,8 +167,17 @@ export default function AgentScreen() {
             em OUTRO aparelho só aparece quando alguém pede. Sem isto não havia
             gesto nenhum para buscar de novo.
           */
-          refreshing={lista.isRefetching && !lista.isFetchingNextPage}
-          onRefresh={() => lista.refetch()}
+          /*
+            O estado é LOCAL, não `isRefetching`: todo turno invalida esta lista
+            (`useAplicarTurno`), e amarrar o indicador ao refetch faria a lista se
+            puxar sozinha, com spinner, sempre que a pessoa voltasse de uma
+            conversa. O indicador é do GESTO, não da requisição.
+          */
+          refreshing={puxando}
+          onRefresh={() => {
+            setPuxando(true);
+            lista.refetch().finally(() => setPuxando(false));
+          }}
           onEndReachedThreshold={0.5}
           onEndReached={() => {
             // `isFetchingNextPage` no guarda: sem ele o `onEndReached` dispara
