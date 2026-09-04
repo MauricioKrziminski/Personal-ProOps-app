@@ -296,36 +296,29 @@ Meta, provar que o número não é reconhecido antes do vínculo e passa a ser d
 outro número e conferir `user_sessions` no ambiente remoto. Promover `0049`–`0053` para produção
 exige uma decisão separada.
 
-### Fase 5 — O agente dentro do app  ·  grande
+### Fase 5 — O agente dentro do app · DESENHO APROVADO, IMPLEMENTAÇÃO PENDENTE (04/09/2026)
 
-O grafo, as tools, os guards, a política de HITL e os prompts são **reaproveitados sem cópia**. O
-que muda é a borda.
+A especificação aprovada está em
+[`docs/superpowers/specs/2026-09-04-agente-no-app-design.md`](superpowers/specs/2026-09-04-agente-no-app-design.md).
 
-| Camada | WhatsApp | No app |
-|---|---|---|
-| Entrada | webhook → `messages_queue` → Cloud Tasks (debounce 3s) | `POST /chat` direto, autenticado pelo JWT (`current_user`, já existe) |
-| Quem é o usuário | resolvido pelo telefone | vem do `sub` do JWT — **mais simples e mais seguro** |
-| Sessão / thread | `user_sessions`, árbitro em `phone` | precisa de thread por **usuário**, não por telefone — ver abaixo |
-| Resposta | `send_text` / `send_interactive` | corpo da resposta HTTP (ou stream) |
-| HITL | botões da Meta | os mesmos `pending_actions`, desenhados como botões na tela |
-| Mídia | `download_media` da Meta | upload direto |
-| Idempotência | `wa_message_id` | id de mensagem gerado pelo cliente |
+O agente será a quinta aba. Ela terá lista, histórico persistente, nova conversa, títulos, renomear,
+excluir, retry e HITL com botões. Cada conversa do app terá sua própria sessão e memória.
 
-**A decisão estrutural desta fase** é a sessão. `user_sessions` tem `phone` como árbitro e
-`not null`. Dois caminhos:
+Gabriel decidiu isolar os canais: o app não verá mensagens nem contexto do WhatsApp, e o WhatsApp
+não verá conversas do app. O compartilhamento fica na implementação do grafo, das tools, dos guards,
+dos prompts e da cota. `user_sessions`, `pending_actions` e `draft_actions` serão generalizadas por
+sessão para sustentar os dois canais sem copiar o motor.
 
-- **(a)** generalizar a tabela: `phone` nulo permitido, chave passa a ser `(user_id, canal)`;
-- **(b)** tabela separada para o app.
+O histórico do app será completo na interface. O prompt receberá até 10 turnos recentes no app e
+5 no WhatsApp, ambos com orçamento de tamanho. O app começa com texto e resposta final persistida,
+sem streaming. O áudio, as imagens e os documentos que o WhatsApp já processa serão preservados.
 
-Prefiro **(a)**: é a mesma conversa, com a mesma memória — e (b) faria o usuário perder o contexto
-ao trocar de canal, que é exatamente o que ele não espera de "a mesma assistente".
-
-**Validar, em etapas** — não construir tudo antes de testar:
-1. `POST /chat` respondendo a "gastei 45 no mercado" com o lançamento criado (sem UI, por `curl`);
-2. a mesma rota exigindo JWT e recusando o de outro usuário;
-3. tela de chat com histórico;
-4. HITL: pedir para apagar algo e confirmar pelos botões da tela;
-5. **teste cruzado**: começar no WhatsApp, continuar no app, e a conversa saber do que se falava.
+**Validar, em etapas:**
+1. migration preservando as sessões atuais do WhatsApp e permitindo vários chats do app;
+2. rotas autenticadas, idempotência, concorrência e isolamento adversarial;
+3. grafo e HITL iguais nos dois canais, sem memória cruzada;
+4. quinta aba com lista, histórico, nova conversa, retry e exclusão completa;
+5. consumo `app` e `whatsapp` somando na mesma cota, além da regressão de áudio no WhatsApp.
 
 ### Fase 6 — Cota compartilhada e medidor · CÓDIGO PRONTO, SCHEMA EM STAGING (04/09/2026)
 
@@ -524,8 +517,8 @@ Registrado para não virar escopo por engano:
 - **Não migra** quem já entra por telefone. Os dois caminhos convivem.
 - **Não separa** cota por canal (decisão 3.2), só passa a mostrar a divisão.
 - **Não** põe login social (Google/Apple). É outra decisão, com outra fila de trabalho.
-- **Não** faz o agente do app falar por voz nem receber áudio na Fase 5 — o STT existe no worker
-  e pode entrar depois, sem mexer no grafo.
+- **Não** faz o agente **do app** falar por voz nem receber áudio na Fase 5. O WhatsApp já baixa o
+  áudio e o transcreve com Groq; esse caminho continua e ganha teste de regressão.
 
 ## 5b. Estado dos dois bancos (04/09/2026)
 
