@@ -690,7 +690,7 @@ async def _executar(
         phone=state["phone"],
         timezone=state["timezone"],
         texto=state.get("text", ""),
-        wa_message_id=state["wa_message_id"],
+        source_message_id=state["source_message_id"],
         last_query_data=state.get("last_query_data"),
         clicked_id=state.get("clicked_id"),
     )

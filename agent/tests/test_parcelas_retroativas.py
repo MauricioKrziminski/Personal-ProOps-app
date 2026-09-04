@@ -27,7 +27,7 @@ CTX = ExecContext(
     phone="5551999999999",
     timezone="America/Sao_Paulo",
     texto="",
-    wa_message_id="w1",
+    source_message_id="w1",
 )
 
 
@@ -121,7 +121,7 @@ class TestRetroacao:
             phone=CTX.phone,
             timezone=CTX.timezone,
             texto="",
-            wa_message_id="w1",
+            source_message_id="w1",
         )
         acao_set = FinanceAction(
             type=FinanceActionType.CREATE_INSTALLMENT_PURCHASE,

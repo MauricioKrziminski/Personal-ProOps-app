@@ -4,7 +4,7 @@ O modelo NÃO escolhe função. Ele produz um objeto validado e este mapa —
 fechado, escrito à mão — decide o que roda. Um tipo desconhecido cai no default
 e vira mensagem de ajuda; ele não tem como chegar a lugar nenhum do banco.
 
-Aqui também mora a idempotência: (wa_message_id, action_index) em
+Aqui também mora a idempotência: (source_message_id, action_index) em
 executed_actions. É o que impede que reprocessar uma mensagem (timeout,
 redeploy, retry do Cloud Tasks) transforme um gasto de R$45 em dois.
 """
@@ -118,10 +118,10 @@ async def execute(ctx: ExecContext, action: FinanceAction | FinanceQuery | Notes
 
     # Consulta pode repetir à vontade; escrita RESERVA a vaga antes de rodar.
     if not somente_leitura:
-        if not await db.reserve_execution(ctx.wa_message_id, ctx.action_index, action.type.value):
+        if not await db.reserve_execution(ctx.source_message_id, ctx.action_index, action.type.value):
             log.info(
                 "ação %s já executada (%s#%s) — pulando",
-                action.type, ctx.wa_message_id, ctx.action_index,
+                action.type, ctx.source_message_id, ctx.action_index,
             )
             return ToolResult("", read_only=True)
 
@@ -131,12 +131,12 @@ async def execute(ctx: ExecContext, action: FinanceAction | FinanceQuery | Notes
         # validação determinística: a mensagem já está escrita para o usuário
         log.info("nível 1 barrou %s: %s", action.type, err)
         if not somente_leitura:
-            await db.release_execution(ctx.wa_message_id, ctx.action_index)
+            await db.release_execution(ctx.source_message_id, ctx.action_index)
         return ToolResult(err.mensagem_usuario, read_only=True)
     except Exception:  # noqa: BLE001
         log.exception("ação %s falhou", action.type)
         if not somente_leitura:
-            await db.release_execution(ctx.wa_message_id, ctx.action_index)
+            await db.release_execution(ctx.source_message_id, ctx.action_index)
         return ToolResult(
             "❌ Deu erro ao processar uma parte da mensagem. Tenta de novo!", read_only=True
         )
@@ -145,9 +145,9 @@ async def execute(ctx: ExecContext, action: FinanceAction | FinanceQuery | Notes
         if resultado.read_only:
             # a tool não escreveu nada (não achou, empate, pediu detalhe):
             # devolve a vaga para o usuário poder tentar de novo
-            await db.release_execution(ctx.wa_message_id, ctx.action_index)
+            await db.release_execution(ctx.source_message_id, ctx.action_index)
         else:
-            await db.confirm_execution(ctx.wa_message_id, ctx.action_index, resultado.result_id)
+            await db.confirm_execution(ctx.source_message_id, ctx.action_index, resultado.result_id)
             if resultado.result_id:
                 ctx.created.append(str(resultado.result_id))
 

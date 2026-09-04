@@ -66,13 +66,16 @@ def _preserve_or_replace(antigo: dict | None, novo: dict | None) -> dict:
 class AgentState(TypedDict, total=False):
     # identidade
     thread_id: str
+    session_id: str
+    channel: str                # 'whatsapp' ou 'app'
     phone: str
     user_id: str
     workspace_id: str
     timezone: str
 
     # entrada (lote consolidado pelo debounce)
-    wa_message_id: str          # o id da ÚLTIMA mensagem do lote: chave de idempotência
+    source_message_id: str      # chave de idempotência do turno: id da Meta
+                                # (última do lote) ou `app:<uuid do cliente>`
     text: str                   # texto já sanitizado, pronto para o envelope
     media: dict[str, str] | None  # {mime_type, data_b64}
     raw_texts: list[str]

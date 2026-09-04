@@ -231,11 +231,15 @@ def _estado_base(sessao: dict, lote: list[dict], conteudo: dict, thread: str) ->
     de ser reiniciada e volta a vazar entre turnos."""
     return {
         "thread_id": thread,
+        "session_id": str(sessao["id"]),
+        "channel": sessao.get("channel") or "whatsapp",
         "phone": sessao["phone"],
         "user_id": sessao["user_id"],
         "workspace_id": sessao["workspace_id"],
         "timezone": sessao["timezone"] or "America/Sao_Paulo",
-        "wa_message_id": lote[-1]["wa_message_id"] if lote else "",
+        # A conversão do nome da Meta acontece AQUI, no adaptador do canal: o
+        # grafo não conhece a fila e o app não tem id da Meta.
+        "source_message_id": lote[-1]["wa_message_id"] if lote else "",
         "text": conteudo.get("text", ""),
         "media": conteudo.get("media"),
         "raw_texts": conteudo.get("raw_texts") or [conteudo.get("text", "")],
@@ -282,7 +286,7 @@ async def _run_graph(sessao: dict, lote: list[dict], conteudo: dict) -> str | di
     # pergunta de SIM/NÃO travando a conversa; rascunho é um lançamento pela
     # metade que ficou inerte enquanto o usuário fazia outra coisa.
     await db.expire_drafts()
-    rascunho = await db.open_draft(sessao["phone"])
+    rascunho = await db.open_draft(sessao["id"])
     clique = conteudo.get("clicked_id") or ""
     # clique `pa:` é do HITL e nunca é do rascunho; `ds:` é o oposto. Sem esta
     # separação, um clique na lista de cartões cairia em `confirm.decide` sem
@@ -314,7 +318,7 @@ async def _run_graph(sessao: dict, lote: list[dict], conteudo: dict) -> str | di
                 ),
             )
         if decidido and decidido["acao"] == "descartar":
-            await db.delete_draft(sessao["phone"])
+            await db.delete_draft(sessao["id"])
             return await _fechar(sessao, uso, "👍 Beleza, esqueci aquele lançamento.")
         # Resolve o cartão ANTES de consumir o rascunho. Falhar aqui e apagar
         # deixaria o usuário a um dado do fim e obrigado a repetir a compra
@@ -349,7 +353,7 @@ async def _run_graph(sessao: dict, lote: list[dict], conteudo: dict) -> str | di
                 return await _fechar(
                     sessao, uso, await _perguntar_slot(sessao, novo_id, slot, pergunta)
                 )
-            await db.delete_draft(sessao["phone"])
+            await db.delete_draft(sessao["id"])
             # segue o fluxo normal com a ação COMPLETA: as validações de
             # segurança (HITL de valor alto, alvo, propriedade) valem igual
             conteudo = {**conteudo, "text": rascunho["raw_text"]}
@@ -360,7 +364,7 @@ async def _run_graph(sessao: dict, lote: list[dict], conteudo: dict) -> str | di
 
     # --- fast-path: a mensagem é resposta a uma pergunta? ---
     await db.expire_pending(thread)
-    pendente = await db.open_pending(sessao["phone"])
+    pendente = await db.open_pending(sessao["id"])
     decisao = await confirm.decide(conteudo, pendente, uso)
 
     if decisao is confirm.STALE:
@@ -380,7 +384,7 @@ async def _run_graph(sessao: dict, lote: list[dict], conteudo: dict) -> str | di
             await db.resolve_pending(
                 pendente["id"], "approved" if decisao.get("approved") else "rejected"
             )
-            await db.delete_draft(sessao["phone"])
+            await db.delete_draft(sessao["id"])
             # O id CONGELADO vem de `pending_actions`, não de uma busca nova: é o
             # que garante que o SIM execute o registro que o usuário LEU, mesmo
             # que outro lançamento tenha entrado entre a pergunta e a resposta.
@@ -624,10 +628,10 @@ async def _resposta_do_estado(sessao: dict, estado: dict, thread: str) -> str | 
     if not rascunho:
         # Se uma ação financeira completa foi processada, descarta rascunho antigo residual
         if estado.get("finance_actions"):
-            await db.delete_draft(sessao["phone"])
+            await db.delete_draft(sessao["id"])
             antigo = None
         else:
-            antigo = await db.open_draft(sessao["phone"])
+            antigo = await db.open_draft(sessao["id"])
 
         # Nunca anexa lembrete de rascunho a consultas financeiras/extratos
         if antigo and not estado.get("finance_queries"):
@@ -646,6 +650,7 @@ async def _resposta_do_estado(sessao: dict, estado: dict, thread: str) -> str | 
         # a extração ficou pela metade: guarda para o usuário poder mudar de
         # assunto e voltar, em vez de ter que repetir a frase inteira
         draft_id = await db.save_draft(
+            session_id=sessao["id"],
             thread_id=thread,
             phone=sessao["phone"],
             user_id=UUID(str(sessao["user_id"])),
@@ -663,6 +668,7 @@ async def _resposta_do_estado(sessao: dict, estado: dict, thread: str) -> str | 
         # O ALVO CONGELADO vai para `pending_actions`: é de lá que o resume lê o
         # id, e é o que torna a mutação imune ao que entrar no banco no meio.
         linha = await db.create_pending(
+            session_id=sessao["id"],
             thread_id=thread,
             phone=sessao["phone"],
             user_id=UUID(str(sessao["user_id"])),

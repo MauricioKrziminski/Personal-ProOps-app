@@ -80,7 +80,7 @@ def _estado(acoes):
     return {
         "thread_id": "t1", "phone": "5551999999999", "user_id": "u1",
         "workspace_id": "w1", "timezone": "America/Sao_Paulo",
-        "wa_message_id": "wamid.1", "text": "teste", "media": None,
+        "source_message_id": "wamid.1", "text": "teste", "media": None,
         "results": [], "domains": [], "finance_actions": [], "finance_queries": [],
         "notes_actions": [],
         "confidence": 1.0, "approved": False, "halted": False,

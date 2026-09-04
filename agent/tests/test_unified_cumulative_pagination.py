@@ -45,7 +45,7 @@ class TestUnifiedCumulativePagination:
             phone="5551999999999",
             timezone="America/Sao_Paulo",
             texto="ver mais",
-            wa_message_id="w2",
+            source_message_id="w2",
             clicked_id="qpage:33333333-3333-3333-3333-333333333333:3",
             last_query_data={
                 "blueprint": {
@@ -113,7 +113,7 @@ class TestUnifiedCumulativePagination:
             phone="5551999999999",
             timezone="America/Sao_Paulo",
             texto="projeção dos próximos 90 dias do nubank",
-            wa_message_id="w1",
+            source_message_id="w1",
         )
         action1 = FinanceQuery(
             type=FinanceQueryType.QUERY_TRANSACTIONS,
@@ -133,7 +133,7 @@ class TestUnifiedCumulativePagination:
             phone="5551999999999",
             timezone="America/Sao_Paulo",
             texto="ver mais",
-            wa_message_id="w2",
+            source_message_id="w2",
             clicked_id="qpage:33333333-3333-3333-3333-333333333333:3",
             last_query_data=res1.data,
         )

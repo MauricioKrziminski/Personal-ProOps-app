@@ -294,21 +294,23 @@ async def expire_pending(thread_id: str | None = None) -> int:
     return row["n"] if row else 0
 
 
-async def open_pending(phone: str) -> dict[str, Any] | None:
+async def open_pending(session_id: UUID) -> dict[str, Any] | None:
+    """Pela SESSÃO, não pelo telefone: a conversa do app não tem número."""
     return await fetch_one(
         """
         select * from public.pending_actions
-        where phone = %s and status = 'awaiting' and expires_at > now()
+        where session_id = %s and status = 'awaiting' and expires_at > now()
         order by created_at desc limit 1
         """,
-        phone,
+        session_id,
     )
 
 
 async def create_pending(
     *,
+    session_id: UUID,
     thread_id: str,
-    phone: str,
+    phone: str | None,
     user_id: UUID,
     workspace_id: UUID,
     action: dict[str, Any],
@@ -318,11 +320,12 @@ async def create_pending(
     return await fetch_one(
         """
         insert into public.pending_actions
-          (thread_id, phone, user_id, workspace_id, action, summary, expires_at)
-        values (%s, %s, %s, %s, %s, %s, now() + make_interval(mins => %s))
+          (session_id, thread_id, phone, user_id, workspace_id, action, summary, expires_at)
+        values (%s, %s, %s, %s, %s, %s, %s, now() + make_interval(mins => %s))
         on conflict do nothing
         returning *
         """,
+        session_id,
         thread_id,
         phone,
         user_id,
@@ -350,7 +353,7 @@ async def resolve_pending(pending_id: UUID, status: str) -> None:
 # ---------------------------------------------------------------------------
 
 
-async def reserve_execution(wa_message_id: str, action_index: int, action_type: str) -> bool:
+async def reserve_execution(source_message_id: str, action_index: int, action_type: str) -> bool:
     """Reserva a vaga ANTES de executar. False = já foi feita (ou está sendo).
 
     A ordem importa e é a correção do bug do fluxo antigo: lá as ações rodavam e
@@ -362,12 +365,12 @@ async def reserve_execution(wa_message_id: str, action_index: int, action_type: 
     row = await fetch_one(
         """
         insert into public.executed_actions
-          (wa_message_id, action_index, action_type)
+          (source_message_id, action_index, action_type)
         values (%s, %s, %s)
-        on conflict (wa_message_id, action_index) do nothing
-        returning wa_message_id
+        on conflict (source_message_id, action_index) do nothing
+        returning source_message_id
         """,
-        wa_message_id,
+        source_message_id,
         action_index,
         action_type,
     )
@@ -375,7 +378,7 @@ async def reserve_execution(wa_message_id: str, action_index: int, action_type: 
 
 
 async def confirm_execution(
-    wa_message_id: str, action_index: int, result_id: UUID | None
+    source_message_id: str, action_index: int, result_id: UUID | None
 ) -> None:
     """Carimba o id criado na reserva (auditoria e desfazer)."""
     if result_id is None:
@@ -383,15 +386,15 @@ async def confirm_execution(
     await execute(
         """
         update public.executed_actions set result_id = %s
-        where wa_message_id = %s and action_index = %s
+        where source_message_id = %s and action_index = %s
         """,
         result_id,
-        wa_message_id,
+        source_message_id,
         action_index,
     )
 
 
-async def release_execution(wa_message_id: str, action_index: int) -> None:
+async def release_execution(source_message_id: str, action_index: int) -> None:
     """Devolve a vaga quando a execução falhou sem escrever nada.
 
     Sem isso, um erro transitório (banco fora por um segundo) queimaria a ação
@@ -400,9 +403,9 @@ async def release_execution(wa_message_id: str, action_index: int) -> None:
     await execute(
         """
         delete from public.executed_actions
-        where wa_message_id = %s and action_index = %s and result_id is null
+        where source_message_id = %s and action_index = %s and result_id is null
         """,
-        wa_message_id,
+        source_message_id,
         action_index,
     )
 
@@ -472,8 +475,9 @@ async def record_ai_event(
 
 async def save_draft(
     *,
+    session_id: UUID,
     thread_id: str,
-    phone: str,
+    phone: str | None,
     user_id: UUID,
     workspace_id: UUID,
     action: dict,
@@ -493,9 +497,9 @@ async def save_draft(
     linha = await fetch_one(
         """
         insert into public.draft_actions
-          (thread_id, phone, user_id, workspace_id, action, raw_text, missing, slot)
-        values (%s, %s, %s, %s, %s, %s, %s, %s)
-        on conflict (phone) do update
+          (session_id, thread_id, phone, user_id, workspace_id, action, raw_text, missing, slot)
+        values (%s, %s, %s, %s, %s, %s, %s, %s, %s)
+        on conflict (session_id) do update
           set action = excluded.action,
               raw_text = excluded.raw_text,
               missing = excluded.missing,
@@ -504,26 +508,28 @@ async def save_draft(
               created_at = now()
         returning id
         """,
-        thread_id, phone, user_id, workspace_id, Jsonb(action), raw_text, missing, slot,
+        session_id, thread_id, phone, user_id, workspace_id,
+        Jsonb(action), raw_text, missing, slot,
     )
     return str(linha["id"])
 
 
-async def open_draft(phone: str) -> dict[str, Any] | None:
-    """Busca por TELEFONE, não por thread: o thread efetivo carrega o epoch, que
+async def open_draft(session_id: UUID) -> dict[str, Any] | None:
+    """Busca pela SESSÃO, não por thread: o thread efetivo carrega o epoch, que
     gira em 6h de silêncio — e o rascunho vive 24h. Buscar por thread perderia
-    de vista o rascunho da própria pessoa depois de uma noite."""
+    de vista o rascunho da própria pessoa depois de uma noite. Era por telefone
+    até a 0055; a sessão é a mesma chave estável e existe também no app."""
     return await fetch_one(
         """
         select * from public.draft_actions
-        where phone = %s and expires_at > now()
+        where session_id = %s and expires_at > now()
         """,
-        phone,
+        session_id,
     )
 
 
-async def delete_draft(phone: str) -> None:
-    await execute("delete from public.draft_actions where phone = %s", phone)
+async def delete_draft(session_id: UUID) -> None:
+    await execute("delete from public.draft_actions where session_id = %s", session_id)
 
 
 async def expire_drafts() -> None:
