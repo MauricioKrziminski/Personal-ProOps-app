@@ -173,6 +173,9 @@ function AppTree() {
                   o login deixa de existir, então `back` nunca reentra nele. */}
                 <Stack.Protected guard={!session}>
                   <Stack.Screen name="login" options={{ headerShown: false }} />
+                  <Stack.Screen name="login-whatsapp" options={{ headerShown: false }} />
+                  <Stack.Screen name="signup" options={{ headerShown: false }} />
+                  <Stack.Screen name="forgot-password" options={{ headerShown: false }} />
                 </Stack.Protected>
 
                 <Stack.Protected guard={!!session}>

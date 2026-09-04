@@ -28,6 +28,9 @@ const RESEND_SECONDS = 45;
 /**
  * Login por Phone OTP — o telefone verificado é a mesma chave que vincula o WhatsApp.
  *
+ * Desde 03/09/2026 esta tela mora em `/login-whatsapp` e a porta principal é e-mail e senha
+ * (`email-login-screen.tsx`). Ela continua inteira para quem já tinha conta por telefone.
+ *
  * ## Por que esta tela foi refeita
  *
  * A arquitetura de dois passos (número → código) estava certa e continua igual. O que mudou foi

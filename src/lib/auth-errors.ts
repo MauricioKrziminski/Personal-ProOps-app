@@ -38,8 +38,27 @@ export function authErrorMessage(err: AuthLike | null | undefined): string | nul
     return 'Esse código expirou. Peça um novo.';
   }
 
+  // Conta por e-mail (0051). `code` primeiro, pelo mesmo motivo de sempre.
+  if (code === 'email_not_confirmed') {
+    return 'Esse e-mail ainda não foi confirmado. Confira a caixa de entrada.';
+  }
+  if (code === 'user_already_exists' || code === 'email_exists') {
+    return 'Já existe uma conta com esse e-mail. Entre ou recupere a senha.';
+  }
+  if (code === 'weak_password' || msg.includes('password should')) {
+    return 'Senha fraca. Use pelo menos 8 caracteres.';
+  }
+  if (code === 'same_password') {
+    return 'A senha nova é igual à antiga.';
+  }
+  if (code === 'invalid_credentials' && msg.includes('login')) {
+    // `Invalid login credentials` — e-mail ou senha. Não dizemos qual: é enumeração de conta.
+    return 'E-mail ou senha incorretos.';
+  }
+
   if (code === 'invalid_credentials' || msg.includes('invalid') || msg.includes('incorrect')) {
     // `Token has expired or is invalid` cai aqui quando não bateu no ramo de expirado acima.
+    if (msg.includes('email')) return 'Esse e-mail não parece válido.';
     return msg.includes('phone') || msg.includes('number')
       ? 'Esse número não parece válido. Confira o DDD e o 9 na frente.'
       : 'Código incorreto. Confira os 6 dígitos.';

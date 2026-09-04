@@ -43,3 +43,25 @@ test('erro imprevisto nunca vaza inglês', () => {
   assert.match(out, /Tente de novo/);
   assert.doesNotMatch(out, /exploded/);
 });
+
+test('e-mail e senha errados não dizem qual dos dois', () => {
+  assert.equal(
+    authErrorMessage({ code: 'invalid_credentials', message: 'Invalid login credentials', status: 400 }),
+    'E-mail ou senha incorretos.'
+  );
+});
+
+test('cadastro por e-mail: confirmado, repetido e senha fraca têm frases próprias', () => {
+  assert.equal(
+    authErrorMessage({ code: 'email_not_confirmed', message: 'Email not confirmed' }),
+    'Esse e-mail ainda não foi confirmado. Confira a caixa de entrada.'
+  );
+  assert.equal(
+    authErrorMessage({ code: 'user_already_exists', message: 'User already registered' }),
+    'Já existe uma conta com esse e-mail. Entre ou recupere a senha.'
+  );
+  assert.equal(
+    authErrorMessage({ code: 'weak_password', message: 'Password should be at least 8 characters.' }),
+    'Senha fraca. Use pelo menos 8 caracteres.'
+  );
+});

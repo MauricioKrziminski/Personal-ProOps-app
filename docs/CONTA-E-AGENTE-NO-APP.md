@@ -4,8 +4,9 @@
 > mudanças são grandes e precisam ser feitas e **validadas em pedaços** — não construídas inteiras
 > para só então serem testadas.
 >
-> Status: nada implementado. Cada fase abaixo tem o seu próprio "como validar", e a fase só está
-> pronta quando ela passa — não quando o código compila.
+> Status (03/09/2026): Fases 1, 2 e 3 feitas e validadas na branch `feat/conta-e-agente`.
+> Cada fase abaixo tem o seu próprio "como validar", e a fase só está pronta quando ela passa —
+> não quando o código compila.
 
 ---
 
@@ -113,7 +114,40 @@ Notas e Financeiro, no claro e no escuro, nas duas plataformas.
 **Validar** — as quatro raízes no claro e no escuro; conferir que nada mais usa `Type.wordmark`
 (se ninguém usar, o token sai junto).
 
-### Fase 3 — Conta por e-mail e senha  ·  **a maior, e a de maior risco**
+### Fase 3 — Conta por e-mail e senha  ·  **a maior, e a de maior risco**  ·  ✅ FEITA (03/09/2026)
+
+Migration `0051` aplicada em produção (trigger copiado da 0029, `phone` anulável, check em
+`display_name`). Telas: `login` (e-mail e senha), `signup`, `forgot-password`, `login-whatsapp`
+(a tela de OTP antiga, inteira), moldura `AuthScreen`. Validado **contra o Supabase LOCAL com
+Mailpit**, sem tocar em produção: cadastro sem telefone, SEGUNDO cadastro sem telefone (o caso do
+23505), e-mail repetido, recuperação de senha ponta a ponta com o código, senha antiga recusada
+(`supabase/tests/profiles_email_signup.sql` + roteiro em Node). No emulador Android, claro e
+escuro: cadastro → código → Hoje já com "Boa noite, Dev"; recuperação → código → dentro do app com
+a senha nova.
+
+**Duas decisões tomadas na execução, diferentes do texto abaixo:**
+1. **Sem campo de telefone no cadastro.** `profiles.phone` é a chave pela qual o agente entrega o
+   WhatsApp de alguém. Número NÃO verificado no cadastro = qualquer pessoa digita o SEU número e
+   recebe os seus lançamentos — e ainda colide no `unique` com quem já tem o número. Telefone só
+   entra pelo OTP do Perfil (Fase 4).
+2. **Confirmação e recuperação por CÓDIGO (`verifyOtp` + `{{ .Token }}`), não por link.** Link
+   exigiria deep link, allow-list de redirect e tratamento de URL; código reaproveita o
+   `OtpInput`. Na recuperação a senha nova é pedida ANTES do código, porque `verifyOtp` já
+   devolve sessão e o portão desmonta a tela (ver `frontend.md`).
+
+⚠️ **Pré-requisitos no dashboard do projeto (`utkqoiigimqzeenxkxdl`), sem os quais as telas não
+funcionam em produção — não dá para fazer pelo CLI:**
+- Authentication → Providers → Email: **Confirm email ligado** (decisão do dono, 03/09/2026).
+- Authentication → Email Templates → **Confirm signup** e **Reset password**: corpo com
+  `{{ .Token }}` (os arquivos em `supabase/templates/` são exatamente o que colar). O padrão da
+  Supabase só tem `{{ .ConfirmationURL }}`, e com ele o e-mail chega SEM o código.
+- Senha mínima: o app exige 8; o dashboard pode ficar em 6 (o app é mais estrito, não menos).
+- O remetente padrão da Supabase tem cota baixa; SMTP próprio quando o produto abrir.
+
+Achado do revisor para a Fase 4: `agent/app/jobs/alerts.py:39-46` reserva a vaga de dedupe do
+dia em `alerts_sent` com canal `whatsapp` quando não há push, e depois pula se `phone` é nulo —
+a vaga é consumida sem envio. Já acontecia com `''`; agora todo usuário de e-mail sem push cai
+aí diariamente.
 
 **Fazer**
 - Migration, tudo junto porque um sem o outro quebra:

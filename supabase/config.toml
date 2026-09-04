@@ -37,3 +37,24 @@ verify_jwt = false
 # constante-time no header Authorization (REVENUECAT_WEBHOOK_SECRET).
 [functions.billing-webhook]
 verify_jwt = false
+
+# ---------------------------------------------------------------------------
+# Auth local (03/09/2026) — conta por e-mail e senha com confirmação por CÓDIGO.
+# Estes templates são os mesmos que precisam estar no dashboard do projeto
+# (Authentication → Email Templates): o app confirma cadastro e recuperação com
+# `verifyOtp` + `{{ .Token }}`, nunca com o `{{ .ConfirmationURL }}` padrão.
+# ---------------------------------------------------------------------------
+[auth.email]
+enable_confirmations = true
+
+[auth.email.template.confirmation]
+subject = "Seu código do Personal ProOps app"
+content_path = "./supabase/templates/confirmation.html"
+
+[auth.email.template.recovery]
+subject = "Trocar a senha do Personal ProOps app"
+content_path = "./supabase/templates/recovery.html"
+
+# Só local: o padrão de 2 e-mails/hora derruba qualquer teste de fluxo com Mailpit.
+[auth.rate_limit]
+email_sent = 1000

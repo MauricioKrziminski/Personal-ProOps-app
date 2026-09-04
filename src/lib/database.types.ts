@@ -1416,7 +1416,7 @@ export type Database = {
           expo_push_token: string | null
           id: string
           locale: string
-          phone: string
+          phone: string | null
           timezone: string
           updated_at: string
           whatsapp_verified: boolean
@@ -1428,7 +1428,7 @@ export type Database = {
           expo_push_token?: string | null
           id: string
           locale?: string
-          phone: string
+          phone?: string | null
           timezone?: string
           updated_at?: string
           whatsapp_verified?: boolean
@@ -1440,7 +1440,7 @@ export type Database = {
           expo_push_token?: string | null
           id?: string
           locale?: string
-          phone?: string
+          phone?: string | null
           timezone?: string
           updated_at?: string
           whatsapp_verified?: boolean
