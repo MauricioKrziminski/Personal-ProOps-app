@@ -147,8 +147,17 @@ CLI. Fazer primeiro no STAGING (`utkqoiigimqzeenxkxdl`) e de novo em produção 
   ainda chama de "Providers" é **Sign In / Providers**, e "Email Templates" é **Emails**. Se um
   passo daqui não existir com esse nome, é o menu que mudou de novo — procure pela seção, não pelo
   nome exato.
-- Senha mínima: o app exige 8; o dashboard pode ficar em 6 (o app é mais estrito, não menos).
-- O remetente padrão da Supabase tem cota baixa; SMTP próprio quando o produto abrir.
+- ⚠️ **Email OTP length = 6.** O padrão do projeto estava em **8** e o `OtpInput` do app tem
+  SEIS caixas (`LENGTH = 6` em `otp-input.tsx`, e as três telas checam `length < 6`). Com 8 a
+  pessoa recebe um código que não cabe no campo e o cadastro trava sem mensagem de erro.
+- Senha mínima: o app exige 8; o dashboard estava em 6. Subir para 8 alinha os dois (o app já é
+  o mais estrito, então 6 no servidor não é falha de segurança, é só divergência).
+- ⚠️ **SMTP → "Minimum interval per user" = 30s.** O padrão é 60 e o app libera "Reenviar" aos
+  **45** (`RESEND_SECONDS`). Com 60 no servidor, o botão aparece habilitado e o reenvio é recusado
+  por rate limit. 30 mantém o app como o lado mais restritivo.
+- SMTP próprio: o domínio é do **Zoho** (MX `mx.zoho.com`), host `smtp.zoho.com` ou
+  `smtppro.zoho.com` conforme o plano, porta 465. A senha tem que ser **app-specific password**
+  do Zoho, não a senha da conta. O SPF do domínio já inclui `zohomail.com`.
 
 Achado do revisor para a Fase 4: `agent/app/jobs/alerts.py:39-46` reserva a vaga de dedupe do
 dia em `alerts_sent` com canal `whatsapp` quando não há push, e depois pula se `phone` é nulo —

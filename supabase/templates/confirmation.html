@@ -1,4 +1,142 @@
-<h2>Seu código do Personal ProOps app</h2>
-<p>Digite este código no app para confirmar sua conta:</p>
-<p style="font-size:28px;font-weight:700;letter-spacing:6px">{{ .Token }}</p>
-<p>Ele vale por pouco tempo. Se você não criou uma conta, ignore este e-mail.</p>
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="x-apple-disable-message-reformatting">
+<meta name="color-scheme" content="dark">
+<meta name="supported-color-schemes" content="dark">
+<title>Seu código do Personal ProOps app</title>
+<!--
+  E-mail de confirmação de cadastro.
+
+  ## Por que ele é assim
+
+  **Escuro e fixo.** O app é OLED e a identidade é escura; um e-mail que troca de cor conforme o
+  cliente não parece o mesmo produto. Toda cor é pintada explicitamente (§2 do design.md permite
+  o desenho que se compromete com um look só, desde que pinte tudo).
+
+  **Sem imagem nenhuma.** O Gmail bloqueia imagem remota até a pessoa clicar em "exibir", então
+  um e-mail que depende de logo aparece quebrado na primeira leitura, que é a única que importa
+  aqui. A marca é a PALAVRA, no peso e no tracking do app. É também o que o design.md já diz:
+  a tipografia carrega o peso quando não há cor de marca.
+
+  **Tabelas, não flex.** O Outlook desktop renderiza com o motor do Word: `flex`, `grid` e
+  `max-width` em div não existem lá. Layout inteiro em `<table role="presentation">` com largura
+  fixa, que é o único jeito de o e-mail ser o mesmo em todo lugar.
+
+  **O código não é dividido em 6 caixas.** Seria o eco perfeito do `OtpInput`, mas exigiria
+  `{{ index .Token 0 }}` no template Go, que devolve BYTE e imprimiria número. Um `letter-spacing`
+  largo em mono dá a mesma leitura de dígito-a-dígito sem depender de função de template.
+
+  ⚠️ O código precisa ter **6 dígitos** (Authentication → Sign In / Providers → Email → "Email
+  OTP length"). O `OtpInput` do app tem 6 caixas; com 8 a pessoa não consegue terminar de digitar.
+-->
+<style>
+  /* Progressive enhancement: onde a fonte carrega (Apple Mail, iOS), o e-mail fica na tipografia
+     do app. Todo o resto cai no stack do sistema declarado inline em cada elemento. */
+  @import url('https://fonts.googleapis.com/css2?family=Hanken+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@600&display=swap');
+  body { margin: 0 !important; padding: 0 !important; width: 100% !important; }
+  a { text-decoration: none; }
+  @media only screen and (max-width: 520px) {
+    .px { padding-left: 24px !important; padding-right: 24px !important; }
+    .code { font-size: 30px !important; letter-spacing: 8px !important; text-indent: 8px !important; }
+    .h1 { font-size: 24px !important; }
+  }
+</style>
+</head>
+<body style="margin:0;padding:0;background-color:#0E0E10;">
+
+<!-- Preheader: a linha que o app de e-mail mostra na LISTA, antes de abrir. Levar o código para
+     cá economiza uma abertura inteira. O bloco fica invisível dentro do corpo. -->
+<div style="display:none;overflow:hidden;line-height:1px;opacity:0;max-height:0;max-width:0;">
+  Seu código é {{ .Token }} — confirme sua conta no Personal ProOps app.
+  &#8199;&#65279;&#847; &#8199;&#65279;&#847; &#8199;&#65279;&#847; &#8199;&#65279;&#847; &#8199;&#65279;&#847; &#8199;&#65279;&#847; &#8199;&#65279;&#847; &#8199;&#65279;&#847; &#8199;&#65279;&#847;
+</div>
+
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" bgcolor="#0E0E10" style="background-color:#0E0E10;">
+  <tr>
+    <td align="center" style="padding:40px 16px;">
+
+      <table role="presentation" width="480" cellpadding="0" cellspacing="0" border="0" style="width:480px;max-width:480px;">
+
+        <!-- Marca -->
+        <tr>
+          <td align="center" style="padding:0 0 28px 0;">
+            <span style="font-family:'Hanken Grotesk',-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;font-size:17px;font-weight:700;letter-spacing:-0.4px;color:#E5E1E4;">ProOps</span>
+          </td>
+        </tr>
+
+        <!-- Card -->
+        <tr>
+          <td bgcolor="#1B1B1D" style="background-color:#1B1B1D;border:1px solid #2A2A2C;border-radius:16px;overflow:hidden;">
+
+            <!-- Fio de acento no topo. Três células em vez de gradiente: `linear-gradient` não
+                 existe no Outlook, e três tons sólidos leem como uma varredura de luz. -->
+            <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
+              <tr>
+                <td width="33.33%" height="3" bgcolor="#6DDC9E" style="width:33.33%;height:3px;line-height:3px;font-size:0;background-color:#6DDC9E;">&nbsp;</td>
+                <td width="33.33%" height="3" bgcolor="#4FB37E" style="width:33.33%;height:3px;line-height:3px;font-size:0;background-color:#4FB37E;">&nbsp;</td>
+                <td width="33.33%" height="3" bgcolor="#2E6B4F" style="width:33.33%;height:3px;line-height:3px;font-size:0;background-color:#2E6B4F;">&nbsp;</td>
+              </tr>
+            </table>
+
+            <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
+              <tr>
+                <td class="px" style="padding:36px 40px 8px 40px;">
+                  <p style="margin:0 0 10px 0;font-family:'Hanken Grotesk',-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;font-size:11px;font-weight:600;letter-spacing:1.1px;text-transform:uppercase;color:#6DDC9E;">Confirmação de cadastro</p>
+                  <h1 class="h1" style="margin:0 0 12px 0;font-family:'Hanken Grotesk',-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;font-size:26px;line-height:32px;font-weight:600;letter-spacing:-0.5px;color:#E5E1E4;">Bem-vindo</h1>
+                  <p style="margin:0;font-family:'Hanken Grotesk',-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;font-size:15px;line-height:23px;color:#A9AEAF;">Digite o código abaixo no app para confirmar sua conta e começar a usar.</p>
+                </td>
+              </tr>
+
+              <!-- O código -->
+              <tr>
+                <td class="px" style="padding:28px 40px 8px 40px;">
+                  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" bgcolor="#131315" style="background-color:#131315;border:1px solid #2A2A2C;border-radius:12px;">
+                    <tr>
+                      <td align="center" style="padding:22px 12px 24px 12px;">
+                        <div class="code" style="font-family:'JetBrains Mono',ui-monospace,SFMono-Regular,'SF Mono',Menlo,Consolas,'Courier New',monospace;font-size:36px;line-height:44px;font-weight:600;letter-spacing:12px;text-indent:12px;color:#6DDC9E;">{{ .Token }}</div>
+                      </td>
+                    </tr>
+                  </table>
+                </td>
+              </tr>
+
+              <tr>
+                <td class="px" align="center" style="padding:12px 40px 32px 40px;">
+                  <p style="margin:0;font-family:'Hanken Grotesk',-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;font-size:13px;line-height:18px;color:#7C8182;">O código vale por 1 hora e só pode ser usado uma vez.</p>
+                </td>
+              </tr>
+
+              <!-- Aviso de segurança, separado por um fio -->
+              <tr>
+                <td style="padding:0 40px;">
+                  <div style="height:1px;line-height:1px;font-size:0;background-color:#2A2A2C;">&nbsp;</div>
+                </td>
+              </tr>
+              <tr>
+                <td class="px" style="padding:20px 40px 32px 40px;">
+                  <p style="margin:0;font-family:'Hanken Grotesk',-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;font-size:13px;line-height:20px;color:#7C8182;">Não foi você que criou esta conta? Pode ignorar este e-mail — sem o código, nada acontece.</p>
+                </td>
+              </tr>
+            </table>
+
+          </td>
+        </tr>
+
+        <!-- Rodapé -->
+        <tr>
+          <td align="center" style="padding:24px 16px 0 16px;">
+            <p style="margin:0;font-family:'Hanken Grotesk',-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;font-size:12px;line-height:18px;color:#5E6363;">Personal ProOps app · notas, lembretes e financeiro no WhatsApp</p>
+          </td>
+        </tr>
+
+      </table>
+
+    </td>
+  </tr>
+</table>
+
+</body>
+</html>

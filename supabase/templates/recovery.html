@@ -1,4 +1,123 @@
-<h2>Trocar a senha do Personal ProOps app</h2>
-<p>Digite este código no app para escolher a senha nova:</p>
-<p style="font-size:28px;font-weight:700;letter-spacing:6px">{{ .Token }}</p>
-<p>Se você não pediu para trocar a senha, ignore este e-mail — nada muda.</p>
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="x-apple-disable-message-reformatting">
+<meta name="color-scheme" content="dark">
+<meta name="supported-color-schemes" content="dark">
+<title>Trocar a senha do Personal ProOps app</title>
+<!--
+  E-mail de recuperação de senha. Mesma anatomia do `confirmation.html` — as decisões (escuro
+  fixo, sem imagem, tabelas, código com tracking em vez de seis caixas) estão comentadas lá.
+
+  A ÚNICA diferença real de conteúdo é o peso do aviso de segurança: aqui ele não é uma nota de
+  rodapé, é um bloco com fundo próprio. Um e-mail de troca de senha que a pessoa não pediu é o
+  primeiro sinal de conta invadida, e enterrar isso em cinza claro no fim seria esconder a única
+  informação que ela precisa agir sobre.
+
+  O acento é ÂMBAR, não verde: `warning`, não `tint`. Trocar senha é uma ação de risco, e o
+  design.md reserva cor semântica para exatamente isso. Verde aqui diria "tudo certo", que é a
+  mensagem errada quando o e-mail pode ser fruto de um pedido que não foi seu.
+-->
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Hanken+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@600&display=swap');
+  body { margin: 0 !important; padding: 0 !important; width: 100% !important; }
+  a { text-decoration: none; }
+  @media only screen and (max-width: 520px) {
+    .px { padding-left: 24px !important; padding-right: 24px !important; }
+    .code { font-size: 30px !important; letter-spacing: 8px !important; text-indent: 8px !important; }
+    .h1 { font-size: 24px !important; }
+  }
+</style>
+</head>
+<body style="margin:0;padding:0;background-color:#0E0E10;">
+
+<div style="display:none;overflow:hidden;line-height:1px;opacity:0;max-height:0;max-width:0;">
+  Seu código para trocar a senha é {{ .Token }}. Se não foi você, ignore.
+  &#8199;&#65279;&#847; &#8199;&#65279;&#847; &#8199;&#65279;&#847; &#8199;&#65279;&#847; &#8199;&#65279;&#847; &#8199;&#65279;&#847; &#8199;&#65279;&#847; &#8199;&#65279;&#847; &#8199;&#65279;&#847;
+</div>
+
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" bgcolor="#0E0E10" style="background-color:#0E0E10;">
+  <tr>
+    <td align="center" style="padding:40px 16px;">
+
+      <table role="presentation" width="480" cellpadding="0" cellspacing="0" border="0" style="width:480px;max-width:480px;">
+
+        <tr>
+          <td align="center" style="padding:0 0 28px 0;">
+            <span style="font-family:'Hanken Grotesk',-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;font-size:17px;font-weight:700;letter-spacing:-0.4px;color:#E5E1E4;">ProOps</span>
+          </td>
+        </tr>
+
+        <tr>
+          <td bgcolor="#1B1B1D" style="background-color:#1B1B1D;border:1px solid #2A2A2C;border-radius:16px;overflow:hidden;">
+
+            <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
+              <tr>
+                <td width="33.33%" height="3" bgcolor="#F0B849" style="width:33.33%;height:3px;line-height:3px;font-size:0;background-color:#F0B849;">&nbsp;</td>
+                <td width="33.33%" height="3" bgcolor="#C08F38" style="width:33.33%;height:3px;line-height:3px;font-size:0;background-color:#C08F38;">&nbsp;</td>
+                <td width="33.33%" height="3" bgcolor="#6E5324" style="width:33.33%;height:3px;line-height:3px;font-size:0;background-color:#6E5324;">&nbsp;</td>
+              </tr>
+            </table>
+
+            <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
+              <tr>
+                <td class="px" style="padding:36px 40px 8px 40px;">
+                  <p style="margin:0 0 10px 0;font-family:'Hanken Grotesk',-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;font-size:11px;font-weight:600;letter-spacing:1.1px;text-transform:uppercase;color:#F0B849;">Recuperação de senha</p>
+                  <h1 class="h1" style="margin:0 0 12px 0;font-family:'Hanken Grotesk',-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;font-size:26px;line-height:32px;font-weight:600;letter-spacing:-0.5px;color:#E5E1E4;">Trocar sua senha</h1>
+                  <p style="margin:0;font-family:'Hanken Grotesk',-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;font-size:15px;line-height:23px;color:#A9AEAF;">Digite o código abaixo no app para escolher a senha nova.</p>
+                </td>
+              </tr>
+
+              <tr>
+                <td class="px" style="padding:28px 40px 8px 40px;">
+                  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" bgcolor="#131315" style="background-color:#131315;border:1px solid #2A2A2C;border-radius:12px;">
+                    <tr>
+                      <td align="center" style="padding:22px 12px 24px 12px;">
+                        <div class="code" style="font-family:'JetBrains Mono',ui-monospace,SFMono-Regular,'SF Mono',Menlo,Consolas,'Courier New',monospace;font-size:36px;line-height:44px;font-weight:600;letter-spacing:12px;text-indent:12px;color:#F0B849;">{{ .Token }}</div>
+                      </td>
+                    </tr>
+                  </table>
+                </td>
+              </tr>
+
+              <tr>
+                <td class="px" align="center" style="padding:12px 40px 28px 40px;">
+                  <p style="margin:0;font-family:'Hanken Grotesk',-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;font-size:13px;line-height:18px;color:#7C8182;">O código vale por 1 hora e só pode ser usado uma vez.</p>
+                </td>
+              </tr>
+
+              <!-- O aviso ganha superfície própria: é a informação que pede AÇÃO se o pedido não
+                   foi da pessoa. Em cinza no rodapé, ninguém lê. -->
+              <tr>
+                <td class="px" style="padding:0 40px 32px 40px;">
+                  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" bgcolor="#221C10" style="background-color:#221C10;border:1px solid #4A3C1E;border-radius:12px;">
+                    <tr>
+                      <td style="padding:16px 18px;">
+                        <p style="margin:0 0 4px 0;font-family:'Hanken Grotesk',-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;font-size:13px;font-weight:600;line-height:19px;color:#F0B849;">Não foi você que pediu?</p>
+                        <p style="margin:0;font-family:'Hanken Grotesk',-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;font-size:13px;line-height:20px;color:#A9AEAF;">Ignore este e-mail. Sua senha continua a mesma enquanto o código não for usado — mas vale conferir se mais alguém tem acesso à sua caixa de entrada.</p>
+                      </td>
+                    </tr>
+                  </table>
+                </td>
+              </tr>
+            </table>
+
+          </td>
+        </tr>
+
+        <tr>
+          <td align="center" style="padding:24px 16px 0 16px;">
+            <p style="margin:0;font-family:'Hanken Grotesk',-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;font-size:12px;line-height:18px;color:#5E6363;">Personal ProOps app · notas, lembretes e financeiro no WhatsApp</p>
+          </td>
+        </tr>
+
+      </table>
+
+    </td>
+  </tr>
+</table>
+
+</body>
+</html>
