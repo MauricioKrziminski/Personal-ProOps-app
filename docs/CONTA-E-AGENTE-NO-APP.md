@@ -275,6 +275,13 @@ aí diariamente.
   compartilhada. De quebra ganhou o **"Voltar"** que as outras três já tinham: ela é sempre
   empurrada a partir do `Entrar`, tem `headerShown: false`, e não havia nenhuma volta visível.
 
+  **Conferido nas DUAS plataformas** — `automaticallyAdjustKeyboardInsets` é só do iOS, e no
+  Android quem encolhe é o `adjustResize` do `AndroidManifest`, então mudar a moldura sem olhar lá
+  seria trocar um bug conhecido por um desconhecido. No emulador, com o teclado aberto: os dois
+  campos, os dois links e o formulário inteiro intactos. Para alcançar as telas de conta sem
+  perder a sessão do staging, dá para apagar só a chave do token no AsyncStorage do Android
+  (`run-as com.proops.personal sqlite3 databases/RKStorage`) e repor o arquivo depois.
+
   ⚠️ O simulador **tem** toque: `System Events` clica na janela do Simulator, e a árvore de
   acessibilidade dá a posição exata de cada elemento (a tela do device fica em (165,135), 1:1).
   Linha de `FlashList` não reage a clique sintético — para essas, `xcrun simctl openurl` com o
