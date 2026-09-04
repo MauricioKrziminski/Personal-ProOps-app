@@ -365,6 +365,33 @@ Arquitetura validada em produção noutro app Android e portada para cá **sem r
 Este fluxo é Android. No iOS não existe instalar APK: teste em aparelho é TestFlight, e é por lá
 que as quatro telas de conta finalmente serão vistas no iOS.
 
+---
+
+### Fase 8 — Controle dos avisos proativos automáticos · pendente (04/09/2026)
+
+**Decisão do Gabriel:** avisos inferidos pelo sistema — por exemplo saldo projetado negativo,
+orçamento estourando, fatura/conta vencendo e fim de teste — não podem interromper o usuário sem
+um controle visível para ativar e desativar esse comportamento.
+
+Eles são diferentes dos lembretes que a própria pessoa criou em `public.reminders`. A mensagem
+observada, “Saldo vai ficar negativo”, era um aviso proativo, mas usava a frase “Você pediu para
+ser lembrado disso”; essa frase é incorreta quando foi o sistema que decidiu avisar.
+
+**Requisitos mínimos antes de reativar qualquer aviso proativo:**
+
+- oferecer uma chave geral que liga/desliga **todos** os avisos automáticos; a granularidade por
+  tipo pode ser decidida na implementação, mas nunca pode substituir esse desligamento total;
+- desligar precisa silenciar todos os canais, inclusive push e WhatsApp — não pode apenas trocar
+  um canal pelo outro;
+- a preferência precisa ser respeitada no produtor/cron, antes de criar ou enviar a mensagem;
+- desligar avisos automáticos não pode apagar nem impedir lembretes pessoais criados pelo usuário;
+- o texto deve identificar que é uma sugestão do ProOps, sem afirmar que a pessoa pediu aquele
+  lembrete quando ela não pediu.
+
+**Validar ponta a ponta:** ligar e receber um aviso; desligar e confirmar ausência no push e no
+WhatsApp; criar um lembrete pessoal e confirmar que ele continua chegando; ligar novamente e
+confirmar que os avisos automáticos voltam.
+
 ## 5. O que este plano NÃO faz
 
 Registrado para não virar escopo por engano:
