@@ -59,7 +59,7 @@
     },
     "owner": "solutions.proops",
     "runtimeVersion": {
-      "policy": "fingerprint"
+      "policy": "appVersion"
     },
     "updates": {
       "url": "https://u.expo.dev/8313579c-3979-4ecd-ba6a-4dc0bf702f05"
