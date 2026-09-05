@@ -1,5 +1,3 @@
-import type { ConfigContext, ExpoConfig } from 'expo/config';
-
 /**
  * Três variantes que convivem NO MESMO APARELHO.
  *
@@ -28,22 +26,26 @@ import type { ConfigContext, ExpoConfig } from 'expo/config';
  *
  * ⚠️ `android/` e `ios/` são saída de `prebuild` (gitignorados) e têm o package ANTIGO
  * gravado. Depois de mudar de variante, `npx expo prebuild --clean` antes de `run:android`.
+ *
+ * ⚠️ **É `.js`, não `.ts`, de propósito.** Como `app.config.ts`, o build no EAS morria na fase
+ * "Configure expo-updates" em ~45s, com `UNKNOWN_ERROR`, duas vezes seguidas — enquanto
+ * `expo config` e `expo prebuild` passavam local. A config é lida por várias ferramentas em
+ * momentos diferentes do build, e nem todas carregam TypeScript; JS puro não tem esse risco e
+ * o arquivo não perde nada (as anotações eram três).
  */
-type Variante = 'development' | 'preview' | 'production';
+const VARIANTE = process.env.APP_VARIANT || 'development';
 
-const VARIANTE = (process.env.APP_VARIANT ?? 'development') as Variante;
-
-const IDENTIDADE: Record<Variante, { id: string; nome: string }> = {
+const IDENTIDADE = {
   development: { id: 'com.proops.personal.dev', nome: 'ProOps (dev)' },
   preview: { id: 'com.proops.personal.staging', nome: 'ProOps (staging)' },
   production: { id: 'com.proops.personal', nome: 'Personal ProOps app' },
 };
 
-export default ({ config }: ConfigContext): ExpoConfig => {
-  const { id, nome } = IDENTIDADE[VARIANTE] ?? IDENTIDADE.development;
+module.exports = ({ config }) => {
+  const { id, nome } = IDENTIDADE[VARIANTE] || IDENTIDADE.development;
 
   return {
-    ...(config as ExpoConfig),
+    ...config,
     name: nome,
     ios: { ...config.ios, bundleIdentifier: id },
     android: { ...config.android, package: id },
