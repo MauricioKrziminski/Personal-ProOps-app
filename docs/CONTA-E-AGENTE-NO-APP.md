@@ -666,6 +666,36 @@ serviço `agente` está numa revisão que não tem as rotas `/internal/chat/*`. 
 não existir, a aba Agente do app de produção diz "não configurado" — que é honesto. Ela entra
 junto com o deploy de produção.
 
+### ⛔ O build do EAS está bloqueado (04/09/2026)
+
+**Sete builds seguidos morreram na fase "Configure expo-updates"**, em ~45s, sempre com
+`UNKNOWN_ERROR` e a mesma mensagem ("See logs of the Configure expo-updates build phase").
+Sem o log da fase — que só a página do build mostra — não dá para ir além.
+
+O que **já foi eliminado** como causa, cada um com um build:
+
+| hipótese | teste | resultado |
+|---|---|---|
+| meu perfil `staging` | build com `preview` puro | falha igual |
+| `app.config.ts` (TypeScript) | reescrito em `app.config.js` | falha igual |
+| falta de `autoIncrement` | acrescentado em `development`/`preview` | falha igual |
+| package novo (`.staging`) | build `distribution` (`com.proops.personal`) | **falha igual** |
+| o `app.config.js` em si | `distribution` com o arquivo REMOVIDO | **falha igual** |
+| cache do EAS | `--clear-cache` | falha igual |
+
+A linha que decide: **o perfil `distribution` funcionou às 13:15 de hoje e falha agora, com o
+arquivo novo fora do caminho.** Entre um e outro não há mudança de dependência nem de config
+nativa — só commits de código do app e do agente. Isso aponta para o lado do EAS, não do repo.
+
+**Próximo passo (precisa de humano):** abrir
+`https://expo.dev/accounts/solutions.proops/projects/app-ProOps/builds/7e6e2cd7-6d38-413b-b0e9-7f3d1d22a06e`
+e ler a fase "Configure expo-updates". Com a mensagem real em mãos isto vira uma correção
+pequena ou um ticket para o Expo.
+
+⚠️ **`appVersionSource: remote` conta por PROJETO, não por package.** Os builds de staging
+subiram o mesmo contador que produção usa (2 → 4). Não houve regressão — produção só andou
+para frente —, mas o número do próximo APK de produção não é o que estava anotado.
+
 ## 5b. Estado dos dois bancos (04/09/2026)
 
 | ambiente | ref | migration |
