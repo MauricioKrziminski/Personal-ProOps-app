@@ -184,7 +184,12 @@ begin
   -- não tem número, então trocar de telefone não pode apagar o que a pessoa escreveu no app.
   select count(*) into n from public.user_sessions where thread_id = 'app-do-mesmo-dono';
   assert n = 1, 'a troca de telefone apagou a conversa do app';
-  select count(*) into n from public.app_chat_messages;
+  -- Escopado na sessão DESTE teste, nunca `count(*)` da tabela inteira: o banco
+  -- local guarda conversas de outras execuções e a asserção global falhava
+  -- dizendo que a troca apagou o histórico, quando nada tinha sido apagado.
+  select count(*) into n from public.app_chat_messages m
+  join public.user_sessions s on s.id = m.session_id
+  where s.thread_id = 'app-do-mesmo-dono';
   assert n = 1, 'a troca de telefone apagou o histórico do app';
   select count(*) into n from langgraph.checkpoints where thread_id = 'app-do-mesmo-dono';
   assert n = 1, 'a troca de telefone apagou o checkpoint da conversa do app';
