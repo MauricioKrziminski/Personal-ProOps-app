@@ -639,15 +639,27 @@ Registrado para não virar escopo por engano:
 | ambiente | ref | migration |
 |---|---|---|
 | produção | `kwriuifcwyvdrxtspjiz` | **0048** |
-| staging | `utkqoiigimqzeenxkxdl` | 0054 |
+| staging | `utkqoiigimqzeenxkxdl` | 0056 *(conferido em 04/09/2026 por `migration list --linked`)* |
 
-Produção está **seis migrations atrás**: `0049` (alertas/pastas), `0050` (nome), `0051` (conta
-por e-mail), `0052` (canais dos avisos), `0053` (vínculo verificado de telefone) e `0054` (consumo
-de IA por workspace/canal). Promover é decisão do Gabriel — nenhuma delas foi para lá.
+Produção está **oito migrations atrás**: `0049` (alertas/pastas), `0050` (nome), `0051` (conta
+por e-mail), `0052` (canais dos avisos), `0053` (vínculo verificado de telefone), `0054` (consumo
+de IA por workspace/canal), `0055` (expand do chat do app) e `0056` (contract do chat do app).
+Promover é decisão do Gabriel — nenhuma delas foi para lá.
+
+⚠️ O `0048` de produção vem da última verificação, **não** de uma leitura nesta sessão: conferir
+exigiria relinkar o CLI para produção, e relinkar por conta própria é justamente o passo que já
+custou duas migrations anunciadas no lugar errado. Antes de promover qualquer coisa, releia o
+número lá.
+
+⚠️ `0055` → **deploy do Cloud Run** → `0056`. A `0056` quebra o agente antigo de propósito. Em
+staging as duas já foram aplicadas de uma vez e o `agente-staging` está inerte até um deploy —
+aceito, porque staging é descartável. Em produção a ordem tem de ser respeitada.
 
 ## 6. Ordem de execução
 
-1 → 2 → 3 → 4 → 6 → 5. As Fases 1–4 e 6 já foram executadas; a próxima desta sequência é a Fase 5.
+1 → 2 → 3 → 4 → 6 → 5. **Todas foram executadas** (a Fase 5 fechou em 04/09/2026). O que resta
+não é fase nenhuma: é o que só existe fora desta máquina — o **deploy do Cloud Run** e um
+**aparelho físico** —, mais a promoção para produção, que é decisão separada do Gabriel.
 
 A Fase 6 veio **antes** da 5 de propósito: `ai_events.channel` e o medidor são o instrumento que
 mostra se o agente do app está funcionando e quanto ele custa. Construir o chat sem o medidor é
