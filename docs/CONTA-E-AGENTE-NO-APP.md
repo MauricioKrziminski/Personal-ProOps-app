@@ -666,35 +666,63 @@ serviço `agente` está numa revisão que não tem as rotas `/internal/chat/*`. 
 não existir, a aba Agente do app de produção diz "não configurado" — que é honesto. Ela entra
 junto com o deploy de produção.
 
-### ⛔ O build do EAS está bloqueado (04/09/2026)
+### Como instalar cada ambiente no aparelho
 
-**Sete builds seguidos morreram na fase "Configure expo-updates"**, em ~45s, sempre com
-`UNKNOWN_ERROR` e a mesma mensagem ("See logs of the Configure expo-updates build phase").
-Sem o log da fase — que só a página do build mostra — não dá para ir além.
+```bash
+# staging  (banco de staging + agente-staging)
+npx eas-cli build --platform android --profile staging
 
-O que **já foi eliminado** como causa, cada um com um build:
+# produção (só depois do runbook — ver docs/PROMOVER-PRODUCAO.md)
+npx eas-cli build --platform android --profile distribution
+```
 
-| hipótese | teste | resultado |
-|---|---|---|
-| meu perfil `staging` | build com `preview` puro | falha igual |
-| `app.config.ts` (TypeScript) | reescrito em `app.config.js` | falha igual |
-| falta de `autoIncrement` | acrescentado em `development`/`preview` | falha igual |
-| package novo (`.staging`) | build `distribution` (`com.proops.personal`) | **falha igual** |
-| o `app.config.js` em si | `distribution` com o arquivo REMOVIDO | **falha igual** |
-| cache do EAS | `--clear-cache` | falha igual |
+O primeiro APK de staging saiu em 04/09/2026, foi instalado ao lado do de produção no emulador
+(`com.proops.personal` e `com.proops.personal.staging` na mesma lista do `pm list packages`) e
+abriu na tela de entrar, em build de release. **É essa coexistência que o `app.config.js`
+existe para dar.**
 
-A linha que decide: **o perfil `distribution` funcionou às 13:15 de hoje e falha agora, com o
-arquivo novo fora do caminho.** Entre um e outro não há mudança de dependência nem de config
-nativa — só commits de código do app e do agente. Isso aponta para o lado do EAS, não do repo.
+### O build do EAS quebrou com as variantes — causa e correção (04/09/2026)
 
-**Próximo passo (precisa de humano):** abrir
-`https://expo.dev/accounts/solutions.proops/projects/app-ProOps/builds/7e6e2cd7-6d38-413b-b0e9-7f3d1d22a06e`
-e ler a fase "Configure expo-updates". Com a mensagem real em mãos isto vira uma correção
-pequena ou um ticket para o Expo.
+Assim que `app.config.js` entrou, **todo** build do EAS passou a morrer em ~45s na fase
+"Configure expo-updates" — inclusive o perfil `distribution`, que tinha funcionado às 13:15 do
+mesmo dia. Nove builds queimados.
+
+**O CLI e a API só dizem `UNKNOWN_ERROR`.** A frase que resolve o caso só existe na PÁGINA do
+build:
+
+> Runtime version calculated on local machine not equal to runtime version calculated during build.
+
+Lição de método antes da técnica: eu queimei seis builds testando hipóteses (perfil, TypeScript,
+`autoIncrement`, package novo, cache) antes de abrir o log. **Abra o log primeiro.**
+
+**A causa.** `runtimeVersion` era `policy: "fingerprint"`. O hash é calculado duas vezes — pelo
+`eas-cli` na sua máquina e pelo builder — e os dois usam implementações DIFERENTES: o `eas-cli`
+traz o próprio `@expo/fingerprint` embutido, o builder usa o do `node_modules` do projeto
+(0.20.10). Com `app.json` estático os dois chegavam ao mesmo hash; com config **dinâmico** eles
+divergem. Medido, mesma entrada, `APP_VARIANT=preview`:
+
+| quem calcula | hash |
+|---|---|
+| `eas-cli fingerprint:generate` | `3bdc0b2…` |
+| `@expo/fingerprint` 0.20.10 do projeto | `a4eef2ca…` |
+
+Um `fingerprint.config.js` com `sourceSkips` de identidade (`ExpoConfigNames`,
+`ExpoConfigAndroidPackage`, `ExpoConfigIosBundleIdentifier`) deixou o hash igual **entre as
+variantes** — que era um problema real e menor —, mas não fez as duas implementações
+concordarem. Foi removido.
+
+**A correção:** `runtimeVersion` virou `{ "policy": "appVersion" }`. Não há hash para divergir; o
+runtime é o `version` do `app.json`. Staging e produção continuam separados pelo **canal** do EAS
+Update, que é o que sempre separou os dois — o runtime nunca foi essa fronteira.
+
+⚠️ **O preço, e ele é real:** o fingerprint invalidava o runtime sozinho quando o código nativo
+mudava. Com `appVersion`, **dependência nova ou plugin novo exige subir o `version` à mão**, senão
+um update OTA pode cair num binário que não o aguenta. Está anotado em `app.config.js`, ao lado
+do código que causou a troca.
 
 ⚠️ **`appVersionSource: remote` conta por PROJETO, não por package.** Os builds de staging
-subiram o mesmo contador que produção usa (2 → 4). Não houve regressão — produção só andou
-para frente —, mas o número do próximo APK de produção não é o que estava anotado.
+subiram o mesmo contador que produção usa (2 → 4). Não houve regressão — produção só andou para
+frente —, mas o número do próximo APK de produção não é o que estava anotado.
 
 ## 5b. Estado dos dois bancos (04/09/2026)
 
