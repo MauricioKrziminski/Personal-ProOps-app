@@ -634,6 +634,38 @@ Registrado para não virar escopo por engano:
 - **Não** faz o agente **do app** falar por voz nem receber áudio na Fase 5. O WhatsApp já baixa o
   áudio e o transcreve com Groq; esse caminho continua e ganha teste de regressão.
 
+## 5a. Os TRÊS ambientes do aparelho (04/09/2026)
+
+Até hoje existia um `package` só (`com.proops.personal`), então instalar um build de staging
+**substituía** o de produção no celular — mesmo ícone, mesmo nome, e a única forma de saber em
+qual banco você estava escrevendo era lembrar qual APK foi instalado por último. Num app de
+dinheiro, é um jeito de gravar lançamento no banco errado sem perceber.
+
+**O APK que estava no aparelho era o de PRODUÇÃO**: o perfil `distribution` usa
+`environment: production`, e só aquele ambiente tinha as chaves do Supabase — as de
+`kwriuifcwyvdrxtspjiz`. E nenhum ambiente tinha `EXPO_PUBLIC_AGENT_URL`, então a aba Agente
+dizia "não configurado".
+
+Agora são três apps que **convivem** (`app.config.ts`, por `APP_VARIANT`):
+
+| perfil EAS | variante | package | nome | banco | agente |
+|---|---|---|---|---|---|
+| `development` | `development` | `com.proops.personal.dev` | ProOps (dev) | staging | `agente-staging` |
+| `staging` / `preview` | `preview` | `com.proops.personal.staging` | ProOps (staging) | staging | `agente-staging` |
+| `production` / `distribution` | `production` | `com.proops.personal` | Personal ProOps app | produção | *(sem URL até o deploy)* |
+
+⚠️ **`APP_VARIANT` sem valor = `development`**, nunca produção — mesma regra do `agent/.env`:
+"sem variável" quer dizer "alguém rodou `expo run:android` na própria máquina", e isso não pode
+sobrescrever o app de produção do celular do dono.
+
+O `scheme` continua um só (`appproops`): ele não é chave de dado nenhum, e com dois apps
+instalados o Android mostra um seletor, que é o comportamento certo.
+
+⚠️ `EXPO_PUBLIC_AGENT_URL` **não** foi configurado no ambiente `production` de propósito: o
+serviço `agente` está numa revisão que não tem as rotas `/internal/chat/*`. Enquanto a variável
+não existir, a aba Agente do app de produção diz "não configurado" — que é honesto. Ela entra
+junto com o deploy de produção.
+
 ## 5b. Estado dos dois bancos (04/09/2026)
 
 | ambiente | ref | migration |
