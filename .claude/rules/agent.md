@@ -109,6 +109,18 @@ garantia sozinho virou responsabilidade do código:
 Um container só, um processo só. `require_internal` aceita OIDC (Cloud Tasks/Scheduler) **ou**
 `X-Internal-Secret` — é só isso que muda num VPS. Nenhuma lógica de negócio conhece o Cloud Run.
 
+## Ambientes
+
+**`agent/.env` é o STAGING e `agent/.env.production` é a produção** (invertido em 04/09/2026).
+A regra é uma só: *o arquivo sem qualificador é o ambiente descartável*, porque tudo que não
+escolhe ambiente — `docker compose up`, `env_file=".env"` do pydantic, `source` no terminal — lê
+justamente esse. Produção tem nome próprio e só é lida por `setup-gcp.sh deploy|secrets`, que
+pede confirmação explícita.
+
+`THREAD_SALT` é o MESMO nos dois ambientes. Não é falha de segurança (`thread_id` só é chave
+dentro de um banco, e os bancos são outros), mas se um dia for rotacionado, rotacione um de cada
+vez e saiba que sessões e confirmações pendentes daquele ambiente recomeçam.
+
 ## Qualidade
 
 `.venv/bin/pytest` verde antes de commitar. Teste que fala com rede ou banco não entra: os nós que

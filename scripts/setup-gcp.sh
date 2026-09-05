@@ -19,7 +19,7 @@ set -euo pipefail
 if [[ "${1:-}" == staging ]]; then
   : "${SERVICE:=agente-staging}"
   : "${QUEUE:=whatsapp-debounce-staging}"
-  : "${ENV_FILE:=agent/.env.staging}"
+  : "${ENV_FILE:=agent/.env}"
   : "${SECRET_SUFFIX:=-staging}"
 fi
 
@@ -34,10 +34,15 @@ SA_NAME="${SA_NAME:-agente-runner}"
 ORGANIZATION="${ORGANIZATION:-76291957852}"
 SA_EMAIL="${SA_NAME}@${PROJECT_ID}.iam.gserviceaccount.com"
 
-# Segredos lidos de agent/.env (NUNCA commitado). O script grava no Secret
-# Manager; o Cloud Run recebe por referência, e o valor nunca vira env var em
-# texto no console nem no histórico de deploy.
-ENV_FILE="${ENV_FILE:-agent/.env}"
+# Segredos lidos de um .env do agente (NUNCA commitado). O script grava no
+# Secret Manager; o Cloud Run recebe por referência, e o valor nunca vira env
+# var em texto no console nem no histórico de deploy.
+#
+# O default é `.env.production` e o `staging` acima já trocou para `.env`. A
+# assimetria é intencional: `.env` é o que TUDO que não escolhe acaba lendo
+# (docker compose, pydantic, `source`), então ele é o staging; produção tem
+# nome próprio e só chega aqui por este caminho.
+ENV_FILE="${ENV_FILE:-agent/.env.production}"
 
 # Sufixo dos IDs no Secret Manager. Os segredos são POR PROJETO GCP, e staging e
 # produção dividem o mesmo projeto — sem sufixo, o serviço de staging receberia
@@ -438,4 +443,34 @@ main() {
     *) echo "uso: $0 [tudo|deploy|staging|secrets|preflight|build-iam|sa]" >&2; exit 1 ;;
   esac
 }
+# ── Trava de produção ──────────────────────────────────────────────────────
+# Mesma convenção do hook do Supabase (`scripts/supabase-target.sh`): produção é
+# pedido explícito, e a saída de emergência é a MESMA variável, para não existir
+# uma segunda coisa para lembrar. Sem isto, `./scripts/setup-gcp.sh` sozinho
+# (subcomando default `tudo`) faz deploy em produção sem perguntar nada.
+prod_gate() {
+  local cmd="${1:-tudo}"
+  case "$cmd" in
+    tudo|deploy|secrets|sa|build-iam) ;;   # escrevem em produção
+    *) return 0 ;;
+  esac
+  [[ "$ENV_FILE" == *".env.production" ]] || return 0   # staging passa direto
+
+  if [[ -n "${PROOPS_PROD_OK:-}" ]]; then
+    warn "PROOPS_PROD_OK=1 — seguindo em PRODUÇÃO ($SERVICE)"
+    return 0
+  fi
+  echo
+  echo "  ⚠️  ALVO: PRODUÇÃO — serviço '$SERVICE', segredos de $ENV_FILE"
+  echo "     (staging é: $0 staging)"
+  if [[ ! -t 0 ]]; then
+    echo "  ✗ sem terminal para confirmar. Use PROOPS_PROD_OK=1 se é de propósito." >&2
+    exit 1
+  fi
+  read -r -p "  Digite PRODUCAO para continuar: " r
+  [[ "$r" == "PRODUCAO" ]] || { echo "  abortado."; exit 1; }
+}
+
+[[ -f "$ENV_FILE" ]] || { echo "✗ $ENV_FILE não existe (staging = $0 staging)" >&2; exit 1; }
+prod_gate "${1:-tudo}"
 main "$@"
