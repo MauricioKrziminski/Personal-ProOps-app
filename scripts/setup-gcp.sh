@@ -450,11 +450,16 @@ main() {
 # (subcomando default `tudo`) faz deploy em produção sem perguntar nada.
 prod_gate() {
   local cmd="${1:-tudo}"
+  # Quem decide o ALVO é o subcomando, não o $ENV_FILE: `SERVICE` e
+  # `SECRET_SUFFIX` saem daqui, e só o `staging` os troca. Uma versão anterior
+  # desta trava perguntava só quando o arquivo era `.env.production`, e então
+  # `ENV_FILE=agent/.env ./setup-gcp.sh deploy` passava batido — gravando valor
+  # de STAGING nos segredos de PRODUÇÃO, sem prompt. Gate por subcomando é mais
+  # estrito e é uma linha a menos.
   case "$cmd" in
     tudo|deploy|secrets|sa|build-iam) ;;   # escrevem em produção
-    *) return 0 ;;
+    *) return 0 ;;                         # staging, preflight: passam direto
   esac
-  [[ "$ENV_FILE" == *".env.production" ]] || return 0   # staging passa direto
 
   if [[ -n "${PROOPS_PROD_OK:-}" ]]; then
     warn "PROOPS_PROD_OK=1 — seguindo em PRODUÇÃO ($SERVICE)"

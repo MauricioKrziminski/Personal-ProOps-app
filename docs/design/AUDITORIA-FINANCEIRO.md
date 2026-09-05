@@ -452,7 +452,7 @@ nasce nessa mesma migration, e a limpeza da `0044` roda sobre `draft_actions`, c
 `0043` do mesmo push.
 
 ⚠️ O `supabase link` do repo aponta para **PRODUÇÃO**: `db push --linked` vai para lá, e staging
-exige `--db-url` com a `DATABASE_URL` do `agent/.env.staging`. Conferir o alvo antes de empurrar
+exige `--db-url` com a `DATABASE_URL` do `agent/.env` (que é o staging). Conferir o alvo antes de empurrar
 continua sendo obrigação de quem empurra.
 
 ---
