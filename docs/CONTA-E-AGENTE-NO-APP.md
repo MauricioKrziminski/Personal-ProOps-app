@@ -683,9 +683,15 @@ exigiria relinkar o CLI para produção, e relinkar por conta própria é justam
 custou duas migrations anunciadas no lugar errado. Antes de promover qualquer coisa, releia o
 número lá.
 
-⚠️ `0055` → **deploy do Cloud Run** → `0056`. A `0056` quebra o agente antigo de propósito. Em
-staging as duas já foram aplicadas de uma vez e o `agente-staging` está inerte até um deploy —
-aceito, porque staging é descartável. Em produção a ordem tem de ser respeitada.
+⚠️ **A ordem `0055` → deploy → `0056` que a própria migration documenta NÃO fecha.** A `0056` é
+quem renomeia `executed_actions.wa_message_id` para `source_message_id`, e o agente novo grava
+nessa coluna: entre o deploy e a `0056` quem quebra é o agente **novo**. Não existe estado do
+schema em que os dois funcionem — para um rename, a fase expand teria que ACRESCENTAR a coluna
+nova ao lado da antiga, e a `0055` não faz isso.
+
+A resposta não é procurar uma janela que não existe: é **pausar a fila do Cloud Tasks** e não
+ter worker nenhum rodando durante a troca. O roteiro completo, com a conta certa do `gcloud`,
+o backup e o rollback, está em **`docs/PROMOVER-PRODUCAO.md`**.
 
 ## 6. Ordem de execução
 
