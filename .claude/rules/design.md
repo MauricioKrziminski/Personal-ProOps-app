@@ -159,6 +159,26 @@ aponta pelo NOME, e face ausente não cai no system font — ela some.
 
 **Uma display por tela** continua valendo.
 
+⚠️ **Todo texto ENCOLHE — `ThemedText` traz `flexShrink: 1` na base** (07/09/2026). O Yoga usa
+`flexShrink: 0` por padrão, ao contrário do flexbox do navegador: numa linha, o texto nunca cedia,
+mantinha a largura natural e **empurrava o irmão para fora do card**, que tem `overflow: 'hidden'`
+e corta. Foi assim que o botão de olho do `HeroPanel` apareceu "cortado à direita" num aparelho
+com fonte grande, e a mesma mecânica valia para as ~400 chamadas do componente. Quem não pode
+ceder desliga na chamada: `Money` (quebrar no meio dos dígitos é pior que estourar a caixa) e o
+título de uma linha que precisa quebrar a linha inteira, abaixo.
+
+⚠️ **`flexShrink: 0` é o que faz `flexWrap` funcionar numa linha com texto.** Medido: com
+`flexShrink: 1` o Yoga prefere ENCOLHER a quebrar, então ligar `flexWrap` não muda nada e o título
+continua sumindo. O padrão para "título + pílula na mesma linha" é `flexWrap: 'wrap'` na linha e
+`flexShrink: 0, maxWidth: '100%'` no título — lado a lado quando cabe, pílula embaixo quando não.
+
+**A régua de largura é 384dp, não 448dp.** O emulador padrão (1344px a 480dpi) tem 448dp, mais
+largo que quase todo celular real, e era a única largura em que as telas eram olhadas. Xiaomi e
+Samsung saem de fábrica com "tamanho de exibição" e fonte maiores; a combinação 384dp × fonte 1,3
+é o cenário de verificação, e é onde "Fatura Nubank Cartão" virava "Fatu…". Para reproduzir:
+`adb shell wm density 560 && adb shell settings put system font_scale 1.30` (e devolver a 480/1.0
+depois — a configuração fica gravada no emulador).
+
 **`fontVariant: ['tabular-nums']` em todo número que conta, mede ou custa** — dinheiro, data,
 percentual, contador. Sem isso o valor "pula" quando muda.
 
@@ -201,6 +221,18 @@ Animação roda em **worklet** (`useSharedValue` + `useAnimatedStyle`), só `tra
 Nunca animar altura de header. `Reduce Motion` colapsa movimento espacial em cross-fade.
 
 Barra de progresso e gráfico **animam** quando o valor muda — valor que salta é bug visual.
+
+⚠️ **A tab bar do Android é a exceção declarada à regra da frequência** (07/09/2026, decisão do
+dono do produto). Ela usa `Motion.spring.tab` (1000 ms, `dampingRatio 0.62`), não `snap`: ~180 ms
+de percurso, ~10% de ultrapassagem e ~500 ms até assentar. Com `snap` o berço atravessava as cinco
+abas em **~130 ms** e parava seco — não lia como "rápido", lia como teleporte, e foi a queixa
+"parece que foi de uma vez". Aqui o movimento É a resposta ao toque: ele carrega o ícone e o
+rótulo fazendo crossfade ao longo do caminho. **Não "corrigir" de volta para `snap`**, que
+continua sendo a mola do indicador do `Segmented`.
+
+A ultrapassagem de uma mola é proporcional à DISTÂNCIA, então ir da primeira à quinta aba jogava
+metade da bolha para fora da pílula. O desenho é preso por `folga` — a sobra real entre o centro
+do slot e a borda da pílula, calculada da geometria, não escolhida a dedo.
 
 ---
 
