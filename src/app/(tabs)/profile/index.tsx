@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Platform, ScrollView, StyleSheet, View } from 'react-native';
+import { Platform, ScrollView, StyleSheet, View, useWindowDimensions } from 'react-native';
 import { router } from 'expo-router';
 import * as Haptics from 'expo-haptics';
 
@@ -190,7 +190,17 @@ export default function ProfileScreen() {
           mensagens de IA do mês, que é medido de verdade e ainda é o número que decide se o
           plano vai estourar.
         */}
-        <View style={styles.idStats}>
+        {/*
+          A fileira QUEBRA quando a fonte do sistema cresce, e a conta é font-aware de propósito.
+          Três chips de largura igual dividem ~312dp numa tela de 384dp: sobram ~74dp de texto por
+          chip, e "lançamentos" a 1,3× precisa de ~80. O Android então quebra no MEIO da palavra
+          ("lançame / ntos"), que lê como texto corrompido. Uma base fixa em dp não resolve — ela
+          não sabe o tamanho da fonte —, e apertar o teto de escala até caber equivaleria a
+          desligar o Dynamic Type nesta linha. Com a base multiplicada por `fontScale`, a fileira
+          fica 3-em-linha na fonte normal e passa a 2+1 quando a pessoa aumenta a letra, onde cada
+          chip fica largo o bastante para a palavra inteira.
+        */}
+        <View style={[styles.idStats, { flexWrap: 'wrap' }]}>
           <Stat
             valor={ia.data ? String(ia.data.lancamentos) : '—'}
             rotulo="lançamentos por mensagem"
@@ -407,8 +417,11 @@ function AppUpdateSection() {
  */
 function Stat({ valor, rotulo, limite }: { valor: string; rotulo: string; limite?: number | null }) {
   const theme = useTheme();
+  // A base em dp precisa acompanhar a fonte, senão a fileira nunca quebra quando deveria.
+  // 96dp é a largura em que "lançamentos" cabe inteiro na fonte normal.
+  const { fontScale } = useWindowDimensions();
   return (
-    <View style={[styles.stat, { backgroundColor: theme.heroChip }]}>
+    <View style={[styles.stat, { flexBasis: 96 * fontScale, backgroundColor: theme.heroChip }]}>
       <View style={styles.statValor}>
         <ThemedText type="subtitle" themeColor="onHero" style={tabular}>
           {valor}
@@ -476,7 +489,7 @@ const styles = StyleSheet.create({
   },
   idStats: { flexDirection: 'row', gap: Space.sm },
   stat: {
-    flex: 1,
+    flexGrow: 1,
     gap: Space.xs,
     padding: Space.md,
     borderRadius: Radius.sm,
