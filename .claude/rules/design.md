@@ -54,6 +54,12 @@ por um passo de 92px; escolher um fecha a pilha com ele na frente. O corpo do ca
 carteira e a fatura tem botão próprio — um toque só não pode decidir entre "ver os outros" e
 "abrir a fatura".
 
+⚠️ **A face do cartão CRESCE com a fonte do sistema** (07/09/2026). `CARD_H` é altura fixa com
+`overflow: 'hidden'` e o conteúdo é texto: a 1,3× o rodapé encostava na barra de limite. A mesma
+escala entra no passo do leque, no `peek` e na altura do palco — escalar só a face deixaria os
+cartões de trás para fora. Vale para qualquer bloco de altura fixa com texto dentro; a alternativa
+(apertar o teto de escala até caber) é desligar o Dynamic Type com outro nome.
+
 ⚠️ **A cor DO BANCO voltou** (03/09/2026, decisão do dono do produto, contra a regra anterior).
 O mapa nome → cor mora em `src/design/card-brands.ts`, que é allowlisted no `anti-slop.test.ts`:
 a cor de um emissor não tem par light/dark porque não é nossa. Ela entra **misturada com a

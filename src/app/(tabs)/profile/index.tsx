@@ -417,11 +417,17 @@ function AppUpdateSection() {
  */
 function Stat({ valor, rotulo, limite }: { valor: string; rotulo: string; limite?: number | null }) {
   const theme = useTheme();
-  // A base em dp precisa acompanhar a fonte, senão a fileira nunca quebra quando deveria.
-  // 96dp é a largura em que "lançamentos" cabe inteiro na fonte normal.
+  /**
+   * A base em dp precisa acompanhar a FONTE, senão a fileira nunca quebra quando deveria.
+   *
+   * 88 é o menor valor em que "lançamentos" ainda cabe inteiro na fonte normal (~63dp de texto
+   * em 64dp úteis). Ele decide só o ponto de quebra — quem dá a largura final é o `flexGrow`.
+   * Com 88, três chips pedem 280dp de fileira: continuam lado a lado até uma tela de 352dp
+   * (abaixo de qualquer Android atual) e passam a 2+1 quando a pessoa aumenta a letra.
+   */
   const { fontScale } = useWindowDimensions();
   return (
-    <View style={[styles.stat, { flexBasis: 96 * fontScale, backgroundColor: theme.heroChip }]}>
+    <View style={[styles.stat, { flexBasis: 88 * fontScale, backgroundColor: theme.heroChip }]}>
       <View style={styles.statValor}>
         <ThemedText type="subtitle" themeColor="onHero" style={tabular}>
           {valor}

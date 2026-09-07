@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import * as Haptics from 'expo-haptics';
-import { Pressable, StyleSheet, View } from 'react-native';
+import { Pressable, StyleSheet, View, useWindowDimensions } from 'react-native';
 import Animated, {
   useAnimatedStyle,
   useSharedValue,
@@ -52,6 +52,21 @@ const INSET = 8;
 const SPREAD = 92;
 /** Espaço reservado no fim do palco para a alça de abrir/fechar. */
 const ALCA = 34;
+
+/**
+ * A face do cartão CRESCE com a fonte do sistema.
+ *
+ * `CARD_H` é altura FIXA com `overflow: 'hidden'`, e o conteúdo (fatura, fechamento, barra de
+ * limite, rodapé) é texto. Com a fonte em 1,3× — o padrão de fábrica de vários Android — as
+ * linhas passavam de 202 e o rodapé encostava na barra de limite. Um cartão de crédito tem
+ * proporção, então ele não pode simplesmente esticar
+ * sozinho: quem cresce é a face INTEIRA, e por isso a mesma escala precisa entrar também no
+ * passo do leque e na altura do palco — senão os cartões de trás ficam para fora.
+ */
+function geometria(fontScale: number) {
+  const k = Math.max(1, fontScale);
+  return { cardH: CARD_H * k, spread: SPREAD * k, peek: PEEK * k, alca: ALCA * k };
+}
 
 /**
  * A carteira: cartões DE VERDADE empilhados, que abrem em leque ao toque.
@@ -121,11 +136,13 @@ export function CardStack({
   }, [idFrente]);
   const visiveis = cards.slice(0, 6);
   const atras = visiveis.length - 1;
+  const { fontScale } = useWindowDimensions();
 
   // Fechada, a pilha é o cartão da frente mais a faixa de cada um dos de trás EM CIMA dele.
   // Aberta, é um passo por cartão mais a altura do último, que aparece inteiro.
+  const { cardH, spread, peek, alca } = geometria(fontScale);
   const altura =
-    (aberta ? atras * SPREAD : atras * PEEK) + CARD_H + (visiveis.length > 1 ? ALCA : 0);
+    (aberta ? atras * spread : atras * peek) + cardH + (visiveis.length > 1 ? alca : 0);
 
   const palco = useAnimatedStyle(() => ({
     height: withSpring(altura, Motion.spring.settle),
@@ -235,7 +252,9 @@ function CardFace({
        clicar". Agora `(atras - depth)` vale para os dois: abrir é só trocar `PEEK` por `SPREAD`,
        ou seja, a mesma pilha respirando.
   */
-  const y = (atras - depth) * (aberta ? SPREAD : PEEK);
+  const { fontScale } = useWindowDimensions();
+  const { cardH, spread, peek } = geometria(fontScale);
+  const y = (atras - depth) * (aberta ? spread : peek);
   /**
    * O estreitamento dos cartões de trás, como ESCALA e não como `left`/`right`.
    *
@@ -275,6 +294,7 @@ function CardFace({
         style={[
           styles.card,
           {
+            height: cardH,
             borderColor: alpha(marca, 0.35),
             // A cor de base embaixo do gradiente. O `GradientSurface` só monta o canvas depois
             // que a `View` mede, e sem isto o cartão pisca transparente no primeiro frame.
@@ -373,7 +393,13 @@ function CardFace({
 
         {/* Rodapé do cartão: titular à esquerda, disponível à direita. */}
         <View style={styles.rodape}>
-          <ThemedText type="meta" themeColor="onHeroMuted" numberOfLines={1} style={styles.shrink}>
+          {/*
+            `flexShrink: 0` + `flexWrap` na linha: a data de vencimento é a informação, não o
+            complemento, e com `flex: 1` ela cedia todo o aperto para o "Disponível" ao lado e
+            truncava em "VENCE 27/09…". Sem encolher, ela ocupa a linha e o disponível desce.
+            (O Yoga prefere ENCOLHER a quebrar — por isso o `flexWrap` sozinho não bastaria.)
+          */}
+          <ThemedText type="meta" themeColor="onHeroMuted" numberOfLines={1} style={styles.rigido}>
             {card.due_date ? `VENCE ${formatDateBR(card.due_date)}` : 'SEM VENCIMENTO'}
           </ThemedText>
           {limite > 0 ? (
@@ -397,7 +423,6 @@ const styles = StyleSheet.create({
   slot: { position: 'absolute', top: 0, left: 0, right: 0 },
   shrink: { flex: 1, minWidth: 0 },
   card: {
-    height: CARD_H,
     padding: Space.gutter,
     borderRadius: Radius.md,
     borderCurve: 'continuous',
@@ -427,7 +452,14 @@ const styles = StyleSheet.create({
   fechaValor: { flexDirection: 'row', alignItems: 'center', gap: Space.xs },
   trilho: { height: 6, borderRadius: Radius.xs, overflow: 'hidden' },
   preenchido: { height: '100%', borderRadius: Radius.xs },
-  rodape: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: Space.sm },
+  rodape: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    flexWrap: 'wrap',
+    gap: Space.sm,
+  },
+  rigido: { flexShrink: 0, maxWidth: '100%' },
   disponivel: { flexDirection: 'row', alignItems: 'center', gap: Space.xs },
   /** A alça de abrir/fechar — alvo explícito para quem não descobre o toque no cartão. */
   /**
