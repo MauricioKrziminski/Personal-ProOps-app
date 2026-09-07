@@ -1,4 +1,4 @@
-import { StyleSheet, View } from "react-native";
+import { StyleSheet } from "react-native";
 import { KeyboardAwareScrollView } from "react-native-keyboard-controller";
 import Animated, { FadeIn, FadeInDown } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -34,8 +34,16 @@ import { Motion, Space } from "@/design/tokens";
  * teclado e rola o campo focado para a área visível. `bottomOffset` é a folga entre o campo e o
  * topo do teclado — sem ela o cursor encosta na borda.
  *
- * O espaçador de `flex: 1` prende o rodapé embaixo quando sobra tela e some quando falta, que é
- * o que o `justifyContent` de antes fazia sem saber lidar com o teclado.
+ * ⚠️ **O conteúdo é CENTRALIZADO como um bloco só** (`justifyContent: 'center'` sobre
+ * `flexGrow: 1`), não espalhado entre o topo e o rodapé. A versão anterior tinha um espaçador de
+ * `flex: 1` entre o formulário e o rodapé: com a tela sobrando, a marca e os campos colavam no
+ * topo e o "Entrar" descia para a base, com um vão morto no meio — a tela parecia dois pedaços
+ * soltos em vez de um formulário. Centralizado, a sobra fica igual em cima e embaixo.
+ *
+ * Isso não conflita com o teclado: `flexGrow` só centraliza enquanto o conteúdo é MENOR que a
+ * área visível. Quando o teclado sobe e o conteúdo passa a ser maior, o container volta a se
+ * comportar como uma lista normal (alinhada ao topo, rolável) e o `KeyboardAwareScrollView`
+ * leva o campo focado para a área visível.
  */
 export function AuthScreen({
   children,
@@ -76,8 +84,6 @@ export function AuthScreen({
         ) : null}
         {children}
 
-        <View style={styles.spacer} />
-
         <Animated.View
           entering={FadeInDown.duration(Motion.duration.slow).delay(
             Motion.stagger.step * 2,
@@ -95,11 +101,10 @@ const styles = StyleSheet.create({
   flex: { flex: 1 },
   content: {
     flexGrow: 1,
+    justifyContent: "center",
     paddingHorizontal: Space.xl,
     gap: Space.xxl,
   },
   brand: { alignItems: "flex-start" },
-  // Come a sobra de tela; colapsa para zero quando o conteúdo já não cabe.
-  spacer: { flex: 1 },
   footer: { gap: Space.sm, alignItems: "stretch" },
 });

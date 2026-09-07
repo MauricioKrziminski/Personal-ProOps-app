@@ -131,18 +131,18 @@ export function EmailLoginScreen() {
 
         <View style={styles.links}>
           <Button
-            label="Esqueci minha senha"
-            variant="ghost"
-            size="sm"
-            onPress={() => router.push('/forgot-password')}
-            disabled={busy}
-          />
-          <Button
             label="Entrar com o WhatsApp"
             variant="ghost"
             size="sm"
             icon="bubble.left"
             onPress={() => router.push('/login-whatsapp')}
+            disabled={busy}
+          />
+          <Button
+            label="Esqueci minha senha"
+            variant="ghost"
+            size="sm"
+            onPress={() => router.push('/forgot-password')}
             disabled={busy}
           />
         </View>
@@ -155,12 +155,25 @@ const styles = StyleSheet.create({
   step: { gap: Space.xl },
   copy: { gap: Space.sm },
   /**
-   * Cancela o padding da pílula: o rótulo do ghost alinha com o campo acima.
+   * Os dois secundários na MESMA linha, um em cada ponta (07/09/2026): WhatsApp à esquerda,
+   * "Esqueci minha senha" à direita, logo abaixo do campo de senha.
    *
-   * O `gap` NÃO é enfeite. Medido no simulador iOS em 04/09/2026: sem ele os dois
-   * botões ficavam encostados (um terminava em y=570 e o outro começava em y=570),
-   * e como o `sm` do `Button` chega aos 44pt por `hitSlop` de 4, as duas ÁREAS DE
-   * TOQUE se sobrepunham em 8pt. Tocar na beira levava para a tela errada.
+   * As margens negativas cancelam o padding interno da pílula do `ghost` dos DOIS lados, para o
+   * rótulo da esquerda alinhar com a borda esquerda do campo e o da direita com a direita.
+   *
+   * `flexWrap` porque a linha é apertada: com a fonte do sistema grande os dois rótulos não
+   * cabem lado a lado, e quebrar é melhor que truncar "Esqueci minha se…". O `gap` NÃO é
+   * enfeite — empilhados eles ficavam encostados (medido no simulador iOS em 04/09/2026: um
+   * terminava em y=570 e o outro começava em y=570), e como o `sm` do `Button` chega aos 44pt
+   * por `hitSlop` de 4, as duas ÁREAS DE TOQUE se sobrepunham em 8pt. Tocar na beira levava
+   * para a tela errada.
    */
-  links: { alignItems: 'flex-start', marginLeft: -Space.md, gap: Space.sm },
+  links: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginHorizontal: -Space.md,
+    gap: Space.sm,
+  },
 });
