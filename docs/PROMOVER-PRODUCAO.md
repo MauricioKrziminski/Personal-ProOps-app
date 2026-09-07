@@ -163,6 +163,31 @@ for j in reminders finance-scheduler alerts; do
 done
 ```
 
+**Passo 6b — desligar o `pg_cron` legado. NÃO É OPCIONAL.**
+
+```sql
+-- no SQL editor de PRODUÇÃO (kwriuifcwyvdrxtspjiz)
+select cron.unschedule('send-reminders');
+select cron.unschedule('send-alerts');
+select jobname, schedule, active from cron.job order by jobname;
+```
+
+Estes dois jobs chamam as Edge Functions **em Deno** (`send-reminders`, `send-alerts`), que mandam
+WhatsApp com as MESMAS credenciais da Meta que o agente Python usa. Depois do passo 6 os crons do
+Cloud Scheduler passam a fazer o mesmo trabalho: **sem este passo, produção entrega cada lembrete e
+cada alerta DUAS vezes**, uma por caminho.
+
+⚠️ **Nenhuma migration remove esses jobs.** Todo `cron.unschedule` do repositório
+(`0003`, `0008`, `0016`, `0025`, `0038`) é a linha de guarda que vem logo antes de um
+`cron.schedule` — serve para a migration ser idempotente, não para desligar nada. Quem aplicou a
+`0008` uma vez tem `send-reminders` rodando **a cada minuto** até alguém desligar à mão. Foi assim
+que, em 07/09/2026, dois números continuaram recebendo alerta de fatura e de saldo negativo de uma
+conta antiga de produção, muito depois de o Cloud Scheduler ter sido pausado.
+
+**Não desligue `process-jobs`**: enquanto houver número com `agent_routing.use_python_agent = false`,
+é ele quem processa a fila do fluxo Deno. Ele sai junto com `supabase/functions/`, no fim do corte.
+`finance-scheduler` e `purge-trashed-notes` não mandam mensagem — podem ficar até lá.
+
 **Passo 7 — ligar a aba Agente do app de produção.**
 
 ```bash
@@ -210,4 +235,8 @@ comando; a `0056` não. Se a dúvida for sobre o schema, pare antes do passo 3.
   staging não podem receber WhatsApp ao mesmo tempo.**
 - **O corte Strangler.** `agent_routing` continua sendo o interruptor; promover o schema não
   liga ninguém.
-- **`WA_ALERT_TEMPLATE`** (Fase 8) continua sem configurar.
+- **`WA_ALERT_TEMPLATE`** (Fase 8) continua sem configurar. Ele cai no nome padrão
+  `personal_proops_alert`; as mensagens vistas em 07/09/2026 chegaram com o corpo do template de
+  LEMBRETE ("Você pediu para ser lembrado disso"), carregando texto de ALERTA — ou seja, alguém
+  apontou a variável para o template errado em produção. Conferir na WABA antes de religar os
+  crons, senão produção volta a dizer "você pediu" para um aviso que ninguém pediu.
