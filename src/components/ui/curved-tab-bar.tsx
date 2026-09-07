@@ -171,7 +171,11 @@ function Rotulo({
     color: interpolateColor(distancia(progresso, index), [0, 1], [ativo, inativo]),
   }));
   return (
-    <Animated.Text numberOfLines={1} style={[Type.caption, estilo]}>
+    // O único `maxFontSizeMultiplier` do app, e por um motivo estrutural: os cinco slots dividem
+    // a largura da barra em partes iguais e não há para onde quebrar. Com a fonte do sistema em
+    // 1,3× "Financeiro" virava "Financei…". Aqui o teto preserva a palavra; no CORPO das telas o
+    // texto continua escalando sem limite, como o §11 de design.md exige.
+    <Animated.Text numberOfLines={1} maxFontSizeMultiplier={1.15} style={[Type.caption, estilo]}>
       {label}
     </Animated.Text>
   );
@@ -257,7 +261,7 @@ export function CurvedTabBar({
   const animarPara = useCallback(
     (destino: number) => {
       'worklet';
-      progresso.set(withSpring(destino, Motion.spring.snap));
+      progresso.set(withSpring(destino, Motion.spring.tab));
     },
     [progresso]
   );
@@ -269,8 +273,29 @@ export function CurvedTabBar({
     animarPara(activeIndex);
   }, [activeIndex, animarPara]);
 
-  /** O centro do berço e da bolha — UMA posição para os dois, senão eles dessincronizam. */
-  const centro = useDerivedValue(() => slot * (progresso.get() + 0.5));
+  /**
+   * Quanto a mola pode passar do alvo, em SLOTS, sem a bolha sair da pílula.
+   *
+   * A ultrapassagem de uma mola é proporcional à DISTÂNCIA percorrida: trocar de aba vizinha
+   * passa um fio, mas ir da primeira à quinta passa quatro vezes mais — e na aba da ponta isso
+   * põe metade da bolha para fora da barra, pendurada no vazio. O limite não é um número
+   * escolhido a dedo: é exatamente a folga que existe entre o centro do slot e a borda da
+   * pílula, com uma margem de 1px.
+   */
+  const folga = Math.max(0, (slot / 2 - BUBBLE / 2 - 1) / slot);
+
+  /**
+   * O centro do berço e da bolha — UMA posição para os dois, senão eles dessincronizam.
+   *
+   * `progresso` é o valor cru da mola (e pode passar do alvo); `posicao` é o que se DESENHA,
+   * preso à faixa em que a bolha ainda cabe na pílula. O quique continua visível em toda troca —
+   * só não vaza para fora da barra nas duas pontas.
+   */
+  const posicao = useDerivedValue(() =>
+    Math.min(Math.max(progresso.get(), -folga), tabs.length - 1 + folga)
+  );
+
+  const centro = useDerivedValue(() => slot * (posicao.get() + 0.5));
 
   /**
    * O disco do berço como PATH, para servir de recorte invertido no traço da pílula.
@@ -303,7 +328,7 @@ export function CurvedTabBar({
    * comunica a continuidade espacial (§5) — a escala não acrescentava informação nenhuma.
    */
   const bolha = useAnimatedStyle(() => ({
-    transform: [{ translateX: slot * (progresso.get() + 0.5) - BUBBLE / 2 }],
+    transform: [{ translateX: slot * (posicao.get() + 0.5) - BUBBLE / 2 }],
   }));
 
   return (
@@ -441,7 +466,9 @@ const styles = StyleSheet.create({
   badge: {
     position: 'absolute',
     minWidth: 16,
-    height: 16,
+    // `minHeight`, não `height`: com fonte grande o dígito é mais alto que 16 e uma caixa de
+    // altura fixa o cortava pela metade.
+    minHeight: 16,
     borderRadius: Radius.pill,
     paddingHorizontal: Space.xs,
     alignItems: 'center',

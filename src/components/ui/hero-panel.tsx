@@ -108,7 +108,7 @@ export function HeroPanel({
           onPress={onPress}
           style={styles.body}>
           <View style={styles.labelRow}>
-            <ThemedText type="caption" themeColor="onHeroMuted" style={Type.meta}>
+            <ThemedText type="caption" themeColor="onHeroMuted" numberOfLines={1} style={Type.meta}>
               {label.toUpperCase()}
             </ThemedText>
             {badge}
@@ -196,7 +196,13 @@ const styles = StyleSheet.create({
   top: { marginBottom: Space.lg },
   body: { gap: Space.xs },
   labelRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: Space.sm },
+  /**
+   * `flexShrink: 0`: o rótulo ao lado agora encolhe (ver `ThemedText`), mas sem isto o Yoga
+   * distribuiria o aperto entre os dois e o chip do olho viraria uma elipse estreita — que é
+   * exatamente o "cortando um pouco à direita do ícone" relatado num aparelho com fonte grande.
+   */
   eye: {
+    flexShrink: 0,
     width: 28,
     height: 28,
     borderRadius: Radius.pill,
@@ -204,7 +210,9 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   valueRow: { flexDirection: 'row', alignItems: 'center', gap: Space.md },
-  secondaryRow: { flexDirection: 'row', alignItems: 'center', gap: Space.xs },
+  // `flex-start`: com fonte grande o texto de estado quebra em três linhas e o ícone, centrado,
+  // flutuava no meio do bloco em vez de marcar a primeira linha.
+  secondaryRow: { flexDirection: 'row', alignItems: 'flex-start', gap: Space.xs },
   chart: { marginTop: Space.lg },
   actions: { marginTop: Space.lg },
   footer: {
@@ -215,6 +223,7 @@ const styles = StyleSheet.create({
     paddingVertical: Space.sm + 2,
   },
   trendPill: {
+    flexShrink: 0,
     flexDirection: 'row',
     alignItems: 'center',
     gap: Space.xs,
