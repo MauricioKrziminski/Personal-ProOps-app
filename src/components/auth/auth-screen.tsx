@@ -1,4 +1,5 @@
-import { ScrollView, StyleSheet, View } from "react-native";
+import { StyleSheet, View } from "react-native";
+import { KeyboardAwareScrollView } from "react-native-keyboard-controller";
 import Animated, { FadeIn, FadeInDown } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
@@ -21,10 +22,20 @@ import { Motion, Space } from "@/design/tokens";
  * campo de senha mais os dois links ficavam escondidos atrás dele, sem nenhuma pista de que
  * havia mais tela. Era o "botões grudados, tudo em cima do outro".
  *
- * `automaticallyAdjustKeyboardInsets` é a versão do sistema disso: ele insere o inset do
- * teclado no scroll e rola o campo FOCADO para a área visível — inclusive o rodapé, que agora
- * é conteúdo. O espaçador de `flex: 1` prende o rodapé embaixo quando sobra tela e some quando
- * falta, que é o que o `justifyContent` de antes fazia sem saber lidar com o teclado.
+ * ⚠️ **`KeyboardAwareScrollView`, nunca `automaticallyAdjustKeyboardInsets`.**
+ * Aquela prop é **iOS-only** — no Android ela não faz nada, em silêncio. O resultado num
+ * aparelho Android real: tocar no campo de e-mail abre o teclado POR CIMA do campo e a pessoa
+ * digita às cegas. A prop resolvia o colapso do iOS e escondia que o Android continuava sem
+ * tratamento nenhum, que é o pior tipo de correção: a plataforma em que ninguém testou some
+ * do radar.
+ *
+ * O `KeyboardAwareScrollView` do `react-native-keyboard-controller` é o que os formulários do
+ * app já usam (lançamento, lembrete, nota) e funciona nas DUAS plataformas: insere o inset do
+ * teclado e rola o campo focado para a área visível. `bottomOffset` é a folga entre o campo e o
+ * topo do teclado — sem ela o cursor encosta na borda.
+ *
+ * O espaçador de `flex: 1` prende o rodapé embaixo quando sobra tela e some quando falta, que é
+ * o que o `justifyContent` de antes fazia sem saber lidar com o teclado.
  */
 export function AuthScreen({
   children,
@@ -41,7 +52,7 @@ export function AuthScreen({
 
   return (
     <ThemedView style={styles.flex}>
-      <ScrollView
+      <KeyboardAwareScrollView
         style={styles.flex}
         contentContainerStyle={[
           styles.content,
@@ -50,7 +61,7 @@ export function AuthScreen({
             paddingBottom: insets.bottom + Space.lg,
           },
         ]}
-        automaticallyAdjustKeyboardInsets
+        bottomOffset={Space.xxl}
         keyboardShouldPersistTaps="handled"
         keyboardDismissMode="interactive"
         showsVerticalScrollIndicator={false}
@@ -75,7 +86,7 @@ export function AuthScreen({
         >
           {footer}
         </Animated.View>
-      </ScrollView>
+      </KeyboardAwareScrollView>
     </ThemedView>
   );
 }

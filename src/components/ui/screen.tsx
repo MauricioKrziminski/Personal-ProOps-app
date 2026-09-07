@@ -1,12 +1,12 @@
 import {
   Platform,
   RefreshControl,
-  ScrollView,
   StyleSheet,
   View,
   type StyleProp,
   type ViewStyle,
 } from 'react-native';
+import { KeyboardAwareScrollView } from 'react-native-keyboard-controller';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { MaxContentWidth } from '@/constants/theme';
@@ -56,6 +56,14 @@ interface ScreenProps {
  * Substitui a pilha `ThemedView` + `SafeAreaView` + `ScrollView` que 21 telas repetem, cada uma
  * com um padding inferior diferente. O padding vem de `useSafeAreaInsets()`, não de constante
  * fixa, e o Android ainda soma a altura da `CurvedTabBar`, que é absoluta.
+ *
+ * ⚠️ **A rolagem é `KeyboardAwareScrollView`, não `ScrollView`.** Toda tela que tem campo no meio
+ * da página (Plano, Projeção, Membros, Pastas) tinha o mesmo defeito: o teclado abria por cima do
+ * campo e a pessoa digitava sem ver. Resolver tela a tela é como o defeito volta na próxima — aqui
+ * ele deixa de existir para as 21 de uma vez, e para as que vierem.
+ *
+ * O componente é um `ScrollView` por dentro, então `refreshControl`, `contentContainerStyle` e
+ * `contentInsetAdjustmentBehavior` continuam valendo. Sem campo em foco ele é inerte.
  */
 export function Screen({
   children,
@@ -102,9 +110,10 @@ export function Screen({
 
   return (
     <View style={[styles.root, { backgroundColor: background }]}>
-      <ScrollView
+      <KeyboardAwareScrollView
         style={styles.root}
         contentContainerStyle={padding}
+        bottomOffset={Space.xxl}
         /*
           `never` só onde o header é NOSSO (`topBar`), porque ali a altura já entra no
           `paddingTop` acima — deixar o iOS ajustar por cima disso soma duas vezes.
@@ -120,7 +129,7 @@ export function Screen({
           onRefresh ? <RefreshControl refreshing={refreshing} onRefresh={onRefresh} /> : undefined
         }>
         {children}
-      </ScrollView>
+      </KeyboardAwareScrollView>
       {/* Depois do scroll na árvore: ele precisa desenhar POR CIMA para o desfoque existir. */}
       {topBar}
     </View>
