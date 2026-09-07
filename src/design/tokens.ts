@@ -113,8 +113,9 @@ export const Motion = {
      * "rápido", é teleporte: o olho não acompanha o percurso, então a barra parece trocar de
      * estado em vez de se mover — foi a queixa "parece que foi de uma vez".
      *
-     * `dampingRatio 0.62` dá ~8% de ultrapassagem: o berço chega, passa um fio e volta. É o
-     * "efeito de mola quando chega no ícone". É deliberadamente mais lento que a régua do §5 de
+     * `dampingRatio 0.62` dá ~10% de ultrapassagem, medido no emulador: o berço chega, passa um
+     * fio e volta. É o "efeito de mola quando chega no ícone". A trajetória medida é ~180 ms de
+     * percurso e ~500 ms até assentar. É deliberadamente mais lento que a régua do §5 de
      * design.md para um controle tocado 100× por dia — decisão do dono do produto, e o motivo é
      * que aqui o movimento É a resposta ao toque, não enfeite: ele carrega o ícone e o rótulo
      * fazendo crossfade ao longo do caminho.

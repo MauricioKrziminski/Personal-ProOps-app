@@ -173,7 +173,9 @@ select jobname, schedule, active from cron.job order by jobname;
 ```
 
 Estes dois jobs chamam as Edge Functions **em Deno** (`send-reminders`, `send-alerts`), que mandam
-WhatsApp com as MESMAS credenciais da Meta que o agente Python usa. Depois do passo 6 os crons do
+WhatsApp com as MESMAS credenciais da Meta que o agente Python usa. O que foi observado saindo em
+07/09/2026 veio do `send-alerts` (o texto é o de `_alerts_to_send`); `send-reminders` entra no
+desligamento por ser a mesma classe de vazamento, não porque tenha sido visto disparando. Depois do passo 6 os crons do
 Cloud Scheduler passam a fazer o mesmo trabalho: **sem este passo, produção entrega cada lembrete e
 cada alerta DUAS vezes**, uma por caminho.
 
@@ -237,6 +239,8 @@ comando; a `0056` não. Se a dúvida for sobre o schema, pare antes do passo 3.
   liga ninguém.
 - **`WA_ALERT_TEMPLATE`** (Fase 8) continua sem configurar. Ele cai no nome padrão
   `personal_proops_alert`; as mensagens vistas em 07/09/2026 chegaram com o corpo do template de
-  LEMBRETE ("Você pediu para ser lembrado disso"), carregando texto de ALERTA — ou seja, alguém
-  apontou a variável para o template errado em produção. Conferir na WABA antes de religar os
-  crons, senão produção volta a dizer "você pediu" para um aviso que ninguém pediu.
+  LEMBRETE ("Você pediu para ser lembrado disso") carregando texto de ALERTA. As duas explicações
+  cabem e não dá para escolher daqui: ou a variável aponta para o template de lembrete em
+  produção, ou o template `personal_proops_alert` foi criado na WABA com esse corpo. **Conferir os
+  dois na WABA** antes de religar os crons — senão produção volta a dizer "você pediu" para um
+  aviso que ninguém pediu.
