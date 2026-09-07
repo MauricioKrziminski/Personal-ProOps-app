@@ -646,7 +646,7 @@ dinheiro, é um jeito de gravar lançamento no banco errado sem perceber.
 `kwriuifcwyvdrxtspjiz`. E nenhum ambiente tinha `EXPO_PUBLIC_AGENT_URL`, então a aba Agente
 dizia "não configurado".
 
-Agora são três apps que **convivem** (`app.config.ts`, por `APP_VARIANT`):
+Agora são três apps que **convivem** (`app.config.js`, por `APP_VARIANT`):
 
 | perfil EAS | variante | package | nome | banco | agente |
 |---|---|---|---|---|---|
