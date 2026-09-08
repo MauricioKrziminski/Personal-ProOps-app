@@ -178,7 +178,12 @@ async def decide(
         if clique.startswith(("pa:", "ds:")):
             if not pendente:
                 return STALE
-            return parse_click(clique, pendente["id"]) or STALE
+            parsed = parse_click(clique, pendente["id"])
+            if parsed and parsed.get('candidate_id'):
+                candidates=(pendente.get('action') or {}).get('candidates') or []
+                if parsed['candidate_id'] not in {str(c['id']) for c in candidates}:
+                    return STALE
+            return parsed or STALE
         # Outros cliques interativos (ex: "qpage:", "qfilter:") seguem para o grafo
         return None
 
@@ -186,6 +191,12 @@ async def decide(
     if pendente:
         candidatos = (pendente.get("action") or {}).get("candidates") or []
         if candidatos:
+            # Exact rendered labels carry the same meaning as their button IDs.
+            matched=[c for c in candidatos if (texto or '').strip().casefold()==c.get('label','').strip().casefold()]
+            if len(matched)==1:
+                return {'approved':True,'candidate_id':matched[0]['id']}
+            if (pendente.get('action') or {}).get('kind')=='soft_warning' and (texto or '').strip()=='3':
+                return {'approved':False}
             k = interpret_choice(texto, len(candidatos))
             if k == 0:
                 return {"approved": False, "none_of_these": True}

@@ -87,3 +87,15 @@ async def test_numero_nao_brasileiro_tenta_uma_vez_so(env, monkeypatch):
         await whatsapp.send_text("14155552671", "oi")
 
     assert cliente.tentativas == ["14155552671"]
+
+@pytest.mark.asyncio
+async def test_long_proposal_is_delivered_in_full_before_buttons(monkeypatch):
+    from app.services import whatsapp
+    payloads=[]
+    async def post(payload): payloads.append(payload)
+    monkeypatch.setattr(whatsapp,'_graph_post',post)
+    body='Valor e consequências 🧾\n'*1000
+    await whatsapp.send_text('fake',body)
+    chunks=[p['text']['body'] for p in payloads]
+    assert ''.join(chunks)==body
+    assert all(len(chunk.encode('utf-16-le'))//2 <=4096 for chunk in chunks)

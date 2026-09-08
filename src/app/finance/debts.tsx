@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import Animated, { FadeInDown, LinearTransition } from 'react-native-reanimated';
-import { Stack } from 'expo-router';
+import { Stack, useLocalSearchParams } from 'expo-router';
 
 import { Chip } from '@/components/finance/chip';
 import { ThemedText } from '@/components/themed-text';
@@ -34,6 +34,7 @@ import {
 } from '@/hooks/use-finance';
 import { useTheme } from '@/hooks/use-theme';
 import { formatBRL, formatNumberBR, isoToBR } from '@/lib/dates';
+import { debtTerm, financeErrorMessage } from '@/lib/finance-form';
 import { confirmDestructive, showItemActions } from '@/lib/item-actions';
 
 /**
@@ -71,6 +72,9 @@ interface FormState {
   taxa: string;
   parcelas: string;
   diaVencimento: string;
+  installmentsPaid: number;
+  installmentCents: number;
+  accountId: string | null;
 }
 
 const FORM_VAZIO: FormState = {
@@ -81,6 +85,9 @@ const FORM_VAZIO: FormState = {
   taxa: '',
   parcelas: '',
   diaVencimento: '',
+  installmentsPaid: 0,
+  installmentCents: 0,
+  accountId: null,
 };
 
 /** Faixa de erro por seção. Seção que falha DIZ que falhou — nunca some. */
@@ -97,6 +104,7 @@ function ErrorBand({ message, onRetry }: { message: string; onRetry: () => void 
 }
 
 export default function DebtsScreen() {
+  const params = useLocalSearchParams<{ create?: string }>();
   const theme = useTheme();
   const toast = useToast();
   const debts = useDebts();
@@ -107,7 +115,7 @@ export default function DebtsScreen() {
   const archive = useArchiveDebt();
   const pagar = usePayDebtInstallment();
 
-  const [form, setForm] = useState<FormState | null>(null);
+  const [form, setForm] = useState<FormState | null>(() => params.create === 'financing' ? { ...FORM_VAZIO, kind: 'financing' } : null);
   const [detalhe, setDetalhe] = useState<Debt | null>(null);
   const [pagando, setPagando] = useState<Debt | null>(null);
   const [pagoCents, setPagoCents] = useState(0);
@@ -140,21 +148,24 @@ export default function DebtsScreen() {
       // sem o toFixed, 0.0199 * 100 vira 1.9900000000000002 no campo
       taxa: d.interest_rate_monthly
         ? formatNumberBR(Number((d.interest_rate_monthly * 100).toFixed(4)))
-        : '',
-      parcelas: d.installments ? String(d.installments) : '',
+        : d.kind === 'financing' ? '0' : '',
+      parcelas: d.installments ? String(Math.max(d.installments - d.installments_paid, 0)) : '',
+      installmentsPaid: d.installments_paid,
+      installmentCents: Number(d.installment_cents ?? 0),
+      accountId: d.account_id,
       diaVencimento: d.due_day ? String(d.due_day) : '',
     });
 
   const abrirPagamento = (d: Debt) => {
     setDetalhe(null);
-    setPagoCents(Number(schedule.data?.[0]?.payment_cents ?? d.installment_cents ?? 0));
-    setContaId(null);
+    setPagoCents(Number((detalhe?.id === d.id ? schedule.data?.[0]?.payment_cents : null) ?? d.installment_cents ?? 0));
+    setContaId(d.account_id);
     setPagando(d);
   };
 
   const fracao = form ? parseTaxa(form.taxa) : 0;
   const nomeOk = (form?.name.trim().length ?? 0) >= 2;
-  const podeSalvar = Boolean(form && nomeOk && form.remainingCents > 0);
+  const podeSalvar = Boolean(form && nomeOk && form.remainingCents > 0 && (!form.parcelas || Number(form.parcelas) > 0) && (!form.diaVencimento || (Number(form.diaVencimento) >= 1 && Number(form.diaVencimento) <= 31)) && (form.kind !== 'financing' || (form.taxa.trim() !== '' && !!form.parcelas)) && Number.isFinite(Number(form.taxa.replace(',', '.'))) && Number(form.taxa.replace(',', '.')) >= 0);
 
   const salvar = () => {
     if (!form || !podeSalvar) return;
@@ -167,7 +178,9 @@ export default function DebtsScreen() {
         principal_cents: form.principalCents > 0 ? form.principalCents : form.remainingCents,
         remaining_cents: form.remainingCents,
         interest_rate_monthly: fracao,
-        installments: form.parcelas ? Number(form.parcelas) : null,
+        installments: debtTerm(form.parcelas, form.installmentsPaid),
+        installment_cents: form.installmentCents || null,
+        account_id: form.accountId,
         due_day: form.diaVencimento ? Number(form.diaVencimento) : null,
       },
       {
@@ -194,7 +207,7 @@ export default function DebtsScreen() {
           setPagando(null);
         },
         // o sheet FICA aberto: fechar num erro faz o usuário registrar o pagamento de novo
-        onError: () => toast({ message: 'Não deu para registrar o pagamento.', tone: 'error' }),
+        onError: (error) => toast({ message: financeErrorMessage(error, 'Não deu para registrar o pagamento.'), tone: 'error' }),
       }
     );
   };
@@ -266,7 +279,7 @@ export default function DebtsScreen() {
       refreshing={debts.isRefetching}>
       <Stack.Screen
         options={{
-          title: 'Dívidas',
+          title: 'Dívidas e financiamentos',
           headerLargeTitle: true,
         }}
       />
@@ -644,7 +657,7 @@ export default function DebtsScreen() {
 
               <Field
                 label="Juros por mês"
-                hint="Deixe em branco se não tem juros (parcelamento de loja, dinheiro com alguém).">
+                hint="No financiamento, informe a taxa mensal do contrato; 0 somente se não houver juros. Não sabe a taxa? Consulte o contrato antes de cadastrar.">
                 <View>
                   <TextField
                     value={form.taxa}
@@ -690,11 +703,21 @@ export default function DebtsScreen() {
                 <View style={styles.aviso}>
                   <Icon name="exclamationmark.triangle" size="sm" color="warning" />
                   <ThemedText type="small" themeColor="textSecondary" style={styles.avisoTexto}>
-                    20% ao mês é rotativo de cartão. Se você quis dizer ao ano, divida por 12.
+                    Confira se a taxa do contrato é mensal. Taxa anual efetiva não deve ser dividida por 12.
                   </ThemedText>
                 </View>
               ) : null}
 
+              <Field label="Valor da prestação" hint="Opcional: valor contratual. A amortização exibida é estimativa Price; seguros e tarifas não são separados.">
+                <MoneyField valueCents={form.installmentCents} onChangeCents={(installmentCents) => setForm({ ...form, installmentCents })} />
+              </Field>
+              <Field label="Conta para pagar">
+                <Section>
+                  <Row title="Não informar" onPress={() => setForm({ ...form, accountId: null })} trailing={form.accountId === null ? <Icon name="checkmark" size="sm" color="tint" /> : undefined} />
+                  {pagadoras.map((a) => <Row key={a.id} title={a.name} onPress={() => setForm({ ...form, accountId: a.id })} trailing={form.accountId === a.id ? <Icon name="checkmark" size="sm" color="tint" /> : undefined} />)}
+                </Section>
+              </Field>
+              <ThemedText type="small" themeColor="textSecondary">O cronograma é uma estimativa mensal. Cadastrar a dívida não cria prestações pendentes na projeção; registre cada pagamento nesta tela.</ThemedText>
               <View style={styles.duasColunas}>
                 <View style={styles.coluna}>
                   <Field label="Parcelas que faltam">

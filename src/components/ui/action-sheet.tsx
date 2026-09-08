@@ -84,8 +84,9 @@ export function AndroidActionSheet() {
                   action.disabled ? 'textSecondary' : action.destructive ? 'danger' : 'text'
                 }
                 style={styles.optionLabel}>
-                {action.actions?.length ? `${action.label}…` : action.label}
+                {action.label}
               </ThemedText>
+              {action.actions?.length ? <Icon name="chevron.right" size="sm" color="textSecondary" /> : null}
               {/* Estado ligado é ÍCONE, não glyph de texto (`design.md` §4). */}
               {action.selected ? <Icon name="checkmark" size="sm" color="tint" /> : null}
             </Pressable>

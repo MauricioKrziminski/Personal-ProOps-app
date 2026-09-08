@@ -29,6 +29,7 @@ import { ToastProvider } from '@/components/ui/toast';
 import { AppUpdateProvider } from '@/hooks/use-app-update';
 import { ThemeProvider as AppThemeProvider, useBarStyle, useScheme } from '@/hooks/use-theme';
 import { useSession } from '@/hooks/use-session';
+import { hasCompletedOnboarding } from '@/lib/onboarding';
 import { attachNotificationListeners, configureNotificationHandler } from '@/lib/notifications';
 
 SplashScreen.preventAutoHideAsync();
@@ -193,7 +194,10 @@ function AppTree() {
                   <Stack.Screen name="forgot-password" options={{ headerShown: false }} />
                 </Stack.Protected>
 
-                <Stack.Protected guard={!!session}>
+                <Stack.Protected guard={!!session && !hasCompletedOnboarding(session.user.user_metadata)}>
+                  <Stack.Screen name="onboarding" options={{ headerShown: false }} />
+                </Stack.Protected>
+                <Stack.Protected guard={!!session && hasCompletedOnboarding(session.user.user_metadata)}>
                   {/* As cinco raízes de aba. Elas desenham o `AppHeader` por conta própria. */}
                   <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
 
@@ -264,7 +268,6 @@ function AppTree() {
                     name="paywall"
                     options={{ presentation: 'modal', title: 'Assinar', ...modalOptions }}
                   />
-                  <Stack.Screen name="onboarding" options={{ headerShown: false }} />
                   <Stack.Screen name="link-phone" options={{ headerShown: false }} />
                   {/* O par de `link-phone`: cadastra e-mail e senha numa conta que só tem
                       WhatsApp, ou troca o endereço de quem já tem. As duas portas do produto

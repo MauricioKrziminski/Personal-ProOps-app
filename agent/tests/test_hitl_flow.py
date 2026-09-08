@@ -239,6 +239,10 @@ async def test_escolha_valida_congela_o_id_e_executa(monkeypatch, grafo):
 
     await grafo.ainvoke(_estado([{"type": "delete_transaction"}]), config=cfg)
     final = await grafo.ainvoke(Command(resume="b"), config=cfg)
+    assert '__interrupt__' in final  # seleção não é consentimento final
+    assert 'EXECUTOU' not in final.get('results', [])
+    final = await grafo.ainvoke(Command(resume=True), config=cfg)
+
 
     assert "EXECUTOU" in final.get("results", [])
     assert final.get("chosen_id") == "b"
@@ -363,6 +367,10 @@ async def test_o_que_o_WORKER_manda_no_resume_o_gate_entende(monkeypatch, grafo)
     # 1) clique no botão do segundo candidato
     decisao = await confirm.decide({"clicked_id": f"pa:{pendente['id']}:c:b"}, pendente)
     final = await grafo.ainvoke(Command(resume=_congelado(decisao, pendente)), config=cfg)
+    assert '__interrupt__' in final  # seleção não é consentimento final
+    assert 'EXECUTOU' not in final.get('results', [])
+    final = await grafo.ainvoke(Command(resume=True), config=cfg)
+
     assert "EXECUTOU" in final.get("results", []), final.get("results")
     assert final["targets"][0]["candidates"] == [{"id": "b", "label": "R$ 80"}]
 
@@ -386,6 +394,10 @@ async def test_numero_digitado_tambem_chega_inteiro_no_gate(monkeypatch, grafo):
                 "action": {"candidates": [{"id": "a"}, {"id": "b"}]}}
     decisao = await confirm.decide({"text": "1"}, pendente)   # quem não clica, digita
     final = await grafo.ainvoke(Command(resume=_congelado(decisao, pendente)), config=cfg)
+    assert '__interrupt__' in final  # seleção não é consentimento final
+    assert 'EXECUTOU' not in final.get('results', [])
+    final = await grafo.ainvoke(Command(resume=True), config=cfg)
+
 
     assert "EXECUTOU" in final.get("results", [])
     assert final["chosen_id"] == "a"
@@ -501,6 +513,10 @@ async def test_escolher_a_compra_inteira_troca_a_TABELA_do_alvo(monkeypatch, gra
 
     await grafo.ainvoke(_estado([{"type": "delete_transaction"}]), config=cfg)
     final = await grafo.ainvoke(Command(resume="p1"), config=cfg)
+    assert '__interrupt__' in final  # seleção não é consentimento final
+    assert 'EXECUTOU' not in final.get('results', [])
+    final = await grafo.ainvoke(Command(resume=True), config=cfg)
+
 
     assert final["targets"][0]["table"] == "installment_plans"
     assert final["targets"][0]["candidates"][0]["id"] == "p1"
@@ -525,6 +541,10 @@ async def test_escolher_a_parcela_mantem_a_tabela_de_transacoes(monkeypatch, gra
 
     await grafo.ainvoke(_estado([{"type": "delete_transaction"}]), config=cfg)
     final = await grafo.ainvoke(Command(resume="tx1"), config=cfg)
+    assert '__interrupt__' in final  # seleção não é consentimento final
+    assert 'EXECUTOU' not in final.get('results', [])
+    final = await grafo.ainvoke(Command(resume=True), config=cfg)
+
 
     assert final["targets"][0]["table"] == "transactions"
 
@@ -560,6 +580,10 @@ async def test_update_em_plano_mostra_menu_interativo_e_exclui_se_selecionado(mo
 
     # Usuário seleciona excluir plano
     final = await grafo.ainvoke(Command(resume="delete_plan:p1"), config=cfg)
+    assert '__interrupt__' in final  # seleção não é consentimento final
+    assert 'EXECUTOU' not in final.get('results', [])
+    final = await grafo.ainvoke(Command(resume=True), config=cfg)
+
     assert final["approved"] is True
     assert final["finance_actions"][0]["type"] == FinanceActionType.DELETE_TRANSACTION.value
     assert final["targets"][0]["table"] == "installment_plans"
@@ -600,6 +624,10 @@ async def test_update_em_plano_mudar_parcelas_com_current_installment_atualiza_p
     assert "__interrupt__" in estado
 
     final = await grafo.ainvoke(Command(resume="change_paid:p1"), config=cfg)
+    assert '__interrupt__' in final  # seleção não é consentimento final
+    assert 'EXECUTOU' not in final.get('results', [])
+    final = await grafo.ainvoke(Command(resume=True), config=cfg)
+
     assert final["approved"] is True
     assert final["finance_actions"][0]["type"] == FinanceActionType.MARK_PAID.value
     assert final["finance_actions"][0]["current_installment"] == 3

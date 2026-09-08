@@ -8,6 +8,7 @@ subindo o grafo inteiro é regra que ninguém testa.
 from __future__ import annotations
 
 from app.config import get_settings
+from app.domain.dates import format_date_br
 from app.domain.money import cents_to_brl
 from app.graph.schemas import (
     DESTRUCTIVE,
@@ -17,6 +18,7 @@ from app.graph.schemas import (
     FinanceActionType,
     FinanceQuery,
     NotesAction,
+    ResourceAction,
 )
 
 CONFIDENCE_MINIMA = 0.6
@@ -25,9 +27,10 @@ CONFIDENCE_MINIMA = 0.6
 # Altera registro existente mas NÃO passa pelo resolver (tem forma de duas
 # etapas: conta -> fatura em aberto). Por isso entra explícito.
 #
-# `set_rule` fica FORA de propósito: é upsert com a chave que o próprio usuário
-# acabou de ditar, não tem como acertar a linha errada, e é editável na tela.
-ALWAYS_CONFIRM = {FinanceActionType.PAY_INVOICE}
+# Regras, metas e transferências também confirmam: alteram compromissos ou
+# movimentam contas mesmo sem um alvo resolvido nesta fase.
+ALWAYS_CONFIRM = {FinanceActionType.PAY_INVOICE, FinanceActionType.CREATE_GOAL,
+                  FinanceActionType.SET_RULE, FinanceActionType.CREATE_TRANSFER}
 
 
 # Abaixo disto o roteador não tem certeza do DOMÍNIO, e a pergunta certa é
@@ -69,6 +72,10 @@ def needs_confirmation(
 
     if action.type in READ_ONLY:
         return None
+    if isinstance(action, ResourceAction):
+        return "cadastro ou alteração estrutural"
+    if getattr(action, "recurrence", None) or action.type == FinanceActionType.CREATE_INSTALLMENT_PURCHASE:
+        return "compromisso futuro"
     if action.type in DESTRUCTIVE:
         return "destrutiva"
     if target:
@@ -105,6 +112,8 @@ def describe_for_confirmation(
     campos crus do modelo, e o usuário lia "apagar a nota sobre última mensagem"
     — confirmando o eco do modelo, não o que ia acontecer de verdade.
     """
+    if isinstance(action, ResourceAction):
+        return (target or {}).get("prepared", {}).get("summary", "revisar cadastro")
     if target and target.get("candidates"):
         verbo = _VERBO.get(action.type.value, "mexer em")
         if target.get("status") == "found":
@@ -113,10 +122,25 @@ def describe_for_confirmation(
             # plano de parcelamento. Numa confirmação DESTRUTIVA o usuário precisa
             # ver o dinheiro antes de dizer sim, não só o nome.
             extra = f" ({escolhido['when']})" if escolhido.get("when") else ""
-            return f"{verbo} {escolhido['label']}{extra}"
+            corrections = []
+            if isinstance(action, FinanceAction) and action.type == FinanceActionType.UPDATE_TRANSACTION:
+                if action.new_amount_cents is not None:
+                    corrections.append(f"valor → {cents_to_brl(action.new_amount_cents)}")
+                if action.new_category:
+                    corrections.append(f"categoria → {action.new_category}")
+                if action.new_occurred_at:
+                    corrections.append(f"data → {format_date_br(action.new_occurred_at)}")
+                if action.new_account:
+                    account_name = (target.get("new_account") or {}).get("name", action.new_account)
+                    corrections.append(f"conta → {account_name}")
+            suffix = f": {', '.join(corrections)}" if corrections else ""
+            return f"{verbo} {escolhido['label']}{extra}{suffix}"
         # Empate: as opções REAIS vão na lista, então a frase só precisa dizer o
         # que vai acontecer. Cair no texto do modelo aqui reintroduzia o eco que
         # este desenho existe para eliminar ("apagar a nota sobre esse item").
+        if isinstance(action, FinanceAction) and action.type == FinanceActionType.UPDATE_TRANSACTION:
+            corrected = action.model_copy(update={"new_account": (target.get("new_account") or {}).get("name", action.new_account)})
+            return describe_for_confirmation(corrected)
         return f"{verbo} qual?"
 
     tipo = action.type.value
@@ -129,7 +153,14 @@ def describe_for_confirmation(
             return f"apagar o lançamento de {valor}" if valor else f"apagar o lançamento de {alvo}"
         if tipo == "update_transaction":
             novo = cents_to_brl(action.new_amount_cents) if action.new_amount_cents else None
-            return f"mudar {alvo} para {novo}" if novo else f"corrigir {alvo}"
+            account = (target or {}).get("new_account", {}).get("name", action.new_account)
+            changes = ", ".join(x for x in (
+                f"valor → {novo}" if novo else None,
+                f"conta → {account}" if account else None,
+                f"categoria → {action.new_category}" if action.new_category else None,
+                f"data → {format_date_br(action.new_occurred_at)}" if action.new_occurred_at else None,
+            ) if x)
+            return f"corrigir {alvo}: {changes}" if changes else f"corrigir {alvo}"
         if tipo == "create_installment_purchase":
             return f"registrar {valor} em {action.installments}x"
         if tipo == "pay_invoice":

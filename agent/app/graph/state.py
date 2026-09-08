@@ -50,6 +50,11 @@ def _preserve_or_replace(antigo: dict | None, novo: dict | None) -> dict:
     return antigo or {}
 
 
+def _resource_draft(antigo, novo):
+    """None on a new turn preserves inert fields; [] explicitly discards them."""
+    return antigo or [] if novo is None else novo
+
+
 class AgentState(TypedDict, total=False):
     # identidade
     thread_id: str
@@ -90,6 +95,9 @@ class AgentState(TypedDict, total=False):
     finance_actions: Annotated[list[dict], _replace]
     finance_queries: Annotated[list[dict], _replace]
     notes_actions: Annotated[list[dict], _replace]
+    resource_actions: Annotated[list[dict], _replace]
+    resource_prepared: Annotated[list[dict], _replace]
+    resource_draft: Annotated[list[dict] | None, _resource_draft]
 
     # alvos resolvidos na Fase Cognitiva, ALINHADOS POR POSIÇÃO com _actions().
     # Entrada: {} para ação que não mira registro existente, ou

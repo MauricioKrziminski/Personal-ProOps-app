@@ -32,15 +32,9 @@ const AVISO = 200;
  * `KeyboardStickyView` e não `KeyboardAvoidingView`: é a mesma peça que a barra
  * de blocos da nota usa, e foi conferida levantando esta barra no emulador.
  *
- * **A barra subir não basta.** A lista não encolhe junto, então as mensagens
- * recém-enviadas ficavam ATRÁS dela — quem devolve a altura do teclado é o
- * rodapé do `contentContainerStyle` em `ConversationScreen`. As duas metades
- * são necessárias; nenhuma sozinha resolve.
- *
- * O respiro de baixo é reservado com o teclado FECHADO (no Android a
- * `CurvedTabBar` é absoluta e passaria por cima do campo) e devolvido com ele
- * ABERTO pelo `offset.opened` — senão sobraria uma faixa vazia entre o campo e
- * o teclado, do tamanho exato de uma tab bar que nem está visível.
+ * O contêiner da lista em `ConversationScreen` reserva a mesma translação,
+ * descontando a safe area devolvida por `offset.opened`. Assim sua janela
+ * termina acima da barra inclusive quando o campo cresce para várias linhas.
  */
 export function ChatComposer({
   value,

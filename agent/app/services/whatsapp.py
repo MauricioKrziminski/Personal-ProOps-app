@@ -74,9 +74,14 @@ async def _graph_post(payload: dict) -> httpx.Response:
 
 async def send_text(to: str, body: str) -> None:
     """Texto livre — grátis dentro da janela de 24h iniciada pelo usuário."""
-    await _graph_post(
-        {"messaging_product": "whatsapp", "to": to, "type": "text", "text": {"body": body}}
-    )
+    # Preserve the entire proposal. Splitting before sending buttons means a
+    # failed chunk prevents the approval buttons from arriving without context.
+    # 2000 code points fit within 4096 UTF-16 units even when all are emoji.
+    for start in range(0, len(body), 2000):
+        await _graph_post(
+            {"messaging_product": "whatsapp", "to": to, "type": "text",
+             "text": {"body": body[start:start + 2000]}}
+        )
 
 
 async def mark_as_read(wa_message_id: str) -> None:

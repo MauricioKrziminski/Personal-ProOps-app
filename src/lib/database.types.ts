@@ -1751,7 +1751,11 @@ export type Database = {
           counterparty_account_id: string | null
           created_at: string
           currency: string
+          debt_balance_after_cents: number | null
           debt_id: string | null
+          debt_interest_cents: number | null
+          debt_payment_no: number | null
+          debt_principal_cents: number | null
           description: string | null
           due_at: string | null
           id: string
@@ -1777,7 +1781,11 @@ export type Database = {
           counterparty_account_id?: string | null
           created_at?: string
           currency?: string
+          debt_balance_after_cents?: number | null
           debt_id?: string | null
+          debt_interest_cents?: number | null
+          debt_payment_no?: number | null
+          debt_principal_cents?: number | null
           description?: string | null
           due_at?: string | null
           id?: string
@@ -1803,7 +1811,11 @@ export type Database = {
           counterparty_account_id?: string | null
           created_at?: string
           currency?: string
+          debt_balance_after_cents?: number | null
           debt_id?: string | null
+          debt_interest_cents?: number | null
+          debt_payment_no?: number | null
+          debt_principal_cents?: number | null
           description?: string | null
           due_at?: string | null
           id?: string

@@ -12,7 +12,7 @@ Este arquivo cobre o fast-path inteiro, que até aqui não tinha teste nenhum.
 
 import pytest
 
-from app import db, conversation, worker
+from app import db, conversation
 from app.domain import confirm, draft
 
 CARTOES = [
@@ -47,13 +47,27 @@ SESSAO = {
 }
 
 
+@pytest.fixture(autouse=True)
+def checkpoint_local(monkeypatch):
+    from types import SimpleNamespace
+    import app.graph.build as build
+    class Checkpoint:
+        async def aget_state(self, config):
+            return SimpleNamespace(values={})
+        async def aupdate_state(self, config, values):
+            return None
+    monkeypatch.setattr(build, "graph", lambda: Checkpoint())
+    async def no_pending(*a, **kw): return None
+    monkeypatch.setattr(db, "open_pending", no_pending)
+
+
 class TestPerguntaCartao:
     """A pergunta vira MENU. O clique executa sem passar por IA nenhuma."""
 
-    def test_ate_dois_cartoes_viram_botoes(self):
-        spec = conversation._pergunta_cartao("d1", CARTOES, "Qual cartão?")
+    def test_um_cartao_mais_financiamento_e_cancelar_viram_botoes(self):
+        spec = conversation._pergunta_cartao("d1", CARTOES[:1], "Qual cartão?")
         assert spec["ui"] == "buttons"
-        # 2 cartões + cancelar = os 3 que a Meta aceita
+        # cartão + financiamento + cancelar = os 3 que a Meta aceita
         assert len(spec["buttons"]) == 3
         assert spec["buttons"][0] == ("ds:d1:c:c1", "Itaú")
         assert spec["buttons"][-1][0] == "ds:d1:no"
@@ -62,13 +76,13 @@ class TestPerguntaCartao:
         muitos = [{"id": f"c{i}", "name": f"Cartão {i}"} for i in range(5)]
         spec = conversation._pergunta_cartao("d1", muitos, "Qual cartão?")
         assert spec["ui"] == "list"
-        assert len(spec["rows"]) == 6
+        assert len(spec["rows"]) == 7
         assert spec["rows"][0][0] == "ds:d1:c:c0"
 
     def test_lista_longa_respeita_o_limite_da_meta(self):
         muitos = [{"id": f"c{i}", "name": f"Cartão {i}"} for i in range(30)]
         spec = conversation._pergunta_cartao("d1", muitos, "Qual cartão?")
-        # 9 cartões + a saída = as 10 linhas que a Meta aceita
+        # 8 cartões + financiamento + cancelar = 10 linhas
         assert len(spec["rows"]) == 10
 
     def test_fallback_pede_o_NOME_e_nao_o_numero(self):
@@ -79,10 +93,10 @@ class TestPerguntaCartao:
         assert "nome" in spec["text"].lower()
         assert "Itaú" in spec["text"] and "Nubank Cartão" in spec["text"]
 
-    def test_sem_cartao_nenhum_nao_finge_um_menu(self):
+    def test_sem_cartao_ainda_oferece_financiamento(self):
         msg = conversation._pergunta_cartao("d1", [], "Qual cartão?")
-        assert isinstance(msg, str)
-        assert "cadastra" in msg.lower()
+        assert msg["ui"] == "buttons"
+        assert msg["buttons"][0][0] == "ds:d1:financing"
 
 
 class TestCartaoDoRascunho:
@@ -128,7 +142,7 @@ class TestCartaoDoRascunho:
             {"acao": "completar", "slot": "account", "account_id": "de-outro-workspace"},
         )
         assert decidido is None
-        assert resposta["ui"] == "buttons"
+        assert resposta["ui"] == "list"
 
     @pytest.mark.asyncio
     async def test_empate_pergunta_em_vez_de_chutar(self, monkeypatch):
@@ -147,8 +161,8 @@ class TestCartaoDoRascunho:
         )
         assert decidido is None
         # só os candidatos, não a lista inteira
-        assert [b[1] for b in resposta["buttons"]] == [
-            "Nubank Roxinho", "Nubank Ultravioleta", "Cancelar"
+        assert [b[1] for b in resposta["rows"]] == [
+            "Nubank Roxinho", "Nubank Ultravioleta", "É financiamento", "Cancelar"
         ]
 
     @pytest.mark.asyncio
@@ -320,8 +334,8 @@ class TestRascunhoComPergunta:
     async def test_a_primeira_pergunta_ja_sai_como_menu(self):
         """Era ela que o teste de usabilidade pegou saindo como texto livre."""
         spec = await conversation._resposta_do_estado(SESSAO, self._estado(False), "t:1")
-        assert spec["ui"] == "buttons"
-        assert spec["buttons"][0] == ("ds:d-novo:c:c1", "Itaú")
+        assert spec["ui"] == "list"
+        assert spec["rows"][0] == ("ds:d-novo:c:c1", "Itaú", "")
         # o corpo leva a resposta inteira, não só a pergunta
         assert "Em qual cartão" in spec["body"]
 
@@ -492,9 +506,9 @@ class TestMuitosCartoes:
         casamento roda sobre a lista inteira."""
         muitos = [{"id": f"c{i}", "name": f"Cartão {i}"} for i in range(14)]
         spec = conversation._pergunta_cartao("d1", muitos, "Qual cartão?")
-        assert len(spec["rows"]) == 10  # 9 + a saída, o limite da Meta
-        assert "+5" in spec["body"]
-        assert "+5" in spec["text"]
+        assert len(spec["rows"]) == 10  # 8 cartões + financiamento + cancelar
+        assert "+6" in spec["body"]
+        assert "+6" in spec["text"]
 
     def test_lista_que_cabe_nao_ganha_aviso(self):
         poucos = [{"id": f"c{i}", "name": f"Cartão {i}"} for i in range(4)]
@@ -524,15 +538,14 @@ class TestCadastroDeCartaoNaHora:
         monkeypatch.setattr(db, "create_credit_card", criar)
 
     @pytest.mark.asyncio
-    async def test_clique_cria_e_devolve_o_nome_do_BANCO(self):
+    async def test_clique_antigo_pede_ciclo_sem_inventar_dias(self):
         decidido, resposta = await conversation._cartao_do_rascunho(
             SESSAO, RASCUNHO, {"acao": "criar_cartao", "name": "Banco do Brasil"}
         )
-        assert resposta is None
-        assert self.criados == ["Banco do Brasil"]
-        # o nome que segue é o que o banco gravou, não o que o usuário digitou
-        assert decidido["account"] == "Banco do Brasil"
-        assert decidido["cartao_criado"] == "Banco do Brasil"
+        assert decidido is None
+        assert self.criados == []
+        assert 'fechamento' in resposta and 'vencimento' in resposta
+        assert 'confirmar' in resposta
 
     @pytest.mark.asyncio
     async def test_escolher_outro_volta_para_a_lista(self):
@@ -540,7 +553,7 @@ class TestCadastroDeCartaoNaHora:
             SESSAO, RASCUNHO, {"acao": "escolher_cartao"}
         )
         assert decidido is None
-        assert [b[1] for b in resposta["buttons"]] == ["Itaú", "Nubank Cartão", "Cancelar"]
+        assert [b[1] for b in resposta["rows"]] == ["Itaú", "Nubank Cartão", "É financiamento", "Cancelar"]
 
     @pytest.mark.asyncio
     async def test_falha_ao_criar_nao_derruba_a_conversa(self, monkeypatch):
@@ -552,62 +565,14 @@ class TestCadastroDeCartaoNaHora:
             SESSAO, RASCUNHO, {"acao": "criar_cartao", "name": "Inter"}
         )
         assert decidido is None
-        assert isinstance(resposta, str) and "tenta de novo" in resposta.lower()
-
-    def test_o_ciclo_assumido_e_DITO_ao_usuario(self):
-        """`set_invoice` precisa de fechamento e vencimento, e mudar os dias
-        depois não reprocessa lançamento já gravado — então a suposição não pode
-        ficar muda."""
-        texto = conversation._com_aviso_de_cartao("🧾 Parcelado: R$ 8.400,00", "Nubank")
-        assert "Criei o cartão *Nubank*" in texto
-        assert f"dia {db.CARTAO_FECHAMENTO_PADRAO}" in texto
-        assert f"dia {db.CARTAO_VENCIMENTO_PADRAO}" in texto
-        assert "R$ 8.400,00" in texto
-
-    def test_sem_cartao_criado_a_resposta_passa_intacta(self):
-        assert conversation._com_aviso_de_cartao("ok", None) == "ok"
+        assert isinstance(resposta, str) and "fechamento" in resposta.lower()
+        assert self.criados == []
 
     def test_nome_longo_nao_estoura_o_id_do_botao(self):
         """O id do botão da Meta tem 256 caracteres e o nome viaja dentro dele."""
         longo = "Cartão " + "muito " * 40
         spec = conversation._pergunta_criar_cartao("d1", draft.nome_de_cartao(longo), [])
         assert all(len(b[0]) <= 256 for b in spec["buttons"])
-
-
-class TestAvisoDoCicloSobreviveAConfirmacao:
-    """O aviso sumia justamente na compra cara.
-
-    Achado em 31/08/2026, depois da 2.8 já commitada: `_com_aviso_de_cartao`
-    devolvia a resposta intacta quando ela era `dict` — e `dict` é o que volta
-    quando o parcelado cruza o `HITL_AMOUNT_THRESHOLD`. Cria cartão → Mac de
-    R$ 8.400 → botões de confirmação SEM o aviso → o usuário clica SIM → o resume
-    lê o `reply` do checkpoint, onde o aviso nunca existiu.
-
-    Ou seja, "criar com ciclo padrão E avisar" degradava sozinho para "avisar
-    nunca" exatamente quando a fatura errada dói mais.
-    """
-
-    CONFIRMACAO = {
-        "ui": "buttons",
-        "body": "⚠️ Confirma registrar R$ 8.400,00 em 10x?",
-        "buttons": [("pa:p1:ok", "Confirmar"), ("pa:p1:no", "Cancelar")],
-        "text": "⚠️ Confirma registrar R$ 8.400,00 em 10x?\nResponde *SIM* ou *NÃO*.",
-    }
-
-    def test_a_pergunta_de_confirmacao_carrega_o_aviso(self):
-        spec = conversation._com_aviso_de_cartao(self.CONFIRMACAO, "Nubank")
-        assert "Criei o cartão *Nubank*" in spec["body"]
-        assert f"dia {db.CARTAO_FECHAMENTO_PADRAO}" in spec["body"]
-        # o fallback de texto também: quem não renderiza interativo lê só ele
-        assert "Criei o cartão *Nubank*" in spec["text"]
-
-    def test_a_pergunta_em_si_nao_se_perde(self):
-        spec = conversation._com_aviso_de_cartao(self.CONFIRMACAO, "Nubank")
-        assert "R$ 8.400,00 em 10x" in spec["body"]
-        assert [b[0] for b in spec["buttons"]] == ["pa:p1:ok", "pa:p1:no"]
-
-    def test_sem_cartao_criado_o_spec_passa_intacto(self):
-        assert conversation._com_aviso_de_cartao(self.CONFIRMACAO, None) == self.CONFIRMACAO
 
 
 class TestFallbackSemPromessaMorta:
@@ -671,3 +636,125 @@ class TestDescriptionSlotAndFallback:
         mesclado = draft.mesclar(rascunho["action"], decidido)
         assert mesclado["description"] == "tv samsung"
         assert mesclado["amount_cents"] == 50000
+
+class TestCadastroInlineCheckpoint:
+    @pytest.fixture(autouse=True)
+    def fixture(self, monkeypatch):
+        from types import SimpleNamespace
+        import app.graph.build as build
+        self.state = {}
+        self.invocations = []
+        self.checkpoint_error = False
+        self.deleted = []
+        self.pending = None
+        self.graph_reply = {'reply':'Cadastro confirmado', 'resource_actions':[{'type':'resource_create','resource':'cards'}]}
+        owner = self
+        class Graph:
+            async def aget_state(self, config):
+                return SimpleNamespace(values=owner.state)
+            async def aupdate_state(self, config, values):
+                if owner.checkpoint_error:
+                    raise RuntimeError('checkpoint unavailable')
+                owner.state.update(values)
+            async def ainvoke(self, entrada, config=None):
+                owner.invocations.append(entrada)
+                return owner.graph_reply
+        monkeypatch.setattr(build,'graph',lambda:Graph())
+        async def nada(*a,**kw): return None
+        async def contas(*a,**kw): return CARTOES
+        async def rascunho(*a,**kw): return RASCUNHO
+        async def pending(*a,**kw): return self.pending
+        async def deleted(*a,**kw): self.deleted.append(a)
+        for key in ('expire_drafts','expire_pending','record_ai_event','resolve_pending'):
+            monkeypatch.setattr(db,key,nada)
+        monkeypatch.setattr(db,'accounts',contas)
+        monkeypatch.setattr(db,'open_draft',rascunho)
+        monkeypatch.setattr(db,'open_pending',pending)
+        monkeypatch.setattr(db,'delete_draft',deleted)
+        async def never(*a,**kw): raise AssertionError('purchase must remain inert')
+        monkeypatch.setattr(draft,'interpretar',never)
+        monkeypatch.setattr(db,'create_credit_card',never)
+
+    @pytest.mark.asyncio
+    async def test_criar_semeia_cadastro_sem_ciclo_e_preserva_compra(self):
+        _, reply = await conversation._cartao_do_rascunho(SESSAO,RASCUNHO,{'acao':'criar_cartao','name':'Inter'})
+        assert self.state['resource_draft'] == [{'type':'resource_create','resource':'cards','name':'Inter','fields':[]}]
+        assert 'fechamento' in reply and 'vencimento' in reply
+        assert not any(char.isdigit() for char in reply)
+        assert self.deleted == []
+
+    @pytest.mark.asyncio
+    async def test_datas_chegam_ao_catalogo_e_nao_viram_nome_de_cartao(self):
+        self.state['resource_draft']=[{'type':'resource_create','resource':'cards','name':'Inter','fields':[]}]
+        await conversation.run_turn(SESSAO,source_message_id='w2',conteudo={'text':'fecha dia 7 e vence dia 14'})
+        state=self.invocations[0]
+        assert state['domains']==['cadastros'] and state['preset']
+        assert state['text']=='fecha dia 7 e vence dia 14'
+        assert state['finance_actions']==[]
+        assert self.deleted==[]
+
+    @pytest.mark.asyncio
+    async def test_sim_do_cadastro_tem_prioridade_e_nao_consume_compra(self,monkeypatch):
+        self.pending={'id':'p1','thread_id':'t:1','summary':'Criar Inter com fechamento7 vencimento14','action':{'action_type':'resource_create'}}
+        async def confirm_sim(*a,**kw): return {'approved':True}
+        monkeypatch.setattr(confirm,'decide',confirm_sim)
+        result=await conversation.run_turn(SESSAO,source_message_id='w3',conteudo={'text':'sim'})
+        assert len(self.invocations)==1
+        assert self.deleted==[]
+        assert 'Cadastro confirmado' in (result.get('body','') if isinstance(result,dict) else result)
+
+    @pytest.mark.asyncio
+    async def test_cancelar_cadastro_incompleto_preserva_compra(self):
+        self.state['resource_draft']=[{'type':'resource_create','resource':'cards','name':'Inter','fields':[]}]
+        self.graph_reply={'reply':'Cadastro cancelado', 'resource_draft':[], 'resource_actions':[]}
+        reply=await conversation.run_turn(SESSAO,source_message_id='w4',conteudo={'text':'cancela esse cadastro'})
+        assert self.invocations[0]['domains']==['cadastros']
+        assert self.deleted==[]
+        assert 'Cadastro cancelado' in reply
+
+class TestFinanciamentoNoRascunho:
+    fixture = TestCadastroInlineCheckpoint.fixture
+    @pytest.mark.asyncio
+    async def test_financiamento_preserva_parcelas_sem_inventar_saldo_ou_taxa(self,monkeypatch):
+        rasc={**RASCUNHO,'action':{**RASCUNHO['action'],'description':'carro','installments':48,'current_installment':9,'amount_cents':7056000}}
+        async def aberto(*a,**kw): return rasc
+        monkeypatch.setattr(db,'open_draft',aberto)
+        reply=await conversation.run_turn(SESSAO,source_message_id='fin1',conteudo={'clicked_id':'ds:d1:financing','text':'É financiamento'})
+        proposal=self.state['resource_draft'][0]
+        assert proposal['resource']=='debts' and proposal['name']=='carro'
+        assert {f['name']:f['value'] for f in proposal['fields']}=={'kind':'financing','installments':'48','installments_paid':'8'}
+        assert len(self.deleted)==1 and self.invocations==[]
+        assert 'saldo' in reply and 'taxa' in reply and 'principal' in reply
+
+    @pytest.mark.asyncio
+    async def test_clique_financiamento_antigo_nao_converte(self):
+        reply=await conversation.run_turn(SESSAO,source_message_id='fin2',conteudo={'clicked_id':'ds:outra:financing','text':'É financiamento'})
+        assert 'expirou' in reply
+        assert not self.state and not self.deleted
+
+    def test_menu_inclui_financiamento_com_e_sem_cartoes(self):
+        for cards in ([],CARTOES,CARTOES[:1],CARTOES*8):
+            spec=conversation._pergunta_cartao('d1',cards,'Em qual cartão?')
+            options=spec.get('buttons') or spec['rows']
+            assert any(item[0]=='ds:d1:financing' for item in options)
+            assert 'financiamento' in spec['text'].lower()
+            assert len(options)<=(3 if spec['ui']=='buttons' else 10)
+
+    @pytest.mark.asyncio
+    async def test_falha_checkpoint_nao_apaga_compra(self):
+        self.checkpoint_error=True
+        with pytest.raises(RuntimeError,match='checkpoint unavailable'):
+            await conversation.run_turn(SESSAO,source_message_id='fin3',conteudo={'clicked_id':'ds:d1:financing'})
+        assert self.deleted==[]
+
+    @pytest.mark.asyncio
+    async def test_turno_seguinte_preserva_cadastro_pelo_reducer(self,monkeypatch):
+        from app.graph.state import _resource_draft
+        await conversation.run_turn(SESSAO,source_message_id='fin4',conteudo={'clicked_id':'ds:d1:financing'})
+        cadastro=self.state['resource_draft']
+        async def nenhum(*a,**kw): return None
+        monkeypatch.setattr(db,'open_draft',nenhum)
+        await conversation.run_turn(SESSAO,source_message_id='fin5',conteudo={'text':'principal 50000, saldo 40000, juros 1% ao mes'})
+        input=self.invocations[-1]
+        assert input['finance_actions']==[]
+        assert _resource_draft(cadastro,input['resource_draft'])==cadastro

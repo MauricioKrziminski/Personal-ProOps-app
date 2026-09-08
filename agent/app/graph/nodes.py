@@ -29,6 +29,7 @@ from app.graph.schemas import (
     NotesAction,
     NotesPlan,
     RouterDecision,
+    ResourceAction, ResourcePlan,
 )
 from app.domain.required import faltando
 from app.domain.money import cents_to_brl
@@ -83,6 +84,10 @@ async def route(state: AgentState) -> dict:
         return {"domains": [Domain.FINANCAS.value], "confidence": 1.0, "llm_calls": 0}
 
     historico = state.get("messages")[:-1] if state.get("messages") else None
+    if state.get('resource_draft'):
+        import json
+        from app.security import wrap_untrusted
+        texto += '\nCadastro incompleto (dado de contexto): ' + wrap_untrusted('document_content',json.dumps(state['resource_draft'],ensure_ascii=False))
     modelo = gemini.structured(RouterDecision, gemini.GEMINI_ROUTER)
     decisao: RouterDecision = await modelo.ainvoke(
         [
@@ -99,7 +104,10 @@ async def route(state: AgentState) -> dict:
         ]
     )
     dominios = [d.value for d in decisao.domains] or [Domain.GERAL.value]
-    return {"domains": dominios, "confidence": decisao.confidence, "llm_calls": 1}
+    ret = {"domains": dominios, "confidence": decisao.confidence, "llm_calls": 1}
+    if decisao.discard_resource_draft:
+        ret.update(resource_draft=[], results=['Cadastro cancelado. Não salvei nada.'], halted=True)
+    return ret
 
 
 def pick_domains(state: AgentState) -> list[str]:
@@ -113,6 +121,7 @@ def pick_domains(state: AgentState) -> list[str]:
         Domain.FINANCAS_CONSULTA.value: "financas_consulta",
         Domain.NOTAS.value: "notas",
         Domain.GERAL.value: "geral",
+        Domain.CADASTROS.value: "cadastros",
     }
     escolhidos = [mapa[d] for d in state.get("domains", []) if d in mapa]
     return escolhidos or ["geral"]
@@ -124,8 +133,8 @@ def pick_domains(state: AgentState) -> list[str]:
 
 
 async def finance_node(state: AgentState) -> dict:
-    if state.get("preset"):
-        return {}  # ações semeadas: não reextrair
+    if state.get("preset") or state.get("halted"):
+        return {}  # ações semeadas ou turno cancelado: não reextrair
 
     historico = state.get("messages")[:-1] if state.get("messages") else None
     modelo = gemini.structured(FinancePlan, gemini.GEMINI_PARSE)
@@ -164,8 +173,8 @@ async def finance_node(state: AgentState) -> dict:
 
 
 async def finance_query_node(state: AgentState) -> dict:
-    if state.get("preset"):
-        return {}  # ações semeadas: não reextrair
+    if state.get("preset") or state.get("halted"):
+        return {}  # ações semeadas ou turno cancelado: não reextrair
 
     """Consultas. Schema próprio (7 × 9) porque o de escrita não cabia junto —
     ver o orçamento medido em schemas.py."""
@@ -194,8 +203,8 @@ async def finance_query_node(state: AgentState) -> dict:
 
 
 async def notes_node(state: AgentState) -> dict:
-    if state.get("preset"):
-        return {}  # ações semeadas: não reextrair
+    if state.get("preset") or state.get("halted"):
+        return {}  # ações semeadas ou turno cancelado: não reextrair
 
     historico = state.get("messages")[:-1] if state.get("messages") else None
     modelo = gemini.structured(NotesPlan, gemini.GEMINI_PARSE)
@@ -221,7 +230,53 @@ async def notes_node(state: AgentState) -> dict:
     }
 
 
+async def resource_node(state: AgentState) -> dict:
+    if state.get("halted"):
+        return {}
+    from app.tools import resources
+    from app.graph.prompts import _ANTI_INJECTION
+    from app.security import wrap_untrusted
+    from app.tools.guards import Level1Error
+    import json
+
+    prompt = """Extraia cadastros do app. Tipos resource_create, resource_update,
+resource_delete, resource_list, resource_pay. resource é uma chave do catálogo; name identifica o item.
+fields contém pares name/value; valores são strings (booleanos true/false, dinheiro
+em centavos inteiros, datas ISO, taxa mensal fração decimal). Nunca invente dados,
+IDs, fechamento/vencimento de cartão ou taxa de financiamento. Campos ausentes serão
+perguntados. Em edição inclua somente os campos que o usuário quer mudar. O nome em
+name é o atual; um novo nome vai no campo name em fields. account_id/payment_account_id
+recebem o NOME da conta citada, não um ID inventado. Parcelas totais incluem as pagas.
+Não confunda compra parcelada NO CARTÃO com financiamento. Uma compra em 48x sem
+menção de cartão pode ser financiamento: peça os dados do contrato, não crie cartão.
+Rascunho anterior só deve ser completado se a mensagem responde à pergunta; se mudar
+assunto não reaproveite dados. Cancelar um cadastro incompleto retorna actions vazio.
+Para atualizar valor de bem use o domínio financeiro específico, não este cadastro.
+Catálogo:
+""" + resources.prompt_catalogue() + "\n" + _ANTI_INJECTION
+    user = user_turn(state.get('text',''), local_datetime_iso(state['timezone']),
+                     state['timezone'], history=(state.get('messages') or [])[:-1])
+    if state.get('resource_draft'):
+        user += "\n" + wrap_untrusted('document_content', json.dumps(state['resource_draft'],ensure_ascii=False))
+    plan = await gemini.structured(ResourcePlan, gemini.GEMINI_PARSE).ainvoke([('system',prompt),('human',user)])
+    context=ExecContext(state['user_id'],state['workspace_id'],state.get('phone'),state['timezone'],state.get('text',''),state['source_message_id'])
+    actions, prepared, incomplete, questions = [], [], [], []
+    for action in plan.actions:
+        try:
+            proposal=await resources.prepare(context,action)
+        except Level1Error as err:
+            incomplete.append(action.model_dump(mode='json'))
+            questions.append(err.mensagem_usuario)
+            continue
+        actions.append(action.model_dump(mode='json'))
+        prepared.append(proposal)
+    return {'resource_actions':actions,'resource_prepared':prepared,'resource_draft':incomplete,
+            'results':[*state.get('results',[]),*questions], 'llm_calls':1}
+
+
 async def general_node(state: AgentState) -> dict:
+    if state.get("halted"):
+        return {}
     """Conversa geral SEM chamar o modelo.
 
     Deixar o LLM escrever livremente aqui seria a única porta de texto não
@@ -250,6 +305,8 @@ def _actions(state: AgentState) -> list[FinanceAction | FinanceQuery | NotesActi
         saida.append(FinanceQuery.model_validate(bruto))
     for bruto in state.get("notes_actions", []):
         saida.append(NotesAction.model_validate(bruto))
+    for bruto in state.get("resource_actions", []):
+        saida.append(ResourceAction.model_validate(bruto))
     return saida
 
 
@@ -311,14 +368,20 @@ async def resolve_node(state: AgentState) -> dict:
     # que não passa pelo resolver. Sair antes daqui pulava o esclarecimento.
     esclarecimentos = _esclarecimentos(state, acoes)
 
+    resource_targets = [{"prepared": p} for p in state.get("resource_prepared", [])]
+    def with_resources(targets):
+        if resource_targets:
+            targets[-len(resource_targets):] = resource_targets
+        return targets
+
     if not any(getattr(a, "type", None) in resolve.TARGETS for a in acoes):
-        return {"targets": [{} for _ in acoes], "results": esclarecimentos,
+        return {"targets": with_resources([{} for _ in acoes]), "results": esclarecimentos,
             "draft": _rascunho(state, acoes)}
 
     alvos = await resolve.for_actions(
         state["workspace_id"], acoes, state.get("text", "")
     )
-    return {"targets": alvos, "results": esclarecimentos,
+    return {"targets": with_resources(alvos), "results": esclarecimentos,
             "draft": _rascunho(state, acoes)}
 
 
@@ -392,6 +455,26 @@ async def safe_node(state: AgentState) -> dict:
     return ret
 
 
+def _confirm_selection(state: AgentState, update: dict) -> dict:
+    """Selecting a target is not permission to mutate it or the rest of the batch."""
+    proposed={**state, **update}
+    actions=_actions(proposed)
+    targets=proposed.get('targets') or [{}]*len(actions)
+    descriptions=[describe_for_confirmation(action,target or None)
+                  for i,(action,target) in enumerate(zip(actions,targets))
+                  if i not in _incompletas(proposed,actions)
+                  and needs_confirmation(action,proposed.get('confidence',1),target or None)
+                  and target.get('status')!='none']
+    if not descriptions:
+        return update
+    answer=interrupt({'kind':'confirmation','summary':'; '.join(descriptions),
+                      'items':descriptions,'action_type':'selected_actions'})
+    if answer is True or (isinstance(answer,dict) and answer.get('approved') is True and not answer.get('candidate_id')):
+        return update
+    return {**update,'approved':False,'halted':True,
+            'results':[*state.get('results',[]),'Ok, não fiz essas alterações.']}
+
+
 async def gate(state: AgentState) -> dict:
     """Decide se executa direto ou pausa esperando confirmação.
 
@@ -415,6 +498,11 @@ async def gate(state: AgentState) -> dict:
     # zip defensivo: comprimento diferente = não resolvido = não executa
     alvos = (alvos + [{}] * len(acoes))[: len(acoes)]
 
+    correction_errors = [t["correction_error"] for t in alvos if t.get("correction_error")]
+    if correction_errors:
+        return {"approved": False, "halted": True,
+                "results": [*state.get("results", []), *correction_errors]}
+
     # 1) Empate tem precedência: escolher o alvo JÁ É o consentimento explícito,
     #    numa ida e volta só. Perguntar "qual?" e depois "confirma?" seria duas.
     for i, (acao, alvo) in enumerate(zip(acoes, alvos)):
@@ -426,7 +514,7 @@ async def gate(state: AgentState) -> dict:
                     "kind": "choice",
                     "action_index": i,
                     "action_type": acao.type.value,
-                    "summary": describe_for_confirmation(acao),
+                    "summary": describe_for_confirmation(acao, alvo),
                     "options": alvo["candidates"],
                 }
             )
@@ -470,7 +558,7 @@ async def gate(state: AgentState) -> dict:
                         if mut_id.startswith("delete_plan") or mut_id in {"delete_plan", "excluir", "apagar", "2"}:
                             acoes_mutadas = list(state.get("finance_actions") or [])
                             acoes_mutadas[i] = FinanceAction(type=FinanceActionType.DELETE_TRANSACTION).model_dump()
-                            return {"approved": True, "targets": congelado, "finance_actions": acoes_mutadas}
+                            return _confirm_selection(state, {"approved": True, "targets": congelado, "finance_actions": acoes_mutadas})
                         if mut_id.startswith("change_paid") or mut_id in {"change_paid", "mudar", "pagas", "1"}:
                             if acao.current_installment:
                                 acoes_mutadas = list(state.get("finance_actions") or [])
@@ -478,7 +566,7 @@ async def gate(state: AgentState) -> dict:
                                     type=FinanceActionType.MARK_PAID,
                                     current_installment=acao.current_installment,
                                 ).model_dump()
-                                return {"approved": True, "targets": congelado, "finance_actions": acoes_mutadas}
+                                return _confirm_selection(state, {"approved": True, "targets": congelado, "finance_actions": acoes_mutadas})
                             return {
                                 "approved": False,
                                 "results": [
@@ -493,7 +581,7 @@ async def gate(state: AgentState) -> dict:
                         "halted": True,
                     }
 
-                return {"approved": True, "chosen_id": escolhido, "targets": congelado}
+                return _confirm_selection(state, {"approved": True, "chosen_id": escolhido, "targets": congelado})
             # SOMA em vez de substituir: `results` tem reducer `_replace`, e
             # sobrescrever aqui apagaria o que a fase segura já gravou — o
             # usuário leria "não mexi em nada" depois de um gasto ter sido
@@ -540,7 +628,7 @@ async def gate(state: AgentState) -> dict:
                     congelado[i] = {**alvo, "status": "found", "table": "installment_plans"}
                     acoes_mutadas = list(state.get("finance_actions") or [])
                     acoes_mutadas[i] = FinanceAction(type=FinanceActionType.DELETE_TRANSACTION).model_dump()
-                    return {"approved": True, "targets": congelado, "finance_actions": acoes_mutadas}
+                    return _confirm_selection(state, {"approved": True, "targets": congelado, "finance_actions": acoes_mutadas})
                 if escolhido.startswith("change_paid") or escolhido in {"change_paid", "mudar", "pagas", "1"}:
                     congelado = [dict(t) for t in alvos]
                     congelado[i] = {**alvo, "status": "found", "table": "installment_plans"}
@@ -550,7 +638,7 @@ async def gate(state: AgentState) -> dict:
                             type=FinanceActionType.MARK_PAID,
                             current_installment=acao.current_installment,
                         ).model_dump()
-                        return {"approved": True, "targets": congelado, "finance_actions": acoes_mutadas}
+                        return _confirm_selection(state, {"approved": True, "targets": congelado, "finance_actions": acoes_mutadas})
                     return {
                         "approved": False,
                         "results": [
@@ -565,6 +653,8 @@ async def gate(state: AgentState) -> dict:
                 "halted": True,
             }
 
+    # Consentimento neste aviso vale só para a ação exibida.
+    avisos_confirmados: set[int] = set()
     # 1.2) Checagem de limite disponível do cartão (Soft Warning)
     for i, acao in enumerate(acoes):
         if i in _incompletas(state, acoes):
@@ -603,20 +693,27 @@ async def gate(state: AgentState) -> dict:
                     escolhido = (
                         escolha.get("candidate_id") if isinstance(escolha, dict) else escolha
                     )
-                    if isinstance(escolhido, str) and (
-                        escolhido in {"confirm", "yes", "sim", "1", "ok"}
-                        or (isinstance(escolha, dict) and escolha.get("approved"))
-                    ):
-                        return {"approved": True}
-                    if isinstance(escolhido, str) and (escolhido in {"change_card", "trocar", "2"}):
+                    if escolhido == "change_card":
+                        pergunta = f"💳 Qual outro cartão você prefere usar para esta compra de {cents_to_brl(acao.amount_cents)}?"
                         return {
                             "approved": False,
-                            "results": [
-                                *state.get("results", []),
-                                f"💳 Qual outro cartão você prefere usar para esta compra de {cents_to_brl(acao.amount_cents)}?",
-                            ],
+                            "draft": {
+                                "action": acao.model_copy(update={"account": None}).model_dump(mode="json"),
+                                "raw_text": state.get("text", ""),
+                                "missing": pergunta,
+                                "slot": "account",
+                            },
+                            "results": [*state.get("results", []), pergunta],
                             "halted": True,
                         }
+                    # Uma escolha válida não significa autorização de escrita.
+                    # Texto SIM chega como bool; botão Confirmar carrega id próprio.
+                    if escolha is True or escolhido == "confirm" or (
+                        isinstance(escolha, dict) and escolha.get("approved") is True
+                        and not escolha.get("candidate_id")
+                    ):
+                        avisos_confirmados.add(i)
+                        continue
                     return {
                         "approved": False,
                         "results": [*state.get("results", []), "👍 Beleza, não registrei a compra."],
@@ -629,7 +726,7 @@ async def gate(state: AgentState) -> dict:
     motivos = [
         (a, alvo, needs_confirmation(a, confidence, alvo or None))
         for i, (a, alvo) in enumerate(zip(acoes, alvos))
-        if i not in bloqueadas
+        if i not in bloqueadas and i not in avisos_confirmados
     ]
     pendentes = [(a, t, m) for a, t, m in motivos if m]
     if not pendentes:
@@ -653,15 +750,15 @@ async def gate(state: AgentState) -> dict:
         {
             "kind": "confirmation",
             "reason": motivo,
-            "summary": itens[0] if len(itens) == 1 else "; ".join(itens[:5]),
-            "items": itens[:5],
+            "summary": itens[0] if len(itens) == 1 else "; ".join(itens),
+            "items": itens,
             "action_type": acao.type.value,
         }
     )
 
     if resposta is True or (isinstance(resposta, str) and resposta.lower() in {"sim", "s", "true"}):
         return {"approved": True}
-    if isinstance(resposta, dict) and resposta.get("approved"):
+    if isinstance(resposta, dict) and resposta.get("approved") and not resposta.get("candidate_id"):
         return {"approved": True, "chosen_id": resposta.get("candidate_id") or ""}
     # idem: preserva o que a fase segura executou antes da pergunta
     return {

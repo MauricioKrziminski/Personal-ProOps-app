@@ -12,8 +12,8 @@ import logging
 from uuid import UUID
 
 from app import db
-from app.domain.dates import add_months, format_date_br, local_iso_date, now_utc
 from app.domain import matching
+from app.domain.dates import add_months, format_date_br, local_iso_date, now_utc
 from app.domain.money import cents_to_brl, parse_valor_em_centavos
 from app.domain.recurrence import next_occurrence
 from app.graph.schemas import FinanceAction, FinanceActionType
@@ -577,12 +577,18 @@ async def update_transaction(ctx: ExecContext, action: FinanceAction) -> ToolRes
         )
 
     patch: dict = {}
-    if action.new_amount_cents:
+    if action.new_amount_cents is not None:
         patch["amount_cents"] = guards.require_amount(action.new_amount_cents, o_que="o valor novo")
     if action.new_category:
         patch["category"] = guards.clean_category(action.new_category)
     if action.new_occurred_at:
         patch["occurred_at"] = guards.require_date(action.new_occurred_at, ctx.timezone, default_hoje=False)
+    frozen_account = None
+    if action.new_account:
+        frozen_account = (ctx.target or {}).get("new_account")
+        if not frozen_account or "id" not in frozen_account:
+            raise Level1Error("A conta corrigida não foi confirmada. Peça a correção novamente.")
+        patch["account_id"] = frozen_account["id"]
     if not patch:
         raise Level1Error(
             "❌ Não entendi o que mudar. Tenta \"muda o último pra 54\" "
@@ -604,14 +610,21 @@ async def update_transaction(ctx: ExecContext, action: FinanceAction) -> ToolRes
     if not antes:
         return ToolResult("🤷 Esse lançamento não está mais aqui.", read_only=True)
     colunas = ", ".join(f"{c} = %s" for c in patch)
-    await db.execute(
-        f"update public.transactions set {colunas} where id = %s and workspace_id = %s",  # noqa: S608
-        *patch.values(),
-        antes["id"],
-        ctx.workspace_id,
+    args = [*patch.values(), antes["id"], ctx.workspace_id]
+    account_guard = ""
+    if frozen_account and frozen_account["id"] is not None:
+        account_guard = " and exists (select 1 from public.accounts a where a.id = %s and a.workspace_id = %s and not a.archived)"
+        args.extend([frozen_account["id"], ctx.workspace_id])
+    updated = await db.fetch_one(
+        f"update public.transactions set {colunas} where id = %s and workspace_id = %s{account_guard} returning id",
+        *args,
     )
+    if not updated:
+        return ToolResult("O lançamento ou a conta mudou desde a confirmação. Não alterei nada; peça a correção novamente.", read_only=True)
 
     mudancas = []
+    if frozen_account:
+        mudancas.append(f"conta → *{frozen_account['name']}*")
     if "amount_cents" in patch:
         mudancas.append(f"{cents_to_brl(antes['amount_cents'])} → {cents_to_brl(patch['amount_cents'])}")
     if "category" in patch:

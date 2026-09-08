@@ -1,6 +1,7 @@
 import { Redirect } from 'expo-router';
 
 import { useSession } from '@/hooks/use-session';
+import { hasCompletedOnboarding } from '@/lib/onboarding';
 
 /**
  * Raiz do app — só decide para onde ir.
@@ -15,5 +16,5 @@ import { useSession } from '@/hooks/use-session';
 export default function Index() {
   const { session, loading } = useSession();
   if (loading) return null;
-  return <Redirect href={session ? '/today' : '/login'} />;
+  return <Redirect href={session ? (hasCompletedOnboarding(session.user.user_metadata) ? '/today' : '/onboarding') : '/login'} />;
 }

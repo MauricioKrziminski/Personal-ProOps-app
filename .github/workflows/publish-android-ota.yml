@@ -1,0 +1,51 @@
+name: Publish compatible Android OTA
+
+on:
+  workflow_dispatch:
+    inputs:
+      native_tag:
+        description: 'Tag do APK de produção já publicado (ex.: v1.0.1)'
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: android-production-ota
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    name: Verify compatibility and publish production OTA
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    environment: production
+    env:
+      APP_VARIANT: production
+      EXPO_NO_DOTENV: '1'
+      NATIVE_TAG: ${{ inputs.native_tag }}
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - run: npx tsc --noEmit
+      - run: npx expo lint
+      - run: npm test
+      - uses: expo/expo-github-action@v8
+        with:
+          eas-version: 23.2.0
+          token: ${{ secrets.EXPO_TOKEN }}
+      - name: Read compatibility receipt from shipped APK release
+        env:
+          GH_TOKEN: ${{ secrets.DISTRIBUTION_REPO_TOKEN }}
+        run: |
+          [[ "$NATIVE_TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]] || exit 1
+          gh release download "$NATIVE_TAG" --repo almeidagabriel01/Personal-ProOps-app-releases --pattern native-compatibility.json --dir "$RUNNER_TEMP/ota-base"
+      - name: Check and publish using one production environment snapshot
+        run: eas env:exec --environment production 'APP_VARIANT=production node scripts/release/publish-compatible-ota.mjs "$RUNNER_TEMP/ota-base/native-compatibility.json" "$RUNNER_TEMP/ota-current.json" "$NATIVE_TAG"'

@@ -54,7 +54,7 @@ import {
 import { categoryIcon } from '@/design/category-icons';
 import { formatBRL, formatDateBR, localISODate } from '@/hooks/use-items';
 import { monthBounds } from '@/lib/dates';
-import { confirmDestructive } from '@/lib/item-actions';
+import { confirmDestructive, showItemActions } from '@/lib/item-actions';
 import { useTheme, useScheme } from '@/hooks/use-theme';
 
 /**
@@ -870,7 +870,11 @@ export default function FinanceScreen() {
       <Button
         label="Lançar"
         icon="plus"
-        onPress={() => router.push({ pathname: '/finance/transaction-form', params: { month } })}
+        onPress={() => showItemActions('Lançar', [
+          { label: 'Gasto ou receita', onPress: () => router.push({ pathname: '/finance/transaction-form', params: { month } }) },
+          { label: 'Despesa ou receita recorrente', onPress: () => router.push({ pathname: '/finance/recurring', params: { create: '1' } }) },
+          { label: 'Financiamento', onPress: () => router.push({ pathname: '/finance/debts', params: { create: 'financing' } }) },
+        ])}
         style={[
           styles.fab,
           {

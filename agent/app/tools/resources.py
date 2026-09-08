@@ -1,0 +1,623 @@
+"""Closed catalogue for app records. Prepare is read-only; execute uses frozen data.
+
+All identifiers below are server literals. User/model data is always bound as values.
+Updates compare the record snapshot in the same SQL statement as the write.
+"""
+
+from __future__ import annotations
+
+from datetime import date, datetime
+from decimal import Decimal, InvalidOperation
+
+from app import db
+from app.domain.dates import now_utc, to_instant, local_iso_date
+from app.domain.money import cents_to_brl, MAX_CENTS
+from app.domain.recurrence import next_occurrence
+from app.domain.categories import normalize
+from app.graph.schemas import ResourceAction, ResourceActionType as Op
+from app.tools.base import ExecContext, ToolResult
+from app.tools.guards import Level1Error, clean_rrule
+
+# table, identifying column, deletion semantics, editable columns
+CATALOG = {
+    "accounts": (
+        "accounts",
+        "name",
+        "archived",
+        "name type initial_balance_cents archived",
+    ),
+    "cards": (
+        "accounts",
+        "name",
+        "archived",
+        "name closing_day due_day credit_limit_cents payment_account_id archived",
+    ),
+    "debts": (
+        "debts",
+        "name",
+        "archived",
+        "name kind principal_cents remaining_cents interest_rate_monthly installments installments_paid installment_cents due_day account_id started_at archived",
+    ),
+    "goals": ("goals", "name", "archived", "name target_cents deadline archived"),
+    "budgets": ("budgets", "category", None, "category limit_cents rollover month"),
+    "assets": (
+        "assets",
+        "name",
+        "archived",
+        "name class is_liability current_value_cents acquired_at archived",
+    ),
+    "recurring": (
+        "recurring_transactions",
+        "description",
+        "active",
+        "kind amount_cents category description account_id rrule dtstart auto_confirm active",
+    ),
+    "rules": (
+        "categorization_rules",
+        "pattern",
+        None,
+        "match_type pattern category account_id priority",
+    ),
+    "notes": ("notes", "content", "deleted_at", "content folder_id pinned"),
+    "reminders": (
+        "reminders",
+        "title",
+        "active",
+        "title recurrence next_run_at channel active",
+    ),
+    "folders": ("note_folders", "name", None, "name parent_id"),
+}
+REQUIRED = {
+    "accounts": ("name", "type"),
+    "cards": ("name", "closing_day", "due_day"),
+    "debts": (
+        "name",
+        "kind",
+        "principal_cents",
+        "remaining_cents",
+        "interest_rate_monthly",
+    ),
+    "goals": ("name", "target_cents"),
+    "budgets": ("category", "limit_cents"),
+    "assets": ("name", "class", "current_value_cents"),
+    "recurring": ("kind", "amount_cents", "description", "rrule", "dtstart"),
+    "rules": ("pattern", "category", "match_type"),
+    "notes": ("content",),
+    "reminders": ("title", "next_run_at"),
+    "folders": ("name",),
+}
+LABELS = {
+    "accounts": "conta",
+    "cards": "cartão",
+    "debts": "dívida/financiamento",
+    "goals": "meta",
+    "budgets": "orçamento",
+    "assets": "bem/investimento",
+    "recurring": "lançamento recorrente",
+    "rules": "regra de categoria",
+    "notes": "nota",
+    "reminders": "lembrete",
+    "folders": "pasta",
+    "name": "nome",
+    "closing_day": "dia de fechamento",
+    "due_day": "dia de vencimento",
+    "credit_limit_cents": "limite",
+    "type": "tipo de conta",
+    "kind": "tipo",
+    "principal_cents": "principal original",
+    "remaining_cents": "saldo devedor atual",
+    "interest_rate_monthly": "juros ao mês",
+    "installments": "parcelas totais",
+    "installments_paid": "parcelas já pagas",
+    "installment_cents": "valor da parcela",
+    "account_id": "conta",
+    "payment_account_id": "conta pagadora",
+    "initial_balance_cents": "saldo inicial",
+    "target_cents": "valor da meta",
+    "deadline": "prazo",
+    "category": "categoria",
+    "limit_cents": "limite",
+    "rollover": "acumular sobra",
+    "month": "mês",
+    "class": "classe",
+    "is_liability": "é passivo",
+    "current_value_cents": "valor atual",
+    "acquired_at": "data de aquisição",
+    "amount_cents": "valor",
+    "description": "descrição",
+    "rrule": "frequência",
+    "dtstart": "primeira ocorrência",
+    "auto_confirm": "confirmar automaticamente",
+    "active": "ativo",
+    "archived": "arquivado",
+    "pattern": "termo",
+    "match_type": "tipo de correspondência",
+    "priority": "prioridade",
+    "content": "conteúdo",
+    "folder_id": "pasta",
+    "pinned": "fixada",
+    "title": "título",
+    "recurrence": "frequência",
+    "next_run_at": "próximo envio",
+    "channel": "canal",
+    "parent_id": "pasta superior",
+    "started_at": "início do contrato",
+    "paid_at": "data do pagamento",
+}
+ENUMS = {
+    ("accounts", "type"): {"checking", "savings", "cash", "investment"},
+    ("debts", "kind"): {"loan", "financing", "credit_card", "person", "other"},
+    ("assets", "class"): {
+        "investment",
+        "real_estate",
+        "vehicle",
+        "crypto",
+        "equity",
+        "receivable",
+        "other",
+    },
+    ("recurring", "kind"): {"expense", "income"},
+    ("reminders", "channel"): {"push", "whatsapp", "both"},
+    ("rules", "match_type"): {"contains", "merchant"},
+}
+BOOLS = {"archived", "active", "rollover", "is_liability", "auto_confirm", "pinned"}
+LINKS = {
+    "account_id": "accounts",
+    "payment_account_id": "accounts",
+    "folder_id": "note_folders",
+    "parent_id": "note_folders",
+}
+
+
+def _error(text):
+    raise Level1Error(text)
+
+
+def validate_fields(action: ResourceAction) -> dict:
+    if action.resource not in CATALOG:
+        _error(
+            "Esse recurso não está disponível. Posso gerenciar contas, cartões, dívidas, metas, orçamentos, recorrências, patrimônio, notas, lembretes, pastas e regras."
+        )
+    _, identity, _, columns = CATALOG[action.resource]
+    if action.type == Op.PAY:
+        if action.resource != "debts":
+            _error("O pagamento de prestação deve indicar uma dívida ou financiamento.")
+        columns = "amount_cents account_id paid_at"
+    values = {}
+    for field in action.fields:
+        key, value = field.name, field.value
+        if key not in columns.split() or key in values:
+            _error("Campo não permitido ou repetido nesta operação.")
+        if value is None:
+            if key in BOOLS or key in {
+                "initial_balance_cents",
+                "interest_rate_monthly",
+                "installments_paid",
+                "priority",
+                "started_at",
+                "paid_at",
+            }:
+                _error(f"{LABELS[key]} não pode ficar vazio.")
+            values[key] = None
+            continue
+        value = value.strip()
+        if key in BOOLS:
+            if value not in {"true", "false"}:
+                _error(f"Informe sim ou não para {LABELS[key]}.")
+            value = value == "true"
+        elif key.endswith("_cents") or key in {
+            "closing_day",
+            "due_day",
+            "installments",
+            "installments_paid",
+            "priority",
+        }:
+            try:
+                value = int(value)
+            except ValueError:
+                _error(f"Informe um número inteiro para {LABELS[key]}.")
+            minimum = -MAX_CENTS if key == "initial_balance_cents" else 0
+            if not minimum <= value <= MAX_CENTS:
+                _error(f"Valor inválido para {LABELS[key]}.")
+            if key in {"closing_day", "due_day"} and not 1 <= value <= 31:
+                _error("Dia deve estar entre 1 e 31.")
+            if (
+                key
+                in {
+                    "amount_cents",
+                    "target_cents",
+                    "limit_cents",
+                    "installment_cents",
+                    "principal_cents",
+                    "installments",
+                }
+                and value <= 0
+            ):
+                _error(f"{LABELS[key]} deve ser positivo.")
+            if key == "installments" and value > 1200:
+                _error("Número de parcelas fora do intervalo permitido.")
+        elif key == "interest_rate_monthly":
+            try:
+                n = Decimal(value.replace(",", "."))
+            except InvalidOperation:
+                _error("Informe a taxa mensal do contrato.")
+            if not n.is_finite() or not 0 <= n <= 1:
+                _error("Taxa mensal inválida.")
+            value = str(n)
+        elif key in {"started_at", "acquired_at", "deadline", "month", "paid_at"}:
+            try:
+                value = date.fromisoformat(value).isoformat()
+            except ValueError:
+                _error(f"Data inválida: {LABELS[key]}.")
+            if key == "month" and not value.endswith("-01"):
+                _error("O mês do orçamento deve começar no dia 1.")
+        elif key in {"rrule", "recurrence"}:
+            value = clean_rrule(value)
+        elif not value or len(value) > 20000:
+            _error(f"Informe {LABELS.get(key, key)} válido.")
+        if (action.resource, key) in ENUMS and value not in ENUMS[action.resource, key]:
+            _error(
+                f"Tipo inválido para {LABELS[key]}. Opções: {', '.join(sorted(ENUMS[action.resource, key]))}."
+            )
+        values[key] = value
+    if action.type == Op.CREATE and action.name and identity not in values:
+        values[identity] = action.name.strip()
+    if action.resource == "folders":
+        if "name" in values:
+            values["name"] = normalize(values["name"])
+            if not values["name"] or len(values["name"]) > 40:
+                _error("Nome de pasta deve ter entre 1 e 40 caracteres.")
+    if action.type == Op.CREATE:
+        if action.resource == "recurring":
+            values.setdefault("auto_confirm", False)
+        for key in REQUIRED[action.resource]:
+            if values.get(key) is None or values.get(key) == "":
+                _error(
+                    f"Para cadastrar {LABELS[action.resource]}, informe {LABELS[key]}. Ainda não salvei nada."
+                )
+        if action.resource == "cards":
+            values["type"] = "credit_card"
+        if action.resource == "reminders":
+            values.setdefault("channel", "push")
+    return values
+
+
+def _where(resource):
+    if resource == "cards":
+        return " and type = 'credit_card'"
+    if resource == "accounts":
+        return " and type <> 'credit_card'"
+    if resource == "notes":
+        return " and deleted_at is null"
+    return ""
+
+
+async def prepare(ctx: ExecContext, action: ResourceAction) -> dict:
+    values = validate_fields(action)
+    table, identity, deletion, _ = CATALOG[action.resource]
+    prepared = {
+        "table": table,
+        "values": values,
+        "resource": action.resource,
+        "operation": action.type.value,
+    }
+    if action.type == Op.LIST:
+        prepared["summary"] = f"listar {LABELS[action.resource]}"
+        return prepared
+    if action.type != Op.CREATE:
+        if not action.name:
+            _error(f"Qual {LABELS[action.resource]}? Informe o nome exato.")
+        lookup_name = (
+            normalize(action.name) if action.resource == "folders" else action.name
+        )
+        selector = ""
+        params = [ctx.workspace_id, lookup_name]
+        if action.resource == "budgets" and action.target_month:
+            if action.target_month == "default":
+                selector = " and month is null"
+            else:
+                try:
+                    month = date.fromisoformat(action.target_month)
+                except ValueError:
+                    _error("Informe o mês do orçamento em YYYY-MM-01.")
+                if month.day != 1:
+                    _error("Informe o primeiro dia do mês do orçamento.")
+                selector = " and month = %s"
+                params.append(month.isoformat())
+        rows = await db.fetch(
+            f"select *, xmin::text as row_version from public.{table} where workspace_id = %s and {identity} = %s"
+            + _where(action.resource)
+            + selector,
+            *params,
+        )
+        if len(rows) != 1:
+            _error(
+                "Não encontrei um único item com esse nome. Informe o nome exato (e o mês, no caso de orçamento). Nada foi alterado."
+            )
+        old = rows[0]
+        prepared.update(id=str(old["id"]), version=old["row_version"])
+        if action.type == Op.PAY:
+            if old.get("archived"):
+                _error("Essa dívida está arquivada. Revise o cadastro antes de pagar.")
+            if not values.get("amount_cents"):
+                _error("Qual o valor da prestação paga? Ainda não registrei nada.")
+            values.setdefault("paid_at", local_iso_date(ctx.timezone))
+            if not values.get("account_id"):
+                values["account_id"] = (
+                    str(old["account_id"]) if old.get("account_id") else None
+                )
+            if not values["account_id"]:
+                _error("Qual conta foi usada para pagar a prestação?")
+        if action.resource == "budgets":
+            prepared["target_label"] = str(old.get("month") or "padrão")
+        if action.type == Op.DELETE:
+            if deletion == "archived":
+                values = {"archived": True}
+            elif deletion == "active":
+                values = {"active": False}
+            elif deletion == "deleted_at":
+                values = {"deleted_at": now_utc().isoformat()}
+            else:
+                values = {}
+            prepared["values"] = values
+        elif not values:
+            _error("O que você quer alterar?")
+        if (
+            action.resource == "accounts"
+            and "type" in values
+            and values["type"] != old["type"]
+        ):
+            _error(
+                "O tipo de uma conta com histórico não pode ser convertido por aqui. Crie outra conta e transfira o saldo."
+            )
+        if action.resource == "assets" and "current_value_cents" in values:
+            _error(
+                'Para mudar a avaliação, peça "atualize o valor do bem"; isso registra também o histórico.'
+            )
+        merged = {**old, **values}
+    else:
+        merged = values
+    # Never let a new non-nullable value become null during an edit.
+    if action.type != Op.DELETE:
+        for key in REQUIRED[action.resource]:
+            if key in values and values[key] is None:
+                _error(f"{LABELS[key]} não pode ficar vazio.")
+    display = {}
+    for key, linked_table in LINKS.items():
+        if values.get(key):
+            rows = await db.fetch(
+                "select id, name"
+                + (", type" if linked_table == "accounts" else "")
+                + f" from public.{linked_table} where workspace_id = %s and (id::text = %s or name = %s)"
+                + (" and not archived" if linked_table == "accounts" else ""),
+                ctx.workspace_id,
+                values[key],
+                values[key],
+            )
+            if len(rows) != 1:
+                _error(
+                    f"Não encontrei {LABELS[key]} nesse espaço. Informe o nome exato."
+                )
+            row = rows[0]
+            if (key == "payment_account_id" or action.resource == "debts") and row.get(
+                "type"
+            ) == "credit_card":
+                _error("Escolha uma conta pagadora que não seja cartão.")
+            if key == "parent_id" and str(row["id"]) == prepared.get("id"):
+                _error("Uma pasta não pode ser sua própria pasta superior.")
+            values[key] = str(row["id"])
+            display[key] = row["name"]
+    if action.resource == "folders" and values.get("parent_id"):
+        ancestors = await db.fetch(
+            """with recursive parents as (
+              select id, parent_id from public.note_folders where id = %s and workspace_id = %s
+              union select f.id, f.parent_id from public.note_folders f
+              join parents p on p.parent_id = f.id where f.workspace_id = %s
+            ) select id from parents""",
+            values["parent_id"],
+            ctx.workspace_id,
+            ctx.workspace_id,
+        )
+        if prepared.get("id") in {str(row["id"]) for row in ancestors}:
+            _error("Uma pasta não pode ser movida para dentro de uma descendente.")
+    if action.resource == "debts" and action.type != Op.DELETE:
+        if int(merged.get("installments_paid") or 0) > int(
+            merged.get("installments") or 1200
+        ):
+            _error("Parcelas pagas não podem ultrapassar as parcelas totais.")
+        if int(merged.get("remaining_cents") or 0) > int(
+            merged.get("principal_cents") or 0
+        ):
+            _error("Confira principal original e saldo devedor do contrato.")
+    if action.resource in {"recurring", "reminders"} and action.type != Op.DELETE:
+        timekey = "dtstart" if action.resource == "recurring" else "next_run_at"
+        if values.get(timekey):
+            try:
+                datetime.fromisoformat(values[timekey].replace("Z", "+00:00"))
+                instant = to_instant(values[timekey], ctx.timezone)
+            except (ValueError, TypeError):
+                _error("Informe data e hora válidas para o agendamento.")
+            values[timekey] = instant.isoformat()
+            if action.resource == "recurring":
+                values["next_run_at"] = instant.isoformat()
+        rule = merged.get("rrule") or merged.get("recurrence")
+        if rule and next_occurrence(rule, now_utc(), ctx.timezone) is None:
+            _error("Recorrência sem próximas ocorrências.")
+        if action.type == Op.CREATE and action.resource == "reminders":
+            values["timezone"] = ctx.timezone
+    verb = {
+        Op.CREATE: "criar",
+        Op.UPDATE: "alterar",
+        Op.DELETE: (
+            "arquivar"
+            if deletion == "archived"
+            else "desativar"
+            if deletion == "active"
+            else "excluir"
+        ),
+        Op.PAY: "registrar pagamento de",
+    }[action.type]
+    details = []
+    for key, value in values.items():
+        if key in {"timezone", "type"} and action.resource == "cards":
+            continue
+        shown = display.get(key, value)
+        if key.endswith("_cents") and value is not None:
+            shown = cents_to_brl(value)
+        elif key == "interest_rate_monthly" and value is not None:
+            shown = f"{Decimal(str(value)) * 100:g}%".replace(".", ",")
+        elif (action.resource, key) in ENUMS:
+            shown = {
+                "checking": "conta corrente",
+                "savings": "poupança",
+                "cash": "dinheiro",
+                "investment": "investimento",
+                "loan": "empréstimo",
+                "financing": "financiamento",
+                "credit_card": "cartão",
+                "person": "pessoa",
+                "other": "outro",
+                "real_estate": "imóvel",
+                "vehicle": "veículo",
+                "crypto": "criptoativo",
+                "equity": "participação",
+                "receivable": "valor a receber",
+                "expense": "gasto",
+                "income": "receita",
+                "push": "notificação no app",
+                "whatsapp": "WhatsApp",
+                "both": "notificação no app e WhatsApp",
+                "contains": "contém o termo",
+                "merchant": "estabelecimento",
+            }.get(str(value), value)
+        elif isinstance(value, bool):
+            shown = "sim" if value else "não"
+        details.append(
+            f"{LABELS.get(key, key)}: {shown if shown is not None else 'não informado'}"
+        )
+    prepared["summary"] = (
+        f"{verb} {LABELS[action.resource]} {action.name or ''} — " + "; ".join(details)
+    )
+    if prepared.get("target_label"):
+        prepared["summary"] += "; orçamento de " + prepared["target_label"]
+    if action.resource in {"recurring", "reminders"} and action.type == Op.DELETE:
+        prepared["summary"] += "; registros já gerados continuam no histórico"
+    if len(prepared["summary"]) > 3500:
+        _error(
+            "Essa alteração é longa demais para revisar em uma confirmação. Peça uma alteração menor ou edite o conteúdo completo no app."
+        )
+    return prepared
+
+
+async def execute(ctx: ExecContext, action: ResourceAction) -> ToolResult:
+    proposal = (ctx.target or {}).get("prepared")
+    if (
+        not proposal
+        or proposal.get("operation") != action.type.value
+        or proposal.get("resource") != action.resource
+    ):
+        raise Level1Error("A proposta não está pronta. Peça a operação novamente.")
+    table, identity, deletion, columns = CATALOG[action.resource]
+    if action.type == Op.LIST:
+        rows = await db.fetch(
+            f"select {identity} as label from public.{table} where workspace_id = %s"
+            + _where(action.resource)
+            + f" order by {identity} limit 50",
+            ctx.workspace_id,
+        )
+        return ToolResult(
+            "\n".join(str(r["label"]) for r in rows) or "Nenhum item cadastrado.",
+            read_only=True,
+        )
+    values = dict(proposal["values"])
+    guards, link_args = [], []
+    for key, linked_table in LINKS.items():
+        if values.get(key):
+            condition = f"EXISTS (select 1 from public.{linked_table} linked where linked.id = %s and linked.workspace_id = %s"
+            if linked_table == "accounts":
+                condition += " and not linked.archived"
+                if key == "payment_account_id" or action.resource == "debts":
+                    condition += " and linked.type <> 'credit_card'"
+            guards.append(condition + ")")
+            link_args.extend([values[key], ctx.workspace_id])
+    reference_guard = (" and " + " and ".join(guards)) if guards else ""
+    if action.type == Op.PAY:
+        # MATERIALIZED locks the exact reviewed debt before evaluating the RPC.
+        # The RPC and 0057 transaction trigger own amortization, never Python.
+        row = await db.fetch_one(
+            """with reviewed as materialized (
+              select id from public.debts where id = %s and workspace_id = %s
+              and xmin::text = %s and not archived"""
+            + reference_guard
+            + """ for update
+            ) select public.pay_debt_installment(id, %s, %s, %s) as remaining_cents
+              from reviewed""",
+            proposal["id"],
+            ctx.workspace_id,
+            proposal["version"],
+            *link_args,
+            values["amount_cents"],
+            values["account_id"],
+            values["paid_at"],
+        )
+        if row is None:
+            _error(
+                "A dívida ou a conta mudou depois da proposta. Peça novamente para revisar antes de confirmar."
+            )
+        return ToolResult(
+            "Pagamento registrado. Saldo devedor: "
+            + cents_to_brl(row["remaining_cents"])
+            + ".",
+            result_id=proposal["id"],
+        )
+    if action.type == Op.CREATE:
+        values.update(user_id=ctx.user_id, workspace_id=ctx.workspace_id)
+        keys = list(values)
+        row = await db.fetch_one(
+            f"insert into public.{table} ({', '.join(keys)}) select {', '.join(['%s'] * len(keys))} where true"
+            + reference_guard
+            + " returning id",
+            *values.values(),
+            *link_args,
+        )
+    else:
+        # MVCC token freezes every column, not only a timestamp updated by some tables.
+        args = [proposal["id"], ctx.workspace_id, proposal["version"]]
+        if action.type == Op.DELETE and not deletion:
+            row = await db.fetch_one(
+                f"delete from public.{table} where id = %s and workspace_id = %s and xmin::text = %s returning id",
+                *args,
+            )
+        else:
+            row = await db.fetch_one(
+                f"update public.{table} set "
+                + ", ".join(f"{key} = %s" for key in values)
+                + " where id = %s and workspace_id = %s and xmin::text = %s"
+                + reference_guard
+                + " returning id",
+                *values.values(),
+                *args,
+                *link_args,
+            )
+    if not row:
+        raise Level1Error(
+            "Esse item mudou depois da proposta. Peça novamente para revisar antes de confirmar."
+        )
+    return ToolResult("Concluído: " + proposal["summary"] + ".", result_id=row["id"])
+
+
+def prompt_catalogue() -> str:
+    catalogue = "\n".join(
+        f"{key}: campos {entry[3]}; obrigatórios ao criar {', '.join(REQUIRED[key])}."
+        for key, entry in CATALOG.items()
+    )
+    choices = "\n".join(
+        f"{resource}.{field}: {', '.join(sorted(values))}"
+        for (resource, field), values in ENUMS.items()
+    )
+    return (
+        catalogue
+        + "\nValores permitidos:\n"
+        + choices
+        + "\nOrçamento mensal existente: target_month=YYYY-MM-01; orçamento padrão: target_month=default.\nPara pagar prestação de dívida existente: resource_pay, resource=debts, name=nome da dívida, campos amount_cents, account_id (nome da conta), paid_at (YYYY-MM-DD). Não editar remaining_cents para registrar pagamento."
+    )

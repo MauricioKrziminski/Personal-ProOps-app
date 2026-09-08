@@ -26,6 +26,7 @@ from app.graph.nodes import (
     gate,
     general_node,
     notes_node,
+    resource_node,
     pick_domains,
     resolve_node,
     route,
@@ -49,6 +50,7 @@ def build(checkpointer: AsyncPostgresSaver):
     builder.add_node("financas_consulta", finance_query_node)
     builder.add_node("notas", notes_node)
     builder.add_node("geral", general_node)
+    builder.add_node("cadastros", resource_node)
     # Fase Cognitiva: resolve e CONGELA os alvos antes de qualquer decisão
     builder.add_node("alvos", resolve_node)
     # fase segura: o que não precisa de confirmação grava ANTES da pergunta
@@ -63,11 +65,11 @@ def build(checkpointer: AsyncPostgresSaver):
     # escolhidos em paralelo. Eles escrevem chaves diferentes do estado, então
     # não há conflito de escrita concorrente.
     builder.add_conditional_edges(
-        "dominio", pick_domains, ["financas", "financas_consulta", "notas", "geral"]
+        "dominio", pick_domains, ["financas", "financas_consulta", "notas", "geral", "cadastros"]
     )
     # fan-in dos domínios no `alvos`: ele precisa ver o lote INTEIRO (finanças e
     # notas juntas) para decidir com todas as ações na mesa, igual ao gate.
-    for dominio in ("financas", "financas_consulta", "notas", "geral"):
+    for dominio in ("financas", "financas_consulta", "notas", "geral", "cadastros"):
         builder.add_edge(dominio, "alvos")
     builder.add_edge("alvos", "seguras")
     builder.add_edge("seguras", "gate")

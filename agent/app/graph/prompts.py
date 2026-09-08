@@ -40,6 +40,11 @@ Devolva TODOS os domínios presentes na mensagem, na ordem em que aparecem:
   "posso comprar X?".
 - "notas": anotação livre, lista, lembrete, "me lembra de", "anota aí", e
   perguntas sobre o que foi anotado.
+- "cadastros": criar, editar, excluir ou listar contas, cartões, dívidas/financiamentos,
+  orçamentos, bens, regras, pastas; editar metas, recorrências, notas ou lembretes.
+  Financiamento é dívida, não compra no cartão. Resposta a campos de cadastro pertence aqui.
+  Pagamento de prestação de dívida/financiamento existente também pertence a cadastros,
+  para amortizar a dívida; não é pagamento de fatura nem gasto avulso.
 - "geral": saudação, agradecimento, dúvida sobre o próprio app, ou nada dos dois.
 
 Contexto e Mensagens Curtas / Deíticas:
@@ -91,7 +96,10 @@ Tipos:
 - set_rule: "sempre que eu falar X, põe em Y". target_ref = X, category = Y.
 - update_transaction: corrigir algo JÁ registrado. Os campos de BUSCA são
   amount_cents/category/description; os de CORREÇÃO são new_amount_cents,
-  new_category e new_occurred_at. Em parcelamentos, "edite a moto pois já paguei 10"
+  new_category, new_occurred_at e new_account (conta/cartão de destino da correção).
+  "Muda o último gasto para 54 na conta Nubank" -> new_amount_cents=5400, new_account="conta Nubank".
+  "Tira a conta desse gasto" -> new_account="sem conta". Nunca use account para corrigir.
+  Em parcelamentos, "edite a moto pois já paguei 10"
   -> description="moto", current_installment=11 (o sistema recalibra o histórico). Nada citado = o último lançamento.
 - delete_transaction: apagar um lançamento específico. "Apaga a TV por completo"
   / "a compra inteira" TAMBÉM é delete_transaction — não existe tipo separado

@@ -50,6 +50,11 @@ jobs:
           eas-version: 23.2.0
           token: ${{ secrets.EXPO_TOKEN }}
 
+      - name: Record native compatibility in the build environment
+        env:
+          EXPO_NO_DOTENV: '1'
+        run: eas env:exec --environment production 'APP_VARIANT=production node scripts/release/create-native-compatibility.mjs "$RUNNER_TEMP/native-compatibility.json"'
+
       - name: Build signed APK on EAS
         run: >-
           eas build
@@ -123,6 +128,11 @@ jobs:
           echo "release_path=$release_path" >> "$GITHUB_OUTPUT"
           echo "apk_sha256=$apk_sha256" >> "$GITHUB_OUTPUT"
 
+      - name: Attest compatibility against finished EAS build and verified APK
+        env:
+          APK_SHA256: ${{ steps.apk.outputs.apk_sha256 }}
+        run: node scripts/release/attest-native-compatibility.mjs "$RUNNER_TEMP/native-compatibility.json" "$RUNNER_TEMP/eas-build.json" "$APK_SHA256"
+
       - name: Generate and validate update manifest
         id: manifest
         env:
@@ -155,14 +165,14 @@ jobs:
 
           if gh release view "$GITHUB_REF_NAME" --repo "$DISTRIBUTION_REPOSITORY" >/dev/null 2>&1; then
             gh release upload "$GITHUB_REF_NAME" "$RELEASE_PATH" --clobber --repo "$DISTRIBUTION_REPOSITORY"
-            gh release upload "$GITHUB_REF_NAME" "$MANIFEST_PATH" --clobber --repo "$DISTRIBUTION_REPOSITORY"
+            gh release upload "$GITHUB_REF_NAME" "$MANIFEST_PATH" "$RUNNER_TEMP/native-compatibility.json" --clobber --repo "$DISTRIBUTION_REPOSITORY"
             gh release edit "$GITHUB_REF_NAME" \
               --repo "$DISTRIBUTION_REPOSITORY" \
               --title "$title" \
               --notes "$notes" \
               --latest
           else
-            gh release create "$GITHUB_REF_NAME" "$RELEASE_PATH" "$MANIFEST_PATH" \
+            gh release create "$GITHUB_REF_NAME" "$RELEASE_PATH" "$MANIFEST_PATH" "$RUNNER_TEMP/native-compatibility.json" \
               --repo "$DISTRIBUTION_REPOSITORY" \
               --target main \
               --title "$title" \

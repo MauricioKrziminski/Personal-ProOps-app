@@ -33,6 +33,7 @@ import {
   type TransactionKind,
 } from '@/hooks/use-finance';
 import { brToISO, formatBRL, isValidBRDate, isoToBR, localISODate } from '@/lib/dates';
+import { financeErrorMessage } from '@/lib/finance-form';
 import { confirmDestructive } from '@/lib/item-actions';
 
 /**
@@ -163,7 +164,7 @@ function TransactionForm({ editing }: { editing?: Transaction }) {
   const createPlan = useCreateInstallmentPlan();
   const remove = useDeleteTransaction();
 
-  const { control, handleSubmit, setValue, formState } = useForm<FormValues>({
+  const { control, handleSubmit, setValue, getValues, formState } = useForm<FormValues>({
     resolver: zodResolver(schema),
     // `editing` já chegou resolvido pelo gate — sem `useEffect`+`reset`, sem corrida.
     defaultValues: {
@@ -257,7 +258,7 @@ function TransactionForm({ editing }: { editing?: Transaction }) {
           router.back();
         },
         // Erro NUNCA fecha o modal: o que foi digitado continua na tela.
-        onError: () => toast({ message: 'Não deu para salvar. Tenta de novo.', tone: 'error' }),
+        onError: (error) => toast({ message: financeErrorMessage(error, 'Não deu para salvar. Tenta de novo.'), tone: 'error' }),
       },
     );
   });
@@ -274,7 +275,7 @@ function TransactionForm({ editing }: { editing?: Transaction }) {
             router.back();
             toast({ message: `Apaguei ${what}.`, tone: 'success' });
           },
-          onError: () => toast({ message: 'Não deu para apagar. Tenta de novo.', tone: 'error' }),
+          onError: (error) => toast({ message: financeErrorMessage(error, 'Não deu para apagar. Tenta de novo.'), tone: 'error' }),
         }),
       `${what}. Isso não volta.`,
     );
@@ -298,6 +299,25 @@ function TransactionForm({ editing }: { editing?: Transaction }) {
         keyboardShouldPersistTaps="handled"
         showsVerticalScrollIndicator={false}
         contentInsetAdjustmentBehavior="automatic">
+        {editing?.debt_id ? (
+          <Card>
+            <ThemedText type="small" themeColor="textSecondary">Pagamento de dívida. Correções de valor recalculam o saldo somente no pagamento mais recente com histórico de amortização.</ThemedText>
+            <Button label="Dívidas e financiamentos" variant="ghost" size="sm" onPress={() => router.push('/finance/debts')} />
+          </Card>
+        ) : null}
+        {!editing ? (
+          <View style={styles.errorActions}>
+            <Button label="Repetir lançamento" variant="secondary" size="sm" onPress={() => {
+              const values = getValues();
+              router.replace({ pathname: '/finance/recurring', params: {
+                create: '1', kind: values.kind === 'income' ? 'income' : 'expense',
+                amount: String(values.amount_cents), description: values.description ?? '',
+                category: values.category ?? '', account: values.account_id ?? '', start: values.occurred_at,
+              } });
+            }} />
+            <Button label="Financiamento" variant="secondary" size="sm" onPress={() => router.push({ pathname: '/finance/debts', params: { create: 'financing' } })} />
+          </View>
+        ) : null}
         {/* Valor primeiro: é o único campo obrigatório e já abre o teclado numérico. */}
         <Controller
           control={control}

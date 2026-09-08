@@ -21,6 +21,7 @@ from app.graph.schemas import (
     FinanceQuery,
     FinanceQueryType,
     NotesAction,
+    ResourceAction,
     NotesActionType,
 )
 from app.tools import finance, notes, queries, resolve
@@ -72,6 +73,9 @@ AJUDA = (
 
 
 def _tool(action: FinanceAction | FinanceQuery | NotesAction):
+    if isinstance(action, ResourceAction):
+        from app.tools.resources import execute as execute_resource
+        return execute_resource
     if isinstance(action, FinanceAction):
         return FINANCE_TOOLS.get(action.type)
     if isinstance(action, FinanceQuery):

@@ -32,7 +32,7 @@ const GROUPS: { title: string; items: ManageItem[] }[] = [
     items: [
       { title: 'Orçamentos', icon: 'chart.pie', href: '/finance/budgets' },
       { title: 'Metas', icon: 'target', href: '/finance/goals' },
-      { title: 'Dívidas', icon: 'dollarsign.circle', href: '/finance/debts' },
+      { title: 'Dívidas e financiamentos', icon: 'dollarsign.circle', href: '/finance/debts' },
       { title: 'Recorrentes', icon: 'arrow.triangle.2.circlepath', href: '/finance/recurring' },
     ],
   },

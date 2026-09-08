@@ -2,6 +2,7 @@ import { FlashList, type FlashListRef } from '@shopify/flash-list';
 import { Stack, router } from 'expo-router';
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Pressable, StyleSheet, View, type NativeScrollEvent, type NativeSyntheticEvent } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { ChatActions } from '@/components/agent/chat-actions';
 import { ChatComposer } from '@/components/agent/chat-composer';
@@ -93,16 +94,12 @@ export function ConversationScreen({ conversationId, initialText = '', title }: 
   const [desistiu, setDesistiu] = useState(false);
   const [perto, setPerto] = useState(true);
   const [renomeando, setRenomeando] = useState(false);
-  /**
-   * O teclado não encolhe a janela deste app.
-   *
-   * `windowSoftInputMode="adjustResize"` está no manifest, mas o
-   * `KeyboardProvider` roda edge-to-edge e nesse modo o Android não redimensiona.
-   * O `KeyboardStickyView` do `ChatComposer` levanta a BARRA; a lista, que não
-   * sabe disso, precisa devolver a mesma altura no rodapé do conteúdo. Sem esta
-   * linha o campo cobre exatamente as mensagens recém-enviadas.
-   */
+  // O sticky translada a barra sem encolher sua posição no layout. A lista
+  // precisa de uma JANELA menor; padding no conteúdo não muda o alinhamento
+  // inferior de conversas curtas feito pela FlashList.
   const alturaDoTeclado = useKeyboardHeight();
+  const insets = useSafeAreaInsets();
+  const obstrucao = Math.max(0, alturaDoTeclado - insets.bottom);
 
   const turno = useTurnoLocal();
   const criar = useCreateAgentConversation();
@@ -356,75 +353,80 @@ export function ConversationScreen({ conversationId, initialText = '', title }: 
       <Stack.Screen options={{ title: title ?? '' }} />
       <HeaderMenu title={title ?? 'Conversa'} actions={acoesDoHeader} />
 
-      {historico.isPending && conversationId ? (
-        <View style={styles.esqueleto}>
-          {/* Alturas diferentes de propósito: o esqueleto tem a FORMA da
-              conversa (pergunta curta, resposta longa), não três barras iguais. */}
-          {[70, 44, 90].map((h) => (
-            <Skeleton key={h} height={h} radius={Radius.md} />
-          ))}
-        </View>
-      ) : historico.isError ? (
-        <EmptyState
-          icon="exclamationmark.triangle"
-          title="Não consegui carregar essa conversa"
-          hint="Confere a conexão e tenta de novo."
-          action={{ label: 'Tentar novamente', onPress: () => historico.refetch() }}
-        />
-      ) : (
-        <FlashList
-          ref={lista}
-          // `flex: 1` explícito: sem ele a lista cresce com o conteúdo e o
-          // composer sai da tela em vez de a lista rolar por dentro.
-          style={styles.lista}
-          data={itens}
-          keyExtractor={(i) => i.key}
-          getItemType={(i) => i.kind}
-          renderItem={desenharLinha}
-          contentContainerStyle={{
-            paddingHorizontal: Space.lg,
-            paddingVertical: Space.md,
-            paddingBottom: Space.md + alturaDoTeclado,
-          }}
-          onScroll={aoRolar}
-          scrollEventThrottle={64}
-          /*
-            `startRenderingFromBottom`: a conversa abre na última mensagem, que é
-            onde ela parou. `autoscrollToBottomThreshold` faz a resposta que
-            chega seguir o fim SÓ quando a pessoa já estava lá — longe do fim ela
-            está lendo, e puxar a lista é arrancar a tela da mão dela.
-          */
-          maintainVisibleContentPosition={{
-            startRenderingFromBottom: true,
-            autoscrollToBottomThreshold: 0.2,
-          }}
-          onStartReachedThreshold={0.3}
-          onStartReached={() => {
-            if (historico.hasNextPage && !historico.isFetchingNextPage) {
-              historico.fetchNextPage();
+      <View style={[styles.lista, { paddingBottom: obstrucao }]}>
+        {historico.isPending && conversationId ? (
+          <View style={styles.esqueleto}>
+            {/* Alturas diferentes de propósito: o esqueleto tem a FORMA da
+                conversa (pergunta curta, resposta longa), não três barras iguais. */}
+            {[70, 44, 90].map((h) => (
+              <Skeleton key={h} height={h} radius={Radius.md} />
+            ))}
+          </View>
+        ) : historico.isError ? (
+          <EmptyState
+            icon="exclamationmark.triangle"
+            title="Não consegui carregar essa conversa"
+            hint="Confere a conexão e tenta de novo."
+            action={{ label: 'Tentar novamente', onPress: () => historico.refetch() }}
+          />
+        ) : (
+          <FlashList
+            ref={lista}
+            // `flex: 1` explícito: sem ele a lista cresce com o conteúdo e o
+            // composer sai da tela em vez de a lista rolar por dentro.
+            style={styles.lista}
+            data={itens}
+            keyExtractor={(i) => i.key}
+            getItemType={(i) => i.kind}
+            renderItem={desenharLinha}
+            contentContainerStyle={{
+              paddingHorizontal: Space.lg,
+              paddingVertical: Space.md,
+            }}
+            onScroll={aoRolar}
+            scrollEventThrottle={64}
+            /*
+              `startRenderingFromBottom`: a conversa abre na última mensagem, que é
+              onde ela parou. `autoscrollToBottomThreshold` faz a resposta que
+              chega seguir o fim SÓ quando a pessoa já estava lá — longe do fim ela
+              está lendo, e puxar a lista é arrancar a tela da mão dela.
+            */
+            maintainVisibleContentPosition={{
+              startRenderingFromBottom: true,
+              autoscrollToBottomThreshold: 0.2,
+            }}
+            onStartReachedThreshold={0.3}
+            onStartReached={() => {
+              if (historico.hasNextPage && !historico.isFetchingNextPage) {
+                historico.fetchNextPage();
+              }
+            }}
+            ListEmptyComponent={
+              <EmptyState
+                title="Pergunta o que quiser"
+                hint="“Gastei 45 no mercado”, “quanto sobrou esse mês?”, “me lembra do aluguel dia 5”."
+              />
             }
-          }}
-          ListEmptyComponent={
-            <EmptyState
-              title="Pergunta o que quiser"
-              hint="“Gastei 45 no mercado”, “quanto sobrou esse mês?”, “me lembra do aluguel dia 5”."
-            />
-          }
-        />
-      )}
+          />
+        )}
 
-      {!perto ? (
-        <Pressable
-          onPress={() => lista.current?.scrollToEnd({ animated: true })}
-          accessibilityRole="button"
-          accessibilityLabel="Ir para a mensagem mais recente"
-          style={[
-            styles.irAoFim,
-            { backgroundColor: theme.backgroundElement, borderColor: theme.cardBorder },
-          ]}>
-          <Icon name="arrow.down" size={18} color="text" />
-        </Pressable>
-      ) : null}
+        {!perto ? (
+          <Pressable
+            onPress={() => lista.current?.scrollToEnd({ animated: true })}
+            accessibilityRole="button"
+            accessibilityLabel="Ir para a mensagem mais recente"
+            style={[
+              styles.irAoFim,
+              {
+                bottom: obstrucao + Space.sm,
+                backgroundColor: theme.backgroundElement,
+                borderColor: theme.cardBorder,
+              },
+            ]}>
+            <Icon name="arrow.down" size={18} color="text" />
+          </Pressable>
+        ) : null}
+      </View>
 
       <ChatComposer
         value={texto}
@@ -526,7 +528,6 @@ const styles = StyleSheet.create({
   irAoFim: {
     position: 'absolute',
     right: Space.lg,
-    bottom: 96,
     width: 40,
     height: 40,
     borderRadius: Radius.pill,

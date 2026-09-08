@@ -13,9 +13,11 @@ a direção é sempre `resolve -> tools`, sem ciclo.
 
 from __future__ import annotations
 
-from typing import Any, Callable, Literal
+from collections.abc import Callable
+from typing import Any, Literal
 
 from app import db
+from app.domain import matching
 from app.domain.reference import clean_term, wants_latest, wants_whole_plan
 from app.graph.schemas import (
     FinanceAction,
@@ -323,8 +325,10 @@ async def for_actions(workspace_id, acoes: list, texto_cru: str) -> list[dict]:
         if acao.type in _ACEITA_PLANO and wants_whole_plan(bruto, texto_cru):
             estado, cands = await por_texto("planos", workspace_id, termo or "")
             if cands:
-                saida.append({"table": "installment_plans", "status": estado,
-                              "candidates": cands})
+                resolved = {"table": "installment_plans", "status": estado, "candidates": cands}
+                if acao.type == FinanceActionType.UPDATE_TRANSACTION and acao.new_account:
+                    resolved["correction_error"] = "Para trocar a conta de uma compra parcelada, edite a parcela individual no app. O plano inteiro não foi alterado."
+                saida.append(resolved)
                 continue
 
         if fonte == "transactions":
@@ -350,5 +354,22 @@ async def for_actions(workspace_id, acoes: list, texto_cru: str) -> list[dict]:
                 if len(cands) == 1 and cands[0].get("table") == "installment_plans":
                     tabela = "installment_plans"
 
-        saida.append({"table": tabela, "status": estado, "candidates": cands})
+        resolved = {"table": tabela, "status": estado, "candidates": cands}
+        if acao.type == FinanceActionType.UPDATE_TRANSACTION and acao.new_account and (tabela == "installment_plans" or any(c.get("table") == "installment_plans" for c in cands)):
+            resolved["correction_error"] = "Para trocar a conta de uma compra parcelada, edite a parcela individual no app. O plano inteiro não foi alterado."
+        elif acao.type == FinanceActionType.UPDATE_TRANSACTION and acao.new_account:
+            name = acao.new_account
+            if matching.normalize(name) in {"sem conta", "nenhuma conta"}:
+                resolved["new_account"] = {"id": None, "name": "Sem conta"}
+            else:
+                accounts = await db.accounts(workspace_id)
+                matches = matching.match_accounts(name, accounts, account_type=matching.infer_account_type(name))
+                if len(matches) == 1:
+                    resolved["new_account"] = {"id": str(matches[0]["id"]), "name": matches[0]["name"]}
+                elif matches:
+                    options = ", ".join(f"{a['name']} ({a.get('type', 'conta')})" for a in matches)
+                    resolved["correction_error"] = f"Encontrei mais de uma conta: {options}. Diga qual conta ou cartão deve ficar no lançamento."
+                else:
+                    resolved["correction_error"] = f"Não encontrei uma conta ativa chamada {name}. Diga o nome de uma conta ou cartão cadastrado."
+        saida.append(resolved)
     return saida

@@ -48,6 +48,7 @@ export type Transaction = Pick<
   | 'installment_plan_id'
   | 'installment_no'
   | 'merchant'
+  | 'debt_id'
 > & {
   kind: TransactionKind;
   source: TransactionSource;
@@ -822,6 +823,7 @@ export type Debt = Pick<
   | 'installments'
   | 'installments_paid'
   | 'installment_cents'
+  | 'account_id'
   | 'due_day'
   | 'archived'
 > & { kind: (typeof DEBT_KINDS)[number]['value'] };
@@ -837,7 +839,7 @@ export function useDebts() {
       const { data, error } = await supabase
         .from('debts')
         .select(
-          'id, name, kind, principal_cents, remaining_cents, interest_rate_monthly, installments, installments_paid, installment_cents, due_day, archived',
+          'id, name, kind, principal_cents, remaining_cents, interest_rate_monthly, installments, installments_paid, installment_cents, account_id, due_day, archived',
         )
         .eq('archived', false)
         .order('remaining_cents', { ascending: false });
@@ -884,11 +886,13 @@ export function useSaveDebt() {
       remaining_cents: number;
       interest_rate_monthly: number;
       installments: number | null;
+      installment_cents: number | null;
+      account_id: string | null;
       due_day: number | null;
     }) => {
       const { id, ...resto } = input;
       if (id) {
-        const { error } = await supabase.from('debts').update(resto).eq('id', id);
+        const { error } = await supabase.from('debts').update(resto).eq('id', id).select('id').single();
         if (error) throw error;
       } else {
         const { error } = await supabase.from('debts').insert({ ...resto, user_id: await userId() });
@@ -1248,7 +1252,7 @@ export function useSaveTransaction() {
   return useMutation({
     mutationFn: async ({ id, ...input }: TransactionInput & { id?: string }) => {
       if (id) {
-        const { error } = await supabase.from('transactions').update(input).eq('id', id);
+        const { error } = await supabase.from('transactions').update(input).eq('id', id).select('id').single();
         if (error) throw error;
       } else {
         const { error } = await supabase

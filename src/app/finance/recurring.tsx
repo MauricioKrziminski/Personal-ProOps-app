@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Switch, View } from 'react-native';
 import Animated, { FadeIn, FadeInDown, LinearTransition } from 'react-native-reanimated';
-import { Stack, router } from 'expo-router';
+import { Stack, router, useLocalSearchParams } from 'expo-router';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
 import { Chip } from '@/components/finance/chip';
@@ -33,6 +33,7 @@ import { useRealtimeInvalidate } from '@/hooks/use-items';
 import { useTheme } from '@/hooks/use-theme';
 import { brToISO, isValidBRDate, isoToBR, localDateTime, localISODate } from '@/lib/dates';
 import { confirmDestructive, showItemActions } from '@/lib/item-actions';
+import { validRecurringRange } from '@/lib/finance-form';
 import { describeRRule } from '@/lib/rrule-text';
 import { supabase } from '@/lib/supabase';
 
@@ -172,6 +173,7 @@ const FORM_VAZIO: FormState = {
 };
 
 export default function RecurringScreen() {
+  const params = useLocalSearchParams<{ create?: string; kind?: string; amount?: string; description?: string; category?: string; account?: string; start?: string }>();
   const theme = useTheme();
   const toast = useToast();
   const series = useRecurringTransactions();
@@ -181,7 +183,13 @@ export default function RecurringScreen() {
   const remove = useDeleteRecurring();
   const create = useCreateRecurring();
 
-  const [form, setForm] = useState<FormState | null>(null);
+  const [form, setForm] = useState<FormState | null>(() => params.create === '1' ? {
+    ...FORM_VAZIO, kind: params.kind === 'income' ? 'income' : 'expense',
+    amountCents: Number(params.amount) > 0 ? Number(params.amount) : 0,
+    description: params.description ?? '', category: params.category || null,
+    accountId: params.account || null,
+    inicio: params.start && isValidBRDate(params.start) ? params.start : isoToBR(localISODate()),
+  } : null);
 
   // `isError` e não só `data`: o TanStack GUARDA o resultado anterior quando o refetch
   // falha, e sem este corte a lista seguia afirmando números embaixo da faixa que acabou
@@ -201,8 +209,8 @@ export default function RecurringScreen() {
 
   const inicioDate = form ? localDateTime(form.inicio, '09:00') : null;
   const inicioOk = Boolean(form && isValidBRDate(form.inicio) && inicioDate);
-  const fimOk = form ? form.fim === '' || isValidBRDate(form.fim) : false;
-  const podeSalvar = Boolean(form && form.amountCents > 0 && inicioOk && fimOk);
+  const fimOk = form ? form.fim === '' || (isValidBRDate(form.fim) && inicioOk && brToISO(form.fim) >= brToISO(form.inicio)) : false;
+  const podeSalvar = Boolean(form && form.amountCents > 0 && inicioOk && fimOk && validRecurringRange(brToISO(form.inicio), form.fim ? brToISO(form.fim) : '', form.preset === 'monthly' ? form.intervalo : '1'));
   const rrulePrevia =
     form && inicioDate
       ? montaRRule(form.preset, inicioDate, Number(form.intervalo) || 1)
@@ -532,7 +540,7 @@ export default function RecurringScreen() {
               </Field>
 
               {form.preset === 'monthly' ? (
-                <Field label="A cada quantos meses" hint="1 = todo mês. 2 = mês sim, mês não.">
+                <Field label="A cada quantos meses" hint="1 = todo mês. 2 = mês sim, mês não." error={Number(form.intervalo) < 1 ? 'Informe um intervalo de 1 a 99 meses' : undefined}>
                   <TextField
                     value={form.intervalo}
                     onChangeText={(v) =>
@@ -567,8 +575,8 @@ export default function RecurringScreen() {
 
               <Field
                 label="Termina em"
-                hint="Opcional. É como se encerra uma assinatura sem apagar o histórico."
-                error={form.fim && !fimOk ? 'Data inválida (dd/mm/aaaa)' : undefined}>
+                hint="Opcional. Não pode ser antes do início da série."
+                error={form.fim && !fimOk ? 'Informe data válida igual ou posterior ao início' : undefined}>
                 <TextField
                   value={form.fim}
                   onChangeText={(fim) => setForm({ ...form, fim })}
@@ -627,7 +635,7 @@ export default function RecurringScreen() {
               </Field>
 
               <ThemedText type="small" themeColor="textSecondary">
-                Pelo WhatsApp é mais rápido: “todo dia 5 pago 1200 de aluguel”.
+                Os lançamentos aparecem após o processamento da série. Criar aqui não registra um gasto avulso.
               </ThemedText>
             </ScrollView>
           ) : null}

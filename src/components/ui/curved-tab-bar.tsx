@@ -15,8 +15,8 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { ThemedText } from '@/components/themed-text';
 import { Icon } from '@/components/ui/icon';
 import { empurraoDaPonta, posicaoDoBerco } from '@/design/tab-cradle';
-import { Elevation, Motion, Radius, Space, Type } from '@/design/tokens';
-import { useScheme, useTheme } from '@/hooks/use-theme';
+import { Motion, Radius, Space, Type } from '@/design/tokens';
+import { useTheme } from '@/hooks/use-theme';
 import type { SymbolViewProps } from 'expo-symbols';
 
 /** Altura da barra, sem a bolha e sem a safe area. */
@@ -206,11 +206,9 @@ function Rotulo({
  *    "linha em cima do ícone"), e no tema escuro é justamente o contorno que define onde a barra
  *    termina.
  *
- * Agora o berço é um CÍRCULO subtraído no Skia, recortado pela própria pílula: pinta-se a barra,
- * pinta-se o traço dela, e por cima vai um disco da cor do FUNDO com o traço do berço, ambos
- * dentro de um `Group clip={pílula}`. O disco apaga o traço da barra exatamente onde a mordida
- * passa — que era a "linha em cima do ícone" — e o arco resultante é, por construção, concêntrico
- * com a bolha.
+ * O berço exclui um CÍRCULO do preenchimento e do traço da pílula usando
+ * `invertClip`; o arco do contorno fica recortado pela própria pílula. Não há
+ * disco pintado da cor do fundo: conteúdo rolando atrás aparece pelo recorte.
  *
  * Isso também dispensa interpolar path: o que anda é o `cx` do círculo, um shared value que o
  * Skia aceita direto na prop. Nada é montado dentro de worklet (o erro que deixou a barra
@@ -233,7 +231,6 @@ export function CurvedTabBar({
   onSelect: (index: number) => void;
 }) {
   const theme = useTheme();
-  const scheme = useScheme();
   const insets = useSafeAreaInsets();
   const { width: screenW } = useWindowDimensions();
 
@@ -361,9 +358,9 @@ export function CurvedTabBar({
           metade de cima da bolha vive fora dele.
         */}
         <Canvas style={[StyleSheet.absoluteFill, { top: TOP }]} pointerEvents="none">
-          <Path path={pilula} color={theme.backgroundElement} style="fill" />
-          {/* O traço da pílula, MENOS o pedaço que cai dentro do berço. */}
+          {/* Preenchimento e traço excluem o berço: o conteúdo atrás fica visível. */}
           <Group clip={disco} invertClip>
+            <Path path={pilula} color={theme.backgroundElement} style="fill" />
             <Path path={pilula} color={theme.separator} style="stroke" strokeWidth={1} />
           </Group>
           {/*
@@ -371,7 +368,6 @@ export function CurvedTabBar({
             de cima do círculo (que fica acima da barra) some sozinha.
           */}
           <Group clip={pilula}>
-            <Circle cx={centro} cy={0} r={CUT} color={theme.background} />
             <Circle cx={centro} cy={0} r={CUT} color={theme.separator} style="stroke" strokeWidth={1} />
           </Group>
         </Canvas>
@@ -383,14 +379,11 @@ export function CurvedTabBar({
             {
               backgroundColor: theme.backgroundSelected,
               borderColor: theme.separator,
-              boxShadow: Elevation[scheme].floating,
             },
             bolha,
           ]}>
           {/*
-            A bolha é da COR DA BARRA com o ícone no accent — é o desenho do export. Preenchê-la
-            de `tint` com o ícone invertido punha o accent inteiro num controle que a pessoa toca
-            100× por dia, e queimava a única alavanca de cor que o app tem em ornamento de chrome.
+            A bolha tem cor sólida; somente o recorte ao redor dela é transparente.
 
             TODOS os ícones moram aqui, em cross-fade pela posição. Trocar o ícone por estado
             (`tabs[activeIndex].icon`) era o que fazia a bolha viajar com o ícone errado: o estado

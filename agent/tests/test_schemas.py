@@ -17,7 +17,6 @@ parse em produção, que foi como isto foi descoberto das duas vezes.
 """
 
 import pytest
-
 from app.graph.schemas import (
     READ_ONLY,
     FinanceAction,
@@ -29,7 +28,10 @@ from app.graph.schemas import (
     RouterDecision,
 )
 
+# 08/09/2026: scripts/probe_transaction_account_schema.py accepted the exact
+# FinancePlan with 15 properties x 14 enum values on gemini-3.7-flash.
 MAX_PRODUTO = 198
+FINANCE_PRODUTO_MEDIDO = 210
 MAX_SOMA = 31
 
 MODELOS = [
@@ -42,8 +44,9 @@ MODELOS = [
 @pytest.mark.parametrize("nome,modelo,enum", MODELOS)
 def test_dentro_do_orcamento(nome, modelo, enum):
     props, valores = len(modelo.model_fields), len(list(enum))
-    assert props * valores <= MAX_PRODUTO, (
-        f"{nome}: {props}×{valores}={props * valores} passa de {MAX_PRODUTO}. "
+    limite = FINANCE_PRODUTO_MEDIDO if modelo is FinanceAction else MAX_PRODUTO
+    assert props * valores <= limite, (
+        f"{nome}: {props}×{valores}={props * valores} passa de {limite}. "
         "Tire um campo, tire um tipo do enum, ou divida o domínio."
     )
     assert props + valores <= MAX_SOMA, f"{nome}: soma {props + valores} passa de {MAX_SOMA}"

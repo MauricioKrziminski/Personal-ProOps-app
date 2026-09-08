@@ -1,15 +1,10 @@
 """Contratos de saída da IA — um schema por domínio.
 
-Por que separado por domínio: o schema único de hoje bateu no teto MEDIDO do
-Gemini (15 propriedades e UM enum; a 16ª devolve 400 INVALID_ARGUMENT sem
-detalhe). Para caber, os campos viraram multiuso — `content` é descrição, título
-de lembrete, nome de meta, gatilho de regra E termo de busca. Cada significado
-extra é uma chance a mais de o modelo escolher o errado.
-
-Com um schema por domínio cada campo volta a ter um significado só, e mesmo
-assim cada um fica DENTRO do teto (finanças: exatamente 15; notas: 9). O teto é
-respeitado de propósito mesmo com o LangChain no meio — a medição foi feita no
-responseSchema cru e não vale a pena descobrir na produção que o limite mudou.
+O schema único excedeu a complexidade aceita pelo Gemini. Os domínios mantêm
+campos com significado definido e formatos efetivamente medidos contra a API.
+Não existe aqui uma garantia universal de "15 campos": enum, aninhamento e
+limites de arrays também influenciam. Os testes prendem os formatos conhecidos;
+ampliar exige sondagem real, além de validação Pydantic local.
 """
 
 from __future__ import annotations
@@ -17,7 +12,7 @@ from __future__ import annotations
 from enum import Enum
 from typing import Literal
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 
 class Domain(str, Enum):
@@ -25,12 +20,15 @@ class Domain(str, Enum):
     FINANCAS_CONSULTA = "financas_consulta"
     NOTAS = "notas"
     GERAL = "geral"
+    CADASTROS = "cadastros"
 
 
 class RouterDecision(BaseModel):
     """Saída do nó Router. Lista, não escolha única: "gastei 45 e me lembra do
     aluguel" é finanças E notas, e um router exclusivo perderia metade da
     mensagem — o multi-intent é a melhor qualidade do produto hoje."""
+
+    discard_resource_draft: bool = Field(False, description="True somente quando o usuário cancela explicitamente o cadastro incompleto informado no contexto.")
 
     domains: list[Domain] = Field(
         description="Domínios presentes na mensagem, na ordem em que aparecem."
@@ -58,7 +56,7 @@ class FinanceActionType(str, Enum):
 
 
 class FinanceAction(BaseModel):
-    """13 propriedades × 14 valores de enum = 182, abaixo do 198 que passou.
+    """15 propriedades × 14 valores de enum = 210, aceito no Gemini em 08/09/2026.
 
     Escrita e correção ficam JUNTAS de propósito. Separá-las obrigaria o router a
     decidir se "o mercado de ontem foi 120" é lançamento novo ou correção — e
@@ -87,6 +85,7 @@ class FinanceAction(BaseModel):
     recurrence: str | None = Field(None, description="RRULE, ex.: FREQ=MONTHLY;BYMONTHDAY=5.")
     new_amount_cents: int | None = Field(None, description="Valor CORRIGIDO.")
     new_category: str | None = Field(None, description="Categoria CORRIGIDA.")
+    new_account: str | None = Field(None, description="Nome da conta ou cartão CORRIGIDO. Sem conta remove o vínculo; account não é correção.")
     new_occurred_at: str | None = Field(None, description="Data CORRIGIDA, YYYY-MM-DD.")
     target_ref: str | None = Field(
         None, description="Nome da meta, do bem, ou o gatilho da regra de categorização."
@@ -248,3 +247,42 @@ class DraftDecision(BaseModel):
             "Vazio se não mencionou parcelas já pagas."
         ),
     )
+
+
+class ResourceActionType(str, Enum):
+    CREATE = 'resource_create'
+    UPDATE = 'resource_update'
+    DELETE = 'resource_delete'
+    LIST = 'resource_list'
+    PAY = 'resource_pay'
+
+
+class ResourceField(BaseModel):
+    """Field names and values are data, validated against the server catalogue."""
+    name: str
+    value: str | None = None
+
+
+class ResourceAction(BaseModel):
+    target_month: str | None = Field(None, description="Só para localizar orçamento existente: YYYY-MM-01 ou default (padrão). Não é o novo mês.")
+    type: ResourceActionType
+    resource: str = Field(description='Recurso do catálogo: accounts, cards, debts, goals, budgets, assets, recurring, rules, notes, reminders, folders.')
+    name: str | None = Field(None, description='Nome do novo item ou nome EXATO do item existente. Não inventar IDs.')
+    # Gemini rejects the combined nested maxItems (10 actions × 20 fields).
+    # Keep the safety bound in server validation without exporting maxItems.
+    fields: list[ResourceField] = Field(default_factory=list)
+
+    @field_validator("fields")
+    @classmethod
+    def bound_fields(cls, fields: list[ResourceField]) -> list[ResourceField]:
+        if len(fields) > 20:
+            raise ValueError("No máximo 20 campos por cadastro.")
+        return fields
+
+
+class ResourcePlan(BaseModel):
+    actions: list[ResourceAction] = Field(default_factory=list, max_length=10)
+    confidence: float = 1.0
+
+
+READ_ONLY.add(ResourceActionType.LIST)

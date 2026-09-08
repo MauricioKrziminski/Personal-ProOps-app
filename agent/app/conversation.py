@@ -143,6 +143,9 @@ def _estado_base(
         "finance_actions": [],
         "finance_queries": [],
         "notes_actions": [],
+        "resource_actions": [],
+        "resource_prepared": [],
+        "resource_draft": None,
         "reply": "",
         "targets": [],
         "chosen_id": "",
@@ -181,16 +184,93 @@ async def run_turn(
     uso: dict = {}
 
     # --- fast-path: a mensagem completa um rascunho aberto? ---
-    # Vem ANTES da pendência porque são coisas diferentes: pendência é uma
-    # pergunta de SIM/NÃO travando a conversa; rascunho é um lançamento pela
-    # metade que ficou inerte enquanto o usuário fazia outra coisa.
+    # A pendência vence o rascunho: SIM confirma a proposta exibida, nunca
+    # preenche um slot de outra operação que ficou pela metade.
     await db.expire_drafts()
     rascunho = await db.open_draft(sessao["id"])
     clique = conteudo.get("clicked_id") or ""
+    # --- fast-path: a mensagem é resposta a uma pergunta? ---
+    await db.expire_pending(thread)
+    pendente = await db.open_pending(sessao["id"])
+    decisao = (None if rascunho and not pendente and clique.startswith(draft.CLICK_PREFIX)
+               else await confirm.decide(conteudo, pendente, uso))
+
+    if decisao is confirm.STALE:
+        # clique de uma pergunta que não está mais aberta. NUNCA deixar seguir
+        # para o grafo: o rótulo do botão ("1) R$45 mercado") seria lido como
+        # mensagem nova e viraria um lançamento de verdade.
+        return await _fechar(
+            sessao, uso, "⏰ Essa confirmação já expirou. Me manda de novo o que você quer."
+        )
+
+    if pendente:
+        if decisao is None:
+            # não foi sim, não, nem escolha: a intenção mudou. Cancela a pergunta
+            # e trata como mensagem nova — insistir prenderia a conversa.
+            await db.resolve_pending(pendente["id"], "expired")
+        else:
+            await db.resolve_pending(
+                pendente["id"], "approved" if decisao.get("approved") else "rejected"
+            )
+            cadastro = str((pendente.get("action") or {}).get("action_type", "")).startswith("resource_")
+            if not cadastro:
+                await db.delete_draft(sessao["id"])
+            # O id CONGELADO vem de `pending_actions`, não de uma busca nova: é o
+            # que garante que o SIM execute o registro que o usuário LEU, mesmo
+            # que outro lançamento tenha entrado entre a pergunta e a resposta.
+            entrada = Command(resume=_congelado(decisao, pendente))
+            # retomar exige o thread EXATO em que o interrupt() aconteceu — é o
+            # que está gravado no pendente, não o recalculado agora
+            retomada = {**config, "configurable": {"thread_id": pendente["thread_id"]}}
+            with telemetry.trace(thread_id=pendente["thread_id"], user_id=sessao["user_id"]):
+                estado = await graph().ainvoke(entrada, config=retomada)
+            # SÓ o que este turno gastou. O estado que volta do checkpoint ainda
+            # carrega o `llm_calls` do turno da PERGUNTA, que já virou linha em
+            # `ai_events` lá atrás — somá-lo aqui cobraria de novo, e um CLIQUE
+            # (que não chama modelo nenhum) passaria a consumir mensagem da cota.
+            # Depois do gate ninguém chama o modelo: `executar` e `compor` são
+            # código puro.
+            await _audit(sessao, {}, uso)
+            if cadastro or estado.get("draft") or _interrupt_payload(estado):
+                # Resume can ask another question or change card. Persist that
+                # next step just like an initial turn; reply alone loses it.
+                return await _resposta_do_estado(sessao, estado, pendente["thread_id"])
+            return estado.get("reply", "")
+
+    if (
+        rascunho and rascunho.get("slot") == "account"
+        and clique == f"{draft.CLICK_PREFIX}{rascunho['id']}:financing"
+    ):
+        compra = rascunho["action"]
+        fields = [{"name": "kind", "value": "financing"}]
+        if compra.get("installments") is not None:
+            fields.append({"name": "installments", "value": str(compra["installments"])})
+        if compra.get("current_installment") is not None:
+            fields.append({"name": "installments_paid", "value": str(max(0, compra["current_installment"] - 1))})
+        # Total parcelado inclui juros. Não é o principal nem o saldo do contrato.
+        await graph().aupdate_state(config, {"resource_draft": [{
+            "type": "resource_create", "resource": "debts",
+            "name": compra.get("description"), "fields": fields,
+        }]})
+        # Só consome a compra DEPOIS de guardar o financiamento inerte.
+        await db.delete_draft(sessao["id"])
+        return await _fechar(sessao, uso, (
+            "Vamos cadastrar como financiamento. Guardei as parcelas informadas. "
+            "Qual é o principal original financiado, o saldo devedor atual e a taxa mensal do contrato? "
+            "O total das parcelas inclui juros e não determina esses valores. "
+            "Vou mostrar os dados para você confirmar antes de salvar."
+        ))
+
+    # Cadastro incompleto fica no checkpoint; seus dias não são resposta ao
+    # slot de cartão da compra que continua inerte no banco.
+    cadastro_incompleto = False
+    if rascunho:
+        snapshot = await graph().aget_state(config)
+        cadastro_incompleto = bool((getattr(snapshot, "values", None) or {}).get("resource_draft"))
     # clique `pa:` é do HITL e nunca é do rascunho; `ds:` é o oposto. Sem esta
     # separação, um clique na lista de cartões cairia em `confirm.decide` sem
     # pendência aberta e viraria "essa confirmação expirou".
-    if rascunho and (not clique or clique.startswith(draft.CLICK_PREFIX)):
+    if rascunho and not cadastro_incompleto and (not clique or clique.startswith(draft.CLICK_PREFIX)):
         decidido = (
             draft.parse_slot_click(clique, rascunho["id"])
             if clique
@@ -232,7 +312,6 @@ async def run_turn(
                 return await _fechar(sessao, uso, resposta)
 
         if decidido and decidido["acao"] == "completar":
-            cartao_novo = decidido.get("cartao_criado")
             acao = draft.mesclar(rascunho["action"], decidido)
             # Ainda falta outro slot? Guarda de novo e pergunta o próximo, em vez
             # de executar pela metade.
@@ -260,52 +339,13 @@ async def run_turn(
                 sessao, source_message_id, conteudo, [acao], thread, config, uso,
                 prompt_history=prompt_history,
             )
-            return _com_aviso_de_cartao(resposta, cartao_novo)
-
-    # --- fast-path: a mensagem é resposta a uma pergunta? ---
-    await db.expire_pending(thread)
-    pendente = await db.open_pending(sessao["id"])
-    decisao = await confirm.decide(conteudo, pendente, uso)
-
-    if decisao is confirm.STALE:
-        # clique de uma pergunta que não está mais aberta. NUNCA deixar seguir
-        # para o grafo: o rótulo do botão ("1) R$45 mercado") seria lido como
-        # mensagem nova e viraria um lançamento de verdade.
-        return await _fechar(
-            sessao, uso, "⏰ Essa confirmação já expirou. Me manda de novo o que você quer."
-        )
-
-    if pendente:
-        if decisao is None:
-            # não foi sim, não, nem escolha: a intenção mudou. Cancela a pergunta
-            # e trata como mensagem nova — insistir prenderia a conversa.
-            await db.resolve_pending(pendente["id"], "expired")
-        else:
-            await db.resolve_pending(
-                pendente["id"], "approved" if decisao.get("approved") else "rejected"
-            )
-            await db.delete_draft(sessao["id"])
-            # O id CONGELADO vem de `pending_actions`, não de uma busca nova: é o
-            # que garante que o SIM execute o registro que o usuário LEU, mesmo
-            # que outro lançamento tenha entrado entre a pergunta e a resposta.
-            entrada = Command(resume=_congelado(decisao, pendente))
-            # retomar exige o thread EXATO em que o interrupt() aconteceu — é o
-            # que está gravado no pendente, não o recalculado agora
-            retomada = {**config, "configurable": {"thread_id": pendente["thread_id"]}}
-            with telemetry.trace(thread_id=pendente["thread_id"], user_id=sessao["user_id"]):
-                estado = await graph().ainvoke(entrada, config=retomada)
-            # SÓ o que este turno gastou. O estado que volta do checkpoint ainda
-            # carrega o `llm_calls` do turno da PERGUNTA, que já virou linha em
-            # `ai_events` lá atrás — somá-lo aqui cobraria de novo, e um CLIQUE
-            # (que não chama modelo nenhum) passaria a consumir mensagem da cota.
-            # Depois do gate ninguém chama o modelo: `executar` e `compor` são
-            # código puro.
-            await _audit(sessao, {}, uso)
-            return estado.get("reply", "")
+            return resposta
 
     estado_inicial = _estado_base(
         sessao, source_message_id, conteudo, thread, prompt_history
     )
+    if cadastro_incompleto:
+        estado_inicial.update(domains=["cadastros"], preset=True)
     with telemetry.trace(thread_id=thread, user_id=sessao["user_id"]):
         estado = await graph().ainvoke(estado_inicial, config=config)
 
@@ -353,16 +393,21 @@ async def _cartao_do_rascunho(
         return None, _pergunta_cartao(draft_id, cartoes, "💳 Então me diz: qual cartão?")
 
     if decidido["acao"] == "criar_cartao":
-        linha = await db.create_credit_card(
-            workspace_id=UUID(str(sessao["workspace_id"])),
-            user_id=UUID(str(sessao["user_id"])),
-            name=decidido["name"],
+        from app.graph.build import graph
+
+        nome = draft.nome_de_cartao(decidido.get("name"))
+        if not nome:
+            return None, "Qual é o nome do cartão que você quer cadastrar?"
+        thread = effective_thread_id(sessao["thread_id"], sessao["session_epoch"])
+        pergunta = (
+            f"Qual é o dia de fechamento e o dia de vencimento do cartão {nome}? "
+            "Vou mostrar o cadastro para você confirmar. A compra continua guardada."
         )
-        if not linha:
-            return None, "❌ Não consegui criar o cartão agora. Tenta de novo?"
-        # o cartão novo entra no rascunho pelo nome que o BANCO gravou
-        return {"acao": "completar", "slot": "account", "account": linha["name"],
-                "cartao_criado": linha["name"]}, None
+        await graph().aupdate_state(
+            {"configurable": {"thread_id": thread}},
+            {"resource_draft": [{"type": "resource_create", "resource": "cards", "name": nome, "fields": []}]},
+        )
+        return None, pergunta
 
     if decidido.get("account_id"):
         # O id veio de um clique DO USUÁRIO e por isso nunca é usado direto: ele é
@@ -394,34 +439,6 @@ async def _cartao_do_rascunho(
     # houvesse nenhum, mandava o usuário cadastrar no app e voltar. Agora o
     # cadastro acontece aqui mesmo, sem sair da compra.
     return None, _pergunta_criar_cartao(draft_id, nome, cartoes)
-
-
-def _com_aviso_de_cartao(resposta: str | dict, nome: str | None) -> str | dict:
-    """Diz que criou o cartão E com que ciclo — a suposição não pode ficar muda.
-
-    `set_invoice` precisa de fechamento e vencimento para associar a fatura, e
-    mudar esses dias depois NÃO reprocessa lançamento já gravado. Então o usuário
-    tem que saber AGORA em que ciclo a compra dele entrou.
-    """
-    if not nome:
-        return resposta
-    aviso = (
-        f"💳 Criei o cartão *{nome}* — assumi fechamento dia "
-        f"{db.CARTAO_FECHAMENTO_PADRAO} e vencimento dia {db.CARTAO_VENCIMENTO_PADRAO}. "
-        "Se for diferente, ajusta no app."
-    )
-    if isinstance(resposta, str):
-        return f"{aviso}\n\n{resposta}"
-    # Compra parcelada de valor alto vira PERGUNTA de confirmação, não texto — e
-    # é o caso mais comum aqui (o pedido fala em Mac e TV). Devolver o dict
-    # intacto engolia o aviso justamente na compra grande, que é onde a fatura
-    # errada dói mais. Depois do SIM a resposta vem do checkpoint, onde o aviso
-    # nunca existiu: ou entra agora, ou não entra nunca.
-    return {
-        **resposta,
-        "body": f"{aviso}\n\n{resposta.get('body', '')}".strip(),
-        "text": f"{aviso}\n\n{resposta.get('text', '')}".strip(),
-    }
 
 
 def _pergunta_criar_cartao(draft_id: str, nome: str, cartoes: list[dict]) -> dict:
@@ -468,51 +485,37 @@ def _pergunta_tipo_valor(draft_id: str, cents: int, parcelas: int) -> dict:
     }
 
 
-def _pergunta_cartao(draft_id: str, cartoes: list[dict], corpo: str) -> str | dict:
-    """A pergunta do cartão como MENU. Mesma divisão de forma que `_pergunta`.
-
-    Até 2 cabem em botões (2 + cancelar = os 3 que a Meta aceita); 3+ viram Lista
-    Interativa (9 + cancelar = as 10 linhas). O clique carrega o id do cartão, ou
-    seja, executa sem passar por IA nenhuma — o texto livre vira o plano B.
-    """
-    if not cartoes:
-        return draft.sem_cartoes()
-
-    mostrar = cartoes[:9]
-    # A Meta aceita 10 linhas e uma é sempre a saída, então do 10º cartão em
-    # diante ninguém cabe. Truncar em silêncio seria o pior dos mundos: o cartão
-    # existe, não aparece, e o usuário conclui que não está cadastrado. Digitar o
-    # nome continua alcançando TODOS — o casamento roda sobre a lista inteira.
+def _pergunta_cartao(draft_id: str, cartoes: list[dict], corpo: str) -> dict:
+    """Cartão ou financiamento: decisões distintas, ambas ainda sem escrita."""
+    mostrar = cartoes[:8]
     sobraram = len(cartoes) - len(mostrar)
     aviso = f"\n(+{sobraram} que não coube na lista — é só digitar o nome.)" if sobraram else ""
-    corpo = f"{corpo}{aviso}"
+    explicacao = (
+        "Se foi compra no cartão, escolha ou diga o nome do cartão. "
+        "Se foi um contrato de financiamento, escolha É financiamento; vou pedir os dados do contrato."
+    )
+    corpo = f"{corpo}\n{explicacao}{aviso}"
     cancelar = f"{draft.CLICK_PREFIX}{draft_id}:no"
-    # O fallback pede o NOME, não o número: o rascunho não congela candidatos
-    # (`pending_actions` congela porque o resume depende do id), então um número
-    # digitado não teria a que se ancorar. Nome digitado a extração + o
-    # casamento normalizado resolvem.
+    financiamento = f"{draft.CLICK_PREFIX}{draft_id}:financing"
     texto = (
         f"{corpo}\n"
         + "\n".join(f"• {c['name']}" for c in mostrar)
-        + "\nDigita o nome de um deles, ou *cancelar*."
+        + "\nDigita o nome de um cartão, escolhe É financiamento, ou *cancelar*."
     )
-
-    if len(mostrar) <= 2:
+    if len(mostrar) <= 1:
         return {
-            "ui": "buttons",
-            "body": corpo,
+            "ui": "buttons", "body": corpo,
             "buttons": [
                 *[(f"{draft.CLICK_PREFIX}{draft_id}:c:{c['id']}", c["name"]) for c in mostrar],
-                (cancelar, "Cancelar"),
+                (financiamento, "É financiamento"), (cancelar, "Cancelar"),
             ],
             "text": texto,
         }
     return {
-        "ui": "list",
-        "body": corpo,
-        "label": "Escolher cartão",
+        "ui": "list", "body": corpo, "label": "Escolher opção",
         "rows": [
             *[(f"{draft.CLICK_PREFIX}{draft_id}:c:{c['id']}", c["name"], "") for c in mostrar],
+            (financiamento, "É financiamento", "Informar os dados do contrato"),
             (cancelar, "Cancelar", "Esquecer essa compra"),
         ],
         "text": texto,

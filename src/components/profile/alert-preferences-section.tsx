@@ -15,6 +15,7 @@ import {
 interface AlertPreferencesSectionProps {
   userId: string | undefined;
   hasVerifiedPhone: boolean;
+  showHistory?: boolean;
 }
 
 function pushSubtitle({
@@ -47,13 +48,14 @@ function whatsappSubtitle({
   if (failed) return 'Não deu para verificar';
   if (!hasVerifiedPhone) return 'Conecte e verifique um telefone para ativar';
   if (enabled) return 'Ativados para orçamento, faturas e saldo';
-  return 'Desligados — nenhum fallback será enviado';
+  return 'Desligados — você não receberá avisos por WhatsApp';
 }
 
 /** Preferências dos avisos inferidos; lembretes pessoais continuam independentes. */
 export function AlertPreferencesSection({
   userId,
   hasVerifiedPhone,
+  showHistory = true,
 }: AlertPreferencesSectionProps) {
   const toast = useToast();
   const push = usePushStatus(userId);
@@ -147,11 +149,11 @@ export function AlertPreferencesSection({
           />
         }
       />
-      <Row
+      {showHistory ? <Row
         title="Histórico de alertas"
         icon="clock.arrow.circlepath"
         onPress={() => router.push('/profile/alerts')}
-      />
+      /> : null}
     </Section>
   );
 }

@@ -60,3 +60,6 @@ agent/.env
 agent/__pycache__/
 agent/**/__pycache__/
 agent/.pytest_cache/
+
+# Local validation captures may contain personal staging data.
+docs/bugs/evidence/
