@@ -19,6 +19,7 @@ import { Field, TextField } from '@/components/ui/field';
 import { Sheet } from '@/components/ui/sheet';
 import { Radius, Space, tabular } from '@/design/tokens';
 import { currentMonth } from '@/components/finance/month-picker';
+import { environmentLabel } from '@/lib/environment';
 import { useAiMonthStats, usePlanStatus } from '@/hooks/use-finance';
 import { useAppUpdate } from '@/hooks/use-app-update';
 import { formatDateBR } from '@/hooks/use-items';
@@ -27,7 +28,7 @@ import { useSession } from '@/hooks/use-session';
 import { useTheme, useThemeMode } from '@/hooks/use-theme';
 import { confirmDestructive } from '@/lib/item-actions';
 import { appUpdateAction, appUpdateSubtitle, type AppUpdateState } from '@/lib/app-update';
-import { supabase } from '@/lib/supabase';
+import { supabase, supabaseUrl } from '@/lib/supabase';
 
 const APP_UPDATE_ICON: Partial<
   Record<AppUpdateState['status'], Parameters<typeof Icon>[0]['name']>
@@ -41,6 +42,7 @@ const APP_UPDATE_ICON: Partial<
  */
 export default function ProfileScreen() {
   const theme = useTheme();
+  const ambiente = environmentLabel(supabaseUrl);
   const { mode, setMode } = useThemeMode();
   const { session } = useSession();
   const toast = useToast();
@@ -377,6 +379,18 @@ export default function ProfileScreen() {
         <ThemedText type="small" themeColor="textSecondary">
           Personal ProOps app
         </ThemedText>
+        {/*
+          Em qual banco este build escreve. Some em produção de propósito — ver
+          `environmentLabel`. Com três apps instalados no mesmo aparelho, o nome do ícone não
+          basta: um build "dev" aponta para o `.env` da máquina, que pode ser qualquer um.
+        */}
+        {ambiente ? (
+          <View style={[styles.ambiente, { backgroundColor: theme.warningSoft }]}>
+            <ThemedText type="meta" themeColor="warning">
+              {ambiente.toUpperCase()}
+            </ThemedText>
+          </View>
+        ) : null}
       </View>
     </Screen>
   );
@@ -530,6 +544,13 @@ const styles = StyleSheet.create({
   },
   footer: {
     alignItems: 'center',
+    gap: Space.sm,
     paddingVertical: Space.xl,
+  },
+  ambiente: {
+    paddingHorizontal: Space.sm,
+    paddingVertical: Space.half,
+    borderRadius: Radius.xs,
+    borderCurve: 'continuous',
   },
 });
