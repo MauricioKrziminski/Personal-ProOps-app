@@ -61,3 +61,11 @@ Verificação de escopo após o trabalho: produção permaneceu em `agente-00025
 Após a entrega OTA compatível com 1.3.1, o usuário solicitou um APK novo e a medição do build completo. A versão 1.3.2 inclui as correções funcionais publicadas em `7fb41d4`. O build usa o workflow nativo já validado, com fallback para os caches da main, assinatura existente e incremento remoto do versionCode. O tempo OTA de 2min40s não é uma medida de geração de APK. Resultado desta release será registrado após conclusão.
 
 A execução nativa 34267445450 (v1.3.2) foi cancelada durante o build após o usuário detalhar o falso pagamento em Hoje. Não publicou assets. O problema foi reproduzido e corrigido antes da próxima tag, v1.3.3. Esse cancelamento não mede o tempo de um build completo.
+
+## Release 1.3.3 publicada e medida
+
+[Run 34268405306](https://github.com/MauricioKrziminski/Personal-ProOps-app/actions/runs/34268405306), commit `6ece162`, terminou com sucesso em 08/09/2026. Disparo 19:20:43 UTC, final 19:35:19 UTC: **14min36s totais** (job 14min32s). Etapa EAS local 19:23:31–19:34:10: **10min39s**; Gradle informou 9min35s. Comparado aos 19min33s totais da v1.2.0, foram 4min57s a menos (~25%). O total inclui preparação, verificações, publicação e gravação dos caches; não é tempo de OTA.
+
+O ccache foi restaurado da main (`fe4c4f2`): **340/340 hits, zero misses**. O release mantém as arquiteturas, assinatura e validações. Cache ausente e mudanças nativas substanciais podem aumentar o tempo de próximas execuções.
+
+[APK 1.3.3](https://github.com/almeidagabriel01/Personal-ProOps-app-releases/releases/tag/v1.3.3): `com.proops.personal`, versionCode **15** (anterior 7), runtime 1.3.3, SHA256 `6c0b123ea8f1e0eca10168bac5800f0fa79630fbfd9ec735b1ad183361d48883`. O APK baixado do release teve hash, assinatura, versão e sourceCommit comparados com o manifesto/comprovante. Instalação `adb install -r` sobre a v1.3.1 assinada passou no emulador isolado Android 36; abriu na tela de login, sem crash observado. Não houve login ou operações financeiras nesse dispositivo. Evidências em `/tmp/proops-v133-release/`.
