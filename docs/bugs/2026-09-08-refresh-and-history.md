@@ -1,6 +1,6 @@
 # Atualização de telas e histórico de parcelas — 08/09/2026
 
-Esta rodada sucede a v1.3.1. Os arquivos locais contêm as correções abaixo; esta rodada ainda não foi publicada em produção.
+Esta rodada sucede a v1.3.1. Correções registradas na main em `7fb41d4`; migration e backend promovidos a produção em 08/09/2026 após autorização explícita do usuário. A OTA Android também foi publicada com sucesso para o APK v1.3.1.
 
 | Pedido | Causa e correção | Evidência |
 | --- | --- | --- |
@@ -28,14 +28,14 @@ Esta rodada sucede a v1.3.1. Os arquivos locais contêm as correções abaixo; e
 
 ## Publicação e dados existentes
 
-Produção não recebeu esta migration, backend ou atualização do app. Nenhum pagamento antigo foi reclassificado automaticamente. A migration preserva registros existentes; corrige novas criações e impede que o cron quite parcelas só pelo vencimento. O contrato antigo recusa criação retroativa sem histórico, evitando que versões antigas inventem pagamentos.
+Produção recebeu a migration `20260908153143` e o backend `agente-00026-5mk`, com 100% do tráfego e `/health` saudável. Nenhum pagamento antigo foi reclassificado automaticamente. A migration preserva registros existentes; corrige novas criações e impede que o cron quite parcelas só pelo vencimento. O contrato antigo recusa criação retroativa sem histórico, evitando que versões antigas inventem pagamentos.
 
-Antes da promoção, revisar conjuntamente migration, backend e app. A regra `.claude/rules/supabase.md:17` exige pedido explícito para promover a migration a produção.
+O usuário autorizou explicitamente a promoção completa. Staging `agente-staging-00072-vg8` passou no health e na verificação autenticada de histórico com rollback. Em produção (`kwriuifcwyvdrxtspjiz`), o dry-run indicou somente a migration prevista; após aplicar, não restaram migrations pendentes. As três definições de função foram comparadas por leitura com staging e são idênticas. Nenhum teste financeiro foi executado sobre registros reais de produção.
 
-Deploy adicional do backend em staging solicitado após os testes: a revisão automática bloqueou o envio de `agent/` ao Cloud Build e a alteração de `agente-staging`, exigindo autorização específica para payload e destino. A autorização está pendente; a migration de staging previamente aplicada permanece, mas este backend corrigido ainda não foi publicado.
+A exclusão explícita em `.gcloudignore` restringiu o envio aos 62 inputs do backend, sem ambientes, credenciais ou virtualenv. Os deploys preservaram a configuração existente dos serviços.
 
 ## Compatibilidade de entrega OTA
 
-Cópia isolada do estado atual, sem diretórios nativos gerados: fingerprint, runtime 1.3.1, canal/ambiente e hash das variáveis públicas coincidem com o comprovante do APK v1.3.1 publicado. A verificação incluiu o diff até a árvore de trabalho e os arquivos novos, sem executar publicação. Evidência: `/tmp/proops-ota-audit-20260908/result.json`. O export Android de produção passou e gerou bundle Hermes de 7,5 MB em `/tmp/proops-ota-audit-20260908/dist`. Isso valida compatibilidade e geração, não entrega/aplicação OTA no aparelho. Migration e backend precisam ser promovidos antes de entregar o novo app.
+Cópia isolada do estado atual, sem diretórios nativos gerados: fingerprint, runtime 1.3.1, canal/ambiente e hash das variáveis públicas coincidem com o comprovante do APK v1.3.1 publicado. A verificação incluiu o diff até a árvore de trabalho e os arquivos novos, sem executar publicação. Evidência: `/tmp/proops-ota-audit-20260908/result.json`. O export Android de produção passou e gerou bundle Hermes de 7,5 MB em `/tmp/proops-ota-audit-20260908/dist`. Isso valida compatibilidade e geração, não entrega/aplicação OTA no aparelho. Migration e backend foram promovidos e validados antes da publicação OTA.
 
-O SDK 57 já verifica atualizações nativamente na abertura (`updates.checkAutomatically=ON_LOAD` por padrão); importar a API JavaScript de expo-updates não é requisito para esse comportamento. O atual hook de APK continua separado. Fonte: https://docs.expo.dev/versions/v57.0.0/sdk/updates/ . Nenhuma OTA foi publicada.
+O SDK 57 já verifica atualizações nativamente na abertura (`updates.checkAutomatically=ON_LOAD` por padrão); importar a API JavaScript de expo-updates não é requisito para esse comportamento. O atual hook de APK continua separado. Fonte: https://docs.expo.dev/versions/v57.0.0/sdk/updates/ . OTA publicada em 08/09/2026 às 18:47:54 UTC: grupo `b3b9b1e6-d57c-4ff4-b326-5770199a26d9`, update Android `01a08259-1984-7ca9-96d9-20919229385d`, branch/canal production, runtime `1.3.1`, código `7fb41d45703c403d3f82d5aea4e8f8c8b0a25d30`. [Workflow 34264912370](https://github.com/MauricioKrziminski/Personal-ProOps-app/actions/runs/34264912370) concluído com sucesso em 2min40s desde o disparo (job 2min35s), incluindo testes e compatibilidade. [Entrega EAS](https://expo.dev/accounts/solutions.proops/projects/app-ProOps/updates/b3b9b1e6-d57c-4ff4-b326-5770199a26d9). A aplicação efetiva no celular físico continua dependendo da abertura do app e validação do usuário; não foi observada remotamente.
