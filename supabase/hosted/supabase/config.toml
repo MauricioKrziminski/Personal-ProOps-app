@@ -117,6 +117,14 @@ otp_expiry = 3600
 subject = "Seu código do Personal ProOps app"
 content_path = "./supabase/confirmation.html"
 
+# `updateUser({ email })` dispara ESTE template, não o `confirmation`. Sem ele o Supabase manda
+# o padrão, com `{{ .ConfirmationURL }}` — um link, num app que só sabe `verifyOtp`. É o mesmo
+# bug do cadastro, uma porta adiante: quem entrou por WhatsApp e vai cadastrar e-mail e senha
+# em `/link-email` receberia um link em inglês apontando para lugar nenhum.
+[auth.email.template.email_change]
+subject = "Confirme seu e-mail no Personal ProOps app"
+content_path = "./supabase/email_change.html"
+
 [auth.email.template.recovery]
 subject = "Trocar a senha do Personal ProOps app"
 content_path = "./supabase/recovery.html"

@@ -65,6 +65,12 @@ export default function ProfileScreen() {
    * construção. Conta criada por e-mail não tem nenhum, e o cartão precisa dizer isso.
    */
   const phone = session?.user?.phone ? `+${session.user.phone}` : null;
+  /*
+    Quem entrou por Phone OTP não tem e-mail, e quem entrou por e-mail pode não ter telefone. A
+    linha da Conta muda de rótulo conforme isso: "Cadastrar" quando falta, "Trocar" quando já
+    existe. Sem esta linha a conta de WhatsApp era de mão única — perdeu o número, perdeu tudo.
+  */
+  const emailDaConta = session?.user?.email ?? null;
 
   const confirmSignOut = () => {
     const doIt = async () => {
@@ -306,6 +312,15 @@ export default function ProfileScreen() {
           }
           icon="bubble.left"
           onPress={() => router.push('/link-phone')}
+        />
+        <Row
+          title={emailDaConta ? 'Trocar e-mail da conta' : 'Cadastrar e-mail e senha'}
+          subtitle={
+            emailDaConta ??
+            'Um segundo jeito de entrar — sem depender de continuar com este número'
+          }
+          icon="paperplane"
+          onPress={() => router.push('/link-email')}
         />
         <Row
           title="Nome"

@@ -129,7 +129,7 @@ export function AppHeader({ title, action }: AppHeaderProps) {
           barra que NÃO é controle, que é exatamente o que ela é.
         */}
         <View pointerEvents="none" style={styles.markBox}>
-          <Mark size={26} color="text" />
+          <Mark size={34} color="text" />
         </View>
 
         <View pointerEvents="box-none" style={styles.right}>
@@ -200,8 +200,13 @@ const styles = StyleSheet.create({
     gap: Space.md,
     paddingHorizontal: Space.lg,
   },
-  /** Mantém a altura de 28 da fileira; o que saiu foi só a superfície atrás da marca. */
-  markBox: { width: 28, height: 28, alignItems: 'center', justifyContent: 'center' },
+  /**
+   * 34, e não os 28 do export: sem o quadrado de fundo a marca perdeu a moldura que lhe dava
+   * presença, e a espiral desenha com folga dentro do próprio viewBox — a 26 ela media ~19dp na
+   * tela, metade do avatar de 32 do outro lado da faixa. A caixa cresce junto para o glifo não
+   * ser cortado, que é o mesmo erro do `Icon`.
+   */
+  markBox: { width: 34, height: 34, alignItems: 'center', justifyContent: 'center' },
   right: { flexDirection: 'row', alignItems: 'center', gap: Space.sm },
   round: {
     width: HitTarget - 12,

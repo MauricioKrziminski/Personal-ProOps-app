@@ -1,4 +1,5 @@
 import { SymbolView, type SymbolViewProps } from 'expo-symbols';
+import { Platform, useWindowDimensions } from 'react-native';
 
 import { IconSize } from '@/design/tokens';
 import { useTheme } from '@/hooks/use-theme';
@@ -173,7 +174,31 @@ const MATERIAL: Record<string, MaterialName> = {
  */
 export function Icon({ name, size = 'md', color = 'text', weight = 'regular' }: IconProps) {
   const theme = useTheme();
+  /*
+    ⚠️ **No Android o ícone é TEXTO, e texto cresce com a fonte do sistema** (07/09/2026).
+
+    O `SymbolView` de `expo-symbols` não é nativo fora do iOS. Ele renderiza, literalmente:
+
+        <View style={{ width: size, height: size }}>
+          <Text style={{ fontFamily: 'Material Symbols', fontSize: size, lineHeight: size }}>…</Text>
+        </View>
+
+    A `View` tem largura FIXA e o `<Text>` lá dentro passa pelo `fontScale` do aparelho como
+    qualquer outro texto. Num celular com fonte a 1,3× o glifo é desenhado a `size × 1,3` dentro
+    de uma caixa de `size` — e sobra para fora. Onde o ícone mora num chip redondo (o olho do
+    `HeroPanel`, o avatar do header, o chip da `Row`), o raio do chip corta a sobra: era o
+    "ícone do olho aparece cortando um pouco à direita" e o "ícone do perfil não está
+    centralizado". Um defeito só, em dois lugares, invisível no simulador com fonte padrão.
+
+    A correção pede o glifo em `px / fontScale`, que o próprio RN multiplica de volta para `px`,
+    e devolve a caixa ao tamanho de layout com o conteúdo CENTRADO — o `style` daqui vence o
+    `{ width: size, height: size }` do componente. O ícone passa a ter tamanho de GEOMETRIA, não
+    de texto, que é o certo: ele vive dentro de chips de dimensão fixa, e crescer com a fonte
+    estouraria o chip em vez de ajudar quem aumentou a letra.
+  */
+  const { fontScale } = useWindowDimensions();
   const px = typeof size === 'number' ? size : IconSize[size];
+  const escala = Platform.OS === 'android' ? Math.max(fontScale, 1) : 1;
 
   // Ícone fora do mapa vira `circle` silencioso no Android — foi assim que a `chevron.left` da
   // navegação de mês virou um círculo vazio. Em dev isso grita.
@@ -187,5 +212,13 @@ export function Icon({ name, size = 'md', color = 'text', weight = 'regular' }: 
       ? { ios: name, android: MATERIAL[name] ?? 'circle', web: MATERIAL[name] ?? 'circle' }
       : name;
 
-  return <SymbolView name={resolved} size={px} tintColor={theme[color]} weight={weight} />;
+  return (
+    <SymbolView
+      name={resolved}
+      size={px / escala}
+      tintColor={theme[color]}
+      weight={weight}
+      style={{ width: px, height: px, alignItems: 'center', justifyContent: 'center' }}
+    />
+  );
 }

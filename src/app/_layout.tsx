@@ -253,6 +253,10 @@ function AppTree() {
                   />
                   <Stack.Screen name="onboarding" options={{ headerShown: false }} />
                   <Stack.Screen name="link-phone" options={{ headerShown: false }} />
+                  {/* O par de `link-phone`: cadastra e-mail e senha numa conta que só tem
+                      WhatsApp, ou troca o endereço de quem já tem. As duas portas do produto
+                      passaram a abrir dos dois lados. */}
+                  <Stack.Screen name="link-email" options={{ headerShown: false }} />
                   <Stack.Screen name="catalog" options={{ title: 'Catálogo' }} />
                 </Stack.Protected>
               </Stack>
