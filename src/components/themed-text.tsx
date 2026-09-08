@@ -40,6 +40,7 @@ export function ThemedText({ style, type = 'default', themeColor, ...rest }: The
   return (
     <Text
       style={[
+        styles.shrink,
         { color: theme[themeColor ?? (type === 'linkPrimary' ? 'tint' : 'text')] },
         styles[type],
         style,
@@ -50,6 +51,21 @@ export function ThemedText({ style, type = 'default', themeColor, ...rest }: The
 }
 
 const styles = StyleSheet.create({
+  /**
+   * **Todo texto encolhe.** O Yoga (React Native) tem `flexShrink: 0` por padrão — ao contrário
+   * do flexbox do navegador, que usa 1. Numa linha, isso significa que o texto NUNCA cede: ele
+   * mantém a largura natural e empurra o irmão para fora do card, que tem `overflow: 'hidden'`
+   * e corta o que sobrou. Foi assim que o botão de olho do `HeroPanel` ficou "cortado à direita"
+   * num aparelho com fonte grande, e a mesma mecânica valia para as ~400 chamadas deste
+   * componente. Um lugar só resolve todas.
+   *
+   * O `minWidth` do Yoga é 0 (o navegador usa `auto`), então aqui `flexShrink` basta — não
+   * precisa do `minWidth: 0` que a mesma correção exigiria na web.
+   *
+   * Quem NÃO pode encolher desliga na chamada: dinheiro (`Money`) e o contador do badge, onde
+   * quebrar no meio do número é pior do que estourar a caixa.
+   */
+  shrink: { flexShrink: 1 },
   /** corpo — título de linha, parágrafo */
   default: Type.body,
   /** display de tela; uma por tela */

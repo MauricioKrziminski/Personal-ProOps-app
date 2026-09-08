@@ -54,6 +54,12 @@ por um passo de 92px; escolher um fecha a pilha com ele na frente. O corpo do ca
 carteira e a fatura tem botão próprio — um toque só não pode decidir entre "ver os outros" e
 "abrir a fatura".
 
+⚠️ **A face do cartão CRESCE com a fonte do sistema** (07/09/2026). `CARD_H` é altura fixa com
+`overflow: 'hidden'` e o conteúdo é texto: a 1,3× o rodapé encostava na barra de limite. A mesma
+escala entra no passo do leque, no `peek` e na altura do palco — escalar só a face deixaria os
+cartões de trás para fora. Vale para qualquer bloco de altura fixa com texto dentro; a alternativa
+(apertar o teto de escala até caber) é desligar o Dynamic Type com outro nome.
+
 ⚠️ **A cor DO BANCO voltou** (03/09/2026, decisão do dono do produto, contra a regra anterior).
 O mapa nome → cor mora em `src/design/card-brands.ts`, que é allowlisted no `anti-slop.test.ts`:
 a cor de um emissor não tem par light/dark porque não é nossa. Ela entra **misturada com a
@@ -159,6 +165,26 @@ aponta pelo NOME, e face ausente não cai no system font — ela some.
 
 **Uma display por tela** continua valendo.
 
+⚠️ **Todo texto ENCOLHE — `ThemedText` traz `flexShrink: 1` na base** (07/09/2026). O Yoga usa
+`flexShrink: 0` por padrão, ao contrário do flexbox do navegador: numa linha, o texto nunca cedia,
+mantinha a largura natural e **empurrava o irmão para fora do card**, que tem `overflow: 'hidden'`
+e corta. Foi assim que o botão de olho do `HeroPanel` apareceu "cortado à direita" num aparelho
+com fonte grande, e a mesma mecânica valia para as ~400 chamadas do componente. Quem não pode
+ceder desliga na chamada: `Money` (quebrar no meio dos dígitos é pior que estourar a caixa) e o
+título de uma linha que precisa quebrar a linha inteira, abaixo.
+
+⚠️ **`flexShrink: 0` é o que faz `flexWrap` funcionar numa linha com texto.** Medido: com
+`flexShrink: 1` o Yoga prefere ENCOLHER a quebrar, então ligar `flexWrap` não muda nada e o título
+continua sumindo. O padrão para "título + pílula na mesma linha" é `flexWrap: 'wrap'` na linha e
+`flexShrink: 0, maxWidth: '100%'` no título — lado a lado quando cabe, pílula embaixo quando não.
+
+**A régua de largura é 384dp, não 448dp.** O emulador padrão (1344px a 480dpi) tem 448dp, mais
+largo que quase todo celular real, e era a única largura em que as telas eram olhadas. Xiaomi e
+Samsung saem de fábrica com "tamanho de exibição" e fonte maiores; a combinação 384dp × fonte 1,3
+é o cenário de verificação, e é onde "Fatura Nubank Cartão" virava "Fatu…". Para reproduzir:
+`adb shell wm density 560 && adb shell settings put system font_scale 1.30` (e devolver a 480/1.0
+depois — a configuração fica gravada no emulador).
+
 **`fontVariant: ['tabular-nums']` em todo número que conta, mede ou custa** — dinheiro, data,
 percentual, contador. Sem isso o valor "pula" quando muda.
 
@@ -202,6 +228,18 @@ Nunca animar altura de header. `Reduce Motion` colapsa movimento espacial em cro
 
 Barra de progresso e gráfico **animam** quando o valor muda — valor que salta é bug visual.
 
+⚠️ **A tab bar do Android é a exceção declarada à regra da frequência** (07/09/2026, decisão do
+dono do produto). Ela usa `Motion.spring.tab` (1000 ms, `dampingRatio 0.62`), não `snap`: ~180 ms
+de percurso, ~10% de ultrapassagem e ~500 ms até assentar. Com `snap` o berço atravessava as cinco
+abas em **~130 ms** e parava seco — não lia como "rápido", lia como teleporte, e foi a queixa
+"parece que foi de uma vez". Aqui o movimento É a resposta ao toque: ele carrega o ícone e o
+rótulo fazendo crossfade ao longo do caminho. **Não "corrigir" de volta para `snap`**, que
+continua sendo a mola do indicador do `Segmented`.
+
+A ultrapassagem de uma mola é proporcional à DISTÂNCIA, então ir da primeira à quinta aba jogava
+metade da bolha para fora da pílula. O desenho é preso por `folga` — a sobra real entre o centro
+do slot e a borda da pílula, calculada da geometria, não escolhida a dedo.
+
 ---
 
 ## 6. Feedback
@@ -239,11 +277,17 @@ estado da primeira: seção que falha diz que falhou, não some.
 Toda transição responde três perguntas: o que é o destino, o usuário precisa poder voltar, e o
 que "voltar" faz depois.
 
-- **Header é do navegador — exceto nas quatro RAÍZES de aba.** Ali quem desenha é o `AppHeader`
+- **Header é do navegador — exceto nas cinco RAÍZES de aba.** Ali quem desenha é o `AppHeader`
   (`src/components/ui/app-header.tsx`): **a faixa de marca do Stitch** — 56px sobre a safe area,
-  fundo do app a 85% com desfoque, fio de 1px embaixo, e dentro dela a marca num quadrado de 28,
-  a palavra "ProOps" em `Type.wordmark`, um ponto de status e o avatar de 32 à direita. Ação de
-  raiz vai no slot `action` (`HeaderIconButton`), antes do avatar.
+  fundo do app a 85% com desfoque, fio de 1px embaixo, e dentro dela a marca num quadrado de 28 à
+  esquerda e o avatar de 32 à direita. Ação de raiz vai no slot `action` (`HeaderIconButton`),
+  antes do avatar.
+
+  **A palavra "ProOps" saiu, e o token `Type.wordmark` com ela** (03/09/2026). O export escrevia o
+  símbolo E a palavra a 8px um do outro: duas afirmações da mesma identidade na faixa mais nobre da
+  tela. Quem passou a ocupar esse peso é a **saudação da Hoje** ("Bom dia, Gabriel"), que diz algo
+  que o usuário não sabia — o nome do app, que ele acabou de tocar para abrir, não. O token foi
+  REMOVIDO de `tokens.ts` para não voltar por descuido; ele não tinha outro uso.
 
   A barra é **sobreposta**, não em fluxo: o desfoque só significa algo com conteúdo passando por
   baixo. Quem reserva a altura é a tela, por `useAppHeaderHeight()` — o `Screen` já faz isso
@@ -255,8 +299,9 @@ que "voltar" faz depois.
   o desenho é do dono do produto e as quatro telas do export têm esta barra. **Não "corrigir" de
   novo.** O custo aceito é a perda da etiqueta (a data em Hoje, a contagem em Notas).
 
-  O avatar leva o ícone de pessoa, não iniciais: `profiles` guarda só o telefone, e tirar iniciais
-  de um número seria escrever um dado que não existe.
+  O avatar leva o ícone de pessoa, não iniciais. `profiles.display_name` existe desde a `0050`, mas
+  é ANULÁVEL — quem entrou por Phone OTP não tem nome —, e um avatar que às vezes é letra e às
+  vezes é ícone muda de forma conforme o cadastro. Um desenho só, para todo mundo.
   **Tela EMPURRADA continua com `<Stack.Title>` + large title** — lá o título e o "voltar" são a
   informação. Barra desenhada à mão dentro do `ScrollView` continua proibida: o `AppHeader` fica
   FORA dele.
@@ -325,6 +370,18 @@ que "voltar" faz depois.
      início do ombro DEPOIS do fim dele e o contorno se cruzava, apagando a mordida. (O export
      tem o mesmo defeito: `C 0 19.7 19.7 0 44 0` seguido de `L 32.7 0`, andando para trás.)
 
+  ⚠️ **O CONTEÚDO da barra segue a POSIÇÃO, nunca a rota** (03/09/2026). A mola parte do dedo, na
+  UI thread; `activeIndex` vem do expo-router e só chega quando a tela de destino monta. Tudo que
+  lia `activeIndex` para desenhar ficava, por isso, um pedaço da animação atrasado: a bolha
+  chegava no destino **carregando o ícone da origem**, com o rótulo errado ainda em verde e um
+  buraco no slot de onde ela saiu. Ícone da bolha, ícone do slot e cor do rótulo derivam de
+  `progresso` (`IconeDaBolha`, `IconeDoSlot`, `Rotulo`) — é a mesma regra do berço e da bolha,
+  estendida ao que está dentro delas. `activeIndex` fica só para a mola, o guarda do toque e a
+  acessibilidade.
+
+  O jeito de VER isso: toque numa aba e capture um quadro imediatamente. Se a tela ainda é a
+  antiga e a barra já é a nova, está certo — a barra deve LIDERAR a navegação, não segui-la.
+
   A bolha é da **cor da barra um degrau acima** (`backgroundSelected`) com o ícone no accent, mais
   sombra — é o desenho do export. Preenchê-la de `tint` com o ícone invertido gastava o accent
   inteiro num controle tocado 100× por dia. No escuro, barra, bolha e fundo ficam todos dentro de
@@ -334,6 +391,12 @@ que "voltar" faz depois.
   ripple entram por `Platform.select` só no Android; no iOS quem desenha é o sistema, mais
   `minimizeBehavior: 'onScrollDown'` (iOS 26), que é comportamento nativo, não animação nossa.
   Isso ficou meses ligado sem ninguém notar, porque a barra *parecia* certa no Android.
+- **A quinta aba é o Agente** (04/09/2026), entre Financeiro e Perfil: ela é uso, não
+  configuração. A ordem é a mesma nas TRÊS implementações de tab bar, e
+  `src/lib/agent-navigation.test.ts` quebra o build se divergirem — no Android o índice do slot
+  vem da POSIÇÃO, então uma aba fora de ordem manda a pessoa para a tela errada enquanto o berço
+  anima para o lugar certo. A matemática do `CurvedTabBar` não mudou: ela já derivava o slot de
+  `tabs.length`.
 - **Badge de aba é contagem real ou não existe.** Mesma régua dos atalhos do painel: número que
   não muda decisão é enfeite. Hoje leva o que vence + lembrete do dia + orçamento estourado, e
   some com zero.

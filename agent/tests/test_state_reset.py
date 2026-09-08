@@ -29,12 +29,12 @@ RAIZ = pathlib.Path(__file__).resolve().parents[1]
 
 
 def _chaves_do_estado_inicial() -> set[str]:
-    """Lê as chaves de `estado_inicial` em worker._run_graph pelo AST.
+    """Lê as chaves de `estado_inicial` em conversation._estado_base pelo AST.
 
     Por AST e não por import/execução: montar o dict de verdade exigiria sessão,
     banco e lote. O que importa aqui é o conjunto de chaves, que é estático.
     """
-    arvore = ast.parse((RAIZ / "app" / "worker.py").read_text())
+    arvore = ast.parse((RAIZ / "app" / "conversation.py").read_text())
     for no in ast.walk(arvore):
         # o dicionário mora no `return` de `_estado_base` (extraído para o
         # fast-path de rascunho reusar). Procurar pela função, e não pelo nome

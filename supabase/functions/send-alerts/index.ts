@@ -5,18 +5,19 @@
  * conta vencendo, saldo projetado negativo. Aqui só entrega.
  *
  * Dedupe: cada alerta é gravado em `alerts_sent` com unique
- * (workspace, tipo, ref, DIA) ANTES do envio. Quem perde a corrida do insert
- * (23505) simplesmente não envia — rodar o cron duas vezes não vira spam.
+ * (workspace, tipo, ref, DIA, CANAL) ANTES do envio. Quem perde a corrida do
+ * insert (23505) simplesmente não envia — rodar o cron duas vezes não vira spam.
  *
- * Canal: push (grátis) como principal; WhatsApp template (pago) só quando não
- * há token. É a regra de custo do produto — ver .claude/rules/whatsapp.md.
+ * Canal: só os que a pessoa ativou. Token e telefone são capacidades, nunca
+ * consentimento ou fallback implícito.
  */
 
 import { adminClient } from "../_shared/admin.ts";
+import { alertChannels } from "../_shared/alert-channels.ts";
 import { sendTemplate } from "../_shared/whatsapp.ts";
 
-const WHATSAPP_REMINDER_TEMPLATE = Deno.env.get("WA_REMINDER_TEMPLATE") ??
-  "personal_proops_reminder";
+const WHATSAPP_ALERT_TEMPLATE = Deno.env.get("WA_ALERT_TEMPLATE") ??
+  "personal_proops_alert";
 /** Teto por rodada: alerta demais no mesmo dia é ruído, não ajuda. */
 const MAX_ALERTS_PER_USER = 4;
 
@@ -25,6 +26,8 @@ interface Alert {
   user_id: string;
   phone: string | null;
   expo_push_token: string | null;
+  alerts_push_enabled: boolean;
+  alerts_whatsapp_enabled: boolean;
   kind: string;
   ref: string;
   title: string;
@@ -80,40 +83,49 @@ Deno.serve(async (_req) => {
       continue;
     }
 
-    // reserva ANTES de enviar: se duas execuções coincidirem, só uma passa
-    const { error: reservaError } = await supabase.from("alerts_sent").insert({
-      workspace_id: alerta.workspace_id,
-      user_id: alerta.user_id,
-      kind: alerta.kind,
-      ref: alerta.ref,
-      channel: alerta.expo_push_token ? "push" : "whatsapp",
-    });
-    if (reservaError) {
-      // 23505 = já mandado hoje; qualquer outro erro também não deve enviar às cegas
-      if (reservaError.code !== "23505") console.error("alerts_sent:", reservaError);
+    const channels = alertChannels(alerta);
+    if (channels.length === 0) {
       pulados++;
       continue;
     }
 
-    try {
-      if (alerta.expo_push_token) {
-        await sendExpoPush(alerta.expo_push_token, alerta.title, alerta.body, alerta.kind);
-      } else if (alerta.phone) {
-        // fora da janela de 24h texto livre não passa: template Utility
-        await sendTemplate(alerta.phone, WHATSAPP_REMINDER_TEMPLATE, [
-          `${alerta.title}: ${alerta.body}`,
-        ]);
-      } else {
+    let entregou = false;
+    for (const channel of channels) {
+      // reserva POR CANAL antes de enviar: duas execuções não duplicam nenhuma entrega
+      const { error: reservaError } = await supabase.from("alerts_sent").insert({
+        workspace_id: alerta.workspace_id,
+        user_id: alerta.user_id,
+        kind: alerta.kind,
+        ref: alerta.ref,
+        channel,
+      });
+      if (reservaError) {
+        if (reservaError.code !== "23505") console.error("alerts_sent:", reservaError);
         pulados++;
         continue;
       }
-      enviados++;
+
+      try {
+        if (channel === "push") {
+          await sendExpoPush(alerta.expo_push_token!, alerta.title, alerta.body, alerta.kind);
+        } else {
+          // Aviso inferido não pode usar o template que diz "você pediu".
+          await sendTemplate(alerta.phone!, WHATSAPP_ALERT_TEMPLATE, [
+            `${alerta.title}: ${alerta.body}`,
+          ]);
+        }
+        enviados++;
+        entregou = true;
+      } catch (err) {
+        // a reserva fica: preferimos perder UM alerta a insistir todo dia num
+        // canal quebrado (foi assim que o cron de lembretes virou loop infinito)
+        console.error(`alerta ${alerta.kind}/${alerta.ref} via ${channel} falhou:`, err);
+        pulados++;
+      }
+    }
+
+    if (entregou) {
       porUsuario.set(alerta.user_id, jaEnviados + 1);
-    } catch (err) {
-      // a reserva fica: preferimos perder UM alerta a insistir todo dia num
-      // canal quebrado (foi assim que o cron de lembretes virou loop infinito)
-      console.error(`alerta ${alerta.kind}/${alerta.ref} falhou:`, err);
-      pulados++;
     }
   }
 

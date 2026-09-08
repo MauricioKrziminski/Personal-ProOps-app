@@ -24,7 +24,7 @@ def _ctx(texto: str = "quanto gastei no nubank esse mês?") -> ExecContext:
         phone="5551999999999",
         timezone="America/Sao_Paulo",
         texto=texto,
-        wa_message_id="w1",
+        source_message_id="w1",
     )
 
 

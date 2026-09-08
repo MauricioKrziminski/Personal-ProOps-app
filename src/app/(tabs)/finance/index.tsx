@@ -337,6 +337,7 @@ export default function FinanceScreen() {
   return (
     <View style={styles.root}>
       <Screen
+      floatingAction
         grouped
         // Sem etiqueta: o seletor de mês fica logo abaixo e diria a mesma coisa duas vezes.
         topBar={<AppHeader title="Financeiro" />}

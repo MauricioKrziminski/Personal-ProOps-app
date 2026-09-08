@@ -48,7 +48,7 @@ class TestQueryBlueprintAndButtonSentry:
             phone="5551999999999",
             timezone="America/Sao_Paulo",
             texto="ver mais lançamentos anteriores",
-            wa_message_id="w2",
+            source_message_id="w2",
             clicked_id="qpage:all:3",
             last_query_data={
                 "blueprint": {
@@ -111,7 +111,7 @@ class TestQueryBlueprintAndButtonSentry:
             phone="5551999999999",
             timezone="America/Sao_Paulo",
             texto="ver mais",
-            wa_message_id="w3",
+            source_message_id="w3",
             clicked_id="qpage:all:3",
             last_query_data={
                 "blueprint": {
@@ -176,7 +176,7 @@ class TestQueryBlueprintAndButtonSentry:
             phone="5551999999999",
             timezone="America/Sao_Paulo",
             texto="gastos no cartão nubank",
-            wa_message_id="w1",
+            source_message_id="w1",
         )
         action1 = FinanceQuery(type=FinanceQueryType.QUERY_TRANSACTIONS, account="nubank")
         res1 = await queries.query_transactions(ctx1, action1)
@@ -199,7 +199,7 @@ class TestQueryBlueprintAndButtonSentry:
             phone="5551999999999",
             timezone="America/Sao_Paulo",
             texto="ver mais",
-            wa_message_id="w2",
+            source_message_id="w2",
             clicked_id=f"qpage:{CARD_ID}:3",
             last_query_data=res1.data,
         )
@@ -249,7 +249,7 @@ class TestQueryBlueprintAndButtonSentry:
             "workspace_id": str(WS),
             "phone": "5551999999999",
             "timezone": "America/Sao_Paulo",
-            "wa_message_id": "w1",
+            "source_message_id": "w1",
             "text": "gastos no nubank",
             "finance_queries": [{"type": "query_transactions", "account": "nubank"}],
             "finance_actions": [],
@@ -289,7 +289,7 @@ class TestQueryBlueprintAndButtonSentry:
             phone="5551999999999",
             timezone="America/Sao_Paulo",
             texto="me mostre dos ultimos 90 dias com projecao dos proximos 90 dias",
-            wa_message_id="w1",
+            source_message_id="w1",
         )
         action = FinanceQuery(
             type=FinanceQueryType.QUERY_TRANSACTIONS,
@@ -344,7 +344,7 @@ class TestQueryBlueprintAndButtonSentry:
             "workspace_id": str(WS),
             "phone": "5551999999999",
             "timezone": "America/Sao_Paulo",
-            "wa_message_id": "w1",
+            "source_message_id": "w1",
             "text": "me mostre dos ultimos 90 dias e com projecao dos proximos 90 dias",
             "finance_queries": [
                 {"type": "query_transactions", "account": "nubank", "query_from": "2026-06-03", "query_to": "2026-09-01"},
@@ -406,7 +406,7 @@ class TestQueryBlueprintAndButtonSentry:
             phone="5551999999999",
             timezone="America/Sao_Paulo",
             texto="ta agora, me mostre os lançamentos dos ultimos 60 dias e com projeçao dos proximos 90 dias",
-            wa_message_id="w3",
+            source_message_id="w3",
             last_query_data={
                 "blueprint": {
                     "start_date": "2026-06-03",

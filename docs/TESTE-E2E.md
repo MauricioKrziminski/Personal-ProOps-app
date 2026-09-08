@@ -13,7 +13,8 @@ npx tsc --noEmit && npx expo lint && npm test   # tem que estar limpo
 npx expo start                                   # ou o build no device
 ```
 
-Confira no app que você está logado e que o telefone do perfil é o mesmo que vai usar no WhatsApp.
+Confira no app que você está logado. Se a conta ainda não tiver telefone, faça primeiro o Bloco 0;
+caso já tenha, confirme que é o mesmo número que vai usar no WhatsApp.
 
 ### Estado inicial do banco
 
@@ -69,6 +70,39 @@ Vazio = ainda rodando. Rode de novo em alguns segundos.
 
 ⚠️ **Sempre passe `timeout_milliseconds`.** O padrão do `pg_net` é 5s e ele **aborta a função no
 meio** — foi assim que a primeira importação gravou os itens mas perdeu a categorização.
+
+---
+
+## Bloco 0 — Conta por e-mail e vínculo do WhatsApp
+
+Execute este bloco em staging antes de qualquer promoção. Ele precisa de aparelho físico e do
+template real de OTP; o teste automatizado local não substitui essa entrega.
+
+| # | Ação | Esperado |
+|---|---|---|
+| 0.1 | Criar/entrar numa conta por e-mail sem telefone | Perfil mostra **WhatsApp não conectado**; o restante do app funciona |
+| 0.2 | Enviar uma mensagem desse número ao WhatsApp do produto | A conta de e-mail não é reconhecida nem recebe acesso por número digitado |
+| 0.3 | Perfil › **Conectar o WhatsApp** › informar o número | Código de 6 dígitos chega pelo template de autenticação |
+| 0.4 | Confirmar o código | Volta ao Perfil; telefone e selo de verificação aparecem |
+| 0.5 | Enviar nova mensagem pelo mesmo WhatsApp | Agora o agente reconhece a conta e cria uma nova `user_sessions` |
+| 0.6 | Deixar uma confirmação ou rascunho pendente e trocar o telefone pelo Perfil | O novo OTP confirma na mesma conta; contexto, fila e checkpoints da conversa anterior somem |
+| 0.7 | Responder “sim” na conversa antiga | Nada antigo é executado na conta já vinculada ao número novo |
+
+Conferência no SQL Editor do **mesmo ambiente** usado pelo app:
+
+```sql
+select id, phone, whatsapp_verified
+from public.profiles
+where id = '<USER_UUID>';
+
+select thread_id, phone, user_id, last_message_at
+from public.user_sessions
+where user_id = '<USER_UUID>'
+order by last_message_at desc;
+```
+
+Use o UUID mostrado em Authentication → Users; o SQL Editor não recebe o JWT do app, portanto
+`auth.uid()` seria nulo ali.
 
 ---
 
@@ -260,25 +294,31 @@ comportamento certo — suba para Pro pelo SQL do Bloco 9 e volte aqui.
 | 9.7 | SQL "volta pra Free" e tentar convidar | Botão bloqueado, com o motivo escrito |
 | 9.8 | SQL "vira Pro" › **Cancelar assinatura** | Alerta explicando que nada é apagado; confirma e marca "cancelado" |
 | 9.9 | Tentar tocar num plano da lista | **Nada acontece** — a lista é só comparativo, sem botão de compra |
+| 9.10 | Perfil › cartão de identidade | Total da IA bate com o plano; abaixo aparecem as parcelas **WhatsApp** e **no app**, cuja soma dá o total |
 
 ---
 
 ## Bloco 10 — Alertas proativos
 
-Com orçamento estourado (7.4) e fatura em aberto, dispare o `send-alerts` (mesmo SQL do topo,
-trocando o nome da função):
+Pré-requisitos: `personal_proops_alert` em `APPROVED`, Python/Edge Function publicados com
+`WA_ALERT_TEMPLATE` e um aparelho físico com token de push. Com orçamento estourado (7.4) e
+fatura em aberto, dispare `/cron/alerts` no ambiente cujo alvo foi conferido.
 
 | # | Verificação | Esperado |
 |---|---|---|
-| 10.1 | Resposta da função | `{ candidatos: N, enviados: X, pulados: Y }` |
-| 10.2 | `select kind, ref, sent_on from public.alerts_sent order by created_at desc;` | Uma linha por alerta |
-| 10.3 | **Disparar de novo** | `enviados: 0` — dedupe do dia funcionando |
-| 10.4 | Ver o texto em `_alerts_to_send()` | Toda mensagem termina numa **ação** |
+| 10.1 | Push e WhatsApp desligados no Perfil | `candidatos: 0`; nada em `alerts_sent` |
+| 10.2 | Somente push ligado | Uma notificação; nenhuma mensagem WhatsApp |
+| 10.3 | Somente WhatsApp ligado | Uma mensagem com `personal_proops_alert`; nenhuma notificação |
+| 10.4 | Ambos ligados | Duas entregas e duas linhas, uma por canal |
+| 10.5 | `select kind, ref, sent_on, channel from public.alerts_sent order by created_at desc;` | `channel` real em cada linha |
+| 10.6 | **Disparar de novo** | `enviados: 0` — dedupe por canal funcionando |
+| 10.7 | Abrir Histórico de alertas | O aviso entregue duas vezes aparece uma vez, “via notificação e WhatsApp” |
+| 10.8 | Criar lembrete pessoal em cada canal e desligar os avisos financeiros | O lembrete continua chegando pelo canal escolhido |
+| 10.9 | Ver o texto em `_alerts_to_send()` | Toda mensagem termina numa **ação** |
 
-⚠️ Sem push configurado (decisão registrada em `docs/PUSH-NOTIFICATIONS.md`), o envio usa template
-do WhatsApp. `personal_proops_reminder` está **APPROVED** desde 27/08/2026, então a entrega
-funciona. Se ainda assim falhar, o alerta fica marcado como enviado assim mesmo — de propósito,
-para o cron não virar loop.
+Falha depois da reserva mantém a linha daquele canal para o cron não virar loop. Falha ou
+duplicata em um canal não pode impedir a tentativa do outro. Telefone e token sem preferência
+ativa não autorizam fallback.
 
 ---
 

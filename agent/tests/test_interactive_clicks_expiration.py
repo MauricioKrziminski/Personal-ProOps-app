@@ -5,6 +5,8 @@ from app import worker, db
 from app.domain import confirm
 
 SESSAO = {
+    "id": "44444444-4444-4444-4444-444444444444",
+    "channel": "whatsapp",
     "phone": "5551999999999",
     "user_id": "11111111-1111-1111-1111-111111111111",
     "workspace_id": "22222222-2222-2222-2222-222222222222",

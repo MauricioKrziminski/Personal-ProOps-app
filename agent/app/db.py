@@ -11,7 +11,7 @@ no schema isolado, e não em `public` (onde o PostgREST as exporia com a anon ke
 from __future__ import annotations
 
 import logging
-from typing import Any
+from typing import Any, Literal
 from uuid import UUID
 
 from psycopg.rows import dict_row
@@ -294,35 +294,42 @@ async def expire_pending(thread_id: str | None = None) -> int:
     return row["n"] if row else 0
 
 
-async def open_pending(phone: str) -> dict[str, Any] | None:
+async def open_pending(session_id: UUID) -> dict[str, Any] | None:
+    """Pela SESSÃO, não pelo telefone: a conversa do app não tem número."""
     return await fetch_one(
         """
         select * from public.pending_actions
-        where phone = %s and status = 'awaiting' and expires_at > now()
+        where session_id = %s and status = 'awaiting' and expires_at > now()
         order by created_at desc limit 1
         """,
-        phone,
+        session_id,
     )
 
 
 async def create_pending(
     *,
+    session_id: UUID,
     thread_id: str,
-    phone: str,
+    phone: str | None,
     user_id: UUID,
     workspace_id: UUID,
     action: dict[str, Any],
     summary: str,
 ) -> dict[str, Any] | None:
     settings = get_settings()
-    return await fetch_one(
+    # `do nothing` devolve NADA quando já existe pendência aberta na conversa
+    # (índice parcial da 0055). Isso acontece em corrida e em recovery — e
+    # devolver None ali faria a pergunta sair SEM BOTÃO, deixando o usuário com
+    # um texto que pede confirmação e nada em que tocar.
+    linha = await fetch_one(
         """
         insert into public.pending_actions
-          (thread_id, phone, user_id, workspace_id, action, summary, expires_at)
-        values (%s, %s, %s, %s, %s, %s, now() + make_interval(mins => %s))
+          (session_id, thread_id, phone, user_id, workspace_id, action, summary, expires_at)
+        values (%s, %s, %s, %s, %s, %s, %s, now() + make_interval(mins => %s))
         on conflict do nothing
         returning *
         """,
+        session_id,
         thread_id,
         phone,
         user_id,
@@ -331,6 +338,7 @@ async def create_pending(
         summary,
         settings.pending_ttl_minutes,
     )
+    return linha or await open_pending(session_id)
 
 
 async def resolve_pending(pending_id: UUID, status: str) -> None:
@@ -350,7 +358,7 @@ async def resolve_pending(pending_id: UUID, status: str) -> None:
 # ---------------------------------------------------------------------------
 
 
-async def reserve_execution(wa_message_id: str, action_index: int, action_type: str) -> bool:
+async def reserve_execution(source_message_id: str, action_index: int, action_type: str) -> bool:
     """Reserva a vaga ANTES de executar. False = já foi feita (ou está sendo).
 
     A ordem importa e é a correção do bug do fluxo antigo: lá as ações rodavam e
@@ -362,12 +370,12 @@ async def reserve_execution(wa_message_id: str, action_index: int, action_type: 
     row = await fetch_one(
         """
         insert into public.executed_actions
-          (wa_message_id, action_index, action_type)
+          (source_message_id, action_index, action_type)
         values (%s, %s, %s)
-        on conflict (wa_message_id, action_index) do nothing
-        returning wa_message_id
+        on conflict (source_message_id, action_index) do nothing
+        returning source_message_id
         """,
-        wa_message_id,
+        source_message_id,
         action_index,
         action_type,
     )
@@ -375,7 +383,7 @@ async def reserve_execution(wa_message_id: str, action_index: int, action_type: 
 
 
 async def confirm_execution(
-    wa_message_id: str, action_index: int, result_id: UUID | None
+    source_message_id: str, action_index: int, result_id: UUID | None
 ) -> None:
     """Carimba o id criado na reserva (auditoria e desfazer)."""
     if result_id is None:
@@ -383,15 +391,15 @@ async def confirm_execution(
     await execute(
         """
         update public.executed_actions set result_id = %s
-        where wa_message_id = %s and action_index = %s
+        where source_message_id = %s and action_index = %s
         """,
         result_id,
-        wa_message_id,
+        source_message_id,
         action_index,
     )
 
 
-async def release_execution(wa_message_id: str, action_index: int) -> None:
+async def release_execution(source_message_id: str, action_index: int) -> None:
     """Devolve a vaga quando a execução falhou sem escrever nada.
 
     Sem isso, um erro transitório (banco fora por um segundo) queimaria a ação
@@ -400,9 +408,9 @@ async def release_execution(wa_message_id: str, action_index: int) -> None:
     await execute(
         """
         delete from public.executed_actions
-        where wa_message_id = %s and action_index = %s and result_id is null
+        where source_message_id = %s and action_index = %s and result_id is null
         """,
-        wa_message_id,
+        source_message_id,
         action_index,
     )
 
@@ -433,6 +441,8 @@ async def plan_status(workspace_id: UUID) -> dict[str, Any] | None:
 async def record_ai_event(
     *,
     user_id: UUID,
+    workspace_id: UUID,
+    channel: Literal["whatsapp", "app"],
     model: str,
     confidence: float | None,
     result: dict[str, Any],
@@ -444,10 +454,13 @@ async def record_ai_event(
         await execute(
             """
             insert into public.ai_events
-              (user_id, model, confidence, result, created_transaction_ids)
-            values (%s, %s, %s, %s, %s)
+              (user_id, workspace_id, channel, model, confidence, result,
+               created_transaction_ids)
+            values (%s, %s, %s, %s, %s, %s, %s)
             """,
             user_id,
+            workspace_id,
+            channel,
             model,
             confidence,
             Jsonb(result),
@@ -467,8 +480,9 @@ async def record_ai_event(
 
 async def save_draft(
     *,
+    session_id: UUID,
     thread_id: str,
-    phone: str,
+    phone: str | None,
     user_id: UUID,
     workspace_id: UUID,
     action: dict,
@@ -488,9 +502,9 @@ async def save_draft(
     linha = await fetch_one(
         """
         insert into public.draft_actions
-          (thread_id, phone, user_id, workspace_id, action, raw_text, missing, slot)
-        values (%s, %s, %s, %s, %s, %s, %s, %s)
-        on conflict (phone) do update
+          (session_id, thread_id, phone, user_id, workspace_id, action, raw_text, missing, slot)
+        values (%s, %s, %s, %s, %s, %s, %s, %s, %s)
+        on conflict (session_id) do update
           set action = excluded.action,
               raw_text = excluded.raw_text,
               missing = excluded.missing,
@@ -499,26 +513,28 @@ async def save_draft(
               created_at = now()
         returning id
         """,
-        thread_id, phone, user_id, workspace_id, Jsonb(action), raw_text, missing, slot,
+        session_id, thread_id, phone, user_id, workspace_id,
+        Jsonb(action), raw_text, missing, slot,
     )
     return str(linha["id"])
 
 
-async def open_draft(phone: str) -> dict[str, Any] | None:
-    """Busca por TELEFONE, não por thread: o thread efetivo carrega o epoch, que
+async def open_draft(session_id: UUID) -> dict[str, Any] | None:
+    """Busca pela SESSÃO, não por thread: o thread efetivo carrega o epoch, que
     gira em 6h de silêncio — e o rascunho vive 24h. Buscar por thread perderia
-    de vista o rascunho da própria pessoa depois de uma noite."""
+    de vista o rascunho da própria pessoa depois de uma noite. Era por telefone
+    até a 0055; a sessão é a mesma chave estável e existe também no app."""
     return await fetch_one(
         """
         select * from public.draft_actions
-        where phone = %s and expires_at > now()
+        where session_id = %s and expires_at > now()
         """,
-        phone,
+        session_id,
     )
 
 
-async def delete_draft(phone: str) -> None:
-    await execute("delete from public.draft_actions where phone = %s", phone)
+async def delete_draft(session_id: UUID) -> None:
+    await execute("delete from public.draft_actions where session_id = %s", session_id)
 
 
 async def expire_drafts() -> None:
@@ -573,3 +589,432 @@ async def accounts(workspace_id, *, only_cards: bool = False) -> list[dict[str, 
         workspace_id,
         only_cards,
     )
+
+
+# ---------------------------------------------------------------------------
+# conversas do app (aba Agente)
+# ---------------------------------------------------------------------------
+# Tudo aqui roda em UMA transação com `select ... for update` na sessão. O
+# WhatsApp serializa a conversa pelo claim da fila; aqui não há fila, e dois
+# turnos simultâneos correriam em cima do mesmo checkpoint.
+#
+# ⚠️ `user_id` NUNCA vem do corpo HTTP — ele sai do `sub` do JWT e entra em toda
+# cláusula `where`. O serviço conecta com papel que ignora RLS: o filtro é a
+# única proteção que existe. Foi assim que a `import-statement` antiga deixou
+# qualquer autenticado importar para o workspace de outro.
+
+
+# O mesmo predicado em toda lookup de conversa do app, num lugar só. Escrever
+# seis vezes à mão é como uma delas perde o `channel` ou o membership e vira o
+# buraco que ninguém procura.
+#
+# `workspace_members` entra porque o `workspace_id` foi resolvido no dia em que a
+# conversa nasceu: quem é tirado do workspace depois continuaria conversando —
+# e ESCREVENDO — num espaço que já não é dele. O serviço ignora RLS, então esta
+# linha é a única coisa entre ele e o dado alheio.
+_VISIVEL = """
+      and s.channel = 'app'
+      and s.deleting_at is null
+      and exists (
+        select 1 from public.workspace_members wm
+        where wm.workspace_id = s.workspace_id and wm.user_id = s.user_id
+      )
+"""
+
+
+async def chat_profile(user_id: UUID) -> dict[str, Any] | None:
+    """Workspace padrão e fuso do dono da conversa, direto do banco."""
+    return await fetch_one(
+        """
+        select p.id, p.timezone, public._default_workspace(p.id) as workspace_id
+        from public.profiles p
+        where p.id = %s
+        """,
+        user_id,
+    )
+
+
+async def create_chat_session(
+    *,
+    user_id: UUID,
+    workspace_id: UUID,
+    title: str,
+    first_client_message_id: UUID,
+    thread_id: str,
+    timezone_: str,
+) -> tuple[dict[str, Any], bool]:
+    """A sessão, e se ela nasceu agora.
+
+    `on conflict (user_id, first_client_message_id)` é o que faz um retry do app
+    devolver a MESMA conversa em vez de abrir uma segunda com a mesma mensagem
+    dentro. O `do update` sem efeito existe só para o `returning` trazer a linha
+    quando ela já existia.
+    """
+    async with pool().connection() as conn:
+        cur = await conn.execute(
+            """
+            insert into public.user_sessions
+              (thread_id, channel, user_id, workspace_id, title,
+               first_client_message_id, timezone, last_message_at)
+            values (%s, 'app', %s, %s, %s, %s, %s, now())
+            on conflict (user_id, first_client_message_id)
+              do update set last_message_at = public.user_sessions.last_message_at
+            returning *, (xmax = 0) as criada
+            """,
+            (thread_id, user_id, workspace_id, title, first_client_message_id, timezone_),
+        )
+        linha = (await cur.fetchall())[0]
+    criada = bool(linha.pop("criada"))
+    return linha, criada
+
+
+async def chat_session(session_id: UUID, user_id: UUID) -> dict[str, Any] | None:
+    return await fetch_one(
+        f"""
+        select s.* from public.user_sessions s
+        where s.id = %s and s.user_id = %s {_VISIVEL}
+        """,
+        session_id,
+        user_id,
+    )
+
+
+async def chat_sessions(
+    user_id: UUID, *, cursor: tuple[Any, UUID] | None = None, limit: int = 20
+) -> list[dict[str, Any]]:
+    """Página da lista de conversas, mais recente primeiro.
+
+    Ordena por `(last_message_at, id)` e não só pela data: duas conversas criadas
+    no mesmo instante embaralhariam entre páginas e uma delas sumiria da lista.
+    """
+    if cursor:
+        return await fetch(
+            f"""
+            select s.*,
+       -- O trecho da última mensagem, qualquer que seja o papel: é o que a
+       -- pessoa vê no fim da conversa e o que faz ela reconhecer qual é qual.
+       -- `completed` só: turno em processamento ou falho não tem o que mostrar.
+       (
+         select m.content from public.app_chat_messages m
+         where m.session_id = s.id and m.status = 'completed'
+         order by m.sequence desc limit 1
+       ) as preview
+            from public.user_sessions s
+            where s.user_id = %s {_VISIVEL}
+              and (s.last_message_at, s.id) < (%s, %s)
+            order by s.last_message_at desc, s.id desc
+            limit %s
+            """,
+            user_id, cursor[0], cursor[1], limit,
+        )
+    return await fetch(
+        f"""
+        select s.*,
+       -- O trecho da última mensagem, qualquer que seja o papel: é o que a
+       -- pessoa vê no fim da conversa e o que faz ela reconhecer qual é qual.
+       -- `completed` só: turno em processamento ou falho não tem o que mostrar.
+       (
+         select m.content from public.app_chat_messages m
+         where m.session_id = s.id and m.status = 'completed'
+         order by m.sequence desc limit 1
+       ) as preview
+        from public.user_sessions s
+        where s.user_id = %s {_VISIVEL}
+        order by s.last_message_at desc, s.id desc
+        limit %s
+        """,
+        user_id, limit,
+    )
+
+
+async def rename_chat_session(
+    session_id: UUID, user_id: UUID, title: str
+) -> dict[str, Any] | None:
+    return await fetch_one(
+        f"""
+        update public.user_sessions as s set title = %s
+        where s.id = %s and s.user_id = %s {_VISIVEL}
+        returning s.*
+        """,
+        title, session_id, user_id,
+    )
+
+
+async def chat_messages(
+    session_id: UUID, user_id: UUID, *, before: int | None = None, limit: int = 40
+) -> list[dict[str, Any]]:
+    """Página do histórico, em ordem CRONOLÓGICA.
+
+    A paginação anda para trás (`sequence < before`) porque é assim que se lê um
+    chat, mas a lista volta na ordem em que foi escrita — inverter na rota seria
+    a mesma regra escrita em dois lugares.
+    """
+    linhas = await fetch(
+        f"""
+        select m.* from public.app_chat_messages m
+        join public.user_sessions s on s.id = m.session_id
+        where m.session_id = %s and s.user_id = %s {_VISIVEL}
+          and (%s::bigint is null or m.sequence < %s)
+        order by m.sequence desc
+        limit %s
+        """,
+        session_id, user_id, before, before, limit,
+    )
+    return list(reversed(linhas))
+
+
+async def chat_prompt_history(session_id: UUID, limit: int = 40) -> list[dict[str, Any]]:
+    """Só o que COMPLETOU, e só desta conversa.
+
+    Turno em `processing` ou `failed` não tem resposta: levá-lo ao prompt
+    ensinaria o modelo a responder a uma pergunta que ninguém respondeu.
+    """
+    linhas = await fetch(
+        """
+        select role, content from public.app_chat_messages
+        where session_id = %s and status = 'completed'
+        order by sequence desc
+        limit %s
+        """,
+        session_id, limit,
+    )
+    return [{"role": l["role"], "content": l["content"]} for l in reversed(linhas)]
+
+
+async def claim_chat_turn(
+    *, session_id: UUID, user_id: UUID, client_message_id: UUID, content: str
+) -> dict[str, Any]:
+    """Reserva o turno e devolve o que fazer com ele.
+
+    Uma transação, um `for update` na sessão. `kind` sai como:
+      - `completed`  : este UUID já rodou; devolve o que ficou gravado
+      - `processing` : este UUID está rodando agora (lease vivo)
+      - `run`        : reservado, pode executar
+    e `busy`/`missing` para os dois jeitos de não poder.
+    """
+    settings = get_settings()
+    async with pool().connection() as conn:
+        async with conn.transaction():
+            # O lease é comparado DENTRO do banco. Trazer `lease_expires_at` e
+            # comparar em Python misturaria dois relógios: a janela passaria a
+            # variar com o drift entre container e Postgres, e o erro apareceria
+            # como conversa presa, sem nada no log.
+            cur = await conn.execute(
+                f"""
+                select s.*,
+                       (s.lease_expires_at is not null and s.lease_expires_at > now())
+                         as lease_vivo
+                from public.user_sessions s
+                where s.id = %s and s.user_id = %s {_VISIVEL}
+                for update
+                """,
+                (session_id, user_id),
+            )
+            linhas = await cur.fetchall()
+            if not linhas:
+                return {"kind": "missing"}
+            sessao = linhas[0]
+            vivo = bool(sessao.pop("lease_vivo"))
+
+            cur = await conn.execute(
+                """
+                select * from public.app_chat_messages
+                where session_id = %s and client_message_id = %s
+                """,
+                (session_id, client_message_id),
+            )
+            anteriores = await cur.fetchall()
+            anterior = anteriores[0] if anteriores else None
+
+            # Outro turno com a conversa: recusa. O MESMO turno reentrando não é
+            # concorrência, é retry — e retry é o caso normal em rede de celular.
+            if vivo and (anterior is None or sessao["lease_message_id"] != anterior["id"]):
+                return {"kind": "busy"}
+
+            if anterior and anterior["status"] == "completed":
+                cur = await conn.execute(
+                    """
+                    select * from public.app_chat_messages
+                    where session_id = %s and in_reply_to = %s
+                    """,
+                    (session_id, anterior["id"]),
+                )
+                respostas = await cur.fetchall()
+                return {
+                    "kind": "completed",
+                    "session": sessao,
+                    "user_message": anterior,
+                    "assistant_message": respostas[0] if respostas else None,
+                }
+
+            if anterior and anterior["status"] == "processing" and vivo:
+                return {"kind": "processing", "session": sessao, "user_message": anterior}
+
+            if anterior:
+                cur = await conn.execute(
+                    """
+                    update public.app_chat_messages
+                    set status = 'processing', error_code = null
+                    where id = %s
+                    returning *
+                    """,
+                    (anterior["id"],),
+                )
+            else:
+                cur = await conn.execute(
+                    """
+                    insert into public.app_chat_messages
+                      (session_id, client_message_id, role, content, status)
+                    values (%s, %s, 'user', %s, 'processing')
+                    returning *
+                    """,
+                    (session_id, client_message_id, content),
+                )
+            mensagem = (await cur.fetchall())[0]
+
+            cur = await conn.execute(
+                """
+                update public.user_sessions
+                set lease_message_id = %s,
+                    lease_expires_at = now() + make_interval(secs => %s)
+                where id = %s
+                returning *
+                """,
+                (mensagem["id"], settings.app_turn_lease_seconds, session_id),
+            )
+            sessao = (await cur.fetchall())[0]
+            return {
+                "kind": "run",
+                "session": sessao,
+                "user_message": mensagem,
+                "retry": bool(anterior),
+            }
+
+
+async def finish_chat_turn(
+    *,
+    session_id: UUID,
+    user_message_id: UUID,
+    content: str,
+    ui_payload: dict | None,
+) -> dict[str, Any]:
+    """Grava a resposta, fecha o turno do usuário e SÓ ENTÃO solta o lease.
+
+    Nessa ordem porque soltar antes abriria a janela em que outro turno entra e
+    grava a resposta dele em cima de uma conversa que ainda não terminou.
+    """
+    async with pool().connection() as conn:
+        async with conn.transaction():
+            cur = await conn.execute(
+                """
+                insert into public.app_chat_messages
+                  (session_id, role, content, ui_payload, in_reply_to, status, completed_at)
+                values (%s, 'assistant', %s, %s, %s, 'completed', now())
+                returning *
+                """,
+                (session_id, content, Jsonb(ui_payload) if ui_payload else None,
+                 user_message_id),
+            )
+            resposta = (await cur.fetchall())[0]
+            await conn.execute(
+                """
+                update public.app_chat_messages
+                set status = 'completed', error_code = null, completed_at = now()
+                where id = %s
+                """,
+                (user_message_id,),
+            )
+            await conn.execute(
+                """
+                update public.user_sessions
+                set last_message_at = now(), lease_message_id = null,
+                    lease_expires_at = null
+                where id = %s
+                """,
+                (session_id,),
+            )
+    return resposta
+
+
+async def fail_chat_turn(
+    *, session_id: UUID, user_message_id: UUID, error_code: str
+) -> None:
+    """Marca a falha e solta o lease.
+
+    `error_code` é um código curto da nossa lista, nunca a exceção: a mensagem do
+    Postgres carrega SQL e às vezes a URL do banco, e ela apareceria na tela.
+    """
+    async with pool().connection() as conn:
+        async with conn.transaction():
+            await conn.execute(
+                """
+                update public.app_chat_messages
+                set status = 'failed', error_code = %s
+                where id = %s
+                """,
+                (error_code, user_message_id),
+            )
+            await conn.execute(
+                """
+                update public.user_sessions
+                set lease_message_id = null, lease_expires_at = null
+                where id = %s
+                """,
+                (session_id,),
+            )
+
+
+async def resolve_chat_ui_payload(
+    *, session_id: UUID, pending_id: UUID, resolution: str
+) -> None:
+    """Carimba a resolução no balão que trouxe os botões.
+
+    Sem isso a tela não distingue uma pergunta já respondida de uma viva, e um
+    toque numa bolha antiga tentaria resolver de novo — o servidor recusaria,
+    mas o usuário veria um erro por ter tocado no que a tela mostrava.
+    """
+    await execute(
+        """
+        update public.app_chat_messages
+        set ui_payload = ui_payload || jsonb_build_object('resolved', %s::text)
+        where session_id = %s and ui_payload->>'pending_id' = %s
+        """,
+        resolution, session_id, str(pending_id),
+    )
+
+
+async def mark_chat_deleting(session_id: UUID, user_id: UUID) -> dict[str, Any] | None:
+    """Esconde a conversa da lista e recusa se houver turno rodando.
+
+    Dois passos (esconder, depois apagar) porque entre eles há uma chamada ao
+    checkpointer que pode falhar: com `deleting_at`, a conversa já sumiu da tela
+    do usuário e uma retentativa da exclusão continua encontrando a linha.
+    """
+    async with pool().connection() as conn:
+        async with conn.transaction():
+            cur = await conn.execute(
+                f"""
+                select s.id,
+                       (s.lease_expires_at is not null and s.lease_expires_at > now())
+                         as lease_vivo
+                from public.user_sessions s
+                where s.id = %s and s.user_id = %s {_VISIVEL}
+                for update
+                """,
+                (session_id, user_id),
+            )
+            linhas = await cur.fetchall()
+            if not linhas:
+                return None
+            if linhas[0]["lease_vivo"]:
+                return {"busy": True}
+            cur = await conn.execute(
+                "update public.user_sessions set deleting_at = now() where id = %s returning *",
+                (session_id,),
+            )
+            return (await cur.fetchall())[0]
+
+
+async def drop_chat_session(session_id: UUID) -> None:
+    """Mensagens, pendências e rascunhos saem por cascade da FK."""
+    await execute("delete from public.user_sessions where id = %s", session_id)

@@ -19,12 +19,15 @@ class ExecContext:
 
     user_id: UUID
     workspace_id: UUID
-    phone: str
+    # None no app: aquela conversa não tem número. Segue existindo no WhatsApp,
+    # onde algumas tools ainda falam com a Meta.
+    phone: str | None
     timezone: str
     # texto cru do lote — rede de segurança quando a IA omite o valor
     texto: str
-    # idempotência: (wa_message_id, action_index) impede que reprocessar duplique
-    wa_message_id: str
+    # idempotência: (source_message_id, action_index) impede que reprocessar
+    # duplique. É o id da Meta no WhatsApp e `app:<uuid do cliente>` no app.
+    source_message_id: str
     action_index: int = 0
     # alvo RESOLVIDO na Fase Cognitiva, congelado no checkpoint. As tools leem
     # daqui em vez de fazer o próprio SELECT — é o que garante que o registro

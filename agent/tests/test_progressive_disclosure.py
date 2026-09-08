@@ -22,7 +22,7 @@ def _ctx(texto: str = "todos os lançamentos no cartão") -> ExecContext:
         phone="5551999999999",
         timezone="America/Sao_Paulo",
         texto=texto,
-        wa_message_id="w1",
+        source_message_id="w1",
     )
 
 

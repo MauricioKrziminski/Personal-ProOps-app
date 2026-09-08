@@ -1,8 +1,10 @@
-import { StyleSheet, Switch, View } from 'react-native';
+import { useState } from 'react';
+import { Platform, ScrollView, StyleSheet, View, useWindowDimensions } from 'react-native';
 import { router } from 'expo-router';
 import * as Haptics from 'expo-haptics';
 
 import { ThemedText } from '@/components/themed-text';
+import { AlertPreferencesSection } from '@/components/profile/alert-preferences-section';
 import { AppHeader } from '@/components/ui/app-header';
 import { EmptyState } from '@/components/ui/empty-state';
 import { Icon } from '@/components/ui/icon';
@@ -13,47 +15,56 @@ import { SkeletonRow } from '@/components/ui/skeleton';
 import { useToast } from '@/components/ui/toast';
 import { GradientSurface } from '@/components/ui/gradient';
 import { Button } from '@/components/ui/button';
+import { Field, TextField } from '@/components/ui/field';
+import { Sheet } from '@/components/ui/sheet';
 import { Radius, Space, tabular } from '@/design/tokens';
 import { currentMonth } from '@/components/finance/month-picker';
+import { environmentLabel } from '@/lib/environment';
 import { useAiMonthStats, usePlanStatus } from '@/hooks/use-finance';
-import {
-  pushBlockerMessage,
-  useAlertsEnabled,
-  useRegisterPush,
-  usePushStatus,
-  useSetAlertsEnabled,
-  useUnregisterPush,
-} from '@/hooks/use-push';
+import { useAppUpdate } from '@/hooks/use-app-update';
 import { formatDateBR } from '@/hooks/use-items';
+import { useProfile, useUpdateProfile } from '@/hooks/use-profile';
 import { useSession } from '@/hooks/use-session';
 import { useTheme, useThemeMode } from '@/hooks/use-theme';
 import { confirmDestructive } from '@/lib/item-actions';
-import { supabase } from '@/lib/supabase';
+import { appUpdateAction, appUpdateSubtitle, type AppUpdateState } from '@/lib/app-update';
+import { supabase, supabaseUrl } from '@/lib/supabase';
+
+const APP_UPDATE_ICON: Partial<
+  Record<AppUpdateState['status'], Parameters<typeof Icon>[0]['name']>
+> = {
+  error: 'exclamationmark.circle',
+  upToDate: 'checkmark.circle',
+};
 
 /**
  * Perfil — tela de manutenção. O sucesso dela é a pessoa achar o que veio buscar e sair.
- *
- * A seção de Notificações **sobe para o topo enquanto o push está desligado**: é a ação com maior
- * consequência econômica do produto (sem token, todo lembrete vira template pago do WhatsApp).
  */
 export default function ProfileScreen() {
   const theme = useTheme();
+  const ambiente = environmentLabel(supabaseUrl);
   const { mode, setMode } = useThemeMode();
   const { session } = useSession();
   const toast = useToast();
   const userId = session?.user?.id;
 
-  const push = usePushStatus(userId);
-  const register = useRegisterPush(userId);
-  const unregister = useUnregisterPush(userId);
-  const alerts = useAlertsEnabled(userId);
-  const setAlerts = useSetAlertsEnabled(userId);
   const plan = usePlanStatus();
   const ia = useAiMonthStats(currentMonth());
+  const profile = useProfile(userId);
+  const saveName = useUpdateProfile(userId);
 
-  const phone = session?.user?.phone ? `+${session.user.phone}` : '—';
-  const pushOn = push.data?.registered ?? false;
-  const blocker = pushBlockerMessage(push.data?.blocker ?? 'unknown');
+  /** `null` = sheet fechado. String vazia é um estado válido (apagar o nome). */
+  const [nameDraft, setNameDraft] = useState<string | null>(null);
+  const [notificationRefreshKey, setNotificationRefreshKey] = useState(0);
+  const nome = profile.data?.display_name?.trim() || null;
+
+  /**
+   * O telefone verificado — e a única coisa que autoriza dizer "conectado ao WhatsApp".
+   *
+   * Ele mora na SESSÃO, não em `profiles`: só entra ali por Phone OTP, que é verificado por
+   * construção. Conta criada por e-mail não tem nenhum, e o cartão precisa dizer isso.
+   */
+  const phone = session?.user?.phone ? `+${session.user.phone}` : null;
 
   const confirmSignOut = () => {
     const doIt = async () => {
@@ -87,96 +98,16 @@ export default function ProfileScreen() {
     </Section>
   );
 
-  const alertsOn = alerts.data ?? true;
-
-  /**
-   * Duas chaves, e elas NÃO são a mesma coisa — a tela precisa deixar isso explícito.
-   *
-   * - **"Avisos do ProOps"** decide SE o app te interrompe (orçamento estourando, fatura
-   *   vencendo, projeção no vermelho). É o interruptor que não existia: até a `0049` não havia
-   *   coluna de preferência nenhuma e `_alerts_to_send` varria todo mundo.
-   * - **"Avisos no celular"** decide POR ONDE. Com push, é notificação e é grátis; sem push, o
-   *   cron cai no template do WhatsApp, que é PAGO.
-   *
-   * Por isso o push deixou de ser porta de mão única (era `disabled={pushOn}`) e por isso o
-   * subtítulo dele muda conforme a outra chave: com os alertas desligados, o canal não decide
-   * mais nada, e prometer "vai por WhatsApp" seria mentira.
-   */
-  const notifications = (
-    <Section title="Notificações">
-      <Row
-        title="Avisos do ProOps"
-        subtitle={
-          alertsOn
-            ? 'Orçamento estourando, fatura vencendo, saldo no vermelho'
-            : 'Desligado — o app não te procura'
-        }
-        icon="bell"
-        chevron={false}
-        trailing={
-          <Switch
-            value={alertsOn}
-            disabled={setAlerts.isPending || alerts.isLoading}
-            accessibilityLabel="Receber avisos do ProOps"
-            onValueChange={(v) =>
-              setAlerts.mutate(v, {
-                onSuccess: () =>
-                  toast({
-                    message: v ? 'Avisos ligados.' : 'Não te procuro mais.',
-                    tone: 'success',
-                  }),
-                onError: () => toast({ message: 'Não deu para salvar.', tone: 'error' }),
-              })
-            }
-          />
-        }
-      />
-      <Row
-        title="Avisos no celular"
-        subtitle={
-          push.isError
-            ? 'Não deu para verificar'
-            : !alertsOn
-              ? 'Só vale quando os avisos estão ligados'
-              : (blocker ?? (pushOn ? 'Chegam como notificação' : 'Vão por WhatsApp, que é pago'))
-        }
-        icon="bell.badge"
-        chevron={false}
-        trailing={
-          <Switch
-            value={pushOn}
-            disabled={register.isPending || unregister.isPending || (!pushOn && !!blocker)}
-            accessibilityLabel="Receber avisos como notificação no celular"
-            onValueChange={(v) =>
-              v
-                ? register.mutate(undefined, {
-                    onSuccess: () => toast({ message: 'Avisos ligados.', tone: 'success' }),
-                    onError: (e) =>
-                      toast({ message: e instanceof Error ? e.message : 'Falhou.', tone: 'error' }),
-                  })
-                : unregister.mutate(undefined, {
-                    onSuccess: () =>
-                      toast({ message: 'Agora os avisos vão pelo WhatsApp.', tone: 'info' }),
-                    onError: () => toast({ message: 'Não deu para desligar.', tone: 'error' }),
-                  })
-            }
-          />
-        }
-      />
-      <Row
-        title="Histórico de alertas"
-        icon="clock.arrow.circlepath"
-        onPress={() => router.push('/profile/alerts')}
-      />
-    </Section>
-  );
-
   return (
     <Screen
       grouped
       topBar={<AppHeader title="Perfil" />}
-      onRefresh={() => { push.refetch(); plan.refetch(); }}
-      refreshing={push.isRefetching}>
+      onRefresh={() => {
+        setNotificationRefreshKey((current) => current + 1);
+        profile.refetch();
+        plan.refetch();
+      }}
+      refreshing={profile.isRefetching || plan.isRefetching}>
       {/*
         Cartão de identidade — o topo da tela no desenho do Stitch.
 
@@ -184,9 +115,10 @@ export default function ProfileScreen() {
         perfil de uma lista de configurações. Fundo em gradiente com brilho, como o painel de
         destaque: é o único bloco de destaque desta tela (§1, um por tela).
 
-        O nome não existe no schema — `profiles` guarda só o telefone —, então o card mostra o
-        número, que é a chave de tudo no produto. O selo verde no avatar diz o que o número
-        significa aqui: está vinculado ao WhatsApp.
+        O nome vem de `profiles.display_name` (migration 0050) e o telefone desce para baixo dele,
+        em mono, porque é DADO (§3). Sem nome preenchido — o caso de quem entrou por Phone OTP —
+        o número volta a ser a linha principal: o card nunca fica com um vazio no lugar do nome.
+        O selo verde no avatar diz o que o número significa aqui: está vinculado ao WhatsApp.
       */}
       <View style={[styles.idCard, { borderColor: theme.cardBorder, backgroundColor: theme.heroBottom }]}>
         <GradientSurface from={theme.heroTop} to={theme.heroBottom} sheen={`${theme.tint}1F`} />
@@ -196,19 +128,49 @@ export default function ProfileScreen() {
             <View style={[styles.idAvatar, { backgroundColor: theme.heroChip }]}>
               <Icon name="person.crop.circle" size="xl" color="onHero" />
             </View>
-            <View style={[styles.idSelo, { backgroundColor: theme.tint, borderColor: theme.heroBottom }]}>
-              <Icon name="checkmark" size="xs" color="onTint" />
-            </View>
+            {/*
+              O selo é uma AFIRMAÇÃO: "este número está ligado ao WhatsApp". Ele era verde
+              incondicional, então uma conta de e-mail — que não tem telefone nenhum — exibia
+              selo de verificado e "conectado ao WhatsApp" com o número em "—". Cor semântica
+              mentindo é pior que ausência de cor (§2): sem telefone, sem selo.
+            */}
+            {phone ? (
+              <View style={[styles.idSelo, { backgroundColor: theme.tint, borderColor: theme.heroBottom }]}>
+                <Icon name="checkmark" size="xs" color="onTint" />
+              </View>
+            ) : null}
           </View>
 
           <View style={styles.idInfo}>
-            <ThemedText type="ticker" themeColor="onHero" selectable>
-              {phone}
-            </ThemedText>
+            {nome ? (
+              <>
+                <ThemedText type="headline" themeColor="onHero" numberOfLines={1}>
+                  {nome}
+                </ThemedText>
+                {phone ? (
+                  <ThemedText type="code" themeColor="onHeroMuted" style={tabular} selectable>
+                    {phone}
+                  </ThemedText>
+                ) : null}
+              </>
+            ) : (
+              <ThemedText type="ticker" themeColor="onHero" selectable>
+                {phone ?? 'Sua conta'}
+              </ThemedText>
+            )}
+            {/*
+              A linha de estado do WhatsApp. Sem telefone ela não vira um erro em vermelho: não
+              ter WhatsApp ligado é um estado NORMAL de quem entrou por e-mail, e pintar de
+              `danger` transformaria uma escolha em problema. Cinza, dizendo o que falta.
+            */}
             <View style={styles.idMeta}>
-              <Icon name="bubble.left" size="xs" color="onHeroSuccess" />
+              <Icon
+                name={phone ? 'bubble.left' : 'exclamationmark.bubble'}
+                size="xs"
+                color={phone ? 'onHeroSuccess' : 'onHeroMuted'}
+              />
               <ThemedText type="caption" themeColor="onHeroMuted">
-                conectado ao WhatsApp
+                {phone ? 'conectado ao WhatsApp' : 'WhatsApp não conectado'}
               </ThemedText>
             </View>
           </View>
@@ -230,7 +192,17 @@ export default function ProfileScreen() {
           mensagens de IA do mês, que é medido de verdade e ainda é o número que decide se o
           plano vai estourar.
         */}
-        <View style={styles.idStats}>
+        {/*
+          A fileira QUEBRA quando a fonte do sistema cresce, e a conta é font-aware de propósito.
+          Três chips de largura igual dividem ~312dp numa tela de 384dp: sobram ~74dp de texto por
+          chip, e "lançamentos" a 1,3× precisa de ~80. O Android então quebra no MEIO da palavra
+          ("lançame / ntos"), que lê como texto corrompido. Uma base fixa em dp não resolve — ela
+          não sabe o tamanho da fonte —, e apertar o teto de escala até caber equivaleria a
+          desligar o Dynamic Type nesta linha. Com a base multiplicada por `fontScale`, a fileira
+          fica 3-em-linha na fonte normal e passa a 2+1 quando a pessoa aumenta a letra, onde cada
+          chip fica largo o bastante para a palavra inteira.
+        */}
+        <View style={[styles.idStats, { flexWrap: 'wrap' }]}>
           <Stat
             valor={ia.data ? String(ia.data.lancamentos) : '—'}
             rotulo="lançamentos por mensagem"
@@ -238,7 +210,11 @@ export default function ProfileScreen() {
           <Stat valor={ia.data ? String(ia.data.notas) : '—'} rotulo="notas capturadas" />
           <Stat
             valor={plan.data ? String(plan.data.ai_messages_month) : '—'}
-            rotulo="mensagens de IA no mês"
+            rotulo={
+              plan.data
+                ? `${plan.data.ai_messages_whatsapp} WhatsApp\n${plan.data.ai_messages_app} no app`
+                : 'mensagens de IA no mês'
+            }
             limite={plan.data ? plan.data.max_ai_messages_month : null}
           />
         </View>
@@ -310,7 +286,35 @@ export default function ProfileScreen() {
         obriga a pessoa a procurá-lo, e a promoção rendia pouco: aqui ele já é a segunda seção de
         cinco. O alerta de push desligado é a LINHA, não a posição dela.
       */}
-      {notifications}
+      <AlertPreferencesSection
+        key={notificationRefreshKey}
+        userId={userId}
+        hasVerifiedPhone={!!phone}
+      />
+
+      {/*
+        Conta — hoje só o nome. Ele é o que a saudação da Hoje lê, e a única coisa desta tela que
+        o usuário ESCREVE; por isso a linha diz o valor atual em vez de repetir "Nome".
+      */}
+      <Section title="Conta">
+        <Row
+          title={phone ? 'Trocar número do WhatsApp' : 'Conectar o WhatsApp'}
+          subtitle={
+            phone
+              ? phone
+              : 'Libera o agente e os avisos neste canal depois da confirmação'
+          }
+          subtitleLines={2}
+          icon="bubble.left"
+          onPress={() => router.push('/link-phone')}
+        />
+        <Row
+          title="Nome"
+          subtitle={nome ?? 'Ninguém te chama pelo nome ainda'}
+          icon="person"
+          onPress={() => setNameDraft(nome ?? '')}
+        />
+      </Section>
 
       <Section title="Dados">
         <Row title="Lixeira de notas" icon="trash" onPress={() => router.push('/notes/trash')} />
@@ -321,6 +325,8 @@ export default function ProfileScreen() {
 
       {aparencia}
 
+      <AppUpdateSection />
+
       <Section>
         <Row title="Sair da conta" icon="rectangle.portrait.and.arrow.right" destructive chevron={false} onPress={confirmSignOut} />
       </Section>
@@ -329,12 +335,90 @@ export default function ProfileScreen() {
         <EmptyState icon="person.crop.circle.badge.questionmark" title="Sem sessão" hint="Entre para ver seu perfil." />
       ) : null}
 
+      {/*
+        Um campo só, no mesmo desenho de sheet que Contas, Metas e Orçamentos já usam — nada de
+        rota modal nova para uma linha de texto.
+      */}
+      <Sheet visible={nameDraft !== null} onClose={() => setNameDraft(null)}>
+        <View style={styles.sheetHead}>
+          <Button label="Cancelar" variant="ghost" size="sm" onPress={() => setNameDraft(null)} />
+          <ThemedText type="smallBold">Seu nome</ThemedText>
+          <Button
+            label="Salvar"
+            size="sm"
+            loading={saveName.isPending}
+            onPress={() =>
+              saveName.mutate(
+                { display_name: (nameDraft ?? '').trim() || null },
+                {
+                  onSuccess: () => {
+                    setNameDraft(null);
+                    toast({ message: 'Nome salvo.', tone: 'success' });
+                  },
+                  onError: () => toast({ message: 'Não deu para salvar.', tone: 'error' }),
+                }
+              )
+            }
+          />
+        </View>
+        <ScrollView contentContainerStyle={styles.sheetBody} keyboardShouldPersistTaps="handled">
+          <Field label="Nome" hint="É como o app vai te cumprimentar na Hoje.">
+            <TextField
+              value={nameDraft ?? ''}
+              onChangeText={(v) => setNameDraft(v.slice(0, 60))}
+              placeholder="Gabriel"
+              autoFocus
+              autoCapitalize="words"
+              returnKeyType="done"
+            />
+          </Field>
+        </ScrollView>
+      </Sheet>
+
       <View style={styles.footer}>
         <ThemedText type="small" themeColor="textSecondary">
           Personal ProOps app
         </ThemedText>
+        {/*
+          Em qual banco este build escreve. Some em produção de propósito — ver
+          `environmentLabel`. Com três apps instalados no mesmo aparelho, o nome do ícone não
+          basta: um build "dev" aponta para o `.env` da máquina, que pode ser qualquer um.
+        */}
+        {ambiente ? (
+          <View style={[styles.ambiente, { backgroundColor: theme.warningSoft }]}>
+            <ThemedText type="meta" themeColor="warning">
+              {ambiente.toUpperCase()}
+            </ThemedText>
+          </View>
+        ) : null}
       </View>
     </Screen>
+  );
+}
+
+/** Só esta linha renderiza de novo a cada percentual; o Perfil inteiro fica fora desse ciclo. */
+function AppUpdateSection() {
+  const appUpdate = useAppUpdate();
+  if (Platform.OS !== 'android') return null;
+
+  const action = appUpdateAction(appUpdate.state);
+  return (
+    <Section title="App">
+      <Row
+        title="Atualização do app"
+        subtitle={appUpdateSubtitle(appUpdate.state, appUpdate.installedVersionName)}
+        subtitleLines={3}
+        icon={APP_UPDATE_ICON[appUpdate.state.status] ?? 'arrow.down.circle'}
+        chevron={false}
+        onPress={
+          action
+            ? () => {
+                void appUpdate.runNextStep();
+              }
+            : undefined
+        }
+      />
+    </Section>
   );
 }
 
@@ -347,8 +431,17 @@ export default function ProfileScreen() {
  */
 function Stat({ valor, rotulo, limite }: { valor: string; rotulo: string; limite?: number | null }) {
   const theme = useTheme();
+  /**
+   * A base em dp precisa acompanhar a FONTE, senão a fileira nunca quebra quando deveria.
+   *
+   * 88 é o menor valor em que "lançamentos" ainda cabe inteiro na fonte normal (~63dp de texto
+   * em 64dp úteis). Ele decide só o ponto de quebra — quem dá a largura final é o `flexGrow`.
+   * Com 88, três chips pedem 280dp de fileira: continuam lado a lado até uma tela de 352dp
+   * (abaixo de qualquer Android atual) e passam a 2+1 quando a pessoa aumenta a letra.
+   */
+  const { fontScale } = useWindowDimensions();
   return (
-    <View style={[styles.stat, { backgroundColor: theme.heroChip }]}>
+    <View style={[styles.stat, { flexBasis: 88 * fontScale, backgroundColor: theme.heroChip }]}>
       <View style={styles.statValor}>
         <ThemedText type="subtitle" themeColor="onHero" style={tabular}>
           {valor}
@@ -416,7 +509,7 @@ const styles = StyleSheet.create({
   },
   idStats: { flexDirection: 'row', gap: Space.sm },
   stat: {
-    flex: 1,
+    flexGrow: 1,
     gap: Space.xs,
     padding: Space.md,
     borderRadius: Radius.sm,
@@ -437,8 +530,27 @@ const styles = StyleSheet.create({
     borderRadius: Radius.pill,
   },
   planoAcoes: { flexDirection: 'row', alignItems: 'center', gap: Space.sm },
+  sheetHead: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: Space.lg,
+    paddingVertical: Space.md,
+  },
+  sheetBody: {
+    gap: Space.xl,
+    padding: Space.lg,
+    paddingBottom: Space.xxxl,
+  },
   footer: {
     alignItems: 'center',
+    gap: Space.sm,
     paddingVertical: Space.xl,
+  },
+  ambiente: {
+    paddingHorizontal: Space.sm,
+    paddingVertical: Space.half,
+    borderRadius: Radius.xs,
+    borderCurve: 'continuous',
   },
 });

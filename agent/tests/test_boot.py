@@ -70,3 +70,42 @@ def test_segredo_compartilhado_serve_no_lugar_do_oidc(monkeypatch):
     _config(monkeypatch, OIDC_AUDIENCE="", INTERNAL_SECRET="a" * 64)
     _checa_producao()
     get_settings.cache_clear()
+
+
+def test_a_aba_agente_esta_no_ar(monkeypatch):
+    """As rotas do chat precisam estar montadas no app de verdade.
+
+    O router existir e nunca ser incluído em `main.py` é um erro invisível: todo
+    teste de rota monta o próprio FastAPI mínimo e passa igual, enquanto o app
+    publicado devolve 404 em tudo.
+    """
+    from app.main import app
+
+    # Pelo OpenAPI, não por `app.routes`: esta versão do FastAPI guarda os
+    # routers incluídos em `_IncludedRouter`, que não expõe `.path` — varrer a
+    # lista crua devolve vazio e o teste "passaria" ao contrário.
+    caminhos = app.openapi()["paths"]
+    assert "/internal/chat/conversations" in caminhos
+    assert "/internal/chat/conversations/{session_id}/messages" in caminhos
+    assert "/internal/chat/conversations/{session_id}/actions/{pending_id}" in caminhos
+    assert {"get", "post"} <= set(caminhos["/internal/chat/conversations"])
+    assert {"patch", "delete"} <= set(
+        caminhos["/internal/chat/conversations/{session_id}"]
+    )
+
+
+def test_cors_nunca_e_curinga(monkeypatch):
+    """`*` com credencial no header é a porta aberta para qualquer página. A
+    lista é enumerada, e vazia significa NENHUMA — não todas."""
+    from app.config import get_settings
+
+    monkeypatch.setenv("APP_CORS_ORIGINS", "http://localhost:8081, http://localhost:19006")
+    get_settings.cache_clear()
+    origens = get_settings().cors_origins
+    assert origens == ["http://localhost:8081", "http://localhost:19006"]
+    assert "*" not in origens
+
+    monkeypatch.setenv("APP_CORS_ORIGINS", "")
+    get_settings.cache_clear()
+    assert get_settings().cors_origins == []
+    get_settings.cache_clear()

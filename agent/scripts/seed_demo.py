@@ -7,7 +7,7 @@ e revisar o design sem eles é revisar meia tela.
 Idempotente por NOME: cada objeto é procurado antes de ser criado, então rodar duas vezes não
 duplica. Nada é apagado.
 
-    .venv/bin/python scripts/seed_demo.py --phone 5535998744200 --env .env.staging
+    .venv/bin/python scripts/seed_demo.py --phone 5535998744200
 
 ⚠️ O script RECUSA rodar se o `DATABASE_URL` não for o de staging, a menos que `--i-know` seja
 passado. Escrever demonstração em produção é o tipo de erro que não tem desfazer.
@@ -38,7 +38,8 @@ def carrega_env(caminho: str) -> dict[str, str]:
 def main() -> None:
     p = argparse.ArgumentParser()
     p.add_argument("--phone", required=True, help="telefone com DDI, como está em profiles.phone")
-    p.add_argument("--env", default=".env.staging")
+    # `.env` É o staging (ver agent/.env.example). Default seguro por construção.
+    p.add_argument("--env", default=".env")
     p.add_argument("--i-know", action="store_true", help="permite rodar fora do staging")
     args = p.parse_args()
 

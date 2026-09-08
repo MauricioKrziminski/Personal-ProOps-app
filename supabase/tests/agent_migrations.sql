@@ -66,8 +66,10 @@ begin
 
   -- (e) MESMO silêncio, mas com confirmação pendente -> NÃO gira.
   -- Girar deixaria o interrupt() do LangGraph órfão e o "sim" cairia no vazio.
-  insert into public.pending_actions (thread_id, phone, user_id, workspace_id, action, summary)
-  values ('hash_B:1', '5551000000001', gen_random_uuid(), gen_random_uuid(), '{}'::jsonb, 'apagar algo');
+  insert into public.pending_actions
+    (session_id, thread_id, phone, user_id, workspace_id, action, summary)
+  select s.id, 'hash_B:1', s.phone, gen_random_uuid(), gen_random_uuid(), '{}'::jsonb, 'apagar algo'
+  from public.user_sessions s where s.phone = '5551000000001';
   update public.user_sessions set last_message_at = now() - interval '10 hours'
     where phone = '5551000000001';
   perform public.__upsert_sessao_teste('hash_B', '5551000000001');
@@ -83,8 +85,10 @@ end $$;
 do $$
 begin
   begin
-    insert into public.pending_actions (thread_id, phone, user_id, workspace_id, action, summary)
-    values ('hash_B:1', '5551000000001', gen_random_uuid(), gen_random_uuid(), '{}'::jsonb, 'segunda');
+    insert into public.pending_actions
+      (session_id, thread_id, phone, user_id, workspace_id, action, summary)
+    select s.id, 'hash_B:1', s.phone, gen_random_uuid(), gen_random_uuid(), '{}'::jsonb, 'segunda'
+    from public.user_sessions s where s.phone = '5551000000001';
     assert false, 'deixou abrir DUAS confirmações na mesma conversa';
   exception when unique_violation then
     null; -- esperado
@@ -152,13 +156,13 @@ end $$;
 do $$
 declare n int;
 begin
-  insert into public.executed_actions (wa_message_id, action_index, action_type)
+  insert into public.executed_actions (source_message_id, action_index, action_type)
   values ('t.1', 0, 'create_expense');
 
   with tentativa as (
-    insert into public.executed_actions (wa_message_id, action_index, action_type)
+    insert into public.executed_actions (source_message_id, action_index, action_type)
     values ('t.1', 0, 'create_expense')
-    on conflict (wa_message_id, action_index) do nothing
+    on conflict (source_message_id, action_index) do nothing
     returning 1
   ) select count(*) into n from tentativa;
   assert n = 0, 'reserva repetida passou — reprocessar duplicaria lançamento';
@@ -207,10 +211,11 @@ begin
 end $$;
 
 -- ---------------------------------------------------------------------------
--- 8. rascunho: um por TELEFONE, e expiração funciona
+-- 8. rascunho: um por CONVERSA, e expiração funciona
 -- ---------------------------------------------------------------------------
--- O índice nasceu em `thread_id` na 0043 e foi corrigido na 0044: o thread
--- carrega o epoch, que gira em 6h, e o rascunho vive 24h.
+-- O índice nasceu em `thread_id` na 0043, foi para `phone` na 0044 (o thread
+-- carrega o epoch, que gira em 6h, e o rascunho vive 24h) e virou `session_id`
+-- na 0055, quando o app passou a ter conversa sem telefone.
 do $$
 declare
   n int;
@@ -221,9 +226,9 @@ begin
 
   if not exists (
     select 1 from pg_indexes
-    where schemaname = 'public' and indexname = 'draft_actions_one_per_phone'
+    where schemaname = 'public' and indexname = 'draft_actions_one_per_session'
   ) then
-    raise exception 'draft_actions precisa do unique por phone (ver 0044)';
+    raise exception 'draft_actions precisa do unique por session_id (ver 0055)';
   end if;
 
   if exists (

@@ -135,6 +135,7 @@ export type Database = {
       }
       ai_events: {
         Row: {
+          channel: string
           confidence: number | null
           created_at: string
           created_transaction_ids: string[] | null
@@ -146,8 +147,10 @@ export type Database = {
           output_tokens: number | null
           result: Json | null
           user_id: string | null
+          workspace_id: string | null
         }
         Insert: {
+          channel: string
           confidence?: number | null
           created_at?: string
           created_transaction_ids?: string[] | null
@@ -159,8 +162,10 @@ export type Database = {
           output_tokens?: number | null
           result?: Json | null
           user_id?: string | null
+          workspace_id?: string | null
         }
         Update: {
+          channel?: string
           confidence?: number | null
           created_at?: string
           created_transaction_ids?: string[] | null
@@ -172,6 +177,7 @@ export type Database = {
           output_tokens?: number | null
           result?: Json | null
           user_id?: string | null
+          workspace_id?: string | null
         }
         Relationships: [
           {
@@ -188,11 +194,18 @@ export type Database = {
             referencedRelation: "profiles"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "ai_events_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
         ]
       }
       alerts_sent: {
         Row: {
-          channel: string | null
+          channel: string
           created_at: string
           id: string
           kind: string
@@ -202,7 +215,7 @@ export type Database = {
           workspace_id: string
         }
         Insert: {
-          channel?: string | null
+          channel: string
           created_at?: string
           id?: string
           kind: string
@@ -212,7 +225,7 @@ export type Database = {
           workspace_id: string
         }
         Update: {
-          channel?: string | null
+          channel?: string
           created_at?: string
           id?: string
           kind?: string
@@ -235,6 +248,66 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "workspaces"
             referencedColumns: ["id"]
+          },
+        ]
+      }
+      app_chat_messages: {
+        Row: {
+          client_message_id: string | null
+          completed_at: string | null
+          content: string
+          created_at: string
+          error_code: string | null
+          id: string
+          in_reply_to: string | null
+          role: string
+          sequence: number
+          session_id: string
+          status: string
+          ui_payload: Json | null
+        }
+        Insert: {
+          client_message_id?: string | null
+          completed_at?: string | null
+          content: string
+          created_at?: string
+          error_code?: string | null
+          id?: string
+          in_reply_to?: string | null
+          role: string
+          sequence?: never
+          session_id: string
+          status: string
+          ui_payload?: Json | null
+        }
+        Update: {
+          client_message_id?: string | null
+          completed_at?: string | null
+          content?: string
+          created_at?: string
+          error_code?: string | null
+          id?: string
+          in_reply_to?: string | null
+          role?: string
+          sequence?: never
+          session_id?: string
+          status?: string
+          ui_payload?: Json | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "app_chat_messages_session_id_fkey"
+            columns: ["session_id"]
+            isOneToOne: false
+            referencedRelation: "user_sessions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "app_chat_messages_session_id_in_reply_to_fkey"
+            columns: ["session_id", "in_reply_to"]
+            isOneToOne: false
+            referencedRelation: "app_chat_messages"
+            referencedColumns: ["session_id", "id"]
           },
         ]
       }
@@ -659,8 +732,9 @@ export type Database = {
           expires_at: string
           id: string
           missing: string
-          phone: string
+          phone: string | null
           raw_text: string
+          session_id: string
           slot: string
           thread_id: string
           user_id: string
@@ -672,8 +746,9 @@ export type Database = {
           expires_at?: string
           id?: string
           missing: string
-          phone: string
+          phone?: string | null
           raw_text: string
+          session_id: string
           slot?: string
           thread_id: string
           user_id: string
@@ -685,8 +760,9 @@ export type Database = {
           expires_at?: string
           id?: string
           missing?: string
-          phone?: string
+          phone?: string | null
           raw_text?: string
+          session_id?: string
           slot?: string
           thread_id?: string
           user_id?: string
@@ -694,11 +770,11 @@ export type Database = {
         }
         Relationships: [
           {
-            foreignKeyName: "draft_actions_phone_fkey"
-            columns: ["phone"]
+            foreignKeyName: "draft_actions_session_id_fkey"
+            columns: ["session_id"]
             isOneToOne: false
             referencedRelation: "user_sessions"
-            referencedColumns: ["phone"]
+            referencedColumns: ["id"]
           },
         ]
       }
@@ -708,21 +784,21 @@ export type Database = {
           action_type: string
           executed_at: string
           result_id: string | null
-          wa_message_id: string
+          source_message_id: string
         }
         Insert: {
           action_index: number
           action_type: string
           executed_at?: string
           result_id?: string | null
-          wa_message_id: string
+          source_message_id: string
         }
         Update: {
           action_index?: number
           action_type?: string
           executed_at?: string
           result_id?: string | null
-          wa_message_id?: string
+          source_message_id?: string
         }
         Relationships: []
       }
@@ -1364,8 +1440,9 @@ export type Database = {
           created_at: string
           expires_at: string
           id: string
-          phone: string
+          phone: string | null
           resolved_at: string | null
+          session_id: string
           status: string
           summary: string
           thread_id: string
@@ -1377,8 +1454,9 @@ export type Database = {
           created_at?: string
           expires_at?: string
           id?: string
-          phone: string
+          phone?: string | null
           resolved_at?: string | null
+          session_id: string
           status?: string
           summary: string
           thread_id: string
@@ -1390,8 +1468,9 @@ export type Database = {
           created_at?: string
           expires_at?: string
           id?: string
-          phone?: string
+          phone?: string | null
           resolved_at?: string | null
+          session_id?: string
           status?: string
           summary?: string
           thread_id?: string
@@ -1400,44 +1479,53 @@ export type Database = {
         }
         Relationships: [
           {
-            foreignKeyName: "pending_actions_phone_fkey"
-            columns: ["phone"]
+            foreignKeyName: "pending_actions_session_id_fkey"
+            columns: ["session_id"]
             isOneToOne: false
             referencedRelation: "user_sessions"
-            referencedColumns: ["phone"]
+            referencedColumns: ["id"]
           },
         ]
       }
       profiles: {
         Row: {
           alerts_enabled: boolean
+          alerts_push_enabled: boolean
+          alerts_whatsapp_enabled: boolean
           created_at: string
+          display_name: string | null
           expo_push_token: string | null
           id: string
           locale: string
-          phone: string
+          phone: string | null
           timezone: string
           updated_at: string
           whatsapp_verified: boolean
         }
         Insert: {
           alerts_enabled?: boolean
+          alerts_push_enabled?: boolean
+          alerts_whatsapp_enabled?: boolean
           created_at?: string
+          display_name?: string | null
           expo_push_token?: string | null
           id: string
           locale?: string
-          phone: string
+          phone?: string | null
           timezone?: string
           updated_at?: string
           whatsapp_verified?: boolean
         }
         Update: {
           alerts_enabled?: boolean
+          alerts_push_enabled?: boolean
+          alerts_whatsapp_enabled?: boolean
           created_at?: string
+          display_name?: string | null
           expo_push_token?: string | null
           id?: string
           locale?: string
-          phone?: string
+          phone?: string | null
           timezone?: string
           updated_at?: string
           whatsapp_verified?: boolean
@@ -1794,35 +1882,56 @@ export type Database = {
       }
       user_sessions: {
         Row: {
+          channel: string
           created_at: string
           debounce_task_name: string | null
+          deleting_at: string | null
+          first_client_message_id: string | null
+          id: string
           last_message_at: string | null
-          phone: string
+          lease_expires_at: string | null
+          lease_message_id: string | null
+          phone: string | null
           session_epoch: number
           thread_id: string
           timezone: string
+          title: string | null
           user_id: string | null
           workspace_id: string | null
         }
         Insert: {
+          channel?: string
           created_at?: string
           debounce_task_name?: string | null
+          deleting_at?: string | null
+          first_client_message_id?: string | null
+          id?: string
           last_message_at?: string | null
-          phone: string
+          lease_expires_at?: string | null
+          lease_message_id?: string | null
+          phone?: string | null
           session_epoch?: number
           thread_id: string
           timezone?: string
+          title?: string | null
           user_id?: string | null
           workspace_id?: string | null
         }
         Update: {
+          channel?: string
           created_at?: string
           debounce_task_name?: string | null
+          deleting_at?: string | null
+          first_client_message_id?: string | null
+          id?: string
           last_message_at?: string | null
-          phone?: string
+          lease_expires_at?: string | null
+          lease_message_id?: string | null
+          phone?: string | null
           session_epoch?: number
           thread_id?: string
           timezone?: string
+          title?: string | null
           user_id?: string | null
           workspace_id?: string | null
         }
@@ -1988,6 +2097,8 @@ export type Database = {
       _alerts_to_send: {
         Args: never
         Returns: {
+          alerts_push_enabled: boolean
+          alerts_whatsapp_enabled: boolean
           body: string
           expo_push_token: string
           kind: string
@@ -2089,7 +2200,9 @@ export type Database = {
       _plan_status: {
         Args: { ws_id: string }
         Returns: {
+          ai_messages_app: number
           ai_messages_month: number
+          ai_messages_whatsapp: number
           can_import: boolean
           current_period_end: string
           is_trial: boolean
@@ -2394,7 +2507,9 @@ export type Database = {
       plan_status: {
         Args: never
         Returns: {
+          ai_messages_app: number
           ai_messages_month: number
+          ai_messages_whatsapp: number
           can_import: boolean
           current_period_end: string
           is_trial: boolean

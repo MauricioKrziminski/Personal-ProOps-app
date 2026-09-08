@@ -1,6 +1,14 @@
-# Dev local. Aponta para o Postgres do Supabase (o mesmo banco) — não sobe um
-# Postgres próprio de propósito: testar contra um schema diferente do de produção
-# é como a gente descobre bug só depois do deploy.
+# Dev local. Aponta para o Postgres do Supabase de STAGING (via `.env`, que é o
+# staging desde 04/09/2026) — não sobe um Postgres próprio de propósito: testar
+# contra um schema diferente do que vai para produção é como a gente descobre
+# bug só depois do deploy.
+#
+# ⚠️ `env_file: .env` não escolhe ambiente nenhum, ele pega o padrão. É por isso
+# que o padrão TEM que ser o staging: enquanto `.env` era produção, este
+# `docker compose up` — o mesmo que o workflow.md manda rodar antes de commitar —
+# ligava o agente local no banco real sem dizer nada. Para apontar em outro
+# lugar, `env_file` explícito ou variável na mão, nunca trocando o conteúdo do
+# `.env`.
 services:
   api:
     build: .

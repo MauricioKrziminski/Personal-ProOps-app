@@ -42,7 +42,7 @@ def _ctx(tabela: str, alvo_id: str = "plano-1") -> ExecContext:
         phone="5551999999999",
         timezone="America/Sao_Paulo",
         texto="",
-        wa_message_id="w1",
+        source_message_id="w1",
         target={"table": tabela, "status": "found",
                 "candidates": [{"id": alvo_id, "label": "TV — tudo (10x)", "table": tabela}]},
     )
@@ -206,7 +206,7 @@ class TestAlvoDefensivo:
             phone="5551999999999",
             timezone="America/Sao_Paulo",
             texto="",
-            wa_message_id="w1",
+            source_message_id="w1",
             target={"table": "installment_plans", "status": "none", "candidates": []},
         )
         r_del = await finance.delete_transaction(

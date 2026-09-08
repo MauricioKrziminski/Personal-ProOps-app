@@ -11,11 +11,12 @@ import logging
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
 
 from app import db
 from app.config import DEV_SALT, get_settings
 from app.graph import build as graph_build
-from app.routes import cron, hooks, inbound, internal, worker
+from app.routes import chat, cron, hooks, inbound, internal, worker
 from app.services import whatsapp
 
 logging.basicConfig(
@@ -77,6 +78,21 @@ app.include_router(worker.router)
 app.include_router(cron.router)
 app.include_router(hooks.router)
 app.include_router(internal.router)
+app.include_router(chat.router)
+chat.install_error_handlers(app)
+
+# CORS só para as origens ENUMERADAS. Nunca `*`: a requisição carrega o JWT no
+# header, e `*` com credencial é a porta aberta para qualquer página do mundo.
+# O app nativo não manda `Origin` — isto existe para o Expo web e o dev server.
+_origens = get_settings().cors_origins
+if _origens:
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=_origens,
+        allow_credentials=True,
+        allow_methods=["GET", "POST", "PATCH", "DELETE", "OPTIONS"],
+        allow_headers=["authorization", "content-type"],
+    )
 
 
 @app.get("/health")

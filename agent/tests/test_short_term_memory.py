@@ -5,32 +5,50 @@ from uuid import UUID
 import pytest
 
 from app.graph.prompts import user_turn
-from app.graph.state import _history_reducer, _preserve_or_replace
+from app.graph.state import AgentState, _preserve_or_replace
 from app.graph.schemas import FinanceQuery, FinanceQueryType
 from app.tools.base import ExecContext, ToolResult
 
 
-def test_history_reducer_limita_em_6_mensagens():
-    """Garante que o buffer de histórico mantém no máximo as últimas 6 mensagens (3 turnos)."""
-    mensagens_anteriores = [
-        {"role": "user", "content": f"msg {i}"}
-        for i in range(1, 6)
-    ]
-    novas = [
-        {"role": "assistant", "content": "resp 5"},
-        {"role": "user", "content": "msg 6"},
-        {"role": "assistant", "content": "resp 6"},
-    ]
-    resultado = _history_reducer(mensagens_anteriores, novas)
-    assert len(resultado) == 6
-    assert resultado[-1]["content"] == "resp 6"
-    assert resultado[0]["content"] == "msg 3"
+def test_messages_substitui_em_vez_de_acumular():
+    """A janela deixou de morar num reducer cego.
+
+    Ela cortava em 6 mensagens fixas DENTRO do grafo — uma segunda regra de
+    janela, escondida do canal que sabe qual janela vale (o app usa 10 pares, o
+    WhatsApp 5). Hoje quem corta é `conversation.trim_prompt_history`, na borda,
+    e o estado só carrega o vetor pronto.
+    """
+    import typing
+
+    from app.graph import state as state_mod
+
+    hints = typing.get_type_hints(
+        AgentState, include_extras=True, globalns=vars(state_mod)
+    )
+    reducer = typing.get_args(hints["messages"])[1]
+    assert reducer is state_mod._replace
+    assert not hasattr(state_mod, "_history_reducer"), (
+        "o reducer cego voltou — ele reintroduz uma janela invisível ao canal"
+    )
 
 
-def test_history_reducer_nao_duplica_mensagem_identica():
-    antigo = [{"role": "user", "content": "olá"}]
-    resultado = _history_reducer(antigo, [{"role": "user", "content": "olá"}])
-    assert len(resultado) == 1
+def test_compose_devolve_o_historico_inteiro_com_a_resposta():
+    """Com substituição, devolver só a resposta apagaria a conversa."""
+    import asyncio
+
+    from app.graph.nodes import compose
+
+    anteriores = [
+        {"role": "user", "content": "quanto gastei?"},
+        {"role": "assistant", "content": "R$ 1.234,00"},
+        {"role": "user", "content": "e no mercado?"},
+    ]
+    saida = asyncio.run(
+        compose({"messages": list(anteriores), "results": ["R$ 300,00"]})
+    )
+
+    assert saida["messages"][:3] == anteriores
+    assert saida["messages"][-1] == {"role": "assistant", "content": "R$ 300,00"}
 
 
 def test_preserve_or_replace_mantem_cache_se_novo_vazio():

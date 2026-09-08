@@ -3,16 +3,18 @@ import * as Haptics from 'expo-haptics';
 import { Pressable, StyleSheet, View, useWindowDimensions } from 'react-native';
 import { Canvas, Circle, Group, Path, Skia } from '@shopify/react-native-skia';
 import Animated, {
+  interpolateColor,
   useAnimatedStyle,
   useDerivedValue,
   useSharedValue,
   withSpring,
+  type SharedValue,
 } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { ThemedText } from '@/components/themed-text';
 import { Icon } from '@/components/ui/icon';
-import { Elevation, Motion, Radius, Space } from '@/design/tokens';
+import { Elevation, Motion, Radius, Space, Type } from '@/design/tokens';
 import { useScheme, useTheme } from '@/hooks/use-theme';
 import type { SymbolViewProps } from 'expo-symbols';
 
@@ -74,6 +76,109 @@ function pillPath(w: number, h: number) {
   const b = Skia.PathBuilder.Make();
   b.addRRect(Skia.RRectXY(Skia.XYWHRect(0, 0, w, h), r, r));
   return b.build();
+}
+
+/**
+ * Distância, em slots, entre a aba `i` e onde a bolha está AGORA.
+ *
+ * É o elo que faltava. `activeIndex` vem da rota e só muda quando o expo-router termina de montar
+ * a tela de destino; `progresso` corre na UI thread desde o toque. Tudo que lia `activeIndex` para
+ * DESENHAR ficava, por isso, um pedaço da animação atrasado: a bolha chegava no Financeiro ainda
+ * carregando o ícone de Notas, com o rótulo "Notas" ainda verde e um buraco no slot de origem.
+ *
+ * Fazendo o conteúdo derivar da mesma posição que move a bolha, ele não tem como dessincronizar —
+ * é a regra que o berço e a bolha já seguiam, estendida ao que está DENTRO delas.
+ */
+function distancia(progresso: SharedValue<number>, i: number) {
+  'worklet';
+  return Math.min(1, Math.abs(progresso.get() - i));
+}
+
+/** O ícone dentro da bolha. Todos existem; quem decide qual aparece é a posição. */
+function IconeDaBolha({
+  tab,
+  index,
+  progresso,
+  badgeColor,
+}: {
+  tab: CurvedTab;
+  index: number;
+  progresso: SharedValue<number>;
+  badgeColor: string;
+}) {
+  const estilo = useAnimatedStyle(() => ({ opacity: 1 - distancia(progresso, index) }));
+  return (
+    <Animated.View pointerEvents="none" style={[StyleSheet.absoluteFill, styles.centro, estilo]}>
+      <Icon name={tab.icon} size="md" color="tint" />
+      {tab.badge ? (
+        <View style={[styles.badge, styles.badgeBolha, { backgroundColor: badgeColor }]}>
+          <ThemedText type="meta" themeColor="onTint">
+            {tab.badge > 9 ? '9+' : String(tab.badge)}
+          </ThemedText>
+        </View>
+      ) : null}
+    </Animated.View>
+  );
+}
+
+/** O ícone que fica NA BARRA. Desaparece conforme a bolha se aproxima de assumi-lo. */
+function IconeDoSlot({
+  tab,
+  index,
+  progresso,
+  badgeColor,
+}: {
+  tab: CurvedTab;
+  index: number;
+  progresso: SharedValue<number>;
+  badgeColor: string;
+}) {
+  const estilo = useAnimatedStyle(() => ({ opacity: distancia(progresso, index) }));
+  return (
+    <Animated.View style={[styles.iconeSlot, estilo]}>
+      <Icon name={tab.icon} size="md" color="textSecondary" />
+      {tab.badge ? (
+        <View style={[styles.badge, styles.badgeIcone, { backgroundColor: badgeColor }]}>
+          <ThemedText type="meta" themeColor="onTint">
+            {tab.badge > 9 ? '9+' : String(tab.badge)}
+          </ThemedText>
+        </View>
+      ) : null}
+    </Animated.View>
+  );
+}
+
+/**
+ * O rótulo da aba, com a cor seguindo a posição.
+ *
+ * `Animated.Text` em vez de `ThemedText` porque cor animada precisa de componente animado — e a
+ * escala continua vindo de `Type.caption`, então não há `fontSize` solto (§2).
+ */
+function Rotulo({
+  label,
+  index,
+  progresso,
+  ativo,
+  inativo,
+}: {
+  label: string;
+  index: number;
+  progresso: SharedValue<number>;
+  ativo: string;
+  inativo: string;
+}) {
+  const estilo = useAnimatedStyle(() => ({
+    color: interpolateColor(distancia(progresso, index), [0, 1], [ativo, inativo]),
+  }));
+  return (
+    // O único `maxFontSizeMultiplier` do app, e por um motivo estrutural: os cinco slots dividem
+    // a largura da barra em partes iguais e não há para onde quebrar. Com a fonte do sistema em
+    // 1,3× "Financeiro" virava "Financei…". Aqui o teto preserva a palavra; no CORPO das telas o
+    // texto continua escalando sem limite, como o §11 de design.md exige.
+    <Animated.Text numberOfLines={1} maxFontSizeMultiplier={1.15} style={[Type.caption, estilo]}>
+      {label}
+    </Animated.Text>
+  );
 }
 
 /**
@@ -156,7 +261,7 @@ export function CurvedTabBar({
   const animarPara = useCallback(
     (destino: number) => {
       'worklet';
-      progresso.set(withSpring(destino, Motion.spring.snap));
+      progresso.set(withSpring(destino, Motion.spring.tab));
     },
     [progresso]
   );
@@ -168,8 +273,29 @@ export function CurvedTabBar({
     animarPara(activeIndex);
   }, [activeIndex, animarPara]);
 
-  /** O centro do berço e da bolha — UMA posição para os dois, senão eles dessincronizam. */
-  const centro = useDerivedValue(() => slot * (progresso.get() + 0.5));
+  /**
+   * Quanto a mola pode passar do alvo, em SLOTS, sem a bolha sair da pílula.
+   *
+   * A ultrapassagem de uma mola é proporcional à DISTÂNCIA percorrida: trocar de aba vizinha
+   * passa um fio, mas ir da primeira à quinta passa quatro vezes mais — e na aba da ponta isso
+   * põe metade da bolha para fora da barra, pendurada no vazio. O limite não é um número
+   * escolhido a dedo: é exatamente a folga que existe entre o centro do slot e a borda da
+   * pílula, com uma margem de 1px.
+   */
+  const folga = Math.max(0, (slot / 2 - BUBBLE / 2 - 1) / slot);
+
+  /**
+   * O centro do berço e da bolha — UMA posição para os dois, senão eles dessincronizam.
+   *
+   * `progresso` é o valor cru da mola (e pode passar do alvo); `posicao` é o que se DESENHA,
+   * preso à faixa em que a bolha ainda cabe na pílula. O quique continua visível em toda troca —
+   * só não vaza para fora da barra nas duas pontas.
+   */
+  const posicao = useDerivedValue(() =>
+    Math.min(Math.max(progresso.get(), -folga), tabs.length - 1 + folga)
+  );
+
+  const centro = useDerivedValue(() => slot * (posicao.get() + 0.5));
 
   /**
    * O disco do berço como PATH, para servir de recorte invertido no traço da pílula.
@@ -202,7 +328,7 @@ export function CurvedTabBar({
    * comunica a continuidade espacial (§5) — a escala não acrescentava informação nenhuma.
    */
   const bolha = useAnimatedStyle(() => ({
-    transform: [{ translateX: slot * (progresso.get() + 0.5) - BUBBLE / 2 }],
+    transform: [{ translateX: slot * (posicao.get() + 0.5) - BUBBLE / 2 }],
   }));
 
   return (
@@ -245,19 +371,21 @@ export function CurvedTabBar({
             A bolha é da COR DA BARRA com o ícone no accent — é o desenho do export. Preenchê-la
             de `tint` com o ícone invertido punha o accent inteiro num controle que a pessoa toca
             100× por dia, e queimava a única alavanca de cor que o app tem em ornamento de chrome.
+
+            TODOS os ícones moram aqui, em cross-fade pela posição. Trocar o ícone por estado
+            (`tabs[activeIndex].icon`) era o que fazia a bolha viajar com o ícone errado: o estado
+            vem da rota e a posição vem do dedo. O badge da aba ativa viaja junto, dentro de cada
+            ícone — no slot ele cairia dentro do berço, em cima do nada.
           */}
-          <Icon name={tabs[activeIndex]?.icon ?? 'circle'} size="md" color="tint" />
-          {/*
-            O badge da aba ATIVA anda com a bolha.
-            Deixado no slot, ele caía dentro do berço — em cima do nada — e encostava no rótulo.
-          */}
-          {tabs[activeIndex]?.badge ? (
-            <View style={[styles.badge, styles.badgeBolha, { backgroundColor: theme.danger }]}>
-              <ThemedText type="meta" themeColor="onTint">
-                {tabs[activeIndex].badge > 9 ? '9+' : String(tabs[activeIndex].badge)}
-              </ThemedText>
-            </View>
-          ) : null}
+          {tabs.map((tab, i) => (
+            <IconeDaBolha
+              key={tab.name}
+              tab={tab}
+              index={i}
+              progresso={progresso}
+              badgeColor={theme.danger}
+            />
+          ))}
         </Animated.View>
 
         <View style={[styles.linha, { height: BAR_H, top: TOP }]}>
@@ -278,23 +406,24 @@ export function CurvedTabBar({
                   onSelect(i);
                 }}
                 style={[styles.slot, { width: slot }]}>
-                {/* A aba ativa não desenha ícone na barra: ele está na bolha, dentro do berço. */}
-                <View style={styles.iconeSlot}>
-                  {ativo ? null : <Icon name={tab.icon} size="md" color="textSecondary" />}
-                  {tab.badge && !ativo ? (
-                    <View style={[styles.badge, styles.badgeIcone, { backgroundColor: theme.danger }]}>
-                      <ThemedText type="meta" themeColor="onTint">
-                        {tab.badge > 9 ? '9+' : String(tab.badge)}
-                      </ThemedText>
-                    </View>
-                  ) : null}
-                </View>
-                <ThemedText
-                  type="caption"
-                  themeColor={ativo ? 'tint' : 'textSecondary'}
-                  numberOfLines={1}>
-                  {tab.label}
-                </ThemedText>
+                {/*
+                  A aba sob a bolha não desenha ícone no slot: ele está na bolha, dentro do berço.
+                  Some por OPACIDADE seguindo a posição, e não por `ativo ? null`, senão o buraco
+                  aparece na origem antes de a bolha sair e some no destino depois de ela chegar.
+                */}
+                <IconeDoSlot
+                  tab={tab}
+                  index={i}
+                  progresso={progresso}
+                  badgeColor={theme.danger}
+                />
+                <Rotulo
+                  label={tab.label}
+                  index={i}
+                  progresso={progresso}
+                  ativo={theme.tint}
+                  inativo={theme.textSecondary}
+                />
               </Pressable>
             );
           })}
@@ -330,13 +459,16 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
+  centro: { alignItems: 'center', justifyContent: 'center' },
   linha: { position: 'absolute', left: 0, right: 0, flexDirection: 'row', alignItems: 'flex-end' },
   slot: { alignItems: 'center', justifyContent: 'flex-end', gap: Space.xs, paddingBottom: Space.md },
   iconeSlot: { width: 24, height: 24, alignItems: 'center', justifyContent: 'center' },
   badge: {
     position: 'absolute',
     minWidth: 16,
-    height: 16,
+    // `minHeight`, não `height`: com fonte grande o dígito é mais alto que 16 e uma caixa de
+    // altura fixa o cortava pela metade.
+    minHeight: 16,
     borderRadius: Radius.pill,
     paddingHorizontal: Space.xs,
     alignItems: 'center',

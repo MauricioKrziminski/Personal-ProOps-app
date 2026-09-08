@@ -1,0 +1,179 @@
+import * as Haptics from 'expo-haptics';
+import { router } from 'expo-router';
+import { useRef, useState } from 'react';
+import { StyleSheet, TextInput, View } from 'react-native';
+import Animated, { FadeInLeft } from 'react-native-reanimated';
+
+import { AuthScreen } from '@/components/auth/auth-screen';
+import { ThemedText } from '@/components/themed-text';
+import { Button } from '@/components/ui/button';
+import { Field, TextField } from '@/components/ui/field';
+import { Motion, Space } from '@/design/tokens';
+import { authErrorMessage } from '@/lib/auth-errors';
+import { isSupabaseConfigured, supabase } from '@/lib/supabase';
+
+/**
+ * Entrar com e-mail e senha — a porta principal desde 03/09/2026.
+ *
+ * O Phone OTP continua existindo em `/login-whatsapp` para quem já tem conta por telefone; o
+ * link no rodapé leva até lá. Nada de migração forçada: os dois caminhos convivem.
+ *
+ * Dois campos e um botão. Validação mínima na tela (e-mail com "@", senha não vazia) — quem
+ * decide se a combinação existe é o servidor, e a resposta dele não distingue "e-mail errado"
+ * de "senha errada" de propósito (enumeração de conta).
+ */
+export function EmailLoginScreen() {
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const passwordRef = useRef<TextInput>(null);
+
+  const valid = email.includes('@') && password.length > 0;
+
+  const signIn = async () => {
+    if (!valid || busy) return;
+    setBusy(true);
+    setError(null);
+    const { error: err } = await supabase.auth.signInWithPassword({
+      email: email.trim(),
+      password,
+    });
+    setBusy(false);
+    if (err) {
+      setError(authErrorMessage(err));
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+    }
+    // Sucesso: `Stack.Protected` do layout raiz troca a tela.
+  };
+
+  // Atalho de desenvolvimento: entra como o usuário de teste (só em __DEV__).
+  const devLogin = async () => {
+    setBusy(true);
+    setError(null);
+    const { error: err } = await supabase.auth.signInWithPassword({
+      email: 'dev@proops.local',
+      password: 'devtest123',
+    });
+    setBusy(false);
+    if (err) setError(authErrorMessage(err));
+  };
+
+  return (
+    <AuthScreen
+      footer={
+        <>
+          <Button label="Entrar" onPress={signIn} loading={busy} disabled={!valid} size="lg" block />
+          <Button
+            label="Criar conta"
+            variant="ghost"
+            onPress={() => router.push('/signup')}
+            disabled={busy}
+            block
+          />
+          {__DEV__ && (
+            <Button label="Entrar como teste (dev)" variant="ghost" size="sm" onPress={devLogin} block />
+          )}
+        </>
+      }>
+      <Animated.View
+        entering={FadeInLeft.duration(Motion.duration.slow).easing(Motion.easing.out)}
+        style={styles.step}>
+        <View style={styles.copy}>
+          <ThemedText type="title">Entrar</ThemedText>
+          <ThemedText type="small" themeColor="textSecondary">
+            Suas notas, lembretes e gastos, organizados num lugar só.
+          </ThemedText>
+        </View>
+
+        <Field
+          label="E-mail"
+          hint={
+            isSupabaseConfigured
+              ? undefined
+              : 'Configure EXPO_PUBLIC_SUPABASE_URL e EXPO_PUBLIC_SUPABASE_ANON_KEY no .env.'
+          }>
+          <TextField
+            value={email}
+            onChangeText={(v) => {
+              setEmail(v);
+              if (error) setError(null);
+            }}
+            placeholder="voce@exemplo.com"
+            autoCapitalize="none"
+            autoComplete="email"
+            keyboardType="email-address"
+            textContentType="emailAddress"
+            returnKeyType="next"
+            onSubmitEditing={() => passwordRef.current?.focus()}
+            editable={!busy}
+            invalid={!!error}
+          />
+        </Field>
+
+        <Field label="Senha" error={error ?? undefined}>
+          <TextField
+            ref={passwordRef}
+            value={password}
+            onChangeText={(v) => {
+              setPassword(v);
+              if (error) setError(null);
+            }}
+            secureTextEntry
+            autoComplete="current-password"
+            textContentType="password"
+            returnKeyType="go"
+            onSubmitEditing={signIn}
+            editable={!busy}
+            invalid={!!error}
+          />
+        </Field>
+
+        <View style={styles.links}>
+          <Button
+            label="Entrar com o WhatsApp"
+            variant="ghost"
+            size="sm"
+            icon="bubble.left"
+            onPress={() => router.push('/login-whatsapp')}
+            disabled={busy}
+          />
+          <Button
+            label="Esqueci minha senha"
+            variant="ghost"
+            size="sm"
+            onPress={() => router.push('/forgot-password')}
+            disabled={busy}
+          />
+        </View>
+      </Animated.View>
+    </AuthScreen>
+  );
+}
+
+const styles = StyleSheet.create({
+  step: { gap: Space.xl },
+  copy: { gap: Space.sm },
+  /**
+   * Os dois secundários na MESMA linha, um em cada ponta (07/09/2026): WhatsApp à esquerda,
+   * "Esqueci minha senha" à direita, logo abaixo do campo de senha.
+   *
+   * As margens negativas cancelam o padding interno da pílula do `ghost` dos DOIS lados, para o
+   * rótulo da esquerda alinhar com a borda esquerda do campo e o da direita com a direita.
+   *
+   * `flexWrap` porque a linha é apertada: com a fonte do sistema grande os dois rótulos não
+   * cabem lado a lado, e quebrar é melhor que truncar "Esqueci minha se…". O `gap` NÃO é
+   * enfeite — empilhados eles ficavam encostados (medido no simulador iOS em 04/09/2026: um
+   * terminava em y=570 e o outro começava em y=570), e como o `sm` do `Button` chega aos 44pt
+   * por `hitSlop` de 4, as duas ÁREAS DE TOQUE se sobrepunham em 8pt. Tocar na beira levava
+   * para a tela errada.
+   */
+  links: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginHorizontal: -Space.md,
+    gap: Space.sm,
+  },
+});

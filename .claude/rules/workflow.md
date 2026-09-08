@@ -15,7 +15,7 @@
    nós que falam com o mundo viram dublê.
 5. Mudou tela → conferir no device/emulador — nada de "deve funcionar".
 
-   **As quatro raízes de aba se olham sem login**, pela rota `design-preview`: ela monta as telas
+   **As cinco raízes de aba se olham sem login**, pela rota `design-preview`: ela monta as telas
    REAIS com o cache do TanStack pré-semeado, então nenhum `queryFn` roda. Sem ela, ver a Hoje ou
    o Financeiro exigia o OTP que chega no WhatsApp do dono do número — e foi por isso que essas
    telas já foram entregues erradas duas vezes.
@@ -32,15 +32,27 @@
    silêncio.
 6. Mudou o agente → subir local (`docker compose up`) e mandar `scripts/fake_meta.py` com payload
    ASSINADO. Testar com o HMAC desligado esconderia justamente o erro mais caro daquele endpoint.
-7. Mudou schema → migration nova aplicada com `db push` + types regenerados. Mexeu em `0040`/`0041`
+
+   **`agent/.env` é o STAGING** (desde 04/09/2026); produção mora em `agent/.env.production`.
+   O padrão tem que ser o staging porque nada que lê `.env` escolhe ambiente — `docker compose
+   up`, o `env_file=".env"` do pydantic e um `source` no terminal pegam o que estiver lá. Enquanto
+   `.env` era produção, este passo 6 ligava o agente local no banco REAL sem avisar.
+7. Mudou schema → **`scripts/supabase-target.sh` para confirmar o alvo**, migration nova aplicada
+   no STAGING com `db push` + types regenerados. Produção (`kwriuifcwyvdrxtspjiz`) só com pedido
+   explícito do Gabriel. Mexeu em `0040`/`0041`
    ou nas tabelas do agente → rodar `supabase/tests/agent_migrations.sql` contra o Postgres local
    (as asserções cobrem upsert de sessão, claim do lote, HITL e idempotência).
 
 ## Deploy
 
-- Agente: `./scripts/setup-gcp.sh` (idempotente — projeto, APIs, service account, segredos, fila do
-  Cloud Tasks, deploy e crons). `deploy` sozinho para redeploy. Secrets no GCP Secret Manager;
-  `agent/.env.example` é a lista.
+- Agente: `./scripts/setup-gcp.sh staging` para o staging e `./scripts/setup-gcp.sh` (idempotente
+  — projeto, APIs, service account, segredos, fila do Cloud Tasks, deploy e crons) para produção.
+  `deploy` sozinho para redeploy. Secrets no GCP Secret Manager; `agent/.env.example` é a lista.
+
+  **Produção pede confirmação**: os subcomandos que escrevem (`tudo`, `deploy`, `secrets`, `sa`,
+  `build-iam`) param e exigem que você digite `PRODUCAO`, ou `PROOPS_PROD_OK=1` — a MESMA saída de
+  emergência do hook do Supabase, para não haver duas convenções. `staging` passa direto. Sem isso,
+  `./scripts/setup-gcp.sh` sem argumento nenhum fazia deploy em produção sem perguntar nada.
 - Edge Functions (legado): `npx supabase functions deploy <nome>`. Hoje só o `whatsapp-webhook`,
   que é o roteador do corte.
 - App: builds via EAS (`eas.json`: development/preview/production).

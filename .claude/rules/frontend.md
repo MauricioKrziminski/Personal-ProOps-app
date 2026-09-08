@@ -6,7 +6,13 @@ Expo SDK 57 (managed), código em `src/`, paths `@/*` → `src/*` e `@/assets/*`
 
 - Telas em `src/app/`. Abas dentro do grupo `(tabs)/` (tab bar = `AppTabs`/NativeTabs); telas de detalhe e forms fora do grupo, registradas no `<Stack>` do `_layout.tsx` raiz. Forms de criação/edição = `presentation: 'modal'`.
 - `typedRoutes` está ligado: navegar com `router.push('/rota')` tipado, nunca strings mágicas erradas.
-- Auth gate fica no `_layout.tsx` raiz (`useSession` → LoginScreen vs app). Não duplicar checagem de sessão em telas.
+- Auth gate fica no `_layout.tsx` raiz (`Stack.Protected` por `useSession`). Sem sessão existem
+  `login` (e-mail e senha), `signup`, `forgot-password` e `login-whatsapp` (Phone OTP); com sessão
+  nenhuma delas existe. Não duplicar checagem de sessão em telas.
+  ⚠️ **`verifyOtp` de recuperação já devolve SESSÃO** e o portão desmonta a tela no mesmo
+  instante: por isso `forgot-password` pede a senha nova ANTES do código, e `verifyOtp` +
+  `updateUser` rodam na mesma função assíncrona. Nada de `setState` depois desse `await`.
+  As três telas de conta compartilham a moldura `AuthScreen` (`src/components/auth/`).
 
 ## Dados (TanStack Query)
 

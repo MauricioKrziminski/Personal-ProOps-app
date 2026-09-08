@@ -68,9 +68,9 @@ done
 | URLs do staging | nova: `https://agente-staging-942030719023.southamerica-east1.run.app`<br>legada (é a de `WORKER_URL`/`OIDC_AUDIENCE`): `https://agente-staging-wwm7xruoyq-rj.a.run.app`<br>as duas respondem; a legada é a que `status.url` devolve |
 | Fila | `whatsapp-debounce-staging` |
 | Segredos | 12, com sufixo `-staging` no Secret Manager |
-| Config local | `agent/.env.staging` (não versionado) |
+| Config local | `agent/.env` (não versionado) — desde 04/09/2026 o arquivo PADRÃO é o staging; produção é `agent/.env.production` |
 
-⚠️ **A senha do banco de staging só existe dentro do `agent/.env.staging`**, no `DATABASE_URL`. Não há segunda cópia — se o arquivo sumir, é resetar a senha no dashboard do Supabase e regravar o segredo (`./scripts/setup-gcp.sh staging`).
+⚠️ **A senha do banco de staging só existe dentro do `agent/.env`**, no `DATABASE_URL`. Não há segunda cópia — se o arquivo sumir, é resetar a senha no dashboard do Supabase e regravar o segredo (`./scripts/setup-gcp.sh staging`).
 
 ## Por que só o banco precisa de staging
 
@@ -85,9 +85,10 @@ Três camadas, três níveis de risco:
   na WABA nova. Não compensa enquanto o único usuário é você — o roteamento
   canário isola melhor.
 
-Consequência: `agent/.env.staging` troca **cinco** linhas do `agent/.env`
-(`DATABASE_URL`, `SUPABASE_URL` e os três nomes do Cloud Run). Gemini, Groq,
-WhatsApp e Langfuse são os **mesmos de produção**, de propósito.
+Consequência: `agent/.env` (staging) troca **cinco** linhas do
+`agent/.env.production` (`DATABASE_URL`, `SUPABASE_URL` e os três nomes do Cloud
+Run). Gemini, Groq, WhatsApp e Langfuse são os **mesmos de produção**, de
+propósito.
 
 ## Montar o Supabase de staging
 
@@ -151,10 +152,10 @@ select jobname, schedule, command like '%kwriuifcwyvdrxtspjiz%' as aponta_produc
 from cron.job order by jobname;
 ```
 
-## O `.env.staging` e o serviço Cloud Run
+## O `.env` (staging) e o serviço Cloud Run
 
 ```bash
-cp agent/.env agent/.env.staging
+cp agent/.env.production agent/.env
 # trocar DATABASE_URL (session pooler do staging, porta 5432),
 # SUPABASE_URL, TASKS_QUEUE, WORKER_URL e OIDC_AUDIENCE.
 ```
@@ -279,7 +280,7 @@ Em produção o sweep do cron de lembretes recupera em até 1 minuto. No staging
 destrave na mão:
 
 ```bash
-SEC=$(grep '^INTERNAL_SECRET=' agent/.env.staging | cut -d= -f2- | sed 's/[[:space:]]*#.*$//' | xargs)
+SEC=$(grep '^INTERNAL_SECRET=' agent/.env | cut -d= -f2- | sed 's/[[:space:]]*#.*$//' | xargs)
 curl -X POST https://agente-staging-wwm7xruoyq-rj.a.run.app/worker/sweep -H "X-Internal-Secret: $SEC"
 ```
 
@@ -398,7 +399,7 @@ Ele resolve três coisas que o WhatsApp não faz bem:
 cd agent
 # o sed NÃO é opcional: a linha do .env tem comentário depois do valor, e
 # sem cortá-lo o HMAC sai errado e o webhook devolve 401 invalid signature
-export WHATSAPP_APP_SECRET=$(grep '^WHATSAPP_APP_SECRET=' .env.staging \
+export WHATSAPP_APP_SECRET=$(grep '^WHATSAPP_APP_SECRET=' .env \
   | cut -d= -f2- | sed 's/[[:space:]]*#.*$//' | xargs)
 export AGENT_URL=https://agente-staging-942030719023.southamerica-east1.run.app
 export TEST_PHONE=55DDD9XXXXXXXX      # SEU número, cadastrado no staging
@@ -425,7 +426,7 @@ NOVO=$(openssl rand -hex 32); echo "$NOVO"
 # 2. atualizar os DOIS arquivos locais
 #    agent/.env         → WHATSAPP_VERIFY_TOKEN=<novo>
 #    supabase/.env      → WHATSAPP_VERIFY_TOKEN=<novo>
-#    (e agent/.env.staging, se existir)
+#    (e agent/.env.production, se existir)
 
 # 3. Secret Manager (o script grava versão nova e destrói a anterior)
 ./scripts/setup-gcp.sh secrets
@@ -828,9 +829,12 @@ ganha a correção no próximo `./scripts/setup-gcp.sh deploy`.**
 
 **`deploy` e `staging` não são intercambiáveis.** `deploy` mexe em cron e lê os
 segredos sem sufixo; `staging` não mexe em cron e usa `SECRET_SUFFIX=-staging`.
-Rodar `deploy` com `ENV_FILE=agent/.env.staging` **não** faz o que parece: o
-`ENV_FILE` só é lido por `gravar_segredos`, que o `deploy` não chama — o serviço
-subiria com o `database-url` de produção.
+Trocar o `ENV_FILE` **não** troca o alvo: quem define `SERVICE` e
+`SECRET_SUFFIX` é o SUBCOMANDO, e o `ENV_FILE` só é lido por `gravar_segredos`.
+`ENV_FILE=agent/.env ./setup-gcp.sh deploy` subiria o serviço de PRODUÇÃO.
+Desde 04/09/2026 uma trava no fim do script barra isso: `tudo`, `deploy`,
+`secrets`, `sa` e `build-iam` pedem que você digite `PRODUCAO` (ou
+`PROOPS_PROD_OK=1`); `staging` e `preflight` passam direto.
 
 **Prompt caching não é alavanca.** Mínimo de 4.096 tokens; os prompts por domínio
 têm ~800. Não gaste tempo "otimizando" para isso.

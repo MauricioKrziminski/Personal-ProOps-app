@@ -12,10 +12,15 @@ const TABS: CurvedTab[] = [
   { name: 'today', label: 'Hoje', icon: 'sun.max' },
   { name: 'notes', label: 'Notas', icon: 'note.text' },
   { name: 'finance', label: 'Financeiro', icon: 'chart.pie' },
+  { name: 'agent', label: 'Agente', icon: 'bubble.left.and.bubble.right' },
   { name: 'profile', label: 'Perfil', icon: 'person' },
 ];
 
-const HREFS = ['/today', '/notes', '/finance', '/profile'] as const;
+/* Indexado pela POSIÇÃO do slot: uma entrada fora de ordem em relação a `TABS` manda a pessoa
+   para a tela errada enquanto o berço anima para o lugar certo. `agent-navigation.test.ts`
+   prende as duas listas juntas. A matemática do `CurvedTabBar` não muda — ela deriva o slot de
+   `tabs.length`, então cinco abas já funcionam. */
+const HREFS = ['/today', '/notes', '/finance', '/agent', '/profile'] as const;
 
 /**
  * A tab bar do **Android** — a pílula com berço deslizante (`CurvedTabBar`).

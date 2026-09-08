@@ -8,6 +8,7 @@ O formato é escolhido pelo NÚMERO de candidatos, e o limite é físico da Meta
 import httpx
 import pytest
 
+from app import conversation
 from app.services import whatsapp
 
 
@@ -116,7 +117,7 @@ async def test_menu_de_cartoes_sai_como_lista_de_verdade(cliente):
     from app import worker
 
     cartoes = [{"id": f"c{i}", "name": f"Cartão {i}"} for i in range(4)]
-    spec = worker._pergunta_cartao("d1", cartoes, "Qual cartão?")
+    spec = conversation._pergunta_cartao("d1", cartoes, "Qual cartão?")
     await whatsapp.try_send_interactive("5511", spec)
 
     inter = cliente.enviados[0]["interactive"]
@@ -137,7 +138,7 @@ async def test_menu_de_cartoes_cai_para_texto_com_os_nomes(cliente, monkeypatch)
     monkeypatch.setattr(whatsapp, "send_list", falha)
     cartoes = [{"id": f"c{i}", "name": f"Cartão {i}"} for i in range(4)]
     await whatsapp.try_send_interactive(
-        "5511", worker._pergunta_cartao("d1", cartoes, "Qual cartão?")
+        "5511", conversation._pergunta_cartao("d1", cartoes, "Qual cartão?")
     )
 
     corpo = cliente.enviados[0]["text"]["body"]

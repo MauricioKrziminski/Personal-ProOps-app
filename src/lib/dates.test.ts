@@ -7,6 +7,7 @@ import {
   brToISO,
   formatBRL,
   formatDateBR,
+  greetingBR,
   isValidBRDate,
   isValidTime,
   isoToBR,
@@ -110,4 +111,15 @@ test('relativeBR: os degraus que a lista de notas mostra', () => {
   assert.equal(relativeBR(atras(60 * 24 * 5), agora), 'há 5 dias');
   // Passou de 30 dias vira data cheia — e na MESMA grafia do resto do app.
   assert.equal(relativeBR('2026-01-09T12:00:00Z', agora), '09/01/2026');
+});
+
+test('greetingBR vira nas fronteiras da manhã, da tarde e da noite', () => {
+  assert.equal(greetingBR(5), 'Bom dia');
+  assert.equal(greetingBR(11), 'Bom dia');
+  assert.equal(greetingBR(12), 'Boa tarde');
+  assert.equal(greetingBR(17), 'Boa tarde');
+  assert.equal(greetingBR(18), 'Boa noite');
+  // Madrugada é "boa noite": quem abre o app às 3h ainda não dormiu.
+  assert.equal(greetingBR(3), 'Boa noite');
+  assert.equal(greetingBR(4), 'Boa noite');
 });

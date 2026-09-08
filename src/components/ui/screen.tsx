@@ -1,24 +1,39 @@
 import {
   Platform,
   RefreshControl,
-  ScrollView,
   StyleSheet,
   View,
   type StyleProp,
   type ViewStyle,
 } from 'react-native';
+import { KeyboardAwareScrollView } from 'react-native-keyboard-controller';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { MaxContentWidth } from '@/constants/theme';
 import { useAppHeaderHeight } from '@/components/ui/app-header';
 import { CURVED_BAR_SPACE } from '@/components/ui/curved-tab-bar';
+
 import { Space } from '@/design/tokens';
 import { useTheme } from '@/hooks/use-theme';
+
+/**
+ * Quanto um FAB come do fim do conteúdo: a altura do botão `md` (48) mais um respiro.
+ * Não é `CURVED_BAR_CLEARANCE` — aquele é onde o FAB COMEÇA; este é o que ele OCUPA.
+ */
+const FAB_CLEARANCE = 48 + 16;
 
 interface ScreenProps {
   children: React.ReactNode;
   /** `false` quando a tela é uma lista virtualizada que rola sozinha. */
   scroll?: boolean;
+  /**
+   * A tela tem um botão FLUTUANTE (FAB) por cima do conteúdo.
+   *
+   * Conteúdo pode passar por baixo da tab bar — o desfoque dela depende disso. Por baixo do FAB,
+   * não: ele é opaco e tem sombra, então o que passar embaixo fica ILEGÍVEL. Era o que acontecia
+   * no Financeiro vazio, com o "Lançar" cobrindo a última linha do estado vazio.
+   */
+  floatingAction?: boolean;
   /** Liga pull-to-refresh. */
   onRefresh?: () => void;
   refreshing?: boolean;
@@ -41,6 +56,14 @@ interface ScreenProps {
  * Substitui a pilha `ThemedView` + `SafeAreaView` + `ScrollView` que 21 telas repetem, cada uma
  * com um padding inferior diferente. O padding vem de `useSafeAreaInsets()`, não de constante
  * fixa, e o Android ainda soma a altura da `CurvedTabBar`, que é absoluta.
+ *
+ * ⚠️ **A rolagem é `KeyboardAwareScrollView`, não `ScrollView`.** Toda tela que tem campo no meio
+ * da página (Plano, Projeção, Membros, Pastas) tinha o mesmo defeito: o teclado abria por cima do
+ * campo e a pessoa digitava sem ver. Resolver tela a tela é como o defeito volta na próxima — aqui
+ * ele deixa de existir para as 21 de uma vez, e para as que vierem.
+ *
+ * O componente é um `ScrollView` por dentro, então `refreshControl`, `contentContainerStyle` e
+ * `contentInsetAdjustmentBehavior` continuam valendo. Sem campo em foco ele é inerte.
  */
 export function Screen({
   children,
@@ -49,6 +72,7 @@ export function Screen({
   refreshing = false,
   grouped = false,
   topBar,
+  floatingAction = false,
   contentStyle,
 }: ScreenProps) {
   const theme = useTheme();
@@ -62,11 +86,13 @@ export function Screen({
    * empurradas não têm barra e não devem ganhar o respiro.
    */
   const tabBarSpace = topBar && Platform.OS === 'android' ? CURVED_BAR_SPACE : 0;
+  /** A altura do FAB mais o respiro dele, para nenhum conteúdo terminar embaixo do botão. */
+  const fabSpace = floatingAction ? FAB_CLEARANCE : 0;
   const padding = [
     styles.content,
     {
       paddingTop: topBar ? headerHeight + Space.md : Space.md,
-      paddingBottom: insets.bottom + Space.xxl + tabBarSpace,
+      paddingBottom: insets.bottom + Space.xxl + tabBarSpace + fabSpace,
     },
     contentStyle,
   ];
@@ -84,9 +110,10 @@ export function Screen({
 
   return (
     <View style={[styles.root, { backgroundColor: background }]}>
-      <ScrollView
+      <KeyboardAwareScrollView
         style={styles.root}
         contentContainerStyle={padding}
+        bottomOffset={Space.xxl}
         /*
           `never` só onde o header é NOSSO (`topBar`), porque ali a altura já entra no
           `paddingTop` acima — deixar o iOS ajustar por cima disso soma duas vezes.
@@ -102,7 +129,7 @@ export function Screen({
           onRefresh ? <RefreshControl refreshing={refreshing} onRefresh={onRefresh} /> : undefined
         }>
         {children}
-      </ScrollView>
+      </KeyboardAwareScrollView>
       {/* Depois do scroll na árvore: ele precisa desenhar POR CIMA para o desfoque existir. */}
       {topBar}
     </View>

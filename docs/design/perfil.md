@@ -38,9 +38,11 @@ Lista agrupada estilo iOS Ajustes — `Section` + `Row`, sem card solto para cad
    - Plano e cobrança → `/finance/plan`
    - Membros → **tela nova**: quem está, papel, remover, convidar
 4. **Notificações**
-   - Toggle nativo de push, com estado real (ligado / permissão negada / erro / não vinculado ao
-     EAS). Mensagem específica por caso, nunca "desativado" genérico.
-   - Canal preferido do lembrete: push · WhatsApp · ambos
+   - Dois toggles independentes para avisos financeiros automáticos: push e WhatsApp. Ambos
+     começam desligados; não existe fallback entre eles.
+   - O toggle de push registra a capacidade do aparelho quando necessário, mas desligá-lo só
+     muda a preferência e preserva o token usado pelos lembretes pessoais.
+   - WhatsApp fica indisponível sem telefone verificado.
    - Histórico de alertas → tela nova (`alerts_sent` já tem policy de leitura para isso)
 5. **Preferências**
    - Fuso horário (`profiles.timezone` — usado pelo cron de lembretes e nunca editável hoje)
@@ -60,24 +62,19 @@ Lista agrupada estilo iOS Ajustes — `Section` + `Row`, sem card solto para cad
 | Workspace | `useWorkspace()` **(novo)** | tabela `workspaces` | hoje sem nenhuma leitura no app |
 | Membros | `useWorkspaceMembers()` **(novo)** | `workspace_members` | idem |
 | Plano | `usePlanStatus` | RPC `plan_status` | já existe |
-| Push | `usePushRegistration()` **(novo, TanStack)** | `profiles.expo_push_token` | hoje é `useState`+`useEffect` cru dentro da tela, fora do padrão |
+| Push | `usePushStatus()` / `useRegisterPush()` | `profiles.expo_push_token` | capacidade do aparelho, não consentimento para aviso automático |
+| Avisos | `useAlertPreferences()` | `profiles.alerts_*_enabled` | preferências independentes, default `false` |
 | Perfil | `useProfile()` **(novo)** | `profiles` | `timezone`, `locale`, `whatsapp_verified` |
-
-`usePushRegistration` substitui o `usePushToken` local e passa a **registrar no boot**, não só
-quando o usuário toca num botão escondido.
 
 ## Ação primária
 
-**Ativar notificações.** É a ação com maior consequência econômica do produto: sem
-`expo_push_token`, todo lembrete e todo alerta cai no **template pago do WhatsApp** — e a partir
-de 01/10/2026 a janela de 24h também deixa de ser grátis.
-
-Por isso ela não fica escondida: quando o push está desligado, a seção Notificações sobe para o
-topo com um aviso explicando o ganho, e desce de volta quando ativa.
+**Escolher se e por onde receber avisos financeiros automáticos.** Telefone e token só tornam o
+canal possível; nenhum deles ativa avisos sozinho. Lembretes criados pela pessoa mantêm o canal
+próprio em `reminders.channel`.
 
 ## Ações secundárias
 
-Renomear workspace · trocar canal do lembrete · ajustar fuso · convidar membro · exportar ·
+Renomear workspace · ajustar fuso · convidar membro · exportar ·
 lixeira · sair.
 
 ## Estados

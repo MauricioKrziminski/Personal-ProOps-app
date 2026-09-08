@@ -43,19 +43,6 @@ def _replace(_antigo: Any, novo: Any) -> Any:
     return novo
 
 
-def _history_reducer(antigo: list[dict] | None, novo: list[dict] | None) -> list[dict]:
-    """Mantém até as últimas 6 mensagens (3 turnos User/Assistant)."""
-    antigo = list(antigo or [])
-    if not novo:
-        return antigo[-6:]
-    if not isinstance(novo, list):
-        novo = [novo]
-    for msg in novo:
-        if not antigo or antigo[-1] != msg:
-            antigo.append(msg)
-    return antigo[-6:]
-
-
 def _preserve_or_replace(antigo: dict | None, novo: dict | None) -> dict:
     """Preserva o cache da última query se novo for vazio."""
     if novo:
@@ -66,20 +53,28 @@ def _preserve_or_replace(antigo: dict | None, novo: dict | None) -> dict:
 class AgentState(TypedDict, total=False):
     # identidade
     thread_id: str
+    session_id: str
+    channel: str                # 'whatsapp' ou 'app'
     phone: str
     user_id: str
     workspace_id: str
     timezone: str
 
     # entrada (lote consolidado pelo debounce)
-    wa_message_id: str          # o id da ÚLTIMA mensagem do lote: chave de idempotência
+    source_message_id: str      # chave de idempotência do turno: id da Meta
+                                # (última do lote) ou `app:<uuid do cliente>`
     text: str                   # texto já sanitizado, pronto para o envelope
     media: dict[str, str] | None  # {mime_type, data_b64}
     raw_texts: list[str]
     clicked_id: str             # id do botão interativo clicado (ex: qpage:...)
 
     # histórico de curto prazo e cache de consulta
-    messages: Annotated[list[dict], _history_reducer]
+    # SUBSTITUIÇÃO, não acumulação. A borda entrega o histórico já cortado pela
+    # janela do canal (`conversation.trim_prompt_history`) mais o turno atual, e
+    # `compose` devolve o mesmo vetor com a resposta no fim. O reducer antigo
+    # cortava em 6 mensagens fixas aqui dentro — uma segunda regra de janela,
+    # escondida do canal que sabe qual janela vale.
+    messages: Annotated[list[dict], _replace]
     last_query_data: Annotated[dict, _preserve_or_replace]
 
     # roteamento

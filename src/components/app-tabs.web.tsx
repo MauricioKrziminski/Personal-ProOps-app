@@ -28,6 +28,9 @@ export default function AppTabs() {
           <TabTrigger name="finance" href="/(tabs)/finance" asChild>
             <TabButton>Financeiro</TabButton>
           </TabTrigger>
+          <TabTrigger name="agent" href="/(tabs)/agent" asChild>
+            <TabButton>Agente</TabButton>
+          </TabTrigger>
           <TabTrigger name="profile" href="/(tabs)/profile" asChild>
             <TabButton>Perfil</TabButton>
           </TabTrigger>

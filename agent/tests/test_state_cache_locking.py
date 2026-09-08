@@ -60,7 +60,7 @@ class TestStateCacheLocking:
             phone="5551999999999",
             timezone="America/Sao_Paulo",
             texto="me mostre todos",
-            wa_message_id="w2",
+            source_message_id="w2",
             last_query_data={
                 "account_id": str(CARD_ID),
                 "account_name": "Nubank Cartão",
@@ -109,7 +109,7 @@ class TestStateCacheLocking:
             phone="5551999999999",
             timezone="America/Sao_Paulo",
             texto="e no Itaú?",
-            wa_message_id="w3",
+            source_message_id="w3",
             last_query_data={
                 "account_id": str(CARD_ID),
                 "account_name": "Nubank Cartão",

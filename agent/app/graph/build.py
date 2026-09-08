@@ -91,3 +91,14 @@ def graph():
     if _graph is None:
         raise RuntimeError("grafo não compilado — falta o lifespan do FastAPI")
     return _graph
+
+
+async def delete_thread(thread_id: str) -> None:
+    """Apaga os checkpoints de uma conversa.
+
+    Excluir um chat do app tem que levar a memória junto: sem isto, um
+    `thread_id` reciclado herdaria o contexto do que foi apagado.
+    """
+    if _checkpointer is None:
+        raise RuntimeError("checkpointer não inicializado")
+    await _checkpointer.adelete_thread(thread_id)

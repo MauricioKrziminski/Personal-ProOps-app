@@ -26,7 +26,10 @@ import {
 } from '@/hooks/use-finance';
 import { categoryIcon } from '@/design/category-icons';
 import { formatBRL, formatDateBR, localISODate, useTodayReminders } from '@/hooks/use-items';
+import { useProfile } from '@/hooks/use-profile';
+import { useSession } from '@/hooks/use-session';
 import { useTheme } from '@/hooks/use-theme';
+import { greetingBR } from '@/lib/dates';
 import { Fonts } from '@/constants/theme';
 
 /** Um orçamento entra na seção "passando do orçamento" a partir de 80% consumido. */
@@ -56,6 +59,11 @@ export default function TodayScreen() {
       monthEndDay: last.getDate(),
     };
   }, []);
+
+  const { session } = useSession();
+  const profile = useProfile(session?.user?.id);
+  /** Só o primeiro nome: "Bom dia, Gabriel Almeida Dias" é um crachá, não um cumprimento. */
+  const firstName = profile.data?.display_name?.trim().split(/\s+/)[0];
 
   const forecast = useCashFlowForecast(daysLeft);
   const bills = useUpcomingBills(7);
@@ -112,6 +120,16 @@ export default function TodayScreen() {
           },
         ]}
         showsVerticalScrollIndicator={false}>
+        {/*
+          0. A saudação. Sem nome preenchido ela NÃO aparece — nem como "Bom dia," sozinho, nem
+          como um espaço reservado: quem entrou por Phone OTP nunca informou nome, e um
+          cumprimento pela metade é pior que nenhum. Em `subtitle` porque a display da tela já é
+          o valor do painel logo abaixo (§3, uma por tela).
+        */}
+        {firstName ? (
+          <ThemedText type="subtitle">{`${greetingBR()}, ${firstName}`}</ThemedText>
+        ) : null}
+
         {/*
           1. O painel de destaque. É o `HeroPanel` compartilhado, não uma cópia local: esta tela
           reimplementava o card inteiro à mão, e por isso não ganhou o gradiente, o brilho e o
@@ -238,7 +256,7 @@ export default function TodayScreen() {
                     "tem uns que pulam para a linha de baixo".
                   */}
                   <View style={styles.billTitleRow}>
-                    <ThemedText type="small" numberOfLines={1} style={styles.shrink}>
+                    <ThemedText type="small" numberOfLines={1} style={styles.billTitle}>
                       {b.title}
                     </ThemedText>
                     <View style={[styles.duePill, { backgroundColor: theme.dangerSoft }]}>
@@ -515,7 +533,23 @@ const styles = StyleSheet.create({
   },
   billCard: { flexDirection: 'row', alignItems: 'center', gap: Space.md },
   billInfo: { flex: 1, minWidth: 0, gap: Space.xs },
-  billTitleRow: { flexDirection: 'row', alignItems: 'center', gap: Space.sm },
+  /**
+   * A pílula é uma `View` de largura de conteúdo e não cede. Com o título em `flex: 1` ele
+   * absorvia 100% do aperto: numa tela de 384dp com a fonte do sistema em 1,3× "Fatura Nubank
+   * Cartão" virava **"Fatu…"**, e em 336dp virava **"."**. O nome do que venceu é a informação
+   * da linha; a data é o complemento.
+   *
+   * ⚠️ **`flexShrink: 0` no título é o que faz o `flexWrap` funcionar.** Medido no emulador: com
+   * `flexShrink: 1` o Yoga prefere ENCOLHER a quebrar, então a linha continuava numa linha só e
+   * o título continuava sumindo — a mesma tela, o mesmo bug, agora com `flexWrap` ligado sem
+   * efeito nenhum. Sem encolher, ele ocupa a linha inteira e a pílula desce sozinha.
+   *
+   * Isso não repete a queixa antiga ("tem uns que pulam para a linha de baixo"): lá a pílula caía
+   * na linha do VALOR e as duas colidiam. Aqui ela quebra dentro da própria linha do título, e só
+   * quando não cabe — na largura normal as duas continuam lado a lado, como no export.
+   */
+  billTitleRow: { flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: Space.sm },
+  billTitle: { flexShrink: 0, maxWidth: '100%' },
   duePill: {
     flexShrink: 0,
     paddingHorizontal: Space.sm,

@@ -1,4 +1,5 @@
 import { Modal, Platform, StyleSheet, View } from 'react-native';
+import { KeyboardAvoidingView } from 'react-native-keyboard-controller';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { useTheme } from '@/hooks/use-theme';
@@ -16,8 +17,23 @@ import { useTheme } from '@/hooks/use-theme';
  * as plataformas é um VALOR (o respiro do topo) e a árvore é a mesma, então ela mora aqui dentro
  * por `Platform.select` — mecanismo 2 de `frontend.md`.
  *
- * Envolve só a moldura: cabeçalho, rolagem e teclado continuam sendo decisão de cada tela, porque
+ * Envolve a moldura e o TECLADO; cabeçalho e rolagem continuam sendo decisão de cada tela, porque
  * são diferentes de verdade entre um form de conta e uma lista de tags.
+ *
+ * ⚠️ **O teclado mora aqui porque dez telas abrem sheet com formulário dentro.** Nenhuma delas
+ * tratava o teclado: tocar num campo abria o teclado POR CIMA dele e a pessoa digitava às cegas.
+ * Resolver dez vezes é garantir que a décima primeira nasça errada — a mesma lição do respiro do
+ * topo, logo acima.
+ *
+ * `KeyboardAvoidingView` do `react-native-keyboard-controller`, não o do React Native: o `Modal`
+ * do RN é uma JANELA separada no Android, e o da plataforma calcula o deslocamento a partir da
+ * janela principal. `automaticOffset` existe exatamente para isto — ele mede onde a view está de
+ * verdade, contando header de navegação e modal.
+ *
+ * `behavior="padding"` encolhe o container, e AQUI isso é o certo (ao contrário da tela de login,
+ * onde derrubava tudo): o cabeçalho tem altura fixa e o corpo é um `ScrollView` de `flex: 1`, então
+ * encolher é exatamente o que o `adjustResize` nativo faria — o cabeçalho com Cancelar/Salvar fica
+ * onde está e quem cede altura é a rolagem.
  */
 export function Sheet({
   visible,
@@ -46,7 +62,9 @@ export function Sheet({
             paddingTop: Platform.OS === 'android' ? insets.top : 0,
           },
         ]}>
-        {children}
+        <KeyboardAvoidingView behavior="padding" automaticOffset style={styles.sheet}>
+          {children}
+        </KeyboardAvoidingView>
       </View>
     </Modal>
   );

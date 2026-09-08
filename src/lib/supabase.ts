@@ -5,7 +5,7 @@ import type { Database } from '@/lib/database.types';
 import { Platform } from 'react-native';
 
 // Apenas anon key no app — service_role vive só nas Edge Functions.
-const supabaseUrl = process.env.EXPO_PUBLIC_SUPABASE_URL ?? '';
+export const supabaseUrl = process.env.EXPO_PUBLIC_SUPABASE_URL ?? '';
 const supabaseAnonKey = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY ?? '';
 
 export const isSupabaseConfigured = Boolean(supabaseUrl && supabaseAnonKey);

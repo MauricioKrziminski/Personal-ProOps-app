@@ -58,8 +58,9 @@ const styles = StyleSheet.create({
     ...Type.title2,
   },
   input: {
+    // `Type.money` já traz `Fonts.bold`. O `fontWeight: '600'` que estava aqui não fazia nada no
+    // Android (fonte custom ignora) e no iOS brigava com a face — peso é FAMÍLIA (§3).
     ...Type.money,
-    fontWeight: '600',
     minWidth: 120,
     textAlign: 'center',
     padding: 0,

@@ -690,7 +690,7 @@ async def _executar(
         phone=state["phone"],
         timezone=state["timezone"],
         texto=state.get("text", ""),
-        wa_message_id=state["wa_message_id"],
+        source_message_id=state["source_message_id"],
         last_query_data=state.get("last_query_data"),
         clicked_id=state.get("clicked_id"),
     )
@@ -738,7 +738,11 @@ async def compose(state: AgentState) -> dict:
         texto = spec.get("text") or spec.get("body") or ""
         ret = {}
         if texto:
-            ret["messages"] = [{"role": "assistant", "content": texto}]
+            # o vetor inteiro, porque `messages` substitui em vez de acumular
+            ret["messages"] = [
+                *state.get("messages", []),
+                {"role": "assistant", "content": texto},
+            ]
         return ret
     linhas = [l for l in state.get("results", []) if l]
     if not linhas:
@@ -746,5 +750,8 @@ async def compose(state: AgentState) -> dict:
     texto_reply = "\n".join(linhas)
     return {
         "reply": texto_reply,
-        "messages": [{"role": "assistant", "content": texto_reply}],
+        "messages": [
+            *state.get("messages", []),
+            {"role": "assistant", "content": texto_reply},
+        ],
     }

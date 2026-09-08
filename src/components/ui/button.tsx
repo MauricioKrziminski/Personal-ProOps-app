@@ -1,5 +1,13 @@
 import * as Haptics from 'expo-haptics';
-import { Pressable, StyleSheet, View, type StyleProp, type ViewStyle } from 'react-native';
+import {
+  ActivityIndicator,
+  Platform,
+  Pressable,
+  StyleSheet,
+  View,
+  type StyleProp,
+  type ViewStyle,
+} from 'react-native';
 import Animated, { useAnimatedStyle, useSharedValue, withTiming } from 'react-native-reanimated';
 
 import { Icon } from '@/components/ui/icon';
@@ -122,7 +130,11 @@ export function Button({
             borderColor: theme.separator,
           },
         ]}>
-        {loading ? (
+        {loading && Platform.OS === 'web' ? (
+          // O CanvasKit do Skia não é inicializado pelo bundle web atual. O fallback mantém o
+          // estado de carregamento funcional sem alterar a marca usada nos apps nativos.
+          <ActivityIndicator size="small" color={theme[labelColor]} />
+        ) : loading ? (
           // A espiral da marca no lugar do `ActivityIndicator`. Não é enfeite: com marca
           // monocromática, a personalidade vem de **repetir a forma** em papéis utilitários —
           // é o que torna a Vercel reconhecível pelo ▲ no prompt e no loading. Um spinner do

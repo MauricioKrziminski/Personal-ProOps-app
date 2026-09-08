@@ -80,7 +80,7 @@ def _estado(acoes):
     return {
         "thread_id": "t1", "phone": "5551999999999", "user_id": "u1",
         "workspace_id": "w1", "timezone": "America/Sao_Paulo",
-        "wa_message_id": "wamid.1", "text": "teste", "media": None,
+        "source_message_id": "wamid.1", "text": "teste", "media": None,
         "results": [], "domains": [], "finance_actions": [], "finance_queries": [],
         "notes_actions": [],
         "confidence": 1.0, "approved": False, "halted": False,
@@ -346,7 +346,7 @@ async def test_o_que_o_WORKER_manda_no_resume_o_gate_entende(monkeypatch, grafo)
     """
     from app.domain import confirm
     from app.graph import nodes
-    from app.worker import _congelado
+    from app.conversation import _congelado
 
     async def dois(workspace_id, acoes, texto_cru):
         return [{"table": "transactions", "status": "ambiguous",
@@ -371,7 +371,7 @@ async def test_o_que_o_WORKER_manda_no_resume_o_gate_entende(monkeypatch, grafo)
 async def test_numero_digitado_tambem_chega_inteiro_no_gate(monkeypatch, grafo):
     from app.domain import confirm
     from app.graph import nodes
-    from app.worker import _congelado
+    from app.conversation import _congelado
 
     async def dois(workspace_id, acoes, texto_cru):
         return [{"table": "transactions", "status": "ambiguous",

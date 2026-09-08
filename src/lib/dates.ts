@@ -120,3 +120,16 @@ export function localDateTime(brDate: string, hhmm: string): Date | null {
 export function timeBR(date: Date): string {
   return `${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}`;
 }
+
+/**
+ * "Bom dia" / "Boa tarde" / "Boa noite" pela hora LOCAL do aparelho.
+ *
+ * As faixas são as do português falado, não as do relógio de 8h: a tarde começa ao meio-dia e a
+ * noite às 18h — e a madrugada é "boa noite", não "bom dia", porque quem abre o app às 3h ainda
+ * não dormiu.
+ */
+export function greetingBR(hour = new Date().getHours()): string {
+  if (hour >= 5 && hour < 12) return 'Bom dia';
+  if (hour >= 12 && hour < 18) return 'Boa tarde';
+  return 'Boa noite';
+}

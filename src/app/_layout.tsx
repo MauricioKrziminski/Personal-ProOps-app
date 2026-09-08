@@ -26,6 +26,7 @@ import { stackHeaderFonts } from '@/components/ui/app-header';
 import { Icon } from '@/components/ui/icon';
 import { ConcealProvider } from '@/components/ui/conceal';
 import { ToastProvider } from '@/components/ui/toast';
+import { AppUpdateProvider } from '@/hooks/use-app-update';
 import { ThemeProvider as AppThemeProvider, useBarStyle, useScheme } from '@/hooks/use-theme';
 import { useSession } from '@/hooks/use-session';
 import { attachNotificationListeners, configureNotificationHandler } from '@/lib/notifications';
@@ -125,9 +126,10 @@ function AppTree() {
         <KeyboardProvider statusBarTranslucent navigationBarTranslucent>
           <ConcealProvider>
           <ToastProvider>
-            <AnimatedSplashOverlay ready={!loading && fontsLoaded} />
-          <AndroidActionSheet />
-            {loading ? null : (
+            <AppUpdateProvider>
+              <AnimatedSplashOverlay ready={!loading && fontsLoaded} />
+              <AndroidActionSheet />
+              {loading ? null : (
               /*
                * `statusBarStyle` mora AQUI, e só aqui.
                *
@@ -173,6 +175,9 @@ function AppTree() {
                   o login deixa de existir, então `back` nunca reentra nele. */}
                 <Stack.Protected guard={!session}>
                   <Stack.Screen name="login" options={{ headerShown: false }} />
+                  <Stack.Screen name="login-whatsapp" options={{ headerShown: false }} />
+                  <Stack.Screen name="signup" options={{ headerShown: false }} />
+                  <Stack.Screen name="forgot-password" options={{ headerShown: false }} />
                 </Stack.Protected>
 
                 <Stack.Protected guard={!!session}>
@@ -198,11 +203,13 @@ function AppTree() {
                     options={{ presentation: 'modal', title: 'Assinar', ...modalOptions }}
                   />
                   <Stack.Screen name="onboarding" options={{ headerShown: false }} />
+                  <Stack.Screen name="link-phone" options={{ headerShown: false }} />
                   <Stack.Screen name="catalog" options={{ title: 'Catálogo' }} />
                 </Stack.Protected>
               </Stack>
             </>
-          )}
+              )}
+            </AppUpdateProvider>
           </ToastProvider>
           </ConcealProvider>
         </KeyboardProvider>

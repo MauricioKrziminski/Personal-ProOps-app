@@ -1800,6 +1800,7 @@ export function useDeleteImportBatch() {
 /** Uma linha de `alerts_sent` — o que o cron JÁ mandou, não o que ele mandaria. */
 export interface AlertSent {
   id: string;
+  workspace_id: string;
   kind: string;
   ref: string;
   sent_on: string;
@@ -1828,7 +1829,7 @@ export function useAlertsSent(limit = 60) {
     queryFn: async (): Promise<AlertSent[]> => {
       const { data, error } = await supabase
         .from('alerts_sent')
-        .select('id, kind, ref, sent_on, channel, created_at')
+        .select('id, workspace_id, kind, ref, sent_on, channel, created_at')
         // `sent_on` primeiro porque é por ele que a tela agrupa: ordenar só por `created_at`
         // produziria cabeçalhos de dia fora de ordem — o mesmo defeito que os "Últimos
         // lançamentos" do Financeiro tinham.

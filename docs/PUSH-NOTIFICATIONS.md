@@ -1,37 +1,38 @@
-# Push notifications — o que falta e como fazer
+# Push notifications — estado e validação pendente
 
-> Fase 4 do runbook, **adiada conscientemente em 26/08/2026**. Este documento existe para
-> que retomar não custe redescoberta. Tudo aqui foi verificado na data, não é de memória.
+> O código, EAS e o primeiro APK foram configurados na Fase 7 em 04/09/2026. A entrega em
+> aparelho físico ainda precisa ser validada; a seção histórica de 26/08 abaixo não representa
+> mais o estado atual.
 
 ## Por que isso importa (o argumento de custo)
 
-O `send-reminders` tenta **push primeiro** e só cai no WhatsApp se não houver token:
+Um lembrete pessoal respeita `reminders.channel`; quando a pessoa pediu push e o token não está
+disponível, `send-reminders` ainda pode cair no WhatsApp:
 
 ```ts
 if (wantsPush && profile?.expo_push_token) { await sendExpoPush(...) }
 // sem token -> fallback para sendTemplate(), que é template Utility PAGO
 ```
 
-Push pelo Expo é **gratuito e ilimitado**. Template Utility é cobrado por mensagem. Enquanto
-`profiles.expo_push_token` estiver vazio, **todo lembrete disparado é uma mensagem paga** — e a
-decisão de arquitetura do projeto (`CLAUDE.md`) é justamente "proativo prefere push, WhatsApp
-template só como complemento". Hoje essa decisão existe no papel e não na prática.
+Nos avisos financeiros inferidos pelo sistema isso não vale: desde a `0052`, push e WhatsApp têm
+preferências independentes, desligadas por padrão, e nunca existe fallback para um canal que a
+pessoa não ativou. `expo_push_token` é capacidade compartilhada com lembretes, não preferência.
 
-## Estado verificado em 26/08/2026
+## Estado atualizado em 04/09/2026
 
 | Item | Estado |
 |---|---|
-| `profiles.expo_push_token` | `NULL` — nenhum token registrado |
-| `app.json` → `extra.eas.projectId` | **ausente** (não existe chave `extra`) |
-| `eas-cli` local | 22.5.0 instalado |
+| `profiles.expo_push_token` | capacidade preservada; entrega física ainda não validada |
+| `app.json` → `extra.eas.projectId` | `8313579c-3979-4ecd-ba6a-4dc0bf702f05` |
+| EAS | projeto, build e update configurados na Fase 7 |
 | Package Android / bundle iOS | `com.proops.personal` (os dois) |
 | Plugin `expo-notifications` no `app.json` | ausente |
-| `setNotificationHandler` / listeners no app | **não existem** |
+| `setNotificationHandler` / listener no app | existem em `src/lib/notifications.ts` |
 
 ## O que JÁ está pronto (não refazer)
 
 - **Coluna** `profiles.expo_push_token` (migration `0001`).
-- **Registro do token**: `src/app/(tabs)/profile.tsx`, hook `usePushToken` — pede permissão,
+- **Registro do token**: `src/hooks/use-push.ts`, hook `useRegisterPush` — pede permissão,
   lê o `projectId`, chama `getExpoPushTokenAsync` e grava no profile. Já falha com mensagem
   útil quando o `projectId` não existe ("App ainda não vinculado ao EAS...").
 - **Envio**: `supabase/functions/send-reminders/index.ts`, `sendExpoPush()` → `POST
@@ -190,16 +191,15 @@ inativo → compensa a partir de ~8–10 usuários inativos.
 Push **nunca** zera a conta da Meta: o OTP de login continua sendo Authentication a cada acesso
 novo, e quem não instalou o app ou revogou a permissão continua caindo no template.
 
-## ⏸️ Decisão de 26/08/2026: adiado de propósito, de novo
+## Histórico: decisão de 26/08/2026, superada pela Fase 7
 
 Depois de entregar as 7 fases do plano de mercado, a decisão (do Mauricio) foi **deixar push por
 último**, quando o app estiver redondo e testado. O raciocínio:
 
 - **O custo hoje é R$ 0.** O banco tem 1 profile e nenhum orçamento/fatura cadastrado, então
   `_alerts_to_send()` volta vazio — não há alerta sendo disparado nem template sendo pago.
-- **Não é dívida de arquitetura, é configuração.** `send-alerts` e `send-reminders` já preferem
-  push e caem no template só como fallback. No dia em que `expo_push_token` existir, nada muda no
-  código: eles passam a usar push sozinhos.
+- **Arquitetura atual:** `send-reminders` mantém o fallback próprio dos lembretes; `send-alerts`
+  exige a preferência explícita de cada canal e nunca escolhe WhatsApp só porque o token falta.
 - **Exige rebuild nativo**, ou seja, é retrabalho garantido se feito antes das telas estabilizarem.
 
 ⚠️ **O item com relógio correndo NÃO é o push** — é a janela de 90 dias do número WhatsApp de

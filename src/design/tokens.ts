@@ -105,6 +105,22 @@ export const Motion = {
      * rápida, com um overshoot mínimo que diz "chegou".
      */
     snap: { duration: 340, dampingRatio: 0.78 },
+    /**
+     * Mola da TAB BAR do Android — a única mola do app com quique de verdade.
+     *
+     * Com `snap` o berço atravessava as cinco abas em **~130 ms** (medido em quadros: quatro
+     * quadros a 30 fps) e parava seco, sem passar do ponto. Lido no aparelho, isso não é
+     * "rápido", é teleporte: o olho não acompanha o percurso, então a barra parece trocar de
+     * estado em vez de se mover — foi a queixa "parece que foi de uma vez".
+     *
+     * `dampingRatio 0.62` dá ~10% de ultrapassagem, medido no emulador: o berço chega, passa um
+     * fio e volta. É o "efeito de mola quando chega no ícone". A trajetória medida é ~180 ms de
+     * percurso e ~500 ms até assentar. É deliberadamente mais lento que a régua do §5 de
+     * design.md para um controle tocado 100× por dia — decisão do dono do produto, e o motivo é
+     * que aqui o movimento É a resposta ao toque, não enfeite: ele carrega o ícone e o rótulo
+     * fazendo crossfade ao longo do caminho.
+     */
+    tab: { duration: 1000, dampingRatio: 0.62 },
   },
   /**
    * Escalonamento de entrada em lista: `delay = min(index * step, cap)`.
@@ -149,8 +165,6 @@ export const Type = {
   code: { fontFamily: Fonts.monoMedium, fontSize: 12, lineHeight: 16, letterSpacing: 0.24 },
   /** mono um degrau acima: valor de dinheiro dentro de card e linha */
   ticker: { fontFamily: Fonts.monoSemibold, fontSize: 14, lineHeight: 18, letterSpacing: -0.14 },
-  /** a palavra "ProOps" na barra de topo — só o `AppHeader` usa */
-  wordmark: { fontFamily: Fonts.bold, fontSize: 16, lineHeight: 20, letterSpacing: -0.4 },
 } as const;
 
 export type TypeVariant = keyof typeof Type;

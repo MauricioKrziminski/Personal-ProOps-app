@@ -2,7 +2,7 @@
   "expo": {
     "name": "Personal ProOps app",
     "slug": "app-ProOps",
-    "version": "1.0.0",
+    "version": "1.1.0",
     "orientation": "portrait",
     "icon": "./assets/images/icons/icon-512.png",
     "scheme": "appproops",
@@ -10,7 +10,9 @@
     "ios": {
       "bundleIdentifier": "com.proops.personal",
       "supportsTablet": true,
-      "infoPlist": { "UIViewControllerBasedStatusBarAppearance": false }
+      "infoPlist": {
+        "UIViewControllerBasedStatusBarAppearance": false
+      }
     },
     "android": {
       "adaptiveIcon": {
@@ -42,11 +44,25 @@
       "expo-secure-store",
       "expo-image",
       "expo-status-bar",
-      "expo-web-browser"
+      "expo-web-browser",
+      "./plugins/with-apk-installer"
     ],
     "experiments": {
       "typedRoutes": true,
       "reactCompiler": true
+    },
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "8313579c-3979-4ecd-ba6a-4dc0bf702f05"
+      }
+    },
+    "owner": "solutions.proops",
+    "runtimeVersion": {
+      "policy": "appVersion"
+    },
+    "updates": {
+      "url": "https://u.expo.dev/8313579c-3979-4ecd-ba6a-4dc0bf702f05"
     }
   }
 }

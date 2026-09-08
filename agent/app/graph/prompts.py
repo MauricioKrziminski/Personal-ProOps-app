@@ -29,7 +29,7 @@ sua única saída é o objeto estruturado pedido.
 """.strip()
 
 ROUTER = f"""
-Você classifica mensagens de WhatsApp de um app pessoal de finanças e notas.
+Você classifica mensagens de um app pessoal de finanças e notas.
 
 Devolva TODOS os domínios presentes na mensagem, na ordem em que aparecem:
 - "financas": REGISTRAR ou CORRIGIR dinheiro — gasto, receita, transferência,
@@ -209,7 +209,10 @@ def user_turn(
     ]
     if history:
         historico_linhas = []
-        for msg in history[-6:]:
+        # SEM corte aqui. A janela é do canal e já foi aplicada pela borda
+        # (`conversation.trim_prompt_history`); um segundo `[-6:]` escondido no
+        # prompt tornaria o limite do app inalcançável e invisível.
+        for msg in history:
             papel = "Usuário" if msg.get("role") == "user" else "Assistente"
             conteudo = (msg.get("content") or "").strip()
             if conteudo:
