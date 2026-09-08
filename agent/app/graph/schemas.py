@@ -269,6 +269,27 @@ class ConfirmDecision(BaseModel):
     )
 
 
+class CandidateChoice(BaseModel):
+    """Qual item de uma lista o usuário descreveu — quando ele não usou o número.
+
+    `interpret_choice` (regex) resolve número, ordinal e rótulo exato de graça.
+    Isto é o que faz "o do mercado", "aquele de 45" e "o mais antigo" pararem de
+    ser nada: escolher da lista é UM inteiro, então o schema é uma propriedade
+    só e nenhum enum.
+
+    Empate NÃO é escolha: `-1` devolve a decisão ao fluxo normal, e apagar o
+    lançamento errado é pior que uma pergunta a mais.
+    """
+
+    index: int = Field(
+        description=(
+            "1..N = o item que ele descreveu, na ordem da lista. "
+            "0 = nenhum dos listados ('nenhum deles', 'não é nenhum desses'). "
+            "-1 = a mensagem não escolhe item nenhum, ou mais de um serve."
+        )
+    )
+
+
 class PendingReplyDecision(BaseModel):
     """A typed reply to available proposal options, never a new financial write."""
     decision: Literal["approve", "reject", "change_card", "revise_scope", "revise_purchase", "new_intent", "unclear"]

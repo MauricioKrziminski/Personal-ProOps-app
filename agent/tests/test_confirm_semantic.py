@@ -142,3 +142,105 @@ async def test_classificar_de_rascunho_extrai_na_MESMA_chamada(monkeypatch):
     assert (decisao.decision, decisao.extracted_value) == ("answer", "nubank")
     # uma chamada, não duas
     assert len(falso.mensagens) == 2
+
+
+# --- escolher da lista por descrição, não só por número ---------------------
+
+
+LISTA = [
+    {"id": "t1", "label": "R$ 45,00 mercado", "when": "30/08"},
+    {"id": "t2", "label": "R$ 120,00 farmácia", "when": "29/08"},
+    {"id": "t3", "label": "R$ 89,90 posto", "when": "28/08"},
+]
+ESCOLHA = {
+    "id": "p1", "thread_id": "t", "summary": "apagar o gasto",
+    "action": {"kind": "choice", "action_type": "delete_transaction", "candidates": LISTA},
+}
+
+
+def _escolha(indice):
+    from unittest.mock import AsyncMock
+    from app.graph.schemas import CandidateChoice
+    return AsyncMock(return_value=CandidateChoice(index=indice))
+
+
+def _modelo(monkeypatch, indice):
+    from app.services import gemini
+    monkeypatch.setattr(
+        gemini, "structured", lambda *a, **kw: type("M", (), {"ainvoke": _escolha(indice)})()
+    )
+
+
+@pytest.mark.asyncio
+async def test_descrever_o_item_escolhe_como_o_numero_escolhe(monkeypatch):
+    """"o do mercado" caía como None e virava intenção nova.
+
+    Número, ordinal e rótulo exato já saíam de graça no regex; descrever o item
+    — que é como as pessoas falam — não saía de jeito nenhum.
+    """
+    _modelo(monkeypatch, 1)
+    assert (await confirm.decide({"text": "o do mercado"}, ESCOLHA, {})) == {
+        "approved": True, "candidate_id": "t1",
+    }
+
+
+@pytest.mark.asyncio
+async def test_numero_nao_gasta_chamada_de_modelo(monkeypatch):
+    """O regex vem primeiro de propósito: clique e número continuam custando zero."""
+    from app.services import gemini
+
+    def nunca(*a, **kw):
+        raise AssertionError("número não deveria chamar o modelo")
+
+    monkeypatch.setattr(gemini, "structured", nunca)
+    assert (await confirm.decide({"text": "2"}, ESCOLHA, {}))["candidate_id"] == "t2"
+
+
+@pytest.mark.asyncio
+async def test_indice_fora_da_lista_nao_escolhe_ninguem(monkeypatch):
+    """O índice vem do modelo; fora da faixa é payload torto, nunca um alvo."""
+    for fora in (4, 99, -7):
+        _modelo(monkeypatch, fora)
+        assert await confirm.decide({"text": "o de 500 reais"}, ESCOLHA, {}) is None
+
+
+@pytest.mark.asyncio
+async def test_empate_devolve_a_conversa_em_vez_de_chutar(monkeypatch):
+    _modelo(monkeypatch, -1)
+    assert await confirm.decide({"text": "um dos dois primeiros"}, ESCOLHA, {}) is None
+
+
+@pytest.mark.asyncio
+async def test_soft_warning_nunca_passa_pelo_classificador_de_escolha(monkeypatch):
+    """Ali os "candidatos" são AÇÕES, não itens.
+
+    Deixar um classificador de escolha pescar *Confirmar* de uma hesitação
+    recria o defeito de "clicar Trocar de Cartão autoriza a compra": escolher
+    uma opção nunca é consentir a compra. Quem interpreta lá é `_classificar_aviso`.
+    """
+    from unittest.mock import AsyncMock
+    from app.services import gemini
+
+    def nunca(*a, **kw):
+        raise AssertionError("soft_warning não pode usar o classificador de escolha")
+
+    monkeypatch.setattr(gemini, "structured", nunca)
+    monkeypatch.setattr(
+        confirm, "_classificar_aviso", AsyncMock(return_value={"decision": "unclear"})
+    )
+    aviso = {
+        "id": "p2", "thread_id": "t", "summary": "compra acima do limite",
+        "action": {"kind": "soft_warning", "action_type": "create_installment_purchase",
+                   "candidates": [{"id": "confirm", "label": "Confirmar"},
+                                  {"id": "change_card", "label": "Trocar de Cartão"}]},
+    }
+    resultado = await confirm.decide({"text": "acho que sim"}, aviso, {})
+    assert resultado["keep_pending"] is True and not resultado["approved"]
+
+
+@pytest.mark.asyncio
+async def test_escolha_conta_a_chamada_para_a_cota(monkeypatch):
+    _modelo(monkeypatch, 1)
+    uso = {}
+    await confirm.decide({"text": "o do mercado"}, ESCOLHA, uso)
+    assert uso["llm_calls"] == 1

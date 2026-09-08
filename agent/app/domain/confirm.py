@@ -163,6 +163,62 @@ def interpret_choice(texto: str | None, n: int) -> int | None:
     return None
 
 
+async def escolher_candidato(
+    texto: str | None, candidatos: list[dict], uso: dict | None = None
+) -> int | None:
+    """1..n escolheu · 0 = nenhuma · None = não é escolha. Semântico.
+
+    `interpret_choice` resolve de graça o que é número, ordinal ou rótulo exato.
+    Isto atende o resto — "o do mercado", "aquele de 45", "o mais antigo" —, que
+    até aqui virava None e caía como intenção nova ou, pior, como um "não".
+
+    Mesma divisão do resto do produto: **clique por igualdade exata, texto
+    digitado por semântica**. E a mesma trava: índice fora da lista não escolhe
+    nada, empate devolve -1, e o alvo escolhido ainda passa pela confirmação do
+    gate antes de qualquer escrita.
+    """
+    if not texto or not texto.strip() or not candidatos:
+        return None
+    from app.graph.schemas import CandidateChoice
+    from app.security import wrap_untrusted
+    from app.services.gemini import structured
+
+    lista = "\n".join(
+        f"{i}. {c.get('label','')}" + (f" ({c['when']})" if c.get("when") else "")
+        for i, c in enumerate(candidatos, 1)
+    )
+    try:
+        decisao = await structured(CandidateChoice).ainvoke(
+            [
+                (
+                    "system",
+                    "O usuário está escolhendo UM item de uma lista que já foi mostrada "
+                    "a ele. Devolva o índice do item que a mensagem descreve.\n"
+                    "Ele pode citar o valor, o estabelecimento, a data ou a posição "
+                    "('o do mercado', 'aquele de 45', 'o mais antigo', 'a de baixo').\n"
+                    "APONTAR um item é diferente de PEDIR alguma coisa. Se a mensagem "
+                    "for um pedido novo — registrar um gasto ('gastei 45 no mercado'), "
+                    "apagar, corrigir, consultar, anotar —, devolva -1 MESMO que ela "
+                    "descreva um dos itens: quem lança um gasto igual a um da lista "
+                    "está lançando, não escolhendo, e escolher aqui apagaria o dele.\n"
+                    "Se a mensagem servir para MAIS DE UM item, ou não escolher item "
+                    "nenhum, devolva -1. Nunca escolha por eliminação nem invente item "
+                    "fora da lista.\n\nLista:\n" + lista,
+                ),
+                ("human", wrap_untrusted("user_input", texto)),
+            ]
+        )
+    except Exception:  # noqa: BLE001 — sem classificação, ninguém é escolhido
+        log.warning("classificador de escolha indisponível", exc_info=True)
+        return None
+    if uso is not None:
+        uso["llm_calls"] = uso.get("llm_calls", 0) + 1
+    escolhido = decisao.index
+    if escolhido == 0:
+        return 0
+    return escolhido if 1 <= escolhido <= len(candidatos) else None
+
+
 async def _classificar_aviso(
     texto: str, resumo: str, *, allow_scope: bool = False
 ) -> dict:
@@ -177,7 +233,11 @@ async def _classificar_aviso(
     )
     prompt = f"""Interprete somente a resposta à proposta ainda NÃO executada:
 {context}
-approve: concordância clara sem mudança; reject: desistência sem novo pedido.
+approve: concordância CLARA e sem ressalva ("sim", "pode", "confirma", "isso mesmo").
+Hesitação, dúvida ou aproximação NÃO é approve — "acho que sim", "talvez", "pode ser",
+"se você acha", "acho que era esse" são unclear. A proposta pode apagar ou alterar dado
+do usuário: aprovar um "acho" é apagar o que ele não confirmou.
+reject: desistência sem novo pedido.
 change_card: escolheu outro cartão ("quero usar outro cartão", "troca para o Inter", "usa Inter em vez do Nubank"). new_account só contém o nome explicitamente informado. Isso NÃO aprova a compra.
 revise_scope: mudou o limite das parcelas ("não, só as 8 anteriores" -> installment_scope="first:8"). Isso NÃO aprova a baixa anterior.
 revise_purchase: mudança da quantidade de parcelas da COMPRA: "sim, mas muda para 24 parcelas" -> new_installments=24; nunca aprova.
@@ -232,6 +292,19 @@ async def decide(
             ).strip() == "3":
                 return {"approved": False}
             k = interpret_choice(texto, len(candidatos))
+            if k is None and (pendente.get("action") or {}).get("kind") == "choice":
+                # O regex cobre número, ordinal e rótulo exato. Descrever o item
+                # ("o do mercado", "o mais antigo") caía aqui como None e virava
+                # intenção nova — ou, num sim/não, um "não".
+                #
+                # ⚠️ SÓ em `choice`, que é a lista de REGISTROS reais para
+                # desambiguar. Em `soft_warning` os "candidatos" são AÇÕES
+                # (Confirmar / Trocar de Cartão), e deixar um classificador de
+                # escolha pescar "Confirmar" de uma hesitação recria o defeito
+                # que a 08/09 corrigiu: escolher uma opção não é consentir a
+                # compra. Lá quem interpreta é `_classificar_aviso`, que sabe
+                # disso.
+                k = await escolher_candidato(texto, candidatos, uso)
             if k == 0:
                 return {"approved": False, "none_of_these": True}
             if k:
