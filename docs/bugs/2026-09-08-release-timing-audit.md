@@ -55,3 +55,7 @@ O CI foi publicado na main em `fe4c4f26055d74ad1eaf9e860d91ce64d8a72910`. O [aqu
 A API do GitHub confirmou nove entradas Gradle/C++ em `refs/heads/main`, incluindo o cache nativo vinculado ao commit acima. Portanto o cache da branch padrão está preparado para as próximas tags. Essa execução fria não substitui nem é apresentada como o benchmark quente de 17min10s. A duração depende da existência e utilidade dos caches e da disponibilidade do runner.
 
 Verificação de escopo após o trabalho: produção permaneceu em `agente-00025-lt7` e staging em `agente-staging-00071-ltm`. As mudanças funcionais do app/agente e a migration nova não foram incluídas no push do CI nem publicadas em produção.
+
+## Release nativa 1.3.2
+
+Após a entrega OTA compatível com 1.3.1, o usuário solicitou um APK novo e a medição do build completo. A versão 1.3.2 inclui as correções funcionais publicadas em `7fb41d4`. O build usa o workflow nativo já validado, com fallback para os caches da main, assinatura existente e incremento remoto do versionCode. O tempo OTA de 2min40s não é uma medida de geração de APK. Resultado desta release será registrado após conclusão.
