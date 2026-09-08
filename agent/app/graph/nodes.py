@@ -350,10 +350,23 @@ Catálogo:
                      state['timezone'], history=(state.get('messages') or [])[:-1])
     if state.get('resource_draft'):
         user += "\n" + wrap_untrusted('document_content', json.dumps(state['resource_draft'],ensure_ascii=False))
-    plan = await gemini.structured(ResourcePlan, gemini.GEMINI_PARSE).ainvoke([('system',prompt),('human',user)])
+    if state.get('preset') and state.get('resource_actions'):
+        # Ação já montada fora do grafo (a compra parcelada que virou
+        # financiamento). Reextrair gastaria uma chamada para chegar a um
+        # resultado PIOR: o texto do turno é "É financiamento", que não descreve
+        # contrato nenhum.
+        #
+        # ⚠️ `preset` sozinho NÃO basta: o caminho do cadastro incompleto também
+        # o liga, e só para fixar o domínio — lá a mensagem ("fecha dia 7") ainda
+        # precisa do modelo. Quem autoriza pular a extração é haver AÇÃO pronta.
+        planned = [ResourceAction.model_validate(a) for a in state.get('resource_actions') or []]
+        calls = 0
+    else:
+        plan = await gemini.structured(ResourcePlan, gemini.GEMINI_PARSE).ainvoke([('system',prompt),('human',user)])
+        planned, calls = plan.actions, 1
     context=ExecContext(state['user_id'],state['workspace_id'],state.get('phone'),state['timezone'],state.get('text',''),state['source_message_id'])
     actions, prepared, incomplete, questions = [], [], [], []
-    for action in plan.actions:
+    for action in planned:
         try:
             proposal=await resources.prepare(context,action)
         except Level1Error as err:
@@ -363,7 +376,7 @@ Catálogo:
         actions.append(action.model_dump(mode='json'))
         prepared.append(proposal)
     return {'resource_actions':actions,'resource_prepared':prepared,'resource_draft':incomplete,
-            'results':[*state.get('results',[]),*questions], 'llm_calls':1}
+            'results':[*state.get('results',[]),*questions], 'llm_calls':calls}
 
 
 async def general_node(state: AgentState) -> dict:

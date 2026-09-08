@@ -657,6 +657,8 @@ class TestCadastroInlineCheckpoint:
                     raise RuntimeError('checkpoint unavailable')
                 owner.state.update(values)
             async def ainvoke(self, entrada, config=None):
+                if owner.checkpoint_error:
+                    raise RuntimeError('checkpoint unavailable')
                 owner.invocations.append(entrada)
                 return owner.graph_reply
         monkeypatch.setattr(build,'graph',lambda:Graph())
@@ -715,16 +717,41 @@ class TestCadastroInlineCheckpoint:
 class TestFinanciamentoNoRascunho:
     fixture = TestCadastroInlineCheckpoint.fixture
     @pytest.mark.asyncio
-    async def test_financiamento_preserva_parcelas_sem_inventar_saldo_ou_taxa(self,monkeypatch):
+    @pytest.mark.parametrize('conteudo',[
+        {'clicked_id':'ds:d1:financing','text':'É financiamento'},
+        {'text':'É financiamento'},
+    ])
+    async def test_financiamento_vira_contrato_completo_pelo_clique_e_pelo_texto(self,monkeypatch,conteudo):
+        """O rótulo do botão é digitável; os dois caminhos chegam no mesmo lugar.
+
+        Digitado, "É financiamento" virava NOME DE CARTÃO e a pessoa levava
+        "não achei o cartão *É financiamento*". Clicado, o agente pedia principal,
+        saldo devedor e taxa — três números que ela não tem em mãos.
+        """
         rasc={**RASCUNHO,'action':{**RASCUNHO['action'],'description':'carro','installments':48,'current_installment':9,'already_paid_count':8,'amount_cents':7056000}}
         async def aberto(*a,**kw): return rasc
         monkeypatch.setattr(db,'open_draft',aberto)
-        reply=await conversation.run_turn(SESSAO,source_message_id='fin1',conteudo={'clicked_id':'ds:d1:financing','text':'É financiamento'})
-        proposal=self.state['resource_draft'][0]
-        assert proposal['resource']=='debts' and proposal['name']=='carro'
-        assert {f['name']:f['value'] for f in proposal['fields']}=={'kind':'financing','installments':'48','installments_paid':'8'}
-        assert len(self.deleted)==1 and self.invocations==[]
-        assert 'saldo' in reply and 'taxa' in reply and 'principal' in reply
+        async def financiamento(texto,rascunho,uso=None): return {'acao':'financiamento'}
+        monkeypatch.setattr(draft,'interpretar',financiamento)
+        await conversation.run_turn(SESSAO,source_message_id='fin1',conteudo=conteudo)
+        entrada=self.invocations[0]
+        acao=entrada['resource_actions'][0]
+        assert entrada['domains']==['cadastros'] and entrada['preset']
+        assert acao['resource']=='debts' and acao['name']=='carro'
+        # 48 × 1470 volta a ser a parcela: o contrato sai do que a pessoa JÁ disse.
+        assert {f['name']:f['value'] for f in acao['fields']}=={
+            'kind':'financing','calculation_mode':'fixed_installments',
+            'installments':'48','installment_cents':'147000','installments_paid':'8'}
+        assert len(self.deleted)==1
+
+    @pytest.mark.asyncio
+    async def test_financiamento_sem_divisao_exata_nao_arredonda_a_parcela(self,monkeypatch):
+        rasc={**RASCUNHO,'action':{**RASCUNHO['action'],'description':'carro','installments':48,'amount_cents':7000000}}
+        async def aberto(*a,**kw): return rasc
+        monkeypatch.setattr(db,'open_draft',aberto)
+        await conversation.run_turn(SESSAO,source_message_id='fin1b',conteudo={'clicked_id':'ds:d1:financing'})
+        campos={f['name']:f['value'] for f in self.invocations[0]['resource_actions'][0]['fields']}
+        assert 'installment_cents' not in campos and campos['installments']=='48'
 
     @pytest.mark.asyncio
     async def test_clique_financiamento_antigo_nao_converte(self):
@@ -741,20 +768,22 @@ class TestFinanciamentoNoRascunho:
             assert len(options)<=(3 if spec['ui']=='buttons' else 10)
 
     @pytest.mark.asyncio
-    async def test_falha_checkpoint_nao_apaga_compra(self):
+    async def test_falha_do_grafo_nao_apaga_compra(self):
         self.checkpoint_error=True
         with pytest.raises(RuntimeError,match='checkpoint unavailable'):
             await conversation.run_turn(SESSAO,source_message_id='fin3',conteudo={'clicked_id':'ds:d1:financing'})
         assert self.deleted==[]
 
     @pytest.mark.asyncio
-    async def test_turno_seguinte_preserva_cadastro_pelo_reducer(self,monkeypatch):
-        from app.graph.state import _resource_draft
-        await conversation.run_turn(SESSAO,source_message_id='fin4',conteudo={'clicked_id':'ds:d1:financing'})
-        cadastro=self.state['resource_draft']
-        async def nenhum(*a,**kw): return None
-        monkeypatch.setattr(db,'open_draft',nenhum)
-        await conversation.run_turn(SESSAO,source_message_id='fin5',conteudo={'text':'principal 50000, saldo 40000, juros 1% ao mes'})
-        input=self.invocations[-1]
-        assert input['finance_actions']==[]
-        assert _resource_draft(cadastro,input['resource_draft'])==cadastro
+    async def test_cadastro_incompleto_ainda_extrai_do_texto(self):
+        """`preset` do cadastro incompleto fixa o DOMÍNIO, não a ação.
+
+        Com ação pronta o nó pula o modelo; sem ela, a resposta seguinte da
+        pessoa ainda precisa ser interpretada — confundir os dois deixaria todo
+        cadastro em duas etapas sem extração nenhuma.
+        """
+        self.state['resource_draft']=[{'type':'resource_create','resource':'debts','name':'carro','fields':[]}]
+        await conversation.run_turn(SESSAO,source_message_id='fin5',conteudo={'text':'nenhuma parcela paga ainda'})
+        entrada=self.invocations[-1]
+        assert entrada['domains']==['cadastros'] and entrada['preset']
+        assert entrada['finance_actions']==[] and entrada['resource_actions']==[]

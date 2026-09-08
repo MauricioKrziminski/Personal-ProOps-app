@@ -29,8 +29,15 @@ _PROMPT = """O usuário tem um lançamento pela metade. Faltou este dado: {pergu
 
 Classifique a mensagem dele em `decision`:
 - answer     — está respondendo o dado que faltava ("foi 5000", "5 mil", "no nubank")
+- financing  — está dizendo que a compra NÃO foi no cartão, é um financiamento ou
+               contrato ("é financiamento", "não é cartão, é um financiamento",
+               "financiei", "foi financiado pelo banco")
 - discard    — está desistindo daquele lançamento ("esquece", "deixa pra lá", "cancela aquilo")
 - unrelated  — é outro assunto ("anota comprar café", "quanto gastei esse mês?")
+
+`financing` NUNCA é nome de conta: quem responde isso está RECUSANDO a pergunta do
+cartão, não respondendo. Foi assim que "É financiamento" — o rótulo do próprio
+botão que oferecemos — virou um cartão inexistente com esse nome.
 
 Quando for `answer` e a pergunta for sobre CONTA ou CARTÃO, preencha também
 `extracted_value` com o nome próprio da conta, limpo, sem o resto da conversa:
@@ -104,6 +111,11 @@ async def interpretar(texto: str, rascunho: dict, uso: dict | None = None) -> di
 
     if decisao.decision == "discard":
         return {"acao": "descartar"}
+    if decisao.decision == "financing":
+        # Só vale contra a pergunta do cartão: em qualquer outro slot ("quanto
+        # foi?") isso não responde nada, e converter a compra ali perderia o
+        # dado que ainda falta.
+        return {"acao": "financiamento"} if rascunho.get("slot") == "account" else None
     if decisao.decision != "answer":
         return None
 
@@ -275,6 +287,7 @@ _TOTAL = "t:"
 _POR_PARCELA = "p:"
 _CRIAR_CARTAO = "create_card:"
 _OUTRO_CARTAO = "retry_card"
+_FINANCIAMENTO = "financing"
 
 # `accounts.name` não tem limite no banco, mas o id do botão da Meta tem 256
 # caracteres e o nome viaja DENTRO dele. Cortar aqui é melhor que o envio
@@ -327,6 +340,11 @@ def parse_slot_click(clicked_id: str, draft_id: str) -> dict | None:
         return {"acao": "completar", "slot": "account", "account_id": escolhido} if escolhido else None
     if sufixo == _OUTRO_CARTAO:
         return {"acao": "escolher_cartao"}
+    if sufixo == _FINANCIAMENTO:
+        # Clique e texto digitado desembocam na MESMA ação de propósito: o rótulo
+        # do botão é digitável, e dois caminhos separados foi exatamente como um
+        # deles ficou sem handler.
+        return {"acao": "financiamento"}
     if sufixo.startswith(_CRIAR_CARTAO):
         nome = nome_de_cartao(sufixo[len(_CRIAR_CARTAO):])
         return {"acao": "criar_cartao", "name": nome} if nome else None

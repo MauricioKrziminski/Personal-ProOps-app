@@ -289,8 +289,8 @@ class DraftDecision(BaseModel):
     porque união vira `anyOf`, que o structured output do Gemini lida mal.
     """
 
-    decision: Literal["answer", "discard", "unrelated"] = Field(
-        description="answer, discard ou unrelated"
+    decision: Literal["answer", "discard", "unrelated", "financing"] = Field(
+        description="answer, discard, unrelated ou financing"
     )
     extracted_value: str = Field(
         default="",

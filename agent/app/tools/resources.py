@@ -36,7 +36,7 @@ CATALOG = {
         "debts",
         "name",
         "archived",
-        "name kind principal_cents remaining_cents interest_rate_monthly installments installments_paid installment_cents due_day account_id started_at archived",
+        "name kind calculation_mode principal_cents remaining_cents interest_rate_monthly installments installments_paid installment_cents due_day account_id started_at archived",
     ),
     "goals": ("goals", "name", "archived", "name target_cents deadline archived"),
     "budgets": ("budgets", "category", None, "category limit_cents rollover month"),
@@ -70,13 +70,7 @@ CATALOG = {
 REQUIRED = {
     "accounts": ("name", "type"),
     "cards": ("name", "closing_day", "due_day"),
-    "debts": (
-        "name",
-        "kind",
-        "principal_cents",
-        "remaining_cents",
-        "interest_rate_monthly",
-    ),
+    "debts": ("name", "kind"),
     "goals": ("name", "target_cents"),
     "budgets": ("category", "limit_cents"),
     "assets": ("name", "class", "current_value_cents"),
@@ -85,6 +79,16 @@ REQUIRED = {
     "notes": ("content",),
     "reminders": ("title", "next_run_at"),
     "folders": ("name",),
+}
+# O modo é do CONTRATO, não do formulário. `fixed_installments` (o "Simples" do
+# app, migration 20260908201355) descreve o total das parcelas — juros dentro,
+# sem separar —; `amortized` descreve principal e taxa. O app passou a abrir em
+# Simples e o agente ficou preso no detalhado: pedia principal, saldo devedor e
+# taxa mensal de um contrato que a pessoa não tem em mãos, e repetia a mesma
+# frase para sempre porque não havia resposta possível.
+DEBT_REQUIRED = {
+    "fixed_installments": ("installment_cents", "installments"),
+    "amortized": ("principal_cents", "remaining_cents", "interest_rate_monthly"),
 }
 LABELS = {
     "accounts": "conta",
@@ -104,6 +108,7 @@ LABELS = {
     "credit_limit_cents": "limite",
     "type": "tipo de conta",
     "kind": "tipo",
+    "calculation_mode": "modo de cálculo",
     "principal_cents": "principal original",
     "remaining_cents": "saldo devedor atual",
     "interest_rate_monthly": "juros ao mês",
@@ -147,6 +152,7 @@ LABELS = {
 ENUMS = {
     ("accounts", "type"): {"checking", "savings", "cash", "investment"},
     ("debts", "kind"): {"loan", "financing", "credit_card", "person", "other"},
+    ("debts", "calculation_mode"): {"amortized", "fixed_installments"},
     ("assets", "class"): {
         "investment",
         "real_estate",
@@ -276,10 +282,20 @@ def validate_fields(action: ResourceAction) -> dict:
         _error(
             "Essas parcelas já estão consideradas no saldo devedor? Informe quantas já foram pagas e o saldo devedor atual para corrigir o histórico sem lançar novo pagamento."
         )
+    if action.type != Op.CREATE and "calculation_mode" in values:
+        # Mesma regra do trigger `tg_debts_calculation_mode`: dito aqui, o usuário
+        # lê o motivo em vez de uma exceção do Postgres.
+        _error(
+            "O modo de cálculo de um financiamento não muda depois de criado. "
+            "Cadastre outro contrato se for o caso."
+        )
     if action.type == Op.CREATE:
         if action.resource == "recurring":
             values.setdefault("auto_confirm", False)
-        for key in REQUIRED[action.resource]:
+        requeridos = REQUIRED[action.resource]
+        if action.resource == "debts":
+            requeridos = (*requeridos, *_debt_mode(values))
+        for key in requeridos:
             if values.get(key) is None or values.get(key) == "":
                 _error(
                     f"Para cadastrar {LABELS[action.resource]}, informe {LABELS[key]}. Ainda não salvei nada."
@@ -292,11 +308,51 @@ def validate_fields(action: ResourceAction) -> dict:
             _error(
                 "Quantas parcelas já foram pagas? Informe a quantidade, incluindo zero se nenhuma. Ainda não salvei o financiamento."
             )
+        if action.resource == "debts" and values["calculation_mode"] == "fixed_installments":
+            _derive_fixed_installments(values)
         if action.resource == "cards":
             values["type"] = "credit_card"
         if action.resource == "reminders":
             values.setdefault("channel", "push")
     return values
+
+
+def _debt_mode(values: dict) -> tuple[str, ...]:
+    """Fixa `calculation_mode` e devolve o que o modo exige ao criar.
+
+    Sem o campo, o modo sai do que FOI informado: principal ou saldo devedor é
+    contrato detalhado, o resto é o simples. Depender do modelo lembrar de uma
+    chave a mais seria o mesmo defeito por outra porta — taxa zero não conta
+    como juros informados.
+    """
+    taxa = values.get("interest_rate_monthly")
+    detalhado = bool(
+        values.get("principal_cents")
+        or values.get("remaining_cents")
+        or (taxa is not None and Decimal(taxa) > 0)
+    )
+    modo = values.get("calculation_mode") or ("amortized" if detalhado else "fixed_installments")
+    values["calculation_mode"] = modo
+    return DEBT_REQUIRED[modo]
+
+
+def _derive_fixed_installments(values: dict) -> None:
+    """Principal, saldo e taxa SAEM da parcela.
+
+    O check `debts_fixed_installments_check` exige exatamente estas igualdades;
+    derivar aqui é o que impede o agente e o app de gravarem dois números
+    diferentes para o mesmo contrato.
+    """
+    parcela, total, pagas = (
+        values["installment_cents"], values["installments"], values["installments_paid"]
+    )
+    if not 0 <= pagas <= total:
+        _error(f"Parcelas já pagas devem ficar entre 0 e {total}.")
+    if parcela * total > MAX_CENTS:
+        _error("O total das parcelas ultrapassa o limite permitido.")
+    values["principal_cents"] = parcela * total
+    values["remaining_cents"] = parcela * (total - pagas)
+    values["interest_rate_monthly"] = "0"
 
 
 def _where(resource):
@@ -334,6 +390,8 @@ async def prepare(ctx: ExecContext, action: ResourceAction) -> dict:
         "resource": action.resource,
         "operation": action.type.value,
     }
+    if values.get("calculation_mode"):
+        prepared["calculation_mode"] = values["calculation_mode"]
     if action.type == Op.LIST:
         prepared["summary"] = f"listar {LABELS[action.resource]}"
         return prepared
@@ -441,7 +499,13 @@ async def prepare(ctx: ExecContext, action: ResourceAction) -> dict:
         merged = values
     # Never let a new non-nullable value become null during an edit.
     if action.type != Op.DELETE:
-        for key in REQUIRED[action.resource]:
+        protegidos = REQUIRED[action.resource]
+        if action.resource == "debts":
+            # `REQUIRED["debts"]` encolheu porque o obrigatório passou a depender
+            # do MODO. A trava de "não pode virar null numa edição" vale para os
+            # dois modos — sem esta linha, encolher a lista afrouxaria a edição.
+            protegidos = (*protegidos, *sorted({k for campos in DEBT_REQUIRED.values() for k in campos}))
+        for key in protegidos:
             if key in values and values[key] is None:
                 _error(f"{LABELS[key]} não pode ficar vazio.")
     display = {}
@@ -519,9 +583,21 @@ async def prepare(ctx: ExecContext, action: ResourceAction) -> dict:
         ),
         Op.PAY: "registrar pagamento de",
     }[action.type]
+    # No modo simples, principal, saldo e taxa são ECO da parcela — foram
+    # derivados dela, não informados. Mostrá-los na confirmação escrevia
+    # "juros ao mês: 0%" na mesma frase que termina em "taxa não informada", que
+    # é exatamente o zero que a doc do modo simples proíbe apresentar como
+    # ausência de juros. Quem diz o que eles significam é a linha do rodapé.
+    derivados = (
+        {"calculation_mode", "principal_cents", "remaining_cents", "interest_rate_monthly"}
+        if prepared.get("calculation_mode") == "fixed_installments"
+        else set()
+    )
     details = []
     for key, value in values.items():
         if key in {"timezone", "type"} and action.resource == "cards":
+            continue
+        if key in derivados:
             continue
         shown = display.get(key, value)
         if key.endswith("_cents") and value is not None:
@@ -689,5 +765,5 @@ def prompt_catalogue() -> str:
         catalogue
         + "\nValores permitidos:\n"
         + choices
-        + "\nOrçamento mensal existente: target_month=YYYY-MM-01; orçamento padrão: target_month=default.\nPara pagar prestação de dívida existente: resource_pay, resource=debts, name=nome da dívida, campos amount_cents, account_id (nome da conta), paid_at (YYYY-MM-DD). Não editar remaining_cents para registrar pagamento. Ao criar dívida parcelada, installments_paid exige quantidade explícita (zero se nenhuma). Parcela atual ou data de início não comprova pagamento. Para histórico de parcelas anteriores já pagas de dívida existente, use resource_update com installments_paid e remaining_cents explicitamente informados; se faltar saldo atual pergunte. Nunca use resource_pay para dar baixa retroativa em várias parcelas ou invente amortização a partir do valor da prestação."
+        + "\nFinanciamento/dívida tem dois modos: fixed_installments (padrão) precisa só de installment_cents e installments — o total contratual das parcelas, com juros dentro; amortized precisa de principal_cents, remaining_cents e interest_rate_monthly, e só serve quando o usuário tem esses números do contrato. Nunca converta o total das parcelas em principal nem invente taxa.\nOrçamento mensal existente: target_month=YYYY-MM-01; orçamento padrão: target_month=default.\nPara pagar prestação de dívida existente: resource_pay, resource=debts, name=nome da dívida, campos amount_cents, account_id (nome da conta), paid_at (YYYY-MM-DD). Não editar remaining_cents para registrar pagamento. Ao criar dívida parcelada, installments_paid exige quantidade explícita (zero se nenhuma). Parcela atual ou data de início não comprova pagamento. Para histórico de parcelas anteriores já pagas de dívida existente, use resource_update com installments_paid e remaining_cents explicitamente informados; se faltar saldo atual pergunte. Nunca use resource_pay para dar baixa retroativa em várias parcelas ou invente amortização a partir do valor da prestação."
     )

@@ -2,7 +2,7 @@
   "expo": {
     "name": "Personal ProOps app",
     "slug": "app-ProOps",
-    "version": "1.3.4",
+    "version": "1.3.5",
     "orientation": "portrait",
     "icon": "./assets/images/icons/icon-512.png",
     "scheme": "appproops",
@@ -45,6 +45,7 @@
       "expo-image",
       "expo-status-bar",
       "expo-web-browser",
+      "./plugins/with-android-abis",
       "./plugins/with-apk-installer"
     ],
     "experiments": {

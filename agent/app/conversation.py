@@ -246,30 +246,6 @@ async def run_turn(
                 return await _resposta_do_estado(sessao, estado, pendente["thread_id"])
             return estado.get("reply", "")
 
-    if (
-        rascunho and rascunho.get("slot") == "account"
-        and clique == f"{draft.CLICK_PREFIX}{rascunho['id']}:financing"
-    ):
-        compra = rascunho["action"]
-        fields = [{"name": "kind", "value": "financing"}]
-        if compra.get("installments") is not None:
-            fields.append({"name": "installments", "value": str(compra["installments"])})
-        if compra.get("already_paid_count") is not None:
-            fields.append({"name": "installments_paid", "value": str(compra["already_paid_count"])})
-        # Total parcelado inclui juros. Não é o principal nem o saldo do contrato.
-        await graph().aupdate_state(config, {"resource_draft": [{
-            "type": "resource_create", "resource": "debts",
-            "name": compra.get("description"), "fields": fields,
-        }]})
-        # Só consome a compra DEPOIS de guardar o financiamento inerte.
-        await db.delete_draft(sessao["id"])
-        return await _fechar(sessao, uso, (
-            "Vamos cadastrar como financiamento. Guardei as parcelas informadas. "
-            "Qual é o principal original financiado, o saldo devedor atual e a taxa mensal do contrato? "
-            "O total das parcelas inclui juros e não determina esses valores. "
-            "Vou mostrar os dados para você confirmar antes de salvar."
-        ))
-
     # Cadastro incompleto fica no checkpoint; seus dias não são resposta ao
     # slot de cartão da compra que continua inerte no banco.
     cadastro_incompleto = False
@@ -308,6 +284,11 @@ async def run_turn(
         if decidido and decidido["acao"] == "descartar":
             await db.delete_draft(sessao["id"])
             return await _fechar(sessao, uso, "👍 Beleza, esqueci aquele lançamento.")
+        if decidido and decidido["acao"] == "financiamento":
+            return await _financiamento_do_rascunho(
+                sessao, rascunho, thread, config, uso,
+                source_message_id, conteudo, prompt_history,
+            )
         # Resolve o cartão ANTES de consumir o rascunho. Falhar aqui e apagar
         # deixaria o usuário a um dado do fim e obrigado a repetir a compra
         # inteira — foi essa a queixa. `criar_cartao` e `escolher_cartao` entram
@@ -381,6 +362,57 @@ async def _perguntar_slot(sessao: dict, draft_id: str, slot: str, pergunta: str)
         return pergunta
     cartoes = await db.accounts(sessao["workspace_id"], only_cards=True)
     return _pergunta_cartao(draft_id, cartoes, pergunta)
+
+
+async def _financiamento_do_rascunho(
+    sessao: dict, rascunho: dict, thread: str, config: dict, uso: dict,
+    source_message_id: str, conteudo: dict, prompt_history: list[dict] | None,
+) -> str | dict:
+    """A compra parcelada vira um contrato de financiamento — COMPLETO.
+
+    O que a pessoa já disse ("48x de 1470") é exatamente o contrato no modo
+    simples: total das parcelas, juros dentro, sem separar. Este caminho pedia
+    principal original, saldo devedor e taxa mensal — três números que ela não
+    tem em mãos e que o app parou de exigir na `20260908201355`. A conversa não
+    tinha saída: nenhuma resposta possível completava o cadastro, e a mesma
+    frase voltava a cada mensagem.
+
+    A compra só é consumida DEPOIS do grafo: falhar aqui e apagar deixaria a
+    pessoa a um dado do fim e obrigada a repetir tudo.
+    """
+    from app.graph.build import graph
+
+    compra = rascunho["action"]
+    parcelas = compra.get("installments") or 0
+    total = compra.get("amount_cents") or 0
+    campos: dict = {"kind": "financing", "calculation_mode": "fixed_installments"}
+    if parcelas >= 2:
+        campos["installments"] = parcelas
+        # Divisão exata é o caso normal (`com_total` multiplicou a parcela de
+        # volta). Sobrando resto, a parcela fica de fora e o catálogo pergunta —
+        # inventar um arredondamento aqui gravaria um contrato que não fecha.
+        if total and total % parcelas == 0:
+            campos["installment_cents"] = total // parcelas
+    if compra.get("already_paid_count") is not None:
+        campos["installments_paid"] = compra["already_paid_count"]
+
+    estado_inicial = _estado_base(
+        sessao, source_message_id, conteudo, thread, prompt_history
+    )
+    estado_inicial.update(
+        resource_actions=[{
+            "type": "resource_create", "resource": "debts",
+            "name": compra.get("description"),
+            "fields": [{"name": k, "value": str(v)} for k, v in campos.items()],
+        }],
+        domains=["cadastros"],
+        preset=True,
+    )
+    with telemetry.trace(thread_id=thread, user_id=sessao["user_id"]):
+        estado = await graph().ainvoke(estado_inicial, config=config)
+    await db.delete_draft(sessao["id"])
+    await _audit(sessao, estado, uso)
+    return await _resposta_do_estado(sessao, estado, thread)
 
 
 async def _cartao_do_rascunho(

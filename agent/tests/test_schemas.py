@@ -104,7 +104,7 @@ def test_schemas_de_decisao_constroem_de_verdade():
 
     for modelo, valores in (
         (ConfirmDecision, {"approve", "reject", "unclear"}),
-        (DraftDecision, {"answer", "discard", "unrelated"}),
+        (DraftDecision, {"answer", "discard", "unrelated", "financing"}),
     ):
         esquema = modelo.model_json_schema()          # levantava PydanticUserError
         campo = esquema["properties"]["decision"]
