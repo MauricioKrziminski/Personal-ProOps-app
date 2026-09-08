@@ -52,8 +52,18 @@ export function attestNativeBuild(receipt, result, apkSha256) {
 export function assertAttestedBuild(receipt) {
   assert.ok(receipt.build, 'Comprovante sem metadados do build publicado; gere um APK nativo.');
   for (const key of ['sourceCommit', 'runtimeVersion', 'channel', 'applicationId', 'projectId']) {
-    assert.equal(receipt.build[key], receipt[key], `Metadado EAS ${key} divergente.`);
+    assert.equal(receipt.build[key], receipt[key], `Metadado do build ${key} divergente.`);
   }
   assert.match(receipt.build.apkSha256, /^[a-f0-9]{64}$/);
   assert.ok(typeof receipt.build.id === 'string' && receipt.build.id.length > 0);
+  if (receipt.build.provider !== undefined) {
+    assert.equal(receipt.build.provider, 'github-actions-local');
+    assert.match(receipt.build.runId, /^[1-9]\d*$/);
+    assert.match(receipt.build.runAttempt, /^[1-9]\d*$/);
+    assert.equal(receipt.build.id, `${receipt.build.runId}/${receipt.build.runAttempt}`);
+    assert.equal(receipt.build.appVersion, receipt.runtimeVersion);
+    assert.equal(receipt.build.updatesEnabled, true);
+    assert.equal(receipt.build.updatesUrl, receipt.updatesUrl);
+    assert.equal(receipt.build.updatesUrl, `https://u.expo.dev/${receipt.projectId}`);
+  }
 }

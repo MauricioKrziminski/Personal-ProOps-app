@@ -1,9 +1,11 @@
 name: Publish Android release
+run-name: ${{ startsWith(github.ref, 'refs/tags/v') && format('Release Android {0}', github.ref_name) || 'Preparar cache Android (sem publicar release)' }}
 
 on:
   push:
     tags:
       - 'v*'
+  workflow_dispatch:
 
 permissions:
   contents: read
@@ -20,7 +22,10 @@ jobs:
   publish:
     name: Build, verify and publish APK
     runs-on: ubuntu-latest
-    timeout-minutes: 180
+    timeout-minutes: 60
+    env:
+      CCACHE_MAXSIZE: 2G
+      CCACHE_COMPILERCHECK: content
 
     steps:
       - name: Check out source
@@ -50,37 +55,49 @@ jobs:
           eas-version: 23.2.0
           token: ${{ secrets.EXPO_TOKEN }}
 
-      - name: Record native compatibility in the build environment
-        env:
-          EXPO_NO_DOTENV: '1'
-        run: eas env:exec production 'APP_VARIANT=production node scripts/release/create-native-compatibility.mjs "$RUNNER_TEMP/native-compatibility.json"'
+      - name: Set up Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
 
-      - name: Build signed APK on EAS
-        run: >-
-          eas build
-          --platform android
-          --profile distribution
-          --non-interactive
-          --wait
-          --freeze-credentials
-          --json
-          > "$RUNNER_TEMP/eas-build.json"
-
-      - name: Download APK
-        id: download
-        run: |
-          release_dir="$RUNNER_TEMP/personal-proops-release"
-          mkdir -p "$release_dir"
-          artifact_url="$(node scripts/release/extract-eas-artifact.mjs --input "$RUNNER_TEMP/eas-build.json")"
-          apk_path="$release_dir/personal-proops.apk"
-          curl --fail --location --retry 3 --retry-all-errors --output "$apk_path" "$artifact_url"
-          echo "apk_path=$apk_path" >> "$GITHUB_OUTPUT"
-          echo "release_dir=$release_dir" >> "$GITHUB_OUTPUT"
-
-      - name: Set up Android inspection tools
+      - name: Set up Android build and inspection tools
         uses: android-actions/setup-android@v4
         with:
-          packages: 'platform-tools build-tools;36.0.0'
+          packages: 'platform-tools platforms;android-36 build-tools;36.0.0 ndk;27.1.12297006 cmake;3.22.1'
+
+      - name: Restore Gradle dependencies and build cache
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          cache-read-only: false
+
+      - name: Install native compiler cache
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install --no-install-recommends -y ccache
+
+      - name: Restore native compiler outputs
+        uses: actions/cache@v4
+        with:
+          path: ${{ runner.temp }}/proops-ccache
+          key: android-ccache-${{ runner.os }}-${{ runner.arch }}-ndk27.1-cmake3.22-${{ hashFiles('package-lock.json') }}-${{ github.sha }}
+          restore-keys: |
+            android-ccache-${{ runner.os }}-${{ runner.arch }}-ndk27.1-cmake3.22-${{ hashFiles('package-lock.json') }}-
+            android-ccache-${{ runner.os }}-${{ runner.arch }}-ndk27.1-cmake3.22-
+
+      - name: Build signed APK on this runner
+        env:
+          APP_VARIANT: production
+          EXPO_NO_DOTENV: '1'
+          CCACHE_DIR: ${{ runner.temp }}/proops-ccache
+          EAS_LOCAL_BUILD_WORKINGDIR: ${{ runner.temp }}/eas-local
+        run: eas env:exec production 'bash scripts/release/build-local-android.sh'
+
+      - name: Locate local APK
+        id: download
+        run: |
+          echo "apk_path=$RUNNER_TEMP/personal-proops-release/personal-proops.apk" >> "$GITHUB_OUTPUT"
+          echo "release_dir=$RUNNER_TEMP/personal-proops-release" >> "$GITHUB_OUTPUT"
 
       - name: Verify APK identity, version and signature
         id: apk
@@ -97,7 +114,7 @@ jobs:
             echo "Unexpected application id: $application_id" >&2
             exit 1
           fi
-          if [ "$GITHUB_REF_NAME" != "v$version_name" ]; then
+          if [[ "$GITHUB_REF" == refs/tags/* && "$GITHUB_REF_NAME" != "v$version_name" ]]; then
             echo "Tag $GITHUB_REF_NAME does not match APK version $version_name" >&2
             exit 1
           fi
@@ -128,12 +145,22 @@ jobs:
           echo "release_path=$release_path" >> "$GITHUB_OUTPUT"
           echo "apk_sha256=$apk_sha256" >> "$GITHUB_OUTPUT"
 
-      - name: Attest compatibility against finished EAS build and verified APK
+      - name: Attest compatibility from the verified APK
         env:
-          APK_SHA256: ${{ steps.apk.outputs.apk_sha256 }}
-        run: node scripts/release/attest-native-compatibility.mjs "$RUNNER_TEMP/native-compatibility.json" "$RUNNER_TEMP/eas-build.json" "$APK_SHA256"
+          APK_PATH: ${{ steps.apk.outputs.release_path }}
+        run: node scripts/release/attest-local-native-compatibility.mjs "$RUNNER_TEMP/native-compatibility.json" "$APK_PATH" "$ANDROID_SDK_ROOT/build-tools/36.0.0/aapt2"
+
+      - name: Retain verified build for inspection
+        uses: actions/upload-artifact@v4
+        with:
+          name: verified-android-${{ github.run_id }}
+          path: |
+            ${{ steps.apk.outputs.release_path }}
+            ${{ runner.temp }}/native-compatibility.json
+          retention-days: 7
 
       - name: Generate and validate update manifest
+        if: startsWith(github.ref, 'refs/tags/v')
         id: manifest
         env:
           APK_SHA256: ${{ steps.apk.outputs.apk_sha256 }}
@@ -154,6 +181,7 @@ jobs:
           echo "manifest_path=$manifest_path" >> "$GITHUB_OUTPUT"
 
       - name: Publish release assets
+        if: startsWith(github.ref, 'refs/tags/v')
         env:
           GH_TOKEN: ${{ secrets.DISTRIBUTION_REPO_TOKEN }}
           MANIFEST_PATH: ${{ steps.manifest.outputs.manifest_path }}
