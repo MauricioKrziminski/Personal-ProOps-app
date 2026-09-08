@@ -33,7 +33,7 @@ from app.graph.schemas import (
 from app.domain.required import faltando
 from app.domain.money import cents_to_brl
 from app.graph.state import AgentState
-from app.tools import resolve
+from app.tools import guards, resolve
 from app.services import gemini
 from app.tools.base import ExecContext
 from app.tools.finance import apply_rules

@@ -6,7 +6,7 @@ cancelou ou cortar quem pagou.
 
 from __future__ import annotations
 
-from datetime import date, timezone as _tz
+from datetime import timezone as _tz
 from datetime import datetime
 
 STORE_PRODUCTS: dict[str, str] = {

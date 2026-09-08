@@ -198,7 +198,8 @@ async def create_reminder(ctx: ExecContext, action: NotesAction) -> ToolResult:
 
 
 async def delete_reminder(ctx: ExecContext, action: NotesAction) -> ToolResult:
-    termo = guards.require_text(action.search_term or action.content, o_que="qual lembrete")
+    # Só valida: o título exibido sai do alvo congelado, logo abaixo.
+    guards.require_text(action.search_term or action.content, o_que="qual lembrete")
     # alvo congelado pela Fase Cognitiva (ver delete_note)
     achados = [{"id": ctx.target["candidates"][0]["id"],
                 "title": ctx.target["candidates"][0]["label"]}]

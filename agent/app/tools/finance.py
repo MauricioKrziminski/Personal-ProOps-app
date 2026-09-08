@@ -737,7 +737,8 @@ async def create_goal(ctx: ExecContext, action: FinanceAction) -> ToolResult:
 async def goal_deposit(ctx: ExecContext, action: FinanceAction) -> ToolResult:
     """Aporte NÃO vira transação: é movimento entre contas do próprio usuário e
     lançar como despesa inflaria o gasto do mês."""
-    nome = guards.require_text(action.target_ref or action.description, o_que="em qual meta")
+    # Só valida: o nome exibido sai do alvo congelado, logo abaixo.
+    guards.require_text(action.target_ref or action.description, o_que="em qual meta")
     valor = guards.require_amount(_amount_with_fallback(ctx, action), o_que="o valor do aporte")
 
     # alvo congelado; `ensure_owned` já rodou no registry, num ponto só
@@ -755,7 +756,8 @@ async def goal_deposit(ctx: ExecContext, action: FinanceAction) -> ToolResult:
 
 
 async def update_asset_value(ctx: ExecContext, action: FinanceAction) -> ToolResult:
-    nome = guards.require_text(action.target_ref or action.description, o_que="qual bem")
+    # Só valida: o nome exibido sai do alvo congelado, logo abaixo.
+    guards.require_text(action.target_ref or action.description, o_que="qual bem")
     valor = guards.require_amount(_amount_with_fallback(ctx, action), o_que="o valor novo")
 
     # alvo congelado; `ensure_owned` já rodou no registry, num ponto só

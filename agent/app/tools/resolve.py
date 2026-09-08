@@ -20,7 +20,6 @@ from app.domain.reference import clean_term, wants_latest, wants_whole_plan
 from app.graph.schemas import (
     FinanceAction,
     FinanceActionType,
-    NotesAction,
     NotesActionType,
 )
 
