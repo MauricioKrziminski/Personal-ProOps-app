@@ -350,6 +350,15 @@ Catálogo:
                      state['timezone'], history=(state.get('messages') or [])[:-1])
     if state.get('resource_draft'):
         user += "\n" + wrap_untrusted('document_content', json.dumps(state['resource_draft'],ensure_ascii=False))
+        # A PERGUNTA que ficou pendente, fora do envelope porque é texto NOSSO.
+        # Sem ela o modelo re-extrai a mensagem inteira do zero e um "8" solto
+        # não é instrução de cadastro nenhuma — era assim que a resposta certa
+        # à pergunta certa não preenchia campo nenhum.
+        pendentes = [d.get('_pergunta') for d in state['resource_draft'] if d.get('_pergunta')]
+        if pendentes:
+            user += ("\n\nVocê perguntou ao usuário: " + " | ".join(pendentes)
+                     + "\nA mensagem dele é a RESPOSTA a isso: preencha o campo correspondente"
+                     " do cadastro pendente em vez de tratá-la como pedido novo.")
     if state.get('preset') and state.get('resource_actions'):
         # Ação já montada fora do grafo (a compra parcelada que virou
         # financiamento). Reextrair gastaria uma chamada para chegar a um
@@ -370,8 +379,23 @@ Catálogo:
         try:
             proposal=await resources.prepare(context,action)
         except Level1Error as err:
-            incomplete.append(action.model_dump(mode='json'))
-            questions.append(err.mensagem_usuario)
+            # A pergunta viaja junto do cadastro pendente: é o que deixa o
+            # próximo turno saber o que foi perguntado e, se a MESMA pergunta
+            # voltar, saber que a resposta não entrou.
+            incomplete.append({**action.model_dump(mode='json'), '_pergunta': err.mensagem_usuario})
+            ja_perguntada = any(
+                d.get('_pergunta') == err.mensagem_usuario
+                for d in (state.get('resource_draft') or [])
+            )
+            questions.append(
+                # Repetir a frase idêntica é o que faz o agente parecer surdo:
+                # o usuário respondeu, não entrou, e nada na tela diz isso nem
+                # como sair. Vale para qualquer recurso e qualquer campo.
+                f"Não consegui tirar esse dado do que você escreveu. {err.mensagem_usuario}"
+                "\nSe preferir, responde *cancela* que eu descarto este cadastro."
+                if ja_perguntada and (state.get('text') or '').strip()
+                else err.mensagem_usuario
+            )
             continue
         actions.append(action.model_dump(mode='json'))
         prepared.append(proposal)

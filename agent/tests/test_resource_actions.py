@@ -250,3 +250,85 @@ async def test_debt_payment_requires_amount_and_account(monkeypatch):
         await resources.prepare(
             ctx(), action("debts", "resource_pay", amount_cents=147000)
         )
+
+
+# --- a pergunta pendente: o que o usuário responde tem que ENTRAR -----------
+
+
+def _no_state(text, resource_draft=None):
+    return {
+        "user_id": "user", "workspace_id": "workspace", "phone": None,
+        "timezone": "America/Sao_Paulo", "text": text, "source_message_id": "app:1",
+        "messages": [], "results": [], "resource_draft": resource_draft or [],
+    }
+
+
+def _stub_incomplete(monkeypatch, capturado=None):
+    """Modelo que devolve sempre um cartão sem ciclo — a Level1Error é o alvo."""
+    from app.graph import nodes
+    from app.graph.schemas import ResourcePlan
+
+    async def sem_banco(sql, *a, **kw):
+        return []
+
+    monkeypatch.setattr(resources.db, "fetch", sem_banco)
+
+    class Modelo:
+        async def ainvoke(self, mensagens):
+            if capturado is not None:
+                capturado.append(mensagens)
+            return ResourcePlan(actions=[action()])
+
+    monkeypatch.setattr(nodes.gemini, "structured", lambda *a, **kw: Modelo())
+    return nodes
+
+
+@pytest.mark.asyncio
+async def test_pergunta_pendente_viaja_com_o_cadastro(monkeypatch):
+    """Sem a pergunta junto, o turno seguinte não sabe o que foi perguntado.
+
+    O modelo re-extraía a mensagem inteira do zero, e um "8" solto não é
+    instrução de cadastro nenhuma — a resposta certa à pergunta certa não
+    preenchia campo nenhum.
+    """
+    nodes = _stub_incomplete(monkeypatch)
+    saida = await nodes.resource_node(_no_state("cadastra o cartão Nubank"))
+    assert saida["resource_draft"][0]["_pergunta"] == saida["results"][0]
+
+
+@pytest.mark.asyncio
+async def test_a_pergunta_chega_ao_modelo_no_turno_seguinte(monkeypatch):
+    capturado = []
+    nodes = _stub_incomplete(monkeypatch, capturado)
+    pendente = [{"type": "resource_create", "resource": "cards", "name": "Nubank",
+                 "fields": [], "_pergunta": "Informe dia de fechamento."}]
+    await nodes.resource_node(_no_state("dia 7", pendente))
+    humano = capturado[0][-1][1]
+    assert "Você perguntou ao usuário: Informe dia de fechamento." in humano
+    assert "RESPOSTA" in humano
+
+
+@pytest.mark.asyncio
+async def test_mesma_pergunta_duas_vezes_nao_repete_a_frase_identica(monkeypatch):
+    """Repetir a frase igual é o que faz o agente parecer surdo.
+
+    O usuário respondeu, não entrou, e nada na tela dizia isso nem como sair.
+    """
+    nodes = _stub_incomplete(monkeypatch)
+    primeiro = await nodes.resource_node(_no_state("cadastra o cartão Nubank"))
+    pergunta = primeiro["results"][0]
+
+    segundo = await nodes.resource_node(_no_state("sei lá", primeiro["resource_draft"]))
+    assert segundo["results"][0] != pergunta
+    assert "Não consegui tirar esse dado" in segundo["results"][0]
+    assert "cancela" in segundo["results"][0]
+    assert pergunta in segundo["results"][0]  # a pergunta continua lá
+
+
+@pytest.mark.asyncio
+async def test_turno_sem_texto_nao_conta_como_resposta_ignorada(monkeypatch):
+    """Anexo ou clique sem texto não é o usuário falhando em responder."""
+    nodes = _stub_incomplete(monkeypatch)
+    primeiro = await nodes.resource_node(_no_state("cadastra o cartão Nubank"))
+    segundo = await nodes.resource_node(_no_state("   ", primeiro["resource_draft"]))
+    assert segundo["results"][0] == primeiro["results"][0]
