@@ -31,6 +31,7 @@ import {
 } from '@/hooks/use-finance';
 import { formatBRL, formatDateBR, localISODate } from '@/hooks/use-items';
 import { confirmDestructive } from '@/lib/item-actions';
+import { dueLabel, settleHint, settleLabel } from '@/lib/settle-labels';
 
 /**
  * Lançamento (detalhe) — a tela que faltava.
@@ -303,12 +304,12 @@ export default function TransactionDetailScreen() {
       {tx.status === 'pending' ? (
         <Section title="Ainda não aconteceu">
           <Row
-            title={tx.due_at ? `Vence em ${formatDateBR(tx.due_at)}` : 'Sem data de vencimento'}
-            subtitle="Marque quando pagar para sair da projeção"
+            title={dueLabel(tx.kind, tx.due_at ? formatDateBR(tx.due_at) : null)}
+            subtitle={settleHint(tx.kind)}
             icon="clock"
             trailing={
               <Button
-                label="Paguei"
+                label={settleLabel(tx.kind)}
                 size="sm"
                 variant="secondary"
                 loading={markPaid.isPending}

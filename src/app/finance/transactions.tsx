@@ -39,6 +39,7 @@ import {
 import { formatBRL, formatDateBR, localISODate } from '@/hooks/use-items';
 import { monthBounds } from '@/lib/dates';
 import { confirmDestructive } from '@/lib/item-actions';
+import { dueInline, settleLabel } from '@/lib/settle-labels';
 import { useDebounced } from '@/hooks/use-debounced';
 import { useTheme, useScheme } from '@/hooks/use-theme';
 
@@ -478,7 +479,7 @@ export default function TransactionsScreen() {
           renderItem={({ item: tx, index, section }) => {
             const badges = [
               tx.status === 'pending'
-                ? `previsto${tx.due_at ? ` · vence ${formatDateBR(tx.due_at)}` : ''}`
+                ? dueInline(tx.kind, tx.due_at ? formatDateBR(tx.due_at) : null)
                 : null,
               tx.installment_no ? `parcela ${tx.installment_no}` : null,
               tx.invoice_id ? 'fatura' : null,
@@ -553,7 +554,7 @@ export default function TransactionsScreen() {
                           />
                           {tx.status === 'pending' ? (
                             <Button
-                              label="Paguei"
+                              label={settleLabel(tx.kind)}
                               size="sm"
                               variant="secondary"
                               onPress={() => pay(tx)}

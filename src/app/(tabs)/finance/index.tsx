@@ -43,6 +43,7 @@ import { Elevation, Motion, Radius, Space, Type, tabular } from '@/design/tokens
 import {
   useAccounts,
   useBudgetsStatus,
+  useDebts,
   useCardSummary,
   useCashFlowForecast,
   useDeleteTransaction,
@@ -229,6 +230,7 @@ export default function FinanceScreen() {
   const previous = useTransactionsSummary(previousRange.from, previousRange.to);
   const budgets = useBudgetsStatus(month);
   const accounts = useAccounts();
+  const debts = useDebts();
   const cards = useCardSummary();
   const [janelaCashflow, setJanelaCashflow] = useState('6');
   /** O cartão que a carteira está mostrando — rotula a saída logo abaixo dela. */
@@ -462,6 +464,25 @@ export default function FinanceScreen() {
                   : undefined
               }
             />
+            {/*
+              Dívida e financiamento SÓ existiam atrás de "Ver tudo". Quem
+              cadastrou um financiamento de R$ 58.800 — pelo app ou pelo agente —
+              abria o Financeiro e não via uma palavra sobre ele; foi assim que
+              um cadastro que DEU CERTO pareceu não ter acontecido.
+
+              Aparece só quando existe, e o número é o que falta pagar: contagem
+              que não muda decisão é enfeite, e saldo devedor muda.
+            */}
+            {debts.data?.length ? (
+              <Shortcut
+                title="Dívidas"
+                icon="banknote"
+                href="/finance/debts"
+                count={formatBRL(
+                  debts.data.reduce((soma, d) => soma + Number(d.remaining_cents), 0),
+                )}
+              />
+            ) : null}
           </View>
         </View>
 

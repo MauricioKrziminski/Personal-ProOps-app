@@ -166,6 +166,10 @@ export default function ForecastScreen() {
 
   const linhaConta = (b: (typeof contas)[number]) => {
     const fatura = b.kind === 'invoice';
+    // `debt` é a prestação de um financiamento: `ref_id` é o id da DÍVIDA, não de
+    // um lançamento. Baixa de lançamento nele não acharia nada — vai para a
+    // dívida, do mesmo jeito que a fatura vai para a fatura.
+    const parcelaDeDivida = b.kind === 'debt';
     const cents = Number(b.amount_cents);
 
     return (
@@ -173,16 +177,18 @@ export default function ForecastScreen() {
         key={b.ref_id}
         title={b.title}
         subtitle={b.overdue ? `venceu em ${isoToBR(b.due_date)}` : isoToBR(b.due_date)}
-        icon={fatura ? 'creditcard' : 'doc.text'}
-        chevron={fatura}
+        icon={fatura ? 'creditcard' : parcelaDeDivida ? 'banknote' : 'doc.text'}
+        chevron={fatura || parcelaDeDivida}
         accessibilityLabel={`${b.title}, ${b.overdue ? 'atrasado, vencia' : 'vence'} em ${isoToBR(b.due_date)}, ${formatBRL(cents)}`}
         onPress={
           fatura
             ? () => router.push({ pathname: '/finance/invoice/[id]', params: { id: b.ref_id } })
-            : undefined
+            : parcelaDeDivida
+              ? () => router.push('/finance/debts')
+              : undefined
         }
         onLongPress={
-          fatura
+          fatura || parcelaDeDivida
             ? undefined
             : () =>
                 showItemActions(b.title, [
@@ -203,6 +209,13 @@ export default function ForecastScreen() {
                 onPress={() =>
                   router.push({ pathname: '/finance/invoice/[id]', params: { id: b.ref_id } })
                 }
+              />
+            ) : parcelaDeDivida ? (
+              <Button
+                label="Ver dívida"
+                size="sm"
+                variant="secondary"
+                onPress={() => router.push('/finance/debts')}
               />
             ) : (
               <Button

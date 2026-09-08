@@ -527,7 +527,13 @@ export function useCreateInstallmentPlan() {
 
 export type ForecastDay = Fns['cash_flow_forecast']['Returns'][number];
 export type UpcomingBill = Omit<Fns['upcoming_bills']['Returns'][number], 'kind'> & {
-  kind: 'invoice' | 'transaction';
+  /**
+   * `debt` entrou na 20260908235000: é a prestação de um financiamento, e o
+   * `ref_id` dela é o id da DÍVIDA, não de um lançamento. Quem consome tem que
+   * rotear, nunca chamar a baixa de lançamento — foi a união fechada aqui que
+   * fez o TypeScript exigir isso das duas telas.
+   */
+  kind: 'invoice' | 'transaction' | 'debt';
 };
 export type Affordability = Fns['affordability']['Returns'][number];
 

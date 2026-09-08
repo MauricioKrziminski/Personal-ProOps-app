@@ -304,8 +304,42 @@ function seedClient() {
     }),
   ];
 
-  client.setQueryData(['transactions', 'recent', '5'], recentes);
-  client.setQueryData(['transactions', 'list', { month: mes }], recentes);
+  // ── as duas fixtures que provam as correções de 08/09/2026 ────────────────
+  // Receita PREVISTA: era ela que ganhava o botão "Paguei", como se salário
+  // fosse dívida. Aqui ela tem que ler "Recebi" e "previsto · chega".
+  const receitaPrevista = tx({
+    id: 'prev-salario-futuro',
+    kind: 'income',
+    description: 'Salário',
+    category: 'salário',
+    amount_cents: 900000,
+    status: 'pending',
+    due_at: ultimoDia,
+    occurred_at: ultimoDia,
+  });
+  const comPrevista = [receitaPrevista, ...recentes];
+
+  client.setQueryData(['transactions', 'recent', '5'], comPrevista);
+  client.setQueryData(['transactions', 'list', { month: mes }], comPrevista);
+
+  // Financiamento: existia no banco e não aparecia em lugar nenhum do Financeiro.
+  client.setQueryData(['debts'], [
+    {
+      id: 'prev-divida-carro',
+      name: 'carro',
+      kind: 'financing',
+      calculation_mode: 'fixed_installments',
+      principal_cents: 7056000,
+      remaining_cents: 5880000,
+      interest_rate_monthly: 0,
+      installments: 48,
+      installments_paid: 8,
+      installment_cents: 147000,
+      account_id: null,
+      due_day: 10,
+      archived: false,
+    },
+  ]);
 
   // `transactions_summary` devolve UMA linha por (categoria, tipo), não a transação.
   const resumo = (fim: string, gasto: number, receita: number) => [

@@ -274,14 +274,31 @@ export default function TodayScreen() {
                   <Money cents={Number(b.amount_cents)} variant="ticker" tone="danger" />
                 </View>
 
+                {/*
+                  `debt` é a prestação de um financiamento, e `ref_id` é o id da
+                  DÍVIDA, não de um lançamento — dar baixa de lançamento nele não
+                  acharia nada. Vai para a dívida, igual a fatura vai para a fatura.
+                */}
                 <Button
-                  label={b.kind === 'invoice' ? 'Pagar fatura' : 'Paguei'}
-                  icon="checkmark"
+                  label={
+                    b.kind === 'invoice'
+                      ? 'Pagar fatura'
+                      : b.kind === 'debt'
+                        ? 'Ver dívida'
+                        : 'Paguei'
+                  }
+                  icon={b.kind === 'debt' ? 'chevron.right' : 'checkmark'}
                   size="sm"
                   variant="secondary"
-                  onPress={() => b.kind === 'invoice'
-                    ? router.push({ pathname: '/finance/invoice/[id]', params: { id: b.ref_id } })
-                    : pay(b.ref_id, b.title)}
+                  onPress={() => {
+                    if (b.kind === 'invoice') {
+                      router.push({ pathname: '/finance/invoice/[id]', params: { id: b.ref_id } });
+                    } else if (b.kind === 'debt') {
+                      router.push('/finance/debts');
+                    } else {
+                      pay(b.ref_id, b.title);
+                    }
+                  }}
                 />
               </View>
             ))}
