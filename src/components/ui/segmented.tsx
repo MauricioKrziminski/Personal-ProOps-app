@@ -96,6 +96,10 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     paddingVertical: Space.sm,
+    // Respiro lateral: sem ele o rótulo encosta na borda da célula e, com fonte grande, quebra
+    // no meio da palavra. O rótulo não trunca mais (design.md §7), então a célula é que precisa
+    // ter onde crescer — quem dá a largura é o `minWidth` de quem usa o controle.
+    paddingHorizontal: Space.xs,
     minHeight: 32,
   },
 });

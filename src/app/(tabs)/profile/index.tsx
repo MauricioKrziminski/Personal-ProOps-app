@@ -473,17 +473,27 @@ function Stat({ valor, rotulo, limite }: { valor: string; rotulo: string; limite
 }
 
 const styles = StyleSheet.create({
+  /*
+    `flexWrap`: com fonte grande o rótulo + os três segmentos não cabem na mesma linha, e apertar
+    o controle partia "Sistema" em "Sistem/a" dentro da célula. Aqui quem cede é o LAYOUT — o
+    segmentado desce inteiro para a linha de baixo (`minWidth` no controle é o gatilho).
+    O `flexShrink: 0` no texto é o que faz o `flexWrap` valer: o Yoga prefere ENCOLHER a quebrar.
+  */
   temaRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
+    flexWrap: 'wrap',
     gap: Space.md,
     paddingHorizontal: Space.lg,
     paddingVertical: Space.md,
   },
-  temaText: { flex: 1, minWidth: 0 },
+  temaText: { flexShrink: 0, maxWidth: '100%' },
   /** Largura fixa: com `flex` o segmentado encolhia até o rótulo "Sistema" truncar. */
-  temaControl: { width: 200 },
+  /* Sem `width` fixa: com fonte grande "Sistema" não cabia em 200 e quebrava no meio da palavra.
+     `minWidth` é o gatilho da quebra da linha acima; `flexGrow` faz o controle ocupar a linha
+     inteira quando ele desce. */
+  temaControl: { flexGrow: 1, minWidth: 240 },
   shrink: { flex: 1, minWidth: 0 },
   idCard: {
     gap: Space.lg,
