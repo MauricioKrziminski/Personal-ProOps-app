@@ -24,6 +24,10 @@ jobs:
     name: Build, verify and publish APK
     runs-on: ubuntu-latest
     timeout-minutes: 60
+    env:
+      CCACHE_DIR: ${{ runner.temp }}/proops-ccache
+      CCACHE_MAXSIZE: 2G
+      CCACHE_COMPILERCHECK: content
 
     steps:
       - name: Check out source
@@ -68,6 +72,19 @@ jobs:
         uses: gradle/actions/setup-gradle@v4
         with:
           cache-read-only: false
+
+      - name: Install native compiler cache
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install --no-install-recommends -y ccache
+
+      - name: Restore native compiler outputs
+        uses: actions/cache@v4
+        with:
+          path: ${{ env.CCACHE_DIR }}
+          key: android-ccache-${{ runner.os }}-${{ runner.arch }}-ndk27.1-cmake3.22-${{ hashFiles('package-lock.json') }}-${{ github.sha }}
+          restore-keys: |
+            android-ccache-${{ runner.os }}-${{ runner.arch }}-ndk27.1-cmake3.22-${{ hashFiles('package-lock.json') }}-
 
       - name: Build signed APK on this runner
         env:

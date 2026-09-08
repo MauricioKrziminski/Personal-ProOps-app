@@ -12,6 +12,10 @@ gradle_home="${GRADLE_USER_HOME:-$HOME/.gradle}"
 mkdir -p "$gradle_home"
 # Match EAS medium's JVM budget; Expo's generated local default is only 2 GB/512 MB.
 printf '\norg.gradle.caching=true\norg.gradle.jvmargs=-Xmx4g -XX:MaxMetaspaceSize=1g -Dfile.encoding=UTF-8\n' >> "$gradle_home/gradle.properties"
+# React Native's CMake hook detects ccache in PATH. Do not wrap it a second time.
+# Keep compiler/header/path checks intact; cache only compiler outputs, never the build tree.
+ccache --zero-stats
+trap 'ccache --show-stats --verbose' EXIT
 started_at=$SECONDS
 eas build --platform android --profile distribution --local --non-interactive --freeze-credentials --output "$release_dir/personal-proops.apk"
 test -s "$release_dir/personal-proops.apk"
