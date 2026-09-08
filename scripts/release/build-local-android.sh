@@ -7,6 +7,10 @@ set -euo pipefail
 release_dir="$RUNNER_TEMP/personal-proops-release"
 mkdir -p "$release_dir"
 node scripts/release/create-native-compatibility.mjs "$RUNNER_TEMP/native-compatibility.json"
+# EAS local does not provide cloud caching; Gradle uses the cache restored by setup-gradle.
+gradle_home="${GRADLE_USER_HOME:-$HOME/.gradle}"
+mkdir -p "$gradle_home"
+printf '\norg.gradle.caching=true\n' >> "$gradle_home/gradle.properties"
 started_at=$SECONDS
 eas build --platform android --profile distribution --local --non-interactive --freeze-credentials --output "$release_dir/personal-proops.apk"
 test -s "$release_dir/personal-proops.apk"
