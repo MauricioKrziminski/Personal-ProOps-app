@@ -1,4 +1,4 @@
-import { StyleSheet } from "react-native";
+import { Platform, StyleSheet } from "react-native";
 import { KeyboardAwareScrollView } from "react-native-keyboard-controller";
 import Animated, { FadeIn, FadeInDown } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -71,7 +71,10 @@ export function AuthScreen({
         ]}
         bottomOffset={Space.xxl}
         keyboardShouldPersistTaps="handled"
-        keyboardDismissMode="interactive"
+        // `interactive` (arrastar o teclado para baixo) é iOS-only: no Android ele cai em
+        // `none`, e o gesto de fechar arrastando simplesmente não existe. `on-drag` é o
+        // equivalente que a plataforma tem.
+        keyboardDismissMode={Platform.OS === "ios" ? "interactive" : "on-drag"}
         showsVerticalScrollIndicator={false}
       >
         {showBrand ? (

@@ -84,6 +84,23 @@ test('nenhum fontSize solto fora de design/tokens.ts', () => {
   );
 });
 
+test('nenhum fontWeight solto — peso é FAMÍLIA, não número', () => {
+  /*
+   * Este é o item da lista que MAIS engana, porque o defeito só aparece numa plataforma: fonte
+   * custom no Android IGNORA `fontWeight` e cai no regular com negrito sintético. No simulador
+   * iOS o texto fica certo, então a revisão passa e o bug viaja para o aparelho.
+   *
+   * Achados em 07/09/2026: a pílula de pasta em Notas, o contador de `QuickActions` e o input de
+   * dinheiro. Três lugares, todos escritos depois da regra existir — é a prova de que contagem
+   * que depende de alguém medir volta a subir sozinha.
+   */
+  assert.deepEqual(
+    offenders(/\bfontWeight:/),
+    [],
+    'aponte para a face certa (Fonts.semibold, Fonts.bold), não para um número'
+  );
+});
+
 test('rgba/hsl literais também não passam', () => {
   // A paleta local da aba Notas escapava por aqui: `accentSoft: 'rgba(139,92,246,0.18)'`.
   assert.deepEqual(

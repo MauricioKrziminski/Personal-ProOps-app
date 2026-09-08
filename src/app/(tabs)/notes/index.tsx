@@ -29,6 +29,7 @@ import {
   type Note,
   type NoteFolder,
 } from '@/hooks/use-notes';
+import { Fonts } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { noteTitle, notePreview, parseChecklist } from '@/lib/search';
 import { relativeBR } from '@/lib/dates';
@@ -598,7 +599,9 @@ const styles = StyleSheet.create({
   },
   folderPillText: {
     ...Type.caption,
-    fontWeight: '600',
+    // Peso é FAMÍLIA (§3 de design.md): no Android a fonte custom IGNORA `fontWeight` e cai no
+    // regular com negrito sintético — ficava certo só no iOS.
+    fontFamily: Fonts.semibold,
   },
   metaBit: {
     flexDirection: 'row',

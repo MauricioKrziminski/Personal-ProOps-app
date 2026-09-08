@@ -6,6 +6,7 @@ import type { SymbolViewProps } from 'expo-symbols';
 import { ThemedText } from '@/components/themed-text';
 import { Icon } from '@/components/ui/icon';
 import { Motion, Radius, Space, tabular } from '@/design/tokens';
+import { Fonts } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 
 export interface QuickAction {
@@ -107,6 +108,7 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
   },
   count: {
-    fontWeight: '700',
+    // Peso é FAMÍLIA (§3 de design.md): `fontWeight` numa fonte custom é ignorado no Android.
+    fontFamily: Fonts.bold,
   },
 });

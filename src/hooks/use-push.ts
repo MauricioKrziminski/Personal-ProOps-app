@@ -2,7 +2,7 @@ import Constants from 'expo-constants';
 import * as Device from 'expo-device';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
-import { notifications } from '@/lib/push-module';
+import { ensureAndroidChannel, notifications } from '@/lib/push-module';
 import { supabase } from '@/lib/supabase';
 
 /**
@@ -55,6 +55,8 @@ export function usePushStatus(userId: string | undefined) {
       if (!Device.isDevice) return { registered: false, blocker: 'simulator' };
       if (!easProjectId()) return { registered: false, blocker: 'no-eas-project' };
 
+      // O canal precisa existir ANTES de qualquer conversa sobre permissão no Android 13+.
+      await ensureAndroidChannel();
       const perm = await notifications.getPermissionsAsync();
       return {
         registered: false,
@@ -75,6 +77,8 @@ export function useRegisterPush(userId: string | undefined) {
       if (!Device.isDevice) {
         throw new Error('Push só funciona em aparelho físico, não no simulador.');
       }
+      // ⚠️ ANTES de pedir permissão: no Android 13+ sem canal o prompt pode não aparecer.
+      await ensureAndroidChannel();
       const { status } = await notifications.requestPermissionsAsync();
       if (status !== 'granted') {
         throw new Error('Permissão negada. Dá para liberar nos Ajustes do sistema.');

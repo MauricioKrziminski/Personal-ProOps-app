@@ -22,3 +22,30 @@ export const notifications: typeof NotificationsModule | null = pushBlockedByExp
   ? null
   : // eslint-disable-next-line @typescript-eslint/no-require-imports
     (require('expo-notifications') as typeof NotificationsModule);
+
+/**
+ * O canal de notificação do Android — **obrigatório, e antes do token**.
+ *
+ * Desde o Android 8 toda notificação precisa de um canal; desde o **Android 13** a doc do
+ * `expo-notifications` é explícita: *"requires at least one notification channel to be created
+ * before requesting push tokens"* — sem canal, o prompt de permissão pode simplesmente **não
+ * aparecer**, e o push nunca funciona. No iOS nada disso existe, então o defeito é invisível
+ * para quem só testa lá: a mesma armadilha do teclado.
+ *
+ * O id é **`default`** e não um nome nosso porque o servidor não manda `channelId`
+ * (`agent/app/services/push.py`), e nesse caso a Expo entrega no canal `default`. Criar
+ * `proops-alertas` deixaria a notificação cair num canal que ninguém configurou.
+ *
+ * `PRIVATE` esconde o conteúdo na tela de bloqueio: os avisos deste app dizem quanto você deve e
+ * quando o saldo fica negativo, e isso não precisa aparecer para quem pega o celular na mesa.
+ */
+export async function ensureAndroidChannel(): Promise<void> {
+  if (Platform.OS !== 'android' || !notifications) return;
+  await notifications.setNotificationChannelAsync('default', {
+    name: 'Lembretes e avisos',
+    importance: notifications.AndroidImportance.HIGH,
+    sound: 'default',
+    vibrationPattern: [0, 250, 250, 250],
+    lockscreenVisibility: notifications.AndroidNotificationVisibility.PRIVATE,
+  });
+}
