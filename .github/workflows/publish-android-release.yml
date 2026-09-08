@@ -84,6 +84,7 @@ jobs:
           key: android-ccache-${{ runner.os }}-${{ runner.arch }}-ndk27.1-cmake3.22-${{ hashFiles('package-lock.json') }}-${{ github.sha }}
           restore-keys: |
             android-ccache-${{ runner.os }}-${{ runner.arch }}-ndk27.1-cmake3.22-${{ hashFiles('package-lock.json') }}-
+            android-ccache-${{ runner.os }}-${{ runner.arch }}-ndk27.1-cmake3.22-
 
       - name: Build signed APK on this runner
         env:
