@@ -396,8 +396,18 @@ export default function InvoiceScreen() {
           ]}>
           <Button
             block
+            label="Marcar como paga"
+            variant="secondary"
+            loading={settle.isPending}
+            disabled={pay.isPending}
+            onPress={quitarSemCaixa}
+          />
+          <ThemedText type="caption" themeColor="textSecondary">Marcar como paga não altera o saldo. Registrar pagamento desconta da conta escolhida.</ThemedText>
+          <Button
+            block
             size="lg"
-            label={`Paguei ${formatBRL(total)}`}
+            label="Registrar pagamento"
+            disabled={settle.isPending || pay.isPending}
             onPress={abrirPagamento}
           />
         </View>

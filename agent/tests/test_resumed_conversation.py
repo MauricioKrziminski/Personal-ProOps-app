@@ -1,6 +1,9 @@
 """A resumed graph must persist its next question/draft at the conversation boundary."""
 
+from unittest.mock import create_autospec
+
 import pytest
+
 from app import conversation
 from app.graph import build
 
@@ -54,7 +57,7 @@ async def test_resume_persists_next_step_instead_of_returning_stale_reply(
     monkeypatch.setattr(conversation.db, "open_pending", open_pending)
     monkeypatch.setattr(conversation.confirm, "decide", decide)
     monkeypatch.setattr(conversation, "_audit", noop)
-    monkeypatch.setattr(conversation.telemetry, "callbacks", lambda: [])
+    monkeypatch.setattr(conversation.telemetry, "callbacks", list)
     state = {"reply": "old checkpoint reply"}
     saved = []
     if next_step == "draft":
@@ -78,7 +81,9 @@ async def test_resume_persists_next_step_instead_of_returning_stale_reply(
         async def accounts(*a, **k):
             return []
 
-        monkeypatch.setattr(conversation.db, "save_draft", save_draft)
+        monkeypatch.setattr(conversation.db, "save_draft", create_autospec(
+            conversation.db.save_draft, side_effect=save_draft,
+        ))
         monkeypatch.setattr(conversation.db, "accounts", accounts)
     else:
         state["__interrupt__"] = [
@@ -110,6 +115,7 @@ async def test_resume_persists_next_step_instead_of_returning_stale_reply(
     )
     assert isinstance(reply, dict) and reply["ui"] == "buttons"
     if next_step == "draft":
+        assert saved[0]["session_id"] == SESSION["id"]
         assert saved[0]["action"]["account"] is None
         assert saved[0]["action"]["current_installment"] == 9
     else:

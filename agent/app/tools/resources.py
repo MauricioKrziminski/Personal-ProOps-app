@@ -368,6 +368,21 @@ async def prepare(ctx: ExecContext, action: ResourceAction) -> dict:
                 "Não encontrei um único item com esse nome. Informe o nome exato (e o mês, no caso de orçamento). Nada foi alterado."
             )
         old = rows[0]
+        if action.resource == "debts":
+            prepared["calculation_mode"] = old.get("calculation_mode") or "amortized"
+            if (
+                prepared["calculation_mode"] == "fixed_installments"
+                and action.type == Op.UPDATE
+                and values.keys() & {
+                    "principal_cents", "remaining_cents", "interest_rate_monthly",
+                    "installments", "installments_paid", "installment_cents",
+                }
+            ):
+                _error(
+                    "Esse financiamento usa parcelas fixas com taxa não informada. "
+                    "Revise os valores e o histórico no app; não posso converter "
+                    "o total das parcelas em principal ou calcular amortização por aqui."
+                )
         if (
             action.resource == "debts"
             and action.type == Op.UPDATE
@@ -545,6 +560,8 @@ async def prepare(ctx: ExecContext, action: ResourceAction) -> dict:
     prepared["summary"] = (
         f"{verb} {LABELS[action.resource]} {action.name or ''} — " + "; ".join(details)
     )
+    if prepared.get("calculation_mode") == "fixed_installments":
+        prepared["summary"] += "; parcelas fixas, juros incluídos no valor e taxa não informada"
     if prepared.get("target_label"):
         prepared["summary"] += "; orçamento de " + prepared["target_label"]
     if action.resource in {"recurring", "reminders"} and action.type == Op.DELETE:
@@ -591,7 +608,7 @@ async def execute(ctx: ExecContext, action: ResourceAction) -> ToolResult:
     reference_guard = (" and " + " and ".join(guards)) if guards else ""
     if action.type == Op.PAY:
         # MATERIALIZED locks the exact reviewed debt before evaluating the RPC.
-        # The RPC and 0057 transaction trigger own amortization, never Python.
+        # The RPC and transaction trigger apply the debt's calculation mode.
         row = await db.fetch_one(
             """with reviewed as materialized (
               select id from public.debts where id = %s and workspace_id = %s
@@ -613,7 +630,10 @@ async def execute(ctx: ExecContext, action: ResourceAction) -> ToolResult:
                 "A dívida ou a conta mudou depois da proposta. Peça novamente para revisar antes de confirmar."
             )
         return ToolResult(
-            "Pagamento registrado. Saldo devedor: "
+            "Pagamento registrado. "
+            + ("Total das parcelas restantes: "
+               if proposal.get("calculation_mode") == "fixed_installments"
+               else "Saldo devedor: ")
             + cents_to_brl(row["remaining_cents"])
             + ".",
             result_id=proposal["id"],

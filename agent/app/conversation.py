@@ -331,6 +331,7 @@ async def run_turn(
             if resta:
                 slot, pergunta = resta
                 novo_id = await db.save_draft(
+                    session_id=sessao["id"],
                     thread_id=thread, phone=sessao["phone"],
                     user_id=UUID(str(sessao["user_id"])),
                     workspace_id=UUID(str(sessao["workspace_id"])),

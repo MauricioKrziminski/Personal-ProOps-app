@@ -30,3 +30,23 @@ export function installmentHistory(text: string, total: number, firstDate: strin
   }
   return paid;
 }
+
+/** Contractual installments include charges; no interest breakdown is inferred. */
+export function simpleDebtValues(installmentCents: number, totalText: string, paid = 0) {
+  const total = Number(totalText);
+  if (!/^\d+$/.test(totalText) || !Number.isSafeInteger(total) || total < 1 || total > 999 ||
+      !Number.isSafeInteger(installmentCents) || installmentCents <= 0 ||
+      !Number.isInteger(paid) || paid < 0 || paid > total ||
+      !Number.isSafeInteger(installmentCents * total)) {
+    throw new Error('Informe um valor de parcela e uma quantidade válidos.');
+  }
+  return {
+    calculation_mode: 'fixed_installments' as const,
+    principal_cents: installmentCents * total,
+    remaining_cents: installmentCents * (total - paid),
+    installments: total,
+    installments_paid: paid,
+    installment_cents: installmentCents,
+    interest_rate_monthly: 0,
+  };
+}

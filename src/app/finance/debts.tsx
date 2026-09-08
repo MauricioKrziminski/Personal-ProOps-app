@@ -34,7 +34,7 @@ import {
 } from '@/hooks/use-finance';
 import { useTheme } from '@/hooks/use-theme';
 import { formatBRL, formatNumberBR, isoToBR } from '@/lib/dates';
-import { debtTerm, financeErrorMessage } from '@/lib/finance-form';
+import { debtTerm, financeErrorMessage, simpleDebtValues } from '@/lib/finance-form';
 import { confirmDestructive, showItemActions } from '@/lib/item-actions';
 
 /**
@@ -63,6 +63,8 @@ function parseTaxa(texto: string): number {
 }
 
 interface FormState {
+  calculationMode: 'amortized' | 'fixed_installments';
+  showDetails: boolean;
   id?: string;
   name: string;
   kind: Debt['kind'];
@@ -79,6 +81,8 @@ interface FormState {
 }
 
 const FORM_VAZIO: FormState = {
+  calculationMode: 'fixed_installments',
+  showDetails: false,
   name: '',
   kind: 'loan',
   remainingCents: 0,
@@ -146,6 +150,8 @@ export default function DebtsScreen() {
   const abrirNova = () => setForm({ ...FORM_VAZIO });
   const abrirEdicao = (d: Debt) =>
     setForm({
+      calculationMode: d.calculation_mode,
+      showDetails: d.calculation_mode !== 'fixed_installments',
       id: d.id,
       name: d.name,
       kind: d.kind,
@@ -155,7 +161,7 @@ export default function DebtsScreen() {
       taxa: d.interest_rate_monthly
         ? formatNumberBR(Number((d.interest_rate_monthly * 100).toFixed(4)))
         : d.kind === 'financing' ? '0' : '',
-      parcelas: d.installments ? String(Math.max(d.installments - d.installments_paid, 0)) : '',
+      parcelas: d.installments ? String(d.calculation_mode === 'fixed_installments' ? d.installments : Math.max(d.installments - d.installments_paid, 0)) : '',
       installmentsPaid: d.installments_paid,
       historyConfirmed: true,
       installmentCents: Number(d.installment_cents ?? 0),
@@ -171,15 +177,29 @@ export default function DebtsScreen() {
   };
 
   const fracao = form ? parseTaxa(form.taxa) : 0;
+  let simpleValues: ReturnType<typeof simpleDebtValues> | null = null;
+  if (form?.calculationMode === 'fixed_installments') {
+    try { simpleValues = simpleDebtValues(form.installmentCents, form.parcelas, form.installmentsPaid); } catch { /* Invalid input keeps Save disabled. */ }
+  }
   const nomeOk = (form?.name.trim().length ?? 0) >= 2;
-  const podeSalvar = Boolean(form && nomeOk && (!form.parcelas || form.historyConfirmed) && Number.isInteger(form.installmentsPaid) && form.installmentsPaid >= 0 && form.remainingCents > 0 && (!form.parcelas || Number(form.parcelas) > 0) && (!form.diaVencimento || (Number(form.diaVencimento) >= 1 && Number(form.diaVencimento) <= 31)) && (form.kind !== 'financing' || (form.taxa.trim() !== '' && !!form.parcelas)) && Number.isFinite(Number(form.taxa.replace(',', '.'))) && Number(form.taxa.replace(',', '.')) >= 0);
+  const validDueDay = !form?.diaVencimento || (Number(form.diaVencimento) >= 1 && Number(form.diaVencimento) <= 31);
+  const advancedValid = form && nomeOk && (!form.parcelas || form.historyConfirmed) &&
+    Number.isInteger(form.installmentsPaid) && form.installmentsPaid >= 0 && form.remainingCents > 0 &&
+    (!form.parcelas || Number(form.parcelas) > 0) &&
+    (form.kind !== 'financing' || (form.taxa.trim() !== '' && !!form.parcelas)) &&
+    Number.isFinite(Number(form.taxa.replace(',', '.'))) && Number(form.taxa.replace(',', '.')) >= 0;
+  const podeSalvar = Boolean(form && validDueDay && (form.calculationMode === 'fixed_installments' ? simpleValues : advancedValid));
+
 
   const salvar = () => {
     if (!form || !podeSalvar) return;
+    let defaultName = 'Financiamento';
+    for (let suffix = 2; lista.some((d) => d.id !== form.id && d.name.toLowerCase() === defaultName.toLowerCase()); suffix++) defaultName = `Financiamento ${suffix}`;
     save.mutate(
       {
         id: form.id,
-        name: form.name.trim(),
+        name: form.name.trim() || defaultName,
+        calculation_mode: form.calculationMode,
         kind: form.kind,
         // sem os dois campos separados a barra de progresso nasce sempre em 0%
         principal_cents: form.principalCents > 0 ? form.principalCents : form.remainingCents,
@@ -188,6 +208,7 @@ export default function DebtsScreen() {
         installments: debtTerm(form.parcelas, form.installmentsPaid),
         ...(!form.id ? { installments_paid: form.installmentsPaid } : {}),
         installment_cents: form.installmentCents || null,
+        ...(form.calculationMode === 'fixed_installments' && simpleValues ? simpleValues : {}),
         account_id: form.accountId,
         due_day: form.diaVencimento ? Number(form.diaVencimento) : null,
       },
@@ -196,9 +217,9 @@ export default function DebtsScreen() {
           toast({ message: form.id ? 'Dívida atualizada.' : 'Dívida cadastrada.', tone: 'success' });
           setForm(null);
         },
-        onError: () =>
+        onError: (error) =>
           toast({
-            message: 'Não deu para salvar. Já existe uma dívida com esse nome?',
+            message: financeErrorMessage(error, 'Não deu para salvar. Já existe uma dívida com esse nome?'),
             tone: 'error',
           }),
       }
@@ -244,7 +265,7 @@ export default function DebtsScreen() {
     const original = Number(d.principal_cents) || restante;
     const pago = Math.max(0, original - restante);
     const tipo = DEBT_KINDS.find((k) => k.value === d.kind)?.label ?? '';
-    const juros = d.interest_rate_monthly > 0 ? taxaLabel(d.interest_rate_monthly) : 'sem juros';
+    const juros = d.calculation_mode === 'fixed_installments' ? 'juros incluídos, sem detalhamento' : d.interest_rate_monthly > 0 ? taxaLabel(d.interest_rate_monthly) : 'sem juros';
     const parcelas = d.installments ? `${d.installments_paid}/${d.installments} pagas` : null;
 
     return (
@@ -341,7 +362,7 @@ export default function DebtsScreen() {
           />
           <ThemedText type="small" themeColor="textSecondary">
             {estrategia === 'avalanche'
-              ? 'Atacar a de juro maior primeiro paga menos no total.'
+              ? 'Ordenado pelas taxas conhecidas. Parcelas simples ficam ao fim, pois a taxa não foi informada.'
               : 'Atacar a de saldo menor primeiro quita a primeira mais rápido.'}
           </ThemedText>
           {(payoff.data ?? []).map((p, i) => (
@@ -357,7 +378,7 @@ export default function DebtsScreen() {
                   {p.name}
                 </ThemedText>
                 <ThemedText type="footnote" themeColor="textSecondary">
-                  juros {taxaLabel(Number(p.interest_rate_monthly))} · {p.months_left} meses
+                  {lista.find((d) => d.id === p.debt_id)?.calculation_mode === 'fixed_installments' ? 'parcelas fixas' : `juros ${taxaLabel(Number(p.interest_rate_monthly))}`} · {p.months_left} meses
                 </ThemedText>
               </View>
               <Money cents={Number(p.remaining_cents)} variant="subhead" tone="danger" />
@@ -375,7 +396,7 @@ export default function DebtsScreen() {
         <EmptyState
           icon="creditcard.trianglebadge.exclamationmark"
           title="Nenhuma dívida cadastrada"
-          hint="Cadastre um empréstimo ou financiamento e eu mostro quanto é juro e por onde começar."
+          hint="Informe o valor da parcela e quantas são. Os outros detalhes são opcionais."
           action={{ label: 'Cadastrar dívida', onPress: abrirNova }}
         />
       ) : null}
@@ -417,12 +438,12 @@ export default function DebtsScreen() {
                     em {isoToBR(proxima.due_date)}
                   </ThemedText>
                 </View>
-                <View style={styles.valores}>
+                {detalhe.calculation_mode !== 'fixed_installments' && <View style={styles.valores}>
                   <Money cents={Number(proxima.interest_cents)} variant="subhead" tone="danger" />
                   <ThemedText type="small" themeColor="danger">
                     disso são juros
                   </ThemedText>
-                </View>
+                </View>}
                 <Button
                   label="Paguei esta parcela"
                   block
@@ -492,10 +513,10 @@ export default function DebtsScreen() {
                           <Money cents={Number(p.payment_cents)} variant="footnote" />
                         </View>
                         <View style={styles.celula}>
-                          <Money cents={Number(p.interest_cents)} variant="footnote" tone="danger" />
+                          {detalhe?.calculation_mode === 'fixed_installments' ? <ThemedText type="footnote">—</ThemedText> : <Money cents={Number(p.interest_cents)} variant="footnote" tone="danger" />}
                         </View>
                         <View style={styles.celula}>
-                          <Money cents={Number(p.principal_cents)} variant="footnote" />
+                          {detalhe?.calculation_mode === 'fixed_installments' ? <ThemedText type="footnote">—</ThemedText> : <Money cents={Number(p.principal_cents)} variant="footnote" />}
                         </View>
                         <View style={styles.celula}>
                           <Money
@@ -525,12 +546,14 @@ export default function DebtsScreen() {
 
           {pagando ? (
             <ScrollView contentContainerStyle={styles.sheetBody} keyboardShouldPersistTaps="handled">
-              <Field label="Quanto você pagou" hint="Pagar a mais abate mais do saldo.">
+              {pagando.calculation_mode === 'fixed_installments' ? <Field label="Valor desta parcela">
+                <Money cents={pagoCents} variant="headline" concealable={false} />
+              </Field> : <Field label="Quanto você pagou" hint="Pagar a mais abate mais do saldo.">
                 <MoneyField valueCents={pagoCents} onChangeCents={setPagoCents} />
-              </Field>
+              </Field>}
 
               {/* A conta é a metade do valor da tela: parcela NÃO abate o saldo pelo valor cheio. */}
-              {proxima ? (
+              {proxima && pagando.calculation_mode !== 'fixed_installments' ? (
                 /* Superfície de DECISÃO: a conta que explica o pagamento em curso não pode
                    sumir com o "esconder saldo" — é ela que justifica o valor digitado. */
                 <Card style={styles.explica}>
@@ -622,6 +645,37 @@ export default function DebtsScreen() {
 
           {form ? (
             <ScrollView contentContainerStyle={styles.sheetBody} keyboardShouldPersistTaps="handled">
+              {!form.id && <Segmented
+                options={[{ value: 'fixed_installments', label: 'Simples' }, { value: 'amortized', label: 'Detalhado' }]}
+                value={form.calculationMode}
+                onChange={(calculationMode) => setForm({ ...form, calculationMode })}
+              />}
+              {form.calculationMode === 'fixed_installments' ? <>
+                <Field label="Valor da parcela" hint="Use o valor que você paga todo mês, já com juros e taxas incluídos.">
+                  <MoneyField valueCents={form.installmentCents} onChangeCents={(installmentCents) => setForm({ ...form, installmentCents })} />
+                </Field>
+                <Field label="Quantidade total de parcelas">
+                  <TextField value={form.parcelas} onChangeText={(value) => setForm({ ...form, parcelas: value.replace(/\D/g, '').slice(0, 3) })} keyboardType="number-pad" placeholder="48" />
+                </Field>
+                {simpleValues && <Card>
+                  <ThemedText type="small">{`${simpleValues.installments - form.installmentsPaid} parcelas de ${formatBRL(form.installmentCents)} a pagar`}</ThemedText>
+                  <Money cents={simpleValues.remaining_cents} variant="headline" />
+                  <ThemedText type="caption" themeColor="textSecondary">Total das parcelas restantes. Não é uma simulação de juros.</ThemedText>
+                </Card>}
+                <Button label={form.showDetails ? 'Ocultar detalhes' : 'Adicionar detalhes (opcional)'} variant="ghost" onPress={() => setForm({ ...form, showDetails: !form.showDetails })} />
+                {form.showDetails && <>
+                  <Field label="Nome (opcional)"><TextField value={form.name} onChangeText={(name) => setForm({ ...form, name })} placeholder="Financiamento do carro" /></Field>
+                  {!form.id && <Field label="Parcelas já pagas" hint="Deixe zero se nenhuma foi paga. Esse histórico não movimenta dinheiro.">
+                    <TextField value={String(form.installmentsPaid)} onChangeText={(value) => setForm({ ...form, installmentsPaid: Number(value.replace(/\D/g, '')), historyConfirmed: true })} keyboardType="number-pad" maxLength={3} />
+                  </Field>}
+                  <Field label="Vence dia (opcional)"><TextField value={form.diaVencimento} onChangeText={(value) => setForm({ ...form, diaVencimento: value.replace(/\D/g, '').slice(0, 2) })} keyboardType="number-pad" placeholder="10" /></Field>
+                  <Field label="Conta para pagar (opcional)"><Section>
+                    <Row title="Não informar" onPress={() => setForm({ ...form, accountId: null })} trailing={form.accountId === null ? <Icon name="checkmark" size="sm" color="tint" /> : undefined} />
+                    {pagadoras.map((a) => <Row key={a.id} title={a.name} onPress={() => setForm({ ...form, accountId: a.id })} trailing={form.accountId === a.id ? <Icon name="checkmark" size="sm" color="tint" /> : undefined} />)}
+                  </Section></Field>
+                </>}
+                <ThemedText type="caption" themeColor="textSecondary">Cadastrar não desconta dinheiro. Registre as parcelas conforme forem pagas.</ThemedText>
+              </> : <>
               <Field label="Nome">
                 <TextField
                   value={form.name}
@@ -767,6 +821,7 @@ export default function DebtsScreen() {
                   </Field>
                 </View>
               </View>
+              </>}
             </ScrollView>
           ) : null}
       </Sheet>

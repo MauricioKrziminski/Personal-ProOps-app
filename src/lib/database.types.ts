@@ -647,6 +647,7 @@ export type Database = {
         Row: {
           account_id: string | null
           archived: boolean
+          calculation_mode: string
           created_at: string
           due_day: number | null
           id: string
@@ -666,6 +667,7 @@ export type Database = {
         Insert: {
           account_id?: string | null
           archived?: boolean
+          calculation_mode?: string
           created_at?: string
           due_day?: number | null
           id?: string
@@ -685,6 +687,7 @@ export type Database = {
         Update: {
           account_id?: string | null
           archived?: boolean
+          calculation_mode?: string
           created_at?: string
           due_day?: number | null
           id?: string

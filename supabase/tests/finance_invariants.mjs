@@ -8,11 +8,11 @@ const db = new PGlite();
 try {
   await db.exec(`
     create schema private; create schema auth;
-    create role anon; create role authenticated;
+    create role anon; create role authenticated; create role service_role;
     create function auth.uid() returns uuid language sql as $$ select null::uuid $$;
     create table accounts(id uuid primary key, workspace_id uuid, user_id uuid, type text, closing_day int, due_day int, archived boolean default false);
     create table card_invoices(id uuid primary key default gen_random_uuid(), workspace_id uuid, user_id uuid, account_id uuid, reference_month date, closing_date date, due_date date, unique(account_id,reference_month));
-    create table debts(id uuid primary key, workspace_id uuid, user_id uuid, name text, remaining_cents bigint, interest_rate_monthly numeric, account_id uuid, installments int, installments_paid int default 0, archived boolean default false);
+    create table debts(id uuid primary key, workspace_id uuid, user_id uuid, name text, principal_cents bigint, installment_cents bigint, due_day int, remaining_cents bigint, interest_rate_monthly numeric, account_id uuid, installments int, installments_paid int default 0, archived boolean default false);
     create table transactions(id uuid primary key default gen_random_uuid(), workspace_id uuid, user_id uuid, account_id uuid, invoice_id uuid, occurred_at date, due_at date, kind text, amount_cents bigint, category text, description text, source text, status text, debt_id uuid);
   `);
   const cards = await readFile(new URL('../migrations/0013_cards_and_installments.sql', import.meta.url), 'utf8');
@@ -22,6 +22,12 @@ try {
   } else {
     await db.exec(await readFile(new URL('../migrations/0057_finance_edit_and_debt_accounts.sql', import.meta.url), 'utf8'));
   }
+  const debtFunctions = await readFile(new URL('../migrations/0023_debts.sql', import.meta.url), 'utf8');
+  await db.exec(debtFunctions.slice(debtFunctions.indexOf('create or replace function private.price_installment'), debtFunctions.indexOf('create or replace function public._payoff_strategy')));
+  // A legacy row must retain its explicit amortization meaning across migration.
+  await db.exec(`insert into debts(id,name,remaining_cents,interest_rate_monthly) values ('20000000-0000-0000-0000-000000000099','Legacy',10000,0.01)`);
+  await db.exec(await readFile(new URL('../migrations/20260908201355_fixed_installment_financing.sql', import.meta.url), 'utf8'));
+  assert.equal((await db.query(`select calculation_mode from debts where name='Legacy'`)).rows[0].calculation_mode,'amortized');
   const ws='00000000-0000-0000-0000-000000000001', other='00000000-0000-0000-0000-000000000002';
   const cardA='10000000-0000-0000-0000-000000000001', cardB='10000000-0000-0000-0000-000000000002', bank='10000000-0000-0000-0000-000000000003', foreign='10000000-0000-0000-0000-000000000004';
   await db.query(`insert into accounts(id,workspace_id,type,closing_day,due_day) values ($1,$5,'credit_card',10,20),($2,$5,'credit_card',5,15),($3,$5,'checking',null,null),($4,$6,'checking',null,null)`,[cardA,cardB,bank,foreign,ws,other]);
@@ -73,5 +79,34 @@ try {
   await db.exec('alter table transactions enable trigger sync_debt_payment');
   await assert.rejects(db.query('update transactions set amount_cents=12000 where debt_id=$1',[debt]),/antigo sem histórico/);
   await db.query('update transactions set account_id=null where debt_id=$1',[debt]);
+  const fixed='20000000-0000-0000-0000-000000000002';
+  await db.query(`insert into debts(id,workspace_id,name,calculation_mode,principal_cents,remaining_cents,interest_rate_monthly,installment_cents,installments,installments_paid,account_id)
+    values($1,$2,'Simple','fixed_installments',60000,40000,0,10000,6,2,$3)`,[fixed,ws,bank]);
+  let schedule=(await db.query('select * from debt_schedule($1)',[fixed])).rows;
+  assert.equal(schedule.length,4);
+  assert.equal(schedule.reduce((sum,r)=>sum+Number(r.payment_cents),0),40000);
+  assert.ok(schedule.every(r=>r.interest_cents===null && r.principal_cents===null));
+  assert.equal(Number(schedule.at(-1).balance_cents),0);
+  const payoff=(await db.query(`select * from private.payoff_strategy_for(array[$1::uuid],'avalanche') where debt_id=$2`,[ws,fixed])).rows[0];
+  assert.equal(payoff.interest_rate_monthly,null); assert.equal(payoff.total_interest_cents,null);
+  await assert.rejects(db.query(`update debts set calculation_mode='amortized' where id=$1`,[fixed]),/modo de cálculo/);
+  await assert.rejects(db.query(`update debts set interest_rate_monthly=0.01 where id=$1`,[fixed]),/debts_fixed_installments_check/);
+  await assert.rejects(db.query(`update debts set remaining_cents=39999 where id=$1`,[fixed]),/debts_fixed_installments_check/);
+  await assert.rejects(db.query(`select pay_debt_installment($1,5000)`,[fixed]),/valor integral/);
+  await assert.rejects(db.query(`select pay_debt_installment($1,20000)`,[fixed]),/valor integral/);
+  await db.query(`select pay_debt_installment($1,10000)`,[fixed]);
+  let fixedState=(await db.query(`select remaining_cents::int,installments_paid from debts where id=$1`,[fixed])).rows[0];
+  assert.deepEqual(fixedState,{remaining_cents:30000,installments_paid:3});
+  await assert.rejects(db.query(`update debts set installment_cents=12000,principal_cents=72000,remaining_cents=36000 where id=$1`,[fixed]),/após registrar pagamentos/);
+  await assert.rejects(db.query(`update debts set remaining_cents=20000,installments_paid=4 where id=$1`,[fixed]),/Corrija os pagamentos/);
+  await assert.rejects(db.query(`update transactions set amount_cents=5000 where debt_id=$1`,[fixed]),/valor integral/);
+  await db.query(`delete from transactions where debt_id=$1`,[fixed]);
+  fixedState=(await db.query(`select remaining_cents::int,installments_paid from debts where id=$1`,[fixed])).rows[0];
+  assert.deepEqual(fixedState,{remaining_cents:40000,installments_paid:2});
+  for(let i=0;i<4;i++) await db.query(`select pay_debt_installment($1,10000)`,[fixed]);
+  assert.equal((await db.query(`select * from debt_schedule($1)`,[fixed])).rows.length,0);
+  assert.equal(Number((await db.query(`select sum(amount_cents) as total from transactions where debt_id=$1`,[fixed])).rows[0].total),40000);
+  await assert.rejects(db.query(`select pay_debt_installment($1,10000)`,[fixed]),/quitada/);
+  console.log('PASS: fixed installment contract, prior payments, unknown interest, full payments, delete reversal, immutable mode, ledger protection and complete payoff.');
   console.log('PASS: invoice date/card changes, inherited vs explicit deadline, cross-workspace rejection, debt account, amount bounds, amortization and single expense.');
 } finally { await db.close(); }

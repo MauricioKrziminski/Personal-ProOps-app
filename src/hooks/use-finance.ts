@@ -824,10 +824,10 @@ export type Debt = Pick<
   | 'account_id'
   | 'due_day'
   | 'archived'
-> & { kind: (typeof DEBT_KINDS)[number]['value'] };
+> & { kind: (typeof DEBT_KINDS)[number]['value']; calculation_mode: 'amortized' | 'fixed_installments' };
 
-export type DebtScheduleRow = Fns['debt_schedule']['Returns'][number];
-export type PayoffRow = Fns['payoff_strategy']['Returns'][number];
+export type DebtScheduleRow = Omit<Fns['debt_schedule']['Returns'][number], 'interest_cents' | 'principal_cents'> & { interest_cents: number | null; principal_cents: number | null };
+export type PayoffRow = Omit<Fns['payoff_strategy']['Returns'][number], 'interest_rate_monthly' | 'total_interest_cents'> & { interest_rate_monthly: number | null; total_interest_cents: number | null };
 
 export function useDebts() {
   useRealtimeInvalidate('debts', ['debts']);
@@ -837,7 +837,7 @@ export function useDebts() {
       const { data, error } = await supabase
         .from('debts')
         .select(
-          'id, name, kind, principal_cents, remaining_cents, interest_rate_monthly, installments, installments_paid, installment_cents, account_id, due_day, archived',
+          'id, name, kind, calculation_mode, principal_cents, remaining_cents, interest_rate_monthly, installments, installments_paid, installment_cents, account_id, due_day, archived',
         )
         .eq('archived', false)
         .order('remaining_cents', { ascending: false });
@@ -881,6 +881,7 @@ export function useSaveDebt() {
       id?: string;
       name: string;
       kind: Debt['kind'];
+      calculation_mode?: Debt['calculation_mode'];
       principal_cents: number;
       remaining_cents: number;
       interest_rate_monthly: number;
