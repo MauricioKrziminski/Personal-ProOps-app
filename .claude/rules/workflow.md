@@ -14,6 +14,12 @@
 4. **Mudou `agent/` → `.venv/bin/ruff check app --select F,E9` E `.venv/bin/pytest` verdes.**
    Teste que fala com rede ou banco não entra: os nós que falam com o mundo viram dublê.
 
+   **Mexeu em prompt, schema de classificador ou catálogo → `.venv/bin/python
+   scripts/evaluate_answer_forms.py` (Gemini real, ~90s).** O pytest usa dublês e
+   dublê sempre concorda: essa suíte é a única que diz se a pessoa pode responder do
+   jeito dela, e a seção de segurança dela é a que impede que "interpretar melhor"
+   vire "aprovou o que não devia".
+
    O `ruff` entrou em 07/09/2026 porque o pytest não pega tudo: `nodes.py` usava `guards.` sem ter
    importado o módulo, e em produção isso virava `NameError` — o app respondia "Não consegui
    processar essa mensagem" para QUALQUER compra parcelada. O teste que existia chamava as funções

@@ -124,23 +124,16 @@ async def route(state: AgentState) -> dict:
         and state.get("workspace_id")
         and not state.get("resource_draft")
     ):
-        from app.domain.matching import normalize
-        import re
-
-        raw = normalize(state.get("text", ""))
-        status_request = re.search(r"\b(parcelas?|anteriores)\b", raw) and re.search(
-            r"\b(pag[ao]s?|paguei|quitad[ao]s?|baixa)\b", raw
-        )
-        creating = re.search(r"\b(comprei|compra|cadastre|cadastro|crie|criar)\b", raw)
-        explicit_debt = re.search(
-            r"\b(financiamento|divida|emprestimo|saldo devedor)\b", raw
-        )
-        if (
-            status_request
-            and not creating
-            and not explicit_debt
-            and not {"financas", "cadastros"}.issubset(dominios)
-        ):
+        # Quem já decidiu "isto é sobre um registro que EXISTE" é o modelo, ao
+        # preencher `financial_entity` — a descrição do campo diz literalmente
+        # "null for creation or unclear reference". Havia três regex de palavra
+        # aqui refazendo esse julgamento em cima do texto cru ("comprei",
+        # "financiamento", "pagas"), e refazendo pior: quem escrevesse
+        # "quitei as anteriores da moto" não casava nenhuma delas e a pergunta
+        # de desambiguação nunca aparecia. A consulta ao banco é barata e é ela
+        # que sabe a verdade — se existem os dois registros, pergunta; se existe
+        # um, roteia; se não existe nenhum, segue o que o router disse.
+        if not {"financas", "cadastros"}.issubset(dominios):
             from app import db
 
             reference = (

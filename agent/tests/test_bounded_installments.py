@@ -333,25 +333,49 @@ async def test_existing_debt_history_does_not_create_new_payment(monkeypatch):
     from app.tools import resources
     from app.tools.guards import Level1Error
 
-    read = AsyncMock()
-    monkeypatch.setattr(db, "fetch", read)
-    ctx = ExecContext(
-        user_id=WS,
-        workspace_id=WS,
-        phone="",
-        timezone="America/Sao_Paulo",
-        texto="As 8 parcelas anteriores do financiamento do carro, marque como pagas",
-        source_message_id="x",
-    )
-    action = ResourceAction(
-        type="resource_pay",
-        resource="debts",
-        name="carro",
-        fields=[{"name": "amount_cents", "value": "1176000"}],
-    )
-    with pytest.raises(Level1Error, match="saldo devedor"):
-        await resources.prepare(ctx, action)
-    read.assert_not_awaited()
+    # Quem denuncia a baixa em lote é a ARITMÉTICA do contrato, não uma palavra.
+    # O regex antigo barrava qualquer pagamento cuja frase tivesse "parcelas" e
+    # deixava passar "quitei as anteriores" — as duas metades erradas.
+    contrato = {
+        "id": "debt", "row_version": "1", "name": "carro", "archived": False,
+        "account_id": "bank", "installment_cents": 147000, "installments": 48,
+        "installments_paid": 8, "principal_cents": 7056000,
+        "remaining_cents": 5880000, "interest_rate_monthly": 0,
+        "calculation_mode": "amortized",
+    }
+
+    async def leitura(sql, *args):
+        return [contrato] if "public.debts" in sql else [
+            {"id": "bank", "name": "Conta", "type": "checking"}
+        ]
+
+    monkeypatch.setattr(db, "fetch", leitura)
+    escrita = AsyncMock()
+    monkeypatch.setattr(db, "fetch_one", escrita)
+
+    def ctx_de(texto):
+        return ExecContext(user_id=WS, workspace_id=WS, phone="",
+                           timezone="America/Sao_Paulo", texto=texto, source_message_id="x")
+
+    def pagamento(cents):
+        return ResourceAction(type="resource_pay", resource="debts", name="carro",
+                              fields=[{"name": "amount_cents", "value": str(cents)}])
+
+    # 8 × 1470: em QUALQUER redação, inclusive a que o regex não pegava.
+    for texto in ("As 8 parcelas anteriores do financiamento do carro, marque como pagas",
+                  "quitei as anteriores do carro",
+                  "ja tinha pago isso tudo do carro"):
+        with pytest.raises(Level1Error, match="prestações"):
+            await resources.prepare(ctx_de(texto), pagamento(1176000))
+
+    # Uma prestação e uma amortização avulsa continuam passando: o veto por
+    # palavra barrava as duas quando a frase tinha "parcelas".
+    for cents in (147000, 200000):
+        proposta = await resources.prepare(
+            ctx_de("paguei as parcelas do carro esse mes"), pagamento(cents)
+        )
+        assert proposta["values"]["amount_cents"] == cents
+    escrita.assert_not_awaited()
 
 
 def test_existing_debt_paid_count_requires_explicit_remaining_baseline():

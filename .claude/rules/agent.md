@@ -36,6 +36,47 @@ O serviço que recebe do WhatsApp, decide e escreve. Substituiu o par
   `400 INVALID_ARGUMENT` sem detalhe. `tests/test_schemas.py` prende o limite — somar campo exige
   tirar outro.
 
+## Padrão de texto: valida estrutura, nunca infere sentido
+
+**Casamento de padrão pode VALIDAR ESTRUTURA** (data ISO, RRULE, MIME, o payload
+dos nossos próprios botões) **e pode ser fast-path grátis cuja falha CAI NO MODELO.
+Nunca pode ser o único intérprete de sentido, e nunca pode VETAR uma ação por causa
+de uma palavra na mensagem.** Quem entende o que o usuário quis dizer é o modelo;
+quem valida e executa é o código.
+
+A exceção deliberada é DINHEIRO: o modelo diz o que o número SIGNIFICA, o código diz
+QUANTO ele é (`parse_valor_em_centavos`, `scope_from_text`). Ali o padrão é rede de
+segurança POR CIMA do modelo num caminho destrutivo, não inferência de intenção.
+
+Três violações foram removidas em 08/09/2026, e as três eram o mesmo defeito:
+uma lista de palavras decidindo o que a pessoa quis.
+
+| era | o que quebrava | o que protege agora |
+|---|---|---|
+| `_guard_debt_history`: `\b(parcelas\|anteriores)\b` vetava pagamento de dívida | "paguei as parcelas de setembro" era recusado; "quitei as anteriores" passava | aritmética do contrato: valor múltiplo exato da prestação PERGUNTA se é histórico ou amortização |
+| `route()`: `status_request`/`creating`/`explicit_debt` decidiam desambiguação | "quitei as anteriores da moto" não casava e a pergunta nunca aparecia | `financial_entity` (que o modelo preenche) + a consulta ao banco |
+| `interpret_choice` era o único intérprete de "qual deles?" | só número, ordinal e rótulo exato; "o do mercado" virava intenção nova | regex continua como fast-path grátis, e a falha cai em `escolher_candidato` |
+
+⚠️ **Escolha semântica só vale em lista de REGISTROS (`kind == "choice"`).** Em
+`soft_warning` os "candidatos" são AÇÕES (Confirmar / Trocar de Cartão), e deixar um
+classificador de escolha pescar "Confirmar" de uma hesitação ressuscita o defeito de
+"clicar Trocar de Cartão autoriza a compra".
+
+**Interpretação liberal exige confirmação.** O par é indivisível: o modelo pode
+inferir o que a pessoa quis dizer PORQUE ela vê o efeito e aprova antes da escrita.
+Afrouxar um lado sem o outro é o que transforma "entendeu bem" em "apagou errado".
+
+## Avaliação: "funciona de infinitas formas" é medido, não afirmado
+
+`scripts/evaluate_answer_forms.py` roda o Gemini REAL sobre muitas redações por
+costura — campo de cadastro, escolha de item, sim/não, slot de rascunho — e sobre um
+conjunto adversarial que **não pode aprovar nada**. O pytest usa dublês, e dublê
+sempre concorda: só esta suíte responde se a pessoa pode escrever do jeito dela.
+
+**Mexeu em prompt, schema de classificador ou catálogo → roda ela.** As duas metades
+têm que passar: regressão em "aceitar" é o agente ficando surdo; regressão em
+"recusar" apaga dado do usuário.
+
 ## Human-In-The-Loop
 
 - Disparam `interrupt()` no LangGraph: **deleções** (`delete_transaction`, `undo_last`,

@@ -365,23 +365,7 @@ def _where(resource):
     return ""
 
 
-def _guard_debt_history(ctx: ExecContext, action: ResourceAction) -> None:
-    import re
-
-    if (
-        action.resource == "debts"
-        and action.type == Op.PAY
-        and re.search(
-            r"\b(parcelas|anteriores|primeiras|ultimas)\b", normalize(ctx.texto or "")
-        )
-    ):
-        _error(
-            "Essas parcelas já estão consideradas no saldo devedor? Informe quantas já foram pagas e o saldo devedor atual para registrar o histórico sem nova saída da conta."
-        )
-
-
 async def prepare(ctx: ExecContext, action: ResourceAction) -> dict:
-    _guard_debt_history(ctx, action)
     values = validate_fields(action)
     table, identity, deletion, _ = CATALOG[action.resource]
     prepared = {
@@ -461,6 +445,25 @@ async def prepare(ctx: ExecContext, action: ResourceAction) -> dict:
                 _error("Essa dívida está arquivada. Revise o cadastro antes de pagar.")
             if not values.get("amount_cents"):
                 _error("Qual o valor da prestação paga? Ainda não registrei nada.")
+            # Quem denuncia "isso são N parcelas de uma vez" é a ARITMÉTICA do
+            # contrato, não uma palavra na frase. Havia um regex vetando qualquer
+            # pagamento cuja mensagem contivesse "parcelas": ele deixava passar
+            # "quitei as anteriores da moto" e barrava "paguei as parcelas de
+            # setembro". Múltiplo exato da prestação é a assinatura de baixa
+            # retroativa em lote — que gravaria UMA despesa gigante que nunca
+            # saiu da conta —, e amortização extra raramente cai num múltiplo
+            # redondo. Na dúvida ele PERGUNTA; nunca grava sozinho.
+            parcela = old.get("installment_cents") or 0
+            pago = values["amount_cents"]
+            if parcela and pago >= parcela * 2 and pago % parcela == 0:
+                _error(
+                    f"Esse valor são {pago // parcela} prestações de "
+                    f"{cents_to_brl(parcela)}. Se elas já foram pagas antes e você só "
+                    "quer registrar o histórico, me diga quantas parcelas já foram "
+                    "pagas e o saldo devedor atual — isso não tira dinheiro da conta. "
+                    "Se foi um pagamento único de amortização agora, me confirme o "
+                    "valor dizendo que é amortização. Ainda não registrei nada."
+                )
             values.setdefault("paid_at", local_iso_date(ctx.timezone))
             if not values.get("account_id"):
                 values["account_id"] = (
@@ -650,7 +653,6 @@ async def prepare(ctx: ExecContext, action: ResourceAction) -> dict:
 
 
 async def execute(ctx: ExecContext, action: ResourceAction) -> ToolResult:
-    _guard_debt_history(ctx, action)
     proposal = (ctx.target or {}).get("prepared")
     if (
         not proposal
