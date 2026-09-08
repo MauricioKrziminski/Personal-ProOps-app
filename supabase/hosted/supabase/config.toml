@@ -145,8 +145,12 @@ message_service_sid = ""
 
 # O CLI manda `[storage.vector] enabled = true` por padrão e o plano free recusa com
 #   402 Please upgrade the project to a paid tier to enable vector buckets
-# O push é por serviço: o auth já tinha ido, mas o comando terminava em erro e parecia
-# ter falhado inteiro. Declarar aqui deixa o push sair limpo.
+# O push é por serviço, e o AUTH vai ANTES do storage: quando o comando termina neste 402, o
+# auth já foi aplicado. Confira pelo diff, não pelo código de saída — sem bloco de auth no diff,
+# o auth está em dia.
+# ⚠️ Declarar `enabled = false` aqui NÃO cala o erro quando o push roda com `SUPABASE_ENV`
+# (medido em 07/09/2026): o CLI remonta a seção de storage a partir dos defaults e volta a mandar
+# `true`. É inofensivo — este projeto não usa vector bucket — e não vale um workaround.
 [storage]
 enabled = true
 
