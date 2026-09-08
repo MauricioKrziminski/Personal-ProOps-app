@@ -746,20 +746,62 @@ aplicar; mandar "n" por pipe não segura nada.
 O push para projeto hospedado sai de `supabase/hosted`, com `--workdir` **ABSOLUTO**:
 
 ```bash
-R=$(git rev-parse --show-toplevel)
-SUPABASE_ENV=staging    npx supabase config push --workdir "$R/supabase/hosted" \
-  --project-ref utkqoiigimqzeenxkxdl
-SUPABASE_ENV=production npx supabase config push --workdir "$R/supabase/hosted" \
-  --project-ref kwriuifcwyvdrxtspjiz
+cd supabase/hosted
+SUPABASE_ENV=staging    npx supabase config push --project-ref utkqoiigimqzeenxkxdl
+SUPABASE_ENV=production npx supabase config push --project-ref kwriuifcwyvdrxtspjiz
 ```
 
-Com caminho RELATIVO o CLI acaba lendo o `supabase/config.toml` da raiz — ou seja, exatamente o
-arquivo que este diretório existe para não empurrar. Medido.
+**`--workdir` não serve** — nem absoluto. Ver a seção sobre isso abaixo.
 
 ⚠️ **`[auth.sms.test_otp]` não sai por push.** A API faz *merge* do mapa, então número de teste
 que entrou lá só sai à mão (Authentication → Sign In / Providers → Phone). O staging ficou com
 `5511999990002` e `5511999990003` — inofensivos enquanto `sms.enable_signup = false`, mas é
 limpeza pendente.
+
+### O que o push de produção revelou (07/09/2026)
+
+O diff do CLI é a única leitura do config remoto que existe sem token da Management API, e ele
+mostrou cinco coisas que ninguém sabia:
+
+| descoberta | consequência |
+|---|---|
+| **`otp_length = 8`** em produção | o `OtpInput` do app tem **6** caixas — a pessoa nunca terminaria de digitar. Corrigido para 6. |
+| **`minimum_password_length = 6`** | o zod da tela exige 8; o servidor aceitava o que a tela recusa. Corrigido. |
+| hook do Phone OTP aponta para **`/functions/v1/wa-send-otp`** (Deno), não para o Cloud Run | eu tinha declarado o Cloud Run por dedução. Declarar errado derruba o login por telefone no próximo push. |
+| **`sms.enable_confirmations = false`** | trocar telefone em produção não pedia código — exatamente o que `config.toml` diz que não pode. Corrigido. |
+| `site_url = http://localhost:3000` | a origem do link que abria localhost no celular. Corrigido para `appproops://`. |
+
+### ⚠️ `--workdir` NÃO funciona; tem que ser `cd`
+
+```bash
+cd supabase/hosted && SUPABASE_ENV=production npx supabase config push --project-ref <ref>
+```
+
+Medido em 07/09/2026: com `--workdir`, mesmo ABSOLUTO, o CLI carrega o `supabase/config.toml` da
+RAIZ e empurra a stack local para o projeto. A prova foi pôr uma linha TOML inválida no arquivo
+de `supabase/hosted`: com `--workdir` o push seguiu sem reclamar; com `cd`, o CLI falhou no parse
+apontando a linha. É o `cd` que decide qual arquivo vale.
+
+### ⚠️ Template de e-mail é bloqueado no plano free, e o PATCH é ATÔMICO
+
+```
+400 Email template modification is not available for free tier projects using the default
+    email provider. Please upgrade your plan or configure a custom SMTP provider.
+```
+
+Com um bloco de template na requisição, **nada** do auth é aplicado — nem `site_url`, nem
+`otp_length`. Por isso os templates moram em `[remotes.staging.auth.email.template.*]` e não na
+base: é o que permite corrigir todo o resto em produção enquanto não há SMTP próprio.
+
+Consequência para o produto: **em produção, a confirmação de cadastro por e-mail não tem como
+mostrar o código** enquanto o SMTP for o do Supabase. O texto padrão manda um link, e o app não
+tem handler de deep link para ele. As saídas são SMTP próprio, plano pago, ou desligar a
+confirmação (`[auth.email] enable_confirmations = false`) — o app já lida com isso: `signUp`
+devolve sessão e o portão troca a tela sozinho (`src/app/signup.tsx`, "Com confirmação desligada
+o signUp já devolve sessão").
+
+Outro 402 no caminho: o CLI manda `[storage.vector] enabled = true` por padrão e o plano free
+recusa. `supabase/hosted` declara `enabled = false` para o push sair limpo.
 
 ### O remetente exige SMTP próprio
 

@@ -34,6 +34,17 @@ project_id = "utkqoiigimqzeenxkxdl"
 enable_signup = false
 enable_confirmations = false
 
+# O template padrão do Supabase usa `{{ .ConfirmationURL }}` (um LINK); o app chama `verifyOtp` e
+# precisa de `{{ .Token }}` (o código de 6 dígitos). Os dois arquivos ao lado são symlinks para
+# `supabase/templates/` — uma fonte só.
+[remotes.staging.auth.email.template.confirmation]
+subject = "Seu código do Personal ProOps app"
+content_path = "./supabase/confirmation.html"
+
+[remotes.staging.auth.email.template.recovery]
+subject = "Trocar a senha do Personal ProOps app"
+content_path = "./supabase/recovery.html"
+
 [remotes.production]
 project_id = "kwriuifcwyvdrxtspjiz"
 
@@ -42,9 +53,19 @@ project_id = "kwriuifcwyvdrxtspjiz"
 # hooks VAZIA e desligaria o login por telefone.
 # O segredo (SEND_SMS_HOOK_SECRET) nao viaja: o CLI trata `auth.hook.*.secrets` como campo
 # secreto e preserva o que ja esta no projeto.
+# ⚠️ Esta e a URI que produção tem HOJE, lida do diff do CLI em 07/09/2026 — a Edge Function
+# em Deno, não o Cloud Run. Declarar errado aqui derruba o login por telefone no próximo push.
+# O `/hooks/otp` do Cloud Run é o destino DEPOIS do corte (docs/PROMOVER-PRODUCAO.md); trocar
+# esta linha é um passo do runbook, não uma correção de config.
+# ⚠️ Em produção o push deixa SEMPRE um diff pendente de uma linha: `[sms.twilio] enabled`.
+# A API recusa desligar o provider enquanto o cadastro por telefone está ligado — devolve 200 e
+# mantém `true`. É inerte (as credenciais estão vazias e quem entrega o OTP é o hook abaixo), e
+# tentar declarar `true` num override aqui quebra a validação do CLI, que exige a tabela
+# `auth.sms.twilio` inteira e não a compõe com a da base. Ver esse diff repetir NÃO é erro.
+
 [remotes.production.auth.hook.send_sms]
 enabled = true
-uri = "https://agente-wwm7xruoyq-rj.a.run.app/hooks/otp"
+uri = "https://kwriuifcwyvdrxtspjiz.supabase.co/functions/v1/wa-send-otp"
 
 [auth]
 enabled = true
@@ -94,16 +115,19 @@ max_frequency = "30s"
 otp_length = 6
 otp_expiry = 3600
 
-# ⚠️ É ESTE bloco que resolve o "me mandou um link em vez do código".
-# O template padrão do Supabase usa `{{ .ConfirmationURL }}`; o app chama `verifyOtp` e precisa
-# de `{{ .Token }}`. Os dois arquivos ao lado são os mesmos de `supabase/templates/`.
-[auth.email.template.confirmation]
-subject = "Seu código do Personal ProOps app"
-content_path = "../templates/confirmation.html"
-
-[auth.email.template.recovery]
-subject = "Trocar a senha do Personal ProOps app"
-content_path = "../templates/recovery.html"
+# ⚠️ **Os templates NÃO ficam aqui na base — eles moram no bloco do staging, mais abaixo.**
+#
+# Medido em 07/09/2026 contra produção:
+#
+#   400 Email template modification is not available for free tier projects using the default
+#       email provider. Please upgrade your plan or configure a custom SMTP provider.
+#
+# E o PATCH de auth é ATÔMICO: com um bloco de template na requisição, **nada** é aplicado —
+# nem `site_url`, nem `otp_length`, nem o resto. Por isso a base não os declara: é o que permite
+# corrigir tudo o mais em produção enquanto o SMTP próprio não existe.
+#
+# Quando houver SMTP próprio, mova os dois blocos de `[remotes.staging.auth.email.template.*]`
+# para cá e o push passa a valer nos dois ambientes.
 
 # Phone OTP é entregue pelo Send SMS Hook (WhatsApp), nunca por Twilio. O provider fica
 # DESLIGADO de propósito: ligado com credencial vazia ele é só uma forma de o login falhar
@@ -118,3 +142,13 @@ max_frequency = "60s"
 enabled = false
 account_sid = ""
 message_service_sid = ""
+
+# O CLI manda `[storage.vector] enabled = true` por padrão e o plano free recusa com
+#   402 Please upgrade the project to a paid tier to enable vector buckets
+# O push é por serviço: o auth já tinha ido, mas o comando terminava em erro e parecia
+# ter falhado inteiro. Declarar aqui deixa o push sair limpo.
+[storage]
+enabled = true
+
+[storage.vector]
+enabled = false
