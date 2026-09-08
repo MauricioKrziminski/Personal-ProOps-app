@@ -724,6 +724,51 @@ do código que causou a troca.
 subiram o mesmo contador que produção usa (2 → 4). Não houve regressão — produção só andou para
 frente —, mas o número do próximo APK de produção não é o que estava anotado.
 
+## 5c. O e-mail de confirmação vinha com LINK, não com código (07/09/2026)
+
+Três defeitos com a mesma raiz: **o `config.toml` do repositório nunca foi aplicado nos projetos
+hospedados.** Ele descreve a stack LOCAL, e o que estava no ar era o padrão do Supabase.
+
+| sintoma | causa | onde se resolve |
+|---|---|---|
+| chegou um link "Confirmar endereço de e-mail" em vez do código de 6 dígitos | template padrão usa `{{ .ConfirmationURL }}`; o app chama `verifyOtp` e precisa de `{{ .Token }}` | `supabase/hosted` |
+| o link abria `localhost` no celular | `site_url` no padrão `http://localhost:3000` | `supabase/hosted` |
+| remetente "Supabase Auth <noreply@mail.app.supabase.io>" | SMTP padrão do Supabase | **só com SMTP próprio** — ver abaixo |
+
+### `supabase/hosted` — por que existe um segundo config
+
+`supabase/config.toml` é a stack local: Twilio com `account_sid = "local-test"`, dois telefones
+com código FIXO em `[auth.sms.test_otp]`, `minimum_password_length = 6` (a tela exige 8) e rate
+limit de 1000. **Um `config push` a partir da raiz escreve tudo isso no projeto linkado** — e foi
+o que aconteceu com o staging em 07/09/2026. O CLI imprime o diff mas **não pergunta** antes de
+aplicar; mandar "n" por pipe não segura nada.
+
+O push para projeto hospedado sai de `supabase/hosted`, com `--workdir` **ABSOLUTO**:
+
+```bash
+R=$(git rev-parse --show-toplevel)
+SUPABASE_ENV=staging    npx supabase config push --workdir "$R/supabase/hosted" \
+  --project-ref utkqoiigimqzeenxkxdl
+SUPABASE_ENV=production npx supabase config push --workdir "$R/supabase/hosted" \
+  --project-ref kwriuifcwyvdrxtspjiz
+```
+
+Com caminho RELATIVO o CLI acaba lendo o `supabase/config.toml` da raiz — ou seja, exatamente o
+arquivo que este diretório existe para não empurrar. Medido.
+
+⚠️ **`[auth.sms.test_otp]` não sai por push.** A API faz *merge* do mapa, então número de teste
+que entrou lá só sai à mão (Authentication → Sign In / Providers → Phone). O staging ficou com
+`5511999990002` e `5511999990003` — inofensivos enquanto `sms.enable_signup = false`, mas é
+limpeza pendente.
+
+### O remetente exige SMTP próprio
+
+Não há como trocar "Supabase Auth" sem SMTP próprio: o mailer embutido é do Supabase e também é
+limitado a **2 e-mails por hora**, o que sozinho já inviabiliza testar cadastro. Depende de uma
+conta num provedor (Resend, SendGrid, Postmark) e de um domínio verificado — decisão e credencial
+do dono do produto. Configurado o provedor, entra em `[auth.email.smtp]` no `supabase/hosted`;
+a senha NÃO vai no arquivo (`auth.email.smtp.pass` é campo secreto e o CLI nunca o envia).
+
 ## 5b. Estado dos dois bancos (04/09/2026)
 
 | ambiente | ref | migration |
