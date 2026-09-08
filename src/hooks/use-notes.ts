@@ -1,3 +1,4 @@
+import { invalidateKeys } from '@/lib/query-invalidation';
 import {
   useInfiniteQuery,
   useMutation,
@@ -141,7 +142,7 @@ export function useNote(id: string | undefined) {
 /** Invalida tudo por prefixo — lista, item, contagem de pasta e de tag numa chamada. */
 function useInvalidateNotes() {
   const client = useQueryClient();
-  return () => client.invalidateQueries({ queryKey: ['notes'] });
+  return () => invalidateKeys(client, [['notes'], ['search', 'notes'], ['ai-month-stats']]);
 }
 
 async function currentUserId() {

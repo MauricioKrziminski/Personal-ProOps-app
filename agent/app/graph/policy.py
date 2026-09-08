@@ -162,7 +162,8 @@ def describe_for_confirmation(
             ) if x)
             return f"corrigir {alvo}: {changes}" if changes else f"corrigir {alvo}"
         if tipo == "create_installment_purchase":
-            return f"registrar {valor} em {action.installments}x"
+            paid=action.already_paid_count or 0
+            return f"registrar {valor} em {action.installments}x no cartão {action.account or 'a informar'}: {paid} parcelas iniciais pagas e {(action.installments or 0)-paid} pendentes"
         if tipo == "pay_invoice":
             return f"registrar o pagamento da fatura do {action.account or 'cartão'}"
         return f"registrar {valor} em {alvo}" if valor else f"registrar {alvo}"

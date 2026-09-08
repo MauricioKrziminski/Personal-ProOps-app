@@ -1,14 +1,6 @@
-"""Compra parcelada que começou no passado.
+"""Schedule anchoring is independent from explicit initial paid history.
 
-"Estou na 4ª parcela de 10" era gravado como uma compra de HOJE em 10x: as dez
-parcelas iam para o futuro, o histórico de três meses sumia, e a projeção de
-caixa ganhava três meses de dívida que já tinha sido paga (encontrado no teste
-ponta a ponta de 31/08/2026).
-
-A correção não é regra nova: a `0013` já gera cada parcela em
-`add_months(occurred_at, i-1)` e marca `cleared` toda data que não é futura
-(`0013:269,278`). Faltava só recuar a data da PRIMEIRA parcela. Este arquivo
-prende a data que sai daqui — é ela que decide tudo o que a RPC faz depois.
+The history RPC receives a separate paid count; dates alone never clear rows.
 """
 
 from uuid import UUID
@@ -62,6 +54,7 @@ def _acao(**extra):
         description="mac",
         account="Nubank",
         occurred_at="2026-08-31",
+        already_paid_count=extra.pop("already_paid_count", 0),
         **extra,
     )
 
@@ -107,9 +100,9 @@ class TestRetroacao:
 
     @pytest.mark.asyncio
     async def test_a_resposta_conta_o_que_foi_feito(self, rpc):
-        r = await finance.create_installment_purchase(CTX, _acao(current_installment=4))
-        assert "3 anteriores entraram como pagas" in r.message
-        assert "4ª" in r.message
+        r = await finance.create_installment_purchase(CTX, _acao(current_installment=4, already_paid_count=3))
+        assert "3 parcelas iniciais pagas" in r.message
+        assert "7 pendentes" in r.message
 
     @pytest.mark.asyncio
     async def test_ja_paguei_duas_parcelas_cai_na_terceira_e_retroage_dois_meses(self, rpc):
@@ -131,9 +124,10 @@ class TestRetroacao:
             account="Nubank",
             occurred_at="2026-09-01",
             current_installment=3,
+            already_paid_count=2,
         )
         r = await finance.create_installment_purchase(ctx_setembro, acao_set)
         # Começa 2 meses atrás (Julho/2026)
         assert rpc[0][3] == "2026-07-01"
-        assert "2 anteriores entraram como pagas" in r.message
-        assert "3ª" in r.message
+        assert "2 parcelas iniciais pagas" in r.message
+        assert "10 pendentes" in r.message

@@ -110,8 +110,8 @@ export default function ProfileScreen() {
       topBar={<AppHeader title="Perfil" />}
       onRefresh={() => {
         setNotificationRefreshKey((current) => current + 1);
-        profile.refetch();
-        plan.refetch();
+
+        return Promise.all([profile.refetch(), plan.refetch(), ia.refetch()]);
       }}
       refreshing={profile.isRefetching || plan.isRefetching}>
       {/*

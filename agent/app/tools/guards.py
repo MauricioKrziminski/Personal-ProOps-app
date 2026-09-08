@@ -155,7 +155,7 @@ _ACCOUNT_EXTRACTOR = re.compile(
     r"\b(?:no|na|pelo|pela|via|com o|com a)\s+([a-zA-Z0-9_\-áéíóúâêîôûãõçÁÉÍÓÚÂÊÎÔÛÃÕÇ]{3,30})",
     re.IGNORECASE,
 )
-_IGNORE_ACCOUNTS = {"cartao", "credito", "debito", "dinheiro", "pix", "mes", "ano", "dia", "total", "mercado"}
+_IGNORE_ACCOUNTS = {"cartão", "cartao", "credito", "debito", "dinheiro", "pix", "mes", "ano", "dia", "total", "mercado"}
 
 
 def extract_description_fallback(texto: str) -> str | None:
@@ -172,6 +172,11 @@ def extract_description_fallback(texto: str) -> str | None:
 def extract_account_fallback(texto: str) -> str | None:
     if not texto:
         return None
+    explicit = re.search(r"\b(?:no|na|pelo|pela|com o|com a)\s+cart[aã]o\s+(?:de cr[eé]dito\s+)?([^,.;!?]+)", texto, re.IGNORECASE)
+    if explicit:
+        candidate = re.split(r"\s+(?:em|e|que|com|para|pra|ontem|hoje)\s+", explicit.group(1), maxsplit=1, flags=re.IGNORECASE)[0].strip()
+        if candidate and candidate.casefold() not in {"crédito", "credito", "débito", "debito"}:
+            return candidate
     m = _ACCOUNT_EXTRACTOR.search(texto)
     if m:
         candidato = m.group(1).strip()

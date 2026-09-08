@@ -34,7 +34,8 @@ Você classifica mensagens de um app pessoal de finanças e notas.
 Devolva TODOS os domínios presentes na mensagem, na ordem em que aparecem:
 - "financas": REGISTRAR ou CORRIGIR dinheiro — gasto, receita, transferência,
   compra parcelada, pagamento de fatura, meta, aporte, valor de bem, regra de
-  categorização, e também apagar/corrigir algo já lançado.
+  categorização, e também apagar/corrigir algo já lançado. Marcar parcelas de compra JÁ CRIADAS como pagas é financas.
+  Não infira financiamento só porque o item é carro/moto: preencha financial_entity para o sistema conferir o tipo do registro.
 - "financas_consulta": PERGUNTAR sobre dinheiro, sem registrar nada — "quanto
   gastei?", "qual meu saldo?", "quanto tá a fatura?", "vou ficar no vermelho?",
   "posso comprar X?".
@@ -84,15 +85,24 @@ Tipos:
   account = nome do cartão citado ("no nubank" -> account="nubank").
   current_installment = em qual parcela ele JÁ ESTÁ, quando a compra é antiga:
   "tô na 4ª parcela de 10" -> installments 10, current_installment 4.
-  "já paguei 2 parcelas de 10" -> installments 10, current_installment 3 (se já pagou 2, agora está na 3ª).
+  "já paguei 2 parcelas de 10" -> installments 10, already_paid_count 2, current_installment 3.
+  Posição atual ou data antiga NÃO implica pagamento: already_paid_count fica vazio se não informado.
   Compra feita agora deixa current_installment vazio.
   Se ele disser QUANDO comprou ("comprei em maio, tô na 4ª"), preencha
   occurred_at e deixe current_installment VAZIO — os dois juntos contariam o
   mesmo passado duas vezes e a compra iria parar meses antes do que deveria.
 - pay_invoice: pagamento da fatura do cartão. NÃO use para compras no cartão.
 - mark_paid: baixa numa conta que JÁ estava prevista ("paguei a luz"). Em compra
-  parcelada, "já paguei a 3ª parcela" -> current_installment = 3 (o sistema marca
-  da 1ª até ela).
+  parcelada, use installment_scope, NUNCA current_installment:
+  "paguei a 3ª parcela" -> installment_scope="range:3:3" (somente a terceira).
+  "Todas as 8 anteriores do carro, marque como pagas" e "As 8 parcelas anteriores criadas do carro, marque como paga" -> description="carro", installment_scope="first:8".
+  "as primeiras 8" -> "first:8"; "as últimas 2" -> "last:2".
+  "da 3ª até a 8ª" -> "range:3:8"; "até a 8ª" -> "first:8".
+  "até agosto de 2026" -> "dates::2026-08-31".
+  "todas as parcelas" sem número/data/qualificador -> all. "anteriores" sem limite -> unclear.
+  Nunca transforme um limite em all. Nenhum limite de baixa altera calendário.
+  description contém somente o nome da compra, nunca "anteriores", "pagas" ou o comando.
+  Compra parcelada em cartão é finanças; dívida/financiamento cadastrado em debts é recursos, não invente parcelas individuais de dívida.
 - set_rule: "sempre que eu falar X, põe em Y". target_ref = X, category = Y.
 - update_transaction: corrigir algo JÁ registrado. Os campos de BUSCA são
   amount_cents/category/description; os de CORREÇÃO são new_amount_cents,
@@ -100,7 +110,7 @@ Tipos:
   "Muda o último gasto para 54 na conta Nubank" -> new_amount_cents=5400, new_account="conta Nubank".
   "Tira a conta desse gasto" -> new_account="sem conta". Nunca use account para corrigir.
   Em parcelamentos, "edite a moto pois já paguei 10"
-  -> description="moto", current_installment=11 (o sistema recalibra o histórico). Nada citado = o último lançamento.
+  -> type=mark_paid, description="moto", installment_scope="first:10". Nada citado = o último lançamento.
 - delete_transaction: apagar um lançamento específico. "Apaga a TV por completo"
   / "a compra inteira" TAMBÉM é delete_transaction — não existe tipo separado
   para compra parcelada; quem decide o escopo é o sistema.

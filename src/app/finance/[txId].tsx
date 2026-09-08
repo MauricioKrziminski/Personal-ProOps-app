@@ -91,6 +91,7 @@ export default function TransactionDetailScreen() {
   const save = useSaveTransaction();
   const remove = useDeleteTransaction();
   const markPaid = useMarkPaid();
+  const refresh = () => Promise.all([list.refetch(), accounts.refetch(), tx?.invoice_id ? invoice.refetch() : Promise.resolve(), plans.refetch()]);
 
   const accountLabel = tx?.account_id
     ? ((accounts.data ?? []).find((a) => a.id === tx.account_id)?.name ?? null)
@@ -190,7 +191,7 @@ export default function TransactionDetailScreen() {
 
   if (list.isLoading) {
     return (
-      <Screen grouped>
+      <Screen grouped onRefresh={refresh} refreshing={list.isRefetching || accounts.isRefetching || invoice.isRefetching || plans.isRefetching}>
         <Stack.Screen options={{ title: 'Lançamento' }} />
         <View style={styles.heroSkeleton}>
           <Skeleton width="45%" height={14} />
@@ -205,7 +206,7 @@ export default function TransactionDetailScreen() {
 
   if (list.isError) {
     return (
-      <Screen grouped>
+      <Screen grouped onRefresh={refresh} refreshing={list.isRefetching || accounts.isRefetching || invoice.isRefetching || plans.isRefetching}>
         <Stack.Screen options={{ title: 'Lançamento' }} />
         <ErrorCard onRetry={list.refetch} />
       </Screen>
@@ -214,7 +215,7 @@ export default function TransactionDetailScreen() {
 
   if (!tx) {
     return (
-      <Screen grouped>
+      <Screen grouped onRefresh={refresh} refreshing={list.isRefetching || accounts.isRefetching || invoice.isRefetching || plans.isRefetching}>
         <Stack.Screen options={{ title: 'Lançamento' }} />
         <EmptyState
           icon="questionmark.folder"
@@ -231,7 +232,7 @@ export default function TransactionDetailScreen() {
   const signedAmount = tx.kind === 'expense' ? -tx.amount_cents : tx.amount_cents;
 
   return (
-    <Screen grouped>
+    <Screen grouped onRefresh={refresh} refreshing={list.isRefetching || accounts.isRefetching || invoice.isRefetching || plans.isRefetching}>
       <Stack.Screen options={{ title }} />
 
       {/*

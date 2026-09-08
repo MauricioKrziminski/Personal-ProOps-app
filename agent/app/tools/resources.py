@@ -267,6 +267,15 @@ def validate_fields(action: ResourceAction) -> dict:
             values["name"] = normalize(values["name"])
             if not values["name"] or len(values["name"]) > 40:
                 _error("Nome de pasta deve ter entre 1 e 40 caracteres.")
+    if (
+        action.resource == "debts"
+        and action.type == Op.UPDATE
+        and "installments_paid" in values
+        and "remaining_cents" not in values
+    ):
+        _error(
+            "Essas parcelas já estão consideradas no saldo devedor? Informe quantas já foram pagas e o saldo devedor atual para corrigir o histórico sem lançar novo pagamento."
+        )
     if action.type == Op.CREATE:
         if action.resource == "recurring":
             values.setdefault("auto_confirm", False)
@@ -275,6 +284,14 @@ def validate_fields(action: ResourceAction) -> dict:
                 _error(
                     f"Para cadastrar {LABELS[action.resource]}, informe {LABELS[key]}. Ainda não salvei nada."
                 )
+        if (
+            action.resource == "debts"
+            and values.get("installments")
+            and values.get("installments_paid") is None
+        ):
+            _error(
+                "Quantas parcelas já foram pagas? Informe a quantidade, incluindo zero se nenhuma. Ainda não salvei o financiamento."
+            )
         if action.resource == "cards":
             values["type"] = "credit_card"
         if action.resource == "reminders":
@@ -292,7 +309,23 @@ def _where(resource):
     return ""
 
 
+def _guard_debt_history(ctx: ExecContext, action: ResourceAction) -> None:
+    import re
+
+    if (
+        action.resource == "debts"
+        and action.type == Op.PAY
+        and re.search(
+            r"\b(parcelas|anteriores|primeiras|ultimas)\b", normalize(ctx.texto or "")
+        )
+    ):
+        _error(
+            "Essas parcelas já estão consideradas no saldo devedor? Informe quantas já foram pagas e o saldo devedor atual para registrar o histórico sem nova saída da conta."
+        )
+
+
 async def prepare(ctx: ExecContext, action: ResourceAction) -> dict:
+    _guard_debt_history(ctx, action)
     values = validate_fields(action)
     table, identity, deletion, _ = CATALOG[action.resource]
     prepared = {
@@ -335,6 +368,20 @@ async def prepare(ctx: ExecContext, action: ResourceAction) -> dict:
                 "Não encontrei um único item com esse nome. Informe o nome exato (e o mês, no caso de orçamento). Nada foi alterado."
             )
         old = rows[0]
+        if (
+            action.resource == "debts"
+            and action.type == Op.UPDATE
+            and "installments_paid" in values
+        ):
+            payments = await db.fetch(
+                "select id from public.transactions where debt_id=%s and workspace_id=%s limit 1",
+                old["id"],
+                ctx.workspace_id,
+            )
+            if payments:
+                _error(
+                    "Essa dívida já possui pagamentos registrados. Revise os pagamentos existentes; não posso substituir a contagem histórica por aqui."
+                )
         prepared.update(id=str(old["id"]), version=old["row_version"])
         if action.type == Op.PAY:
             if old.get("archived"):
@@ -510,6 +557,7 @@ async def prepare(ctx: ExecContext, action: ResourceAction) -> dict:
 
 
 async def execute(ctx: ExecContext, action: ResourceAction) -> ToolResult:
+    _guard_debt_history(ctx, action)
     proposal = (ctx.target or {}).get("prepared")
     if (
         not proposal
@@ -589,6 +637,8 @@ async def execute(ctx: ExecContext, action: ResourceAction) -> ToolResult:
                 *args,
             )
         else:
+            if action.resource == "debts" and "installments_paid" in values:
+                reference_guard += " and not exists (select 1 from public.transactions payment where payment.debt_id=public.debts.id and payment.workspace_id=public.debts.workspace_id)"
             row = await db.fetch_one(
                 f"update public.{table} set "
                 + ", ".join(f"{key} = %s" for key in values)
@@ -619,5 +669,5 @@ def prompt_catalogue() -> str:
         catalogue
         + "\nValores permitidos:\n"
         + choices
-        + "\nOrçamento mensal existente: target_month=YYYY-MM-01; orçamento padrão: target_month=default.\nPara pagar prestação de dívida existente: resource_pay, resource=debts, name=nome da dívida, campos amount_cents, account_id (nome da conta), paid_at (YYYY-MM-DD). Não editar remaining_cents para registrar pagamento."
+        + "\nOrçamento mensal existente: target_month=YYYY-MM-01; orçamento padrão: target_month=default.\nPara pagar prestação de dívida existente: resource_pay, resource=debts, name=nome da dívida, campos amount_cents, account_id (nome da conta), paid_at (YYYY-MM-DD). Não editar remaining_cents para registrar pagamento. Ao criar dívida parcelada, installments_paid exige quantidade explícita (zero se nenhuma). Parcela atual ou data de início não comprova pagamento. Para histórico de parcelas anteriores já pagas de dívida existente, use resource_update com installments_paid e remaining_cents explicitamente informados; se faltar saldo atual pergunte. Nunca use resource_pay para dar baixa retroativa em várias parcelas ou invente amortização a partir do valor da prestação."
     )

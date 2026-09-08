@@ -1,4 +1,5 @@
-import { useEffect } from 'react';
+import { createNativeQueryFocusHandler } from '@/lib/query-invalidation';
+import { useEffect, useRef } from 'react';
 import {
   HankenGrotesk_400Regular,
   HankenGrotesk_400Regular_Italic,
@@ -12,11 +13,11 @@ import {
   JetBrainsMono_600SemiBold,
 } from '@expo-google-fonts/jetbrains-mono';
 import { useFonts } from 'expo-font';
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { DarkTheme, DefaultTheme, Stack, ThemeProvider, router } from 'expo-router';
+import { focusManager, QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { DarkTheme, DefaultTheme, Stack, ThemeProvider, router, usePathname } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
 import { StatusBar } from 'expo-status-bar';
-import { Platform, Pressable } from 'react-native';
+import { AppState, Platform, Pressable } from 'react-native';
 import { KeyboardProvider } from 'react-native-keyboard-controller';
 
 import { AnimatedSplashOverlay } from '@/components/animated-icon';
@@ -42,7 +43,7 @@ const queryClient = new QueryClient({
       staleTime: 30_000,
       gcTime: 5 * 60_000,
       retry: 1,
-      refetchOnWindowFocus: false,
+      refetchOnWindowFocus: Platform.OS === 'web',
     },
   },
 });
@@ -86,6 +87,22 @@ export default function RootLayout() {
 
 function AppTree() {
   const scheme = useScheme();
+  const pathname = usePathname();
+
+  useEffect(() => {
+    if (Platform.OS === 'web') return;
+    focusManager.setFocused(AppState.currentState === 'active');
+    const handleState = createNativeQueryFocusHandler(queryClient, AppState.currentState);
+    const subscription = AppState.addEventListener('change', (state) => {
+      void handleState(state);
+    });
+    return () => subscription.remove();
+  }, []);
+
+  // Tabs/stacks can keep screens mounted. Re-entering a route is not a query mount.
+  useEffect(() => {
+    void queryClient.refetchQueries({ type: 'active', stale: true });
+  }, [pathname]);
 
   // Tocar numa notificação precisa levar a algum lugar — inclusive em cold start.
   useEffect(attachNotificationListeners, []);
@@ -108,6 +125,15 @@ function AppTree() {
   });
 
   const { session, loading } = useSession();
+  const previousUser = useRef<string | null | undefined>(undefined);
+  useEffect(() => {
+    if (loading) return;
+    const user = session?.user.id ?? null;
+    if (previousUser.current !== undefined && previousUser.current !== user) {
+      queryClient.clear();
+    }
+    previousUser.current = user;
+  }, [loading, session?.user.id]);
   const barStyle = useBarStyle();
   /**
    * A barra de status segue o TEMA e nada mais.

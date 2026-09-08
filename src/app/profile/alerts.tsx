@@ -81,7 +81,7 @@ export default function AlertsScreen() {
   const dias = porDia(combineAlertDeliveries(alertas.data ?? []));
 
   return (
-    <Screen grouped>
+    <Screen grouped onRefresh={() => Promise.all([alertas.refetch()])} refreshing={alertas.isRefetching}>
       <Stack.Screen options={{ title: 'Histórico de alertas' }} />
 
       {alertas.isLoading ? (

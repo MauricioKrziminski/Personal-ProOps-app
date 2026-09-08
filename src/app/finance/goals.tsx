@@ -89,11 +89,14 @@ export default function GoalsScreen() {
   const archive = useArchiveGoal();
 
   const [form, setForm] = useState<FormState | null>(null);
-  const [aporte, setAporte] = useState<Goal | null>(null);
+  const [aporteSelecionado, setAporte] = useState<Goal | null>(null);
   const [aporteCents, setAporteCents] = useState(0);
   const [aporteNota, setAporteNota] = useState('');
-  const [extrato, setExtrato] = useState<Goal | null>(null);
+  const [extratoSelecionado, setExtrato] = useState<Goal | null>(null);
   const [concluidasAbertas, setConcluidasAbertas] = useState(false);
+
+  const aporte = goals.isError ? null : (goals.data?.find((goal) => goal.id === aporteSelecionado?.id) ?? null);
+  const extrato = goals.isError ? null : (goals.data?.find((goal) => goal.id === extratoSelecionado?.id) ?? null);
 
   // Lazy de propósito: com 8 metas na tela isso é a diferença entre 1 e 9 requisições.
   const contribuicoes = useGoalContributions(extrato?.id);
@@ -298,7 +301,7 @@ export default function GoalsScreen() {
   };
 
   return (
-    <Screen grouped onRefresh={goals.refetch} refreshing={goals.isRefetching}>
+    <Screen grouped onRefresh={() => Promise.all([goals.refetch(), extrato?.id ? contribuicoes.refetch() : Promise.resolve()])} refreshing={goals.isRefetching}>
       <Stack.Screen
         options={{
           title: 'Metas',

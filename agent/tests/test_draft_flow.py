@@ -716,7 +716,7 @@ class TestFinanciamentoNoRascunho:
     fixture = TestCadastroInlineCheckpoint.fixture
     @pytest.mark.asyncio
     async def test_financiamento_preserva_parcelas_sem_inventar_saldo_ou_taxa(self,monkeypatch):
-        rasc={**RASCUNHO,'action':{**RASCUNHO['action'],'description':'carro','installments':48,'current_installment':9,'amount_cents':7056000}}
+        rasc={**RASCUNHO,'action':{**RASCUNHO['action'],'description':'carro','installments':48,'current_installment':9,'already_paid_count':8,'amount_cents':7056000}}
         async def aberto(*a,**kw): return rasc
         monkeypatch.setattr(db,'open_draft',aberto)
         reply=await conversation.run_turn(SESSAO,source_message_id='fin1',conteudo={'clicked_id':'ds:d1:financing','text':'É financiamento'})

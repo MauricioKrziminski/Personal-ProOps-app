@@ -109,28 +109,24 @@ class TestApagarCompraInteira:
 
 class TestBaixaRetroativa:
     @pytest.mark.asyncio
-    async def test_marca_da_primeira_ate_a_informada_com_shifting(self, sql):
+    async def test_confirmacao_antiga_sem_snapshot_nao_altera_plano(self, sql):
         r = await finance.mark_paid(
             _ctx("installment_plans"),
             FinanceAction(type=FinanceActionType.MARK_PAID, current_installment=3),
         )
-        # Primeiro sql: update em installment_plans ajustando first_occurred_at
-        q_plan, args_plan = sql[0]
-        assert "update public.installment_plans set first_occurred_at = %s" in q_plan
-        assert args_plan[1] == "plano-1"
-        assert args_plan[2] == WS
-        # Atualizou as 10 parcelas
-        assert len(sql) == 1 + 10
-        assert "3 parcelas constam como pagas" in r.message
+        assert sql == []
+        assert r.read_only
+        assert "confirmação antiga" in r.message
 
     @pytest.mark.asyncio
     async def test_parcela_fora_da_faixa_nao_vira_update_maluco(self, sql):
-        """"já paguei a 30ª de 10" é o modelo errando; o guard clampa para 1."""
+        """Invalid legacy counts never clamp into another payment."""
         r = await finance.mark_paid(
             _ctx("installment_plans"),
             FinanceAction(type=FinanceActionType.MARK_PAID, current_installment=30),
         )
-        assert "1 parcelas constam como pagas" in r.message or "1ª é a parcela" in r.message
+        assert sql == []
+        assert r.read_only
 
 
 class TestBaixaEmLancamentoUnico:
@@ -180,13 +176,13 @@ class TestBaixaEmLancamentoUnico:
 
 class TestEdicaoPlano:
     @pytest.mark.asyncio
-    async def test_update_em_plano_com_current_installment_atualiza_parcelas_pagas(self, sql):
+    async def test_update_antigo_sem_snapshot_exige_nova_confirmacao(self, sql):
         r = await finance.update_transaction(
             _ctx("installment_plans"),
             FinanceAction(type=FinanceActionType.UPDATE_TRANSACTION, current_installment=3),
         )
-        assert len(sql) == 1 + 10
-        assert "3 parcelas constam como pagas" in r.message
+        assert sql == []
+        assert r.read_only
 
     @pytest.mark.asyncio
     async def test_update_em_plano_sem_parcelas_informa_opcoes(self, monkeypatch):

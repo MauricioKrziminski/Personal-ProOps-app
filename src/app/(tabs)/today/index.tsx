@@ -1,6 +1,6 @@
 import { useMemo } from 'react';
 import { router } from 'expo-router';
-import { Platform, Pressable, ScrollView, StyleSheet, View, useWindowDimensions } from 'react-native';
+import { Platform, Pressable, RefreshControl, ScrollView, StyleSheet, View, useWindowDimensions } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { ThemedText } from '@/components/themed-text';
@@ -107,6 +107,12 @@ export default function TodayScreen() {
   return (
     <View style={[styles.root, { backgroundColor: theme.background }]}>
       <ScrollView
+        alwaysBounceVertical
+        refreshControl={<RefreshControl
+          progressViewOffset={headerHeight}
+          refreshing={forecast.isRefetching || bills.isRefetching || reminders.isRefetching || budgets.isRefetching || recent.isRefetching || profile.isRefetching}
+          onRefresh={() => Promise.all([forecast.refetch(), bills.refetch(), reminders.refetch(), budgets.refetch(), recent.refetch(), profile.refetch()])}
+        />}
         contentContainerStyle={[
           styles.scroll,
           {

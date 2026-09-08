@@ -461,11 +461,8 @@ export default function TransactionsScreen() {
           onEndReached={() => {
             if (list.hasNextPage && !list.isFetchingNextPage) list.fetchNextPage();
           }}
-          refreshing={list.isRefetching && !list.isFetchingNextPage}
-          onRefresh={() => {
-            list.refetch();
-            summary.refetch();
-          }}
+          refreshing={(list.isRefetching && !list.isFetchingNextPage) || summary.isRefetching || accounts.isRefetching || anyEver.isRefetching}
+          onRefresh={() => Promise.all([list.refetch(), summary.refetch(), accounts.refetch(), anyEver.refetch()])}
           renderSectionHeader={({ section }) => (
             <View style={[styles.dayHeader, { backgroundColor: theme.groupedBackground }]}>
               <ThemedText

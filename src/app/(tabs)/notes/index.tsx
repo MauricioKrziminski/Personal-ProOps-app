@@ -384,6 +384,9 @@ export default function NotesScreen() {
         />
       }>
       <FlashList
+        alwaysBounceVertical
+        refreshing={(list.isRefetching && !list.isFetchingNextPage) || foldersQuery.isRefetching || tagsQuery.isRefetching}
+        onRefresh={() => Promise.all([list.refetch(), foldersQuery.refetch(), tagsQuery.refetch()])}
         data={notes}
         keyExtractor={(note) => note.id}
         // As pontas do grupo dependem do VIZINHO, não só do item. Sem isto a `FlashList` não

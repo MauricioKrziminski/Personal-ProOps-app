@@ -145,7 +145,7 @@ export default function InvoicesScreen() {
     ]);
 
   return (
-    <Screen grouped onRefresh={() => invoices.refetch()} refreshing={invoices.isRefetching}>
+    <Screen grouped onRefresh={() => Promise.all([accounts.refetch(), atual?.id ? invoices.refetch() : Promise.resolve()])} refreshing={invoices.isRefetching}>
       <Stack.Screen
         options={{
           title: 'Faturas',

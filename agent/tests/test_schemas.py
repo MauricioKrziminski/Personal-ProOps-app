@@ -31,7 +31,9 @@ from app.graph.schemas import (
 # 08/09/2026: scripts/probe_transaction_account_schema.py accepted the exact
 # FinancePlan with 15 properties x 14 enum values on gemini-3.7-flash.
 MAX_PRODUTO = 198
-FINANCE_PRODUTO_MEDIDO = 210
+# 08/09/2026: probe_bounded_installments.py accepted 17 flat fields with compact
+# string scope (decoded to typed object) and max10 enforced by a local validator.
+FINANCE_PRODUTO_MEDIDO = 238
 MAX_SOMA = 31
 
 MODELOS = [

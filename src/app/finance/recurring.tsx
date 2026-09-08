@@ -1,8 +1,9 @@
+import { useInvalidateFinance } from '@/hooks/use-finance';
 import { useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Switch, View } from 'react-native';
 import Animated, { FadeIn, FadeInDown, LinearTransition } from 'react-native-reanimated';
 import { Stack, router, useLocalSearchParams } from 'expo-router';
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useMutation, useQuery } from '@tanstack/react-query';
 
 import { Chip } from '@/components/finance/chip';
 import { ThemedText } from '@/components/themed-text';
@@ -116,7 +117,7 @@ function useRecurringUpcoming(days = 30) {
  * Duas chamadas do app deixariam a série nova com 90 dias de lançamentos antigos.
  */
 function useCreateRecurring() {
-  const queryClient = useQueryClient();
+  const invalidate = useInvalidateFinance();
   return useMutation({
     mutationFn: async (input: {
       kind: 'expense' | 'income';
@@ -139,10 +140,7 @@ function useCreateRecurring() {
       });
       if (error) throw error;
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['recurring'] });
-      queryClient.invalidateQueries({ queryKey: ['forecast'] });
-    },
+    onSuccess: invalidate,
   });
 }
 
@@ -335,10 +333,7 @@ export default function RecurringScreen() {
   return (
     <Screen
       grouped
-      onRefresh={() => {
-        series.refetch();
-        proximos.refetch();
-      }}
+      onRefresh={() => Promise.all([series.refetch(), proximos.refetch()])}
       refreshing={series.isRefetching}>
       <Stack.Screen
         options={{

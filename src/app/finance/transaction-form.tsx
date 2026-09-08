@@ -33,7 +33,7 @@ import {
   type TransactionKind,
 } from '@/hooks/use-finance';
 import { brToISO, formatBRL, isValidBRDate, isoToBR, localISODate } from '@/lib/dates';
-import { financeErrorMessage } from '@/lib/finance-form';
+import { financeErrorMessage, installmentHistory } from '@/lib/finance-form';
 import { confirmDestructive } from '@/lib/item-actions';
 
 /**
@@ -65,10 +65,16 @@ const schema = z
     counterparty_account_id: z.string().nullable(),
     // 1 = à vista; >= 2 vira plano de parcelas (RPC create_installment_plan)
     installments: z.number().int().min(1).max(72),
+    paid_installments: z.string(),
     occurred_at: z.string().refine(isValidBRDate, 'Data em dd/mm/aaaa'),
     /** "Isso ainda vai acontecer" — vira `status='pending'`, a base da projeção de caixa. */
     pending: z.boolean(),
     due_at: z.string().nullable(),
+  })
+  .superRefine((data, ctx) => {
+    if (data.installments <= 1 || !isValidBRDate(data.occurred_at)) return;
+    try { installmentHistory(data.paid_installments, data.installments, brToISO(data.occurred_at), localISODate()); }
+    catch (error) { ctx.addIssue({ code: 'custom', path: ['paid_installments'], message: (error as Error).message }); }
   })
   .refine((data) => data.installments === 1 || (data.kind === 'expense' && !!data.account_id), {
     message: 'Parcelamento precisa de uma conta/cartão e só vale para gastos',
@@ -176,6 +182,7 @@ function TransactionForm({ editing }: { editing?: Transaction }) {
       account_id: editing?.account_id ?? null,
       counterparty_account_id: editing?.counterparty_account_id ?? null,
       installments: 1,
+      paid_installments: '',
       occurred_at: isoToBR(editing?.occurred_at ?? localISODate()),
       pending: editing?.status === 'pending',
       due_at: editing?.due_at ? isoToBR(editing.due_at) : null,
@@ -187,6 +194,8 @@ function TransactionForm({ editing }: { editing?: Transaction }) {
   const occurredAt = useWatch({ control, name: 'occurred_at' });
   const accountId = useWatch({ control, name: 'account_id' });
   const amountCents = useWatch({ control, name: 'amount_cents' });
+  const installmentCount = useWatch({ control, name: 'installments' });
+  const paidHistory = useWatch({ control, name: 'paid_installments' });
   const pending = useWatch({ control, name: 'pending' });
   const errors = formState.errors;
 
@@ -218,6 +227,7 @@ function TransactionForm({ editing }: { editing?: Transaction }) {
           accountId: values.account_id,
           totalCents: values.amount_cents,
           installments: values.installments,
+          paidInstallments: installmentHistory(values.paid_installments, values.installments, brToISO(values.occurred_at), localISODate()),
           occurredAt: brToISO(values.occurred_at),
           description: values.description?.trim() || null,
           category: values.category,
@@ -227,8 +237,8 @@ function TransactionForm({ editing }: { editing?: Transaction }) {
             Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
             router.back();
           },
-          onError: () =>
-            toast({ message: 'Não deu para parcelar. Tenta de novo.', tone: 'error' }),
+          onError: (error) =>
+            toast({ message: financeErrorMessage(error, 'Não deu para parcelar. Tenta de novo.'), tone: 'error' }),
         },
       );
       return;
@@ -459,11 +469,29 @@ function TransactionForm({ editing }: { editing?: Transaction }) {
           </Animated.View>
         )}
 
+        {podeParcelar && installmentCount > 1 && (
+          <Controller control={control} name="paid_installments" render={({ field }) => (
+            <Field label="Quantas parcelas iniciais já foram pagas?" error={errors.paid_installments?.message}
+              hint="Informe zero se nenhuma foi paga. Datas passadas não significam pagamento; as demais parcelas ficam pendentes.">
+              <View style={styles.chipRow}>
+                <Chip label="Nenhuma" selected={field.value === '0'} onPress={() => field.onChange('0')} />
+                <TextField value={field.value} onChangeText={field.onChange} keyboardType="number-pad" maxLength={2}
+                  placeholder="0" accessibilityLabel="Parcelas iniciais já pagas" />
+              </View>
+              {paidHistory !== '' && /^\d+$/.test(paidHistory) && Number(paidHistory) <= installmentCount && (
+                <ThemedText type="small" themeColor="textSecondary">
+                  {Number(paidHistory) === 0 ? `As ${installmentCount} parcelas ficam pendentes.` : `${paidHistory} parcelas iniciais pagas; ${installmentCount - Number(paidHistory)} pendentes.`}
+                </ThemedText>
+              )}
+            </Field>
+          )} />
+        )}
+
         <Controller
           control={control}
           name="occurred_at"
           render={({ field }) => (
-            <Field label="Data" error={errors.occurred_at?.message}>
+            <Field label={podeParcelar && installmentCount > 1 ? "Data da primeira parcela" : "Data"} error={errors.occurred_at?.message}>
               <View style={styles.chipRow}>
                 <Chip
                   label="Hoje"
@@ -545,7 +573,7 @@ function TransactionForm({ editing }: { editing?: Transaction }) {
 
         {isCard ? (
           <ThemedText type="small" themeColor="textSecondary">
-            Compra no cartão já entra na fatura — o dinheiro sai do caixa quando a fatura vence.
+            Compra no cartão entra na fatura. O dinheiro sai da conta quando você registra o pagamento da fatura.
           </ThemedText>
         ) : null}
 

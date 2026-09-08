@@ -1,0 +1,13 @@
+# Cloud Run uploads only the inputs used by this Dockerfile.
+# Keep development environments, credentials, tests and caches out of the source archive.
+**
+!.gcloudignore
+!.dockerignore
+!Dockerfile
+!requirements.txt
+!app/
+!app/**
+**/__pycache__/
+**/*.pyc
+**/.env
+**/.env.*

@@ -158,6 +158,9 @@ def _amount_with_fallback(ctx: ExecContext, action: FinanceAction) -> int | None
     """
     if action.amount_cents:
         return action.amount_cents
+    if action.type == FinanceActionType.CREATE_INSTALLMENT_PURCHASE:
+        from app.domain.money import parse_installment_total
+        return parse_installment_total(ctx.texto, action.installments)
     return parse_valor_em_centavos(ctx.texto)
 
 
@@ -246,38 +249,46 @@ async def create_transfer(ctx: ExecContext, action: FinanceAction) -> ToolResult
     )
 
 
-async def create_installment_purchase(ctx: ExecContext, action: FinanceAction) -> ToolResult:
-    total = guards.require_amount(_amount_with_fallback(ctx, action), o_que="o valor total")
+async def create_installment_purchase(
+    ctx: ExecContext, action: FinanceAction
+) -> ToolResult:
+    total = guards.require_amount(
+        _amount_with_fallback(ctx, action), o_que="o valor total"
+    )
     parcelas = guards.require_installments(action.installments)
     atual = guards.require_current_installment(action.current_installment, parcelas)
     quando = guards.require_date(action.occurred_at, ctx.timezone)
     conta = await resolve_account(ctx.workspace_id, action.account, only_cards=True)
     if not conta:
-        raise Level1Error("❌ Em qual cartão foi? Cadastra ele no app e me fala o nome.")
+        raise Level1Error(
+            "❌ Em qual cartão foi? Cadastra ele no app e me fala o nome."
+        )
     await ensure_owned("accounts", conta, ctx.workspace_id)
 
-    # "Tô na 4ª parcela de 10" é uma compra de TRÊS MESES ATRÁS, não uma compra
-    # de hoje em 10x — e era assim que ela era gravada, com as 10 parcelas no
-    # futuro. Recuar a data da 1ª parcela é tudo o que falta: a RPC gera cada
-    # parcela em `add_months(occurred_at, i-1)` e marca `cleared` toda data que
-    # não é futura (0013:269,278). As 1..3 nascem pagas, a 4ª cai no mês
-    # corrente e as 5..10 ficam pendentes — sem nenhuma regra nova em Python.
+    paid = action.already_paid_count
+    historical = atual > 1 or quando < local_iso_date(ctx.timezone)
+    if (historical and paid is None) or (
+        paid is not None and not 0 <= paid <= parcelas
+    ):
+        raise Level1Error(
+            "Quantas parcelas já foram pagas? Diga a quantidade, incluindo zero se nenhuma."
+        )
+    paid = paid or 0
+    # Current position only anchors the schedule; it never determines payment.
     if atual > 1:
         quando = add_months(quando, -(atual - 1))
-
     row = await db.fetch_one(
-        """
-        select public.create_installment_plan(%s, %s, %s, %s, %s, %s) as id
-        """,
-        conta, total, parcelas, quando,
-        action.description, guards.clean_category(action.category),
+        "select public.create_installment_plan_with_history(%s, %s, %s, %s, %s, %s, %s) as id",
+        conta,
+        total,
+        parcelas,
+        quando,
+        paid,
+        action.description,
+        guards.clean_category(action.category),
     )
     por_parcela = guards.split_installment_total(total, parcelas)[0]
-    historico = (
-        f"\nAs {atual - 1} anteriores entraram como pagas; você está na {atual}ª."
-        if atual > 1
-        else ""
-    )
+    historico = f"\n{paid} parcelas iniciais pagas; {parcelas - paid} pendentes."
     return ToolResult(
         f"🧾 Parcelado: *{cents_to_brl(total)}* em {parcelas}x de "
         f"{cents_to_brl(por_parcela)} (a última acerta os centavos).{historico}",
@@ -379,123 +390,70 @@ async def verificar_limite_disponivel(
     }
 
 
-async def shift_installment_plan(
-    ctx: ExecContext, plano_id: str | UUID, new_paid_count: int
-) -> ToolResult:
-    """Recalibra o calendário de um plano de parcelamento (Shifting de Datas).
-
-    Quando o usuário atualiza o número de parcelas já pagas (de A para B):
-    1. Calcula a diferença de meses (shift = B - A).
-    2. Recua a data inicial (first_occurred_at) do plano em shift meses.
-    3. Reajusta as N parcelas no banco:
-       - Parcelas 1..B ficam nos meses passados com status 'cleared'.
-       - Parcela B+1 (atual) cai no mês corrente com status 'pending'.
-       - Parcelas subsequentes ficam agendadas abertas com status 'pending'.
-    """
-    plano = await db.fetch_one(
-        """
-        select id, description, installments, total_cents, first_occurred_at
-        from public.installment_plans
-        where id = %s and workspace_id = %s
-        """,
-        plano_id,
-        ctx.workspace_id,
-    )
-    if not plano:
-        return ToolResult("🤷 Essa compra parcelada não está mais aqui.", read_only=True)
-
-    installments = int(plano["installments"])
-    B = max(0, min(int(new_paid_count), installments))
-
-    # Conta quantas parcelas constavam pagas atualmente (A)
-    pagas_row = await db.fetch_one(
-        """
-        select count(*) as count
-        from public.transactions
-        where installment_plan_id = %s and workspace_id = %s and status = 'cleared'
-        """,
-        plano["id"],
-        ctx.workspace_id,
-    )
-    A = 0
-    if pagas_row:
-        if isinstance(pagas_row, dict):
-            A = int(pagas_row.get("count") or pagas_row.get("count(*)") or 0)
-        else:
-            try:
-                A = int(pagas_row["count"])
-            except Exception:
-                A = 0
-
-    first_dt = plano.get("first_occurred_at") or local_iso_date(ctx.timezone)
-    shift = B - A
-    new_first_occurred_at = (
-        add_months(str(first_dt), -shift)
-        if shift != 0
-        else str(first_dt)
-    )
-
-    # Atualiza a data inicial do plano
-    await db.execute(
-        """
-        update public.installment_plans
-        set first_occurred_at = %s
-        where id = %s and workspace_id = %s
-        """,
-        new_first_occurred_at,
-        plano["id"],
-        ctx.workspace_id,
-    )
-
-    # Reajusta cada uma das N parcelas
-    for i in range(1, installments + 1):
-        data_i = add_months(new_first_occurred_at, i - 1)
-        is_paga = i <= B
-        status_i = "cleared" if is_paga else "pending"
-        paid_at_i = data_i if is_paga else None
-
-        await db.execute(
-            """
-            update public.transactions
-            set occurred_at = %s, status = %s, paid_at = %s
-            where installment_plan_id = %s and installment_no = %s and workspace_id = %s
-            """,
-            data_i,
-            status_i,
-            paid_at_i,
-            plano["id"],
-            i,
-            ctx.workspace_id,
-        )
-
-    nome = plano["description"] or "compra parcelada"
-    if B == 0:
-        msg = f"✅ Atualizei o plano de *{nome}* ({installments}x): nenhuma parcela consta como paga; a 1ª é a parcela deste mês."
-    elif B < installments:
-        msg = f"✅ Atualizei o plano de *{nome}* ({installments}x): {B} parcelas constam como pagas no histórico e a {B + 1}ª é a parcela deste mês."
-    else:
-        msg = f"✅ Atualizei o plano de *{nome}* ({installments}x): todas as {B} parcelas foram marcadas como pagas."
-
-    return ToolResult(msg, result_id=plano["id"])
-
-
 async def _baixa_em_parcelas(ctx: ExecContext, action: FinanceAction) -> ToolResult:
     cands = (ctx.target or {}).get("candidates") or []
     if not cands:
-        return ToolResult("🤷 Essa compra parcelada não está mais aqui.", read_only=True)
+        return ToolResult(
+            "🤷 Essa compra parcelada não está mais aqui.", read_only=True
+        )
 
-    plano = await db.fetch_one(
+    # Old checkpoints only froze the plan ID. Never replay their broad effect.
+    snapshot = cands[0].get("installment_snapshot") or {}
+    rows = snapshot.get("rows") or []
+    if (
+        snapshot.get("version") != 2
+        or not rows
+        or snapshot.get("total_cents") != sum(r["amount_cents"] for r in rows)
+    ):
+        return ToolResult(
+            "Essa confirmação antiga não detalha as parcelas. Peça a baixa novamente para revisar o intervalo e o valor.",
+            read_only=True,
+        )
+    import json
+
+    # One statement locks and checks EVERY reviewed record before updating ANY.
+    # A changed amount/date/status, removed row or ownership mismatch rejects all.
+    updated = await db.fetch_one(
         """
-        select id, description, installments from public.installment_plans
-        where id = %s and workspace_id = %s
+        with reviewed as (
+            select * from jsonb_to_recordset(%s::jsonb) as r(
+                id uuid, installment_no int, amount_cents bigint, occurred_at date,
+                status text, paid_at date, account_id uuid, invoice_id uuid)
+        ), locked as materialized (
+            select t.* from public.transactions t join reviewed r on r.id=t.id
+            where t.workspace_id=%s and t.installment_plan_id=%s
+            order by t.id for update of t
+        ), valid as (
+            select count(*) as n from locked t join reviewed r on r.id=t.id
+            where t.installment_no=r.installment_no and t.amount_cents=r.amount_cents
+              and t.occurred_at=r.occurred_at and t.status::text=r.status
+              and t.paid_at is not distinct from r.paid_at
+              and t.account_id is not distinct from r.account_id
+              and t.invoice_id is not distinct from r.invoice_id
+        ), changed as (
+            update public.transactions t set status='cleared',paid_at=%s
+            from locked l where t.id=l.id and l.status::text<>'cleared'
+              and (select n from valid)=%s
+            returning t.id
+        ) select (select n from valid) as matched, (select count(*) from changed) as changed
         """,
-        cands[0]["id"], ctx.workspace_id,
+        json.dumps(rows),
+        ctx.workspace_id,
+        cands[0]["id"],
+        local_iso_date(ctx.timezone),
+        len(rows),
     )
-    if not plano:
-        return ToolResult("🤷 Essa compra parcelada não está mais aqui.", read_only=True)
-
-    ate = guards.require_current_installment(action.current_installment, plano["installments"])
-    return await shift_installment_plan(ctx, plano["id"], ate)
+    if not updated or updated["matched"] != len(rows):
+        return ToolResult(
+            "As parcelas mudaram desde a confirmação. Não alterei nada; peça a baixa novamente.",
+            read_only=True,
+        )
+    return ToolResult(
+        f"✅ {cands[0].get('label', 'Parcelas')} — {cents_to_brl(snapshot['total_cents'])}. "
+        f"{updated['changed']} parcelas marcadas como pagas; as que já estavam pagas foram preservadas.",
+        result_id=cands[0]["id"],
+        read_only=updated["changed"] == 0,
+    )
 
 
 async def mark_paid(ctx: ExecContext, action: FinanceAction) -> ToolResult:
@@ -569,7 +527,7 @@ async def update_transaction(ctx: ExecContext, action: FinanceAction) -> ToolRes
         return ToolResult("🤷 Esse lançamento não está mais aqui.", read_only=True)
 
     if _alvo_e_plano(ctx):
-        if action.current_installment:
+        if action.installment_scope or action.current_installment:
             return await _baixa_em_parcelas(ctx, action)
         return ToolResult(
             "🤷 Para compras parceladas, você pode mudar as parcelas pagas ou excluir o plano.",

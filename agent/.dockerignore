@@ -1,7 +1,11 @@
 .venv/
 __pycache__/
 *.pyc
-.env
+.env*
+**/.env*
 .pytest_cache/
 tests/
 scripts/
+**/__pycache__/
+.ruff_cache/
+docs/

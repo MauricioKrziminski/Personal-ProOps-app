@@ -31,6 +31,7 @@ import { formatBRL, formatDateBR, localISODate } from '@/hooks/use-items';
 import { useToast } from '@/components/ui/toast';
 import { confirmDestructive, showItemActions } from '@/lib/item-actions';
 import { useTheme } from '@/hooks/use-theme';
+import { nextPendingInstallment } from '@/lib/installment-progress';
 
 /**
  * Parceladas — "o que eu já comprometi nos próximos meses, e quanto falta para acabar?".
@@ -255,7 +256,7 @@ export default function InstallmentsScreen() {
     const parcelas = [...plano.parcels].sort(
       (a, b) => (a.installment_no ?? 0) - (b.installment_no ?? 0),
     );
-    const atual = Math.min(plano.installments, plano.paid + 1);
+    const atual = nextPendingInstallment(parcelas, plano.installments);
     const resumo = plano.active
       ? `${atual} de ${plano.installments} · ${formatBRL(plano.installment_cents)} por mês`
       : `${plano.installments} de ${plano.installments} · quitada`;
@@ -355,7 +356,7 @@ export default function InstallmentsScreen() {
   };
 
   return (
-    <Screen grouped onRefresh={() => plans.refetch()} refreshing={plans.isRefetching}>
+    <Screen grouped onRefresh={() => Promise.all([plans.refetch(), accounts.refetch()])} refreshing={plans.isRefetching}>
       {/* Sem headerRight de propósito: parcelamento nasce da compra, não desta tela. */}
       <Stack.Screen options={{ title: 'Parceladas', headerLargeTitle: true }} />
 

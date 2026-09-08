@@ -153,6 +153,7 @@ def veredito(
             "label": rotulo(r),
             "table": tabela,
             **({"when": detalhe(r)} if detalhe else {}),
+            **({"plan_installments":r["installments"]} if tabela=="installment_plans" else {}),
         }
         for r in linhas[:MOSTRAR]
     ]
@@ -287,12 +288,114 @@ async def _com_plano(workspace_id, candidatos: list[dict]) -> list[dict]:
     return [*plan_cands, *outras_txs][:MOSTRAR]
 
 
+async def _bounded_plan_target(workspace_id, candidates, scope):
+    from app.domain.installment_scope import select_rows
+    from app.domain.money import cents_to_brl
+    from app.domain.dates import format_date_br
+
+    result = []
+    for candidate in candidates:
+        rows = await db.fetch(
+            "select t.id, t.installment_no, t.amount_cents, t.occurred_at, t.status, t.paid_at, t.account_id, t.invoice_id, a.name as account_name "
+            "from public.transactions t left join public.accounts a on a.id=t.account_id and a.workspace_id=t.workspace_id "
+            "where t.installment_plan_id = %s and t.workspace_id = %s order by t.installment_no",
+            candidate["id"],
+            workspace_id,
+        )
+        try:
+            selected = select_rows(
+                rows, scope, total_installments=candidate.get("plan_installments")
+            )
+        except (ValueError, TypeError) as error:
+            return {
+                "table": "installment_plans",
+                "status": "none",
+                "candidates": [],
+                "correction_error": str(error),
+            }
+        frozen = [
+            {
+                key: (
+                    str(row[key])
+                    if key
+                    in {"id", "occurred_at", "paid_at", "account_id", "invoice_id"}
+                    and row.get(key) is not None
+                    else row.get(key)
+                )
+                for key in (
+                    "id",
+                    "installment_no",
+                    "amount_cents",
+                    "occurred_at",
+                    "status",
+                    "paid_at",
+                    "account_id",
+                    "invoice_id",
+                )
+            }
+            for row in selected
+        ]
+        accounts = ", ".join(
+            sorted(
+                {
+                    r.get("account_name")
+                    or ("Conta vinculada" if r.get("account_id") else "Sem conta")
+                    for r in selected
+                }
+            )
+        )
+        first, last = frozen[0], frozen[-1]
+        total = sum(r["amount_cents"] for r in frozen)
+        name = candidate["label"].split(" — ", 1)[-1]
+        span = f"{first['installment_no']}–{last['installment_no']}"
+        result.append(
+            {
+                **candidate,
+                "label": f"{len(frozen)} parcelas ({span}) — {name}",
+                "when": f"{cents_to_brl(total)} · {format_date_br(first['occurred_at'])} a {format_date_br(last['occurred_at'])} · {accounts}",
+                "installment_snapshot": {
+                    "version": 2,
+                    "scope": scope.model_dump(),
+                    "rows": frozen,
+                    "total_cents": total,
+                },
+            }
+        )
+    return {
+        "table": "installment_plans",
+        "status": "found" if len(result) == 1 else ("ambiguous" if result else "none"),
+        "candidates": result,
+    }
+
+
 async def for_actions(workspace_id, acoes: list, texto_cru: str) -> list[dict]:
     """Um alvo por ação, alinhado POR POSIÇÃO com a lista de ações.
 
     A posição é a mesma que `ctx.action_index` já usa para idempotência — não há
     segundo esquema de correspondência para divergir.
     """
+    from app.domain.installment_scope import scope_from_text
+
+    payment_actions = [
+        a
+        for a in acoes
+        if getattr(a, "type", None)
+        in {FinanceActionType.MARK_PAID, FinanceActionType.UPDATE_TRANSACTION}
+    ]
+    if len(payment_actions) > 1 and (
+        scope_from_text(texto_cru) is not None
+        or any(a.installment_scope for a in payment_actions)
+    ):
+        return [
+            {
+                "status": "none",
+                "candidates": [],
+                "correction_error": "Para preservar cada intervalo, peça a baixa de uma compra por mensagem.",
+            }
+            if a in payment_actions
+            else {}
+            for a in acoes
+        ]
     saida: list[dict] = []
     for acao in acoes:
         fonte = TARGETS.get(getattr(acao, "type", None))
@@ -318,6 +421,35 @@ async def for_actions(workspace_id, acoes: list, texto_cru: str) -> list[dict]:
         if acao.type == FinanceActionType.UNDO_LAST:
             recente = True
 
+        # Resolve bounded payment directly from plans, beyond the recent-40 window.
+        if acao.type == FinanceActionType.MARK_PAID or (
+            acao.type == FinanceActionType.UPDATE_TRANSACTION
+            and (acao.installment_scope or acao.current_installment)
+        ):
+            from app.domain.installment_scope import scope_from_text
+            from app.graph.schemas import InstallmentScope
+
+            scope = scope_from_text(texto_cru, acao.installment_scope)
+            if scope is not None or acao.current_installment:
+                _, candidates = await por_texto("planos", workspace_id, termo or "")
+                if candidates:
+                    saida.append(
+                        await _bounded_plan_target(
+                            workspace_id,
+                            candidates,
+                            scope or InstallmentScope(mode="unclear"),
+                        )
+                    )
+                else:
+                    saida.append(
+                        {
+                            "table": "installment_plans",
+                            "status": "none",
+                            "candidates": [],
+                            "correction_error": "Não encontrei a compra parcelada. Diga o nome do plano; se for financiamento cadastrado como dívida, diga isso.",
+                        }
+                    )
+                continue
         # "por completo" busca na tabela de PLANOS, nunca deduzindo a partir das
         # transações: `por_transacao` só enxerga os 40 lançamentos mais recentes,
         # e as parcelas de uma compra antiga estão fora dessa janela justamente
@@ -325,9 +457,18 @@ async def for_actions(workspace_id, acoes: list, texto_cru: str) -> list[dict]:
         if acao.type in _ACEITA_PLANO and wants_whole_plan(bruto, texto_cru):
             estado, cands = await por_texto("planos", workspace_id, termo or "")
             if cands:
-                resolved = {"table": "installment_plans", "status": estado, "candidates": cands}
-                if acao.type == FinanceActionType.UPDATE_TRANSACTION and acao.new_account:
-                    resolved["correction_error"] = "Para trocar a conta de uma compra parcelada, edite a parcela individual no app. O plano inteiro não foi alterado."
+                resolved = {
+                    "table": "installment_plans",
+                    "status": estado,
+                    "candidates": cands,
+                }
+                if (
+                    acao.type == FinanceActionType.UPDATE_TRANSACTION
+                    and acao.new_account
+                ):
+                    resolved["correction_error"] = (
+                        "Para trocar a conta de uma compra parcelada, edite a parcela individual no app. O plano inteiro não foi alterado."
+                    )
                 saida.append(resolved)
                 continue
 
@@ -354,22 +495,55 @@ async def for_actions(workspace_id, acoes: list, texto_cru: str) -> list[dict]:
                 if len(cands) == 1 and cands[0].get("table") == "installment_plans":
                     tabela = "installment_plans"
 
+        if acao.type == FinanceActionType.MARK_PAID and any(
+            c.get("table") == "installment_plans" for c in cands
+        ):
+            saida.append(
+                {
+                    "table": "installment_plans",
+                    "status": "none",
+                    "candidates": [],
+                    "correction_error": "Quais parcelas deseja pagar? Diga a quantidade inicial, o intervalo ou até qual data.",
+                }
+            )
+            continue
+
         resolved = {"table": tabela, "status": estado, "candidates": cands}
-        if acao.type == FinanceActionType.UPDATE_TRANSACTION and acao.new_account and (tabela == "installment_plans" or any(c.get("table") == "installment_plans" for c in cands)):
-            resolved["correction_error"] = "Para trocar a conta de uma compra parcelada, edite a parcela individual no app. O plano inteiro não foi alterado."
+        if (
+            acao.type == FinanceActionType.UPDATE_TRANSACTION
+            and acao.new_account
+            and (
+                tabela == "installment_plans"
+                or any(c.get("table") == "installment_plans" for c in cands)
+            )
+        ):
+            resolved["correction_error"] = (
+                "Para trocar a conta de uma compra parcelada, edite a parcela individual no app. O plano inteiro não foi alterado."
+            )
         elif acao.type == FinanceActionType.UPDATE_TRANSACTION and acao.new_account:
             name = acao.new_account
             if matching.normalize(name) in {"sem conta", "nenhuma conta"}:
                 resolved["new_account"] = {"id": None, "name": "Sem conta"}
             else:
                 accounts = await db.accounts(workspace_id)
-                matches = matching.match_accounts(name, accounts, account_type=matching.infer_account_type(name))
+                matches = matching.match_accounts(
+                    name, accounts, account_type=matching.infer_account_type(name)
+                )
                 if len(matches) == 1:
-                    resolved["new_account"] = {"id": str(matches[0]["id"]), "name": matches[0]["name"]}
+                    resolved["new_account"] = {
+                        "id": str(matches[0]["id"]),
+                        "name": matches[0]["name"],
+                    }
                 elif matches:
-                    options = ", ".join(f"{a['name']} ({a.get('type', 'conta')})" for a in matches)
-                    resolved["correction_error"] = f"Encontrei mais de uma conta: {options}. Diga qual conta ou cartão deve ficar no lançamento."
+                    options = ", ".join(
+                        f"{a['name']} ({a.get('type', 'conta')})" for a in matches
+                    )
+                    resolved["correction_error"] = (
+                        f"Encontrei mais de uma conta: {options}. Diga qual conta ou cartão deve ficar no lançamento."
+                    )
                 else:
-                    resolved["correction_error"] = f"Não encontrei uma conta ativa chamada {name}. Diga o nome de uma conta ou cartão cadastrado."
+                    resolved["correction_error"] = (
+                        f"Não encontrei uma conta ativa chamada {name}. Diga o nome de uma conta ou cartão cadastrado."
+                    )
         saida.append(resolved)
     return saida

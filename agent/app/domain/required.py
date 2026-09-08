@@ -50,7 +50,7 @@ def _tem_valor(action: FinanceAction, texto_cru: str) -> bool:
     return parse_valor_em_centavos(texto_cru or "") is not None
 
 
-def faltando(action, texto_cru: str = "") -> tuple[str, str] | None:
+def faltando(action, texto_cru: str = "", timezone: str = "America/Sao_Paulo") -> tuple[str, str] | None:
     """`(slot, pergunta)` do primeiro dado que falta, ou None se está completa.
 
     Devolve TEXTO pronto para o usuário, não código de erro: quem chama só
@@ -86,4 +86,18 @@ def faltando(action, texto_cru: str = "") -> tuple[str, str] | None:
     ):
         return "account", "💳 Em qual cartão foi essa compra?"
 
+    if tipo is FinanceActionType.CREATE_INSTALLMENT_PURCHASE:
+        from app.domain.dates import local_iso_date
+
+        historical = (action.current_installment or 1) > 1 or bool(
+            action.occurred_at and action.occurred_at < local_iso_date(timezone)
+        )
+        paid = action.already_paid_count
+        if (historical and paid is None) or (
+            paid is not None and not 0 <= paid <= (action.installments or 0)
+        ):
+            return (
+                "already_paid_count",
+                "Quantas parcelas anteriores já foram pagas? Diga a quantidade (ou zero se nenhuma foi paga). Vou manter as demais pendentes.",
+            )
     return None

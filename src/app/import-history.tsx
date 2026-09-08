@@ -111,10 +111,7 @@ export default function ImportHistoryScreen() {
   return (
     <Screen
       grouped
-      onRefresh={() => {
-        batches.refetch();
-        plano.refetch();
-      }}
+      onRefresh={() => Promise.all([batches.refetch(), plano.refetch()])}
       refreshing={batches.isRefetching}>
       <Stack.Screen
         options={{

@@ -221,11 +221,7 @@ export default function ForecastScreen() {
   return (
     <Screen
       grouped
-      onRefresh={() => {
-        forecast.refetch();
-        bills.refetch();
-        accounts.refetch();
-      }}
+      onRefresh={() => Promise.all([forecast.refetch(), bills.refetch(), accounts.refetch(), historico.refetch(), simDebounced > 0 ? sim.refetch() : Promise.resolve()])}
       refreshing={forecast.isRefetching}>
       <Stack.Screen
         options={{

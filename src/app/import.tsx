@@ -117,7 +117,8 @@ export default function ImportScreen() {
   const insets = useSafeAreaInsets();
   const params = useLocalSearchParams<{ batch?: string }>();
 
-  const { data: accounts } = useAccounts();
+  const accountsQuery = useAccounts();
+  const accounts = accountsQuery.data;
   const importar = useImportStatement();
   const [batchId, setBatchId] = useState<string | undefined>(params.batch);
   const [accountId, setAccountId] = useState<string | null>(null);
@@ -338,7 +339,7 @@ export default function ImportScreen() {
 
   // ── Etapa 2: revisar o lote ──────────────────────────────────────────────
   return (
-    <Screen grouped onRefresh={refetch} refreshing={isRefetching}>
+    <Screen grouped onRefresh={() => Promise.all([accountsQuery.refetch(), batchId ? refetch() : Promise.resolve()])} refreshing={isRefetching}>
       <Stack.Screen
         options={{
           title: vaoEntrar > 0 ? `Revisar ${vaoEntrar}` : 'Revisar lote',

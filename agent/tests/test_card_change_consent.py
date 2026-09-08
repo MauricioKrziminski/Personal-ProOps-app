@@ -52,6 +52,7 @@ def state():
                 "amount_cents": 7056000,
                 "installments": 48,
                 "current_installment": 9,
+                "already_paid_count": 8,
                 "account": "Nubank",
                 "description": "carro",
             }

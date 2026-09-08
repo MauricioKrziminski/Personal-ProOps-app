@@ -77,6 +77,17 @@ def parse_valor_em_centavos(texto: str | None) -> int | None:
     return round(valor * 100)
 
 
+def parse_installment_total(text: str, installments: int | None) -> int | None:
+    """The explicit Nx de R$ amount pattern denotes each installment."""
+    matches = re.findall(
+        r"\b(\d{1,3})\s*x\s*(?:de\s*)?(?:R\$\s*)?(\d[\d.,]*)", text or "", re.IGNORECASE
+    )
+    if len(matches) == 1 and int(matches[0][0]) == installments:
+        each = parse_valor_em_centavos(matches[0][1].rstrip(".,"))
+        return each * installments if each else None
+    return parse_valor_em_centavos(text)
+
+
 def cents_to_brl(cents: int | float | None) -> str:
     """Formatação pt-BR sem depender de locale do sistema (container é C.UTF-8)."""
     valor = (int(cents or 0)) / 100

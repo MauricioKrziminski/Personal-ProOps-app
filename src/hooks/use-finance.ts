@@ -1,3 +1,4 @@
+import { invalidateFinance, invalidateKeys } from '@/lib/query-invalidation';
 import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
 import { supabase } from '@/lib/supabase';
@@ -396,17 +397,9 @@ export function useBudgetsStatus(month?: string) {
 
 // ── mutations (inserts diretos via supabase-js — RLS own-rows cobre) ──────────
 
-const FINANCE_KEYS = [
-  ['transactions'], ['tx-summary'], ['monthly-cashflow'], ['account-balances'],
-  ['budgets-status'], ['accounts'], ['goals'], ['budgets'], ['recurring'],
-  ['card-summary'], ['invoice'], ['forecast'], ['upcoming-bills'], ['debts'], ['payoff'], ['assets'], ['net-worth'], ['financial-health'],
-];
-
-function useInvalidateFinance() {
+export function useInvalidateFinance() {
   const queryClient = useQueryClient();
-  return () => {
-    for (const key of FINANCE_KEYS) queryClient.invalidateQueries({ queryKey: key });
-  };
+  return () => invalidateFinance(queryClient);
 }
 
 async function userId(): Promise<string> {
@@ -433,6 +426,7 @@ export function useCardSummary() {
 
 /** Fatura + as compras dela (RLS já limita ao workspace). */
 export function useInvoice(invoiceId: string | undefined) {
+  useRealtimeInvalidate('card_invoices', ['invoice']);
   useRealtimeInvalidate('transactions', ['invoice']);
   return useQuery({
     enabled: Boolean(invoiceId),
@@ -509,14 +503,16 @@ export function useCreateInstallmentPlan() {
       accountId: string;
       totalCents: number;
       installments: number;
+      paidInstallments: number;
       occurredAt: string;
       description: string | null;
       category: string | null;
     }) => {
-      const { error } = await supabase.rpc('create_installment_plan', {
+      const { error } = await supabase.rpc('create_installment_plan_with_history', {
         p_account_id: input.accountId,
         p_total_cents: input.totalCents,
         p_installments: input.installments,
+        p_paid_installments: input.paidInstallments,
         p_occurred_at: input.occurredAt,
         p_description: input.description ?? undefined,
         p_category: input.category ?? undefined,
@@ -638,6 +634,7 @@ export interface ImportResult {
  * o retorno é um lote para revisão.
  */
 export function useImportStatement() {
+  const queryClient = useQueryClient();
   return useMutation({
     mutationFn: async (input: {
       content: string;
@@ -662,6 +659,7 @@ export function useImportStatement() {
       if (data && 'error' in data) throw new Error(data.error);
       return data as ImportResult;
     },
+    onSuccess: () => invalidateKeys(queryClient, [['import-items'], ['import-batches'], ['plan-status']]),
   });
 }
 
@@ -693,10 +691,7 @@ export function useApproveImportItems() {
       const { error } = await supabase.rpc('approve_import_items', { p_item_ids: ids });
       if (error) throw error;
     },
-    onSuccess: () => {
-      invalidate();
-      queryClient.invalidateQueries({ queryKey: ['import-items'] });
-    },
+    onSuccess: () => Promise.all([invalidate(), invalidateKeys(queryClient, [['import-items'], ['import-batches'], ['plan-status']])]),
   });
 }
 
@@ -710,7 +705,7 @@ export function useDiscardImportItems() {
         .in('id', ids);
       if (error) throw error;
     },
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['import-items'] }),
+    onSuccess: () => invalidateKeys(queryClient, [['import-items'], ['import-batches']]),
   });
 }
 
@@ -725,7 +720,7 @@ export function useUpdateImportItem() {
         .eq('id', input.id);
       if (error) throw error;
     },
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['import-items'] }),
+    onSuccess: () => invalidateKeys(queryClient, [['import-items'], ['import-batches']]),
   });
 }
 
@@ -851,6 +846,7 @@ export function useDebts() {
 
 /** Tabela de amortização do que ainda falta pagar (Price, calculada no banco). */
 export function useDebtSchedule(debtId: string | undefined) {
+  useRealtimeInvalidate('debts', ['debt-schedule']);
   return useQuery({
     enabled: Boolean(debtId),
     queryKey: ['debt-schedule', debtId ?? ''],
@@ -886,6 +882,7 @@ export function useSaveDebt() {
       remaining_cents: number;
       interest_rate_monthly: number;
       installments: number | null;
+      installments_paid?: number;
       installment_cents: number | null;
       account_id: string | null;
       due_day: number | null;
@@ -906,7 +903,6 @@ export function useSaveDebt() {
 /** Paga uma parcela: a RPC cria a despesa e abate o saldo já descontando juros. */
 export function usePayDebtInstallment() {
   const invalidate = useInvalidateFinance();
-  const queryClient = useQueryClient();
   return useMutation({
     mutationFn: async (input: { debtId: string; amountCents: number; accountId?: string | null }) => {
       const { error } = await supabase.rpc('pay_debt_installment', {
@@ -917,11 +913,7 @@ export function usePayDebtInstallment() {
       });
       if (error) throw error;
     },
-    onSuccess: () => {
-      invalidate();
-      queryClient.invalidateQueries({ queryKey: ['debt-schedule'] });
-      queryClient.invalidateQueries({ queryKey: ['payoff'] });
-    },
+    onSuccess: invalidate,
   });
 }
 
@@ -1194,10 +1186,7 @@ export function useInviteMember() {
       });
       if (error) throw error;
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['invites'] });
-      queryClient.invalidateQueries({ queryKey: ['plan-status'] });
-    },
+    onSuccess: () => invalidateKeys(queryClient, [['invites'], ['plan-status']]),
   });
 }
 
@@ -1370,7 +1359,6 @@ export function useSaveGoal() {
  */
 export function useGoalDeposit() {
   const invalidate = useInvalidateFinance();
-  const queryClient = useQueryClient();
   return useMutation({
     mutationFn: async ({ goal, amountCents, note }: {
       goal: Goal;
@@ -1385,10 +1373,7 @@ export function useGoalDeposit() {
       });
       if (error) throw error;
     },
-    onSuccess: () => {
-      invalidate();
-      queryClient.invalidateQueries({ queryKey: ['goal-contributions'] });
-    },
+    onSuccess: invalidate,
   });
 }
 
@@ -1399,6 +1384,7 @@ export type GoalContribution = Pick<
 
 /** Extrato de aportes da meta. */
 export function useGoalContributions(goalId: string | undefined) {
+  useRealtimeInvalidate('goal_contributions', ['goal-contributions']);
   return useQuery({
     enabled: Boolean(goalId),
     queryKey: ['goal-contributions', goalId ?? ''],

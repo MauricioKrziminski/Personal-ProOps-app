@@ -278,10 +278,7 @@ export default function AccountsScreen() {
   return (
     <Screen
       grouped
-      onRefresh={() => {
-        balances.refetch();
-        accounts.refetch();
-      }}
+      onRefresh={() => Promise.all([balances.refetch(), accounts.refetch()])}
       refreshing={balances.isRefetching}>
       <Stack.Screen
         options={{

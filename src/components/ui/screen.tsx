@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import {
   Platform,
   RefreshControl,
@@ -35,7 +36,7 @@ interface ScreenProps {
    */
   floatingAction?: boolean;
   /** Liga pull-to-refresh. */
-  onRefresh?: () => void;
+  onRefresh?: () => unknown;
   refreshing?: boolean;
   /** Fundo agrupado para telas de lista; `background` para telas de conteúdo. */
   grouped?: boolean;
@@ -76,6 +77,7 @@ export function Screen({
   contentStyle,
 }: ScreenProps) {
   const theme = useTheme();
+  const [pulling, setPulling] = useState(false);
   const insets = useSafeAreaInsets();
   const headerHeight = useAppHeaderHeight();
 
@@ -125,8 +127,16 @@ export function Screen({
         */
         contentInsetAdjustmentBehavior={topBar ? 'never' : 'automatic'}
         showsVerticalScrollIndicator={false}
+        alwaysBounceVertical={Boolean(onRefresh)}
         refreshControl={
-          onRefresh ? <RefreshControl refreshing={refreshing} onRefresh={onRefresh} /> : undefined
+          onRefresh ? <RefreshControl
+            refreshing={pulling || refreshing}
+            progressViewOffset={topBar ? headerHeight : 0}
+            onRefresh={() => {
+              setPulling(true);
+              void Promise.resolve().then(onRefresh).catch(() => undefined).finally(() => setPulling(false));
+            }}
+          /> : undefined
         }>
         {children}
       </KeyboardAwareScrollView>

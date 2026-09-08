@@ -13,7 +13,8 @@ import {
   useQueryClient,
   type InfiniteData,
 } from '@tanstack/react-query';
-import { useCallback, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { invalidateAgentData, invalidateKeys } from '@/lib/query-invalidation';
 
 import {
   type AgentApiError,
@@ -78,7 +79,9 @@ const LEASE_MS = 300_000;
  * também para quem reabre o app com um turno pendente de ontem.
  */
 export function useAgentMessages(conversationId: string | undefined) {
-  return useInfiniteQuery({
+  const client = useQueryClient();
+  const seen = useRef(new Set<string>());
+  const result = useInfiniteQuery({
     queryKey: agentKeys.messages(conversationId ?? ''),
     enabled: isAgentConfigured && Boolean(conversationId),
     refetchInterval: (query) => {
@@ -95,7 +98,20 @@ export function useAgentMessages(conversationId: string | undefined) {
     getNextPageParam: (ultima: Page<AgentMessage>) =>
       ultima.next_cursor ? Number(ultima.next_cursor) : null,
   });
+  // A recovered/async turn can finish through history polling instead of mutation success.
+  useEffect(() => {
+    let changed = false;
+    for (const message of result.data?.pages.flatMap((page) => page.items) ?? []) {
+      if (message.role !== 'assistant' || message.status !== 'completed' || seen.current.has(message.id)) continue;
+      seen.current.add(message.id);
+      changed = true;
+    }
+    if (changed) void invalidateAgentData(client);
+  }, [client, result.data]);
+  return result;
 }
+
+
 
 // ---------------------------------------------------------------------------
 // escrita
@@ -133,10 +149,10 @@ function useAplicarTurno() {
       qc.setQueryData<CacheMensagens>(agentKeys.messages(turno.conversation.id), (c) =>
         aplicarTurno(c, turno),
       );
-      // Só a lista de conversas (a ordem e o título podem ter mudado) e a cota.
-      // Invalidar o histórico aqui desfaria o encaixe que acabou de acontecer.
-      qc.invalidateQueries({ queryKey: agentKeys.conversations });
-      qc.invalidateQueries({ queryKey: PLAN_STATUS });
+      return Promise.all([
+        invalidateKeys(qc, [agentKeys.conversations, PLAN_STATUS]),
+        turno.status === 'completed' ? invalidateAgentData(qc) : Promise.resolve(),
+      ]);
     },
     [qc],
   );
@@ -187,11 +203,11 @@ export function useResolveAgentPending(conversationId: string) {
         v.decision,
         v.candidateId,
       ),
-    onSuccess: (turno) => {
-      aplicar(turno);
+    onSuccess: async (turno) => {
+      await aplicar(turno);
       // O balão ANTERIOR ganhou `resolved` no servidor; ele não vem no turno.
       // Sem este refetch os botões da pergunta respondida seguiriam vivos.
-      qc.invalidateQueries({ queryKey: agentKeys.messages(conversationId) });
+      await qc.invalidateQueries({ queryKey: agentKeys.messages(conversationId) });
     },
     onError: (erro, v) => {
       // `pending_invalid` (422) é o único erro que a tela precisa GRAVAR: a

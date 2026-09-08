@@ -48,7 +48,7 @@ Quando for `answer` e houver um NÚMERO, diga em `amount_type` o que ele signifi
 - "8400 no total", "saiu 8400", "ao todo"     -> total
 - "700" (número solto, cabem as duas leituras) -> ambiguous
 
-Quando o usuário disser quantas parcelas já pagou ("já paguei 2 parcelas", "já foram 2", "paguei duas"), preencha `already_paid_count` com essa quantidade inteira (ex: 2). Se ele não citou parcelas já pagas, deixe vazio.
+Quando o usuário disser quantas parcelas já pagou ("já paguei 2 parcelas", "já foram 2", "paguei duas"), preencha `already_paid_count` com essa quantidade inteira (ex: 2). Se a pergunta pede quantidade paga, número solto ou "nenhuma" também é resposta (nenhuma=0). Se ele não citou parcelas já pagas, deixe vazio.
 
 Na dúvida entre total e per_installment, responda ambiguous: perguntar custa uma
 mensagem, e registrar 12x errado custa o mês inteiro do usuário.
@@ -114,6 +114,11 @@ async def interpretar(texto: str, rascunho: dict, uso: dict | None = None) -> di
     )
 
     slot = rascunho.get("slot") or "amount"
+    if slot == 'already_paid_count':
+        paid=decisao.already_paid_count
+        if paid is None or not 0 <= paid <= _parcelas(rascunho.get('action') or {}):
+            return None
+        return {'acao':'completar','slot':slot,'already_paid_count':paid}
     if slot == "account":
         # A entidade extraída pelo modelo, não a frase inteira: era isso que
         # fazia "acabei de criar um pelo app, chama nubank cartao" virar o nome
@@ -125,6 +130,7 @@ async def interpretar(texto: str, rascunho: dict, uso: dict | None = None) -> di
         res = {"acao": "completar", "slot": "account", "account": nome}
         if current_inst is not None:
             res["current_installment"] = current_inst
+            res["already_paid_count"] = decisao.already_paid_count
         return res
 
     if slot in ("description", "identification"):
@@ -134,6 +140,7 @@ async def interpretar(texto: str, rascunho: dict, uso: dict | None = None) -> di
         res = {"acao": "completar", "slot": "description", "description": item}
         if current_inst is not None:
             res["current_installment"] = current_inst
+            res["already_paid_count"] = decisao.already_paid_count
         return res
 
     # O NÚMERO continua sendo determinístico, sempre. O modelo diz o que ele
@@ -157,6 +164,7 @@ async def interpretar(texto: str, rascunho: dict, uso: dict | None = None) -> di
             }
             if current_inst is not None:
                 res["current_installment"] = current_inst
+                res["already_paid_count"] = decisao.already_paid_count
             return res
         if decisao.amount_type == "ambiguous":
             # "700" numa compra de 12x são duas contas MUITO diferentes
@@ -165,10 +173,12 @@ async def interpretar(texto: str, rascunho: dict, uso: dict | None = None) -> di
             res = {"acao": "perguntar_tipo", "amount_cents": valor, "installments": parcelas}
             if current_inst is not None:
                 res["current_installment"] = current_inst
+                res["already_paid_count"] = decisao.already_paid_count
             return res
     res = {"acao": "completar", "slot": "amount", "amount_cents": valor}
     if current_inst is not None:
         res["current_installment"] = current_inst
+        res["already_paid_count"] = decisao.already_paid_count
     return res
 
 
@@ -206,7 +216,9 @@ def com_total(decidido: dict | None, acao: dict) -> dict | None:
 def mesclar(acao_guardada: dict, decidido: dict) -> dict:
     """Preenche o slot respondido, sem sobrescrever o que já estava lá."""
     juntado = dict(acao_guardada)
-    if decidido.get("slot") == "account":
+    if decidido.get('slot') == 'already_paid_count':
+        juntado['already_paid_count']=decidido['already_paid_count']
+    elif decidido.get("slot") == "account":
         if not juntado.get("account"):
             juntado["account"] = decidido["account"]
     elif decidido.get("slot") == "description":
@@ -216,6 +228,8 @@ def mesclar(acao_guardada: dict, decidido: dict) -> dict:
         juntado["amount_cents"] = decidido["amount_cents"]
     if decidido.get("current_installment") is not None:
         juntado["current_installment"] = decidido["current_installment"]
+    if decidido.get("already_paid_count") is not None:
+        juntado["already_paid_count"]=decidido["already_paid_count"]
     return juntado
 
 

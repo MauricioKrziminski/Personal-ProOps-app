@@ -78,6 +78,7 @@ class TestClassificacao:
             "slot": "amount",
             "amount_cents": 500000,
             "current_installment": 3,
+            "already_paid_count": 2,
         }
 
 

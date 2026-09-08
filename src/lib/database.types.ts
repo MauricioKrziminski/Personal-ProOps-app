@@ -2396,6 +2396,19 @@ export type Database = {
         }
         Returns: string
       }
+      create_installment_plan_with_history: {
+        Args: {
+          p_account_id: string
+          p_category?: string
+          p_description?: string
+          p_installments: number
+          p_merchant?: string
+          p_occurred_at: string
+          p_paid_installments: number
+          p_total_cents: number
+        }
+        Returns: string
+      }
       debt_schedule: {
         Args: { p_debt_id: string }
         Returns: {

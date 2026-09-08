@@ -339,11 +339,7 @@ export default function BudgetsScreen() {
   return (
     <Screen
       grouped
-      onRefresh={() => {
-        status.refetch();
-        rows.refetch();
-        resumo.refetch();
-      }}
+      onRefresh={() => Promise.all([status.refetch(), rows.refetch(), resumo.refetch()])}
       refreshing={status.isRefetching}>
       <Stack.Screen
         options={{

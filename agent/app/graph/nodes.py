@@ -76,7 +76,18 @@ async def route(state: AgentState) -> dict:
         return {"domains": [Domain.GERAL.value], "confidence": 1.0, "llm_calls": 0}
 
     curto = texto.lower().strip(" !?.,")
-    if curto in {"oi", "olá", "ola", "bom dia", "boa tarde", "boa noite", "obrigado", "obrigada", "vlw", "valeu"}:
+    if curto in {
+        "oi",
+        "olá",
+        "ola",
+        "bom dia",
+        "boa tarde",
+        "boa noite",
+        "obrigado",
+        "obrigada",
+        "vlw",
+        "valeu",
+    }:
         return {"domains": [Domain.GERAL.value], "confidence": 1.0, "llm_calls": 0}
 
     # Documento anexo é quase sempre cupom/fatura: vai direto para finanças.
@@ -84,10 +95,13 @@ async def route(state: AgentState) -> dict:
         return {"domains": [Domain.FINANCAS.value], "confidence": 1.0, "llm_calls": 0}
 
     historico = state.get("messages")[:-1] if state.get("messages") else None
-    if state.get('resource_draft'):
+    if state.get("resource_draft"):
         import json
         from app.security import wrap_untrusted
-        texto += '\nCadastro incompleto (dado de contexto): ' + wrap_untrusted('document_content',json.dumps(state['resource_draft'],ensure_ascii=False))
+
+        texto += "\nCadastro incompleto (dado de contexto): " + wrap_untrusted(
+            "document_content", json.dumps(state["resource_draft"], ensure_ascii=False)
+        )
     modelo = gemini.structured(RouterDecision, gemini.GEMINI_ROUTER)
     decisao: RouterDecision = await modelo.ainvoke(
         [
@@ -105,8 +119,68 @@ async def route(state: AgentState) -> dict:
     )
     dominios = [d.value for d in decisao.domains] or [Domain.GERAL.value]
     ret = {"domains": dominios, "confidence": decisao.confidence, "llm_calls": 1}
+    if (
+        decisao.financial_entity
+        and state.get("workspace_id")
+        and not state.get("resource_draft")
+    ):
+        from app.domain.matching import normalize
+        import re
+
+        raw = normalize(state.get("text", ""))
+        status_request = re.search(r"\b(parcelas?|anteriores)\b", raw) and re.search(
+            r"\b(pag[ao]s?|paguei|quitad[ao]s?|baixa)\b", raw
+        )
+        creating = re.search(r"\b(comprei|compra|cadastre|cadastro|crie|criar)\b", raw)
+        explicit_debt = re.search(
+            r"\b(financiamento|divida|emprestimo|saldo devedor)\b", raw
+        )
+        if (
+            status_request
+            and not creating
+            and not explicit_debt
+            and not {"financas", "cadastros"}.issubset(dominios)
+        ):
+            from app import db
+
+            reference = (
+                "%"
+                + decisao.financial_entity.replace("\\", "\\\\")
+                .replace("%", "\\%")
+                .replace("_", "\\_")
+                + "%"
+            )
+            plans = await db.fetch(
+                "select id from public.installment_plans where workspace_id=%s and description ilike %s",
+                state["workspace_id"],
+                reference,
+            )
+            debts = await db.fetch(
+                "select id from public.debts where workspace_id=%s and name ilike %s and not archived",
+                state["workspace_id"],
+                reference,
+            )
+            if plans and debts:
+                ret["domain_options"] = [
+                    {"id": "financas", "label": "Compra parcelada no cartão"},
+                    {"id": "cadastros", "label": "Dívida / financiamento"},
+                ]
+            elif plans or debts:
+                financial_domain = "financas" if plans else "cadastros"
+                ret["domains"] = [
+                    financial_domain,
+                    *[
+                        d
+                        for d in dominios
+                        if d not in {"financas", "cadastros", "geral"}
+                    ],
+                ]
     if decisao.discard_resource_draft:
-        ret.update(resource_draft=[], results=['Cadastro cancelado. Não salvei nada.'], halted=True)
+        ret.update(
+            resource_draft=[],
+            results=["Cadastro cancelado. Não salvei nada."],
+            halted=True,
+        )
     return ret
 
 
@@ -163,7 +237,25 @@ async def finance_node(state: AgentState) -> dict:
         ):
             if not a.description:
                 a.description = guards.extract_description_fallback(texto_orig)
-            if a.type == FinanceActionType.CREATE_INSTALLMENT_PURCHASE and not a.account:
+            if a.type == FinanceActionType.CREATE_INSTALLMENT_PURCHASE:
+                if not a.amount_cents:
+                    from app.domain.money import parse_installment_total
+
+                    a.amount_cents = parse_installment_total(texto_orig, a.installments)
+                if (
+                    a.already_paid_count is not None
+                    and not a.current_installment
+                    and not a.occurred_at
+                    and a.installments
+                ):
+                    a.current_installment = min(
+                        a.already_paid_count + 1, a.installments
+                    )
+            if a.type == FinanceActionType.CREATE_INSTALLMENT_PURCHASE and (
+                not a.account
+                or a.account.strip().casefold()
+                in {"cartão", "cartao", "crédito", "credito"}
+            ):
                 a.account = guards.extract_account_fallback(texto_orig)
     return {
         "finance_actions": [a.model_dump() for a in acoes],
@@ -323,6 +415,28 @@ async def domain_gate(state: AgentState) -> dict:
     """
     if state.get("halted"):
         return {}
+    if state.get("domain_options"):
+        choice = interrupt(
+            {
+                "kind": "domain",
+                "action_type": "router",
+                "summary": "Encontrei compra parcelada e financiamento com esse nome. Qual deles você quer alterar?",
+                "options": state["domain_options"],
+            }
+        )
+        selected = choice.get("candidate_id") if isinstance(choice, dict) else choice
+        if selected in {option["id"] for option in state["domain_options"]}:
+            other_domains = [
+                d
+                for d in state.get("domains", [])
+                if d not in {"financas", "cadastros"}
+            ]
+            return {
+                "domains": [selected, *other_domains],
+                "domain_options": [],
+                "confidence": 1.0,
+            }
+        return {"results": ["Não alterei nenhum dos registros."], "halted": True}
     if not dominio_incerto(state.get("domains") or [], state.get("confidence", 1.0)):
         return {}
 
@@ -396,7 +510,7 @@ def _incompletas(state: AgentState, acoes: list) -> dict[int, str]:
     return {
         i: faltou
         for i, acao in enumerate(acoes)
-        if (faltou := faltando(acao, texto)) is not None
+        if (faltou := faltando(acao, texto, state.get("timezone", "America/Sao_Paulo"))) is not None
     }
 
 
@@ -476,6 +590,13 @@ def _confirm_selection(state: AgentState, update: dict) -> dict:
 
 
 async def gate(state: AgentState) -> dict:
+    # A revision finishes this node before the next confirmation, so its exact
+    # targets are checkpointed and are not re-read on approval replay.
+    result = await _gate(state)
+    return {"revision_pending": False, **result}
+
+
+async def _gate(state: AgentState) -> dict:
     """Decide se executa direto ou pausa esperando confirmação.
 
     O interrupt() do LangGraph guarda o checkpoint e devolve o controle. Quem
@@ -538,7 +659,7 @@ async def gate(state: AgentState) -> dict:
                 cand_table = escolhidos[0].get("table", alvo.get("table"))
                 congelado[i] = {**alvo, "status": "found", "candidates": escolhidos,
                                 "table": cand_table}
-                if cand_table == "installment_plans" and acao.type == FinanceActionType.UPDATE_TRANSACTION:
+                if cand_table == "installment_plans" and acao.type == FinanceActionType.UPDATE_TRANSACTION and not escolhidos[0].get("installment_snapshot"):
                     p_id = escolhido
                     p_label = escolhidos[0]["label"]
                     mut_escolha = interrupt(
@@ -603,6 +724,7 @@ async def gate(state: AgentState) -> dict:
             alvo.get("status") == "found"
             and alvo.get("table") == "installment_plans"
             and acao.type == FinanceActionType.UPDATE_TRANSACTION
+            and not alvo["candidates"][0].get("installment_snapshot")
         ):
             cand = alvo["candidates"][0]
             p_id = cand["id"]
@@ -694,6 +816,13 @@ async def gate(state: AgentState) -> dict:
                         escolha.get("candidate_id") if isinstance(escolha, dict) else escolha
                     )
                     if escolhido == "change_card":
+                        new_account = escolha.get("new_account") if isinstance(escolha, dict) else None
+                        if new_account and await resolve_account(state["workspace_id"], new_account, only_cards=True):
+                            revised = list(state.get("finance_actions") or [])
+                            revised[i] = acao.model_copy(update={"account": new_account}).model_dump(mode="json")
+                            # Replay the gate with the replacement card. Choosing it is
+                            # not permission: its own limit and final summary must run.
+                            return {"finance_actions": revised, "approved": False, "revision_pending": True}
                         pergunta = f"💳 Qual outro cartão você prefere usar para esta compra de {cents_to_brl(acao.amount_cents)}?"
                         return {
                             "approved": False,
@@ -756,6 +885,17 @@ async def gate(state: AgentState) -> dict:
         }
     )
 
+    if isinstance(resposta, dict) and resposta.get("revision_scope"):
+        if len(acoes) == 1 and acao.type == FinanceActionType.MARK_PAID and alvo.get("table") == "installment_plans" and len(alvo.get("candidates", [])) == 1:
+            from app.domain.installment_scope import scope_from_text
+            from app.graph.schemas import InstallmentScope
+            scope = scope_from_text(resposta.get("revision_text", ""), InstallmentScope.model_validate(resposta["revision_scope"]))
+            revised_action = acao.model_copy(update={"installment_scope": scope})
+            revised_target = await resolve._bounded_plan_target(state["workspace_id"], alvo["candidates"], scope)
+            revised = [revised_action.model_dump(mode="json")]
+            return {"finance_actions": revised, "targets": [revised_target], "approved": False, "revision_pending": True}
+        return {"approved": False, "halted": True, "results": [*state.get("results", []), "Diga uma compra e o intervalo de parcelas para revisar a baixa. Nada foi alterado."]}
+
     if resposta is True or (isinstance(resposta, str) and resposta.lower() in {"sim", "s", "true"}):
         return {"approved": True}
     if isinstance(resposta, dict) and resposta.get("approved") and not resposta.get("candidate_id"):
@@ -769,6 +909,8 @@ async def gate(state: AgentState) -> dict:
 
 
 def after_gate(state: AgentState) -> str:
+    if state.get("revision_pending"):
+        return "gate"
     return "executar" if state.get("approved") else "compor"
 
 

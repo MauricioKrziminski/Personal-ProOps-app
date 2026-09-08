@@ -341,15 +341,7 @@ export default function FinanceScreen() {
         grouped
         // Sem etiqueta: o seletor de mês fica logo abaixo e diria a mesma coisa duas vezes.
         topBar={<AppHeader title="Financeiro" />}
-        onRefresh={() => {
-          forecast.refetch();
-          summary.refetch();
-          previous.refetch();
-          budgets.refetch();
-          accounts.refetch();
-          cards.refetch();
-          recent.refetch();
-        }}
+        onRefresh={() => Promise.all([forecast.refetch(), summary.refetch(), previous.refetch(), budgets.refetch(), accounts.refetch(), cards.refetch(), recent.refetch(), cashflow.refetch()])}
         refreshing={summary.isRefetching}>
         {/*
           O painel deixou de sangrar até as bordas e virou CARD FLUTUANTE (design Stitch,

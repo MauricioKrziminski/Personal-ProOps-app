@@ -73,6 +73,7 @@ interface FormState {
   parcelas: string;
   diaVencimento: string;
   installmentsPaid: number;
+  historyConfirmed: boolean;
   installmentCents: number;
   accountId: string | null;
 }
@@ -86,6 +87,7 @@ const FORM_VAZIO: FormState = {
   parcelas: '',
   diaVencimento: '',
   installmentsPaid: 0,
+  historyConfirmed: false,
   installmentCents: 0,
   accountId: null,
 };
@@ -116,8 +118,12 @@ export default function DebtsScreen() {
   const pagar = usePayDebtInstallment();
 
   const [form, setForm] = useState<FormState | null>(() => params.create === 'financing' ? { ...FORM_VAZIO, kind: 'financing' } : null);
-  const [detalhe, setDetalhe] = useState<Debt | null>(null);
-  const [pagando, setPagando] = useState<Debt | null>(null);
+  const [detalheId, setDetalheId] = useState<string | null>(null);
+  const [pagandoId, setPagandoId] = useState<string | null>(null);
+  const detalhe = debts.data?.find((debt) => debt.id === detalheId) ?? null;
+  const pagando = debts.data?.find((debt) => debt.id === pagandoId) ?? null;
+  const setDetalhe = (debt: Debt | null) => setDetalheId(debt?.id ?? null);
+  const setPagando = (debt: Debt | null) => setPagandoId(debt?.id ?? null);
   const [pagoCents, setPagoCents] = useState(0);
   const [contaId, setContaId] = useState<string | null>(null);
 
@@ -151,6 +157,7 @@ export default function DebtsScreen() {
         : d.kind === 'financing' ? '0' : '',
       parcelas: d.installments ? String(Math.max(d.installments - d.installments_paid, 0)) : '',
       installmentsPaid: d.installments_paid,
+      historyConfirmed: true,
       installmentCents: Number(d.installment_cents ?? 0),
       accountId: d.account_id,
       diaVencimento: d.due_day ? String(d.due_day) : '',
@@ -165,7 +172,7 @@ export default function DebtsScreen() {
 
   const fracao = form ? parseTaxa(form.taxa) : 0;
   const nomeOk = (form?.name.trim().length ?? 0) >= 2;
-  const podeSalvar = Boolean(form && nomeOk && form.remainingCents > 0 && (!form.parcelas || Number(form.parcelas) > 0) && (!form.diaVencimento || (Number(form.diaVencimento) >= 1 && Number(form.diaVencimento) <= 31)) && (form.kind !== 'financing' || (form.taxa.trim() !== '' && !!form.parcelas)) && Number.isFinite(Number(form.taxa.replace(',', '.'))) && Number(form.taxa.replace(',', '.')) >= 0);
+  const podeSalvar = Boolean(form && nomeOk && (!form.parcelas || form.historyConfirmed) && Number.isInteger(form.installmentsPaid) && form.installmentsPaid >= 0 && form.remainingCents > 0 && (!form.parcelas || Number(form.parcelas) > 0) && (!form.diaVencimento || (Number(form.diaVencimento) >= 1 && Number(form.diaVencimento) <= 31)) && (form.kind !== 'financing' || (form.taxa.trim() !== '' && !!form.parcelas)) && Number.isFinite(Number(form.taxa.replace(',', '.'))) && Number(form.taxa.replace(',', '.')) >= 0);
 
   const salvar = () => {
     if (!form || !podeSalvar) return;
@@ -179,6 +186,7 @@ export default function DebtsScreen() {
         remaining_cents: form.remainingCents,
         interest_rate_monthly: fracao,
         installments: debtTerm(form.parcelas, form.installmentsPaid),
+        ...(!form.id ? { installments_paid: form.installmentsPaid } : {}),
         installment_cents: form.installmentCents || null,
         account_id: form.accountId,
         due_day: form.diaVencimento ? Number(form.diaVencimento) : null,
@@ -272,11 +280,8 @@ export default function DebtsScreen() {
   return (
     <Screen
       grouped
-      onRefresh={() => {
-        debts.refetch();
-        payoff.refetch();
-      }}
-      refreshing={debts.isRefetching}>
+      onRefresh={() => Promise.all([debts.refetch(), payoff.refetch(), accounts.refetch(), ...(detalheId || pagandoId ? [schedule.refetch()] : [])])}
+      refreshing={debts.isRefetching || payoff.isRefetching || accounts.isRefetching || schedule.isRefetching}>
       <Stack.Screen
         options={{
           title: 'Dívidas e financiamentos',
@@ -718,6 +723,24 @@ export default function DebtsScreen() {
                 </Section>
               </Field>
               <ThemedText type="small" themeColor="textSecondary">O cronograma é uma estimativa mensal. Cadastrar a dívida não cria prestações pendentes na projeção; registre cada pagamento nesta tela.</ThemedText>
+              {!form.id && form.parcelas !== '' && (
+                <Field label="Quantas parcelas já foram pagas?"
+                  hint="Esse histórico já está incluído no saldo devedor informado acima. Não vou descontá-lo novamente nem criar pagamentos antigos.">
+                  <View style={styles.duasColunas}>
+                    <Chip label="Nenhuma" selected={form.historyConfirmed && form.installmentsPaid === 0}
+                      onPress={() => setForm({ ...form, installmentsPaid: 0, historyConfirmed: true })} />
+                    <TextField value={form.historyConfirmed ? String(form.installmentsPaid) : ''}
+                      onChangeText={(v) => setForm({ ...form, installmentsPaid: Number(v.replace(/\D/g, '')), historyConfirmed: v.trim() !== '' })}
+                      placeholder="Informe, inclusive zero" maxLength={3} keyboardType="number-pad"
+                      accessibilityLabel="Parcelas do financiamento já pagas" />
+                  </View>
+                </Field>
+              )}
+              {form.parcelas !== '' && form.historyConfirmed && (
+                <ThemedText type="small" themeColor="textSecondary">
+                  {`${form.installmentsPaid} pagas + ${form.parcelas} restantes = ${Number(form.parcelas) + form.installmentsPaid} parcelas no total.`}
+                </ThemedText>
+              )}
               <View style={styles.duasColunas}>
                 <View style={styles.coluna}>
                   <Field label="Parcelas que faltam">

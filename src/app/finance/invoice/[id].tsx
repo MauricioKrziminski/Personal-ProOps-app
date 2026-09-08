@@ -29,7 +29,7 @@ import {
   useSettleInvoice,
   type Transaction,
 } from '@/hooks/use-finance';
-import { formatBRL, formatDateBR, localISODate, useRealtimeInvalidate } from '@/hooks/use-items';
+import { formatBRL, formatDateBR, localISODate } from '@/hooks/use-items';
 import { useTheme } from '@/hooks/use-theme';
 import { confirmDestructive } from '@/lib/item-actions';
 
@@ -114,10 +114,6 @@ export default function InvoiceScreen() {
   const pay = usePayInvoice();
   const settle = useSettleInvoice();
   const remove = useDeleteTransaction();
-
-  // `useInvoice` só escuta `transactions`: o fechamento da fatura vem do finance-scheduler e
-  // mudaria só `card_invoices` — sem isto, o status ficaria velho na tela até um refetch manual.
-  useRealtimeInvalidate('card_invoices', ['invoice']);
 
   const [pagando, setPagando] = useState(false);
   const [payerId, setPayerId] = useState<string | null>(null);
@@ -323,6 +319,9 @@ export default function InvoiceScreen() {
       />
 
       <FlatList
+        alwaysBounceVertical
+        refreshing={invoice.isRefetching || accounts.isRefetching || vizinhas.isRefetching}
+        onRefresh={() => Promise.all([invoice.refetch(), accounts.refetch(), fatura?.account_id ? vizinhas.refetch() : Promise.resolve()])}
         data={dias}
         style={styles.flex}
         keyExtractor={(g) => g.data}

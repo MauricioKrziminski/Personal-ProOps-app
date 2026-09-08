@@ -1,5 +1,6 @@
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { useEffect, useId } from 'react';
+import { scheduleRealtimeFinanceRefresh, invalidateKeys } from '@/lib/query-invalidation';
+import { useMutation, useQuery, useQueryClient, type QueryClient } from '@tanstack/react-query';
+import { useEffect } from 'react';
 
 import { localISODate } from '@/lib/dates';
 import { supabase } from '@/lib/supabase';
@@ -32,26 +33,47 @@ export interface Reminder {
   last_error?: string | null;
 }
 
-/** Invalida a query quando a tabela muda (itens novos vindos do WhatsApp aparecem ao vivo). */
+const financialTables = new Set([
+  'transactions', 'accounts', 'card_invoices', 'installment_plans', 'budgets',
+  'recurring_transactions', 'debts', 'goals', 'goal_contributions', 'assets',
+]);
+let nextSubscriptionId = 0;
+const subscriptions = new WeakMap<QueryClient, Map<string, {
+  channel: ReturnType<typeof supabase.channel>;
+  keys: Map<string, { queryKey: string[]; count: number }>;
+}>>();
+
+/** One subscription per table/client; derived reads update even on mounted sibling screens. */
 export function useRealtimeInvalidate(table: string, queryKey: string[]) {
   const queryClient = useQueryClient();
-  // string estável nas deps: um array literal novo a cada render re-subscreveria o canal sem parar
   const key = JSON.stringify(queryKey);
-  // supabase.channel(nome) REUTILIZA canal existente com o mesmo nome; dois hooks com a mesma
-  // tabela+key colidiriam ("cannot add callbacks after subscribe") — id único por instância.
-  const instanceId = useId();
   useEffect(() => {
-    const parsedKey = JSON.parse(key) as string[];
-    const channel = supabase
-      .channel(`realtime:${table}:${key}:${instanceId}`)
-      .on('postgres_changes', { event: '*', schema: 'public', table }, () => {
-        queryClient.invalidateQueries({ queryKey: parsedKey });
-      })
-      .subscribe();
+    let tables = subscriptions.get(queryClient);
+    if (!tables) { tables = new Map(); subscriptions.set(queryClient, tables); }
+    let entry = tables.get(table);
+    if (!entry) {
+      const keys = new Map<string, { queryKey: string[]; count: number }>();
+      const channel = supabase.channel(`realtime:${table}:${++nextSubscriptionId}`).on(
+        'postgres_changes', { event: '*', schema: 'public', table }, () => {
+          if (financialTables.has(table)) return scheduleRealtimeFinanceRefresh(queryClient);
+          return invalidateKeys(queryClient, [...keys.values()].map((value) => value.queryKey));
+        },
+      ).subscribe();
+      entry = { channel, keys };
+      tables.set(table, entry);
+    }
+    const existing = entry.keys.get(key);
+    entry.keys.set(key, { queryKey: JSON.parse(key), count: (existing?.count ?? 0) + 1 });
     return () => {
-      supabase.removeChannel(channel);
+      const value = entry.keys.get(key)!;
+      if (value.count > 1) value.count -= 1;
+      else entry.keys.delete(key);
+      if (entry.keys.size === 0) {
+        void supabase.removeChannel(entry.channel);
+        tables.delete(table);
+      }
     };
-  }, [table, queryClient, key, instanceId]);
+  }, [table, queryClient, key]);
 }
 
 export function useNotes() {
@@ -114,7 +136,7 @@ export function useCreateNote() {
         .insert({ user_id: await userId(), content, source: 'app' });
       if (error) throw error;
     },
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['notes'] }),
+    onSuccess: () => invalidateKeys(queryClient, [['notes'], ['search', 'notes'], ['ai-month-stats']]),
   });
 }
 
@@ -125,7 +147,7 @@ export function useDeleteNote() {
       const { error } = await supabase.from('notes').delete().eq('id', id);
       if (error) throw error;
     },
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['notes'] }),
+    onSuccess: () => invalidateKeys(queryClient, [['notes'], ['search', 'notes'], ['ai-month-stats']]),
   });
 }
 
@@ -157,7 +179,7 @@ export function useSaveReminder() {
         if (error) throw error;
       }
     },
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['reminders'] }),
+    onSuccess: () => invalidateKeys(queryClient, [['reminders'], ['search', 'reminders']]),
   });
 }
 
@@ -170,7 +192,7 @@ export function useToggleReminder() {
       const { error } = await supabase.from('reminders').update(patch).eq('id', id);
       if (error) throw error;
     },
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['reminders'] }),
+    onSuccess: () => invalidateKeys(queryClient, [['reminders'], ['search', 'reminders']]),
   });
 }
 
@@ -181,7 +203,7 @@ export function useDeleteReminder() {
       const { error } = await supabase.from('reminders').delete().eq('id', id);
       if (error) throw error;
     },
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['reminders'] }),
+    onSuccess: () => invalidateKeys(queryClient, [['reminders'], ['search', 'reminders']]),
   });
 }
 

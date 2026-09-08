@@ -1,4 +1,4 @@
-"""Testes da Etapa 3.1: Shifting de Calendário e Alerta de Limite do Cartão."""
+"""Baixa preserva calendário; alerta de limite do cartão."""
 
 from uuid import UUID
 import pytest
@@ -23,67 +23,18 @@ def _ctx() -> ExecContext:
     )
 
 
-class TestShiftingCalendario:
+class TestBaixaSemReprogramacao:
     @pytest.mark.asyncio
-    async def test_shifting_de_7_para_10_pagas_recua_inicio_e_reajusta_parcelas(self, monkeypatch):
-        """O caso da moto:
-        Plano de 12x iniciado em 2026-08-10 com 7 parcelas pagas.
-        Usuário atualiza para 10 pagas.
-        Shift = 10 - 7 = 3 meses para trás.
-        Novo início: 2026-05-10.
-        Parcelas 1..10 viram 'cleared'.
-        Parcela 11 vira 'pending' (em 2026-03-10 + 10 meses = 2026-03 ou cálculo exato de meses).
-        """
-        plano = {
-            "id": "plano-moto",
-            "description": "Moto Honda",
-            "installments": 12,
-            "total_cents": 1200000,
-            "first_occurred_at": "2026-08-10",
-        }
-        updates = []
-
-        async def fetch_one(query, *args):
-            if "installment_plans" in query:
-                return dict(plano)
-            if "from public.transactions" in query and "count" in query:
-                return {"count": 7}  # A = 7 atualmente pagas
-            return None
-
-        async def execute(query, *args):
-            updates.append((" ".join(query.split()), args))
-            return 1
-
-        monkeypatch.setattr(db, "fetch_one", fetch_one)
-        monkeypatch.setattr(db, "execute", execute)
-
-        r = await finance.shift_installment_plan(_ctx(), "plano-moto", new_paid_count=10)
-
-        # 1 update no installment_plans + 12 updates nas transactions
-        assert len(updates) == 1 + 12
-        q_plan, args_plan = updates[0]
-        assert "update public.installment_plans set first_occurred_at = %s" in q_plan
-        # 2026-08-10 recuado em 3 meses = 2026-05-10
-        assert args_plan[0] == "2026-05-10"
-
-        # Parcela 10: cleared, data 2026-05-10 + 9 meses = 2026-02-10
-        q_p10, args_p10 = updates[10]
-        assert args_p10[1] == "cleared"  # status
-        assert args_p10[4] == 10  # installment_no
-
-        # Parcela 11: pending, data 2026-05-10 + 10 meses = 2026-03-10
-        q_p11, args_p11 = updates[11]
-        assert args_p11[1] == "pending"  # status
-        assert args_p11[2] is None  # paid_at is None
-        assert args_p11[4] == 11  # installment_no
-
-        # Parcela 12: pending
-        q_p12, args_p12 = updates[12]
-        assert args_p12[1] == "pending"
-        assert args_p12[4] == 12
-
-        assert "10 parcelas constam como pagas" in r.message
-        assert "11ª é a parcela deste mês" in r.message
+    async def test_proposta_antiga_nao_reprograma_calendario(self, monkeypatch):
+        from app.graph.schemas import FinanceAction
+        from unittest.mock import AsyncMock
+        writes = AsyncMock()
+        monkeypatch.setattr(db, "execute", writes)
+        ctx = _ctx()
+        ctx.target = {"table": "installment_plans", "candidates": [{"id": "plano-moto"}]}
+        result = await finance.mark_paid(ctx, FinanceAction(type="mark_paid", current_installment=10))
+        assert result.read_only
+        writes.assert_not_awaited()
 
 
 class TestVerificarLimiteCartao:

@@ -10,9 +10,9 @@ ampliar exige sondagem real, além de validação Pydantic local.
 from __future__ import annotations
 
 from enum import Enum
-from typing import Literal
+from typing import Annotated, Literal
 
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, BeforeValidator, Field, WithJsonSchema, field_validator
 
 
 class Domain(str, Enum):
@@ -28,6 +28,7 @@ class RouterDecision(BaseModel):
     aluguel" é finanças E notas, e um router exclusivo perderia metade da
     mensagem — o multi-intent é a melhor qualidade do produto hoje."""
 
+    financial_entity: str | None = Field(None, description="For status/payment of EXISTING installments only: exact item/contract name, e.g. carro. Recover from clear history; null for creation or unclear reference.")
     discard_resource_draft: bool = Field(False, description="True somente quando o usuário cancela explicitamente o cadastro incompleto informado no contexto.")
 
     domains: list[Domain] = Field(
@@ -55,8 +56,49 @@ class FinanceActionType(str, Enum):
     UNKNOWN = "unknown"
 
 
+class InstallmentScope(BaseModel):
+    """Selection of existing installments; never a schedule correction."""
+
+    mode: str = Field(
+        description="first, last, range, dates, all, or unclear. all only for explicitly every installment without a bound."
+    )
+    count: int | None = None
+    start: int | None = None
+    end: int | None = None
+    from_date: str | None = None
+    through_date: str | None = None
+
+
+def _parse_installment_scope(value):
+    if not isinstance(value, str):
+        return value
+    parts = value.split(":")
+    mode = parts[0]
+    if mode in {"first", "last"} and len(parts) == 2:
+        return {"mode": mode, "count": int(parts[1])}
+    if mode == "range" and len(parts) == 3:
+        return {"mode": mode, "start": int(parts[1]), "end": int(parts[2])}
+    if mode == "dates" and len(parts) == 3:
+        return {
+            "mode": mode,
+            "from_date": parts[1] or None,
+            "through_date": parts[2] or None,
+        }
+    if mode in {"all", "unclear"} and len(parts) == 1:
+        return {"mode": mode}
+    raise ValueError("Invalid installment selector")
+
+
+# Compact wire format tested against Gemini; typed object in checkpoints/tools.
+# Nested scope caused INVALID_ARGUMENT, while 17 flat fields passed the real API.
+CompactInstallmentScope = Annotated[
+    InstallmentScope, BeforeValidator(_parse_installment_scope),
+    WithJsonSchema({'type':'string'})
+]
+
+
 class FinanceAction(BaseModel):
-    """15 propriedades × 14 valores de enum = 210, aceito no Gemini em 08/09/2026.
+    """17 propriedades × 14 valores de enum = 238, aceito no Gemini em 08/09/2026.
 
     Escrita e correção ficam JUNTAS de propósito. Separá-las obrigaria o router a
     decidir se "o mercado de ontem foi 120" é lançamento novo ou correção — e
@@ -82,19 +124,40 @@ class FinanceAction(BaseModel):
             "('tô na 4ª de 10' -> 4). Vazio se a compra é de agora."
         ),
     )
-    recurrence: str | None = Field(None, description="RRULE, ex.: FREQ=MONTHLY;BYMONTHDAY=5.")
+    installment_scope: CompactInstallmentScope | None = Field(
+        None,
+        description="EXISTING payment subset: first:8, last:2, range:3:8, dates:2026-01-01:2026-08-31, dates::2026-08-31, all, or unclear. Never current_installment.",
+    )
+    already_paid_count: int | None = Field(
+        None,
+        description="CREATION only: explicitly reported number of initial installments already paid, including zero. Current position/date alone does not prove payment.",
+    )
+    recurrence: str | None = Field(
+        None, description="RRULE, ex.: FREQ=MONTHLY;BYMONTHDAY=5."
+    )
     new_amount_cents: int | None = Field(None, description="Valor CORRIGIDO.")
     new_category: str | None = Field(None, description="Categoria CORRIGIDA.")
-    new_account: str | None = Field(None, description="Nome da conta ou cartão CORRIGIDO. Sem conta remove o vínculo; account não é correção.")
+    new_account: str | None = Field(
+        None,
+        description="Nome da conta ou cartão CORRIGIDO. Sem conta remove o vínculo; account não é correção.",
+    )
     new_occurred_at: str | None = Field(None, description="Data CORRIGIDA, YYYY-MM-DD.")
     target_ref: str | None = Field(
-        None, description="Nome da meta, do bem, ou o gatilho da regra de categorização."
+        None,
+        description="Nome da meta, do bem, ou o gatilho da regra de categorização.",
     )
 
 
 class FinancePlan(BaseModel):
-    actions: list[FinanceAction] = Field(default_factory=list, max_length=10)
+    actions: list[FinanceAction] = Field(default_factory=list)
     confidence: float = 1.0
+
+    @field_validator("actions")
+    @classmethod
+    def limit_actions(cls, actions):
+        if len(actions) > 10:
+            raise ValueError("At most 10 financial actions per turn")
+        return actions
 
 
 class FinanceQueryType(str, Enum):
@@ -204,6 +267,14 @@ class ConfirmDecision(BaseModel):
     decision: Literal["approve", "reject", "unclear"] = Field(
         description="approve, reject ou unclear"
     )
+
+
+class PendingReplyDecision(BaseModel):
+    """A typed reply to available proposal options, never a new financial write."""
+    decision: Literal["approve", "reject", "change_card", "revise_scope", "revise_purchase", "new_intent", "unclear"]
+    new_installments: int | None = Field(None, description="Explicit revised purchase installment count, never a payment scope.")
+    new_account: str | None = Field(None, description="Only the explicitly named replacement card; null for an unspecified other card.")
+    installment_scope: CompactInstallmentScope | None = Field(None, description="Only a revised existing-installment bound: first:8, last:2, range:3:8, dates::2026-08-31. Never infer all.")
 
 
 class DraftDecision(BaseModel):

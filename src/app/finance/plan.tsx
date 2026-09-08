@@ -133,7 +133,7 @@ export default function PlanScreen() {
     );
 
   return (
-    <Screen grouped onRefresh={refetch} refreshing={isRefetching}>
+    <Screen grouped onRefresh={() => Promise.all([refetch(), convites.refetch()])} refreshing={isRefetching}>
       <Stack.Screen options={{ title: 'Plano', headerLargeTitle: true }} />
 
       {/* Falhar aqui não pode virar "você é Free": sem dado, a tela diz que não conseguiu ler. */}

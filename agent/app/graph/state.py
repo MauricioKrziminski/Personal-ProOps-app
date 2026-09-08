@@ -83,6 +83,7 @@ class AgentState(TypedDict, total=False):
     last_query_data: Annotated[dict, _preserve_or_replace]
 
     # roteamento
+    domain_options: Annotated[list[dict], _replace]
     domains: Annotated[list[str], _replace]
     confidence: float
     # chamadas de modelo desta execução. Aditivo porque o fan-out (finanças e
@@ -116,6 +117,7 @@ class AgentState(TypedDict, total=False):
     preset: bool
 
     # execução
+    revision_pending: bool  # Persist revised proposal before asking for approval.
     approved: bool
     # id escolhido pelo usuário num empate — congelado, vem do pendente
     chosen_id: str

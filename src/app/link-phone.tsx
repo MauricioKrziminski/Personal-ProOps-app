@@ -1,3 +1,4 @@
+import { useQueryClient } from '@tanstack/react-query';
 import * as Haptics from 'expo-haptics';
 import { router } from 'expo-router';
 import { useEffect, useState } from 'react';
@@ -31,6 +32,7 @@ const RESEND_SECONDS = 45;
  */
 export default function LinkPhoneScreen() {
   const { session } = useSession();
+  const queryClient = useQueryClient();
   const toast = useToast();
   const currentPhone = session?.user.phone ?? null;
   const [phone, setPhone] = useState(() => phoneDigits(currentPhone ?? ''));
@@ -114,6 +116,9 @@ export default function LinkPhoneScreen() {
     const { error: inviteError } = await supabase.rpc('accept_pending_invites');
     if (inviteError) console.warn('accept_pending_invites depois de vincular telefone:', inviteError.message);
 
+    // A phone invite can change the active workspace as well as profile.phone.
+    // Reset removes the previous workspace's values before active reads reload.
+    await queryClient.resetQueries();
     setBusy(false);
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     toast({

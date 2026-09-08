@@ -73,7 +73,7 @@ def build(checkpointer: AsyncPostgresSaver):
         builder.add_edge(dominio, "alvos")
     builder.add_edge("alvos", "seguras")
     builder.add_edge("seguras", "gate")
-    builder.add_conditional_edges("gate", after_gate, ["executar", "compor"])
+    builder.add_conditional_edges("gate", after_gate, ["executar", "compor", "gate"])
     builder.add_edge("executar", "compor")
     builder.add_edge("compor", END)
 

@@ -243,7 +243,7 @@ export default function FoldersScreen() {
   const arvore = folderTree(list);
 
   return (
-    <Screen grouped>
+    <Screen grouped onRefresh={() => Promise.all([folders.refetch(), loose.refetch()])} refreshing={folders.isRefetching || loose.isRefetching}>
       <Stack.Screen
         options={{
           title: 'Pastas',

@@ -140,6 +140,7 @@ def _estado_base(
         # `tests/test_state_reset.py` quebra o build se sobrar chave nova.
         "results": [],
         "domains": [],
+        "domain_options": [],
         "finance_actions": [],
         "finance_queries": [],
         "notes_actions": [],
@@ -153,6 +154,7 @@ def _estado_base(
         "preset": False,
         "confidence": 1.0,
         "llm_calls": 0,
+        "revision_pending": False,
         "approved": False,
         "halted": False,
     }
@@ -203,6 +205,13 @@ async def run_turn(
             sessao, uso, "⏰ Essa confirmação já expirou. Me manda de novo o que você quer."
         )
 
+    if isinstance(decisao, dict) and decisao.get("keep_pending"):
+        return await _fechar(
+            sessao, uso,
+            decisao.get("clarification")
+            or "Ainda não alterei nada e mantive a proposta. Confirme, cancele ou diga exatamente o que deseja mudar.",
+        )
+
     if pendente:
         if decisao is None:
             # não foi sim, não, nem escolha: a intenção mudou. Cancela a pergunta
@@ -245,8 +254,8 @@ async def run_turn(
         fields = [{"name": "kind", "value": "financing"}]
         if compra.get("installments") is not None:
             fields.append({"name": "installments", "value": str(compra["installments"])})
-        if compra.get("current_installment") is not None:
-            fields.append({"name": "installments_paid", "value": str(max(0, compra["current_installment"] - 1))})
+        if compra.get("already_paid_count") is not None:
+            fields.append({"name": "installments_paid", "value": str(compra["already_paid_count"])})
         # Total parcelado inclui juros. Não é o principal nem o saldo do contrato.
         await graph().aupdate_state(config, {"resource_draft": [{
             "type": "resource_create", "resource": "debts",
@@ -318,7 +327,7 @@ async def run_turn(
             from app.graph.schemas import FinanceAction
             from app.domain.required import faltando
 
-            resta = faltando(FinanceAction.model_validate(acao), rascunho["raw_text"])
+            resta = faltando(FinanceAction.model_validate(acao), rascunho["raw_text"], sessao.get("timezone", "America/Sao_Paulo"))
             if resta:
                 slot, pergunta = resta
                 novo_id = await db.save_draft(
@@ -728,7 +737,12 @@ def _congelado(decisao: dict, pendente: dict) -> dict | bool:
     entendem, e por isso os testes de SIM/NÃO continuam valendo.
     """
     if decisao.get("candidate_id"):
-        return {"approved": True, "candidate_id": decisao["candidate_id"]}
+        frozen = {"approved": True, "candidate_id": decisao["candidate_id"]}
+        if decisao["candidate_id"] == "change_card" and decisao.get("new_account"):
+            frozen["new_account"] = decisao["new_account"]
+        return frozen
+    if decisao.get("revision_scope"):
+        return {"approved": False, "revision_scope": decisao["revision_scope"], "revision_text": decisao.get("revision_text", "")}
     if decisao.get("none_of_these"):
         return {"approved": False, "none_of_these": True}
     return bool(decisao.get("approved"))
