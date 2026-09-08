@@ -97,7 +97,10 @@ npx eas-cli build --platform android --profile distribution   # APK
 ```
 
 - **Banco:** `kwriuifcwyvdrxtspjiz`. **Zerado em 07/09/2026** — 0 usuários, 0 linhas. Na `0056`.
-- **Cadastro por e-mail:** **código de 6 dígitos**, com SMTP próprio (`noreply@proops.com.br`).
+- **Cadastro por e-mail:** **código de 6 dígitos**. Os templates subiram (0 linhas divergindo do
+  repo); o SMTP próprio foi configurado no dashboard e **o remetente só se confirma no primeiro
+  cadastro real** — se o e-mail chegar como "Supabase Auth", é o SMTP que não pegou, não o
+  template.
 - **Agente:** `agente`, revisão `agente-00019-rck`, com `/internal/chat/*` respondendo 401.
 - **Selo no Perfil:** nenhum.
 - ⚠️ **Os três crons do Cloud Scheduler estão PAUSADOS** (`reminders`, `finance-scheduler`,
@@ -113,7 +116,7 @@ npx eas-cli build --platform android --profile distribution   # APK
 | | local | staging | produção |
 |---|---|---|---|
 | e-mail de confirmação | Mailpit, código | **código** (6 dígitos) | **código** (6 dígitos) |
-| remetente | Mailpit | Supabase Auth | `noreply@proops.com.br` |
+| remetente | Mailpit | Supabase Auth | SMTP próprio (a confirmar no 1º cadastro) |
 | login por telefone | código fixo de teste | **desligado** | ligado (Send SMS Hook) |
 | dados | os que você criar | demonstração | vazio |
 | crons | nenhum | ligados | **pausados** |
