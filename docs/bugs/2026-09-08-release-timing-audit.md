@@ -59,3 +59,5 @@ Verificação de escopo após o trabalho: produção permaneceu em `agente-00025
 ## Release nativa 1.3.2
 
 Após a entrega OTA compatível com 1.3.1, o usuário solicitou um APK novo e a medição do build completo. A versão 1.3.2 inclui as correções funcionais publicadas em `7fb41d4`. O build usa o workflow nativo já validado, com fallback para os caches da main, assinatura existente e incremento remoto do versionCode. O tempo OTA de 2min40s não é uma medida de geração de APK. Resultado desta release será registrado após conclusão.
+
+A execução nativa 34267445450 (v1.3.2) foi cancelada durante o build após o usuário detalhar o falso pagamento em Hoje. Não publicou assets. O problema foi reproduzido e corrigido antes da próxima tag, v1.3.3. Esse cancelamento não mede o tempo de um build completo.

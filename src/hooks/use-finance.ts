@@ -589,11 +589,14 @@ export function useMarkPaid() {
   const invalidate = useInvalidateFinance();
   return useMutation({
     mutationFn: async (input: { id: string; paidAt: string }) => {
-      const { error } = await supabase
+      const { data, error } = await supabase
         .from('transactions')
         .update({ status: 'cleared', paid_at: input.paidAt })
-        .eq('id', input.id);
+        .eq('id', input.id)
+        .select('id')
+        .single();
       if (error) throw error;
+      if (!data || data.id !== input.id) throw new Error('Lançamento não encontrado para dar baixa.');
     },
     onSuccess: invalidate,
   });

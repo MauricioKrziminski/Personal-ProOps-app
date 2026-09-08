@@ -255,3 +255,63 @@ test('48 realtime row events coalesce and an event during refetch still gets a f
     assert.equal(client.getQueryData(['account-balances']), 49);
   } finally { release(); off(); client.clear(); }
 });
+
+function renderToday(bill: { kind: 'invoice' | 'transaction'; ref_id: string }) {
+  const writes: unknown[] = [];
+  const routes: unknown[] = [];
+  const module = { exports: {} as any };
+  const query = { data: [], isLoading: false, isRefetching: false, refetch: async () => {} };
+  const finance = { useCashFlowForecast: () => query, useUpcomingBills: () => ({ ...query, data: [{ ...bill, title: 'Fatura teste', amount_cents: 147000, due_date: '2026-01-20', overdue: true }] }), useBudgetsStatus: () => query, useRecentTransactions: () => query, useMarkPaid: () => ({ mutate: (...args: unknown[]) => writes.push(args) }) };
+  const code = ts.transpileModule(readFileSync('src/app/(tabs)/today/index.tsx', 'utf8'), { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022, jsx: ts.JsxEmit.ReactJSX } }).outputText;
+  runInNewContext(code, { module, exports: module.exports, require: (name: string) => {
+    if (name === 'react') return { useMemo: (fn: () => unknown) => fn(), useState: (value: unknown) => [value, () => {}] };
+    if (name === 'react/jsx-runtime') return require(name);
+    if (name === 'react-native') return { Platform: { OS: 'android' }, StyleSheet: { create: (v: unknown) => v }, useWindowDimensions: () => ({ width: 400 }), View: 'View', ScrollView: 'ScrollView', RefreshControl: 'RefreshControl' };
+    if (name === 'expo-router') return { router: { push: (route: unknown) => routes.push(route) } };
+    if (name === 'react-native-safe-area-context') return { useSafeAreaInsets: () => ({ bottom: 0 }) };
+    if (name === '@/hooks/use-finance') return finance;
+    if (name === '@/hooks/use-items') return { useTodayReminders: () => query, localISODate: () => '2026-09-08', formatDateBR: (s: string) => s };
+    if (name === '@/hooks/use-profile') return { useProfile: () => query };
+    if (name === '@/hooks/use-session') return { useSession: () => ({ session: null }) };
+    if (name === '@/hooks/use-theme') return { useTheme: () => ({}) };
+    if (name === '@/components/ui/toast') return { useToast: () => () => {} };
+    if (name === '@/components/ui/app-header') return { AppHeader: 'AppHeader', useAppHeaderHeight: () => 80 };
+    if (name === '@/design/tokens') return { Space: {}, Radius: {}, tabular: {} };
+    if (name === '@/constants/theme') return { Fonts: {} };
+    return new Proxy({}, { get: (_, key) => String(key) });
+  } });
+  const tree = module.exports.default();
+  const nodes: any[] = [];
+  const visit = (node: any) => { if (Array.isArray(node)) return node.forEach(visit); if (node && typeof node === 'object' && node.props) { nodes.push(node); visit(node.props.children); } };
+  visit(tree);
+  return { writes, routes, nodes };
+}
+
+test('Today routes an overdue invoice to invoice payment instead of writing its ID into transactions', () => {
+  const { nodes, routes, writes } = renderToday({ kind: 'invoice', ref_id: 'invoice-1' });
+  const button = nodes.find((n) => n.type === 'Button');
+  button.props.onPress();
+  assert.equal(writes.length, 0, 'an invoice UUID is not a transaction UUID');
+  assert.equal(routes.length, 1);
+  assert.equal((routes[0] as any).pathname, '/finance/invoice/[id]');
+  assert.equal((routes[0] as any).params.id, 'invoice-1');
+  assert.equal(button.props.label, 'Pagar fatura');
+});
+
+test('Today still marks a standalone transaction paid and exposes pull to refresh', () => {
+  const { nodes, routes, writes } = renderToday({ kind: 'transaction', ref_id: 'transaction-1' });
+  nodes.find((n) => n.type === 'Button').props.onPress();
+  assert.equal(routes.length, 0);
+  assert.equal((writes[0] as any[])[0].id, 'transaction-1');
+  const scroll = nodes.find((n) => n.type === 'ScrollView');
+  assert.equal(typeof scroll.props.refreshControl.props.onRefresh, 'function');
+});
+
+test('mark paid rejects a zero-row write instead of reporting success', async () => {
+  const client = new QueryClient();
+  const result = { data: null, error: null };
+  const chain: any = { update: () => chain, eq: () => chain, select: () => chain, single: async () => result, then: (resolve: any) => Promise.resolve(result).then(resolve) };
+  const hook = loadHooks(client, 'src/hooks/use-finance.ts', { '@/lib/supabase': { supabase: { from: () => chain } } }).useMarkPaid();
+  try { await assert.rejects(hook.mutationFn({ id: 'missing', paidAt: '2026-09-08' })); }
+  finally { client.clear(); }
+});

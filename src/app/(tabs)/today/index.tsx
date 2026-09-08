@@ -275,11 +275,13 @@ export default function TodayScreen() {
                 </View>
 
                 <Button
-                  label="Paguei"
+                  label={b.kind === 'invoice' ? 'Pagar fatura' : 'Paguei'}
                   icon="checkmark"
                   size="sm"
                   variant="secondary"
-                  onPress={() => pay(b.ref_id, b.title)}
+                  onPress={() => b.kind === 'invoice'
+                    ? router.push({ pathname: '/finance/invoice/[id]', params: { id: b.ref_id } })
+                    : pay(b.ref_id, b.title)}
                 />
               </View>
             ))}

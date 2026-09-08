@@ -28,6 +28,13 @@ def main():
                 check([r[0] for r in rows if r[1]=='cleared']==list(range(1,count+1)),'exact paid prefix')
                 check(all(r[3] for r in rows),'invoice trigger executed')
             check(conn.execute("select count(*) from card_invoices where workspace_id=%s and status='paid'",(workspace,)).fetchone()[0]==0,'invoice-wide status preserved')
+            historical_invoice = conn.execute("select id from card_invoices where workspace_id=%s order by due_date limit 1", (workspace,)).fetchone()[0]
+            before = conn.execute("select ref_id from upcoming_bills(7) where ref_id=%s and kind='invoice'", (historical_invoice,)).fetchall()
+            check(len(before) == 1, 'historical invoice appears in Today before settling')
+            wrong_write = conn.execute("update transactions set status='cleared' where id=%s returning id", (historical_invoice,)).fetchall()
+            check(wrong_write == [], 'invoice UUID does not update any transaction: old Today false success reproduced')
+            conn.execute("select settle_invoice(%s,current_date)", (historical_invoice,))
+            check(conn.execute("select ref_id from upcoming_bills(7) where ref_id=%s", (historical_invoice,)).fetchall() == [], 'settled invoice disappears from Today source immediately')
             for sql,args in [
                 ("select create_installment_plan_with_history(%s,4800,48,current_date,0)",(accounts[1],)),
                 ("select create_installment_plan(%s,4800,48,'2026-01-08')",(accounts[0],)),
@@ -41,7 +48,7 @@ def main():
         for table in ['accounts','installment_plans','transactions','card_invoices','workspace_members']:
             check(conn.execute(f'select count(*) from public.{table} where workspace_id in (%s,%s)',(workspace,foreign)).fetchone()[0]==0,f'rollback empty {table}')
         check(conn.execute('select count(*) from workspaces where id in (%s,%s)',(workspace,foreign)).fetchone()[0]==0,'rollback workspaces')
-        print('PASS staging: authenticated RPC, 0/8/48 paid, exact sums, invoice status preserved, foreign account denied; rollback zero fixtures')
+        print('PASS staging: Today false-success reproduced, settled invoice removed from upcoming_bills; authenticated RPC, 0/8/48 paid, exact sums, invoice status preserved, foreign account denied; rollback zero fixtures')
     finally:
         conn.close()
 
