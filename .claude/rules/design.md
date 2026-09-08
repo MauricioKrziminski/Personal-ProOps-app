@@ -197,6 +197,14 @@ nunca "Confirmar" na tela seguinte.
 
 - `Icon` (`src/components/ui/icon.tsx`) é o único caminho. Nenhuma outra biblioteca de ícone
   entra no projeto.
+- ⚠️ **No Android o ícone é TEXTO, e texto cresce com a fonte do sistema.** O `SymbolView` só é
+  nativo no iOS; fora dele ele renderiza `<Text style={{fontSize: size, lineHeight: size}}>` dentro
+  de uma `View` de `size × size`. O `<Text>` passa pelo `fontScale` do aparelho, a `View` não —
+  então a 1,3× o glifo é desenhado maior que a caixa e **sobra para fora**. Dentro de um chip
+  redondo o raio corta a sobra: era o "ícone do olho cortando à direita" e o "ícone do perfil não
+  centralizado" de 07/09/2026 — um defeito só, em todo chip do app, invisível no simulador com
+  fonte padrão. `Icon` pede o glifo em `px / fontScale` e centra o conteúdo numa caixa de `px`.
+  **Ícone tem tamanho de geometria, não de texto**: ele mora em chips de dimensão fixa.
 - **`expo-symbols` NÃO traduz nome sozinho** — esta regra afirmava que sim, e por isso *todo*
   ícone do app ficou invisível no Android até 28/08. No Android o `SymbolView` só resolve o nome
   no formato objeto (`{ ios, android }`); recebendo a string de um SF Symbol ele devolve o
@@ -265,7 +273,27 @@ do slot e a borda da pílula, calculada da geometria, não escolhida a dedo.
 2. **Empty** — `EmptyState`: ícone SF, título, e uma **dica acionável** (normalmente o atalho do
    WhatsApp). Composto, não um parágrafo cinza.
 3. **Error** — inline e específico, com "Tentar de novo" que refaz a query.
-4. **Conteúdo longo** — texto que trunca sem quebrar layout.
+4. **Conteúdo longo** — texto que **quebra** sem quebrar layout. Quem cede é o LAYOUT.
+
+⚠️ **Isto mudou em 07/09/2026, e mudou de sinal.** A regra dizia "texto que TRUNCA sem quebrar
+layout", e o resultado num aparelho real foi um Perfil com três linhas seguidas terminando antes
+do sentido: "Avisos financeiros no c…", "Você negou a permissão. Libe…", "Trocar número do
+WhatsA…". A queixa do dono do produto foi literal — *"como que o usuário vai saber se ele não
+consegue nem ler"*. Foram removidas **44** truncagens.
+
+A régua nova:
+
+- **Identificador nunca trunca** — nome, título, rótulo, valor, mensagem de erro. Não coube? A
+  linha quebra, a célula cresce (`minWidth`, não `width`), a pílula desce para a linha de baixo.
+- **Prévia de um corpo pode ficar pela metade**, porque o texto inteiro está a um toque: o trecho
+  da nota no cartão e o trecho da última mensagem na lista de conversas. Só isso.
+
+`anti-slop.test.ts` quebra o build em `numberOfLines` fora de uma allowlist de três arquivos, e
+cada entrada exige escrever POR QUE aquele texto não é identificador. Sem o teste a contagem volta
+a subir sozinha, como já aconteceu com hex e `fontSize`.
+
+⚠️ **`Row` não tem mais `subtitleLines`.** O prop existia para "deixar duas linhas nesta tela", que
+é a decisão que produzia o problema — subtítulo agora ocupa quantas linhas precisar, em todo lugar.
 
 **Cada seção da tela tem o seu.** Tela com 4 queries não pode esconder o erro de 3 delas atrás do
 estado da primeira: seção que falha diz que falhou, não some.
@@ -343,6 +371,20 @@ que "voltar" faz depois.
 - **Porta de mão única** (login, onboarding concluído, compra) sai da pilha com `Stack.Protected`
   + `replace` — voltar nunca reentra no estado antigo.
 - **Abas são pares.** Nada de slide entre abas; re-tap na aba ativa volta à raiz.
+- ⚠️ **A tab bar aparece SÓ nas cinco raízes** (07/09/2026, decisão do dono do produto). Toda tela
+  empurrada mora no `<Stack>` da RAIZ (`src/app/_layout.tsx`), fora de `(tabs)` — 23 arquivos
+  saíram de `(tabs)/finance/`, `(tabs)/notes/`, `(tabs)/profile/` e `(tabs)/agent/`. Aninhadas nas
+  abas, elas ficavam POR BAIXO da dock: ela aparecia dentro da conversa do agente, da fatura, do
+  editor de nota.
+
+  **Não existe chave para escondê-la tela a tela**: no iOS a `NativeTabs` é a barra do sistema. O
+  padrão que a doc do Expo documenta para "detail screen overlays the tab bar" é exatamente este.
+  **A URL não mudou em nenhuma delas** — `(tabs)` é um GRUPO e nunca entrou no caminho, então
+  `/finance/cards` continua `/finance/cards` e nenhum `router.push` foi reescrito. Cada pilha de
+  aba ficou com uma tela só (a raiz); o título das empurradas vive no `_layout.tsx` da raiz.
+
+  Efeito colateral a lembrar: quem reservava `CURVED_BAR_SPACE` numa tela secundária passou a
+  deixar uma faixa vazia do tamanho da dock. Foi o caso do `ChatComposer`.
 - **A tab bar tem DUAS implementações, uma por plataforma.** No iOS é a `NativeTabs`
   (`app-tabs.tsx`) em Liquid Glass, que o sistema desenha melhor do que qualquer coisa nossa —
   inclusive o encolhimento ao rolar. No Android é o `CurvedTabBar` (`app-tabs.android.tsx`): uma

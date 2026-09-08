@@ -11,8 +11,14 @@
 1. `npx tsc --noEmit` limpo.
 2. `npx expo lint` limpo.
 3. `npm test` verde (`node --test`, sem framework — helpers puros de data/dinheiro do app).
-4. **Mudou `agent/` → `.venv/bin/pytest` verde.** Teste que fala com rede ou banco não entra: os
-   nós que falam com o mundo viram dublê.
+4. **Mudou `agent/` → `.venv/bin/ruff check app --select F,E9` E `.venv/bin/pytest` verdes.**
+   Teste que fala com rede ou banco não entra: os nós que falam com o mundo viram dublê.
+
+   O `ruff` entrou em 07/09/2026 porque o pytest não pega tudo: `nodes.py` usava `guards.` sem ter
+   importado o módulo, e em produção isso virava `NameError` — o app respondia "Não consegui
+   processar essa mensagem" para QUALQUER compra parcelada. O teste que existia chamava as funções
+   direto de `guards`, então elas estavam cobertas e o caminho que as usa não estava. `F821`
+   (nome não definido) custa 200ms e pega essa classe inteira.
 5. Mudou tela → conferir no device/emulador — nada de "deve funcionar".
 
    **As cinco raízes de aba se olham sem login**, pela rota `design-preview`: ela monta as telas
