@@ -17,9 +17,18 @@ O modo simples aceita parcelas integrais. Valores variáveis e amortização con
 ## Validação
 
 - Backend: 563 testes passando; regressão do session_id reproduzida antes de corrigir; guardas de edição de dívida simples e apresentação da taxa desconhecida.
-- Interação das telas reais por JSX e estado com transportes simulados: dois campos suficientes; oito anteriores; história inválida; modo detalhado; edição legada; confirmação sem caixa da fatura; ações ausentes em fatura paga.
+- App: 303 testes passando, TypeScript e lint sem erros. Interação das telas reais por JSX e estado com transportes simulados: dois campos suficientes; oito anteriores; história inválida; modo detalhado; edição legada; confirmação sem caixa da fatura; ações ausentes em fatura paga.
 - PGlite: contrato fixo, juros desconhecidos, parcelas anteriores, pagamentos integrais, reversão, modo imutável e quitação; regressões anteriores de conta/fatura preservadas.
 - Staging autenticado: 48×1470, oito pagas, quarenta restantes, parcelas e taxa desconhecida nas RPCs; pagamento reduz exatamente uma parcela; transação de teste revertida sem resíduos.
 - Migration `20260908201355_fixed_installment_financing` aplicada em staging; tipos regenerados pelo CLI.
 
-Esses testes não equivalem a uso no celular físico, nem a pagamento sobre dados reais de produção. Identificadores e resultado da publicação serão registrados após a entrega.
+Esses testes não equivalem a uso no celular físico, nem a pagamento sobre dados reais de produção. O teste da continuação usa interpretação simulada e valida o contrato da sessão; não comprova toda interpretação de linguagem natural do modelo ou entrega real por WhatsApp.
+
+## Publicação
+
+- Código: `75339f4`, tag `v1.3.4`.
+- Staging: backend `agente-staging-00073-6rh`, health ok.
+- Produção: migration `20260908201355` aplicada em `kwriuifcwyvdrxtspjiz`, dry-run posterior sem pendências; backend `agente-00027-p85`, 100% do tráfego e health ok.
+- APK: execução `34275053777` concluída com sucesso, 20:29:01–20:45:53 UTC: **16min52s** no total; etapa de build **13min03s**, Gradle **11min45s**. Cache nativo: 340/340 acertos, nenhuma perda. Acima dos 14min36s da 1.3.3 e abaixo dos 19min33s originais; não existe garantia de tempo fixo no runner compartilhado.
+- Release `v1.3.4`, versionCode **16**, runtime `1.3.4`, source `75339f4`, ambiente production. APK baixado da release teve assinatura esperada verificada; hash igual ao manifesto e ao recibo nativo: `f18bcebeeee717879afcb93c9bc9cc324eab34ed8ab5b38ba904f2c0b130393e`.
+- Emulador Android isolado: instalação `-r` sobre 1.3.3/code15 concluída, sem desinstalação; abertura da MainActivity com status ok e versão instalada 1.3.4/code16. Sem teste autenticado das novas telas no dispositivo físico.
