@@ -34,16 +34,6 @@ project_id = "utkqoiigimqzeenxkxdl"
 enable_signup = false
 enable_confirmations = false
 
-# O template padrão do Supabase usa `{{ .ConfirmationURL }}` (um LINK); o app chama `verifyOtp` e
-# precisa de `{{ .Token }}` (o código de 6 dígitos). Os dois arquivos ao lado são symlinks para
-# `supabase/templates/` — uma fonte só.
-[remotes.staging.auth.email.template.confirmation]
-subject = "Seu código do Personal ProOps app"
-content_path = "./supabase/confirmation.html"
-
-[remotes.staging.auth.email.template.recovery]
-subject = "Trocar a senha do Personal ProOps app"
-content_path = "./supabase/recovery.html"
 
 [remotes.production]
 project_id = "kwriuifcwyvdrxtspjiz"
@@ -115,32 +105,21 @@ max_frequency = "30s"
 otp_length = 6
 otp_expiry = 3600
 
-# ---------------------------------------------------------------------------
-# QUANDO O SMTP PRÓPRIO EXISTIR — o passo único que destrava produção
-# ---------------------------------------------------------------------------
-# 1. Configure o SMTP no dashboard de produção (Authentication → Emails → SMTP Settings).
-#    Vai ali porque a SENHA não viaja por este arquivo: `auth.email.smtp.pass` é campo secreto.
-# 2. MOVA os dois blocos `[remotes.staging.auth.email.template.*]` (acima) para cá, sem o
-#    prefixo `remotes.staging` — eles passam a valer nos dois ambientes.
-# 3. `cd supabase/hosted && SUPABASE_ENV=production npx supabase config push --project-ref
-#    kwriuifcwyvdrxtspjiz`
+# O template padrão do Supabase usa `{{ .ConfirmationURL }}` (um LINK); o app chama `verifyOtp`
+# e precisa de `{{ .Token }}` — o código de 6 dígitos. Os dois arquivos ao lado são symlinks para
+# `supabase/templates/`: uma fonte só para os dois ambientes.
 #
-# Só depois disso o e-mail de produção mostra o CÓDIGO em vez do link, e o remetente deixa de
-# ser "Supabase Auth". O limite de 2 e-mails/hora do mailer embutido também cai junto.
+# ⚠️ Isto **exige SMTP próprio** no projeto. Com o mailer padrão do Supabase no plano free a API
+# recusa com `400 Email template modification is not available for free tier projects using the
+# default email provider`, e o PATCH de auth é ATÔMICO — o bloco de template derruba a
+# requisição inteira, inclusive `site_url` e `otp_length`. Produção ganhou SMTP em 07/09/2026.
+[auth.email.template.confirmation]
+subject = "Seu código do Personal ProOps app"
+content_path = "./supabase/confirmation.html"
 
-# ⚠️ **Os templates NÃO ficam aqui na base — eles moram no bloco do staging, mais abaixo.**
-#
-# Medido em 07/09/2026 contra produção:
-#
-#   400 Email template modification is not available for free tier projects using the default
-#       email provider. Please upgrade your plan or configure a custom SMTP provider.
-#
-# E o PATCH de auth é ATÔMICO: com um bloco de template na requisição, **nada** é aplicado —
-# nem `site_url`, nem `otp_length`, nem o resto. Por isso a base não os declara: é o que permite
-# corrigir tudo o mais em produção enquanto o SMTP próprio não existe.
-#
-# Quando houver SMTP próprio, mova os dois blocos de `[remotes.staging.auth.email.template.*]`
-# para cá e o push passa a valer nos dois ambientes.
+[auth.email.template.recovery]
+subject = "Trocar a senha do Personal ProOps app"
+content_path = "./supabase/recovery.html"
 
 # Phone OTP é entregue pelo Send SMS Hook (WhatsApp), nunca por Twilio. O provider fica
 # DESLIGADO de propósito: ligado com credencial vazia ele é só uma forma de o login falhar
