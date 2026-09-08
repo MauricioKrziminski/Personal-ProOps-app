@@ -30,7 +30,8 @@ async def run() -> dict:
     vencidos = await db.fetch(
         """
         select r.id, r.user_id, r.title, r.recurrence, r.channel, r.next_run_at,
-               r.timezone, r.send_attempts, p.phone, p.expo_push_token
+               r.timezone, r.send_attempts, p.phone, p.expo_push_token,
+               p.alerts_whatsapp_enabled
         from public.reminders r
         join public.profiles p on p.id = r.user_id
         where r.active = true and r.next_run_at <= %s
@@ -92,11 +93,24 @@ async def run() -> dict:
 
 
 async def _entregar(lembrete: dict) -> None:
-    """Tenta os canais pedidos. Push que falha não anula o WhatsApp."""
+    """Tenta os canais pedidos. Push que falha não anula o WhatsApp.
+
+    ⚠️ **O WhatsApp obedece ao portão do Perfil** (`profiles.alerts_whatsapp_enabled`, default
+    `false` desde a `0052`), inclusive quando o lembrete pede esse canal explicitamente.
+
+    Antes este job não lia flag nenhuma: ele buscava todo lembrete vencido e entregava pelo canal
+    gravado na linha. Como a tela de lembrete nascia com `both`, criar um lembrete no app bastava
+    para receber um template PAGO no WhatsApp — e o "Avisos financeiros no WhatsApp: desligado"
+    do Perfil não valia nada aqui. Um interruptor que não desliga é pior que nenhum interruptor.
+
+    O bloqueio nunca é silencioso: quando o WhatsApp era o único caminho, a entrega falha com
+    motivo e o texto vai para `reminders.last_error`, que é onde se debuga isto.
+    """
     settings = get_settings()
     canal = lembrete["channel"]
     quer_push = canal in ("push", "both")
     quer_whatsapp = canal in ("whatsapp", "both")
+    pode_whatsapp = bool(lembrete.get("alerts_whatsapp_enabled"))
 
     entregue = False
     falhas: list[str] = []
@@ -108,7 +122,15 @@ async def _entregar(lembrete: dict) -> None:
         except Exception as err:  # noqa: BLE001
             falhas.append(f"push: {err}")
 
-    if lembrete["phone"] and (quer_whatsapp or (not entregue and quer_push)):
+    # O fallback (push pedido mas não entregue) era o caminho mais traiçoeiro: sem token de push
+    # ele transformava `channel = 'push'` — o default, o canal "grátis" — em template pago.
+    precisa_whatsapp = quer_whatsapp or (not entregue and quer_push)
+
+    if precisa_whatsapp and not pode_whatsapp:
+        falhas.append("whatsapp: desligado no Perfil (alerts_whatsapp_enabled)")
+    elif precisa_whatsapp and not lembrete["phone"]:
+        falhas.append("whatsapp: perfil sem telefone verificado")
+    elif precisa_whatsapp:
         try:
             await whatsapp.send_template(
                 lembrete["phone"], settings.wa_reminder_template, [lembrete["title"]]

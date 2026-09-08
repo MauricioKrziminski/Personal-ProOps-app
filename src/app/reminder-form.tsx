@@ -283,7 +283,14 @@ function ReminderForm({
       date: now.date,
       time: now.time,
       recurrence: editing?.recurrence ?? null,
-      channel: editing?.channel ?? 'both',
+      /*
+        **`push`, não `both`** (08/09/2026). O default da coluna no banco sempre foi `push`; era
+        esta tela que sobrescrevia para `both`, e com isso todo lembrete criado no app nascia
+        mandando também um template PAGO de WhatsApp — sem ninguém ter pedido esse canal. O canal
+        proativo principal do produto é push (`whatsapp.md`: template Utility é complemento), e
+        quem quer WhatsApp marca aqui.
+      */
+      channel: editing?.channel ?? 'push',
     },
   });
 
@@ -517,7 +524,7 @@ function ReminderForm({
                   hint={
                     field.value === 'push'
                       ? 'Push é grátis. Se a notificação estiver desligada no aparelho, esse lembrete não chega.'
-                      : 'Push é grátis; WhatsApp usa um template pago.'
+                      : 'Push é grátis; WhatsApp usa um template pago e só sai com "Avisos financeiros no WhatsApp" ligado no Perfil.'
                   }>
                   <Segmented
                     options={CHANNELS.map((c) => ({ value: c.value, label: c.label }))}
