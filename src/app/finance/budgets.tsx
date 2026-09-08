@@ -278,7 +278,7 @@ export default function BudgetsScreen() {
                 {estourou ? (
                   <Icon name="exclamationmark.triangle" size="sm" color="danger" />
                 ) : null}
-                <ThemedText type="default" numberOfLines={1}>
+                <ThemedText type="default">
                   {b.category}
                 </ThemedText>
               </View>
@@ -425,7 +425,7 @@ export default function BudgetsScreen() {
           {semLimite.slice(0, 5).map((r) => (
             <Card key={r.category} style={styles.linha}>
               <View style={styles.linhaTopo}>
-                <ThemedText type="default" numberOfLines={1}>
+                <ThemedText type="default">
                   {r.category}
                 </ThemedText>
                 <Money cents={Number(r.total_cents)} variant="headline" tone="textSecondary" />

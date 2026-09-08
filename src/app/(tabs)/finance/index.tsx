@@ -138,7 +138,7 @@ function Shortcut({ title, count, icon, href }: ShortcutProps) {
           <Icon name="chevron.right" size="xs" color="textSecondary" />
         </View>
         <View style={styles.shortcutBottom}>
-          <ThemedText type="headline" numberOfLines={1}>
+          <ThemedText type="headline">
             {title}
           </ThemedText>
           {count ? (
@@ -730,7 +730,6 @@ export default function FinanceScreen() {
                         <ThemedText
                           type="small"
                           themeColor="textSecondary"
-                          numberOfLines={1}
                           style={styles.cashMes}>
                           {monthShort(m.month.slice(0, 7))}
                         </ThemedText>
@@ -820,7 +819,7 @@ export default function FinanceScreen() {
                             { backgroundColor: pressed ? theme.backgroundSelected : 'transparent' },
                           ]}>
                           <View style={styles.categoryHead}>
-                            <ThemedText type="default" numberOfLines={1} style={styles.categoryName}>
+                            <ThemedText type="default" style={styles.categoryName}>
                               {row.category}
                             </ThemedText>
                             <Money cents={total} variant="ticker" />

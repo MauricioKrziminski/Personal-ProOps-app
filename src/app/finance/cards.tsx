@@ -223,7 +223,7 @@ export default function CardsScreen() {
               onPress={() => irParaFatura(card)}
               accessibilityLabel={`${card.name}, ${estado ? `fatura ${estado.toLowerCase()}` : 'sem fatura aberta'}, ${formatBRL(totalFatura)}${card.due_date ? `, ${prazoLabel(card.due_date, 'vence')}` : ''}`}>
               <View style={styles.cardHead}>
-                <ThemedText type="smallBold" numberOfLines={1} style={styles.cardName}>
+                <ThemedText type="smallBold" style={styles.cardName}>
                   {card.name}
                 </ThemedText>
                 {/* estado como PALAVRA, nunca só cor */}

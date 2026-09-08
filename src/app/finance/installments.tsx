@@ -280,7 +280,7 @@ export default function InstallmentsScreen() {
                 { backgroundColor: pressed ? theme.backgroundSelected : 'transparent' },
               ]}>
               <View style={styles.planoTopo}>
-                <ThemedText type="default" numberOfLines={1} style={styles.planoNome}>
+                <ThemedText type="default" style={styles.planoNome}>
                   {plano.title}
                 </ThemedText>
                 <View style={styles.planoValor}>

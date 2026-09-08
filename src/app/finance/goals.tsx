@@ -229,7 +229,7 @@ export default function GoalsScreen() {
                   size="md"
                   color={concluida ? 'success' : 'tint'}
                 />
-                <ThemedText type="default" numberOfLines={1}>
+                <ThemedText type="default">
                   {g.name}
                 </ThemedText>
               </View>
@@ -378,7 +378,7 @@ export default function GoalsScreen() {
       <Sheet visible={aporte !== null} onClose={() => setAporte(null)}>
           <View style={styles.sheetHead}>
             <Button label="Cancelar" variant="ghost" size="sm" onPress={() => setAporte(null)} />
-            <ThemedText type="smallBold" numberOfLines={1}>
+            <ThemedText type="smallBold">
               {aporte?.name}
             </ThemedText>
             <View style={styles.sheetHeadSpacer} />
@@ -429,7 +429,7 @@ export default function GoalsScreen() {
       <Sheet visible={extrato !== null} onClose={() => setExtrato(null)}>
           <View style={styles.sheetHead}>
             <Button label="Fechar" variant="ghost" size="sm" onPress={() => setExtrato(null)} />
-            <ThemedText type="smallBold" numberOfLines={1}>
+            <ThemedText type="smallBold">
               Extrato de {extrato?.name}
             </ThemedText>
             <View style={styles.sheetHeadSpacer} />

@@ -240,7 +240,7 @@ export default function DebtsScreen() {
           onLongPress={() => acoes(d)}>
           <Card style={styles.divida}>
             <View style={styles.dividaTopo}>
-              <ThemedText type="default" numberOfLines={1} style={styles.dividaNome}>
+              <ThemedText type="default" style={styles.dividaNome}>
                 {d.name}
               </ThemedText>
               <Money cents={restante} variant="ticker" tone="danger" />
@@ -335,7 +335,7 @@ export default function DebtsScreen() {
                 {i + 1}
               </ThemedText>
               <View style={styles.ordemTexto}>
-                <ThemedText type="small" numberOfLines={1}>
+                <ThemedText type="small">
                   {p.name}
                 </ThemedText>
                 <ThemedText type="footnote" themeColor="textSecondary">
@@ -366,7 +366,7 @@ export default function DebtsScreen() {
       <Sheet visible={detalhe !== null} onClose={() => setDetalhe(null)}>
           <View style={styles.sheetHead}>
             <Button label="Fechar" variant="ghost" size="sm" onPress={() => setDetalhe(null)} />
-            <ThemedText type="smallBold" numberOfLines={1}>
+            <ThemedText type="smallBold">
               {detalhe?.name}
             </ThemedText>
             <View style={styles.sheetHeadSpacer} />
@@ -453,7 +453,6 @@ export default function DebtsScreen() {
                           key={h}
                           type="footnote"
                           themeColor="textSecondary"
-                          numberOfLines={1}
                           style={[styles.celula, h === 'nº' ? styles.celulaEstreita : null]}>
                           {h}
                         </ThemedText>
@@ -465,11 +464,10 @@ export default function DebtsScreen() {
                         style={[styles.tabelaLinha, { borderTopColor: theme.separator }]}>
                         <ThemedText
                           type="footnote"
-                          numberOfLines={1}
                           style={[styles.celula, styles.celulaEstreita, tabular]}>
                           {p.installment_no}
                         </ThemedText>
-                        <ThemedText type="footnote" numberOfLines={1} style={[styles.celula, tabular]}>
+                        <ThemedText type="footnote" style={[styles.celula, tabular]}>
                           {isoToBR(p.due_date)}
                         </ThemedText>
                         <View style={styles.celula}>
@@ -501,7 +499,7 @@ export default function DebtsScreen() {
       <Sheet visible={pagando !== null} onClose={() => setPagando(null)}>
           <View style={styles.sheetHead}>
             <Button label="Cancelar" variant="ghost" size="sm" onPress={() => setPagando(null)} />
-            <ThemedText type="smallBold" numberOfLines={1}>
+            <ThemedText type="smallBold">
               Pagar {pagando?.name}
             </ThemedText>
             <View style={styles.sheetHeadSpacer} />
@@ -788,11 +786,16 @@ const styles = StyleSheet.create({
     borderTopWidth: StyleSheet.hairlineWidth,
     borderTopColor: 'transparent',
   },
+  /**
+   * `minWidth`, não `width`: a tabela vive num `ScrollView` horizontal, então a célula pode
+   * crescer com o conteúdo em vez de cortá-lo. Com largura fixa, "vencimento" e uma data em
+   * fonte grande viravam "vencimen…" — e uma data pela metade não é dado, é ruído.
+   */
   celula: {
-    width: 92,
+    minWidth: 92,
   },
   celulaEstreita: {
-    width: 32,
+    minWidth: 32,
   },
   sheetHead: {
     flexDirection: 'row',

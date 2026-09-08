@@ -298,7 +298,7 @@ export default function RecurringScreen() {
                   size="md"
                   color={receita ? 'success' : 'textSecondary'}
                 />
-                <ThemedText type="default" numberOfLines={1}>
+                <ThemedText type="default">
                   {r.description ?? 'sem descrição'}
                 </ThemedText>
               </View>
@@ -406,13 +406,13 @@ export default function RecurringScreen() {
                 <View style={styles.serieTopo}>
                   <View style={styles.serieTitulo}>
                     <Icon name="exclamationmark.triangle" size="md" color="warning" />
-                    <ThemedText type="default" numberOfLines={1}>
+                    <ThemedText type="default">
                       {r.description ?? 'sem descrição'}
                     </ThemedText>
                   </View>
                   <Money cents={Number(r.amount_cents)} variant="ticker" />
                 </View>
-                <ThemedText type="small" themeColor="textSecondary" numberOfLines={3}>
+                <ThemedText type="small" themeColor="textSecondary">
                   {r.last_error}
                 </ThemedText>
                 <ThemedText type="small" themeColor="textSecondary" style={tabular}>

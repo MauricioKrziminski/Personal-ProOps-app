@@ -1,17 +1,23 @@
 import { Stack } from 'expo-router';
 
-import { stackHeaderFonts } from '@/components/ui/app-header';
-
-/** Pilha da aba Perfil — `NativeTabs` não tem header próprio. */
-export const unstable_settings = { initialRouteName: 'index' };
+/**
+ * Pilha da aba Perfil — **uma tela só: a raiz**.
+ *
+ * As telas empurradas saíram de `(tabs)` em 07/09/2026 e foram para o `<Stack>` da RAIZ, para a
+ * tab bar não aparecer dentro delas. O motivo completo está em `(tabs)/finance/_layout.tsx`; o
+ * resumo é que não existe chave para esconder a barra numa tela (a `NativeTabs` do iOS é a do
+ * sistema), e a doc do Expo manda pôr a rota de detalhe no stack raiz. A URL não mudou, porque
+ * `(tabs)` é um grupo e nunca entrou no caminho.
+ */
+export const unstable_settings = {
+  initialRouteName: 'index',
+};
 
 export default function ProfileStackLayout() {
   return (
-    <Stack screenOptions={{ headerShadowVisible: false, ...stackHeaderFonts }}>
-      {/* A raiz desenha o `AppHeader` (design Stitch): sem título de tela, sem large title. */}
-      <Stack.Screen name="index" options={{ headerShown: false }} />
-      <Stack.Screen name="members" options={{ title: 'Pessoas' }} />
-      <Stack.Screen name="alerts" options={{ title: 'Histórico de alertas' }} />
+    <Stack screenOptions={{ headerShown: false }}>
+      {/* A raiz desenha o `AppHeader` (design Stitch). */}
+      <Stack.Screen name="index" />
     </Stack>
   );
 }

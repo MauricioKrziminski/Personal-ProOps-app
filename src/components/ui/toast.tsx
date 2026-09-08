@@ -89,7 +89,7 @@ function ToastView({ toast, onDismiss }: { toast: Toast; onDismiss: () => void }
           { backgroundColor: theme.surfaceRaised, boxShadow: Elevation[scheme].overlay },
         ]}>
         <Icon name={icon[toast.tone]} size="md" color={tint[toast.tone]} />
-        <ThemedText type="small" style={styles.message} numberOfLines={2}>
+        <ThemedText type="small" style={styles.message}>
           {toast.message}
         </ThemedText>
         {toast.action ? (

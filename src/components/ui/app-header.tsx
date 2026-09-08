@@ -121,13 +121,15 @@ export function AppHeader({ title, action }: AppHeaderProps) {
       />
 
       <View pointerEvents="box-none" style={styles.row}>
-        <View
-          pointerEvents="none"
-          style={[
-            styles.markBox,
-            { backgroundColor: theme.backgroundSelected, borderColor: theme.cardBorder },
-          ]}>
-          <Mark size={16} color="text" />
+        {/*
+          A marca fica SOLTA na faixa, sem o quadradinho de fundo (07/09/2026, decisão do dono do
+          produto). O export do Stitch desenha um `bg-surface-container` de 28 atrás dela, e no
+          aparelho aquilo lia como um segundo botão ao lado do avatar — três pílulas cinzas em
+          fileira, sendo que duas são toque e uma não. Sem o fundo a marca é a única coisa da
+          barra que NÃO é controle, que é exatamente o que ela é.
+        */}
+        <View pointerEvents="none" style={styles.markBox}>
+          <Mark size={26} color="text" />
         </View>
 
         <View pointerEvents="box-none" style={styles.right}>
@@ -198,15 +200,8 @@ const styles = StyleSheet.create({
     gap: Space.md,
     paddingHorizontal: Space.lg,
   },
-  markBox: {
-    width: 28,
-    height: 28,
-    borderRadius: Radius.sm,
-    borderCurve: 'continuous',
-    borderWidth: StyleSheet.hairlineWidth,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
+  /** Mantém a altura de 28 da fileira; o que saiu foi só a superfície atrás da marca. */
+  markBox: { width: 28, height: 28, alignItems: 'center', justifyContent: 'center' },
   right: { flexDirection: 'row', alignItems: 'center', gap: Space.sm },
   round: {
     width: HitTarget - 12,

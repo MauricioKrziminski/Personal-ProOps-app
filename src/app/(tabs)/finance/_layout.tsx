@@ -1,13 +1,24 @@
 import { Stack } from 'expo-router';
 
-import { stackHeaderFonts } from '@/components/ui/app-header';
-
 /**
- * Pilha da aba Financeiro.
+ * Pilha da aba Financeiro — **uma tela só: a raiz**.
  *
- * `NativeTabs` não traz header nenhum — a doc do Expo é explícita: para ter title e navegação
- * dentro de uma aba é preciso aninhar um `<Stack>`. É isto que substitui o `ScreenHeader`
- * caseiro (um `‹` desenhado como texto) que as 15 telas repetiam.
+ * ## Por que as outras 17 saíram daqui (07/09/2026)
+ *
+ * Aninhada dentro de `(tabs)`, toda tela empurrada continuava **por baixo da tab bar** — a dock
+ * ficava visível dentro da fatura, do editor de nota, da conversa do agente. A queixa foi
+ * literal: *"a navbar em baixo só deve aparecer nas telas iniciais, em nenhum momento que eu
+ * entro em uma tela secundária ela deve ficar visível"*.
+ *
+ * **Não existe chave para esconder a barra numa tela.** No iOS a `NativeTabs` é a barra do
+ * sistema e não expõe isso; no Android a `CurvedTabBar` é nossa, mas esconder só lá deixaria as
+ * duas plataformas com navegação diferente. O que a doc do Expo manda fazer para "detail screen
+ * overlays the tab bar" é exatamente esta mudança: a rota de detalhe vai para o `<Stack>` da
+ * RAIZ (`src/app/_layout.tsx`), que fica ACIMA do grupo de abas.
+ *
+ * **A URL não mudou.** `(tabs)` é um GRUPO e nunca entrou no caminho, então
+ * `src/app/(tabs)/finance/cards.tsx` e `src/app/finance/cards.tsx` são os dois `/finance/cards` —
+ * nenhum `router.push` precisou ser reescrito.
  */
 export const unstable_settings = {
   initialRouteName: 'index',
@@ -15,32 +26,9 @@ export const unstable_settings = {
 
 export default function FinanceStackLayout() {
   return (
-    <Stack
-      screenOptions={{
-        // Large title + blur entram tela a tela na fase 4, quando cada uma migrar para o
-        // primitivo `Screen` (o colapso exige o ScrollView como primeiro filho).
-        headerShadowVisible: false,
-        ...stackHeaderFonts,
-      }}>
+    <Stack screenOptions={{ headerShown: false }}>
       {/* A raiz desenha o `AppHeader` (design Stitch): sem título de tela, sem large title. */}
-      <Stack.Screen name="index" options={{ headerShown: false }} />
-      <Stack.Screen name="transactions" options={{ title: 'Lançamentos' }} />
-      <Stack.Screen name="[txId]" options={{ title: 'Lançamento' }} />
-      <Stack.Screen name="accounts" options={{ title: 'Contas' }} />
-      <Stack.Screen name="cards" options={{ title: 'Cartões' }} />
-      <Stack.Screen name="invoice/[id]" options={{ title: 'Fatura' }} />
-      <Stack.Screen name="invoices" options={{ title: 'Faturas' }} />
-      <Stack.Screen name="installments" options={{ title: 'Parceladas' }} />
-      <Stack.Screen name="budgets" options={{ title: 'Orçamentos' }} />
-      <Stack.Screen name="goals" options={{ title: 'Metas' }} />
-      <Stack.Screen name="debts" options={{ title: 'Dívidas' }} />
-      <Stack.Screen name="recurring" options={{ title: 'Recorrentes' }} />
-      <Stack.Screen name="forecast" options={{ title: 'Projeção' }} />
-      <Stack.Screen name="reports" options={{ title: 'Relatórios' }} />
-      <Stack.Screen name="net-worth" options={{ title: 'Patrimônio' }} />
-      <Stack.Screen name="rules" options={{ title: 'Regras' }} />
-      <Stack.Screen name="manage" options={{ title: 'Gerenciar' }} />
-      <Stack.Screen name="plan" options={{ title: 'Plano e família' }} />
+      <Stack.Screen name="index" />
     </Stack>
   );
 }

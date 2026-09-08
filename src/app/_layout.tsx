@@ -181,8 +181,57 @@ function AppTree() {
                 </Stack.Protected>
 
                 <Stack.Protected guard={!!session}>
-                  {/* O grupo de abas desenha os próprios headers nas pilhas aninhadas. */}
+                  {/* As cinco raízes de aba. Elas desenham o `AppHeader` por conta própria. */}
                   <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+
+                  {/*
+                    ⚠️ **Toda tela SECUNDÁRIA mora aqui, não dentro de `(tabs)`** (07/09/2026).
+
+                    Enquanto elas eram pilhas aninhadas nas abas, a tab bar continuava visível por
+                    baixo: a dock aparecia dentro da conversa do agente, da fatura, do editor de
+                    nota. Não há como escondê-la tela a tela — no iOS a `NativeTabs` É a barra do
+                    sistema —, e o padrão que a doc do Expo documenta para "detail screen overlays
+                    the tab bar" é este: a rota de detalhe entra no stack RAIZ, que fica acima do
+                    grupo de abas.
+
+                    A URL não mudou em nenhuma delas: `(tabs)` é um GRUPO e nunca entrou no
+                    caminho, então `/finance/cards` continua `/finance/cards`.
+
+                    O título vive AQUI porque aqui é onde o header é desenhado. Uma tela nova de
+                    detalhe se registra nesta lista — se esquecer, ela aparece com o nome do
+                    arquivo na barra.
+                  */}
+                  <Stack.Screen name="finance/transactions" options={{ title: 'Lançamentos' }} />
+                  <Stack.Screen name="finance/[txId]" options={{ title: 'Lançamento' }} />
+                  <Stack.Screen name="finance/accounts" options={{ title: 'Contas' }} />
+                  <Stack.Screen name="finance/cards" options={{ title: 'Cartões' }} />
+                  <Stack.Screen name="finance/invoice/[id]" options={{ title: 'Fatura' }} />
+                  <Stack.Screen name="finance/invoices" options={{ title: 'Faturas' }} />
+                  <Stack.Screen name="finance/installments" options={{ title: 'Parceladas' }} />
+                  <Stack.Screen name="finance/budgets" options={{ title: 'Orçamentos' }} />
+                  <Stack.Screen name="finance/goals" options={{ title: 'Metas' }} />
+                  <Stack.Screen name="finance/debts" options={{ title: 'Dívidas' }} />
+                  <Stack.Screen name="finance/recurring" options={{ title: 'Recorrentes' }} />
+                  <Stack.Screen name="finance/forecast" options={{ title: 'Projeção' }} />
+                  <Stack.Screen name="finance/reports" options={{ title: 'Relatórios' }} />
+                  <Stack.Screen name="finance/net-worth" options={{ title: 'Patrimônio' }} />
+                  <Stack.Screen name="finance/rules" options={{ title: 'Regras' }} />
+                  <Stack.Screen name="finance/manage" options={{ title: 'Gerenciar' }} />
+                  <Stack.Screen name="finance/plan" options={{ title: 'Plano e família' }} />
+
+                  {/* Sem título: o da nota é o conteúdo dela, e um provisório faria a barra
+                      trocar de texto na frente do usuário. */}
+                  <Stack.Screen name="notes/[id]" options={{ title: '' }} />
+                  <Stack.Screen name="notes/folders" options={{ title: 'Pastas' }} />
+                  <Stack.Screen name="notes/trash" options={{ title: 'Lixeira' }} />
+
+                  <Stack.Screen name="profile/members" options={{ title: 'Pessoas' }} />
+                  <Stack.Screen name="profile/alerts" options={{ title: 'Histórico de alertas' }} />
+
+                  {/* Mesma regra do `notes/[id]`: em `new` o conteúdo é o campo vazio, e em
+                      `[id]` o nome da conversa só é conhecido depois da query. */}
+                  <Stack.Screen name="agent/new" options={{ title: '' }} />
+                  <Stack.Screen name="agent/[id]" options={{ title: '' }} />
 
                   {/* Atenção total: formulário com etapas vive acima das abas. */}
                   <Stack.Screen

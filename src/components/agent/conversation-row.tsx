@@ -66,9 +66,11 @@ export const ConversationRow = memo(function ConversationRow({
       <View style={styles.body}>
         {/* Uma linha só: título longo é comum (ele sai da primeira frase da mensagem) e
             quebrar em duas mudaria a altura da linha item a item. */}
-        <ThemedText type="default" numberOfLines={1} style={styles.title}>
+        <ThemedText type="default" style={styles.title}>
           {title}
         </ThemedText>
+        {/* PRÉVIA, e por isso é a única coisa desta linha que pode ficar pela metade: o texto
+            inteiro está a um toque. O título acima, não — ele identifica a conversa. */}
         {resumo ? (
           <ThemedText type="caption" themeColor="textSecondary" numberOfLines={1}>
             {resumo}

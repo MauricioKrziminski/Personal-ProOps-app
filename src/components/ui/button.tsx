@@ -147,7 +147,7 @@ export function Button({
             <ThemedText
               type={size === 'sm' ? 'caption' : 'smallBold'}
               themeColor={labelColor}
-              numberOfLines={1}>
+>
               {label}
             </ThemedText>
           </View>

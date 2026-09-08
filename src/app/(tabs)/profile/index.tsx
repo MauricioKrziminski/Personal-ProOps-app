@@ -144,7 +144,7 @@ export default function ProfileScreen() {
           <View style={styles.idInfo}>
             {nome ? (
               <>
-                <ThemedText type="headline" themeColor="onHero" numberOfLines={1}>
+                <ThemedText type="headline" themeColor="onHero">
                   {nome}
                 </ThemedText>
                 {phone ? (
@@ -304,7 +304,6 @@ export default function ProfileScreen() {
               ? phone
               : 'Libera o agente e os avisos neste canal depois da confirmação'
           }
-          subtitleLines={2}
           icon="bubble.left"
           onPress={() => router.push('/link-phone')}
         />
@@ -407,7 +406,6 @@ function AppUpdateSection() {
       <Row
         title="Atualização do app"
         subtitle={appUpdateSubtitle(appUpdate.state, appUpdate.installedVersionName)}
-        subtitleLines={3}
         icon={APP_UPDATE_ICON[appUpdate.state.status] ?? 'arrow.down.circle'}
         chevron={false}
         onPress={
@@ -452,7 +450,7 @@ function Stat({ valor, rotulo, limite }: { valor: string; rotulo: string; limite
           </ThemedText>
         ) : null}
       </View>
-      <ThemedText type="caption" themeColor="onHeroMuted" numberOfLines={2}>
+      <ThemedText type="caption" themeColor="onHeroMuted">
         {rotulo}
       </ThemedText>
     </View>

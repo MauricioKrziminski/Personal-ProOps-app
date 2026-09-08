@@ -256,11 +256,11 @@ export default function TodayScreen() {
                     "tem uns que pulam para a linha de baixo".
                   */}
                   <View style={styles.billTitleRow}>
-                    <ThemedText type="small" numberOfLines={1} style={styles.billTitle}>
+                    <ThemedText type="small" style={styles.billTitle}>
                       {b.title}
                     </ThemedText>
                     <View style={[styles.duePill, { backgroundColor: theme.dangerSoft }]}>
-                      <ThemedText type="caption" themeColor="danger" numberOfLines={1}>
+                      <ThemedText type="caption" themeColor="danger">
                         {`venceu ${formatDateBR(b.due_date)}`}
                       </ThemedText>
                     </View>
@@ -307,7 +307,7 @@ export default function TodayScreen() {
                     style={styles.taskRow}>
                     <View style={[styles.check, { borderColor: theme.separator }]} />
                     <View style={styles.shrink}>
-                      <ThemedText type="small" numberOfLines={1}>
+                      <ThemedText type="small">
                         {r.title}
                       </ThemedText>
                       <View style={styles.taskMeta}>
@@ -356,7 +356,7 @@ export default function TodayScreen() {
                       <Icon name={categoryIcon(b.category)} size="sm" color="text" />
                     </View>
                     <View style={styles.shrink}>
-                      <ThemedText type="headline" numberOfLines={1}>
+                      <ThemedText type="headline">
                         {b.category}
                       </ThemedText>
                       <ThemedText type="caption" themeColor="textSecondary">
@@ -405,7 +405,7 @@ export default function TodayScreen() {
                   <Icon name="mic" size="sm" color="success" />
                 </View>
                 <View style={styles.shrink}>
-                  <ThemedText type="small" numberOfLines={1} style={styles.quote}>
+                  <ThemedText type="small" style={styles.quote}>
                     {`“${captured.description ?? 'Lançamento por mensagem'}”`}
                   </ThemedText>
                   <ThemedText type="caption" themeColor="textSecondary">
@@ -472,7 +472,7 @@ function Counter({
       onPress={onPress}
       style={[styles.counter, { backgroundColor: theme.surface, borderColor: theme.cardBorder }]}>
       <View style={styles.shrink}>
-        <ThemedText type="caption" themeColor="textSecondary" numberOfLines={1}>
+        <ThemedText type="caption" themeColor="textSecondary">
           {label}
         </ThemedText>
         {/*

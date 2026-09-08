@@ -50,7 +50,7 @@ export function AndroidActionSheet() {
           { backgroundColor: theme.surfaceRaised, paddingBottom: insets.bottom + Space.md },
         ]}>
         {sheet?.title ? (
-          <ThemedText type="smallBold" style={styles.title} numberOfLines={2}>
+          <ThemedText type="smallBold" style={styles.title}>
             {sheet.title}
           </ThemedText>
         ) : null}

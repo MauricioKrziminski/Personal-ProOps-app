@@ -109,7 +109,7 @@ export default function AgentScreen() {
       ) : conversas.length === 0 ? (
         <View>
           <EmptyState
-            title="Comece uma conversa"
+            title="Crie sua primeira conversa"
             hint="Peça o que quiser em português — eu anoto, lanço e respondo."
           />
           <View style={styles.prompts}>
@@ -126,7 +126,7 @@ export default function AgentScreen() {
                     borderColor: theme.cardBorder,
                   },
                 ]}>
-                <ThemedText type="default" numberOfLines={2}>
+                <ThemedText type="default">
                   {p}
                 </ThemedText>
               </Pressable>

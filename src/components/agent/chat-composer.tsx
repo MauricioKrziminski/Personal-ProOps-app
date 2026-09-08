@@ -1,12 +1,11 @@
 import { useState } from 'react';
-import { Platform, Pressable, StyleSheet, View } from 'react-native';
+import { Pressable, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { ThemedText } from '@/components/themed-text';
 import { KeyboardStickyView } from 'react-native-keyboard-controller';
 
 import { TextField } from '@/components/ui/field';
-import { CURVED_BAR_SPACE } from '@/components/ui/curved-tab-bar';
 import { Icon } from '@/components/ui/icon';
 import { HitTarget, Radius, Space, Type, tabular } from '@/design/tokens';
 import { useTheme } from '@/hooks/use-theme';
@@ -55,8 +54,12 @@ export function ChatComposer({
   const [altura, setAltura] = useState(0);
 
 
-  const reservado =
-    insets.bottom + (Platform.OS === 'android' ? CURVED_BAR_SPACE : 0);
+  /*
+    Só a safe area. A conversa saiu de dentro de `(tabs)` em 07/09/2026 e não tem mais tab bar
+    embaixo — somar `CURVED_BAR_SPACE` aqui deixaria uma faixa vazia da altura da dock entre o
+    campo e a borda do aparelho, que é a marca de um espaço reservado para algo que não existe.
+  */
+  const reservado = insets.bottom;
   const pode = canSubmitMessage(value, { sending, awaitingAction });
   const restantes = MAX_MESSAGE_LENGTH - value.trim().length;
 

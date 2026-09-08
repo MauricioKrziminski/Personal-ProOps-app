@@ -1,15 +1,13 @@
 import { Stack } from 'expo-router';
 
-import { stackHeaderFonts } from '@/components/ui/app-header';
-
-
 /**
- * Pilha da aba Notas.
+ * Pilha da aba Notas — **uma tela só: a raiz**.
  *
- * O Stack aninhado não é preferência: `NativeTabs` não traz header nenhum, e `<Stack.SearchBar>`
- * exige um Stack. É ele que dá large title com colapso e o "re-tap na aba volta à raiz".
- *
- * Diretório comum, NÃO grupo: `(notes)` não entraria no caminho e colidiria com a aba Hoje em `/`.
+ * As telas empurradas saíram de `(tabs)` em 07/09/2026 e foram para o `<Stack>` da RAIZ, para a
+ * tab bar não aparecer dentro delas. O motivo completo está em `(tabs)/finance/_layout.tsx`; o
+ * resumo é que não existe chave para esconder a barra numa tela (a `NativeTabs` do iOS é a do
+ * sistema), e a doc do Expo manda pôr a rota de detalhe no stack raiz. A URL não mudou, porque
+ * `(tabs)` é um grupo e nunca entrou no caminho.
  */
 export const unstable_settings = {
   initialRouteName: 'index',
@@ -17,16 +15,9 @@ export const unstable_settings = {
 
 export default function NotesStackLayout() {
   return (
-    <Stack screenOptions={{ headerShadowVisible: false, ...stackHeaderFonts }}>
-      {/*
-        A raiz desenha o `AppHeader` (design Stitch): sem título de tela e sem large title — e,
-        com ele, sem o `<Stack.SearchBar>` nativo, que exigia este header. A busca da raiz virou
-        a pílula do desenho, no corpo da tela.
-      */}
-      <Stack.Screen name="index" options={{ headerShown: false }} />
-      <Stack.Screen name="[id]" options={{ title: '' }} />
-      <Stack.Screen name="folders" options={{ title: 'Pastas' }} />
-      <Stack.Screen name="trash" options={{ title: 'Lixeira' }} />
+    <Stack screenOptions={{ headerShown: false }}>
+      {/* A raiz desenha o `AppHeader` (design Stitch). */}
+      <Stack.Screen name="index" />
     </Stack>
   );
 }

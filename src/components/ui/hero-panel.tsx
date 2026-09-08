@@ -108,7 +108,7 @@ export function HeroPanel({
           onPress={onPress}
           style={styles.body}>
           <View style={styles.labelRow}>
-            <ThemedText type="caption" themeColor="onHeroMuted" numberOfLines={1} style={Type.meta}>
+            <ThemedText type="caption" themeColor="onHeroMuted" style={Type.meta}>
               {label.toUpperCase()}
             </ThemedText>
             {badge}
@@ -169,7 +169,7 @@ export function HeroPanel({
             </ThemedText>
           </View>
           {trend.label ? (
-            <ThemedText type="footnote" themeColor="onHeroMuted" numberOfLines={1} style={styles.shrink}>
+            <ThemedText type="footnote" themeColor="onHeroMuted" style={styles.shrink}>
               {trend.label}
             </ThemedText>
           ) : null}

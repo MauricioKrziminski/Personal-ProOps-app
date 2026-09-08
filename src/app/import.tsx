@@ -505,7 +505,7 @@ export default function ImportScreen() {
                 Cancelar
               </ThemedText>
             </Pressable>
-            <ThemedText type="smallBold" numberOfLines={1} style={styles.sheetTitulo}>
+            <ThemedText type="smallBold" style={styles.sheetTitulo}>
               {editando?.description ?? 'Categoria'}
             </ThemedText>
             <View style={styles.sheetEspaco} />

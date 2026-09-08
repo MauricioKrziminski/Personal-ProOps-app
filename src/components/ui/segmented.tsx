@@ -66,7 +66,7 @@ export function Segmented<T extends string>({ options, value, onChange }: Segmen
             <ThemedText
               type={selected ? 'smallBold' : 'small'}
               themeColor={selected ? 'text' : 'textSecondary'}
-              numberOfLines={1}>
+>
               {option.label}
             </ThemedText>
           </Pressable>

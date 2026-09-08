@@ -10,8 +10,6 @@ import { useTheme, useScheme } from '@/hooks/use-theme';
 interface RowProps {
   title: string;
   subtitle?: string;
-  /** Quantas linhas o subtítulo pode ocupar. Linhas comuns continuam compactas por padrão. */
-  subtitleLines?: number;
   icon?: SymbolViewProps['name'];
   /** Valor, badge ou qualquer coisa à direita. Chevron é automático quando há `onPress`. */
   trailing?: ReactNode;
@@ -47,7 +45,6 @@ interface RowProps {
 export function Row({
   title,
   subtitle,
-  subtitleLines = 1,
   icon,
   trailing,
   onPress,
@@ -80,12 +77,19 @@ export function Row({
           <Icon name={icon} size="md" color={destructive ? 'danger' : 'text'} />
         </View>
       ) : null}
+      {/*
+        ⚠️ **Nada aqui trunca.** Título e subtítulo tinham `` e a linha virava
+        "Avisos financeiros no c…" / "Trocar número do WhatsA…" num aparelho com fonte grande —
+        reticências onde estava a informação. A regra passou a ser: o texto QUEBRA e a linha
+        cresce (`minHeight`, não `height`, e sem `overflow: 'hidden'` no grupo do texto).
+        Ver `design.md` §7.
+      */}
       <View style={styles.labels}>
-        <ThemedText type="default" themeColor={destructive ? 'danger' : 'text'} numberOfLines={1}>
+        <ThemedText type="default" themeColor={destructive ? 'danger' : 'text'}>
           {title}
         </ThemedText>
         {subtitle ? (
-          <ThemedText type="footnote" themeColor="textSecondary" numberOfLines={subtitleLines}>
+          <ThemedText type="footnote" themeColor="textSecondary">
             {subtitle}
           </ThemedText>
         ) : null}

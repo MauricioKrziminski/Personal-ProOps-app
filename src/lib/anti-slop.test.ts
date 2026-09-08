@@ -109,3 +109,41 @@ test('rgba/hsl literais também não passam', () => {
     'cor em rgba() é cor hardcoded igual — o par light/dark mora em constants/theme.ts'
   );
 });
+
+/**
+ * Truncar rótulo é esconder a informação que a linha existe para dar.
+ *
+ * Em 07/09/2026, num aparelho real, o Perfil mostrava "Avisos financeiros no c…", "Você negou a
+ * permissão. Libe…" e "Trocar número do WhatsA…" — três linhas seguidas em que o texto acabava
+ * antes do sentido. A queixa foi literal: *"como que o usuário vai saber se ele nao consegue nem
+ * ler"*. Foram removidas 44 truncagens; a régua que ficou é esta:
+ *
+ * - **Identificador nunca trunca** — nome, título, rótulo, valor, mensagem de erro. Se não cabe,
+ *   quem muda é o LAYOUT (a linha quebra, a célula cresce, a pílula desce), não o texto.
+ * - **Prévia de um corpo pode ficar pela metade**, porque o texto inteiro está a um toque: o
+ *   trecho da nota no cartão e o trecho da última mensagem na lista de conversas.
+ *
+ * A allowlist abaixo é a lista fechada dessas exceções. Uma entrada nova exige escrever aqui por
+ * que aquele texto não é identificador — que é a pergunta que ninguém faz quando `numberOfLines`
+ * entra sozinho numa tela.
+ */
+const TRUNCAGEM_PERMITIDA = new Set([
+  // Slot de largura fixa: a barra inteira é geometria calculada e o rótulo já limita a escala
+  // da fonte. Duas linhas moveriam a bolha e o berço para fora do lugar.
+  'src/components/ui/curved-tab-bar.tsx',
+  // Prévia do corpo da nota, no cartão da lista.
+  'src/app/(tabs)/notes/index.tsx',
+  // Prévia da última mensagem, na lista de conversas.
+  'src/components/agent/conversation-row.tsx',
+]);
+
+test('nenhum rótulo truncado — texto quebra, layout cede', () => {
+  const fora = offenders(/\bnumberOfLines=/).filter(
+    (achado) => !TRUNCAGEM_PERMITIDA.has(achado.split(':')[0])
+  );
+  assert.deepEqual(
+    fora,
+    [],
+    'rótulo não trunca: quebre a linha, alargue a célula ou desça a pílula — reticências escondem o dado'
+  );
+});

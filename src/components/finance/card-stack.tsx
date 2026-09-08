@@ -320,7 +320,6 @@ function CardFace({
             <ThemedText
               type="small"
               themeColor="onHero"
-              numberOfLines={1}
               style={styles.shrink}>
               {card.name}
             </ThemedText>
@@ -399,7 +398,7 @@ function CardFace({
             truncava em "VENCE 27/09…". Sem encolher, ela ocupa a linha e o disponível desce.
             (O Yoga prefere ENCOLHER a quebrar — por isso o `flexWrap` sozinho não bastaria.)
           */}
-          <ThemedText type="meta" themeColor="onHeroMuted" numberOfLines={1} style={styles.rigido}>
+          <ThemedText type="meta" themeColor="onHeroMuted" style={styles.rigido}>
             {card.due_date ? `VENCE ${formatDateBR(card.due_date)}` : 'SEM VENCIMENTO'}
           </ThemedText>
           {limite > 0 ? (

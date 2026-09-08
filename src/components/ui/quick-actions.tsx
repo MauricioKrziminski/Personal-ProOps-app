@@ -54,7 +54,7 @@ function Tile({ action }: { action: QuickAction }) {
           {action.count}
         </ThemedText>
       </View>
-      <ThemedText type="caption" themeColor="onHeroMuted" numberOfLines={1}>
+      <ThemedText type="caption" themeColor="onHeroMuted">
         {action.label}
       </ThemedText>
     </AnimatedPressable>

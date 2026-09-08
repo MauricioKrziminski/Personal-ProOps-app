@@ -152,7 +152,7 @@ function NoteRow({
           {/* Título e pin dividem a primeira linha: o pin fica no canto do cartão (padrão do
               Keep), não como bullet antes do texto — ali ele lia como marcador de lista. */}
           <View style={styles.cardHead}>
-            <ThemedText type="headline" numberOfLines={2} style={styles.grow}>
+            <ThemedText type="headline" style={styles.grow}>
               {title}
             </ThemedText>
             {note.pinned ? <Icon name="pin.fill" size="sm" color="tint" /> : null}
@@ -174,7 +174,6 @@ function NoteRow({
             {folderName ? (
               <View style={[styles.folderPill, { backgroundColor: theme.accentSoft }]}>
                 <ThemedText
-                  numberOfLines={1}
                   themeColor="tint"
                   style={styles.folderPillText}>
                   {folderName}

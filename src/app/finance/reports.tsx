@@ -234,7 +234,7 @@ export default function ReportsScreen() {
             {visiveis.map((c) => (
               <View key={c.category} style={styles.categoria}>
                 <View style={styles.categoriaTopo}>
-                  <ThemedText type="default" numberOfLines={1} style={styles.categoriaNome}>
+                  <ThemedText type="default" style={styles.categoriaNome}>
                     {c.category}
                   </ThemedText>
                   <Money cents={Number(c.total_cents)} variant="headline" />
