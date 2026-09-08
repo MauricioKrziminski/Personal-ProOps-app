@@ -53,7 +53,7 @@ jobs:
       - name: Record native compatibility in the build environment
         env:
           EXPO_NO_DOTENV: '1'
-        run: eas env:exec --environment production 'APP_VARIANT=production node scripts/release/create-native-compatibility.mjs "$RUNNER_TEMP/native-compatibility.json"'
+        run: eas env:exec production 'APP_VARIANT=production node scripts/release/create-native-compatibility.mjs "$RUNNER_TEMP/native-compatibility.json"'
 
       - name: Build signed APK on EAS
         run: >-

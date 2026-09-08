@@ -53,7 +53,7 @@ O único workflow de publicação era `.github/workflows/publish-android-release
 - Release nativa passa a anexar `native-compatibility.json` ao APK verificado. O comprovante registra fingerprint do código-base no runner, SHA do código, runtime, identidade/canal/variante resolvidos da configuração validada, versão do gerador e hash das variáveis públicas do ambiente EAS, sem seus valores. O perfil distribution deve ser produção, APK interno, com apenas APP_VARIANT no env do perfil; override de runtime Android, project/updateURL divergentes ou ambiente/canal incorretos são rejeitados.
 - Antes de publicar o APK, o comprovante é vinculado aos metadados EAS do build FINISHED: source SHA, runtime.version, updateChannel.name, project ID, package e perfil, mais SHA-256 do APK já inspecionado. Metadados ausentes ou divergentes bloqueiam a release. O fingerprint retornado pelo EAS é registrado separadamente do fingerprint de fonte; não se presume que sejam idênticos.
 - OTA exige comprovante atestado, correspondência exata de fingerprint/ambiente/runtime, tag apontando ao SHA registrado e ancestralidade desse SHA em HEAD. Diferenças em dependências, configuração nativa, módulos, plugins ou regras de fingerprint rejeitam publicação mesmo com hash igual.
-- O workflow OTA executa geração do fingerprint e publicação no mesmo processo envolvido por um único `eas env:exec --environment production`. A publicação interna herda essa snapshot e não faz uma segunda consulta de ambiente EAS. Exige CI, APP_VARIANT=production e EXPO_NO_DOTENV=1.
+- O workflow OTA executa geração do fingerprint e publicação no mesmo processo envolvido por um único `eas env:exec production`. A publicação interna herda essa snapshot e não faz uma segunda consulta de ambiente EAS. Exige CI, APP_VARIANT=production e EXPO_NO_DOTENV=1.
 - O primeiro APK após esta mudança estabelece o comprovante. APKs anteriores sem esse asset falham fechado; não houve backfill por suposição. Staging não ganhou workflow OTA sem pipeline equivalente de APK comprovável.
 
 ### Verificações locais
@@ -82,3 +82,7 @@ Esses limites são registrados para a primeira publicação coordenada; esta tar
 - [Fingerprint SDK 57](https://docs.expo.dev/versions/v57.0.0/sdk/fingerprint/).
 
 Histórico local de distribuição foi usado como contexto. Os arquivos atuais e as verificações descritas sustentam o estado acima; publicação passada não comprova OTA no aparelho de hoje.
+
+## Publicação real e correção do comando EAS
+
+A tentativa v1.3.0 parou antes do build: EAS CLI 23.2.0 rejeitou `env:exec --environment production`. O comando correto usa ambiente posicional: `eas env:exec production '<comando>'`. Os dois workflows foram corrigidos. O comando real foi executado localmente com CI=1 e EXPO_NO_DOTENV=1 contra ambiente production, gerando comprovante com runtime1.3.1/channelproduction/fingerprint/hash de ambiente, sem publicar OTA/build.37 testes específicos passaram. A nova tentativa usa v1.3.1; a tag v1.3.0 não foi reescrita.

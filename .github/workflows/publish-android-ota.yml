@@ -48,4 +48,4 @@ jobs:
           [[ "$NATIVE_TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]] || exit 1
           gh release download "$NATIVE_TAG" --repo almeidagabriel01/Personal-ProOps-app-releases --pattern native-compatibility.json --dir "$RUNNER_TEMP/ota-base"
       - name: Check and publish using one production environment snapshot
-        run: eas env:exec --environment production 'APP_VARIANT=production node scripts/release/publish-compatible-ota.mjs "$RUNNER_TEMP/ota-base/native-compatibility.json" "$RUNNER_TEMP/ota-current.json" "$NATIVE_TAG"'
+        run: eas env:exec production 'APP_VARIANT=production node scripts/release/publish-compatible-ota.mjs "$RUNNER_TEMP/ota-base/native-compatibility.json" "$RUNNER_TEMP/ota-current.json" "$NATIVE_TAG"'
