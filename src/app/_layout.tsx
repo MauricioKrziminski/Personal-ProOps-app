@@ -160,6 +160,19 @@ function AppTree() {
                 <Stack
                   screenOptions={{
                     statusBarStyle: Platform.OS === 'android' ? statusBarStyle : undefined,
+                    /*
+                      As duas opções abaixo vieram das pilhas de aba quando as 23 telas de detalhe
+                      migraram para cá (07/09/2026). Sem elas:
+
+                      - `headerShadowVisible` volta ao padrão e reaparece a sombra sob o header,
+                        que o design nunca teve;
+                      - no iOS o botão "voltar" carrega o TÍTULO da tela anterior, e a anterior
+                        agora é uma raiz de aba com `headerShown: false` — sem título. O sistema
+                        cai no nome da ROTA e o botão passaria a dizer "(tabs)". `minimal` é só o
+                        chevron, que é o que estas telas precisam. (No Android é ignorado.)
+                    */
+                    headerShadowVisible: false,
+                    headerBackButtonDisplayMode: 'minimal',
                     ...stackHeaderFonts,
                   }}>
                   {/* `/` é a URL inicial: renderiza antes de qualquer guard, por isso fica FORA dos

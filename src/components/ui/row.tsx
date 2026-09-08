@@ -94,8 +94,18 @@ export function Row({
           </ThemedText>
         ) : null}
       </View>
-      {trailing}
-      {(chevron ?? !!onPress) ? <Icon name="chevron.right" size="sm" color="textSecondary" /> : null}
+      {/*
+        Valor e chevron andam JUNTOS: com `flexWrap` na linha eles poderiam cair em linhas
+        diferentes, e um chevron sozinho numa terceira linha não é ponteiro de nada.
+      */}
+      {trailing || (chevron ?? !!onPress) ? (
+        <View style={styles.trailing}>
+          {trailing}
+          {(chevron ?? !!onPress) ? (
+            <Icon name="chevron.right" size="sm" color="textSecondary" />
+          ) : null}
+        </View>
+      ) : null}
     </View>
   );
 
@@ -148,17 +158,38 @@ export function Section({ title, children }: { title?: string; children: ReactNo
 }
 
 const styles = StyleSheet.create({
+  /*
+    ⚠️ `flexWrap`: o valor à direita desce para a linha de baixo quando o título não caberia.
+
+    Sem isso, com fonte grande o bloco do valor ("−R$ 1.280,00" + a data) comia metade da linha e
+    o título ficava com uma coluna estreita demais — o Android então quebrava DENTRO da palavra:
+    "Ferramenta / s", "Passagem / aérea". Palavra partida ao meio é pior que reticências, que é o
+    problema que a remoção das truncagens veio resolver.
+
+    O gatilho é o `minWidth` de `labels`: enquanto o título tem 180 de largura, tudo fica na mesma
+    linha; abaixo disso o valor quebra e cada um fica inteiro na sua.
+  */
   row: {
     flexDirection: 'row',
     alignItems: 'center',
+    flexWrap: 'wrap',
     gap: Space.md,
     minHeight: HitTarget,
     paddingVertical: Space.md,
     paddingHorizontal: Space.lg,
   },
   labels: {
-    flex: 1,
+    flexGrow: 1,
+    flexShrink: 1,
+    minWidth: 180,
     gap: 2,
+  },
+  /** `marginLeft: auto` mantém o valor encostado à direita mesmo quando ele desce de linha. */
+  trailing: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Space.md,
+    marginLeft: 'auto',
   },
   iconChip: {
     width: 38,

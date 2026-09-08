@@ -101,7 +101,7 @@ npx eas-cli build --platform android --profile distribution   # APK
   repo); o SMTP próprio foi configurado no dashboard e **o remetente só se confirma no primeiro
   cadastro real** — se o e-mail chegar como "Supabase Auth", é o SMTP que não pegou, não o
   template.
-- **Agente:** `agente`, revisão `agente-00019-rck`, com `/internal/chat/*` respondendo 401.
+- **Agente:** `agente`, revisão `agente-00021-k65`, com `/internal/chat/*` respondendo 401.
 - **Selo no Perfil:** nenhum.
 - ⚠️ **Os três crons do Cloud Scheduler estão PAUSADOS** (`reminders`, `finance-scheduler`,
   `alerts`) e `agent_routing` está vazia. Ou seja: **nada sai de produção sozinho** — nenhum
@@ -139,7 +139,7 @@ Os cinco itens que faltavam foram executados nesta ordem, e a ordem importa:
    cria `app_chat_messages`, sem a qual a aba Agente não tem onde gravar. Runbook em
    `docs/PROMOVER-PRODUCAO.md`.
 2. **Deploy do agente** (`PROOPS_PROD_OK=1 ./scripts/setup-gcp.sh deploy`), revisão
-   `agente-00019-rck`. `GET /internal/chat/conversations` devolve **401** — era 404 antes, porque
+   `agente-00021-k65`. `GET /internal/chat/conversations` devolve **401** — era 404 antes, porque
    a revisão no ar não tinha as rotas.
 3. **`EXPO_PUBLIC_AGENT_URL`** criada no ambiente `production` do EAS, que é o que o perfil
    `distribution` usa. Ela entrou **depois** do passo 2, de propósito: antes disso seria 404 na
