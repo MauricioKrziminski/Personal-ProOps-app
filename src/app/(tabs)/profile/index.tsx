@@ -227,6 +227,48 @@ export default function ProfileScreen() {
       </View>
 
       {/*
+        **Conta é a PRIMEIRA seção**, logo abaixo do cartão de identidade (07/09/2026). Ela estava
+        em quarto lugar, depois de Notificações — quem abria o Perfil para conferir "com que
+        e-mail eu entrei" passava por dois blocos antes de chegar nisso.
+
+        A ordem inteira da tela virou a convenção de quem faz isso há mais tempo — WhatsApp abre
+        em *Conta*; o app de Ajustes do iOS põe o cartão de identidade e as linhas da conta no
+        topo; Revolut e Nubank vão de perfil → plano → notificações. A régua que a literatura de
+        UX repete é a mesma: o que é mais usado e mais identitário vem primeiro, e o número de
+        seções de topo fica em quatro ou cinco.
+
+        Dentro da seção a ordem é **Nome → e-mail → WhatsApp**: é a ordem em que uma pessoa diz
+        quem é, e vai do que ela escolheu para o que confirma o vínculo.
+      */}
+      <Section title="Conta">
+        <Row
+          title="Nome"
+          subtitle={nome ?? 'Ninguém te chama pelo nome ainda'}
+          icon="person"
+          onPress={() => setNameDraft(nome ?? '')}
+        />
+        <Row
+          title={emailDaConta ? 'Trocar e-mail da conta' : 'Cadastrar e-mail e senha'}
+          subtitle={
+            emailDaConta ??
+            'Um segundo jeito de entrar — sem depender de continuar com este número'
+          }
+          icon="paperplane"
+          onPress={() => router.push('/link-email')}
+        />
+        <Row
+          title={phone ? 'Trocar número do WhatsApp' : 'Conectar o WhatsApp'}
+          subtitle={
+            phone
+              ? phone
+              : 'Libera o agente e os avisos neste canal depois da confirmação'
+          }
+          icon="bubble.left"
+          onPress={() => router.push('/link-phone')}
+        />
+      </Section>
+
+      {/*
         Assinatura — card próprio, não uma linha perdida em "Conta".
         É o segundo motivo pelo qual alguém abre o Perfil (o primeiro é desligar notificação), e
         como `Row` ele competia em peso com "Lixeira de notas".
@@ -286,7 +328,7 @@ export default function ProfileScreen() {
       ) : null}
 
       {/*
-        Notificações tem UM lugar, logo abaixo de Conta.
+        Notificações tem UM lugar: depois de Conta e Plano, antes de Dados.
         Antes ela era renderizada em duas posições diferentes conforme o push estivesse ligado ou
         não — o bloco "subia" quando desligado. Um bloco que muda de lugar conforme o estado
         obriga a pessoa a procurá-lo, e a promoção rendia pouco: aqui ele já é a segunda seção de
@@ -297,38 +339,6 @@ export default function ProfileScreen() {
         userId={userId}
         hasVerifiedPhone={!!phone}
       />
-
-      {/*
-        Conta — hoje só o nome. Ele é o que a saudação da Hoje lê, e a única coisa desta tela que
-        o usuário ESCREVE; por isso a linha diz o valor atual em vez de repetir "Nome".
-      */}
-      <Section title="Conta">
-        <Row
-          title={phone ? 'Trocar número do WhatsApp' : 'Conectar o WhatsApp'}
-          subtitle={
-            phone
-              ? phone
-              : 'Libera o agente e os avisos neste canal depois da confirmação'
-          }
-          icon="bubble.left"
-          onPress={() => router.push('/link-phone')}
-        />
-        <Row
-          title={emailDaConta ? 'Trocar e-mail da conta' : 'Cadastrar e-mail e senha'}
-          subtitle={
-            emailDaConta ??
-            'Um segundo jeito de entrar — sem depender de continuar com este número'
-          }
-          icon="paperplane"
-          onPress={() => router.push('/link-email')}
-        />
-        <Row
-          title="Nome"
-          subtitle={nome ?? 'Ninguém te chama pelo nome ainda'}
-          icon="person"
-          onPress={() => setNameDraft(nome ?? '')}
-        />
-      </Section>
 
       <Section title="Dados">
         <Row title="Lixeira de notas" icon="trash" onPress={() => router.push('/notes/trash')} />

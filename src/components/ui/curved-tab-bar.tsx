@@ -14,6 +14,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { ThemedText } from '@/components/themed-text';
 import { Icon } from '@/components/ui/icon';
+import { empurraoDaPonta, posicaoDoBerco } from '@/design/tab-cradle';
 import { Elevation, Motion, Radius, Space, Type } from '@/design/tokens';
 import { useScheme, useTheme } from '@/hooks/use-theme';
 import type { SymbolViewProps } from 'expo-symbols';
@@ -295,7 +296,24 @@ export function CurvedTabBar({
     Math.min(Math.max(progresso.get(), -folga), tabs.length - 1 + folga)
   );
 
-  const centro = useDerivedValue(() => slot * (posicao.get() + 0.5));
+  /**
+   * O empurrão das pontas: a mordida precisa ALCANÇAR a borda da pílula.
+   *
+   * A 384dp o disco parava 2,2dp antes do fim da barra e sobrava uma lasca de pílula fina demais
+   * para ler como ponta arredondada — o contorno saía da mordida, dava um pulinho e recomeçava.
+   * `tab-cradle.ts` tem a conta inteira e o teste que a prende; aqui só entra o resultado.
+   *
+   * Ele é aplicado à MESMA posição que move a bolha, então os dois continuam concêntricos —
+   * berço e bolha andam juntos os 2,2dp, e é isso que separa esta correção do erro antigo, em
+   * que a bolha ficava empoleirada na borda de um buraco 26dp fora do lugar.
+   */
+  const empurrao = empurraoDaPonta(slot, CUT, BAR_H / 2);
+
+  const posicaoDesenhada = useDerivedValue(() =>
+    posicaoDoBerco(posicao.get(), tabs.length, empurrao, slot)
+  );
+
+  const centro = useDerivedValue(() => slot * (posicaoDesenhada.get() + 0.5));
 
   /**
    * O disco do berço como PATH, para servir de recorte invertido no traço da pílula.
@@ -328,7 +346,9 @@ export function CurvedTabBar({
    * comunica a continuidade espacial (§5) — a escala não acrescentava informação nenhuma.
    */
   const bolha = useAnimatedStyle(() => ({
-    transform: [{ translateX: slot * (posicao.get() + 0.5) - BUBBLE / 2 }],
+    // `posicaoDesenhada`, não `posicao`: a bolha acompanha o berço nos 2,2dp do empurrão. Duas
+    // fontes de posição aqui era o bug antigo — a bolha saía de dentro da mordida no caminho.
+    transform: [{ translateX: slot * (posicaoDesenhada.get() + 0.5) - BUBBLE / 2 }],
   }));
 
   return (

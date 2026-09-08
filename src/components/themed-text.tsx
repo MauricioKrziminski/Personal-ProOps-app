@@ -39,6 +39,30 @@ export function ThemedText({ style, type = 'default', themeColor, ...rest }: The
 
   return (
     <Text
+      /*
+        ⚠️ **Nenhuma palavra parte ao meio, e nenhuma letra fica sozinha na última linha.**
+
+        Num aparelho com fonte grande a lista de lançamentos escrevia "Ferramenta / s" e
+        "Passagem / aérea": o Android quebra DENTRO da palavra quando ela não cabe na largura
+        disponível, e a hifenização automática (`hyphenationFrequency` padrão) ainda oferece
+        pontos de corte no meio de palavras que caberiam.
+
+        As duas props abaixo são a metade tipográfica da correção — a outra metade é de LAYOUT,
+        e é a que resolve de verdade: a doc do Android é explícita em que `none` não impede a
+        quebra quando a palavra é mais larga que a caixa. Por isso os primitivos de duas colunas
+        (`Row`) quebram a linha e mandam o valor para baixo em vez de espremer o título.
+
+        - `android_hyphenationFrequency="none"`: sem hífen automático. Português tem palavras
+          longas ("Financiamento", "Supermercado") e o corte silábico no meio de uma linha de
+          lista lê como erro.
+        ⚠️ **`textBreakStrategy="balanced"` foi testado e devolvido** (07/09/2026). Ele é o
+        `text-wrap: balance` do Android e equilibra o comprimento das linhas — mas equilibrar
+        move os pontos de quebra, e no painel da Hoje ele empurrou o separador para o começo da
+        linha seguinte: "22 dias até virar o mês" / "· Projeção positiva". Um "·" abrindo linha
+        lê como marcador de lista. O ganho era hipotético (última linha curta); o custo apareceu
+        na primeira tela olhada. O padrão do Android (`highQuality`) fica.
+      */
+      android_hyphenationFrequency="none"
       style={[
         styles.shrink,
         { color: theme[themeColor ?? (type === 'linkPrimary' ? 'tint' : 'text')] },

@@ -165,6 +165,16 @@ aponta pelo NOME, e face ausente não cai no system font — ela some.
 
 **Uma display por tela** continua valendo.
 
+⚠️ **Nenhuma palavra parte ao meio.** `ThemedText` traz `android_hyphenationFrequency="none"`, e
+os primitivos de duas colunas (`Row`) **quebram a linha e mandam o valor para baixo** em vez de
+espremer o título. A doc do Android é explícita: `none` não impede a quebra quando a palavra é
+mais larga que a caixa — quem resolve é o layout. Sem isso a lista de lançamentos escrevia
+"Ferramenta / s" e "Passagem / aérea" com fonte grande, que é pior que reticências.
+
+⚠️ **`textBreakStrategy="balanced"` foi testado e devolvido** (07/09/2026): equilibrar o
+comprimento das linhas move os pontos de quebra, e no painel da Hoje empurrou o separador para o
+começo da linha seguinte ("· Projeção positiva"). Um "·" abrindo linha lê como marcador de lista.
+
 ⚠️ **Todo texto ENCOLHE — `ThemedText` traz `flexShrink: 1` na base** (07/09/2026). O Yoga usa
 `flexShrink: 0` por padrão, ao contrário do flexbox do navegador: numa linha, o texto nunca cedia,
 mantinha a largura natural e **empurrava o irmão para fora do card**, que tem `overflow: 'hidden'`

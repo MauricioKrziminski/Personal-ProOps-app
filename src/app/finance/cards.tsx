@@ -193,6 +193,13 @@ export default function CardsScreen() {
         return (
           <Animated.View
             key={card.account_id}
+            /*
+              A faixa de atraso e o cartão são DOIS blocos dentro do mesmo `Animated.View`, e o
+              `gap` do `Screen` só separa irmãos — sem este `gap` a faixa nascia colada no card
+              de baixo, como se fosse o cabeçalho dele. São coisas diferentes: uma leva à fatura
+              mais antiga, a outra é a fatura corrente.
+            */
+            style={styles.cartaoBloco}
             entering={FadeInDown.duration(Motion.duration.slow).delay(
               Math.min(index * Motion.stagger.step, Motion.stagger.cap)
             )}>
@@ -328,6 +335,7 @@ export default function CardsScreen() {
 }
 
 const styles = StyleSheet.create({
+  cartaoBloco: { gap: Space.sm },
   hero: {
     gap: Space.sm,
   },
