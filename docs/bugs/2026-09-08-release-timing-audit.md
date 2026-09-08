@@ -47,3 +47,11 @@ Tentativas anteriores: run 34249360916 cancelado para habilitar cache; run 34249
 O GitHub isola caches por branch/tag e permite fallback para a branch padrão. Tags distintas não compartilham automaticamente os caches umas das outras; a branch de benchmark também não aquece a main. É necessário executar manualmente este workflow na main, sem publicação, para criar o cache acessível às próximas tags. Esse primeiro aquecimento pode levar o tempo do build sem cache. [Regra de escopo do GitHub](https://docs.github.com/en/actions/reference/workflows-and-actions/dependency-caching#restrictions-for-accessing-a-cache).
 
 O workflow OTA já existe para alterações compatíveis de JS, mas não teve publicação real nesta investigação. Esses tempos são de APK completo, não de OTA. Nenhum plano pago foi alterado; produção não recebeu migration, backend ou atualização do app nesta rodada.
+
+## Promoção concluída
+
+O CI foi publicado na main em `fe4c4f26055d74ad1eaf9e860d91ce64d8a72910`. O [aquecimento da main](https://github.com/MauricioKrziminski/Personal-ProOps-app/actions/runs/34259929977) concluiu em 08/09/2026 às 18:28 UTC: job 33min27s, compilação 29min36s, total desde criação 33min33s. Era o primeiro build da main sem cache, não uma release. Identidade, assinatura e atestação passaram; publicação de assets foi explicitamente ignorada.
+
+A API do GitHub confirmou nove entradas Gradle/C++ em `refs/heads/main`, incluindo o cache nativo vinculado ao commit acima. Portanto o cache da branch padrão está preparado para as próximas tags. Essa execução fria não substitui nem é apresentada como o benchmark quente de 17min10s. A duração depende da existência e utilidade dos caches e da disponibilidade do runner.
+
+Verificação de escopo após o trabalho: produção permaneceu em `agente-00025-lt7` e staging em `agente-staging-00071-ltm`. As mudanças funcionais do app/agente e a migration nova não foram incluídas no push do CI nem publicadas em produção.
