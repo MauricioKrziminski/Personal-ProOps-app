@@ -115,6 +115,19 @@ max_frequency = "30s"
 otp_length = 6
 otp_expiry = 3600
 
+# ---------------------------------------------------------------------------
+# QUANDO O SMTP PRÓPRIO EXISTIR — o passo único que destrava produção
+# ---------------------------------------------------------------------------
+# 1. Configure o SMTP no dashboard de produção (Authentication → Emails → SMTP Settings).
+#    Vai ali porque a SENHA não viaja por este arquivo: `auth.email.smtp.pass` é campo secreto.
+# 2. MOVA os dois blocos `[remotes.staging.auth.email.template.*]` (acima) para cá, sem o
+#    prefixo `remotes.staging` — eles passam a valer nos dois ambientes.
+# 3. `cd supabase/hosted && SUPABASE_ENV=production npx supabase config push --project-ref
+#    kwriuifcwyvdrxtspjiz`
+#
+# Só depois disso o e-mail de produção mostra o CÓDIGO em vez do link, e o remetente deixa de
+# ser "Supabase Auth". O limite de 2 e-mails/hora do mailer embutido também cai junto.
+
 # ⚠️ **Os templates NÃO ficam aqui na base — eles moram no bloco do staging, mais abaixo.**
 #
 # Medido em 07/09/2026 contra produção:
