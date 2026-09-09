@@ -14,6 +14,7 @@ import DebtsScreen from './finance/debts';
 import InvoiceScreen from './finance/invoice/[id]';
 import RecurringScreen from './finance/recurring';
 import TransactionDetailScreen from './finance/[txId]';
+import TransactionsScreen from './finance/transactions';
 import TransactionFormScreen from './finance/transaction-form';
 import MonthScreen from './finance/month';
 import FinanceScreen from './(tabs)/finance/index';
@@ -73,7 +74,7 @@ import TodayScreen from './(tabs)/today/index';
  * FATURA, não do lançamento, e a tela escrevia "Vence em") e a linha "Repete …" que leva à
  * série. Numa parcela ou num lançamento solto, nenhuma das duas existe.
  */
-const ABAS = ['Hoje', 'Finanças', 'Notas', 'Agente', 'Perfil', 'Dívidas', 'Mês', 'Fatura', 'Recorrentes', 'Editar', 'Detalhe'] as const;
+const ABAS = ['Hoje', 'Finanças', 'Notas', 'Agente', 'Perfil', 'Dívidas', 'Mês', 'Fatura', 'Recorrentes', 'Editar', 'Detalhe', 'Lançamentos'] as const;
 
 /**
  * A tela é montada numa caixa ALTA e deslocada para cima, em vez de rolada.
@@ -118,6 +119,7 @@ const ABA_PARA_TAB: Record<string, number> = {
   Recorrentes: 2,
   Editar: 2,
   Detalhe: 2,
+  'Lançamentos': 2,
 };
 /** Quantas alturas de tela cada aba ocupa — medido, para não gastar frame em preto. */
 const FAIXAS: Record<(typeof ABAS)[number], number> = {
@@ -141,6 +143,10 @@ const FAIXAS: Record<(typeof ABAS)[number], number> = {
   // Duas faixas: o herói, a faixa "Ainda não aconteceu" e o bloco "Faz parte de" — que é
   // onde a linha da série e a da fatura precisam aparecer.
   Detalhe: 2,
+  // Duas faixas: a busca, o resumo, os filtros e o começo da lista. Ela entrou em 09/09/2026
+  // porque o header de busca ficava CRAVADO no topo do Android enquanto o extrato rolava por
+  // baixo, e a vitrine não montava esta tela — o defeito viveu meses sem ninguém ver.
+  'Lançamentos': 2,
 };
 /** As cinco raízes de aba. As outras faixas são telas EMPURRADAS e não têm tab bar. */
 const RAIZES = new Set<(typeof ABAS)[number]>(['Hoje', 'Finanças', 'Notas', 'Agente', 'Perfil']);
@@ -200,6 +206,7 @@ export default function DesignPreviewScreen() {
             {aba === 'Recorrentes' ? <RecurringScreen /> : null}
             {aba === 'Editar' ? <TransactionFormScreen /> : null}
             {aba === 'Detalhe' ? <TransactionDetailScreen /> : null}
+            {aba === 'Lançamentos' ? <TransactionsScreen /> : null}
           </View>
 
           {/*
@@ -402,7 +409,15 @@ function seedClient() {
   const comPrevista = [receitaPrevista, ...recentes];
 
   client.setQueryData(['transactions', 'recent', '5'], comPrevista);
-  client.setQueryData(['transactions', 'list', { month: mes }], comPrevista);
+  // Um item basta para a tela separar "nunca teve nada" de "este mês não teve nada".
+  client.setQueryData(['transactions', 'recent', '1'], comPrevista.slice(0, 1));
+  // ⚠️ `useTransactions` é `useInfiniteQuery`: o cache guarda `{pages, pageParams}`, não o
+  // array. Estava array cru aqui desde sempre e ninguém viu, porque nenhuma banda montava
+  // Lançamentos — chave/forma errada não quebra, cai no estado de erro em silêncio.
+  client.setQueryData(['transactions', 'list', { month: mes }], {
+    pages: [comPrevista],
+    pageParams: [0],
+  });
 
   // Financiamento: existia no banco e não aparecia em lugar nenhum do Financeiro.
   client.setQueryData(['debts'], [
