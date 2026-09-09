@@ -119,10 +119,37 @@ async def route(state: AgentState) -> dict:
     )
     dominios = [d.value for d in decisao.domains] or [Domain.GERAL.value]
     ret = {"domains": dominios, "confidence": decisao.confidence, "llm_calls": 1}
+    # ⚠️ **A escolha parcelamento × dívida só existe para ESCRITA** (09/09/2026).
+    #
+    # Ela pergunta "qual deles você quer alterar?" e REESCREVE `domains` para um domínio de
+    # escrita. Rodando numa consulta, as duas metades ficam erradas: "quanto falta do carro?"
+    # era respondido com um menu de alteração — sobre uma pergunta que não altera nada — e a
+    # resposta do usuário jogava a mensagem num nó de escrita que não tinha ação nenhuma para
+    # executar. Aconteceu no número do dono do produto, no corte do WhatsApp, com uma compra
+    # parcelada e um financiamento chamados "carro".
+    #
+    # `financial_entity` continua certo em vir preenchido — a descrição do campo diz
+    # "status/payment", e "quanto falta" é status. Quem tem que olhar a intenção é ESTE bloco.
+    # Em consulta a ambiguidade se resolve sozinha e melhor: `query_debts` filtra por
+    # `search_term` e responde o financiamento, sem perguntar nada.
+    # SÓ ler, sem nenhum lado de escrita na mensagem. Este bloco resolve QUAL REGISTRO ESCREVER,
+    # então numa leitura pura ele não tem pergunta a fazer nem domínio a corrigir.
+    #
+    # A primeira tentativa de conserto exigia um domínio de escrita presente, e isso apagou o
+    # RESGATE: quando o router erra e devolve "geral" para "marque as 2 primeiras parcelas da TV
+    # como pagas", é a busca no banco que acha o parcelamento e corrige o domínio — e o teste
+    # `test_unrelated_debt_history_does_not_override_existing_purchase` prendeu a perda na hora.
+    # As duas metades são diferentes: o resgate vale para qualquer domínio que o router chute; o
+    # MENU ("qual deles você quer alterar?") é que não pode aparecer sobre uma pergunta.
+    so_consulta = "financas_consulta" in dominios and not ({"financas", "cadastros"} & set(dominios))
     if (
         decisao.financial_entity
         and state.get("workspace_id")
         and not state.get("resource_draft")
+        and not so_consulta
+        # Com os DOIS domínios de escrita presentes o router já disse que a mensagem toca os
+        # dois lados: não há o que escolher.
+        and not {"financas", "cadastros"}.issubset(dominios)
     ):
         # Quem já decidiu "isto é sobre um registro que EXISTE" é o modelo, ao
         # preencher `financial_entity` — a descrição do campo diz literalmente
@@ -133,41 +160,40 @@ async def route(state: AgentState) -> dict:
         # de desambiguação nunca aparecia. A consulta ao banco é barata e é ela
         # que sabe a verdade — se existem os dois registros, pergunta; se existe
         # um, roteia; se não existe nenhum, segue o que o router disse.
-        if not {"financas", "cadastros"}.issubset(dominios):
-            from app import db
+        from app import db
 
-            reference = (
-                "%"
-                + decisao.financial_entity.replace("\\", "\\\\")
-                .replace("%", "\\%")
-                .replace("_", "\\_")
-                + "%"
-            )
-            plans = await db.fetch(
-                "select id from public.installment_plans where workspace_id=%s and description ilike %s",
-                state["workspace_id"],
-                reference,
-            )
-            debts = await db.fetch(
-                "select id from public.debts where workspace_id=%s and name ilike %s and not archived",
-                state["workspace_id"],
-                reference,
-            )
-            if plans and debts:
-                ret["domain_options"] = [
-                    {"id": "financas", "label": "Compra parcelada no cartão"},
-                    {"id": "cadastros", "label": "Dívida / financiamento"},
-                ]
-            elif plans or debts:
-                financial_domain = "financas" if plans else "cadastros"
-                ret["domains"] = [
-                    financial_domain,
-                    *[
-                        d
-                        for d in dominios
-                        if d not in {"financas", "cadastros", "geral"}
-                    ],
-                ]
+        reference = (
+            "%"
+            + decisao.financial_entity.replace("\\", "\\\\")
+            .replace("%", "\\%")
+            .replace("_", "\\_")
+            + "%"
+        )
+        plans = await db.fetch(
+            "select id from public.installment_plans where workspace_id=%s and description ilike %s",
+            state["workspace_id"],
+            reference,
+        )
+        debts = await db.fetch(
+            "select id from public.debts where workspace_id=%s and name ilike %s and not archived",
+            state["workspace_id"],
+            reference,
+        )
+        if plans and debts:
+            ret["domain_options"] = [
+                {"id": "financas", "label": "Compra parcelada no cartão"},
+                {"id": "cadastros", "label": "Dívida / financiamento"},
+            ]
+        elif plans or debts:
+            financial_domain = "financas" if plans else "cadastros"
+            ret["domains"] = [
+                financial_domain,
+                *[
+                    d
+                    for d in dominios
+                    if d not in {"financas", "cadastros", "geral"}
+                ],
+            ]
     if decisao.discard_resource_draft:
         ret.update(
             resource_draft=[],

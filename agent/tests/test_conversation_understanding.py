@@ -349,6 +349,65 @@ async def test_same_name_debt_and_plan_requires_domain_choice(monkeypatch):
 
 
 @pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "achados",
+    ["os_dois", "so_parcelamento", "so_divida"],
+    ids=["dois registros", "só parcelamento", "só dívida"],
+)
+async def test_pergunta_nao_abre_menu_de_alteracao(monkeypatch, achados):
+    """CONSULTA sobre um nome ambíguo não pergunta "qual você quer alterar?".
+
+    O defeito (09/09/2026, número do dono do produto): "quanto falta do carro?" abria o menu
+    parcelamento × dívida. Duas coisas erradas de uma vez — um menu de ALTERAÇÃO sobre uma
+    pergunta que não altera nada, e a escolha reescrevia `domains` para escrita, mandando a
+    mensagem para um nó que não tinha ação nenhuma para executar.
+
+    `financial_entity` continua preenchido, e está certo: a descrição do campo diz
+    "status/payment", e "quanto falta" é status. Quem tem que olhar a intenção é o `route`.
+
+    Os três achados importam porque são caminhos DIFERENTES no código, e o que mais aparece na
+    vida real é o do meio: uma pessoa com UM financiamento chamado Carro cai no `elif`, que
+    reescrevia `domains` para escrita em silêncio — sem menu, sem pergunta, sem nada na tela
+    dizendo que a consulta virou outra coisa. Com dois registros o defeito ao menos aparecia.
+    """
+    from app import db
+    from app.graph import nodes
+    from app.graph.schemas import RouterDecision
+
+    model = type(
+        "Model",
+        (),
+        {
+            "ainvoke": AsyncMock(
+                return_value=RouterDecision(
+                    domains=["financas_consulta"], confidence=1.0, financial_entity="carro"
+                )
+            )
+        },
+    )()
+    monkeypatch.setattr(nodes.gemini, "structured", lambda *args: model)
+
+    async def reads(query, *args):
+        eh_parcelamento = "installment_plans" in query
+        if achados == "os_dois":
+            return [{"id": "record"}]
+        if achados == "so_parcelamento":
+            return [{"id": "tv"}] if eh_parcelamento else []
+        return [] if eh_parcelamento else [{"id": "carro"}]
+
+    monkeypatch.setattr(db, "fetch", reads)
+    result = await nodes.route(
+        {
+            "text": "quanto falta do carro?",
+            "timezone": "America/Sao_Paulo",
+            "workspace_id": "fixture",
+        }
+    )
+    assert result.get("domain_options", []) == []
+    assert result["domains"] == ["financas_consulta"]
+
+
+@pytest.mark.asyncio
 @pytest.mark.parametrize("failure", [False, True])
 async def test_unclear_or_model_error_keeps_pending_purchase(monkeypatch, failure):
     model = (

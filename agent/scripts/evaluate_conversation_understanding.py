@@ -3,6 +3,24 @@
 Run in agent/: .venv/bin/python scripts/evaluate_conversation_understanding.py
 --output /tmp/conversation-eval.json records observations. --cases id,id selects cases.
 Network is Gemini only. SQL mutations are prohibited; reads use explicit fixtures.
+
+## Baseline: 18/22 em 09/09/2026
+
+**Verde aqui é 18, não 22.** Estes quatro falham e falhavam antes de qualquer mudança do dia —
+medido rodando os mesmos ids no commit anterior, com erro idêntico:
+
+| caso | o que dá |
+|---|---|
+| `financing_complete` | o modelo pede o dia de vencimento em vez de completar → `list index out of range` |
+| `account_followup` | a ordem dos campos extraídos varia entre execuções, e a asserção compara o dict inteiro |
+| `financing_missing_contract` | router devolve `['financas']` onde o caso espera `['cadastros']` |
+| `ambiguous_previous` | "as anteriores" vira `mode='all'` em vez de `unclear` |
+
+Sem este parágrafo, quem rodar a suíte depois de mexer no roteamento lê 18/22 como regressão
+própria e vai caçar um bug que não é dele — foi o que quase aconteceu em 09/09/2026, e custou
+uma rodada inteira para descobrir que o número já era esse. **Comparou e piorou? Aí é seu.**
+Os quatro são dívida real, cada um por um motivo diferente: dois são não-determinismo do
+modelo, um é asserção estreita demais e um é o router escolhendo o domínio errado.
 """
 
 from __future__ import annotations
