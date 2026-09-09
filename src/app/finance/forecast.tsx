@@ -37,7 +37,7 @@ import {
 import { useDebounced } from '@/hooks/use-debounced';
 import { formatBRL, isoToBR, localISODate } from '@/lib/dates';
 import { showItemActions } from '@/lib/item-actions';
-import { settleAccessibilityLabel, settleLabel } from '@/lib/settle-labels';
+import { settleAccessibilityLabel } from '@/lib/settle-labels';
 
 /**
  * Projeção — "posso gastar isso?".
@@ -222,40 +222,21 @@ export default function ForecastScreen() {
                   },
                 ])
         }
+        // ⚠️ **Só o valor fica na linha — a ação mora no toque e no menu.** Os três botões
+        // que ficavam aqui não faziam nada que a própria linha já não fizesse: "Pagar fatura"
+        // e "Ver dívida" repetiam literalmente o `onPress` acima, e dar baixa já está no menu
+        // de toque longo. O que eles somavam era largura: o bloco passava do `minWidth: 180`
+        // do título, o `flexWrap` do `Row` mandava valor e botão para a linha de baixo e a
+        // linha ficava com o dobro da altura. Mesma régua de Lançamentos — o comentário longo
+        // está lá.
         trailing={
-          <View style={styles.trailing}>
-            <Money
-              cents={cents}
-              variant="headline"
-              // Receita atrasada não é dívida: `success` mesmo quando não caiu. `danger` ali
-              // seria gastar a alavanca de cor do app num aviso (design.md §2b).
-              tone={receita ? 'success' : b.overdue ? 'danger' : 'text'}
-            />
-            {fatura ? (
-              <Button
-                label="Pagar fatura"
-                size="sm"
-                variant="secondary"
-                onPress={() =>
-                  router.push({ pathname: '/finance/invoice/[id]', params: { id: b.ref_id } })
-                }
-              />
-            ) : parcelaDeDivida ? (
-              <Button
-                label="Ver dívida"
-                size="sm"
-                variant="secondary"
-                onPress={() => router.push('/finance/debts')}
-              />
-            ) : (
-              <Button
-                label={settleLabel(receita ? 'income' : 'expense')}
-                size="sm"
-                variant="secondary"
-                onPress={() => pagar(b.ref_id, b.title)}
-              />
-            )}
-          </View>
+          <Money
+            cents={cents}
+            variant="headline"
+            // Receita atrasada não é dívida: `success` mesmo quando não caiu. `danger` ali
+            // seria gastar a alavanca de cor do app num aviso (design.md §2b).
+            tone={receita ? 'success' : b.overdue ? 'danger' : 'text'}
+          />
         }
       />
     );
@@ -528,11 +509,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: Space.xs,
     paddingTop: Space.xs,
-  },
-  trailing: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: Space.sm,
   },
   band: {
     alignItems: 'center',

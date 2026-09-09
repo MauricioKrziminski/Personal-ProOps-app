@@ -537,7 +537,32 @@ export default function TransactionsScreen() {
                 <ItemLink
                   href={{ pathname: '/finance/[txId]', params: { txId: tx.id, month } }}
                   title={tx.description || tx.merchant || tx.category || 'Lançamento'}
+                  /**
+                   * ⚠️ **Dar baixa é AÇÃO DE ITEM, não botão na linha** (09/09/2026).
+                   *
+                   * A régua: *linha de lista mostra o registro e a ação mora no menu dela;
+                   * card de painel mostra a decisão e a ação é o botão*. A Hoje é painel — três
+                   * ou quatro coisas pedindo decisão — e continua com botão. Aqui é extrato:
+                   * a maioria das linhas já está efetivada e não tem ação nenhuma.
+                   *
+                   * Um `<Button>` em `Row.trailing` empurrava o bloco além do `minWidth: 180`
+                   * do título, o `flexWrap` jogava valor+botão para a linha de baixo, e só nas
+                   * previstas — a linha previsto ficava com o dobro da altura da vizinha
+                   * efetivada. Foi a queixa do dono do produto, duas vezes, e as tentativas de
+                   * arrumar o `trailing` (coluna, depois linha) só trocaram a forma da quebra.
+                   *
+                   * `design.md §6` já dizia: *ação de item é context menu nativo*.
+                   */
                   actions={[
+                    ...(tx.status === 'pending'
+                      ? [
+                          {
+                            label: settleLabel(tx.kind),
+                            icon: 'checkmark.circle' as const,
+                            onPress: () => pay(tx),
+                          },
+                        ]
+                      : []),
                     {
                       label: 'Ver detalhe',
                       icon: 'doc.text.magnifyingglass',
@@ -563,22 +588,12 @@ export default function TransactionsScreen() {
                       accessibilityLabel={`${tx.description || tx.merchant || tx.category || 'Lançamento'}, ${formatBRL(tx.amount_cents)}, ${tx.kind === 'income' ? 'receita' : tx.kind === 'expense' ? 'despesa' : 'transferência'}, ${dayTitle(tx.occurred_at)}${tx.status === 'pending' ? ', previsto' : ''}`}
                       onLongPress={onLongPress}
                       trailing={
-                        <View style={styles.trailing}>
-                          <Money
-                            cents={valor}
-                            variant="ticker"
-                            tone={tx.kind === 'income' ? 'success' : 'text'}
-                            signed={assinado}
-                          />
-                          {tx.status === 'pending' ? (
-                            <Button
-                              label={settleLabel(tx.kind)}
-                              size="sm"
-                              variant="secondary"
-                              onPress={() => pay(tx)}
-                            />
-                          ) : null}
-                        </View>
+                        <Money
+                          cents={valor}
+                          variant="ticker"
+                          tone={tx.kind === 'income' ? 'success' : 'text'}
+                          signed={assinado}
+                        />
                       }
                     />
                   )}
@@ -661,23 +676,6 @@ const styles = StyleSheet.create({
     borderBottomLeftRadius: Radius.md,
     borderBottomRightRadius: Radius.md,
     borderCurve: 'continuous',
-  },
-  /**
-   * ⚠️ **Linha, não coluna: o valor NÃO fica em cima do botão.**
-   *
-   * `Row.trailing` foi desenhado para um valor compacto. Um `<Button>` ali dentro empurra o
-   * bloco além do `minWidth: 180` do título, o `flexWrap` da linha o joga para baixo, e em
-   * coluna o resultado é `−R$ 900,00` flutuando sobre um `Paguei` — quatro linhas empilhadas
-   * com o chevron solto ao lado. Foi a queixa do dono do produto em 09/09/2026, primeiro na
-   * Projeção e depois AQUI: a correção lá não bastou porque o padrão estava em duas telas.
-   *
-   * As outras `trailing` em coluna do app (Financeiro, importação) empilham valor + legenda,
-   * sem botão — ali a coluna é o desenho certo e continua.
-   */
-  trailing: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: Space.sm,
   },
   separator: {
     height: StyleSheet.hairlineWidth,
