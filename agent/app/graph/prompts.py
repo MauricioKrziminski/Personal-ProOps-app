@@ -106,9 +106,11 @@ Tipos:
 - set_rule: "sempre que eu falar X, põe em Y". target_ref = X, category = Y.
 - update_transaction: corrigir algo JÁ registrado. Os campos de BUSCA são
   amount_cents/category/description; os de CORREÇÃO são new_amount_cents,
-  new_category, new_occurred_at e new_account (conta/cartão de destino da correção).
+  new_category, new_occurred_at, new_description e new_account (conta/cartão de destino).
   "Muda o último gasto para 54 na conta Nubank" -> new_amount_cents=5400, new_account="conta Nubank".
   "Tira a conta desse gasto" -> new_account="sem conta". Nunca use account para corrigir.
+  "Renomeia o mercado de ontem para Mercado do Zé" -> description="mercado" (busca),
+  new_description="Mercado do Zé". Trocar o NOME é correção como qualquer outra.
   Em parcelamentos, "edite a moto pois já paguei 10"
   -> type=mark_paid, description="moto", installment_scope="first:10". Nada citado = o último lançamento.
 - delete_transaction: apagar um lançamento específico. "Apaga a TV por completo"

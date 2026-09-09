@@ -142,6 +142,10 @@ class FinanceAction(BaseModel):
         description="Nome da conta ou cartão CORRIGIDO. Sem conta remove o vínculo; account não é correção.",
     )
     new_occurred_at: str | None = Field(None, description="Data CORRIGIDA, YYYY-MM-DD.")
+    new_description: str | None = Field(
+        None,
+        description="Descrição CORRIGIDA do lançamento. description é BUSCA, esta é o nome novo.",
+    )
     target_ref: str | None = Field(
         None,
         description="Nome da meta, do bem, ou o gatilho da regra de categorização.",

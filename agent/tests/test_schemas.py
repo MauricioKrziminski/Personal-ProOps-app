@@ -33,8 +33,12 @@ from app.graph.schemas import (
 MAX_PRODUTO = 198
 # 08/09/2026: probe_bounded_installments.py accepted 17 flat fields with compact
 # string scope (decoded to typed object) and max10 enforced by a local validator.
-FINANCE_PRODUTO_MEDIDO = 238
+# 09/09/2026: probe_rename_schema.py accepted 18 x 14 = 252 (sum 32) on
+# gemini-3.7-flash, adding new_description. Measured, never estimated: the API
+# refuses with a bare 400 INVALID_ARGUMENT and it already broke production once.
+FINANCE_PRODUTO_MEDIDO = 252
 MAX_SOMA = 31
+FINANCE_SOMA_MEDIDA = 32
 
 MODELOS = [
     ("FinanceAction", FinanceAction, FinanceActionType),
@@ -51,7 +55,8 @@ def test_dentro_do_orcamento(nome, modelo, enum):
         f"{nome}: {props}×{valores}={props * valores} passa de {limite}. "
         "Tire um campo, tire um tipo do enum, ou divida o domínio."
     )
-    assert props + valores <= MAX_SOMA, f"{nome}: soma {props + valores} passa de {MAX_SOMA}"
+    teto_soma = FINANCE_SOMA_MEDIDA if modelo is FinanceAction else MAX_SOMA
+    assert props + valores <= teto_soma, f"{nome}: soma {props + valores} passa de {teto_soma}"
 
 
 def test_router_e_minusculo():

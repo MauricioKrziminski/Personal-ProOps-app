@@ -37,8 +37,12 @@ nenhum outro:
 - **O limite do schema é o PRODUTO propriedades × valores de enum, não cada um.** Medido contra a
   API real em 30/08/2026 (`agent/scripts/diagnose_finance_schema.py`, uma variável por vez):
   `15×22 = 330` recusa; `9×22 = 198`, `15×10 = 150` e `15×7 = 105` passam. Campos INTEGER são
-  inocentes — a recusa é igual com tudo STRING. **Regra: fique abaixo de 198 (produto) e 31
-  (soma)**; `tests/test_schemas.py` quebra o build se passar.
+  inocentes — a recusa é igual com tudo STRING. `tests/test_schemas.py` quebra o build se passar.
+
+  **O teto do `FinanceAction` subiu duas vezes, sempre MEDINDO**: 238 (`probe_bounded_installments`,
+  08/09/2026) e **252 com soma 32** (`probe_rename_schema.py`, 09/09/2026, ao somar
+  `new_description`). Os outros schemas seguem em 198/31. Antes de somar campo, rode o probe — a
+  recusa é um `400 INVALID_ARGUMENT` sem detalhe, e estimar aqui já custou uma quebra em produção.
 - Por isso Finanças são **dois** schemas: escrita/correção (13×14) e consulta (7×9). Escrita e
   correção ficam juntas de propósito — separá-las obrigaria o router a decidir se "o mercado de
   ontem foi 120" é lançamento novo ou correção, e errar isso cria a duplicata que o produto
@@ -58,8 +62,11 @@ nenhum outro:
 - Corrigir item existente é `update_transaction` / `delete_transaction`, nunca um lançamento novo.
   O prompt diz isso explicitamente.
 - Campos de BUSCA (`amount_cents`, `category`, `description`, `occurred_at`) são separados dos de
-  CORREÇÃO (`new_amount_cents`, `new_category`, `new_occurred_at`) — sem isso o modelo confunde
-  "era 45, virou 54".
+  CORREÇÃO (`new_amount_cents`, `new_category`, `new_occurred_at`, `new_description`,
+  `new_account`) — sem isso o modelo confunde "era 45, virou 54". Em `new_description` a confusão
+  é pior e silenciosa: o modelo procuraria pelo nome que o usuário AINDA NÃO DEU, e a correção
+  volta vazia. `scripts/probe_rename_schema.py` mede a separação com o Gemini real, em quatro
+  redações diferentes.
 - `resolve_transaction` (`app/tools/finance.py`) procura na janela dos 40 mais recentes. **Empate
   pergunta, não chuta**: alterar o lançamento errado é pior que uma mensagem a mais.
 

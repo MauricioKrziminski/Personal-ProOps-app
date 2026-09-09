@@ -578,6 +578,8 @@ async def update_transaction(ctx: ExecContext, action: FinanceAction) -> ToolRes
         patch["category"] = guards.clean_category(action.new_category)
     if action.new_occurred_at:
         patch["occurred_at"] = guards.require_date(action.new_occurred_at, ctx.timezone, default_hoje=False)
+    if action.new_description:
+        patch["description"] = guards.require_text(action.new_description, o_que="a descrição nova", maximo=200)
     frozen_account = None
     if action.new_account:
         frozen_account = (ctx.target or {}).get("new_account")
@@ -586,8 +588,8 @@ async def update_transaction(ctx: ExecContext, action: FinanceAction) -> ToolRes
         patch["account_id"] = frozen_account["id"]
     if not patch:
         raise Level1Error(
-            "❌ Não entendi o que mudar. Tenta \"muda o último pra 54\" "
-            "ou \"o mercado de ontem era transporte\"."
+            "❌ Não entendi o que mudar. Tenta \"muda o último pra 54\", "
+            "\"o mercado de ontem era transporte\" ou \"renomeia pra Mercado do Zé\"."
         )
 
     # O alvo já veio resolvido e CONGELADO pela Fase Cognitiva; o registry barrou
@@ -626,6 +628,8 @@ async def update_transaction(ctx: ExecContext, action: FinanceAction) -> ToolRes
         mudancas.append(f"categoria → *{patch['category']}*")
     if "occurred_at" in patch:
         mudancas.append(f"data → {format_date_br(patch['occurred_at'])}")
+    if "description" in patch:
+        mudancas.append(f"nome → *{patch['description']}*")
     return ToolResult(
         f"✏️ Corrigido ({describe(antes)}): {', '.join(mudancas)}.", result_id=antes["id"]
     )

@@ -183,3 +183,55 @@ def test_ambiguous_transaction_confirmation_keeps_all_corrections():
     summary = describe_for_confirmation(action(new_account='Nu', new_amount_cents=5400,
                                                new_category='casa', new_occurred_at='2026-09-08'), resolved)
     assert 'Nubank' in summary and '54' in summary and 'casa' in summary and '08/09/2026' in summary
+
+
+@pytest.mark.asyncio
+async def test_rename_is_a_correction_and_never_touches_the_search_field(monkeypatch):
+    """Trocar o NOME de um lançamento (09/09/2026).
+
+    `description` continua sendo BUSCA e `new_description` é o nome novo. Confundir os dois faz o
+    modelo procurar pelo nome que o usuário AINDA NÃO deu, e a correção não acha nada.
+    """
+    escrito: dict = {}
+
+    async def fetch_one(sql, *args):
+        if sql.strip().startswith('select id, kind'):
+            return {'id': TX, 'kind': 'expense', 'amount_cents': 4500,
+                    'category': 'mercado', 'description': 'Mercado',
+                    'occurred_at': __import__('datetime').date(2026, 9, 1)}
+        escrito['sql'], escrito['args'] = sql, args
+        return {'id': TX}
+
+    monkeypatch.setattr(finance.db, 'fetch_one', fetch_one)
+    alvo = {'table': 'transactions', 'status': 'found',
+            'candidates': [{'id': str(TX), 'label': 'Mercado'}]}
+    r = await finance.update_transaction(
+        ctx(alvo), action(description='mercado', new_description='Mercado do Zé'))
+
+    assert 'description = %s' in escrito['sql']
+    assert escrito['args'][0] == 'Mercado do Zé'
+    assert 'Mercado do Zé' in r.message
+    # o campo de busca não pode virar patch: senão renomear e procurar viram a mesma coisa
+    assert escrito['sql'].count('description = %s') == 1
+
+
+@pytest.mark.asyncio
+async def test_rename_alone_is_enough_to_be_a_correction(monkeypatch):
+    """Sem valor, sem categoria e sem data, só o nome novo já é uma correção válida."""
+    async def fetch_one(sql, *args):
+        if sql.strip().startswith('select id, kind'):
+            return {'id': TX, 'kind': 'expense', 'amount_cents': 4500, 'category': None,
+                    'description': 'Padaria', 'occurred_at': __import__('datetime').date(2026, 9, 1)}
+        return {'id': TX}
+
+    monkeypatch.setattr(finance.db, 'fetch_one', fetch_one)
+    alvo = {'table': 'transactions', 'status': 'found',
+            'candidates': [{'id': str(TX), 'label': 'Padaria'}]}
+    r = await finance.update_transaction(ctx(alvo), action(new_description='Padaria do Léo'))
+    assert 'Padaria do Léo' in r.message
+
+
+def test_rename_needs_the_same_yes_as_any_other_change():
+    """`needs_confirmation` deriva de "tem alvo resolvido", então cobre o campo novo sozinha."""
+    from app.graph.policy import needs_confirmation
+    assert needs_confirmation(action(new_description='Mercado do Zé'), 0.99, target()) is not None
