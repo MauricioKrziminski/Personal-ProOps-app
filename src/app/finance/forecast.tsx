@@ -111,6 +111,10 @@ export default function ForecastScreen() {
     .filter((p) => p.day < localISODate())
     .map((p) => p.cents);
   const valores = [...passado, ...projetados];
+  // O que a projeção soma e o que ela tira, no horizonte escolhido. A RPC devolve os dois desde
+  // sempre; nada nesta tela lia `in_cents`.
+  const entra = serie.reduce((t, d) => t + Number(d.in_cents), 0);
+  const sai = serie.reduce((t, d) => t + Number(d.out_cents), 0);
   const primeiroNegativo = serie.find((d) => Number(d.balance_cents) < 0);
   // `upcoming_bills` passou a devolver receita prevista (`kind: 'income'`, 20260909150000).
   // Ela tem seção própria: "O que vence" é vocabulário de saída.
@@ -321,9 +325,23 @@ export default function ForecastScreen() {
               />
             </View>
 
+            {/*
+              A legenda que o gráfico nunca teve. Ele desenha passado e futuro na MESMA linha
+              (o traço muda de estilo em `pastCount`), e nada dizia onde um acaba — a pedido do
+              dono do produto: *"nos gráficos, tem que ter alguma coisa explicando a diferença"*.
+            */}
+            <View style={styles.legenda}>
+              <ThemedText type="caption" themeColor="textSecondary">
+                {passado.length > 0 ? '━ o que já caiu na conta' : '━ saldo de hoje'}
+              </ThemedText>
+              <ThemedText type="caption" themeColor="textSecondary">
+                ┄ previsto: o real, mais o que entra e sai
+              </ThemedText>
+            </View>
+
             <View style={styles.heroSplit}>
               <View style={styles.heroParte}>
-                <HeroLabel>hoje</HeroLabel>
+                <HeroLabel>tenho hoje</HeroLabel>
                 <Money cents={hoje} variant="title2" tone={hoje < 0 ? 'danger' : 'text'} />
               </View>
               <View style={styles.heroParte}>
@@ -331,6 +349,17 @@ export default function ForecastScreen() {
                 <Money cents={fim} variant="title2" tone={fim < 0 ? 'danger' : 'text'} />
               </View>
             </View>
+
+            {/*
+              `in_cents` vinha do banco desde sempre e o arquivo inteiro não usava — a projeção
+              SOMA entradas previstas e a tela só falava de subtrair. É esta linha que explica
+              por que a curva sobe.
+            */}
+            {entra > 0 || sai > 0 ? (
+              <ThemedText type="footnote" themeColor="textSecondary" style={tabular}>
+                entra {formatBRL(entra)} · sai {formatBRL(sai)} em {dias} dias
+              </ThemedText>
+            ) : null}
           </Card>
         </Animated.View>
       ) : null}
@@ -447,9 +476,19 @@ export default function ForecastScreen() {
               Começo pelo dinheiro que já está nas suas contas — cartão fica de fora, e só conta o
               que já aconteceu.
             </ThemedText>
+            {/*
+              A frase que faltava. As três originais começavam por "Começo…", "TIRO…" e "…SAI do
+              caixa" — o explicador descrevia a projeção como se ela só subtraísse, enquanto o SQL
+              soma `in_cents` desde sempre. Quem lia isso não tinha como saber que o número já
+              contava com o Pix que ainda não chegou.
+            */}
             <ThemedText type="small" themeColor="textSecondary">
-              Tiro cada fatura não paga no dia em que ela vence, e cada lançamento previsto na data
-              dele.
+              Somo o que está previsto para entrar, na data de cada um — e quando você marca
+              Recebi, o valor sai daqui e entra no seu saldo de verdade.
+            </ThemedText>
+            <ThemedText type="small" themeColor="textSecondary">
+              Tiro cada fatura não paga no dia em que ela vence, e cada despesa prevista na data
+              dela.
             </ThemedText>
             <ThemedText type="small" themeColor="textSecondary">
               Por isso a compra no cartão sai do caixa quando a fatura vence, não no dia da compra:
@@ -515,5 +554,8 @@ const styles = StyleSheet.create({
   },
   explicacaoCorpo: {
     gap: Space.sm,
+  },
+  legenda: {
+    gap: Space.half,
   },
 });

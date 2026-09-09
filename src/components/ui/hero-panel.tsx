@@ -39,6 +39,12 @@ interface HeroPanelProps {
    * contexto: o valor responde "quanto", o rodapé responde "comparado com o quê".
    */
   trend?: { value: string; positive?: boolean; label?: string };
+  /**
+   * Conteúdo livre na MESMA faixa de rodapé do `trend` (a que sangra até as bordas, §1 de
+   * design.md). Serve para o par de números que não cabe na pílula — "tenho hoje / a receber".
+   * `trend` ganha quando os dois vêm: a faixa é uma só.
+   */
+  footer?: React.ReactNode;
   /** Sparkline ou barra. Opcional. */
   chart?: React.ReactNode;
   /** Atalhos de decisão. Somem sozinhos quando não há nada pendente. */
@@ -76,6 +82,7 @@ export function HeroPanel({
   value,
   secondary,
   trend,
+  footer,
   chart,
   actions,
   concealable = false,
@@ -193,6 +200,10 @@ export function HeroPanel({
           </View>
         ) : null}
       </View>
+
+      {!trend && footer ? (
+        <View style={[styles.footer, { backgroundColor: theme.heroFooter }]}>{footer}</View>
+      ) : null}
 
       {trend ? (
         <View style={[styles.footer, { backgroundColor: theme.heroFooter }]}>

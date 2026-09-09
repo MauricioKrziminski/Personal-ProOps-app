@@ -16,7 +16,7 @@ import { SectionHead } from '@/components/ui/section-head';
 import { Skeleton } from '@/components/ui/skeleton';
 import { ProgressBar, Sparkline } from '@/components/ui/sparkline';
 import { useToast } from '@/components/ui/toast';
-import { Radius, Space, tabular } from '@/design/tokens';
+import { Radius, Space, tabular, Type } from '@/design/tokens';
 import {
   useBudgetsStatus,
   useCashFlowForecast,
@@ -76,6 +76,16 @@ export default function TodayScreen() {
 
   const series = (forecast.data ?? []).map((d) => Number(d.balance_cents));
   const leftover = series.at(-1) ?? 0;
+  /**
+   * Os dois números que o card passou a mostrar lado a lado, a pedido do dono do produto.
+   *
+   * `series[0]` é o dia 0 da projeção, e o dia 0 é `private.cash_total` — que filtra
+   * `status='cleared'`. Ou seja: é o dinheiro que ele TEM, sem o Pix que não chegou. O
+   * "a receber" é a soma de `in_cents` do resto do mês, que é justamente o que está fora
+   * do primeiro número e dentro do último.
+   */
+  const tenhoHoje = series[0] ?? 0;
+  const aReceberNoMes = (forecast.data ?? []).reduce((t, d) => t + Number(d.in_cents), 0);
 
   /**
    * `upcoming_bills` passou a devolver RECEITA prevista (`kind: 'income'`, migration
@@ -211,6 +221,24 @@ export default function TodayScreen() {
                 </>
               ) : undefined
             }
+          footer={
+            aReceberNoMes > 0 ? (
+              <View style={styles.heroFooter}>
+                <View style={styles.heroFooterPart}>
+                  <ThemedText type="caption" themeColor="onHeroMuted" style={Type.meta}>
+                    TENHO HOJE
+                  </ThemedText>
+                  <Money cents={tenhoHoje} variant="subhead" tone="onHero" concealable />
+                </View>
+                <View style={styles.heroFooterPart}>
+                  <ThemedText type="caption" themeColor="onHeroMuted" style={Type.meta}>
+                    A RECEBER
+                  </ThemedText>
+                  <Money cents={aReceberNoMes} variant="subhead" tone="onHeroSuccess" concealable />
+                </View>
+              </View>
+            ) : undefined
+          }
           onPress={() =>
             showItemActions('Mais opções', [
               { label: 'Projeção de caixa', icon: 'chart.line.uptrend.xyaxis', onPress: () => router.push('/finance/forecast') },
@@ -723,5 +751,13 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     padding: Space.lg,
+  },
+  heroFooter: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    gap: Space.lg,
+  },
+  heroFooterPart: {
+    gap: Space.half,
   },
 });
