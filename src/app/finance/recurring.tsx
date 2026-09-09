@@ -711,14 +711,26 @@ export default function RecurringScreen() {
                 </Animated.View>
               ) : null}
 
+              {/*
+                ⚠️ **O placeholder era uma DATA PLAUSÍVEL (`31/12/2026`), e o campo lia como
+                preenchido.** `placeholderTextColor` é `textSecondary`, a mesma cor de subtítulo:
+                num campo chamado "Termina em", uma data cinza dentro da caixa é indistinguível de
+                um valor gravado. A leitura do dono do produto em 09/09/2026 foi literal — *"como
+                assim 'Termina em'? Se é recorrente não termina"* —, ou seja, ele entendeu que o
+                salário dele pararia no fim do ano.
+
+                Placeholder diz FORMATO; a dica diz o que o vazio SIGNIFICA. A série sem fim é o
+                caso normal (salário, aluguel); a data existe para as que realmente acabam —
+                financiamento de 48x, assinatura com cancelamento marcado.
+              */}
               <Field
                 label="Termina em"
-                hint="Opcional. Não pode ser antes do início da série."
+                hint="Deixe em branco para não ter fim. Preencha só se a série acaba (um financiamento, por exemplo) — e nunca antes do início."
                 error={form.fim && !fimOk ? 'Informe data válida igual ou posterior ao início' : undefined}>
                 <TextField
                   value={form.fim}
                   onChangeText={(fim) => setForm({ ...form, fim })}
-                  placeholder="31/12/2026"
+                  placeholder="dd/mm/aaaa"
                   keyboardType="number-pad"
                   invalid={Boolean(form.fim) && !fimOk}
                 />
