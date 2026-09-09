@@ -54,20 +54,32 @@ async def query_balance(ctx: ExecContext, action: FinanceQuery) -> ToolResult:
     investimentos = [r for r in rows if r["type"] == "investment"]
     cartoes = [r for r in rows if r["type"] == "credit_card"]
 
-    caixa = sum(int(r["cleared_cents"]) for r in dinheiro)
-    investido = sum(int(r["cleared_cents"]) for r in investimentos)
+    def col(linha, nome: str) -> int:
+        """Coluna da `20260909140000`, com queda para o comportamento antigo.
+
+        O código sobe por deploy e a coluna por migration, e nada garante a ordem. Sem esta
+        queda, um deploy que chegasse ANTES da migration levantava `KeyError` — ou seja,
+        "Não consegui processar essa mensagem" para qualquer pergunta de saldo, que é o pior
+        jeito de descobrir uma ordem errada. `.get` com default mantém a resposta de pé com o
+        número antigo (o total), que é o que a versão anterior já respondia.
+        """
+        valor = linha.get(nome)
+        return int(valor) if valor is not None else int(linha["balance_cents"] if nome == "cleared_cents" else 0)
+
+    caixa = sum(col(r, "cleared_cents") for r in dinheiro)
+    investido = sum(col(r, "cleared_cents") for r in investimentos)
     # `min(0, ...)` como na tela: cartão com saldo positivo (crédito a favor) não vira "dívida
     # negativa" nem some do total.
     divida = sum(min(0, int(r["balance_cents"])) for r in cartoes)
-    a_receber = sum(int(r["pending_in_cents"]) for r in dinheiro)
-    a_pagar = sum(int(r["pending_out_cents"]) for r in dinheiro)
-    parcelas_futuras = sum(int(r["pending_out_cents"]) for r in cartoes)
+    a_receber = sum(col(r, "pending_in_cents") for r in dinheiro)
+    a_pagar = sum(col(r, "pending_out_cents") for r in dinheiro)
+    parcelas_futuras = sum(col(r, "pending_out_cents") for r in cartoes)
 
     partes = [f"💼 Dinheiro disponível: *{cents_to_brl(caixa)}*"]
     partes += [
-        f"  • {r['name']}: {cents_to_brl(r['cleared_cents'])}"
+        f"  • {r['name']}: {cents_to_brl(col(r, 'cleared_cents'))}"
         for r in dinheiro
-        if int(r["cleared_cents"]) != 0 or int(r["pending_in_cents"]) != 0
+        if col(r, "cleared_cents") != 0 or col(r, "pending_in_cents") != 0
     ]
 
     if investido:
