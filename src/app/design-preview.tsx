@@ -11,6 +11,7 @@ import { useTheme } from '@/hooks/use-theme';
 
 import AgentScreen from './(tabs)/agent/index';
 import DebtsScreen from './finance/debts';
+import InvoiceScreen from './finance/invoice/[id]';
 import MonthScreen from './finance/month';
 import FinanceScreen from './(tabs)/finance/index';
 import NotesScreen from './(tabs)/notes/index';
@@ -38,7 +39,13 @@ import TodayScreen from './(tabs)/today/index';
  * pagas mora dentro de um sheet que só abre no toque, então sem esta faixa a correção de
  * 09/09/2026 (numeração 9..48 + as 8 anteriores) só poderia ser conferida logando.
  */
-const ABAS = ['Hoje', 'Finanças', 'Notas', 'Agente', 'Perfil', 'Dívidas', 'Mês'] as const;
+/**
+ * `Fatura` entra pelo mesmo motivo de `Dívidas`: o pagamento parcial (09/09/2026) só aparece com
+ * uma fatura que já recebeu dinheiro e continua em aberto, e o campo de valor mora num sheet.
+ * Ela lê o `id` de `useLocalSearchParams`, então a URL da vitrine precisa levá-lo:
+ * `/design-preview?id=prev-i1`.
+ */
+const ABAS = ['Hoje', 'Finanças', 'Notas', 'Agente', 'Perfil', 'Dívidas', 'Mês', 'Fatura'] as const;
 
 /**
  * A tela é montada numa caixa ALTA e deslocada para cima, em vez de rolada.
@@ -79,6 +86,7 @@ const ABA_PARA_TAB: Record<string, number> = {
   Perfil: 4,
   'Dívidas': 2,
   'Mês': 2,
+  Fatura: 1,
 };
 /** Quantas alturas de tela cada aba ocupa — medido, para não gastar frame em preto. */
 const FAIXAS: Record<(typeof ABAS)[number], number> = {
@@ -92,7 +100,12 @@ const FAIXAS: Record<(typeof ABAS)[number], number> = {
   // Uma faixa: a tela rola de verdade (é um `Screen` com ScrollView), e o deslocamento por
   // `translateY` só funciona para tela que desenha a altura inteira.
   'Mês': 1,
+  // Uma faixa: o herói e o começo da lista respondem se o parcial aparece.
+  Fatura: 1,
 };
+/** As cinco raízes de aba. As outras faixas são telas EMPURRADAS e não têm tab bar. */
+const RAIZES = new Set<(typeof ABAS)[number]>(['Hoje', 'Finanças', 'Notas', 'Agente', 'Perfil']);
+
 const PASSOS = ABAS.flatMap((aba) =>
   Array.from({ length: FAIXAS[aba] }, (_, faixa) => ({ aba, faixa }))
 );
@@ -144,14 +157,20 @@ export default function DesignPreviewScreen() {
             {aba === 'Perfil' ? <ProfileScreen /> : null}
             {aba === 'Dívidas' ? <DebtsScreen /> : null}
             {aba === 'Mês' ? <MonthScreen /> : null}
+            {aba === 'Fatura' ? <InvoiceScreen /> : null}
           </View>
 
           {/*
             A barra do Android por cima da faixa, exatamente como no app: ela é absoluta e
             desenha sobre o conteúdo. Fica DENTRO da janela recortada para não brigar com o
             seletor da vitrine, que é ferramenta e não produto.
+
+            ⚠️ Só nas RAÍZES. Tela empurrada não tem tab bar desde 07/09/2026 (`design.md` §8), e
+            desenhá-la aqui não era só enfeite errado: ela cobre a ação ancorada no rodapé, que é
+            justamente o que essas faixas existem para mostrar — o "Registrar pagamento" da Fatura
+            ficava embaixo dela.
           */}
-          {Platform.OS === 'android' ? (
+          {Platform.OS === 'android' && RAIZES.has(aba) ? (
             <CurvedTabBar
               tabs={TABS_ANDROID}
               activeIndex={ABA_PARA_TAB[aba] ?? 0}
@@ -489,6 +508,56 @@ function seedClient() {
     { id: 'prev-a1', name: 'Conta corrente', type: 'checking', initial_balance_cents: 0 },
     { id: 'prev-a2', name: 'Carteira', type: 'cash', initial_balance_cents: 0 },
   ]);
+  // Fatura PARCIALMENTE paga: 2.393,92 de compras, 2.080,00 já pagos, 313,92 faltando.
+  // É o caso real de setembro/2026 e o único jeito de ver a linha "Pago … · falta …" do herói
+  // e o campo de valor do sheet já preenchido com o que falta.
+  client.setQueryData(['invoice', 'prev-i1'], {
+    invoice: {
+      id: 'prev-i1',
+      account_id: 'prev-c1',
+      reference_month: `${mes}-01`,
+      closing_date: `${mes}-03`,
+      due_date: `${mes}-10`,
+      status: 'closed',
+      paid_at: null,
+      paid_cents: 208000,
+    },
+    transactions: [
+      tx({ id: 'prev-f1', description: 'King Cell Machado', amount_cents: 39900, category: 'compras',
+           occurred_at: `${mesAnterior}-03`, account_id: 'prev-c1', invoice_id: 'prev-i1',
+           installment_plan_id: 'prev-p1', installment_no: 9, source: 'import' }),
+      tx({ id: 'prev-f2', description: 'Luizroberto', amount_cents: 78096, category: 'compras',
+           occurred_at: `${mesAnterior}-04`, account_id: 'prev-c1', invoice_id: 'prev-i1',
+           installment_plan_id: 'prev-p2', installment_no: 1, status: 'pending', source: 'import' }),
+      tx({ id: 'prev-f3', description: 'Auto Posto Costa Costa', amount_cents: 7000,
+           category: 'transporte', occurred_at: `${mesAnterior}-09`, account_id: 'prev-c1',
+           invoice_id: 'prev-i1', source: 'import' }),
+      tx({ id: 'prev-f4', description: 'Saldo em rotativo do mês passado', amount_cents: 33372,
+           category: 'juros', occurred_at: `${mesAnterior}-10`, account_id: 'prev-c1',
+           invoice_id: 'prev-i1', source: 'import' }),
+      tx({ id: 'prev-f5', description: 'Anthropic* Claude Sub', amount_cents: 56764,
+           category: 'assinaturas', occurred_at: `${mesAnterior}-12`, account_id: 'prev-c1',
+           invoice_id: 'prev-i1', source: 'import' }),
+      tx({ id: 'prev-f6', description: 'Mercadolivre*Mercadol', amount_cents: 10570,
+           category: 'compras', occurred_at: `${mesAnterior}-12`, account_id: 'prev-c1',
+           invoice_id: 'prev-i1', source: 'import' }),
+      tx({ id: 'prev-f7', description: 'Bicho Molhado Petcente', amount_cents: 9990,
+           category: 'pet', occurred_at: `${mesAnterior}-14`, account_id: 'prev-c1',
+           invoice_id: 'prev-i1', source: 'import' }),
+      tx({ id: 'prev-f8', description: 'Casa do Acai Cafe', amount_cents: 3700,
+           category: 'alimentação', occurred_at: `${mesAnterior}-21`, account_id: 'prev-c1',
+           invoice_id: 'prev-i1', source: 'import' }),
+    ],
+  });
+  // A chave leva `months` como STRING e o default do hook é 60 — chave errada não quebra,
+  // cai no estado de carregando e o pager some sem avisar.
+  client.setQueryData(['card-invoices', 'prev-c1', '60'], [
+    { id: 'prev-i0', reference_month: `${mesAnterior}-01`, due_date: `${mesAnterior}-10`,
+      status: 'paid', total_cents: 292008 },
+    { id: 'prev-i1', reference_month: `${mes}-01`, due_date: `${mes}-10`,
+      status: 'closed', total_cents: 324010 },
+  ]);
+
   client.setQueryData(['card-summary'], [
     {
       account_id: 'prev-c1',
