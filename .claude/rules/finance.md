@@ -13,7 +13,14 @@
 - **`installment_plans`**: compra parcelada. Uma `transactions` por parcela, uma por mês; as futuras nascem `status='pending'`. Resto da divisão inteira vai na ÚLTIMA parcela (a soma sempre bate com o total).
 - **`transactions`** ganhou `status in (pending, cleared)`, `due_at`, `invoice_id`, `installment_plan_id`, `installment_no`, `merchant`. `pending` = ainda vai acontecer; é a base da projeção de fluxo de caixa.
 - **`goals`**: `target_cents` + `saved_cents`, que é **derivado da soma de `goal_contributions`** (ledger). Aporte só pela RPC `goal_deposit` — nunca `+=` no cliente. Aporte NÃO vira transação: é movimento entre contas do próprio usuário e lançar como despesa inflaria o gasto do mês.
-- **`budgets`**: `month` null = limite padrão; linha com `month` sobrescreve aquele mês. **Dois unique parciais** (NULL não colide com NULL no Postgres). `rollover` soma a sobra do mês anterior, um nível só — e **só se o orçamento já existia antes do mês corrente** (`created_at`), senão um orçamento criado hoje ganharia sobra de um mês em que não existia. Status via `_budgets_status`.
+- **`budgets`**: **gasto e comprometido são colunas separadas, e a régua é "já aconteceu", não
+  `status`** (`20260909180000`, validado contra o mercado). `spent_cents` = efetivado **+ parcela
+  de cartão** (a compra foi feita, a parcela é inevitável); `committed_cents` = previsto sem
+  fatura (dá para adiar). Filtrar só `cleared` seria trocar um erro por outro pior — subestimaria
+  justamente o cartão. **O AVISO conta os dois; o número exibido é só o gasto**, que é o destaque
+  amarelo do YNAB traduzido: transação agendada não entra no "Activity", mas acende a categoria
+  quando o que vem não está coberto. Vale para as 5 telas, as 2 tab bars e o alerta.
+  `month` null = limite padrão; linha com `month` sobrescreve aquele mês. **Dois unique parciais** (NULL não colide com NULL no Postgres). `rollover` soma a sobra do mês anterior, um nível só — e **só se o orçamento já existia antes do mês corrente** (`created_at`), senão um orçamento criado hoje ganharia sobra de um mês em que não existia. Status via `_budgets_status`.
 - **`debts`**: dívidas com `interest_rate_monthly` em fração mensal (1,99% a.m. = 0.0199). `debt_schedule` monta a Price; `pay_debt_installment` abate o saldo **já descontando os juros do mês**.
 - **`recurring_transactions`**: RRULE + `dtstart` (âncora imutável) + `next_run_at` (próxima ocorrência FUTURA, é o que o app mostra) + `materialized_until` (controle do cron). Materializadas **90 dias à frente** pelo `finance-scheduler` como `pending`, com `source='recurring'`. Idempotência pelo unique `(recurring_id, occurred_at)`.
   **Apagar a série leva junto as ocorrências futuras ainda `pending`** (trigger
@@ -78,6 +85,13 @@
 
 ## Projeção de fluxo de caixa
 
+- **Receita atrasada sai da projeção depois de 3 dias; despesa atrasada NÃO** (`20260909200000`).
+  `greatest(coalesce(due_at, occurred_at), current_date)` empurra todo previsto vencido para hoje.
+  Para despesa está certo: você atrasou, mas ainda deve. Para receita era o anti-padrão que a
+  prática de contas a receber nomeia — *"não assuma que o atrasado será pago mais rápido do que
+  historicamente foi"* —, e na versão extrema: reassumia todo dia que chega HOJE. A janela de 3
+  dias é a mesma cadência do alerta `income_to_confirm`: o app cutuca duas vezes e então deixa de
+  contar. **Some do número, não da tela** — continua em "O que entra" com a pílula "não caiu".
 - Modelo de caixa (não contar o mesmo gasto duas vezes): saldo inicial = contas **não-cartão**, só `cleared`; saídas futuras = (a) toda fatura não paga **na data de vencimento** + (b) `pending` sem fatura em `coalesce(due_at, occurred_at)`. Compra no cartão sai do caixa quando a fatura vence, não quando foi feita.
 - `cash_flow_forecast(days)`, `upcoming_bills(days)` e `affordability(amount_cents, installments)` — pares interna/wrapper. `affordability` **compõe** com a projeção (interna chama interna, wrapper chama wrapper): não duplicar a query grande.
 - **`transactions.auto_confirm` decide quem vira `cleared` sozinho na data** (`20260909110000`).

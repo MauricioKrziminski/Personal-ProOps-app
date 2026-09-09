@@ -97,8 +97,12 @@ export default function TodayScreen() {
   const dueSoon = contas.filter((b) => !b.overdue);
   const aReceber = (bills.data ?? []).filter((b) => b.kind === 'income');
   const todayReminders = reminders.data ?? [];
+  // Gasto + comprometido: o aviso existe para o que AINDA dá para evitar. Ver a régua em
+  // `budgets.tsx` e a `20260909180000`.
   const tight = (budgets.data ?? []).filter(
-    (b) => Number(b.limit_cents) > 0 && Number(b.spent_cents) / Number(b.limit_cents) >= TIGHT
+    (b) =>
+      Number(b.limit_cents) > 0 &&
+      (Number(b.spent_cents) + Number(b.committed_cents ?? 0)) / Number(b.limit_cents) >= TIGHT
   );
   const captured = (recent.data ?? []).find((tx) => tx.source === 'whatsapp');
 

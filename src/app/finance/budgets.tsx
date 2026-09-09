@@ -135,10 +135,26 @@ export default function BudgetsScreen() {
   const linhas = status.isError ? [] : (status.data ?? []);
   const limite = linhas.reduce((s, b) => s + Number(b.limit_cents), 0);
   const gasto = linhas.reduce((s, b) => s + Number(b.spent_cents), 0);
-  const noLimite = linhas.filter((b) => Number(b.spent_cents) <= Number(b.limit_cents)).length;
+  const noLimite = linhas.filter(
+    (b) => Number(b.spent_cents) + Number(b.committed_cents ?? 0) <= Number(b.limit_cents)
+  ).length;
 
+  /**
+   * ⚠️ O alerta olha gasto **+ comprometido**; o número exibido é só o gasto.
+   *
+   * É o padrão do YNAB: transação agendada não entra no "Activity" da categoria, mas a
+   * categoria ganha destaque quando o que vem não está coberto. Avisar só pelo gasto deixaria
+   * você tranquilo com R$ 380 de R$ 500 tendo um boleto de R$ 200 agendado; contar o boleto
+   * como gasto diria que você gastou um dinheiro que ainda está com você.
+   *
+   * `spent_cents` já inclui parcela de CARTÃO mesmo pendente — lá a compra aconteceu
+   * (`20260909180000`).
+   */
+  const comprometidoDe = (b: BudgetStatus) => Number(b.committed_cents ?? 0);
   const pctDe = (b: BudgetStatus) =>
-    Number(b.limit_cents) > 0 ? Number(b.spent_cents) / Number(b.limit_cents) : 0;
+    Number(b.limit_cents) > 0
+      ? (Number(b.spent_cents) + comprometidoDe(b)) / Number(b.limit_cents)
+      : 0;
 
   const apertando = linhas.filter((b) => pctDe(b) >= 0.8).sort((a, b) => pctDe(b) - pctDe(a));
   const tranquilas = linhas.filter((b) => pctDe(b) < 0.8);
@@ -254,11 +270,14 @@ export default function BudgetsScreen() {
 
   const linhaOrcamento = (b: BudgetStatus, index: number) => {
     const gastoCents = Number(b.spent_cents);
+    const comprometido = comprometidoDe(b);
     const limiteCents = Number(b.limit_cents);
     const pct = pctDe(b);
-    const estourou = gastoCents > limiteCents;
+    // "Estourou" também conta o comprometido: um boleto agendado que não cabe no limite é o
+    // problema ANTES de virar gasto, não depois.
+    const estourou = gastoCents + comprometido > limiteCents;
     const tom = estourou ? 'danger' : pct >= 0.8 ? 'warning' : 'success';
-    const sobra = limiteCents - gastoCents;
+    const sobra = limiteCents - gastoCents - comprometido;
 
     return (
       <Animated.View
@@ -269,7 +288,7 @@ export default function BudgetsScreen() {
         )}>
         <Pressable
           accessibilityRole="button"
-          accessibilityLabel={`${b.category}, gastou ${formatBRL(gastoCents)} de ${formatBRL(limiteCents)}, ${Math.round(pct * 100)} por cento${estourou ? ', estourou' : ''}`}
+          accessibilityLabel={`${b.category}, gastou ${formatBRL(gastoCents)} de ${formatBRL(limiteCents)}${comprometido > 0 ? `, mais ${formatBRL(comprometido)} comprometidos` : ''}, ${Math.round(pct * 100)} por cento${estourou ? ', estourou' : ''}`}
           onPress={() => verLancamentos(b.category)}
           onLongPress={() => acoes(b)}>
           <Card style={styles.linha}>
@@ -287,7 +306,7 @@ export default function BudgetsScreen() {
               </ThemedText>
             </View>
 
-            <ProgressBar value={gastoCents} max={limiteCents} tone={tom} />
+            <ProgressBar value={gastoCents + comprometido} max={limiteCents} tone={tom} />
 
             <View style={styles.valores}>
               <Money cents={gastoCents} variant="subhead" tone="textSecondary" />
@@ -307,6 +326,17 @@ export default function BudgetsScreen() {
                 tone={estourou ? 'danger' : 'textSecondary'}
               />
             </View>
+
+            {/*
+              O comprometido fica FORA do número de gasto e ao lado dele. Somar seria dizer que
+              você gastou um dinheiro que ainda está na sua conta; esconder seria deixar você
+              confortável com um limite que já está tomado.
+            */}
+            {comprometido > 0 ? (
+              <ThemedText type="small" themeColor="textSecondary" style={tabular}>
+                mais {formatBRL(comprometido)} já comprometidos em contas previstas
+              </ThemedText>
+            ) : null}
 
             {/* De onde o limite vem — sem isso o número parece arbitrário. */}
             {Number(b.rollover_cents) > 0 || b.month ? (

@@ -345,7 +345,9 @@ export default function FinanceScreen() {
   }, [previous.data]);
 
   const tight = (budgets.data ?? []).filter(
-    (b) => Number(b.limit_cents) > 0 && Number(b.spent_cents) / Number(b.limit_cents) >= 0.8
+    (b) =>
+      Number(b.limit_cents) > 0 &&
+      (Number(b.spent_cents) + Number(b.committed_cents ?? 0)) / Number(b.limit_cents) >= 0.8
   );
 
   // O corte do futuro é feito DUAS vezes de propósito. A `0048` fecha a janela no banco, mas o
@@ -598,7 +600,9 @@ export default function FinanceScreen() {
         ) : tight.length > 0 ? (
           <Section title="Passando do limite">
             {tight.map((b) => {
-              const pct = Number(b.spent_cents) / Number(b.limit_cents);
+              const comprometido = Number(b.committed_cents ?? 0);
+              // o aviso conta o comprometido; o número exibido continua sendo o gasto
+              const pct = (Number(b.spent_cents) + comprometido) / Number(b.limit_cents);
               return (
                 <Pressable
                   key={b.category}

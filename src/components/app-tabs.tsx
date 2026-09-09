@@ -59,7 +59,10 @@ export default function AppTabs() {
     (bills.data ?? []).length +
     (reminders.data ?? []).length +
     (budgets.data ?? []).filter(
-      (b) => Number(b.limit_cents) > 0 && Number(b.spent_cents) / Number(b.limit_cents) >= 1
+      (b) =>
+        Number(b.limit_cents) > 0 &&
+        // inclui o comprometido: o badge avisa o que dá para evitar, não o arrependimento
+        (Number(b.spent_cents) + Number(b.committed_cents ?? 0)) / Number(b.limit_cents) >= 1
     ).length;
 
   return (

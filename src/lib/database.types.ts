@@ -2167,6 +2167,7 @@ export type Database = {
         Returns: {
           base_limit_cents: number
           category: string
+          committed_cents: number
           limit_cents: number
           month: string
           rollover: boolean
@@ -2320,6 +2321,7 @@ export type Database = {
         Returns: {
           category: string
           kind: string
+          pending_cents: number
           total_cents: number
           tx_count: number
         }[]
@@ -2383,6 +2385,7 @@ export type Database = {
         Returns: {
           base_limit_cents: number
           category: string
+          committed_cents: number
           limit_cents: number
           month: string
           rollover: boolean
