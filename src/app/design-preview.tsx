@@ -14,6 +14,7 @@ import DebtsScreen from './finance/debts';
 import InvoiceScreen from './finance/invoice/[id]';
 import RecurringScreen from './finance/recurring';
 import TransactionDetailScreen from './finance/[txId]';
+import BudgetsScreen from './finance/budgets';
 import TransactionsScreen from './finance/transactions';
 import TransactionFormScreen from './finance/transaction-form';
 import MonthScreen from './finance/month';
@@ -74,7 +75,7 @@ import TodayScreen from './(tabs)/today/index';
  * FATURA, não do lançamento, e a tela escrevia "Vence em") e a linha "Repete …" que leva à
  * série. Numa parcela ou num lançamento solto, nenhuma das duas existe.
  */
-const ABAS = ['Hoje', 'Finanças', 'Notas', 'Agente', 'Perfil', 'Dívidas', 'Mês', 'Fatura', 'Recorrentes', 'Editar', 'Detalhe', 'Lançamentos'] as const;
+const ABAS = ['Hoje', 'Finanças', 'Notas', 'Agente', 'Perfil', 'Dívidas', 'Mês', 'Fatura', 'Recorrentes', 'Editar', 'Detalhe', 'Lançamentos', 'Orçamentos'] as const;
 
 /**
  * A tela é montada numa caixa ALTA e deslocada para cima, em vez de rolada.
@@ -120,6 +121,7 @@ const ABA_PARA_TAB: Record<string, number> = {
   Editar: 2,
   Detalhe: 2,
   'Lançamentos': 2,
+  'Orçamentos': 2,
 };
 /** Quantas alturas de tela cada aba ocupa — medido, para não gastar frame em preto. */
 const FAIXAS: Record<(typeof ABAS)[number], number> = {
@@ -147,6 +149,9 @@ const FAIXAS: Record<(typeof ABAS)[number], number> = {
   // porque o header de busca ficava CRAVADO no topo do Android enquanto o extrato rolava por
   // baixo, e a vitrine não montava esta tela — o defeito viveu meses sem ninguém ver.
   'Lançamentos': 2,
+  // Duas faixas: o destaque e as categorias. Entrou em 09/09/2026 junto da separação entre
+  // gasto e comprometido — a tela decide um AVISO, e aviso que ninguém olhou é aviso que erra.
+  'Orçamentos': 2,
 };
 /** As cinco raízes de aba. As outras faixas são telas EMPURRADAS e não têm tab bar. */
 const RAIZES = new Set<(typeof ABAS)[number]>(['Hoje', 'Finanças', 'Notas', 'Agente', 'Perfil']);
@@ -207,6 +212,7 @@ export default function DesignPreviewScreen() {
             {aba === 'Editar' ? <TransactionFormScreen /> : null}
             {aba === 'Detalhe' ? <TransactionDetailScreen /> : null}
             {aba === 'Lançamentos' ? <TransactionsScreen /> : null}
+            {aba === 'Orçamentos' ? <BudgetsScreen /> : null}
           </View>
 
           {/*
@@ -364,6 +370,10 @@ function seedClient() {
         base_limit_cents: 200000,
         limit_cents: 200000,
         spent_cents: 176000,
+        // `committed_cents` veio na `20260909180000`: o que ainda pode não acontecer. Aqui ele
+        // é o caso interessante — 1.760 gastos de 2.000 parecem confortáveis até somar os 300
+        // de conta prevista, que é exatamente quando o aviso tem que acender.
+        committed_cents: 30000,
         rollover: false,
         rollover_cents: 0,
       },
@@ -372,6 +382,7 @@ function seedClient() {
         base_limit_cents: 60000,
         limit_cents: 60000,
         spent_cents: 18700,
+        committed_cents: 0,
         rollover: false,
         rollover_cents: 0,
       },

@@ -314,27 +314,42 @@ export default function BudgetsScreen() {
                 de
               </ThemedText>
               <Money cents={limiteCents} variant="subhead" tone="textSecondary" />
-              <ThemedText type="small" themeColor="textSecondary">
-                ·
-              </ThemedText>
-              <ThemedText type="small" themeColor={estourou ? 'danger' : 'textSecondary'}>
-                {estourou ? 'estourou em' : 'faltam'}
-              </ThemedText>
-              <Money
-                cents={Math.abs(sobra)}
-                variant="subhead"
-                tone={estourou ? 'danger' : 'textSecondary'}
-              />
+              {/*
+                O saldo (`faltam`/`estourou`) só entra AQUI quando não há comprometido. Com
+                comprometido, "R$ 1.760,00 de R$ 2.000,00 · estourou em R$ 60,00" se contradiz
+                na mesma linha — a conta só fecha somando um número que está três linhas abaixo.
+                Nesse caso o saldo migra para a frase do comprometido, onde ele faz sentido.
+              */}
+              {comprometido === 0 ? (
+                <>
+                  <ThemedText type="small" themeColor="textSecondary">
+                    ·
+                  </ThemedText>
+                  <ThemedText type="small" themeColor={estourou ? 'danger' : 'textSecondary'}>
+                    {estourou ? 'estourou em' : 'faltam'}
+                  </ThemedText>
+                  <Money
+                    cents={Math.abs(sobra)}
+                    variant="subhead"
+                    tone={estourou ? 'danger' : 'textSecondary'}
+                  />
+                </>
+              ) : null}
             </View>
 
             {/*
-              O comprometido fica FORA do número de gasto e ao lado dele. Somar seria dizer que
-              você gastou um dinheiro que ainda está na sua conta; esconder seria deixar você
-              confortável com um limite que já está tomado.
+              O comprometido fica FORA do número de gasto. Somar seria dizer que você gastou um
+              dinheiro que ainda está na sua conta; esconder seria deixar você confortável com um
+              limite que já está tomado. Uma frase só, com a conclusão no fim.
             */}
             {comprometido > 0 ? (
-              <ThemedText type="small" themeColor="textSecondary" style={tabular}>
-                mais {formatBRL(comprometido)} já comprometidos em contas previstas
+              <ThemedText
+                type="small"
+                themeColor={estourou ? 'danger' : 'textSecondary'}
+                style={tabular}>
+                {`mais ${formatBRL(comprometido)} em contas previstas — ${
+                  estourou ? `passa em ${formatBRL(Math.abs(sobra))}` : `sobram ${formatBRL(sobra)}`
+                }`}
               </ThemedText>
             ) : null}
 
