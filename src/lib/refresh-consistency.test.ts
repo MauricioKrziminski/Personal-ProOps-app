@@ -6,6 +6,8 @@ import { runInNewContext } from 'node:vm';
 import ts from 'typescript';
 import { QueryClient, QueryObserver } from '@tanstack/react-query';
 
+import * as settleLabels from './settle-labels.ts';
+
 const require = createRequire(import.meta.url);
 function loadHooks(client: QueryClient, entry = 'src/hooks/use-finance.ts', dependencies: Record<string, unknown> = {}) {
   const load = (file: string): any => {
@@ -278,6 +280,11 @@ function renderToday(bill: { kind: 'invoice' | 'transaction'; ref_id: string }) 
     if (name === '@/components/ui/app-header') return { AppHeader: 'AppHeader', useAppHeaderHeight: () => 80 };
     if (name === '@/design/tokens') return { Space: {}, Radius: {}, tabular: {} };
     if (name === '@/constants/theme') return { Fonts: {} };
+    // O módulo REAL, não o Proxy: o fallback devolve uma string para cada chave, e a tela
+    // chama `settleLabel(...)` — o que dava "is not a function" no minuto em que a Hoje
+    // parou de cravar "Paguei". `settle-labels` é puro, então carregá-lo aqui é de graça e
+    // faz o teste conferir o rótulo de verdade em vez de um dublê que sempre concorda.
+    if (name === '@/lib/settle-labels') return settleLabels;
     return new Proxy({}, { get: (_, key) => String(key) });
   } });
   const tree = module.exports.default();

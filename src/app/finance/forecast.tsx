@@ -37,6 +37,7 @@ import {
 import { useDebounced } from '@/hooks/use-debounced';
 import { formatBRL, isoToBR, localISODate } from '@/lib/dates';
 import { showItemActions } from '@/lib/item-actions';
+import { settleAccessibilityLabel, settleLabel } from '@/lib/settle-labels';
 
 /**
  * Projeção — "posso gastar isso?".
@@ -111,9 +112,12 @@ export default function ForecastScreen() {
     .map((p) => p.cents);
   const valores = [...passado, ...projetados];
   const primeiroNegativo = serie.find((d) => Number(d.balance_cents) < 0);
-  const contas = bills.data ?? [];
+  // `upcoming_bills` passou a devolver receita prevista (`kind: 'income'`, 20260909150000).
+  // Ela tem seção própria: "O que vence" é vocabulário de saída.
+  const contas = (bills.data ?? []).filter((b) => b.kind !== 'income');
   const atrasadas = contas.filter((b) => b.overdue);
   const aVencer = contas.filter((b) => !b.overdue);
+  const aReceber = (bills.data ?? []).filter((b) => b.kind === 'income');
 
   /**
    * O empty de verdade é *nada para projetar*: sem conta cadastrada, sem nada a vencer e a série
@@ -170,16 +174,23 @@ export default function ForecastScreen() {
     // um lançamento. Baixa de lançamento nele não acharia nada — vai para a
     // dívida, do mesmo jeito que a fatura vai para a fatura.
     const parcelaDeDivida = b.kind === 'debt';
+    const receita = b.kind === 'income';
     const cents = Number(b.amount_cents);
 
     return (
       <Row
         key={b.ref_id}
         title={b.title}
-        subtitle={b.overdue ? `venceu em ${isoToBR(b.due_date)}` : isoToBR(b.due_date)}
-        icon={fatura ? 'creditcard' : parcelaDeDivida ? 'banknote' : 'doc.text'}
+        subtitle={
+          b.overdue
+            ? receita
+              ? `não caiu em ${isoToBR(b.due_date)}`
+              : `venceu em ${isoToBR(b.due_date)}`
+            : isoToBR(b.due_date)
+        }
+        icon={fatura ? 'creditcard' : parcelaDeDivida ? 'banknote' : receita ? 'arrow.down.left' : 'doc.text'}
         chevron
-        accessibilityLabel={`${b.title}, ${b.overdue ? 'atrasado, vencia' : 'vence'} em ${isoToBR(b.due_date)}, ${formatBRL(cents)}`}
+        accessibilityLabel={`${b.title}, ${b.overdue ? (receita ? 'ainda não caiu, era esperado' : 'atrasado, vencia') : receita ? 'chega' : 'vence'} em ${isoToBR(b.due_date)}, ${formatBRL(cents)}`}
         // Lançamento avulso agora ABRE, como fatura e dívida já abriam. Dar baixa num
         // valor que veio diferente do previsto grava o valor errado, e esta tela não
         // tinha caminho nenhum para corrigir antes — só o "marcar como pago".
@@ -196,7 +207,7 @@ export default function ForecastScreen() {
             : () =>
                 showItemActions(b.title, [
                   {
-                    label: `Marcar ${b.title} como pago`,
+                    label: settleAccessibilityLabel(receita ? 'income' : 'expense', b.title),
                     onPress: () => pagar(b.ref_id, b.title),
                   },
                   {
@@ -209,7 +220,13 @@ export default function ForecastScreen() {
         }
         trailing={
           <View style={styles.trailing}>
-            <Money cents={cents} variant="headline" tone={b.overdue ? 'danger' : 'text'} />
+            <Money
+              cents={cents}
+              variant="headline"
+              // Receita atrasada não é dívida: `success` mesmo quando não caiu. `danger` ali
+              // seria gastar a alavanca de cor do app num aviso (design.md §2b).
+              tone={receita ? 'success' : b.overdue ? 'danger' : 'text'}
+            />
             {fatura ? (
               <Button
                 label="Pagar fatura"
@@ -228,7 +245,7 @@ export default function ForecastScreen() {
               />
             ) : (
               <Button
-                label="Paguei"
+                label={settleLabel(receita ? 'income' : 'expense')}
                 size="sm"
                 variant="secondary"
                 onPress={() => pagar(b.ref_id, b.title)}
@@ -385,10 +402,21 @@ export default function ForecastScreen() {
       {!bills.isError && aVencer.length > 0 ? (
         <Section title="O que vence">{aVencer.map(linhaConta)}</Section>
       ) : null}
+      {/*
+        O par de "O que vence". Vem DEPOIS de propósito: quem abre esta tela vem perguntar se o
+        dinheiro dá, e a resposta é o que sai. O que entra é a segunda metade da conta.
+      */}
+      {!bills.isError && aReceber.length > 0 ? (
+        <Section title="O que entra">{aReceber.map(linhaConta)}</Section>
+      ) : null}
 
-      {!bills.isLoading && !bills.isError && contas.length === 0 && !nadaParaProjetar ? (
+      {!bills.isLoading &&
+      !bills.isError &&
+      contas.length === 0 &&
+      aReceber.length === 0 &&
+      !nadaParaProjetar ? (
         <ThemedText type="small" themeColor="textSecondary" style={styles.calmo}>
-          Nada vence nos próximos 30 dias.
+          Nada vence nem entra nos próximos 30 dias.
         </ThemedText>
       ) : null}
 

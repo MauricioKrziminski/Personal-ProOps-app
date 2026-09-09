@@ -578,7 +578,12 @@ export type UpcomingBill = Omit<Fns['upcoming_bills']['Returns'][number], 'kind'
    * rotear, nunca chamar a baixa de lançamento — foi a união fechada aqui que
    * fez o TypeScript exigir isso das duas telas.
    */
-  kind: 'invoice' | 'transaction' | 'debt';
+  /**
+   * `income` entrou na 20260909150000 pelo mesmo motivo e com o mesmo efeito: a RPC deixou de
+   * ser só "o que vou pagar" e a união fechada obriga as telas a decidirem o rótulo em vez de
+   * cravarem "Paguei". Use `settleLabel(kind)`.
+   */
+  kind: 'invoice' | 'transaction' | 'debt' | 'income';
 };
 export type Affordability = Fns['affordability']['Returns'][number];
 

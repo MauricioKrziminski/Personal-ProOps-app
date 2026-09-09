@@ -30,6 +30,7 @@ import { useProfile } from '@/hooks/use-profile';
 import { useSession } from '@/hooks/use-session';
 import { useTheme } from '@/hooks/use-theme';
 import { greetingBR } from '@/lib/dates';
+import { settleLabel } from '@/lib/settle-labels';
 import { Fonts } from '@/constants/theme';
 
 /** Um orçamento entra na seção "passando do orçamento" a partir de 80% consumido. */
@@ -75,8 +76,15 @@ export default function TodayScreen() {
   const series = (forecast.data ?? []).map((d) => Number(d.balance_cents));
   const leftover = series.at(-1) ?? 0;
 
-  const overdue = (bills.data ?? []).filter((b) => b.overdue);
-  const dueSoon = (bills.data ?? []).filter((b) => !b.overdue);
+  /**
+   * `upcoming_bills` passou a devolver RECEITA prevista (`kind: 'income'`, migration
+   * 20260909150000). Ela tem seção própria: o cabeçalho desta aqui diz "ATRASADO / ATENÇÃO",
+   * que é vocabulário de dívida — um Pix que não chegou não é culpa de ninguém e não gera juros.
+   */
+  const contas = (bills.data ?? []).filter((b) => b.kind !== 'income');
+  const overdue = contas.filter((b) => b.overdue);
+  const dueSoon = contas.filter((b) => !b.overdue);
+  const aReceber = (bills.data ?? []).filter((b) => b.kind === 'income');
   const todayReminders = reminders.data ?? [];
   const tight = (budgets.data ?? []).filter(
     (b) => Number(b.limit_cents) > 0 && Number(b.spent_cents) / Number(b.limit_cents) >= TIGHT
@@ -303,7 +311,7 @@ export default function TodayScreen() {
                       ? 'Pagar fatura'
                       : b.kind === 'debt'
                         ? 'Ver dívida'
-                        : 'Paguei'
+                        : settleLabel(b.kind === 'income' ? 'income' : 'expense')
                   }
                   icon={b.kind === 'debt' ? 'chevron.right' : 'checkmark'}
                   size="sm"
@@ -317,6 +325,67 @@ export default function TodayScreen() {
                       pay(b.ref_id, b.title);
                     }
                   }}
+                />
+              </Pressable>
+            ))}
+          </View>
+        ) : null}
+
+        {/*
+          3b. O que ENTRA. Seção própria, e não uma linha na de cima: o cabeçalho de lá diz
+          "Atrasado / atenção", que é vocabulário de dívida. Um Pix que não chegou não é culpa
+          do usuário e não gera juros — por isso a pílula aqui é `warning`, não `danger`. Gastar
+          `danger` num aviso queima a única alavanca de cor do app (design.md §2b).
+
+          O contador da aba (`overdue.length + dueSoon.length`) continua SÓ de despesa: badge é
+          contagem real, e salário previsto dentro de "Vencendo" seria o contador mentindo.
+        */}
+        {aReceber.length > 0 ? (
+          <View style={styles.section}>
+            <SectionHead
+              title="O que entra"
+              inset={false}
+              action={
+                <ThemedText type="caption" themeColor="textSecondary">
+                  {`${aReceber.length} a receber`}
+                </ThemedText>
+              }
+            />
+            {aReceber.map((b) => (
+              <Pressable
+                key={b.ref_id}
+                accessibilityRole="button"
+                accessibilityLabel={`Abrir ${b.title}`}
+                onPress={() => router.push({ pathname: '/finance/[txId]', params: { txId: b.ref_id } })}
+                style={({ pressed }) => [
+                  styles.card,
+                  styles.billCard,
+                  {
+                    backgroundColor: pressed ? theme.backgroundSelected : theme.surface,
+                    borderColor: theme.cardBorder,
+                  },
+                ]}>
+                <View style={styles.billInfo}>
+                  <View style={styles.billTitleRow}>
+                    <ThemedText type="small" style={styles.billTitle}>
+                      {b.title}
+                    </ThemedText>
+                    <View style={[styles.duePill, { backgroundColor: theme.warningSoft }]}>
+                      <ThemedText type="caption" themeColor="warning">
+                        {b.overdue
+                          ? `não caiu ${formatDateBR(b.due_date)}`
+                          : `chega ${formatDateBR(b.due_date)}`}
+                      </ThemedText>
+                    </View>
+                  </View>
+                  <Money cents={Number(b.amount_cents)} variant="ticker" tone="success" />
+                </View>
+                <Button
+                  label={settleLabel('income')}
+                  icon="checkmark"
+                  size="sm"
+                  variant="secondary"
+                  onPress={() => pay(b.ref_id, b.title)}
                 />
               </Pressable>
             ))}

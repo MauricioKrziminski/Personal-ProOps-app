@@ -582,17 +582,32 @@ async function executeAction(
         linhas.push(`  Menor saldo: ${centsToBRL(Number(pior.balance_cents))} em ${formatDateBR(pior.day)}`);
       }
 
-      const contas = (bills.data ?? []) as {
+      // `_upcoming_bills` passou a devolver RECEITA prevista também (`kind = 'income'`,
+      // migration 20260909150000). Sem separar as duas, o salário apareceria listado sob
+      // "A pagar" — a RPC mudou de conteúdo, e quem escreve o rótulo é aqui.
+      const linhasConta = (bills.data ?? []) as {
+        kind: string;
         title: string;
         amount_cents: number;
         due_date: string;
         overdue: boolean;
       }[];
+      const contas = linhasConta.filter((c) => c.kind !== "income");
+      const receitas = linhasConta.filter((c) => c.kind === "income");
       if (contas.length) {
         linhas.push("", "📅 A pagar:");
         for (const c of contas.slice(0, 6)) {
           linhas.push(
             `  ${c.overdue ? "🔴" : "•"} ${c.title}: ${centsToBRL(Number(c.amount_cents))} — ${formatDateBR(c.due_date)}`,
+          );
+        }
+      }
+      if (receitas.length) {
+        linhas.push("", "💰 A receber:");
+        for (const c of receitas.slice(0, 6)) {
+          // 🔴 seria alarme: receita atrasada não é dívida, é um Pix que ainda não chegou
+          linhas.push(
+            `  ${c.overdue ? "⏳" : "•"} ${c.title}: ${centsToBRL(Number(c.amount_cents))} — ${formatDateBR(c.due_date)}`,
           );
         }
       }

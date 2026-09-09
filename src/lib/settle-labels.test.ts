@@ -19,7 +19,9 @@ const AQUI = path.dirname(fileURLToPath(import.meta.url));
 const SEMPRE_PAGAMENTO = new Set([
   'app/finance/cards.tsx',
   'app/finance/debts.tsx',
-  'app/finance/forecast.tsx',
+  // `forecast.tsx` SAIU daqui em 09/09/2026: a justificativa acima ("fatura de cartão e parcela
+  // de dívida são sempre saída") deixou de valer no minuto em que a tela passou a listar receita
+  // prevista. Allowlist com motivo vencido é allowlist que esconde bug.
 ]);
 
 test('receita se recebe, despesa se paga', () => {
@@ -95,8 +97,23 @@ test('nenhuma tela escreve "Paguei" à mão', () => {
       if (entrada.isDirectory()) varrer(alvo);
       else if (/\.tsx?$/.test(entrada.name) && !entrada.name.includes('.test.')) {
         const conteudo = fs.readFileSync(alvo, 'utf8');
-        // `label="Paguei"` e `label={'Paguei'}` — o rótulo cravado numa tela.
-        if (/label=\{?['"`]Paguei/.test(conteudo) && !SEMPRE_PAGAMENTO.has(path.relative(raiz, alvo))) {
+        /**
+         * A string em QUALQUER posição, não só colada em `label=` — mas só em CÓDIGO.
+         *
+         * A versão anterior era `/label=\{?['"`]Paguei/` e deixou passar a Hoje, onde o
+         * literal estava no FIM de um ternário (`: 'Paguei'`) — o teste existia, rodava verde,
+         * e o defeito que ele foi escrito para pegar estava na tela mais usada do app. Um
+         * guarda que depende de a violação ter uma forma específica não é guarda.
+         *
+         * Alargar a regex sozinha, porém, passou a acusar três arquivos que só CITAM a palavra
+         * num comentário (inclusive este próprio histórico). Por isso o comentário sai antes da
+         * checagem: o alvo é o rótulo que chega na tela, não a prosa que explica por que ele
+         * não deve existir.
+         */
+        const codigo = conteudo
+          .replace(/\/\*[\s\S]*?\*\//g, '')
+          .replace(/(^|[^:])\/\/.*$/gm, '$1');
+        if (/['"`]Paguei['"`]/.test(codigo) && !SEMPRE_PAGAMENTO.has(path.relative(raiz, alvo))) {
           suspeitos.push(path.relative(raiz, alvo));
         }
       }
