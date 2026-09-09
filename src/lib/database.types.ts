@@ -2270,7 +2270,9 @@ export type Database = {
         Args: { months_back?: number; uid: string }
         Returns: {
           expense_cents: number
+          expense_pending_cents: number
           income_cents: number
+          income_pending_cents: number
           month: string
         }[]
       }
@@ -2602,7 +2604,9 @@ export type Database = {
         Args: { months_back?: number }
         Returns: {
           expense_cents: number
+          expense_pending_cents: number
           income_cents: number
+          income_pending_cents: number
           month: string
         }[]
       }
@@ -2709,6 +2713,7 @@ export type Database = {
         Returns: {
           category: string
           kind: string
+          pending_cents: number
           total_cents: number
           tx_count: number
         }[]

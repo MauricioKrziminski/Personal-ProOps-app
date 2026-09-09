@@ -182,7 +182,26 @@ const LARGURA_BARRA = 10;
  * alavanca de cor que o app tem. O par é o mesmo de `invoices.tsx`: `tint` cheio contra
  * `backgroundElement`, mais a legenda em PALAVRA, que é o que funciona sem enxergar cor.
  */
-function CashBar({ ratio, index, forte }: { ratio: number; index: number; forte: boolean }) {
+/**
+ * Uma barra do fluxo mensal, em DUAS partes.
+ *
+ * A base é o realizado; a tampa, meio transparente, é o previsto que ainda não aconteceu.
+ * Até 09/09/2026 era uma barra só somando os dois — o mês corrente parecia fechado desde o
+ * dia 1, e o dono do produto pediu que *"nos gráficos, tem que ter alguma coisa explicando a
+ * diferença"*. Empilhar em vez de colorir mantém a comparação por CLARIDADE (§2b): a altura
+ * total continua sendo o total, e o pedaço claro em cima diz o quanto dela é promessa.
+ */
+function CashBar({
+  ratio,
+  previsto,
+  index,
+  forte,
+}: {
+  ratio: number;
+  previsto: number;
+  index: number;
+  forte: boolean;
+}) {
   const theme = useTheme();
   const grow = useSharedValue(0);
 
@@ -196,6 +215,9 @@ function CashBar({ ratio, index, forte }: { ratio: number; index: number; forte:
     // "entrou um pouquinho": é o mesmo "previsto R$ 0,00" que o painel já não escreve.
     height: ratio <= 0 ? 0 : Math.max(Space.xs, grow.get() * ALTURA_BARRA),
   }));
+  // A fração da barra que é previsto. `flex` e não altura fixa: assim ela acompanha a mola da
+  // barra inteira em vez de precisar de uma segunda animação que dessincroniza.
+  const fracaoPrevista = ratio > 0 ? Math.min(1, Math.max(0, previsto / ratio)) : 0;
 
   return (
     <Animated.View
@@ -206,8 +228,16 @@ function CashBar({ ratio, index, forte }: { ratio: number; index: number; forte:
         // Sem matiz nenhuma — o accent fica reservado para ação e estado, e a comparação entre
         // "entrou" e "saiu" se resolve por CLARIDADE, que é o que funciona sem enxergar cor.
         { backgroundColor: forte ? theme.text : theme.surfaceRaised },
-      ]}
-    />
+      ]}>
+      {fracaoPrevista > 0 ? (
+        <View
+          style={[
+            styles.cashBarPrevisto,
+            { flex: fracaoPrevista, backgroundColor: theme.groupedBackground },
+          ]}
+        />
+      ) : null}
+    </Animated.View>
   );
 }
 
@@ -267,9 +297,17 @@ export default function FinanceScreen() {
   const recent = useRecentTransactions(5);
   const remove = useDeleteTransaction();
 
+  /**
+   * ⚠️ `total_cents - pending_cents`: o REALIZADO.
+   *
+   * Até 09/09/2026 isto somava `total_cents` e a faixa escrevia "entrou R$ 10.200,00" contando
+   * o Pix que ainda não tinha chegado — verbo no passado em cima de dinheiro que não entrou.
+   * `pending_cents` veio na `20260909160000` exatamente para esta subtração.
+   */
   const totalOf = (rows: typeof summary.data, kind: 'expense' | 'income') =>
-    (rows ?? []).filter((r) => r.kind === kind).reduce((s, r) => s + Number(r.total_cents), 0);
-
+    (rows ?? [])
+      .filter((r) => r.kind === kind)
+      .reduce((s, r) => s + Number(r.total_cents) - Number(r.pending_cents), 0);
   const income = totalOf(summary.data, 'income');
   const expense = totalOf(summary.data, 'expense');
   const previousExpense = totalOf(previous.data, 'expense');
@@ -404,9 +442,18 @@ export default function FinanceScreen() {
             secondary={{
               icon: leftover < 0 ? 'chart.line.downtrend.xyaxis' : 'chart.line.uptrend.xyaxis',
               negative: leftover < 0,
+              /*
+                "previsto" sozinho não dizia de que LADO: `upcomingOut` é só saída. Com receita
+                prevista visível no resto do app, a palavra virou ambígua — passou a "ainda sai".
+
+                Quatro segmentos NÃO cabem: a `secondaryRow` é `flex-start` justamente porque
+                quebra em três linhas com fonte grande (`hero-panel.tsx:213-215`), e a régua é
+                384dp × 1,3. Quem quer o lado de entrada abre a Projeção, que agora tem a linha
+                do `in_cents`.
+              */
               text:
                 isCurrent && upcomingOut > 0
-                  ? `entrou ${formatBRL(income)} · saiu ${formatBRL(expense)} · previsto ${formatBRL(upcomingOut)}`
+                  ? `entrou ${formatBRL(income)} · saiu ${formatBRL(expense)} · ainda sai ${formatBRL(upcomingOut)}`
                   : `entrou ${formatBRL(income)} · saiu ${formatBRL(expense)}`,
             }}
             /*
@@ -758,6 +805,17 @@ export default function FinanceScreen() {
                         saiu
                       </ThemedText>
                     </View>
+                    <View style={styles.cashChave}>
+                      <View
+                        style={[
+                          styles.cashSwatch,
+                          { backgroundColor: theme.groupedBackground, borderColor: theme.cardBorder, borderWidth: 1 },
+                        ]}
+                      />
+                      <ThemedText type="caption" themeColor="textSecondary">
+                        previsto
+                      </ThemedText>
+                    </View>
                   </View>
                 </View>
 
@@ -771,18 +829,30 @@ export default function FinanceScreen() {
                   {meses.map((m, index) => {
                     const entrou = Number(m.income_cents);
                     const saiu = Number(m.expense_cents);
+                    const entrouPrevisto = Number(m.income_pending_cents);
+                    const saiuPrevisto = Number(m.expense_pending_cents);
                     return (
                       <View
                         key={m.month}
                         style={styles.cashSlot}
                         accessible
-                        accessibilityLabel={`${monthTitle(m.month.slice(0, 7))}: entrou ${formatBRL(entrou)}, saiu ${formatBRL(saiu)}`}>
+                        accessibilityLabel={`${monthTitle(m.month.slice(0, 7))}: entrou ${formatBRL(entrou - entrouPrevisto)}, saiu ${formatBRL(saiu - saiuPrevisto)}${entrouPrevisto + saiuPrevisto > 0 ? `, previsto ${formatBRL(entrouPrevisto)} a receber e ${formatBRL(saiuPrevisto)} a pagar` : ''}`}>
                         <View style={styles.cashPair}>
                           <View style={styles.cashTrack}>
-                            <CashBar ratio={entrou / tetoCashflow} index={index} forte />
+                            <CashBar
+                              ratio={entrou / tetoCashflow}
+                              previsto={entrouPrevisto / tetoCashflow}
+                              index={index}
+                              forte
+                            />
                           </View>
                           <View style={styles.cashTrack}>
-                            <CashBar ratio={saiu / tetoCashflow} index={index} forte={false} />
+                            <CashBar
+                              ratio={saiu / tetoCashflow}
+                              previsto={saiuPrevisto / tetoCashflow}
+                              index={index}
+                              forte={false}
+                            />
                           </View>
                         </View>
                         {/* `monthShort`, não `monthLabel`: "agosto de 2026" numa fatia de 40pt
@@ -1062,8 +1132,15 @@ const styles = StyleSheet.create({
     height: ALTURA_BARRA,
     justifyContent: 'flex-end',
   },
+  cashBarPrevisto: {
+    width: '100%',
+    borderTopLeftRadius: Radius.xs,
+    borderTopRightRadius: Radius.xs,
+  },
   cashBar: {
     width: '100%',
+    // A tampa do previsto vive DENTRO da barra e ocupa o topo — daí `flex-start`.
+    justifyContent: 'flex-start',
     // Só o topo é arredondado (`rounded-t-sm`): a base da barra tem que assentar numa linha reta,
     // senão o eixo do gráfico fica ondulado.
     borderTopLeftRadius: Radius.xs,

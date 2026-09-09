@@ -192,12 +192,14 @@ export default function TransactionsScreen() {
     return map;
   }, [accounts.data]);
 
-  const income = (summary.data ?? [])
-    .filter((r) => r.kind === 'income')
-    .reduce((s, r) => s + Number(r.total_cents), 0);
-  const expense = (summary.data ?? [])
-    .filter((r) => r.kind === 'expense')
-    .reduce((s, r) => s + Number(r.total_cents), 0);
+  // Realizado, não total: `entrou`/`saiu` são verbos no passado e não podem contar previsto.
+  // Mesmo defeito e mesma correção do Financeiro — ver o comentário em `(tabs)/finance/index.tsx`.
+  const realizado = (kind: 'income' | 'expense') =>
+    (summary.data ?? [])
+      .filter((r) => r.kind === kind)
+      .reduce((s, r) => s + Number(r.total_cents) - Number(r.pending_cents), 0);
+  const income = realizado('income');
+  const expense = realizado('expense');
 
   // `toSections` agrupa em varredura linear, então o dia que atravessa a fronteira de duas
   // páginas continua sendo uma seção só depois do `flat()`.
