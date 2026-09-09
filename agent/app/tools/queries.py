@@ -16,7 +16,13 @@ from uuid import UUID
 
 from app import db
 from app.domain import matching
-from app.domain.dates import add_months, format_date_br, invoice_cycle_window, local_iso_date
+from app.domain.dates import (
+    add_months,
+    format_date_br,
+    invoice_cycle_window,
+    local_iso_date,
+)
+from app.domain.recurrence import descreve_rrule
 from app.domain.money import cents_to_brl
 from app.graph.schemas import FinanceQuery
 from app.tools.base import ExecContext, ToolResult
@@ -655,3 +661,121 @@ async def simulate_purchase(ctx: ExecContext, action: FinanceQuery) -> ToolResul
     return ToolResult(
         f"{veredito}: {cents_to_brl(valor)}{parcela}.{pior}", read_only=True
     )
+
+
+async def query_recurring(ctx: ExecContext, action: FinanceQuery) -> ToolResult:
+    """As séries recorrentes, com valor, regra em português e a PRÓXIMA data.
+
+    ⚠️ **Existe porque "não achei" era a resposta errada.** A série vive em
+    `recurring_transactions`; os lançamentos dela só existem depois que o
+    `finance-scheduler` materializa a janela de 90 dias. Perguntar "quando cai meu salário?"
+    caía em `query_transactions`, que olha `transactions`, não achava a ocorrência e respondia
+    que não existia — sobre uma série cadastrada e correta. Foi o caso do dono do produto em
+    09/09/2026, com o `finance-scheduler` pausado no Cloud Scheduler.
+
+    ⚠️ **`next_run_at` é `timestamptz` (UTC) e a data do usuário é a do FUSO DELE.** Formatar o
+    instante cru mostraria o dia anterior toda vez que a ocorrência cair antes das 03h de
+    Brasília — que é justamente a madrugada em que o cron roda. Quem converte é
+    `local_iso_date(ctx.timezone, ...)`, com queda para America/Sao_Paulo.
+
+    Escopo: filtro obrigatório por `workspace_id`, nome de tabela literal, nenhum id vindo do
+    modelo. O serviço conecta com papel que IGNORA RLS — aqui a proteção é esta linha.
+    """
+    linhas_sql = await db.fetch(
+        """
+        select kind, amount_cents, description, category, rrule, next_run_at, end_date, active
+        from public.recurring_transactions
+        where workspace_id = %s
+        order by active desc, kind, next_run_at
+        limit 20
+        """,
+        ctx.workspace_id,
+    )
+    if not linhas_sql:
+        return ToolResult(
+            "🔁 Você ainda não tem nada recorrente. Tenta "
+            '"todo dia 5 pago 1800 de aluguel" ou "meu salário de 3000 cai todo dia 20".',
+            read_only=True,
+        )
+
+    def bloco(kind: str, titulo: str) -> list[str]:
+        itens = [r for r in linhas_sql if r["kind"] == kind and r["active"]]
+        if not itens:
+            return []
+        saida = [titulo]
+        for r in itens:
+            nome = r["description"] or r["category"] or "sem descrição"
+            quando = descreve_rrule(r["rrule"])
+            proxima = format_date_br(local_iso_date(ctx.timezone, r["next_run_at"]))
+            ate = f" · até {format_date_br(r['end_date'])}" if r["end_date"] else ""
+            saida.append(
+                f"  • {nome}: {cents_to_brl(r['amount_cents'])} — {quando} · "
+                f"próxima em {proxima}{ate}"
+            )
+        return saida
+
+    partes = ["🔁 *Suas recorrências*"]
+    partes += bloco("income", "\n*Entra*")
+    partes += bloco("expense", "\n*Sai*")
+
+    pausadas = [r for r in linhas_sql if not r["active"]]
+    if pausadas:
+        nomes = ", ".join((r["description"] or r["category"] or "sem descrição") for r in pausadas[:5])
+        partes.append(f"\n⏸️ Pausadas: {nomes}")
+
+    if len(partes) == 1:
+        return ToolResult(
+            "🔁 Suas recorrências estão todas pausadas no momento.", read_only=True
+        )
+    # A janela é do materializador, não um número solto: `HORIZON_DAYS` em `jobs/scheduler.py`.
+    partes.append("\nOs lançamentos dos próximos 90 dias já estão no seu extrato.")
+    return ToolResult("\n".join(partes), read_only=True)
+
+
+async def query_debts(ctx: ExecContext, action: FinanceQuery) -> ToolResult:
+    """As dívidas em aberto, com saldo, prestação e quanto já foi pago.
+
+    `interest_rate_monthly` é FRAÇÃO mensal (1,99% a.m. = 0.0199) — multiplicar por 100 na
+    exibição é obrigatório, e é o erro que faz um financiamento parecer de graça.
+
+    Escopo por `workspace_id`, tabela literal, nenhum id do modelo.
+    """
+    rows = await db.fetch(
+        """
+        select name, kind, remaining_cents, principal_cents, installment_cents,
+               interest_rate_monthly, installments, installments_paid, due_day
+        from public.debts
+        where workspace_id = %s and archived = false
+        order by remaining_cents desc
+        limit 20
+        """,
+        ctx.workspace_id,
+    )
+    if not rows:
+        return ToolResult(
+            "🎉 Você não tem nenhuma dívida cadastrada.", read_only=True
+        )
+
+    partes = ["💳 *Suas dívidas*"]
+    for d in rows:
+        partes.append(
+            f"  • {d['name']}: faltam {cents_to_brl(d['remaining_cents'])} "
+            f"de {cents_to_brl(d['principal_cents'])}"
+        )
+        detalhe = []
+        if d["installment_cents"]:
+            detalhe.append(f"parcela {cents_to_brl(d['installment_cents'])}")
+        taxa = float(d["interest_rate_monthly"] or 0)
+        if taxa > 0:
+            # vírgula, nunca ponto — mesma régua de `formatNumberBR` no app
+            detalhe.append(f"{taxa * 100:.2f}".replace(".", ",") + "% a.m.")
+        if d["installments"]:
+            detalhe.append(f"{d['installments_paid']} de {d['installments']} pagas")
+        if d["due_day"]:
+            detalhe.append(f"vence dia {d['due_day']}")
+        if detalhe:
+            partes.append(f"    {' · '.join(detalhe)}")
+
+    total = sum(int(d["remaining_cents"]) for d in rows)
+    partes.append(f"\n*Total em aberto:* {cents_to_brl(total)}")
+    return ToolResult("\n".join(partes), read_only=True)

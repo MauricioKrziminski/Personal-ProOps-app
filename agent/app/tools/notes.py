@@ -10,12 +10,19 @@ Duas regras do produto que vivem aqui e não no prompt:
 from __future__ import annotations
 
 import logging
+from datetime import timedelta
 from uuid import UUID
 
 from app import db
 from app.domain.categories import normalize as normalize_folder
-from app.domain.dates import format_date_br, now_utc, to_instant
-from app.domain.recurrence import next_occurrence
+from app.domain.dates import (
+    format_date_br,
+    local_iso_date,
+    local_now,
+    now_utc,
+    to_instant,
+)
+from app.domain.recurrence import descreve_rrule, next_occurrence
 from app.graph.schemas import NotesAction
 from app.tools import guards
 from app.tools.base import ExecContext, ToolResult
@@ -208,3 +215,66 @@ async def delete_reminder(ctx: ExecContext, action: NotesAction) -> ToolResult:
         achados[0]["id"], ctx.workspace_id,
     )
     return ToolResult(f"🗑️ Lembrete apagado: {achados[0]['title']}", result_id=achados[0]["id"])
+
+
+async def query_reminders(ctx: ExecContext, action: NotesAction) -> ToolResult:
+    """Os lembretes agendados, do mais próximo para o mais distante.
+
+    ⚠️ **Todo instante aqui é convertido para o FUSO DO USUÁRIO antes de virar data ou hora.**
+    `reminders.next_run_at` é `timestamptz` e o container roda em UTC: um lembrete das 21h de
+    Brasília é meia-noite do DIA SEGUINTE em UTC. Formatar o instante cru diria "amanhã" para
+    algo que toca hoje à noite — e lembrete que anuncia o dia errado é pior que lembrete
+    nenhum. Quem resolve é `local_iso_date` / `local_now` com `ctx.timezone`, que já cai em
+    America/Sao_Paulo quando o profile não tem fuso.
+
+    "Hoje" e "amanhã" também saem da data LOCAL, nunca de `now_utc().date()`.
+
+    Escopo por `workspace_id`, tabela literal, nenhum id vindo do modelo.
+    """
+    termo = (action.search_term or action.content or "").strip()
+
+    sql = [
+        """
+        select title, next_run_at, recurrence, channel
+        from public.reminders
+        where workspace_id = %s and active = true
+        """
+    ]
+    args: list = [ctx.workspace_id]
+    if termo:
+        sql.append("and title ilike %s")
+        args.append(f"%{termo}%")
+    if action.query_from:
+        sql.append("and next_run_at >= %s")
+        args.append(to_instant(action.query_from, ctx.timezone))
+    if action.query_to:
+        sql.append("and next_run_at <= %s")
+        args.append(to_instant(f"{action.query_to}T23:59:59", ctx.timezone))
+    sql.append("order by next_run_at limit 10")
+
+    rows = await db.fetch(" ".join(sql), *args)
+    if not rows:
+        alvo = f' com "{termo}"' if termo else ""
+        return ToolResult(
+            f"⏰ Nenhum lembrete{alvo} por aqui. Tenta "
+            '"me lembra de pagar o aluguel todo dia 5".',
+            read_only=True,
+        )
+
+    hoje = local_iso_date(ctx.timezone)
+    amanha = local_iso_date(ctx.timezone, now_utc() + timedelta(days=1))
+
+    linhas = ["⏰ *Seus lembretes*"]
+    for r in rows:
+        dia = local_iso_date(ctx.timezone, r["next_run_at"])
+        hora = local_now(ctx.timezone, r["next_run_at"]).strftime("%H:%M")
+        if dia == hoje:
+            quando = f"hoje às {hora}"
+        elif dia == amanha:
+            quando = f"amanhã às {hora}"
+        else:
+            quando = f"{format_date_br(dia)} às {hora}"
+        repete = descreve_rrule(r["recurrence"]) if r["recurrence"] else ""
+        sufixo = f" · {repete}" if repete and repete != "sem recorrência" else ""
+        linhas.append(f"  • {r['title']} — {quando}{sufixo}")
+    return ToolResult("\n".join(linhas), read_only=True)

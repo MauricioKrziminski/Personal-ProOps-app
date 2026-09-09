@@ -46,6 +46,11 @@ Devolva TODOS os domínios presentes na mensagem, na ordem em que aparecem:
   Financiamento é dívida, não compra no cartão. Resposta a campos de cadastro pertence aqui.
   Pagamento de prestação de dívida/financiamento existente também pertence a cadastros,
   para amortizar a dívida; não é pagamento de fatura nem gasto avulso.
+  ⚠️ A fronteira com "financas_consulta" é o que a pessoa quer SABER, não o substantivo:
+  perguntar VALOR, QUANDO cai ou QUANTO falta é sempre "financas_consulta" — "quais minhas
+  recorrências?", "quando cai meu salário?", "quanto falta da dívida?", "quanto devo?".
+  "cadastros" é para MEXER no cadastro (criar, renomear, editar, pausar, apagar) e para listar
+  o que não tem valor associado (pastas, regras).
 - "geral": saudação, agradecimento, dúvida sobre o próprio app, ou nada dos dois.
 
 Contexto e Mensagens Curtas / Deíticas:
@@ -173,6 +178,14 @@ Tipos:
   account = o cartão citado.
 - query_forecast: estimativa numérica do SALDO bancário no futuro — "quanto vai sobrar de dinheiro na conta no fim do mês?", "vou ficar no vermelho?". query_to = até quando, se citado. Use SOMENTE quando a pergunta for sobre o saldo em conta / fluxo de caixa, e NÃO sobre lista de compras/faturas/parcelas.
 - query_net_worth: "qual meu patrimônio?", "como tá minha saúde financeira?".
+- query_recurring: o que se REPETE — "quais minhas recorrências?", "quando cai meu salário?",
+  "o que entra todo mês?", "cadastrei o salário, tá certo?", "quais contas fixas eu tenho?".
+  Use este tipo, e NÃO query_transactions, quando a pergunta é sobre a REGRA (a série) e não
+  sobre um lançamento já registrado: a ocorrência do mês que vem só existe depois que o
+  agendador materializa, então procurar em lançamentos responderia "não achei" sobre uma
+  série que existe e está correta.
+- query_debts: "quanto falta da dívida?", "quanto devo?", "como tá o financiamento?",
+  "quando quito o empréstimo?".
 - simulate_purchase: "posso comprar um celular de 3000 em 10x?". amount_cents =
   valor total em centavos, installments = parcelas (1 à vista).
 - unknown: não é pergunta sobre dinheiro.
@@ -206,6 +219,9 @@ Tipos:
   quando (ISO, na hora local do usuário), recurrence = RRULE quando se repete
   ("todo dia 5" -> FREQ=MONTHLY;BYMONTHDAY=5; "todo dia às 8h" -> FREQ=DAILY).
 - delete_reminder: cancelar um lembrete. search_term identifica qual.
+- query_reminders: LISTAR lembretes — "quais meus lembretes?", "o que eu tinha pra lembrar
+  essa semana?", "tenho algum lembrete do dentista?". search_term filtra por título e
+  query_from/query_to pelo período, quando citados.
 - Referência ao CONTEXTO ("essa última", "a que acabei de mandar", "isso") NÃO é
   texto de busca: deixe search_term VAZIO. O sistema resolve o alvo e pergunta
   mostrando as opções reais. Escrever a referência faz buscar literalmente por

@@ -172,12 +172,19 @@ class FinanceQueryType(str, Enum):
     QUERY_INVOICE = "query_invoice"
     QUERY_FORECAST = "query_forecast"
     QUERY_NET_WORTH = "query_net_worth"
+    # A auditoria de 09/09/2026 cobriu MUTAÇÃO; leitura ficou de fora e estas duas eram a
+    # lacuna. Sem elas, "quando cai meu salário?" caía em `query_transactions`, não achava
+    # nada (a ocorrência ainda não foi materializada) e o agente respondia "não encontrei" —
+    # a resposta errada para uma série que existe. Teto MEDIDO em `probe_query_schema.py`:
+    # 7×12 = 84 passa; aqui ficamos em 7×11 = 77.
+    QUERY_RECURRING = "query_recurring"
+    QUERY_DEBTS = "query_debts"
     SIMULATE_PURCHASE = "simulate_purchase"
     UNKNOWN = "unknown"
 
 
 class FinanceQuery(BaseModel):
-    """7 propriedades × 9 valores de enum = 63. Folga larga.
+    """7 propriedades × 11 valores de enum = 77. Teto medido: 84 passa.
 
     Consulta nunca escreve, então nada de `description`, `recurrence` ou dos
     campos `new_*`: eles não teriam significado aqui.
@@ -206,6 +213,9 @@ class NotesActionType(str, Enum):
     DELETE_NOTE = "delete_note"
     CREATE_REMINDER = "create_reminder"
     DELETE_REMINDER = "delete_reminder"
+    # O agente criava e apagava lembrete, mas não sabia LISTAR: "o que tenho pra hoje?" não
+    # tinha caminho. Teto medido: 9×8 = 72 (`probe_query_schema.py`).
+    QUERY_REMINDERS = "query_reminders"
     UNKNOWN = "unknown"
 
 

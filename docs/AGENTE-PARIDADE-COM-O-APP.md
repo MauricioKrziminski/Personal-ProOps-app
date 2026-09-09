@@ -163,3 +163,99 @@ como AVISO fora do total, com a ação junto ("me manda recebi").
 sua própria cópia da mesma resposta, e a tabela `agent_routing` está vazia — ou seja, o caminho
 Deno é o que responde hoje. `agent/tests/test_query_balance.py` prende os três defeitos com os
 números reais do staging; a cópia Deno é a mesma aritmética, linha a linha.
+
+---
+
+# A outra metade: LEITURA — auditoria de 09/09/2026 (parte 2)
+
+> Pedido do dono do produto: *"Corrija o agente completamente... ele tem que saber de tudo, mas
+> cuidado com os guard rails e segurança de dados daquele user."*
+
+A auditoria de cima enumerou as 52 **mutações** e parou aí. Leitura nunca foi auditada, e a
+lacuna apareceu do jeito mais caro possível: o dono cadastrou um salário recorrente, ele não
+apareceu no mês seguinte, e a pergunta natural — *"o agente saberia me ajudar com isso?"* — tinha
+como resposta **não**.
+
+Método igual: enumerar todo hook de leitura (`useQuery`/`useInfiniteQuery` em `src/hooks/`) e
+casar com o caminho do agente.
+
+## Resultado
+
+| | |
+|---|---|
+| hooks de leitura | 47 |
+| já cobertos | 27 |
+| **lacunas fechadas aqui** | **3** |
+| fora do escopo por decisão, com motivo | 17 |
+
+## As três lacunas fechadas
+
+| o app mostra | o agente (antes) | o agente (agora) |
+|---|---|---|
+| `useRecurringTransactions` — a tela Recorrentes | `resource_list recurring`, que devolve **só a descrição** | `query_recurring`: valor, regra em português, próxima data, data de fim e as pausadas |
+| `useReminders` / `useTodayReminders` | criava e apagava; **não sabia listar** | `query_reminders`: título, hoje/amanhã/data, hora e recorrência, com filtro por termo e período |
+| `useDebts` / `useDebtSchedule` / `usePayoffStrategy` | `resource_list debts`, só o nome | `query_debts`: saldo, principal, prestação, taxa mensal, parcelas pagas e vencimento |
+
+**Por que `resource_list` não bastava.** Ele é `select {identity} from {tabela}` — por desenho,
+devolve o rótulo e mais nada. Serve para "quais pastas eu tenho?"; não serve para nada que tenha
+VALOR ou DATA, que é o que a pessoa pergunta sobre dinheiro.
+
+**Nenhuma custou orçamento de schema, e o teto foi MEDIDO antes** (`scripts/probe_query_schema.py`,
+09/09/2026): `FinanceQuery` 7×12 = 84 passa — ficamos em 7×11 = 77; `NotesAction` 9×8 = 72 passa e
+é onde ficamos. Estimar aqui já custou uma quebra em produção (`ai-gemini.md`).
+
+## O roteador precisou de uma linha
+
+"quais minhas recorrências?" caía em **`cadastros`** — que tem `resource_list` e devolveria os
+nomes secos, exatamente o defeito que esta auditoria fecha. A fronteira agora está escrita no
+prompt do roteador: *perguntar VALOR, QUANDO cai ou QUANTO falta é `financas_consulta`;
+`cadastros` é para MEXER no cadastro*.
+
+## Segurança, uma linha por consulta
+
+As três são leitura pura (`read_only=True`), não gravam idempotência e não passam por HITL.
+
+| | escopo | id do modelo | tabela |
+|---|---|---|---|
+| `query_recurring` | `workspace_id = %s` obrigatório | nenhum | literal |
+| `query_debts` | `workspace_id = %s` + `archived = false` | nenhum | literal |
+| `query_reminders` | `workspace_id = %s` + `active = true` | nenhum | literal |
+
+⚠️ **O serviço conecta com papel que IGNORA RLS**, então esse filtro é a única proteção que
+existe — e por isso ele é TESTE, não vistoria: `tests/test_query_reads.py` falha se a cláusula
+sair do SQL ou se o argumento deixar de ser `ctx.workspace_id`. Termo de busca entra
+parametrizado (`ilike %s`), nunca concatenado.
+
+## Fuso: o defeito que não dá para ver lendo o código
+
+Todo instante vem do Postgres em **UTC** e o usuário lê em **America/Sao_Paulo**. Um lembrete das
+23h30 de Brasília é 02h30 do **dia seguinte** em UTC: formatar o instante cru faria o agente
+dizer *"amanhã"* para algo que toca hoje à noite. O mesmo vale para `recurring.next_run_at`, cuja
+ocorrência costuma cair de madrugada — é quando o materializador roda.
+
+Quem converte é `local_iso_date` / `local_now` com `ctx.timezone`, que já cai em
+America/Sao_Paulo quando o profile não tem fuso. `tests/test_query_reads.py` prende os dois casos
+com instantes que cruzam a meia-noite, e os dois testes foram **verificados falhando** com a
+conversão removida — guarda que não morde não é guarda.
+
+## Fora do escopo, com motivo
+
+| hook | por quê |
+|---|---|
+| `usePlanStatus`, `useAiMonthStats` | paywall e telemetria: é o que COBRA pelo agente, não o que ele responde |
+| `useImportBatches`, `useImportItems`, `useImportStatement`, `useUpdateImportItem` | fluxo de conferência de extrato, feito com o dedo numa lista |
+| `useInvites`, `useWorkspaceMembers` | administração de workspace |
+| `useProfile`, `usePushStatus`, `useAlertPreferences`, `useAlertsSent` | configuração do app |
+| `useAgentConversations`, `useAgentMessages` | é a própria conversa |
+| `useCategoriesUsed`, `useFirstTransactionYear`, `useGlobalSearch` | alimentam seletor e busca da UI |
+| `useAnnualReport`, `useFinancialHealth` | alcançáveis por `query_transactions` com período e por `query_net_worth`; um tipo próprio seria enum gasto em pergunta que ninguém faz por texto |
+
+## ⚠️ Isto só vale no APP enquanto o corte não acontecer
+
+O chat de dentro do app fala **direto com o serviço Python** (`EXPO_PUBLIC_AGENT_URL` →
+`/app/conversations`), então as três consultas novas valem lá assim que houver deploy.
+
+O **WhatsApp não**: o roteador Deno lê `agent_routing.use_python_agent` pelo telefone e a tabela
+está **vazia**, então quem responde continua sendo `process-jobs` em Deno, que não conhece nenhum
+`query_*` novo. Ligar o número na `agent_routing` é o que faz o WhatsApp herdar tudo isto — e é
+decisão do Gabriel, não consequência desta auditoria.

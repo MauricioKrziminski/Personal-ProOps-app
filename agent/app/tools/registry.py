@@ -54,6 +54,8 @@ QUERY_TOOLS = {
     FinanceQueryType.QUERY_INVOICE: queries.query_invoice,
     FinanceQueryType.QUERY_FORECAST: queries.query_forecast,
     FinanceQueryType.QUERY_NET_WORTH: queries.query_net_worth,
+    FinanceQueryType.QUERY_RECURRING: queries.query_recurring,
+    FinanceQueryType.QUERY_DEBTS: queries.query_debts,
     FinanceQueryType.SIMULATE_PURCHASE: queries.simulate_purchase,
 }
 
@@ -64,6 +66,7 @@ NOTES_TOOLS = {
     NotesActionType.DELETE_NOTE: notes.delete_note,
     NotesActionType.CREATE_REMINDER: notes.create_reminder,
     NotesActionType.DELETE_REMINDER: notes.delete_reminder,
+    NotesActionType.QUERY_REMINDERS: notes.query_reminders,
 }
 
 AJUDA = (
