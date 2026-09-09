@@ -64,6 +64,23 @@ if [ ! -t 0 ]; then
     explicito="$(printf '%s' "$comando" | sed -nE 's/.*--project-ref[= ]+([a-z0-9]+).*/\1/p')"
     [ -n "$explicito" ] && alvo="$explicito"
 
+    # `--db-url` escolhe o alvo IGNORANDO o link, e não passava por aqui: `db push --db-url <prod>`
+    # com o CLI linkado no staging era lido como staging e passava batido. O ref aparece no
+    # usuário do pooler (`postgres.<ref>`) ou no host (`<ref>.supabase.co`), então basta procurá-lo
+    # no comando inteiro. Encontrado em 09/09/2026, tentando escrever a conciliação de setembro.
+    if printf '%s' "$comando" | grep -q -- '--db-url'; then
+      if printf '%s' "$comando" | grep -q "$PROD_REF"; then
+        alvo="$PROD_REF"
+      elif printf '%s' "$comando" | grep -q "$STAGING_REF"; then
+        alvo="$STAGING_REF"
+      else
+        # URL montada em tempo de execução (`$(cat .env)`, variável): o ref não está no texto e
+        # NÃO dá para saber o destino. Vazio cai no "ask" logo abaixo — perguntar é o certo aqui,
+        # porque o caso mais provável de uma URL opaca é justamente produção.
+        alvo=""
+      fi
+    fi
+
     if [ "$alvo" = "$PROD_REF" ] && [ "${PROOPS_PROD_OK:-}" != "1" ]; then
       jq -nc --arg r "$(printf 'Bloqueado: este comando ESCREVE no Supabase de PRODUÇÃO (%s, "Personal ProOps app"). O staging é %s, e é para onde o .env.local aponta. Se a intenção era produção mesmo, confirme com o Gabriel e rode de novo com PROOPS_PROD_OK=1 no ambiente.' "$PROD_REF" "$STAGING_REF")" \
         '{hookSpecificOutput: {hookEventName: "PreToolUse", permissionDecision: "deny", permissionDecisionReason: $r}}'
