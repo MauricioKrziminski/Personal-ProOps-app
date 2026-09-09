@@ -133,6 +133,17 @@ begin
     (ws, usr, cc, 'income', 114800, 'Salário CLT (2ª parte)', 'salario',
      'FREQ=MONTHLY;BYMONTHDAY=20', '2026-08-20', '2026-09-20', null);
 
+  -- ── 6c. o Marcelao não é mensal ──────────────────────────────────────────
+  --
+  -- Na fatura o estabelecimento é `Marcelao Beer Luck` (bar), 43,00 em 08/08. A importação leu
+  -- isso como corte de cabelo mensal e criou uma recorrência; o dono do produto confirmou que não
+  -- é — ele nem foi ainda. A COMPRA de agosto fica (aconteceu, está na fatura); some a regra que
+  -- inventava uma nova todo dia 15.
+  delete from public.transactions t
+   using public.recurring_transactions r
+   where t.recurring_id = r.id and r.description = 'Cabelo Marcelao';
+  delete from public.recurring_transactions where workspace_id = ws and description = 'Cabelo Marcelao';
+
   -- ── 7. o futuro que a importação materializou com os valores velhos ──────
   --
   -- As recorrências foram corrigidas no script anterior, mas as linhas já geradas guardam o valor
