@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo } from 'react';
 import * as Haptics from 'expo-haptics';
-import { Pressable, StyleSheet, View, useWindowDimensions } from 'react-native';
+import { Platform, Pressable, StyleSheet, View, useWindowDimensions } from 'react-native';
 import { Canvas, Circle, Group, Path, Skia } from '@shopify/react-native-skia';
 import Animated, {
   interpolateColor,
@@ -96,6 +96,50 @@ function distancia(progresso: SharedValue<number>, i: number) {
 }
 
 /** O ícone dentro da bolha. Todos existem; quem decide qual aparece é a posição. */
+/**
+ * O contador da aba — "9+" no máximo.
+ *
+ * ⚠️ **A fonte NÃO escala aqui, e é a mesma razão do `Icon`.**
+ *
+ * O badge é `position: absolute` dentro de um `iconeSlot` de **24×24**, e em RN a largura
+ * disponível de um filho absoluto é a do PAI. Com a fonte do sistema a 1,3× o "9+" precisa de
+ * ~20px, sobram ~16 depois do respiro, e o texto quebrava: "9" numa linha, "+" na outra, dentro
+ * de uma pílula que virava um oval alto. Aconteceu no aparelho do dono do produto.
+ *
+ * `flexShrink: 0` não resolve — quebra de linha é layout de TEXTO, não de flex. Aumentar o slot
+ * mexeria na geometria da barra inteira. A saída é a que `icon.tsx` já documenta: pedir o texto
+ * em `px / fontScale`, que o RN multiplica de volta, e devolver a caixa ao tamanho de layout.
+ * **Badge tem tamanho de geometria, não de texto** — ele mora numa bolha de dimensão fixa, e
+ * crescer com a fonte estoura a bolha em vez de ajudar quem aumentou a letra. O número continua
+ * legível porque tem no máximo dois caracteres.
+ *
+ * Só no Android: no iOS o `fontScale` não afeta este caminho e `Math.max(…, 1)` evita encolher
+ * quando o usuário DIMINUI a fonte.
+ */
+function Badge({
+  valor,
+  cor,
+  posicao,
+}: {
+  valor: number | undefined;
+  cor: string;
+  posicao: object;
+}) {
+  const { fontScale } = useWindowDimensions();
+  if (!valor) return null;
+  const escala = Platform.OS === 'android' ? Math.max(fontScale, 1) : 1;
+  return (
+    <View style={[styles.badge, posicao, { backgroundColor: cor }]}>
+      <ThemedText
+        type="meta"
+        themeColor="onTint"
+        style={[styles.badgeTexto, { fontSize: Type.meta.fontSize / escala }]}>
+        {valor > 9 ? '9+' : String(valor)}
+      </ThemedText>
+    </View>
+  );
+}
+
 function IconeDaBolha({
   tab,
   index,
@@ -111,13 +155,7 @@ function IconeDaBolha({
   return (
     <Animated.View pointerEvents="none" style={[StyleSheet.absoluteFill, styles.centro, estilo]}>
       <Icon name={tab.icon} size="md" color="tint" />
-      {tab.badge ? (
-        <View style={[styles.badge, styles.badgeBolha, { backgroundColor: badgeColor }]}>
-          <ThemedText type="meta" themeColor="onTint" style={styles.badgeTexto}>
-            {tab.badge > 9 ? '9+' : String(tab.badge)}
-          </ThemedText>
-        </View>
-      ) : null}
+      <Badge valor={tab.badge} cor={badgeColor} posicao={styles.badgeBolha} />
     </Animated.View>
   );
 }
@@ -138,13 +176,7 @@ function IconeDoSlot({
   return (
     <Animated.View style={[styles.iconeSlot, estilo]}>
       <Icon name={tab.icon} size="md" color="textSecondary" />
-      {tab.badge ? (
-        <View style={[styles.badge, styles.badgeIcone, { backgroundColor: badgeColor }]}>
-          <ThemedText type="meta" themeColor="onTint" style={styles.badgeTexto}>
-            {tab.badge > 9 ? '9+' : String(tab.badge)}
-          </ThemedText>
-        </View>
-      ) : null}
+      <Badge valor={tab.badge} cor={badgeColor} posicao={styles.badgeIcone} />
     </Animated.View>
   );
 }
