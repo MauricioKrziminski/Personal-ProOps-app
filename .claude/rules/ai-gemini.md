@@ -100,6 +100,11 @@ nenhum outro:
   `evaluate_answer_forms.py` (~94 chamadas por execução) mais os `probe_*`, e **nenhum deles grava
   em `ai_events`**: não aparecem em contagem nenhuma. Com o gate em Flash, cada execução completa é
   paga. Rode a suíte **uma vez, no fim**, e use `--secao` enquanto estiver iterando.
+
+  ⏱️ **Ela passou de ~90s para ~8 min** depois da divisão de modelos: o Flash tem **5 RPM** e a
+  seção de confirmação/rascunho tem ~40 casos, todos no gate. Não é travamento — é a cota. Espere
+  o processo terminar em vez de reexecutar; duas execuções em paralelo custam o dobro e uma delas
+  é jogada fora (aconteceu em 09/09/2026).
 - **Todo parse que CHAMOU o modelo grava linha em `ai_events`** (`llm_calls > 0` no estado do
   grafo). Isso não é só auditoria: `private.plan_status_for` **conta essas linhas** para saber
   quantas mensagens de IA o workspace gastou no mês. Não gravar derruba o paywall em silêncio, e
