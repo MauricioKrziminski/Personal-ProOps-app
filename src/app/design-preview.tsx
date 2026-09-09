@@ -13,6 +13,7 @@ import AgentScreen from './(tabs)/agent/index';
 import DebtsScreen from './finance/debts';
 import InvoiceScreen from './finance/invoice/[id]';
 import RecurringScreen from './finance/recurring';
+import TransactionDetailScreen from './finance/[txId]';
 import TransactionFormScreen from './finance/transaction-form';
 import MonthScreen from './finance/month';
 import FinanceScreen from './(tabs)/finance/index';
@@ -65,7 +66,14 @@ import TodayScreen from './(tabs)/today/index';
  * `osascript ... get {position, size} of window 1` dá a origem, a tela do device fica em
  * `(origem + 27, origem + 80)` com 398×865pt, e o screenshot é 1206×2622px — fator 0,33.
  */
-const ABAS = ['Hoje', 'Finanças', 'Notas', 'Agente', 'Perfil', 'Dívidas', 'Mês', 'Fatura', 'Recorrentes', 'Editar'] as const;
+/**
+ * `Detalhe` monta `[txId]` sobre uma ocorrência de SÉRIE no CARTÃO (`?txId=prev-r9`), que é o
+ * caso real que o dono do produto reclamou em 09/09/2026 — o DAS. Duas coisas só aparecem
+ * nessa combinação: o rótulo "Entra na fatura de …" (em cartão `due_at` é o vencimento da
+ * FATURA, não do lançamento, e a tela escrevia "Vence em") e a linha "Repete …" que leva à
+ * série. Numa parcela ou num lançamento solto, nenhuma das duas existe.
+ */
+const ABAS = ['Hoje', 'Finanças', 'Notas', 'Agente', 'Perfil', 'Dívidas', 'Mês', 'Fatura', 'Recorrentes', 'Editar', 'Detalhe'] as const;
 
 /**
  * A tela é montada numa caixa ALTA e deslocada para cima, em vez de rolada.
@@ -109,6 +117,7 @@ const ABA_PARA_TAB: Record<string, number> = {
   Fatura: 1,
   Recorrentes: 2,
   Editar: 2,
+  Detalhe: 2,
 };
 /** Quantas alturas de tela cada aba ocupa — medido, para não gastar frame em preto. */
 const FAIXAS: Record<(typeof ABAS)[number], number> = {
@@ -129,6 +138,9 @@ const FAIXAS: Record<(typeof ABAS)[number], number> = {
   // Uma faixa: o valor, a categoria e o botão Salvar cabem numa tela — é o que precisa
   // ser tocado para a pergunta de escopo aparecer.
   Editar: 1,
+  // Duas faixas: o herói, a faixa "Ainda não aconteceu" e o bloco "Faz parte de" — que é
+  // onde a linha da série e a da fatura precisam aparecer.
+  Detalhe: 2,
 };
 /** As cinco raízes de aba. As outras faixas são telas EMPURRADAS e não têm tab bar. */
 const RAIZES = new Set<(typeof ABAS)[number]>(['Hoje', 'Finanças', 'Notas', 'Agente', 'Perfil']);
@@ -187,6 +199,7 @@ export default function DesignPreviewScreen() {
             {aba === 'Fatura' ? <InvoiceScreen /> : null}
             {aba === 'Recorrentes' ? <RecurringScreen /> : null}
             {aba === 'Editar' ? <TransactionFormScreen /> : null}
+            {aba === 'Detalhe' ? <TransactionDetailScreen /> : null}
           </View>
 
           {/*
@@ -248,6 +261,7 @@ function seedClient() {
   const ultimoDia = localISODate(new Date(agora.getFullYear(), agora.getMonth() + 1, 0));
   const anterior = new Date(agora.getFullYear(), agora.getMonth() - 1, 1);
   const mesAnterior = localISODate(anterior).slice(0, 7);
+  const mesSeguinte = localISODate(new Date(agora.getFullYear(), agora.getMonth() + 1, 1)).slice(0, 7);
   const ultimoDiaAnterior = localISODate(
     new Date(anterior.getFullYear(), anterior.getMonth() + 1, 0)
   );
@@ -791,6 +805,20 @@ function seedClient() {
     // (refine do zod). Toda linha pendente em produção tem: 92 de 92, conferido.
     status: 'pending', due_at: `${mes}-13`, invoice_id: null,
     installment_plan_id: 'prev-pl1', installment_no: 3, recurring_id: null, debt_id: null,
+  });
+
+  /**
+   * A ocorrência de SÉRIE no CARTÃO da banda `Detalhe` (`?txId=prev-r9`), com a forma exata
+   * do DAS em produção: compra no dia 20, `due_at` no dia 10 do mês seguinte (que é o
+   * vencimento da FATURA, não do lançamento) e `recurring_id` apontando para `prev-r1`.
+   */
+  client.setQueryData(['transactions', 'item', 'prev-r9'], {
+    id: 'prev-r9', kind: 'expense', amount_cents: 12850, currency: 'BRL',
+    category: 'impostos', description: 'DAS', merchant: null,
+    account_id: 'prev-a3', counterparty_account_id: null,
+    occurred_at: `${mes}-20`, source: 'recurring', created_at: `${mes}-01T10:00:00Z`,
+    status: 'pending', due_at: `${mesSeguinte}-10`, invoice_id: 'prev-i1',
+    installment_plan_id: null, installment_no: null, recurring_id: 'prev-r1', debt_id: null,
   });
 
   client.setQueryData(['recurring', 'upcoming', '30', hoje], [

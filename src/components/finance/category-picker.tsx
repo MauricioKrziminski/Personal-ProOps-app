@@ -100,11 +100,12 @@ export function CategoryPicker({
               title={`Usar "${termo}"`}
               subtitle="Categoria nova"
               icon="plus"
+              chevron={false}
               onPress={() => escolher(termo)}
             />
           ) : null}
           {value ? (
-            <Row title="Sem categoria" icon="xmark" onPress={() => escolher(null)} />
+            <Row title="Sem categoria" icon="xmark" chevron={false} onPress={() => escolher(null)} />
           ) : null}
           {filtradas.map((o) => (
             <Row
@@ -114,6 +115,7 @@ export function CategoryPicker({
               icon={
                 value && foldCategory(o.label) === foldCategory(value) ? 'checkmark' : 'tag'
               }
+              chevron={false}
               onPress={() => escolher(o.label)}
             />
           ))}
