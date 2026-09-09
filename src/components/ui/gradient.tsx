@@ -1,6 +1,8 @@
 import { useState } from 'react';
 import { StyleSheet, View, type LayoutChangeEvent } from 'react-native';
-import { BlurMask, Canvas, Circle, Fill, LinearGradient, vec } from '@shopify/react-native-skia';
+import { BlurMask, Circle, Fill, LinearGradient, vec } from '@shopify/react-native-skia';
+
+import { SkiaCanvas } from '@/components/ui/skia-canvas';
 
 /**
  * O fundo das superfícies de destaque do Stitch: um gradiente vertical curto e, opcionalmente,
@@ -52,7 +54,7 @@ export function GradientSurface({
     */
     <View style={StyleSheet.absoluteFill} onLayout={measure} pointerEvents="none">
       {size.h > 0 ? (
-        <Canvas style={StyleSheet.absoluteFill}>
+        <SkiaCanvas style={StyleSheet.absoluteFill}>
           <Fill>
             <LinearGradient start={vec(0, 0)} end={vec(0, size.h)} colors={[from, to]} />
           </Fill>
@@ -61,7 +63,7 @@ export function GradientSurface({
               <BlurMask blur={sheenSize / 2} style="normal" />
             </Circle>
           ) : null}
-        </Canvas>
+        </SkiaCanvas>
       ) : null}
     </View>
   );

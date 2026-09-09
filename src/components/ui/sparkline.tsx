@@ -1,8 +1,9 @@
 import { useEffect, useMemo } from 'react';
 import { View } from 'react-native';
 import Animated, { useAnimatedStyle, useSharedValue, withTiming } from 'react-native-reanimated';
-import { Canvas, Circle, Line, LinearGradient, Path, Skia, vec } from '@shopify/react-native-skia';
+import { Circle, Line, LinearGradient, Path, Skia, vec } from '@shopify/react-native-skia';
 
+import { SkiaCanvas } from '@/components/ui/skia-canvas';
 import { Motion, Radius } from '@/design/tokens';
 import { useTheme } from '@/hooks/use-theme';
 
@@ -146,7 +147,7 @@ export function Sparkline({
   const gradStart = splitX ?? 0;
 
   return (
-    <Canvas style={{ width, height }}>
+    <SkiaCanvas style={{ width, height }}>
       {/*
         A área é um GRADIENTE, não um preenchimento chapado (`from secondary/0.35 to /0`).
         Chapada com 14% ela lia como uma sombra retangular embaixo da linha; com a queda para
@@ -194,7 +195,7 @@ export function Sparkline({
       {/* O alfinete do dia de hoje: disco na cor do texto com o miolo vazado na cor do fundo. */}
       <Circle cx={pinX} cy={pinY2} r={R} color={theme.text} />
       <Circle cx={pinX} cy={pinY2} r={1.75} color={theme.heroBottom} />
-    </Canvas>
+    </SkiaCanvas>
   );
 }
 

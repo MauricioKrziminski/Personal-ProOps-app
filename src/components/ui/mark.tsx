@@ -1,5 +1,5 @@
 import { useEffect, useMemo } from 'react';
-import { Canvas, Group, Path } from '@shopify/react-native-skia';
+import { Group, Path } from '@shopify/react-native-skia';
 import {
   Easing,
   useDerivedValue,
@@ -11,6 +11,7 @@ import type { StyleProp, ViewStyle } from 'react-native';
 
 import type { ThemeColor } from '@/constants/theme';
 import { markPath } from '@/design/mark-path';
+import { SkiaCanvas } from '@/components/ui/skia-canvas';
 import { useTheme } from '@/hooks/use-theme';
 
 interface MarkProps {
@@ -65,7 +66,7 @@ export function Mark({
   const origin = useMemo(() => ({ x: size / 2, y: size / 2 }), [size]);
 
   return (
-    <Canvas
+    <SkiaCanvas
       style={[{ width: size, height: size }, style]}
       // A marca é decoração quando não carrega informação; girando, quem anuncia o estado é o
       // componente que a hospeda (o Button já expõe `busy`).
@@ -74,6 +75,6 @@ export function Mark({
       <Group transform={transform} origin={origin}>
         <Path path={path} color={theme[color]} opacity={watermark ? 0.06 : 1} />
       </Group>
-    </Canvas>
+    </SkiaCanvas>
   );
 }

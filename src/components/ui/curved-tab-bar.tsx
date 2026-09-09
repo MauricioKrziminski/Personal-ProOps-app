@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo } from 'react';
 import * as Haptics from 'expo-haptics';
 import { Platform, Pressable, StyleSheet, View, useWindowDimensions } from 'react-native';
-import { Canvas, Circle, Group, Path, Skia } from '@shopify/react-native-skia';
+import { Circle, Group, Path, Skia } from '@shopify/react-native-skia';
 import Animated, {
   interpolateColor,
   useAnimatedStyle,
@@ -14,6 +14,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { ThemedText } from '@/components/themed-text';
 import { Icon } from '@/components/ui/icon';
+import { SkiaCanvas } from '@/components/ui/skia-canvas';
 import { empurraoDaPonta, posicaoDoBerco } from '@/design/tab-cradle';
 import { Motion, Radius, Space, Type } from '@/design/tokens';
 import { useTheme } from '@/hooks/use-theme';
@@ -389,7 +390,7 @@ export function CurvedTabBar({
           O canvas é deslocado `TOP` para baixo: a pílula é desenhada com a aresta em y=0, e a
           metade de cima da bolha vive fora dele.
         */}
-        <Canvas style={[StyleSheet.absoluteFill, { top: TOP }]} pointerEvents="none">
+        <SkiaCanvas style={[StyleSheet.absoluteFill, { top: TOP }]} pointerEvents="none">
           {/* Preenchimento e traço excluem o berço: o conteúdo atrás fica visível. */}
           <Group clip={disco} invertClip>
             <Path path={pilula} color={theme.backgroundElement} style="fill" />
@@ -402,7 +403,7 @@ export function CurvedTabBar({
           <Group clip={pilula}>
             <Circle cx={centro} cy={0} r={CUT} color={theme.separator} style="stroke" strokeWidth={1} />
           </Group>
-        </Canvas>
+        </SkiaCanvas>
 
         <Animated.View
           pointerEvents="none"

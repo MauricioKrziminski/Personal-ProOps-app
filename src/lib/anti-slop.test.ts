@@ -147,3 +147,40 @@ test('nenhum rótulo truncado — texto quebra, layout cede', () => {
     'rótulo não trunca: quebre a linha, alargue a célula ou desça a pílula — reticências escondem o dado'
   );
 });
+
+/**
+ * `Canvas` do Skia só existe dentro de `ui/skia-canvas.tsx`.
+ *
+ * **A superfície do Skia guarda o px/dp com que nasceu.** Mudou a densidade da tela com o app
+ * rodando — "tamanho de exibição" nas configurações, dobrável trocando de painel — e o desenho
+ * sai na escala VELHA enquanto as `View`s ao lado já se reposicionaram. Em 09/09/2026 isso apareceu
+ * como "a bola da aba selecionada está fora do lugar": o berço da `CurvedTabBar` desenhado a
+ * 145,4dp com raio 38,5 quando o JS mandava 124,8 e 33 — os dois × 1,1667, que é 3,5/3,0 —, com a
+ * bolha (uma `View`) no lugar certo ao lado. O código da barra estava correto o tempo todo.
+ *
+ * `SkiaCanvas` remonta a superfície quando a escala muda, e são CINCO canvases no app. Mesma
+ * régua do `GlassCard` e do `Icon`: a decisão mora no primitivo, com o motivo escrito uma vez —
+ * um canvas novo importado direto nasceria com o defeito de volta, em silêncio.
+ */
+test('nenhum Canvas do Skia fora de ui/skia-canvas.tsx', () => {
+  /*
+    Casa o ARQUIVO inteiro, não linha a linha.
+    `import { Circle, Line, LinearGradient, Path, Skia, vec } from '@shopify/react-native-skia'`
+    já tem 98 colunas: somar `Canvas` estoura a régua e o formatador quebra o import em várias
+    linhas — aí nenhuma linha tem `Canvas` E o `from`, e um guarda por linha fica verde com o
+    defeito de volta. Testado: a violação plantada em `sparkline.tsx` passou batido assim.
+  */
+  const fora: string[] = [];
+  for (const file of walk(SRC)) {
+    if (file.endsWith(join('ui', 'skia-canvas.tsx'))) continue;
+    const code = stripComments(readFileSync(file, 'utf8'));
+    for (const imp of code.matchAll(/import\s*\{([^}]*)\}\s*from\s*'@shopify\/react-native-skia'/g)) {
+      if (/\bCanvas\b/.test(imp[1])) fora.push(file.replace(SRC, 'src'));
+    }
+  }
+  assert.deepEqual(
+    fora,
+    [],
+    'use SkiaCanvas de @/components/ui/skia-canvas: o Canvas cru fica preso na escala px/dp em que nasceu'
+  );
+});

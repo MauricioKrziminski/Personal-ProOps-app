@@ -1,5 +1,5 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { Canvas, Group, Path } from '@shopify/react-native-skia';
+import { Group, Path } from '@shopify/react-native-skia';
 import * as SplashScreen from 'expo-splash-screen';
 import { useEffect, useMemo, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
@@ -14,6 +14,7 @@ import Animated, {
 
 import { Motion, Space } from '@/design/tokens';
 import { markPath } from '@/design/mark-path';
+import { SkiaCanvas } from '@/components/ui/skia-canvas';
 import { useTheme } from '@/hooks/use-theme';
 
 /**
@@ -159,11 +160,11 @@ export function AnimatedSplashOverlay({ ready = true }: { ready?: boolean }) {
       }}
       style={[styles.overlay, { backgroundColor: theme.background }]}>
       <Animated.View style={markStyle}>
-        <Canvas style={{ width: MARK, height: MARK }}>
+        <SkiaCanvas style={{ width: MARK, height: MARK }}>
           <Group>
             <Path path={path} color={theme.text} />
           </Group>
-        </Canvas>
+        </SkiaCanvas>
       </Animated.View>
 
       {full ? <SettlingLines progress={lines} tint={theme.textSecondary} /> : null}
