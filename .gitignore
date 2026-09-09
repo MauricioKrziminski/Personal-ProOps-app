@@ -63,3 +63,6 @@ agent/.pytest_cache/
 
 # Local validation captures may contain personal staging data.
 docs/bugs/evidence/
+
+# Checkpoints do banco: dado financeiro real, nunca versionado
+.checkpoints/
