@@ -12,6 +12,7 @@ import { EmptyState } from '@/components/ui/empty-state';
 import { Money } from '@/components/ui/money';
 import { Row, Section } from '@/components/ui/row';
 import { HeaderActions, HeaderMenu } from '@/components/ui/header-actions';
+import { describeRRule } from '@/lib/rrule-text';
 import { Screen } from '@/components/ui/screen';
 import { HeroLabel } from '@/components/ui/section-head';
 import { Skeleton, SkeletonRow } from '@/components/ui/skeleton';
@@ -25,6 +26,7 @@ import {
   useMarkPaid,
   useDeleteInstallmentPlan,
   useInstallmentPlans,
+  useRecurringTransactions,
   useSaveTransaction,
   useTransaction,
   type Transaction,
@@ -88,6 +90,8 @@ export default function TransactionDetailScreen() {
   const invoice = useInvoice(tx?.invoice_id ?? undefined);
   const plans = useInstallmentPlans();
   const plano = (plans.data ?? []).find((p) => p.id === tx?.installment_plan_id);
+  const series = useRecurringTransactions();
+  const serie = (series.data ?? []).find((r) => r.id === tx?.recurring_id);
   const removePlan = useDeleteInstallmentPlan();
   const save = useSaveTransaction();
   const remove = useDeleteTransaction();
@@ -304,8 +308,10 @@ export default function TransactionDetailScreen() {
       {tx.status === 'pending' ? (
         <Section title="Ainda não aconteceu">
           <Row
-            title={dueLabel(tx.kind, tx.due_at ? formatDateBR(tx.due_at) : null)}
-            subtitle={settleHint(tx.kind)}
+            title={dueLabel(tx.kind, tx.due_at ? formatDateBR(tx.due_at) : null, {
+              onCard: tx.invoice_id !== null,
+            })}
+            subtitle={settleHint(tx.kind, { onCard: tx.invoice_id !== null })}
             icon="clock"
             trailing={
               <Button
@@ -342,7 +348,7 @@ export default function TransactionDetailScreen() {
         ) : null}
       </Section>
 
-      {(tx.invoice_id || tx.installment_plan_id) && (
+      {(tx.invoice_id || tx.installment_plan_id || tx.recurring_id) && (
         <Section title="Faz parte de">
           {tx.invoice_id ? (
             <Row
@@ -358,6 +364,28 @@ export default function TransactionDetailScreen() {
               accessibilityLabel="Ver a fatura em que essa compra caiu"
               onPress={() =>
                 router.push({ pathname: '/finance/invoice/[id]', params: { id: tx.invoice_id! } })
+              }
+            />
+          ) : null}
+          {/*
+            A REGRA da série (o dia do mês, a frequência, quando acaba) só existia em
+            Recorrentes. O DAS é uma ocorrência de série no cartão: pelo lançamento dava
+            para mudar o valor daquele mês, mas não o que gera os próximos — era o
+            "tenho que ir até onde ele de fato foi criado" de 09/09/2026. São 25 das
+            pendências de cartão.
+          */}
+          {tx.recurring_id ? (
+            <Row
+              title={serie ? `Repete ${describeRRule(serie.rrule)}` : 'Faz parte de uma recorrência'}
+              subtitle={
+                serie
+                  ? `${formatBRL(serie.amount_cents)} por vez · editar a série`
+                  : 'Editar a série que gera este lançamento'
+              }
+              icon="repeat"
+              accessibilityLabel="Editar a série recorrente que gerou este lançamento"
+              onPress={() =>
+                router.push({ pathname: '/finance/recurring', params: { edit: tx.recurring_id! } })
               }
             />
           ) : null}

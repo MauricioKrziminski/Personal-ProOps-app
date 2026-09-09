@@ -30,11 +30,25 @@ export function settleAccessibilityLabel(
   return `${settleLabel(kind)}: ${item}`;
 }
 
+/**
+ * Em lançamento de CARTÃO, `due_at` é o vencimento da FATURA, não do lançamento.
+ * O DAS é comprado dia 20 e a fatura vence dia 10 do mês seguinte — escrever
+ * "vence 10/09" numa linha de 20/08 é dizer a data errada com todas as letras,
+ * e foi a queixa de 09/09/2026. São 69 linhas em produção com essa forma.
+ *
+ * A data continua sendo a mesma; o que muda é o de QUEM ela é.
+ */
+export type DueOpts = { onCard?: boolean };
+
 /** A data de um previsto. Receita não "vence" — ela é esperada. */
 export function dueLabel(
   kind: SettleKind | string | null | undefined,
   dateBR: string | null | undefined,
+  opts: DueOpts = {},
 ): string {
+  if (opts.onCard) {
+    return dateBR ? `Entra na fatura de ${dateBR}` : 'Entra na próxima fatura';
+  }
   if (!dateBR) {
     return kind === 'income' ? 'Sem data prevista' : 'Sem data de vencimento';
   }
@@ -45,13 +59,21 @@ export function dueLabel(
 export function dueInline(
   kind: SettleKind | string | null | undefined,
   dateBR: string | null | undefined,
+  opts: DueOpts = {},
 ): string {
+  if (opts.onCard) return dateBR ? `na fatura de ${dateBR}` : 'na próxima fatura';
   if (!dateBR) return 'previsto';
   return kind === 'income' ? `previsto · chega ${dateBR}` : `previsto · vence ${dateBR}`;
 }
 
 /** A dica de "o que fazer com isto", que também falava só de pagar. */
-export function settleHint(kind: SettleKind | string | null | undefined): string {
+export function settleHint(
+  kind: SettleKind | string | null | undefined,
+  opts: DueOpts = {},
+): string {
+  // No cartão a projeção conta a FATURA, nunca a linha: dar baixa aqui só marca
+  // esta compra como já conferida, não tira nada do caixa.
+  if (opts.onCard) return 'Sai do caixa quando a fatura for paga';
   return kind === 'income'
     ? 'Marque quando receber para sair da projeção'
     : 'Marque quando pagar para sair da projeção';

@@ -1610,7 +1610,7 @@ export function useToggleRecurring() {
   });
 }
 
-/** Apaga a série. Os lançamentos já materializados continuam em transactions. */
+/** Apaga a série. O trigger `recurring_drop_future` leva junto as ocorrências futuras em aberto; histórico e atrasado ficam. */
 export function useDeleteRecurring() {
   const invalidate = useInvalidateFinance();
   return useMutation({

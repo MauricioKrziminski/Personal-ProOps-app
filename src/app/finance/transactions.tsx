@@ -266,6 +266,22 @@ export default function TransactionsScreen() {
 
   const header = (
     <View style={styles.header}>
+      {/*
+        A busca vive DENTRO do `ListHeaderComponent`, não ao lado da lista. Irmã do
+        `SectionList` numa `Screen scroll={false}`, a pílula do Android ficava cravada no
+        topo enquanto o extrato passava por baixo — a queixa de 09/09/2026, com foto. No
+        iOS ela é `Stack.SearchBar`, que escreve opções por hook e devolve `null`: a
+        posição na árvore não muda nada de lá.
+      */}
+      <Search
+        gutter
+        value={search}
+        onChangeText={setSearch}
+        hideWhenScrolling={false}
+        placeholder="Buscar por descrição, lugar ou categoria"
+        accessibilityLabel="Buscar lançamentos"
+      />
+
       <MonthPicker month={month} onChange={setMonth} />
 
       {accountId !== undefined ? null : summary.isError ? (
@@ -388,14 +404,6 @@ export default function TransactionsScreen() {
         <Stack.Screen
           options={{ title: accountLabel ?? 'Lançamentos', headerLargeTitle: true }}
         />
-        <Search
-          gutter
-          value={search}
-          onChangeText={setSearch}
-          hideWhenScrolling={false}
-          placeholder="Buscar por descrição, lugar ou categoria"
-          accessibilityLabel="Buscar lançamentos"
-        />
         <HeaderMenu
           title="Mais opções"
           actions={[
@@ -479,10 +487,13 @@ export default function TransactionsScreen() {
           renderItem={({ item: tx, index, section }) => {
             const badges = [
               tx.status === 'pending'
-                ? dueInline(tx.kind, tx.due_at ? formatDateBR(tx.due_at) : null)
+                ? dueInline(tx.kind, tx.due_at ? formatDateBR(tx.due_at) : null, {
+                    onCard: tx.invoice_id !== null,
+                  })
                 : null,
               tx.installment_no ? `parcela ${tx.installment_no}` : null,
-              tx.invoice_id ? 'fatura' : null,
+              // "na fatura de 10/09" já diz que é do cartão; a pílula solta viraria eco
+              tx.invoice_id && tx.status !== 'pending' ? 'fatura' : null,
             ].filter(Boolean);
             // Transferência não tem sinal na lista global — ela não é entrada nem saída do
             // conjunto. No extrato de UMA conta ela tem: sai da conta de origem e ENTRA na de

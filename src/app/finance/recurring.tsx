@@ -384,9 +384,10 @@ export default function RecurringScreen() {
           onSuccess: () => toast({ message: 'Recorrência apagada.', tone: 'success' }),
           onError: () => toast({ message: 'Não deu para apagar a série.', tone: 'error' }),
         }),
-      // honestidade sobre o FUTURO, não só sobre o passado: a série sai, mas as ocorrências já
-      // materializadas (até 90 dias) continuam pesando na projeção até serem apagadas à mão
-      'A série para de gerar. Os lançamentos já criados continuam — inclusive os futuros, que seguem na projeção. Para tirá-los, apague em Lançamentos. Para só parar de gerar, pause a série.'
+      // O trigger `recurring_drop_future` (20260909090000) leva junto as ocorrências futuras
+      // ainda em aberto. O que fica é histórico e conta atrasada — nenhum dos dois some
+      // porque a série parou de existir.
+      'As ocorrências futuras saem da projeção junto. O histórico e o que está atrasado ficam. Para só parar de gerar, pause a série.'
     );
 
   const acoes = (r: RecurringTransaction) =>
