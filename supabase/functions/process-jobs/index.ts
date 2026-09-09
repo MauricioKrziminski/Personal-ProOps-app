@@ -976,20 +976,36 @@ async function executeAction(
         to_date: to,
       });
       if (error) throw error;
-      let rows = (data ?? []) as { kind: string; category: string; total_cents: number; tx_count: number }[];
+      // `pending_cents` é opcional pelo mesmo motivo do saldo: código sobe por deploy, coluna
+      // por migration, e a ordem não é garantida. Ausente, cai no total — que é o que esta
+      // resposta já dizia — em vez de imprimir NaN.
+      let rows = (data ?? []) as {
+        kind: string; category: string; total_cents: number; tx_count: number;
+        pending_cents?: number | null;
+      }[];
       const cat = action.category?.toLowerCase();
       if (cat) rows = rows.filter((r) => r.category === cat);
       if (!rows.length) return `📊 Nada registrado entre ${formatDateBR(from)} e ${formatDateBR(to)}.`;
-      const spent = rows.filter((r) => r.kind === "expense").reduce((s, r) => s + Number(r.total_cents), 0);
-      const earned = rows.filter((r) => r.kind === "income").reduce((s, r) => s + Number(r.total_cents), 0);
+      const previsto = (r: (typeof rows)[number]) =>
+        r.pending_cents === undefined || r.pending_cents === null ? 0 : Number(r.pending_cents);
+      // REALIZADO. "Gastos"/"Receitas" são fatos consumados: contar o que ainda não aconteceu
+      // fazia o WhatsApp dar um número e o app dar outro, no mesmo mês.
+      const realizado = (r: (typeof rows)[number]) => Number(r.total_cents) - previsto(r);
+      const spent = rows.filter((r) => r.kind === "expense").reduce((s, r) => s + realizado(r), 0);
+      const earned = rows.filter((r) => r.kind === "income").reduce((s, r) => s + realizado(r), 0);
+      const aConfirmar = rows.reduce((s, r) => s + previsto(r), 0);
       const lines = rows.slice(0, 8).map((r) =>
-        `  • ${r.kind === "income" ? "💰" : "💸"} ${r.category}: ${centsToBRL(Number(r.total_cents))} (${r.tx_count}x)`
+        `  • ${r.kind === "income" ? "💰" : "💸"} ${r.category}: ${centsToBRL(realizado(r))} (${r.tx_count}x)` +
+        (previsto(r) ? ` + ${centsToBRL(previsto(r))} previsto` : "")
       );
       const header = [
         spent ? `Gastos: *${centsToBRL(spent)}*` : null,
         earned ? `Receitas: *${centsToBRL(earned)}*` : null,
       ].filter(Boolean).join(" | ");
-      return `📊 ${formatDateBR(from)} a ${formatDateBR(to)} — ${header}\n${lines.join("\n")}`;
+      const rodape = aConfirmar
+        ? `\n\n⏳ ${centsToBRL(aConfirmar)} ainda previstos, fora das somas acima.`
+        : "";
+      return `📊 ${formatDateBR(from)} a ${formatDateBR(to)} — ${header}\n${lines.join("\n")}${rodape}`;
     }
 
     case "query_budgets": {
