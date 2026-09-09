@@ -217,14 +217,23 @@ const linhaProjetada = {
   kind: 'expense', amount_cents: 147000, settled: false, projected: true,
 };
 
-test('a parcela projetada abre a DÍVIDA, nunca um lançamento', () => {
+test('a parcela projetada abre A DÍVIDA CERTA, nunca um lançamento', () => {
   // `ref_id` de uma linha projetada é id de DÍVIDA. Empurrar `/finance/[txId]` com ele abriria
   // um lançamento que não existe — é a mesma lição de `kind='debt'` em upcoming_bills.
+  //
+  // E vai com o `id`: mandar para a LISTA fazia quem tem cinco financiamentos ter que caçar
+  // qual era. A tela de Dívidas abre o detalhe direto quando recebe o parâmetro.
   const ui = screen(monthFile, { monthLines: [linhaProjetada], monthSummary: RESUMO_MES });
   const linha = ui.nodes().find((n) => n.type === 'Row' && n.props.title === 'Parcela carro');
   assert.ok(linha, 'a linha do financiamento aparece no mês');
   linha.props.onPress();
-  assert.deepEqual(ui.navigations, ['/finance/debts']);
+  // Campo a campo, não `deepEqual`: o objeto é criado dentro do módulo avaliado pelo harness,
+  // ou seja em outro realm, e a comparação estrita reprova por protótipo mesmo com a estrutura
+  // idêntica ("same structure but not reference-equal"). Os outros casos deste arquivo comparam
+  // strings e por isso nunca esbarraram nisso.
+  assert.equal(ui.navigations.length, 1);
+  assert.equal(ui.navigations[0].pathname, '/finance/debts');
+  assert.equal(ui.navigations[0].params.id, 'debt-1');
 });
 
 test('a parcela projetada não oferece dar baixa: ela ainda não é lançamento', () => {
