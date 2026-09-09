@@ -482,3 +482,41 @@ async def test_pausar_serie_nao_passa_pela_rpc(monkeypatch):
         acao,
     )
     assert not any("update_recurring_series" in s for s in sqls), sqls
+
+
+@pytest.mark.asyncio
+async def test_apagar_serie_avisa_que_o_futuro_sai_junto(monkeypatch):
+    """
+    A frase da confirmação é o que a pessoa lê ANTES de aprovar, e ela dizia
+    "registros já gerados continuam no histórico".
+
+    Desde o trigger `recurring_drop_future` (`20260909090000`) isso é mentira para série:
+    as ocorrências futuras ainda em aberto saem junto. Aprovar uma exclusão com a promessa
+    errada na tela é o pior jeito de essa mudança chegar no usuário.
+    """
+    async def fetch(*a):
+        return [_linha(kind="expense", amount_cents=150000, description="Aluguel",
+                       category="moradia", account_id=None, rrule="FREQ=MONTHLY;BYMONTHDAY=5",
+                       dtstart="2026-01-05T09:00:00Z", auto_confirm=True, active=True)]
+
+    monkeypatch.setattr(resources.db, "fetch", fetch)
+    prepared = await resources.prepare(
+        ctx(), action(resource="recurring", kind="resource_delete")
+    )
+    resumo = prepared["summary"]
+    assert "futuras" in resumo, resumo
+    assert "registros já gerados continuam no histórico" not in resumo, resumo
+
+
+@pytest.mark.asyncio
+async def test_apagar_lembrete_nao_herda_o_aviso_da_serie(monkeypatch):
+    """Lembrete não materializa lançamento: para ele a frase antiga continua verdadeira."""
+    async def fetch(*a):
+        return [_linha(title="Pagar aluguel", rrule="FREQ=MONTHLY;BYMONTHDAY=5",
+                       due_at="2026-10-05T09:00:00Z", done=False)]
+
+    monkeypatch.setattr(resources.db, "fetch", fetch)
+    prepared = await resources.prepare(
+        ctx(), action(resource="reminders", kind="resource_delete")
+    )
+    assert "registros já gerados continuam no histórico" in prepared["summary"]

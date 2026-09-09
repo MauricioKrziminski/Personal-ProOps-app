@@ -691,8 +691,16 @@ async def prepare(ctx: ExecContext, action: ResourceAction) -> dict:
         prepared["summary"] += "; parcelas fixas, juros incluídos no valor e taxa não informada"
     if prepared.get("target_label"):
         prepared["summary"] += "; orçamento de " + prepared["target_label"]
-    if action.resource in {"recurring", "reminders"} and action.type == Op.DELETE:
+    if action.type == Op.DELETE and action.resource == "reminders":
         prepared["summary"] += "; registros já gerados continuam no histórico"
+    if action.type == Op.DELETE and action.resource == "recurring":
+        # O trigger `recurring_drop_future` (20260909090000) leva as ocorrências futuras
+        # ainda em aberto. Esta frase é o que a pessoa lê ANTES de aprovar — dizer que
+        # "os registros já gerados continuam" virou mentira no dia em que o trigger entrou.
+        prepared["summary"] += (
+            "; o que já aconteceu e o que está atrasado ficam, mas as ocorrências futuras "
+            "ainda em aberto saem junto"
+        )
     if len(prepared["summary"]) > 3500:
         _error(
             "Essa alteração é longa demais para revisar em uma confirmação. Peça uma alteração menor ou edite o conteúdo completo no app."

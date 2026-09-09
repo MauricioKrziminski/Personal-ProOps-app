@@ -16,11 +16,21 @@
 - **`budgets`**: `month` null = limite padrão; linha com `month` sobrescreve aquele mês. **Dois unique parciais** (NULL não colide com NULL no Postgres). `rollover` soma a sobra do mês anterior, um nível só — e **só se o orçamento já existia antes do mês corrente** (`created_at`), senão um orçamento criado hoje ganharia sobra de um mês em que não existia. Status via `_budgets_status`.
 - **`debts`**: dívidas com `interest_rate_monthly` em fração mensal (1,99% a.m. = 0.0199). `debt_schedule` monta a Price; `pay_debt_installment` abate o saldo **já descontando os juros do mês**.
 - **`recurring_transactions`**: RRULE + `dtstart` (âncora imutável) + `next_run_at` (próxima ocorrência FUTURA, é o que o app mostra) + `materialized_until` (controle do cron). Materializadas **90 dias à frente** pelo `finance-scheduler` como `pending`, com `source='recurring'`. Idempotência pelo unique `(recurring_id, occurred_at)`.
+  **Apagar a série leva junto as ocorrências futuras ainda `pending`** (trigger
+  `recurring_drop_future`, `20260909090000`) — a FK é `on delete set null`, e sem o trigger elas
+  ficavam órfãs pesando na projeção. Histórico e ocorrência ATRASADA ficam: a primeira aconteceu,
+  a segunda é conta em aberto. Foi assim que nasceu um terceiro salário de R$ 2.632,00 que nunca
+  existiu, quando o salário único virou dois pagamentos.
 
 ## Categorias
 
 - **Texto livre, minúsculo, curto** — sem FK. Fonte única da lista de sugestões:
-  `src/lib/categories.ts`. Existem DUAS cópias literais, porque nem o Deno nem o Python importam de
+  `src/lib/categories.ts` — que é SUGESTÃO, não a lista. O seletor do app oferece **as
+  categorias que o usuário usa** (`categories_used()`, `20260909100000`), mescladas com as
+  sugestões e agrupadas por forma sem acento (`src/lib/categories-merge.ts`): em produção havia 25
+  categorias distintas e só 8 estavam entre as 13 sugeridas — "despesas eventuais" (14
+  lançamentos), "roupa", "eletrônicos" e "impostos" não davam para escolher no app. Existem DUAS
+  cópias literais, porque nem o Deno nem o Python importam de
   `src/`: `agent/app/domain/categories.py` (a que vale hoje) e `_shared/gemini.ts` (legado).
   `src/lib/categories.test.ts` falha se qualquer uma divergir — mexeu numa, mexe nas outras. A
   tabela `categories` legada foi dropada na `0010_workspaces.sql`.

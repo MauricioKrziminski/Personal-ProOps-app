@@ -29,6 +29,16 @@ Expo SDK 57 (managed), código em `src/`, paths `@/*` → `src/*` e `@/assets/*`
 - Datas exibidas com `formatDateBR`; armazenadas ISO. **Uma grafia só: `28/08/2026`** — leitura
   (`formatDateBR`) e formulário (`isoToBR`) escrevem igual, e um teste em `dates.test.ts` compara
   as duas. Hífen (`28-08-2026`) lembra ISO, que é como o dado é ARMAZENADO, não como se lê.
+- **Ordem dos campos, uma régua para o app inteiro** (09/09/2026 — a queixa foi literal, "a
+  ordem dos campos está toda bagunçada"):
+  - **Form de EVENTO** (lançamento, recorrente): tipo → valor → descrição/estabelecimento →
+    categoria → conta → como se divide (parcelas, juros do Pix) → quando → extras.
+  - **Form de ENTIDADE** (conta, dívida, meta, bem): nome → tipo → valores → cronograma → conta.
+  - **Controle que muda QUAIS campos existem vem antes dos que ele muda.** "Tipo" troca
+    "Categoria" por "Para a conta"; "Parcelas" troca o rótulo de "Data" por "Data da primeira
+    parcela". Vindo depois, a tela se remonta debaixo do dedo.
+  - Campo longo (uma lista de contas) não parte um grupo curto ao meio.
+  O lançamento era o fora-da-curva: descrição e estabelecimento ficavam no FIM, depois da data.
 - Decimal em texto (percentual, taxa, meses) só por `formatNumberBR` — vírgula, nunca ponto.
   Havia três cópias disso e uma tela sem nenhuma, escrevendo `90.4%` ao lado de `90,4%`.
 

@@ -131,3 +131,15 @@ pedido explícito** — a confirmação já cobriria o risco.
 - `useToggleRecurring`, `useToggleReminder`: `active` é coluna editável dos dois.
 - Trocar a conta de uma parcela solta: o app permite o mesmo (`useSaveTransaction` não distingue),
   então não é diferença entre os dois — é uma decisão de produto igual dos dois lados.
+
+## Mudanças no app depois da auditoria (09/09/2026)
+
+A regra do `agent.md` é "botão novo no app = linha nova nesta tabela". Estas são as do mesmo dia.
+
+| botão novo no app | o agente faz? | por onde |
+|---|---|---|
+| **Juros do Pix no crédito** (campo em `transaction-form`, grava compra + linha `juros` na mesma fatura) | sim, sem código novo | multi-intent: *"paguei 84,20 do DAS e 1,85 de juros do pix no crédito"* vira dois `create_expense`. `'juros'` entrou em `categories.py`, então a categoria sai igual dos dois lados. |
+| **Editar a série a partir de um lançamento** (linha "Repete …" no detalhe → `recurring?edit=`) | sim, já fazia | `ResourceAction` em `recurring` propaga por `update_recurring_series` (fechado na própria auditoria). O que mudou foi só o caminho no app. |
+| **Seletor de categoria com as usadas** (`categories_used()`) | não se aplica | categoria é texto livre no agente desde sempre — ele nunca esteve preso às 13 sugestões. A lacuna era só do app. |
+
+**Nada disso mexeu no `FinanceAction`**, que segue no teto medido de 252/32.
