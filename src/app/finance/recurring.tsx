@@ -623,7 +623,11 @@ export default function RecurringScreen() {
                     { value: 'income', label: 'Receita' },
                   ]}
                   value={form.kind}
-                  onChange={(kind) => setForm({ ...form, kind })}
+                  onChange={(kind) =>
+                    // Trocar o tipo leva o padrão junto ENQUANTO a série é nova. Numa série
+                    // existente o valor é escolha dele e não pode ser reescrito por baixo.
+                    setForm({ ...form, kind, ...(form.id ? {} : { autoConfirm: kind !== 'income' }) })
+                  }
                 />
               </Field>
 
@@ -748,19 +752,37 @@ export default function RecurringScreen() {
                 </Section>
               </Field>
 
+              {/*
+                Receita e despesa NÃO falam a mesma língua aqui. O texto antigo era todo de
+                despesa ("entra como pago", "você dizer que pagou") num campo que aparece para
+                os dois — o mesmo defeito que `settle-labels.ts` já tinha corrigido em outro
+                lugar ("ninguém paga um salário que vai receber").
+
+                E o padrão inverte: despesa recorrente é boleto que você sabe que sai; receita
+                de terceiro é Pix que pode não chegar. Por isso receita nova nasce DESLIGADA —
+                ver `FORM_VAZIO` e o `20260909110000`.
+              */}
               <Field
-                label="Confirmar automático"
+                label={form.kind === 'income' ? 'Receber automático' : 'Confirmar automático'}
                 hint={
-                  form.autoConfirm
-                    ? 'Ligado, o lançamento já entra como pago na data.'
-                    : 'Desligado, ele fica esperando você dizer que pagou.'
+                  form.kind === 'income'
+                    ? form.autoConfirm
+                      ? 'Ligado, entra no saldo sozinho na data — serve para salário, que cai sem falta.'
+                      : 'Desligado, fica esperando você confirmar que o dinheiro caiu. É o certo para Pix de terceiro.'
+                    : form.autoConfirm
+                      ? 'Ligado, o lançamento já entra como pago na data.'
+                      : 'Desligado, ele fica esperando você dizer que pagou.'
                 }>
                 <View style={styles.switchRow}>
                   <ThemedText type="small" themeColor="textSecondary">
-                    Entrar como pago na data
+                    {form.kind === 'income' ? 'Entrar como recebido na data' : 'Entrar como pago na data'}
                   </ThemedText>
                   <Switch
-                    accessibilityLabel="Confirmar automaticamente na data"
+                    accessibilityLabel={
+                      form.kind === 'income'
+                        ? 'Marcar como recebido automaticamente na data'
+                        : 'Confirmar automaticamente na data'
+                    }
                     accessibilityHint="Desligado, o lançamento fica pendente esperando você confirmar"
                     value={form.autoConfirm}
                     onValueChange={(autoConfirm) => setForm({ ...form, autoConfirm })}

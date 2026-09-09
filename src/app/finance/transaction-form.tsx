@@ -2,7 +2,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { Stack, router, useLocalSearchParams } from 'expo-router';
 import { useState } from 'react';
 import { Controller, useForm, useWatch } from 'react-hook-form';
-import { StyleSheet, View } from 'react-native';
+import { StyleSheet, Switch, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Animated, { FadeIn, LinearTransition } from 'react-native-reanimated';
 import { KeyboardAwareScrollView } from 'react-native-keyboard-controller';
@@ -35,6 +35,12 @@ import {
 } from '@/hooks/use-finance';
 import { brToISO, formatBRL, isValidBRDate, isoToBR, localISODate } from '@/lib/dates';
 import { financeErrorMessage, installmentHistory } from '@/lib/finance-form';
+import {
+  autoConfirmHint,
+  autoConfirmLabel,
+  dueFieldHint,
+  dueFieldLabel,
+} from '@/lib/settle-labels';
 import { confirmDestructive, showItemActions } from '@/lib/item-actions';
 
 /**
@@ -68,6 +74,8 @@ const schema = z
     installments: z.number().int().min(1).max(72),
     // Pix no crédito: o que o cartão cobra a MAIS do que o boleto pediu. 0 = compra normal.
     fee_cents: z.number().int().min(0),
+    /** `transactions.auto_confirm` — entra sozinho na data em vez de esperar baixa. */
+    auto_confirm: z.boolean(),
     paid_installments: z.string(),
     occurred_at: z.string().refine(isValidBRDate, 'Data em dd/mm/aaaa'),
     /** "Isso ainda vai acontecer" — vira `status='pending'`, a base da projeção de caixa. */
@@ -188,6 +196,7 @@ function TransactionForm({ editing }: { editing?: Transaction }) {
       installments: 1,
       paid_installments: '',
       fee_cents: 0,
+      auto_confirm: editing?.auto_confirm ?? false,
       occurred_at: isoToBR(editing?.occurred_at ?? localISODate()),
       pending: editing?.status === 'pending',
       due_at: editing?.due_at ? isoToBR(editing.due_at) : null,
@@ -300,6 +309,8 @@ function TransactionForm({ editing }: { editing?: Transaction }) {
         status,
         due_at: adiado && values.due_at ? brToISO(values.due_at) : editing?.due_at ?? null,
         fee_cents: editing ? 0 : values.fee_cents,
+        // Só faz diferença em previsto: `_promote_due_transactions` só olha `pending`.
+        auto_confirm: adiado ? values.auto_confirm : false,
       },
       {
         onSuccess: () => {
@@ -683,13 +694,9 @@ function TransactionForm({ editing }: { editing?: Transaction }) {
                       name="due_at"
                       render={({ field }) => (
                         <Field
-                          label="Vence em"
+                          label={dueFieldLabel(kind)}
                           error={errors.due_at?.message}
-                          hint={
-                            errors.due_at
-                              ? undefined
-                              : 'Fica como conta a pagar até você confirmar que pagou.'
-                          }>
+                          hint={errors.due_at ? undefined : dueFieldHint(kind)}>
                           <TextField
                             value={field.value ?? ''}
                             onChangeText={(text) => field.onChange(text || null)}
@@ -700,6 +707,35 @@ function TransactionForm({ editing }: { editing?: Transaction }) {
                             invalid={!!errors.due_at}
                             style={styles.dateField}
                           />
+                        </Field>
+                      )}
+                    />
+
+                    {/*
+                      O interruptor de "entra sozinho na data". Só existe em PREVISTO porque é
+                      só ali que ele muda algo — `_promote_due_transactions` só olha `pending`.
+
+                      O padrão inverte entre os dois lados (ver `autoConfirmHint`): despesa
+                      recorrente é boleto que sai; receita de terceiro é Pix que pode não
+                      chegar. Foi o pedido literal do dono do produto em 09/09/2026.
+                    */}
+                    <Controller
+                      control={control}
+                      name="auto_confirm"
+                      render={({ field }) => (
+                        <Field
+                          label={kind === 'income' ? 'Receber automático' : 'Confirmar automático'}
+                          hint={autoConfirmHint(kind, field.value)}>
+                          <View style={styles.switchRow}>
+                            <ThemedText type="small" themeColor="textSecondary">
+                              {autoConfirmLabel(kind)}
+                            </ThemedText>
+                            <Switch
+                              value={field.value}
+                              onValueChange={field.onChange}
+                              accessibilityLabel={autoConfirmLabel(kind)}
+                            />
+                          </View>
                         </Field>
                       )}
                     />
@@ -775,5 +811,11 @@ const styles = StyleSheet.create({
   },
   centered: {
     textAlign: 'center',
+  },
+  switchRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: Space.md,
   },
 });

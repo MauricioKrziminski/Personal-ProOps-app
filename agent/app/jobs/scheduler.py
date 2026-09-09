@@ -92,14 +92,18 @@ async def materialize_horizon(agora) -> int:
                         insert into public.transactions
                           (user_id, workspace_id, kind, amount_cents, currency, category,
                            description, account_id, occurred_at, due_at, source, status,
-                           recurring_id)
-                        values (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, 'recurring', %s, %s)
+                           recurring_id, auto_confirm)
+                        values (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, 'recurring', %s, %s, %s)
                         """,
                         rec["user_id"], rec["workspace_id"], rec["kind"], rec["amount_cents"],
                         rec["currency"], rec["category"], rec["description"], rec["account_id"],
                         dia, dia,
                         "cleared" if (ja_aconteceu and rec["auto_confirm"]) else "pending",
                         rec["id"],
+                        # A ocorrencia HERDA o interruptor da serie. Sem isto ela nasceria com o
+                        # `default false` da coluna e `_promote_due_transactions` (que agora olha a
+                        # LINHA, nao a serie) nunca daria baixa nem no salario.
+                        rec["auto_confirm"],
                     )
                     criadas += 1
                 except UniqueViolation:

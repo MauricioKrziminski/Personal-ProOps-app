@@ -78,3 +78,42 @@ export function settleHint(
     ? 'Marque quando receber para sair da projeção'
     : 'Marque quando pagar para sair da projeção';
 }
+
+/**
+ * O rótulo da data de um previsto no FORMULÁRIO. Receita não "vence" — ela é esperada,
+ * e "conta a pagar" é a frase errada em cima de um Pix que você vai receber.
+ */
+export function dueFieldLabel(kind: SettleKind | string | null | undefined): string {
+  return kind === 'income' ? 'Previsto para' : 'Vence em';
+}
+
+export function dueFieldHint(kind: SettleKind | string | null | undefined): string {
+  return kind === 'income'
+    ? 'Conta na projeção, mas fica fora do saldo até você confirmar que caiu.'
+    : 'Fica como conta a pagar até você confirmar que pagou.';
+}
+
+/**
+ * O interruptor de "entra sozinho na data" — `transactions.auto_confirm` (`20260909110000`).
+ *
+ * O padrão INVERTE entre os dois lados, e é isso que o dono do produto pediu: despesa
+ * recorrente é boleto que você sabe que sai; receita de terceiro é Pix que pode não chegar,
+ * e "precisa de comprovação". Salário é o caso em que ligar faz sentido.
+ */
+export function autoConfirmLabel(kind: SettleKind | string | null | undefined): string {
+  return kind === 'income' ? 'Entrar como recebido na data' : 'Entrar como pago na data';
+}
+
+export function autoConfirmHint(
+  kind: SettleKind | string | null | undefined,
+  ligado: boolean,
+): string {
+  if (kind === 'income') {
+    return ligado
+      ? 'Entra no saldo sozinho na data — serve para salário, que cai sem falta.'
+      : 'Fica esperando você confirmar que o dinheiro caiu. É o certo para Pix de terceiro.';
+  }
+  return ligado
+    ? 'O lançamento já entra como pago na data.'
+    : 'Fica esperando você dizer que pagou.';
+}

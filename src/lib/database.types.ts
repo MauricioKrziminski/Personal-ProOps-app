@@ -1756,6 +1756,7 @@ export type Database = {
           account_id: string | null
           amount_cents: number
           attachment_path: string | null
+          auto_confirm: boolean
           category: string | null
           counterparty_account_id: string | null
           created_at: string
@@ -1786,6 +1787,7 @@ export type Database = {
           account_id?: string | null
           amount_cents: number
           attachment_path?: string | null
+          auto_confirm?: boolean
           category?: string | null
           counterparty_account_id?: string | null
           created_at?: string
@@ -1816,6 +1818,7 @@ export type Database = {
           account_id?: string | null
           amount_cents?: number
           attachment_path?: string | null
+          auto_confirm?: boolean
           category?: string | null
           counterparty_account_id?: string | null
           created_at?: string
