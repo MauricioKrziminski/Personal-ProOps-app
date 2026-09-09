@@ -1,5 +1,10 @@
 import { Pressable, StyleSheet, View } from 'react-native';
-import Animated, { FadeIn } from 'react-native-reanimated';
+import Animated, {
+  FadeIn,
+  useAnimatedStyle,
+  useSharedValue,
+  withTiming,
+} from 'react-native-reanimated';
 
 import { ThemedText } from '@/components/themed-text';
 import { Icon } from '@/components/ui/icon';
@@ -78,12 +83,16 @@ export function HeroPanel({
 }: HeroPanelProps) {
   const theme = useTheme();
   const { concealed, toggle } = useConceal();
+  // Press-in do card (§5): 0.97 em 120ms, o mesmo do `Shortcut`. Só existe quando há destino.
+  const escala = useSharedValue(1);
+  const aoTocar = useAnimatedStyle(() => ({ transform: [{ scale: escala.get() }] }));
 
   return (
     <Animated.View
       entering={FadeIn.duration(Motion.duration.slow)}
       style={[
         styles.panel,
+        aoTocar,
         {
           borderColor: theme.cardBorder,
           // Base embaixo do gradiente: o `GradientSurface` só monta o canvas depois que a `View`
@@ -103,15 +112,46 @@ export function HeroPanel({
       <View style={styles.inner}>
         {top ? <View style={styles.top}>{top}</View> : null}
 
+        {/*
+          O toque existia desde sempre e NINGUÉM sabia: este `Pressable` não tinha chevron, nem
+          press-in, nem haptic, nem rótulo de acessibilidade — o dono do produto pediu "abrir
+          alguma coisa com mais opções" numa função que já estava lá, invisível.
+
+          O que ganhou: press-in de `scale 0.97` (§5 de design.md pede em card) e o chip "…" ao
+          lado do olho. **Não é chevron**: chevron é promessa de tela nova, e `row.tsx:20-24` já
+          registra essa regra — o glyph de menu do projeto é o "…" do `HeaderMenu`.
+
+          Haptic NÃO entra aqui: `showItemActions` já chama `selectionAsync()`, e dois no mesmo
+          frame quebra §6 ("um por ação do usuário").
+        */}
         <Pressable
           accessibilityRole={onPress ? 'button' : undefined}
+          accessibilityLabel={onPress ? `${label}, abre mais opções` : undefined}
           onPress={onPress}
+          onPressIn={
+            onPress
+              ? () => escala.set(withTiming(Motion.pressScale, { duration: Motion.duration.fast }))
+              : undefined
+          }
+          onPressOut={
+            onPress ? () => escala.set(withTiming(1, { duration: Motion.duration.fast })) : undefined
+          }
           style={styles.body}>
           <View style={styles.labelRow}>
             <ThemedText type="caption" themeColor="onHeroMuted" style={Type.meta}>
               {label.toUpperCase()}
             </ThemedText>
             {badge}
+            {onPress ? (
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel="Mais opções"
+                onPress={onPress}
+                hitSlop={Space.sm}
+                style={[styles.eye, { backgroundColor: theme.heroChip }]}>
+                <Icon name="ellipsis" size="sm" color="onHero" />
+              </Pressable>
+            ) : null}
             {concealable ? (
               <Pressable
                 accessibilityRole="button"

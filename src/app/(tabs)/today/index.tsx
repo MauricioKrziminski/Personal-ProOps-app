@@ -30,6 +30,7 @@ import { useProfile } from '@/hooks/use-profile';
 import { useSession } from '@/hooks/use-session';
 import { useTheme } from '@/hooks/use-theme';
 import { greetingBR } from '@/lib/dates';
+import { showItemActions } from '@/lib/item-actions';
 import { settleLabel } from '@/lib/settle-labels';
 import { Fonts } from '@/constants/theme';
 
@@ -157,6 +158,17 @@ export default function TodayScreen() {
         ) : forecast.isError ? (
           <ErrorCard onRetry={() => forecast.refetch()} />
         ) : (
+          /*
+            O toque no card abre o MENU, não um destino. Antes ele ia direto para a Projeção e
+            ninguém sabia que existia — `HeroPanel` não tinha chevron, press-in nem rótulo de
+            acessibilidade —, então o "custo" do toque a mais está sendo cobrado de um caminho
+            que na prática não existia.
+
+            As quatro opções são as mesmas nas duas raízes de propósito: mesmo card, mesmo
+            gesto, e menu que muda de forma conforme a tela é menu que se lê toda vez.
+            Patrimônio e Metas ganham de quebra — eram três toques (Ver tudo → Gerenciar →
+            item), sem atalho nenhum.
+          */
           <HeroPanel
             label="Sobra até o fim do mês"
             concealable
@@ -199,7 +211,14 @@ export default function TodayScreen() {
                 </>
               ) : undefined
             }
-            onPress={() => router.push('/finance/forecast')}
+          onPress={() =>
+            showItemActions('Mais opções', [
+              { label: 'Projeção de caixa', icon: 'chart.line.uptrend.xyaxis', onPress: () => router.push('/finance/forecast') },
+              { label: 'O mês inteiro', icon: 'calendar', onPress: () => router.push('/finance/month') },
+              { label: 'Patrimônio', icon: 'building.columns', onPress: () => router.push('/finance/net-worth') },
+              { label: 'Metas', icon: 'target', onPress: () => router.push('/finance/goals') },
+            ])
+          }
           />
         )}
 

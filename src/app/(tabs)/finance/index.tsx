@@ -380,6 +380,17 @@ export default function FinanceScreen() {
             }}
           />
         ) : (
+          /*
+            O toque no card abre o MENU, não um destino. Antes ele ia direto para a Projeção e
+            ninguém sabia que existia — `HeroPanel` não tinha chevron, press-in nem rótulo de
+            acessibilidade —, então o "custo" do toque a mais está sendo cobrado de um caminho
+            que na prática não existia.
+
+            As quatro opções são as mesmas nas duas raízes de propósito: mesmo card, mesmo
+            gesto, e menu que muda de forma conforme a tela é menu que se lê toda vez.
+            Patrimônio e Metas ganham de quebra — eram três toques (Ver tudo → Gerenciar →
+            item), sem atalho nenhum.
+          */
           <HeroPanel
             label={isCurrent ? 'Sobra até o fim do mês' : `Sobrou em ${monthTitle(month)}`}
             value={
@@ -414,7 +425,14 @@ export default function FinanceScreen() {
                 : undefined
             }
             concealable
-            onPress={() => router.push('/finance/forecast')}
+          onPress={() =>
+            showItemActions('Mais opções', [
+              { label: 'Projeção de caixa', icon: 'chart.line.uptrend.xyaxis', onPress: () => router.push('/finance/forecast') },
+              { label: 'O mês inteiro', icon: 'calendar', onPress: () => router.push({ pathname: '/finance/month', params: { month } }) },
+              { label: 'Patrimônio', icon: 'building.columns', onPress: () => router.push('/finance/net-worth') },
+              { label: 'Metas', icon: 'target', onPress: () => router.push('/finance/goals') },
+            ])
+          }
           />
         )}
 

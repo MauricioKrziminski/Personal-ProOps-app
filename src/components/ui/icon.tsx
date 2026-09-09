@@ -105,6 +105,8 @@ const MATERIAL: Record<string, MaterialName> = {
   'doc.text': 'description',
   'doc.text.magnifyingglass': 'find_in_page',
   'dollarsign.circle': 'paid',
+  // liso para dentro de chip (o chip já é o círculo); `.circle` para header e menu de item
+  ellipsis: 'more_horiz',
   'ellipsis.circle': 'more_horiz',
   'exclamationmark.circle.fill': 'error',
   'exclamationmark.triangle': 'warning',
