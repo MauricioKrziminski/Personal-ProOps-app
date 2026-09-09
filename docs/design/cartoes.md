@@ -11,7 +11,7 @@ Duas coisas que esta tela **não faz e nunca deve fazer**:
 1. **A regra de ciclo mora no banco, em um lugar só.** O trigger `set_invoice`
    (`0013_cards_and_installments.sql:210-213`) chama `private.invoice_window(closing_day, due_day,
    occurred_at)` (`:44-64`) e resolve a fatura de cada compra — no app, no WhatsApp e na
-   importação. Compra **até** o dia de fechamento cai na fatura do próprio mês; depois, na do mês
+   importação. Compra **antes** do dia de fechamento cai na fatura do próprio mês; no dia dele e depois, na do mês
    seguinte; dia 31 em mês curto cai no último dia (`private.day_in_month`, `:18-27`). A tela lê
    `closing_date`/`due_date` prontos e **não recalcula nada**. Se um dia aparecer aritmética de
    ciclo em TS aqui, é bug de arquitetura, não detalhe.

@@ -33,7 +33,14 @@
 ## Cartão de crédito
 
 - **A regra de ciclo mora no banco, em UM lugar**: o trigger `set_invoice` em `transactions` chama `private.invoice_window(closing_day, due_day, occurred_at)` e resolve a fatura. App, WhatsApp e importação não recalculam nada — nunca duplicar essa lógica em TS.
-- Compra **até** o dia de fechamento cai na fatura do próprio mês; depois, na do mês seguinte. Dia 31 em mês curto cai no último dia (`private.day_in_month`).
+- Compra **antes** do dia de fechamento cai na fatura do próprio mês; **no** dia do fechamento e
+  depois, na do mês seguinte — a janela é `[fechamento anterior, fechamento atual)`. Dia 31 em mês
+  curto cai no último dia (`private.day_in_month`).
+  > Isto era `<=` até 09/09/2026 e estava errado por um ciclo inteiro. Prova nos dois lados, mesmo
+  > cartão: a fatura Nubank de 10/09 ("Período vigente: 03 AGO a 03 SET") contém as compras de
+  > 03 AGO, e o OFX da de outubro (`DTSTART 20260903`) contém as de 03 SET. Era a causa de as
+  > parcelas postadas no dia do fechamento aparecerem um mês fora. Migration
+  > `20260909050000`, conciliação em `docs/bugs/2026-09-09-conciliacao-setembro.md`.
 - Cartão é conta comum em partida dobrada: a compra deixa o saldo do cartão negativo (dívida) e o **pagamento da fatura é `transfer`** da conta pagadora para o cartão (RPC `pay_invoice`). Pagamento de fatura **nunca** é despesa nova — o gasto já contou na compra.
 - Parcelamento só pela RPC `create_installment_plan` (nunca inserindo N linhas no app).
 
