@@ -47,20 +47,23 @@ begin
   -- ── compra parcelada com as quatro situações que importam ─────────────────
   insert into public.installment_plans
     (id, workspace_id, user_id, account_id, description, total_cents, installments, first_occurred_at)
-    values (plano, w, u, card, 'Notebook', 40000, 4, '2026-08-15');
+    -- Dia 3 DE PROPÓSITO: é o dia de fechamento do cartão acima, e é a forma do dado
+    -- real (Nubank fecha dia 3, parcelas caem dia 3). É só nessa forma que um
+    -- `set_invoice` disparado à toa move a parcela de fatura.
+    values (plano, w, u, card, 'Notebook', 40000, 4, '2026-08-03');
 
   insert into public.transactions
     (workspace_id, user_id, account_id, kind, amount_cents, description, occurred_at, source, status,
      installment_plan_id, installment_no)
   values
     -- 1/4: passada e paga
-    (w, u, card, 'expense', 10000, 'Notebook', '2026-08-15', 'app', 'cleared', plano, 1),
+    (w, u, card, 'expense', 10000, 'Notebook', '2026-08-03', 'app', 'cleared', plano, 1),
     -- 2/4: passada e AINDA EM ABERTO (atrasada) — o caso que só o status deixaria passar
-    (w, u, card, 'expense', 10000, 'Notebook', '2026-09-15', 'app', 'pending', plano, 2),
+    (w, u, card, 'expense', 10000, 'Notebook', '2026-09-03', 'app', 'pending', plano, 2),
     -- 3/4: a âncora, futura e em aberto
-    (w, u, card, 'expense', 10000, 'Notebook', '2026-10-15', 'app', 'pending', plano, 3),
+    (w, u, card, 'expense', 10000, 'Notebook', '2026-10-03', 'app', 'pending', plano, 3),
     -- 4/4: futura mas JÁ PAGA (adiantada) — o caso que só a data deixaria passar
-    (w, u, card, 'expense', 10000, 'Notebook', '2026-11-15', 'app', 'cleared', plano, 4);
+    (w, u, card, 'expense', 10000, 'Notebook', '2026-11-03', 'app', 'cleared', plano, 4);
 
   select id into ancora from public.transactions
     where installment_plan_id = plano and installment_no = 3;
@@ -116,6 +119,78 @@ begin
     raise exception 'valor zero deveria ter sido recusado';
   exception when others then
     assert sqlerrm like '%maior que zero%', format('erro inesperado: %s', sqlerrm);
+  end;
+
+  -- ── a correção de TEXTO não pode remanejar fatura ────────────────────────
+  --
+  -- Mencionar `account_id` no `set` já dispara `set_invoice` — o Postgres olha as
+  -- colunas do `set`, não as que mudaram de valor. Com dado recém-inserido isso é
+  -- inofensivo: o gatilho recalcula e chega no mesmo lugar.
+  --
+  -- O caso que MORDE é a linha cuja fatura gravada discorda do que a regra calcula
+  -- HOJE — dado escrito antes da `20260909050000`, que corrigiu o dia do fechamento
+  -- por um caractere. A `050000` diz explicitamente que remanejar as linhas existentes
+  -- é "decisão separada, feita linha a linha"; fazer isso em lote como efeito colateral
+  -- de uma correção de texto é o oposto. Aqui a divergência é forçada à mão, que é a
+  -- única forma de reproduzir dado antigo num banco novo.
+  declare
+    fatura_antes uuid;
+    outra uuid;
+  begin
+    select id into outra from public.card_invoices
+      where account_id = card and id is distinct from
+            (select invoice_id from public.transactions where id = ancora)
+      limit 1;
+    if outra is null then
+      -- só há uma fatura no cartão: cria a do mês seguinte movendo uma compra solta
+      insert into public.transactions (workspace_id, user_id, account_id, kind, amount_cents,
+                                       description, occurred_at, source, status)
+        values (w, u, card, 'expense', 100, 'semente', '2026-12-20', 'app', 'cleared');
+      select invoice_id into outra from public.transactions
+        where account_id = card and description = 'semente';
+    end if;
+
+    update public.transactions set invoice_id = outra where id = ancora;
+    fatura_antes := outra;
+
+    perform public.update_transaction_scoped(ancora, 'one', '{"description": "Notebook novo"}'::jsonb);
+    assert (select invoice_id from public.transactions where id = ancora) is not distinct from fatura_antes,
+      'corrigir a descrição remanejou a parcela de fatura — set_invoice disparou à toa';
+  end;
+
+  -- e o contrato do plano acompanha o que a TELA mostra, não só o total
+  assert (select description from public.installment_plans where id = plano) = 'Notebook novo',
+    'a lista de Parcelamentos ficaria com o nome velho sobre parcelas já renomeadas';
+
+  -- ── transferência não troca de conta por aqui ────────────────────────────
+  --
+  -- Ela tem DUAS contas e um check que proíbe as duas iguais: por aqui daria 23514 cru
+  -- (que a tela não traduz) ou, com null, uma transferência sem origem.
+  declare
+    poupanca uuid := '00000000-0000-0000-0000-0000000000c2';
+    transf uuid;
+  begin
+    insert into public.accounts (id, workspace_id, user_id, name, type, initial_balance_cents)
+      values (poupanca, w, u, 'Poupança teste', 'savings', 0);
+    insert into public.transactions
+      (workspace_id, user_id, account_id, counterparty_account_id, kind, amount_cents,
+       description, occurred_at, source, status)
+      values (w, u, cc, poupanca, 'transfer', 20000, 'Reserva', '2026-09-01', 'app', 'cleared')
+      returning id into transf;
+
+    perform public.update_transaction_scoped(transf, 'one', format('{"account_id": "%s"}', poupanca)::jsonb);
+    raise exception 'transferência deveria ter sido recusada';
+  exception when others then
+    assert sqlerrm like '%ransfer%', format('erro inesperado: %s', sqlerrm);
+  end;
+
+  -- ── conta de outro workspace não entra ───────────────────────────────────
+  begin
+    perform public.update_transaction_scoped(
+      ancora, 'one', '{"account_id": "00000000-0000-0000-0000-0000000000ff"}'::jsonb);
+    raise exception 'conta fora do workspace deveria ter sido recusada';
+  exception when others then
+    assert sqlerrm like '%mesmo workspace%', format('erro inesperado: %s', sqlerrm);
   end;
 
   -- ── série recorrente: a regra E as ocorrências futuras ───────────────────
