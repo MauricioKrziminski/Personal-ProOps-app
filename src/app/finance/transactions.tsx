@@ -273,8 +273,13 @@ export default function TransactionsScreen() {
         iOS ela é `Stack.SearchBar`, que escreve opções por hook e devolve `null`: a
         posição na árvore não muda nada de lá.
       */}
+      {/*
+        Sem `gutter`: dentro do `ListHeaderComponent` quem já dá a calha lateral é o
+        `contentContainerStyle` da lista (`styles.list`). Ele existia para IGUALAR o recuo da
+        lista quando a busca era irmã dela — aqui ele DOBRARIA, e a pílula sairia mais estreita
+        que o MonthPicker logo abaixo.
+      */}
       <Search
-        gutter
         value={search}
         onChangeText={setSearch}
         hideWhenScrolling={false}

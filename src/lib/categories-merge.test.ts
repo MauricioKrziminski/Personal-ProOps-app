@@ -31,10 +31,23 @@ test('acento e caixa não viram duas entradas', () => {
   assert.equal(opcoes.filter((o) => foldCategory(o.label) === 'saude').length, 1);
 });
 
-test('a grafia que sobrevive é a mais usada, e a contagem é a soma', () => {
+test('a contagem é a soma das duas grafias', () => {
   const salario = mergeCategories(USADAS, SUGERIDAS).find((o) => foldCategory(o.label) === 'salario');
-  assert.equal(salario?.label, 'salario', '7 usos ganham de 6');
   assert.equal(salario?.uses, 13, 'as duas grafias são a mesma categoria');
+});
+
+test('a grafia da SUGESTÃO ganha da contagem — o erro de digitação não vira o chip principal', () => {
+  const salario = mergeCategories(USADAS, SUGERIDAS).find((o) => foldCategory(o.label) === 'salario');
+  // `salario` tem 7 usos e `salário` 6: pela contagem o typo venceria, e cada escolha nova
+  // pelo seletor aumentaria o 7 — o app afundaria a forma correta sozinho.
+  assert.equal(salario?.label, 'salário');
+});
+
+test('sem sugestão para arbitrar, vence a mais usada', () => {
+  const [pet] = mergeCategories(
+    [{ category: 'Pet', uses: 5 }, { category: 'pet', uses: 2 }], [],
+  );
+  assert.equal(pet.label, 'Pet');
 });
 
 test('empate vai para a forma acentuada', () => {

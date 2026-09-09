@@ -46,8 +46,19 @@ export function mergeCategories(
   };
 
   for (const u of used) somar(u.category, u.uses);
-  // Sugestão nunca usada entra com zero: continua oferecida, mas atrás do que ele usa.
-  for (const s of suggested) if (!porChave.has(foldCategory(s))) somar(s, 0);
+  for (const s of suggested) {
+    const chave = foldCategory(s);
+    const atual = porChave.get(chave);
+    if (!atual) {
+      // Sugestão nunca usada entra com zero: continua oferecida, mas atrás do que ele usa.
+      somar(s, 0);
+    } else {
+      // A GRAFIA da sugestão ganha da contagem: `salario` tem 7 usos e `salário` 6, e sem esta
+      // linha o seletor ofereceria o erro de digitação como chip principal — cada escolha nova
+      // aumentaria o 7 e afundaria mais a forma certa.
+      porChave.set(chave, { label: s, uses: atual.uses });
+    }
+  }
   // A categoria do lançamento aberto não pode sumir da lista só porque é única no banco.
   if (keepAlways) somar(keepAlways, 0);
 

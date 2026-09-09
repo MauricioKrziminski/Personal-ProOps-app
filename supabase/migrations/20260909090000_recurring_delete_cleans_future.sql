@@ -57,6 +57,8 @@ select * from public.transactions
    and status = 'pending'
    and occurred_at >= current_date;
 
+alter table private.recurring_orphans_20260909 enable row level security;
+
 -- Entulho já existente: mesma regra, aplicada uma vez. `source='recurring'` só é escrito
 -- pelo materializador (`agent/app/jobs/scheduler.py`), que sempre grava `recurring_id`
 -- junto — a linha sem série é órfã por construção, não um lançamento que alguém digitou.
