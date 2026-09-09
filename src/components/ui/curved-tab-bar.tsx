@@ -113,7 +113,7 @@ function IconeDaBolha({
       <Icon name={tab.icon} size="md" color="tint" />
       {tab.badge ? (
         <View style={[styles.badge, styles.badgeBolha, { backgroundColor: badgeColor }]}>
-          <ThemedText type="meta" themeColor="onTint">
+          <ThemedText type="meta" themeColor="onTint" style={styles.badgeTexto}>
             {tab.badge > 9 ? '9+' : String(tab.badge)}
           </ThemedText>
         </View>
@@ -140,7 +140,7 @@ function IconeDoSlot({
       <Icon name={tab.icon} size="md" color="textSecondary" />
       {tab.badge ? (
         <View style={[styles.badge, styles.badgeIcone, { backgroundColor: badgeColor }]}>
-          <ThemedText type="meta" themeColor="onTint">
+          <ThemedText type="meta" themeColor="onTint" style={styles.badgeTexto}>
             {tab.badge > 9 ? '9+' : String(tab.badge)}
           </ThemedText>
         </View>
@@ -478,6 +478,9 @@ const styles = StyleSheet.create({
   iconeSlot: { width: 24, height: 24, alignItems: 'center', justifyContent: 'center' },
   badge: {
     position: 'absolute',
+    // `row`: em coluna (o padrão do RN) a largura é o eixo CRUZADO, e o "9+" ficava sujeito ao
+    // aperto da caixa em vez de definir o tamanho dela.
+    flexDirection: 'row',
     minWidth: 16,
     // `minHeight`, não `height`: com fonte grande o dígito é mais alto que 16 e uma caixa de
     // altura fixa o cortava pela metade.
@@ -487,6 +490,17 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
+  /**
+   * ⚠️ `flexShrink: 0` — o "9+" QUEBRAVA EM DUAS LINHAS na barra do Android.
+   *
+   * `ThemedText` traz `flexShrink: 1` na base (o Yoga usa 0 por padrão, ao contrário do
+   * flexbox do navegador), e ali isso é o certo: num card, texto que não cede empurra o irmão
+   * para fora. Num badge é o oposto — ele TEM que definir a largura da bolha, não ceder a ela.
+   * Cedendo, o "+" ia para a linha de baixo e a pílula virava um oval alto com um caractere em
+   * cada linha. É a mesma exceção que `Money` já faz: quebrar no meio do dado é pior que
+   * estourar a caixa.
+   */
+  badgeTexto: { flexShrink: 0 },
   badgeIcone: { top: -4, right: -8 },
   badgeBolha: { top: 0, right: 0 },
 });
