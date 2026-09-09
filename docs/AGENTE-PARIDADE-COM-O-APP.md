@@ -153,8 +153,13 @@ A regra do `agent.md` é "botão novo no app = linha nova nesta tabela". Estas s
 | **Alerta "Chegou o dinheiro?"** | é do agente, não do app | `_alerts_to_send` → `POST /cron/alerts`. O app só recebe o push. |
 | **Menu do card de destaque** | não se aplica | navegação. |
 
-**Uma dívida nomeada:** `agent/app/tools/queries.py` (`query_balance`, o "saldo total" do WhatsApp)
-continua somando `balance_cents` — ou seja, com previsto dentro — enquanto o app passou a mostrar
-`cleared_cents`. Os dois números vão divergir até isso ser acertado. Não foi feito nesta leva
-porque `query_balance` já misturava cartão junto, que é um segundo defeito e merece decisão
-própria.
+**A dívida foi paga na mesma leva.** `query_balance` somava `balance_cents` (com previsto dentro)
+E somava o cartão no mesmo total: com uma fatura aberta de R$ 21.360,00, o "Saldo total" respondia
+**−R$ 16.070,00** — um número que não é o saldo de nada. Agora ele espelha a tela Contas: dinheiro
+disponível (`cleared_cents`, contas não-cartão), investido, dívida de cartão à parte, e o previsto
+como AVISO fora do total, com a ação junto ("me manda recebi").
+
+⚠️ **Foi preciso corrigir nos DOIS lugares.** `supabase/functions/process-jobs/index.ts:961` tem a
+sua própria cópia da mesma resposta, e a tabela `agent_routing` está vazia — ou seja, o caminho
+Deno é o que responde hoje. `agent/tests/test_query_balance.py` prende os três defeitos com os
+números reais do staging; a cópia Deno é a mesma aritmética, linha a linha.

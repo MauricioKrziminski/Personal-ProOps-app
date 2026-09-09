@@ -23,16 +23,79 @@ from app.tools.base import ExecContext, ToolResult
 
 KIND_EMOJI = {"expense": "💸", "income": "💰"}
 
+# As contas que GUARDAM dinheiro. Cópia literal de `GUARDA_DINHEIRO` em
+# `src/app/finance/accounts.tsx:63` — o WhatsApp e a tela têm que agrupar igual, senão o
+# usuário vê dois "saldos" diferentes e nenhum dos dois ganha confiança.
+GUARDA_DINHEIRO = ("checking", "savings", "cash")
+
 
 async def query_balance(ctx: ExecContext, action: FinanceQuery) -> ToolResult:
+    """O saldo, com a mesma aritmética da tela Contas.
+
+    Três defeitos foram corrigidos aqui em 09/09/2026, e os três produziam um número que
+    parecia certo:
+
+    1. **Somava `balance_cents`**, que inclui `pending` — ou seja, dizia que o dinheiro do Pix
+       que o terceiro ainda não mandou já estava na conta. A coluna certa é `cleared_cents`
+       (`20260909140000`), a mesma que `private.cash_total` usa.
+    2. **Somava o CARTÃO dentro do "saldo total"**, misturando o que a pessoa tem com o que ela
+       deve num número só. Um cartão com R$ 21.360 de fatura aberta derrubava o "saldo" para
+       perto de zero e a mensagem não dizia por quê.
+    3. **Não avisava de nada**: nem do previsto a receber, nem do previsto a pagar.
+
+    Cartão fica FORA do dinheiro e aparece como dívida, exatamente como na tela — e ali o número
+    certo é `balance_cents`, porque parcela futura de cartão é dívida já assumida.
+    """
     rows = await db.fetch("select * from public._account_balances(%s)", ctx.user_id)
     if not rows:
         return ToolResult("💼 Você ainda não tem contas nem lançamentos.", read_only=True)
-    total = sum(int(r["balance_cents"]) for r in rows)
-    linhas = [f"  • {r['name']}: {cents_to_brl(r['balance_cents'])}" for r in rows]
-    return ToolResult(
-        f"💼 Saldo total: *{cents_to_brl(total)}*\n" + "\n".join(linhas), read_only=True
-    )
+
+    dinheiro = [r for r in rows if r["type"] in GUARDA_DINHEIRO or r["account_id"] is None]
+    investimentos = [r for r in rows if r["type"] == "investment"]
+    cartoes = [r for r in rows if r["type"] == "credit_card"]
+
+    caixa = sum(int(r["cleared_cents"]) for r in dinheiro)
+    investido = sum(int(r["cleared_cents"]) for r in investimentos)
+    # `min(0, ...)` como na tela: cartão com saldo positivo (crédito a favor) não vira "dívida
+    # negativa" nem some do total.
+    divida = sum(min(0, int(r["balance_cents"])) for r in cartoes)
+    a_receber = sum(int(r["pending_in_cents"]) for r in dinheiro)
+    a_pagar = sum(int(r["pending_out_cents"]) for r in dinheiro)
+    parcelas_futuras = sum(int(r["pending_out_cents"]) for r in cartoes)
+
+    partes = [f"💼 Dinheiro disponível: *{cents_to_brl(caixa)}*"]
+    partes += [
+        f"  • {r['name']}: {cents_to_brl(r['cleared_cents'])}"
+        for r in dinheiro
+        if int(r["cleared_cents"]) != 0 or int(r["pending_in_cents"]) != 0
+    ]
+
+    if investido:
+        partes.append(f"\n📈 Investido: {cents_to_brl(investido)}")
+
+    if divida:
+        partes.append(f"\n💳 Dívida de cartão: {cents_to_brl(divida)}")
+        partes += [
+            f"  • {r['name']}: {cents_to_brl(r['balance_cents'])}"
+            for r in cartoes
+            if int(r["balance_cents"]) < 0
+        ]
+        if parcelas_futuras:
+            partes.append(f"  ({cents_to_brl(parcelas_futuras)} são parcelas de meses à frente)")
+
+    # Os avisos. Ficam DEPOIS e FORA do total de propósito: somá-los seria repetir o defeito que
+    # esta função tinha. Cada um diz o que fazer.
+    if a_receber:
+        partes.append(
+            f"\n⏳ A receber: {cents_to_brl(a_receber)} previstos e ainda não confirmados."
+            '\n   Conta na projeção, não no saldo. Quando cair, me manda "recebi".'
+        )
+    if a_pagar:
+        partes.append(
+            f"\n📅 A pagar: {cents_to_brl(a_pagar)} de contas previstas que ainda não saíram."
+        )
+
+    return ToolResult("\n".join(partes), read_only=True)
 
 
 async def query_transactions(ctx: ExecContext, action: FinanceQuery) -> ToolResult:

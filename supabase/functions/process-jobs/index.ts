@@ -958,14 +958,78 @@ async function executeAction(
         (saved >= goal.target_cents ? " 🎉 Meta batida!" : "");
     }
 
+    /*
+      "Saldo total" com a mesma aritmética da tela Contas e do agente Python
+      (`agent/app/tools/queries.py::query_balance`). Três defeitos corrigidos em 09/09/2026:
+
+      1. somava `balance_cents`, que inclui `pending` — dizia que o Pix não recebido já estava
+         na conta;
+      2. somava o CARTÃO dentro do total, misturando o que a pessoa tem com o que ela deve (uma
+         fatura aberta de R$ 21 mil derrubava o "saldo" para −R$ 16 mil, sem explicar);
+      3. não avisava do previsto, que é justamente a diferença entre os dois.
+
+      Cartão fica FORA do dinheiro e vira dívida — e lá o número certo é `balance_cents`, porque
+      parcela futura de cartão é dívida já assumida. Colunas da `20260909140000`.
+    */
     case "query_balance": {
       const { data, error } = await supabase.rpc("_account_balances", { uid: userId });
       if (error) throw error;
-      const rows = (data ?? []) as { name: string; balance_cents: number }[];
+      const rows = (data ?? []) as {
+        account_id: string | null;
+        name: string;
+        type: string;
+        balance_cents: number;
+        cleared_cents: number;
+        pending_in_cents: number;
+        pending_out_cents: number;
+      }[];
       if (!rows.length) return "💼 Você ainda não tem contas nem lançamentos. Cadastre contas no app!";
-      const total = rows.reduce((s, r) => s + Number(r.balance_cents), 0);
-      const lines = rows.map((r) => `  • ${r.name}: ${centsToBRL(Number(r.balance_cents))}`);
-      return `💼 Saldo total: *${centsToBRL(total)}*\n${lines.join("\n")}`;
+
+      // Cópia literal de `GUARDA_DINHEIRO` (`src/app/finance/accounts.tsx:63`).
+      const GUARDA_DINHEIRO = ["checking", "savings", "cash"];
+      const dinheiro = rows.filter((r) => GUARDA_DINHEIRO.includes(r.type) || r.account_id === null);
+      const investimentos = rows.filter((r) => r.type === "investment");
+      const cartoes = rows.filter((r) => r.type === "credit_card");
+      const soma = (rs: typeof rows, campo: "cleared_cents" | "pending_in_cents" | "pending_out_cents") =>
+        rs.reduce((s, r) => s + Number(r[campo]), 0);
+
+      const caixa = soma(dinheiro, "cleared_cents");
+      const investido = soma(investimentos, "cleared_cents");
+      // `Math.min(0, ...)` como na tela: cartão com crédito a favor não vira dívida negativa.
+      const divida = cartoes.reduce((s, r) => s + Math.min(0, Number(r.balance_cents)), 0);
+      const aReceber = soma(dinheiro, "pending_in_cents");
+      const aPagar = soma(dinheiro, "pending_out_cents");
+      const parcelasFuturas = soma(cartoes, "pending_out_cents");
+
+      const partes = [`💼 Dinheiro disponível: *${centsToBRL(caixa)}*`];
+      for (const r of dinheiro) {
+        if (Number(r.cleared_cents) !== 0 || Number(r.pending_in_cents) !== 0) {
+          partes.push(`  • ${r.name}: ${centsToBRL(Number(r.cleared_cents))}`);
+        }
+      }
+      if (investido) partes.push(`\n📈 Investido: ${centsToBRL(investido)}`);
+      if (divida) {
+        partes.push(`\n💳 Dívida de cartão: ${centsToBRL(divida)}`);
+        for (const r of cartoes) {
+          if (Number(r.balance_cents) < 0) {
+            partes.push(`  • ${r.name}: ${centsToBRL(Number(r.balance_cents))}`);
+          }
+        }
+        if (parcelasFuturas) {
+          partes.push(`  (${centsToBRL(parcelasFuturas)} são parcelas de meses à frente)`);
+        }
+      }
+      // Os avisos ficam DEPOIS e FORA do total: somá-los repetiria o defeito de origem.
+      if (aReceber) {
+        partes.push(
+          `\n⏳ A receber: ${centsToBRL(aReceber)} previstos e ainda não confirmados.` +
+            `\n   Conta na projeção, não no saldo. Quando cair, me manda "recebi".`,
+        );
+      }
+      if (aPagar) {
+        partes.push(`\n📅 A pagar: ${centsToBRL(aPagar)} de contas previstas que ainda não saíram.`);
+      }
+      return partes.join("\n");
     }
 
     case "query_transactions": {
