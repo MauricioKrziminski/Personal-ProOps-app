@@ -662,9 +662,22 @@ const styles = StyleSheet.create({
     borderBottomRightRadius: Radius.md,
     borderCurve: 'continuous',
   },
+  /**
+   * ⚠️ **Linha, não coluna: o valor NÃO fica em cima do botão.**
+   *
+   * `Row.trailing` foi desenhado para um valor compacto. Um `<Button>` ali dentro empurra o
+   * bloco além do `minWidth: 180` do título, o `flexWrap` da linha o joga para baixo, e em
+   * coluna o resultado é `−R$ 900,00` flutuando sobre um `Paguei` — quatro linhas empilhadas
+   * com o chevron solto ao lado. Foi a queixa do dono do produto em 09/09/2026, primeiro na
+   * Projeção e depois AQUI: a correção lá não bastou porque o padrão estava em duas telas.
+   *
+   * As outras `trailing` em coluna do app (Financeiro, importação) empilham valor + legenda,
+   * sem botão — ali a coluna é o desenho certo e continua.
+   */
   trailing: {
-    alignItems: 'flex-end',
-    gap: Space.xs,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Space.sm,
   },
   separator: {
     height: StyleSheet.hairlineWidth,
