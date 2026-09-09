@@ -158,9 +158,9 @@ test('nenhum rótulo truncado — texto quebra, layout cede', () => {
  * 145,4dp com raio 38,5 quando o JS mandava 124,8 e 33 — os dois × 1,1667, que é 3,5/3,0 —, com a
  * bolha (uma `View`) no lugar certo ao lado. O código da barra estava correto o tempo todo.
  *
- * `SkiaCanvas` remonta a superfície quando a escala muda, e são CINCO canvases no app. Mesma
- * régua do `GlassCard` e do `Icon`: a decisão mora no primitivo, com o motivo escrito uma vez —
- * um canvas novo importado direto nasceria com o defeito de volta, em silêncio.
+ * `SkiaCanvas` desfaz a escala errada, e são CINCO canvases no app. Mesma régua do `GlassCard`
+ * e do `Icon`: a decisão mora no primitivo, com o motivo escrito uma vez — um canvas novo
+ * importado direto nasceria com o defeito de volta, em silêncio.
  */
 test('nenhum Canvas do Skia fora de ui/skia-canvas.tsx', () => {
   /*
@@ -182,5 +182,37 @@ test('nenhum Canvas do Skia fora de ui/skia-canvas.tsx', () => {
     fora,
     [],
     'use SkiaCanvas de @/components/ui/skia-canvas: o Canvas cru fica preso na escala px/dp em que nasceu'
+  );
+});
+
+/**
+ * A densidade que o Skia usa é lida UMA VEZ, no carregamento do módulo.
+ *
+ * É o coração do conserto e a parte que some sem deixar rastro. `RNSkPlatformContext::_pixelDensity`
+ * nasce na construção do módulo nativo (`PlatformContext.java`) e nada o atualiza; `SkiaCanvas`
+ * compara aquele valor com o `scale` de agora e desfaz a diferença. Se alguém mover o
+ * `PixelRatio.get()` para DENTRO do componente — que é o que parece mais "reativo" —, os dois
+ * lados passam a ser o mesmo número, `correcao` vira 1 para sempre e o conserto desliga **sem
+ * erro, sem aviso e sem teste vermelho**: só volta a barra torta no aparelho de quem mexeu no
+ * tamanho de exibição.
+ *
+ * Não dá para pegar isso renderizando (não há Skia no `node --test`), então o guarda lê o texto:
+ * a chamada tem que estar em coluna zero, fora de qualquer função.
+ */
+test('SkiaCanvas lê PixelRatio no carregamento do módulo, não a cada render', () => {
+  const code = stripComments(
+    readFileSync(join(SRC, 'components', 'ui', 'skia-canvas.tsx'), 'utf8')
+  );
+  const noModulo = /^const\s+\w+\s*=\s*PixelRatio\.get\(\);/m.test(code);
+  const chamadas = [...code.matchAll(/PixelRatio\.get\(\)/g)].length;
+
+  assert.ok(
+    noModulo,
+    'PixelRatio.get() precisa ser uma const de módulo: dentro do componente ele devolve a escala de AGORA, igual ao useWindowDimensions, e a correção vira 1'
+  );
+  assert.equal(
+    chamadas,
+    1,
+    'uma chamada só — uma segunda, dentro do render, seria a que o componente acabaria usando'
   );
 });
