@@ -530,8 +530,9 @@ const styles = StyleSheet.create({
     paddingTop: Space.xs,
   },
   trailing: {
-    alignItems: 'flex-end',
-    gap: Space.xs,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Space.sm,
   },
   band: {
     alignItems: 'center',
