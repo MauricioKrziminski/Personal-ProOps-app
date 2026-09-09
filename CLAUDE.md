@@ -30,10 +30,16 @@ App mobile pessoal de **notas rápidas, lembretes e controle financeiro operado 
   Isso já falhou **duas vezes** (03/09/2026): a `0049` e depois as `0050`/`0051` foram anunciadas
   como "aplicadas em produção" quando foram para o staging.
 
-  Produção está em **`20260909060000`** (09/09/2026), aplicada pelo Gabriel com
+  Produção está em **`20260909200000`** (09/09/2026), aplicada pelo Gabriel com
   `link --project-ref` + `db push` + `link` de volta para o staging. **`--db-url` não serve**: o
   hook lê o projeto LINKADO e a flag passava por cima da trava em silêncio — buraco fechado no
   mesmo dia, com `scripts/supabase-target.test.sh` prendendo os sete casos.
+
+  ⚠️ **Este número envelhece calado, e envelhecer aqui é caro.** Ele já ficou 14 migrations
+  atrasado, e a consequência não é um doc feio: em 09/09/2026 ele quase virou "não suba o OTA,
+  produção está sem as RPCs". Antes de decidir qualquer coisa com base nesta linha, confirme
+  na fonte — no SQL Editor de produção:
+  `select version from supabase_migrations.schema_migrations order by version desc limit 3;`
 - **Observabilidade:** **Langfuse**, integrado por middleware/tracing do LangGraph.
 - **WhatsApp:** Meta Cloud API **oficial** (nunca Baileys/não-oficial).
 - **Áudio (STT):** **Groq** (Whisper).
