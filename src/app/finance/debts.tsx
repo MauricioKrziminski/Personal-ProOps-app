@@ -834,12 +834,6 @@ export default function DebtsScreen() {
               <Field label="Valor da prestação" hint="Opcional: valor contratual. A amortização exibida é estimativa Price; seguros e tarifas não são separados.">
                 <MoneyField valueCents={form.installmentCents} onChangeCents={(installmentCents) => setForm({ ...form, installmentCents })} />
               </Field>
-              <Field label="Conta para pagar">
-                <Section>
-                  <Row title="Não informar" onPress={() => setForm({ ...form, accountId: null })} trailing={form.accountId === null ? <Icon name="checkmark" size="sm" color="tint" /> : undefined} />
-                  {pagadoras.map((a) => <Row key={a.id} title={a.name} onPress={() => setForm({ ...form, accountId: a.id })} trailing={form.accountId === a.id ? <Icon name="checkmark" size="sm" color="tint" /> : undefined} />)}
-                </Section>
-              </Field>
               <ThemedText type="small" themeColor="textSecondary">O cronograma é uma estimativa mensal. Cadastrar a dívida não cria prestações pendentes na projeção; registre cada pagamento nesta tela.</ThemedText>
               {!form.id && form.parcelas !== '' && (
                 <Field label="Quantas parcelas já foram pagas?"
@@ -885,6 +879,17 @@ export default function DebtsScreen() {
                   </Field>
                 </View>
               </View>
+              {/*
+                A conta que paga vem DEPOIS do cronograma: ela estava no meio dos valores,
+                separando "valor da prestação" de "quantas parcelas". Campo longo (uma lista
+                de contas) partindo um grupo curto era o "ordem toda bagunçada" de 09/09/2026.
+              */}
+              <Field label="Conta para pagar">
+                <Section>
+                  <Row title="Não informar" onPress={() => setForm({ ...form, accountId: null })} trailing={form.accountId === null ? <Icon name="checkmark" size="sm" color="tint" /> : undefined} />
+                  {pagadoras.map((a) => <Row key={a.id} title={a.name} onPress={() => setForm({ ...form, accountId: a.id })} trailing={form.accountId === a.id ? <Icon name="checkmark" size="sm" color="tint" /> : undefined} />)}
+                </Section>
+              </Field>
               </>}
             </ScrollView>
           ) : null}

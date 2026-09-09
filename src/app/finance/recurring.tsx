@@ -5,7 +5,7 @@ import Animated, { FadeIn, FadeInDown, LinearTransition } from 'react-native-rea
 import { Stack, router, useLocalSearchParams } from 'expo-router';
 import { useMutation, useQuery } from '@tanstack/react-query';
 
-import { Chip } from '@/components/finance/chip';
+import { CategoryPicker } from '@/components/finance/category-picker';
 import { ThemedText } from '@/components/themed-text';
 import { HeaderActions } from '@/components/ui/header-actions';
 import { Sheet } from '@/components/ui/sheet';
@@ -23,7 +23,6 @@ import { Skeleton, SkeletonRow } from '@/components/ui/skeleton';
 import { useToast } from '@/components/ui/toast';
 import { HitTarget, Motion, Radius, Space, tabular } from '@/design/tokens';
 import {
-  SUGGESTED_CATEGORIES,
   useAccounts,
   useDeleteRecurring,
   useRecurringTransactions,
@@ -644,16 +643,10 @@ export default function RecurringScreen() {
               </Field>
 
               <Field label="Categoria">
-                <View style={styles.chips}>
-                  {SUGGESTED_CATEGORIES.map((c) => (
-                    <Chip
-                      key={c}
-                      label={c}
-                      selected={form.category === c}
-                      onPress={() => setForm({ ...form, category: form.category === c ? null : c })}
-                    />
-                  ))}
-                </View>
+                <CategoryPicker
+                  value={form.category}
+                  onChange={(category) => setForm({ ...form, category })}
+                />
               </Field>
 
               {form.id ? (

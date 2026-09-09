@@ -6,6 +6,7 @@ import Animated, { FadeInDown, LinearTransition } from 'react-native-reanimated'
 import * as Haptics from 'expo-haptics';
 
 import { ErrorCard } from '@/components/error-card';
+import { CategoryPicker } from '@/components/finance/category-picker';
 import { Chip } from '@/components/finance/chip';
 import { Card } from '@/components/ui/card';
 import { Sheet } from '@/components/ui/sheet';
@@ -20,7 +21,6 @@ import { SkeletonRow } from '@/components/ui/skeleton';
 import { useToast } from '@/components/ui/toast';
 import { Motion, Space, Type, tabular } from '@/design/tokens';
 import { confirmDestructive, showItemActions } from '@/lib/item-actions';
-import { SUGGESTED_CATEGORIES } from '@/lib/categories';
 import {
   useAccounts,
   useDeleteRule,
@@ -297,25 +297,12 @@ export default function RulesScreen() {
             </Field>
 
             <Field label="Categorizar como">
-              <View style={styles.chips}>
-                {SUGGESTED_CATEGORIES.map((cat) => (
-                  <Chip
-                    key={cat}
-                    label={cat}
-                    selected={rascunho?.category === cat}
-                    onPress={() =>
-                      setRascunho((atual) =>
-                        atual
-                          ? {
-                              ...atual,
-                              category: atual.category === cat ? null : cat,
-                            }
-                          : atual
-                      )
-                    }
-                  />
-                ))}
-              </View>
+              <CategoryPicker
+                value={rascunho?.category ?? null}
+                onChange={(category) =>
+                  setRascunho((atual) => (atual ? { ...atual, category } : atual))
+                }
+              />
             </Field>
 
             {(accounts ?? []).length > 0 ? (

@@ -9,6 +9,7 @@ import { KeyboardAwareScrollView } from 'react-native-keyboard-controller';
 import * as Haptics from 'expo-haptics';
 import { z } from 'zod';
 
+import { CategoryPicker } from '@/components/finance/category-picker';
 import { Chip } from '@/components/finance/chip';
 import { ThemedText } from '@/components/themed-text';
 import { HeaderActions } from '@/components/ui/header-actions';
@@ -23,7 +24,6 @@ import { useToast } from '@/components/ui/toast';
 import { MaxContentWidth } from '@/constants/theme';
 import { Motion, Space, Type } from '@/design/tokens';
 import {
-  SUGGESTED_CATEGORIES,
   useAccounts,
   useCreateInstallmentPlan,
   useDeleteTransaction,
@@ -403,7 +403,20 @@ function TransactionForm({ editing }: { editing?: Transaction }) {
             <Button label="Financiamento" variant="secondary" size="sm" onPress={() => router.push({ pathname: '/finance/debts', params: { create: 'financing' } })} />
           </View>
         ) : null}
-        {/* Valor primeiro: é o único campo obrigatório e já abre o teclado numérico. */}
+        {/*
+          Tipo primeiro porque ele decide QUAIS campos existem: transferência troca
+          "Categoria" por "Para a conta". Controle que remonta o formulário não pode vir
+          depois do que ele remonta.
+        */}
+        <Controller
+          control={control}
+          name="kind"
+          render={({ field }) => (
+            <Segmented options={KINDS} value={field.value} onChange={field.onChange} />
+          )}
+        />
+
+        {/* Único campo obrigatório, e o que abre o teclado — `autoFocus` continua aqui. */}
         <Controller
           control={control}
           name="amount_cents"
@@ -419,13 +432,44 @@ function TransactionForm({ editing }: { editing?: Transaction }) {
           )}
         />
 
+        {/*
+          Descrição e Estabelecimento moravam no FIM do formulário, depois da data e do
+          "vou pagar depois". A ordem agora é a mesma de Recorrentes, que já estava certa:
+          o que É (tipo, valor, nome) antes do que ele CLASSIFICA (categoria, conta) antes
+          do QUANDO. Era a queixa de 09/09/2026 — "a ordem dos campos está toda bagunçada".
+        */}
         <Controller
           control={control}
-          name="kind"
+          name="description"
           render={({ field }) => (
-            <Segmented options={KINDS} value={field.value} onChange={field.onChange} />
+            <Field label="Descrição">
+              <TextField
+                value={field.value ?? ''}
+                onChangeText={(text) => field.onChange(text || null)}
+                placeholder="Ex.: compras da semana"
+                accessibilityLabel="Descrição"
+                multiline
+                style={styles.multiline}
+              />
+            </Field>
           )}
         />
+
+        <Controller
+          control={control}
+          name="merchant"
+          render={({ field }) => (
+            <Field label="Estabelecimento">
+              <TextField
+                value={field.value ?? ''}
+                onChangeText={(text) => field.onChange(text || null)}
+                placeholder="Ex.: Padaria do Zé"
+                accessibilityLabel="Estabelecimento"
+              />
+            </Field>
+          )}
+        />
+
 
         {kind !== 'transfer' && (
           <Animated.View entering={FadeIn.duration(Motion.duration.base)} layout={linear}>
@@ -434,16 +478,7 @@ function TransactionForm({ editing }: { editing?: Transaction }) {
               name="category"
               render={({ field }) => (
                 <Field label="Categoria">
-                  <View style={styles.chipRow}>
-                    {SUGGESTED_CATEGORIES.map((cat) => (
-                      <Chip
-                        key={cat}
-                        label={cat}
-                        selected={field.value === cat}
-                        onPress={() => field.onChange(field.value === cat ? null : cat)}
-                      />
-                    ))}
-                  </View>
+                  <CategoryPicker value={field.value} onChange={field.onChange} />
                 </Field>
               )}
             />
@@ -544,6 +579,24 @@ function TransactionForm({ editing }: { editing?: Transaction }) {
           </Animated.View>
         )}
 
+        {podeParcelar && installmentCount > 1 && (
+          <Controller control={control} name="paid_installments" render={({ field }) => (
+            <Field label="Quantas parcelas iniciais já foram pagas?" error={errors.paid_installments?.message}
+              hint="Informe zero se nenhuma foi paga. Datas passadas não significam pagamento; as demais parcelas ficam pendentes.">
+              <View style={styles.chipRow}>
+                <Chip label="Nenhuma" selected={field.value === '0'} onPress={() => field.onChange('0')} />
+                <TextField value={field.value} onChangeText={field.onChange} keyboardType="number-pad" maxLength={2}
+                  placeholder="0" accessibilityLabel="Parcelas iniciais já pagas" />
+              </View>
+              {paidHistory !== '' && /^\d+$/.test(paidHistory) && Number(paidHistory) <= installmentCount && (
+                <ThemedText type="small" themeColor="textSecondary">
+                  {Number(paidHistory) === 0 ? `As ${installmentCount} parcelas ficam pendentes.` : `${paidHistory} parcelas iniciais pagas; ${installmentCount - Number(paidHistory)} pendentes.`}
+                </ThemedText>
+              )}
+            </Field>
+          )} />
+        )}
+
         {/*
           **Pix no crédito** (Nubank e afins): o boleto pede um valor, o cartão cobra outro.
           Na fatura são duas coisas diferentes — a compra e o custo de ter usado o crédito —
@@ -572,23 +625,6 @@ function TransactionForm({ editing }: { editing?: Transaction }) {
           </Animated.View>
         )}
 
-        {podeParcelar && installmentCount > 1 && (
-          <Controller control={control} name="paid_installments" render={({ field }) => (
-            <Field label="Quantas parcelas iniciais já foram pagas?" error={errors.paid_installments?.message}
-              hint="Informe zero se nenhuma foi paga. Datas passadas não significam pagamento; as demais parcelas ficam pendentes.">
-              <View style={styles.chipRow}>
-                <Chip label="Nenhuma" selected={field.value === '0'} onPress={() => field.onChange('0')} />
-                <TextField value={field.value} onChangeText={field.onChange} keyboardType="number-pad" maxLength={2}
-                  placeholder="0" accessibilityLabel="Parcelas iniciais já pagas" />
-              </View>
-              {paidHistory !== '' && /^\d+$/.test(paidHistory) && Number(paidHistory) <= installmentCount && (
-                <ThemedText type="small" themeColor="textSecondary">
-                  {Number(paidHistory) === 0 ? `As ${installmentCount} parcelas ficam pendentes.` : `${paidHistory} parcelas iniciais pagas; ${installmentCount - Number(paidHistory)} pendentes.`}
-                </ThemedText>
-              )}
-            </Field>
-          )} />
-        )}
 
         <Controller
           control={control}
@@ -680,37 +716,6 @@ function TransactionForm({ editing }: { editing?: Transaction }) {
           </ThemedText>
         ) : null}
 
-        <Controller
-          control={control}
-          name="description"
-          render={({ field }) => (
-            <Field label="Descrição">
-              <TextField
-                value={field.value ?? ''}
-                onChangeText={(text) => field.onChange(text || null)}
-                placeholder="Ex.: compras da semana"
-                accessibilityLabel="Descrição"
-                multiline
-                style={styles.multiline}
-              />
-            </Field>
-          )}
-        />
-
-        <Controller
-          control={control}
-          name="merchant"
-          render={({ field }) => (
-            <Field label="Estabelecimento">
-              <TextField
-                value={field.value ?? ''}
-                onChangeText={(text) => field.onChange(text || null)}
-                placeholder="Ex.: Padaria do Zé"
-                accessibilityLabel="Estabelecimento"
-              />
-            </Field>
-          )}
-        />
 
         {editing ? (
           <Button

@@ -331,6 +331,25 @@ export function useGoals() {
 const RECURRING_COLUMNS =
   'id, kind, amount_cents, currency, category, description, account_id, rrule, next_run_at, active, run_attempts, last_error, created_at, dtstart, end_date, auto_confirm';
 
+/**
+ * As categorias que o usuário realmente usa, mais usada primeiro.
+ *
+ * Categoria é texto livre (`finance.md`): quem lança pelo WhatsApp cria categoria nova, e o
+ * seletor do app só conhecia as 13 sugestões. Ver `categories_used()` na `20260909100000`.
+ */
+export function useCategoriesUsed() {
+  useRealtimeInvalidate('transactions', ['categories-used']);
+  return useQuery({
+    queryKey: ['categories-used'],
+    queryFn: async (): Promise<{ category: string; uses: number }[]> => {
+      const { data, error } = await supabase.rpc('categories_used');
+      if (error) throw error;
+      return (data ?? []).map((r) => ({ category: r.category, uses: Number(r.uses) }));
+    },
+    staleTime: 60_000,
+  });
+}
+
 /** Séries recorrentes — criadas por WhatsApp, materializadas pelo cron do send-reminders. */
 export function useRecurringTransactions() {
   useRealtimeInvalidate('recurring_transactions', ['recurring']);
