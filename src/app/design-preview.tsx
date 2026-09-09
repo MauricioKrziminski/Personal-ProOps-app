@@ -742,7 +742,16 @@ function seedClient() {
       active: true, run_attempts: 0, last_error: null, created_at: `${mes}-01T09:00:00Z`,
     },
   ]);
-  client.setQueryData(['recurring', 'upcoming', 30], []);
+  /**
+   * ⚠️ A chave é `['recurring','upcoming', String(dias), HOJE]` — dias como STRING e a data de
+   * hoje no fim. Com `30` numérico e sem a data, a query rodava de verdade, falhava sem sessão e
+   * a tela abria com a faixa "Não deu para somar os próximos 30 dias" em cima da lista certa.
+   * Chave errada não quebra: cai no estado de erro, em silêncio.
+   */
+  client.setQueryData(['recurring', 'upcoming', '30', hoje], [
+    { kind: 'expense', amount_cents: 150000 },
+    { kind: 'income', amount_cents: 420000 },
+  ]);
 
   return client;
 }
