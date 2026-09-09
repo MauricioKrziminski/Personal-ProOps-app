@@ -10,7 +10,7 @@
  */
 export const SUGGESTED_CATEGORIES = [
   'mercado', 'transporte', 'lazer', 'contas', 'saúde', 'casa',
-  'educação', 'assinaturas', 'restaurante', 'salário', 'freela', 'outros',
+  'educação', 'assinaturas', 'restaurante', 'salário', 'freela', 'juros', 'outros',
 ] as const;
 
 export type SuggestedCategory = (typeof SUGGESTED_CATEGORIES)[number];

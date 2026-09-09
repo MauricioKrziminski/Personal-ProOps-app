@@ -16,6 +16,7 @@ SUGGESTED_CATEGORIES: tuple[str, ...] = (
     "restaurante",
     "salário",
     "freela",
+    "juros",
     "outros",
 )
 

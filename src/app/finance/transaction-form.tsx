@@ -66,6 +66,8 @@ const schema = z
     counterparty_account_id: z.string().nullable(),
     // 1 = à vista; >= 2 vira plano de parcelas (RPC create_installment_plan)
     installments: z.number().int().min(1).max(72),
+    // Pix no crédito: o que o cartão cobra a MAIS do que o boleto pediu. 0 = compra normal.
+    fee_cents: z.number().int().min(0),
     paid_installments: z.string(),
     occurred_at: z.string().refine(isValidBRDate, 'Data em dd/mm/aaaa'),
     /** "Isso ainda vai acontecer" — vira `status='pending'`, a base da projeção de caixa. */
@@ -185,6 +187,7 @@ function TransactionForm({ editing }: { editing?: Transaction }) {
       counterparty_account_id: editing?.counterparty_account_id ?? null,
       installments: 1,
       paid_installments: '',
+      fee_cents: 0,
       occurred_at: isoToBR(editing?.occurred_at ?? localISODate()),
       pending: editing?.status === 'pending',
       due_at: editing?.due_at ? isoToBR(editing.due_at) : null,
@@ -296,6 +299,7 @@ function TransactionForm({ editing }: { editing?: Transaction }) {
         occurred_at: brToISO(values.occurred_at),
         status,
         due_at: adiado && values.due_at ? brToISO(values.due_at) : editing?.due_at ?? null,
+        fee_cents: editing ? 0 : values.fee_cents,
       },
       {
         onSuccess: () => {
@@ -534,6 +538,34 @@ function TransactionForm({ editing }: { editing?: Transaction }) {
                       />
                     ))}
                   </View>
+                </Field>
+              )}
+            />
+          </Animated.View>
+        )}
+
+        {/*
+          **Pix no crédito** (Nubank e afins): o boleto pede um valor, o cartão cobra outro.
+          Na fatura são duas coisas diferentes — a compra e o custo de ter usado o crédito —
+          e é assim que ficam aqui: duas linhas, mesma fatura, os juros em `juros`.
+
+          Vazio = compra normal. Não é um modo: é um campo a mais que só aparece onde a
+          pergunta faz sentido (gasto em cartão, à vista, sendo criado agora).
+        */}
+        {isCard && kind === 'expense' && !editing && installmentCount === 1 && (
+          <Animated.View entering={FadeIn.duration(Motion.duration.base)} layout={linear}>
+            <Controller
+              control={control}
+              name="fee_cents"
+              render={({ field }) => (
+                <Field
+                  label="Juros do Pix no crédito"
+                  hint={
+                    field.value > 0
+                      ? `Duas linhas na fatura: ${formatBRL(amountCents)} da compra e ${formatBRL(field.value)} de juros — ${formatBRL(amountCents + field.value)} no total.`
+                      : 'Só se você pagou por Pix usando o limite do cartão. Acima fica o valor original; aqui, o que o banco cobrou a mais.'
+                  }>
+                  <MoneyField valueCents={field.value} onChangeCents={field.onChange} />
                 </Field>
               )}
             />

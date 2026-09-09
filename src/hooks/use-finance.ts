@@ -1386,19 +1386,41 @@ export interface TransactionInput {
   merchant?: string | null;
 }
 
+/**
+ * `fee_cents` é o **Pix no crédito**: pagar um boleto por Pix usando o limite do cartão
+ * custa mais do que o boleto pedia. As duas metades viram DUAS linhas na mesma fatura,
+ * porque são duas coisas diferentes — o que foi pago e o que custou pagar assim. Uma linha
+ * só, no valor cobrado, esconderia o juro dentro do gasto e ele nunca apareceria num
+ * orçamento nem numa soma do ano.
+ *
+ * Quem resolve a fatura das duas é o trigger `set_invoice`: mesma conta e mesma data caem
+ * no mesmo ciclo, sem o app calcular nada.
+ */
 export function useSaveTransaction() {
   const invalidate = useInvalidateFinance();
   return useMutation({
-    mutationFn: async ({ id, ...input }: TransactionInput & { id?: string }) => {
+    mutationFn: async ({ id, fee_cents, ...input }: TransactionInput & { id?: string; fee_cents?: number }) => {
       if (id) {
         const { error } = await supabase.from('transactions').update(input).eq('id', id).select('id').single();
         if (error) throw error;
-      } else {
-        const { error } = await supabase
-          .from('transactions')
-          .insert({ ...input, user_id: await userId(), source: 'app' });
-        if (error) throw error;
+        return;
       }
+      const uid = await userId();
+      const compra = { ...input, user_id: uid, source: 'app' as const };
+      const linhas = [compra];
+      if (fee_cents && fee_cents > 0) {
+        linhas.push({
+          ...compra,
+          amount_cents: fee_cents,
+          category: 'juros',
+          description: 'Juros do Pix no crédito',
+          // O favorecido é da compra, não do juro: o juro é do banco.
+          merchant: null,
+        });
+      }
+      // Um insert só: meia gravação deixaria o juro sem a compra (ou o contrário) na fatura.
+      const { error } = await supabase.from('transactions').insert(linhas);
+      if (error) throw error;
     },
     onSuccess: invalidate,
   });
