@@ -332,3 +332,93 @@ async def test_turno_sem_texto_nao_conta_como_resposta_ignorada(monkeypatch):
     primeiro = await nodes.resource_node(_no_state("cadastra o cartão Nubank"))
     segundo = await nodes.resource_node(_no_state("   ", primeiro["resource_draft"]))
     assert segundo["results"][0] == primeiro["results"][0]
+
+
+# --- paridade com o app: conta padrão e lixeira de notas --------------------
+#
+# As três são o que o usuário faz com o dedo (`useSetDefaultAccount`,
+# `useRestoreNote`, `usePurgeNote`) e o agente não alcançava. Nenhuma custou
+# schema: `is_default` e `trashed` são campos VIRTUAIS validados pelo catálogo,
+# e `ResourceAction` continua em 5×5.
+
+
+def _linha(**extra):
+    return {"id": "11111111-1111-1111-1111-111111111111", "row_version": "42", **extra}
+
+
+@pytest.mark.asyncio
+async def test_conta_padrao_sai_de_values_e_escreve_no_workspace(monkeypatch):
+    async def fetch(*a):
+        return [_linha(name="Nubank", type="checking", archived=False)]
+
+    monkeypatch.setattr(resources.db, "fetch", fetch)
+    acao = action(resource="accounts", kind="resource_update", is_default="true")
+    prepared = await resources.prepare(ctx(), acao)
+
+    # `is_default` não é coluna de `accounts`: se sobrasse aqui, o UPDATE de
+    # `execute` viraria `set is_default = ...` numa coluna inexistente.
+    assert "is_default" not in prepared["values"]
+    assert prepared["set_default"] is True
+    assert needs_confirmation(acao, 1.0)
+
+    escritas = []
+
+    async def fetch_one(sql, *args):
+        escritas.append((sql, args))
+        return {"id": prepared["id"]}
+
+    async def execute(sql, *args):
+        escritas.append((sql, args))
+
+    monkeypatch.setattr(resources.db, "fetch_one", fetch_one)
+    monkeypatch.setattr(resources.db, "execute", execute)
+    await resources.execute(
+        ExecContext(
+            "user", "workspace", None, "America/Sao_Paulo", "", "app:1",
+            target={"prepared": prepared},
+        ),
+        acao,
+    )
+    # sem coluna a mexer, o SELECT existe só pelo xmin; a escrita é em workspaces
+    assert "select id from public.accounts" in escritas[0][0]
+    assert "workspaces set default_account_id" in escritas[1][0]
+
+
+@pytest.mark.asyncio
+async def test_restaurar_nota_procura_na_lixeira_e_zera_deleted_at(monkeypatch):
+    consultas = []
+
+    async def fetch(sql, *a):
+        consultas.append(sql)
+        return [_linha(content="lista de compras", deleted_at="2026-09-01T00:00:00Z")]
+
+    monkeypatch.setattr(resources.db, "fetch", fetch)
+    prepared = await resources.prepare(
+        ctx(), action(resource="notes", kind="resource_update", trashed="false")
+    )
+    # sem inverter o filtro, a nota apagada era inalcançável e o erro dizia
+    # "não encontrei" sobre uma nota que existe
+    assert "deleted_at is not null" in consultas[0]
+    assert prepared["values"] == {"deleted_at": None}
+
+
+@pytest.mark.asyncio
+async def test_apagar_de_vez_so_vale_para_nota_ja_na_lixeira(monkeypatch):
+    async def na_lixeira(*a):
+        return [_linha(content="rascunho", deleted_at="2026-09-01T00:00:00Z")]
+
+    monkeypatch.setattr(resources.db, "fetch", na_lixeira)
+    prepared = await resources.prepare(
+        ctx(), action(resource="notes", kind="resource_delete", trashed="true")
+    )
+    # values vazio é o que faz `execute` apagar a linha em vez de regravar deleted_at
+    assert prepared["values"] == {}
+    assert "DE VEZ" in prepared["summary"]
+
+    async def viva(*a):
+        return [_linha(content="rascunho", deleted_at=None)]
+
+    monkeypatch.setattr(resources.db, "fetch", viva)
+    prepared = await resources.prepare(ctx(), action(resource="notes", kind="resource_delete"))
+    assert prepared["values"] == {"deleted_at": prepared["values"]["deleted_at"]}
+    assert "lixeira" in prepared["summary"]

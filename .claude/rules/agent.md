@@ -77,6 +77,19 @@ sempre concorda: só esta suíte responde se a pessoa pode escrever do jeito del
 têm que passar: regressão em "aceitar" é o agente ficando surdo; regressão em
 "recusar" apaga dado do usuário.
 
+## Paridade com o app
+
+**O agente faz tudo que o usuário faz com o dedo.** As 52 mutações do app (`useMutation` em
+`src/hooks/`) foram casadas uma a uma com o caminho do agente em 09/09/2026; a tabela, as quatro
+lacunas fechadas e as nove exclusões com motivo estão em `docs/AGENTE-PARIDADE-COM-O-APP.md`.
+**Botão novo no app = linha nova naquela tabela**, senão a diferença volta a crescer sozinha —
+foi assim que renomear um lançamento ficou de fora por meses.
+
+Onde a capacidade nova cabe, em ordem: **campo no catálogo de `ResourceAction`** (5×5, sobra
+folga, e campo virtual traduzido no `prepare` não precisa nem existir como coluna) → **alvo novo
+resolvido** para uma ação que já existe → tipo de ação novo, que hoje **não cabe** em
+`FinanceAction` (teto medido de 252/32).
+
 ## Human-In-The-Loop
 
 - Disparam `interrupt()` no LangGraph: **deleções** (`delete_transaction`, `undo_last`,

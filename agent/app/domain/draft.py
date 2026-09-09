@@ -77,9 +77,9 @@ async def _classificar(texto: str, pergunta: str):
     """
     from app.graph.schemas import DraftDecision
     from app.security import wrap_untrusted
-    from app.services.gemini import structured
+    from app.services.gemini import GEMINI_GATE, structured
 
-    modelo = structured(DraftDecision)
+    modelo = structured(DraftDecision, GEMINI_GATE)
     return await modelo.ainvoke(
         [
             ("system", _PROMPT.format(pergunta=pergunta or "o valor")),

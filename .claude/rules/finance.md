@@ -42,6 +42,11 @@
   > parcelas postadas no dia do fechamento aparecerem um mês fora. Migration
   > `20260909050000`, conciliação em `docs/bugs/2026-09-09-conciliacao-setembro.md`.
 - Cartão é conta comum em partida dobrada: a compra deixa o saldo do cartão negativo (dívida) e o **pagamento da fatura é `transfer`** da conta pagadora para o cartão (RPC `pay_invoice`). Pagamento de fatura **nunca** é despesa nova — o gasto já contou na compra.
+- **Pagar e quitar são efeitos diferentes e a interface tem que distinguir os dois.** `pay_invoice`
+  move dinheiro (aceita valor parcial); `settle_invoice` marca a fatura como paga SEM criar
+  transferência, para o pagamento que aconteceu fora do app. No app são dois botões; no WhatsApp,
+  `pay_invoice` e `mark_paid` com a fatura como alvo. Confirmar "a fatura do Nubank" não separa os
+  dois — a frase do SIM diz se o caixa se move.
 - Parcelamento só pela RPC `create_installment_plan` (nunca inserindo N linhas no app).
 
 ## Projeção de fluxo de caixa

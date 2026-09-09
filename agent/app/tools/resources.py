@@ -24,7 +24,7 @@ CATALOG = {
         "accounts",
         "name",
         "archived",
-        "name type initial_balance_cents archived",
+        "name type initial_balance_cents archived is_default",
     ),
     "cards": (
         "accounts",
@@ -58,7 +58,7 @@ CATALOG = {
         None,
         "match_type pattern category account_id priority",
     ),
-    "notes": ("notes", "content", "deleted_at", "content folder_id pinned"),
+    "notes": ("notes", "content", "deleted_at", "content folder_id pinned trashed"),
     "reminders": (
         "reminders",
         "title",
@@ -148,6 +148,8 @@ LABELS = {
     "parent_id": "pasta superior",
     "started_at": "início do contrato",
     "paid_at": "data do pagamento",
+    "is_default": "conta padrão",
+    "trashed": "na lixeira",
 }
 ENUMS = {
     ("accounts", "type"): {"checking", "savings", "cash", "investment"},
@@ -166,7 +168,7 @@ ENUMS = {
     ("reminders", "channel"): {"push", "whatsapp", "both"},
     ("rules", "match_type"): {"contains", "merchant"},
 }
-BOOLS = {"archived", "active", "rollover", "is_liability", "auto_confirm", "pinned"}
+BOOLS = {"archived", "active", "rollover", "is_liability", "auto_confirm", "pinned", "is_default", "trashed"}
 LINKS = {
     "account_id": "accounts",
     "payment_account_id": "accounts",
@@ -369,13 +371,17 @@ def _derive_fixed_installments(values: dict) -> None:
     values["interest_rate_monthly"] = "0"
 
 
-def _where(resource):
+def _where(resource, lixeira=None):
     if resource == "cards":
         return " and type = 'credit_card'"
     if resource == "accounts":
         return " and type <> 'credit_card'"
     if resource == "notes":
-        return " and deleted_at is null"
+        # `trashed` no pedido é o usuário dizendo que fala da LIXEIRA — restaurar
+        # ("tira da lixeira") e apagar de vez só alcançam a nota se a busca parar
+        # de filtrar `deleted_at is null`. Sem isto o "não encontrei" seria mentira:
+        # a nota existe, só está do outro lado do filtro.
+        return " and deleted_at is not null" if lixeira is not None else " and deleted_at is null"
     return ""
 
 
@@ -388,6 +394,23 @@ async def prepare(ctx: ExecContext, action: ResourceAction) -> dict:
         "resource": action.resource,
         "operation": action.type.value,
     }
+    # Campos VIRTUAIS: o modelo fala a linguagem do app e o SQL fica com a coluna real.
+    # Saem de `values` ANTES de qualquer ramo porque tanto o INSERT quanto o UPDATE de
+    # `execute` são montados a partir destas chaves — um `is_default` sobrando viraria
+    # `insert into accounts (..., is_default)` numa coluna que não existe.
+    if "is_default" in values:
+        prepared["set_default"] = values.pop("is_default")
+    lixeira = None
+    if "trashed" in values:
+        lixeira = queria_lixeira = values.pop("trashed")
+        if action.type == Op.UPDATE:
+            # false = tirar da lixeira (é o `useRestoreNote` do app). true seria mandar
+            # para a lixeira, que já é o que `resource_delete` faz.
+            values["deleted_at"] = now_utc().isoformat() if queria_lixeira else None
+        elif action.type == Op.DELETE and not queria_lixeira:
+            _error("Para apagar de vez, diga que a nota está na lixeira.")
+        elif action.type == Op.CREATE:
+            _error("Uma nota nova não nasce na lixeira.")
     if values.get("calculation_mode"):
         prepared["calculation_mode"] = values["calculation_mode"]
     if action.type == Op.LIST:
@@ -415,7 +438,7 @@ async def prepare(ctx: ExecContext, action: ResourceAction) -> dict:
                 params.append(month.isoformat())
         rows = await db.fetch(
             f"select *, xmin::text as row_version from public.{table} where workspace_id = %s and {identity} = %s"
-            + _where(action.resource)
+            + _where(action.resource, lixeira)
             + selector,
             *params,
         )
@@ -488,6 +511,13 @@ async def prepare(ctx: ExecContext, action: ResourceAction) -> dict:
         if action.resource == "budgets":
             prepared["target_label"] = str(old.get("month") or "padrão")
         if action.type == Op.DELETE:
+            if prepared.pop("set_default", None) is not None:
+                _error("Para tirar a conta padrão, peça para deixá-la sem ser a padrão.")
+            # Nota JÁ na lixeira e o usuário pediu de novo: o segundo apagar é o
+            # definitivo (o `usePurgeNote` do app). Sem isto, apagar uma nota já
+            # apagada só regravava o mesmo `deleted_at` e a lixeira nunca esvaziava.
+            if action.resource == "notes" and old.get("deleted_at") is not None:
+                deletion = None
             if deletion == "archived":
                 values = {"archived": True}
             elif deletion == "active":
@@ -497,7 +527,7 @@ async def prepare(ctx: ExecContext, action: ResourceAction) -> dict:
             else:
                 values = {}
             prepared["values"] = values
-        elif not values:
+        elif not values and "set_default" not in prepared:
             _error("O que você quer alterar?")
         if (
             action.resource == "accounts"
@@ -596,6 +626,10 @@ async def prepare(ctx: ExecContext, action: ResourceAction) -> dict:
             if deletion == "archived"
             else "desativar"
             if deletion == "active"
+            else "mandar para a lixeira"
+            if deletion == "deleted_at"
+            else "apagar DE VEZ (não dá para desfazer)"
+            if action.resource == "notes"
             else "excluir"
         ),
         Op.PAY: "registrar pagamento de",
@@ -743,9 +777,17 @@ async def execute(ctx: ExecContext, action: ResourceAction) -> ToolResult:
     else:
         # MVCC token freezes every column, not only a timestamp updated by some tables.
         args = [proposal["id"], ctx.workspace_id, proposal["version"]]
-        if action.type == Op.DELETE and not deletion:
+        if action.type == Op.DELETE and not values:
             row = await db.fetch_one(
                 f"delete from public.{table} where id = %s and workspace_id = %s and xmin::text = %s returning id",
+                *args,
+            )
+        elif not values:
+            # Só "vira a conta padrão": não há coluna a mexer nesta tabela, e um
+            # `set` vazio é erro de sintaxe. O SELECT existe pelo xmin — a trava de
+            # "mudou depois da proposta" vale igual quando a escrita é em outra tabela.
+            row = await db.fetch_one(
+                f"select id from public.{table} where id = %s and workspace_id = %s and xmin::text = %s",
                 *args,
             )
         else:
@@ -765,7 +807,30 @@ async def execute(ctx: ExecContext, action: ResourceAction) -> ToolResult:
         raise Level1Error(
             "Esse item mudou depois da proposta. Peça novamente para revisar antes de confirmar."
         )
+    if "set_default" in proposal:
+        await _definir_conta_padrao(ctx, proposal["id"], proposal["set_default"])
     return ToolResult("Concluído: " + proposal["summary"] + ".", result_id=row["id"])
+
+
+async def _definir_conta_padrao(ctx: ExecContext, account_id: str, virar_padrao: bool) -> None:
+    """A conta padrão mora em `workspaces`, não na conta — é do espaço, não do dono.
+
+    O trigger `tg_workspaces_default_account` (20260909035000) recusa cartão de
+    crédito e conta arquivada; não repetir a checagem aqui seria a segunda cópia
+    da mesma regra. Desmarcar só zera se o padrão AINDA for esta conta: senão
+    "essa não é mais a padrão" derrubaria a escolha de outra, feita no meio.
+    """
+    if virar_padrao:
+        await db.execute(
+            "update public.workspaces set default_account_id = %s where id = %s",
+            account_id, ctx.workspace_id,
+        )
+    else:
+        await db.execute(
+            "update public.workspaces set default_account_id = null "
+            "where id = %s and default_account_id = %s",
+            ctx.workspace_id, account_id,
+        )
 
 
 def prompt_catalogue() -> str:
@@ -781,5 +846,5 @@ def prompt_catalogue() -> str:
         catalogue
         + "\nValores permitidos:\n"
         + choices
-        + "\nFinanciamento/dívida tem dois modos: fixed_installments (padrão) precisa só de installment_cents e installments — o total contratual das parcelas, com juros dentro; amortized precisa de principal_cents, remaining_cents e interest_rate_monthly, e só serve quando o usuário tem esses números do contrato. Nunca converta o total das parcelas em principal nem invente taxa.\nOrçamento mensal existente: target_month=YYYY-MM-01; orçamento padrão: target_month=default.\nPara pagar prestação de dívida existente: resource_pay, resource=debts, name=nome da dívida, campos amount_cents, account_id (nome da conta), paid_at (YYYY-MM-DD). Não editar remaining_cents para registrar pagamento. Ao CRIAR dívida parcelada, installments_paid sai do que o usuário disse, inclusive pela posição: 'estou na 9ª parcela' são 8 pagas, 'tô na terceira' são 2, 'comecei agora' é 0, e um número solto respondendo à pergunta é a quantidade. Deixe vazio só quando a mensagem não disser nada sobre isso — o usuário confirma o cadastro inteiro antes de qualquer gravação, e é ali que ele corrige. Em dívida QUE JÁ EXISTE é o contrário: posição e data não comprovam pagamento; use resource_update com installments_paid e remaining_cents explicitamente informados, e se faltar saldo atual pergunte. Nunca use resource_pay para dar baixa retroativa em várias parcelas ou invente amortização a partir do valor da prestação."
+        + "\nFinanciamento/dívida tem dois modos: fixed_installments (padrão) precisa só de installment_cents e installments — o total contratual das parcelas, com juros dentro; amortized precisa de principal_cents, remaining_cents e interest_rate_monthly, e só serve quando o usuário tem esses números do contrato. Nunca converta o total das parcelas em principal nem invente taxa.\nConta padrão (onde cai o lançamento que não cita conta): resource_update, resource=accounts, name=nome da conta, campo is_default=true; para tirar, is_default=false. Cartão de crédito não pode ser conta padrão.\nNota na LIXEIRA: resource_delete em notes manda para a lixeira; restaurar (\"tira da lixeira\", \"recupera a nota\") é resource_update com trashed=false; apagar DE VEZ (\"esvazia\", \"apaga definitivo\") é resource_delete com trashed=true.\nOrçamento mensal existente: target_month=YYYY-MM-01; orçamento padrão: target_month=default.\nPara pagar prestação de dívida existente: resource_pay, resource=debts, name=nome da dívida, campos amount_cents, account_id (nome da conta), paid_at (YYYY-MM-DD). Não editar remaining_cents para registrar pagamento. Ao CRIAR dívida parcelada, installments_paid sai do que o usuário disse, inclusive pela posição: 'estou na 9ª parcela' são 8 pagas, 'tô na terceira' são 2, 'comecei agora' é 0, e um número solto respondendo à pergunta é a quantidade. Deixe vazio só quando a mensagem não disser nada sobre isso — o usuário confirma o cadastro inteiro antes de qualquer gravação, e é ali que ele corrige. Em dívida QUE JÁ EXISTE é o contrário: posição e data não comprovam pagamento; use resource_update com installments_paid e remaining_cents explicitamente informados, e se faltar saldo atual pergunte. Nunca use resource_pay para dar baixa retroativa em várias parcelas ou invente amortização a partir do valor da prestação."
     )

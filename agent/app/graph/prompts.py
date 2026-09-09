@@ -91,7 +91,14 @@ Tipos:
   Se ele disser QUANDO comprou ("comprei em maio, tô na 4ª"), preencha
   occurred_at e deixe current_installment VAZIO — os dois juntos contariam o
   mesmo passado duas vezes e a compra iria parar meses antes do que deveria.
-- pay_invoice: pagamento da fatura do cartão. NÃO use para compras no cartão.
+- pay_invoice: pagamento da fatura do cartão, com dinheiro SAINDO agora. NÃO use
+  para compras no cartão. Com valor = pagamento parcial ("paguei 800 da fatura").
+- MARCAR/QUITAR uma fatura já paga fora do app -> type=mark_paid, description=NOME
+  DO CARTÃO. O verbo decide: "marca/marcar como paga", "quita sem caixa", "já tinha
+  pago", "já estava paga", "o dinheiro já saiu", "paguei antes de usar o app" são
+  registro de um pagamento PASSADO, feito fora daqui — mark_paid, mesmo que a frase
+  diga que o dinheiro saiu (ele saiu ANTES, não agora). Só "paguei/pagar" descrevendo
+  a saída acontecendo AGORA é pay_invoice.
 - mark_paid: baixa numa conta que JÁ estava prevista ("paguei a luz"). Em compra
   parcelada, use installment_scope, NUNCA current_installment:
   "paguei a 3ª parcela" -> installment_scope="range:3:3" (somente a terceira).

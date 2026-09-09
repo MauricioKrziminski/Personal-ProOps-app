@@ -102,9 +102,15 @@ async def test_classificar_de_confirmacao_monta_a_chamada_de_verdade(monkeypatch
     from app.services import gemini
 
     falso = _ModeloFalso("approve")
-    monkeypatch.setattr(gemini, "structured", lambda schema: falso)
+    modelos: list[str | None] = []
+    monkeypatch.setattr(gemini, "structured", lambda schema, model=None: (modelos.append(model), falso)[1])
 
     assert await confirm._classificar("manda bala", "apagar X") == "approve"
+
+    # O portão roda no modelo BOM, não no barato do parse. Medido em 09/09/2026:
+    # no Lite, "apaga todos" voltava approved=True. Cair para o padrão aqui é
+    # regressão de SEGURANÇA e não aparece em nenhum outro teste.
+    assert modelos == [gemini.GEMINI_GATE]
 
     papeis = [m[0] for m in falso.mensagens]
     assert papeis == ["system", "human"]
@@ -119,10 +125,12 @@ async def test_classificar_de_rascunho_monta_a_chamada_de_verdade(monkeypatch):
     from app.services import gemini
 
     falso = _ModeloFalso("answer")
-    monkeypatch.setattr(gemini, "structured", lambda schema: falso)
+    modelos: list[str | None] = []
+    monkeypatch.setattr(gemini, "structured", lambda schema, model=None: (modelos.append(model), falso)[1])
 
     assert (await draft._classificar("foi 5000", "qual o valor?")).decision == "answer"
     assert "<user_input>" in falso.mensagens[1][1]
+    assert modelos == [gemini.GEMINI_GATE]
 
 
 @pytest.mark.asyncio
@@ -134,7 +142,8 @@ async def test_classificar_de_rascunho_extrai_na_MESMA_chamada(monkeypatch):
     from app.services import gemini
 
     falso = _ModeloFalso("answer", extracted_value="nubank")
-    monkeypatch.setattr(gemini, "structured", lambda schema: falso)
+    modelos: list[str | None] = []
+    monkeypatch.setattr(gemini, "structured", lambda schema, model=None: (modelos.append(model), falso)[1])
 
     decisao = await draft._classificar(
         "acabei de criar um pelo app, chama nubank cartao", "qual cartão?"

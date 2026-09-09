@@ -59,6 +59,18 @@ def _rotulo_tx(row: dict) -> str:
     return describe(row)
 
 
+def _rotulo_fatura(row: dict) -> str:
+    from app.domain.dates import format_date_br
+
+    return f"Fatura {row['card_name']} — vence {format_date_br(row['due_date'])}"
+
+
+def _detalhe_fatura(row: dict) -> str:
+    from app.domain.money import cents_to_brl
+
+    return f"{cents_to_brl(int(row.get('aberto') or 0))} em aberto"
+
+
 def _rotulo_plano(row: dict) -> str:
     """O ESCOPO vem primeiro, e é isso que importa.
 
@@ -121,6 +133,18 @@ _FONTES: dict[str, dict] = {
                   order by created_at desc limit %s""",
         "label": _rotulo_plano,
         "detalhe": _detalhe_plano,
+    },
+    "faturas": {
+        "table": "card_invoices",
+        "sql": """select ci.id, ci.due_date, ci.reference_month, a.name as card_name,
+                         private.invoice_open_cents(ci.id) as aberto
+                  from public.card_invoices ci
+                  join public.accounts a
+                    on a.id = ci.account_id and a.workspace_id = ci.workspace_id
+                  where ci.workspace_id = %s and ci.status <> 'paid' and a.name ilike %s
+                  order by ci.due_date limit %s""",
+        "label": _rotulo_fatura,
+        "detalhe": _detalhe_fatura,
     },
     "pendentes": {
         "table": "transactions",
@@ -494,6 +518,23 @@ async def for_actions(workspace_id, acoes: list, texto_cru: str) -> list[dict]:
                 estado = "found" if len(cands) == 1 else "ambiguous"
                 if len(cands) == 1 and cands[0].get("table") == "installment_plans":
                     tabela = "installment_plans"
+
+        # Quitar a fatura SEM MOVIMENTAR CAIXA é "dar baixa", não "pagar": o dinheiro
+        # já saiu, fora do app. É o botão "Quitar sem caixa" da tela de fatura, e o
+        # verbo é o mesmo de dar baixa numa conta prevista — por isso mora em
+        # `mark_paid` e não num tipo novo, que não caberia (o schema está no teto
+        # medido de 252/32; 266 e 270 foram recusados pela API em 09/09/2026).
+        #
+        # A fatura só entra na lista quando o termo casa com o NOME DO CARTÃO, então
+        # "marca a conta de luz como paga" continua achando só a conta prevista. Casando
+        # os dois, vira empate e o usuário escolhe — que é a regra de todo o resto daqui.
+        if acao.type == FinanceActionType.MARK_PAID and termo:
+            _, faturas = await por_texto("faturas", workspace_id, termo)
+            if faturas:
+                cands = [*faturas, *cands][:MOSTRAR]
+                estado = "found" if len(cands) == 1 else "ambiguous"
+                if len(cands) == 1:
+                    tabela = "card_invoices"
 
         if acao.type == FinanceActionType.MARK_PAID and any(
             c.get("table") == "installment_plans" for c in cands

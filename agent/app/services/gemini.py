@@ -10,6 +10,33 @@ Escolha de modelo aqui é COTA, não só qualidade (verificado no painel em
   Flash 3.6/3.7      -> 5 RPM,  20 requisições/DIA
   Flash-Lite 3.1/3.5 -> 15 RPM, 500 requisições/dia
 Vinte por dia não sustenta nem uma sessão de teste: o principal é o Lite.
+
+**Um modelo por PAPEL, dimensionado por volume E por risco** (09/09/2026):
+
+  GEMINI_ROUTER / GEMINI_PARSE -> Lite. São DUAS chamadas por mensagem: é o volume.
+  GEMINI_GATE                  -> Flash. Só dispara em resposta DIGITADA (o clique
+                                  custa zero) e é o portão de segurança.
+
+Isto veio de uma medição, não de gosto. Entre 01 e 09/09/2026 tudo ficou em `gemini-3.7-flash`
+(commit bb927ea, "upgrade"). Rodando `evaluate_answer_forms.py` inteiro no Lite: **86/94**, e uma
+das quedas é do lado que NÃO PODE cair — "apaga todos" voltou `approved: True`. As oito quedas
+saem todas de `domain/confirm.py` e `domain/draft.py`, que chamavam o modelo PADRÃO; nenhuma é do
+router nem do parse de domínio. Daí a divisão: o caminho barato roda no barato, o portão roda no
+bom.
+
+⚠️ **O Lite do parse é o 3.1, não o 3.5, e a diferença é DINHEIRO.** Em "48x de 1470" o
+3.5-flash-lite devolveu 705600 em vez de 7056000 — uma ordem de grandeza — em 1 de 3 execuções,
+e `parse_valor_em_centavos` não protege contra isso (a rede só entra quando a IA OMITE o valor,
+não quando ela erra). Medido em 15 amostras por modelo, 5 frases: 3.1-lite 15/15, 3.5-lite 14/15.
+O 3.1 também passa nas três sondas de schema (`probe_rename_schema` 4/4,
+`probe_bounded_installments` 5/5, `probe_transaction_account_schema`) no teto de 252/32, e é o
+mesmo modelo que o `GEMINI_BATCH` já usava — um modelo a menos no sistema.
+
+⚠️ **O dinheiro não estava no tráfego.** A produção tem 29 chamadas em `ai_events` desde que
+existe, e o staging 130. Quem gasta é a SUÍTE: `evaluate_answer_forms.py` são ~94 chamadas por
+execução, os `probe_*` mais algumas, e nenhuma delas grava em `ai_events` — não aparecem em
+contagem nenhuma. Com o gate em Flash, cada execução completa da suíte é paga. **Rode a suíte
+UMA vez, no fim, e use `--secao` enquanto estiver iterando.**
 """
 
 from __future__ import annotations
@@ -21,9 +48,11 @@ from pydantic import BaseModel
 
 from app.config import get_settings
 
-GEMINI_ROUTER = "gemini-3.7-flash"
-GEMINI_PARSE = "gemini-3.7-flash"
-GEMINI_ESCALATE = "gemini-3.7-flash"
+GEMINI_ROUTER = "gemini-3.1-flash-lite"
+GEMINI_PARSE = "gemini-3.1-flash-lite"
+# Portão de confirmação e preenchimento de rascunho (`domain/confirm.py`, `domain/draft.py`).
+# Era GEMINI_ESCALATE, definido e ligado a NADA desde que o escalonamento automático saiu.
+GEMINI_GATE = "gemini-3.7-flash"
 GEMINI_BATCH = "gemini-3.1-flash-lite"
 
 # Sobre prompt caching: NÃO ativar nem reestruturar prompt por causa disso.

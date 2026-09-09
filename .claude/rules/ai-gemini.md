@@ -25,12 +25,29 @@ nenhum outro:
 - `temperature: 0.1` continua no código mas o **Flash-Lite 3.5 a IGNORA** ("uses fixed sampling
   defaults", medido em 30/08/2026). Não gaste tempo ajustando temperatura neste modelo.
 - **Modelos FIXADOS, nunca alias `-latest`** — o alias já migrou sozinho e quebrou o parse em
-  produção. `GEMINI_ROUTER`/`GEMINI_PARSE` = Flash-Lite (500 req/dia no free); `GEMINI_BATCH` para
-  extrato. Escolha de modelo aqui é **cota**, não só qualidade.
-- **Confiança baixa NÃO escala mais para o modelo maior — ela pede confirmação.** O Flash tem 20
+  produção. Escolha de modelo aqui é **cota E risco**, não só qualidade:
+
+  | constante | modelo | por quê |
+  |---|---|---|
+  | `GEMINI_ROUTER` / `GEMINI_PARSE` | `gemini-3.1-flash-lite` | duas chamadas por mensagem — é o volume |
+  | `GEMINI_GATE` | `gemini-3.7-flash` | só em resposta DIGITADA, e é o portão de segurança |
+  | `GEMINI_BATCH` | `gemini-3.1-flash-lite` | extrato, lote inteiro numa chamada |
+
+  **A divisão veio de medição, em 09/09/2026.** Entre 01 e 09/09 tudo ficou em `gemini-3.7-flash`
+  (commit `bb927ea`, "upgrade"). Rodando `evaluate_answer_forms.py` inteiro no Lite: **86/94**, e
+  uma das quedas é do lado que não pode cair — *"apaga todos"* voltou `approved: True`. As oito
+  saem todas de `domain/confirm.py` e `domain/draft.py`, que chamavam o modelo PADRÃO; nenhuma é
+  do router nem do parse. Daí `GEMINI_GATE`, que é o antigo `GEMINI_ESCALATE` finalmente ligado em
+  alguma coisa. `tests/test_confirm_semantic.py` quebra se o portão cair para o padrão.
+
+  ⚠️ **O Lite do parse é o 3.1, não o 3.5, e a diferença é DINHEIRO.** Em "48x de 1470" o
+  3.5-flash-lite devolveu `705600` em vez de `7056000` — uma ordem de grandeza — em 1 de 3
+  execuções. `parse_valor_em_centavos` **não** protege: a rede só entra quando a IA OMITE o valor,
+  não quando ela erra. Medido em 15 amostras por modelo: 3.1-lite 15/15, 3.5-lite 14/15.
+- **Confiança baixa NÃO escala para o modelo maior — ela pede confirmação.** O Flash tem 20
   requisições/dia no nível gratuito, e escalonamento automático estourava isso rápido; perguntar
   "confirma?" é grátis e, quando o modelo entendeu errado, é a resposta mais útil de qualquer
-  forma. `GEMINI_ESCALATE` continua definido mas **não está ligado a nada** — ver `policy.py`.
+  forma.
 - **Valor de dinheiro tem rede de segurança determinística.** Se a ação exige `amount_cents` e a
   IA omitiu, `parse_valor_em_centavos` (`app/domain/money.py`) tira do texto cru — mas só com UM
   número plausível. Nunca chutar entre dois: pedir para reformular é melhor que gravar errado.
@@ -43,6 +60,12 @@ nenhum outro:
   08/09/2026) e **252 com soma 32** (`probe_rename_schema.py`, 09/09/2026, ao somar
   `new_description`). Os outros schemas seguem em 198/31. Antes de somar campo, rode o probe — a
   recusa é um `400 INVALID_ARGUMENT` sem detalhe, e estimar aqui já custou uma quebra em produção.
+
+  **252 é o TETO, não um degrau.** Em 09/09/2026 as duas ampliações possíveis foram medidas e
+  recusadas: 19×14 = 266 (uma propriedade a mais) e 18×15 = 270 (um valor de enum a mais).
+  `FinanceAction` está cheio — capacidade nova ali sai por ALVO resolvido (foi assim que quitar
+  fatura sem caixa virou `mark_paid` sobre `card_invoices`) ou pelo catálogo de `ResourceAction`,
+  que segue em 5×5 e aceita campo novo de graça. Ver `docs/AGENTE-PARIDADE-COM-O-APP.md`.
 - Por isso Finanças são **dois** schemas: escrita/correção (13×14) e consulta (7×9). Escrita e
   correção ficam juntas de propósito — separá-las obrigaria o router a decidir se "o mercado de
   ontem foi 120" é lançamento novo ou correção, e errar isso cria a duplicata que o produto
@@ -72,6 +95,11 @@ nenhum outro:
 
 ## Auditoria e custo
 
+- ⚠️ **O custo NÃO está no tráfego, está nas suítes.** Em 09/09/2026 a produção tinha 29 chamadas
+  em `ai_events` desde que existe, e o staging 130 — e mesmo assim 04/09 custou R$ 10. Quem gasta é
+  `evaluate_answer_forms.py` (~94 chamadas por execução) mais os `probe_*`, e **nenhum deles grava
+  em `ai_events`**: não aparecem em contagem nenhuma. Com o gate em Flash, cada execução completa é
+  paga. Rode a suíte **uma vez, no fim**, e use `--secao` enquanto estiver iterando.
 - **Todo parse que CHAMOU o modelo grava linha em `ai_events`** (`llm_calls > 0` no estado do
   grafo). Isso não é só auditoria: `private.plan_status_for` **conta essas linhas** para saber
   quantas mensagens de IA o workspace gastou no mês. Não gravar derruba o paywall em silêncio, e

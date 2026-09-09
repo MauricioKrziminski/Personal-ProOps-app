@@ -116,6 +116,11 @@ def describe_for_confirmation(
         return (target or {}).get("prepared", {}).get("summary", "revisar cadastro")
     if target and target.get("candidates"):
         verbo = _VERBO.get(action.type.value, "mexer em")
+        # Quitar a fatura sem caixa e pagar a fatura terminam com a mesma palavra na
+        # tela ("paga"), e são efeitos diferentes: um mexe no saldo da conta pagadora
+        # e o outro não. A frase tem que dizer QUAL dos dois, senão o SIM não distingue.
+        if target.get("table") == "card_invoices":
+            verbo = "marcar como paga, SEM tirar do caixa,"
         if target.get("status") == "found":
             escolhido = target["candidates"][0]
             # O detalhe (valor, data) só existe onde o rótulo não coube — hoje o

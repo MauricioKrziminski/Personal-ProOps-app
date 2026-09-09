@@ -173,6 +173,13 @@ no app uma conta que o emissor já fez e já cobrou — e que o app não tem com
   total, e o botão passa a dizer o que falta.
 - `settle_invoice` (quitação histórica sem caixa) continua existindo e não mexe em `paid_cents`:
   são coisas diferentes — uma é dinheiro que saiu, a outra é dado antigo.
+- **O WhatsApp alcança os dois desde 09/09/2026.** "paguei 800 da fatura do nubank" é `pay_invoice`
+  (parcial, com transferência); "quita a fatura do nubank sem caixa" / "já estava paga" é
+  `mark_paid` com a FATURA como alvo, que chama `settle_invoice`. Não deu para criar um tipo de
+  ação novo — `FinanceAction` está no teto medido de 252/32 — e o verbo já era o mesmo de dar
+  baixa. A confirmação escreve *"marcar como paga, SEM tirar do caixa"*, porque as duas terminam
+  com a fatura paga e mexem no caixa de forma diferente. `scripts/probe_settle_vs_pay.py` mede
+  que as redações não se cruzam.
 
 **Fora de escopo:** pagamento parcial de conta a pagar avulsa. O pedido foi sobre fatura, e conta
 avulsa já tem "Paguei" que resolve o caso comum.

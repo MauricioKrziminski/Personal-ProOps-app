@@ -497,6 +497,8 @@ async def mark_paid(ctx: ExecContext, action: FinanceAction) -> ToolResult:
     """Baixa numa conta PREVISTA. Diferente de create_expense: o lançamento já existe."""
     if _alvo_e_plano(ctx):
         return await _baixa_em_parcelas(ctx, action)
+    if (ctx.target or {}).get("table") == "card_invoices":
+        return await _quitar_fatura(ctx)
     cands = (ctx.target or {}).get("candidates") or []
     if not cands:
         return ToolResult("🤷 Não achei essa conta em aberto.", read_only=True)
@@ -531,6 +533,43 @@ async def mark_paid(ctx: ExecContext, action: FinanceAction) -> ToolResult:
     return ToolResult(
         f"✅ Baixa dada: {nome} — {cents_to_brl(conta['amount_cents'])}.",
         result_id=conta["id"],
+    )
+
+
+async def _quitar_fatura(ctx: ExecContext) -> ToolResult:
+    """Fatura paga FORA do app: marca como paga sem criar a transferência.
+
+    É o `settle_invoice` da `0046`, o mesmo que o botão "Quitar sem caixa" da tela.
+    Pagamento de verdade continua sendo `pay_invoice` — aqui o dinheiro não sai do
+    caixa de propósito, e inventar a transferência quebraria o saldo da conta
+    pagadora que já refletiu a saída na vida real.
+
+    A RPC é `security invoker` e daqui a RLS não vale (o serviço ignora RLS), então
+    o `ensure_owned` do registry é o que segura o escopo — a mesma regra do resto.
+    """
+    cands = (ctx.target or {}).get("candidates") or []
+    if not cands:
+        return ToolResult("🤷 Não achei essa fatura em aberto.", read_only=True)
+
+    fatura = await db.fetch_one(
+        """
+        select ci.id, ci.due_date, a.name as card_name,
+               private.invoice_open_cents(ci.id) as aberto
+        from public.card_invoices ci
+        join public.accounts a on a.id = ci.account_id and a.workspace_id = ci.workspace_id
+        where ci.id = %s and ci.workspace_id = %s and ci.status <> 'paid'
+        """,
+        cands[0]["id"], ctx.workspace_id,
+    )
+    if not fatura:
+        return ToolResult("✅ Essa fatura já está quitada.", read_only=True)
+
+    await db.execute("select public.settle_invoice(%s, %s)",
+                     fatura["id"], local_iso_date(ctx.timezone))
+    return ToolResult(
+        f"✅ Fatura do *{fatura['card_name']}* (vencimento {format_date_br(fatura['due_date'])}) "
+        f"marcada como paga — {cents_to_brl(int(fatura['aberto'] or 0))} quitados sem sair do caixa.",
+        result_id=str(fatura["id"]),
     )
 
 
