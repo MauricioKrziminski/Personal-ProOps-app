@@ -38,6 +38,23 @@
 ## Agregações
 
 - Toda leitura agregada via RPC (padrão duplo interna/wrapper de `supabase.md`): `transactions_summary`, `monthly_cashflow`, `account_balances`, `budgets_status`. Não somar transações no cliente nem em TS das functions.
+- **Previsto e realizado são colunas SEPARADAS, e o total nunca muda de significado**
+  (09/09/2026). `account_balances` ganhou `cleared_cents`/`pending_in_cents`/`pending_out_cents`,
+  `transactions_summary` ganhou `pending_cents`, `monthly_cashflow` ganhou
+  `income_pending_cents`/`expense_pending_cents` e `month_summary` ganhou
+  `income_unsettled_cents`. `balance_cents` e `total_cents` continuam sendo o total —
+  três telas e o agente somam eles, e trocar o que uma coluna quer dizer é a quebra que não dá
+  erro, só número errado. O realizado sai por subtração.
+
+  ⚠️ **A tela é que escolhe qual coluna usar, e o cartão é o motivo.** Numa conta de dinheiro o
+  saldo honesto é `cleared_cents`; num `credit_card` a parcela futura `pending` **é** dívida já
+  assumida e o número certo é `balance_cents`. Filtrar `cleared` dentro do agregado forçaria um
+  `case` de tipo de conta na soma — regra de produto vazando para dentro do SQL.
+
+  ⚠️ **`month_summary` tem TRÊS definições que se alinham por POSIÇÃO** (`select *` em
+  `public.month_summary` e `public._month_summary` sobre `private.month_summary_for`). Coluna
+  nova entra nas três, no mesmo lugar, ou a tela mostra despesa no lugar de receita sem erro
+  nenhum.
 - `expenses_summary(from_date, to_date)` é **wrapper de back-compat** lendo `transactions where kind='expense'` — manter assinatura enquanto houver app antigo em campo.
 
 ## Cartão de crédito
@@ -63,7 +80,16 @@
 
 - Modelo de caixa (não contar o mesmo gasto duas vezes): saldo inicial = contas **não-cartão**, só `cleared`; saídas futuras = (a) toda fatura não paga **na data de vencimento** + (b) `pending` sem fatura em `coalesce(due_at, occurred_at)`. Compra no cartão sai do caixa quando a fatura vence, não quando foi feita.
 - `cash_flow_forecast(days)`, `upcoming_bills(days)` e `affordability(amount_cents, installments)` — pares interna/wrapper. `affordability` **compõe** com a projeção (interna chama interna, wrapper chama wrapper): não duplicar a query grande.
-- `pending` → `cleared` só automaticamente para parcela de compra parcelada e recorrente com `auto_confirm`. Conta a pagar avulsa espera o usuário confirmar.
+- **`transactions.auto_confirm` decide quem vira `cleared` sozinho na data** (`20260909110000`).
+  A coluna mora na LINHA, não só na série: o materializador cria ocorrência com data passada já
+  `cleared` (`scheduler.py:101`) sem passar pelo promote, então uma regra que vivesse só em
+  `_promote_due_transactions` não cobriria esse caminho. A ocorrência HERDA o valor da série.
+  **Receita nasce `false`** — Pix de terceiro precisa de comprovação; salário é o caso em que
+  ligar faz sentido, e é escolha explícita do usuário, não inferência de categoria. Parcela de
+  compra parcelada continua fora (espera pagamento).
+- **Receita prevista que passou da data gera alerta `income_to_confirm`** — no dia e três dias
+  depois, e para. Aberto (`occurred_at <= current_date`) mandaria o mesmo aviso todo dia, e no
+  WhatsApp fora da janela de 24h isso é template PAGO.
 
 ## Editar em série — "o passado só muda à mão"
 

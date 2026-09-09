@@ -283,9 +283,16 @@ function seedClient() {
     new Date(agora.getFullYear(), agora.getMonth(), agora.getDate(), hora, minuto).toISOString();
 
   // Curva de saldo do mês: começa em 3.910 e desce até 2.450, para o sparkline ter o que desenhar.
+  /**
+   * `in_cents`/`out_cents` entraram em 09/09/2026: a Projeção passou a somá-los na linha
+   * "entra X · sai Y", e o card da Hoje usa `in_cents` para o "a receber" do rodapé. Sem eles
+   * a conta vira `NaN` e a faixa some — que é falha silenciosa, não erro visível.
+   */
   const forecast = Array.from({ length: diasRestantes + 1 }, (_, i) => ({
     day: `2026-09-${String(agora.getDate() + i).padStart(2, '0')}`,
     balance_cents: 391000 - Math.round((i / diasRestantes) * 146000),
+    in_cents: i === 3 ? 42000 : 0,
+    out_cents: i === 1 ? 21430 : i === 5 ? 180000 : 0,
   }));
 
   client.setQueryData(['forecast', String(diasRestantes)], forecast);
@@ -298,7 +305,7 @@ function seedClient() {
         title: 'Aluguel',
         due_date: '2026-09-01',
         amount_cents: 180000,
-        kind: 'expense',
+        kind: 'transaction',
         overdue: true,
       },
       {
@@ -306,8 +313,22 @@ function seedClient() {
         title: 'Energia',
         due_date: '2026-09-08',
         amount_cents: 21430,
-        kind: 'expense',
+        kind: 'transaction',
         overdue: false,
+      },
+      /*
+        RECEITA prevista e ATRASADA — o caso do "Pix Winicius" que não chegou. `kind: 'income'`
+        veio da `20260909150000`, e é o que faz a seção "O que entra" existir na Hoje e na
+        Projeção. Atrasada de propósito: a Hoje só renderiza `overdue` (o `dueSoon` alimenta
+        apenas o contador), então sem `overdue: true` a seção nova não apareceria na vitrine.
+      */
+      {
+        ref_id: 'prev-pix-winicius',
+        title: 'Pix Winicius',
+        due_date: '2026-09-05',
+        amount_cents: 42000,
+        kind: 'income',
+        overdue: true,
       },
     ]
   );
@@ -675,10 +696,17 @@ function seedClient() {
   ]);
   client.setQueryData(
     ['monthly-cashflow', '6'],
-    ['2026-04', '2026-05', '2026-06', '2026-07', '2026-08', '2026-09'].map((m, i) => ({
+    ['2026-04', '2026-05', '2026-06', '2026-07', '2026-08', '2026-09'].map((m, i, todos) => ({
       month: `${m}-01`,
       income_cents: 780000 + i * 40000,
       expense_cents: 520000 - i * 18000,
+      /*
+        Previsto SÓ no mês corrente (o último), que é a verdade: mês fechado não tem pendência.
+        É essa fatia que a barra desenha como tampa esmaecida — sem estes campos ela vira `NaN`
+        e a tampa some em silêncio, escondendo a feature na única tela que a mostra.
+      */
+      income_pending_cents: i === todos.length - 1 ? 420000 : 0,
+      expense_pending_cents: i === todos.length - 1 ? 96000 : 0,
     }))
   );
   client.setQueryData(['budgets'], []);

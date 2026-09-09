@@ -143,3 +143,18 @@ A regra do `agent.md` é "botão novo no app = linha nova nesta tabela". Estas s
 | **Seletor de categoria com as usadas** (`categories_used()`) | não se aplica | categoria é texto livre no agente desde sempre — ele nunca esteve preso às 13 sugestões. A lacuna era só do app. |
 
 **Nada disso mexeu no `FinanceAction`**, que segue no teto medido de 252/32.
+
+## Receita prevista × recebida (09/09/2026, segunda leva)
+
+| botão novo no app | o agente faz? | por onde |
+|---|---|---|
+| **"Recebi" na Hoje e na Projeção** | sim, já fazia | `mark_paid` com o lançamento como alvo. O que mudou foi `upcoming_bills` passar a devolver receita (`kind='income'`) e as telas pararem de cravar "Paguei". |
+| **Interruptor "entra sozinho na data"** (`transactions.auto_confirm`) | **sim, e é campo do catálogo** | `auto_confirm` já existia em `recurring`; agora existe também na linha. `resources.py` propaga. Sem tocar no `FinanceAction` (teto 252). |
+| **Alerta "Chegou o dinheiro?"** | é do agente, não do app | `_alerts_to_send` → `POST /cron/alerts`. O app só recebe o push. |
+| **Menu do card de destaque** | não se aplica | navegação. |
+
+**Uma dívida nomeada:** `agent/app/tools/queries.py` (`query_balance`, o "saldo total" do WhatsApp)
+continua somando `balance_cents` — ou seja, com previsto dentro — enquanto o app passou a mostrar
+`cleared_cents`. Os dois números vão divergir até isso ser acertado. Não foi feito nesta leva
+porque `query_balance` já misturava cartão junto, que é um segundo defeito e merece decisão
+própria.

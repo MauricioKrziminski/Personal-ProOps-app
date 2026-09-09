@@ -215,9 +215,17 @@ function CashBar({
     // "entrou um pouquinho": é o mesmo "previsto R$ 0,00" que o painel já não escreve.
     height: ratio <= 0 ? 0 : Math.max(Space.xs, grow.get() * ALTURA_BARRA),
   }));
-  // A fração da barra que é previsto. `flex` e não altura fixa: assim ela acompanha a mola da
-  // barra inteira em vez de precisar de uma segunda animação que dessincroniza.
-  const fracaoPrevista = ratio > 0 ? Math.min(1, Math.max(0, previsto / ratio)) : 0;
+  /**
+   * A fração da barra que é previsto. `flex` e não altura fixa: assim ela acompanha a mola da
+   * barra inteira em vez de precisar de uma segunda animação que dessincroniza.
+   *
+   * ⚠️ `Number.isFinite` não é paranoia: `Math.min(1, Math.max(0, NaN))` devolve `NaN`, e NaN
+   * num estilo do RN some com a view SEM UM ÚNICO ERRO no log — é a mesma mecânica que já
+   * apagou a carteira inteira (design.md §1). Uma coluna ausente numa fixture ou num cache
+   * antigo basta para chegar aqui.
+   */
+  const bruta = ratio > 0 ? previsto / ratio : 0;
+  const fracaoPrevista = Number.isFinite(bruta) ? Math.min(1, Math.max(0, bruta)) : 0;
 
   return (
     <Animated.View
@@ -233,7 +241,11 @@ function CashBar({
         <View
           style={[
             styles.cashBarPrevisto,
-            { flex: fracaoPrevista, backgroundColor: theme.groupedBackground },
+            // `surface` é a cor do PRÓPRIO card: a tampa lê como o pedaço da barra que ainda não
+            // foi preenchido, que é a convenção de "projetado" — e funciona nos dois temas, ao
+            // contrário de um cinza fixo (no claro a barra é quase-preta, no escuro quase-branca).
+            // O contorno é o que a separa do fundo quando a barra encosta na borda do card.
+            { flex: fracaoPrevista, backgroundColor: theme.surface, borderColor: theme.separator },
           ]}
         />
       ) : null}
@@ -809,7 +821,7 @@ export default function FinanceScreen() {
                       <View
                         style={[
                           styles.cashSwatch,
-                          { backgroundColor: theme.groupedBackground, borderColor: theme.cardBorder, borderWidth: 1 },
+                          { backgroundColor: theme.surface, borderColor: theme.separator, borderWidth: 1 },
                         ]}
                       />
                       <ThemedText type="caption" themeColor="textSecondary">
@@ -1136,6 +1148,7 @@ const styles = StyleSheet.create({
     width: '100%',
     borderTopLeftRadius: Radius.xs,
     borderTopRightRadius: Radius.xs,
+    borderWidth: 1,
   },
   cashBar: {
     width: '100%',
