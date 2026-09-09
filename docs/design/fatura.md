@@ -126,6 +126,57 @@ viram a mesma frase "Não deu para registrar. Tenta de novo." (`invoice/[id].tsx
 paga" e "fatura sem lançamentos" não são falhas de rede e não se resolvem tentando de novo:
 mapear pela mensagem e dizer o que aconteceu.
 
+## Pagar uma parte (09/09/2026)
+
+`pay_invoice` só sabia pagar o valor cheio, e a vida do dono do produto não é assim: em setembro
+ele pagou R$ 2.080,00 em 04/09 e mais R$ 809,00 em 08/09 de uma fatura de R$ 3.271,77, ficando
+com R$ 371,67 no rotativo. Não havia como registrar isso — e é literalmente o que ele pediu:
+*"estou sentindo falta de pagar as coisas parcialmente ... seria mais fatura e o que mais fizer
+sentido pagar parcialmente"*.
+
+### O que a fatura passa a guardar
+
+**`card_invoices.paid_cents`**, somado a cada pagamento. É a ÚNICA coisa materializada aqui, e a
+exceção é deliberada: a regra "o total nunca é materializado" existe porque o total é uma soma de
+linhas que o usuário edita o tempo todo, então uma cópia derivaria. Pagamento não é isso —
+ninguém edita um pagamento por fora, e o único caminho de escrita é `pay_invoice`.
+
+A alternativa derivada seria marcar a transferência com `invoice_id` e somar. Não dá: o trigger
+`set_invoice` (`0013:175-188`) **zera `invoice_id` de qualquer linha cuja conta não seja cartão**,
+e a conta da transferência de pagamento é a PAGADORA. Fazer a transferência ser exceção dentro
+desse trigger é carvar um desvio no caminho por onde passa toda linha de cartão do app, para
+economizar uma coluna.
+
+### Quanto a fatura ainda deve
+
+`private.invoice_open_cents(invoice_id)` = soma das compras − `paid_cents`. Um lugar só, porque
+**oito funções calculavam isso inline** — `_card_summary`, `_upcoming_bills`,
+`_cash_flow_forecast`, `_alerts_to_send`, `net_worth`, `month_lines_for`, `month_summary_for` e
+os wrappers de cada uma. Pagamento parcial que não passe por todas produz a contradição que a
+`0046 §4` descreve: o saldo do cartão diz −371,67 e a tela de Cartões diz −3.271,77.
+
+⚠️ **`invoice_total_cents` continua sendo a soma das compras**, não o que falta. É o valor de face
+da fatura — o número impresso no PDF —, e trocá-lo por "o que falta" faria a tela de Cartões
+mentir sobre o que foi cobrado.
+
+### Juros e IOF de rotativo não são modelados
+
+Eles chegam como duas despesas comuns na fatura seguinte (`Juros de rotativo R$ 54,07` e
+`IOF de rotativo R$ 2,13` estão assim na fatura de setembro). Modelar juros aqui seria reimplementar
+no app uma conta que o emissor já fez e já cobrou — e que o app não tem como conferir.
+
+### Na tela
+
+- O sheet de pagamento ganha **campo de valor**, pré-preenchido com o que falta. Pagar tudo
+  continua sendo um toque: o valor já vem certo.
+- Fatura com `paid_cents > 0` e ainda em aberto mostra **"Pago R$ X · Falta R$ Y"** abaixo do
+  total, e o botão passa a dizer o que falta.
+- `settle_invoice` (quitação histórica sem caixa) continua existindo e não mexe em `paid_cents`:
+  são coisas diferentes — uma é dinheiro que saiu, a outra é dado antigo.
+
+**Fora de escopo:** pagamento parcial de conta a pagar avulsa. O pedido foi sobre fatura, e conta
+avulsa já tem "Paguei" que resolve o caso comum.
+
 ## Ações secundárias
 
 - Context menu na compra: Editar · Mudar categoria · Apagar (action sheet).
