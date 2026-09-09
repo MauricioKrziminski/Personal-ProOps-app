@@ -96,6 +96,15 @@ const ABAS = ['Hoje', 'Finanças', 'Notas', 'Agente', 'Perfil', 'Dívidas', 'Mê
  *
  * Para print de DIVULGAÇÃO esta rota não serve: use o app real com "Entrar como teste (dev)".
  * Ver `.claude/rules/workflow.md` §5.
+ *
+ * ⚠️ **Sem os chips, esta rota é visualmente indistinguível do app — e ela NÃO ROLA.** O sintoma
+ * de estar preso aqui sem saber é exatamente esse: dá para trocar de tela pela barra do Android,
+ * mas o dedo não rola nada. Isso não é bug, é o `translateY` + `overflow: hidden` que torna o
+ * screenshot determinístico.
+ *
+ * E um deep link (`adb shell am start -d "appproops:///design-preview"`, `simctl openurl`) entra
+ * DIRETO na rota, ignorando o `Redirect` do `index.tsx` — reverter o redirect não tira o app
+ * daqui. Para sair: `force-stop` e abrir pelo ÍCONE, não pelo link.
  */
 const PASSO_KEY = 'design-preview-step';
 /**
