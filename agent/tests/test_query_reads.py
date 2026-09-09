@@ -114,7 +114,7 @@ class TestQueryRecurring:
         monkeypatch.setattr(db, "fetch", fetch)
         await queries.query_recurring(ctx(), FinanceQuery(type=FinanceQueryType.QUERY_RECURRING))
         assert "workspace_id = %s" in capturado["sql"]
-        assert capturado["args"] == (WS,)
+        assert capturado["args"][0] == WS
 
     @pytest.mark.asyncio
     async def test_separa_entra_de_sai_e_lista_pausadas(self, monkeypatch):
@@ -188,7 +188,7 @@ class TestQueryDebts:
         await queries.query_debts(ctx(), FinanceQuery(type=FinanceQueryType.QUERY_DEBTS))
         assert "workspace_id = %s" in capturado["sql"]
         assert "archived = false" in capturado["sql"]
-        assert capturado["args"] == (WS,)
+        assert capturado["args"][0] == WS
 
 
 class TestQueryReminders:
@@ -249,3 +249,125 @@ class TestQueryReminders:
             ctx(), NotesAction(type=NotesActionType.QUERY_REMINDERS, search_term="dentista")
         )
         assert "dentista" in r.message
+
+
+class TestBuscaPorNome:
+    """`search_term` — pergunta específica, resposta específica (09/09/2026).
+
+    Sem isto, "quando cai meu salário?" era respondido com as 16 séries do usuário, quatro
+    delas salário. A lista estava certa; a RESPOSTA não estava. Foi o teste 3 do corte do
+    WhatsApp, no número do dono do produto.
+    """
+
+    @pytest.mark.asyncio
+    async def test_termo_vai_parametrizado_e_nao_concatenado(self, monkeypatch):
+        """SQL injection não é hipótese aqui: o termo vem do modelo, que lê o texto do usuário."""
+        # Guarda TODAS as chamadas: o filtro sem resultado dispara a segunda (a lista inteira),
+        # e olhar só a última esconderia justamente a query que carrega o termo.
+        chamadas: list[tuple[str, tuple]] = []
+
+        async def fetch(query, *args):
+            chamadas.append((query, args))
+            return []
+
+        monkeypatch.setattr(db, "fetch", fetch)
+        await queries.query_recurring(
+            ctx(),
+            FinanceQuery(type=FinanceQueryType.QUERY_RECURRING, search_term="'; drop table x --"),
+        )
+        sql, args = chamadas[0]
+        assert "drop table" not in sql
+        assert "%'; drop table x --%" in args
+        assert "ilike %s" in sql
+
+    @pytest.mark.asyncio
+    async def test_filtra_e_ordena_pela_proxima_data(self, monkeypatch):
+        """A primeira linha É o 'quando' — por isso a ordem é a do banco, não a de kind."""
+        base = {
+            "category": None,
+            "rrule": "FREQ=MONTHLY;BYMONTHDAY=20",
+            "end_date": None,
+            "active": True,
+            "kind": "income",
+        }
+
+        async def fetch(query, *args):
+            return [
+                {
+                    **base,
+                    "amount_cents": 114800,
+                    "description": "Salário CLT (2ª parte)",
+                    "next_run_at": datetime(2026, 9, 20, 15, 0, tzinfo=UTC),
+                },
+                {
+                    **base,
+                    "amount_cents": 400000,
+                    "description": "Salário PJ",
+                    "next_run_at": datetime(2026, 10, 4, 15, 0, tzinfo=UTC),
+                },
+            ]
+
+        monkeypatch.setattr(db, "fetch", fetch)
+        r = await queries.query_recurring(
+            ctx(), FinanceQuery(type=FinanceQueryType.QUERY_RECURRING, search_term="salário")
+        )
+        assert "*Salário*" in r.message
+        # sem filtro o texto traz os cabeçalhos de bloco; filtrado, eles são ruído
+        assert "*Entra*" not in r.message
+        assert r.message.index("20/09/2026") < r.message.index("04/10/2026")
+
+    @pytest.mark.asyncio
+    async def test_filtro_sem_resultado_cai_na_lista_inteira(self, monkeypatch):
+        """"Não achei" sobre algo que existe foi o defeito que criou este tool."""
+        chamadas: list[tuple] = []
+
+        async def fetch(query, *args):
+            chamadas.append(args)
+            if len(chamadas) == 1:
+                return []  # o filtro não achou
+            return [
+                {
+                    "kind": "income",
+                    "amount_cents": 400000,
+                    "description": "Salário PJ",
+                    "category": None,
+                    "rrule": "FREQ=MONTHLY;BYMONTHDAY=4",
+                    "next_run_at": datetime(2026, 10, 4, 15, 0, tzinfo=UTC),
+                    "end_date": None,
+                    "active": True,
+                }
+            ]
+
+        monkeypatch.setattr(db, "fetch", fetch)
+        r = await queries.query_recurring(
+            ctx(), FinanceQuery(type=FinanceQueryType.QUERY_RECURRING, search_term="ordenado")
+        )
+        assert "ordenado" in r.message
+        assert "Salário PJ" in r.message
+        assert len(chamadas) == 2
+
+    @pytest.mark.asyncio
+    async def test_divida_filtrada_nao_mostra_total_de_um_item(self, monkeypatch):
+        """Soma de um item é eco, não resumo — mesma régua do card de Cartões."""
+
+        async def fetch(query, *args):
+            return [
+                {
+                    "name": "Carro",
+                    "kind": "financing",
+                    "remaining_cents": 6088500,
+                    "principal_cents": 7128000,
+                    "installment_cents": 148500,
+                    "interest_rate_monthly": 0,
+                    "installments": 48,
+                    "installments_paid": 7,
+                    "due_day": 23,
+                }
+            ]
+
+        monkeypatch.setattr(db, "fetch", fetch)
+        r = await queries.query_debts(
+            ctx(), FinanceQuery(type=FinanceQueryType.QUERY_DEBTS, search_term="carro")
+        )
+        assert "*Carro*" in r.message
+        assert "Total em aberto" not in r.message

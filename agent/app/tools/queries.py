@@ -678,19 +678,53 @@ async def query_recurring(ctx: ExecContext, action: FinanceQuery) -> ToolResult:
     Brasília — que é justamente a madrugada em que o cron roda. Quem converte é
     `local_iso_date(ctx.timezone, ...)`, com queda para America/Sao_Paulo.
 
+    ⚠️ **Pergunta específica pede resposta específica** (09/09/2026). Sem `search_term` este
+    tool devolvia SEMPRE a lista inteira: "quando cai meu salário?" era respondido com as 16
+    séries do usuário, quatro delas salário, e ele que achasse. Devolver tudo não é errado
+    tecnicamente — é errado como resposta, que é o que o produto entrega. Com o filtro a lista
+    vem ordenada pela PRÓXIMA data, então a primeira linha É o "quando".
+
     Escopo: filtro obrigatório por `workspace_id`, nome de tabela literal, nenhum id vindo do
-    modelo. O serviço conecta com papel que IGNORA RLS — aqui a proteção é esta linha.
+    modelo. O serviço conecta com papel que IGNORA RLS — aqui a proteção é esta linha. O
+    `search_term` entra como parâmetro (`ilike %%s`), nunca concatenado.
     """
+    alvo = (action.search_term or "").strip()
     linhas_sql = await db.fetch(
         """
         select kind, amount_cents, description, category, rrule, next_run_at, end_date, active
         from public.recurring_transactions
         where workspace_id = %s
-        order by active desc, kind, next_run_at
+          and (%s = '' or description ilike %s or category ilike %s)
+        order by active desc, next_run_at, kind
         limit 20
         """,
         ctx.workspace_id,
+        alvo,
+        f"%{alvo}%",
+        f"%{alvo}%",
     )
+    # Filtro que não acha nada cai na lista inteira, com o aviso. "Não achei" sobre uma série
+    # que existe foi o defeito que criou este tool; repetir isso por causa de uma palavra
+    # diferente seria o mesmo erro com outra roupa.
+    #
+    # ⚠️ **`ilike` não ignora acento**: "emprestimo" não casa "Empréstimo". É teto conhecido, e
+    # a queda para a lista inteira é justamente a rede — o pior caso vira o comportamento de
+    # antes do filtro, nunca um "não achei". Resolver de verdade pede a extensão `unaccent`,
+    # que é migration; só vale a pena se aparecer no uso real.
+    se_esvaziou = ""
+    if alvo and not linhas_sql:
+        se_esvaziou = f"Não achei recorrência com “{alvo}”. Estas são todas:\n"
+        alvo = ""
+        linhas_sql = await db.fetch(
+            """
+            select kind, amount_cents, description, category, rrule, next_run_at, end_date, active
+            from public.recurring_transactions
+            where workspace_id = %s
+            order by active desc, next_run_at, kind
+            limit 20
+            """,
+            ctx.workspace_id,
+        )
     if not linhas_sql:
         return ToolResult(
             "🔁 Você ainda não tem nada recorrente. Tenta "
@@ -698,25 +732,32 @@ async def query_recurring(ctx: ExecContext, action: FinanceQuery) -> ToolResult:
             read_only=True,
         )
 
+    def linha(r) -> str:
+        nome = r["description"] or r["category"] or "sem descrição"
+        quando = descreve_rrule(r["rrule"])
+        proxima = format_date_br(local_iso_date(ctx.timezone, r["next_run_at"]))
+        ate = f" · até {format_date_br(r['end_date'])}" if r["end_date"] else ""
+        return (
+            f"  • {nome}: {cents_to_brl(r['amount_cents'])} — {quando} · "
+            f"próxima em {proxima}{ate}"
+        )
+
     def bloco(kind: str, titulo: str) -> list[str]:
         itens = [r for r in linhas_sql if r["kind"] == kind and r["active"]]
         if not itens:
             return []
-        saida = [titulo]
-        for r in itens:
-            nome = r["description"] or r["category"] or "sem descrição"
-            quando = descreve_rrule(r["rrule"])
-            proxima = format_date_br(local_iso_date(ctx.timezone, r["next_run_at"]))
-            ate = f" · até {format_date_br(r['end_date'])}" if r["end_date"] else ""
-            saida.append(
-                f"  • {nome}: {cents_to_brl(r['amount_cents'])} — {quando} · "
-                f"próxima em {proxima}{ate}"
-            )
-        return saida
+        return [titulo] + [linha(r) for r in itens]
 
-    partes = ["🔁 *Suas recorrências*"]
-    partes += bloco("income", "\n*Entra*")
-    partes += bloco("expense", "\n*Sai*")
+    # Filtrado, o título é a PERGUNTA e a divisão entra/sai vira ruído — normalmente todos os
+    # achados são do mesmo lado. Sem filtro, os dois blocos são o que organiza a lista longa.
+    if alvo:
+        partes = [f"🔁 *{alvo.capitalize()}*"]
+        for r in [x for x in linhas_sql if x["active"]]:
+            partes.append(linha(r))
+    else:
+        partes = [f"{se_esvaziou}🔁 *Suas recorrências*"]
+        partes += bloco("income", "\n*Entra*")
+        partes += bloco("expense", "\n*Sai*")
 
     pausadas = [r for r in linhas_sql if not r["active"]]
     if pausadas:
@@ -738,25 +779,35 @@ async def query_debts(ctx: ExecContext, action: FinanceQuery) -> ToolResult:
     `interest_rate_monthly` é FRAÇÃO mensal (1,99% a.m. = 0.0199) — multiplicar por 100 na
     exibição é obrigatório, e é o erro que faz um financiamento parecer de graça.
 
-    Escopo por `workspace_id`, tabela literal, nenhum id do modelo.
+    `search_term` responde "quanto falta do CARRO?" com o carro, não com as três dívidas —
+    mesma régua de `query_recurring`. Filtro que não acha nada cai na lista inteira com aviso:
+    a pessoa perguntou de algo que ela acha que existe, e a lista é o que resolve a dúvida.
+
+    Escopo por `workspace_id`, tabela literal, nenhum id do modelo. `search_term` entra
+    parametrizado (`ilike %%s`), nunca concatenado.
     """
-    rows = await db.fetch(
-        """
+    alvo = (action.search_term or "").strip()
+    SQL = """
         select name, kind, remaining_cents, principal_cents, installment_cents,
                interest_rate_monthly, installments, installments_paid, due_day
         from public.debts
         where workspace_id = %s and archived = false
+          and (%s = '' or name ilike %s)
         order by remaining_cents desc
         limit 20
-        """,
-        ctx.workspace_id,
-    )
+    """
+    rows = await db.fetch(SQL, ctx.workspace_id, alvo, f"%{alvo}%")
+    aviso = ""
+    if alvo and not rows:
+        aviso = f"Não achei dívida com “{alvo}”. Estas são todas:\n"
+        alvo = ""
+        rows = await db.fetch(SQL, ctx.workspace_id, "", "%")
     if not rows:
         return ToolResult(
             "🎉 Você não tem nenhuma dívida cadastrada.", read_only=True
         )
 
-    partes = ["💳 *Suas dívidas*"]
+    partes = [f"{aviso}💳 *{alvo.capitalize() if alvo else 'Suas dívidas'}*"]
     for d in rows:
         partes.append(
             f"  • {d['name']}: faltam {cents_to_brl(d['remaining_cents'])} "
@@ -776,6 +827,8 @@ async def query_debts(ctx: ExecContext, action: FinanceQuery) -> ToolResult:
         if detalhe:
             partes.append(f"    {' · '.join(detalhe)}")
 
-    total = sum(int(d["remaining_cents"]) for d in rows)
-    partes.append(f"\n*Total em aberto:* {cents_to_brl(total)}")
+    # Soma de UM item é eco, não resumo — a mesma régua que tirou o card de total de Cartões.
+    if len(rows) > 1:
+        total = sum(int(d["remaining_cents"]) for d in rows)
+        partes.append(f"\n*Total em aberto:* {cents_to_brl(total)}")
     return ToolResult("\n".join(partes), read_only=True)

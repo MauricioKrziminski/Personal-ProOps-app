@@ -176,7 +176,7 @@ class FinanceQueryType(str, Enum):
     # lacuna. Sem elas, "quando cai meu salário?" caía em `query_transactions`, não achava
     # nada (a ocorrência ainda não foi materializada) e o agente respondia "não encontrei" —
     # a resposta errada para uma série que existe. Teto MEDIDO em `probe_query_schema.py`:
-    # 7×12 = 84 passa; aqui ficamos em 7×11 = 77.
+    # 8×13 = 104 passa; aqui ficamos em 8×11 = 88.
     QUERY_RECURRING = "query_recurring"
     QUERY_DEBTS = "query_debts"
     SIMULATE_PURCHASE = "simulate_purchase"
@@ -184,13 +184,19 @@ class FinanceQueryType(str, Enum):
 
 
 class FinanceQuery(BaseModel):
-    """7 propriedades × 11 valores de enum = 77. Teto medido: 84 passa.
+    """8 propriedades × 11 valores de enum = 88. Teto MEDIDO: 8×13 = 104 passa
+    (`scripts/probe_query_schema.py`, 09/09/2026).
 
     Consulta nunca escreve, então nada de `description`, `recurrence` ou dos
-    campos `new_*`: eles não teriam significado aqui.
+    campos `new_*`: eles não teriam significado aqui. `search_term` é a exceção
+    e não é escrita — é o que faz uma pergunta ESPECÍFICA ter resposta
+    específica.
     """
 
     type: FinanceQueryType
+    search_term: str | None = Field(
+        None, description="Nome do que a pergunta procura: 'salário', 'carro', 'aluguel'."
+    )
     category: str | None = Field(None, description="Filtrar por esta categoria.")
     account: str | None = Field(None, description="Conta ou cartão citado.")
     query_from: str | None = Field(None, description="Início do período, YYYY-MM-DD.")

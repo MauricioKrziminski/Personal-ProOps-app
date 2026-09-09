@@ -184,8 +184,12 @@ Tipos:
   sobre um lançamento já registrado: a ocorrência do mês que vem só existe depois que o
   agendador materializa, então procurar em lançamentos responderia "não achei" sobre uma
   série que existe e está correta.
+  search_term = o NOME do que a pergunta procura, quando ela cita um: "quando cai meu
+  salário?" → "salário"; "quando vence o aluguel?" → "aluguel". Pergunta geral ("quais
+  minhas recorrências?", "o que entra todo mês?") deixa search_term VAZIO.
 - query_debts: "quanto falta da dívida?", "quanto devo?", "como tá o financiamento?",
-  "quando quito o empréstimo?".
+  "quando quito o empréstimo?". search_term = o nome da dívida citada ("quanto falta do
+  carro?" → "carro"); pergunta geral deixa vazio.
 - simulate_purchase: "posso comprar um celular de 3000 em 10x?". amount_cents =
   valor total em centavos, installments = parcelas (1 à vista).
 - unknown: não é pergunta sobre dinheiro.
