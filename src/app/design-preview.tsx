@@ -1,11 +1,9 @@
 import { useEffect, useMemo, useState } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { Platform, Pressable, ScrollView, StyleSheet, View, useWindowDimensions } from 'react-native';
+import { Platform, StyleSheet, View, useWindowDimensions } from 'react-native';
 
-import { ThemedText } from '@/components/themed-text';
 import { CurvedTabBar, type CurvedTab } from '@/components/ui/curved-tab-bar';
-import { Radius, Space } from '@/design/tokens';
 import { localISODate } from '@/hooks/use-items';
 import { useTheme } from '@/hooks/use-theme';
 
@@ -87,6 +85,17 @@ const ABAS = ['Hoje', 'Finanças', 'Notas', 'Agente', 'Perfil', 'Dívidas', 'Mê
  *
  * O passo avança a cada LANÇAMENTO do app (guardado no `AsyncStorage`), não por timer: assim
  * `terminate` + `launch` + `screenshot` é uma sequência determinística, sem corrida com o relógio.
+ * Para pular direto para uma banda, grave `design-preview-step` no `AsyncStorage` com o app
+ * fechado (ver a memória "Verificar telas no simulador e no emulador").
+ *
+ * ⚠️ **Não existe mais uma tira de chips no rodapé.** Ela era a navegação desta rota e aparecia
+ * em TODO screenshot — chrome que o app não tem, no material que sai daqui. Foi removida em
+ * 09/09/2026 depois de ninguém tocar nela em nenhuma verificação: quem sempre navegou foi o
+ * passo no `AsyncStorage`, que é o mecanismo documentado e o único determinístico. No Android a
+ * `CurvedTabBar` continua tocável, e é assim que se vê o berço animar (design.md §5).
+ *
+ * Para print de DIVULGAÇÃO esta rota não serve: use o app real com "Entrar como teste (dev)".
+ * Ver `.claude/rules/workflow.md` §5.
  */
 const PASSO_KEY = 'design-preview-step';
 /**
@@ -168,15 +177,20 @@ export default function DesignPreviewScreen() {
   const dev = __DEV__;
   const { height } = useWindowDimensions();
   const [aba, setAba] = useState<(typeof ABAS)[number]>('Hoje');
-  const [passo, setPasso] = useState<number | null>(null);
+  /**
+   * A faixa vertical. Era derivada de `passo`, e por isso tocar na barra do Android trocava a
+   * tela mas mantinha o deslocamento da aba anterior — numa aba de uma faixa só, dava tela
+   * preta. Como estado, o toque volta para o topo.
+   */
+  const [faixa, setFaixa] = useState(0);
 
   useEffect(() => {
     let vivo = true;
     AsyncStorage.getItem(PASSO_KEY).then((raw) => {
       if (!vivo) return;
       const atual = Number(raw ?? 0) % PASSOS.length;
-      setPasso(atual);
       setAba(PASSOS[atual].aba);
+      setFaixa(PASSOS[atual].faixa);
       AsyncStorage.setItem(PASSO_KEY, String(atual + 1));
     });
     return () => {
@@ -184,7 +198,6 @@ export default function DesignPreviewScreen() {
     };
   }, []);
 
-  const faixa = passo === null ? 0 : PASSOS[passo].faixa;
   const alturaTotal = height * FAIXAS[aba];
 
   const client = useMemo(() => seedClient(), []);
@@ -231,36 +244,15 @@ export default function DesignPreviewScreen() {
               activeIndex={ABA_PARA_TAB[aba] ?? 0}
               onSelect={(i) => {
                 const alvo = ABAS.find((nome) => ABA_PARA_TAB[nome] === i);
-                if (alvo) setAba(alvo);
+                if (alvo) {
+                  setAba(alvo);
+                  setFaixa(0);
+                }
               }}
             />
           ) : null}
         </View>
 
-        {/* Rolável desde que a vitrine passou de cinco faixas: com sete chips o último saía da tela. */}
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          style={[styles.switcherBox, { borderTopColor: theme.cardBorder }]}
-          contentContainerStyle={styles.switcher}>
-          {ABAS.map((nome) => (
-            <Pressable
-              key={nome}
-              accessibilityRole="button"
-              onPress={() => setAba(nome)}
-              style={[
-                styles.chip,
-                {
-                  backgroundColor: aba === nome ? theme.tint : theme.surface,
-                  borderColor: theme.cardBorder,
-                },
-              ]}>
-              <ThemedText type="caption" themeColor={aba === nome ? 'onTint' : 'textSecondary'}>
-                {nome === aba ? `${nome} ${faixa + 1}/${FAIXAS[aba]}` : nome}
-              </ThemedText>
-            </Pressable>
-          ))}
-        </ScrollView>
       </View>
     </QueryClientProvider>
   );
@@ -886,20 +878,4 @@ function seedClient() {
 const styles = StyleSheet.create({
   root: { flex: 1 },
   janela: { flex: 1, overflow: 'hidden' },
-  switcherBox: {
-    flexGrow: 0,
-    borderTopWidth: StyleSheet.hairlineWidth,
-  },
-  switcher: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: Space.sm,
-    padding: Space.sm,
-  },
-  chip: {
-    paddingHorizontal: Space.md,
-    paddingVertical: Space.sm,
-    borderRadius: Radius.pill,
-    borderWidth: StyleSheet.hairlineWidth,
-  },
 });

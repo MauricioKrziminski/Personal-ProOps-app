@@ -43,8 +43,8 @@
    torna `xcrun simctl io booted screenshot` uma sequência determinística — não existe gesto de
    rolagem por linha de comando, então a tela é montada inteira e deslocada por `translateY`.
 
-   ⚠️ **A vitrine é para CONFERIR, não para gerar material.** A tira de chips no rodapé é a
-   navegação dela e aparece em todo screenshot; e **no iOS a dock não aparece de jeito nenhum**,
+   ⚠️ **A vitrine é para CONFERIR, não para gerar material.** **No iOS a dock não aparece de jeito
+   nenhum**,
    porque `NativeTabs` é a barra do SISTEMA e só existe dentro de um navegador de abas real (no
    Android dá para montar a `CurvedTabBar` à mão, e a vitrine já faz).
 

@@ -149,25 +149,37 @@ export function HeroPanel({
               {label.toUpperCase()}
             </ThemedText>
             {badge}
-            {onPress ? (
-              <Pressable
-                accessibilityRole="button"
-                accessibilityLabel="Mais opções"
-                onPress={onPress}
-                hitSlop={Space.sm}
-                style={[styles.eye, { backgroundColor: theme.heroChip }]}>
-                <Icon name="ellipsis" size="sm" color="onHero" />
-              </Pressable>
-            ) : null}
-            {concealable ? (
-              <Pressable
-                accessibilityRole="button"
-                accessibilityLabel={concealed ? 'Mostrar valor' : 'Ocultar valor'}
-                onPress={toggle}
-                hitSlop={Space.sm}
-                style={[styles.eye, { backgroundColor: theme.heroChip }]}>
-                <Icon name={concealed ? 'eye.slash' : 'eye'} size="sm" color="onHero" />
-              </Pressable>
+            {/*
+              Os dois chips andam JUNTOS, num grupo só.
+              
+              A `labelRow` é `space-between`, e com três filhos soltos (rótulo, "…", olho) ela
+              espalhava os TRÊS: o "…" caía no meio da linha, longe do olho e longe do rótulo,
+              parecendo um botão perdido. Agrupados, o `space-between` volta a ter dois lados —
+              rótulo de um, ações do outro.
+            */}
+            {onPress || concealable ? (
+              <View style={styles.acoes}>
+                {onPress ? (
+                  <Pressable
+                    accessibilityRole="button"
+                    accessibilityLabel="Mais opções"
+                    onPress={onPress}
+                    hitSlop={Space.sm}
+                    style={[styles.eye, { backgroundColor: theme.heroChip }]}>
+                    <Icon name="ellipsis" size="sm" color="onHero" />
+                  </Pressable>
+                ) : null}
+                {concealable ? (
+                  <Pressable
+                    accessibilityRole="button"
+                    accessibilityLabel={concealed ? 'Mostrar valor' : 'Ocultar valor'}
+                    onPress={toggle}
+                    hitSlop={Space.sm}
+                    style={[styles.eye, { backgroundColor: theme.heroChip }]}>
+                    <Icon name={concealed ? 'eye.slash' : 'eye'} size="sm" color="onHero" />
+                  </Pressable>
+                ) : null}
+              </View>
             ) : null}
           </View>
 
@@ -247,6 +259,8 @@ const styles = StyleSheet.create({
   top: { marginBottom: Space.lg },
   body: { gap: Space.xs },
   labelRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: Space.sm },
+  /** O par de chips. `flexShrink: 0` pela mesma razão do `eye` logo abaixo. */
+  acoes: { flexDirection: 'row', alignItems: 'center', gap: Space.sm, flexShrink: 0 },
   /**
    * `flexShrink: 0`: o rótulo ao lado agora encolhe (ver `ThemedText`), mas sem isto o Yoga
    * distribuiria o aperto entre os dois e o chip do olho viraria uma elipse estreita — que é
