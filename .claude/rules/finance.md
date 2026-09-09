@@ -55,6 +55,30 @@
 - `cash_flow_forecast(days)`, `upcoming_bills(days)` e `affordability(amount_cents, installments)` — pares interna/wrapper. `affordability` **compõe** com a projeção (interna chama interna, wrapper chama wrapper): não duplicar a query grande.
 - `pending` → `cleared` só automaticamente para parcela de compra parcelada e recorrente com `auto_confirm`. Conta a pagar avulsa espera o usuário confirmar.
 
+## Editar em série — "o passado só muda à mão"
+
+- **Editar tem ESCOPO, igual apagar já tinha**: "só esta" ou "esta e as futuras"
+  (`update_transaction_scoped` e `update_recurring_series`, migration `20260909070000`). A
+  pergunta é feita no SALVAR e só quando um campo propagável mudou — perguntar na abertura seria
+  perguntar sem saber se há o que propagar.
+- **Futuro é `status = 'pending'` E `occurred_at >= a da âncora`, as duas juntas.** Cada condição
+  sozinha deixa passar um caso: só o status pega a parcela ATRASADA (passado para o usuário); só a
+  data pega a parcela paga ADIANTADA (já aconteceu, e pode estar numa fatura quitada).
+  `supabase/tests/scoped_transaction_edit.sql` testa as duas separadas.
+- **Campos propagáveis: valor, categoria, descrição, comerciante, conta.** `occurred_at` não —
+  data é de cada ocorrência e propagar empilharia tudo no mesmo dia. `status` também não: baixa
+  tem caminho próprio, com efeito em fatura e projeção.
+- **A âncora é sempre a primeira parcela EM ABERTO**, nunca a primeira do plano: a RPC reescreve a
+  âncora inclusive no escopo "futuras", e ancorar numa parcela paga mexeria num mês fechado.
+- **Editar em lote recalcula `installment_plans.total_cents`** e **atualiza a regra da
+  recorrência**. Sem o primeiro, a tela mostra um total que não é a soma do que está embaixo dele;
+  sem o segundo, os 90 dias materializados ficam com o valor novo e o mês seguinte volta com o
+  velho (o unique `(recurring_id, occurred_at)` impede o cron de reescrever).
+- ⚠️ **Formulário não escreve campo que ele não mostra.** Em cartão o "vou pagar depois" não
+  existe, e o form derivava `status` desse campo ausente: editar o NOME de uma parcela futura dava
+  baixa nela, mudando a projeção e o total da fatura sem nada na tela dizer isso. Onde o campo não
+  aparece, o valor é o que já era.
+
 ## Patrimônio
 
 - `assets` + `asset_valuations` (marcação com data). Valor novo entra sempre por `update_asset_value`, que grava no histórico — nunca `update` direto na coluna.

@@ -196,7 +196,15 @@ export default function InstallmentsScreen() {
   const temFaixa = maiorDaFaixa > 0;
 
   const acoes = (plano: InstallmentPlanSummary) => {
-    const primeira = [...plano.parcels].sort((a, b) => (a.installment_no ?? 0) - (b.installment_no ?? 0))[0];
+    const ordenadas = [...plano.parcels].sort((a, b) => (a.installment_no ?? 0) - (b.installment_no ?? 0));
+    const primeira = ordenadas[0];
+    /**
+     * A âncora do "Editar" é a primeira parcela EM ABERTO, não a primeira do plano.
+     * A âncora é sempre reescrita — inclusive quando o escopo é "esta e as futuras" —
+     * e ancorar numa parcela já paga mexeria num mês fechado (e no total de uma fatura
+     * que já foi quitada) sem ninguém ter pedido. Sem nenhuma em aberto, resta a última.
+     */
+    const ancora = ordenadas.find((p) => p.status === 'pending') ?? ordenadas[ordenadas.length - 1];
     showItemActions(plano.title, [
       {
         label: aberto === plano.id ? 'Esconder parcelas' : 'Ver parcelas',
@@ -210,6 +218,19 @@ export default function InstallmentsScreen() {
                 router.push({
                   pathname: '/finance/[txId]',
                   params: { txId: primeira.id, month: primeira.occurred_at.slice(0, 7) },
+                }),
+            },
+            {
+              // O menu do plano só sabia APAGAR a compra inteira. Editar exigia achar
+              // uma parcela, abrir o detalhe e só então achar o "Editar" — em 48x isso
+              // é um caminho que ninguém percorre. A escolha de escopo ("só esta" /
+              // "esta e as futuras") é feita no salvar, dentro do formulário.
+              label: 'Editar',
+              icon: 'pencil' as const,
+              onPress: () =>
+                router.push({
+                  pathname: '/finance/transaction-form',
+                  params: { id: ancora.id, month: ancora.occurred_at.slice(0, 7) },
                 }),
             },
           ]

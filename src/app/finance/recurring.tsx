@@ -52,6 +52,15 @@ import { supabase } from '@/lib/supabase';
  */
 
 interface FormState {
+  /**
+   * Presente = está EDITANDO uma série que já existe. A frequência e a âncora saem
+   * da tela nesse modo: `dtstart` é imutável por desenho e trocar a frequência
+   * implicaria remontar o calendário já materializado — isso continua sendo apagar
+   * e criar de novo, que é honesto.
+   */
+  id?: string;
+  /** Só no modo edição: a cadência que a série já tem, para mostrar (não para editar). */
+  rrule?: string;
   kind: 'expense' | 'income';
   amountCents: number;
   description: string;
@@ -144,6 +153,38 @@ function useCreateRecurring() {
   });
 }
 
+/**
+ * Editar a série. Vai por RPC porque não é UM update: a regra manda nas ocorrências
+ * que ainda não existem e as já materializadas (90 dias à frente, `pending`) precisam
+ * acompanhar — senão os próximos três meses ficam com o valor velho e o quarto com o
+ * novo. As passadas não mudam, que é a regra que o dono do produto pediu.
+ */
+function useSaveRecurringSeries() {
+  const invalidate = useInvalidateFinance();
+  return useMutation({
+    mutationFn: async ({ id, patch }: {
+      id: string;
+      patch: {
+        amount_cents?: number;
+        category?: string | null;
+        description?: string | null;
+        account_id?: string | null;
+        auto_confirm?: boolean;
+        end_date?: string | null;
+      };
+    }) => {
+      const { data, error } = await supabase.rpc('update_recurring_series', {
+        p_recurring_id: id,
+        p_patch: patch,
+        p_propagate: true,
+      });
+      if (error) throw error;
+      return Number(data ?? 0);
+    },
+    onSuccess: invalidate,
+  });
+}
+
 /** Faixa de erro por seção. Seção que falha DIZ que falhou — nunca some. */
 function ErrorBand({ message, onRetry }: { message: string; onRetry: () => void }) {
   return (
@@ -180,6 +221,7 @@ export default function RecurringScreen() {
   const toggle = useToggleRecurring();
   const remove = useDeleteRecurring();
   const create = useCreateRecurring();
+  const editar = useSaveRecurringSeries();
 
   const [form, setForm] = useState<FormState | null>(() => params.create === '1' ? {
     ...FORM_VAZIO, kind: params.kind === 'income' ? 'income' : 'expense',
@@ -215,7 +257,36 @@ export default function RecurringScreen() {
       : null;
 
   const salvar = () => {
-    if (!form || !podeSalvar || !inicioDate || !rrulePrevia) return;
+    if (!form) return;
+    if (form.id) {
+      editar.mutate(
+        {
+          id: form.id,
+          patch: {
+            amount_cents: form.amountCents,
+            category: form.category,
+            description: form.description.trim() || null,
+            account_id: form.accountId,
+            auto_confirm: form.autoConfirm,
+            end_date: form.fim ? brToISO(form.fim) : null,
+          },
+        },
+        {
+          onSuccess: (quantas) => {
+            toast({
+              message: quantas > 0
+                ? `Série alterada e ${quantas} ${quantas === 1 ? 'ocorrência futura' : 'ocorrências futuras'} junto.`
+                : 'Série alterada.',
+              tone: 'success',
+            });
+            setForm(null);
+          },
+          onError: () => toast({ message: 'Não deu para alterar a série.', tone: 'error' }),
+        },
+      );
+      return;
+    }
+    if (!podeSalvar || !inicioDate || !rrulePrevia) return;
     create.mutate(
       {
         kind: form.kind,
@@ -273,6 +344,29 @@ export default function RecurringScreen() {
           router.push({
             pathname: '/finance/transactions',
             params: { recurringId: r.id, month: r.next_run_at.slice(0, 7) },
+          }),
+      },
+      {
+        // Até 09/09/2026 esta tela só sabia criar, pausar e apagar: corrigir o valor
+        // do aluguel exigia apagar a série e refazer, perdendo o histórico.
+        label: 'Editar',
+        icon: 'pencil' as const,
+        onPress: () =>
+          setForm({
+            id: r.id,
+            rrule: r.rrule,
+            kind: r.kind === 'income' ? 'income' : 'expense',
+            amountCents: Number(r.amount_cents),
+            description: r.description ?? '',
+            category: r.category,
+            accountId: r.account_id,
+            // Frequência e âncora não são editáveis; ficam aqui só para o formulário
+            // ter forma completa e o resumo continuar legível.
+            preset: 'monthly',
+            intervalo: '1',
+            inicio: isoToBR((r.dtstart ?? r.next_run_at).slice(0, 10)),
+            fim: r.end_date ? isoToBR(r.end_date) : '',
+            autoConfirm: r.auto_confirm,
           }),
       },
       { label: r.active ? 'Pausar' : 'Retomar', onPress: () => alternar(r) },
@@ -471,12 +565,14 @@ export default function RecurringScreen() {
 
           <View style={styles.sheetHead}>
             <Button label="Cancelar" variant="ghost" size="sm" onPress={() => setForm(null)} />
-            <ThemedText type="smallBold">Nova recorrência</ThemedText>
+            <ThemedText type="smallBold">{form?.id ? 'Editar recorrência' : 'Nova recorrência'}</ThemedText>
             <Button
-              label="Criar"
+              label={form?.id ? 'Salvar' : 'Criar'}
               size="sm"
-              loading={create.isPending}
-              disabled={!podeSalvar}
+              loading={create.isPending || editar.isPending}
+              // Editando, a validação de calendário não se aplica: frequência e âncora
+              // não estão na tela. O que precisa valer é valor > 0 e o fim opcional.
+              disabled={form?.id ? !(form.amountCents > 0 && fimOk) : !podeSalvar}
               onPress={salvar}
             />
           </View>
@@ -522,6 +618,15 @@ export default function RecurringScreen() {
                 </View>
               </Field>
 
+              {form.id ? (
+                // Editando: a frequência e a âncora saem da tela. `dtstart` é imutável
+                // por desenho e mudar a cadência implicaria remontar o que já foi
+                // materializado — o resumo fica, para a pessoa saber o que está mexendo.
+                <ThemedText type="small" themeColor="textSecondary">
+                  {describeRRule(form.rrule ?? '')}, desde {form.inicio}. Para mudar a
+                  frequência, apague a série e crie outra.
+                </ThemedText>
+              ) : (
               <Field label="Repete">
                 <Segmented
                   options={[
@@ -533,8 +638,9 @@ export default function RecurringScreen() {
                   onChange={(preset) => setForm({ ...form, preset })}
                 />
               </Field>
+              )}
 
-              {form.preset === 'monthly' ? (
+              {!form.id && form.preset === 'monthly' ? (
                 <Field label="A cada quantos meses" hint="1 = todo mês. 2 = mês sim, mês não." error={Number(form.intervalo) < 1 ? 'Informe um intervalo de 1 a 99 meses' : undefined}>
                   <TextField
                     value={form.intervalo}
@@ -547,6 +653,7 @@ export default function RecurringScreen() {
                 </Field>
               ) : null}
 
+              {form.id ? null : (
               <Field
                 label="Começa em"
                 hint="É a âncora da série e não muda depois. Data no passado lança as ocorrências antigas de uma vez."
@@ -559,8 +666,9 @@ export default function RecurringScreen() {
                   invalid={Boolean(form.inicio) && !inicioOk}
                 />
               </Field>
+              )}
 
-              {rrulePrevia ? (
+              {!form.id && rrulePrevia ? (
                 <Animated.View key={rrulePrevia} entering={FadeIn.duration(Motion.duration.fast)}>
                   <ThemedText type="small" themeColor="tint">
                     {describeRRule(rrulePrevia)}, a partir de {form.inicio}.

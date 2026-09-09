@@ -139,6 +139,14 @@ def describe_for_confirmation(
                     account_name = (target.get("new_account") or {}).get("name", action.new_account)
                     corrections.append(f"conta → {account_name}")
             suffix = f": {', '.join(corrections)}" if corrections else ""
+            # Numa compra parcelada a correção vale para a parcela em aberto e as
+            # seguintes, nunca para as já pagas. O rótulo do candidato diz "Tudo (10x)",
+            # que é o alvo da BUSCA — sem esta linha o usuário confirmaria entendendo
+            # que as dez mudam.
+            if (target.get("table") == "installment_plans" and corrections
+                    and isinstance(action, FinanceAction)
+                    and action.type == FinanceActionType.UPDATE_TRANSACTION):
+                suffix += " (só as parcelas em aberto; as pagas ficam como estão)"
             return f"{verbo} {escolhido['label']}{extra}{suffix}"
         # Empate: as opções REAIS vão na lista, então a frase só precisa dizer o
         # que vai acontecer. Cair no texto do modelo aqui reintroduzia o eco que

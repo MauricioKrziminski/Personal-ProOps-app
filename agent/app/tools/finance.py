@@ -8,6 +8,7 @@ duas cópias divergem.
 
 from __future__ import annotations
 
+import json
 import logging
 from uuid import UUID
 
@@ -605,10 +606,7 @@ async def update_transaction(ctx: ExecContext, action: FinanceAction) -> ToolRes
     if _alvo_e_plano(ctx):
         if action.installment_scope or action.current_installment:
             return await _baixa_em_parcelas(ctx, action)
-        return ToolResult(
-            "🤷 Para compras parceladas, você pode mudar as parcelas pagas ou excluir o plano.",
-            read_only=True,
-        )
+        return await _corrigir_parcelas_futuras(ctx, action)
 
     patch: dict = {}
     if action.new_amount_cents is not None:
@@ -671,6 +669,66 @@ async def update_transaction(ctx: ExecContext, action: FinanceAction) -> ToolRes
         mudancas.append(f"nome → *{patch['description']}*")
     return ToolResult(
         f"✏️ Corrigido ({describe(antes)}): {', '.join(mudancas)}.", result_id=antes["id"]
+    )
+
+
+async def _corrigir_parcelas_futuras(ctx: ExecContext, action: FinanceAction) -> ToolResult:
+    """Corrigir a compra parcelada: a parcela em aberto e as seguintes.
+
+    Até 09/09/2026 isto era um beco — "você pode mudar as parcelas pagas ou excluir o
+    plano" — e a única saída era abrir parcela por parcela no app. Em 48x isso não é
+    uma saída.
+
+    Quem decide o que é "futura" é a RPC `update_transaction_scoped`, a MESMA que o
+    botão do app usa: `pending` e a partir da âncora. Repetir a regra aqui criaria a
+    segunda cópia, e a que diverge é sempre a que mexe em dinheiro.
+
+    A âncora é a primeira parcela EM ABERTO, nunca a primeira do plano: a RPC sempre
+    reescreve a âncora, e ancorar numa parcela paga mexeria num mês fechado.
+    """
+    cands = (ctx.target or {}).get("candidates") or []
+    if not cands:
+        return ToolResult("🤷 Essa compra parcelada não está mais aqui.", read_only=True)
+
+    patch: dict = {}
+    if action.new_amount_cents is not None:
+        patch["amount_cents"] = guards.require_amount(action.new_amount_cents, o_que="o valor novo")
+    if action.new_category:
+        patch["category"] = guards.clean_category(action.new_category)
+    if action.new_description:
+        patch["description"] = guards.require_text(action.new_description, o_que="a descrição nova", maximo=200)
+    if not patch:
+        # Trocar a CONTA de um plano inteiro continua fora: cada parcela mora numa
+        # fatura, e mover todas de cartão é outra operação, não uma correção.
+        raise Level1Error(
+            "❌ Numa compra parcelada dá para corrigir valor, categoria ou nome. "
+            "Tenta \"muda o notebook para 300 por parcela\"."
+        )
+
+    ancora = await db.fetch_one(
+        """
+        select id, installment_no from public.transactions
+        where installment_plan_id = %s and workspace_id = %s and status = 'pending'
+        order by occurred_at limit 1
+        """,
+        cands[0]["id"], ctx.workspace_id,
+    )
+    if not ancora:
+        return ToolResult(
+            "🤷 Essa compra não tem parcela em aberto — as passadas só mudam uma a uma.",
+            read_only=True,
+        )
+
+    row = await db.fetch_one(
+        "select public.update_transaction_scoped(%s, 'future', %s::jsonb) as mexidas",
+        ancora["id"], json.dumps(patch),
+    )
+    mexidas = int((row or {}).get("mexidas") or 0)
+    nome = cands[0].get("label") or "a compra"
+    return ToolResult(
+        f"✏️ Corrigi {mexidas} {'parcela' if mexidas == 1 else 'parcelas'} em aberto de *{nome}*. "
+        "As já pagas ficaram como estavam.",
+        result_id=str(ancora["id"]),
     )
 
 

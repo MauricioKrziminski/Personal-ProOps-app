@@ -251,9 +251,27 @@ export default function TodayScreen() {
               }
             />
             {overdue.map((b) => (
-              <View
+              /*
+                A linha ABRE o lançamento. O botão dá baixa, que é a ação de 90% dos
+                dias; mas quando a conta veio diferente do previsto ("a luz veio 180"),
+                dar baixa grava o valor errado — e até 09/09/2026 esta tela não tinha
+                caminho nenhum para corrigir antes de pagar. Fatura e dívida já tinham
+                destino próprio pelo botão; só o lançamento avulso ficava sem.
+              */
+              <Pressable
                 key={b.ref_id}
-                style={[styles.card, styles.billCard, { backgroundColor: theme.surface, borderColor: theme.cardBorder }]}>
+                accessibilityRole={b.kind === 'transaction' ? 'button' : undefined}
+                accessibilityLabel={b.kind === 'transaction' ? `Abrir ${b.title}` : undefined}
+                disabled={b.kind !== 'transaction'}
+                onPress={() => router.push({ pathname: '/finance/[txId]', params: { txId: b.ref_id } })}
+                style={({ pressed }) => [
+                  styles.card,
+                  styles.billCard,
+                  {
+                    backgroundColor: pressed ? theme.backgroundSelected : theme.surface,
+                    borderColor: theme.cardBorder,
+                  },
+                ]}>
                 <View style={styles.billInfo}>
                   {/*
                     Título e pílula na MESMA linha, como no export — o título encolhe e trunca,
@@ -300,7 +318,7 @@ export default function TodayScreen() {
                     }
                   }}
                 />
-              </View>
+              </Pressable>
             ))}
           </View>
         ) : null}

@@ -73,6 +73,26 @@ O cruzamento em `probe_settle_vs_pay` bloqueou o envio uma vez: *"marca a fatura
 paga, o dinheiro já saiu"* virava `pay_invoice`, que inventaria uma transferência. O prompt passou
 a dizer que o verbo decide e que "o dinheiro já saiu" é passado, não agora.
 
+## Edição com escopo (09/09/2026, mesmo dia)
+
+Pedido do dono do produto logo depois desta auditoria: *"eu quero poder editar os valores, editar
+completamente aquela parcela ou lançamento... posso editar somente aquele ou de todos as demais
+parcelas futuras... Note que nao edita as passadas."*
+
+O app ganhou a pergunta "Aplicar em: só esta / esta e as futuras" no salvar, e o agente **entrou
+junto no mesmo lugar**: `update_transaction` com alvo numa compra parcelada era um beco
+(*"você pode mudar as parcelas pagas ou excluir o plano"*) e agora chama
+`public.update_transaction_scoped`, a MESMA RPC do botão. A frase da confirmação diz o escopo —
+*"só as parcelas em aberto; as pagas ficam como estão"*.
+
+| app | agente |
+|---|---|
+| escolher "esta e as futuras" no formulário | `update_transaction` sobre a compra parcelada |
+| "Editar" no menu do plano | idem — a âncora é a primeira parcela EM ABERTO nos dois |
+| "Editar" numa recorrência | **pendente**: a série ainda não é alvo de `update_transaction` |
+
+A linha pendente é deliberada e está aqui em vez de ficar em silêncio, que é a regra desta tabela.
+
 ## Fora do escopo — decisão, não esquecimento
 
 **Revisão de importação de extrato** (`useImportStatement`, `useApproveImportItems`,

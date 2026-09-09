@@ -28,13 +28,14 @@ import {
   useCreateInstallmentPlan,
   useDeleteTransaction,
   useSaveTransaction,
+  useSaveTransactionScoped,
   useTransaction,
   type Transaction,
   type TransactionKind,
 } from '@/hooks/use-finance';
 import { brToISO, formatBRL, isValidBRDate, isoToBR, localISODate } from '@/lib/dates';
 import { financeErrorMessage, installmentHistory } from '@/lib/finance-form';
-import { confirmDestructive } from '@/lib/item-actions';
+import { confirmDestructive, showItemActions } from '@/lib/item-actions';
 
 /**
  * Novo/editar lançamento — modal do Stack raiz (Cancelar nativo vem do `_layout.tsx`).
@@ -167,6 +168,7 @@ function TransactionForm({ editing }: { editing?: Transaction }) {
   const { data: accounts } = useAccounts();
 
   const save = useSaveTransaction();
+  const salvarSerie = useSaveTransactionScoped();
   const createPlan = useCreateInstallmentPlan();
   const remove = useDeleteTransaction();
 
@@ -218,6 +220,26 @@ function TransactionForm({ editing }: { editing?: Transaction }) {
 
   const saving = save.isPending || createPlan.isPending;
 
+  /**
+   * O que mudou E vale para a série inteira. Data fica de fora: ela é de cada
+   * ocorrência, e propagar empilharia todas as parcelas no mesmo dia.
+   *
+   * Chave só entra quando o valor MUDOU — mandar o objeto inteiro faria "corrigi só
+   * o nome" reescrever a categoria das 40 parcelas com o que estava no formulário.
+   */
+  const patchDaSerie = (values: FormValues) => {
+    if (!editing) return {};
+    const patch: Record<string, unknown> = {};
+    if (values.amount_cents !== editing.amount_cents) patch.amount_cents = values.amount_cents;
+    if ((values.category ?? null) !== editing.category) patch.category = values.category ?? null;
+    const desc = values.description?.trim() || null;
+    if (desc !== editing.description) patch.description = desc;
+    const merc = values.merchant?.trim() || null;
+    if (merc !== editing.merchant) patch.merchant = merc;
+    if ((values.account_id ?? null) !== editing.account_id) patch.account_id = values.account_id ?? null;
+    return patch;
+  };
+
   const onSubmit = handleSubmit((values) => {
     // parcelado: quem cria as N transações (e resolve a fatura de cada uma) é o
     // banco, não o app — mesma regra usada pelo WhatsApp.
@@ -247,8 +269,21 @@ function TransactionForm({ editing }: { editing?: Transaction }) {
     // Reforço do `podeAdiar`: trocar para cartão depois de marcar "vou pagar depois" não
     // pode vazar um `pending` que a UI já escondeu.
     const adiado = podeAdiar && values.pending;
+    /**
+     * ⚠️ Em cartão o campo "vou pagar depois" NÃO existe (`podeAdiar` é false), então
+     * `adiado` é sempre false ali — e escrever `'cleared'` a partir disso DAVA BAIXA numa
+     * parcela futura só porque alguém corrigiu o nome dela. A projeção de caixa e o total
+     * da fatura mudavam sozinhos, sem nada na tela dizendo isso.
+     *
+     * Onde o campo não aparece, o status não é do formulário: ele é o que já era.
+     */
+    const status = podeAdiar ? (adiado ? 'pending' : 'cleared') : (editing?.status ?? 'cleared');
 
-    save.mutate(
+    const patch = patchDaSerie(values);
+    const naSerie = Boolean(editing?.installment_plan_id || editing?.recurring_id);
+
+    const gravar = (escopo: 'one' | 'future') =>
+      save.mutate(
       {
         id: editing?.id,
         kind: values.kind,
@@ -259,11 +294,32 @@ function TransactionForm({ editing }: { editing?: Transaction }) {
         account_id: values.account_id,
         counterparty_account_id: values.kind === 'transfer' ? values.counterparty_account_id : null,
         occurred_at: brToISO(values.occurred_at),
-        status: adiado ? 'pending' : 'cleared',
-        due_at: adiado && values.due_at ? brToISO(values.due_at) : null,
+        status,
+        due_at: adiado && values.due_at ? brToISO(values.due_at) : editing?.due_at ?? null,
       },
       {
         onSuccess: () => {
+          // A âncora já foi gravada com o formulário inteiro (inclusive data, que não
+          // se propaga). A RPC leva o resto da série — e reescreve a âncora com os
+          // mesmos valores, que é barato e mantém UM caminho para a regra do lote.
+          if (escopo === 'future' && editing) {
+            salvarSerie.mutate(
+              { id: editing.id, scope: 'future', patch },
+              {
+                onSuccess: (quantas) => {
+                  Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+                  router.back();
+                  toast({ message: `Alterei ${quantas} ${quantas === 1 ? 'lançamento' : 'lançamentos'} desta série.`, tone: 'success' });
+                },
+                // A âncora JÁ mudou aqui: dizer só "não deu para salvar" seria mentira.
+                onError: (error) => toast({
+                  message: financeErrorMessage(error, 'Salvei este, mas não consegui aplicar nos futuros. Tenta de novo.'),
+                  tone: 'error',
+                }),
+              },
+            );
+            return;
+          }
           Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
           router.back();
         },
@@ -271,6 +327,21 @@ function TransactionForm({ editing }: { editing?: Transaction }) {
         onError: (error) => toast({ message: financeErrorMessage(error, 'Não deu para salvar. Tenta de novo.'), tone: 'error' }),
       },
     );
+
+    // A pergunta é no SALVAR, não na abertura: só aqui se sabe se mudou algum campo
+    // que faz sentido propagar. Sem mudança propagável, não há escolha a fazer.
+    if (naSerie && Object.keys(patch).length > 0) {
+      showItemActions(
+        'Aplicar em quais?',
+        [
+          { label: 'Só esta', onPress: () => gravar('one') },
+          { label: 'Esta e as futuras', onPress: () => gravar('future') },
+        ],
+        'As anteriores não mudam — só se você editar cada uma.',
+      );
+      return;
+    }
+    gravar('one');
   });
 
   const onDelete = () => {

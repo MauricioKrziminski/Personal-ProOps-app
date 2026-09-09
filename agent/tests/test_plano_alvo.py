@@ -185,12 +185,44 @@ class TestEdicaoPlano:
         assert r.read_only
 
     @pytest.mark.asyncio
-    async def test_update_em_plano_sem_parcelas_informa_opcoes(self, monkeypatch):
+    async def test_update_em_plano_corrige_as_parcelas_em_aberto(self, monkeypatch):
+        """Isto era um beco: "mudar as parcelas pagas ou excluir o plano".
+
+        Em 48x a única saída era abrir parcela por parcela no app. Agora cai na MESMA
+        RPC do botão do app, que é quem sabe o que é "futura" — repetir a regra aqui
+        criaria a segunda cópia, e a que diverge é a que mexe em dinheiro.
+        """
+        chamadas = []
+
+        async def fetch_one(sql, *args):
+            chamadas.append((sql, args))
+            if "status = 'pending'" in sql:
+                return {"id": "aaaaaaaa-0000-0000-0000-000000000001", "installment_no": 3}
+            return {"mexidas": 6}
+
+        monkeypatch.setattr(finance.db, "fetch_one", fetch_one)
         r = await finance.update_transaction(
             _ctx("installment_plans"),
             FinanceAction(type=FinanceActionType.UPDATE_TRANSACTION, new_amount_cents=5000),
         )
-        assert "mudar as parcelas pagas ou excluir" in r.message
+        assert "6 parcelas" in r.message and "já pagas ficaram" in r.message
+        assert any("update_transaction_scoped" in sql for sql, _ in chamadas)
+        # a âncora é a primeira EM ABERTO: a RPC sempre reescreve a âncora, e ancorar
+        # numa parcela paga mexeria num mês fechado
+        assert any("status = 'pending'" in sql and "order by occurred_at" in sql
+                   for sql, _ in chamadas)
+
+    @pytest.mark.asyncio
+    async def test_update_em_plano_sem_parcela_em_aberto_nao_mexe(self, monkeypatch):
+        async def fetch_one(sql, *args):
+            return None if "status = 'pending'" in sql else {"mexidas": 0}
+
+        monkeypatch.setattr(finance.db, "fetch_one", fetch_one)
+        r = await finance.update_transaction(
+            _ctx("installment_plans"),
+            FinanceAction(type=FinanceActionType.UPDATE_TRANSACTION, new_amount_cents=5000),
+        )
+        assert r.read_only and "só mudam uma a uma" in r.message
 
 
 class TestAlvoDefensivo:

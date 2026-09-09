@@ -1072,6 +1072,7 @@ export type Database = {
           installments: number
           merchant: string | null
           total_cents: number
+          updated_at: string | null
           user_id: string
           workspace_id: string
         }
@@ -1085,6 +1086,7 @@ export type Database = {
           installments: number
           merchant?: string | null
           total_cents: number
+          updated_at?: string | null
           user_id: string
           workspace_id?: string
         }
@@ -1098,6 +1100,7 @@ export type Database = {
           installments?: number
           merchant?: string | null
           total_cents?: number
+          updated_at?: string | null
           user_id?: string
           workspace_id?: string
         }
@@ -2705,6 +2708,14 @@ export type Database = {
       }
       update_asset_value: {
         Args: { p_as_of?: string; p_asset_id: string; p_value_cents: number }
+        Returns: number
+      }
+      update_recurring_series: {
+        Args: { p_patch: Json; p_propagate?: boolean; p_recurring_id: string }
+        Returns: number
+      }
+      update_transaction_scoped: {
+        Args: { p_patch: Json; p_scope: string; p_transaction_id: string }
         Returns: number
       }
       year_end_balances: {

@@ -51,6 +51,9 @@ export type Transaction = Pick<
   | 'installment_no'
   | 'merchant'
   | 'debt_id'
+  // A série da recorrência: é o que diz se "esta e as futuras" faz sentido nesta linha.
+  // Já vinha no select desde sempre; faltava só no tipo.
+  | 'recurring_id'
 > & {
   kind: TransactionKind;
   source: TransactionSource;
@@ -117,6 +120,12 @@ export type RecurringTransaction = Pick<
   | 'run_attempts'
   | 'last_error'
   | 'created_at'
+  // Os três que a EDIÇÃO da série precisa: a âncora (só para mostrar), o fim opcional
+  // e a baixa automática. Sem eles o formulário de edição abriria com valores
+  // inventados e sobrescreveria o que o usuário não tocou.
+  | 'dtstart'
+  | 'end_date'
+  | 'auto_confirm'
 > & { kind: 'expense' | 'income' };
 
 export type MonthlyCashflow = Fns['monthly_cashflow']['Returns'][number];
@@ -320,7 +329,7 @@ export function useGoals() {
 }
 
 const RECURRING_COLUMNS =
-  'id, kind, amount_cents, currency, category, description, account_id, rrule, next_run_at, active, run_attempts, last_error, created_at';
+  'id, kind, amount_cents, currency, category, description, account_id, rrule, next_run_at, active, run_attempts, last_error, created_at, dtstart, end_date, auto_confirm';
 
 /** Séries recorrentes — criadas por WhatsApp, materializadas pelo cron do send-reminders. */
 export function useRecurringTransactions() {
@@ -1422,6 +1431,41 @@ export function useDeleteInstallmentPlan() {
     mutationFn: async (planId: string) => {
       const { error } = await supabase.from('installment_plans').delete().eq('id', planId);
       if (error) throw error;
+    },
+    onSuccess: invalidate,
+  });
+}
+
+/**
+ * Editar uma parcela/ocorrência e, se o usuário escolher, as FUTURAS da mesma série.
+ *
+ * O escopo mora na RPC porque um laço aqui faria N chamadas sem transação: caindo no
+ * meio, metade das parcelas fica com o valor novo e o total do plano com o velho. A RPC
+ * também recalcula `installment_plans.total_cents` e propaga para a regra da recorrência
+ * — coisas que o cliente não tem como fazer atomicamente.
+ *
+ * `patch` é parcial de propósito: chave ausente = não mexe, chave com `null` = limpa.
+ * Mandar o objeto inteiro faria "editei só o nome" reescrever a categoria das 40 parcelas.
+ */
+export function useSaveTransactionScoped() {
+  const invalidate = useInvalidateFinance();
+  return useMutation({
+    mutationFn: async ({
+      id,
+      scope,
+      patch,
+    }: {
+      id: string;
+      scope: 'one' | 'future';
+      patch: Partial<Pick<TransactionInput, 'amount_cents' | 'category' | 'description' | 'merchant' | 'account_id'>>;
+    }) => {
+      const { data, error } = await supabase.rpc('update_transaction_scoped', {
+        p_transaction_id: id,
+        p_scope: scope,
+        p_patch: patch,
+      });
+      if (error) throw error;
+      return Number(data ?? 0);
     },
     onSuccess: invalidate,
   });

@@ -178,14 +178,17 @@ export default function ForecastScreen() {
         title={b.title}
         subtitle={b.overdue ? `venceu em ${isoToBR(b.due_date)}` : isoToBR(b.due_date)}
         icon={fatura ? 'creditcard' : parcelaDeDivida ? 'banknote' : 'doc.text'}
-        chevron={fatura || parcelaDeDivida}
+        chevron
         accessibilityLabel={`${b.title}, ${b.overdue ? 'atrasado, vencia' : 'vence'} em ${isoToBR(b.due_date)}, ${formatBRL(cents)}`}
+        // Lançamento avulso agora ABRE, como fatura e dívida já abriam. Dar baixa num
+        // valor que veio diferente do previsto grava o valor errado, e esta tela não
+        // tinha caminho nenhum para corrigir antes — só o "marcar como pago".
         onPress={
           fatura
             ? () => router.push({ pathname: '/finance/invoice/[id]', params: { id: b.ref_id } })
             : parcelaDeDivida
               ? () => router.push('/finance/debts')
-              : undefined
+              : () => router.push({ pathname: '/finance/[txId]', params: { txId: b.ref_id } })
         }
         onLongPress={
           fatura || parcelaDeDivida
@@ -195,6 +198,12 @@ export default function ForecastScreen() {
                   {
                     label: `Marcar ${b.title} como pago`,
                     onPress: () => pagar(b.ref_id, b.title),
+                  },
+                  {
+                    label: 'Editar',
+                    icon: 'pencil',
+                    onPress: () =>
+                      router.push({ pathname: '/finance/transaction-form', params: { id: b.ref_id } }),
                   },
                 ])
         }
