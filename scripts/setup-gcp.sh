@@ -410,9 +410,25 @@ criar_cron() {
     --oidc-token-audience "${alvo%/cron/*}" \
     --attempt-deadline 300s \
     --quiet >/dev/null
-  gcloud scheduler jobs pause "$nome" --location "$REGION" --project "$PROJECT_ID" \
-    --quiet >/dev/null 2>&1 || true
-  printf '  ✓ %s (%s) — PAUSADO até o corte\n' "$nome" "$agenda"
+  # ⚠️ **Pausa só na CRIAÇÃO.** Isto era incondicional, e por isso TODO deploy de produção
+  # desligava os três crons em silêncio — o script imprimia "PAUSADO até o corte" e ninguém
+  # relacionava aquela linha com o efeito. Em 09/09/2026 custou caro: a recorrência do salário
+  # do dono do produto não materializava havia semanas, e o diagnóstico ("o finance-scheduler
+  # está pausado") foi desfeito pelo deploy seguinte, meia hora depois de ser corrigido.
+  #
+  # A premissa de "nascer pausado" continua válida para um job NOVO (o fluxo Deno podia estar
+  # entregando o mesmo lembrete, e lembrete não tem dedupe). Ela não vale para um job que já
+  # existe: quem o ligou fez isso de propósito, e um deploy não é lugar de reverter operação.
+  if [[ "$cmd" == create ]]; then
+    gcloud scheduler jobs pause "$nome" --location "$REGION" --project "$PROJECT_ID" \
+      --quiet >/dev/null 2>&1 || true
+    printf '  ✓ %s (%s) — criado PAUSADO (ligue no corte)\n' "$nome" "$agenda"
+    return
+  fi
+  local estado
+  estado=$(gcloud scheduler jobs describe "$nome" --location "$REGION" --project "$PROJECT_ID" \
+    --format='value(state)' 2>/dev/null || echo '?')
+  printf '  ✓ %s (%s) — %s (estado preservado)\n' "$nome" "$agenda" "$estado"
 }
 
 # ---------------------------------------------------------------------------
