@@ -383,6 +383,88 @@ export default function TodayScreen() {
         ) : null}
 
         {/*
+          3a. O que VENCE — o que ainda não venceu, dentro dos 7 dias da consulta.
+
+          ⚠️ **Esta seção sumiu em 02/09/2026** (`e8aab38`, o redesenho do Stitch) e o resto da
+          tela continuou contando com ela: `dueSoon` soma no contador "Vencendo" e no badge da
+          aba, e entra em `nothing`, que é o que decide se o `EmptyState` aparece. Com uma conta
+          a vencer e mais nada, a Hoje ficava com "Vencendo 1" e um VAZIO embaixo — nem seção,
+          nem estado vazio. Foi o que apareceu no aparelho do dono do produto em 09/09/2026.
+
+          O título é o mesmo da Projeção ("O que vence"), que nunca perdeu a dela: as duas telas
+          leem `upcoming_bills` e chamar a mesma coisa por dois nomes é o começo de divergirem.
+
+          A pílula aqui é NEUTRA, e é o ponto da seção existir separada: o que vence daqui a
+          cinco dias não é problema nem aviso. `danger` é de "Atrasado / atenção" e `warning` é
+          de receita que não caiu — gastar qualquer um dos dois aqui queima a única alavanca de
+          cor do app (design.md §2b).
+        */}
+        {dueSoon.length > 0 ? (
+          <View style={styles.section}>
+            <SectionHead
+              title="O que vence"
+              inset={false}
+              action={
+                <ThemedText type="caption" themeColor="textSecondary">
+                  {`${dueSoon.length} ${dueSoon.length === 1 ? 'conta' : 'contas'}`}
+                </ThemedText>
+              }
+            />
+            {dueSoon.map((b) => (
+              <Pressable
+                key={b.ref_id}
+                accessibilityRole={b.kind === 'transaction' ? 'button' : undefined}
+                accessibilityLabel={b.kind === 'transaction' ? `Abrir ${b.title}` : undefined}
+                disabled={b.kind !== 'transaction'}
+                onPress={() => router.push({ pathname: '/finance/[txId]', params: { txId: b.ref_id } })}
+                style={({ pressed }) => [
+                  styles.card,
+                  styles.billCard,
+                  {
+                    backgroundColor: pressed ? theme.backgroundSelected : theme.surface,
+                    borderColor: theme.cardBorder,
+                  },
+                ]}>
+                <View style={styles.billInfo}>
+                  <View style={styles.billTitleRow}>
+                    <ThemedText type="small" style={styles.billTitle}>
+                      {b.title}
+                    </ThemedText>
+                    <View style={[styles.duePill, { backgroundColor: theme.backgroundElement }]}>
+                      <ThemedText type="caption" themeColor="textSecondary">
+                        {`vence ${formatDateBR(b.due_date)}`}
+                      </ThemedText>
+                    </View>
+                  </View>
+                  <Money cents={Number(b.amount_cents)} variant="ticker" />
+                </View>
+                <Button
+                  label={
+                    b.kind === 'invoice'
+                      ? 'Pagar fatura'
+                      : b.kind === 'debt'
+                        ? 'Ver dívida'
+                        : settleLabel('expense')
+                  }
+                  icon={b.kind === 'debt' ? 'chevron.right' : 'checkmark'}
+                  size="sm"
+                  variant="secondary"
+                  onPress={() => {
+                    if (b.kind === 'invoice') {
+                      router.push({ pathname: '/finance/invoice/[id]', params: { id: b.ref_id } });
+                    } else if (b.kind === 'debt') {
+                      router.push('/finance/debts');
+                    } else {
+                      pay(b.ref_id, b.title);
+                    }
+                  }}
+                />
+              </Pressable>
+            ))}
+          </View>
+        ) : null}
+
+        {/*
           3b. O que ENTRA. Seção própria, e não uma linha na de cima: o cabeçalho de lá diz
           "Atrasado / atenção", que é vocabulário de dívida. Um Pix que não chegou não é culpa
           do usuário e não gera juros — por isso a pílula aqui é `warning`, não `danger`. Gastar
