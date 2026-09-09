@@ -198,6 +198,28 @@ function ErrorBand({ message, onRetry }: { message: string; onRetry: () => void 
   );
 }
 
+/**
+ * O formulário aberto sobre uma série existente. Frequência e âncora ficam de fora
+ * (`dtstart` é imutável e mudar a cadência implicaria remontar o que já foi materializado);
+ * o `rrule` vai junto só para o resumo continuar legível.
+ */
+function formDaSerie(r: RecurringTransaction): FormState {
+  return {
+    id: r.id,
+    rrule: r.rrule,
+    kind: r.kind === 'income' ? 'income' : 'expense',
+    amountCents: Number(r.amount_cents),
+    description: r.description ?? '',
+    category: r.category,
+    accountId: r.account_id,
+    preset: 'monthly',
+    intervalo: '1',
+    inicio: isoToBR((r.dtstart ?? r.next_run_at).slice(0, 10)),
+    fim: r.end_date ? isoToBR(r.end_date) : '',
+    autoConfirm: r.auto_confirm,
+  };
+}
+
 const FORM_VAZIO: FormState = {
   kind: 'expense',
   amountCents: 0,
@@ -212,7 +234,7 @@ const FORM_VAZIO: FormState = {
 };
 
 export default function RecurringScreen() {
-  const params = useLocalSearchParams<{ create?: string; kind?: string; amount?: string; description?: string; category?: string; account?: string; start?: string }>();
+  const params = useLocalSearchParams<{ create?: string; edit?: string; kind?: string; amount?: string; description?: string; category?: string; account?: string; start?: string }>();
   const theme = useTheme();
   const toast = useToast();
   const series = useRecurringTransactions();
@@ -222,6 +244,8 @@ export default function RecurringScreen() {
   const remove = useDeleteRecurring();
   const create = useCreateRecurring();
   const editar = useSaveRecurringSeries();
+  /** Qual `?edit=` já foi consumido — sem isto, fechar o sheet reabriria no render seguinte. */
+  const [edicaoAberta, setEdicaoAberta] = useState<string | null>(null);
 
   const [form, setForm] = useState<FormState | null>(() => params.create === '1' ? {
     ...FORM_VAZIO, kind: params.kind === 'income' ? 'income' : 'expense',
@@ -319,6 +343,25 @@ export default function RecurringScreen() {
     );
   };
 
+  const abrirEdicao = (r: RecurringTransaction) => setForm(formDaSerie(r));
+
+  /**
+   * `?edit=<id>` abre a edição direto, como `?create=1` já abria a criação — dá destino
+   * para link de fora e é o que torna o sheet conferível sem toque (a vitrine monta por URL).
+   *
+   * Ajuste de estado NO RENDER, não em efeito: a série chega DEPOIS do primeiro render (a
+   * query ainda carregava), então o inicializador do `useState` não a alcança; e `setState`
+   * dentro de `useEffect` é o que o React Compiler recusa, por encadear renders. Este é o
+   * padrão documentado de "ajustar estado quando a entrada muda", com guarda de idempotência.
+   */
+  if (params.edit && params.edit !== edicaoAberta && form === null) {
+    const alvo = lista.find((r) => r.id === params.edit);
+    if (alvo) {
+      setEdicaoAberta(params.edit);
+      setForm(formDaSerie(alvo));
+    }
+  }
+
   const alternar = (r: RecurringTransaction) =>
     toggle.mutate(
       { id: r.id, active: !r.active },
@@ -361,23 +404,7 @@ export default function RecurringScreen() {
         // do aluguel exigia apagar a série e refazer, perdendo o histórico.
         label: 'Editar',
         icon: 'pencil' as const,
-        onPress: () =>
-          setForm({
-            id: r.id,
-            rrule: r.rrule,
-            kind: r.kind === 'income' ? 'income' : 'expense',
-            amountCents: Number(r.amount_cents),
-            description: r.description ?? '',
-            category: r.category,
-            accountId: r.account_id,
-            // Frequência e âncora não são editáveis; ficam aqui só para o formulário
-            // ter forma completa e o resumo continuar legível.
-            preset: 'monthly',
-            intervalo: '1',
-            inicio: isoToBR((r.dtstart ?? r.next_run_at).slice(0, 10)),
-            fim: r.end_date ? isoToBR(r.end_date) : '',
-            autoConfirm: r.auto_confirm,
-          }),
+        onPress: () => abrirEdicao(r),
       },
       { label: r.active ? 'Pausar' : 'Retomar', onPress: () => alternar(r) },
       { label: 'Apagar', destructive: true, onPress: () => apagar(r) },

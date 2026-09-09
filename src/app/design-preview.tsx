@@ -46,6 +46,15 @@ import TodayScreen from './(tabs)/today/index';
  * Ela lê o `id` de `useLocalSearchParams`, então a URL da vitrine precisa levá-lo:
  * `/design-preview?id=prev-i1`.
  */
+/**
+ * `Recorrentes` entra porque a tela ganhou EDIÇÃO em 09/09/2026, e o sheet de edição é outro
+ * desenho do de criação (sem frequência, sem âncora, com um resumo no lugar).
+ *
+ * ⚠️ **Sheet se confere por URL, não por toque.** `xcrun simctl` não tem tap; o clique por
+ * System Events exige acesso assistivo que o osascript aqui não tem; e o `idb` não está
+ * instalado. Por isso a tela abre a edição por `?edit=<id>`, do mesmo jeito que já abria a
+ * criação por `?create=1`: `appproops:///design-preview?edit=prev-r1`.
+ */
 const ABAS = ['Hoje', 'Finanças', 'Notas', 'Agente', 'Perfil', 'Dívidas', 'Mês', 'Fatura', 'Recorrentes'] as const;
 
 /**
