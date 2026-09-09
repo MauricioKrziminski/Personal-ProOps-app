@@ -43,6 +43,18 @@
    torna `xcrun simctl io booted screenshot` uma sequência determinística — não existe gesto de
    rolagem por linha de comando, então a tela é montada inteira e deslocada por `translateY`.
 
+   ⚠️ **A vitrine é para CONFERIR, não para gerar material.** A tira de chips no rodapé é a
+   navegação dela e aparece em todo screenshot; e **no iOS a dock não aparece de jeito nenhum**,
+   porque `NativeTabs` é a barra do SISTEMA e só existe dentro de um navegador de abas real (no
+   Android dá para montar a `CurvedTabBar` à mão, e a vitrine já faz).
+
+   **Para print de divulgação, use o app de verdade no simulador:** `npx expo start --dev-client`,
+   `xcrun simctl launch booted com.proops.personal`, e na tela de login o botão **"Entrar como
+   teste (dev)"** (`components/auth/email-login-screen.tsx`, só em `__DEV__`) — ele faz
+   `signInWithPassword` com `dev@proops.local` no STAGING, que tem dados de demonstração. Sai o
+   app inteiro, com dock e sem chrome, e **sem dado financeiro real no print**. O aviso amarelo do
+   LogBox some com um toque no X e não existe em release.
+
    ⚠️ Fixture nova precisa casar a chave EXATA do hook: `useNotesList` é `useInfiniteQuery` (o
    cache guarda `{pages, pageParams}`) e `budgets_status` é consultada com duas chaves diferentes
    (o DIA na Hoje, o MÊS no Financeiro). Chave errada não quebra — cai no estado de erro, em
