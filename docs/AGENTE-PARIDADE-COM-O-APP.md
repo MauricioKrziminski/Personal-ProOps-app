@@ -259,3 +259,18 @@ O **WhatsApp não**: o roteador Deno lê `agent_routing.use_python_agent` pelo t
 está **vazia**, então quem responde continua sendo `process-jobs` em Deno, que não conhece nenhum
 `query_*` novo. Ligar o número na `agent_routing` é o que faz o WhatsApp herdar tudo isto — e é
 decisão do Gabriel, não consequência desta auditoria.
+
+## Evidência da validação (09/09/2026)
+
+| gate | resultado |
+|---|---|
+| `ruff check app --select F,E9` | limpo |
+| `pytest` | **624** (eram 604; +20 em `test_query_reads.py`) |
+| `npx tsc --noEmit` · `npm test` | limpos |
+| SQL das três consultas contra o Postgres do **staging** | executado, com dado real — pytest usa dublê e o SQL nunca tinha rodado |
+| `evaluate_answer_forms.py` (Gemini real) | **93/94** |
+
+A única falha foi `confirmação/aprovar: 'sim, pode registrar'`. Reexecutada a seção inteira
+(`--secao confirma`): **26/26**, incluindo o caso exato. Nada nesta mudança toca `domain/confirm.py`
+nem o `GEMINI_GATE` — é variação do modelo, não regressão. **A seção de segurança passou inteira**,
+que é o lado que não pode cair: aprovar o que não devia apaga dado do usuário.
