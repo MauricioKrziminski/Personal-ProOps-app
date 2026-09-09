@@ -16,6 +16,7 @@ import { Money } from '@/components/ui/money';
 import { Row, Section } from '@/components/ui/row';
 import { HeaderMenu } from '@/components/ui/header-actions';
 import { InvoicePager } from '@/components/finance/invoice-pager';
+import { MoneyInput } from '@/components/finance/money-input';
 import { Screen } from '@/components/ui/screen';
 import { Skeleton, SkeletonRow } from '@/components/ui/skeleton';
 import { useToast } from '@/components/ui/toast';
@@ -80,6 +81,9 @@ function isoDeBR(valor: string): string | null {
  */
 function mensagemDoErro(erro: unknown): string {
   const texto = (erro as { message?: string })?.message ?? '';
+  if (texto.includes('maior que o valor em aberto'))
+    return 'Esse valor passa do que falta nesta fatura.';
+  if (texto.includes('maior que zero')) return 'Informe quanto você pagou.';
   if (texto.includes('já paga')) return 'Esta fatura já consta como paga.';
   if (texto.includes('sem lançamentos')) return 'Esta fatura não tem compras para pagar.';
   if (texto.includes('próprio cartão')) return 'O cartão não pode pagar a si mesmo. Escolha outra conta.';
@@ -116,6 +120,8 @@ export default function InvoiceScreen() {
   const remove = useDeleteTransaction();
 
   const [pagando, setPagando] = useState(false);
+  // quanto vai ser pago AGORA. Nasce igual ao que falta, então pagar tudo continua sendo um toque.
+  const [valorCents, setValorCents] = useState(0);
   const [payerId, setPayerId] = useState<string | null>(null);
   const [dataBR, setDataBR] = useState(() => formatDateBR(localISODate()));
 
@@ -151,8 +157,13 @@ export default function InvoiceScreen() {
   // janela curta, quem tem anos de cartão pararia de navegar num ponto arbitrário.
   const vizinhas = useCardInvoices(fatura?.account_id);
 
+  // `paid_cents` é a única coisa materializada da fatura, e é somada só por `pay_invoice`.
+  // O total continua saindo das compras: é o valor de face, o número impresso na fatura.
+  const jaPago = fatura?.paid_cents ?? 0;
+  const falta = Math.max(total - jaPago, 0);
   const paga = fatura?.status === 'paid';
-  const podePagar = Boolean(fatura) && !paga && total > 0;
+  const parcial = !paga && jaPago > 0;
+  const podePagar = Boolean(fatura) && !paga && falta > 0;
   const dataISO = isoDeBR(dataBR);
   const pagadora = pagadoras.find((a) => a.id === payerId);
 
@@ -165,17 +176,31 @@ export default function InvoiceScreen() {
     const sugerida = pagadoras.find((a) => a.id === cartao?.payment_account_id);
     setPayerId(sugerida?.id ?? null);
     setDataBR(formatDateBR(localISODate()));
+    setValorCents(falta);
     setPagando(true);
   };
 
   const registrar = () => {
     if (!fatura || !payerId || !dataISO) return;
+    // Sem valor explícito quando paga tudo: assim o banco recalcula o que falta na hora do
+    // commit, e o botão nunca registra um número que ficou velho na tela.
+    const quita = valorCents >= falta;
     pay.mutate(
-      { invoiceId: fatura.id, accountId: payerId, paidAt: dataISO },
+      {
+        invoiceId: fatura.id,
+        accountId: payerId,
+        paidAt: dataISO,
+        ...(quita ? {} : { amountCents: valorCents }),
+      },
       {
         onSuccess: () => {
           setPagando(false);
-          toast({ message: `Fatura paga com ${pagadora?.name ?? 'a conta escolhida'}.`, tone: 'success' });
+          toast({
+            message: quita
+              ? `Fatura paga com ${pagadora?.name ?? 'a conta escolhida'}.`
+              : `Pagamento de ${formatBRL(valorCents)} registrado. Faltam ${formatBRL(falta - valorCents)}.`,
+            tone: 'success',
+          });
         },
         onError: (erro) => toast({ message: mensagemDoErro(erro), tone: 'error' }),
       }
@@ -277,6 +302,16 @@ export default function InvoiceScreen() {
                 </ThemedText>
               </View>
             ) : null}
+            {/* O número grande continua sendo o valor de face da fatura. Esta linha é a única
+                que responde "e quanto ainda falta?", que é a pergunta de quem pagou uma parte. */}
+            {parcial ? (
+              <View style={styles.pagaLinha}>
+                <Icon name="clock.fill" size="md" color="warning" />
+                <ThemedText type="small" themeColor="textSecondary" style={tabular}>
+                  Pago {formatBRL(jaPago)} · falta {formatBRL(falta)}
+                </ThemedText>
+              </View>
+            ) : null}
           </Card>
         </Animated.View>
       ) : null}
@@ -286,6 +321,7 @@ export default function InvoiceScreen() {
   const rodape = fatura ? (
     <ThemedText type="small" themeColor="textSecondary" style={styles.rodape}>
       O pagamento entra como transferência: as compras já contaram como gasto quando foram feitas.
+      Pagando só uma parte, o resto continua na fatura.
     </ThemedText>
   ) : null;
 
@@ -422,11 +458,18 @@ export default function InvoiceScreen() {
           </View>
 
           <ScrollView contentContainerStyle={styles.sheetBody} keyboardShouldPersistTaps="handled">
-            <Field label="Valor" hint="Pagamento parcial não existe: a fatura é quitada inteira.">
+            <Field
+              label="Valor"
+              error={valorCents > falta ? `Falta ${formatBRL(falta)} nesta fatura.` : undefined}
+              hint={
+                parcial
+                  ? `Você já pagou ${formatBRL(jaPago)}. Vem preenchido com o que falta.`
+                  : 'Vem preenchido com o valor cheio. Pagou só uma parte? Troque aqui.'
+              }>
               {/* Superfície de DECISÃO: este é o valor que a pessoa está confirmando pagar, e
-                  por isso ele ignora o "esconder saldo". Confirmar no escuro é pior que ser
-                  visto. */}
-              <Money cents={total} variant="title2" concealable={false} />
+                  por isso o campo é editável e mostra o número por extenso. O que sobrar fica na
+                  fatura, como fica no rotativo do cartão de verdade. */}
+              <MoneyInput valueCents={valorCents} onChangeCents={setValorCents} />
             </Field>
 
             {/* Erro de rede e "não tem conta" são coisas diferentes e não podem ter o mesmo texto. */}
@@ -489,10 +532,10 @@ export default function InvoiceScreen() {
               label={
                 pay.isPending
                   ? 'Registrando…'
-                  : `Paguei ${formatBRL(total)}${pagadora ? ` com ${pagadora.name}` : ''}`
+                  : `Paguei ${formatBRL(valorCents)}${pagadora ? ` com ${pagadora.name}` : ''}`
               }
               loading={pay.isPending}
-              disabled={!payerId || !dataISO}
+              disabled={!payerId || !dataISO || valorCents <= 0 || valorCents > falta}
               onPress={registrar}
             />
 

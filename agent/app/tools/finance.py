@@ -325,7 +325,7 @@ async def pay_invoice(ctx: ExecContext, action: FinanceAction) -> ToolResult:
 
     fatura = await db.fetch_one(
         """
-        select ci.id, ci.due_date
+        select ci.id, ci.due_date, private.invoice_open_cents(ci.id) as aberto
         from public.card_invoices ci
         where ci.account_id = %s and ci.workspace_id = %s and ci.status <> 'paid'
         order by ci.due_date
@@ -337,15 +337,30 @@ async def pay_invoice(ctx: ExecContext, action: FinanceAction) -> ToolResult:
     if not fatura:
         return ToolResult("✅ Não achei fatura em aberto nesse cartão.", read_only=True)
 
+    # "paguei 800 da fatura do nubank" é pagamento PARCIAL: o resto fica na fatura, como fica no
+    # rotativo do cartão de verdade. Sem valor, paga o que falta e quita.
+    aberto = int(fatura["aberto"] or 0)
+    valor = guards.optional_amount(action.amount_cents)
+    if valor is not None and valor > aberto:
+        raise Level1Error(
+            f"❌ Essa fatura está com {cents_to_brl(aberto)} em aberto — o valor que você "
+            f"falou passa disso. Confere?"
+        )
+
     pagadora = await resolve_account(ctx.workspace_id, action.counterparty_account)
     row = await db.fetch_one(
-        "select public.pay_invoice(%s, %s, %s) as id",
-        fatura["id"], pagadora, guards.require_date(action.occurred_at, ctx.timezone),
+        "select public.pay_invoice(%s, %s, %s, %s) as id",
+        fatura["id"], pagadora, guards.require_date(action.occurred_at, ctx.timezone), valor,
     )
-    return ToolResult(
-        f"✅ Fatura paga (vencimento {format_date_br(fatura['due_date'])}).",
-        result_id=row["id"] if row else None,
-    )
+    vencimento = format_date_br(fatura["due_date"])
+    if valor is None or valor >= aberto:
+        texto = f"✅ Fatura paga (vencimento {vencimento})."
+    else:
+        texto = (
+            f"✅ Registrei {cents_to_brl(valor)} na fatura do vencimento {vencimento}. "
+            f"Ainda faltam {cents_to_brl(aberto - valor)}."
+        )
+    return ToolResult(texto, result_id=row["id"] if row else None)
 
 
 async def verificar_limite_disponivel(

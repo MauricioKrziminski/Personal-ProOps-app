@@ -96,6 +96,7 @@ const MATERIAL: Record<string, MaterialName> = {
   'chevron.left': 'chevron_left',
   'chevron.up': 'expand_less',
   clock: 'schedule',
+  'clock.fill': 'schedule',
   'clock.arrow.circlepath': 'history',
   creditcard: 'credit_card',
   'creditcard.and.123': 'credit_card',

@@ -165,7 +165,13 @@ def describe_for_confirmation(
             paid=action.already_paid_count or 0
             return f"registrar {valor} em {action.installments}x no cartão {action.account or 'a informar'}: {paid} parcelas iniciais pagas e {(action.installments or 0)-paid} pendentes"
         if tipo == "pay_invoice":
-            return f"registrar o pagamento da fatura do {action.account or 'cartão'}"
+            # com valor a frase precisa dizer QUANTO: pagamento parcial e quitação são efeitos
+            # diferentes, e confirmar "o pagamento da fatura" não distingue os dois
+            cartao = action.account or "cartão"
+            return (
+                f"registrar {valor} de pagamento na fatura do {cartao}" if valor
+                else f"registrar o pagamento da fatura do {cartao}"
+            )
         # A conta entra na frase quando o usuário citou uma: é o que permite corrigir o meio
         # ("não, foi no Itaú") antes da escrita, sem custar uma pergunta a mais. Quando ele não
         # citou, a frase CALA em vez de afirmar "na conta padrão" — pode não haver nenhuma, e

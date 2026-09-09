@@ -507,6 +507,7 @@ export type Database = {
           due_date: string
           id: string
           paid_at: string | null
+          paid_cents: number
           payment_transaction_id: string | null
           reference_month: string
           settled_manually: boolean
@@ -522,6 +523,7 @@ export type Database = {
           due_date: string
           id?: string
           paid_at?: string | null
+          paid_cents?: number
           payment_transaction_id?: string | null
           reference_month: string
           settled_manually?: boolean
@@ -537,6 +539,7 @@ export type Database = {
           due_date?: string
           id?: string
           paid_at?: string | null
+          paid_cents?: number
           payment_transaction_id?: string | null
           reference_month?: string
           settled_manually?: boolean
@@ -2629,7 +2632,12 @@ export type Database = {
         Returns: number
       }
       pay_invoice: {
-        Args: { p_account_id: string; p_invoice_id: string; p_paid_at?: string }
+        Args: {
+          p_account_id: string
+          p_amount_cents?: number
+          p_invoice_id: string
+          p_paid_at?: string
+        }
         Returns: string
       }
       payoff_strategy: {

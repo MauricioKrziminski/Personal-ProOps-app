@@ -88,7 +88,8 @@ export type CardSummary = Omit<
 
 export type CardInvoice = Pick<
   Tables['card_invoices']['Row'],
-  'id' | 'account_id' | 'reference_month' | 'closing_date' | 'due_date' | 'status' | 'paid_at'
+  | 'id' | 'account_id' | 'reference_month' | 'closing_date' | 'due_date' | 'status' | 'paid_at'
+  | 'paid_cents'
 > & { status: 'open' | 'closed' | 'paid' };
 
 export type AccountBalance = Fns['account_balances']['Returns'][number];
@@ -436,7 +437,7 @@ export function useInvoice(invoiceId: string | undefined) {
       const [invoiceRes, txRes] = await Promise.all([
         supabase
           .from('card_invoices')
-          .select('id, account_id, reference_month, closing_date, due_date, status, paid_at')
+          .select('id, account_id, reference_month, closing_date, due_date, status, paid_at, paid_cents')
           .eq('id', invoiceId!)
           .single(),
         supabase
@@ -455,15 +456,27 @@ export function useInvoice(invoiceId: string | undefined) {
   });
 }
 
-/** Paga a fatura: a RPC cria a transferência e marca a fatura (regra no banco). */
+/**
+ * Paga a fatura: a RPC cria a transferência e marca a fatura (regra no banco).
+ *
+ * `amountCents` ausente = paga o que falta e quita. Com valor menor, o banco soma em
+ * `card_invoices.paid_cents` e a fatura segue em aberto — é o rotativo, e é o caso real de quem
+ * paga o boleto em duas vezes no mesmo mês. Quem decide isso é `pay_invoice`, não a tela.
+ */
 export function usePayInvoice() {
   const invalidate = useInvalidateFinance();
   return useMutation({
-    mutationFn: async (input: { invoiceId: string; accountId: string; paidAt: string }) => {
+    mutationFn: async (input: {
+      invoiceId: string;
+      accountId: string;
+      paidAt: string;
+      amountCents?: number;
+    }) => {
       const { error } = await supabase.rpc('pay_invoice', {
         p_invoice_id: input.invoiceId,
         p_account_id: input.accountId,
         p_paid_at: input.paidAt,
+        ...(input.amountCents === undefined ? {} : { p_amount_cents: input.amountCents }),
       });
       if (error) throw error;
     },
