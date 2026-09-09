@@ -21,8 +21,12 @@ security definer
 set search_path = public
 as $$
 begin
+  -- `workspace_id` não é redundante: a FK amarra à série, mas quem garante que a ocorrência
+  -- nasce no workspace DELA são os escritores (`scheduler.py`), não o banco. Função `definer`
+  -- não confia em convenção de chamador — é a mesma correção da `20260909071000`.
   delete from public.transactions
    where recurring_id = old.id
+     and workspace_id = old.workspace_id
      and status = 'pending'
      and occurred_at >= current_date;
   return old;
@@ -35,6 +39,23 @@ drop trigger if exists recurring_drop_future on public.recurring_transactions;
 create trigger recurring_drop_future
   before delete on public.recurring_transactions
   for each row execute function private.recurring_drop_future();
+
+-- ⚠️ Teto conhecido, herdado e NÃO fechado aqui: se uma dessas ocorrências estiver numa fatura
+-- com pagamento PARCIAL (`paid_cents > 0`), removê-la derruba a soma da fatura abaixo do que já
+-- foi pago e `pay_invoice` passa a recusar ("fatura sem lançamentos"). `useDeleteTransaction` já
+-- produz o mesmo estado hoje para qualquer linha — a correção de raiz é um guard no delete de
+-- `transactions`, não aqui, e filtrar por fatura paga neste ponto só recriaria a órfã.
+-- ponytail: teto aceito; fechar junto com o guard geral de delete se aparecer em campo.
+
+-- Cópia do que vai sair, antes de sair. São linhas de DINHEIRO e não há undo — e a tela ANTIGA
+-- prometia que as ocorrências sobreviviam à exclusão da série, então alguém pode ter deixado uma
+-- de propósito, como conta avulsa.
+create table if not exists private.recurring_orphans_20260909 as
+select * from public.transactions
+ where source = 'recurring'
+   and recurring_id is null
+   and status = 'pending'
+   and occurred_at >= current_date;
 
 -- Entulho já existente: mesma regra, aplicada uma vez. `source='recurring'` só é escrito
 -- pelo materializador (`agent/app/jobs/scheduler.py`), que sempre grava `recurring_id`

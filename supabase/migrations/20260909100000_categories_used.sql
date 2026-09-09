@@ -27,5 +27,7 @@ as $$
    order by count(*) desc, t.category;
 $$;
 
-revoke execute on function public.categories_used() from anon;
+-- `from public`, não só `from anon`: o Postgres concede EXECUTE a PUBLIC na criação, e revogar
+-- de `anon` não tira a herança — ele continuaria podendo chamar. Padrão da `0010_workspaces.sql`.
+revoke execute on function public.categories_used() from public, anon;
 grant execute on function public.categories_used() to authenticated;
