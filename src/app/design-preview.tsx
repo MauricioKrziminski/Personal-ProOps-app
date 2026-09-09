@@ -10,6 +10,7 @@ import { localISODate } from '@/hooks/use-items';
 import { useTheme } from '@/hooks/use-theme';
 
 import AgentScreen from './(tabs)/agent/index';
+import DebtsScreen from './finance/debts';
 import FinanceScreen from './(tabs)/finance/index';
 import NotesScreen from './(tabs)/notes/index';
 import ProfileScreen from './(tabs)/profile/index';
@@ -31,7 +32,12 @@ import TodayScreen from './(tabs)/today/index';
  * Não é tela de produto: não tem link para ela em lugar nenhum e o caminho é o deep link
  * `com.proops.personal://design-preview`.
  */
-const ABAS = ['Hoje', 'Finanças', 'Notas', 'Agente', 'Perfil'] as const;
+/**
+ * `Dívidas` é a única EMPURRADA aqui, e está de propósito: o histórico das parcelas já
+ * pagas mora dentro de um sheet que só abre no toque, então sem esta faixa a correção de
+ * 09/09/2026 (numeração 9..48 + as 8 anteriores) só poderia ser conferida logando.
+ */
+const ABAS = ['Hoje', 'Finanças', 'Notas', 'Agente', 'Perfil', 'Dívidas'] as const;
 
 /**
  * A tela é montada numa caixa ALTA e deslocada para cima, em vez de rolada.
@@ -70,6 +76,7 @@ const ABA_PARA_TAB: Record<string, number> = {
   Notas: 1,
   Agente: 3,
   Perfil: 4,
+  'Dívidas': 2,
 };
 /** Quantas alturas de tela cada aba ocupa — medido, para não gastar frame em preto. */
 const FAIXAS: Record<(typeof ABAS)[number], number> = {
@@ -79,6 +86,7 @@ const FAIXAS: Record<(typeof ABAS)[number], number> = {
   // Uma faixa: a lista de conversas cabe inteira numa tela.
   Agente: 1,
   Perfil: 3,
+  'Dívidas': 2,
 };
 const PASSOS = ABAS.flatMap((aba) =>
   Array.from({ length: FAIXAS[aba] }, (_, faixa) => ({ aba, faixa }))
@@ -129,6 +137,7 @@ export default function DesignPreviewScreen() {
             {aba === 'Notas' ? <NotesScreen /> : null}
             {aba === 'Agente' ? <AgentScreen /> : null}
             {aba === 'Perfil' ? <ProfileScreen /> : null}
+            {aba === 'Dívidas' ? <DebtsScreen /> : null}
           </View>
 
           {/*
@@ -340,6 +349,26 @@ function seedClient() {
       archived: false,
     },
   ]);
+
+  /*
+    O cronograma como o banco passou a devolvê-lo: numerado pelo CONTRATO (9..48), não pela
+    posição na lista do que sobrou. As oito anteriores NÃO vêm daqui — a tela as deriva de
+    `installments_paid`, que é como o passado de um financiamento é guardado.
+  */
+  client.setQueryData(
+    ['debt-schedule', 'prev-divida-carro'],
+    Array.from({ length: 40 }, (_, i) => ({
+      installment_no: 9 + i,
+      due_date: `${2026 + Math.floor((9 + i) / 12)}-${String(((9 + i) % 12) + 1).padStart(2, '0')}-10`,
+      payment_cents: 147000,
+      interest_cents: null,
+      principal_cents: null,
+      balance_cents: 5880000 - 147000 * (i + 1),
+    })),
+  );
+  // Nenhum pagamento registrado: as 8 pagas são as DECLARADAS no cadastro.
+  client.setQueryData(['debt-payments', 'prev-divida-carro'], []);
+  client.setQueryData(['payoff', 'avalanche'], []);
 
   // `transactions_summary` devolve UMA linha por (categoria, tipo), não a transação.
   const resumo = (fim: string, gasto: number, receita: number) => [

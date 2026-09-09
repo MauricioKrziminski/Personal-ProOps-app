@@ -83,3 +83,53 @@ NÃO foi observado nesta rodada (a tela de lançamentos é empurrada e não entr
 - O rótulo `Recebi` está coberto por teste unitário e pela varredura anti-regressão, **não**
   por captura de tela — a tela de lançamentos é empurrada e o `design-preview` só monta as
   cinco raízes de aba.
+
+## 5. O histórico das parcelas pagas — 09/09/2026
+
+Origem: *"ao falar que estou na nona parcela ... ele tem que continuar aparecendo quando eu
+abrir o lançamento e olhar para trás, quero ter o histórico completo, só não tendo aquele
+aviso chato de que estou devendo tudo para trás"*, e *"parece que ele criou 40 parcelas ao
+invés das 48"*.
+
+Eram **dois** defeitos, não um.
+
+**(i) A numeração era da lista, não do contrato.** `private.debt_schedule_for` devolve só o
+que falta — 40 linhas — e as numerava de 1 em diante. Medido em produção:
+
+```
+select count(*), min(installment_no), max(installment_no)
+from private.debt_schedule_for('c5d8ba6e-…')  → 40, 1, 40
+```
+
+A 9ª parcela aparecia como "parcela 1" e a tabela terminava em 40: daí a leitura de que o
+financiamento nasceu com 40 parcelas. Corrigido em
+`20260909010000_debt_schedule_contract_numbering.sql`, deslocando pelo `installments_paid`
+**no SELECT final** (a recursão continua contando de 1, porque é ela que decide quando
+parar). Medido no staging com fixture em transação e rollback: `carro` 48x/8 pagas passou a
+devolver 40 linhas numeradas **9..48**, soma inalterada (R$ 58.800); um Price de 24x/4 pagas
+devolve 20 linhas **5..24**.
+
+Nenhum dos seis consumidores de `debt_schedule_for` lê `installment_no`
+(`_cash_flow_forecast`, `_upcoming_bills`, `payoff_strategy_for` e os wrappers) — conferido
+por `prosrc` em produção. Contagem de linhas e valores não mudaram, então projeção e contas
+a pagar continuam idênticas.
+
+**(ii) O passado não existia como linha.** Diferente da compra parcelada no cartão (onde
+`create_installment_plan_with_history` materializa as N parcelas e marca as pagas como
+`cleared`), um financiamento guarda o passado como **contagem**: `installments_paid = 8`.
+Não há data, conta nem valor para as oito — quem disse "estou na nona" declarou, não lançou.
+
+Por isso as linhas antigas são **apresentação derivada da contagem**, nunca lançamento:
+`src/lib/debt-history.ts` monta `Parcela 1..8 de 48` com o valor da parcela e a data andando
+para trás na cadência mensal a partir do primeiro vencimento em aberto. Onde existe pagamento
+de verdade (`pay_debt_installment` grava um `transactions` com `debt_payment_no`), a data e o
+valor vêm dele — `useDebtPayments`. Elas não entram na projeção, não viram `transactions` e
+não mexem no saldo, e a tela diz isso em uma linha embaixo da lista.
+
+O sheet do financiamento agora tem **Já pagas · 8 de 48** (check, sem cor de atraso) e
+**A pagar** começando em 9 e terminando em 48.
+
+Verificado no emulador (s26, 1344×2992, claro e escuro) pela faixa `Dívidas` nova do
+`design-preview` — o sheet só abre no toque, então sem essa faixa a correção só poderia ser
+conferida logando. De quebra, o cartão da lista escrevia "juros juros incluídos, sem
+detalhamento": a palavra vinha do template e do rótulo ao mesmo tempo.

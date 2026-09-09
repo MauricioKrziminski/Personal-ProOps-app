@@ -25,6 +25,7 @@ import {
   DEBT_KINDS,
   useAccounts,
   useArchiveDebt,
+  useDebtPayments,
   useDebtSchedule,
   useDebts,
   usePayDebtInstallment,
@@ -34,6 +35,7 @@ import {
 } from '@/hooks/use-finance';
 import { useTheme } from '@/hooks/use-theme';
 import { formatBRL, formatNumberBR, isoToBR } from '@/lib/dates';
+import { paidInstallments } from '@/lib/debt-history';
 import { debtTerm, financeErrorMessage, simpleDebtValues } from '@/lib/finance-form';
 import { confirmDestructive, showItemActions } from '@/lib/item-actions';
 
@@ -133,6 +135,7 @@ export default function DebtsScreen() {
 
   // Lazy: só a dívida aberta (detalhe ou pagamento) puxa a tabela Price.
   const schedule = useDebtSchedule(detalhe?.id ?? pagando?.id);
+  const payments = useDebtPayments(detalhe?.id ?? pagando?.id);
 
   // `isError` e não só `data`: o TanStack GUARDA o resultado anterior quando o refetch
   // falha, e sem este corte a lista seguia afirmando números embaixo da faixa que acabou
@@ -145,6 +148,21 @@ export default function DebtsScreen() {
     0
   );
   const proxima = schedule.data?.[0];
+  /**
+   * O passado do contrato. `debts` guarda "8 pagas" como CONTAGEM, então abrir um
+   * financiamento de 48x mostrava só as 40 que faltam — o histórico não existia e o
+   * contrato parecia ter nascido com 40 parcelas. Isto é apresentação derivada da
+   * contagem, não lançamento: não entra na projeção nem no saldo.
+   */
+  const historico = detalhe
+    ? paidInstallments({
+        installmentsPaid: detalhe.installments_paid,
+        installmentCents: Number(detalhe.installment_cents ?? proxima?.payment_cents ?? 0),
+        nextDueDate: proxima?.due_date ?? null,
+        payments: payments.data ?? [],
+      })
+    : [];
+  const temEstimada = historico.some((p) => !p.registered);
   const pagadoras = (accounts.data ?? []).filter((a) => a.type !== 'credit_card');
 
   const abrirNova = () => setForm({ ...FORM_VAZIO });
@@ -265,7 +283,7 @@ export default function DebtsScreen() {
     const original = Number(d.principal_cents) || restante;
     const pago = Math.max(0, original - restante);
     const tipo = DEBT_KINDS.find((k) => k.value === d.kind)?.label ?? '';
-    const juros = d.calculation_mode === 'fixed_installments' ? 'juros incluídos, sem detalhamento' : d.interest_rate_monthly > 0 ? taxaLabel(d.interest_rate_monthly) : 'sem juros';
+    const juros = d.calculation_mode === 'fixed_installments' ? 'juros incluídos, sem detalhamento' : d.interest_rate_monthly > 0 ? `juros ${taxaLabel(d.interest_rate_monthly)}` : 'sem juros';
     const parcelas = d.installments ? `${d.installments_paid}/${d.installments} pagas` : null;
 
     return (
@@ -277,7 +295,7 @@ export default function DebtsScreen() {
         )}>
         <Pressable
           accessibilityRole="button"
-          accessibilityLabel={`${d.name}, ${tipo}, deve ${formatBRL(restante)}, ${juros === 'sem juros' ? 'sem juros' : `juros de ${juros}`}${parcelas ? `, ${parcelas}` : ''}`}
+          accessibilityLabel={`${d.name}, ${tipo}, deve ${formatBRL(restante)}, ${juros}${parcelas ? `, ${parcelas}` : ''}`}
           onPress={() => setDetalhe(d)}
           onLongPress={() => acoes(d)}>
           <Card style={styles.divida}>
@@ -289,7 +307,7 @@ export default function DebtsScreen() {
             </View>
             <ProgressBar value={pago} max={original} tone="success" />
             <ThemedText type="footnote" themeColor="textSecondary">
-              {tipo} · juros {juros}
+              {tipo} · {juros}
               {parcelas ? ` · ${parcelas}` : ''}
             </ThemedText>
           </Card>
@@ -480,9 +498,39 @@ export default function DebtsScreen() {
               />
             ) : null}
 
+            {historico.length > 0 && detalhe ? (
+              <View style={styles.tabelaBloco}>
+                <SectionHead
+                  title={`Já pagas · ${historico.length}${detalhe.installments ? ` de ${detalhe.installments}` : ''}`}
+                />
+                <Section>
+                  {historico.map((p) => (
+                    <Row
+                      key={p.installment_no}
+                      icon="checkmark.circle.fill"
+                      chevron={false}
+                      title={`Parcela ${p.installment_no}${detalhe.installments ? ` de ${detalhe.installments}` : ''}`}
+                      subtitle={
+                        p.registered
+                          ? `Paga em ${isoToBR(p.due_date)}`
+                          : `Vencimento estimado · ${isoToBR(p.due_date)}`
+                      }
+                      trailing={<Money cents={p.payment_cents} variant="footnote" tone="textSecondary" />}
+                    />
+                  ))}
+                </Section>
+                {temEstimada ? (
+                  <ThemedText type="footnote" themeColor="textSecondary">
+                    As parcelas sem pagamento registrado vieram da contagem que você informou. O
+                    valor é o da parcela e a data segue a cadência mensal do contrato.
+                  </ThemedText>
+                ) : null}
+              </View>
+            ) : null}
+
             {(schedule.data ?? []).length > 0 ? (
               <View style={styles.tabelaBloco}>
-                <SectionHead title="Amortização" />
+                <SectionHead title="A pagar" />
                 {/* rola dentro do próprio container, nunca empurrando o corpo do sheet */}
                 <ScrollView horizontal showsHorizontalScrollIndicator={false}>
                   <View>

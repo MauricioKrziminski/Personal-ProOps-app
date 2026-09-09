@@ -4,6 +4,7 @@ import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tansta
 import { supabase } from '@/lib/supabase';
 import type { Database } from '@/lib/database.types';
 import { localISODate, monthBounds } from '@/lib/dates';
+import type { DebtPaymentRow } from '@/lib/debt-history';
 import { toIlikeTerm } from '@/lib/search';
 import { useRealtimeInvalidate, workspaceId } from '@/hooks/use-items';
 
@@ -861,6 +862,28 @@ export function useDebtSchedule(debtId: string | undefined) {
     queryKey: ['debt-schedule', debtId ?? ''],
     queryFn: async (): Promise<DebtScheduleRow[]> => {
       const { data, error } = await supabase.rpc('debt_schedule', { p_debt_id: debtId! });
+      if (error) throw error;
+      return data;
+    },
+  });
+}
+
+/**
+ * Os pagamentos JÁ REGISTRADOS de uma dívida (`pay_debt_installment` grava um
+ * `transactions` com `debt_payment_no`). O histórico da tela mistura isto com as parcelas
+ * apenas DECLARADAS na criação — ver `paidInstallments` em `@/lib/debt-history`.
+ */
+export function useDebtPayments(debtId: string | undefined) {
+  useRealtimeInvalidate('transactions', ['debt-payments']);
+  return useQuery({
+    enabled: Boolean(debtId),
+    queryKey: ['debt-payments', debtId ?? ''],
+    queryFn: async (): Promise<DebtPaymentRow[]> => {
+      const { data, error } = await supabase
+        .from('transactions')
+        .select('debt_payment_no, occurred_at, amount_cents')
+        .eq('debt_id', debtId!)
+        .order('occurred_at');
       if (error) throw error;
       return data;
     },
