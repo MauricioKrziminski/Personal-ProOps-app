@@ -163,11 +163,25 @@ const styles = StyleSheet.create({
 
     Sem isso, com fonte grande o bloco do valor ("−R$ 1.280,00" + a data) comia metade da linha e
     o título ficava com uma coluna estreita demais — o Android então quebrava DENTRO da palavra:
-    "Ferramenta / s", "Passagem / aérea". Palavra partida ao meio é pior que reticências, que é o
-    problema que a remoção das truncagens veio resolver.
+    "Ferramenta / s". Palavra partida ao meio é pior que reticências, que é o problema que a
+    remoção das truncagens veio resolver.
 
-    O gatilho é o `minWidth` de `labels`: enquanto o título tem 180 de largura, tudo fica na mesma
-    linha; abaixo disso o valor quebra e cada um fica inteiro na sua.
+    O gatilho é o `minWidth` de `labels`. **Ele valia 180 e foi MEDIDO em 384dp em 09/09/2026**,
+    porque 180 era o número do emulador de 448dp e nenhum celular real tem essa largura: a
+    conta é `384 − 32 (calha) − 32 (padding) − 38 (chip) − 12 − 12 = 270` para título + valor,
+    e um `−R$ 1.280,00` com a seta deixa **131** para o título. Com 180 a linha quebrava
+    SEMPRE — todo extrato ficava com o valor pendurado sozinho numa terceira linha, em toda
+    linha da lista. Era a queixa do dono do produto, e as duas tentativas de arrumar isso pelo
+    `trailing` das telas só trocaram a FORMA da quebra, porque a causa estava aqui.
+
+    134 é a largura medida de "Estacionamentoo" (15 letras a 17px ≈ 8,9dp por letra), o maior
+    título de uma palavra que este app produz. Abaixo disso a palavra parte; acima, o extrato
+    inteiro quebra à toa. Não é escolha de gosto — é o ponto onde os dois defeitos se tocam, e
+    trocar o número exige repetir a medição (plantar um título de 15 letras e olhar a 384dp).
+
+    Não precisa de `fontScale`: com fonte grande o VALOR cresce e o espaço do título encolhe
+    sozinho, então a válvula dispara na hora certa. Medido a 1,3× — a linha quebra, a palavra
+    fica inteira.
   */
   row: {
     flexDirection: 'row',
@@ -181,14 +195,20 @@ const styles = StyleSheet.create({
   labels: {
     flexGrow: 1,
     flexShrink: 1,
-    minWidth: 180,
+    minWidth: 134,
     gap: 2,
   },
-  /** `marginLeft: auto` mantém o valor encostado à direita mesmo quando ele desce de linha. */
+  /**
+   * `marginLeft: auto` mantém o valor encostado à direita mesmo quando ele desce de linha.
+   *
+   * O respiro entre valor e seta é `xs`, não `md`: a seta pertence ao valor (o iOS usa ~6pt),
+   * e os 8dp que isso devolve são o que faz um título de 15 letras caber ao lado de um valor
+   * de quatro dígitos em 384dp. Quem separa o par do texto é o `gap` da própria linha.
+   */
   trailing: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: Space.md,
+    gap: Space.xs,
     marginLeft: 'auto',
   },
   iconChip: {
