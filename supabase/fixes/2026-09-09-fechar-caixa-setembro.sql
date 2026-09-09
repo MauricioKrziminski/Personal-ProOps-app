@@ -114,6 +114,25 @@ begin
   -- 05/09 ele aplicou 37,00 no RDB e 08/09 resgatou os mesmos 37,00. As duas pontas se anulam
   -- dentro do mês e a caixinha não é conta do app — não entra nada, de propósito.
 
+  -- ── 6b. o CLT cai em DUAS partes, e nenhuma delas era o que o app tinha ──
+  --
+  -- Documentado no extrato da conta Nubank, as duas vindas da agência 1203, conta 39805-5:
+  --   05/08 → R$ 1.488,02   ·   20/08 → R$ 1.148,00   (04/09 → R$ 1.488,02 de novo)
+  -- Soma R$ 2.636,02, e não os R$ 2.632,00 de uma parcela só que a planilha trazia. Duas
+  -- recorrências e não uma com dois dias: `BYMONTHDAY=5,20` valeria como RRULE, mas as duas
+  -- metades têm VALORES diferentes, e uma recorrência só guarda um `amount_cents`.
+  delete from public.recurring_transactions where workspace_id = ws and description = 'Salário';
+  insert into public.recurring_transactions
+    (workspace_id, user_id, account_id, kind, amount_cents, description, category, rrule,
+     dtstart, next_run_at, materialized_until)
+  values
+    -- setembro já está lançado à mão (a linha de 04/09), então esta só passa a valer em outubro
+    (ws, usr, cc, 'income', 148802, 'Salário CLT (1ª parte)', 'salario',
+     'FREQ=MONTHLY;BYMONTHDAY=5', '2026-09-05', '2026-10-05', '2026-09-30'),
+    -- 20/09 ainda não aconteceu: esta o cron materializa como previsto, que é o certo
+    (ws, usr, cc, 'income', 114800, 'Salário CLT (2ª parte)', 'salario',
+     'FREQ=MONTHLY;BYMONTHDAY=20', '2026-08-20', '2026-09-20', null);
+
   -- ── 7. o futuro que a importação materializou com os valores velhos ──────
   --
   -- As recorrências foram corrigidas no script anterior, mas as linhas já geradas guardam o valor
@@ -123,11 +142,11 @@ begin
    using public.recurring_transactions r
    where t.recurring_id = r.id and t.occurred_at > current_date
      and r.description in ('Pix Winicius','Pix pai carro','Salário PJ','Fundacred',
-                           'Manutenção dentista','DAS','Salário');
+                           'Manutenção dentista','DAS');
   update public.recurring_transactions set materialized_until = null
    where workspace_id = ws
      and description in ('Pix Winicius','Pix pai carro','Salário PJ','Fundacred',
-                         'Manutenção dentista','DAS','Salário');
+                         'Manutenção dentista','DAS');
 
   -- ── 8. as asserções ──────────────────────────────────────────────────────
   --

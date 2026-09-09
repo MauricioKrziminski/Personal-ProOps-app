@@ -3,6 +3,7 @@
 
     agent/.venv/bin/python scripts/checkpoint.py backup                 # staging
     agent/.venv/bin/python scripts/checkpoint.py backup --prod
+    agent/.venv/bin/python scripts/checkpoint.py restore            # o mais recente
     agent/.venv/bin/python scripts/checkpoint.py restore .checkpoints/<pasta>
     agent/.venv/bin/python scripts/checkpoint.py list
 
@@ -129,6 +130,7 @@ def backup(prod: bool, destino: Path | None) -> None:
 def restore(pasta: Path, prod: bool) -> None:
     manifesto = json.loads((pasta / "manifesto.json").read_text())
     url, ref = alvo(prod)
+    print(f"checkpoint: {pasta}")
     if manifesto["ref"] != ref:
         sys.exit(f"este checkpoint é de {manifesto['ref']} e o alvo é {ref} — abortando")
     if prod and os.environ.get("PROOPS_PROD_OK") != "1":
@@ -170,6 +172,19 @@ def restore(pasta: Path, prod: bool) -> None:
     print(f"\n{ref} devolvido ao checkpoint de {manifesto['quando']}")
 
 
+def mais_recente(prod: bool) -> Path:
+    ref = PROD_REF if prod else STAGING_REF
+    raiz = RAIZ / ".checkpoints"
+    candidatos = sorted(
+        (p for p in raiz.glob("*/manifesto.json")
+         if json.loads(p.read_text()).get("ref") == ref),
+        key=lambda p: p.parent.name,
+    )
+    if not candidatos:
+        sys.exit(f"nenhum checkpoint de {ref} em {raiz}")
+    return candidatos[-1].parent
+
+
 def listar() -> None:
     raiz = RAIZ / ".checkpoints"
     if not raiz.exists():
@@ -191,9 +206,9 @@ if __name__ == "__main__":
     if cmd == "backup":
         backup(prod, Path(resto[0]) if resto else None)
     elif cmd == "restore":
-        if not resto:
-            sys.exit("uso: restore <pasta do checkpoint> [--prod]")
-        restore(Path(resto[0]), prod)
+        # Sem pasta, o mais recente do MESMO alvo. Decorar carimbo de data não é parte do
+        # trabalho, e a pasta escolhida é impressa antes de qualquer escrita.
+        restore(Path(resto[0]) if resto else mais_recente(prod), prod)
     elif cmd == "list":
         listar()
     else:
