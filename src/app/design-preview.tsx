@@ -13,6 +13,7 @@ import AgentScreen from './(tabs)/agent/index';
 import DebtsScreen from './finance/debts';
 import InvoiceScreen from './finance/invoice/[id]';
 import RecurringScreen from './finance/recurring';
+import TransactionFormScreen from './finance/transaction-form';
 import MonthScreen from './finance/month';
 import FinanceScreen from './(tabs)/finance/index';
 import NotesScreen from './(tabs)/notes/index';
@@ -50,12 +51,21 @@ import TodayScreen from './(tabs)/today/index';
  * `Recorrentes` entra porque a tela ganhou EDIÇÃO em 09/09/2026, e o sheet de edição é outro
  * desenho do de criação (sem frequência, sem âncora, com um resumo no lugar).
  *
- * ⚠️ **Sheet se confere por URL, não por toque.** `xcrun simctl` não tem tap; o clique por
+ * `Editar` monta o formulário sobre uma PARCELA (`?id=prev-p1`): é a única forma de chegar na
+ * pergunta "Aplicar em quais?", que só aparece ao salvar e só quando a linha pertence a uma série.
+ * A parcela precisa de `due_at` — o zod do formulário exige vencimento em lançamento previsto.
+ *
+ * ⚠️ **Sheet se confere por URL + `cliclick`, não por `osascript`.** `xcrun simctl` não tem tap; o clique por
  * System Events exige acesso assistivo que o osascript aqui não tem; e o `idb` não está
  * instalado. Por isso a tela abre a edição por `?edit=<id>`, do mesmo jeito que já abria a
  * criação por `?create=1`: `appproops:///design-preview?edit=prev-r1`.
+ *
+ * Para tocar: `cliclick c:X,Y` (instalado), com `open -a Simulator` ANTES DE CADA clique — sem
+ * refocar, o segundo clique não chega no app. A conversão sai da geometria da janela:
+ * `osascript ... get {position, size} of window 1` dá a origem, a tela do device fica em
+ * `(origem + 27, origem + 80)` com 398×865pt, e o screenshot é 1206×2622px — fator 0,33.
  */
-const ABAS = ['Hoje', 'Finanças', 'Notas', 'Agente', 'Perfil', 'Dívidas', 'Mês', 'Fatura', 'Recorrentes'] as const;
+const ABAS = ['Hoje', 'Finanças', 'Notas', 'Agente', 'Perfil', 'Dívidas', 'Mês', 'Fatura', 'Recorrentes', 'Editar'] as const;
 
 /**
  * A tela é montada numa caixa ALTA e deslocada para cima, em vez de rolada.
@@ -97,6 +107,8 @@ const ABA_PARA_TAB: Record<string, number> = {
   'Dívidas': 2,
   'Mês': 2,
   Fatura: 1,
+  Recorrentes: 2,
+  Editar: 2,
 };
 /** Quantas alturas de tela cada aba ocupa — medido, para não gastar frame em preto. */
 const FAIXAS: Record<(typeof ABAS)[number], number> = {
@@ -114,6 +126,9 @@ const FAIXAS: Record<(typeof ABAS)[number], number> = {
   Fatura: 1,
   // Duas faixas: a lista de séries e o painel do que entra/sai no mês.
   Recorrentes: 2,
+  // Uma faixa: o valor, a categoria e o botão Salvar cabem numa tela — é o que precisa
+  // ser tocado para a pergunta de escopo aparecer.
+  Editar: 1,
 };
 /** As cinco raízes de aba. As outras faixas são telas EMPURRADAS e não têm tab bar. */
 const RAIZES = new Set<(typeof ABAS)[number]>(['Hoje', 'Finanças', 'Notas', 'Agente', 'Perfil']);
@@ -171,6 +186,7 @@ export default function DesignPreviewScreen() {
             {aba === 'Mês' ? <MonthScreen /> : null}
             {aba === 'Fatura' ? <InvoiceScreen /> : null}
             {aba === 'Recorrentes' ? <RecurringScreen /> : null}
+            {aba === 'Editar' ? <TransactionFormScreen /> : null}
           </View>
 
           {/*
@@ -757,6 +773,22 @@ function seedClient() {
    * a tela abria com a faixa "Não deu para somar os próximos 30 dias" em cima da lista certa.
    * Chave errada não quebra: cai no estado de erro, em silêncio.
    */
+  /**
+   * A parcela que a banda `Editar` abre (`/design-preview?id=prev-p1`). Ela precisa de
+   * `installment_plan_id`: é ele que faz o formulário perguntar "Aplicar em: só esta / esta e
+   * as futuras" ao salvar. Sem série, o salvamento é direto e a pergunta não existe.
+   */
+  client.setQueryData(['transactions', 'item', 'prev-p1'], {
+    id: 'prev-p1', kind: 'expense', amount_cents: 41500, currency: 'BRL',
+    category: 'casa', description: 'Notebook', merchant: 'Kabum',
+    account_id: 'prev-a2', counterparty_account_id: null,
+    occurred_at: `${mes}-03`, source: 'app', created_at: `${mes}-03T10:00:00Z`,
+    // `due_at` preenchido porque o formulário EXIGE vencimento em lançamento previsto
+    // (refine do zod). Toda linha pendente em produção tem: 92 de 92, conferido.
+    status: 'pending', due_at: `${mes}-13`, invoice_id: null,
+    installment_plan_id: 'prev-pl1', installment_no: 3, recurring_id: null, debt_id: null,
+  });
+
   client.setQueryData(['recurring', 'upcoming', '30', hoje], [
     { kind: 'expense', amount_cents: 150000 },
     { kind: 'income', amount_cents: 420000 },
