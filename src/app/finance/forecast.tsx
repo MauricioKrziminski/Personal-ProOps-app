@@ -37,7 +37,7 @@ import {
 import { useDebounced } from '@/hooks/use-debounced';
 import { formatBRL, isoToBR, localISODate } from '@/lib/dates';
 import { showItemActions } from '@/lib/item-actions';
-import { settleAccessibilityLabel } from '@/lib/settle-labels';
+import { settleLabel } from '@/lib/settle-labels';
 
 /**
  * Projeção — "posso gastar isso?".
@@ -211,7 +211,11 @@ export default function ForecastScreen() {
             : () =>
                 showItemActions(b.title, [
                   {
-                    label: settleAccessibilityLabel(receita ? 'income' : 'expense', b.title),
+                    // Um rótulo só para a mesma intenção (design.md §10): o menu de Lançamentos
+                    // diz "Paguei", e o cabeçalho do sheet já nomeia o item — repetir o nome
+                    // aqui escrevia "Paguei: Aluguel" embaixo de "Aluguel".
+                    label: settleLabel(receita ? 'income' : 'expense'),
+                    icon: 'checkmark.circle',
                     onPress: () => pagar(b.ref_id, b.title),
                   },
                   {
