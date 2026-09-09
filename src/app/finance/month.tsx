@@ -43,7 +43,7 @@ import {
   type Bucket,
   type GroupBy,
 } from '@/lib/month-view';
-import { settleLabel } from '@/lib/settle-labels';
+import { settleLabel, unsettledLabel } from '@/lib/settle-labels';
 
 /**
  * Mês — "para onde foi o dinheiro deste mês, e como ele fechou?".
@@ -107,7 +107,9 @@ export default function MonthScreen() {
     variavel: Number(s?.variaveis_cents ?? 0),
   };
   const falta: Record<Bucket, number> = {
-    entrada: 0,
+    // Era `0` cravado porque `month_summary` não devolvia o recorte de receita — o dado existia
+    // em `month_lines` (coluna `settled`) e só não era somado. `20260909130000` fechou isso.
+    entrada: Number(s?.income_unsettled_cents ?? 0),
     fixa: Number(s?.fixas_unsettled_cents ?? 0),
     parcela: Number(s?.parcelas_unsettled_cents ?? 0),
     variavel: Number(s?.variaveis_unsettled_cents ?? 0),
@@ -338,7 +340,7 @@ export default function MonthScreen() {
 
             {falta[bucket] > 0 ? (
               <ThemedText type="footnote" themeColor="textSecondary">
-                falta pagar {formatBRL(falta[bucket])}
+                {unsettledLabel(bucket)} {formatBRL(falta[bucket])}
               </ThemedText>
             ) : null}
           </Animated.View>

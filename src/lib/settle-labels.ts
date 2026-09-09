@@ -117,3 +117,13 @@ export function autoConfirmHint(
     ? 'O lançamento já entra como pago na data.'
     : 'Fica esperando você dizer que pagou.';
 }
+
+/**
+ * O que falta num bucket do Mês. Entrada não "falta pagar" — ela falta RECEBER, e escrever
+ * o verbo errado ali era o mesmo defeito que criou este arquivo. Cravado em `month.tsx` até
+ * `income_unsettled_cents` existir (`20260909130000`); antes disso a entrada era zero e o
+ * texto nunca aparecia, o que escondia o erro.
+ */
+export function unsettledLabel(bucket: string): string {
+  return bucket === 'entrada' ? 'falta receber' : 'falta pagar';
+}

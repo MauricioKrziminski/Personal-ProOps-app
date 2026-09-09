@@ -2115,7 +2115,10 @@ export type Database = {
         Returns: {
           account_id: string
           balance_cents: number
+          cleared_cents: number
           name: string
+          pending_in_cents: number
+          pending_out_cents: number
           type: string
         }[]
       }
@@ -2253,6 +2256,7 @@ export type Database = {
           fixas_cents: number
           fixas_unsettled_cents: number
           income_cents: number
+          income_unsettled_cents: number
           opening_cash_cents: number
           parcelas_cents: number
           parcelas_unsettled_cents: number
@@ -2336,7 +2340,10 @@ export type Database = {
         Returns: {
           account_id: string
           balance_cents: number
+          cleared_cents: number
           name: string
+          pending_in_cents: number
+          pending_out_cents: number
           type: string
         }[]
       }
@@ -2581,6 +2588,7 @@ export type Database = {
           fixas_cents: number
           fixas_unsettled_cents: number
           income_cents: number
+          income_unsettled_cents: number
           opening_cash_cents: number
           parcelas_cents: number
           parcelas_unsettled_cents: number

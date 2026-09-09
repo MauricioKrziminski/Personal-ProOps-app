@@ -20,7 +20,7 @@ import { HeroLabel } from '@/components/ui/section-head';
 import { Segmented } from '@/components/ui/segmented';
 import { Skeleton, SkeletonRow } from '@/components/ui/skeleton';
 import { useToast } from '@/components/ui/toast';
-import { Motion, Radius, Space } from '@/design/tokens';
+import { Motion, Radius, Space, tabular } from '@/design/tokens';
 import { formatBRL } from '@/hooks/use-items';
 import {
   ACCOUNT_TYPES,
@@ -133,10 +133,21 @@ export default function AccountsScreen() {
   const investimentos = linhas.filter((l) => l.account_id && l.type === 'investment');
   const cartoes = linhas.filter((l) => l.account_id && l.type === 'credit_card');
 
+  /**
+   * ⚠️ `cleared_cents`, não `balance_cents`. Até 09/09/2026 esta soma usava o total e portanto
+   * incluía o que ainda não caiu — enquanto Patrimônio e Projeção usam `private.cash_total`, que
+   * só conta `cleared`. Eram dois números para o mesmo dinheiro, e o daqui era o errado.
+   *
+   * O CARTÃO continua em `balance_cents` (logo abaixo) de propósito: lá a parcela futura
+   * `pending` é dívida já assumida, e tirá-la esconderia o que ele vai pagar.
+   */
   const caixa =
-    dinheiro.reduce((s, l) => s + Number(l.balance_cents), 0) +
-    Number(semConta?.balance_cents ?? 0);
-  const investido = investimentos.reduce((s, l) => s + Number(l.balance_cents), 0);
+    dinheiro.reduce((s, l) => s + Number(l.cleared_cents), 0) +
+    Number(semConta?.cleared_cents ?? 0);
+  const aReceber =
+    dinheiro.reduce((s, l) => s + Number(l.pending_in_cents), 0) +
+    Number(semConta?.pending_in_cents ?? 0);
+  const investido = investimentos.reduce((s, l) => s + Number(l.cleared_cents), 0);
   // saldo de cartão é negativo quando há fatura em aberto; aqui vira dívida positiva
   const dividaCartao = cartoes.reduce((s, l) => s + Math.min(0, Number(l.balance_cents)), 0);
 
@@ -222,12 +233,24 @@ export default function AccountsScreen() {
 
   const linhaConta = (saldo: AccountBalance) => {
     const conta = contaDe(saldo.account_id);
-    const cents = Number(saldo.balance_cents);
+    const cartao = saldo.type === 'credit_card';
+    /**
+     * Cartão mostra o TOTAL (parcela futura é dívida assumida); conta de dinheiro mostra o
+     * confirmado, e o que falta cair vai para o subtítulo em vez de sumir dentro do número.
+     */
+    const cents = Number(cartao ? saldo.balance_cents : saldo.cleared_cents);
+    const previsto = Number(cartao ? saldo.pending_out_cents : saldo.pending_in_cents);
     const negativo = cents < 0;
     const tipo = ACCOUNT_TYPES.find((t) => t.value === saldo.type)?.label ?? '';
     const ciclo =
       conta?.closing_day && conta.due_day
         ? `fecha dia ${conta.closing_day} · vence dia ${conta.due_day}`
+        : null;
+    const previstoTexto =
+      previsto > 0
+        ? cartao
+          ? `${formatBRL(previsto)} em parcelas futuras`
+          : `${formatBRL(previsto)} a receber`
         : null;
 
     return (
@@ -262,10 +285,11 @@ export default function AccountsScreen() {
         {({ onLongPress }) => (
           <Row
             title={saldo.name}
-            subtitle={ciclo ?? tipo}
+            subtitle={[ciclo ?? tipo, previstoTexto].filter(Boolean).join(' · ')}
             icon={ICONE[saldo.type]}
-            // o valor negativo não pode ser comunicado só pela cor
-            accessibilityLabel={`${saldo.name}, ${tipo}, ${negativo ? 'deve' : 'tem'} ${formatBRL(Math.abs(cents))}`}
+            // o valor negativo não pode ser comunicado só pela cor — e o previsto precisa
+            // estar aqui também, senão o leitor de tela esconde o que a tela mostra
+            accessibilityLabel={`${saldo.name}, ${tipo}, ${negativo ? 'deve' : 'tem'} ${formatBRL(Math.abs(cents))}${previstoTexto ? `, ${previstoTexto}` : ''}`}
             onLongPress={onLongPress}
             trailing={
               <Money
@@ -312,6 +336,15 @@ export default function AccountsScreen() {
           <Card style={styles.hero}>
             <HeroLabel>Dinheiro disponível</HeroLabel>
             <Money cents={caixa} variant="money" tone={caixa < 0 ? 'danger' : 'text'} />
+            {/*
+              O que falta cair fica FORA do número grande e ao lado dele. Somar seria voltar ao
+              defeito que esta tela tinha: dizer que você tem um dinheiro que ainda não chegou.
+            */}
+            {aReceber > 0 ? (
+              <ThemedText type="footnote" themeColor="textSecondary" style={tabular}>
+                mais {formatBRL(aReceber)} previstos, que entram quando você confirmar
+              </ThemedText>
+            ) : null}
             <View style={styles.heroSplit}>
               <View style={styles.heroPart}>
                 <HeroLabel>investido</HeroLabel>
