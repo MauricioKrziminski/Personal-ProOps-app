@@ -11,6 +11,11 @@
 1. `npx tsc --noEmit` limpo.
 2. `npx expo lint` limpo.
 3. `npm test` verde (`node --test`, sem framework — helpers puros de data/dinheiro do app).
+
+   ⚠️ **Olhe o código de saída, não a contagem.** O resumo do `node --test` tem linhas separadas
+   para `pass` e `fail`, e filtrar a saída (`| grep pass`, `| head`) esconde a segunda: em
+   09/09/2026 um `pass 329` foi lido como verde com `fail 1` embaixo, e o build da tag quebrou no
+   CI. `npm test` já sai diferente de zero quando falha — use isso.
 4. **Mudou `agent/` → `.venv/bin/ruff check app --select F,E9` E `.venv/bin/pytest` verdes.**
    Teste que fala com rede ou banco não entra: os nós que falam com o mundo viram dublê.
 
