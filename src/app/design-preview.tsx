@@ -12,6 +12,7 @@ import { useTheme } from '@/hooks/use-theme';
 import AgentScreen from './(tabs)/agent/index';
 import DebtsScreen from './finance/debts';
 import InvoiceScreen from './finance/invoice/[id]';
+import RecurringScreen from './finance/recurring';
 import MonthScreen from './finance/month';
 import FinanceScreen from './(tabs)/finance/index';
 import NotesScreen from './(tabs)/notes/index';
@@ -45,7 +46,7 @@ import TodayScreen from './(tabs)/today/index';
  * Ela lê o `id` de `useLocalSearchParams`, então a URL da vitrine precisa levá-lo:
  * `/design-preview?id=prev-i1`.
  */
-const ABAS = ['Hoje', 'Finanças', 'Notas', 'Agente', 'Perfil', 'Dívidas', 'Mês', 'Fatura'] as const;
+const ABAS = ['Hoje', 'Finanças', 'Notas', 'Agente', 'Perfil', 'Dívidas', 'Mês', 'Fatura', 'Recorrentes'] as const;
 
 /**
  * A tela é montada numa caixa ALTA e deslocada para cima, em vez de rolada.
@@ -102,6 +103,8 @@ const FAIXAS: Record<(typeof ABAS)[number], number> = {
   'Mês': 1,
   // Uma faixa: o herói e o começo da lista respondem se o parcial aparece.
   Fatura: 1,
+  // Duas faixas: a lista de séries e o painel do que entra/sai no mês.
+  Recorrentes: 2,
 };
 /** As cinco raízes de aba. As outras faixas são telas EMPURRADAS e não têm tab bar. */
 const RAIZES = new Set<(typeof ABAS)[number]>(['Hoje', 'Finanças', 'Notas', 'Agente', 'Perfil']);
@@ -158,6 +161,7 @@ export default function DesignPreviewScreen() {
             {aba === 'Dívidas' ? <DebtsScreen /> : null}
             {aba === 'Mês' ? <MonthScreen /> : null}
             {aba === 'Fatura' ? <InvoiceScreen /> : null}
+            {aba === 'Recorrentes' ? <RecurringScreen /> : null}
           </View>
 
           {/*
@@ -717,7 +721,28 @@ function seedClient() {
   });
   client.setQueryData(['reminders'], []);
   client.setQueryData(['goals'], []);
-  client.setQueryData(['recurring'], []);
+  /**
+   * `Recorrentes` ganhou EDIÇÃO em 09/09/2026 e o sheet de edição é outro desenho do de
+   * criação: sem frequência e sem âncora, com um resumo no lugar. Com a lista vazia a tela
+   * cai no estado vazio e nada disso é conferível.
+   */
+  client.setQueryData(['recurring'], [
+    {
+      id: 'prev-r1', kind: 'expense', amount_cents: 150000, currency: 'BRL',
+      category: 'moradia', description: 'Aluguel', account_id: 'prev-a1',
+      rrule: 'FREQ=MONTHLY;BYMONTHDAY=5', next_run_at: `${mes}-05T09:00:00Z`,
+      dtstart: `${mes}-05T09:00:00Z`, end_date: null, auto_confirm: true,
+      active: true, run_attempts: 0, last_error: null, created_at: `${mes}-01T09:00:00Z`,
+    },
+    {
+      id: 'prev-r2', kind: 'income', amount_cents: 420000, currency: 'BRL',
+      category: 'salário', description: 'Salário PJ', account_id: 'prev-a1',
+      rrule: 'FREQ=MONTHLY;BYMONTHDAY=4', next_run_at: `${mes}-04T09:00:00Z`,
+      dtstart: `${mes}-04T09:00:00Z`, end_date: null, auto_confirm: true,
+      active: true, run_attempts: 0, last_error: null, created_at: `${mes}-01T09:00:00Z`,
+    },
+  ]);
+  client.setQueryData(['recurring', 'upcoming', 30], []);
 
   return client;
 }
