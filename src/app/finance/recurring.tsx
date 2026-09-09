@@ -259,18 +259,28 @@ export default function RecurringScreen() {
   const salvar = () => {
     if (!form) return;
     if (form.id) {
+      /**
+       * Só o que MUDOU. `update_recurring_series` propaga toda chave presente para as
+       * ocorrências futuras: mandar o objeto inteiro faria "corrigi só o valor do
+       * aluguel" reescrever a categoria e o nome de ocorrências que alguém ajustou à
+       * mão. É a mesma regra do `patchDaSerie` do formulário de lançamento.
+       */
+      const antes = lista.find((r) => r.id === form.id);
+      const patch: Parameters<typeof editar.mutate>[0]['patch'] = {};
+      if (!antes || form.amountCents !== Number(antes.amount_cents)) patch.amount_cents = form.amountCents;
+      if (!antes || form.category !== antes.category) patch.category = form.category;
+      const desc = form.description.trim() || null;
+      if (!antes || desc !== antes.description) patch.description = desc;
+      if (!antes || form.accountId !== antes.account_id) patch.account_id = form.accountId;
+      if (!antes || form.autoConfirm !== antes.auto_confirm) patch.auto_confirm = form.autoConfirm;
+      const fim = form.fim ? brToISO(form.fim) : null;
+      if (!antes || fim !== antes.end_date) patch.end_date = fim;
+      if (Object.keys(patch).length === 0) {
+        setForm(null);
+        return;
+      }
       editar.mutate(
-        {
-          id: form.id,
-          patch: {
-            amount_cents: form.amountCents,
-            category: form.category,
-            description: form.description.trim() || null,
-            account_id: form.accountId,
-            auto_confirm: form.autoConfirm,
-            end_date: form.fim ? brToISO(form.fim) : null,
-          },
-        },
+        { id: form.id, patch },
         {
           onSuccess: (quantas) => {
             toast({
