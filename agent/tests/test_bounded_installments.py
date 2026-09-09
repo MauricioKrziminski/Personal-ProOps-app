@@ -323,7 +323,7 @@ def test_financing_with_installments_requires_explicit_paid_history():
         name="carro",
         fields=[{"name": k, "value": v} for k, v in values.items()],
     )
-    with pytest.raises(Level1Error, match="pagas"):
+    with pytest.raises(Level1Error, match="já pagou"):
         validate_fields(action)
 
 

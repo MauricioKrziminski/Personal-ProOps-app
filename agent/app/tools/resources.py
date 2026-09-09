@@ -300,14 +300,28 @@ def validate_fields(action: ResourceAction) -> dict:
                 _error(
                     f"Para cadastrar {LABELS[action.resource]}, informe {LABELS[key]}. Ainda não salvei nada."
                 )
-        if (
-            action.resource == "debts"
-            and values.get("installments")
-            and values.get("installments_paid") is None
-        ):
-            _error(
-                "Quantas parcelas já foram pagas? Informe a quantidade, incluindo zero se nenhuma. Ainda não salvei o financiamento."
-            )
+        # O que só um CONTRATO COM PARCELAS precisa. "Devo 500 pro João" não tem
+        # cadência nem vencimento, e exigir isso ali travaria a conversa por um
+        # dado que não existe.
+        #
+        # Os dois numa pergunta só, e não uma por turno: são duas palavras na
+        # resposta ("8, dia 10") e o modelo preenche as duas de uma vez. Faltando
+        # apenas um, a frase encolhe sozinha e pergunta só o que falta.
+        #
+        # `due_day` entrou em 09/09/2026: sem ele o cronograma ancorava no dia de
+        # HOJE, então a data da próxima parcela andava um dia por dia — e com ela
+        # a projeção de caixa, as contas a pagar e o histórico estimado.
+        if action.resource == "debts" and values.get("installments"):
+            pedidos = []
+            if values.get("installments_paid") is None:
+                pedidos.append("quantas parcelas você já pagou (zero se nenhuma)")
+            if values.get("due_day") is None:
+                pedidos.append("que dia do mês vence a parcela")
+            if pedidos:
+                _error(
+                    "Me diz " + " e ".join(pedidos)
+                    + ". Ainda não salvei o financiamento."
+                )
         if action.resource == "debts" and values["calculation_mode"] == "fixed_installments":
             _derive_fixed_installments(values)
         if action.resource == "cards":

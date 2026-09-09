@@ -77,11 +77,14 @@ const debtsFile = 'src/app/finance/debts.tsx';
 
 test('new financing saves from only the installment value and total count, without account/name/interest', () => {
   const ui = screen(debtsFile);
-  assert.deepEqual(ui.nodes().filter((n) => n.type === 'Field').map((n) => n.props.label), ['Valor da parcela', 'Quantidade total de parcelas']);
+  assert.deepEqual(ui.nodes().filter((n) => n.type === 'Field').map((n) => n.props.label), ['Valor da parcela', 'Quantidade total de parcelas', 'Vence dia']);
   assert.equal(ui.button('Salvar').props.disabled, true);
   ui.fill('Valor da parcela', 147000);
   assert.equal(ui.button('Salvar').props.disabled, true);
   ui.fill('Quantidade total de parcelas', '48');
+  // O cronograma ancora no vencimento: sem ele a projeção chuta o dia da saída.
+  assert.equal(ui.button('Salvar').props.disabled, true);
+  ui.fill('Vence dia', '10');
   ui.press('Salvar');
   const saved = ui.writes[0].value;
   assert.equal(ui.writes.length, 1);
@@ -93,6 +96,7 @@ test('new financing saves from only the installment value and total count, witho
   assert.equal(saved.principal_cents, 7056000);
   assert.equal(saved.remaining_cents, 7056000);
   assert.equal(saved.interest_rate_monthly, 0);
+  assert.equal(saved.due_day, 10);
   assert.equal(saved.account_id, null);
 });
 
@@ -100,6 +104,7 @@ test('optional history reduces remaining installments without changing the origi
   const ui = screen(debtsFile);
   ui.fill('Valor da parcela', 147000);
   ui.fill('Quantidade total de parcelas', '48');
+  ui.fill('Vence dia', '10');
   ui.press('Adicionar detalhes (opcional)');
   ui.fill('Parcelas já pagas', '8');
   ui.press('Salvar');
@@ -113,6 +118,7 @@ test('history above the contract total prevents submission', () => {
   const ui = screen(debtsFile);
   ui.fill('Valor da parcela', 147000);
   ui.fill('Quantidade total de parcelas', '48');
+  ui.fill('Vence dia', '10');
   ui.press('Adicionar detalhes (opcional)');
   ui.fill('Parcelas já pagas', '49');
   assert.equal(ui.button('Salvar').props.disabled, true);
@@ -126,6 +132,21 @@ test('detailed mode still exposes the financial inputs', () => {
   const labels = ui.nodes().filter((n) => n.type === 'Field').map((n) => n.props.label);
   for (const label of ['Nome', 'Quanto você deve hoje', 'Valor original', 'Juros por mês']) assert.ok(labels.includes(label), label);
   assert.equal(ui.button('Salvar').props.disabled, true);
+});
+
+test('a debt without installments has no cadence, so it never demands a due day', () => {
+  // "Devo 500 pro João": exigir dia de vencimento aqui travaria o cadastro por
+  // um dado que o contrato não tem. A trava vale só para contrato com parcelas.
+  // `create: 'financing'` no deep link nasce como financiamento, que exige parcelas.
+  const ui = screen(debtsFile, { create: false });
+  ui.interact((nodes) => nodes.find((n) => n.type === 'EmptyState').props.action.onPress());
+  ui.interact((nodes) => nodes.find((n) => n.type === 'Segmented').props.onChange('amortized'));
+  ui.fill('Nome', 'João');
+  ui.fill('Quanto você deve hoje', 50000);
+  ui.fill('Juros por mês', '0');
+  ui.press('Salvar');
+  assert.equal(ui.writes[0].value.due_day, null);
+  assert.equal(ui.writes[0].value.remaining_cents, 50000);
 });
 
 test('editing a legacy amortized financing preserves its mode and remaining-term semantics', () => {

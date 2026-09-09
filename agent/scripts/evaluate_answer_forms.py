@@ -54,17 +54,29 @@ def _hist(*pares):
 
 
 # --- costura 1: campo de cadastro ------------------------------------------
-P_PAGAS = ("Quantas parcelas já foram pagas? Informe a quantidade, incluindo zero "
-           "se nenhuma. Ainda não salvei o financiamento.")
+# Contrato com parcelas pergunta as DUAS coisas de uma vez (09/09/2026): quantas
+# já foram pagas e o dia do vencimento. Quem responde só uma recebe a frase
+# encolhida com a que falta — por isso as duas variações abaixo.
+P_PAGAS = ("Me diz quantas parcelas você já pagou (zero se nenhuma) e que dia do mês "
+           "vence a parcela. Ainda não salvei o financiamento.")
+P_VENC = ("Me diz que dia do mês vence a parcela. Ainda não salvei o financiamento.")
+_CONTRATO = [{"name": "kind", "value": "financing"},
+             {"name": "calculation_mode", "value": "fixed_installments"},
+             {"name": "installments", "value": "48"},
+             {"name": "installment_cents", "value": "147000"}]
 DIVIDA = [{"type": "resource_create", "resource": "debts", "name": "carro",
            "_pergunta": P_PAGAS,
-           "fields": [{"name": "kind", "value": "financing"},
-                      {"name": "calculation_mode", "value": "fixed_installments"},
-                      {"name": "installments", "value": "48"},
-                      {"name": "installment_cents", "value": "147000"}]}]
+           "fields": [*_CONTRATO, {"name": "due_day", "value": "10"}]}]
+VENCIMENTO = [{"type": "resource_create", "resource": "debts", "name": "carro",
+               "_pergunta": P_VENC,
+               "fields": [*_CONTRATO, {"name": "installments_paid", "value": "8"}]}]
 H_DIVIDA = _hist(("user", "Comprei um carro em 48x"), ("assistant", "Qual o valor?"),
                  ("user", "48x de 1470"), ("assistant", "Em qual cartao? Ou E financiamento."),
                  ("user", "Financiamento"), ("assistant", P_PAGAS))
+H_VENC = _hist(("user", "Comprei um carro em 48x"), ("assistant", "Qual o valor?"),
+               ("user", "48x de 1470"), ("assistant", "Em qual cartao? Ou E financiamento."),
+               ("user", "Financiamento"), ("assistant", P_PAGAS),
+               ("user", "estou na nona"), ("assistant", P_VENC))
 P_CARTAO = "Para cadastrar cartão, informe dia de fechamento. Ainda não salvei nada."
 CARTAO = [{"type": "resource_create", "resource": "cards", "name": "Inter",
            "_pergunta": P_CARTAO, "fields": []}]
@@ -119,6 +131,13 @@ def secoes():
                          ("acho que umas 8", 8), ("faltam 40", 8), ("nenhuma", 0),
                          ("zero", 0), ("nenhuma ainda", 0), ("comecei agora", 0),
                          ("é nova, nao paguei nada", 0), ("nao paguei nenhuma ainda", 0)]
+        ],
+        "cadastro/dia de vencimento": [
+            (t, lambda v, e=e: v == e, f"={e}", lambda t=t: _cadastro(t, VENCIMENTO, H_VENC, "due_day"))
+            for t, e in [("dia 10", 10), ("todo dia 5", 5), ("vence dia 15", 15),
+                         ("no dia 20 de cada mês", 20), ("5", 5), ("cinco", 5),
+                         ("sempre no primeiro dia do mes", 1),
+                         ("debita no dia 28", 28), ("todo mês no dia 3", 3)]
         ],
         "cadastro/ciclo do cartão": [
             (t, lambda v: v == 7, "=7", lambda t=t: _cadastro(t, CARTAO, H_CARTAO, "closing_day"))

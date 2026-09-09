@@ -200,7 +200,14 @@ export default function DebtsScreen() {
     try { simpleValues = simpleDebtValues(form.installmentCents, form.parcelas, form.installmentsPaid); } catch { /* Invalid input keeps Save disabled. */ }
   }
   const nomeOk = (form?.name.trim().length ?? 0) >= 2;
-  const validDueDay = !form?.diaVencimento || (Number(form.diaVencimento) >= 1 && Number(form.diaVencimento) <= 31);
+  /**
+   * Contrato com parcelas TEM dia de vencimento — sem ele o cronograma ancora numa
+   * data arbitrária e a projeção de caixa passa a mentir sobre quando o dinheiro sai.
+   * Dívida sem parcelas ("devo 500 pro João") não tem cadência e continua sem exigir.
+   */
+  const validDueDay = form?.diaVencimento
+    ? Number(form.diaVencimento) >= 1 && Number(form.diaVencimento) <= 31
+    : !form?.parcelas;
   const advancedValid = form && nomeOk && (!form.parcelas || form.historyConfirmed) &&
     Number.isInteger(form.installmentsPaid) && form.installmentsPaid >= 0 && form.remainingCents > 0 &&
     (!form.parcelas || Number(form.parcelas) > 0) &&
@@ -705,6 +712,11 @@ export default function DebtsScreen() {
                 <Field label="Quantidade total de parcelas">
                   <TextField value={form.parcelas} onChangeText={(value) => setForm({ ...form, parcelas: value.replace(/\D/g, '').slice(0, 3) })} keyboardType="number-pad" placeholder="48" />
                 </Field>
+                {/* Saiu de "detalhes (opcional)": é o vencimento que ancora o cronograma.
+                    Sem ele a projeção de caixa chuta em que dia o dinheiro sai. */}
+                <Field label="Vence dia" hint="O dia do mês em que a parcela é cobrada.">
+                  <TextField value={form.diaVencimento} onChangeText={(value) => setForm({ ...form, diaVencimento: value.replace(/\D/g, '').slice(0, 2) })} keyboardType="number-pad" placeholder="10" />
+                </Field>
                 {simpleValues && <Card>
                   <ThemedText type="small">{`${simpleValues.installments - form.installmentsPaid} parcelas de ${formatBRL(form.installmentCents)} a pagar`}</ThemedText>
                   <Money cents={simpleValues.remaining_cents} variant="headline" />
@@ -716,7 +728,6 @@ export default function DebtsScreen() {
                   {!form.id && <Field label="Parcelas já pagas" hint="Deixe zero se nenhuma foi paga. Esse histórico não movimenta dinheiro.">
                     <TextField value={String(form.installmentsPaid)} onChangeText={(value) => setForm({ ...form, installmentsPaid: Number(value.replace(/\D/g, '')), historyConfirmed: true })} keyboardType="number-pad" maxLength={3} />
                   </Field>}
-                  <Field label="Vence dia (opcional)"><TextField value={form.diaVencimento} onChangeText={(value) => setForm({ ...form, diaVencimento: value.replace(/\D/g, '').slice(0, 2) })} keyboardType="number-pad" placeholder="10" /></Field>
                   <Field label="Conta para pagar (opcional)"><Section>
                     <Row title="Não informar" onPress={() => setForm({ ...form, accountId: null })} trailing={form.accountId === null ? <Icon name="checkmark" size="sm" color="tint" /> : undefined} />
                     {pagadoras.map((a) => <Row key={a.id} title={a.name} onPress={() => setForm({ ...form, accountId: a.id })} trailing={form.accountId === a.id ? <Icon name="checkmark" size="sm" color="tint" /> : undefined} />)}

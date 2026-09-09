@@ -133,3 +133,44 @@ Verificado no emulador (s26, 1344×2992, claro e escuro) pela faixa `Dívidas` n
 `design-preview` — o sheet só abre no toque, então sem essa faixa a correção só poderia ser
 conferida logando. De quebra, o cartão da lista escrevia "juros juros incluídos, sem
 detalhamento": a palavra vinha do template e do rótulo ao mesmo tempo.
+
+## 6. A data da parcela andava sozinha — e pulava um mês — 09/09/2026
+
+O `carro` foi criado pelo agente **sem dia de vencimento**. Sem ele
+`private.debt_schedule_for` tirava o dia de `current_date`: a próxima parcela vencia "dia 8"
+ontem e "dia 9" hoje, e com ela andavam a projeção de caixa, as contas a pagar e as datas
+estimadas do histórico da seção 5. Cronograma que muda de resposta porque o relógio virou
+não é cronograma.
+
+Olhando a mesma expressão, um segundo erro: a primeira parcela era **sempre** no mês
+seguinte (`add_months(current_date, 1)`). Com vencimento no dia 15 e hoje dia 9, a parcela
+que vence daqui a seis dias sumia da projeção e o app anunciava a de outubro.
+
+`20260909020000_debt_schedule_stable_anchor.sql` corrige as duas: a âncora do dia passa a ser
+`started_at` (`not null`, default `current_date`) e a primeira parcela é a **próxima
+ocorrência do vencimento a partir de hoje, inclusive**. Medido no staging em transação com
+rollback, hoje 09/09: `dia 15` → 15/09; `dia 5` → 05/10; `sem dia` com `started_at` em 31/01
+→ 30/09, 31/10, 30/11 (o `day_in_month` prende o dia 31 no fim de cada mês). Nos três,
+40 linhas numeradas 9..48 e soma R$ 58.800 — contagem e valores intactos.
+
+### E o dado que faltava: quem pergunta o vencimento
+
+O buraco não era do cronograma, era de quem cadastra. **Nem o agente nem o app pediam o dia.**
+
+- **Agente** (`app/tools/resources.py`): contrato com `installments` agora exige `due_day`,
+  na MESMA pergunta das parcelas já pagas — *"Me diz quantas parcelas você já pagou (zero se
+  nenhuma) e que dia do mês vence a parcela"*. Faltando só uma, a frase encolhe sozinha.
+  Dívida sem parcelas ("devo 500 pro João") não tem cadência e continua sem exigir nada.
+- **App** (`finance/debts.tsx`): "Vence dia" saiu de *Adicionar detalhes (opcional)* e virou
+  o terceiro campo do modo Simples, obrigatório sempre que houver parcelas.
+
+Medido com o Gemini REAL (`scripts/evaluate_answer_forms.py`, seção nova
+`cadastro/dia de vencimento`): **94/94**, incluindo "dia 10", "todo dia 5", "vence dia 15",
+"no dia 20 de cada mês", "cinco", "sempre no primeiro dia do mes", "debita no dia 28". As 15
+formas de responder "quantas já pagou" continuam passando.
+
+Verificado no emulador: o formulário mostra os três campos e o **Salvar fica desabilitado**
+enquanto o dia estiver vazio.
+
+A dívida `carro` de produção foi **apagada a pedido do Gabriel** (zero pagamentos lançados
+apontavam para ela) para ser recriada já com o vencimento.

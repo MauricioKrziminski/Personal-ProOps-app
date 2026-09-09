@@ -87,7 +87,7 @@ async def test_financiamento_simples_deriva_principal_saldo_e_taxa(workspace):
     """
     proposal = await resources.prepare(workspace, action(
         "resource_create", kind="financing", calculation_mode="fixed_installments",
-        installments=48, installment_cents=147000, installments_paid=8,
+        installments=48, installment_cents=147000, installments_paid=8, due_day=10,
     ))
     valores = proposal["values"]
     assert valores["principal_cents"] == 147000 * 48
@@ -107,7 +107,7 @@ async def test_financiamento_simples_deriva_principal_saldo_e_taxa(workspace):
 async def test_financiamento_sem_modo_declarado_cai_no_simples(workspace):
     proposal = await resources.prepare(workspace, action(
         "resource_create", kind="financing",
-        installments=48, installment_cents=147000, installments_paid=0,
+        installments=48, installment_cents=147000, installments_paid=0, due_day=10,
     ))
     assert proposal["values"]["calculation_mode"] == "fixed_installments"
     assert proposal["values"]["remaining_cents"] == 147000 * 48
@@ -128,6 +128,7 @@ async def test_simples_sem_parcela_pergunta_a_parcela_e_nao_o_principal(workspac
     with pytest.raises(Level1Error) as erro:
         await resources.prepare(workspace, action(
             "resource_create", kind="financing", installments=48, installments_paid=0,
+            due_day=10,
         ))
     assert "valor da parcela" in erro.value.mensagem_usuario
     assert "principal" not in erro.value.mensagem_usuario
@@ -166,6 +167,7 @@ async def test_no_de_cadastros_usa_a_acao_pronta_sem_chamar_o_modelo(workspace, 
                 {"name": "installments", "value": "48"},
                 {"name": "installment_cents", "value": "147000"},
                 {"name": "installments_paid", "value": "8"},
+                {"name": "due_day", "value": "10"},
             ],
         }],
     })
@@ -196,3 +198,27 @@ async def test_no_de_cadastros_sem_acao_pronta_ainda_extrai(workspace, monkeypat
         "resource_actions": [],
     })
     assert chamado and saida["llm_calls"] == 1
+
+
+@pytest.mark.asyncio
+async def test_contrato_com_parcelas_pergunta_o_dia_de_vencimento(workspace):
+    """Sem o dia, `debt_schedule_for` ancorava no dia de HOJE: a data da próxima
+    parcela andava sozinha, e com ela a projeção de caixa e as contas a pagar."""
+    with pytest.raises(Level1Error) as erro:
+        await resources.prepare(workspace, action(
+            "resource_create", kind="financing", installments=48,
+            installment_cents=147000, installments_paid=8,
+        ))
+    assert "que dia do mês vence" in erro.value.mensagem_usuario
+    assert "já pagou" not in erro.value.mensagem_usuario  # essa já foi respondida
+
+
+@pytest.mark.asyncio
+async def test_divida_sem_parcelas_nao_pergunta_vencimento(workspace):
+    """"Devo 500 pro João" não tem parcela nem cadência — exigir um dia aqui
+    seria travar a conversa por um dado que não existe no contrato."""
+    proposal = await resources.prepare(workspace, action(
+        "resource_create", kind="loan", remaining_cents=50000,
+        principal_cents=50000, interest_rate_monthly="0.01",
+    ))
+    assert proposal["values"].get("due_day") is None
