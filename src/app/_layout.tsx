@@ -245,6 +245,7 @@ function AppTree() {
                     arquivo na barra.
                   */}
                   <Stack.Screen name="finance/transactions" options={{ title: 'Lançamentos' }} />
+                  <Stack.Screen name="finance/month" options={{ title: 'Mês' }} />
                   <Stack.Screen name="finance/[txId]" options={{ title: 'Lançamento' }} />
                   <Stack.Screen name="finance/accounts" options={{ title: 'Contas' }} />
                   <Stack.Screen name="finance/cards" options={{ title: 'Cartões' }} />

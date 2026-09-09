@@ -28,7 +28,9 @@ import {
   useAccountBalances,
   useAccounts,
   useArchiveAccount,
+  useDefaultAccount,
   useSaveAccount,
+  useSetDefaultAccount,
   type Account,
   type AccountBalance,
 } from '@/hooks/use-finance';
@@ -117,6 +119,8 @@ export default function AccountsScreen() {
   const toast = useToast();
   const balances = useAccountBalances();
   const accounts = useAccounts();
+  const contaPadrao = useDefaultAccount();
+  const definirPadrao = useSetDefaultAccount();
   const save = useSaveAccount();
   const archive = useArchiveAccount();
   const [form, setForm] = useState<FormState | null>(null);
@@ -140,6 +144,8 @@ export default function AccountsScreen() {
   const pagadoras = (accounts.data ?? []).filter(
     (a) => a.type !== 'credit_card' && a.id !== form?.id
   );
+  /** Candidatas a conta padrão: guardar dinheiro é requisito, e o banco também exige. */
+  const guardamDinheiro = (accounts.data ?? []).filter((a) => a.type !== 'credit_card');
 
   // erro de contas NÃO é lista vazia: sem esta guarda a tela mandava cadastrar conta para quem
   // já tem cinco cadastradas e só perdeu a rede
@@ -341,6 +347,40 @@ export default function AccountsScreen() {
         <Section title="Investimentos">{investimentos.map(linhaConta)}</Section>
       ) : null}
       {cartoes.length > 0 ? <Section title="Cartões">{cartoes.map(linhaConta)}</Section> : null}
+
+      {/*
+        A conta padrão existe por causa do WhatsApp: "gastei 45 no mercado" não diz de onde saiu
+        o dinheiro, e o agente devolve conta nula de propósito — perder o registro é pior que
+        registrá-lo sem conta. O preço aparece quando se pergunta PARA ONDE o dinheiro foi: sem
+        padrão, tudo cai num balde chamado "Sem conta". Cartão de crédito não pode ser padrão
+        (toda compra do WhatsApp viraria dívida de fatura em silêncio) e o banco recusa.
+      */}
+      {guardamDinheiro.length > 0 ? (
+        <Section title="Conta padrão">
+          <Row
+            title="Não definir"
+            subtitle="lançamento sem conta continua sem conta"
+            onPress={() => definirPadrao.mutate(null)}
+            chevron={false}
+            accessibilityState={{ selected: contaPadrao.data == null }}
+            trailing={
+              contaPadrao.data == null ? <Icon name="checkmark" size="sm" color="tint" /> : undefined
+            }
+          />
+          {guardamDinheiro.map((a) => (
+            <Row
+              key={a.id}
+              title={a.name}
+              onPress={() => definirPadrao.mutate(a.id)}
+              chevron={false}
+              accessibilityState={{ selected: contaPadrao.data === a.id }}
+              trailing={
+                contaPadrao.data === a.id ? <Icon name="checkmark" size="sm" color="tint" /> : undefined
+              }
+            />
+          ))}
+        </Section>
+      ) : null}
 
       {/* Fora do agrupamento de propósito: quem só usa o WhatsApp tem quase tudo aqui. */}
       {semConta && Number(semConta.balance_cents) !== 0 ? (

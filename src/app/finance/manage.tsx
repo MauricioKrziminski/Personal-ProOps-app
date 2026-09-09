@@ -39,6 +39,7 @@ const GROUPS: { title: string; items: ManageItem[] }[] = [
   {
     title: 'Panorama',
     items: [
+      { title: 'O mês inteiro', icon: 'calendar', href: '/finance/month' },
       { title: 'Patrimônio', icon: 'building.columns', href: '/finance/net-worth' },
       { title: 'Relatórios e IR', icon: 'chart.bar', href: '/finance/reports' },
     ],

@@ -166,7 +166,12 @@ def describe_for_confirmation(
             return f"registrar {valor} em {action.installments}x no cartão {action.account or 'a informar'}: {paid} parcelas iniciais pagas e {(action.installments or 0)-paid} pendentes"
         if tipo == "pay_invoice":
             return f"registrar o pagamento da fatura do {action.account or 'cartão'}"
-        return f"registrar {valor} em {alvo}" if valor else f"registrar {alvo}"
+        # A conta entra na frase quando o usuário citou uma: é o que permite corrigir o meio
+        # ("não, foi no Itaú") antes da escrita, sem custar uma pergunta a mais. Quando ele não
+        # citou, a frase CALA em vez de afirmar "na conta padrão" — pode não haver nenhuma, e
+        # este módulo é puro de propósito: descobrir isso exigiria ir ao banco.
+        onde = f", no {action.account}" if action.account else ""
+        return f"registrar {valor} em {alvo}{onde}" if valor else f"registrar {alvo}{onde}"
 
     alvo = action.search_term or action.content or "esse item"
     if tipo == "delete_note":

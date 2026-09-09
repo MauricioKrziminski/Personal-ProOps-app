@@ -890,6 +890,101 @@ export function useDebtPayments(debtId: string | undefined) {
   });
 }
 
+/**
+ * A conta padrão do espaço — onde cai o lançamento que não cita conta nenhuma.
+ *
+ * Lançamento do WhatsApp quase nunca diz de onde saiu o dinheiro, e o agente devolve `null` de
+ * propósito (perder o registro é pior que registrá-lo sem conta). Sem uma conta padrão, o corte
+ * "para onde o dinheiro foi" nasce com um balde só, chamado `Sem conta`.
+ */
+export function useDefaultAccount() {
+  useRealtimeInvalidate('workspaces', ['default-account']);
+  return useQuery({
+    queryKey: ['default-account'],
+    queryFn: async (): Promise<string | null> => {
+      const { data, error } = await supabase
+        .from('workspaces')
+        .select('default_account_id')
+        .eq('id', await workspaceId())
+        .maybeSingle();
+      if (error) throw error;
+      return data?.default_account_id ?? null;
+    },
+  });
+}
+
+export function useSetDefaultAccount() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (accountId: string | null) => {
+      const { error } = await supabase
+        .from('workspaces')
+        .update({ default_account_id: accountId })
+        .eq('id', await workspaceId());
+      if (error) throw error;
+    },
+    onSuccess: () => invalidateKeys(queryClient, [['default-account']]),
+  });
+}
+
+/**
+ * A visão de MÊS — as três leituras da tela `Mês`.
+ *
+ * `month` chega como `YYYY-MM`; as RPCs recebem o primeiro dia. Cada uma invalida em
+ * `transactions`, `debts`, `recurring_transactions` **e** `accounts`: o rótulo do meio de
+ * pagamento É `accounts.name`, então renomear uma conta muda o que a tela escreve.
+ */
+function useRealtimeMonth(key: string) {
+  useRealtimeInvalidate('transactions', [key]);
+  useRealtimeInvalidate('debts', [key]);
+  useRealtimeInvalidate('recurring_transactions', [key]);
+  useRealtimeInvalidate('accounts', [key]);
+}
+
+export type MonthLine = Fns['month_lines']['Returns'][number];
+export type MonthSummary = Fns['month_summary']['Returns'][number];
+export type MonthBreakdownRow = Fns['month_breakdown']['Returns'][number];
+
+export function useMonthLines(month: string) {
+  useRealtimeMonth('month-lines');
+  return useQuery({
+    queryKey: ['month-lines', month],
+    queryFn: async (): Promise<MonthLine[]> => {
+      const { data, error } = await supabase.rpc('month_lines', { p_month: `${month}-01` });
+      if (error) throw error;
+      return data;
+    },
+  });
+}
+
+export function useMonthSummary(month: string) {
+  useRealtimeMonth('month-summary');
+  return useQuery({
+    queryKey: ['month-summary', month],
+    // A RPC devolve UMA linha; o hook entrega o objeto para a tela não escrever `[0]` em toda leitura.
+    queryFn: async (): Promise<MonthSummary | null> => {
+      const { data, error } = await supabase.rpc('month_summary', { p_month: `${month}-01` });
+      if (error) throw error;
+      return data?.[0] ?? null;
+    },
+  });
+}
+
+export function useMonthBreakdown(month: string, groupBy: 'natureza' | 'meio' | 'categoria') {
+  useRealtimeMonth('month-breakdown');
+  return useQuery({
+    queryKey: ['month-breakdown', month, groupBy],
+    queryFn: async (): Promise<MonthBreakdownRow[]> => {
+      const { data, error } = await supabase.rpc('month_breakdown', {
+        p_month: `${month}-01`,
+        p_group_by: groupBy,
+      });
+      if (error) throw error;
+      return data;
+    },
+  });
+}
+
 /** Ordem de ataque: 'avalanche' (mais juros) ou 'snowball' (menor saldo). */
 export function usePayoffStrategy(estrategia: 'avalanche' | 'snowball') {
   useRealtimeInvalidate('debts', ['payoff']);

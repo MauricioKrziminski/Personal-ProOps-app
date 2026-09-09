@@ -42,6 +42,7 @@ import { useToast } from '@/components/ui/toast';
 import { Elevation, Motion, Radius, Space, Type, tabular } from '@/design/tokens';
 import {
   useAccounts,
+  useMonthSummary,
   useBudgetsStatus,
   useDebts,
   useCardSummary,
@@ -72,13 +73,18 @@ import { useTheme, useScheme } from '@/hooks/use-theme';
  * | # | bloco | por que aqui |
  * |---|---|---|
  * | 1 | saldo projetado | a pergunta que trouxe a pessoa |
- * | 2 | atalhos | as quatro portas para o resto do domínio |
- * | 3 | passando do limite | alerta; só existe quando já dói |
- * | 4 | carteira | a fatura é a maior saída isolada do mês |
- * | 5 | últimos lançamentos | o que aconteceu desde ontem — a checagem diária |
- * | 6 | tendência mensal | o primeiro bloco de ANÁLISE |
- * | 7 | onde o dinheiro foi | análise mais funda, seis linhas |
- * | 8 | posso comprar isso? | ferramenta; ninguém abre o app para simular |
+ * | 2 | o mês inteiro | a página de mês: entradas, fixas, parcelas e para onde foi, num lugar só |
+ * | 3 | atalhos | as quatro portas para o resto do domínio |
+ * | 4 | passando do limite | alerta; só existe quando já dói |
+ * | 5 | carteira | a fatura é a maior saída isolada do mês |
+ * | 6 | últimos lançamentos | o que aconteceu desde ontem — a checagem diária |
+ * | 7 | tendência mensal | o primeiro bloco de ANÁLISE |
+ * | 8 | onde o dinheiro foi | análise mais funda, seis linhas |
+ * | 9 | posso comprar isso? | ferramenta; ninguém abre o app para simular |
+ *
+ * O bloco 2 entrou em 09/09/2026 e **não** virou um quinto tile do grid de atalhos: ali ele
+ * leria como igual a "Contas", e não é — é a única porta que responde "para onde o dinheiro
+ * foi" sem entrar em cinco telas.
  *
  * Antes, o simulador e as categorias vinham em 4º e 5º — uma ferramenta e um bloco de seis
  * barras empurravam a carteira e o extrato para baixo de duas rolagens. É o que os apps de banco
@@ -257,6 +263,7 @@ export default function FinanceScreen() {
     [cards.data]
   );
   const cashflow = useMonthlyCashflow(Number(janelaCashflow));
+  const mes = useMonthSummary(month);
   const recent = useRecentTransactions(5);
   const remove = useDeleteTransaction();
 
@@ -411,7 +418,29 @@ export default function FinanceScreen() {
           />
         )}
 
-        {/* 2. Atalhos. Sempre visível: sem conta cadastrada não existe dado a mostrar. */}
+        {/*
+        2. A porta para a página do mês. Segue o `MonthPicker` desta tela, então o número bate
+        com o resto. Erro no resumo tira o número, nunca a porta.
+      */}
+      <Section>
+        <Row
+          title="O mês inteiro"
+          subtitle="entradas, fixas, parcelas e para onde o dinheiro foi"
+          icon="calendar"
+          onPress={() => router.push({ pathname: '/finance/month', params: { month } })}
+          trailing={
+            mes.data ? (
+              <Money
+                cents={Number(mes.data.result_cents)}
+                variant="ticker"
+                tone={Number(mes.data.result_cents) < 0 ? 'danger' : 'success'}
+              />
+            ) : undefined
+          }
+        />
+      </Section>
+
+      {/* 3. Atalhos. Sempre visível: sem conta cadastrada não existe dado a mostrar. */}
         <View style={styles.block}>
           <SectionHead
             title="Gerenciar"

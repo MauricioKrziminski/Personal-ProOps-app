@@ -9,19 +9,23 @@ const require = createRequire(import.meta.url);
 
 // Execute the screen JSX and its event handlers. Native components/query boundaries
 // are inert; state persists across renders so each interaction uses current props.
-function screen(file: string, options: { debts?: any[]; invoiceStatus?: string; create?: boolean } = {}) {
+function screen(file: string, options: { debts?: any[]; invoiceStatus?: string; create?: boolean; monthLines?: any[]; monthSummary?: any } = {}) {
   const state: any[] = [];
   let cursor = 0;
   let nodes: any[] = [];
   const writes: { operation: string; value: any }[] = [];
   const confirmations: (() => void)[] = [];
   const actions: { label: string; onPress: () => void }[] = [];
+  const navigations: any[] = [];
   const query = { data: [], isLoading: false, isError: false, isRefetching: false, refetch: async () => {} };
   const mutation = (operation: string) => ({ isPending: false, reset() {}, mutate(value: any) { writes.push({ operation, value }); } });
   const animation = { duration: () => animation, delay: () => animation };
   const finance = new Proxy({
     DEBT_KINDS: [{ value: 'financing', label: 'Financiamento' }, { value: 'loan', label: 'Empréstimo' }],
     useDebts: () => ({ ...query, data: options.debts ?? [] }),
+    useMonthLines: () => ({ ...query, data: options.monthLines ?? [] }),
+    useMonthSummary: () => ({ ...query, data: options.monthSummary ?? null }),
+    useMonthBreakdown: () => ({ ...query, data: [] }),
     useSaveDebt: () => mutation('saveDebt'),
     useSettleInvoice: () => mutation('settleInvoice'),
     usePayInvoice: () => mutation('payInvoice'),
@@ -41,12 +45,24 @@ function screen(file: string, options: { debts?: any[]; invoiceStatus?: string; 
       if (name === 'react/jsx-runtime') return require(name);
       if (name === 'react-native') return { StyleSheet: { create: (value: unknown) => value }, View: 'View', Pressable: 'Pressable', ScrollView: 'ScrollView', FlatList: 'FlatList' };
       if (name === 'react-native-reanimated') return { default: { View: 'AnimatedView' }, FadeInDown: animation, LinearTransition: animation };
-      if (name === 'expo-router') return { Stack: { Screen: 'StackScreen' }, useLocalSearchParams: () => ({ id: 'invoice-1', ...(options.create !== false ? { create: 'financing' } : {}) }), router: {} };
+      if (name === 'expo-router') return { Stack: { Screen: 'StackScreen' }, useLocalSearchParams: () => ({ id: 'invoice-1', ...(options.create !== false ? { create: 'financing' } : {}) }), router: { push: (to: any) => navigations.push(to) } };
       if (name === 'react-native-safe-area-context') return { useSafeAreaInsets: () => ({ bottom: 0 }) };
       if (name === '@/hooks/use-finance') return finance;
       if (name === '@/hooks/use-theme') return { useTheme: () => ({}) };
       if (name === '@/hooks/use-items') return { localISODate: () => '2026-09-08', formatDateBR: () => '08/09/2026', formatBRL: load('src/lib/dates.ts').formatBRL };
-      if (name === '@/lib/finance-form' || name === '@/lib/dates') return load(`src/lib/${name.split('/').at(-1)}.ts`);
+      if (name === '@/lib/finance-form' || name === '@/lib/dates' || name === '@/lib/month-view' || name === '@/lib/settle-labels') return load(`src/lib/${name.split('/').at(-1)}.ts`);
+      // import relativo DENTRO de um módulo puro já carregado (month-view → ./dates.ts)
+      if (name === './dates.ts' || name === './dates') return load('src/lib/dates.ts');
+      // o `month-picker` é `.tsx` e importa React Native; aqui só as funções puras dele
+      if (name === '@/components/finance/month-picker') return {
+        MonthPicker: 'MonthPicker',
+        currentMonth: () => '2026-09',
+        monthTitle: (m: string) => {
+          const [y, mm] = m.split('-').map(Number);
+          const label = new Date(y, mm - 1, 1).toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' });
+          return label.charAt(0).toUpperCase() + label.slice(1);
+        },
+      };
       if (name === '@/lib/item-actions') return { confirmDestructive: (_title: string, _label: string, callback: () => void) => confirmations.push(callback), showItemActions: (_title: string, entries: any[]) => actions.push(...entries) };
       if (name === '@/components/ui/toast') return { useToast: () => () => {} };
       if (name === '@/design/tokens') return { Motion: { duration: {}, stagger: {} }, Space: {}, Radius: {}, tabular: {} };
@@ -65,7 +81,7 @@ function screen(file: string, options: { debts?: any[]; invoiceStatus?: string; 
   const render = () => { cursor = 0; nodes = []; visit(Component()); };
   render();
   return {
-    writes, confirmations, actions,
+    writes, confirmations, actions, navigations,
     nodes: () => nodes,
     button(label: string) { const node = nodes.find((n) => n.type === 'Button' && n.props.label === label); assert.ok(node, `visible button: ${label}`); return node; },
     press(label: string) { const node = this.button(label); assert.ok(!node.props.disabled, `${label} must be enabled`); node.props.onPress(); render(); },
@@ -178,4 +194,52 @@ test('visible invoice settlement confirms then marks paid without issuing an acc
 test('a paid invoice does not expose settlement or payment buttons', () => {
   const ui = screen('src/app/finance/invoice/[id].tsx', { invoiceStatus: 'paid' });
   assert.ok(!ui.nodes().some((n) => n.type === 'Button' && ['Marcar como paga', 'Registrar pagamento'].includes(n.props.label)));
+});
+
+
+// ── tela Mês ────────────────────────────────────────────────────────────────
+
+const monthFile = 'src/app/finance/month.tsx';
+/** O `month_summary` do mês corrente, com os totais que a tela decompõe. */
+const RESUMO_MES = {
+  income_cents: 900000, expense_cents: 225096, result_cents: 674904,
+  fixas_cents: 0, fixas_unsettled_cents: 0,
+  parcelas_cents: 225096, parcelas_unsettled_cents: 225096,
+  variaveis_cents: 0, variaveis_unsettled_cents: 0,
+  opening_cash_cents: 41005, closing_cash_cents: 892040,
+  recurring_covered_until: null, beyond_recurring_horizon: false,
+  debt_installments_undocumented: 0,
+};
+const linhaProjetada = {
+  bucket: 'parcela', origin: 'debt_schedule', ref_id: 'debt-1', title: 'Parcela carro',
+  category: 'contas', method_id: null, method_label: 'Financiamento',
+  due_date: '2026-09-10', due_day: 10, installment_no: 9, installments_total: 48,
+  kind: 'expense', amount_cents: 147000, settled: false, projected: true,
+};
+
+test('a parcela projetada abre a DÍVIDA, nunca um lançamento', () => {
+  // `ref_id` de uma linha projetada é id de DÍVIDA. Empurrar `/finance/[txId]` com ele abriria
+  // um lançamento que não existe — é a mesma lição de `kind='debt'` em upcoming_bills.
+  const ui = screen(monthFile, { monthLines: [linhaProjetada], monthSummary: RESUMO_MES });
+  const linha = ui.nodes().find((n) => n.type === 'Row' && n.props.title === 'Parcela carro');
+  assert.ok(linha, 'a linha do financiamento aparece no mês');
+  linha.props.onPress();
+  assert.deepEqual(ui.navigations, ['/finance/debts']);
+});
+
+test('a parcela projetada não oferece dar baixa: ela ainda não é lançamento', () => {
+  const ui = screen(monthFile, { monthLines: [linhaProjetada], monthSummary: RESUMO_MES });
+  const linha = ui.nodes().find((n) => n.type === 'Row' && n.props.title === 'Parcela carro');
+  assert.equal(linha.props.onLongPress, undefined);
+});
+
+test('o mês mostra os dois números: caixa no destaque, resultado na conta do mês', () => {
+  const ui = screen(monthFile, { monthLines: [linhaProjetada], monthSummary: RESUMO_MES });
+  const hero = ui.nodes().find((n) => n.type === 'HeroPanel');
+  assert.equal(hero.props.label, 'Tenho hoje');
+  assert.equal(hero.props.trend.label, 'resultado do mês');
+  const titulos = ui.nodes().filter((n) => n.type === 'Row').map((n) => n.props.title);
+  for (const t of ['Comecei setembro com', 'Entrou', 'Saiu', 'Resultado']) {
+    assert.ok(titulos.includes(t), t);
+  }
 });

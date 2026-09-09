@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { Platform, Pressable, StyleSheet, View, useWindowDimensions } from 'react-native';
+import { Platform, Pressable, ScrollView, StyleSheet, View, useWindowDimensions } from 'react-native';
 
 import { ThemedText } from '@/components/themed-text';
 import { CurvedTabBar, type CurvedTab } from '@/components/ui/curved-tab-bar';
@@ -11,6 +11,7 @@ import { useTheme } from '@/hooks/use-theme';
 
 import AgentScreen from './(tabs)/agent/index';
 import DebtsScreen from './finance/debts';
+import MonthScreen from './finance/month';
 import FinanceScreen from './(tabs)/finance/index';
 import NotesScreen from './(tabs)/notes/index';
 import ProfileScreen from './(tabs)/profile/index';
@@ -37,7 +38,7 @@ import TodayScreen from './(tabs)/today/index';
  * pagas mora dentro de um sheet que só abre no toque, então sem esta faixa a correção de
  * 09/09/2026 (numeração 9..48 + as 8 anteriores) só poderia ser conferida logando.
  */
-const ABAS = ['Hoje', 'Finanças', 'Notas', 'Agente', 'Perfil', 'Dívidas'] as const;
+const ABAS = ['Hoje', 'Finanças', 'Notas', 'Agente', 'Perfil', 'Dívidas', 'Mês'] as const;
 
 /**
  * A tela é montada numa caixa ALTA e deslocada para cima, em vez de rolada.
@@ -77,6 +78,7 @@ const ABA_PARA_TAB: Record<string, number> = {
   Agente: 3,
   Perfil: 4,
   'Dívidas': 2,
+  'Mês': 2,
 };
 /** Quantas alturas de tela cada aba ocupa — medido, para não gastar frame em preto. */
 const FAIXAS: Record<(typeof ABAS)[number], number> = {
@@ -87,6 +89,9 @@ const FAIXAS: Record<(typeof ABAS)[number], number> = {
   Agente: 1,
   Perfil: 3,
   'Dívidas': 2,
+  // Uma faixa: a tela rola de verdade (é um `Screen` com ScrollView), e o deslocamento por
+  // `translateY` só funciona para tela que desenha a altura inteira.
+  'Mês': 1,
 };
 const PASSOS = ABAS.flatMap((aba) =>
   Array.from({ length: FAIXAS[aba] }, (_, faixa) => ({ aba, faixa }))
@@ -138,6 +143,7 @@ export default function DesignPreviewScreen() {
             {aba === 'Agente' ? <AgentScreen /> : null}
             {aba === 'Perfil' ? <ProfileScreen /> : null}
             {aba === 'Dívidas' ? <DebtsScreen /> : null}
+            {aba === 'Mês' ? <MonthScreen /> : null}
           </View>
 
           {/*
@@ -157,7 +163,12 @@ export default function DesignPreviewScreen() {
           ) : null}
         </View>
 
-        <View style={[styles.switcher, { borderTopColor: theme.cardBorder }]}>
+        {/* Rolável desde que a vitrine passou de cinco faixas: com sete chips o último saía da tela. */}
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          style={[styles.switcherBox, { borderTopColor: theme.cardBorder }]}
+          contentContainerStyle={styles.switcher}>
           {ABAS.map((nome) => (
             <Pressable
               key={nome}
@@ -175,7 +186,7 @@ export default function DesignPreviewScreen() {
               </ThemedText>
             </Pressable>
           ))}
-        </View>
+        </ScrollView>
       </View>
     </QueryClientProvider>
   );
@@ -370,6 +381,96 @@ function seedClient() {
   client.setQueryData(['debt-payments', 'prev-divida-carro'], []);
   client.setQueryData(['payoff', 'avalanche'], []);
 
+  /*
+    A página de MÊS. As três chaves das RPCs novas, semeadas com a forma que o banco devolve —
+    inclusive a parcela do financiamento como linha PROJETADA (`origin: 'debt_schedule'`), que é
+    a que resolve "o carro só aparece entrando em Dívidas".
+  */
+  const linhaMes = (over: Record<string, unknown>) => ({
+    bucket: 'variavel', origin: 'transaction', ref_id: 'prev-l1', title: 'Lançamento',
+    category: 'outros', method_id: 'prev-a1', method_label: 'Conta corrente',
+    due_date: `${mes}-10`, due_day: 10, installment_no: null, installments_total: null,
+    kind: 'expense', amount_cents: 10000, settled: false, projected: false, ...over,
+  });
+  client.setQueryData(['month-lines', mes], [
+    linhaMes({ bucket: 'entrada', ref_id: 'prev-e1', title: 'Salário', category: 'salário',
+      kind: 'income', amount_cents: 900000, settled: true, due_day: 1 }),
+    linhaMes({ bucket: 'fixa', ref_id: 'prev-f1', title: 'Vivo', category: 'contas',
+      method_label: 'Nubank Ultravioleta', amount_cents: 3500, due_day: 8 }),
+    linhaMes({ bucket: 'fixa', ref_id: 'prev-f2', title: 'Apple iCloud', category: 'assinaturas',
+      amount_cents: 1990, due_day: 5, settled: true }),
+    linhaMes({ bucket: 'parcela', origin: 'debt_schedule', ref_id: 'prev-divida-carro',
+      title: 'Parcela carro', category: 'contas', method_label: 'Financiamento',
+      amount_cents: 147000, due_day: 10, installment_no: 9, installments_total: 48,
+      projected: true }),
+    linhaMes({ bucket: 'parcela', ref_id: 'prev-p1', title: 'Mac', category: 'outros',
+      method_label: 'Nubank Ultravioleta', amount_cents: 78096, due_day: 3,
+      installment_no: 1, installments_total: 12 }),
+    linhaMes({ bucket: 'variavel', ref_id: 'prev-v1', title: 'Gastei 45 no almoço do Rangão',
+      category: 'alimentação', method_label: 'Sem conta', method_id: null, amount_cents: 4500,
+      settled: true, due_day: 8 }),
+    linhaMes({ bucket: 'variavel', ref_id: 'prev-v2', title: 'Vacina do gato',
+      category: 'saúde', amount_cents: 9990, settled: true, due_day: 6 }),
+  ]);
+  client.setQueryData(['month-summary', mes], {
+    income_cents: 900000, expense_cents: 245076, result_cents: 654924,
+    fixas_cents: 5490, fixas_unsettled_cents: 3500,
+    parcelas_cents: 225096, parcelas_unsettled_cents: 225096,
+    variaveis_cents: 14490, variaveis_unsettled_cents: 0,
+    opening_cash_cents: 41005, closing_cash_cents: 892040,
+    recurring_covered_until: `${mes}-04`, beyond_recurring_horizon: false,
+    debt_installments_undocumented: 0,
+  });
+  /*
+    O mês ANTERIOR, para a vitrine mostrar o que a tela diz quando está incompleta: recorrentes
+    não geradas até lá (a faixa de aviso) e parcela de financiamento declarada como paga sem
+    lançamento por trás. É o estado que o `MonthPicker` alcança com um toque em ‹.
+  */
+  client.setQueryData(['month-lines', mesAnterior], [
+    linhaMes({ bucket: 'entrada', ref_id: 'prev-e0', title: 'Salário', category: 'salário',
+      kind: 'income', amount_cents: 900000, settled: true, due_day: 1,
+      due_date: `${mesAnterior}-01` }),
+    linhaMes({ bucket: 'parcela', ref_id: 'prev-p0', title: 'Mac', category: 'outros',
+      method_label: 'Nubank Ultravioleta', amount_cents: 78096, due_day: 3, settled: true,
+      installment_no: 0, installments_total: 12, due_date: `${mesAnterior}-03` }),
+    linhaMes({ bucket: 'variavel', ref_id: 'prev-v0', title: 'Mercado', category: 'alimentação',
+      amount_cents: 41230, settled: true, due_day: 20, due_date: `${mesAnterior}-20` }),
+  ]);
+  client.setQueryData(['month-summary', mesAnterior], {
+    income_cents: 900000, expense_cents: 119326, result_cents: 780674,
+    fixas_cents: 0, fixas_unsettled_cents: 0,
+    parcelas_cents: 78096, parcelas_unsettled_cents: 0,
+    variaveis_cents: 41230, variaveis_unsettled_cents: 0,
+    opening_cash_cents: 12000, closing_cash_cents: 41005,
+    recurring_covered_until: null, beyond_recurring_horizon: true,
+    debt_installments_undocumented: 8,
+  });
+  client.setQueryData(['month-breakdown', mesAnterior, 'natureza'], [
+    { group_key: 'parcela', group_label: 'parcela', total_cents: 78096, unsettled_cents: 0, line_count: 1, share_bp: 6545 },
+    { group_key: 'variavel', group_label: 'variavel', total_cents: 41230, unsettled_cents: 0, line_count: 1, share_bp: 3455 },
+  ]);
+
+  // os outros dois cortes do mês corrente, para o `Segmented` funcionar na vitrine
+  client.setQueryData(['month-breakdown', mes, 'meio'], [
+    { group_key: 'financiamento', group_label: 'Financiamento', total_cents: 147000, unsettled_cents: 147000, line_count: 1, share_bp: 5998 },
+    { group_key: 'prev-a3', group_label: 'Nubank Ultravioleta', total_cents: 81596, unsettled_cents: 78096, line_count: 2, share_bp: 3330 },
+    { group_key: 'prev-a1', group_label: 'Conta corrente', total_cents: 11980, unsettled_cents: 0, line_count: 2, share_bp: 489 },
+    { group_key: 'Sem conta', group_label: 'Sem conta', total_cents: 4500, unsettled_cents: 0, line_count: 1, share_bp: 184 },
+  ]);
+  client.setQueryData(['month-breakdown', mes, 'categoria'], [
+    { group_key: 'contas', group_label: 'contas', total_cents: 150500, unsettled_cents: 150500, line_count: 2, share_bp: 6141 },
+    { group_key: 'outros', group_label: 'outros', total_cents: 78096, unsettled_cents: 78096, line_count: 1, share_bp: 3187 },
+    { group_key: 'saúde', group_label: 'saúde', total_cents: 9990, unsettled_cents: 0, line_count: 1, share_bp: 408 },
+    { group_key: 'alimentação', group_label: 'alimentação', total_cents: 4500, unsettled_cents: 0, line_count: 1, share_bp: 184 },
+    { group_key: 'assinaturas', group_label: 'assinaturas', total_cents: 1990, unsettled_cents: 0, line_count: 1, share_bp: 81 },
+  ]);
+
+  client.setQueryData(['month-breakdown', mes, 'natureza'], [
+    { group_key: 'parcela', group_label: 'parcela', total_cents: 225096, unsettled_cents: 225096, line_count: 2, share_bp: 9185 },
+    { group_key: 'variavel', group_label: 'variavel', total_cents: 14490, unsettled_cents: 0, line_count: 2, share_bp: 591 },
+    { group_key: 'fixa', group_label: 'fixa', total_cents: 5490, unsettled_cents: 3500, line_count: 2, share_bp: 224 },
+  ]);
+
   // `transactions_summary` devolve UMA linha por (categoria, tipo), não a transação.
   const resumo = (fim: string, gasto: number, receita: number) => [
     { category: 'alimentação', kind: 'expense', total_cents: gasto, tx_count: 12 },
@@ -555,13 +656,15 @@ function seedClient() {
 const styles = StyleSheet.create({
   root: { flex: 1 },
   janela: { flex: 1, overflow: 'hidden' },
+  switcherBox: {
+    flexGrow: 0,
+    borderTopWidth: StyleSheet.hairlineWidth,
+  },
   switcher: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
     gap: Space.sm,
     padding: Space.sm,
-    borderTopWidth: StyleSheet.hairlineWidth,
   },
   chip: {
     paddingHorizontal: Space.md,

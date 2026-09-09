@@ -2054,6 +2054,7 @@ export type Database = {
       workspaces: {
         Row: {
           created_at: string
+          default_account_id: string | null
           id: string
           name: string
           owner_id: string
@@ -2062,6 +2063,7 @@ export type Database = {
         }
         Insert: {
           created_at?: string
+          default_account_id?: string | null
           id?: string
           name?: string
           owner_id: string
@@ -2070,6 +2072,7 @@ export type Database = {
         }
         Update: {
           created_at?: string
+          default_account_id?: string | null
           id?: string
           name?: string
           owner_id?: string
@@ -2077,6 +2080,13 @@ export type Database = {
           updated_at?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "workspaces_default_account_id_fkey"
+            columns: ["default_account_id"]
+            isOneToOne: false
+            referencedRelation: "accounts"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "workspaces_owner_id_fkey"
             columns: ["owner_id"]
@@ -2173,6 +2183,7 @@ export type Database = {
           unpaid_total_cents: number
         }[]
       }
+      _cash_at: { Args: { as_of?: string; uid: string }; Returns: number }
       _cash_flow_forecast: {
         Args: { days?: number; uid: string }
         Returns: {
@@ -2190,6 +2201,56 @@ export type Database = {
           account_id: string
           category: string
           rule_id: string
+        }[]
+      }
+      _month_breakdown: {
+        Args: { p_group_by?: string; p_month: string; uid: string }
+        Returns: {
+          group_key: string
+          group_label: string
+          line_count: number
+          share_bp: number
+          total_cents: number
+          unsettled_cents: number
+        }[]
+      }
+      _month_lines: {
+        Args: { p_month: string; uid: string }
+        Returns: {
+          amount_cents: number
+          bucket: string
+          category: string
+          due_date: string
+          due_day: number
+          installment_no: number
+          installments_total: number
+          kind: string
+          method_id: string
+          method_label: string
+          origin: string
+          projected: boolean
+          ref_id: string
+          settled: boolean
+          title: string
+        }[]
+      }
+      _month_summary: {
+        Args: { p_month: string; uid: string }
+        Returns: {
+          beyond_recurring_horizon: boolean
+          closing_cash_cents: number
+          debt_installments_undocumented: number
+          expense_cents: number
+          fixas_cents: number
+          fixas_unsettled_cents: number
+          income_cents: number
+          opening_cash_cents: number
+          parcelas_cents: number
+          parcelas_unsettled_cents: number
+          recurring_covered_until: string
+          result_cents: number
+          variaveis_cents: number
+          variaveis_unsettled_cents: number
         }[]
       }
       _monthly_cashflow: {
@@ -2332,6 +2393,7 @@ export type Database = {
           unpaid_total_cents: number
         }[]
       }
+      cash_at: { Args: { as_of?: string }; Returns: number }
       cash_flow_forecast: {
         Args: { days?: number }
         Returns: {
@@ -2461,6 +2523,56 @@ export type Database = {
           p_occurred_at?: string
         }
         Returns: number
+      }
+      month_breakdown: {
+        Args: { p_group_by?: string; p_month: string }
+        Returns: {
+          group_key: string
+          group_label: string
+          line_count: number
+          share_bp: number
+          total_cents: number
+          unsettled_cents: number
+        }[]
+      }
+      month_lines: {
+        Args: { p_month: string }
+        Returns: {
+          amount_cents: number
+          bucket: string
+          category: string
+          due_date: string
+          due_day: number
+          installment_no: number
+          installments_total: number
+          kind: string
+          method_id: string
+          method_label: string
+          origin: string
+          projected: boolean
+          ref_id: string
+          settled: boolean
+          title: string
+        }[]
+      }
+      month_summary: {
+        Args: { p_month: string }
+        Returns: {
+          beyond_recurring_horizon: boolean
+          closing_cash_cents: number
+          debt_installments_undocumented: number
+          expense_cents: number
+          fixas_cents: number
+          fixas_unsettled_cents: number
+          income_cents: number
+          opening_cash_cents: number
+          parcelas_cents: number
+          parcelas_unsettled_cents: number
+          recurring_covered_until: string
+          result_cents: number
+          variaveis_cents: number
+          variaveis_unsettled_cents: number
+        }[]
       }
       monthly_cashflow: {
         Args: { months_back?: number }

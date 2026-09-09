@@ -61,6 +61,24 @@ async def resolve_account(
     return por_semelhanca[0]["id"] if len(por_semelhanca) == 1 else None
 
 
+async def default_account(workspace_id: UUID) -> UUID | None:
+    """A conta padrão do espaço — para onde vai o lançamento que não cita conta.
+
+    "gastei 45 no mercado" não diz de onde saiu o dinheiro, e `resolve_account` devolve
+    None de propósito: perder o registro do gasto é pior que registrá-lo sem conta. O
+    preço aparece na hora de perguntar PARA ONDE o dinheiro foi — sem padrão, tudo cai
+    num balde só, chamado "Sem conta".
+
+    Só vale para gasto/receita/transferência. Compra parcelada e fatura pedem CARTÃO, e
+    a conta padrão nunca é cartão (o banco recusa) — cair nela ali seria trocar o
+    contrato por outro em silêncio.
+    """
+    linha = await db.fetch_one(
+        "select default_account_id from public.workspaces where id = %s", workspace_id
+    )
+    return linha["default_account_id"] if linha else None
+
+
 async def resolve_transaction(
     workspace_id: UUID, action: FinanceAction
 ) -> tuple[str, list[dict]]:
@@ -174,7 +192,9 @@ async def create_transaction(ctx: ExecContext, action: FinanceAction) -> ToolRes
     valor = guards.require_amount(_amount_with_fallback(ctx, action))
     quando = guards.require_date(action.occurred_at, ctx.timezone)
     categoria = guards.clean_category(action.category)
-    conta = await resolve_account(ctx.workspace_id, action.account)
+    conta = await resolve_account(ctx.workspace_id, action.account) or await default_account(
+        ctx.workspace_id
+    )
     rrule = guards.clean_rrule(action.recurrence)
 
     if rrule:
@@ -223,7 +243,9 @@ async def create_transaction(ctx: ExecContext, action: FinanceAction) -> ToolRes
 async def create_transfer(ctx: ExecContext, action: FinanceAction) -> ToolResult:
     valor = guards.require_amount(_amount_with_fallback(ctx, action))
     quando = guards.require_date(action.occurred_at, ctx.timezone)
-    origem = await resolve_account(ctx.workspace_id, action.account)
+    origem = await resolve_account(ctx.workspace_id, action.account) or await default_account(
+        ctx.workspace_id
+    )
     destino = await resolve_account(ctx.workspace_id, action.counterparty_account)
     if not origem or not destino:
         raise Level1Error(

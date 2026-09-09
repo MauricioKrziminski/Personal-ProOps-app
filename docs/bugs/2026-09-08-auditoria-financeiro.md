@@ -174,3 +174,59 @@ enquanto o dia estiver vazio.
 
 A dívida `carro` de produção foi **apagada a pedido do Gabriel** (zero pagamentos lançados
 apontavam para ela) para ser recriada já com o vencimento.
+
+## 6. Dois defeitos que a tela de Mês ia colocar na cara do usuário — 09/09/2026
+
+Encontrados ao modelar a página de mês (`docs/design/mes.md`), e confirmados lendo as definições
+vivas em produção. Nenhum dos dois fazia estrago naquele momento (produção estava com 0 dívidas e
+0 planos parcelados), e os dois quebram exatamente os números daquela tela assim que houver dado.
+
+### A parcela do financiamento contava duas vezes no mês em que foi paga
+
+**Regressão da `20260909020000`, aplicada horas antes.** Até ela, a primeira parcela do cronograma
+era sempre `add_months(current_date, 1)` — nunca o mês corrente. Ao corrigir o caso "vence dia 15 e
+hoje é dia 9" (que escondia da projeção a parcela que vence em seis dias), o mês corrente passou a
+ser possível, e o cálculo olha só para `current_date` e o dia do vencimento:
+
+```sql
+case when private.day_in_month(current_date, dia) >= current_date
+     then private.day_in_month(current_date, dia)
+     else private.day_in_month(private.add_months(current_date, 1), dia) end
+```
+
+Com vencimento no dia 20, hoje 09/09 e a parcela de setembro registrada em 05/09: o trigger já
+incrementou `installments_paid`, então o cronograma começa na parcela SEGUINTE — e a data nela em
+20/09. Setembro ficava com a parcela paga (`transactions`) mais uma do cronograma, nos três
+consumidores: projeção de caixa, contas a pagar e a tela nova.
+
+`20260909030000_debt_schedule_skip_paid_month.sql` — havendo pagamento registrado para o contrato
+dentro do mês corrente, a próxima parcela é a do mês seguinte. Medido no staging, hoje 09/09, com
+`due_day = 20`: **antes** do pagamento o cronograma devolve a 9ª em 20/09; **depois**, começa na
+10ª em 20/10 e setembro fica com **zero** linhas do cronograma.
+
+### Parcela de cartão em fatura paga ficava `pending` para sempre
+
+`pay_invoice` (`0013:292`) cria a transferência e marca a fatura como paga, mas **nunca tocava em
+`transactions.status`**. Era inofensivo enquanto `_promote_due_transactions` promovia por data
+qualquer linha com `installment_plan_id not null` — cláusula que a `20260908153143` removeu de
+propósito, quando o histórico de parcelas virou explícito.
+
+Consequência já visível fora da tela nova: `nextPendingInstallment`
+(`src/lib/installment-progress.ts:6`) tira a próxima parcela do `min(installment_no) where
+status='pending'`, então quem paga a fatura pela RPC lê **"parcela 1 de 10" pelo resto do plano**.
+Os totais não mudavam (nenhum agregado filtra `status`), mas a coluna ✔ e qualquer "falta pagar"
+ficavam errados.
+
+`20260909031000_pay_invoice_clears_rows.sql` — a baixa que `settle_invoice` já fazia (`0046:110`).
+Medido no staging: fatura com 4 linhas `pending` → todas `cleared` com `paid_at`, fatura `paid`,
+transferência criada, e a próxima parcela do plano anda.
+
+### Um terceiro caso, NÃO corrigido, registrado de propósito
+
+`debt_schedule_for` ancora na *próxima ocorrência do dia de vencimento a partir de hoje,
+inclusive*. Com hoje 25/09, vencimento no dia 23 e a parcela **não paga**, ele devolve 23/10: a
+parcela vencida e não paga de setembro **não aparece em lugar nenhum** — nem como atrasada. Não é
+regressão (o comportamento anterior tinha a mesma propriedade por outro caminho) e o conserto pede
+uma decisão que não cabia nesta rodada: um financiamento cujo `installments_paid` foi DECLARADO no
+cadastro, sem pagamento nenhum registrado, ficaria com uma parcela "atrasada" em todo mês, para
+sempre. Fica anotado aqui para não ser redescoberto como mistério.

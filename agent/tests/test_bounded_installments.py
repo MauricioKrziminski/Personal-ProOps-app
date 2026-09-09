@@ -494,3 +494,37 @@ async def test_debt_baseline_correction_only_before_payment_ledger(
         proposal = await resources.prepare(ctx, action)
         assert proposal["values"]["installments_paid"] == 8
         assert proposal["values"]["remaining_cents"] == 5000000
+
+
+@pytest.mark.asyncio
+async def test_lancamento_sem_conta_cai_na_conta_padrao(monkeypatch):
+    """O WhatsApp quase nunca diz de onde saiu o dinheiro.
+
+    `resolve_account` devolve None de propósito — perder o registro é pior que registrá-lo
+    sem conta —, e o preço aparecia na hora de perguntar PARA ONDE o dinheiro foi: sem
+    conta padrão, tudo cai num balde só.
+    """
+    from app.tools import finance
+    from app import db as agent_db
+
+    padrao = UUID("44444444-4444-4444-4444-444444444444")
+    monkeypatch.setattr(
+        agent_db, "fetch_one", AsyncMock(return_value={"default_account_id": padrao})
+    )
+    assert await finance.default_account(WS) == padrao
+
+    monkeypatch.setattr(agent_db, "fetch_one", AsyncMock(return_value=None))
+    assert await finance.default_account(WS) is None
+
+
+def test_confirmacao_nomeia_a_conta_citada_e_cala_quando_nao_ha():
+    from app.graph.policy import describe_for_confirmation
+
+    com = FinanceAction(
+        type="create_expense", amount_cents=200000, description="reforma", account="Itaú"
+    )
+    assert "no Itaú" in describe_for_confirmation(com)
+    # sem conta citada a frase não inventa "na conta padrão": pode não existir nenhuma
+    sem = FinanceAction(type="create_expense", amount_cents=200000, description="reforma")
+    frase = describe_for_confirmation(sem)
+    assert "conta" not in frase and "reforma" in frase

@@ -8,7 +8,7 @@ export const FINANCE_KEYS = [
   ['upcoming-bills'], ['debts'], ['debt-schedule'], ['payoff'], ['assets'],
   ['net-worth'], ['net-worth-series'], ['cash-history'], ['financial-health'],
   ['annual-report'], ['affordability'], ['goal-contributions'], ['search', 'transactions'],
-  ['ai-month-stats'],
+  ['ai-month-stats'], ['month-lines'], ['month-summary'], ['month-breakdown'], ['default-account'],
 ] as const;
 
 export function invalidateKeys(client: QueryClient, keys: readonly (readonly string[])[]) {
