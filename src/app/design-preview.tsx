@@ -536,6 +536,10 @@ function seedClient() {
   client.setQueryData(['accounts'], [
     { id: 'prev-a1', name: 'Conta corrente', type: 'checking', initial_balance_cents: 0 },
     { id: 'prev-a2', name: 'Carteira', type: 'cash', initial_balance_cents: 0 },
+    // O cartão existe para a banda `Editar`: numa parcela de CARTÃO o formulário esconde
+    // "vou pagar depois", e era exatamente daí que ele derivava o status — editar o nome de
+    // uma parcela futura dava baixa nela. Sem um cartão aqui essa variante não se olha.
+    { id: 'prev-a3', name: 'Nubank', type: 'credit_card', initial_balance_cents: 0 },
   ]);
   // Fatura PARCIALMENTE paga: 2.393,92 de compras, 2.080,00 já pagos, 313,92 faltando.
   // É o caso real de setembro/2026 e o único jeito de ver a linha "Pago … · falta …" do herói
@@ -781,7 +785,7 @@ function seedClient() {
   client.setQueryData(['transactions', 'item', 'prev-p1'], {
     id: 'prev-p1', kind: 'expense', amount_cents: 41500, currency: 'BRL',
     category: 'casa', description: 'Notebook', merchant: 'Kabum',
-    account_id: 'prev-a2', counterparty_account_id: null,
+    account_id: 'prev-a3', counterparty_account_id: null,
     occurred_at: `${mes}-03`, source: 'app', created_at: `${mes}-03T10:00:00Z`,
     // `due_at` preenchido porque o formulário EXIGE vencimento em lançamento previsto
     // (refine do zod). Toda linha pendente em produção tem: 92 de 92, conferido.

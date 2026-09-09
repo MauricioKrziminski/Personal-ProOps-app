@@ -112,7 +112,7 @@ function ErrorBand({ message, onRetry }: { message: string; onRetry: () => void 
 }
 
 export default function DebtsScreen() {
-  const params = useLocalSearchParams<{ create?: string }>();
+  const params = useLocalSearchParams<{ create?: string; id?: string }>();
   const theme = useTheme();
   const toast = useToast();
   const debts = useDebts();
@@ -124,7 +124,12 @@ export default function DebtsScreen() {
   const pagar = usePayDebtInstallment();
 
   const [form, setForm] = useState<FormState | null>(() => params.create === 'financing' ? { ...FORM_VAZIO, kind: 'financing' } : null);
-  const [detalheId, setDetalheId] = useState<string | null>(null);
+  /**
+   * `?id=<dívida>` já abre o detalhe. O extrato do mês mandava a prestação para a LISTA — o
+   * `ref_id` de linha projetada é id de dívida, não de lançamento —, e quem tem cinco
+   * financiamentos tinha que caçar qual era.
+   */
+  const [detalheId, setDetalheId] = useState<string | null>(() => params.id ?? null);
   const [pagandoId, setPagandoId] = useState<string | null>(null);
   const detalhe = debts.data?.find((debt) => debt.id === detalheId) ?? null;
   const pagando = debts.data?.find((debt) => debt.id === pagandoId) ?? null;

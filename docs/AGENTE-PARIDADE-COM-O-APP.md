@@ -89,9 +89,14 @@ junto no mesmo lugar**: `update_transaction` com alvo numa compra parcelada era 
 |---|---|
 | escolher "esta e as futuras" no formulário | `update_transaction` sobre a compra parcelada |
 | "Editar" no menu do plano | idem — a âncora é a primeira parcela EM ABERTO nos dois |
-| "Editar" numa recorrência | **pendente**: a série ainda não é alvo de `update_transaction` |
+| "Editar" numa recorrência | `resource_update recurring` — roteado para `update_recurring_series` |
 
-A linha pendente é deliberada e está aqui em vez de ficar em silêncio, que é a regra desta tabela.
+A recorrência fechou no mesmo dia: `resource_update` sobre `recurring` já existia, mas fazia um
+UPDATE só na REGRA. Como o `finance-scheduler` materializa 90 dias à frente e o unique
+`(recurring_id, occurred_at)` impede reescrita, os três meses seguintes ficavam com o valor velho
+e o quarto com o novo. Agora, quando o patch toca valor, categoria, descrição ou conta, a execução
+cai na mesma RPC do botão do app; `active`, `rrule` e afins seguem no UPDATE normal, porque a RPC
+os recusa de propósito.
 
 ## Fora do escopo — decisão, não esquecimento
 

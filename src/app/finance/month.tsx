@@ -116,7 +116,7 @@ export default function MonthScreen() {
   /** Linha projetada aponta para a DÍVIDA: o `ref_id` dela é id de dívida, não de lançamento. */
   const abrir = (l: MonthLine) =>
     l.projected
-      ? router.push('/finance/debts')
+      ? router.push({ pathname: '/finance/debts', params: { id: l.ref_id } })
       : router.push({ pathname: '/finance/[txId]', params: { txId: l.ref_id, month } });
 
   const acoes = (l: MonthLine) => {

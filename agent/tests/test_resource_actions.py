@@ -422,3 +422,63 @@ async def test_apagar_de_vez_so_vale_para_nota_ja_na_lixeira(monkeypatch):
     prepared = await resources.prepare(ctx(), action(resource="notes", kind="resource_delete"))
     assert prepared["values"] == {"deleted_at": prepared["values"]["deleted_at"]}
     assert "lixeira" in prepared["summary"]
+
+
+@pytest.mark.asyncio
+async def test_editar_recorrencia_propaga_pelas_futuras(monkeypatch):
+    """Mudar o valor da série tem que alcançar o que já foi materializado.
+
+    O UPDATE genérico mexeria só na regra, e o `finance-scheduler` não reescreve o que já
+    existe (unique `recurring_id, occurred_at`): os próximos três meses ficariam no valor
+    velho e o quarto no novo. Cai na MESMA RPC do botão do app.
+    """
+    async def fetch(*a):
+        return [_linha(kind="expense", amount_cents=150000, description="Aluguel",
+                       category="moradia", account_id=None, rrule="FREQ=MONTHLY;BYMONTHDAY=5",
+                       dtstart="2026-01-05T09:00:00Z", auto_confirm=True, active=True)]
+
+    monkeypatch.setattr(resources.db, "fetch", fetch)
+    acao = action(resource="recurring", kind="resource_update", amount_cents=160000)
+    prepared = await resources.prepare(ctx(), acao)
+
+    sqls = []
+
+    async def fetch_one(sql, *args):
+        sqls.append(sql)
+        return {"futuras": 2}
+
+    monkeypatch.setattr(resources.db, "fetch_one", fetch_one)
+    await resources.execute(
+        ExecContext("user", "workspace", None, "America/Sao_Paulo", "", "app:1",
+                    target={"prepared": prepared}),
+        acao,
+    )
+    assert any("update_recurring_series" in s for s in sqls), sqls
+    assert not any(s.startswith("update public.recurring_transactions set") for s in sqls)
+
+
+@pytest.mark.asyncio
+async def test_pausar_serie_nao_passa_pela_rpc(monkeypatch):
+    """`active` não é campo propagável: pausar não reescreve ocorrência nenhuma."""
+    async def fetch(*a):
+        return [_linha(kind="expense", amount_cents=150000, description="Aluguel",
+                       category="moradia", account_id=None, rrule="FREQ=MONTHLY;BYMONTHDAY=5",
+                       dtstart="2026-01-05T09:00:00Z", auto_confirm=True, active=True)]
+
+    monkeypatch.setattr(resources.db, "fetch", fetch)
+    acao = action(resource="recurring", kind="resource_update", active="false")
+    prepared = await resources.prepare(ctx(), acao)
+
+    sqls = []
+
+    async def fetch_one(sql, *args):
+        sqls.append(sql)
+        return {"id": prepared["id"]}
+
+    monkeypatch.setattr(resources.db, "fetch_one", fetch_one)
+    await resources.execute(
+        ExecContext("user", "workspace", None, "America/Sao_Paulo", "", "app:1",
+                    target={"prepared": prepared}),
+        acao,
+    )
+    assert not any("update_recurring_series" in s for s in sqls), sqls

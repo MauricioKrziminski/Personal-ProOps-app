@@ -790,6 +790,10 @@ async def execute(ctx: ExecContext, action: ResourceAction) -> ToolResult:
                 f"select id from public.{table} where id = %s and workspace_id = %s and xmin::text = %s",
                 *args,
             )
+        elif action.resource == "recurring" and action.type == Op.UPDATE and (
+            values.keys() & _SERIE_PROPAGA
+        ):
+            row = await _editar_serie(ctx, proposal, values)
         else:
             if action.resource == "debts" and "installments_paid" in values:
                 reference_guard += " and not exists (select 1 from public.transactions payment where payment.debt_id=public.debts.id and payment.workspace_id=public.debts.workspace_id)"
@@ -810,6 +814,43 @@ async def execute(ctx: ExecContext, action: ResourceAction) -> ToolResult:
     if "set_default" in proposal:
         await _definir_conta_padrao(ctx, proposal["id"], proposal["set_default"])
     return ToolResult("Concluído: " + proposal["summary"] + ".", result_id=row["id"])
+
+
+# O que, mudando na REGRA, tem que alcançar as ocorrências já materializadas.
+# `rrule`/`dtstart`/`active` ficam de fora: cadência e âncora não se propagam (remontariam
+# o calendário) e pausar não reescreve nada do que já existe.
+_SERIE_PROPAGA = {"amount_cents", "category", "description", "account_id"}
+
+
+async def _editar_serie(ctx: ExecContext, proposal: dict, values: dict):
+    """Editar recorrência pelo agente = o mesmo efeito do botão do app.
+
+    O UPDATE genérico mexeria só na regra, e o `finance-scheduler` materializa 90 dias à
+    frente com o unique `(recurring_id, occurred_at)` impedindo reescrita: os próximos três
+    meses ficariam com o valor velho e o quarto com o novo. `update_recurring_series` é a
+    MESMA RPC que a tela chama — repetir a regra aqui criaria a cópia que diverge.
+
+    Só as chaves propagáveis vão no patch; `active`, `rrule` e afins continuam no UPDATE
+    normal da mesma chamada, porque a RPC os recusa de propósito.
+    """
+    import json
+
+    patch = {k: v for k, v in values.items() if k in _SERIE_PROPAGA}
+    resto = {k: v for k, v in values.items() if k not in _SERIE_PROPAGA}
+    row = await db.fetch_one(
+        "select public.update_recurring_series(%s, %s::jsonb, true) as futuras",
+        proposal["id"], json.dumps(patch, default=str),
+    )
+    if row is None:
+        raise Level1Error("Essa recorrência mudou depois da proposta. Peça novamente.")
+    if resto:
+        await db.execute(
+            "update public.recurring_transactions set "
+            + ", ".join(f"{k} = %s" for k in resto)
+            + " where id = %s and workspace_id = %s",
+            *resto.values(), proposal["id"], ctx.workspace_id,
+        )
+    return {"id": proposal["id"]}
 
 
 async def _definir_conta_padrao(ctx: ExecContext, account_id: str, virar_padrao: bool) -> None:
