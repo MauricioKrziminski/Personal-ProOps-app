@@ -50,6 +50,17 @@ def _preserve_or_replace(antigo: dict | None, novo: dict | None) -> dict:
     return antigo or {}
 
 
+def _preserva_se_vazio(antigo: str | None, novo: str | None) -> str:
+    """Como `_preserve_or_replace`, para texto.
+
+    O worker declara a chave a cada turno (é o que `test_state_reset` exige:
+    campo novo obriga uma decisão explícita), e manda `""`. Aqui `""` quer dizer
+    "não escrevi nada NESTE turno", e o antecedente da conversa continua valendo
+    — que é justamente a memória curta que ele representa.
+    """
+    return novo if novo else (antigo or "")
+
+
 def _resource_draft(antigo, novo):
     """None on a new turn preserves inert fields; [] explicitly discards them."""
     return antigo or [] if novo is None else novo
@@ -81,6 +92,12 @@ class AgentState(TypedDict, total=False):
     # escondida do canal que sabe qual janela vale.
     messages: Annotated[list[dict], _replace]
     last_query_data: Annotated[dict, _preserve_or_replace]
+    # O registro que ESTA conversa escreveu por último — o antecedente de "esse",
+    # "isso", "esse lançamento". Some sozinho quando a sessão roda por
+    # inatividade, porque o checkpoint é chaveado pelo `thread_id` EFETIVO, que
+    # carrega o `session_epoch`. Não precisa de janela em minutos: a janela já é
+    # a conversa. Quem escreve é o nó `executar`; quem lê é `alvos`.
+    last_write_id: Annotated[str, _preserva_se_vazio]
 
     # roteamento
     domain_options: Annotated[list[dict], _replace]

@@ -133,6 +133,8 @@ def _estado_base(
         "messages": [*(prompt_history or []),
                      {"role": "user", "content": conteudo.get("text", "")}],
         "last_query_data": {},
+        # "" = nada escrito neste turno; o reducer preserva o antecedente anterior
+        "last_write_id": "",
         # Zerar TUDO é obrigatório, não zelo: o thread do checkpointer é o
         # mesmo a conversa inteira, então chave não reiniciada vaza para a
         # mensagem seguinte. `finance_queries` esquecido aqui fez uma consulta

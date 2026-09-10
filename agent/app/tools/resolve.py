@@ -59,6 +59,25 @@ def _rotulo_tx(row: dict) -> str:
     return describe(row)
 
 
+def _detalhe_tx(row: dict) -> str:
+    """A data do lançamento — o que separa uma linha da outra numa lista.
+
+    Sem isto, desambiguar era impossível de propósito nenhum: em 09/09/2026 a
+    pergunta "apagar qual?" mostrou QUATRO linhas escritas
+    `receita de R$ 4.000,00 em *salário* (Salário PJ)`, idênticas letra por
+    letra, e três `gasto de R$ 88,85 em *contas* (DAS)`. Escolher entre opções
+    iguais não é escolher — e é o que uma série recorrente sempre produz, já que
+    o que muda entre as ocorrências é só a data.
+
+    Vale também para o classificador semântico: `escolher_candidato` monta a
+    lista que vai ao modelo com este mesmo campo, então "o de outubro" só passa
+    a ser respondível depois que a data existe.
+    """
+    from app.domain.dates import format_date_br
+
+    return format_date_br(row["occurred_at"]) if row.get("occurred_at") else ""
+
+
 def _rotulo_fatura(row: dict) -> str:
     from app.domain.dates import format_date_br
 
@@ -154,6 +173,7 @@ _FONTES: dict[str, dict] = {
                     and (coalesce(description,'') ilike %s or coalesce(category,'') ilike %s)
                   order by coalesce(due_at, occurred_at) limit %s""",
         "label": _rotulo_tx,
+        "detalhe": _detalhe_tx,
         "dois_termos": True,
     },
 }
@@ -250,10 +270,10 @@ async def por_transacao(
         return "none", []
     if not filtrou and not quer_recente:
         # Sem pista E sem pedido de recência: NÃO é "o último", é vago.
-        return veredito(linhas[:MOSTRAR], _rotulo_tx, "transactions")
+        return veredito(linhas[:MOSTRAR], _rotulo_tx, "transactions", _detalhe_tx)
     if not filtrou:
-        return veredito(linhas[:1], _rotulo_tx, "transactions")
-    return veredito(linhas, _rotulo_tx, "transactions")
+        return veredito(linhas[:1], _rotulo_tx, "transactions", _detalhe_tx)
+    return veredito(linhas, _rotulo_tx, "transactions", _detalhe_tx)
 
 
 # Ações em que "a compra inteira" é uma resposta possível.
@@ -392,7 +412,38 @@ async def _bounded_plan_target(workspace_id, candidates, scope):
     }
 
 
-async def for_actions(workspace_id, acoes: list, texto_cru: str) -> list[dict]:
+async def _antecedente_da_conversa(workspace_id, tx_id: str | None) -> list[dict] | None:
+    """O lançamento que ESTA conversa acabou de escrever, se ele ainda existe.
+
+    É o que um demonstrativo significa. "Apague esse lançamento" logo depois de
+    "gastei 20 no café" aponta para o café — não para "algum dos 40 mais
+    recentes do workspace", que é coisa diferente e inclui o que o cron
+    materializou às 3 da manhã. Em 09/09/2026 a pergunta que isto evita listou
+    quatro salários iguais gerados pelo agendador.
+
+    **A existência é reconferida sempre.** O id também é gravado quando a ação
+    foi um DELETE, e aí a linha não está mais lá: devolver None manda o fluxo
+    para a pergunta, que é o certo — depois de apagar, não há mais "esse".
+    """
+    if not tx_id:
+        return None
+    row = await db.fetch_one(
+        """
+        select id, kind, amount_cents, category, description, occurred_at
+        from public.transactions where id = %s and workspace_id = %s
+        """,
+        tx_id,
+        workspace_id,
+    )
+    if not row:
+        return None
+    _, cands = veredito([row], _rotulo_tx, "transactions", _detalhe_tx)
+    return cands
+
+
+async def for_actions(
+    workspace_id, acoes: list, texto_cru: str, antecedente: str | None = None
+) -> list[dict]:
     """Um alvo por ação, alinhado POR POSIÇÃO com a lista de ações.
 
     A posição é a mesma que `ctx.action_index` já usa para idempotência — não há
@@ -444,6 +495,29 @@ async def for_actions(workspace_id, acoes: list, texto_cru: str) -> list[dict]:
         )
         if acao.type == FinanceActionType.UNDO_LAST:
             recente = True
+
+        # Demonstrativo ("esse", "isso", "esse lançamento") sem termo de busca e
+        # sem pedido de recência: quem responde é o que a conversa acabou de
+        # escrever. Sem antecedente vivo, segue para a pergunta de sempre — a
+        # lista continua sendo a resposta certa para quem não apontou nada.
+        #
+        # Isto NÃO afrouxa a trava destrutiva: apagar e corrigir passam pelo
+        # `interrupt()` de `policy.py` de qualquer jeito, e a confirmação diz
+        # qual linha é ("Confirma apagar gasto de R$ 20,00 (café)?"). O que
+        # muda é só o usuário parar de escolher entre nove opções para dizer o
+        # que ele já tinha dito.
+        # ponytail: o antecedente só resolve TRANSAÇÃO. Para nota, lembrete, meta
+        # e bem o ponteiro cai no ramo "sem termo utilizável" mais abaixo, que
+        # lista os recentes daquela fonte para escolher — resposta pior que o
+        # alvo direto, melhor que a busca literal por "%essa nota%" que era o
+        # comportamento anterior. Estender exige uma consulta de existência por
+        # fonte; vale a pena quando alguém reclamar de nota, não antes.
+        if fonte == "transactions" and termo is None and not recente:
+            cands = await _antecedente_da_conversa(workspace_id, antecedente)
+            if cands:
+                saida.append({"status": "found", "candidates": cands,
+                              "table": "transactions"})
+                continue
 
         # Resolve bounded payment directly from plans, beyond the recent-40 window.
         if acao.type == FinanceActionType.MARK_PAID or (

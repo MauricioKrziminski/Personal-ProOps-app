@@ -69,6 +69,28 @@ toque em "Escolher". O corpo tem que repetir a lista numerada — senão a tela 
 nenhuma resposta possível, e a pessoa tenta responder por escrito (que é o caminho caro e o que
 mais erra). O caminho de botões (≤2 candidatos) já fazia isso.
 
+⚠️ **Demonstrativo aponta para o que a CONVERSA escreveu, não para a linha mais nova do banco**
+(09/09/2026). "Apague esse lançamento" logo depois de "gastei 20 no café" tem antecedente, e ele
+é o café. O estado do grafo carrega `last_write_id` (escrito por `executar` e por `seguras`, lido
+por `alvos`), e a janela não precisa de constante em minutos: o checkpoint é chaveado pelo
+`thread_id` EFETIVO, que já embute o `session_epoch`. Três travas que não caíram: a existência da
+linha é reconferida (o id de um DELETE também é gravado, e antecedente morto vira pergunta), quem
+DISSE um termo de busca nunca é redirecionado para o antecedente, e apagar/corrigir continuam
+passando pelo `interrupt()` — o que mudou é o usuário parar de escolher entre nove opções para
+dizer o que ele já tinha dito.
+
+⚠️ **Ponteiro e termo de busca se separam por uma lista de substantivos só** (`_SUBSTANTIVO` em
+`domain/reference.py`). Eram duas listas divergentes: `_VAGO` conhecia "esse item" e não conhecia
+"esse lançamento", então o ponteiro virava busca literal por `%esse lançamento%`. O padrão é
+ancorado no texto INTEIRO de propósito — como substring destruiria "essa nota da reunião", que é
+nome legítimo. E o substantivo opcional pende do GRUPO de demonstrativos: escrito como
+`a|b|c(\s+N)?` a alternância corta antes do parêntese e só `c` aceita substantivo.
+
+⚠️ **Candidato de empate precisa do que o DISTINGUE.** Uma série recorrente produz ocorrências que
+só diferem na data, e a lista saía com quatro linhas escritas `receita de R$ 4.000,00 em *salário*
+(Salário PJ)`, idênticas. `veredito` recebe `detalhe`; para transação é a data. Isso também é o
+que o classificador semântico vê, então "o de outubro" só passa a ser respondível depois disso.
+
 ⚠️ **Escolha semântica só vale em lista de REGISTROS (`kind == "choice"`).** Em
 `soft_warning` os "candidatos" são AÇÕES (Confirmar / Trocar de Cartão), e deixar um
 classificador de escolha pescar "Confirmar" de uma hesitação ressuscita o defeito de

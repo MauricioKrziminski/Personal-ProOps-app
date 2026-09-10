@@ -15,14 +15,29 @@ import re
 # Casam o texto INTEIRO, nunca substring. É a diferença entre recusar "a última"
 # (ponteiro) e preservar "última reunião" (nome de verdade de uma nota). Como
 # substring, esta lista destruiria busca legítima.
+# O substantivo que pode vir depois do ponteiro. UMA lista, usada pelos dois
+# padrões abaixo — eram duas listas diferentes, e a diferença entre elas era o
+# defeito: `_VAGO` conhecia "esse item" e não conhecia "esse lançamento", que é
+# como quem fala de dinheiro fala. Resultado medido em produção (09/09/2026):
+# "apague esse lançamento" virou busca literal por `%esse lançamento%`, não
+# casou com nada, e o agente ofereceu os NOVE lançamentos mais recentes.
+_SUBSTANTIVO = (
+    r"lançamento|lancamento|gasto|despesa|receita|compra|pagamento|recebimento"
+    r"|transação|transacao|conta|nota|lembrete|item|coisa|mensagem|registro"
+)
+
 _RECENCIA = re.compile(
     r"^\s*(o|a)?\s*(últim[oa]|ultim[oa]|mais\s+recente|de\s+agora|recente)"
-    r"(\s+(lançamento|lancamento|nota|gasto|item|mensagem|coisa))?\s*$",
+    rf"(\s+({_SUBSTANTIVO}))?\s*$",
     re.IGNORECASE,
 )
+# ⚠️ O substantivo opcional pende do GRUPO de demonstrativos, não do último
+# deles. Escrito como `a|b|c(\s+N)?`, a alternância corta antes do parêntese e
+# só `c` aceita substantivo — foi o erro que fez "esse lançamento" continuar
+# passando enquanto "este lançamento" passava a casar.
 _VAGO = re.compile(
-    r"^\s*(iss[oa]|aquil[oa]|aquel[ae]s?|ess[ea]s?"
-    r"(\s+(item|coisa|mensagem|registro))?|o\s+que\s+existe|tudo)\s*$",
+    r"^\s*((iss[oa]|aquil[oa]|aquel[ae]s?|ess[ea]s?|est[ea]s?)"
+    rf"(\s+({_SUBSTANTIVO}))?|o\s+que\s+existe|tudo)\s*$",
     re.IGNORECASE,
 )
 

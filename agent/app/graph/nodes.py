@@ -549,7 +549,8 @@ async def resolve_node(state: AgentState) -> dict:
             "draft": _rascunho(state, acoes)}
 
     alvos = await resolve.for_actions(
-        state["workspace_id"], acoes, state.get("text", "")
+        state["workspace_id"], acoes, state.get("text", ""),
+        antecedente=state.get("last_write_id"),
     )
     return {"targets": with_resources(alvos), "results": esclarecimentos,
             "draft": _rascunho(state, acoes)}
@@ -616,7 +617,13 @@ async def safe_node(state: AgentState) -> dict:
     linhas = res[0] if isinstance(res, tuple) else res
     spec = res[1] if isinstance(res, tuple) and len(res) > 1 else None
     query_data = res[2] if isinstance(res, tuple) and len(res) > 2 else None
+    escritos = res[3] if isinstance(res, tuple) and len(res) > 3 else []
     ret = {"results": [*state.get("results", []), *linhas]}
+    if escritos:
+        # Mesma regra do `execute_node`: quem escreveu deixa o antecedente. Este
+        # nó só roda em LOTE MISTO, e é o único jeito de "gastei 20 e apaga o
+        # do mercado" deixar rastro do que foi criado na parte segura.
+        ret["last_write_id"] = escritos[-1]
     if spec:
         texto_completo = "\n\n".join(l for l in ret["results"] if l)
         ret["reply"] = {**spec, "body": texto_completo, "text": texto_completo}
@@ -977,7 +984,7 @@ def after_gate(state: AgentState) -> str:
 
 async def _executar(
     state: AgentState, indexadas: list[tuple[int, object]]
-) -> tuple[list[str], dict | None, dict | None]:
+) -> tuple[list[str], dict | None, dict | None, list[str]]:
     """Roda as ações dadas, preservando o `action_index` ORIGINAL."""
     ctx = ExecContext(
         user_id=state["user_id"],
@@ -1007,7 +1014,7 @@ async def _executar(
             spec_interativo = resultado.interactive_spec
         if resultado.data:
             ultimo_data = resultado.data
-    return linhas, spec_interativo, ultimo_data
+    return linhas, spec_interativo, ultimo_data, ctx.created
 
 
 async def execute_node(state: AgentState) -> dict:
@@ -1017,7 +1024,16 @@ async def execute_node(state: AgentState) -> dict:
     linhas = res[0] if isinstance(res, tuple) else res
     spec = res[1] if isinstance(res, tuple) and len(res) > 1 else None
     query_data = res[2] if isinstance(res, tuple) and len(res) > 2 else None
+    escritos = res[3] if isinstance(res, tuple) and len(res) > 3 else []
     ret = {"results": [*state.get("results", []), *linhas]}
+    if escritos:
+        # O último id escrito no turno é o antecedente de "esse"/"isso" no turno
+        # seguinte — é o que faz "apague esse lançamento" logo depois de
+        # "gastei 20 no café" apontar para o café, e não para os nove mais
+        # recentes do workspace (que incluem o que o cron materializou de
+        # madrugada). Um DELETE também grava aqui, e isso está certo: quem lê
+        # revalida a existência, e antecedente morto vira pergunta.
+        ret["last_write_id"] = escritos[-1]
     if spec:
         texto_completo = "\n\n".join(l for l in ret["results"] if l)
         ret["reply"] = {**spec, "body": texto_completo, "text": texto_completo}

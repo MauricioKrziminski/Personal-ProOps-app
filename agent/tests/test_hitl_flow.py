@@ -50,7 +50,7 @@ def grafo(monkeypatch):
 
     monkeypatch.setattr(nodes, "_executar", _executar_falso)
 
-    async def alvos_falso(workspace_id, acoes, texto_cru):
+    async def alvos_falso(workspace_id, acoes, texto_cru, antecedente=None):
         """Dublê da Fase Cognitiva: alvo único e resolvido, salvo se o teste
         tiver pré-carregado `targets` no estado inicial."""
         from app.tools import resolve as _r
@@ -204,7 +204,7 @@ async def test_pergunta_cita_a_linha_real_e_nao_o_eco_do_modelo(grafo):
 async def test_alvo_ambiguo_vira_escolha_e_so_id_da_lista_aprova(monkeypatch, grafo):
     from app.graph import nodes
 
-    async def dois_candidatos(workspace_id, acoes, texto_cru):
+    async def dois_candidatos(workspace_id, acoes, texto_cru, antecedente=None):
         return [{"table": "transactions", "status": "ambiguous",
                  "candidates": [{"id": "a", "label": "gasto de R$ 45"},
                                 {"id": "b", "label": "gasto de R$ 80"}]}
@@ -228,7 +228,7 @@ async def test_alvo_ambiguo_vira_escolha_e_so_id_da_lista_aprova(monkeypatch, gr
 async def test_escolha_valida_congela_o_id_e_executa(monkeypatch, grafo):
     from app.graph import nodes
 
-    async def dois_candidatos(workspace_id, acoes, texto_cru):
+    async def dois_candidatos(workspace_id, acoes, texto_cru, antecedente=None):
         return [{"table": "transactions", "status": "ambiguous",
                  "candidates": [{"id": "a", "label": "gasto de R$ 45"},
                                 {"id": "b", "label": "gasto de R$ 80"}]}
@@ -254,7 +254,7 @@ async def test_escolha_valida_congela_o_id_e_executa(monkeypatch, grafo):
 async def test_id_inventado_no_resume_nao_executa(monkeypatch, grafo):
     from app.graph import nodes
 
-    async def dois_candidatos(workspace_id, acoes, texto_cru):
+    async def dois_candidatos(workspace_id, acoes, texto_cru, antecedente=None):
         return [{"table": "transactions", "status": "ambiguous",
                  "candidates": [{"id": "a", "label": "x"}, {"id": "b", "label": "y"}]}
                 for _ in acoes]
@@ -279,7 +279,7 @@ async def test_lote_misto_grava_o_seguro_e_pergunta_o_sensivel(monkeypatch, graf
     esperando uma decisão sobre OUTRA coisa — e um NÃO não pode desfazê-lo."""
     from app.graph import nodes
 
-    async def alvos(workspace_id, acoes, texto_cru):
+    async def alvos(workspace_id, acoes, texto_cru, antecedente=None):
         from app.tools import resolve as _r
 
         return [
@@ -311,7 +311,7 @@ async def test_lote_misto_grava_o_seguro_e_pergunta_o_sensivel(monkeypatch, graf
 async def test_nao_no_lote_misto_preserva_o_que_ja_foi_gravado(monkeypatch, grafo):
     from app.graph import nodes
 
-    async def alvos(workspace_id, acoes, texto_cru):
+    async def alvos(workspace_id, acoes, texto_cru, antecedente=None):
         from app.tools import resolve as _r
 
         return [
@@ -352,7 +352,7 @@ async def test_o_que_o_WORKER_manda_no_resume_o_gate_entende(monkeypatch, grafo)
     from app.graph import nodes
     from app.conversation import _congelado
 
-    async def dois(workspace_id, acoes, texto_cru):
+    async def dois(workspace_id, acoes, texto_cru, antecedente=None):
         return [{"table": "transactions", "status": "ambiguous",
                  "candidates": [{"id": "a", "label": "R$ 45"}, {"id": "b", "label": "R$ 80"}]}
                 for _ in acoes]
@@ -381,7 +381,7 @@ async def test_numero_digitado_tambem_chega_inteiro_no_gate(monkeypatch, grafo):
     from app.graph import nodes
     from app.conversation import _congelado
 
-    async def dois(workspace_id, acoes, texto_cru):
+    async def dois(workspace_id, acoes, texto_cru, antecedente=None):
         return [{"table": "transactions", "status": "ambiguous",
                  "candidates": [{"id": "a", "label": "R$ 45"}, {"id": "b", "label": "R$ 80"}]}
                 for _ in acoes]
@@ -499,7 +499,7 @@ async def test_escolher_a_compra_inteira_troca_a_TABELA_do_alvo(monkeypatch, gra
     """
     from app.graph import nodes
 
-    async def plano_e_parcela(workspace_id, acoes, texto_cru):
+    async def plano_e_parcela(workspace_id, acoes, texto_cru, antecedente=None):
         return [{"table": "transactions", "status": "ambiguous",
                  "candidates": [
                      {"id": "p1", "label": "Tudo (10x) — TV",
@@ -527,7 +527,7 @@ async def test_escolher_a_parcela_mantem_a_tabela_de_transacoes(monkeypatch, gra
     """O outro lado da mesma pergunta: escolher a parcela não pode virar plano."""
     from app.graph import nodes
 
-    async def plano_e_parcela(workspace_id, acoes, texto_cru):
+    async def plano_e_parcela(workspace_id, acoes, texto_cru, antecedente=None):
         return [{"table": "transactions", "status": "ambiguous",
                  "candidates": [
                      {"id": "p1", "label": "Tudo (10x) — TV",
@@ -553,7 +553,7 @@ async def test_escolher_a_parcela_mantem_a_tabela_de_transacoes(monkeypatch, gra
 async def test_update_em_plano_mostra_menu_interativo_e_exclui_se_selecionado(monkeypatch, grafo):
     from app.graph import nodes
 
-    async def plano_alvo(workspace_id, acoes, texto_cru):
+    async def plano_alvo(workspace_id, acoes, texto_cru, antecedente=None):
         return [
             {
                 "table": "installment_plans",
@@ -595,7 +595,7 @@ async def test_update_em_plano_mudar_parcelas_com_current_installment_atualiza_p
 ):
     from app.graph import nodes
 
-    async def plano_alvo(workspace_id, acoes, texto_cru):
+    async def plano_alvo(workspace_id, acoes, texto_cru, antecedente=None):
         return [
             {
                 "table": "installment_plans",
@@ -637,7 +637,7 @@ async def test_update_em_plano_mudar_parcelas_com_current_installment_atualiza_p
 async def test_update_em_plano_mudar_parcelas_sem_numero_pede_quantidade(monkeypatch, grafo):
     from app.graph import nodes
 
-    async def plano_alvo(workspace_id, acoes, texto_cru):
+    async def plano_alvo(workspace_id, acoes, texto_cru, antecedente=None):
         return [
             {
                 "table": "installment_plans",
