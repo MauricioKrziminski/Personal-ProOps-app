@@ -16,7 +16,8 @@ nenhum outro:
 | O que exige confirmação | `app/graph/policy.py` |
 | Execução das ações | `app/tools/` |
 
-`_shared/gemini.ts` e `process-jobs/index.ts` são **legado**. Ver `.claude/rules/agent.md`.
+Os equivalentes em Deno (`_shared/gemini.ts`, `process-jobs/index.ts`) foram **apagados** em
+09/09/2026. Ver `.claude/rules/agent.md`.
 
 ## Regras de chamada
 

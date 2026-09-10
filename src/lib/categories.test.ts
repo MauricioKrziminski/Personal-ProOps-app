@@ -9,6 +9,10 @@ import { INCOME_CATEGORIES, SUGGESTED_CATEGORIES } from './categories.ts';
 /**
  * Extrai a lista literal de `SUGGESTED_CATEGORIES` de um arquivo, seja ele TS
  * (`= [...]`) ou Python (`: tuple[str, ...] = (...)`).
+ *
+ * Eram TRÊS cópias (app, agente, prompt Deno) e viraram duas em 09/09/2026, quando
+ * `supabase/functions/` foi apagado. O teste do Deno já nascia com prazo — "enquanto ele
+ * existir" estava escrito no nome dele.
  */
 function parseListFrom(path: string): string[] {
   const source = readFileSync(path, 'utf8');
@@ -22,11 +26,6 @@ test('o agente Python usa exatamente as mesmas categorias do app', () => {
   // Divergir aqui faz o modelo sugerir categoria que a tela não conhece.
   const doAgente = parseListFrom('agent/app/domain/categories.py');
   assert.deepEqual(doAgente, [...SUGGESTED_CATEGORIES]);
-});
-
-test('o prompt legado do Deno ainda bate (enquanto ele existir)', () => {
-  const doPrompt = parseListFrom('supabase/functions/_shared/gemini.ts');
-  assert.deepEqual(doPrompt, [...SUGGESTED_CATEGORIES]);
 });
 
 test('categorias são curtas, minúsculas e sem duplicata', () => {

@@ -14,7 +14,7 @@ send-reminders (pg_cron) dispara lembretes vencidos por push/WhatsApp.
 ```
 
 - **App:** Expo SDK 57 + expo-router + TypeScript (`src/`), design liquid glass iOS, TanStack Query, dark mode automático.
-- **Backend:** Supabase — Postgres (RLS deny-by-default), Auth Phone OTP, Edge Functions Deno (`supabase/functions/`), Realtime, pg_cron.
+- **Backend:** Python 3.12 + FastAPI em `agent/` (Cloud Run). Supabase é Postgres (RLS deny-by-default), Auth e Realtime — sem Edge Functions desde 09/09/2026.
 - **IA:** Google Gemini (Flash + fallback Pro, saída estruturada) · **Áudio:** Groq Whisper · **WhatsApp:** Meta Cloud API oficial.
 
 ## Rodando o app
@@ -30,7 +30,7 @@ Login por telefone (OTP). Em dev (`__DEV__`) há um botão de login de teste.
 ## Backend (Supabase)
 
 - Migrations: `supabase/migrations/` — aplicar com `npx supabase db push`.
-- Edge Functions: `supabase/functions/` — testar com `npx supabase functions serve`, deployar com `npx supabase functions deploy <nome>`.
+- Agente: `agent/` — testar com `.venv/bin/pytest`, deployar com `./scripts/setup-gcp.sh deploy`.
 - Secrets das functions: documentados em `supabase/.env.example`, definidos com `npx supabase secrets set` (nunca commitados).
 
 ## Qualidade

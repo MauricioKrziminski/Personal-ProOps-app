@@ -82,8 +82,8 @@
   `build-iam`) param e exigem que você digite `PRODUCAO`, ou `PROOPS_PROD_OK=1` — a MESMA saída de
   emergência do hook do Supabase, para não haver duas convenções. `staging` passa direto. Sem isso,
   `./scripts/setup-gcp.sh` sem argumento nenhum fazia deploy em produção sem perguntar nada.
-- Edge Functions (legado): `npx supabase functions deploy <nome>`. Hoje só o `whatsapp-webhook`,
-  que é o roteador do corte.
+- Edge Functions: **não existem mais** (09/09/2026). Não há o que deployar; o que era delas é
+  rota do agente.
 - App: builds via EAS (`eas.json`: development/preview/production).
 - Fluxo WhatsApp ponta-a-ponta: usar o checklist do comando `/verify-whatsapp`.
 

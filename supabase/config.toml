@@ -1,97 +1,17 @@
-# Configuração das Edge Functions do Personal ProOps app.
-# O webhook do WhatsApp NÃO recebe JWT (a Meta chama direto) — a segurança dele
-# é a verificação HMAC (X-Hub-Signature-256) + verify_token feita no código.
-# Todas as outras funções exigem JWT.
+# Projeto Supabase do Personal ProOps app.
+#
+# ⚠️ **Não há mais Edge Functions** (09/09/2026). Este arquivo tinha oito blocos
+# `[functions.*]` com a política de JWT de cada uma; todas foram apagadas quando o corte
+# Strangler terminou e o agente Python passou a receber tudo diretamente:
+#
+#   whatsapp-webhook  → POST /whatsapp-inbound   (Meta chama direto o Cloud Run)
+#   wa-send-otp       → POST /hooks/otp          (Send SMS Hook do Supabase Auth)
+#   billing-webhook   → POST /hooks/billing
+#   import-statement  → POST /internal/import-statement
+#   process-jobs      → o worker do agente
+#   send-reminders / finance-scheduler / send-alerts → POST /cron/* (Cloud Scheduler)
+#
+# O Supabase segue sendo BANCO e FILA. Se um dia alguém precisar de uma function aqui, leia
+# antes o `.claude/rules/supabase.md`: o lugar de lógica nova é `agent/`.
 
 project_id = "app-proops"
-
-[functions.whatsapp-webhook]
-verify_jwt = false
-
-[functions.process-jobs]
-verify_jwt = true
-
-[functions.send-reminders]
-verify_jwt = true
-
-# manutencao financeira (materializa recorrentes 90 dias a frente, fecha faturas,
-# promove pendentes vencidos). Chamada por pg_cron de hora em hora.
-[functions.finance-scheduler]
-verify_jwt = true
-
-# alertas proativos (orcamento, fatura, conta vencendo, saldo negativo).
-# Chamada por pg_cron uma vez por dia.
-[functions.send-alerts]
-verify_jwt = true
-
-# importacao de extrato OFX/CSV chamada pelo app (usuario autenticado)
-[functions.import-statement]
-verify_jwt = true
-
-# Send SMS Auth Hook do Supabase (entrega OTP via WhatsApp). Sem JWT — a
-# segurança é a assinatura standardwebhooks (SEND_SMS_HOOK_SECRET).
-[functions.wa-send-otp]
-verify_jwt = false
-
-# webhook da RevenueCat (concede plano pago). Sem JWT — a seguranca e o segredo
-# constante-time no header Authorization (REVENUECAT_WEBHOOK_SECRET).
-[functions.billing-webhook]
-verify_jwt = false
-
-# ---------------------------------------------------------------------------
-# ⚠️ NUNCA rode `supabase config push` a partir daqui (07/09/2026).
-#
-# Este arquivo descreve a STACK LOCAL. Um `config push` sem `--workdir` empurra ELE para o
-# projeto LINKADO (hoje o staging) e escreve no ar: Twilio com `account_sid = "local-test"`,
-# dois telefones com código FIXO em `[auth.sms.test_otp]`, `minimum_password_length = 6` (a tela
-# exige 8), rate limit de 1000 e `site_url = "http://127.0.0.1:3000"`.
-#
-# Aconteceu em 07/09/2026. O CLI imprime o diff mas NÃO pergunta antes de aplicar — piping de
-# "n" não segura nada. E os números de `test_otp` não saem por push: a API faz merge do mapa, e
-# tirá-los é manual no dashboard.
-#
-# O caminho para os projetos hospedados é `supabase/hosted/` — ver o cabeçalho de lá.
-# ---------------------------------------------------------------------------
-
-# ---------------------------------------------------------------------------
-# Auth local (03/09/2026) — conta por e-mail e senha com confirmação por CÓDIGO.
-# Estes templates são os mesmos que precisam estar no dashboard do projeto
-# (Authentication → Email Templates): o app confirma cadastro e recuperação com
-# `verifyOtp` + `{{ .Token }}`, nunca com o `{{ .ConfirmationURL }}` padrão.
-# ---------------------------------------------------------------------------
-[auth.email]
-enable_confirmations = true
-
-[auth.email.template.confirmation]
-subject = "Seu código do Personal ProOps app"
-content_path = "./supabase/templates/confirmation.html"
-
-[auth.email.template.recovery]
-subject = "Trocar a senha do Personal ProOps app"
-content_path = "./supabase/templates/recovery.html"
-
-# O projeto hospedado entrega este OTP pelo Send SMS Hook/WhatsApp. Localmente não há Meta nem
-# custo: estes dois números aceitam códigos fixos e deixam login + phone_change testáveis de ponta
-# a ponta. `enable_confirmations` precisa ser true; false mudaria o telefone sem passar pelo código.
-[auth.sms]
-enable_signup = true
-enable_confirmations = true
-template = "Seu código do Personal ProOps app é {{ .Code }}"
-max_frequency = "1s"
-
-[auth.sms.test_otp]
-5511999990002 = "123456"
-5511999990003 = "654321"
-
-# A CLI exige um provider habilitado até para os números de test_otp. Os valores abaixo são
-# marcadores locais: para esses dois números o GoTrue valida o mapa acima e não chama a Twilio.
-[auth.sms.twilio]
-enabled = true
-account_sid = "local-test"
-message_service_sid = "local-test"
-auth_token = "local-test"
-
-# Só local: o padrão de 2 e-mails/hora derruba qualquer teste de fluxo com Mailpit.
-[auth.rate_limit]
-email_sent = 1000
-sms_sent = 1000

@@ -9,9 +9,13 @@
  *
  * **O que é comportamento está em pytest**, não aqui: quem prova que um turno do
  * app grava `channel='app'` e um do WhatsApp grava `whatsapp` é
- * `tests/test_app_whatsapp_isolation.py`. Este arquivo cobre só o que o Node
- * alcança e o Python não: a Edge Function legada, que ainda escreve na mesma
- * tabela enquanto o corte Strangler não termina.
+ * `tests/test_app_whatsapp_isolation.py`.
+ *
+ * ⚠️ **Sobrou UM escritor** (09/09/2026). Este arquivo existia porque eram dois: o Python e a
+ * Edge Function legada, que escrevia na mesma tabela durante o corte Strangler. Com
+ * `supabase/functions/` apagado, o segundo escritor deixou de existir — o teste dele saiu, e a
+ * asserção sobre a assinatura Python fica, porque o defeito que ela prende (um chamador novo
+ * herdar um canal que não é o dele) não dependia da existência do outro.
  *
  * A leitura de fonte do lado Python ficou, mas ANCORADA na declaração e no SQL —
  * não em offsets entre comentários, que era o jeito frágil de antes: renomear um
@@ -22,22 +26,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { test } from 'node:test';
 
-const legacyWorker = readFileSync('supabase/functions/process-jobs/index.ts', 'utf8');
 const pythonDb = readFileSync('agent/app/db.py', 'utf8');
-
-/** O objeto passado a `.insert({...})` do `ai_events`, do `{` até o `}` que fecha. */
-function insertLegado(fonte: string): string {
-  const inicio = fonte.indexOf('.from("ai_events").insert({');
-  assert.notEqual(inicio, -1, 'a Edge Function legada não escreve mais em ai_events');
-  const fim = fonte.indexOf('})', inicio);
-  return fonte.slice(inicio, fim);
-}
-
-test('a Edge Function legada atribui workspace e canal', () => {
-  const insert = insertLegado(legacyWorker);
-  assert.match(insert, /workspace_id:\s*workspaceId/);
-  assert.match(insert, /channel:\s*["']whatsapp["']/);
-});
 
 test('o serviço Python exige o canal e grava as duas colunas', () => {
   // A assinatura: `channel` é keyword-only e SEM default. Um default aqui seria

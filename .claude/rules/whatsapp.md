@@ -3,7 +3,7 @@
 **Decisão imutável: só a Meta Cloud API oficial. Nunca Baileys ou qualquer cliente não-oficial.**
 Graph API v21.0, helpers em `agent/app/services/whatsapp.py` (`send_text`, `send_template`,
 `send_auth_code`, `download_media`, `try_send`) e assinatura em `agent/app/security.py`.
-`_shared/whatsapp.ts` é legado.
+O helper Deno equivalente foi apagado em 09/09/2026 junto com `supabase/functions/`.
 
 ## Webhook (`POST /whatsapp-inbound`)
 

@@ -36,10 +36,10 @@
   categorias que o usuário usa** (`categories_used()`, `20260909100000`), mescladas com as
   sugestões e agrupadas por forma sem acento (`src/lib/categories-merge.ts`): em produção havia 25
   categorias distintas e só 8 estavam entre as 13 sugeridas — "despesas eventuais" (14
-  lançamentos), "roupa", "eletrônicos" e "impostos" não davam para escolher no app. Existem DUAS
-  cópias literais, porque nem o Deno nem o Python importam de
-  `src/`: `agent/app/domain/categories.py` (a que vale hoje) e `_shared/gemini.ts` (legado).
-  `src/lib/categories.test.ts` falha se qualquer uma divergir — mexeu numa, mexe nas outras. A
+  lançamentos), "roupa", "eletrônicos" e "impostos" não davam para escolher no app. Existe UMA
+  cópia literal, porque o Python não importa de `src/`: `agent/app/domain/categories.py`.
+  (Eram duas; a do Deno saiu com `supabase/functions/` em 09/09/2026.)
+  `src/lib/categories.test.ts` falha se as duas divergirem — mexeu numa, mexe na outra. A
   tabela `categories` legada foi dropada na `0010_workspaces.sql`.
 
 ## Agregações

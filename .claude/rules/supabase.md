@@ -1,9 +1,8 @@
 # Supabase — schema, RLS, functions
 
 > **O Supabase é BANCO e FILA, não onde a lógica roda** (desde 30/08/2026). Quem processa é o
-> serviço Python em `agent/` — ver `.claude/rules/agent.md`. As Edge Functions em
-> `supabase/functions/` são legado em desmonte; a seção sobre elas, mais abaixo, vale só enquanto
-> o corte Strangler não terminar.
+> serviço Python em `agent/` — ver `.claude/rules/agent.md`. **As Edge Functions não existem
+> mais**: `supabase/functions/` foi apagado em 09/09/2026, quando o corte Strangler terminou.
 
 ## Migrations
 
@@ -56,17 +55,24 @@ Cada agregação existe como par interna + wrapper:
 
 Funções `security definer` sempre com `set search_path = public` e revoke explícito (padrão do `0002_security_hardening.sql`).
 
-## Edge Functions (Deno, `supabase/functions/`) — LEGADO
+## Edge Functions — NÃO EXISTEM MAIS (09/09/2026)
 
-Em desmonte. Só o `whatsapp-webhook` tem função ativa nova: ele é o **roteador do corte
-Strangler** (lê `agent_routing.use_python_agent` e repassa para o Cloud Run). Não adicionar
-função nem lógica aqui — o lugar é `agent/`.
+`supabase/functions/` foi apagado. Eram oito funções e todas têm rota equivalente no agente
+(`/whatsapp-inbound`, `/hooks/otp`, `/hooks/billing`, `/internal/import-statement`, `/cron/*`).
 
-- `service_role` **só** aqui, via `adminClient()` de `_shared/admin.ts`.
-- `verify_jwt` por função em `config.toml`: webhooks externos (Meta) = `false` com validação própria (HMAC); funções internas de cron = `true`.
-- Módulos compartilhados em `_shared/` (`admin.ts`, `whatsapp.ts`, `gemini.ts`, `datetime.ts`, `recurrence.ts`) — não duplicar helpers entre functions.
-- **Datas**: o runtime roda em UTC. "Hoje" para o usuário sai de `localISODate(date, timezone)` e RRULE de `nextOccurrence(...)` (`_shared/`), nunca de `toISOString().slice(0,10)`. Datetime vindo do Gemini passa por `toInstantISO` antes de virar `timestamptz`.
-- Testar localmente com `npx supabase functions serve` antes de `functions deploy`.
+**Lógica nova vai em `agent/`, sempre.** Se você está prestes a criar uma function aqui, o que
+você quer é uma rota no FastAPI: ela tem o mesmo alcance, testes em pytest, e não cria uma
+segunda cópia da regra de negócio — que é o problema que este corte existiu para matar.
+
+⚠️ **`service_role` saiu do repositório junto.** Ele vivia no `adminClient()` das functions. O
+agente conecta com papel próprio e o escopo de workspace virou código (`ensure_owned`, filtro
+obrigatório). Não reintroduza `service_role` no app: a RLS é o que protege o cliente.
+
+⚠️ **O app não chama servidor por `functions.invoke`.** O caminho é `agentFetch`
+(`src/lib/agent-api.ts`), que manda o JWT do Supabase e deixa o servidor tirar o usuário do
+`sub`. A última chamada que sobrou (`import-statement`) recebia `user_id` e `workspace_id` no
+CORPO e confiava neles — qualquer autenticado escrevia no workspace de outro.
+`src/lib/anti-slop.test.ts` quebra o build se isso voltar.
 
 ## Segredos
 

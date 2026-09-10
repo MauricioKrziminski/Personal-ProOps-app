@@ -79,7 +79,7 @@ App mobile pessoal de **notas rápidas, lembretes e controle financeiro operado 
 | Banco | Supabase Postgres — migrations em `supabase/migrations/` |
 | Observabilidade | Langfuse (tracing do grafo) + tabela `ai_events` |
 | Auth | Supabase Auth **e-mail + senha** (código por e-mail, sem link) · Phone OTP só para vincular o WhatsApp e para contas antigas |
-| Legado | Edge Functions (Deno) em `supabase/functions/` — em desmonte |
+| ~~Legado~~ | **Não há mais Edge Functions** — `supabase/functions/` foi apagado em 09/09/2026 |
 
 ## Arquitetura (resumo)
 
@@ -103,31 +103,38 @@ Cloud Scheduler: /cron/reminders (1 min, leva junto o sweep da fila),
 - Idempotência de **entrada** por `wa_message_id` único; de **execução** por
   `executed_actions (wa_message_id, action_index)`, reservada ANTES de executar.
 
-## Corte em produção (Strangler Fig)
+## Corte em produção (Strangler Fig) — TERMINADO em 09/09/2026
 
-A Edge Function `whatsapp-webhook` sobrevive como **roteador fino**: lê
-`agent_routing.use_python_agent` pelo telefone e repassa o corpo cru para o Cloud Run quando for
-`true`. Rollback é um `update` numa linha.
+**Não existe mais Edge Function.** `supabase/functions/` foi apagado, e o agente Python recebe
+tudo diretamente:
 
-Se o repasse não voltar 2xx, o roteador devolve **não-200** para a Meta reentregar. Cair no fluxo
-Deno antigo como fallback seria pior: uma conversa esperando "SIM" no Python teria a resposta
-processada pelo fluxo velho, que não sabe que uma pergunta foi feita, e o "sim" viraria uma nota.
-`supabase/functions/` só é deletado quando todos os números estiverem migrados.
+| quem chama | onde bate |
+|---|---|
+| Meta (WhatsApp) | `POST /whatsapp-inbound` — Callback URL trocada no painel da Meta |
+| Supabase Auth (Send SMS Hook) | `POST /hooks/otp` |
+| RevenueCat | `POST /hooks/billing` |
+| o app (importar extrato) | `POST /internal/import-statement` |
+| Cloud Scheduler | `POST /cron/reminders`, `/cron/finance-scheduler`, `/cron/alerts` |
 
-**O padrão inverteu em 09/09/2026** (`20260909210000`, aplicada em produção). Telefone **sem
-linha** em `agent_routing` vai para o **Python**; a tabela deixou de ser lista de ENTRADA e virou
-lista de **EXCEÇÃO** (`use_python_agent = false` segura um número no Deno). O motivo é que cada
-usuário novo precisaria de uma linha escrita à mão, e uma hora ninguém lembraria — o sintoma seria
-o agente "não saber" o que já sabe no app.
+Verificado em log no dia: a mensagem chegou com user-agent `facebookexternalua` vindo de
+`2a03:2880:…` (faixa da Meta), e o OTP com `Go-http-client` (o GoTrue do Supabase). Nenhum dos
+dois passa mais pelo Deno.
 
-⚠️ **Apagar `supabase/functions/` tem um pré-requisito que não é o número de linhas `false`.**
-O caminho hoje é **Meta → Edge Function → Cloud Run**: a Callback URL no painel da Meta aponta
-para a function. Apagar antes de repontar para
-`https://agente-wwm7xruoyq-rj.a.run.app/whatsapp-inbound` derruba o WhatsApp inteiro. A ordem é
-repontar → testar → apagar. O Cloud Run já responde a verificação (`GET /whatsapp-inbound`).
+⚠️ **A ordem importava, e é a lição que fica: repontar → testar → apagar.** Apagar o CÓDIGO não
+desliga a função PUBLICADA — ela serve até um `functions delete` explícito. Quem derruba o
+WhatsApp é trocar a URL errado, não remover o arquivo. Por isso o repositório só deixou de ter o
+diretório depois de as duas pontas externas estarem provadas.
 
-Enquanto a function existir, ela é o **botão de rollback**: voltar ao fluxo antigo é um `update`
-numa linha. Depois de apagada, é um redeploy.
+⚠️ **Duas coisas quase foram apagadas junto e não podiam:** o app ainda chamava
+`import-statement` (que lia o dono do dado do CORPO do POST — qualquer autenticado importava
+para o workspace de outro), e três testes de paridade LIAM os arquivos Deno. O primeiro virou
+rota no agente com o usuário saindo do JWT; os outros trocaram de alvo para os arquivos Python,
+porque o que eles protegem nunca foi "o Deno está igual". `src/lib/anti-slop.test.ts` quebra o
+build se o app voltar a chamar `functions.invoke`.
+
+Rollback, se algum dia precisar: as URLs antigas eram
+`https://kwriuifcwyvdrxtspjiz.supabase.co/functions/v1/<nome>`, e o código está no histórico do
+git até o commit anterior à remoção.
 
 ## Regras detalhadas (obrigatórias)
 
