@@ -31,6 +31,23 @@
   conciliável) e o resto se expande da regra — o Google Calendar pré-computa ~1 ano, o Asana 30
   dias. Aqui a janela virou 365 dias, que é ~12 linhas por série.
 
+  ⚠️ **Passar de 90 para 365 dias quebrou TODA leitura de "o mais recente", e em silêncio.**
+  O cron grava as ocorrências do ano inteiro NO MESMO INSTANTE: quem ordena por `created_at`
+  passa a ver só futuro. Medido em produção em 10/09/2026, com 200 linhas futuras contra 103
+  passadas:
+
+  - `useRecentTransactions` — "Últimos lançamentos" da Hoje e do Financeiro virou doze
+    "Manutenção dentista", uma por mês, até agosto de 2027.
+  - `finance.reference_window` (era `resolve_transaction` e `por_transacao`, com a consulta
+    duplicada) — a janela dos 40 ficou **40 de 40 no futuro**, e "apaga o último gasto"
+    resolvia para *Manutenção dentista de 10/08/2027*. Caminho destrutivo; quem segurava era o
+    usuário ler o `interrupt()` e dizer não.
+
+  O corte certo é a DATA, nunca o `status`: compra no cartão fica `pending` até a fatura ser
+  paga e ainda assim é lançamento que aconteceu. E a janela do agente tem duas metades — o
+  passado primeiro (é o que "o último" quer dizer), depois as 10 ocorrências futuras mais
+  próximas, para "a parcela de outubro" continuar alcançável.
+
   **Não escreva um segundo expansor em SQL** para ir além do horizonte: a aritmética de
   recorrência mora em `agent/app/jobs/scheduler.py` (`HORIZON_DAYS`) e duplicá-la é a segunda
   cópia que diverge. Além de 12 meses, o caminho é uma RPC de LEITURA que marque a linha como
@@ -56,6 +73,57 @@
   (Eram duas; a do Deno saiu com `supabase/functions/` em 09/09/2026.)
   `src/lib/categories.test.ts` falha se as duas divergirem — mexeu numa, mexe na outra. A
   tabela `categories` legada foi dropada na `0010_workspaces.sql`.
+
+## "Quanto sobrou" tem UMA definição, e ela inclui o que não é transação
+
+⚠️ **Nem tudo que sai do caixa é linha em `transactions`.** A parcela de financiamento sai do
+CRONOGRAMA (`private.debt_schedule_for`) e a recorrente além do horizonte materializado sai da
+REGRA (`private.recurring_projection_for`). Quem ignora essas duas fontes mostra um mês melhor do
+que ele é — e não dá erro nenhum, só um número otimista.
+
+Em 10/09/2026 existiam **três** respostas para "quanto sobrou em setembro" e uma estava errada:
+
+| RPC | tela | setembro/2026 |
+|---|---|---|
+| `month_summary` (sobre `month_lines_for`) | O mês inteiro | **−358,75** |
+| `cash_flow_forecast` | Projeção | acumulado, −707,92 no fim do mês |
+| `monthly_cashflow` | Tendência mensal | **+1.126,25** ← lia só `transactions` |
+
+A diferença de R$ 1.485,00 era uma linha só: `Parcela Carro (8/48)`, `origin='debt_schedule'`.
+O gráfico dizia "sobrou mil reais" no mês em que o dono do produto estava no vermelho, e ele
+reparou antes de nós. `monthly_cashflow` passou a agregar `month_lines_for`
+(`20260911010000`): **existe uma fonte de linha do mês, e é ela.**
+
+Custo medido em produção: 146–256 ms para 6–24 meses, contra ~20 ms da soma crua. É uma
+chamada por montagem de tela, cacheada pelo TanStack Query.
+
+⚠️ **A hachura "a pagar" mudou de régua junto**, de `status='pending'` para `not settled` — a
+mesma coluna de "O mês inteiro". A diferença é a compra de cartão com fatura em aberto: `cleared`
+na linha, mas o dinheiro ainda não saiu. Setembro: 3.433,01 → 4.961,01. Para um gráfico de FLUXO
+DE CAIXA a régua nova é a certa.
+
+⚠️ **Isto não reescreveu o passado, e o motivo é frágil:** `debt_schedule_for` devolve o
+cronograma a partir da PRÓXIMA parcela. Se um dia ela passar a devolver as já pagas,
+`private.debt_paid_in_month` não segura — ela procura transação com `debt_id`, e as 8 parcelas
+pagas do carro moram só no cadastro (`debt_installments_undocumented`). Seria história reescrita
+para baixo, em silêncio. Medido antes de aplicar: abril a agosto deram delta 0,00.
+
+## O acumulado é o produto, não um detalhe da Projeção
+
+A pergunta que faz o usuário manter uma planilha ao lado do app não é "quanto entrou e saiu neste
+mês" — é *"o que de fato restou para eu gastar esse mês contando com o que restou do mês
+anterior"*. Com salário caindo num mês e fatura vencendo no começo do outro, **mês isolado dá um
+número que nunca existiu na conta dele.**
+
+A série de caixa sempre foi cumulativa; o que faltava era o ponto de partida ESCRITO. `veioDe`
+(`src/lib/forecast-months.ts`) sai por subtração (`saldo − entra + sai`) em vez de vir do mês
+anterior no array: no primeiro mês não existe anterior, e o valor certo lá é o saldo em conta
+ANTES dos vencimentos de hoje — nem o `hoje` do payload (que já os desconta), nem zero. Como é a
+identidade da série, uma quebra futura aparece como número que não fecha.
+
+Por isso o "E se…?" saiu do ÚLTIMO lugar da home do Financeiro para logo abaixo de "O mês
+inteiro": o argumento antigo ("ninguém abre o app para simular") descrevia um simulador de
+compra, não a única tela que responde quanto resta.
 
 ## Agregações
 
