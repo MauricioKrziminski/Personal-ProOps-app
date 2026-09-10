@@ -74,6 +74,44 @@
   `src/lib/categories.test.ts` falha se as duas divergirem — mexeu numa, mexe na outra. A
   tabela `categories` legada foi dropada na `0010_workspaces.sql`.
 
+## O mês financeiro fecha no dia que o usuário paga, não no dia 31
+
+⚠️ **"Do dia 1 ao 31" é uma suposição, e para quem paga tudo num dia só ela corta o ciclo ao
+meio.** O caso do dono do produto (10/09/2026): salário no dia 5 e no 20, e as DUAS faturas
+vencendo dia 10 — Nubank (fecha dia 3) e BB (fecha no último dia). O período que importa para
+ele é **11/08 a 10/09**: recebe, gasta, e no dia 10 paga tudo. Lido de 1 a 31, o salário do dia
+20 aparece num balde e a fatura que ele paga com esse salário no seguinte — e nenhum número da
+tela bate com a planilha dele.
+
+`workspaces.cycle_close_day` (`20260911020000`), **null = último dia do mês**, que é
+exatamente o comportamento anterior. Teto de 28 para o dia existir em fevereiro: sem isso o
+ciclo mudaria de tamanho conforme o mês, que é o defeito que ele resolve.
+
+**Uma função sabe a regra, e é `private.cycle_bounds(close_day, mes)`.** Dela saem
+`month_lines_for`, `month_summary_for`, `monthly_lines_range` e `month_group` — os quatro
+`date_trunc('month', ...)` que existiam viraram uma chamada. `private.cycle_month_of` responde
+a outra metade: a que ciclo um DIA pertence.
+
+⚠️ **O rótulo é o mês em que o ciclo TERMINA.** "Setembro" com fechamento no dia 10 é
+11/08–10/09, porque é assim que o usuário fala ("o que eu pago em setembro"). A consequência é
+que `date_trunc('month', current_date)` deixa de servir para "mês corrente": no dia 15/09 o
+ciclo corrente já se chama outubro, e ancorar no mês civil deixaria a tela um ciclo atrasada
+durante 20 dias por mês.
+
+⚠️ **Isto é parâmetro de LEITURA e não encosta na regra de fatura.** Em qual fatura uma compra
+cai continua sendo o `closing_day` do cartão pelo trigger `set_invoice`, e a projeção continua
+tirando o dinheiro do caixa na data de VENCIMENTO. Compra no Nubank dia 04/09 cai na fatura que
+vence 10/10 — antes e depois. O ciclo só move a régua que corta os gráficos.
+
+⚠️ **O app PERGUNTA o ciclo, nunca calcula** (`cycle_now`, `cycle_range`). Reescrever a
+aritmética em TypeScript seria a segunda cópia da regra, e o modo de falha é mudo: o painel
+pediria N dias de projeção enquanto o banco agrupa outra borda, e os dois números da tela
+discordariam sem erro nenhum. Foi quase o que aconteceu — o painel já seguia o ciclo enquanto a
+linha "entrou · saiu" logo abaixo dele ainda somava 01 a 31.
+
+Padrão do nicho, não invenção: YNAB, Monarch, Mobills e Organizze todos têm dia de
+início/fechamento do mês configurável.
+
 ## "Quanto sobrou" tem UMA definição, e ela inclui o que não é transação
 
 ⚠️ **Nem tudo que sai do caixa é linha em `transactions`.** A parcela de financiamento sai do
