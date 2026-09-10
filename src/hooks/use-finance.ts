@@ -1232,11 +1232,19 @@ export function useCashHistory(days: number) {
     queryKey: ['cash-history', String(days)],
     queryFn: async (): Promise<{ day: string; cents: number }[]> => {
       const desde = new Date(Date.now() - days * 86_400_000).toISOString().slice(0, 10);
+      // ⚠️ **Do mais NOVO para o mais velho, com teto explícito.** O PostgREST corta em 1000
+      // linhas de qualquer jeito; pedindo em ordem crescente ele devolveria as 1.000 fotos
+      // MAIS ANTIGAS e jogaria fora o passado recente — que é justamente a metade que encosta
+      // no dia 0 da projeção, e o degrau que o comentário acima diz não existir apareceria.
+      // Com o horizonte de 10 anos este hook passou a pedir 3.650 dias, então isto deixou de
+      // ser teórico: estoura com ~1.000 fotos (uma por dia, ou ~500 com dois workspaces).
+      // A ordenação crescente que a curva precisa é feita no `sort` logo abaixo.
       const { data, error } = await supabase
         .from('net_worth_snapshots')
         .select('as_of, cash_cents')
         .gte('as_of', desde)
-        .order('as_of');
+        .order('as_of', { ascending: false })
+        .limit(1000);
       if (error) throw error;
       const porDia = new Map<string, number>();
       for (const row of data ?? []) {
