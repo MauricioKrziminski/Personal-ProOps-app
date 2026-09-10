@@ -998,9 +998,9 @@ export default function FinanceScreen() {
         {/* 8. A ferramenta. Fica por último de propósito — ver o docblock da tela. */}
         <Section>
           <Row
-            title="Posso comprar isso?"
-            subtitle="Simula o parcelado em cima da projeção"
-            icon="cart"
+            title="E se…?"
+            subtitle="Suponha uma entrada ou saída e veja os meses"
+            icon="questionmark.circle"
             onPress={() => router.push('/finance/forecast')}
           />
         </Section>

@@ -108,6 +108,18 @@
   `supabase/tests/draft_scenario.sql` prova que ele devolve o mesmo de antes — trocar o motor de
   uma feature que funciona sem provar equivalência é como ela quebra em silêncio.
 
+  **Duas formas de hipótese, e confundi-las erra por um fator de N** (`20260910200000`):
+  `mode: 'total'` reparte um total em N parcelas (3.000 em 6x = 500/mês, a COMPRA);
+  `mode: 'monthly'` repete o valor cheio todo mês (1.500/mês, a RECORRÊNCIA). `mode` ausente cai
+  em `total` — é o que mantém `affordability` intacta. Em `monthly` a função **não precisa saber
+  onde a projeção termina**: ela é avaliada por dia, e "quantas vezes já repetiu até `d`" é
+  aritmética de meses; quem corta é o horizonte de quem chama.
+
+  **O bloco chama-se "E se…?", não mais "Posso comprar isso?"** — o nome antigo contava a
+  limitação (a conta vivia dentro do `affordability`, que sempre subtrai). Com `kind`, o bloco
+  responde entrada E saída, e o veredito sai da própria série simulada (`primeiroNegativo` sobre
+  `serie`), não de uma segunda RPC.
+
   ⚠️ **O rascunho move o CAIXA, e só.** Não remonta fatura (`set_invoice`), orçamento
   (`_budgets_status`) nem cronograma de dívida (`debt_schedule_for`) — reproduzir essas regras no
   cliente ou numa segunda função seria a cópia que diverge. A tela diz isso ao usuário.

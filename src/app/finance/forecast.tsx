@@ -1,13 +1,12 @@
 import { useEffect, useRef, useState } from 'react';
 import {
-  AccessibilityInfo,
   Pressable,
   StyleSheet,
   View,
   useWindowDimensions,
 } from 'react-native';
 import Animated, { FadeIn, FadeInDown } from 'react-native-reanimated';
-import { Stack, router, useLocalSearchParams } from 'expo-router';
+import { Stack, router } from 'expo-router';
 import * as Haptics from 'expo-haptics';
 
 import { ThemedText } from '@/components/themed-text';
@@ -30,7 +29,6 @@ import { useToast } from '@/components/ui/toast';
 import { Motion, Radius, Space, tabular } from '@/design/tokens';
 import {
   useAccounts,
-  useAffordability,
   useCashFlowForecast,
   useCashHistory,
   useForecastWithDrafts,
@@ -39,7 +37,6 @@ import {
   useUpcomingBills,
   type Draft,
 } from '@/hooks/use-finance';
-import { useDebounced } from '@/hooks/use-debounced';
 import { monthTitle } from '@/components/finance/month-picker';
 import { agruparPorMes, mesDoCorte } from '@/lib/forecast-months';
 import { formatBRL, isoToBR, localISODate } from '@/lib/dates';
@@ -86,11 +83,8 @@ function ErrorBand({ message, onRetry }: { message: string; onRetry: () => void 
 export default function ForecastScreen() {
   const toast = useToast();
   const { width } = useWindowDimensions();
-  const { simular } = useLocalSearchParams<{ simular?: string }>();
 
   const [dias, setDias] = useState(90);
-  const [simCents, setSimCents] = useState(0);
-  const [parcelas, setParcelas] = useState(1);
   const [comoCalculo, setComoCalculo] = useState(false);
   /**
    * Dia × Mês.
@@ -115,15 +109,11 @@ export default function ForecastScreen() {
   const [novoValor, setNovoValor] = useState(0);
   const [novoMes, setNovoMes] = useState<string | null>(null);
   const [novoParcelas, setNovoParcelas] = useState(1);
-
-  // Cada tecla do MoneyField é uma chave nova, e `affordability` roda uma projeção de 370 dias por
-  // dentro: sem o atraso, digitar "1250" são quatro projeções de um ano.
-  const simDebounced = useDebounced(simCents, 400);
+  const [novoModo, setNovoModo] = useState<'total' | 'monthly'>('total');
 
   const forecast = useCashFlowForecast(dias);
   const bills = useUpcomingBills(30);
   const accounts = useAccounts();
-  const sim = useAffordability(simDebounced, parcelas);
   const markPaid = useMarkPaid();
 
   // ⚠️ A troca acontece AQUI, num lugar só. Tudo que vem depois — o destaque, a curva, o
@@ -183,24 +173,28 @@ export default function ForecastScreen() {
     contas.length === 0 &&
     valores.every((v) => v === 0);
 
-  const veredito = sim.data
-    ? sim.data.can_afford
-      ? `Dá para pagar. No pior dia você fica com ${formatBRL(Number(sim.data.worst_balance_cents))}, em ${isoToBR(sim.data.worst_day)}.`
-      : `Aperta. Você fica com ${formatBRL(Number(sim.data.worst_balance_cents))} em ${isoToBR(sim.data.worst_day)}.`
-    : null;
-
-  // Haptic e anúncio só quando o veredito VIRA — nunca a cada tecla.
+  /**
+   * Haptic quando o cenário VIRA de sinal — não a cada tecla.
+   *
+   * Antes isso pendurava em `affordability.can_afford`. Agora sai da própria série simulada:
+   * `primeiroNegativo` já é calculado sobre `serie`, que é a projeção COM as hipóteses. Um
+   * caminho a menos e um significado a mais — vale para receita também, não só para compra.
+   */
+  const fica = simulando ? primeiroNegativo === undefined : null;
   const vereditoAnterior = useRef<boolean | null>(null);
   useEffect(() => {
-    const cabe = sim.data?.can_afford;
-    if (cabe === undefined || veredito === null) return;
-    if (vereditoAnterior.current === cabe) return;
-    vereditoAnterior.current = cabe;
+    if (fica === null) {
+      vereditoAnterior.current = null;
+      return;
+    }
+    if (vereditoAnterior.current === fica) return;
+    const primeiro = vereditoAnterior.current === null;
+    vereditoAnterior.current = fica;
+    if (primeiro) return;
     Haptics.notificationAsync(
-      cabe ? Haptics.NotificationFeedbackType.Success : Haptics.NotificationFeedbackType.Warning
+      fica ? Haptics.NotificationFeedbackType.Success : Haptics.NotificationFeedbackType.Warning,
     );
-    AccessibilityInfo.announceForAccessibility(veredito);
-  }, [sim.data?.can_afford, veredito]);
+  }, [fica]);
 
   const pagar = (id: string, titulo: string) =>
     markPaid.mutate(
@@ -295,7 +289,7 @@ export default function ForecastScreen() {
   return (
     <Screen
       grouped
-      onRefresh={() => Promise.all([forecast.refetch(), bills.refetch(), accounts.refetch(), historico.refetch(), simDebounced > 0 ? sim.refetch() : Promise.resolve()])}
+      onRefresh={() => Promise.all([forecast.refetch(), bills.refetch(), accounts.refetch(), historico.refetch()])}
       refreshing={forecast.isRefetching}>
       <Stack.Screen
         options={{
@@ -313,54 +307,6 @@ export default function ForecastScreen() {
           },
         ]}
       />
-
-      {/*
-        A faixa do rascunho vem ANTES do destaque de propósito: o número grande muda de valor
-        quando há hipótese, e um usuário que role direto para ele precisa ter passado por aqui.
-        Dinheiro simulado que parece dinheiro real é o pior defeito possível nesta tela.
-      */}
-      {simulando ? (
-        <Card style={styles.rascunhoFaixa}>
-          <View style={styles.rascunhoTopo}>
-            <Icon name="pencil.and.outline" size="md" color="warning" />
-            <ThemedText type="smallBold" style={styles.bandText}>
-              Rascunho — nada disso está salvo
-            </ThemedText>
-            <Button
-              label="Limpar"
-              variant="secondary"
-              size="sm"
-              onPress={() => setRascunhos([])}
-            />
-          </View>
-          {rascunhos.map((d, i) => (
-            <View key={`${d.kind}-${d.start}-${d.amount_cents}-${i}`} style={styles.rascunhoLinha}>
-              <ThemedText type="small" themeColor="textSecondary" style={tabular}>
-                {d.kind === 'income' ? 'entra' : 'sai'} {formatBRL(d.amount_cents)}
-                {d.installments > 1 ? ` em ${d.installments}x` : ''} · a partir de{' '}
-                {isoToBR(d.start)}
-              </ThemedText>
-              <Button
-                label="Tirar"
-                variant="ghost"
-                size="sm"
-                onPress={() => setRascunhos((r) => r.filter((_, j) => j !== i))}
-              />
-            </View>
-          ))}
-          {/* Falhou o cálculo? DIZ. Cair calado na projeção real mostraria o número sem a
-              hipótese, com a faixa por cima jurando que está simulando. */}
-          {simulado.isError ? (
-            <ErrorBand
-              message="Não deu para calcular o rascunho — os números abaixo são os reais."
-              onRetry={simulado.refetch}
-            />
-          ) : null}
-          <ThemedText type="caption" themeColor="textSecondary">
-            Move o caixa. Não remonta fatura de cartão, orçamento nem cronograma de dívida.
-          </ThemedText>
-        </Card>
-      ) : null}
 
       {forecast.isLoading ? (
         <>
@@ -443,57 +389,84 @@ export default function ForecastScreen() {
         </Animated.View>
       ) : null}
 
-      {/* Segundo bloco, sempre visível: é a pergunta mais frequente do produto. */}
+      {/*
+        "E se…?" — o simulador de cenário.
+        
+        Era "Posso comprar isso?", e o nome contava a limitação: a conta vivia dentro do
+        `affordability`, que SEMPRE subtrai. Perguntar "e se eu passar a receber 1.500 por mês?"
+        não tinha como. Desde `20260910170000` a aritmética é `private.draft_effect`, com
+        `kind` — e aí o nome do bloco não podia mais falar só de compra.
+        
+        Ele é o SEGUNDO bloco e sempre visível: é a pergunta mais frequente do produto.
+      */}
       {!nadaParaProjetar ? (
         <Card style={styles.simulador}>
-          <ThemedText type="smallBold">Posso comprar isso?</ThemedText>
-
-          <Field label="Valor da compra">
-            <MoneyField
-              valueCents={simCents}
-              onChangeCents={setSimCents}
-              autoFocus={simular === '1'}
-            />
-          </Field>
-
-          <Field label="Em quantas vezes">
-            <Segmented
-              options={PARCELAS.map((p) => ({ value: String(p), label: `${p}x` }))}
-              value={String(parcelas)}
-              onChange={(v) => setParcelas(Number(v))}
-            />
-          </Field>
-
-          {sim.isError ? (
-            <ErrorBand message="Não deu para simular agora." onRetry={sim.refetch} />
-          ) : simCents === 0 ? (
-            <ThemedText type="small" themeColor="textSecondary">
-              Digite um valor para simular contra a sua projeção real.
+          <View style={styles.rascunhoTopo}>
+            <Icon name={simulando ? 'pencil.and.outline' : 'questionmark.circle'} size="md" color={simulando ? 'warning' : 'textSecondary'} />
+            <ThemedText type="smallBold" style={styles.bandText}>
+              {simulando ? 'Rascunho — nada disso está salvo' : 'E se…?'}
             </ThemedText>
-          ) : sim.data && veredito ? (
-            <Animated.View key={veredito} entering={FadeIn.duration(Motion.duration.fast)}>
-              <ThemedText
-                type="small"
-                themeColor={sim.data.can_afford ? 'success' : 'danger'}
-                accessibilityLiveRegion="polite">
-                {veredito}
-              </ThemedText>
-              {parcelas > 1 ? (
-                <View style={styles.parcela}>
-                  <ThemedText type="small" themeColor="textSecondary" style={tabular}>
-                    {parcelas}x de
-                  </ThemedText>
-                  <Money
-                    cents={Number(sim.data.installment_cents)}
-                    variant="subhead"
-                    tone="textSecondary"
-                  />
-                </View>
-              ) : null}
-            </Animated.View>
+            {simulando ? (
+              <Button label="Limpar" variant="secondary" size="sm" onPress={() => setRascunhos([])} />
+            ) : null}
+          </View>
+
+          {simulando ? (
+            rascunhos.map((d, i) => (
+              <View key={`${d.kind}-${d.start}-${d.amount_cents}-${i}`} style={styles.rascunhoLinha}>
+                <ThemedText type="small" themeColor="textSecondary" style={tabular}>
+                  {d.kind === 'income' ? 'entra' : 'sai'} {formatBRL(d.amount_cents)}
+                  {d.mode === 'monthly'
+                    ? ' todo mês'
+                    : d.installments > 1
+                      ? ` em ${d.installments}x`
+                      : ''}{' '}
+                  · a partir de {isoToBR(d.start)}
+                </ThemedText>
+                <Button
+                  label="Tirar"
+                  variant="ghost"
+                  size="sm"
+                  onPress={() => setRascunhos((r) => r.filter((_, j) => j !== i))}
+                />
+              </View>
+            ))
           ) : (
-            <Skeleton height={20} />
+            <ThemedText type="small" themeColor="textSecondary">
+              Suponha uma entrada ou uma saída — uma vez, parcelada ou todo mês — e veja os
+              meses recalculados como se você tivesse lançado de verdade.
+            </ThemedText>
           )}
+
+          {/* Falhou o cálculo? DIZ. Cair calado na projeção real mostraria o número sem a
+              hipótese, com o rótulo por cima jurando que está simulando. */}
+          {simulado.isError ? (
+            <ErrorBand
+              message="Não deu para calcular o rascunho — os números acima são os reais."
+              onRetry={simulado.refetch}
+            />
+          ) : null}
+
+          <Button
+            label={simulando ? 'Somar outra suposição' : 'Supor um lançamento'}
+            variant={simulando ? 'secondary' : 'primary'}
+            size="sm"
+            onPress={() => {
+              setNovoTipo('income');
+              setNovoValor(0);
+              setNovoMes(meses[0]?.mes ?? null);
+              setNovoParcelas(1);
+              setNovoModo('total');
+              setSheetAberto(true);
+            }}
+          />
+
+          {simulando ? (
+            <ThemedText type="caption" themeColor="textSecondary">
+              Move o caixa. Não remonta fatura de cartão, orçamento nem cronograma de dívida.
+              Sair da tela apaga.
+            </ThemedText>
+          ) : null}
         </Card>
       ) : null}
 
@@ -510,18 +483,6 @@ export default function ForecastScreen() {
             ]}
             value={modo}
             onChange={(v) => setModo(v)}
-          />
-          <Button
-            label={simulando ? 'Somar outra suposição' : 'Simular um cenário'}
-            variant="secondary"
-            size="sm"
-            onPress={() => {
-              setNovoTipo('income');
-              setNovoValor(0);
-              setNovoMes(meses[0]?.mes ?? null);
-              setNovoParcelas(1);
-              setSheetAberto(true);
-            }}
           />
         </View>
       ) : null}
@@ -711,7 +672,8 @@ export default function ForecastScreen() {
                   kind: novoTipo,
                   amount_cents: novoValor,
                   start: inicio,
-                  installments: novoParcelas,
+                  installments: novoModo === 'monthly' ? 1 : novoParcelas,
+                  mode: novoModo,
                 },
               ]);
               setSheetAberto(false);
@@ -737,7 +699,23 @@ export default function ForecastScreen() {
             />
           </Field>
 
-          <Field label="Valor">
+          {/*
+            ⚠️ Vem ANTES do valor e das parcelas de propósito (`frontend.md`): é o controle que
+            muda o SIGNIFICADO do valor e quais campos existem abaixo. Depois deles, a tela se
+            remontaria debaixo do dedo.
+          */}
+          <Field label="Acontece uma vez ou todo mês?">
+            <Segmented
+              options={[
+                { value: 'total', label: 'Uma vez' },
+                { value: 'monthly', label: 'Todo mês' },
+              ]}
+              value={novoModo}
+              onChange={(v) => setNovoModo(v)}
+            />
+          </Field>
+
+          <Field label={novoModo === 'monthly' ? 'Valor por mês' : 'Valor'}>
             <MoneyField valueCents={novoValor} onChangeCents={setNovoValor} autoFocus />
           </Field>
 
@@ -750,15 +728,21 @@ export default function ForecastScreen() {
             />
           </Field>
 
-          <Field label="Em quantas vezes">
-            <Segmented
-              options={PARCELAS.map((n) => ({ value: String(n), label: `${n}x` }))}
-              value={String(novoParcelas)}
-              onChange={(v) => setNovoParcelas(Number(v))}
-            />
-          </Field>
+          {/* Parcelar só faz sentido em "uma vez": "todo mês" já é a repetição. */}
+          {novoModo === 'total' ? (
+            <Field label="Em quantas vezes">
+              <Segmented
+                options={PARCELAS.map((n) => ({ value: String(n), label: `${n}x` }))}
+                value={String(novoParcelas)}
+                onChange={(v) => setNovoParcelas(Number(v))}
+              />
+            </Field>
+          ) : null}
 
           <ThemedText type="caption" themeColor="textSecondary">
+            {novoModo === 'monthly'
+              ? 'Repete todo mês até o fim da projeção. '
+              : ''}
             Some ao seu fluxo real — saldo de hoje, faturas, parcelas, financiamentos e
             recorrentes — e recalcula os meses daqui para frente. Sair da tela apaga.
           </ThemedText>
@@ -790,7 +774,6 @@ const styles = StyleSheet.create({
   },
   modo: {
     marginTop: Space.xs,
-    gap: Space.sm,
   },
   rascunhoFaixa: {
     gap: Space.sm,

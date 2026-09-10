@@ -614,6 +614,15 @@ export type Draft = {
   /** ISO `YYYY-MM-DD` */
   start: string;
   installments: number;
+  /**
+   * O que o valor SIGNIFICA — e confundir os dois erra por um fator de N:
+   *
+   * - `total`: 3.000 em 6x → 500 por mês, seis vezes. Uma COMPRA repartida.
+   * - `monthly`: 1.500 por mês → 1.500 todo mês, até o fim da projeção. Uma RECORRÊNCIA.
+   *
+   * Ausente = `total`, que é o que mantém `affordability` funcionando sem tocar nela.
+   */
+  mode?: 'total' | 'monthly';
 };
 
 /**

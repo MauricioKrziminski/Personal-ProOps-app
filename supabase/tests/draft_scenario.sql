@@ -94,7 +94,51 @@ begin
       antes, depois;
   end if;
 
-  raise notice 'OK: rascunho de cenário — 8 asserções';
+  -- 9. modo MONTHLY: repete o valor CHEIO todo mês, sem dividir
+  select * into r from private.draft_effect(
+    jsonb_build_array(jsonb_build_object(
+      'kind','income','mode','monthly','amount_cents',150000,'start',hoje)), hoje);
+  if r.delta_cents <> 150000 then
+    raise exception 'monthly no 1º mês devia ser 150000; veio %', r.delta_cents;
+  end if;
+  select * into r from private.draft_effect(
+    jsonb_build_array(jsonb_build_object(
+      'kind','income','mode','monthly','amount_cents',150000,'start',hoje)),
+    private.add_months(hoje, 3));
+  if r.delta_cents <> 600000 then
+    raise exception 'monthly no 4º mês devia acumular 600000; veio %', r.delta_cents;
+  end if;
+
+  -- 10. o mesmo dinheiro, os dois modos: 12 x 1.500 (monthly) = 18.000 em 12x (total)
+  select delta_cents into antes from private.draft_effect(
+    jsonb_build_array(jsonb_build_object(
+      'kind','income','mode','monthly','amount_cents',150000,'start',hoje)),
+    private.add_months(hoje, 11));
+  select delta_cents into depois from private.draft_effect(
+    jsonb_build_array(jsonb_build_object(
+      'kind','income','mode','total','amount_cents',1800000,'installments',12,'start',hoje)),
+    private.add_months(hoje, 11));
+  if antes <> depois then
+    raise exception 'os dois modos deviam convergir em 12 meses: monthly=% total=%', antes, depois;
+  end if;
+
+  -- 11. ⚠️ `mode` ausente cai em `total` — é o que mantém `affordability` intacto
+  select * into r from private.draft_effect(
+    jsonb_build_array(jsonb_build_object(
+      'kind','expense','amount_cents',30000,'installments',3,'start',hoje)), hoje);
+  if r.delta_cents <> -10000 then
+    raise exception 'sem mode, devia dividir (total); veio %', r.delta_cents;
+  end if;
+
+  -- 12. monthly não vaza para antes do início
+  select * into r from private.draft_effect(
+    jsonb_build_array(jsonb_build_object(
+      'kind','income','mode','monthly','amount_cents',150000,'start',hoje + 60)), hoje);
+  if r.delta_cents <> 0 then
+    raise exception 'monthly futuro vazou para hoje: %', r.delta_cents;
+  end if;
+
+  raise notice 'OK: rascunho de cenário — 12 asserções';
 end $$;
 
 rollback;
