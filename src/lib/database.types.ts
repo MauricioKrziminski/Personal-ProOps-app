@@ -2552,6 +2552,7 @@ export type Database = {
           score: number
         }[]
       }
+      forecast_json: { Args: { days: number; drafts?: Json }; Returns: Json }
       forecast_with_drafts: {
         Args: { days: number; drafts: Json }
         Returns: {

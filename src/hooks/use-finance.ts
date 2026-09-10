@@ -588,15 +588,23 @@ export type UpcomingBill = Omit<Fns['upcoming_bills']['Returns'][number], 'kind'
 /**
  * Saldo projetado dia a dia. Sai pronto do banco somando saldo atual + o que
  * está `pending` + faturas não pagas (cada uma na data de vencimento).
+ *
+ * ⚠️ **Chama `forecast_json`, não `cash_flow_forecast`, e a diferença é CORREÇÃO.** A RPC que
+ * devolve `setof` entrega uma linha por dia, e o PostgREST corta a resposta em **1000 linhas**
+ * sem avisar: acima de ~2,7 anos o app somava "entra/sai", tirava o saldo do fim e procurava o
+ * primeiro dia negativo sobre uma série truncada, escrevendo o rótulo do horizonte pedido em
+ * cima disso. Medido: em 10 anos o saldo final aparecia **R$ 16.164,60 otimista**, e 3, 5 e 10
+ * anos mostravam todos a mesma data (05/06/2029). `forecast_json` devolve UMA linha com a
+ * série inteira dentro — o teto do PostgREST é por linha, não por tamanho.
  */
 export function useCashFlowForecast(days = 90) {
   useRealtimeInvalidate('transactions', ['forecast']);
   return useQuery({
     queryKey: ['forecast', String(days)],
     queryFn: async (): Promise<ForecastDay[]> => {
-      const { data, error } = await supabase.rpc('cash_flow_forecast', { days });
+      const { data, error } = await supabase.rpc('forecast_json', { days });
       if (error) throw error;
-      return data;
+      return (data ?? []) as unknown as ForecastDay[];
     },
   });
 }
@@ -644,9 +652,9 @@ export function useForecastWithDrafts(days: number, drafts: Draft[]) {
     gcTime: 0,
     queryKey: ['forecast-drafts', String(days), JSON.stringify(drafts)],
     queryFn: async (): Promise<ForecastDay[]> => {
-      const { data, error } = await supabase.rpc('forecast_with_drafts', { days, drafts });
+      const { data, error } = await supabase.rpc('forecast_json', { days, drafts });
       if (error) throw error;
-      return data;
+      return (data ?? []) as unknown as ForecastDay[];
     },
   });
 }

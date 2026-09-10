@@ -248,6 +248,42 @@ test('nenhuma chamada a Edge Function no app', () => {
 });
 
 /**
+ * Nenhuma leitura do app passa por RPC que devolve UMA LINHA POR DIA.
+ *
+ * O PostgREST corta a resposta em **1000 linhas** (`db-max-rows`) e o corte é SILENCIOSO: a
+ * lista chega menor, sem erro e sem aviso. `cash_flow_forecast` e `forecast_with_drafts`
+ * devolvem `setof` — uma linha por dia —, então acima de ~2,7 anos o app somava "entra/sai",
+ * tirava o saldo do fim e procurava o primeiro dia negativo sobre uma série truncada, e
+ * escrevia em cima disso o rótulo do horizonte que o usuário pediu.
+ *
+ * Medido no staging em 10/09/2026, pela API autenticada: pedindo 3.650 dias vinham 1.000
+ * linhas, último dia 05/06/2029, saldo **R$ 16.164,60 otimista**. Pior: 3, 5 e 10 anos
+ * mostravam todos a MESMA data — o rótulo mudava, o número não. E já estava em produção desde
+ * o teto de 3 anos (1.096 linhas).
+ *
+ * O caminho é `forecast_json`, que devolve UMA linha com a série inteira dentro — o teto do
+ * PostgREST é por linha, não por tamanho. As RPCs `setof` continuam existindo para o AGENTE
+ * (que fala com o Postgres direto e nunca passou por esse teto) e para APK antigo em campo.
+ *
+ * Isto não pode ser vistoria: nada quebra quando volta, só o número fica errado.
+ */
+test('nenhuma leitura do app usa RPC de projeção linha-por-dia', () => {
+  const fora: string[] = [];
+  for (const file of walk(SRC)) {
+    if (file.endsWith('.test.ts') || file.endsWith('.test.tsx')) continue;
+    const code = stripComments(readFileSync(file, 'utf8'));
+    if (/rpc\(\s*['"`](cash_flow_forecast|forecast_with_drafts)['"`]/.test(code)) {
+      fora.push(file.replace(SRC, 'src'));
+    }
+  }
+  assert.deepEqual(
+    fora,
+    [],
+    'use rpc("forecast_json"): o PostgREST corta setof em 1000 linhas e a projeção fica otimista sem avisar'
+  );
+});
+
+/**
  * Nenhuma tela monta lista de conta à mão.
  *
  * O mesmo campo já teve OITO implementações — `<Row title={a.name}/>` em quatro
