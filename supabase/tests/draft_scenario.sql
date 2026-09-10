@@ -199,7 +199,23 @@ begin
       r.out_cents, r.delta_cents;
   end if;
 
-  raise notice 'OK: rascunho de cenário — 17 asserções';
+  -- 18. ⚠️ SEM `start`, a hipótese começa HOJE — não no fim da janela (20260911000500).
+  --
+  -- `start` é opcional no contrato e todo chamador real o manda, então o default nunca era
+  -- exercitado. Quando a expansão saiu para `draft_ocorrencias(drafts, ate)`, o default virou
+  -- `ate` — o ÚLTIMO dia da projeção. Medido: receita de 1.500/mês por 10 anos sem data
+  -- rendia 7 ocorrências a partir de 2036 e R$ 1.000 de efeito, em vez de ~178.500.
+  select min(vence), count(*) into antes_d, antes from private.draft_ocorrencias(
+    jsonb_build_array(jsonb_build_object(
+      'kind','income','mode','monthly','amount_cents',150000)), hoje + 365);
+  if antes_d <> current_date then
+    raise exception 'sem start devia começar hoje (%); começou em %', current_date, antes_d;
+  end if;
+  if antes < 12 then
+    raise exception 'monthly de um ano devia render ~13 ocorrências; veio %', antes;
+  end if;
+
+  raise notice 'OK: rascunho de cenário — 18 asserções';
 end $$;
 
 rollback;
