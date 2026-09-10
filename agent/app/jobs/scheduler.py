@@ -1,7 +1,7 @@
 """Manutenção financeira (cron de hora em hora).
 
 Quatro coisas, nessa ordem:
-  1. materializa recorrentes 90 dias à frente (é o que alimenta a projeção de
+  1. materializa recorrentes UM ANO à frente (é o que alimenta a projeção de
      fluxo de caixa — sem isso a previsão só enxerga o que já aconteceu)
   2. fecha faturas vencidas
   3. promove pendentes que já venceram
@@ -25,7 +25,24 @@ from app.domain.recurrence import next_occurrence
 
 log = logging.getLogger(__name__)
 
-HORIZON_DAYS = 90
+# Um ANO à frente, não 90 dias (10/09/2026).
+#
+# O padrão da indústria para recorrência é híbrido: a REGRA (RRULE) é a fonte da verdade, uma
+# janela próxima é materializada em linhas de verdade — que dá para editar, conciliar e cobrar
+# lembrete — e o que está além dela é expandido da regra. O Google Calendar pré-computa ~1 ano;
+# o Asana, 30 dias.
+#
+# Este app tinha só a metade materializada, e com a janela em 90 dias abrir outubro de 2027
+# mostrava um mês VAZIO de salário e conta fixa — a projeção não "acabava", ela mentia: a
+# despesa parcelada continuava (ela é linha real) e a receita recorrente sumia. O resultado era
+# um saldo despencando para −8.893,32 que nunca existiu.
+#
+# 365 dias resolve sem código novo: são ~12 linhas por série (15 séries = ~180 linhas), e o
+# expansor continua num lugar só. Escrever um segundo expansor em SQL para "projetar além do
+# horizonte" criaria a segunda cópia da regra — exatamente o que este projeto evita.
+# Para ir além de 12 meses, o caminho é uma RPC de LEITURA marcando a linha como projetada,
+# nunca duplicar a aritmética.
+HORIZON_DAYS = 365
 MAX_OCCURRENCES_PER_SERIES = 200
 MAX_SERIES_PER_RUN = 200
 DEFAULT_TIMEZONE = "America/Sao_Paulo"

@@ -138,6 +138,38 @@ class TestQueryRecurring:
         assert "Pausadas" in r.message and "Academia" in r.message
 
     @pytest.mark.asyncio
+    async def test_a_janela_anunciada_SAI_do_materializador(self, monkeypatch):
+        """A frase não pode cravar o número da janela.
+
+        Ela dizia "próximos 90 dias" com um comentário logo acima avisando que a janela vem de
+        `HORIZON_DAYS` — e quando o horizonte virou um ano (10/09/2026) a mensagem teria
+        continuado prometendo 90 dias. Anúncio ao usuário que repete uma constante de cabeça é
+        a constante com duas cópias: uma delas envelhece calada.
+        """
+        from app.jobs.scheduler import HORIZON_DAYS
+
+        async def fetch(query, *args):
+            return [
+                {
+                    "category": None,
+                    "rrule": "FREQ=MONTHLY;BYMONTHDAY=5",
+                    "next_run_at": datetime(2026, 10, 5, 15, 0, tzinfo=UTC),
+                    "end_date": None,
+                    "kind": "income",
+                    "amount_cents": 100,
+                    "description": "Salário",
+                    "active": True,
+                }
+            ]
+
+        monkeypatch.setattr(db, "fetch", fetch)
+        r = await queries.query_recurring(ctx(), FinanceQuery(type=FinanceQueryType.QUERY_RECURRING))
+        assert f"{HORIZON_DAYS // 30} meses" in r.message
+        # O horizonte precisa cobrir um ano inteiro: é o que faz "outubro de 2027" ter
+        # salário e conta fixa em vez de um mês vazio com só as parcelas.
+        assert HORIZON_DAYS >= 365
+
+    @pytest.mark.asyncio
     async def test_sem_series_ensina_a_frase(self, monkeypatch):
         async def fetch(query, *args):
             return []

@@ -25,6 +25,7 @@ from app.domain.dates import (
 from app.domain.recurrence import descreve_rrule
 from app.domain.money import cents_to_brl
 from app.graph.schemas import FinanceQuery
+from app.jobs.scheduler import HORIZON_DAYS
 from app.tools.base import ExecContext, ToolResult
 
 KIND_EMOJI = {"expense": "💸", "income": "💰"}
@@ -668,7 +669,7 @@ async def query_recurring(ctx: ExecContext, action: FinanceQuery) -> ToolResult:
 
     ⚠️ **Existe porque "não achei" era a resposta errada.** A série vive em
     `recurring_transactions`; os lançamentos dela só existem depois que o
-    `finance-scheduler` materializa a janela de 90 dias. Perguntar "quando cai meu salário?"
+    `finance-scheduler` materializa a janela de um ano. Perguntar "quando cai meu salário?"
     caía em `query_transactions`, que olha `transactions`, não achava a ocorrência e respondia
     que não existia — sobre uma série cadastrada e correta. Foi o caso do dono do produto em
     09/09/2026, com o `finance-scheduler` pausado no Cloud Scheduler.
@@ -769,7 +770,11 @@ async def query_recurring(ctx: ExecContext, action: FinanceQuery) -> ToolResult:
             "🔁 Suas recorrências estão todas pausadas no momento.", read_only=True
         )
     # A janela é do materializador, não um número solto: `HORIZON_DAYS` em `jobs/scheduler.py`.
-    partes.append("\nOs lançamentos dos próximos 90 dias já estão no seu extrato.")
+    # E agora ela é LIDA de lá — a frase dizia "90 dias" cravado logo abaixo deste comentário,
+    # então mudar o horizonte para um ano teria feito a mensagem mentir para o usuário.
+    partes.append(
+        f"\nOs lançamentos dos próximos {HORIZON_DAYS // 30} meses já estão no seu extrato."
+    )
     return ToolResult("\n".join(partes), read_only=True)
 
 

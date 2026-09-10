@@ -22,7 +22,22 @@
   quando o que vem não está coberto. Vale para as 5 telas, as 2 tab bars e o alerta.
   `month` null = limite padrão; linha com `month` sobrescreve aquele mês. **Dois unique parciais** (NULL não colide com NULL no Postgres). `rollover` soma a sobra do mês anterior, um nível só — e **só se o orçamento já existia antes do mês corrente** (`created_at`), senão um orçamento criado hoje ganharia sobra de um mês em que não existia. Status via `_budgets_status`.
 - **`debts`**: dívidas com `interest_rate_monthly` em fração mensal (1,99% a.m. = 0.0199). `debt_schedule` monta a Price; `pay_debt_installment` abate o saldo **já descontando os juros do mês**.
-- **`recurring_transactions`**: RRULE + `dtstart` (âncora imutável) + `next_run_at` (próxima ocorrência FUTURA, é o que o app mostra) + `materialized_until` (controle do cron). Materializadas **90 dias à frente** pelo `finance-scheduler` como `pending`, com `source='recurring'`. Idempotência pelo unique `(recurring_id, occurred_at)`.
+- **`recurring_transactions`**: RRULE + `dtstart` (âncora imutável) + `next_run_at` (próxima ocorrência FUTURA, é o que o app mostra) + `materialized_until` (controle do cron). Materializadas **um ano à frente** pelo `finance-scheduler` como `pending`, com `source='recurring'`. Idempotência pelo unique `(recurring_id, occurred_at)`.
+
+  ⚠️ **Era 90 dias até 10/09/2026, e 90 dias fazia a projeção MENTIR** — não "acabar". A parcela
+  é linha real e continuava aparecendo; a receita recorrente, não. Abrir outubro de 2027 mostrava
+  as parcelas sem o salário, e o saldo despencava para um número que nunca existiu. O padrão da
+  indústria é híbrido: a REGRA é a fonte da verdade, uma janela vira linha de verdade (editável,
+  conciliável) e o resto se expande da regra — o Google Calendar pré-computa ~1 ano, o Asana 30
+  dias. Aqui a janela virou 365 dias, que é ~12 linhas por série.
+
+  **Não escreva um segundo expansor em SQL** para ir além do horizonte: a aritmética de
+  recorrência mora em `agent/app/jobs/scheduler.py` (`HORIZON_DAYS`) e duplicá-la é a segunda
+  cópia que diverge. Além de 12 meses, o caminho é uma RPC de LEITURA que marque a linha como
+  projetada. E **quem anuncia a janela ao usuário lê a constante** — a frase de `query_recurring`
+  cravava "90 dias" logo abaixo de um comentário dizendo que a janela vinha de `HORIZON_DAYS`;
+  `tests/test_query_reads.py` quebra se voltar a cravar.
+
   **Apagar a série leva junto as ocorrências futuras ainda `pending`** (trigger
   `recurring_drop_future`, `20260909090000`) — a FK é `on delete set null`, e sem o trigger elas
   ficavam órfãs pesando na projeção. Histórico e ocorrência ATRASADA ficam: a primeira aconteceu,
