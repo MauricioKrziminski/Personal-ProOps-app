@@ -355,3 +355,30 @@ test('nenhuma tela declara HeaderActions e HeaderMenu juntos', () => {
     'os dois escrevem headerRight e o último ganha — passe o menu por <HeaderActions menu={{ title, actions }} />'
   );
 });
+
+/**
+ * "Últimos lançamentos" nunca lista o que ainda não aconteceu.
+ *
+ * O hook não filtrava data e ordenava por `created_at`. Enquanto o materializador gravava 90
+ * dias, isso passava despercebido — eram 3 linhas. Em 10/09/2026 a janela virou 365 dias e o
+ * cron criou as 12 ocorrências da mesma recorrente NO MESMO INSTANTE: a lista da Hoje e a do
+ * Financeiro viraram doze "Manutenção dentista", uma por mês, até agosto de 2027.
+ *
+ * O corte certo é a DATA (`occurred_at <= hoje`), não o `status`: compra no cartão fica
+ * `pending` até a fatura ser paga e ainda assim é lançamento que aconteceu.
+ */
+test('useRecentTransactions só lista o que já aconteceu', () => {
+  const code = stripComments(readFileSync(join(SRC, 'hooks/use-finance.ts'), 'utf8'));
+  const hook = code.slice(code.indexOf('export function useRecentTransactions'));
+  const corpo = hook.slice(0, hook.indexOf('export function', 1));
+  assert.match(
+    corpo,
+    /\.lte\(\s*['"`]occurred_at['"`]/,
+    'sem o corte por data a lista mostra ocorrência futura da recorrente como "último lançamento"'
+  );
+  assert.match(
+    corpo,
+    /\.order\(\s*['"`]occurred_at['"`]/,
+    'ordenar por created_at põe o que o cron acabou de materializar no topo'
+  );
+});

@@ -244,14 +244,29 @@ export function useFirstTransactionYear() {
   });
 }
 
+/**
+ * "Últimos lançamentos" é o que JÁ ACONTECEU — nunca o que ainda vai acontecer.
+ *
+ * ⚠️ Duas coisas erradas aqui de uma vez, e as duas só apareceram quando o materializador passou
+ * de 90 para 365 dias (10/09/2026): a lista não filtrava nada e ordenava por `created_at`. O cron
+ * cria as 12 ocorrências da recorrente no MESMO instante, então "Manutenção dentista" ocupava a
+ * lista inteira — uma por mês, até agosto de 2027, todas com data futura.
+ *
+ * O corte é a DATA, não o `status`: compra no cartão fica `pending` até a fatura ser paga e
+ * mesmo assim é lançamento que aconteceu. E a ordem é `occurred_at`, senão um extrato importado
+ * hoje joga o mês passado para o topo.
+ */
 export function useRecentTransactions(limit = 5) {
   useRealtimeInvalidate('transactions', ['transactions']);
+  const hoje = localISODate();
   return useQuery({
-    queryKey: ['transactions', 'recent', String(limit)],
+    queryKey: ['transactions', 'recent', String(limit), hoje],
     queryFn: async (): Promise<Transaction[]> => {
       const { data, error } = await supabase
         .from('transactions')
         .select(TRANSACTION_COLUMNS)
+        .lte('occurred_at', hoje)
+        .order('occurred_at', { ascending: false })
         .order('created_at', { ascending: false })
         .limit(limit);
       if (error) throw error;
