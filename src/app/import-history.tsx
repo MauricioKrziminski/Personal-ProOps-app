@@ -23,6 +23,7 @@ import {
 } from '@/hooks/use-finance';
 import { formatDateBR } from '@/hooks/use-items';
 import { confirmDestructive, showItemActions } from '@/lib/item-actions';
+import { accountLabel } from '@/lib/accounts';
 
 /**
  * Importações — "cadê aquele extrato que eu comecei a importar?".
@@ -65,7 +66,7 @@ export default function ImportHistoryScreen() {
 
   const contaPorId = useMemo(() => {
     const mapa = new Map<string, string>();
-    for (const conta of accounts.data ?? []) mapa.set(conta.id, conta.name);
+    for (const conta of accounts.data ?? []) mapa.set(conta.id, accountLabel(conta));
     return mapa;
   }, [accounts.data]);
 

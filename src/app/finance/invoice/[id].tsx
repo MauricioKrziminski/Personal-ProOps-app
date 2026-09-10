@@ -33,6 +33,7 @@ import {
 import { formatBRL, formatDateBR, localISODate } from '@/hooks/use-items';
 import { useTheme } from '@/hooks/use-theme';
 import { confirmDestructive } from '@/lib/item-actions';
+import { accountLabel } from '@/lib/accounts';
 
 /**
  * Fatura — "o que tem nesta fatura, e como eu marco como paga?".
@@ -497,7 +498,7 @@ export default function InvoiceScreen() {
                   {pagadoras.map((a) => (
                     <Row
                       key={a.id}
-                      title={a.name}
+                      title={accountLabel(a)}
                       icon="building.columns"
                       onPress={() => setPayerId(a.id)}
                       trailing={
@@ -532,7 +533,7 @@ export default function InvoiceScreen() {
               label={
                 pay.isPending
                   ? 'Registrando…'
-                  : `Paguei ${formatBRL(valorCents)}${pagadora ? ` com ${pagadora.name}` : ''}`
+                  : `Paguei ${formatBRL(valorCents)}${pagadora ? ` com ${accountLabel(pagadora)}` : ''}`
               }
               loading={pay.isPending}
               disabled={!payerId || !dataISO || valorCents <= 0 || valorCents > falta}

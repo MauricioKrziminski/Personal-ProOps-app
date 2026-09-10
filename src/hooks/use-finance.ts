@@ -7,19 +7,17 @@ import { localISODate, monthBounds } from '@/lib/dates';
 import type { DebtPaymentRow } from '@/lib/debt-history';
 import { agentFetch } from '@/lib/agent-api';
 import { toIlikeTerm } from '@/lib/search';
+import { ACCOUNT_TYPES } from '@/lib/accounts';
 import { useRealtimeInvalidate, workspaceId } from '@/hooks/use-items';
 
 // Categorias vivem em @/lib/categories (fonte única, travada por teste contra o
 // prompt do Gemini); reexportadas aqui para não quebrar os imports das telas.
 export { INCOME_CATEGORIES, SUGGESTED_CATEGORIES } from '@/lib/categories';
 
-export const ACCOUNT_TYPES = [
-  { value: 'checking', label: 'Corrente' },
-  { value: 'savings', label: 'Poupança' },
-  { value: 'credit_card', label: 'Cartão' },
-  { value: 'cash', label: 'Dinheiro' },
-  { value: 'investment', label: 'Investimento' },
-] as const;
+// Tipos de conta vivem em @/lib/accounts (junto de `accountLabel`, que é quem
+// os usa para dizer que "Nubank" é cartão); reexportados aqui para não quebrar
+// os imports das telas — mesmo padrão das categorias, logo acima.
+export { ACCOUNT_TYPES } from '@/lib/accounts';
 
 /**
  * Tipos derivados do schema gerado (`src/lib/database.types.ts`): renomear ou

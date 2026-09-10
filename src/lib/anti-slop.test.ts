@@ -246,3 +246,34 @@ test('nenhuma chamada a Edge Function no app', () => {
     'use agentFetch de @/lib/agent-api: as Edge Functions estão sendo apagadas, e a que o app chamava lia o dono do dado do CORPO do POST'
   );
 });
+
+/**
+ * Conta se apresenta pelo `accountLabel`, nunca pelo `.name` cru.
+ *
+ * Um chip escrito "Nubank" não diz que é um CARTÃO, e cartão guarda dívida, não
+ * saldo. Em 09/09/2026 isso pôs um salário de R$ 4.000 dentro da fatura do
+ * cartão, e não houve erro nenhum na tela — só um número errado. A regra não
+ * dá para ser vistoria: são oito telas hoje, e a nona nasce copiando uma delas.
+ */
+test('nenhuma tela desenha o nome cru de uma conta', () => {
+  // `accounts.ts` é quem monta o rótulo; `accounts.tsx` é a tela que GERENCIA
+  // contas, onde o tipo já é o cabeçalho da seção e repeti-lo em toda linha
+  // seria o ruído que a própria regra manda evitar.
+  const PERMITIDO = new Set(['src/lib/accounts.ts', 'src/app/finance/accounts.tsx']);
+  const fora: string[] = [];
+  for (const file of walk(SRC)) {
+    if (file.endsWith('.test.ts') || file.endsWith('.test.tsx')) continue;
+    const rel = file.replace(SRC, 'src');
+    if (PERMITIDO.has(rel)) continue;
+    const code = stripComments(readFileSync(file, 'utf8'));
+    // só onde o nome VIRA texto na tela: label/title recebendo `<algo>.name`
+    if (/\b(?:label|title)=\{\s*\w*(?:onta|cc|ccount)\w*\.name\s*\}/.test(code)) {
+      fora.push(rel);
+    }
+  }
+  assert.deepEqual(
+    fora,
+    [],
+    'use accountLabel de @/lib/accounts: "Nubank" sozinho não diz que é cartão, e foi assim que um salário caiu na fatura'
+  );
+});

@@ -38,6 +38,7 @@ import {
   type ImportItem,
 } from '@/hooks/use-finance';
 import { useTheme } from '@/hooks/use-theme';
+import { accountLabel } from '@/lib/accounts';
 
 /**
  * O MIME curinga está na lista de propósito: banco brasileiro manda MIME errado com frequência, e
@@ -299,7 +300,7 @@ export default function ImportScreen() {
               {(accounts ?? []).map((conta) => (
                 <Chip
                   key={conta.id}
-                  label={conta.name}
+                  label={accountLabel(conta)}
                   selected={accountId === conta.id}
                   onPress={() => setAccountId(accountId === conta.id ? null : conta.id)}
                 />

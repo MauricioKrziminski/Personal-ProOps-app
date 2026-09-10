@@ -42,6 +42,7 @@ import {
   dueFieldLabel,
 } from '@/lib/settle-labels';
 import { confirmDestructive, showItemActions } from '@/lib/item-actions';
+import { accountLabel } from '@/lib/accounts';
 
 /**
  * Novo/editar lançamento — modal do Stack raiz (Cancelar nativo vem do `_layout.tsx`).
@@ -511,7 +512,7 @@ function TransactionForm({ editing }: { editing?: Transaction }) {
                 {(accounts ?? []).map((acc) => (
                   <Chip
                     key={acc.id}
-                    label={acc.name}
+                    label={accountLabel(acc)}
                     selected={field.value === acc.id}
                     onPress={() => {
                       const next = field.value === acc.id ? null : acc.id;
@@ -548,7 +549,7 @@ function TransactionForm({ editing }: { editing?: Transaction }) {
                     {(accounts ?? []).map((acc) => (
                       <Chip
                         key={acc.id}
-                        label={acc.name}
+                        label={accountLabel(acc)}
                         selected={field.value === acc.id}
                         onPress={() => field.onChange(acc.id)}
                       />

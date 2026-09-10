@@ -36,6 +36,7 @@ import { confirmDestructive, showItemActions } from '@/lib/item-actions';
 import { validRecurringRange } from '@/lib/finance-form';
 import { describeRRule } from '@/lib/rrule-text';
 import { supabase } from '@/lib/supabase';
+import { accountLabel } from '@/lib/accounts';
 
 /**
  * Recorrentes — "o que vai sair da minha conta todo mês sem eu fazer nada?".
@@ -751,7 +752,7 @@ export default function RecurringScreen() {
                   {(accounts.data ?? []).map((a) => (
                     <Row
                       key={a.id}
-                      title={a.name}
+                      title={accountLabel(a)}
                       chevron={false}
                       onPress={() => setForm({ ...form, accountId: a.id })}
                       trailing={

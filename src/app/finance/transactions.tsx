@@ -42,6 +42,7 @@ import { confirmDestructive } from '@/lib/item-actions';
 import { dueInline, settleLabel } from '@/lib/settle-labels';
 import { useDebounced } from '@/hooks/use-debounced';
 import { useTheme, useScheme } from '@/hooks/use-theme';
+import { accountLabel } from '@/lib/accounts';
 
 /**
  * Lançamentos — "cadê aquele lançamento, e o que entrou e saiu neste mês?".
@@ -188,7 +189,7 @@ export default function TransactionsScreen() {
 
   const accountName = useMemo(() => {
     const map = new Map<string, string>();
-    for (const a of accounts.data ?? []) map.set(a.id, a.name);
+    for (const a of accounts.data ?? []) map.set(a.id, accountLabel(a));
     return map;
   }, [accounts.data]);
 
@@ -209,7 +210,8 @@ export default function TransactionsScreen() {
   /** Id da conta filtrada; `undefined` na lista global e também em "Sem conta". */
   const contaFiltrada = accountId === undefined || accountId === NO_ACCOUNT ? undefined : accountId;
 
-  const accountLabel =
+  /** Título da tela quando ela está filtrada por conta — não é o rótulo de uma conta. */
+  const tituloDaConta =
     accountId === undefined
       ? undefined
       : accountId === NO_ACCOUNT
@@ -347,9 +349,9 @@ export default function TransactionsScreen() {
             onPress={() => setCategory(undefined)}
           />
         ) : null}
-        {accountLabel ? (
+        {tituloDaConta ? (
           <Button
-            label={`conta: ${accountLabel}`}
+            label={`conta: ${tituloDaConta}`}
             icon="xmark"
             size="sm"
             variant="secondary"
@@ -409,7 +411,7 @@ export default function TransactionsScreen() {
       <Screen
       floatingAction scroll={false} grouped>
         <Stack.Screen
-          options={{ title: accountLabel ?? 'Lançamentos', headerLargeTitle: true }}
+          options={{ title: tituloDaConta ?? 'Lançamentos', headerLargeTitle: true }}
         />
         <HeaderMenu
           title="Mais opções"
@@ -426,7 +428,7 @@ export default function TransactionsScreen() {
                   onPress: () => setAccountId(undefined),
                 },
                 ...(accounts.data ?? []).map((a) => ({
-                  label: a.name,
+                  label: accountLabel(a),
                   selected: accountId === a.id,
                   onPress: () => setAccountId(a.id),
                 })),

@@ -29,6 +29,7 @@ import {
   type CategorizationRule,
 } from '@/hooks/use-finance';
 import { useTheme } from '@/hooks/use-theme';
+import { accountLabel } from '@/lib/accounts';
 
 /** Postgres: violação de unique. Aqui só pode ser `(workspace_id, match_type, pattern)` da `0017`. */
 const UNIQUE_VIOLATION = '23505';
@@ -314,7 +315,7 @@ export default function RulesScreen() {
                   {(accounts ?? []).map((conta) => (
                     <Chip
                       key={conta.id}
-                      label={conta.name}
+                      label={accountLabel(conta)}
                       selected={rascunho?.accountId === conta.id}
                       onPress={() =>
                         setRascunho((atual) =>

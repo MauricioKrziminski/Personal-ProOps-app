@@ -32,6 +32,7 @@ import { useToast } from '@/components/ui/toast';
 import { confirmDestructive, showItemActions } from '@/lib/item-actions';
 import { useTheme } from '@/hooks/use-theme';
 import { nextPendingInstallment } from '@/lib/installment-progress';
+import { accountLabel } from '@/lib/accounts';
 
 /**
  * Parceladas — "o que eu já comprometi nos próximos meses, e quanto falta para acabar?".
@@ -100,7 +101,7 @@ export default function InstallmentsScreen() {
 
   const contaPorId = useMemo(() => {
     const mapa = new Map<string, string>();
-    for (const conta of accounts.data ?? []) mapa.set(conta.id, conta.name);
+    for (const conta of accounts.data ?? []) mapa.set(conta.id, accountLabel(conta));
     return mapa;
   }, [accounts.data]);
 
