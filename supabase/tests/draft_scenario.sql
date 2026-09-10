@@ -19,6 +19,7 @@ declare
   r record;
   antes bigint;
   depois bigint;
+  antes_d date;
 begin
   receita := jsonb_build_array(jsonb_build_object(
     'kind','income','amount_cents',150000,'installments',1,'start', hoje + 30));
@@ -170,7 +171,35 @@ begin
     raise exception 'affordability mudou de comportamento; veio %', r.delta_cents;
   end if;
 
-  raise notice 'OK: rascunho de cenário — 15 asserções';
+  -- 16. ⚠️ INVARIANTE DO QUAL A OTIMIZAÇÃO DEPENDE (20260910234500).
+  --
+  -- `forecast_with_drafts` deixou de chamar `draft_effect` por dia e passou a acumular com
+  -- `sum(...) over (order by day)` sobre a série. Isso só é correto porque NENHUMA ocorrência
+  -- cai antes do dia 0 — uma que caísse não teria linha para somar e sumiria do saldo, em
+  -- silêncio. Quem garante é o piso da `20260910233000`.
+  --
+  -- Se alguém tirar o piso, ESTA asserção quebra ANTES de o saldo ficar errado na tela. A
+  -- alternativa seria um termo de arraste ("o que venceu antes entra como constante"), e ela
+  -- foi recusada de propósito: ele devolve o dinheiro ao SALDO sem devolvê-lo a "entra/sai" —
+  -- que é exatamente o defeito invisível que o piso saiu matando.
+  select min(vence) into antes_d from private.draft_ocorrencias(
+    jsonb_build_array(jsonb_build_object(
+      'kind','expense','amount_cents',30000,'installments',3,
+      'start', hoje - 60)), hoje + 30);
+  if antes_d < current_date then
+    raise exception 'ocorrência antes do dia 0 (%): o acumulado por janela perde dinheiro', antes_d;
+  end if;
+
+  -- 17. ...e a parcela empurrada para hoje APARECE em "sai", não só no saldo
+  select * into r from private.draft_effect(
+    jsonb_build_array(jsonb_build_object(
+      'kind','expense','amount_cents',30000,'installments',3,'start', hoje - 60)), hoje);
+  if r.out_cents <> 10000 or r.delta_cents <> -10000 then
+    raise exception 'hipótese do passado devia virar 1 parcela HOJE, visível; veio out=% delta=%',
+      r.out_cents, r.delta_cents;
+  end if;
+
+  raise notice 'OK: rascunho de cenário — 17 asserções';
 end $$;
 
 rollback;
