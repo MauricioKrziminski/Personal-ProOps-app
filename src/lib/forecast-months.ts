@@ -37,3 +37,23 @@ export function mesDoCorte(meses: MesProjetado[], cobertoAte: string | null): st
   const corte = cobertoAte.slice(0, 7);
   return meses.some((m) => m.mes > corte) ? corte : null;
 }
+
+/**
+ * Com quanto o mês COMEÇOU — a sobra que veio do mês anterior.
+ *
+ * É a linha que faltava para a Projeção ser a planilha do dono do produto. A tela já mostrava o
+ * `saldo` acumulado (a série de caixa é cumulativa desde sempre), mas sem o ponto de partida
+ * escrito não dava para reconhecer a conta: *"o que importa é o que de fato restou para eu
+ * gastar esse mês contando com o que restou do mês anterior"*. Salário caindo num mês e fatura
+ * vencendo no começo do outro é exatamente o caso em que olhar mês isolado engana.
+ *
+ * Sai por SUBTRAÇÃO em vez de vir do mês anterior no array, e isso é de propósito: no primeiro
+ * mês não existe anterior, e o valor certo lá é o saldo em conta de hoje ANTES dos vencimentos
+ * de hoje (R$ 0,72 em produção em 10/09/2026) — nem o `hoje` do payload, que já desconta o que
+ * vence hoje, nem zero. A subtração acerta os dois casos com uma conta só, e como ela é a
+ * identidade da série (`saldo = veio + entra − sai`), uma quebra futura aparece como número que
+ * não fecha, e não como linha faltando.
+ */
+export function veioDe(m: Pick<MesProjetado, 'saldo' | 'entra' | 'sai'>): number {
+  return Number(m.saldo) - Number(m.entra) + Number(m.sai);
+}

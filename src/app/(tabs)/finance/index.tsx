@@ -74,17 +74,23 @@ import { useTheme, useScheme } from '@/hooks/use-theme';
  * |---|---|---|
  * | 1 | saldo projetado | a pergunta que trouxe a pessoa |
  * | 2 | o mês inteiro | a página de mês: entradas, fixas, parcelas e para onde foi, num lugar só |
- * | 3 | atalhos | as quatro portas para o resto do domínio |
- * | 4 | passando do limite | alerta; só existe quando já dói |
- * | 5 | carteira | a fatura é a maior saída isolada do mês |
- * | 6 | últimos lançamentos | o que aconteceu desde ontem — a checagem diária |
- * | 7 | tendência mensal | o primeiro bloco de ANÁLISE |
- * | 8 | onde o dinheiro foi | análise mais funda, seis linhas |
- * | 9 | posso comprar isso? | ferramenta; ninguém abre o app para simular |
+ * | 3 | e se…? | o mesmo fôlego do 2, para os meses SEGUINTES: a sobra que se carrega |
+ * | 4 | atalhos | as quatro portas para o resto do domínio |
+ * | 5 | passando do limite | alerta; só existe quando já dói |
+ * | 6 | carteira | a fatura é a maior saída isolada do mês |
+ * | 7 | últimos lançamentos | o que aconteceu desde ontem — a checagem diária |
+ * | 8 | tendência mensal | o primeiro bloco de ANÁLISE |
+ * | 9 | onde o dinheiro foi | análise mais funda, seis linhas |
  *
  * O bloco 2 entrou em 09/09/2026 e **não** virou um quinto tile do grid de atalhos: ali ele
  * leria como igual a "Contas", e não é — é a única porta que responde "para onde o dinheiro
  * foi" sem entrar em cinco telas.
+ *
+ * O bloco 3 subiu do último lugar em 10/09/2026. O argumento antigo ("ninguém abre o app para
+ * simular") descrevia um simulador de compra; o bloco virou o saldo mês a mês com a sobra
+ * CARREGADA de um mês para o outro, que é a pergunta que fazia o dono do produto voltar para a
+ * planilha. Ele fica colado no bloco 2 porque os dois são a mesma leitura em fôlegos
+ * diferentes — este mês, e daqui para frente.
  *
  * Antes, o simulador e as categorias vinham em 4º e 5º — uma ferramenta e um bloco de seis
  * barras empurravam a carteira e o extrato para baixo de duas rolagens. É o que os apps de banco
@@ -519,7 +525,29 @@ export default function FinanceScreen() {
         />
       </Section>
 
-      {/* 3. Atalhos. Sempre visível: sem conta cadastrada não existe dado a mostrar. */}
+
+      {/*
+        3. O par do bloco 2: este mês fechado, e então os PRÓXIMOS.
+
+        Ela vivia por último, com o argumento de que "ninguém abre o app para simular". O
+        argumento vale para um simulador de compra; deixou de valer quando o bloco passou a
+        responder o saldo mês a mês CARREGANDO a sobra do anterior — que é a única tela do app
+        que responde "quanto me resta para gastar", e a razão pela qual o dono do produto ainda
+        mantinha a conta numa planilha. Ferramenta que ninguém procura fica no fim; a resposta
+        que a pessoa veio buscar, não.
+
+        Aqui ela não parte nada: 1 e 2 são o mês corrente, 4 em diante é o resto do domínio.
+      */}
+      <Section>
+        <Row
+          title="E se…?"
+          subtitle="Saldo mês a mês, carregando a sobra — e suponha uma entrada ou saída"
+          icon="questionmark.circle"
+          onPress={() => router.push('/finance/forecast')}
+        />
+      </Section>
+
+      {/* 4. Atalhos. Sempre visível: sem conta cadastrada não existe dado a mostrar. */}
         <View style={styles.block}>
           <SectionHead
             title="Gerenciar"
@@ -594,7 +622,7 @@ export default function FinanceScreen() {
           </View>
         </View>
 
-        {/* 3. Só o que já dói. Orçamento em 30% não é notícia — e alerta vem antes de análise. */}
+        {/* 5. Só o que já dói. Orçamento em 30% não é notícia — e alerta vem antes de análise. */}
         {budgets.isError ? (
           <ErrorCard onRetry={budgets.refetch} />
         ) : tight.length > 0 ? (
@@ -631,7 +659,7 @@ export default function FinanceScreen() {
           </Section>
         ) : null}
 
-        {/* 4. A carteira. A fatura é a maior saída isolada do mês. */}
+        {/* 6. A carteira. A fatura é a maior saída isolada do mês. */}
         {cards.isError ? (
           <ErrorCard onRetry={cards.refetch} />
         ) : (cards.data ?? []).length > 0 ? (
@@ -685,7 +713,7 @@ export default function FinanceScreen() {
         ) : null}
 
         {/*
-          5. O extrato recente — a confirmação do que a IA registrou.
+          7. O extrato recente — a confirmação do que a IA registrou.
 
           **Lista CHAPADA, sem cabeçalho de dia.** Ela era agrupada por `occurred_at` e ganhava um
           cabeçalho por data, mas a query ordena por `created_at` (a ordem em que as coisas foram
@@ -783,7 +811,7 @@ export default function FinanceScreen() {
           </View>
         ) : null}
 
-        {/* 6. A tendência. Os outros blocos são todos do MÊS; este é o único que responde
+        {/* 8. A tendência. Os outros blocos são todos do MÊS; este é o único que responde
             "e ao longo do tempo?". Sai de `monthly_cashflow`. */}
         {cashflow.isError ? (
           <ErrorCard onRetry={cashflow.refetch} />
@@ -914,7 +942,7 @@ export default function FinanceScreen() {
           </View>
         ) : null}
 
-        {/* 7. Categoria sem comparação é número; com comparação é informação. */}
+        {/* 9. Categoria sem comparação é número; com comparação é informação. */}
         {summary.isError ? null : categories.length > 0 ? (
           <View style={styles.block}>
             <SectionHead
@@ -994,16 +1022,6 @@ export default function FinanceScreen() {
             </Section>
           </View>
         ) : null}
-
-        {/* 8. A ferramenta. Fica por último de propósito — ver o docblock da tela. */}
-        <Section>
-          <Row
-            title="E se…?"
-            subtitle="Suponha uma entrada ou saída e veja os meses"
-            icon="questionmark.circle"
-            onPress={() => router.push('/finance/forecast')}
-          />
-        </Section>
 
         {isEmpty ? (
           <EmptyState

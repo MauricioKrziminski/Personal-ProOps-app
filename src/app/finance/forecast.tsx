@@ -38,7 +38,7 @@ import {
   type Draft,
 } from '@/hooks/use-finance';
 import { MonthPicker, currentMonth, monthTitle } from '@/components/finance/month-picker';
-import { mesDoCorte, type MesProjetado } from '@/lib/forecast-months';
+import { mesDoCorte, veioDe, type MesProjetado } from '@/lib/forecast-months';
 import { formatBRL, isoToBR, localISODate } from '@/lib/dates';
 import { showItemActions } from '@/lib/item-actions';
 import { settleLabel } from '@/lib/settle-labels';
@@ -533,7 +533,7 @@ export default function ForecastScreen() {
       ) : null}
 
       {modo === 'mes' && !nadaParaProjetar ? (
-        <Section title="Saldo mês a mês">
+        <Section title="Saldo mês a mês, carregando a sobra">
           {meses.map((m) => (
             <View key={m.mes}>
               {/*
@@ -549,11 +549,11 @@ export default function ForecastScreen() {
               <Row
                 title={monthTitle(m.mes)}
                 subtitle={
-                  (m.parcial ? 'mês parcial · ' : '') +
-                  `entra ${formatBRL(m.entra)} · sai ${formatBRL(m.sai)}` +
+                  (m.parcial ? 'de hoje até o fim do mês · ' : '') +
+                  `veio de ${formatBRL(veioDe(m))} · entra ${formatBRL(m.entra)} · sai ${formatBRL(m.sai)}` +
                   (m.primeiroNegativo ? ` · no vermelho em ${isoToBR(m.primeiroNegativo)}` : '')
                 }
-                accessibilityLabel={`${monthTitle(m.mes)}, saldo ${formatBRL(m.saldo)}`}
+                accessibilityLabel={`${monthTitle(m.mes)}, veio de ${formatBRL(veioDe(m))}, entra ${formatBRL(m.entra)}, sai ${formatBRL(m.sai)}, sobra ${formatBRL(m.saldo)}`}
                 accessibilityState={{ expanded: mesAberto === m.mes }}
                 onPress={() => setMesAberto(mesAberto === m.mes ? null : m.mes)}
                 trailing={
