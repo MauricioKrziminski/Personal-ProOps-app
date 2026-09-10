@@ -59,11 +59,27 @@ import { settleLabel } from '@/lib/settle-labels';
  * ficava no fim da tela e só renderizava com série carregada.
  */
 
+/**
+ * Até 3 anos. O teto vive em `private.clamp_forecast_days` (`20260910220000`) e vale 1095.
+ *
+ * Ir além de 6 meses só passou a fazer sentido depois que a recorrente virou projeção da regra
+ * (`20260910140000`): antes, o ano 2 mostraria a parcela do financiamento e ZERO salário. E é o
+ * que faz o rascunho poder supor uma receita em 2028 — o seletor de mês dele oferece os meses
+ * DESTA janela, então horizonte curto = suposição curta.
+ */
 const HORIZONTES = [
   { dias: 30, label: '30 dias' },
   { dias: 90, label: '90 dias' },
   { dias: 180, label: '6 meses' },
+  { dias: 365, label: '1 ano' },
+  { dias: 730, label: '2 anos' },
+  { dias: 1095, label: '3 anos' },
 ];
+
+/** O rótulo do horizonte, para a tela nunca escrever "em 730 dias". */
+function rotuloHorizonte(dias: number): string {
+  return HORIZONTES.find((h) => h.dias === dias)?.label ?? `${dias} dias`;
+}
 
 const PARCELAS = [1, 3, 6, 10, 12];
 
@@ -301,7 +317,7 @@ export default function ForecastScreen() {
       <HeaderActions
         actions={[
           {
-            label: `Horizonte da projeção, ${HORIZONTES.find((h) => h.dias === dias)?.label}`,
+            label: `Horizonte da projeção, ${rotuloHorizonte(dias)}`,
             icon: 'calendar',
             onPress: escolherHorizonte,
           },
@@ -333,7 +349,7 @@ export default function ForecastScreen() {
                 style={styles.heroTexto}>
                 {primeiroNegativo
                   ? `Você fica no vermelho em ${isoToBR(primeiroNegativo.day)}`
-                  : `Não fica negativo nos próximos ${HORIZONTES.find((h) => h.dias === dias)?.label}`}
+                  : `Não fica negativo nos próximos ${rotuloHorizonte(dias)}`}
               </ThemedText>
             </View>
 
@@ -370,7 +386,7 @@ export default function ForecastScreen() {
                 <Money cents={hoje} variant="title2" tone={hoje < 0 ? 'danger' : 'text'} />
               </View>
               <View style={styles.heroParte}>
-                <HeroLabel>em {dias} dias</HeroLabel>
+                <HeroLabel>em {rotuloHorizonte(dias)}</HeroLabel>
                 <Money cents={fim} variant="title2" tone={fim < 0 ? 'danger' : 'text'} />
               </View>
             </View>
@@ -382,7 +398,7 @@ export default function ForecastScreen() {
             */}
             {entra > 0 || sai > 0 ? (
               <ThemedText type="footnote" themeColor="textSecondary" style={tabular}>
-                entra {formatBRL(entra)} · sai {formatBRL(sai)} em {dias} dias
+                entra {formatBRL(entra)} · sai {formatBRL(sai)} em {rotuloHorizonte(dias)}
               </ThemedText>
             ) : null}
           </Card>

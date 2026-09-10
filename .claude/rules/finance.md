@@ -100,6 +100,15 @@
 
 ## Projeção de fluxo de caixa
 
+- **Horizonte da projeção: até 3 anos, e o teto num lugar só** (`20260910220000`).
+  `private.clamp_forecast_days` — piso 1, teto 1095, default 90. Antes o 365 estava cravado
+  dentro de `cash_flow_forecast` e `_cash_flow_forecast`, e a tela parava em "6 meses": "O mês
+  inteiro" navegava para 2028 e mostrava tudo, mas a Projeção não chegava lá, e o seletor de mês
+  do rascunho só oferece os meses DA JANELA — supor uma receita em 2028 era impossível com o dado
+  existindo. Efeito colateral bom: `affordability` chama com 370 dias e filtra até
+  `add_months(hoje, parcelas)`; com o teto em 365, parcelamento acima de 12 meses era truncado em
+  silêncio e o "pior dia" saía otimista.
+
 - **Rascunho de cenário: um motor, duas portas** (`20260910170000`). `private.draft_effect(drafts,
   dia)` é a ÚNICA aritmética de hipótese do sistema — receita soma, gasto subtrai, parcela cai de
   mês em mês e o resto da divisão vai na última. Dela saem `forecast_with_drafts` (o Rascunho da
