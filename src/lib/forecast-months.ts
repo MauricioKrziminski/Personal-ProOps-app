@@ -1,22 +1,16 @@
 /**
- * A projeção diária, agrupada por mês.
+ * A forma de um mês projetado, e o aviso do corte.
  *
- * A RPC `cash_flow_forecast` devolve uma linha POR DIA com `balance_cents` já acumulado — é uma
- * soma corrida, não um saldo do dia. Então o saldo de um mês é o do ÚLTIMO dia dele, nunca a
- * soma dos dias: somar acumulados conta o mesmo dinheiro N vezes.
+ * ⚠️ **O AGRUPAMENTO saiu daqui em 10/09/2026** (`20260911001500`). Ele virava 3.651 linhas
+ * diárias baixadas para desenhar ~120 números — 288 KB contra 13 KB —, e agrupar no cliente
+ * punha aritmética de dinheiro numa segunda linguagem, longe da projeção que a produz. Agora é
+ * `private.month_group`, com as 9 asserções portadas para `supabase/tests/month_forecast.sql`.
  *
- * `entra`/`sai`, ao contrário, são fluxo do dia e SOMAM dentro do mês.
- *
- * Isto existe porque a planilha do dono do produto tem exatamente esta tabela (uma aba por mês,
- * com o saldo do mês anterior entrando no seguinte) e o app só sabia mostrar dia a dia.
+ * O que ficou é `mesDoCorte`, que não é aritmética: é a regra de QUANDO avisar.
  */
 
-export type DiaProjetado = {
-  day: string;
-  in_cents: number | string;
-  out_cents: number | string;
-  balance_cents: number | string;
-};
+/** O que `month_forecast_json` devolve: o saldo de hoje mais os meses. */
+export type ProjecaoMensal = { hoje: number; meses: MesProjetado[] };
 
 export type MesProjetado = {
   /** `2026-11` */
@@ -30,51 +24,6 @@ export type MesProjetado = {
   /** O mês está inteiro na série, ou é o mês em que o horizonte corta? */
   parcial: boolean;
 };
-
-/**
- * Agrupa preservando a ordem cronológica que a RPC já devolve.
- *
- * ⚠️ **Não reordena.** `balance_cents` só faz sentido na ordem em que veio; ordenar por outra
- * coisa e pegar "o último" devolveria o saldo de um dia qualquer.
- */
-export function agruparPorMes(serie: DiaProjetado[]): MesProjetado[] {
-  const meses: MesProjetado[] = [];
-  let atual: MesProjetado | null = null;
-
-  for (const dia of serie) {
-    const mes = dia.day.slice(0, 7);
-    if (!atual || atual.mes !== mes) {
-      atual = { mes, entra: 0, sai: 0, saldo: 0, primeiroNegativo: null, parcial: false };
-      meses.push(atual);
-    }
-    atual.entra += Number(dia.in_cents);
-    atual.sai += Number(dia.out_cents);
-    // sobrescreve a cada dia: no fim do laço sobra o último dia do mês
-    atual.saldo = Number(dia.balance_cents);
-    if (atual.primeiroNegativo === null && Number(dia.balance_cents) < 0) {
-      atual.primeiroNegativo = dia.day;
-    }
-  }
-
-  // O último mês quase sempre está cortado no meio pelo horizonte (90 dias a partir de hoje não
-  // termina em dia 31). Dizer o saldo "do mês" ali seria mentira — a tela precisa saber para
-  // rotular. O primeiro também: a série começa HOJE, não no dia 1.
-  const ultimo = meses[meses.length - 1];
-  if (ultimo) {
-    const fim = serie[serie.length - 1].day;
-    const ultimoDiaDoMes = new Date(
-      Number(fim.slice(0, 4)),
-      Number(fim.slice(5, 7)),
-      0,
-    ).getDate();
-    ultimo.parcial = Number(fim.slice(8, 10)) < ultimoDiaDoMes;
-  }
-  if (meses[0] && serie[0] && Number(serie[0].day.slice(8, 10)) > 1) {
-    meses[0].parcial = true;
-  }
-
-  return meses;
-}
 
 /**
  * O mês a partir do qual a linha deixa de ser lançamento real e passa a sair da regra.

@@ -2582,6 +2582,10 @@ export type Database = {
           unsettled_cents: number
         }[]
       }
+      month_forecast_json: {
+        Args: { days: number; drafts?: Json }
+        Returns: Json
+      }
       month_lines: {
         Args: { p_month: string }
         Returns: {

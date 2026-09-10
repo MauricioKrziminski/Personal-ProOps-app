@@ -30,6 +30,7 @@ import {
   useAccounts,
   useCashFlowForecast,
   useCashHistory,
+  useForecastMonths,
   useForecastWithDrafts,
   useMarkPaid,
   useMonthSummary,
@@ -37,7 +38,7 @@ import {
   type Draft,
 } from '@/hooks/use-finance';
 import { MonthPicker, currentMonth, monthTitle } from '@/components/finance/month-picker';
-import { agruparPorMes, mesDoCorte } from '@/lib/forecast-months';
+import { mesDoCorte, type MesProjetado } from '@/lib/forecast-months';
 import { formatBRL, isoToBR, localISODate } from '@/lib/dates';
 import { showItemActions } from '@/lib/item-actions';
 import { settleLabel } from '@/lib/settle-labels';
@@ -128,42 +129,69 @@ export default function ForecastScreen() {
   const [novoParcelas, setNovoParcelas] = useState(1);
   const [novoModo, setNovoModo] = useState<'total' | 'monthly'>('total');
 
-  const forecast = useCashFlowForecast(dias);
+  /**
+   * ⚠️ **Cada modo busca a SUA granularidade, e só a sua.**
+   *
+   * O modo Mês desenha ~120 números; baixar os 3.651 dias para somá-los no cliente custava
+   * 288 KB contra 13 KB (medido pela API, 10/09/2026) e punha aritmética de dinheiro numa
+   * segunda linguagem. Agora quem agrupa é `private.month_group`, e no modo Mês a série diária
+   * e o histórico nem são pedidos.
+   */
+  const emMes = modo === 'mes';
+  const forecast = useCashFlowForecast(dias, !emMes);
   const bills = useUpcomingBills(30);
   const accounts = useAccounts();
   const markPaid = useMarkPaid();
 
-  // ⚠️ A troca acontece AQUI, num lugar só. Tudo que vem depois — o destaque, a curva, o
-  // "fica negativo em", a tabela mês a mês, o mês expandido — lê `serie` e passa a simular
-  // junto, sem nenhum deles saber que existe rascunho.
-  const simulado = useForecastWithDrafts(dias, rascunhos);
+  // ⚠️ A troca do rascunho acontece AQUI, num lugar só, nos DOIS caminhos: o mensal recebe as
+  // mesmas hipóteses e passa pela mesma `forecast_json` por dentro. Assim a tabela e a curva
+  // não têm como discordar por caminho.
+  const simulado = useForecastWithDrafts(dias, rascunhos, !emMes);
+  const mensal = useForecastMonths(dias, rascunhos, emMes);
   const simulando = rascunhos.length > 0;
   // `?? forecast.data` enquanto a simulação carrega: sem isso a tela PISCA vazia a cada
   // suposição somada, e o destaque salta de um número real para nada e de volta.
   const serie = (simulando ? (simulado.data ?? forecast.data) : forecast.data) ?? [];
-  const projetados = serie.map((d) => Number(d.balance_cents));
+  const meses: MesProjetado[] = mensal.data?.meses ?? [];
+
+  // `hoje` é o saldo do dia 0. No mensal ele vem do payload de propósito: o primeiro MÊS fecha
+  // no fim do mês corrente, e usá-lo aqui mostraria esse número com o rótulo "TENHO HOJE".
+  const saldoHoje = emMes
+    ? Number(mensal.data?.hoje ?? 0)
+    : Number(serie[0]?.balance_cents ?? 0);
+  const projetados = emMes
+    ? [saldoHoje, ...meses.map((m) => Number(m.saldo))]
+    : serie.map((d) => Number(d.balance_cents));
   const hoje = projetados[0] ?? 0;
   const fim = projetados[projetados.length - 1] ?? 0;
 
   // O passado entra ANTES do dia 0 e no mesmo eixo. A foto de HOJE é descartada: ela foi tirada
   // pelo cron de madrugada e o dia 0 da projeção já é o valor de agora — manter as duas criaria
   // um degrau na emenda entre histórico e projeção.
-  const historico = useCashHistory(dias);
+  //
+  // ⚠️ **No modo Mês o passado sai.** A curva espaça os pontos por igual: dias no passado ao
+  // lado de meses no futuro daria duas escalas no mesmo eixo, e o passado apareceria esmagado.
+  const historico = useCashHistory(dias, !emMes);
   // Sem `useMemo`: são duas listas de no máximo ~180 números, e memoizar em cima de
   // `projetados` (que nasce novo a cada render) faz o React Compiler desistir da tela inteira.
-  const passado = (historico.data ?? [])
-    .filter((p) => p.day < localISODate())
-    .map((p) => p.cents);
+  const passado = emMes
+    ? []
+    : (historico.data ?? []).filter((p) => p.day < localISODate()).map((p) => p.cents);
   const valores = [...passado, ...projetados];
-  // O que a projeção soma e o que ela tira, no horizonte escolhido. A RPC devolve os dois desde
-  // sempre; nada nesta tela lia `in_cents`.
-  const entra = serie.reduce((t, d) => t + Number(d.in_cents), 0);
-  const sai = serie.reduce((t, d) => t + Number(d.out_cents), 0);
-  const primeiroNegativo = serie.find((d) => Number(d.balance_cents) < 0);
+  // O que a projeção soma e o que ela tira, no horizonte escolhido.
+  const entra = emMes
+    ? meses.reduce((t, m) => t + Number(m.entra), 0)
+    : serie.reduce((t, d) => t + Number(d.in_cents), 0);
+  const sai = emMes
+    ? meses.reduce((t, m) => t + Number(m.sai), 0)
+    : serie.reduce((t, d) => t + Number(d.out_cents), 0);
+  // O PRIMEIRO dia negativo — a data em que a pessoa precisa agir, não o pior dia.
+  const primeiroNegativo = emMes
+    ? (meses.find((m) => m.primeiroNegativo)?.primeiroNegativo ?? null)
+    : (serie.find((d) => Number(d.balance_cents) < 0)?.day ?? null);
 
-  // A tabela mensal e o mês expandido. `mesAberto` governa o `enabled` do hook: sem nenhum mês
-  // aberto, nenhuma RPC é chamada.
-  const meses = agruparPorMes(serie);
+  // O mês expandido. `mesAberto` governa o `enabled` do hook: sem nenhum mês aberto, nenhuma
+  // RPC é chamada.
   const resumoAberto = useMonthSummary(mesAberto ?? '', mesAberto !== null);
   // `recurring_covered_until` é propriedade da SÉRIE, não do mês — qualquer mês devolve o mesmo.
   // Vem do mês corrente porque essa chave já está no cache (a aba Financeiro a usa).
@@ -197,7 +225,7 @@ export default function ForecastScreen() {
    * `primeiroNegativo` já é calculado sobre `serie`, que é a projeção COM as hipóteses. Um
    * caminho a menos e um significado a mais — vale para receita também, não só para compra.
    */
-  const fica = simulando ? primeiroNegativo === undefined : null;
+  const fica = simulando ? primeiroNegativo === null : null;
   const vereditoAnterior = useRef<boolean | null>(null);
   useEffect(() => {
     if (fica === null) {
@@ -349,7 +377,7 @@ export default function ForecastScreen() {
                 themeColor={primeiroNegativo ? 'danger' : 'text'}
                 style={styles.heroTexto}>
                 {primeiroNegativo
-                  ? `Você fica no vermelho em ${isoToBR(primeiroNegativo.day)}`
+                  ? `Você fica no vermelho em ${isoToBR(primeiroNegativo)}`
                   : `Não fica negativo nos próximos ${rotuloHorizonte(dias)}`}
               </ThemedText>
             </View>
@@ -357,7 +385,7 @@ export default function ForecastScreen() {
             {/* Skia não gera árvore de acessibilidade: sem este label a tela fica muda. */}
             <View
               accessible
-              accessibilityLabel={`Saldo hoje ${formatBRL(hoje)}, no fim do período ${formatBRL(fim)}${primeiroNegativo ? `, negativo a partir de ${isoToBR(primeiroNegativo.day)}` : ''}`}>
+              accessibilityLabel={`Saldo hoje ${formatBRL(hoje)}, no fim do período ${formatBRL(fim)}${primeiroNegativo ? `, negativo a partir de ${isoToBR(primeiroNegativo)}` : ''}`}>
               <Sparkline
                 values={valores}
                 width={width - Space.lg * 4}
@@ -471,7 +499,7 @@ export default function ForecastScreen() {
             onPress={() => {
               setNovoTipo('income');
               setNovoValor(0);
-              setNovoMes(meses[0]?.mes ?? null);
+              setNovoMes(currentMonth());
               setNovoParcelas(1);
               setNovoModo('total');
               setSheetAberto(true);

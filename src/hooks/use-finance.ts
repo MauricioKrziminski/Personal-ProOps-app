@@ -1,6 +1,7 @@
 import { invalidateFinance, invalidateKeys } from '@/lib/query-invalidation';
 import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
+import type { ProjecaoMensal } from '@/lib/forecast-months';
 import { supabase } from '@/lib/supabase';
 import type { Database } from '@/lib/database.types';
 import { localISODate, monthBounds } from '@/lib/dates';
@@ -597,9 +598,10 @@ export type UpcomingBill = Omit<Fns['upcoming_bills']['Returns'][number], 'kind'
  * anos mostravam todos a mesma data (05/06/2029). `forecast_json` devolve UMA linha com a
  * série inteira dentro — o teto do PostgREST é por linha, não por tamanho.
  */
-export function useCashFlowForecast(days = 90) {
+export function useCashFlowForecast(days = 90, enabled = true) {
   useRealtimeInvalidate('transactions', ['forecast']);
   return useQuery({
+    enabled,
     queryKey: ['forecast', String(days)],
     queryFn: async (): Promise<ForecastDay[]> => {
       const { data, error } = await supabase.rpc('forecast_json', { days });
@@ -642,10 +644,10 @@ export type Draft = {
  * Com a lista vazia o hook desliga: quem não está simulando não paga uma RPC a mais, e a tela
  * cai na projeção real (`useCashFlowForecast`).
  */
-export function useForecastWithDrafts(days: number, drafts: Draft[]) {
+export function useForecastWithDrafts(days: number, drafts: Draft[], enabled = true) {
   useRealtimeInvalidate('transactions', ['forecast-drafts']);
   return useQuery({
-    enabled: drafts.length > 0,
+    enabled: enabled && drafts.length > 0,
     // O rascunho é efêmero de propósito: sai da tela, some. `gcTime: 0` impede que ele
     // ressuscite do cache quando o usuário voltar — que é justamente o que ele pediu que NÃO
     // acontecesse ("se eu voltar, ele some").
@@ -655,6 +657,38 @@ export function useForecastWithDrafts(days: number, drafts: Draft[]) {
       const { data, error } = await supabase.rpc('forecast_json', { days, drafts });
       if (error) throw error;
       return (data ?? []) as unknown as ForecastDay[];
+    },
+  });
+}
+
+/**
+ * A projeção **agrupada por mês**, somada no banco.
+ *
+ * ⚠️ **Existe para o modo Mês NÃO baixar a série diária.** Ele desenha ~120 números e a série
+ * de 10 anos tem 3.651 linhas: medido pela API, 288 KB contra **13 KB** — 22×. E o
+ * agrupamento é aritmética de dinheiro, que agora mora junto da projeção que a produz
+ * (`private.month_group`), com as asserções em `supabase/tests/month_forecast.sql`.
+ *
+ * `hoje` vem junto porque o destaque escreve "TENHO HOJE", que é o saldo do dia 0 — o primeiro
+ * MÊS fecha no fim do mês corrente, e confundir os dois mostraria um número com o rótulo errado.
+ *
+ * `drafts` vazio devolve a projeção real: é a mesma porta para os dois casos, então o Rascunho
+ * e a projeção nunca podem discordar por caminho.
+ */
+export function useForecastMonths(days: number, drafts: Draft[], enabled = true) {
+  useRealtimeInvalidate('transactions', ['forecast-months']);
+  return useQuery({
+    enabled,
+    // Segura o valor anterior enquanto o horizonte novo carrega: sem isso o destaque salta
+    // para R$ 0,00 a cada troca, que lê como dado errado e não como carregamento.
+    placeholderData: (anterior) => anterior,
+    // Mesmo contrato efêmero do rascunho: sair da tela apaga.
+    gcTime: drafts.length > 0 ? 0 : undefined,
+    queryKey: ['forecast-months', String(days), JSON.stringify(drafts)],
+    queryFn: async (): Promise<ProjecaoMensal> => {
+      const { data, error } = await supabase.rpc('month_forecast_json', { days, drafts });
+      if (error) throw error;
+      return (data ?? { hoje: 0, meses: [] }) as unknown as ProjecaoMensal;
     },
   });
 }
@@ -1227,8 +1261,9 @@ export function useNetWorth() {
  * pegar "a linha do dia" traria só uma delas. É exatamente o defeito que a `0047` corrigiu na
  * série do patrimônio — não vale reintroduzi-lo aqui, no cliente.
  */
-export function useCashHistory(days: number) {
+export function useCashHistory(days: number, enabled = true) {
   return useQuery({
+    enabled,
     queryKey: ['cash-history', String(days)],
     queryFn: async (): Promise<{ day: string; cents: number }[]> => {
       const desde = new Date(Date.now() - days * 86_400_000).toISOString().slice(0, 10);
