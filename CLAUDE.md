@@ -132,9 +132,17 @@ rota no agente com o usuário saindo do JWT; os outros trocaram de alvo para os 
 porque o que eles protegem nunca foi "o Deno está igual". `src/lib/anti-slop.test.ts` quebra o
 build se o app voltar a chamar `functions.invoke`.
 
-Rollback, se algum dia precisar: as URLs antigas eram
-`https://kwriuifcwyvdrxtspjiz.supabase.co/functions/v1/<nome>`, e o código está no histórico do
-git até o commit anterior à remoção.
+⚠️ **As sete funções PUBLICADAS foram desligadas em 09/09/2026** (`functions delete`, uma a uma):
+`import-statement` primeiro, porque era a que lia o dono do dado do corpo do POST e continuava
+respondendo em produção depois de o app já ter parado de chamá-la; `whatsapp-webhook` por último,
+porque era o rollback. `supabase functions list --project-ref kwriuifcwyvdrxtspjiz` devolve `[]`.
+
+**Não existe mais rollback de um comando.** Enquanto o roteador estava publicado, voltar para o
+Deno era um `update` numa linha de `agent_routing`; agora é redeployar do histórico do git (o
+código está até o commit `7e51e40`, e as URLs eram
+`https://kwriuifcwyvdrxtspjiz.supabase.co/functions/v1/<nome>`). Isso foi decidido de propósito,
+com o WhatsApp já rodando pelo Python e mensagem real chegando: manter uma cópia da regra de
+negócio viva "por segurança" é como a segunda cópia volta a divergir.
 
 ## Regras detalhadas (obrigatórias)
 
