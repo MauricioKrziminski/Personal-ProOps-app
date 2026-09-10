@@ -65,6 +65,31 @@ async def run() -> dict:
 
 
 async def materialize_horizon(agora) -> int:
+    """Cria as ocorrências que ainda faltam dentro do horizonte.
+
+    ⚠️ **A query pega quem PRECISA de trabalho, e os mais atrasados primeiro.**
+
+    Ela era `where r.active = true limit 200`, sem filtro e sem ordem, e isso tinha dois
+    defeitos que só apareceriam com escala:
+
+      • **Trabalho à toa.** Toda hora ela relia as 200 séries inteiras — inclusive as já
+        materializadas até o fim do horizonte — para descobrir que não havia nada a criar.
+        Com o horizonte em um ano, a esmagadora maioria das rodadas não tem NADA a fazer, e
+        agora elas custam um index scan em vez de 200 expansões de RRULE.
+
+      • **Inanição.** Sem `order by`, "as primeiras 200" é o que o Postgres achar primeiro — e
+        isso é estável o bastante para as MESMAS 200 ganharem toda hora. Passando de 200 séries
+        ativas no banco (uns 13 usuários como o atual), as de fora nunca seriam materializadas,
+        e o usuário veria meses vazios sem erro nenhum em lugar nenhum.
+
+    `materialized_until asc nulls first` inverte isso: quem está mais atrasado passa na frente,
+    e o `limit` deixa de ser um recorte arbitrário para virar orçamento por rodada.
+
+    O índice que sustenta isso é `recurring_pendentes_idx` (`20260910230000`), parcial em
+    `active` — ele só indexa as séries que o cron pode querer.
+    """
+    horizonte = agora + timedelta(days=HORIZON_DAYS)
+
     series = await db.fetch(
         """
         select r.id, r.user_id, r.workspace_id, r.kind, r.amount_cents, r.currency,
@@ -74,12 +99,15 @@ async def materialize_horizon(agora) -> int:
         from public.recurring_transactions r
         left join public.profiles p on p.id = r.user_id
         where r.active = true
+          and (r.materialized_until is null or r.materialized_until < %s)
+          and (r.end_date is null or r.end_date >= %s)
+        order by r.materialized_until asc nulls first
         limit %s
         """,
+        horizonte,
+        agora.date(),
         MAX_SERIES_PER_RUN,
     )
-
-    horizonte = agora + timedelta(days=HORIZON_DAYS)
     criadas = 0
 
     for rec in series:

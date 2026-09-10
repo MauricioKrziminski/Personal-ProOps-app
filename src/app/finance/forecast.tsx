@@ -21,7 +21,6 @@ import { Row, Section } from '@/components/ui/row';
 import { Screen } from '@/components/ui/screen';
 import { HeroLabel } from '@/components/ui/section-head';
 import { Segmented } from '@/components/ui/segmented';
-import { SelectField } from '@/components/ui/select-field';
 import { Sheet } from '@/components/ui/sheet';
 import { Skeleton, SkeletonRow } from '@/components/ui/skeleton';
 import { Sparkline } from '@/components/ui/sparkline';
@@ -37,7 +36,7 @@ import {
   useUpcomingBills,
   type Draft,
 } from '@/hooks/use-finance';
-import { monthTitle } from '@/components/finance/month-picker';
+import { MonthPicker, currentMonth, monthTitle } from '@/components/finance/month-picker';
 import { agruparPorMes, mesDoCorte } from '@/lib/forecast-months';
 import { formatBRL, isoToBR, localISODate } from '@/lib/dates';
 import { showItemActions } from '@/lib/item-actions';
@@ -692,6 +691,16 @@ export default function ForecastScreen() {
                   mode: novoModo,
                 },
               ]);
+              // ⚠️ Supor num mês além do horizonte aberto estica o horizonte.
+              //
+              // Sem isto, a hipótese entrava na conta e o usuário não via NADA mudar: a janela
+              // de 90 dias não alcança agosto de 2028, e a tabela mês a mês só desenha o que
+              // está na série. O rascunho pareceria ter sido ignorado.
+              const alvo = new Date(Number(novoMes.slice(0, 4)), Number(novoMes.slice(5, 7)), 0);
+              const precisa = Math.ceil((alvo.getTime() - Date.now()) / 86400000);
+              const maior = HORIZONTES.filter((h) => h.dias >= precisa).at(0) ?? HORIZONTES.at(-1)!;
+              if (maior.dias > dias) setDias(maior.dias);
+
               setSheetAberto(false);
               setModo('mes');
             }}>
@@ -735,13 +744,18 @@ export default function ForecastScreen() {
             <MoneyField valueCents={novoValor} onChangeCents={setNovoValor} autoFocus />
           </Field>
 
+          {/*
+            ⚠️ `MonthPicker`, não `SelectField`.
+            
+            O seletor listava os meses DA JANELA aberta — com o horizonte em 90 dias, quatro
+            opções, e supor uma receita em 2028 era impossível mesmo com a projeção sabendo
+            chegar lá. E uma lista de 36 meses aberta no lugar comeria a tela inteira.
+            
+            `MonthPicker` já existe para exatamente isto: setas de mês, escolha de ano, uma
+            linha só. É o mesmo controle de "O mês inteiro", então o gesto já é conhecido.
+          */}
           <Field label="A partir de qual mês">
-            <SelectField
-              options={meses.map((m) => ({ id: m.mes, label: monthTitle(m.mes) }))}
-              value={novoMes}
-              onChange={setNovoMes}
-              placeholder="Escolher o mês"
-            />
+            <MonthPicker month={novoMes ?? currentMonth()} onChange={setNovoMes} />
           </Field>
 
           {/* Parcelar só faz sentido em "uma vez": "todo mês" já é a repetição. */}
