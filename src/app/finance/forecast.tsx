@@ -550,7 +550,11 @@ export default function ForecastScreen() {
                 title={monthTitle(m.mes)}
                 subtitle={
                   (m.parcial ? 'de hoje até o fim do mês · ' : '') +
-                  `veio de ${formatBRL(veioDe(m))} · entra ${formatBRL(m.entra)} · sai ${formatBRL(m.sai)}` +
+                  // No primeiro mês nada "veio" de lugar nenhum: é o que está na conta AGORA,
+                  // antes dos vencimentos de hoje. Chamar de carregado seria dizer que agosto
+                  // fechou nesse número, e não foi ele que fechou nada.
+                  `${m.parcial ? 'começa com' : 'veio de'} ${formatBRL(veioDe(m))}` +
+                  ` · entra ${formatBRL(m.entra)} · sai ${formatBRL(m.sai)}` +
                   (m.primeiroNegativo ? ` · no vermelho em ${isoToBR(m.primeiroNegativo)}` : '')
                 }
                 accessibilityLabel={`${monthTitle(m.mes)}, veio de ${formatBRL(veioDe(m))}, entra ${formatBRL(m.entra)}, sai ${formatBRL(m.sai)}, sobra ${formatBRL(m.saldo)}`}

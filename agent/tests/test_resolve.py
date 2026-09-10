@@ -219,9 +219,39 @@ class TestJanelaDeReferencia:
         await finance.reference_window("ws-1")
 
         sql = " ".join(vistos[0].split())
-        assert "occurred_at <= current_date" in sql, "sem o corte, o futuro ocupa a janela toda"
-        assert "occurred_at > current_date" in sql, "a parcela do mês que vem tem que ser alcançável"
-        assert sql.index("occurred_at <= current_date") < sql.index("occurred_at > current_date"), (
+        antes, depois = "t.occurred_at <= current_date", "t.occurred_at > current_date"
+        assert antes in sql, "sem o corte, o futuro ocupa a janela toda"
+        assert depois in sql, "a parcela do mês que vem tem que ser alcançável"
+        assert sql.index(antes) < sql.index(depois), (
             "o passado vem primeiro: é o que 'o último' quer dizer"
         )
-        assert "order by occurred_at desc" in sql, "ordenar por created_at é o que quebrou"
+        assert "order by t.occurred_at desc" in sql, "ordenar por created_at é o que quebrou"
+
+    @pytest.mark.asyncio
+    async def test_a_pista_alcanca_o_futuro(self, monkeypatch):
+        """Alvo NOMEADO no futuro tem que caber, senão "não achei" vira mentira.
+
+        Sem isto a metade futura são as 10 ocorrências mais PRÓXIMAS — uma semana, com as 200
+        linhas futuras que existem em produção. "Muda a parcela do Mac de outubro" cairia fora
+        da janela e o agente responderia que não achou um lançamento que existe. É pedido
+        legítimo: `update_transaction_scoped` existe exatamente para ele.
+        """
+        vistos: list[str] = []
+
+        async def fake_fetch(sql, *args):
+            vistos.append(sql)
+            return []
+
+        monkeypatch.setattr(finance.db, "fetch", fake_fetch)
+        await finance.reference_window(
+            "ws-1", FinanceAction(type=FinanceActionType.UPDATE_TRANSACTION, description="Mac")
+        )
+
+        sql = " ".join(vistos[0].split())
+        futuro = sql[sql.index("t.occurred_at > current_date") :]
+        assert "p.termo" in futuro and "ilike" in futuro, "texto tem que alcançar o futuro"
+        assert "p.cents" in futuro, "valor tem que alcançar o futuro"
+        assert "p.dia" in futuro, "data tem que alcançar o futuro"
+        assert "p.termo is null and p.cents is null and p.dia is null" in futuro, (
+            "sem pista nenhuma o futuro entra por proximidade — ali ele é contexto, não alvo"
+        )

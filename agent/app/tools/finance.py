@@ -82,7 +82,9 @@ async def default_account(workspace_id: UUID) -> UUID | None:
     return linha["default_account_id"] if linha else None
 
 
-async def reference_window(workspace_id: UUID) -> list[dict]:
+async def reference_window(
+    workspace_id: UUID, action: FinanceAction | None = None
+) -> list[dict]:
     """As transações alcançáveis quando o usuário aponta para uma ("o último", "o de 45").
 
     ⚠️ **Isto era `order by created_at desc limit 40` e em 10/09/2026 a janela ficou 40 de 40
@@ -92,25 +94,46 @@ async def reference_window(workspace_id: UUID) -> list[dict]:
     "apaga o último gasto" acertava *Manutenção dentista de 10/08/2027*, e o caminho passa por
     `interrupt()` — quem segurava era o usuário ler a pergunta e dizer não.
 
-    A janela agora tem duas metades explícitas, e a ordem entre elas é a correção: primeiro o
-    passado, do mais recente para trás (é o que "o último" quer dizer), depois as poucas
-    ocorrências mais PRÓXIMAS do futuro, para "a parcela de outubro" continuar alcançável sem
-    as 200 seguintes empurrarem o passado para fora.
+    A janela tem duas metades. **O passado primeiro**, do mais recente para trás: é o que "o
+    último" quer dizer, e é a correção do defeito acima.
+
+    **O futuro entra pela PISTA, não só pela proximidade.** Sem pista nenhuma, as ocorrências
+    mais próximas bastam (é contexto, não alvo). Mas "muda a parcela do Mac de outubro" é
+    pedido legítimo — `update_transaction_scoped` existe para ele —, e com 200 linhas futuras
+    outubro está longe das 10 primeiras. Por isso valor, texto e data entram na consulta: o que
+    volta é SUPERCONJUNTO do que o filtro em Python aceita, nunca menos. Filtrar aqui mais
+    apertado que lá devolveria "não achei" para um alvo que existe, que é como uma janela de
+    referência mente.
     """
+    termo = (action.description or "").strip() if action else ""
     return await db.fetch(
         """
-        (select id, kind, amount_cents, category, description, occurred_at
-           from public.transactions
-          where workspace_id = %s and occurred_at <= current_date
-          order by occurred_at desc, created_at desc
+        with pista as (
+          select nullif(%s, '')::text as termo, %s::bigint as cents, %s::date as dia
+        )
+        (select t.id, t.kind, t.amount_cents, t.category, t.description, t.occurred_at
+           from public.transactions t
+          where t.workspace_id = %s and t.occurred_at <= current_date
+          order by t.occurred_at desc, t.created_at desc
           limit %s)
         union all
-        (select id, kind, amount_cents, category, description, occurred_at
-           from public.transactions
-          where workspace_id = %s and occurred_at > current_date
-          order by occurred_at asc, created_at desc
+        (select t.id, t.kind, t.amount_cents, t.category, t.description, t.occurred_at
+           from public.transactions t cross join pista p
+          where t.workspace_id = %s and t.occurred_at > current_date
+            and (
+              (p.termo is null and p.cents is null and p.dia is null)
+              or (p.termo is not null
+                  and (t.description ilike '%%' || p.termo || '%%'
+                       or t.category ilike '%%' || p.termo || '%%'))
+              or (p.cents is not null and t.amount_cents = p.cents)
+              or (p.dia is not null and t.occurred_at = p.dia)
+            )
+          order by t.occurred_at asc, t.created_at desc
           limit %s)
         """,
+        termo,
+        action.amount_cents if action else None,
+        action.occurred_at if action else None,
         workspace_id,
         REFERENCE_WINDOW,
         workspace_id,
@@ -126,7 +149,7 @@ async def resolve_transaction(
     Devolve ("found"|"ambiguous"|"none", candidatos). Empate PERGUNTA em vez de
     chutar: alterar o lançamento errado é pior que uma mensagem a mais.
     """
-    candidatos = await reference_window(workspace_id)
+    candidatos = await reference_window(workspace_id, action)
     if not candidatos:
         return "none", []
 

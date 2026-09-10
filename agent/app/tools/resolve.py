@@ -229,7 +229,7 @@ async def por_transacao(
     mais recente. Antes elegia a última em silêncio — foi assim que "apaga
     aquilo" virava um DELETE sem o usuário ter dito o quê.
     """
-    linhas = await finance.reference_window(workspace_id)
+    linhas = await finance.reference_window(workspace_id, action)
     if not linhas:
         return "none", []
 
