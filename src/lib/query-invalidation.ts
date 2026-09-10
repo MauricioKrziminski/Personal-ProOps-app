@@ -4,10 +4,10 @@ import { focusManager, type QueryClient } from '@tanstack/react-query';
 export const FINANCE_KEYS = [
   ['transactions'], ['tx-summary'], ['monthly-cashflow'], ['account-balances'],
   ['budgets-status'], ['accounts'], ['goals'], ['budgets'], ['recurring'],
-  ['card-summary'], ['invoice'], ['card-invoices'], ['installments'], ['forecast'],
+  ['card-summary'], ['invoice'], ['card-invoices'], ['installments'], ['forecast'], ['forecast-drafts'],
   ['upcoming-bills'], ['debts'], ['debt-schedule'], ['payoff'], ['assets'],
   ['net-worth'], ['net-worth-series'], ['cash-history'], ['financial-health'],
-  ['annual-report'], ['affordability'], ['goal-contributions'], ['search', 'transactions'],
+  ['annual-report'], ['goal-contributions'], ['search', 'transactions'],
   ['ai-month-stats'], ['month-lines'], ['month-summary'], ['month-breakdown'], ['default-account'],
 ] as const;
 

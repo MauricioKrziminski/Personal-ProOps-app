@@ -634,11 +634,6 @@ async def query_net_worth(ctx: ExecContext, action: FinanceQuery) -> ToolResult:
     )
 
 
-# Teto da projeção, o mesmo de `private.clamp_forecast_days` (20260910220000). O banco corta
-# de qualquer jeito; repetir aqui é só para a frase não prometer um horizonte que não existe.
-FORECAST_MAX_DIAS = 1095
-
-
 def _rascunho(action: FinanceQuery, hoje: date) -> dict:
     """Uma hipótese no formato que `private.draft_effect` entende.
 
@@ -695,7 +690,11 @@ def _janela(rascunhos: list[dict], action: FinanceQuery, hoje: date) -> int:
     # início da suposição: ela mexeria no saldo (o delta vale para todo dia >= início) e não
     # teria dia nenhum para aparecer em "entra/sai" — o mesmo sintoma que a `20260910233000`
     # matou pelo outro lado, e igualmente mudo.
-    return max(30, min(max(pedido, precisa), FORECAST_MAX_DIAS))
+    # ⚠️ Sem teto AQUI de propósito. Quem corta é `private.clamp_forecast_days`, e ele existe
+    # justamente porque o horizonte já esteve cravado em dois lugares — a tela parava em
+    # "6 meses" sem ninguém entender por quê. Pedir demais devolve o máximo; a frase lê a data
+    # do ÚLTIMO dia que VOLTOU, então ela nunca promete um horizonte que não existe.
+    return max(30, max(pedido, precisa))
 
 
 def _frase(r: dict) -> str:

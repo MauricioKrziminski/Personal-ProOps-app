@@ -147,10 +147,13 @@ class TestJanela:
         assert cap["args"][1] > 24 * 30, "24 parcelas não cabem na janela pedida"
 
     @pytest.mark.asyncio
-    async def test_respeita_o_teto_de_tres_anos(self, espia):
+    async def test_nao_tem_teto_proprio_quem_corta_e_o_banco(self, espia):
+        """72 parcelas pedem ~6 anos. O agente PEDE o que a hipótese precisa; quem corta é
+        `private.clamp_forecast_days`. Um segundo teto aqui divergiria do banco no dia em que
+        um dos dois mudasse — foi assim que a projeção já parou em "6 meses" sem motivo."""
         cap = espia(serie({}))
         await queries.simulate_scenario(ctx(), acao(amount_cents=100, installments=72))
-        assert cap["args"][1] <= queries.FORECAST_MAX_DIAS
+        assert cap["args"][1] > 1095, "o agente cortou sozinho em vez de deixar o banco cortar"
 
     @pytest.mark.asyncio
     async def test_query_to_nunca_encolhe_abaixo_da_hipotese(self, espia):

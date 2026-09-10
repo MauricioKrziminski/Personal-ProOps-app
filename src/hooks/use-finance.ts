@@ -584,7 +584,6 @@ export type UpcomingBill = Omit<Fns['upcoming_bills']['Returns'][number], 'kind'
    */
   kind: 'invoice' | 'transaction' | 'debt' | 'income';
 };
-export type Affordability = Fns['affordability']['Returns'][number];
 
 /**
  * Saldo projetado dia a dia. Sai pronto do banco somando saldo atual + o que
@@ -662,34 +661,6 @@ export function useUpcomingBills(days = 30) {
       const { data, error } = await supabase.rpc('upcoming_bills', { days });
       if (error) throw error;
       return data as UpcomingBill[];
-    },
-  });
-}
-
-/**
- * "Posso comprar isso?" — simula N parcelas sobre a projeção. Não grava nada.
- *
- * ⚠️ **Sem chamada nenhuma nesta versão do app, e mesmo assim fica.** O "E se…?" da Projeção
- * passou a tirar o veredito de `primeiroNegativo` sobre a própria série (10/09/2026), que
- * responde receita, hipótese que repete e várias suposições juntas — coisas que a RPC
- * `affordability` não sabe fazer, porque ela é UMA hipótese de gasto começando hoje.
- *
- * O hook continua aqui para o leitor não concluir que a RPC também está morta: **APK antigo em
- * campo ainda chama `rpc('affordability')`**. Derrubá-la quebraria só quem não atualizou, que é
- * a pior forma de quebrar. O agente também deixou de usá-la — ver
- * `docs/AGENTE-PARIDADE-COM-O-APP.md`.
- */
-export function useAffordability(amountCents: number, installments: number) {
-  return useQuery({
-    enabled: amountCents > 0,
-    queryKey: ['affordability', String(amountCents), String(installments)],
-    queryFn: async (): Promise<Affordability | null> => {
-      const { data, error } = await supabase.rpc('affordability', {
-        amount_cents: amountCents,
-        installments,
-      });
-      if (error) throw error;
-      return data?.[0] ?? null;
     },
   });
 }

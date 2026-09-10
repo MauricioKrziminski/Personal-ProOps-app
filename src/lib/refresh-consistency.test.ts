@@ -31,7 +31,7 @@ test('settling a historical invoice refreshes history without realtime and inval
   const client = new QueryClient({ defaultOptions: { queries: { retry: false, staleTime: Infinity } } });
   const historyKey = ['card-invoices', 'card-1', '60'];
   client.setQueryData(historyKey, 'open');
-  const dependent = ['installments', 'annual-report', 'net-worth-series', 'cash-history', 'affordability', 'debt-schedule', 'goal-contributions'];
+  const dependent = ['installments', 'annual-report', 'net-worth-series', 'cash-history', 'debt-schedule', 'goal-contributions'];
   for (const key of dependent) client.setQueryData([key, 'old'], 'old');
   const observer = new QueryObserver(client, { queryKey: historyKey, queryFn: async () => 'paid', staleTime: Infinity });
   const unsubscribe = observer.subscribe(() => {});

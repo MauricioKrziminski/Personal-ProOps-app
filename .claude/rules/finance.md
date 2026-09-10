@@ -100,14 +100,31 @@
 
 ## Projeção de fluxo de caixa
 
-- **Horizonte da projeção: até 3 anos, e o teto num lugar só** (`20260910220000`).
-  `private.clamp_forecast_days` — piso 1, teto 1095, default 90. Antes o 365 estava cravado
-  dentro de `cash_flow_forecast` e `_cash_flow_forecast`, e a tela parava em "6 meses": "O mês
-  inteiro" navegava para 2028 e mostrava tudo, mas a Projeção não chegava lá, e o seletor de mês
-  do rascunho só oferece os meses DA JANELA — supor uma receita em 2028 era impossível com o dado
-  existindo. Efeito colateral bom: `affordability` chama com 370 dias e filtra até
-  `add_months(hoje, parcelas)`; com o teto em 365, parcelamento acima de 12 meses era truncado em
-  silêncio e o "pior dia" saía otimista.
+- **Horizonte da projeção: até 10 anos, e o teto num lugar só** (`20260910235500`).
+  `private.clamp_forecast_days` — piso 1, teto 3650, default 90.
+
+  > **Era 1095 (3 anos) por algumas horas em 10/09/2026.** O argumento para o teto baixo era
+  > "a regra envelhece, projetar longe é fingir precisão" — e estava errado: PocketSmith
+  > projeta 30 anos de saldo diário e o Monarch faz multi-ano. A resposta da indústria à
+  > decadência da regra é dar ALAVANCA ao usuário, não encurtar o alcance, e a alavanca já
+  > existe aqui: é o "E se…?". O que realmente impedia era CUSTO — com `draft_effect` sendo
+  > chamada por dia, 3 anos com rascunho custava 1.769 ms e 10 anos passaria de 6 s. Depois da
+  > `20260910234500`, 10 anos com duas hipóteses custa **68 ms**.
+
+  ⚠️ **Teto de LEITURA não é janela de ESCRITA.** O materializador segue gravando UM ano
+  (`HORIZON_DAYS = 365`); tudo além é calculado. Subir o teto não grava uma linha.
+
+  ⚠️ **Não crie um segundo teto em código de aplicação.** Já aconteceu duas vezes. Na
+  primeira, o 365 estava cravado dentro de `cash_flow_forecast` E de `_cash_flow_forecast`: a
+  tela parava em "6 meses", "O mês inteiro" navegava para 2028 e mostrava tudo, e o seletor de
+  mês do rascunho — que só oferece os meses DA JANELA — tornava impossível supor uma receita em
+  2028 com o dado existindo. Na segunda, o agente ganhou um espelho (`FORECAST_MAX_DIAS`) que
+  durou poucas horas. Quem pede demais recebe o máximo, e a frase lê a data do último dia que
+  VOLTOU — não há o que espelhar.
+
+  Efeito colateral bom da centralização: `affordability` chama com 370 dias e filtra até
+  `add_months(hoje, parcelas)`; com o teto em 365, parcelamento acima de 12 meses era truncado
+  em silêncio e o "pior dia" saía otimista.
 
 - **Rascunho de cenário: um motor, duas portas** (`20260910170000`). `private.draft_effect(drafts,
   dia)` é a ÚNICA aritmética de hipótese do sistema — receita soma, gasto subtrai, parcela cai de

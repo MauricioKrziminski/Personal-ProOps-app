@@ -73,6 +73,8 @@ const HORIZONTES = [
   { dias: 365, label: '1 ano' },
   { dias: 730, label: '2 anos' },
   { dias: 1095, label: '3 anos' },
+  { dias: 1825, label: '5 anos' },
+  { dias: 3650, label: '10 anos' },
 ];
 
 /** O rótulo do horizonte, para a tela nunca escrever "em 730 dias". */
