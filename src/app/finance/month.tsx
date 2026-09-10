@@ -23,11 +23,12 @@ import {
   useMarkPaid,
   useMonthBreakdown,
   useMonthLines,
+  useMonthRange,
   useMonthSummary,
   type MonthLine,
 } from '@/hooks/use-finance';
 import { useTheme } from '@/hooks/use-theme';
-import { formatBRL, isoToBR, localISODate, monthBounds } from '@/lib/dates';
+import { formatBRL, isoToBR, localISODate } from '@/lib/dates';
 import { showItemActions } from '@/lib/item-actions';
 import {
   BUCKETS,
@@ -93,6 +94,7 @@ export default function MonthScreen() {
   const [groupBy, setGroupBy] = useState<GroupBy>('natureza');
 
   const lines = useMonthLines(month);
+  const janela = useMonthRange(month);
   const summary = useMonthSummary(month);
   const breakdown = useMonthBreakdown(month, groupBy);
   const darBaixa = useMarkPaid();
@@ -165,7 +167,10 @@ export default function MonthScreen() {
           Uma linha de legenda resolve o que nenhuma explicação depois resolve.
         */}
         <ThemedText type="caption" themeColor="textSecondary" style={tabular}>
-          mês de calendário · {isoToBR(monthBounds(month).from)} a {isoToBR(monthBounds(month).to)}
+          {/* A legenda diz a JANELA, não o nome dela: com fechamento configurado, "setembro"
+              vai de 11/08 a 10/09 e escrever "mês de calendário" viraria a mentira que esta
+              linha existe para evitar. */}
+          {isoToBR(janela.from)} a {isoToBR(janela.to)}
         </ThemedText>
       </View>
 

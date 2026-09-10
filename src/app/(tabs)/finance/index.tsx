@@ -48,6 +48,7 @@ import {
   useCardSummary,
   useCashFlowForecast,
   useCycle,
+  useMonthRange,
   useDeleteTransaction,
   useMonthlyCashflow,
   useRecentTransactions,
@@ -293,9 +294,12 @@ export default function FinanceScreen() {
   const mesCorrente = cycle.data?.mes ?? currentMonth();
   const month = mesEscolhido ?? mesCorrente;
 
-  const range = useMemo(() => monthBounds(month), [month]);
+  // ⚠️ As bordas seguem o CICLO, não o mês civil. O painel acima soma a janela do ciclo; se a
+  // linha "entrou · saiu" logo abaixo somasse 01 a 31, os dois números não fechariam — colados,
+  // sem nada na tela explicando por quê.
+  const range = useMonthRange(month);
   const previousMonth = useMemo(() => shiftMonth(month, -1), [month]);
-  const previousRange = useMemo(() => monthBounds(previousMonth), [previousMonth]);
+  const previousRange = useMonthRange(previousMonth);
   const isCurrent = month === mesCorrente;
   const daysLeft = cycle.data?.diasAteOFim ?? daysToMonthEnd();
 

@@ -24,6 +24,8 @@ function screen(file: string, options: { debts?: any[]; invoiceStatus?: string; 
     DEBT_KINDS: [{ value: 'financing', label: 'Financiamento' }, { value: 'loan', label: 'Empréstimo' }],
     useDebts: () => ({ ...query, data: options.debts ?? [] }),
     useMonthLines: () => ({ ...query, data: options.monthLines ?? [] }),
+    // Devolve as BORDAS direto, não um query — o Proxy abaixo assume "todo hook é query".
+    useMonthRange: (month: string) => ({ from: `${month}-01`, to: `${month}-30` }),
     useMonthSummary: () => ({ ...query, data: options.monthSummary ?? null }),
     useMonthBreakdown: () => ({ ...query, data: [] }),
     useSaveDebt: () => mutation('saveDebt'),

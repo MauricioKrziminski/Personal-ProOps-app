@@ -1091,6 +1091,34 @@ export function useCycle() {
   });
 }
 
+/**
+ * As bordas do ciclo de um mês QUALQUER — para as telas que navegam entre meses.
+ *
+ * `useCycle` responde pelo ciclo corrente e basta para o painel; a lista de lançamentos, o
+ * recorte por categoria e a comparação com o mês anterior precisam das bordas do mês que o
+ * usuário abriu. Enquanto a resposta não chega, o mês civil é o palpite — e é o valor certo
+ * para quem não mexeu na configuração.
+ */
+export function useCycleRange(month: string) {
+  useRealtimeInvalidate('workspaces', ['cycle-range']);
+  return useQuery({
+    queryKey: ['cycle-range', month],
+    queryFn: async (): Promise<{ de: string; ate: string }> => {
+      const { data, error } = await supabase.rpc('cycle_range', { p_month: `${month}-01` });
+      if (error) throw error;
+      return data as unknown as { de: string; ate: string };
+    },
+    staleTime: 12 * 60 * 60 * 1000,
+  });
+}
+
+/** As bordas do mês exibido: o ciclo quando ele já chegou, o mês civil enquanto não. */
+export function useMonthRange(month: string): { from: string; to: string } {
+  const ciclo = useCycleRange(month);
+  const civil = monthBounds(month);
+  return ciclo.data ? { from: ciclo.data.de, to: ciclo.data.ate } : civil;
+}
+
 export function useSetCycleCloseDay() {
   const queryClient = useQueryClient();
   return useMutation({
@@ -1105,6 +1133,7 @@ export function useSetCycleCloseDay() {
     onSuccess: () =>
       invalidateKeys(queryClient, [
         ['cycle'],
+        ['cycle-range'],
         ['forecast'],
         ['forecast-drafts'],
         ['forecast-months'],

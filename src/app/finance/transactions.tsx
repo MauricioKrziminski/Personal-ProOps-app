@@ -30,6 +30,7 @@ import {
   useDeleteTransaction,
   useMarkPaid,
   useRecentTransactions,
+  useMonthRange,
   useTransactions,
   useTransactionsSummary,
   type Transaction,
@@ -169,7 +170,7 @@ export default function TransactionsScreen() {
     if (params.accountId) setAccountId(params.accountId);
   }
 
-  const range = useMemo(() => monthBounds(month), [month]);
+  const range = useMonthRange(month);
   const list = useTransactions({
     month,
     kind: kind === 'all' ? undefined : kind,

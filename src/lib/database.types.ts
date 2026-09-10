@@ -2515,6 +2515,7 @@ export type Database = {
         Returns: string
       }
       cycle_now: { Args: never; Returns: Json }
+      cycle_range: { Args: { p_month: string }; Returns: Json }
       debt_schedule: {
         Args: { p_debt_id: string }
         Returns: {
