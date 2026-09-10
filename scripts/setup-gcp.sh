@@ -67,6 +67,7 @@ log()  { printf '\n\033[1m▸ %s\033[0m\n' "$*"; }
 skip() { printf '  · %s\n' "$*"; }
 ok()   { printf '  \033[32m✓\033[0m %s\n' "$*"; }
 warn() { printf '  \033[33m!\033[0m %s\n' "$*"; }
+err()  { printf '  \033[31m✗\033[0m %s\n' "$*" >&2; }
 
 # ---------------------------------------------------------------------------
 # 0. preflight — conta certa, componente certo
@@ -114,6 +115,29 @@ preflight() {
 # ---------------------------------------------------------------------------
 criar_projeto() {
   log "Projeto $PROJECT_ID"
+
+  # ⚠️ "não consegui ver o projeto" NÃO é "o projeto não existe".
+  #
+  # O `describe` abaixo mandava tudo para /dev/null, então um PERMISSION_DENIED — a conta ativa
+  # do gcloud sendo outra, o que é comum em quem trabalha para mais de um lugar — caía no `else`
+  # e ia CRIAR o projeto. Em 10/09/2026 isso parou por um segundo acaso: a conta também não
+  # tinha permissão de criar. Se tivesse, teria nascido um `personal-proops-agent` paralelo na
+  # organização errada, e o deploy seguinte publicaria o agente num projeto vazio.
+  #
+  # A checagem certa separa os dois casos pelo texto do erro, e um erro de acesso PARA.
+  local erro
+  if ! erro="$(gcloud projects describe "$PROJECT_ID" 2>&1 >/dev/null)"; then
+    if grep -qi "permission\|denied\|not authorized" <<<"$erro"; then
+      err "sem acesso ao projeto $PROJECT_ID com a conta ativa do gcloud:"
+      err "  $(gcloud config get-value account 2>/dev/null)"
+      err ""
+      err "Troque para a conta deste projeto e rode de novo:"
+      err "  gcloud config set account <a-conta-do-projeto>"
+      err "  gcloud auth list   # para ver as disponíveis"
+      exit 1
+    fi
+  fi
+
   if gcloud projects describe "$PROJECT_ID" &>/dev/null; then
     local pai
     pai="$(gcloud projects describe "$PROJECT_ID" --format='value(parent.id)' 2>/dev/null)"
