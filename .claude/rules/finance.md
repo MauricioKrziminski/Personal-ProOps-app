@@ -111,6 +111,17 @@
   > chamada por dia, 3 anos com rascunho custava 1.769 ms e 10 anos passaria de 6 s. Depois da
   > `20260910234500`, 10 anos com duas hipóteses custa **68 ms**.
 
+  ⚠️ **A leitura do app passa por `forecast_json`, não pelas RPCs `setof`.** O PostgREST corta
+  a resposta em **1000 linhas** e o corte é MUDO: a série chega menor, o app soma "entra/sai" e
+  tira o saldo do fim em cima do pedaço, e escreve o rótulo do horizonte pedido por cima. Medido
+  em 10/09/2026 pela API autenticada: pedindo 3.650 dias vinham 1.000, último dia 05/06/2029,
+  saldo **R$ 16.164,60 otimista** — e 3, 5 e 10 anos mostravam todos a MESMA data. Já valia em
+  produção desde o teto de 3 anos (1.096 linhas, R$ 613,30 de erro).
+  `cash_flow_forecast`/`forecast_with_drafts` continuam para o AGENTE (fala com o Postgres
+  direto, sem esse teto) e para APK antigo; `src/lib/anti-slop.test.ts` quebra o build se uma
+  tela voltar a chamá-las. **Qualquer leitura nova que possa passar de 1000 linhas nasce
+  agregada ou em JSON** — não dá para ver esse defeito no SQL, só na tela.
+
   ⚠️ **Teto de LEITURA não é janela de ESCRITA.** O materializador segue gravando UM ano
   (`HORIZON_DAYS = 365`); tudo além é calculado. Subir o teto não grava uma linha.
 
