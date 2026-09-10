@@ -34,6 +34,7 @@ import { formatBRL, formatDateBR, localISODate } from '@/hooks/use-items';
 import { useTheme } from '@/hooks/use-theme';
 import { confirmDestructive } from '@/lib/item-actions';
 import { accountLabel } from '@/lib/accounts';
+import { AccountPicker } from '@/components/finance/account-picker';
 
 /**
  * Fatura — "o que tem nesta fatura, e como eu marco como paga?".
@@ -494,21 +495,12 @@ export default function InvoiceScreen() {
               />
             ) : (
               <Field label="Pagar com">
-                <Section>
-                  {pagadoras.map((a) => (
-                    <Row
-                      key={a.id}
-                      title={accountLabel(a)}
-                      icon="building.columns"
-                      onPress={() => setPayerId(a.id)}
-                      trailing={
-                        payerId === a.id ? (
-                          <Icon name="checkmark" size="sm" color="tint" />
-                        ) : undefined
-                      }
-                    />
-                  ))}
-                </Section>
+                <AccountPicker
+                  accounts={pagadoras}
+                  value={payerId}
+                  onChange={setPayerId}
+                  placeholder="Escolher a conta que paga"
+                />
               </Field>
             )}
 

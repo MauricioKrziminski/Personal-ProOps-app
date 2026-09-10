@@ -38,7 +38,7 @@ import {
   type ImportItem,
 } from '@/hooks/use-finance';
 import { useTheme } from '@/hooks/use-theme';
-import { accountLabel } from '@/lib/accounts';
+import { AccountPicker } from '@/components/finance/account-picker';
 
 /**
  * O MIME curinga está na lista de propósito: banco brasileiro manda MIME errado com frequência, e
@@ -296,16 +296,12 @@ export default function ImportScreen() {
         {(accounts ?? []).length > 0 ? (
           <View style={styles.bloco}>
             <SectionHead title="Lançar na conta" />
-            <View style={styles.chips}>
-              {(accounts ?? []).map((conta) => (
-                <Chip
-                  key={conta.id}
-                  label={accountLabel(conta)}
-                  selected={accountId === conta.id}
-                  onPress={() => setAccountId(accountId === conta.id ? null : conta.id)}
-                />
-              ))}
-            </View>
+            <AccountPicker
+              accounts={accounts ?? []}
+              value={accountId}
+              onChange={setAccountId}
+              emptyLabel="Sem conta"
+            />
             <ThemedText type="small" themeColor="textSecondary" style={styles.rodape}>
               Opcional — sem conta escolhida o lançamento nasce sem conta.
             </ThemedText>

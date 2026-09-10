@@ -248,23 +248,21 @@ test('nenhuma chamada a Edge Function no app', () => {
 });
 
 /**
- * Conta se apresenta pelo `accountLabel`, nunca pelo `.name` cru.
+ * Nenhuma tela monta lista de conta à mão.
  *
- * Um chip escrito "Nubank" não diz que é um CARTÃO, e cartão guarda dívida, não
- * saldo. Em 09/09/2026 isso pôs um salário de R$ 4.000 dentro da fatura do
- * cartão, e não houve erro nenhum na tela — só um número errado. A regra não
- * dá para ser vistoria: são oito telas hoje, e a nona nasce copiando uma delas.
+ * O mesmo campo já teve OITO implementações — `<Row title={a.name}/>` em quatro
+ * telas e `<Chip label={...}/>` em outras quatro —, e em todas elas um cartão de
+ * crédito e uma conta corrente têm a mesma cara. Foi assim que um salário de
+ * R$ 4.000 entrou na fatura do cartão em 09/09/2026, sem erro nenhum na tela.
+ *
+ * A regra não dá para ser vistoria: a nona tela nasce copiando a oitava. Quem
+ * precisa escolher conta usa `AccountPicker`; quem precisa escolher item de uma
+ * lista curta usa `SelectField`.
  */
-test('nenhuma tela desenha o nome cru de uma conta', () => {
-  // `accounts.ts` é quem monta o rótulo; `accounts.tsx` é a tela que GERENCIA
-  // contas, onde o tipo já é o cabeçalho da seção e repeti-lo em toda linha
-  // seria o ruído que a própria regra manda evitar.
-  // `accounts.ts` monta o rótulo; `account-picker.tsx` é o seletor, que escreve
-  // o tipo na própria linha de baixo (repetir o sufixo ali seria o ruído que a
-  // regra manda evitar); `accounts.tsx` é a tela que GERENCIA contas, onde o
-  // tipo já é o cabeçalho da seção.
+test('nenhuma tela monta lista de conta à mão', () => {
+  // Só o próprio seletor pode iterar contas para desenhar opção; `accounts.tsx`
+  // é a tela que GERENCIA contas (ali a lista é o conteúdo, não um campo).
   const PERMITIDO = new Set([
-    'src/lib/accounts.ts',
     'src/components/finance/account-picker.tsx',
     'src/app/finance/accounts.tsx',
   ]);
@@ -274,17 +272,11 @@ test('nenhuma tela desenha o nome cru de uma conta', () => {
     const rel = file.replace(SRC, 'src');
     if (PERMITIDO.has(rel)) continue;
     const code = stripComments(readFileSync(file, 'utf8'));
-    // Onde o nome VIRA texto na tela, dentro de um `.map` sobre contas.
-    //
-    // ⚠️ A primeira versão exigia que a variável se chamasse `conta`/`acc`, e
-    // por isso deixou passar TRÊS `<Row title={a.name}>` em debts.tsx — o
-    // apelido de uma letra é o mais comum num `.map`. O gatilho agora é a
-    // COLEÇÃO iterada, não o nome do item.
-    const iteraContas = /\b(?:accounts|contas|pagadoras|cartoes|cartões)\b[^\n]{0,40}\.map\(\s*\(?(\w+)/g;
-    for (const m of code.matchAll(iteraContas)) {
-      const item = m[1];
-      const corpo = code.slice(m.index ?? 0, (m.index ?? 0) + 900);
-      if (new RegExp(`\\b(?:label|title)=\\{\\s*${item}\\.name\\s*\\}`).test(corpo)) {
+    // `<coleção de contas>.map(...)` com um Chip ou Row desenhado dentro.
+    const itera = /\b(?:accounts|contas|pagadoras|cartoes|cartões)\b[^\n]{0,40}\.map\(/g;
+    for (const m of code.matchAll(itera)) {
+      const corpo = code.slice(m.index ?? 0, (m.index ?? 0) + 700);
+      if (/<(?:Chip|Row)\b/.test(corpo)) {
         fora.push(rel);
         break;
       }
@@ -293,6 +285,6 @@ test('nenhuma tela desenha o nome cru de uma conta', () => {
   assert.deepEqual(
     fora,
     [],
-    'use accountLabel de @/lib/accounts: "Nubank" sozinho não diz que é cartão, e foi assim que um salário caiu na fatura'
+    'use AccountPicker de @/components/finance/account-picker: uma lista de nomes não diz qual é cartão, e foi assim que um salário caiu na fatura'
   );
 });

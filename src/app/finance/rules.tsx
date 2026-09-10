@@ -7,7 +7,6 @@ import * as Haptics from 'expo-haptics';
 
 import { ErrorCard } from '@/components/error-card';
 import { CategoryPicker } from '@/components/finance/category-picker';
-import { Chip } from '@/components/finance/chip';
 import { Card } from '@/components/ui/card';
 import { Sheet } from '@/components/ui/sheet';
 import { ThemedText } from '@/components/themed-text';
@@ -29,7 +28,7 @@ import {
   type CategorizationRule,
 } from '@/hooks/use-finance';
 import { useTheme } from '@/hooks/use-theme';
-import { accountLabel } from '@/lib/accounts';
+import { AccountPicker } from '@/components/finance/account-picker';
 
 /** Postgres: violação de unique. Aqui só pode ser `(workspace_id, match_type, pattern)` da `0017`. */
 const UNIQUE_VIOLATION = '23505';
@@ -311,25 +310,14 @@ export default function RulesScreen() {
                 label="Só nesta conta"
                 hint="Opcional. Sem conta escolhida, a regra vale em todas."
               >
-                <View style={styles.chips}>
-                  {(accounts ?? []).map((conta) => (
-                    <Chip
-                      key={conta.id}
-                      label={accountLabel(conta)}
-                      selected={rascunho?.accountId === conta.id}
-                      onPress={() =>
-                        setRascunho((atual) =>
-                          atual
-                            ? {
-                                ...atual,
-                                accountId: atual.accountId === conta.id ? null : conta.id,
-                              }
-                            : atual
-                        )
-                      }
-                    />
-                  ))}
-                </View>
+                <AccountPicker
+                  accounts={accounts ?? []}
+                  value={rascunho?.accountId ?? null}
+                  onChange={(accountId: string | null) =>
+                    setRascunho((atual) => (atual ? { ...atual, accountId } : atual))
+                  }
+                  emptyLabel="Em todas as contas"
+                />
               </Field>
             ) : null}
           </ScrollView>

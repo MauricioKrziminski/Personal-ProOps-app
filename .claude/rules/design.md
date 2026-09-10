@@ -87,6 +87,21 @@ Android e web. **Nunca** usar `GlassView`/`BlurView` direto numa tela.
 
 Card comum é `Card` (`src/components/ui/card.tsx`): opaco, `Elevation`, `Radius.md`.
 
+**Escolher item de lista curta num formulário é `SelectField`**
+(`src/components/ui/select-field.tsx`), e ele nasce **colapsado**: campo de formulário mostra o
+VALOR, a lista é o que aparece quando se vai trocá-lo. Aberto de cara, seis contas comiam meia
+tela antes de o usuário pedir nada.
+
+⚠️ **Ele abre NO LUGAR, não em `formSheet`.** O sheet seria o mecanismo natural para "escolha
+curta" (§8), mas quatro dos formulários que usam este campo já vivem dentro de um `Sheet` —
+recorrentes, dívidas (×3), regras e importação. `Modal` dentro de `Modal` no Android é uma janela
+dentro de outra, com teclado e botão voltar disputando qual fecha.
+
+⚠️ **Enquanto a lista está aberta, o valor SOME.** Mantê-lo visível duplicava a opção escolhida —
+o valor em cima e a mesma linha marcada logo abaixo, coladas —, e com "Não informar" (que é o
+padrão e a primeira opção) isso lia como defeito. Fechar é escolher; a linha marcada mostra o que
+tocar para sair sem mudar nada.
+
 **Escolher CONTA é `AccountPicker`** (`src/components/finance/account-picker.tsx`), nunca uma
 lista de `Row` com o nome dentro. Eram quatro cópias de `<Row title={a.name} trailing={check}/>`,
 e nelas um cartão de crédito e uma conta corrente têm exatamente a mesma cara — foi assim que um

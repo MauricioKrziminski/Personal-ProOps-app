@@ -42,7 +42,7 @@ import {
   dueFieldLabel,
 } from '@/lib/settle-labels';
 import { confirmDestructive, showItemActions } from '@/lib/item-actions';
-import { accountLabel } from '@/lib/accounts';
+import { AccountPicker } from '@/components/finance/account-picker';
 
 /**
  * Novo/editar lançamento — modal do Stack raiz (Cancelar nativo vem do `_layout.tsx`).
@@ -508,32 +508,29 @@ function TransactionForm({ editing }: { editing?: Transaction }) {
                   ? 'Lançamento sem conta também vale — ele entra no caixa.'
                   : undefined
               }>
-              <View style={styles.chipRow}>
-                {(accounts ?? []).map((acc) => (
-                  <Chip
-                    key={acc.id}
-                    label={accountLabel(acc)}
-                    selected={field.value === acc.id}
-                    onPress={() => {
-                      const next = field.value === acc.id ? null : acc.id;
-                      field.onChange(next);
-                      // Trocar para cartão desliga "vou pagar depois" em vez de só escondê-lo.
-                      if (acc.type === 'credit_card' && next) {
-                        setValue('pending', false);
-                        setValue('due_at', null);
-                      }
-                    }}
-                  />
-                ))}
-                {(accounts ?? []).length === 0 && (
-                  <Button
-                    label="Cadastrar uma conta"
-                    variant="secondary"
-                    size="sm"
-                    onPress={() => router.push('/finance/accounts')}
-                  />
-                )}
-              </View>
+              {(accounts ?? []).length === 0 ? (
+                <Button
+                  label="Cadastrar uma conta"
+                  variant="secondary"
+                  size="sm"
+                  onPress={() => router.push('/finance/accounts')}
+                />
+              ) : (
+                <AccountPicker
+                  accounts={accounts ?? []}
+                  value={field.value ?? null}
+                  onChange={(next: string | null) => {
+                    field.onChange(next);
+                    // Trocar para cartão desliga "vou pagar depois" em vez de só escondê-lo.
+                    const escolhida = (accounts ?? []).find((a) => a.id === next);
+                    if (escolhida?.type === 'credit_card') {
+                      setValue('pending', false);
+                      setValue('due_at', null);
+                    }
+                  }}
+                  emptyLabel="Sem conta"
+                />
+              )}
             </Field>
           )}
         />
@@ -545,16 +542,12 @@ function TransactionForm({ editing }: { editing?: Transaction }) {
               name="counterparty_account_id"
               render={({ field }) => (
                 <Field label="Para a conta" error={errors.counterparty_account_id?.message}>
-                  <View style={styles.chipRow}>
-                    {(accounts ?? []).map((acc) => (
-                      <Chip
-                        key={acc.id}
-                        label={accountLabel(acc)}
-                        selected={field.value === acc.id}
-                        onPress={() => field.onChange(acc.id)}
-                      />
-                    ))}
-                  </View>
+                  <AccountPicker
+                    accounts={accounts ?? []}
+                    value={field.value ?? null}
+                    onChange={field.onChange}
+                    placeholder="Escolher a conta de destino"
+                  />
                 </Field>
               )}
             />

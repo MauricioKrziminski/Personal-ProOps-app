@@ -1,11 +1,6 @@
 import { useMemo } from 'react';
-import { Pressable, StyleSheet, View } from 'react-native';
-import * as Haptics from 'expo-haptics';
 
-import { Icon } from '@/components/ui/icon';
-import { ThemedText } from '@/components/themed-text';
-import { useScheme, useTheme } from '@/hooks/use-theme';
-import { Elevation, Radius, Space, Type } from '@/design/tokens';
+import { SelectField, type SelectOption } from '@/components/ui/select-field';
 import { accountTypeLabel } from '@/lib/accounts';
 import type { IconName } from '@/components/ui/icon';
 
@@ -36,14 +31,17 @@ function detalhe(conta: PickableAccount): string {
 }
 
 /**
- * Escolher a conta de um lançamento.
+ * Escolher a conta de um lançamento. **O único caminho** — nenhuma tela monta
+ * lista de conta à mão.
  *
  * ## Por que ele existe
  *
- * Eram QUATRO cópias de `<Row title={a.name} trailing={check}/>` — uma lista de
- * texto onde cartão e conta corrente têm exatamente a mesma cara. Foi assim que
- * um salário de R$ 4.000 foi parar dentro da fatura do cartão em 09/09/2026: a
- * pessoa procurou a conta do Nubank e tocou no cartão do Nubank.
+ * O mesmo campo tinha OITO implementações: `<Row title={a.name}/>` em quatro
+ * telas e `<Chip label={a.name}/>` em outras quatro. Em todas elas um cartão de
+ * crédito e uma conta corrente têm exatamente a mesma cara. Foi assim que um
+ * salário de R$ 4.000 foi parar dentro da fatura do cartão em 09/09/2026: a
+ * pessoa procurou a conta do Nubank e tocou no cartão do Nubank — *"aparece só
+ * nubank e eu achei que era a conta corrente nubank e nao cartao nubank"*.
  *
  * ## Como ele separa cartão de conta
  *
@@ -62,12 +60,17 @@ function detalhe(conta: PickableAccount): string {
  * da forma de um cartão de crédito (`card-brands.ts`); numa linha de lista ela
  * volta a ser cor de terceiro competindo com o único accent do app. A separação
  * aqui é forma e estrutura, não tinta.
+ *
+ * ⚠️ **O nome vem CRU aqui**, não por `accountLabel`. Aquele emenda "· Cartão"
+ * para caber numa linha só; neste campo o tipo tem lugar próprio embaixo, e
+ * repetir o sufixo ensina a pessoa a não ler o sufixo.
  */
 export function AccountPicker({
   accounts,
   value,
   onChange,
   emptyLabel,
+  placeholder = 'Escolher conta',
 }: {
   accounts: readonly PickableAccount[];
   value: string | null;
@@ -77,184 +80,41 @@ export function AccountPicker({
    * transferência, que precisa dos dois lados para significar alguma coisa.
    */
   emptyLabel?: string;
+  placeholder?: string;
 }) {
-  const theme = useTheme();
-  const scheme = useScheme();
+  const opcoes = useMemo<SelectOption[]>(() => {
+    const contas = accounts.filter((a) => a.type !== 'credit_card');
+    const cartoes = accounts.filter((a) => a.type === 'credit_card');
+    // Cabeçalho só vale quando há o que separar.
+    const agrupado = contas.length > 0 && cartoes.length > 0;
 
-  const [contas, cartoes] = useMemo(
-    () => [
-      accounts.filter((a) => a.type !== 'credit_card'),
-      accounts.filter((a) => a.type === 'credit_card'),
-    ],
-    [accounts]
-  );
-  // Cabeçalho só vale quando há o que separar.
-  const agrupado = contas.length > 0 && cartoes.length > 0;
-
-  function escolher(id: string | null) {
-    if (id !== value) Haptics.selectionAsync();
-    onChange(id);
-  }
-
-  const opcao = (
-    key: string,
-    id: string | null,
-    nome: string,
-    meta: string,
-    glifo: IconName,
-    /** A opção "sem conta" não é uma conta: o glifo dela não vira accent. */
-    neutra = false
-  ) => {
-    const escolhida = value === id;
-    const ladrilhoAceso = escolhida && !neutra;
-    return (
-      <Pressable
-        key={key}
-        onPress={() => escolher(id)}
-        accessibilityRole="radio"
-        accessibilityState={{ selected: escolhida }}
-        accessibilityLabel={meta ? `${nome}, ${meta}` : nome}>
-        {({ pressed }) => (
-          <View
-            style={[
-              styles.opcao,
-              {
-                backgroundColor: escolhida
-                  ? theme.accentSoft
-                  : pressed
-                    ? theme.backgroundSelected
-                    : 'transparent',
-              },
-            ]}>
-            {/* O contorno não é enfeite: no escuro `backgroundElement` (#201F21) e
-                `surface` (#1B1B1D) distam 5 pontos, e sem o fio o ladrilho não
-                tem onde terminar. É a mesma razão pela qual todo card do app
-                leva 1px em `cardBorder`. */}
-            <View
-              style={[
-                styles.ladrilho,
-                {
-                  backgroundColor: ladrilhoAceso ? theme.tint : theme.backgroundElement,
-                  borderColor: ladrilhoAceso ? 'transparent' : theme.cardBorder,
-                },
-              ]}>
-              <Icon
-                name={glifo}
-                size="sm"
-                color={ladrilhoAceso ? 'onTint' : 'textSecondary'}
-              />
-            </View>
-
-            <View style={styles.textos}>
-              <ThemedText>{nome}</ThemedText>
-              {meta ? (
-                <ThemedText type="caption" themeColor="textSecondary">
-                  {meta}
-                </ThemedText>
-              ) : null}
-            </View>
-
-            {/* Só a escolhida desenha algo. Um círculo vazio em cada linha é
-                ruído: a ausência já diz "não é esta". */}
-            {escolhida ? (
-              <View style={[styles.marca, { backgroundColor: theme.tint }]}>
-                <Icon name="checkmark" size="xs" color="onTint" />
-              </View>
-            ) : null}
-          </View>
-        )}
-      </Pressable>
-    );
-  };
-
-  const divisor = (key: string) => (
-    <View key={key} style={[styles.divisor, { backgroundColor: theme.separator }]} />
-  );
-
-  const cabecalho = (key: string, texto: string) => (
-    <View key={key} style={styles.cabecalho}>
-      <ThemedText type="caption" themeColor="textSecondary" style={styles.etiqueta}>
-        {texto}
-      </ThemedText>
-    </View>
-  );
-
-  const filhos: React.ReactNode[] = [];
-  if (emptyLabel) {
-    filhos.push(opcao('vazio', null, emptyLabel, '', 'minus', true));
-  }
-  if (agrupado) filhos.push(cabecalho('h-contas', 'CONTAS'));
-  contas.forEach((a, i) => {
-    if (filhos.length && !(agrupado && i === 0)) filhos.push(divisor(`d-c-${a.id}`));
-    filhos.push(opcao(a.id, a.id, a.name, detalhe(a), GLIFO[a.type ?? ''] ?? 'building.columns'));
-  });
-  if (agrupado) filhos.push(cabecalho('h-cartoes', 'CARTÕES'));
-  cartoes.forEach((a, i) => {
-    if (filhos.length && !(agrupado && i === 0)) filhos.push(divisor(`d-k-${a.id}`));
-    filhos.push(opcao(a.id, a.id, a.name, detalhe(a), 'creditcard'));
-  });
+    return [
+      ...(emptyLabel
+        ? [{ id: null, label: emptyLabel, icon: 'minus' as IconName, neutral: true }]
+        : []),
+      ...contas.map((a) => ({
+        id: a.id,
+        label: a.name,
+        meta: detalhe(a),
+        icon: GLIFO[a.type ?? ''] ?? 'building.columns',
+        group: agrupado ? 'CONTAS' : undefined,
+      })),
+      ...cartoes.map((a) => ({
+        id: a.id,
+        label: a.name,
+        meta: detalhe(a),
+        icon: 'creditcard' as IconName,
+        group: agrupado ? 'CARTÕES' : undefined,
+      })),
+    ];
+  }, [accounts, emptyLabel]);
 
   return (
-    <View
-      style={[
-        styles.grupo,
-        {
-          backgroundColor: theme.surface,
-          borderColor: theme.cardBorder,
-          boxShadow: Elevation[scheme].raised,
-        },
-      ]}
-      accessibilityRole="radiogroup">
-      {filhos}
-    </View>
+    <SelectField
+      options={opcoes}
+      value={value}
+      onChange={onChange}
+      placeholder={emptyLabel ?? placeholder}
+    />
   );
 }
-
-const styles = StyleSheet.create({
-  grupo: {
-    borderRadius: Radius.md,
-    borderCurve: 'continuous',
-    borderWidth: StyleSheet.hairlineWidth,
-    overflow: 'hidden',
-  },
-  opcao: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: Space.md,
-    paddingHorizontal: Space.lg,
-    paddingVertical: Space.md,
-    minHeight: 56, // alvo de toque confortável mesmo com uma linha só
-  },
-  /** Caixa de GEOMETRIA: o ícone não cresce com a fonte, o texto ao lado sim. */
-  ladrilho: {
-    width: 36,
-    height: 36,
-    borderRadius: Radius.sm,
-    borderWidth: StyleSheet.hairlineWidth,
-    borderCurve: 'continuous',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  textos: {
-    flex: 1,
-    gap: Space.half,
-  },
-  marca: {
-    width: 22,
-    height: 22,
-    borderRadius: Radius.pill,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  /** Começa depois do ladrilho: o filete alinhado ao texto agrupa em vez de fatiar. */
-  divisor: {
-    height: StyleSheet.hairlineWidth,
-    marginLeft: Space.lg + 36 + Space.md,
-  },
-  cabecalho: {
-    paddingHorizontal: Space.lg,
-    paddingTop: Space.md,
-    paddingBottom: Space.xs,
-  },
-  etiqueta: Type.meta,
-});
