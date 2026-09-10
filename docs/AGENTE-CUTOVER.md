@@ -442,10 +442,9 @@ painel da Meta.
 # 1. gerar
 NOVO=$(openssl rand -hex 32); echo "$NOVO"
 
-# 2. atualizar os DOIS arquivos locais
-#    agent/.env         → WHATSAPP_VERIFY_TOKEN=<novo>
-#    supabase/.env      → WHATSAPP_VERIFY_TOKEN=<novo>
-#    (e agent/.env.production, se existir)
+# 2. atualizar os arquivos locais do agente
+#    agent/.env             → WHATSAPP_VERIFY_TOKEN=<novo>   (staging)
+#    agent/.env.production  → WHATSAPP_VERIFY_TOKEN=<novo>   (produção)
 
 # 3. Secret Manager (o script grava versão nova e destrói a anterior)
 ./scripts/setup-gcp.sh secrets
@@ -453,11 +452,10 @@ NOVO=$(openssl rand -hex 32); echo "$NOVO"
 # 4. redeploy do Cloud Run para pegar a versão nova
 ./scripts/setup-gcp.sh deploy
 
-# 5. secret do Supabase + redeploy da Edge Function
-npx supabase secrets set WHATSAPP_VERIFY_TOKEN="$NOVO"
-npx supabase functions deploy whatsapp-webhook
+# 5. painel da Meta: WhatsApp → Configuração → Token de verificação
 
-# 6. painel da Meta: WhatsApp → Configuration → Verify token
+# (não há mais passo do Supabase: `supabase/functions/` foi apagado em 09/09/2026
+#  e o handshake do webhook mora só no Cloud Run.)
 ```
 
 O passo 6 é o último. Trocar antes derruba a verificação se a Meta reenviar o

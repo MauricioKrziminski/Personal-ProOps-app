@@ -121,7 +121,7 @@ O passo que é o produto.
 4. **"Já mandei / pular"** discreto no rodapé.
 
 O toque abre `https://wa.me/<numero>?text=<sugestão>` com `expo-linking` (já instalado). O número
-do produto vem de **`EXPO_PUBLIC_WA_NUMBER` (env nova)**, documentada em `supabase/.env.example`
+do produto vem de **`EXPO_PUBLIC_WA_NUMBER` (env nova)**, documentada em `.env.example` da raiz
 como as outras — nunca literal no código, porque ele muda entre WABA de teste e de produção,
 exatamente como os nomes de template (`.claude/rules/whatsapp.md`).
 

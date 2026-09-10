@@ -106,12 +106,12 @@ Via Graph API v21.0 com o token de System User do app:
    estado verificado, armadilhas e o código de recepção que ainda falta: **[docs/PUSH-NOTIFICATIONS.md](PUSH-NOTIFICATIONS.md)**.
    Resumo: sem `extra.eas.projectId` + credenciais FCM, `expo_push_token` fica `NULL` e **todo lembrete
    vira template Utility pago** em vez de push grátis.
-3. **Sincronizar os secrets e redeployar o send-reminders** (o nome do template saiu do código):
-   ```
-   npx supabase secrets set --env-file supabase/.env --project-ref kwriuifcwyvdrxtspjiz
-   npx supabase functions deploy send-reminders --project-ref kwriuifcwyvdrxtspjiz --use-api
-   ```
-4. **Ligar o OTP**: habilitar o provider Phone no Supabase Auth e registrar o hook Send SMS apontando para `/functions/v1/wa-send-otp`. Sem isso não existe login fora de build de desenvolvimento — `__DEV__` é `false` em preview/production, e o atalho de teste não renderiza.
+3. ~~**Sincronizar os secrets e redeployar o send-reminders**~~ — **não existe mais** (09/09/2026).
+   Os lembretes viraram `POST /cron/reminders` no Cloud Run, os segredos moram no GCP Secret
+   Manager (`./scripts/setup-gcp.sh secrets`) e `supabase/functions/` foi apagado.
+4. ~~**Ligar o OTP**~~ — **feito** (09/09/2026). O provider Phone está habilitado e o Send SMS Hook
+   aponta para `https://agente-wwm7xruoyq-rj.a.run.app/hooks/otp`, não mais para
+   `/functions/v1/wa-send-otp`. Validado em produção: código recebido e login concluído.
 
 ## 🔴 Dívidas técnicas (resolver cedo)
 

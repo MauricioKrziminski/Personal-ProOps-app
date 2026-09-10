@@ -78,8 +78,9 @@ CORPO e confiava neles — qualquer autenticado escrevia no workspace de outro.
 
 - Segredos (Gemini, Groq, WhatsApp, hooks, DATABASE_URL, THREAD_SALT) no **GCP Secret Manager**,
   injetados por `gcloud run deploy --set-secrets`. Nunca no app, nunca commitados. Toda variável
-  nova documentada em `agent/.env.example` com comentário. (`supabase/.env.example` cobre só o que
-  as Edge Functions legadas ainda usam.)
+  nova documentada em `agent/.env.example` com comentário — é a lista ÚNICA desde 09/09/2026,
+  quando `supabase/.env.example` foi apagado junto com as functions. Segredo com duas listas é
+  segredo que diverge.
 - **Os crons saíram do pg_cron para o Cloud Scheduler** (`/cron/reminders` a cada minuto, levando
   junto o sweep da fila; `/cron/finance-scheduler` de hora em hora; `/cron/alerts` diário). O
   Scheduler autentica com OIDC: não há mais token para vazar.

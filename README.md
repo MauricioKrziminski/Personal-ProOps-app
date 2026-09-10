@@ -31,7 +31,7 @@ Login por telefone (OTP). Em dev (`__DEV__`) há um botão de login de teste.
 
 - Migrations: `supabase/migrations/` — aplicar com `npx supabase db push`.
 - Agente: `agent/` — testar com `.venv/bin/pytest`, deployar com `./scripts/setup-gcp.sh deploy`.
-- Secrets das functions: documentados em `supabase/.env.example`, definidos com `npx supabase secrets set` (nunca commitados).
+- Secrets do agente: documentados em `agent/.env.example`, guardados no GCP Secret Manager e injetados por `./scripts/setup-gcp.sh secrets` (nunca commitados).
 
 ## Qualidade
 
