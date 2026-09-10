@@ -371,4 +371,42 @@ async def decide(
         return {"approved": False, "keep_pending": True}
 
     decisao = await interpret_text(texto, (pendente or {}).get("summary", ""), uso)
-    return None if decisao is None else {"approved": decisao}
+    if decisao is None:
+        return None
+    # ⚠️ Um "sim" NÃO resolve uma pergunta "qual deles?".
+    #
+    # Este classificador é de SIM/NÃO e a pergunta aberta é de ESCOLHA: ele não
+    # tem índice para devolver, então o `approved: True` volta sem
+    # `candidate_id`, o grafo não acha o candidato e responde "não mexi em
+    # nada" — matando a pergunta e as nove opções junto. Medido em produção em
+    # 09/09/2026: "é para apagar esse último que eu acabei de mandar" com nove
+    # candidatos abertos virou `pending_actions.status = approved` sem escolher
+    # linha nenhuma, e o usuário teve que repetir a frase três vezes.
+    #
+    # A recusa continua valendo: "não", "deixa pra lá" cancelam de verdade. É
+    # só a APROVAÇÃO que não tem o que aprovar aqui.
+    if decisao and ((pendente or {}).get("action") or {}).get("kind") == "choice":
+        return {
+            "approved": False,
+            "keep_pending": True,
+            "clarification": _relembrar_opcoes(pendente or {}),
+        }
+    return {"approved": decisao}
+
+
+def _relembrar_opcoes(pendente: dict) -> str:
+    """Repete a lista numerada quando a resposta não escolheu nenhuma.
+
+    Repetir as opções é o ponto: quem respondeu por escrito quase sempre não
+    VIU a lista — com 3+ candidatos a pergunta vira lista do WhatsApp, que
+    esconde as opções atrás de um toque em "Escolher".
+    """
+    candidatos = (pendente.get("action") or {}).get("candidates") or []
+    numerado = "\n".join(
+        f"{i}) {c.get('label','')}" + (f" ({c['when']})" if c.get("when") else "")
+        for i, c in enumerate(candidatos, 1)
+    )
+    return (
+        "🤔 Ainda não mexi em nada — preciso saber qual.\n"
+        f"{numerado}\nResponde com o número, ou *NENHUMA*."
+    )

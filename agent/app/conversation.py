@@ -683,7 +683,11 @@ def _pergunta(pausa: dict, candidatos: list[dict], pendente: dict | None) -> dic
             "text": f"{corpo}\nResponde *SIM* ou *NÃO*.",
         }
 
-    corpo = f"🤔 {pausa['summary']} — qual deles?"
+    # Vários resumos JÁ são a pergunta ("apagar qual?", "O que você deseja fazer
+    # com X?"): emendar "— qual deles?" neles escrevia "apagar qual? — qual
+    # deles?". Quem termina em "?" já se explica sozinho.
+    resumo = pausa["summary"].rstrip()
+    corpo = f"🤔 {resumo}" if resumo.endswith("?") else f"🤔 {resumo} — qual deles?"
     if len(candidatos) <= 2:
         # 2 opções + "nenhuma dessas" = os 3 botões que a Meta permite
         return {
@@ -698,8 +702,12 @@ def _pergunta(pausa: dict, candidatos: list[dict], pendente: dict | None) -> dic
 
     # 3..10 -> lista. Acima de 10, os 9 mais recentes + a saída.
     mostrar = candidatos[:9]
+    # O corpo leva a lista numerada igual ao caminho de botões. A lista do
+    # WhatsApp esconde as linhas atrás de um toque em "Escolher", então um corpo
+    # só com a pergunta deixa quem não tocou sem NENHUMA opção na tela — foi o
+    # que aconteceu em 09/09/2026 com nove candidatos abertos.
     return {
-        "ui": "list", "body": corpo, "label": "Escolher",
+        "ui": "list", "body": f"{corpo}\n{numerado}", "label": "Escolher",
         "rows": [
             *[(f"pa:{pid}:c:{c['id']}", f"{i}) {c['label']}", c.get("when", ""))
               for i, c in enumerate(mostrar, 1)],

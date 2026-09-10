@@ -164,3 +164,42 @@ async def test_corpo_longo_divide_em_texto_e_botoes(cliente):
     assert inter["body"]["text"] == "Deseja ver mais detalhes ou opções?"
     assert inter["action"]["buttons"][0]["reply"]["title"] == "Ver mais"
 
+
+
+def test_a_lista_leva_as_opcoes_no_CORPO_tambem():
+    """A lista do WhatsApp esconde as linhas atrás de "Escolher".
+
+    Com 3+ candidatos a pergunta vira `ui: "list"`, e ali as opções só aparecem
+    depois de um toque. O corpo que não as repete deixa na tela uma pergunta
+    sem nenhuma resposta possível — em 09/09/2026 o usuário recebeu só
+    "🤔 apagar qual?" com NOVE lançamentos abertos, não viu nenhum, e tentou
+    responder por escrito três vezes. O caminho de botões (≤2) já fazia certo.
+    """
+    candidatos = [
+        {"id": f"t{i}", "label": f"R$ {i}0,00 café", "when": "09/09"} for i in range(1, 10)
+    ]
+    saida = conversation._pergunta(
+        {"kind": "choice", "summary": "apagar qual?"}, candidatos, {"id": "p1"}
+    )
+
+    assert saida["ui"] == "list"
+    for i, c in enumerate(candidatos, 1):
+        assert f"{i}) {c['label']}" in saida["body"]
+
+
+def test_resumo_que_ja_e_pergunta_nao_ganha_outra():
+    """"apagar qual?" + "— qual deles?" era a mesma pergunta duas vezes."""
+    um = conversation._pergunta(
+        {"kind": "choice", "summary": "apagar qual?"},
+        [{"id": "t1", "label": "R$ 20,00 café"}],
+        {"id": "p1"},
+    )
+    assert "qual deles" not in um["body"]
+
+    # e o resumo que NÃO é pergunta continua ganhando a dela
+    dois = conversation._pergunta(
+        {"kind": "choice", "summary": "apagar o gasto"},
+        [{"id": "t1", "label": "R$ 20,00 café"}],
+        {"id": "p1"},
+    )
+    assert dois["body"].startswith("🤔 apagar o gasto — qual deles?")

@@ -173,6 +173,12 @@ def _escolha(indice):
     return AsyncMock(return_value=CandidateChoice(index=indice))
 
 
+def _sempre(valor):
+    async def _f(*a, **kw):
+        return valor
+    return _f
+
+
 def _modelo(monkeypatch, indice):
     from app.services import gemini
     monkeypatch.setattr(
@@ -253,3 +259,40 @@ async def test_escolha_conta_a_chamada_para_a_cota(monkeypatch):
     uso = {}
     await confirm.decide({"text": "o do mercado"}, ESCOLHA, uso)
     assert uso["llm_calls"] == 1
+
+
+@pytest.mark.asyncio
+async def test_sim_NAO_resolve_uma_pergunta_de_escolha(monkeypatch):
+    """"Sim" não aponta linha nenhuma — e aprovar sem apontar matava a pergunta.
+
+    Reproduz o que aconteceu em produção em 09/09/2026: com nove candidatos
+    abertos, "é para apagar esse último que eu acabei de mandar" não casou no
+    classificador de ESCOLHA (que devolveu None) e caiu no de SIM/NÃO, que
+    respondeu SIM. O `approved: True` voltava sem `candidate_id`, o grafo não
+    achava o candidato e respondia "não mexi em nada" — a pergunta e as nove
+    opções morriam, e o usuário repetia a frase.
+    """
+    _modelo(monkeypatch, -1)  # a escolha não casa
+    monkeypatch.setattr(confirm, "interpret_text", _sempre(True))
+
+    decisao = await confirm.decide(
+        {"text": "é para apagar esse último que eu acabei de mandar"}, ESCOLHA, {}
+    )
+
+    assert decisao.get("approved") is not True, "aprovou sem escolher candidato"
+    assert decisao["keep_pending"] is True, "a pergunta tem que sobreviver"
+    # e o usuário precisa VER as opções de novo: com 3+ candidatos a lista do
+    # WhatsApp esconde as linhas atrás de um toque que ele não deu.
+    for c in LISTA:
+        assert c["label"] in decisao["clarification"]
+
+
+@pytest.mark.asyncio
+async def test_nao_continua_cancelando_a_escolha(monkeypatch):
+    """A recusa não muda: "deixa pra lá" numa lista continua cancelando."""
+    _modelo(monkeypatch, -1)
+    monkeypatch.setattr(confirm, "interpret_text", _sempre(False))
+
+    decisao = await confirm.decide({"text": "deixa pra lá"}, ESCOLHA, {})
+
+    assert decisao == {"approved": False}

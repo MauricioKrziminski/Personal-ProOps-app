@@ -57,6 +57,18 @@ uma lista de palavras decidindo o que a pessoa quis.
 | `route()`: `status_request`/`creating`/`explicit_debt` decidiam desambiguação | "quitei as anteriores da moto" não casava e a pergunta nunca aparecia | `financial_entity` (que o modelo preenche) + a consulta ao banco |
 | `interpret_choice` era o único intérprete de "qual deles?" | só número, ordinal e rótulo exato; "o do mercado" virava intenção nova | regex continua como fast-path grátis, e a falha cai em `escolher_candidato` |
 
+⚠️ **Um SIM não resolve uma pergunta "qual deles?"** (09/09/2026, medido em produção).
+`decide()` cai no classificador de SIM/NÃO quando o de ESCOLHA não casa — e ele não tem índice
+para devolver, então o `approved: True` volta sem `candidate_id`, o grafo não acha o candidato e
+responde "não mexi em nada", matando a pergunta e as opções junto. Prova:
+`pending_actions` com `kind=choice`, `cand=9`, `status=approved` e nenhuma escrita. Numa pergunta
+de escolha só a RECUSA age; a aprovação mantém a pendência e repete a lista numerada.
+
+⚠️ **Pergunta com 3+ candidatos vira lista do WhatsApp, e a lista ESCONDE as opções** atrás de um
+toque em "Escolher". O corpo tem que repetir a lista numerada — senão a tela mostra a pergunta e
+nenhuma resposta possível, e a pessoa tenta responder por escrito (que é o caminho caro e o que
+mais erra). O caminho de botões (≤2 candidatos) já fazia isso.
+
 ⚠️ **Escolha semântica só vale em lista de REGISTROS (`kind == "choice"`).** Em
 `soft_warning` os "candidatos" são AÇÕES (Confirmar / Trocar de Cartão), e deixar um
 classificador de escolha pescar "Confirmar" de uma hesitação ressuscita o defeito de
