@@ -660,3 +660,61 @@ async def test_update_em_plano_mudar_parcelas_sem_numero_pede_quantidade(monkeyp
     assert final["approved"] is False
     assert final["halted"] is True
     assert "Quantas parcelas" in " ".join(final.get("results", []))
+
+
+@pytest.mark.asyncio
+async def test_o_antecedente_atravessa_DOIS_turnos_no_grafo_de_verdade(monkeypatch, grafo):
+    """O que a conversa escreveu no turno 1 chega ao resolvedor no turno 2.
+
+    Este é o teste que sustenta o desenho inteiro do `last_write_id`: testar o
+    reducer isolado prova que a FUNÇÃO preserva, não que o LangGraph a APLICA
+    entre dois `ainvoke` no mesmo thread. Se o checkpoint não mesclasse o estado,
+    "apague esse lançamento" voltaria a listar os nove mais recentes e nenhum
+    outro teste perceberia.
+
+    O worker manda `last_write_id: ""` a cada turno (é o que `test_state_reset`
+    exige de toda chave); `""` significa "não escrevi neste turno" e o reducer
+    preserva o que já havia.
+    """
+    from app.graph import nodes
+
+    CAFE = "11111111-1111-4111-8111-111111111111"
+
+    async def executar_falso(state, indexadas):
+        # devolve a 4ª posição: os ids escritos no turno
+        return ["💸 Gasto de R$ 20,00."], None, None, [CAFE]
+
+    monkeypatch.setattr(nodes, "_executar", executar_falso)
+
+    vistos: list[str | None] = []
+
+    async def alvos_espiao(workspace_id, acoes, texto_cru, antecedente=None):
+        vistos.append(antecedente)
+        return [{"table": "transactions", "status": "found",
+                 "candidates": [{"id": CAFE, "label": "gasto de R$ 20,00 (café)"}]}
+                for _ in acoes]
+
+    monkeypatch.setattr(nodes.resolve, "for_actions", alvos_espiao)
+
+    cfg = {"configurable": {"thread_id": "antecedente-2-turnos"}}
+
+    # turno 1: "gastei 20 no café" — cria, e deixa o rastro
+    await grafo.ainvoke(
+        _estado([{"type": FinanceActionType.CREATE_EXPENSE.value,
+                  "amount_cents": 2000, "category": "café"}]) | {"last_write_id": ""},
+        config=cfg,
+    )
+    # `create_expense` não mira registro existente, então `alvos` nem consulta:
+    # o rastro do turno 1 é o que o executor gravou, não uma resolução.
+    assert vistos == [], "criar um gasto não devia resolver alvo nenhum"
+
+    # turno 2, MESMO thread: "apague esse lançamento"
+    await grafo.ainvoke(
+        _estado([{"type": FinanceActionType.DELETE_TRANSACTION.value,
+                  "description": "esse lançamento"}]) | {"last_write_id": ""},
+        config=cfg,
+    )
+    assert vistos == [CAFE], (
+        f"o antecedente não sobreviveu ao turno: {vistos!r}. "
+        "Sem isso, 'apague esse lançamento' volta a listar os 9 mais recentes."
+    )

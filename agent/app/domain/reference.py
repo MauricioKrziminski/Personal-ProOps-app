@@ -21,6 +21,12 @@ import re
 # como quem fala de dinheiro fala. Resultado medido em produção (09/09/2026):
 # "apague esse lançamento" virou busca literal por `%esse lançamento%`, não
 # casou com nada, e o agente ofereceu os NOVE lançamentos mais recentes.
+#
+# ⚠️ "conta" está aqui e é a única palavra da lista que também nomeia uma
+# ENTIDADE de verdade ("Conta corrente"). Hoje não colide: `clean_term` só é
+# chamado para resolver transação, nota, lembrete, meta e bem — nunca para
+# achar conta pelo nome. Quem for resolver conta por nome passando por aqui
+# precisa tirar "conta" da lista ou usar outro caminho.
 _SUBSTANTIVO = (
     r"lançamento|lancamento|gasto|despesa|receita|compra|pagamento|recebimento"
     r"|transação|transacao|conta|nota|lembrete|item|coisa|mensagem|registro"
