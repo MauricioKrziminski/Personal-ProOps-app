@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Haptics from 'expo-haptics';
 import { Pressable, StyleSheet, View, useWindowDimensions } from 'react-native';
 import Animated, {
@@ -38,6 +39,36 @@ export interface StackedCard {
  * o conteúdo (fatura + fechamento + limite + titular) não cabe na proporção exata sem apertar.
  */
 const CARD_H = 202;
+const STORAGE_KEY = 'card-stack-front';
+
+/**
+ * O cartão escolhido, memorizado no processo.
+ *
+ * ⚠️ **A escolha era um ÍNDICE em `useState`, e índice não sobrevive a nada.** Toda vez que a
+ * query dos cartões voltava a `isLoading`, a tela trocava a pilha por um esqueleto e a
+ * carteira remontava em `frente = 0` — que é o primeiro cartão do array. A queixa foi literal:
+ * *"eu seleciono o do nubank e depois ele volta para o BB sozinho"*.
+ *
+ * Agora o que se grava é o `account_id`, e ele mora em dois lugares de propósito: no
+ * `AsyncStorage` (para atravessar o fechar-e-abrir do app) e nesta variável de módulo, que é o
+ * cache SÍNCRONO. Sem o cache, cada remontagem voltaria a montar no cartão 0 e corrigiria um
+ * frame depois — o mesmo salto visível, só mais rápido.
+ *
+ * `undefined` = ainda não lido do disco; `null` = lido e não havia nada.
+ */
+const cache: { id?: string | null } = {};
+
+function indiceGravado(cards: StackedCard[]): number {
+  if (!cache.id) return 0;
+  return Math.max(0, cards.findIndex((c) => c.account_id === cache.id));
+}
+
+/** Grava a escolha nos dois lugares. Fora do componente porque quem mexe no módulo é o módulo. */
+function lembrar(id: string | null) {
+  cache.id = id;
+  if (id) AsyncStorage.setItem(STORAGE_KEY, id).catch(() => {});
+}
+
 /** Quanto de cada cartão de trás aparece ACIMA do da frente, com a pilha fechada. */
 const PEEK = 14;
 /** Quanto cada cartão de trás recua de cada lado — é o `inset-x-2` / `inset-x-4` do export. */
@@ -112,8 +143,30 @@ export function CardStack({
    */
   onFrontChange?: (card: StackedCard) => void;
 }) {
-  const [frente, setFrente] = useState(0);
+  const [frente, setFrente] = useState(() => indiceGravado(cards));
   const [aberta, setAberta] = useState(false);
+  /**
+   * A carteira só avisa a tela qual cartão está na frente DEPOIS de saber a escolha gravada.
+   *
+   * Sem isso o efeito abaixo dispara com o cartão 0 e, milissegundos depois, de novo com o
+   * escolhido: o rótulo embaixo da pilha escrevia "BB" e virava "Nubank" na frente do usuário.
+   */
+  const [pronto, setPronto] = useState(cache.id !== undefined);
+
+  useEffect(() => {
+    if (cache.id !== undefined) return;
+    AsyncStorage.getItem(STORAGE_KEY)
+      .then((raw) => {
+        cache.id = raw;
+        const i = cards.findIndex((c) => c.account_id === raw);
+        if (i > 0) setFrente(i);
+      })
+      .catch(() => {
+        cache.id = null;
+      })
+      .finally(() => setPronto(true));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
   /** A largura do palco, para o estreitamento dos cartões de trás virar `scaleX` (§5). */
   const [largura, setLargura] = useState(0);
 
@@ -131,9 +184,9 @@ export function CardStack({
    */
   const idFrente = naFrente?.account_id;
   useEffect(() => {
-    if (naFrente) onFrontChange?.(naFrente);
+    if (naFrente && pronto) onFrontChange?.(naFrente);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [idFrente]);
+  }, [idFrente, pronto]);
   const visiveis = cards.slice(0, 6);
   const atras = visiveis.length - 1;
   const { fontScale } = useWindowDimensions();
@@ -158,6 +211,7 @@ export function CardStack({
     }
     setFrente(i);
     setAberta(false);
+    lembrar(cards[i]?.account_id ?? null);
   };
 
   return (
