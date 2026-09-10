@@ -13,6 +13,7 @@ import {
   isoToBR,
   localDateTime,
   localISODate,
+  moneySign,
   monthBounds,
   relativeBR,
   timeBR,
@@ -122,4 +123,15 @@ test('greetingBR vira nas fronteiras da manhã, da tarde e da noite', () => {
   // Madrugada é "boa noite": quem abre o app às 3h ainda não dormiu.
   assert.equal(greetingBR(3), 'Boa noite');
   assert.equal(greetingBR(4), 'Boa noite');
+});
+
+test('negativo sempre leva o sinal; `signed` decide só o + do positivo', () => {
+  // O defeito real: saldo projetado de -R$ 42.427,85 aparecia "R$ 42.427,85", com a cor
+  // `danger` como única pista. Cor não é sinal.
+  assert.equal(moneySign(-4242785), '−');
+  assert.equal(moneySign(-4242785, true), '−');
+  assert.equal(moneySign(2926030), '');
+  assert.equal(moneySign(2926030, true), '+');
+  assert.equal(moneySign(0), '');
+  assert.equal(moneySign(0, true), '');
 });

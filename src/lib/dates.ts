@@ -18,6 +18,22 @@ export function monthBounds(month: string): { from: string; to: string } {
   return { from, to };
 }
 
+/**
+ * O prefixo de sinal de um valor em dinheiro.
+ *
+ * ⚠️ **Negativo SEMPRE leva `−`; `signed` decide só o `+` do positivo** (10/09/2026). A regra
+ * já foi "os dois são opt-in", e o resultado era um saldo projetado de −R$ 42.427,85 escrito
+ * "R$ 42.427,85", com a cor `danger` como única pista de que a pessoa DEVE esse dinheiro em vez
+ * de TER. Cor não é sinal: some em print, em daltonismo e em leitor de tela.
+ *
+ * Mora aqui, e não dentro do `<Money>`, porque é a única parte dele que dá para testar sem
+ * renderizar — e é a parte que já esteve errada.
+ */
+export function moneySign(cents: number, signed = false): string {
+  if (cents < 0) return '−';
+  return signed && cents > 0 ? '+' : '';
+}
+
 export function formatBRL(cents: number): string {
   return (cents / 100).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 }

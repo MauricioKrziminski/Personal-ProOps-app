@@ -3,6 +3,7 @@ import { type ThemeColor } from '@/constants/theme';
 import { Type, tabular, type TypeVariant } from '@/design/tokens';
 import { concealText, useConceal } from '@/components/ui/conceal';
 import { formatBRL } from '@/hooks/use-items';
+import { moneySign } from '@/lib/dates';
 
 interface MoneyProps {
   /** SEMPRE centavos inteiros. Nunca float, nunca `parseFloat`. */
@@ -13,7 +14,15 @@ interface MoneyProps {
    * vermelho é para erro). `plain` não colore. Ou uma chave de cor explícita.
    */
   tone?: 'auto' | 'plain' | ThemeColor;
-  /** Mostra `+`/`−` na frente. Útil em extrato, ruído em saldo. */
+  /**
+   * Mostra `+` na frente do valor POSITIVO. Útil em extrato, ruído em saldo.
+   *
+   * ⚠️ **O `−` do negativo não depende deste prop** (10/09/2026). Ele era opt-in junto com o
+   * `+`, e o resultado era um saldo de −R$ 42.427,85 escrito "R$ 42.427,85" com a cor `danger`
+   * como única pista de que a pessoa DEVE esse dinheiro em vez de TER. Cor não é sinal: some
+   * em print, em daltonismo e em leitor de tela. Um caso já denunciava o defeito sozinho —
+   * `import.tsx` escreve `cents={-somaDespesas}` de propósito e o `Math.abs` engolia.
+   */
   signed?: boolean;
   /**
    * Obedece ao "esconder saldo" global. **Ligado por padrão.**
@@ -46,7 +55,7 @@ export function Money({
   const color: ThemeColor =
     tone === 'auto' ? (cents >= 0 ? 'success' : 'text') : tone === 'plain' ? 'text' : tone;
 
-  const prefix = signed ? (cents > 0 ? '+' : cents < 0 ? '−' : '') : '';
+  const prefix = moneySign(cents, signed);
   const texto = formatBRL(Math.abs(cents));
 
   return (
