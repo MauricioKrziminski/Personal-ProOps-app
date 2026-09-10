@@ -138,7 +138,39 @@ begin
     raise exception 'monthly futuro vazou para hoje: %', r.delta_cents;
   end if;
 
-  raise notice 'OK: rascunho de cenário — 12 asserções';
+  -- 13. ⚠️ A HIPÓTESE NUNCA COMEÇA ANTES DO DIA 0 (20260910233000).
+  --
+  -- A série é `generate_series(current_date, ...)` — data do SERVIDOR, que roda em UTC. O app
+  -- monta `start` com a data de SÃO PAULO. Das 21h à meia-noite os dois discordam e a
+  -- hipótese caía antes do primeiro dia da janela: `delta` contava (soma tudo `vence <= d`)
+  -- mas nenhum dia casava `vence = d`, então o SALDO mudava e "entra/sai" ficava zerado.
+  select * into r from private.draft_effect(
+    jsonb_build_array(jsonb_build_object(
+      'kind','expense','amount_cents',50000,'installments',1,'start', hoje - 30)), hoje);
+  if r.out_cents <> 50000 then
+    raise exception 'parcela do passado devia aparecer em "sai" no dia 0; veio out=%', r.out_cents;
+  end if;
+  if r.delta_cents <> -50000 then
+    raise exception 'e continuar valendo no saldo; veio delta=%', r.delta_cents;
+  end if;
+
+  -- 14. ...e o piso não empurra nada que já estava no futuro
+  select * into r from private.draft_effect(
+    jsonb_build_array(jsonb_build_object(
+      'kind','income','amount_cents',50000,'installments',1,'start', hoje + 10)), hoje + 10);
+  if r.in_cents <> 50000 then
+    raise exception 'hipótese futura foi movida pelo piso; veio in=%', r.in_cents;
+  end if;
+
+  -- 15. o piso é no-op para `affordability`, que já passa `start = current_date`
+  select * into r from private.draft_effect(
+    jsonb_build_array(jsonb_build_object(
+      'kind','expense','amount_cents',300000,'installments',3,'start', current_date)), hoje);
+  if r.delta_cents <> -100000 then
+    raise exception 'affordability mudou de comportamento; veio %', r.delta_cents;
+  end if;
+
+  raise notice 'OK: rascunho de cenário — 15 asserções';
 end $$;
 
 rollback;
