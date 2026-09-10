@@ -26,8 +26,17 @@ import { filterCategories, foldCategory, mergeCategories } from '@/lib/categorie
  *
  * `LIMITE_CHIPS` é o teto do que fica à vista: acima disso a fileira vira um bloco de rolagem
  * que come a tela do formulário. O resto está a um toque em "Todas", com busca.
+ *
+ * **Caiu de 8 para 5 em 09/09/2026**, quando a Conta virou um campo colapsado de uma linha
+ * (`SelectField`). Oito chips mais o "Todas…" ocupavam três fileiras logo acima de um campo de
+ * 56px — nove pílulas cinzas idênticas, que foi a queixa do dono do produto ("parecendo um mvp").
+ * O corte é de VOLUME, não de alcance: a lista inteira continua a um toque, com busca, e a
+ * ordenação é por USO (`mergeCategories`), então as cinco à vista são as cinco que ele mais
+ * escolhe. Um toque continua bastando para o caso comum — que é por que isto não virou o mesmo
+ * campo colapsado da Conta: categoria é o campo preenchido em TODO lançamento, e um toque a mais
+ * ali é um imposto diário.
  */
-const LIMITE_CHIPS = 8;
+const LIMITE_CHIPS = 5;
 
 export function CategoryPicker({
   value,
