@@ -67,6 +67,35 @@ import { settleLabel } from '@/lib/settle-labels';
  * que faz o rascunho poder supor uma receita em 2028 — o seletor de mês dele oferece os meses
  * DESTA janela, então horizonte curto = suposição curta.
  */
+/**
+ * A legenda de um ciclo, e por que a PRIMEIRA linha fala diferente das outras.
+ *
+ * A projeção começa HOJE, então o primeiro ciclo quase sempre está pela metade — e nele
+ * "entra/sai" é o que ainda vai acontecer, não o ciclo inteiro. Escrito com as mesmas palavras
+ * das outras linhas, um ciclo que já recebeu o salário no dia 20 aparece como
+ * `Setembro · entra R$ 0,00`, e a leitura óbvia é *"o app perdeu meu salário"*. Ele não perdeu:
+ * o salário já está DENTRO do "hoje você tem".
+ *
+ * A última linha tem o problema espelhado — ela é parcial porque o HORIZONTE corta ali, não
+ * porque falta acontecer.
+ */
+function legendaDoMes(m: MesProjetado, primeiro: boolean, ultimo: boolean): string {
+  const janela = `${isoToBR(m.de)} a ${isoToBR(m.ate)}`;
+  const vermelho = m.primeiroNegativo ? ` · no vermelho em ${isoToBR(m.primeiroNegativo)}` : '';
+
+  if (primeiro && m.parcial) {
+    return (
+      `${janela} · hoje você tem ${formatBRL(veioDe(m))}` +
+      ` · ainda entra ${formatBRL(m.entra)} · ainda sai ${formatBRL(m.sai)}${vermelho}`
+    );
+  }
+  const corte = ultimo && m.parcial ? ' · a projeção termina aqui' : '';
+  return (
+    `${janela} · veio de ${formatBRL(veioDe(m))}` +
+    ` · entra ${formatBRL(m.entra)} · sai ${formatBRL(m.sai)}${vermelho}${corte}`
+  );
+}
+
 const HORIZONTES = [
   { dias: 30, label: '30 dias' },
   { dias: 90, label: '90 dias' },
@@ -534,7 +563,7 @@ export default function ForecastScreen() {
 
       {modo === 'mes' && !nadaParaProjetar ? (
         <Section title="Saldo mês a mês, carregando a sobra">
-          {meses.map((m) => (
+          {meses.map((m, iMes) => (
             <View key={m.mes}>
               {/*
                 A linha do corte: daqui para baixo a recorrente não é mais lançamento criado
@@ -548,16 +577,7 @@ export default function ForecastScreen() {
               ) : null}
               <Row
                 title={monthTitle(m.mes)}
-                subtitle={
-                  `${isoToBR(m.de)} a ${isoToBR(m.ate)} · ` +
-                  (m.parcial ? 'parcial · ' : '') +
-                  // No primeiro mês nada "veio" de lugar nenhum: é o que está na conta AGORA,
-                  // antes dos vencimentos de hoje. Chamar de carregado seria dizer que agosto
-                  // fechou nesse número, e não foi ele que fechou nada.
-                  `${m.parcial ? 'começa com' : 'veio de'} ${formatBRL(veioDe(m))}` +
-                  ` · entra ${formatBRL(m.entra)} · sai ${formatBRL(m.sai)}` +
-                  (m.primeiroNegativo ? ` · no vermelho em ${isoToBR(m.primeiroNegativo)}` : '')
-                }
+                subtitle={legendaDoMes(m, iMes === 0, iMes === meses.length - 1)}
                 accessibilityLabel={`${monthTitle(m.mes)}, veio de ${formatBRL(veioDe(m))}, entra ${formatBRL(m.entra)}, sai ${formatBRL(m.sai)}, sobra ${formatBRL(m.saldo)}`}
                 accessibilityState={{ expanded: mesAberto === m.mes }}
                 onPress={() => setMesAberto(mesAberto === m.mes ? null : m.mes)}
