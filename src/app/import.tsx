@@ -7,6 +7,8 @@ import * as DocumentPicker from 'expo-document-picker';
 import { File } from 'expo-file-system';
 import * as Haptics from 'expo-haptics';
 
+import { AgentApiError } from '@/lib/agent-api';
+
 import { ErrorCard } from '@/components/error-card';
 import { Chip } from '@/components/finance/chip';
 import { Card } from '@/components/ui/card';
@@ -61,36 +63,32 @@ interface FalhaImport {
 }
 
 /**
- * `functions.invoke` lança `FunctionsHttpError` em QUALQUER não-2xx, com `data` nulo — então a
- * mensagem gentil que a Edge Function escreveu (402 do plano, 422 do arquivo ilegível) nunca
- * chegava na tela: o usuário lia "Edge Function returned a non-2xx status code".
+ * A mensagem que o servidor escreveu tem que CHEGAR na tela.
  *
- * O corpo real vem em `err.context`, que é a `Response`.
+ * Antes a importação ia por `functions.invoke`, que lança `FunctionsHttpError` em qualquer
+ * não-2xx com `data` nulo: a frase gentil (402 do plano, 422 do arquivo ilegível) se perdia e o
+ * usuário lia "Edge Function returned a non-2xx status code". Agora vai pelo agente, e o
+ * `agentFetch` já entrega `AgentApiError` com `status` e `message` prontos — o motivo de a
+ * tradução ter encolhido pela metade.
  */
-async function traduzErro(err: unknown): Promise<FalhaImport> {
-  const context = (err as { context?: Response } | null)?.context;
-  if (!context || typeof context.status !== 'number') {
+function traduzErro(err: unknown): FalhaImport {
+  // `status: 0` é o que o `agentFetch` usa para "nem chegou ao servidor".
+  const erro = err instanceof AgentApiError && err.status !== 0 ? err : null;
+  if (!erro) {
     return {
       titulo: 'Não deu para importar agora',
       detalhe: 'Pode ter sido a conexão. Tenta de novo em instantes.',
     };
   }
+  const doServidor = erro.message ?? '';
 
-  let doServidor = '';
-  try {
-    const corpo = (await context.json()) as { error?: string } | null;
-    doServidor = corpo?.error ?? '';
-  } catch {
-    // 500 nem sempre devolve JSON — segue com a mensagem por status.
-  }
-
-  if (context.status === 402) {
+  if (erro.status === 402) {
     return {
       titulo: 'Importar extrato é do plano Pro',
       detalhe: doServidor || 'No Free dá para registrar pelo WhatsApp à vontade.',
     };
   }
-  if (context.status === 422) {
+  if (erro.status === 422) {
     return {
       titulo: 'Não achei lançamentos nesse arquivo',
       detalhe:
@@ -172,7 +170,7 @@ export default function ImportScreen() {
       setBatchId(resultado.batch_id);
     } catch (err) {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
-      setFalha(await traduzErro(err));
+      setFalha(traduzErro(err));
     }
   };
 

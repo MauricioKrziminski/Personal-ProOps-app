@@ -260,7 +260,15 @@ def install_error_handlers(app) -> None:
         if exc.status_code == 403:
             return _erro(403, "forbidden", "Você não tem acesso a isso.")
         codigo = getattr(exc, "code", None) or "error"
-        return _erro(exc.status_code, codigo, MENSAGEM.get(exc.status_code))
+        # ⚠️ **`detail` de um `HTTPException` é texto NOSSO, e passa.** O fallback do `MENSAGEM`
+        # é escrito para a conversa ("Essa confirmação não vale mais", "Essa conversa não
+        # existe") — sobre a importação de extrato ele mente: um 422 de OFX ilegível viraria
+        # "Essa confirmação não vale mais". O risco que o comentário do `ChatError` descreve
+        # (mensagem carregando SQL ou a URL do banco) é de `str(exc)` numa exceção que subiu
+        # sozinha; aqui a frase foi escrita à mão na rota, e é justamente a que o usuário
+        # precisa ler para saber o que fazer com o arquivo dele.
+        detalhe = exc.detail if isinstance(exc.detail, str) and exc.detail.strip() else None
+        return _erro(exc.status_code, codigo, detalhe or MENSAGEM.get(exc.status_code))
 
     @app.exception_handler(app_chat.ChatError)
     async def _dominio(request: Request, exc: app_chat.ChatError):

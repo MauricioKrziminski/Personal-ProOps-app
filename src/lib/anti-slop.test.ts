@@ -216,3 +216,33 @@ test('SkiaCanvas lê PixelRatio no carregamento do módulo, não a cada render',
     'uma chamada só — uma segunda, dentro do render, seria a que o componente acabaria usando'
   );
 });
+
+
+/**
+ * O app não fala mais com Edge Function.
+ *
+ * `supabase/functions/` é legado em desmonte, e o último chamado do app — `import-statement` —
+ * saiu em 09/09/2026. Ele não era só legado: recebia `user_id` e `workspace_id` NO CORPO e
+ * confiava neles. O `verify_jwt` do Supabase provava que ALGUM usuário válido chamou, não que
+ * fosse aquele — qualquer autenticado importava lançamentos para o workspace de outro trocando
+ * duas linhas do POST. A rota Python (`/internal/import-statement`) tira o usuário do `sub`.
+ *
+ * Sem este guarda, a próxima tela que precisar de servidor copia o padrão da tela ao lado — que
+ * é exatamente como o chamado velho sobreviveu meses depois de o substituto existir. O caminho
+ * é `agentFetch` (`src/lib/agent-api.ts`).
+ */
+test('nenhuma chamada a Edge Function no app', () => {
+  const fora: string[] = [];
+  for (const file of walk(SRC)) {
+    if (file.endsWith('.test.ts') || file.endsWith('.test.tsx')) continue;
+    const code = stripComments(readFileSync(file, 'utf8'));
+    if (/\bfunctions\s*\.\s*invoke\b/.test(code) || /\/functions\/v1\//.test(code)) {
+      fora.push(file.replace(SRC, 'src'));
+    }
+  }
+  assert.deepEqual(
+    fora,
+    [],
+    'use agentFetch de @/lib/agent-api: as Edge Functions estão sendo apagadas, e a que o app chamava lia o dono do dado do CORPO do POST'
+  );
+});

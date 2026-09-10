@@ -5,6 +5,7 @@ import { supabase } from '@/lib/supabase';
 import type { Database } from '@/lib/database.types';
 import { localISODate, monthBounds } from '@/lib/dates';
 import type { DebtPaymentRow } from '@/lib/debt-history';
+import { agentFetch } from '@/lib/agent-api';
 import { toIlikeTerm } from '@/lib/search';
 import { useRealtimeInvalidate, workspaceId } from '@/hooks/use-items';
 
@@ -701,22 +702,28 @@ export function useImportStatement() {
       filename: string;
       accountId: string | null;
     }): Promise<ImportResult> => {
-      const { data, error } = await supabase.functions.invoke<ImportResult | { error: string }>(
-        'import-statement',
-        {
-          body: {
-            user_id: await userId(),
-            workspace_id: await workspaceId(),
-            account_id: input.accountId,
-            filename: input.filename,
-            content: input.content,
-            source: input.source,
-          },
-        },
-      );
-      if (error) throw error;
-      if (data && 'error' in data) throw new Error(data.error);
-      return data as ImportResult;
+      /*
+        ⚠️ **Vai para o AGENTE, não para a Edge Function** (09/09/2026).
+
+        A `import-statement` em Deno recebia `user_id` e `workspace_id` NO CORPO e confiava
+        neles. O `verify_jwt` do Supabase provava que ALGUM usuário válido chamou, não que
+        fosse aquele — qualquer autenticado importava lançamentos para o workspace de outro
+        trocando duas linhas do POST. A rota Python tira o usuário do `sub` do token e checa
+        a participação no workspace antes de escrever.
+
+        `user_id` sumiu do corpo de propósito: mandar um id que o servidor ignora convida
+        alguém a "consertar" o servidor para voltar a lê-lo.
+      */
+      return agentFetch<ImportResult>('/internal/import-statement', {
+        method: 'POST',
+        body: JSON.stringify({
+          workspace_id: await workspaceId(),
+          account_id: input.accountId,
+          filename: input.filename,
+          content: input.content,
+          source: input.source,
+        }),
+      });
     },
     onSuccess: () => invalidateKeys(queryClient, [['import-items'], ['import-batches'], ['plan-status']]),
   });
