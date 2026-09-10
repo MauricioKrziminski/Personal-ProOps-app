@@ -18,7 +18,7 @@ import { Segmented } from '@/components/ui/segmented';
 import { Skeleton, SkeletonRow } from '@/components/ui/skeleton';
 import { ProgressBar } from '@/components/ui/sparkline';
 import { useToast } from '@/components/ui/toast';
-import { Motion, Radius, Space } from '@/design/tokens';
+import { Motion, Radius, Space, tabular } from '@/design/tokens';
 import {
   useMarkPaid,
   useMonthBreakdown,
@@ -27,7 +27,7 @@ import {
   type MonthLine,
 } from '@/hooks/use-finance';
 import { useTheme } from '@/hooks/use-theme';
-import { formatBRL, isoToBR, localISODate } from '@/lib/dates';
+import { formatBRL, isoToBR, localISODate, monthBounds } from '@/lib/dates';
 import { showItemActions } from '@/lib/item-actions';
 import {
   BUCKETS,
@@ -66,9 +66,11 @@ import { settleLabel, unsettledLabel } from '@/lib/settle-labels';
  *
  * ## O que a tela declara em vez de mentir
  *
- * Recorrentes são materializadas 90 dias à frente e o cron nunca faz backfill; o cronograma de
- * financiamento não tem horizonte nenhum. Sem aviso, o quarto mês mostraria a parcela do carro e
- * ZERO contas fixas — e o resultado daquele mês ficaria lindo e falso.
+ * Recorrentes são materializadas um ANO à frente e, além disso, expandidas da regra
+ * (`20260910140000`); o cronograma de financiamento não tem horizonte nenhum. Antes das duas
+ * coisas, o quarto mês mostrava a parcela do carro e ZERO contas fixas — e o resultado daquele
+ * mês ficava lindo e falso. O aviso continua porque a natureza da linha muda: além do horizonte
+ * materializado ela é projeção da regra, não lançamento que alguém pode editar.
  */
 
 /** Faixa de aviso por seção. Seção incompleta DIZ que está incompleta. */
@@ -151,6 +153,20 @@ export default function MonthScreen() {
 
       <View style={styles.escopo}>
         <MonthPicker month={month} onChange={setMonth} />
+        {/*
+          ⚠️ **Qual mês é "este mês" não é óbvio, e a confusão custa uma tarde.**
+
+          Esta tela é o mês do CALENDÁRIO. A fatura do cartão é um CICLO (o Nubank fecha dia 3,
+          então a fatura que vence em outubro cobre 03/09 a 02/10). Quem compara os dois lado a
+          lado vê números diferentes para "outubro" e conclui que um dos dois está errado —
+          quando os dois estão certos e recortam janelas diferentes. Foi exatamente o que
+          aconteceu com o dono do produto em 10/09/2026, contra a planilha dele.
+
+          Uma linha de legenda resolve o que nenhuma explicação depois resolve.
+        */}
+        <ThemedText type="caption" themeColor="textSecondary" style={tabular}>
+          mês de calendário · {isoToBR(monthBounds(month).from)} a {isoToBR(monthBounds(month).to)}
+        </ThemedText>
       </View>
 
       {/* 1. O destaque: como o mês fecha. Único da tela. */}
@@ -200,6 +216,18 @@ export default function MonthScreen() {
           );
         })()
       )}
+
+      {/*
+        O aviso de horizonte vinha SÓ no bloco de fixas, e o número grande é o que se lê. Quem
+        olha o destaque e sai não descobria que aquele mês está além do que o cron materializou.
+      */}
+      {s?.beyond_recurring_horizon ? (
+        <Aviso>
+          {horizonWarning(
+            s.recurring_covered_until ? monthTitle(s.recurring_covered_until.slice(0, 7)) : null,
+          )}
+        </Aviso>
+      ) : null}
 
       {/* 2. A equação da planilha, em linhas. É o segundo número sem virar segundo destaque. */}
       {s ? (
@@ -300,14 +328,6 @@ export default function MonthScreen() {
               title={bucketTitle(bucket)}
               action={<Money cents={subtotal[bucket]} variant="ticker" tone="textSecondary" />}
             />
-
-            {bucket === 'fixa' && s?.beyond_recurring_horizon ? (
-              <Aviso>
-                {horizonWarning(
-                  s.recurring_covered_until ? monthTitle(s.recurring_covered_until.slice(0, 7)) : null,
-                )}
-              </Aviso>
-            ) : null}
 
             {bucket === 'parcela' && month < hoje && (s?.debt_installments_undocumented ?? 0) > 0 ? (
               <Aviso>{undocumentedWarning(s!.debt_installments_undocumented)}</Aviso>

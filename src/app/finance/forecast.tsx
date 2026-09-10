@@ -32,9 +32,12 @@ import {
   useCashFlowForecast,
   useCashHistory,
   useMarkPaid,
+  useMonthSummary,
   useUpcomingBills,
 } from '@/hooks/use-finance';
 import { useDebounced } from '@/hooks/use-debounced';
+import { monthTitle } from '@/components/finance/month-picker';
+import { agruparPorMes, mesDoCorte } from '@/lib/forecast-months';
 import { formatBRL, isoToBR, localISODate } from '@/lib/dates';
 import { showItemActions } from '@/lib/item-actions';
 import { settleLabel } from '@/lib/settle-labels';
@@ -85,6 +88,16 @@ export default function ForecastScreen() {
   const [simCents, setSimCents] = useState(0);
   const [parcelas, setParcelas] = useState(1);
   const [comoCalculo, setComoCalculo] = useState(false);
+  /**
+   * Dia × Mês.
+   *
+   * A curva diária responde "quando aperta"; a tabela mensal responde "como fecha cada mês" —
+   * que é a pergunta que o dono do produto vinha respondendo numa planilha, uma aba por mês.
+   * Os dois saem da MESMA série: `agruparPorMes` não refaz conta nenhuma, só lê o acumulado do
+   * último dia de cada mês.
+   */
+  const [modo, setModo] = useState<'dia' | 'mes'>('dia');
+  const [mesAberto, setMesAberto] = useState<string | null>(null);
 
   // Cada tecla do MoneyField é uma chave nova, e `affordability` roda uma projeção de 370 dias por
   // dentro: sem o atraso, digitar "1250" são quatro projeções de um ano.
@@ -116,6 +129,15 @@ export default function ForecastScreen() {
   const entra = serie.reduce((t, d) => t + Number(d.in_cents), 0);
   const sai = serie.reduce((t, d) => t + Number(d.out_cents), 0);
   const primeiroNegativo = serie.find((d) => Number(d.balance_cents) < 0);
+
+  // A tabela mensal e o mês expandido. `mesAberto` governa o `enabled` do hook: sem nenhum mês
+  // aberto, nenhuma RPC é chamada.
+  const meses = agruparPorMes(serie);
+  const resumoAberto = useMonthSummary(mesAberto ?? '', mesAberto !== null);
+  // `recurring_covered_until` é propriedade da SÉRIE, não do mês — qualquer mês devolve o mesmo.
+  // Vem do mês corrente porque essa chave já está no cache (a aba Financeiro a usa).
+  const mesCorrente = useMonthSummary(localISODate().slice(0, 7));
+  const corte = mesDoCorte(meses, mesCorrente.data?.recurring_covered_until ?? null);
   // `upcoming_bills` passou a devolver receita prevista (`kind: 'income'`, 20260909150000).
   // Ela tem seção própria: "O que vence" é vocabulário de saída.
   const contas = (bills.data ?? []).filter((b) => b.kind !== 'income');
@@ -403,28 +425,117 @@ export default function ForecastScreen() {
         </Card>
       ) : null}
 
-      {bills.isError ? (
+      {/*
+        Dia × Mês. Governa só o que vem ABAIXO — o destaque e o simulador continuam nos dois
+        modos, porque respondem a pergunta de entrada da tela em qualquer recorte.
+      */}
+      {!nadaParaProjetar && serie.length > 0 ? (
+        <View style={styles.modo}>
+          <Segmented
+            options={[
+              { value: 'dia', label: 'Dia' },
+              { value: 'mes', label: 'Mês' },
+            ]}
+            value={modo}
+            onChange={(v) => setModo(v)}
+          />
+        </View>
+      ) : null}
+
+      {modo === 'mes' && !nadaParaProjetar ? (
+        <Section title="Saldo mês a mês">
+          {meses.map((m) => (
+            <View key={m.mes}>
+              {/*
+                A linha do corte: daqui para baixo a recorrente não é mais lançamento criado
+                pelo cron, é a regra expandida (migration 20260910140000). O número continua
+                válido; o que muda é a natureza dele, e o usuário tem direito de saber onde.
+              */}
+              {corte && m.mes > corte && meses[meses.indexOf(m) - 1]?.mes === corte ? (
+                <ThemedText type="caption" themeColor="textSecondary" style={styles.corte}>
+                  ─── daqui em diante é projetado da regra, não lançamento criado
+                </ThemedText>
+              ) : null}
+              <Row
+                title={monthTitle(m.mes)}
+                subtitle={
+                  (m.parcial ? 'mês parcial · ' : '') +
+                  `entra ${formatBRL(m.entra)} · sai ${formatBRL(m.sai)}` +
+                  (m.primeiroNegativo ? ` · no vermelho em ${isoToBR(m.primeiroNegativo)}` : '')
+                }
+                accessibilityLabel={`${monthTitle(m.mes)}, saldo ${formatBRL(m.saldo)}`}
+                accessibilityState={{ expanded: mesAberto === m.mes }}
+                onPress={() => setMesAberto(mesAberto === m.mes ? null : m.mes)}
+                trailing={
+                  <Money
+                    cents={m.saldo}
+                    variant="subhead"
+                    tone={m.saldo < 0 ? 'danger' : 'text'}
+                  />
+                }
+              />
+
+              {mesAberto === m.mes ? (
+                <Animated.View
+                  entering={FadeIn.duration(Motion.duration.fast)}
+                  style={styles.expandido}>
+                  {resumoAberto.isError ? (
+                    <ErrorBand
+                      message="Não deu para abrir esse mês."
+                      onRetry={resumoAberto.refetch}
+                    />
+                  ) : resumoAberto.isLoading || !resumoAberto.data ? (
+                    <>
+                      <Skeleton height={14} width="70%" />
+                      <Skeleton height={14} width="55%" />
+                    </>
+                  ) : (
+                    <>
+                      <ThemedText type="small" themeColor="textSecondary" style={tabular}>
+                        fixas {formatBRL(Number(resumoAberto.data.fixas_cents))} · parcelas{' '}
+                        {formatBRL(Number(resumoAberto.data.parcelas_cents))} · variáveis{' '}
+                        {formatBRL(Number(resumoAberto.data.variaveis_cents))}
+                      </ThemedText>
+                      <Button
+                        label="Ver todos os lançamentos"
+                        variant="secondary"
+                        size="sm"
+                        onPress={() =>
+                          router.push({ pathname: '/finance/month', params: { month: m.mes } })
+                        }
+                      />
+                    </>
+                  )}
+                </Animated.View>
+              ) : null}
+            </View>
+          ))}
+        </Section>
+      ) : null}
+
+      {modo === 'dia' && bills.isError ? (
         <ErrorBand message="Não deu para carregar o que vence." onRetry={bills.refetch} />
       ) : null}
 
       {/* `!bills.isError`: o `data` do TanStack sobrevive ao erro de refetch, e sem isso a lista
           de "Atrasado" continuava oferecendo "Pagar fatura" logo abaixo da faixa que acabou de
           dizer que não conseguiu carregar o que vence — com um botão que escreve no banco. */}
-      {!bills.isError && atrasadas.length > 0 ? (
+      {modo === 'dia' && !bills.isError && atrasadas.length > 0 ? (
         <Section title="Atrasado">{atrasadas.map(linhaConta)}</Section>
       ) : null}
-      {!bills.isError && aVencer.length > 0 ? (
+      {modo === 'dia' && !bills.isError && aVencer.length > 0 ? (
         <Section title="O que vence">{aVencer.map(linhaConta)}</Section>
       ) : null}
       {/*
         O par de "O que vence". Vem DEPOIS de propósito: quem abre esta tela vem perguntar se o
         dinheiro dá, e a resposta é o que sai. O que entra é a segunda metade da conta.
       */}
-      {!bills.isError && aReceber.length > 0 ? (
+      {modo === 'dia' && !bills.isError && aReceber.length > 0 ? (
         <Section title="O que entra">{aReceber.map(linhaConta)}</Section>
       ) : null}
 
-      {!bills.isLoading &&
+      {modo === 'dia' &&
+      !bills.isLoading &&
       !bills.isError &&
       contas.length === 0 &&
       aReceber.length === 0 &&
@@ -504,6 +615,19 @@ const styles = StyleSheet.create({
   },
   heroParte: {
     gap: Space.xs,
+  },
+  modo: {
+    marginTop: Space.xs,
+  },
+  corte: {
+    paddingHorizontal: Space.md,
+    paddingTop: Space.sm,
+    paddingBottom: Space.xs,
+  },
+  expandido: {
+    gap: Space.sm,
+    paddingHorizontal: Space.md,
+    paddingBottom: Space.md,
   },
   simulador: {
     gap: Space.lg,

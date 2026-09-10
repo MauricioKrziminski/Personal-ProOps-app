@@ -1011,9 +1011,15 @@ export function useMonthLines(month: string) {
   });
 }
 
-export function useMonthSummary(month: string) {
+/**
+ * `enabled` existe para o mês EXPANDIDO da Projeção: lá o mês só é conhecido quando o usuário
+ * toca numa linha, e hook não pode ser condicional. Sem isto, o estado "nenhum expandido"
+ * chamaria a RPC com `-01` e a tela nasceria em erro.
+ */
+export function useMonthSummary(month: string, enabled = true) {
   useRealtimeMonth('month-summary');
   return useQuery({
+    enabled: enabled && month.length === 7,
     queryKey: ['month-summary', month],
     // A RPC devolve UMA linha; o hook entrega o objeto para a tela não escrever `[0]` em toda leitura.
     queryFn: async (): Promise<MonthSummary | null> => {
