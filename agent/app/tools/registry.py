@@ -56,7 +56,7 @@ QUERY_TOOLS = {
     FinanceQueryType.QUERY_NET_WORTH: queries.query_net_worth,
     FinanceQueryType.QUERY_RECURRING: queries.query_recurring,
     FinanceQueryType.QUERY_DEBTS: queries.query_debts,
-    FinanceQueryType.SIMULATE_PURCHASE: queries.simulate_purchase,
+    FinanceQueryType.SIMULATE_SCENARIO: queries.simulate_scenario,
 }
 
 NOTES_TOOLS = {

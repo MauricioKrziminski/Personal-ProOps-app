@@ -39,6 +39,16 @@ class ExecContext:
     last_query_data: dict | None = None
     # id do botão ou linha clicada (para paginação determinística e filtros)
     clicked_id: str | None = None
+    # as ações deste turno que VÃO RODAR, como `(action_index, ação)`. Existe para a
+    # simulação de cenário poder empilhar as hipóteses numa resposta só, como o "E se…?" da
+    # tela — responder duas vezes, cada uma ignorando a outra, dá dois saldos e nenhum deles
+    # é o saldo.
+    #
+    # ⚠️ São as que rodam, não todas as do plano. Quem "responde pelo grupo" é eleita aqui
+    # dentro; se a eleita pudesse estar fora da execução (bloqueada por campo faltando, ou
+    # segurada pelo HITL), as outras sairiam caladas esperando por ela e a resposta sumiria
+    # inteira — sem erro nenhum.
+    siblings: list[tuple[int, object]] = field(default_factory=list)
 
 
 @dataclass

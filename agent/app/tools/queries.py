@@ -12,6 +12,8 @@ extra de custo.
 
 from __future__ import annotations
 
+import json
+from datetime import date
 from uuid import UUID
 
 from app import db
@@ -24,7 +26,7 @@ from app.domain.dates import (
 )
 from app.domain.recurrence import descreve_rrule
 from app.domain.money import cents_to_brl
-from app.graph.schemas import FinanceQuery
+from app.graph.schemas import FinanceQuery, FinanceQueryType
 from app.jobs.scheduler import HORIZON_DAYS
 from app.tools.base import ExecContext, ToolResult
 
@@ -578,8 +580,6 @@ async def query_invoice(ctx: ExecContext, action: FinanceQuery) -> ToolResult:
 async def query_forecast(ctx: ExecContext, action: FinanceQuery) -> ToolResult:
     dias = 30
     if action.query_to:
-        from datetime import date
-
         try:
             # hoje do USUÁRIO: date.today() é o dia em UTC, e depois das 21h em
             # GMT-3 isso já é amanhã — a armadilha que este projeto testa contra
@@ -634,33 +634,151 @@ async def query_net_worth(ctx: ExecContext, action: FinanceQuery) -> ToolResult:
     )
 
 
-async def simulate_purchase(ctx: ExecContext, action: FinanceQuery) -> ToolResult:
-    """Simulação NÃO registra nada — é a pergunta "posso comprar isso?"."""
+# Teto da projeção, o mesmo de `private.clamp_forecast_days` (20260910220000). O banco corta
+# de qualquer jeito; repetir aqui é só para a frase não prometer um horizonte que não existe.
+FORECAST_MAX_DIAS = 1095
+
+
+def _rascunho(action: FinanceQuery, hoje: date) -> dict:
+    """Uma hipótese no formato que `private.draft_effect` entende.
+
+    Mesmo dicionário que a tela monta em `forecast.tsx` — `kind`, `amount_cents`,
+    `installments`, `start`, `mode`. É o contrato do motor, e ele é um só.
+    """
     from app.tools.guards import require_amount
 
-    valor = require_amount(action.amount_cents, o_que="o valor da compra")
-    parcelas = action.installments or 1
+    valor = require_amount(action.amount_cents, o_que="o valor a simular")
+    # Fora do enum cai no lado conservador: dinheiro que SAI. Supor uma entrada que o usuário
+    # não pediu deixaria a projeção otimista, que é o erro caro dos dois.
+    kind = "income" if (action.kind or "").strip().lower() == "income" else "expense"
+    mode = "monthly" if (action.mode or "").strip().lower() == "monthly" else "total"
+    # `monthly` repete o valor CHEIO todo mês: dividir em parcelas ali erraria por um fator de N.
+    parcelas = 1 if mode == "monthly" else min(max(action.installments or 1, 1), 72)
 
-    row = await db.fetch_one(
-        "select * from public._affordability(%s, %s, %s)", ctx.user_id, valor, parcelas
+    inicio = hoje
+    if action.query_from:
+        try:
+            inicio = max(date.fromisoformat(action.query_from), hoje)
+        except ValueError:
+            inicio = hoje
+    return {
+        "kind": kind,
+        "amount_cents": valor,
+        "installments": parcelas,
+        "start": inicio.isoformat(),
+        "mode": mode,
+    }
+
+
+def _janela(rascunhos: list[dict], action: FinanceQuery, hoje: date) -> int:
+    """Até onde projetar para a hipótese CABER na resposta.
+
+    ⚠️ É o mesmo cuidado do "Somar" da tela: supor num mês além do horizonte aberto e não
+    esticar a janela faz a hipótese entrar na conta e NADA mudar no que o usuário lê — ela
+    parece ter sido ignorada.
+    """
+    precisa = 0
+    for r in rascunhos:
+        inicio = date.fromisoformat(r["start"])
+        # `monthly` não termina — mostra um ano dela, que é a pergunta que a pessoa fez
+        meses = 12 if r["mode"] == "monthly" else r["installments"] - 1
+        precisa = max(precisa, (inicio - hoje).days + meses * 31 + 31)
+
+    pedido = 0
+    if action.query_to:
+        try:
+            pedido = (date.fromisoformat(action.query_to) - hoje).days
+        except ValueError:
+            pedido = 0
+    # ⚠️ `query_to` ESTICA a janela, nunca encolhe abaixo do que a hipótese precisa.
+    # "e se eu receber 5.000 em dezembro, como fico até novembro?" fecharia a janela ANTES do
+    # início da suposição: ela mexeria no saldo (o delta vale para todo dia >= início) e não
+    # teria dia nenhum para aparecer em "entra/sai" — o mesmo sintoma que a `20260910233000`
+    # matou pelo outro lado, e igualmente mudo.
+    return max(30, min(max(pedido, precisa), FORECAST_MAX_DIAS))
+
+
+def _frase(r: dict) -> str:
+    """A hipótese em português, para a resposta repetir o que ENTENDEU."""
+    verbo = "receber" if r["kind"] == "income" else "gastar"
+    valor = cents_to_brl(r["amount_cents"])
+    quando = f" a partir de {format_date_br(r['start'])}"
+    if r["mode"] == "monthly":
+        return f"{verbo} {valor} por mês{quando}"
+    if r["installments"] > 1:
+        parcela = cents_to_brl(r["amount_cents"] // r["installments"])
+        return f"{verbo} {valor} em {r['installments']}x de {parcela}{quando}"
+    return f"{verbo} {valor}{quando}"
+
+
+async def simulate_scenario(ctx: ExecContext, action: FinanceQuery) -> ToolResult:
+    """O "E se…?" da tela de Projeção, pelo texto. NÃO registra nada.
+
+    ⚠️ **Mesmo motor e mesmo VEREDITO da tela** (10/09/2026). Antes isto chamava
+    `_affordability`, e o número podia discordar do que o app mostrava para a mesma hipótese,
+    por três construções diferentes:
+
+    1. **Janela.** `_affordability` filtra `day <= add_months(current_date, parcelas)` — numa
+       compra à vista, UM mês. Medido na produção: o pior ponto em 1 mês era −3.547,28 e no
+       horizonte da tela, −3.781,13. O agente enxergava R$ 233,85 a menos de buraco, e é esse
+       delta que vira "cabe" numa conta que não está negativa.
+    2. **Pior ≠ primeiro.** Ele devolve o MÍNIMO da série; a tela avisa no PRIMEIRO dia
+       negativo (`serie.find`). Mesma hipótese, datas diferentes — medido: 04/11 contra 10/09.
+    3. **Só gasto, só hoje, uma só.** Nem receita, nem hipótese que repete todo mês, nem data
+       de início, nem empilhar.
+
+    `_affordability` continua existindo e intacta: APK antigo em campo ainda chama
+    `affordability` por RPC, e derrubar isso seria a regressão que este conserto quer evitar.
+
+    ⚠️ A data que a frase MOSTRA é a de hoje no fuso do usuário; o piso que o motor aplica é
+    `current_date`, que é UTC. Das 21h à meia-noite de Brasília os dois diferem por um dia e a
+    frase pode dizer "a partir de 10/09" para uma hipótese que o banco começou em 11/09. É
+    rótulo, não conta — o saldo está certo nos dois casos.
+
+    ⚠️ **As hipóteses do mesmo plano EMPILHAM numa resposta só**, como na tela. Responder duas
+    vezes, cada uma ignorando a outra, é o erro que a feature existe para não cometer: quem
+    pergunta "e se eu receber 1.500 e gastar 3.000 em 6x?" quer o saldo com AS DUAS.
+    """
+    hoje = date.fromisoformat(local_iso_date(ctx.timezone))
+
+    # Todas as simulações deste plano, na ordem. Quem responde é a PRIMEIRA; as outras saem
+    # caladas (mensagem vazia não entra na resposta).
+    irmas = [
+        (i, a)
+        for i, a in (ctx.siblings or [])
+        if isinstance(a, FinanceQuery) and a.type == FinanceQueryType.SIMULATE_SCENARIO
+    ]
+    if not irmas:
+        irmas = [(ctx.action_index, action)]
+    if ctx.action_index != irmas[0][0]:
+        return ToolResult("", read_only=True)
+
+    rascunhos = [_rascunho(a, hoje) for _, a in irmas]
+    dias = _janela(rascunhos, action, hoje)
+
+    rows = await db.fetch(
+        "select * from public._forecast_with_drafts(%s, %s, %s::jsonb)",
+        ctx.user_id,
+        dias,
+        json.dumps(rascunhos),
     )
-    if not row:
+    if not rows:
         return ToolResult("🤔 Não consegui simular agora. Tenta de novo?", read_only=True)
 
-    veredito = "✅ Cabe" if row.get("can_afford") else "⚠️ Aperta"
-    parcela = (
-        f" ({parcelas}x de {cents_to_brl(row.get('installment_cents') or 0)})"
-        if parcelas > 1
-        else ""
-    )
-    pior = (
-        f"\n  Pior dia: {format_date_br(row['worst_day'])} com "
-        f"{cents_to_brl(row.get('worst_balance_cents') or 0)}"
-        if row.get("worst_day")
-        else ""
+    negativo = next((r for r in rows if int(r["balance_cents"]) < 0), None)
+    fim = rows[-1]
+    hipoteses = "\n".join(f"  • {_frase(r)}" for r in rascunhos)
+    veredito = (
+        f"⚠️ Você fica no vermelho em {format_date_br(negativo['day'])} "
+        f"({cents_to_brl(negativo['balance_cents'])})."
+        if negativo
+        else "✅ Você não fica no vermelho nesse período."
     )
     return ToolResult(
-        f"{veredito}: {cents_to_brl(valor)}{parcela}.{pior}", read_only=True
+        f"🔮 Simulando:\n{hipoteses}\n\n{veredito}\n"
+        f"  Saldo em {format_date_br(fim['day'])}: *{cents_to_brl(fim['balance_cents'])}*\n"
+        f"  _Nada disso foi salvo._",
+        read_only=True,
     )
 
 

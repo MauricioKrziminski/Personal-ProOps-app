@@ -274,3 +274,70 @@ A única falha foi `confirmação/aprovar: 'sim, pode registrar'`. Reexecutada a
 (`--secao confirma`): **26/26**, incluindo o caso exato. Nada nesta mudança toca `domain/confirm.py`
 nem o `GEMINI_GATE` — é variação do modelo, não regressão. **A seção de segurança passou inteira**,
 que é o lado que não pode cair: aprovar o que não devia apaga dado do usuário.
+
+---
+
+# "E se…?" — a terceira leva (10/09/2026)
+
+> A tela de Projeção ganhou o simulador de cenário em 10/09/2026 e **subiu sem linha nesta
+> tabela** — que é exatamente o que a regra do `agent.md` existe para impedir. A auditoria de
+> 09/09 cobriu MUTAÇÃO; leitura entrou na parte 2; **feature de leitura NOVA escapou das duas.**
+
+| o que a tela faz | o agente fazia? | agora |
+|---|---|---|
+| supor um **GASTO** parcelado | sim, por `simulate_purchase` → `_affordability` | `simulate_scenario` → `_forecast_with_drafts` |
+| supor uma **RECEITA** | **não** — `_affordability` crava `'kind','expense'` | `kind='income'` |
+| hipótese que **REPETE todo mês** | **não** — só `total`, que reparte | `mode='monthly'` |
+| escolher **QUANDO** começa | **não** — cravava `current_date` | `query_from` |
+| **EMPILHAR** hipóteses | **não** — array de um elemento | as ações irmãs do plano somam numa resposta só (`ExecContext.siblings`) |
+| ver a **série** | **não** — só veredito + pior dia | veredito no 1º dia negativo + saldo no fim |
+
+## O número podia discordar, e discordava por construção
+
+Não era só capacidade faltando: para a hipótese **idêntica**, o agente e a tela davam respostas
+diferentes. Três causas, todas medidas na produção em 10/09/2026:
+
+1. **Janela.** `_affordability` filtra `day <= add_months(current_date, parcelas)` — numa compra
+   à vista, **um mês**. O pior ponto em 1 mês era **−3.547,28** (04/10); no horizonte da tela,
+   **−3.781,13** (04/11). O agente enxergava R$ 233,85 a menos de buraco — e é esse delta que
+   vira "✅ Cabe" numa conta que não está negativa.
+2. **Pior ≠ primeiro.** `_affordability` devolve o **mínimo** da série (`order by balance_cents
+   limit 1`); a tela avisa no **primeiro dia negativo** (`serie.find`). Mesma hipótese: agente
+   dizia 04/11/2026, tela dizia 10/09/2026.
+3. **A tela abandonou o `affordability` no mesmo dia.** `useAffordability` ficou com **zero**
+   chamadas — o veredito passou a sair de `primeiroNegativo` sobre a série. O agente ficou
+   sozinho num caminho que o app já não usava.
+
+⚠️ **`affordability` e `_affordability` continuam existindo e intactas.** APK antigo em campo
+ainda chama `rpc('affordability')`, e `useAffordability` fica no `use-finance.ts` por isso —
+apagar o hook convidaria a apagar a RPC junto, que é a regressão silenciosa clássica: quebra só
+para quem não atualizou.
+
+## O schema coube, e isso foi MEDIDO
+
+`FinanceQuery` foi de **8×11 = 88** para **10×11 = 110**, com `kind` e `mode`.
+`scripts/probe_scenario_schema.py` (Gemini real) provou **121** — sobra uma propriedade.
+`query_from` e `query_to` fazem dobradinha como início da hipótese e horizonte: o probe mostra
+que campos próprios caberiam, então reusar é decisão, não aperto — dois campos com a mesma forma
+e o mesmo sentido seriam a duplicação que diverge.
+
+`SIMULATE_PURCHASE` virou `SIMULATE_SCENARIO`. O nome antigo era um **prior forte** para o
+modelo: *"e se eu receber 1.500 por mês?"* nunca casaria com algo chamado *purchase*, caía em
+`query_forecast` — que roda a projeção **real**, ignora a premissa e devolve um número confiante
+que responde outra pergunta. Era o defeito mais caro dos seis, porque não parece defeito.
+
+## Qual metade do conserto é que segura — medido, não suposto
+
+`scripts/probe_scenario_routing.py` roda as perguntas contra o Gemini real (o pytest usa dublê,
+e dublê sempre concorda). Três formas, os mesmos casos:
+
+| forma | resultado |
+|---|---|
+| **antes** (`simulate_purchase`, sem `kind`/`mode`, prompt antigo) | **3 de 4 hipóteses de receita caem fora** — *"e se eu passar a receber 1.500 por mês, fico no vermelho?"* vai para `query_forecast` com `amount_cents=None`, e *"supondo que eu ganhe 2 mil a mais"* não gera ação nenhuma |
+| **nome e campos novos, prompt ANTIGO** | 3/3 certos |
+| **tudo novo** | **10/10** (7 hipóteses + 3 perguntas sem hipótese, que têm que continuar em `query_forecast`) |
+
+⚠️ **A alavanca é o NOME do tipo e a existência de `kind`/`mode` — não a prosa do prompt.** A
+linha do meio prova: com a redação antiga, mas o enum chamado `simulate_scenario` e os campos
+disponíveis, o modelo já acerta. O texto que foi somado ao prompt é cinto e suspensório, e é
+honesto dizer isso: se um dia alguém precisar cortar prompt por token, é ele que sai, não o nome.

@@ -179,18 +179,30 @@ class FinanceQueryType(str, Enum):
     # 8×13 = 104 passa; aqui ficamos em 8×11 = 88.
     QUERY_RECURRING = "query_recurring"
     QUERY_DEBTS = "query_debts"
-    SIMULATE_PURCHASE = "simulate_purchase"
+    # Renomeado de `simulate_purchase` em 10/09/2026: o tipo deixou de ser só compra.
+    # O nome antigo era um PRIOR forte para o modelo — "e se eu receber 1.500 por mês?"
+    # nunca casaria com algo chamado "purchase", e caía em `query_forecast`, que roda a
+    # projeção REAL e devolve um número confiante ignorando a premissa. O valor não é
+    # persistido em lugar nenhum (consulta é `read_only`, não gera pendência), então
+    # renomear não deixa dado velho para trás.
+    SIMULATE_SCENARIO = "simulate_scenario"
     UNKNOWN = "unknown"
 
 
 class FinanceQuery(BaseModel):
-    """8 propriedades × 11 valores de enum = 88. Teto MEDIDO: 8×13 = 104 passa
-    (`scripts/probe_query_schema.py`, 09/09/2026).
+    """10 propriedades × 11 valores de enum = 110. Teto MEDIDO: **121 passa**
+    (`scripts/probe_scenario_schema.py`, 10/09/2026) — sobra uma propriedade.
 
     Consulta nunca escreve, então nada de `description`, `recurrence` ou dos
     campos `new_*`: eles não teriam significado aqui. `search_term` é a exceção
     e não é escrita — é o que faz uma pergunta ESPECÍFICA ter resposta
     específica.
+
+    ⚠️ **`query_from` e `query_to` fazem dobradinha na simulação**: início da
+    hipótese e até onde projetar. Campos novos com a mesma FORMA (uma data) e o
+    mesmo sentido ("de quando", "até quando") seriam a duplicação que diverge —
+    e o probe prova que caberiam, o que torna a escolha uma decisão, não um
+    aperto. Quem desambigua é `type`, que o prompt descreve.
     """
 
     type: FinanceQueryType
@@ -202,9 +214,22 @@ class FinanceQuery(BaseModel):
     query_from: str | None = Field(None, description="Início do período, YYYY-MM-DD.")
     query_to: str | None = Field(None, description="Fim do período, YYYY-MM-DD.")
     amount_cents: int | None = Field(
-        None, description="Valor da compra a simular, em centavos inteiros."
+        None, description="Valor a simular, em centavos inteiros."
     )
-    installments: int | None = Field(None, description="Parcelas da compra a simular.")
+    installments: int | None = Field(
+        None, description="Em quantas parcelas o valor se divide (1 = à vista)."
+    )
+    kind: str | None = Field(
+        None, description="Na simulação: 'income' se o dinheiro ENTRA, 'expense' se SAI."
+    )
+    mode: str | None = Field(
+        None,
+        description=(
+            "Na simulação, o que o valor significa: 'total' quando é um valor único "
+            "repartido em parcelas (3000 em 6x = 500 por mês, seis vezes); 'monthly' "
+            "quando é um valor que se repete todo mês (1500 por mês, sempre)."
+        ),
+    )
 
 
 class FinanceQueryPlan(BaseModel):

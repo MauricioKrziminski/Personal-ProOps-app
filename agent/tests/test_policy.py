@@ -56,7 +56,7 @@ def test_baixa_confianca_pergunta_em_vez_de_escalar():
 
 
 def test_consulta_nunca_pergunta():
-    for tipo in (FinanceQueryType.QUERY_BALANCE, FinanceQueryType.SIMULATE_PURCHASE):
+    for tipo in (FinanceQueryType.QUERY_BALANCE, FinanceQueryType.SIMULATE_SCENARIO):
         assert needs_confirmation(FinanceQuery(type=tipo, amount_cents=999_999_00), 0.1) is None
 
 

@@ -998,6 +998,7 @@ async def _executar(
     )
     acoes = _actions(state)
     alvos = (list(state.get("targets") or []) + [{}] * len(acoes))[: len(acoes)]
+    ctx.siblings = list(indexadas)
 
     linhas: list[str] = []
     spec_interativo: dict | None = None

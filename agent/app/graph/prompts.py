@@ -176,7 +176,10 @@ Tipos:
 - query_goals: "como tão minhas metas?".
 - query_invoice: "quanto tá a fatura?", "quanto sobrou de limite no nubank".
   account = o cartão citado.
-- query_forecast: estimativa numérica do SALDO bancário no futuro — "quanto vai sobrar de dinheiro na conta no fim do mês?", "vou ficar no vermelho?". query_to = até quando, se citado. Use SOMENTE quando a pergunta for sobre o saldo em conta / fluxo de caixa, e NÃO sobre lista de compras/faturas/parcelas.
+- query_forecast: estimativa numérica do SALDO bancário no futuro, com os dados que JÁ existem — "quanto vai sobrar de dinheiro na conta no fim do mês?", "vou ficar no vermelho?". query_to = até quando, se citado. Use SOMENTE quando a pergunta for sobre o saldo em conta / fluxo de caixa, e NÃO sobre lista de compras/faturas/parcelas.
+  NUNCA use query_forecast quando a pergunta SUPÕE algo que ainda não aconteceu ("e se eu
+  receber…", "se eu comprar…", "posso…"): isso é simulate_scenario. query_forecast não enxerga
+  a suposição e responderia com um número certo para outra pergunta.
 - query_net_worth: "qual meu patrimônio?", "como tá minha saúde financeira?".
 - query_recurring: o que se REPETE — "quais minhas recorrências?", "quando cai meu salário?",
   "o que entra todo mês?", "cadastrei o salário, tá certo?", "quais contas fixas eu tenho?".
@@ -190,8 +193,20 @@ Tipos:
 - query_debts: "quanto falta da dívida?", "quanto devo?", "como tá o financiamento?",
   "quando quito o empréstimo?". search_term = o nome da dívida citada ("quanto falta do
   carro?" → "carro"); pergunta geral deixa vazio.
-- simulate_purchase: "posso comprar um celular de 3000 em 10x?". amount_cents =
-  valor total em centavos, installments = parcelas (1 à vista).
+- simulate_scenario: qualquer pergunta HIPOTÉTICA sobre o futuro do saldo — "posso comprar
+  um celular de 3000 em 10x?", "e se eu receber 1500 por mês?", "e se eu gastar 2000 em
+  janeiro?", "dá pra bancar uma parcela de 800?".
+  amount_cents = o valor em centavos. kind = 'income' se o dinheiro ENTRA, 'expense' se SAI.
+  mode = 'total' quando o valor é único e se reparte ("3000 em 6x" → total, installments=6);
+  mode = 'monthly' quando o valor se REPETE todo mês ("1500 por mês" → monthly).
+  installments = parcelas quando mode='total' (1 = à vista).
+  query_from = quando a hipótese começa (YYYY-MM-DD), se o usuário citar mês ou data.
+  query_to = até quando projetar, se citado.
+  Uma hipótese POR AÇÃO: "e se eu receber 1500 e gastar 3000 em 6x?" são DUAS ações
+  simulate_scenario, e o sistema soma as duas numa resposta só.
+  IMPORTANTE: pergunta com "e se", "supondo", "posso", "dá pra", "caso eu" é SEMPRE
+  simulate_scenario — NUNCA query_forecast. query_forecast roda a projeção REAL e ignoraria a
+  suposição, devolvendo um número que não responde o que foi perguntado.
 - unknown: não é pergunta sobre dinheiro.
 
 Contexto e Continuação de Consultas:
