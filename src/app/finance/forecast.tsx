@@ -549,7 +549,8 @@ export default function ForecastScreen() {
               <Row
                 title={monthTitle(m.mes)}
                 subtitle={
-                  (m.parcial ? 'de hoje até o fim do mês · ' : '') +
+                  `${isoToBR(m.de)} a ${isoToBR(m.ate)} · ` +
+                  (m.parcial ? 'parcial · ' : '') +
                   // No primeiro mês nada "veio" de lugar nenhum: é o que está na conta AGORA,
                   // antes dos vencimentos de hoje. Chamar de carregado seria dizer que agosto
                   // fechou nesse número, e não foi ele que fechou nada.

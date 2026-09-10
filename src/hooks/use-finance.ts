@@ -1057,6 +1057,65 @@ export function useDefaultAccount() {
   });
 }
 
+/**
+ * Onde o mês financeiro do usuário começa e termina.
+ *
+ * ⚠️ **A aritmética do ciclo NÃO mora aqui.** Ela é `private.cycle_bounds` no banco, e o app
+ * pergunta em vez de calcular — se as duas contas divergissem, o painel pediria N dias de
+ * projeção enquanto o agrupamento usa outra borda, e os dois números da tela discordariam sem
+ * erro nenhum. Uma chamada, cacheada; o painel já esperava a projeção de qualquer jeito.
+ *
+ * `closeDay` null = último dia do mês, que é o comportamento de sempre.
+ */
+export interface Cycle {
+  closeDay: number | null;
+  /** `2026-09` — o mês que dá NOME ao ciclo. É o mês em que ele termina. */
+  mes: string;
+  de: string;
+  ate: string;
+  diasAteOFim: number;
+}
+
+export function useCycle() {
+  useRealtimeInvalidate('workspaces', ['cycle']);
+  return useQuery({
+    queryKey: ['cycle'],
+    queryFn: async (): Promise<Cycle> => {
+      const { data, error } = await supabase.rpc('cycle_now');
+      if (error) throw error;
+      return data as unknown as Cycle;
+    },
+    // O ciclo vira à meia-noite do dia de fechamento. Meio dia de cache é folgado para uma tela
+    // que o usuário abre várias vezes ao dia e apertado o bastante para não errar a virada.
+    staleTime: 12 * 60 * 60 * 1000,
+  });
+}
+
+export function useSetCycleCloseDay() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (day: number | null) => {
+      const { error } = await supabase
+        .from('workspaces')
+        .update({ cycle_close_day: day })
+        .eq('id', await workspaceId());
+      if (error) throw error;
+    },
+    // Muda a borda de TODA leitura de mês: painel, tendência, mês a mês e a tela do mês.
+    onSuccess: () =>
+      invalidateKeys(queryClient, [
+        ['cycle'],
+        ['forecast'],
+        ['forecast-drafts'],
+        ['forecast-months'],
+        ['monthly-cashflow'],
+        ['month-summary'],
+        ['month-lines'],
+        ['month-breakdown'],
+      ]),
+  });
+}
+
 export function useSetDefaultAccount() {
   const queryClient = useQueryClient();
   return useMutation({

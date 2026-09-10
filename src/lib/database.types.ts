@@ -2063,6 +2063,7 @@ export type Database = {
       workspaces: {
         Row: {
           created_at: string
+          cycle_close_day: number | null
           default_account_id: string | null
           id: string
           name: string
@@ -2072,6 +2073,7 @@ export type Database = {
         }
         Insert: {
           created_at?: string
+          cycle_close_day?: number | null
           default_account_id?: string | null
           id?: string
           name?: string
@@ -2081,6 +2083,7 @@ export type Database = {
         }
         Update: {
           created_at?: string
+          cycle_close_day?: number | null
           default_account_id?: string | null
           id?: string
           name?: string
@@ -2511,6 +2514,7 @@ export type Database = {
         }
         Returns: string
       }
+      cycle_now: { Args: never; Returns: Json }
       debt_schedule: {
         Args: { p_debt_id: string }
         Returns: {

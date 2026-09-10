@@ -20,6 +20,7 @@ import { Radius, Space, tabular, Type } from '@/design/tokens';
 import {
   useBudgetsStatus,
   useCashFlowForecast,
+  useCycle,
   useMarkPaid,
   useRecentTransactions,
   useUpcomingBills,
@@ -29,7 +30,7 @@ import { formatBRL, formatDateBR, localISODate, useTodayReminders } from '@/hook
 import { useProfile } from '@/hooks/use-profile';
 import { useSession } from '@/hooks/use-session';
 import { useTheme } from '@/hooks/use-theme';
-import { greetingBR } from '@/lib/dates';
+import { greetingBR, isoToBR } from '@/lib/dates';
 import { showItemActions } from '@/lib/item-actions';
 import { settleLabel } from '@/lib/settle-labels';
 import { Fonts } from '@/constants/theme';
@@ -53,14 +54,24 @@ export default function TodayScreen() {
   const headerHeight = useAppHeaderHeight();
   const { width } = useWindowDimensions();
 
+  /**
+   * A janela do painel é o CICLO do usuário, não o mês civil.
+   *
+   * Quem paga tudo no mesmo dia tem o ciclo cortado ao meio por "dia 1 a 31": o salário do dia
+   * 20 cai num balde e a fatura que ele paga com esse salário, no seguinte. Quem sabe onde o
+   * ciclo fecha é o banco (`cycle_now`); aqui só se lê. Enquanto ele não responde, o fim do mês
+   * civil é o palpite certo — é o que vale para quem não configurou nada.
+   */
+  const cycle = useCycle();
   const { daysLeft, monthEndDay } = useMemo(() => {
     const now = new Date();
     const last = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+    const fim = cycle.data ? new Date(`${cycle.data.ate}T12:00:00`) : last;
     return {
-      daysLeft: Math.max(1, last.getDate() - now.getDate()),
-      monthEndDay: last.getDate(),
+      daysLeft: cycle.data?.diasAteOFim ?? Math.max(1, last.getDate() - now.getDate()),
+      monthEndDay: fim.getDate(),
     };
-  }, []);
+  }, [cycle.data]);
 
   const { session } = useSession();
   const profile = useProfile(session?.user?.id);
@@ -184,7 +195,7 @@ export default function TodayScreen() {
             item), sem atalho nenhum.
           */
           <HeroPanel
-            label="Sobra até o fim do mês"
+            label={cycle.data ? `Saldo projetado em ${isoToBR(cycle.data.ate)}` : 'Saldo projetado'}
             concealable
             value={
               <Money
@@ -197,7 +208,7 @@ export default function TodayScreen() {
             secondary={{
               icon: leftover < 0 ? 'chart.line.downtrend.xyaxis' : 'chart.line.uptrend.xyaxis',
               negative: leftover < 0,
-              text: `${daysLeft} ${daysLeft === 1 ? 'dia' : 'dias'} até virar o mês · Projeção ${
+              text: `${daysLeft} ${daysLeft === 1 ? 'dia' : 'dias'} até fechar o ciclo · Projeção ${
                 leftover < 0 ? 'negativa' : 'positiva'
               }`,
             }}

@@ -263,7 +263,7 @@ function renderToday(bill: { kind: 'invoice' | 'transaction'; ref_id: string }) 
   const routes: unknown[] = [];
   const module = { exports: {} as any };
   const query = { data: [], isLoading: false, isRefetching: false, refetch: async () => {} };
-  const finance = { useCashFlowForecast: () => query, useUpcomingBills: () => ({ ...query, data: [{ ...bill, title: 'Fatura teste', amount_cents: 147000, due_date: '2026-01-20', overdue: true }] }), useBudgetsStatus: () => query, useRecentTransactions: () => query, useMarkPaid: () => ({ mutate: (...args: unknown[]) => writes.push(args) }) };
+  const finance = { useCycle: () => ({ ...query, data: null }), useCashFlowForecast: () => query, useUpcomingBills: () => ({ ...query, data: [{ ...bill, title: 'Fatura teste', amount_cents: 147000, due_date: '2026-01-20', overdue: true }] }), useBudgetsStatus: () => query, useRecentTransactions: () => query, useMarkPaid: () => ({ mutate: (...args: unknown[]) => writes.push(args) }) };
   const code = ts.transpileModule(readFileSync('src/app/(tabs)/today/index.tsx', 'utf8'), { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022, jsx: ts.JsxEmit.ReactJSX } }).outputText;
   runInNewContext(code, { module, exports: module.exports, require: (name: string) => {
     if (name === 'react') return { useMemo: (fn: () => unknown) => fn(), useState: (value: unknown) => [value, () => {}] };

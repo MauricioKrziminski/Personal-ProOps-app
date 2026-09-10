@@ -23,6 +23,15 @@ export type MesProjetado = {
   primeiroNegativo: string | null;
   /** O mês está inteiro na série, ou é o mês em que o horizonte corta? */
   parcial: boolean;
+  /**
+   * As bordas REAIS do ciclo — que só são o mês civil quando o usuário não mudou nada.
+   *
+   * Com fechamento no dia 10, "Outubro" vai de 11/09 a 10/10. O rótulo continua sendo um mês
+   * porque é assim que a pessoa fala ("o que sobrou em outubro"), mas o intervalo tem que
+   * aparecer: sem ele, quem configurou o ciclo lê "Outubro" e procura o dia 1º.
+   */
+  de: string;
+  ate: string;
 };
 
 /**

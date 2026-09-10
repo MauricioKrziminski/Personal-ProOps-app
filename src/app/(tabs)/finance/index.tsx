@@ -47,6 +47,7 @@ import {
   useDebts,
   useCardSummary,
   useCashFlowForecast,
+  useCycle,
   useDeleteTransaction,
   useMonthlyCashflow,
   useRecentTransactions,
@@ -55,7 +56,7 @@ import {
 } from '@/hooks/use-finance';
 import { categoryIcon } from '@/design/category-icons';
 import { formatBRL, formatDateBR, localISODate } from '@/hooks/use-items';
-import { monthBounds } from '@/lib/dates';
+import { isoToBR, monthBounds } from '@/lib/dates';
 import { confirmDestructive, showItemActions } from '@/lib/item-actions';
 import { useTheme, useScheme } from '@/hooks/use-theme';
 
@@ -259,7 +260,12 @@ function CashBar({
   );
 }
 
-/** Dias entre hoje e o último dia do mês corrente (mínimo 1). */
+/**
+ * Dias entre hoje e o fim do mês civil (mínimo 1).
+ *
+ * É só o PALPITE enquanto `cycle_now` não responde — quem manda é o ciclo do usuário, e quem
+ * sabe onde ele fecha é o banco. Para quem não configurou nada os dois dão o mesmo número.
+ */
 function daysToMonthEnd(): number {
   const now = new Date();
   const last = new Date(now.getFullYear(), now.getMonth() + 1, 0);
@@ -271,13 +277,27 @@ export default function FinanceScreen() {
   const scheme = useScheme();
   const toast = useToast();
   const insets = useSafeAreaInsets();
-  const [month, setMonth] = useState(currentMonth);
+  const cycle = useCycle();
+  /**
+   * ⚠️ O mês CORRENTE é o ciclo que contém hoje, não `date_trunc('month')`.
+   *
+   * Com fechamento no dia 10, o dia 15/09 já pertence ao ciclo chamado "outubro". Ancorado no
+   * mês civil, o seletor abriria em setembro — um ciclo atrasado — durante 20 dias por mês, e
+   * o painel diria "Sobrou em setembro" em cima de um número de outubro.
+   *
+   * `null` = "siga o ciclo". O mês exibido é DERIVADO, nunca sincronizado por efeito: o ciclo
+   * chega depois da primeira renderização, e copiá-lo para dentro de um `useState` seria uma
+   * renderização em cascata para dizer o que já dava para calcular.
+   */
+  const [mesEscolhido, setMonth] = useState<string | null>(null);
+  const mesCorrente = cycle.data?.mes ?? currentMonth();
+  const month = mesEscolhido ?? mesCorrente;
 
   const range = useMemo(() => monthBounds(month), [month]);
   const previousMonth = useMemo(() => shiftMonth(month, -1), [month]);
   const previousRange = useMemo(() => monthBounds(previousMonth), [previousMonth]);
-  const isCurrent = month === currentMonth();
-  const daysLeft = useMemo(() => daysToMonthEnd(), []);
+  const isCurrent = month === mesCorrente;
+  const daysLeft = cycle.data?.diasAteOFim ?? daysToMonthEnd();
 
   const forecast = useCashFlowForecast(daysLeft);
   const summary = useTransactionsSummary(range.from, range.to);
@@ -450,7 +470,13 @@ export default function FinanceScreen() {
             item), sem atalho nenhum.
           */
           <HeroPanel
-            label={isCurrent ? 'Sobra até o fim do mês' : `Sobrou em ${monthTitle(month)}`}
+            label={
+              isCurrent
+                ? cycle.data
+                  ? `Saldo projetado em ${isoToBR(cycle.data.ate)}`
+                  : 'Saldo projetado'
+                : `Sobrou em ${monthTitle(month)}`
+            }
             value={
               <Money
                 cents={leftover}

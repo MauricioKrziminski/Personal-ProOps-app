@@ -41,10 +41,10 @@ test('sem meses não há corte', () => {
  */
 test('veioDe encadeia: o começo de um mês é a sobra do anterior', () => {
   const meses: MesProjetado[] = [
-    { mes: '2026-09', sai: 185664, entra: 114800, saldo: -70792, parcial: true, primeiroNegativo: '2026-09-10' },
-    { mes: '2026-10', sai: 780037, entra: 756652, saldo: -94177, parcial: false, primeiroNegativo: '2026-10-01' },
-    { mes: '2026-11', sai: 684516, entra: 756652, saldo: -22041, parcial: false, primeiroNegativo: '2026-11-01' },
-    { mes: '2026-12', sai: 670505, entra: 756652, saldo: 64106, parcial: false, primeiroNegativo: null },
+    { mes: '2026-09', sai: 185664, entra: 114800, saldo: -70792, parcial: true, primeiroNegativo: '2026-09-10', de: '2026-09-01', ate: '2026-09-30' },
+    { mes: '2026-10', sai: 780037, entra: 756652, saldo: -94177, parcial: false, primeiroNegativo: '2026-10-01', de: '2026-10-01', ate: '2026-10-31' },
+    { mes: '2026-11', sai: 684516, entra: 756652, saldo: -22041, parcial: false, primeiroNegativo: '2026-11-01', de: '2026-11-01', ate: '2026-11-30' },
+    { mes: '2026-12', sai: 670505, entra: 756652, saldo: 64106, parcial: false, primeiroNegativo: null, de: '2026-12-01', ate: '2026-12-31' },
   ];
 
   // O primeiro mês não tem anterior: ele abre com o dinheiro que está na conta HOJE, antes dos

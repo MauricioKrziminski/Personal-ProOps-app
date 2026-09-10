@@ -16,13 +16,15 @@ import { useToast } from '@/components/ui/toast';
 import { GradientSurface } from '@/components/ui/gradient';
 import { Button } from '@/components/ui/button';
 import { Field, TextField } from '@/components/ui/field';
+import { SelectField } from '@/components/ui/select-field';
 import { Sheet } from '@/components/ui/sheet';
 import { Radius, Space, tabular } from '@/design/tokens';
 import { currentMonth } from '@/components/finance/month-picker';
 import { environmentLabel } from '@/lib/environment';
-import { useAiMonthStats, usePlanStatus } from '@/hooks/use-finance';
+import { useAiMonthStats, useCycle, usePlanStatus, useSetCycleCloseDay } from '@/hooks/use-finance';
 import { useAppUpdate } from '@/hooks/use-app-update';
 import { formatDateBR } from '@/hooks/use-items';
+import { isoToBR } from '@/lib/dates';
 import { useProfile, useUpdateProfile } from '@/hooks/use-profile';
 import { useSession } from '@/hooks/use-session';
 import { useTheme, useThemeMode } from '@/hooks/use-theme';
@@ -41,6 +43,8 @@ const APP_UPDATE_ICON: Partial<
  * Perfil — tela de manutenção. O sucesso dela é a pessoa achar o que veio buscar e sair.
  */
 export default function ProfileScreen() {
+  const cycle = useCycle();
+  const setCloseDay = useSetCycleCloseDay();
   const theme = useTheme();
   const ambiente = environmentLabel(supabaseUrl);
   const { mode, setMode } = useThemeMode();
@@ -101,6 +105,48 @@ export default function ProfileScreen() {
           />
         </View>
       </View>
+    </Section>
+  );
+
+  /**
+   * Onde o mês FINANCEIRO fecha.
+   *
+   * O padrão é o último dia do mês, que é o que quase todo app assume — e é errado para quem
+   * paga tudo num dia só. O caso que motivou: salário no dia 5 e no 20, as duas faturas
+   * vencendo dia 10. O período que importa é **11 de agosto a 10 de setembro** — recebe,
+   * gasta, e no dia 10 paga tudo. Lido de 1 a 31, o salário do dia 20 cai num balde e a fatura
+   * que ele paga com esse salário, no seguinte.
+   *
+   * ⚠️ **Isto não mexe em fatura.** Em qual fatura uma compra cai continua sendo o dia de
+   * FECHAMENTO do cartão (Nubank fecha dia 3, BB no último dia), e o dinheiro sai do caixa na
+   * data de VENCIMENTO. Uma compra no dia 4 no Nubank já não entra na fatura que vence dia 10 —
+   * isso valia antes e continua valendo. O ciclo só move a régua que corta os gráficos.
+   *
+   * Teto de 28 para o dia existir em fevereiro: sem isso o ciclo mudaria de tamanho conforme o
+   * mês, que é exatamente o defeito que ele resolve.
+   */
+  const cicloConfig = (
+    <Section title="Meu mês">
+      <SelectField
+        placeholder="Último dia do mês"
+        value={cycle.data?.closeDay == null ? null : String(cycle.data.closeDay)}
+        onChange={(v) => setCloseDay.mutate(v == null ? null : Number(v))}
+        options={[
+          { id: null, label: 'Último dia do mês', meta: 'o padrão', neutral: true },
+          ...Array.from({ length: 28 }, (_, i) => ({
+            id: String(i + 1),
+            label: `Fecha no dia ${i + 1}`,
+            meta: `o mês vai do dia ${i + 2 > 28 ? 1 : i + 2} ao dia ${i + 1}`,
+          })),
+        ]}
+      />
+      <Row
+        title="Ciclo atual"
+        subtitle={
+          cycle.data ? `${isoToBR(cycle.data.de)} a ${isoToBR(cycle.data.ate)}` : 'carregando…'
+        }
+        icon="calendar"
+      />
     </Section>
   );
 
@@ -348,6 +394,7 @@ export default function ProfileScreen() {
       </Section>
 
       {aparencia}
+      {cicloConfig}
 
       <AppUpdateSection />
 
