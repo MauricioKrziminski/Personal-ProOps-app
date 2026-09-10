@@ -11,7 +11,7 @@ import { Button } from '@/components/ui/button';
 import { EmptyState } from '@/components/ui/empty-state';
 import { Money } from '@/components/ui/money';
 import { Row, Section } from '@/components/ui/row';
-import { HeaderActions, HeaderMenu } from '@/components/ui/header-actions';
+import { HeaderActions } from '@/components/ui/header-actions';
 import { describeRRule } from '@/lib/rrule-text';
 import { Screen } from '@/components/ui/screen';
 import { HeroLabel } from '@/components/ui/section-head';
@@ -241,9 +241,12 @@ export default function TransactionDetailScreen() {
       <Stack.Screen options={{ title }} />
 
       {/*
-        As ações do header saem de UM array, nos dois sistemas. Antes elas eram escritas duas
-        vezes nesta tela — como `Stack.Toolbar` (iOS) e como `androidOverflow` — e o
-        `Platform.OS === 'ios' ? ... : null` em volta do toolbar era o sintoma.
+        UM componente desenha o header inteiro — botão e menu juntos.
+
+        Declarar `<HeaderActions>` e `<HeaderMenu>` lado a lado PARECIA funcionar e não
+        funcionava: os dois montam `headerRight` e `setOptions` faz merge raso, então no
+        Android o menu apagava o "Editar" sem erro nenhum. Como toda lista do app desemboca
+        aqui, editar um lançamento pelo app ficou inalcançável. `anti-slop.test.ts` prende.
       */}
       <HeaderActions
         actions={[
@@ -253,37 +256,37 @@ export default function TransactionDetailScreen() {
               router.push({ pathname: '/finance/transaction-form', params: { id: tx.id, month } }),
           },
         ]}
-      />
-      <HeaderMenu
-        title="Lançamento"
-        actions={[
-          {
-            label: 'Mudar categoria',
-            icon: 'tag',
-            actions: SUGGESTED_CATEGORIES.map((option) => ({
-              label: option,
-              selected: tx.category === option,
-              onPress: () => patch({ category: option }),
-            })),
-          },
-          { label: 'Duplicar', icon: 'plus.square.on.square', onPress: duplicate },
-          {
-            label: tx.installment_plan_id ? 'Apagar só esta parcela' : 'Apagar',
-            icon: 'trash',
-            destructive: true,
-            onPress: confirmDelete,
-          },
-          ...(tx.installment_plan_id
-            ? [
-                {
-                  label: 'Apagar a compra inteira',
-                  icon: 'trash' as const,
-                  destructive: true,
-                  onPress: confirmDeletePlan,
-                },
-              ]
-            : []),
-        ]}
+        menu={{
+          title: 'Lançamento',
+          actions: [
+            {
+              label: 'Mudar categoria',
+              icon: 'tag',
+              actions: SUGGESTED_CATEGORIES.map((option) => ({
+                label: option,
+                selected: tx.category === option,
+                onPress: () => patch({ category: option }),
+              })),
+            },
+            { label: 'Duplicar', icon: 'plus.square.on.square', onPress: duplicate },
+            {
+              label: tx.installment_plan_id ? 'Apagar só esta parcela' : 'Apagar',
+              icon: 'trash',
+              destructive: true,
+              onPress: confirmDelete,
+            },
+            ...(tx.installment_plan_id
+              ? [
+                  {
+                    label: 'Apagar a compra inteira',
+                    icon: 'trash' as const,
+                    destructive: true,
+                    onPress: confirmDeletePlan,
+                  },
+                ]
+              : []),
+          ],
+        }}
       />
 
       {/* O único destaque: é o que a pessoa veio conferir em três segundos. */}

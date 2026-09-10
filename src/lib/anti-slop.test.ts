@@ -288,3 +288,34 @@ test('nenhuma tela monta lista de conta à mão', () => {
     'use AccountPicker de @/components/finance/account-picker: uma lista de nomes não diz qual é cartão, e foi assim que um salário caiu na fatura'
   );
 });
+
+/**
+ * Dois donos do mesmo slot de header.
+ *
+ * `HeaderActions` e `HeaderMenu` escrevem os DOIS em `headerRight`, cada um pelo seu
+ * `<Stack.Screen options={...} />`. `setOptions` faz merge raso: a mesma chave escrita duas
+ * vezes não soma, o último ganha. Numa tela que monta os dois, o botão declarado primeiro
+ * simplesmente **não existe** no Android — sem erro, sem aviso, sem nada no log.
+ *
+ * Foi o que aconteceu com o detalhe do lançamento: ele declarava "Editar" e logo abaixo o
+ * menu "…", e o menu apagava o "Editar". Como TODA lista do app (Hoje, Financeiro,
+ * Lançamentos, Mês, Projeção, Parcelas, Faturas, Busca) desemboca nessa tela, editar um
+ * lançamento pelo app ficou inalcançável — a queixa de 10/09/2026 foi literal: *"eu queria
+ * conseguir editar direto nessa tela já"*.
+ *
+ * O caminho certo é UM componente por header: `<HeaderActions actions={...} menu={...} />`.
+ */
+test('nenhuma tela declara HeaderActions e HeaderMenu juntos', () => {
+  const fora: string[] = [];
+  for (const file of walk(join(SRC, 'app'))) {
+    const code = stripComments(readFileSync(file, 'utf8'));
+    if (/<HeaderActions\b/.test(code) && /<HeaderMenu\b/.test(code)) {
+      fora.push(file.replace(SRC, 'src'));
+    }
+  }
+  assert.deepEqual(
+    fora,
+    [],
+    'os dois escrevem headerRight e o último ganha — passe o menu por <HeaderActions menu={{ title, actions }} />'
+  );
+});

@@ -2,7 +2,7 @@
   "expo": {
     "name": "Personal ProOps app",
     "slug": "app-ProOps",
-    "version": "1.3.15",
+    "version": "1.3.16",
     "orientation": "portrait",
     "icon": "./assets/images/icons/icon-512.png",
     "scheme": "appproops",

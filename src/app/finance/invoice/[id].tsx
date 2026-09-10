@@ -390,7 +390,17 @@ export default function InvoiceScreen() {
                 return (
                   <ItemLink
                     key={tx.id}
-                    href={`/finance/transaction-form?id=${tx.id}`}
+                    /*
+                      A linha abre o DETALHE, como nas outras oito listas do app — não o
+                      formulário. Esta era a única que pulava direto para a tela que altera,
+                      que é justamente o que o detalhe do lançamento existe para evitar: para
+                      LER não se entra na tela que edita. O "Editar" do toque longo continua
+                      como caminho rápido, e o detalhe tem o dele no header.
+                    */
+                    href={{
+                      pathname: '/finance/[txId]',
+                      params: { txId: tx.id, month: tx.occurred_at.slice(0, 7) },
+                    }}
                     title={tx.description ?? tx.merchant ?? 'Sem descrição'}
                     actions={[
                       {

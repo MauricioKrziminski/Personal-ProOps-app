@@ -408,6 +408,22 @@ que "voltar" faz depois.
   desfaz no unmount — desmontar deixaria o botão velho no header do Android. Submit de form modal
   leva `primary` (vira `variant: 'done'`, o negrito do sistema); sem ele o "Salvar" fica menos
   proeminente que o "Cancelar" ao lado.
+
+  ⚠️ **Botão e menu "…" na mesma tela saem de UMA chamada:
+  `<HeaderActions actions={[...]} menu={{ title, actions }} />`** (10/09/2026). Montar
+  `<HeaderActions>` e `<HeaderMenu>` lado a lado parecia óbvio e estava errado: os dois escrevem
+  `headerRight`, `setOptions` faz merge raso, e a mesma chave escrita duas vezes não soma — **o
+  último ganha**. No Android o "Editar" do detalhe do lançamento simplesmente não existia: sem
+  erro, sem aviso, sem log. E como TODA lista do app (Hoje, Financeiro, Lançamentos, Mês,
+  Projeção, Parcelas, Faturas, Busca) desemboca nessa tela, editar um lançamento pelo app ficou
+  inalcançável — a queixa foi literal: *"eu queria conseguir editar direto nessa tela já"*.
+  `HeaderMenu` continua para quem só tem menu (é casca fina sobre o mesmo componente), e
+  `anti-slop.test.ts` quebra o build se alguma tela declarar os dois. O escape hatch
+  `androidOverflow` foi REMOVIDO: ele existia exatamente para este caso e o caso virou o caminho
+  normal.
+
+  No iOS a regra é a mesma por outro motivo: a doc do `Stack.Toolbar` mostra **um toolbar por
+  `placement`**, com botão e menu como IRMÃOS dentro dele — nunca dois `placement="right"`.
 - **Presentation é significado**: tarefa com etapas → `modal` com Cancelar/Salvar próprios;
   escolha curta → `formSheet` com detents; confirmação destrutiva → action sheet; ação de item →
   context menu nativo.

@@ -36,6 +36,40 @@ export interface HeaderAction {
 }
 
 /**
+ * Menu "…" desta tela — o overflow que acompanha os botões.
+ *
+ * Vive DENTRO de `HeaderActions` de propósito: os dois escreviam `headerRight` por conta e
+ * `setOptions` faz merge raso, então numa tela com os dois o último apagava o primeiro. Ver
+ * `anti-slop.test.ts`.
+ */
+export interface HeaderOverflow {
+  /** Título do sheet no Android — some no iOS, onde o menu nativo não tem cabeçalho. */
+  title: string;
+  actions: ItemAction[];
+}
+
+/** Submenu vira `Stack.Toolbar.Menu` aninhado — o "Mudar categoria" do detalhe do lançamento. */
+function renderToolbarAction(action: ItemAction) {
+  if (action.actions?.length) {
+    return (
+      <Stack.Toolbar.Menu key={action.label} title={action.label} icon={action.icon}>
+        {action.actions.map(renderToolbarAction)}
+      </Stack.Toolbar.Menu>
+    );
+  }
+  return (
+    <Stack.Toolbar.MenuAction
+      key={action.label}
+      icon={action.icon}
+      destructive={action.destructive}
+      isOn={action.selected}
+      onPress={() => action.onPress?.()}>
+      {action.label}
+    </Stack.Toolbar.MenuAction>
+  );
+}
+
+/**
  * O único caminho para ação no header.
  *
  * Existiam TRÊS padrões convivendo — `View` à mão com dois `Pressable` e `gap: 16` (Hoje, Notas),
@@ -58,17 +92,24 @@ export interface HeaderAction {
  */
 export function HeaderActions({
   actions,
+  menu,
   onHero = false,
 }: {
   actions: HeaderAction[];
+  /** Ações de overflow, atrás de um "…" à direita dos botões. */
+  menu?: HeaderOverflow;
   /** O header desta tela veste a cor do painel — ver `heroHeaderOptions`. */
   onHero?: boolean;
 }) {
   const theme = useTheme();
+  const menuActions = menu?.actions ?? [];
+  // Slot vazio é slot devolvido ao padrão — vale para os DOIS, senão um menu que esvazia
+  // (o lote da importação) deixa um "…" apontando para ações que não existem mais.
+  const vazio = actions.length === 0 && menuActions.length === 0;
 
   if (Platform.OS === 'ios') {
     // Toolbar sem filho ainda reclama o slot; desmontar é o que devolve o header ao padrão.
-    if (actions.length === 0) return null;
+    if (vazio) return null;
     return (
       <Stack.Toolbar placement="right">
         {actions.map((action) => (
@@ -86,6 +127,11 @@ export function HeaderActions({
             {action.icon ? undefined : action.label}
           </Stack.Toolbar.Button>
         ))}
+        {menuActions.length > 0 ? (
+          <Stack.Toolbar.Menu icon="ellipsis.circle" accessibilityLabel="Mais opções">
+            {menuActions.map(renderToolbarAction)}
+          </Stack.Toolbar.Menu>
+        ) : null}
       </Stack.Toolbar>
     );
   }
@@ -95,7 +141,25 @@ export function HeaderActions({
   return (
     <Stack.Screen
       options={{
-        headerRight: actions.length === 0 ? undefined : () => <AndroidActions actions={actions} onHero={onHero} />,
+        headerRight: vazio
+          ? undefined
+          : () => (
+              <AndroidActions
+                onHero={onHero}
+                actions={[
+                  ...actions,
+                  ...(menuActions.length > 0 && menu
+                    ? [
+                        {
+                          label: 'Mais opções',
+                          icon: 'ellipsis.circle' as const,
+                          onPress: () => showItemActions(menu.title, menuActions),
+                        },
+                      ]
+                    : []),
+                ]}
+              />
+            ),
       }}
     />
   );
@@ -110,27 +174,6 @@ export function HeaderActions({
  * existia, então "Importar extrato", "Regras de categoria", "Duplicar" e "Apagar" ficavam
  * **inalcançáveis** no Android. Lá o menu vira `showItemActions`, que fala o idioma da plataforma.
  */
-/** Submenu vira `Stack.Toolbar.Menu` aninhado — o "Mudar categoria" do detalhe do lançamento. */
-function renderToolbarAction(action: ItemAction) {
-  if (action.actions?.length) {
-    return (
-      <Stack.Toolbar.Menu key={action.label} title={action.label} icon={action.icon}>
-        {action.actions.map(renderToolbarAction)}
-      </Stack.Toolbar.Menu>
-    );
-  }
-  return (
-    <Stack.Toolbar.MenuAction
-      key={action.label}
-      icon={action.icon}
-      destructive={action.destructive}
-      isOn={action.selected}
-      onPress={() => action.onPress?.()}>
-      {action.label}
-    </Stack.Toolbar.MenuAction>
-  );
-}
-
 export function HeaderMenu({
   title,
   actions,
@@ -141,42 +184,7 @@ export function HeaderMenu({
   /** O header desta tela veste a cor do painel — ver `heroHeaderOptions`. */
   onHero?: boolean;
 }) {
-  if (Platform.OS === 'ios') {
-    if (actions.length === 0) return null;
-    return (
-      <Stack.Toolbar placement="right">
-        <Stack.Toolbar.Menu icon="ellipsis.circle" accessibilityLabel="Mais opções">
-          {actions.map(renderToolbarAction)}
-        </Stack.Toolbar.Menu>
-      </Stack.Toolbar>
-    );
-  }
-
-  // Mesmo contrato do `HeaderActions`: lista vazia devolve o slot. Montar/desmontar o componente
-  // NÃO limpa nada — `Stack.Screen` só chama `setOptions` e o expo-router não desfaz no unmount.
-  // Com `{cond ? <HeaderMenu/> : null}` o "…" continuava no header do Android depois que o lote
-  // esvaziava, apontando para ações de um lote que não existe mais.
-  return (
-    <Stack.Screen
-      options={{
-        headerRight:
-          actions.length === 0
-            ? undefined
-            : () => (
-                <AndroidActions
-                  onHero={onHero}
-                  actions={[
-                    {
-                      label: 'Mais opções',
-                      icon: 'ellipsis.circle',
-                      onPress: () => showItemActions(title, actions),
-                    },
-                  ]}
-                />
-              ),
-      }}
-    />
-  );
+  return <HeaderActions actions={[]} menu={{ title, actions }} onHero={onHero} />;
 }
 
 /**
@@ -236,27 +244,3 @@ const styles = StyleSheet.create({
     paddingHorizontal: Space.sm,
   },
 });
-
-/**
- * Escape hatch: `headerRight` do Android para uma tela cujo menu o `HeaderMenu` não expressa.
- *
- * Só o detalhe do lançamento usa. Lá o toolbar do iOS tem um botão "Editar" ao lado de um menu
- * **com submenu** ("Mudar categoria"), e achatar isso num sheet só para uniformizar seria trocar
- * um menu nativo bom por um pior. No Android o submenu vira um segundo sheet, que é o natural.
- */
-export function androidOverflow(title: string, actions: ItemAction[]) {
-  if (Platform.OS !== 'android') return undefined;
-
-  function OverflowButton() {
-    return (
-      <AndroidActions
-        onHero={false}
-        actions={[
-          { label: 'Mais opções', icon: 'ellipsis.circle', onPress: () => showItemActions(title, actions) },
-        ]}
-      />
-    );
-  }
-
-  return OverflowButton;
-}
