@@ -122,6 +122,15 @@
   tela voltar a chamá-las. **Qualquer leitura nova que possa passar de 1000 linhas nasce
   agregada ou em JSON** — não dá para ver esse defeito no SQL, só na tela.
 
+  ⚠️ **"O mês inteiro" NÃO tem teto, e isso é desenho, não esquecimento.** Já foi levantado
+  duas vezes como inconsistência ("a Projeção para em N anos e o mês navega para sempre").
+  Medido em produção em 10/09/2026: `month_lines_for` em março/2035 devolve as MESMAS 6
+  entradas (R$ 7.566,52) de outubro/2026, com 15 linhas marcadas `projected` — a recorrente é
+  expandida da REGRA em qualquer distância, então o mês distante não some com a receita. Não
+  existe ali o modo de falha que derrubava a projeção. E o `MonthSheet` recusa teto de propósito
+  ("um teto criaria a única fronteira do app que o usuário descobriria batendo nela"). O teto da
+  Projeção limita o TAMANHO DA SÉRIE, não a honestidade do dado — são coisas diferentes.
+
   ⚠️ **Teto de LEITURA não é janela de ESCRITA.** O materializador segue gravando UM ano
   (`HORIZON_DAYS = 365`); tudo além é calculado. Subir o teto não grava uma linha.
 
