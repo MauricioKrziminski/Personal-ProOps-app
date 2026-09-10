@@ -1,27 +1,46 @@
 # Agente Python — staging e corte para produção
 
-> Estado em 31/08/2026. O agente está **no ar e inerte**: o Cloud Run responde, o
-> banco tem as tabelas, e nenhum telefone está roteado para ele. Este documento
-> é o que falta para ele receber a primeira mensagem de verdade.
+> ## ⚠️ O CORTE ESTÁ FEITO (09/09/2026). Este documento virou HISTÓRICO.
+>
+> O agente Python atende **todo o WhatsApp em produção**. A migration
+> `20260909210000` inverteu o padrão do roteador: telefone sem linha em
+> `agent_routing` vai para o Python, e a tabela virou lista de EXCEÇÃO.
+>
+> Validado no número do dono do produto, com evidência em log:
+>
+> | teste | resultado |
+> |---|---|
+> | três mensagens picotadas | as de dentro da janela de 3s viraram UM lote e uma resposta; a que chegou 4,4s depois virou turno próprio, sem duplicar nem perder |
+> | "apagar o último gasto" | perguntou antes, nomeou o item, e o CLIQUE em Confirmar custou **zero** chamada de Gemini |
+> | consultas de recorrência e dívida | responderam com número e data certos — e acharam dois defeitos, corrigidos no mesmo dia |
+>
+> **O que ainda NÃO foi feito, e a ordem importa:** a Callback URL no painel da
+> Meta ainda aponta para a Edge Function (`Meta → Edge Function → Cloud Run`).
+> Apagar `supabase/functions/` antes de repontar para
+> `https://agente-wwm7xruoyq-rj.a.run.app/whatsapp-inbound` derruba o WhatsApp.
+> A ordem é **repontar → testar um `oi` → apagar**. Enquanto a function existir,
+> ela é o botão de rollback: um `update` numa linha.
+>
+> As partes 1 e 2 abaixo ficam como registro de COMO o corte foi feito — os
+> comandos ainda servem para montar um staging do zero. Não são mais um roteiro
+> a executar.
 >
 > Contexto arquitetural em `CLAUDE.md` e `.claude/rules/agent.md`.
 > Plano completo da migração em `~/.claude/plans/voc-um-engenheiro-glittery-pike.md`.
 
 ## Onde o código está (leia antes de qualquer coisa)
 
-**Tudo vive na branch `gabriel/agente-python`, já enviada para o remoto e NÃO
-mesclada.** Na `main` o diretório `agent/` não existe — um `git checkout main`
-remove os 64 arquivos do serviço, e eles voltam ao trocar de volta.
+**`agent/` está na `main`.** O texto abaixo dizia que tudo vivia na branch
+`gabriel/agente-python`, não mesclada — verdade em 31/08/2026, e mentira desde a
+mesclagem. Ficou aqui porque a primeira linha que alguém lê num runbook é a que
+mais custa quando envelhece: seguindo-a, a pessoa faz `git checkout` para uma
+branch velha e mexe no agente errado.
 
 ```bash
-git checkout gabriel/agente-python   # obrigatório para mexer no agente
-cd agent && .venv/bin/python -m pytest -q   # 64 verdes
+cd agent && .venv/bin/pytest -q   # 631 verdes em 09/09/2026
 ```
 
-O `.venv` e o `.env` não são versionados e sobrevivem à troca de branch. As
-regras que ignoram bytecode do Python estão no `.gitignore` **da branch** e
-também em `.git/info/exclude` (local) — sem o segundo, todo `.pyc` aparecia como
-arquivo novo ao voltar para a `main`.
+O `.venv` e o `.env` não são versionados.
 
 **O contexto do ERP não está aqui.** Aquela migração (transferência de posse dos
 projetos Firebase) tem runbook próprio no repositório do ERP, em

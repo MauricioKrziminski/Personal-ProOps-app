@@ -30,7 +30,7 @@ App mobile pessoal de **notas rápidas, lembretes e controle financeiro operado 
   Isso já falhou **duas vezes** (03/09/2026): a `0049` e depois as `0050`/`0051` foram anunciadas
   como "aplicadas em produção" quando foram para o staging.
 
-  Produção está em **`20260909200000`** (09/09/2026), aplicada pelo Gabriel com
+  Produção está em **`20260909210000`** (09/09/2026), aplicada pelo Gabriel com
   `link --project-ref` + `db push` + `link` de volta para o staging. **`--db-url` não serve**: o
   hook lê o projeto LINKADO e a flag passava por cima da trava em silêncio — buraco fechado no
   mesmo dia, com `scripts/supabase-target.test.sh` prendendo os sete casos.
@@ -113,6 +113,21 @@ Se o repasse não voltar 2xx, o roteador devolve **não-200** para a Meta reentr
 Deno antigo como fallback seria pior: uma conversa esperando "SIM" no Python teria a resposta
 processada pelo fluxo velho, que não sabe que uma pergunta foi feita, e o "sim" viraria uma nota.
 `supabase/functions/` só é deletado quando todos os números estiverem migrados.
+
+**O padrão inverteu em 09/09/2026** (`20260909210000`, aplicada em produção). Telefone **sem
+linha** em `agent_routing` vai para o **Python**; a tabela deixou de ser lista de ENTRADA e virou
+lista de **EXCEÇÃO** (`use_python_agent = false` segura um número no Deno). O motivo é que cada
+usuário novo precisaria de uma linha escrita à mão, e uma hora ninguém lembraria — o sintoma seria
+o agente "não saber" o que já sabe no app.
+
+⚠️ **Apagar `supabase/functions/` tem um pré-requisito que não é o número de linhas `false`.**
+O caminho hoje é **Meta → Edge Function → Cloud Run**: a Callback URL no painel da Meta aponta
+para a function. Apagar antes de repontar para
+`https://agente-wwm7xruoyq-rj.a.run.app/whatsapp-inbound` derruba o WhatsApp inteiro. A ordem é
+repontar → testar → apagar. O Cloud Run já responde a verificação (`GET /whatsapp-inbound`).
+
+Enquanto a function existir, ela é o **botão de rollback**: voltar ao fluxo antigo é um `update`
+numa linha. Depois de apagada, é um redeploy.
 
 ## Regras detalhadas (obrigatórias)
 
