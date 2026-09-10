@@ -12,7 +12,7 @@ Dois bugs que este módulo existe para matar, ambos medidos em 31/08/2026:
 import pytest
 
 from app.graph.schemas import FinanceAction, FinanceActionType
-from app.tools import resolve
+from app.tools import finance, resolve
 
 
 def _tx(id_, cents, cat, desc=None, data="2026-08-30"):
@@ -192,3 +192,36 @@ class TestPlanoComoAlvo:
 
         monkeypatch.setattr(resolve.db, "fetch", explode)
         assert await resolve._com_plano("ws", []) == []
+
+
+class TestJanelaDeReferencia:
+    """A janela é o PASSADO primeiro — foi 40 de 40 no futuro em produção.
+
+    Em 10/09/2026 o materializador passou de 90 para 365 dias e o cron gravou 200 ocorrências
+    futuras num instante só. Ordenada por `created_at desc`, a janela dos 40 ficou inteira em
+    2027 e nenhuma das 103 transações que aconteceram sobrava nela: "apaga o último gasto"
+    resolvia para *Manutenção dentista de 10/08/2027*.
+
+    Não dá para provar isso com dublê — quem ordena é o Postgres. O que este teste prende é a
+    FORMA da consulta: as duas metades e o corte em `current_date`. Sem elas o defeito volta e
+    a suíte inteira continua verde, que foi exatamente o que aconteceu.
+    """
+
+    @pytest.mark.asyncio
+    async def test_a_consulta_separa_passado_de_futuro(self, monkeypatch):
+        vistos: list[str] = []
+
+        async def fake_fetch(sql, *args):
+            vistos.append(sql)
+            return []
+
+        monkeypatch.setattr(finance.db, "fetch", fake_fetch)
+        await finance.reference_window("ws-1")
+
+        sql = " ".join(vistos[0].split())
+        assert "occurred_at <= current_date" in sql, "sem o corte, o futuro ocupa a janela toda"
+        assert "occurred_at > current_date" in sql, "a parcela do mês que vem tem que ser alcançável"
+        assert sql.index("occurred_at <= current_date") < sql.index("occurred_at > current_date"), (
+            "o passado vem primeiro: é o que 'o último' quer dizer"
+        )
+        assert "order by occurred_at desc" in sql, "ordenar por created_at é o que quebrou"

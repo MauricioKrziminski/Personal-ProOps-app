@@ -19,6 +19,7 @@ from typing import Any, Literal
 from app import db
 from app.domain import matching
 from app.domain.reference import clean_term, wants_latest, wants_whole_plan
+from app.tools import finance
 from app.graph.schemas import (
     FinanceAction,
     FinanceActionType,
@@ -27,8 +28,8 @@ from app.graph.schemas import (
 
 Status = Literal["found", "ambiguous", "none"]
 
-# Janela de busca das transações: além dela, nada é alcançável.
-REFERENCE_WINDOW = 40
+# A janela de transações mora em `finance.reference_window` — era duplicada aqui como
+# `REFERENCE_WINDOW = 40` e as duas cópias tinham o mesmo defeito de ordenação.
 # Quantos candidatos mostrar num empate. 9 porque a Lista Interativa da Meta
 # cabe 10 linhas e a última é sempre "Nenhuma dessas". Com 3 (o valor
 # anterior) as faixas de 3-10 e >10 do formato híbrido eram inalcançáveis.
@@ -228,17 +229,7 @@ async def por_transacao(
     mais recente. Antes elegia a última em silêncio — foi assim que "apaga
     aquilo" virava um DELETE sem o usuário ter dito o quê.
     """
-    linhas = await db.fetch(
-        """
-        select id, kind, amount_cents, category, description, occurred_at
-        from public.transactions
-        where workspace_id = %s
-        order by created_at desc
-        limit %s
-        """,
-        workspace_id,
-        REFERENCE_WINDOW,
-    )
+    linhas = await finance.reference_window(workspace_id)
     if not linhas:
         return "none", []
 

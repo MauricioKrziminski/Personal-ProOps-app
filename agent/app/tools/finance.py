@@ -26,6 +26,8 @@ log = logging.getLogger(__name__)
 
 KIND_LABEL = {"expense": "gasto", "income": "receita", "transfer": "transferência"}
 REFERENCE_WINDOW = 40
+# Quantas ocorrências FUTURAS entram na janela, além das passadas. Ver `reference_window`.
+REFERENCE_AHEAD = 10
 
 
 # ---------------------------------------------------------------------------
@@ -80,6 +82,42 @@ async def default_account(workspace_id: UUID) -> UUID | None:
     return linha["default_account_id"] if linha else None
 
 
+async def reference_window(workspace_id: UUID) -> list[dict]:
+    """As transações alcançáveis quando o usuário aponta para uma ("o último", "o de 45").
+
+    ⚠️ **Isto era `order by created_at desc limit 40` e em 10/09/2026 a janela ficou 40 de 40
+    NO FUTURO.** O materializador passou de 90 para 365 dias e o cron gravou 200 ocorrências
+    futuras num instante só; ordenado pela hora de CRIAÇÃO, o topo virou parcela de 2027 e
+    nenhuma das 103 transações que de fato aconteceram sobrava na janela. Medido em produção:
+    "apaga o último gasto" acertava *Manutenção dentista de 10/08/2027*, e o caminho passa por
+    `interrupt()` — quem segurava era o usuário ler a pergunta e dizer não.
+
+    A janela agora tem duas metades explícitas, e a ordem entre elas é a correção: primeiro o
+    passado, do mais recente para trás (é o que "o último" quer dizer), depois as poucas
+    ocorrências mais PRÓXIMAS do futuro, para "a parcela de outubro" continuar alcançável sem
+    as 200 seguintes empurrarem o passado para fora.
+    """
+    return await db.fetch(
+        """
+        (select id, kind, amount_cents, category, description, occurred_at
+           from public.transactions
+          where workspace_id = %s and occurred_at <= current_date
+          order by occurred_at desc, created_at desc
+          limit %s)
+        union all
+        (select id, kind, amount_cents, category, description, occurred_at
+           from public.transactions
+          where workspace_id = %s and occurred_at > current_date
+          order by occurred_at asc, created_at desc
+          limit %s)
+        """,
+        workspace_id,
+        REFERENCE_WINDOW,
+        workspace_id,
+        REFERENCE_AHEAD,
+    )
+
+
 async def resolve_transaction(
     workspace_id: UUID, action: FinanceAction
 ) -> tuple[str, list[dict]]:
@@ -88,17 +126,7 @@ async def resolve_transaction(
     Devolve ("found"|"ambiguous"|"none", candidatos). Empate PERGUNTA em vez de
     chutar: alterar o lançamento errado é pior que uma mensagem a mais.
     """
-    candidatos = await db.fetch(
-        """
-        select id, kind, amount_cents, category, description, occurred_at
-        from public.transactions
-        where workspace_id = %s
-        order by created_at desc
-        limit %s
-        """,
-        workspace_id,
-        REFERENCE_WINDOW,
-    )
+    candidatos = await reference_window(workspace_id)
     if not candidatos:
         return "none", []
 
