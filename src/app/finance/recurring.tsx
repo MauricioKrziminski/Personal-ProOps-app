@@ -15,7 +15,6 @@ import { EmptyState } from '@/components/ui/empty-state';
 import { Field, MoneyField, TextField } from '@/components/ui/field';
 import { Icon } from '@/components/ui/icon';
 import { Money } from '@/components/ui/money';
-import { Row, Section } from '@/components/ui/row';
 import { Screen } from '@/components/ui/screen';
 import { HeroLabel, SectionHead } from '@/components/ui/section-head';
 import { Segmented } from '@/components/ui/segmented';
@@ -36,7 +35,7 @@ import { confirmDestructive, showItemActions } from '@/lib/item-actions';
 import { validRecurringRange } from '@/lib/finance-form';
 import { describeRRule } from '@/lib/rrule-text';
 import { supabase } from '@/lib/supabase';
-import { accountLabel } from '@/lib/accounts';
+import { AccountPicker } from '@/components/finance/account-picker';
 
 /**
  * Recorrentes — "o que vai sair da minha conta todo mês sem eu fazer nada?".
@@ -738,31 +737,12 @@ export default function RecurringScreen() {
               </Field>
 
               <Field label="Conta">
-                <Section>
-                  <Row
-                    title="Não informar"
-                    chevron={false}
-                    onPress={() => setForm({ ...form, accountId: null })}
-                    trailing={
-                      form.accountId === null ? (
-                        <Icon name="checkmark" size="sm" color="tint" />
-                      ) : undefined
-                    }
-                  />
-                  {(accounts.data ?? []).map((a) => (
-                    <Row
-                      key={a.id}
-                      title={accountLabel(a)}
-                      chevron={false}
-                      onPress={() => setForm({ ...form, accountId: a.id })}
-                      trailing={
-                        form.accountId === a.id ? (
-                          <Icon name="checkmark" size="sm" color="tint" />
-                        ) : undefined
-                      }
-                    />
-                  ))}
-                </Section>
+                <AccountPicker
+                  accounts={accounts.data ?? []}
+                  value={form.accountId}
+                  onChange={(accountId: string | null) => setForm({ ...form, accountId })}
+                  emptyLabel="Não informar"
+                />
               </Field>
 
               {/*

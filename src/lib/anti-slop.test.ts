@@ -259,16 +259,35 @@ test('nenhuma tela desenha o nome cru de uma conta', () => {
   // `accounts.ts` é quem monta o rótulo; `accounts.tsx` é a tela que GERENCIA
   // contas, onde o tipo já é o cabeçalho da seção e repeti-lo em toda linha
   // seria o ruído que a própria regra manda evitar.
-  const PERMITIDO = new Set(['src/lib/accounts.ts', 'src/app/finance/accounts.tsx']);
+  // `accounts.ts` monta o rótulo; `account-picker.tsx` é o seletor, que escreve
+  // o tipo na própria linha de baixo (repetir o sufixo ali seria o ruído que a
+  // regra manda evitar); `accounts.tsx` é a tela que GERENCIA contas, onde o
+  // tipo já é o cabeçalho da seção.
+  const PERMITIDO = new Set([
+    'src/lib/accounts.ts',
+    'src/components/finance/account-picker.tsx',
+    'src/app/finance/accounts.tsx',
+  ]);
   const fora: string[] = [];
   for (const file of walk(SRC)) {
     if (file.endsWith('.test.ts') || file.endsWith('.test.tsx')) continue;
     const rel = file.replace(SRC, 'src');
     if (PERMITIDO.has(rel)) continue;
     const code = stripComments(readFileSync(file, 'utf8'));
-    // só onde o nome VIRA texto na tela: label/title recebendo `<algo>.name`
-    if (/\b(?:label|title)=\{\s*\w*(?:onta|cc|ccount)\w*\.name\s*\}/.test(code)) {
-      fora.push(rel);
+    // Onde o nome VIRA texto na tela, dentro de um `.map` sobre contas.
+    //
+    // ⚠️ A primeira versão exigia que a variável se chamasse `conta`/`acc`, e
+    // por isso deixou passar TRÊS `<Row title={a.name}>` em debts.tsx — o
+    // apelido de uma letra é o mais comum num `.map`. O gatilho agora é a
+    // COLEÇÃO iterada, não o nome do item.
+    const iteraContas = /\b(?:accounts|contas|pagadoras|cartoes|cartões)\b[^\n]{0,40}\.map\(\s*\(?(\w+)/g;
+    for (const m of code.matchAll(iteraContas)) {
+      const item = m[1];
+      const corpo = code.slice(m.index ?? 0, (m.index ?? 0) + 900);
+      if (new RegExp(`\\b(?:label|title)=\\{\\s*${item}\\.name\\s*\\}`).test(corpo)) {
+        fora.push(rel);
+        break;
+      }
     }
   }
   assert.deepEqual(

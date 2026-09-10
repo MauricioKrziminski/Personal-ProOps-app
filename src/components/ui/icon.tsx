@@ -5,7 +5,7 @@ import { IconSize } from '@/design/tokens';
 import { useTheme } from '@/hooks/use-theme';
 import type { ThemeColor } from '@/constants/theme';
 
-type IconName = SymbolViewProps['name'];
+export type IconName = SymbolViewProps['name'];
 /** Nomes de Material Symbol que o `expo-symbols` aceita no Android/web. */
 type MaterialName = NonNullable<Extract<IconName, object>['android']>;
 

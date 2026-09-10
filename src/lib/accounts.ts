@@ -40,7 +40,19 @@ export const ACCOUNT_TYPES = [
 const semAcento = (s: string) =>
   s.normalize('NFD').replace(/\p{Diacritic}/gu, '').trim().toLowerCase();
 
-/** O rótulo da conta: o nome, mais o tipo quando o nome não o entrega. */
+/** Só a palavra do tipo: "Corrente", "Cartão", "Poupança"... */
+export function accountTypeLabel(account: { type?: string | null } | null | undefined): string {
+  return ACCOUNT_TYPES.find((t) => t.value === account?.type)?.label ?? '';
+}
+
+/**
+ * O rótulo de UMA LINHA: o nome, mais o tipo quando o nome não o entrega.
+ *
+ * Onde o tipo tem um lugar próprio na interface — o `AccountPicker`, que o
+ * escreve embaixo do nome —, use o nome cru mais `accountTypeLabel`. Dizer
+ * "Nubank · Cartão" numa linha que já tem "Cartão" embaixo é o ruído que ensina
+ * a pessoa a não ler o sufixo.
+ */
 export function accountLabel(
   account: { name: string; type?: string | null } | null | undefined
 ): string {

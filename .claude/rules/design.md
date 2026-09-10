@@ -87,6 +87,24 @@ Android e web. **Nunca** usar `GlassView`/`BlurView` direto numa tela.
 
 Card comum é `Card` (`src/components/ui/card.tsx`): opaco, `Elevation`, `Radius.md`.
 
+**Escolher CONTA é `AccountPicker`** (`src/components/finance/account-picker.tsx`), nunca uma
+lista de `Row` com o nome dentro. Eram quatro cópias de `<Row title={a.name} trailing={check}/>`,
+e nelas um cartão de crédito e uma conta corrente têm exatamente a mesma cara — foi assim que um
+salário de R$ 4.000 foi lançado dentro da fatura do cartão em 09/09/2026 ("aparece só nubank e eu
+achei que era a conta corrente nubank e nao cartao nubank").
+
+O seletor separa os dois por **três caminhos ao mesmo tempo**, porque errar aqui não dá erro
+nenhum na tela, só um número errado meses depois: **agrupamento** (seções "Contas" e "Cartões",
+que só aparecem quando existem os dois), **forma** (um glifo por tipo num ladrilho de geometria
+fixa, escaneável sem ler) e **palavra** (o tipo embaixo do nome, e no cartão o dia de fechamento,
+que é o dado que decide em qual fatura a compra cai).
+
+⚠️ **Sem cor de emissor aqui.** A liberação da cor da marca vale DENTRO da forma de um cartão de
+crédito; numa linha de lista ela volta a ser cor de terceiro competindo com o único accent. E o
+nome vem CRU no seletor — `accountLabel` (que emenda "· Cartão") é para onde só cabe uma linha,
+como os chips do lançamento. Repetir o sufixo numa linha que já tem o tipo embaixo ensina a
+pessoa a não ler o sufixo.
+
 ---
 
 ## 2. Tokens — fonte única, sem exceção

@@ -38,6 +38,7 @@ import { formatBRL, formatNumberBR, isoToBR } from '@/lib/dates';
 import { paidInstallments } from '@/lib/debt-history';
 import { debtTerm, financeErrorMessage, simpleDebtValues } from '@/lib/finance-form';
 import { confirmDestructive, showItemActions } from '@/lib/item-actions';
+import { AccountPicker } from '@/components/finance/account-picker';
 
 /**
  * Dívidas — "quanto disso é juro, e por onde eu começo?".
@@ -655,27 +656,12 @@ export default function DebtsScreen() {
               ) : null}
 
               <Field label="Conta que paga" hint="Opcional — o lançamento fica sem conta se você não escolher.">
-                <Section>
-                  <Row
-                    title="Não informar"
-                    chevron={false}
-                    onPress={() => setContaId(null)}
-                    trailing={
-                      contaId === null ? <Icon name="checkmark" size="sm" color="tint" /> : undefined
-                    }
-                  />
-                  {pagadoras.map((a) => (
-                    <Row
-                      key={a.id}
-                      title={a.name}
-                      chevron={false}
-                      onPress={() => setContaId(a.id)}
-                      trailing={
-                        contaId === a.id ? <Icon name="checkmark" size="sm" color="tint" /> : undefined
-                      }
-                    />
-                  ))}
-                </Section>
+                <AccountPicker
+                  accounts={pagadoras}
+                  value={contaId}
+                  onChange={setContaId}
+                  emptyLabel="Não informar"
+                />
               </Field>
 
               <Button
@@ -733,10 +719,9 @@ export default function DebtsScreen() {
                   {!form.id && <Field label="Parcelas já pagas" hint="Deixe zero se nenhuma foi paga. Esse histórico não movimenta dinheiro.">
                     <TextField value={String(form.installmentsPaid)} onChangeText={(value) => setForm({ ...form, installmentsPaid: Number(value.replace(/\D/g, '')), historyConfirmed: true })} keyboardType="number-pad" maxLength={3} />
                   </Field>}
-                  <Field label="Conta para pagar (opcional)"><Section>
-                    <Row title="Não informar" onPress={() => setForm({ ...form, accountId: null })} trailing={form.accountId === null ? <Icon name="checkmark" size="sm" color="tint" /> : undefined} />
-                    {pagadoras.map((a) => <Row key={a.id} title={a.name} onPress={() => setForm({ ...form, accountId: a.id })} trailing={form.accountId === a.id ? <Icon name="checkmark" size="sm" color="tint" /> : undefined} />)}
-                  </Section></Field>
+                  <Field label="Conta para pagar (opcional)">
+                    <AccountPicker accounts={pagadoras} value={form.accountId} onChange={(accountId: string | null) => setForm({ ...form, accountId })} emptyLabel="Não informar" />
+                  </Field>
                 </>}
                 <ThemedText type="caption" themeColor="textSecondary">Cadastrar não desconta dinheiro. Registre as parcelas conforme forem pagas.</ThemedText>
               </> : <>
@@ -885,10 +870,7 @@ export default function DebtsScreen() {
                 de contas) partindo um grupo curto era o "ordem toda bagunçada" de 09/09/2026.
               */}
               <Field label="Conta para pagar">
-                <Section>
-                  <Row title="Não informar" onPress={() => setForm({ ...form, accountId: null })} trailing={form.accountId === null ? <Icon name="checkmark" size="sm" color="tint" /> : undefined} />
-                  {pagadoras.map((a) => <Row key={a.id} title={a.name} onPress={() => setForm({ ...form, accountId: a.id })} trailing={form.accountId === a.id ? <Icon name="checkmark" size="sm" color="tint" /> : undefined} />)}
-                </Section>
+                <AccountPicker accounts={pagadoras} value={form.accountId} onChange={(accountId: string | null) => setForm({ ...form, accountId })} emptyLabel="Não informar" />
               </Field>
               </>}
             </ScrollView>
