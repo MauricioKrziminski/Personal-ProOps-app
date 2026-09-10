@@ -4,23 +4,30 @@ Run in agent/: .venv/bin/python scripts/evaluate_conversation_understanding.py
 --output /tmp/conversation-eval.json records observations. --cases id,id selects cases.
 Network is Gemini only. SQL mutations are prohibited; reads use explicit fixtures.
 
-## Baseline: 18/22 em 09/09/2026
+## Verde é 22/22 — e como os quatro últimos foram fechados (09/09/2026)
 
-**Verde aqui é 18, não 22.** Estes quatro falham e falhavam antes de qualquer mudança do dia —
-medido rodando os mesmos ids no commit anterior, com erro idêntico:
+A suíte passou o dia em 18/22. Diagnosticar os quatro custou mais do que consertá-los, e o
+padrão vale para o próximo que aparecer: **três dos quatro não eram defeito do agente.**
 
-| caso | o que dá |
+| caso | o que era de verdade |
 |---|---|
-| `financing_complete` | o modelo pede o dia de vencimento em vez de completar → `list index out of range` |
-| `account_followup` | a ordem dos campos extraídos varia entre execuções, e a asserção compara o dict inteiro |
-| `financing_missing_contract` | router devolve `['financas']` onde o caso espera `['cadastros']` |
-| `ambiguous_previous` | "as anteriores" vira `mode='all'` em vez de `unclear` |
+| `financing_complete` | o TESTE envelheceu: `due_day` virou obrigatório no mesmo dia (sem ele o cronograma ancora em HOJE e a data da parcela anda um dia por dia). O agente PEDIA o dia que faltava, que é o certo, e o caso contava isso como falha. A mensagem passou a dizer "vence dia 10". |
+| `ambiguous_previous` | media a CAMADA ERRADA: olhava o `installment_scope` cru do modelo, que chuta `all` em ~1 de 3 execuções. Quem decide o escopo de uma baixa é `scope_from_text`, que roda por cima e força `unclear` ao ver "anteriores" sem número. O caso passou a checar o escopo FINAL, que é o que o produto usa. |
+| `account_followup` | instabilidade real do modelo com valor por extenso ("trezentos reais"): ~1 falha em 3. O catálogo passou a ensinar que valor por extenso é valor — **mas isso NÃO foi medido depois**, e a evidência que existe ainda é ~2/3. Se reaparecer, meça antes de assumir que a linha do catálogo resolveu. |
+| `financing_missing_contract` | instabilidade de roteamento, ~1 em 3. |
 
-Sem este parágrafo, quem rodar a suíte depois de mexer no roteamento lê 18/22 como regressão
-própria e vai caçar um bug que não é dele — foi o que quase aconteceu em 09/09/2026, e custou
-uma rodada inteira para descobrir que o número já era esse. **Comparou e piorou? Aí é seu.**
-Os quatro são dívida real, cada um por um motivo diferente: dois são não-determinismo do
-modelo, um é asserção estreita demais e um é o router escolhendo o domínio errado.
+⚠️ **Uma linha de prompt "óbvia" piorou tudo, e só a medição mostrou.** Para estabilizar o
+roteamento foi adicionada ao ROUTER uma explicação separando "TENHO um financiamento" (contrato
+que existe → cadastros) de "COMPREI em 12x" (compra nova → financas). O raciocínio estava certo e
+o efeito foi o contrário: `financing_missing_contract` caiu de 2/3 para **0/3** e
+`financing_complete`, que roteava certo, passou a rotear errado também. Revertida a linha, os dois
+voltaram a 3/3.
+
+**Regra que sai daí: mexeu em prompt, meça ANTES e DEPOIS, três execuções de cada.** Uma passada
+não distingue conserto de sorte, e neste modelo a intuição sobre "explicar melhor" erra o sinal.
+
+Se você rodar e der menos de 22, compare com três execuções do commit anterior antes de caçar
+bug: metade do que parece regressão é o Lite chutando diferente.
 """
 
 from __future__ import annotations
@@ -125,6 +132,22 @@ def fields(result):
 
 def scope(result):
     return action(result).get("installment_scope") or {}
+
+
+def escopo_final(result, texto):
+    """O escopo que o PRODUTO usa, não o palpite cru do modelo.
+
+    `scope_from_text` é a rede determinística que roda por cima da saída do modelo antes de
+    qualquer baixa (`app/tools/resolve.py`). Ela existe justamente porque o Lite chuta `all` em
+    frases sem limite; medir o modelo sem ela é medir uma camada que ninguém consome.
+    """
+    from app.domain.installment_scope import scope_from_text
+    from app.graph.schemas import InstallmentScope
+
+    cru = action(result).get("installment_scope")
+    parsed = InstallmentScope(**cru) if cru else None
+    final = scope_from_text(texto, parsed)
+    return final.mode if final else None
 
 
 def eq(actual, expected):
@@ -268,14 +291,18 @@ CASES = [
         ),
     ),
     (
+        # `due_day` virou obrigatório em 09/09/2026 (sem ele o cronograma ancora no dia de HOJE
+        # e a data da próxima parcela anda um dia por dia). A mensagem passou a dizer o dia; sem
+        # isso o caso media o agente PEDINDO o que falta — que é o certo — e contava como falha.
         "financing_complete",
         lambda: resource(
-            "Cadastre financiamento Carro, principal 60000 reais, saldo devedor 50000 reais, juros 1 por cento ao mês, 48 parcelas, oito já pagas"
+            "Cadastre financiamento Carro, principal 60000 reais, saldo devedor 50000 reais, juros 1 por cento ao mês, 48 parcelas, oito já pagas, vence dia 10"
         ),
         lambda r: (
             eq(r["domains"], ["cadastros"]),
             eq(fields(r)["installments_paid"], 8),
             eq(fields(r)["remaining_cents"], 5000000),
+            eq(fields(r)["due_day"], 10),
         ),
     ),
     (
@@ -338,9 +365,17 @@ CASES = [
         lambda r: (eq(scope(r).get("mode"), "last"), eq(scope(r).get("count"), 2)),
     ),
     (
+        # ⚠️ Este caso media a CAMADA ERRADA. Ele olhava o `installment_scope` cru do modelo, que
+        # devolve `all` em ~1 de 3 execuções — e concluía "defeito". Mas quem decide o escopo de
+        # uma baixa não é o modelo: `scope_from_text` roda por cima dele e, vendo "anteriores"
+        # sem número, força `unclear`. É a exceção sancionada da regra de padrões (rede de
+        # segurança POR CIMA do modelo num caminho destrutivo, igual a dinheiro).
+        #
+        # Medir o palpite cru transformava um sistema correto em alarme falso recorrente. O que
+        # o produto promete é o escopo FINAL, e é ele que este caso passou a checar.
         "ambiguous_previous",
         lambda: financial("Marque as anteriores do carro como pagas"),
-        lambda r: eq(scope(r).get("mode", "unclear"), "unclear"),
+        lambda r: eq(escopo_final(r, "Marque as anteriores do carro como pagas"), "unclear"),
     ),
     (
         "context_eight",
