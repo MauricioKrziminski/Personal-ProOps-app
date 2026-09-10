@@ -22,6 +22,8 @@ import { Row, Section } from '@/components/ui/row';
 import { Screen } from '@/components/ui/screen';
 import { HeroLabel } from '@/components/ui/section-head';
 import { Segmented } from '@/components/ui/segmented';
+import { SelectField } from '@/components/ui/select-field';
+import { Sheet } from '@/components/ui/sheet';
 import { Skeleton, SkeletonRow } from '@/components/ui/skeleton';
 import { Sparkline } from '@/components/ui/sparkline';
 import { useToast } from '@/components/ui/toast';
@@ -31,9 +33,11 @@ import {
   useAffordability,
   useCashFlowForecast,
   useCashHistory,
+  useForecastWithDrafts,
   useMarkPaid,
   useMonthSummary,
   useUpcomingBills,
+  type Draft,
 } from '@/hooks/use-finance';
 import { useDebounced } from '@/hooks/use-debounced';
 import { monthTitle } from '@/components/finance/month-picker';
@@ -98,6 +102,19 @@ export default function ForecastScreen() {
    */
   const [modo, setModo] = useState<'dia' | 'mes'>('dia');
   const [mesAberto, setMesAberto] = useState<string | null>(null);
+  /**
+   * Rascunho de cenário.
+   *
+   * Mora em `useState` de propósito: sair da tela desmonta o componente e o rascunho some, que é
+   * exatamente o que o dono do produto pediu — *"ser meio que um rascunho e se eu voltar, ele
+   * some"*. Nada disso vai para o banco nem para o AsyncStorage.
+   */
+  const [rascunhos, setRascunhos] = useState<Draft[]>([]);
+  const [sheetAberto, setSheetAberto] = useState(false);
+  const [novoTipo, setNovoTipo] = useState<'income' | 'expense'>('income');
+  const [novoValor, setNovoValor] = useState(0);
+  const [novoMes, setNovoMes] = useState<string | null>(null);
+  const [novoParcelas, setNovoParcelas] = useState(1);
 
   // Cada tecla do MoneyField é uma chave nova, e `affordability` roda uma projeção de 370 dias por
   // dentro: sem o atraso, digitar "1250" são quatro projeções de um ano.
@@ -109,7 +126,14 @@ export default function ForecastScreen() {
   const sim = useAffordability(simDebounced, parcelas);
   const markPaid = useMarkPaid();
 
-  const serie = forecast.data ?? [];
+  // ⚠️ A troca acontece AQUI, num lugar só. Tudo que vem depois — o destaque, a curva, o
+  // "fica negativo em", a tabela mês a mês, o mês expandido — lê `serie` e passa a simular
+  // junto, sem nenhum deles saber que existe rascunho.
+  const simulado = useForecastWithDrafts(dias, rascunhos);
+  const simulando = rascunhos.length > 0;
+  // `?? forecast.data` enquanto a simulação carrega: sem isso a tela PISCA vazia a cada
+  // suposição somada, e o destaque salta de um número real para nada e de volta.
+  const serie = (simulando ? (simulado.data ?? forecast.data) : forecast.data) ?? [];
   const projetados = serie.map((d) => Number(d.balance_cents));
   const hoje = projetados[0] ?? 0;
   const fim = projetados[projetados.length - 1] ?? 0;
@@ -290,6 +314,54 @@ export default function ForecastScreen() {
         ]}
       />
 
+      {/*
+        A faixa do rascunho vem ANTES do destaque de propósito: o número grande muda de valor
+        quando há hipótese, e um usuário que role direto para ele precisa ter passado por aqui.
+        Dinheiro simulado que parece dinheiro real é o pior defeito possível nesta tela.
+      */}
+      {simulando ? (
+        <Card style={styles.rascunhoFaixa}>
+          <View style={styles.rascunhoTopo}>
+            <Icon name="pencil.and.outline" size="md" color="warning" />
+            <ThemedText type="smallBold" style={styles.bandText}>
+              Rascunho — nada disso está salvo
+            </ThemedText>
+            <Button
+              label="Limpar"
+              variant="secondary"
+              size="sm"
+              onPress={() => setRascunhos([])}
+            />
+          </View>
+          {rascunhos.map((d, i) => (
+            <View key={`${d.kind}-${d.start}-${d.amount_cents}-${i}`} style={styles.rascunhoLinha}>
+              <ThemedText type="small" themeColor="textSecondary" style={tabular}>
+                {d.kind === 'income' ? 'entra' : 'sai'} {formatBRL(d.amount_cents)}
+                {d.installments > 1 ? ` em ${d.installments}x` : ''} · a partir de{' '}
+                {isoToBR(d.start)}
+              </ThemedText>
+              <Button
+                label="Tirar"
+                variant="ghost"
+                size="sm"
+                onPress={() => setRascunhos((r) => r.filter((_, j) => j !== i))}
+              />
+            </View>
+          ))}
+          {/* Falhou o cálculo? DIZ. Cair calado na projeção real mostraria o número sem a
+              hipótese, com a faixa por cima jurando que está simulando. */}
+          {simulado.isError ? (
+            <ErrorBand
+              message="Não deu para calcular o rascunho — os números abaixo são os reais."
+              onRetry={simulado.refetch}
+            />
+          ) : null}
+          <ThemedText type="caption" themeColor="textSecondary">
+            Move o caixa. Não remonta fatura de cartão, orçamento nem cronograma de dívida.
+          </ThemedText>
+        </Card>
+      ) : null}
+
       {forecast.isLoading ? (
         <>
           <Skeleton height={180} radius={Radius.lg} />
@@ -438,6 +510,18 @@ export default function ForecastScreen() {
             ]}
             value={modo}
             onChange={(v) => setModo(v)}
+          />
+          <Button
+            label={simulando ? 'Somar outra suposição' : 'Simular um cenário'}
+            variant="secondary"
+            size="sm"
+            onPress={() => {
+              setNovoTipo('income');
+              setNovoValor(0);
+              setNovoMes(meses[0]?.mes ?? null);
+              setNovoParcelas(1);
+              setSheetAberto(true);
+            }}
           />
         </View>
       ) : null}
@@ -593,6 +677,94 @@ export default function ForecastScreen() {
           </Card>
         ) : null}
       </View>
+      {/*
+        A suposição. `formSheet` porque é tarefa curta com Cancelar/Somar próprios (design.md §8),
+        e nada aqui escreve no banco — o "Somar" só empilha no estado local.
+      */}
+      <Sheet visible={sheetAberto} onClose={() => setSheetAberto(false)}>
+        <View style={styles.sheetCabecalho}>
+          <Pressable accessibilityRole="button" hitSlop={12} onPress={() => setSheetAberto(false)}>
+            <ThemedText type="default" themeColor="tint">
+              Cancelar
+            </ThemedText>
+          </Pressable>
+          <ThemedText type="smallBold">Supor um lançamento</ThemedText>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityState={{ disabled: novoValor <= 0 || novoMes === null }}
+            disabled={novoValor <= 0 || novoMes === null}
+            hitSlop={12}
+            onPress={() => {
+              if (novoValor <= 0 || novoMes === null) return;
+              // Dia 1 do mês escolhido — a granularidade da pergunta é o MÊS ("quanto eu fico
+              // em novembro"), e fingir precisão de dia num número inventado é falsa exatidão.
+              //
+              // ⚠️ Mas nunca ANTES de hoje: a projeção começa hoje, e uma hipótese datada no
+              // passado entra no saldo (o delta vale para todo dia >= início) sem ter um dia na
+              // janela para aparecer em "entra/sai" — o destaque subia e a linha de fluxo
+              // continuava zerada, que foi o que apareceu na verificação de 10/09/2026.
+              const primeiroDia = `${novoMes}-01`;
+              const inicio = primeiroDia < localISODate() ? localISODate() : primeiroDia;
+              setRascunhos((r) => [
+                ...r,
+                {
+                  kind: novoTipo,
+                  amount_cents: novoValor,
+                  start: inicio,
+                  installments: novoParcelas,
+                },
+              ]);
+              setSheetAberto(false);
+              setModo('mes');
+            }}>
+            <ThemedText
+              type="smallBold"
+              themeColor={novoValor <= 0 || novoMes === null ? 'textSecondary' : 'tint'}>
+              Somar
+            </ThemedText>
+          </Pressable>
+        </View>
+
+        <View style={styles.sheetCorpo}>
+          <Field label="É entrada ou saída?">
+            <Segmented
+              options={[
+                { value: 'income', label: 'Entra' },
+                { value: 'expense', label: 'Sai' },
+              ]}
+              value={novoTipo}
+              onChange={(v) => setNovoTipo(v)}
+            />
+          </Field>
+
+          <Field label="Valor">
+            <MoneyField valueCents={novoValor} onChangeCents={setNovoValor} autoFocus />
+          </Field>
+
+          <Field label="A partir de qual mês">
+            <SelectField
+              options={meses.map((m) => ({ id: m.mes, label: monthTitle(m.mes) }))}
+              value={novoMes}
+              onChange={setNovoMes}
+              placeholder="Escolher o mês"
+            />
+          </Field>
+
+          <Field label="Em quantas vezes">
+            <Segmented
+              options={PARCELAS.map((n) => ({ value: String(n), label: `${n}x` }))}
+              value={String(novoParcelas)}
+              onChange={(v) => setNovoParcelas(Number(v))}
+            />
+          </Field>
+
+          <ThemedText type="caption" themeColor="textSecondary">
+            Some ao seu fluxo real — saldo de hoje, faturas, parcelas, financiamentos e
+            recorrentes — e recalcula os meses daqui para frente. Sair da tela apaga.
+          </ThemedText>
+        </View>
+      </Sheet>
+
     </Screen>
   );
 }
@@ -618,6 +790,32 @@ const styles = StyleSheet.create({
   },
   modo: {
     marginTop: Space.xs,
+    gap: Space.sm,
+  },
+  rascunhoFaixa: {
+    gap: Space.sm,
+  },
+  rascunhoTopo: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Space.sm,
+  },
+  rascunhoLinha: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: Space.sm,
+  },
+  sheetCorpo: {
+    gap: Space.md,
+    padding: Space.lg,
+  },
+  sheetCabecalho: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    padding: Space.lg,
+    borderBottomWidth: StyleSheet.hairlineWidth,
   },
   corte: {
     paddingHorizontal: Space.md,

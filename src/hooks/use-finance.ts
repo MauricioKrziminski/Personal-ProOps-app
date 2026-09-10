@@ -602,6 +602,47 @@ export function useCashFlowForecast(days = 90) {
   });
 }
 
+/**
+ * Uma hipótese de rascunho: "e se entrar 1.500 em novembro?", "e se eu comprar 3.000 em 6x?".
+ *
+ * `start` é a data da PRIMEIRA parcela; as seguintes caem de mês em mês. O resto da divisão
+ * inteira vai na última, igual a `create_installment_plan` — senão 100 em 3x soma 99.
+ */
+export type Draft = {
+  kind: 'income' | 'expense';
+  amount_cents: number;
+  /** ISO `YYYY-MM-DD` */
+  start: string;
+  installments: number;
+};
+
+/**
+ * A projeção com hipóteses aplicadas — o Rascunho.
+ *
+ * ⚠️ **A conta mora no BANCO** (`private.draft_effect`), no MESMO motor que o "Posso comprar
+ * isso?" usa desde `20260910170000`. Somar aqui seria a segunda cópia de uma aritmética de
+ * dinheiro, e as duas telas passariam a poder discordar.
+ *
+ * Com a lista vazia o hook desliga: quem não está simulando não paga uma RPC a mais, e a tela
+ * cai na projeção real (`useCashFlowForecast`).
+ */
+export function useForecastWithDrafts(days: number, drafts: Draft[]) {
+  useRealtimeInvalidate('transactions', ['forecast-drafts']);
+  return useQuery({
+    enabled: drafts.length > 0,
+    // O rascunho é efêmero de propósito: sai da tela, some. `gcTime: 0` impede que ele
+    // ressuscite do cache quando o usuário voltar — que é justamente o que ele pediu que NÃO
+    // acontecesse ("se eu voltar, ele some").
+    gcTime: 0,
+    queryKey: ['forecast-drafts', String(days), JSON.stringify(drafts)],
+    queryFn: async (): Promise<ForecastDay[]> => {
+      const { data, error } = await supabase.rpc('forecast_with_drafts', { days, drafts });
+      if (error) throw error;
+      return data;
+    },
+  });
+}
+
 /** Faturas e lançamentos previstos que vencem no período (atrasados incluídos). */
 export function useUpcomingBills(days = 30) {
   useRealtimeInvalidate('transactions', ['upcoming-bills']);

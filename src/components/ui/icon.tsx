@@ -148,6 +148,9 @@ const MATERIAL: Record<string, MaterialName> = {
   'square.and.arrow.down': 'download',
   'square.and.arrow.up': 'share',
   'square.and.pencil': 'edit_square',
+  // o rascunho de cenário da Projeção: papel com dobra, não lápis — o que ele comunica é
+  // "isto ainda não é um documento", não "editar"
+  'pencil.and.outline': 'draft',
   storefront: 'storefront',
   'sun.max': 'light_mode',
   'sun.max.fill': 'light_mode',

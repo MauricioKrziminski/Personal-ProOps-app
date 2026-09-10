@@ -2208,6 +2208,15 @@ export type Database = {
       }
       _close_due_invoices: { Args: never; Returns: number }
       _default_workspace: { Args: { uid: string }; Returns: string }
+      _forecast_with_drafts: {
+        Args: { days: number; drafts: Json; uid: string }
+        Returns: {
+          balance_cents: number
+          day: string
+          in_cents: number
+          out_cents: number
+        }[]
+      }
       _match_rule: {
         Args: { texto: string; ws_id: string }
         Returns: {
@@ -2541,6 +2550,15 @@ export type Database = {
           months_of_reserve: number
           savings_rate: number
           score: number
+        }[]
+      }
+      forecast_with_drafts: {
+        Args: { days: number; drafts: Json }
+        Returns: {
+          balance_cents: number
+          day: string
+          in_cents: number
+          out_cents: number
         }[]
       }
       goal_deposit: {

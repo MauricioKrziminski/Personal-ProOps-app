@@ -100,6 +100,24 @@
 
 ## Projeção de fluxo de caixa
 
+- **Rascunho de cenário: um motor, duas portas** (`20260910170000`). `private.draft_effect(drafts,
+  dia)` é a ÚNICA aritmética de hipótese do sistema — receita soma, gasto subtrai, parcela cai de
+  mês em mês e o resto da divisão vai na última. Dela saem `forecast_with_drafts` (o Rascunho da
+  Projeção) e `affordability` ("Posso comprar isso?", que virou uma casca de UMA hipótese de
+  gasto). Antes, `affordability` tinha a conta dentro de si e por isso **só sabia gasto**.
+  `supabase/tests/draft_scenario.sql` prova que ele devolve o mesmo de antes — trocar o motor de
+  uma feature que funciona sem provar equivalência é como ela quebra em silêncio.
+
+  ⚠️ **O rascunho move o CAIXA, e só.** Não remonta fatura (`set_invoice`), orçamento
+  (`_budgets_status`) nem cronograma de dívida (`debt_schedule_for`) — reproduzir essas regras no
+  cliente ou numa segunda função seria a cópia que diverge. A tela diz isso ao usuário.
+
+  ⚠️ **Ele vive em `useState` da Projeção e em lugar nenhum mais** — nem banco, nem
+  AsyncStorage, e `gcTime: 0` no hook para não ressuscitar do cache. Sair da tela apaga, que é o
+  contrato com o usuário. A hipótese nunca começa ANTES de hoje (a projeção começa hoje, e uma
+  data passada entrava no saldo sem ter dia na janela para aparecer em "entra/sai").
+
+
 - **Receita atrasada sai da projeção depois de 3 dias; despesa atrasada NÃO** (`20260909200000`).
   `greatest(coalesce(due_at, occurred_at), current_date)` empurra todo previsto vencido para hoje.
   Para despesa está certo: você atrasou, mas ainda deve. Para receita era o anti-padrão que a
