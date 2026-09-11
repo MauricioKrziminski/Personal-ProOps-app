@@ -5,7 +5,7 @@ import { Stack } from 'expo-router';
 
 import { ThemedText } from '@/components/themed-text';
 import { HeaderActions } from '@/components/ui/header-actions';
-import { Sheet } from '@/components/ui/sheet';
+import { Sheet, SheetHeader } from '@/components/ui/sheet';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { EmptyState } from '@/components/ui/empty-state';
@@ -379,13 +379,10 @@ export default function GoalsScreen() {
 
       {/* Aportar — detent pequeno: um valor, uma nota, dois botões de intenção. */}
       <Sheet visible={aporte !== null} onClose={() => setAporte(null)}>
-          <View style={styles.sheetHead}>
-            <Button label="Cancelar" variant="ghost" size="sm" onPress={() => setAporte(null)} />
-            <ThemedText type="smallBold">
-              {aporte?.name}
-            </ThemedText>
-            <View style={styles.sheetHeadSpacer} />
-          </View>
+          <SheetHeader
+            title={aporte?.name ?? 'Meta'}
+            onClose={() => setAporte(null)}
+          />
 
           {aporte ? (
             <ScrollView contentContainerStyle={styles.sheetBody} keyboardShouldPersistTaps="handled">
@@ -430,13 +427,10 @@ export default function GoalsScreen() {
 
       {/* Extrato — sheet próprio, lista completa (não o acordeão truncado em 8 linhas). */}
       <Sheet visible={extrato !== null} onClose={() => setExtrato(null)}>
-          <View style={styles.sheetHead}>
-            <Button label="Fechar" variant="ghost" size="sm" onPress={() => setExtrato(null)} />
-            <ThemedText type="smallBold">
-              Extrato de {extrato?.name}
-            </ThemedText>
-            <View style={styles.sheetHeadSpacer} />
-          </View>
+          <SheetHeader
+            title="Extrato de {extrato?.name}"
+            onClose={() => setExtrato(null)}
+          />
 
           <ScrollView contentContainerStyle={styles.sheetBody}>
             {contribuicoes.isLoading ? (
@@ -504,17 +498,19 @@ export default function GoalsScreen() {
 
       {/* Criar / editar */}
       <Sheet visible={form !== null} onClose={() => setForm(null)}>
-          <View style={styles.sheetHead}>
-            <Button label="Cancelar" variant="ghost" size="sm" onPress={() => setForm(null)} />
-            <ThemedText type="smallBold">{form?.id ? 'Editar meta' : 'Nova meta'}</ThemedText>
-            <Button
-              label="Salvar"
-              size="sm"
-              loading={save.isPending}
-              disabled={!podeSalvar}
-              onPress={salvar}
-            />
-          </View>
+          <SheetHeader
+            title={form?.id ? 'Editar meta' : 'Nova meta'}
+            onClose={() => setForm(null)}
+            action={
+              <Button
+                label="Salvar"
+                size="sm"
+                loading={save.isPending}
+                disabled={!podeSalvar}
+                onPress={salvar}
+              />
+            }
+          />
 
           {form ? (
             <ScrollView contentContainerStyle={styles.sheetBody} keyboardShouldPersistTaps="handled">
@@ -588,16 +584,6 @@ const styles = StyleSheet.create({
   },
   bandText: {
     textAlign: 'center',
-  },
-  sheetHead: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: Space.lg,
-    paddingVertical: Space.md,
-  },
-  sheetHeadSpacer: {
-    width: Space.xxl,
   },
   sheetBody: {
     gap: Space.xl,

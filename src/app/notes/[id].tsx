@@ -14,7 +14,7 @@ import type { SymbolViewProps } from 'expo-symbols';
 
 import { ThemedText } from '@/components/themed-text';
 import { Button } from '@/components/ui/button';
-import { Sheet } from '@/components/ui/sheet';
+import { Sheet, SheetHeader } from '@/components/ui/sheet';
 import { Card } from '@/components/ui/card';
 import { EmptyState } from '@/components/ui/empty-state';
 import { HeaderActions, type HeaderAction } from '@/components/ui/header-actions';
@@ -720,14 +720,7 @@ function TagPicker({
 
   return (
     <Sheet visible={visible} onClose={onClose}>
-        <View style={styles.sheetHeader}>
-          <ThemedText type="smallBold">Tags da nota</ThemedText>
-          <Pressable accessibilityRole="button" accessibilityLabel="Fechar" hitSlop={12} onPress={onClose}>
-            <ThemedText type="smallBold" themeColor="tint">
-              Fechar
-            </ThemedText>
-          </Pressable>
-        </View>
+        <SheetHeader title="Tags da nota" onClose={onClose} />
 
         <ScrollView
           contentContainerStyle={styles.sheetBody}
@@ -837,14 +830,7 @@ function FolderPicker({
 
   return (
     <Sheet visible={visible} onClose={onClose}>
-        <View style={styles.sheetHeader}>
-          <ThemedText type="smallBold">Mover para</ThemedText>
-          <Pressable accessibilityRole="button" accessibilityLabel="Fechar" hitSlop={12} onPress={onClose}>
-            <ThemedText type="smallBold" themeColor="tint">
-              Fechar
-            </ThemedText>
-          </Pressable>
-        </View>
+        <SheetHeader title="Mover para" onClose={onClose} />
 
         <ScrollView
           contentContainerStyle={styles.sheetBody}
@@ -1022,12 +1008,6 @@ const styles = StyleSheet.create({
     paddingVertical: Space.xs,
     borderRadius: Radius.pill,
     borderCurve: 'continuous',
-  },
-  sheetHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    padding: Space.lg,
   },
   sheetBody: {
     gap: Space.lg,

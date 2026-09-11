@@ -8,7 +8,7 @@ import { useMutation, useQuery } from '@tanstack/react-query';
 import { CategoryPicker } from '@/components/finance/category-picker';
 import { ThemedText } from '@/components/themed-text';
 import { HeaderActions } from '@/components/ui/header-actions';
-import { Sheet } from '@/components/ui/sheet';
+import { Sheet, SheetHeader } from '@/components/ui/sheet';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { EmptyState } from '@/components/ui/empty-state';
@@ -600,19 +600,21 @@ export default function RecurringScreen() {
 
       <Sheet visible={form !== null} onClose={() => setForm(null)}>
 
-          <View style={styles.sheetHead}>
-            <Button label="Cancelar" variant="ghost" size="sm" onPress={() => setForm(null)} />
-            <ThemedText type="smallBold">{form?.id ? 'Editar recorrência' : 'Nova recorrência'}</ThemedText>
-            <Button
-              label={form?.id ? 'Salvar' : 'Criar'}
-              size="sm"
-              loading={create.isPending || editar.isPending}
-              // Editando, a validação de calendário não se aplica: frequência e âncora
-              // não estão na tela. O que precisa valer é valor > 0 e o fim opcional.
-              disabled={form?.id ? !(form.amountCents > 0 && fimOk) : !podeSalvar}
-              onPress={salvar}
-            />
-          </View>
+          <SheetHeader
+            title={form?.id ? 'Editar recorrência' : 'Nova recorrência'}
+            onClose={() => setForm(null)}
+            action={
+              <Button
+                label={form?.id ? 'Salvar' : 'Criar'}
+                size="sm"
+                loading={create.isPending || editar.isPending}
+                // Editando, a validação de calendário não se aplica: frequência e âncora
+                // não estão na tela. O que precisa valer é valor > 0 e o fim opcional.
+                disabled={form?.id ? !(form.amountCents > 0 && fimOk) : !podeSalvar}
+                onPress={salvar}
+              />
+            }
+          />
 
           {form ? (
             <ScrollView contentContainerStyle={styles.sheetBody} keyboardShouldPersistTaps="handled">
@@ -846,13 +848,6 @@ const styles = StyleSheet.create({
   },
   bandText: {
     textAlign: 'center',
-  },
-  sheetHead: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: Space.lg,
-    paddingVertical: Space.md,
   },
   sheetBody: {
     gap: Space.xl,

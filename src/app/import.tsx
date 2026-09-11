@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { ScrollView, StyleSheet, View } from 'react-native';
 import { Stack, router, useLocalSearchParams } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Animated, { FadeInDown, LinearTransition } from 'react-native-reanimated';
@@ -12,7 +12,7 @@ import { AgentApiError } from '@/lib/agent-api';
 import { ErrorCard } from '@/components/error-card';
 import { Chip } from '@/components/finance/chip';
 import { Card } from '@/components/ui/card';
-import { Sheet } from '@/components/ui/sheet';
+import { Sheet, SheetHeader } from '@/components/ui/sheet';
 import { ThemedText } from '@/components/themed-text';
 import { HeaderMenu } from '@/components/ui/header-actions';
 import { Button } from '@/components/ui/button';
@@ -495,17 +495,10 @@ export default function ImportScreen() {
 
       {/* Trocar categoria: sheet, não accordion que empurra a lista. */}
       <Sheet visible={editando !== null} onClose={() => setEditando(null)}>
-          <View style={[styles.sheetHeader, { borderBottomColor: theme.separator }]}>
-            <Pressable accessibilityRole="button" hitSlop={12} onPress={() => setEditando(null)}>
-              <ThemedText type="default" themeColor="tint">
-                Cancelar
-              </ThemedText>
-            </Pressable>
-            <ThemedText type="smallBold" style={styles.sheetTitulo}>
-              {editando?.description ?? 'Categoria'}
-            </ThemedText>
-            <View style={styles.sheetEspaco} />
-          </View>
+          <SheetHeader
+            title={editando?.description ?? 'Categoria'}
+            onClose={() => setEditando(null)}
+          />
 
           <ScrollView
             contentContainerStyle={[styles.sheetBody, { paddingBottom: insets.bottom + Space.xxl }]}
@@ -566,22 +559,6 @@ const styles = StyleSheet.create({
   },
   sheet: {
     flex: 1,
-  },
-  sheetHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    gap: Space.md,
-    paddingHorizontal: Space.lg,
-    paddingVertical: Space.lg,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-  },
-  sheetTitulo: {
-    flex: 1,
-    textAlign: 'center',
-  },
-  sheetEspaco: {
-    width: 60,
   },
   sheetBody: {
     gap: Space.xl,

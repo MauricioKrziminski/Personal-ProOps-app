@@ -7,7 +7,7 @@ import { Chip } from '@/components/finance/chip';
 import { SelectField } from '@/components/ui/select-field';
 import { ThemedText } from '@/components/themed-text';
 import { HeaderActions } from '@/components/ui/header-actions';
-import { Sheet } from '@/components/ui/sheet';
+import { Sheet, SheetHeader } from '@/components/ui/sheet';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { EmptyState } from '@/components/ui/empty-state';
@@ -435,13 +435,10 @@ export default function DebtsScreen() {
 
       {/* Amortização — sheet, não acordeão: um financiamento em 60x tem 60 linhas. */}
       <Sheet visible={detalhe !== null} onClose={() => setDetalhe(null)}>
-          <View style={styles.sheetHead}>
-            <Button label="Fechar" variant="ghost" size="sm" onPress={() => setDetalhe(null)} />
-            <ThemedText type="smallBold">
-              {detalhe?.name}
-            </ThemedText>
-            <View style={styles.sheetHeadSpacer} />
-          </View>
+          <SheetHeader
+            title={detalhe?.name ?? 'Dívida'}
+            onClose={() => setDetalhe(null)}
+          />
 
           <ScrollView contentContainerStyle={styles.sheetBody}>
             {schedule.isLoading ? (
@@ -598,13 +595,10 @@ export default function DebtsScreen() {
 
       {/* Pagar parcela — sheet com a conta explicada ANTES de confirmar. */}
       <Sheet visible={pagando !== null} onClose={() => setPagando(null)}>
-          <View style={styles.sheetHead}>
-            <Button label="Cancelar" variant="ghost" size="sm" onPress={() => setPagando(null)} />
-            <ThemedText type="smallBold">
-              Pagar {pagando?.name}
-            </ThemedText>
-            <View style={styles.sheetHeadSpacer} />
-          </View>
+          <SheetHeader
+            title="Pagar {pagando?.name}"
+            onClose={() => setPagando(null)}
+          />
 
           {pagando ? (
             <ScrollView contentContainerStyle={styles.sheetBody} keyboardShouldPersistTaps="handled">
@@ -678,17 +672,19 @@ export default function DebtsScreen() {
 
       {/* Criar / editar */}
       <Sheet visible={form !== null} onClose={() => setForm(null)}>
-          <View style={styles.sheetHead}>
-            <Button label="Cancelar" variant="ghost" size="sm" onPress={() => setForm(null)} />
-            <ThemedText type="smallBold">{form?.id ? 'Editar dívida' : 'Nova dívida'}</ThemedText>
-            <Button
-              label="Salvar"
-              size="sm"
-              loading={save.isPending}
-              disabled={!podeSalvar}
-              onPress={salvar}
-            />
-          </View>
+          <SheetHeader
+            title={form?.id ? 'Editar dívida' : 'Nova dívida'}
+            onClose={() => setForm(null)}
+            action={
+              <Button
+                label="Salvar"
+                size="sm"
+                loading={save.isPending}
+                disabled={!podeSalvar}
+                onPress={salvar}
+              />
+            }
+          />
 
           {form ? (
             <ScrollView contentContainerStyle={styles.sheetBody} keyboardShouldPersistTaps="handled">
@@ -950,16 +946,6 @@ const styles = StyleSheet.create({
   },
   celulaEstreita: {
     minWidth: 32,
-  },
-  sheetHead: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: Space.lg,
-    paddingVertical: Space.md,
-  },
-  sheetHeadSpacer: {
-    width: Space.xxl,
   },
   sheetBody: {
     gap: Space.xl,

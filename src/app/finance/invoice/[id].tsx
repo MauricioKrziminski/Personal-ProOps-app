@@ -6,7 +6,7 @@ import { Stack, router, useLocalSearchParams } from 'expo-router';
 
 import { ThemedText } from '@/components/themed-text';
 import { Button } from '@/components/ui/button';
-import { Sheet } from '@/components/ui/sheet';
+import { Sheet, SheetHeader } from '@/components/ui/sheet';
 import { Card } from '@/components/ui/card';
 import { EmptyState } from '@/components/ui/empty-state';
 import { ItemLink } from '@/components/ui/item-link';
@@ -544,11 +544,10 @@ export default function InvoiceScreen() {
 
       <Sheet visible={pagando} onClose={() => setPagando(false)}>
 
-          <View style={styles.sheetHead}>
-            <Button label="Cancelar" variant="ghost" size="sm" onPress={() => setPagando(false)} />
-            <ThemedText type="smallBold">Pagar fatura</ThemedText>
-            <View style={styles.sheetSpacer} />
-          </View>
+          <SheetHeader
+            title="Pagar fatura"
+            onClose={() => setPagando(false)}
+          />
 
           <ScrollView contentContainerStyle={styles.sheetBody} keyboardShouldPersistTaps="handled">
             <Field
@@ -677,16 +676,6 @@ const styles = StyleSheet.create({
   ancora: {
     paddingHorizontal: Space.lg,
     paddingTop: Space.md,
-  },
-  sheetHead: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: Space.lg,
-    paddingVertical: Space.md,
-  },
-  sheetSpacer: {
-    width: Space.xxxl,
   },
   sheetBody: {
     gap: Space.xl,

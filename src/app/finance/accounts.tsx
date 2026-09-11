@@ -6,7 +6,7 @@ import type { SymbolViewProps } from 'expo-symbols';
 
 import { ThemedText } from '@/components/themed-text';
 import { HeaderActions } from '@/components/ui/header-actions';
-import { Sheet } from '@/components/ui/sheet';
+import { Sheet, SheetHeader } from '@/components/ui/sheet';
 import { ItemLink } from '@/components/ui/item-link';
 import { Button } from '@/components/ui/button';
 import { AccountPicker } from '@/components/finance/account-picker';
@@ -478,17 +478,19 @@ export default function AccountsScreen() {
 
       <Sheet visible={form !== null} onClose={() => setForm(null)}>
 
-          <View style={styles.sheetHead}>
-            <Button label="Cancelar" variant="ghost" size="sm" onPress={() => setForm(null)} />
-            <ThemedText type="smallBold">{form?.id ? 'Editar conta' : 'Nova conta'}</ThemedText>
-            <Button
-              label="Salvar"
-              size="sm"
-              loading={save.isPending}
-              disabled={!nomeOk || !cicloOk || !taxaOk}
-              onPress={salvar}
-            />
-          </View>
+          <SheetHeader
+            title={form?.id ? 'Editar conta' : 'Nova conta'}
+            onClose={() => setForm(null)}
+            action={
+              <Button
+                label="Salvar"
+                size="sm"
+                loading={save.isPending}
+                disabled={!nomeOk || !cicloOk || !taxaOk}
+                onPress={salvar}
+              />
+            }
+          />
 
           {form ? (
             <ScrollView contentContainerStyle={styles.sheetBody} keyboardShouldPersistTaps="handled">
@@ -702,13 +704,6 @@ const styles = StyleSheet.create({
   },
   bandText: {
     textAlign: 'center',
-  },
-  sheetHead: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: Space.lg,
-    paddingVertical: Space.md,
   },
   sheetBody: {
     gap: Space.xl,

@@ -17,7 +17,7 @@ import { useToast } from '@/components/ui/toast';
 import { GradientSurface } from '@/components/ui/gradient';
 import { Button } from '@/components/ui/button';
 import { Field, TextField } from '@/components/ui/field';
-import { Sheet } from '@/components/ui/sheet';
+import { Sheet, SheetHeader } from '@/components/ui/sheet';
 import { Motion, Radius, Space, tabular } from '@/design/tokens';
 import { currentMonth } from '@/components/finance/month-picker';
 import { CycleDayPicker } from '@/components/finance/cycle-day-picker';
@@ -482,27 +482,29 @@ export default function ProfileScreen() {
         rota modal nova para uma linha de texto.
       */}
       <Sheet visible={nameDraft !== null} onClose={() => setNameDraft(null)}>
-        <View style={styles.sheetHead}>
-          <Button label="Cancelar" variant="ghost" size="sm" onPress={() => setNameDraft(null)} />
-          <ThemedText type="smallBold">Seu nome</ThemedText>
-          <Button
-            label="Salvar"
-            size="sm"
-            loading={saveName.isPending}
-            onPress={() =>
-              saveName.mutate(
-                { display_name: (nameDraft ?? '').trim() || null },
-                {
-                  onSuccess: () => {
-                    setNameDraft(null);
-                    toast({ message: 'Nome salvo.', tone: 'success' });
-                  },
-                  onError: () => toast({ message: 'Não deu para salvar.', tone: 'error' }),
-                }
-              )
-            }
-          />
-        </View>
+        <SheetHeader
+          title="Seu nome"
+          onClose={() => setNameDraft(null)}
+          action={
+            <Button
+              label="Salvar"
+              size="sm"
+              loading={saveName.isPending}
+              onPress={() =>
+                saveName.mutate(
+                  { display_name: (nameDraft ?? '').trim() || null },
+                  {
+                    onSuccess: () => {
+                      setNameDraft(null);
+                      toast({ message: 'Nome salvo.', tone: 'success' });
+                    },
+                    onError: () => toast({ message: 'Não deu para salvar.', tone: 'error' }),
+                  }
+                )
+              }
+            />
+          }
+        />
         <ScrollView contentContainerStyle={styles.sheetBody} keyboardShouldPersistTaps="handled">
           <Field label="Nome" hint="É como o app vai te cumprimentar na Hoje.">
             <TextField
@@ -694,13 +696,6 @@ const styles = StyleSheet.create({
     borderRadius: Radius.pill,
   },
   planoAcoes: { flexDirection: 'row', alignItems: 'center', gap: Space.sm },
-  sheetHead: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: Space.lg,
-    paddingVertical: Space.md,
-  },
   sheetBody: {
     gap: Space.xl,
     padding: Space.lg,

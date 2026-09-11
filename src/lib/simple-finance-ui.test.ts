@@ -85,6 +85,9 @@ function screen(file: string, options: { debts?: any[]; invoiceStatus?: string; 
     nodes.push(node);
     visit(node.props.children);
     visit(node.props.ListHeaderComponent);
+    // O "Salvar" do sheet mora no slot `action` do `SheetHeader`, não em `children` — sem esta
+    // linha o botão existe na tela e some daqui, que foi o que estas seis asserções viram.
+    visit(node.props.action);
   };
   const render = () => { cursor = 0; nodes = []; visit(Component()); };
   render();

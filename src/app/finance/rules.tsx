@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { ScrollView, StyleSheet, View } from 'react-native';
 import { Stack } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Animated, { FadeInDown, LinearTransition } from 'react-native-reanimated';
@@ -8,7 +8,8 @@ import * as Haptics from 'expo-haptics';
 import { ErrorCard } from '@/components/error-card';
 import { CategoryPicker } from '@/components/finance/category-picker';
 import { Card } from '@/components/ui/card';
-import { Sheet } from '@/components/ui/sheet';
+import { Button } from '@/components/ui/button';
+import { Sheet, SheetHeader } from '@/components/ui/sheet';
 import { ThemedText } from '@/components/themed-text';
 import { HeaderActions } from '@/components/ui/header-actions';
 import { EmptyState } from '@/components/ui/empty-state';
@@ -27,7 +28,6 @@ import {
   useSaveRule,
   type CategorizationRule,
 } from '@/hooks/use-finance';
-import { useTheme } from '@/hooks/use-theme';
 import { AccountPicker } from '@/components/finance/account-picker';
 
 /** Postgres: violação de unique. Aqui só pode ser `(workspace_id, match_type, pattern)` da `0017`. */
@@ -57,7 +57,6 @@ const VAZIO: Rascunho = { pattern: '', category: null, accountId: null };
  * regra com zero acerto é lixo, e o usuário precisa ver isso para limpar.
  */
 export default function RulesScreen() {
-  const theme = useTheme();
   const toast = useToast();
   const insets = useSafeAreaInsets();
   const { data: rules, isLoading, isError, refetch, isRefetching } = useRules();
@@ -251,28 +250,19 @@ export default function RulesScreen() {
       {/* Form sheet: o formulário deixa de empurrar a lista para baixo quando abre. */}
       <Sheet visible={rascunho !== null} onClose={fechar}>
 
-          <View style={[styles.sheetHeader, { borderBottomColor: theme.separator }]}>
-            <Pressable accessibilityRole="button" hitSlop={12} onPress={fechar}>
-              <ThemedText type="default" themeColor="tint">
-                Cancelar
-              </ThemedText>
-            </Pressable>
-            <ThemedText type="smallBold">{rascunho?.id ? 'Editar regra' : 'Nova regra'}</ThemedText>
-            <Pressable
-              accessibilityRole="button"
-              accessibilityState={{ disabled: !podeSalvar || save.isPending }}
-              disabled={!podeSalvar || save.isPending}
-              hitSlop={12}
-              onPress={salvar}
-            >
-              <ThemedText
-                type="smallBold"
-                themeColor={podeSalvar && !save.isPending ? 'tint' : 'textSecondary'}
-              >
-                {save.isPending ? 'Salvando…' : 'Salvar'}
-              </ThemedText>
-            </Pressable>
-          </View>
+          <SheetHeader
+            title={rascunho?.id ? 'Editar regra' : 'Nova regra'}
+            onClose={fechar}
+            action={
+              <Button
+                label="Salvar"
+                size="sm"
+                loading={save.isPending}
+                disabled={!podeSalvar}
+                onPress={salvar}
+              />
+            }
+          />
 
           <ScrollView
             contentContainerStyle={[styles.sheetBody, { paddingBottom: insets.bottom + Space.xxl }]}
@@ -336,15 +326,6 @@ const styles = StyleSheet.create({
   },
   sheet: {
     flex: 1,
-  },
-  sheetHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    gap: Space.md,
-    paddingHorizontal: Space.lg,
-    paddingVertical: Space.lg,
-    borderBottomWidth: StyleSheet.hairlineWidth,
   },
   sheetBody: {
     gap: Space.xl,
