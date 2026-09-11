@@ -21,6 +21,7 @@ from app.domain import matching
 from app.domain.reference import clean_term, wants_latest, wants_whole_plan
 from app.tools import finance
 from app.tools.base import FATURA_ABERTA
+from app.tools.guards import Level1Error
 from app.graph.schemas import (
     FinanceAction,
     FinanceActionType,
@@ -679,3 +680,57 @@ async def for_actions(
                     )
         saida.append(resolved)
     return saida
+
+
+# ---------------------------------------------------------------------------
+# conta citada que não existe: pergunta ANTES da confirmação
+# ---------------------------------------------------------------------------
+
+# (campo, só cartões, como a pergunta chama esse papel)
+_CONTAS_CITADAS: dict[Any, tuple[tuple[str, bool, str], ...]] = {
+    FinanceActionType.CREATE_EXPENSE: (("account", False, "a conta"),),
+    FinanceActionType.CREATE_INCOME: (("account", False, "a conta"),),
+    FinanceActionType.CREATE_TRANSFER: (
+        ("account", False, "a conta de onde saiu"),
+        ("counterparty_account", False, "a conta de destino"),
+    ),
+    FinanceActionType.CREATE_INSTALLMENT_PURCHASE: (("account", True, "o cartão"),),
+    FinanceActionType.PAY_INVOICE: (("counterparty_account", False, "a conta que pagou"),),
+}
+
+
+async def contas_citadas(workspace_id, acoes: list, alvos: list[dict]) -> list[dict]:
+    """Marca `correction_error` onde o usuário citou uma conta que não bate.
+
+    ⚠️ **Isto roda na fase de RESOLUÇÃO, e não dentro da tool, porque a
+    confirmação é montada antes da tool rodar.** A checagem existia só em
+    `conta_citada` (dentro da tool) e o efeito era este, medido em 11/09/2026:
+
+        "comprei uma tv em 10x de 300 no santander"
+        ⚠️ Confirma registrar R$ 3.000,00 em 10x no cartão santander?
+
+    Não existe cartão Santander. O usuário lia uma frase que descrevia algo
+    impossível, dizia SIM, e SÓ ENTÃO recebia a pergunta. Confirmar uma coisa e
+    receber outra é o oposto de pedir confirmação.
+
+    `correction_error` já é o caminho que o `gate` usa para parar antes de
+    perguntar "confirma?" — ele existia para `new_account` de correção e vale
+    igual aqui.
+    """
+    from app.tools.finance import conta_citada
+
+    alvos = [*alvos] + [{}] * max(0, len(acoes) - len(alvos))
+    for i, acao in enumerate(acoes):
+        campos = _CONTAS_CITADAS.get(getattr(acao, "type", None))
+        if not campos or alvos[i].get("correction_error"):
+            continue
+        for campo, so_cartoes, papel in campos:
+            nome = getattr(acao, campo, None)
+            if not nome:
+                continue
+            try:
+                await conta_citada(workspace_id, nome, only_cards=so_cartoes, papel=papel)
+            except Level1Error as err:
+                alvos[i] = {**alvos[i], "correction_error": err.mensagem_usuario}
+                break
+    return alvos

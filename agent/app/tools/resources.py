@@ -203,11 +203,18 @@ def validate_fields(action: ResourceAction) -> dict:
         if action.fields:
             _error("Para adiar a fatura eu só preciso do cartão.")
         columns = ""
-    if action.resource == "mes" and action.type != Op.UPDATE:
-        # Linha única que já existe: não há o que criar, apagar, listar nem pagar.
+    if action.resource == "mes" and action.type not in (Op.UPDATE, Op.CREATE, Op.LIST):
+        # Linha única que já existe: não há o que apagar, listar nem pagar.
         # A recusa mora aqui, e não no `prepare`, porque `validate_fields` roda
-        # antes dele e um CREATE bateria em `REQUIRED["mes"]`, que não existe.
-        _error("Seu mês já existe: dá para mudar o dia em que ele fecha, não criar nem apagar.")
+        # antes dele e bateria em `REQUIRED["mes"]`, que não existe.
+        #
+        # ⚠️ **CREATE é tratado como UPDATE, não recusado** (11/09/2026). O
+        # modelo manda `resource_create` para "muda meu ciclo" — e recusar com
+        # "não dá para criar" responde uma coisa que o usuário não pediu, num
+        # beco sem saída: ele quer DEFINIR o dia, e definir é a única operação
+        # que existe aqui. A pergunta certa ("que dia fecha?") vem do
+        # `_preparar_mes`. Achado por `probe_pergunta_ou_supoe.py`.
+        _error("Seu mês já existe: dá para mudar o dia em que ele fecha, não apagar.")
     if action.type == Op.PAY:
         if action.resource != "debts":
             _error("O pagamento de prestação deve indicar uma dívida ou financiamento.")
@@ -238,9 +245,20 @@ def validate_fields(action: ResourceAction) -> dict:
             # 1..28, não 1..31: o dia tem que existir em fevereiro, senão o ciclo
             # muda de tamanho conforme o mês — que é o defeito que ele resolve.
             # É o mesmo `check` da coluna (20260911020000).
-            # Vazio = último dia do mês, e é escolha legítima (volta ao padrão),
-            # por isso `cycle_close_day` fica FORA da lista de "não pode ficar
-            # vazio" lá em cima.
+            #
+            # ⚠️ **"último dia" é a palavra "ultimo", não o campo vazio**
+            # (11/09/2026). Vazio significava as DUAS coisas — "o usuário pediu o
+            # padrão" e "o usuário não disse nada" —, e o modelo manda vazio nos
+            # dois casos. Medido: "muda meu ciclo", sem dia nenhum, virava
+            # *"⚠️ Confirma seu mês volta a fechar no último dia do mês?"*. O
+            # agente escolhia o valor e pedia para confirmar a escolha DELE.
+            if normalize(value) in {"ultimo", "ultimo dia", "ultimo dia do mes",
+                                    "fim do mes", "final do mes", "padrao", "normal"}:
+                values[key] = None
+                # Marca que o `None` VEIO DE UMA PALAVRA. `_preparar_mes` a
+                # consome e remove — ela nunca chega ao UPDATE.
+                values["cycle_close_day_ultimo"] = True
+                continue
             try:
                 value = int(value)
             except ValueError:
@@ -343,7 +361,10 @@ def validate_fields(action: ResourceAction) -> dict:
             "O modo de cálculo de um financiamento não muda depois de criado. "
             "Cadastre outro contrato se for o caso."
         )
-    if action.type == Op.CREATE:
+    # `mes` fica de fora: ele não se cria (a linha já existe) e o CREATE que o
+    # modelo manda para "muda meu ciclo" é tratado como UPDATE. Sem a guarda,
+    # `REQUIRED["mes"]` era KeyError no meio do turno.
+    if action.type == Op.CREATE and action.resource in REQUIRED:
         if action.resource == "recurring":
             values.setdefault("auto_confirm", False)
         requeridos = REQUIRED[action.resource]
@@ -504,8 +525,8 @@ async def _preparar_mes(ctx: ExecContext, action: ResourceAction, prepared: dict
     convidado moveria a régua de leitura de TODO mundo do workspace, e a única
     pista seria os números da tela mudarem sozinhos.
     """
-    if action.type != Op.UPDATE:
-        _error("Seu mês já existe: dá para mudar o dia em que ele fecha, não criar nem apagar.")
+    if action.type not in (Op.UPDATE, Op.CREATE):
+        _error("Seu mês já existe: dá para mudar o dia em que ele fecha, não apagar.")
 
     linha = await db.fetch_one(
         "select owner_id, cycle_close_day, xmin::text as row_version "
@@ -516,8 +537,17 @@ async def _preparar_mes(ctx: ExecContext, action: ResourceAction, prepared: dict
         _error("Não achei o seu espaço.")
     if str(linha["owner_id"]) != str(ctx.user_id):
         _error("Só quem é dono do espaço muda o dia em que o mês fecha.")
-    if "cycle_close_day" not in prepared["values"]:
-        _error("Que dia seu mês fecha? Diga um dia de 1 a 28, ou peça o último dia do mês.")
+    # `not in` E `is None` juntos: o modelo manda a chave com valor vazio quando
+    # a frase não diz o dia, e vazio deixou de significar "último dia" (só a
+    # palavra significa). As duas formas de "não disse" caem na mesma pergunta.
+    pediu_ultimo = prepared["values"].pop("cycle_close_day_ultimo", False)
+    if "cycle_close_day" not in prepared["values"] or (
+        prepared["values"]["cycle_close_day"] is None and not pediu_ultimo
+    ):
+        _error(
+            "Que dia do mês o seu mês fecha? Diga um dia de 1 a 28 — ou "
+            '"último dia do mês" para voltar ao padrão.'
+        )
 
     dia = prepared["values"].get("cycle_close_day")
     prepared["row_id"] = str(ctx.workspace_id)
@@ -559,11 +589,25 @@ async def prepare(ctx: ExecContext, action: ResourceAction) -> dict:
             _error("Uma nota nova não nasce na lixeira.")
     if values.get("calculation_mode"):
         prepared["calculation_mode"] = values["calculation_mode"]
+    if action.resource == "mes":
+        if action.type == Op.LIST:
+            # ⚠️ **Listar o mês não existe — é uma linha só, sem nome.** O modelo
+            # manda `resource_list` quando a frase não diz o dia ("muda meu
+            # ciclo"), o mesmo reflexo de "não sei qual, então listo" que já
+            # tinha mandado "adia a fatura" para cá. A recusa antiga ("dá para
+            # mudar, não criar nem apagar") respondia sobre uma operação que
+            # ninguém pediu.
+            #
+            # A resposta certa serve às DUAS leituras possíveis da frase: diz
+            # qual é o ciclo hoje (para quem estava perguntando) e diz como
+            # mudá-lo (para quem estava mandando). Nenhuma das duas é um palpite.
+            prepared["somente_leitura"] = True
+            prepared["summary"] = "ver seu mês"
+            return prepared
+        return await _preparar_mes(ctx, action, prepared)
     if action.type == Op.LIST:
         prepared["summary"] = f"listar {LABELS[action.resource]}"
         return prepared
-    if action.resource == "mes":
-        return await _preparar_mes(ctx, action, prepared)
     if action.type == Op.ROLL:
         return await _preparar_adiamento(ctx, action, prepared)
     if action.type != Op.CREATE:
@@ -964,6 +1008,21 @@ async def execute(ctx: ExecContext, action: ResourceAction) -> ToolResult:
         raise Level1Error("A proposta não está pronta. Peça a operação novamente.")
     table, identity, deletion, columns = CATALOG[action.resource]
     if action.resource == "mes":
+        if proposal.get("somente_leitura"):
+            c = await db.cycle(ctx.workspace_id, local_iso_date(ctx.timezone))
+            agora = (
+                f"📅 Seu mês ({c['rotulo']}) vai de {format_date_br(c['ini'])} a "
+                f"{format_date_br(c['fim'])} — "
+                + (f"fecha todo dia {c['close_day']}." if c["close_day"]
+                   else "fecha no último dia de cada mês.")
+                if c
+                else "📅 Seu mês fecha no último dia de cada mês."
+            )
+            return ToolResult(
+                f"{agora}\nPara mudar, me diz o dia (de 1 a 28) ou "
+                '"último dia do mês".',
+                read_only=True,
+            )
         return await _gravar_mes(ctx, proposal)
     if action.type == Op.ROLL:
         return await _adiar_fatura(ctx, proposal)
@@ -974,9 +1033,18 @@ async def execute(ctx: ExecContext, action: ResourceAction) -> ToolResult:
             + f" order by {identity} limit 50",
             ctx.workspace_id,
         )
+        # ⚠️ **A lista leva um cabeçalho.** Sem ele a resposta era só os nomes,
+        # um por linha — e quando o modelo erra o roteamento (mandar
+        # "adia a fatura" para cá, por exemplo) o usuário recebe três nomes
+        # soltos, sem frase, sem saber se algo aconteceu. O cabeçalho não
+        # conserta o roteamento; ele garante que uma listagem SEMPRE se
+        # apresente como listagem.
+        if not rows:
+            return ToolResult(f"Nenhum(a) {LABELS[action.resource]} cadastrado(a).",
+                              read_only=True)
+        corpo = "\n".join(f"• {r['label']}" for r in rows)
         return ToolResult(
-            "\n".join(str(r["label"]) for r in rows) or "Nenhum item cadastrado.",
-            read_only=True,
+            f"📋 Seus cadastros de {LABELS[action.resource]}:\n{corpo}", read_only=True
         )
     values = dict(proposal["values"])
     guards, link_args = [], []

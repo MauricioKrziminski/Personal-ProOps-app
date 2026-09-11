@@ -126,3 +126,29 @@ async def test_cartao_que_nao_existe_pergunta_com_a_lista_de_cartoes(contas, mon
     assert "cartão" in texto
     assert "Nubank Cartão" in texto
     assert "Itaú Corrente" not in texto, "só cartões entram na lista de cartões"
+
+
+@pytest.mark.parametrize("texto,espera_pergunta", [
+    ("gastei 45 no mercado dia 45", True),
+    ("gastei 45 no mercado dia 32", True),
+    ("gastei 45 no mercado dia 5", False),
+    ("gastei 45 no mercado dia 31", False),
+    ("comprei 45 no mercado", False),
+])
+def test_dia_que_nao_existe_pergunta_em_vez_de_virar_hoje(texto, espera_pergunta):
+    """O modelo DESCARTA a data impossível e o default era hoje, calado.
+
+    Medido em 11/09/2026: "dia 45" devolve `occurred_at=None` do Gemini, e o
+    lançamento nascia com a data de hoje — uma data que a pessoa não disse e
+    acha que disse.
+    """
+    from app.domain.required import faltando
+
+    acao = FinanceAction(
+        type=FinanceActionType.CREATE_EXPENSE, amount_cents=4500, description="mercado"
+    )
+    resultado = faltando(acao, texto)
+    if espera_pergunta:
+        assert resultado and "não existe" in resultado[1]
+    else:
+        assert resultado is None

@@ -350,8 +350,17 @@ async def resource_node(state: AgentState) -> dict:
     from app.tools.guards import Level1Error
     import json
 
+    # ⚠️ `resource_roll` estava SÓ no catálogo, não nesta linha — e esta é a que
+    # o modelo lê como "os tipos que existem". "adia a fatura" caía em
+    # `resource_list` e o usuário recebia a lista dos cartões dele, sem frase
+    # nenhuma, achando que nada tinha acontecido. Tipo novo entra AQUI também.
     prompt = """Extraia cadastros do app. Tipos resource_create, resource_update,
-resource_delete, resource_list, resource_pay. resource é uma chave do catálogo; name identifica o item.
+resource_delete, resource_list, resource_pay, resource_roll. resource é uma chave do catálogo; name identifica o item.
+⚠️ NÃO SABER QUAL ITEM NUNCA MUDA A AÇÃO. "adia a fatura" é resource_roll com name
+vazio; "liga o rotativo" é resource_update com name vazio; "apaga a meta" é
+resource_delete com name vazio. O sistema pergunta qual — trocar por resource_list
+responde outra pergunta e a pessoa acha que nada aconteceu. resource_list é só para
+quem PEDIU para ver ("quais meus cartões?", "lista minhas metas").
 fields contém pares name/value; valores são strings (booleanos true/false, dinheiro
 em centavos inteiros, datas ISO, taxa mensal fração decimal). Nunca invente dados,
 IDs, fechamento/vencimento de cartão ou taxa de financiamento. Campos ausentes serão
@@ -545,13 +554,21 @@ async def resolve_node(state: AgentState) -> dict:
         return targets
 
     if not any(getattr(a, "type", None) in resolve.TARGETS for a in acoes):
-        return {"targets": with_resources([{} for _ in acoes]), "results": esclarecimentos,
-            "draft": _rascunho(state, acoes)}
+        alvos = [{} for _ in acoes]
+    else:
+        alvos = await resolve.for_actions(
+            state["workspace_id"], acoes, state.get("text", ""),
+            antecedente=state.get("last_write_id"),
+        )
 
-    alvos = await resolve.for_actions(
-        state["workspace_id"], acoes, state.get("text", ""),
-        antecedente=state.get("last_write_id"),
-    )
+    # ⚠️ **Conta citada é validada AQUI, junto com o alvo — não dentro da tool.**
+    # A confirmação é montada entre este nó e a execução: com a checagem só na
+    # tool, "comprei uma tv em 10x de 300 no santander" perguntava
+    # "Confirma registrar R$ 3.000,00 no cartão santander?" para um cartão que
+    # não existe, e a pessoa só descobria DEPOIS de dizer sim. Vale para os dois
+    # ramos acima: criação pura nem passa por `for_actions`.
+    alvos = await resolve.contas_citadas(state["workspace_id"], acoes, alvos)
+
     return {"targets": with_resources(alvos), "results": esclarecimentos,
             "draft": _rascunho(state, acoes)}
 

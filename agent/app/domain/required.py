@@ -13,6 +13,8 @@ mudar, a exigência de um lançamento ter valor não muda.
 
 from __future__ import annotations
 
+import re
+
 from app.domain.money import parse_valor_em_centavos
 from app.graph.schemas import FinanceAction, FinanceActionType
 
@@ -50,6 +52,17 @@ def _tem_valor(action: FinanceAction, texto_cru: str) -> bool:
     return parse_valor_em_centavos(texto_cru or "") is not None
 
 
+_DIA_SOLTO = re.compile(r"\bdia\s+(\d{1,3})\b", re.I)
+
+
+def _dia_impossivel(texto: str) -> str | None:
+    """O número escrito depois de "dia" que não cabe num mês, ou None."""
+    for achado in _DIA_SOLTO.finditer(texto or ""):
+        if not 1 <= int(achado.group(1)) <= 31:
+            return achado.group(1)
+    return None
+
+
 def faltando(action, texto_cru: str = "", timezone: str = "America/Sao_Paulo") -> tuple[str, str] | None:
     """`(slot, pergunta)` do primeiro dado que falta, ou None se está completa.
 
@@ -72,6 +85,22 @@ def faltando(action, texto_cru: str = "", timezone: str = "America/Sao_Paulo") -
                 "Quanto foi no total (ou quanto é cada parcela)?"
             )
         return "amount", "💸 Faltou o valor. Quanto foi?"
+
+    # ⚠️ **Dia impossível não vira "hoje" em silêncio.** O modelo DESCARTA a data
+    # quando ela não existe ("dia 45" devolve `occurred_at=None`, medido), e o
+    # `require_date` então cai no default de hoje — o lançamento nasce com uma
+    # data que a pessoa não disse e que ela acha que disse.
+    #
+    # Isto valida ESTRUTURA (um dia do mês vai de 1 a 31) e a falha dele é uma
+    # PERGUNTA, não uma recusa de intenção: é o uso que `agent.md` permite para
+    # casamento de padrão. Não tenta interpretar a frase — só repara que o número
+    # que veio depois de "dia" não pode ser um dia.
+    if tipo in EXIGEM_VALOR and not action.occurred_at:
+        if impossivel := _dia_impossivel(texto_cru):
+            return "amount", (
+                f"📅 “dia {impossivel}” não existe. Que dia foi? "
+                "(ou me fala \"hoje\", \"ontem\")"
+            )
 
     if tipo in EXIGEM_IDENTIFICACAO and not (action.description or action.category):
         return "description", "🛍️ Entendi os detalhes da compra, mas não identifiquei o que você comprou. Do que se trata? (ex: 'tv', 'mercado', 'almoço')"

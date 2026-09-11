@@ -66,12 +66,31 @@ async def test_dono_muda_o_dia_e_ve_as_bordas_novas(monkeypatch):
 
 
 @pytest.mark.asyncio
-async def test_vazio_volta_para_o_ultimo_dia_do_mes(monkeypatch):
+async def test_a_PALAVRA_ultimo_volta_para_o_ultimo_dia_do_mes(monkeypatch):
+    _banco(monkeypatch)
+    acao = ResourceAction(type=Op.UPDATE, resource="mes",
+                          fields=[ResourceField(name="cycle_close_day", value="ultimo")])
+    prep = await resources.prepare(_ctx(), acao)
+    assert "último dia" in prep["summary"]
+    assert "cycle_close_day_ultimo" not in prep["values"], "a marca não chega ao UPDATE"
+
+
+@pytest.mark.asyncio
+async def test_campo_VAZIO_pergunta_o_dia_em_vez_de_escolher(monkeypatch):
+    """⚠️ Este teste já afirmou o contrário — e o contrário era o defeito.
+
+    Vazio significava as duas coisas: "o usuário pediu o padrão" e "o usuário
+    não disse nada". O modelo manda vazio nos dois casos, então "muda meu ciclo",
+    sem dia nenhum, virava *"⚠️ Confirma seu mês volta a fechar no último dia do
+    mês?"* — o agente escolhia o valor e pedia para confirmar a escolha dele.
+    Medido pelo `probe_pergunta_ou_supoe.py` em 11/09/2026.
+    """
     _banco(monkeypatch)
     acao = ResourceAction(type=Op.UPDATE, resource="mes",
                           fields=[ResourceField(name="cycle_close_day", value=None)])
-    prep = await resources.prepare(_ctx(), acao)
-    assert "último dia" in prep["summary"]
+    with pytest.raises(Level1Error) as err:
+        await resources.prepare(_ctx(), acao)
+    assert "que dia" in str(err.value).lower()
 
 
 @pytest.mark.asyncio
@@ -105,13 +124,28 @@ async def test_proposta_velha_nao_escreve(monkeypatch):
 
 
 @pytest.mark.asyncio
-async def test_o_mes_nao_se_cria_nem_se_apaga(monkeypatch):
+async def test_o_mes_nao_se_apaga(monkeypatch):
     _banco(monkeypatch)
-    for op in (Op.CREATE, Op.DELETE):
-        with pytest.raises(Level1Error):
-            await resources.prepare(_ctx(), ResourceAction(
-                type=op, resource="mes",
-                fields=[ResourceField(name="cycle_close_day", value="10")]))
+    with pytest.raises(Level1Error) as err:
+        await resources.prepare(_ctx(), ResourceAction(
+            type=Op.DELETE, resource="mes",
+            fields=[ResourceField(name="cycle_close_day", value="10")]))
+    assert "apagar" in str(err.value)
+
+
+@pytest.mark.asyncio
+async def test_criar_o_mes_e_o_mesmo_que_mudar_o_dia(monkeypatch):
+    """⚠️ CREATE era recusado, e a recusa era um beco sem saída.
+
+    O modelo manda `resource_create` para "muda meu ciclo", e a resposta era
+    "não dá para criar" — sobre uma operação que o usuário não pediu. Definir o
+    dia é a única coisa que existe aqui; quem não disse o dia recebe a pergunta.
+    """
+    _banco(monkeypatch)
+    prep = await resources.prepare(_ctx(), ResourceAction(
+        type=Op.CREATE, resource="mes",
+        fields=[ResourceField(name="cycle_close_day", value="10")]))
+    assert "dia 10" in prep["summary"]
 
 
 @pytest.mark.parametrize("dia", ["0", "29", "31", "banana"])
@@ -294,3 +328,44 @@ async def test_a_frase_do_ciclo_nao_cola_pedaco(monkeypatch, fim_iso, dias, espe
     assert r.message.endswith(esperado), r.message
     assert "para fechar para fechar" not in r.message
     assert "hoje para fechar" not in r.message
+
+
+def test_todo_tipo_de_resource_aparece_na_linha_de_tipos_do_prompt():
+    """A linha "Tipos ..." é o que o modelo lê como o que existe.
+
+    `resource_roll` ficou só no catálogo, lá embaixo: "adia a fatura" virava
+    `resource_list` e o usuário recebia a lista dos cartões dele, sem frase
+    nenhuma. Achado por `scripts/probe_pergunta_ou_supoe.py` em 11/09/2026.
+    """
+    import inspect
+
+    from app.graph import nodes
+    from app.graph.schemas import ResourceActionType
+
+    fonte = inspect.getsource(nodes.resource_node)
+    linha = next(l for l in fonte.splitlines() if "Tipos resource_" in l)
+    # a linha quebra em duas no arquivo; junta o bloco inteiro do prompt
+    bloco = fonte[fonte.index("Tipos resource_"):][:400]
+    faltando = [t.value for t in ResourceActionType if t.value not in bloco]
+    assert not faltando, f"tipos fora da linha de tipos do prompt: {faltando}"
+    assert linha
+
+
+@pytest.mark.asyncio
+async def test_listar_o_mes_responde_qual_e_e_como_mudar(monkeypatch):
+    """⚠️ `resource_list` em `mes` era recusado, e a recusa não ajudava ninguém.
+
+    O modelo manda `resource_list` quando a frase não diz o dia ("muda meu
+    ciclo") — o mesmo reflexo de "não sei qual, então listo" que mandava
+    "adia a fatura" para a listagem de cartões. A resposta serve às duas
+    leituras possíveis: diz qual é o ciclo hoje e diz como mudá-lo.
+    """
+    _banco(monkeypatch)
+    acao = ResourceAction(type=Op.LIST, resource="mes")
+    ctx = _ctx()
+    ctx.target = {"prepared": await resources.prepare(ctx, acao)}
+    r = await resources.execute(ctx, acao)
+    assert r.read_only
+    assert "11/08/2026" in r.message and "10/09/2026" in r.message
+    assert "dia 10" in r.message
+    assert "1 a 28" in r.message, "diz como mudar"
