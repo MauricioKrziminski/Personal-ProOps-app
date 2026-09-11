@@ -102,6 +102,26 @@ o valor em cima e a mesma linha marcada logo abaixo, coladas —, e com "Não in
 padrão e a primeira opção) isso lia como defeito. Fechar é escolher; a linha marcada mostra o que
 tocar para sair sem mudar nada.
 
+**"Escolher um" tem TRÊS controles, e qual deles é regra, não gosto** (11/09/2026). O app tinha
+cinco jeitos — `Segmented`, `Chip`, `Section`+`Row`+glifo, `Row`+`✓`, `SelectField` —, e `Field
+label="Tipo"` aparecia em três telas com três renderizações diferentes:
+
+| controle | quando | por quê |
+|---|---|---|
+| `Segmented` | **2 a 4** opções de rótulo curto | é uma chave de estado, e as opções competem lado a lado. A partir de 5 a célula fica estreita demais e o rótulo parte no meio da palavra — "Investimen/to" |
+| `Chip` | **filtro** de lista, muitos, resposta imediata | não grava campo nenhum: liga e desliga o que a lista mostra |
+| `SelectField` | escolher UM item **gravado num campo** | colapsado, mostra o valor, e o glifo de cada opção vem da lista de opções |
+
+O tipo de conta era `Segmented` de 5 e quebrava "Investimento" ao meio; o tipo de dívida era
+`Chip` (5); o tipo de bem era `Section` de 7 `Row` com `checkmark` — sete linhas abertas dentro de
+um formulário. Os três viraram `SelectField`, e o teste de anti-slop quebra o build se um
+`Segmented` passar de quatro opções.
+
+⚠️ **O glifo mora na LISTA DE OPÇÕES, não na tela.** `ACCOUNT_TYPES`, `DEBT_KINDS` e
+`ASSET_CLASSES` carregam `icon`; o formulário e a linha da lista leem dali. Com o mapa na tela,
+duas telas mostravam formas diferentes para o mesmo tipo, e um tipo novo nascia caindo no `circle`
+genérico do Android.
+
 **Escolher CONTA é `AccountPicker`** (`src/components/finance/account-picker.tsx`), nunca uma
 lista de `Row` com o nome dentro. Eram quatro cópias de `<Row title={a.name} trailing={check}/>`,
 e nelas um cartão de crédito e uma conta corrente têm exatamente a mesma cara — foi assim que um
@@ -340,6 +360,23 @@ a subir sozinha, como já aconteceu com hex e `fontSize`.
 
 **Cada seção da tela tem o seu.** Tela com 4 queries não pode esconder o erro de 3 delas atrás do
 estado da primeira: seção que falha diz que falhou, não some.
+
+## 7b. Texto explicativo — o rótulo e a explicação não podem ter o mesmo peso
+
+⚠️ **`Field` empatava os dois** (11/09/2026): rótulo e `hint` eram ambos `small` +
+`textSecondary`, e com 89 usos de `hint=` o formulário virava uma parede de cinza de 15px onde
+nada dizia o que era campo e o que era explicação. O `hint` desceu para `footnote` (13px) —
+um degrau abaixo do rótulo —, e `error` e `hint` deixaram de se excluir: o erro apagava a
+explicação justamente quando ela mais importa.
+
+- **Teto de 90 caracteres no `hint`**, preso por `anti-slop.test.ts`. Não é estilo: o que não cabe
+  em uma linha não é ajuda de campo, é documentação — e documentação empilhada embaixo de cinco
+  campos seguidos é o que o dono do produto chamou de *"muito texto explicativo"*.
+- **Nota com ícone é `<Note>`** (`src/components/ui/note.tsx`), nunca `...Type.footnote` montado
+  no `StyleSheet` da tela. Era o padrão copiado 3× com o mesmo `noteText` à mão.
+- **Explicação vai ABAIXO do que ela explica**, sempre — inclusive embaixo do botão. Três
+  parágrafos empilhados sob a ação primária (o caso do paywall) é a forma mais cara de dizer que
+  ninguém decidiu o que era essencial.
 
 ---
 
