@@ -27,10 +27,12 @@ import {
   useDeleteTransaction,
   useInvoice,
   usePayInvoice,
+  useRollInvoice,
   useSettleInvoice,
   type Transaction,
 } from '@/hooks/use-finance';
 import { formatBRL, formatDateBR, localISODate } from '@/hooks/use-items';
+import { formatNumberBR } from '@/lib/dates';
 import { useTheme } from '@/hooks/use-theme';
 import { confirmDestructive } from '@/lib/item-actions';
 import { accountLabel } from '@/lib/accounts';
@@ -52,6 +54,10 @@ const STATUS_LABEL: Record<string, string> = {
   open: 'Aberta',
   closed: 'Fechada',
   paid: 'Paga',
+  // ⚠️ Nunca "Rolada". O dono do produto recusou o jargão — *"eu não saberia o que seria
+  // rolada"* —, e ele tem razão: o estado não precisa de substantivo novo. A linha logo abaixo
+  // diz para ONDE o saldo foi, que é o que a pessoa quer saber.
+  rolled: 'Adiada',
 };
 
 function mesLabel(iso: string): string {
@@ -119,6 +125,7 @@ export default function InvoiceScreen() {
   const accounts = useAccounts();
   const pay = usePayInvoice();
   const settle = useSettleInvoice();
+  const roll = useRollInvoice();
   const remove = useDeleteTransaction();
 
   const [pagando, setPagando] = useState(false);
@@ -164,10 +171,56 @@ export default function InvoiceScreen() {
   const jaPago = fatura?.paid_cents ?? 0;
   const falta = Math.max(total - jaPago, 0);
   const paga = fatura?.status === 'paid';
+  const adiada = fatura?.status === 'rolled';
   const parcial = !paga && jaPago > 0;
-  const podePagar = Boolean(fatura) && !paga && falta > 0;
+  const podePagar = Boolean(fatura) && !paga && !adiada && falta > 0;
+  /**
+   * Adiar só faz sentido depois do vencimento.
+   *
+   * Antes disso não há nada a adiar — a fatura ainda está no prazo, e oferecer o botão
+   * convidaria a jogar para frente uma conta que não venceu, com juros que não precisavam
+   * existir. É a mesma régua do banco: o rotativo começa quando o pagamento não acontece.
+   */
+  const vencida = Boolean(fatura && fatura.due_date < localISODate());
+  const podeAdiar = podePagar && vencida;
   const dataISO = isoDeBR(dataBR);
   const pagadora = pagadoras.find((a) => a.id === payerId);
+
+  /**
+   * Adiar é destrutivo o bastante para confirmar: o saldo MUDA de fatura e passa a render juros.
+   *
+   * `confirmDestructive` é action sheet nativo no iOS e diálogo no Android — o mesmo caminho de
+   * apagar lançamento. O resultado volta em toast porque o que interessa é o que ENTROU na
+   * próxima fatura, e isso a pessoa confere na fatura seguinte, não aqui.
+   */
+  const adiar = () => {
+    if (!fatura) return;
+    confirmDestructive(
+      `Jogar ${formatBRL(falta)} para a próxima fatura?`,
+      'Jogar para a próxima',
+      () => {
+        roll.mutate(fatura.id, {
+          onSuccess: (r) => {
+            const partes = [`Principal ${formatBRL(Number(r.principal_cents))}`];
+            if (Number(r.juros_cents) > 0) {
+              partes.push(`juros ${formatBRL(Number(r.juros_cents))}${r.juros_estimados ? ' (estimado)' : ''}`);
+            }
+            if (Number(r.iof_cents) > 0) partes.push(`IOF ${formatBRL(Number(r.iof_cents))}`);
+            toast({
+              tone: 'success',
+              message:
+                `Foi para a fatura de ${formatDateBR(r.destino_vence_em)} · ${partes.join(' · ')}` +
+                (r.sem_taxa ? ' · sem juros: o cartão não tem taxa do rotativo' : '') +
+                (r.segundo_ciclo
+                  ? ' · segundo ciclo seguido: pela regra do Banco Central o banco tem que te oferecer parcelamento'
+                  : ''),
+            });
+          },
+          onError: (erro) => toast({ message: mensagemDoErro(erro), tone: 'error' }),
+        });
+      }
+    );
+  };
 
   const abrirPagamento = () => {
     // o erro do pagamento é mostrado DENTRO do sheet (toast fica atrás do Modal nativo)
@@ -451,6 +504,23 @@ export default function InvoiceScreen() {
             onPress={quitarSemCaixa}
           />
           <ThemedText type="caption" themeColor="textSecondary">Marcar como paga não altera o saldo. Registrar pagamento desconta da conta escolhida.</ThemedText>
+          {podeAdiar ? (
+            <>
+              <Button
+                block
+                label="Jogar para a próxima"
+                variant="secondary"
+                loading={roll.isPending}
+                disabled={settle.isPending || pay.isPending}
+                onPress={adiar}
+              />
+              <ThemedText type="caption" themeColor="textSecondary">
+                {cartao?.rotativo_rate_monthly == null
+                  ? 'O saldo em aberto vira uma linha na próxima fatura, com IOF. Sem a taxa do rotativo cadastrada no cartão, os juros não entram — e a projeção fica otimista por esse valor.'
+                  : `O saldo em aberto vira uma linha na próxima fatura, com juros de ${formatNumberBR(cartao.rotativo_rate_monthly * 100)}% e IOF.`}
+              </ThemedText>
+            </>
+          ) : null}
           <Button
             block
             size="lg"

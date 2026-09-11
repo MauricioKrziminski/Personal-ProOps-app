@@ -51,6 +51,8 @@ export type Database = {
           initial_balance_cents: number
           name: string
           payment_account_id: string | null
+          rotativo_auto: boolean
+          rotativo_rate_monthly: number | null
           type: string
           updated_at: string
           user_id: string
@@ -67,6 +69,8 @@ export type Database = {
           initial_balance_cents?: number
           name: string
           payment_account_id?: string | null
+          rotativo_auto?: boolean
+          rotativo_rate_monthly?: number | null
           type?: string
           updated_at?: string
           user_id: string
@@ -83,6 +87,8 @@ export type Database = {
           initial_balance_cents?: number
           name?: string
           payment_account_id?: string | null
+          rotativo_auto?: boolean
+          rotativo_rate_monthly?: number | null
           type?: string
           updated_at?: string
           user_id?: string
@@ -510,6 +516,7 @@ export type Database = {
           paid_cents: number
           payment_transaction_id: string | null
           reference_month: string
+          rolled_into_invoice_id: string | null
           settled_manually: boolean
           status: string
           updated_at: string
@@ -526,6 +533,7 @@ export type Database = {
           paid_cents?: number
           payment_transaction_id?: string | null
           reference_month: string
+          rolled_into_invoice_id?: string | null
           settled_manually?: boolean
           status?: string
           updated_at?: string
@@ -542,6 +550,7 @@ export type Database = {
           paid_cents?: number
           payment_transaction_id?: string | null
           reference_month?: string
+          rolled_into_invoice_id?: string | null
           settled_manually?: boolean
           status?: string
           updated_at?: string
@@ -561,6 +570,13 @@ export type Database = {
             columns: ["payment_transaction_id"]
             isOneToOne: false
             referencedRelation: "transactions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "card_invoices_rolled_into_invoice_id_fkey"
+            columns: ["rolled_into_invoice_id"]
+            isOneToOne: false
+            referencedRelation: "card_invoices"
             referencedColumns: ["id"]
           },
           {
@@ -1777,6 +1793,7 @@ export type Database = {
           occurred_at: string
           paid_at: string | null
           recurring_id: string | null
+          rollover_of_invoice_id: string | null
           source: string
           status: string
           updated_at: string
@@ -1808,6 +1825,7 @@ export type Database = {
           occurred_at?: string
           paid_at?: string | null
           recurring_id?: string | null
+          rollover_of_invoice_id?: string | null
           source?: string
           status?: string
           updated_at?: string
@@ -1839,6 +1857,7 @@ export type Database = {
           occurred_at?: string
           paid_at?: string | null
           recurring_id?: string | null
+          rollover_of_invoice_id?: string | null
           source?: string
           status?: string
           updated_at?: string
@@ -1886,6 +1905,13 @@ export type Database = {
             columns: ["recurring_id"]
             isOneToOne: false
             referencedRelation: "recurring_transactions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "transactions_rollover_of_invoice_id_fkey"
+            columns: ["rollover_of_invoice_id"]
+            isOneToOne: false
+            referencedRelation: "card_invoices"
             referencedColumns: ["id"]
           },
           {
@@ -2327,6 +2353,7 @@ export type Database = {
         }[]
       }
       _promote_due_transactions: { Args: never; Returns: number }
+      _roll_overdue_invoices: { Args: never; Returns: number }
       _snapshot_net_worth: { Args: never; Returns: number }
       _tx_summary: {
         Args: { from_date: string; to_date: string; uid: string }
@@ -2724,6 +2751,14 @@ export type Database = {
           provider: string
           status: string
         }[]
+      }
+      roll_invoice: {
+        Args: {
+          p_invoice_id: string
+          p_iof_cents?: number
+          p_juros_cents?: number
+        }
+        Returns: Json
       }
       routes_to_python: { Args: { p_phone: string }; Returns: boolean }
       save_budget: {

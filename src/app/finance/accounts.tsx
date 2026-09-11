@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { ScrollView, StyleSheet, View } from 'react-native';
+import { ScrollView, StyleSheet, Switch, View } from 'react-native';
 import Animated, { FadeInDown } from 'react-native-reanimated';
 import { Stack, router } from 'expo-router';
 import type { SymbolViewProps } from 'expo-symbols';
@@ -12,6 +12,7 @@ import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { EmptyState } from '@/components/ui/empty-state';
 import { Field, MoneyField, TextField } from '@/components/ui/field';
+import { formatNumberBR } from '@/lib/dates';
 import { Icon } from '@/components/ui/icon';
 import { Money } from '@/components/ui/money';
 import { Row, Section } from '@/components/ui/row';
@@ -71,6 +72,9 @@ interface FormState {
   dueDay: string;
   limitCents: number;
   payerId: string | null;
+  rotativoAuto: boolean;
+  /** Texto, porque é digitado: "15,5". Vira fração na hora de salvar. */
+  rotativoRate: string;
 }
 
 const FORM_VAZIO: FormState = {
@@ -81,9 +85,16 @@ const FORM_VAZIO: FormState = {
   dueDay: '',
   limitCents: 0,
   payerId: null,
+  rotativoAuto: false,
+  rotativoRate: '',
 };
 
 const diaValido = (v: string) => /^\d{1,2}$/.test(v) && Number(v) >= 1 && Number(v) <= 31;
+/** Percentual mensal digitado em pt-BR: "15,5". Vírgula, nunca ponto (regra do frontend). */
+const taxaValida = (v: string) => {
+  const n = Number(v.replace(',', '.'));
+  return Number.isFinite(n) && n >= 0 && n <= 100;
+};
 
 /**
  * Confirmação de ação destrutiva.
@@ -183,15 +194,19 @@ export default function AccountsScreen() {
       dueDay: a.due_day ? String(a.due_day) : '',
       limitCents: a.credit_limit_cents ?? 0,
       payerId: a.payment_account_id,
+      rotativoAuto: a.rotativo_auto ?? false,
+      rotativoRate:
+        a.rotativo_rate_monthly == null ? '' : formatNumberBR(a.rotativo_rate_monthly * 100),
     });
   };
 
   const ehCartao = form?.type === 'credit_card';
   const nomeOk = (form?.name.trim().length ?? 0) >= 1;
   const cicloOk = !ehCartao || (diaValido(form!.closingDay) && diaValido(form!.dueDay));
+  const taxaOk = !ehCartao || !form!.rotativoRate.trim() || taxaValida(form!.rotativoRate);
 
   const salvar = () => {
-    if (!form || !nomeOk || !cicloOk) return;
+    if (!form || !nomeOk || !cicloOk || !taxaOk) return;
     save.mutate(
       {
         id: form.id,
@@ -201,6 +216,13 @@ export default function AccountsScreen() {
         closing_day: ehCartao ? Number(form.closingDay) : null,
         due_day: ehCartao ? Number(form.dueDay) : null,
         credit_limit_cents: ehCartao ? form.limitCents : null,
+        rotativo_auto: ehCartao ? form.rotativoAuto : false,
+        // Percentual digitado vira FRAÇÃO, igual a `debts.interest_rate_monthly`: 15,5 -> 0.155.
+        // Vazio é null de propósito — o app não estima juros que não conhece.
+        rotativo_rate_monthly:
+          ehCartao && form.rotativoRate.trim()
+            ? Number(form.rotativoRate.replace(',', '.')) / 100
+            : null,
         // sem isto o cartão nunca sabe qual conta paga a fatura dele (bug antigo: null fixo)
         payment_account_id: ehCartao ? form.payerId : null,
       },
@@ -452,7 +474,7 @@ export default function AccountsScreen() {
               label="Salvar"
               size="sm"
               loading={save.isPending}
-              disabled={!nomeOk || !cicloOk}
+              disabled={!nomeOk || !cicloOk || !taxaOk}
               onPress={salvar}
             />
           </View>
@@ -514,6 +536,51 @@ export default function AccountsScreen() {
                     Compra depois do fechamento cai na fatura do mês seguinte.
                   </ThemedText>
 
+                  {/*
+                    O rotativo, e por que ele nasce DESLIGADO.
+                    Ligado para todo cartão, um que a pessoa paga em dia nunca mais apareceria
+                    como atrasado — o aviso que mais importa sumiria justamente de quem não
+                    precisa da feature. Por isso é escolha, e é aqui: junto do ciclo, que é o
+                    outro campo que só existe em cartão.
+                  */}
+                  <Field
+                    label="Fatura não paga vai para a próxima"
+                    hint={
+                      form.rotativoAuto
+                        ? 'No dia seguinte ao vencimento, o saldo em aberto vira uma linha na próxima fatura.'
+                        : 'Desligado, a fatura fica em aberto e você decide na tela dela.'
+                    }>
+                    <View style={styles.switchRow}>
+                      <ThemedText type="small" themeColor="textSecondary">
+                        Adiar sozinho depois do vencimento
+                      </ThemedText>
+                      <Switch
+                        accessibilityLabel="Adiar a fatura não paga automaticamente"
+                        accessibilityHint="Desligado, a fatura vencida fica em aberto até você decidir"
+                        value={form.rotativoAuto}
+                        onValueChange={(rotativoAuto: boolean) => setForm({ ...form, rotativoAuto })}
+                      />
+                    </View>
+                  </Field>
+
+                  <Field
+                    label="Juros do rotativo (% ao mês)"
+                    hint="Vem impresso na própria fatura. Em branco, o app adia só o valor e o IOF — que é lei (0,38% + 0,0082% ao dia) — e não inventa juros."
+                    error={
+                      form.rotativoRate.trim() && !taxaValida(form.rotativoRate)
+                        ? 'Use um número de 0 a 100, como 15,5'
+                        : undefined
+                    }>
+                    <TextField
+                      value={form.rotativoRate}
+                      onChangeText={(rotativoRate) =>
+                        setForm({ ...form, rotativoRate: rotativoRate.replace(/[^\d,.]/g, '').slice(0, 6) })
+                      }
+                      keyboardType="decimal-pad"
+                      placeholder="15,5"
+                    />
+                  </Field>
+
                   <Field label="Limite do cartão">
                     <MoneyField
                       valueCents={form.limitCents}
@@ -572,6 +639,12 @@ export default function AccountsScreen() {
 }
 
 const styles = StyleSheet.create({
+  switchRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: Space.md,
+  },
   hero: {
     gap: Space.sm,
   },

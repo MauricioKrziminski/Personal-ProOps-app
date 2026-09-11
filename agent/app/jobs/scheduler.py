@@ -53,12 +53,17 @@ async def run() -> dict:
     criadas = await materialize_horizon(agora)
 
     fechadas = await db.fetch_one("select public._close_due_invoices() as n")
+    # Depois de FECHAR e antes de promover: a fatura vencida dos cartões com rotativo ligado vai
+    # para a próxima. Ordem importa — adiar antes de fechar deixaria a fatura do ciclo corrente
+    # fora do alcance da varredura.
+    adiadas = await db.fetch_one("select public._roll_overdue_invoices() as n")
     promovidas = await db.fetch_one("select public._promote_due_transactions() as n")
     fotos = await db.fetch_one("select public._snapshot_net_worth() as n")
 
     return {
         "created": criadas,
         "invoices_closed": (fechadas or {}).get("n", 0),
+        "invoices_rolled": (adiadas or {}).get("n", 0),
         "promoted": (promovidas or {}).get("n", 0),
         "snapshots": (fotos or {}).get("n", 0),
     }

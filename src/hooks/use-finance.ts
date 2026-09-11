@@ -63,6 +63,15 @@ export type Transaction = Pick<
   status: TransactionStatus;
 };
 
+/**
+ * ⚠️ `rolled` entrou em 10/09/2026 e NÃO é sinônimo de paga.
+ *
+ * A fatura adiada teve o saldo movido para a seguinte: ela não cobra mais nada (sai da
+ * projeção, do "atrasado" e do patrimônio) mas ninguém pagou nada. Na interface ela nunca se
+ * chama "rolada" — o rótulo é "Adiada" e a linha diz para qual fatura o saldo foi.
+ */
+export type InvoiceStatus = 'open' | 'closed' | 'paid' | 'rolled';
+
 export type Account = Pick<
   Tables['accounts']['Row'],
   | 'id'
@@ -74,6 +83,9 @@ export type Account = Pick<
   | 'due_day'
   | 'credit_limit_cents'
   | 'payment_account_id'
+  // rotativo: só fazem sentido em cartão
+  | 'rotativo_auto'
+  | 'rotativo_rate_monthly'
 > & { type: (typeof ACCOUNT_TYPES)[number]['value'] };
 
 /**
@@ -96,7 +108,7 @@ export type CardInvoice = Pick<
   Tables['card_invoices']['Row'],
   | 'id' | 'account_id' | 'reference_month' | 'closing_date' | 'due_date' | 'status' | 'paid_at'
   | 'paid_cents'
-> & { status: 'open' | 'closed' | 'paid' };
+> & { status: InvoiceStatus };
 
 export type AccountBalance = Fns['account_balances']['Returns'][number];
 
@@ -321,7 +333,7 @@ export function useAccounts() {
     queryFn: async (): Promise<Account[]> => {
       const { data, error } = await supabase
         .from('accounts')
-        .select('id, name, type, initial_balance_cents, archived, closing_day, due_day, credit_limit_cents, payment_account_id')
+        .select('id, name, type, initial_balance_cents, archived, closing_day, due_day, credit_limit_cents, payment_account_id, rotativo_auto, rotativo_rate_monthly')
         .eq('archived', false)
         .order('created_at');
       if (error) throw error;
@@ -538,6 +550,39 @@ export function usePayInvoice() {
  * existir, e "pagá-la" agora tiraria do caixa de hoje um dinheiro que saiu há
  * meses. A RPC também fecha as parcelas `pending` de dentro.
  */
+/** O que `roll_invoice` devolve — serve para a tela contar o que aconteceu. */
+export interface RollResult {
+  principal_cents: number;
+  juros_cents: number;
+  iof_cents: number;
+  /** Os juros saíram da taxa do cartão, não de um valor informado. */
+  juros_estimados: boolean;
+  /** O cartão não tem taxa cadastrada: rolou só o principal, e a projeção fica otimista. */
+  sem_taxa: boolean;
+  /** Esta fatura já tinha recebido um saldo adiado — é o segundo ciclo seguido no rotativo. */
+  segundo_ciclo: boolean;
+  destino_id: string;
+  destino_vence_em: string;
+}
+
+/**
+ * Joga o saldo em aberto de uma fatura vencida para a próxima (o "rotativo").
+ *
+ * Invalida MUITO de propósito: o saldo muda de fatura, some da projeção na data antiga e
+ * aparece na nova, e os juros e o IOF são gasto novo que entra no mês e no orçamento.
+ */
+export function useRollInvoice() {
+  const invalidate = useInvalidateFinance();
+  return useMutation({
+    mutationFn: async (invoiceId: string): Promise<RollResult> => {
+      const { data, error } = await supabase.rpc('roll_invoice', { p_invoice_id: invoiceId });
+      if (error) throw error;
+      return data as unknown as RollResult;
+    },
+    onSuccess: invalidate,
+  });
+}
+
 export function useSettleInvoice() {
   const invalidate = useInvalidateFinance();
   return useMutation({
@@ -1751,6 +1796,8 @@ export function useSaveAccount() {
       due_day?: number | null;
       credit_limit_cents?: number | null;
       payment_account_id?: string | null;
+      rotativo_auto?: boolean;
+      rotativo_rate_monthly?: number | null;
     }) => {
       if (id) {
         const { error } = await supabase.from('accounts').update(input).eq('id', id);
@@ -2057,7 +2104,9 @@ export interface CardInvoiceHistory {
   reference_month: string;
   closing_date: string;
   due_date: string;
-  status: 'open' | 'closed' | 'paid';
+  status: InvoiceStatus;
+  /** Preenchido só quando a fatura foi adiada: para qual fatura o saldo foi. */
+  rolled_into_invoice_id?: string | null;
   paid_at: string | null;
   payment_transaction_id: string | null;
   total_cents: number;
@@ -2085,7 +2134,7 @@ export function useCardInvoices(accountId: string | undefined, months = 60) {
       const limite = Math.min(60, Math.max(1, months));
       const { data: invoices, error } = await supabase
         .from('card_invoices')
-        .select('id, reference_month, closing_date, due_date, status, paid_at, payment_transaction_id')
+        .select('id, reference_month, closing_date, due_date, status, paid_at, payment_transaction_id, rolled_into_invoice_id')
         .eq('account_id', accountId!)
         .order('reference_month', { ascending: false })
         .limit(limite);

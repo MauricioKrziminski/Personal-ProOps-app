@@ -48,6 +48,18 @@ begin
     raise exception '1. IOF é lei e deveria ser 634 (0,38%% + 0,0082%%/dia x 31), veio %', r->>'iof_cents';
   end if;
 
+  -- 1b. o mês vai em PORTUGUÊS. `to_char(..., 'TMMonth')` lia o `lc_time` da sessão e escreveu
+  --     "Saldo em rotativo de July" no primeiro teste contra dados reais — em inglês, no meio de
+  --     uma frase em português, na descrição de um lançamento de dinheiro.
+  -- O rótulo é o mês de REFERÊNCIA da fatura, não o da compra: a compra de 15/07 entra na
+  -- fatura que fecha 03/08, e é dela que o saldo vem. É a mesma palavra que a planilha do dono
+  -- do produto usa ("Saldo em rotativo de Agosto" na aba de setembro).
+  if not exists (select 1 from public.transactions
+                 where rollover_of_invoice_id = fat and description = 'Saldo em rotativo de agosto') then
+    raise exception '1b. a descrição deveria ser "Saldo em rotativo de agosto", veio "%"',
+      (select description from public.transactions where rollover_of_invoice_id = fat);
+  end if;
+
   -- 2. a origem ficou adiada e aponta para o destino
   select rolled_into_invoice_id into destino from public.card_invoices where id = fat;
   if destino is null then raise exception '2. a fatura adiada tem que apontar para o destino'; end if;
@@ -117,7 +129,7 @@ begin
     raise exception '8. o segundo adiamento seguido tem que ser sinalizado: %', r;
   end if;
 
-  raise notice 'OK: roll_invoice — 10 asserções';
+  raise notice 'OK: roll_invoice — 11 asserções';
 end $$;
 
 rollback;

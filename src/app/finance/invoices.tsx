@@ -44,10 +44,29 @@ import { useTheme } from '@/hooks/use-theme';
 const MESES = 60;
 const ALTURA_BARRA = 76;
 
-/** Estado como PALAVRA — cor sozinha não informa. */
-function estado(invoice: CardInvoiceHistory, hoje: string): { texto: string; atrasada: boolean } {
+/**
+ * Estado como PALAVRA — cor sozinha não informa.
+ *
+ * ⚠️ A fatura adiada não se chama "rolada" em lugar nenhum da interface. O dono do produto
+ * recusou o jargão — *"eu não saberia o que seria rolada"* — e a frase que ele usou é a que
+ * ficou: o saldo **foi para a próxima**. Quem lê quer saber PARA ONDE, não o nome do estado,
+ * e "Atrasada" seria mentira: ela não cobra mais nada.
+ */
+function estado(
+  invoice: CardInvoiceHistory,
+  hoje: string,
+  destinoVenceEm?: string
+): { texto: string; atrasada: boolean } {
   if (invoice.status === 'paid') {
     return { texto: invoice.paid_at ? `Paga em ${formatDateBR(invoice.paid_at)}` : 'Paga', atrasada: false };
+  }
+  if (invoice.status === 'rolled') {
+    return {
+      texto: destinoVenceEm
+        ? `Foi para a fatura de ${formatDateBR(destinoVenceEm)}`
+        : 'Foi para a próxima fatura',
+      atrasada: false,
+    };
   }
   if (invoice.due_date < hoje) return { texto: 'Atrasada', atrasada: true };
   return { texto: invoice.status === 'closed' ? 'Fechada' : 'Aberta', atrasada: false };
@@ -261,7 +280,13 @@ export default function InvoicesScreen() {
       {passadas.length > 0 ? (
         <Section title="Faturas anteriores">
           {passadas.map((invoice, index) => {
-            const situacao = estado(invoice, hoje);
+            // A data do DESTINO sai da própria lista — todas as faturas do cartão já estão
+            // aqui, então não custa consulta nenhuma.
+            const situacao = estado(
+              invoice,
+              hoje,
+              lista.find((o) => o.id === invoice.rolled_into_invoice_id)?.due_date
+            );
             const mes = invoice.reference_month.slice(0, 7);
             return (
               <Animated.View
