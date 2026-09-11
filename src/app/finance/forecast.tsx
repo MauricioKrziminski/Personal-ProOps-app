@@ -146,6 +146,8 @@ export default function ForecastScreen() {
    * "de hoje até <data>" em vez de oferecer um campo que só aceita um valor.
    */
   const [horizonteAberto, setHorizonteAberto] = useState(false);
+  /** O campo de data nasce fechado toda vez que o sheet abre — ver o comentário no `Sheet`. */
+  const [calendarioAberto, setCalendarioAberto] = useState(false);
   const [comoCalculo, setComoCalculo] = useState(false);
   /**
    * Dia × Mês.
@@ -302,6 +304,7 @@ export default function ForecastScreen() {
   /** Atalho e calendário desembocam aqui: aplicam e fecham, num gesto só. */
   const aplicarHorizonte = (d: number) => {
     setDias(Math.min(Math.max(d, 1), 3650));
+    setCalendarioAberto(false);
     setHorizonteAberto(false);
   };
 
@@ -396,7 +399,10 @@ export default function ForecastScreen() {
           {
             label: `Horizonte da projeção, de hoje até ${isoToBR(somaDias(localISODate(), dias))}`,
             icon: 'calendar',
-            onPress: () => setHorizonteAberto(true),
+            onPress: () => {
+              setCalendarioAberto(false);
+              setHorizonteAberto(true);
+            },
           },
         ]}
       />
@@ -409,22 +415,20 @@ export default function ForecastScreen() {
         />
 
         {/*
-          ⚠️ **Atalhos em CIMA, calendário embaixo, e os dois aplicam no toque** (11/09/2026).
+          ⚠️ **Atalhos abertos, calendário COLAPSADO** (11/09/2026, pedido do dono do produto:
+          *"pedi para que fosse um campo, que ao clicar ele expandisse, e ao selecionar ou fechar
+          ele, ele voltasse a colapsar"*).
 
-          A versão anterior era uma lista de oito linhas com `flex: 1` e um campo de texto preso
-          no rodapé — e a queixa do dono do produto foi sobre o buraco que isso abria: *"olha o
-          tamanho do gap e espaço vazio entre as datas pré-setadas e o campo"*. O `flex: 1` era
-          a causa: ele existia para o campo subir com o teclado, então a lista esticava até o
-          fim do sheet e o vazio nascia entre as duas coisas.
+          É o mesmo idioma do `SelectField` (design.md §1): campo de formulário mostra o VALOR, e
+          a lista — aqui a grade de dias — é o que aparece quando se vai trocá-lo. Ele abre NO
+          LUGAR e não em `Modal`, porque já estamos dentro de um `Sheet`.
 
-          Sem campo de texto não há teclado, sem teclado não há `flex: 1`, e sem ele o conteúdo
-          volta a ter altura natural. Os oito atalhos viraram uma fileira de `Chip` (que é o
-          controle de "muitos, resposta imediata" — design.md §1) e ocupam duas linhas no lugar
-          de oito.
+          Eu tinha argumentado contra, com o motivo errado: o sheet tem altura fixa, então
+          colapsar não encolhe o sheet. Só que o que sobra fechado é ESPAÇO, e o que sobrava
+          aberto era uma grade de 42 células competindo com os oito atalhos — duas respostas
+          para a mesma pergunta, as duas gritando.
 
-          As duas formas respondem a MESMA pergunta e por isso as duas fecham o sheet: um toque
-          no atalho ou um toque no dia. O calendário abre no mês do horizonte atual, com o dia
-          marcado — é o sheet dizendo onde a tela está antes de perguntar para onde vai.
+          O estado morre junto com o sheet: abrir de novo mostra o campo fechado.
         */}
         <ScrollView contentContainerStyle={styles.horizonteCorpo}>
           <View style={styles.horizonteAtalhos}>
@@ -438,14 +442,36 @@ export default function ForecastScreen() {
             ))}
           </View>
 
-          <Calendar
-            value={ate}
-            onChange={(iso) => aplicarHorizonte(diasAte(iso))}
-            // Hoje não é horizonte (a projeção precisa de pelo menos um dia à frente), e o teto
-            // é o mesmo `clamp_forecast_days` do banco — 10 anos.
-            min={somaDias(localISODate(), 1)}
-            max={somaDias(localISODate(), 3650)}
-          />
+          <Section>
+            <Row
+              title="Outra data"
+              subtitle={isoToBR(ate)}
+              chevron={false}
+              accessibilityState={{ expanded: calendarioAberto }}
+              accessibilityLabel={`Outra data, ${isoToBR(ate)}`}
+              trailing={
+                <Icon
+                  name={calendarioAberto ? 'chevron.up' : 'chevron.down'}
+                  size="sm"
+                  color="textSecondary"
+                />
+              }
+              onPress={() => {
+                Haptics.selectionAsync();
+                setCalendarioAberto((aberto) => !aberto);
+              }}
+            />
+            {calendarioAberto ? (
+              <Calendar
+                value={ate}
+                onChange={(iso) => aplicarHorizonte(diasAte(iso))}
+                // Hoje não é horizonte (a projeção precisa de pelo menos um dia à frente), e o
+                // teto é o mesmo `clamp_forecast_days` do banco — 10 anos.
+                min={somaDias(localISODate(), 1)}
+                max={somaDias(localISODate(), 3650)}
+              />
+            ) : null}
+          </Section>
         </ScrollView>
       </Sheet>
 

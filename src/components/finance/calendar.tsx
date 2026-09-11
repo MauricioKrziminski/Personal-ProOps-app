@@ -104,7 +104,7 @@ export function Calendar({ value, onChange, min, max }: Props) {
   };
 
   return (
-    <View style={[styles.wrap, { backgroundColor: theme.surface, borderColor: theme.cardBorder }]}>
+    <View style={styles.wrap}>
       <View style={styles.cabecalho}>
         {passo(-1)}
         <ThemedText type="smallBold" accessibilityRole="header" style={styles.mes}>
@@ -177,12 +177,13 @@ export function Calendar({ value, onChange, min, max }: Props) {
 }
 
 const styles = StyleSheet.create({
+  /*
+    Sem superfície PRÓPRIA: ele nasce dentro de um campo que expande, e um card dentro do card
+    da `Section` seria moldura sobre moldura. Quem enquadra é quem usa.
+  */
   wrap: {
     gap: Space.sm,
     padding: Space.md,
-    borderRadius: Radius.md,
-    borderCurve: 'continuous',
-    borderWidth: StyleSheet.hairlineWidth,
   },
   cabecalho: {
     flexDirection: 'row',

@@ -95,18 +95,19 @@ export function Screen({
     styles.content,
     {
       /*
-        ⚠️ **Tela empurrada não leva respiro nosso no topo.** Abaixo de um large title o iOS já
-        deixa ~20pt antes do primeiro item — é a distância que Ajustes, Mail e Notas usam. Somar
-        `Space.md` a isso dava ~32, e a queixa do dono do produto foi exatamente essa: *"olha o
-        tamanho do espaço/gap entre o título e o componente embaixo do título"*.
+        ⚠️ **O respiro do topo é UM número, para o app inteiro** — e ele foi calibrado no
+        aparelho, nos dois sentidos: com `Space.md` o dono do produto reclamou do vazio embaixo
+        do título grande; com zero, de que ficou apertado. `Space.sm` é o degrau entre os dois, e
+        vale igual no iOS e no Android para o gap não mudar de tela para tela.
 
-        Com `topBar` o respiro continua, porque ali o header é NOSSO (`AppHeader`, desenhado por
-        cima) e ninguém reservou nada embaixo dele. **E no Android também**: lá não existe large
-        title — o header é uma barra compacta que termina rente ao conteúdo, e sem o respiro o
-        primeiro card encosta nela. É a diferença de um VALOR entre plataformas, então ela mora
-        aqui dentro (mecanismo 2 de `frontend.md`), nunca na tela.
+        Com `topBar` ele SOMA a altura do header, porque ali a barra é NOSSA (`AppHeader`,
+        desenhada por cima do scroll) e ninguém reservou espaço embaixo dela. Na tela empurrada
+        quem reserva é o header nativo, e o que fica aqui é só o respiro.
+
+        Nenhuma tela sobrescreve isto: `contentStyle` existe para outras coisas e nenhuma das 23
+        telas empurradas passa `paddingTop` próprio — conferido em 11/09/2026.
       */
-      paddingTop: topBar ? headerHeight + Space.md : Platform.OS === 'ios' ? 0 : Space.md,
+      paddingTop: topBar ? headerHeight + Space.sm : Space.sm,
       paddingBottom: insets.bottom + Space.xxl + tabBarSpace + fabSpace,
     },
     contentStyle,
