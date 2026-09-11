@@ -6,8 +6,18 @@ O mês do usuário e a fatura do cartão fecham num dia, e a frase é quase a me
 outro move a régua de leitura do workspace inteiro achando que cadastrou um
 cartão — ou cria um cartão achando que mudou o mês.
 
-Metade ACEITAR (resource=mes) e metade DISCRIMINAR (resource=cards). As duas
-passam ou a mudança não fechou.
+Três metades: ACEITAR o ciclo dito de qualquer jeito (inclusive sem a palavra
+"ciclo" e sem "mês fecha"), DISCRIMINAR o cartão, e RECUSAR o que só tem um "dia
+N" dentro. As três passam ou a mudança não fechou.
+
+⚠️ **A terceira metade nasceu de um defeito medido.** A primeira versão do texto
+do catálogo dizia só "é resource=mes quando a frase fala do MÊS da pessoa, sem
+citar cartão" — e com ela *"meu salário cai todo dia 5"* virava `resource=mes`:
+o agente mudaria a régua de leitura do mês inteiro em vez de cadastrar a
+recorrente do salário. O "meu" + "dia N" bastava para puxar. O que consertou não
+foi mais prosa afirmativa e sim CONTRAEXEMPLOS no prompt, mais a pergunta que
+separa os dois casos ("o que acontece nesse dia? se a resposta é dinheiro, é
+recurring").
 
     source .env && export GEMINI_API_KEY
     .venv/bin/python scripts/probe_mes_vs_cartao.py
@@ -44,6 +54,22 @@ CASOS: list[tuple[str, str, str | None]] = [
     ("meu periodo financeiro vai do dia 15 ao dia 15", "mes", "cycle_close_day"),
     ("muda meu mes pra fechar no dia 20", "mes", "cycle_close_day"),
     ("meu mes volta a fechar no fim do mes", "mes", "cycle_close_day"),
+    # --- o ciclo SEM a palavra "ciclo" e sem "mês fecha": é assim que a pessoa
+    #     que não sabe o nome da feature fala ---
+    ("quero contar do dia 15 ao dia 15", "mes", "cycle_close_day"),
+    ("minha virada tem que ser no dia 20", "mes", "cycle_close_day"),
+    ("faz o corte no dia 10", "mes", "cycle_close_day"),
+    ("quero que zere no dia 25", "mes", "cycle_close_day"),
+    ("prefiro contar a partir do dia 6", "mes", "cycle_close_day"),
+    ("organiza minhas contas do dia 10 em diante", "mes", "cycle_close_day"),
+    ("eu recebo dia 5 e pago tudo dia 10, quero que o app siga isso", "mes", "cycle_close_day"),
+    # --- RECUSAR: "dia N" que não é o ciclo. Nenhuma pode virar resource=mes ---
+    ("meu salario cai todo dia 5", "recurring", None),
+    ("recebo 4000 de salario todo dia 5", "recurring", None),
+    ("todo dia 15 pago a academia", "recurring", None),
+    ("o aluguel vence todo dia 10", "recurring", None),
+    ("minha internet vence dia 12", "recurring", None),
+    ("cria uma meta de 5000 pro dia 20", "goals", None),
     # --- o cartão continua sendo cartão ---
     ("cadastra o cartao Inter que fecha dia 7", "cards", "closing_day"),
     ("o fechamento do nubank e dia 3", "cards", "closing_day"),

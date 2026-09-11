@@ -6,8 +6,9 @@ A prova que motivou este arquivo foi feita no emulador em 11/09/2026: perguntei
 de faturas de cartão**. Não era o modelo errando — a palavra "ciclo" não existia
 em `prompts.py`, e "ciclo" sem mais nada é o ciclo do cartão.
 
-Metade ACEITAR (o mês do usuário) e metade DISCRIMINAR (o cartão continua sendo
-cartão). As duas passam ou a mudança não fechou: regressão em "aceitar" é o
+Metade ACEITAR (o mês do usuário, dito de qualquer jeito — inclusive sem a
+palavra "ciclo", que é como fala quem não sabe o nome da feature) e metade
+DISCRIMINAR (o cartão continua sendo cartão, e dinheiro continua sendo projeção). As duas passam ou a mudança não fechou: regressão em "aceitar" é o
 agente ficando surdo; regressão em "discriminar" é ele responder sobre o cartão
 errado com cara de certeza.
 
@@ -53,6 +54,15 @@ CASOS: list[tuple[str, set[FinanceQueryType]]] = [
     ("que periodo ta valendo agora?", {CY}),
     ("qual meu ciclo financeiro?", {CY}),
     ("meu mes comeca que dia?", {CY}),
+    # --- sem a palavra "ciclo" e sem "meu mês": é assim que fala quem não sabe
+    #     o nome da feature, e é o caso que o dono do produto levantou ---
+    ("de quando a quando conta meus gastos?", {CY}),
+    ("qual o meu periodo?", {CY}),
+    ("quando vira a virada?", {CY}),
+    ("a partir de que dia conta o mes novo?", {CY}),
+    ("qual a data de corte?", {CY}),
+    ("quando zera minha contagem de gastos?", {CY}),
+    ("qual o meu fechamento?", {CY}),
     # --- discriminar: o cartão continua sendo o cartão ---
     ("quando fecha a fatura do nubank?", {INV}),
     ("qual o ciclo do nubank?", {INV}),
