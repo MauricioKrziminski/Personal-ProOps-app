@@ -38,7 +38,6 @@ import {
   type TransactionSource,
 } from '@/hooks/use-finance';
 import { formatBRL, formatDateBR, localISODate } from '@/hooks/use-items';
-import { monthBounds } from '@/lib/dates';
 import { confirmDestructive } from '@/lib/item-actions';
 import { dueInline, settleLabel } from '@/lib/settle-labels';
 import { useDebounced } from '@/hooks/use-debounced';

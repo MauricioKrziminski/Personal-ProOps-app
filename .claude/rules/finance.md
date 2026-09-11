@@ -351,6 +351,55 @@ compra, não a única tela que responde quanto resta.
   baixa nela, mudando a projeção e o total da fatura sem nada na tela dizer isso. Onde o campo não
   aparece, o valor é o que já era.
 
+## Rotativo — a fatura vencida que vai para a próxima
+
+O usuário só tinha duas saídas para uma fatura que não pagou: deixá-la atrasada para sempre ou
+marcá-la como PAGA. A segunda é mentira, e mentira que contamina tudo — saldo, projeção,
+patrimônio. `roll_invoice` é a terceira (`20260911040000`).
+
+**O que a lei decide, o app não estima:**
+- **IOF é exato**: 0,38% fixo + 0,0082% ao dia sobre o principal, teto 3,38% (Decretos
+  12.466/2025 e 12.499/2025). Sai sempre, mesmo sem taxa de juros cadastrada.
+- **Juros são do cartão** (`accounts.rotativo_rate_monthly`, fração mensal como
+  `debts.interest_rate_monthly`) e vêm impressos na fatura. **Null = o app não inventa**: rola
+  só o principal e a tela diz que a projeção ficou otimista por esse valor.
+
+⚠️ **Regra de terceiro não vira trava de digitação.** A primeira versão recusava adiar uma
+fatura que já tinha recebido um saldo adiado, citando a Resolução CMN 4.549/2017 (o rotativo
+dura um ciclo). O dono do produto apontou o furo — *"o Nubank consegue, ele mescla o pendente
+na fatura como se fosse um lançamento"* — e ele estava certo: **a 4.549 obriga o BANCO**. Com a
+trava, uma fatura que na vida real carregou saldo dois ciclos ficaria impossível de registrar, e
+a única saída seria de novo marcar como paga uma fatura não paga. Hoje `roll_invoice` devolve
+`segundo_ciclo` e a tela AVISA. A única recusa que ficou é adiar a MESMA fatura duas vezes, que
+é idempotência de verdade.
+
+⚠️ **Duas contagens duplas, e as duas são mudas.**
+1. **Caixa**: a fatura adiada continua `status <> 'paid'`, então ela pesaria no vencimento E o
+   principal pesaria de novo na fatura seguinte. São **15 ocorrências em 9 funções** — o filtro
+   virou `status not in ('paid','rolled')`. `supabase/tests/roll_invoice.sql` prende o
+   "exatamente uma vez".
+2. **Competência**: o principal adiado NÃO é gasto novo — é a mesma compra, já contada no mês em
+   que foi feita. Ele precisa existir como lançamento (o total da fatura é a soma das transações
+   dela), mas `month_lines_for` e `budgets_status_for` o excluem por
+   `transactions.rollover_of_invoice_id`. Sem isso a compra de agosto inflaria setembro e comeria
+   o orçamento duas vezes. **Juros e IOF são gasto novo e contam em todo lugar.**
+
+⚠️ **A interface nunca escreve "rolada".** O dono do produto recusou o jargão — *"eu não saberia
+o que seria rolada"*. O status no banco é `rolled`; na tela é **"Adiada"**, e a linha diz
+**"Foi para a fatura de 10/11"**, que é o que aconteceu.
+
+⚠️ **`to_char(d, 'TMMonth')` escreve em INGLÊS aqui.** O `TM` traduz pelo `lc_time` da sessão, e
+o Postgres do Supabase roda em `C`. Saiu "Saldo em rotativo de July" no primeiro teste com dados
+reais. Quem traduz mês é `private.mes_pt` — array literal, exato, sem depender de configuração
+global.
+
+**Automático é por CARTÃO e nasce desligado** (`accounts.rotativo_auto`). Ligado para todos, um
+cartão pago em dia nunca mais apareceria como atrasado. O cron roda um dia DEPOIS do vencimento
+(`due_date < current_date`, nunca `<=`): pagar no próprio dia é o normal.
+
+**O agente NÃO adia fatura** — lacuna declarada em `docs/AGENTE-PARIDADE-COM-O-APP.md`, com o
+motivo (teto de `FinanceAction`) e o custo aceito.
+
 ## Patrimônio
 
 - `assets` + `asset_valuations` (marcação com data). Valor novo entra sempre por `update_asset_value`, que grava no histórico — nunca `update` direto na coluna.

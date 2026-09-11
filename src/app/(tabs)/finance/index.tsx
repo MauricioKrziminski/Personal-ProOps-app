@@ -57,7 +57,7 @@ import {
 } from '@/hooks/use-finance';
 import { categoryIcon } from '@/design/category-icons';
 import { formatBRL, formatDateBR, localISODate } from '@/hooks/use-items';
-import { isoToBR, monthBounds } from '@/lib/dates';
+import { isoToBR } from '@/lib/dates';
 import { confirmDestructive, showItemActions } from '@/lib/item-actions';
 import { useTheme, useScheme } from '@/hooks/use-theme';
 
