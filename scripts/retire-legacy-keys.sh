@@ -45,6 +45,40 @@ log()  { printf '\n\033[1m▸ %s\033[0m\n' "$*"; }
 warn() { printf '  \033[33m! %s\033[0m\n' "$*"; }
 ok()   { printf '  \033[32m✓ %s\033[0m\n' "$*"; }
 
+# ---------------------------------------------------------------------------
+# ⚠️ **Sem `psql`, a checagem do Vault dava VERDE em vez de erro** (11/09/2026).
+# `psql ... | grep -q 1` com o binário ausente falha no primeiro elo, o `grep` não
+# acha nada e o `else` dizia "sem cópia da chave no Vault" — um relatório limpo
+# sobre um banco que ninguém olhou. Checagem que mente quando a ferramenta falta é
+# pior que checagem nenhuma: ela encerra a investigação.
+#
+# Este Mac não tem `psql` no PATH e não tem Postgres instalado; tem Docker. Então o
+# roteiro aceita as três formas, nesta ordem, e RECLAMA quando não acha nenhuma.
+PSQL=()
+resolve_psql() {
+  local c
+  for c in psql /opt/homebrew/opt/libpq/bin/psql /usr/local/opt/libpq/bin/psql; do
+    if command -v "$c" >/dev/null 2>&1; then PSQL=("$c"); return 0; fi
+  done
+  if command -v docker >/dev/null 2>&1; then
+    # `-i` porque as etapas de escrita mandam SQL por stdin (heredoc).
+    PSQL=(docker run --rm -i postgres:16 psql)
+    return 0
+  fi
+  return 1
+}
+
+precisa_psql() {
+  resolve_psql || {
+    cat >&2 <<'TXT'
+  ✗ não achei psql nem docker. Escolha um:
+      brew install libpq     # depois use /opt/homebrew/opt/libpq/bin/psql
+      (ou abra o Docker Desktop — o script usa a imagem postgres:16 sozinho)
+TXT
+    exit 1
+  }
+}
+
 precisa_db() {
   [[ -n "$DB_URL" ]] || {
     echo "  ✗ defina SUPABASE_DB_URL (Dashboard → Settings → Database → Connection string)" >&2
@@ -68,15 +102,23 @@ check() {
   fi
 
   printf '\n  2) pg_cron via Vault — migrations 0008/0016/0025\n'
-  if [[ -n "$DB_URL" ]]; then
-    if psql "$DB_URL" -tAc "select 1 from vault.decrypted_secrets where name='anon_key'" | grep -q 1; then
+  if [[ -z "$DB_URL" ]]; then
+    warn "SUPABASE_DB_URL não definida — NÃO OLHEI o Vault (isto não é um ok)"
+  elif ! resolve_psql; then
+    warn "sem psql e sem docker — NÃO OLHEI o Vault (isto não é um ok)"
+    warn "brew install libpq, ou abra o Docker Desktop"
+  else
+    local saida rc=0
+    saida="$("${PSQL[@]}" "$DB_URL" -tAc "select 1 from vault.decrypted_secrets where name='anon_key'" 2>&1)" || rc=$?
+    if (( rc != 0 )); then
+      warn "não deu para consultar o banco — NÃO OLHEI o Vault:"
+      printf '     %s\n' "$saida"
+    elif [[ "$saida" == *1* ]]; then
       warn "o segredo 'anon_key' ainda existe no Vault"
-      psql "$DB_URL" -tAc "select '     cron ativo: '||jobname from cron.job" || true
+      "${PSQL[@]}" "$DB_URL" -tAc "select '     cron ativo: '||jobname from cron.job" || true
     else
       ok "sem cópia da chave no Vault"
     fi
-  else
-    warn "SUPABASE_DB_URL não definida — pulei a checagem do Vault"
   fi
 
   printf '\n  3) Agente Python\n'
@@ -92,6 +134,7 @@ check() {
 # Vault e os cron.schedule do pg_cron não têm mais razão de existir.
 vault() {
   precisa_db
+  precisa_psql
   log "Desligando os crons do pg_cron e apagando a chave do Vault"
 
   warn "isto pressupõe que /cron/reminders, /cron/finance-scheduler e /cron/alerts"
@@ -99,7 +142,7 @@ vault() {
   read -r -p "  Os crons do Cloud Scheduler já estão no ar? [s/N] " r
   [[ "$r" =~ ^[sS]$ ]] || { echo "  abortado."; exit 0; }
 
-  psql "$DB_URL" <<'PSQL'
+  "${PSQL[@]}" "$DB_URL" <<'PSQL'
 do $$
 declare j text;
 begin
