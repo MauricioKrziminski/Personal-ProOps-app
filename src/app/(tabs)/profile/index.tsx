@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Platform, Pressable, ScrollView, StyleSheet, View, useWindowDimensions } from 'react-native';
+import { Platform, ScrollView, StyleSheet, View, useWindowDimensions } from 'react-native';
 import { router } from 'expo-router';
 import * as Haptics from 'expo-haptics';
 import Animated, { FadeIn } from 'react-native-reanimated';
@@ -20,6 +20,7 @@ import { Field, TextField } from '@/components/ui/field';
 import { Sheet } from '@/components/ui/sheet';
 import { Motion, Radius, Space, tabular } from '@/design/tokens';
 import { currentMonth } from '@/components/finance/month-picker';
+import { CycleDayPicker } from '@/components/finance/cycle-day-picker';
 import { environmentLabel } from '@/lib/environment';
 import { useAiMonthStats, useCycle, usePlanStatus, useSetCycleCloseDay } from '@/hooks/use-finance';
 import { useAppUpdate } from '@/hooks/use-app-update';
@@ -187,81 +188,18 @@ export default function ProfileScreen() {
       />
 
       {editandoCiclo ? (
-        <Animated.View entering={FadeIn.duration(Motion.duration.fast)}>
-          <View style={styles.cicloGrade}>
-            {Array.from({ length: 28 }, (_, i) => i + 1).map((dia) => {
-              const escolhido = diaEmEdicao === dia;
-              return (
-                <Pressable
-                  key={dia}
-                  accessibilityRole="button"
-                  accessibilityState={{ selected: escolhido }}
-                  accessibilityLabel={`Fechar o mês no dia ${dia}`}
-                  onPress={() => {
-                    Haptics.selectionAsync();
-                    setDiaRascunho(dia);
-                  }}
-                  style={[
-                    styles.cicloDia,
-                    {
-                      backgroundColor: escolhido ? theme.tint : theme.surface,
-                      borderColor: escolhido ? theme.tint : theme.cardBorder,
-                    },
-                  ]}>
-                  <ThemedText
-                    type="default"
-                    style={[tabular, escolhido ? { color: theme.onTint } : undefined]}>
-                    {dia}
-                  </ThemedText>
-                </Pressable>
-              );
-            })}
-          </View>
+        <Animated.View
+          entering={FadeIn.duration(Motion.duration.fast)}
+          style={styles.cicloEdicao}>
+          <CycleDayPicker value={diaEmEdicao} onChange={setDiaRascunho} />
 
-          {/*
-            Fora da grade de propósito: "último dia" não é um número entre 1 e 28, é a AUSÊNCIA
-            de escolha (e o padrão). Dentro dela leria como um 29º dia — e o mês nem sempre tem.
-          */}
-          <Pressable
-            accessibilityRole="button"
-            accessibilityState={{ selected: diaEmEdicao == null }}
-            onPress={() => {
-              Haptics.selectionAsync();
-              setDiaRascunho(null);
-            }}
-            style={[
-              styles.cicloUltimo,
-              {
-                backgroundColor: diaEmEdicao == null ? theme.tint : theme.surface,
-                borderColor: diaEmEdicao == null ? theme.tint : theme.cardBorder,
-              },
-            ]}>
-            <ThemedText
-              type="default"
-              style={diaEmEdicao == null ? { color: theme.onTint } : undefined}>
-              Último dia do mês
-            </ThemedText>
-          </Pressable>
-
-          {/*
-            A prévia fica COLADA no botão: é a resposta a "onde eu defino começo e fim?". Não dá
-            para escolher os dois — o mês seguinte começa no dia após o anterior fechar —, então
-            o que resolve não é explicar, é o intervalo mudar junto com o dedo.
-          */}
-          <View style={styles.cicloSalvar}>
-            <ThemedText type="footnote" themeColor="textSecondary" style={tabular}>
-              {diaEmEdicao == null
-                ? 'do dia 1 ao último dia de cada mês'
-                : `do dia ${diaEmEdicao === 28 ? 1 : diaEmEdicao + 1} de um mês ao dia ${diaEmEdicao} do seguinte`}
-            </ThemedText>
-            <Button
-              label={mudou ? 'Salvar' : 'Fechar'}
-              variant={mudou ? 'primary' : 'secondary'}
-              onPress={salvarCiclo}
-              loading={setCloseDay.isPending}
-              block
-            />
-          </View>
+          <Button
+            label={mudou ? 'Salvar' : 'Fechar'}
+            variant={mudou ? 'primary' : 'secondary'}
+            onPress={salvarCiclo}
+            loading={setCloseDay.isPending}
+            block
+          />
         </Animated.View>
       ) : null}
     </Section>
@@ -647,48 +585,11 @@ function Stat({ valor, rotulo, limite }: { valor: string; rotulo: string; limite
 }
 
 const styles = StyleSheet.create({
-  /*
-    7 colunas, como a semana de um calendário — é a grade que a pessoa já sabe varrer com o
-    olho. `flexBasis` em vez de largura fixa: a calha muda entre 384dp e um tablet, e um número
-    cravado deixaria a última coluna fora ou uma faixa vazia à direita.
-  */
-  cicloGrade: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: Space.sm,
+  /* A calha lateral é da TELA; o seletor não conhece o recuo de quem o usa. */
+  cicloEdicao: {
     paddingHorizontal: Space.lg,
     paddingBottom: Space.md,
-  },
-  /*
-    ⚠️ `minHeight`, nunca `height`. O conteúdo é TEXTO e cresce com a fonte do sistema: a 1,3×
-    um alvo de altura fixa corta o número. 44 é o mínimo de toque; daí para cima quem manda é
-    o texto.
-  */
-  cicloDia: {
-    flexBasis: '12%',
-    flexGrow: 1,
-    minHeight: 44,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderRadius: Radius.sm,
-    borderWidth: 1,
-    borderCurve: 'continuous',
-  },
-  cicloSalvar: {
-    paddingHorizontal: Space.lg,
-    paddingBottom: Space.md,
-    gap: Space.sm,
-  },
-  cicloUltimo: {
-    marginHorizontal: Space.lg,
-    marginBottom: Space.md,
-    minHeight: 44,
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: Space.sm,
-    borderRadius: Radius.sm,
-    borderWidth: 1,
-    borderCurve: 'continuous',
+    gap: Space.md,
   },
   /*
     `flexWrap`: com fonte grande o rótulo + os três segmentos não cabem na mesma linha, e apertar

@@ -364,6 +364,32 @@ test('nenhuma tela compõe variante de texto com spread de Type', () => {
   );
 });
 
+/**
+ * Glifo de texto não faz papel de ícone.
+ *
+ * O onboarding escrevia `✓` num `<Text>` para marcar a opção escolhida — o
+ * mesmo papel que `<Icon name="checkmark">` cumpre com o símbolo da
+ * plataforma, o tamanho de geometria e o mapa SF→Material. Glifo herda a
+ * métrica da FONTE: ele cresce com o `fontScale`, muda de desenho entre
+ * aparelhos e não tem cor semântica. É a mesma regra que já tirou `‹` e `＋`
+ * das telas (§4 do design), e ela some sozinha se ninguém contar.
+ */
+test('nenhum glifo de texto fazendo papel de ícone', () => {
+  const fora: string[] = [];
+  for (const file of walk(SRC)) {
+    if (file.endsWith('.test.ts') || file.endsWith('.test.tsx')) continue;
+    stripComments(readFileSync(file, 'utf8'))
+      .split('\n')
+      .forEach((line, n) => {
+        // Só os glifos que JÁ fizeram papel de ícone aqui. `×` fica de fora de
+        // propósito: ele é sinal de multiplicação em comentário ("384 × 1,3"),
+        // e proibi-lo transformaria a trava numa lista de exceções.
+        if (/[✓✔✗✘＋]/.test(line)) fora.push(`${file.replace(SRC, 'src')}:${n + 1}`);
+      });
+  }
+  assert.deepEqual(fora, [], 'use <Icon name=...>: glifo de texto cresce com a fonte e não tem mapa Android');
+});
+
 test('nenhuma tela monta lista de conta à mão', () => {
   // Só o próprio seletor pode iterar contas para desenhar opção; `accounts.tsx`
   // é a tela que GERENCIA contas (ali a lista é o conteúdo, não um campo).
