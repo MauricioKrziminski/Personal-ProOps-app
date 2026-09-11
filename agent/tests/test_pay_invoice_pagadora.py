@@ -140,3 +140,32 @@ def test_o_termo_da_fatura_vem_do_cartao_e_nao_da_descricao():
     fonte = inspect.getsource(resolve)
     assert "FinanceActionType.PAY_INVOICE" in fonte
     assert 'bruto = getattr(acao, "account", None)' in fonte
+
+
+@pytest.mark.asyncio
+async def test_cartao_nao_paga_fatura_de_cartao(monkeypatch):
+    """A RPC só recusa o PRÓPRIO cartão; cartão→cartão passaria.
+
+    O app filtra `type !== 'credit_card'` na lista de pagadoras e o catálogo
+    recusa por escrito. O agente não tinha nada: "paguei a fatura do nubank pelo
+    inter", com o Inter também cartão, criaria uma transferência entre cartões.
+    """
+    chamadas = _banco(monkeypatch, citada="55555555-5555-5555-5555-555555555555")
+
+    async def fetch_one(sql, *args):
+        if "select type from public.accounts" in sql:
+            return {"type": "credit_card"}
+        if "invoice_open_cents" in sql:
+            return {"id": "fatura-1", "due_date": "2026-10-10",
+                    "account_id": CARTAO, "aberto": 100000}
+        return None
+
+    monkeypatch.setattr(finance.db, "fetch_one", fetch_one)
+
+    with pytest.raises(Level1Error) as erro:
+        await finance.pay_invoice(
+            _ctx(),
+            FinanceAction(type=FinanceActionType.PAY_INVOICE, counterparty_account="inter"),
+        )
+    assert "cartão não paga" in str(erro.value).lower()
+    assert "args" not in chamadas

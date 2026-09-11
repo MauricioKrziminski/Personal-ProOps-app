@@ -415,8 +415,24 @@ async def _conta_que_paga(workspace_id, cartao_id, citada: str | None):
     `create_transaction`.
     """
     if citada:
+        # `account_type="checking"` não serve: a conta pagadora pode ser poupança
+        # ou dinheiro. O que ela NÃO pode ser é cartão — a RPC só recusa o próprio
+        # cartão (`p_account_id = inv.account_id`), então "paguei a fatura do nubank
+        # pelo inter", com o Inter também cartão, passaria e criaria uma
+        # transferência de cartão para cartão. O app filtra `type !== 'credit_card'`
+        # na lista de pagadoras e o catálogo recusa com todas as letras; aqui não
+        # havia nada.
         achada = await resolve_account(workspace_id, citada)
         if achada:
+            linha = await db.fetch_one(
+                "select type from public.accounts where id = %s and workspace_id = %s",
+                achada,
+                workspace_id,
+            )
+            if linha and linha.get("type") == "credit_card":
+                raise Level1Error(
+                    "❌ Um cartão não paga a fatura de outro. De qual conta saiu o dinheiro?"
+                )
             return achada
 
     linha = await db.fetch_one(
