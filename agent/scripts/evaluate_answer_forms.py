@@ -225,7 +225,7 @@ async def main(args):
         #
         # Use enquanto estiver mexendo em prompt. A execução que DECIDE se está
         # pronto roda sem esta flag.
-        os.environ["GEMINI_MODEL_GATE"] = gemini.GEMINI_ROUTER
+        os.environ["GEMINI_MODEL_GATE"] = gemini.MODELOS["router"]
         print(
             "⚠️  --barato: gate no Flash-Lite (grátis até 500/dia).\n"
             "    O Lite reprova ~8 casos que o Flash passa — este número NÃO "

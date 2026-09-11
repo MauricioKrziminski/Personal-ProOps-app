@@ -50,53 +50,77 @@ from pydantic import BaseModel
 
 from app.config import get_settings
 
-GEMINI_ROUTER = "gemini-3.1-flash-lite"
-GEMINI_PARSE = "gemini-3.1-flash-lite"
-# Portão de confirmação e preenchimento de rascunho (`domain/confirm.py`, `domain/draft.py`).
-# Era GEMINI_ESCALATE, definido e ligado a NADA desde que o escalonamento automático saiu.
-GEMINI_GATE = "gemini-3.7-flash"
-GEMINI_BATCH = "gemini-3.1-flash-lite"
-
-# Sobre prompt caching: NÃO ativar nem reestruturar prompt por causa disso.
-# O mínimo para cache implícito é 4.096 tokens nos modelos 3.5/3.6/3.7 Flash e o
-# prompt por domínio aqui tem ~800. Medido em 30/08/2026 — se alguém "otimizar"
-# o prompt para caching no futuro, vai gastar tempo por zero de economia.
-
 # ---------------------------------------------------------------------------
-# Trocar o modelo PARA TESTE, sem tocar no que roda em produção
+# A ESCOLHA DE MODELO ACONTECE AQUI, E SÓ AQUI
 # ---------------------------------------------------------------------------
-# O custo deste projeto não está no tráfego — está nas suítes. `ai_events` tinha
-# 29 chamadas em produção desde que existe, e mesmo assim um dia de trabalho
-# custou dinheiro: quem gasta é `evaluate_answer_forms.py` (~94 chamadas por
-# execução) e os `probe_*`.
+# Uma tabela por PAPEL. Nenhum outro lugar do sistema decide modelo: as tools, os
+# nós e os scripts pedem o papel, não o nome.
 #
-# E o que gasta DENTRO delas é o modelo, não a quantidade: o Flash-Lite tem 500
-# requisições/dia no nível gratuito e o Flash tem **20**. Uma execução da suíte
-# manda ~40 no gate (Flash) — a partir da segunda do dia, tudo é pago.
+# ⚠️ Havia TRÊS mecanismos, e um deles era uma arma carregada. Além destas
+# constantes existia `settings.gemini_model` (default `gemini-3.7-flash`) sendo
+# lido em `llm()` ANTES do padrão do papel: bastava alguém chamar `llm()` sem
+# argumento — ou preencher `GEMINI_MODEL` no ambiente — para todo o router e todo
+# o parse migrarem do Lite para o Flash em silêncio, que é 25× menos cota grátis.
+# Ele saiu do caminho em 11/09/2026.
 #
-# Estas variáveis existem para uma execução de ITERAÇÃO poder ficar inteira no
-# Lite. Elas são vazias em produção e o `_resolver` avisa no log quando estão
-# ligadas: modelo trocado em silêncio é como a medição deixa de valer sem
-# ninguém perceber.
-_ENV_POR_MODELO = {
-    GEMINI_ROUTER: "GEMINI_MODEL_LITE",
-    GEMINI_PARSE: "GEMINI_MODEL_LITE",
-    GEMINI_BATCH: "GEMINI_MODEL_LITE",
-    GEMINI_GATE: "GEMINI_MODEL_GATE",
+# A divisão entre Lite e Flash veio de MEDIÇÃO, não de preferência (09/09/2026):
+# a suíte inteira no Lite deu 86/94, e uma das quedas é do lado que não pode cair
+# ("apaga todos" voltou `approved: True`). Router e parse são duas chamadas por
+# mensagem — é o volume, e é onde a cota grátis importa.
+MODELOS: dict[str, str] = {
+    "router": "gemini-3.1-flash-lite",
+    "parse": "gemini-3.1-flash-lite",
+    "batch": "gemini-3.1-flash-lite",
+    # Portão de confirmação e preenchimento de rascunho (`domain/confirm.py`,
+    # `domain/draft.py`). Era GEMINI_ESCALATE, definido e ligado a NADA desde que
+    # o escalonamento automático saiu.
+    "gate": "gemini-3.7-flash",
 }
 
 log = logging.getLogger(__name__)
 _avisados: set[str] = set()
 
 
-def _resolver(nome: str) -> str:
-    trocado = os.environ.get(_ENV_POR_MODELO.get(nome, ""), "").strip()
-    if not trocado or trocado == nome:
-        return nome
-    if nome not in _avisados:
-        _avisados.add(nome)
-        log.warning("modelo %s trocado por %s (variável de ambiente)", nome, trocado)
+def modelo(papel: str) -> str:
+    """O modelo de um papel — com a troca de TESTE aplicada, se houver.
+
+    `GEMINI_MODEL_<PAPEL>` (`GEMINI_MODEL_GATE`, `GEMINI_MODEL_PARSE`, ...) troca
+    o modelo daquele papel sem tocar em código. Vazias em produção.
+
+    Elas existem por causa do custo, e o custo tem um formato específico: o
+    Flash-Lite tem **500** requisições/dia no nível gratuito e o Flash tem **20**.
+    Uma execução de `evaluate_answer_forms.py` manda ~40 no gate — da segunda do
+    dia em diante, ela inteira é paga. Com a troca, uma execução de ITERAÇÃO cabe
+    no gratuito.
+
+    ⚠️ O nome do papel é o contrato: papel desconhecido levanta, em vez de cair
+    num default silencioso. Era exatamente assim que `settings.gemini_model`
+    mudava o modelo do sistema inteiro sem ninguém pedir.
+    """
+    if papel not in MODELOS:
+        raise ValueError(f"papel de modelo desconhecido: {papel!r} (tenho {sorted(MODELOS)})")
+    padrao = MODELOS[papel]
+    trocado = os.environ.get(f"GEMINI_MODEL_{papel.upper()}", "").strip()
+    if not trocado or trocado == padrao:
+        return padrao
+    if papel not in _avisados:
+        _avisados.add(papel)
+        # Modelo trocado em silêncio é medição que deixa de valer sem ninguém
+        # perceber — por isso ele aparece no log toda vez que o processo sobe.
+        log.warning("modelo do papel %s trocado de %s para %s (ambiente)",
+                    papel, padrao, trocado)
     return trocado
+
+
+# Apelidos para quem chama por nome. Eles DERIVAM da tabela — não são uma segunda
+# fonte. Passar a string continua funcionando porque `llm()` volta dela ao papel.
+GEMINI_ROUTER = MODELOS["router"]
+GEMINI_PARSE = MODELOS["parse"]
+GEMINI_BATCH = MODELOS["batch"]
+GEMINI_GATE = MODELOS["gate"]
+
+# nome do modelo -> papel, para quem passa a constante em vez do papel.
+_PAPEL_POR_NOME = {nome: papel for papel, nome in MODELOS.items()}
 
 
 _cache: dict[tuple[str, float], ChatGoogleGenerativeAI] = {}
@@ -105,9 +129,14 @@ T = TypeVar("T", bound=BaseModel)
 
 
 def llm(model: str | None = None, temperature: float = 0.1) -> ChatGoogleGenerativeAI:
-    """Cliente por (modelo, temperatura). Reusar evita reconstruir o transporte."""
+    """Cliente por (modelo, temperatura). Reusar evita reconstruir o transporte.
+
+    `model` pode ser o PAPEL ("gate") ou o nome do modelo — os dois passam por
+    `modelo()`, que é o único lugar que decide. Sem argumento, o papel é `parse`.
+    """
     settings = get_settings()
-    nome_modelo = _resolver(model or settings.gemini_model or GEMINI_PARSE)
+    papel = model if model in MODELOS else _PAPEL_POR_NOME.get(model or "", "parse")
+    nome_modelo = modelo(papel)
     chave = (nome_modelo, temperature)
     if chave not in _cache:
         _cache[chave] = ChatGoogleGenerativeAI(

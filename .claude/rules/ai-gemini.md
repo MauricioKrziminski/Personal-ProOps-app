@@ -102,9 +102,18 @@ Os equivalentes em Deno (`_shared/gemini.ts`, `process-jobs/index.ts`) foram **a
   do dia em diante, ela inteira é paga. Três execuções num dia consumiram quase todo o
   crédito da conta.
 
-  `GEMINI_MODEL_LITE` e `GEMINI_MODEL_GATE` trocam o modelo de um papel sem tocar no código.
-  Vazias em produção; `gemini._resolver` grava um WARNING quando estão ligadas, porque modelo
-  trocado em silêncio é medição que deixa de valer sem ninguém perceber.
+  **A escolha de modelo mora em UM lugar: `gemini.MODELOS`**, uma tabela por PAPEL (`router`,
+  `parse`, `batch`, `gate`), lida por `gemini.modelo(papel)`. `GEMINI_MODEL_<PAPEL>` troca o
+  modelo daquele papel sem tocar no código — vazias em produção, e `modelo()` grava WARNING
+  quando estão ligadas, porque modelo trocado em silêncio é medição que deixa de valer sem
+  ninguém perceber. Papel desconhecido levanta, em vez de cair num default.
+
+  ⚠️ **Eram TRÊS mecanismos, e um era arma carregada** (11/09/2026): além da tabela existia
+  `settings.gemini_model`, com default **Flash**, lido em `llm()` ANTES do padrão do papel.
+  Uma chamada sem argumento — ou `GEMINI_MODEL` no ambiente — tirava router e parse do Lite
+  (500/dia grátis) e punha no Flash (20/dia), calado. Ele foi removido, e
+  `tests/test_schemas.py` quebra o build se um nome de modelo voltar a aparecer fora da
+  tabela.
 
   | quando | comando |
   |---|---|

@@ -137,6 +137,41 @@ def test_sem_variavel_de_ambiente_o_modelo_nao_muda(monkeypatch):
     from app.services import gemini
 
     monkeypatch.delenv("GEMINI_MODEL_GATE", raising=False)
-    assert gemini._resolver(gemini.GEMINI_GATE) == gemini.GEMINI_GATE
+    assert gemini.modelo("gate") == "gemini-3.7-flash"
     monkeypatch.setenv("GEMINI_MODEL_GATE", "gemini-3.1-flash-lite")
-    assert gemini._resolver(gemini.GEMINI_GATE) == "gemini-3.1-flash-lite"
+    assert gemini.modelo("gate") == "gemini-3.1-flash-lite"
+
+
+def test_papel_desconhecido_levanta_em_vez_de_cair_num_default():
+    """Era assim que `settings.gemini_model` trocava o modelo do sistema inteiro.
+
+    Ele era lido em `llm()` ANTES do padrão do papel e vinha com default
+    `gemini-3.7-flash`: bastava uma chamada sem argumento para router e parse
+    saírem do Lite (500/dia grátis) para o Flash (20/dia), em silêncio.
+    """
+    import pytest
+
+    from app.services import gemini
+
+    with pytest.raises(ValueError, match="papel de modelo desconhecido"):
+        gemini.modelo("inventado")
+
+
+def test_existe_UM_lugar_que_escolhe_modelo():
+    """Nenhum nome de modelo cru fora da tabela.
+
+    Três mecanismos coexistiam (as constantes, `settings.gemini_model` e as
+    variáveis de troca). Uma tabela, uma função: `gemini.MODELOS` + `modelo()`.
+    """
+    import pathlib
+    import re
+
+    raiz = pathlib.Path(__file__).resolve().parent.parent / "app"
+    fora = []
+    for arquivo in raiz.rglob("*.py"):
+        if arquivo.name == "gemini.py":
+            continue
+        for n, linha in enumerate(arquivo.read_text().splitlines(), 1):
+            if re.search(r'"gemini-[0-9]', linha) or re.search(r"'gemini-[0-9]", linha):
+                fora.append(f"{arquivo.name}:{n}")
+    assert not fora, f"nome de modelo fora da tabela: {fora}"
