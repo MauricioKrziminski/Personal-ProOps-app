@@ -30,23 +30,25 @@ App mobile pessoal de **notas rápidas, lembretes e controle financeiro operado 
   Isso já falhou **duas vezes** (03/09/2026): a `0049` e depois as `0050`/`0051` foram anunciadas
   como "aplicadas em produção" quando foram para o staging.
 
-  Produção está em **`20260911061000`** (conferido na fonte em 11/09/2026), aplicada pelo
-  Gabriel com `link --project-ref` + `db push` + `link` de volta para o staging.
+  Produção está em **`20260911061000`**, conferido na fonte em 11/09/2026 com
+  `link --project-ref` + `db push` + `link` de volta para o staging, que é o caminho do Gabriel.
+  **`--db-url` não serve**: o hook lê o projeto LINKADO e a flag passava por cima da trava em
+  silêncio — buraco fechado no mesmo dia, com `scripts/supabase-target.test.sh` prendendo os
+  sete casos.
 
-  **Duas migrations do repo ainda NÃO estão lá**, as duas desta data e as duas protetivas:
-  `20260911070000` (pagar fatura exige a conta de origem — sem ela a RPC aceita
-  `p_account_id` nulo e a fatura fica paga sem nenhum saldo se mexer) e `20260911120000`
-  (o `CHECK` de `draft_actions.slot` passa a aceitar `description` — sem ela, toda mensagem
-  sem descrição, tipo "gastei 45 no bradesco", derruba o turno com CheckViolation e o usuário
-  lê "não consegui processar"). **`--db-url` não serve**: o
-  hook lê o projeto LINKADO e a flag passava por cima da trava em silêncio — buraco fechado no
-  mesmo dia, com `scripts/supabase-target.test.sh` prendendo os sete casos.
+  **Duas migrations do repo ainda NÃO estão lá**, ambas de 11/09/2026 e ambas protetivas:
 
-  ⚠️ **Este número envelhece calado, e envelhecer aqui é caro.** Ele já ficou 14 migrations
-  atrasado — e em 11/09/2026 estava 6 atrasado para MENOS (dizia `20260909210000` com a
-  produção em `20260911061000`), o que é igualmente perigoso: subestimar leva a reaplicar, e a consequência não é um doc feio: em 09/09/2026 ele quase virou "não suba o OTA,
-  produção está sem as RPCs". Antes de decidir qualquer coisa com base nesta linha, confirme
-  na fonte — no SQL Editor de produção:
+  - `20260911070000` — pagar fatura exige a conta de origem. Sem ela a RPC aceita
+    `p_account_id` nulo, a fatura fica paga e **nenhum saldo se mexe**.
+  - `20260911120000` — o `CHECK` de `draft_actions.slot` passa a aceitar `description`. Sem ela
+    toda mensagem sem descrição ("gastei 45 no bradesco") derruba o turno com CheckViolation, e
+    o usuário lê "não consegui processar".
+
+  ⚠️ **Este número envelhece calado, e envelhecer aqui é caro — nos DOIS sentidos.** Ele já ficou
+  14 migrations atrasado, e em 09/09/2026 quase virou "não suba o OTA, produção está sem as
+  RPCs". Em 11/09/2026 o erro foi o contrário: a linha dizia `20260909210000` com a produção em
+  `20260911061000`, seis à frente — subestimar leva a reaplicar o que já está lá. Antes de
+  decidir qualquer coisa com base nesta linha, confirme na fonte, no SQL Editor de produção:
   `select version from supabase_migrations.schema_migrations order by version desc limit 3;`
 - **Observabilidade:** **Langfuse**, integrado por middleware/tracing do LangGraph.
 - **WhatsApp:** Meta Cloud API **oficial** (nunca Baileys/não-oficial).
