@@ -4,6 +4,7 @@ import Animated, { FadeInDown, LinearTransition } from 'react-native-reanimated'
 import { Stack, useLocalSearchParams } from 'expo-router';
 
 import { Chip } from '@/components/finance/chip';
+import { SelectField } from '@/components/ui/select-field';
 import { ThemedText } from '@/components/themed-text';
 import { HeaderActions } from '@/components/ui/header-actions';
 import { Sheet } from '@/components/ui/sheet';
@@ -734,17 +735,18 @@ export default function DebtsScreen() {
                 />
               </Field>
 
+              {/*
+                `Chip` é filtro de lista — muitos, ligáveis, resposta imediata. Aqui são cinco
+                opções mutuamente exclusivas GRAVADAS num campo, que é o papel do `SelectField`:
+                colapsado ele mostra o valor, e a forma de cada tipo vem do glifo em `DEBT_KINDS`.
+              */}
               <Field label="Tipo">
-                <View style={styles.chips}>
-                  {DEBT_KINDS.map((k) => (
-                    <Chip
-                      key={k.value}
-                      label={k.label}
-                      selected={form.kind === k.value}
-                      onPress={() => setForm({ ...form, kind: k.value })}
-                    />
-                  ))}
-                </View>
+                <SelectField
+                  options={DEBT_KINDS.map((k) => ({ id: k.value, label: k.label, icon: k.icon }))}
+                  value={form.kind}
+                  onChange={(kind) => setForm({ ...form, kind: (kind ?? 'loan') as Debt['kind'] })}
+                  placeholder="Escolher"
+                />
               </Field>
 
               <Field label="Quanto você deve hoje">

@@ -1001,12 +1001,19 @@ export function useDeleteRule() {
 
 // ── dívidas ─────────────────────────────────────────────────────────────────
 
+/**
+ * O glifo faz parte da opção, não da tela que a desenha.
+ *
+ * Mesma regra de `ACCOUNT_TYPES`: com o ícone morando aqui, o seletor do
+ * formulário e a linha da lista mostram a MESMA forma para o mesmo tipo — e um
+ * tipo novo nasce com glifo em vez de cair no `circle` genérico do Android.
+ */
 export const DEBT_KINDS = [
-  { value: 'loan', label: 'Empréstimo' },
-  { value: 'financing', label: 'Financiamento' },
-  { value: 'credit_card', label: 'Rotativo' },
-  { value: 'person', label: 'Pessoa' },
-  { value: 'other', label: 'Outro' },
+  { value: 'loan', label: 'Empréstimo', icon: 'building.columns' },
+  { value: 'financing', label: 'Financiamento', icon: 'doc.text' },
+  { value: 'credit_card', label: 'Rotativo', icon: 'creditcard' },
+  { value: 'person', label: 'Pessoa', icon: 'person.fill' },
+  { value: 'other', label: 'Outro', icon: 'shippingbox' },
 ] as const;
 
 export type Debt = Pick<
@@ -1358,13 +1365,13 @@ export function useArchiveDebt() {
 // ── patrimônio, investimentos e relatórios ──────────────────────────────────
 
 export const ASSET_CLASSES = [
-  { value: 'investment', label: 'Investimento' },
-  { value: 'real_estate', label: 'Imóvel' },
-  { value: 'vehicle', label: 'Veículo' },
-  { value: 'crypto', label: 'Cripto' },
-  { value: 'equity', label: 'Participação' },
-  { value: 'receivable', label: 'A receber' },
-  { value: 'other', label: 'Outro' },
+  { value: 'investment', label: 'Investimento', icon: 'chart.line.uptrend.xyaxis' },
+  { value: 'real_estate', label: 'Imóvel', icon: 'house' },
+  { value: 'vehicle', label: 'Veículo', icon: 'car' },
+  { value: 'crypto', label: 'Cripto', icon: 'bitcoinsign.circle' },
+  { value: 'equity', label: 'Participação', icon: 'chart.pie' },
+  { value: 'receivable', label: 'A receber', icon: 'clock.arrow.circlepath' },
+  { value: 'other', label: 'Outro', icon: 'shippingbox' },
 ] as const;
 
 export type Asset = Pick<

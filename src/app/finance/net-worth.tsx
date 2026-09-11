@@ -19,6 +19,7 @@ import { Field, MoneyField, TextField } from '@/components/ui/field';
 import { Icon } from '@/components/ui/icon';
 import { Money } from '@/components/ui/money';
 import { Row, Section } from '@/components/ui/row';
+import { SelectField } from '@/components/ui/select-field';
 import { Screen } from '@/components/ui/screen';
 import { HeroLabel } from '@/components/ui/section-head';
 import { Segmented } from '@/components/ui/segmented';
@@ -52,15 +53,10 @@ import { confirmDestructive } from '@/lib/item-actions';
  * o bloco (era o que acontecia antes, justo com quem mais precisa da explicação).
  */
 
-const CLASSE_ICONE: Record<string, Parameters<typeof Icon>[0]['name']> = {
-  investment: 'chart.line.uptrend.xyaxis',
-  real_estate: 'house',
-  vehicle: 'car',
-  crypto: 'bitcoinsign.circle',
-  equity: 'chart.pie',
-  receivable: 'clock.arrow.circlepath',
-  other: 'shippingbox',
-};
+/** O glifo mora em `ASSET_CLASSES`: a lista e o seletor mostram a mesma forma. */
+const CLASSE_ICONE = Object.fromEntries(
+  ASSET_CLASSES.map((c) => [c.value, c.icon]),
+) as Record<string, (typeof ASSET_CLASSES)[number]['icon']>;
 
 /**
  * Janelas da curva. Mesma ideia dos `HORIZONTES` da projeção: opção fixa e curta, não um
@@ -536,22 +532,18 @@ export default function NetWorthScreen() {
                 />
               </Field>
 
+              {/*
+                Era uma `Section` de `Row` com um `checkmark` no fim — sete linhas abertas dentro
+                de um formulário, e o mesmo desenho de uma lista de conteúdo para o que é um
+                CAMPO. `SelectField` é o caminho único dessa escolha no app.
+              */}
               <Field label="Tipo">
-                <Section>
-                  {ASSET_CLASSES.map((c) => (
-                    <Row
-                      key={c.value}
-                      title={c.label}
-                      icon={CLASSE_ICONE[c.value]}
-                      onPress={() => setForm({ ...form, classe: c.value })}
-                      trailing={
-                        form.classe === c.value ? (
-                          <Icon name="checkmark" size="sm" color="tint" />
-                        ) : undefined
-                      }
-                    />
-                  ))}
-                </Section>
+                <SelectField
+                  options={ASSET_CLASSES.map((c) => ({ id: c.value, label: c.label, icon: c.icon }))}
+                  value={form.classe}
+                  onChange={(classe) => setForm({ ...form, classe: (classe ?? 'other') as Asset['class'] })}
+                  placeholder="Escolher"
+                />
               </Field>
 
               <Field
