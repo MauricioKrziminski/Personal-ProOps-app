@@ -3,8 +3,7 @@ import { useState } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 
 import { ThemedText } from '@/components/themed-text';
-import { Button } from '@/components/ui/button';
-import { Sheet } from '@/components/ui/sheet';
+import { Sheet, SheetHeader } from '@/components/ui/sheet';
 import { Icon } from '@/components/ui/icon';
 import { HitTarget, Radius, Space } from '@/design/tokens';
 import { useTheme } from '@/hooks/use-theme';
@@ -56,13 +55,10 @@ interface MonthPickerProps {
   month: string;
   onChange: (month: string) => void;
   /**
-   * Sobre o painel de destaque (tinta), em vez de sobre o fundo da tela.
-   *
-   * O seletor é o **controle do número do painel** — quem muda o mês muda o valor grande. Fora
-   * dele, flutuando entre o header e a faixa preta, ele lia como um filtro solto e a relação
-   * com o valor sumia. Aqui só troca as cores; a mecânica é a mesma.
+   * Rodapé DENTRO da mesma superfície, abaixo de um fio — a janela que o mês cobre e a régua
+   * que a produz (`PeriodBar`). Sem ele o controle é só o passo de mês.
    */
-  onHero?: boolean;
+  children?: React.ReactNode;
 }
 
 /**
@@ -71,8 +67,22 @@ interface MonthPickerProps {
  * `transactions.tsx` e `budgets.tsx` tinham a mesma função duplicada com visual e
  * acessibilidade diferentes (setas desenhadas como texto `‹`/`›`, sem label). Aqui a seta é
  * `Icon` (SF Symbol) e cada uma diz para onde vai.
+ *
+ * ## Ele virou uma SUPERFÍCIE, e isso reverte uma decisão anterior (11/09/2026)
+ *
+ * Era uma linha solta com `alignSelf: 'flex-start'`, e o comentário de então dizia que esticar
+ * faria dele "navegação de página". O argumento estava certo sobre o desenho ANTIGO — duas setas
+ * de 44pt e um texto no meio, sem nada em volta, espalhados até as bordas da tela. O que ele não
+ * previu é o que sobra quando esse controle é o primeiro elemento abaixo do header: texto nu com
+ * ar em volta, que é a queixa literal do dono do produto (*"está tendo espaço vazio para cima
+ * sem necessidade"*, *"dá para melhorar o componente de passar e voltar o mês"*).
+ *
+ * Dentro de um card com contorno, as setas passam a ser DELE e não da tela; o vazio acima vira a
+ * distância entre dois blocos, que é exatamente o que ele é. As setas caíram de 44 para 36 de
+ * geometria com `hitSlop` — o alvo continua acima dos 44pt exigidos (§11) e o bloco encolhe 16pt
+ * de altura, que era metade do "espaço vazio".
  */
-export function MonthPicker({ month, onChange, onHero = false }: MonthPickerProps) {
+export function MonthPicker({ month, onChange, children }: MonthPickerProps) {
   const theme = useTheme();
   /** Ano aberto no sheet; `null` = sheet fechado. */
   const [sheet, setSheet] = useState<string | null>(null);
@@ -88,45 +98,46 @@ export function MonthPicker({ month, onChange, onHero = false }: MonthPickerProp
       accessibilityLabel={
         delta < 0 ? `Mês anterior, ${monthTitle(shiftMonth(month, -1))}` : `Próximo mês, ${monthTitle(shiftMonth(month, 1))}`
       }
-      hitSlop={8}
+      hitSlop={Space.sm}
       onPress={step(delta)}
       style={({ pressed }) => [
         styles.arrow,
-        onHero
-          ? { borderWidth: StyleSheet.hairlineWidth, borderColor: theme.heroSeparator }
-          : { backgroundColor: pressed ? theme.backgroundSelected : theme.backgroundElement },
+        { backgroundColor: pressed ? theme.backgroundSelected : theme.backgroundElement },
       ]}>
-      <Icon
-        name={delta < 0 ? 'chevron.left' : 'chevron.right'}
-        size="sm"
-        color={onHero ? 'onHero' : 'tint'}
-      />
+      <Icon name={delta < 0 ? 'chevron.left' : 'chevron.right'} size="sm" color="tint" />
     </Pressable>
   );
 
   return (
-    <View style={styles.row}>
-      {arrow(-1)}
-      {/*
-        O título deixou de ser só rótulo e virou a PORTA do salto de ano. As setas resolvem ±1;
-        voltar catorze meses custava catorze toques (o achado 5 da auditoria). Continua sendo
-        `header` para o leitor de tela — é o que diz onde a pessoa está —, mas agora com hint e
-        alvo de 44pt.
-      */}
-      <Pressable
-        accessibilityRole="header"
-        accessibilityLabel={monthTitle(month)}
-        accessibilityHint="Escolher outro mês ou ano"
-        onPress={() => {
-          Haptics.selectionAsync();
-          setSheet(month.slice(0, 4));
-        }}
-        style={({ pressed }) => [styles.label, { opacity: pressed ? 0.5 : 1 }]}>
-        <ThemedText type="smallBold" themeColor={onHero ? 'onHeroMuted' : 'text'}>
-          {monthTitle(month)}
-        </ThemedText>
-      </Pressable>
-      {arrow(1)}
+    <View style={[styles.card, { backgroundColor: theme.surface, borderColor: theme.cardBorder }]}>
+      <View style={styles.row}>
+        {arrow(-1)}
+        {/*
+          O título deixou de ser só rótulo e virou a PORTA do salto de ano. As setas resolvem ±1;
+          voltar catorze meses custava catorze toques (o achado 5 da auditoria). Continua sendo
+          `header` para o leitor de tela — é o que diz onde a pessoa está —, mas agora com hint e
+          alvo de 44pt.
+        */}
+        <Pressable
+          accessibilityRole="header"
+          accessibilityLabel={monthTitle(month)}
+          accessibilityHint="Escolher outro mês ou ano"
+          onPress={() => {
+            Haptics.selectionAsync();
+            setSheet(month.slice(0, 4));
+          }}
+          style={({ pressed }) => [styles.label, { opacity: pressed ? 0.5 : 1 }]}>
+          <ThemedText type="smallBold">{monthTitle(month)}</ThemedText>
+        </Pressable>
+        {arrow(1)}
+      </View>
+
+      {children ? (
+        <>
+          <View style={[styles.divisor, { backgroundColor: theme.separator }]} />
+          <View style={styles.rodape}>{children}</View>
+        </>
+      ) : null}
 
       <MonthSheet
         year={sheet}
@@ -169,12 +180,7 @@ function MonthSheet({
 
   return (
     <Sheet visible={year !== null} onClose={onClose}>
-        <View style={styles.sheetHead}>
-          <Button label="Cancelar" variant="ghost" size="sm" onPress={onClose} />
-          <ThemedText type="smallBold">Escolher mês</ThemedText>
-          {/* Espelha a largura do "Cancelar" para o título ficar no centro ÓPTICO. */}
-          <View style={styles.sheetSpacer} />
-        </View>
+        <SheetHeader title="Escolher mês" onClose={onClose} />
 
         <View style={styles.yearRow}>
           <Pressable
@@ -243,41 +249,44 @@ function MonthSheet({
 }
 
 const styles = StyleSheet.create({
+  card: {
+    borderRadius: Radius.md,
+    borderCurve: 'continuous',
+    borderWidth: StyleSheet.hairlineWidth,
+    overflow: 'hidden',
+  },
   row: {
     flexDirection: 'row',
     alignItems: 'center',
-    alignSelf: 'flex-start',
-    gap: Space.xs,
+    gap: Space.sm,
+    padding: Space.sm,
   },
   arrow: {
-    width: HitTarget,
-    height: HitTarget,
+    width: HitTarget - Space.sm,
+    height: HitTarget - Space.sm,
     borderRadius: Radius.pill,
     borderCurve: 'continuous',
     alignItems: 'center',
     justifyContent: 'center',
   },
   /**
-   * Sem `flex: 1`: o seletor é uma PÍLULA, não uma barra.
-   *
-   * Esticado, os dois chevrons iam parar nas pontas da tela e o controle lia como navegação de
-   * página — no desenho ele é um chip compacto que diz apenas de que mês a tela está falando.
+   * `flex: 1` porque agora o controle É a largura do bloco: o mês fica no centro ÓPTICO entre as
+   * duas setas, sem contrapeso inventado. Com fonte grande ele quebra a linha e o card cresce —
+   * "Setembro de 2026" é identificador e identificador não trunca (design.md §7).
    */
   label: {
-    minHeight: HitTarget,
+    flex: 1,
+    minHeight: HitTarget - Space.sm,
     alignItems: 'center',
     justifyContent: 'center',
-    paddingHorizontal: Space.sm,
+    paddingHorizontal: Space.xs,
   },
-  sheetHead: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: Space.lg,
-    paddingVertical: Space.md,
+  divisor: {
+    height: StyleSheet.hairlineWidth,
   },
-  sheetSpacer: {
-    width: HitTarget,
+  rodape: {
+    paddingHorizontal: Space.md,
+    paddingVertical: Space.sm,
   },
   yearRow: {
     flexDirection: 'row',

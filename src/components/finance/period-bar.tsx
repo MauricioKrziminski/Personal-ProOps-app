@@ -13,6 +13,11 @@ interface Props {
   ruler: MonthRulerState;
 }
 
+/** `2026-08-11` → `11/08`. O ANO já está escrito no título do mês, logo acima, no mesmo card. */
+function diaEMes(iso: string): string {
+  return `${iso.slice(8, 10)}/${iso.slice(5, 7)}`;
+}
+
 /**
  * O cabeçalho de PERÍODO das telas de dinheiro: **qual mês, com que régua, cobrindo que dias.**
  *
@@ -33,6 +38,15 @@ interface Props {
  *    afirmava que "o `gap` do `Screen` já dá o respiro" — o que é falso quando os dois estão
  *    dentro do mesmo `View`. O `Screen` espaça FILHOS dele; aqui eles eram irmãos aninhados.
  *
+ * ## O card, e por que a legenda parou de flutuar (11/09/2026)
+ *
+ * A primeira correção pôs os três controles em duas linhas SOLTAS, e o dono do produto voltou na
+ * mesma tela: *"dá para melhorar esse layout, texto embaixo desse componente de passar de mês
+ * horrível"*. Ele estava certo — uma legenda pendurada embaixo de um controle, sem nada ligando
+ * os dois, lê como sobra. Agora ela é o RODAPÉ do próprio seletor de mês, dentro da mesma
+ * superfície e abaixo de um fio: o card inteiro responde "de que período esta tela fala", em vez
+ * de três peças tentando responder juntas.
+ *
  * ## A legenda não é enfeite
  *
  * "Ciclo" é tão opaco para um leigo quanto "Meio" era: a palavra não diz que setembro vai de
@@ -43,34 +57,23 @@ export function PeriodBar({ month, onChangeMonth, ruler }: Props) {
   const janela = useMonthRange(month, ruler.view);
 
   return (
-    <View style={styles.wrap}>
-      <MonthPicker month={month} onChange={onChangeMonth} />
-      {/*
-        ⚠️ **A régua fica ao lado da JANELA, não ao lado do seletor de mês** (medido no aparelho).
-
-        A primeira tentativa pôs os dois na mesma linha — e eles não cabem: "Setembro de 2026"
-        entre dois alvos de 44pt gasta ~240pt e a régua ~152, contra ~370 de calha no iPhone 17
-        Pro. Com `flexWrap` a régua caía sozinha para a linha de baixo, encostada à esquerda, que
-        é a mesma pilha de antes com um controle órfão no lugar de um largo.
-
-        Ao lado da legenda ela cabe com folga (≈138 + 152) e ganha o sentido que faltava: o
-        controle encosta no texto que ele MUDA. Trocar de régua e ver "11/08 a 10/09" virar
-        "01/09 a 30/09" na mesma linha é a explicação que a palavra "Ciclo" nunca deu sozinha.
-      */}
+    <MonthPicker month={month} onChange={onChangeMonth}>
       <View style={styles.linhaJanela}>
-        <ThemedText type="caption" themeColor="textSecondary" style={styles.janela}>
-          {isoToBR(janela.from)} a {isoToBR(janela.to)}
+        <ThemedText
+          type="code"
+          themeColor="textSecondary"
+          // Na tela, a data curta; para o leitor de tela, a frase inteira — "11/08 traço 10/09"
+          // não é o que a pessoa precisa ouvir.
+          accessibilityLabel={`De ${isoToBR(janela.from)} a ${isoToBR(janela.to)}`}>
+          {diaEMes(janela.from)} – {diaEMes(janela.to)}
         </ThemedText>
         <MonthRuler value={ruler.view} onChange={ruler.setView} visible={ruler.temCiclo} />
       </View>
-    </View>
+    </MonthPicker>
   );
 }
 
 const styles = StyleSheet.create({
-  wrap: {
-    gap: Space.xs,
-  },
   linhaJanela: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -81,8 +84,5 @@ const styles = StyleSheet.create({
     */
     flexWrap: 'wrap',
     gap: Space.sm,
-  },
-  janela: {
-    fontVariant: ['tabular-nums'],
   },
 });

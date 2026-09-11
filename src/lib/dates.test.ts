@@ -10,6 +10,7 @@ import {
   formatDateBR,
   greetingBR,
   isValidBRDate,
+  monthGrid,
   isValidTime,
   isoToBR,
   localDateTime,
@@ -169,4 +170,31 @@ test('maskBRDate põe as barras e deixa apagar', () => {
   assert.equal(maskBRDate('15/'), '15');
   // lixo e excesso não passam
   assert.equal(maskBRDate('15a03b2027999'), '15/03/2027');
+});
+
+test('monthGrid põe cada dia na coluna do dia da semana', () => {
+  // 01/02/2026 é um DOMINGO: o mês começa na primeira célula e fevereiro tem 28 dias.
+  const fev = monthGrid('2026-02');
+  assert.equal(fev.length, 42, 'o tabuleiro é 6×7 — o pior caso são 31 dias começando no sábado');
+  assert.equal(fev[0], '2026-02-01');
+  assert.equal(fev.filter(Boolean).length, 28);
+  assert.equal(fev[27], '2026-02-28');
+  assert.equal(fev[28], null);
+
+  // 2028 é bissexto — o 29 existe e cai logo depois do 28.
+  assert.equal(monthGrid('2028-02').filter(Boolean).length, 29);
+
+  // 01/09/2026 é uma TERÇA (índice 2): as duas primeiras células ficam vazias.
+  const set = monthGrid('2026-09');
+  assert.equal(set[0], null);
+  assert.equal(set[1], null);
+  assert.equal(set[2], '2026-09-01');
+  assert.equal(set.filter(Boolean).length, 30);
+
+  // Todo dia cai na coluna do seu dia da semana — é a única coisa que a grade promete.
+  for (const [i, iso] of set.entries()) {
+    if (!iso) continue;
+    const [y, m, d] = iso.split('-').map(Number);
+    assert.equal(new Date(y, m - 1, d).getDay(), i % 7, `${iso} na coluna errada`);
+  }
 });

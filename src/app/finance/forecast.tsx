@@ -10,7 +10,7 @@ import { Button } from '@/components/ui/button';
 import { Chip } from '@/components/finance/chip';
 import { Card } from '@/components/ui/card';
 import { EmptyState } from '@/components/ui/empty-state';
-import { Field, MoneyField, TextField } from '@/components/ui/field';
+import { Field, MoneyField } from '@/components/ui/field';
 import { Icon } from '@/components/ui/icon';
 import { Money } from '@/components/ui/money';
 import { Row, Section } from '@/components/ui/row';
@@ -18,7 +18,8 @@ import { Screen } from '@/components/ui/screen';
 import { HeroLabel } from '@/components/ui/section-head';
 import { Segmented } from '@/components/ui/segmented';
 import { MonthRuler, useMonthRuler } from '@/components/finance/month-ruler';
-import { Sheet } from '@/components/ui/sheet';
+import { Calendar } from '@/components/finance/calendar';
+import { Sheet, SheetHeader } from '@/components/ui/sheet';
 import { Skeleton, SkeletonRow } from '@/components/ui/skeleton';
 import { Sparkline } from '@/components/ui/sparkline';
 import { useToast } from '@/components/ui/toast';
@@ -37,13 +38,10 @@ import {
 import { MonthPicker, currentMonth, monthTitle } from '@/components/finance/month-picker';
 import { mesDoCorte, veioDe, type MesProjetado } from '@/lib/forecast-months';
 import {
-  brToISO,
   diasAte,
   formatBRL,
-  isValidBRDate,
   isoToBR,
   localISODate,
-  maskBRDate,
   somaDias,
 } from '@/lib/dates';
 import { showItemActions } from '@/lib/item-actions';
@@ -148,7 +146,6 @@ export default function ForecastScreen() {
    * "de hoje até <data>" em vez de oferecer um campo que só aceita um valor.
    */
   const [horizonteAberto, setHorizonteAberto] = useState(false);
-  const [ateTexto, setAteTexto] = useState('');
   const [comoCalculo, setComoCalculo] = useState(false);
   /**
    * Dia × Mês.
@@ -298,34 +295,13 @@ export default function ForecastScreen() {
       }
     );
 
-  const escolherHorizonte = () => {
-    setAteTexto(isoToBR(somaDias(localISODate(), dias)));
-    setHorizonteAberto(true);
-  };
 
-  /**
-   * A data digitada aplica **sozinha, no dígito que a completa** — não há botão.
-   *
-   * ⚠️ **Um botão ao lado do campo exigia DOIS toques, e isso foi medido no emulador.** O
-   * primeiro toque tira o foco do campo, o teclado desce, o `KeyboardAvoidingView` devolve a
-   * altura e o botão desliza ~880px para baixo ANTES do release — o `Pressable` cancela o
-   * press porque o dedo já não está sobre ele. O segundo toque é que aplicava.
-   *
-   * Com a máscara, `dd/mm/aaaa` só fica válido no décimo caractere, então o próprio
-   * preenchimento é o sinal de "terminei" — é o mesmo contrato do código de 6 dígitos do
-   * login. Some o botão, some a corrida com o teclado, e a escolha por data passa a custar o
-   * mesmo UM gesto que os atalhos acima.
-   *
-   * Vive em `onChangeText` e não num `useEffect`: abrir o sheet já preenche o campo com a data
-   * do horizonte atual, e um efeito aplicaria (e fecharia) sozinho na abertura.
-   */
-  const digitarAte = (v: string) => {
-    const texto = maskBRDate(v);
-    setAteTexto(texto);
-    if (!isValidBRDate(texto)) return;
-    const d = diasAte(brToISO(texto));
-    if (d < 1) return;
-    setDias(Math.min(d, 3650));
+  /** O último dia da projeção — o que o sheet marca no calendário e escreve no subtítulo. */
+  const ate = somaDias(localISODate(), dias);
+
+  /** Atalho e calendário desembocam aqui: aplicam e fecham, num gesto só. */
+  const aplicarHorizonte = (d: number) => {
+    setDias(Math.min(Math.max(d, 1), 3650));
     setHorizonteAberto(false);
   };
 
@@ -420,90 +396,57 @@ export default function ForecastScreen() {
           {
             label: `Horizonte da projeção, de hoje até ${isoToBR(somaDias(localISODate(), dias))}`,
             icon: 'calendar',
-            onPress: escolherHorizonte,
+            onPress: () => setHorizonteAberto(true),
           },
         ]}
       />
 
       <Sheet visible={horizonteAberto} onClose={() => setHorizonteAberto(false)}>
-        <View style={styles.horizonteTopo}>
-          <Button label="Fechar" variant="ghost" size="sm" onPress={() => setHorizonteAberto(false)} />
-          <ThemedText type="smallBold">Até quando projetar</ThemedText>
-          <View style={styles.horizonteContrapeso} />
-        </View>
+        <SheetHeader
+          title="Até quando projetar"
+          subtitle={`de hoje até ${isoToBR(ate)}`}
+          onClose={() => setHorizonteAberto(false)}
+        />
 
         {/*
-          ⚠️ **A ordem estava invertida, e o campo mentia sobre o que ele é** (11/09/2026).
+          ⚠️ **Atalhos em CIMA, calendário embaixo, e os dois aplicam no toque** (11/09/2026).
 
-          O sheet abria com o campo de data, um botão verde de largura cheia e SÓ ENTÃO os
-          atalhos. Três problemas de uma vez: o caminho comum (tocar "6 meses") ficava embaixo
-          do caminho raro; o botão cortava o campo da lista, deixando os dois parecendo blocos
-          sem relação; e o campo, sozinho no topo com uma data já preenchida, prometia um
-          calendário — *"parece que se eu clicar no campo 'projetar até' iria abrir um
-          calendário e nada acontece"*.
+          A versão anterior era uma lista de oito linhas com `flex: 1` e um campo de texto preso
+          no rodapé — e a queixa do dono do produto foi sobre o buraco que isso abria: *"olha o
+          tamanho do gap e espaço vazio entre as datas pré-setadas e o campo"*. O `flex: 1` era
+          a causa: ele existia para o campo subir com o teclado, então a lista esticava até o
+          fim do sheet e o vazio nascia entre as duas coisas.
 
-          Agora: os atalhos primeiro (com o atual marcado, para o sheet DIZER onde a tela está),
-          e a data livre por último, rotulada "Outra data" e dizendo que é para digitar. Sem
-          date picker nativo: nenhuma lib de calendário está aprovada no projeto, e o que
-          faltava não era o calendário — era o campo parar de se anunciar como um.
+          Sem campo de texto não há teclado, sem teclado não há `flex: 1`, e sem ele o conteúdo
+          volta a ter altura natural. Os oito atalhos viraram uma fileira de `Chip` (que é o
+          controle de "muitos, resposta imediata" — design.md §1) e ocupam duas linhas no lugar
+          de oito.
+
+          As duas formas respondem a MESMA pergunta e por isso as duas fecham o sheet: um toque
+          no atalho ou um toque no dia. O calendário abre no mês do horizonte atual, com o dia
+          marcado — é o sheet dizendo onde a tela está antes de perguntar para onde vai.
         */}
-        {/*
-          ⚠️ **Lista que ROLA + campo FIXO no rodapé, senão o teclado come o campo.**
-
-          O `Sheet` envolve os filhos num `KeyboardAvoidingView behavior="padding"`: quando o
-          teclado abre, ele aplica `paddingBottom` da altura do teclado. Isso só empurra alguma
-          coisa para cima se o conteúdo for FLEXÍVEL — num corpo de altura natural, os oito
-          atalhos continuam ocupando o mesmo espaço e o campo sai por baixo do teclado.
-
-          Duas construções foram medidas no emulador ANTES desta, e as duas falharam:
-          um `ScrollView` comum (rola, mas ninguém rola sozinho quando o campo ganha foco) e um
-          `KeyboardAwareScrollView` (que traz o próprio tratamento de inset e, aninhado dentro
-          do `KeyboardAvoidingView` do `Sheet`, briga com ele — são dois donos da mesma altura).
-
-          Quem cede é a LISTA (`flex: 1`); o campo é rodapé de altura natural e sobe inteiro com
-          o padding do teclado. É o padrão para o qual o `behavior="padding"` foi desenhado.
-
-          `keyboardShouldPersistTaps="handled"` para que, com o teclado aberto, tocar num atalho
-          da lista valha na hora em vez de gastar o toque só fechando o teclado.
-        */}
-        <View style={styles.horizonteCorpo}>
-          <ScrollView
-            contentContainerStyle={styles.horizonteLista}
-            keyboardShouldPersistTaps="handled">
-            <Section>
-              {HORIZONTES.map((h) => {
-                const atual = h.dias === dias;
-                return (
-                  <Row
-                    key={h.dias}
-                    title={h.label}
-                    subtitle={`até ${isoToBR(somaDias(localISODate(), h.dias))}`}
-                    chevron={false}
-                    accessibilityState={{ selected: atual }}
-                    trailing={atual ? <Icon name="checkmark" size="sm" color="tint" /> : undefined}
-                    onPress={() => {
-                      setDias(h.dias);
-                      setHorizonteAberto(false);
-                    }}
-                  />
-                );
-              })}
-            </Section>
-          </ScrollView>
-
-          <View style={styles.horizonteRodape}>
-            <Field label="Outra data" hint="Digite dia, mês e ano — ex.: 31/12/2027.">
-              <TextField
-                value={ateTexto}
-                onChangeText={digitarAte}
-                placeholder="dd/mm/aaaa"
-                keyboardType="number-pad"
-                maxLength={10}
-                accessibilityLabel="Projetar até a data"
+        <ScrollView contentContainerStyle={styles.horizonteCorpo}>
+          <View style={styles.horizonteAtalhos}>
+            {HORIZONTES.map((h) => (
+              <Chip
+                key={h.dias}
+                label={h.label}
+                selected={h.dias === dias}
+                onPress={() => aplicarHorizonte(h.dias)}
               />
-            </Field>
+            ))}
           </View>
-        </View>
+
+          <Calendar
+            value={ate}
+            onChange={(iso) => aplicarHorizonte(diasAte(iso))}
+            // Hoje não é horizonte (a projeção precisa de pelo menos um dia à frente), e o teto
+            // é o mesmo `clamp_forecast_days` do banco — 10 anos.
+            min={somaDias(localISODate(), 1)}
+            max={somaDias(localISODate(), 3650)}
+          />
+        </ScrollView>
       </Sheet>
 
       {forecast.isLoading ? (
@@ -990,18 +933,16 @@ export default function ForecastScreen() {
 }
 
 const styles = StyleSheet.create({
-  horizonteTopo: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: Space.md,
-    paddingBottom: Space.sm,
+  horizonteCorpo: {
+    paddingHorizontal: Space.lg,
+    paddingBottom: Space.xl,
+    gap: Space.lg,
   },
-  /** Contrapeso do "Fechar": sem ele o título não fica centrado. */
-  horizonteContrapeso: { width: 72 },
-  horizonteCorpo: { flex: 1 },
-  horizonteLista: { paddingHorizontal: Space.lg, paddingBottom: Space.lg },
-  horizonteRodape: { paddingHorizontal: Space.lg, paddingBottom: Space.lg },
+  horizonteAtalhos: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: Space.sm,
+  },
   chips: { flexDirection: 'row', flexWrap: 'wrap', gap: Space.sm },
   hero: {
     gap: Space.md,

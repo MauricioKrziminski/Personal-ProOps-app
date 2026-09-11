@@ -187,3 +187,24 @@ export function maskBRDate(texto: string): string {
   if (d.length <= 4) return `${d.slice(0, 2)}/${d.slice(2)}`;
   return `${d.slice(0, 2)}/${d.slice(2, 4)}/${d.slice(4)}`;
 }
+
+/**
+ * As 42 células (6 semanas × 7 dias) da grade de um mês, `null` onde não há dia.
+ *
+ * O tabuleiro é FIXO em 6×7 porque é o que o pior caso exige — 31 dias começando no sábado. Quem
+ * desenha decide quantas linhas mostrar (o `Calendar` corta as semanas vazias do fim); aqui não
+ * há decisão de layout, só a aritmética do calendário.
+ *
+ * Domingo é a primeira coluna, que é como todo calendário pt-BR desenha a semana.
+ */
+export function monthGrid(month: string): (string | null)[] {
+  const [y, m] = month.split('-').map(Number);
+  // `getDay()` local, para casar com `localISODate` — a grade é o calendário do APARELHO.
+  const primeiroDiaDaSemana = new Date(y, m - 1, 1).getDay();
+  // Dia 0 do mês SEGUINTE é o último deste; resolve fevereiro e ano bissexto sem tabela.
+  const diasNoMes = new Date(y, m, 0).getDate();
+  return Array.from({ length: 42 }, (_, i) => {
+    const dia = i - primeiroDiaDaSemana + 1;
+    return dia >= 1 && dia <= diasNoMes ? `${month}-${String(dia).padStart(2, '0')}` : null;
+  });
+}
