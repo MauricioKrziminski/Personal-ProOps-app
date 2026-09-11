@@ -3,7 +3,6 @@ import { StyleSheet, View } from 'react-native';
 import * as Haptics from 'expo-haptics';
 
 import { Segmented } from '@/components/ui/segmented';
-import { Space } from '@/design/tokens';
 import { useCycle, type CycleView } from '@/hooks/use-finance';
 
 /**
