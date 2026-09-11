@@ -185,3 +185,31 @@ async def test_fatura_zerada_nao_entra_na_pergunta(monkeypatch):
     sql = resolve._FONTES["faturas"]["sql"]
     assert "private.invoice_open_cents(ci.id) > 0" in sql
     assert "status not in ('paid','rolled')" in sql
+
+
+def test_a_frase_do_sim_separa_pagar_de_quitar():
+    """A confirmação de `pay_invoice` não pode dizer "SEM tirar do caixa".
+
+    A regra estava presa à TABELA do alvo, e até 11/09/2026 só `mark_paid`
+    resolvia uma fatura. Quando `pay_invoice` passou a resolver a fatura como
+    alvo, ele herdou a frase de quem NÃO move dinheiro — na tela que o usuário
+    aprova. Visto no emulador.
+    """
+    from app.graph.policy import describe_for_confirmation
+
+    alvo = {
+        "table": "card_invoices",
+        "status": "found",
+        "candidates": [{"id": "i1", "label": "Fatura Nubank — vence 10/09/2026"}],
+    }
+
+    pagar = describe_for_confirmation(
+        FinanceAction(type=FinanceActionType.PAY_INVOICE), alvo
+    )
+    assert "SEM tirar do caixa" not in pagar
+    assert "pagar" in pagar.lower()
+
+    quitar = describe_for_confirmation(
+        FinanceAction(type=FinanceActionType.MARK_PAID), alvo
+    )
+    assert "SEM tirar do caixa" in quitar

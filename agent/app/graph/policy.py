@@ -96,6 +96,7 @@ _VERBO = {
     "delete_note": "apagar", "delete_reminder": "cancelar",
     "update_transaction": "corrigir", "append_note": "acrescentar em",
     "mark_paid": "dar baixa em", "goal_deposit": "aportar em",
+    "pay_invoice": "pagar",
     "update_asset_value": "atualizar o valor de",
 }
 
@@ -119,7 +120,16 @@ def describe_for_confirmation(
         # Quitar a fatura sem caixa e pagar a fatura terminam com a mesma palavra na
         # tela ("paga"), e são efeitos diferentes: um mexe no saldo da conta pagadora
         # e o outro não. A frase tem que dizer QUAL dos dois, senão o SIM não distingue.
-        if target.get("table") == "card_invoices":
+        #
+        # ⚠️ **A condição é a AÇÃO, não a tabela do alvo** (11/09/2026). Escrita como
+        # `table == "card_invoices"`, ela valia para qualquer ação que resolvesse uma
+        # fatura — e até 11/09 só `mark_paid` resolvia. No mesmo dia `pay_invoice`
+        # passou a resolver a fatura como alvo (para empate virar pergunta em vez de
+        # pagar a mais antiga em silêncio), e herdou a frase: o agente perguntava
+        # "marcar como paga, SEM tirar do caixa?" para a ação que TIRA do caixa.
+        # Visto no emulador, e é o pior lugar possível para uma frase errada — ela é
+        # exatamente o que o usuário aprova.
+        if target.get("table") == "card_invoices" and action.type.value == "mark_paid":
             verbo = "marcar como paga, SEM tirar do caixa,"
         if target.get("status") == "found":
             escolhido = target["candidates"][0]
