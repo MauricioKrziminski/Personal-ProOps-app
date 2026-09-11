@@ -221,7 +221,10 @@ export default function InvoiceScreen() {
           },
           onError: (erro) => toast({ message: mensagemDoErro(erro), tone: 'error' }),
         });
-      }
+      },
+      'Os juros são estimados pela última taxa que este cartão cobrou de você, e o IOF pela ' +
+        'fórmula da lei. Os dois entram como previsão — quando a fatura real chegar, você ' +
+        'corrige os valores como em qualquer lançamento.'
     );
   };
 
@@ -517,11 +520,14 @@ export default function InvoiceScreen() {
                 disabled={settle.isPending || pay.isPending}
                 onPress={adiar}
               />
+              {/*
+                Uma linha, e curta. A explicação inteira dos encargos mora na CONFIRMAÇÃO, que é
+                onde a pessoa está decidindo — aqui ela empurrava "Registrar pagamento", a ação
+                primária, para a beirada da tela. A âncora existe justamente para a primária não
+                sumir; enchê-la de texto desfaz o motivo de ela existir.
+              */}
               <ThemedText type="caption" themeColor="textSecondary">
-                O saldo em aberto vira uma linha na próxima fatura. Os juros são estimados pela
-                última taxa que este cartão cobrou de você (ou pela taxa de partida, se ainda não
-                houve nenhuma) e o IOF pela fórmula da lei — os dois entram como previsão, e você
-                corrige pelos valores da fatura quando ela chegar.
+                O saldo em aberto vira uma linha na próxima fatura, com juros e IOF estimados.
               </ThemedText>
             </>
           ) : null}
