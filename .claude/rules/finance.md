@@ -222,15 +222,33 @@ mesma tela. Por meio é o bloco "Saídas" da planilha do dono do produto.
 
 ## A Projeção vai até a data que o usuário escolher
 
-Além dos atalhos (30 dias … 10 anos, cada um dizendo a data que produz), um campo livre "Projetar
-até". ⚠️ **Não existe "de quando"**: uma projeção de caixa parte do saldo que existe AGORA, e
-começar em outra data exigiria o saldo daquela data — que é justamente o que ela está calculando.
-A tela escreve "de hoje até <data>" em vez de oferecer um campo que só aceita um valor.
+Dois caminhos para a MESMA pergunta, e os dois aplicam num toque só, fechando o sheet: uma
+fileira de `Chip` com os atalhos (30 dias … 10 anos) e um **calendário** para a data exata. Piso
+de amanhã (hoje não é horizonte) e teto do `clamp_forecast_days` — 10 anos.
 
-⚠️ **Campo de data com `keyboardType="number-pad"` precisa de MÁSCARA** (`maskBRDate`): o teclado
-numérico do iOS não tem a tecla "/", então um campo que espera o usuário digitar a barra só
-aceita texto colado. A máscara reconstrói a partir dos dígitos, e não acrescentando barra ao que
-já está lá, para o backspace atravessar a barra sozinho.
+⚠️ **Não existe "de quando"**: uma projeção de caixa parte do saldo que existe AGORA, e começar
+em outra data exigiria o saldo daquela data — que é justamente o que ela está calculando. A tela
+escreve "de hoje até <data>" em vez de oferecer um campo que só aceita um valor.
+
+⚠️ **O campo de texto mascarado saiu, e a lição não é sobre máscara** (11/09/2026). Ele foi
+pedido duas vezes pelo dono do produto — *"parece que se eu clicar no campo 'projetar até' iria
+abrir um calendário e nada acontece"* e depois *"se eu ainda clico em 'Outra data', eu não
+consigo mudar a data, tinha que abrir um calendar pick ou algo assim"*. Um campo `dd/mm/aaaa`
+pede que a pessoa SAIBA a data; quem escolhe horizonte quer VER onde ela cai. (E o campo tinha um
+defeito por cima: abria preenchido com dez caracteres sob `maxLength={10}`, então a primeira
+tecla era engolida.)
+
+O calendário é `Calendar` (`src/components/finance/calendar.tsx`), escrito à mão como o
+`Segmented` e o `MonthSheet`, e **inline, nunca `Modal`** — ele mora dentro de um `Sheet`, e
+`Modal` dentro de `Modal` no Android é a mesma armadilha que fez o `SelectField` abrir no lugar.
+A aritmética da grade é `monthGrid` em `src/lib/dates.ts`, com teste.
+
+⚠️ **Campo de data em texto continua existindo em cinco formulários, e ele precisa de MÁSCARA**
+— o caminho único é `DateField` (`src/components/ui/field.tsx`), nunca `TextField` cru: o teclado
+`number-pad` do iOS **não tem a tecla "/"**, então um campo que espera a barra digitada só aceita
+texto colado. Em 11/09/2026 havia SEIS campos de data e só um tinha máscara — e esse um carregava
+uma cópia local dela. Os outros cinco estavam indigitáveis no iPhone, em silêncio, porque o
+teclado numérico do Android TEM a barra e o defeito não aparece no emulador.
 
 ## Em qual fatura cai a compra feita NO dia do fechamento
 

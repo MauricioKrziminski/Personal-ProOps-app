@@ -122,6 +122,19 @@ um formulário. Os três viraram `SelectField`, e o teste de anti-slop quebra o 
 duas telas mostravam formas diferentes para o mesmo tipo, e um tipo novo nascia caindo no `circle`
 genérico do Android.
 
+**Escolher UMA DATA é `Calendar`** (`src/components/finance/calendar.tsx`), e ele abre **no
+lugar**, nunca em `Modal` — quem pede data já está dentro de um sheet, e `Modal` dentro de
+`Modal` no Android é a mesma janela-dentro-de-janela que fez o `SelectField` abrir colapsado.
+Onde só cabe texto, o campo é `DateField` (`src/components/ui/field.tsx`), que traz a máscara:
+`TextField` cru com `keyboardType="number-pad"` é **indigitável no iOS**, porque o teclado
+numérico não tem a tecla "/". Cinco formulários nasceram assim.
+
+**Cabeçalho de sheet é `SheetHeader`** (`src/components/ui/sheet.tsx`): pegador, título à
+esquerda, ação opcional e o X. Eram DEZESSEIS cópias à mão, com três nomes de estilo, dois
+paddings verticais e um contrapeso de largura chutada para "centralizar" o título — e o efeito
+era a queixa literal *"o botão fechar horrivelmente feio, colado com o top, sem padding/margin"*.
+Montar um à mão é a décima sétima.
+
 **Escolher CONTA é `AccountPicker`** (`src/components/finance/account-picker.tsx`), nunca uma
 lista de `Row` com o nome dentro. Eram quatro cópias de `<Row title={a.name} trailing={check}/>`,
 e nelas um cartão de crédito e uma conta corrente têm exatamente a mesma cara — foi assim que um
