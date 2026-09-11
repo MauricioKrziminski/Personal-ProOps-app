@@ -1085,9 +1085,21 @@ export function useCycle() {
       if (error) throw error;
       return data as unknown as Cycle;
     },
-    // O ciclo vira à meia-noite do dia de fechamento. Meio dia de cache é folgado para uma tela
-    // que o usuário abre várias vezes ao dia e apertado o bastante para não errar a virada.
-    staleTime: 12 * 60 * 60 * 1000,
+    /**
+     * ⚠️ **Cache curto DE PROPÓSITO: o ciclo vira sozinho, e o cache não podia segurar isso.**
+     *
+     * Com 12 horas (o valor anterior) o app passava meia virada mostrando o ciclo velho: às
+     * 00h01 do dia 11, com fechamento no dia 10, `cycle_now` no banco já responde o ciclo
+     * novo e o telefone continuava desenhando o antigo até a tarde. A pergunta foi literal:
+     * *"se eu já estou no dia 11 e meu ciclo fecha dia 10, os gráficos mudam automaticamente?
+     * ele tem que mudar automaticamente se já passou"*.
+     *
+     * Cinco minutos porque a resposta é uma linha de JSON e a tela já espera a projeção de
+     * qualquer jeito; `refetchOnWindowFocus` cobre o caso de o app ficar aberto atravessando
+     * a virada.
+     */
+    staleTime: 5 * 60 * 1000,
+    refetchOnWindowFocus: true,
   });
 }
 
@@ -1108,6 +1120,8 @@ export function useCycleRange(month: string) {
       if (error) throw error;
       return data as unknown as { de: string; ate: string };
     },
+    // Esta NÃO depende de "hoje" — as bordas de um mês nomeado só mudam se o usuário trocar o
+    // dia de fechamento, e `useSetCycleCloseDay` invalida a chave.
     staleTime: 12 * 60 * 60 * 1000,
   });
 }
