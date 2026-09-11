@@ -664,10 +664,15 @@ export default function RecurringScreen() {
               ) : (
               <Field label="Repete">
                 <Segmented
+                  // Rótulos de UMA palavra: a 384dp × 1,3 "Toda semana" quebrava
+                  // em duas linhas dentro da célula e as três ficavam de alturas
+                  // diferentes. `Segmented` é para 2 a 4 opções CURTAS (§1 do
+                  // design), e "curtas" se mede na régua de verificação, não na
+                  // largura do emulador padrão.
                   options={[
-                    { value: 'monthly', label: 'Todo mês' },
-                    { value: 'weekly', label: 'Toda semana' },
-                    { value: 'yearly', label: 'Todo ano' },
+                    { value: 'monthly', label: 'Mensal' },
+                    { value: 'weekly', label: 'Semanal' },
+                    { value: 'yearly', label: 'Anual' },
                   ]}
                   value={form.preset}
                   onChange={(preset) => setForm({ ...form, preset })}
