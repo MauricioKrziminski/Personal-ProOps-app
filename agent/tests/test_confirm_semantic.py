@@ -105,7 +105,9 @@ async def test_classificar_de_confirmacao_monta_a_chamada_de_verdade(monkeypatch
     modelos: list[str | None] = []
     monkeypatch.setattr(gemini, "structured", lambda schema, model=None: (modelos.append(model), falso)[1])
 
-    assert await confirm._classificar("manda bala", "apagar X") == "approve"
+    # ⚠️ Sentinelas, não frases naturais: "manda bala" é um EXEMPLO literal dentro do system
+    # prompt estático, então procurá-la lá daria falso positivo para sempre.
+    assert await confirm._classificar("ZZTEXTO", "ZZRESUMO") == "approve"
 
     # O portão roda no modelo BOM, não no barato do parse. Medido em 09/09/2026:
     # no Lite, "apaga todos" voltava approved=True. Cair para o padrão aqui é
@@ -113,10 +115,24 @@ async def test_classificar_de_confirmacao_monta_a_chamada_de_verdade(monkeypatch
     assert modelos == [gemini.GEMINI_GATE]
 
     papeis = [m[0] for m in falso.mensagens]
-    assert papeis == ["system", "human"]
-    # o texto do usuário vai ENVELOPADO como dado, nunca solto no system
-    assert "<user_input>" in falso.mensagens[1][1]
-    assert "manda bala" in falso.mensagens[1][1]
+    assert papeis == ["system", "human", "human"]
+
+    # ⚠️ **A invariante é esta: NADA escrito pelo usuário no system prompt.**
+    #
+    # O resumo da ação pendente ("apagar X") embute o `label` do alvo — primeira linha da nota,
+    # descrição do lançamento, nome da meta —, e ele ia interpolado no `("system", ...)`, que é
+    # o único lugar do turno com autoridade. Num workspace compartilhado, o atacante nomeia o
+    # registro e a vítima roda a ação. Aqui isso pesa o dobro: este é o PORTÃO que autoriza
+    # escrita destrutiva.
+    system = falso.mensagens[0][1]
+    assert "ZZRESUMO" not in system
+    assert "ZZTEXTO" not in system
+
+    # os dois vão envelopados, como dado
+    assert "<acao_pendente>" in falso.mensagens[1][1]
+    assert "ZZRESUMO" in falso.mensagens[1][1]
+    assert "<user_input>" in falso.mensagens[2][1]
+    assert "ZZTEXTO" in falso.mensagens[2][1]
 
 
 @pytest.mark.asyncio

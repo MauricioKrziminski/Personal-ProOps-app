@@ -279,9 +279,13 @@ export default function TodayScreen() {
             tone={todayReminders.length > 0 ? 'warning' : 'textSecondary'}
             onPress={() => router.push('/reminders')}
           />
+          {/*
+            "Orçamento" não era nem evento nem coisa contável — o número é quantas categorias
+            passaram do limite, e lia-se "Orçamento 2". "No limite" diz o que o número conta.
+          */}
           <Counter
-            label="Orçamento"
-            value={tight.length}
+            label="No limite"
+            value={budgets.isError ? null : tight.length}
             tone={tight.length > 0 ? 'warning' : 'textSecondary'}
             onPress={() => router.push('/finance/budgets')}
           />
@@ -593,8 +597,21 @@ export default function TodayScreen() {
           </View>
         ) : null}
 
-        {/* 5. Orçamento apertado — barra em `warning`/`danger`, que é ESTADO a resolver. */}
-        {tight.length > 0 ? (
+        {/*
+          5. Orçamento apertado — barra em `warning`/`danger`, que é ESTADO a resolver.
+
+          ⚠️ **Seção que falha DIZ que falhou (design.md §7).** `budgets` e `recent` eram lidos
+          com `?? []` e sem `isError`, então uma falha de `budgets_status` fazia esta seção
+          sumir **e o contador marcar zero** — a tela afirmava que estava tudo bem justamente
+          quando não sabia. As outras três seções desta mesma tela já tratavam erro; estas duas
+          ficaram para trás.
+        */}
+        {budgets.isError ? (
+          <View style={styles.section}>
+            <SectionHead title="Passando do limite" inset={false} />
+            <ErrorCard onRetry={() => budgets.refetch()} />
+          </View>
+        ) : tight.length > 0 ? (
           <View style={styles.section}>
             <SectionHead title="Passando do limite" inset={false} />
             {tight.map((b) => {
@@ -644,7 +661,17 @@ export default function TodayScreen() {
         ) : null}
 
         {/* 6. O que acabou de chegar pelo WhatsApp — a prova de que o canal funcionou. */}
-        {captured ? (
+        {/*
+          ⚠️ Mesma régua da seção de limite: `recent` era lido com `?? []` e sem `isError`, e uma
+          falha apagava a única prova, na tela, de que a mensagem virou lançamento. Some
+          calado é o pior desenho possível justamente aqui.
+        */}
+        {recent.isError ? (
+          <View style={styles.section}>
+            <SectionHead title="Capturado no WhatsApp" inset={false} />
+            <ErrorCard onRetry={() => recent.refetch()} />
+          </View>
+        ) : captured ? (
           <View style={styles.section}>
             <SectionHead
               title="Capturado no WhatsApp"
@@ -715,7 +742,8 @@ function Counter({
   onPress,
 }: {
   label: string;
-  value: number;
+  /** `null` = a consulta falhou. Zero afirma "está tudo bem"; "—" não afirma nada. */
+  value: number | null;
   tone: 'danger' | 'warning' | 'textSecondary';
   onPress: () => void;
 }) {
@@ -724,7 +752,7 @@ function Counter({
   return (
     <Pressable
       accessibilityRole="button"
-      accessibilityLabel={`${label}: ${value}`}
+      accessibilityLabel={value === null ? `${label}: não deu para carregar` : `${label}: ${value}`}
       onPress={onPress}
       style={[styles.counter, { backgroundColor: theme.surface, borderColor: theme.cardBorder }]}>
       <View style={styles.shrink}>
@@ -735,8 +763,11 @@ function Counter({
           A contagem carrega a cor que o ponto carregava. Um ponto ao lado de um número é o
           mesmo dado dito duas vezes — e o número é a metade que se lê.
         */}
-        <ThemedText type="headline" themeColor={value > 0 ? tone : 'text'} style={tabular}>
-          {value}
+        <ThemedText
+          type="headline"
+          themeColor={value === null ? 'textSecondary' : value > 0 ? tone : 'text'}
+          style={tabular}>
+          {value ?? '—'}
         </ThemedText>
       </View>
     </Pressable>
