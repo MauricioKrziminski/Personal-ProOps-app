@@ -2198,7 +2198,7 @@ export type Database = {
         Returns: string
       }
       _budgets_status: {
-        Args: { ref_month?: string; uid: string }
+        Args: { p_view?: string; ref_month?: string; uid: string }
         Returns: {
           base_limit_cents: number
           category: string
@@ -2261,7 +2261,12 @@ export type Database = {
         }[]
       }
       _month_breakdown: {
-        Args: { p_group_by?: string; p_month: string; uid: string }
+        Args: {
+          p_group_by?: string
+          p_month: string
+          p_view?: string
+          uid: string
+        }
         Returns: {
           group_key: string
           group_label: string
@@ -2272,7 +2277,7 @@ export type Database = {
         }[]
       }
       _month_lines: {
-        Args: { p_month: string; uid: string }
+        Args: { p_month: string; p_view?: string; uid: string }
         Returns: {
           amount_cents: number
           bucket: string
@@ -2292,7 +2297,7 @@ export type Database = {
         }[]
       }
       _month_summary: {
-        Args: { p_month: string; uid: string }
+        Args: { p_month: string; p_view?: string; uid: string }
         Returns: {
           beyond_recurring_horizon: boolean
           closing_cash_cents: number
@@ -2312,7 +2317,7 @@ export type Database = {
         }[]
       }
       _monthly_cashflow: {
-        Args: { months_back?: number; uid: string }
+        Args: { months_back?: number; p_view?: string; uid: string }
         Returns: {
           expense_cents: number
           expense_pending_cents: number
@@ -2426,7 +2431,7 @@ export type Database = {
       }
       approve_import_items: { Args: { p_item_ids: string[] }; Returns: number }
       budgets_status: {
-        Args: { ref_month?: string }
+        Args: { p_view?: string; ref_month?: string }
         Returns: {
           base_limit_cents: number
           category: string
@@ -2547,8 +2552,8 @@ export type Database = {
         }
         Returns: string
       }
-      cycle_now: { Args: never; Returns: Json }
-      cycle_range: { Args: { p_month: string }; Returns: Json }
+      cycle_now: { Args: { p_view?: string }; Returns: Json }
+      cycle_range: { Args: { p_month: string; p_view?: string }; Returns: Json }
       debt_schedule: {
         Args: { p_debt_id: string }
         Returns: {
@@ -2610,7 +2615,7 @@ export type Database = {
         Returns: number
       }
       month_breakdown: {
-        Args: { p_group_by?: string; p_month: string }
+        Args: { p_group_by?: string; p_month: string; p_view?: string }
         Returns: {
           group_key: string
           group_label: string
@@ -2621,11 +2626,11 @@ export type Database = {
         }[]
       }
       month_forecast_json: {
-        Args: { days: number; drafts?: Json }
+        Args: { days: number; drafts?: Json; p_view?: string }
         Returns: Json
       }
       month_lines: {
-        Args: { p_month: string }
+        Args: { p_month: string; p_view?: string }
         Returns: {
           amount_cents: number
           bucket: string
@@ -2645,7 +2650,7 @@ export type Database = {
         }[]
       }
       month_summary: {
-        Args: { p_month: string }
+        Args: { p_month: string; p_view?: string }
         Returns: {
           beyond_recurring_horizon: boolean
           closing_cash_cents: number
@@ -2665,7 +2670,7 @@ export type Database = {
         }[]
       }
       monthly_cashflow: {
-        Args: { months_back?: number }
+        Args: { months_back?: number; p_view?: string }
         Returns: {
           expense_cents: number
           expense_pending_cents: number

@@ -65,6 +65,12 @@ function screen(file: string, options: { debts?: any[]; invoiceStatus?: string; 
           return label.charAt(0).toUpperCase() + label.slice(1);
         },
       };
+      // `month-ruler` também é `.tsx`: o hook devolve a régua inerte, que é o que a tela
+      // precisa para renderizar sem escolher nada.
+      if (name === '@/components/finance/month-ruler') return {
+        MonthRuler: 'MonthRuler',
+        useMonthRuler: () => ({ view: 'cycle', setView: () => {}, temCiclo: false, cycle: { data: undefined } }),
+      };
       if (name === '@/lib/item-actions') return { confirmDestructive: (_title: string, _label: string, callback: () => void) => confirmations.push(callback), showItemActions: (_title: string, entries: any[]) => actions.push(...entries) };
       if (name === '@/components/ui/toast') return { useToast: () => () => {} };
       if (name === '@/design/tokens') return { Motion: { duration: {}, stagger: {} }, Space: {}, Radius: {}, tabular: {} };

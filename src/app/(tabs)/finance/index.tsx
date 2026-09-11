@@ -22,6 +22,7 @@ import {
   monthTitle,
   shiftMonth,
 } from '@/components/finance/month-picker';
+import { MonthRuler, useMonthRuler } from '@/components/finance/month-ruler';
 import { ThemedText } from '@/components/themed-text';
 import { CardStack, type StackedCard } from '@/components/finance/card-stack';
 import { CURVED_BAR_CLEARANCE } from '@/components/ui/curved-tab-bar';
@@ -278,7 +279,8 @@ export default function FinanceScreen() {
   const scheme = useScheme();
   const toast = useToast();
   const insets = useSafeAreaInsets();
-  const cycle = useCycle();
+  const regua = useMonthRuler();
+  const cycle = regua.cycle;
   /**
    * ⚠️ O mês CORRENTE é o ciclo que contém hoje, não `date_trunc('month')`.
    *
@@ -297,7 +299,7 @@ export default function FinanceScreen() {
   // ⚠️ As bordas seguem o CICLO, não o mês civil. O painel acima soma a janela do ciclo; se a
   // linha "entrou · saiu" logo abaixo somasse 01 a 31, os dois números não fechariam — colados,
   // sem nada na tela explicando por quê.
-  const range = useMonthRange(month);
+  const range = useMonthRange(month, regua.view);
   const previousMonth = useMemo(() => shiftMonth(month, -1), [month]);
   const previousRange = useMonthRange(previousMonth);
   const isCurrent = month === mesCorrente;
@@ -306,7 +308,7 @@ export default function FinanceScreen() {
   const forecast = useCashFlowForecast(daysLeft);
   const summary = useTransactionsSummary(range.from, range.to);
   const previous = useTransactionsSummary(previousRange.from, previousRange.to);
-  const budgets = useBudgetsStatus(month);
+  const budgets = useBudgetsStatus(month, regua.view);
   const accounts = useAccounts();
   const debts = useDebts();
   const cards = useCardSummary();
@@ -447,6 +449,7 @@ export default function FinanceScreen() {
         */}
         <View style={styles.escopo}>
           <MonthPicker month={month} onChange={setMonth} />
+          <MonthRuler value={regua.view} onChange={regua.setView} visible={regua.temCiclo} />
         </View>
 
         {heroLoading ? (

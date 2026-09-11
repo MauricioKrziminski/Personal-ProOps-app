@@ -191,4 +191,65 @@ begin
   raise notice 'ok 3 — a régua é uma preferência, e o orçamento obedece ela';
 end $$;
 
+-- =============================================================================================
+-- 4. `p_view` manda na leitura, e `null` continua obedecendo o padrão gravado
+-- =============================================================================================
+do $$
+declare
+  u uuid := '00000000-0000-0000-0000-0000000000a9';
+  w uuid := '00000000-0000-0000-0000-0000000000b9';
+  cc uuid := '00000000-0000-0000-0000-0000000000c9';
+  g_padrao bigint; g_civil bigint; g_ciclo bigint;
+begin
+  insert into auth.users (id, email) values (u, 'teste-pview@example.invalid') on conflict do nothing;
+  insert into public.profiles (id) values (u) on conflict do nothing;
+  -- padrão GRAVADO = ciclo, fechamento no dia 10
+  insert into public.workspaces (id, owner_id, name, cycle_close_day, cycle_view)
+    values (w, u, 'Teste p_view', 10, 'cycle');
+  insert into public.workspace_members (workspace_id, user_id, role) values (w, u, 'owner');
+  insert into public.accounts (id, workspace_id, user_id, name, type, initial_balance_cents)
+    values (cc, w, u, 'Conta', 'checking', 1000000);
+  insert into public.transactions
+    (workspace_id, user_id, account_id, kind, amount_cents, category, description, occurred_at, source, status)
+  values (w, u, cc, 'expense', 10000, 'casa', 'só no ciclo', date '2026-08-15', 'app', 'cleared'),
+         (w, u, cc, 'expense', 70000, 'casa', 'só no mês civil', date '2026-09-20', 'app', 'cleared');
+  insert into public.budgets (workspace_id, user_id, category, limit_cents, month)
+    values (w, u, 'casa', 500000, null);
+
+  -- null = o padrão gravado (ciclo)
+  select spent_cents into g_padrao
+    from private.budgets_status_for(array[w], date '2026-09-01') where category = 'casa';
+  -- 'civil' IGNORA o padrão gravado
+  select spent_cents into g_civil
+    from private.budgets_status_for(array[w], date '2026-09-01', 'civil') where category = 'casa';
+  -- 'cycle' pede o ciclo explicitamente
+  select spent_cents into g_ciclo
+    from private.budgets_status_for(array[w], date '2026-09-01', 'cycle') where category = 'casa';
+
+  if g_padrao <> 10000 then
+    raise exception 'p_view null devia seguir o padrão gravado (ciclo, 10000); veio %', g_padrao;
+  end if;
+  if g_civil <> 70000 then
+    raise exception 'p_view civil devia ignorar o padrão gravado (70000); veio %', g_civil;
+  end if;
+  if g_ciclo <> 10000 then
+    raise exception 'p_view cycle devia dar o ciclo (10000); veio %', g_ciclo;
+  end if;
+
+  -- ⚠️ a mesma régua tem que valer nas OUTRAS leituras, não só no orçamento
+  if (select count(*) from private.month_lines_for(array[w], date '2026-09-01', 'civil')
+      where title = 'só no mês civil') <> 1 then
+    raise exception 'month_lines_for não respeitou p_view civil';
+  end if;
+  if (select count(*) from private.month_lines_for(array[w], date '2026-09-01', 'cycle')
+      where title = 'só no ciclo') <> 1 then
+    raise exception 'month_lines_for não respeitou p_view cycle';
+  end if;
+  if (select expense_cents from private.month_summary_for(array[w], date '2026-09-01', 'civil')) <> 70000 then
+    raise exception 'month_summary_for não respeitou p_view civil';
+  end if;
+
+  raise notice 'ok 4 — p_view manda na leitura e null continua obedecendo o padrão gravado';
+end $$;
+
 rollback;

@@ -5,6 +5,7 @@ import { Stack, router, useLocalSearchParams } from 'expo-router';
 
 import { ErrorCard } from '@/components/error-card';
 import { MonthPicker, currentMonth, monthTitle } from '@/components/finance/month-picker';
+import { MonthRuler, useMonthRuler } from '@/components/finance/month-ruler';
 import { ThemedText } from '@/components/themed-text';
 import { Card } from '@/components/ui/card';
 import { EmptyState } from '@/components/ui/empty-state';
@@ -93,10 +94,11 @@ export default function MonthScreen() {
   const [month, setMonth] = useState(() => params.month ?? currentMonth());
   const [groupBy, setGroupBy] = useState<GroupBy>('natureza');
 
-  const lines = useMonthLines(month);
-  const janela = useMonthRange(month);
-  const summary = useMonthSummary(month);
-  const breakdown = useMonthBreakdown(month, groupBy);
+  const regua = useMonthRuler();
+  const lines = useMonthLines(month, regua.view);
+  const janela = useMonthRange(month, regua.view);
+  const summary = useMonthSummary(month, true, regua.view);
+  const breakdown = useMonthBreakdown(month, groupBy, regua.view);
   const darBaixa = useMarkPaid();
 
   const hoje = currentMonth();
@@ -155,6 +157,7 @@ export default function MonthScreen() {
 
       <View style={styles.escopo}>
         <MonthPicker month={month} onChange={setMonth} />
+        <MonthRuler value={regua.view} onChange={regua.setView} visible={regua.temCiclo} />
         {/*
           ⚠️ **Qual mês é "este mês" não é óbvio, e a confusão custa uma tarde.**
 

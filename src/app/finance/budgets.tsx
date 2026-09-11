@@ -6,6 +6,7 @@ import { useQuery } from '@tanstack/react-query';
 
 import { Chip } from '@/components/finance/chip';
 import { MonthPicker, currentMonth } from '@/components/finance/month-picker';
+import { MonthRuler, useMonthRuler } from '@/components/finance/month-ruler';
 import { ThemedText } from '@/components/themed-text';
 import { HeaderActions } from '@/components/ui/header-actions';
 import { Sheet } from '@/components/ui/sheet';
@@ -26,7 +27,6 @@ import {
   INCOME_CATEGORIES,
   SUGGESTED_CATEGORIES,
   useBudgetsStatus,
-  useCycle,
   useDeleteBudget,
   useMonthRange,
   useSaveBudget,
@@ -127,7 +127,8 @@ export default function BudgetsScreen() {
    * período que acabou de fechar como se fosse o que a pessoa está gastando agora. É o mesmo
    * `cycle.data?.mes ?? currentMonth()` do Financeiro; no modo civil os dois coincidem.
    */
-  const cycle = useCycle();
+  const regua = useMonthRuler();
+  const cycle = regua.cycle;
   const [mesEscolhido, setMesEscolhido] = useState<string | null>(null);
   const mesCorrente = cycle.data?.mes ?? currentMonth();
   const month = mesEscolhido ?? mesCorrente;
@@ -135,14 +136,14 @@ export default function BudgetsScreen() {
   const [form, setForm] = useState<FormState | null>(null);
   const [noControleAberto, setNoControleAberto] = useState(true);
 
-  const status = useBudgetsStatus(month);
+  const status = useBudgetsStatus(month, regua.view);
   const rows = useBudgetRows();
   /**
    * As bordas seguem a RÉGUA ATIVA. Somar 01 a 31 aqui enquanto `budgets_status` soma
    * 11/08–10/09 punha dois números de períodos diferentes na mesma tela, colados, sem nada
    * explicando por quê — era o defeito que esta tela tinha até 11/09/2026.
    */
-  const { from, to } = useMonthRange(month);
+  const { from, to } = useMonthRange(month, regua.view);
   const resumo = useTransactionsSummary(from, to);
   const save = useSaveBudget();
   const remove = useDeleteBudget();
@@ -415,6 +416,7 @@ export default function BudgetsScreen() {
       <HeaderActions actions={[{ label: 'Novo orçamento', icon: 'plus', onPress: () => abrirNovo() }]} />
 
       <MonthPicker month={month} onChange={setMonth} />
+      <MonthRuler value={regua.view} onChange={regua.setView} visible={regua.temCiclo} />
 
       {status.isLoading ? (
         <>

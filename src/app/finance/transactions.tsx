@@ -7,6 +7,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { categoryIcon } from '@/design/category-icons';
 import { ErrorCard } from '@/components/error-card';
 import { MonthPicker, currentMonth, monthTitle, shiftMonth } from '@/components/finance/month-picker';
+import { MonthRuler, useMonthRuler } from '@/components/finance/month-ruler';
 import { Card } from '@/components/ui/card';
 import { ThemedText } from '@/components/themed-text';
 import { HeaderMenu } from '@/components/ui/header-actions';
@@ -169,7 +170,8 @@ export default function TransactionsScreen() {
     if (params.accountId) setAccountId(params.accountId);
   }
 
-  const range = useMonthRange(month);
+  const regua = useMonthRuler();
+  const range = useMonthRange(month, regua.view);
   const list = useTransactions({
     month,
     kind: kind === 'all' ? undefined : kind,
@@ -292,6 +294,7 @@ export default function TransactionsScreen() {
       />
 
       <MonthPicker month={month} onChange={setMonth} />
+      <MonthRuler value={regua.view} onChange={regua.setView} visible={regua.temCiclo} />
 
       {accountId !== undefined ? null : summary.isError ? (
         <ErrorCard onRetry={summary.refetch} />

@@ -22,6 +22,7 @@ import { Row, Section } from '@/components/ui/row';
 import { Screen } from '@/components/ui/screen';
 import { HeroLabel } from '@/components/ui/section-head';
 import { Segmented } from '@/components/ui/segmented';
+import { MonthRuler, useMonthRuler } from '@/components/finance/month-ruler';
 import { Sheet } from '@/components/ui/sheet';
 import { Skeleton, SkeletonRow } from '@/components/ui/skeleton';
 import { Sparkline } from '@/components/ui/sparkline';
@@ -177,7 +178,8 @@ export default function ForecastScreen() {
   // mesmas hipóteses e passa pela mesma `forecast_json` por dentro. Assim a tabela e a curva
   // não têm como discordar por caminho.
   const simulado = useForecastWithDrafts(dias, rascunhos, !emMes);
-  const mensal = useForecastMonths(dias, rascunhos, emMes);
+  const regua = useMonthRuler();
+  const mensal = useForecastMonths(dias, rascunhos, emMes, regua.view);
   const simulando = rascunhos.length > 0;
   // `?? forecast.data` enquanto a simulação carrega: sem isso a tela PISCA vazia a cada
   // suposição somada, e o destaque salta de um número real para nada e de volta.
@@ -222,7 +224,7 @@ export default function ForecastScreen() {
 
   // O mês expandido. `mesAberto` governa o `enabled` do hook: sem nenhum mês aberto, nenhuma
   // RPC é chamada.
-  const resumoAberto = useMonthSummary(mesAberto ?? '', mesAberto !== null);
+  const resumoAberto = useMonthSummary(mesAberto ?? '', mesAberto !== null, regua.view);
   // `recurring_covered_until` é propriedade da SÉRIE, não do mês — qualquer mês devolve o mesmo.
   // Vem do mês corrente porque essa chave já está no cache (a aba Financeiro a usa).
   const mesCorrente = useMonthSummary(localISODate().slice(0, 7));
@@ -559,6 +561,11 @@ export default function ForecastScreen() {
             value={modo}
             onChange={(v) => setModo(v)}
           />
+          {/* A régua qualifica só o modo Mês: no modo Dia a série é diária e não tem borda de
+              mês para escolher. */}
+          {modo === 'mes' ? (
+            <MonthRuler value={regua.view} onChange={regua.setView} visible={regua.temCiclo} />
+          ) : null}
         </View>
       ) : null}
 
