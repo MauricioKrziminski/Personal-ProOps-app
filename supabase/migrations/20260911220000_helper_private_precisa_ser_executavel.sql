@@ -1,0 +1,21 @@
+-- Desfaz o `revoke` da `20260911200000` sobre `private.debt_paid_in_cycle`.
+--
+-- ⚠️ **`revoke` é o padrão das funções `public._*`, e aplicá-lo a um helper `private` QUEBRA a
+-- cadeia.** As `public._*` são `security definer` e a revogação existe para ninguém chamá-las
+-- direto pelo PostgREST. `private.debt_paid_in_cycle` é o oposto: é `security invoker` e vive
+-- DENTRO de `private.debt_schedule_for` e `private.debt_paid_in_month`, que também são invoker.
+-- Sem execute, o `authenticated` esbarrava na chamada aninhada.
+--
+-- O sintoma foi visto no aparelho, nos dois: a Hoje abriu com "Algo deu errado" no painel e na
+-- seção "Atrasado", e pelo PostgREST as duas RPCs devolviam **42501 permission denied** —
+-- `upcoming_bills`, `forecast_json` e `month_lines` passam todas por `debt_schedule_for`.
+--
+-- ⚠️ **E o teste SQL não pegava, porque ele roda como dono do banco.** A checagem que faltava é
+-- de PRIVILÉGIO, não de resultado: as asserções continuavam verdes com a cadeia quebrada. A
+-- verificação no device é o que achou — é literalmente o passo 5 de `workflow.md`.
+--
+-- O que protege `private` não é revoke função a função: é o schema não estar exposto ao
+-- PostgREST (mesma razão pela qual ele foi criado). Os irmãos — `cycle_bounds`,
+-- `cycle_close_day`, `cash_total`, `debt_schedule_for` — todos têm execute para `authenticated`.
+
+grant execute on function private.debt_paid_in_cycle(uuid, date) to authenticated, anon, service_role;
