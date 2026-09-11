@@ -201,6 +201,37 @@ async def test_a_lista_do_whatsapp_leva_as_opcoes_no_CORPO_tambem(cliente):
         assert f"{i}) {c['label']}" in corpo
 
 
+@pytest.mark.asyncio
+async def test_botao_com_rotulo_cortado_leva_o_rotulo_inteiro_no_corpo(cliente):
+    """Dois candidatos viram BOTÕES, e título de botão é cortado em 20 chars.
+
+    "1) Fatura Nubank Cartão — vence 10/07/2026" e a de 10/08 viram
+    "1) Fatura Nubank Ca…" e "2) Fatura Nubank Ca…": o número sobrevive ao corte
+    e o sentido não. Quem salvava isso era a lista numerada que o motor emendava
+    no corpo; ela saiu de lá porque o mesmo corpo é o que o app mostra.
+
+    ⚠️ Rótulo que CABE não é repetido — senão "Confirmar"/"Cancelar" ganhariam
+    duas linhas de corpo dizendo o que os botões dizem.
+    """
+    candidatos = [
+        {"id": "f1", "label": "Fatura Nubank Cartão — vence 10/07/2026"},
+        {"id": "f2", "label": "Fatura Nubank Cartão — vence 10/08/2026"},
+    ]
+    saida = conversation._pergunta(
+        {"kind": "choice", "summary": "pagar qual?"}, candidatos, {"id": "p1"}
+    )
+    assert saida["ui"] == "buttons"
+
+    await whatsapp.send_buttons("5511", saida["body"], saida["buttons"])
+    corpo = cliente.enviados[-1]["interactive"]["body"]["text"]
+    for i, c in enumerate(candidatos, 1):
+        assert f"{i}) {c['label']}" in corpo
+
+    # E o par Confirmar/Cancelar não repete nada.
+    await whatsapp.send_buttons("5511", "Confirma?", [("ok", "Confirmar"), ("no", "Cancelar")])
+    assert cliente.enviados[-1]["interactive"]["body"]["text"] == "Confirma?"
+
+
 def test_resumo_que_ja_e_pergunta_nao_ganha_outra():
     """"apagar qual?" + "— qual deles?" era a mesma pergunta duas vezes."""
     um = conversation._pergunta(

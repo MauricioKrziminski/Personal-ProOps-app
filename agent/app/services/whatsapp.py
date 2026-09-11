@@ -139,7 +139,20 @@ async def send_buttons(to: str, body: str, buttons: list[tuple[str, str]]) -> No
     if not 1 <= len(buttons) <= BTN_MAX:
         raise ValueError(f"WhatsApp aceita 1..{BTN_MAX} botões, recebi {len(buttons)}")
 
-    body_str = (body or "").strip()
+    # ⚠️ **Rótulo que NÃO CABE no botão vai inteiro para o corpo.**
+    #
+    # O título de um botão é cortado em 20 caracteres, e duas faturas do mesmo
+    # cartão viram "1) Fatura Nubank Ca…" e "2) Fatura Nubank Ca…" — o número
+    # sobrevive ao corte (é o que `_cut` garante) mas o SENTIDO não, e aí a
+    # pergunta fica impossível de responder. Antes quem salvava isso era a lista
+    # numerada que o motor emendava no corpo; ela saiu de lá em 11/09/2026
+    # porque o mesmo corpo é o que o chat do app mostra, e lá as opções já são
+    # controles na tela.
+    #
+    # Repetir só quando corta: com "Confirmar"/"Cancelar" (que cabem) o corpo
+    # ganharia duas linhas dizendo o que os botões logo abaixo já dizem.
+    titulos = [t for _, t in buttons if len(_cut(t, BTN_TITLE_MAX)) < len(t.strip())]
+    body_str = "\n".join(x for x in [(body or "").strip(), *titulos] if x)
     # Se o corpo for longo (> 800 bytes em UTF-8), envia o texto principal completo primeiro
     # e manda os botões em seguida com prompt conciso para evitar rejeição 400 da Meta (limite 1024 bytes).
     if len(body_str.encode("utf-8")) > 800:

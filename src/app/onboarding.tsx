@@ -153,6 +153,20 @@ export default function OnboardingScreen() {
 
   const avancar = () => (passo === TOTAL - 1 ? void finish() : irPara(passo + 1));
 
+  /**
+   * "Agora não" DESFAZ o que o passo tinha preenchido — o rótulo promete isso.
+   *
+   * Sem o descarte, digitar o nome e tocar em "Agora não" gravava o nome assim
+   * mesmo, e escolher o dia 10 e pular gravava o dia 10: o botão dizia uma coisa
+   * e o `finish()` fazia outra, calado. Pular é sair como se o passo não tivesse
+   * acontecido.
+   */
+  const pular = () => {
+    if (passo === 1) setNome(null);
+    if (passo === 2) setDiaDoCiclo(undefined);
+    irPara(passo + 1);
+  };
+
   const conteudo = [
     <PassoBoasVindas key="0" entra={entra} />,
     <PassoNome
@@ -242,7 +256,7 @@ export default function OnboardingScreen() {
           />
           {/* Pular existe só onde a resposta é opcional de verdade — nome e avisos. */}
           {passo === 1 || passo === 2 ? (
-            <Button label="Agora não" variant="ghost" onPress={() => irPara(passo + 1)} block />
+            <Button label="Agora não" variant="ghost" onPress={pular} block />
           ) : null}
         </View>
       </View>
