@@ -19,6 +19,15 @@
 #    o login e as consultas de quem não atualizou. Por isso o script se recusa a
 #    fazer esse passo sozinho.
 #
+#    ⚠️ **Enquanto o app não foi lançado, "quem não atualizou" é só você** (11/09/2026):
+#    a espera de adoção existe para a base instalada, e não há base. Com um build
+#    novo no seu aparelho, dá para fazer as quatro etapas na mesma sessão.
+#
+# 4. **Depois de desabilitar as legadas, REVOGUE o JWT secret legado** — é ele que
+#    assina a chave que está no git. Nesta ordem: a doc do Supabase é explícita que
+#    revogar o secret antes de desabilitar as chaves deixa o projeto inconsistente,
+#    porque `anon` e `service_role` não são só chaves, são JWTs assinados por ele.
+#
 # Ordem correta (as etapas 1-3 são seguras e reversíveis; a 4 não é):
 #
 #   ./scripts/retire-legacy-keys.sh check     # o que ainda usa a chave legada
@@ -74,7 +83,7 @@ check() {
   ok "não usa a anon key (conecta por DATABASE_URL); nada a fazer"
 
   printf '\n  4) Edge Functions\n'
-  ok "o webhook usa SUPABASE_SERVICE_ROLE_KEY injetada pelo runtime, não a anon"
+  ok "não existem mais desde 09/09/2026 — nada usa service_role neste projeto"
 }
 
 # ---------------------------------------------------------------------------
