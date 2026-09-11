@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 import Animated, { FadeInDown } from 'react-native-reanimated';
 import { Stack, router, useLocalSearchParams } from 'expo-router';
@@ -92,7 +92,13 @@ export default function MonthScreen() {
   const params = useLocalSearchParams<{ month?: string }>();
   const toast = useToast();
   const [month, setMonth] = useState(() => params.month ?? currentMonth());
-  const [groupBy, setGroupBy] = useState<GroupBy>('natureza');
+  /*
+    ⚠️ **Padrão `meio`, não `natureza`.** A lista logo acima JÁ está agrupada por natureza
+    (Fixas, Parcelas, Variáveis), então abrir o recorte na mesma régua repetia a mesma leitura
+    duas vezes na mesma tela. Por meio de pagamento ele acrescenta o que a lista não diz — e é
+    o bloco "Saídas" da planilha do dono do produto: Nubank 3.271 · BB 1.432 · Itaú 1.485 · Pix.
+  */
+  const [groupBy, setGroupBy] = useState<GroupBy>('meio');
 
   const regua = useMonthRuler();
   const lines = useMonthLines(month, regua.view);
@@ -105,6 +111,32 @@ export default function MonthScreen() {
   const nomeDoMes = monthTitle(month).replace(/ de \d{4}$/, '').toLowerCase();
   const s = summary.data;
   const porBloco = (bucket: Bucket) => (lines.data ?? []).filter((l) => l.bucket === bucket);
+
+  /*
+    As faturas que o período contém — derivadas das LINHAS, não de uma consulta nova.
+    Cada linha de cartão já diz a que fatura pertence (`invoice_id`/`invoice_due`), então o bloco
+    é um agrupamento no cliente: zero rede, zero número novo para divergir do que está acima.
+
+    ⚠️ **Isto NÃO substitui a lista.** O pedido foi *"mostrar a fatura e se ele quiser ver os
+    lançamentos daquela fatura ele clica nela"*, e a tela da fatura já existe e já lista as
+    compras dela — o que faltava era o caminho. Tirar as compras da lista para pôr só a fatura
+    quebraria os subtotais por natureza, que vêm do `month_summary` e não sabem de fatura.
+  */
+  const faturasDoPeriodo = useMemo(() => {
+    const mapa = new Map<string, { id: string; nome: string; vence: string; cents: number }>();
+    for (const l of lines.data ?? []) {
+      if (!l.invoice_id || !l.invoice_due) continue;
+      const atual = mapa.get(l.invoice_id);
+      if (atual) atual.cents += Number(l.amount_cents);
+      else mapa.set(l.invoice_id, {
+        id: l.invoice_id,
+        nome: l.method_label ?? 'Cartão',
+        vence: l.invoice_due,
+        cents: Number(l.amount_cents),
+      });
+    }
+    return [...mapa.values()].sort((a, b) => a.vence.localeCompare(b.vence));
+  }, [lines.data]);
 
   const subtotal: Record<Bucket, number> = {
     entrada: Number(s?.income_cents ?? 0),
@@ -376,6 +408,32 @@ export default function MonthScreen() {
       })}
 
       {/* 7. Para onde foi — três cortes, um desenho só. */}
+      {faturasDoPeriodo.length > 0 ? (
+        <View style={styles.bloco}>
+          <SectionHead title="Faturas do período" />
+          <Section>
+            {faturasDoPeriodo.map((f) => (
+              <Row
+                key={f.id}
+                title={f.nome}
+                subtitle={`vence ${isoToBR(f.vence)} · ${f.cents === 0 ? 'sem compras aqui' : 'toque para ver as compras'}`}
+                icon="creditcard"
+                trailing={<Money cents={f.cents} variant="ticker" />}
+                onPress={() =>
+                  router.push({ pathname: '/finance/invoice/[id]', params: { id: f.id } })
+                }
+              />
+            ))}
+          </Section>
+          {/* A soma daqui JÁ está dentro dos blocos acima — dizer isso evita a leitura de que
+              são gastos a mais. */}
+          <ThemedText type="footnote" themeColor="textSecondary">
+            O que está aqui já está somado acima; é a mesma compra, vista pela fatura que vai
+            pagá-la.
+          </ThemedText>
+        </View>
+      ) : null}
+
       {(breakdown.data ?? []).length > 0 || breakdown.isLoading ? (
         <View style={styles.bloco}>
           <SectionHead title="Para onde o dinheiro foi" />

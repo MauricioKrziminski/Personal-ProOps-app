@@ -7,7 +7,7 @@
  * é linguagem, e por isso é testável sem banco.
  */
 
-import { formatBRL } from './dates.ts';
+import { formatBRL, isoToBR } from './dates.ts';
 
 export type Bucket = 'entrada' | 'fixa' | 'parcela' | 'variavel';
 export type GroupBy = 'natureza' | 'meio' | 'categoria';
@@ -56,6 +56,8 @@ export function sharePercent(shareBp: number): number {
 }
 
 export interface LineLike {
+  invoice_id?: string | null;
+  invoice_due?: string | null;
   installment_no: number | null;
   installments_total: number | null;
   due_day: number | null;
@@ -77,6 +79,19 @@ export function lineSubtitle(line: LineLike, { comCategoria = false } = {}): str
   if (line.due_day) partes.push(`dia ${line.due_day}`);
   if (line.method_label) partes.push(line.method_label);
   if (comCategoria && line.category) partes.push(line.category);
+  /*
+    ⚠️ **A ponte entre as duas réguas, e ela é uma frase.**
+
+    Esta tela é COMPETÊNCIA: a compra conta no dia em que foi feita. O dinheiro dela, porém, só
+    sai quando a fatura vence — e com fechamento no dia 3 e ciclo fechando no 10, TODA compra
+    feita entre os dias 4 e 10 é contada num ciclo e paga no seguinte. Não é defeito, é a
+    distância entre gastar e pagar; o que era defeito é a pessoa não conseguir VER isso.
+
+    Era a dúvida literal do dono do produto (*"ele mostra essa minha compra por mais que meu
+    ciclo está do dia 11 até 10?"*), e a resposta certa não era remanejar número nenhum — era
+    dizer, na própria linha, para qual fatura ela vai.
+  */
+  if (line.invoice_due) partes.push(`cai na fatura de ${isoToBR(line.invoice_due)}`);
   return partes.join(' · ');
 }
 

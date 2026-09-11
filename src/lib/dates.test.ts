@@ -5,6 +5,7 @@ import { test } from 'node:test';
 
 import {
   brToISO,
+  diasAte,
   formatBRL,
   formatDateBR,
   greetingBR,
@@ -17,6 +18,8 @@ import {
   monthBounds,
   relativeBR,
   timeBR,
+  somaDias,
+  maskBRDate,
 } from './dates.ts';
 
 test('localISODate formata a data local com zero à esquerda', () => {
@@ -134,4 +137,36 @@ test('negativo sempre leva o sinal; `signed` decide só o + do positivo', () => 
   assert.equal(moneySign(2926030, true), '+');
   assert.equal(moneySign(0), '');
   assert.equal(moneySign(0, true), '');
+});
+
+test('diasAte e somaDias são a mesma régua nos dois sentidos', () => {
+  // o par tem que fechar: somar N dias e perguntar quantos faltam devolve N
+  for (const n of [1, 30, 90, 365, 3650]) {
+    assert.equal(diasAte(somaDias('2026-09-11', n), '2026-09-11'), n);
+  }
+
+  // ⚠️ o mês do `Date.UTC` é 0-based e o `split('-')` devolve 1-based: sem o -1 a conta erra
+  // um mês inteiro, e o horizonte da projeção sairia ~30 dias maior sem nada acusar.
+  assert.equal(somaDias('2026-01-31', 1), '2026-02-01');
+  assert.equal(somaDias('2026-12-31', 1), '2027-01-01');
+  assert.equal(diasAte('2026-03-01', '2026-02-01'), 28, 'fevereiro de 2026 tem 28 dias');
+
+  // data que já passou devolve negativo — é o que o botão "Aplicar" usa para se desabilitar
+  assert.ok(diasAte('2026-09-01', '2026-09-11') < 0);
+  assert.equal(diasAte('2026-09-11', '2026-09-11'), 0, 'hoje não é horizonte');
+});
+
+test('maskBRDate põe as barras e deixa apagar', () => {
+  assert.equal(maskBRDate('1'), '1');
+  assert.equal(maskBRDate('15'), '15');
+  assert.equal(maskBRDate('153'), '15/3');
+  assert.equal(maskBRDate('1503'), '15/03');
+  assert.equal(maskBRDate('15032027'), '15/03/2027');
+  // já mascarado, continua estável (o campo é controlado: o valor volta para cá a cada tecla)
+  assert.equal(maskBRDate('15/03/2027'), '15/03/2027');
+  // backspace: some o último dígito e a barra sai junto quando fica sobrando
+  assert.equal(maskBRDate('15/0'), '15/0');
+  assert.equal(maskBRDate('15/'), '15');
+  // lixo e excesso não passam
+  assert.equal(maskBRDate('15a03b2027999'), '15/03/2027');
 });

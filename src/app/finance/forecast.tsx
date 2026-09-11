@@ -15,7 +15,7 @@ import { Button } from '@/components/ui/button';
 import { Chip } from '@/components/finance/chip';
 import { Card } from '@/components/ui/card';
 import { EmptyState } from '@/components/ui/empty-state';
-import { Field, MoneyField } from '@/components/ui/field';
+import { Field, MoneyField, TextField } from '@/components/ui/field';
 import { Icon } from '@/components/ui/icon';
 import { Money } from '@/components/ui/money';
 import { Row, Section } from '@/components/ui/row';
@@ -41,7 +41,16 @@ import {
 } from '@/hooks/use-finance';
 import { MonthPicker, currentMonth, monthTitle } from '@/components/finance/month-picker';
 import { mesDoCorte, veioDe, type MesProjetado } from '@/lib/forecast-months';
-import { formatBRL, isoToBR, localISODate } from '@/lib/dates';
+import {
+  brToISO,
+  diasAte,
+  formatBRL,
+  isValidBRDate,
+  isoToBR,
+  localISODate,
+  maskBRDate,
+  somaDias,
+} from '@/lib/dates';
 import { showItemActions } from '@/lib/item-actions';
 import { settleLabel } from '@/lib/settle-labels';
 
@@ -134,6 +143,17 @@ export default function ForecastScreen() {
   const { width } = useWindowDimensions();
 
   const [dias, setDias] = useState(90);
+  /**
+   * Até quando projetar, escolhido à mão — o pedido foi *"deixar um filtro que ele seleciona a
+   * data de quando até quando ele quer projetar"*.
+   *
+   * ⚠️ **O "de quando" tem UM valor certo e ele não é escolha: HOJE.** Uma projeção de caixa
+   * parte do saldo que existe agora; começar em outra data exigiria um saldo daquela data, que
+   * é justamente o que a projeção está calculando. Por isso o controle é "até", e a tela escreve
+   * "de hoje até <data>" em vez de oferecer um campo que só aceita um valor.
+   */
+  const [horizonteAberto, setHorizonteAberto] = useState(false);
+  const [ateTexto, setAteTexto] = useState('');
   const [comoCalculo, setComoCalculo] = useState(false);
   /**
    * Dia × Mês.
@@ -283,11 +303,19 @@ export default function ForecastScreen() {
       }
     );
 
-  const escolherHorizonte = () =>
-    showItemActions(
-      'Horizonte da projeção',
-      HORIZONTES.map((h) => ({ label: h.label, onPress: () => setDias(h.dias) }))
-    );
+  const escolherHorizonte = () => {
+    setAteTexto(isoToBR(somaDias(localISODate(), dias)));
+    setHorizonteAberto(true);
+  };
+
+  /** A data digitada vale quando é válida E está no futuro; senão o horizonte não muda. */
+  const aplicarAte = () => {
+    if (!isValidBRDate(ateTexto)) return;
+    const d = diasAte(brToISO(ateTexto));
+    if (d < 1) return;
+    setDias(Math.min(d, 3650));
+    setHorizonteAberto(false);
+  };
 
   const linhaConta = (b: (typeof contas)[number]) => {
     const fatura = b.kind === 'invoice';
@@ -378,12 +406,56 @@ export default function ForecastScreen() {
       <HeaderActions
         actions={[
           {
-            label: `Horizonte da projeção, ${rotuloHorizonte(dias)}`,
+            label: `Horizonte da projeção, de hoje até ${isoToBR(somaDias(localISODate(), dias))}`,
             icon: 'calendar',
             onPress: escolherHorizonte,
           },
         ]}
       />
+
+      <Sheet visible={horizonteAberto} onClose={() => setHorizonteAberto(false)}>
+        <View style={styles.horizonteTopo}>
+          <Button label="Fechar" variant="ghost" size="sm" onPress={() => setHorizonteAberto(false)} />
+          <ThemedText type="smallBold">Até quando projetar</ThemedText>
+          <View style={styles.horizonteContrapeso} />
+        </View>
+
+        <View style={styles.horizonteCorpo}>
+          <Field
+            label="Projetar até"
+            hint="De hoje até a data que você escolher.">
+            <TextField
+              value={ateTexto}
+              onChangeText={(v) => setAteTexto(maskBRDate(v))}
+              placeholder="dd/mm/aaaa"
+              keyboardType="number-pad"
+              maxLength={10}
+              accessibilityLabel="Projetar até a data"
+            />
+          </Field>
+          <Button
+            label="Aplicar"
+            onPress={aplicarAte}
+            disabled={!isValidBRDate(ateTexto) || diasAte(brToISO(ateTexto)) < 1}
+            block
+          />
+
+          <Section>
+            {HORIZONTES.map((h) => (
+              <Row
+                key={h.dias}
+                title={h.label}
+                subtitle={`até ${isoToBR(somaDias(localISODate(), h.dias))}`}
+                chevron={false}
+                onPress={() => {
+                  setDias(h.dias);
+                  setHorizonteAberto(false);
+                }}
+              />
+            ))}
+          </Section>
+        </View>
+      </Sheet>
 
       {forecast.isLoading ? (
         <>
@@ -857,6 +929,16 @@ export default function ForecastScreen() {
 }
 
 const styles = StyleSheet.create({
+  horizonteTopo: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: Space.md,
+    paddingBottom: Space.sm,
+  },
+  /** Contrapeso do "Fechar": sem ele o título não fica centrado. */
+  horizonteContrapeso: { width: 72 },
+  horizonteCorpo: { paddingHorizontal: Space.lg, paddingBottom: Space.lg, gap: Space.lg },
   chips: { flexDirection: 'row', flexWrap: 'wrap', gap: Space.sm },
   hero: {
     gap: Space.md,

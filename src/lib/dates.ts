@@ -149,3 +149,41 @@ export function greetingBR(hour = new Date().getHours()): string {
   if (hour >= 12 && hour < 18) return 'Boa tarde';
   return 'Boa noite';
 }
+
+/**
+ * Quantos dias faltam de HOJE até `iso` (negativo se já passou).
+ *
+ * Em UTC de propósito: as duas pontas viram meia-noite UTC antes da subtração, então o horário
+ * de verão e o fuso não entram na conta — o que se quer aqui é diferença de DIAS de calendário,
+ * não de instantes.
+ */
+export function diasAte(iso: string, hoje = localISODate()): number {
+  const [ay, am, ad] = hoje.split('-').map(Number);
+  const [by, bm, bd] = iso.split('-').map(Number);
+  const a = Date.UTC(ay, am - 1, ad);
+  const b = Date.UTC(by, bm - 1, bd);
+  return Math.round((b - a) / 86400000);
+}
+
+/** `2026-09-11` + 90 → `2026-12-10`. O par de `diasAte`, para a tela escrever a data que pediu. */
+export function somaDias(iso: string, dias: number): string {
+  const [y, m, d] = iso.split('-').map(Number);
+  return new Date(Date.UTC(y, m - 1, d + dias)).toISOString().slice(0, 10);
+}
+
+/**
+ * `15032027` → `15/03/2027`, enquanto se digita.
+ *
+ * ⚠️ **Sem isto o campo é indigitável.** Com `keyboardType="number-pad"` o teclado do iOS não tem
+ * a tecla "/", então um campo de data que espera o usuário digitar a barra só aceita texto colado.
+ * A máscara põe as barras; quem digita entra só com os números.
+ *
+ * Apagar tem que funcionar: por isso ela reconstrói a partir dos DÍGITOS, em vez de acrescentar
+ * uma barra ao que já está lá — assim o backspace atravessa a barra sozinho.
+ */
+export function maskBRDate(texto: string): string {
+  const d = texto.replace(/\D/g, '').slice(0, 8);
+  if (d.length <= 2) return d;
+  if (d.length <= 4) return `${d.slice(0, 2)}/${d.slice(2)}`;
+  return `${d.slice(0, 2)}/${d.slice(2, 4)}/${d.slice(4)}`;
+}

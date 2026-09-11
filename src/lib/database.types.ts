@@ -2286,6 +2286,8 @@ export type Database = {
           due_day: number
           installment_no: number
           installments_total: number
+          invoice_due: string
+          invoice_id: string
           kind: string
           method_id: string
           method_label: string
@@ -2639,6 +2641,8 @@ export type Database = {
           due_day: number
           installment_no: number
           installments_total: number
+          invoice_due: string
+          invoice_id: string
           kind: string
           method_id: string
           method_label: string

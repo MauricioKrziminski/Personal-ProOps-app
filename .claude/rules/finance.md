@@ -173,6 +173,65 @@ por `from`/`to`, que mudam junto; a do orçamento é chaveada pelo rótulo, que 
 nas duas réguas. Ela está em `REGUA_MUDOU` (`use-finance.ts`), a lista que os DOIS setters
 invalidam.
 
+## A régua do mês é de CADA TELA, e não existe régua "por fatura"
+
+`workspaces.cycle_close_day` é global (o Perfil grava o dia). **Como cada tela está olhando é da
+tela**: `MonthRuler` (`Mês | Ciclo`) vive em `useState` e morre com ela, e as leituras recebem
+`p_view` (`'cycle'` | `'civil'` | null) — `null` cai no `workspaces.cycle_view`, que é o que
+mantém o agente e APK antigo funcionando sem tocar em nada. `20260911170000` levou o argumento a
+**19 funções**.
+
+⚠️ **Não existe uma terceira opção "por fatura", e isso é resultado de pesquisa.** O artigo que
+DEFENDE alinhar orçamento ao ciclo do cartão entrega a frase que mata a ideia: *"if you have
+several cards with different closing dates, you cannot align to all of them, and picking one
+means the others are still misaligned"*. O fechamento é interno do cartão — com três cartões há
+três fechamentos e nenhum período comum. O **vencimento**, ao contrário, é evento de caixa e cai
+sozinho no período que o contém: é por isso que o usuário com cartões vencendo em dias diferentes
+fica certo sem escolher nada.
+
+O que o dono do produto queria da régua "fatura" (*"ver os lançamentos por fatura dentro do
+ciclo"*) veio da **fatura virar linha**, não de um período novo — o modelo do Organizze, cujo
+"Saldo diário" conta o cartão como uma despesa única "Fatura Mês Ano", pelo vencimento.
+
+Mercado, medido: Finny tem dia configurável **1 a 28** (o mesmo teto daqui); Goodbudget e Lunch
+Money também; **Monarch e Copilot só têm mês civil**; e o **YNAB recusa por decisão de desenho** —
+a resposta deles para quem recebe fora do dia 1 é "orce um mês à frente", para a borda deixar de
+importar.
+
+## A fatura como linha, e a etiqueta que liga as duas réguas
+
+`month_lines_for` devolve `invoice_id` e `invoice_due` (`20260911180000`), e disso saem duas
+coisas na tela do Mês: o bloco **"Faturas do período"** (uma linha por fatura, que leva para a
+tela da fatura, que já lista as compras) e a etiqueta **"cai na fatura de DD/MM"** em cada linha
+de cartão.
+
+⚠️ **Nenhum número muda.** As colunas são informativas e o bloco é agrupamento no cliente, sobre
+as linhas que já vieram. A tela continua em COMPETÊNCIA, porque é ela que alimenta orçamento e
+categoria: mover a compra para o mês da fatura faria agosto fechar folgado e setembro estourar
+por uma compra que a pessoa não lembra de ter feito ali. Tirar as compras da lista para deixar só
+a fatura quebraria os subtotais por natureza, que vêm do `month_summary` e não sabem de fatura.
+
+A etiqueta existe porque a distância entre gastar e pagar é real e era invisível: com fechamento
+no dia 3 e ciclo fechando no 10, **toda compra feita entre os dias 4 e 10 é contada num ciclo e
+paga no seguinte**. A pergunta do dono do produto foi exatamente essa, e a resposta certa não era
+remanejar número — era dizer, na linha, para onde ela vai.
+
+⚠️ **O recorte "Para onde o dinheiro foi" abre em MEIO, não em natureza.** A lista logo acima já
+está agrupada por natureza, e abrir o recorte na mesma régua dizia a mesma coisa duas vezes na
+mesma tela. Por meio é o bloco "Saídas" da planilha do dono do produto.
+
+## A Projeção vai até a data que o usuário escolher
+
+Além dos atalhos (30 dias … 10 anos, cada um dizendo a data que produz), um campo livre "Projetar
+até". ⚠️ **Não existe "de quando"**: uma projeção de caixa parte do saldo que existe AGORA, e
+começar em outra data exigiria o saldo daquela data — que é justamente o que ela está calculando.
+A tela escreve "de hoje até <data>" em vez de oferecer um campo que só aceita um valor.
+
+⚠️ **Campo de data com `keyboardType="number-pad"` precisa de MÁSCARA** (`maskBRDate`): o teclado
+numérico do iOS não tem a tecla "/", então um campo que espera o usuário digitar a barra só
+aceita texto colado. A máscara reconstrói a partir dos dígitos, e não acrescentando barra ao que
+já está lá, para o backspace atravessar a barra sozinho.
+
 ## Em qual fatura cai a compra feita NO dia do fechamento
 
 **Não há padrão, e por isso é campo do cartão** (`accounts.closing_day_inclusive`,
