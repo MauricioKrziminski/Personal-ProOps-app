@@ -166,6 +166,24 @@ export function Screen({
           Cartões, Orçamentos e companhia debaixo da barra de navegação.
         */
       contentInsetAdjustmentBehavior={topBar ? 'never' : 'automatic'}
+      /*
+        ⚠️ **Sem isto, o recuo do topo é contado DUAS vezes e sobram ~132pt de nada** entre o
+        large title e o primeiro card (medido no simulador em 11/09/2026: o card começava em
+        306pt; o certo é 186). São dois mecanismos fazendo a mesma coisa —
+        `automaticallyAdjustContentInsets` é o legado do UIKit (ligado por padrão) e
+        `contentInsetAdjustmentBehavior` é a API do iOS 11 —, e com os dois ligados o inset da
+        barra entra duas vezes.
+
+        **Só aparece em tela com `Stack.Toolbar`** (toda tela empurrada com ação de header, via
+        `HeaderActions`): é ele que faz o RN enxergar um navigation controller para compensar.
+        Isolado tirando o `HeaderActions` da Projeção — sem ele o card já nascia em 186pt com o
+        mesmo `Screen`. A queixa do dono do produto foi literal: *"olha o tamanho do espaço/gap
+        entre o título e o componente embaixo do título"*.
+
+        Não confundir com o `never` acima, que é outra decisão: lá o recuo é NOSSO (`topBar`).
+        Aqui quem recua é o header nativo, uma vez só.
+      */
+      automaticallyAdjustContentInsets={false}
       showsVerticalScrollIndicator={false}
       alwaysBounceVertical={Boolean(onRefresh)}
       refreshControl={
