@@ -10,7 +10,7 @@ import { Sheet, SheetHeader } from '@/components/ui/sheet';
 import { Card } from '@/components/ui/card';
 import { EmptyState } from '@/components/ui/empty-state';
 import { ItemLink } from '@/components/ui/item-link';
-import { Field, TextField } from '@/components/ui/field';
+import { DateField, Field } from '@/components/ui/field';
 import { Icon } from '@/components/ui/icon';
 import { Money } from '@/components/ui/money';
 import { Row, Section } from '@/components/ui/row';
@@ -63,14 +63,6 @@ const STATUS_LABEL: Record<string, string> = {
 function mesLabel(iso: string): string {
   const [y, m] = iso.split('-').map(Number);
   return new Date(y, m - 1, 1).toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' });
-}
-
-/** Máscara `dd/mm/aaaa`: o number-pad não tem a tecla `/`, então ela entra sozinha. */
-function mascaraData(valor: string): string {
-  const d = valor.replace(/\D/g, '').slice(0, 8);
-  if (d.length <= 2) return d;
-  if (d.length <= 4) return `${d.slice(0, 2)}/${d.slice(2)}`;
-  return `${d.slice(0, 2)}/${d.slice(2, 4)}/${d.slice(4)}`;
 }
 
 /** `dd/mm/aaaa` → ISO, ou null se a data não existe no calendário. */
@@ -598,13 +590,7 @@ export default function InvoiceScreen() {
               label="Data do pagamento"
               error={dataISO ? undefined : 'Data em dd/mm/aaaa'}
               hint="Pagou ontem e está registrando hoje? Corrija aqui.">
-              <TextField
-                value={dataBR}
-                onChangeText={(v) => setDataBR(mascaraData(v))}
-                placeholder="dd/mm/aaaa"
-                keyboardType="number-pad"
-                invalid={!dataISO}
-              />
+              <DateField value={dataBR} onChangeText={setDataBR} invalid={!dataISO} />
             </Field>
 
             <Button

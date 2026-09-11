@@ -12,7 +12,7 @@ import { Sheet, SheetHeader } from '@/components/ui/sheet';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { EmptyState } from '@/components/ui/empty-state';
-import { Field, MoneyField, TextField } from '@/components/ui/field';
+import { DateField, Field, MoneyField, TextField } from '@/components/ui/field';
 import { Icon } from '@/components/ui/icon';
 import { Money } from '@/components/ui/money';
 import { Screen } from '@/components/ui/screen';
@@ -700,11 +700,10 @@ export default function RecurringScreen() {
                 label="Começa em"
                 hint="Âncora da série, não muda depois. No passado, lança as antigas de uma vez."
                 error={form.inicio && !inicioOk ? 'Data inválida (dd/mm/aaaa)' : undefined}>
-                <TextField
+                <DateField
                   value={form.inicio}
                   onChangeText={(inicio) => setForm({ ...form, inicio })}
                   placeholder="05/09/2026"
-                  keyboardType="number-pad"
                   invalid={Boolean(form.inicio) && !inicioOk}
                 />
               </Field>
@@ -734,11 +733,9 @@ export default function RecurringScreen() {
                 label="Termina em"
                 hint="Em branco não tem fim. Preencha só se a série acaba."
                 error={form.fim && !fimOk ? 'Informe data válida igual ou posterior ao início' : undefined}>
-                <TextField
+                <DateField
                   value={form.fim}
                   onChangeText={(fim) => setForm({ ...form, fim })}
-                  placeholder="dd/mm/aaaa"
-                  keyboardType="number-pad"
                   invalid={Boolean(form.fim) && !fimOk}
                 />
               </Field>

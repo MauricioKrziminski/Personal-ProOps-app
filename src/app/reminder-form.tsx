@@ -14,7 +14,7 @@ import { ThemedText } from '@/components/themed-text';
 import { HeaderActions } from '@/components/ui/header-actions';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
-import { Field, TextField } from '@/components/ui/field';
+import { DateField, Field, TextField } from '@/components/ui/field';
 import { Icon } from '@/components/ui/icon';
 import { Screen } from '@/components/ui/screen';
 import { HeroLabel } from '@/components/ui/section-head';
@@ -461,15 +461,11 @@ function ReminderForm({
                       selected={field.value === now.tomorrow}
                       onPress={() => setValue('date', now.tomorrow, { shouldValidate: true })}
                     />
-                    <TextField
+                    <DateField
                       value={field.value}
                       onChangeText={field.onChange}
-                      placeholder="dd/mm/aaaa"
-                      keyboardType="number-pad"
-                      maxLength={10}
                       accessibilityLabel="Data do lembrete"
                       invalid={!!errors.date}
-                      style={styles.dateField}
                     />
                   </View>
                 </Field>
@@ -598,6 +594,15 @@ function RecurrenceEditor({
   const editable = isEditableRRule(value);
   const state = parseRRule(value);
   const patch = (changes: Partial<RecurrenceState>) => onChange(buildRRule({ ...state, ...changes }));
+  /*
+    O "até" precisa de texto PRÓPRIO: a regra só aceita a data quando ela fica válida, e um campo
+    controlado pela regra devolveria o valor antigo no primeiro dígito — ou seja, indigitável.
+    Era o motivo do `defaultValue` de antes; com a máscara, o texto tem que voltar para a tela.
+  */
+  const [ateTexto, setAteTexto] = useState(() => {
+    const until = parseRRule(value).until;
+    return until ? untilToBR(until) : '';
+  });
 
   const endMode = state.count ? 'count' : state.until ? 'until' : 'never';
 
@@ -761,16 +766,13 @@ function RecurrenceEditor({
         {state.until ? (
           <Animated.View entering={FadeIn.duration(Motion.duration.base)} layout={linear}>
             <Field label="Até">
-              <TextField
-                defaultValue={untilToBR(state.until)}
-                onChangeText={(text) =>
-                  isValidBRDate(text) ? patch({ until: text.split('/').reverse().join('') }) : undefined
-                }
-                placeholder="dd/mm/aaaa"
-                keyboardType="number-pad"
-                maxLength={10}
+              <DateField
+                value={ateTexto}
+                onChangeText={(texto) => {
+                  setAteTexto(texto);
+                  if (isValidBRDate(texto)) patch({ until: texto.split('/').reverse().join('') });
+                }}
                 accessibilityLabel="Repetir até a data"
-                style={styles.dateField}
               />
             </Field>
           </Animated.View>

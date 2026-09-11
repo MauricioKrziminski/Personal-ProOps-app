@@ -4,6 +4,7 @@ import { StyleSheet, TextInput, View, type TextInputProps } from 'react-native';
 import { ThemedText } from '@/components/themed-text';
 import { HitTarget, Radius, Space, Type, tabular } from '@/design/tokens';
 import { useTheme } from '@/hooks/use-theme';
+import { maskBRDate } from '@/lib/dates';
 
 interface FieldProps {
   /** Label VISÍVEL. Placeholder não é label — some quando o usuário digita. */
@@ -79,6 +80,48 @@ export const TextField = forwardRef<TextInput, TextInputProps & { invalid?: bool
     );
   }
 );
+
+interface DateFieldProps {
+  /** Data em `dd/mm/aaaa`, como o usuário digita. */
+  value: string;
+  onChangeText: (br: string) => void;
+  invalid?: boolean;
+  accessibilityLabel?: string;
+  placeholder?: string;
+}
+
+/**
+ * Campo de data em `dd/mm/aaaa` — **com a máscara, que não é detalhe: sem ela o campo não
+ * aceita ser digitado no iOS.**
+ *
+ * ⚠️ O teclado `number-pad` do iOS **não tem a tecla "/"**. Um campo de data que espera o
+ * usuário digitar a barra só aceita texto colado — foi a queixa "não consigo mudar a data".
+ * `maskBRDate` põe as barras a partir dos DÍGITOS (e por isso o backspace atravessa a barra
+ * sozinho), e este componente existe para que nenhuma tela precise lembrar disso.
+ *
+ * Eram SEIS campos de data no app e só um tinha máscara — e esse um carregava uma cópia local
+ * chamada `mascaraData`. Os outros cinco (prazo da meta, início e fim da recorrência, data e
+ * "repetir até" do lembrete) estavam indigitáveis no iPhone, em silêncio, porque no Android o
+ * teclado numérico TEM a barra e o defeito não aparece no emulador.
+ *
+ * ponytail: teto conhecido — ele pede que a pessoa SAIBA a data. Onde ver o dia da semana
+ * importa, o caminho é o `Calendar` inline (`components/finance/calendar.tsx`), como fez a
+ * Projeção. Trocar os cinco de uma vez é redesenhar cinco formulários; a máscara conserta o
+ * que está quebrado hoje.
+ */
+export function DateField({ value, onChangeText, invalid, accessibilityLabel, placeholder }: DateFieldProps) {
+  return (
+    <TextField
+      value={value}
+      onChangeText={(texto) => onChangeText(maskBRDate(texto))}
+      placeholder={placeholder ?? 'dd/mm/aaaa'}
+      keyboardType="number-pad"
+      maxLength={10}
+      accessibilityLabel={accessibilityLabel}
+      invalid={invalid}
+    />
+  );
+}
 
 interface MoneyFieldProps {
   /** Valor em centavos. Nunca float. */
