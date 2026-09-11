@@ -341,3 +341,30 @@ e dublê sempre concorda). Três formas, os mesmos casos:
 linha do meio prova: com a redação antiga, mas o enum chamado `simulate_scenario` e os campos
 disponíveis, o modelo já acerta. O texto que foi somado ao prompt é cinto e suspensório, e é
 honesto dizer isso: se um dia alguém precisar cortar prompt por token, é ele que sai, não o nome.
+
+## Adiar a fatura para a próxima — lacuna ABERTA e declarada (10/09/2026)
+
+`useRollInvoice` ("Jogar para a próxima", o rotativo) nasceu **só no app**. A regra desta página
+é que botão novo vira linha aqui; esta linha existe para a diferença não crescer calada.
+
+| app | agente | por quê |
+|---|---|---|
+| `useRollInvoice` — "Jogar para a próxima" | **não existe** | ver abaixo |
+
+**Não é esquecimento, é orçamento de schema.** `FinanceAction` está no teto medido de 252/32, e
+as duas ampliações possíveis já foram recusadas pela API em 09/09/2026. Adiar não cabe nos dois
+caminhos baratos que sobraram:
+
+- **Não é alvo novo de uma ação existente.** Foi assim que "quitar sem caixa" virou `mark_paid`
+  sobre `card_invoices`, mas ali o VERBO já era o mesmo (dar baixa). Adiar não dá baixa em nada:
+  move dívida de fatura, cria juros e IOF e deixa a origem sem pagamento. Empurrar isso para
+  dentro de `mark_paid` faria "marca a fatura como paga" e "joga a fatura para a próxima" caírem
+  no mesmo verbo — e é exatamente a confusão que separa `pay_invoice` de `settle_invoice`, que
+  esta base já pagou caro para manter distinta.
+- **Não é campo de `ResourceAction`.** O catálogo (5×5, com folga) escreve COLUNA; aqui o efeito
+  é uma RPC que insere três lançamentos e remonta duas faturas.
+
+**Custo aceito:** quem usa só o WhatsApp não adia fatura por lá. A mitigação é o automático —
+`accounts.rotativo_auto` roda no cron e não precisa de conversa —, e o manual é um toque na tela
+da fatura. Quando `FinanceAction` ganhar folga (ou quando o adiamento virar a coisa mais pedida
+no WhatsApp), o caminho é um tipo próprio, nunca um alvo pendurado em `mark_paid`.
