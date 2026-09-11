@@ -148,3 +148,117 @@ def test_taxa_do_rotativo_aceita_porcento(entrada, esperado):
 def test_taxa_do_rotativo_pode_ficar_vazia():
     """`null` = não estimar juros, e a tela diz isso. Apagar é operação legítima."""
     assert resources.validate_fields(_cartao("rotativo_rate_monthly", None))["rotativo_rate_monthly"] is None
+
+
+# --- adiar a fatura --------------------------------------------------------
+
+def _roll(nome="nubank"):
+    return ResourceAction(type=Op.ROLL, resource="cards", name=nome)
+
+
+def _fatura(monkeypatch, *, vencida=True, aberto=135000, resultado=None):
+    chamadas = []
+
+    async def fetch_one(sql, *args):
+        if "invoice_open_cents" in sql and "card_invoices" in sql:
+            return {"id": "fat-1", "due_date": "2026-07-10", "card_name": "Nubank",
+                    "aberto": aberto, "vencida": vencida}
+        if "roll_invoice" in sql:
+            chamadas.append(args)
+            return {"r": resultado or {
+                "principal_cents": 135000, "juros_cents": 17383, "iof_cents": 856,
+                "taxa_usada": "0.12876", "juros_estimados": True, "sem_taxa": False,
+                "segundo_ciclo": False, "destino_id": "fat-2",
+                "destino_vence_em": "2026-08-10",
+            }}
+        return None
+
+    async def owned(table, row_id, ws):
+        return None
+
+    monkeypatch.setattr(resources.db, "fetch_one", fetch_one)
+    monkeypatch.setattr(resources, "ensure_owned", owned)
+    return chamadas
+
+
+@pytest.mark.asyncio
+async def test_adiar_diz_o_principal_e_avisa_dos_juros(monkeypatch):
+    """A frase do SIM não promete o número dos juros, mas avisa que eles vêm.
+
+    `roll_invoice` só devolve juros/IOF depois de executar, e recalcular a
+    fórmula aqui seria a segunda cópia da regra. O app faz igual.
+    """
+    _fatura(monkeypatch)
+    prep = await resources.prepare(_ctx(), _roll())
+    assert "1.350,00" in prep["summary"]
+    assert "juros" in prep["summary"] and "IOF" in prep["summary"]
+    assert "Nubank" in prep["summary"] and "10/07/2026" in prep["summary"]
+
+
+@pytest.mark.asyncio
+async def test_adiar_conta_o_que_entrou_na_fatura_nova(monkeypatch):
+    chamadas = _fatura(monkeypatch)
+    ctx = _ctx()
+    ctx.target = {"prepared": await resources.prepare(ctx, _roll())}
+    r = await resources.execute(ctx, _roll())
+    assert chamadas, "chamou roll_invoice"
+    assert "1.350,00" in r.message           # principal
+    assert "173,83" in r.message             # juros
+    assert "12,876%" in r.message            # a taxa que os gerou
+    assert "8,56" in r.message               # IOF
+    assert "10/08/2026" in r.message         # para onde foi
+
+
+@pytest.mark.asyncio
+async def test_fatura_que_ainda_nao_venceu_nao_e_adiada(monkeypatch):
+    """Mesma regra da tela: adiar só vale depois do vencimento."""
+    _fatura(monkeypatch, vencida=False)
+    with pytest.raises(Level1Error) as err:
+        await resources.prepare(_ctx(), _roll())
+    assert "não venceu" in str(err.value)
+
+
+@pytest.mark.asyncio
+async def test_sem_taxa_o_agente_diz_que_nao_estimou(monkeypatch):
+    """Não inventar juros é regra: sem histórico e sem taxa, o app não estima."""
+    _fatura(monkeypatch, resultado={
+        "principal_cents": 135000, "juros_cents": 0, "iof_cents": 856,
+        "taxa_usada": None, "juros_estimados": False, "sem_taxa": True,
+        "segundo_ciclo": False, "destino_id": "fat-2", "destino_vence_em": "2026-08-10",
+    })
+    ctx = _ctx()
+    ctx.target = {"prepared": await resources.prepare(ctx, _roll())}
+    r = await resources.execute(ctx, _roll())
+    assert "Não estimei juros" in r.message
+
+
+@pytest.mark.asyncio
+async def test_segundo_ciclo_vira_aviso(monkeypatch):
+    """A trava de cadeia foi removida de propósito (o Nubank faz isso), mas avisa."""
+    _fatura(monkeypatch, resultado={
+        "principal_cents": 135000, "juros_cents": 17383, "iof_cents": 856,
+        "taxa_usada": "0.12876", "juros_estimados": True, "sem_taxa": False,
+        "segundo_ciclo": True, "destino_id": "fat-2", "destino_vence_em": "2026-08-10",
+    })
+    ctx = _ctx()
+    ctx.target = {"prepared": await resources.prepare(ctx, _roll())}
+    r = await resources.execute(ctx, _roll())
+    assert "já carregava saldo adiado" in r.message
+
+
+def test_adiar_so_vale_para_cartao():
+    with pytest.raises(Level1Error):
+        resources.validate_fields(ResourceAction(type=Op.ROLL, resource="debts", name="carro"))
+
+
+def test_adiar_sempre_pede_confirmacao():
+    """Cria juros e IOF: nunca pode acontecer sem o usuário ver antes."""
+    from app.graph import policy
+
+    assert policy.needs_confirmation(_roll(), confidence=1.0) is not None
+
+
+def test_taxa_formatada_sem_zero_a_toa():
+    assert resources.formata_taxa("0.12876") == "12,876%"
+    assert resources.formata_taxa("0.155") == "15,5%"
+    assert resources.formata_taxa("0.15") == "15%"

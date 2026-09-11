@@ -37,8 +37,8 @@ from app.tools import resources  # noqa: E402
 
 VERDE, VERMELHO, CINZA, FIM = "\033[32m", "\033[31m", "\033[90m", "\033[0m"
 
+# texto, recurso esperado, campo obrigatório (ou o TIPO esperado, com "type:" na frente)
 CASOS: list[tuple[str, str, str | None]] = [
-    # texto, recurso esperado, campo que tem que aparecer
     ("meu mes fecha dia 10", "mes", "cycle_close_day"),
     ("quero que meu mes feche todo dia 5", "mes", "cycle_close_day"),
     ("meu periodo financeiro vai do dia 15 ao dia 15", "mes", "cycle_close_day"),
@@ -54,6 +54,12 @@ CASOS: list[tuple[str, str, str | None]] = [
     ("deixa a fatura do nubank rolar sozinha se eu nao pagar", "cards", "rotativo_auto"),
     ("os juros do rotativo do nubank sao 12,876%", "cards", "rotativo_rate_monthly"),
     ("desliga o rotativo automatico do inter", "cards", "rotativo_auto"),
+    # --- adiar (rotativo): não é pagar nem quitar ---
+    ("joga a fatura do nubank pra proxima", "cards", "type:resource_roll"),
+    ("adia a fatura do nubank", "cards", "type:resource_roll"),
+    ("nao vou conseguir pagar a fatura do inter esse mes", "cards", "type:resource_roll"),
+    ("deixa a fatura do itau pro mes que vem", "cards", "type:resource_roll"),
+
 ]
 
 
@@ -75,22 +81,25 @@ async def rodar(texto: str):
             ]
         )
     except Exception as err:  # noqa: BLE001
-        return None, [], str(err)[:60]
+        return None, [], str(err)[:60], None
     if not plano.actions:
-        return None, [], "sem ação"
+        return None, [], "sem ação", None
     a = plano.actions[0]
-    return a.resource, [f.name for f in a.fields], None
+    return a.resource, [f.name for f in a.fields], None, a.type.value
 
 
 async def main() -> int:
     print(f"modelo: {gemini.GEMINI_PARSE}\n")
     falhas = 0
     for texto, esperado, campo in CASOS:
-        recurso, campos, erro = await rodar(texto)
-        ok = recurso == esperado and (campo is None or campo in campos)
+        recurso, campos, erro, tipo = await rodar(texto)
+        if campo and campo.startswith("type:"):
+            ok = recurso == esperado and tipo == campo[5:]
+        else:
+            ok = recurso == esperado and (campo is None or campo in campos)
         falhas += 0 if ok else 1
         marca = f"{VERDE}✓{FIM}" if ok else f"{VERMELHO}✗{FIM}"
-        detalhe = erro or f"{recurso} {campos}"
+        detalhe = erro or f"{tipo} {recurso} {campos}"
         print(f"  {marca} {texto:<48} {CINZA}{detalhe:<44} (esperado {esperado}.{campo}){FIM}")
 
     print(f"\n{'-' * 84}")

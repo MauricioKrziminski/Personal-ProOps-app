@@ -402,6 +402,19 @@ class ResourceActionType(str, Enum):
     DELETE = 'resource_delete'
     LIST = 'resource_list'
     PAY = 'resource_pay'
+    # Adiar a fatura vencida: o saldo vai para a próxima, com juros e IOF.
+    #
+    # `docs/AGENTE-PARIDADE-COM-O-APP.md` registrou esta lacuna em 10/09/2026 e
+    # rejeitou o catálogo com o argumento de que ele "escreve COLUNA; aqui o
+    # efeito é uma RPC". O argumento já era falso quando foi escrito: `resource_pay`
+    # chama `public.pay_debt_installment` e não escreve coluna nenhuma. O outro
+    # argumento do doc continua de pé e foi respeitado — adiar NÃO virou alvo de
+    # `mark_paid`, porque "marca como paga" e "joga para a próxima" no mesmo verbo
+    # é a confusão que separa `pay_invoice` de `settle_invoice`.
+    #
+    # Custo de schema: 5 propriedades × 6 valores = 30. `FinanceAction` está em
+    # 252/32 e não cabia nada; aqui sobra folga.
+    ROLL = 'resource_roll'
 
 
 class ResourceField(BaseModel):

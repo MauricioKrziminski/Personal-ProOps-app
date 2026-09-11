@@ -342,29 +342,54 @@ linha do meio prova: com a redação antiga, mas o enum chamado `simulate_scenar
 disponíveis, o modelo já acerta. O texto que foi somado ao prompt é cinto e suspensório, e é
 honesto dizer isso: se um dia alguém precisar cortar prompt por token, é ele que sai, não o nome.
 
-## Adiar a fatura para a próxima — lacuna ABERTA e declarada (10/09/2026)
+## Adiar a fatura para a próxima — FECHADA (11/09/2026)
 
-`useRollInvoice` ("Jogar para a próxima", o rotativo) nasceu **só no app**. A regra desta página
-é que botão novo vira linha aqui; esta linha existe para a diferença não crescer calada.
+`useRollInvoice` ("Jogar para a próxima", o rotativo) nasceu só no app e ficou um dia como lacuna
+declarada. O agente faz desde 11/09: **`resource_roll`**, `resource=cards`, o nome do cartão e
+nenhum campo.
 
-| app | agente | por quê |
-|---|---|---|
-| `useRollInvoice` — "Jogar para a próxima" | **não existe** | ver abaixo |
+| app | agente |
+|---|---|
+| `useRollInvoice` — "Jogar para a próxima" | `resource_roll cards <nome>` |
+| `useSetCycleCloseDay` — Perfil → Meu mês | `resource_update mes cycle_close_day` |
+| campos de rotativo do cartão | `resource_update cards rotativo_auto / rotativo_rate_monthly` |
 
-**Não é esquecimento, é orçamento de schema.** `FinanceAction` está no teto medido de 252/32, e
-as duas ampliações possíveis já foram recusadas pela API em 09/09/2026. Adiar não cabe nos dois
-caminhos baratos que sobraram:
+As duas últimas linhas eram lacunas que **nunca tinham sido declaradas** — a regra desta página é
+que botão novo vira linha aqui, e as duas passaram batido quando o ciclo e o rotativo entraram.
 
-- **Não é alvo novo de uma ação existente.** Foi assim que "quitar sem caixa" virou `mark_paid`
-  sobre `card_invoices`, mas ali o VERBO já era o mesmo (dar baixa). Adiar não dá baixa em nada:
-  move dívida de fatura, cria juros e IOF e deixa a origem sem pagamento. Empurrar isso para
-  dentro de `mark_paid` faria "marca a fatura como paga" e "joga a fatura para a próxima" caírem
-  no mesmo verbo — e é exatamente a confusão que separa `pay_invoice` de `settle_invoice`, que
-  esta base já pagou caro para manter distinta.
-- **Não é campo de `ResourceAction`.** O catálogo (5×5, com folga) escreve COLUNA; aqui o efeito
-  é uma RPC que insere três lançamentos e remonta duas faturas.
+### O argumento que caiu, e o que ficou de pé
 
-**Custo aceito:** quem usa só o WhatsApp não adia fatura por lá. A mitigação é o automático —
-`accounts.rotativo_auto` roda no cron e não precisa de conversa —, e o manual é um toque na tela
-da fatura. Quando `FinanceAction` ganhar folga (ou quando o adiamento virar a coisa mais pedida
-no WhatsApp), o caminho é um tipo próprio, nunca um alvo pendurado em `mark_paid`.
+A versão de 10/09 rejeitava as duas saídas baratas. **Uma das duas rejeições estava errada:**
+
+- ~~"Não é campo de `ResourceAction`. O catálogo escreve COLUNA; aqui o efeito é uma RPC."~~
+  **Falso, e já era falso quando foi escrito.** `resource_pay` chama `public.pay_debt_installment`
+  e não escreve coluna nenhuma (`resources.py`). O catálogo nunca foi "só coluna" — ele é o lugar
+  das operações que não cabem no orçamento de `FinanceAction`, e uma RPC cabe nele tanto quanto
+  um UPDATE. `resource_roll` é o 6º valor do enum: **5×6 = 30**, contra o teto de 252/32 de
+  `FinanceAction`, onde não cabia nada.
+- **"Não é alvo novo de uma ação existente" continua de pé, e foi respeitado.** Adiar NÃO virou
+  alvo de `mark_paid`. Medido com o Gemini real em 11/09 (`scripts/probe_mes_vs_cartao.py` e o
+  router): "paguei a fatura", "paguei 800 da fatura", "já tinha pago" e "quitei" vão os quatro
+  para `financas`; "joga pra próxima", "adia", "não vou conseguir pagar esse mês" e "deixa pro
+  mês que vem" vão os quatro para `cadastros`. 8/8 e 17/17 — os três verbos não se cruzam.
+
+### O que a confirmação diz, e o que ela não promete
+
+A frase do SIM traz o **principal** e avisa que juros e IOF entram junto — mas **não promete o
+número deles**. `roll_invoice` só devolve `juros_cents`, `iof_cents` e `taxa_usada` depois de
+executar, e recalcular a fórmula em Python seria a segunda cópia de duas regras que não são
+nossas: o IOF é lei (Decretos 12.466/2025 e 12.499/2025) e a taxa sai de
+`private.rotativo_rate_for`, que **aprende** do histórico do próprio cartão.
+
+Isso não é limitação do agente: **a tela faz exatamente igual** — pergunta "Jogar R$ X para a
+próxima fatura?" e detalha no toast depois, com o comentário dizendo por quê ("o que interessa é
+o que ENTROU na próxima fatura, e isso a pessoa confere na fatura seguinte").
+
+Os três avisos da RPC chegam ao usuário: `sem_taxa` ("não estimei juros"), `juros_estimados` (com
+a taxa que os gerou, porque dizer "estimados" sem dizer com que taxa é pedir confiança cega) e
+`segundo_ciclo` ("essa fatura já carregava saldo adiado").
+
+### O que ficou de fora, e por quê
+
+Fatura que **ainda não venceu** não é adiada — a mesma regra da tela (`invoice/[id].tsx`: "adiar
+só faz sentido depois do vencimento"). A recusa diz a data do vencimento, em vez de só negar.

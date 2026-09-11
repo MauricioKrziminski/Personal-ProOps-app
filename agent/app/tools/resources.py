@@ -15,7 +15,7 @@ from app.domain.money import cents_to_brl, MAX_CENTS
 from app.domain.recurrence import next_occurrence
 from app.domain.categories import normalize
 from app.graph.schemas import ResourceAction, ResourceActionType as Op
-from app.tools.base import ExecContext, ToolResult
+from app.tools.base import ExecContext, ToolResult, ensure_owned
 from app.tools.guards import Level1Error, clean_rrule
 
 # table, identifying column, deletion semantics, editable columns
@@ -197,6 +197,12 @@ def validate_fields(action: ResourceAction) -> dict:
             "Esse recurso não está disponível. Posso gerenciar contas, cartões, dívidas, metas, orçamentos, recorrências, patrimônio, notas, lembretes, pastas e regras."
         )
     _, identity, _, columns = CATALOG[action.resource]
+    if action.type == Op.ROLL:
+        if action.resource != "cards":
+            _error("Adiar é coisa de fatura de cartão. Qual cartão?")
+        if action.fields:
+            _error("Para adiar a fatura eu só preciso do cartão.")
+        columns = ""
     if action.resource == "mes" and action.type != Op.UPDATE:
         # Linha única que já existe: não há o que criar, apagar, listar nem pagar.
         # A recusa mora aqui, e não no `prepare`, porque `validate_fields` roda
@@ -431,6 +437,60 @@ def _where(resource, lixeira=None):
     return ""
 
 
+async def _preparar_adiamento(ctx: ExecContext, action: ResourceAction, prepared: dict) -> dict:
+    """Adiar a fatura vencida: acha QUAL, e diz o principal antes do SIM.
+
+    ⚠️ **A frase não promete o número dos juros.** `roll_invoice` só devolve
+    `juros_cents`, `iof_cents` e `taxa_usada` DEPOIS de executar, e recalcular a
+    fórmula aqui seria a segunda cópia da regra — a do IOF é lei (Decretos
+    12.466/2025 e 12.499/2025) e a dos juros vem de `private.rotativo_rate_for`,
+    que APRENDE do histórico do cartão. O app faz exatamente igual: pergunta
+    "Jogar R$ X para a próxima fatura?" e detalha no toast depois, porque o que
+    importa conferir é o que ENTROU na fatura seguinte.
+
+    O que a frase faz é avisar que os dois vêm junto — confirmar um adiamento
+    achando que só o principal migra é a surpresa que não pode acontecer.
+    """
+    if not action.name:
+        _error("Qual cartão? Me fala o nome dele.")
+
+    fatura = await db.fetch_one(
+        """
+        select ci.id, ci.due_date, a.name as card_name,
+               private.invoice_open_cents(ci.id) as aberto,
+               ci.due_date < %s::date as vencida
+        from public.card_invoices ci
+        join public.accounts a on a.id = ci.account_id and a.workspace_id = ci.workspace_id
+        where ci.workspace_id = %s and a.name ilike %s
+          and ci.status not in ('paid','rolled')
+          and private.invoice_open_cents(ci.id) > 0
+        order by ci.due_date
+        limit 1
+        """,
+        local_iso_date(ctx.timezone),
+        ctx.workspace_id,
+        f"%{action.name}%",
+    )
+    if not fatura:
+        _error("Não achei fatura em aberto nesse cartão.")
+    if not fatura["vencida"]:
+        # Mesma regra da tela: adiar só faz sentido depois do vencimento.
+        _error(
+            f"A fatura do {fatura['card_name']} vence em "
+            f"{format_date_br(fatura['due_date'])} e ainda não venceu. "
+            f"Adiar só vale para fatura vencida."
+        )
+
+    aberto = int(fatura["aberto"] or 0)
+    prepared["invoice_id"] = str(fatura["id"])
+    prepared["summary"] = (
+        f"jogar {cents_to_brl(aberto)} da fatura do {fatura['card_name']} "
+        f"(venceu {format_date_br(fatura['due_date'])}) para a próxima, "
+        f"somando juros do rotativo e IOF"
+    )
+    return prepared
+
+
 async def _preparar_mes(ctx: ExecContext, action: ResourceAction, prepared: dict) -> dict:
     """O mês financeiro: linha única, sem nome, e só o DONO muda.
 
@@ -504,6 +564,8 @@ async def prepare(ctx: ExecContext, action: ResourceAction) -> dict:
         return prepared
     if action.resource == "mes":
         return await _preparar_mes(ctx, action, prepared)
+    if action.type == Op.ROLL:
+        return await _preparar_adiamento(ctx, action, prepared)
     if action.type != Op.CREATE:
         if not action.name:
             _error(f"Qual {LABELS[action.resource]}? Informe o nome exato.")
@@ -721,6 +783,7 @@ async def prepare(ctx: ExecContext, action: ResourceAction) -> dict:
             else "excluir"
         ),
         Op.PAY: "registrar pagamento de",
+        Op.ROLL: "adiar a fatura de",
     }[action.type]
     # No modo simples, principal, saldo e taxa são ECO da parcela — foram
     # derivados dela, não informados. Mostrá-los na confirmação escrevia
@@ -796,6 +859,64 @@ async def prepare(ctx: ExecContext, action: ResourceAction) -> dict:
     return prepared
 
 
+async def _adiar_fatura(ctx: ExecContext, proposal: dict) -> ToolResult:
+    """Chama `roll_invoice` e conta o que entrou na fatura nova.
+
+    Toda a aritmética (principal, juros pela taxa aprendida, IOF pela fórmula da
+    lei, e qual é a fatura destino) mora na RPC. Aqui só se lê o jsonb que ela
+    devolve — os mesmos campos que a tela usa no toast.
+    """
+    await ensure_owned("card_invoices", proposal["invoice_id"], ctx.workspace_id)
+    linha = await db.fetch_one(
+        "select public.roll_invoice(%s) as r", proposal["invoice_id"]
+    )
+    if not linha or not linha.get("r"):
+        return ToolResult("🤷 Não consegui adiar essa fatura.", read_only=True)
+    r = linha["r"]
+
+    partes = [f"principal {cents_to_brl(int(r['principal_cents']))}"]
+    if int(r.get("juros_cents") or 0) > 0:
+        # A taxa entra na frase: é o número que o usuário confere contra a fatura,
+        # e dizer "juros estimados" sem dizer COM QUE taxa é pedir confiança cega.
+        # Mesma decisão da tela.
+        taxa = r.get("taxa_usada")
+        com = f" a {formata_taxa(taxa)}" if taxa is not None else ""
+        estimado = " estimados" + com if r.get("juros_estimados") else ""
+        partes.append(f"juros {cents_to_brl(int(r['juros_cents']))}{estimado}")
+    if int(r.get("iof_cents") or 0) > 0:
+        partes.append(f"IOF estimado {cents_to_brl(int(r['iof_cents']))}")
+
+    avisos = ""
+    if r.get("sem_taxa"):
+        avisos += (
+            "\n⚠️ Não estimei juros: esse cartão ainda não cobrou rotativo nenhum e "
+            "não tem taxa cadastrada. O valor real vem na fatura."
+        )
+    if r.get("segundo_ciclo"):
+        avisos += (
+            "\n⚠️ Essa fatura já carregava saldo adiado de antes. Dois ciclos no "
+            "rotativo saem caro — vale ver se dá para parcelar."
+        )
+
+    destino = (
+        f" que vence em {format_date_br(r['destino_vence_em'])}"
+        if r.get("destino_vence_em")
+        else ""
+    )
+    return ToolResult(
+        f"✅ Fatura adiada: {', '.join(partes)} entraram na próxima{destino}.{avisos}",
+        result_id=str(r.get("destino_id") or proposal["invoice_id"]),
+    )
+
+
+def formata_taxa(taxa) -> str:
+    """Fração vira porcento com vírgula, sem zero à toa: 0.12876 -> 12,876%."""
+    from decimal import Decimal
+
+    n = (Decimal(str(taxa)) * 100).normalize()
+    return f"{n:f}".replace(".", ",") + "%"
+
+
 async def _gravar_mes(ctx: ExecContext, proposal: dict) -> ToolResult:
     """Grava o dia de fechamento e responde com as bordas NOVAS.
 
@@ -844,6 +965,8 @@ async def execute(ctx: ExecContext, action: ResourceAction) -> ToolResult:
     table, identity, deletion, columns = CATALOG[action.resource]
     if action.resource == "mes":
         return await _gravar_mes(ctx, proposal)
+    if action.type == Op.ROLL:
+        return await _adiar_fatura(ctx, proposal)
     if action.type == Op.LIST:
         rows = await db.fetch(
             f"select {identity} as label from public.{table} where workspace_id = %s"
@@ -1025,5 +1148,5 @@ def prompt_catalogue() -> str:
         catalogue
         + "\nValores permitidos:\n"
         + choices
-        + "\nFinanciamento/dívida tem dois modos: fixed_installments (padrão) precisa só de installment_cents e installments — o total contratual das parcelas, com juros dentro; amortized precisa de principal_cents, remaining_cents e interest_rate_monthly, e só serve quando o usuário tem esses números do contrato. Nunca converta o total das parcelas em principal nem invente taxa.\nConta padrão (onde cai o lançamento que não cita conta): resource_update, resource=accounts, name=nome da conta, campo is_default=true; para tirar, is_default=false. Cartão de crédito não pode ser conta padrão.\nNota na LIXEIRA: resource_delete em notes manda para a lixeira; restaurar (\"tira da lixeira\", \"recupera a nota\") é resource_update com trashed=false; apagar DE VEZ (\"esvazia\", \"apaga definitivo\") é resource_delete com trashed=true.\nMEU MÊS (o período financeiro do usuário, não o do cartão): resource_update, resource=mes, campo cycle_close_day = o dia em que o mês dele fecha (1 a 28). Exemplos: 'meu mês fecha dia 10', 'quero olhar do dia 15 ao 15', 'fecha todo dia 5'. Para voltar ao último dia do mês ('volta pro normal', 'fecha no fim do mês'), mande cycle_close_day vazio. ATENÇÃO: não confunda com o cartão. 'o cartão fecha dia 7', 'cadastra o Inter que fecha dia 7' e 'o fechamento do nubank é dia 3' são resource=cards com closing_day, porque quem tem fatura é o CARTÃO. Só é resource=mes quando a frase fala do MÊS ou do PERÍODO da pessoa, sem citar cartão nenhum.\nROTATIVO do cartão: resource_update, resource=cards, name=nome do cartão. rotativo_auto=true faz a fatura vencida e não paga ir sozinha para a próxima, com juros e IOF. rotativo_rate_monthly são os juros do rotativo, do jeito que o usuário falar ('15,5%', '12,876', '1,99') — o sistema converte para fração. É a taxa de PARTIDA: assim que chegar a primeira cobrança real, o app passa a usar a que ESTE cartão cobrou. Vazio significa não estimar juros.\nOrçamento mensal existente: target_month=YYYY-MM-01; orçamento padrão: target_month=default.\nPara pagar prestação de dívida existente: resource_pay, resource=debts, name=nome da dívida, campos amount_cents, account_id (nome da conta), paid_at (YYYY-MM-DD). Não editar remaining_cents para registrar pagamento. Ao CRIAR dívida parcelada, installments_paid sai do que o usuário disse, inclusive pela posição: 'estou na 9ª parcela' são 8 pagas, 'tô na terceira' são 2, 'comecei agora' é 0, e um número solto respondendo à pergunta é a quantidade. Deixe vazio só quando a mensagem não disser nada sobre isso — o usuário confirma o cadastro inteiro antes de qualquer gravação, e é ali que ele corrige. Em dívida QUE JÁ EXISTE é o contrário: posição e data não comprovam pagamento; use resource_update com installments_paid e remaining_cents explicitamente informados, e se faltar saldo atual pergunte. Nunca use resource_pay para dar baixa retroativa em várias parcelas ou invente amortização a partir do valor da prestação.\nValor POR EXTENSO é valor: 'trezentos reais' é 30000 centavos, 'mil e quinhentos' é 150000, 'dois mil e quinhentos' é 250000. Áudio transcrito e resposta falada escrevem número assim o tempo todo — deixar o campo vazio porque o número veio em palavras é perder o dado que o usuário acabou de dar."
+        + "\nFinanciamento/dívida tem dois modos: fixed_installments (padrão) precisa só de installment_cents e installments — o total contratual das parcelas, com juros dentro; amortized precisa de principal_cents, remaining_cents e interest_rate_monthly, e só serve quando o usuário tem esses números do contrato. Nunca converta o total das parcelas em principal nem invente taxa.\nConta padrão (onde cai o lançamento que não cita conta): resource_update, resource=accounts, name=nome da conta, campo is_default=true; para tirar, is_default=false. Cartão de crédito não pode ser conta padrão.\nNota na LIXEIRA: resource_delete em notes manda para a lixeira; restaurar (\"tira da lixeira\", \"recupera a nota\") é resource_update com trashed=false; apagar DE VEZ (\"esvazia\", \"apaga definitivo\") é resource_delete com trashed=true.\nMEU MÊS (o período financeiro do usuário, não o do cartão): resource_update, resource=mes, campo cycle_close_day = o dia em que o mês dele fecha (1 a 28). Exemplos: 'meu mês fecha dia 10', 'quero olhar do dia 15 ao 15', 'fecha todo dia 5'. Para voltar ao último dia do mês ('volta pro normal', 'fecha no fim do mês'), mande cycle_close_day vazio. ATENÇÃO: não confunda com o cartão. 'o cartão fecha dia 7', 'cadastra o Inter que fecha dia 7' e 'o fechamento do nubank é dia 3' são resource=cards com closing_day, porque quem tem fatura é o CARTÃO. Só é resource=mes quando a frase fala do MÊS ou do PERÍODO da pessoa, sem citar cartão nenhum.\nADIAR A FATURA (o rotativo): resource_roll, resource=cards, name=nome do cartão, sem campos. É para a fatura VENCIDA que a pessoa não pagou: o saldo dela vai para a próxima fatura, com juros do rotativo e IOF. Frases: 'joga a fatura do nubank pra próxima', 'não vou conseguir pagar a fatura do inter esse mês', 'deixa a fatura do nubank pro mês que vem', 'adia a fatura'. ATENÇÃO: adiar NÃO é pagar nem quitar. 'paguei a fatura' é pagamento (sai dinheiro), 'já tinha pago a fatura' é quitação (o dinheiro saiu fora do app), e adiar não move dinheiro nenhum — cria dívida nova. Se a pessoa disser que pagou, nunca use resource_roll.\nROTATIVO do cartão: resource_update, resource=cards, name=nome do cartão. rotativo_auto=true faz a fatura vencida e não paga ir sozinha para a próxima, com juros e IOF. rotativo_rate_monthly são os juros do rotativo, do jeito que o usuário falar ('15,5%', '12,876', '1,99') — o sistema converte para fração. É a taxa de PARTIDA: assim que chegar a primeira cobrança real, o app passa a usar a que ESTE cartão cobrou. Vazio significa não estimar juros.\nOrçamento mensal existente: target_month=YYYY-MM-01; orçamento padrão: target_month=default.\nPara pagar prestação de dívida existente: resource_pay, resource=debts, name=nome da dívida, campos amount_cents, account_id (nome da conta), paid_at (YYYY-MM-DD). Não editar remaining_cents para registrar pagamento. Ao CRIAR dívida parcelada, installments_paid sai do que o usuário disse, inclusive pela posição: 'estou na 9ª parcela' são 8 pagas, 'tô na terceira' são 2, 'comecei agora' é 0, e um número solto respondendo à pergunta é a quantidade. Deixe vazio só quando a mensagem não disser nada sobre isso — o usuário confirma o cadastro inteiro antes de qualquer gravação, e é ali que ele corrige. Em dívida QUE JÁ EXISTE é o contrário: posição e data não comprovam pagamento; use resource_update com installments_paid e remaining_cents explicitamente informados, e se faltar saldo atual pergunte. Nunca use resource_pay para dar baixa retroativa em várias parcelas ou invente amortização a partir do valor da prestação.\nValor POR EXTENSO é valor: 'trezentos reais' é 30000 centavos, 'mil e quinhentos' é 150000, 'dois mil e quinhentos' é 250000. Áudio transcrito e resposta falada escrevem número assim o tempo todo — deixar o campo vazio porque o número veio em palavras é perder o dado que o usuário acabou de dar."
     )
