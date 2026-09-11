@@ -248,6 +248,24 @@ def _fallback_format_query(data: dict) -> str:
     return f"{titulo} {de} a {ate}{conta_txt} — {header}\n" + "\n".join(linhas)
 
 
+def _sanitize_leaves(value: object) -> object:  # noqa: D401
+    """`sanitize_untrusted` em toda string do documento, preservando a estrutura.
+
+    Envelopar o JSON inteiro não serve: o corte de 4.000 caracteres do `sanitize_untrusted`
+    truncaria o documento no meio de uma chave e o modelo receberia JSON quebrado. As folhas
+    é que são conteúdo não confiável — `description`, `merchant`, nome de conta.
+    """
+    from app.security import sanitize_untrusted
+
+    if isinstance(value, str):
+        return sanitize_untrusted(value)
+    if isinstance(value, dict):
+        return {k: _sanitize_leaves(v) for k, v in value.items()}
+    if isinstance(value, list):
+        return [_sanitize_leaves(v) for v in value]
+    return value
+
+
 async def format_query_response(
     user_prompt: str, data: dict, timezone_name: str = "America/Sao_Paulo"
 ) -> str:
@@ -281,10 +299,22 @@ async def format_query_response(
         "7. Use emojis pontuais (📊, 💳, 💸, 💰, 🗓) e formatação WhatsApp (*negrito* para valores)."
     )
 
-    dados_str = json.dumps(data, ensure_ascii=False, indent=2)
+    # ⚠️ **Os dois envelopes eram f-string CRUA — nada passava por `sanitize_untrusted`.**
+    #
+    # E o perigo aqui não é só o dono da conta se auto-sabotar: `description` de lançamento
+    # chega por IMPORTAÇÃO DE EXTRATO, ou seja, é texto escolhido por TERCEIRO — quem manda o
+    # Pix escreve a mensagem. Sem envelope, essa pessoa escrevia o que o agente diz para a
+    # vítima, num app de dinheiro ("sua conta foi bloqueada, acesse…").
+    #
+    # A limpeza é por FOLHA, não no documento inteiro: `sanitize_untrusted` corta em 4.000
+    # caracteres, e aplicá-la ao JSON pronto truncaria a resposta no meio de uma chave.
+    from app.security import wrap_untrusted
+
+    dados_str = json.dumps(_sanitize_leaves(data), ensure_ascii=False, indent=2)
     corpo = (
-        f"<user_prompt>\n{user_prompt}\n</user_prompt>\n\n"
-        f"<dados_financeiros>\n{dados_str}\n</dados_financeiros>"
+        wrap_untrusted("user_prompt", user_prompt)
+        + "\n\n"
+        + wrap_untrusted("dados_financeiros", dados_str)
     )
 
     try:

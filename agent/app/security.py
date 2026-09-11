@@ -78,16 +78,36 @@ def verify_shared_secret(header_value: str | None, expected: str) -> bool:
 # --------------------------------------------------------------------------
 
 
-def _verify_oidc(token: str, audience: str) -> bool:
+def _verify_oidc(token: str, audience: str, caller_email: str) -> bool:
+    """OIDC do Cloud Tasks/Scheduler — assinatura, `aud` **e QUEM ASSINOU**.
+
+    ⚠️ **`verify_oauth2_token` não diz quem é o chamador, e nós descartávamos a resposta.**
+    A biblioteca valida assinatura, `exp`, `aud` e que o emissor é o Google — e só. O código
+    devolvia `True` sem olhar as claims, então **qualquer conta de serviço do Google no mundo**
+    passava: bastava criar um projeto GCP grátis e pedir um ID token com o `aud` certo.
+
+    E o `aud` não é segredo: é a URL pública do Cloud Run, que roda com
+    `--allow-unauthenticated` por obrigação (a Meta não manda OIDC no webhook). Ou seja, não
+    havia segunda trava — `/worker/process-thread`, `/worker/sweep` e os três `/cron/*` eram
+    alcançáveis por um estranho, incluindo o de alertas, que manda template Utility **pago**.
+
+    Agora o `email` da claim precisa ser exatamente a nossa service account. Uma constante só
+    cobre os dois chamadores: o Scheduler usa a MESMA SA que o Tasks (`setup-gcp.sh`).
+    """
     # import tardio: num VPS sem GCP essas libs podem nem estar configuradas
     from google.auth.transport import requests as ga_requests
     from google.oauth2 import id_token
 
     try:
-        id_token.verify_oauth2_token(token, ga_requests.Request(), audience)
-        return True
+        claims = id_token.verify_oauth2_token(token, ga_requests.Request(), audience)
     except Exception:  # noqa: BLE001 — token inválido é 401, não 500
         return False
+
+    # `email_verified` porque um ID token de usuário humano também traz `email`; só a claim
+    # verificada de uma service account serve aqui.
+    if not claims.get("email_verified"):
+        return False
+    return hmac.compare_digest(str(claims.get("email", "")), caller_email)
 
 
 async def require_internal(request: Request) -> None:
@@ -100,8 +120,12 @@ async def require_internal(request: Request) -> None:
     settings = get_settings()
 
     auth = request.headers.get("authorization", "")
-    if auth.startswith("Bearer ") and settings.oidc_audience:
-        if _verify_oidc(auth.removeprefix("Bearer "), settings.oidc_audience):
+    # `tasks_sa_email` vazio desliga o ramo OIDC por inteiro em vez de aceitar qualquer um —
+    # num VPS sem GCP o caminho é o segredo compartilhado, logo abaixo.
+    if auth.startswith("Bearer ") and settings.oidc_audience and settings.tasks_sa_email:
+        if _verify_oidc(
+            auth.removeprefix("Bearer "), settings.oidc_audience, settings.tasks_sa_email
+        ):
             return
 
     if verify_shared_secret(
@@ -138,8 +162,16 @@ def effective_thread_id(thread_id: str, epoch: int) -> str:
 
 # Fecha qualquer tag do nosso envelope que o usuário (ou um PDF preparado) tente
 # escrever, além de tags de papel do modelo.
+#
+# ⚠️ **Esta lista ENVELHECE, e por isso ela não é mais a única defesa.** Ela nasceu com dois
+# envelopes e o código foi ganhando outros — `pending_proposal`, `user_prompt`,
+# `dados_financeiros` — sem ninguém voltar aqui. Medido: `</user_input>` era removido e
+# `</pending_proposal>` passava direto. A trava que não depende de memória é o
+# `wrap_untrusted`, que fecha a PRÓPRIA tag no ponto em que a escreve; esta lista continua
+# como segunda linha, para o caso de um texto tentar fechar o envelope de um VIZINHO.
 _TAG_INJECTION = re.compile(
-    r"</?\s*(user_input|document_content|system|assistant|model|tool_\w*)\s*/?>",
+    r"</?\s*(user_input|document_content|user_prompt|dados_financeiros|pending_proposal"
+    r"|system|assistant|model|tool_\w*)\s*/?>",
     re.IGNORECASE,
 )
 _CONTROL = re.compile(r"[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]")
@@ -165,6 +197,24 @@ def sanitize_untrusted(text: str | None) -> str:
 
 
 def wrap_untrusted(tag: str, text: str | None) -> str:
-    """Envelopa conteúdo do usuário/documento como DADO."""
+    """Envelopa conteúdo do usuário/documento como DADO.
+
+    ⚠️ **A tag que ENVELOPA é fechada aqui, não na lista do `_TAG_INJECTION`.**
+
+    A lista era fechada (`user_input|document_content|system|assistant|model|tool_*`) e o código
+    foi ganhando envelopes novos sem ninguém acrescentá-los a ela — `pending_proposal`,
+    `user_prompt`, `dados_financeiros`. Medido: `</user_input>` era removido e
+    `</pending_proposal>` **passava direto**, ou seja, o texto saía do próprio envelope que
+    deveria contê-lo.
+
+    Isso tinha dentes com texto de TERCEIRO, não só do dono da conta: a descrição de um Pix
+    recebido entra por importação de extrato e chega a este prompt. Quem escolhe a mensagem do
+    Pix escolhia o que o agente dizia para a vítima — phishing dentro de um app de dinheiro.
+
+    Fechar a tag no ponto em que ela é escrita mata a classe inteira e não depende de alguém
+    lembrar de atualizar uma lista na próxima vez que criar um envelope.
+    """
     content = sanitize_untrusted(text)
+    propria = re.compile(rf"</?\s*{re.escape(tag)}\s*/?>", re.IGNORECASE)
+    content = propria.sub(" ", content).strip()
     return f"<{tag}>\n{content}\n</{tag}>"
