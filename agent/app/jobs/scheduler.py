@@ -48,25 +48,51 @@ MAX_SERIES_PER_RUN = 200
 DEFAULT_TIMEZONE = "America/Sao_Paulo"
 
 
+async def _passo(nome: str, sql: str, erros: dict) -> int:
+    """Um passo do cron, isolado dos outros.
+
+    ⚠️ **Os quatro passos são INDEPENDENTES e não podiam cair juntos.** Eles rodavam em
+    sequência crua: a primeira exceção matava os seguintes. O caso concreto que expôs isso foi
+    a ordem de deploy — subir o agente antes de aplicar a migration faz
+    `_roll_overdue_invoices` não existir, e o `undefined_function` levava junto a PROMOÇÃO de
+    lançamentos vencidos (o que vira `cleared` na data) e o snapshot de patrimônio. Um erro de
+    ordem numa feature nova apagaria dois comportamentos antigos, de hora em hora, calado.
+
+    O erro não some: vai para o log e para a resposta do cron, que é o que o Cloud Logging
+    guarda. Engolir seria trocar um estrago barulhento por um silencioso.
+    """
+    try:
+        linha = await db.fetch_one(sql)
+        return int((linha or {}).get("n", 0) or 0)
+    except Exception as erro:  # noqa: BLE001 — um passo não derruba os outros
+        log.exception("cron: passo %s falhou", nome)
+        erros[nome] = str(erro)
+        return 0
+
+
 async def run() -> dict:
     agora = now_utc()
+    erros: dict[str, str] = {}
     criadas = await materialize_horizon(agora)
 
-    fechadas = await db.fetch_one("select public._close_due_invoices() as n")
+    fechadas = await _passo("close_invoices", "select public._close_due_invoices() as n", erros)
     # Depois de FECHAR e antes de promover: a fatura vencida dos cartões com rotativo ligado vai
     # para a próxima. Ordem importa — adiar antes de fechar deixaria a fatura do ciclo corrente
     # fora do alcance da varredura.
-    adiadas = await db.fetch_one("select public._roll_overdue_invoices() as n")
-    promovidas = await db.fetch_one("select public._promote_due_transactions() as n")
-    fotos = await db.fetch_one("select public._snapshot_net_worth() as n")
+    adiadas = await _passo("roll_overdue", "select public._roll_overdue_invoices() as n", erros)
+    promovidas = await _passo("promote", "select public._promote_due_transactions() as n", erros)
+    fotos = await _passo("snapshot", "select public._snapshot_net_worth() as n", erros)
 
-    return {
+    resultado = {
         "created": criadas,
-        "invoices_closed": (fechadas or {}).get("n", 0),
-        "invoices_rolled": (adiadas or {}).get("n", 0),
-        "promoted": (promovidas or {}).get("n", 0),
-        "snapshots": (fotos or {}).get("n", 0),
+        "invoices_closed": fechadas,
+        "invoices_rolled": adiadas,
+        "promoted": promovidas,
+        "snapshots": fotos,
     }
+    if erros:
+        resultado["errors"] = erros
+    return resultado
 
 
 async def materialize_horizon(agora) -> int:
