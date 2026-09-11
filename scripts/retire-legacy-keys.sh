@@ -142,6 +142,15 @@ vault() {
   read -r -p "  Os crons do Cloud Scheduler já estão no ar? [s/N] " r
   [[ "$r" =~ ^[sS]$ ]] || { echo "  abortado."; exit 0; }
 
+  # ⚠️ **A lista é NOMINAL de propósito — não troque por "desagende tudo".**
+  #
+  # Estes quatro chamam Edge Function por `pg_net` com a chave do Vault, e as
+  # functions não existem mais desde 09/09/2026: são chamadas mortas batendo num
+  # endpoint apagado. Mas `cron.job` em produção tem também o
+  # `purge-trashed-notes` (`0038`), que é SQL puro — `delete from public.notes
+  # where deleted_at < now() - interval '30 days'` — e NÃO toca na chave. Varrer a
+  # tabela inteira desligaria a limpeza da lixeira de notas junto, sem nada na tela
+  # dizendo isso. Conferido em produção em 11/09/2026.
   "${PSQL[@]}" "$DB_URL" <<'PSQL'
 do $$
 declare j text;
