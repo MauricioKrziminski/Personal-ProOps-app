@@ -179,7 +179,18 @@ async def send_list(to: str, body: str, label: str, rows: list[tuple[str, str, s
     if not 1 <= len(rows) <= ROW_MAX:
         raise ValueError(f"WhatsApp aceita 1..{ROW_MAX} linhas, recebi {len(rows)}")
 
-    body_str = (body or "").strip()
+    # ⚠️ **A lista numerada é montada AQUI, e o motivo é só do WhatsApp:** a
+    # lista nativa esconde as linhas atrás de um toque em "Escolher", então um
+    # corpo com a pergunta sozinha deixa quem não tocou sem NENHUMA opção na
+    # tela (aconteceu em 09/09/2026 com nove candidatos abertos).
+    #
+    # Ela saiu do `body` que o motor devolve porque esse mesmo `body` é o que o
+    # CHAT DO APP mostra — e lá as opções são desenhadas, então a lista no corpo
+    # aparecia duas vezes, uma como texto e outra como controle. A queixa foi
+    # literal: *"que poluição visual é essa do agente?"*. Canal que esconde as
+    # opções repete; canal que as mostra, não.
+    numerado = "\n".join(titulo for _, titulo, _ in rows)
+    body_str = "\n".join(x for x in [(body or "").strip(), numerado] if x)
     if len(body_str.encode("utf-8")) > 800:
         await send_text(to, body_str)
         prompt_lista = "Escolha uma opção na lista abaixo:"

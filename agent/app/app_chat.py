@@ -120,7 +120,12 @@ def _split_reply(resposta: str | dict | None) -> tuple[str, dict | None]:
     então um dict sem texto ainda precisa render alguma coisa.
     """
     if isinstance(resposta, dict):
-        texto = resposta.get("text") or resposta.get("body") or ""
+        # ⚠️ **`body` ANTES de `text`, e não o contrário.** `text` é o fallback
+        # do WhatsApp: ele traz a lista numerada e termina em "Responde com o
+        # número, ou *NENHUMA*" — instrução de um canal onde não há botão. No
+        # app as opções são controles na tela, e o texto tem que ser só a
+        # pergunta.
+        texto = resposta.get("body") or resposta.get("text") or ""
         return texto, resposta
     return (resposta or ""), None
 

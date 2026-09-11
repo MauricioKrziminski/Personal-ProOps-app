@@ -169,3 +169,19 @@ async def test_cartao_nao_paga_fatura_de_cartao(monkeypatch):
         )
     assert "cartão não paga" in str(erro.value).lower()
     assert "args" not in chamadas
+
+
+@pytest.mark.asyncio
+async def test_fatura_zerada_nao_entra_na_pergunta(monkeypatch):
+    """Ciclo sem compra nenhuma nasce aberto e vazio — e não é pagável.
+
+    Visto no emulador em 11/09/2026: "paguei a fatura do nubank" devolveu NOVE
+    candidatas, as três primeiras com "R$ 0,00 em aberto". Com o teto de 10
+    linhas da lista do WhatsApp, as zeradas empurram para fora as que têm
+    dívida.
+    """
+    from app.tools import resolve
+
+    sql = resolve._FONTES["faturas"]["sql"]
+    assert "private.invoice_open_cents(ci.id) > 0" in sql
+    assert "status not in ('paid','rolled')" in sql

@@ -693,7 +693,7 @@ def _pergunta(pausa: dict, candidatos: list[dict], pendente: dict | None) -> dic
     if len(candidatos) <= 2:
         # 2 opções + "nenhuma dessas" = os 3 botões que a Meta permite
         return {
-            "ui": "buttons", "body": f"{corpo}\n{numerado}",
+            "ui": "buttons", "body": corpo,
             "buttons": [
                 *[(f"pa:{pid}:c:{c['id']}", f"{i}) {c['label']}")
                   for i, c in enumerate(candidatos, 1)],
@@ -709,7 +709,7 @@ def _pergunta(pausa: dict, candidatos: list[dict], pendente: dict | None) -> dic
     # só com a pergunta deixa quem não tocou sem NENHUMA opção na tela — foi o
     # que aconteceu em 09/09/2026 com nove candidatos abertos.
     return {
-        "ui": "list", "body": f"{corpo}\n{numerado}", "label": "Escolher",
+        "ui": "list", "body": corpo, "label": "Escolher",
         "rows": [
             *[(f"pa:{pid}:c:{c['id']}", f"{i}) {c['label']}", c.get("when", ""))
               for i, c in enumerate(mostrar, 1)],

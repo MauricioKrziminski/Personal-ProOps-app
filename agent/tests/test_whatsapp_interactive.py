@@ -166,14 +166,22 @@ async def test_corpo_longo_divide_em_texto_e_botoes(cliente):
 
 
 
-def test_a_lista_leva_as_opcoes_no_CORPO_tambem():
+@pytest.mark.asyncio
+async def test_a_lista_do_whatsapp_leva_as_opcoes_no_CORPO_tambem(cliente):
     """A lista do WhatsApp esconde as linhas atrás de "Escolher".
 
     Com 3+ candidatos a pergunta vira `ui: "list"`, e ali as opções só aparecem
     depois de um toque. O corpo que não as repete deixa na tela uma pergunta
     sem nenhuma resposta possível — em 09/09/2026 o usuário recebeu só
     "🤔 apagar qual?" com NOVE lançamentos abertos, não viu nenhum, e tentou
-    responder por escrito três vezes. O caminho de botões (≤2) já fazia certo.
+    responder por escrito três vezes.
+
+    ⚠️ **A repetição mora no ENVIO, não no motor** (11/09/2026). Ela estava no
+    `body` que `_pergunta` devolve, e esse mesmo `body` é o que o chat do app
+    mostra — onde as opções JÁ são controles na tela. Resultado: a lista
+    aparecia duas vezes, uma como texto e outra como botão, e a queixa foi
+    literal ("que poluição visual é essa do agente?"). Aqui a asserção é sobre
+    o que chega no aparelho, que é o que o defeito original quebrava.
     """
     candidatos = [
         {"id": f"t{i}", "label": f"R$ {i}0,00 café", "when": "09/09"} for i in range(1, 10)
@@ -181,10 +189,16 @@ def test_a_lista_leva_as_opcoes_no_CORPO_tambem():
     saida = conversation._pergunta(
         {"kind": "choice", "summary": "apagar qual?"}, candidatos, {"id": "p1"}
     )
-
     assert saida["ui"] == "list"
+    # O motor devolve só a pergunta: é o que o app desenha acima dos controles.
+    for c in candidatos:
+        assert c["label"] not in saida["body"]
+
+    await whatsapp.send_list("5511", saida["body"], saida["label"], saida["rows"])
+
+    corpo = cliente.enviados[-1]["interactive"]["body"]["text"]
     for i, c in enumerate(candidatos, 1):
-        assert f"{i}) {c['label']}" in saida["body"]
+        assert f"{i}) {c['label']}" in corpo
 
 
 def test_resumo_que_ja_e_pergunta_nao_ganha_outra():

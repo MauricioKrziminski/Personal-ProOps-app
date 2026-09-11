@@ -163,6 +163,12 @@ _FONTES: dict[str, dict] = {
         "label": _rotulo_plano,
         "detalhe": _detalhe_plano,
     },
+    # ⚠️ **Fatura com R$ 0,00 em aberto NÃO é candidata.** `status <> 'paid'` não
+    # basta: o ciclo em que a pessoa não comprou nada nasce aberto e vazio, e ele
+    # entrava na pergunta "qual delas?" junto com as que têm dívida. Com nove
+    # candidatos e as três primeiras zeradas, a lista do WhatsApp (teto de 10
+    # linhas) empurra para fora justamente as faturas que se quer pagar — e no app
+    # a pessoa lê nove opções para escolher entre seis.
     "faturas": {
         "table": "card_invoices",
         "sql": f"""select ci.id, ci.due_date, ci.reference_month, a.name as card_name,
@@ -171,6 +177,7 @@ _FONTES: dict[str, dict] = {
                   join public.accounts a
                     on a.id = ci.account_id and a.workspace_id = ci.workspace_id
                   where ci.workspace_id = %s and ci.{FATURA_ABERTA} and a.name ilike %s
+                    and private.invoice_open_cents(ci.id) > 0
                   order by ci.due_date limit %s""",
         "label": _rotulo_fatura,
         "detalhe": _detalhe_fatura,
