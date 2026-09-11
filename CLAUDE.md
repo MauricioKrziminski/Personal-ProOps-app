@@ -30,8 +30,13 @@ App mobile pessoal de **notas rápidas, lembretes e controle financeiro operado 
   Isso já falhou **duas vezes** (03/09/2026): a `0049` e depois as `0050`/`0051` foram anunciadas
   como "aplicadas em produção" quando foram para o staging.
 
-  Produção está em **`20260911120000`**, conferido na fonte em 11/09/2026 — e o repo não tem
-  nenhuma migration fora de lá. O caminho é `link --project-ref` + `db push` + `link` de volta
+  Produção está em **`20260911220000`**, aplicado em 11/09/2026 pelo Gabriel (as dez de
+  `130000` a `220000` de uma vez) — e o repo não tem nenhuma migration fora de lá.
+
+  ⚠️ **A `200000` e a `220000` são um PAR e sobem juntas.** A primeira cria
+  `private.debt_paid_in_cycle` com `revoke`, e a segunda devolve o `execute`; só a primeira
+  derruba a Hoje e a Projeção com `42501 permission denied`, porque `debt_schedule_for` é
+  `security invoker` e a chamada aninhada usa o privilégio do `authenticated`. O caminho é `link --project-ref` + `db push` + `link` de volta
   para o staging, rodado pelo Gabriel. **`--db-url` não serve**: o hook lê o projeto LINKADO e a
   flag passava por cima da trava em silêncio — buraco fechado no mesmo dia, com
   `scripts/supabase-target.test.sh` prendendo os sete casos.
