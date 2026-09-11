@@ -111,10 +111,15 @@ Via Graph API v21.0 com o token de System User do app:
    existem desde 09/09) e o segredo `anon_key` saiu do Vault. Sobrou vivo só o
    `purge-trashed-notes`, que é SQL puro e **não** pode ser desagendado junto.
 
-   **Falta**, no dashboard de produção: criar o par novo, conferir
+   **TERMINADO em 11/09/2026.** Par novo criado, `EXPO_PUBLIC_SUPABASE_ANON_KEY` do ambiente
+   *production* da EAS trocada pela `sb_publishable_…`, chaves legadas desabilitadas e JWT secret
+   legado revogado. Conferido contra a API: a chave da `0003` devolve 401, a nova devolve 200 e
+   `/auth/v1/settings` responde 200.
+
+   ~~**Falta**, no dashboard de produção: criar o par novo, conferir
    `EXPO_PUBLIC_SUPABASE_ANON_KEY` no ambiente *production* da EAS, publicar um build, e então
    **disable** das legadas seguido de **revoke** do JWT secret — nessa ordem, porque `anon` não é
-   só chave, é um JWT assinado por esse secret.
+   só chave, é um JWT assinado por esse secret.~~
 
    Severidade real: **baixa**. A anon é pública por desenho (vai dentro do binário); o que ela
    permite é o que a RLS permite ao papel `anon`. O problema é higiene, e a regra que fica é
