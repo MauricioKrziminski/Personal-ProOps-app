@@ -101,7 +101,24 @@ Via Graph API v21.0 com o token de System User do app:
 
 ## 🔥 Aplicar agora (na ordem)
 
-1. **Vault + migration `0008_cron_token_from_vault.sql`** — criar os segredos fora do repo (`select vault.create_secret('https://<ref>.supabase.co','project_url')` e `select vault.create_secret('<anon key>','anon_key')`) e só então aplicar a migration; ela **falha de propósito** se os segredos não existirem. Depois: **rotacionar a anon key** (ela está no histórico do git pela `0003`) e atualizar `EXPO_PUBLIC_SUPABASE_ANON_KEY` no `.env` e o segredo `anon_key` no Vault.
+1. **Aposentar a chave legada** — `./scripts/retire-legacy-keys.sh`. ⚠️ **"Rotacionar a anon
+   key" não existe mais**: o Supabase encerrou a rotação das legadas e o caminho é migrar para o
+   par `sb_publishable_…`/`sb_secret_…` e então DESABILITAR as antigas — é desabilitar que
+   invalida a chave que está no histórico do git pela `0003`.
+
+   **Feito em 11/09/2026** (metade do banco): o app já usa a publishable, os crons `process-jobs`
+   e `finance-scheduler` foram desagendados (chamavam Edge Function por `pg_net`, e elas não
+   existem desde 09/09) e o segredo `anon_key` saiu do Vault. Sobrou vivo só o
+   `purge-trashed-notes`, que é SQL puro e **não** pode ser desagendado junto.
+
+   **Falta**, no dashboard de produção: criar o par novo, conferir
+   `EXPO_PUBLIC_SUPABASE_ANON_KEY` no ambiente *production* da EAS, publicar um build, e então
+   **disable** das legadas seguido de **revoke** do JWT secret — nessa ordem, porque `anon` não é
+   só chave, é um JWT assinado por esse secret.
+
+   Severidade real: **baixa**. A anon é pública por desenho (vai dentro do binário); o que ela
+   permite é o que a RLS permite ao papel `anon`. O problema é higiene, e a regra que fica é
+   nunca escrever token em migration.
 2. **Push notifications (Fase 4)** — **adiada conscientemente em 26/08**. Passo a passo completo,
    estado verificado, armadilhas e o código de recepção que ainda falta: **[docs/PUSH-NOTIFICATIONS.md](PUSH-NOTIFICATIONS.md)**.
    Resumo: sem `extra.eas.projectId` + credenciais FCM, `expo_push_token` fica `NULL` e **todo lembrete
