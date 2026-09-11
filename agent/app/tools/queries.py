@@ -480,13 +480,9 @@ async def query_transactions(ctx: ExecContext, action: FinanceQuery) -> ToolResu
         ],
     }
 
-    from app.services.gemini import format_query_response
+    from app.domain.query_text import format_query_response
 
-    msg = await format_query_response(
-        user_prompt=ctx.texto,
-        data=data,
-        timezone_name=ctx.timezone,
-    )
+    msg = format_query_response(data)
 
     # 6. Button Sentry: Condição de Parada Rígida de Botões
     spec = None

@@ -7,7 +7,7 @@ import pytest
 from app import db
 from app.domain.dates import invoice_cycle_window
 from app.graph.schemas import FinanceQuery, FinanceQueryType
-from app.services.gemini import _fallback_format_query
+from app.domain.query_text import format_query_response as _fallback_format_query
 from app.tools import queries
 from app.tools.base import ExecContext
 

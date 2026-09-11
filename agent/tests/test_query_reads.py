@@ -403,3 +403,29 @@ class TestBuscaPorNome:
         )
         assert "*Carro*" in r.message
         assert "Total em aberto" not in r.message
+
+
+def test_resposta_de_consulta_nao_chama_modelo():
+    """⚠️ **Consulta responde por template Python — nunca por uma segunda chamada de LLM.**
+
+    `ai-gemini.md` proíbe desde sempre, e mesmo assim `query_transactions` mandava os números já
+    lidos do banco de volta para o Gemini só para redigir o texto. O defeito é invisível em
+    teste de comportamento (a resposta continua "bonita") e caro de duas formas: gasta cota e
+    põe descrição de lançamento — texto de TERCEIRO, vindo da importação de extrato — dentro de
+    um prompt.
+
+    A trava é estrutural porque o sintoma não aparece em asserção de conteúdo: se
+    `app/tools/queries.py` voltar a importar o cliente do modelo, isto quebra.
+    """
+    import inspect
+    from pathlib import Path
+
+    from app.domain.query_text import format_query_response
+
+    fonte = Path(__file__).resolve().parents[1] / "app" / "tools" / "queries.py"
+    assert "services.gemini" not in fonte.read_text(), (
+        "queries.py voltou a importar o cliente do Gemini"
+    )
+    assert not inspect.iscoroutinefunction(format_query_response), (
+        "o formatador virou async — sinal de que alguém pôs um await de modelo dentro dele"
+    )
