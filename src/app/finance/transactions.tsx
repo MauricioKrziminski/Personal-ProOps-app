@@ -6,8 +6,9 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { categoryIcon } from '@/design/category-icons';
 import { ErrorCard } from '@/components/error-card';
-import { MonthPicker, currentMonth, monthTitle, shiftMonth } from '@/components/finance/month-picker';
-import { MonthRuler, useMonthRuler } from '@/components/finance/month-ruler';
+import { currentMonth, monthTitle, shiftMonth } from '@/components/finance/month-picker';
+import { useMonthRuler } from '@/components/finance/month-ruler';
+import { PeriodBar } from '@/components/finance/period-bar';
 import { Card } from '@/components/ui/card';
 import { ThemedText } from '@/components/themed-text';
 import { HeaderMenu } from '@/components/ui/header-actions';
@@ -293,8 +294,7 @@ export default function TransactionsScreen() {
         accessibilityLabel="Buscar lançamentos"
       />
 
-      <MonthPicker month={month} onChange={setMonth} />
-      <MonthRuler value={regua.view} onChange={regua.setView} visible={regua.temCiclo} />
+      <PeriodBar month={month} onChangeMonth={setMonth} ruler={regua} />
 
       {accountId !== undefined ? null : summary.isError ? (
         <ErrorCard onRetry={summary.refetch} />

@@ -5,8 +5,9 @@ import { Stack, router } from 'expo-router';
 import { useQuery } from '@tanstack/react-query';
 
 import { Chip } from '@/components/finance/chip';
-import { MonthPicker, currentMonth } from '@/components/finance/month-picker';
-import { MonthRuler, useMonthRuler } from '@/components/finance/month-ruler';
+import { currentMonth } from '@/components/finance/month-picker';
+import { useMonthRuler } from '@/components/finance/month-ruler';
+import { PeriodBar } from '@/components/finance/period-bar';
 import { ThemedText } from '@/components/themed-text';
 import { HeaderActions } from '@/components/ui/header-actions';
 import { Sheet } from '@/components/ui/sheet';
@@ -415,8 +416,7 @@ export default function BudgetsScreen() {
 
       <HeaderActions actions={[{ label: 'Novo orçamento', icon: 'plus', onPress: () => abrirNovo() }]} />
 
-      <MonthPicker month={month} onChange={setMonth} />
-      <MonthRuler value={regua.view} onChange={regua.setView} visible={regua.temCiclo} />
+      <PeriodBar month={month} onChangeMonth={setMonth} ruler={regua} />
 
       {status.isLoading ? (
         <>

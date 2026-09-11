@@ -14,15 +14,9 @@ import * as Haptics from 'expo-haptics';
 import type { SymbolViewProps } from 'expo-symbols';
 
 import { ErrorCard } from '@/components/error-card';
-import {
-  MonthPicker,
-  currentMonth,
-  monthLabel,
-  monthShort,
-  monthTitle,
-  shiftMonth,
-} from '@/components/finance/month-picker';
-import { MonthRuler, useMonthRuler } from '@/components/finance/month-ruler';
+import { currentMonth, monthLabel, monthShort, monthTitle, shiftMonth } from '@/components/finance/month-picker';
+import { useMonthRuler } from '@/components/finance/month-ruler';
+import { PeriodBar } from '@/components/finance/period-bar';
 import { ThemedText } from '@/components/themed-text';
 import { CardStack, type StackedCard } from '@/components/finance/card-stack';
 import { CURVED_BAR_CLEARANCE } from '@/components/ui/curved-tab-bar';
@@ -446,10 +440,7 @@ export default function FinanceScreen() {
           painel, e ali um controle no topo de um card lia como parte do número — além de
           empurrar o rótulo para baixo e desalinhar o painel do resto das telas.
         */}
-        <View style={styles.escopo}>
-          <MonthPicker month={month} onChange={setMonth} />
-          <MonthRuler value={regua.view} onChange={regua.setView} visible={regua.temCiclo} />
-        </View>
+        <PeriodBar month={month} onChangeMonth={setMonth} ruler={regua} />
 
         {heroLoading ? (
           <View style={styles.heroSkeleton}>
@@ -527,7 +518,7 @@ export default function FinanceScreen() {
           onPress={() =>
             showItemActions('Mais opções', [
               { label: 'Projeção de caixa', icon: 'chart.line.uptrend.xyaxis', onPress: () => router.push('/finance/forecast') },
-              { label: 'O mês inteiro', icon: 'calendar', onPress: () => router.push({ pathname: '/finance/month', params: { month } }) },
+              { label: 'Entradas e saídas', icon: 'calendar', onPress: () => router.push({ pathname: '/finance/month', params: { month } }) },
               { label: 'Patrimônio', icon: 'building.columns', onPress: () => router.push('/finance/net-worth') },
               { label: 'Metas', icon: 'target', onPress: () => router.push('/finance/goals') },
             ])
@@ -541,7 +532,7 @@ export default function FinanceScreen() {
       */}
       <Section>
         <Row
-          title="O mês inteiro"
+          title="Entradas e saídas"
           subtitle="entradas, fixas, parcelas e para onde o dinheiro foi"
           icon="calendar"
           onPress={() => router.push({ pathname: '/finance/month', params: { month } })}
@@ -1091,7 +1082,6 @@ export default function FinanceScreen() {
 }
 
 const styles = StyleSheet.create({
-  escopo: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   root: {
     flex: 1,
   },

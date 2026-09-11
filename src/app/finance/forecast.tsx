@@ -1,10 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import {
-  Pressable,
-  StyleSheet,
-  View,
-  useWindowDimensions,
-} from 'react-native';
+import { Pressable, ScrollView, StyleSheet, View, useWindowDimensions } from 'react-native';
 import Animated, { FadeIn, FadeInDown } from 'react-native-reanimated';
 import { Stack, router } from 'expo-router';
 import * as Haptics from 'expo-haptics';
@@ -308,10 +303,27 @@ export default function ForecastScreen() {
     setHorizonteAberto(true);
   };
 
-  /** A data digitada vale quando é válida E está no futuro; senão o horizonte não muda. */
-  const aplicarAte = () => {
-    if (!isValidBRDate(ateTexto)) return;
-    const d = diasAte(brToISO(ateTexto));
+  /**
+   * A data digitada aplica **sozinha, no dígito que a completa** — não há botão.
+   *
+   * ⚠️ **Um botão ao lado do campo exigia DOIS toques, e isso foi medido no emulador.** O
+   * primeiro toque tira o foco do campo, o teclado desce, o `KeyboardAvoidingView` devolve a
+   * altura e o botão desliza ~880px para baixo ANTES do release — o `Pressable` cancela o
+   * press porque o dedo já não está sobre ele. O segundo toque é que aplicava.
+   *
+   * Com a máscara, `dd/mm/aaaa` só fica válido no décimo caractere, então o próprio
+   * preenchimento é o sinal de "terminei" — é o mesmo contrato do código de 6 dígitos do
+   * login. Some o botão, some a corrida com o teclado, e a escolha por data passa a custar o
+   * mesmo UM gesto que os atalhos acima.
+   *
+   * Vive em `onChangeText` e não num `useEffect`: abrir o sheet já preenche o campo com a data
+   * do horizonte atual, e um efeito aplicaria (e fecharia) sozinho na abertura.
+   */
+  const digitarAte = (v: string) => {
+    const texto = maskBRDate(v);
+    setAteTexto(texto);
+    if (!isValidBRDate(texto)) return;
+    const d = diasAte(brToISO(texto));
     if (d < 1) return;
     setDias(Math.min(d, 3650));
     setHorizonteAberto(false);
@@ -420,40 +432,77 @@ export default function ForecastScreen() {
           <View style={styles.horizonteContrapeso} />
         </View>
 
-        <View style={styles.horizonteCorpo}>
-          <Field
-            label="Projetar até"
-            hint="De hoje até a data que você escolher.">
-            <TextField
-              value={ateTexto}
-              onChangeText={(v) => setAteTexto(maskBRDate(v))}
-              placeholder="dd/mm/aaaa"
-              keyboardType="number-pad"
-              maxLength={10}
-              accessibilityLabel="Projetar até a data"
-            />
-          </Field>
-          <Button
-            label="Aplicar"
-            onPress={aplicarAte}
-            disabled={!isValidBRDate(ateTexto) || diasAte(brToISO(ateTexto)) < 1}
-            block
-          />
+        {/*
+          ⚠️ **A ordem estava invertida, e o campo mentia sobre o que ele é** (11/09/2026).
 
-          <Section>
-            {HORIZONTES.map((h) => (
-              <Row
-                key={h.dias}
-                title={h.label}
-                subtitle={`até ${isoToBR(somaDias(localISODate(), h.dias))}`}
-                chevron={false}
-                onPress={() => {
-                  setDias(h.dias);
-                  setHorizonteAberto(false);
-                }}
+          O sheet abria com o campo de data, um botão verde de largura cheia e SÓ ENTÃO os
+          atalhos. Três problemas de uma vez: o caminho comum (tocar "6 meses") ficava embaixo
+          do caminho raro; o botão cortava o campo da lista, deixando os dois parecendo blocos
+          sem relação; e o campo, sozinho no topo com uma data já preenchida, prometia um
+          calendário — *"parece que se eu clicar no campo 'projetar até' iria abrir um
+          calendário e nada acontece"*.
+
+          Agora: os atalhos primeiro (com o atual marcado, para o sheet DIZER onde a tela está),
+          e a data livre por último, rotulada "Outra data" e dizendo que é para digitar. Sem
+          date picker nativo: nenhuma lib de calendário está aprovada no projeto, e o que
+          faltava não era o calendário — era o campo parar de se anunciar como um.
+        */}
+        {/*
+          ⚠️ **Lista que ROLA + campo FIXO no rodapé, senão o teclado come o campo.**
+
+          O `Sheet` envolve os filhos num `KeyboardAvoidingView behavior="padding"`: quando o
+          teclado abre, ele aplica `paddingBottom` da altura do teclado. Isso só empurra alguma
+          coisa para cima se o conteúdo for FLEXÍVEL — num corpo de altura natural, os oito
+          atalhos continuam ocupando o mesmo espaço e o campo sai por baixo do teclado.
+
+          Duas construções foram medidas no emulador ANTES desta, e as duas falharam:
+          um `ScrollView` comum (rola, mas ninguém rola sozinho quando o campo ganha foco) e um
+          `KeyboardAwareScrollView` (que traz o próprio tratamento de inset e, aninhado dentro
+          do `KeyboardAvoidingView` do `Sheet`, briga com ele — são dois donos da mesma altura).
+
+          Quem cede é a LISTA (`flex: 1`); o campo é rodapé de altura natural e sobe inteiro com
+          o padding do teclado. É o padrão para o qual o `behavior="padding"` foi desenhado.
+
+          `keyboardShouldPersistTaps="handled"` para que, com o teclado aberto, tocar num atalho
+          da lista valha na hora em vez de gastar o toque só fechando o teclado.
+        */}
+        <View style={styles.horizonteCorpo}>
+          <ScrollView
+            contentContainerStyle={styles.horizonteLista}
+            keyboardShouldPersistTaps="handled">
+            <Section>
+              {HORIZONTES.map((h) => {
+                const atual = h.dias === dias;
+                return (
+                  <Row
+                    key={h.dias}
+                    title={h.label}
+                    subtitle={`até ${isoToBR(somaDias(localISODate(), h.dias))}`}
+                    chevron={false}
+                    accessibilityState={{ selected: atual }}
+                    trailing={atual ? <Icon name="checkmark" size="sm" color="tint" /> : undefined}
+                    onPress={() => {
+                      setDias(h.dias);
+                      setHorizonteAberto(false);
+                    }}
+                  />
+                );
+              })}
+            </Section>
+          </ScrollView>
+
+          <View style={styles.horizonteRodape}>
+            <Field label="Outra data" hint="Digite dia, mês e ano — ex.: 31/12/2027.">
+              <TextField
+                value={ateTexto}
+                onChangeText={digitarAte}
+                placeholder="dd/mm/aaaa"
+                keyboardType="number-pad"
+                maxLength={10}
+                accessibilityLabel="Projetar até a data"
               />
-            ))}
-          </Section>
+            </Field>
+          </View>
         </View>
       </Sheet>
 
@@ -887,7 +936,7 @@ export default function ForecastScreen() {
             chegar lá. E uma lista de 36 meses aberta no lugar comeria a tela inteira.
             
             `MonthPicker` já existe para exatamente isto: setas de mês, escolha de ano, uma
-            linha só. É o mesmo controle de "O mês inteiro", então o gesto já é conhecido.
+            linha só. É o mesmo controle de "Entradas e saídas", então o gesto já é conhecido.
           */}
           <Field label="A partir de qual mês">
             <MonthPicker month={novoMes ?? currentMonth()} onChange={setNovoMes} />
@@ -938,7 +987,9 @@ const styles = StyleSheet.create({
   },
   /** Contrapeso do "Fechar": sem ele o título não fica centrado. */
   horizonteContrapeso: { width: 72 },
-  horizonteCorpo: { paddingHorizontal: Space.lg, paddingBottom: Space.lg, gap: Space.lg },
+  horizonteCorpo: { flex: 1 },
+  horizonteLista: { paddingHorizontal: Space.lg, paddingBottom: Space.lg },
+  horizonteRodape: { paddingHorizontal: Space.lg, paddingBottom: Space.lg },
   chips: { flexDirection: 'row', flexWrap: 'wrap', gap: Space.sm },
   hero: {
     gap: Space.md,

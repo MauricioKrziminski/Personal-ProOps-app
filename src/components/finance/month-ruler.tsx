@@ -34,6 +34,8 @@ import { useCycle, type CycleView } from '@/hooks/use-finance';
  * ("Saldo diário" conta o cartão como uma despesa única "Fatura Mês Ano", pelo vencimento).
  * Por isso são DUAS opções aqui, e o resto é a linha da fatura.
  */
+export type MonthRulerState = ReturnType<typeof useMonthRuler>;
+
 export function useMonthRuler() {
   const [view, setView] = useState<CycleView>('cycle');
   const cycle = useCycle(view);
@@ -74,12 +76,17 @@ export function MonthRuler({ value, onChange, visible }: Props) {
 
 const styles = StyleSheet.create({
   /*
-    ⚠️ **Sem margem negativa.** A primeira versão puxava o controle para cima com
+    ⚠️ **Sem margem negativa.** Uma versão anterior puxava o controle para cima com
     `marginTop: -Space.md`, para ele ler como qualificador do seletor de mês em vez de um bloco
     separado — e o resultado foi ele SOBREPOR o seletor: as setas ‹ › e "Setembro de 2026"
-    ficaram por baixo dos segmentos. O `gap` do `Screen` já dá o respiro certo; a ligação entre
-    os dois se faz pela ORDEM (período, depois régua, depois o intervalo escrito), não por
-    aproximação forçada.
+    ficaram por baixo dos segmentos. Quem liga os dois hoje é o `PeriodBar`, que os põe na mesma
+    LINHA; aproximação forçada por margem não é o mesmo que estar junto.
+
+    A largura é fixa porque o controle é COMPACTO — ele qualifica o seletor de mês ao lado, não
+    é um seletor de página. Largura cheia (o que ele tinha, por ser filho de um `View` em
+    coluna) fazia dele o elemento mais pesado da tela, lido como uma barra de abas: foi a queixa
+    "grudado sem gap nenhum com o tab embaixo". 152 cabe "Ciclo" a 1,3× com folga e mantém as
+    duas células acima dos 44pt de alvo.
   */
-  wrap: {},
+  wrap: { width: 152 },
 });

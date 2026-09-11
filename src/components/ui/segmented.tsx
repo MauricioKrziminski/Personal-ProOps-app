@@ -4,7 +4,7 @@ import Animated, { useAnimatedStyle, withSpring } from 'react-native-reanimated'
 import * as Haptics from 'expo-haptics';
 
 import { ThemedText } from '@/components/themed-text';
-import { Elevation, Motion, Radius, Space } from '@/design/tokens';
+import { Elevation, HitTarget, Motion, Radius, Space } from '@/design/tokens';
 import { useTheme, useScheme } from '@/hooks/use-theme';
 
 type Opcao<T extends string> = { value: T; label: string };
@@ -133,5 +133,19 @@ const styles = StyleSheet.create({
     // ter onde crescer — quem dá a largura é o `minWidth` de quem usa o controle.
     paddingHorizontal: Space.xs,
     minHeight: 32,
+    /*
+      ⚠️ **Piso de largura, senão o controle SOME quando o pai é uma linha.**
+
+      `flex: 1` no React Native é `flexBasis: 0`, então a largura NATURAL da trilha é a soma das
+      células: zero. Num pai `column` isso não aparece (o filho estica), mas dentro de um
+      `flexDirection: 'row'` a trilha inteira colapsa para os 4pt do padding — uma lasquinha
+      branca vertical, sem erro nenhum no log. Foi exatamente o que apareceu no Financeiro
+      ("que toggle é esse no iOS?? eu nem tinha visto isso"): o `Mês | Ciclo` estava lá,
+      desenhado com 4pt de largura, ao lado do seletor de mês.
+
+      44 é o alvo de toque mínimo que design.md §11 já exige — o piso não é um número escolhido
+      para este bug, é a regra que o controle não estava cumprindo.
+    */
+    minWidth: HitTarget,
   },
 });

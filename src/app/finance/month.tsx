@@ -4,8 +4,9 @@ import Animated, { FadeInDown } from 'react-native-reanimated';
 import { Stack, router, useLocalSearchParams } from 'expo-router';
 
 import { ErrorCard } from '@/components/error-card';
-import { MonthPicker, currentMonth, monthTitle } from '@/components/finance/month-picker';
-import { MonthRuler, useMonthRuler } from '@/components/finance/month-ruler';
+import { currentMonth, monthTitle } from '@/components/finance/month-picker';
+import { useMonthRuler } from '@/components/finance/month-ruler';
+import { PeriodBar } from '@/components/finance/period-bar';
 import { ThemedText } from '@/components/themed-text';
 import { Card } from '@/components/ui/card';
 import { EmptyState } from '@/components/ui/empty-state';
@@ -19,12 +20,11 @@ import { Segmented } from '@/components/ui/segmented';
 import { Skeleton, SkeletonRow } from '@/components/ui/skeleton';
 import { ProgressBar } from '@/components/ui/sparkline';
 import { useToast } from '@/components/ui/toast';
-import { Motion, Radius, Space, tabular } from '@/design/tokens';
+import { Motion, Radius, Space } from '@/design/tokens';
 import {
   useMarkPaid,
   useMonthBreakdown,
   useMonthLines,
-  useMonthRange,
   useMonthSummary,
   type MonthLine,
 } from '@/hooks/use-finance';
@@ -102,7 +102,6 @@ export default function MonthScreen() {
 
   const regua = useMonthRuler();
   const lines = useMonthLines(month, regua.view);
-  const janela = useMonthRange(month, regua.view);
   const summary = useMonthSummary(month, true, regua.view);
   const breakdown = useMonthBreakdown(month, groupBy, regua.view);
   const darBaixa = useMarkPaid();
@@ -185,29 +184,9 @@ export default function MonthScreen() {
       grouped
       onRefresh={() => Promise.all([lines.refetch(), summary.refetch(), breakdown.refetch()])}
       refreshing={lines.isRefetching}>
-      <Stack.Screen options={{ title: 'Mês', headerLargeTitle: true }} />
+      <Stack.Screen options={{ title: 'Entradas e saídas', headerLargeTitle: true }} />
 
-      <View style={styles.escopo}>
-        <MonthPicker month={month} onChange={setMonth} />
-        <MonthRuler value={regua.view} onChange={regua.setView} visible={regua.temCiclo} />
-        {/*
-          ⚠️ **Qual mês é "este mês" não é óbvio, e a confusão custa uma tarde.**
-
-          Esta tela é o mês do CALENDÁRIO. A fatura do cartão é um CICLO (o Nubank fecha dia 3,
-          então a fatura que vence em outubro cobre 03/09 a 02/10). Quem compara os dois lado a
-          lado vê números diferentes para "outubro" e conclui que um dos dois está errado —
-          quando os dois estão certos e recortam janelas diferentes. Foi exatamente o que
-          aconteceu com o dono do produto em 10/09/2026, contra a planilha dele.
-
-          Uma linha de legenda resolve o que nenhuma explicação depois resolve.
-        */}
-        <ThemedText type="caption" themeColor="textSecondary" style={tabular}>
-          {/* A legenda diz a JANELA, não o nome dela: com fechamento configurado, "setembro"
-              vai de 11/08 a 10/09 e escrever "mês de calendário" viraria a mentira que esta
-              linha existe para evitar. */}
-          {isoToBR(janela.from)} a {isoToBR(janela.to)}
-        </ThemedText>
-      </View>
+      <PeriodBar month={month} onChangeMonth={setMonth} ruler={regua} />
 
       {/* 1. O destaque: como o mês fecha. Único da tela. */}
       {summary.isLoading ? (
@@ -477,9 +456,6 @@ export default function MonthScreen() {
 }
 
 const styles = StyleSheet.create({
-  escopo: {
-    marginBottom: Space.xs,
-  },
   heroSkeleton: {
     gap: Space.sm,
   },

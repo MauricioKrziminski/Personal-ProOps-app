@@ -42,11 +42,24 @@ export function groupLabel(groupBy: GroupBy, key: string, label: string): string
   return groupBy === 'natureza' ? (NATUREZA[key] ?? label) : label;
 }
 
+/**
+ * ⚠️ **"Meio" não queria dizer nada para quem não construiu a tela** (11/09/2026). A queixa do
+ * dono do produto foi literal: *"esses textos como 'Meio' fica horrível para um usuário leigo
+ * entender"*. O rótulo era a palavra do MODELO (meio de pagamento), não a do usuário.
+ *
+ * O que o corte devolve são os nomes das contas e cartões dele — `Nubank Cartão`, `Cartão da
+ * viagem`, mais `Sem conta` e `Financiamento` para o que não tem conta. "Conta" é a palavra
+ * que ele já usa para isso no app inteiro (o seletor chama-se `AccountPicker`, a tela chama-se
+ * Contas).
+ *
+ * **"Conta" e não "Cartão"** porque os dois aparecem no mesmo corte; **e não "Pagamento"**
+ * porque a coluna também agrupa ENTRADA, e "pagamento" descreveria metade do dado.
+ */
 export const GROUP_OPTIONS = [
   // Natureza primeiro porque é a leitura mais forte: quanto do mês já estava comprometido
   // antes de qualquer escolha.
   { value: 'natureza', label: 'Tipo' },
-  { value: 'meio', label: 'Meio' },
+  { value: 'meio', label: 'Conta' },
   { value: 'categoria', label: 'Categoria' },
 ] as const satisfies readonly { value: GroupBy; label: string }[];
 
