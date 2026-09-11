@@ -84,7 +84,7 @@ function isoDeBR(valor: string): string | null {
 }
 
 /**
- * `pay_invoice` levanta quatro exceções diferentes e três delas NÃO se resolvem tentando de novo.
+ * `pay_invoice` levanta sete exceções diferentes e seis delas NÃO se resolvem tentando de novo.
  * Dizer "erro, tenta de novo" para "fatura já paga" é mandar o usuário repetir o que não falhou.
  */
 function mensagemDoErro(erro: unknown): string {
@@ -96,6 +96,7 @@ function mensagemDoErro(erro: unknown): string {
   if (texto.includes('sem lançamentos')) return 'Esta fatura não tem compras para pagar.';
   if (texto.includes('próprio cartão')) return 'O cartão não pode pagar a si mesmo. Escolha outra conta.';
   if (texto.includes('não encontrada')) return 'Não encontrei esta fatura. Volte e abra de novo.';
+  if (texto.includes('exige a conta')) return 'Escolha a conta de onde o dinheiro sai.';
   return 'Não deu para registrar o pagamento. Tenta de novo.';
 }
 

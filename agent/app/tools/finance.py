@@ -370,6 +370,73 @@ async def create_installment_purchase(
     )
 
 
+async def _aviso_de_fatura_adiada_por_id(invoice_id, workspace_id) -> str | None:
+    """Explica quando a fatura que o usuário escolheu já foi adiada.
+
+    A janela entre resolver o alvo e executar é real: o cron `_roll_overdue_invoices`
+    roda de hora em hora e pode adiar a fatura entre a pergunta e o SIM.
+    """
+    linha = await db.fetch_one(
+        """
+        select ci.status, ci.due_date, destino.due_date as destino_due
+        from public.card_invoices ci
+        left join public.card_invoices destino on destino.id = ci.rolled_into_invoice_id
+        where ci.id = %s and ci.workspace_id = %s
+        """,
+        invoice_id,
+        workspace_id,
+    )
+    if not linha or linha["status"] != "rolled":
+        return None
+    destino = (
+        f" O saldo dela entrou na fatura de {format_date_br(linha['destino_due'])}."
+        if linha.get("destino_due")
+        else ""
+    )
+    return (
+        f"🤷 Essa fatura (vencimento {format_date_br(linha['due_date'])}) foi adiada "
+        f"para a próxima, não paga.{destino} Não há o que pagar nela."
+    )
+
+
+async def _conta_que_paga(workspace_id, cartao_id, citada: str | None):
+    """De onde sai o dinheiro da fatura, na mesma ordem que a tela usa.
+
+    Antes isto era `resolve_account(ws, action.counterparty_account)` e mais nada.
+    `resolve_account` devolve None quando o nome vem vazio — e "paguei a fatura do
+    nubank", que é como a frase sai na vida real, não cita conta nenhuma. O NULL
+    chegava na RPC, onde a guarda `p_account_id = inv.account_id` não dispara
+    (NULL = x é NULL, não TRUE) e o INSERT do `transfer` aceita origem nula: a
+    fatura ficava paga e **nenhum saldo se mexia**.
+
+    A ordem é a do produto, não inventada aqui: `accounts.payment_account_id` é o
+    campo "Conta que paga a fatura", e a tela da fatura já o usa como sugestão
+    (`invoice/[id].tsx:237`). A conta padrão do workspace vem depois, como em
+    `create_transaction`.
+    """
+    if citada:
+        achada = await resolve_account(workspace_id, citada)
+        if achada:
+            return achada
+
+    linha = await db.fetch_one(
+        "select payment_account_id from public.accounts where id = %s and workspace_id = %s",
+        cartao_id,
+        workspace_id,
+    )
+    if linha and linha.get("payment_account_id"):
+        return linha["payment_account_id"]
+
+    padrao = await default_account(workspace_id)
+    if padrao:
+        return padrao
+
+    raise Level1Error(
+        "❌ De qual conta saiu o dinheiro? Me fala o nome dela "
+        '(ex.: "paguei a fatura do nubank pelo itaú").'
+    )
+
+
 async def _aviso_de_fatura_adiada(account_id, workspace_id) -> str | None:
     """Explica o silêncio quando o cartão não tem fatura aberta mas TEM uma adiada.
 
@@ -402,26 +469,32 @@ async def _aviso_de_fatura_adiada(account_id, workspace_id) -> str | None:
 
 
 async def pay_invoice(ctx: ExecContext, action: FinanceAction) -> ToolResult:
-    cartao = await resolve_account(ctx.workspace_id, action.account, only_cards=True)
-    if not cartao:
-        raise Level1Error("❌ Qual cartão? Me fala o nome dele (ex.: \"paguei a fatura do nubank\").")
+    """Pagar a fatura: o dinheiro SAI de uma conta agora.
+
+    O alvo vem do `ctx.target`, resolvido e congelado na Fase Cognitiva — não de
+    um SELECT aqui. Antes esta tool fazia o próprio `order by due_date limit 1` e
+    pagava a fatura mais antiga em silêncio; com três faturas vencidas no mesmo
+    cartão, a confirmação dizia "na fatura do nubank" e não dava para saber qual.
+    Agora duas faturas em aberto viram pergunta, e uma só entra na frase do SIM
+    com o vencimento — que é a regra de `base.py:31-34` para todo o resto daqui.
+    """
+    alvo = (ctx.target or {}).get("candidates") or []
+    if not alvo:
+        return ToolResult("✅ Não achei fatura em aberto nesse cartão.", read_only=True)
 
     fatura = await db.fetch_one(
         f"""
-        select ci.id, ci.due_date, private.invoice_open_cents(ci.id) as aberto
+        select ci.id, ci.due_date, ci.account_id,
+               private.invoice_open_cents(ci.id) as aberto
         from public.card_invoices ci
-        where ci.account_id = %s and ci.workspace_id = %s and ci.{FATURA_ABERTA}
-        order by ci.due_date
-        limit 1
+        where ci.id = %s and ci.workspace_id = %s and ci.{FATURA_ABERTA}
         """,
-        cartao,
+        alvo[0]["id"],
         ctx.workspace_id,
     )
     if not fatura:
-        aviso = await _aviso_de_fatura_adiada(cartao, ctx.workspace_id)
-        if aviso:
-            return ToolResult(f"🤷 {aviso} Não há o que pagar nesse cartão agora.", read_only=True)
-        return ToolResult("✅ Não achei fatura em aberto nesse cartão.", read_only=True)
+        aviso = await _aviso_de_fatura_adiada_por_id(alvo[0]["id"], ctx.workspace_id)
+        return ToolResult(aviso or "✅ Essa fatura já está paga.", read_only=True)
 
     # "paguei 800 da fatura do nubank" é pagamento PARCIAL: o resto fica na fatura, como fica no
     # rotativo do cartão de verdade. Sem valor, paga o que falta e quita.
@@ -433,7 +506,7 @@ async def pay_invoice(ctx: ExecContext, action: FinanceAction) -> ToolResult:
             f"falou passa disso. Confere?"
         )
 
-    pagadora = await resolve_account(ctx.workspace_id, action.counterparty_account)
+    pagadora = await _conta_que_paga(ctx.workspace_id, fatura["account_id"], action.counterparty_account)
     row = await db.fetch_one(
         "select public.pay_invoice(%s, %s, %s, %s) as id",
         fatura["id"], pagadora, guards.require_date(action.occurred_at, ctx.timezone), valor,

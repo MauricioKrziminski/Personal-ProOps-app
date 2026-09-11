@@ -42,6 +42,14 @@ TARGETS: dict[Any, str] = {
     FinanceActionType.DELETE_TRANSACTION: "transactions",
     FinanceActionType.UNDO_LAST: "transactions",
     FinanceActionType.MARK_PAID: "pendentes",
+    # Pagar a fatura passou a resolver alvo como todo o resto (11/09/2026). Antes
+    # `pay_invoice` fazia o próprio `order by due_date limit 1` e pagava a fatura
+    # MAIS ANTIGA em silêncio — com três faturas vencidas no mesmo cartão, "paguei
+    # 800 da fatura do nubank" mexia na de julho e a confirmação dizia só "na
+    # fatura do nubank", sem vencimento nenhum. É o mesmo `limit 1` que já tinha
+    # sido removido de `mark_paid` por dar baixa "na mais antiga EM SILÊNCIO", e
+    # aqui o valor é maior.
+    FinanceActionType.PAY_INVOICE: "faturas",
     FinanceActionType.GOAL_DEPOSIT: "goals",
     FinanceActionType.UPDATE_ASSET_VALUE: "assets",
     NotesActionType.APPEND_NOTE: "notes",
@@ -212,7 +220,10 @@ def veredito(
 
 async def por_texto(fonte: str, workspace_id, termo: str) -> tuple[Status, list[dict]]:
     cfg = _FONTES[fonte]
-    like = f"%{termo}%"
+    # Termo ausente casa tudo (`%%`), e não a string "None". É o que faz
+    # "paguei a fatura" (sem citar cartão) virar a lista de faturas em aberto
+    # em vez de uma busca literal que não acha nada.
+    like = f"%{termo or ''}%"
     args = (workspace_id, like, like, MOSTRAR) if cfg.get("dois_termos") else (
         workspace_id, like, MOSTRAR
     )
@@ -474,12 +485,19 @@ async def for_actions(
         # tem search_term nem content). Sem ele, goal_deposit e update_asset_value
         # resolviam com termo vazio — ou seja, listavam TODAS as metas em vez de
         # achar "viagem".
-        bruto = (
-            getattr(acao, "search_term", None)
-            or getattr(acao, "content", None)
-            or getattr(acao, "target_ref", None)
-            or getattr(acao, "description", None)
-        )
+        if getattr(acao, "type", None) == FinanceActionType.PAY_INVOICE:
+            # O alvo aqui é a FATURA, e quem a identifica é o nome do cartão —
+            # que em FinanceAction mora em `account`, não em `description`.
+            # Sem esta linha o termo sairia de `description` ("fatura", vazio) e
+            # a resolução listaria as faturas de todos os cartões.
+            bruto = getattr(acao, "account", None)
+        else:
+            bruto = (
+                getattr(acao, "search_term", None)
+                or getattr(acao, "content", None)
+                or getattr(acao, "target_ref", None)
+                or getattr(acao, "description", None)
+            )
         termo = clean_term(bruto)
         # a recência só é lida do texto cru quando NÃO sobrou termo de busca
         recente = wants_latest(bruto, getattr(acao, "description", None)) or (

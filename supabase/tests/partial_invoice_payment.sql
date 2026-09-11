@@ -135,6 +135,17 @@ begin
     assert sqlerrm like '%próprio cartão%', format('erro inesperado: %s', sqlerrm);
   end;
 
+  begin
+    perform public.pay_invoice(fat, null, current_date, 5000);
+    raise exception 'aceitou pagar sem conta de origem';
+  exception when others then
+    -- A guarda que faltava (20260911070000). `if p_account_id = inv.account_id`
+    -- NÃO pega o NULL: em SQL `NULL = x` é NULL, não TRUE. Sem esta recusa, a
+    -- fatura virava `paid` com um `transfer` sem origem — medido no staging,
+    -- saldo da conta pagadora 500000 -> 500000 numa fatura de R$ 1.000,00.
+    assert sqlerrm like '%exige a conta%', format('erro inesperado: %s', sqlerrm);
+  end;
+
   raise notice 'recusas: todas as asserções passaram';
 end $$;
 
