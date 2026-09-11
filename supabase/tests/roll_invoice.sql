@@ -15,7 +15,7 @@ declare
   ws uuid; usr uuid; cartao uuid; conta uuid;
   fat uuid; destino uuid;
   r jsonb;
-  n int; v bigint;
+  n int; v bigint; taxa_aprendida numeric;
 begin
   select id into usr from auth.users limit 1;
   insert into public.workspaces (name, owner_id) values ('teste rotativo', usr) returning id into ws;
@@ -129,7 +129,48 @@ begin
     raise exception '8. o segundo adiamento seguido tem que ser sinalizado: %', r;
   end if;
 
-  raise notice 'OK: roll_invoice — 11 asserções';
+  -- 9. A TAXA SE APRENDE, e estimativa não vira observação.
+  --    Sem cobrança real nenhuma, o cartão não tem o que observar: sem juros.
+  if (r->>'sem_taxa')::boolean is not true then
+    raise exception '9. o segundo adiamento também não deveria estimar juros: %', r;
+  end if;
+  --    Agora entra uma cobrança REAL (como a que vem na importação da fatura).
+  insert into public.transactions
+    (workspace_id, user_id, account_id, kind, amount_cents, category, description, occurred_at, status)
+  values (ws, usr, cartao, 'expense', 12876, 'juros',
+          'Juros de pagamento parcial da fatura (rotativo)', '2026-08-31', 'pending');
+  --    A propriedade que importa é que ela passou a EXISTIR e veio do histórico, não de um
+  --    campo. O valor exato depende de qual saldo pareou com a cobrança, e cravá-lo aqui seria
+  --    o teste repetindo a implementação em vez de prender o comportamento.
+  if private.rotativo_rate_for(cartao) is null then
+    raise exception '9a. depois de uma cobrança real a taxa tem que sair do histórico';
+  end if;
+  taxa_aprendida := private.rotativo_rate_for(cartao);
+  --    E a linha ESTIMADA que o próprio app criou não pode virar a nova "observação".
+  insert into public.transactions
+    (workspace_id, user_id, account_id, kind, amount_cents, category, description, occurred_at, status)
+  values (ws, usr, cartao, 'expense', 99999, 'juros',
+          'Juros do rotativo (estimado)', '2026-09-01', 'pending');
+  if private.rotativo_rate_for(cartao) <> taxa_aprendida then
+    raise exception '9b. estimativa não pode virar observação — a taxa foi de % para %',
+      taxa_aprendida, private.rotativo_rate_for(cartao);
+  end if;
+
+  -- 10. TRÊS CICLOS SEGUIDOS: o caixa continua saindo uma vez só.
+  --     É o cenário que o dono do produto pediu para testar. Cada adiamento tira a origem da
+  --     projeção e põe o valor na seguinte; se alguma etapa esquecesse de excluir a origem, o
+  --     total explodiria em progressão.
+  select coalesce(sum(out_cents),0) into v from public._cash_flow_forecast(usr, 400)
+    where day between '2026-08-01' and '2027-06-30';
+  --     100000 do principal + 634 de IOF do 1º + o IOF do 2º + os dois juros reais lançados acima
+  if v <> 100634
+        + (select coalesce(sum(amount_cents),0) from public.transactions
+           where workspace_id = ws and description like 'IOF do rotativo%' and occurred_at > '2026-08-10')
+        + 12876 + 99999 then
+    raise exception '10. três ciclos e o caixa tem que sair UMA vez por valor; saiu %', v;
+  end if;
+
+  raise notice 'OK: roll_invoice — 14 asserções';
 end $$;
 
 rollback;

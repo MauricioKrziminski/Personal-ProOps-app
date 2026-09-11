@@ -555,9 +555,11 @@ export interface RollResult {
   principal_cents: number;
   juros_cents: number;
   iof_cents: number;
-  /** Os juros saíram da taxa do cartão, não de um valor informado. */
+  /** A taxa usada — aprendida do histórico do cartão, ou a de partida. `null` = não havia. */
+  taxa_usada: number | null;
+  /** Os juros saíram de uma taxa estimada, não de um valor informado. */
   juros_estimados: boolean;
-  /** O cartão não tem taxa cadastrada: rolou só o principal, e a projeção fica otimista. */
+  /** Não havia taxa nenhuma: rolou só o principal, e a projeção fica otimista. */
   sem_taxa: boolean;
   /** Esta fatura já tinha recebido um saldo adiado — é o segundo ciclo seguido no rotativo. */
   segundo_ciclo: boolean;

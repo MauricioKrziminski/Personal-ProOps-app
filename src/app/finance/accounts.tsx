@@ -564,8 +564,8 @@ export default function AccountsScreen() {
                   </Field>
 
                   <Field
-                    label="Juros do rotativo (% ao mês)"
-                    hint="Vem impresso na própria fatura. Em branco, o app adia só o valor e o IOF — que é lei (0,38% + 0,0082% ao dia) — e não inventa juros."
+                    label="Juros do rotativo de partida (% ao mês)"
+                    hint="Só vale até a primeira cobrança real: depois disso o app usa a última taxa que ESTE cartão cobrou, porque ela muda todo mês. Vem impressa na fatura. Em branco e sem histórico, o app não estima juros."
                     error={
                       form.rotativoRate.trim() && !taxaValida(form.rotativoRate)
                         ? 'Use um número de 0 a 100, como 15,5'

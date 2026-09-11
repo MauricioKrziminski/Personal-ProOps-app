@@ -203,14 +203,17 @@ export default function InvoiceScreen() {
           onSuccess: (r) => {
             const partes = [`Principal ${formatBRL(Number(r.principal_cents))}`];
             if (Number(r.juros_cents) > 0) {
-              partes.push(`juros ${formatBRL(Number(r.juros_cents))}${r.juros_estimados ? ' (estimado)' : ''}`);
+              // A taxa entra na frase: é o número que o usuário vai querer conferir contra a
+              // fatura, e dizer "juros estimados" sem dizer com QUE taxa é pedir confiança cega.
+              const taxa = r.taxa_usada == null ? '' : ` a ${formatNumberBR(Number(r.taxa_usada) * 100)}%`;
+              partes.push(`juros ${formatBRL(Number(r.juros_cents))}${r.juros_estimados ? ` estimados${taxa}` : ''}`);
             }
-            if (Number(r.iof_cents) > 0) partes.push(`IOF ${formatBRL(Number(r.iof_cents))}`);
+            if (Number(r.iof_cents) > 0) partes.push(`IOF estimado ${formatBRL(Number(r.iof_cents))}`);
             toast({
               tone: 'success',
               message:
                 `Foi para a fatura de ${formatDateBR(r.destino_vence_em)} · ${partes.join(' · ')}` +
-                (r.sem_taxa ? ' · sem juros: o cartão não tem taxa do rotativo' : '') +
+                (r.sem_taxa ? ' · sem juros: este cartão ainda não cobrou rotativo nenhum, então não há taxa para estimar' : '') +
                 (r.segundo_ciclo
                   ? ' · segundo ciclo seguido: pela regra do Banco Central o banco tem que te oferecer parcelamento'
                   : ''),
@@ -515,9 +518,10 @@ export default function InvoiceScreen() {
                 onPress={adiar}
               />
               <ThemedText type="caption" themeColor="textSecondary">
-                {cartao?.rotativo_rate_monthly == null
-                  ? 'O saldo em aberto vira uma linha na próxima fatura, com IOF. Sem a taxa do rotativo cadastrada no cartão, os juros não entram — e a projeção fica otimista por esse valor.'
-                  : `O saldo em aberto vira uma linha na próxima fatura, com juros de ${formatNumberBR(cartao.rotativo_rate_monthly * 100)}% e IOF.`}
+                O saldo em aberto vira uma linha na próxima fatura. Os juros são estimados pela
+                última taxa que este cartão cobrou de você (ou pela taxa de partida, se ainda não
+                houve nenhuma) e o IOF pela fórmula da lei — os dois entram como previsão, e você
+                corrige pelos valores da fatura quando ela chegar.
               </ThemedText>
             </>
           ) : null}

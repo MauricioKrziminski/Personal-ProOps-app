@@ -357,12 +357,26 @@ O usuário só tinha duas saídas para uma fatura que não pagou: deixá-la atra
 marcá-la como PAGA. A segunda é mentira, e mentira que contamina tudo — saldo, projeção,
 patrimônio. `roll_invoice` é a terceira (`20260911040000`).
 
-**O que a lei decide, o app não estima:**
-- **IOF é exato**: 0,38% fixo + 0,0082% ao dia sobre o principal, teto 3,38% (Decretos
-  12.466/2025 e 12.499/2025). Sai sempre, mesmo sem taxa de juros cadastrada.
-- **Juros são do cartão** (`accounts.rotativo_rate_monthly`, fração mensal como
-  `debts.interest_rate_monthly`) e vêm impressos na fatura. **Null = o app não inventa**: rola
-  só o principal e a tela diz que a projeção ficou otimista por esse valor.
+**Encargos são ESTIMATIVA, e a tela não promete exatidão.**
+
+- **IOF segue a fórmula da lei** — 0,38% + 0,0082% ao dia, teto 3,38% (Decretos 12.466/2025 e
+  12.499/2025) — e ela acerta a ordem de grandeza, **não o centavo**. Medido contra a cobrança
+  real do Nubank em agosto/2026: sobre R$ 333,72 a fórmula dá R$ 2,12 e o emissor cobrou
+  R$ 2,13. A diferença é contagem de dias e arredondamento do banco, que não são públicos.
+  ⚠️ Este arquivo já afirmou "IOF é exato" — era afirmação forte demais e foi corrigida.
+- **A taxa de juros NÃO fica num campo** (`20260911060000`). O dono do produto barrou o desenho
+  antes de ir para produção: *"esse valor pode mudar também à medida que o tempo passa, por isso
+  não queria deixar fixo"*. E os números dele provam: a cobrança real foi **12,876%**, não os
+  15,5% que eu tinha usado de exemplo — um campo fixo erraria ~20% já no primeiro mês.
+
+  `private.rotativo_rate_for` divide os juros efetivamente cobrados pelo saldo que os gerou, na
+  última vez que isso aconteceu **naquele cartão**. Se atualiza sozinha a cada fatura importada.
+  `accounts.rotativo_rate_monthly` sobrou como taxa de PARTIDA, só enquanto não há o que
+  observar; sem as duas, o app não estima juros e diz isso.
+
+  ⚠️ **Linha `(estimado)` não alimenta a estimativa.** Sem esse filtro o palpite de um mês vira
+  a "observação" do seguinte e o número nunca mais se corrige — um laço que parece aprendizado
+  e é só eco.
 
 ⚠️ **Regra de terceiro não vira trava de digitação.** A primeira versão recusava adiar uma
 fatura que já tinha recebido um saldo adiado, citando a Resolução CMN 4.549/2017 (o rotativo
@@ -387,6 +401,12 @@ a única saída seria de novo marcar como paga uma fatura não paga. Hoje `roll_
 ⚠️ **A interface nunca escreve "rolada".** O dono do produto recusou o jargão — *"eu não saberia
 o que seria rolada"*. O status no banco é `rolled`; na tela é **"Adiada"**, e a linha diz
 **"Foi para a fatura de 10/11"**, que é o que aconteceu.
+
+⚠️ **Fatura ADIADA não recebe cobrança nova — `set_invoice` segue a corrente.** Achado pelo
+teste de três ciclos seguidos, e é dinheiro sumindo em silêncio: a adiada sai da projeção, então
+os juros e o IOF REAIS que chegam na importação do extrato, datados dentro daquele ciclo, iam
+para dentro dela e desapareciam. O emissor faz o mesmo que a correção: fechada a fatura e
+mandado o saldo ao rotativo, o que vem depois é cobrado na próxima.
 
 ⚠️ **`to_char(d, 'TMMonth')` escreve em INGLÊS aqui.** O `TM` traduz pelo `lc_time` da sessão, e
 o Postgres do Supabase roda em `C`. Saiu "Saldo em rotativo de July" no primeiro teste com dados
