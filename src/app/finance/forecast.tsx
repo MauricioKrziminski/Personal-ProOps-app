@@ -47,7 +47,7 @@ import {
   somaDias,
 } from '@/lib/dates';
 import { showItemActions } from '@/lib/item-actions';
-import { settleLabel } from '@/lib/settle-labels';
+import { settleDone, settleLabel } from '@/lib/settle-labels';
 
 /**
  * Projeção — "posso gastar isso?".
@@ -288,11 +288,11 @@ export default function ForecastScreen() {
     );
   }, [fica]);
 
-  const pagar = (id: string, titulo: string) =>
+  const pagar = (id: string, titulo: string, kind: string | null | undefined) =>
     markPaid.mutate(
       { id, paidAt: localISODate() },
       {
-        onSuccess: () => toast({ message: `${titulo} marcado como pago.`, tone: 'success' }),
+        onSuccess: () => toast({ message: `${titulo}: ${settleDone(kind)}.`, tone: 'success' }),
         // otimista sem rollback visível faz o usuário achar que pagou
         onError: () => toast({ message: `Não deu para dar baixa em ${titulo}.`, tone: 'error' }),
       }
@@ -373,7 +373,7 @@ export default function ForecastScreen() {
                     // aqui escrevia "Paguei: Aluguel" embaixo de "Aluguel".
                     label: settleLabel(receita ? 'income' : 'expense'),
                     icon: 'checkmark.circle',
-                    onPress: () => pagar(b.ref_id, b.title),
+                    onPress: () => pagar(b.ref_id, b.title, b.kind),
                   },
                   {
                     label: 'Editar',

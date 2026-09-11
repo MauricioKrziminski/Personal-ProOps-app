@@ -32,7 +32,7 @@ import { useSession } from '@/hooks/use-session';
 import { useTheme } from '@/hooks/use-theme';
 import { greetingBR, isoToBR } from '@/lib/dates';
 import { showItemActions } from '@/lib/item-actions';
-import { settleLabel } from '@/lib/settle-labels';
+import { settleDone, settleLabel } from '@/lib/settle-labels';
 import { Fonts } from '@/constants/theme';
 
 /** Um orçamento entra na seção "passando do orçamento" a partir de 80% consumido. */
@@ -126,11 +126,11 @@ export default function TodayScreen() {
     tight.length === 0 &&
     !captured;
 
-  const pay = (id: string, title: string) =>
+  const pay = (id: string, title: string, kind: string | null | undefined) =>
     markPaid.mutate(
       { id, paidAt: localISODate() },
       {
-        onSuccess: () => toast({ message: `${title} marcado como pago.`, tone: 'success' }),
+        onSuccess: () => toast({ message: `${title}: ${settleDone(kind)}.`, tone: 'success' }),
         onError: () => toast({ message: `Não deu para dar baixa em ${title}.`, tone: 'error' }),
       }
     );
@@ -256,7 +256,7 @@ export default function TodayScreen() {
           }
           onPress={() =>
             showItemActions('Mais opções', [
-              { label: 'Projeção de caixa', icon: 'chart.line.uptrend.xyaxis', onPress: () => router.push('/finance/forecast') },
+              { label: 'Projeção', icon: 'chart.line.uptrend.xyaxis', onPress: () => router.push('/finance/forecast') },
               { label: 'Entradas e saídas', icon: 'calendar', onPress: () => router.push('/finance/month') },
               { label: 'Patrimônio', icon: 'building.columns', onPress: () => router.push('/finance/net-worth') },
               { label: 'Metas', icon: 'target', onPress: () => router.push('/finance/goals') },
@@ -306,13 +306,13 @@ export default function TodayScreen() {
         {/* 3. O que já venceu. */}
         {bills.isError ? (
           <View style={styles.section}>
-            <SectionHead title="Atrasado / atenção" inset={false} />
+            <SectionHead title="Atrasado" inset={false} />
             <ErrorCard onRetry={() => bills.refetch()} />
           </View>
         ) : overdue.length > 0 ? (
           <View style={styles.section}>
             <SectionHead
-              title="Atrasado / atenção"
+              title="Atrasado"
               inset={false}
               action={
                 <ThemedText type="caption" themeColor="textSecondary">
@@ -384,7 +384,7 @@ export default function TodayScreen() {
                     } else if (b.kind === 'debt') {
                       router.push('/finance/debts');
                     } else {
-                      pay(b.ref_id, b.title);
+                      pay(b.ref_id, b.title, b.kind);
                     }
                   }}
                 />
@@ -466,7 +466,7 @@ export default function TodayScreen() {
                     } else if (b.kind === 'debt') {
                       router.push('/finance/debts');
                     } else {
-                      pay(b.ref_id, b.title);
+                      pay(b.ref_id, b.title, b.kind);
                     }
                   }}
                 />
@@ -529,7 +529,7 @@ export default function TodayScreen() {
                   icon="checkmark"
                   size="sm"
                   variant="secondary"
-                  onPress={() => pay(b.ref_id, b.title)}
+                  onPress={() => pay(b.ref_id, b.title, b.kind)}
                 />
               </Pressable>
             ))}
@@ -596,7 +596,7 @@ export default function TodayScreen() {
         {/* 5. Orçamento apertado — barra em `warning`/`danger`, que é ESTADO a resolver. */}
         {tight.length > 0 ? (
           <View style={styles.section}>
-            <SectionHead title="Passando do orçamento" inset={false} />
+            <SectionHead title="Passando do limite" inset={false} />
             {tight.map((b) => {
               const spent = Number(b.spent_cents);
               const limit = Number(b.limit_cents);
@@ -616,7 +616,7 @@ export default function TodayScreen() {
                         {b.category}
                       </ThemedText>
                       <ThemedText type="caption" themeColor="textSecondary">
-                        {`Teto do mês: ${formatBRL(limit)}`}
+                        {`Limite do mês: ${formatBRL(limit)}`}
                       </ThemedText>
                     </View>
                     <ThemedText type="ticker" themeColor={left < 0 ? 'danger' : 'text'} style={tabular}>
@@ -665,7 +665,7 @@ export default function TodayScreen() {
                     {`“${captured.description ?? 'Lançamento por mensagem'}”`}
                   </ThemedText>
                   <ThemedText type="caption" themeColor="textSecondary">
-                    Registrado pela IA do ProOps
+                    Registrado pelo agente
                   </ThemedText>
                 </View>
                 <View style={[styles.amountBadge, { backgroundColor: theme.surfaceRaised }]}>

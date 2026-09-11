@@ -14,17 +14,34 @@ import { Screen } from '@/components/ui/screen';
  * Agrupar não é enfeite: doze linhas seguidas se leem como parede, e a pessoa que veio ver a
  * fatura não deveria passar o olho por "Relatórios e IR" no caminho.
  */
-type ManageItem = { title: string; icon: SymbolViewProps['name']; href: Href };
+/**
+ * ⚠️ **O `title` é o título da tela de DESTINO, palavra por palavra.**
+ *
+ * Nove linhas daqui prometiam um nome e entregavam outro — você tocava em "Contas e carteiras"
+ * e chegava em "Contas", tocava em "Plano e família" e chegava em "Plano" (e "família" não
+ * existe em lugar nenhum do app; o equivalente chama-se "Pessoas"). Para quem não construiu o
+ * app isso é a dúvida "cliquei errado?" nove vezes, e quem manda é o `_layout.tsx`: é o nome
+ * dele que aparece no header e no botão voltar.
+ *
+ * O que a linha precisa dizer A MAIS vai no `subtitle`, que é onde contexto cabe sem disputar
+ * com o nome do lugar.
+ */
+type ManageItem = {
+  title: string;
+  subtitle?: string;
+  icon: SymbolViewProps['name'];
+  href: Href;
+};
 
 const GROUPS: { title: string; items: ManageItem[] }[] = [
   {
     title: 'Dia a dia',
     items: [
-      { title: 'Todos os lançamentos', icon: 'list.bullet', href: '/finance/transactions' },
-      { title: 'Contas e carteiras', icon: 'wallet.pass', href: '/finance/accounts' },
-      { title: 'Cartões e faturas', icon: 'creditcard', href: '/finance/cards' },
-      { title: 'Faturas anteriores', icon: 'calendar', href: '/finance/invoices' },
-      { title: 'Compras parceladas', icon: 'creditcard.and.123', href: '/finance/installments' },
+      { title: 'Lançamentos', subtitle: 'Tudo que entrou e saiu, com filtros', icon: 'list.bullet', href: '/finance/transactions' },
+      { title: 'Contas', subtitle: 'Contas correntes, poupança e dinheiro', icon: 'wallet.pass', href: '/finance/accounts' },
+      { title: 'Cartões', subtitle: 'Limite, fechamento e a fatura de cada um', icon: 'creditcard', href: '/finance/cards' },
+      { title: 'Faturas', subtitle: 'As que já fecharam e as que estão por vir', icon: 'calendar', href: '/finance/invoices' },
+      { title: 'Parceladas', subtitle: 'Suas compras parceladas e o que falta pagar', icon: 'creditcard.and.123', href: '/finance/installments' },
     ],
   },
   {
@@ -32,7 +49,7 @@ const GROUPS: { title: string; items: ManageItem[] }[] = [
     items: [
       { title: 'Orçamentos', icon: 'chart.pie', href: '/finance/budgets' },
       { title: 'Metas', icon: 'target', href: '/finance/goals' },
-      { title: 'Dívidas e financiamentos', icon: 'dollarsign.circle', href: '/finance/debts' },
+      { title: 'Dívidas', subtitle: 'Empréstimos e financiamentos, com os juros', icon: 'dollarsign.circle', href: '/finance/debts' },
       { title: 'Recorrentes', icon: 'arrow.triangle.2.circlepath', href: '/finance/recurring' },
     ],
   },
@@ -41,7 +58,7 @@ const GROUPS: { title: string; items: ManageItem[] }[] = [
     items: [
       { title: 'Entradas e saídas', icon: 'calendar', href: '/finance/month' },
       { title: 'Patrimônio', icon: 'building.columns', href: '/finance/net-worth' },
-      { title: 'Relatórios e IR', icon: 'chart.bar', href: '/finance/reports' },
+      { title: 'Relatórios', subtitle: 'Exportar o ano, inclusive para o IR', icon: 'chart.bar', href: '/finance/reports' },
     ],
   },
   {
@@ -53,12 +70,12 @@ const GROUPS: { title: string; items: ManageItem[] }[] = [
     title: 'Entrada de dados',
     items: [
       { title: 'Importar extrato', icon: 'square.and.arrow.down', href: '/import' },
-      { title: 'Regras de categoria', icon: 'line.3.horizontal.decrease', href: '/finance/rules' },
+      { title: 'Regras', subtitle: 'Categoria automática por palavra', icon: 'line.3.horizontal.decrease', href: '/finance/rules' },
     ],
   },
   {
     title: 'Conta',
-    items: [{ title: 'Plano e família', icon: 'person.2', href: '/finance/plan' }],
+    items: [{ title: 'Plano', subtitle: 'Assinatura e quem mais usa com você', icon: 'person.2', href: '/finance/plan' }],
   },
 ];
 
@@ -73,6 +90,7 @@ export default function ManageScreen() {
             <Row
               key={item.title}
               title={item.title}
+              subtitle={item.subtitle}
               icon={item.icon}
               onPress={() => router.push(item.href)}
             />

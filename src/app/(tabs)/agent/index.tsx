@@ -65,13 +65,13 @@ export default function AgentScreen() {
           onPress: () => setRenomeando(conversa),
         },
         {
-          label: 'Excluir',
+          label: 'Apagar',
           icon: 'trash',
           destructive: true,
           onPress: () =>
             confirmDestructive(
               'Excluir conversa?',
-              'Excluir',
+              'Apagar',
               () =>
                 excluir.mutate(conversa.id, {
                   onError: () =>
@@ -103,7 +103,7 @@ export default function AgentScreen() {
             icon="exclamationmark.triangle"
             title="Não consegui carregar suas conversas"
             hint="Confere a conexão e tenta de novo."
-            action={{ label: 'Tentar novamente', onPress: () => lista.refetch() }}
+            action={{ label: 'Tentar de novo', onPress: () => lista.refetch() }}
           />
         </View>
       ) : conversas.length === 0 ? (

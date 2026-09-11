@@ -41,7 +41,7 @@ import {
 } from '@/hooks/use-finance';
 import { formatBRL, formatDateBR, localISODate } from '@/hooks/use-items';
 import { confirmDestructive } from '@/lib/item-actions';
-import { dueInline, settleLabel } from '@/lib/settle-labels';
+import { dueInline, settleDone, settleLabel } from '@/lib/settle-labels';
 import { useDebounced } from '@/hooks/use-debounced';
 import { useTheme, useScheme } from '@/hooks/use-theme';
 import { accountLabel } from '@/lib/accounts';
@@ -70,10 +70,18 @@ const KIND_OPTIONS = [
   { value: 'transfer', label: 'Transf.' },
 ] as const satisfies readonly { value: TransactionKind | 'all'; label: string }[];
 
+/**
+ * ⚠️ **"Efetivado" é palavra de extrato bancário, e o app já usava OUTRA para a mesma coisa.**
+ *
+ * O botão que muda este estado diz **"Paguei"** / **"Recebi"** (`settle-labels.ts`), e o
+ * formulário chama os dois lados de **"Já aconteceu"** / **"Ainda vai acontecer"**
+ * (`transaction-form.tsx`). Eram três vocabulários para um campo só (`status`). Estes chips
+ * passam a falar a língua do formulário — quem filtra e quem cadastra dizem o mesmo.
+ */
 const STATUS_OPTIONS: { value: 'all' | 'pending' | 'cleared'; label: string }[] = [
   { value: 'all', label: 'Todos' },
-  { value: 'pending', label: 'Previstos' },
-  { value: 'cleared', label: 'Efetivados' },
+  { value: 'pending', label: 'Ainda vai acontecer' },
+  { value: 'cleared', label: 'Já aconteceu' },
 ];
 
 /** Rótulo da ORIGEM como filtro. `SOURCE_LABEL` é o subtítulo da linha e deixa `app` vazio. */
@@ -251,7 +259,7 @@ export default function TransactionsScreen() {
     markPaid.mutate(
       { id: tx.id, paidAt: localISODate() },
       {
-        onSuccess: () => toast({ message: 'Dei baixa no lançamento.', tone: 'success' }),
+        onSuccess: () => toast({ message: `${tx.description}: ${settleDone(tx.kind)}.`, tone: 'success' }),
         onError: () => toast({ message: 'Não deu para dar baixa. Tenta de novo.', tone: 'error' }),
       }
     );
@@ -305,7 +313,7 @@ export default function TransactionsScreen() {
         </View>
       ) : (
         <Card style={styles.summary}>
-          <HeroLabel>Sobra de {monthTitle(month)}</HeroLabel>
+          <HeroLabel>Sobrou em {monthTitle(month)}</HeroLabel>
           <Money cents={income - expense} variant="money" tone={income - expense < 0 ? 'danger' : 'text'} />
           <View style={styles.summaryFacts}>
             <ThemedText type="small" themeColor="textSecondary" style={tabular}>
@@ -460,7 +468,7 @@ export default function TransactionsScreen() {
               onPress: () => router.push('/import'),
             },
             {
-              label: 'Regras de categoria',
+              label: 'Regras',
               icon: 'line.3.horizontal.decrease',
               onPress: () => router.push('/finance/rules'),
             },
@@ -658,7 +666,9 @@ const styles = StyleSheet.create({
   filters: {
     gap: Space.sm,
   },
-  statusChips: { flexDirection: 'row', gap: Space.sm },
+  // `flexWrap` porque os rótulos passaram a ser frases ("Ainda vai acontecer"): cabem numa
+  // linha a 384dp e descem para a segunda com fonte grande, em vez de sair pela borda.
+  statusChips: { flexDirection: 'row', gap: Space.sm, flexWrap: 'wrap' },
   dayHeader: {
     flexDirection: 'row',
     alignItems: 'center',

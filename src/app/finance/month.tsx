@@ -45,7 +45,7 @@ import {
   type Bucket,
   type GroupBy,
 } from '@/lib/month-view';
-import { settleLabel, unsettledLabel } from '@/lib/settle-labels';
+import { settleDone, settleLabel, unsettledLabel } from '@/lib/settle-labels';
 
 /**
  * Mês — "para onde foi o dinheiro deste mês, e como ele fechou?".
@@ -168,7 +168,7 @@ export default function MonthScreen() {
             darBaixa.mutate(
               { id: l.ref_id, paidAt: localISODate() },
               {
-                onSuccess: () => toast({ message: `${l.title} baixado.`, tone: 'success' }),
+                onSuccess: () => toast({ message: `${l.title}: ${settleDone(l.kind)}.`, tone: 'success' }),
                 onError: () => toast({ message: `Não deu para dar baixa em ${l.title}.`, tone: 'error' }),
               },
             ),

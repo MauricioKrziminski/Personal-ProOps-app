@@ -517,7 +517,7 @@ export default function FinanceScreen() {
             concealable
           onPress={() =>
             showItemActions('Mais opções', [
-              { label: 'Projeção de caixa', icon: 'chart.line.uptrend.xyaxis', onPress: () => router.push('/finance/forecast') },
+              { label: 'Projeção', icon: 'chart.line.uptrend.xyaxis', onPress: () => router.push('/finance/forecast') },
               { label: 'Entradas e saídas', icon: 'calendar', onPress: () => router.push({ pathname: '/finance/month', params: { month } }) },
               { label: 'Patrimônio', icon: 'building.columns', onPress: () => router.push('/finance/net-worth') },
               { label: 'Metas', icon: 'target', onPress: () => router.push('/finance/goals') },
@@ -563,8 +563,8 @@ export default function FinanceScreen() {
       */}
       <Section>
         <Row
-          title="E se…?"
-          subtitle="Saldo mês a mês, carregando a sobra — e suponha uma entrada ou saída"
+          title="Projeção"
+          subtitle="Saldo mês a mês, carregando a sobra — e “e se…?” para supor uma entrada ou saída"
           icon="questionmark.circle"
           onPress={() => router.push('/finance/forecast')}
         />
@@ -619,7 +619,7 @@ export default function FinanceScreen() {
               href="/finance/budgets"
               count={
                 budgets.data
-                  ? `${budgets.data.length} ${budgets.data.length === 1 ? 'teto' : 'tetos'}`
+                  ? `${budgets.data.length} ${budgets.data.length === 1 ? 'limite' : 'limites'}`
                   : undefined
               }
             />
@@ -1059,7 +1059,7 @@ export default function FinanceScreen() {
         icon="plus"
         onPress={() => showItemActions('Lançar', [
           { label: 'Gasto ou receita', onPress: () => router.push({ pathname: '/finance/transaction-form', params: { month } }) },
-          { label: 'Despesa ou receita recorrente', onPress: () => router.push({ pathname: '/finance/recurring', params: { create: '1' } }) },
+          { label: 'Gasto ou receita que se repete', onPress: () => router.push({ pathname: '/finance/recurring', params: { create: '1' } }) },
           { label: 'Financiamento', onPress: () => router.push({ pathname: '/finance/debts', params: { create: 'financing' } }) },
         ])}
         style={[

@@ -99,7 +99,7 @@ const COMPONENTES: {
   },
   {
     key: 'liabilities_cents',
-    title: 'Passivos',
+    title: 'O que eu devo',
     subtitle: 'fatura aberta e dívidas',
     icon: 'creditcard',
     passivo: true,
@@ -398,7 +398,7 @@ export default function NetWorthScreen() {
       ) : saude.data ? (
         <Section title="Saúde financeira">
           <Row
-            title="Score"
+            title="Nota"
             subtitle="de 0 a 100"
             trailing={
               <ThemedText
@@ -420,10 +420,15 @@ export default function NetWorthScreen() {
               }
             />
           </View>
-          {/* Os pesos são o que diz ao usuário O QUE MEXER — antes era um parágrafo corrido. */}
+          {/*
+            O peso é o que diz ao usuário O QUE MEXER primeiro — antes era um parágrafo corrido.
+            Ele fica, mas escrito em português: "peso 40 pts" é a unidade do ALGORITMO e não
+            significava nada para quem lê ("peso de quê? pts de quê?"). "vale 40 pontos" diz a
+            mesma coisa com as palavras da nota que está logo acima.
+          */}
           <Row
             title="Poupança"
-            subtitle="peso 40 pts"
+            subtitle="vale 40 pontos"
             trailing={
               <ThemedText type="small" style={tabular}>
                 {formatNumberBR(saude.data.savings_rate)}%
@@ -431,8 +436,8 @@ export default function NetWorthScreen() {
             }
           />
           <Row
-            title="Orçamentos respeitados"
-            subtitle="peso 25 pts"
+            title="Limites respeitados"
+            subtitle="vale 25 pontos"
             trailing={
               <ThemedText type="small" style={tabular}>
                 {formatNumberBR(saude.data.budget_adherence)}%
@@ -441,7 +446,7 @@ export default function NetWorthScreen() {
           />
           <Row
             title="Reserva"
-            subtitle="peso 20 pts"
+            subtitle="vale 20 pontos"
             trailing={
               <ThemedText type="small" style={tabular}>
                 {formatNumberBR(saude.data.months_of_reserve)} meses
@@ -449,8 +454,8 @@ export default function NetWorthScreen() {
             }
           />
           <Row
-            title="Dívida sobre a renda"
-            subtitle="peso 15 pts"
+            title="Quanto da renda vai para dívida"
+            subtitle="vale 15 pontos"
             trailing={
               <ThemedText type="small" style={tabular}>
                 {formatNumberBR(saude.data.debt_ratio)}%
@@ -471,7 +476,7 @@ export default function NetWorthScreen() {
 
       {ativos.length > 0 ? <Section title="Bens">{ativos.map(linhaBem)}</Section> : null}
       {passivos.length > 0 ? (
-        <Section title="Passivos">{passivos.map(linhaBem)}</Section>
+        <Section title="O que eu devo">{passivos.map(linhaBem)}</Section>
       ) : null}
 
       <Section>

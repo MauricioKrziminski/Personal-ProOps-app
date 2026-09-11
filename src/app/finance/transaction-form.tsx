@@ -399,7 +399,7 @@ function TransactionForm({ editing }: { editing?: Transaction }) {
         {editing?.debt_id ? (
           <Card>
             <ThemedText type="small" themeColor="textSecondary">Pagamento de dívida. Correções de valor recalculam o saldo somente no pagamento mais recente com histórico de amortização.</ThemedText>
-            <Button label="Dívidas e financiamentos" variant="ghost" size="sm" onPress={() => router.push('/finance/debts')} />
+            <Button label="Dívidas" variant="ghost" size="sm" onPress={() => router.push('/finance/debts')} />
           </Card>
         ) : null}
         {!editing ? (

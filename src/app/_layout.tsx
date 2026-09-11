@@ -261,7 +261,7 @@ function AppTree() {
                   <Stack.Screen name="finance/net-worth" options={{ title: 'Patrimônio' }} />
                   <Stack.Screen name="finance/rules" options={{ title: 'Regras' }} />
                   <Stack.Screen name="finance/manage" options={{ title: 'Gerenciar' }} />
-                  <Stack.Screen name="finance/plan" options={{ title: 'Plano e família' }} />
+                  <Stack.Screen name="finance/plan" options={{ title: 'Plano' }} />
 
                   {/* Sem título: o da nota é o conteúdo dela, e um provisório faria a barra
                       trocar de texto na frente do usuário. */}

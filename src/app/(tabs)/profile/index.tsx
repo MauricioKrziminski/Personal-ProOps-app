@@ -459,7 +459,7 @@ export default function ProfileScreen() {
 
       <Section title="Dados">
         <Row title="Lixeira de notas" icon="trash" onPress={() => router.push('/notes/trash')} />
-        <Row title="Regras de categoria" icon="wand.and.stars" onPress={() => router.push('/finance/rules')} />
+        <Row title="Regras" subtitle="Categoria automática por palavra" icon="wand.and.stars" onPress={() => router.push('/finance/rules')} />
         <Row title="Importar extrato" icon="square.and.arrow.down" onPress={() => router.push('/import')} />
         <Row title="Importações" subtitle="histórico e revisões pendentes" icon="clock.arrow.circlepath" onPress={() => router.push('/import-history')} />
       </Section>

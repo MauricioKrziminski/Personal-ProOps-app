@@ -22,6 +22,18 @@ export function settleLabel(kind: SettleKind | string | null | undefined): strin
   return kind === 'income' ? 'Recebi' : kind === 'transfer' ? 'Concluí' : 'Paguei';
 }
 
+/**
+ * O que o toast responde depois da baixa — o PARTICÍPIO do mesmo verbo do botão.
+ *
+ * As cinco telas respondiam cada uma de um jeito ("marcado como pago", "baixado", "Dei baixa
+ * no lançamento"), e nenhum deles era o verbo que a pessoa tinha acabado de apertar. Pior:
+ * "dar baixa" é jargão de contas a pagar e "baixado" ainda lê como download. Quem apertou
+ * "Recebi" não recebe "marcado como pago" — um salário não é pago por você.
+ */
+export function settleDone(kind: SettleKind | string | null | undefined): string {
+  return kind === 'income' ? 'recebido' : kind === 'transfer' ? 'concluído' : 'pago';
+}
+
 /** O rótulo acessível da ação, com o item nomeado. */
 export function settleAccessibilityLabel(
   kind: SettleKind | string | null | undefined,

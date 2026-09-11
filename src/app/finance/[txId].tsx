@@ -33,7 +33,7 @@ import {
 } from '@/hooks/use-finance';
 import { formatBRL, formatDateBR, localISODate } from '@/hooks/use-items';
 import { confirmDestructive } from '@/lib/item-actions';
-import { dueLabel, settleHint, settleLabel } from '@/lib/settle-labels';
+import { dueLabel, settleDone, settleHint, settleLabel } from '@/lib/settle-labels';
 
 /**
  * Lançamento (detalhe) — a tela que faltava.
@@ -330,7 +330,7 @@ export default function TransactionDetailScreen() {
                       // ficar aqui mostraria "esse lançamento não existe mais" logo após dar certo.
                       onSuccess: () => {
                         router.back();
-                        toast({ message: 'Dei baixa.', tone: 'success' });
+                        toast({ message: `${tx.description}: ${settleDone(tx.kind)}.`, tone: 'success' });
                       },
                       onError: () =>
                         toast({ message: 'Não deu para dar baixa. Tenta de novo.', tone: 'error' }),

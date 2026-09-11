@@ -170,7 +170,7 @@ export default function GoalsScreen() {
           setAporte(null);
         },
         // o sheet FICA aberto com o valor: fechar num erro faz o usuário achar que guardou
-        onError: () => toast({ message: 'Não deu para registrar o aporte.', tone: 'error' }),
+        onError: () => toast({ message: 'Não deu para guardar.', tone: 'error' }),
       }
     );
   };
@@ -179,8 +179,8 @@ export default function GoalsScreen() {
     deposit.mutate(
       { goal, amountCents: -amountCents, note: 'estorno' },
       {
-        onSuccess: () => toast({ message: 'Aporte desfeito.', tone: 'success' }),
-        onError: () => toast({ message: 'Não deu para desfazer o aporte.', tone: 'error' }),
+        onSuccess: () => toast({ message: 'Depósito desfeito.', tone: 'success' }),
+        onError: () => toast({ message: 'Não deu para desfazer.', tone: 'error' }),
       }
     );
 
@@ -193,12 +193,12 @@ export default function GoalsScreen() {
           onSuccess: () => toast({ message: `${g.name} arquivada.`, tone: 'success' }),
           onError: () => toast({ message: `Não deu para arquivar ${g.name}.`, tone: 'error' }),
         }),
-      'A meta sai da lista. Os aportes ficam no histórico.'
+      'A meta sai da lista. O que você guardou fica no histórico.'
     );
 
   const acoes = (g: Goal) =>
     showItemActions(g.name, [
-      { label: 'Aportar', onPress: () => abrirAporte(g) },
+      { label: 'Guardar', onPress: () => abrirAporte(g) },
       { label: 'Editar', onPress: () => abrirEdicao(g) },
       { label: 'Ver extrato', onPress: () => setExtrato(g) },
       { label: 'Arquivar', destructive: true, onPress: () => arquivar(g) },
@@ -279,7 +279,7 @@ export default function GoalsScreen() {
             ) : null}
 
             {!concluida ? (
-              <Button label="Aportar" size="sm" variant="secondary" onPress={() => abrirAporte(g)} />
+              <Button label="Guardar" size="sm" variant="secondary" onPress={() => abrirAporte(g)} />
             ) : null}
           </Card>
         </Pressable>
@@ -463,12 +463,12 @@ export default function GoalsScreen() {
                     title={isoToBR(c.occurred_at)}
                     subtitle={c.note ?? undefined}
                     chevron={false}
-                    accessibilityLabel={`${isoToBR(c.occurred_at)}, ${Number(c.amount_cents) < 0 ? 'retirada' : 'aporte'} de ${formatBRL(Math.abs(Number(c.amount_cents)))}`}
+                    accessibilityLabel={`${isoToBR(c.occurred_at)}, ${Number(c.amount_cents) < 0 ? 'retirada' : 'depósito'} de ${formatBRL(Math.abs(Number(c.amount_cents)))}`}
                     onLongPress={() =>
                       extrato &&
                       showItemActions(isoToBR(c.occurred_at), [
                         {
-                          label: 'Desfazer aporte',
+                          label: 'Desfazer',
                           destructive: true,
                           onPress: () => desfazerAporte(extrato, Number(c.amount_cents)),
                         },
@@ -487,10 +487,10 @@ export default function GoalsScreen() {
             (contribuicoes.data ?? []).length === 0 ? (
               <EmptyState
                 icon="tray"
-                title="Nenhum aporte ainda"
+                title="Você ainda não guardou nada"
                 hint="O primeiro pode ser agora."
                 action={{
-                  label: 'Aportar',
+                  label: 'Guardar',
                   onPress: () => {
                     const meta = extrato;
                     setExtrato(null);

@@ -414,7 +414,7 @@ export default function BudgetsScreen() {
         }}
       />
 
-      <HeaderActions actions={[{ label: 'Novo orçamento', icon: 'plus', onPress: () => abrirNovo() }]} />
+      <HeaderActions actions={[{ label: 'Novo limite', icon: 'plus', onPress: () => abrirNovo() }]} />
 
       <PeriodBar month={month} onChangeMonth={setMonth} ruler={regua} />
 
@@ -433,7 +433,7 @@ export default function BudgetsScreen() {
       ) : linhas.length > 0 ? (
         <Animated.View entering={FadeInDown.duration(Motion.duration.slow)}>
           <Card style={styles.hero}>
-            <HeroLabel>Sobrou do mês</HeroLabel>
+            <HeroLabel>Ainda dá para gastar</HeroLabel>
             <Money
               cents={limite - gasto}
               variant="money"
@@ -528,7 +528,7 @@ export default function BudgetsScreen() {
           <View style={styles.sheetHead}>
             <Button label="Cancelar" variant="ghost" size="sm" onPress={() => setForm(null)} />
             <ThemedText type="smallBold">
-              {form?.editing ? 'Editar limite' : 'Novo orçamento'}
+              {form?.editing ? 'Editar limite' : 'Novo limite'}
             </ThemedText>
             <Button
               label="Salvar"

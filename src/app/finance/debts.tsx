@@ -287,7 +287,7 @@ export default function DebtsScreen() {
 
   const acoes = (d: Debt) =>
     showItemActions(d.name, [
-      { label: 'Ver amortização', onPress: () => setDetalhe(d) },
+      { label: 'Ver as parcelas', onPress: () => setDetalhe(d) },
       { label: 'Editar', onPress: () => abrirEdicao(d) },
       { label: 'Arquivar', destructive: true, onPress: () => arquivar(d) },
     ]);
@@ -337,7 +337,7 @@ export default function DebtsScreen() {
       refreshing={debts.isRefetching || payoff.isRefetching || accounts.isRefetching || schedule.isRefetching}>
       <Stack.Screen
         options={{
-          title: 'Dívidas e financiamentos',
+          title: 'Dívidas',
           headerLargeTitle: true,
         }}
       />
@@ -386,8 +386,8 @@ export default function DebtsScreen() {
           <ThemedText type="smallBold">Por onde começar</ThemedText>
           <Segmented
             options={[
-              { value: 'avalanche', label: 'Mais juros' },
-              { value: 'snowball', label: 'Menor saldo' },
+              { value: 'avalanche', label: 'Juros mais altos' },
+              { value: 'snowball', label: 'Dívida mais curta' },
             ]}
             value={estrategia}
             onChange={setEstrategia}
@@ -693,7 +693,7 @@ export default function DebtsScreen() {
           {form ? (
             <ScrollView contentContainerStyle={styles.sheetBody} keyboardShouldPersistTaps="handled">
               {!form.id && <Segmented
-                options={[{ value: 'fixed_installments', label: 'Simples' }, { value: 'amortized', label: 'Detalhado' }]}
+                options={[{ value: 'fixed_installments', label: 'Parcela fixa' }, { value: 'amortized', label: 'Com juros ao mês' }]}
                 value={form.calculationMode}
                 onChange={(calculationMode) => setForm({ ...form, calculationMode })}
               />}
