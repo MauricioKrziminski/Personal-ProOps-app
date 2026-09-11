@@ -11,6 +11,14 @@
 \set ON_ERROR_STOP on
 begin;
 
+set local timezone to 'America/Sao_Paulo';
+-- ⚠️ O relógio do teste tem que ser o MESMO do negócio.
+-- Desde a `20260911030000` as funções financeiras avaliam `current_date` em BRT
+-- (`alter function ... set timezone`), enquanto a sessão continua em UTC. Das 21h à meia-noite
+-- as duas datas diferem, e um teste que compara "o dia 0 da projeção" com o `current_date` da
+-- SESSÃO falha por um dia — sem nada de errado no código. Foi o que aconteceu com
+-- `draft_scenario`, `agent_migrations` e `alert_channels` em 10/09/2026 às 21h.
+
 -- O MESMO upsert que `agent/app/db.py::ensure_session` executa, com uma diferença
 -- que importa saber: aqui a janela de inatividade é **6h fixas**, enquanto o
 -- db.py lê `SESSION_IDLE_HOURS` do config. Mexeu no env var, mexe aqui também.
@@ -177,7 +185,17 @@ begin
   assert public.routes_to_python('5551992553295'), 'não casou com o número cadastrado';
   assert public.routes_to_python('555192553295'), 'não casou sem o 9º dígito (a Meta manda assim)';
   assert public.routes_to_python('+55 (51) 99255-3295'), 'não casou com o número formatado';
-  assert not public.routes_to_python('5511999998888'), 'roteou um número que não está na flag';
+
+  -- ⚠️ **O PADRÃO INVERTEU quando o corte Strangler terminou (09/09/2026), e esta asserção
+  -- ficou vermelha cobrando o mundo antigo.** Enquanto existia Deno, telefone sem linha na
+  -- tabela ia para o Deno; hoje `routes_to_python` é `coalesce(bool_or(...), true)` — sem Deno
+  -- para onde mandar, número desconhecido VAI de Python. A tabela deixou de ser a lista de
+  -- quem entra e virou a lista de EXCEÇÕES.
+  assert public.routes_to_python('5511999998888'),
+    'número sem linha na tabela tem que ir de Python — não existe mais Deno para onde mandar';
+  insert into public.agent_routing (phone, use_python_agent) values ('5511999998888', false);
+  assert not public.routes_to_python('5511999998888'),
+    'linha explícita com false é a única exceção, e ela tem que vencer o padrão';
 end $$;
 
 -- ===========================================================================

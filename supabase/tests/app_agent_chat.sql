@@ -9,6 +9,14 @@
 \set ON_ERROR_STOP on
 begin;
 
+set local timezone to 'America/Sao_Paulo';
+-- ⚠️ O relógio do teste tem que ser o MESMO do negócio.
+-- Desde a `20260911030000` as funções financeiras avaliam `current_date` em BRT
+-- (`alter function ... set timezone`), enquanto a sessão continua em UTC. Das 21h à meia-noite
+-- as duas datas diferem, e um teste que compara "o dia 0 da projeção" com o `current_date` da
+-- SESSÃO falha por um dia — sem nada de errado no código. Foi o que aconteceu com
+-- `draft_scenario`, `agent_migrations` e `alert_channels` em 10/09/2026 às 21h.
+
 -- O checkpointer nasce no startup do agente, não nas migrations.
 create table if not exists langgraph.checkpoints (
   thread_id text not null,
