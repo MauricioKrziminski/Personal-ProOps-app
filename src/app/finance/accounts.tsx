@@ -9,6 +9,7 @@ import { HeaderActions } from '@/components/ui/header-actions';
 import { Sheet } from '@/components/ui/sheet';
 import { ItemLink } from '@/components/ui/item-link';
 import { Button } from '@/components/ui/button';
+import { AccountPicker } from '@/components/finance/account-picker';
 import { Card } from '@/components/ui/card';
 import { EmptyState } from '@/components/ui/empty-state';
 import { Field, MoneyField, TextField } from '@/components/ui/field';
@@ -586,7 +587,7 @@ export default function AccountsScreen() {
 
                   <Field
                     label="Juros do rotativo de partida (% ao mês)"
-                    hint="Serve de partida: na primeira cobrança real o app passa a usar a deste cartão."
+                    hint="Serve de partida: na primeira cobrança real o app passa a usar a taxa deste cartão."
                     error={
                       form.rotativoRate.trim() && !taxaValida(form.rotativoRate)
                         ? 'Use um número de 0 a 100, como 15,5'
@@ -611,31 +612,20 @@ export default function AccountsScreen() {
 
                   <Field
                     label="Conta que paga a fatura"
-                    hint="A fatura já vem com ela sugerida quando você for registrar o pagamento.">
-                    <Section>
-                      <Row
-                        title="Escolher na hora de pagar"
-                        onPress={() => setForm({ ...form, payerId: null })}
-                        trailing={
-                          form.payerId === null ? (
-                            <Icon name="checkmark" size="sm" color="tint" />
-                          ) : undefined
-                        }
-                      />
-                      {pagadoras.map((a) => (
-                        <Row
-                          key={a.id}
-                          title={a.name}
-                          icon={ICONE[a.type]}
-                          onPress={() => setForm({ ...form, payerId: a.id })}
-                          trailing={
-                            form.payerId === a.id ? (
-                              <Icon name="checkmark" size="sm" color="tint" />
-                            ) : undefined
-                          }
-                        />
-                      ))}
-                    </Section>
+                    hint="Já vem sugerida na hora de registrar o pagamento.">
+                    {/*
+                      `AccountPicker`, não uma `Section` de `Row` com checkmark:
+                      era a sexta implementação do mesmo campo no app, e ela nasce
+                      ABERTA — com seis contas, meia tela antes de o usuário pedir
+                      qualquer coisa. O seletor é o mesmo de todo lugar que escolhe
+                      conta, colapsado e com o glifo por tipo.
+                    */}
+                    <AccountPicker
+                      accounts={pagadoras}
+                      value={form.payerId}
+                      onChange={(payerId) => setForm({ ...form, payerId })}
+                      emptyLabel="Escolher na hora de pagar"
+                    />
                   </Field>
                 </>
               ) : (
