@@ -565,7 +565,7 @@ export default function BudgetsScreen() {
                 label="Acumular sobra"
                 hint={
                   form.rollover
-                    ? 'O que sobrar de um mês soma no limite do mês seguinte. Um mês só — a sobra não empilha. E vale a partir do primeiro mês inteiro depois de você criar o orçamento.'
+                    ? 'A sobra do mês soma no limite do seguinte. Um mês só, sem empilhar.'
                     : 'Sem acúmulo: cada mês começa do zero.'
                 }>
                 <View style={styles.switchRow}>

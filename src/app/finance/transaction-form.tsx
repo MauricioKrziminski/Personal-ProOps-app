@@ -587,7 +587,7 @@ function TransactionForm({ editing }: { editing?: Transaction }) {
         {podeParcelar && installmentCount > 1 && (
           <Controller control={control} name="paid_installments" render={({ field }) => (
             <Field label="Quantas parcelas iniciais já foram pagas?" error={errors.paid_installments?.message}
-              hint="Informe zero se nenhuma foi paga. Datas passadas não significam pagamento; as demais parcelas ficam pendentes.">
+              hint="Zero se nenhuma foi paga. Data passada não conta como pagamento.">
               <View style={styles.chipRow}>
                 <Chip label="Nenhuma" selected={field.value === '0'} onPress={() => field.onChange('0')} />
                 <TextField value={field.value} onChangeText={field.onChange} keyboardType="number-pad" maxLength={2}

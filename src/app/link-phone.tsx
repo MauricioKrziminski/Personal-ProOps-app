@@ -9,9 +9,9 @@ import { AuthScreen } from '@/components/auth/auth-screen';
 import { OtpInput } from '@/components/auth/otp-input';
 import { PhoneField } from '@/components/auth/phone-field';
 import { ThemedText } from '@/components/themed-text';
+import { Note } from '@/components/ui/note';
 import { Button } from '@/components/ui/button';
 import { Field } from '@/components/ui/field';
-import { Icon } from '@/components/ui/icon';
 import { useToast } from '@/components/ui/toast';
 import { Motion, Space } from '@/design/tokens';
 import { useSession } from '@/hooks/use-session';
@@ -193,20 +193,14 @@ export default function LinkPhoneScreen() {
             />
           </Field>
 
-          <View style={styles.note}>
-            <Icon name="bubble.left" size="sm" color="textSecondary" />
-            <ThemedText type="footnote" themeColor="textSecondary" style={styles.noteText}>
-              O código de 6 dígitos chega pelo WhatsApp. Não compartilhe com ninguém.
-            </ThemedText>
-          </View>
+          <Note icon="bubble.left">
+            O código de 6 dígitos chega pelo WhatsApp. Não compartilhe com ninguém.
+          </Note>
 
           {currentPhone ? (
-            <View style={styles.note}>
-              <Icon name="exclamationmark.circle" size="sm" color="textSecondary" />
-              <ThemedText type="footnote" themeColor="textSecondary" style={styles.noteText}>
-                Confirmações e rascunhos pendentes da conversa anterior serão descartados.
-              </ThemedText>
-            </View>
+            <Note icon="exclamationmark.circle">
+            Confirmações e rascunhos pendentes da conversa anterior serão descartados.
+          </Note>
           ) : null}
         </Animated.View>
       ) : (

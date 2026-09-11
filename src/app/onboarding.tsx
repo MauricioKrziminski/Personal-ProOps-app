@@ -1,17 +1,19 @@
 import { useState } from 'react';
 import { Stack, router } from 'expo-router';
-import { StyleSheet, TextInput, View } from 'react-native';
+import { StyleSheet, View } from 'react-native';
 
 import { AlertPreferencesSection } from '@/components/profile/alert-preferences-section';
 import { ThemedText } from '@/components/themed-text';
 import { Button } from '@/components/ui/button';
+import { Icon } from '@/components/ui/icon';
+import { Field, TextField } from '@/components/ui/field';
 import { Row, Section } from '@/components/ui/row';
 import { Screen } from '@/components/ui/screen';
 import { useToast } from '@/components/ui/toast';
-import { Space, Radius, Type } from '@/design/tokens';
+import { Space } from '@/design/tokens';
 import { useProfile, useUpdateProfile } from '@/hooks/use-profile';
 import { useSession } from '@/hooks/use-session';
-import { useTheme, useThemeMode, type ThemeMode } from '@/hooks/use-theme';
+import { useThemeMode, type ThemeMode } from '@/hooks/use-theme';
 import { supabase } from '@/lib/supabase';
 
 export default function OnboardingScreen() {
@@ -19,7 +21,6 @@ export default function OnboardingScreen() {
   const userId = session?.user.id;
   const profile = useProfile(userId);
   const updateProfile = useUpdateProfile(userId);
-  const theme = useTheme();
   const { mode, setMode } = useThemeMode();
   const toast = useToast();
   const [name, setName] = useState<string | null>(null);
@@ -52,25 +53,28 @@ export default function OnboardingScreen() {
           Escolha como prefere começar. Você pode mudar tudo depois no Perfil.
         </ThemedText>
       </View>
-      <View style={styles.intro}>
-        <ThemedText type="subtitle">Como podemos te chamar?</ThemedText>
-        <TextInput
+      {/*
+        `TextField`, não um `TextInput` cru com borda e `...Type.body` à mão: a
+        tela que escreve o próprio input escreve a própria versão de "campo
+        errado" logo depois, e este ficava visivelmente diferente de todo outro
+        campo do app (contorno cinza em vez da superfície com raio `sm`).
+      */}
+      <Field label="Como podemos te chamar?">
+        <TextField
           accessibilityLabel="Seu nome (opcional)"
           placeholder="Seu nome (opcional)"
-          placeholderTextColor={theme.textSecondary}
           value={name ?? profile.data?.display_name ?? ''}
           onChangeText={setName}
           maxLength={100}
           editable={!saving && !profile.isLoading && !profile.isError}
           autoCapitalize="words"
-          style={[styles.input, { color: theme.text, borderColor: theme.textSecondary }]}
         />
-      </View>
+      </Field>
       <Section title="Aparência">
         {([['system', 'Seguir o aparelho'], ['light', 'Claro'], ['dark', 'Escuro']] as const).map(([value, label]) => (
           <Row key={value} title={label} chevron={false}
             accessibilityState={{ selected: mode === value }}
-            trailing={mode === value ? <ThemedText>✓</ThemedText> : undefined}
+            trailing={mode === value ? <Icon name="checkmark" size="sm" color="tint" /> : undefined}
             onPress={() => setMode(value as ThemeMode)} />
         ))}
       </Section>
@@ -86,5 +90,4 @@ export default function OnboardingScreen() {
 const styles = StyleSheet.create({
   content: { gap: Space.xl, paddingTop: Space.xxxl, paddingBottom: Space.xxxl },
   intro: { gap: Space.sm },
-  input: { borderWidth: 1, borderRadius: Radius.md, padding: Space.md, ...Type.body, minHeight: 48 },
 });

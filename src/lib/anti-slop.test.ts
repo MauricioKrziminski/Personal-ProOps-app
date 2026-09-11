@@ -295,6 +295,75 @@ test('nenhuma leitura do app usa RPC de projeção linha-por-dia', () => {
  * precisa escolher conta usa `AccountPicker`; quem precisa escolher item de uma
  * lista curta usa `SelectField`.
  */
+/**
+ * Hint de `Field` cabe em DUAS linhas.
+ *
+ * `footnote` (13px) a 1,3× numa calha de 352dp dá ~44 caracteres por linha, então
+ * duas linhas são ~90. O recorde do app tinha **199** — quatro linhas —, e a tela
+ * de cartão empilhava cinco blocos assim. Foi a queixa literal do dono do
+ * produto: *"esses textos explicativos embaixo do botão não está bonito"*.
+ *
+ * Explicação que não cabe em duas linhas não é apoio a um campo: ou vira uma
+ * frase, ou o que sobra sobe para onde a decisão é tomada.
+ *
+ * ⚠️ O hint de `EmptyState` fica FORA: design.md §7 pede ali uma dica ACIONÁVEL
+ * (normalmente o atalho do WhatsApp), e ela é o conteúdo da tela vazia, não apoio
+ * a um campo. Por isso o teste procura `hint=` precedido de `<Field`.
+ */
+test('hint de Field cabe em duas linhas', () => {
+  const MAX = 90;
+  const longos: string[] = [];
+  for (const file of walk(SRC)) {
+    if (file.endsWith('.test.ts') || file.endsWith('.test.tsx')) continue;
+    const code = stripComments(readFileSync(file, 'utf8'));
+    // O literal vem COLADO no `hint=` (como `hint="..."` ou `hint={\`...\`}`), com no
+    // máximo um `{` e espaço no meio. Sem esta âncora o teste andava para dentro do
+    // JSX seguinte e media o código do próximo campo como se fosse texto.
+    for (const m of code.matchAll(/<Field\b[\s\S]{0,900}?\bhint=\s*\{?\s*(?:'([^']+)'|"([^"]+)"|`([^`]+)`)/g)) {
+      const texto = (m[1] ?? m[2] ?? m[3]).replace(/\s+/g, ' ').trim();
+      // Em hint dinâmico, o que conta é o texto FIXO: `${valor}` vira o número que
+      // ele representa, e medir a expressão mediria o código, não a frase.
+      const visivel = texto.replace(/\$\{[^}]*\}/g, '0,00');
+      if (visivel.length > MAX) {
+        longos.push(`${file.replace(SRC, 'src')}  ${visivel.length} ch: ${visivel.slice(0, 48)}…`);
+      }
+    }
+  }
+  assert.deepEqual(
+    longos,
+    [],
+    `hint acima de ${MAX} caracteres ocupa 3+ linhas a 1,3× em 384dp — vire uma frase`
+  );
+});
+
+/**
+ * Tamanho de texto não é composto na tela.
+ *
+ * `...Type.footnote` espalhado num `StyleSheet` de tela é como o helper text
+ * nasceu ad-hoc: o paywall escrevia `rodape: { ...Type.footnote }` só para chegar
+ * onde `<Note>` chega. `Type.x` LIDO (`Type.body.lineHeight` num `Skeleton`)
+ * continua valendo — o que não pode é ESPALHAR o token para montar uma variante
+ * nova de texto numa tela.
+ */
+test('nenhuma tela compõe variante de texto com spread de Type', () => {
+  const fora: string[] = [];
+  for (const file of walk(join(SRC, 'app'))) {
+    if (file.endsWith('.test.ts') || file.endsWith('.test.tsx')) continue;
+    stripComments(readFileSync(file, 'utf8'))
+      .split('\n')
+      .forEach((line, n) => {
+        if (/\.\.\.Type\.(body|subhead|callout|footnote|headline)\b/.test(line)) {
+          fora.push(`${file.replace(SRC, 'src')}:${n + 1}`);
+        }
+      });
+  }
+  assert.deepEqual(
+    fora,
+    [],
+    'use <ThemedText type=...> ou <Note>: variante de texto mora no primitivo'
+  );
+});
+
 test('nenhuma tela monta lista de conta à mão', () => {
   // Só o próprio seletor pode iterar contas para desenhar opção; `accounts.tsx`
   // é a tela que GERENCIA contas (ali a lista é o conteúdo, não um campo).

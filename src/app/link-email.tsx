@@ -10,9 +10,9 @@ import { z } from 'zod';
 import { AuthScreen } from '@/components/auth/auth-screen';
 import { OtpInput } from '@/components/auth/otp-input';
 import { ThemedText } from '@/components/themed-text';
+import { Note } from '@/components/ui/note';
 import { Button } from '@/components/ui/button';
 import { Field, TextField } from '@/components/ui/field';
-import { Icon } from '@/components/ui/icon';
 import { useToast } from '@/components/ui/toast';
 import { Motion, Space } from '@/design/tokens';
 import { useSession } from '@/hooks/use-session';
@@ -297,12 +297,9 @@ export default function LinkEmailScreen() {
             )}
           />
 
-          <View style={styles.note}>
-            <Icon name="lock" size="sm" color="textSecondary" />
-            <ThemedText type="footnote" themeColor="textSecondary" style={styles.noteText}>
-              Seu WhatsApp continua ligado à conta. Isto acrescenta um segundo jeito de entrar.
-            </ThemedText>
-          </View>
+          <Note icon="lock">
+            Seu WhatsApp continua ligado à conta. Isto acrescenta um segundo jeito de entrar.
+          </Note>
         </Animated.View>
       ) : (
         <Animated.View

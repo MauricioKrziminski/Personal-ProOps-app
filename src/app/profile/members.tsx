@@ -204,7 +204,7 @@ export default function MembersScreen() {
           <View style={styles.bloco}>
             <Field
               label="Convidar alguém"
-              hint="Quem entrar enxerga e lança no mesmo financeiro. O acesso entra sozinho quando a pessoa se cadastrar com esse número."
+              hint="Quem entrar enxerga e lança no mesmo financeiro."
             >
               <TextField
                 value={telefone}

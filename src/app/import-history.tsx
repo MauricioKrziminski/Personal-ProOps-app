@@ -13,7 +13,7 @@ import { Row, Section } from '@/components/ui/row';
 import { Screen } from '@/components/ui/screen';
 import { SkeletonRow } from '@/components/ui/skeleton';
 import { useToast } from '@/components/ui/toast';
-import { Motion, Space, Type } from '@/design/tokens';
+import { Motion, Space } from '@/design/tokens';
 import {
   useAccounts,
   useDeleteImportBatch,
@@ -237,7 +237,7 @@ export default function ImportHistoryScreen() {
       {/* Só com histórico: sem nenhuma importação a nota ficava órfã 200px abaixo do empty
           state, explicando o "Tentar de novo" de uma linha que não existe na tela. */}
       {lista.length > 0 ? (
-        <ThemedText type="small" themeColor="textSecondary" style={styles.rodape}>
+        <ThemedText type="footnote" themeColor="textSecondary" style={styles.rodape}>
           Os arquivos não ficam guardados — só os lançamentos que você confirmou. “Tentar de novo”
           pede o arquivo outra vez.
         </ThemedText>
@@ -260,8 +260,8 @@ const styles = StyleSheet.create({
     alignItems: 'flex-end',
     gap: Space.xs,
   },
+  /* Só o recuo: o TAMANHO vem de `type="footnote"` no próprio texto. */
   rodape: {
-    ...Type.footnote,
     paddingHorizontal: Space.lg,
   },
 });

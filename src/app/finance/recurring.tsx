@@ -691,7 +691,7 @@ export default function RecurringScreen() {
               {form.id ? null : (
               <Field
                 label="Começa em"
-                hint="É a âncora da série e não muda depois. Data no passado lança as ocorrências antigas de uma vez."
+                hint="Âncora da série, não muda depois. No passado, lança as antigas de uma vez."
                 error={form.inicio && !inicioOk ? 'Data inválida (dd/mm/aaaa)' : undefined}>
                 <TextField
                   value={form.inicio}
@@ -725,7 +725,7 @@ export default function RecurringScreen() {
               */}
               <Field
                 label="Termina em"
-                hint="Deixe em branco para não ter fim. Preencha só se a série acaba (um financiamento, por exemplo) — e nunca antes do início."
+                hint="Em branco não tem fim. Preencha só se a série acaba."
                 error={form.fim && !fimOk ? 'Informe data válida igual ou posterior ao início' : undefined}>
                 <TextField
                   value={form.fim}

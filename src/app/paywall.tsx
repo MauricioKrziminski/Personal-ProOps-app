@@ -8,6 +8,7 @@ import { ThemedText } from '@/components/themed-text';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Row, Section } from '@/components/ui/row';
+import { Note } from '@/components/ui/note';
 import { Screen } from '@/components/ui/screen';
 import { HeroLabel } from '@/components/ui/section-head';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -123,6 +124,13 @@ export default function PaywallScreen() {
               {plano.data.max_members === 1 ? 'pessoa' : 'pessoas'} ·{' '}
               {plano.data.can_import ? 'importação liberada' : 'importação bloqueada'}
             </ThemedText>
+            {/* Aqui, e não no rodapé: é informação para DECIDIR, e decidir se olha
+                ao lado do número que a qualifica. */}
+            <Note icon="checkmark.circle">
+              {plano.data.plan === 'free'
+                ? 'O Free continua funcionando, sem prazo.'
+                : 'Cancelar devolve ao Free e não apaga nada.'}
+            </Note>
           </Card>
         </Animated.View>
       ) : null}
@@ -174,24 +182,22 @@ export default function PaywallScreen() {
             block
           />
         )}
-        <ThemedText type="small" themeColor="textSecondary" style={styles.rodape}>
+        {/*
+          UMA linha depois do botão, não três parágrafos empilhados.
+          Eram três blocos de `type="small"` seguidos — o exemplo canônico da
+          queixa "esses textos explicativos embaixo do botão não está bonito".
+          A régua que ficou: texto que ajuda a DECIDIR vem antes do botão; texto
+          que tranquiliza sobre a CONSEQUÊNCIA vem depois, e é uma linha só.
+          O que o Free continua fazendo é informação para decidir, então subiu
+          para o card do plano, ao lado do número que ela qualifica.
+        */}
+        <Note icon={naWeb ? 'iphone' : 'clock'}>
           {naWeb
-            ? 'A compra acontece dentro do app, na App Store ou na Google Play. Por aqui dá só para comparar.'
-            : 'A compra pelas lojas ainda não está ligada neste app. Quando estiver, o preço aparece aqui vindo direto da App Store e da Google Play — é ele que vale, e ele muda por país e por promoção.'}
-        </ThemedText>
-        <ThemedText type="small" themeColor="textSecondary" style={styles.rodape}>
-          Cancelar é um toque, na própria loja, sem formulário e sem ligação. Cancelou, o plano
-          volta para o Free no fim do período e nada é apagado.
-        </ThemedText>
+            ? 'A compra acontece na App Store ou na Google Play. Por aqui dá para comparar.'
+            : 'A compra pelas lojas ainda não está ligada. Cancelar é um toque, na própria loja.'}
+        </Note>
       </View>
 
-      {plano.data ? (
-        <ThemedText type="small" themeColor="textSecondary" style={styles.rodape}>
-          {plano.data.plan === 'free'
-            ? `O Free continua funcionando: ${plano.data.max_members} ${plano.data.max_members === 1 ? 'pessoa' : 'pessoas'} e ${plano.data.max_ai_messages_month} mensagens por mês.`
-            : 'O Free continua existindo como estado padrão — cancelar não apaga nada do que você já registrou.'}
-        </ThemedText>
-      ) : null}
     </Screen>
   );
 }
@@ -207,8 +213,5 @@ const styles = StyleSheet.create({
     gap: Space.xs,
     borderWidth: 2,
     borderCurve: 'continuous',
-  },
-  rodape: {
-    ...Type.footnote,
   },
 });

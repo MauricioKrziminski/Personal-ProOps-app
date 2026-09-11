@@ -7,10 +7,10 @@ import Animated, { FadeInLeft, FadeInRight } from "react-native-reanimated";
 import { AuthScreen } from "@/components/auth/auth-screen";
 import { OtpInput } from "@/components/auth/otp-input";
 import { PhoneField } from "@/components/auth/phone-field";
+import { Note } from "@/components/ui/note";
 import { ThemedText } from "@/components/themed-text";
 import { Button } from "@/components/ui/button";
 import { Field } from "@/components/ui/field";
-import { Icon } from "@/components/ui/icon";
 import { Motion, Space } from "@/design/tokens";
 import { authErrorMessage } from "@/lib/auth-errors";
 import {
@@ -218,16 +218,9 @@ export function LoginScreen() {
             />
           </Field>
 
-          <View style={styles.note}>
-            <Icon name="bubble.left" size="sm" color="textSecondary" />
-            <ThemedText
-              type="footnote"
-              themeColor="textSecondary"
-              style={styles.noteText}
-            >
-              Você recebe um código de 6 dígitos no WhatsApp. Sem senha.
-            </ThemedText>
-          </View>
+          <Note icon="bubble.left">
+            Você recebe um código de 6 dígitos no WhatsApp. Sem senha.
+          </Note>
         </Animated.View>
       ) : (
         <Animated.View

@@ -24,7 +24,7 @@ import { Screen } from '@/components/ui/screen';
 import { HeroLabel, SectionHead } from '@/components/ui/section-head';
 import { Skeleton, SkeletonRow } from '@/components/ui/skeleton';
 import { useToast } from '@/components/ui/toast';
-import { Motion, Radius, Space, Type } from '@/design/tokens';
+import { Motion, Radius, Space } from '@/design/tokens';
 import { formatDateBR } from '@/hooks/use-items';
 import { confirmDestructive, showItemActions } from '@/lib/item-actions';
 import { SUGGESTED_CATEGORIES } from '@/lib/categories';
@@ -302,7 +302,7 @@ export default function ImportScreen() {
               onChange={setAccountId}
               emptyLabel="Sem conta"
             />
-            <ThemedText type="small" themeColor="textSecondary" style={styles.rodape}>
+            <ThemedText type="footnote" themeColor="textSecondary" style={styles.rodape}>
               Opcional — sem conta escolhida o lançamento nasce sem conta.
             </ThemedText>
           </View>
@@ -325,7 +325,7 @@ export default function ImportScreen() {
           block
         />
 
-        <ThemedText type="small" themeColor="textSecondary" style={styles.rodape}>
+        <ThemedText type="footnote" themeColor="textSecondary" style={styles.rodape}>
           Até {MAX_ITENS} lançamentos por arquivo.
         </ThemedText>
       </Screen>
@@ -421,7 +421,7 @@ export default function ImportScreen() {
       {repetidos.length > 0 ? (
         <View style={styles.bloco}>
           <Section title="Possíveis repetidos">{repetidos.map(linha)}</Section>
-          <ThemedText type="small" themeColor="textSecondary" style={styles.rodape}>
+          <ThemedText type="footnote" themeColor="textSecondary" style={styles.rodape}>
             Parecidos com algo que já está no seu financeiro. Dois cafés iguais no mesmo dia são
             legítimos — quem decide é você: toque para revisar, segure para descartar ou confirme um
             por um.
@@ -544,8 +544,8 @@ const styles = StyleSheet.create({
   bloco: {
     gap: Space.md,
   },
+  /* Só o recuo: o TAMANHO vem de `type="footnote"` no próprio texto. */
   rodape: {
-    ...Type.footnote,
     paddingHorizontal: Space.lg,
   },
   chips: {

@@ -765,7 +765,7 @@ export default function DebtsScreen() {
 
               <Field
                 label="Juros por mês"
-                hint="No financiamento, informe a taxa mensal do contrato; 0 somente se não houver juros. Não sabe a taxa? Consulte o contrato antes de cadastrar.">
+                hint="A taxa mensal do contrato. Zero só se não houver juros.">
                 <View>
                   <TextField
                     value={form.taxa}
@@ -816,13 +816,13 @@ export default function DebtsScreen() {
                 </View>
               ) : null}
 
-              <Field label="Valor da prestação" hint="Opcional: valor contratual. A amortização exibida é estimativa Price; seguros e tarifas não são separados.">
+              <Field label="Valor da prestação" hint="O valor do contrato. A amortização é estimativa Price.">
                 <MoneyField valueCents={form.installmentCents} onChangeCents={(installmentCents) => setForm({ ...form, installmentCents })} />
               </Field>
               <ThemedText type="small" themeColor="textSecondary">O cronograma é uma estimativa mensal. Cadastrar a dívida não cria prestações pendentes na projeção; registre cada pagamento nesta tela.</ThemedText>
               {!form.id && form.parcelas !== '' && (
                 <Field label="Quantas parcelas já foram pagas?"
-                  hint="Esse histórico já está incluído no saldo devedor informado acima. Não vou descontá-lo novamente nem criar pagamentos antigos.">
+                  hint="Já está no saldo devedor acima — não desconto de novo.">
                   <View style={styles.duasColunas}>
                     <Chip label="Nenhuma" selected={form.historyConfirmed && form.installmentsPaid === 0}
                       onPress={() => setForm({ ...form, installmentsPaid: 0, historyConfirmed: true })} />

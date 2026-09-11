@@ -18,20 +18,39 @@ interface FieldProps {
  *
  * Hoje as telas mostram `Não deu para salvar (nome repetido?)` num texto solto abaixo do botão —
  * genérico, longe do campo, e nunca com a causa real.
+ *
+ * ## Label e hint NÃO podem ter o mesmo estilo
+ *
+ * Os dois eram `type="small"` + `textSecondary`, byte por byte — em 47 campos.
+ * Nada separava "o que é o campo" de "explicação sobre o campo", e um formulário
+ * com quatro ou cinco hints virava uma parede de cinza de 15px onde o olho não
+ * acha onde começa nada. Foi a queixa literal do dono do produto sobre a tela de
+ * cartão: *"esses textos explicativos... está muito feio"*.
+ *
+ * A distinção anda em DOIS eixos, porque um só não sobrevive a 1,3×:
+ * **tamanho** (15 → 13) e **cor** (`text` → `textSecondary`). É a régua que
+ * `themed-text.tsx` já descreve: hierarquia sai de tamanho, peso e cor, nunca de
+ * dois pixels de diferença.
  */
 export function Field({ label, error, hint, children }: FieldProps) {
   return (
     <View style={styles.field}>
-      <ThemedText type="small" themeColor="textSecondary">
-        {label}
-      </ThemedText>
+      {/* O label é IDENTIFICADOR do campo, e por isso vai na cor cheia. */}
+      <ThemedText type="small">{label}</ThemedText>
       {children}
+      {/*
+        O erro NÃO apaga mais o hint. Eles se excluíam por um ternário, e o
+        resultado era a explicação sumir exatamente quando ela mais importa: o
+        campo está errado e a frase que diz o que ele espera desapareceu junto.
+        Mesma geometria (footnote) nos dois, então a altura não pula na validação.
+      */}
       {error ? (
-        <ThemedText type="small" themeColor="danger">
+        <ThemedText type="footnote" themeColor="danger">
           {error}
         </ThemedText>
-      ) : hint ? (
-        <ThemedText type="small" themeColor="textSecondary">
+      ) : null}
+      {hint ? (
+        <ThemedText type="footnote" themeColor="textSecondary">
           {hint}
         </ThemedText>
       ) : null}
