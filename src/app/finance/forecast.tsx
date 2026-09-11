@@ -669,19 +669,31 @@ export default function ForecastScreen() {
       ) : null}
 
       {/*
-        Dia × Mês. Governa só o que vem ABAIXO — o destaque e o simulador continuam nos dois
-        modos, porque respondem a pergunta de entrada da tela em qualquer recorte.
+        Por dia × Por mês. Governa só o que vem ABAIXO — o destaque e o simulador continuam nos
+        dois modos, porque respondem a pergunta de entrada da tela em qualquer recorte.
+
+        ⚠️ **Os dois controles numa LINHA, e o da esquerda deixou de dizer "Mês".** Empilhados e
+        sem `gap`, eles liam como um controle partido ao meio — a mesma queixa do seletor de
+        período ("grudado sem gap nenhum"). Pior: lado a lado, a palavra "Mês" aparecia nos DOIS
+        querendo dizer coisas diferentes — à esquerda é a GRANULARIDADE da série (um ponto por
+        dia ou por mês), à direita é a BORDA do mês (civil ou ciclo).
+
+        Quem muda de rótulo é o da esquerda, porque ele é local a esta tela; a régua fala a mesma
+        língua em sete telas, e mudar o texto só aqui criaria dois nomes para a mesma intenção
+        (contagem anti-slop §10).
       */}
       {!nadaParaProjetar && serie.length > 0 ? (
         <View style={styles.modo}>
-          <Segmented
-            options={[
-              { value: 'dia', label: 'Dia' },
-              { value: 'mes', label: 'Mês' },
-            ]}
-            value={modo}
-            onChange={(v) => setModo(v)}
-          />
+          <View style={styles.modoGranularidade}>
+            <Segmented
+              options={[
+                { value: 'dia', label: 'Por dia' },
+                { value: 'mes', label: 'Por mês' },
+              ]}
+              value={modo}
+              onChange={(v) => setModo(v)}
+            />
+          </View>
           {/* A régua qualifica só o modo Mês: no modo Dia a série é diária e não tem borda de
               mês para escolher. */}
           {modo === 'mes' ? (
@@ -1011,7 +1023,14 @@ const styles = StyleSheet.create({
   },
   modo: {
     marginTop: Space.xs,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Space.sm,
+    // A 384dp × fonte 1,3 os dois não cabem lado a lado; a régua desce em vez de espremer.
+    flexWrap: 'wrap',
   },
+  // Come a sobra da linha: a régua tem largura fixa, a granularidade fica com o resto.
+  modoGranularidade: { flex: 1, minWidth: 160 },
   rascunhoFaixa: {
     gap: Space.sm,
   },
