@@ -38,6 +38,7 @@ os.environ.setdefault("WHATSAPP_APP_SECRET", "sem-envio")
 
 from app.domain import confirm, draft  # noqa: E402
 from app.graph import nodes  # noqa: E402
+from app.services import gemini  # noqa: E402
 from app.tools import resources  # noqa: E402
 
 WS = "20000000-0000-0000-0000-000000000001"
@@ -213,6 +214,30 @@ def secoes():
 
 async def main(args):
     resources.db.fetch = _sem_banco
+
+    if args.barato:
+        # ⚠️ **Modo de ITERAÇÃO, nunca de aprovação.** O gate roda no Flash
+        # porque o Lite JÁ FOI MEDIDO e reprova 8 dos 94 casos — e uma das
+        # quedas é do lado que não pode cair ("apaga todos" voltou
+        # `approved: True`). Aqui ele é forçado para o Lite só porque o Flash
+        # tem 20 requisições/dia grátis e esta suíte manda ~40 nele: a partir da
+        # segunda execução do dia, toda ela é paga.
+        #
+        # Use enquanto estiver mexendo em prompt. A execução que DECIDE se está
+        # pronto roda sem esta flag.
+        os.environ["GEMINI_MODEL_GATE"] = gemini.GEMINI_ROUTER
+        print(
+            "⚠️  --barato: gate no Flash-Lite (grátis até 500/dia).\n"
+            "    O Lite reprova ~8 casos que o Flash passa — este número NÃO "
+            "aprova mudança.\n"
+        )
+
+    total = sum(
+        len(casos) for secao, casos in secoes().items()
+        if not args.secao or args.secao in secao
+    )
+    print(f"{total} chamadas ao Gemini nesta execução.\n")
+
     resultados, falhas = [], []
     for secao, casos in secoes().items():
         if args.secao and args.secao not in secao:
@@ -246,4 +271,9 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--secao", help="roda só as seções cujo nome contém isto")
     parser.add_argument("--output", help="grava o JSON completo aqui")
+    parser.add_argument(
+        "--barato", action="store_true",
+        help="roda o gate no Flash-Lite (grátis até 500/dia). Para iterar, "
+             "NUNCA para aprovar: o Lite reprova ~8 casos que o Flash passa.",
+    )
     raise SystemExit(asyncio.run(main(parser.parse_args())))

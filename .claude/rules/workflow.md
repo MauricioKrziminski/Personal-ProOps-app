@@ -20,7 +20,10 @@
    Teste que fala com rede ou banco não entra: os nós que falam com o mundo viram dublê.
 
    **Mexeu em prompt, schema de classificador ou catálogo → `.venv/bin/python
-   scripts/evaluate_answer_forms.py` (Gemini real, ~90s).** O pytest usa dublês e
+   scripts/evaluate_answer_forms.py` (Gemini real, ~8 min).** Enquanto itera, use
+   `--secao <x> --barato`, que põe o gate no Flash-Lite (500/dia grátis contra 20/dia do
+   Flash) — a execução que APROVA roda sem flag, uma vez. Ver a tabela de custo em
+   `ai-gemini.md`. O pytest usa dublês e
    dublê sempre concorda: essa suíte é a única que diz se a pessoa pode responder do
    jeito dela, e a seção de segurança dela é a que impede que "interpretar melhor"
    vire "aprovou o que não devia".

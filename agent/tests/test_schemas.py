@@ -114,3 +114,29 @@ def test_schemas_de_decisao_constroem_de_verdade():
         esquema = modelo.model_json_schema()          # levantava PydanticUserError
         campo = esquema["properties"]["decision"]
         assert set(campo.get("enum", [])) == valores, modelo.__name__
+
+
+def test_os_modelos_de_producao_sao_os_documentados():
+    """A troca de modelo por variável de ambiente é para TESTE, não para produção.
+
+    `GEMINI_MODEL_LITE`/`GEMINI_MODEL_GATE` existem para uma execução de
+    iteração caber no nível gratuito (Flash-Lite: 500/dia; Flash: 20/dia). As
+    constantes são o que vale quando ninguém pediu troca — e a divisão entre
+    elas veio de medição: o gate no Lite reprova 8 dos 94 casos, e uma das
+    quedas é "apaga todos" voltando `approved: True`.
+    """
+    from app.services import gemini
+
+    assert gemini.GEMINI_ROUTER == "gemini-3.1-flash-lite"
+    assert gemini.GEMINI_PARSE == "gemini-3.1-flash-lite"
+    assert gemini.GEMINI_BATCH == "gemini-3.1-flash-lite"
+    assert gemini.GEMINI_GATE == "gemini-3.7-flash"
+
+
+def test_sem_variavel_de_ambiente_o_modelo_nao_muda(monkeypatch):
+    from app.services import gemini
+
+    monkeypatch.delenv("GEMINI_MODEL_GATE", raising=False)
+    assert gemini._resolver(gemini.GEMINI_GATE) == gemini.GEMINI_GATE
+    monkeypatch.setenv("GEMINI_MODEL_GATE", "gemini-3.1-flash-lite")
+    assert gemini._resolver(gemini.GEMINI_GATE) == "gemini-3.1-flash-lite"

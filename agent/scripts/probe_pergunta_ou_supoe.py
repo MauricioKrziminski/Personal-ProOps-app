@@ -197,6 +197,12 @@ async def main() -> int:
     args = ap.parse_args()
 
     casos = [c for c in CASOS if not args.secao or c[0] == args.secao]
+    # O custo deste projeto está nas suítes, não no tráfego — então ele aparece
+    # ANTES de gastar. Cada caso é um turno: router + domínio, os dois no
+    # Flash-Lite (500/dia grátis). O gate (Flash, 20/dia) não entra aqui:
+    # mensagem nova nunca passa pelo classificador de SIM/NÃO.
+    print(f"{len(casos)} turnos · ~{len(casos) * 2} chamadas ao Gemini, "
+          f"todas no Flash-Lite.\n")
 
     await db.open_pools()
 

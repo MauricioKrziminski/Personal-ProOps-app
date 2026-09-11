@@ -96,6 +96,29 @@ Os equivalentes em Deno (`_shared/gemini.ts`, `process-jobs/index.ts`) foram **a
 
 ## Auditoria e custo
 
+- 💸 **Como NÃO gastar enquanto testa** (11/09/2026). O que custa não é a quantidade de
+  chamadas, é o MODELO: o Flash-Lite tem **500 requisições/dia** grátis e o Flash tem **20**.
+  Uma execução de `evaluate_answer_forms.py` manda ~40 no gate (Flash) — da segunda execução
+  do dia em diante, ela inteira é paga. Três execuções num dia consumiram quase todo o
+  crédito da conta.
+
+  `GEMINI_MODEL_LITE` e `GEMINI_MODEL_GATE` trocam o modelo de um papel sem tocar no código.
+  Vazias em produção; `gemini._resolver` grava um WARNING quando estão ligadas, porque modelo
+  trocado em silêncio é medição que deixa de valer sem ninguém perceber.
+
+  | quando | comando |
+  |---|---|
+  | iterando em prompt | `evaluate_answer_forms.py --secao <x> --barato` (gate no Lite, de graça) |
+  | a execução que APROVA | `evaluate_answer_forms.py`, sem flag, **uma vez** |
+  | sonda de turno inteiro | `probe_pergunta_ou_supoe.py` — já é toda Lite |
+
+  ⚠️ **`--barato` não aprova nada.** O gate está no Flash porque o Lite FOI MEDIDO e reprova
+  8 dos 94 casos — e uma das quedas é do lado que não pode cair ("apaga todos" voltou
+  `approved: True`). Ler 86/94 do modo barato como regressão é perder tempo; lê-lo como
+  aprovação é pior.
+
+  Toda sonda imprime quantas chamadas vai fazer ANTES de fazer.
+
 - ⚠️ **O custo NÃO está no tráfego, está nas suítes.** Em 09/09/2026 a produção tinha 29 chamadas
   em `ai_events` desde que existe, e o staging 130 — e mesmo assim 04/09 custou R$ 10. Quem gasta é
   `evaluate_answer_forms.py` (~94 chamadas por execução) mais os `probe_*`, e **nenhum deles grava

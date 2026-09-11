@@ -41,6 +41,8 @@ UMA vez, no fim, e use `--secao` enquanto estiver iterando.**
 
 from __future__ import annotations
 
+import logging
+import os
 from typing import TypeVar
 
 from langchain_google_genai import ChatGoogleGenerativeAI
@@ -60,6 +62,43 @@ GEMINI_BATCH = "gemini-3.1-flash-lite"
 # prompt por domínio aqui tem ~800. Medido em 30/08/2026 — se alguém "otimizar"
 # o prompt para caching no futuro, vai gastar tempo por zero de economia.
 
+# ---------------------------------------------------------------------------
+# Trocar o modelo PARA TESTE, sem tocar no que roda em produção
+# ---------------------------------------------------------------------------
+# O custo deste projeto não está no tráfego — está nas suítes. `ai_events` tinha
+# 29 chamadas em produção desde que existe, e mesmo assim um dia de trabalho
+# custou dinheiro: quem gasta é `evaluate_answer_forms.py` (~94 chamadas por
+# execução) e os `probe_*`.
+#
+# E o que gasta DENTRO delas é o modelo, não a quantidade: o Flash-Lite tem 500
+# requisições/dia no nível gratuito e o Flash tem **20**. Uma execução da suíte
+# manda ~40 no gate (Flash) — a partir da segunda do dia, tudo é pago.
+#
+# Estas variáveis existem para uma execução de ITERAÇÃO poder ficar inteira no
+# Lite. Elas são vazias em produção e o `_resolver` avisa no log quando estão
+# ligadas: modelo trocado em silêncio é como a medição deixa de valer sem
+# ninguém perceber.
+_ENV_POR_MODELO = {
+    GEMINI_ROUTER: "GEMINI_MODEL_LITE",
+    GEMINI_PARSE: "GEMINI_MODEL_LITE",
+    GEMINI_BATCH: "GEMINI_MODEL_LITE",
+    GEMINI_GATE: "GEMINI_MODEL_GATE",
+}
+
+log = logging.getLogger(__name__)
+_avisados: set[str] = set()
+
+
+def _resolver(nome: str) -> str:
+    trocado = os.environ.get(_ENV_POR_MODELO.get(nome, ""), "").strip()
+    if not trocado or trocado == nome:
+        return nome
+    if nome not in _avisados:
+        _avisados.add(nome)
+        log.warning("modelo %s trocado por %s (variável de ambiente)", nome, trocado)
+    return trocado
+
+
 _cache: dict[tuple[str, float], ChatGoogleGenerativeAI] = {}
 
 T = TypeVar("T", bound=BaseModel)
@@ -68,7 +107,7 @@ T = TypeVar("T", bound=BaseModel)
 def llm(model: str | None = None, temperature: float = 0.1) -> ChatGoogleGenerativeAI:
     """Cliente por (modelo, temperatura). Reusar evita reconstruir o transporte."""
     settings = get_settings()
-    nome_modelo = model or settings.gemini_model or GEMINI_PARSE
+    nome_modelo = _resolver(model or settings.gemini_model or GEMINI_PARSE)
     chave = (nome_modelo, temperature)
     if chave not in _cache:
         _cache[chave] = ChatGoogleGenerativeAI(
