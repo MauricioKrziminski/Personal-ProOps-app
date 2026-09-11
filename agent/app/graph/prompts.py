@@ -98,6 +98,13 @@ Tipos:
   mesmo passado duas vezes e a compra iria parar meses antes do que deveria.
 - pay_invoice: pagamento da fatura do cartão, com dinheiro SAINDO agora. NÃO use
   para compras no cartão. Com valor = pagamento parcial ("paguei 800 da fatura").
+  ⚠️ A regra "account = origem" das transferências NÃO vale aqui. O que identifica
+  a FATURA é o cartão, e ele vai em account; a conta de onde o dinheiro sai vai em
+  counterparty_account. "paguei a fatura do nubank pelo inter" -> account="nubank",
+  counterparty_account="inter". "paguei 800 da fatura do nubank saindo do itaú" ->
+  account="nubank", counterparty_account="itaú", amount_cents=80000. Sem dizer de
+  onde saiu, deixe counterparty_account VAZIO — o app usa a conta de pagamento do
+  próprio cartão.
 - MARCAR/QUITAR uma fatura já paga fora do app -> type=mark_paid, description=NOME
   DO CARTÃO. O verbo decide: "marca/marcar como paga", "quita sem caixa", "já tinha
   pago", "já estava paga", "o dinheiro já saiu", "paguei antes de usar o app" são
