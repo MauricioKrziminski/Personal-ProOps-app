@@ -53,11 +53,11 @@ import { AccountPicker } from '@/components/finance/account-picker';
  * responde, não existe formulário para submeter.
  */
 
-const KINDS: { value: TransactionKind; label: string }[] = [
+const KINDS = [
   { value: 'expense', label: 'Gasto' },
   { value: 'income', label: 'Receita' },
   { value: 'transfer', label: 'Transferência' },
-];
+] as const satisfies readonly { value: TransactionKind; label: string }[];
 
 /** Opções de parcelamento mais comuns no varejo brasileiro. */
 const INSTALLMENT_OPTIONS = [1, 2, 3, 4, 6, 10, 12, 18, 24] as const;

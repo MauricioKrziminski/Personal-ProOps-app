@@ -61,12 +61,12 @@ const SOURCE_LABEL: Record<Transaction['source'], string> = {
   recurring: 'recorrente',
 };
 
-const KIND_OPTIONS: { value: TransactionKind | 'all'; label: string }[] = [
+const KIND_OPTIONS = [
   { value: 'all', label: 'Tudo' },
   { value: 'expense', label: 'Gastos' },
   { value: 'income', label: 'Receitas' },
   { value: 'transfer', label: 'Transf.' },
-];
+] as const satisfies readonly { value: TransactionKind | 'all'; label: string }[];
 
 const STATUS_OPTIONS: { value: 'all' | 'pending' | 'cleared'; label: string }[] = [
   { value: 'all', label: 'Todos' },

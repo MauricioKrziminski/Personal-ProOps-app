@@ -175,7 +175,7 @@ function Shortcut({ title, count, icon, href }: ShortcutProps) {
 const JANELAS_CASHFLOW = [
   { value: '6', label: '6 meses' },
   { value: '12', label: '12 meses' },
-];
+] as const;
 
 /** A altura útil da barra. O `h-24` do export. */
 const ALTURA_BARRA = 96;

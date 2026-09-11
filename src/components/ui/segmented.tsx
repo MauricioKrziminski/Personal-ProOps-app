@@ -7,8 +7,36 @@ import { ThemedText } from '@/components/themed-text';
 import { Elevation, Motion, Radius, Space } from '@/design/tokens';
 import { useTheme, useScheme } from '@/hooks/use-theme';
 
+type Opcao<T extends string> = { value: T; label: string };
+
 interface SegmentedProps<T extends string> {
-  options: { value: T; label: string }[];
+  /**
+   * De duas a QUATRO opções, e quem trava é o TIPO.
+   *
+   * Medido a 384dp × fonte 1,3 (a régua de verificação do projeto): numa calha de
+   * 352pt, cinco células deixam ~62pt de texto e "Investimento" precisa de ~117 —
+   * a palavra parte no meio ("Investimen/to"), o que design.md §3 proíbe. Já
+   * aconteceu em três telas. O `minWidth` de quem chama não resolve: não existe
+   * largura que caiba cinco células num sheet, ela só empurraria o controle para
+   * fora da tela.
+   *
+   * Cinco ou mais é `SelectField` (quando o valor vai ser GRAVADO) ou uma fileira
+   * rolável de `Chip` (quando FILTRA uma lista). E quatro só com rótulo CURTO: a
+   * folga some rápido — em Lançamentos, "Transferências" já teve que virar
+   * "Transf." para caber, o que é truncar na copy em vez de no `numberOfLines`.
+   *
+   * ⚠️ Lista de tamanho VARIÁVEL nunca entra aqui, nem que hoje tenha três itens:
+   * em Faturas as opções eram os cartões do usuário, então a largura por célula
+   * era função de quantos cartões ele tinha.
+   *
+   * A trava é o tipo e não um teste porque ela precisa valer em tempo de
+   * compilação: um `.map()` sobre lista de tamanho desconhecido para de compilar
+   * aqui, que é onde o defeito nasce.
+   */
+  options:
+    | readonly [Opcao<T>, Opcao<T>]
+    | readonly [Opcao<T>, Opcao<T>, Opcao<T>]
+    | readonly [Opcao<T>, Opcao<T>, Opcao<T>, Opcao<T>];
   value: T;
   onChange: (value: T) => void;
 }
@@ -17,9 +45,13 @@ interface SegmentedProps<T extends string> {
  * Seletor segmentado.
  *
  * ponytail: reconstruído em JS em vez de usar o controle nativo — o projeto tirou `@expo/ui` no
- * commit `de229d7` e nenhuma lib de segmented está aprovada. O polegar desliza com a mola de
- * `Motion.spring.settle` para ficar perto do iOS. Se a diferença de timing incomodar, o upgrade é
- * `@react-native-segmented-control/segmented-control`, e a API deste componente não muda.
+ * commit `de229d7` e nenhuma lib de segmented está aprovada. Se a diferença de timing incomodar,
+ * o upgrade é `@react-native-segmented-control/segmented-control`, e a API não muda.
+ *
+ * O polegar desliza com `Motion.spring.snap`, que `tokens.ts` nomeia literalmente para "o
+ * indicador de um segmented" e explica por quê: `settle` é criticamente amortecida e, num
+ * controle tocado o dia inteiro, lê como travada. O componente usava `settle` — contra o próprio
+ * token, e em silêncio, porque as duas molas compilam igual.
  */
 export function Segmented<T extends string>({ options, value, onChange }: SegmentedProps<T>) {
   const theme = useTheme();
@@ -31,7 +63,7 @@ export function Segmented<T extends string>({ options, value, onChange }: Segmen
 
   const thumb = useAnimatedStyle(() => ({
     width: slot,
-    transform: [{ translateX: withSpring(index * slot, Motion.spring.settle) }],
+    transform: [{ translateX: withSpring(index * slot, Motion.spring.snap) }],
   }));
 
   const onLayout = (e: LayoutChangeEvent) => setWidth(e.nativeEvent.layout.width);

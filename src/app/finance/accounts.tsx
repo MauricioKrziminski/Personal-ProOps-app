@@ -18,7 +18,7 @@ import { Money } from '@/components/ui/money';
 import { Row, Section } from '@/components/ui/row';
 import { Screen } from '@/components/ui/screen';
 import { HeroLabel } from '@/components/ui/section-head';
-import { Segmented } from '@/components/ui/segmented';
+import { SelectField } from '@/components/ui/select-field';
 import { Skeleton, SkeletonRow } from '@/components/ui/skeleton';
 import { useToast } from '@/components/ui/toast';
 import { Motion, Radius, Space, tabular } from '@/design/tokens';
@@ -52,12 +52,16 @@ import { confirmDestructive } from '@/lib/item-actions';
  *   do escopo desta entrega. A apresentação e o par Cancelar/Salvar são os mesmos.
  */
 
+/**
+ * O glifo por tipo sai de `ACCOUNT_TYPES`, não de um mapa local.
+ *
+ * Eram DOIS mapas privados que discordavam — aqui `cash` era `dollarsign.circle`
+ * e no `AccountPicker` era `wallet.bifold`. O mesmo tipo de conta com duas caras
+ * no mesmo app é como a forma deixa de ser um sinal confiável, e a forma é
+ * exatamente o que separa cartão de conta antes de qualquer texto.
+ */
 const ICONE: Record<string, SymbolViewProps['name']> = {
-  checking: 'building.columns',
-  savings: 'banknote',
-  cash: 'dollarsign.circle',
-  investment: 'chart.line.uptrend.xyaxis',
-  credit_card: 'creditcard',
+  ...Object.fromEntries(ACCOUNT_TYPES.map((t) => [t.value, t.icon])),
   none: 'questionmark.circle',
 };
 
@@ -491,11 +495,28 @@ export default function AccountsScreen() {
                 />
               </Field>
 
+              {/*
+                `SelectField`, não `Segmented`: cinco rótulos não cabem numa linha.
+                Medido a 384dp × fonte 1,3 — cada célula fica com ~62pt de texto e
+                "Investimento" precisa de ~117, então a palavra partia no meio
+                ("Investimen/to"), o que design.md §3 proíbe. `minWidth` não
+                resolveria: não existe largura que caiba cinco células num sheet.
+
+                De quebra o campo ganha o GLIFO por tipo, que é o que separa cartão
+                de conta antes de qualquer texto — o mesmo motivo do `AccountPicker`.
+              */}
               <Field label="Tipo">
-                <Segmented
-                  options={ACCOUNT_TYPES.map((t) => ({ value: t.value, label: t.label }))}
+                <SelectField
+                  options={ACCOUNT_TYPES.map((t) => ({
+                    id: t.value,
+                    label: t.label,
+                    icon: t.icon,
+                    meta: 'meta' in t ? t.meta : undefined,
+                  }))}
                   value={form.type}
-                  onChange={(type) => setForm({ ...form, type })}
+                  /* Nenhuma opção tem `id: null`, então o campo nunca devolve nulo. */
+                  onChange={(id) => setForm({ ...form, type: id as Account['type'] })}
+                  placeholder="Escolher tipo"
                 />
               </Field>
 

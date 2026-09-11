@@ -12,6 +12,7 @@ import * as Haptics from 'expo-haptics';
 import { ThemedText } from '@/components/themed-text';
 import { HeaderActions } from '@/components/ui/header-actions';
 import { Button } from '@/components/ui/button';
+import { Chip } from '@/components/finance/chip';
 import { Card } from '@/components/ui/card';
 import { EmptyState } from '@/components/ui/empty-state';
 import { Field, MoneyField } from '@/components/ui/field';
@@ -816,11 +817,21 @@ export default function ForecastScreen() {
           {/* Parcelar só faz sentido em "uma vez": "todo mês" já é a repetição. */}
           {novoModo === 'total' ? (
             <Field label="Em quantas vezes">
-              <Segmented
-                options={PARCELAS.map((n) => ({ value: String(n), label: `${n}x` }))}
-                value={String(novoParcelas)}
-                onChange={(v) => setNovoParcelas(Number(v))}
-              />
+              {/*
+                `Chip`, não `Segmented`: cinco opções, e o formulário do lançamento
+                já escolhe parcela assim (`INSTALLMENT_OPTIONS`, nove chips). Eram
+                dois desenhos para a mesma pergunta no mesmo app.
+              */}
+              <View style={styles.chips}>
+                {PARCELAS.map((n) => (
+                  <Chip
+                    key={n}
+                    label={n === 1 ? 'À vista' : `${n}x`}
+                    selected={novoParcelas === n}
+                    onPress={() => setNovoParcelas(n)}
+                  />
+                ))}
+              </View>
             </Field>
           ) : null}
 
@@ -839,6 +850,7 @@ export default function ForecastScreen() {
 }
 
 const styles = StyleSheet.create({
+  chips: { flexDirection: 'row', flexWrap: 'wrap', gap: Space.sm },
   hero: {
     gap: Space.md,
   },

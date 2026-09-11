@@ -376,7 +376,7 @@ export default function MonthScreen() {
       {(breakdown.data ?? []).length > 0 || breakdown.isLoading ? (
         <View style={styles.bloco}>
           <SectionHead title="Para onde o dinheiro foi" />
-          <Segmented options={[...GROUP_OPTIONS]} value={groupBy} onChange={setGroupBy} />
+          <Segmented options={GROUP_OPTIONS} value={groupBy} onChange={setGroupBy} />
           {breakdown.isError ? (
             <ErrorCard onRetry={() => breakdown.refetch()} />
           ) : breakdown.isLoading ? (

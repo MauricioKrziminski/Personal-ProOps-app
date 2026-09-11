@@ -301,6 +301,12 @@ test('nenhuma tela monta lista de conta à mão', () => {
   const PERMITIDO = new Set([
     'src/components/finance/account-picker.tsx',
     'src/app/finance/accounts.tsx',
+    // Faturas: a fileira de chips FILTRA o conteúdo da tela, não escolhe onde
+    // lançar — e só cartões aparecem nela, porque a tela inteira é de cartão.
+    // A confusão que este teste existe para matar (um salário caindo na fatura
+    // porque "Nubank" e "Nubank Cartão" tinham a mesma cara) não tem como
+    // acontecer onde não há conta corrente na lista.
+    'src/app/finance/invoices.tsx',
   ]);
   const fora: string[] = [];
   for (const file of walk(SRC)) {

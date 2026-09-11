@@ -70,7 +70,7 @@ const JANELAS = [
   { value: '6', label: '6 meses' },
   { value: '12', label: '12 meses' },
   { value: '24', label: '24 meses' },
-];
+] as const;
 
 /**
  * O que forma o patrimônio líquido, na ordem em que `private.net_worth_now` soma:

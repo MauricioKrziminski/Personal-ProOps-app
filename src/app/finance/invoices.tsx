@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Pressable, StyleSheet, View } from 'react-native';
+import { ScrollView, Pressable, StyleSheet, View } from 'react-native';
 import { Stack, router, useLocalSearchParams } from 'expo-router';
 import * as Haptics from 'expo-haptics';
 import Animated, {
@@ -19,7 +19,7 @@ import { Money } from '@/components/ui/money';
 import { Row, Section } from '@/components/ui/row';
 import { Screen } from '@/components/ui/screen';
 import { HeroLabel } from '@/components/ui/section-head';
-import { Segmented } from '@/components/ui/segmented';
+import { Chip } from '@/components/finance/chip';
 import { Skeleton, SkeletonRow } from '@/components/ui/skeleton';
 import { Motion, Radius, Space, tabular } from '@/design/tokens';
 import { useAccounts, useCardInvoices, type CardInvoiceHistory } from '@/hooks/use-finance';
@@ -185,15 +185,29 @@ export default function InvoicesScreen() {
 
       {accounts.isLoading ? <Skeleton height={36} radius={Radius.xs} /> : null}
 
+      {/*
+        Fileira rolável de `Chip`, não `Segmented`: aqui o número de opções é o
+        número de CARTÕES do usuário, então a largura por célula é uma função de
+        quantos cartões ele tem — com quatro, o nome de cada um já não cabe. E é
+        um FILTRO (escolhe o que a tela mostra), não um valor que vai ser gravado.
+      */}
       {cartoes.length > 1 ? (
-        <Segmented
-          options={cartoes.map((c) => ({ value: c.id, label: c.name }))}
-          value={atual?.id ?? cartoes[0].id}
-          onChange={(id) => {
-            setCartaoId(id);
-            setMesSelecionado(null);
-          }}
-        />
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={styles.chipsCartoes}>
+          {cartoes.map((c) => (
+            <Chip
+              key={c.id}
+              label={c.name}
+              selected={(atual?.id ?? cartoes[0].id) === c.id}
+              onPress={() => {
+                setCartaoId(c.id);
+                setMesSelecionado(null);
+              }}
+            />
+          ))}
+        </ScrollView>
       ) : null}
 
       {/* Com UM cartão o nome solto no topo não desambigua nada — a tela inteira é dele.
@@ -373,6 +387,7 @@ export default function InvoicesScreen() {
 }
 
 const styles = StyleSheet.create({
+  chipsCartoes: { flexDirection: 'row', gap: Space.sm, paddingRight: Space.lg },
   aviso: {
     gap: Space.sm,
   },

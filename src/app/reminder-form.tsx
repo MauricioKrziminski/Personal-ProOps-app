@@ -19,6 +19,7 @@ import { Icon } from '@/components/ui/icon';
 import { Screen } from '@/components/ui/screen';
 import { HeroLabel } from '@/components/ui/section-head';
 import { Segmented } from '@/components/ui/segmented';
+import { SelectField } from '@/components/ui/select-field';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useToast } from '@/components/ui/toast';
 import { MaxContentWidth } from '@/constants/theme';
@@ -95,6 +96,15 @@ const FREQ_OPTIONS = [
   { value: 'MONTHLY', label: 'Mês' },
   { value: 'YEARLY', label: 'Ano' },
 ] as const;
+
+/** Uma forma por frequência: o campo colapsado mostra o glifo antes do texto. */
+const FREQ_ICONE = {
+  NONE: 'minus',
+  DAILY: 'sun.max',
+  WEEKLY: 'calendar',
+  MONTHLY: 'repeat',
+  YEARLY: 'clock.arrow.circlepath',
+} as const;
 
 const FREQ_UNIT: Record<Freq, [string, string]> = {
   DAILY: ['dia', 'dias'],
@@ -526,11 +536,7 @@ function ReminderForm({
                       ? 'Push é grátis. Se a notificação estiver desligada no aparelho, esse lembrete não chega.'
                       : 'Push é grátis; WhatsApp usa um template pago e só sai com "Avisos financeiros no WhatsApp" ligado no Perfil.'
                   }>
-                  <Segmented
-                    options={CHANNELS.map((c) => ({ value: c.value, label: c.label }))}
-                    value={field.value}
-                    onChange={field.onChange}
-                  />
+                  <Segmented options={CHANNELS} value={field.value} onChange={field.onChange} />
                 </Field>
               )}
             />
@@ -628,16 +634,23 @@ function RecurrenceEditor({
     <Card>
       <View style={styles.block}>
         <Field label="Repetir" hint={describeRRule(value)}>
-          <Segmented
-            options={FREQ_OPTIONS.map((f) => ({ value: f.value, label: f.label }))}
+          {/*
+            Cinco opções não cabem num `Segmented`: a 384dp × 1,3 cada célula fica
+            com ~62pt e "Não repete" precisa de ~97 — a mesma medida que tirou o
+            tipo de conta de lá. `SelectField` é o campo de escolher UM item num
+            formulário, e este formulário já vive dentro de um `Sheet`.
+          */}
+          <SelectField
+            options={FREQ_OPTIONS.map((f) => ({ id: f.value, label: f.label, icon: FREQ_ICONE[f.value] }))}
             value={state.freq ?? 'NONE'}
+            placeholder="Não repete"
             onChange={(next) =>
               // Trocar de frequência PRESERVA o INTERVAL; BYDAY e BYMONTHDAY são descartados
               // junto com a frequência a que pertencem.
               onChange(
                 buildRRule({
                   ...state,
-                  freq: next === 'NONE' ? null : (next as Freq),
+                  freq: next === 'NONE' || next === null ? null : (next as Freq),
                   byday: [],
                   bymonthday: [],
                 }),

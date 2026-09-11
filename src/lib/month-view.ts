@@ -42,13 +42,13 @@ export function groupLabel(groupBy: GroupBy, key: string, label: string): string
   return groupBy === 'natureza' ? (NATUREZA[key] ?? label) : label;
 }
 
-export const GROUP_OPTIONS: readonly { value: GroupBy; label: string }[] = [
+export const GROUP_OPTIONS = [
   // Natureza primeiro porque é a leitura mais forte: quanto do mês já estava comprometido
   // antes de qualquer escolha.
   { value: 'natureza', label: 'Tipo' },
   { value: 'meio', label: 'Meio' },
   { value: 'categoria', label: 'Categoria' },
-];
+] as const satisfies readonly { value: GroupBy; label: string }[];
 
 /** Pontos-base inteiros → percentual inteiro. Dinheiro não vira float em lugar nenhum. */
 export function sharePercent(shareBp: number): number {

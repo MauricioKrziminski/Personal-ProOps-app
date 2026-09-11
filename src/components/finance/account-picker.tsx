@@ -1,7 +1,7 @@
 import { useMemo } from 'react';
 
 import { SelectField, type SelectOption } from '@/components/ui/select-field';
-import { accountTypeLabel } from '@/lib/accounts';
+import { ACCOUNT_TYPES, accountTypeLabel } from '@/lib/accounts';
 import type { IconName } from '@/components/ui/icon';
 
 /** O mínimo que o seletor precisa saber. Aceita `Account` inteiro sem conversão. */
@@ -12,14 +12,16 @@ export type PickableAccount = {
   closing_day?: number | null;
 };
 
-/** Cada tipo tem a sua forma — é o que separa cartão de conta antes de qualquer texto. */
-const GLIFO: Record<string, IconName> = {
-  checking: 'building.columns',
-  savings: 'banknote',
-  credit_card: 'creditcard',
-  cash: 'wallet.bifold',
-  investment: 'chart.line.uptrend.xyaxis',
-};
+/**
+ * Cada tipo tem a sua forma — é o que separa cartão de conta antes de qualquer
+ * texto, e a razão de este componente existir.
+ *
+ * A fonte é `ACCOUNT_TYPES`: este mapa era uma cópia privada que discordava da
+ * cópia da tela de contas em `cash`.
+ */
+const GLIFO: Record<string, IconName> = Object.fromEntries(
+  ACCOUNT_TYPES.map((t) => [t.value, t.icon])
+);
 
 /** A segunda linha: o tipo, e no cartão o dia que muda a decisão de onde lançar. */
 function detalhe(conta: PickableAccount): string {

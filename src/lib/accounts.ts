@@ -29,12 +29,36 @@
  * alguma tela voltar a desenhar `account.name` cru.
  */
 
+/**
+ * Os cinco tipos de conta, com o glifo de cada um.
+ *
+ * O ícone mora AQUI porque ele é o que separa cartão de conta antes de qualquer
+ * texto — foi o que fez o `AccountPicker` existir, depois de um salário de
+ * R$ 4.000 ser lançado dentro da fatura do cartão. Ele estava em dois mapas
+ * privados que **discordavam**: `cash` era `dollarsign.circle` na tela de contas
+ * e `wallet.bifold` no seletor, ou seja, o mesmo tipo tinha duas caras no mesmo
+ * app. Uma fonte só.
+ *
+ * `meta` é a segunda linha da opção, e só o cartão tem: escolher "Cartão" TROCA
+ * os campos de baixo (some o saldo inicial, entram fechamento, vencimento,
+ * limite e rotativo), e dizer o que vai mudar é a metade que faltava. Dar `meta`
+ * às cinco opções seria a parede de cinza que o resto desta leva está desmontando.
+ *
+ * ⚠️ Sem `import type { IconName }` aqui: este arquivo é lido por `node --test`
+ * (`accounts.test.ts`), e importar do `@/components/ui/icon` traria `expo-symbols`
+ * junto. O `as const` já dá os tipos literais, que são atribuíveis a `IconName`.
+ */
 export const ACCOUNT_TYPES = [
-  { value: 'checking', label: 'Corrente' },
-  { value: 'savings', label: 'Poupança' },
-  { value: 'credit_card', label: 'Cartão' },
-  { value: 'cash', label: 'Dinheiro' },
-  { value: 'investment', label: 'Investimento' },
+  { value: 'checking', label: 'Corrente', icon: 'building.columns' },
+  { value: 'savings', label: 'Poupança', icon: 'banknote' },
+  {
+    value: 'credit_card',
+    label: 'Cartão',
+    icon: 'creditcard',
+    meta: 'fatura e limite, não saldo',
+  },
+  { value: 'cash', label: 'Dinheiro', icon: 'wallet.bifold' },
+  { value: 'investment', label: 'Investimento', icon: 'chart.line.uptrend.xyaxis' },
 ] as const;
 
 const semAcento = (s: string) =>
