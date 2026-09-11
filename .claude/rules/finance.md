@@ -99,6 +99,15 @@ coluna de fuso. Quando existir, o caminho é `private.today(ws_ids)` lendo
 **Função nova que use `current_date` precisa do `set timezone` junto** — senão ela volta a
 enxergar o dia do UTC, e o sintoma aparece só depois das 21h.
 
+⚠️ **`default current_date` na ASSINATURA não é alcançado pelo `set timezone`** — default de
+parâmetro é avaliado no CHAMADOR, antes de a GUC da função valer. São 7 funções assim
+(`pay_invoice`, `settle_invoice`, `goal_deposit`, `pay_debt_installment`, `update_asset_value`,
+`budgets_status`, `_budgets_status`) e hoje nenhuma corre risco: **todo chamador passa a data
+local** (`localISODate()` no app, `local_iso_date(ctx.timezone)` / `require_date` no agente).
+Conferido em produção em 11/09/2026 — nas 7 o `current_date` está SÓ na assinatura, nunca no
+corpo. Chamador novo que omitir a data grava o dia do UTC, e alterar o fuso da função não
+conserta: o jeito é passar a data, ou trocar o default por `null` + `coalesce` DENTRO do corpo.
+
 ## O mês financeiro fecha no dia que o usuário paga, não no dia 31
 
 ⚠️ **"Do dia 1 ao 31" é uma suposição, e para quem paga tudo num dia só ela corta o ciclo ao
