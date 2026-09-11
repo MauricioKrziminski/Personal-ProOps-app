@@ -26,13 +26,15 @@ import {
   INCOME_CATEGORIES,
   SUGGESTED_CATEGORIES,
   useBudgetsStatus,
+  useCycle,
   useDeleteBudget,
+  useMonthRange,
   useSaveBudget,
   useTransactionsSummary,
   type BudgetStatus,
 } from '@/hooks/use-finance';
 import { useRealtimeInvalidate } from '@/hooks/use-items';
-import { formatBRL, monthBounds } from '@/lib/dates';
+import { formatBRL } from '@/lib/dates';
 import { showItemActions, type ItemAction } from '@/lib/item-actions';
 import { supabase } from '@/lib/supabase';
 
@@ -117,13 +119,30 @@ function ErrorBand({ message, onRetry }: { message: string; onRetry: () => void 
 
 export default function BudgetsScreen() {
   const toast = useToast();
-  const [month, setMonth] = useState(currentMonth);
+  /**
+   * ⚠️ **O mês corrente é o do CICLO, não o civil** — e a diferença aparece por até 20 dias.
+   *
+   * Com fechamento no dia 10, no dia 15/09 o ciclo corrente já se chama *outubro*. Abrindo
+   * `currentMonth()` (que é sempre `2026-09`) a tela nasceria um ciclo atrasada, mostrando o
+   * período que acabou de fechar como se fosse o que a pessoa está gastando agora. É o mesmo
+   * `cycle.data?.mes ?? currentMonth()` do Financeiro; no modo civil os dois coincidem.
+   */
+  const cycle = useCycle();
+  const [mesEscolhido, setMesEscolhido] = useState<string | null>(null);
+  const mesCorrente = cycle.data?.mes ?? currentMonth();
+  const month = mesEscolhido ?? mesCorrente;
+  const setMonth = setMesEscolhido;
   const [form, setForm] = useState<FormState | null>(null);
   const [noControleAberto, setNoControleAberto] = useState(true);
 
   const status = useBudgetsStatus(month);
   const rows = useBudgetRows();
-  const { from, to } = monthBounds(month);
+  /**
+   * As bordas seguem a RÉGUA ATIVA. Somar 01 a 31 aqui enquanto `budgets_status` soma
+   * 11/08–10/09 punha dois números de períodos diferentes na mesma tela, colados, sem nada
+   * explicando por quê — era o defeito que esta tela tinha até 11/09/2026.
+   */
+  const { from, to } = useMonthRange(month);
   const resumo = useTransactionsSummary(from, to);
   const save = useSaveBudget();
   const remove = useDeleteBudget();
@@ -164,7 +183,7 @@ export default function BudgetsScreen() {
     .filter((r) => r.kind === 'expense' && !linhas.some((b) => b.category === r.category))
     .sort((a, b) => Number(b.total_cents) - Number(a.total_cents));
 
-  const mesFuturo = month > currentMonth();
+  const mesFuturo = month > mesCorrente;
 
   const abrirNovo = (categoria?: string) =>
     setForm({

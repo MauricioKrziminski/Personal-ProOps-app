@@ -43,6 +43,7 @@ export type Database = {
         Row: {
           archived: boolean
           closing_day: number | null
+          closing_day_inclusive: boolean
           created_at: string
           credit_limit_cents: number | null
           currency: string
@@ -61,6 +62,7 @@ export type Database = {
         Insert: {
           archived?: boolean
           closing_day?: number | null
+          closing_day_inclusive?: boolean
           created_at?: string
           credit_limit_cents?: number | null
           currency?: string
@@ -79,6 +81,7 @@ export type Database = {
         Update: {
           archived?: boolean
           closing_day?: number | null
+          closing_day_inclusive?: boolean
           created_at?: string
           credit_limit_cents?: number | null
           currency?: string
@@ -2090,6 +2093,7 @@ export type Database = {
         Row: {
           created_at: string
           cycle_close_day: number | null
+          cycle_view: string
           default_account_id: string | null
           id: string
           name: string
@@ -2100,6 +2104,7 @@ export type Database = {
         Insert: {
           created_at?: string
           cycle_close_day?: number | null
+          cycle_view?: string
           default_account_id?: string | null
           id?: string
           name?: string
@@ -2110,6 +2115,7 @@ export type Database = {
         Update: {
           created_at?: string
           cycle_close_day?: number | null
+          cycle_view?: string
           default_account_id?: string | null
           id?: string
           name?: string

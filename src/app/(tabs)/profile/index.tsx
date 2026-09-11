@@ -22,7 +22,13 @@ import { Motion, Radius, Space, tabular } from '@/design/tokens';
 import { currentMonth } from '@/components/finance/month-picker';
 import { CycleDayPicker } from '@/components/finance/cycle-day-picker';
 import { environmentLabel } from '@/lib/environment';
-import { useAiMonthStats, useCycle, usePlanStatus, useSetCycleCloseDay } from '@/hooks/use-finance';
+import {
+  useAiMonthStats,
+  useCycle,
+  usePlanStatus,
+  useSetCycleCloseDay,
+  useSetCycleView,
+} from '@/hooks/use-finance';
 import { useAppUpdate } from '@/hooks/use-app-update';
 import { formatDateBR } from '@/hooks/use-items';
 import { isoToBR } from '@/lib/dates';
@@ -46,6 +52,7 @@ const APP_UPDATE_ICON: Partial<
 export default function ProfileScreen() {
   const cycle = useCycle();
   const setCloseDay = useSetCycleCloseDay();
+  const setCycleView = useSetCycleView();
   const theme = useTheme();
   const ambiente = environmentLabel(supabaseUrl);
   const { mode, setMode } = useThemeMode();
@@ -201,6 +208,45 @@ export default function ProfileScreen() {
             block
           />
         </Animated.View>
+      ) : null}
+
+      {/*
+        A régua de LEITURA — e ela só existe depois de haver um dia configurado.
+        Sem `closeDay`, "Mês" e "Ciclo" descrevem exatamente o mesmo período (`cycle_bounds(null,
+        m)` É o `date_trunc('month')`), e um controle cujas duas opções fazem a mesma coisa
+        ensina a pessoa a não confiar nos controles da tela.
+
+        ⚠️ **Trocar aqui NÃO apaga o dia.** É o par do `closeDay` continuar vindo cru do banco:
+        a pessoa volta para "Ciclo" e reencontra o 10 onde deixou.
+
+        A confirmação é o SUBTÍTULO da linha acima, que já escreve o intervalo ativo e vira
+        "01/09/2026 a 30/09/2026" no toque. Por isso não há texto explicativo aqui — seria a
+        parede de cinza do §7b para dizer o que o próprio controle mostra.
+      */}
+      {diaAtual != null ? (
+        <View style={styles.temaRow}>
+          <View style={styles.temaText}>
+            <ThemedText type="default">Ver por</ThemedText>
+            <ThemedText type="footnote" themeColor="textSecondary">
+              {(cycle.data?.view ?? 'cycle') === 'civil'
+                ? 'do dia 1 ao último de cada mês'
+                : 'do seu ciclo'}
+            </ThemedText>
+          </View>
+          <View style={styles.temaControl}>
+            <Segmented
+              value={cycle.data?.view ?? 'cycle'}
+              onChange={(v) => {
+                Haptics.selectionAsync();
+                setCycleView.mutate(v);
+              }}
+              options={[
+                { value: 'civil', label: 'Mês' },
+                { value: 'cycle', label: 'Ciclo' },
+              ]}
+            />
+          </View>
+        </View>
       ) : null}
     </Section>
   );

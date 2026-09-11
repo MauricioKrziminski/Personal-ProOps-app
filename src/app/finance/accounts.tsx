@@ -17,6 +17,7 @@ import { formatNumberBR } from '@/lib/dates';
 import { Icon } from '@/components/ui/icon';
 import { Money } from '@/components/ui/money';
 import { Row, Section } from '@/components/ui/row';
+import { Segmented } from '@/components/ui/segmented';
 import { Screen } from '@/components/ui/screen';
 import { HeroLabel } from '@/components/ui/section-head';
 import { SelectField } from '@/components/ui/select-field';
@@ -77,6 +78,8 @@ interface FormState {
   dueDay: string;
   limitCents: number;
   payerId: string | null;
+  /** Compra feita NO dia do fechamento entra na fatura que fecha nesse dia? Varia por emissor. */
+  fechamentoInclusivo: boolean;
   rotativoAuto: boolean;
   /** Texto, porque é digitado: "15,5". Vira fração na hora de salvar. */
   rotativoRate: string;
@@ -90,6 +93,7 @@ const FORM_VAZIO: FormState = {
   dueDay: '',
   limitCents: 0,
   payerId: null,
+  fechamentoInclusivo: false,
   rotativoAuto: false,
   rotativoRate: '',
 };
@@ -199,6 +203,7 @@ export default function AccountsScreen() {
       dueDay: a.due_day ? String(a.due_day) : '',
       limitCents: a.credit_limit_cents ?? 0,
       payerId: a.payment_account_id,
+      fechamentoInclusivo: a.closing_day_inclusive ?? false,
       rotativoAuto: a.rotativo_auto ?? false,
       rotativoRate:
         a.rotativo_rate_monthly == null ? '' : formatNumberBR(a.rotativo_rate_monthly * 100),
@@ -221,6 +226,7 @@ export default function AccountsScreen() {
         closing_day: ehCartao ? Number(form.closingDay) : null,
         due_day: ehCartao ? Number(form.dueDay) : null,
         credit_limit_cents: ehCartao ? form.limitCents : null,
+        closing_day_inclusive: ehCartao ? form.fechamentoInclusivo : false,
         rotativo_auto: ehCartao ? form.rotativoAuto : false,
         // Percentual digitado vira FRAÇÃO, igual a `debts.interest_rate_monthly`: 15,5 -> 0.155.
         // Vazio é null de propósito — o app não estima juros que não conhece.
@@ -554,9 +560,33 @@ export default function AccountsScreen() {
                     </View>
                   </View>
 
-                  <ThemedText type="small" themeColor="textSecondary">
-                    Compra depois do fechamento cai na fatura do mês seguinte.
-                  </ThemedText>
+                  {/*
+                    ⚠️ **Aqui havia uma AFIRMAÇÃO, e ela era chute de um emissor só.**
+
+                    A frase era "Compra depois do fechamento cai na fatura do mês seguinte" e o
+                    código cravava `<` (a compra DO dia já é da próxima) desde a `20260909050000`
+                    — medido contra duas faturas reais do Nubank. Pesquisado em 11/09/2026, não
+                    é padrão: o Mobills escreve "a partir do dia de fechamento entra na
+                    seguinte", a Serasa escreve "antes ou NO DIA EXATO entram na fatura do mês
+                    atual", e diz que depende do horário e do sistema da instituição.
+
+                    Sem padrão, quem sabe é o dono do cartão. O default é o que já valia, então
+                    ninguém acorda com a fatura remontada.
+                  */}
+                  <Field
+                    label="Compra no dia do fechamento"
+                    hint="Varia por banco. Só vale para compras novas.">
+                    <Segmented
+                      value={form.fechamentoInclusivo ? 'atual' : 'seguinte'}
+                      onChange={(v) =>
+                        setForm({ ...form, fechamentoInclusivo: v === 'atual' })
+                      }
+                      options={[
+                        { value: 'seguinte', label: 'Na próxima' },
+                        { value: 'atual', label: 'Nesta fatura' },
+                      ]}
+                    />
+                  </Field>
 
                   {/*
                     O rotativo, e por que ele nasce DESLIGADO.

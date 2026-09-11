@@ -83,6 +83,8 @@ export type Account = Pick<
   | 'due_day'
   | 'credit_limit_cents'
   | 'payment_account_id'
+  // em qual fatura cai a compra feita NO dia do fechamento — varia por emissor
+  | 'closing_day_inclusive'
   // rotativo: só fazem sentido em cartão
   | 'rotativo_auto'
   | 'rotativo_rate_monthly'
@@ -333,7 +335,7 @@ export function useAccounts() {
     queryFn: async (): Promise<Account[]> => {
       const { data, error } = await supabase
         .from('accounts')
-        .select('id, name, type, initial_balance_cents, archived, closing_day, due_day, credit_limit_cents, payment_account_id, rotativo_auto, rotativo_rate_monthly')
+        .select('id, name, type, initial_balance_cents, archived, closing_day, due_day, credit_limit_cents, payment_account_id, closing_day_inclusive, rotativo_auto, rotativo_rate_monthly')
         .eq('archived', false)
         .order('created_at');
       if (error) throw error;
@@ -1121,8 +1123,19 @@ export function useDefaultAccount() {
  *
  * `closeDay` null = último dia do mês, que é o comportamento de sempre.
  */
+export type CycleView = 'cycle' | 'civil';
+
 export interface Cycle {
+  /**
+   * O dia CONFIGURADO, não o que está valendo.
+   *
+   * Ele continua preenchido quando `view` é `civil` — é o que a grade do Perfil e a do
+   * onboarding mostram. Zerá-lo no modo civil apagaria a configuração na tela sem ninguém
+   * ter pedido, e o caminho de volta para o ciclo deixaria de existir.
+   */
   closeDay: number | null;
+  /** Qual régua está valendo AGORA. `civil` ignora `closeDay` em toda leitura de mês. */
+  view: CycleView;
   /** `2026-09` — o mês que dá NOME ao ciclo. É o mês em que ele termina. */
   mes: string;
   de: string;
@@ -1187,6 +1200,27 @@ export function useMonthRange(month: string): { from: string; to: string } {
   return ciclo.data ? { from: ciclo.data.de, to: ciclo.data.ate } : civil;
 }
 
+/**
+ * Tudo que uma troca de RÉGUA (dia de fechamento, ou mês civil × ciclo) invalida.
+ *
+ * ⚠️ `budgets-status` é a única que NÃO se conserta sozinha. As outras são chaveadas por
+ * `from`/`to`, que saem de `useCycleRange` e mudam junto com a régua; a do orçamento é chaveada
+ * pelo RÓTULO do mês, que é o mesmo `2026-09` nas duas — sem esta linha a tela seguiria
+ * mostrando a soma da régua antiga até alguém puxar para atualizar.
+ */
+const REGUA_MUDOU = [
+  ['cycle'],
+  ['cycle-range'],
+  ['forecast'],
+  ['forecast-drafts'],
+  ['forecast-months'],
+  ['monthly-cashflow'],
+  ['month-summary'],
+  ['month-lines'],
+  ['month-breakdown'],
+  ['budgets-status'],
+];
+
 export function useSetCycleCloseDay() {
   const queryClient = useQueryClient();
   return useMutation({
@@ -1198,18 +1232,28 @@ export function useSetCycleCloseDay() {
       if (error) throw error;
     },
     // Muda a borda de TODA leitura de mês: painel, tendência, mês a mês e a tela do mês.
-    onSuccess: () =>
-      invalidateKeys(queryClient, [
-        ['cycle'],
-        ['cycle-range'],
-        ['forecast'],
-        ['forecast-drafts'],
-        ['forecast-months'],
-        ['monthly-cashflow'],
-        ['month-summary'],
-        ['month-lines'],
-        ['month-breakdown'],
-      ]),
+    onSuccess: () => invalidateKeys(queryClient, REGUA_MUDOU),
+  });
+}
+
+/**
+ * Ver por mês civil ou pelo ciclo — sem apagar o dia configurado.
+ *
+ * Quem aplica é `private.cycle_close_day` no banco, que devolve `null` no modo civil: as cinco
+ * leituras que perguntam o dia a ela caem no `date_trunc('month')` que já era o caminho de quem
+ * nunca configurou ciclo. Não existe uma segunda aritmética de "onde o mês começa" no app.
+ */
+export function useSetCycleView() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (view: CycleView) => {
+      const { error } = await supabase
+        .from('workspaces')
+        .update({ cycle_view: view })
+        .eq('id', await workspaceId());
+      if (error) throw error;
+    },
+    onSuccess: () => invalidateKeys(queryClient, REGUA_MUDOU),
   });
 }
 
@@ -1805,6 +1849,7 @@ export function useSaveAccount() {
       due_day?: number | null;
       credit_limit_cents?: number | null;
       payment_account_id?: string | null;
+      closing_day_inclusive?: boolean;
       rotativo_auto?: boolean;
       rotativo_rate_monthly?: number | null;
     }) => {

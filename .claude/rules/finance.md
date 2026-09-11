@@ -146,6 +146,63 @@ linha "entrou · saiu" logo abaixo dele ainda somava 01 a 31.
 Padrão do nicho, não invenção: YNAB, Monarch, Mobills e Organizze todos têm dia de
 início/fechamento do mês configurável.
 
+⚠️ **E a régua é ESCOLHA, não configuração de mão única** (`20260911130000`). `cycle_close_day`
+sozinho fixava a leitura: quem configurava o dia 10 via 11/08–10/09 em todo lugar, e o único
+caminho de volta era apagar a configuração. `workspaces.cycle_view` (`cycle` | `civil`) separa
+"qual é o meu ciclo" de "como eu quero ver agora" — o Perfil mostra os dois, e trocar a régua
+**não apaga o dia**.
+
+**Ela é aplicada num ponto só: `private.cycle_close_day()` devolve `null` no modo civil.** As
+cinco leituras que perguntam o dia a ela (`month_lines_for`, `month_summary_for`,
+`monthly_lines_range`, `month_group`/`month_forecast_json`, `cycle_range`) caem sozinhas no
+`date_trunc('month')` que já era o caminho de quem nunca configurou ciclo. Zero argumento novo,
+zero segunda aritmética de "onde o mês começa".
+
+⚠️ **`budgets_status_for` era a quinta leitura e tinha ficado para trás.** Ela seguia em
+`date_trunc('month')` enquanto as outras quatro migraram na `20260911021000`: na tela do
+Financeiro o painel somava 11/08–10/09 e o bloco de orçamento logo abaixo somava 01–30/09, os
+dois escritos "setembro". Na Hoje e no badge da dock era pior — `useBudgetsStatus()` manda HOJE,
+e no dia 11/09 o ciclo corrente já se chama outubro.
+
+⚠️ **`budgets.month` é o RÓTULO; `occurred_at` é a JANELA.** Com ciclo os dois deixam de ser o
+mesmo valor (rótulo `01/09`, janela `11/08`–`10/09`), e comparar `b.month` com o início da janela
+faz o limite personalizado do mês sumir da tela sem erro nenhum.
+
+⚠️ **A chave `budgets-status` não se conserta sozinha na troca de régua.** As outras são chaveadas
+por `from`/`to`, que mudam junto; a do orçamento é chaveada pelo rótulo, que é o mesmo `2026-09`
+nas duas réguas. Ela está em `REGUA_MUDOU` (`use-finance.ts`), a lista que os DOIS setters
+invalidam.
+
+## Em qual fatura cai a compra feita NO dia do fechamento
+
+**Não há padrão, e por isso é campo do cartão** (`accounts.closing_day_inclusive`,
+`20260911140000`). A `20260909050000` cravou `<` ("a compra DO dia já é da próxima") com prova
+boa — duas faturas reais do Nubank, nos dois sentidos —, e o erro não foi a conclusão, foi
+generalizar um emissor para o sistema inteiro. Pesquisado em 11/09/2026: o Mobills escreve "a
+partir do dia de fechamento entra na seguinte", a Serasa escreve "antes ou **no dia exato** do
+fechamento entram na fatura do mês atual", e acrescenta que depende do horário da compra e do
+sistema da instituição.
+
+O default é `false` = o comportamento que já valia. **Trocar a chave não reescreve o passado**: o
+trigger só roda em insert/update da transação, então compra já classificada mantém o
+`invoice_id`. Remanejar retroativamente mexeria em fatura paga e em mês fechado.
+
+⚠️ **A borda anda UM dia, não o ciclo.** `p_inclusive` soma 1 à data de corte em vez de trocar
+`<` por `<=` — uma expressão só, em vez de dois ramos que divergem. O teste confere que os dois
+modos concordam nos outros 27 dias do mês.
+
+⚠️ **O trigger se chama `public.tg_transactions_set_invoice()`; `set_invoice` é o nome do
+TRIGGER.** Escrever `create or replace function private.set_invoice()` CRIA uma função órfã —
+sem erro, sem aviso, com a migration aplicando limpa — e a coluna nova nasce inerte. Quem pegou
+foi `supabase/tests/regua_e_dia_do_fechamento.sql`, que insere a compra e confere o vencimento da
+fatura em que ela caiu: testar `invoice_window` direto passava com o defeito de pé.
+
+⚠️ **`CREATE OR REPLACE FUNCTION` preserva dono e permissões — e SÓ isso.** Toda cláusula que a
+definição nova não repetir é APAGADA: foi assim que o trigger perdeu `security definer` e
+`cycle_now` perdeu o `set timezone` que a `20260911030000` tinha pendurado por `alter function`
+(o bug das 21h–00h voltando em silêncio). **Fuso e `security definer` vão no CABEÇALHO**, nunca
+por `alter` depois — pendurados, eles morrem no próximo replace.
+
 ## "Quanto sobrou" tem UMA definição, e ela inclui o que não é transação
 
 ⚠️ **Nem tudo que sai do caixa é linha em `transactions`.** A parcela de financiamento sai do
