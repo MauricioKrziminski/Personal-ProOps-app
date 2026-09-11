@@ -74,6 +74,31 @@
   `src/lib/categories.test.ts` falha se as duas divergirem — mexeu numa, mexe na outra. A
   tabela `categories` legada foi dropada na `0010_workspaces.sql`.
 
+## O "hoje" do banco não é o hoje do usuário
+
+⚠️ **O Postgres do Supabase roda em UTC, e das 21h à meia-noite `current_date` já é amanhã.**
+Medido em 10/09/2026 às 21h03 BRT: aparelho e Mac diziam `10/09`, o banco dizia `11/09`. Nas
+três horas finais de todo dia a projeção começava amanhã (largando o que ainda vence hoje), "o
+que vence" perdia o dia, e o ciclo virava cedo — com fechamento no dia 10, às 21h do dia 10 o
+app já mostrava o ciclo seguinte.
+
+**24 funções usavam `current_date`** e a correção não foi reescrever nenhuma:
+`alter function ... set timezone to 'America/Sao_Paulo'` (`20260911030000`) fixa a GUC pela
+DURAÇÃO da chamada. O corpo não muda, o default do banco não muda, e como a GUC vale para tudo
+que a função chamar, a porta pública leva o fuso certo para a árvore inteira. Provado antes de
+aplicar: `cycle_now` devolvia `diasAteOFim` 19 em UTC e 20 com o fuso.
+
+⚠️ **Não mude o fuso do BANCO.** A doc do Supabase é explícita — *"strongly recommend keeping
+it [UTC]"* —, e `alter database` arrastaria junto `auth`, `storage`, `realtime` e os
+checkpoints do LangGraph.
+
+⚠️ **O fuso é fixo, e é decisão.** O produto é brasileiro em todas as pontas e não existe
+coluna de fuso. Quando existir, o caminho é `private.today(ws_ids)` lendo
+`workspaces.timezone`, e as 24 linhas viram `reset timezone`.
+
+**Função nova que use `current_date` precisa do `set timezone` junto** — senão ela volta a
+enxergar o dia do UTC, e o sintoma aparece só depois das 21h.
+
 ## O mês financeiro fecha no dia que o usuário paga, não no dia 31
 
 ⚠️ **"Do dia 1 ao 31" é uma suposição, e para quem paga tudo num dia só ela corta o ciclo ao

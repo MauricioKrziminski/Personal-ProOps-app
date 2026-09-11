@@ -1,7 +1,8 @@
 import { useState } from 'react';
-import { Platform, ScrollView, StyleSheet, View, useWindowDimensions } from 'react-native';
+import { Platform, Pressable, ScrollView, StyleSheet, View, useWindowDimensions } from 'react-native';
 import { router } from 'expo-router';
 import * as Haptics from 'expo-haptics';
+import Animated, { FadeIn } from 'react-native-reanimated';
 
 import { ThemedText } from '@/components/themed-text';
 import { AlertPreferencesSection } from '@/components/profile/alert-preferences-section';
@@ -16,9 +17,8 @@ import { useToast } from '@/components/ui/toast';
 import { GradientSurface } from '@/components/ui/gradient';
 import { Button } from '@/components/ui/button';
 import { Field, TextField } from '@/components/ui/field';
-import { SelectField } from '@/components/ui/select-field';
 import { Sheet } from '@/components/ui/sheet';
-import { Radius, Space, tabular } from '@/design/tokens';
+import { Motion, Radius, Space, tabular } from '@/design/tokens';
 import { currentMonth } from '@/components/finance/month-picker';
 import { environmentLabel } from '@/lib/environment';
 import { useAiMonthStats, useCycle, usePlanStatus, useSetCycleCloseDay } from '@/hooks/use-finance';
@@ -122,31 +122,148 @@ export default function ProfileScreen() {
    * data de VENCIMENTO. Uma compra no dia 4 no Nubank já não entra na fatura que vence dia 10 —
    * isso valia antes e continua valendo. O ciclo só move a régua que corta os gráficos.
    *
-   * Teto de 28 para o dia existir em fevereiro: sem isso o ciclo mudaria de tamanho conforme o
-   * mês, que é exatamente o defeito que ele resolve.
+   * ## Por que uma GRADE, e não o `SelectField`
+   *
+   * A primeira versão usava o seletor de lista, e ele estava errado por dois motivos ao mesmo
+   * tempo — a queixa foi literal: *"como assim abre um mundo de uma caixa de seleção para
+   * escolher de 1 até 31?"*. Escolher um DIA DO MÊS não é escolher um item de lista curta: são
+   * 29 opções homogêneas, sem nome, que a pessoa compara por posição e não por leitura. Numa
+   * lista elas viram 29 linhas de rolagem para um número; numa grade de 7 colunas cabem todas
+   * na tela de uma vez, como num calendário — que é a forma que a pessoa já sabe ler.
+   *
+   * `SelectField` continua certo para conta, categoria e cartão. Componente pronto não vira o
+   * componente certo só porque aceita os dados.
+   *
+   * ## Por que UM número define os dois extremos
+   *
+   * A outra metade da queixa foi *"onde eu defino um começo e final para o meu ciclo?"*. Não
+   * dá para escolher os dois: eles são grudados — o mês seguinte começa no dia após o anterior
+   * fechar. Explicar isso em texto não resolve; o que resolve é o intervalo aparecer em cima,
+   * grande, e MUDAR junto com o toque. A pessoa toca no 10 e lê "de 11/08 a 10/09".
    */
+  const diaAtual = cycle.data?.closeDay ?? null;
+  /**
+   * ⚠️ **O campo nasce COLAPSADO, e a escolha só vale no Salvar.**
+   *
+   * A primeira versão deixava a grade sempre aberta: cinco fileiras de números ocupando um
+   * terço do Perfil para uma configuração que se mexe uma vez na vida. A queixa foi literal —
+   * *"não fica mostrando esse calendário aberto 100% do tempo que fica poluído"*. É a mesma
+   * régua do `SelectField` (§1 do design): campo de formulário mostra o VALOR; a escolha é o
+   * que aparece quando se vai trocá-la.
+   *
+   * O rascunho existe porque aqui a escolha CUSTA: trocar o dia remonta painel, tendência,
+   * projeção e lista. Gravar a cada toque faria quatro telas recalcularem enquanto o dedo
+   * ainda procura o número certo. Fecha sem salvar = nada mudou.
+   */
+  const [editandoCiclo, setEditandoCiclo] = useState(false);
+  const [diaRascunho, setDiaRascunho] = useState<number | null>(null);
+  const diaEmEdicao = editandoCiclo ? diaRascunho : diaAtual;
+  const mudou = editandoCiclo && diaRascunho !== diaAtual;
+
+  const abrirCiclo = () => {
+    setDiaRascunho(diaAtual);
+    setEditandoCiclo(true);
+  };
+  const salvarCiclo = () => {
+    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    if (mudou) setCloseDay.mutate(diaRascunho);
+    setEditandoCiclo(false);
+  };
+
+  const rotuloCiclo = diaAtual == null ? 'Último dia do mês' : `Fecha todo dia ${diaAtual}`;
+
   const cicloConfig = (
     <Section title="Meu mês">
-      <SelectField
-        placeholder="Último dia do mês"
-        value={cycle.data?.closeDay == null ? null : String(cycle.data.closeDay)}
-        onChange={(v) => setCloseDay.mutate(v == null ? null : Number(v))}
-        options={[
-          { id: null, label: 'Último dia do mês', meta: 'o padrão', neutral: true },
-          ...Array.from({ length: 28 }, (_, i) => ({
-            id: String(i + 1),
-            label: `Fecha no dia ${i + 1}`,
-            meta: `o mês vai do dia ${i + 2 > 28 ? 1 : i + 2} ao dia ${i + 1}`,
-          })),
-        ]}
-      />
       <Row
-        title="Ciclo atual"
+        title={rotuloCiclo}
         subtitle={
-          cycle.data ? `${isoToBR(cycle.data.de)} a ${isoToBR(cycle.data.ate)}` : 'carregando…'
+          cycle.data
+            ? `${isoToBR(cycle.data.de)} a ${isoToBR(cycle.data.ate)}`
+            : 'carregando…'
         }
         icon="calendar"
+        onPress={editandoCiclo ? () => setEditandoCiclo(false) : abrirCiclo}
+        accessibilityState={{ expanded: editandoCiclo }}
       />
+
+      {editandoCiclo ? (
+        <Animated.View entering={FadeIn.duration(Motion.duration.fast)}>
+          <View style={styles.cicloGrade}>
+            {Array.from({ length: 28 }, (_, i) => i + 1).map((dia) => {
+              const escolhido = diaEmEdicao === dia;
+              return (
+                <Pressable
+                  key={dia}
+                  accessibilityRole="button"
+                  accessibilityState={{ selected: escolhido }}
+                  accessibilityLabel={`Fechar o mês no dia ${dia}`}
+                  onPress={() => {
+                    Haptics.selectionAsync();
+                    setDiaRascunho(dia);
+                  }}
+                  style={[
+                    styles.cicloDia,
+                    {
+                      backgroundColor: escolhido ? theme.tint : theme.surface,
+                      borderColor: escolhido ? theme.tint : theme.cardBorder,
+                    },
+                  ]}>
+                  <ThemedText
+                    type="default"
+                    style={[tabular, escolhido ? { color: theme.onTint } : undefined]}>
+                    {dia}
+                  </ThemedText>
+                </Pressable>
+              );
+            })}
+          </View>
+
+          {/*
+            Fora da grade de propósito: "último dia" não é um número entre 1 e 28, é a AUSÊNCIA
+            de escolha (e o padrão). Dentro dela leria como um 29º dia — e o mês nem sempre tem.
+          */}
+          <Pressable
+            accessibilityRole="button"
+            accessibilityState={{ selected: diaEmEdicao == null }}
+            onPress={() => {
+              Haptics.selectionAsync();
+              setDiaRascunho(null);
+            }}
+            style={[
+              styles.cicloUltimo,
+              {
+                backgroundColor: diaEmEdicao == null ? theme.tint : theme.surface,
+                borderColor: diaEmEdicao == null ? theme.tint : theme.cardBorder,
+              },
+            ]}>
+            <ThemedText
+              type="default"
+              style={diaEmEdicao == null ? { color: theme.onTint } : undefined}>
+              Último dia do mês
+            </ThemedText>
+          </Pressable>
+
+          {/*
+            A prévia fica COLADA no botão: é a resposta a "onde eu defino começo e fim?". Não dá
+            para escolher os dois — o mês seguinte começa no dia após o anterior fechar —, então
+            o que resolve não é explicar, é o intervalo mudar junto com o dedo.
+          */}
+          <View style={styles.cicloSalvar}>
+            <ThemedText type="footnote" themeColor="textSecondary" style={tabular}>
+              {diaEmEdicao == null
+                ? 'do dia 1 ao último dia de cada mês'
+                : `do dia ${diaEmEdicao === 28 ? 1 : diaEmEdicao + 1} de um mês ao dia ${diaEmEdicao} do seguinte`}
+            </ThemedText>
+            <Button
+              label={mudou ? 'Salvar' : 'Fechar'}
+              variant={mudou ? 'primary' : 'secondary'}
+              onPress={salvarCiclo}
+              loading={setCloseDay.isPending}
+              block
+            />
+          </View>
+        </Animated.View>
+      ) : null}
     </Section>
   );
 
@@ -530,6 +647,49 @@ function Stat({ valor, rotulo, limite }: { valor: string; rotulo: string; limite
 }
 
 const styles = StyleSheet.create({
+  /*
+    7 colunas, como a semana de um calendário — é a grade que a pessoa já sabe varrer com o
+    olho. `flexBasis` em vez de largura fixa: a calha muda entre 384dp e um tablet, e um número
+    cravado deixaria a última coluna fora ou uma faixa vazia à direita.
+  */
+  cicloGrade: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: Space.sm,
+    paddingHorizontal: Space.lg,
+    paddingBottom: Space.md,
+  },
+  /*
+    ⚠️ `minHeight`, nunca `height`. O conteúdo é TEXTO e cresce com a fonte do sistema: a 1,3×
+    um alvo de altura fixa corta o número. 44 é o mínimo de toque; daí para cima quem manda é
+    o texto.
+  */
+  cicloDia: {
+    flexBasis: '12%',
+    flexGrow: 1,
+    minHeight: 44,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: Radius.sm,
+    borderWidth: 1,
+    borderCurve: 'continuous',
+  },
+  cicloSalvar: {
+    paddingHorizontal: Space.lg,
+    paddingBottom: Space.md,
+    gap: Space.sm,
+  },
+  cicloUltimo: {
+    marginHorizontal: Space.lg,
+    marginBottom: Space.md,
+    minHeight: 44,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: Space.sm,
+    borderRadius: Radius.sm,
+    borderWidth: 1,
+    borderCurve: 'continuous',
+  },
   /*
     `flexWrap`: com fonte grande o rótulo + os três segmentos não cabem na mesma linha, e apertar
     o controle partia "Sistema" em "Sistem/a" dentro da célula. Aqui quem cede é o LAYOUT — o
