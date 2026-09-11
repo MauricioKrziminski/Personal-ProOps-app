@@ -30,19 +30,16 @@ App mobile pessoal de **notas rápidas, lembretes e controle financeiro operado 
   Isso já falhou **duas vezes** (03/09/2026): a `0049` e depois as `0050`/`0051` foram anunciadas
   como "aplicadas em produção" quando foram para o staging.
 
-  Produção está em **`20260911061000`**, conferido na fonte em 11/09/2026 com
-  `link --project-ref` + `db push` + `link` de volta para o staging, que é o caminho do Gabriel.
-  **`--db-url` não serve**: o hook lê o projeto LINKADO e a flag passava por cima da trava em
-  silêncio — buraco fechado no mesmo dia, com `scripts/supabase-target.test.sh` prendendo os
-  sete casos.
+  Produção está em **`20260911120000`**, conferido na fonte em 11/09/2026 — e o repo não tem
+  nenhuma migration fora de lá. O caminho é `link --project-ref` + `db push` + `link` de volta
+  para o staging, rodado pelo Gabriel. **`--db-url` não serve**: o hook lê o projeto LINKADO e a
+  flag passava por cima da trava em silêncio — buraco fechado no mesmo dia, com
+  `scripts/supabase-target.test.sh` prendendo os sete casos.
 
-  **Duas migrations do repo ainda NÃO estão lá**, ambas de 11/09/2026 e ambas protetivas:
-
-  - `20260911070000` — pagar fatura exige a conta de origem. Sem ela a RPC aceita
-    `p_account_id` nulo, a fatura fica paga e **nenhum saldo se mexe**.
-  - `20260911120000` — o `CHECK` de `draft_actions.slot` passa a aceitar `description`. Sem ela
-    toda mensagem sem descrição ("gastei 45 no bradesco") derruba o turno com CheckViolation, e
-    o usuário lê "não consegui processar".
+  ⚠️ **A trava só abre com o Gabriel, e isso é o desenho, não um atrito a contornar.** O hook
+  `PreToolUse` roda em processo próprio: `PROOPS_PROD_OK=1` exportado dentro da sessão do agente
+  **não** chega nele. Um agente não consegue liberar a si mesmo — quem roda o comando é o dono do
+  banco. Foi assim que as duas de 11/09/2026 subiram.
 
   ⚠️ **Este número envelhece calado, e envelhecer aqui é caro — nos DOIS sentidos.** Ele já ficou
   14 migrations atrasado, e em 09/09/2026 quase virou "não suba o OTA, produção está sem as
