@@ -852,7 +852,9 @@ async def _gate(state: AgentState) -> dict:
             from app.tools.finance import resolve_account, verificar_limite_disponivel
             acc_id = await resolve_account(state["workspace_id"], acao.account, only_cards=True)
             if acc_id:
-                limite_res = await verificar_limite_disponivel(state["workspace_id"], acc_id, acao.amount_cents)
+                limite_res = await verificar_limite_disponivel(
+                    state["workspace_id"], state["user_id"], acc_id, acao.amount_cents
+                )
                 if limite_res.get("excedeu"):
                     card_name = limite_res.get("card_name") or acao.account
                     limite_str = cents_to_brl(limite_res["limite_centavos"])

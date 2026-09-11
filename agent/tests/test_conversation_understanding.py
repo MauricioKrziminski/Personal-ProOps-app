@@ -61,7 +61,7 @@ async def test_change_named_card_requires_second_confirmation_before_write(
     async def account(ws, name, **kwargs):
         return name
 
-    async def limit(ws, account_id, amount):
+    async def limit(ws, user_id, account_id, amount):
         return {
             "excedeu": account_id == "Nubank",
             "card_name": account_id,

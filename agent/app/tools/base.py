@@ -79,6 +79,22 @@ class ToolResult:
 # invoker` e confiavam na RLS — chamadas daqui, elas NÃO checam nada.
 
 
+# ---------------------------------------------------------------------------
+# fatura em aberto: 'rolled' NÃO é aberta, e não é paga
+# ---------------------------------------------------------------------------
+# A 20260911040000 criou o status `rolled` — a fatura vencida cujo saldo foi
+# para a próxima (o rotativo). Ela não foi paga, mas o dinheiro já mudou de
+# fatura, e o cron `_roll_overdue_invoices` cria essas linhas sozinho de hora em
+# hora para todo cartão com `rotativo_auto`.
+#
+# `status <> 'paid'` a trata como aberta. Foi assim que o agente passou a somar
+# o mesmo dinheiro duas vezes (na origem e no destino), a oferecer fatura já
+# adiada como candidata, e a responder "quitados sem sair do caixa" para uma
+# fatura que ninguém pagou. A migration conta 15 ocorrências em 9 funções do
+# SQL; as do Python não estavam nessa conta.
+FATURA_ABERTA = "status not in ('paid','rolled')"
+
+
 async def ensure_owned(table: str, row_id, workspace_id) -> None:
     """Confirma que a linha pertence ao workspace da conversa."""
     from app import db

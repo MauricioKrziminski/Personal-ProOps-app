@@ -20,6 +20,7 @@ from app import db
 from app.domain import matching
 from app.domain.reference import clean_term, wants_latest, wants_whole_plan
 from app.tools import finance
+from app.tools.base import FATURA_ABERTA
 from app.graph.schemas import (
     FinanceAction,
     FinanceActionType,
@@ -156,12 +157,12 @@ _FONTES: dict[str, dict] = {
     },
     "faturas": {
         "table": "card_invoices",
-        "sql": """select ci.id, ci.due_date, ci.reference_month, a.name as card_name,
+        "sql": f"""select ci.id, ci.due_date, ci.reference_month, a.name as card_name,
                          private.invoice_open_cents(ci.id) as aberto
                   from public.card_invoices ci
                   join public.accounts a
                     on a.id = ci.account_id and a.workspace_id = ci.workspace_id
-                  where ci.workspace_id = %s and ci.status <> 'paid' and a.name ilike %s
+                  where ci.workspace_id = %s and ci.{FATURA_ABERTA} and a.name ilike %s
                   order by ci.due_date limit %s""",
         "label": _rotulo_fatura,
         "detalhe": _detalhe_fatura,

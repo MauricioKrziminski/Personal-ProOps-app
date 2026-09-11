@@ -36,6 +36,7 @@ async def test_quita_pela_rpc_e_nao_cria_transferencia(monkeypatch):
     async def fetch_one(sql, *args):
         chamadas.append(sql)
         return {"id": ALVO["candidates"][0]["id"], "due_date": "2026-10-10",
+                "status": "open", "destino_due": None,
                 "card_name": "Nubank", "aberto": 37164}
 
     async def execute(sql, *args):
@@ -74,3 +75,35 @@ def test_confirmacao_diz_que_o_caixa_nao_se_move():
     frase = describe_for_confirmation(acao, ALVO)
     # "dar baixa na fatura" leria igual a pagar; o SIM tem que distinguir os dois
     assert "SEM tirar do caixa" in frase and "Nubank" in frase
+
+
+@pytest.mark.asyncio
+async def test_fatura_adiada_nao_e_quitada(monkeypatch):
+    """A regressão do rotativo: adiada NÃO é paga, e a frase tem que dizer isso.
+
+    Com `status <> 'paid'` no filtro, uma fatura `rolled` passava pelo `where`,
+    `settle_invoice` voltava cedo (é idempotente) e o agente respondia
+    "✅ quitados sem sair do caixa" — sucesso falso sobre dinheiro que foi para a
+    próxima fatura, não para o banco.
+    """
+    chamadas = []
+
+    async def fetch_one(sql, *args):
+        chamadas.append(sql)
+        return {"id": ALVO["candidates"][0]["id"], "due_date": "2026-09-10",
+                "status": "rolled", "destino_due": "2026-10-10",
+                "card_name": "Nubank", "aberto": 0}
+
+    async def execute(sql, *args):
+        chamadas.append(sql)
+
+    monkeypatch.setattr(finance.db, "fetch_one", fetch_one)
+    monkeypatch.setattr(finance.db, "execute", execute)
+
+    r = await finance.mark_paid(_ctx(), FinanceAction(type=FinanceActionType.MARK_PAID))
+
+    assert r.read_only, "não pode gravar nada numa fatura já adiada"
+    assert not any("settle_invoice" in c for c in chamadas)
+    assert "adiada" in r.message and "não paga" in r.message
+    assert "10/10/2026" in r.message, "precisa dizer para onde o saldo foi"
+    assert "quitados" not in r.message

@@ -19,7 +19,7 @@ from app.domain.money import cents_to_brl, parse_valor_em_centavos
 from app.domain.recurrence import next_occurrence
 from app.graph.schemas import FinanceAction, FinanceActionType
 from app.tools import guards
-from app.tools.base import ExecContext, ToolResult, ensure_owned
+from app.tools.base import FATURA_ABERTA, ExecContext, ToolResult, ensure_owned
 from app.tools.guards import Level1Error
 
 log = logging.getLogger(__name__)
@@ -370,16 +370,47 @@ async def create_installment_purchase(
     )
 
 
+async def _aviso_de_fatura_adiada(account_id, workspace_id) -> str | None:
+    """Explica o silêncio quando o cartão não tem fatura aberta mas TEM uma adiada.
+
+    Sem isto a resposta é "não achei fatura em aberto" — tecnicamente verdade e
+    inútil: a pessoa está olhando a fatura na tela do app, marcada como Adiada.
+    Roda só no caminho em que já íamos responder que não há nada, então não custa
+    nada no caminho normal.
+    """
+    linha = await db.fetch_one(
+        """
+        select ci.due_date, destino.due_date as destino_due
+        from public.card_invoices ci
+        left join public.card_invoices destino on destino.id = ci.rolled_into_invoice_id
+        where ci.account_id = %s and ci.workspace_id = %s and ci.status = 'rolled'
+        order by ci.due_date desc
+        limit 1
+        """,
+        account_id,
+        workspace_id,
+    )
+    if not linha:
+        return None
+    venceu = format_date_br(linha["due_date"])
+    if linha.get("destino_due"):
+        return (
+            f"A fatura que vencia em {venceu} foi adiada — o saldo dela, com juros e IOF, "
+            f"entrou na fatura de {format_date_br(linha['destino_due'])}."
+        )
+    return f"A fatura que vencia em {venceu} foi adiada para a próxima."
+
+
 async def pay_invoice(ctx: ExecContext, action: FinanceAction) -> ToolResult:
     cartao = await resolve_account(ctx.workspace_id, action.account, only_cards=True)
     if not cartao:
         raise Level1Error("❌ Qual cartão? Me fala o nome dele (ex.: \"paguei a fatura do nubank\").")
 
     fatura = await db.fetch_one(
-        """
+        f"""
         select ci.id, ci.due_date, private.invoice_open_cents(ci.id) as aberto
         from public.card_invoices ci
-        where ci.account_id = %s and ci.workspace_id = %s and ci.status <> 'paid'
+        where ci.account_id = %s and ci.workspace_id = %s and ci.{FATURA_ABERTA}
         order by ci.due_date
         limit 1
         """,
@@ -387,6 +418,9 @@ async def pay_invoice(ctx: ExecContext, action: FinanceAction) -> ToolResult:
         ctx.workspace_id,
     )
     if not fatura:
+        aviso = await _aviso_de_fatura_adiada(cartao, ctx.workspace_id)
+        if aviso:
+            return ToolResult(f"🤷 {aviso} Não há o que pagar nesse cartão agora.", read_only=True)
         return ToolResult("✅ Não achei fatura em aberto nesse cartão.", read_only=True)
 
     # "paguei 800 da fatura do nubank" é pagamento PARCIAL: o resto fica na fatura, como fica no
@@ -416,65 +450,65 @@ async def pay_invoice(ctx: ExecContext, action: FinanceAction) -> ToolResult:
 
 
 async def verificar_limite_disponivel(
-    workspace_id: UUID | str, account_id: UUID | str | None, valor_total_centavos: int
+    workspace_id: UUID | str,
+    user_id: UUID | str,
+    account_id: UUID | str | None,
+    valor_total_centavos: int,
 ) -> dict:
-    """Verifica se a compra excede o limite disponível do cartão de crédito (Soft Warning)."""
+    """Verifica se a compra excede o limite disponível do cartão (Soft Warning).
+
+    Quem calcula é `public._card_summary`, a MESMA RPC que `query_invoice` usa —
+    não uma soma aqui. Antes havia um `select sum(amount_cents)` próprio, e ele
+    errava de duas formas que ninguém via na tela:
+
+    * contava a fatura ADIADA (`status <> 'paid'` inclui `'rolled'`) junto com o
+      principal que já migrou para a fatura seguinte — o mesmo dinheiro duas
+      vezes, exatamente o erro que a 20260911040000 corrigiu nas 9 funções do
+      SQL e não alcançou aqui;
+    * somava `amount_cents` cru, ignorando `paid_cents`: quem pagou R$ 800 da
+      fatura continuava com os R$ 800 comendo o limite.
+
+    `available_limit_cents` sai de `invoice_open_cents` sobre faturas
+    `not in ('paid','rolled')` e acerta os dois.
+
+    O escopo vem da cadeia, não desta query: `account_id` já foi resolvido por
+    `resolve_account(workspace_id, ...)`, que filtra pelo workspace da conversa.
+    """
+    vazio = {
+        "excedeu": False,
+        "limite_centavos": None,
+        "disponivel_centavos": None,
+        "card_name": "",
+        "account_id": str(account_id) if account_id else None,
+    }
     if not account_id:
-        return {
-            "excedeu": False,
-            "limite_centavos": None,
-            "disponivel_centavos": None,
-            "card_name": "",
-            "account_id": None,
-        }
+        return vazio
 
-    acc = await db.fetch_one(
+    # `_card_summary` só devolve cartão de crédito ativo: conta corrente, conta
+    # arquivada e cartão sem limite simplesmente não aparecem, e aí não há aviso
+    # a dar — que é o comportamento antigo, sem o `if` de tipo.
+    linha = await db.fetch_one(
         """
-        select id, name, type, credit_limit_cents
-        from public.accounts
-        where id = %s and workspace_id = %s
+        select name, credit_limit_cents, available_limit_cents
+        from public._card_summary(%s)
+        where account_id = %s
         """,
+        user_id,
         account_id,
-        workspace_id,
     )
-    if not acc or acc.get("type") != "credit_card" or not acc.get("credit_limit_cents"):
-        return {
-            "excedeu": False,
-            "limite_centavos": None,
-            "disponivel_centavos": None,
-            "card_name": acc.get("name", "") if acc else "",
-            "account_id": str(account_id),
-        }
+    if not linha or not linha.get("credit_limit_cents"):
+        return vazio
 
-    limite = int(acc["credit_limit_cents"])
+    limite = int(linha["credit_limit_cents"])
     if limite <= 0:
-        return {
-            "excedeu": False,
-            "limite_centavos": limite,
-            "disponivel_centavos": None,
-            "card_name": acc.get("name", ""),
-            "account_id": str(account_id),
-        }
+        return {**vazio, "limite_centavos": limite, "card_name": linha.get("name") or ""}
 
-    aberto_row = await db.fetch_one(
-        """
-        select coalesce(sum(t.amount_cents), 0) as total
-        from public.transactions t
-        join public.card_invoices ci on ci.id = t.invoice_id
-        where ci.account_id = %s and ci.status <> 'paid' and t.workspace_id = %s
-        """,
-        account_id,
-        workspace_id,
-    )
-    aberto_cents = int(aberto_row["total"] or 0) if aberto_row else 0
-    disponivel = limite - aberto_cents
-    excedeu = valor_total_centavos > disponivel
-
+    disponivel = int(linha["available_limit_cents"] or 0)
     return {
-        "excedeu": excedeu,
+        "excedeu": valor_total_centavos > disponivel,
         "limite_centavos": limite,
         "disponivel_centavos": disponivel,
-        "card_name": acc.get("name", "Cartão"),
+        "card_name": linha.get("name") or "Cartão",
         "account_id": str(account_id),
     }
 
@@ -603,18 +637,41 @@ async def _quitar_fatura(ctx: ExecContext) -> ToolResult:
     if not cands:
         return ToolResult("🤷 Não achei essa fatura em aberto.", read_only=True)
 
+    # Traz o STATUS em vez de filtrar por ele: "paga" e "adiada" são situações
+    # diferentes e a resposta precisa dizer qual das duas. Filtrando, as duas
+    # viravam a mesma frase — e "já está quitada" para uma fatura que ninguém
+    # pagou é a mentira que o rotativo introduziu aqui.
+    # A janela entre resolver o alvo e executar é real: o cron adia sozinho de
+    # hora em hora.
     fatura = await db.fetch_one(
         """
-        select ci.id, ci.due_date, a.name as card_name,
+        select ci.id, ci.due_date, ci.status, a.name as card_name,
+               destino.due_date as destino_due,
                private.invoice_open_cents(ci.id) as aberto
         from public.card_invoices ci
         join public.accounts a on a.id = ci.account_id and a.workspace_id = ci.workspace_id
-        where ci.id = %s and ci.workspace_id = %s and ci.status <> 'paid'
+        left join public.card_invoices destino on destino.id = ci.rolled_into_invoice_id
+        where ci.id = %s and ci.workspace_id = %s
         """,
         cands[0]["id"], ctx.workspace_id,
     )
     if not fatura:
+        return ToolResult("🤷 Não achei essa fatura em aberto.", read_only=True)
+    if fatura["status"] == "rolled":
+        destino = (
+            f" O saldo dela entrou na fatura de {format_date_br(fatura['destino_due'])}."
+            if fatura.get("destino_due")
+            else ""
+        )
+        return ToolResult(
+            f"🤷 Essa fatura do *{fatura['card_name']}* (vencimento "
+            f"{format_date_br(fatura['due_date'])}) foi adiada, não paga.{destino} "
+            f"Quitar aqui não mudaria nada.",
+            read_only=True,
+        )
+    if fatura["status"] == "paid":
         return ToolResult("✅ Essa fatura já está quitada.", read_only=True)
+
 
     await db.execute("select public.settle_invoice(%s, %s)",
                      fatura["id"], local_iso_date(ctx.timezone))
