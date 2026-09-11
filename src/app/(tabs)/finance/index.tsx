@@ -587,12 +587,14 @@ export default function FinanceScreen() {
             }
           />
           <View style={styles.shortcuts}>
-            <Shortcut
-              title="Lançamentos"
-              icon="list.bullet"
-              href="/finance/transactions"
-              count={summary.data ? `${(summary.data ?? []).length} itens` : undefined}
-            />
+            {/*
+              ⚠️ **Sem contagem aqui: `summary` NÃO conta lançamentos.** `transactions_summary`
+              devolve uma linha por (tipo, categoria), então o atalho escrevia "8 itens" com 200
+              lançamentos em 8 categorias. Os outros três atalhos contam a própria coleção e por
+              isso ficaram. Design §8: badge é contagem real ou não existe — número que não é o
+              que o rótulo promete ensina a pessoa a não ler os números da tela.
+            */}
+            <Shortcut title="Lançamentos" icon="list.bullet" href="/finance/transactions" />
             <Shortcut
               title="Contas"
               icon="wallet.pass"
