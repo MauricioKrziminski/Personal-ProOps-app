@@ -390,6 +390,55 @@ test('nenhum glifo de texto fazendo papel de ícone', () => {
   assert.deepEqual(fora, [], 'use <Icon name=...>: glifo de texto cresce com a fonte e não tem mapa Android');
 });
 
+/**
+ * Campo de formulário é `TextField`, não `TextInput` cru.
+ *
+ * Era o defeito mais visível do onboarding antigo: um `TextInput` com borda e
+ * `...Type.body` escritos à mão, visivelmente diferente de todo outro campo do
+ * app (contorno cinza em vez da superfície com raio `sm`). A tela que escreve o
+ * próprio input escreve a própria versão de "campo com erro" logo depois — e aí
+ * são dois desenhos de foco, dois de erro, dois de placeholder.
+ *
+ * Os PRIMITIVOS podem: eles são a implementação do campo. A exceção de tela é
+ * uma só, e ela não é um campo:
+ *
+ * - `notes/[id].tsx` — o CORPO da nota é um editor de página inteira, multilinha,
+ *   com `selection` controlada para a barra de blocos saber em que linha agir.
+ *   Embrulhar isso num `TextField` seria pôr uma moldura de formulário em volta
+ *   de uma folha de papel.
+ */
+const INPUT_CRU_PERMITIDO = new Set([
+  'src/components/ui/field.tsx',
+  'src/components/ui/search-field.tsx',
+  'src/components/auth/otp-input.tsx',
+  'src/components/auth/phone-field.tsx',
+  'src/components/finance/money-input.tsx',
+  'src/app/notes/[id].tsx',
+]);
+
+test('nenhuma tela desenha o próprio campo de texto', () => {
+  const fora: string[] = [];
+  for (const file of walk(SRC)) {
+    if (file.endsWith('.test.ts') || file.endsWith('.test.tsx')) continue;
+    const rel = file.replace(SRC, 'src');
+    if (INPUT_CRU_PERMITIDO.has(rel)) continue;
+    stripComments(readFileSync(file, 'utf8'))
+      .split('\n')
+      .forEach((line, n) => {
+        // ⚠️ `>` FORA da classe: `useRef<TextInput>(null)` é a tipagem de uma
+        // ref de foco e não desenha campo nenhum — cinco telas legítimas caíam
+        // aqui quando ele estava dentro. O ELEMENTO vem seguido de espaço (as
+        // props descem para a linha de baixo) ou de `/`.
+        if (/<TextInput([\s/]|$)/.test(line)) fora.push(`${rel}:${n + 1}`);
+      });
+  }
+  assert.deepEqual(
+    fora,
+    [],
+    'use <TextField> (ou o primitivo do domínio): campo escrito à mão diverge no foco, no erro e no placeholder'
+  );
+});
+
 test('nenhuma tela monta lista de conta à mão', () => {
   // Só o próprio seletor pode iterar contas para desenhar opção; `accounts.tsx`
   // é a tela que GERENCIA contas (ali a lista é o conteúdo, não um campo).
