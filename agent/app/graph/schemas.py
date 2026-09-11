@@ -186,6 +186,16 @@ class FinanceQueryType(str, Enum):
     # persistido em lugar nenhum (consulta é `read_only`, não gera pendência), então
     # renomear não deixa dado velho para trás.
     SIMULATE_SCENARIO = "simulate_scenario"
+    # O MÊS FINANCEIRO do usuário: de quando a quando ele vai e que dia fecha.
+    # `workspaces.cycle_close_day` existe desde a 20260911020000 e o app inteiro já
+    # o respeita, mas o agente não sabia que ele existia: "qual é o meu ciclo atual?"
+    # devolvia a LISTA DE FATURAS DE CARTÃO, porque "ciclo" sem mais nada é o ciclo
+    # do cartão para o modelo. Medido em 11/09/2026 no emulador, com o agente de
+    # staging — não é hipótese.
+    #
+    # Teto MEDIDO com o Gemini real no mesmo dia (`probe_query_schema.py`):
+    # 10×14 = 140 passa e 11×13 = 143 passa. Aqui ficamos em 10×12 = 120, com folga.
+    QUERY_CYCLE = "query_cycle"
     UNKNOWN = "unknown"
 
 

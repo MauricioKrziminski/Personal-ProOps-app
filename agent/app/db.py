@@ -1018,3 +1018,42 @@ async def mark_chat_deleting(session_id: UUID, user_id: UUID) -> dict[str, Any] 
 async def drop_chat_session(session_id: UUID) -> None:
     """Mensagens, pendências e rascunhos saem por cascade da FK."""
     await execute("delete from public.user_sessions where id = %s", session_id)
+
+
+async def cycle(workspace_id, hoje: str) -> dict[str, Any] | None:
+    """Bordas do MÊS FINANCEIRO do workspace: de quando a quando ele vai.
+
+    `workspaces.cycle_close_day` (migration `20260911020000`) deixa o usuário
+    fechar o mês no dia em que ele paga as contas — null = último dia do mês,
+    que é o comportamento antigo. Quem tem salário no dia 5 e fatura vencendo
+    no 10 vive de 11 a 10, e lido de 1 a 31 nenhum número da tela bate com o
+    que ele vê no extrato.
+
+    ⚠️ **Não usar `public.cycle_now()`.** Ela é `security invoker` e resolve o
+    workspace por `private.my_workspace_ids()`, que lê `auth.uid()` — NULL aqui,
+    porque o serviço conecta com papel que ignora RLS. Ela responderia
+    `closeDay: null` e o mês CIVIL para todo usuário, sempre, **sem erro
+    nenhum**. As três `private.*` aceitam o escopo explícito e são o caminho
+    certo para quem já tem o `workspace_id` na mão. O precedente de chamar
+    `private.*` direto daqui já existe: `private.invoice_open_cents`.
+
+    ⚠️ **`hoje` vem de fora, em BRT.** `cycle_bounds` e `cycle_month_of` são
+    `immutable` e não herdam o `set timezone` da `20260911030000` — quem entra
+    por elas direto precisa passar a data já resolvida, senão das 21h à
+    meia-noite o ciclo vira um dia antes do tempo. `local_iso_date(tz)`.
+    """
+    return await fetch_one(
+        """
+        select c.dia                                  as close_day,
+               b.ini, b.fim,
+               private.mes_pt(m.mes)                  as rotulo,
+               to_char(m.mes, 'YYYY-MM')              as mes,
+               greatest(1, b.fim - %s::date)          as dias_ate_o_fim
+        from (select private.cycle_close_day(array[%s::uuid]) as dia) c
+        cross join lateral (select private.cycle_month_of(c.dia, %s::date) as mes) m
+        cross join lateral private.cycle_bounds(c.dia, m.mes) b
+        """,
+        hoje,
+        workspace_id,
+        hoje,
+    )

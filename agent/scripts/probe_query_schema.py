@@ -101,7 +101,7 @@ async def main() -> int:
 
     print("FinanceQuery — somar tipos de consulta")
     ok["fq_atual"] = await tenta("atual (controle)", _plano("fq0", FinanceQuery, fq, 0), nfq, len(fq))
-    for n in (2, 3):
+    for n in (1, 2, 3):
         tipos = fq + [f"query_extra_{i}" for i in range(n)]
         ok[f"fq+{n}"] = await tenta(f"+{n} tipos", _plano(f"fq{n}", FinanceQuery, tipos, 0), nfq, len(tipos))
     print("\nFinanceQuery — somar tipos E uma propriedade (alvo por texto)")
@@ -120,6 +120,7 @@ async def main() -> int:
         print(f"  {VERMELHO}os CONTROLES falharam — o problema não é tamanho de schema{FIM}")
         return 1
     for chave, rotulo in (
+        ("fq+1", "FinanceQuery cabe +1 tipo (query_cycle)"),
         ("fq+2", "FinanceQuery cabe +2 tipos"),
         ("fq+3", "FinanceQuery cabe +3 tipos"),
         ("fq+2+1p", "FinanceQuery cabe +2 tipos e +1 propriedade"),

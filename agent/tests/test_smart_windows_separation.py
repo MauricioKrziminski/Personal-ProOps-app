@@ -117,7 +117,13 @@ class TestSmartWindows:
         assert ate == hoje
 
     @pytest.mark.asyncio
-    async def test_sem_data_em_conta_corrente_busca_ultimos_30_dias(self, monkeypatch):
+    async def test_sem_data_em_conta_corrente_busca_o_mes_do_usuario(self, monkeypatch):
+        """A janela default é o MÊS FINANCEIRO, não 30 dias corridos.
+
+        Mudou em 11/09/2026. A janela de 30 dias não termina em borda nenhuma:
+        com `cycle_close_day = 10`, a tela somava de 11/08 a 10/09 e o agente
+        somava os últimos 30 dias, e os dois números discordavam sem erro.
+        """
         queries_feitas = []
         hoje = local_iso_date("America/Sao_Paulo")
 
@@ -128,8 +134,14 @@ class TestSmartWindows:
             queries_feitas.append((query, args))
             return []
 
+        async def cycle(workspace_id, dia):
+            from datetime import date
+            return {"ini": date(2026, 8, 11), "fim": date(2026, 9, 10),
+                    "close_day": 10, "rotulo": "setembro", "dias_ate_o_fim": 1}
+
         monkeypatch.setattr(db, "accounts", accounts)
         monkeypatch.setattr(db, "fetch", fetch)
+        monkeypatch.setattr(db, "cycle", cycle)
 
         action = FinanceQuery(type=FinanceQueryType.QUERY_TRANSACTIONS, account="itaú")
         ctx = _ctx("extrato da conta itaú")
@@ -139,5 +151,32 @@ class TestSmartWindows:
         assert len(queries_feitas) == 1
         _, args = queries_feitas[0]
         de, ate = args[5], args[6]
-        assert de == add_months(hoje, -1)
-        assert ate == hoje
+        assert de == "2026-08-11", "o início é a borda do ciclo, não hoje-30"
+        assert ate == hoje, "o fim continua sendo hoje: mexer nele mexe na projeção"
+
+    @pytest.mark.asyncio
+    async def test_sem_ciclo_configurado_cai_nos_30_dias(self, monkeypatch):
+        """Rede de segurança: se a leitura do ciclo falhar, a janela antiga vale."""
+        queries_feitas = []
+        hoje = local_iso_date("America/Sao_Paulo")
+
+        async def accounts(workspace_id, only_cards=False):
+            return [{"id": CHECKING_ID, "name": "Itaú Corrente", "type": "checking"}]
+
+        async def fetch(query, *args):
+            queries_feitas.append((query, args))
+            return []
+
+        async def cycle(workspace_id, dia):
+            return None
+
+        monkeypatch.setattr(db, "accounts", accounts)
+        monkeypatch.setattr(db, "fetch", fetch)
+        monkeypatch.setattr(db, "cycle", cycle)
+
+        await queries.query_transactions(
+            _ctx("extrato da conta itaú"),
+            FinanceQuery(type=FinanceQueryType.QUERY_TRANSACTIONS, account="itaú"),
+        )
+        _, args = queries_feitas[0]
+        assert args[5] == add_months(hoje, -1)

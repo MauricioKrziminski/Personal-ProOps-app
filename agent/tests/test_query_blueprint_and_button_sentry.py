@@ -39,6 +39,12 @@ class TestQueryBlueprintAndButtonSentry:
                 for i in range(1, 11)
             ]
 
+        # O ciclo é lido por `db.cycle` antes da janela default (11/09/2026).
+        # Dublê aqui para o teste continuar contando só as queries que ele mede.
+        async def _sem_ciclo(workspace_id, dia):
+            return None
+
+        monkeypatch.setattr(db, "cycle", _sem_ciclo)
         monkeypatch.setattr(db, "fetch", fetch)
 
         # Contexto contendo last_query_data com blueprint de projeção futura (03/06 a 30/11)
@@ -102,6 +108,12 @@ class TestQueryBlueprintAndButtonSentry:
                 for i in range(1, 7)  # 6 itens no total
             ]
 
+        # O ciclo é lido por `db.cycle` antes da janela default (11/09/2026).
+        # Dublê aqui para o teste continuar contando só as queries que ele mede.
+        async def _sem_ciclo(workspace_id, dia):
+            return None
+
+        monkeypatch.setattr(db, "cycle", _sem_ciclo)
         monkeypatch.setattr(db, "fetch", fetch)
 
         # Página 2: offset = 3, trazendo os 3 itens finais (total_exibidos = 6 de 6)
@@ -167,6 +179,12 @@ class TestQueryBlueprintAndButtonSentry:
             return fake_rows
 
         monkeypatch.setattr(db, "accounts", accounts)
+        # O ciclo é lido por `db.cycle` antes da janela default (11/09/2026).
+        # Dublê aqui para o teste continuar contando só as queries que ele mede.
+        async def _sem_ciclo(workspace_id, dia):
+            return None
+
+        monkeypatch.setattr(db, "cycle", _sem_ciclo)
         monkeypatch.setattr(db, "fetch", fetch)
 
         # Turno 1: Primeira consulta
@@ -242,6 +260,12 @@ class TestQueryBlueprintAndButtonSentry:
         async def fetch(query, *args):
             return fake_rows
 
+        # O ciclo é lido por `db.cycle` antes da janela default (11/09/2026).
+        # Dublê aqui para o teste continuar contando só as queries que ele mede.
+        async def _sem_ciclo(workspace_id, dia):
+            return None
+
+        monkeypatch.setattr(db, "cycle", _sem_ciclo)
         monkeypatch.setattr(db, "fetch", fetch)
 
         state = {
@@ -280,6 +304,12 @@ class TestQueryBlueprintAndButtonSentry:
             return []
 
         monkeypatch.setattr(db, "accounts", accounts)
+        # O ciclo é lido por `db.cycle` antes da janela default (11/09/2026).
+        # Dublê aqui para o teste continuar contando só as queries que ele mede.
+        async def _sem_ciclo(workspace_id, dia):
+            return None
+
+        monkeypatch.setattr(db, "cycle", _sem_ciclo)
         monkeypatch.setattr(db, "fetch", fetch)
 
         # LLM extraiu query_from = 2026-06-03 e query_to = 2026-09-01 (hoje), mas texto pede projeção futura dos próximos 90 dias
@@ -337,6 +367,12 @@ class TestQueryBlueprintAndButtonSentry:
             return fake_rows
 
         monkeypatch.setattr(db, "accounts", accounts)
+        # O ciclo é lido por `db.cycle` antes da janela default (11/09/2026).
+        # Dublê aqui para o teste continuar contando só as queries que ele mede.
+        async def _sem_ciclo(workspace_id, dia):
+            return None
+
+        monkeypatch.setattr(db, "cycle", _sem_ciclo)
         monkeypatch.setattr(db, "fetch", fetch)
 
         state = {
@@ -397,6 +433,12 @@ class TestQueryBlueprintAndButtonSentry:
             return fake_rows
 
         monkeypatch.setattr(db, "accounts", accounts)
+        # O ciclo é lido por `db.cycle` antes da janela default (11/09/2026).
+        # Dublê aqui para o teste continuar contando só as queries que ele mede.
+        async def _sem_ciclo(workspace_id, dia):
+            return None
+
+        monkeypatch.setattr(db, "cycle", _sem_ciclo)
         monkeypatch.setattr(db, "fetch", fetch)
 
         # Contexto já continha uma consulta anterior (last_query_data dos últimos 90 dias)

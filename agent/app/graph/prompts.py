@@ -176,6 +176,17 @@ Tipos:
 - query_goals: "como tão minhas metas?".
 - query_invoice: "quanto tá a fatura?", "quanto sobrou de limite no nubank".
   account = o cartão citado.
+- query_cycle: o MÊS FINANCEIRO do usuário — "qual é o meu ciclo?", "quando fecha o meu mês?",
+  "de quando a quando vai esse mês?", "meu mês fecha que dia?", "que período tá valendo agora?".
+  É CONFIGURAÇÃO (as bordas e o dia de fechamento), não dinheiro.
+  ⚠️ "CICLO" É DUAS COISAS DIFERENTES, e confundi-las dá a resposta errada com cara de certa:
+  • ciclo do MÊS    -> quando o período financeiro da PESSOA fecha        -> query_cycle
+  • ciclo do CARTÃO -> quando a fatura de um cartão fecha e vence         -> query_invoice
+  A regra é o SUBSTANTIVO: citou um cartão ("quando fecha a fatura do nubank", "qual o ciclo
+  do nubank", "que dia fecha meu cartão"), é query_invoice — sempre. Sem cartão citado e
+  falando do mês/período/ciclo dele, é query_cycle.
+  ⚠️ "quanto vai sobrar até o fim do ciclo" NÃO é query_cycle: pergunta dinheiro, então é
+  query_forecast (que já projeta até o fim do mês do usuário por padrão).
 - query_forecast: estimativa numérica do SALDO bancário no futuro, com os dados que JÁ existem — "quanto vai sobrar de dinheiro na conta no fim do mês?", "vou ficar no vermelho?". query_to = até quando, se citado. Use SOMENTE quando a pergunta for sobre o saldo em conta / fluxo de caixa, e NÃO sobre lista de compras/faturas/parcelas.
   NUNCA use query_forecast quando a pergunta SUPÕE algo que ainda não aconteceu ("e se eu
   receber…", "se eu comprar…", "posso…"): isso é simulate_scenario. query_forecast não enxerga
@@ -217,7 +228,12 @@ Se o usuário enviar uma mensagem de continuação, refinamento ou expansão (ex
 
 Regras:
 - Datas em YYYY-MM-DD, resolvidas pela data atual do usuário informada na
-  mensagem. "esse mês" -> do dia 1 até hoje. "semana passada" -> os 7 dias.
+  mensagem. "semana passada" -> os 7 dias.
+- "esse mês", "nesse ciclo", "no mês corrente", "no período atual" -> deixe query_from e
+  query_to VAZIOS. O mês do usuário pode fechar num dia que não é o 1 (ele configura isso no
+  app), e só o sistema sabe qual é. Preencher "do dia 1 até hoje" cortaria o ciclo dele ao meio
+  e o número não bateria com o da tela. Mês NOMEADO ("em agosto", "julho") continua com as
+  datas do mês civil.
 - Campo que não se aplica: omita.
 
 {_ANTI_INJECTION}

@@ -51,6 +51,12 @@ class TestStateCacheLocking:
             ]
 
         monkeypatch.setattr(db, "accounts", accounts)
+        # O ciclo é lido por `db.cycle` antes da janela default (11/09/2026).
+        # Dublê aqui para o teste continuar contando só as queries que ele mede.
+        async def _sem_ciclo(workspace_id, dia):
+            return None
+
+        monkeypatch.setattr(db, "cycle", _sem_ciclo)
         monkeypatch.setattr(db, "fetch", fetch)
 
         # Contexto contendo last_query_data da consulta anterior ao Cartão Nubank
@@ -101,6 +107,12 @@ class TestStateCacheLocking:
             return []
 
         monkeypatch.setattr(db, "accounts", accounts)
+        # O ciclo é lido por `db.cycle` antes da janela default (11/09/2026).
+        # Dublê aqui para o teste continuar contando só as queries que ele mede.
+        async def _sem_ciclo(workspace_id, dia):
+            return None
+
+        monkeypatch.setattr(db, "cycle", _sem_ciclo)
         monkeypatch.setattr(db, "fetch", fetch)
 
         ctx = ExecContext(

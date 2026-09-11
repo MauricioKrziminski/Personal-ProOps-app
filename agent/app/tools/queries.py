@@ -311,8 +311,18 @@ async def query_transactions(ctx: ExecContext, action: FinanceQuery) -> ToolResu
                 de = f"{add_months(hoje, -1)[:7]}-25"
                 ate = hoje
         else:
-            # Geral / Conta corrente: últimos 30 dias por padrão
-            de = add_months(hoje, -1)
+            # Geral / Conta corrente: o MÊS DO USUÁRIO, não 30 dias corridos.
+            #
+            # A janela de 30 dias não termina em borda nenhuma: com fechamento no
+            # dia 10, "quanto gastei esse mês" somava de 11/08 a 10/09 na tela e
+            # os últimos 30 dias no WhatsApp, e os dois números discordavam sem
+            # erro nenhum. Quem não configurou nada continua vendo do dia 1 até
+            # hoje, que é o que o app sempre mostrou.
+            #
+            # ⚠️ Só o `de` muda. Mexer no `ate` mexeria em `include_projection`
+            # logo abaixo, que decide se as ocorrências futuras entram na conta.
+            c = await db.cycle(ctx.workspace_id, hoje)
+            de = c["ini"].isoformat() if c else add_months(hoje, -1)
             ate = hoje
 
     is_explicit_full_request = (
@@ -578,15 +588,26 @@ async def query_invoice(ctx: ExecContext, action: FinanceQuery) -> ToolResult:
 
 
 async def query_forecast(ctx: ExecContext, action: FinanceQuery) -> ToolResult:
-    dias = 30
+    # hoje do USUÁRIO: date.today() é o dia em UTC, e depois das 21h em
+    # GMT-3 isso já é amanhã — a armadilha que este projeto testa contra
+    hoje = date.fromisoformat(local_iso_date(ctx.timezone))
+    dias, ate_o_ciclo = 30, None
+
     if action.query_to:
         try:
-            # hoje do USUÁRIO: date.today() é o dia em UTC, e depois das 21h em
-            # GMT-3 isso já é amanhã — a armadilha que este projeto testa contra
-            hoje = date.fromisoformat(local_iso_date(ctx.timezone))
             dias = max(1, (date.fromisoformat(action.query_to) - hoje).days)
         except ValueError:
             dias = 30
+    else:
+        # Sem data pedida, o horizonte é o FIM DO MÊS DO USUÁRIO, não 30 dias
+        # corridos. "quanto vai sobrar no fim do mês" com fechamento no dia 10
+        # respondia sobre 30 dias a partir de hoje — uma janela que não termina
+        # em borda nenhuma e não bate com nada da tela. O painel da Hoje já
+        # mostra "Saldo projetado em <fim do ciclo>"; agora os dois concordam.
+        c = await db.cycle(ctx.workspace_id, hoje.isoformat())
+        if c:
+            dias = int(c["dias_ate_o_fim"])
+            ate_o_ciclo = c
 
     rows = await db.fetch(
         "select * from public._cash_flow_forecast(%s, %s)", ctx.user_id, dias
@@ -602,8 +623,16 @@ async def query_forecast(ctx: ExecContext, action: FinanceQuery) -> ToolResult:
         if int(pior["balance_cents"]) < 0
         else ""
     )
+    # Dizer a DATA do fim é mais útil que dizer "em N dias", e é o que a tela
+    # escreve. `rows[-1]` é o último dia que a projeção realmente devolveu — ler
+    # daí, e não do que foi pedido, é a regra que já existe para o horizonte.
+    quando = (
+        f"até {format_date_br(fim['day'])}, quando seu mês fecha"
+        if ate_o_ciclo
+        else f"em {dias} dias"
+    )
     return ToolResult(
-        f"🔮 Em {dias} dias você deve ficar com *{cents_to_brl(fim['balance_cents'])}*.{aviso}",
+        f"🔮 {quando.capitalize()} você deve ficar com *{cents_to_brl(fim['balance_cents'])}*.{aviso}",
         read_only=True,
     )
 
@@ -954,3 +983,35 @@ async def query_debts(ctx: ExecContext, action: FinanceQuery) -> ToolResult:
         total = sum(int(d["remaining_cents"]) for d in rows)
         partes.append(f"\n*Total em aberto:* {cents_to_brl(total)}")
     return ToolResult("\n".join(partes), read_only=True)
+
+
+async def query_cycle(ctx: ExecContext, query: FinanceQuery) -> ToolResult:
+    """De quando a quando vai o mês do usuário, e que dia ele fecha.
+
+    É CONFIGURAÇÃO, não dinheiro: quem responde "quanto sobra até lá" é
+    `query_forecast`, que agora usa estas mesmas bordas como horizonte padrão.
+
+    A frase usa o vocabulário da tela ("Fecha todo dia 10" / "Último dia do mês",
+    `profile/index.tsx`), não o jargão da coluna — o usuário nunca viu a palavra
+    `cycle_close_day` e não deveria ver agora.
+    """
+    hoje = local_iso_date(ctx.timezone)
+    c = await db.cycle(ctx.workspace_id, hoje)
+    if not c:
+        return ToolResult("🤷 Não consegui ler o seu mês agora.", read_only=True)
+
+    de, ate = format_date_br(c["ini"]), format_date_br(c["fim"])
+    dias = int(c["dias_ate_o_fim"])
+    quando = (
+        f"fecha todo dia {c['close_day']}"
+        if c["close_day"]
+        else "fecha no último dia do mês"
+    )
+    falta = "fecha hoje" if c["fim"].isoformat() == hoje else (
+        f"falta {dias} dia" if dias == 1 else f"faltam {dias} dias"
+    )
+    return ToolResult(
+        f"📅 Seu mês ({c['rotulo']}) vai de {de} a {ate} — {quando}.\n{falta[0].upper()}{falta[1:]} para fechar.",
+        read_only=True,
+        data={"close_day": c["close_day"], "de": de, "ate": ate, "dias": dias},
+    )
