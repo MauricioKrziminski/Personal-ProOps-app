@@ -413,6 +413,25 @@ que "voltar" faz depois.
   **Tela EMPURRADA continua com `<Stack.Title>` + large title** — lá o título e o "voltar" são a
   informação. Barra desenhada à mão dentro do `ScrollView` continua proibida: o `AppHeader` fica
   FORA dele.
+
+  ⚠️ **E o scroll da tela empurrada tem que ser a RAIZ dela — uma `View` em volta mata o large
+  title** (11/09/2026). O iOS procura o scroll view da interação do título grande andando pelos
+  PRIMEIROS SUBVIEWS a partir da raiz, e a busca é rasa: com uma `View` no meio ele não acha,
+  `prefersLargeTitles` fica ligado e o título **nunca colapsa** — fica cravado no lugar do large
+  title enquanto o conteúdo rola por baixo, sem fundo, os dois sobrepostos. O
+  `react-native-screens` documenta a mesma heurística ("only going through first subviews, as the
+  OS does something similar e.g. when looking for scrollview for large header interaction").
+
+  Valia para as **23 telas empurradas ao mesmo tempo**, e a queixa foi literal: *"o título tá
+  descendo junto com a tela… isso vem sendo bastante comum"*. Provado com uma tela mínima:
+  `<ScrollView>` na raiz colapsa certo; o MESMO conteúdo dentro de `<View style={{flex:1}}>`
+  reproduz o defeito inteiro. **Não** era `headerShadowVisible`, **não** era a fonte custom do
+  header, **não** era o `KeyboardAwareScrollView` — os três foram trocados um a um e o defeito
+  ficou de pé. `Screen` devolve o scroll direto quando não há `topBar`; o fundo, que era da `View`
+  que sumiu, passa a vir do `contentStyle` do navegador.
+
+  Quem TEM `topBar` (as cinco raízes de aba) mantém a `View`: ali o header é o `AppHeader`, com
+  `headerShown: false`, e a barra precisa ser irmã do scroll para desenhar por cima dele.
 - **Ponto de status não existe mais — nem piscando, nem parado** (03/09/2026, decisão do dono do
   produto). Primeiro caiu a pulsação: movimento permanente no canto do olho não tem propósito
   (§5), some do radar em um dia e custa bateria. Depois caiu o ponto inteiro, e por um motivo

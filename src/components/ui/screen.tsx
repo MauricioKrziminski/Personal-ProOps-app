@@ -9,6 +9,7 @@ import {
 } from 'react-native';
 import { KeyboardAwareScrollView } from 'react-native-keyboard-controller';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { Stack } from 'expo-router';
 
 import { MaxContentWidth } from '@/constants/theme';
 import { useAppHeaderHeight } from '@/components/ui/app-header';
@@ -100,9 +101,26 @@ export function Screen({
   ];
 
   if (!scroll) {
+    /*
+      ⚠️ **Sem `topBar`, o filho precisa ser a RAIZ da tela.** Ver o bloco `SCROLL VIEW NA RAIZ`
+      abaixo: aqui o filho é a lista (SectionList/FlatList), e envolvê-la numa `View` mata o
+      large title do header nativo exatamente do mesmo jeito.
+
+      O fundo, que era o da `View` que sumiu, passa a vir do `contentStyle` do navegador — que é
+      onde ele deveria estar desde sempre: quem pinta o container da tela é a pilha, não um
+      retângulo nosso por dentro dela.
+    */
+    if (!topBar) {
+      return (
+        <>
+          <Stack.Screen options={{ contentStyle: { backgroundColor: background } }} />
+          {children}
+        </>
+      );
+    }
     return (
       <View style={[styles.root, { backgroundColor: background }]}>
-        <View style={[styles.root, { paddingTop: topBar ? headerHeight : 0 }, contentStyle]}>
+        <View style={[styles.root, { paddingTop: headerHeight }, contentStyle]}>
           {children}
         </View>
         {topBar}
@@ -110,12 +128,34 @@ export function Screen({
     );
   }
 
-  return (
-    <View style={[styles.root, { backgroundColor: background }]}>
-      <KeyboardAwareScrollView
-        style={styles.root}
-        contentContainerStyle={padding}
-        bottomOffset={Space.xxl}
+  /*
+    ══ SCROLL VIEW NA RAIZ ═══════════════════════════════════════════════════════════════════
+    ⚠️ **O `ScrollView` só pode ser embrulhado numa `View` quando a tela NÃO tem header nativo.**
+
+    O iOS procura o scroll view da interação do título grande andando pelos PRIMEIROS SUBVIEWS a
+    partir da raiz da tela, e a busca é rasa — uma `View` no meio já esconde o scroll. Sem achar,
+    `prefersLargeTitles` fica ligado e o título NUNCA colapsa: ele fica cravado no lugar do large
+    title enquanto o conteúdo rola por baixo, sem fundo, e os dois se sobrepõem. O
+    `react-native-screens` documenta a mesma heurística no `RNSScreen.mm` ("only going through
+    first subviews, as the OS does something similar e.g. when looking for scrollview for large
+    header interaction").
+
+    Isso valia para as 23 telas empurradas ao mesmo tempo e a queixa foi literal — *"o título tá
+    descendo junto com a tela... isso vem sendo bastante comum"*. Provado com uma tela mínima em
+    11/09/2026: `<ScrollView>` na raiz colapsa certo; o MESMO conteúdo dentro de
+    `<View style={{flex:1}}>` reproduz o defeito inteiro. Não era o `headerShadowVisible`, nem a
+    fonte custom do header, nem o `KeyboardAwareScrollView` — os três foram testados e
+    descartados um a um.
+
+    Quem TEM `topBar` (as raízes de aba) fica com a `View`: ali o header é o nosso `AppHeader`,
+    com `headerShown: false`, e a barra precisa ser irmã do scroll para desenhar por cima dele.
+    ═══════════════════════════════════════════════════════════════════════════════════════════
+  */
+  const conteudo = (
+    <KeyboardAwareScrollView
+      style={[styles.root, topBar ? null : { backgroundColor: background }]}
+      contentContainerStyle={padding}
+      bottomOffset={Space.xxl}
         /*
           `never` só onde o header é NOSSO (`topBar`), porque ali a altura já entra no
           `paddingTop` acima — deixar o iOS ajustar por cima disso soma duas vezes.
@@ -125,21 +165,28 @@ export function Screen({
           `never` para todo mundo (o que eu tinha feito) enfiava a primeira linha de Contas,
           Cartões, Orçamentos e companhia debaixo da barra de navegação.
         */
-        contentInsetAdjustmentBehavior={topBar ? 'never' : 'automatic'}
-        showsVerticalScrollIndicator={false}
-        alwaysBounceVertical={Boolean(onRefresh)}
-        refreshControl={
-          onRefresh ? <RefreshControl
-            refreshing={pulling || refreshing}
-            progressViewOffset={topBar ? headerHeight : 0}
-            onRefresh={() => {
-              setPulling(true);
-              void Promise.resolve().then(onRefresh).catch(() => undefined).finally(() => setPulling(false));
-            }}
-          /> : undefined
-        }>
-        {children}
-      </KeyboardAwareScrollView>
+      contentInsetAdjustmentBehavior={topBar ? 'never' : 'automatic'}
+      showsVerticalScrollIndicator={false}
+      alwaysBounceVertical={Boolean(onRefresh)}
+      refreshControl={
+        onRefresh ? <RefreshControl
+          refreshing={pulling || refreshing}
+          progressViewOffset={topBar ? headerHeight : 0}
+          onRefresh={() => {
+            setPulling(true);
+            void Promise.resolve().then(onRefresh).catch(() => undefined).finally(() => setPulling(false));
+          }}
+        /> : undefined
+      }>
+      {children}
+    </KeyboardAwareScrollView>
+  );
+
+  if (!topBar) return conteudo;
+
+  return (
+    <View style={[styles.root, { backgroundColor: background }]}>
+      {conteudo}
       {/* Depois do scroll na árvore: ele precisa desenhar POR CIMA para o desfoque existir. */}
       {topBar}
     </View>
