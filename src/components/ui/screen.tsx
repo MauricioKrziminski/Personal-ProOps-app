@@ -94,7 +94,19 @@ export function Screen({
   const padding = [
     styles.content,
     {
-      paddingTop: topBar ? headerHeight + Space.md : Space.md,
+      /*
+        ⚠️ **Tela empurrada não leva respiro nosso no topo.** Abaixo de um large title o iOS já
+        deixa ~20pt antes do primeiro item — é a distância que Ajustes, Mail e Notas usam. Somar
+        `Space.md` a isso dava ~32, e a queixa do dono do produto foi exatamente essa: *"olha o
+        tamanho do espaço/gap entre o título e o componente embaixo do título"*.
+
+        Com `topBar` o respiro continua, porque ali o header é NOSSO (`AppHeader`, desenhado por
+        cima) e ninguém reservou nada embaixo dele. **E no Android também**: lá não existe large
+        title — o header é uma barra compacta que termina rente ao conteúdo, e sem o respiro o
+        primeiro card encosta nela. É a diferença de um VALOR entre plataformas, então ela mora
+        aqui dentro (mecanismo 2 de `frontend.md`), nunca na tela.
+      */
+      paddingTop: topBar ? headerHeight + Space.md : Platform.OS === 'ios' ? 0 : Space.md,
       paddingBottom: insets.bottom + Space.xxl + tabBarSpace + fabSpace,
     },
     contentStyle,
