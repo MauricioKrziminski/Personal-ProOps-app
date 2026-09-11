@@ -244,13 +244,28 @@ def validate_fields(action: ResourceAction) -> dict:
                 _error(f"{LABELS[key]} deve ser positivo.")
             if key == "installments" and value > 1200:
                 _error("Número de parcelas fora do intervalo permitido.")
-        elif key == "interest_rate_monthly":
+        elif key in {"interest_rate_monthly", "rotativo_rate_monthly"}:
+            # A coluna guarda FRAÇÃO (1,99% a.m. = 0.0199) e a pessoa fala em
+            # PORCENTO. Antes daqui só saía `replace(",", ".")`, então "1,99"
+            # virava 1.99, caía fora do `0 <= n <= 1` e era recusado como "taxa
+            # inválida" — ou seja, dizer a taxa do jeito que ela vem impressa no
+            # contrato nunca funcionou, nem no financiamento.
+            #
+            # O corte em 1 é a leitura honesta: taxa MENSAL acima de 100% não
+            # existe, e 0.0199 continua passando intocado. O empate em 1 fica com
+            # a fração, que é o que o banco guarda — "1" lido como 100% ao mês
+            # seria absurdo.
+            bruto = value.replace("%", "").replace(",", ".").strip()
             try:
-                n = Decimal(value.replace(",", "."))
+                n = Decimal(bruto)
             except InvalidOperation:
-                _error("Informe a taxa mensal do contrato.")
-            if not n.is_finite() or not 0 <= n <= 1:
-                _error("Taxa mensal inválida.")
+                _error(f"Informe {LABELS[key]} (ex.: 1,99).")
+            if not n.is_finite() or n < 0:
+                _error(f"{LABELS[key]}: valor inválido.")
+            if n > 1 or "%" in value:
+                n = n / 100
+            if n > 1:
+                _error(f"{LABELS[key]}: valor inválido.")
             value = str(n)
         elif key in {"started_at", "acquired_at", "deadline", "month", "paid_at"}:
             try:
