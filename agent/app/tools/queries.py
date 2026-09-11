@@ -1007,11 +1007,17 @@ async def query_cycle(ctx: ExecContext, query: FinanceQuery) -> ToolResult:
         if c["close_day"]
         else "fecha no último dia do mês"
     )
-    falta = "fecha hoje" if c["fim"].isoformat() == hoje else (
-        f"falta {dias} dia" if dias == 1 else f"faltam {dias} dias"
-    )
+    # A segunda linha é uma frase INTEIRA por caso, não um pedaço colado num
+    # sufixo fixo: com "para fechar" cravado no fim, o dia do fechamento saía
+    # "Fecha hoje para fechar."
+    if c["fim"].isoformat() == hoje:
+        falta = "Fecha hoje."
+    elif dias == 1:
+        falta = "Fecha amanhã."
+    else:
+        falta = f"Faltam {dias} dias para fechar."
     return ToolResult(
-        f"📅 Seu mês ({c['rotulo']}) vai de {de} a {ate} — {quando}.\n{falta[0].upper()}{falta[1:]} para fechar.",
+        f"📅 Seu mês ({c['rotulo']}) vai de {de} a {ate} — {quando}.\n{falta}",
         read_only=True,
         data={"close_day": c["close_day"], "de": de, "ate": ate, "dias": dias},
     )

@@ -262,3 +262,35 @@ def test_taxa_formatada_sem_zero_a_toa():
     assert resources.formata_taxa("0.12876") == "12,876%"
     assert resources.formata_taxa("0.155") == "15,5%"
     assert resources.formata_taxa("0.15") == "15%"
+
+
+# --- a frase da leitura ----------------------------------------------------
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("fim_iso,dias,esperado", [
+    ("2026-09-10", 1, "Fecha hoje."),        # hoje é o dia do fechamento
+    ("2026-09-11", 1, "Fecha amanhã."),
+    ("2026-09-30", 20, "Faltam 20 dias para fechar."),
+])
+async def test_a_frase_do_ciclo_nao_cola_pedaco(monkeypatch, fim_iso, dias, esperado):
+    """"Fecha hoje para fechar." — o sufixo fixo grudado num pedaço variável.
+
+    Visto no emulador em 11/09/2026. A segunda linha é uma frase inteira por
+    caso, não um trecho mais um "para fechar" cravado no fim.
+    """
+    from datetime import date
+
+    from app.graph.schemas import FinanceQuery, FinanceQueryType
+    from app.tools import queries
+
+    async def cycle(ws, dia):
+        return {"ini": date(2026, 8, 11), "fim": date.fromisoformat(fim_iso),
+                "close_day": 10, "rotulo": "setembro", "dias_ate_o_fim": dias}
+
+    monkeypatch.setattr(queries.db, "cycle", cycle)
+    monkeypatch.setattr(queries, "local_iso_date", lambda tz: "2026-09-10")
+
+    r = await queries.query_cycle(_ctx(), FinanceQuery(type=FinanceQueryType.QUERY_CYCLE))
+    assert r.message.endswith(esperado), r.message
+    assert "para fechar para fechar" not in r.message
+    assert "hoje para fechar" not in r.message
