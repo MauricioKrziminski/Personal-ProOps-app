@@ -10,7 +10,7 @@ from datetime import date, datetime
 from decimal import Decimal, InvalidOperation
 
 from app import db
-from app.domain.dates import now_utc, to_instant, local_iso_date
+from app.domain.dates import format_date_br, now_utc, to_instant, local_iso_date
 from app.domain.money import cents_to_brl, MAX_CENTS
 from app.domain.recurrence import next_occurrence
 from app.domain.categories import normalize
@@ -30,7 +30,8 @@ CATALOG = {
         "accounts",
         "name",
         "archived",
-        "name closing_day due_day credit_limit_cents payment_account_id archived",
+        "name closing_day due_day credit_limit_cents payment_account_id "
+        "rotativo_auto rotativo_rate_monthly archived",
     ),
     "debts": (
         "debts",
@@ -38,6 +39,10 @@ CATALOG = {
         "archived",
         "name kind calculation_mode principal_cents remaining_cents interest_rate_monthly installments installments_paid installment_cents due_day account_id started_at archived",
     ),
+    # O MES FINANCEIRO do workspace. Nao tem nome, e linha UNICA e o escopo e o
+    # `id`, nao `workspace_id` - por isso `prepare` e `execute` o tratam a parte,
+    # antes do caminho generico de busca por nome.
+    "mes": ("workspaces", "id", None, "cycle_close_day"),
     "goals": ("goals", "name", "archived", "name target_cents deadline archived"),
     "budgets": ("budgets", "category", None, "category limit_cents rollover month"),
     "assets": (
@@ -93,6 +98,8 @@ DEBT_REQUIRED = {
 LABELS = {
     "accounts": "conta",
     "cards": "cartão",
+    "mes": "seu mês",
+    "cycle_close_day": "dia de fechamento do mês",
     "debts": "dívida/financiamento",
     "goals": "meta",
     "budgets": "orçamento",
@@ -112,6 +119,8 @@ LABELS = {
     "principal_cents": "principal original",
     "remaining_cents": "saldo devedor atual",
     "interest_rate_monthly": "juros ao mês",
+    "rotativo_auto": "adiar a fatura não paga sozinho",
+    "rotativo_rate_monthly": "juros do rotativo ao mês",
     "installments": "parcelas totais",
     "installments_paid": "parcelas já pagas",
     "installment_cents": "valor da parcela",
@@ -168,7 +177,8 @@ ENUMS = {
     ("reminders", "channel"): {"push", "whatsapp", "both"},
     ("rules", "match_type"): {"contains", "merchant"},
 }
-BOOLS = {"archived", "active", "rollover", "is_liability", "auto_confirm", "pinned", "is_default", "trashed"}
+BOOLS = {"archived", "active", "rollover", "is_liability", "auto_confirm", "pinned", "is_default",
+         "trashed", "rotativo_auto"}
 LINKS = {
     "account_id": "accounts",
     "payment_account_id": "accounts",
@@ -187,6 +197,11 @@ def validate_fields(action: ResourceAction) -> dict:
             "Esse recurso não está disponível. Posso gerenciar contas, cartões, dívidas, metas, orçamentos, recorrências, patrimônio, notas, lembretes, pastas e regras."
         )
     _, identity, _, columns = CATALOG[action.resource]
+    if action.resource == "mes" and action.type != Op.UPDATE:
+        # Linha única que já existe: não há o que criar, apagar, listar nem pagar.
+        # A recusa mora aqui, e não no `prepare`, porque `validate_fields` roda
+        # antes dele e um CREATE bateria em `REQUIRED["mes"]`, que não existe.
+        _error("Seu mês já existe: dá para mudar o dia em que ele fecha, não criar nem apagar.")
     if action.type == Op.PAY:
         if action.resource != "debts":
             _error("O pagamento de prestação deve indicar uma dívida ou financiamento.")
@@ -213,6 +228,22 @@ def validate_fields(action: ResourceAction) -> dict:
             if value not in {"true", "false"}:
                 _error(f"Informe sim ou não para {LABELS[key]}.")
             value = value == "true"
+        elif key == "cycle_close_day":
+            # 1..28, não 1..31: o dia tem que existir em fevereiro, senão o ciclo
+            # muda de tamanho conforme o mês — que é o defeito que ele resolve.
+            # É o mesmo `check` da coluna (20260911020000).
+            # Vazio = último dia do mês, e é escolha legítima (volta ao padrão),
+            # por isso `cycle_close_day` fica FORA da lista de "não pode ficar
+            # vazio" lá em cima.
+            try:
+                value = int(value)
+            except ValueError:
+                _error("Informe o dia do mês (de 1 a 28) em que seu mês fecha.")
+            if not 1 <= value <= 28:
+                _error(
+                    "O mês fecha num dia de 1 a 28 — 29, 30 e 31 não existem em todo "
+                    "mês. Para fechar no fim do mês, é só não informar o dia."
+                )
         elif key.endswith("_cents") or key in {
             "closing_day",
             "due_day",
@@ -400,6 +431,46 @@ def _where(resource, lixeira=None):
     return ""
 
 
+async def _preparar_mes(ctx: ExecContext, action: ResourceAction, prepared: dict) -> dict:
+    """O mês financeiro: linha única, sem nome, e só o DONO muda.
+
+    Foge do caminho genérico em três pontos, e por isso mora aqui: `workspaces`
+    não tem coluna de nome para o `identity` casar, é uma linha só (não há o que
+    criar nem apagar) e o escopo é o `id`, não `workspace_id`.
+
+    ⚠️ **A checagem de dono é código, não policy.** No app quem autoriza é
+    `"workspaces: owner writes"` (`owner_id = auth.uid()`, `0010_workspaces.sql`).
+    O serviço conecta com papel que IGNORA RLS — sem esta consulta, um membro
+    convidado moveria a régua de leitura de TODO mundo do workspace, e a única
+    pista seria os números da tela mudarem sozinhos.
+    """
+    if action.type != Op.UPDATE:
+        _error("Seu mês já existe: dá para mudar o dia em que ele fecha, não criar nem apagar.")
+
+    linha = await db.fetch_one(
+        "select owner_id, cycle_close_day, xmin::text as row_version "
+        "from public.workspaces where id = %s",
+        ctx.workspace_id,
+    )
+    if not linha:
+        _error("Não achei o seu espaço.")
+    if str(linha["owner_id"]) != str(ctx.user_id):
+        _error("Só quem é dono do espaço muda o dia em que o mês fecha.")
+    if "cycle_close_day" not in prepared["values"]:
+        _error("Que dia seu mês fecha? Diga um dia de 1 a 28, ou peça o último dia do mês.")
+
+    dia = prepared["values"].get("cycle_close_day")
+    prepared["row_id"] = str(ctx.workspace_id)
+    prepared["row_version"] = linha["row_version"]
+    prepared["owner_id"] = str(linha["owner_id"])
+    prepared["summary"] = (
+        f"seu mês passa a fechar todo dia {dia}"
+        if dia
+        else "seu mês volta a fechar no último dia do mês"
+    )
+    return prepared
+
+
 async def prepare(ctx: ExecContext, action: ResourceAction) -> dict:
     values = validate_fields(action)
     table, identity, deletion, _ = CATALOG[action.resource]
@@ -431,6 +502,8 @@ async def prepare(ctx: ExecContext, action: ResourceAction) -> dict:
     if action.type == Op.LIST:
         prepared["summary"] = f"listar {LABELS[action.resource]}"
         return prepared
+    if action.resource == "mes":
+        return await _preparar_mes(ctx, action, prepared)
     if action.type != Op.CREATE:
         if not action.name:
             _error(f"Qual {LABELS[action.resource]}? Informe o nome exato.")
@@ -723,6 +796,43 @@ async def prepare(ctx: ExecContext, action: ResourceAction) -> dict:
     return prepared
 
 
+async def _gravar_mes(ctx: ExecContext, proposal: dict) -> ToolResult:
+    """Grava o dia de fechamento e responde com as bordas NOVAS.
+
+    ⚠️ `owner_id` entra no WHERE, não só na checagem do `prepare`. A checagem da
+    proposta vale para o instante da proposta; entre ela e o SIM o dono pode ter
+    mudado. Mesma razão de `xmin` estar aqui: proposta velha não escreve.
+    """
+    dia = proposal["values"].get("cycle_close_day")
+    linha = await db.fetch_one(
+        "update public.workspaces set cycle_close_day = %s "
+        "where id = %s and owner_id = %s and xmin::text = %s "
+        "returning cycle_close_day",
+        dia,
+        ctx.workspace_id,
+        proposal["owner_id"],
+        proposal["row_version"],
+    )
+    if not linha:
+        return ToolResult(
+            "🤷 Seu mês mudou enquanto eu perguntava. Me fala de novo qual dia você quer.",
+            read_only=True,
+        )
+
+    c = await db.cycle(ctx.workspace_id, local_iso_date(ctx.timezone))
+    bordas = (
+        f" Agora ele vai de {format_date_br(c['ini'])} a {format_date_br(c['fim'])}."
+        if c
+        else ""
+    )
+    texto = (
+        f"✅ Seu mês agora fecha todo dia {dia}.{bordas}"
+        if dia
+        else f"✅ Seu mês voltou a fechar no último dia do mês.{bordas}"
+    )
+    return ToolResult(texto, result_id=str(ctx.workspace_id))
+
+
 async def execute(ctx: ExecContext, action: ResourceAction) -> ToolResult:
     proposal = (ctx.target or {}).get("prepared")
     if (
@@ -732,6 +842,8 @@ async def execute(ctx: ExecContext, action: ResourceAction) -> ToolResult:
     ):
         raise Level1Error("A proposta não está pronta. Peça a operação novamente.")
     table, identity, deletion, columns = CATALOG[action.resource]
+    if action.resource == "mes":
+        return await _gravar_mes(ctx, proposal)
     if action.type == Op.LIST:
         rows = await db.fetch(
             f"select {identity} as label from public.{table} where workspace_id = %s"
@@ -898,8 +1010,11 @@ async def _definir_conta_padrao(ctx: ExecContext, account_id: str, virar_padrao:
 
 
 def prompt_catalogue() -> str:
+    # `mes` não aparece em REQUIRED porque não se cria nem se apaga: ele já existe,
+    # e a única operação é trocar o dia em que fecha.
     catalogue = "\n".join(
-        f"{key}: campos {entry[3]}; obrigatórios ao criar {', '.join(REQUIRED[key])}."
+        f"{key}: campos {entry[3]}"
+        + (f"; obrigatórios ao criar {', '.join(REQUIRED[key])}." if key in REQUIRED else ".")
         for key, entry in CATALOG.items()
     )
     choices = "\n".join(
@@ -910,5 +1025,5 @@ def prompt_catalogue() -> str:
         catalogue
         + "\nValores permitidos:\n"
         + choices
-        + "\nFinanciamento/dívida tem dois modos: fixed_installments (padrão) precisa só de installment_cents e installments — o total contratual das parcelas, com juros dentro; amortized precisa de principal_cents, remaining_cents e interest_rate_monthly, e só serve quando o usuário tem esses números do contrato. Nunca converta o total das parcelas em principal nem invente taxa.\nConta padrão (onde cai o lançamento que não cita conta): resource_update, resource=accounts, name=nome da conta, campo is_default=true; para tirar, is_default=false. Cartão de crédito não pode ser conta padrão.\nNota na LIXEIRA: resource_delete em notes manda para a lixeira; restaurar (\"tira da lixeira\", \"recupera a nota\") é resource_update com trashed=false; apagar DE VEZ (\"esvazia\", \"apaga definitivo\") é resource_delete com trashed=true.\nOrçamento mensal existente: target_month=YYYY-MM-01; orçamento padrão: target_month=default.\nPara pagar prestação de dívida existente: resource_pay, resource=debts, name=nome da dívida, campos amount_cents, account_id (nome da conta), paid_at (YYYY-MM-DD). Não editar remaining_cents para registrar pagamento. Ao CRIAR dívida parcelada, installments_paid sai do que o usuário disse, inclusive pela posição: 'estou na 9ª parcela' são 8 pagas, 'tô na terceira' são 2, 'comecei agora' é 0, e um número solto respondendo à pergunta é a quantidade. Deixe vazio só quando a mensagem não disser nada sobre isso — o usuário confirma o cadastro inteiro antes de qualquer gravação, e é ali que ele corrige. Em dívida QUE JÁ EXISTE é o contrário: posição e data não comprovam pagamento; use resource_update com installments_paid e remaining_cents explicitamente informados, e se faltar saldo atual pergunte. Nunca use resource_pay para dar baixa retroativa em várias parcelas ou invente amortização a partir do valor da prestação.\nValor POR EXTENSO é valor: 'trezentos reais' é 30000 centavos, 'mil e quinhentos' é 150000, 'dois mil e quinhentos' é 250000. Áudio transcrito e resposta falada escrevem número assim o tempo todo — deixar o campo vazio porque o número veio em palavras é perder o dado que o usuário acabou de dar."
+        + "\nFinanciamento/dívida tem dois modos: fixed_installments (padrão) precisa só de installment_cents e installments — o total contratual das parcelas, com juros dentro; amortized precisa de principal_cents, remaining_cents e interest_rate_monthly, e só serve quando o usuário tem esses números do contrato. Nunca converta o total das parcelas em principal nem invente taxa.\nConta padrão (onde cai o lançamento que não cita conta): resource_update, resource=accounts, name=nome da conta, campo is_default=true; para tirar, is_default=false. Cartão de crédito não pode ser conta padrão.\nNota na LIXEIRA: resource_delete em notes manda para a lixeira; restaurar (\"tira da lixeira\", \"recupera a nota\") é resource_update com trashed=false; apagar DE VEZ (\"esvazia\", \"apaga definitivo\") é resource_delete com trashed=true.\nMEU MÊS (o período financeiro do usuário, não o do cartão): resource_update, resource=mes, campo cycle_close_day = o dia em que o mês dele fecha (1 a 28). Exemplos: 'meu mês fecha dia 10', 'quero olhar do dia 15 ao 15', 'fecha todo dia 5'. Para voltar ao último dia do mês ('volta pro normal', 'fecha no fim do mês'), mande cycle_close_day vazio. ATENÇÃO: não confunda com o cartão. 'o cartão fecha dia 7', 'cadastra o Inter que fecha dia 7' e 'o fechamento do nubank é dia 3' são resource=cards com closing_day, porque quem tem fatura é o CARTÃO. Só é resource=mes quando a frase fala do MÊS ou do PERÍODO da pessoa, sem citar cartão nenhum.\nROTATIVO do cartão: resource_update, resource=cards, name=nome do cartão. rotativo_auto=true faz a fatura vencida e não paga ir sozinha para a próxima, com juros e IOF. rotativo_rate_monthly são os juros do rotativo, do jeito que o usuário falar ('15,5%', '12,876', '1,99') — o sistema converte para fração. É a taxa de PARTIDA: assim que chegar a primeira cobrança real, o app passa a usar a que ESTE cartão cobrou. Vazio significa não estimar juros.\nOrçamento mensal existente: target_month=YYYY-MM-01; orçamento padrão: target_month=default.\nPara pagar prestação de dívida existente: resource_pay, resource=debts, name=nome da dívida, campos amount_cents, account_id (nome da conta), paid_at (YYYY-MM-DD). Não editar remaining_cents para registrar pagamento. Ao CRIAR dívida parcelada, installments_paid sai do que o usuário disse, inclusive pela posição: 'estou na 9ª parcela' são 8 pagas, 'tô na terceira' são 2, 'comecei agora' é 0, e um número solto respondendo à pergunta é a quantidade. Deixe vazio só quando a mensagem não disser nada sobre isso — o usuário confirma o cadastro inteiro antes de qualquer gravação, e é ali que ele corrige. Em dívida QUE JÁ EXISTE é o contrário: posição e data não comprovam pagamento; use resource_update com installments_paid e remaining_cents explicitamente informados, e se faltar saldo atual pergunte. Nunca use resource_pay para dar baixa retroativa em várias parcelas ou invente amortização a partir do valor da prestação.\nValor POR EXTENSO é valor: 'trezentos reais' é 30000 centavos, 'mil e quinhentos' é 150000, 'dois mil e quinhentos' é 250000. Áudio transcrito e resposta falada escrevem número assim o tempo todo — deixar o campo vazio porque o número veio em palavras é perder o dado que o usuário acabou de dar."
     )
