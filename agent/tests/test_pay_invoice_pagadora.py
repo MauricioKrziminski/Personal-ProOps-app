@@ -56,7 +56,12 @@ def _banco(monkeypatch, *, payment_account_id=None, padrao=None, citada=None):
             return CARTAO
         return citada if nome else None
 
+    async def accounts(workspace_id, only_cards=False):
+        # A pergunta "de qual conta saiu?" lista o que existe.
+        return [{"id": PADRAO, "name": "Itaú Corrente", "type": "checking"}]
+
     monkeypatch.setattr(finance.db, "fetch_one", fetch_one)
+    monkeypatch.setattr(finance.db, "accounts", accounts)
     monkeypatch.setattr(finance, "resolve_account", resolve)
     return chamadas
 
@@ -73,10 +78,20 @@ async def test_sem_conta_citada_usa_a_que_paga_a_fatura(monkeypatch):
 
 
 @pytest.mark.asyncio
-async def test_sem_conta_do_cartao_cai_na_conta_padrao(monkeypatch):
+async def test_sem_conta_do_cartao_PERGUNTA_em_vez_de_usar_a_padrao(monkeypatch):
+    """A conta padrão do workspace não decide de onde sai mil reais.
+
+    ⚠️ Este teste já afirmou o contrário. O fallback foi copiado de
+    `create_transaction`, e as duas situações não são a mesma: lá o padrão é
+    onde o gasto do dia a dia cai quando ninguém diz nada; aqui ele escolheria
+    a origem de uma transferência que a pessoa não citou — e a frase do SIM nem
+    dizia qual era. Regra do dono do produto: na dúvida, pergunta.
+    """
     chamadas = _banco(monkeypatch, payment_account_id=None, padrao=PADRAO)
-    await finance.pay_invoice(_ctx(), FinanceAction(type=FinanceActionType.PAY_INVOICE))
-    assert chamadas["args"][1] == PADRAO
+    with pytest.raises(Level1Error) as erro:
+        await finance.pay_invoice(_ctx(), FinanceAction(type=FinanceActionType.PAY_INVOICE))
+    assert "qual conta" in str(erro.value).lower()
+    assert "args" not in chamadas
 
 
 @pytest.mark.asyncio

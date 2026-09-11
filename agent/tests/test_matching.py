@@ -88,12 +88,13 @@ class TestCardinalidade:
 
 
 class TestResolveAccount:
-    """`resolve_account` resolve em SILÊNCIO — não tem como perguntar.
+    """`resolve_account` CASA, e não decide o que fazer quando não dá.
 
-    Por isso ele trata o tier de semelhança diferente do rascunho: acertar um
-    typo é ótimo quando dá para confirmar, e é um jeito novo de escolher a conta
-    errada quando não dá. Isso importa porque `pay_invoice` e transferência
-    passam por aqui.
+    Ele trata o tier de semelhança diferente do rascunho: acertar um typo é ótimo
+    quando dá para confirmar, e é um jeito novo de escolher a conta errada quando
+    não dá. Empate — exato ou por semelhança — devolve `None`; quem transforma
+    esse `None` em pergunta é `conta_citada`, e é por ele que passam gasto,
+    receita, transferência, parcelamento e pagamento de fatura.
     """
 
     @pytest.fixture
@@ -197,9 +198,25 @@ class TestColisaoDeNome:
         assert await resolve_account("ws", "itau", only_cards=True) == "cartao"
 
     @pytest.mark.asyncio
-    async def test_sem_filtro_o_empate_volta_a_existir(self, duas_contas):
-        """Documenta por que o filtro precisa existir: sem ele as duas linhas
-        casam e quem decide é a ordem."""
+    async def test_sem_filtro_o_empate_NAO_escolhe_por_ordem(self, duas_contas):
+        """Sem o filtro as duas linhas casam — e aí ninguém escolhe.
+
+        ⚠️ Este teste já afirmou o contrário (`in ("conta", "cartao")`), com o
+        comentário "quem decide é a ordem". Ele estava DOCUMENTANDO um defeito:
+        "gastei 45 no itau", com conta e cartão de mesmo nome, gravava em quem
+        viesse primeiro do banco. É a mesma confusão que lançou um salário de
+        R$ 4.000 dentro da fatura pelo app, e aqui não havia nem tela mostrando
+        a escolha.
+        """
         from app.tools.finance import resolve_account
 
-        assert await resolve_account("ws", "itau") in ("conta", "cartao")
+        assert await resolve_account("ws", "itau") is None
+
+    @pytest.mark.asyncio
+    async def test_o_empate_vira_pergunta_com_os_dois_nomes(self, duas_contas):
+        from app.tools.finance import conta_citada
+        from app.tools.guards import Level1Error
+
+        with pytest.raises(Level1Error) as erro:
+            await conta_citada("ws", "itau")
+        assert "mais de uma" in str(erro.value)

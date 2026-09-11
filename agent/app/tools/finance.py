@@ -46,6 +46,14 @@ async def resolve_account(
 
     De propósito: o lançamento NUNCA falha por conta desconhecida. Perder o
     registro do gasto é pior do que registrá-lo sem conta.
+
+    ⚠️ **Empate devolve `None`, e não a primeira da lista** (11/09/2026). O
+    ramo exato fazia `return certos[0]["id"]` sem olhar quantas casaram: com
+    "Nubank Conta" e "Nubank Cartão" cadastrados, "gastei 45 no nubank" caía na
+    que viesse primeiro do banco. É o MESMO defeito que lançou um salário de
+    R$ 4.000 dentro da fatura pelo app em 09/09/2026, e aqui era pior, porque
+    não havia tela mostrando a escolha — só o lançamento certo na conta errada.
+    Quem transforma esse `None` em pergunta é `conta_citada`.
     """
     if not name:
         return None
@@ -55,13 +63,63 @@ async def resolve_account(
     certos = matching.match_accounts(
         name, linhas, semelhanca=False, account_type=tipo
     )
-    if certos:
+    if len(certos) == 1:
         return certos[0]["id"]
+    if certos:
+        return None
 
     por_semelhanca = matching.match_accounts(
         name, linhas, account_type=tipo
     )
     return por_semelhanca[0]["id"] if len(por_semelhanca) == 1 else None
+
+
+async def conta_citada(
+    workspace_id: UUID,
+    nome: str | None,
+    *,
+    only_cards: bool = False,
+    papel: str = "a conta",
+) -> UUID | None:
+    """A conta que o usuário CITOU — ou uma PERGUNTA, nunca um palpite.
+
+    ⚠️ **`resolve_account` devolve `None` em três situações diferentes e o
+    chamador não conseguia distingui-las**: o usuário não citou conta nenhuma,
+    citou um nome que não existe, ou citou um nome que casa com DUAS contas. As
+    três caíam no mesmo `or await default_account(...)` — então dizer "gastei 45
+    no nubank", sem ter nenhum "nubank" cadastrado, gravava o gasto na conta
+    padrão, calado. O dinheiro fica na conta errada e ninguém revisa lançamento
+    que aparece certo.
+
+    Aqui só a PRIMEIRA situação devolve `None` (e aí quem decide é o chamador:
+    conta padrão, ou erro). As outras duas levantam a pergunta com os nomes que
+    existem — é a regra do dono do produto, e ela vale para o agente inteiro:
+    *"ele tem que perguntar sempre que tiver dúvida, nunca deduzir"*.
+    """
+    if not nome:
+        return None
+
+    # A resolução continua sendo a de `resolve_account`: uma regra de casamento
+    # só. O que muda aqui é o que fazer quando ela NÃO acha.
+    achada = await resolve_account(workspace_id, nome, only_cards=only_cards)
+    if achada:
+        return achada
+
+    linhas = await db.accounts(workspace_id, only_cards=only_cards)
+    parecidas = matching.match_accounts(
+        nome, linhas, account_type="credit_card" if only_cards else None
+    )
+
+    if len(parecidas) > 1:
+        opcoes = ", ".join(f"*{c['name']}*" for c in parecidas[:6])
+        raise Level1Error(f"🤔 “{nome}” casa com mais de uma: {opcoes}. Qual delas?")
+
+    existentes = ", ".join(f"*{c['name']}*" for c in linhas[:8]) or "nenhuma ainda"
+    o_que = "cartão" if only_cards else "conta"
+    raise Level1Error(
+        f"🤔 Não achei {o_que} com o nome “{nome}”. Você tem: {existentes}. "
+        f"Qual é {papel}?"
+    )
 
 
 async def default_account(workspace_id: UUID) -> UUID | None:
@@ -244,7 +302,9 @@ async def create_transaction(ctx: ExecContext, action: FinanceAction) -> ToolRes
     valor = guards.require_amount(_amount_with_fallback(ctx, action))
     quando = guards.require_date(action.occurred_at, ctx.timezone)
     categoria = guards.clean_category(action.category)
-    conta = await resolve_account(ctx.workspace_id, action.account) or await default_account(
+    # Citou conta que não existe (ou ambígua) -> pergunta. Só quem NÃO citou cai
+    # na conta padrão, que é preferência do usuário e não dedução nossa.
+    conta = await conta_citada(ctx.workspace_id, action.account) or await default_account(
         ctx.workspace_id
     )
     rrule = guards.clean_rrule(action.recurrence)
@@ -295,10 +355,12 @@ async def create_transaction(ctx: ExecContext, action: FinanceAction) -> ToolRes
 async def create_transfer(ctx: ExecContext, action: FinanceAction) -> ToolResult:
     valor = guards.require_amount(_amount_with_fallback(ctx, action))
     quando = guards.require_date(action.occurred_at, ctx.timezone)
-    origem = await resolve_account(ctx.workspace_id, action.account) or await default_account(
-        ctx.workspace_id
+    origem = await conta_citada(
+        ctx.workspace_id, action.account, papel="a conta de onde saiu"
+    ) or await default_account(ctx.workspace_id)
+    destino = await conta_citada(
+        ctx.workspace_id, action.counterparty_account, papel="a conta de destino"
     )
-    destino = await resolve_account(ctx.workspace_id, action.counterparty_account)
     if not origem or not destino:
         raise Level1Error(
             "❌ Para transferir eu preciso das duas contas. "
@@ -332,7 +394,9 @@ async def create_installment_purchase(
     parcelas = guards.require_installments(action.installments)
     atual = guards.require_current_installment(action.current_installment, parcelas)
     quando = guards.require_date(action.occurred_at, ctx.timezone)
-    conta = await resolve_account(ctx.workspace_id, action.account, only_cards=True)
+    conta = await conta_citada(
+        ctx.workspace_id, action.account, only_cards=True, papel="o cartão"
+    )
     if not conta:
         raise Level1Error(
             "❌ Em qual cartão foi? Cadastra ele no app e me fala o nome."
@@ -422,7 +486,7 @@ async def _conta_que_paga(workspace_id, cartao_id, citada: str | None):
         # transferência de cartão para cartão. O app filtra `type !== 'credit_card'`
         # na lista de pagadoras e o catálogo recusa com todas as letras; aqui não
         # havia nada.
-        achada = await resolve_account(workspace_id, citada)
+        achada = await conta_citada(workspace_id, citada, papel="a conta que pagou")
         if achada:
             linha = await db.fetch_one(
                 "select type from public.accounts where id = %s and workspace_id = %s",
@@ -443,13 +507,17 @@ async def _conta_que_paga(workspace_id, cartao_id, citada: str | None):
     if linha and linha.get("payment_account_id"):
         return linha["payment_account_id"]
 
-    padrao = await default_account(workspace_id)
-    if padrao:
-        return padrao
-
+    # ⚠️ **A conta padrão do workspace NÃO entra aqui** (11/09/2026). Ela entrava,
+    # copiada de `create_transaction`, e as duas situações não são a mesma: lá o
+    # padrão é onde o gasto do dia a dia cai quando ninguém diz nada; aqui ele
+    # decidiria de qual conta sai uma transferência de mil reais, sem a pessoa
+    # ter falado e sem a frase do SIM dizer qual é. `payment_account_id` fica
+    # porque é o campo "Conta que paga a fatura" que o próprio usuário gravou no
+    # cartão — preferência dele, não palpite nosso.
+    contas = [c for c in await db.accounts(workspace_id) if c.get("type") != "credit_card"]
+    nomes = ", ".join(f"*{c['name']}*" for c in contas[:8]) or "nenhuma cadastrada"
     raise Level1Error(
-        "❌ De qual conta saiu o dinheiro? Me fala o nome dela "
-        '(ex.: "paguei a fatura do nubank pelo itaú").'
+        f"🤔 De qual conta saiu o dinheiro? Você tem: {nomes}."
     )
 
 
@@ -523,16 +591,24 @@ async def pay_invoice(ctx: ExecContext, action: FinanceAction) -> ToolResult:
         )
 
     pagadora = await _conta_que_paga(ctx.workspace_id, fatura["account_id"], action.counterparty_account)
+    # A conta pagadora entra na RESPOSTA. Quando ela veio do `payment_account_id`
+    # do cartão, a pessoa não a citou nesta frase — e "✅ Fatura paga" não dizia
+    # de onde o dinheiro saiu, num movimento que muda dois saldos.
+    de_onde = await db.fetch_one(
+        "select name from public.accounts where id = %s and workspace_id = %s",
+        pagadora, ctx.workspace_id,
+    )
+    origem = f" — saiu de *{de_onde['name']}*" if de_onde else ""
     row = await db.fetch_one(
         "select public.pay_invoice(%s, %s, %s, %s) as id",
         fatura["id"], pagadora, guards.require_date(action.occurred_at, ctx.timezone), valor,
     )
     vencimento = format_date_br(fatura["due_date"])
     if valor is None or valor >= aberto:
-        texto = f"✅ Fatura paga (vencimento {vencimento})."
+        texto = f"✅ Fatura paga (vencimento {vencimento}){origem}."
     else:
         texto = (
-            f"✅ Registrei {cents_to_brl(valor)} na fatura do vencimento {vencimento}. "
+            f"✅ Registrei {cents_to_brl(valor)} na fatura do vencimento {vencimento}{origem}. "
             f"Ainda faltam {cents_to_brl(aberto - valor)}."
         )
     return ToolResult(texto, result_id=row["id"] if row else None)

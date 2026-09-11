@@ -1,9 +1,10 @@
-import { memo } from 'react';
+import { memo, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 
 import { ThemedText } from '@/components/themed-text';
 import { Button } from '@/components/ui/button';
 import { Row, Section } from '@/components/ui/row';
+import { Sheet } from '@/components/ui/sheet';
 import { Space } from '@/design/tokens';
 import type { AgentUiPayload } from '@/lib/agent-api';
 import { hitlControlsDisabled, parseUiActions, type UiOption } from '@/lib/agent-chat';
@@ -34,6 +35,15 @@ const ENCERRADA: Record<string, string> = {
 const numeroNaFrente = /^\d+\)\s*/;
 
 /**
+ * A partir de quantos candidatos a lista sai do balão e vira sheet.
+ *
+ * Dois cabem como botões e são a resposta inteira à vista. Três já empilham
+ * seis linhas de texto dentro da conversa; nove viram uma parede que empurra a
+ * própria pergunta para fora da tela.
+ */
+const CABE_NO_BALAO = 2;
+
+/**
  * Os botões de uma pergunta do agente (HITL).
  *
  * O resumo NÃO é redesenhado aqui — ele é o texto do próprio balão. O que este
@@ -50,28 +60,31 @@ const numeroNaFrente = /^\d+\)\s*/;
  *
  * ⚠️ Tudo virava `Button block`, e com nove faturas abertas a tela era uma
  * parede de nove pílulas de duas linhas cada, a primeira delas pintada de
- * accent — a queixa foi literal: *"que poluição visual é essa do agente?"*.
+ * accent. Trocar as pílulas por linhas de lista deixou mais limpo e **não
+ * resolveu**: nove linhas continuam sendo nove linhas dentro de uma conversa.
+ * A queixa veio duas vezes, e a segunda trouxe o desenho: *"tem que ter um
+ * botão para abrir um menu com a lista, igual no WhatsApp"*.
  *
- * São duas perguntas diferentes e elas pedem dois controles:
+ * É o mesmo mecanismo que o WhatsApp usa (`ui: "list"`, botão "Escolher") e a
+ * mesma régua do §8 do design — **escolha curta é `formSheet`**. A conversa
+ * fica com a pergunta e UM botão; as opções aparecem quando a pessoa vai
+ * escolher, e somem quando ela escolhe.
  *
- * - **Confirmar / recusar** (até duas opções) é AÇÃO: pílula preenchida para o
- *   que o agente propôs, contorno para a saída. Continua `Button`.
- * - **"Qual deles?"** (três ou mais) é ESCOLHER ITEM DE UMA LISTA, o mesmo
- *   gesto do `SelectField` e do `AccountPicker` — e por isso usa o mesmo
- *   vocabulário: linhas numa `Section`, título em cima, o que distingue embaixo.
- *   Nenhuma delas é "a proposta": pintar a primeira de accent dizia que o
- *   agente recomendava a fatura mais antiga, que é exatamente o que o `limit 1`
- *   fazia em silêncio antes de virar pergunta.
- *
- * A saída ("Nenhuma dessas") sai da lista e vira botão fantasma embaixo: ela
- * não é um item, é desistir de escolher.
+ * - **Confirmar / recusar** (até dois) é AÇÃO: pílula preenchida para o que o
+ *   agente propôs, contorno para a saída. Continua no balão.
+ * - **"Qual deles?"** (três ou mais) é ESCOLHER ITEM DE LISTA: botão no balão,
+ *   lista no sheet. Nenhuma opção é "a proposta" — pintar a primeira de accent
+ *   dizia que o agente recomendava a fatura mais antiga, que é exatamente o que
+ *   o `limit 1` fazia em silêncio antes de virar pergunta.
  */
 export const ChatActions = memo(function ChatActions({ payload, busy, onDecide }: Props) {
   const { options } = parseUiActions(payload);
-  if (options.length === 0) return null;
+  const [aberto, setAberto] = useState(false);
 
   const inerte = hitlControlsDisabled(payload, { busy });
   const encerrada = payload.resolved;
+
+  if (options.length === 0) return null;
 
   if (encerrada) {
     return (
@@ -86,33 +99,54 @@ export const ChatActions = memo(function ChatActions({ payload, busy, onDecide }
   const candidatos = options.filter((o) => o.decision === 'choose');
   const saidas = options.filter((o) => o.decision !== 'choose');
 
-  if (candidatos.length >= 3) {
+  if (candidatos.length > CABE_NO_BALAO) {
+    const escolher = (o: UiOption) => {
+      setAberto(false);
+      onDecide(o);
+    };
+
     return (
-      <View style={styles.lista}>
-        <Section>
-          {candidatos.map((o) => (
-            <Row
-              key={o.id}
-              title={o.label.replace(numeroNaFrente, '')}
-              subtitle={o.description}
-              chevron={false}
-              accessibilityState={{ disabled: inerte }}
-              /* `Row` não tem `disabled`: sem `onPress` ela deixa de ser tocável
-                 e para de acender o realce — que é o que "inerte" quer dizer. */
-              onPress={inerte ? undefined : () => onDecide(o)}
-            />
-          ))}
-        </Section>
-        {saidas.map((o) => (
-          <Button
-            key={o.id}
-            label={o.label}
-            variant="ghost"
-            block
-            disabled={inerte}
-            onPress={() => onDecide(o)}
-          />
-        ))}
+      <View style={styles.bloco}>
+        {/* A contagem entra no RÓTULO: "Escolher" sozinho não diz que há nove. */}
+        <Button
+          label={`Escolher (${candidatos.length})`}
+          block
+          disabled={inerte}
+          onPress={() => setAberto(true)}
+        />
+
+        <Sheet visible={aberto} onClose={() => setAberto(false)}>
+          <View style={styles.cabecalho}>
+            <Button label="Cancelar" variant="ghost" size="sm" onPress={() => setAberto(false)} />
+            <ThemedText type="smallBold">Escolher</ThemedText>
+            {/* Contrapeso do "Cancelar": sem ele o título não fica centrado. */}
+            <View style={styles.contrapeso} />
+          </View>
+
+          <View style={styles.corpo}>
+            <Section>
+              {candidatos.map((o) => (
+                <Row
+                  key={o.id}
+                  title={o.label.replace(numeroNaFrente, '')}
+                  subtitle={o.description}
+                  chevron={false}
+                  onPress={() => escolher(o)}
+                />
+              ))}
+            </Section>
+
+            {saidas.map((o) => (
+              <Button
+                key={o.id}
+                label={o.label}
+                variant="ghost"
+                block
+                onPress={() => escolher(o)}
+              />
+            ))}
+          </View>
+        </Sheet>
       </View>
     );
   }
@@ -139,6 +173,13 @@ export const ChatActions = memo(function ChatActions({ payload, busy, onDecide }
 
 const styles = StyleSheet.create({
   bloco: { gap: Space.sm, paddingTop: Space.sm, maxWidth: '86%' },
-  /* A lista é conteúdo, não um balão: ela usa a largura toda, como as do app. */
-  lista: { gap: Space.sm, paddingTop: Space.sm },
+  cabecalho: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: Space.lg,
+    paddingVertical: Space.sm,
+  },
+  contrapeso: { width: 72 },
+  corpo: { paddingHorizontal: Space.lg, paddingTop: Space.md, gap: Space.md },
 });

@@ -585,9 +585,16 @@ function Stat({ valor, rotulo, limite }: { valor: string; rotulo: string; limite
 }
 
 const styles = StyleSheet.create({
-  /* A calha lateral é da TELA; o seletor não conhece o recuo de quem o usa. */
+  /*
+    A calha lateral é da TELA; o seletor não conhece o recuo de quem o usa.
+
+    O `paddingTop` separa a grade da LINHA que a abriu: sem ele a primeira
+    fileira de dias nascia colada em "Último dia do mês / 01/09 a 30/09", e as
+    duas coisas liam como um bloco só.
+  */
   cicloEdicao: {
     paddingHorizontal: Space.lg,
+    paddingTop: Space.md,
     paddingBottom: Space.md,
     gap: Space.md,
   },

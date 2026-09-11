@@ -145,6 +145,49 @@ resolvido** para uma ação que já existe → tipo de ação novo, que hoje **n
 - A pergunta descreve o **efeito**, não o nome interno da ação. Ninguém confirma
   "delete_transaction"; todo mundo entende "apagar o gasto de R$ 45".
 
+## Na dúvida, PERGUNTA — nunca deduz
+
+Regra do dono do produto (11/09/2026), e ela vale para o agente inteiro:
+*"ele tem que perguntar sempre que tiver dúvida, nunca deduzir. Isso para qualquer
+situação do agente."*
+
+A fronteira é uma só: **o que o usuário DISSE, o agente resolve; o que ele NÃO disse
+pode cair numa preferência que ele mesmo gravou; o que ele disse e não bate vira
+pergunta.** Deduzir é a terceira coisa, e ela não existe.
+
+| situação | o que fazer |
+|---|---|
+| não citou nada | preferência GRAVADA pelo usuário (`workspaces.default_account_id`, `accounts.payment_account_id`) — não é palpite, é configuração |
+| citou e não existe | pergunta, listando o que existe |
+| citou e casa com duas | pergunta, com os dois nomes |
+| campo obrigatório faltando | pergunta ("Para cadastrar X, informe Y. **Ainda não salvei nada.**") |
+| dois itens candidatos | `interrupt()` com a lista — já era assim |
+
+⚠️ **`resolve_account` devolvia `None` para as três situações e ninguém distinguia.**
+Os chamadores faziam `resolve_account(...) or default_account(...)`, então "gastei 45
+no bradesco", sem Bradesco cadastrado, gravava na conta padrão — calado. Pior: o ramo
+de casamento EXATO fazia `return certos[0]["id"]` sem contar quantas casaram, e com
+"Nubank Conta" e "Nubank Cartão" a escolha era a ordem do banco. É o mesmo defeito que
+lançou um salário de R$ 4.000 dentro da fatura pelo app, sem nem a tela para mostrar a
+escolha. Hoje empate devolve `None` e **`conta_citada`** (`app/tools/finance.py`) é
+quem transforma "citou e não achei" em pergunta. Gasto, receita, transferência,
+parcelamento e pagamento de fatura passam por ela.
+
+⚠️ **Fallback copiado de outro caminho não herda o motivo dele.** A conta padrão do
+workspace decide onde cai o gasto do dia a dia de quem não citou conta; ela foi copiada
+para `_conta_que_paga` e lá decidiria a ORIGEM de uma transferência de mil reais que a
+pessoa não citou — com a frase do SIM sem dizer qual era. Saiu. `payment_account_id`
+ficou, porque é campo que o usuário preencheu no cartão.
+
+⚠️ **A resposta diz o que foi DECIDIDO por ela.** "✅ Fatura paga" não contava de qual
+conta o dinheiro saiu, num movimento que muda dois saldos. Toda escolha que o agente
+fez sozinho (ainda que por preferência gravada) aparece na frase.
+
+⚠️ **A frase da confirmação descreve a AÇÃO, não a tabela do alvo.** `pay_invoice`
+passou a resolver a fatura como alvo e herdou a frase de `mark_paid`: o agente
+perguntava *"marcar como paga, SEM tirar do caixa?"* para a ação que TIRA do caixa —
+na tela que o usuário aprova. Condição por `action.type`, sempre.
+
 ## Proteção de propriedade (IDOR)
 
 **O serviço conecta no Postgres com papel que IGNORA RLS** (`auth.uid()` é null). Tudo que o banco
