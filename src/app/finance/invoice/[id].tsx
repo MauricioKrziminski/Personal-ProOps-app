@@ -10,7 +10,8 @@ import { Sheet, SheetHeader } from '@/components/ui/sheet';
 import { Card } from '@/components/ui/card';
 import { EmptyState } from '@/components/ui/empty-state';
 import { ItemLink } from '@/components/ui/item-link';
-import { DateField, Field } from '@/components/ui/field';
+import { Field } from '@/components/ui/field';
+import { DatePickerField } from '@/components/finance/date-picker-field';
 import { Icon } from '@/components/ui/icon';
 import { Money } from '@/components/ui/money';
 import { Row, Section } from '@/components/ui/row';
@@ -590,7 +591,12 @@ export default function InvoiceScreen() {
               label="Data do pagamento"
               error={dataISO ? undefined : 'Data em dd/mm/aaaa'}
               hint="Pagou ontem e está registrando hoje? Corrija aqui.">
-              <DateField value={dataBR} onChangeText={setDataBR} invalid={!dataISO} />
+              <DatePickerField
+                value={dataBR}
+                onChange={setDataBR}
+                accessibilityLabel="Data do pagamento"
+                invalid={!dataISO}
+              />
             </Field>
 
             <Button

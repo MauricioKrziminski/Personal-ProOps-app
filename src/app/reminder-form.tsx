@@ -14,7 +14,8 @@ import { ThemedText } from '@/components/themed-text';
 import { HeaderActions } from '@/components/ui/header-actions';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
-import { DateField, Field, TextField } from '@/components/ui/field';
+import { Field, TextField } from '@/components/ui/field';
+import { DatePickerField } from '@/components/finance/date-picker-field';
 import { Icon } from '@/components/ui/icon';
 import { Screen } from '@/components/ui/screen';
 import { HeroLabel } from '@/components/ui/section-head';
@@ -461,9 +462,9 @@ function ReminderForm({
                       selected={field.value === now.tomorrow}
                       onPress={() => setValue('date', now.tomorrow, { shouldValidate: true })}
                     />
-                    <DateField
+                    <DatePickerField
                       value={field.value}
-                      onChangeText={field.onChange}
+                      onChange={(br) => setValue('date', br, { shouldValidate: true })}
                       accessibilityLabel="Data do lembrete"
                       invalid={!!errors.date}
                     />
@@ -766,9 +767,9 @@ function RecurrenceEditor({
         {state.until ? (
           <Animated.View entering={FadeIn.duration(Motion.duration.base)} layout={linear}>
             <Field label="Até">
-              <DateField
+              <DatePickerField
                 value={ateTexto}
-                onChangeText={(texto) => {
+                onChange={(texto) => {
                   setAteTexto(texto);
                   if (isValidBRDate(texto)) patch({ until: texto.split('/').reverse().join('') });
                 }}

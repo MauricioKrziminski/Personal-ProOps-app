@@ -9,24 +9,22 @@ import { ErrorCard } from '@/components/error-card';
 import { currentMonth, monthTitle, shiftMonth } from '@/components/finance/month-picker';
 import { useMonthRuler } from '@/components/finance/month-ruler';
 import { PeriodBar } from '@/components/finance/period-bar';
-import { Card } from '@/components/ui/card';
 import { ThemedText } from '@/components/themed-text';
 import { HeaderMenu } from '@/components/ui/header-actions';
 import { ItemLink } from '@/components/ui/item-link';
 import { Search } from '@/components/ui/search';
+import { CycleSummaryCard } from '@/components/finance/cycle-summary-card';
 import { Button } from '@/components/ui/button';
-import { Note } from '@/components/ui/note';
 import { Chip } from '@/components/finance/chip';
 import { EmptyState } from '@/components/ui/empty-state';
 import { Money } from '@/components/ui/money';
 import { Row } from '@/components/ui/row';
 import { Screen } from '@/components/ui/screen';
-import { HeroLabel } from '@/components/ui/section-head';
 import { Segmented } from '@/components/ui/segmented';
 import { Skeleton, SkeletonRow } from '@/components/ui/skeleton';
 import { useToast } from '@/components/ui/toast';
 import { MaxContentWidth } from '@/constants/theme';
-import { Elevation, Motion, Radius, Space, tabular } from '@/design/tokens';
+import { Elevation, Motion, Radius, Space } from '@/design/tokens';
 import {
   NO_ACCOUNT,
   useAccounts,
@@ -35,6 +33,7 @@ import {
   useRecentTransactions,
   useMonthRange,
   useTransactions,
+  useCycleSeries,
   useTransactionsSummary,
   type Transaction,
   type TransactionKind,
@@ -193,6 +192,14 @@ export default function TransactionsScreen() {
     q: term,
   });
   const summary = useTransactionsSummary(range.from, range.to);
+  /*
+    ⚠️ **O card do topo lê o CICLO, não esta lista.** Ele responde "como o período fecha", que é
+    a mesma pergunta da home e tem que dar o mesmo número; a lista responde "cadê aquele
+    lançamento". Fazer o card somar a lista foi o que criou dois resultados com a mesma cara em
+    telas vizinhas.
+  */
+  const serieCiclo = useCycleSeries(month, month, regua.view);
+  const ciclo = serieCiclo.data?.find((c) => c.mes.startsWith(month)) ?? null;
   const accounts = useAccounts();
   // Um item basta para separar "nunca teve nada" de "este mês não teve nada".
   const anyEver = useRecentTransactions(1);
@@ -204,21 +211,6 @@ export default function TransactionsScreen() {
     for (const a of accounts.data ?? []) map.set(a.id, accountLabel(a));
     return map;
   }, [accounts.data]);
-
-  /*
-    ⚠️ **Soma TUDO que a lista mostra, previsto incluído.** Ela somava só o realizado
-    (`total - pending`), e num ciclo FUTURO todo lançamento é pendente — então o card nascia
-    `R$ 0,00 · entrou R$ 0,00 · saiu R$ 0,00` com a lista cheia logo abaixo. Foi a queixa de
-    13/09/2026: *"essa tela de lançamentos está vindo zerada"*.
-
-    Um card que não soma a lista embaixo dele é pior que card nenhum.
-  */
-  const somaDaLista = (kind: 'income' | 'expense') =>
-    (summary.data ?? [])
-      .filter((r) => r.kind === kind)
-      .reduce((s, r) => s + Number(r.total_cents), 0);
-  const income = somaDaLista('income');
-  const expense = somaDaLista('expense');
 
   // `toSections` agrupa em varredura linear, então o dia que atravessa a fronteira de duas
   // páginas continua sendo uma seção só depois do `flat()`.
@@ -311,45 +303,25 @@ export default function TransactionsScreen() {
 
       <PeriodBar month={month} onChangeMonth={setMonth} ruler={regua} />
 
-      {accountId !== undefined ? null : summary.isError ? (
-        <ErrorCard onRetry={summary.refetch} />
-      ) : summary.isLoading ? (
+      {accountId !== undefined ? null : serieCiclo.isError ? (
+        <ErrorCard onRetry={() => { void serieCiclo.refetch(); }} />
+      ) : serieCiclo.isPending || !ciclo ? (
         <View style={styles.summarySkeleton}>
           <Skeleton width="40%" height={14} />
           <Skeleton width="65%" height={40} />
         </View>
       ) : (
-        <Card style={styles.summary}>
-          {/*
-            ⚠️ **Esta tela NÃO tem um "resultado".** Ela teve, e o número não batia com o do
-            ciclo — a queixa foi direta: *"não era essa tela que ia mostrar os lançamentos que
-            justificam aquele 371,64? O que que eu falei sobre números diferentes?"*.
-
-            E os dois estavam certos: aqui é o LIVRO DE LANÇAMENTOS, listado por data; o ciclo
-            conta o dia em que o dinheiro sai da conta, com a fatura virando uma linha só e com
-            coisas que nem são lançamento (cronograma de dívida, recorrente projetada). Dois
-            números diferentes com a mesma cara em telas vizinhas é o defeito; ter um só, e uma
-            porta para o outro, é a correção.
-          */}
-          <HeroLabel>Lançamentos de {monthTitle(month)}</HeroLabel>
-          <ThemedText type="small" themeColor="textSecondary" style={tabular}>
-            {`${rows.length === 1 ? '1 lançamento' : `${rows.length} lançamentos`} · entra ${formatBRL(income)} · sai ${formatBRL(expense)}`}
-          </ThemedText>
-          <Note icon="questionmark.circle">
-            Esta lista é por data do lançamento. O que fecha o ciclo conta pelo pagamento.
-          </Note>
-          <Button
-            label="Ver o que fecha o ciclo"
-            variant="secondary"
-            size="sm"
-            onPress={() =>
-              router.push({
-                pathname: '/finance/cycle',
-                params: { month, view: regua.view, tipo: 'tudo' },
-              })
-            }
-          />
-        </Card>
+        <CycleSummaryCard
+          ciclo={ciclo}
+          nomeDoMes={monthTitle(month).replace(/ de \d{4}$/, '').toLowerCase()}
+          lancamentos={rows.length}
+          onAbrirCiclo={() =>
+            router.push({
+              pathname: '/finance/cycle',
+              params: { month, view: regua.view, tipo: 'tudo' },
+            })
+          }
+        />
       )}
 
       {/*

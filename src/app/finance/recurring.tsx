@@ -12,7 +12,8 @@ import { Sheet, SheetHeader } from '@/components/ui/sheet';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { EmptyState } from '@/components/ui/empty-state';
-import { DateField, Field, MoneyField, TextField } from '@/components/ui/field';
+import { Field, MoneyField, TextField } from '@/components/ui/field';
+import { DatePickerField } from '@/components/finance/date-picker-field';
 import { Icon } from '@/components/ui/icon';
 import { Money } from '@/components/ui/money';
 import { Screen } from '@/components/ui/screen';
@@ -730,10 +731,11 @@ export default function RecurringScreen() {
                 label="Começa em"
                 hint="Âncora da série, não muda depois. No passado, lança as antigas de uma vez."
                 error={form.inicio && !inicioOk ? 'Data inválida (dd/mm/aaaa)' : undefined}>
-                <DateField
+                <DatePickerField
                   value={form.inicio}
-                  onChangeText={(inicio) => setForm({ ...form, inicio })}
-                  placeholder="05/09/2026"
+                  onChange={(inicio) => setForm({ ...form, inicio })}
+                  placeholder="Escolher o início"
+                  accessibilityLabel="Data de início da série"
                   invalid={Boolean(form.inicio) && !inicioOk}
                 />
               </Field>
@@ -763,9 +765,11 @@ export default function RecurringScreen() {
                 label="Termina em"
                 hint="Em branco não tem fim. Preencha só se a série acaba."
                 error={form.fim && !fimOk ? 'Informe data válida igual ou posterior ao início' : undefined}>
-                <DateField
+                <DatePickerField
                   value={form.fim}
-                  onChangeText={(fim) => setForm({ ...form, fim })}
+                  onChange={(fim) => setForm({ ...form, fim })}
+                  placeholder="Sem fim"
+                  accessibilityLabel="Data em que a série termina"
                   invalid={Boolean(form.fim) && !fimOk}
                 />
               </Field>

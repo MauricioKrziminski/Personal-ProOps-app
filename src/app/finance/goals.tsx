@@ -9,7 +9,8 @@ import { Sheet, SheetHeader } from '@/components/ui/sheet';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { EmptyState } from '@/components/ui/empty-state';
-import { DateField, Field, MoneyField, TextField } from '@/components/ui/field';
+import { Field, MoneyField, TextField } from '@/components/ui/field';
+import { DatePickerField } from '@/components/finance/date-picker-field';
 import { Icon } from '@/components/ui/icon';
 import { Money } from '@/components/ui/money';
 import { Row, Section } from '@/components/ui/row';
@@ -534,10 +535,11 @@ export default function GoalsScreen() {
                 label="Prazo"
                 hint="Opcional. Com o prazo eu mostro quanto guardar por mês."
                 error={form.deadline && !prazoOk ? 'Data inválida (dd/mm/aaaa)' : undefined}>
-                <DateField
+                <DatePickerField
                   value={form.deadline}
-                  onChangeText={(deadline) => setForm({ ...form, deadline })}
-                  placeholder="31/12/2026"
+                  onChange={(deadline) => setForm({ ...form, deadline })}
+                  placeholder="Escolher prazo"
+                  accessibilityLabel="Prazo da meta"
                   invalid={Boolean(form.deadline) && !prazoOk}
                 />
               </Field>
