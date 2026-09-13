@@ -27,6 +27,7 @@ import { EmptyState } from '@/components/ui/empty-state';
 import { Icon } from '@/components/ui/icon';
 import { Money } from '@/components/ui/money';
 import { Note } from '@/components/ui/note';
+import { describeCycle } from '@/lib/cycle-label';
 import { Row, Section } from '@/components/ui/row';
 import { SectionHead } from '@/components/ui/section-head';
 import { Segmented } from '@/components/ui/segmented';
@@ -356,8 +357,12 @@ export default function FinanceScreen() {
   const cicloAnterior = serie.data?.find((c) => !c.mes.startsWith(month)) ?? null;
   const faltouPagar = Number(ciclo?.faltou_pagar ?? 0);
   const cicloFechado = ciclo?.estado === 'fechado';
+  const descricao = ciclo
+    ? describeCycle(ciclo, monthTitle(month).replace(/ de \d{4}$/, '').toLowerCase())
+    // Sem a série ainda (primeiro frame), o painel não inventa rótulo: fica no esqueleto.
+    : null;
   /** Fechou devendo, ou vai fechar no vermelho. */
-  const cicloRuim = cicloFechado ? faltouPagar > 0 : Number(ciclo?.resultado ?? 0) < 0;
+  const cicloRuim = descricao?.ruim ?? false;
   const variacaoSaida =
     ciclo && cicloAnterior && Number(cicloAnterior.saiu) > 0
       ? Math.round(((Number(ciclo.saiu) - Number(cicloAnterior.saiu)) / Number(cicloAnterior.saiu)) * 100)
@@ -480,83 +485,30 @@ export default function FinanceScreen() {
           */
           <HeroPanel
             /*
-              ⚠️ **Ciclo fechado com fatura em aberto lidera com a DÍVIDA, não com o caixa.**
-              A primeira versão abria com "Sobrou na conta R$ 0,72" em verde num ciclo que
-              terminou devendo R$ 371,64, e a leitura foi imediata: *"você está mostrando o saldo
-              como se eu tivesse ficado positivo em setembro… sendo que ficou mais de 370 reais
-              para pagar"*. Os dois números continuam na tela — o que mudou é qual deles é o
-              tamanho 32 e qual é o rodapé.
+              ⚠️ **Quem decide como um ciclo é DESCRITO é `describeCycle`, não esta tela.**
+              O rótulo estava escrito aqui dentro, e foi assim que a mesma linha de dados virou
+              "Sobrou em setembro" num lugar e "Fechei devendo" em outro. Agora existe uma função
+              pura, com teste, e toda tela lê dela.
             */
-            label={
-              cicloFechado
-                ? faltouPagar > 0
-                  ? `Fechei ${monthTitle(month).toLowerCase()} devendo`
-                  : `Sobrou em ${monthTitle(month)}`
-                : ciclo
-                  ? `Vou fechar em ${isoToBR(ciclo.fim)}`
-                  : 'Saldo projetado'
-            }
+            label={descricao?.label ?? 'Saldo projetado'}
             value={
               <Money
-                cents={
-                  cicloFechado
-                    ? faltouPagar > 0
-                      ? faltouPagar
-                      : Number(ciclo?.caixa_no_fim ?? 0)
-                    : Number(ciclo?.resultado ?? leftover)
-                }
+                cents={descricao?.cents ?? 0}
                 variant="heroMoney"
-                tone={
-                  cicloFechado && faltouPagar > 0 ? 'danger'
-                  : Number(ciclo?.resultado ?? leftover) < 0 ? 'danger'
-                  : 'onHero'
-                }
+                tone={cicloRuim ? 'danger' : 'onHero'}
                 concealable
               />
             }
             footer={
-              cicloFechado && faltouPagar > 0 ? (
+              descricao?.rodape ? (
                 <View style={styles.heroRodape}>
                   <ThemedText type="footnote" themeColor="onHeroMuted">
-                    Sobrou na conta
+                    {descricao.rodape.label}
                   </ThemedText>
-                  <Money cents={Number(ciclo?.caixa_no_fim ?? 0)} variant="footnote" />
+                  <Money cents={descricao.rodape.cents} variant="footnote" />
                 </View>
               ) : undefined
             }
-            secondary={{
-              /*
-                O sinal segue o CICLO, não o `leftover` antigo: um ciclo que fechou devendo
-                mostrava a seta para cima e a linha em verde logo abaixo de "fechei devendo".
-              */
-              icon: cicloRuim ? 'chart.line.downtrend.xyaxis' : 'chart.line.uptrend.xyaxis',
-              negative: cicloRuim,
-              /*
-                "previsto" sozinho não dizia de que LADO: `upcomingOut` é só saída. Com receita
-                prevista visível no resto do app, a palavra virou ambígua — passou a "ainda sai".
-
-                Quatro segmentos NÃO cabem: a `secondaryRow` é `flex-start` justamente porque
-                quebra em três linhas com fonte grande (`hero-panel.tsx:213-215`), e a régua é
-                384dp × 1,3. Quem quer o lado de entrada abre a Projeção, que agora tem a linha
-                do `in_cents`.
-              */
-              /*
-                ⚠️ **Sai do CICLO, não de `transactions_summary`.** Aquela soma conta o cartão na
-                data da compra e a janela dela é outra: no ciclo 11/09–10/10 ela devolvia zero, e
-                o card escrevia "entrou R$ 0,00 · saiu R$ 0,00" logo abaixo de um herói de
-                −615,87. Dois números da mesma tela discordando é exatamente o que esta
-                refatoração existe para matar.
-              */
-              text: cicloFechado
-                ? `entrou ${formatBRL(Number(ciclo?.entrou ?? 0))} · saiu ${formatBRL(Number(ciclo?.saiu ?? 0))}`
-                : `entra ${formatBRL(Number(ciclo?.entrou ?? 0))} · sai ${formatBRL(Number(ciclo?.saiu ?? 0))}`,
-            }}
-            /*
-              **Sem gráfico aqui.** O herói do Financeiro no export é só rótulo, valor e a faixa
-              de comparação — quem tem sparkline é o da Hoje. Dois gráficos a uma rolagem de
-              distância (este e a Tendência Mensal) também diziam a mesma coisa duas vezes, com
-              recortes diferentes: um de 30 dias, outro de 6 meses.
-            */
             /*
               A comparação é entre CICLOS, pela mesma régua do número grande. Comparar a saída do
               ciclo com a do mês civil anterior daria um percentual que não descreve nem um nem
