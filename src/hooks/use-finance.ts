@@ -1210,6 +1210,8 @@ export function useMonthRange(month: string, view?: CycleView): { from: string; 
  */
 const REGUA_MUDOU = [
   ['cycle'],
+  ['cycle-series'],
+  ['cycle-lines'],
   ['cycle-range'],
   ['forecast'],
   ['forecast-drafts'],
@@ -1263,6 +1265,54 @@ function useRealtimeMonth(key: string) {
   useRealtimeInvalidate('debts', [key]);
   useRealtimeInvalidate('recurring_transactions', [key]);
   useRealtimeInvalidate('accounts', [key]);
+}
+
+
+/**
+ * A linha do tempo de ciclos — a ÚNICA leitura de "como fecha o período".
+ *
+ * Ela substitui o par `useMonthSummary` + `useForecastMonths`, que respondiam a mesma pergunta
+ * com bases diferentes: a primeira contava o cartão na data da COMPRA, a segunda na data do
+ * PAGAMENTO, as duas navegavam meses, e nenhuma tela dizia qual era qual. Foi a causa medida do
+ * *"eu ainda estou 100% perdido no app"* (13/09/2026).
+ *
+ * Aqui a base é uma só: **o dia em que o dinheiro sai da conta**. Compra no cartão entra no
+ * ciclo em que a FATURA VENCE.
+ *
+ * ⚠️ **Série, não mês.** `comecei_com` de um ciclo futuro é o `resultado` do anterior, e isso
+ * não cabe numa chamada por mês — pedir os ciclos um a um devolveria cada um partindo do caixa
+ * de hoje, e a corrente (que é o produto) não existiria.
+ */
+export type CycleRow = Fns['cycle_series']['Returns'][number];
+export type CycleLine = Fns['cycle_lines']['Returns'][number];
+
+export function useCycleSeries(de: string, ate: string, view?: CycleView) {
+  useRealtimeMonth('cycle-series');
+  return useQuery({
+    queryKey: ['cycle-series', de, ate, view ?? ''],
+    queryFn: async (): Promise<CycleRow[]> => {
+      const { data, error } = await supabase.rpc('cycle_series', {
+        de: `${de}-01`, ate: `${ate}-01`, p_view: view ?? undefined,
+      });
+      if (error) throw error;
+      return data;
+    },
+  });
+}
+
+export function useCycleLines(month: string, view?: CycleView) {
+  useRealtimeMonth('cycle-lines');
+  return useQuery({
+    enabled: month.length === 7,
+    queryKey: ['cycle-lines', month, view ?? ''],
+    queryFn: async (): Promise<CycleLine[]> => {
+      const { data, error } = await supabase.rpc('cycle_lines', {
+        p_month: `${month}-01`, p_view: view ?? undefined,
+      });
+      if (error) throw error;
+      return data;
+    },
+  });
 }
 
 export type MonthLine = Fns['month_lines']['Returns'][number];

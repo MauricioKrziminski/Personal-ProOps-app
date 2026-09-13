@@ -2242,6 +2242,33 @@ export type Database = {
         }[]
       }
       _close_due_invoices: { Args: never; Returns: number }
+      _cycle_lines: {
+        Args: { p_month: string; p_view?: string; uid: string }
+        Returns: {
+          day: string
+          in_cents: number
+          method_label: string
+          origin: string
+          out_cents: number
+          ref_id: string
+          title: string
+        }[]
+      }
+      _cycle_series: {
+        Args: { ate: string; de: string; p_view?: string; uid: string }
+        Returns: {
+          caixa_no_fim: number
+          comecei_com: number
+          entrou: number
+          estado: string
+          faltou_pagar: number
+          fim: string
+          ini: string
+          mes: string
+          resultado: number
+          saiu: number
+        }[]
+      }
       _default_workspace: { Args: { uid: string }; Returns: string }
       _forecast_with_drafts: {
         Args: { days: number; drafts: Json; uid: string }
@@ -2554,8 +2581,35 @@ export type Database = {
         }
         Returns: string
       }
+      cycle_lines: {
+        Args: { p_month: string; p_view?: string }
+        Returns: {
+          day: string
+          in_cents: number
+          method_label: string
+          origin: string
+          out_cents: number
+          ref_id: string
+          title: string
+        }[]
+      }
       cycle_now: { Args: { p_view?: string }; Returns: Json }
       cycle_range: { Args: { p_month: string; p_view?: string }; Returns: Json }
+      cycle_series: {
+        Args: { ate: string; de: string; p_view?: string }
+        Returns: {
+          caixa_no_fim: number
+          comecei_com: number
+          entrou: number
+          estado: string
+          faltou_pagar: number
+          fim: string
+          ini: string
+          mes: string
+          resultado: number
+          saiu: number
+        }[]
+      }
       debt_schedule: {
         Args: { p_debt_id: string }
         Returns: {

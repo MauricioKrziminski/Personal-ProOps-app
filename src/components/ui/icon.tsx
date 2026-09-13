@@ -115,6 +115,8 @@ const MATERIAL: Record<string, MaterialName> = {
   house: 'home',
   'line.3.horizontal.decrease': 'filter_list',
   'list.bullet': 'list',
+  /** O "Gerenciar" do header da linha do tempo — contas, cartões, orçamentos, dívidas. */
+  'slider.horizontal.3': 'tune',
   /* Barra de blocos da nota. */
   'list.number': 'format_list_numbered',
   'textformat.size': 'format_size',
