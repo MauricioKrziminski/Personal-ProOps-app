@@ -204,14 +204,20 @@ export default function TransactionsScreen() {
     return map;
   }, [accounts.data]);
 
-  // Realizado, não total: `entrou`/`saiu` são verbos no passado e não podem contar previsto.
-  // Mesmo defeito e mesma correção do Financeiro — ver o comentário em `(tabs)/finance/index.tsx`.
-  const realizado = (kind: 'income' | 'expense') =>
+  /*
+    ⚠️ **Soma TUDO que a lista mostra, previsto incluído.** Ela somava só o realizado
+    (`total - pending`), e num ciclo FUTURO todo lançamento é pendente — então o card nascia
+    `R$ 0,00 · entrou R$ 0,00 · saiu R$ 0,00` com a lista cheia logo abaixo. Foi a queixa de
+    13/09/2026: *"essa tela de lançamentos está vindo zerada"*.
+
+    Um card que não soma a lista embaixo dele é pior que card nenhum.
+  */
+  const somaDaLista = (kind: 'income' | 'expense') =>
     (summary.data ?? [])
       .filter((r) => r.kind === kind)
-      .reduce((s, r) => s + Number(r.total_cents) - Number(r.pending_cents), 0);
-  const income = realizado('income');
-  const expense = realizado('expense');
+      .reduce((s, r) => s + Number(r.total_cents), 0);
+  const income = somaDaLista('income');
+  const expense = somaDaLista('expense');
 
   // `toSections` agrupa em varredura linear, então o dia que atravessa a fronteira de duas
   // páginas continua sendo uma seção só depois do `flat()`.
@@ -313,16 +319,35 @@ export default function TransactionsScreen() {
         </View>
       ) : (
         <Card style={styles.summary}>
-          <HeroLabel>Sobrou em {monthTitle(month)}</HeroLabel>
+          {/*
+            ⚠️ **"Os lançamentos", não "o ciclo".** O número daqui é a soma DESTA LISTA, e ela
+            não é o fechamento do ciclo: a fatura entra ali como uma linha só (no vencimento), e
+            o cronograma da dívida e a recorrente projetada nem são lançamento. Chamar os dois de
+            "sobrou" punha dois números diferentes com o mesmo nome em duas telas — exatamente o
+            que esta refatoração existe para matar. Por isso o rótulo diz o que ele soma, e a
+            porta abaixo leva a quem responde a outra pergunta.
+          */}
+          <HeroLabel>Os lançamentos deste período</HeroLabel>
           <Money cents={income - expense} variant="money" tone={income - expense < 0 ? 'danger' : 'text'} />
           <View style={styles.summaryFacts}>
             <ThemedText type="small" themeColor="textSecondary" style={tabular}>
-              entrou {formatBRL(income)}
+              entra {formatBRL(income)}
             </ThemedText>
             <ThemedText type="small" themeColor="textSecondary" style={tabular}>
-              saiu {formatBRL(expense)}
+              sai {formatBRL(expense)}
             </ThemedText>
           </View>
+          <Button
+            label="Ver o que fecha o ciclo"
+            variant="secondary"
+            size="sm"
+            onPress={() =>
+              router.push({
+                pathname: '/finance/cycle',
+                params: { month, view: regua.view, tipo: 'sai' },
+              })
+            }
+          />
         </Card>
       )}
 
