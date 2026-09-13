@@ -335,3 +335,59 @@ extrato tem.
 **O extrato do Nubank de 08/09 até hoje.** O arquivo disponível para em 07/09, e é justamente na
 janela 08–13/09 que os três pix poderiam ter caído. Sem ele não dá para dizer se eles existem —
 e a regra aqui é a mesma o tempo todo: **o que não está em documento não entra.**
+
+---
+
+# O −371,67 é a posição de HOJE, não o fechamento de 30/09 (13/09/2026)
+
+**O saldo real da conta Nubank hoje é R$ 0,62** (informado pelo dono do produto). Com ele, a
+reconstrução fecha exata:
+
+```
+867,86  saldo em 31/08            (LEDGERBAL do extrato de agosto)
+  0,72  saldo em 07/09            (LEDGERBAL do extrato de setembro)
+ -0,10  movimento de 08 a 13/09   (+420,00 Winicius +350,00 pai +38,90 cashback
+                                   −160,00 −649,00 pagamentos da fatura)
+  0,62  saldo hoje                ✓ bate com o Nubank
+```
+
+O cashback de **38,90** da planilha estava certo e o app tinha 1,90: os 37,00 de diferença são o
+resgate do RDB (`Aplicação RDB −37,00` em 05/09 no extrato, resgatado depois). Corrigido — e é
+justamente ele que faz o saldo cair em 0,62 no centavo.
+
+## Por que os dois números pareciam discordar
+
+| | valor | o que é |
+|---|---|---|
+| planilha, `Saldo: −371,67` | −371,67 | **a posição AGORA** — o carry de agosto é um plug calibrado para chegar nela |
+| app, tela **Hoje**, `TENHO HOJE` | **−370,92** | caixa 0,72 menos os 371,64 que restam da fatura de setembro |
+| app, **Projeção**, "Setembro de 2026" | −707,92 | a posição em **30/09**, que ainda tem pela frente o salário do dia 20 (+1.148,00) e a parcela do Carro do dia 23 (−1.485,00) |
+
+`−370,92 + 1.148,00 − 1.485,00 = −707,92`. Os três números estão certos; são momentos
+diferentes. **A planilha e o app já concordam, com 75 centavos de folga** — e o lugar onde eles
+concordam é a tela Hoje, não a Projeção.
+
+## E é exatamente isso que desalinha outubro
+
+O plug de agosto foi calibrado para a posição de hoje, mas o bloco de setembro da planilha
+**também lista** o salário do dia 20 e a parcela do Carro do dia 23. O plug absorveu os dois, e
+por isso a planilha entra em outubro sem descontar os **−337,00** que ainda vão acontecer em
+setembro.
+
+| | outubro |
+|---|---|
+| planilha | −429,56 |
+| planilha + os −337,00 que faltam de setembro | −766,56 |
+| + as seis linhas que faltam na fatura + 11,10 de juros − 4,02 de salário | ≈ −953,61 |
+| **app** | **−952,87** |
+
+Sobram ~74 centavos, o mesmo arredondamento acumulado das linhas da fatura.
+
+## ⚠️ Um ponto em aberto
+
+O dono do produto disse que `Pix Maurício` (160,50) e o `Scai` (225,00, da conta PJ para a PF)
+**já caíram em setembro**. Mas a reconstrução acima fecha em 0,62 no centavo **sem** eles — se os
+dois entraram, faltam também R$ 385,50 de saída que ninguém tem. O `Pix mãe controle` (60,00)
+ele confirmou que **não** recebeu.
+
+Só o extrato do Nubank de **08/09 até hoje** resolve. Até lá, nenhum dos dois foi lançado.
