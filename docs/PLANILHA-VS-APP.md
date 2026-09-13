@@ -391,3 +391,56 @@ dois entraram, faltam também R$ 385,50 de saída que ninguém tem. O `Pix mãe 
 ele confirmou que **não** recebeu.
 
 Só o extrato do Nubank de **08/09 até hoje** resolve. Até lá, nenhum dos dois foi lançado.
+
+---
+
+# A régua da planilha É o Ciclo do app (13/09/2026)
+
+O dono do produto descreveu a régua dele com todas as letras:
+
+> *"Qualquer lançamento que for no pix ou outra coisa que não envolve cartão, eu considero até
+> dia 10 para colocar… O salário que eu recebo dia 5 ou qualquer receita que eu tiver até o dia
+> 10 de setembro, fica em setembro, o que faltou ou restou depois do dia 10 é carregado para
+> projeção de outubro."*
+
+Isso é **exatamente** `workspaces.cycle_close_day = 10`, que já está configurado em produção:
+
+| ciclo | janela | a fatura que cai dentro |
+|---|---|---|
+| Setembro | 11/08 → 10/09 | Nubank e BB que vencem **10/09** |
+| Outubro | 11/09 → 10/10 | Nubank e BB que vencem **10/10** |
+
+E a fatura de 10/09 contém as compras de **03/08 a 02/09** (o `closing_day = 3` do Nubank), que é
+a outra metade da descrição dele. Nada disso precisa ser construído — está pronto.
+
+⚠️ **Seções anteriores mandaram usar a régua "Mês". Estava errado para este modelo.** O mês
+civil é a régua de quem não configurou ciclo; aqui a régua é **Ciclo**.
+
+## Setembro já bate — 75 centavos
+
+| | |
+|---|---|
+| caixa em 10/09 | 0,72 |
+| fatura de setembro ainda em aberto | −371,64 |
+| **fechamento do ciclo de setembro** | **−370,92** |
+| planilha | −371,67 |
+
+## E os ciclos seguintes, na tela (Projeção → Por mês → **Ciclo**)
+
+| ciclo | janela | fecha em |
+|---|---|---|
+| Outubro | 11/09 → 10/10 | **−615,87** |
+| Novembro | 11/10 → 10/11 | +105,49 |
+| Dezembro | 11/11 → 10/12 | +966,96 |
+
+Cada um parte do anterior (`veio de …`), que é o encadeamento da planilha.
+
+## Por que setembro não aparece nessa lista
+
+A Projeção parte de HOJE. O ciclo de setembro fechou em 10/09 e hoje é 13 — o ciclo corrente já
+é o de outubro. Quem mostra um ciclo passado é a tela **"O mês inteiro"**, e é lá que a conta
+ainda não fecha: ela soma o cartão por **competência** (cada compra na data da compra), não pela
+fatura no vencimento.
+
+**É essa a única peça que falta**, e é a base Caixa descrita lá em cima. A Projeção já a tem —
+por isso ela bate com a planilha e a outra tela não.
