@@ -154,43 +154,64 @@ Medido no emulador com os dados reais clonados:
 | Outubro 2026 | −941,77 | −429,56 |
 | Novembro 2026 | −220,41 | −105,22 |
 
-## ⚠️ A planilha tem um elo quebrado, e a fórmula prova
+## O carry-over de setembro foi digitado à mão DE PROPÓSITO
 
-O carry-over de cada aba é um link para a anterior — **menos um**:
+`Setembro 26!R8` é `770.57` cravado, enquanto todas as outras abas usam
+`='<mês anterior>'!R40`. **Isso não é erro:** agosto estava incompleto (faltava lançamento), e o
+Gabriel reabriu a corrente com o valor certo em vez de arrastar um agosto pela metade. De
+setembro em diante os links voltam a funcionar e a planilha está correta.
 
-| aba | fórmula de `R8` (o "Saldo <mês anterior>") |
+> Esta seção já afirmou que era um "elo quebrado" de R$ 360,52. Estava errado — a diferença
+> entre `Agosto!R40` (410,05) e o 770,57 é exatamente a correção manual, não uma falha.
+
+**Setembro é o marco zero: dali para trás é histórico, dali para frente é o que vale.**
+
+## O que separa o app da planilha em setembro: R$ 336,25, e ele fecha exato
+
+App fecha setembro em **−707,92**, planilha em **−371,67**. A conta é esta, sem sobra:
+
+| parte | efeito no app |
 |---|---|
-| Agosto 26 | `='Julho 26 ✔️'!R40` |
-| **Setembro 26** | **`770.57`** ← valor digitado à mão |
-| Outubro 26 | `='Setembro 26'!R40` |
-| Novembro 26 | `='Outubro 26'!R40` |
+| abertura de setembro — app 867,97 (saldo inicial da Conta corrente), planilha 770,57 | **+97,40** |
+| quatro entradas que a planilha tem e o app não | **−444,78** |
+| juros do rotativo — app 42,97, planilha 54,07 (+3 centavos no saldo adiado) | **+11,13** |
+| **total** | **−336,25** |
 
-Agosto fecha em **410,05** (`R19-R32`) e Setembro abre com **770,57**. A planilha está
-**R$ 360,52 otimista** de setembro em diante, e o erro se propaga por outubro e novembro porque
-daí para frente os links funcionam. Conserto: trocar `Setembro 26!R8` por `='Agosto 26'!R40`.
+As quatro entradas, item a item:
 
-(`Julho 26 ✔️!R40` também é valor cravado, `-876.13`, em vez de `=R19-R32` = −1.012,50 — mas
-julho está fechado e não entra nesta conta.)
+| entrada | planilha | app |
+|---|---|---|
+| Pix Maurício | 160,50 | não existe em setembro — o recorrente só materializa a partir de **05/10** |
+| Pix mãe controle | 60,00 | não existe |
+| Freela Scai Entrada | 225,00 | não existe |
+| Cashback Nubank | 38,90 | 1,90 (faltam 37,00) |
+| Crédito em conta | não existe | 33,70 |
+| Salário (as duas partes) | 2.632,00 | 2.636,02 |
 
-## O que sobra depois de corrigir
+`482,50 − 33,70 − 4,02 = 444,78`.
 
-| mês | app | planilha corrigida | resta |
-|---|---|---|---|
-| Setembro | −707,92 | −732,19 | 24,27 |
-| Outubro | −941,77 | −790,08 | −151,69 |
-| Novembro | −220,41 | −465,74 | 245,33 |
+## Para outubro bater: as seis linhas que faltam na planilha
 
-**Setembro não é comparável por construção.** A Projeção parte de HOJE — caixa real de R$ 0,72
-em 13/09 — e só projeta 13/09→30/09. A planilha soma o mês inteiro. De outubro em diante a
-comparação é honesta.
+Corrigido setembro, o app vai para **−605,52** em outubro e a planilha para **−429,56**. Os
+**R$ 175,96** que sobram são seis lançamentos que o app tem e a planilha ainda não, mais o
+arredondamento do salário:
 
-**Outubro (−151,69):** as entradas batem com **4,02** de diferença (o arredondamento do salário:
-planilha 2.632,00, app 2.636,02). Tudo está nas saídas: a fatura do Nubank que vence 10/10 já
-tem **3.276,91** lançados no app e a planilha previu **2.529,32**; o BB vai ao contrário (app
-199,10, planilha 766,71). É dado, não régua.
+| o que | valor | onde está |
+|---|---|---|
+| IOF Claude | 19,86 | fatura Nubank vence 10/10 — a planilha não prevê IOF de assinatura em dólar |
+| IOF ChatGPT | 19,12 | idem |
+| Shopee *Shpstecnologia (06/09) | 19,99 | compra de setembro ainda não lançada na planilha |
+| Auto Posto Costa Costa (07/09) | 70,00 | idem |
+| Auto Posto Costa Costa (07/09) | 14,00 | idem |
+| Casa do Açaí Cafe (04/09) | 37,00 | idem |
+| **soma** | **179,97** | |
+| salário (app 2.636,02 × planilha 2.632,00) | −4,02 | |
+| **resta** | **175,95** | (1 centavo de arredondamento) |
 
-**Novembro (+245,33):** a planilha para de contar o `Pix pai carro` (350,00) em novembro e o app
-o repete, porque ele está cadastrado como recorrente mensal. Mais os mesmos 4,02.
+⚠️ **E tem um item no cartão trocado, que NÃO muda o total.** `Anthropic* Claude Sub` 567,64
+está na fatura do **Nubank** no app e em **BB** na planilha. Por isso o BB de outubro é 199,10 no
+app e 766,71 na planilha, e o Nubank é o inverso. O total de saídas é o mesmo — mas um dos dois
+está no cartão errado, e vale conferir na fatura.
 
 ## Duas coisas a saber sobre a tela
 
