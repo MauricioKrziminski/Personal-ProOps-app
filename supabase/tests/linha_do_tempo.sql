@@ -17,8 +17,12 @@ begin
   if ws is null then raise notice 'sem workspace — nada a testar'; return; end if;
 
   for r in
-    select * from private.cycle_series_for(array[ws], current_date - interval '6 months',
-                                           current_date + interval '3 months', 'cycle')
+    -- ⚠️ Os `::date` não são enfeite: `current_date - interval` é TIMESTAMP, e sem o cast o
+    -- Postgres não acha `cycle_series_for(uuid[], date, date, text)`. O teste morria com
+    -- `UndefinedFunction` ANTES de conferir qualquer coisa — ou seja, a invariante que ele
+    -- existe para prender ficou meses sem prender nada, e o erro lê como falha de ambiente.
+    select * from private.cycle_series_for(array[ws], (current_date - interval '6 months')::date,
+                                           (current_date + interval '3 months')::date, 'cycle')
   loop
     if r.estado = 'fechado' and r.confere is distinct from true then
       quebrou := quebrou + 1;
