@@ -356,6 +356,8 @@ export default function FinanceScreen() {
   const cicloAnterior = serie.data?.find((c) => !c.mes.startsWith(month)) ?? null;
   const faltouPagar = Number(ciclo?.faltou_pagar ?? 0);
   const cicloFechado = ciclo?.estado === 'fechado';
+  /** Fechou devendo, ou vai fechar no vermelho. */
+  const cicloRuim = cicloFechado ? faltouPagar > 0 : Number(ciclo?.resultado ?? 0) < 0;
   const variacaoSaida =
     ciclo && cicloAnterior && Number(cicloAnterior.saiu) > 0
       ? Math.round(((Number(ciclo.saiu) - Number(cicloAnterior.saiu)) / Number(cicloAnterior.saiu)) * 100)
@@ -523,8 +525,12 @@ export default function FinanceScreen() {
               ) : undefined
             }
             secondary={{
-              icon: leftover < 0 ? 'chart.line.downtrend.xyaxis' : 'chart.line.uptrend.xyaxis',
-              negative: leftover < 0,
+              /*
+                O sinal segue o CICLO, não o `leftover` antigo: um ciclo que fechou devendo
+                mostrava a seta para cima e a linha em verde logo abaixo de "fechei devendo".
+              */
+              icon: cicloRuim ? 'chart.line.downtrend.xyaxis' : 'chart.line.uptrend.xyaxis',
+              negative: cicloRuim,
               /*
                 "previsto" sozinho não dizia de que LADO: `upcomingOut` é só saída. Com receita
                 prevista visível no resto do app, a palavra virou ambígua — passou a "ainda sai".
