@@ -235,10 +235,6 @@ export default function ForecastScreen() {
   const primeiroNegativo = emMes
     ? (meses.find((m) => m.primeiroNegativo)?.primeiroNegativo ?? null)
     : (serie.find((d) => Number(d.balance_cents) < 0)?.day ?? null);
-
-  // O mês expandido. `mesAberto` governa o `enabled` do hook: sem nenhum mês aberto, nenhuma
-  // RPC é chamada.
-  const resumoAberto = useMonthSummary(mesAberto ?? '', mesAberto !== null, regua.view);
   // `recurring_covered_until` é propriedade da SÉRIE, não do mês — qualquer mês devolve o mesmo.
   // Vem do mês corrente porque essa chave já está no cache (a aba Financeiro a usa).
   const mesCorrente = useMonthSummary(localISODate().slice(0, 7));
