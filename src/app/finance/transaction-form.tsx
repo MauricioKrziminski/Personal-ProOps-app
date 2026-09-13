@@ -637,25 +637,31 @@ function TransactionForm({ editing }: { editing?: Transaction }) {
           name="occurred_at"
           render={({ field }) => (
             <Field label={podeParcelar && installmentCount > 1 ? "Data da primeira parcela" : "Data"} error={errors.occurred_at?.message}>
-              <View style={styles.chipRow}>
-                <Chip
-                  label="Hoje"
-                  selected={occurredAt === today}
-                  onPress={() => setValue('occurred_at', today, { shouldValidate: true })}
-                />
-                <Chip
-                  label="Ontem"
-                  selected={occurredAt === yesterday}
-                  onPress={() => setValue('occurred_at', yesterday, { shouldValidate: true })}
-                />
-                <View style={styles.dateField}>
-                  <DatePickerField
-                    value={field.value}
-                    onChange={(br) => setValue('occurred_at', br, { shouldValidate: true })}
-                    accessibilityLabel="Data do lançamento"
-                    invalid={!!errors.occurred_at}
+              {/*
+                ⚠️ **O campo tem a linha inteira; os atalhos ficam ACIMA dele.** Espremido entre
+                "Hoje" e "Ontem" na mesma fileira, o valor quebrava no meio do ano
+                ("13/09/2 026") — o seletor tem ícone e chevron, e não é um `TextField` compacto.
+                Chip é atalho, campo é campo.
+              */}
+              <View style={styles.dateBlock}>
+                <View style={styles.chipRow}>
+                  <Chip
+                    label="Hoje"
+                    selected={occurredAt === today}
+                    onPress={() => setValue('occurred_at', today, { shouldValidate: true })}
+                  />
+                  <Chip
+                    label="Ontem"
+                    selected={occurredAt === yesterday}
+                    onPress={() => setValue('occurred_at', yesterday, { shouldValidate: true })}
                   />
                 </View>
+                <DatePickerField
+                  value={field.value}
+                  onChange={(br) => setValue('occurred_at', br, { shouldValidate: true })}
+                  accessibilityLabel="Data do lançamento"
+                  invalid={!!errors.occurred_at}
+                />
               </View>
             </Field>
           )}
@@ -771,6 +777,7 @@ const styles = StyleSheet.create({
     maxWidth: MaxContentWidth,
     alignSelf: 'center',
   },
+  dateBlock: { gap: Space.sm },
   chipRow: {
     flexDirection: 'row',
     flexWrap: 'wrap',
