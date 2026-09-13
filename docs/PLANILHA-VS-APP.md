@@ -279,3 +279,59 @@ item**, com no máximo 3 centavos de arredondamento por linha.
 
 ⚠️ **Fora esses seis, só o `Claude ProOps` 567,64 está em cartão diferente** — Nubank no app, BB
 na planilha. Não muda o total de saídas, mas um dos dois está errado.
+
+---
+
+# Conferido contra extrato e fatura (13/09/2026) — e a conclusão virou
+
+Arquivos em `~/Downloads`: `NU_986762896_01AGO2026_31AGO2026.ofx`,
+`NU_986762896_01SET2026_07SET2026.ofx`, `Extrato conta corrente - 08/092026.ofx` (Banco do
+Brasil, ag. 872 c. 43143) e `Nubank_2026-10-10.ofx` (a fatura).
+
+⚠️ **A seção anterior dizia "faltam quatro entradas no app". Estava errada** — ela tratava a
+planilha como fonte. O extrato desmente três delas, e a abertura que eu dei como "ninguém sabe"
+está documentada.
+
+## O que o extrato prova
+
+| fato | documento | quem estava certo |
+|---|---|---|
+| saldo em **31/08 = 867,86** (Nubank) + 0,11 (BB) | `LEDGERBAL` do OFX de agosto | **o app** — a planilha erra 97,40 com o 770,57 |
+| saldo em **07/09 = 0,72** (Nubank) | `LEDGERBAL` do OFX de setembro | **o app** (0,82 com o BB; 1 centavo de diferença) |
+| `Crédito em conta` **33,70** em 04/09 | extrato | **o app** — a planilha não tem |
+| `Aplicação RDB` **−37,00** em 05/09 | extrato | **nenhum dos dois** — faltava no app, lancei |
+| `Juros rotativo` **11,10** em 04/09 | fatura que vence 10/10 | **nenhum dos dois** — faltava no app, lancei |
+| `Pix Maurício`, `Pix mãe controle`, `Freela Scai` | **não aparecem no extrato até 07/09** | **o app** — a planilha marca ✔️ recebido e o banco não mostra |
+| cashback de 38,90 | **não existe no extrato** | **o app**, que tem 1,90 em 08/09 |
+
+O `54,07` de juros da planilha é a soma de duas linhas que caem em faturas diferentes: **42,97**
+na fatura que venceu 10/09 e **11,10** na que vence 10/10. A planilha juntou as duas em setembro.
+
+## O que ficou lançado no staging
+
+| lançamento | valor | data | fonte |
+|---|---|---|---|
+| `Aplicação RDB` | −37,00 | 05/09 | extrato do Nubank |
+| `Juros de pagamento parcial da fatura (rotativo)` | −11,10 | 04/09 | fatura 10/10 |
+
+**Desfeitos:** as três entradas de pix que eu tinha inventado com data 05/09, e a edição do
+Cashback de 1,90 para 38,90. Nenhuma delas existe no extrato. O app em 07/09 voltou a bater com
+o `LEDGERBAL` do banco.
+
+## Onde os dois estão agora
+
+| | app | planilha |
+|---|---|---|
+| Setembro | **−744,92** | −371,67 |
+| Outubro | **−989,87** | −429,56 |
+
+A distância de setembro (373,25) é quase toda **R$ 482,50 de entrada que a planilha conta e o
+extrato do Nubank não mostra** — 160,50 + 60,00 + 225,00 de pix e 37,00 de cashback —, menos os
+97,40 em que a planilha erra a abertura, mais o crédito de 33,70 e a aplicação de 37,00 que só o
+extrato tem.
+
+## O que falta para fechar
+
+**O extrato do Nubank de 08/09 até hoje.** O arquivo disponível para em 07/09, e é justamente na
+janela 08–13/09 que os três pix poderiam ter caído. Sem ele não dá para dizer se eles existem —
+e a regra aqui é a mesma o tempo todo: **o que não está em documento não entra.**
