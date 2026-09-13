@@ -53,7 +53,6 @@ import {
 } from '@/hooks/use-finance';
 import { categoryIcon } from '@/design/category-icons';
 import { formatBRL, formatDateBR, localISODate } from '@/hooks/use-items';
-import { isoToBR } from '@/lib/dates';
 import { confirmDestructive, showItemActions } from '@/lib/item-actions';
 import { useTheme, useScheme } from '@/hooks/use-theme';
 
@@ -355,8 +354,6 @@ export default function FinanceScreen() {
   const serie = useCycleSeries(shiftMonth(month, -1), month, regua.view);
   const ciclo = serie.data?.find((c) => c.mes.startsWith(month)) ?? null;
   const cicloAnterior = serie.data?.find((c) => !c.mes.startsWith(month)) ?? null;
-  const faltouPagar = Number(ciclo?.faltou_pagar ?? 0);
-  const cicloFechado = ciclo?.estado === 'fechado';
   const descricao = ciclo
     ? describeCycle(ciclo, monthTitle(month).replace(/ de \d{4}$/, '').toLowerCase())
     // Sem a série ainda (primeiro frame), o painel não inventa rótulo: fica no esqueleto.
@@ -367,11 +364,7 @@ export default function FinanceScreen() {
     ciclo && cicloAnterior && Number(cicloAnterior.saiu) > 0
       ? Math.round(((Number(ciclo.saiu) - Number(cicloAnterior.saiu)) / Number(cicloAnterior.saiu)) * 100)
       : null;
-
-  const income = totalOf(summary.data, 'income');
   const expense = totalOf(summary.data, 'expense');
-  const projected = forecast.data?.at(-1)?.balance_cents ?? 0;
-  const leftover = isCurrent ? Number(projected) : income - expense;
 
   const categories = useMemo(() => {
     const rows = (summary.data ?? []).filter((r) => r.kind === 'expense');
