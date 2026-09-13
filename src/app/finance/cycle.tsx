@@ -5,115 +5,107 @@ import { ScrollView, StyleSheet, View } from 'react-native';
 import { ErrorCard } from '@/components/error-card';
 import { monthTitle } from '@/components/finance/month-picker';
 import { ThemedText } from '@/components/themed-text';
+import { Card } from '@/components/ui/card';
 import { EmptyState } from '@/components/ui/empty-state';
 import { Money } from '@/components/ui/money';
 import { Row, Section } from '@/components/ui/row';
-import { SectionHead } from '@/components/ui/section-head';
+import { HeroLabel, SectionHead } from '@/components/ui/section-head';
 import { Segmented } from '@/components/ui/segmented';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Radius, Space } from '@/design/tokens';
-import { useCycleLines, type CycleLine, type CycleView } from '@/hooks/use-finance';
+import {
+  useCycleLines,
+  useCycleSeries,
+  useInvoice,
+  type CycleLine,
+  type CycleRow,
+  type CycleView,
+} from '@/hooks/use-finance';
+import { formatBRL } from '@/hooks/use-items';
+import { describeCycle } from '@/lib/cycle-label';
+import { rotaDaLinha } from '@/lib/cycle-routes';
 import { isoToBR } from '@/lib/dates';
 
-type Recorte = 'tudo' | 'entra' | 'sai' | 'faturas';
-
-const TITULO: Record<Recorte, string> = {
-  tudo: 'Tudo que fecha o ciclo',
-  entra: 'O que entra',
-  sai: 'O que sai',
-  faturas: 'Faturas',
-};
-
-/*
-  Quatro opções de rótulo curto: `Segmented` (§1 de design.md). O recorte é ESTADO DA TELA, não
-  do chamador — abrir cravada em "sai" era a queixa de 13/09/2026: *"se eu clico em 'ver o que
-  fecha o ciclo' aparece somente os gastos, e o restante?"*. O parâmetro agora só diz onde
-  COMEÇAR.
-*/
-const RECORTES = [
-  { value: 'tudo', label: 'Tudo' },
-  { value: 'entra', label: 'Entra' },
-  { value: 'sai', label: 'Sai' },
-  { value: 'faturas', label: 'Faturas' },
-] as const;
-
 /**
- * **O detalhe de um recorte do ciclo** — as linhas que produziram o número, e nada além delas.
+ * **Por que o ciclo fechou naquele valor** — a tela que justifica o número da home.
  *
- * Pedido do dono do produto (13/09/2026): *"aparece que eu vou ter −615,87 ao fim do ciclo de
- * outubro, mas como eu vejo tudo que dá dentro disso? As faturas organizadas, os lançamentos,
- * entra e sai olhando individualmente cada receita e gasto"*.
+ * ## O que ela corrige
  *
- * ⚠️ **Ela lê exatamente a mesma fonte do número de cima** (`cycle_lines`, que é
- * `private.cash_events`), filtrada. Montar a lista de outra consulta é como o detalhe passa a
- * não somar o total que ele explica — e essa divergência não dá erro, só um número que não
- * fecha. É a mesma razão pela qual o resumo do ciclo não é calculado no cliente.
+ * A primeira versão listava por DIA e somava `entra − sai`, e isso criou um TERCEIRO número para
+ * setembro: a home dizia `−371,64` (a dívida), o `resultado` do ciclo era `0,72` (o caixa) e esta
+ * tela dizia `−867,25` (o fluxo). A queixa foi direta (13/09/2026): *"ainda não entendi por que a
+ * tela 'ver o que fecha o ciclo' dá valor diferente da do que realmente fechou o ciclo"*.
  *
- * ⚠️ **Fatura aparece como UMA linha, pelo valor cheio, no dia em que o dinheiro sai.** Ela leva
- * para a tela da fatura, que já lista as compras — repetir as compras aqui quebraria a soma (a
- * compra já está dentro da fatura) e diria a mesma coisa em dois lugares.
+ * ⚠️ **Ela abre com a MESMA descrição da home** — `describeCycle`, a função única — e mostra a
+ * CONTA que chega até lá antes de qualquer lista. Um detalhe que não reconstrói o número que ele
+ * explica não é detalhe: é um quarto número.
+ *
+ * ## Por que agrupa por NATUREZA, não por dia
+ *
+ * Pedido: *"mostrando faturas separadas, lançamentos pix, ter filtro de mostrar todos juntos
+ * abrindo todas as faturas"*. Por dia, a fatura de R$ 2.080 ficava ao lado de um pix de R$ 37 sem
+ * nada dizer que são naturezas diferentes. Por natureza, "o que pesou foi o cartão" se lê num
+ * relance — e o subtotal de cada grupo está no próprio cabeçalho.
+ *
+ * ⚠️ **"Tudo aberto" expande a fatura nas COMPRAS dela**, e cada fatura busca as suas na própria
+ * linha, só quando aberta. Uma consulta que trouxesse as compras de todas as faturas do ciclo
+ * pagaria o custo mesmo com ninguém abrindo nada.
  */
 export default function CycleDetailScreen() {
   const params = useLocalSearchParams<{ month?: string; view?: string; tipo?: string }>();
   const month = params.month ?? '';
   const view = (params.view === 'civil' ? 'civil' : 'cycle') as CycleView;
-  const [tipo, setTipo] = useState<Recorte>(
-    (['tudo', 'entra', 'sai', 'faturas'].includes(params.tipo ?? '') ? params.tipo : 'tudo') as Recorte,
-  );
+  const [modo, setModo] = useState(params.tipo === 'tudo' ? 'aberto' : 'resumo');
 
+  const serie = useCycleSeries(month, month, view);
   const linhas = useCycleLines(month, view);
+  const ciclo = serie.data?.find((c) => c.mes.startsWith(month)) ?? null;
 
-  const { dias, total } = useMemo(() => agrupar(linhas.data ?? [], tipo), [linhas.data, tipo]);
+  const grupos = useMemo(() => agrupar(linhas.data ?? []), [linhas.data]);
 
-  if (linhas.isError) {
+  if (serie.isError || linhas.isError) {
     return (
       <ScrollView contentContainerStyle={styles.conteudo}>
-        <ErrorCard onRetry={() => { void linhas.refetch(); }} />
+        <ErrorCard
+          onRetry={() => {
+            void serie.refetch();
+            void linhas.refetch();
+          }}
+        />
+      </ScrollView>
+    );
+  }
+
+  if (serie.isPending || !ciclo) {
+    return (
+      <ScrollView contentContainerStyle={styles.conteudo}>
+        <Skeleton height={220} radius={Radius.md} />
       </ScrollView>
     );
   }
 
   return (
     <ScrollView contentContainerStyle={styles.conteudo}>
-      <View style={styles.topo}>
-        <ThemedText type="caption" themeColor="textSecondary">
-          {TITULO[tipo].toUpperCase()} · {monthTitle(month)}
-        </ThemedText>
-        <Money
-          cents={total}
-          variant="title"
-          tone={tipo === 'entra' ? 'success' : tipo === 'tudo' ? 'auto' : 'danger'}
-          signed={tipo === 'tudo'}
-        />
-      </View>
+      <Fechamento ciclo={ciclo} month={month} />
 
-      <Segmented options={RECORTES} value={tipo} onChange={setTipo} />
+      <Segmented
+        options={[
+          { value: 'resumo', label: 'Resumido' },
+          { value: 'aberto', label: 'Tudo aberto' },
+        ]}
+        value={modo}
+        onChange={setModo}
+      />
 
-      {linhas.isPending ? (
-        <Skeleton height={220} radius={Radius.md} />
-      ) : dias.length === 0 ? (
-        <EmptyState title="Nada neste recorte" hint="Nenhum movimento deste tipo cai neste ciclo." />
+      {grupos.length === 0 ? (
+        <EmptyState title="Nada neste ciclo" hint="Nenhum movimento cai neste período." />
       ) : (
-        dias.map(([dia, itens]) => (
-          <View key={dia}>
-            {/* O dia é o cabeçalho porque a pergunta aqui é "quando o dinheiro sai", que é a
-                própria base de cálculo do ciclo. Agrupar por categoria seria a outra pergunta,
-                e ela já tem tela ("Onde o dinheiro foi"). */}
-            <SectionHead title={isoToBR(dia)} />
+        grupos.map((g) => (
+          <View key={g.titulo}>
+            <SectionHead title={g.titulo} />
             <Section>
-              {itens.map((l, i) => (
-                <Row
-                  key={`${l.origin}-${l.ref_id}-${i}`}
-                  title={l.title}
-                  subtitle={`${legenda(l.origin)} · ${l.method_label}`}
-                  trailing={
-                    <Money
-                      cents={Number(l.in_cents) > 0 ? Number(l.in_cents) : Number(l.out_cents)}
-                      tone={Number(l.in_cents) > 0 ? 'success' : 'danger'}
-                    />
-                  }
-                  onPress={destino(l)}
-                />
+              {g.linhas.map((l, i) => (
+                <Linha key={`${l.origin}-${l.ref_id}-${i}`} linha={l} expandida={modo === 'aberto'} />
               ))}
             </Section>
           </View>
@@ -123,82 +115,150 @@ export default function CycleDetailScreen() {
   );
 }
 
-/** O que a linha É, em uma palavra — a pessoa precisa saber por que ela está nesta soma. */
-function legenda(origin: string) {
-  switch (origin) {
-    case 'invoice':
-      return 'Fatura a pagar';
-    case 'invoice_payment':
-      return 'Pagamento de fatura';
-    case 'debt_schedule':
-      return 'Parcela do financiamento';
-    case 'recurring_projection':
-      return 'Recorrente (projetada)';
-    case 'transaction_overdue':
-      return 'Atrasado';
-    default:
-      return 'Lançamento';
-  }
+/**
+ * A conta que chega ao número da home, na ordem em que se lê.
+ *
+ * ⚠️ **`Faltou pagar` fica FORA da soma, de propósito.** O dinheiro não saiu da conta: por isso
+ * `comecei + entrou − saiu` dá o caixa que de fato ficou, e a dívida é uma linha à parte. Somar
+ * as duas seria o abatimento automático que o dono do produto recusou.
+ */
+function Fechamento({ ciclo, month }: { ciclo: CycleRow; month: string }) {
+  const nome = monthTitle(month).replace(/ de \d{4}$/, '').toLowerCase();
+  const d = describeCycle(ciclo, nome);
+  const faltou = Number(ciclo.faltou_pagar ?? 0);
+
+  return (
+    <Card style={styles.painel}>
+      <HeroLabel>{d.label}</HeroLabel>
+      <Money cents={d.cents} variant="money" tone={d.ruim ? 'danger' : 'text'} signed />
+      <ThemedText type="caption" themeColor="textSecondary">
+        {`${isoToBR(ciclo.ini)} a ${isoToBR(ciclo.fim)} · ciclo ${ciclo.estado}`}
+      </ThemedText>
+
+      <View style={styles.conta}>
+        <Conta rotulo="Comecei com" cents={Number(ciclo.comecei_com)} />
+        <Conta rotulo="Entrou" cents={Number(ciclo.entrou)} tone="success" />
+        <Conta rotulo="Saiu" cents={-Number(ciclo.saiu)} tone="danger" />
+        <Conta
+          rotulo="Sobrou na conta"
+          cents={Number(ciclo.caixa_no_fim ?? ciclo.resultado)}
+          forte
+        />
+        {faltou > 0 ? <Conta rotulo="Faltou pagar" cents={-faltou} tone="danger" forte /> : null}
+      </View>
+    </Card>
+  );
+}
+
+function Conta({
+  rotulo,
+  cents,
+  tone = 'text',
+  forte,
+}: {
+  rotulo: string;
+  cents: number;
+  tone?: 'text' | 'success' | 'danger';
+  forte?: boolean;
+}) {
+  return (
+    <View style={styles.contaLinha}>
+      <ThemedText type={forte ? 'smallBold' : 'small'} themeColor={forte ? 'text' : 'textSecondary'}>
+        {rotulo}
+      </ThemedText>
+      <Money cents={cents} variant={forte ? 'ticker' : 'footnote'} tone={tone} signed />
+    </View>
+  );
+}
+
+/** Uma linha do ciclo. Fatura vira o cabeçalho das compras dela no modo "Tudo aberto". */
+function Linha({ linha, expandida }: { linha: CycleLine; expandida: boolean }) {
+  const ehFatura = linha.origin === 'invoice' || linha.origin === 'invoice_payment';
+  // Só a fatura tem o que abrir, e só busca quando alguém abriu.
+  const fatura = useInvoice(ehFatura && expandida ? linha.ref_id : undefined);
+  const entra = Number(linha.in_cents) > 0;
+
+  return (
+    <>
+      <Row
+        title={linha.title}
+        subtitle={`${isoToBR(linha.day)} · ${linha.method_label}`}
+        trailing={
+          <Money
+            cents={entra ? Number(linha.in_cents) : Number(linha.out_cents)}
+            tone={entra ? 'success' : 'danger'}
+          />
+        }
+        onPress={destino(linha)}
+      />
+      {ehFatura && expandida
+        ? (fatura.data?.transactions ?? []).map((t) => (
+            <Row
+              key={t.id}
+              title={t.description ?? t.merchant ?? 'Compra'}
+              subtitle={`${isoToBR(t.occurred_at)}${t.category ? ` · ${t.category}` : ''}`}
+              trailing={<Money cents={Number(t.amount_cents)} variant="footnote" />}
+              onPress={() => router.push({ pathname: '/finance/[txId]', params: { txId: t.id } })}
+            />
+          ))
+        : null}
+    </>
+  );
 }
 
 /**
- * Cada linha leva para onde ela MORA. Sem destino para o que é projetado da regra: ali não existe
- * lançamento para abrir, e mandar a pessoa para uma tela vazia é pior que não ter link.
+ * A ordem dos grupos é a de quem pesa na decisão: cartão primeiro (costuma ser o maior), depois o
+ * que sai da conta, o financiamento, e as entradas por último — quem abre esta tela veio entender
+ * um número ruim, não comemorar o salário.
  */
-function destino(l: CycleLine) {
-  switch (l.origin) {
-    case 'invoice':
-      return () => router.push({ pathname: '/finance/invoice/[id]', params: { id: l.ref_id } });
-    // O pagamento é uma TRANSAÇÃO (o transfer para o cartão), não a fatura — mandar para a tela
-    // da fatura com o id do transfer abriria uma tela vazia.
-    case 'invoice_payment':
-    case 'transaction':
-    case 'transaction_overdue':
-      return () => router.push({ pathname: '/finance/[txId]', params: { txId: l.ref_id } });
-    /*
-      ⚠️ **Vai com o `id`.** `ref_id` de uma linha de cronograma é id de DÍVIDA, não de
-      lançamento — empurrar `/finance/[txId]` com ele abriria uma tela que não existe. E mandar
-      para a LISTA fazia quem tem cinco financiamentos caçar qual era; a tela de Dívidas abre o
-      detalhe direto quando recebe o parâmetro. Lição herdada do teste da tela do mês.
-    */
-    case 'debt_schedule':
-      return () => router.push({ pathname: '/finance/debts', params: { id: l.ref_id } });
-    default:
-      return undefined;
-  }
-}
-
-/** Agrupa por dia e soma — a soma tem que ser a MESMA que a linha de cima do ciclo mostra. */
-function agrupar(linhas: CycleLine[], tipo: Recorte) {
-  const filtradas = linhas.filter((l) => {
-    if (tipo === 'tudo') return true;
-    if (tipo === 'entra') return Number(l.in_cents) > 0;
-    if (tipo === 'faturas') return l.origin === 'invoice' || l.origin === 'invoice_payment';
-    return Number(l.out_cents) > 0;
-  });
+function agrupar(linhas: CycleLine[]) {
+  const balde = (l: CycleLine) => {
+    if (Number(l.in_cents) > 0) return 'Entradas';
+    if (l.origin === 'invoice' || l.origin === 'invoice_payment') return 'Faturas de cartão';
+    if (l.origin === 'debt_schedule') return 'Parcelas de financiamento';
+    if (l.origin === 'recurring_projection') return 'Previstos da recorrência';
+    return 'Boletos, pix e gastos';
+  };
+  const ordem = [
+    'Faturas de cartão',
+    'Boletos, pix e gastos',
+    'Parcelas de financiamento',
+    'Previstos da recorrência',
+    'Entradas',
+  ];
 
   const mapa = new Map<string, CycleLine[]>();
-  for (const l of filtradas) {
-    const atual = mapa.get(l.day);
+  for (const l of linhas) {
+    const k = balde(l);
+    const atual = mapa.get(k);
     if (atual) atual.push(l);
-    else mapa.set(l.day, [l]);
+    else mapa.set(k, [l]);
   }
 
-  return {
-    dias: [...mapa.entries()].sort((a, b) => a[0].localeCompare(b[0])),
-    /*
-      Em "Tudo" o número de cima é o RESULTADO — entra menos sai —, que é o que fecha o ciclo.
-      Nos outros recortes é a soma daquele lado. Somar os módulos em "Tudo" daria um número que
-      não é nada: nem o que entrou, nem o que saiu, nem o que sobrou.
-    */
-    total:
-      tipo === 'tudo'
-        ? filtradas.reduce((s, l) => s + Number(l.in_cents) - Number(l.out_cents), 0)
-        : filtradas.reduce((s, l) => s + Number(l.in_cents) + Number(l.out_cents), 0),
-  };
+  return ordem
+    .filter((t) => mapa.has(t))
+    .map((titulo) => ({
+      // O subtotal mora no cabeçalho: sem ele, "qual grupo pesou" só sai somando de cabeça.
+      titulo: `${titulo} · ${formatBRL(
+        (mapa.get(titulo) ?? []).reduce((s, l) => s + Number(l.in_cents) + Number(l.out_cents), 0),
+      )}`,
+      linhas: (mapa.get(titulo) ?? []).sort((a, b) => a.day.localeCompare(b.day)),
+    }));
+}
+
+function destino(l: CycleLine) {
+  const rota = rotaDaLinha(l.origin, l.ref_id);
+  return rota ? () => router.push(rota as never) : undefined;
 }
 
 const styles = StyleSheet.create({
-  conteudo: { padding: Space.md, paddingBottom: Space.xxl, gap: Space.sm },
-  topo: { gap: Space.xs, paddingBottom: Space.sm },
+  conteudo: { padding: Space.md, paddingBottom: Space.xxl, gap: Space.md },
+  painel: { gap: Space.xs },
+  conta: { gap: Space.xs, paddingTop: Space.sm },
+  contaLinha: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    gap: Space.sm,
+  },
 });

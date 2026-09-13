@@ -9,7 +9,7 @@ const require = createRequire(import.meta.url);
 
 // Execute the screen JSX and its event handlers. Native components/query boundaries
 // are inert; state persists across renders so each interaction uses current props.
-function screen(file: string, options: { debts?: any[]; invoiceStatus?: string; create?: boolean; monthLines?: any[]; monthSummary?: any; cycleLines?: any[] } = {}) {
+function screen(file: string, options: { debts?: any[]; invoiceStatus?: string; create?: boolean; monthLines?: any[]; monthSummary?: any; cycleLines?: any[]; cycleRow?: any } = {}) {
   const state: any[] = [];
   let cursor = 0;
   let nodes: any[] = [];
@@ -25,6 +25,13 @@ function screen(file: string, options: { debts?: any[]; invoiceStatus?: string; 
     useDebts: () => ({ ...query, data: options.debts ?? [] }),
     useMonthLines: () => ({ ...query, data: options.monthLines ?? [] }),
     useCycleLines: () => ({ ...query, data: options.cycleLines ?? [] }),
+    // A tela do ciclo mostra o esqueleto enquanto não tem a série — sem este dublê ela nunca
+    // chega a renderizar linha nenhuma, e o teste passaria a medir o esqueleto.
+    useCycleSeries: () => ({ ...query, isPending: false, data: [options.cycleRow ?? {
+      mes: '2026-09-01', ini: '2026-08-11', fim: '2026-09-10', estado: 'fechado',
+      comecei_com: 86797, entrou: 633062, saiu: 719787, resultado: 72,
+      caixa_no_fim: 72, faltou_pagar: 37164, confere: true,
+    }] }),
     // Devolve as BORDAS direto, não um query — o Proxy abaixo assume "todo hook é query".
     useMonthRange: (month: string) => ({ from: `${month}-01`, to: `${month}-30` }),
     useMonthSummary: () => ({ ...query, data: options.monthSummary ?? null }),
@@ -210,33 +217,7 @@ test('a paid invoice does not expose settlement or payment buttons', () => {
 
 
 // ── tela do ciclo (era a tela Mês, apagada em 13/09/2026) ───────────────────
-
-const cycleFile = 'src/app/finance/cycle.tsx';
-/** Uma linha de cronograma de dívida vinda de `cash_events`. */
-const linhaDeDivida = {
-  day: '2026-09-23', in_cents: 0, out_cents: 148500, title: 'Parcela carro',
-  origin: 'debt_schedule', ref_id: 'debt-1', method_label: 'Financiamento',
-};
-
-test('a parcela do cronograma abre A DÍVIDA CERTA, nunca um lançamento', () => {
-  // `ref_id` de uma linha de cronograma é id de DÍVIDA. Empurrar `/finance/[txId]` com ele
-  // abriria um lançamento que não existe — a mesma lição de `kind='debt'` em upcoming_bills.
-  //
-  // E vai com o `id`: mandar para a LISTA fazia quem tem cinco financiamentos ter que caçar
-  // qual era. A tela de Dívidas abre o detalhe direto quando recebe o parâmetro.
-  const ui = screen(cycleFile, { cycleLines: [linhaDeDivida] });
-  const linha = ui.nodes().find((n) => n.type === 'Row' && n.props.title === 'Parcela carro');
-  assert.ok(linha, 'a linha do financiamento aparece no ciclo');
-  linha.props.onPress();
-  assert.equal(ui.navigations.length, 1);
-  assert.equal(ui.navigations[0].pathname, '/finance/debts');
-  assert.equal(ui.navigations[0].params.id, 'debt-1');
-});
-
-test('o que é projetado da regra não tem destino: não existe lançamento para abrir', () => {
-  const ui = screen(cycleFile, {
-    cycleLines: [{ ...linhaDeDivida, origin: 'recurring_projection', ref_id: 'rec-1' }],
-  });
-  const linha = ui.nodes().find((n) => n.type === 'Row' && n.props.title === 'Parcela carro');
-  assert.equal(linha.props.onPress, undefined);
-});
+//
+// O roteamento das linhas é testado em `cycle-routes.test.ts`: ele é lógica PURA, e este harness
+// não desce em componente aninhado — a linha do ciclo mora dentro de `<Linha>`, não solta na
+// árvore da tela.
