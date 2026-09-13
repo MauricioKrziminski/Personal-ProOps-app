@@ -11,6 +11,7 @@ import { z } from 'zod';
 
 import { CategoryPicker } from '@/components/finance/category-picker';
 import { Chip } from '@/components/finance/chip';
+import { Note } from '@/components/ui/note';
 import { DatePickerField } from '@/components/finance/date-picker-field';
 import { ThemedText } from '@/components/themed-text';
 import { HeaderActions } from '@/components/ui/header-actions';
@@ -403,17 +404,44 @@ function TransactionForm({ editing }: { editing?: Transaction }) {
             <Button label="Dívidas" variant="ghost" size="sm" onPress={() => router.push('/finance/debts')} />
           </Card>
         ) : null}
-        {!editing ? (
+        {/*
+          ⚠️ **Um lançamento que JÁ é de uma série precisa dizer isso na tela.** A pergunta de
+          escopo ("Só esta / Esta e as futuras") só aparece no Salvar — e, sem esta nota, quem
+          abre o lançamento não tem como saber que ele se repete: a queixa foi literal
+          (13/09/2026), *"ele não mostra como recorrente para eu colocar aqui"*.
+        */}
+        {editing && (editing.recurring_id || editing.installment_plan_id) ? (
+          <Note icon="arrow.triangle.branch">
+            {editing.recurring_id
+              ? 'Faz parte de uma série. Ao salvar, você escolhe se muda só esta ou as futuras.'
+              : 'É uma parcela. Ao salvar, você escolhe se muda só esta ou as futuras.'}
+          </Note>
+        ) : null}
+
+        {/*
+          ⚠️ **"Repetir lançamento" também no MODO EDIÇÃO**, quando o lançamento ainda não é de
+          série. Era só na criação, e por isso não havia caminho para transformar um gasto que já
+          existe em recorrente — foi a queixa *"queria colocar o Cabelo Marcelao como recorrente
+          mas quando vou em editar o lançamento, eu não consigo"*. Quem já tem série não vê o
+          botão: ali o caminho é editar a série, não criar uma segunda.
+        */}
+        {!editing || !(editing.recurring_id || editing.installment_plan_id) ? (
           <View style={styles.errorActions}>
             <Button label="Repetir lançamento" variant="secondary" size="sm" onPress={() => {
               const values = getValues();
-              router.replace({ pathname: '/finance/recurring', params: {
+              const destino = { pathname: '/finance/recurring' as const, params: {
                 create: '1', kind: values.kind === 'income' ? 'income' : 'expense',
                 amount: String(values.amount_cents), description: values.description ?? '',
                 category: values.category ?? '', account: values.account_id ?? '', start: values.occurred_at,
-              } });
+              } };
+              // Criando, o formulário é descartável e `replace` evita voltar para um rascunho
+              // pela metade. Editando, o lançamento continua existindo — `push` devolve para ele.
+              if (editing) router.push(destino);
+              else router.replace(destino);
             }} />
-            <Button label="Financiamento" variant="secondary" size="sm" onPress={() => router.push({ pathname: '/finance/debts', params: { create: 'financing' } })} />
+            {!editing ? (
+              <Button label="Financiamento" variant="secondary" size="sm" onPress={() => router.push({ pathname: '/finance/debts', params: { create: 'financing' } })} />
+            ) : null}
           </View>
         ) : null}
         {/*
