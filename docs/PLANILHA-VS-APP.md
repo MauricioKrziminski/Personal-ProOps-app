@@ -219,3 +219,63 @@ está no cartão errado, e vale conferir na fatura.
   ciclo TERMINA. Comparando com a planilha, use a régua **Mês**.
 - **A projeção vai 90 dias por padrão** e por isso termina em janeiro/2027. O horizonte se
   estende pelo ícone de calendário no header (atalhos até 10 anos, ou data exata).
+
+---
+
+# Lançado no staging (13/09/2026) — e o que sobrou
+
+**Só no clone do staging. Produção não foi tocada.**
+
+Quatro correções em setembro, todas na Conta corrente, `cleared`:
+
+| lançamento | valor | data |
+|---|---|---|
+| Pix Maurício | 160,50 | 05/09 |
+| Pix mãe controle | 60,00 | 05/09 |
+| Freela Scai (entrada) | 225,00 | 05/09 |
+| Cashback — editado de 1,90 para 38,90 | +37,00 | 08/09 |
+
+⚠️ **As três datas são suposição minha.** A planilha não tem coluna de data no bloco de
+Entradas, só o ✔️ de recebido. Escolhi 05/09 porque é o dia em que todo pix de entrada dele cai
+(é o `BYMONTHDAY=5` do próprio recorrente do Pix Maurício), e porque 05/09 cai dentro das duas
+réguas — mês civil e ciclo 11/08–10/09 — então mudar a data não muda balde nenhum.
+
+Resultado na tela (Projeção → Por mês → Mês):
+
+| | antes | depois | planilha |
+|---|---|---|---|
+| Setembro | −707,92 | **−225,42** | −371,67 |
+| Outubro | −941,77 | **−459,27** | −429,56 |
+
+## O que ainda separa os dois: R$ 150,26, e o app pode estar mais certo
+
+| o que | valor | quem provavelmente está certo |
+|---|---|---|
+| saldo de abertura de setembro — app 867,97, planilha 770,57 | 97,40 | **ninguém sabe** — é o fechamento de agosto, que não foi conferido |
+| `Crédito em conta` 04/09 — existe no app, não na planilha | 33,70 | **o app** (veio da importação do extrato) |
+| juros do rotativo — app 42,97, planilha 54,07 | 11,13 | **o app** (veio da fatura) |
+| salário — app 2.636,02, planilha 2.632,00, em setembro E outubro | 8,04 | a conferir no holerite |
+
+Três dos quatro vieram de documento (extrato, fatura); só o primeiro é de fato desconhecido, e é
+agosto. **Não forcei nenhum deles** — inventar o saldo de abertura para a conta fechar é
+exatamente o que faz a planilha e o app concordarem num número errado.
+
+## O que falta na planilha de outubro: seis linhas, R$ 179,97
+
+Diff item a item da fatura do Nubank que vence 10/10 (app 3.276,91 × planilha 2.529,32):
+
+| o que | valor | quando |
+|---|---|---|
+| IOF Claude | 19,86 | 04/09 |
+| IOF ChatGPT | 19,12 | 04/09 |
+| Casa do Açaí Cafe | 37,00 | 04/09 |
+| Shopee *Shpstecnologia | 19,99 | 06/09 |
+| Auto Posto Costa Costa | 70,00 | 07/09 |
+| Auto Posto Costa Costa | 14,00 | 07/09 |
+
+Os dois IOF são das assinaturas em dólar e a planilha não os prevê; as quatro compras são de
+setembro e ainda não foram lançadas. **Todo o resto das duas faturas de outubro bate item a
+item**, com no máximo 3 centavos de arredondamento por linha.
+
+⚠️ **Fora esses seis, só o `Claude ProOps` 567,64 está em cartão diferente** — Nubank no app, BB
+na planilha. Não muda o total de saídas, mas um dos dois está errado.
