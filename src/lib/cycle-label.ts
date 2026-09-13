@@ -45,7 +45,9 @@ export function describeCycle(c: CycleLike, nomeDoMes: string): CycleLabel {
     if (faltou > 0) {
       return {
         label: `Fechei ${nomeDoMes} devendo`,
-        cents: faltou,
+        // ⚠️ NEGATIVO. Vermelho e a palavra "devendo" não bastam: todo outro número ruim do app
+        // vem com o sinal, e um `R$ 371,64` sem ele lê como valor positivo num card vermelho.
+        cents: -faltou,
         ruim: true,
         rodape: { label: 'Sobrou na conta', cents: caixa },
       };

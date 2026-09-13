@@ -15,6 +15,7 @@ import { HeaderMenu } from '@/components/ui/header-actions';
 import { ItemLink } from '@/components/ui/item-link';
 import { Search } from '@/components/ui/search';
 import { Button } from '@/components/ui/button';
+import { Note } from '@/components/ui/note';
 import { Chip } from '@/components/finance/chip';
 import { EmptyState } from '@/components/ui/empty-state';
 import { Money } from '@/components/ui/money';
@@ -320,23 +321,23 @@ export default function TransactionsScreen() {
       ) : (
         <Card style={styles.summary}>
           {/*
-            ⚠️ **"Os lançamentos", não "o ciclo".** O número daqui é a soma DESTA LISTA, e ela
-            não é o fechamento do ciclo: a fatura entra ali como uma linha só (no vencimento), e
-            o cronograma da dívida e a recorrente projetada nem são lançamento. Chamar os dois de
-            "sobrou" punha dois números diferentes com o mesmo nome em duas telas — exatamente o
-            que esta refatoração existe para matar. Por isso o rótulo diz o que ele soma, e a
-            porta abaixo leva a quem responde a outra pergunta.
+            ⚠️ **Esta tela NÃO tem um "resultado".** Ela teve, e o número não batia com o do
+            ciclo — a queixa foi direta: *"não era essa tela que ia mostrar os lançamentos que
+            justificam aquele 371,64? O que que eu falei sobre números diferentes?"*.
+
+            E os dois estavam certos: aqui é o LIVRO DE LANÇAMENTOS, listado por data; o ciclo
+            conta o dia em que o dinheiro sai da conta, com a fatura virando uma linha só e com
+            coisas que nem são lançamento (cronograma de dívida, recorrente projetada). Dois
+            números diferentes com a mesma cara em telas vizinhas é o defeito; ter um só, e uma
+            porta para o outro, é a correção.
           */}
-          <HeroLabel>Os lançamentos deste período</HeroLabel>
-          <Money cents={income - expense} variant="money" tone={income - expense < 0 ? 'danger' : 'text'} />
-          <View style={styles.summaryFacts}>
-            <ThemedText type="small" themeColor="textSecondary" style={tabular}>
-              entra {formatBRL(income)}
-            </ThemedText>
-            <ThemedText type="small" themeColor="textSecondary" style={tabular}>
-              sai {formatBRL(expense)}
-            </ThemedText>
-          </View>
+          <HeroLabel>Lançamentos de {monthTitle(month)}</HeroLabel>
+          <ThemedText type="small" themeColor="textSecondary" style={tabular}>
+            {`${rows.length === 1 ? '1 lançamento' : `${rows.length} lançamentos`} · entra ${formatBRL(income)} · sai ${formatBRL(expense)}`}
+          </ThemedText>
+          <Note icon="questionmark.circle">
+            Esta lista é por data do lançamento. O que fecha o ciclo conta pelo pagamento.
+          </Note>
           <Button
             label="Ver o que fecha o ciclo"
             variant="secondary"
@@ -344,7 +345,7 @@ export default function TransactionsScreen() {
             onPress={() =>
               router.push({
                 pathname: '/finance/cycle',
-                params: { month, view: regua.view, tipo: 'sai' },
+                params: { month, view: regua.view, tipo: 'tudo' },
               })
             }
           />

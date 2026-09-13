@@ -1,5 +1,5 @@
 import { router, useLocalSearchParams } from 'expo-router';
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import { ScrollView, StyleSheet, View } from 'react-native';
 
 import { ErrorCard } from '@/components/error-card';
@@ -9,18 +9,33 @@ import { EmptyState } from '@/components/ui/empty-state';
 import { Money } from '@/components/ui/money';
 import { Row, Section } from '@/components/ui/row';
 import { SectionHead } from '@/components/ui/section-head';
+import { Segmented } from '@/components/ui/segmented';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Radius, Space } from '@/design/tokens';
 import { useCycleLines, type CycleLine, type CycleView } from '@/hooks/use-finance';
 import { isoToBR } from '@/lib/dates';
 
-type Recorte = 'entra' | 'sai' | 'faturas';
+type Recorte = 'tudo' | 'entra' | 'sai' | 'faturas';
 
 const TITULO: Record<Recorte, string> = {
+  tudo: 'Tudo que fecha o ciclo',
   entra: 'O que entra',
   sai: 'O que sai',
   faturas: 'Faturas',
 };
+
+/*
+  Quatro opções de rótulo curto: `Segmented` (§1 de design.md). O recorte é ESTADO DA TELA, não
+  do chamador — abrir cravada em "sai" era a queixa de 13/09/2026: *"se eu clico em 'ver o que
+  fecha o ciclo' aparece somente os gastos, e o restante?"*. O parâmetro agora só diz onde
+  COMEÇAR.
+*/
+const RECORTES = [
+  { value: 'tudo', label: 'Tudo' },
+  { value: 'entra', label: 'Entra' },
+  { value: 'sai', label: 'Sai' },
+  { value: 'faturas', label: 'Faturas' },
+] as const;
 
 /**
  * **O detalhe de um recorte do ciclo** — as linhas que produziram o número, e nada além delas.
@@ -42,7 +57,9 @@ export default function CycleDetailScreen() {
   const params = useLocalSearchParams<{ month?: string; view?: string; tipo?: string }>();
   const month = params.month ?? '';
   const view = (params.view === 'civil' ? 'civil' : 'cycle') as CycleView;
-  const tipo = (['entra', 'sai', 'faturas'].includes(params.tipo ?? '') ? params.tipo : 'sai') as Recorte;
+  const [tipo, setTipo] = useState<Recorte>(
+    (['tudo', 'entra', 'sai', 'faturas'].includes(params.tipo ?? '') ? params.tipo : 'tudo') as Recorte,
+  );
 
   const linhas = useCycleLines(month, view);
 
@@ -62,8 +79,15 @@ export default function CycleDetailScreen() {
         <ThemedText type="caption" themeColor="textSecondary">
           {TITULO[tipo].toUpperCase()} · {monthTitle(month)}
         </ThemedText>
-        <Money cents={total} variant="title" tone={tipo === 'entra' ? 'success' : 'danger'} />
+        <Money
+          cents={total}
+          variant="title"
+          tone={tipo === 'entra' ? 'success' : tipo === 'tudo' ? 'auto' : 'danger'}
+          signed={tipo === 'tudo'}
+        />
       </View>
+
+      <Segmented options={RECORTES} value={tipo} onChange={setTipo} />
 
       {linhas.isPending ? (
         <Skeleton height={220} radius={Radius.md} />
@@ -147,6 +171,7 @@ function destino(l: CycleLine) {
 /** Agrupa por dia e soma — a soma tem que ser a MESMA que a linha de cima do ciclo mostra. */
 function agrupar(linhas: CycleLine[], tipo: Recorte) {
   const filtradas = linhas.filter((l) => {
+    if (tipo === 'tudo') return true;
     if (tipo === 'entra') return Number(l.in_cents) > 0;
     if (tipo === 'faturas') return l.origin === 'invoice' || l.origin === 'invoice_payment';
     return Number(l.out_cents) > 0;
@@ -161,7 +186,15 @@ function agrupar(linhas: CycleLine[], tipo: Recorte) {
 
   return {
     dias: [...mapa.entries()].sort((a, b) => a[0].localeCompare(b[0])),
-    total: filtradas.reduce((s, l) => s + Number(l.in_cents) + Number(l.out_cents), 0),
+    /*
+      Em "Tudo" o número de cima é o RESULTADO — entra menos sai —, que é o que fecha o ciclo.
+      Nos outros recortes é a soma daquele lado. Somar os módulos em "Tudo" daria um número que
+      não é nada: nem o que entrou, nem o que saiu, nem o que sobrou.
+    */
+    total:
+      tipo === 'tudo'
+        ? filtradas.reduce((s, l) => s + Number(l.in_cents) - Number(l.out_cents), 0)
+        : filtradas.reduce((s, l) => s + Number(l.in_cents) + Number(l.out_cents), 0),
   };
 }
 

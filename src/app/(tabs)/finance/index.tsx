@@ -519,6 +519,7 @@ export default function FinanceScreen() {
             concealable
           onPress={() =>
             showItemActions('Mais opções', [
+              { label: 'Ver o que fecha o ciclo', icon: 'list.bullet', onPress: () => router.push({ pathname: '/finance/cycle', params: { month, view: regua.view, tipo: 'tudo' } }) },
               { label: 'O que entra', icon: 'arrow.down.circle', onPress: () => router.push({ pathname: '/finance/cycle', params: { month, view: regua.view, tipo: 'entra' } }) },
               { label: 'O que sai', icon: 'arrow.up.circle', onPress: () => router.push({ pathname: '/finance/cycle', params: { month, view: regua.view, tipo: 'sai' } }) },
               { label: 'Projeção', icon: 'chart.line.uptrend.xyaxis', onPress: () => router.push('/finance/forecast') },
@@ -601,7 +602,13 @@ export default function FinanceScreen() {
               isso ficaram. Design §8: badge é contagem real ou não existe — número que não é o
               que o rótulo promete ensina a pessoa a não ler os números da tela.
             */}
-            <Shortcut title="Lançamentos" icon="list.bullet" href="/finance/transactions" />
+            {/* Leva o mês da tela: abrir sempre no corrente fazia quem estava olhando outubro
+                cair em setembro sem nada dizer que o período tinha mudado. */}
+            <Shortcut
+              title="Lançamentos"
+              icon="list.bullet"
+              href={{ pathname: '/finance/transactions', params: { month, view: regua.view } }}
+            />
             <Shortcut
               title="Contas"
               icon="wallet.pass"

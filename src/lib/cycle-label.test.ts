@@ -13,7 +13,7 @@ test('ciclo fechado devendo lidera com a DÍVIDA, e o caixa vai para o rodapé',
     'setembro',
   );
   assert.equal(d.label, 'Fechei setembro devendo');
-  assert.equal(d.cents, 37164);
+  assert.equal(d.cents, -37164, 'a dívida vem negativa: vermelho sozinho não diz o sinal');
   assert.equal(d.ruim, true);
   assert.deepEqual(d.rodape, { label: 'Sobrou na conta', cents: 72 });
 });
@@ -63,6 +63,6 @@ test('os campos chegam como string do PostgREST e continuam somando', () => {
     { estado: 'fechado', resultado: '72', caixa_no_fim: '72', faltou_pagar: '37164' },
     'setembro',
   );
-  assert.equal(d.cents, 37164);
+  assert.equal(d.cents, -37164);
   assert.equal(d.ruim, true);
 });
