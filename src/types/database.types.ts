@@ -2259,6 +2259,7 @@ export type Database = {
         Returns: {
           caixa_no_fim: number
           comecei_com: number
+          confere: boolean
           entrou: number
           estado: string
           faltou_pagar: number
@@ -2600,6 +2601,7 @@ export type Database = {
         Returns: {
           caixa_no_fim: number
           comecei_com: number
+          confere: boolean
           entrou: number
           estado: string
           faltou_pagar: number

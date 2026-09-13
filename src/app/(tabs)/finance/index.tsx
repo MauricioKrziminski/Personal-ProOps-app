@@ -17,7 +17,13 @@ import { Skeleton, SkeletonRow } from '@/components/ui/skeleton';
 import { Radius, Space } from '@/design/tokens';
 import { formatBRL } from '@/hooks/use-items';
 import { isoToBR } from '@/lib/dates';
-import { useCycleLines, useCycleSeries, type CycleLine, type CycleRow } from '@/hooks/use-finance';
+import {
+  useCycleLines,
+  useCycleSeries,
+  type CycleLine,
+  type CycleRow,
+  type CycleView,
+} from '@/hooks/use-finance';
 
 /**
  * **A linha do tempo de ciclos** — a única tela que responde "quanto eu tenho / quanto vou ter".
@@ -102,7 +108,7 @@ export default function FinanceScreen() {
         <CicloHero ciclo={ciclo} />
       )}
 
-      <Recortes month={month} linhas={linhas.data ?? []} carregando={linhas.isPending} />
+      <Recortes month={month} view={regua.view} linhas={linhas.data ?? []} carregando={linhas.isPending} />
 
       {proximos.length > 0 ? (
         <>
@@ -132,59 +138,77 @@ export default function FinanceScreen() {
  */
 function CicloHero({ ciclo }: { ciclo: CycleRow }) {
   const fechado = ciclo.estado === 'fechado';
-  const rotulo = fechado ? 'Fechei este ciclo em' : ciclo.estado === 'aberto' ? 'Vou fechar em' : 'Devo fechar em';
+  const faltou = ciclo.faltou_pagar ?? 0;
+
+  /*
+    ⚠️ **Ciclo fechado NÃO lidera com o número líquido.** Ele mostra o caixa que de fato ficou, e
+    o que ficou devendo é uma segunda linha. Recusa explícita do dono do produto (13/09/2026):
+    *"não é porque meu saldo na conta é de 0,72 que fechei o ciclo com −370,92. Se eu não paguei
+    nada com esse saldo, o saldo na conta permanece exatamente na conta e o que faltou pagar
+    continua faltando pagar."*
+
+    Ciclo aberto e previsto lideram com o resultado porque ali a pergunta é outra — "como vou
+    terminar se eu pagar tudo" —, e aí o número único é a resposta certa.
+  */
+  if (fechado) {
+    return (
+      <HeroPanel
+        label="Sobrou na conta"
+        value={<Money cents={ciclo.caixa_no_fim ?? 0} variant="heroMoney" tone="auto" />}
+        secondary={{
+          text: `entrou ${formatBRL(ciclo.entrou)} · saiu ${formatBRL(ciclo.saiu)}`,
+          negative: (ciclo.caixa_no_fim ?? 0) < 0,
+        }}
+        concealable
+        footer={
+          faltou > 0 ? (
+            <View style={styles.fechamentoLinha}>
+              <ThemedText type="footnote" themeColor="onHeroMuted">
+                Ficou faltando pagar
+              </ThemedText>
+              <Money cents={faltou} variant="footnote" tone="danger" />
+            </View>
+          ) : undefined
+        }
+      />
+    );
+  }
 
   return (
     <HeroPanel
-      label={rotulo}
+      label={ciclo.estado === 'aberto' ? 'Vou fechar em' : 'Devo fechar em'}
       value={<Money cents={ciclo.resultado} variant="heroMoney" tone="auto" signed />}
       secondary={{
-        text: `veio de ${formatBRL(ciclo.comecei_com)} · entrou ${formatBRL(ciclo.entrou)} · saiu ${formatBRL(ciclo.saiu)}`,
+        text: `veio de ${formatBRL(ciclo.comecei_com)} · entra ${formatBRL(ciclo.entrou)} · sai ${formatBRL(ciclo.saiu)}`,
         negative: ciclo.resultado < 0,
       }}
       concealable
-      footer={fechado ? <Fechamento ciclo={ciclo} /> : undefined}
     />
   );
 }
 
-/**
- * ⚠️ **Os dois números, e eles não se cancelam.** `sobrou na conta` é o caixa que de fato ficou;
- * `faltou pagar` é o que venceu no ciclo e não saiu. Mostrar só a diferença é exatamente o que o
- * dono do produto recusou — e quando sobra positivo o segundo não existe, porque aí a sobra é
- * dinheiro guardado para o ciclo seguinte, não dívida.
- */
-function Fechamento({ ciclo }: { ciclo: CycleRow }) {
-  const faltou = ciclo.faltou_pagar ?? 0;
-  const caixa = ciclo.caixa_no_fim ?? 0;
-
-  return (
-    <View style={styles.fechamento}>
-      <View style={styles.fechamentoLinha}>
-        <ThemedText type="footnote" themeColor="onHeroMuted">
-          Sobrou na conta
-        </ThemedText>
-        <Money cents={caixa} variant="footnote" tone="plain" />
-      </View>
-      {faltou > 0 ? (
-        <View style={styles.fechamentoLinha}>
-          <ThemedText type="footnote" themeColor="onHeroMuted">
-            Faltou pagar
-          </ThemedText>
-          <Money cents={faltou} variant="footnote" tone="danger" />
-        </View>
-      ) : null}
-    </View>
-  );
-}
-
 /** Os recortes do ciclo. Cada um abre o detalhe; nenhum recalcula nada. */
-function Recortes({ month, linhas, carregando }: { month: string; linhas: CycleLine[]; carregando: boolean }) {
+function Recortes({
+  month,
+  view,
+  linhas,
+  carregando,
+}: {
+  month: string;
+  view: CycleView;
+  linhas: CycleLine[];
+  carregando: boolean;
+}) {
+  const abrir = (tipo: 'entra' | 'sai' | 'faturas') => () =>
+    router.push({ pathname: '/finance/cycle', params: { month, view, tipo } });
   const total = useMemo(() => {
     const entra = linhas.reduce((s, l) => s + Number(l.in_cents), 0);
     const sai = linhas.reduce((s, l) => s + Number(l.out_cents), 0);
+    // Fatura tem DOIS tipos de evento e os dois são fatura para quem olha: o pagamento que já
+    // saiu da conta (`invoice_payment`) e o que ainda falta pagar (`invoice`). Contar só um
+    // mostrava R$ 0,00 num ciclo fechado, onde tudo já virou pagamento.
     const faturas = linhas
-      .filter((l) => l.origin === 'invoice' || l.origin === 'invoice_overdue')
+      .filter((l) => l.origin === 'invoice' || l.origin === 'invoice_payment')
       .reduce((s, l) => s + Number(l.out_cents), 0);
     return { entra, sai, faturas };
   }, [linhas]);
@@ -198,18 +222,18 @@ function Recortes({ month, linhas, carregando }: { month: string; linhas: CycleL
         <Row
           title="O que entra"
           trailing={<Money cents={total.entra} tone="success" />}
-          onPress={() => router.push({ pathname: '/finance/transactions', params: { month } })}
+          onPress={abrir('entra')}
         />
         <Row
           title="O que sai"
           trailing={<Money cents={total.sai} tone="danger" />}
-          onPress={() => router.push({ pathname: '/finance/transactions', params: { month } })}
+          onPress={abrir('sai')}
         />
         <Row
           title="Faturas"
           subtitle="contam no ciclo em que vencem"
           trailing={<Money cents={total.faturas} />}
-          onPress={() => router.push('/finance/invoices')}
+          onPress={abrir('faturas')}
         />
         <Row title="Onde o dinheiro foi" onPress={() => router.push({ pathname: '/finance/month', params: { month } })} />
         <Row title="Orçamento" onPress={() => router.push('/finance/budgets')} />
@@ -240,7 +264,6 @@ function shiftMonths(month: string, n: number) {
 }
 
 const styles = StyleSheet.create({
-  fechamento: { gap: Space.xs },
   fechamentoLinha: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', gap: Space.sm },
   nota: { paddingHorizontal: Space.xs, paddingTop: Space.sm },
 });
