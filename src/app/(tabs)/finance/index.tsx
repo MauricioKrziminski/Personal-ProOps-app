@@ -351,19 +351,18 @@ export default function FinanceScreen() {
     "estou 100% perdido": este card dizia uma coisa e a tela do mês, outra. `cycle_series` é a
     fonte única — a mesma que o detalhe do ciclo soma linha a linha.
   */
-  const serie = useCycleSeries(month, month, regua.view);
-  const ciclo = serie.data?.[0] ?? null;
+  const serie = useCycleSeries(shiftMonth(month, -1), month, regua.view);
+  const ciclo = serie.data?.find((c) => c.mes.startsWith(month)) ?? null;
+  const cicloAnterior = serie.data?.find((c) => !c.mes.startsWith(month)) ?? null;
   const faltouPagar = Number(ciclo?.faltou_pagar ?? 0);
   const cicloFechado = ciclo?.estado === 'fechado';
+  const variacaoSaida =
+    ciclo && cicloAnterior && Number(cicloAnterior.saiu) > 0
+      ? Math.round(((Number(ciclo.saiu) - Number(cicloAnterior.saiu)) / Number(cicloAnterior.saiu)) * 100)
+      : null;
 
   const income = totalOf(summary.data, 'income');
   const expense = totalOf(summary.data, 'expense');
-  const previousExpense = totalOf(previous.data, 'expense');
-  const diffExpense =
-    previous.isSuccess && previousExpense > 0
-      ? Math.round(((expense - previousExpense) / previousExpense) * 100)
-      : null;
-  const upcomingOut = (forecast.data ?? []).reduce((s, d) => s + Number(d.out_cents), 0);
   const projected = forecast.data?.at(-1)?.balance_cents ?? 0;
   const leftover = isCurrent ? Number(projected) : income - expense;
 
@@ -535,10 +534,16 @@ export default function FinanceScreen() {
                 384dp × 1,3. Quem quer o lado de entrada abre a Projeção, que agora tem a linha
                 do `in_cents`.
               */
-              text:
-                isCurrent && upcomingOut > 0
-                  ? `entrou ${formatBRL(income)} · saiu ${formatBRL(expense)} · ainda sai ${formatBRL(upcomingOut)}`
-                  : `entrou ${formatBRL(income)} · saiu ${formatBRL(expense)}`,
+              /*
+                ⚠️ **Sai do CICLO, não de `transactions_summary`.** Aquela soma conta o cartão na
+                data da compra e a janela dela é outra: no ciclo 11/09–10/10 ela devolvia zero, e
+                o card escrevia "entrou R$ 0,00 · saiu R$ 0,00" logo abaixo de um herói de
+                −615,87. Dois números da mesma tela discordando é exatamente o que esta
+                refatoração existe para matar.
+              */
+              text: cicloFechado
+                ? `entrou ${formatBRL(Number(ciclo?.entrou ?? 0))} · saiu ${formatBRL(Number(ciclo?.saiu ?? 0))}`
+                : `entra ${formatBRL(Number(ciclo?.entrou ?? 0))} · sai ${formatBRL(Number(ciclo?.saiu ?? 0))}`,
             }}
             /*
               **Sem gráfico aqui.** O herói do Financeiro no export é só rótulo, valor e a faixa
@@ -546,11 +551,16 @@ export default function FinanceScreen() {
               distância (este e a Tendência Mensal) também diziam a mesma coisa duas vezes, com
               recortes diferentes: um de 30 dias, outro de 6 meses.
             */
+            /*
+              A comparação é entre CICLOS, pela mesma régua do número grande. Comparar a saída do
+              ciclo com a do mês civil anterior daria um percentual que não descreve nem um nem
+              outro.
+            */
             trend={
-              diffExpense !== null
+              variacaoSaida !== null
                 ? {
-                    value: `${diffExpense > 0 ? '+' : ''}${diffExpense}% gastos`,
-                    positive: diffExpense <= 0,
+                    value: `${variacaoSaida > 0 ? '+' : ''}${variacaoSaida}% gastos`,
+                    positive: variacaoSaida <= 0,
                     label: `vs ${monthLabel(previousMonth)}`,
                   }
                 : undefined
