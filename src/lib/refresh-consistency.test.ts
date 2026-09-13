@@ -263,7 +263,7 @@ function renderToday(bill: { kind: 'invoice' | 'transaction'; ref_id: string }) 
   const routes: unknown[] = [];
   const module = { exports: {} as any };
   const query = { data: [], isLoading: false, isRefetching: false, refetch: async () => {} };
-  const finance = { useCycle: () => ({ ...query, data: null }), useCashFlowForecast: () => query, useUpcomingBills: () => ({ ...query, data: [{ ...bill, title: 'Fatura teste', amount_cents: 147000, due_date: '2026-01-20', overdue: true }] }), useBudgetsStatus: () => query, useRecentTransactions: () => query, useMarkPaid: () => ({ mutate: (...args: unknown[]) => writes.push(args) }) };
+  const finance = { useCycle: () => ({ ...query, data: null }), useCashFlowForecast: () => query, useCycleSeries: () => ({ ...query, data: [] }), useAccountBalances: () => ({ ...query, data: [] }), useUpcomingBills: () => ({ ...query, data: [{ ...bill, title: 'Fatura teste', amount_cents: 147000, due_date: '2026-01-20', overdue: true }] }), useBudgetsStatus: () => query, useRecentTransactions: () => query, useMarkPaid: () => ({ mutate: (...args: unknown[]) => writes.push(args) }) };
   const code = ts.transpileModule(readFileSync('src/app/(tabs)/today/index.tsx', 'utf8'), { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022, jsx: ts.JsxEmit.ReactJSX } }).outputText;
   runInNewContext(code, { module, exports: module.exports, require: (name: string) => {
     if (name === 'react') return { useMemo: (fn: () => unknown) => fn(), useState: (value: unknown) => [value, () => {}] };
@@ -274,6 +274,7 @@ function renderToday(bill: { kind: 'invoice' | 'transaction'; ref_id: string }) 
     if (name === '@/hooks/use-finance') return finance;
     if (name === '@/hooks/use-items') return { useTodayReminders: () => query, localISODate: () => '2026-09-08', formatDateBR: (s: string) => s };
     if (name === '@/hooks/use-profile') return { useProfile: () => query };
+    if (name === '@/components/finance/month-picker') return { currentMonth: () => '2026-09' };
     if (name === '@/hooks/use-session') return { useSession: () => ({ session: null }) };
     if (name === '@/hooks/use-theme') return { useTheme: () => ({}) };
     if (name === '@/components/ui/toast') return { useToast: () => () => {} };

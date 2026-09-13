@@ -19,7 +19,9 @@ import { useToast } from '@/components/ui/toast';
 import { Radius, Space, tabular, Type } from '@/design/tokens';
 import {
   useBudgetsStatus,
+  useAccountBalances,
   useCashFlowForecast,
+  useCycleSeries,
   useCycle,
   useMarkPaid,
   useRecentTransactions,
@@ -27,6 +29,7 @@ import {
 } from '@/hooks/use-finance';
 import { categoryIcon } from '@/design/category-icons';
 import { formatBRL, formatDateBR, localISODate, useTodayReminders } from '@/hooks/use-items';
+import { currentMonth } from '@/components/finance/month-picker';
 import { useProfile } from '@/hooks/use-profile';
 import { useSession } from '@/hooks/use-session';
 import { useTheme } from '@/hooks/use-theme';
@@ -63,6 +66,7 @@ export default function TodayScreen() {
    * civil é o palpite certo — é o que vale para quem não configurou nada.
    */
   const cycle = useCycle();
+  const saldos = useAccountBalances();
   const { daysLeft, monthEndDay } = useMemo(() => {
     const now = new Date();
     const last = new Date(now.getFullYear(), now.getMonth() + 1, 0);
@@ -86,7 +90,15 @@ export default function TodayScreen() {
   const markPaid = useMarkPaid();
 
   const series = (forecast.data ?? []).map((d) => Number(d.balance_cents));
-  const leftover = series.at(-1) ?? 0;
+  /*
+    ⚠️ **O número grande vem do CICLO, a mesma fonte do Financeiro.** Ele saía da última linha da
+    série diária, e a série e o ciclo são recortes diferentes: a Hoje dizia −615,87 enquanto o
+    Financeiro dizia −629,30 depois do rotativo. Dois números com o mesmo nome em duas telas foi
+    a queixa que abriu esta refatoração — a curva continua sendo o desenho, mas quem responde é
+    `cycle_series`.
+  */
+  const cicloAtual = useCycleSeries(currentMonth(), currentMonth()).data?.[0] ?? null;
+  const leftover = Number(cicloAtual?.resultado ?? series.at(-1) ?? 0);
   /**
    * Os dois números que o card passou a mostrar lado a lado, a pedido do dono do produto.
    *
@@ -95,7 +107,18 @@ export default function TodayScreen() {
    * "a receber" é a soma de `in_cents` do resto do mês, que é justamente o que está fora
    * do primeiro número e dentro do último.
    */
-  const tenhoHoje = series[0] ?? 0;
+  /*
+    ⚠️ **`TENHO HOJE` é o dinheiro NA CONTA, sem abater fatura vencida.** Ele saía de `series[0]`,
+    que é o caixa JÁ menos o que venceu e não foi pago — por isso a Hoje mostrava −370,92 onde o
+    extrato do banco diz 0,72. Recusa explícita do dono do produto: *"o saldo na conta permanece
+    exatamente na conta e o que faltou pagar continua faltando pagar"*.
+
+    ⚠️ E é `cleared_cents`, não `balance_cents`: em conta de dinheiro o saldo honesto é o que já
+    passou pela conta. `balance_cents` inclui previsto, que é o que o número de cima projeta.
+  */
+  const tenhoHoje = (saldos.data ?? [])
+    .filter((a) => a.type !== 'credit_card')
+    .reduce((t, a) => t + Number(a.cleared_cents), 0);
   const aReceberNoMes = (forecast.data ?? []).reduce((t, d) => t + Number(d.in_cents), 0);
 
   /**
@@ -195,7 +218,7 @@ export default function TodayScreen() {
             item), sem atalho nenhum.
           */
           <HeroPanel
-            label={cycle.data ? `Saldo projetado em ${isoToBR(cycle.data.ate)}` : 'Saldo projetado'}
+            label={cycle.data ? `Vou fechar o ciclo em ${isoToBR(cycle.data.ate)}` : 'Vou fechar o ciclo'}
             concealable
             value={
               <Money
