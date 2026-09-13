@@ -11,6 +11,7 @@ import { z } from 'zod';
 
 import { CategoryPicker } from '@/components/finance/category-picker';
 import { Chip } from '@/components/finance/chip';
+import { DatePickerField } from '@/components/finance/date-picker-field';
 import { ThemedText } from '@/components/themed-text';
 import { HeaderActions } from '@/components/ui/header-actions';
 import { Button } from '@/components/ui/button';
@@ -647,16 +648,14 @@ function TransactionForm({ editing }: { editing?: Transaction }) {
                   selected={occurredAt === yesterday}
                   onPress={() => setValue('occurred_at', yesterday, { shouldValidate: true })}
                 />
-                <TextField
-                  value={field.value}
-                  onChangeText={field.onChange}
-                  placeholder="dd/mm/aaaa"
-                  keyboardType="number-pad"
-                  maxLength={10}
-                  accessibilityLabel="Data do lançamento"
-                  invalid={!!errors.occurred_at}
-                  style={styles.dateField}
-                />
+                <View style={styles.dateField}>
+                  <DatePickerField
+                    value={field.value}
+                    onChange={(br) => setValue('occurred_at', br, { shouldValidate: true })}
+                    accessibilityLabel="Data do lançamento"
+                    invalid={!!errors.occurred_at}
+                  />
+                </View>
               </View>
             </Field>
           )}
@@ -691,15 +690,12 @@ function TransactionForm({ editing }: { editing?: Transaction }) {
                           label={dueFieldLabel(kind)}
                           error={errors.due_at?.message}
                           hint={errors.due_at ? undefined : dueFieldHint(kind)}>
-                          <TextField
-                            value={field.value ?? ''}
-                            onChangeText={(text) => field.onChange(text || null)}
-                            placeholder="dd/mm/aaaa"
-                            keyboardType="number-pad"
-                            maxLength={10}
+                          <DatePickerField
+                            value={field.value}
+                            onChange={(br) => field.onChange(br)}
+                            placeholder="Escolher vencimento"
                             accessibilityLabel="Data de vencimento"
                             invalid={!!errors.due_at}
-                            style={styles.dateField}
                           />
                         </Field>
                       )}
