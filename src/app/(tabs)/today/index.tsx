@@ -257,7 +257,6 @@ export default function TodayScreen() {
           onPress={() =>
             showItemActions('Mais opções', [
               { label: 'Projeção', icon: 'chart.line.uptrend.xyaxis', onPress: () => router.push('/finance/forecast') },
-              { label: 'Entradas e saídas', icon: 'calendar', onPress: () => router.push('/finance/month') },
               { label: 'Patrimônio', icon: 'building.columns', onPress: () => router.push('/finance/net-worth') },
               { label: 'Metas', icon: 'target', onPress: () => router.push('/finance/goals') },
             ])

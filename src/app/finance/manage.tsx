@@ -56,7 +56,6 @@ const GROUPS: { title: string; items: ManageItem[] }[] = [
   {
     title: 'Panorama',
     items: [
-      { title: 'Entradas e saídas', icon: 'calendar', href: '/finance/month' },
       { title: 'Patrimônio', icon: 'building.columns', href: '/finance/net-worth' },
       { title: 'Relatórios', subtitle: 'Exportar o ano, inclusive para o IR', icon: 'chart.bar', href: '/finance/reports' },
     ],

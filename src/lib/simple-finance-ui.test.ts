@@ -9,7 +9,7 @@ const require = createRequire(import.meta.url);
 
 // Execute the screen JSX and its event handlers. Native components/query boundaries
 // are inert; state persists across renders so each interaction uses current props.
-function screen(file: string, options: { debts?: any[]; invoiceStatus?: string; create?: boolean; monthLines?: any[]; monthSummary?: any } = {}) {
+function screen(file: string, options: { debts?: any[]; invoiceStatus?: string; create?: boolean; monthLines?: any[]; monthSummary?: any; cycleLines?: any[] } = {}) {
   const state: any[] = [];
   let cursor = 0;
   let nodes: any[] = [];
@@ -24,6 +24,7 @@ function screen(file: string, options: { debts?: any[]; invoiceStatus?: string; 
     DEBT_KINDS: [{ value: 'financing', label: 'Financiamento' }, { value: 'loan', label: 'Empréstimo' }],
     useDebts: () => ({ ...query, data: options.debts ?? [] }),
     useMonthLines: () => ({ ...query, data: options.monthLines ?? [] }),
+    useCycleLines: () => ({ ...query, data: options.cycleLines ?? [] }),
     // Devolve as BORDAS direto, não um query — o Proxy abaixo assume "todo hook é query".
     useMonthRange: (month: string) => ({ from: `${month}-01`, to: `${month}-30` }),
     useMonthSummary: () => ({ ...query, data: options.monthSummary ?? null }),
@@ -208,58 +209,34 @@ test('a paid invoice does not expose settlement or payment buttons', () => {
 });
 
 
-// ── tela Mês ────────────────────────────────────────────────────────────────
+// ── tela do ciclo (era a tela Mês, apagada em 13/09/2026) ───────────────────
 
-const monthFile = 'src/app/finance/month.tsx';
-/** O `month_summary` do mês corrente, com os totais que a tela decompõe. */
-const RESUMO_MES = {
-  income_cents: 900000, expense_cents: 225096, result_cents: 674904,
-  fixas_cents: 0, fixas_unsettled_cents: 0,
-  parcelas_cents: 225096, parcelas_unsettled_cents: 225096,
-  variaveis_cents: 0, variaveis_unsettled_cents: 0,
-  opening_cash_cents: 41005, closing_cash_cents: 892040,
-  recurring_covered_until: null, beyond_recurring_horizon: false,
-  debt_installments_undocumented: 0,
-};
-const linhaProjetada = {
-  bucket: 'parcela', origin: 'debt_schedule', ref_id: 'debt-1', title: 'Parcela carro',
-  category: 'contas', method_id: null, method_label: 'Financiamento',
-  due_date: '2026-09-10', due_day: 10, installment_no: 9, installments_total: 48,
-  kind: 'expense', amount_cents: 147000, settled: false, projected: true,
+const cycleFile = 'src/app/finance/cycle.tsx';
+/** Uma linha de cronograma de dívida vinda de `cash_events`. */
+const linhaDeDivida = {
+  day: '2026-09-23', in_cents: 0, out_cents: 148500, title: 'Parcela carro',
+  origin: 'debt_schedule', ref_id: 'debt-1', method_label: 'Financiamento',
 };
 
-test('a parcela projetada abre A DÍVIDA CERTA, nunca um lançamento', () => {
-  // `ref_id` de uma linha projetada é id de DÍVIDA. Empurrar `/finance/[txId]` com ele abriria
-  // um lançamento que não existe — é a mesma lição de `kind='debt'` em upcoming_bills.
+test('a parcela do cronograma abre A DÍVIDA CERTA, nunca um lançamento', () => {
+  // `ref_id` de uma linha de cronograma é id de DÍVIDA. Empurrar `/finance/[txId]` com ele
+  // abriria um lançamento que não existe — a mesma lição de `kind='debt'` em upcoming_bills.
   //
   // E vai com o `id`: mandar para a LISTA fazia quem tem cinco financiamentos ter que caçar
   // qual era. A tela de Dívidas abre o detalhe direto quando recebe o parâmetro.
-  const ui = screen(monthFile, { monthLines: [linhaProjetada], monthSummary: RESUMO_MES });
+  const ui = screen(cycleFile, { cycleLines: [linhaDeDivida] });
   const linha = ui.nodes().find((n) => n.type === 'Row' && n.props.title === 'Parcela carro');
-  assert.ok(linha, 'a linha do financiamento aparece no mês');
+  assert.ok(linha, 'a linha do financiamento aparece no ciclo');
   linha.props.onPress();
-  // Campo a campo, não `deepEqual`: o objeto é criado dentro do módulo avaliado pelo harness,
-  // ou seja em outro realm, e a comparação estrita reprova por protótipo mesmo com a estrutura
-  // idêntica ("same structure but not reference-equal"). Os outros casos deste arquivo comparam
-  // strings e por isso nunca esbarraram nisso.
   assert.equal(ui.navigations.length, 1);
   assert.equal(ui.navigations[0].pathname, '/finance/debts');
   assert.equal(ui.navigations[0].params.id, 'debt-1');
 });
 
-test('a parcela projetada não oferece dar baixa: ela ainda não é lançamento', () => {
-  const ui = screen(monthFile, { monthLines: [linhaProjetada], monthSummary: RESUMO_MES });
+test('o que é projetado da regra não tem destino: não existe lançamento para abrir', () => {
+  const ui = screen(cycleFile, {
+    cycleLines: [{ ...linhaDeDivida, origin: 'recurring_projection', ref_id: 'rec-1' }],
+  });
   const linha = ui.nodes().find((n) => n.type === 'Row' && n.props.title === 'Parcela carro');
-  assert.equal(linha.props.onLongPress, undefined);
-});
-
-test('o mês mostra os dois números: caixa no destaque, resultado na conta do mês', () => {
-  const ui = screen(monthFile, { monthLines: [linhaProjetada], monthSummary: RESUMO_MES });
-  const hero = ui.nodes().find((n) => n.type === 'HeroPanel');
-  assert.equal(hero.props.label, 'Tenho hoje');
-  assert.equal(hero.props.trend.label, 'resultado do mês');
-  const titulos = ui.nodes().filter((n) => n.type === 'Row').map((n) => n.props.title);
-  for (const t of ['Comecei setembro com', 'Entrou', 'Saiu', 'Resultado']) {
-    assert.ok(titulos.includes(t), t);
-  }
+  assert.equal(linha.props.onPress, undefined);
 });

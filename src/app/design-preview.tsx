@@ -15,7 +15,6 @@ import TransactionDetailScreen from './finance/[txId]';
 import BudgetsScreen from './finance/budgets';
 import TransactionsScreen from './finance/transactions';
 import TransactionFormScreen from './finance/transaction-form';
-import MonthScreen from './finance/month';
 import FinanceScreen from './(tabs)/finance/index';
 import NotesScreen from './(tabs)/notes/index';
 import ProfileScreen from './(tabs)/profile/index';
@@ -73,7 +72,7 @@ import TodayScreen from './(tabs)/today/index';
  * FATURA, não do lançamento, e a tela escrevia "Vence em") e a linha "Repete …" que leva à
  * série. Numa parcela ou num lançamento solto, nenhuma das duas existe.
  */
-const ABAS = ['Hoje', 'Finanças', 'Notas', 'Agente', 'Perfil', 'Dívidas', 'Mês', 'Fatura', 'Recorrentes', 'Editar', 'Detalhe', 'Lançamentos', 'Orçamentos'] as const;
+const ABAS = ['Hoje', 'Finanças', 'Notas', 'Agente', 'Perfil', 'Dívidas', 'Fatura', 'Recorrentes', 'Editar', 'Detalhe', 'Lançamentos', 'Orçamentos'] as const;
 
 /**
  * A tela é montada numa caixa ALTA e deslocada para cima, em vez de rolada.
@@ -133,7 +132,6 @@ const ABA_PARA_TAB: Record<string, number> = {
   Agente: 3,
   Perfil: 4,
   'Dívidas': 2,
-  'Mês': 2,
   Fatura: 1,
   Recorrentes: 2,
   Editar: 2,
@@ -152,7 +150,6 @@ const FAIXAS: Record<(typeof ABAS)[number], number> = {
   'Dívidas': 2,
   // Uma faixa: a tela rola de verdade (é um `Screen` com ScrollView), e o deslocamento por
   // `translateY` só funciona para tela que desenha a altura inteira.
-  'Mês': 1,
   // Uma faixa: o herói e o começo da lista respondem se o parcial aparece.
   Fatura: 1,
   // Duas faixas: a lista de séries e o painel do que entra/sai no mês.
@@ -228,7 +225,6 @@ export default function DesignPreviewScreen() {
             {aba === 'Agente' ? <AgentScreen /> : null}
             {aba === 'Perfil' ? <ProfileScreen /> : null}
             {aba === 'Dívidas' ? <DebtsScreen /> : null}
-            {aba === 'Mês' ? <MonthScreen /> : null}
             {aba === 'Fatura' ? <InvoiceScreen /> : null}
             {aba === 'Recorrentes' ? <RecurringScreen /> : null}
             {aba === 'Editar' ? <TransactionFormScreen /> : null}

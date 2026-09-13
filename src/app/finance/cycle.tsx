@@ -131,8 +131,14 @@ function destino(l: CycleLine) {
     case 'transaction':
     case 'transaction_overdue':
       return () => router.push({ pathname: '/finance/[txId]', params: { txId: l.ref_id } });
+    /*
+      ⚠️ **Vai com o `id`.** `ref_id` de uma linha de cronograma é id de DÍVIDA, não de
+      lançamento — empurrar `/finance/[txId]` com ele abriria uma tela que não existe. E mandar
+      para a LISTA fazia quem tem cinco financiamentos caçar qual era; a tela de Dívidas abre o
+      detalhe direto quando recebe o parâmetro. Lição herdada do teste da tela do mês.
+    */
     case 'debt_schedule':
-      return () => router.push('/finance/debts');
+      return () => router.push({ pathname: '/finance/debts', params: { id: l.ref_id } });
     default:
       return undefined;
   }

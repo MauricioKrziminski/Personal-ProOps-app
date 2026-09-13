@@ -704,33 +704,26 @@ export default function ForecastScreen() {
                 <Animated.View
                   entering={FadeIn.duration(Motion.duration.fast)}
                   style={styles.expandido}>
-                  {resumoAberto.isError ? (
-                    <ErrorBand
-                      message="Não deu para abrir esse mês."
-                      onRetry={resumoAberto.refetch}
-                    />
-                  ) : resumoAberto.isLoading || !resumoAberto.data ? (
-                    <>
-                      <Skeleton height={14} width="70%" />
-                      <Skeleton height={14} width="55%" />
-                    </>
-                  ) : (
-                    <>
-                      <ThemedText type="small" themeColor="textSecondary" style={tabular}>
-                        fixas {formatBRL(Number(resumoAberto.data.fixas_cents))} · parcelas{' '}
-                        {formatBRL(Number(resumoAberto.data.parcelas_cents))} · variáveis{' '}
-                        {formatBRL(Number(resumoAberto.data.variaveis_cents))}
-                      </ThemedText>
-                      <Button
-                        label="Ver todos os lançamentos"
-                        variant="secondary"
-                        size="sm"
-                        onPress={() =>
-                          router.push({ pathname: '/finance/month', params: { month: m.mes } })
-                        }
-                      />
-                    </>
-                  )}
+                  {/*
+                    ⚠️ **O expandido NÃO lê `month_summary`.** Aquela RPC conta o cartão na data
+                    da COMPRA, e este mês foi projetado pela data do PAGAMENTO: o recorte abria
+                    debaixo do número e dizia outra coisa, na mesma tela. Quem detalha o que está
+                    dentro do ciclo é a tela do ciclo, que soma exatamente este número.
+                  */}
+                  <ThemedText type="small" themeColor="textSecondary" style={tabular}>
+                    entra {formatBRL(m.entra)} · sai {formatBRL(m.sai)}
+                  </ThemedText>
+                  <Button
+                    label="Ver tudo que está aqui dentro"
+                    variant="secondary"
+                    size="sm"
+                    onPress={() =>
+                      router.push({
+                        pathname: '/finance/cycle',
+                        params: { month: m.mes, view: regua.view, tipo: 'sai' },
+                      })
+                    }
+                  />
                 </Animated.View>
               ) : null}
             </View>
