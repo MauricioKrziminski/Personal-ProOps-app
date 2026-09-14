@@ -15,7 +15,7 @@
 | | |
 |---|---|
 | Branch | `main`, limpa, tudo commitado e com push |
-| Último commit | `ad069d4 fix(seguranca): o active atrasado do prompt nao tranca o app de novo` |
+| Último commit | `6027afe docs: a justificativa do OTA medida e o aviso do expurgo` |
 | Migrations no **staging** (`utkqoiigimqzeenxkxdl`) | até `20260914170000` — **em dia** |
 | Migrations em **produção** (`kwriuifcwyvdrxtspjiz`) | `20260911220000` — **11 atrás** (contadas no repo; confirme no SQL Editor de produção antes de decidir) |
 | `tsc`, `expo lint`, `npm test` | verdes (390 testes) · `pytest` **784** · `ruff` limpo |
@@ -991,10 +991,18 @@ Nenhum bloco pode aparecer enquanto outro ainda mostra skeleton.
 > prova de que a trava funciona — 231 mortos apagados, os 11 vivos intactos —, mas ela foi
 > manual.
 >
-> Para exercitar o agendamento no staging antes, o caminho é criar o job à mão (ou chamar
-> `/cron/alerts` com o segredo interno); nenhum dos dois é passo do dia a dia. E antes de qualquer
-> `gcloud`, confira a conta ATIVA: a que está ativa neste Mac não é a do projeto, e com ela o
-> script conclui que o projeto não existe.
+> **Staging já está com o código no ar** (14/09/2026, `./scripts/setup-gcp.sh staging`, revisão
+> `agente-staging-00105-jcc`, `/health` respondendo `ok`). `cron.py` importa `checkpoints` no topo,
+> então o container não subiria sem ele — a fiação está provada pelo próprio boot. O expurgo foi
+> rodado de novo contra o banco de staging e é idempotente: **0 apagados, 11 threads de pé**.
+>
+> ⚠️ **O que NÃO foi feito, de propósito: chamar `/cron/alerts` por HTTP.** Essa rota manda
+> alerta de verdade pelo WhatsApp — em staging, para o número que estiver no banco, e fora da
+> janela de 24h isso é template PAGO. Criar um job de Scheduler para ela no staging tem o mesmo
+> efeito, todo dia ao meio-dia. As duas coisas são decisão do Gabriel, não passo de verificação.
+>
+> E antes de qualquer `gcloud`, confira a conta ATIVA — com a errada o script conclui que o
+> projeto não existe.
 >
 > ⚠️ `pg_total_relation_size` não encolhe sem `VACUUM FULL`, que trava a tabela e não cabe num
 > cron. O espaço vira reutilizável pelo autovacuum; o que este job garante é que o crescimento
