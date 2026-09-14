@@ -587,10 +587,18 @@ Com as 6 datas já corrigidas nesta sessão, o esperado é:
 > | caso | iOS | Android |
 > |---|---|---|
 > | sem biometria cadastrada, a opção some | ✅ | ✅ (diz "a senha do celular") |
-> | com biometria, a opção aparece | ✅ Face ID | — (emulador não inscreve digital) |
-> | biometria certa abre | ✅ Matching Face | — |
-> | biometria errada mantém trancado | ✅ Non-matching Face | — |
-> | **a senha do APARELHO abre** | — (simulador sem senha) | ✅ prompt "Desbloquear o app" + PIN |
+> | a cortina desenha e o pedido sai sozinho ao abrir | ✅ tema claro | ✅ tema escuro |
+> | **a senha do APARELHO abre o app** | — simulador sem senha | ✅ PIN → Hoje montada |
+> | cancelar mostra "Não reconheci…" e o toque repete o pedido | — | ✅ |
+> | biometria certa abre / errada mantém trancado | ⚠️ **não verificável neste simulador** | — emulador não inscreve digital |
+>
+> ⚠️ **A simulação de Face ID deste simulador não resolve, e isso não é do app.** Com Face ID
+> inscrito (Features → Face ID → Enrolled), a folha do sistema sobe e **Matching Face (⌥⌘M) não
+> devolve nada** — nem pelo menu, nem pelo atalho, nem por
+> `simctl spawn <udid> notifyutil -p com.apple.BiometricKit_Sim.pearl.match`, nem depois de
+> reinscrever. Reproduzido IGUAL com `disableDeviceFallback: true`, ou seja, independe da política
+> que o app escolhe. O que dá para afirmar no iOS é o que está na tabela; o caminho biométrico
+> ponta a ponta **só um iPhone de verdade fecha**.
 >
 > ⚠️ **O módulo nativo não estava no APK de Android** (`Cannot find native module
 > 'ExpoLocalAuthentication'`) — o autolinking do Gradle estava com estado velho e a Fase 4 nunca
