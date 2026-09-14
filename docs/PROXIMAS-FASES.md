@@ -15,10 +15,10 @@
 | | |
 |---|---|
 | Branch | `main`, limpa, tudo commitado e com push |
-| Último commit | `9ac4b1c feat(alerts): o ciclo que fechou avisa por push e whatsapp` |
-| Migrations no **staging** (`utkqoiigimqzeenxkxdl`) | até `20260914140000` — **em dia** |
-| Migrations em **produção** (`kwriuifcwyvdrxtspjiz`) | `20260911220000` — **9 atrás** |
-| `tsc`, `expo lint`, `npm test` | verdes (372 testes) · `pytest` 780 |
+| Último commit | `3375cd0 feat(seguranca): bloqueio do app por senha de 6 digitos ou biometria` |
+| Migrations no **staging** (`utkqoiigimqzeenxkxdl`) | até `20260914170000` — **em dia** |
+| Migrations em **produção** (`kwriuifcwyvdrxtspjiz`) | `20260911220000` — **12 atrás** |
+| `tsc`, `expo lint`, `npm test` | verdes (382 testes) · `pytest` 780 |
 | Tags | **nenhuma criada** — é o Gabriel quem cria, depois de testar |
 
 ⚠️ **Confirme o número de produção na fonte antes de decidir qualquer coisa com base nele.** No
@@ -386,7 +386,38 @@ Confirme que `alerts_sent` ganhou a linha e que o push chegou no dev build.
 
 ---
 
-## Fase 3 — Conciliação: o extrato como fonte da verdade
+## Fase 3 — Conciliação: o extrato como fonte da verdade ✅ FEITA em 14/09/2026 (commits `16bc21a`, `645f70c`)
+
+> Migrations `20260914160000` (casamento aproximado) e `20260914170000` (conciliação inversa), no
+> staging. O que o plano abaixo não previa:
+>
+> 1. ⚠️ **`near_match` precisa de UNIQUE PARCIAL, senão dois itens do extrato apontam para a mesma
+>    transação.** `create unique index ... on import_items (transaction_id) where status =
+>    'near_match'`. Sem ele, duas compras de mesmo valor em dias vizinhos casavam as duas com o
+>    único lançamento do app — e aceitar as duas correções moveria a data duas vezes.
+> 2. ⚠️ **São QUATRO guardas, não uma.** Mesmo valor/`kind`/conta, distância ≤ 5 dias,
+>    `candidatos_do_item = 1` **e** `posicao_no_alvo = 1`. As duas últimas são a mesma pergunta
+>    pelos dois lados: um item com dois candidatos não sabe qual corrigir, e um alvo disputado por
+>    dois itens é o caso do índice acima.
+> 3. ⚠️ **`update_transaction_scoped` RECUSA `occurred_at` — de propósito** (`finance.md`: "data é
+>    de cada ocorrência e propagar empilharia tudo no mesmo dia"). A correção de data é `update`
+>    direto na transação, não a RPC de edição em série. Descobrir isso depois de escrever a
+>    chamada custou uma volta.
+> 4. **`import_batches.status` aceita `parsing|review|done|failed`** — escrevi `ready` e o check
+>    constraint pegou. O valor certo para "lote esperando revisão" é `review`.
+> 5. **`create or replace` com a MESMA assinatura de retorno preservou a ACL** de
+>    `_prepare_import_batch` — foi conferido com `has_function_privilege` antes e depois, porque
+>    mudar o `returns table` obrigaria `drop`+`create`, e aí a ACL iria junto (a lição da Fase 2).
+> 6. **O `DocumentPicker` entrou no `semTrancar()` da Fase 4** — escolher arquivo tira o app do
+>    primeiro plano no Android e, sem a bandeira, a pessoa voltaria do seletor para um pedido de
+>    PIN por cima da tela de importação.
+>
+> **Não testado, e é honesto dizer:** o OFX real de outubro do Nubank **não foi reimportado** — o
+> arquivo não está no repositório e reexportá-lo é do Gabriel. O que foi provado: as quatro
+> guardas, nos dois sentidos, com transações de teste criadas para isso (mesmo valor a 3 dias →
+> `near_match`; a 6 dias → `pending`; dois candidatos → nenhum casamento), e a contagem de
+> transações do workspace **antes e depois: 322 nas duas vezes**.
+
 
 ### Por quê
 
@@ -496,7 +527,38 @@ Com as 6 datas já corrigidas nesta sessão, o esperado é:
 
 ---
 
-## Fase 4 — Bloqueio do app por senha ou biometria
+## Fase 4 — Bloqueio do app por senha ou biometria ✅ FEITA em 14/09/2026 (commit `3375cd0`)
+
+> Sem migration — é tudo aparelho. O que o plano abaixo não previa:
+>
+> 1. ⚠️ **O acumulador do PIN não pode ser `useState`.** Digitando rápido, os dígitos se perdiam:
+>    cada toque lia o estado do render anterior. É `useRef` (`digitado`), com o `useState` só
+>    para desenhar as bolinhas.
+> 2. ⚠️ **`insets.bottom` devolve 0 no emulador** e o teclado numérico ficava colado na barra de
+>    gestos. `paddingBottom: Math.max(insets.bottom, Space.xxl)` — vale para qualquer tela cheia
+>    desenhada por cima do sistema.
+> 3. ⚠️ **`flex: 1` no texto colapsou a linha do Perfil.** O padrão que funciona já existia e é o
+>    `temaRow`; copiá-lo resolveu. (Mesma mecânica de `flexShrink` de `design.md` §3.)
+> 4. **O `Segmented` da trava tem 5 opções quando há biometria — e o anti-slop barra acima de 4.**
+>    A saída NÃO foi afrouxar o teste: as opções viraram constantes de módulo
+>    (`MODOS_COM_BIOMETRIA`, `MODOS_SEM_BIOMETRIA`, `ESPERAS`) e `src/lib/lock-section.test.ts`
+>    repõe a checagem sobre elas. Tirar código de dentro do JSX para escapar de um guard é como o
+>    guard morre.
+> 5. **React Compiler barrou duas coisas**: `setState` síncrono dentro de efeito (resolvido
+>    partindo `LockOverlay`/`Tela`, para montar já ser o reset) e `Date.now()` em render (o relógio
+>    da espera foi para `lock-secret.ts`, onde a contagem de erros já morava).
+> 6. ⚠️ **`uiautomator dump` inclui view COBERTA.** Ler os primeiros textos do dump com o overlay
+>    aberto devolve a tela de baixo — foi assim que eu quase reportei "qualquer PIN destrava" como
+>    falha de segurança, sendo erro meu de medição. Presença de texto no dump **não** é prova de
+>    que a tela está visível; quem prova é log instrumentado ou o screenshot.
+>
+> **Biometria: NÃO verificada ponta a ponta em nenhuma das duas plataformas.** O
+> `adb emu finger touch 1` responde `OK` e a inscrição avança ("Touch the sensor" → "Lift, then
+> touch again" → "Keep lifting your finger"), mas termina em *"Can't complete fingerprint setup"*
+> em quatro cadências diferentes (rajada, 0,7 s, 0,9 s e 1,3 s entre toque e levantada) na imagem
+> Pixel com Pixel Imprint. **Sem digital cadastrada o caminho nem existe** (`isEnrolledAsync()`
+> devolve `false` e a opção some da tela, que é o comportamento correto e esse ficou provado).
+
 
 ### Por quê
 
