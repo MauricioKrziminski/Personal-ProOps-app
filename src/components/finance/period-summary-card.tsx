@@ -13,69 +13,81 @@ import type { CycleRow } from '@/hooks/use-finance';
 import { describeCycle } from '@/lib/cycle-label';
 
 interface Props {
-  ciclo: CycleRow;
-  /** Nome do mês já em minúsculas, ex. `setembro`. */
+  /** Somado por COMPETÊNCIA, na mesma janela da lista logo abaixo. */
+  entrou: number;
+  saiu: number;
+  /** Nome do mês já em minúsculas, ex. `outubro`. */
   nomeDoMes: string;
   /** Quantos lançamentos a lista abaixo está mostrando. */
   lancamentos: number;
+  /** O mesmo período pela outra lente — vira o link do rodapé. `null` enquanto carrega. */
+  ciclo: CycleRow | null;
   onAbrirCiclo: () => void;
 }
 
 /**
- * **Como o ciclo fecha, no topo de uma lista de lançamentos.**
+ * **O total do que está logo abaixo, no topo de uma lista de lançamentos.**
  *
- * ## O que ele substitui
+ * ## A regra: um resumo resume o que está DEBAIXO dele
  *
- * Uma pilha de texto: rótulo, uma frase `40 lançamentos · entra X · sai Y`, uma nota e um botão —
- * quatro blocos de texto do mesmo peso, sem hierarquia nenhuma. A queixa foi literal
- * (13/09/2026): *"essa informação do jeito que está ali está horrivelmente feia… quero saber o
- * saldo final do ciclo, essa informação de quanto entrou e quanto saiu não necessariamente
- * precisa ficar no card"*.
+ * Este card já foi dos dois jeitos, e os dois falharam:
+ *
+ * 1. Somando a lista, com a MESMA cara do painel da home — dois resultados idênticos em telas
+ *    vizinhas, sem nada dizendo que respondiam a perguntas diferentes.
+ * 2. Lendo o ciclo (`cycle_series`), para bater com a home — e aí ele parou de bater com a lista
+ *    a 200px dele. Medido no staging em 13/09/2026, ciclo de outubro: o card dizia
+ *    `saiu R$ 8.326,63` sobre uma lista que somava `R$ 3.842,78`.
+ *
+ * O erro comum aos dois é o mesmo: **um número de outra lente ocupando o topo de uma lista.**
+ * Agora ele soma o que a lista soma (competência — a data da COMPRA), diz isso no rótulo, e o
+ * resultado do ciclo (a data do PAGAMENTO) vira o link do rodapé, que é o que um número de outra
+ * lente pode ser sem mentir.
+ *
+ * ⚠️ **A tela esconde este card quando há filtro ativo.** Ele soma o período inteiro, e a lista
+ * filtrada soma menos — exibi-lo ali reintroduziria, com uma cara nova, exatamente o defeito que
+ * ele existe para matar.
  *
  * ## As duas barras são o conteúdo, não enfeite
  *
- * `entrou` e `saiu` saíram da frase e viraram **duas barras na MESMA escala**. É a leitura que
- * nenhum número dá sozinho: a de saída passando a de entrada É o mês no vermelho, visível antes
- * de ler qualquer dígito. `max` é o maior dos dois de propósito — normalizar cada uma pelo
- * próprio valor encheria as duas e apagaria justamente a comparação.
+ * `entrou` e `saiu` são **duas barras na MESMA escala**. É a leitura que nenhum número dá
+ * sozinho: a de saída passando a de entrada É o período no vermelho, visível antes de ler
+ * qualquer dígito. `max` é o maior dos dois de propósito — normalizar cada uma pelo próprio
+ * valor encheria as duas e apagaria justamente a comparação.
  *
  * Reusa `ProgressBar`, que já anima por `scaleX` na UI thread (§5: barra que salta é bug visual).
- * Uma barra nova aqui seria uma segunda implementação do mesmo desenho.
  *
  * ## A faixa que sangra
  *
  * É o segundo padrão repetido do design (§1): superfície um degrau mais escura, sangrando até as
- * bordas por margem negativa + `overflow: 'hidden'`. Ela carrega o escopo da LISTA — que é outra
- * régua, e por isso não pode dividir espaço com o número do ciclo lá em cima.
+ * bordas por margem negativa + `overflow: 'hidden'`. Ela carrega a OUTRA régua — e por isso não
+ * pode dividir espaço com o número lá em cima.
  */
-export function CycleSummaryCard({ ciclo, nomeDoMes, lancamentos, onAbrirCiclo }: Props) {
+export function PeriodSummaryCard({
+  entrou,
+  saiu,
+  nomeDoMes,
+  lancamentos,
+  ciclo,
+  onAbrirCiclo,
+}: Props) {
   const theme = useTheme();
-  const d = describeCycle(ciclo, nomeDoMes);
-
-  const entrou = Number(ciclo.entrou);
-  const saiu = Number(ciclo.saiu);
   const escala = Math.max(entrou, saiu, 1);
+
+  /*
+    O rodapé fala do CICLO, e quem descreve ciclo é `describeCycle` — a mesma função da home e da
+    tela do ciclo. Escrever a frase aqui à mão é como "cada lugar fala uma coisa" volta: o mesmo
+    dado viraria "fechei devendo" num lugar e "vou fechar em" no outro.
+  */
+  const d = ciclo ? describeCycle(ciclo, nomeDoMes) : null;
 
   return (
     <Animated.View entering={FadeIn.duration(Motion.duration.base)}>
       <Card style={styles.card}>
-        <HeroLabel>{d.label}</HeroLabel>
-        <Money cents={d.cents} variant="money" tone={d.ruim ? 'danger' : 'text'} signed />
-
-        {/*
-          ⚠️ **O rodapé do `describeCycle` é RENDERIZADO aqui.** Ele existia e era descartado: num
-          ciclo que fechou devendo, a função devolve "Sobrou na conta R$ 0,72" junto com a dívida,
-          e este card mostrava só a dívida. A mesma função dando saídas diferentes em duas telas é
-          exatamente o defeito que `cycle-label.ts` existe para matar.
-        */}
-        {d.rodape ? (
-          <View style={styles.rodape}>
-            <ThemedText type="footnote" themeColor="textSecondary" style={styles.shrink}>
-              {d.rodape.label}
-            </ThemedText>
-            <Money cents={d.rodape.cents} variant="ticker" />
-          </View>
-        ) : null}
+        <HeroLabel>{`Gastei em ${nomeDoMes}`}</HeroLabel>
+        <Money cents={saiu} variant="money" />
+        <ThemedText type="footnote" themeColor="textSecondary">
+          {`${lancamentos === 1 ? '1 lançamento' : `${lancamentos} lançamentos`} · por data da compra`}
+        </ThemedText>
 
         <View style={styles.barras}>
           {/*
@@ -89,24 +101,33 @@ export function CycleSummaryCard({ ciclo, nomeDoMes, lancamentos, onAbrirCiclo }
           <Fluxo rotulo="saiu" cents={saiu} max={escala} />
         </View>
 
-        <Pressable
-          onPress={onAbrirCiclo}
-          accessibilityRole="button"
-          accessibilityLabel="Ver tudo que fecha o ciclo"
-          accessibilityHint="Abre a lista por data do pagamento, com as faturas">
-          {({ pressed }) => (
-            <View
-              style={[
-                styles.faixa,
-                { backgroundColor: pressed ? theme.backgroundSelected : theme.backgroundElement },
-              ]}>
-              <ThemedText type="footnote" themeColor="textSecondary" style={styles.faixaTexto}>
-                {`${lancamentos === 1 ? '1 lançamento' : `${lancamentos} lançamentos`} por data da compra · ver o que fecha o ciclo`}
-              </ThemedText>
-              <Icon name="chevron.right" size="sm" color="textSecondary" />
-            </View>
-          )}
-        </Pressable>
+        {d ? (
+          <Pressable
+            onPress={onAbrirCiclo}
+            accessibilityRole="button"
+            accessibilityLabel={`${d.label} ${Math.abs(d.cents) / 100} reais. Ver tudo que fecha o ciclo`}
+            accessibilityHint="Abre a lista por data do pagamento, com as faturas">
+            {({ pressed }) => (
+              <View
+                style={[
+                  styles.faixa,
+                  { backgroundColor: pressed ? theme.backgroundSelected : theme.backgroundElement },
+                ]}>
+                <ThemedText type="footnote" themeColor="textSecondary" style={styles.faixaTexto}>
+                  {/*
+                    ⚠️ **"sai do caixa" é o que separa esta linha do número lá em cima.** As duas
+                    somam o mesmo período; o que muda é o DIA que cada uma conta — a compra, ou o
+                    dia em que o dinheiro deixa a conta (a fatura vence). Sem esta palavra, os
+                    dois números viram "dois totais diferentes para outubro", que é a queixa.
+                  */}
+                  {`${d.label.toLowerCase()} `}
+                </ThemedText>
+                <Money cents={d.cents} variant="ticker" tone={d.ruim ? 'danger' : 'text'} signed />
+                <Icon name="chevron.right" size="sm" color="textSecondary" />
+              </View>
+            )}
+          </Pressable>
+        ) : null}
       </Card>
     </Animated.View>
   );
@@ -143,14 +164,12 @@ const styles = StyleSheet.create({
   card: { gap: Space.sm, overflow: 'hidden' },
   barras: { gap: Space.sm, paddingTop: Space.xs },
   fluxo: { gap: Space.xs },
-  rodape: {
+  fluxoTopo: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    alignItems: 'center',
+    alignItems: 'baseline',
     gap: Space.sm,
   },
-  shrink: { flex: 1, minWidth: 0 },
-  fluxoTopo: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'baseline', gap: Space.sm },
   /*
     Sangra até as bordas: `Card` tem `padding: Space.lg`, então as margens negativas são o
     simétrico exato dele. Sem o `-lg` de baixo a faixa flutuaria acima da borda inferior.
@@ -158,7 +177,7 @@ const styles = StyleSheet.create({
   faixa: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: Space.sm,
+    gap: Space.xs,
     marginHorizontal: -Space.lg,
     marginBottom: -Space.lg,
     marginTop: Space.sm,
@@ -167,5 +186,5 @@ const styles = StyleSheet.create({
     borderBottomLeftRadius: Radius.md,
     borderBottomRightRadius: Radius.md,
   },
-  faixaTexto: { flex: 1 },
+  faixaTexto: { flexShrink: 1 },
 });

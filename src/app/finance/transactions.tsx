@@ -13,7 +13,7 @@ import { ThemedText } from '@/components/themed-text';
 import { HeaderMenu } from '@/components/ui/header-actions';
 import { ItemLink } from '@/components/ui/item-link';
 import { Search } from '@/components/ui/search';
-import { CycleSummaryCard } from '@/components/finance/cycle-summary-card';
+import { PeriodSummaryCard } from '@/components/finance/period-summary-card';
 import { Button } from '@/components/ui/button';
 import { Chip } from '@/components/finance/chip';
 import { EmptyState } from '@/components/ui/empty-state';
@@ -195,7 +195,14 @@ export default function TransactionsScreen() {
   const setMonth = setMesEscolhido;
   const range = useMonthRange(month, regua.view);
   const list = useTransactions({
-    month,
+    /*
+      ⚠️ **As MESMAS bordas do resumo, não `month`.** O hook recortava o mês civil por conta
+      própria, então o botão `Mês | Ciclo` logo acima não mexia na lista: com fechamento no dia
+      10 ela mostrava 01/10–31/10 embaixo de um card que falava de 11/09–10/10.
+    */
+    from: range.from,
+    to: range.to,
+    pronto: range.pronto,
     kind: kind === 'all' ? undefined : kind,
     category,
     recurringId: params.recurringId,
@@ -206,13 +213,29 @@ export default function TransactionsScreen() {
   });
   const summary = useTransactionsSummary(range.from, range.to);
   /*
-    ⚠️ **O card do topo lê o CICLO, não esta lista.** Ele responde "como o período fecha", que é
-    a mesma pergunta da home e tem que dar o mesmo número; a lista responde "cadê aquele
-    lançamento". Fazer o card somar a lista foi o que criou dois resultados com a mesma cara em
-    telas vizinhas.
+    ⚠️ **O card do topo soma a LISTA, e o ciclo virou o link do rodapé.** Ele já foi o contrário
+    — lia `cycle_series` para bater com a home — e aí parou de bater com a lista logo abaixo
+    dele: no ciclo de outubro dizia `saiu R$ 8.326,63` sobre uma lista de `R$ 3.842,78`. As duas
+    leituras estão certas e respondem perguntas diferentes (data da compra × dia em que o
+    dinheiro sai do caixa); o que não pode é a de OUTRA lente ocupar o topo desta.
   */
   const serieCiclo = useCycleSeries(month, month, regua.view);
   const ciclo = serieCiclo.data?.find((c) => c.mes.startsWith(month)) ?? null;
+  /*
+    Os totais do card saem de `transactions_summary`, que soma a MESMA janela da lista e exclui
+    transferência (pagar fatura não é gasto novo: a compra já contou). Somar `rows` no cliente
+    passaria a mentir na primeira página — a lista é paginada de 50 em 50.
+  */
+  const totais = useMemo(() => {
+    let entrou = 0;
+    let saiu = 0;
+    for (const r of summary.data ?? []) {
+      if (r.kind === 'income') entrou += Number(r.total_cents);
+      if (r.kind === 'expense') saiu += Number(r.total_cents);
+    }
+    return { entrou, saiu };
+  }, [summary.data]);
+
   const accounts = useAccounts();
   // Um item basta para separar "nunca teve nada" de "este mês não teve nada".
   const anyEver = useRecentTransactions(1);
@@ -255,8 +278,13 @@ export default function TransactionsScreen() {
   // "Ver Fevereiro de 2025" cortado ao meio pelo "Lançar". Nesses dois estados o FAB sai: não há
   // lista para completar, e a oferta da tela é a do estado vazio. Ele fica no
   // `neverHadAnything`, cuja dica manda tocar justamente nele.
+  /*
+    ⚠️ **`isPending`, não `isLoading`.** A lista fica `enabled: false` até `useMonthRange`
+    resolver a janela, e nesse intervalo `isLoading` (que é `isPending && isFetching`) é FALSO
+    com zero linhas — ou seja, a tela anunciaria "Nada em outubro" antes de ter perguntado.
+  */
   const vazioComAcao =
-    sections.length === 0 && !list.isLoading && !list.isError && !neverHadAnything;
+    sections.length === 0 && !list.isPending && !list.isError && !neverHadAnything;
 
   const clearFilters = () => {
     setKind('all');
@@ -316,15 +344,25 @@ export default function TransactionsScreen() {
 
       <PeriodBar month={month} onChangeMonth={setMonth} ruler={regua} />
 
-      {accountId !== undefined ? null : serieCiclo.isError ? (
-        <ErrorCard onRetry={() => { void serieCiclo.refetch(); }} />
-      ) : serieCiclo.isPending || !ciclo ? (
+      {/*
+        ⚠️ **Com filtro ativo o card SOME.** Ele soma o período inteiro; a lista filtrada soma
+        menos. Deixá-lo ali recriaria, com outra cara, o mesmo defeito que ele acabou de perder:
+        um total no topo que não é o total do que está embaixo.
+
+        ⚠️ **A falha de `serieCiclo` não derruba o card.** O conteúdo dele é o resumo; o ciclo é
+        só o link do rodapé, e `ciclo={null}` o omite. Estados separados por seção, §7.
+      */}
+      {hasFilters ? null : summary.isError ? (
+        <ErrorCard onRetry={() => { void summary.refetch(); }} />
+      ) : summary.isPending ? (
         <View style={styles.summarySkeleton}>
           <Skeleton width="40%" height={14} />
           <Skeleton width="65%" height={40} />
         </View>
       ) : (
-        <CycleSummaryCard
+        <PeriodSummaryCard
+          entrou={totais.entrou}
+          saiu={totais.saiu}
           ciclo={ciclo}
           nomeDoMes={monthTitle(month).replace(/ de \d{4}$/, '').toLowerCase()}
           lancamentos={rows.length}
@@ -393,7 +431,7 @@ export default function TransactionsScreen() {
     </View>
   );
 
-  const empty = list.isLoading ? (
+  const empty = list.isPending ? (
     <View>
       <SkeletonRow />
       <SkeletonRow />

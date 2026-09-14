@@ -749,3 +749,38 @@ test('createAnimatedComponent(Pressable) só com estilo estático', () => {
     'o style em função do Pressable não sobrevive ao componente animado: envolva num Animated.View'
   );
 });
+
+/**
+ * A lista e o total do topo leem a MESMA janela.
+ *
+ * `useTransactions` recortava o mês CIVIL por conta própria (`monthBounds`), enquanto o resumo
+ * da mesma tela pedia a janela a `useMonthRange`, que respeita a régua `Mês | Ciclo`. Com
+ * fechamento no dia 10 as duas discordavam em ~20 dias: medido no staging em 13/09/2026, a
+ * lista de "outubro" trazia 4 lançamentos do ciclo SEGUINTE (Meli+, DAS e salário de 20/10,
+ * Carro Peças 3/3) e escondia 6 do ciclo que estava na tela, incluindo o salário de 20/09.
+ *
+ * Nada apontava o defeito: o total de RECEITA batia por coincidência — cada janela continha
+ * exatamente um salário —, e o botão `Mês | Ciclo` ficava logo acima de uma lista que o
+ * ignorava. Um card somando 8.326,63 em cima de uma lista de 3.842,78 foi a metade visível.
+ *
+ * O tipo já impede voltar a passar `month`. O que ele não vê é as duas leituras receberem
+ * janelas de origens DIFERENTES, que é a forma que o defeito tinha.
+ */
+test('o resumo e a lista de lançamentos leem a mesma janela', () => {
+  const fora: string[] = [];
+  for (const file of walk(SRC)) {
+    const code = stripComments(readFileSync(file, 'utf8'));
+    const lista = code.match(/useTransactions\(\{[\s\S]*?\bfrom:\s*([\w.]+)\.from\b/);
+    // Tela sem lista de lançamentos não tem o que casar — a home do Financeiro tem só o resumo.
+    if (!lista) continue;
+    const nome = file.replace(SRC, 'src');
+    const resumo = code.match(/useTransactionsSummary\(\s*([\w.]+)\.from\s*,\s*\1\.to\s*\)/);
+    if (!resumo) fora.push(`${nome}: a lista declara janela e o resumo não sai da mesma variável`);
+    else if (resumo[1] !== lista[1]) fora.push(`${nome}: resumo lê ${resumo[1]}, lista lê ${lista[1]}`);
+  }
+  assert.deepEqual(
+    fora,
+    [],
+    'o total do topo soma a lista de baixo: as duas leituras saem do MESMO useMonthRange'
+  );
+});
