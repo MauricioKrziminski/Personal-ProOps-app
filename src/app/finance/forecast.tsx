@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, useMemo } from 'react';
 import { Pressable, ScrollView, StyleSheet, View, useWindowDimensions } from 'react-native';
 import Animated, { FadeIn, FadeInDown } from 'react-native-reanimated';
 import { Stack, router } from 'expo-router';
@@ -208,7 +208,30 @@ export default function ForecastScreen() {
   // `?? forecast.data` enquanto a simulação carrega: sem isso a tela PISCA vazia a cada
   // suposição somada, e o destaque salta de um número real para nada e de volta.
   const serie = (simulando ? (simulado.data ?? forecast.data) : forecast.data) ?? [];
-  const meses: MesProjetado[] = mensal.data?.meses ?? [];
+  const meses: MesProjetado[] = useMemo(() => mensal.data?.meses ?? [], [mensal.data]);
+
+  /**
+   * A lista de meses SEM o ciclo que o horizonte cortou no meio.
+   *
+   * ⚠️ **Um ciclo pela metade não é um mês, e mostrá-lo como mês MENTE.** Com horizonte de 90
+   * dias a partir de 14/09, a janela termina em 13/12 — e o ciclo "Janeiro de 2027" começa em
+   * 11/12. Sobravam 3 dias, nenhum deles com lançamento, e a tela escrevia
+   * `Janeiro de 2027 · entra R$ 0,00 · sai R$ 0,00`, que se lê como "janeiro não tem salário".
+   * Não tem: pedindo 420 dias o mesmo janeiro devolve `entra 7.566,52 · sai 5.965,40`.
+   *
+   * O caso silencioso é pior que o zero: com o corte caindo no meio do ciclo, `entra`/`sai` vêm
+   * NÃO-nulos e incompletos — um mês que parece só barato.
+   *
+   * ⚠️ **Só a LISTA perde a linha; `meses` continua inteiro** para o gráfico e para o "no fim do
+   * período". O saldo do ciclo cortado é o saldo real no fim do horizonte; o que não vale é o
+   * `entra`/`sai` dele. O primeiro mês também é `parcial` (começou antes de hoje) e continua —
+   * ali a metade que falta já passou, e a legenda diz "ainda entra / ainda sai".
+   */
+  const mesesInteiros = useMemo(() => {
+    const ultimo = meses[meses.length - 1];
+    return ultimo && meses.length > 1 && ultimo.parcial ? meses.slice(0, -1) : meses;
+  }, [meses]);
+  const cicloCortado = meses.length > mesesInteiros.length ? meses[meses.length - 1] : null;
 
   // `hoje` é o saldo do dia 0. No mensal ele vem do payload de propósito: o primeiro MÊS fecha
   // no fim do mês corrente, e usá-lo aqui mostraria esse número com o rótulo "TENHO HOJE".
@@ -689,14 +712,14 @@ export default function ForecastScreen() {
 
       {modo === 'mes' && !nadaParaProjetar ? (
         <Section title="Saldo mês a mês, carregando a sobra">
-          {meses.map((m, iMes) => (
+          {mesesInteiros.map((m, iMes) => (
             <View key={m.mes}>
               {/*
                 A linha do corte: daqui para baixo a recorrente não é mais lançamento criado
                 pelo cron, é a regra expandida (migration 20260910140000). O número continua
                 válido; o que muda é a natureza dele, e o usuário tem direito de saber onde.
               */}
-              {corte && m.mes > corte && meses[meses.indexOf(m) - 1]?.mes === corte ? (
+              {corte && m.mes > corte && mesesInteiros[iMes - 1]?.mes === corte ? (
                 <ThemedText type="caption" themeColor="textSecondary" style={styles.corte}>
                   ─── daqui em diante é projetado da regra, não lançamento criado
                 </ThemedText>
@@ -744,6 +767,11 @@ export default function ForecastScreen() {
               ) : null}
             </View>
           ))}
+          {cicloCortado ? (
+            <ThemedText type="footnote" themeColor="textSecondary" style={styles.corte}>
+              {`A projeção para em ${isoToBR(cicloCortado.de)}. O ciclo seguinte entraria pela metade — aumente o horizonte para vê-lo inteiro.`}
+            </ThemedText>
+          ) : null}
         </Section>
       ) : null}
 
