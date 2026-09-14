@@ -228,6 +228,13 @@ export function Screen({
  * daqui, e embrulhar o `null` criaria uma `View` vazia — que o `gap` do container espaçaria,
  * abrindo um buraco do tamanho de um bloco onde não há bloco nenhum.
  *
+ * ⚠️ **O embrulho REPETE o `gap` do container, e isso é bug medido.** Um filho pode ser um
+ * `<>…</>` com vários blocos dentro (é como as telas agrupam o que aparece junto); embrulhado,
+ * ele vira UMA caixa de layout e o espaço que o `gap` do container dava ENTRE esses blocos
+ * simplesmente some. Medido no Patrimônio: a distância do herói até "O QUE FORMA ESSE NÚMERO"
+ * caiu de 451px para 379px — exatamente `Space.xl` a 3×. Com o `gap` no embrulho, o resultado é
+ * idêntico ao de antes da cascata; num filho de elemento único ele não custa nada.
+ *
  * ⚠️ **O teto é `Motion.stagger.cap`**, o mesmo da Hoje: numa tela de oito blocos, 60 ms por
  * bloco acumularia meio segundo até o último — e aí a cascata deixa de ser "a tela montando" e
  * vira "o rodapé está demorando".
@@ -240,7 +247,9 @@ function Cascata({ children }: { children: ReactNode }) {
         if (!isValidElement(filho)) return filho;
         const atraso = Math.min(i++ * 60, Motion.stagger.cap);
         return (
-          <Animated.View entering={FadeInDown.delay(atraso).duration(Motion.duration.slow)}>
+          <Animated.View
+            style={styles.cascata}
+            entering={FadeInDown.delay(atraso).duration(Motion.duration.slow)}>
             {filho}
           </Animated.View>
         );
@@ -251,6 +260,8 @@ function Cascata({ children }: { children: ReactNode }) {
 
 const styles = StyleSheet.create({
   root: { flex: 1 },
+  /** O mesmo `gap` do `content` — ver `Cascata`. */
+  cascata: { gap: Space.xl },
   content: {
     gap: Space.xl,
     paddingHorizontal: Space.lg,
