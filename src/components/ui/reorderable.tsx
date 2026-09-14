@@ -457,11 +457,51 @@ function Celula({
       : g.minDistance(DISTANCIA);
   }, [enabled, index, total, eixo, geo, activation, onTapItem, onLevantou, onSoltou, onArrastando]);
 
+  /**
+   * ⚠️ **Na GRADE o slot vive DENTRO do transform, e isso não é estilo — é o que impede o
+   * teleporte no instante do commit.**
+   *
+   * Com o slot em `left`/`top` estáticos, soltar produzia dois movimentos ao mesmo tempo: o
+   * `left` pulava para o slot novo (mudança de layout, sem transição) enquanto o transform
+   * voltava a zero. O ladrilho desaparecia de um lugar e reaparecia noutro.
+   *
+   * Com o slot no transform, a posição é UMA expressão: solta-se, `index` muda para o destino e
+   * `dx/dy` zeram — e o valor final é o mesmo ponto em que o dedo largou. Não há salto porque
+   * não há duas fontes de posição.
+   *
+   * Na LISTA o item está no FLUXO (altura variável, posição vem do layout) e o transform é
+   * relativo. Ali o salto no commit é o tamanho do vão que os vizinhos já abriram — quase nada —
+   * e a atualização otimista do cache faz a ordem nova chegar no mesmo quadro.
+   */
   const movimento = useAnimatedStyle(() => {
-    if (arrastando.value === index) {
+    const arrastado = arrastando.value === index;
+    // O irmão só anda se estiver ENTRE a origem e o destino, e anda um slot, nunca mais.
+    const destino = arrastado ? index : slotDoIrmao(index, arrastando.value, alvo.value);
+
+    if (grade) {
+      const baseX = posX(destino, larguraLadrilho, gap, columns);
+      const baseY = posY(destino, idsSV.value, alturas.value, tileHeight, gap, columns);
+      return arrastado
+        ? {
+            // ⚠️ A conta vai DENTRO do withSpring: `withSpring(a) * b` devolve NaN e a view some
+            // sem um único erro no log — foi assim que a carteira de cartões ficou invisível.
+            transform: [
+              { translateX: baseX + dx.value },
+              { translateY: baseY + dy.value },
+              { scale: withSpring(1.04, Motion.spring.snap) },
+            ],
+          }
+        : {
+            transform: [
+              { translateX: withSpring(baseX, Motion.spring.settle) },
+              { translateY: withSpring(baseY, Motion.spring.settle) },
+              { scale: withSpring(1, Motion.spring.settle) },
+            ],
+          };
+    }
+
+    if (arrastado) {
       return {
-        // ⚠️ A conta vai DENTRO do withSpring: `withSpring(a) * b` devolve NaN e a view some sem
-        // um único erro no log — foi assim que a carteira de cartões inteira ficou invisível.
         transform: [
           { translateX: dx.value },
           { translateY: dy.value },
@@ -470,23 +510,18 @@ function Celula({
       };
     }
 
-    // O irmão só anda se estiver ENTRE a origem e o destino, e anda um slot, nunca mais.
-    const destino = slotDoIrmao(index, arrastando.value, alvo.value);
-
-    const dX =
-      posX(destino, larguraLadrilho, gap, columns) - posX(index, larguraLadrilho, gap, columns);
     const dY =
       posY(destino, idsSV.value, alturas.value, tileHeight, gap, columns) -
       posY(index, idsSV.value, alturas.value, tileHeight, gap, columns);
 
     return {
       transform: [
-        { translateX: withSpring(dX, Motion.spring.settle) },
+        { translateX: 0 },
         { translateY: withSpring(dY, Motion.spring.settle) },
         { scale: withSpring(1, Motion.spring.settle) },
       ],
     };
-  }, [index, larguraLadrilho, tileHeight, gap, columns]);
+  }, [index, larguraLadrilho, tileHeight, gap, columns, grade]);
 
   /**
    * Elevação e empilhamento saem do ESTADO, não do worklet: os dois trocam uma vez por arrasto
@@ -497,14 +532,9 @@ function Celula({
     ? { zIndex: 20, boxShadow: Elevation[scheme].overlay }
     : { zIndex: 1 };
 
+  // Na grade, `left/top` ficam em ZERO: a posição inteira é transform (ver `movimento`).
   const posicao: ViewStyle = grade
-    ? {
-        position: 'absolute',
-        left: posX(index, larguraLadrilho, gap, columns),
-        top: posY(index, [], {}, tileHeight, gap, columns),
-        width: larguraLadrilho,
-        height: tileHeight,
-      }
+    ? { position: 'absolute', left: 0, top: 0, width: larguraLadrilho, height: tileHeight }
     : { marginBottom: gap };
 
   return (

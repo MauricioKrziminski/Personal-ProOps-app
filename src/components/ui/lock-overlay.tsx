@@ -133,7 +133,7 @@ function Cortina() {
         <Animated.View
           entering={FadeInDown.delay(140).duration(Motion.duration.slow)}
           style={styles.dizeres}>
-          <ThemedText type="title" style={styles.centrado}>
+          <ThemedText type="title" style={styles.titulo}>
             App bloqueado
           </ThemedText>
           {/*
@@ -181,4 +181,20 @@ const styles = StyleSheet.create({
   centro: { alignItems: 'center', gap: Space.xl },
   dizeres: { alignItems: 'center', gap: Space.xs, maxWidth: 320 },
   centrado: { textAlign: 'center' },
+  /*
+    ⚠️ **`flexShrink: 0`, e isto foi MEDIDO no APK de release** (15/09/2026): com o padrão do
+    `ThemedText` (`flexShrink: 1`), o título saía da tela escrito **"App"** — a palavra
+    "bloqueado" simplesmente não era pintada. O bundle trazia a string inteira e a árvore de
+    acessibilidade também ("App bloqueado", 617px de largura), então o que falhava era a PINTURA.
+
+    A prova de quem causa: `adb shell settings put global animator_duration_scale 0` devolve o
+    título inteiro. É a animação de entrada (`FadeInDown` no bloco `dizeres`) que mede o texto
+    enquanto o bloco ainda está chegando, e com `flexShrink: 1` o Yoga prefere ENCOLHER a quebrar
+    — a mesma mecânica já registrada em `design.md` §3. Encolhido naquele instante, o texto não
+    volta a se medir nem depois de uma rotação.
+
+    Título é IDENTIFICADOR (design §7: "identificador nunca trunca"), então quem cede é o layout,
+    nunca ele.
+  */
+  titulo: { textAlign: 'center', flexShrink: 0 },
 });

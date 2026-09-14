@@ -273,6 +273,21 @@ com fonte grande, e a mesma mecânica valia para as ~400 chamadas do componente.
 ceder desliga na chamada: `Money` (quebrar no meio dos dígitos é pior que estourar a caixa) e o
 título de uma linha que precisa quebrar a linha inteira, abaixo.
 
+⚠️ **Texto dentro de um contêiner com `entering` do Reanimated precisa de `flexShrink: 0`**
+(15/09/2026, medido no APK de RELEASE, não no dev). O título da tela de bloqueio chegava na tela
+escrito **"App"** — a palavra "bloqueado" não era pintada. O bundle Hermes trazia a string inteira
+e a árvore de acessibilidade também (`"App bloqueado"`, 617px de largura): o que falhava era a
+PINTURA, e ela sobrevivia a uma rotação completa.
+
+Quem prova a causa é uma linha: `adb shell settings put global animator_duration_scale 0` devolve
+o título inteiro. A animação de entrada (`FadeInDown` no bloco de texto) mede o filho enquanto o
+bloco ainda está chegando, e com o `flexShrink: 1` que o `ThemedText` traz na base o Yoga prefere
+ENCOLHER a quebrar — encolhido naquele instante, o texto **não se remede nunca mais**.
+
+O mesmo `type="title"` de duas palavras ("Criar conta", no cadastro) pinta inteiro, porque lá não
+há animação no contêiner do texto. **Identificador dentro de `Animated.View` com `entering`
+desliga o encolhimento na chamada.**
+
 ⚠️ **`flexShrink: 0` é o que faz `flexWrap` funcionar numa linha com texto.** Medido: com
 `flexShrink: 1` o Yoga prefere ENCOLHER a quebrar, então ligar `flexWrap` não muda nada e o título
 continua sumindo. O padrão para "título + pílula na mesma linha" é `flexWrap: 'wrap'` na linha e
