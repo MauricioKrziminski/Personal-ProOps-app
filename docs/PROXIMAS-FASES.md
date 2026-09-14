@@ -1150,6 +1150,86 @@ Nenhum bloco pode aparecer enquanto outro ainda mostra skeleton.
 > | **o preço** | App Store Connect / Play Console + RevenueCat — **nenhum preço entra no código** |
 
 
+### 💰 A conta fechada, e a proposta de preço (14/09/2026)
+
+> **Isto é RECOMENDAÇÃO, não decisão.** Preço e limites são do dono do produto; o que está abaixo
+> é a aritmética com os números medidos, para a decisão não ser chute.
+
+**Custo FIXO — não escala com usuário** (medido: 190 s/dia de `billable_instance_time`, preços do
+catálogo de faturamento do GCP para `southamerica-east1`, request-based, Tier 2):
+
+| item | volume/mês | US$ |
+|---|---|---|
+| Cloud Run CPU | 5.700 vCPU-s × 0,0000336 | 0,192 |
+| Cloud Run memória | 5.700 GiB-s × 0,0000035 | 0,020 |
+| Requests | 43.950 | 0 (grátis até 2 M) |
+| Cloud Tasks · Scheduler · Supabase · push Expo | — | 0 (camada grátis) |
+| **total** | | **US$ 0,21 ≈ R$ 1,08/mês** |
+
+**Custo VARIÁVEL por usuário** — só IA; o resto é ruído: **US$ 0,00062/mensagem ≈ R$ 0,0032**.
+
+| mensagens de IA/mês | custo |
+|---|---|
+| 100 | R$ 0,32 |
+| 1.000 | R$ 3,17 |
+| 2.000 | R$ 6,35 |
+
+⚠️ **O `gate` custa 3,7× uma mensagem inteira.** Medido em 08/09: 35 chamadas do
+`gemini-3.7-flash` por US$ 0,0809 = **US$ 0,0023 cada**, contra US$ 0,00062 de um turno completo
+no Lite. Ele só dispara em confirmação **digitada** — é a única variável que escala mal, e é por
+isso que a razão clicado × digitado importa para o preço.
+
+**Preço recomendado: `pro` R$ 19,90/mês ou R$ 149,90/ano; `family` R$ 29,90/mês ou R$ 229,90/ano.**
+
+Ancoragem de mercado (pesquisado em 14/09/2026): Organizze Pro ~R$ 17,90/mês e ~R$ 199,90/ano;
+Mobills Premium ~R$ 19,90/mês e R$ 119,90/ano. R$ 19,90 fica no meio do mensal, e R$ 149,90 fica
+entre os dois anuais — com desconto de 37% sobre o mensal, que é a faixa em que anual converte.
+
+**Margem, já descontada a taxa de 15% da loja** (Apple Small Business / Google até US$ 1 M):
+
+| preço | líquido | usuário no TETO de 1.000 msgs | margem |
+|---|---|---|---|
+| R$ 14,90 | R$ 12,66 | R$ 3,17 | R$ 9,49 (75%) |
+| **R$ 19,90** | **R$ 16,91** | **R$ 3,17** | **R$ 13,74 (81%)** |
+| R$ 24,90 | R$ 21,16 | R$ 3,17 | R$ 17,99 (85%) |
+
+O custo fixo de R$ 1,08/mês é pago pelo **primeiro** assinante, com 13× de folga. Não existe
+ponto de equilíbrio a perseguir: o modelo é lucrativo no assinante nº 1.
+
+**Limites propostos** (hoje: free 1/100/não · pro 3/1000/sim · family 5/2000/sim):
+
+| | free | pro | family |
+|---|---|---|---|
+| preço | R$ 0 | R$ 19,90/mês · R$ 149,90/ano | R$ 29,90/mês · R$ 229,90/ano |
+| membros | 1 | **1** (era 3) | 5 |
+| mensagens de IA/mês | 100 | 1.000 | 2.000 |
+| importar extrato | não | sim | sim |
+
+Duas mudanças, e o motivo de cada uma:
+
+1. **`pro` cai de 3 membros para 1.** Ter 3 no Pro apaga a razão de existir do Family — e o Family
+   é o plano que justifica preço maior sem tocar em limite de IA. Dá para mudar sem custo: não há
+   nenhum assinante pago hoje (produção tem 1 workspace, `free`).
+2. **O teto de 100 do `free` FICA, e é escolha de produto, não de custo.** 100 mensagens custam
+   R$ 0,32 — servir o plano grátis é irrelevante na conta. O limite existe para formar hábito sem
+   substituir o pago; mexer nele é decisão de conversão, e a alavanca forte já está no lugar
+   (**importar extrato é pago**).
+
+⚠️ **NÃO acrescente uma quarta dimensão de limite.** Foi avaliado e recusado: as candidatas
+naturais (horizonte da projeção, "E se…?", conciliação inversa) são o CORAÇÃO do produto — o
+próprio documento já registra que o acumulado *"é o produto, não um detalhe da Projeção"*.
+Limitar isso venderia um app pior por menos dinheiro. As três dimensões que existem mapeiam
+custo real (IA), valor real (importação) e escopo real (membros).
+
+**O que ainda NÃO está na conta, e é honesto dizer:**
+
+| buraco | por quê importa |
+|---|---|
+| **Groq (áudio)** | não medido. Áudio vira texto antes do grafo, então some no custo de IA — mas a transcrição em si tem preço próprio |
+| **template do WhatsApp fora da janela de 24h** | é pago por mensagem. Hoje o proativo prefere push (grátis); se isso inverter, o custo por usuário muda de patamar |
+| **camada grátis do Langfuse** | staging e produção dividem um projeto só; se o volume crescer, ali aparece uma conta nova |
+| **fatura real do GCP** | o export para o BigQuery foi ligado em 14/09/2026 e não é retroativo. Ele vai CONFIRMAR os R$ 1,08, não descobri-los — a proporção fixo × variável já está medida |
+
 ### Por quê por último
 
 Preço se define com **custo medido de uso real**, e o uso real só existe depois das fases
