@@ -15,7 +15,7 @@
 | | |
 |---|---|
 | Branch | `main`, limpa, tudo commitado e com push |
-| Último commit | `e0990aa fix(ui): a condicao do ciclo entra dentro do portao` |
+| Último commit | `ad069d4 fix(seguranca): o active atrasado do prompt nao tranca o app de novo` |
 | Migrations no **staging** (`utkqoiigimqzeenxkxdl`) | até `20260914170000` — **em dia** |
 | Migrations em **produção** (`kwriuifcwyvdrxtspjiz`) | `20260911220000` — **11 atrás** (contadas no repo; confirme no SQL Editor de produção antes de decidir) |
 | `tsc`, `expo lint`, `npm test` | verdes (390 testes) · `pytest` **784** · `ruff` limpo |
