@@ -271,6 +271,18 @@ export default function TransactionsScreen() {
     accountId !== undefined ||
     source !== undefined ||
     search.trim() !== '';
+
+  /**
+   * A lista está mostrando MENOS que o período inteiro?
+   *
+   * ⚠️ **Não é `hasFilters`, e a diferença é o `recurringId`.** Ele chega por ROTA ("ver
+   * ocorrências" de uma recorrente), é lido direto de `params` e `clearFilters` não tem como
+   * limpá-lo — por isso ele fica fora de `hasFilters`, que governa o "Limpar filtros" do estado
+   * vazio. Mas ele recorta a lista igual a qualquer filtro: sem esta linha o card somava o
+   * período inteiro em cima de uma ocorrência só, escrevendo "GASTEI EM OUTUBRO R$ 3.842,78 ·
+   * 1 lançamento" sobre uma linha de R$ 88,85. É o mesmo defeito que o card acabou de perder.
+   */
+  const listaRecortada = hasFilters || Boolean(params.recurringId);
   const neverHadAnything = (anyEver.data ?? []).length === 0 && !anyEver.isLoading;
 
   // Estado vazio que oferece BOTÃO ("Ver fevereiro", "Limpar filtros") cai exatamente na faixa
@@ -352,9 +364,15 @@ export default function TransactionsScreen() {
         ⚠️ **A falha de `serieCiclo` não derruba o card.** O conteúdo dele é o resumo; o ciclo é
         só o link do rodapé, e `ciclo={null}` o omite. Estados separados por seção, §7.
       */}
-      {hasFilters ? null : summary.isError ? (
+      {listaRecortada ? null : summary.isError ? (
         <ErrorCard onRetry={() => { void summary.refetch(); }} />
-      ) : summary.isPending ? (
+      ) : /*
+          ⚠️ **`!range.pronto` junto.** Enquanto `cycle_range` não responde, `useMonthRange`
+          devolve o palpite CIVIL — e o resumo, que não espera, voltaria com o total da janela
+          errada por cima de uma lista ainda vazia ("R$ 3.718,64 · 0 lançamentos"). O card só
+          aparece quando os dois falam da mesma janela.
+        */
+        summary.isPending || !range.pronto ? (
         <View style={styles.summarySkeleton}>
           <Skeleton width="40%" height={14} />
           <Skeleton width="65%" height={40} />
