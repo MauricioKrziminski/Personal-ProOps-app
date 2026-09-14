@@ -120,5 +120,34 @@ Nada mais anima. É uma tela de escrever.
 
 ## Fora de escopo
 
-Markdown rico · anexo · histórico de versões · colaboração em tempo real dentro da nota ·
-compartilhar nota para fora do app.
+Anexo · histórico de versões · colaboração em tempo real dentro da nota · compartilhar nota para
+fora do app.
+
+> **"Markdown rico" saiu desta lista em 14/09/2026.** O que entrou não é um editor de blocos — é
+> a marcação que a nota JÁ carrega, desenhada.
+
+## Formatação — o marcador é visível ao editar, e some ao ler (14/09/2026)
+
+A barra de formatação tem duas metades: **bloco** (título, subtítulo, lista, numerada, checklist,
+citação, divisória) e **inline** (`B` `I` `S` `mono`). O botão acende quando o cursor está dentro
+daquela marca — sem isso a barra é um teclado de setas, e a pessoa não sabe em que bloco está.
+
+⚠️ **A sintaxe é a do WhatsApp** (`*negrito*`, `_itálico_`, `~riscado~`, `` `mono` ``), e isso não
+é gosto: a nota faz round-trip. Ela nasce numa mensagem, é editada aqui e pode voltar para lá — e
+`**negrito**` (o markdown de duas estrelas) chega ao WhatsApp como duas estrelas literais. Medido
+antes de escolher: das 12 notas do staging, **zero** usavam `*…*`, `_…_` ou `~…~`, então não havia
+legado para honrar.
+
+⚠️ **Ao EDITAR, os marcadores ficam à mostra; ao LER, o texto é desenhado.** É o desenho do
+Bear/Obsidian, e é o único que não mente: um editor WYSIWYG por cima de um campo de texto teria
+que esconder caracteres que o usuário pode apagar com backspace.
+
+⚠️ **Nada disso vale para as colisões com a sintaxe de bloco, e elas foram conferidas:** o
+marcador de lista exige ESPAÇO depois do `*`, a divisória exige TRÊS ou mais, e o `_` só abre e
+fecha em fronteira de palavra — `snake_case` fica intocado. É a mesma regra do WhatsApp.
+
+## Cor
+
+Um disco na barra de propriedades abre o seletor (oito tokens + "sem cor"). Ele só aparece depois
+que a nota EXISTE: cor é propriedade de item salvo, e oferecer antes seria um controle que não
+tem onde gravar. A cor pinta o trilho de 3px do cartão na lista — nunca o corpo do texto.
