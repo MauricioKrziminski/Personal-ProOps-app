@@ -1055,13 +1055,38 @@ Nenhum bloco pode aparecer enquanto outro ainda mostra skeleton.
 > cron. O espaço vira reutilizável pelo autovacuum; o que este job garante é que o crescimento
 > **para**, não que o número na tela caia hoje.
 >
+> **O custo do Gemini está MEDIDO** (14/09/2026). O Langfuse tem API pública e as chaves estão
+> no `.env` do agente — este item nunca precisou do Gabriel, e a conta sai de
+> `/api/public/metrics/daily` cruzada com `ai_events` dos dois bancos (que é tráfego de usuário,
+> porque fast-path não grava lá):
+>
+> | | |
+> |---|---|
+> | custo total dos últimos 60 dias | **US$ 0,83** |
+> | atribuível a usuário / a suíte | **66% / 34%** — 187 mensagens contra 299 chamadas de sonda |
+> | por mensagem, **antes** da divisão de modelos (02/09) | US$ 0,0078 |
+> | por mensagem, **depois** (10/09, só Lite) | **US$ 0,00062** |
+> | por 1.000 mensagens, hoje | **US$ 0,62 ≈ R$ 3,35** |
+>
+> A divisão de modelos de 09/09 (`router`/`parse` no Lite, `gate` no Flash) derrubou o custo
+> unitário em **~10×**. E o dia 11/09 sozinho — 233 traces de sonda — custou US$ 0,22, mais que
+> um quarto dos 60 dias: a frase de `ai-gemini.md` ("o custo não está no tráfego, está nas
+> suítes") continua valendo, agora com número.
+>
+> ⚠️ **Staging e produção escrevem no MESMO projeto do Langfuse** (as chaves dos dois `.env` são
+> idênticas — conferido por hash). Então "custo de produção" não é separável lá dentro hoje; o
+> que dá para fazer é o cruzamento acima. Separar exige projeto próprio por ambiente.
+>
+> ⚠️ **A proporção clicado × digitado continua sem amostra**, e agora com número: produção tem
+> **7 confirmações em toda a sua história** (6 `approved`, 1 `expired`). Não é falta de
+> ferramenta, é falta de tráfego.
+>
 > **O que falta, e por que precisa do Gabriel:**
 >
 > | o quê | por quê não dá para eu fazer |
 > |---|---|
-> | fatura do GCP por SKU | console de billing, conta dele |
-> | custo unitário do Gemini | Langfuse, e separar o que foi suíte do que foi usuário |
-> | proporção clicado × digitado no gate | precisa de tráfego real, não de staging |
+> | fatura do GCP por SKU | o detalhe por SKU é só console — **conferido: não há export de billing para o BigQuery** (nenhum dataset no projeto). Ligado o export, este item vira consulta e deixa de precisar dele |
+> | proporção clicado × digitado no gate | precisa de tráfego real; produção tem 7 confirmações ao todo |
 > | os limites de cada plano | decisão de produto em cima dos números acima |
 > | **o preço** | App Store Connect / Play Console + RevenueCat — **nenhum preço entra no código** |
 
