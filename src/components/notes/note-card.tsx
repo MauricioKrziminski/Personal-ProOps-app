@@ -1,12 +1,6 @@
-import { memo, useEffect } from 'react';
+import { memo } from 'react';
 import { Pressable, StyleSheet, View, useWindowDimensions } from 'react-native';
-import Animated, {
-  FadeIn,
-  useAnimatedStyle,
-  useSharedValue,
-  withSequence,
-  withSpring,
-} from 'react-native-reanimated';
+import Animated, { FadeIn } from 'react-native-reanimated';
 import { GestureDetector, type ComposedGesture, type GestureType } from 'react-native-gesture-handler';
 
 import { ThemedText } from '@/components/themed-text';
@@ -146,7 +140,7 @@ function NoteCardBase({ note, folderName, folderColor, actions, drag, dragging }
                   <ThemedText type="headline" style={styles.cresce}>
                     {titulo}
                   </ThemedText>
-                  {note.pinned ? <Pin /> : null}
+                  {note.pinned ? <Icon name="pin.fill" size="sm" color="tint" /> : null}
                 </View>
 
                 {previa ? (
@@ -212,33 +206,14 @@ function NoteCardBase({ note, folderName, folderColor, actions, drag, dragging }
   );
 }
 
-/**
- * O alfinete, com o pulso de quem acabou de ser fixado.
- *
- * `0.6 → 1.15 → 1`: ele nasce pequeno, passa do tamanho e assenta. Sem isso, fixar uma nota fazia
- * a linha saltar para o topo da lista com um ícone que simplesmente apareceu — o movimento diz
- * QUEM causou o salto. No desfixar não há pulso nenhum: o ícone some junto com a linha subindo.
- *
- * `ReduceMotion.System` é o padrão do `withSpring`/`withTiming` no Reanimated 4, então quem
- * desligou movimento no sistema recebe o ícone direto no tamanho final, sem nada a mais aqui.
- */
-function Pin() {
-  const escala = useSharedValue(0.6);
-  useEffect(() => {
-    escala.value = withSequence(
-      withSpring(1.15, Motion.spring.snap),
-      withSpring(1, Motion.spring.settle)
-    );
-  }, [escala]);
-  // A conta vai DENTRO do withSpring — `withSpring(a) * b` devolve NaN e a view some sem log.
-  const estilo = useAnimatedStyle(() => ({ transform: [{ scale: escala.value }] }));
-
-  return (
-    <Animated.View style={estilo}>
-      <Icon name="pin.fill" size="sm" color="tint" />
-    </Animated.View>
-  );
-}
+/*
+  ⚠️ **O alfinete NÃO pulsa, e a tentativa está registrada aqui para não voltar.** O plano previa
+  `withSequence(0.6 → 1.15 → 1)` ao fixar, e ele funcionava — só que não no momento certo. FIXADAS
+  e SOLTAS são dois `Reorderable` separados: a nota fixada MONTA na outra lista, e um pulso preso
+  ao mount dispara em todo mount — abrir a aba fazia todos os alfinetes pularem de uma vez, que é
+  movimento permanente sem propósito (§5). Prendê-lo a uma transição false→true nunca dispararia,
+  porque o cartão que chega em FIXADAS é novo. Quem conta a chegada é o `FadeIn` da linha.
+*/
 
 /**
  * O punho.

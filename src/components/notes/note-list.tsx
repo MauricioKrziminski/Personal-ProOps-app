@@ -1,6 +1,7 @@
 import Animated, {
+  FadeIn,
+  FadeOut,
   LinearTransition,
-  SlideOutRight,
   type useAnimatedRef,
 } from 'react-native-reanimated';
 
@@ -66,12 +67,21 @@ export function NoteList({
       renderItem={({ item, active, drag }) => {
         const pasta = folderById(item.folder_id);
         return (
-          // `layout` fecha o buraco quando uma nota é fixada ou movida — a lista se reorganiza
-          // andando, não piscando. `exiting` é a outra metade: arquivar e mandar para a lixeira
-          // SAEM pela direita, que é a direção de "tirei isto daqui".
+          /*
+            `layout` fecha o buraco quando a lista se reorganiza — ela anda, não pisca.
+
+            ⚠️ **A saída é CROSS-FADE, não o deslize para a direita que o plano previa.** FIXADAS
+            e SOLTAS são dois `Reorderable` separados, então FIXAR uma nota a DESMONTA de uma
+            lista e a MONTA na outra — e `exiting` não tem como saber por que desmontou. Com o
+            deslize, fixar mandava o cartão voando para fora da tela antes de ele reaparecer lá
+            em cima: a direção contava a história errada ("tirei isto daqui") justamente na ação
+            que o traz para o topo. Cross-fade é o que §5 manda para saída sem direção, e é honesto
+            nos três casos (fixar, arquivar, lixeira). Saída mais rápida que a entrada, também §5.
+          */
           <Animated.View
             layout={LinearTransition.duration(Motion.duration.base)}
-            exiting={SlideOutRight.duration(Motion.duration.exit)}>
+            entering={FadeIn.duration(Motion.duration.base)}
+            exiting={FadeOut.duration(Motion.duration.exit)}>
             <NoteCard
               note={item}
               folderName={showFolder ? pasta?.name : undefined}
