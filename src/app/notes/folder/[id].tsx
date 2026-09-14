@@ -302,6 +302,7 @@ export default function FolderScreen() {
                   notas={fixadas}
                   acoes={acoes}
                   folderById={folderById}
+                  showFolder={false}
                   enabled={podeArrastar}
                   scrollRef={scrollRef}
                   topInset={topoFixadas}
@@ -327,6 +328,7 @@ export default function FolderScreen() {
                   notas={soltas}
                   acoes={acoes}
                   folderById={folderById}
+                  showFolder={false}
                   enabled={podeArrastar}
                   scrollRef={scrollRef}
                   topInset={topoNotas}

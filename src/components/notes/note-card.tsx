@@ -250,12 +250,16 @@ function Pin() {
 function Alca({ gesture }: { gesture: ComposedGesture | GestureType }) {
   return (
     <GestureDetector gesture={gesture}>
-      <View
+      {/* ⚠️ `Pressable` com `onPress` vazio, não `View`: o punho vive DENTRO do gatilho do
+          `ItemLink`, e sem engolir o toque encostar nele abriria a nota. O punho é para
+          arrastar; quem quer abrir toca no cartão, que é o resto da linha. */}
+      <Pressable
         accessibilityElementsHidden
         importantForAccessibility="no-hide-descendants"
+        onPress={() => undefined}
         style={styles.alca}>
         <Icon name="line.3.horizontal" size="md" color="textSecondary" />
-      </View>
+      </Pressable>
     </GestureDetector>
   );
 }

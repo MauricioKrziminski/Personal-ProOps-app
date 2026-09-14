@@ -24,6 +24,7 @@ export function NoteList({
   notas,
   acoes,
   folderById,
+  showFolder = true,
   enabled,
   scrollRef,
   topInset,
@@ -35,6 +36,14 @@ export function NoteList({
   acoes: NoteCardActions;
   /** A nota herda o nome e a COR da pasta quando não tem cor própria. */
   folderById: (id: string | null) => NoteFolder | undefined;
+  /**
+   * Mostrar a pílula com o nome da pasta.
+   *
+   * `false` DENTRO de uma pasta: ali a pílula repete o título da tela em toda linha, e a cor do
+   * trilho já diz de qual pasta a nota herdou. A cor continua vindo — ela identifica, a palavra
+   * só ecoa.
+   */
+  showFolder?: boolean;
   enabled: boolean;
   scrollRef: ReturnType<typeof useAnimatedRef<Animated.ScrollView>>;
   topInset: number;
@@ -65,7 +74,7 @@ export function NoteList({
             exiting={SlideOutRight.duration(Motion.duration.exit)}>
             <NoteCard
               note={item}
-              folderName={pasta?.name}
+              folderName={showFolder ? pasta?.name : undefined}
               folderColor={pasta?.color ?? null}
               actions={acoes}
               drag={enabled ? drag : undefined}

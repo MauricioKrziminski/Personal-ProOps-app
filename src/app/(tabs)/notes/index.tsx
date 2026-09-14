@@ -284,14 +284,14 @@ export default function NotesScreen() {
     ]);
   };
 
+  const menuDaPasta = useFolderMenu({ onColor: setPintandoPasta });
+
   /*
     O PORTÃO DA TELA — três consultas, e todas precisam estar de pé antes de a tela pintar.
 
     ⚠️ **`list` é `useInfiniteQuery`**, e o `isPending` dela vale para a PRIMEIRA página, que é
     exatamente o que este portão quer. As páginas seguintes têm o skeleton do rodapé.
   */
-  const menuDaPasta = useFolderMenu({ onColor: setPintandoPasta });
-
   const pronta = useTelaPronta(list, foldersQuery, tagsQuery);
 
   const cabecalho = (
