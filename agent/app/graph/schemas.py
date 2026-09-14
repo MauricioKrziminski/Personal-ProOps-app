@@ -313,7 +313,15 @@ MONEY_WRITES = {
 
 # Só leem. Nunca pedem confirmação, nunca gravam em executed_actions.
 # Todo FinanceQueryType é leitura por construção — é o ganho de ter separado.
-READ_ONLY = {*FinanceQueryType, NotesActionType.QUERY_NOTES}
+# `QUERY_REMINDERS` é leitura pura e estava de fora: ela reservava e liberava
+# slot de idempotência em `executed_actions` a cada "quais meus lembretes?",
+# gastando linha e podendo recusar uma escrita legítima do mesmo lote por
+# índice já usado.
+READ_ONLY = {
+    *FinanceQueryType,
+    NotesActionType.QUERY_NOTES,
+    NotesActionType.QUERY_REMINDERS,
+}
 
 
 class ConfirmDecision(BaseModel):

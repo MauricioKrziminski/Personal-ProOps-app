@@ -175,3 +175,24 @@ def test_existe_UM_lugar_que_escolhe_modelo():
             if re.search(r'"gemini-[0-9]', linha) or re.search(r"'gemini-[0-9]", linha):
                 fora.append(f"{arquivo.name}:{n}")
     assert not fora, f"nome de modelo fora da tabela: {fora}"
+
+
+def test_catalogo_de_notas_cabe_no_prompt_sem_crescer_o_schema():
+    """Organizar nota e pasta não custou orçamento de schema, e isso é medível.
+
+    `ResourceAction.resource` é `str` (não enum) e `color`/`icon` viajam como
+    VALOR de campo — o produto propriedades × enum do schema não se mexe. O que
+    cresce é o texto do prompt, que não tem teto de 15×1.
+    """
+    from app.graph.schemas import ResourceAction, ResourceActionType
+    from app.tools.resources import prompt_catalogue
+
+    props = ResourceAction.model_json_schema()["properties"]
+    assert len(props) == 5
+    # o único enum do schema continua sendo o tipo da operação
+    assert len(ResourceActionType) == 6
+
+    texto = prompt_catalogue()
+    for campo in ("pinned", "color", "archived", "tags", "icon"):
+        assert campo in texto
+    assert "oceano" in texto and "azul -> oceano" in texto

@@ -434,3 +434,39 @@ def test_resposta_de_consulta_nao_chama_modelo():
     assert not inspect.iscoroutinefunction(format_query_response), (
         "o formatador virou async — sinal de que alguém pôs um await de modelo dentro dele"
     )
+
+
+# --- notas: o topo do agente é o mesmo topo da tela ------------------------
+
+
+@pytest.mark.asyncio
+async def test_query_notes_respeita_fixada_e_esconde_arquivada(monkeypatch):
+    """Fixar no app tinha que mudar o que o agente responde — não mudava.
+
+    E nota ARQUIVADA saiu da tela inicial a pedido do usuário; continuar
+    listando-a aqui é o app e o agente discordando sobre o que existe.
+    """
+    from app.graph.schemas import NotesAction
+    from app.tools import notes
+
+    capturado = {}
+
+    async def fetch(sql, *args):
+        capturado["sql"] = sql
+        return []
+
+    monkeypatch.setattr(notes.db, "fetch", fetch)
+    await notes.query_notes(
+        ExecContext("u", "w", None, "America/Sao_Paulo", "o que eu anotei?", "app:1"),
+        NotesAction(type="query_notes"),
+    )
+    assert "order by n.pinned desc, n.updated_at desc" in capturado["sql"]
+    assert "archived_at is null" in capturado["sql"]
+
+
+def test_listar_lembretes_e_leitura_pura():
+    """Ela reservava slot de idempotência a cada 'quais meus lembretes?'."""
+    from app.graph.schemas import READ_ONLY, NotesActionType
+
+    assert NotesActionType.QUERY_REMINDERS in READ_ONLY
+    assert NotesActionType.DELETE_REMINDER not in READ_ONLY

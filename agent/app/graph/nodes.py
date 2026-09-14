@@ -313,11 +313,34 @@ async def finance_query_node(state: AgentState) -> dict:
     }
 
 
+async def _pastas_do_workspace(workspace_id) -> list[str]:
+    """Os nomes das pastas que existem, para o modelo REUSAR em vez de inventar.
+
+    Falhar aqui não pode derrubar o turno: sem a lista o comportamento é o
+    antigo (o modelo escolhe o nome e `ensure_folder` cria), que é pior, não
+    quebrado. Teto de 40 porque isto entra em TODO turno de nota — a lista é
+    contexto, não catálogo.
+    """
+    from app import db
+
+    try:
+        linhas = await db.fetch(
+            "select name from public.note_folders where workspace_id = %s "
+            "and archived_at is null order by pinned desc, name limit 40",
+            workspace_id,
+        )
+    except Exception:  # noqa: BLE001 — contexto opcional nunca derruba o turno
+        log.warning("não consegui listar as pastas; o turno segue sem elas")
+        return []
+    return [linha["name"] for linha in linhas if linha.get("name")]
+
+
 async def notes_node(state: AgentState) -> dict:
     if state.get("preset") or state.get("halted"):
         return {}  # ações semeadas ou turno cancelado: não reextrair
 
     historico = state.get("messages")[:-1] if state.get("messages") else None
+    pastas = await _pastas_do_workspace(state["workspace_id"])
     modelo = gemini.structured(NotesPlan, gemini.GEMINI_PARSE)
     plano: NotesPlan = await modelo.ainvoke(
         [
@@ -329,6 +352,7 @@ async def notes_node(state: AgentState) -> dict:
                     local_datetime_iso(state["timezone"]),
                     state["timezone"],
                     history=historico,
+                    pastas=pastas,
                 ),
             ),
         ]

@@ -116,6 +116,7 @@ async def query_notes(ctx: ExecContext, action: NotesAction) -> ToolResult:
         from public.notes n
         left join public.note_folders f on f.id = n.folder_id
         where n.workspace_id = %s and n.deleted_at is null
+          and n.archived_at is null
         """
     ]
     args: list = [ctx.workspace_id]
@@ -133,7 +134,11 @@ async def query_notes(ctx: ExecContext, action: NotesAction) -> ToolResult:
     if action.query_to:
         sql.append("and n.created_at <= %s")
         args.append(to_instant(f"{action.query_to}T23:59:59", ctx.timezone))
-    sql.append("order by n.updated_at desc limit 5")
+    # ⚠️ **`pinned desc` primeiro, igual à tela.** Sem ele o "topo" do agente e o
+    # topo do app discordavam: a pessoa fixa uma nota, pergunta "o que eu anotei?"
+    # e recebe outra lista — sem erro nenhum, só a sensação de que fixar não fez
+    # nada. Arquivada some das DUAS (o filtro acima), pelo mesmo motivo.
+    sql.append("order by n.pinned desc, n.updated_at desc limit 5")
 
     notas = await db.fetch(" ".join(sql), *args)
     if not notas:

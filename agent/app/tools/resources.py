@@ -6,6 +6,7 @@ Updates compare the record snapshot in the same SQL statement as the write.
 
 from __future__ import annotations
 
+import re
 from datetime import date, datetime
 from decimal import Decimal, InvalidOperation
 
@@ -63,14 +64,24 @@ CATALOG = {
         None,
         "match_type pattern category account_id priority",
     ),
-    "notes": ("notes", "content", "deleted_at", "content folder_id pinned trashed"),
+    "notes": (
+        "notes",
+        "content",
+        "deleted_at",
+        "content folder_id pinned color archived trashed",
+    ),
     "reminders": (
         "reminders",
         "title",
         "active",
         "title recurrence next_run_at channel active",
     ),
-    "folders": ("note_folders", "name", None, "name parent_id"),
+    "folders": (
+        "note_folders",
+        "name",
+        None,
+        "name parent_id icon color pinned archived tags",
+    ),
 }
 REQUIRED = {
     "accounts": ("name", "type"),
@@ -159,7 +170,58 @@ LABELS = {
     "paid_at": "data do pagamento",
     "is_default": "conta padrão",
     "trashed": "na lixeira",
+    "deleted_at": "na lixeira",
+    "archived_at": "arquivada",
+    "color": "cor",
+    "icon": "ícone",
+    "tags": "tags",
 }
+# As oito cores de nota e pasta. O nome do TOKEN, nunca hex: hex no banco seria
+# cor fora do `theme.ts`, que é o que o `anti-slop.test.ts` do app existe para
+# impedir — e ele não enxerga o que vem por aqui. Mesma lista do CHECK
+# `notes_color_ck` (`20260914180000`); divergir aqui é 23514 na cara do usuário.
+NOTE_COLORS = {
+    "grafite", "oceano", "violeta", "magenta",
+    "terra", "mostarda", "musgo", "turquesa",
+}
+# ⚠️ **A pessoa diz "azul", não "oceano".** Sem esta tradução "pinta de azul"
+# morria na validação com uma frase que lista oito nomes que ela nunca viu. O
+# mapa é de MÃO ÚNICA (apelido -> token): o nome do token continua valendo, e
+# quem escreve a paleta é o app.
+COLOR_ALIASES = {
+    "azul": "oceano", "azul claro": "oceano", "ciano": "turquesa",
+    "cinza": "grafite", "chumbo": "grafite", "preto": "grafite",
+    "roxo": "violeta", "lilas": "violeta", "lilás": "violeta",
+    "rosa": "magenta", "pink": "magenta", "vinho": "magenta",
+    "vermelho": "terra", "laranja": "terra", "marrom": "terra",
+    "amarelo": "mostarda", "dourado": "mostarda", "ouro": "mostarda",
+    "verde": "musgo", "verde escuro": "musgo", "verde agua": "turquesa",
+}
+# "tira a cor" é um valor possível, e ele é NULL — não um erro de digitação.
+SEM_COR = {"sem cor", "nenhuma", "nenhum", "sem", "padrao", "normal", "tira",
+           "tirar", "remove", "remover", "limpa", "limpar"}
+# O catálogo fechado de ícones de pasta é o do app (`note-actions.ts`), e é
+# fechado porque ícone fora do mapa de `Icon` vira o `circle` genérico no
+# Android — sem erro, sem log, só uma pasta sem cara.
+FOLDER_ICONS = {
+    "folder", "briefcase", "lightbulb", "cart", "heart", "book",
+    "airplane", "house", "dumbbell", "pills", "gift", "graduationcap",
+}
+ICON_ALIASES = {
+    "pasta": "folder", "maleta": "briefcase", "trabalho": "briefcase",
+    "lampada": "lightbulb", "lâmpada": "lightbulb", "ideia": "lightbulb",
+    "carrinho": "cart", "compras": "cart", "mercado": "cart",
+    "coracao": "heart", "coração": "heart", "livro": "book", "estudo": "book",
+    "aviao": "airplane", "avião": "airplane", "viagem": "airplane",
+    "casa": "house", "halter": "dumbbell", "academia": "dumbbell",
+    "remedio": "pills", "remédios": "pills", "remedios": "pills", "saude": "pills",
+    "presente": "gift", "formatura": "graduationcap", "faculdade": "graduationcap",
+}
+# A mesma forma que `public.note_tags_valid` aceita (`20260914180000`), que por
+# sua vez copia o que `note_tags_of` GERA a partir do `#hashtag` do texto:
+# alfanumérico com acento, underscore, 2 a 30, tudo minúsculo.
+TAG_RE = re.compile(r"[^\W]{2,30}\Z", re.UNICODE)
+
 ENUMS = {
     ("accounts", "type"): {"checking", "savings", "cash", "investment"},
     ("debts", "kind"): {"loan", "financing", "credit_card", "person", "other"},
@@ -176,6 +238,9 @@ ENUMS = {
     ("recurring", "kind"): {"expense", "income"},
     ("reminders", "channel"): {"push", "whatsapp", "both"},
     ("rules", "match_type"): {"contains", "merchant"},
+    ("notes", "color"): NOTE_COLORS,
+    ("folders", "color"): NOTE_COLORS,
+    ("folders", "icon"): FOLDER_ICONS,
 }
 BOOLS = {"archived", "active", "rollover", "is_liability", "auto_confirm", "pinned", "is_default",
          "trashed", "rotativo_auto"}
@@ -331,6 +396,38 @@ def validate_fields(action: ResourceAction) -> dict:
                 _error("O mês do orçamento deve começar no dia 1.")
         elif key in {"rrule", "recurrence"}:
             value = clean_rrule(value)
+        elif key == "color":
+            # "tira a cor" é resposta legítima e vira NULL. Sem este ramo ela
+            # caía no `not value` lá embaixo e virava "informe cor válido" —
+            # erro para quem respondeu certo.
+            apelido = normalize(value)
+            if apelido in SEM_COR:
+                values[key] = None
+                continue
+            value = COLOR_ALIASES.get(apelido, apelido)
+        elif key == "icon":
+            value = ICON_ALIASES.get(normalize(value), normalize(value))
+        elif key == "tags":
+            # Uma string só, do jeito que a pessoa fala: "urgente, casa" ou
+            # "#urgente #casa". A validação é a MESMA de `note_tags_valid` —
+            # recusar aqui, com a forma escrita na frase, é melhor que um 23514
+            # do Postgres que ninguém entende.
+            etiquetas = []
+            for bruta in re.split(r"[\s,;]+", value.replace("#", " ")):
+                t = bruta.strip().lower()
+                if not t:
+                    continue
+                if not TAG_RE.match(t):
+                    _error(
+                        f"Tag inválida: *{bruta.strip()}*. Use uma palavra só, "
+                        "de 2 a 30 letras ou números (pode ter _)."
+                    )
+                if t not in etiquetas:
+                    etiquetas.append(t)
+            if not etiquetas:
+                _error("Quais tags? Diga uma palavra por tag.")
+            values[key] = etiquetas
+            continue
         elif not value or len(value) > 20000:
             _error(f"Informe {LABELS.get(key, key)} válido.")
         if (action.resource, key) in ENUMS and value not in ENUMS[action.resource, key]:
@@ -561,6 +658,57 @@ async def _preparar_mes(ctx: ExecContext, action: ResourceAction, prepared: dict
     return prepared
 
 
+async def _notas_parecidas(ctx: ExecContext, termo: str, lixeira) -> list[dict]:
+    """Nota não tem NOME — tem texto, e ninguém repete o texto inteiro.
+
+    ⚠️ **Era `content = %s` exato, e isso deixava metade do catálogo inalcançável
+    por voz.** "Fixa a nota do mercado" nunca casaria com "lista do mercado\nleite,
+    ovos" — o usuário dizia o trecho que lembra, e o agente respondia "não
+    encontrei" sobre uma nota que está lá. Todo o resto do catálogo tem nome
+    curto e digitável (conta, cartão, meta, pasta); nota é a exceção, e é por
+    isso que a busca dela é a fuzzy.
+
+    Não reaproveita `resolve.por_texto("notes", ...)` de propósito: aquela fonte
+    crava `deleted_at is null` (a lixeira ficaria inalcançável, quebrando
+    restaurar e apagar de vez) e devolve só `id, content` — aqui o `xmin` é a
+    trava de concorrência e as outras colunas alimentam a confirmação.
+    """
+    return await db.fetch(
+        "select *, xmin::text as row_version from public.notes "
+        "where workspace_id = %s and content ilike %s"
+        + _where("notes", lixeira)
+        + " order by updated_at desc limit 6",
+        ctx.workspace_id,
+        f"%{termo}%",
+    )
+
+
+def _nao_achei(action: ResourceAction, rows: list[dict]) -> str:
+    """Empate PERGUNTA, e a pergunta mostra o que existe.
+
+    Devolver "não encontrei" quando existem três candidatos é mentir sobre o
+    banco e deixar o usuário adivinhar qual trecho digitar. Com nota, a lista é
+    a primeira linha de cada uma — o mesmo rótulo que a tela mostra.
+    """
+    if action.resource == "notes" and len(rows) > 1:
+        from app.tools.notes import first_line
+
+        lista = "\n".join(f"  • {first_line(r.get('content'))}" for r in rows)
+        return (
+            f"Achei {len(rows)} notas com *{action.name}*. Qual delas? "
+            f"Me diz um trecho que só apareça nela:\n{lista}\nNada foi alterado."
+        )
+    if action.resource == "notes":
+        return (
+            f"Não achei nota com *{action.name}*. Diga um trecho do texto dela. "
+            "Nada foi alterado."
+        )
+    return (
+        "Não encontrei um único item com esse nome. Informe o nome exato (e o "
+        "mês, no caso de orçamento). Nada foi alterado."
+    )
+
+
 async def prepare(ctx: ExecContext, action: ResourceAction) -> dict:
     values = validate_fields(action)
     table, identity, deletion, _ = CATALOG[action.resource]
@@ -576,6 +724,16 @@ async def prepare(ctx: ExecContext, action: ResourceAction) -> dict:
     # `insert into accounts (..., is_default)` numa coluna que não existe.
     if "is_default" in values:
         prepared["set_default"] = values.pop("is_default")
+    # ⚠️ **`archived` é coluna DE VERDADE em metas, bens e dívidas** — é o
+    # `deletion` delas no catálogo. Em nota e pasta o app arquiva com
+    # TIMESTAMP (`archived_at`, espelhando `deleted_at`, para a tela de
+    # arquivadas poder dizer "quando"). Traduzir sem escopo mandaria
+    # `archived_at` para dentro de `goals` e o UPDATE quebraria no SQL.
+    if action.resource in {"notes", "folders"} and "archived" in values:
+        arquivar = values.pop("archived")
+        if action.type == Op.CREATE:
+            _error("Uma nota ou pasta nova não nasce arquivada.")
+        values["archived_at"] = now_utc().isoformat() if arquivar else None
     lixeira = None
     if "trashed" in values:
         lixeira = queria_lixeira = values.pop("trashed")
@@ -636,11 +794,18 @@ async def prepare(ctx: ExecContext, action: ResourceAction) -> dict:
             + selector,
             *params,
         )
+        if len(rows) != 1 and action.resource == "notes":
+            rows = await _notas_parecidas(ctx, action.name, lixeira)
         if len(rows) != 1:
-            _error(
-                "Não encontrei um único item com esse nome. Informe o nome exato (e o mês, no caso de orçamento). Nada foi alterado."
-            )
+            _error(_nao_achei(action, rows))
         old = rows[0]
+        if action.resource == "folders" and isinstance(values.get("tags"), list):
+            # ⚠️ **Tag SOMA, não substitui.** "Põe a tag urgente na pasta" é
+            # acrescentar; gravar só o que veio na frase apagaria em silêncio as
+            # tags que já estavam lá, e a confirmação ("tags: urgente") não dá
+            # nenhuma pista disso. TIRAR uma tag continua sendo do app — lacuna
+            # declarada em `docs/AGENTE-PARIDADE-COM-O-APP.md`.
+            values["tags"] = sorted({*(old.get("tags") or []), *values["tags"]})
         if action.resource == "debts":
             prepared["calculation_mode"] = old.get("calculation_mode") or "amortized"
             if (
@@ -874,6 +1039,17 @@ async def prepare(ctx: ExecContext, action: ResourceAction) -> dict:
                 "contains": "contém o termo",
                 "merchant": "estabelecimento",
             }.get(str(value), value)
+        elif key in {"archived_at", "deleted_at"}:
+            # O verbo já diz o que acontece quando a operação é o próprio
+            # arquivar/apagar; repetir vira "mandar para a lixeira nota X —
+            # na lixeira: sim". Fora dali (desarquivar, restaurar) a linha é a
+            # única coisa que conta o efeito, e ela é sim/não — nunca o
+            # timestamp cru, que já apareceu inteiro na cara do usuário.
+            if action.type == Op.DELETE:
+                continue
+            shown = "sim" if value else "não"
+        elif isinstance(value, list):
+            shown = ", ".join(value)
         elif isinstance(value, bool):
             shown = "sim" if value else "não"
         details.append(
@@ -1216,5 +1392,7 @@ def prompt_catalogue() -> str:
         catalogue
         + "\nValores permitidos:\n"
         + choices
-        + "\nFinanciamento/dívida tem dois modos: fixed_installments (padrão) precisa só de installment_cents e installments — o total contratual das parcelas, com juros dentro; amortized precisa de principal_cents, remaining_cents e interest_rate_monthly, e só serve quando o usuário tem esses números do contrato. Nunca converta o total das parcelas em principal nem invente taxa.\nConta padrão (onde cai o lançamento que não cita conta): resource_update, resource=accounts, name=nome da conta, campo is_default=true; para tirar, is_default=false. Cartão de crédito não pode ser conta padrão.\nNota na LIXEIRA: resource_delete em notes manda para a lixeira; restaurar (\"tira da lixeira\", \"recupera a nota\") é resource_update com trashed=false; apagar DE VEZ (\"esvazia\", \"apaga definitivo\") é resource_delete com trashed=true.\nMEU MÊS (o período financeiro do usuário — quando o mês dele começa e termina): resource_update, resource=mes, campo cycle_close_day = o dia em que o mês fecha (1 a 28). Para voltar ao último dia do mês ('volta pro normal', 'fecha no fim do mês'), mande cycle_close_day vazio. Serve para: 'meu mês fecha dia 10', 'quero contar do dia 15 ao dia 15', 'qual a data de corte', 'minha virada é no dia 20', 'faz o corte no dia 10', 'prefiro contar a partir do dia 6'.\nATENÇÃO — 'dia N' aparece em quase toda frase e quase nunca é o ciclo. Só é resource=mes quando a frase fala do PERÍODO em si (o mês, o ciclo, o corte, a virada, a contagem, de-quando-a-quando). Contraexemplos que NÃO são resource=mes:\n- 'meu salário cai todo dia 5', 'todo dia 15 pago a academia', 'o aluguel vence dia 10' -> resource=recurring. Isso é um EVENTO que se repete (dinheiro entrando ou saindo), não a régua do mês. A pista é que existe uma coisa (salário, aluguel, academia) acontecendo no dia.\n- 'o cartão fecha dia 7', 'cadastra o Inter que fecha dia 7' -> resource=cards com closing_day. Quem tem fatura é o CARTÃO.\n- 'me lembra dia 20', 'a reunião é dia 20' -> lembrete ou nota, não cadastro.\nNa dúvida entre mes e recurring: se dá para perguntar 'o que acontece nesse dia?' e a resposta é um valor em dinheiro, é recurring.\nADIAR A FATURA AGORA (o rotativo, uma vez): resource_roll, resource=cards, name=nome do cartão, SEM campos. É a fatura VENCIDA que a pessoa não pagou: o saldo dela vai para a próxima, com juros e IOF. Frases: 'joga a fatura do nubank pra próxima', 'adia a fatura do inter', 'não vou conseguir pagar a fatura esse mês', 'deixa a fatura do itaú pro mês que vem', 'empurra essa fatura'.\n⚠️ resource_roll (agir AGORA nesta fatura) é diferente de rotativo_auto (LIGAR a regra para as próximas). 'adia a fatura' é resource_roll; 'deixa a fatura rolar sozinha daqui pra frente' é resource_update com rotativo_auto=true.\n⚠️ Adiar NÃO é pagar nem quitar: 'paguei a fatura' sai dinheiro, 'já tinha pago a fatura' é quitação, e adiar não move dinheiro nenhum — cria dívida nova. Se a pessoa disser que pagou, nunca use resource_roll.\nROTATIVO AUTOMÁTICO do cartão (a REGRA, não o ato de agora): resource_update, resource=cards, name=nome do cartão. rotativo_auto=true faz TODA fatura vencida e não paga, daqui pra frente, ir sozinha para a próxima, com juros e IOF. rotativo_rate_monthly são os juros do rotativo, do jeito que o usuário falar ('15,5%', '12,876', '1,99') — o sistema converte para fração. É a taxa de PARTIDA: assim que chegar a primeira cobrança real, o app passa a usar a que ESTE cartão cobrou. Vazio significa não estimar juros.\nOrçamento mensal existente: target_month=YYYY-MM-01; orçamento padrão: target_month=default.\nPara pagar prestação de dívida existente: resource_pay, resource=debts, name=nome da dívida, campos amount_cents, account_id (nome da conta), paid_at (YYYY-MM-DD). Não editar remaining_cents para registrar pagamento. Ao CRIAR dívida parcelada, installments_paid sai do que o usuário disse, inclusive pela posição: 'estou na 9ª parcela' são 8 pagas, 'tô na terceira' são 2, 'comecei agora' é 0, e um número solto respondendo à pergunta é a quantidade. Deixe vazio só quando a mensagem não disser nada sobre isso — o usuário confirma o cadastro inteiro antes de qualquer gravação, e é ali que ele corrige. Em dívida QUE JÁ EXISTE é o contrário: posição e data não comprovam pagamento; use resource_update com installments_paid e remaining_cents explicitamente informados, e se faltar saldo atual pergunte. Nunca use resource_pay para dar baixa retroativa em várias parcelas ou invente amortização a partir do valor da prestação.\nValor POR EXTENSO é valor: 'trezentos reais' é 30000 centavos, 'mil e quinhentos' é 150000, 'dois mil e quinhentos' é 250000. Áudio transcrito e resposta falada escrevem número assim o tempo todo — deixar o campo vazio porque o número veio em palavras é perder o dado que o usuário acabou de dar."
+        + "\nApelidos de cor aceitos (o sistema traduz): "
+        + ", ".join(f"{k} -> {v}" for k, v in sorted(COLOR_ALIASES.items()))
+        + "\nFinanciamento/dívida tem dois modos: fixed_installments (padrão) precisa só de installment_cents e installments — o total contratual das parcelas, com juros dentro; amortized precisa de principal_cents, remaining_cents e interest_rate_monthly, e só serve quando o usuário tem esses números do contrato. Nunca converta o total das parcelas em principal nem invente taxa.\nConta padrão (onde cai o lançamento que não cita conta): resource_update, resource=accounts, name=nome da conta, campo is_default=true; para tirar, is_default=false. Cartão de crédito não pode ser conta padrão.\nNota na LIXEIRA: resource_delete em notes manda para a lixeira; restaurar (\"tira da lixeira\", \"recupera a nota\") é resource_update com trashed=false; apagar DE VEZ (\"esvazia\", \"apaga definitivo\") é resource_delete com trashed=true.\nORGANIZAR NOTA E PASTA (é o que o usuário faz com o dedo na tela de Notas): fixar no topo é pinned=true (\"fixa a nota do mercado\", \"deixa essa pasta no topo\"); desafixar é pinned=false. Arquivar é archived=true (\"arquiva a nota da reunião\", \"tira a pasta de projetos da tela\") e desarquivar é archived=false — arquivar NÃO é apagar: a nota continua existindo, só sai da tela inicial. Cor é color com um dos oito nomes; se a pessoa falar a cor do dia a dia (azul, verde, rosa, vermelho, amarelo, roxo, cinza), pode mandar a palavra dela que o sistema traduz, e \"tira a cor\" é color vazio. Pasta também tem icon (um dos nomes da lista, ou a palavra em português: maleta, carrinho, casa, avião…) e tags (uma palavra por tag, \"urgente, casa\"); tag acrescenta às que já existem.\n⚠️ NOTA se identifica pelo TRECHO do texto, não por um nome: name = o pedaço que a pessoa citou (\"a nota do mercado\" -> name=mercado). Se casar com mais de uma, o sistema mostra a lista e pergunta qual — nunca escolha por ela.\nMEU MÊS (o período financeiro do usuário — quando o mês dele começa e termina): resource_update, resource=mes, campo cycle_close_day = o dia em que o mês fecha (1 a 28). Para voltar ao último dia do mês ('volta pro normal', 'fecha no fim do mês'), mande cycle_close_day vazio. Serve para: 'meu mês fecha dia 10', 'quero contar do dia 15 ao dia 15', 'qual a data de corte', 'minha virada é no dia 20', 'faz o corte no dia 10', 'prefiro contar a partir do dia 6'.\nATENÇÃO — 'dia N' aparece em quase toda frase e quase nunca é o ciclo. Só é resource=mes quando a frase fala do PERÍODO em si (o mês, o ciclo, o corte, a virada, a contagem, de-quando-a-quando). Contraexemplos que NÃO são resource=mes:\n- 'meu salário cai todo dia 5', 'todo dia 15 pago a academia', 'o aluguel vence dia 10' -> resource=recurring. Isso é um EVENTO que se repete (dinheiro entrando ou saindo), não a régua do mês. A pista é que existe uma coisa (salário, aluguel, academia) acontecendo no dia.\n- 'o cartão fecha dia 7', 'cadastra o Inter que fecha dia 7' -> resource=cards com closing_day. Quem tem fatura é o CARTÃO.\n- 'me lembra dia 20', 'a reunião é dia 20' -> lembrete ou nota, não cadastro.\nNa dúvida entre mes e recurring: se dá para perguntar 'o que acontece nesse dia?' e a resposta é um valor em dinheiro, é recurring.\nADIAR A FATURA AGORA (o rotativo, uma vez): resource_roll, resource=cards, name=nome do cartão, SEM campos. É a fatura VENCIDA que a pessoa não pagou: o saldo dela vai para a próxima, com juros e IOF. Frases: 'joga a fatura do nubank pra próxima', 'adia a fatura do inter', 'não vou conseguir pagar a fatura esse mês', 'deixa a fatura do itaú pro mês que vem', 'empurra essa fatura'.\n⚠️ resource_roll (agir AGORA nesta fatura) é diferente de rotativo_auto (LIGAR a regra para as próximas). 'adia a fatura' é resource_roll; 'deixa a fatura rolar sozinha daqui pra frente' é resource_update com rotativo_auto=true.\n⚠️ Adiar NÃO é pagar nem quitar: 'paguei a fatura' sai dinheiro, 'já tinha pago a fatura' é quitação, e adiar não move dinheiro nenhum — cria dívida nova. Se a pessoa disser que pagou, nunca use resource_roll.\nROTATIVO AUTOMÁTICO do cartão (a REGRA, não o ato de agora): resource_update, resource=cards, name=nome do cartão. rotativo_auto=true faz TODA fatura vencida e não paga, daqui pra frente, ir sozinha para a próxima, com juros e IOF. rotativo_rate_monthly são os juros do rotativo, do jeito que o usuário falar ('15,5%', '12,876', '1,99') — o sistema converte para fração. É a taxa de PARTIDA: assim que chegar a primeira cobrança real, o app passa a usar a que ESTE cartão cobrou. Vazio significa não estimar juros.\nOrçamento mensal existente: target_month=YYYY-MM-01; orçamento padrão: target_month=default.\nPara pagar prestação de dívida existente: resource_pay, resource=debts, name=nome da dívida, campos amount_cents, account_id (nome da conta), paid_at (YYYY-MM-DD). Não editar remaining_cents para registrar pagamento. Ao CRIAR dívida parcelada, installments_paid sai do que o usuário disse, inclusive pela posição: 'estou na 9ª parcela' são 8 pagas, 'tô na terceira' são 2, 'comecei agora' é 0, e um número solto respondendo à pergunta é a quantidade. Deixe vazio só quando a mensagem não disser nada sobre isso — o usuário confirma o cadastro inteiro antes de qualquer gravação, e é ali que ele corrige. Em dívida QUE JÁ EXISTE é o contrário: posição e data não comprovam pagamento; use resource_update com installments_paid e remaining_cents explicitamente informados, e se faltar saldo atual pergunte. Nunca use resource_pay para dar baixa retroativa em várias parcelas ou invente amortização a partir do valor da prestação.\nValor POR EXTENSO é valor: 'trezentos reais' é 30000 centavos, 'mil e quinhentos' é 150000, 'dois mil e quinhentos' é 250000. Áudio transcrito e resposta falada escrevem número assim o tempo todo — deixar o campo vazio porque o número veio em palavras é perder o dado que o usuário acabou de dar."
     )

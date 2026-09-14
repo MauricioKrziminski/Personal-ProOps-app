@@ -520,3 +520,158 @@ async def test_apagar_lembrete_nao_herda_o_aviso_da_serie(monkeypatch):
         ctx(), action(resource="reminders", kind="resource_delete")
     )
     assert "registros já gerados continuam no histórico" in prepared["summary"]
+
+
+# --- organizar nota e pasta: fixar, cor, arquivar, tag, ícone ---------------
+#
+# A tela de Notas ganhou pin, cor, arquivar, tag de pasta e ícone
+# (`20260914180000`); o agente faz tudo que o dedo faz, então cada um deles é
+# campo do catálogo. Nenhum custou schema: `ResourceAction.resource` é `str`, e
+# `color`/`icon` entram como valores permitidos no PROMPT, não no schema.
+
+
+def nota(nome="mercado", kind="resource_update", **values):
+    a = action(resource="notes", kind=kind, **values)
+    a.name = nome
+    return a
+
+
+def pasta(nome="trabalho", kind="resource_update", **values):
+    a = action(resource="folders", kind=kind, **values)
+    a.name = nome
+    return a
+
+
+@pytest.mark.asyncio
+async def test_fixar_nota_acha_pelo_trecho_e_nao_pelo_texto_inteiro(monkeypatch):
+    """A busca exata deixava metade do catálogo inalcançável por voz."""
+    consultas = []
+
+    async def fetch(sql, *args):
+        consultas.append((sql, args))
+        # a primeira é a busca EXATA pelo texto inteiro e não acha nada
+        if "ilike" not in sql:
+            return []
+        return [_linha(content="lista do mercado\nleite, ovos", deleted_at=None)]
+
+    monkeypatch.setattr(resources.db, "fetch", fetch)
+    prepared = await resources.prepare(ctx(), nota(pinned="true"))
+    assert prepared["values"] == {"pinned": True}
+    assert "ilike" in consultas[-1][0]
+    assert consultas[-1][1][1] == "%mercado%"
+
+
+@pytest.mark.asyncio
+async def test_duas_notas_parecidas_perguntam_qual_com_a_lista(monkeypatch):
+    """Empate PERGUNTA — e a pergunta mostra o que existe, senão é adivinhação."""
+
+    async def fetch(sql, *a):
+        if "ilike" not in sql:
+            return []
+        return [
+            _linha(content="lista do mercado\nleite"),
+            _linha(content="mercado da esquina fecha 22h"),
+        ]
+
+    monkeypatch.setattr(resources.db, "fetch", fetch)
+    with pytest.raises(Level1Error) as erro:
+        await resources.prepare(ctx(), nota(pinned="true"))
+    mensagem = erro.value.mensagem_usuario
+    assert "Achei 2 notas" in mensagem
+    assert "lista do mercado" in mensagem and "mercado da esquina" in mensagem
+    assert "Nada foi alterado" in mensagem
+
+
+@pytest.mark.asyncio
+async def test_cor_aceita_a_palavra_do_dia_a_dia(monkeypatch):
+    async def fetch(*a):
+        return [_linha(content="reunião de segunda")]
+
+    monkeypatch.setattr(resources.db, "fetch", fetch)
+    prepared = await resources.prepare(ctx(), nota(color="azul"))
+    assert prepared["values"] == {"color": "oceano"}
+
+    prepared = await resources.prepare(ctx(), nota(color="sem cor"))
+    assert prepared["values"] == {"color": None}
+
+    with pytest.raises(Level1Error, match="Tipo inválido para cor"):
+        await resources.prepare(ctx(), nota(color="#ff0000"))
+
+
+@pytest.mark.asyncio
+async def test_arquivar_nota_vira_timestamp_e_meta_continua_booleana(monkeypatch):
+    async def fetch(*a):
+        return [_linha(content="reunião", name="viagem", archived=False)]
+
+    monkeypatch.setattr(resources.db, "fetch", fetch)
+
+    arquivada = await resources.prepare(ctx(), nota(archived="true"))
+    assert set(arquivada["values"]) == {"archived_at"}
+    assert arquivada["values"]["archived_at"] is not None
+    assert "arquivada: sim" in arquivada["summary"]
+
+    devolvida = await resources.prepare(ctx(), nota(archived="false"))
+    assert devolvida["values"] == {"archived_at": None}
+    assert "arquivada: não" in devolvida["summary"]
+
+    # ⚠️ a regressão que a tradução podia causar: `archived` É coluna em metas,
+    # bens e dívidas. Traduzir sem escopo mandaria `archived_at` para `goals`.
+    meta = action(resource="goals", kind="resource_update", archived="true")
+    assert (await resources.prepare(ctx(), meta))["values"] == {"archived": True}
+
+
+@pytest.mark.asyncio
+async def test_desarquivar_nota_ainda_encontra_a_nota(monkeypatch):
+    """`_where` de notes filtra a LIXEIRA, nunca o arquivo — senão desarquivar
+    procura no conjunto que exclui justamente o alvo."""
+    consultas = []
+
+    async def fetch(sql, *a):
+        consultas.append(sql)
+        return [_linha(content="reunião")]
+
+    monkeypatch.setattr(resources.db, "fetch", fetch)
+    await resources.prepare(ctx(), nota(archived="false"))
+    assert "archived_at" not in consultas[0]
+    assert "deleted_at is null" in consultas[0]
+
+
+@pytest.mark.asyncio
+async def test_tag_de_pasta_soma_e_valida_a_forma(monkeypatch):
+    async def fetch(*a):
+        return [_linha(name="trabalho", tags=["projetos"])]
+
+    monkeypatch.setattr(resources.db, "fetch", fetch)
+    prepared = await resources.prepare(ctx(), pasta(tags="urgente, #casa"))
+    # soma: gravar só o que veio na frase apagaria "projetos" em silêncio
+    assert prepared["values"]["tags"] == ["casa", "projetos", "urgente"]
+    assert "tags: casa, projetos, urgente" in prepared["summary"]
+
+    with pytest.raises(Level1Error, match="Tag inválida"):
+        await resources.prepare(ctx(), pasta(tags="tag com espaço e muito longa demais"))
+
+
+@pytest.mark.asyncio
+async def test_icone_de_pasta_aceita_a_palavra_em_portugues(monkeypatch):
+    async def fetch(*a):
+        return [_linha(name="trabalho")]
+
+    monkeypatch.setattr(resources.db, "fetch", fetch)
+    prepared = await resources.prepare(ctx(), pasta(icon="maleta"))
+    assert prepared["values"] == {"icon": "briefcase"}
+
+    # fora do catálogo o Android desenha o `circle` genérico, sem erro nenhum:
+    # a recusa aqui é o que impede uma pasta sem cara.
+    with pytest.raises(Level1Error, match="Tipo inválido para ícone"):
+        await resources.prepare(ctx(), pasta(icon="foguete"))
+
+
+@pytest.mark.asyncio
+async def test_mandar_para_a_lixeira_nao_escreve_timestamp_na_confirmacao(monkeypatch):
+    async def fetch(*a):
+        return [_linha(content="rascunho", deleted_at=None)]
+
+    monkeypatch.setattr(resources.db, "fetch", fetch)
+    prepared = await resources.prepare(ctx(), nota(kind="resource_delete"))
+    assert "lixeira" in prepared["summary"]
+    assert "T" not in prepared["summary"].split("—")[-1]  # sem ISO na cara do usuário
