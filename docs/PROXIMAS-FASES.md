@@ -17,7 +17,7 @@
 | Branch | `main`, limpa, tudo commitado e com push |
 | Último commit | `54829c3 fix(importacao): importar extrato estava quebrado desde o corte para o python` |
 | Migrations no **staging** (`utkqoiigimqzeenxkxdl`) | até `20260914170000` — **em dia** |
-| Migrations em **produção** (`kwriuifcwyvdrxtspjiz`) | `20260911220000` — **11 atrás** (contadas no repo; confirme no SQL Editor de produção antes de decidir) |
+| Migrations em **produção** (`kwriuifcwyvdrxtspjiz`) | `20260914170000` — **em dia** (as 11 subiram em 14/09/2026; conferido na fonte) |
 | `tsc`, `expo lint`, `npm test` | verdes (391 testes) · `pytest` **787** · `ruff` limpo |
 | Tags | **nenhuma criada** — é o Gabriel quem cria, depois de testar |
 

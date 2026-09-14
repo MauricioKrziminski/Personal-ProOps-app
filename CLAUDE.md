@@ -30,8 +30,12 @@ App mobile pessoal de **notas rápidas, lembretes e controle financeiro operado 
   Isso já falhou **duas vezes** (03/09/2026): a `0049` e depois as `0050`/`0051` foram anunciadas
   como "aplicadas em produção" quando foram para o staging.
 
-  Produção está em **`20260911220000`**, aplicado em 11/09/2026 pelo Gabriel (as dez de
-  `130000` a `220000` de uma vez) — e o repo não tem nenhuma migration fora de lá.
+  Produção está em **`20260914170000`**, aplicado em 14/09/2026 pelo Gabriel (as ONZE de
+  `20260913120000` a `20260914170000` de uma vez) — e o repo não tem nenhuma migration fora de lá.
+  Conferido na fonte logo depois: as 43 RPCs que o app chama existem e continuam com `execute`
+  para `authenticated` (é o modo de falha do par `200000`/`220000`, abaixo), e
+  `public._alerts_to_send()` ficou sem `execute` para `anon` e `authenticated` — era um vazamento
+  de telefone e push token de todos os workspaces, alcançável com a anon key e sem login.
 
   ⚠️ **A `200000` e a `220000` são um PAR e sobem juntas.** A primeira cria
   `private.debt_paid_in_cycle` com `revoke`, e a segunda devolve o `execute`; só a primeira
