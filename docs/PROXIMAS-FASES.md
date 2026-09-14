@@ -15,10 +15,10 @@
 | | |
 |---|---|
 | Branch | `main`, limpa, tudo commitado e com push |
-| Último commit | `cc8f898 feat(finance): as linhas do ciclo dizem quanto ja caiu e quanto ja saiu da conta` |
-| Migrations no **staging** (`utkqoiigimqzeenxkxdl`) | até `20260914120000` — **em dia** |
-| Migrations em **produção** (`kwriuifcwyvdrxtspjiz`) | `20260911220000` — **8 atrás** |
-| `tsc`, `expo lint`, `npm test` | verdes (359 testes) |
+| Último commit | `9ac4b1c feat(alerts): o ciclo que fechou avisa por push e whatsapp` |
+| Migrations no **staging** (`utkqoiigimqzeenxkxdl`) | até `20260914140000` — **em dia** |
+| Migrations em **produção** (`kwriuifcwyvdrxtspjiz`) | `20260911220000` — **9 atrás** |
+| `tsc`, `expo lint`, `npm test` | verdes (372 testes) · `pytest` 780 |
 | Tags | **nenhuma criada** — é o Gabriel quem cria, depois de testar |
 
 ⚠️ **Confirme o número de produção na fonte antes de decidir qualquer coisa com base nele.** No
@@ -245,7 +245,33 @@ from public.cycle_lines('2026-10-01');
 
 ---
 
-## Fase 2 — Fechamento de ciclo
+## Fase 2 — Fechamento de ciclo ✅ FEITA em 14/09/2026 (commit `9ac4b1c`)
+
+> Migration `20260914140000`, no staging. Quatro coisas que o plano abaixo não previa:
+>
+> 1. ⚠️ **A ACL de `_alerts_to_send` não se reproduz sozinha, e errar aqui VAZA DADO.** A viva era
+>    `postgres=X | service_role=X` — PUBLIC revogado, `service_role` com grant explícito. Um
+>    `revoke ... from public` **não basta**: o Supabase mantém `alter default privileges ... grant
+>    execute on functions to anon, authenticated`, então a função nova nasceu executável pelas
+>    duas. O dry-run mostrou `(True, True, True)` — e essa função devolve **telefone e
+>    `expo_push_token` de TODOS os workspaces**, alcançável com a anon key, sem login. Os três
+>    nomes vão escritos no `revoke`, mais o `grant` de volta para `service_role`.
+> 2. ⚠️ **`target_for("negative_forecast")` devolvia `today`** — o ramo testava
+>    `startswith(("balance","forecast"))` e o kind começa com "negative". O aviso *"seu saldo fica
+>    negativo — quer ver o que dá pra adiar?"* abria a Hoje, onde não se adia nada. Ramo morto
+>    desde sempre; achado ao escrever o teste de `target_for`.
+> 3. **A Fase 0.2 virou TESTE, não alinhamento de uma vez** — `src/lib/push-targets-contract.test.ts`
+>    lê a `TARGETS` do Python e a `ALLOWED` do app e quebra o build se divergirem. Provado que
+>    morde: removendo `cycle` do servidor, o teste falha.
+> 4. **`routeFor` saiu para `src/lib/push-routes.ts`** (o padrão de `cycle-routes.ts`): é fronteira
+>    de confiança — o `data` é escrito por quem manda o push — e dentro de `notifications.ts` não
+>    dava para testar. 7 testes, incluindo `__proto__`, `toString` e path traversal no `ref`.
+>
+> **Não testado, e é honesto dizer:** push real não chega no emulador (precisa de aparelho
+> físico), e o perfil do Gabriel no staging está com push e WhatsApp DESLIGADOS e sem telefone —
+> então `_alerts_to_send()` devolve zero hoje e nenhuma mensagem paga foi enviada. O que foi
+> provado: a RPC produz a linha certa com o ciclo forçado, o payload sai com `target=cycle` e
+> `ref=<fim>`, e o deep link que o `ref` gera abre a tela certa no aparelho.
 
 ### Por quê
 
@@ -950,7 +976,7 @@ Coisas encontradas e não corrigidas, com o motivo. Nenhuma é urgente; todas s�
 |---|---|---|---|
 | 0 | ~~Higiene~~ ✅ `b36f706` (a 0.2 vai junto com a Fase 2) | 30 min | — |
 | 1 | ~~"Já caiu" no Financeiro~~ ✅ `cc8f898` | meio dia | 0 |
-| 2 | Fechamento de ciclo | 1 dia | — |
+| 2 | ~~Fechamento de ciclo~~ ✅ `9ac4b1c` | 1 dia | — |
 | 3 | Conciliação pelo extrato | 1–2 dias | — |
 | 4 | Bloqueio por senha/biometria | 1 dia + rebuild nativo | — |
 | 5 | Loaders uniformes | 1–2 dias | — |
