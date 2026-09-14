@@ -32,7 +32,8 @@ import {
 import { useTelaPronta } from '@/hooks/use-tela-pronta';
 import { Fonts } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
-import { noteTitle, notePreview, parseChecklist } from '@/lib/search';
+import { noteTitle, notePreview } from '@/lib/search';
+import { todoProgress } from '@/lib/note-blocks';
 import { relativeBR } from '@/lib/dates';
 
 /**
@@ -83,22 +84,21 @@ function NoteRow({
 
   const title = noteTitle(note.content) || 'Sem título';
   const preview = notePreview(note.content);
-  const checklist = parseChecklist(note.content);
-  const done = checklist.filter((item) => item.done).length;
+  const { done, total } = todoProgress(note.content);
   // Tag com o mesmo nome da pasta não vira metadado: `mercado · #mercado` gasta a linha
   // inteira para dizer a mesma coisa duas vezes.
   const tags = (note.tags ?? []).filter(
     (tag) => tag.toLowerCase() !== folderName?.toLowerCase()
   );
 
-  const checklistLabel = checklist.length > 0 ? `${done}/${checklist.length}` : null;
+  const checklistLabel = total > 0 ? `${done}/${total}` : null;
   const quando = relativeBR(note.updated_at);
 
   const label = [
     title,
     folderName ? `pasta ${folderName}` : null,
     tags.length > 0 ? `${tags.length} ${tags.length === 1 ? 'tag' : 'tags'}` : null,
-    checklistLabel ? `${done} de ${checklist.length} itens feitos` : null,
+    checklistLabel ? `${done} de ${total} itens feitos` : null,
     note.source === 'whatsapp' ? 'via WhatsApp' : null,
     `atualizada ${quando}`,
     note.pinned ? 'fixada' : null,

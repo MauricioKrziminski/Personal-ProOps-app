@@ -47,10 +47,9 @@ import {
   normalizeFolderName,
   removeTag,
   tagsOf,
-  toggleChecklistLine,
 } from '@/lib/search';
 import { showItemActions } from '@/lib/item-actions';
-import { noteBlocks, setBlockKind, lineAt, type BlockKind } from '@/lib/note-blocks';
+import { noteBlocks, setBlockKind, lineAt, toggleTodo, type BlockKind } from '@/lib/note-blocks';
 import { skipReason } from '@/lib/notes-autosave';
 
 /**
@@ -290,7 +289,7 @@ export default function NoteDetailScreen() {
 
   const onToggleLine = (lineIndex: number) => {
     Haptics.selectionAsync();
-    setContent((current) => toggleChecklistLine(current, lineIndex));
+    setContent((current) => toggleTodo(current, lineIndex));
   };
 
   /**
@@ -521,7 +520,7 @@ export default function NoteDetailScreen() {
  * o header mostrava `noteTitle(content)` e o corpo renderizava todas as linhas, inclusive a
  * primeira. A pessoa lia a mesma frase duas vezes, com 40px de distância.
  *
- * `readLines` (`src/lib/search.ts`) resolve título, `#tag` e linha vazia — com teste. Aqui só
+ * `noteBlocks` (`src/lib/note-blocks.ts`) resolve título, `#tag` e linha vazia — com teste. Aqui só
  * sobra desenho: hierarquia por peso (22/600 no título, 17/400 no corpo), `Space.sm` entre
  * linhas e um alvo de toque que cobre o vazio.
  */

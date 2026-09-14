@@ -1,4 +1,5 @@
 import { classify } from './note-blocks.ts';
+import { stripInline } from './note-inline.ts';
 
 /**
  * Termo de busca do usuário → `tsquery` do Postgres.
@@ -19,8 +20,6 @@ export function toTsQuery(input: string): string {
   return terms.map((term, i) => (i === terms.length - 1 ? `${term}:*` : term)).join(' & ');
 }
 
-const CHECKLIST_LINE = /^(\s*)-\s\[( |x|X)\]\s?(.*)$/;
-
 /**
  * Linha como ela é LIDA, sem a marcação que só existe para o texto voltar inteiro ao WhatsApp.
  *
@@ -29,11 +28,13 @@ const CHECKLIST_LINE = /^(\s*)-\s\[( |x|X)\]\s?(.*)$/;
  * rótulo de acessibilidade — oito chamadas que teriam o mesmo vazamento.
  */
 function stripMarkup(line: string): string {
-  // Delega para o classificador de blocos: ele já devolve o texto limpo de TODOS os tipos.
-  // A versão anterior conhecia só checklist, e por isso a lista passou a exibir `# Feira` com o
-  // jogo-da-velha à mostra assim que os blocos nasceram — a marcação vazava de novo, exatamente
-  // o defeito que esta função existe para impedir.
-  return classify(line).text;
+  // Duas camadas, nessa ordem: o classificador de blocos tira o prefixo da LINHA (`# `, `- [ ]`,
+  // `> `) e `stripInline` tira os delimitadores DENTRO dela (`*negrito*`, `_itálico_`).
+  //
+  // Faltar a segunda é o mesmo defeito que já aconteceu duas vezes: a lista exibindo
+  // `- [x] leite - [ ] pão` quando só o checklist era conhecido, e depois `# Feira` com o
+  // jogo-da-velha à mostra quando os blocos nasceram. A marcação nunca vaza para título ou prévia.
+  return stripInline(classify(line).text);
 }
 
 /**
@@ -71,83 +72,6 @@ export function notePreview(content: string): string {
     .trim();
 
   return stripTags(body);
-}
-
-/**
- * As linhas da nota como o modo LEITURA as mostra.
- *
- * Três decisões moram aqui, e não no componente, porque são regra de conteúdo e precisam de teste:
- *
- * 1. **A primeira linha não vazia é o título** — a mesma que `noteTitle` usa na lista, então a
- *    nota se chama igual nos dois lugares. Exceção: se ela for item de checklist, NÃO vira título;
- *    promover um to-do a manchete custa a caixinha, que é o ponto dela.
- * 2. **`#tag` sai do texto exibido**, porque a mesma tag já é um chip logo acima. O `content`
- *    continua intocado — é ele que volta inteiro para o WhatsApp, e é ele que o modo edição mostra.
- *    Linha que fica vazia depois de tirar a tag mantém o texto original: nota que é só `#trabalho`
- *    não pode aparecer em branco.
- * 3. **Linha vazia não vira linha renderizada** — o respiro entre parágrafos passou a ser o `gap`
- *    do container. Antes o corpo empilhava `ThemedText` sem espaço nenhum e cinco linhas viravam
- *    um bloco.
- *
- * `index` é sempre o índice no texto ORIGINAL: é o que `toggleChecklistLine` reescreve.
- */
-export interface ReadLine {
-  index: number;
-  text: string;
-  role: 'title' | 'body';
-  /** `null` quando a linha não é item de checklist. */
-  done: boolean | null;
-}
-
-export function readLines(content: string): ReadLine[] {
-  const lines = content.split('\n');
-  const firstFilled = lines.findIndex((line) => line.trim().length > 0);
-
-  return lines.flatMap((line, index) => {
-    if (line.trim().length === 0) return [];
-    const check = CHECKLIST_LINE.exec(line);
-    const raw = check ? check[3] : line.trim();
-    return [
-      {
-        index,
-        text: stripTags(raw) || raw,
-        role: index === firstFilled && !check ? ('title' as const) : ('body' as const),
-        done: check ? check[2].toLowerCase() === 'x' : null,
-      },
-    ];
-  });
-}
-
-export interface ChecklistItem {
-  index: number;
-  done: boolean;
-  text: string;
-}
-
-/**
- * Checklist mora dentro do próprio texto (`- [ ]` / `- [x]`), não em jsonb nem em tabela filha:
- * é o que mantém a nota sendo texto puro que volta para o WhatsApp.
- */
-export function parseChecklist(content: string): ChecklistItem[] {
-  return content.split('\n').flatMap((line, index) => {
-    const m = CHECKLIST_LINE.exec(line);
-    if (!m) return [];
-    return [{ index, done: m[2].toLowerCase() === 'x', text: m[3] }];
-  });
-}
-
-/** Marca/desmarca UMA linha, preservando o resto do texto exatamente como está. */
-export function toggleChecklistLine(content: string, lineIndex: number): string {
-  const lines = content.split('\n');
-  const line = lines[lineIndex];
-  if (line === undefined) return content;
-
-  const m = CHECKLIST_LINE.exec(line);
-  if (!m) return content;
-
-  const done = m[2].toLowerCase() === 'x';
-  lines[lineIndex] = `${m[1]}- [${done ? ' ' : 'x'}] ${m[3]}`;
-  return lines.join('\n');
 }
 
 /** Nome de pasta normalizado — o `check` do banco exige `lower(trim())` com no máximo 40. */

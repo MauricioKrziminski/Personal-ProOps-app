@@ -9,14 +9,6 @@ import { supabase } from '@/lib/supabase';
 // para não quebrar os imports existentes das telas.
 export { formatBRL, formatDateBR, localISODate } from '@/lib/dates';
 
-export interface Note {
-  id: string;
-  content: string;
-  category: string | null;
-  source: 'whatsapp' | 'app';
-  created_at: string;
-}
-
 export interface Reminder {
   id: string;
   title: string;
@@ -76,22 +68,6 @@ export function useRealtimeInvalidate(table: string, queryKey: string[]) {
   }, [table, queryClient, key]);
 }
 
-export function useNotes() {
-  useRealtimeInvalidate('notes', ['notes']);
-  return useQuery({
-    queryKey: ['notes'],
-    queryFn: async (): Promise<Note[]> => {
-      const { data, error } = await supabase
-        .from('notes')
-        .select('id, content, category, source, created_at')
-        .order('created_at', { ascending: false })
-        .limit(100);
-      if (error) throw error;
-      return data as Note[];
-    },
-  });
-}
-
 export function useReminders() {
   useRealtimeInvalidate('reminders', ['reminders']);
   return useQuery({
@@ -125,30 +101,6 @@ export async function workspaceId(): Promise<string> {
   const { data, error } = await supabase.rpc('my_default_workspace');
   if (error || !data) throw error ?? new Error('sem workspace');
   return data as string;
-}
-
-export function useCreateNote() {
-  const queryClient = useQueryClient();
-  return useMutation({
-    mutationFn: async (content: string) => {
-      const { error } = await supabase
-        .from('notes')
-        .insert({ user_id: await userId(), content, source: 'app' });
-      if (error) throw error;
-    },
-    onSuccess: () => invalidateKeys(queryClient, [['notes'], ['search', 'notes'], ['ai-month-stats']]),
-  });
-}
-
-export function useDeleteNote() {
-  const queryClient = useQueryClient();
-  return useMutation({
-    mutationFn: async (id: string) => {
-      const { error } = await supabase.from('notes').delete().eq('id', id);
-      if (error) throw error;
-    },
-    onSuccess: () => invalidateKeys(queryClient, [['notes'], ['search', 'notes'], ['ai-month-stats']]),
-  });
 }
 
 export interface ReminderInput {
