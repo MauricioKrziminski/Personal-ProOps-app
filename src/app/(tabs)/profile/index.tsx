@@ -11,6 +11,8 @@ import { EmptyState } from '@/components/ui/empty-state';
 import { Icon } from '@/components/ui/icon';
 import { Row, Section } from '@/components/ui/row';
 import { Segmented } from '@/components/ui/segmented';
+import { LockSection } from '@/components/profile/lock-section';
+import { apagarPin } from '@/lib/lock-secret';
 import { Screen } from '@/components/ui/screen';
 import { SkeletonRow } from '@/components/ui/skeleton';
 import { useToast } from '@/components/ui/toast';
@@ -86,6 +88,13 @@ export default function ProfileScreen() {
   const confirmSignOut = () => {
     const doIt = async () => {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
+      /*
+        ⚠️ **Sair da conta apaga o PIN.** "Esqueci a senha" É sair e entrar de novo — e se o PIN
+        sobrevivesse ao logout, a próxima pessoa a entrar nesta instalação (ou o próprio dono
+        depois de esquecer) acharia o app trancado numa senha que ninguém tem. O Supabase Auth já
+        é o caminho de recuperação; inventar um segundo é abrir uma segunda porta para a mesma casa.
+      */
+      await apagarPin();
       await supabase.auth.signOut();
     };
     confirmDestructive('Sair da conta?', 'Sair', doIt);
@@ -114,6 +123,9 @@ export default function ProfileScreen() {
       </View>
     </Section>
   );
+
+  // A trava fica junto de Aparência: é configuração do APARELHO, não da conta — igual ao tema.
+  const bloqueio = <LockSection />;
 
   /**
    * Onde o mês FINANCEIRO fecha.
@@ -466,6 +478,7 @@ export default function ProfileScreen() {
       </Section>
 
       {aparencia}
+      {bloqueio}
       {cicloConfig}
 
       <AppUpdateSection />

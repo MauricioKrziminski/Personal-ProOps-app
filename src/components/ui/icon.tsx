@@ -69,6 +69,11 @@ const MATERIAL: Record<string, MaterialName> = {
   'bell.slash': 'notifications_off',
   'building.columns': 'account_balance',
   calendar: 'calendar_today',
+  // Teclado do PIN e biometria. No Android o Material não separa face de digital como o iOS:
+  // `fingerprint` cobre os dois, e é o que o sistema desenha no próprio prompt.
+  'delete.left': 'backspace',
+  faceid: 'fingerprint',
+  touchid: 'fingerprint',
   // A data que o extrato discorda: `event_busy` é o calendário com aviso do Material.
   'calendar.badge.exclamationmark': 'event_busy',
   cart: 'shopping_cart',

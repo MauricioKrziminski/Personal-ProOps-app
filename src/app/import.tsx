@@ -25,6 +25,7 @@ import { Screen } from '@/components/ui/screen';
 import { HeroLabel, SectionHead } from '@/components/ui/section-head';
 import { Skeleton, SkeletonRow } from '@/components/ui/skeleton';
 import { useToast } from '@/components/ui/toast';
+import { useLock } from '@/hooks/use-lock';
 import { Motion, Radius, Space } from '@/design/tokens';
 import { formatDateBR } from '@/hooks/use-items';
 import { confirmDestructive, showItemActions } from '@/lib/item-actions';
@@ -125,6 +126,7 @@ export default function ImportScreen() {
   const accounts = accountsQuery.data;
   const importar = useImportStatement();
   const corrigirData = useFixImportItemDate();
+  const { semTrancar } = useLock();
   const apagarLancamento = useDeleteTransaction();
   const desparear = useUnmatchImportItem();
   const [batchId, setBatchId] = useState<string | undefined>(params.batch);
@@ -172,11 +174,18 @@ export default function ImportScreen() {
 
   const escolherArquivo = async () => {
     setFalha(null);
-    const escolha = await DocumentPicker.getDocumentAsync({
-      type: ACCEPTED,
-      copyToCacheDirectory: true,
-      multiple: false,
-    });
+    /*
+      ⚠️ **`semTrancar` não é opcional aqui.** No Android abrir o seletor de arquivo dispara
+      `AppState: background`, e sem a bandeira a trava do app pediria o PIN no meio da
+      importação — a pessoa escolhe o extrato, volta, e leva uma tela de bloqueio por cima.
+    */
+    const escolha = await semTrancar(() =>
+      DocumentPicker.getDocumentAsync({
+        type: ACCEPTED,
+        copyToCacheDirectory: true,
+        multiple: false,
+      })
+    );
     if (escolha.canceled) return;
 
     const arquivo = escolha.assets[0];

@@ -21,6 +21,8 @@ import { AppState, Platform } from 'react-native';
 import { KeyboardProvider } from 'react-native-keyboard-controller';
 
 import { AnimatedSplashOverlay } from '@/components/animated-icon';
+import { LockOverlay } from '@/components/ui/lock-overlay';
+import { LockProvider } from '@/hooks/use-lock';
 import { AndroidActionSheet } from '@/components/ui/action-sheet';
 import { stackHeaderFonts } from '@/components/ui/app-header';
 import { ConcealProvider } from '@/components/ui/conceal';
@@ -126,9 +128,17 @@ function AppTree() {
             teclado (o editor de nota) não recebem evento nenhum. */}
         <KeyboardProvider statusBarTranslucent navigationBarTranslucent>
           <ConcealProvider>
+          {/*
+            A trava fica ACIMA do `<Stack>` e DENTRO dos providers (precisa de `useTheme` e de
+            `useSafeAreaInsets`). Irmã do `AnimatedSplashOverlay`, pelo mesmo motivo: é um overlay
+            sobre o app inteiro, não uma rota — rota tem "voltar", e voltar de uma tela de
+            bloqueio é a própria falha.
+          */}
+          <LockProvider>
           <ToastProvider>
             <AppUpdateProvider>
               <AnimatedSplashOverlay ready={!loading && fontsLoaded} />
+              <LockOverlay />
               <AndroidActionSheet />
               {loading ? null : (
               /*
@@ -292,6 +302,7 @@ function AppTree() {
               )}
             </AppUpdateProvider>
           </ToastProvider>
+          </LockProvider>
           </ConcealProvider>
         </KeyboardProvider>
       </ThemeProvider>

@@ -42,6 +42,12 @@
         }
       ],
       "expo-secure-store",
+      [
+        "expo-local-authentication",
+        {
+          "faceIDPermission": "Permite abrir o $(PRODUCT_NAME) com o Face ID."
+        }
+      ],
       "expo-image",
       "expo-status-bar",
       "expo-web-browser",
