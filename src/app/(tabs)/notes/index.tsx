@@ -1,232 +1,90 @@
-import { useEffect, useState } from 'react';
-import { Platform, Pressable, ScrollView, StyleSheet, View, useWindowDimensions } from 'react-native';
-import { FlashList } from '@shopify/flash-list';
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import {
+  Pressable,
+  RefreshControl,
+  ScrollView,
+  StyleSheet,
+  View,
+} from 'react-native';
+import Animated, { useAnimatedRef } from 'react-native-reanimated';
 import { router } from 'expo-router';
 import * as Haptics from 'expo-haptics';
 
 import { Chip } from '@/components/finance/chip';
 import { ThemedText } from '@/components/themed-text';
+import { ColorPicker } from '@/components/notes/color-picker';
+import { FolderGrid } from '@/components/notes/folder-grid';
+import { FolderPicker } from '@/components/notes/folder-picker';
+import type { NoteCardActions } from '@/components/notes/note-card';
+import { NoteList } from '@/components/notes/note-list';
+import { useFolderMenu } from '@/components/notes/use-folder-menu';
 import { AppHeader, HeaderIconButton } from '@/components/ui/app-header';
 import { EmptyState } from '@/components/ui/empty-state';
-import { ItemLink } from '@/components/ui/item-link';
 import { SearchField } from '@/components/ui/search-field';
+import { SectionHead } from '@/components/ui/section-head';
 import { TextField } from '@/components/ui/field';
 import { Icon } from '@/components/ui/icon';
-import { Mark } from '@/components/ui/mark';
-import { CURVED_BAR_SPACE } from '@/components/ui/curved-tab-bar';
 import { Screen } from '@/components/ui/screen';
 import { Skeleton, SkeletonList } from '@/components/ui/skeleton';
 import { useToast } from '@/components/ui/toast';
-import { HitTarget, Radius, Space, Type, tabular } from '@/design/tokens';
+import { MaxContentWidth } from '@/constants/theme';
+import { HitTarget, Radius, Space } from '@/design/tokens';
 import {
   useNoteFolders,
   useNoteTags,
   useNotesList,
+  useReorderFolders,
+  useReorderNotes,
   useRestoreNote,
   useSaveNote,
   useToggleNotePin,
   useTrashNote,
+  useUpdateFolder,
+  useUpdateNote,
   type Note,
   type NoteFolder,
+  type NoteSort,
 } from '@/hooks/use-notes';
+import { SORT_LABEL, useNoteSort } from '@/hooks/use-note-sort';
 import { useTelaPronta } from '@/hooks/use-tela-pronta';
-import { Fonts } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
-import { noteTitle, notePreview } from '@/lib/search';
-import { todoProgress } from '@/lib/note-blocks';
-import { relativeBR } from '@/lib/dates';
+import { showItemActions } from '@/lib/item-actions';
 
 /**
- * `typedRoutes`: `trash.tsx` ainda não existe como arquivo, então o typegen não conhece a rota
- * (o `_layout` já a declara). Cast pontual e greppável — some quando o arquivo nascer.
+ * Notas — a home da aba.
+ *
+ * ## A mudança que organiza a tela: PASTA É LUGAR, não filtro
+ *
+ * Até 14/09/2026 a pasta era um chip numa fileira de filtros, ou seja um recorte da mesma lista,
+ * e a tela abria com QUATRO fileiras de controle antes da primeira nota — captura, busca, chips
+ * de pasta e chips de tag. Agora a pasta é um ladrilho numa grade e abre tela própria; a home
+ * lista só o que está SOLTO. É a régua do Apple Notes e do Files, e é a única que faz "o que
+ * está dentro" e "o que está fora" serem coisas visivelmente diferentes.
+ *
+ * Os chips de TAG ficaram, porque tag é transversal: ela recorta pasta e nota ao mesmo tempo.
+ *
+ * ⚠️ **Com busca ou tag ativas a lista deixa de se limitar às soltas.** Os dois são modos de
+ * ACHAR alguma coisa, e uma busca que esconde metade das notas porque elas estão dentro de uma
+ * pasta não é busca — é armadilha. É também exatamente o escopo em que o arrasto se desliga:
+ * ordem manual dentro de um recorte não quer dizer nada.
+ *
+ * ## Por que o container é um `Animated.ScrollView` e não a `FlashList`
+ *
+ * Reordenar exige saber a altura de TODA célula do escopo, e uma lista que recicla célula não
+ * sabe a altura do que está fora da tela. Além disso o auto-scroll do arrasto chama `scrollTo`
+ * de dentro de um worklet, que precisa de um `AnimatedRef<Animated.ScrollView>` — a `FlashList`
+ * não é um. E são DOIS escopos de arrasto na mesma tela (fixadas e soltas), que numa lista
+ * plana com cabeçalho calculado por índice seria um `data` só com duas semânticas dentro.
+ *
+ * `// ponytail: home não virtualizada. O escopo é "notas SOLTAS" — dezenas, e a paginação de 30
+ * continua. Se alguém chegar a centenas de notas soltas, o caminho é um modo de reordenação com
+ * linha de altura FIXA sobre a FlashList, e não desvirtualizar mais nada.`
  */
 
-
-/**
- * A lista de notas TINHA uma paleta própria (`NOTE_SKIN`): fundo `#0F0F12`, superfície `#1C1C26`
- * e um accent violeta `#8B5CF6` que não existe em `Colors`.
- *
- * Ela forçava dark mesmo no tema claro — a aba inteira lia como se fosse de outro app — e
- * violava duas contagens da regra §10 de uma vez (hex hardcoded e um segundo accent). O cartão
- * outlined e a densidade que ela introduziu eram bons e ficam; o que sai é a cor inventada.
- *
- * Agora tudo vem de `useTheme()`. Raio e padding vêm da escala (`Radius.md`, `Space.lg`): o 14
- * de antes estava fora dela.
- */
-
-interface RowActions {
-  folders: NoteFolder[];
-  onPin: (note: Note) => void;
-  onMove: (note: Note, folderId: string | null) => void;
-  onTrash: (note: Note) => void;
-}
-
-/**
- * Linha da lista.
- *
- * Sem `entering`: `FlashList` recicla a célula e a animação replay a cada scroll.
- * Sem `onLongPress` + `Alert`: as ações moram no context menu nativo (`Link.Menu`), que é
- * descobrível por toque longo e não bloqueia a tela. `Link.Menu` é iOS-only — no Android a linha
- * continua navegando normalmente, as ações ficam no detalhe.
- */
-function NoteRow({
-  note,
-  folderName,
-  actions,
-}: {
-  note: Note;
-  folderName?: string;
-  actions: RowActions;
-}) {
-  // Dynamic Type XL: a prévia cai para uma linha para os metadados não sumirem da tela.
-  const { fontScale } = useWindowDimensions();
-  const theme = useTheme();
-
-  const title = noteTitle(note.content) || 'Sem título';
-  const preview = notePreview(note.content);
-  const { done, total } = todoProgress(note.content);
-  // Tag com o mesmo nome da pasta não vira metadado: `mercado · #mercado` gasta a linha
-  // inteira para dizer a mesma coisa duas vezes.
-  const tags = (note.tags ?? []).filter(
-    (tag) => tag.toLowerCase() !== folderName?.toLowerCase()
-  );
-
-  const checklistLabel = total > 0 ? `${done}/${total}` : null;
-  const quando = relativeBR(note.updated_at);
-
-  const label = [
-    title,
-    folderName ? `pasta ${folderName}` : null,
-    tags.length > 0 ? `${tags.length} ${tags.length === 1 ? 'tag' : 'tags'}` : null,
-    checklistLabel ? `${done} de ${total} itens feitos` : null,
-    note.source === 'whatsapp' ? 'via WhatsApp' : null,
-    `atualizada ${quando}`,
-    note.pinned ? 'fixada' : null,
-  ]
-    .filter(Boolean)
-    .join(', ');
-
-  return (
-    <ItemLink
-      href={`/notes/${note.id}`}
-      title={title}
-      actions={[
-        {
-          label: note.pinned ? 'Desafixar' : 'Fixar',
-          icon: note.pinned ? 'pin.slash' : 'pin',
-          onPress: () => actions.onPin(note),
-        },
-        {
-          label: 'Mover para pasta',
-          icon: 'folder',
-          actions: [
-            {
-              label: 'Sem pasta',
-              icon: 'tray',
-              selected: !note.folder_id,
-              onPress: () => actions.onMove(note, null),
-            },
-            ...actions.folders.map((folder) => ({
-              label: folder.name,
-              selected: note.folder_id === folder.id,
-              onPress: () => actions.onMove(note, folder.id),
-            })),
-          ],
-        },
-        { label: 'Lixeira', icon: 'trash', destructive: true, onPress: () => actions.onTrash(note) },
-      ]}>
-      {({ onLongPress }) => (
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel={label}
-          onLongPress={onLongPress}
-          style={styles.press}>
-          {({ pressed }) => (
-          <View
-            style={[
-              styles.card,
-              {
-                backgroundColor: pressed ? theme.backgroundSelected : theme.surface,
-                borderColor: theme.separator,
-              },
-            ]}>
-          {/* Título e pin dividem a primeira linha: o pin fica no canto do cartão (padrão do
-              Keep), não como bullet antes do texto — ali ele lia como marcador de lista. */}
-          <View style={styles.cardHead}>
-            <ThemedText type="headline" style={styles.grow}>
-              {title}
-            </ThemedText>
-            {note.pinned ? <Icon name="pin.fill" size="sm" color="tint" /> : null}
-          </View>
-
-          {preview ? (
-            <ThemedText
-              type="small"
-              themeColor="textSecondary"
-              numberOfLines={fontScale >= 1.4 ? 1 : 2}>
-              {preview}
-            </ThemedText>
-          ) : null}
-
-          {/* Faixa de metadados com FORMA, não string corrida: pasta é pill, checklist é ícone
-              + contagem, origem é ícone, e a data vai encostada à direita — como em Apple Notes,
-              onde o "quando" é o segundo campo mais consultado depois do título. */}
-          <View style={styles.cardMeta}>
-            {folderName ? (
-              <View style={[styles.folderPill, { backgroundColor: theme.accentSoft }]}>
-                <ThemedText
-                  themeColor="tint"
-                  style={styles.folderPillText}>
-                  {folderName}
-                </ThemedText>
-              </View>
-            ) : null}
-
-            {checklistLabel ? (
-              <View style={styles.metaBit}>
-                <Icon name="checkmark.circle" size={13} color="textSecondary" />
-                <ThemedText type="caption" themeColor="textSecondary" style={tabular}>
-                  {checklistLabel}
-                </ThemedText>
-              </View>
-            ) : null}
-
-            {/*
-              A espiral marca o que a IA registrou — o quinto papel previsto em `design.md` §2b,
-              e o que estava faltando desde que a tela de Atividade saiu.
-
-              Era um balão de conversa genérico. O balão diz "veio de um chat"; a marca diz "isto
-              entrou pelo ProOps", que é a informação que importa e a única que ninguém mais pode
-              desenhar. Mesma forma da abertura, do spinner e do estado vazio.
-            */}
-            {note.source === 'whatsapp' ? (
-              <View style={styles.metaBit}>
-                <Mark size={13} color="textSecondary" />
-                <ThemedText type="caption" themeColor="textSecondary">
-                  WhatsApp
-                </ThemedText>
-              </View>
-            ) : null}
-
-            <ThemedText
-              type="caption"
-              themeColor="textSecondary"
-              style={[styles.quando, tabular]}>
-              {quando}
-            </ThemedText>
-          </View>
-          </View>
-          )}
-        </Pressable>
-      )}
-    </ItemLink>
-  );
-}
-
-/** Skeleton na forma da linha: título + duas linhas de prévia. */
+/** Skeleton na forma do cartão: título + duas linhas de prévia. */
 function NoteSkeleton() {
   return (
-    <View style={styles.row}>
+    <View style={styles.esqueleto}>
       <Skeleton width="55%" height={17} />
       <Skeleton width="92%" height={13} />
       <Skeleton width="70%" height={13} />
@@ -241,8 +99,26 @@ export default function NotesScreen() {
   const [draft, setDraft] = useState('');
   const [typed, setTyped] = useState('');
   const [q, setQ] = useState('');
-  const [folderId, setFolderId] = useState<string | undefined>(undefined);
   const [tag, setTag] = useState<string | null>(null);
+  const [sort, setSort] = useNoteSort();
+  const [arrastando, setArrastando] = useState(false);
+
+  /**
+   * Alvo de cada sheet. `null` = fechado — um estado só diz "qual" e "se".
+   *
+   * A cor de pasta tem alvo próprio em vez de reusar `pintando`: os dois `<ColorPicker>` são o
+   * mesmo componente com títulos e destinos diferentes, e um alvo polimórfico ("nota ou pasta")
+   * obrigaria todo leitor a perguntar qual dos dois é antes de usar.
+   */
+  const [pintando, setPintando] = useState<Note | null>(null);
+  const [pintandoPasta, setPintandoPasta] = useState<NoteFolder | null>(null);
+  const [movendo, setMovendo] = useState<Note | null>(null);
+
+  const scrollRef = useAnimatedRef<Animated.ScrollView>();
+  /** Distância do topo do conteúdo até cada bloco arrastável — é o que o auto-scroll precisa. */
+  const [topoPastas, setTopoPastas] = useState(0);
+  const [topoFixadas, setTopoFixadas] = useState(0);
+  const [topoSoltas, setTopoSoltas] = useState(0);
 
   // Busca-enquanto-digita sem uma requisição por tecla.
   useEffect(() => {
@@ -250,10 +126,14 @@ export default function NotesScreen() {
     return () => clearTimeout(timer);
   }, [typed]);
 
+  const procurando = !!q || !!tag;
+
   const list = useNotesList({
-    ...(folderId ? { folderId } : {}),
+    // Sem recorte a home é a caixa de SOLTAS; com recorte ela é o resultado da busca.
+    ...(procurando ? {} : { folderId: null }),
     ...(tag ? { tag } : {}),
     ...(q ? { q } : {}),
+    sort,
   });
   const foldersQuery = useNoteFolders();
   const tagsQuery = useNoteTags();
@@ -262,23 +142,53 @@ export default function NotesScreen() {
   const togglePin = useToggleNotePin();
   const trash = useTrashNote();
   const restore = useRestoreNote();
+  const updateNote = useUpdateNote();
+  const updateFolder = useUpdateFolder();
+  const reorderNotes = useReorderNotes();
+  const reorderFolders = useReorderFolders();
 
-  // Falha em pastas/tags não derruba a lista: os chips só somem.
-  const folders = foldersQuery.data ?? [];
-  const tags = tagsQuery.data ?? [];
-  const notes = list.data?.pages.flat() ?? [];
-  const folderName = (id: string | null) => folders.find((f) => f.id === id)?.name;
+  // Falha em pastas/tags não derruba a lista: a grade e os chips só somem.
+  const folders = useMemo(() => foldersQuery.data ?? [], [foldersQuery.data]);
+  const notes = useMemo(() => list.data?.pages.flat() ?? [], [list.data]);
+  const folderById = useCallback((id: string | null) => folders.find((f) => f.id === id), [folders]);
 
-  const clearFilters = () => {
-    setFolderId(undefined);
-    setTag(null);
-  };
+  /**
+   * Os chips somam tag de NOTA e tag de PASTA — o namespace é um só, e é isso que faz um toque
+   * em `#casa` recortar a tela inteira. A contagem de pasta sai em memória porque as pastas já
+   * vieram todas; uma segunda RPC só para contar o que está na mão seria consulta por nada.
+   */
+  const chips = useMemo(() => {
+    const mapa = new Map<string, number>();
+    for (const t of tagsQuery.data ?? []) mapa.set(t.tag, t.count);
+    for (const f of folders) for (const t of f.tags) mapa.set(t, (mapa.get(t) ?? 0) + 1);
+    return [...mapa.entries()]
+      .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))
+      .map(([nome]) => nome);
+  }, [tagsQuery.data, folders]);
+
+  /** A grade mostra só a RAIZ: subpasta aparece dentro da mãe, que é onde ela mora. */
+  const pastas = useMemo(
+    () => folders.filter((f) => f.parent_id === null && (!tag || f.tags.includes(tag))),
+    [folders, tag]
+  );
+
+  const fixadas = useMemo(() => notes.filter((n) => n.pinned), [notes]);
+  const soltas = useMemo(() => notes.filter((n) => !n.pinned), [notes]);
+
+  /**
+   * Arrastar só vale na ordem MANUAL e sem recorte.
+   *
+   * Sob busca ou tag a lista é um subconjunto, e gravar posição a partir dele reescreveria a
+   * ordem do escopo inteiro com a ordem de um pedaço dele. Nas outras ordens o servidor manda, e
+   * uma alça que some ao soltar seria pior que não existir.
+   */
+  const podeArrastar = sort === 'manual' && !procurando;
 
   const submitDraft = () => {
     const content = draft.trim();
     if (!content || save.isPending) return;
     save.mutate(
-      { content, folder_id: folderId ?? null },
+      { content, folder_id: null },
       {
         onSuccess: () => {
           Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
@@ -289,45 +199,112 @@ export default function NotesScreen() {
     );
   };
 
-  const actions: RowActions = {
-    folders,
-    onPin: (note) => {
-      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-      togglePin.mutate(
-        { id: note.id, pinned: !note.pinned },
-        { onError: () => toast({ message: 'Não deu para fixar a nota.', tone: 'error' }) }
-      );
-    },
-    onMove: (note, target) =>
-      save.mutate(
-        { id: note.id, content: note.content, folder_id: target },
-        {
+  const acoesDaNota: NoteCardActions = useMemo(
+    () => ({
+      onPin: (note) => {
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+        togglePin.mutate(
+          { id: note.id, pinned: !note.pinned },
+          { onError: () => toast({ message: 'Não deu para fixar a nota.', tone: 'error' }) }
+        );
+      },
+      onColor: setPintando,
+      onMove: setMovendo,
+      onArchive: (note) => {
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+        updateNote.mutate(
+          { id: note.id, archived: true },
+          {
+            onSuccess: () =>
+              toast({
+                message: 'Nota arquivada.',
+                tone: 'success',
+                action: {
+                  label: 'Desfazer',
+                  onPress: () => updateNote.mutate({ id: note.id, archived: false }),
+                },
+              }),
+            onError: () => toast({ message: 'Não deu para arquivar a nota.', tone: 'error' }),
+          }
+        );
+      },
+      onTrash: (note) => {
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+        trash.mutate(note.id, {
           onSuccess: () =>
             toast({
-              message: target ? `Movida para ${folderName(target)}.` : 'Tirada da pasta.',
+              message: 'Nota na lixeira.',
               tone: 'success',
+              action: { label: 'Desfazer', onPress: () => restore.mutate(note.id) },
             }),
-          onError: () => toast({ message: 'Não deu para mover a nota.', tone: 'error' }),
-        }
-      ),
-    onTrash: (note) => {
-      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-      trash.mutate(note.id, {
-        onSuccess: () =>
-          toast({
-            message: 'Nota na lixeira.',
-            tone: 'success',
-            action: { label: 'Desfazer', onPress: () => restore.mutate(note.id) },
-          }),
-        onError: () => toast({ message: 'Não deu para apagar a nota.', tone: 'error' }),
-      });
-    },
+          onError: () => toast({ message: 'Não deu para apagar a nota.', tone: 'error' }),
+        });
+      },
+    }),
+    [togglePin, trash, restore, updateNote, toast]
+  );
+
+  const menuDaTela = () => {
+    const ordens: NoteSort[] = ['manual', 'recentes', 'criadas', 'titulo'];
+    showItemActions('Notas', [
+      {
+        label: 'Ordenar',
+        icon: 'arrow.up.arrow.down',
+        actions: ordens.map((o) => ({
+          label: SORT_LABEL[o],
+          selected: sort === o,
+          onPress: () => {
+            Haptics.selectionAsync();
+            setSort(o);
+          },
+        })),
+      },
+      {
+        label: 'Organizar pastas',
+        icon: 'folder',
+        onPress: () => router.push('/notes/folders'),
+      },
+      { label: 'Arquivadas', icon: 'archivebox', onPress: () => router.push('/notes/archived') },
+      { label: 'Lixeira', icon: 'trash', onPress: () => router.push('/notes/trash') },
+    ]);
   };
 
-  const filtered = !!folderId || !!tag;
-  const hasChips = folders.length > 0 || tags.length > 0;
+  /*
+    O PORTÃO DA TELA — três consultas, e todas precisam estar de pé antes de a tela pintar.
 
-  const empty = list.isError ? (
+    ⚠️ **`list` é `useInfiniteQuery`**, e o `isPending` dela vale para a PRIMEIRA página, que é
+    exatamente o que este portão quer. As páginas seguintes têm o skeleton do rodapé.
+  */
+  const menuDaPasta = useFolderMenu({ onColor: setPintandoPasta });
+
+  const pronta = useTelaPronta(list, foldersQuery, tagsQuery);
+
+  const cabecalho = (
+    <AppHeader
+      title="Notas"
+      action={
+        <>
+          <HeaderIconButton
+            icon="square.and.pencil"
+            label="Nova nota"
+            onPress={() => router.push('/notes/new')}
+          />
+          <HeaderIconButton icon="ellipsis" label="Mais opções" onPress={menuDaTela} />
+        </>
+      }
+    />
+  );
+
+  if (!pronta) {
+    return (
+      <Screen grouped topBar={cabecalho}>
+        <SkeletonList linhas={4} />
+        <SkeletonList linhas={3} />
+      </Screen>
+    );
+  }
+
+  const vazio = list.isError ? (
     <EmptyState
       icon="exclamationmark.triangle"
       title="Não deu para carregar as notas"
@@ -336,7 +313,7 @@ export default function NotesScreen() {
     />
   ) : list.isLoading ? (
     <View accessibilityLabel="Carregando notas">
-      {Array.from({ length: 6 }, (_, i) => (
+      {Array.from({ length: 4 }, (_, i) => (
         <NoteSkeleton key={i} />
       ))}
     </View>
@@ -347,12 +324,18 @@ export default function NotesScreen() {
       hint="Se você já apagou, ainda dá tempo de resgatar."
       action={{ label: 'Buscar na lixeira', onPress: () => router.push('/notes/trash') }}
     />
-  ) : filtered ? (
+  ) : tag ? (
     <EmptyState
-      icon="folder"
-      title="Nada com esse filtro"
-      hint="Essa pasta (ou essa tag) ainda não tem nota nenhuma."
-      action={{ label: 'Limpar filtro', onPress: clearFilters }}
+      icon="tag"
+      title={`Nada com #${tag}`}
+      hint="Nenhuma nota e nenhuma pasta usam essa tag agora."
+      action={{ label: 'Limpar filtro', onPress: () => setTag(null) }}
+    />
+  ) : pastas.length > 0 ? (
+    <EmptyState
+      icon="tray"
+      title="Nada solto por aqui"
+      hint="Tudo que você anotou está dentro de uma pasta. Escreve aí em cima para começar outra."
     />
   ) : (
     <EmptyState
@@ -361,202 +344,234 @@ export default function NotesScreen() {
     />
   );
 
-  /*
-    O PORTÃO DA TELA (Fase 5) — 7 consultas, 4 portões antes disto.
-
-    ⚠️ **`list` é `useInfiniteQuery`**, e o `isPending` dela vale para a PRIMEIRA página — que é
-    exatamente o que este portão quer. As páginas seguintes têm o spinner do rodapé da lista
-    (§5.4), nunca o skeleton de volta.
-  */
-  const pronta = useTelaPronta(list, foldersQuery, tagsQuery);
-
-  if (!pronta) {
-    return (
-      <Screen grouped topBar={<AppHeader title="Notas" />}>
-        <SkeletonList linhas={4} />
-        <SkeletonList linhas={3} />
-      </Screen>
-    );
-  }
-
   return (
-    <Screen
-      scroll={false}
-      grouped
-      topBar={
-        <AppHeader
-          title="Notas"
-          action={
-            <>
-              <HeaderIconButton
-                icon="square.and.pencil"
-                label="Nova nota"
-                onPress={() => router.push('/notes/new')}
-              />
-              <HeaderIconButton
-                icon="folder"
-                label="Pastas"
-                onPress={() => router.push('/notes/folders')}
-              />
-            </>
-          }
-        />
-      }>
-      <FlashList
-        alwaysBounceVertical
-        refreshing={(list.isRefetching && !list.isFetchingNextPage) || foldersQuery.isRefetching || tagsQuery.isRefetching}
-        onRefresh={() => Promise.all([list.refetch(), foldersQuery.refetch(), tagsQuery.refetch()])}
-        data={notes}
-        keyExtractor={(note) => note.id}
-        // As pontas do grupo dependem do VIZINHO, não só do item. Sem isto a `FlashList` não
-        // redesenha a última linha da página anterior quando a próxima chega: ela guardava o
-        // canto arredondado e a hairline entre as páginas nunca aparecia.
-        extraData={notes.length}
-        contentInsetAdjustmentBehavior="automatic"
-        keyboardDismissMode="on-drag"
-        contentContainerStyle={styles.list}
-        ListHeaderComponent={
-          <View>
-            {/*
-              ## A ordem: AÇÃO, depois FILTRO, depois conteúdo (03/09/2026)
-
-              A tela abria com três fileiras de controle quase idênticas — busca, captura e chips
-              — e só então a primeira nota. Duas caixas de texto de uma linha, empilhadas e com um
-              botão redondo cada, não se distinguem de relance: a pessoa não sabia em qual estava
-              digitando.
-
-              A captura subiu para o topo porque é o que este app É: "anotar rápido" é a razão de
-              o produto existir, e busca só acontece depois de já haver o que buscar. Abaixo dela,
-              busca e chips passam a ler como UM grupo de filtro, que é o que os dois são.
-
-              O botão de nota longa saiu daqui e foi para o `action` do header: ao lado do campo
-              de captura ele oferecia dois jeitos de criar a mesma coisa, um do lado do outro.
-            */}
-            <View style={styles.quickAdd}>
-              <TextField
-                value={draft}
-                onChangeText={setDraft}
-                placeholder="Anotar rápido…"
-                returnKeyType="done"
-                submitBehavior="submit"
-                onSubmitEditing={submitDraft}
-                accessibilityLabel="Nova nota rápida"
-                style={styles.grow}
-              />
-              <Pressable
-                accessibilityRole="button"
-                accessibilityLabel="Salvar nota"
-                accessibilityState={{ disabled: !draft.trim(), busy: save.isPending }}
-                disabled={!draft.trim() || save.isPending}
-                onPress={submitDraft}
-                style={({ pressed }) => [
-                  styles.send,
-                  {
-                    backgroundColor: draft.trim() ? theme.tint : theme.backgroundElement,
-                    opacity: pressed ? 0.5 : 1,
-                  },
-                ]}>
-                {/*
-                  `onTint`, nunca `text`: a pílula é pintada de `tint`, que é TINTA (quase-preto
-                  no claro). Com `text` a seta saía preta sobre preto — o botão virava um disco
-                  cego no tema claro. Desabilitado perde a cor em vez de perder opacidade, que é
-                  a mesma régua do `Button`.
-                */}
-                <Icon
-                  name="arrow.up"
-                  size="md"
-                  color={draft.trim() ? 'onTint' : 'textSecondary'}
-                  weight="semibold"
-                />
-              </Pressable>
-            </View>
-
-            <View style={styles.searchRow}>
-              <SearchField
-                value={typed}
-                onChangeText={setTyped}
-                placeholder="Buscar nas notas"
-                accessibilityLabel="Buscar nas notas"
-              />
-            </View>
-
-            {/* Usuário novo não vê estrutura vazia. */}
-            {hasChips ? (
-              // Pasta e tag dividem UMA faixa. Empilhadas, somavam a quarta fileira de controle
-              // antes de qualquer nota — a tela abria pedindo configuração em vez de mostrar
-              // conteúdo. O filete separa os dois filtros sem gastar uma linha inteira.
-              <ScrollView
-                horizontal
-                showsHorizontalScrollIndicator={false}
-                contentContainerStyle={styles.chips}
-                style={styles.filters}>
-                {folders.length > 0 ? (
-                  <>
-                    <Chip label="Todas" selected={!folderId} onPress={() => setFolderId(undefined)} />
-                    {folders.map((folder) => (
-                      <Chip
-                        key={folder.id}
-                        label={folder.name}
-                        count={folder.notes_count}
-                        selected={folderId === folder.id}
-                        onPress={() =>
-                          setFolderId(folderId === folder.id ? undefined : folder.id)
-                        }
-                      />
-                    ))}
-                  </>
-                ) : null}
-                {folders.length > 0 && tags.length > 0 ? (
-                  <View style={[styles.chipDivider, { backgroundColor: theme.separator }]} />
-                ) : null}
-                {tags.map((t) => (
-                  <Chip
-                    key={t.tag}
-                    label={`#${t.tag}`}
-                    selected={tag === t.tag}
-                    onPress={() => setTag(tag === t.tag ? null : t.tag)}
-                  />
-                ))}
-              </ScrollView>
-            ) : null}
-          </View>
+    <Screen scroll={false} grouped topBar={cabecalho}>
+      <Animated.ScrollView
+        ref={scrollRef}
+        // ⚠️ É isto que faz o arrasto não brigar com a rolagem: em vez de negociar prioridade
+        // entre dois reconhecedores, o scroll simplesmente sai de cena enquanto o dedo carrega
+        // um item. O auto-scroll continua, porque ele é `scrollTo`, não gesto.
+        scrollEnabled={!arrastando}
+        refreshControl={
+          <RefreshControl
+            refreshing={
+              (list.isRefetching && !list.isFetchingNextPage) ||
+              foldersQuery.isRefetching ||
+              tagsQuery.isRefetching
+            }
+            progressViewOffset={0}
+            onRefresh={() => {
+              void Promise.all([list.refetch(), foldersQuery.refetch(), tagsQuery.refetch()]);
+            }}
+          />
         }
-        ListEmptyComponent={empty}
-        ListFooterComponent={list.isFetchingNextPage ? <NoteSkeleton /> : null}
-        onEndReachedThreshold={0.5}
-        onEndReached={() => {
-          if (list.hasNextPage && !list.isFetchingNextPage) list.fetchNextPage();
-        }}
-        renderItem={({ item, index }) => {
-          // Fixadas vêm primeiro do banco (`pinned desc`); o rótulo só marca onde o grupo troca.
-          const heading =
-            index === 0 && item.pinned
-              ? 'Fixadas'
-              : index > 0 && !item.pinned && notes[index - 1].pinned
-                ? 'Notas'
-                : null;
+        keyboardDismissMode="on-drag"
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={styles.conteudo}
+        scrollEventThrottle={16}
+        onScroll={({ nativeEvent: e }) => {
+          const fim = e.contentSize.height - e.layoutMeasurement.height - e.contentOffset.y;
+          if (fim < 600 && list.hasNextPage && !list.isFetchingNextPage) list.fetchNextPage();
+        }}>
+        {/*
+          ## A ordem: AÇÃO, depois FILTRO, depois conteúdo
 
-          // UM cartão por nota. Agrupadas num cartão só, com fio de cabelo entre as linhas,
-          // três notas liam como um parágrafo contínuo. Cartão por item é o que Keep e Bear
-          // fazem: custa scroll, devolve legibilidade.
-          //
-          // O cartão é o PRÓPRIO `NoteRow` (o padding vive lá dentro): pôr o padding aqui e o
-          // Pressable lá dentro deixava a área de toque menor que o cartão — dava para tocar na
-          // borda e nada acontecer.
-          return (
-            <View style={styles.item}>
-              {heading ? (
-                <ThemedText type="caption" themeColor="textSecondary" style={styles.heading}>
-                  {heading.toUpperCase()}
-                </ThemedText>
-              ) : null}
-              <NoteRow
-                note={item}
-                folderName={folderName(item.folder_id)}
-                actions={actions}
+          A captura fica no topo porque é o que este app É — "anotar rápido" é a razão de o
+          produto existir, e busca só acontece depois de já haver o que buscar.
+        */}
+        <View style={styles.captura}>
+          <TextField
+            value={draft}
+            onChangeText={setDraft}
+            placeholder="Anotar rápido…"
+            returnKeyType="done"
+            submitBehavior="submit"
+            onSubmitEditing={submitDraft}
+            accessibilityLabel="Nova nota rápida"
+            style={styles.cresce}
+          />
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Salvar nota"
+            accessibilityState={{ disabled: !draft.trim(), busy: save.isPending }}
+            disabled={!draft.trim() || save.isPending}
+            onPress={submitDraft}
+            style={({ pressed }) => [
+              styles.enviar,
+              {
+                backgroundColor: draft.trim() ? theme.tint : theme.backgroundElement,
+                opacity: pressed ? 0.5 : 1,
+              },
+            ]}>
+            {/*
+              `onTint`, nunca `text`: a pílula é pintada de `tint`, que é TINTA (quase-preto no
+              claro). Com `text` a seta saía preta sobre preto — um disco cego no tema claro.
+            */}
+            <Icon
+              name="arrow.up"
+              size="md"
+              color={draft.trim() ? 'onTint' : 'textSecondary'}
+              weight="semibold"
+            />
+          </Pressable>
+        </View>
+
+        <SearchField
+          value={typed}
+          onChangeText={setTyped}
+          placeholder="Buscar nas notas"
+          accessibilityLabel="Buscar nas notas"
+        />
+
+        {chips.length > 0 ? (
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.chips}>
+            {chips.map((t) => (
+              <Chip
+                key={t}
+                label={`#${t}`}
+                selected={tag === t}
+                onPress={() => setTag(tag === t ? null : t)}
               />
-            </View>
+            ))}
+          </ScrollView>
+        ) : null}
+
+        {pastas.length > 0 ? (
+          <View onLayout={(e) => setTopoPastas(e.nativeEvent.layout.y)}>
+            <SectionHead
+              title="Pastas"
+              inset={false}
+              action={
+                podeArrastar && pastas.length > 1 ? (
+                  <ThemedText type="caption" themeColor="textSecondary">
+                    Segure para mover
+                  </ThemedText>
+                ) : null
+              }
+            />
+            <FolderGrid
+              pastas={pastas}
+              enabled={podeArrastar}
+              scrollRef={scrollRef}
+              topInset={topoPastas}
+              onDragStateChange={setArrastando}
+              onOpen={(f) => router.push(`/notes/folder/${f.id}`)}
+              onMenu={menuDaPasta}
+              onReorder={(ids) =>
+                reorderFolders.mutate(ids, {
+                  onError: () =>
+                    toast({ message: 'Não deu para salvar a ordem das pastas.', tone: 'error' }),
+                })
+              }
+            />
+          </View>
+        ) : null}
+
+        {fixadas.length > 0 ? (
+          <View onLayout={(e) => setTopoFixadas(e.nativeEvent.layout.y)}>
+            <SectionHead title="Fixadas" inset={false} />
+            <NoteList
+              notas={fixadas}
+              acoes={acoesDaNota}
+              folderById={folderById}
+              enabled={podeArrastar}
+              scrollRef={scrollRef}
+              topInset={topoFixadas}
+              onDragStateChange={setArrastando}
+              onReorder={(ids) =>
+                reorderNotes.mutate(ids, {
+                  onError: () => toast({ message: 'Não deu para salvar a ordem.', tone: 'error' }),
+                })
+              }
+            />
+          </View>
+        ) : null}
+
+        <View onLayout={(e) => setTopoSoltas(e.nativeEvent.layout.y)}>
+          {/* O rótulo só existe quando há duas seções para separar — sozinho ele nomearia a
+              tela inteira, que já tem nome no header. */}
+          {fixadas.length > 0 && soltas.length > 0 ? (
+            <SectionHead title={procurando ? 'Resultados' : 'Notas'} inset={false} />
+          ) : null}
+
+          {soltas.length > 0 ? (
+            <NoteList
+              notas={soltas}
+              acoes={acoesDaNota}
+              folderById={folderById}
+              enabled={podeArrastar}
+              scrollRef={scrollRef}
+              topInset={topoSoltas}
+              onDragStateChange={setArrastando}
+              onReorder={(ids) =>
+                reorderNotes.mutate(ids, {
+                  onError: () => toast({ message: 'Não deu para salvar a ordem.', tone: 'error' }),
+                })
+              }
+            />
+          ) : fixadas.length === 0 ? (
+            vazio
+          ) : null}
+        </View>
+
+        {list.isFetchingNextPage ? <NoteSkeleton /> : null}
+      </Animated.ScrollView>
+
+      <ColorPicker
+        visible={pintando !== null}
+        value={pintando?.color ?? null}
+        title="Cor da nota"
+        onClose={() => setPintando(null)}
+        onPick={(cor) => {
+          if (!pintando) return;
+          updateNote.mutate(
+            { id: pintando.id, color: cor },
+            { onError: () => toast({ message: 'Não deu para mudar a cor.', tone: 'error' }) }
           );
+        }}
+      />
+
+      <ColorPicker
+        visible={pintandoPasta !== null}
+        value={pintandoPasta?.color ?? null}
+        title="Cor da pasta"
+        onClose={() => setPintandoPasta(null)}
+        onPick={(cor) => {
+          if (pintandoPasta) {
+            updateFolder.mutate(
+              { id: pintandoPasta.id, color: cor },
+              { onError: () => toast({ message: 'Não deu para mudar a cor.', tone: 'error' }) }
+            );
+          }
+        }}
+      />
+
+      <FolderPicker
+        visible={movendo !== null}
+        current={movendo?.folder_id ?? null}
+        folders={folders}
+        onClose={() => setMovendo(null)}
+        onPick={(destino) => {
+          if (movendo) {
+            Haptics.selectionAsync();
+            updateNote.mutate(
+              { id: movendo.id, folder_id: destino },
+              {
+                onSuccess: () =>
+                  toast({
+                    message: destino
+                      ? `Movida para ${folderById(destino)?.name ?? 'a pasta'}.`
+                      : 'Tirada da pasta.',
+                    tone: 'success',
+                  }),
+                onError: () => toast({ message: 'Não deu para mover a nota.', tone: 'error' }),
+              }
+            );
+          }
+          setMovendo(null);
         }}
       />
     </Screen>
@@ -564,92 +579,16 @@ export default function NotesScreen() {
 }
 
 const styles = StyleSheet.create({
-  searchRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: Space.sm,
+  conteudo: {
+    gap: Space.xl,
     paddingHorizontal: Space.lg,
-    marginTop: Space.md,
-    marginBottom: Space.md,
+    paddingBottom: Space.xxxl,
+    width: '100%',
+    maxWidth: MaxContentWidth,
+    alignSelf: 'center',
   },
-  /** M3: padding 16 · raio 14 · 8 entre cards. `gap` 6 dentro — título, prévia e metadado são
-      três degraus da MESMA nota, não três blocos. */
-  /** M3: 8 entre cards empilhados. O recuo lateral é o mesmo do resto da tela. */
-  item: {
-    paddingHorizontal: Space.lg,
-    paddingBottom: Space.sm,
-  },
-  /**
-   * O cartão é uma `View` DENTRO do `Pressable`, não o próprio `Pressable`.
-   *
-   * `<Link asChild>` + `<Link.Trigger>` engolem o `style` do filho: padding e fundo postos no
-   * `Pressable` simplesmente não aparecem — foi assim que o cartão ficou invisível e o texto
-   * colado na borda. A `View` interna está fora do alcance disso.
-   */
-  press: {
-    minHeight: HitTarget,
-  },
-  card: {
-    gap: Space.xs + 2,
-    padding: Space.lg,
-    borderRadius: Radius.md,
-    borderCurve: 'continuous',
-    // Cartão OUTLINED, não elevated: quem desenha a borda é a hairline, não a sombra.
-    // É o que Linear e Notion fazem, e funciona nos dois temas — a cor vem do `theme.separator`
-    // aplicado inline, porque `StyleSheet.create` não enxerga o tema.
-    borderWidth: StyleSheet.hairlineWidth,
-  },
-  cardHead: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    gap: Space.sm,
-  },
-  cardMeta: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: Space.md,
-    marginTop: 2,
-  },
-  /** Pasta é LUGAR: ganha pill no accent suave. Origem e checklist são fatos: ficam em texto. */
-  folderPill: {
-    paddingHorizontal: Space.sm,
-    paddingVertical: 3,
-    borderRadius: Radius.xs,
-    borderCurve: 'continuous',
-    maxWidth: 130,
-  },
-  folderPillText: {
-    ...Type.caption,
-    // Peso é FAMÍLIA (§3 de design.md): no Android a fonte custom IGNORA `fontWeight` e cai no
-    // regular com negrito sintético — ficava certo só no iOS.
-    fontFamily: Fonts.semibold,
-  },
-  metaBit: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: Space.xs,
-  },
-  /** Encostada à direita: a data é a âncora que faz as linhas lerem como coluna. */
-  quando: {
-    marginLeft: 'auto',
-  },
-  grow: {
-    flex: 1,
-  },
-  pinDot: {
-    width: 6,
-    height: 6,
-    borderRadius: 3,
-  },
-  quickAdd: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: Space.sm,
-    paddingHorizontal: Space.lg,
-    paddingTop: Space.md,
-    paddingBottom: Space.lg,
-  },
-  send: {
+  captura: { flexDirection: 'row', alignItems: 'center', gap: Space.sm, paddingTop: Space.md },
+  enviar: {
     width: HitTarget,
     height: HitTarget,
     alignItems: 'center',
@@ -657,50 +596,7 @@ const styles = StyleSheet.create({
     borderRadius: Radius.pill,
     borderCurve: 'continuous',
   },
-  list: {
-    /**
-     * A barra do Android é ABSOLUTA e desenha por cima da lista; a `FlashList` rola sozinha e o
-     * `Screen` (aqui com `scroll={false}`) não tem como acrescentar padding nela. Sem isto a
-     * última nota ficava escondida atrás da pílula — não dava para ler nem tocar.
-     */
-    paddingBottom:
-      Space.xxxl + (Platform.OS === 'android' ? CURVED_BAR_SPACE : 0),
-  },
-  filters: {
-    paddingBottom: Space.lg,
-  },
-  chipDivider: {
-    width: StyleSheet.hairlineWidth,
-    alignSelf: 'stretch',
-    marginHorizontal: Space.xs,
-  },
-  group: {
-    marginHorizontal: Space.lg,
-    marginBottom: Space.sm,
-    borderRadius: Radius.md,
-    borderCurve: 'continuous',
-  },
-  chips: {
-    gap: Space.sm,
-    paddingHorizontal: Space.lg,
-  },
-  row: {
-    // `sm` entre título, prévia e metadado: com `xs` as três linhas colavam e a nota inteira
-    // lia como um parágrafo só.
-    gap: Space.sm,
-    minHeight: HitTarget,
-    paddingVertical: Space.lg,
-    paddingHorizontal: Space.lg,
-  },
-  rowTitle: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: Space.sm,
-  },
-  /** Mesma etiqueta do `Section` — token `Type.meta`, não tracking à mão. */
-  heading: {
-    ...Type.meta,
-    marginTop: Space.xl,
-    marginBottom: Space.sm,
-  },
+  chips: { gap: Space.sm, paddingRight: Space.lg },
+  cresce: { flex: 1 },
+  esqueleto: { gap: Space.sm, paddingVertical: Space.lg },
 });

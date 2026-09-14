@@ -20,7 +20,7 @@ import { useToast } from '@/components/ui/toast';
 import { Motion, Space } from '@/design/tokens';
 import { usePurgeNote, useRestoreNote, useNotesList, type Note } from '@/hooks/use-notes';
 import { noteTitle, notePreview } from '@/lib/search';
-import { showItemActions } from '@/lib/item-actions';
+import { actionSheet } from '@/components/notes/note-actions';
 
 /**
  * Lixeira.
@@ -52,28 +52,6 @@ function notesLabel(count: number): string {
   return `${count} nota${count === 1 ? '' : 's'}`;
 }
 
-/**
- * Delega para o helper único do projeto (`src/lib/item-actions.ts`).
- *
- * A cópia local caía na armadilha do `Alert` do Android, que renderiza no máximo 3 botões e some
- * com o resto — inclusive a ação destrutiva. O helper compartilhado usa um sheet próprio no
- * Android, sem limite de opções.
- */
-function actionSheet(
-  config: { title?: string; message?: string; options: string[]; destructiveIndex?: number },
-  onPick: (index: number) => void
-) {
-  const { title, message, options, destructiveIndex } = config;
-  showItemActions(
-    title ?? '',
-    options.map((label, index) => ({
-      label,
-      destructive: index === destructiveIndex,
-      onPress: () => onPick(index),
-    })),
-    message
-  );
-}
 
 export default function TrashScreen() {
   const toast = useToast();

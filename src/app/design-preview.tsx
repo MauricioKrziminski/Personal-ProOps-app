@@ -721,9 +721,14 @@ function seedClient() {
 
   const nota = (over: Record<string, unknown>) => ({
     id: 'prev-n1',
-    content: 'Lista do supermercado & feira\nazeite extravirgem · café · filtro de água',
-    folder_id: 'prev-f1',
+    content: 'Lista do supermercado & feira\nazeite *extravirgem* · café · filtro de água',
+    // ⚠️ A home lista as SOLTAS (`folder_id is null`). Uma nota com pasta aqui simplesmente não
+    // apareceria, e a vitrine mostraria uma tela vazia sem nada dizer.
+    folder_id: null,
     pinned: true,
+    color: 'turquesa',
+    archived_at: null,
+    position: null,
     source: 'whatsapp',
     tags: ['mercado'],
     created_at: at(9, 12),
@@ -770,24 +775,31 @@ function seedClient() {
     ],
   });
 
-  client.setQueryData(['notes', 'list', {}], {
+  /*
+    ⚠️ **A chave carrega `folderId: null`.** A home passa esse filtro (ela é a caixa das notas
+    SOLTAS) e `chaveDaLista` só descarta o `sort` quando é o padrão — `['notes','list',{}]`, que
+    era a chave antiga, agora não é lida por tela nenhuma e a vitrine cairia no estado de erro em
+    silêncio.
+  */
+  client.setQueryData(['notes', 'list', { folderId: null }], {
     pageParams: [0],
     pages: [
       [
         nota({}),
         nota({
           id: 'prev-n2',
-          content: 'Ideias para o app\nresumo semanal por áudio no domingo à noite',
-          folder_id: 'prev-f2',
+          content:
+            '# Ideias para o app\n- resumo semanal por áudio no domingo à noite\n- [ ] testar com o time',
           pinned: false,
+          color: null,
           source: 'app',
           tags: ['ideias'],
         }),
         nota({
           id: 'prev-n3',
           content: 'Reunião com o contador — levar notas fiscais de agosto',
-          folder_id: 'prev-f2',
           pinned: false,
+          color: 'magenta',
           source: 'whatsapp',
           tags: ['trabalho'],
           updated_at: at(8, 5),
@@ -796,10 +808,21 @@ function seedClient() {
     ],
   });
 
+  // A grade da home mostra só a RAIZ (`parent_id === null`) e lê `color`, `pinned` e `tags`.
+  const pasta = (over: Record<string, unknown>) => ({
+    color: null,
+    pinned: false,
+    archived_at: null,
+    position: null,
+    tags: [] as string[],
+    parent_id: null,
+    ...over,
+  });
   client.setQueryData(['notes', 'folders'], [
-    { id: 'prev-f1', name: 'Mercado', icon: 'cart', notes_count: 4 },
-    { id: 'prev-f2', name: 'Trabalho', icon: 'briefcase', notes_count: 6 },
-    { id: 'prev-f3', name: 'Ideias', icon: 'lightbulb', notes_count: 8 },
+    pasta({ id: 'prev-f1', name: 'mercado', icon: 'cart', notes_count: 4, color: 'musgo', pinned: true }),
+    pasta({ id: 'prev-f2', name: 'trabalho', icon: 'briefcase', notes_count: 6, color: 'oceano', tags: ['trabalho'] }),
+    pasta({ id: 'prev-f3', name: 'ideias', icon: 'lightbulb', notes_count: 8, color: 'violeta' }),
+    pasta({ id: 'prev-f4', name: 'casa', icon: 'house', notes_count: 2 }),
   ]);
   client.setQueryData(['notes', 'tags'], [
     { tag: 'mercado', count: 4 },

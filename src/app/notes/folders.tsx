@@ -8,7 +8,6 @@ import {
 } from 'react-native';
 import Animated, { FadeInDown, LinearTransition } from 'react-native-reanimated';
 import * as Haptics from 'expo-haptics';
-import type { SymbolViewProps } from 'expo-symbols';
 
 import { ThemedText } from '@/components/themed-text';
 import { HeaderActions } from '@/components/ui/header-actions';
@@ -27,66 +26,32 @@ import {
   folderTree,
   useNoteFolders,
   useSaveFolder,
+  useUpdateFolder,
   type NoteFolder,
 } from '@/hooks/use-notes';
-import { useTheme } from '@/hooks/use-theme';
+import { useScheme, useTheme } from '@/hooks/use-theme';
 import { supabase } from '@/lib/supabase';
 import { normalizeFolderName } from '@/lib/search';
-import { showItemActions } from '@/lib/item-actions';
+import { actionSheet, FOLDER_ICONS, notesLabel, symbol } from '@/components/notes/note-actions';
+import { ColorPicker } from '@/components/notes/color-picker';
+import { TagPicker } from '@/components/notes/tag-picker';
+import { noteInk } from '@/design/note-colors';
 
 /**
- * Pastas — criar, renomear, trocar ícone, apagar.
+ * Organizar pastas — criar, renomear, trocar ícone, cor, tags, mover, arquivar e apagar.
  *
- * Catálogo fechado de símbolos, nunca picker de emoji: emoji na chrome é proibido pela regra de
- * design, e o catálogo é o que mantém a lista visualmente coerente. O nome em inglês do SF Symbol
- * não serve de rótulo — por isso cada um carrega o seu em pt-BR.
- */
-/** `name` fica como `string`: é assim que a coluna `note_folders.icon` guarda. */
-const FOLDER_ICONS: { name: string; label: string }[] = [
-  { name: 'folder', label: 'pasta' },
-  { name: 'briefcase', label: 'maleta' },
-  { name: 'lightbulb', label: 'lâmpada' },
-  { name: 'cart', label: 'carrinho' },
-  { name: 'heart', label: 'coração' },
-  { name: 'book', label: 'livro' },
-  { name: 'airplane', label: 'avião' },
-  { name: 'house', label: 'casa' },
-  { name: 'dumbbell', label: 'halter' },
-  { name: 'pills', label: 'remédios' },
-  { name: 'gift', label: 'presente' },
-  { name: 'graduationcap', label: 'formatura' },
-];
-
-function symbol(icon: string | null | undefined): SymbolViewProps['name'] {
-  return (icon ?? 'folder') as SymbolViewProps['name'];
-}
-
-function notesLabel(count: number): string {
-  return `${count} nota${count === 1 ? '' : 's'}`;
-}
-
-/**
- * Delega para o helper único do projeto (`src/lib/item-actions.ts`).
+ * ## Por que ela continua existindo depois de a pasta virar LUGAR
  *
- * A cópia local caía na armadilha do `Alert` do Android, que renderiza no máximo 3 botões e some
- * com o resto — inclusive a ação destrutiva. O helper compartilhado usa um sheet próprio no
- * Android, sem limite de opções.
+ * A grade da home mostra a RAIZ e a tela de uma pasta mostra as filhas dela; nenhuma das duas
+ * mostra a ÁRVORE inteira, que é o que se precisa ver para mover "Trabalho / 2026" de lugar. É
+ * também onde uma pasta nasce sem haver uma nota para movê-la.
+ *
+ * ⚠️ **Aqui NÃO se arrasta, e é decisão.** Reordenar já existe onde a conta é exata — a grade da
+ * raiz, na home, e a grade das subpastas, dentro de uma pasta. Sobre esta lista, que é uma
+ * árvore ACHATADA com recuo, "soltar entre duas linhas" seria ambíguo em todo cruzamento de
+ * nível (virou irmã da de cima? filha dela?), e a resposta errada reorganiza a árvore de alguém
+ * em silêncio. Mudar de nível tem caminho explícito: "Mover para dentro de…".
  */
-function actionSheet(
-  config: { title?: string; message?: string; options: string[]; destructiveIndex?: number },
-  onPick: (index: number) => void
-) {
-  const { title, message, options, destructiveIndex } = config;
-  showItemActions(
-    title ?? '',
-    options.map((label, index) => ({
-      label,
-      destructive: index === destructiveIndex,
-      onPress: () => onPick(index),
-    })),
-    message
-  );
-}
 
 /**
  * "Sem pasta" não é pasta — `useNoteFolders` descarta a linha `folder_id = null` que a RPC
@@ -106,16 +71,21 @@ function useLooseNotesCount() {
 
 export default function FoldersScreen() {
   const theme = useTheme();
+  const scheme = useScheme();
   const toast = useToast();
   const folders = useNoteFolders();
   const loose = useLooseNotesCount();
   const saveFolder = useSaveFolder();
   const deleteFolder = useDeleteFolder();
+  const updateFolder = useUpdateFolder();
 
   const [editing, setEditing] = useState<NoteFolder | null>(null);
   const [name, setName] = useState('');
   const [icon, setIcon] = useState('folder');
   const [error, setError] = useState<string | null>(null);
+  /** Alvo de cada sheet — a pasta, nunca um booleano: os dois servem qualquer linha da árvore. */
+  const [pintando, setPintando] = useState<NoteFolder | null>(null);
+  const [etiquetando, setEtiquetando] = useState<NoteFolder | null>(null);
 
   const reset = () => {
     setEditing(null);
@@ -219,18 +189,62 @@ export default function FoldersScreen() {
     );
   };
 
+  /**
+   * Arquivar some da grade e do seletor, e NÃO toca nas notas.
+   *
+   * Uma cascata de `archived_at` para dentro seria escrita em massa impossível de desfazer com
+   * exatidão: quem já estava arquivada antes voltaria junto no "Desfazer". As notas continuam na
+   * pasta e a pasta inteira volta em Arquivadas.
+   */
+  const arquivar = (folder: NoteFolder) => {
+    updateFolder.mutate(
+      { id: folder.id, archived: true },
+      {
+        onSuccess: () =>
+          toast({
+            message: `«${folder.name}» arquivada.`,
+            tone: 'success',
+            action: {
+              label: 'Desfazer',
+              onPress: () => updateFolder.mutate({ id: folder.id, archived: false }),
+            },
+          }),
+        onError: () => toast({ message: 'Não deu para arquivar a pasta.', tone: 'error' }),
+      }
+    );
+  };
+
   const showActions = (folder: NoteFolder) => {
     Haptics.selectionAsync();
     actionSheet(
       {
         title: folder.name,
-        options: ['Renomear', 'Trocar ícone', 'Mover para dentro de…', 'Apagar'],
-        destructiveIndex: 3,
+        message: notesLabel(folder.notes_count),
+        options: [
+          'Renomear ou trocar ícone',
+          'Cor',
+          'Tags',
+          folder.pinned ? 'Desafixar' : 'Fixar',
+          'Mover para dentro de…',
+          'Arquivar',
+          'Apagar',
+        ],
+        destructiveIndex: 6,
       },
       (index) => {
-        if (index === 0 || index === 1) startEdit(folder);
-        if (index === 2) moverPara(folder);
-        if (index === 3) confirmDelete(folder);
+        if (index === 0) startEdit(folder);
+        if (index === 1) setPintando(folder);
+        if (index === 2) setEtiquetando(folder);
+        if (index === 3) {
+          Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+          updateFolder.mutate(
+            { id: folder.id, pinned: !folder.pinned },
+            { onError: () => toast({ message: 'Não deu para fixar a pasta.', tone: 'error' }) }
+          );
+        }
+        if (index === 4) moverPara(folder);
+        if (index === 5) arquivar(folder);
+        if (index === 6) confirmDelete(folder);
       }
     );
   };
@@ -244,13 +258,22 @@ export default function FoldersScreen() {
 
   return (
     <Screen grouped onRefresh={() => Promise.all([folders.refetch(), loose.refetch()])} refreshing={folders.isRefetching || loose.isRefetching}>
-      <Stack.Screen
-        options={{
+      <Stack.Screen options={{ title: 'Organizar pastas' }} />
+
+      <HeaderActions
+        actions={[]}
+        menu={{
           title: 'Pastas',
+          actions: [
+            {
+              label: 'Arquivadas',
+              icon: 'archivebox',
+              onPress: () => router.push('/notes/archived'),
+            },
+            { label: 'Lixeira', icon: 'trash', onPress: () => router.push('/notes/trash') },
+          ],
         }}
       />
-
-      <HeaderActions actions={[{ label: 'Lixeira', icon: 'trash', onPress: () => router.push('/notes/trash') }]} />
 
       {/* Ação primária: criar. Campo no topo, sem modal. */}
       <Card>
@@ -348,11 +371,23 @@ export default function FoldersScreen() {
                 indent={folder.depth}
                 chevron={false}
                 trailing={
-                  <ThemedText type="footnote" themeColor="textSecondary" style={tabular}>
-                    {folder.notes_count}
-                  </ThemedText>
+                  <View style={styles.trailing}>
+                    {folder.pinned ? <Icon name="pin.fill" size="sm" color="tint" /> : null}
+                    {/* O disco é a MESMA tinta do ladrilho da grade: é assim que a pessoa
+                        reconhece aqui a pasta que ela pintou lá. */}
+                    {noteInk(folder.color, scheme) ? (
+                      <View
+                        style={[styles.disco, { backgroundColor: noteInk(folder.color, scheme)! }]}
+                      />
+                    ) : null}
+                    <ThemedText type="footnote" themeColor="textSecondary" style={tabular}>
+                      {folder.notes_count}
+                    </ThemedText>
+                  </View>
                 }
-                accessibilityLabel={`${folder.name}, ${notesLabel(folder.notes_count)}`}
+                accessibilityLabel={`${folder.name}, ${notesLabel(folder.notes_count)}${
+                  folder.pinned ? ', fixada' : ''
+                }`}
                 onPress={() => showActions(folder)}
                 onLongPress={() => showActions(folder)}
               />
@@ -377,11 +412,46 @@ export default function FoldersScreen() {
           />
         </Section>
       )}
+      <ColorPicker
+        visible={pintando !== null}
+        value={pintando?.color ?? null}
+        title="Cor da pasta"
+        onClose={() => setPintando(null)}
+        onPick={(cor) => {
+          if (!pintando) return;
+          updateFolder.mutate(
+            { id: pintando.id, color: cor },
+            { onError: () => toast({ message: 'Não deu para mudar a cor.', tone: 'error' }) }
+          );
+        }}
+      />
+
+      <TagPicker
+        visible={etiquetando !== null}
+        alvo="pasta"
+        current={etiquetando?.tags ?? []}
+        onClose={() => setEtiquetando(null)}
+        onToggle={(t) => {
+          if (!etiquetando) return;
+          const tags = etiquetando.tags.includes(t)
+            ? etiquetando.tags.filter((x) => x !== t)
+            : [...etiquetando.tags, t];
+          // O alvo é uma CÓPIA do cache: sem atualizá-lo, marcar duas tags seguidas mandaria a
+          // segunda com a lista de antes da primeira e desfaria a anterior.
+          setEtiquetando({ ...etiquetando, tags });
+          updateFolder.mutate(
+            { id: etiquetando.id, tags },
+            { onError: () => toast({ message: 'Não deu para salvar as tags.', tone: 'error' }) }
+          );
+        }}
+      />
     </Screen>
   );
 }
 
 const styles = StyleSheet.create({
+  trailing: { flexDirection: 'row', alignItems: 'center', gap: Space.sm },
+  disco: { width: 12, height: 12, borderRadius: 6 },
   form: {
     gap: Space.lg,
   },

@@ -7,7 +7,10 @@ import * as Haptics from 'expo-haptics';
 import type { SymbolViewProps } from 'expo-symbols';
 
 import { ThemedText } from '@/components/themed-text';
+import { ColorPicker } from '@/components/notes/color-picker';
 import { FolderPicker } from '@/components/notes/folder-picker';
+import { FormatBar } from '@/components/notes/format-bar';
+import { NoteBody } from '@/components/notes/note-body';
 import { TagPicker } from '@/components/notes/tag-picker';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
@@ -21,11 +24,13 @@ import { HitTarget, Motion, Radius, Space, Type } from '@/design/tokens';
 import {
   useNote,
   useNoteFolders,
+  useUpdateNote,
   useSaveNote,
   useToggleNotePin,
   useTrashNote,
 } from '@/hooks/use-notes';
-import { useTheme } from '@/hooks/use-theme';
+import { useScheme, useTheme } from '@/hooks/use-theme';
+import { noteInk } from '@/design/note-colors';
 import { relativeBR } from '@/lib/dates';
 import {
   addTag,
@@ -34,7 +39,8 @@ import {
   tagsOf,
 } from '@/lib/search';
 import { showItemActions } from '@/lib/item-actions';
-import { noteBlocks, setBlockKind, lineAt, toggleTodo, type BlockKind } from '@/lib/note-blocks';
+import { setBlockKind, lineAt, toggleTodo, type BlockKind } from '@/lib/note-blocks';
+import { toggleMark, type Mark } from '@/lib/note-inline';
 import { skipReason } from '@/lib/notes-autosave';
 
 /**
@@ -81,8 +87,9 @@ function actionSheet(
 }
 
 export default function NoteDetailScreen() {
-  const params = useLocalSearchParams<{ id: string }>();
+  const params = useLocalSearchParams<{ id: string; folder?: string }>();
   const theme = useTheme();
+  const scheme = useScheme();
   const toast = useToast();
 
   const note = useNote(params.id);
@@ -90,9 +97,19 @@ export default function NoteDetailScreen() {
   const save = useSaveNote();
   const togglePin = useToggleNotePin();
   const trash = useTrashNote();
+  const updateNote = useUpdateNote();
 
   const [content, setContent] = useState('');
-  const [folderId, setFolderId] = useState<string | null>(null);
+  /**
+   * Nota criada de DENTRO de uma pasta já nasce nela (`/notes/new?folder=<id>`).
+   *
+   * Sem isto, o `+` da tela de uma pasta criava uma nota solta — e a pessoa voltava para a pasta
+   * sem encontrar o que acabou de escrever. Em nota existente o parâmetro não existe, e a
+   * hidratação sobrescreve este valor com o do banco.
+   */
+  const [folderId, setFolderId] = useState<string | null>(
+    params.id === 'new' ? (params.folder ?? null) : null
+  );
   const [editing, setEditing] = useState(() => params.id === 'new');
   /** Onde o cursor está, em caracteres. Só a barra de blocos lê — não precisa re-renderizar. */
   const cursorRef = useRef(0);
@@ -100,6 +117,15 @@ export default function NoteDetailScreen() {
   const [selection, setSelection] = useState<{ start: number; end: number } | undefined>();
   const [pickerOpen, setPickerOpen] = useState(false);
   const [tagPickerOpen, setTagPickerOpen] = useState(false);
+  const [colorOpen, setColorOpen] = useState(false);
+  /**
+   * A seleção VIVA — o que a barra de formatação lê.
+   *
+   * Diferente de `selection`, que é o prop CONTROLADO e existe só para empurrar o cursor depois
+   * de uma edição programática (e é zerado no quadro seguinte). A barra precisa do estado o
+   * tempo todo, e `cursorRef` guarda só o início: envolver um trecho selecionado precisa do fim.
+   */
+  const [sel, setSel] = useState({ start: 0, end: 0 });
   const [savedFlash, setSavedFlash] = useState(false);
 
   /** Fonte da verdade do autosave: `null` até o primeiro insert. Não espera o `setParams`. */
@@ -204,6 +230,7 @@ export default function NoteDetailScreen() {
 
   const creating = savedId === null;
   const tags = useMemo(() => tagsOf(content), [content]);
+  const tinta = noteInk(note.data?.color ?? null, scheme);
   const folder = folders.data?.find((f) => f.id === folderId);
 
   const onTogglePin = () => {
@@ -338,6 +365,23 @@ export default function NoteDetailScreen() {
     inputRef.current?.focus();
   };
 
+  /**
+   * Envolve o trecho selecionado com a marca — ou tira, se ele já estiver marcado.
+   *
+   * ⚠️ **A seleção NOVA volta do `toggleMark` e é reaplicada.** Inserir dois caracteres antes do
+   * trecho desloca tudo: sem devolver o cursor, escrever `*negrito*` deixaria o caret dois
+   * caracteres atrás de onde a pessoa estava, e a próxima letra cairia no meio do delimitador.
+   */
+  const aplicarMarca = (mark: Mark) => {
+    Haptics.selectionAsync();
+    const r = toggleMark(content, sel.start, sel.end, mark);
+    setContent(r.text);
+    setSelection(r.selection);
+    setSel(r.selection);
+    cursorRef.current = r.selection.start;
+    inputRef.current?.focus();
+  };
+
   return (
     <Screen scroll={false}>
       <Stack.Screen options={{ title: screenTitle }} />
@@ -383,6 +427,32 @@ export default function NoteDetailScreen() {
               <Icon name="xmark" size={12} color="textSecondary" />
             </Pressable>
           ))}
+
+          {/*
+            A cor é um DISCO, e ele só existe depois do primeiro autosave: `useUpdateNote` grava
+            por id, e em nota nova ainda não há id. Sem cor ele é um anel vazio — a mesma forma
+            do "Sem cor" do seletor, para o controle não mudar de silhueta ao ganhar cor.
+          */}
+          {savedId ? (
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel={
+                note.data?.color ? `Cor ${note.data.color}. Toque para mudar.` : 'Escolher cor'
+              }
+              hitSlop={8}
+              onPress={() => {
+                Haptics.selectionAsync();
+                setColorOpen(true);
+              }}
+              style={[
+                styles.disco,
+                {
+                  backgroundColor: tinta ?? 'transparent',
+                  borderColor: tinta ?? theme.separator,
+                },
+              ]}
+            />
+          ) : null}
 
           <Pressable
             accessibilityRole="button"
@@ -436,6 +506,7 @@ export default function NoteDetailScreen() {
               // ela só poderia agir na última linha, e converter um bloco do meio da nota
               // exigiria descer até o fim e voltar.
               cursorRef.current = e.nativeEvent.selection.start;
+              setSel(e.nativeEvent.selection);
               setSelection(undefined);
             }}
             onBlur={() => {
@@ -449,7 +520,7 @@ export default function NoteDetailScreen() {
             style={[Type.body, styles.input, { color: theme.text }]}
           />
         ) : (
-          <ReadBody content={content} onEdit={startEditing} onToggleLine={onToggleLine} />
+          <NoteBody content={content} onEdit={startEditing} onToggleLine={onToggleLine} />
         )}
 
       </KeyboardAwareScrollView>
@@ -466,7 +537,12 @@ export default function NoteDetailScreen() {
       {editing ? (
         <KeyboardStickyView>
           <View style={styles.blockBarWrap}>
-            <BlockBar onPick={aplicarBloco} />
+            <FormatBar
+              content={content}
+              selection={sel}
+              onMark={aplicarMarca}
+              onBlock={aplicarBloco}
+            />
           </View>
         </KeyboardStickyView>
       ) : null}
@@ -481,6 +557,20 @@ export default function NoteDetailScreen() {
             tagsOf(current).includes(tag) ? removeTag(current, tag) : addTag(current, tag)
           )
         }
+      />
+
+      <ColorPicker
+        visible={colorOpen}
+        value={note.data?.color ?? null}
+        title="Cor da nota"
+        onClose={() => setColorOpen(false)}
+        onPick={(cor) => {
+          if (!savedId) return;
+          updateNote.mutate(
+            { id: savedId, color: cor },
+            { onError: () => toast({ message: 'Não deu para mudar a cor.', tone: 'error' }) }
+          );
+        }}
       />
 
       <FolderPicker
@@ -510,168 +600,14 @@ export default function NoteDetailScreen() {
  * sobra desenho: hierarquia por peso (22/600 no título, 17/400 no corpo), `Space.sm` entre
  * linhas e um alvo de toque que cobre o vazio.
  */
-/**
- * O corpo da nota em modo LEITURA, bloco a bloco.
- *
- * Antes ele conhecia dois tipos — título e item marcável — e mandava todo o resto para parágrafo.
- * Agora desenha os oito de `lib/note-blocks.ts`: cabeçalho, subtítulo, item marcável, item de
- * lista, item numerado, citação, divisória e parágrafo. A marcação (`#`, `- [ ]`, `>`) some da
- * tela; ela continua existindo só no texto, que é o que volta para o WhatsApp.
- *
- * Um `Pressable` só por fora, com altura mínima: nota curta deixava 70% da tela em branco sem
- * affordance nenhuma. O vazio É a área de edição — tocar em qualquer ponto abre o teclado, que é
- * o comportamento do Apple Notes. A exceção é a caixinha do item marcável, que ganha o gesto para
- * si e NÃO entra em edição.
- */
-function ReadBody({
-  content,
-  onEdit,
-  onToggleLine,
-}: {
-  content: string;
-  onEdit: () => void;
-  onToggleLine: (index: number) => void;
-}) {
-  const theme = useTheme();
-  const blocos = noteBlocks(content);
-
-  return (
-    <Pressable
-      accessibilityRole="button"
-      accessibilityLabel={
-        blocos.length === 0 ? 'Escrever na nota' : 'Conteúdo da nota. Toque para editar.'
-      }
-      onPress={onEdit}
-      style={styles.readBody}>
-      {blocos.length === 0 ? (
-        <ThemedText type="subtitle" themeColor="textSecondary">
-          Escreve alguma coisa…
-        </ThemedText>
-      ) : (
-        blocos.map((b) => {
-          if (b.kind === 'divider') {
-            return (
-              <View
-                key={b.index}
-                style={[styles.divider, { backgroundColor: theme.separator }]}
-              />
-            );
-          }
-
-          if (b.kind === 'todo') {
-            return (
-              <View key={b.index} style={styles.checkLine}>
-                {/* Caixinha pequena, alvo de toque ≥ 44 pelo hitSlop. */}
-                <Pressable
-                  accessibilityRole="checkbox"
-                  accessibilityState={{ checked: !!b.done }}
-                  accessibilityLabel={b.text}
-                  hitSlop={12}
-                  onPress={() => onToggleLine(b.index)}>
-                  <Animated.View
-                    key={b.done ? 'on' : 'off'}
-                    entering={FadeIn.duration(Motion.duration.fast)}>
-                    <Icon
-                      name={b.done ? 'checkmark.circle.fill' : 'circle'}
-                      size="lg"
-                      color={b.done ? 'tint' : 'textSecondary'}
-                    />
-                  </Animated.View>
-                </Pressable>
-                <ThemedText
-                  style={[
-                    Type.body,
-                    styles.grow,
-                    { color: b.done ? theme.textSecondary : theme.text },
-                    b.done && styles.done,
-                  ]}>
-                  {b.text}
-                </ThemedText>
-              </View>
-            );
-          }
-
-          if (b.kind === 'bullet' || b.kind === 'numbered') {
-            return (
-              <View key={b.index} style={styles.listLine}>
-                {/* Marcador em mono para os números ficarem na mesma coluna. */}
-                <ThemedText type="code" themeColor="textSecondary" style={styles.marker}>
-                  {b.kind === 'numbered' ? `${b.order ?? 1}.` : '•'}
-                </ThemedText>
-                <ThemedText style={[Type.body, styles.grow]}>{b.text}</ThemedText>
-              </View>
-            );
-          }
-
-          if (b.kind === 'quote') {
-            return (
-              <View key={b.index} style={styles.quoteLine}>
-                <View style={[styles.quoteBar, { backgroundColor: theme.tint }]} />
-                <ThemedText
-                  themeColor="textSecondary"
-                  style={[Type.body, styles.grow, styles.quoteText]}>
-                  {b.text}
-                </ThemedText>
-              </View>
-            );
-          }
-
-          return (
-            <ThemedText
-              key={b.index}
-              type={b.kind === 'title' || b.kind === 'h1' ? 'subtitle' : b.kind === 'h2' ? 'headline' : 'default'}
-              style={b.kind === 'title' || b.kind === 'h1' ? styles.readTitle : undefined}>
-              {b.text}
-            </ThemedText>
-          );
-        })
-      )}
-    </Pressable>
-  );
-}
-
-/**
- * A barra de blocos — o "digite / para inserir" do Notion, em forma de barra.
- *
- * Ela existe porque a marcação sozinha exige que a pessoa **saiba** markdown. O toque converte a
- * linha em que o cursor está, e tocar de novo no mesmo tipo desfaz (`setBlockKind` trata isso) —
- * sem o desfazer, virar citação seria beco sem saída.
- *
- * Só aparece em edição, e some junto com o teclado: em leitura ela seria uma fileira de botões
- * sobre um texto que ninguém está editando.
- */
-const BLOCOS: { kind: BlockKind; icon: React.ComponentProps<typeof Icon>['name']; label: string }[] = [
-  { kind: 'h1', icon: 'textformat.size', label: 'Título' },
-  { kind: 'todo', icon: 'checkmark.circle', label: 'Item marcável' },
-  { kind: 'bullet', icon: 'list.bullet', label: 'Lista' },
-  { kind: 'numbered', icon: 'list.number', label: 'Lista numerada' },
-  { kind: 'quote', icon: 'text.quote', label: 'Citação' },
-  { kind: 'divider', icon: 'minus', label: 'Divisória' },
-];
-
-function BlockBar({ onPick }: { onPick: (kind: BlockKind) => void }) {
-  const theme = useTheme();
-  return (
-    <View style={[styles.blockBar, { backgroundColor: theme.surface, borderColor: theme.cardBorder }]}>
-      {BLOCOS.map((b) => (
-        <Pressable
-          key={b.kind}
-          accessibilityRole="button"
-          accessibilityLabel={b.label}
-          hitSlop={6}
-          onPress={() => onPick(b.kind)}
-          style={({ pressed }) => [
-            styles.blockButton,
-            { backgroundColor: pressed ? theme.backgroundSelected : 'transparent' },
-          ]}>
-          <Icon name={b.icon} size="md" color="text" />
-        </Pressable>
-      ))}
-    </View>
-  );
-}
-
 const styles = StyleSheet.create({
+  /** Disco de 18 com anel de 1,5 — a mesma relação tinta/borda das amostras do seletor. */
+  disco: {
+    width: 18,
+    height: 18,
+    borderRadius: 9,
+    borderWidth: 1.5,
+  },
   body: {
     gap: Space.lg,
     paddingHorizontal: Space.lg,

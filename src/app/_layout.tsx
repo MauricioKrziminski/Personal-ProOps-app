@@ -267,7 +267,10 @@ function AppTree() {
                   {/* Sem título: o da nota é o conteúdo dela, e um provisório faria a barra
                       trocar de texto na frente do usuário. */}
                   <Stack.Screen name="notes/[id]" options={{ title: '' }} />
-                  <Stack.Screen name="notes/folders" options={{ title: 'Pastas' }} />
+                  <Stack.Screen name="notes/folders" options={{ title: 'Organizar pastas' }} />
+                  {/* O título vem da TELA (`Stack.Screen` interno): é o nome da pasta. */}
+                  <Stack.Screen name="notes/folder/[id]" options={{ title: 'Pasta' }} />
+                  <Stack.Screen name="notes/archived" options={{ title: 'Arquivadas' }} />
                   <Stack.Screen name="notes/trash" options={{ title: 'Lixeira' }} />
 
                   <Stack.Screen name="profile/members" options={{ title: 'Pessoas' }} />

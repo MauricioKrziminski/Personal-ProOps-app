@@ -1,0 +1,68 @@
+import Animated, { LinearTransition, type useAnimatedRef } from 'react-native-reanimated';
+
+import { NoteCard, type NoteCardActions } from '@/components/notes/note-card';
+import { Reorderable } from '@/components/ui/reorderable';
+import { Motion } from '@/design/tokens';
+import type { Note, NoteFolder } from '@/hooks/use-notes';
+
+/**
+ * Um ESCOPO de notas arrastáveis — a home usa dois (fixadas e soltas), a tela de uma pasta usa um.
+ *
+ * ⚠️ **Escopos separados não são detalhe de layout.** Cada `onReorder` manda `ord 1..N` para a
+ * RPC, e a leitura é `pinned desc, position asc`: com fixadas e soltas no MESMO escopo, o
+ * primeiro arrasto daria posição 1 a uma nota solta e ela subiria para o meio das fixadas. Dois
+ * escopos mantêm os dois grupos inteiros sem o banco precisar saber que existe uma seção.
+ *
+ * ⚠️ **A alça só existe com `enabled`.** Um punho que aparece e não arrasta (ordem por data,
+ * busca ativa) é pior que punho nenhum: ele promete um gesto que a tela recusa em silêncio.
+ */
+export function NoteList({
+  notas,
+  acoes,
+  folderById,
+  enabled,
+  scrollRef,
+  topInset,
+  onDragStateChange,
+  onReorder,
+}: {
+  notas: Note[];
+  acoes: NoteCardActions;
+  /** A nota herda o nome e a COR da pasta quando não tem cor própria. */
+  folderById: (id: string | null) => NoteFolder | undefined;
+  enabled: boolean;
+  scrollRef: ReturnType<typeof useAnimatedRef<Animated.ScrollView>>;
+  topInset: number;
+  onDragStateChange: (v: boolean) => void;
+  onReorder: (ids: string[]) => void;
+}) {
+  return (
+    <Reorderable
+      data={notas}
+      keyExtractor={(n) => n.id}
+      enabled={enabled}
+      activation="alça"
+      scrollRef={scrollRef}
+      topInset={topInset}
+      onDragStateChange={onDragStateChange}
+      onReorder={onReorder}
+      renderItem={({ item, active, drag }) => {
+        const pasta = folderById(item.folder_id);
+        return (
+          // `LinearTransition` é o que fecha o buraco quando uma nota é fixada, arquivada ou
+          // mandada para uma pasta: a lista se reorganiza andando, não piscando.
+          <Animated.View layout={LinearTransition.duration(Motion.duration.base)}>
+            <NoteCard
+              note={item}
+              folderName={pasta?.name}
+              folderColor={pasta?.color ?? null}
+              actions={acoes}
+              drag={enabled ? drag : undefined}
+              dragging={active}
+            />
+          </Animated.View>
+        );
+      }}
+    />
+  );
+}
