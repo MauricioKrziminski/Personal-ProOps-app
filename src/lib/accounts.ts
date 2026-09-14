@@ -1,3 +1,5 @@
+import { semAcento } from './text.ts';
+
 /**
  * Como uma conta se chama na tela — fonte única.
  *
@@ -60,9 +62,6 @@ export const ACCOUNT_TYPES = [
   { value: 'cash', label: 'Dinheiro', icon: 'wallet.bifold' },
   { value: 'investment', label: 'Investimento', icon: 'chart.line.uptrend.xyaxis' },
 ] as const;
-
-const semAcento = (s: string) =>
-  s.normalize('NFD').replace(/\p{Diacritic}/gu, '').trim().toLowerCase();
 
 /** Só a palavra do tipo: "Corrente", "Cartão", "Poupança"... */
 export function accountTypeLabel(account: { type?: string | null } | null | undefined): string {

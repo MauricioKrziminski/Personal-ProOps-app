@@ -1,3 +1,5 @@
+import { semAcento } from './text.ts';
+
 /**
  * Junta o que o usuário USA com o que o app SUGERE, numa lista só.
  *
@@ -19,8 +21,8 @@
 
 export type CategoryOption = { label: string; uses: number };
 
-export const foldCategory = (c: string) =>
-  c.normalize('NFD').replace(/\p{Diacritic}/gu, '').trim().toLowerCase();
+/** Mesma normalização da busca — ver `semAcento`. O nome fica porque é usado fora daqui. */
+export const foldCategory = semAcento;
 
 const temAcento = (c: string) => foldCategory(c) !== c.trim().toLowerCase();
 

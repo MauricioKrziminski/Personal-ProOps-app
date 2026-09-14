@@ -1,5 +1,5 @@
 import { useInvalidateFinance } from '@/hooks/use-finance';
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Switch, View } from 'react-native';
 import Animated, { FadeIn, FadeInDown, LinearTransition } from 'react-native-reanimated';
 import { Stack, router, useLocalSearchParams } from 'expo-router';
@@ -19,6 +19,7 @@ import { Icon } from '@/components/ui/icon';
 import { Money } from '@/components/ui/money';
 import { Screen } from '@/components/ui/screen';
 import { HeroLabel, SectionHead } from '@/components/ui/section-head';
+import { Search } from '@/components/ui/search';
 import { Segmented } from '@/components/ui/segmented';
 import { Skeleton, SkeletonRow } from '@/components/ui/skeleton';
 import { useToast } from '@/components/ui/toast';
@@ -32,6 +33,8 @@ import {
 } from '@/hooks/use-finance';
 import { useRealtimeInvalidate } from '@/hooks/use-items';
 import { useTheme } from '@/hooks/use-theme';
+import { useDebounced } from '@/hooks/use-debounced';
+import { semAcento } from '@/lib/text';
 import { brToISO, ehUltimoDiaDoMes, isValidBRDate, isoToBR, localDateTime, localISODate } from '@/lib/dates';
 import { confirmDestructive, showItemActions } from '@/lib/item-actions';
 import { validRecurringRange } from '@/lib/finance-form';
@@ -283,7 +286,27 @@ export default function RecurringScreen() {
   // falha, e sem este corte a lista seguia afirmando números embaixo da faixa que acabou
   // de dizer que não conseguiu carregar. Zerar aqui cobre lista, contadores e destaque de
   // uma vez; os estados vazios já checam `isError` e continuam calados.
-  const lista = series.isError ? [] : (series.data ?? []);
+  const todas = useMemo(
+    () => (series.isError ? [] : (series.data ?? [])),
+    [series.isError, series.data]
+  );
+
+  /**
+   * Busca — 16 séries hoje, e é a lista que mais CRESCE: toda conta fixa nova entra aqui.
+   *
+   * Filtra no cliente porque a lista já veio inteira (não é paginada). Casa descrição e
+   * categoria, sem acento e sem caixa, que é o que a busca de Lançamentos também faz.
+   */
+  const [busca, setBusca] = useState('');
+  const termo = useDebounced(busca.trim(), 200);
+  const lista = useMemo(() => {
+    const t = semAcento(termo);
+    if (!t) return todas;
+    return todas.filter((r) =>
+      semAcento(`${r.description ?? ''} ${r.category ?? ''}`).includes(t)
+    );
+  }, [todas, termo]);
+
   const comErro = lista.filter((r) => r.last_error);
   const ativas = lista.filter((r) => r.active && !r.last_error);
   const pausadas = lista.filter((r) => !r.active && !r.last_error);
@@ -520,7 +543,19 @@ export default function RecurringScreen() {
       {/* O único destaque da tela. Some quando não há série: "SAI R$ 0,00 / ENTRA R$ 0,00" em
           cima de um empty state é cabeçalho vazio para a tela parecer cheia — exatamente o que a
           regra da aba Hoje proíbe. */}
-      {lista.length === 0 ? null : proximos.isError ? (
+      <Search
+        value={busca}
+        onChangeText={setBusca}
+        placeholder="Buscar por nome ou categoria"
+        accessibilityLabel="Buscar recorrências"
+      />
+
+      {/*
+        ⚠️ **Com busca ativa o destaque SOME.** Ele soma os próximos 30 dias da carteira inteira;
+        a lista filtrada mostra uma série. Deixá-lo ali é o mesmo defeito que o card de
+        Lançamentos acabou de perder: um total no topo que não é o total do que está embaixo.
+      */}
+      {lista.length === 0 || termo ? null : proximos.isError ? (
         <ErrorBand
           message="Não deu para somar os próximos 30 dias. A lista abaixo continua valendo."
           onRetry={proximos.refetch}

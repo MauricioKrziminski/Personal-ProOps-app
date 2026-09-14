@@ -7,12 +7,26 @@ import { Icon } from '@/components/ui/icon';
 import { Elevation, HitTarget, Radius, Space, Type } from '@/design/tokens';
 import { useTheme, useScheme } from '@/hooks/use-theme';
 
+type RowBadgeTone = 'warning' | 'danger' | 'success' | 'textSecondary';
+
 interface RowProps {
   title: string;
   subtitle?: string;
   icon?: SymbolViewProps['name'];
   /** Valor, badge ou qualquer coisa à direita. Chevron é automático quando há `onPress`. */
   trailing?: ReactNode;
+  /**
+   * O ESTADO da linha, em pílula — "previsto", "atrasado", "pago".
+   *
+   * ⚠️ **Estado emendado no `subtitle` não se lê.** O subtítulo é uma frase cinza única
+   * (`previsto · vence 08/10/2026 · assinaturas · Nubank · Cartão · recorrente`) onde a palavra
+   * que diz se aquilo ACONTECEU tem exatamente o mesmo peso do nome do cartão. Quem abre o app
+   * pela primeira vez não tem como saber qual das seis palavras importa.
+   *
+   * A pílula é o mesmo desenho que a Hoje já usava para "venceu 10/07" — só que lá estava
+   * escrita à mão dentro da tela, então nenhuma outra lista podia usá-la.
+   */
+  badge?: { label: string; tone?: RowBadgeTone };
   onPress?: () => void;
   /** Menu de contexto do item (action sheet nativo). */
   onLongPress?: () => void;
@@ -47,6 +61,7 @@ export function Row({
   subtitle,
   icon,
   trailing,
+  badge,
   onPress,
   onLongPress,
   destructive = false,
@@ -88,10 +103,25 @@ export function Row({
         <ThemedText type="default" themeColor={destructive ? 'danger' : 'text'}>
           {title}
         </ThemedText>
-        {subtitle ? (
-          <ThemedText type="footnote" themeColor="textSecondary">
-            {subtitle}
-          </ThemedText>
+        {badge || subtitle ? (
+          /*
+            `flexWrap` e não `numberOfLines`: a pílula fica ao lado do subtítulo quando cabe e
+            sobe para a própria linha quando não — identificador não trunca (§7).
+          */
+          <View style={styles.meta}>
+            {badge ? (
+              <View style={[styles.badge, { backgroundColor: fundoDoBadge(theme, badge.tone) }]}>
+                <ThemedText type="caption" themeColor={badge.tone ?? 'textSecondary'}>
+                  {badge.label}
+                </ThemedText>
+              </View>
+            ) : null}
+            {subtitle ? (
+              <ThemedText type="footnote" themeColor="textSecondary" style={styles.subtitle}>
+                {subtitle}
+              </ThemedText>
+            ) : null}
+          </View>
         ) : null}
       </View>
       {/*
@@ -121,6 +151,20 @@ export function Row({
       {({ pressed }) => content(pressed)}
     </Pressable>
   );
+}
+
+/**
+ * O fundo da pílula de estado.
+ *
+ * ⚠️ Não dá para derivar de `${tone}Soft`: o neutro não tem par — existem `dangerSoft`,
+ * `successSoft` e `warningSoft`, mas `textSecondarySoft` nunca existiu, e a chave montada por
+ * template devolveria `undefined` (pílula transparente) sem erro nenhum.
+ */
+function fundoDoBadge(theme: ReturnType<typeof useTheme>, tone: RowBadgeTone | undefined) {
+  if (tone === 'danger') return theme.dangerSoft;
+  if (tone === 'success') return theme.successSoft;
+  if (tone === 'warning') return theme.warningSoft;
+  return theme.backgroundElement;
 }
 
 /**
@@ -197,6 +241,15 @@ const styles = StyleSheet.create({
     flexShrink: 1,
     minWidth: 134,
     gap: 2,
+  },
+  // A pílula fica ao lado do subtítulo quando cabe e sobe para a própria linha quando não.
+  meta: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', columnGap: Space.xs, rowGap: 2 },
+  subtitle: { flexShrink: 1 },
+  badge: {
+    paddingHorizontal: Space.xs + 2,
+    paddingVertical: 1,
+    borderRadius: Radius.xs,
+    borderCurve: 'continuous',
   },
   /**
    * `marginLeft: auto` mantém o valor encostado à direita mesmo quando ele desce de linha.

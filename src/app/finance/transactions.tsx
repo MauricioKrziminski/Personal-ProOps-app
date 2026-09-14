@@ -626,15 +626,24 @@ export default function TransactionsScreen() {
             </View>
           )}
           renderItem={({ item: tx, index, section }) => {
+            /*
+              ⚠️ **"previsto" saiu da frase cinza e virou PÍLULA.** Ele vinha emendado em
+              `previsto · vence 08/10/2026 · assinaturas · Nubank · Cartão · recorrente`, com o
+              mesmo peso do nome do cartão — seis palavras cinzas em que só a primeira diz se
+              aquilo aconteceu. Quem abre o app pela primeira vez não tem como saber qual olhar.
+
+              O "vence DD/MM" continua no subtítulo: ele é DETALHE do estado, não o estado.
+            */
+            const previsto = tx.status === 'pending';
             const badges = [
-              tx.status === 'pending'
-                ? dueInline(tx.kind, tx.due_at ? formatDateBR(tx.due_at) : null, {
-                    onCard: tx.invoice_id !== null,
-                  })
-                : null,
               tx.installment_no ? `parcela ${tx.installment_no}` : null,
               // "na fatura de 10/09" já diz que é do cartão; a pílula solta viraria eco
-              tx.invoice_id && tx.status !== 'pending' ? 'fatura' : null,
+              tx.invoice_id && !previsto ? 'fatura' : null,
+              previsto
+                ? dueInline(tx.kind, tx.due_at ? formatDateBR(tx.due_at) : null, {
+                    onCard: tx.invoice_id !== null,
+                  }).replace(/^previsto( · )?/, '')
+                : null,
             ].filter(Boolean);
             // Transferência não tem sinal na lista global — ela não é entrada nem saída do
             // conjunto. No extrato de UMA conta ela tem: sai da conta de origem e ENTRA na de
@@ -717,6 +726,7 @@ export default function TransactionsScreen() {
                   {({ onLongPress }) => (
                     <Row
                       title={tx.description || tx.merchant || tx.category || 'Sem descrição'}
+                      badge={previsto ? { label: 'previsto', tone: 'warning' } : undefined}
                       subtitle={[...badges, ...context].join(' · ')}
                       icon={categoryIcon(tx.category, tx.kind)}
                       accessibilityLabel={`${tx.description || tx.merchant || tx.category || 'Lançamento'}, ${formatBRL(tx.amount_cents)}, ${tx.kind === 'income' ? 'receita' : tx.kind === 'expense' ? 'despesa' : 'transferência'}, ${dayTitle(tx.occurred_at)}${tx.status === 'pending' ? ', previsto' : ''}`}
