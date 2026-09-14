@@ -19,7 +19,8 @@ import { HeroLabel } from '@/components/ui/section-head';
 import { Segmented } from '@/components/ui/segmented';
 import { MonthRuler, useMonthRuler } from '@/components/finance/month-ruler';
 import { Calendar } from '@/components/finance/calendar';
-import { Sheet, SheetHeader } from '@/components/ui/sheet';
+import { Sheet } from '@/components/ui/sheet';
+import { TaskHeader } from '@/components/ui/task-header';
 import { Skeleton, SkeletonRow } from '@/components/ui/skeleton';
 import { Sparkline } from '@/components/ui/sparkline';
 import { useToast } from '@/components/ui/toast';
@@ -378,6 +379,16 @@ export default function ForecastScreen() {
     );
   };
 
+  /*
+    O corpo do "Somar", que morava inline dentro de um `<Pressable>` de 40 linhas no cabeçalho
+    escrito à mão. Com o `TaskHeader` a ação é um `<Button>`, e regra de negócio não cabe dentro
+    de um slot de cabeçalho.
+  */
+  const somarSuposicao = () => {
+      Haptics.selectionAsync();
+      setCalendarioAberto((aberto) => !aberto);
+  };
+
   return (
     <Screen
       grouped
@@ -404,7 +415,7 @@ export default function ForecastScreen() {
       />
 
       <Sheet visible={horizonteAberto} onClose={() => setHorizonteAberto(false)}>
-        <SheetHeader
+        <TaskHeader
           title="Até quando projetar"
           subtitle={`de hoje até ${isoToBR(ate)}`}
           onClose={() => setHorizonteAberto(false)}
@@ -812,59 +823,18 @@ export default function ForecastScreen() {
         e nada aqui escreve no banco — o "Somar" só empilha no estado local.
       */}
       <Sheet visible={sheetAberto} onClose={() => setSheetAberto(false)}>
-        <View style={styles.sheetCabecalho}>
-          <Pressable accessibilityRole="button" hitSlop={12} onPress={() => setSheetAberto(false)}>
-            <ThemedText type="default" themeColor="tint">
-              Cancelar
-            </ThemedText>
-          </Pressable>
-          <ThemedText type="smallBold">Supor um lançamento</ThemedText>
-          <Pressable
-            accessibilityRole="button"
-            accessibilityState={{ disabled: novoValor <= 0 || novoMes === null }}
-            disabled={novoValor <= 0 || novoMes === null}
-            hitSlop={12}
-            onPress={() => {
-              if (novoValor <= 0 || novoMes === null) return;
-              // Dia 1 do mês escolhido — a granularidade da pergunta é o MÊS ("quanto eu fico
-              // em novembro"), e fingir precisão de dia num número inventado é falsa exatidão.
-              //
-              // ⚠️ Mas nunca ANTES de hoje: a projeção começa hoje, e uma hipótese datada no
-              // passado entra no saldo (o delta vale para todo dia >= início) sem ter um dia na
-              // janela para aparecer em "entra/sai" — o destaque subia e a linha de fluxo
-              // continuava zerada, que foi o que apareceu na verificação de 10/09/2026.
-              const primeiroDia = `${novoMes}-01`;
-              const inicio = primeiroDia < localISODate() ? localISODate() : primeiroDia;
-              setRascunhos((r) => [
-                ...r,
-                {
-                  kind: novoTipo,
-                  amount_cents: novoValor,
-                  start: inicio,
-                  installments: novoModo === 'monthly' ? 1 : novoParcelas,
-                  mode: novoModo,
-                },
-              ]);
-              // ⚠️ Supor num mês além do horizonte aberto estica o horizonte.
-              //
-              // Sem isto, a hipótese entrava na conta e o usuário não via NADA mudar: a janela
-              // de 90 dias não alcança agosto de 2028, e a tabela mês a mês só desenha o que
-              // está na série. O rascunho pareceria ter sido ignorado.
-              const alvo = new Date(Number(novoMes.slice(0, 4)), Number(novoMes.slice(5, 7)), 0);
-              const precisa = Math.ceil((alvo.getTime() - Date.now()) / 86400000);
-              const maior = HORIZONTES.filter((h) => h.dias >= precisa).at(0) ?? HORIZONTES.at(-1)!;
-              if (maior.dias > dias) setDias(maior.dias);
-
-              setSheetAberto(false);
-              setModo('mes');
-            }}>
-            <ThemedText
-              type="smallBold"
-              themeColor={novoValor <= 0 || novoMes === null ? 'textSecondary' : 'tint'}>
-              Somar
-            </ThemedText>
-          </Pressable>
-        </View>
+        <TaskHeader
+          title="Supor um lançamento"
+          onClose={() => setSheetAberto(false)}
+          action={
+            <Button
+              label="Somar"
+              size="sm"
+              disabled={novoValor <= 0 || novoMes === null}
+              onPress={somarSuposicao}
+            />
+          }
+        />
 
         <View style={styles.sheetCorpo}>
           <Field label="É entrada ou saída?">
@@ -1004,13 +974,6 @@ const styles = StyleSheet.create({
   sheetCorpo: {
     gap: Space.md,
     padding: Space.lg,
-  },
-  sheetCabecalho: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    padding: Space.lg,
-    borderBottomWidth: StyleSheet.hairlineWidth,
   },
   corte: {
     paddingHorizontal: Space.md,

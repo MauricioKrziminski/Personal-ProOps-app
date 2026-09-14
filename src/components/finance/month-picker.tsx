@@ -3,7 +3,8 @@ import { useState } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 
 import { ThemedText } from '@/components/themed-text';
-import { Sheet, SheetHeader } from '@/components/ui/sheet';
+import { Sheet } from '@/components/ui/sheet';
+import { TaskHeader } from '@/components/ui/task-header';
 import { Icon } from '@/components/ui/icon';
 import { HitTarget, Radius, Space } from '@/design/tokens';
 import { useTheme } from '@/hooks/use-theme';
@@ -180,7 +181,7 @@ function MonthSheet({
 
   return (
     <Sheet visible={year !== null} onClose={onClose}>
-        <SheetHeader title="Escolher mês" onClose={onClose} />
+        <TaskHeader title="Escolher mês" onClose={onClose} />
 
         <View style={styles.yearRow}>
           <Pressable

@@ -6,7 +6,8 @@ import type { SymbolViewProps } from 'expo-symbols';
 
 import { ThemedText } from '@/components/themed-text';
 import { HeaderActions } from '@/components/ui/header-actions';
-import { Sheet, SheetHeader } from '@/components/ui/sheet';
+import { Sheet } from '@/components/ui/sheet';
+import { TaskHeader } from '@/components/ui/task-header';
 import { ItemLink } from '@/components/ui/item-link';
 import { Button } from '@/components/ui/button';
 import { AccountPicker } from '@/components/finance/account-picker';
@@ -478,7 +479,7 @@ export default function AccountsScreen() {
 
       <Sheet visible={form !== null} onClose={() => setForm(null)}>
 
-          <SheetHeader
+          <TaskHeader
             title={form?.id ? 'Editar conta' : 'Nova conta'}
             onClose={() => setForm(null)}
             action={

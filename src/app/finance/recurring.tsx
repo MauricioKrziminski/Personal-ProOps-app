@@ -8,7 +8,8 @@ import { useMutation, useQuery } from '@tanstack/react-query';
 import { CategoryPicker } from '@/components/finance/category-picker';
 import { ThemedText } from '@/components/themed-text';
 import { HeaderActions } from '@/components/ui/header-actions';
-import { Sheet, SheetHeader } from '@/components/ui/sheet';
+import { Sheet } from '@/components/ui/sheet';
+import { TaskHeader } from '@/components/ui/task-header';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { EmptyState } from '@/components/ui/empty-state';
@@ -618,7 +619,7 @@ export default function RecurringScreen() {
 
       <Sheet visible={form !== null} onClose={() => setForm(null)}>
 
-          <SheetHeader
+          <TaskHeader
             title={form?.id ? 'Editar recorrência' : 'Nova recorrência'}
             onClose={() => setForm(null)}
             action={

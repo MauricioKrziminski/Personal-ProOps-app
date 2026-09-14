@@ -7,7 +7,8 @@ import { Chip } from '@/components/finance/chip';
 import { SelectField } from '@/components/ui/select-field';
 import { ThemedText } from '@/components/themed-text';
 import { HeaderActions } from '@/components/ui/header-actions';
-import { Sheet, SheetHeader } from '@/components/ui/sheet';
+import { Sheet } from '@/components/ui/sheet';
+import { TaskHeader } from '@/components/ui/task-header';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { EmptyState } from '@/components/ui/empty-state';
@@ -435,7 +436,7 @@ export default function DebtsScreen() {
 
       {/* Amortização — sheet, não acordeão: um financiamento em 60x tem 60 linhas. */}
       <Sheet visible={detalhe !== null} onClose={() => setDetalhe(null)}>
-          <SheetHeader
+          <TaskHeader
             title={detalhe?.name ?? 'Dívida'}
             onClose={() => setDetalhe(null)}
           />
@@ -595,7 +596,7 @@ export default function DebtsScreen() {
 
       {/* Pagar parcela — sheet com a conta explicada ANTES de confirmar. */}
       <Sheet visible={pagando !== null} onClose={() => setPagando(null)}>
-          <SheetHeader
+          <TaskHeader
             title="Pagar {pagando?.name}"
             onClose={() => setPagando(null)}
           />
@@ -672,7 +673,7 @@ export default function DebtsScreen() {
 
       {/* Criar / editar */}
       <Sheet visible={form !== null} onClose={() => setForm(null)}>
-          <SheetHeader
+          <TaskHeader
             title={form?.id ? 'Editar dívida' : 'Nova dívida'}
             onClose={() => setForm(null)}
             action={

@@ -9,7 +9,8 @@ import { useMonthRuler } from '@/components/finance/month-ruler';
 import { PeriodBar } from '@/components/finance/period-bar';
 import { ThemedText } from '@/components/themed-text';
 import { HeaderActions } from '@/components/ui/header-actions';
-import { Sheet, SheetHeader } from '@/components/ui/sheet';
+import { Sheet } from '@/components/ui/sheet';
+import { TaskHeader } from '@/components/ui/task-header';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { EmptyState } from '@/components/ui/empty-state';
@@ -524,7 +525,7 @@ export default function BudgetsScreen() {
 
       <Sheet visible={form !== null} onClose={() => setForm(null)}>
 
-          <SheetHeader
+          <TaskHeader
             title={form?.editing ? 'Editar limite' : 'Novo limite'}
             onClose={() => setForm(null)}
             action={

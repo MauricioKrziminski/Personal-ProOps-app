@@ -6,7 +6,8 @@ import { Stack, router, useLocalSearchParams } from 'expo-router';
 
 import { ThemedText } from '@/components/themed-text';
 import { Button } from '@/components/ui/button';
-import { Sheet, SheetHeader } from '@/components/ui/sheet';
+import { Sheet } from '@/components/ui/sheet';
+import { TaskHeader } from '@/components/ui/task-header';
 import { Card } from '@/components/ui/card';
 import { EmptyState } from '@/components/ui/empty-state';
 import { ItemLink } from '@/components/ui/item-link';
@@ -537,7 +538,7 @@ export default function InvoiceScreen() {
 
       <Sheet visible={pagando} onClose={() => setPagando(false)}>
 
-          <SheetHeader
+          <TaskHeader
             title="Pagar fatura"
             onClose={() => setPagando(false)}
           />

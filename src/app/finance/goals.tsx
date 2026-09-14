@@ -5,7 +5,8 @@ import { Stack } from 'expo-router';
 
 import { ThemedText } from '@/components/themed-text';
 import { HeaderActions } from '@/components/ui/header-actions';
-import { Sheet, SheetHeader } from '@/components/ui/sheet';
+import { Sheet } from '@/components/ui/sheet';
+import { TaskHeader } from '@/components/ui/task-header';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { EmptyState } from '@/components/ui/empty-state';
@@ -380,7 +381,7 @@ export default function GoalsScreen() {
 
       {/* Aportar — detent pequeno: um valor, uma nota, dois botões de intenção. */}
       <Sheet visible={aporte !== null} onClose={() => setAporte(null)}>
-          <SheetHeader
+          <TaskHeader
             title={aporte?.name ?? 'Meta'}
             onClose={() => setAporte(null)}
           />
@@ -428,7 +429,7 @@ export default function GoalsScreen() {
 
       {/* Extrato — sheet próprio, lista completa (não o acordeão truncado em 8 linhas). */}
       <Sheet visible={extrato !== null} onClose={() => setExtrato(null)}>
-          <SheetHeader
+          <TaskHeader
             title="Extrato de {extrato?.name}"
             onClose={() => setExtrato(null)}
           />
@@ -499,7 +500,7 @@ export default function GoalsScreen() {
 
       {/* Criar / editar */}
       <Sheet visible={form !== null} onClose={() => setForm(null)}>
-          <SheetHeader
+          <TaskHeader
             title={form?.id ? 'Editar meta' : 'Nova meta'}
             onClose={() => setForm(null)}
             action={

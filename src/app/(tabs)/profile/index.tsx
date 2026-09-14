@@ -17,7 +17,8 @@ import { useToast } from '@/components/ui/toast';
 import { GradientSurface } from '@/components/ui/gradient';
 import { Button } from '@/components/ui/button';
 import { Field, TextField } from '@/components/ui/field';
-import { Sheet, SheetHeader } from '@/components/ui/sheet';
+import { Sheet } from '@/components/ui/sheet';
+import { TaskHeader } from '@/components/ui/task-header';
 import { Motion, Radius, Space, tabular } from '@/design/tokens';
 import { currentMonth } from '@/components/finance/month-picker';
 import { CycleDayPicker } from '@/components/finance/cycle-day-picker';
@@ -482,7 +483,7 @@ export default function ProfileScreen() {
         rota modal nova para uma linha de texto.
       */}
       <Sheet visible={nameDraft !== null} onClose={() => setNameDraft(null)}>
-        <SheetHeader
+        <TaskHeader
           title="Seu nome"
           onClose={() => setNameDraft(null)}
           action={

@@ -5,6 +5,7 @@ import { ThemedText } from '@/components/themed-text';
 import { Button } from '@/components/ui/button';
 import { TextField } from '@/components/ui/field';
 import { Sheet } from '@/components/ui/sheet';
+import { TaskHeader } from '@/components/ui/task-header';
 import { Space, tabular } from '@/design/tokens';
 import { useTheme } from '@/hooks/use-theme';
 import { MAX_TITLE_LENGTH, canSaveTitle } from '@/lib/agent-chat';
@@ -46,24 +47,19 @@ export function RenameConversationSheet({
 
   return (
     <Sheet visible={visible} onClose={onClose}>
-      {/*
-        Cabeçalho Cancelar · título · Salvar, igual ao sheet de nome do Perfil.
-        No Android o `Sheet` é um `Modal` de tela CHEIA (está escrito lá dentro):
-        sem esse cabeçalho e sem calha lateral, o título nascia colado na borda
-        esquerda e a ação primária ficava perdida no meio do corpo — foi o que a
-        conferência no emulador mostrou.
-      */}
-      <View style={styles.cabecalho}>
-        <Button label="Cancelar" variant="ghost" size="sm" onPress={onClose} />
-        <ThemedText type="smallBold">Renomear conversa</ThemedText>
-        <Button
-          label="Salvar"
-          size="sm"
-          onPress={() => onSave(titulo.trim())}
-          disabled={!podeSalvar}
-          loading={saving}
-        />
-      </View>
+      <TaskHeader
+        title="Renomear conversa"
+        onClose={onClose}
+        action={
+          <Button
+            label="Salvar"
+            size="sm"
+            onPress={() => onSave(titulo.trim())}
+            disabled={!podeSalvar}
+            loading={saving}
+          />
+        }
+      />
 
       <View style={styles.corpo}>
         <TextField
@@ -91,12 +87,5 @@ export function RenameConversationSheet({
 }
 
 const styles = StyleSheet.create({
-  cabecalho: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: Space.lg,
-    paddingVertical: Space.md,
-  },
   corpo: { gap: Space.md, paddingHorizontal: Space.lg },
 });

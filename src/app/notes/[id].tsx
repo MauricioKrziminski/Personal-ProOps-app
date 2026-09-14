@@ -14,7 +14,8 @@ import type { SymbolViewProps } from 'expo-symbols';
 
 import { ThemedText } from '@/components/themed-text';
 import { Button } from '@/components/ui/button';
-import { Sheet, SheetHeader } from '@/components/ui/sheet';
+import { Sheet } from '@/components/ui/sheet';
+import { TaskHeader } from '@/components/ui/task-header';
 import { Card } from '@/components/ui/card';
 import { EmptyState } from '@/components/ui/empty-state';
 import { HeaderActions, type HeaderAction } from '@/components/ui/header-actions';
@@ -720,7 +721,7 @@ function TagPicker({
 
   return (
     <Sheet visible={visible} onClose={onClose}>
-        <SheetHeader title="Tags da nota" onClose={onClose} />
+        <TaskHeader title="Tags da nota" onClose={onClose} />
 
         <ScrollView
           contentContainerStyle={styles.sheetBody}
@@ -830,7 +831,7 @@ function FolderPicker({
 
   return (
     <Sheet visible={visible} onClose={onClose}>
-        <SheetHeader title="Mover para" onClose={onClose} />
+        <TaskHeader title="Mover para" onClose={onClose} />
 
         <ScrollView
           contentContainerStyle={styles.sheetBody}

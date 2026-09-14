@@ -9,7 +9,8 @@ import { ErrorCard } from '@/components/error-card';
 import { CategoryPicker } from '@/components/finance/category-picker';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Sheet, SheetHeader } from '@/components/ui/sheet';
+import { Sheet } from '@/components/ui/sheet';
+import { TaskHeader } from '@/components/ui/task-header';
 import { ThemedText } from '@/components/themed-text';
 import { HeaderActions } from '@/components/ui/header-actions';
 import { EmptyState } from '@/components/ui/empty-state';
@@ -250,7 +251,7 @@ export default function RulesScreen() {
       {/* Form sheet: o formulário deixa de empurrar a lista para baixo quando abre. */}
       <Sheet visible={rascunho !== null} onClose={fechar}>
 
-          <SheetHeader
+          <TaskHeader
             title={rascunho?.id ? 'Editar regra' : 'Nova regra'}
             onClose={fechar}
             action={

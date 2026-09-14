@@ -12,7 +12,8 @@ import { AgentApiError } from '@/lib/agent-api';
 import { ErrorCard } from '@/components/error-card';
 import { Chip } from '@/components/finance/chip';
 import { Card } from '@/components/ui/card';
-import { Sheet, SheetHeader } from '@/components/ui/sheet';
+import { Sheet } from '@/components/ui/sheet';
+import { TaskHeader } from '@/components/ui/task-header';
 import { ThemedText } from '@/components/themed-text';
 import { HeaderMenu } from '@/components/ui/header-actions';
 import { Button } from '@/components/ui/button';
@@ -495,7 +496,7 @@ export default function ImportScreen() {
 
       {/* Trocar categoria: sheet, não accordion que empurra a lista. */}
       <Sheet visible={editando !== null} onClose={() => setEditando(null)}>
-          <SheetHeader
+          <TaskHeader
             title={editando?.description ?? 'Categoria'}
             onClose={() => setEditando(null)}
           />

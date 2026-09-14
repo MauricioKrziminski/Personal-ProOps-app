@@ -5,6 +5,7 @@ import { ThemedText } from '@/components/themed-text';
 import { Button } from '@/components/ui/button';
 import { Row, Section } from '@/components/ui/row';
 import { Sheet } from '@/components/ui/sheet';
+import { TaskHeader } from '@/components/ui/task-header';
 import { Space } from '@/design/tokens';
 import type { AgentUiPayload } from '@/lib/agent-api';
 import { hitlControlsDisabled, parseUiActions, type UiOption } from '@/lib/agent-chat';
@@ -116,12 +117,7 @@ export const ChatActions = memo(function ChatActions({ payload, busy, onDecide }
         />
 
         <Sheet visible={aberto} onClose={() => setAberto(false)}>
-          <View style={styles.cabecalho}>
-            <Button label="Cancelar" variant="ghost" size="sm" onPress={() => setAberto(false)} />
-            <ThemedText type="smallBold">Escolher</ThemedText>
-            {/* Contrapeso do "Cancelar": sem ele o título não fica centrado. */}
-            <View style={styles.contrapeso} />
-          </View>
+          <TaskHeader title="Escolher" onClose={() => setAberto(false)} />
 
           <View style={styles.corpo}>
             <Section>
@@ -173,13 +169,5 @@ export const ChatActions = memo(function ChatActions({ payload, busy, onDecide }
 
 const styles = StyleSheet.create({
   bloco: { gap: Space.sm, paddingTop: Space.sm, maxWidth: '86%' },
-  cabecalho: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: Space.lg,
-    paddingVertical: Space.sm,
-  },
-  contrapeso: { width: 72 },
   corpo: { paddingHorizontal: Space.lg, paddingTop: Space.md, gap: Space.md },
 });

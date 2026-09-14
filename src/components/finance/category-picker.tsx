@@ -3,10 +3,10 @@ import { ScrollView, StyleSheet, View } from 'react-native';
 
 import { Chip } from '@/components/finance/chip';
 import { ThemedText } from '@/components/themed-text';
-import { Button } from '@/components/ui/button';
 import { Row } from '@/components/ui/row';
 import { SearchField } from '@/components/ui/search-field';
 import { Sheet } from '@/components/ui/sheet';
+import { TaskHeader } from '@/components/ui/task-header';
 import { Space } from '@/design/tokens';
 import { useCategoriesUsed } from '@/hooks/use-finance';
 import { SUGGESTED_CATEGORIES } from '@/lib/categories';
@@ -86,12 +86,8 @@ export function CategoryPicker({
       </View>
 
       <Sheet visible={aberto} onClose={() => setAberto(false)}>
-        <View style={styles.head}>
-          <Button label="Cancelar" variant="ghost" size="sm" onPress={() => setAberto(false)} />
-          <ThemedText type="smallBold">Categoria</ThemedText>
-          {/* Simetria da faixa: o sheet fecha por Cancelar ou pela escolha, não por "Salvar". */}
-          <View style={styles.headSpacer} />
-        </View>
+        {/* Sem `action`: este sheet fecha por escolher uma categoria ou pelo ✕, não por Salvar. */}
+        <TaskHeader title="Categoria" onClose={() => setAberto(false)} />
 
         <View style={styles.searchSlot}>
           <SearchField
@@ -141,14 +137,6 @@ export function CategoryPicker({
 
 const styles = StyleSheet.create({
   chipRow: { flexDirection: 'row', flexWrap: 'wrap', gap: Space.sm },
-  head: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: Space.lg,
-    paddingBottom: Space.md,
-  },
-  headSpacer: { width: 72 },
   searchSlot: { paddingHorizontal: Space.lg },
   body: { padding: Space.lg, gap: Space.xs },
 });
