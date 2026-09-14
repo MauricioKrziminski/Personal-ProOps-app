@@ -14,7 +14,7 @@ import { ItemLink } from '@/components/ui/item-link';
 import { Field, MoneyField } from '@/components/ui/field';
 import { DatePickerField } from '@/components/finance/date-picker-field';
 import { Icon } from '@/components/ui/icon';
-import { concealText, useConceal } from '@/components/ui/conceal';
+import { concealText, useBRL, useConceal } from '@/components/ui/conceal';
 import { Money } from '@/components/ui/money';
 import { Row, Section } from '@/components/ui/row';
 import { HeaderMenu } from '@/components/ui/header-actions';
@@ -166,6 +166,7 @@ export default function InvoiceScreen() {
    * `lançado × previsto` mostrado lado a lado convida a uma conferência que não fecha.
    */
   const { concealed } = useConceal();
+  const brl = useBRL();
   const hoje = localISODate();
   const aindaVem = compras
     .filter((t) => t.kind === 'expense' && t.occurred_at > hoje)
@@ -417,7 +418,7 @@ export default function InvoiceScreen() {
               <View style={styles.pagaLinha}>
                 <Icon name="clock.fill" size="md" color="warning" />
                 <ThemedText type="small" themeColor="textSecondary" style={tabular}>
-                  Pago {formatBRL(jaPago)} · falta {formatBRL(falta)}
+                  Pago {brl(jaPago)} · falta {brl(falta)}
                 </ThemedText>
               </View>
             ) : null}

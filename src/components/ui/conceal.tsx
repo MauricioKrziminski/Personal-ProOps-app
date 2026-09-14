@@ -1,6 +1,8 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
 
+import { formatBRL } from '@/hooks/use-items';
+
 const KEY = 'proops.conceal';
 
 interface ConcealValue {
@@ -64,6 +66,27 @@ export function ConcealProvider({ children }: { children: React.ReactNode }) {
 
 export function useConceal() {
   return useContext(Ctx);
+}
+
+/**
+ * `formatBRL` que obedece ao "esconder saldo" — para valor no MEIO de uma frase.
+ *
+ * ⚠️ **Existe porque `<Money>` não serve em texto corrido.** `Money` é um `<Text>` irmão com
+ * `flexShrink: 0`; enfiado dentro de "entra X · sai Y" ele quebra a sentença em pedaços que se
+ * alinham sozinhos. Então toda frase com dinheiro caía no `formatBRL` cru — e o olho que esconde
+ * o total do topo deixava o mesmo número escrito por extenso três linhas abaixo.
+ *
+ * Esconder num lugar e vazar em três é a falha nº 1 deste padrão, e está escrita no cabeçalho
+ * deste arquivo: *"meio-olho é pior que nenhum olho"*.
+ *
+ * ⚠️ **É HOOK de propósito, e `formatBRL` continua puro.** Um formatador que lesse o estado por
+ * variável de módulo devolveria texto diferente sem o React saber — e qualquer string montada
+ * dentro de um `useMemo` ficaria com o valor à mostra depois de apertar o olho, em silêncio.
+ * Sendo hook, `concealed` entra nas dependências e o compilador cobra.
+ */
+export function useBRL(): (cents: number) => string {
+  const { concealed } = useConceal();
+  return useCallback((cents: number) => (concealed ? MASK : formatBRL(cents)), [concealed]);
 }
 
 /**

@@ -2,6 +2,7 @@ import { router, useLocalSearchParams } from 'expo-router';
 import { useMemo, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 
+import { useBRL } from '@/components/ui/conceal';
 import { ErrorCard } from '@/components/error-card';
 import { monthTitle } from '@/components/finance/month-picker';
 import { ThemedText } from '@/components/themed-text';
@@ -15,7 +16,6 @@ import { Screen } from '@/components/ui/screen';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Radius, Space } from '@/design/tokens';
 import { type CycleLine, type CycleRow, type CycleView, useCycleLines, useCycleMonth, useCycleSeries, useInvoice } from '@/hooks/use-finance';
-import { formatBRL } from '@/hooks/use-items';
 import { describeCycle } from '@/lib/cycle-label';
 import { rotaDaLinha } from '@/lib/cycle-routes';
 import { isoToBR } from '@/lib/dates';
@@ -46,6 +46,8 @@ import { isoToBR } from '@/lib/dates';
  * pagaria o custo mesmo com ninguém abrindo nada.
  */
 export default function CycleDetailScreen() {
+  // Dinheiro no meio de frase obedece ao "esconder saldo" — `Money` não cabe em texto corrido.
+  const brl = useBRL();
   const params = useLocalSearchParams<{ month?: string; view?: string; tipo?: string }>();
   const view = (params.view === 'civil' ? 'civil' : 'cycle') as CycleView;
   /*
@@ -63,7 +65,7 @@ export default function CycleDetailScreen() {
   const linhas = useCycleLines(month, view);
   const ciclo = serie.data?.find((c) => c.mes.startsWith(month)) ?? null;
 
-  const grupos = useMemo(() => agrupar(linhas.data ?? []), [linhas.data]);
+  const grupos = useMemo(() => agrupar(linhas.data ?? [], brl), [linhas.data, brl]);
 
   if (serie.isError || linhas.isError) {
     return (
@@ -219,7 +221,11 @@ function Linha({ linha, expandida }: { linha: CycleLine; expandida: boolean }) {
  * que sai da conta, o financiamento, e as entradas por último — quem abre esta tela veio entender
  * um número ruim, não comemorar o salário.
  */
-function agrupar(linhas: CycleLine[]) {
+/**
+ * ⚠️ **`brl` entra por PARÂMETRO, não por hook.** Isto é helper de módulo, e o subtotal do
+ * cabeçalho é dinheiro visível: precisa obedecer ao "esconder saldo" como o resto da tela.
+ */
+function agrupar(linhas: CycleLine[], brl: (cents: number) => string) {
   const balde = (l: CycleLine) => {
     if (Number(l.in_cents) > 0) return 'Entradas';
     if (l.origin === 'invoice' || l.origin === 'invoice_payment') return 'Faturas de cartão';
@@ -247,7 +253,7 @@ function agrupar(linhas: CycleLine[]) {
     .filter((t) => mapa.has(t))
     .map((titulo) => ({
       // O subtotal mora no cabeçalho: sem ele, "qual grupo pesou" só sai somando de cabeça.
-      titulo: `${titulo} · ${formatBRL(
+      titulo: `${titulo} · ${brl(
         (mapa.get(titulo) ?? []).reduce((s, l) => s + Number(l.in_cents) + Number(l.out_cents), 0),
       )}`,
       linhas: (mapa.get(titulo) ?? []).sort((a, b) => a.day.localeCompare(b.day)),

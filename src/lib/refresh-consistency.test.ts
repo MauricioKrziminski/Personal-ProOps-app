@@ -279,6 +279,12 @@ function renderToday(bill: { kind: 'invoice' | 'transaction'; ref_id: string }) 
     if (name === '@/hooks/use-session') return { useSession: () => ({ session: null }) };
     if (name === '@/hooks/use-theme') return { useTheme: () => ({}) };
     if (name === '@/components/ui/toast') return { useToast: () => () => {} };
+    // O provider de "esconder saldo" só existe na árvore real; aqui o valor aparece.
+    if (name === '@/components/ui/conceal') return {
+      useConceal: () => ({ concealed: false, toggle: () => {} }),
+      concealText: () => '••••••',
+      useBRL: () => (cents: number) => `R$ ${(cents / 100).toFixed(2)}`,
+    };
     if (name === '@/components/ui/app-header') return { AppHeader: 'AppHeader', useAppHeaderHeight: () => 80 };
     if (name === '@/design/tokens') return { Space: {}, Radius: {}, tabular: {}, Motion: { duration: { base: 200 }, stagger: { step: 30, cap: 400 } } };
     // O Reanimated não roda fora do device; aqui só precisa que `Animated.View` seja um nó com

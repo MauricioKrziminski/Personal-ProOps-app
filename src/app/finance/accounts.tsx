@@ -4,6 +4,7 @@ import Animated, { FadeInDown } from 'react-native-reanimated';
 import { Stack, router } from 'expo-router';
 import type { SymbolViewProps } from 'expo-symbols';
 
+import { useBRL } from '@/components/ui/conceal';
 import { ThemedText } from '@/components/themed-text';
 import { HeaderActions } from '@/components/ui/header-actions';
 import { Sheet } from '@/components/ui/sheet';
@@ -137,6 +138,8 @@ function ErrorBand({ message, onRetry }: { message: string; onRetry: () => void 
 }
 
 export default function AccountsScreen() {
+  // Dinheiro no meio de frase obedece ao "esconder saldo" — `Money` não cabe em texto corrido.
+  const brl = useBRL();
   const toast = useToast();
   const balances = useAccountBalances();
   const accounts = useAccounts();
@@ -283,8 +286,8 @@ export default function AccountsScreen() {
     const previstoTexto =
       previsto > 0
         ? cartao
-          ? `${formatBRL(previsto)} em parcelas futuras`
-          : `${formatBRL(previsto)} a receber`
+          ? `${brl(previsto)} em parcelas futuras`
+          : `${brl(previsto)} a receber`
         : null;
 
     return (
@@ -376,7 +379,7 @@ export default function AccountsScreen() {
             */}
             {aReceber > 0 ? (
               <ThemedText type="footnote" themeColor="textSecondary" style={tabular}>
-                mais {formatBRL(aReceber)} previstos, que entram quando você confirmar
+                mais {brl(aReceber)} previstos, que entram quando você confirmar
               </ThemedText>
             ) : null}
             <View style={styles.heroSplit}>

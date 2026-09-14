@@ -3,6 +3,7 @@ import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { Stack, router } from 'expo-router';
 import Animated, { FadeInDown, LinearTransition } from 'react-native-reanimated';
 
+import { useBRL } from '@/components/ui/conceal';
 import { monthLabel, monthShort, shiftMonth } from '@/components/finance/month-picker';
 import { ThemedText } from '@/components/themed-text';
 import { Card } from '@/components/ui/card';
@@ -69,6 +70,8 @@ function Bar({
 }
 
 export default function InstallmentsScreen() {
+  // Dinheiro no meio de frase obedece ao "esconder saldo" — `Money` não cabe em texto corrido.
+  const brl = useBRL();
   const theme = useTheme();
   const toast = useToast();
   const plans = useInstallmentPlans();
@@ -258,7 +261,7 @@ export default function InstallmentsScreen() {
     );
     const atual = nextPendingInstallment(parcelas, plano.installments);
     const resumo = plano.active
-      ? `${atual} de ${plano.installments} · ${formatBRL(plano.installment_cents)} por mês`
+      ? `${atual} de ${plano.installments} · ${brl(plano.installment_cents)} por mês`
       : `${plano.installments} de ${plano.installments} · quitada`;
 
     return (
@@ -388,7 +391,7 @@ export default function InstallmentsScreen() {
             <Money cents={comprometido} variant="money" />
             <ThemedText type="small" themeColor="textSecondary" style={tabular}>
               {comprometido > 0
-                ? `${formatBRL(media)} por mês em média${ultimaParcela ? ` · última parcela em ${monthLabel(ultimaParcela)}` : ''}`
+                ? `${brl(media)} por mês em média${ultimaParcela ? ` · última parcela em ${monthLabel(ultimaParcela)}` : ''}`
                 : 'Nada parcelado em aberto.'}
             </ThemedText>
           </Card>
@@ -434,7 +437,7 @@ export default function InstallmentsScreen() {
             ))}
           </ScrollView>
           <ThemedText type="small" themeColor="textSecondary" style={tabular}>
-            {`Mês mais pesado: ${formatBRL(maiorDaFaixa)}`}
+            {`Mês mais pesado: ${brl(maiorDaFaixa)}`}
           </ThemedText>
         </Card>
       ) : null}

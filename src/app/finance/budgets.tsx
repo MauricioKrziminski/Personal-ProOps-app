@@ -4,6 +4,7 @@ import Animated, { FadeInDown, LinearTransition } from 'react-native-reanimated'
 import { Stack, router } from 'expo-router';
 import { useQuery } from '@tanstack/react-query';
 
+import { useBRL } from '@/components/ui/conceal';
 import { Chip } from '@/components/finance/chip';
 import { useMonthRuler } from '@/components/finance/month-ruler';
 import { PeriodBar } from '@/components/finance/period-bar';
@@ -120,6 +121,8 @@ function ErrorBand({ message, onRetry }: { message: string; onRetry: () => void 
 }
 
 export default function BudgetsScreen() {
+  // Dinheiro no meio de frase obedece ao "esconder saldo" — `Money` não cabe em texto corrido.
+  const brl = useBRL();
   const toast = useToast();
   /**
    * ⚠️ **O mês corrente é o do CICLO, não o civil** — e a diferença aparece por até 20 dias.
@@ -368,8 +371,8 @@ export default function BudgetsScreen() {
                 type="small"
                 themeColor={estourou ? 'danger' : 'textSecondary'}
                 style={tabular}>
-                {`mais ${formatBRL(comprometido)} em contas previstas — ${
-                  estourou ? `passa em ${formatBRL(Math.abs(sobra))}` : `sobram ${formatBRL(sobra)}`
+                {`mais ${brl(comprometido)} em contas previstas — ${
+                  estourou ? `passa em ${brl(Math.abs(sobra))}` : `sobram ${brl(sobra)}`
                 }`}
               </ThemedText>
             ) : null}

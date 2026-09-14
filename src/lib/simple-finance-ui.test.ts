@@ -85,6 +85,7 @@ function screen(file: string, options: { debts?: any[]; invoiceStatus?: string; 
       if (name === '@/components/ui/conceal') return {
         useConceal: () => ({ concealed: false, toggle: () => {} }),
         concealText: () => '••••••',
+        useBRL: () => (cents: number) => `R$ ${(cents / 100).toFixed(2)}`,
       };
       if (name === '@/design/tokens') return { Motion: { duration: {}, stagger: {} }, Space: {}, Radius: {}, tabular: {} };
       return new Proxy({}, { get: (_, key) => String(key) });

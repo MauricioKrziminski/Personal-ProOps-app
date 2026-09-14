@@ -784,3 +784,69 @@ test('o resumo e a lista de lançamentos leem a mesma janela', () => {
     'o total do topo soma a lista de baixo: as duas leituras saem do MESMO useMonthRange'
   );
 });
+
+/**
+ * Dinheiro visível obedece ao "esconder saldo".
+ *
+ * `formatBRL` é puro e não conhece o olho do painel — então toda frase que interpolava um valor
+ * (`entra X · sai Y`, `usado X de Y`, `mais X previstos`) continuava escrevendo o número por
+ * extenso depois de a pessoa esconder o total logo acima. Esconder num lugar e vazar em três é a
+ * falha nº 1 deste padrão, e o próprio `conceal.tsx` já dizia isso no cabeçalho: *"meio-olho é
+ * pior que nenhum olho"*.
+ *
+ * O caminho é `<Money>` (bloco) ou `useBRL()` (dentro de frase). A allowlist abaixo é o que
+ * **não** deve esconder, e cada entrada precisa do motivo escrito.
+ */
+test('valor em texto visível passa por Money ou useBRL', () => {
+  /** Onde `formatBRL` cru está CERTO — e por quê. */
+  const PERMITIDO: Record<string, string> = {
+    'components/ui/money.tsx': 'é quem implementa o esconder',
+    'components/ui/count-up-money.tsx': 'idem, na variante animada',
+    'components/ui/conceal.tsx': 'é o próprio useBRL',
+    // Superfície de DECISÃO: a pessoa está confirmando ou digitando ESTE valor agora, e
+    // esconder o número que ela precisa conferir é o oposto de proteger (é a mesma régua do
+    // `concealable={false}` do Money). Vale para toast, action sheet destrutivo e erro de campo.
+    'app/finance/transaction-form.tsx': 'valor sendo digitado e a dica de parcelamento dele',
+    'lib/dates.ts': 'é onde formatBRL nasce',
+    'lib/brl-worklet.ts': 'deriva o separador do formatador, não mostra valor',
+    'lib/month-view.ts': 'helper puro, sem tela chamando — quando tiver, recebe o brl por parâmetro',
+  };
+  const fora: string[] = [];
+  for (const file of walk(SRC)) {
+    const rel = file.replace(`${SRC}/`, '');
+    if (PERMITIDO[rel]) continue;
+    // Linhas CRUAS: `stripComments` apaga blocos inteiros e desloca a numeração, e este teste
+    // aponta arquivo:linha. Comentário de uma linha é descartado no filtro abaixo.
+    const linhas = readFileSync(file, 'utf8').split('\n');
+    linhas.forEach((linha, i) => {
+      if (!linha.includes('formatBRL(')) return;
+      if (/^\s*(\/\/|\*|\/\*)/.test(linha)) return;
+      if (/^\s*import /.test(linha)) return;
+      // Já trata o esconder na própria linha.
+      if (/concealed \?/.test(linha)) return;
+      /*
+        a11y é lido por quem já está com o aparelho na mão; confirmação, toast e erro de campo
+        são superfície de DECISÃO — esconder o número que a pessoa precisa conferir agora é o
+        oposto de proteger (mesma régua do `concealable={false}` do Money).
+
+        A janela olha para os DOIS lados porque essas chamadas são quase sempre multilinha, e o
+        marcador cai ora antes ora depois: `accessibilityLabel=` abre antes do valor, mas o
+        `toast({...})` do rotativo é montado em `partes[]` várias linhas ACIMA da chamada.
+      */
+      const janela = linhas.slice(Math.max(0, i - 6), i + 7).join(' ');
+      if (
+        /accessibilityLabel|confirmDestructive|toast\(|message:|const what =|`Some |hint=|error=|label=/.test(
+          janela
+        )
+      ) {
+        return;
+      }
+      fora.push(`${rel}:${i + 1}`);
+    });
+  }
+  assert.deepEqual(
+    fora,
+    [],
+    'dinheiro que a tela mostra sai de <Money> ou de useBRL() — formatBRL cru ignora o esconder saldo'
+  );
+});

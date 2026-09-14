@@ -3,6 +3,7 @@ import { StyleSheet, View } from 'react-native';
 import Animated, { FadeInDown } from 'react-native-reanimated';
 import type { SymbolViewProps } from 'expo-symbols';
 
+import { useBRL } from '@/components/ui/conceal';
 import { ErrorCard } from '@/components/error-card';
 import { currentMonth, monthTitle } from '@/components/finance/month-picker';
 import { Card } from '@/components/ui/card';
@@ -74,6 +75,8 @@ function longDate(iso: string): string {
 }
 
 export default function TransactionDetailScreen() {
+  // Dinheiro no meio de frase obedece ao "esconder saldo" — `Money` não cabe em texto corrido.
+  const brl = useBRL();
   const toast = useToast();
   const params = useLocalSearchParams<{ txId: string; month?: string }>();
   const txId = params.txId;
@@ -382,7 +385,7 @@ export default function TransactionDetailScreen() {
               title={serie ? `Repete ${describeRRule(serie.rrule)}` : 'Faz parte de uma recorrência'}
               subtitle={
                 serie
-                  ? `${formatBRL(serie.amount_cents)} por vez · editar a série`
+                  ? `${brl(serie.amount_cents)} por vez · editar a série`
                   : 'Editar a série que gera este lançamento'
               }
               icon="repeat"
@@ -403,7 +406,7 @@ export default function TransactionDetailScreen() {
               }
               subtitle={
                 plano
-                  ? `${formatBRL(plano.total_cents)} no total · ver todas as parcelas`
+                  ? `${brl(plano.total_cents)} no total · ver todas as parcelas`
                   : 'Ver todas as parcelas'
               }
               icon="rectangle.split.3x1"

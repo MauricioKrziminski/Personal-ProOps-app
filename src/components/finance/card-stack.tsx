@@ -9,6 +9,7 @@ import Animated, {
   withTiming,
 } from 'react-native-reanimated';
 
+import { useBRL } from '@/components/ui/conceal';
 import { ThemedText } from '@/components/themed-text';
 import { Icon } from '@/components/ui/icon';
 import { GradientSurface } from '@/components/ui/gradient';
@@ -284,6 +285,8 @@ function CardFace({
   onPress: () => void;
   onOpen: () => void;
 }) {
+  // O disponível do cartão é saldo: obedece ao "esconder saldo" como o resto do app.
+  const brl = useBRL();
   const theme = useTheme();
   const press = useSharedValue(1);
 
@@ -461,7 +464,7 @@ function CardFace({
                 Disponível:
               </ThemedText>
               <ThemedText type="code" themeColor="onHeroSuccess" style={tabular}>
-                {formatBRL(Number(card.available_limit_cents ?? 0))}
+                {brl(Number(card.available_limit_cents ?? 0))}
               </ThemedText>
             </View>
           ) : null}

@@ -3,6 +3,7 @@ import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import Animated, { FadeInDown, LinearTransition } from 'react-native-reanimated';
 import { Stack } from 'expo-router';
 
+import { useBRL } from '@/components/ui/conceal';
 import { ThemedText } from '@/components/themed-text';
 import { HeaderActions } from '@/components/ui/header-actions';
 import { Sheet } from '@/components/ui/sheet';
@@ -84,6 +85,8 @@ function ErrorBand({ message, onRetry }: { message: string; onRetry: () => void 
 }
 
 export default function GoalsScreen() {
+  // Dinheiro no meio de frase obedece ao "esconder saldo" — `Money` não cabe em texto corrido.
+  const brl = useBRL();
   const toast = useToast();
   const goals = useGoals();
   const save = useSaveGoal();
@@ -452,7 +455,7 @@ export default function GoalsScreen() {
             {mesesDoExtrato().map(([mes, grupo]) => (
               <Section
                 key={mes}
-                title={`${new Date(Number(mes.slice(0, 4)), Number(mes.slice(5, 7)) - 1, 1).toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' })} · ${formatBRL(grupo.total)}`}>
+                title={`${new Date(Number(mes.slice(0, 4)), Number(mes.slice(5, 7)) - 1, 1).toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' })} · ${brl(grupo.total)}`}>
                 {(grupo.itens ?? []).map((c) => (
                   <Row
                     key={c.id}

@@ -3,6 +3,7 @@ import { router } from 'expo-router';
 import { Pressable, StyleSheet, View } from 'react-native';
 import Animated, { FadeInDown, FadeOut, LinearTransition } from 'react-native-reanimated';
 
+import { useBRL } from '@/components/ui/conceal';
 import { ThemedText } from '@/components/themed-text';
 import { ErrorCard } from '@/components/error-card';
 import { AppHeader } from '@/components/ui/app-header';
@@ -27,7 +28,7 @@ import {
   useUpcomingBills,
 } from '@/hooks/use-finance';
 import { categoryIcon } from '@/design/category-icons';
-import { formatBRL, formatDateBR, localISODate, useTodayReminders } from '@/hooks/use-items';
+import { formatDateBR, localISODate, useTodayReminders } from '@/hooks/use-items';
 import { useProfile } from '@/hooks/use-profile';
 import { useSession } from '@/hooks/use-session';
 import { useTheme } from '@/hooks/use-theme';
@@ -106,6 +107,8 @@ function Secao({ index, children }: { index: number; children: React.ReactNode }
 }
 
 export default function TodayScreen() {
+  // Dinheiro no meio de frase obedece ao "esconder saldo" — `Money` não cabe em texto corrido.
+  const brl = useBRL();
   const theme = useTheme();
   const toast = useToast();
 
@@ -227,11 +230,11 @@ export default function TodayScreen() {
   const porDia = livre > 0 ? Math.floor(livre / diasLivres) : 0;
   const veredito: { icon: React.ComponentProps<typeof Icon>['name']; negative: boolean; text: string } =
     atrasadoCents > 0
-      ? { icon: 'exclamationmark.triangle', negative: true, text: `${formatBRL(atrasadoCents)} atrasado` }
+      ? { icon: 'exclamationmark.triangle', negative: true, text: `${brl(atrasadoCents)} atrasado` }
       : venceHojeCents > 0
-        ? { icon: 'clock', negative: true, text: `${formatBRL(venceHojeCents)} vence hoje` }
+        ? { icon: 'clock', negative: true, text: `${brl(venceHojeCents)} vence hoje` }
         : porDia >= 100
-          ? { icon: 'calendar', negative: false, text: `≈ ${formatBRL(porDia)} por dia · ${diasLivres} ${diasLivres === 1 ? 'dia' : 'dias'}` }
+          ? { icon: 'calendar', negative: false, text: `≈ ${brl(porDia)} por dia · ${diasLivres} ${diasLivres === 1 ? 'dia' : 'dias'}` }
           : { icon: 'checkmark.circle', negative: false, text: `Nada vence hoje · ${diasLivres} ${diasLivres === 1 ? 'dia' : 'dias'} até entrar` };
 
   const loading = gasto.isLoading || bills.isLoading || reminders.isLoading;
@@ -747,7 +750,7 @@ export default function TodayScreen() {
                         {b.category}
                       </ThemedText>
                       <ThemedText type="caption" themeColor="textSecondary">
-                        {`Limite do mês: ${formatBRL(limit)}`}
+                        {`Limite do mês: ${brl(limit)}`}
                       </ThemedText>
                     </View>
                     <ThemedText type="ticker" themeColor={left < 0 ? 'danger' : 'text'} style={tabular}>
@@ -761,7 +764,7 @@ export default function TodayScreen() {
                     <View style={styles.tag}>
                       <Icon name="exclamationmark.triangle" size="xs" color={left < 0 ? 'danger' : 'warning'} />
                       <ThemedText type="caption" themeColor={left < 0 ? 'danger' : 'warning'}>
-                        {left < 0 ? `${formatBRL(-left)} acima` : `${formatBRL(left)} restantes`}
+                        {left < 0 ? `${brl(-left)} acima` : `${brl(left)} restantes`}
                       </ThemedText>
                     </View>
                     <ThemedText type="caption" themeColor="textSecondary">
@@ -811,7 +814,7 @@ export default function TodayScreen() {
                 </View>
                 <View style={[styles.amountBadge, { backgroundColor: theme.surfaceRaised }]}>
                   <ThemedText type="code" themeColor="textSecondary" style={tabular}>
-                    {`${captured.kind === 'income' ? '+' : '−'} ${formatBRL(Number(captured.amount_cents))}`}
+                    {`${captured.kind === 'income' ? '+' : '−'} ${brl(Number(captured.amount_cents))}`}
                   </ThemedText>
                 </View>
               </View>

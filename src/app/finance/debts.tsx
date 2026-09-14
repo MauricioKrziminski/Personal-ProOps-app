@@ -3,6 +3,7 @@ import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import Animated, { FadeInDown, LinearTransition } from 'react-native-reanimated';
 import { Stack, useLocalSearchParams } from 'expo-router';
 
+import { useBRL } from '@/components/ui/conceal';
 import { Chip } from '@/components/finance/chip';
 import { SelectField } from '@/components/ui/select-field';
 import { ThemedText } from '@/components/themed-text';
@@ -115,6 +116,8 @@ function ErrorBand({ message, onRetry }: { message: string; onRetry: () => void 
 }
 
 export default function DebtsScreen() {
+  // Dinheiro no meio de frase obedece ao "esconder saldo" — `Money` não cabe em texto corrido.
+  const brl = useBRL();
   const params = useLocalSearchParams<{ create?: string; id?: string }>();
   const theme = useTheme();
   const toast = useToast();
@@ -707,7 +710,7 @@ export default function DebtsScreen() {
                   <TextField value={form.diaVencimento} onChangeText={(value) => setForm({ ...form, diaVencimento: value.replace(/\D/g, '').slice(0, 2) })} keyboardType="number-pad" placeholder="10" />
                 </Field>
                 {simpleValues && <Card>
-                  <ThemedText type="small">{`${simpleValues.installments - form.installmentsPaid} parcelas de ${formatBRL(form.installmentCents)} a pagar`}</ThemedText>
+                  <ThemedText type="small">{`${simpleValues.installments - form.installmentsPaid} parcelas de ${brl(form.installmentCents)} a pagar`}</ThemedText>
                   <Money cents={simpleValues.remaining_cents} variant="headline" />
                   <ThemedText type="caption" themeColor="textSecondary">Total das parcelas restantes. Não é uma simulação de juros.</ThemedText>
                 </Card>}
@@ -780,7 +783,7 @@ export default function DebtsScreen() {
                     accessibilityLabel="Juros por mês, em porcentagem"
                     accessibilityHint={
                       fracao > 0
-                        ? `${taxaLabel(fracao)} dá ${formatBRL(Math.round(form.remainingCents * fracao))} de juros no primeiro mês`
+                        ? `${taxaLabel(fracao)} dá ${brl(Math.round(form.remainingCents * fracao))} de juros no primeiro mês`
                         : undefined
                     }
                     style={styles.taxaInput}

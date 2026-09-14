@@ -11,6 +11,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';
 import type { SymbolViewProps } from 'expo-symbols';
 
+import { useBRL } from '@/components/ui/conceal';
 import { ErrorCard } from '@/components/error-card';
 import { monthLabel, monthShort, monthTitle, shiftMonth } from '@/components/finance/month-picker';
 import { useMonthRuler } from '@/components/finance/month-ruler';
@@ -256,6 +257,8 @@ function daysToMonthEnd(): number {
 }
 
 export default function FinanceScreen() {
+  // Dinheiro no meio de frase obedece ao "esconder saldo" — `Money` não cabe em texto corrido.
+  const brl = useBRL();
   const theme = useTheme();
   const scheme = useScheme();
   const toast = useToast();
@@ -542,7 +545,7 @@ export default function FinanceScreen() {
                     <ThemedText
                       type="caption"
                       themeColor={cicloRuim ? 'onHeroDanger' : 'onHeroSuccess'}>
-                      {`${formatBRL(descricao?.cents ?? 0)} projetado`}
+                      {`${brl(descricao?.cents ?? 0)} projetado`}
                     </ThemedText>
                     <ThemedText type="caption" themeColor="onHeroMuted">
                       {fimDoCiclo ? isoToBR(fimDoCiclo).slice(0, 5) : ''}
@@ -689,7 +692,7 @@ export default function FinanceScreen() {
                 title="Dívidas"
                 icon="banknote"
                 href="/finance/debts"
-                count={formatBRL(
+                count={brl(
                   debts.data.reduce((soma, d) => soma + Number(d.remaining_cents), 0),
                 )}
               />
@@ -719,7 +722,7 @@ export default function FinanceScreen() {
                         type="small"
                         themeColor={pct >= 1 ? 'danger' : 'warning'}
                         style={tabular}>
-                        {Math.round(pct * 100)}% de {formatBRL(Number(b.limit_cents))}
+                        {Math.round(pct * 100)}% de {brl(Number(b.limit_cents))}
                       </ThemedText>
                     </View>
                     <ProgressBar

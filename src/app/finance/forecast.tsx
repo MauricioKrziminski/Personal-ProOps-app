@@ -4,6 +4,7 @@ import Animated, { FadeIn, FadeInDown } from 'react-native-reanimated';
 import { Stack, router } from 'expo-router';
 import * as Haptics from 'expo-haptics';
 
+import { useBRL } from '@/components/ui/conceal';
 import { ThemedText } from '@/components/themed-text';
 import { HeaderActions } from '@/components/ui/header-actions';
 import { Button } from '@/components/ui/button';
@@ -84,20 +85,26 @@ import { settleDone, settleLabel } from '@/lib/settle-labels';
  * A última linha tem o problema espelhado — ela é parcial porque o HORIZONTE corta ali, não
  * porque falta acontecer.
  */
-function legendaDoMes(m: MesProjetado, primeiro: boolean, ultimo: boolean): string {
+function legendaDoMes(
+  m: MesProjetado,
+  primeiro: boolean,
+  ultimo: boolean,
+  // Helper de módulo: o formatador entra por parâmetro para a legenda obedecer ao "esconder saldo".
+  brl: (cents: number) => string
+): string {
   const janela = `${isoToBR(m.de)} a ${isoToBR(m.ate)}`;
   const vermelho = m.primeiroNegativo ? ` · no vermelho em ${isoToBR(m.primeiroNegativo)}` : '';
 
   if (primeiro && m.parcial) {
     return (
-      `${janela} · hoje você tem ${formatBRL(veioDe(m))}` +
-      ` · ainda entra ${formatBRL(m.entra)} · ainda sai ${formatBRL(m.sai)}${vermelho}`
+      `${janela} · hoje você tem ${brl(veioDe(m))}` +
+      ` · ainda entra ${brl(m.entra)} · ainda sai ${brl(m.sai)}${vermelho}`
     );
   }
   const corte = ultimo && m.parcial ? ' · a projeção termina aqui' : '';
   return (
-    `${janela} · veio de ${formatBRL(veioDe(m))}` +
-    ` · entra ${formatBRL(m.entra)} · sai ${formatBRL(m.sai)}${vermelho}${corte}`
+    `${janela} · veio de ${brl(veioDe(m))}` +
+    ` · entra ${brl(m.entra)} · sai ${brl(m.sai)}${vermelho}${corte}`
   );
 }
 
@@ -133,6 +140,8 @@ function ErrorBand({ message, onRetry }: { message: string; onRetry: () => void 
 }
 
 export default function ForecastScreen() {
+  // Dinheiro no meio de frase obedece ao "esconder saldo" — `Money` não cabe em texto corrido.
+  const brl = useBRL();
   const toast = useToast();
   const { width } = useWindowDimensions();
 
@@ -556,7 +565,7 @@ export default function ForecastScreen() {
             */}
             {entra > 0 || sai > 0 ? (
               <ThemedText type="footnote" themeColor="textSecondary" style={tabular}>
-                entra {formatBRL(entra)} · sai {formatBRL(sai)} em {rotuloHorizonte(dias)}
+                entra {brl(entra)} · sai {brl(sai)} em {rotuloHorizonte(dias)}
               </ThemedText>
             ) : null}
           </Card>
@@ -589,7 +598,7 @@ export default function ForecastScreen() {
             rascunhos.map((d, i) => (
               <View key={`${d.kind}-${d.start}-${d.amount_cents}-${i}`} style={styles.rascunhoLinha}>
                 <ThemedText type="small" themeColor="textSecondary" style={tabular}>
-                  {d.kind === 'income' ? 'entra' : 'sai'} {formatBRL(d.amount_cents)}
+                  {d.kind === 'income' ? 'entra' : 'sai'} {brl(d.amount_cents)}
                   {d.mode === 'monthly'
                     ? ' todo mês'
                     : d.installments > 1
@@ -694,7 +703,7 @@ export default function ForecastScreen() {
               ) : null}
               <Row
                 title={monthTitle(m.mes)}
-                subtitle={legendaDoMes(m, iMes === 0, iMes === meses.length - 1)}
+                subtitle={legendaDoMes(m, iMes === 0, iMes === meses.length - 1, brl)}
                 accessibilityLabel={`${monthTitle(m.mes)}, veio de ${formatBRL(veioDe(m))}, entra ${formatBRL(m.entra)}, sai ${formatBRL(m.sai)}, sobra ${formatBRL(m.saldo)}`}
                 accessibilityState={{ expanded: mesAberto === m.mes }}
                 onPress={() => setMesAberto(mesAberto === m.mes ? null : m.mes)}
@@ -718,7 +727,7 @@ export default function ForecastScreen() {
                     dentro do ciclo é a tela do ciclo, que soma exatamente este número.
                   */}
                   <ThemedText type="small" themeColor="textSecondary" style={tabular}>
-                    entra {formatBRL(m.entra)} · sai {formatBRL(m.sai)}
+                    entra {brl(m.entra)} · sai {brl(m.sai)}
                   </ThemedText>
                   <Button
                     label="Ver tudo que está aqui dentro"

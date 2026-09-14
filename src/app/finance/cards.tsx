@@ -8,6 +8,7 @@ import Animated, {
 import { Stack, router } from 'expo-router';
 import * as Haptics from 'expo-haptics';
 
+import { useBRL } from '@/components/ui/conceal';
 import { ThemedText } from '@/components/themed-text';
 import { HeaderActions } from '@/components/ui/header-actions';
 import { Button } from '@/components/ui/button';
@@ -113,6 +114,8 @@ function PressCard({
 }
 
 export default function CardsScreen() {
+  // Dinheiro no meio de frase obedece ao "esconder saldo" — `Money` não cabe em texto corrido.
+  const brl = useBRL();
   const cards = useCardSummary();
 
   // Ordem de urgência, não alfabética: atrasada primeiro, depois quem vence antes.
@@ -215,7 +218,7 @@ export default function CardsScreen() {
                       ? 'Fatura atrasada'
                       : `${atrasadas} faturas atrasadas`
                   }
-                  subtitle={formatBRL(Number(card.overdue_total_cents ?? 0))}
+                  subtitle={brl(Number(card.overdue_total_cents ?? 0))}
                   onPress={() =>
                     router.push({
                       pathname: '/finance/invoice/[id]',
@@ -267,18 +270,18 @@ export default function CardsScreen() {
                   />
                   <View style={styles.limitLine}>
                     <ThemedText type="footnote" themeColor="textSecondary" style={tabular}>
-                      usado {formatBRL(naoPago)} de {formatBRL(limite)}
+                      usado {brl(naoPago)} de {brl(limite)}
                     </ThemedText>
                     {livre < 0 ? (
                       <View style={styles.badge}>
                         <Icon name="exclamationmark.triangle.fill" size="sm" color="danger" />
                         <ThemedText type="footnote" themeColor="danger" style={tabular}>
-                          {formatBRL(Math.abs(livre))} acima do limite
+                          {brl(Math.abs(livre))} acima do limite
                         </ThemedText>
                       </View>
                     ) : (
                       <ThemedText type="footnote" themeColor="textSecondary" style={tabular}>
-                        livre {formatBRL(livre)}
+                        livre {brl(livre)}
                       </ThemedText>
                     )}
                   </View>
@@ -292,7 +295,7 @@ export default function CardsScreen() {
               {/* "usado" soma TODAS as faturas não pagas; o número grande é só a desta. */}
               {anterior > 0 ? (
                 <ThemedText type="footnote" themeColor="textSecondary">
-                  Inclui {formatBRL(anterior)} de fatura anterior em aberto.
+                  Inclui {brl(anterior)} de fatura anterior em aberto.
                 </ThemedText>
               ) : null}
 

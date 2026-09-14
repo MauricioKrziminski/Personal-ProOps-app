@@ -4,6 +4,7 @@ import { Stack, router, useLocalSearchParams } from 'expo-router';
 import * as Haptics from 'expo-haptics';
 import Animated, { FadeInDown } from 'react-native-reanimated';
 
+import { useBRL } from '@/components/ui/conceal';
 import { Card } from '@/components/ui/card';
 import { monthTitle } from '@/components/finance/month-picker';
 import { ThemedText } from '@/components/themed-text';
@@ -80,6 +81,8 @@ function Bar({ ratio, index, selecionada }: { ratio: number; index: number; sele
 }
 
 export default function InvoicesScreen() {
+  // Dinheiro no meio de frase obedece ao "esconder saldo" — `Money` não cabe em texto corrido.
+  const brl = useBRL();
   const theme = useTheme();
   const params = useLocalSearchParams<{ account?: string }>();
   const accounts = useAccounts();
@@ -248,7 +251,7 @@ export default function InvoicesScreen() {
               ))}
             </View>
             <ThemedText type="small" themeColor="textSecondary" style={tabular}>
-              média de {formatBRL(media)} nas últimas {ultimos.length}{' '}
+              média de {brl(media)} nas últimas {ultimos.length}{' '}
               {ultimos.length === 1 ? 'fatura' : 'faturas'}
             </ThemedText>
           </Card>
