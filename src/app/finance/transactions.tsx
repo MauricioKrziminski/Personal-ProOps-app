@@ -413,8 +413,12 @@ export default function TransactionsScreen() {
           tinha ~66px, então a lista inteira saltava ~165px quando o resumo chegava — e ela é o
           `ListHeaderComponent`, então saltava tudo junto. É o mesmo padrão do card de tendência
           do Financeiro e do pager da Fatura.
+
+          284 é a soma dos tokens COM as duas linhas de "já aconteceu" (16 + 14 + 8 + 38 + 8 +
+          18 + 8 + 104 + 16 + 54). Era 230, medido antes do split, e voltou a saltar ~54px — o
+          mês corrente, que é o que abre, sempre tem previsto.
         */
-        <Skeleton height={230} radius={Radius.md} />
+        <Skeleton height={284} radius={Radius.md} />
       ) : (
         <PeriodSummaryCard
           entrou={totais.entrou}

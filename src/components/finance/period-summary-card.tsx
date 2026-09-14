@@ -222,22 +222,68 @@ function Fluxo({
   const mostrarSplit = previsto > 0;
 
   return (
-    <View style={styles.fluxo}>
+    /*
+      ⚠️ **Um nó só para o leitor de tela.** Solto, o VoiceOver lia "entrou · R$ 7.566,52 ·
+      0 por cento · já aconteceu · R$ 0,00" — e os "0 por cento" vêm do `accessibilityValue` da
+      `ProgressBar`, chegando sem rótulo nenhum no meio da frase. É o mesmo tratamento que o
+      painel do Financeiro já dá ao par dele.
+    */
+    <View
+      style={styles.fluxo}
+      accessible
+      accessibilityLabel={`${rotulo} ${formatBRL(cents)}${
+        mostrarSplit ? `, já aconteceu ${jaAconteceu === 0 ? 'nada ainda' : formatBRL(jaAconteceu)}` : ''
+      }`}>
       <View style={styles.fluxoTopo}>
         <ThemedText type="caption" themeColor="textSecondary">
           {rotulo}
         </ThemedText>
         <Money cents={cents} variant="ticker" />
       </View>
-      <View style={{ width: `${max > 0 ? (cents / max) * 100 : 0}%` }}>
-        <ProgressBar value={jaAconteceu} max={cents} tone={forte ? 'strong' : 'data'} />
+      {/*
+        ⚠️ **`track` explícito: aqui a PISTA é carga útil, não fundo.** A caixa em volta carrega
+        `entrou × saiu` e o preenchimento carrega `já aconteceu` dentro da própria linha — então
+        quem não enxerga a pista lê realizado contra realizado, que é outra pergunta, sem erro
+        nenhum na tela. No escuro o `backgroundElement` padrão é `#201F21` sobre um card
+        `#1B1B1D`: **5/255**, a mesma amplitude que este arquivo chama de invisível lá em cima. E
+        no começo de um ciclo, com `jaAconteceu` perto de zero, a barra sumia inteira.
+
+        ⚠️ **`minWidth` porque 1% não desenha.** Com R$ 50 contra R$ 5.000 a caixa fica com ~3px
+        sob um raio de 4 — valor diferente de zero que aparece como nada. Zero continua sendo a
+        única coisa que não desenha.
+      */}
+      <View
+        style={{
+          width: `${max > 0 ? (cents / max) * 100 : 0}%`,
+          minWidth: cents > 0 ? Space.sm : 0,
+        }}>
+        <ProgressBar
+          value={jaAconteceu}
+          max={cents}
+          tone={forte ? 'strong' : 'data'}
+          track="backgroundSelected"
+        />
       </View>
       {mostrarSplit ? (
         <View style={styles.fluxoTopo}>
           <ThemedText type="caption" themeColor="textSecondary">
             já aconteceu
           </ThemedText>
-          <Money cents={jaAconteceu} variant="caption" tone="textSecondary" />
+          {/*
+            "já aconteceu R$ 0,00" é o mesmo defeito que `BarTrack` nomeia: escrever um zero onde
+            a ausência já é a informação. A palavra diz o que o zero diria, sem parecer defeito.
+
+            `code` e não `caption`: no mesmo bloco o total é `ticker` (mono), e `caption` é
+            Hanken 11 com tracking POSITIVO — tracking desenhado para caixa alta, aplicado a
+            dígito.
+          */}
+          {jaAconteceu === 0 ? (
+            <ThemedText type="caption" themeColor="textSecondary">
+              nada ainda
+            </ThemedText>
+          ) : (
+            <Money cents={jaAconteceu} variant="code" tone="textSecondary" />
+          )}
         </View>
       ) : null}
     </View>
@@ -247,7 +293,9 @@ function Fluxo({
 const styles = StyleSheet.create({
   // `overflow: hidden` é o que deixa a faixa sangrar sem vazar o raio do card.
   card: { gap: Space.sm, overflow: 'hidden' },
-  barras: { gap: Space.sm, paddingTop: Space.xs },
+  // §2: linhas irmãs de um card são `md`. Com `sm` (8) o agrupamento das quatro linhas se
+  // apoiava em 4 contra 8 — e a 1,3× o texto cresce e o gap não.
+  barras: { gap: Space.md, paddingTop: Space.xs },
   fluxo: { gap: Space.xs },
   fluxoTopo: {
     flexDirection: 'row',

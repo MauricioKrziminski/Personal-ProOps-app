@@ -14,7 +14,7 @@ import { ItemLink } from '@/components/ui/item-link';
 import { Field, MoneyField } from '@/components/ui/field';
 import { DatePickerField } from '@/components/finance/date-picker-field';
 import { Icon } from '@/components/ui/icon';
-import { concealText, useBRL, useConceal } from '@/components/ui/conceal';
+import { useBRL } from '@/components/ui/conceal';
 import { Money } from '@/components/ui/money';
 import { Row, Section } from '@/components/ui/row';
 import { HeaderMenu } from '@/components/ui/header-actions';
@@ -165,7 +165,6 @@ export default function InvoiceScreen() {
    * banco posta no ritmo dele, não na data que a compra tem aqui, então qualquer par
    * `lançado × previsto` mostrado lado a lado convida a uma conferência que não fecha.
    */
-  const { concealed } = useConceal();
   const brl = useBRL();
   const hoje = localISODate();
   const aindaVem = compras
@@ -396,12 +395,12 @@ export default function InvoiceScreen() {
             {aindaVem > 0 && aindaVem < total ? (
               <ThemedText type="small" themeColor="textSecondary" style={tabular}>
                 {/*
-                  `concealText()` inline, não `<Money>`: o valor está no MEIO de uma frase, e
-                  `Money` entra como irmão `flexShrink: 0` — quebraria a sentença. `formatBRL`
-                  cru aqui vazaria o valor com o saldo escondido, que é o que o olho ao lado do
-                  total acabou de esconder.
+                  `brl()` e não `<Money>`: o valor está no MEIO de uma frase, e `Money` entra
+                  como irmão `flexShrink: 0` — quebraria a sentença. `formatBRL` cru vazaria o
+                  valor com o saldo escondido, que é o que o olho ao lado do total acabou de
+                  esconder.
                 */}
-                Inclui {concealed ? concealText() : formatBRL(aindaVem)} com data à frente
+                Inclui {brl(aindaVem)} com data à frente
               </ThemedText>
             ) : null}
             {paga && fatura.paid_at ? (
@@ -550,25 +549,30 @@ export default function InvoiceScreen() {
             styles.ancora,
             { backgroundColor: theme.groupedBackground, paddingBottom: insets.bottom + Space.md },
           ]}>
-          <Button
-            block
-            label="Marcar como paga"
-            variant="secondary"
-            loading={settle.isPending}
-            disabled={pay.isPending}
-            onPress={quitarSemCaixa}
-          />
           {/*
             §7b: explicação ABAIXO do que ela explica. A frase era uma só e metade dela falava
             do "Registrar pagamento", que só aparece lá embaixo — o leitor lia a explicação de
             um botão que ainda não tinha visto. `finance.md` exige que a interface distinga os
             dois efeitos, então as duas metades ficam, cada uma sob o seu botão.
+
+            Cada par vive no MESMO nó: o §7b se lê por proximidade, e irmãos soltos numa coluna
+            com um `gap` só ficam todos à mesma distância de tudo.
           */}
-          <ThemedText type="caption" themeColor="textSecondary">
-            Não altera o saldo: registra que a fatura foi paga fora do app.
-          </ThemedText>
+          <View style={styles.acaoExplicada}>
+            <Button
+              block
+              label="Marcar como paga"
+              variant="secondary"
+              loading={settle.isPending}
+              disabled={pay.isPending}
+              onPress={quitarSemCaixa}
+            />
+            <ThemedText type="footnote" themeColor="textSecondary">
+              Não altera o saldo: registra que a fatura foi paga fora do app.
+            </ThemedText>
+          </View>
           {podeAdiar ? (
-            <>
+            <View style={styles.acaoExplicada}>
               <Button
                 block
                 label="Jogar para a próxima"
@@ -583,21 +587,23 @@ export default function InvoiceScreen() {
                 primária, para a beirada da tela. A âncora existe justamente para a primária não
                 sumir; enchê-la de texto desfaz o motivo de ela existir.
               */}
-              <ThemedText type="caption" themeColor="textSecondary">
+              <ThemedText type="footnote" themeColor="textSecondary">
                 O saldo em aberto vira uma linha na próxima fatura, com juros e IOF estimados.
               </ThemedText>
-            </>
+            </View>
           ) : null}
-          <Button
-            block
-            size="lg"
-            label="Registrar pagamento"
-            disabled={settle.isPending || pay.isPending}
-            onPress={abrirPagamento}
-          />
-          <ThemedText type="caption" themeColor="textSecondary">
-            Desconta da conta que você escolher.
-          </ThemedText>
+          <View style={styles.acaoExplicada}>
+            <Button
+              block
+              size="lg"
+              label="Registrar pagamento"
+              disabled={settle.isPending || pay.isPending}
+              onPress={abrirPagamento}
+            />
+            <ThemedText type="footnote" themeColor="textSecondary">
+              Desconta da conta que você escolher.
+            </ThemedText>
+          </View>
         </View>
       ) : null}
 
@@ -735,10 +741,20 @@ const styles = StyleSheet.create({
   centered: {
     textAlign: 'center',
   },
+  /*
+    ⚠️ **`gap` aqui não é respiro, é o que faz o §7b funcionar.** `Button` tem altura fixa e
+    nenhuma margem vertical, então sem isto os três botões e as três legendas empilhavam a 0px:
+    cada legenda ficava exatamente tão perto do botão que ela explica quanto do botão seguinte.
+    A regra "explicação abaixo do que ela explica" se lê por PROXIMIDADE — sem distância
+    diferente, não há o que ler.
+  */
   ancora: {
     paddingHorizontal: Space.lg,
     paddingTop: Space.md,
+    gap: Space.md,
   },
+  /** Botão e a legenda dele são um par: mais perto entre si do que do próximo botão. */
+  acaoExplicada: { gap: Space.xs },
   sheetBody: {
     gap: Space.xl,
     padding: Space.lg,
