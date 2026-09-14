@@ -418,3 +418,51 @@ no app = linha nova nesta tabela").
 "falha fechada" dizendo que `-1` era 0% da produção; tornar `-1` o padrão do formulário inverte
 essa premissa. Removido o campo sem o SQL, a recorrência de fim de mês sumiria da projeção sem
 erro nenhum — dinheiro faltando em silêncio, que é a classe de bug mais cara deste produto.
+
+## A tela de Notas ganhou organização (14/09/2026)
+
+A aba Notas passou a ter pin de pasta, cor, arquivar, ordem manual, tag de pasta e ícone
+(migration `20260914180000`). Pela regra do `agent.md` — *botão novo no app = linha nova nesta
+tabela* —, cada um deles entra aqui.
+
+| botão novo no app | o agente faz? | por onde |
+|---|---|---|
+| `useToggleFolderPin` | sim | `resource_update folders pinned` |
+| `useSetNoteColor` / `useSetFolderColor` | sim | `resource_update … color`, com o nome do TOKEN (`oceano`) — a pessoa fala "azul" e o catálogo traduz |
+| `useArchiveNote` / `useArchiveFolder` (e desarquivar) | sim | `resource_update … archived=true/false`, campo **virtual** traduzido para `archived_at` |
+| `useSetFolderTags` | **parcial** | `resource_update folders tags` ACRESCENTA; tirar uma tag continua sendo do app (ver abaixo) |
+| ícone da pasta (`folders.tsx`) | sim | `resource_update folders icon`, com os nomes em português aceitos ("maleta", "carrinho") |
+| `useReorderNotes` / `useReorderFolders` | **não — exclusão declarada** | ordem manual é GESTO, não frase: "põe a nota do mercado em terceiro" pede que a pessoa conheça a numeração de uma lista que ela está vendo, e arrastar já resolve em um movimento. O que o agente faz é FIXAR, que é a mesma intenção ("deixa isso no topo") dita em palavras. |
+
+**Nada disso custou orçamento de schema.** `ResourceAction.resource` é `str` e `color`/`icon`
+viajam como VALOR de campo: o produto propriedades × enum do schema não se mexeu, e
+`tests/test_schemas.py` prende isso. O que cresceu foi o texto do prompt, que não tem esse teto.
+
+### Três correções que vieram junto
+
+- **Nota se identifica pelo TRECHO.** `resource_update` em `notes` procurava `content = %s`
+  **exato** — ou seja, "fixa a nota do mercado" nunca achava nada, e metade do catálogo novo
+  nasceria inalcançável por voz. Agora tenta o exato e cai num `ilike`; **empate PERGUNTA**, com
+  a primeira linha de cada candidata na frase. Nota é a única exceção do catálogo: todo o resto
+  tem nome curto e digitável.
+- **`query_notes` ordena por `pinned desc`** e esconde arquivada. Sem isso o "topo" do agente e o
+  topo da tela discordavam — a pessoa fixa uma nota, pergunta "o que eu anotei?" e recebe outra
+  lista, sem erro nenhum.
+- **`QUERY_REMINDERS` virou `READ_ONLY`.** Uma leitura pura reservava e liberava slot de
+  idempotência em `executed_actions` a cada "quais meus lembretes?".
+
+### Lacuna declarada: tirar uma tag
+
+`tags` SOMA. Gravar só o que veio na frase apagaria em silêncio as outras tags da pasta, e a
+confirmação ("tags: urgente") não daria pista nenhuma disso. Remover exige dizer QUAL sai, e o
+catálogo tem um campo por coluna, não uma operação por campo — o `TagPicker` do app resolve com
+um toque. Se virar pedido, o caminho é um campo virtual `untag`, sem custo de schema.
+
+### O formato do texto é do agente também
+
+O `NOTES` ensina a escrever no formato que o app DESENHA: enumeração vira `- ` (ou `- [ ] `
+quando é coisa a fazer), passo a passo vira `1. `, título vira `# `, e ênfase usa a marcação do
+WhatsApp (`*negrito*`), que é a mesma que o editor lê e escreve. Medido no staging em 14/09/2026:
+*"anota na pasta ia: testar o agente, revisar o prompt e medir o custo"* virou três linhas
+`- [ ]` dentro da pasta `ia` — que já existia, porque as pastas do workspace entram no turno
+(delimitadas por `wrap_untrusted`, que nome de pasta é conteúdo do usuário).
