@@ -552,12 +552,47 @@ Com as 6 datas já corrigidas nesta sessão, o esperado é:
 >    falha de segurança, sendo erro meu de medição. Presença de texto no dump **não** é prova de
 >    que a tela está visível; quem prova é log instrumentado ou o screenshot.
 >
-> **Biometria: NÃO verificada ponta a ponta em nenhuma das duas plataformas.** O
-> `adb emu finger touch 1` responde `OK` e a inscrição avança ("Touch the sensor" → "Lift, then
-> touch again" → "Keep lifting your finger"), mas termina em *"Can't complete fingerprint setup"*
-> em quatro cadências diferentes (rajada, 0,7 s, 0,9 s e 1,3 s entre toque e levantada) na imagem
-> Pixel com Pixel Imprint. **Sem digital cadastrada o caminho nem existe** (`isEnrolledAsync()`
-> devolve `false` e a opção some da tela, que é o comportamento correto e esse ficou provado).
+> ### ⚠️ O DESENHO MUDOU no mesmo dia: a senha é a DO CELULAR
+>
+> Decisão do dono do produto, 14/09/2026, depois de ver a primeira versão rodando:
+>
+> > *"a senha que eu queria é a que já usa no celular, igual bancos como banco do brasil,
+> > nubank, e outros usam. Ele usa a própria senha do celular e se tiver biometria ou faceID
+> > cadastrado ele reaproveita"*
+>
+> A linha que faz isso é **uma**: `disableDeviceFallback: false` (o default) em vez de `true`. No
+> iOS isso troca `LAPolicyDeviceOwnerAuthenticationWithBiometrics` por
+> `LAPolicyDeviceOwnerAuthentication`, que tenta o Face ID e cai sozinho na senha do aparelho; no
+> Android o `BiometricPrompt` passa a aceitar a credencial do aparelho. Com ela, **todo o resto
+> saiu**: `lock-secret.ts` (PIN salgado no SecureStore), a contagem de erros, a espera de 30s, o
+> teclado numérico do overlay e o sheet de "trocar a senha". Menos 240 linhas, e uma senha a
+> menos para o usuário decorar — mais o caminho de recuperação, que deixou de ser problema nosso.
+>
+> - **`LockMode` virou `off` | `on`.** Preferência gravada como `'pin'` ou `'biometric'` cai em
+>   `off` na leitura — falha ABERTA de propósito: trancar o app num modo que não existe mais não
+>   tem saída.
+> - **`getEnrolledLevelAsync() === NONE` esconde o controle.** Celular sem bloqueio de tela não
+>   consegue autenticar ninguém, e ligado ali o app ficaria trancado para sempre — não há PIN
+>   nosso para servir de saída. A tela explica o que fazer em vez de mostrar o controle.
+> - **O overlay virou uma CORTINA**, não um teclado: `Aurora` (três massas de luz em Skia, uma
+>   passada de blur, movidas por transform num relógio só) + `Keyhole` (disco de vidro com a marca
+>   dentro, que É o botão) + a frase que conta o estado. Uma ação só na tela.
+>
+> **Verificado nas duas plataformas, no aparelho:**
+>
+> | caso | iOS | Android |
+> |---|---|---|
+> | sem biometria cadastrada, a opção some | ✅ | ✅ (diz "a senha do celular") |
+> | com biometria, a opção aparece | ✅ Face ID | — (emulador não inscreve digital) |
+> | biometria certa abre | ✅ Matching Face | — |
+> | biometria errada mantém trancado | ✅ Non-matching Face | — |
+> | **a senha do APARELHO abre** | — (simulador sem senha) | ✅ prompt "Desbloquear o app" + PIN |
+>
+> ⚠️ **O módulo nativo não estava no APK de Android** (`Cannot find native module
+> 'ExpoLocalAuthentication'`) — o autolinking do Gradle estava com estado velho e a Fase 4 nunca
+> rodou de verdade ali. `expo run:android` depois de apagar `android/**/generated/autolinking`
+> resolveu. **Mexeu em dependência nativa → rebuild do APK**, senão o app serve um bundle antigo
+> em silêncio e todo diagnóstico feito em cima dele é inventado.
 
 
 ### Por quê
