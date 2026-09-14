@@ -726,7 +726,7 @@ export default function TransactionsScreen() {
                   {({ onLongPress }) => (
                     <Row
                       title={tx.description || tx.merchant || tx.category || 'Sem descrição'}
-                      badge={previsto ? { label: 'previsto', tone: 'warning' } : undefined}
+                      badge={previsto ? { label: 'previsto' } : undefined}
                       subtitle={[...badges, ...context].join(' · ')}
                       icon={categoryIcon(tx.category, tx.kind)}
                       accessibilityLabel={`${tx.description || tx.merchant || tx.category || 'Lançamento'}, ${formatBRL(tx.amount_cents)}, ${tx.kind === 'income' ? 'receita' : tx.kind === 'expense' ? 'despesa' : 'transferência'}, ${dayTitle(tx.occurred_at)}${tx.status === 'pending' ? ', previsto' : ''}`}
