@@ -1159,36 +1159,72 @@ Nenhum bloco pode aparecer enquanto outro ainda mostra skeleton.
 vai ser obrigado a colocar cartão para ter 7 dias gratis e não vai ter como usar free"*. A porta
 de entrada é **trial de 7 dias com cartão**, e o que vem depois dele é assinatura ou nada.
 
-**Custo FIXO — não escala com usuário** (medido: 190 s/dia de `billable_instance_time`, preços do
-catálogo de faturamento do GCP para `southamerica-east1`, request-based, Tier 2):
+**Custo FIXO — não escala com usuário** (190 s/dia de `billable_instance_time` medidos no Cloud
+Monitoring; preços do catálogo de faturamento do GCP, `southamerica-east1`, request-based Tier 2):
 
 | item | volume/mês | US$ |
 |---|---|---|
 | Cloud Run CPU | 5.700 vCPU-s × 0,0000336 | 0,192 |
 | Cloud Run memória | 5.700 GiB-s × 0,0000035 | 0,020 |
+| **Artifact Registry** | **3,95 GiB × 0,10** (4,45 GiB em 88 imagens, 0,5 grátis) | **0,395** |
 | Requests | 43.950 | 0 (grátis até 2 M) |
 | Cloud Tasks · Scheduler · Supabase · push Expo | — | 0 (camada grátis) |
-| **total** | | **US$ 0,21 ≈ R$ 1,08/mês** |
+| **total** | | **US$ 0,61 ≈ R$ 3,11/mês** |
 
-**Custo VARIÁVEL por mensagem de IA: ≈ R$ 0,0042** — Gemini US$ 0,00062 (**medido**, 11 traces de
-10/09/2026 no Langfuse) mais Cloud Run **não medido**: os 190 s/dia acima são ~1.465 chamadas de
-cron a ~0,13 s, e produção teve ~0 mensagem de usuário naquela janela. O worker segura a requisição
-aberta enquanto espera o Gemini (~2 chamadas, segundos cada) — na cobrança por requisição isso são
-~5 vCPU-s ≈ US$ 0,0002, uns **30% em cima da IA**. Confirmar com a fatura real.
+⚠️ **O Artifact Registry era quase DOIS TERÇOS do custo fixo e não estava na conta.** Cada
+`gcloud run deploy --source` empurra uma imagem nova (~50 MB) e **nada apaga a anterior**: 88
+versões acumuladas desde o começo. Não é pico, é rampa — sobe ~US$ 0,005 por deploy, para sempre.
+Achado em 15/09/2026 ao conferir a conta contra a evidência de gasto real. **A fazer:** política de
+retenção no repositório (`cloud-run-source-deploy`), guardando as últimas ~10 imagens.
+
+**Custo VARIÁVEL por mensagem de IA: R$ 0,0056** — Gemini **US$ 0,00090** (medido) mais Cloud Run
+**estimado** em ~US$ 0,0002.
+
+⚠️ **Este número subiu 45% em 15/09/2026, e o motivo é amostra.** A conta anterior dizia
+US$ 0,00062 e saía de **11 traces de um dia só**. A amostra boa é 11/09: **244 traces, 480
+chamadas Lite + 2 Flash, US$ 0,2197** — 1,97 chamada por turno, que é exatamente `router` +
+`parse`. É o custo de um **turno completo**, e por isso é conservador: tráfego real tem fast-path
+(saudação, SIM/NÃO, anexo) que não chama modelo nenhum.
+
+**A unidade é oficial, não palpite.** Preço por token lido em `ai.google.dev/gemini-api/docs/pricing`
+(15/09/2026) e conferido contra o que o Langfuse cobra — **batem na sexta casa decimal**:
+
+| modelo | in / out (US$ por 1 M) | tokens médios por chamada | US$/chamada |
+|---|---|---|---|
+| `gemini-3.1-flash-lite` | 0,25 / 1,50 | 1.577 in · 43 out | **0,000459** |
+| `gemini-3.7-flash` (gate) | 0,75 / 3,75 | 1.246 in · 352 out | **0,002253** |
 
 | mensagens de IA/mês | custo |
 |---|---|
-| 200 | R$ 0,84 |
-| 1.000 | R$ 4,20 |
-| 2.000 | R$ 8,40 |
+| 200 (uso realista) | R$ 1,13 |
+| 1.000 (teto do `pro`) | R$ 5,63 |
+| 1.500 (teto do `family`) | R$ 8,45 |
 
-⚠️ **O `gate` custa 3,7× uma mensagem inteira.** Medido em 08/09: 35 chamadas do
-`gemini-3.7-flash` por US$ 0,0809 = **US$ 0,0023 cada**, contra US$ 0,00062 de um turno completo
-no Lite. Ele só dispara em confirmação **digitada** — é a única variável que escala mal, e é por
-isso que a razão clicado × digitado importa para o preço.
+⚠️ **O `gate` custa 4,9× uma chamada do Lite**, e só dispara em confirmação **digitada** — é a
+única variável que escala mal, e é por isso que a razão clicado × digitado importa para o preço.
+
+⚠️ **Não conte com a camada grátis do Lite (500/dia) no modelo.** O projeto tem faturamento
+ligado; a aritmética acima é toda paga, que é o default seguro.
+
+#### ⚠️ O Langfuse NÃO audita a fatura — ele é cego para as suítes
+
+Medido em 15/09/2026, e é a lição mais cara desta seção. Entre 08 e 11/09 a **API do Gemini
+recebeu 5.923 chamadas** (Cloud Monitoring, `serviceruntime.googleapis.com/api/request_count` no
+projeto `gen-lang-client-0373931877`), e o Langfuse enxergou **~500**. As outras ~5.400 são
+`evaluate_answer_forms.py` e os `probe_*`, que **não passam pelo handler de tracing** — do mesmo
+jeito que já não gravavam em `ai_events`.
+
+Consequência prática: **nenhuma das nossas duas telas de contagem consegue explicar a fatura.**
+Só a fatura explica a fatura. Custo real se confere no console de faturamento (conta
+`01ED4C-C3849B-0169D7` → Relatórios, por serviço e SKU) ou no export para o BigQuery.
+
+E a ordem de grandeza bate com o susto: 5.923 chamadas custam **R$ 14 se tudo for Lite e R$ 68 se
+tudo for Flash**. O split por modelo não existe no Monitoring, então o intervalo é o que dá para
+afirmar — mas o `ai-gemini.md` já registrava que "três execuções num dia consumiram quase todo o
+crédito da conta", e é exatamente este o caminho.
 
 **O trial de 7 dias não é risco de custo.** No uso real (~230 mensagens em 7 dias) ele custa
-**R$ 0,97**; um trial que estoure o teto do `pro` inteiro dentro da semana custa **R$ 4,20**. O
+**R$ 1,30**; um trial que estoure o teto inteiro do `pro` dentro da semana custa **R$ 5,63**. O
 teto do plano já é a trava — não precisa de segunda.
 
 #### O trial já está construído — é configuração, não código
@@ -1225,7 +1261,7 @@ alguém para fora de meses do próprio dado financeiro, que ele digitou, é a ve
 
 #### Preço recomendado
 
-**`pro` R$ 19,90/mês ou R$ 139,90/ano · `family` R$ 29,90/mês ou R$ 209,90/ano.**
+**`pro` R$ 19,90/mês ou R$ 139,90/ano · `family` R$ 29,90/mês ou R$ 229,90/ano.**
 
 Ancoragem de mercado (14/09/2026): **Organizze Pro R$ 17,90/mês e R$ 134,90/ano** (−37%);
 **Mobills Premium R$ 19,90/mês e R$ 119,90/ano** (−50%). R$ 19,90 empata com o Mobills no mensal,
@@ -1236,23 +1272,24 @@ WhatsApp, que nenhum dos dois tem.
 que é argumento para ficar *no* preço deles e não acima. Cobrar mais que os dois **e** exigir
 cartão antes de qualquer uso é empilhar as duas fricções na mesma decisão.
 
-⚠️ **O desconto anual é 41%, não 47%.** A margem do anual é definida pelo TETO de mensagens, não
-pelo preço: cada R$ 1 de desconto anual sai inteiro da margem, enquanto o custo de IA continua o
-mesmo todo mês. A 47% (R$ 129,90 / R$ 189,90) o `family` no teto chega a **16% de margem** no
-Simples mais caro. 41% mantém os quatro acima de 20%.
+⚠️ **É o TETO DE MENSAGENS que decide a margem do anual, não o preço.** Cada real de desconto
+anual sai inteiro da margem enquanto o custo de IA continua caindo todo mês. Com o custo corrigido
+(R$ 0,0056/msg), `family` **anual com teto de 2.000 cai para 5% de margem** no Simples mais caro —
+praticamente empatado. Por isso o teto do `family` desce para **1.500** e o anual dele fica em
+R$ 229,90 (−36%, a mesma faixa do Organizze). O `pro` continua em 1.000 e −41%.
 
 **Margem depois da loja (15%, Apple Small Business / Google até US$ 1 M) E do imposto**
 (Simples Nacional, Anexo III a 6% e Anexo V a 16% — a faixa real depende do fator R):
 
 | plano | receita/mês | sobra (imp. 6% → 16%) | IA no TETO | **margem** |
 |---|---|---|---|---|
-| `pro` mensal R$ 19,90 | 19,90 | 15,72 → 13,73 | 4,20 | **11,52 → 9,53** (58% → 48%) |
-| `pro` anual R$ 139,90 | 11,66 | 9,21 → 8,04 | 4,20 | **5,01 → 3,85** (43% → 33%) |
-| `family` mensal R$ 29,90 | 29,90 | 23,62 → 20,63 | 8,40 | **15,22 → 12,23** (51% → 41%) |
-| `family` anual R$ 209,90 | 17,49 | 13,82 → 12,07 | 8,40 | **5,42 → 3,67** (31% → 21%) |
+| `pro` mensal R$ 19,90 | 19,90 | 15,72 → 13,73 | 5,63 | **10,09 → 8,10** (51% → 41%) |
+| `pro` anual R$ 139,90 | 11,66 | 9,21 → 8,04 | 5,63 | **3,58 → 2,41** (31% → 21%) |
+| `family` mensal R$ 29,90 | 29,90 | 23,62 → 20,63 | 8,45 | **15,17 → 12,18** (51% → 41%) |
+| `family` anual R$ 229,90 | 19,16 | 15,13 → 13,23 | 8,45 | **6,68 → 4,77** (35% → 25%) |
 
 ⚠️ **A coluna "IA no teto" é o pior caso, não o esperado.** Um usuário em 200 mensagens/mês custa
-R$ 0,84, e aí o `pro` anual margina R$ 8,37 (72%). O teto existe para o custo ter fundo, não
+R$ 1,13, e aí o `pro` anual margina R$ 8,08 (69%). Nenhum dos quatro fica negativo nem no teto. O teto existe para o custo ter fundo, não
 porque alguém vá encostar nele.
 
 O custo fixo de R$ 1,08/mês é pago pelo **primeiro** assinante, com folga de uma ordem de
@@ -1262,9 +1299,9 @@ grandeza. Não existe ponto de equilíbrio a perseguir: o modelo é lucrativo no
 
 | | (sem assinatura) | pro | family |
 |---|---|---|---|
-| preço | — | R$ 19,90/mês · R$ 139,90/ano | R$ 29,90/mês · R$ 209,90/ano |
+| preço | — | R$ 19,90/mês · R$ 139,90/ano | R$ 29,90/mês · R$ 229,90/ano |
 | membros | 1 | **1** (era 3) | 5 |
-| mensagens de IA/mês | **0** (era 100) | 1.000 | 2.000 |
+| mensagens de IA/mês | **0** (era 100) | 1.000 | **1.500** (era 2.000) |
 | importar extrato | não | sim | sim |
 | ver e exportar o próprio dado | **sim** | sim | sim |
 
@@ -1273,7 +1310,10 @@ Duas mudanças, e o motivo de cada uma:
 1. **`pro` cai de 3 membros para 1.** Ter 3 no Pro apaga a razão de existir do Family — e o Family
    é o plano que justifica preço maior sem tocar em limite de IA. Dá para mudar sem custo: não há
    nenhum assinante pago hoje (produção tem 1 workspace, `free`).
-2. **`free` cai de 100 mensagens para 0**, que é a tradução literal de "não vai ter como usar
+2. **`family` cai de 2.000 para 1.500 mensagens.** Não é aperto de produto: 5 pessoas dividindo
+   1.500 é 10 por pessoa por dia. É o que o preço anual carrega com o custo medido — 2.000 no
+   anual deixava a margem em 5%.
+3. **`free` cai de 100 mensagens para 0**, que é a tradução literal de "não vai ter como usar
    free". Servir 100 mensagens custaria R$ 0,42 — a mudança **não é de custo, é de produto**: com
    trial de 7 dias, um teto grátis permanente competiria com o próprio trial.
 
@@ -1287,13 +1327,13 @@ custo real (IA), valor real (importação) e escopo real (membros).
 
 | buraco | por quê importa |
 |---|---|
-| **Cloud Run por mensagem** | estimado em ~30% sobre a IA, **não medido** — a janela medida era ~100% cron |
+| **Cloud Run por mensagem** | estimado em ~20% sobre a IA, **não medido** — a janela medida era ~100% cron |
 | **imposto** | a faixa do Simples (Anexo III × V, fator R) é decisão contábil; a tabela usa 6% e 16% como extremos |
 | **Groq (áudio)** | não medido. Áudio vira texto antes do grafo, então some no custo de IA — mas a transcrição em si tem preço próprio |
 | **template do WhatsApp fora da janela de 24h** | é pago por mensagem. Hoje o proativo prefere push (grátis); se isso inverter, o custo por usuário muda de patamar |
 | **camada grátis do Langfuse** | staging e produção dividem um projeto só; se o volume crescer, ali aparece uma conta nova |
-| **fatura real do GCP** | o export para o BigQuery foi ligado em 14/09/2026 e não é retroativo. Ele vai CONFIRMAR os R$ 1,08, não descobri-los — a proporção fixo × variável já está medida |
-| **amostra da IA** | os US$ 0,00062 saem de 11 traces de UM dia. O preço por token do Lite é determinístico, então o erro provável é de mix de tamanho, não de ordem de grandeza |
+| **fatura real do GCP** | o export para o BigQuery foi ligado em 14/09/2026, não é retroativo e **a tabela ainda não existe** (o Google leva até 24 h). Enquanto isso, o número oficial está no console de faturamento, em Relatórios |
+| **amostra da IA** | os US$ 0,00090 saem de 244 traces de UM dia (11/09). O preço por token é oficial e determinístico, então o erro provável é de mix de tamanho, não de ordem de grandeza |
 
 ### Por quê por último
 

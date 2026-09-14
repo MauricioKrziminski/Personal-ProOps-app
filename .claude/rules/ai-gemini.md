@@ -121,6 +121,20 @@ Os equivalentes em Deno (`_shared/gemini.ts`, `process-jobs/index.ts`) foram **a
   | a execução que APROVA | `evaluate_answer_forms.py`, sem flag, **uma vez** |
   | sonda de turno inteiro | `probe_pergunta_ou_supoe.py` — já é toda Lite |
 
+  ⚠️ **NEM `ai_events` NEM o Langfuse enxergam as suítes — só a fatura enxerga** (medido em
+  15/09/2026). Entre 08 e 11/09 a API do Gemini recebeu **5.923 chamadas** (Cloud Monitoring,
+  `serviceruntime.googleapis.com/api/request_count` no projeto `gen-lang-client-0373931877`) e o
+  Langfuse traçou **~500**: os scripts de avaliação e os `probe_*` chamam o modelo fora do grafo,
+  então não passam pelo handler de tracing. Ler "o Langfuse diz US$ 0,83 no mês" como se fosse o
+  gasto é como a conta some. Custo real: console de faturamento da conta `01ED4C-C3849B-0169D7`
+  (Relatórios, por serviço e SKU) ou o export para o BigQuery.
+
+  📏 **Unidade oficial, conferida em 15/09/2026** contra `ai.google.dev/gemini-api/docs/pricing` —
+  e o Langfuse bate na sexta casa decimal, então a tabela DELE serve de calculadora (só não serve
+  de auditoria, pelo motivo acima): `gemini-3.1-flash-lite` US$ 0,25/1,50 por 1 M de tokens
+  (in/out) = **US$ 0,000459/chamada**; `gemini-3.7-flash` US$ 0,75/3,75 = **US$ 0,002253/chamada**,
+  4,9× mais caro. Um turno completo (router + parse) custa **US$ 0,0009**.
+
   ⚠️ **`--barato` não aprova nada.** O gate está no Flash porque o Lite FOI MEDIDO e reprova
   8 dos 94 casos — e uma das quedas é do lado que não pode cair ("apaga todos" voltou
   `approved: True`). Ler 86/94 do modo barato como regressão é perder tempo; lê-lo como
