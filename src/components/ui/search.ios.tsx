@@ -32,7 +32,18 @@ export function Search({
       hintTextColor={theme.textSecondary}
       headerIconColor={theme.text}
       tintColor={theme.tint}
-      placement="automatic"
+      /*
+        ⚠️ **`stacked`, nunca `automatic` — no iOS 26 o `automatic` joga a busca no TOOLBAR.**
+        A partir do iOS 26 o sistema pode integrar a barra de busca entre os itens do toolbar do
+        iPhone, que é a faixa de BAIXO — e lá ela cai exatamente em cima do FAB "Lançar", os dois
+        desenhados um sobre o outro. É o que `allowToolbarIntegration` (default `true`) autoriza.
+
+        `stacked` é "abaixo do conteúdo da navigation bar", que é o comportamento clássico e o
+        que o docblock acima descreve: integrado ao large title, sumindo no scroll. De quebra,
+        ele força `allowToolbarIntegration` a `false`, contornando um bug do UIKit que impede a
+        barra de aparecer na tela raiz.
+      */
+      placement="stacked"
       autoCapitalize="none"
       autoFocus={autoFocus}
       hideWhenScrolling={hideWhenScrolling}
