@@ -75,3 +75,17 @@ class TestParcelaAtual:
 
     def test_nao_confunde_bool_com_int(self):
         assert require_current_installment(True, 10) == 1
+
+
+def test_clean_rrule_aceita_ultimo_dia_do_mes():
+    """`BYMONTHDAY=-1` é "todo último dia do mês", e o app GERA essa forma sozinho.
+
+    Desde 13/09/2026 o formulário de recorrentes deriva a regra da data escolhida: 31/10 é o
+    último dia de outubro, então vira `-1`. Se o guard recusasse o sinal de menos, a série que o
+    usuário pedisse pelo WhatsApp viraria lançamento simples, em silêncio — e a diferença só
+    apareceria meses depois, como uma conta que não repetiu.
+
+    ⚠️ Não é sinônimo de `31`: o dia 31 PULA fevereiro e os meses de 30 dias no `dateutil`.
+    """
+    assert clean_rrule("FREQ=MONTHLY;BYMONTHDAY=-1") == "FREQ=MONTHLY;BYMONTHDAY=-1"
+    assert clean_rrule("RRULE:FREQ=MONTHLY;BYMONTHDAY=-1") == "FREQ=MONTHLY;BYMONTHDAY=-1"

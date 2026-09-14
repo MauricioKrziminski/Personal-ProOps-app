@@ -133,7 +133,12 @@ class FinanceAction(BaseModel):
         description="CREATION only: explicitly reported number of initial installments already paid, including zero. Current position/date alone does not prove payment.",
     )
     recurrence: str | None = Field(
-        None, description="RRULE, ex.: FREQ=MONTHLY;BYMONTHDAY=5."
+        None,
+        description=(
+            "RRULE. Ex.: FREQ=MONTHLY;BYMONTHDAY=5 (todo dia 5); "
+            "FREQ=MONTHLY;BYMONTHDAY=-1 (todo ÚLTIMO dia do mês — nunca use 31 para isso, "
+            "porque o dia 31 pula fevereiro e os meses de 30 dias)."
+        ),
     )
     new_amount_cents: int | None = Field(None, description="Valor CORRIGIDO.")
     new_category: str | None = Field(None, description="Categoria CORRIGIDA.")

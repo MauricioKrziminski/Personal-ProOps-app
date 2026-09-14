@@ -1,6 +1,7 @@
 
 import { router } from 'expo-router';
 import { Pressable, StyleSheet, View } from 'react-native';
+import Animated, { FadeInDown, LinearTransition } from 'react-native-reanimated';
 
 import { ThemedText } from '@/components/themed-text';
 import { ErrorCard } from '@/components/error-card';
@@ -16,7 +17,7 @@ import { SectionHead } from '@/components/ui/section-head';
 import { Skeleton } from '@/components/ui/skeleton';
 import { ProgressBar } from '@/components/ui/sparkline';
 import { useToast } from '@/components/ui/toast';
-import { Radius, Space, tabular } from '@/design/tokens';
+import { Motion, Radius, Space, tabular } from '@/design/tokens';
 import {
   useBudgetsStatus,
   useSpendable,
@@ -47,6 +48,34 @@ const TIGHT = 0.8;
  * desenho mostra as cinco cheias porque é uma composição, não porque a tela deva inventar
  * linha quando não há dado. Sem nada, a tela é um `EmptyState` com o atalho do WhatsApp.
  */
+/** Uma instância só: `LinearTransition` recriado a cada render remonta a animação. */
+const linear = LinearTransition.duration(Motion.duration.base);
+
+/**
+ * Um bloco da Hoje, entrando escalonado.
+ *
+ * A palavra é **continuidade** (§5): a tela nasce com seis queries assentando em tempos
+ * diferentes, e sem isto os blocos aparecem piscando fora de ordem. O `cap` do `Motion.stagger`
+ * é o que impede o último bloco de esperar meio segundo — escalonar sem teto vira espera, não
+ * ritmo.
+ *
+ * ⚠️ `layout` é o que faz a linha que SAI — você deu baixa numa conta — empurrar as de baixo em
+ * vez de a lista dar um salto. Mesma classe de mudança de estado que §5 já exige animar em barra
+ * e gráfico ("valor que salta é bug visual").
+ */
+function Secao({ index, children }: { index: number; children: React.ReactNode }) {
+  return (
+    <Animated.View
+      style={styles.section}
+      layout={linear}
+      entering={FadeInDown.duration(Motion.duration.base).delay(
+        Math.min(index * Motion.stagger.step, Motion.stagger.cap)
+      )}>
+      {children}
+    </Animated.View>
+  );
+}
+
 export default function TodayScreen() {
   const theme = useTheme();
   const toast = useToast();
@@ -357,20 +386,20 @@ export default function TodayScreen() {
         ) : null}
 
         {loading ? (
-          <View style={styles.section}>
+          <Secao index={0}>
             <Skeleton width="100%" height={92} radius={Radius.md} />
             <Skeleton width="100%" height={140} radius={Radius.md} />
-          </View>
+          </Secao>
         ) : null}
 
         {/* 3. O que já venceu. */}
         {bills.isError ? (
-          <View style={styles.section}>
+          <Secao index={1}>
             <SectionHead title="Atrasado" inset={false} />
             <ErrorCard onRetry={() => bills.refetch()} />
-          </View>
+          </Secao>
         ) : overdue.length > 0 ? (
-          <View style={styles.section}>
+          <Secao index={2}>
             <SectionHead
               title="Atrasado"
               inset={false}
@@ -450,7 +479,7 @@ export default function TodayScreen() {
                 />
               </Pressable>
             ))}
-          </View>
+          </Secao>
         ) : null}
 
         {/*
@@ -471,7 +500,7 @@ export default function TodayScreen() {
           cor do app (design.md §2b).
         */}
         {dueSoon.length > 0 ? (
-          <View style={styles.section}>
+          <Secao index={3}>
             <SectionHead
               title="O que vence"
               inset={false}
@@ -532,7 +561,7 @@ export default function TodayScreen() {
                 />
               </Pressable>
             ))}
-          </View>
+          </Secao>
         ) : null}
 
         {/*
@@ -545,7 +574,7 @@ export default function TodayScreen() {
           contagem real, e salário previsto dentro de "Vencendo" seria o contador mentindo.
         */}
         {aReceber.length > 0 ? (
-          <View style={styles.section}>
+          <Secao index={4}>
             <SectionHead
               title="O que entra"
               inset={false}
@@ -593,17 +622,17 @@ export default function TodayScreen() {
                 />
               </Pressable>
             ))}
-          </View>
+          </Secao>
         ) : null}
 
         {/* 4. Os lembretes de hoje, agrupados numa superfície só, como no desenho. */}
         {reminders.isError ? (
-          <View style={styles.section}>
+          <Secao index={5}>
             <SectionHead title="Lembretes de hoje" inset={false} />
             <ErrorCard onRetry={() => reminders.refetch()} />
-          </View>
+          </Secao>
         ) : todayReminders.length > 0 ? (
-          <View style={styles.section}>
+          <Secao index={6}>
             <SectionHead
               title="Lembretes de hoje"
               inset={false}
@@ -650,7 +679,7 @@ export default function TodayScreen() {
                 </View>
               ))}
             </View>
-          </View>
+          </Secao>
         ) : null}
 
         {/*
@@ -663,12 +692,12 @@ export default function TodayScreen() {
           ficaram para trás.
         */}
         {budgets.isError ? (
-          <View style={styles.section}>
+          <Secao index={7}>
             <SectionHead title="Passando do limite" inset={false} />
             <ErrorCard onRetry={() => budgets.refetch()} />
-          </View>
+          </Secao>
         ) : tight.length > 0 ? (
-          <View style={styles.section}>
+          <Secao index={8}>
             <SectionHead title="Passando do limite" inset={false} />
             {tight.map((b) => {
               const spent = Number(b.spent_cents);
@@ -713,7 +742,7 @@ export default function TodayScreen() {
                 </View>
               );
             })}
-          </View>
+          </Secao>
         ) : null}
 
         {/* 6. O que acabou de chegar pelo WhatsApp — a prova de que o canal funcionou. */}
@@ -723,12 +752,12 @@ export default function TodayScreen() {
           calado é o pior desenho possível justamente aqui.
         */}
         {recent.isError ? (
-          <View style={styles.section}>
+          <Secao index={9}>
             <SectionHead title="Capturado no WhatsApp" inset={false} />
             <ErrorCard onRetry={() => recent.refetch()} />
-          </View>
+          </Secao>
         ) : captured ? (
-          <View style={styles.section}>
+          <Secao index={10}>
             <SectionHead
               title="Capturado no WhatsApp"
               inset={false}
@@ -775,7 +804,7 @@ export default function TodayScreen() {
                 </Pressable>
               </View>
             </View>
-          </View>
+          </Secao>
         ) : null}
         {/*
           ⚠️ **O vazio é o ÚLTIMO filho, e isso é guarda estrutural.** Ele renderizava no meio da

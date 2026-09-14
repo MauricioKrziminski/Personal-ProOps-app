@@ -11,14 +11,13 @@ import { TaskHeader } from '@/components/ui/task-header';
 import { Card } from '@/components/ui/card';
 import { EmptyState } from '@/components/ui/empty-state';
 import { ItemLink } from '@/components/ui/item-link';
-import { Field } from '@/components/ui/field';
+import { Field, MoneyField } from '@/components/ui/field';
 import { DatePickerField } from '@/components/finance/date-picker-field';
 import { Icon } from '@/components/ui/icon';
 import { Money } from '@/components/ui/money';
 import { Row, Section } from '@/components/ui/row';
 import { HeaderMenu } from '@/components/ui/header-actions';
 import { InvoicePager } from '@/components/finance/invoice-pager';
-import { MoneyInput } from '@/components/finance/money-input';
 import { Screen } from '@/components/ui/screen';
 import { Skeleton, SkeletonRow } from '@/components/ui/skeleton';
 import { useToast } from '@/components/ui/toast';
@@ -555,7 +554,11 @@ export default function InvoiceScreen() {
               {/* Superfície de DECISÃO: este é o valor que a pessoa está confirmando pagar, e
                   por isso o campo é editável e mostra o número por extenso. O que sobrar fica na
                   fatura, como fica no rotativo do cartão de verdade. */}
-              <MoneyInput valueCents={valorCents} onChangeCents={setValorCents} />
+              <MoneyField
+                valueCents={valorCents}
+                onChangeCents={setValorCents}
+                invalid={valorCents <= 0}
+              />
             </Field>
 
             {/* Erro de rede e "não tem conta" são coisas diferentes e não podem ter o mesmo texto. */}

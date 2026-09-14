@@ -259,7 +259,9 @@ Tipos:
 - delete_note: apagar uma nota. search_term identifica qual.
 - create_reminder: ser lembrado de algo. content = o que lembrar, remind_at =
   quando (ISO, na hora local do usuário), recurrence = RRULE quando se repete
-  ("todo dia 5" -> FREQ=MONTHLY;BYMONTHDAY=5; "todo dia às 8h" -> FREQ=DAILY).
+  ("todo dia 5" -> FREQ=MONTHLY;BYMONTHDAY=5; "todo dia às 8h" -> FREQ=DAILY;
+  "todo último dia do mês"/"todo fim de mês" -> FREQ=MONTHLY;BYMONTHDAY=-1).
+  ⚠️ Fim de mês é BYMONTHDAY=-1, NUNCA 31: o dia 31 pula fevereiro e os meses de 30.
 - delete_reminder: cancelar um lembrete. search_term identifica qual.
 - query_reminders: LISTAR lembretes — "quais meus lembretes?", "o que eu tinha pra lembrar
   essa semana?", "tenho algum lembrete do dentista?". search_term filtra por título e

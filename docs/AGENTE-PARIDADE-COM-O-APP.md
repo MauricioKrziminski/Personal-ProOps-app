@@ -393,3 +393,28 @@ a taxa que os gerou, porque dizer "estimados" sem dizer com que taxa é pedir co
 
 Fatura que **ainda não venceu** não é adiada — a mesma regra da tela (`invoice/[id].tsx`: "adiar
 só faz sentido depois do vencimento"). A recusa diz a data do vencimento, em vez de só negar.
+
+---
+
+## "Todo último dia do mês" (13/09/2026)
+
+O campo **"Vence quando"** (Dia do mês | Último dia) saiu do formulário de recorrentes: a data
+escolhida passou a decidir sozinha. 31/10 é o último dia de outubro, então grava
+`FREQ=MONTHLY;BYMONTHDAY=-1`; 05/10 grava `BYMONTHDAY=5`.
+
+**Isso mudou o que o APP produz, então o agente tinha que aprender a mesma forma.** Um botão novo
+não foi somado — mas uma forma de dado nova foi, que é a outra metade da mesma regra ("botão novo
+no app = linha nova nesta tabela").
+
+| ponta | estado | o que foi feito |
+|---|---|---|
+| `clean_rrule` (`tools/guards.py`) | **já aceitava** | o regex permite `-` nos valores. Teste somado para prender (`test_guards.py`) |
+| `descreve_rrule` (`domain/recurrence.py`) | **não sabia** | dizia *"todo dia -1"* no WhatsApp enquanto o app escrevia "todo último dia do mês". Ramo somado, espelhando `src/lib/rrule-text.ts`, com dois casos em `test_query_reads.py` |
+| prompt (`graph/prompts.py`) | **não ensinava** | só `BYMONTHDAY=5`. Agora ensina `-1` para "fim de mês", com o aviso de que **31 não é sinônimo** |
+| schema (`graph/schemas.py`) | **não ensinava** | mesma coisa na descrição do campo `recurrence` |
+| projeção (`recurring_projection_for`) | **rejeitava** | filtrava `BYMONTHDAY=[0-9]+`, sem o sinal de menos — série "último dia" **não projetava nada**. Migration `20260913170000`, com `supabase/tests/ultimo_dia_do_mes.sql` |
+
+⚠️ **A ponta que quase passou batido foi a projeção.** A migration `20260910140000` justifica o
+"falha fechada" dizendo que `-1` era 0% da produção; tornar `-1` o padrão do formulário inverte
+essa premissa. Removido o campo sem o SQL, a recorrência de fim de mês sumiria da projeção sem
+erro nenhum — dinheiro faltando em silêncio, que é a classe de bug mais cara deste produto.

@@ -30,6 +30,7 @@ import { Row, Section } from '@/components/ui/row';
 import { SectionHead } from '@/components/ui/section-head';
 import { Segmented } from '@/components/ui/segmented';
 import { HeroPanel } from '@/components/ui/hero-panel';
+import { CountUpMoney } from '@/components/ui/count-up-money';
 import { Screen } from '@/components/ui/screen';
 import { Skeleton, SkeletonRow } from '@/components/ui/skeleton';
 import { isoToBR } from '@/lib/dates';
@@ -490,11 +491,10 @@ export default function FinanceScreen() {
                 aqui é `onHeroDanger` (§2). Com `danger`, o modo claro pintava #BA1A1A — vermelho
                 escuro sobre superfície quase preta.
               */
-              <Money
+              <CountUpMoney
                 cents={descricao?.cents ?? 0}
                 variant="heroMoney"
                 tone={cicloRuim ? 'onHeroDanger' : 'onHero'}
-                concealable
               />
             }
             footer={

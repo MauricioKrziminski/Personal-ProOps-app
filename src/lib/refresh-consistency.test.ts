@@ -280,7 +280,13 @@ function renderToday(bill: { kind: 'invoice' | 'transaction'; ref_id: string }) 
     if (name === '@/hooks/use-theme') return { useTheme: () => ({}) };
     if (name === '@/components/ui/toast') return { useToast: () => () => {} };
     if (name === '@/components/ui/app-header') return { AppHeader: 'AppHeader', useAppHeaderHeight: () => 80 };
-    if (name === '@/design/tokens') return { Space: {}, Radius: {}, tabular: {} };
+    if (name === '@/design/tokens') return { Space: {}, Radius: {}, tabular: {}, Motion: { duration: { base: 200 }, stagger: { step: 30, cap: 400 } } };
+    // O Reanimated não roda fora do device; aqui só precisa que `Animated.View` seja um nó com
+    // props, que é o que o `visit` do teste percorre.
+    if (name === 'react-native-reanimated') {
+      const anim = (n: string) => ({ duration: () => anim(n), delay: () => anim(n) });
+      return { default: { View: 'Animated.View' }, FadeInDown: anim('in'), FadeOut: anim('out'), LinearTransition: anim('layout') };
+    }
     if (name === '@/constants/theme') return { Fonts: {} };
     // O módulo REAL, não o Proxy: o fallback devolve uma string para cada chave, e a tela
     // chama `settleLabel(...)` — o que dava "is not a function" no minuto em que a Hoje
