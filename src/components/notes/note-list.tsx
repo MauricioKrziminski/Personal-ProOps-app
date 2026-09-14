@@ -1,4 +1,8 @@
-import Animated, { LinearTransition, type useAnimatedRef } from 'react-native-reanimated';
+import Animated, {
+  LinearTransition,
+  SlideOutRight,
+  type useAnimatedRef,
+} from 'react-native-reanimated';
 
 import { NoteCard, type NoteCardActions } from '@/components/notes/note-card';
 import { Reorderable } from '@/components/ui/reorderable';
@@ -23,6 +27,7 @@ export function NoteList({
   enabled,
   scrollRef,
   topInset,
+  viewportHeight,
   onDragStateChange,
   onReorder,
 }: {
@@ -33,6 +38,8 @@ export function NoteList({
   enabled: boolean;
   scrollRef: ReturnType<typeof useAnimatedRef<Animated.ScrollView>>;
   topInset: number;
+  /** Altura VISÍVEL da rolagem. Sem ela o auto-scroll mede pela janela e só dispara tarde. */
+  viewportHeight: number;
   onDragStateChange: (v: boolean) => void;
   onReorder: (ids: string[]) => void;
 }) {
@@ -44,14 +51,18 @@ export function NoteList({
       activation="alça"
       scrollRef={scrollRef}
       topInset={topInset}
+      viewportHeight={viewportHeight || undefined}
       onDragStateChange={onDragStateChange}
       onReorder={onReorder}
       renderItem={({ item, active, drag }) => {
         const pasta = folderById(item.folder_id);
         return (
-          // `LinearTransition` é o que fecha o buraco quando uma nota é fixada, arquivada ou
-          // mandada para uma pasta: a lista se reorganiza andando, não piscando.
-          <Animated.View layout={LinearTransition.duration(Motion.duration.base)}>
+          // `layout` fecha o buraco quando uma nota é fixada ou movida — a lista se reorganiza
+          // andando, não piscando. `exiting` é a outra metade: arquivar e mandar para a lixeira
+          // SAEM pela direita, que é a direção de "tirei isto daqui".
+          <Animated.View
+            layout={LinearTransition.duration(Motion.duration.base)}
+            exiting={SlideOutRight.duration(Motion.duration.exit)}>
             <NoteCard
               note={item}
               folderName={pasta?.name}

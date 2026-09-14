@@ -1,11 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import {
-  Pressable,
-  RefreshControl,
-  ScrollView,
-  StyleSheet,
-  View,
-} from 'react-native';
+import { Platform, Pressable, RefreshControl, ScrollView, StyleSheet, View } from 'react-native';
 import Animated, { useAnimatedRef } from 'react-native-reanimated';
 import { router } from 'expo-router';
 import * as Haptics from 'expo-haptics';
@@ -24,6 +18,8 @@ import { SearchField } from '@/components/ui/search-field';
 import { SectionHead } from '@/components/ui/section-head';
 import { TextField } from '@/components/ui/field';
 import { Icon } from '@/components/ui/icon';
+import { CURVED_BAR_SPACE } from '@/components/ui/curved-tab-bar';
+import { DragScrollView } from '@/components/ui/drag-scroll';
 import { Screen } from '@/components/ui/screen';
 import { Skeleton, SkeletonList } from '@/components/ui/skeleton';
 import { useToast } from '@/components/ui/toast';
@@ -116,6 +112,14 @@ export default function NotesScreen() {
 
   const scrollRef = useAnimatedRef<Animated.ScrollView>();
   /** Distância do topo do conteúdo até cada bloco arrastável — é o que o auto-scroll precisa. */
+  /**
+   * Altura VISÍVEL da rolagem.
+   *
+   * Sem ela o `Reorderable` cai em `Dimensions.get('window').height`, que aqui sobra ~180px (a
+   * faixa de marca em cima, a dock embaixo): o auto-scroll só começaria com o dedo já embaixo da
+   * barra, ou seja, nunca.
+   */
+  const [alturaVisivel, setAlturaVisivel] = useState(0);
   const [topoPastas, setTopoPastas] = useState(0);
   const [topoFixadas, setTopoFixadas] = useState(0);
   const [topoSoltas, setTopoSoltas] = useState(0);
@@ -250,14 +254,25 @@ export default function NotesScreen() {
       {
         label: 'Ordenar',
         icon: 'arrow.up.arrow.down',
-        actions: ordens.map((o) => ({
-          label: SORT_LABEL[o],
-          selected: sort === o,
-          onPress: () => {
-            Haptics.selectionAsync();
-            setSort(o);
-          },
-        })),
+        /*
+          ⚠️ **O segundo sheet é aberto À MÃO, e a ordem atual vai no `message`.** Uma entrada
+          com `actions` também abriria um submenu, mas sem mensagem — e `selected` não desenha
+          nada no `ActionSheetIOS`, que não tem checkmark. Sem o "Agora:", no iOS o menu não diz
+          em que ordem a tela já está, que é metade do que se vem perguntar aqui.
+        */
+        onPress: () =>
+          showItemActions(
+            'Ordenar notas',
+            ordens.map((o) => ({
+              label: SORT_LABEL[o],
+              selected: sort === o,
+              onPress: () => {
+                Haptics.selectionAsync();
+                setSort(o);
+              },
+            })),
+            `Agora: ${SORT_LABEL[sort].toLowerCase()}`
+          ),
       },
       {
         label: 'Organizar pastas',
@@ -346,8 +361,9 @@ export default function NotesScreen() {
 
   return (
     <Screen scroll={false} grouped topBar={cabecalho}>
-      <Animated.ScrollView
+      <DragScrollView
         ref={scrollRef}
+        onLayout={(e) => setAlturaVisivel(e.nativeEvent.layout.height)}
         // ⚠️ É isto que faz o arrasto não brigar com a rolagem: em vez de negociar prioridade
         // entre dois reconhecedores, o scroll simplesmente sai de cena enquanto o dedo carrega
         // um item. O auto-scroll continua, porque ele é `scrollTo`, não gesto.
@@ -379,6 +395,7 @@ export default function NotesScreen() {
           A captura fica no topo porque é o que este app É — "anotar rápido" é a razão de o
           produto existir, e busca só acontece depois de já haver o que buscar.
         */}
+        <View style={styles.grupoDeEntrada}>
         <View style={styles.captura}>
           <TextField
             value={draft}
@@ -427,6 +444,9 @@ export default function NotesScreen() {
           <ScrollView
             horizontal
             showsHorizontalScrollIndicator={false}
+            // A faixa SANGRA até as bordas: presa na calha da tela, o primeiro e o último chip
+            // ficariam cortados a 16px da borda em vez de saírem de baixo dela.
+            style={styles.faixaChips}
             contentContainerStyle={styles.chips}>
             {chips.map((t) => (
               <Chip
@@ -438,6 +458,7 @@ export default function NotesScreen() {
             ))}
           </ScrollView>
         ) : null}
+        </View>
 
         {pastas.length > 0 ? (
           <View onLayout={(e) => setTopoPastas(e.nativeEvent.layout.y)}>
@@ -457,6 +478,7 @@ export default function NotesScreen() {
               enabled={podeArrastar}
               scrollRef={scrollRef}
               topInset={topoPastas}
+              viewportHeight={alturaVisivel}
               onDragStateChange={setArrastando}
               onOpen={(f) => router.push(`/notes/folder/${f.id}`)}
               onMenu={menuDaPasta}
@@ -480,6 +502,7 @@ export default function NotesScreen() {
               enabled={podeArrastar}
               scrollRef={scrollRef}
               topInset={topoFixadas}
+              viewportHeight={alturaVisivel}
               onDragStateChange={setArrastando}
               onReorder={(ids) =>
                 reorderNotes.mutate(ids, {
@@ -505,6 +528,7 @@ export default function NotesScreen() {
               enabled={podeArrastar}
               scrollRef={scrollRef}
               topInset={topoSoltas}
+              viewportHeight={alturaVisivel}
               onDragStateChange={setArrastando}
               onReorder={(ids) =>
                 reorderNotes.mutate(ids, {
@@ -518,7 +542,7 @@ export default function NotesScreen() {
         </View>
 
         {list.isFetchingNextPage ? <NoteSkeleton /> : null}
-      </Animated.ScrollView>
+      </DragScrollView>
 
       <ColorPicker
         visible={pintando !== null}
@@ -582,12 +606,19 @@ const styles = StyleSheet.create({
   conteudo: {
     gap: Space.xl,
     paddingHorizontal: Space.lg,
-    paddingBottom: Space.xxxl,
+    /**
+     * ⚠️ **A dock do Android é ABSOLUTA e desenha POR CIMA da lista.** O `Screen` só soma esse
+     * respiro no ramo COM rolagem própria dele; aqui a rolagem é nossa, então a conta é nossa.
+     * Sem isto a última nota fica escondida atrás da pílula — não dá para ler nem tocar.
+     */
+    paddingBottom: Space.xxxl + (Platform.OS === 'android' ? CURVED_BAR_SPACE : 0),
     width: '100%',
     maxWidth: MaxContentWidth,
     alignSelf: 'center',
   },
-  captura: { flexDirection: 'row', alignItems: 'center', gap: Space.sm, paddingTop: Space.md },
+  /** Captura, busca e chips são UM grupo — `md` entre eles, `xl` só até o próximo bloco (§2). */
+  grupoDeEntrada: { gap: Space.md, paddingTop: Space.md },
+  captura: { flexDirection: 'row', alignItems: 'center', gap: Space.sm },
   enviar: {
     width: HitTarget,
     height: HitTarget,
@@ -596,7 +627,8 @@ const styles = StyleSheet.create({
     borderRadius: Radius.pill,
     borderCurve: 'continuous',
   },
-  chips: { gap: Space.sm, paddingRight: Space.lg },
+  faixaChips: { marginHorizontal: -Space.lg },
+  chips: { gap: Space.sm, paddingHorizontal: Space.lg },
   cresce: { flex: 1 },
   esqueleto: { gap: Space.sm, paddingVertical: Space.lg },
 });

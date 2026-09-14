@@ -1,5 +1,12 @@
-import { memo } from 'react';
+import { memo, useEffect } from 'react';
 import { Pressable, StyleSheet, View, useWindowDimensions } from 'react-native';
+import Animated, {
+  FadeIn,
+  useAnimatedStyle,
+  useSharedValue,
+  withSequence,
+  withSpring,
+} from 'react-native-reanimated';
 import { GestureDetector, type ComposedGesture, type GestureType } from 'react-native-gesture-handler';
 
 import { ThemedText } from '@/components/themed-text';
@@ -8,7 +15,7 @@ import { ItemLink } from '@/components/ui/item-link';
 import { Mark } from '@/components/ui/mark';
 import { Fonts, type NoteColorName } from '@/constants/theme';
 import { noteRail } from '@/design/note-colors';
-import { HitTarget, Radius, Space, Type, tabular } from '@/design/tokens';
+import { HitTarget, Motion, Radius, Space, Type, tabular } from '@/design/tokens';
 import { useScheme, useTheme } from '@/hooks/use-theme';
 import type { Note } from '@/hooks/use-notes';
 import { relativeBR } from '@/lib/dates';
@@ -121,7 +128,16 @@ function NoteCardBase({ note, folderName, folderColor, actions, drag, dragging }
                   borderColor: theme.separator,
                 },
               ]}>
-              {trilho ? <View style={[styles.trilho, { backgroundColor: trilho }]} /> : null}
+              {/* `key` na COR: trocar a cor remonta o trilho e ele entra em fade, em vez de
+                  saltar de um tom para o outro. É o cross-fade do §5 sem uma shared value só
+                  para uma transição que acontece uma vez a cada muitas semanas. */}
+              {trilho ? (
+                <Animated.View
+                  key={trilho}
+                  entering={FadeIn.duration(Motion.duration.base)}
+                  style={[styles.trilho, { backgroundColor: trilho }]}
+                />
+              ) : null}
 
               <View style={styles.conteudo}>
                 {/* Título e pin dividem a primeira linha: o pin fica no canto do cartão (padrão
@@ -130,7 +146,7 @@ function NoteCardBase({ note, folderName, folderColor, actions, drag, dragging }
                   <ThemedText type="headline" style={styles.cresce}>
                     {titulo}
                   </ThemedText>
-                  {note.pinned ? <Icon name="pin.fill" size="sm" color="tint" /> : null}
+                  {note.pinned ? <Pin /> : null}
                 </View>
 
                 {previa ? (
@@ -193,6 +209,34 @@ function NoteCardBase({ note, folderName, folderColor, actions, drag, dragging }
         </Pressable>
       )}
     </ItemLink>
+  );
+}
+
+/**
+ * O alfinete, com o pulso de quem acabou de ser fixado.
+ *
+ * `0.6 → 1.15 → 1`: ele nasce pequeno, passa do tamanho e assenta. Sem isso, fixar uma nota fazia
+ * a linha saltar para o topo da lista com um ícone que simplesmente apareceu — o movimento diz
+ * QUEM causou o salto. No desfixar não há pulso nenhum: o ícone some junto com a linha subindo.
+ *
+ * `ReduceMotion.System` é o padrão do `withSpring`/`withTiming` no Reanimated 4, então quem
+ * desligou movimento no sistema recebe o ícone direto no tamanho final, sem nada a mais aqui.
+ */
+function Pin() {
+  const escala = useSharedValue(0.6);
+  useEffect(() => {
+    escala.value = withSequence(
+      withSpring(1.15, Motion.spring.snap),
+      withSpring(1, Motion.spring.settle)
+    );
+  }, [escala]);
+  // A conta vai DENTRO do withSpring — `withSpring(a) * b` devolve NaN e a view some sem log.
+  const estilo = useAnimatedStyle(() => ({ transform: [{ scale: escala.value }] }));
+
+  return (
+    <Animated.View style={estilo}>
+      <Icon name="pin.fill" size="sm" color="tint" />
+    </Animated.View>
   );
 }
 

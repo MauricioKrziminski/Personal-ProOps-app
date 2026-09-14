@@ -13,6 +13,7 @@ import { useFolderMenu } from '@/components/notes/use-folder-menu';
 import { TagPicker } from '@/components/notes/tag-picker';
 import { EmptyState } from '@/components/ui/empty-state';
 import { HeaderActions } from '@/components/ui/header-actions';
+import { DragScrollView } from '@/components/ui/drag-scroll';
 import { Screen } from '@/components/ui/screen';
 import { SectionHead } from '@/components/ui/section-head';
 import { SkeletonList } from '@/components/ui/skeleton';
@@ -64,8 +65,12 @@ export default function FolderScreen() {
    */
   const [pintandoPasta, setPintandoPasta] = useState<NoteFolder | null>(null);
   const [etiquetando, setEtiquetando] = useState(false);
+  /** As tags enquanto o sheet está aberto; `null` = espelha o cache. */
+  const [tagsEmEdicao, setTagsEmEdicao] = useState<string[] | null>(null);
 
   const scrollRef = useAnimatedRef<Animated.ScrollView>();
+  /** Altura visível da rolagem — sem ela o auto-scroll usa a janela inteira e nunca dispara. */
+  const [alturaVisivel, setAlturaVisivel] = useState(0);
   const [topoSubpastas, setTopoSubpastas] = useState(0);
   const [topoFixadas, setTopoFixadas] = useState(0);
   const [topoNotas, setTopoNotas] = useState(0);
@@ -164,11 +169,16 @@ export default function FolderScreen() {
     );
   };
 
+  /**
+   * ⚠️ **A lista de tags vem do ESTADO local, não do cache.** O cache só volta depois do
+   * refetch: dois toques seguidos leriam os dois a mesma lista de antes do primeiro, e a
+   * segunda gravação desfaria a primeira.
+   */
   const alternarTag = (t: string) => {
     if (!folder) return;
-    const tags = folder.tags.includes(t)
-      ? folder.tags.filter((x) => x !== t)
-      : [...folder.tags, t];
+    const atuais = tagsEmEdicao ?? folder.tags;
+    const tags = atuais.includes(t) ? atuais.filter((x) => x !== t) : [...atuais, t];
+    setTagsEmEdicao(tags);
     updateFolder.mutate(
       { id: folder.id, tags },
       { onError: () => toast({ message: 'Não deu para salvar as tags.', tone: 'error' }) }
@@ -227,8 +237,9 @@ export default function FolderScreen() {
         }
       />
 
-      <Animated.ScrollView
+      <DragScrollView
         ref={scrollRef}
+        onLayout={(e) => setAlturaVisivel(e.nativeEvent.layout.height)}
         scrollEnabled={!arrastando}
         showsVerticalScrollIndicator={false}
         contentInsetAdjustmentBehavior="automatic"
@@ -270,6 +281,7 @@ export default function FolderScreen() {
                   enabled={podeArrastar}
                   scrollRef={scrollRef}
                   topInset={topoSubpastas}
+                  viewportHeight={alturaVisivel}
                   onDragStateChange={setArrastando}
                   onOpen={(f) => router.push(`/notes/folder/${f.id}`)}
                   onMenu={menuDaSubpasta}
@@ -293,6 +305,7 @@ export default function FolderScreen() {
                   enabled={podeArrastar}
                   scrollRef={scrollRef}
                   topInset={topoFixadas}
+                  viewportHeight={alturaVisivel}
                   onDragStateChange={setArrastando}
                   onReorder={(ids) =>
                     reorderNotes.mutate(ids, {
@@ -317,6 +330,7 @@ export default function FolderScreen() {
                   enabled={podeArrastar}
                   scrollRef={scrollRef}
                   topInset={topoNotas}
+                  viewportHeight={alturaVisivel}
                   onDragStateChange={setArrastando}
                   onReorder={(ids) =>
                     reorderNotes.mutate(ids, {
@@ -342,7 +356,7 @@ export default function FolderScreen() {
             </View>
           </>
         )}
-      </Animated.ScrollView>
+      </DragScrollView>
 
       <ColorPicker
         visible={pintandoNota !== null}
@@ -375,8 +389,11 @@ export default function FolderScreen() {
       <TagPicker
         visible={etiquetando}
         alvo="pasta"
-        current={folder?.tags ?? []}
-        onClose={() => setEtiquetando(false)}
+        current={tagsEmEdicao ?? folder?.tags ?? []}
+        onClose={() => {
+          setEtiquetando(false);
+          setTagsEmEdicao(null);
+        }}
         onToggle={alternarTag}
       />
 

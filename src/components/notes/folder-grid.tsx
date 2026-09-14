@@ -1,10 +1,9 @@
-import { useWindowDimensions } from 'react-native';
-import type Animated from 'react-native-reanimated';
-import type { useAnimatedRef } from 'react-native-reanimated';
+import { StyleSheet, useWindowDimensions } from 'react-native';
+import Animated, { FadeInDown, type useAnimatedRef } from 'react-native-reanimated';
 
 import { FolderCard, folderTileHeight } from '@/components/notes/folder-card';
 import { Reorderable } from '@/components/ui/reorderable';
-import { Space } from '@/design/tokens';
+import { Motion, Space } from '@/design/tokens';
 import type { NoteFolder } from '@/hooks/use-notes';
 
 /**
@@ -28,6 +27,7 @@ export function FolderGrid({
   enabled,
   scrollRef,
   topInset,
+  viewportHeight,
   onDragStateChange,
   onOpen,
   onMenu,
@@ -37,6 +37,8 @@ export function FolderGrid({
   enabled: boolean;
   scrollRef: ReturnType<typeof useAnimatedRef<Animated.ScrollView>>;
   topInset: number;
+  /** Altura VISÍVEL da rolagem. Sem ela o auto-scroll mede pela janela e só dispara tarde. */
+  viewportHeight: number;
   onDragStateChange: (v: boolean) => void;
   onOpen: (folder: NoteFolder) => void;
   /** Toque longo sem arrastar. */
@@ -56,12 +58,27 @@ export function FolderGrid({
       activation="toque-longo"
       scrollRef={scrollRef}
       topInset={topInset}
+      viewportHeight={viewportHeight || undefined}
       onDragStateChange={onDragStateChange}
       onTapItem={(i) => onMenu(pastas[i])}
       onReorder={onReorder}
-      renderItem={({ item, active }) => (
-        <FolderCard folder={item} dragging={active} onPress={() => onOpen(item)} />
+      renderItem={({ item, index, active }) => (
+        // A grade se MONTA, em cascata — é explicação, não enfeite: o olho lê a ordem dos
+        // ladrilhos enquanto eles chegam, e o teto de `Motion.stagger.cap` impede que a última
+        // pasta de uma grade grande pareça atrasada.
+        <Animated.View
+          style={styles.celula}
+          entering={FadeInDown.delay(
+            Math.min(index * Motion.stagger.step, Motion.stagger.cap)
+          ).duration(Motion.duration.slow)}>
+          <FolderCard folder={item} dragging={active} onPress={() => onOpen(item)} />
+        </Animated.View>
       )}
     />
   );
 }
+
+const styles = StyleSheet.create({
+  /** O embrulho da cascata precisa ocupar a célula inteira, senão o ladrilho encolhe. */
+  celula: { flex: 1 },
+});
