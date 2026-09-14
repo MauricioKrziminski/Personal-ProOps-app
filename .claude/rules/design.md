@@ -169,11 +169,29 @@ pessoa a não ler o sufixo.
 |---|---|
 | **Cor** | Sempre via `useTheme()`. **Zero hex em tela.** Toda cor nova precisa de par light **e** dark. |
 | **Raio** | `Radius`: `xs 8` (nada menor), `sm 12` inputs e linhas, `md 16` cards, `lg 20`, `xl 28` sheets, `pill` ações. Sempre com `borderCurve: 'continuous'`. |
-| **Espaço** | Escala `Spacing`. Preferir `gap` do flexbox a empilhar margem. Padding de scroll vai em `contentContainerStyle`, nunca no `ScrollView`. |
+| **Espaço** | Escala `Space` (`design/tokens.ts`). Preferir `gap` do flexbox a empilhar margem. Padding de scroll vai em `contentContainerStyle`, nunca no `ScrollView`. |
 | **Elevação** | `Elevation` via `boxShadow`. **Nunca** `shadow*`/`elevation` legado. Um sistema de elevação só. |
 | **Movimento** | `Motion` (durações e curvas). Nada de `400` literal espalhado. |
 | **Tipografia** | `ThemedText type=...`. **Zero `fontSize` solto.** |
 | **Ícone** | `Icon` (`expo-symbols`). Zero emoji na chrome, zero glyph de texto (`‹`, `＋`) fazendo papel de ícone. |
+
+**O ritmo vertical NÃO é escolha de tela — ele mora no `<Screen>`.** Qual `gap` significa o quê:
+
+| distância | token | onde |
+|---|---|---|
+| entre BLOCOS da tela | `Space.xl` (24) | é o `gap` do `Screen`; a tela não repete |
+| calha lateral | `Space.lg` (16) | idem |
+| dentro de um bloco (título + conteúdo) | `Space.sm` (8) | `styles.section` |
+| entre linhas irmãs de um card | `Space.md` (12) | `Card` e `Row` |
+| entre rótulo e valor colados | `Space.xs` (4) / `half` (2) | par de texto |
+
+⚠️ **Espaçamento já era todo tokenizado** — 13 literais crus no repo inteiro em 13/09/2026. O que
+estava bagunçado não era o valor, era *qual* token cada tela escolhia — e, principalmente, as
+**duas telas que escreviam o próprio padding** em vez de usar o `Screen`: a Hoje (96dp de vazio
+empilhado em volta do empty state, `+ Space.md` no topo contra `+ Space.sm` de todas as outras) e
+a do ciclo (calha 12 contra 16, gap 12 contra 24). As duas eram exatamente as que o dono do
+produto chamou de desorganizadas. `anti-slop.test.ts` quebra o build se uma tela de conteúdo
+nascer fora do `Screen`.
 
 **Um accent só** (`tint`), gasto em ação primária, estado ativo e progresso. `danger`, `success`
 e `warning` são semânticos — nunca decoração. Uma família de cinza no app inteiro.

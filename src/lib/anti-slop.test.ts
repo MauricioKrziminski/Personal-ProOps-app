@@ -666,3 +666,49 @@ test('Segmented não passa de 4 opções', () => {
   }
   assert.deepEqual(fora, [], 'acima de 4 opções o rótulo quebra no meio da palavra a 384dp — use SelectField');
 });
+
+/**
+ * Toda tela de CONTEÚDO passa pelo `<Screen>`.
+ *
+ * `Screen` é quem carrega o ritmo vertical do app: `gap: Space.xl` entre blocos, calha
+ * `Space.lg`, o respiro do topo calibrado no aparelho (`+ Space.sm`, nos dois sentidos) e o
+ * padding de baixo que soma safe area + dock + FAB. Ele também resolve o teclado e a heurística
+ * do large title do iOS, que exige o `ScrollView` na RAIZ da tela.
+ *
+ * ⚠️ **Espaçamento neste app já era todo tokenizado** — 13 literais crus no repo inteiro. O
+ * desvio nunca foi "faltam tokens"; era tela escrevendo o PRÓPRIO padding. Eram duas: a Hoje
+ * (que empilhava 96dp de vazio em volta do empty state, e tinha `+ Space.md` no topo contra o
+ * `+ Space.sm` de todas as outras) e a do ciclo (calha 12 contra 16, gap 12 contra 24). As duas
+ * eram exatamente as que o dono do produto chamou de desorganizadas.
+ *
+ * A allowlist é de telas com MOLDURA PRÓPRIA, não de exceções de estilo.
+ */
+const SEM_SCREEN = new Set([
+  'src/app/index.tsx',                 // só um <Redirect>
+  'src/app/design-preview.tsx',        // vitrine de dev: monta as raízes de aba à mão
+  'src/app/onboarding.tsx',            // fluxo de tela cheia, com paginação própria
+  // As seis portas de conta compartilham a moldura `AuthScreen`.
+  'src/app/login.tsx',
+  'src/app/signup.tsx',
+  'src/app/forgot-password.tsx',
+  'src/app/login-whatsapp.tsx',
+  'src/app/link-email.tsx',
+  'src/app/link-phone.tsx',
+  // Conversa: lista INVERTIDA com composer fixo — o oposto de um scroll de conteúdo.
+  'src/app/agent/new.tsx',
+  'src/app/agent/[id].tsx',
+]);
+
+test('toda tela de conteúdo usa <Screen>', () => {
+  const fora: string[] = [];
+  for (const file of walk(join(SRC, 'app'))) {
+    const rel = file.replace(SRC, 'src');
+    if (rel.endsWith('_layout.tsx') || SEM_SCREEN.has(rel)) continue;
+    if (!/<Screen[\s/>]/.test(stripComments(readFileSync(file, 'utf8')))) fora.push(rel);
+  }
+  assert.deepEqual(
+    fora,
+    [],
+    'o ritmo vertical mora no <Screen>: tela que escreve o próprio padding é a que diverge'
+  );
+});

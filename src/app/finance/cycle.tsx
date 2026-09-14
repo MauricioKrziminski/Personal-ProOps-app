@@ -1,6 +1,6 @@
 import { router, useLocalSearchParams } from 'expo-router';
 import { useMemo, useState } from 'react';
-import { ScrollView, StyleSheet, View } from 'react-native';
+import { StyleSheet, View } from 'react-native';
 
 import { ErrorCard } from '@/components/error-card';
 import { monthTitle } from '@/components/finance/month-picker';
@@ -11,6 +11,7 @@ import { Money } from '@/components/ui/money';
 import { Row, Section } from '@/components/ui/row';
 import { HeroLabel, SectionHead } from '@/components/ui/section-head';
 import { Segmented } from '@/components/ui/segmented';
+import { Screen } from '@/components/ui/screen';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Radius, Space } from '@/design/tokens';
 import {
@@ -65,27 +66,33 @@ export default function CycleDetailScreen() {
 
   if (serie.isError || linhas.isError) {
     return (
-      <ScrollView contentContainerStyle={styles.conteudo}>
+      <Screen>
         <ErrorCard
           onRetry={() => {
             void serie.refetch();
             void linhas.refetch();
           }}
         />
-      </ScrollView>
+      </Screen>
     );
   }
 
   if (serie.isPending || !ciclo) {
     return (
-      <ScrollView contentContainerStyle={styles.conteudo}>
+      <Screen>
         <Skeleton height={220} radius={Radius.md} />
-      </ScrollView>
+      </Screen>
     );
   }
 
   return (
-    <ScrollView contentContainerStyle={styles.conteudo}>
+    /*
+      ⚠️ **`<Screen>`, não um `ScrollView` próprio.** Esta era a outra tela de conteúdo que furava
+      o primitivo do ritmo — e o desvio era visível: calha de `Space.md` (12) contra os 16 do app
+      inteiro, e gap de 12 contra 24. Num app cuja queixa era "espaçamento bagunçado", a tela que
+      escreve o próprio padding é a que diverge.
+    */
+    <Screen>
       <Fechamento ciclo={ciclo} month={month} />
 
       <Segmented
@@ -111,7 +118,7 @@ export default function CycleDetailScreen() {
           </View>
         ))
       )}
-    </ScrollView>
+    </Screen>
   );
 }
 
@@ -252,7 +259,6 @@ function destino(l: CycleLine) {
 }
 
 const styles = StyleSheet.create({
-  conteudo: { padding: Space.md, paddingBottom: Space.xxl, gap: Space.md },
   painel: { gap: Space.xs },
   conta: { gap: Space.xs, paddingTop: Space.sm },
   contaLinha: {
