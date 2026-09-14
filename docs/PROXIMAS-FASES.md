@@ -15,10 +15,10 @@
 | | |
 |---|---|
 | Branch | `main`, limpa, tudo commitado e com push |
-| Último commit | `ac81f4f fix(finance): a pilula 'previsto' fica neutra — estado nao e aviso` |
-| Migrations no **staging** (`utkqoiigimqzeenxkxdl`) | até `20260913180000` — **em dia** |
-| Migrations em **produção** (`kwriuifcwyvdrxtspjiz`) | `20260911220000` — **7 atrás** |
-| `tsc`, `expo lint`, `npm test` | verdes (353 testes) |
+| Último commit | `cc8f898 feat(finance): as linhas do ciclo dizem quanto ja caiu e quanto ja saiu da conta` |
+| Migrations no **staging** (`utkqoiigimqzeenxkxdl`) | até `20260914120000` — **em dia** |
+| Migrations em **produção** (`kwriuifcwyvdrxtspjiz`) | `20260911220000` — **8 atrás** |
+| `tsc`, `expo lint`, `npm test` | verdes (359 testes) |
 | Tags | **nenhuma criada** — é o Gabriel quem cria, depois de testar |
 
 ⚠️ **Confirme o número de produção na fonte antes de decidir qualquer coisa com base nele.** No
@@ -70,7 +70,11 @@ Esta linha já envelheceu calada duas vezes, nos dois sentidos.
 
 ---
 
-## Fase 0 — Higiene (30 min, faça antes de tudo)
+## Fase 0 — Higiene ✅ FEITA em 14/09/2026 (commit `b36f706`)
+
+> A 0.1 foi feita. **A 0.2 continua aberta de propósito** — ela é uma linha da Fase 2, onde o
+> alvo `cycle` entra nas duas listas de uma vez; mexer agora seria tocar nos mesmos dois arquivos
+> duas vezes.
 
 ### 0.1 Apagar `src/types/database.types.ts`
 
@@ -107,7 +111,25 @@ existe só de um lado é um caminho morto. Ao mexer aqui na Fase 2, deixe as dua
 
 ---
 
-## Fase 1 — "Já caiu" nas linhas do Financeiro *(a versão minimalista de "até hoje")*
+## Fase 1 — "Já caiu" nas linhas do Financeiro ✅ FEITA em 14/09/2026 (commit `cc8f898`)
+
+> Migration `20260914120000`, aplicada **no staging**. O que o plano abaixo não previu, e a tela
+> mostrou:
+>
+> 1. **A sub-linha SOME quando o realizado é igual ao total.** Num ciclo fechado e quitado ela
+>    escrevia o mesmo número que o `<Money>` a 60px dela — eco, §1 do design. Visto na tela antes
+>    de virar regra: *"já caiu na conta R$ 6.330,62"* debaixo de *"R$ 6.330,62"*. É a mesma
+>    decisão que o `mostrarSplit` de `period-summary-card.tsx` já tomava, pelo mesmo motivo.
+> 2. **Ciclo `previsto` também não ganha sub-linha** — lá o realizado é zero por definição.
+> 3. **A cópia foi para `src/lib/cycle-label.ts`** (`describeRealizado`), ao lado de
+>    `describeCycle`, com 6 testes puros — inclusive o da conta oculta, que prova que o valor
+>    passa pelo `brl` recebido por parâmetro. Não existe caso PARCIAL nos dados de staging hoje
+>    (todo ciclo fechado está quitado e os abertos estão em zero), então essa é a única forma de
+>    cobrir o ramo do meio.
+> 4. ⚠️ **O corpo vivo de `cycle_series_for` era o da `20260913160000`, não o da `150000`** — a
+>    `160000` trocou `em_aberto` para `ci.status <> 'paid'` (fatura adiada conta como "faltou
+>    pagar"). Copiar a `150000`, como o plano abaixo sugere, teria revertido isso **em silêncio**.
+>    Confira com `pg_get_functiondef` antes de reescrever QUALQUER função.
 
 ### Por quê
 
@@ -164,8 +186,12 @@ npx supabase gen types typescript --linked > src/lib/database.types.ts
 **Na tela** (`src/app/(tabs)/finance/index.tsx`, por volta da linha 583): as duas `<Row>` de
 `O que entra` / `O que sai` já recebem `trailing={<Money .../>}`. Acrescente a sub-linha usando o
 mesmo vocabulário do card de Lançamentos — **"já caiu"** para entrada, **"já saiu"** para saída, e
-**"nada ainda"** quando for zero (é o texto que `period-summary-card.tsx` já usa; não invente um
-terceiro).
+**"nada ainda"** quando for zero.
+
+> ⚠️ **Correção (14/09/2026, o código ganhou):** esta linha dizia que `period-summary-card.tsx` já
+> escreve "já caiu"/"já saiu". Ele escreve **"já aconteceu"** — e é assim que tem que ser: aquele
+> card é COMPETÊNCIA e estas linhas são CAIXA. As duas cópias diferem de propósito, e é a lente
+> abaixo que separa as duas.
 
 O lugar certo é o `subtitle` da `Row`, que hoje diz "salário, pix e o que mais cai na conta". Duas
 opções, escolha ao ver na tela:
@@ -174,6 +200,10 @@ opções, escolha ao ver na tela:
 
 Prefira a primeira: o subtítulo atual explica o que é a linha, e depois de um mês de uso ninguém
 mais lê isso — o número, sim.
+
+> **Escolhido: a primeira, SEM repetir o total.** `já caiu R$ 0,00 de R$ 7.566,52` escreve o
+> `<Money>` do lado direito outra vez — o mesmo eco. A sub-linha carrega só a metade realizada, e
+> some quando essa metade é o total inteiro.
 
 ⚠️ **Escreva a LENTE na cópia: "já saiu **da conta**", não "já saiu".** Estas linhas são caixa
 (por data do pagamento) e a vizinha de Lançamentos é competência (por data da compra) — são
@@ -918,8 +948,8 @@ Coisas encontradas e não corrigidas, com o motivo. Nenhuma é urgente; todas s�
 
 | # | fase | tamanho | depende de |
 |---|---|---|---|
-| 0 | Higiene | 30 min | — |
-| 1 | "Já caiu" no Financeiro | meio dia | 0 |
+| 0 | ~~Higiene~~ ✅ `b36f706` (a 0.2 vai junto com a Fase 2) | 30 min | — |
+| 1 | ~~"Já caiu" no Financeiro~~ ✅ `cc8f898` | meio dia | 0 |
 | 2 | Fechamento de ciclo | 1 dia | — |
 | 3 | Conciliação pelo extrato | 1–2 dias | — |
 | 4 | Bloqueio por senha/biometria | 1 dia + rebuild nativo | — |
