@@ -13,9 +13,11 @@ import { Screen } from '@/components/ui/screen';
 import { Field, MoneyField, TextField } from '@/components/ui/field';
 import { Segmented } from '@/components/ui/segmented';
 import { Skeleton, SkeletonRow } from '@/components/ui/skeleton';
-import { ProgressBar, Sparkline } from '@/components/ui/sparkline';
+import { BarTrack, ProgressBar, Sparkline } from '@/components/ui/sparkline';
 import { useToast } from '@/components/ui/toast';
 import { Mark } from '@/components/ui/mark';
+import { TaskHeader } from '@/components/ui/task-header';
+import { CountUpMoney } from '@/components/ui/count-up-money';
 import { useTheme } from '@/hooks/use-theme';
 import { Radius, Space } from '@/design/tokens';
 
@@ -37,6 +39,42 @@ export default function CatalogScreen() {
   return (
     <Screen grouped>
       <ThemedText type="title">Catálogo</ThemedText>
+
+      {/*
+        Os primitivos de 13/09/2026. Entram aqui porque é onde se olha um primitivo em claro E
+        escuro sem precisar do dado real por trás dele — e os três nasceram de uma varredura cujo
+        pedido era justamente padronização.
+      */}
+      <Section title="TaskHeader (sheet e modal usam o MESMO)">
+        <View style={{ backgroundColor: theme.groupedBackground, borderRadius: Radius.md, overflow: 'hidden' }}>
+          <TaskHeader title="Nova conta" onClose={() => toast({ message: 'fechar', tone: 'info' })} />
+        </View>
+        <View style={{ backgroundColor: theme.groupedBackground, borderRadius: Radius.md, overflow: 'hidden', marginTop: Space.md }}>
+          <TaskHeader
+            title="Título longo que precisa quebrar em duas linhas"
+            subtitle="de hoje até 10/12/2026"
+            onClose={() => toast({ message: 'fechar', tone: 'info' })}
+            action={<Button label="Salvar" size="sm" onPress={() => {}} />}
+          />
+        </View>
+      </Section>
+
+      <Section title="CountUpMoney (anima na MUDANÇA, não na montagem)">
+        <View style={{ gap: Space.md, padding: Space.lg, backgroundColor: theme.heroBottom, borderRadius: Radius.md }}>
+          <CountUpMoney cents={valor} />
+          <Button label="Trocar o valor" variant="secondary" size="sm" onPress={() => setValor((v) => (v > 500000 ? 4500 : v * 7 + 137))} />
+        </View>
+      </Section>
+
+      <Section title="BarTrack (scaleY, não height)">
+        <View style={{ flexDirection: 'row', alignItems: 'flex-end', gap: Space.sm, padding: Space.lg, height: 120 }}>
+          {[0.2, 0.55, 1, 0.4, 0, 0.8].map((r, i) => (
+            <View key={i} style={{ flex: 1, height: 88, justifyContent: 'flex-end' }}>
+              <BarTrack ratio={r} index={i} height={88} color={i === 2 ? theme.tint : theme.backgroundElement} dim={i > 3} />
+            </View>
+          ))}
+        </View>
+      </Section>
 
       <Section title="Marca">
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: Space.xl, padding: Space.lg }}>
