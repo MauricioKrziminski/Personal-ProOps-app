@@ -147,23 +147,27 @@ export default function InvoiceScreen() {
     .reduce((soma, t) => soma + t.amount_cents, 0);
 
   /**
-   * Quanto do total JÁ foi lançado, contra o que ainda vai entrar até o fechamento.
+   * Quanto do total ainda tem data À FRENTE — ou seja, ainda não aconteceu.
    *
    * ⚠️ **O corte é a DATA, nunca o `status`** — a régua está escrita em `finance.md`: compra de
    * cartão fica `pending` até a fatura ser paga, então filtrar por `cleared` chamaria de
    * "previsto" a compra que a pessoa fez semana passada.
    *
-   * Isto existe porque a conta não fechava contra o extrato do banco e a pergunta foi literal
-   * (13/09/2026): a fatura do Nubank dizia R$ 3.660,28 e o app, R$ 3.760,20. A diferença era uma
-   * recorrente de R$ 88,85 com data 20/09 — ainda não aconteceu. **Os dois números estavam
-   * certos**: o banco mostra o que já foi lançado, o app mostra como a fatura vai FECHAR. O que
-   * faltava era a tela dizer qual dos dois ela estava mostrando.
+   * Isto existe porque o total não batia com o extrato do banco e a pergunta foi literal
+   * (13/09/2026): a fatura do Nubank dizia R$ 3.660,28 e o app, R$ 3.760,20. **Os dois números
+   * estavam certos** — o banco mostra o que já postou, o app mostra como a fatura vai FECHAR —,
+   * e o que faltava era a tela dizer qual dos dois ela estava mostrando.
+   *
+   * ⚠️ **Esta linha explica a diferença; ela NÃO reconcilia com o extrato.** Medido no staging
+   * nessa fatura: R$ 228,95 têm data à frente (DAS de 20/09 e Carro Peças de 22/09), o que
+   * deixaria "até hoje" em R$ 3.531,25 — nem o total do app, nem os R$ 3.660,28 do banco. O
+   * banco posta no ritmo dele, não na data que a compra tem aqui, então qualquer par
+   * `lançado × previsto` mostrado lado a lado convida a uma conferência que não fecha.
    */
   const hoje = localISODate();
-  const jaLancado = compras
-    .filter((t) => t.kind === 'expense' && t.occurred_at <= hoje)
+  const aindaVem = compras
+    .filter((t) => t.kind === 'expense' && t.occurred_at > hoje)
     .reduce((soma, t) => soma + t.amount_cents, 0);
-  const aindaVem = total - jaLancado;
 
   const dias = useMemo(() => {
     const mapa = new Map<string, Transaction[]>();
@@ -369,14 +373,26 @@ export default function InvoiceScreen() {
               fecha {formatDateBR(fatura.closing_date)} · vence {formatDateBR(fatura.due_date)}
             </ThemedText>
             {/*
-                Só aparece quando há previsto: numa fatura já fechada esta linha repetiria o
-                número grande, e soma que repete a única parcela é eco, não resumo (§1).
-                "lançado / ainda vem" e não "pago / falta": as duas palavras de pagamento são da
-                linha logo abaixo, que fala de quanto da fatura já foi QUITADO.
+                Só aparece quando PARTE do total está à frente. Numa fatura já fechada não há
+                o que dizer; numa fatura inteiramente futura (a de dezembro, hoje) a linha
+                repetiria o número grande palavra por palavra — soma que repete a única parcela
+                é eco, não resumo (§1). Quem já diz que ela é futura é o `fecha · vence` logo
+                acima.
+
+                ⚠️ **UM número, e nenhuma palavra emprestada.** Mostrar o par
+                `lançado X · ainda vem Y` convidava a conferir o "lançado" contra o extrato do
+                banco — e ele NÃO bate, porque o banco posta no ritmo dele, não na data que a
+                compra tem aqui. O que responde a pergunta ("por que o app é maior que a minha
+                fatura hoje?") é só a parte que ainda não aconteceu.
+
+                ⚠️ **E não é "já aconteceu / ainda vai acontecer"**, que são as palavras dos
+                chips de Lançamentos — lá elas filtram `status`, aqui o corte é a DATA
+                (`finance.md`: compra de cartão fica `pending` até a fatura ser paga). Mesmo
+                rótulo para duas réguas é como as duas passam a divergir sem ninguém ver.
             */}
-            {aindaVem > 0 ? (
+            {aindaVem > 0 && aindaVem < total ? (
               <ThemedText type="small" themeColor="textSecondary" style={tabular}>
-                Lançado {formatBRL(jaLancado)} · ainda vem {formatBRL(aindaVem)}
+                Inclui {formatBRL(aindaVem)} com data à frente
               </ThemedText>
             ) : null}
             {paga && fatura.paid_at ? (

@@ -10,6 +10,7 @@ import { ProgressBar } from '@/components/ui/sparkline';
 import { Motion, Radius, Space } from '@/design/tokens';
 import { useTheme } from '@/hooks/use-theme';
 import type { CycleRow } from '@/hooks/use-finance';
+import { formatBRL } from '@/hooks/use-items';
 import { describeCycle } from '@/lib/cycle-label';
 
 interface Props {
@@ -105,7 +106,11 @@ export function PeriodSummaryCard({
           <Pressable
             onPress={onAbrirCiclo}
             accessibilityRole="button"
-            accessibilityLabel={`${d.label} ${Math.abs(d.cents) / 100} reais. Ver tudo que fecha o ciclo`}
+            /*
+              ⚠️ `cents / 100` é lido como "35196.9". Quem escreve dinheiro para leitor de tela
+              é o mesmo formatador da tela — senão o número falado não é o número visto.
+            */
+            accessibilityLabel={`${d.label} ${formatBRL(d.cents)}, por data do pagamento. Ver tudo que fecha o ciclo`}
             accessibilityHint="Abre a lista por data do pagamento, com as faturas">
             {({ pressed }) => (
               <View
