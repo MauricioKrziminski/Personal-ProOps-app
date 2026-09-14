@@ -89,6 +89,15 @@ const WEEKDAYS = [
 ] as const;
 
 const MONTH_DAYS = Array.from({ length: 31 }, (_, i) => i + 1);
+/**
+ * "Último dia do mês" na RRULE.
+ *
+ * ⚠️ Ele existe porque **o dia 31 não é isso**: `dateutil` (que é quem dispara o lembrete) PULA
+ * os meses que não têm o dia — medido, `BYMONTHDAY=31` a partir de janeiro dá 31/01, 31/03,
+ * 31/05, sem fevereiro e sem abril. O campo dizia o contrário ("cai no último dia") e a pessoa
+ * ficava sem o lembrete justamente nos meses curtos, sem nada na tela avisando.
+ */
+const ULTIMO_DIA = -1;
 
 const FREQ_OPTIONS = [
   { value: 'NONE', label: 'Não repete' },
@@ -138,7 +147,8 @@ function parseRRule(rrule: string | null): RecurrenceState {
       freq === 'MONTHLY' && parts.BYMONTHDAY
         ? parts.BYMONTHDAY.split(',')
             .map(Number)
-            .filter((n) => n >= 1 && n <= 31)
+            // `-1` é "último dia do mês" na RRULE — um valor legítimo, não lixo a descartar.
+            .filter((n) => n === ULTIMO_DIA || (n >= 1 && n <= 31))
         : [],
     count: parts.COUNT ? Number(parts.COUNT) : null,
     until: parts.UNTIL ?? null,
@@ -160,7 +170,11 @@ function buildRRule(state: RecurrenceState): string | null {
     parts.push(`BYDAY=${ordered.join(',')}`);
   }
   if (state.freq === 'MONTHLY' && state.bymonthday.length) {
-    parts.push(`BYMONTHDAY=${[...state.bymonthday].sort((a, b) => a - b).join(',')}`);
+    // `-1` ordena por último: ele É o último dia, e `a - b` cru o jogaria para a frente do dia 1.
+    const dias = [...state.bymonthday].sort((a, b) =>
+      a === ULTIMO_DIA ? 1 : b === ULTIMO_DIA ? -1 : a - b
+    );
+    parts.push(`BYMONTHDAY=${dias.join(',')}`);
   }
   // COUNT e UNTIL são mutuamente exclusivos na RRULE; COUNT ganha.
   if (state.count) parts.push(`COUNT=${state.count}`);
@@ -718,7 +732,7 @@ function RecurrenceEditor({
               label="Em quais dias do mês"
               hint={
                 state.bymonthday.includes(31)
-                  ? 'Em mês que não tem dia 31, cai no último dia.'
+                  ? 'Dia 31 não dispara em fevereiro nem em meses de 30. Use “Último dia”.'
                   : state.bymonthday.length > 4
                     ? `Isso vai disparar ${state.bymonthday.length} vezes por mês.`
                     : state.bymonthday.length === 0
@@ -740,6 +754,21 @@ function RecurrenceEditor({
                     }
                   />
                 ))}
+                {/*
+                  Depois do 31, porque é onde a pessoa chega procurando "o fim do mês" — e é o
+                  único valor da fileira que NÃO é um número de dia.
+                */}
+                <Chip
+                  label="Último dia"
+                  selected={state.bymonthday.includes(ULTIMO_DIA)}
+                  onPress={() =>
+                    patch({
+                      bymonthday: state.bymonthday.includes(ULTIMO_DIA)
+                        ? state.bymonthday.filter((d) => d !== ULTIMO_DIA)
+                        : [...state.bymonthday, ULTIMO_DIA],
+                    })
+                  }
+                />
               </View>
             </Field>
           </Animated.View>

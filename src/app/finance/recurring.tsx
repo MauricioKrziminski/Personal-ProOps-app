@@ -32,7 +32,7 @@ import {
 } from '@/hooks/use-finance';
 import { useRealtimeInvalidate } from '@/hooks/use-items';
 import { useTheme } from '@/hooks/use-theme';
-import { brToISO, isValidBRDate, isoToBR, localDateTime, localISODate } from '@/lib/dates';
+import { brToISO, ehUltimoDiaDoMes, isValidBRDate, isoToBR, localDateTime, localISODate } from '@/lib/dates';
 import { confirmDestructive, showItemActions } from '@/lib/item-actions';
 import { validRecurringRange } from '@/lib/finance-form';
 import { describeRRule } from '@/lib/rrule-text';
@@ -76,7 +76,6 @@ interface FormState {
    * resolve — devolve 30/09, 31/10, 30/11, 31/12. Foi o caso do Fundacred, que vence no último
    * dia e estava cadastrado no dia 4.
    */
-  ultimoDia: boolean;
   /** Só no preset mensal: `A cada N meses`. */
   intervalo: string;
   /** dd/mm/aaaa — vira `dtstart` E o `next_run_at` inicial. */
@@ -96,13 +95,22 @@ function montaRRule(
   preset: FormState['preset'],
   inicio: Date,
   intervalo: number,
-  ultimoDia = false,
 ): string {
   if (preset === 'weekly') return `FREQ=WEEKLY;BYDAY=${DIAS_RRULE[inicio.getDay()]}`;
   if (preset === 'yearly')
     return `FREQ=YEARLY;BYMONTH=${inicio.getMonth() + 1};BYMONTHDAY=${inicio.getDate()}`;
   const passo = intervalo > 1 ? `;INTERVAL=${intervalo}` : '';
-  return `FREQ=MONTHLY${passo};BYMONTHDAY=${ultimoDia ? -1 : inicio.getDate()}`;
+  /*
+    ⚠️ **A data DIZ se é "todo dia N" ou "todo último dia do mês".** Havia um campo só para
+    perguntar isso ("Vence quando: Dia do mês | Último dia"), e ele era um controle que a própria
+    data já respondia — quem escolhe 31/10 quer o fim do mês, quem escolhe 05/10 quer o dia 5.
+    Pior: ele renderizava ANTES de "Começa em", o campo que lhe dá sentido.
+
+    `-1` não é cosmético ao lado de 31: `BYMONTHDAY=31` PULA fevereiro e os meses de 30 dias.
+  */
+  return `FREQ=MONTHLY${passo};BYMONTHDAY=${
+    ehUltimoDiaDoMes(inicio) ? -1 : inicio.getDate()
+  }`;
 }
 
 /**
@@ -229,7 +237,6 @@ function formDaSerie(r: RecurringTransaction): FormState {
     accountId: r.account_id,
     preset: 'monthly',
     // Edição não mostra frequência (dtstart é imutável por desenho), então o valor não é lido.
-    ultimoDia: false,
     intervalo: '1',
     inicio: isoToBR((r.dtstart ?? r.next_run_at).slice(0, 10)),
     fim: r.end_date ? isoToBR(r.end_date) : '',
@@ -244,7 +251,6 @@ const FORM_VAZIO: FormState = {
   category: null,
   accountId: null,
   preset: 'monthly',
-  ultimoDia: false,
   intervalo: '1',
   inicio: isoToBR(localISODate()),
   fim: '',
@@ -295,7 +301,7 @@ export default function RecurringScreen() {
   const podeSalvar = Boolean(form && form.amountCents > 0 && inicioOk && fimOk && validRecurringRange(brToISO(form.inicio), form.fim ? brToISO(form.fim) : '', form.preset === 'monthly' ? form.intervalo : '1'));
   const rrulePrevia =
     form && inicioDate
-      ? montaRRule(form.preset, inicioDate, Number(form.intervalo) || 1, form.ultimoDia)
+      ? montaRRule(form.preset, inicioDate, Number(form.intervalo) || 1)
       : null;
 
   const salvar = () => {
@@ -700,19 +706,6 @@ export default function RecurringScreen() {
                 />
               </Field>
               )}
-
-              {!form.id && form.preset === 'monthly' ? (
-                <Field label="Vence quando" hint="Último dia acerta fevereiro sozinho.">
-                  <Segmented
-                    options={[
-                      { value: 'fixo', label: 'Dia do mês' },
-                      { value: 'ultimo', label: 'Último dia' },
-                    ]}
-                    value={form.ultimoDia ? 'ultimo' : 'fixo'}
-                    onChange={(v) => setForm({ ...form, ultimoDia: v === 'ultimo' })}
-                  />
-                </Field>
-              ) : null}
 
               {!form.id && form.preset === 'monthly' ? (
                 <Field label="A cada quantos meses" hint="1 = todo mês. 2 = mês sim, mês não." error={Number(form.intervalo) < 1 ? 'Informe um intervalo de 1 a 99 meses' : undefined}>

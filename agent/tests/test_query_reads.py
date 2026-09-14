@@ -54,6 +54,11 @@ class TestDescreveRRule:
             ("FREQ=WEEKLY;BYDAY=SA", "todo sábado"),
             ("FREQ=WEEKLY;BYDAY=MO,WE,FR", "toda segunda, quarta e sexta"),
             ("FREQ=MONTHLY;INTERVAL=2;BYMONTHDAY=5", "a cada 2 meses, no dia 5"),
+            # `-1` é "último dia do mês", e o app passou a GERAR essa forma sozinho quando a data
+            # escolhida é o último dia do mês (o campo "Vence quando" saiu do formulário). Sem o
+            # ramo, o WhatsApp escrevia "todo dia -1" enquanto o app escrevia a frase certa.
+            ("FREQ=MONTHLY;BYMONTHDAY=-1", "todo último dia do mês"),
+            ("FREQ=MONTHLY;INTERVAL=3;BYMONTHDAY=-1", "a cada 3 meses, no último dia do mês"),
             ("", "sem recorrência"),
             (None, "sem recorrência"),
         ],

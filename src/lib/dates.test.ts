@@ -21,6 +21,7 @@ import {
   timeBR,
   somaDias,
   maskBRDate,
+  ehUltimoDiaDoMes,
 } from './dates.ts';
 
 test('localISODate formata a data local com zero à esquerda', () => {
@@ -196,5 +197,19 @@ test('monthGrid põe cada dia na coluna do dia da semana', () => {
     if (!iso) continue;
     const [y, m, d] = iso.split('-').map(Number);
     assert.equal(new Date(y, m - 1, d).getDay(), i % 7, `${iso} na coluna errada`);
+  }
+});
+
+test('ehUltimoDiaDoMes reconhece o fim de cada mês', () => {
+  // Meses de 31, 30, 28 e 29 dias — o ano bissexto entra porque é onde a conta ingênua erra.
+  for (const [iso, esperado] of [
+    ['2027-01-31', true], ['2027-01-30', false],
+    ['2027-04-30', true], ['2027-04-29', false],
+    ['2027-02-28', true], ['2027-02-27', false],
+    ['2028-02-29', true], ['2028-02-28', false],
+    ['2027-12-31', true], ['2027-06-30', true],
+  ] as const) {
+    const [y, m, d] = iso.split('-').map(Number);
+    assert.equal(ehUltimoDiaDoMes(new Date(y, m - 1, d)), esperado, iso);
   }
 });

@@ -208,3 +208,19 @@ export function monthGrid(month: string): (string | null)[] {
     return dia >= 1 && dia <= diasNoMes ? `${month}-${String(dia).padStart(2, '0')}` : null;
   });
 }
+
+/**
+ * A data é o ÚLTIMO dia do mês dela?
+ *
+ * É o que decide entre `BYMONTHDAY=31` e `BYMONTHDAY=-1` numa recorrência. O campo "Vence quando"
+ * (Dia do mês / Último dia) existia só para perguntar isso, e era um controle que a própria data
+ * já respondia: quem escolhe 31/10 quer o fim do mês, e quem escolhe 05/10 quer o dia 5.
+ *
+ * ⚠️ A diferença não é cosmética. `BYMONTHDAY=31` **pula** fevereiro e os meses de 30 dias (o
+ * `dateutil` que dispara lembrete faz exatamente isso); `-1` cai em 28, 30 ou 31 conforme o mês.
+ *
+ * `new Date(y, m + 1, 0)` é o dia 0 do mês SEGUINTE, que o JS normaliza para o último dia deste.
+ */
+export function ehUltimoDiaDoMes(d: Date): boolean {
+  return d.getDate() === new Date(d.getFullYear(), d.getMonth() + 1, 0).getDate();
+}

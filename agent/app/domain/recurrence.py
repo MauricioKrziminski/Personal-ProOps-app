@@ -105,6 +105,12 @@ def descreve_rrule(rrule: str | None) -> str:
 
     if freq == "MONTHLY" and partes.get("BYMONTHDAY"):
         dias = [d for d in partes["BYMONTHDAY"].split(",") if d]
+        # `-1` é "último dia do mês" na RRULE, e é diferente de "dia 31": fevereiro não tem 31.
+        # Sem este ramo a frase saía **"todo dia -1"** no WhatsApp enquanto o app escrevia "todo
+        # último dia do mês" — e o app passou a GERAR `-1` sozinho quando a data escolhida é o
+        # último dia do mês, então isto deixou de ser caso raro. Espelha `src/lib/rrule-text.ts`.
+        if dias == ["-1"]:
+            return f"{base}, no último dia do mês" if intervalo > 1 else "todo último dia do mês"
         if dias:
             return f"{base}, no dia {_lista_pt(dias)}" if intervalo > 1 else f"todo dia {_lista_pt(dias)}"
 
