@@ -173,6 +173,33 @@ por `from`/`to`, que mudam junto; a do orçamento é chaveada pelo rótulo, que 
 nas duas réguas. Ela está em `REGUA_MUDOU` (`use-finance.ts`), a lista que os DOIS setters
 invalidam.
 
+## Um resumo resume o que está LOGO ABAIXO dele
+
+⚠️ **Número de outra lente no topo de uma lista é mentira, e já foi escrito dos dois jeitos.**
+O card de Lançamentos somou a lista (e virou cópia do painel da home: dois resultados idênticos
+em telas vizinhas, nada dizendo que respondiam a perguntas diferentes) e depois passou a ler
+`cycle_series` para bater com a home — e aí parou de bater com a lista a 200px dele. Medido no
+staging em 13/09/2026, ciclo de outubro: `saiu R$ 8.326,63` em cima de uma lista de
+**R$ 3.842,78**.
+
+A régua é uma só: **o total do topo soma exatamente as linhas de baixo.** Número de outra lente
+vira LINK, com a lente escrita — em Lançamentos, "por data da compra" no card e "por data do
+pagamento" no rodapé que leva ao ciclo. As duas leituras estão certas; o que não pode é a de
+outra lente ocupar o topo desta.
+
+⚠️ **Com filtro ativo o card SOME.** `transactions_summary` soma o período inteiro e a lista
+filtrada soma menos — mantê-lo ali recria o mesmo defeito com outra cara.
+
+⚠️ **A lista precisa da janela JÁ RESOLVIDA, nunca de um `YYYY-MM` para ela mesma recortar.**
+`useTransactions` chamava `monthBounds()` (o mês CIVIL) enquanto o resumo da mesma tela pedia a
+janela a `useMonthRange`, que respeita a régua. Com fechamento no dia 10 as duas discordavam em
+~20 dias: a lista de "outubro" trazia 4 lançamentos do ciclo SEGUINTE e escondia 6 do ciclo que
+estava na tela, e o botão `Mês | Ciclo` ficava logo acima de uma lista que o ignorava.
+
+Nada apontava o defeito — **o total de RECEITA batia por coincidência**, porque cada janela
+continha exatamente um salário. `src/lib/anti-slop.test.ts` prende as duas leituras na mesma
+variável.
+
 ## A régua do mês é de CADA TELA, e não existe régua "por fatura"
 
 `workspaces.cycle_close_day` é global (o Perfil grava o dia). **Como cada tela está olhando é da
