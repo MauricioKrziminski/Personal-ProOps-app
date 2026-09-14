@@ -17,6 +17,9 @@ interface Props {
   /** Somado por COMPETÊNCIA, na mesma janela da lista logo abaixo. */
   entrou: number;
   saiu: number;
+  /** Quanto de cada um ainda NÃO aconteceu (`status = 'pending'`). */
+  entrouPrevisto: number;
+  saiuPrevisto: number;
   /** Nome do mês já em minúsculas, ex. `outubro`. */
   nomeDoMes: string;
   /** Quantos lançamentos a lista abaixo está mostrando. */
@@ -66,6 +69,8 @@ interface Props {
 export function PeriodSummaryCard({
   entrou,
   saiu,
+  entrouPrevisto,
+  saiuPrevisto,
   nomeDoMes,
   lancamentos,
   ciclo,
@@ -84,7 +89,12 @@ export function PeriodSummaryCard({
   return (
     <Animated.View entering={FadeIn.duration(Motion.duration.base)}>
       <Card style={styles.card}>
-        <HeroLabel>{`Gastei em ${nomeDoMes}`}</HeroLabel>
+        {/*
+          ⚠️ **"Gastei" é passado, e o número quase nunca é.** No dia 3 de um ciclo o total é
+          ~98% futuro: dizia "GASTEI EM OUTUBRO R$ 3.842,78" quando R$ 83,97 tinham acontecido.
+          O rótulo agora é neutro, e quem separa passado de futuro são as barras.
+        */}
+        <HeroLabel>{`Gastos de ${nomeDoMes}`}</HeroLabel>
         <Money cents={saiu} variant="money" />
         <ThemedText type="footnote" themeColor="textSecondary">
           {`${lancamentos === 1 ? '1 lançamento' : `${lancamentos} lançamentos`} · por data da compra`}
@@ -98,8 +108,8 @@ export function PeriodSummaryCard({
             gráfico em telas vizinhas é como elas divergem. Quem separa as barras é a PALAVRA à
             esquerda e a claridade — que é o que funciona sem enxergar cor.
           */}
-          <Fluxo rotulo="entrou" cents={entrou} max={escala} forte />
-          <Fluxo rotulo="saiu" cents={saiu} max={escala} />
+          <Fluxo rotulo="entrou" cents={entrou} previsto={entrouPrevisto} max={escala} forte />
+          <Fluxo rotulo="saiu" cents={saiu} previsto={saiuPrevisto} max={escala} />
         </View>
 
         {d ? (
@@ -173,19 +183,44 @@ export function PeriodSummaryCard({
   );
 }
 
-/** Uma das duas barras. O rótulo à esquerda, o valor à direita, a barra ocupando o meio. */
+/**
+ * Uma das duas barras: o rótulo à esquerda, o total à direita, e a barra dizendo quanto disso
+ * JÁ ACONTECEU.
+ *
+ * ## Duas perguntas numa linha só
+ *
+ * O comprimento da barra compara **entrou × saiu** (as duas na mesma escala, `max` é o maior dos
+ * dois); a parte PREENCHIDA dela é o que já aconteceu. Por isso a barra vive dentro de uma caixa
+ * de largura proporcional: a caixa carrega a comparação entre as duas linhas, o preenchimento
+ * carrega o realizado dentro da própria linha. Sem a caixa, `value/total` encheria as duas
+ * barras e apagaria justamente a comparação.
+ *
+ * ## Por que `status` e não a data
+ *
+ * Logo abaixo deste card estão os chips **"Já aconteceu" / "Ainda vai acontecer"**, que filtram
+ * `status`. A regra desta tela é que o topo soma o que está embaixo — então tocar no chip tem
+ * que devolver exatamente o número que o card mostra. Cortar por DATA aqui daria um número que
+ * nenhum chip reproduz. (Na Fatura o corte É a data, porque lá a pergunta é outra — "por que o
+ * app é maior que meu extrato?" — e o rótulo diz "com data à frente", não "vai acontecer".)
+ */
 function Fluxo({
   rotulo,
   cents,
+  previsto,
   max,
   forte = false,
 }: {
   rotulo: string;
   cents: number;
+  previsto: number;
   max: number;
-  /** A barra de "entrou" leva o accent; "saiu" fica em cinza de dado. */
+  /** A barra de "entrou" é a mais clara das duas; "saiu" fica em cinza de dado. */
   forte?: boolean;
 }) {
+  const jaAconteceu = Math.max(0, cents - previsto);
+  // Nada pendente = a barra cheia já diz tudo, e a linha repetiria o total (§1, eco).
+  const mostrarSplit = previsto > 0;
+
   return (
     <View style={styles.fluxo}>
       <View style={styles.fluxoTopo}>
@@ -194,7 +229,17 @@ function Fluxo({
         </ThemedText>
         <Money cents={cents} variant="ticker" />
       </View>
-      <ProgressBar value={cents} max={max} tone={forte ? 'tint' : 'data'} />
+      <View style={{ width: `${max > 0 ? (cents / max) * 100 : 0}%` }}>
+        <ProgressBar value={jaAconteceu} max={cents} tone={forte ? 'strong' : 'data'} />
+      </View>
+      {mostrarSplit ? (
+        <View style={styles.fluxoTopo}>
+          <ThemedText type="caption" themeColor="textSecondary">
+            já aconteceu
+          </ThemedText>
+          <Money cents={jaAconteceu} variant="caption" tone="textSecondary" />
+        </View>
+      ) : null}
     </View>
   );
 }

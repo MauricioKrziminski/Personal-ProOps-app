@@ -14,6 +14,7 @@ import { ItemLink } from '@/components/ui/item-link';
 import { Field, MoneyField } from '@/components/ui/field';
 import { DatePickerField } from '@/components/finance/date-picker-field';
 import { Icon } from '@/components/ui/icon';
+import { concealText, useConceal } from '@/components/ui/conceal';
 import { Money } from '@/components/ui/money';
 import { Row, Section } from '@/components/ui/row';
 import { HeaderMenu } from '@/components/ui/header-actions';
@@ -164,6 +165,7 @@ export default function InvoiceScreen() {
    * banco posta no ritmo dele, não na data que a compra tem aqui, então qualquer par
    * `lançado × previsto` mostrado lado a lado convida a uma conferência que não fecha.
    */
+  const { concealed } = useConceal();
   const hoje = localISODate();
   const aindaVem = compras
     .filter((t) => t.kind === 'expense' && t.occurred_at > hoje)
@@ -392,7 +394,13 @@ export default function InvoiceScreen() {
             */}
             {aindaVem > 0 && aindaVem < total ? (
               <ThemedText type="small" themeColor="textSecondary" style={tabular}>
-                Inclui {formatBRL(aindaVem)} com data à frente
+                {/*
+                  `concealText()` inline, não `<Money>`: o valor está no MEIO de uma frase, e
+                  `Money` entra como irmão `flexShrink: 0` — quebraria a sentença. `formatBRL`
+                  cru aqui vazaria o valor com o saldo escondido, que é o que o olho ao lado do
+                  total acabou de esconder.
+                */}
+                Inclui {concealed ? concealText() : formatBRL(aindaVem)} com data à frente
               </ThemedText>
             ) : null}
             {paga && fatura.paid_at ? (
@@ -549,7 +557,15 @@ export default function InvoiceScreen() {
             disabled={pay.isPending}
             onPress={quitarSemCaixa}
           />
-          <ThemedText type="caption" themeColor="textSecondary">Marcar como paga não altera o saldo. Registrar pagamento desconta da conta escolhida.</ThemedText>
+          {/*
+            §7b: explicação ABAIXO do que ela explica. A frase era uma só e metade dela falava
+            do "Registrar pagamento", que só aparece lá embaixo — o leitor lia a explicação de
+            um botão que ainda não tinha visto. `finance.md` exige que a interface distinga os
+            dois efeitos, então as duas metades ficam, cada uma sob o seu botão.
+          */}
+          <ThemedText type="caption" themeColor="textSecondary">
+            Não altera o saldo: registra que a fatura foi paga fora do app.
+          </ThemedText>
           {podeAdiar ? (
             <>
               <Button
@@ -578,6 +594,9 @@ export default function InvoiceScreen() {
             disabled={settle.isPending || pay.isPending}
             onPress={abrirPagamento}
           />
+          <ThemedText type="caption" themeColor="textSecondary">
+            Desconta da conta que você escolher.
+          </ThemedText>
         </View>
       ) : null}
 

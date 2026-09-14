@@ -238,13 +238,21 @@ export default function TransactionsScreen() {
   const totais = useMemo(() => {
     let entrou = 0;
     let saiu = 0;
+    let entrouPrevisto = 0;
+    let saiuPrevisto = 0;
     let linhas = 0;
     for (const r of summary.data ?? []) {
-      if (r.kind === 'income') entrou += Number(r.total_cents);
-      if (r.kind === 'expense') saiu += Number(r.total_cents);
+      if (r.kind === 'income') {
+        entrou += Number(r.total_cents);
+        entrouPrevisto += Number(r.pending_cents);
+      }
+      if (r.kind === 'expense') {
+        saiu += Number(r.total_cents);
+        saiuPrevisto += Number(r.pending_cents);
+      }
       linhas += Number(r.tx_count);
     }
-    return { entrou, saiu, linhas };
+    return { entrou, saiu, entrouPrevisto, saiuPrevisto, linhas };
   }, [summary.data]);
 
   const accounts = useAccounts();
@@ -411,6 +419,8 @@ export default function TransactionsScreen() {
         <PeriodSummaryCard
           entrou={totais.entrou}
           saiu={totais.saiu}
+          entrouPrevisto={totais.entrouPrevisto}
+          saiuPrevisto={totais.saiuPrevisto}
           ciclo={ciclo}
           nomeDoMes={monthTitle(month).replace(/ de \d{4}$/, '').toLowerCase()}
           lancamentos={totais.linhas}

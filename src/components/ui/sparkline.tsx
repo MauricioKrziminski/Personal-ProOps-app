@@ -236,7 +236,24 @@ export function ProgressBar({
 }: {
   value: number;
   max: number;
-  tone?: 'tint' | 'data' | 'success' | 'warning' | 'danger' | 'onHeroSuccess' | 'onHeroDanger' | 'onHeroWarning';
+  /**
+   * `data` é comparação (cinza), `tint` é estado que o usuário resolve (orçamento, meta).
+   *
+   * ⚠️ **`strong` é comparação que precisa de DOIS pesos.** Em "entrou × saiu" as duas barras
+   * comparam, então nenhuma delas é `tint` — gastar o accent ali o tira de ação e estado, que é
+   * a única alavanca de cor do app. Quem separa as duas é a CLARIDADE, que é a mesma decisão
+   * (e a mesma frase) do `CashBar` do Financeiro.
+   */
+  tone?:
+    | 'tint'
+    | 'data'
+    | 'strong'
+    | 'success'
+    | 'warning'
+    | 'danger'
+    | 'onHeroSuccess'
+    | 'onHeroDanger'
+    | 'onHeroWarning';
   /**
    * A cor da PISTA (o que fica atrás do preenchimento).
    *
@@ -273,7 +290,12 @@ export function ProgressBar({
             width: '100%',
             height: '100%',
             borderRadius: Radius.xs,
-            backgroundColor: tone === 'data' ? theme.textSecondary : theme[tone as ThemeColor],
+            backgroundColor:
+              tone === 'data'
+                ? theme.textSecondary
+                : tone === 'strong'
+                  ? theme.text
+                  : theme[tone as ThemeColor],
             transformOrigin: 'left',
           },
           animated,

@@ -81,6 +81,11 @@ function screen(file: string, options: { debts?: any[]; invoiceStatus?: string; 
       };
       if (name === '@/lib/item-actions') return { confirmDestructive: (_title: string, _label: string, callback: () => void) => confirmations.push(callback), showItemActions: (_title: string, entries: any[]) => actions.push(...entries) };
       if (name === '@/components/ui/toast') return { useToast: () => () => {} };
+      // O provider de "esconder saldo" só existe dentro da árvore real; aqui o valor aparece.
+      if (name === '@/components/ui/conceal') return {
+        useConceal: () => ({ concealed: false, toggle: () => {} }),
+        concealText: () => '••••••',
+      };
       if (name === '@/design/tokens') return { Motion: { duration: {}, stagger: {} }, Space: {}, Radius: {}, tabular: {} };
       return new Proxy({}, { get: (_, key) => String(key) });
     } });
