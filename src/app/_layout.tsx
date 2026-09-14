@@ -14,17 +14,15 @@ import {
 } from '@expo-google-fonts/jetbrains-mono';
 import { useFonts } from 'expo-font';
 import { focusManager, QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { DarkTheme, DefaultTheme, Stack, ThemeProvider, router, usePathname } from 'expo-router';
+import { DarkTheme, DefaultTheme, Stack, ThemeProvider, usePathname } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
 import { StatusBar } from 'expo-status-bar';
-import { AppState, Platform, Pressable } from 'react-native';
+import { AppState, Platform } from 'react-native';
 import { KeyboardProvider } from 'react-native-keyboard-controller';
 
 import { AnimatedSplashOverlay } from '@/components/animated-icon';
-import { ThemedText } from '@/components/themed-text';
 import { AndroidActionSheet } from '@/components/ui/action-sheet';
 import { stackHeaderFonts } from '@/components/ui/app-header';
-import { Icon } from '@/components/ui/icon';
 import { ConcealProvider } from '@/components/ui/conceal';
 import { ToastProvider } from '@/components/ui/toast';
 import { AppUpdateProvider } from '@/hooks/use-app-update';
@@ -48,30 +46,6 @@ const queryClient = new QueryClient({
   },
 });
 
-/**
- * Modal precisa de saída explícita: arrastar para baixo não é descoberto nem acessível.
- *
- * A saída fala o idioma de cada plataforma. No Android o título do header é alinhado à esquerda,
- * então a palavra "Cancelar" colidia com ele — virava `CancelarNovo lançamento`. Lá a convenção
- * é o X, que ocupa a largura de um ícone e não disputa espaço com o título.
- */
-const modalOptions = {
-  headerLeft: () => (
-    <Pressable
-      accessibilityRole="button"
-      accessibilityLabel="Cancelar"
-      hitSlop={12}
-      onPress={() => router.back()}>
-      {Platform.OS === 'android' ? (
-        <Icon name="xmark" size="lg" color="text" />
-      ) : (
-        <ThemedText type="default" themeColor="tint">
-          Cancelar
-        </ThemedText>
-      )}
-    </Pressable>
-  ),
-};
 
 /**
  * O provider de tema envolve TUDO, e por isso a árvore do app mora num componente separado:
@@ -277,14 +251,25 @@ function AppTree() {
                   <Stack.Screen name="agent/new" options={{ title: '' }} />
                   <Stack.Screen name="agent/[id]" options={{ title: '' }} />
 
-                  {/* Atenção total: formulário com etapas vive acima das abas. */}
+                  {/*
+                    Atenção total: formulário com etapas vive acima das abas.
+
+                    ⚠️ **`headerShown: false` — o cabeçalho é o `TaskHeader`, no conteúdo.**
+                    `react-native-screens` (`ScreenStackHeaderConfig.kt:374-382`) roda
+                    `toolbar.title = null` sempre que existe um subview LEFT customizado, e o ✕
+                    era exatamente isso: no Android estas três telas renderizavam SEM TÍTULO —
+                    "Novo lançamento" e "Editar lançamento" eram a mesma tela na tela. O
+                    `modalOptions` que morava aqui também era o único pedaço de chrome do app sem
+                    um token de espaço (um `<Pressable hitSlop={12}>` cru), que era a queixa
+                    literal do dono do produto sobre o título colado no botão de fechar.
+                  */}
                   <Stack.Screen
                     name="finance/transaction-form"
-                    options={{ presentation: 'modal', title: 'Lançamento', ...modalOptions }}
+                    options={{ presentation: 'modal', headerShown: false }}
                   />
                   <Stack.Screen
                     name="reminder-form"
-                    options={{ presentation: 'modal', title: 'Lembrete', ...modalOptions }}
+                    options={{ presentation: 'modal', headerShown: false }}
                   />
                   <Stack.Screen name="reminders" options={{ title: 'Lembretes' }} />
                   <Stack.Screen name="search" options={{ title: 'Buscar' }} />
@@ -293,7 +278,7 @@ function AppTree() {
                   {/* Paywall é modal fechável SEMPRE: paywall que não fecha é reprovação na App Review. */}
                   <Stack.Screen
                     name="paywall"
-                    options={{ presentation: 'modal', title: 'Assinar', ...modalOptions }}
+                    options={{ presentation: 'modal', headerShown: false }}
                   />
                   <Stack.Screen name="link-phone" options={{ headerShown: false }} />
                   {/* O par de `link-phone`: cadastra e-mail e senha numa conta que só tem

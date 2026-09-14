@@ -556,3 +556,101 @@ test('mês de ciclo nunca vem de currentMonth()', () => {
     'o mês que nomeia o ciclo vem de useCycleMonth(): currentMonth() é o mês CIVIL e devolve o ciclo anterior'
   );
 });
+
+/**
+ * Todo `<Sheet>` abre com `<TaskHeader>`.
+ *
+ * Havia QUATRO cabeçalhos escritos à mão dentro de sheets — `styles.cabecalho`, `styles.head`,
+ * `styles.sheetCabecalho` —, cada um com um padding vertical diferente, título em `smallBold`
+ * (15/21) em vez de `title2` (20/26), e DOIS contrapesos de 72px que não centravam nada. O
+ * quinto nasceria copiando o quarto.
+ *
+ * O primitivo também é quem carrega o respiro do topo: no Android o `Modal` ocupa a janela
+ * inteira, e sheet sem `TaskHeader` nasce com o conteúdo em cima do relógio.
+ */
+test('todo Sheet abre com TaskHeader', () => {
+  const fora: string[] = [];
+  for (const file of walk(SRC)) {
+    const code = stripComments(readFileSync(file, 'utf8'));
+    // `<Sheet` seguido de espaço ou `>`: `\b` casaria `<SheetHeader` e o guarda ficaria verde só.
+    for (const m of code.matchAll(/<Sheet[\s>]/g)) {
+      const inicio = m.index ?? 0;
+      if (!/<TaskHeader[\s/>]/.test(code.slice(inicio, inicio + 400))) {
+        fora.push(`${file.replace(SRC, 'src')}:${code.slice(0, inicio).split('\n').length}`);
+      }
+    }
+  }
+  assert.deepEqual(
+    fora,
+    [],
+    'a primeira coisa dentro de um <Sheet> é <TaskHeader>: fechar mora lá, à esquerda, com o padding do primitivo'
+  );
+});
+
+/**
+ * `headerLeft` não existe mais.
+ *
+ * ⚠️ `react-native-screens` (`ScreenStackHeaderConfig.kt:374-382`) roda `toolbar.title = null`
+ * sempre que existe um subview LEFT customizado. As três telas modais renderizavam ✕ + Salvar e
+ * NENHUM título no Android — "Novo lançamento" e "Editar lançamento" eram a mesma tela na tela.
+ * Modal agora é `headerShown: false` + `<TaskHeader>`.
+ *
+ * Allowlist ZERO, e é medido: `headerLeft` aparecia uma vez no repo e essa uma saiu.
+ */
+test('nenhuma tela monta headerLeft', () => {
+  assert.deepEqual(
+    offenders(/\bheaderLeft\b/),
+    [],
+    'no Android um subview LEFT apaga o título do toolbar: use headerShown:false + <TaskHeader>'
+  );
+});
+
+/**
+ * A saída de uma tarefa é `<TaskHeader onClose>`, não um ✕ solto numa tela.
+ *
+ * O `xmark` fora do primitivo é o começo de um cabeçalho à mão: foi assim que o `modalOptions`
+ * do `_layout.tsx` e quatro linhas de sheet nasceram, cada uma com o seu padding.
+ */
+const XMARK_PERMITIDO = new Set([
+  // O ✕ que REMOVE a tag da nota, dentro da pílula. Não é saída de tela.
+  'src/app/notes/[id].tsx',
+]);
+
+test('nenhuma tela desenha o próprio botão de fechar', () => {
+  const fora = offenders(/name="xmark"/).filter((achado) => {
+    const arquivo = achado.split(':')[0];
+    return arquivo.startsWith('src/app/') && !XMARK_PERMITIDO.has(arquivo);
+  });
+  assert.deepEqual(
+    fora,
+    [],
+    'a saída de um sheet ou modal é <TaskHeader onClose>: ✕ solto vira cabeçalho à mão na linha seguinte'
+  );
+});
+
+/**
+ * `Segmented` tem de 2 a 4 opções.
+ *
+ * A partir de 5 a célula fica estreita demais e o rótulo parte no meio da palavra —
+ * "Investimen/to" foi o caso real, no tipo de conta. Acima de 4, o controle é `SelectField`
+ * (`design.md` §1: "escolher um" tem TRÊS controles, e qual deles é regra, não gosto).
+ *
+ * ⚠️ O `design.md` afirmava que este teste já existia. Não existia — foi escrito em 13/09/2026,
+ * e a afirmação era a única coisa segurando a regra.
+ */
+test('Segmented não passa de 4 opções', () => {
+  const fora: string[] = [];
+  for (const file of walk(SRC)) {
+    const code = stripComments(readFileSync(file, 'utf8'));
+    for (const m of code.matchAll(/<Segmented[\s\S]{0,1200}?\/>/g)) {
+      const trecho = m[0];
+      const opcoes = [...trecho.matchAll(/\{\s*value:/g)].length;
+      if (opcoes > 4) {
+        fora.push(
+          `${file.replace(SRC, 'src')}:${code.slice(0, m.index ?? 0).split('\n').length}  ${opcoes} opções`
+        );
+      }
+    }
+  }
+  assert.deepEqual(fora, [], 'acima de 4 opções o rótulo quebra no meio da palavra a 384dp — use SelectField');
+});

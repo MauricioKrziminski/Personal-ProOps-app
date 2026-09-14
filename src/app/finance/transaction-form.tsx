@@ -1,5 +1,5 @@
 import { zodResolver } from '@hookform/resolvers/zod';
-import { Stack, router, useLocalSearchParams } from 'expo-router';
+import { router, useLocalSearchParams } from 'expo-router';
 import { useState } from 'react';
 import { Controller, useForm, useWatch } from 'react-hook-form';
 import { StyleSheet, Switch, View } from 'react-native';
@@ -14,12 +14,12 @@ import { Chip } from '@/components/finance/chip';
 import { Note } from '@/components/ui/note';
 import { DatePickerField } from '@/components/finance/date-picker-field';
 import { ThemedText } from '@/components/themed-text';
-import { HeaderActions } from '@/components/ui/header-actions';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Field, MoneyField, TextField } from '@/components/ui/field';
 import { Icon } from '@/components/ui/icon';
 import { Screen } from '@/components/ui/screen';
+import { TaskHeader } from '@/components/ui/task-header';
 import { Segmented } from '@/components/ui/segmented';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useToast } from '@/components/ui/toast';
@@ -128,9 +128,9 @@ export default function TransactionFormScreen() {
 
   if (params.id && query.isLoading) {
     return (
-      <Screen>
-        <Stack.Screen options={{ title: 'Editar lançamento' }} />
-        <View style={styles.loading}>
+      <Screen scroll={false}>
+        <TaskHeader title="Editar lançamento" onClose={() => router.back()} />
+        <View style={[styles.body, styles.loading]}>
           <Skeleton height={56} />
           <Skeleton height={36} />
           <Skeleton width="45%" height={Type.footnote.lineHeight} />
@@ -145,10 +145,11 @@ export default function TransactionFormScreen() {
   // Nunca cair em modo criação por omissão: um id que não resolve é erro, não formulário vazio.
   if (params.id && (query.isError || !query.data)) {
     return (
-      <Screen>
-        <Stack.Screen options={{ title: 'Lançamento' }} />
-        <Card>
-          <View style={styles.errorCard}>
+      <Screen scroll={false}>
+        <TaskHeader title="Lançamento" onClose={() => router.back()} />
+        <View style={styles.body}>
+          <Card>
+            <View style={styles.errorCard}>
             <Icon name="exclamationmark.triangle" size="xl" color="danger" />
             <ThemedText type="smallBold">Não encontrei esse lançamento</ThemedText>
             <ThemedText type="small" themeColor="textSecondary" style={styles.centered}>
@@ -163,8 +164,9 @@ export default function TransactionFormScreen() {
               />
               <Button label="Voltar" size="sm" onPress={() => router.back()} />
             </View>
-          </View>
-        </Card>
+            </View>
+          </Card>
+        </View>
       </Screen>
     );
   }
@@ -382,14 +384,18 @@ function TransactionForm({ editing }: { editing?: Transaction }) {
 
   return (
     <Screen scroll={false}>
-      <Stack.Screen
-        options={{
-          title: editing ? 'Editar lançamento' : 'Novo lançamento',
-        }}
-      />
-
-      <HeaderActions
-        actions={[{ label: saving ? 'Salvando…' : 'Salvar', disabled: saving, primary: true, onPress: onSubmit }]}
+      <TaskHeader
+        title={editing ? 'Editar lançamento' : 'Novo lançamento'}
+        onClose={() => router.back()}
+        action={
+          <Button
+            label={saving ? 'Salvando…' : 'Salvar'}
+            size="sm"
+            disabled={saving}
+            loading={saving}
+            onPress={onSubmit}
+          />
+        }
       />
 
       <KeyboardAwareScrollView

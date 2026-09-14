@@ -1,5 +1,5 @@
 import { zodResolver } from '@hookform/resolvers/zod';
-import { Stack, router, useLocalSearchParams } from 'expo-router';
+import { router, useLocalSearchParams } from 'expo-router';
 import { useState } from 'react';
 import { Controller, useForm, useWatch } from 'react-hook-form';
 import { StyleSheet, View } from 'react-native';
@@ -11,13 +11,13 @@ import { z } from 'zod';
 
 import { Chip } from '@/components/finance/chip';
 import { ThemedText } from '@/components/themed-text';
-import { HeaderActions } from '@/components/ui/header-actions';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Field, TextField } from '@/components/ui/field';
 import { DatePickerField } from '@/components/finance/date-picker-field';
 import { Icon } from '@/components/ui/icon';
 import { Screen } from '@/components/ui/screen';
+import { TaskHeader } from '@/components/ui/task-header';
 import { HeroLabel } from '@/components/ui/section-head';
 import { Segmented } from '@/components/ui/segmented';
 import { SelectField } from '@/components/ui/select-field';
@@ -218,9 +218,9 @@ export default function ReminderFormScreen() {
 
   if (params.id && query.isLoading) {
     return (
-      <Screen>
-        <Stack.Screen options={{ title: 'Editar lembrete' }} />
-        <View style={styles.loading}>
+      <Screen scroll={false}>
+        <TaskHeader title="Editar lembrete" onClose={() => router.back()} />
+        <View style={[styles.body, styles.loading]}>
           <Skeleton height={48} />
           <Skeleton height={120} />
           <Skeleton height={120} />
@@ -234,10 +234,11 @@ export default function ReminderFormScreen() {
   // resolve NUNCA cai em modo criação (era assim que uma edição virava lembrete duplicado).
   if (params.id && (query.isError || !query.data)) {
     return (
-      <Screen>
-        <Stack.Screen options={{ title: 'Lembrete' }} />
-        <Card>
-          <View style={styles.errorCard}>
+      <Screen scroll={false}>
+        <TaskHeader title="Lembrete" onClose={() => router.back()} />
+        <View style={styles.body}>
+          <Card>
+            <View style={styles.errorCard}>
             <Icon name="bell.slash" size="xl" color="danger" />
             <ThemedText type="smallBold">Esse lembrete não existe mais</ThemedText>
             <ThemedText type="small" themeColor="textSecondary" style={styles.centered}>
@@ -252,8 +253,9 @@ export default function ReminderFormScreen() {
               />
               <Button label="Voltar" size="sm" onPress={() => router.back()} />
             </View>
-          </View>
-        </Card>
+            </View>
+          </Card>
+        </View>
       </Screen>
     );
   }
@@ -373,16 +375,18 @@ function ReminderForm({
 
   return (
     <Screen scroll={false}>
-      <Stack.Screen
-        options={{
-          title: editing ? 'Editar lembrete' : 'Novo lembrete',
-        }}
-      />
-
-      <HeaderActions
-        actions={[
-          { label: save.isPending ? 'Salvando…' : 'Salvar', disabled: save.isPending, primary: true, onPress: onSubmit },
-        ]}
+      <TaskHeader
+        title={editing ? 'Editar lembrete' : 'Novo lembrete'}
+        onClose={() => router.back()}
+        action={
+          <Button
+            label={save.isPending ? 'Salvando…' : 'Salvar'}
+            size="sm"
+            disabled={save.isPending}
+            loading={save.isPending}
+            onPress={onSubmit}
+          />
+        }
       />
 
       <KeyboardAwareScrollView

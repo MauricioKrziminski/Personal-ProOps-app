@@ -1,6 +1,7 @@
 import { useState } from 'react';
-import { Platform, Pressable, StyleSheet, View } from 'react-native';
-import { Stack, useLocalSearchParams } from 'expo-router';
+import { Platform, Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { router, useLocalSearchParams } from 'expo-router';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';
 import Animated, { FadeInDown } from 'react-native-reanimated';
 
@@ -10,10 +11,12 @@ import { Card } from '@/components/ui/card';
 import { Row, Section } from '@/components/ui/row';
 import { Note } from '@/components/ui/note';
 import { Screen } from '@/components/ui/screen';
+import { TaskHeader } from '@/components/ui/task-header';
 import { HeroLabel } from '@/components/ui/section-head';
 import { Skeleton } from '@/components/ui/skeleton';
 import { ProgressBar } from '@/components/ui/sparkline';
 import { Motion, Radius, Space, Type, tabular } from '@/design/tokens';
+import { MaxContentWidth } from '@/constants/theme';
 import { PLANS, usePlanStatus } from '@/hooks/use-finance';
 import { TRIAL_DAYS } from '@/lib/billing';
 import { useTheme } from '@/hooks/use-theme';
@@ -70,10 +73,19 @@ export default function PaywallScreen() {
   const teto = plano.data?.max_ai_messages_month ?? 0;
   const nomeAtual = PLANS.find((p) => p.value === plano.data?.plan)?.label ?? plano.data?.plan ?? '';
   const naWeb = Platform.OS === 'web';
+  const insets = useSafeAreaInsets();
 
   return (
-    <Screen grouped>
-      <Stack.Screen options={{ title: 'Assinar' }} />
+    /*
+      ⚠️ **`scroll={false}` + `ScrollView` próprio, e isso é obrigatório aqui.** Com `scroll`, o
+      `Screen` devolve o scroll como RAIZ da tela (não há slot irmão), então o `TaskHeader` rolaria
+      para fora junto com o conteúdo — e paywall que não fecha é reprovação na App Review.
+    */
+    <Screen scroll={false} grouped>
+      <TaskHeader title="Assinar" onClose={() => router.back()} />
+      <ScrollView
+        contentContainerStyle={[styles.corpo, { paddingBottom: insets.bottom + Space.xxl }]}
+        showsVerticalScrollIndicator={false}>
 
       <View style={styles.bloco}>
         <ThemedText type="title">{motivo.titulo}</ThemedText>
@@ -197,12 +209,21 @@ export default function PaywallScreen() {
             : 'A compra pelas lojas ainda não está ligada. Cancelar é um toque, na própria loja.'}
         </Note>
       </View>
-
+      </ScrollView>
     </Screen>
   );
 }
 
 const styles = StyleSheet.create({
+  // Replica o padding do `Screen`, que está em `scroll={false}` para o ✕ ficar fixo.
+  corpo: {
+    gap: Space.xl,
+    paddingHorizontal: Space.lg,
+    paddingTop: Space.md,
+    width: '100%',
+    maxWidth: MaxContentWidth,
+    alignSelf: 'center',
+  },
   bloco: {
     gap: Space.md,
   },

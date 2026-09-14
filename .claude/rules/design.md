@@ -129,11 +129,17 @@ Onde só cabe texto, o campo é `DateField` (`src/components/ui/field.tsx`), que
 `TextField` cru com `keyboardType="number-pad"` é **indigitável no iOS**, porque o teclado
 numérico não tem a tecla "/". Cinco formulários nasceram assim.
 
-**Cabeçalho de sheet é `SheetHeader`** (`src/components/ui/sheet.tsx`): pegador, título à
-esquerda, ação opcional e o X. Eram DEZESSEIS cópias à mão, com três nomes de estilo, dois
-paddings verticais e um contrapeso de largura chutada para "centralizar" o título — e o efeito
-era a queixa literal *"o botão fechar horrivelmente feio, colado com o top, sem padding/margin"*.
-Montar um à mão é a décima sétima.
+**Cabeçalho de TAREFA — sheet e tela modal — é `TaskHeader`**
+(`src/components/ui/task-header.tsx`): pegador, **✕ à esquerda**, título, ação opcional à direita.
+Montar um à mão é bloqueado por `anti-slop.test.ts` (todo `<Sheet>` abre com `<TaskHeader>`).
+
+> **Mudou em 13/09/2026, e o ✕ TROCOU DE LADO.** Era `SheetHeader`, com o ✕ à direita, e
+> conviviam **três mecanismos e seis implementações**: 18 sheets com o ✕ à direita, 3 telas modais
+> com ele à esquerda **sem um único token de espaço** (um `<Pressable hitSlop={12}>` cru no
+> `_layout.tsx` — a queixa literal, *"ta colado o titulo no botao de fechar"*), e 4 cabeçalhos à
+> mão com 4 paddings, título em 15/21 contra 20/26, ✕ de 24px contra 16px e **dois contrapesos
+> mortos de 72px**. Decisão do dono do produto: **✕ à esquerda, ação primária à direita, uma
+> regra para as duas superfícies.**
 
 **Escolher CONTA é `AccountPicker`** (`src/components/finance/account-picker.tsx`), nunca uma
 lista de `Row` com o nome dentro. Eram quatro cópias de `<Row title={a.name} trailing={check}/>`,
@@ -398,7 +404,21 @@ explicação justamente quando ela mais importa.
 Toda transição responde três perguntas: o que é o destino, o usuário precisa poder voltar, e o
 que "voltar" faz depois.
 
-- **Header é do navegador — exceto nas cinco RAÍZES de aba.** Ali quem desenha é o `AppHeader`
+- **Header é do navegador — exceto nas cinco RAÍZES de aba e nas telas MODAIS.**
+
+  ⚠️ **As três telas `presentation: 'modal'` são `headerShown: false` desde 13/09/2026** e
+  desenham `TaskHeader` no conteúdo, igual aos sheets. Não é preferência:
+  `react-native-screens` (`ScreenStackHeaderConfig.kt:374-382`) roda `toolbar.title = null`
+  sempre que existe um subview `LEFT` customizado — e o ✕ era exatamente isso. No Android
+  `transaction-form`, `reminder-form` e `paywall` renderizavam **sem título nenhum**, então "Novo
+  lançamento" e "Editar lançamento" eram a mesma tela na tela. Custo aceito: o iOS perde a palavra
+  "Cancelar" e a pílula de vidro do `Stack.Toolbar` no "Salvar" nessas três.
+  `anti-slop.test.ts` quebra o build se `headerLeft` voltar (allowlist ZERO).
+
+  **Tela EMPURRADA continua com o header do navegador**, `<Stack.Title>` e large title — e o
+  `ScrollView` continua precisando ser a raiz dela.
+
+  Nas cinco raízes de aba quem desenha é o `AppHeader`
   (`src/components/ui/app-header.tsx`): **a faixa de marca do Stitch** — 56px sobre a safe area,
   fundo do app a 85% com desfoque, fio de 1px embaixo, e dentro dela a marca num quadrado de 28 à
   esquerda e o avatar de 32 à direita. Ação de raiz vai no slot `action` (`HeaderIconButton`),
