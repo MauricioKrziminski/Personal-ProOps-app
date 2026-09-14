@@ -105,3 +105,50 @@ Apagar mostra action sheet com a consequência escrita: *"As N notas ficam em Se
 
 Pasta aninhada (`parent_id`) · cor por pasta (um accent só) · reordenar à mão (ordem é
 alfabética) · compartilhar pasta · ícone customizado fora do catálogo.
+
+---
+
+# Pasta virou LUGAR (14/09/2026)
+
+Até aqui a pasta era um chip de filtro na lista e uma tela de gestão. As duas continuam
+existindo, mas o papel principal mudou: **pasta é um lugar em que se entra.**
+
+## As três superfícies, e por que são três
+
+| superfície | rota | papel |
+|---|---|---|
+| **grade na home** | `(tabs)/notes/index.tsx` | onde a pasta VIVE: ladrilho com ícone, nome, contagem, pin e tags. Toque longo abre o menu; toque abre a pasta |
+| **a pasta** | `notes/folder/[id]` (`push`, fora de `(tabs)`) | subpastas + FIXADAS + notas daquela pasta, todas arrastáveis |
+| **organizar** | `notes/folders` | a ÁRVORE: renomear, mover de nível, criar, arquivar — o que a grade não comporta |
+
+O chip de pasta na lista **saiu**. Grade e chip seriam dois caminhos para a mesma pasta, e o app
+já removeu esse padrão uma vez ("dois jeitos de criar a mesma coisa"). Os chips que ficaram são
+só de TAG.
+
+⚠️ **A tela da pasta mora no `<Stack>` RAIZ, não em `(tabs)`** — a dock só aparece nas cinco
+raízes (§8 do design). E o scroll é a RAIZ dela: uma `View` em volta mata o large title.
+
+⚠️ **Botão e menu saem de UMA chamada de `HeaderActions`** (`actions` + `menu`). Dois componentes
+lado a lado escrevem `headerRight` duas vezes, `setOptions` faz merge raso e o último ganha — foi
+assim que o "Editar" do lançamento sumiu no Android.
+
+## O que a pasta ganhou
+
+- **cor** (`color`): pinta o ladrilho do ícone na grade e é herdada pelo trilho de 3px das notas
+  de dentro. Nunca o cartão inteiro.
+- **ícone** (`icon`): catálogo FECHADO (`FOLDER_ICONS`), porque ícone fora do mapa do `Icon` vira
+  `circle` genérico no Android, sem erro nenhum.
+- **pin** (`pinned`): sobe na grade.
+- **tags** (`tags text[]`): mesmo namespace das tags de nota, e o CHECK aceita a mesma forma que
+  o gerador de `#hashtag` produz — inclusive acento, senão `#reunião` seria recusada na pasta e
+  aceita na nota.
+- **arquivar** (`archived_at`): some da home E esconde as notas de dentro, sem escrever nada nas
+  notas. Elas continuam alcançáveis em `Arquivadas` e dentro da pasta.
+
+## Ordem
+
+Arrastar reordena **pastas entre pastas** e **notas entre notas** — nunca entre os dois grupos.
+Na grade o gatilho é **toque longo** (é o idioma da tela inicial do iOS, e a grade não tem menu de
+contexto disputando); soltar sem ter andado abre o menu. Em `Organizar pastas` **não há arrasto**
+de propósito: lá o que se edita é a ÁRVORE (quem é filho de quem), e misturar as duas coisas na
+mesma tela é como um arrasto vira "mover para dentro" sem ninguém pedir.
