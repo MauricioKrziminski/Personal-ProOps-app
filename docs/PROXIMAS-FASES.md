@@ -1067,6 +1067,19 @@ Nenhum bloco pode aparecer enquanto outro ainda mostra skeleton.
 > o SQL Editor conecta como `postgres`, e `has_table_privilege('postgres','cron.job_run_details','TRUNCATE')`
 > é `true` (a dona é `supabase_admin`, mas `postgres` tem o privilégio).
 >
+> ✅ **Feito em 14/09/2026, e o resultado é grande:**
+>
+> | produção | antes | depois |
+> |---|---|---|
+> | `cron.job_run_details` | 167.490 linhas · **138 MB** | 0 linhas · **16 kB** |
+> | banco inteiro | **157 MB** | **20 MB** |
+> | uso da camada grátis (500 MB) | 31,4% | **3,9%** |
+>
+> Com isso **armazenamento deixa de ser variável da Fase 6**. A maior tabela de produção agora é
+> `net._http_response` com 696 kB, e as três do `langgraph` somam 1,6 MB. O teto de 500 MB está a
+> mais de uma ordem de grandeza de distância; o que define plano e preço é custo de IA e de Cloud
+> Run, não disco.
+>
 > **E não se perde nada**, medido: os jobs de minuto em minuto (`jobid` 3 e 4, 41.292 execuções)
 > pararam em 11/09 e 07/09, quando os crons foram para o Cloud Scheduler; os `jobid` 1 e 2 somam
 > 62.891 cada e terminaram em 26/08. De 12/09 em diante **só o `jobid` 7 roda, 1 linha por dia**
