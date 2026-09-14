@@ -52,14 +52,33 @@ const TIGHT = 0.8;
 const linear = LinearTransition.duration(Motion.duration.base);
 
 /**
- * A linha de conta, animada.
+ * A linha de conta, animada — **um `Animated.View` POR FORA do `Pressable`**.
  *
- * ⚠️ **`exiting` só existe em componente do Reanimated**, e a linha É o `Pressable` — envolvê-lo
- * numa `View` mudaria o layout. A palavra é **mudança de estado** (§5): você toca em "Paguei" e a
- * linha some; sem a saída ela pisca fora e as de baixo saltam para ocupar o lugar. Saída mais
- * rápida que entrada, também §5 — `duration.exit` é 140ms contra os 200 da entrada.
+ * ⚠️ **Não use `createAnimatedComponent(Pressable)` aqui.** O `Pressable` recebe `style` como
+ * FUNÇÃO (`({ pressed }) => [...]`), e o componente animado não a aplica: o estilo simplesmente
+ * não chega. Como `flexDirection: 'row'` mora nesse estilo, a linha virava COLUNA — título,
+ * valor e botão empilhados, com o botão encostado na esquerda. Foi a queixa literal
+ * (*"olha como está todo desorganizado esse card"*), e o print veio do iOS e do Android.
+ *
+ * ⚠️ E o pior: `uiautomator dump` continuava listando os três textos, só que em `bounds`
+ * diferentes — conferir a PRESENÇA do texto deu verde num layout quebrado. Layout se confere por
+ * geometria ou por imagem, nunca por "o texto está lá".
+ *
+ * O `Animated.View` por fora não muda o layout (é um bloco sem estilo dentro de uma `Secao` que
+ * já espaça por `gap`) e carrega o que só existe em componente do Reanimated: `layout` e
+ * `exiting`. A palavra é **mudança de estado** (§5) — você toca em "Paguei" e a linha some;
+ * saída mais rápida que entrada, `duration.exit` contra `duration.base`.
  */
-const LinhaAnimada = Animated.createAnimatedComponent(Pressable);
+function LinhaAnimada({
+  children,
+  ...props
+}: React.ComponentProps<typeof Pressable> & { children: React.ReactNode }) {
+  return (
+    <Animated.View layout={linear} exiting={FadeOut.duration(Motion.duration.exit)}>
+      <Pressable {...props}>{children}</Pressable>
+    </Animated.View>
+  );
+}
 
 /**
  * Um bloco da Hoje, entrando escalonado.
@@ -429,13 +448,11 @@ export default function TodayScreen() {
               */
               <LinhaAnimada
                 key={b.ref_id}
-                layout={linear}
-                exiting={FadeOut.duration(Motion.duration.exit)}
                 accessibilityRole={b.kind === 'transaction' ? 'button' : undefined}
                 accessibilityLabel={b.kind === 'transaction' ? `Abrir ${b.title}` : undefined}
                 disabled={b.kind !== 'transaction'}
                 onPress={() => router.push({ pathname: '/finance/[txId]', params: { txId: b.ref_id } })}
-                style={({ pressed }: { pressed: boolean }) => [
+                style={({ pressed }) => [
                   styles.card,
                   styles.billCard,
                   {
@@ -525,13 +542,11 @@ export default function TodayScreen() {
             {dueSoon.map((b) => (
               <LinhaAnimada
                 key={b.ref_id}
-                layout={linear}
-                exiting={FadeOut.duration(Motion.duration.exit)}
                 accessibilityRole={b.kind === 'transaction' ? 'button' : undefined}
                 accessibilityLabel={b.kind === 'transaction' ? `Abrir ${b.title}` : undefined}
                 disabled={b.kind !== 'transaction'}
                 onPress={() => router.push({ pathname: '/finance/[txId]', params: { txId: b.ref_id } })}
-                style={({ pressed }: { pressed: boolean }) => [
+                style={({ pressed }) => [
                   styles.card,
                   styles.billCard,
                   {
@@ -601,12 +616,10 @@ export default function TodayScreen() {
             {aReceber.map((b) => (
               <LinhaAnimada
                 key={b.ref_id}
-                layout={linear}
-                exiting={FadeOut.duration(Motion.duration.exit)}
                 accessibilityRole="button"
                 accessibilityLabel={`Abrir ${b.title}`}
                 onPress={() => router.push({ pathname: '/finance/[txId]', params: { txId: b.ref_id } })}
-                style={({ pressed }: { pressed: boolean }) => [
+                style={({ pressed }) => [
                   styles.card,
                   styles.billCard,
                   {
