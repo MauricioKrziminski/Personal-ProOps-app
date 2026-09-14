@@ -98,6 +98,7 @@ export default function NotesScreen() {
   const [tag, setTag] = useState<string | null>(null);
   const [sort, setSort] = useNoteSort();
   const [arrastando, setArrastando] = useState(false);
+  const [puxando, setPuxando] = useState(false);
 
   /**
    * Alvo de cada sheet. `null` = fechado — um estado só diz "qual" e "se".
@@ -369,15 +370,24 @@ export default function NotesScreen() {
         // um item. O auto-scroll continua, porque ele é `scrollTo`, não gesto.
         scrollEnabled={!arrastando}
         refreshControl={
+          /*
+            ⚠️ **O indicador é do GESTO, não da requisição** — `puxando` é estado local, nunca
+            `isRefetching`. Esta tela invalida a lista a cada fixar, colorir, arquivar e
+            arrastar; amarrado ao refetch, o `RefreshControl` abria sozinho depois de CADA uma
+            delas e empurrava a tela inteira uns 60pt para baixo — salto de layout em toda ação,
+            medido no simulador em 14/09/2026 ao fixar uma nota. Mesmo desenho da lista do
+            Agente (`agent/index.tsx`), pelo mesmo motivo.
+          */
           <RefreshControl
-            refreshing={
-              (list.isRefetching && !list.isFetchingNextPage) ||
-              foldersQuery.isRefetching ||
-              tagsQuery.isRefetching
-            }
+            refreshing={puxando}
             progressViewOffset={0}
             onRefresh={() => {
-              void Promise.all([list.refetch(), foldersQuery.refetch(), tagsQuery.refetch()]);
+              setPuxando(true);
+              void Promise.all([
+                list.refetch(),
+                foldersQuery.refetch(),
+                tagsQuery.refetch(),
+              ]).finally(() => setPuxando(false));
             }}
           />
         }

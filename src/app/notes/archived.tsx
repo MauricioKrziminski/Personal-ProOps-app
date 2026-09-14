@@ -1,4 +1,4 @@
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 import Animated, { LinearTransition } from 'react-native-reanimated';
 import { router } from 'expo-router';
@@ -54,6 +54,8 @@ export default function ArchivedScreen() {
   const carregando = notas.isLoading || pastas.isLoading;
   const vazia = !carregando && listaNotas.length === 0 && listaPastas.length === 0;
 
+  const [puxando, setPuxando] = useState(false);
+
   const desarquivarNota = (n: Note) => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     updateNote.mutate(
@@ -79,8 +81,13 @@ export default function ArchivedScreen() {
   return (
     <Screen
       grouped
-      onRefresh={() => Promise.all([notas.refetch(), pastas.refetch()])}
-      refreshing={notas.isRefetching || pastas.isRefetching}>
+      // O indicador é do GESTO, não da requisição: desarquivar invalida as duas listas, e preso
+      // ao `isRefetching` o spinner abria sozinho a cada item devolvido. Ver a home de Notas.
+      onRefresh={() => {
+        setPuxando(true);
+        return Promise.all([notas.refetch(), pastas.refetch()]).finally(() => setPuxando(false));
+      }}
+      refreshing={puxando}>
       {notas.isError || pastas.isError ? (
         <EmptyState
           icon="exclamationmark.triangle"

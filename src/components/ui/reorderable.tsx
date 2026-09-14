@@ -277,6 +277,7 @@ export function Reorderable<T>({
           idsSV={idsSV}
           arrastando={arrastando}
           alvo={alvo}
+          scrollRef={scrollRef}
           dx={dx}
           dy={dy}
           rolado={rolado}
@@ -379,6 +380,7 @@ interface CelulaProps {
   dx: SharedValue<number>;
   dy: SharedValue<number>;
   rolado: SharedValue<number>;
+  scrollRef?: AnimatedRef<Animated.ScrollView>;
   enabled: boolean;
   activation: 'alça' | 'toque-longo';
   scheme: 'light' | 'dark';
@@ -406,6 +408,7 @@ function Celula({
   dx,
   dy,
   rolado,
+  scrollRef,
   enabled,
   activation,
   scheme,
@@ -452,10 +455,31 @@ function Celula({
         runOnJS(onArrastando)(false);
       });
 
-    return activation === 'toque-longo'
-      ? g.activateAfterLongPress(TOQUE_LONGO)
-      : g.minDistance(DISTANCIA);
-  }, [enabled, index, total, eixo, geo, activation, onTapItem, onLevantou, onSoltou, onArrastando]);
+    const comGatilho =
+      activation === 'toque-longo'
+        ? g.activateAfterLongPress(TOQUE_LONGO)
+        : g.minDistance(DISTANCIA);
+
+    /*
+      **`blocksExternalGesture` é a relação entre os reconhecedores; `scrollEnabled` é a trava
+      da tela.** As duas existem porque resolvem coisas diferentes, em tempos diferentes.
+
+      Desligar a rolagem responde ao `onStart`, e o `onStart` sai daqui por `runOnJS`: um
+      `setState` e um render DEPOIS de o dedo já ter andado os 4px. Nessa fresta o scroll nativo
+      ainda está livre para seguir o dedo — é a mesma fresta que faz uma lista no topo começar a
+      esticar. Esta linha fecha isso ANTES, no nível em que o RNGH decide quem ganha: o scroll
+      espera este gesto falhar. É o padrão que a doc do RNGH mostra exatamente para este caso
+      (gesto de filho contra rolagem do pai) e o que o plano desta fase pedia.
+    */
+    // O RNGH tipa o alvo como ref de CLASSE de componente; a ref animada guarda a INSTÂNCIA.
+    // Em runtime ele só lê `.current` para achar a tag nativa — daí o cast, aqui e em lugar nenhum.
+    return scrollRef
+      ? comGatilho.blocksExternalGesture(scrollRef as unknown as React.RefObject<React.ComponentType>)
+      : comGatilho;
+  }, [
+    enabled, index, total, eixo, geo, activation, scrollRef,
+    onTapItem, onLevantou, onSoltou, onArrastando,
+  ]);
 
   /**
    * ⚠️ **Na GRADE o slot vive DENTRO do transform, e isso não é estilo — é o que impede o
