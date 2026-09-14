@@ -107,6 +107,7 @@ export default function TodayScreen() {
   */
   const totalDoCiclo = caixa + aReceberNoCiclo;
   const usado = totalDoCiclo > 0 ? comprometido / totalDoCiclo : 0;
+
   /**
    * Os dois números que o card passou a mostrar lado a lado, a pedido do dono do produto.
    *
@@ -143,6 +144,37 @@ export default function TodayScreen() {
       (Number(b.spent_cents) + Number(b.committed_cents ?? 0)) / Number(b.limit_cents) >= TIGHT
   );
   const captured = (recent.data ?? []).find((tx) => tx.source === 'whatsapp');
+
+  /*
+    ⚠️ **A segunda linha do herói é o VEREDITO DO DIA, não uma métrica fixa.**
+
+    Quem abre um app de dinheiro de manhã não pergunta "qual é o meu saldo seguro" — pergunta
+    *"preciso fazer alguma coisa agora?"*. O número grande é a permissão (posso gastar?); esta
+    linha é a obrigação (devo alguma coisa?), e obrigação GANHA de permissão quando existe.
+
+    A ordem é a mesma da tela (atrasado → vence hoje → o resto), então o herói passa a liderar a
+    urgência em vez de repetir um número enquanto ela fica três blocos abaixo.
+  */
+  const atrasadoCents = overdue.reduce((s, b) => s + Number(b.amount_cents), 0);
+  const hojeISO = localISODate();
+  const venceHoje = dueSoon.filter((b) => b.due_date === hojeISO);
+  const venceHojeCents = venceHoje.reduce((s, b) => s + Number(b.amount_cents), 0);
+
+  /*
+    ⚠️ **O "por dia" some quando não significa nada.** Com R$ 0,72 livres em 7 dias ele escrevia
+    "≈ R$ 0,10 por dia": preciso, e inútil — ninguém planeja o dia em dez centavos, e um número
+    ridículo no lugar mais nobre da tela ensina a pessoa a não ler a linha. Abaixo de R$ 1,00 por
+    dia a frase vira o que realmente importa ali, que é quando entra dinheiro de novo.
+  */
+  const porDia = livre > 0 ? Math.floor(livre / diasLivres) : 0;
+  const veredito: { icon: React.ComponentProps<typeof Icon>['name']; negative: boolean; text: string } =
+    atrasadoCents > 0
+      ? { icon: 'exclamationmark.triangle', negative: true, text: `${formatBRL(atrasadoCents)} atrasado` }
+      : venceHojeCents > 0
+        ? { icon: 'clock', negative: true, text: `${formatBRL(venceHojeCents)} vence hoje` }
+        : porDia >= 100
+          ? { icon: 'calendar', negative: false, text: `≈ ${formatBRL(porDia)} por dia · ${diasLivres} ${diasLivres === 1 ? 'dia' : 'dias'}` }
+          : { icon: 'checkmark.circle', negative: false, text: `Nada vence hoje · ${diasLivres} ${diasLivres === 1 ? 'dia' : 'dias'} até entrar` };
 
   const loading = gasto.isLoading || bills.isLoading || reminders.isLoading;
   const nothing =
@@ -232,18 +264,7 @@ export default function TodayScreen() {
                 tone={livre < 0 ? 'onHeroDanger' : 'onHero'}
               />
             }
-            secondary={{
-              icon: livre > 0 ? 'calendar' : 'exclamationmark.triangle',
-              negative: livre <= 0,
-              /*
-                O "por dia" só existe com saldo POSITIVO: dividir um número negativo por dias não
-                significa nada, e "−R$ 2,00 por dia" seria inventar uma métrica.
-              */
-              text:
-                livre > 0
-                  ? `≈ ${formatBRL(Math.floor(livre / diasLivres))} por dia · ${diasLivres} ${diasLivres === 1 ? 'dia' : 'dias'}`
-                  : `${diasLivres} ${diasLivres === 1 ? 'dia' : 'dias'} até entrar dinheiro`,
-            }}
+            secondary={veredito}
             chart={
               totalDoCiclo > 0 ? (
                 <View style={styles.medidor}>
@@ -296,7 +317,19 @@ export default function TodayScreen() {
           />
         )}
 
-        {/* 2. Os três contadores. Número real — zero é informação, não motivo para esconder. */}
+        {/*
+          2. Os três contadores — **só quando algum deles conta alguma coisa.**
+
+          ⚠️ Isto MUDOU (13/09/2026): a regra antiga era "zero é informação, não motivo para
+          esconder", e ela estava certa enquanto ninguém mais dizia isso na tela. Agora o herói
+          escreve "Nada vence hoje" logo acima, então três caixas com "0" repetem o que já foi
+          dito e gastam uma fileira inteira para isso — o mesmo argumento do badge de aba
+          (`design.md` §8: contagem real, ou não existe).
+
+          Com qualquer um deles diferente de zero a fileira volta inteira: aí os zeros ao lado do
+          número que importa são contraste, não enchimento.
+        */}
+        {overdue.length + dueSoon.length + todayReminders.length + tight.length > 0 ? (
         <View style={styles.triad}>
           <Counter
             label="Vencendo"
@@ -321,6 +354,7 @@ export default function TodayScreen() {
             onPress={() => router.push('/finance/budgets')}
           />
         </View>
+        ) : null}
 
         {loading ? (
           <View style={styles.section}>
