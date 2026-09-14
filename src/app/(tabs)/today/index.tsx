@@ -1,6 +1,6 @@
-import { useMemo } from 'react';
+
 import { router } from 'expo-router';
-import { Platform, Pressable, RefreshControl, ScrollView, StyleSheet, View, useWindowDimensions } from 'react-native';
+import { Platform, Pressable, RefreshControl, ScrollView, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { ThemedText } from '@/components/themed-text';
@@ -12,17 +12,15 @@ import { EmptyState } from '@/components/ui/empty-state';
 import { Icon } from '@/components/ui/icon';
 import { Money } from '@/components/ui/money';
 import { HeroPanel } from '@/components/ui/hero-panel';
+import { CountUpMoney } from '@/components/ui/count-up-money';
 import { SectionHead } from '@/components/ui/section-head';
 import { Skeleton } from '@/components/ui/skeleton';
-import { ProgressBar, Sparkline } from '@/components/ui/sparkline';
+import { ProgressBar } from '@/components/ui/sparkline';
 import { useToast } from '@/components/ui/toast';
-import { Radius, Space, tabular, Type } from '@/design/tokens';
+import { Radius, Space, tabular } from '@/design/tokens';
 import {
   useBudgetsStatus,
-  useAccountBalances,
-  useCashFlowForecast,
-  useCycleSeries,
-  useCycleMonth,
+  useSpendable,
   useCycle,
   useMarkPaid,
   useRecentTransactions,
@@ -33,7 +31,7 @@ import { formatBRL, formatDateBR, localISODate, useTodayReminders } from '@/hook
 import { useProfile } from '@/hooks/use-profile';
 import { useSession } from '@/hooks/use-session';
 import { useTheme } from '@/hooks/use-theme';
-import { greetingBR, isoToBR } from '@/lib/dates';
+import { diasAte, greetingBR, isoToBR } from '@/lib/dates';
 import { showItemActions } from '@/lib/item-actions';
 import { settleDone, settleLabel } from '@/lib/settle-labels';
 import { Fonts } from '@/constants/theme';
@@ -55,7 +53,6 @@ export default function TodayScreen() {
   const toast = useToast();
   const insets = useSafeAreaInsets();
   const headerHeight = useAppHeaderHeight();
-  const { width } = useWindowDimensions();
 
   /**
    * A janela do painel é o CICLO do usuário, não o mês civil.
@@ -66,23 +63,21 @@ export default function TodayScreen() {
    * civil é o palpite certo — é o que vale para quem não configurou nada.
    */
   const cycle = useCycle();
-  const saldos = useAccountBalances();
-  const { daysLeft, monthEndDay } = useMemo(() => {
-    const now = new Date();
-    const last = new Date(now.getFullYear(), now.getMonth() + 1, 0);
-    const fim = cycle.data ? new Date(`${cycle.data.ate}T12:00:00`) : last;
-    return {
-      daysLeft: cycle.data?.diasAteOFim ?? Math.max(1, last.getDate() - now.getDate()),
-      monthEndDay: fim.getDate(),
-    };
-  }, [cycle.data]);
+  /*
+    ⚠️ **A projeção diária saiu daqui** (13/09/2026). `useCashFlowForecast(daysLeft)` era a
+    leitura mais cara desta tela — um JSON de N dias, mais o motor de projeção inteiro — e depois
+    do redesenho ela só alimentava `isLoading` e uma soma que `spendable` já devolve pronta.
+    `useAccountBalances` saiu junto: ela somava `cleared_cents` das contas não-cartão, que é
+    `private.cash_total` REIMPLEMENTADO em TypeScript — e sem o termo de `account_id is null`,
+    que `finance.md` registra como "zerava o caixa de quem só usa o WhatsApp" (bug da `0028`).
+  */
+  const daysLeft = cycle.data?.diasAteOFim ?? 1;
 
   const { session } = useSession();
   const profile = useProfile(session?.user?.id);
   /** Só o primeiro nome: "Bom dia, Gabriel Almeida Dias" é um crachá, não um cumprimento. */
   const firstName = profile.data?.display_name?.trim().split(/\s+/)[0];
 
-  const forecast = useCashFlowForecast(daysLeft);
   const bills = useUpcomingBills(7);
   const reminders = useTodayReminders();
   const budgets = useBudgetsStatus();
@@ -90,36 +85,31 @@ export default function TodayScreen() {
   const markPaid = useMarkPaid();
 
   /*
-    ⚠️ `useMemo` porque `Sparkline` memoiza o path do Skia com `values` na dependência: um array
-    novo a cada render nunca acerta esse cache, e a tela reconstrói o desenho inteiro a cada uma
-    das ~6 queries que assentam.
-  */
-  const series = useMemo(
-    () => (forecast.data ?? []).map((d) => Number(d.balance_cents)),
-    [forecast.data]
-  );
-  /*
-    ⚠️ **O número grande vem do CICLO, a mesma fonte do Financeiro.** Ele saía da última linha da
-    série diária, e a série e o ciclo são recortes diferentes: a Hoje dizia −615,87 enquanto o
-    Financeiro dizia −629,30 depois do rotativo. Dois números com o mesmo nome em duas telas foi
-    a queixa que abriu esta refatoração — a curva continua sendo o desenho, mas quem responde é
-    `cycle_series`.
-  */
-  /*
-    ⚠️ **O ciclo é NOMEADO pelo mês em que TERMINA, e isso NÃO é o mês civil.** Com fechamento
-    no dia 10, o dia 13/09 já pertence ao ciclo chamado "outubro" (11/09–10/10). Passando
-    `currentMonth()` a série voltava com UMA linha — setembro, `fechado`, R$ 0,72 — enquanto o
-    rótulo ao lado lia a data de fim de outubro. Número, sinal, cor e palavra errados de uma vez:
-    o card anunciava "Projeção positiva" num ciclo que fecha em −R$ 759,39.
+    ⚠️ **O número grande é "quanto dá para gastar", não o resultado do ciclo.**
 
-    ⚠️ E `.find()` sozinho não resolvia: com o mês errado no ARGUMENTO, a linha de outubro nem
-    vinha no resultado. Quem responde qual é o mês do ciclo é `useCycleMonth`.
+    Ele já foi o resultado do ciclo, e por isso as duas raízes diziam a MESMA coisa com rótulos
+    diferentes — e a daqui ainda por cima lia o ciclo JÁ FECHADO (o mês do ciclo não é o mês
+    civil; ver `useCycleMonth`). Hoje o Financeiro responde "como o ciclo fecha" e esta tela
+    responde "quanto está livre até entrar dinheiro de novo": mesma base, janelas diferentes.
   */
-  const mesCorrente = useCycleMonth();
-  const cicloAtual =
-    useCycleSeries(mesCorrente, mesCorrente).data?.find((c) => c.mes.startsWith(mesCorrente)) ??
-    null;
-  const leftover = Number(cicloAtual?.resultado ?? series.at(-1) ?? 0);
+  const gasto = useSpendable();
+  const caixa = Number(gasto.data?.caixa ?? 0);
+  const comprometido = Number(gasto.data?.comprometido_no_ciclo ?? 0);
+  const aReceberNoCiclo = Number(gasto.data?.a_receber_no_ciclo ?? 0);
+  const proximaEntrada = gasto.data?.proxima_entrada ?? null;
+  const livre = caixa - Number(gasto.data?.comprometido_ate_entrada ?? 0);
+
+  /** Até quando o "livre" vale: a próxima entrada, ou o fim do ciclo se não houver nenhuma. */
+  const ateQuando = proximaEntrada ?? cycle.data?.ate ?? null;
+  const diasLivres = Math.max(1, ateQuando ? diasAte(ateQuando) : (cycle.data?.diasAteOFim ?? 1));
+
+  /*
+    O denominador é TODO o dinheiro que passa pela mão neste ciclo — o que já está na conta mais
+    o que ainda entra. Acima de 100% a barra satura e a frase muda (ver o `chart` abaixo): barra
+    cheia com "110%" ao lado lê como defeito de render, não como aviso.
+  */
+  const totalDoCiclo = caixa + aReceberNoCiclo;
+  const usado = totalDoCiclo > 0 ? comprometido / totalDoCiclo : 0;
   /**
    * Os dois números que o card passou a mostrar lado a lado, a pedido do dono do produto.
    *
@@ -137,10 +127,6 @@ export default function TodayScreen() {
     ⚠️ E é `cleared_cents`, não `balance_cents`: em conta de dinheiro o saldo honesto é o que já
     passou pela conta. `balance_cents` inclui previsto, que é o que o número de cima projeta.
   */
-  const tenhoHoje = (saldos.data ?? [])
-    .filter((a) => a.type !== 'credit_card')
-    .reduce((t, a) => t + Number(a.cleared_cents), 0);
-  const aReceberNoMes = (forecast.data ?? []).reduce((t, d) => t + Number(d.in_cents), 0);
 
   /**
    * `upcoming_bills` passou a devolver RECEITA prevista (`kind: 'income'`, migration
@@ -161,7 +147,7 @@ export default function TodayScreen() {
   );
   const captured = (recent.data ?? []).find((tx) => tx.source === 'whatsapp');
 
-  const loading = forecast.isLoading || bills.isLoading || reminders.isLoading;
+  const loading = gasto.isLoading || bills.isLoading || reminders.isLoading;
   const nothing =
     !loading &&
     overdue.length === 0 &&
@@ -184,7 +170,6 @@ export default function TodayScreen() {
     );
 
   /** Largura útil do gráfico: tela menos a calha da tela menos a calha do painel. */
-  const chartWidth = width - Space.lg * 2 - Space.gutter * 2;
 
   return (
     <View style={[styles.root, { backgroundColor: theme.background }]}>
@@ -192,8 +177,8 @@ export default function TodayScreen() {
         alwaysBounceVertical
         refreshControl={<RefreshControl
           progressViewOffset={headerHeight}
-          refreshing={forecast.isRefetching || bills.isRefetching || reminders.isRefetching || budgets.isRefetching || recent.isRefetching || profile.isRefetching}
-          onRefresh={() => Promise.all([forecast.refetch(), bills.refetch(), reminders.refetch(), budgets.refetch(), recent.refetch(), profile.refetch()])}
+          refreshing={gasto.isRefetching || bills.isRefetching || reminders.isRefetching || budgets.isRefetching || recent.isRefetching || profile.isRefetching}
+          onRefresh={() => Promise.all([gasto.refetch(), bills.refetch(), reminders.refetch(), budgets.refetch(), recent.refetch(), profile.refetch()])}
         />}
         contentContainerStyle={[
           styles.scroll,
@@ -223,13 +208,13 @@ export default function TodayScreen() {
           reimplementava o card inteiro à mão, e por isso não ganhou o gradiente, o brilho e o
           alfinete do gráfico quando o primitivo ganhou.
         */}
-        {forecast.isLoading ? (
+        {gasto.isLoading ? (
           <View style={styles.heroSkeleton}>
             <Skeleton width="55%" height={14} />
             <Skeleton width="70%" height={38} />
           </View>
-        ) : forecast.isError ? (
-          <ErrorCard onRetry={() => forecast.refetch()} />
+        ) : gasto.isError ? (
+          <ErrorCard onRetry={() => gasto.refetch()} />
         ) : (
           /*
             O toque no card abre o MENU, não um destino. Antes ele ia direto para a Projeção e
@@ -243,72 +228,86 @@ export default function TodayScreen() {
             item), sem atalho nenhum.
           */
           <HeroPanel
-            label={cycle.data ? `Vou fechar o ciclo em ${isoToBR(cycle.data.ate)}` : 'Vou fechar o ciclo'}
+            /*
+              ⚠️ **Esta tela NÃO repete o número do Financeiro, e isso é o produto.** Lá a
+              pergunta é "como o ciclo fecha"; aqui é "quanto dá para gastar AGORA" — o dinheiro
+              na conta menos o que vence ANTES da próxima entrada. Os dois saem dos mesmos três
+              números, e a identidade que os amarra está em `supabase/tests/da_para_gastar.sql`;
+              o que muda é a janela e a pergunta.
+
+              Antes as duas raízes mostravam o mesmo valor com rótulos diferentes — e o da Hoje
+              ainda estava errado, lendo o ciclo já fechado.
+            */
+            label={ateQuando ? `Livre até ${isoToBR(ateQuando)}` : 'Livre'}
             concealable
             value={
-              <Money
-                cents={leftover}
+              <CountUpMoney
+                cents={livre}
                 variant="heroMoney"
-                tone={leftover < 0 ? 'onHeroDanger' : 'onHero'}
-                concealable
+                tone={livre < 0 ? 'onHeroDanger' : 'onHero'}
               />
             }
             secondary={{
-              icon: leftover < 0 ? 'chart.line.downtrend.xyaxis' : 'chart.line.uptrend.xyaxis',
-              negative: leftover < 0,
-              text: `${daysLeft} ${daysLeft === 1 ? 'dia' : 'dias'} até fechar o ciclo · Projeção ${
-                leftover < 0 ? 'negativa' : 'positiva'
-              }`,
+              icon: livre > 0 ? 'calendar' : 'exclamationmark.triangle',
+              negative: livre <= 0,
+              /*
+                O "por dia" só existe com saldo POSITIVO: dividir um número negativo por dias não
+                significa nada, e "−R$ 2,00 por dia" seria inventar uma métrica.
+              */
+              text:
+                livre > 0
+                  ? `≈ ${formatBRL(Math.floor(livre / diasLivres))} por dia · ${diasLivres} ${diasLivres === 1 ? 'dia' : 'dias'}`
+                  : `${diasLivres} ${diasLivres === 1 ? 'dia' : 'dias'} até entrar dinheiro`,
             }}
             chart={
-              series.length > 1 ? (
-                <>
-                  {/*
-                    O eixo do desenho: onde a série começa, o que ela projeta, onde ela termina.
-                    Sem os extremos o gráfico é uma curva sem escala — bonita e muda.
-                  */}
-                  <View style={styles.legend}>
-                    <ThemedText type="caption" themeColor="onHeroMuted">
-                      Hoje
+              totalDoCiclo > 0 ? (
+                <View style={styles.medidor}>
+                  <ProgressBar
+                    value={comprometido}
+                    max={totalDoCiclo}
+                    tone={usado >= 1 ? 'onHeroDanger' : 'onHeroWarning'}
+                    track="heroChip"
+                  />
+                  <View style={styles.medidorLinha}>
+                    {/*
+                      Acima de 100% a barra satura e a FRASE muda: "110%" ao lado de uma barra
+                      cheia lê como defeito de render, não como aviso.
+                    */}
+                    <ThemedText type="code" themeColor="onHeroMuted" style={styles.shrink}>
+                      {usado >= 1
+                        ? 'comprometi mais do que entra'
+                        : `já comprometi ${Math.round(usado * 100)}%`}
                     </ThemedText>
-                    <ThemedText
-                      type="caption"
-                      themeColor={leftover < 0 ? 'onHeroDanger' : 'onHeroSuccess'}>
-                      {`${formatBRL(leftover)} projetado`}
-                    </ThemedText>
-                    <ThemedText type="caption" themeColor="onHeroMuted">
-                      {`Dia ${monthEndDay}`}
-                    </ThemedText>
+                    {proximaEntrada ? (
+                      <ThemedText type="code" themeColor="onHeroSuccess">
+                        {`entra ${isoToBR(proximaEntrada)}`}
+                      </ThemedText>
+                    ) : null}
                   </View>
-                  <Sparkline values={series} width={chartWidth} height={48} />
-                </>
+                </View>
               ) : undefined
             }
-          footer={
-            aReceberNoMes > 0 ? (
-              <View style={styles.heroFooter}>
-                <View style={styles.heroFooterPart}>
-                  <ThemedText type="caption" themeColor="onHeroMuted" style={Type.meta}>
-                    TENHO HOJE
+            footer={
+              cycle.data ? (
+                <View style={styles.heroFooter}>
+                  <ThemedText type="footnote" themeColor="onHeroMuted" style={styles.shrink}>
+                    {`Compromissos até ${isoToBR(cycle.data.ate)}`}
                   </ThemedText>
-                  <Money cents={tenhoHoje} variant="subhead" tone="onHero" concealable />
+                  {/*
+                    `ticker` + `onHero`: `footnote` com o tone padrão vira `text`, que no tema
+                    claro é #131315 sobre a faixa escura — invisível.
+                  */}
+                  <Money cents={comprometido} variant="ticker" tone="onHero" concealable />
                 </View>
-                <View style={styles.heroFooterPart}>
-                  <ThemedText type="caption" themeColor="onHeroMuted" style={Type.meta}>
-                    A RECEBER
-                  </ThemedText>
-                  <Money cents={aReceberNoMes} variant="subhead" tone="onHeroSuccess" concealable />
-                </View>
-              </View>
-            ) : undefined
-          }
-          onPress={() =>
-            showItemActions('Mais opções', [
-              { label: 'Projeção', icon: 'chart.line.uptrend.xyaxis', onPress: () => router.push('/finance/forecast') },
-              { label: 'Patrimônio', icon: 'building.columns', onPress: () => router.push('/finance/net-worth') },
-              { label: 'Metas', icon: 'target', onPress: () => router.push('/finance/goals') },
-            ])
-          }
+              ) : undefined
+            }
+            onPress={() =>
+              showItemActions('Mais opções', [
+                { label: 'Projeção', icon: 'chart.line.uptrend.xyaxis', onPress: () => router.push('/finance/forecast') },
+                { label: 'Patrimônio', icon: 'building.columns', onPress: () => router.push('/finance/net-worth') },
+                { label: 'Metas', icon: 'target', onPress: () => router.push('/finance/goals') },
+              ])
+            }
           />
         )}
 
@@ -931,6 +930,14 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     gap: Space.lg,
+  },
+  /* O medidor de comprometimento: barra e a linha de leitura abaixo dela. */
+  medidor: { gap: Space.sm },
+  medidorLinha: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    gap: Space.sm,
   },
   heroFooterPart: {
     gap: Space.half,

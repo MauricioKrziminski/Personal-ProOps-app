@@ -1235,6 +1235,11 @@ export function useMonthRange(month: string, view?: CycleView): { from: string; 
  */
 const REGUA_MUDOU = [
   ['cycle'],
+  /*
+    A chave carrega `view`, então trocar Mês↔Ciclo já se conserta sozinha — mas mudar o DIA DE
+    FECHAMENTO move a janela para a MESMA view, e aí só esta linha salva.
+  */
+  ['spendable'],
   ['cycle-series'],
   ['cycle-lines'],
   ['cycle-range'],
@@ -1321,6 +1326,37 @@ export function useCycleSeries(de: string, ate: string, view?: CycleView) {
       });
       if (error) throw error;
       return data;
+    },
+  });
+}
+
+export type Spendable = Fns['spendable']['Returns'][number];
+
+/**
+ * O que dá para gastar AGORA — o número da tela Hoje.
+ *
+ * `livre = caixa − comprometido_ate_entrada`: o dinheiro na conta menos o que vence ANTES da
+ * próxima entrada prevista. É a pergunta "posso gastar isto hoje?", e ela termina no dia em que
+ * entra dinheiro novo.
+ *
+ * ⚠️ **Não é o resultado do ciclo, e é por isso que os dois cards deixaram de dizer a mesma
+ * coisa.** O Financeiro responde "como o ciclo fecha" (−R$ 759,39 em 10/10); este responde
+ * "quanto está livre até a próxima entrada" (R$ 0,72 até 20/09). Mesmos dados, perguntas
+ * diferentes, e a identidade
+ * `caixa + a_receber_no_ciclo − comprometido_no_ciclo == cycle_series.resultado` amarra os dois
+ * (`supabase/tests/da_para_gastar.sql`).
+ *
+ * ⚠️ `proxima_entrada` é NULL quando não há entrada prevista no ciclo — a tela trata.
+ */
+export function useSpendable(view?: CycleView) {
+  useRealtimeMonth('spendable');
+  useRealtimeInvalidate('card_invoices', ['spendable']);
+  return useQuery({
+    queryKey: ['spendable', view ?? ''],
+    queryFn: async (): Promise<Spendable> => {
+      const { data, error } = await supabase.rpc('spendable', { p_view: view ?? undefined });
+      if (error) throw error;
+      return (data as Spendable[])[0];
     },
   });
 }
