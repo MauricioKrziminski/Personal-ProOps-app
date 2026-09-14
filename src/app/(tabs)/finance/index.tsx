@@ -1,6 +1,6 @@
 import { router, type Href } from 'expo-router';
 import { useMemo, useState } from 'react';
-import { Platform, Pressable, StyleSheet, View } from 'react-native';
+import { Platform, Pressable, StyleSheet, View, useWindowDimensions } from 'react-native';
 import Animated, {
   FadeInDown,
   useAnimatedStyle,
@@ -32,7 +32,8 @@ import { Segmented } from '@/components/ui/segmented';
 import { HeroPanel } from '@/components/ui/hero-panel';
 import { Screen } from '@/components/ui/screen';
 import { Skeleton, SkeletonRow } from '@/components/ui/skeleton';
-import { BarTrack, ProgressBar } from '@/components/ui/sparkline';
+import { isoToBR } from '@/lib/dates';
+import { BarTrack, ProgressBar, Sparkline } from '@/components/ui/sparkline';
 import { useToast } from '@/components/ui/toast';
 import { Elevation, Motion, Radius, Space, Type, tabular } from '@/design/tokens';
 import {
@@ -282,6 +283,7 @@ export default function FinanceScreen() {
   const previousMonth = useMemo(() => shiftMonth(month, -1), [month]);
   const previousRange = useMonthRange(previousMonth);
   const isCurrent = month === mesCorrente;
+  const { width } = useWindowDimensions();
   const daysLeft = cycle.data?.diasAteOFim ?? daysToMonthEnd();
 
   const forecast = useCashFlowForecast(daysLeft);
@@ -349,6 +351,19 @@ export default function FinanceScreen() {
     ciclo && cicloAnterior && Number(cicloAnterior.saiu) > 0
       ? Math.round(((Number(ciclo.saiu) - Number(cicloAnterior.saiu)) / Number(cicloAnterior.saiu)) * 100)
       : null;
+  /*
+    ⚠️ **`useMemo` não é micro-otimização aqui.** `Sparkline` memoiza o path do Skia com `values`
+    na dependência; um array novo a cada render NUNCA acerta esse cache, e a tela reconstrói o
+    desenho inteiro a cada uma das ~10 queries que assentam. A curva já era buscada (`forecast`
+    alimentava só `isLoading`) — ela passou a ser DESENHADA sem nenhuma query nova.
+  */
+  const series = useMemo(
+    () => (forecast.data ?? []).map((d) => Number(d.balance_cents)),
+    [forecast.data]
+  );
+  const chartWidth = width - Space.lg * 2 - Space.gutter * 2;
+  const fimDoCiclo = ciclo?.fim ?? cycle.data?.ate ?? null;
+
   const expense = totalOf(summary.data, 'expense');
 
   const categories = useMemo(() => {
@@ -497,14 +512,45 @@ export default function FinanceScreen() {
               ciclo com a do mês civil anterior daria um percentual que não descreve nem um nem
               outro.
             */
-            trend={
+            /*
+              A variação saiu de `trend` e virou `secondary`: ela é uma linha de ESTADO sobre o
+              número de cima, que é o que este slot é. E `trend` COMIA o `footer` em silêncio
+              (`{!trend && footer ? ... : null}`), então o rodapé "Sobrou na conta" nunca
+              aparecia nesta tela — ele existia no `describeCycle` e morria aqui.
+            */
+            secondary={
               variacaoSaida !== null
                 ? {
-                    value: `${variacaoSaida > 0 ? '+' : ''}${variacaoSaida}% gastos`,
-                    positive: variacaoSaida <= 0,
-                    label: `vs ${monthLabel(previousMonth)}`,
+                    icon: variacaoSaida > 0 ? 'arrow.up.right' : 'arrow.down.right',
+                    negative: variacaoSaida > 0,
+                    text: `${variacaoSaida > 0 ? '+' : ''}${variacaoSaida}% de gastos vs ${monthLabel(previousMonth)}`,
                   }
                 : undefined
+            }
+            /*
+              A curva do ciclo corrente. `forecast` já era buscada nesta tela e só alimentava
+              `isLoading`/`isError` — o gráfico não custa uma query, custa um `useMemo`.
+              Em mês passado ela não aparece: projeção de um período que já fechou é ficção.
+            */
+            chart={
+              isCurrent && series.length > 1 ? (
+                <>
+                  <View style={styles.heroLegenda}>
+                    <ThemedText type="caption" themeColor="onHeroMuted">
+                      Hoje
+                    </ThemedText>
+                    <ThemedText
+                      type="caption"
+                      themeColor={cicloRuim ? 'onHeroDanger' : 'onHeroSuccess'}>
+                      {`${formatBRL(descricao?.cents ?? 0)} projetado`}
+                    </ThemedText>
+                    <ThemedText type="caption" themeColor="onHeroMuted">
+                      {fimDoCiclo ? isoToBR(fimDoCiclo).slice(0, 5) : ''}
+                    </ThemedText>
+                  </View>
+                  <Sparkline values={series} width={chartWidth} height={48} />
+                </>
+              ) : undefined
             }
             concealable
           onPress={() =>
@@ -1105,6 +1151,13 @@ const styles = StyleSheet.create({
     gap: Space.sm,
   },
   /* A faixa de rodapé do herói: o caixa que sobrou, embaixo da dívida que lidera. */
+  /* Os três extremos do gráfico: onde a curva começa, o que ela projeta, onde termina. */
+  heroLegenda: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    gap: Space.sm,
+  },
   heroRodape: {
     flexDirection: 'row',
     justifyContent: 'space-between',

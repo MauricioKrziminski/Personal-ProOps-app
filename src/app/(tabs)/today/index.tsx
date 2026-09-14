@@ -89,7 +89,15 @@ export default function TodayScreen() {
   const recent = useRecentTransactions(5);
   const markPaid = useMarkPaid();
 
-  const series = (forecast.data ?? []).map((d) => Number(d.balance_cents));
+  /*
+    ⚠️ `useMemo` porque `Sparkline` memoiza o path do Skia com `values` na dependência: um array
+    novo a cada render nunca acerta esse cache, e a tela reconstrói o desenho inteiro a cada uma
+    das ~6 queries que assentam.
+  */
+  const series = useMemo(
+    () => (forecast.data ?? []).map((d) => Number(d.balance_cents)),
+    [forecast.data]
+  );
   /*
     ⚠️ **O número grande vem do CICLO, a mesma fonte do Financeiro.** Ele saía da última linha da
     série diária, e a série e o ciclo são recortes diferentes: a Hoje dizia −615,87 enquanto o

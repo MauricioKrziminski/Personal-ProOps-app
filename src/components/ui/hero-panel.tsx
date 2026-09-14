@@ -33,16 +33,16 @@ interface HeroPanelProps {
   /**
    * A faixa do rodapé, que **sangra até as bordas** do card.
    *
-   * É um dos dois padrões repetidos do export (o outro é o mesmo rodapé no card de tendência):
-   * uma pílula com o delta à esquerda e a comparação em texto corrido à direita, sobre uma
-   * superfície um degrau mais escura. Ela existe para o número grande não precisar carregar
-   * contexto: o valor responde "quanto", o rodapé responde "comparado com o quê".
-   */
-  trend?: { value: string; positive?: boolean; label?: string };
-  /**
-   * Conteúdo livre na MESMA faixa de rodapé do `trend` (a que sangra até as bordas, §1 de
-   * design.md). Serve para o par de números que não cabe na pílula — "tenho hoje / a receber".
-   * `trend` ganha quando os dois vêm: a faixa é uma só.
+   * É um dos dois padrões repetidos do export: superfície um degrau mais escura, para o número
+   * grande não precisar carregar contexto — o valor responde "quanto", o rodapé responde
+   * "comparado com o quê".
+   *
+   * ⚠️ **Havia um `trend` aqui, e ele COMIA este slot em silêncio.** A condição era
+   * `{!trend && footer ? ... : null}`, o Financeiro passava os dois, e o rodapé "Sobrou na
+   * conta" simplesmente nunca renderizou — ele existia no `describeCycle` e morria aqui.
+   * `trend` desenhava uma pílula com um delta, que é uma linha de ESTADO: `secondary` já faz
+   * isso, acima do gráfico, sem disputar a faixa. Ele saiu junto com seu único caller, em vez
+   * de ganhar uma regra de precedência que ninguém lembraria na próxima tela.
    */
   footer?: React.ReactNode;
   /** Sparkline ou barra. Opcional. */
@@ -81,7 +81,6 @@ export function HeroPanel({
   label,
   value,
   secondary,
-  trend,
   footer,
   chart,
   actions,
@@ -213,31 +212,10 @@ export function HeroPanel({
         ) : null}
       </View>
 
-      {!trend && footer ? (
+      {footer ? (
         <View style={[styles.footer, { backgroundColor: theme.heroFooter }]}>{footer}</View>
       ) : null}
 
-      {trend ? (
-        <View style={[styles.footer, { backgroundColor: theme.heroFooter }]}>
-          <View style={[styles.trendPill, { backgroundColor: theme.heroChip }]}>
-            <Icon
-              name={trend.positive ? 'arrow.up.right' : 'arrow.down.right'}
-              size="sm"
-              color={trend.positive ? 'onHeroSuccess' : 'onHeroDanger'}
-            />
-            <ThemedText
-              type="code"
-              themeColor={trend.positive ? 'onHeroSuccess' : 'onHeroDanger'}>
-              {trend.value}
-            </ThemedText>
-          </View>
-          {trend.label ? (
-            <ThemedText type="footnote" themeColor="onHeroMuted" style={styles.shrink}>
-              {trend.label}
-            </ThemedText>
-          ) : null}
-        </View>
-      ) : null}
     </Animated.View>
   );
 }
@@ -286,14 +264,5 @@ const styles = StyleSheet.create({
     gap: Space.sm,
     paddingHorizontal: Space.gutter,
     paddingVertical: Space.sm + 2,
-  },
-  trendPill: {
-    flexShrink: 0,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: Space.xs,
-    paddingHorizontal: Space.sm,
-    paddingVertical: Space.half,
-    borderRadius: Radius.pill,
   },
 });
