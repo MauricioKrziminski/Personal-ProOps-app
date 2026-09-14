@@ -113,16 +113,39 @@ export function PeriodSummaryCard({
                   styles.faixa,
                   { backgroundColor: pressed ? theme.backgroundSelected : theme.backgroundElement },
                 ]}>
-                <ThemedText type="footnote" themeColor="textSecondary" style={styles.faixaTexto}>
+                {/*
+                  ⚠️ **Duas LINHAS, não uma frase que quebra.** Emendado com "·", o separador
+                  caía no começo da segunda linha assim que a frase não coubesse — e "·" abrindo
+                  linha lê como marcador de lista (§3, a mesma razão que devolveu o
+                  `textBreakStrategy="balanced"`). Em duas linhas declaradas, onde cada parte
+                  começa não depende da largura da tela.
+
+                  O chevron fica FORA deste bloco: irmão de uma linha que quebra, ele é quem
+                  desce sozinho, longe do texto que continua.
+                */}
+                <View style={styles.faixaTexto}>
+                  <View style={styles.faixaLinha}>
+                    <ThemedText type="footnote" themeColor="textSecondary">
+                      {d.label.toLowerCase()}
+                    </ThemedText>
+                    <Money
+                      cents={d.cents}
+                      variant="ticker"
+                      tone={d.ruim ? 'danger' : 'text'}
+                      signed
+                    />
+                  </View>
                   {/*
-                    ⚠️ **"sai do caixa" é o que separa esta linha do número lá em cima.** As duas
-                    somam o mesmo período; o que muda é o DIA que cada uma conta — a compra, ou o
-                    dia em que o dinheiro deixa a conta (a fatura vence). Sem esta palavra, os
-                    dois números viram "dois totais diferentes para outubro", que é a queixa.
+                    ⚠️ **É esta linha que diz por que os dois números diferem.** Os dois somam o
+                    mesmo período; o que muda é o DIA que cada um conta — a data da compra lá em
+                    cima, a data em que o dinheiro sai da conta aqui (a fatura pesa quando vence).
+                    Sem o par "por data da compra" / "por data do pagamento", eles viram dois
+                    totais diferentes para outubro sem explicação, que é exatamente a queixa.
                   */}
-                  {`${d.label.toLowerCase()} `}
-                </ThemedText>
-                <Money cents={d.cents} variant="ticker" tone={d.ruim ? 'danger' : 'text'} signed />
+                  <ThemedText type="caption" themeColor="textSecondary">
+                    por data do pagamento
+                  </ThemedText>
+                </View>
                 <Icon name="chevron.right" size="sm" color="textSecondary" />
               </View>
             )}
@@ -186,5 +209,7 @@ const styles = StyleSheet.create({
     borderBottomLeftRadius: Radius.md,
     borderBottomRightRadius: Radius.md,
   },
-  faixaTexto: { flexShrink: 1 },
+  // Quebra em vez de truncar: nada aqui é prévia de corpo (§7).
+  faixaTexto: { flex: 1, gap: Space.half },
+  faixaLinha: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', columnGap: Space.xs },
 });
