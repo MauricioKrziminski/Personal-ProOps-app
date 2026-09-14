@@ -1051,10 +1051,26 @@ Nenhum bloco pode aparecer enquanto outro ainda mostra skeleton.
 > então o crescimento hoje é ~1 linha/dia. É peso morto, e é o que chega perto dos 500 MB da
 > camada grátis primeiro — não os checkpoints.
 >
-> A limpeza é **escrita em produção**, então é do Gabriel:
-> `delete from cron.job_run_details where end_time < now() - interval '7 days';` — e, como
-> `pg_total_relation_size` não encolhe sozinho, um `vacuum full cron.job_run_details` depois
-> (tabela de log que ninguém lê; o lock é curto e não derruba o produto).
+> A limpeza é **escrita em produção**, então é do Gabriel, e o comando é **um só**:
+>
+> ```sql
+> truncate cron.job_run_details;
+> ```
+>
+> ⚠️ **`VACUUM FULL` NÃO roda no SQL Editor do Supabase** — ele envolve tudo numa transação e o
+> Postgres responde `25001: VACUUM cannot run inside a transaction block`. Pior: o erro reverte o
+> **bloco inteiro**, então o `delete` que vinha antes também não vale. (Recomendei esse par aqui e
+> ele falhou na primeira tentativa, em 14/09/2026.)
+>
+> `TRUNCATE` resolve os dois problemas de uma vez: roda dentro de transação **e** devolve o espaço
+> na hora, porque reescreve o arquivo em vez de marcar linha morta. Conferido que dá:
+> o SQL Editor conecta como `postgres`, e `has_table_privilege('postgres','cron.job_run_details','TRUNCATE')`
+> é `true` (a dona é `supabase_admin`, mas `postgres` tem o privilégio).
+>
+> **E não se perde nada**, medido: os jobs de minuto em minuto (`jobid` 3 e 4, 41.292 execuções)
+> pararam em 11/09 e 07/09, quando os crons foram para o Cloud Scheduler; os `jobid` 1 e 2 somam
+> 62.891 cada e terminaram em 26/08. De 12/09 em diante **só o `jobid` 7 roda, 1 linha por dia**
+> (a limpeza de notas apagadas). O truncate leva três linhas vivas e 167 mil mortas.
 >
 > ⚠️ **Antes de 14/09/2026 esta seção dizia** que a primeira execução automática seria em
 > produção e que isso precisava ser sabido antes de subir. Continua verdade, e a linha de base
