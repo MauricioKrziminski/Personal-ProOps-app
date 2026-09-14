@@ -34,7 +34,7 @@ import { HeroPanel } from '@/components/ui/hero-panel';
 import { CountUpMoney } from '@/components/ui/count-up-money';
 import { Screen } from '@/components/ui/screen';
 import { Skeleton, SkeletonRow } from '@/components/ui/skeleton';
-import { isoToBR } from '@/lib/dates';
+import { isoToBR, mesmoMes } from '@/lib/dates';
 import { BarTrack, ProgressBar, Sparkline } from '@/components/ui/sparkline';
 import { useToast } from '@/components/ui/toast';
 import { Elevation, Motion, Radius, Space, Type, tabular } from '@/design/tokens';
@@ -343,8 +343,8 @@ export default function FinanceScreen() {
     fonte única — a mesma que o detalhe do ciclo soma linha a linha.
   */
   const serie = useCycleSeries(shiftMonth(month, -1), month, regua.view);
-  const ciclo = serie.data?.find((c) => c.mes.startsWith(month)) ?? null;
-  const cicloAnterior = serie.data?.find((c) => !c.mes.startsWith(month)) ?? null;
+  const ciclo = serie.data?.find((c) => mesmoMes(c.mes, month)) ?? null;
+  const cicloAnterior = serie.data?.find((c) => !mesmoMes(c.mes, month)) ?? null;
   const descricao = ciclo
     ? describeCycle(ciclo, monthTitle(month).replace(/ de \d{4}$/, '').toLowerCase())
     // Sem a série ainda (primeiro frame), o painel não inventa rótulo: fica no esqueleto.

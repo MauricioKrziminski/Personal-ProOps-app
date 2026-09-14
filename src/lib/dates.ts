@@ -29,6 +29,44 @@ export function monthBounds(month: string): { from: string; to: string } {
  * Mora aqui, e não dentro do `<Money>`, porque é a única parte dele que dá para testar sem
  * renderizar — e é a parte que já esteve errada.
  */
+/**
+ * O primeiro dia do mês, aceitando `2026-10` **ou** `2026-10-01`.
+ *
+ * As RPCs de mês recebem uma DATA e o app fala em `YYYY-MM` — daí o `-01` que era emendado à mão
+ * em oito lugares. Emendado num valor que JÁ traz o dia, ele produz `2026-10-01-01`, que o
+ * Postgres recusa com `22007 invalid input syntax for type date` e a tela mostra como
+ * "Algo deu errado".
+ *
+ * ⚠️ **Dentro do app ninguém produzia o formato longo**, e é por isso que isso nunca apareceu:
+ * `cycle_now` devolve `mes` como TEXTO `YYYY-MM` e `month_group` faz `to_char(..., 'YYYY-MM')`.
+ * Só chega por FORA — deep link, atalho e o toque numa NOTIFICAÇÃO. Medido em 14/09/2026:
+ * `appproops://finance/cycle?month=2026-10-01` abria direto no erro, e
+ * `appproops://finance/cycle?month=2026-10` abria certo.
+ *
+ * ⚠️ E o sintoma era pior do que "uma tela com erro": `useCycleLines` tinha a trava
+ * `month.length === 7` e `useCycleSeries` **não tinha**. Com o formato longo, a primeira ficava
+ * DESLIGADA para sempre (`enabled: false` no v5 = `isPending` eterno) e só a segunda estourava.
+ * Uma normalização só, na entrada, mata os dois casos — e é a razão de isto ser função e não um
+ * `if` em cada chamada.
+ */
+export function primeiroDiaDoMes(mes: string): string {
+  return `${mes.slice(0, 7)}-01`;
+}
+
+/**
+ * As duas datas caem no MESMO mês? Aceita `YYYY-MM` e `YYYY-MM-DD` dos dois lados.
+ *
+ * ⚠️ **Existe porque `c.mes.startsWith(month)` mentia de um jeito mudo.** As telas procuram o
+ * ciclo do mês aberto com `find(c => c.mes.startsWith(month))`, e `c.mes` vem do banco como
+ * `2026-09-01`. Com `month = '2026-09-15'` (o dia do meio que uma NOTIFICAÇÃO manda — o `ref` do
+ * fechamento de ciclo é a data de FIM), `startsWith` dá `false`, `ciclo` fica `null` e a tela
+ * desenha só o cabeçalho: **sem erro, sem esqueleto, sem conteúdo**. Só o dia `01` casava por
+ * coincidência. Medido no emulador em 14/09/2026. Par de [[primeiroDiaDoMes]].
+ */
+export function mesmoMes(a: string, b: string): boolean {
+  return a.slice(0, 7) === b.slice(0, 7);
+}
+
 export function moneySign(cents: number, signed = false): string {
   if (cents < 0) return '−';
   return signed && cents > 0 ? '+' : '';

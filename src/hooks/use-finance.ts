@@ -4,7 +4,7 @@ import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tansta
 import type { ProjecaoMensal } from '@/lib/forecast-months';
 import { supabase } from '@/lib/supabase';
 import type { Database } from '@/lib/database.types';
-import { localISODate, monthBounds } from '@/lib/dates';
+import { localISODate, monthBounds, primeiroDiaDoMes } from '@/lib/dates';
 import type { DebtPaymentRow } from '@/lib/debt-history';
 import { agentFetch } from '@/lib/agent-api';
 import { toIlikeTerm } from '@/lib/search';
@@ -467,11 +467,12 @@ export function useTransaction(id: string | undefined) {
   });
 }
 
+
 /** `month` no formato YYYY-MM; omitido = mês corrente. */
 export function useBudgetsStatus(month?: string, view?: CycleView) {
   useRealtimeInvalidate('transactions', ['budgets-status']);
   useRealtimeInvalidate('budgets', ['budgets-status']);
-  const refMonth = month ? `${month}-01` : localISODate();
+  const refMonth = month ? primeiroDiaDoMes(month) : localISODate();
   return useQuery({
     queryKey: ['budgets-status', refMonth, view ?? ''],
     queryFn: async (): Promise<BudgetStatus[]> => {
@@ -1233,7 +1234,7 @@ export function useCycleRange(month: string, view?: CycleView) {
   return useQuery({
     queryKey: ['cycle-range', month, view ?? ''],
     queryFn: async (): Promise<{ de: string; ate: string }> => {
-      const { data, error } = await supabase.rpc('cycle_range', { p_month: `${month}-01`, p_view: view ?? undefined });
+      const { data, error } = await supabase.rpc('cycle_range', { p_month: primeiroDiaDoMes(month), p_view: view ?? undefined });
       if (error) throw error;
       return data as unknown as { de: string; ate: string };
     },
@@ -1359,7 +1360,7 @@ export function useCycleSeries(de: string, ate: string, view?: CycleView) {
     queryKey: ['cycle-series', de, ate, view ?? ''],
     queryFn: async (): Promise<CycleRow[]> => {
       const { data, error } = await supabase.rpc('cycle_series', {
-        de: `${de}-01`, ate: `${ate}-01`, p_view: view ?? undefined,
+        de: primeiroDiaDoMes(de), ate: primeiroDiaDoMes(ate), p_view: view ?? undefined,
       });
       if (error) throw error;
       return data;
@@ -1401,11 +1402,11 @@ export function useSpendable(view?: CycleView) {
 export function useCycleLines(month: string, view?: CycleView) {
   useRealtimeMonth('cycle-lines');
   return useQuery({
-    enabled: month.length === 7,
+    enabled: month.length >= 7,
     queryKey: ['cycle-lines', month, view ?? ''],
     queryFn: async (): Promise<CycleLine[]> => {
       const { data, error } = await supabase.rpc('cycle_lines', {
-        p_month: `${month}-01`, p_view: view ?? undefined,
+        p_month: primeiroDiaDoMes(month), p_view: view ?? undefined,
       });
       if (error) throw error;
       return data;
@@ -1422,7 +1423,7 @@ export function useMonthLines(month: string, view?: CycleView) {
   return useQuery({
     queryKey: ['month-lines', month, view ?? ''],
     queryFn: async (): Promise<MonthLine[]> => {
-      const { data, error } = await supabase.rpc('month_lines', { p_month: `${month}-01`, p_view: view ?? undefined });
+      const { data, error } = await supabase.rpc('month_lines', { p_month: primeiroDiaDoMes(month), p_view: view ?? undefined });
       if (error) throw error;
       return data;
     },
@@ -1441,7 +1442,7 @@ export function useMonthSummary(month: string, enabled = true, view?: CycleView)
     queryKey: ['month-summary', month, view ?? ''],
     // A RPC devolve UMA linha; o hook entrega o objeto para a tela não escrever `[0]` em toda leitura.
     queryFn: async (): Promise<MonthSummary | null> => {
-      const { data, error } = await supabase.rpc('month_summary', { p_month: `${month}-01`, p_view: view ?? undefined });
+      const { data, error } = await supabase.rpc('month_summary', { p_month: primeiroDiaDoMes(month), p_view: view ?? undefined });
       if (error) throw error;
       return data?.[0] ?? null;
     },
@@ -1458,7 +1459,7 @@ export function useMonthBreakdown(
     queryKey: ['month-breakdown', month, groupBy, view ?? ''],
     queryFn: async (): Promise<MonthBreakdownRow[]> => {
       const { data, error } = await supabase.rpc('month_breakdown', {
-        p_month: `${month}-01`,
+        p_month: primeiroDiaDoMes(month),
         p_group_by: groupBy,
         p_view: view ?? undefined,
       });
@@ -2137,7 +2138,7 @@ export function useSaveBudget() {
         p_category: input.category,
         p_limit_cents: input.limit_cents,
         p_rollover: input.rollover ?? false,
-        p_month: input.month ? `${input.month}-01` : undefined,
+        p_month: input.month ? primeiroDiaDoMes(input.month) : undefined,
       });
       if (error) throw error;
     },

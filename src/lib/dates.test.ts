@@ -6,22 +6,24 @@ import { test } from 'node:test';
 import {
   brToISO,
   diasAte,
+  ehUltimoDiaDoMes,
   formatBRL,
   formatDateBR,
   greetingBR,
   isValidBRDate,
-  monthGrid,
   isValidTime,
   isoToBR,
   localDateTime,
   localISODate,
+  maskBRDate,
+  mesmoMes,
   moneySign,
   monthBounds,
+  monthGrid,
+  primeiroDiaDoMes,
   relativeBR,
-  timeBR,
   somaDias,
-  maskBRDate,
-  ehUltimoDiaDoMes,
+  timeBR,
 } from './dates.ts';
 
 test('localISODate formata a data local com zero à esquerda', () => {
@@ -212,4 +214,27 @@ test('ehUltimoDiaDoMes reconhece o fim de cada mês', () => {
     const [y, m, d] = iso.split('-').map(Number);
     assert.equal(ehUltimoDiaDoMes(new Date(y, m - 1, d)), esperado, iso);
   }
+});
+
+test('primeiroDiaDoMes aceita YYYY-MM e YYYY-MM-DD — o deep link manda o segundo', () => {
+  // O app fala `YYYY-MM` e as RPCs de mês recebem DATA, então oito chamadas emendavam `-01`.
+  // Com um valor que já traz o dia, isso virava `2026-10-01-01`, que o Postgres recusa com
+  // `22007` — e a tela do ciclo abria em "Algo deu errado". Medido no emulador em 14/09/2026:
+  // `appproops://finance/cycle?month=2026-10-01` quebrava, `?month=2026-10` não.
+  assert.equal(primeiroDiaDoMes('2026-10'), '2026-10-01');
+  assert.equal(primeiroDiaDoMes('2026-10-01'), '2026-10-01');
+  assert.equal(primeiroDiaDoMes('2026-10-31'), '2026-10-01', 'qualquer dia cai no dia 1');
+  // Dezembro: o mês de dois dígitos não pode ser cortado no lugar errado.
+  assert.equal(primeiroDiaDoMes('2026-12-25'), '2026-12-01');
+});
+
+test('mesmoMes casa qualquer dia do mês — o `startsWith` só acertava o dia 01', () => {
+  // `c.mes` vem do banco como `2026-09-01`. Com `month` no dia do meio (o `ref` de uma
+  // notificação de fechamento é a data de FIM do ciclo), `startsWith` dava false, `ciclo` ficava
+  // null e a tela desenhava só o cabeçalho — sem erro e sem conteúdo. Visto no emulador.
+  assert.equal(mesmoMes('2026-09-01', '2026-09-15'), true);
+  assert.equal(mesmoMes('2026-09-01', '2026-09'), true);
+  assert.equal(mesmoMes('2026-09-01', '2026-09-01'), true);
+  assert.equal(mesmoMes('2026-09-01', '2026-10-01'), false);
+  assert.equal(mesmoMes('2026-09-01', '2027-09-01'), false, 'o ano conta');
 });

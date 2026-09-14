@@ -18,7 +18,7 @@ import { Radius, Space } from '@/design/tokens';
 import { type CycleLine, type CycleRow, type CycleView, useCycleLines, useCycleMonth, useCycleSeries, useInvoice } from '@/hooks/use-finance';
 import { describeCycle } from '@/lib/cycle-label';
 import { rotaDaLinha } from '@/lib/cycle-routes';
-import { isoToBR } from '@/lib/dates';
+import { isoToBR, mesmoMes } from '@/lib/dates';
 
 /**
  * **Por que o ciclo fechou naquele valor** — a tela que justifica o número da home.
@@ -63,7 +63,7 @@ export default function CycleDetailScreen() {
 
   const serie = useCycleSeries(month, month, view);
   const linhas = useCycleLines(month, view);
-  const ciclo = serie.data?.find((c) => c.mes.startsWith(month)) ?? null;
+  const ciclo = serie.data?.find((c) => mesmoMes(c.mes, month)) ?? null;
 
   const grupos = useMemo(() => agrupar(linhas.data ?? [], brl), [linhas.data, brl]);
 

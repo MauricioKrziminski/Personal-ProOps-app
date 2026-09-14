@@ -41,6 +41,7 @@ import {
   type TransactionSource,
 } from '@/hooks/use-finance';
 import { formatBRL, formatDateBR, localISODate } from '@/hooks/use-items';
+import { mesmoMes } from '@/lib/dates';
 import { confirmDestructive } from '@/lib/item-actions';
 import { dueInline, settleDone, settleLabel } from '@/lib/settle-labels';
 import { useDebounced } from '@/hooks/use-debounced';
@@ -220,7 +221,7 @@ export default function TransactionsScreen() {
     dinheiro sai do caixa); o que não pode é a de OUTRA lente ocupar o topo desta.
   */
   const serieCiclo = useCycleSeries(month, month, regua.view);
-  const ciclo = serieCiclo.data?.find((c) => c.mes.startsWith(month)) ?? null;
+  const ciclo = serieCiclo.data?.find((c) => mesmoMes(c.mes, month)) ?? null;
   /*
     Os totais do card saem de `transactions_summary`, que soma a MESMA janela da lista e exclui
     transferência (pagar fatura não é gasto novo: a compra já contou). Somar `rows` no cliente
