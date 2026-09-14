@@ -6,7 +6,12 @@ import {
   View,
   type ViewStyle,
 } from 'react-native';
-import { Gesture, GestureDetector } from 'react-native-gesture-handler';
+import {
+  Gesture,
+  GestureDetector,
+  type ComposedGesture,
+  type GestureType,
+} from 'react-native-gesture-handler';
 import Animated, {
   runOnJS,
   scrollTo,
@@ -85,6 +90,15 @@ export interface ReorderRenderInfo<T> {
   index: number;
   /** `true` no item levantado — a tela usa para calar o que competir com o arrasto. */
   active: boolean;
+  /**
+   * O gesto de arrastar.
+   *
+   * No modo `alça` **quem o monta é o item**, em volta do punho: aqui o `Reorderable` não
+   * embrulha nada. Posto no cartão inteiro, qualquer deslize vertical sobre uma nota viraria
+   * arrasto e brigaria com a rolagem da lista — e o dedo do usuário não avisa qual dos dois ele
+   * queria. No modo `toque-longo` o `Reorderable` já embrulha o item todo e este gesto sobra.
+   */
+  drag: ComposedGesture | GestureType;
 }
 
 export interface ReorderableProps<T> {
@@ -113,6 +127,15 @@ export interface ReorderableProps<T> {
   activation?: 'alça' | 'toque-longo';
   /** Só no modo `toque-longo`: soltou sem ter arrastado. */
   onTapItem?: (index: number) => void;
+  /**
+   * Avisa que um item está levantado.
+   *
+   * ⚠️ **A tela usa isto para DESLIGAR a rolagem** (`scrollEnabled={false}`) enquanto o arrasto
+   * acontece. É a forma robusta de não disputar o gesto com o scroll nativo: em vez de negociar
+   * prioridade entre dois reconhecedores, um deles simplesmente sai de cena. O auto-scroll
+   * continua funcionando, porque ele é programático (`scrollTo`), não gesto.
+   */
+  onDragStateChange?: (dragging: boolean) => void;
   /** Ref animada do scroll que contém esta lista. Sem ela não há auto-scroll. */
   scrollRef?: AnimatedRef<Animated.ScrollView>;
   /** Distância entre o topo do conteúdo do scroll e o topo deste container. */
@@ -133,6 +156,7 @@ export function Reorderable<T>({
   enabled = true,
   activation = 'alça',
   onTapItem,
+  onDragStateChange,
   scrollRef,
   topInset = 0,
   viewportHeight,
@@ -214,7 +238,13 @@ export function Reorderable<T>({
   }, false);
 
   /** `setActive` vem de um objeto do Reanimated; passar o método solto perderia o `this`. */
-  const ligarQuadro = useCallback((ligado: boolean) => quadro.setActive(ligado), [quadro]);
+  const ligarQuadro = useCallback(
+    (ligado: boolean) => {
+      quadro.setActive(ligado);
+      onDragStateChange?.(ligado);
+    },
+    [quadro, onDragStateChange]
+  );
 
   const medir = useCallback(
     (id: string) => (e: LayoutChangeEvent) => {
@@ -258,7 +288,7 @@ export function Reorderable<T>({
           onSoltou={comprometer}
           onTapItem={onTapItem}
           onArrastando={ligarQuadro}>
-          {(active) => renderItem({ item, index, active })}
+          {(active, drag) => renderItem({ item, index, active, drag })}
         </Celula>
       ))}
     </View>
@@ -357,7 +387,7 @@ interface CelulaProps {
   onSoltou: (de: number, para: number) => void;
   onTapItem?: (index: number) => void;
   onArrastando: (ativo: boolean) => void;
-  children: (active: boolean) => React.ReactNode;
+  children: (active: boolean, drag: ComposedGesture | GestureType) => React.ReactNode;
 }
 
 function Celula({
@@ -481,11 +511,21 @@ function Celula({
     /*
       `Animated.View` por FORA e o conteúdo tocável por dentro: `createAnimatedComponent(Pressable)`
       com `style` em função não aplica o estilo — o `anti-slop.test.ts` quebra o build por isso.
+
+      No modo `toque-longo` o gesto embrulha o ladrilho inteiro (é a grade, e ela não tem menu de
+      contexto para disputar). No modo `alça` o `GestureDetector` é responsabilidade do ITEM, em
+      volta do punho: no cartão inteiro, todo deslize vertical viraria arrasto e brigaria com a
+      rolagem — e a tela ainda desliga o scroll durante o arrasto (`onDragStateChange`), que é o
+      que remove a disputa de vez em vez de negociar prioridade entre dois reconhecedores.
     */
     <Animated.View onLayout={onMedir} style={[posicao, camada, movimento]}>
-      <GestureDetector gesture={pan}>
-        <View style={styles.preenche}>{children(ativo)}</View>
-      </GestureDetector>
+      {activation === 'toque-longo' ? (
+        <GestureDetector gesture={pan}>
+          <View style={styles.preenche}>{children(ativo, pan)}</View>
+        </GestureDetector>
+      ) : (
+        children(ativo, pan)
+      )}
     </Animated.View>
   );
 }

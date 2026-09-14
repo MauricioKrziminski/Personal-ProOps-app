@@ -179,6 +179,26 @@ const MATERIAL: Record<string, MaterialName> = {
   'arrow.clockwise': 'sync',
   xmark: 'close',
   'xmark.circle': 'cancel',
+
+  /* ── Notas: formatação, organização e arrasto ───────────────────────────── */
+  bold: 'format_bold',
+  italic: 'format_italic',
+  strikethrough: 'format_strikethrough',
+  /** Mono inline — o mesmo par que o `Type.code` usa em texto. */
+  'chevron.left.forwardslash.chevron.right': 'code',
+  textformat: 'text_fields',
+  /** Alça de arrastar. Três traços é o glifo que o Material e o iOS usam para a mesma coisa. */
+  'line.3.horizontal': 'drag_handle',
+  /** "Ordenar por" no menu do header. */
+  'arrow.up.arrow.down': 'swap_vert',
+  paintpalette: 'palette',
+  'folder.badge.plus': 'create_new_folder',
+  /**
+   * Arquivada. ⚠️ Cai no MESMO `archive` que `archivebox`, como `pin`/`pin.fill` caem no mesmo
+   * `push_pin`: no Android o estado tem de vir da COR, nunca do glifo.
+   */
+  'archivebox.fill': 'archive',
+  'tray.full': 'inbox',
 };
 
 /**

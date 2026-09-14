@@ -131,7 +131,9 @@ const TRUNCAGEM_PERMITIDA = new Set([
   // Slot de largura fixa: a barra inteira é geometria calculada e o rótulo já limita a escala
   // da fonte. Duas linhas moveriam a bolha e o berço para fora do lugar.
   'src/components/ui/curved-tab-bar.tsx',
-  // Prévia do corpo da nota, no cartão da lista.
+  // Prévia do corpo da nota, no cartão da lista. É PRÉVIA de um corpo, não identificador: o
+  // texto inteiro está a um toque, e o título logo acima nunca trunca.
+  'src/components/notes/note-card.tsx',
   'src/app/(tabs)/notes/index.tsx',
   // Prévia da última mensagem, na lista de conversas.
   'src/components/agent/conversation-row.tsx',
