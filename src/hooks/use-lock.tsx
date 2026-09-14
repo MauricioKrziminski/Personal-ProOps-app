@@ -230,7 +230,19 @@ export function LockProvider({ children }: { children: ReactNode }) {
       return saida;
     } finally {
       emVoo.current = false;
-      vigia.current.systemUiOpen = false;
+      /*
+        ⚠️ **A bandeira cai um TIQUE depois, não aqui.** O `active` do AppState chega DEPOIS de
+        `authenticateAsync` resolver — é o sistema devolvendo o foco ao app quando o prompt sai —,
+        e com a bandeira já limpa esse evento é lido como "voltou do segundo plano": `deveTrancar`
+        devolve `true` e a cortina reabre POR CIMA do app que acabou de ser destravado.
+
+        Medido no simulador: Face ID aceito, app aberto, e o primeiro toque na tela trancava tudo
+        de novo. É exatamente a lição que `semTrancar` (logo abaixo) já carregava — ela só não
+        tinha sido aplicada aqui, que é o caminho mais usado dos dois.
+      */
+      setTimeout(() => {
+        vigia.current.systemUiOpen = false;
+      }, 1000);
     }
   }, []);
 
