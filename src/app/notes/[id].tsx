@@ -1,27 +1,18 @@
 import { Stack, router, useLocalSearchParams } from 'expo-router';
 import { useEffect, useMemo, useRef, useState } from 'react';
-import {
-  Pressable,
-  ScrollView,
-  StyleSheet,
-  TextInput,
-  View,
-} from 'react-native';
+import { Pressable, StyleSheet, TextInput, View } from 'react-native';
 import Animated, { FadeIn, FadeOut } from 'react-native-reanimated';
 import { KeyboardAwareScrollView, KeyboardStickyView } from 'react-native-keyboard-controller';
 import * as Haptics from 'expo-haptics';
 import type { SymbolViewProps } from 'expo-symbols';
 
 import { ThemedText } from '@/components/themed-text';
+import { FolderPicker } from '@/components/notes/folder-picker';
+import { TagPicker } from '@/components/notes/tag-picker';
 import { Button } from '@/components/ui/button';
-import { Sheet } from '@/components/ui/sheet';
-import { TaskHeader } from '@/components/ui/task-header';
 import { Card } from '@/components/ui/card';
-import { EmptyState } from '@/components/ui/empty-state';
 import { HeaderActions, type HeaderAction } from '@/components/ui/header-actions';
-import { TextField } from '@/components/ui/field';
 import { Icon } from '@/components/ui/icon';
-import { Row, Section } from '@/components/ui/row';
 import { Screen } from '@/components/ui/screen';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useToast } from '@/components/ui/toast';
@@ -30,21 +21,15 @@ import { HitTarget, Motion, Radius, Space, Type } from '@/design/tokens';
 import {
   useNote,
   useNoteFolders,
-  useSaveFolder,
   useSaveNote,
   useToggleNotePin,
   useTrashNote,
-  type NoteFolder,
-  useNoteTags,
 } from '@/hooks/use-notes';
 import { useTheme } from '@/hooks/use-theme';
 import { relativeBR } from '@/lib/dates';
 import {
   addTag,
-  isValidTag,
-  normalizeTag,
   noteTitle,
-  normalizeFolderName,
   removeTag,
   tagsOf,
 } from '@/lib/search';
@@ -488,6 +473,7 @@ export default function NoteDetailScreen() {
 
       <TagPicker
         visible={tagPickerOpen}
+        alvo="nota"
         current={tags}
         onClose={() => setTagPickerOpen(false)}
         onToggle={(tag) =>
@@ -685,222 +671,6 @@ function BlockBar({ onPick }: { onPick: (kind: BlockKind) => void }) {
   );
 }
 
-/** Quando o campo de busca deixa de ser ruído e passa a ser necessário. */
-const SEARCH_FROM = 8;
-
-/**
- * Seletor de tag.
- *
- * `notes.tags` é coluna GERADA do texto — não dá para escrever nela. Então escolher uma tag aqui
- * **edita o conteúdo**, acrescentando ou tirando o token `#tag`. É o que dá chip de verdade sem
- * quebrar a decisão de origem: a nota continua sendo texto puro que volta inteiro pro WhatsApp.
- *
- * Oferece as tags que já existem no workspace (evita `#mercado` e `#Mercado` virando duas coisas)
- * e deixa criar uma na hora.
- */
-function TagPicker({
-  visible,
-  current,
-  onClose,
-  onToggle,
-}: {
-  visible: boolean;
-  current: string[];
-  onClose: () => void;
-  onToggle: (tag: string) => void;
-}) {
-  const known = useNoteTags();
-  const [draft, setDraft] = useState('');
-
-  const typed = normalizeTag(draft);
-  const existing = (known.data ?? []).map((t) => t.tag);
-  const options = Array.from(new Set([...existing, ...current])).sort();
-  const shown = typed ? options.filter((t) => t.includes(typed)) : options;
-  const canCreate = isValidTag(typed) && !options.includes(typed);
-
-  return (
-    <Sheet visible={visible} onClose={onClose}>
-        <TaskHeader title="Tags da nota" onClose={onClose} />
-
-        <ScrollView
-          contentContainerStyle={styles.sheetBody}
-          keyboardShouldPersistTaps="handled"
-          showsVerticalScrollIndicator={false}>
-          <TextField
-            value={draft}
-            onChangeText={setDraft}
-            placeholder="Buscar ou criar tag"
-            autoCapitalize="none"
-            autoCorrect={false}
-            accessibilityLabel="Buscar ou criar tag"
-          />
-
-          {canCreate ? (
-            <Section>
-              <Row
-                title={`Criar #${typed}`}
-                icon="plus.circle"
-                chevron={false}
-                onPress={() => {
-                  Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-                  onToggle(typed);
-                  setDraft('');
-                }}
-              />
-            </Section>
-          ) : null}
-
-          {shown.length > 0 ? (
-            <Section title="Tags">
-              {shown.map((tag) => {
-                const on = current.includes(tag);
-                return (
-                  <Row
-                    key={tag}
-                    title={`#${tag}`}
-                    chevron={false}
-                    accessibilityState={{ selected: on }}
-                    trailing={on ? <Icon name="checkmark" size="md" color="tint" /> : null}
-                    onPress={() => {
-                      Haptics.selectionAsync();
-                      onToggle(tag);
-                    }}
-                  />
-                );
-              })}
-            </Section>
-          ) : !canCreate ? (
-            <EmptyState
-              icon="tag"
-              title="Nenhuma tag ainda"
-              hint="Escreve o nome aí em cima — ou digita #assim no corpo da nota."
-            />
-          ) : null}
-        </ScrollView>
-    </Sheet>
-  );
-}
-
-/**
- * Seletor de pasta.
- *
- * O documento pede uma rota `formSheet` com detents `[0.5, 0.9]`; ela precisaria ser registrada
- * no `_layout.tsx` da aba, que não é desta entrega. `Modal presentationStyle="pageSheet"` dá o
- * sheet nativo com arrasto para cancelar; o que falta é só o ajuste de detent.
- */
-function FolderPicker({
-  visible,
-  current,
-  folders,
-  onClose,
-  onPick,
-}: {
-  visible: boolean;
-  current: string | null;
-  folders: NoteFolder[];
-  onClose: () => void;
-  onPick: (id: string | null) => void;
-}) {
-  const toast = useToast();
-  const saveFolder = useSaveFolder();
-  const [query, setQuery] = useState('');
-  const [newName, setNewName] = useState<string | null>(null);
-
-  const visibleFolders = query
-    ? folders.filter((f) => f.name.includes(normalizeFolderName(query)))
-    : folders;
-
-  const check = (selected: boolean) =>
-    selected ? <Icon name="checkmark" size="md" color="tint" /> : null;
-
-  const createAndMove = async () => {
-    const name = normalizeFolderName(newName ?? '');
-    if (!name) return;
-    try {
-      // Nome repetido aqui NÃO é erro: o upsert devolve a pasta existente e a nota vai para ela.
-      const id = await saveFolder.mutateAsync({ name, icon: 'folder' });
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-      setNewName(null);
-      setQuery('');
-      onPick(id);
-    } catch {
-      toast({ message: 'Não deu para criar a pasta.', tone: 'error' });
-    }
-  };
-
-  return (
-    <Sheet visible={visible} onClose={onClose}>
-        <TaskHeader title="Mover para" onClose={onClose} />
-
-        <ScrollView
-          contentContainerStyle={styles.sheetBody}
-          keyboardShouldPersistTaps="handled"
-          showsVerticalScrollIndicator={false}>
-          {folders.length > SEARCH_FROM ? (
-            <TextField
-              value={query}
-              onChangeText={setQuery}
-              placeholder="Buscar pasta"
-              autoCapitalize="none"
-              accessibilityLabel="Buscar pasta"
-            />
-          ) : null}
-
-          <Section>
-            <Row
-              title="Sem pasta"
-              icon="tray"
-              chevron={false}
-              accessibilityState={{ selected: current === null }}
-              trailing={check(current === null)}
-              onPress={() => onPick(null)}
-            />
-            {visibleFolders.map((f) => (
-              <Row
-                key={f.id}
-                title={f.name}
-                subtitle={`${f.notes_count} nota${f.notes_count === 1 ? '' : 's'}`}
-                icon={symbol(f.icon)}
-                chevron={false}
-                accessibilityState={{ selected: current === f.id }}
-                accessibilityLabel={`${f.name}, ${f.notes_count} notas`}
-                trailing={check(current === f.id)}
-                onPress={() => onPick(f.id)}
-              />
-            ))}
-            {newName === null ? (
-              <Row
-                title="Nova pasta…"
-                icon="plus.circle"
-                chevron={false}
-                onPress={() => setNewName('')}
-              />
-            ) : (
-              <View style={styles.newFolder}>
-                <TextField
-                  value={newName}
-                  onChangeText={setNewName}
-                  placeholder="Nome da pasta"
-                  autoCapitalize="none"
-                  autoFocus
-                  maxLength={40}
-                  accessibilityLabel="Nome da nova pasta"
-                  onSubmitEditing={() => void createAndMove()}
-                />
-                <Button
-                  label="Criar e mover"
-                  size="sm"
-                  loading={saveFolder.isPending}
-                  onPress={() => void createAndMove()}
-                />
-              </View>
-            )}
-          </Section>
-        </ScrollView>
-    </Sheet>
-  );
-}
-
 const styles = StyleSheet.create({
   body: {
     gap: Space.lg,
@@ -1008,14 +778,5 @@ const styles = StyleSheet.create({
     paddingVertical: Space.xs,
     borderRadius: Radius.pill,
     borderCurve: 'continuous',
-  },
-  sheetBody: {
-    gap: Space.lg,
-    paddingHorizontal: Space.lg,
-    paddingBottom: Space.xxxl,
-  },
-  newFolder: {
-    gap: Space.md,
-    padding: Space.lg,
   },
 });

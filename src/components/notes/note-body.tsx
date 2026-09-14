@@ -1,4 +1,4 @@
-import { Pressable, StyleSheet, View } from 'react-native';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
 import Animated, { FadeIn } from 'react-native-reanimated';
 
 import { ThemedText } from '@/components/themed-text';
@@ -129,6 +129,12 @@ function Bloco({ bloco: b, onToggle }: { bloco: NoteBlock; onToggle: (i: number)
  * Um `<ThemedText>` por fora com os `<Text>` dos trechos DENTRO dele: assim a linha inteira
  * quebra, alinha e escala como um parágrafo só, em vez de virar N caixas lado a lado que quebram
  * cada uma por conta.
+ *
+ * ⚠️ **Os trechos são `Text` CRU de propósito.** `ThemedText` chama `useTheme()` e aplica
+ * `flexShrink`/`android_hyphenationFrequency` — que em `<Text>` aninhado são no-op —, e numa
+ * lista de 30 cartões com ~3 trechos por linha isso vira ~100 chamadas de hook por render para
+ * não mudar um pixel. Cor, tamanho e tracking o filho HERDA do pai; o trecho só acrescenta o que
+ * a marca muda.
  */
 function Inline({
   text,
@@ -148,17 +154,17 @@ function Inline({
   return (
     <ThemedText type={tipo} style={[color ? { color } : null, style]}>
       {spans.map((span, i) => (
-        <ThemedText
+        <Text
           key={i}
-          type={tipo}
           style={[
-            { fontFamily: noteFace(span.marks, base) },
+            // `Type.code` traz tamanho e entrelinha do mono; a família vem de `noteFace`, que
+            // devolve a MESMA para `code` — as duas concordam, e a ordem só garante isso.
             span.marks.includes('code') ? Type.code : null,
+            { fontFamily: noteFace(span.marks, base) },
             { textDecorationLine: noteStrike(span.marks) ?? 'none' },
-            color ? { color } : null,
           ]}>
           {span.text}
-        </ThemedText>
+        </Text>
       ))}
     </ThemedText>
   );

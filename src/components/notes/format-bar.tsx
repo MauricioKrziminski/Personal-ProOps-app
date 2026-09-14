@@ -62,7 +62,16 @@ export function FormatBar({
   const linha = lineAt(content, selection.start);
   const tipoDaLinha =
     linha >= 0 ? classify(content.split('\n')[linha] ?? '').kind : ('text' as const);
-  const ativas = marksAt(content, selection.start);
+  // ⚠️ Com um TRECHO selecionado, `start` costuma cair EM CIMA do delimitador de abertura
+  // (selecionar "leite" em `*leite*` começa no índice do `*`), e ali `marksAt` devolve vazio —
+  // a barra diria "não está em negrito" com a seleção visivelmente dentro do negrito, que é
+  // exatamente o estado mentiroso que ela existe para acabar. O meio da seleção está sempre
+  // dentro dela.
+  const ondeLer =
+    selection.end > selection.start
+      ? Math.floor((selection.start + selection.end) / 2)
+      : selection.start;
+  const ativas = marksAt(content, ondeLer);
 
   return (
     <View style={[styles.barra, { backgroundColor: theme.surface, borderColor: theme.cardBorder }]}>

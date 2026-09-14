@@ -9,8 +9,20 @@ import { useScheme, useTheme } from '@/hooks/use-theme';
 import type { NoteFolder } from '@/hooks/use-notes';
 import { symbol } from '@/components/notes/note-actions';
 
-/** Altura fixa do ladrilho — é dela que sai a aritmética exata do slot na grade. */
-export const FOLDER_TILE_HEIGHT = 108;
+/**
+ * Altura do ladrilho — é dela que sai a aritmética exata do slot na grade.
+ *
+ * ⚠️ **Ela CRESCE com a fonte do sistema.** O ladrilho tem altura fixa e três textos dentro: a
+ * 1,3× o nome em `smallBold` mais a contagem passam de 108 e o conteúdo sai pela borda. É a mesma
+ * armadilha da face do cartão de crédito (`design.md` §1) — apertar o teto de escala até caber é
+ * desligar o Dynamic Type com outro nome.
+ *
+ * É FUNÇÃO e não constante porque quem posiciona os slots é a tela: o cartão e a grade precisam
+ * do mesmo número, e um `* fontScale` escrito num dos dois lados é o defeito que não dá erro.
+ */
+export function folderTileHeight(fontScale: number): number {
+  return Math.round(108 * Math.max(1, fontScale));
+}
 
 /**
  * O ladrilho de uma pasta na grade da home.

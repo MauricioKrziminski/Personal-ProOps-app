@@ -115,12 +115,25 @@ export interface NoteFilters {
   sort?: NoteSort;
 }
 
+/**
+ * A chave da lista, com o PADRÃO fora dela.
+ *
+ * `sort: 'manual'` é o default e produz exatamente a consulta de quem não escolheu ordem nenhuma;
+ * deixá-lo na chave criaria duas entradas de cache para a mesma resposta — e quebraria em
+ * silêncio a vitrine, que semeia `['notes','list',{}]` (`design-preview.tsx`) e cairia no estado
+ * de erro sem nada dizer. `undefined` o próprio hash do TanStack já descarta.
+ */
+function chaveDaLista(filters: NoteFilters) {
+  const { sort, ...resto } = filters;
+  return sort && sort !== 'manual' ? { ...resto, sort } : resto;
+}
+
 /** Lista paginada. Antes era `limit(100)` fixo, sem paginação nenhuma. */
 export function useNotesList(filters: NoteFilters = {}) {
   useRealtimeInvalidate('notes', ['notes']);
 
   return useInfiniteQuery({
-    queryKey: ['notes', 'list', filters],
+    queryKey: ['notes', 'list', chaveDaLista(filters)],
     initialPageParam: 0,
     queryFn: async ({ pageParam }) => {
       let query = supabase.from('notes').select(NOTE_COLUMNS);
@@ -288,31 +301,101 @@ export function useUpdateNote() {
 }
 
 /**
+ * Reordena o que JÁ ESTÁ no cache, **por slot**.
+ *
+ * Só os ids passados trocam de lugar entre si, e cada um cai num slot que já pertencia a alguém
+ * do grupo. Por isso a função não precisa saber nada sobre fixadas, filtro de tag ou paginação:
+ * o que não veio na lista fica exatamente onde estava, e o arrasto de "soltas" não move a seção
+ * FIXADAS logo acima nem um pixel.
+ */
+function reordenarPorSlot<T extends { id: string }>(itens: T[], ids: string[]): T[] {
+  const alvo = new Set(ids);
+  const doGrupo = new Map(itens.filter((i) => alvo.has(i.id)).map((i) => [i.id, i]));
+  if (doGrupo.size === 0) return itens;
+
+  const fila = ids.map((id) => doGrupo.get(id)).filter((i): i is T => i !== undefined);
+  let n = 0;
+  return itens.map((i) => (doGrupo.has(i.id) ? fila[n++] : i));
+}
+
+/** O mesmo, sobre as páginas de um `useInfiniteQuery`, preservando o tamanho de cada página. */
+function reordenarPaginas(data: { pages: Note[][]; pageParams: unknown[] }, ids: string[]) {
+  const plano = reordenarPorSlot(data.pages.flat(), ids);
+  let corte = 0;
+  const pages = data.pages.map((p) => {
+    const pedaco = plano.slice(corte, corte + p.length);
+    corte += p.length;
+    return pedaco;
+  });
+  return { ...data, pages };
+}
+
+/**
  * Ordem manual — pela RPC, nunca por `update` direto.
  *
  * A RPC reescreve o escopo visível inteiro numa sentença e pula a linha que não mudou de slot,
  * que é o que impede o `moddatetime` de carimbar `updated_at` em metade da lista (ver o teste
  * `supabase/tests/notas_ordem_cor_arquivo.sql`).
+ *
+ * ## Por que o update otimista aqui NÃO é enfeite
+ *
+ * Sem ele a sequência é: solta o dedo → mutation → `invalidate` → refetch (100–400 ms no
+ * Supabase) → ordem nova. Nesse intervalo a lista ainda está na ordem VELHA, e o cartão que
+ * acabou de ser largado volta molejando para o slot de onde saiu antes de a lista inteira se
+ * reorganizar de uma vez. É o piscar de "não pegou" — exatamente o que a coreografia do arrasto
+ * existe para evitar. Com ele, a ordem nova já está na tela no quadro em que o dedo levanta e o
+ * refetch só confirma.
+ *
+ * `cancelQueries` primeiro, senão um refetch que já estava no ar pousa por cima do otimista e
+ * devolve a ordem velha — com o arrasto já concluído no banco.
  */
 export function useReorderNotes() {
+  const client = useQueryClient();
   const invalidate = useInvalidateNotes();
+
   return useMutation({
     mutationFn: async (ids: string[]) => {
       const { error } = await supabase.rpc('notes_reorder', { p_ids: ids });
       if (error) throw error;
     },
-    onSuccess: invalidate,
+    onMutate: async (ids: string[]) => {
+      await client.cancelQueries({ queryKey: ['notes', 'list'] });
+      const antes = client.getQueriesData<{ pages: Note[][]; pageParams: unknown[] }>({
+        queryKey: ['notes', 'list'],
+      });
+      for (const [chave, dados] of antes) {
+        if (dados) client.setQueryData(chave, reordenarPaginas(dados, ids));
+      }
+      return antes;
+    },
+    onError: (_erro, _ids, antes) => {
+      for (const [chave, dados] of antes ?? []) client.setQueryData(chave, dados);
+    },
+    // `onSettled`, não `onSuccess`: no erro a verdade do servidor também precisa voltar, senão o
+    // rollback fica valendo em cima de um cache que ninguém mais vai reconferir.
+    onSettled: invalidate,
   });
 }
 
 export function useReorderFolders() {
+  const client = useQueryClient();
   const invalidate = useInvalidateNotes();
+
   return useMutation({
     mutationFn: async (ids: string[]) => {
       const { error } = await supabase.rpc('note_folders_reorder', { p_ids: ids });
       if (error) throw error;
     },
-    onSuccess: invalidate,
+    onMutate: async (ids: string[]) => {
+      await client.cancelQueries({ queryKey: ['notes', 'folders'] });
+      const antes = client.getQueryData<NoteFolder[]>(['notes', 'folders']);
+      if (antes) client.setQueryData(['notes', 'folders'], reordenarPorSlot(antes, ids));
+      return antes;
+    },
+    onError: (_erro, _ids, antes) => {
+      if (antes) client.setQueryData(['notes', 'folders'], antes);
+    },
+    onSettled: invalidate,
   });
 }
 

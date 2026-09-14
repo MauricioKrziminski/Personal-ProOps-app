@@ -131,7 +131,6 @@ function NoteCardBase({ note, folderName, folderColor, actions, drag, dragging }
                     {titulo}
                   </ThemedText>
                   {note.pinned ? <Icon name="pin.fill" size="sm" color="tint" /> : null}
-                  {drag ? <Alca gesture={drag} /> : null}
                 </View>
 
                 {previa ? (
@@ -183,6 +182,12 @@ function NoteCardBase({ note, folderName, folderColor, actions, drag, dragging }
                   </ThemedText>
                 </View>
               </View>
+
+              {/* ⚠️ A alça é COLUNA do cartão, irmã do trilho — não um ícone na linha do título.
+                  Dentro da `cabeca` ela dividia a fileira com o pin (e com o negativo de margem
+                  os dois se encavalavam), e o alvo de toque ficava do tamanho de uma linha de
+                  texto. Como coluna ela tem a altura inteira do cartão e nunca colide. */}
+              {drag ? <Alca gesture={drag} /> : null}
             </View>
           )}
         </Pressable>
@@ -256,10 +261,9 @@ const styles = StyleSheet.create({
   quando: { marginLeft: 'auto' },
   cresce: { flex: 1 },
   alca: {
-    width: HitTarget - 12,
-    height: HitTarget - 12,
+    width: HitTarget - 8,
+    alignSelf: 'stretch',
     alignItems: 'center',
     justifyContent: 'center',
-    marginRight: -Space.sm,
   },
 });
