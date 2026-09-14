@@ -155,7 +155,22 @@ const TRANSACTION_COLUMNS =
   'id, kind, amount_cents, currency, category, description, account_id, counterparty_account_id, occurred_at, source, created_at, status, due_at, invoice_id, installment_plan_id, installment_no, merchant, recurring_id, debt_id, auto_confirm';
 
 export interface TransactionFilters {
-  month: string; // YYYY-MM
+  /**
+   * As bordas do período EXIBIDO, já resolvidas — nunca um `YYYY-MM` para este hook recortar.
+   *
+   * ⚠️ **Isto era `month: string` e o hook chamava `monthBounds()`, ou seja, o mês CIVIL.** A
+   * tela ao lado media o mesmo período por `useMonthRange`, que respeita a régua — então com
+   * fechamento no dia 10 a LISTA mostrava 01/10–31/10 enquanto o card em cima dela, a
+   * `PeriodBar` e o resumo falavam de 11/09–10/10. Medido no staging em 13/09/2026, ciclo de
+   * outubro: a lista trazia 4 lançamentos do ciclo SEGUINTE (Meli+, DAS e salário de 20/10,
+   * Carro Peças 3/3) e escondia 6 do ciclo que estava na tela (incluindo o salário de 20/09).
+   * O total de receita batia por coincidência — cada janela continha um salário —, e foi isso
+   * que deixou o defeito invisível.
+   *
+   * O botão `Mês | Ciclo` ficava bem em cima de uma lista que o ignorava.
+   */
+  from: string;
+  to: string;
   kind?: TransactionKind;
   category?: string;
   /** Ocorrências de uma série recorrente. */
@@ -166,6 +181,12 @@ export interface TransactionFilters {
   source?: TransactionSource;
   /** Busca em descrição, lugar e categoria. */
   q?: string;
+  /**
+   * `false` enquanto `from`/`to` ainda são o palpite civil de `useMonthRange`.
+   *
+   * Sem isto a lista busca duas vezes na abertura e mostra o período errado no meio.
+   */
+  pronto?: boolean;
 }
 
 /**
@@ -181,8 +202,11 @@ const TRANSACTION_PAGE = 50;
 /** Lista paginada. Antes era `limit(200)` fixo, que sumia com o resto do mês sem avisar. */
 export function useTransactions(filters: TransactionFilters) {
   useRealtimeInvalidate('transactions', ['transactions']);
-  const { from, to } = monthBounds(filters.month);
+  const { from, to } = filters;
   return useInfiniteQuery({
+    // Chaveada por `from`/`to`, que é como toda leitura de período do app já se conserta sozinha
+    // na troca de régua (ver `REGUA_MUDOU`). Chaveada pelo RÓTULO do mês ela não se corrigiria:
+    // `2026-10` é o mesmo texto nas duas réguas.
     queryKey: ['transactions', 'list', filters],
     initialPageParam: 0,
     queryFn: async ({ pageParam }): Promise<Transaction[]> => {
@@ -231,6 +255,7 @@ export function useTransactions(filters: TransactionFilters) {
     },
     getNextPageParam: (last, all) =>
       last.length < TRANSACTION_PAGE ? undefined : all.length * TRANSACTION_PAGE,
+    enabled: filters.pronto !== false,
   });
 }
 
@@ -1218,11 +1243,23 @@ export function useCycleRange(month: string, view?: CycleView) {
   });
 }
 
-/** As bordas do mês exibido: o ciclo quando ele já chegou, o mês civil enquanto não. */
-export function useMonthRange(month: string, view?: CycleView): { from: string; to: string } {
+/**
+ * As bordas do mês exibido: o ciclo quando ele já chegou, o mês civil enquanto não.
+ *
+ * ⚠️ **`pronto` diz se a resposta já é a definitiva.** O palpite civil serve para um número
+ * aparecer no lugar de um esqueleto, mas uma LISTA que renderiza o palpite mostra linhas de
+ * outro período por um quadro e depois as troca — que é o defeito que esta função existe para
+ * evitar, só que piscando. Quem desenha linha espera; quem desenha total pode adiantar.
+ */
+export function useMonthRange(
+  month: string,
+  view?: CycleView
+): { from: string; to: string; pronto: boolean } {
   const ciclo = useCycleRange(month, view);
   const civil = monthBounds(month);
-  return ciclo.data ? { from: ciclo.data.de, to: ciclo.data.ate } : civil;
+  return ciclo.data
+    ? { from: ciclo.data.de, to: ciclo.data.ate, pronto: true }
+    : { ...civil, pronto: false };
 }
 
 /**
