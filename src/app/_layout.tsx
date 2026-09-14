@@ -5,7 +5,9 @@ import {
   HankenGrotesk_400Regular_Italic,
   HankenGrotesk_500Medium,
   HankenGrotesk_600SemiBold,
+  HankenGrotesk_600SemiBold_Italic,
   HankenGrotesk_700Bold,
+  HankenGrotesk_700Bold_Italic,
 } from '@expo-google-fonts/hanken-grotesk';
 import {
   JetBrainsMono_400Regular,
@@ -94,7 +96,9 @@ function AppTree() {
     HankenGrotesk_400Regular_Italic,
     HankenGrotesk_500Medium,
     HankenGrotesk_600SemiBold,
+    HankenGrotesk_600SemiBold_Italic,
     HankenGrotesk_700Bold,
+    HankenGrotesk_700Bold_Italic,
     JetBrainsMono_400Regular,
     JetBrainsMono_500Medium,
     JetBrainsMono_600SemiBold,

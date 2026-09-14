@@ -850,3 +850,60 @@ test('valor em texto visível passa por Money ou useBRL', () => {
     'dinheiro que a tela mostra sai de <Money> ou de useBRL() — formatBRL cru ignora o esconder saldo'
   );
 });
+
+/**
+ * Toda face declarada em `Fonts` está carregada no `_layout.tsx` raiz.
+ *
+ * É o modo de falha mais caro que este projeto já teve duas vezes, sempre pela mesma causa — um
+ * NOME que ninguém resolve. Face de fonte não cai no system font quando falta: **o texto some**.
+ * Em 28/08 foi o `Icon` (nome de SF Symbol sem par no mapa do Android) e todos os ícones do app
+ * ficaram invisíveis; aqui seria o `*negrito*` de uma nota desaparecendo da tela.
+ *
+ * Por texto e não por import: `constants/theme.ts` puxa `react-native` e `global.css`, que não
+ * carregam no `node --test`. É a mesma estratégia do `icon-map.test.ts`.
+ */
+test('toda face de Fonts está carregada no _layout raiz', () => {
+  const theme = readFileSync(join(SRC, 'constants', 'theme.ts'), 'utf8');
+  const layout = readFileSync(join(SRC, 'app', '_layout.tsx'), 'utf8');
+
+  const faces = [...theme.matchAll(/^\s+\w+:\s+'((?:HankenGrotesk|JetBrainsMono)_\w+)',/gm)].map(
+    (m) => m[1]
+  );
+  assert.ok(faces.length >= 8, 'não achei as faces em theme.ts — o regex envelheceu');
+
+  const faltando = faces.filter((face) => !layout.includes(face));
+  assert.deepEqual(faltando, [], 'face declarada e não carregada faz o TEXTO SUMIR, sem erro');
+});
+
+/**
+ * `NoteColors` e o CHECK do banco listam os MESMOS oito nomes.
+ *
+ * A cor da nota é guardada como nome de token, e o CHECK da migration é o que impede o app de
+ * gravar um nome que não existe na paleta. Divergiram → ou a tela oferece uma cor que o banco
+ * recusa com 23514 no salvar, ou existe no banco uma cor que a tela não sabe pintar e o trilho
+ * some. Mesma régua do `categories.test.ts`, que prende a lista duplicada entre TS e Python.
+ */
+test('a paleta de nota e o CHECK do banco dizem a mesma coisa', () => {
+  const theme = readFileSync(join(SRC, 'constants', 'theme.ts'), 'utf8');
+  const migrations = join(SRC, '..', 'supabase', 'migrations');
+  const sql = readdirSync(migrations)
+    .filter((f) => f.includes('nota_ganha_lugar_cor_e_ordem'))
+    .map((f) => readFileSync(join(migrations, f), 'utf8'))
+    .join('\n');
+  assert.ok(sql, 'a migration da cor sumiu — este teste perdeu o alvo');
+
+  const naPaleta = [
+    ...theme.slice(theme.indexOf('export const NoteColors')).matchAll(/^\s+(\w+): '#[0-9A-Fa-f]{6}',/gm),
+  ].map((m) => m[1]);
+  const noCheck = [...sql.matchAll(/color is null or color in\s*\n?\s*\(([^)]+)\)/g)]
+    .map((m) => m[1].match(/'(\w+)'/g)?.map((x) => x.replace(/'/g, '')) ?? []);
+
+  assert.ok(noCheck.length >= 2, 'esperava o CHECK em notes E em note_folders');
+  for (const lista of noCheck) {
+    assert.deepEqual(
+      [...new Set(lista)].sort(),
+      [...new Set(naPaleta)].sort(),
+      'paleta e CHECK divergiram: ou a tela oferece cor que o banco recusa, ou o contrário'
+    );
+  }
+});

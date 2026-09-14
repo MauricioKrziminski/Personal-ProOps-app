@@ -237,6 +237,16 @@ export const Fonts = {
   medium: 'HankenGrotesk_500Medium',
   semibold: 'HankenGrotesk_600SemiBold',
   bold: 'HankenGrotesk_700Bold',
+  /**
+   * As duas faces que a marcação INLINE da nota precisa.
+   *
+   * `*negrito*` dentro de um `# título` (que já é semibold) e `_itálico_` dentro dele não têm
+   * face sintética que preste: pela mesma regra do peso, o Android cairia no regular com bold
+   * falso e o iOS inclinaria a letra por transformação. `noteFace` (`src/design/note-colors.ts`)
+   * resolve peso × itálico para uma destas seis faces exatas.
+   */
+  semiboldItalic: 'HankenGrotesk_600SemiBold_Italic',
+  boldItalic: 'HankenGrotesk_700Bold_Italic',
   mono: 'JetBrainsMono_400Regular',
   monoMedium: 'JetBrainsMono_500Medium',
   monoSemibold: 'JetBrainsMono_600SemiBold',
@@ -254,3 +264,62 @@ export const Spacing = {
 
 export const BottomTabInset = Platform.select({ ios: 50, android: 80 }) ?? 0;
 export const MaxContentWidth = 800;
+
+/**
+ * A paleta de COR DE NOTA E DE PASTA — oito nomes, cada um com par claro/escuro.
+ *
+ * ## Por que aqui, e não num arquivo allowlistado como `card-brands.ts`
+ *
+ * O argumento que tirou as cores dos bancos da paleta é que **cor de terceiro não tem par**: o
+ * roxo do Nubank é o mesmo roxo nos dois temas ou deixa de ser o roxo do Nubank. Estas são
+ * NOSSAS e precisam de par — sobre `#F7F8F8` e sobre `#131315` o mesmo valor não serve —, então
+ * elas moram onde mora toda cor do app.
+ *
+ * ## Por que oito cores não quebram "um accent só"
+ *
+ * Elas são **conteúdo do usuário**, não estado da interface, e vivem em geometria fechada: o
+ * trilho de 3px na borda do cartão e o ladrilho do ícone da pasta. Nunca pintam texto, superfície
+ * de card, botão ou ícone de ação. É a mesma fronteira que liberou a cor do emissor DENTRO da
+ * forma de um cartão de crédito.
+ *
+ * ⚠️ **Nenhum dos oito é igual a `tint`, `danger` ou `warning`.** Reaproveitar o verde do accent
+ * faria uma nota colorida ler como "selecionada"; reaproveitar o vermelho faria ler como erro —
+ * e a cor semântica é a última alavanca de cor que este design tem.
+ *
+ * Os valores são tom 40 (claro) e tom 80 (escuro) do Material 3, a mesma régua com que `danger`
+ * (`#BA1A1A` / `#FFB4AB`) foi construído: contraste suficiente para o trilho existir nos dois
+ * temas sem virar um bloco de tinta.
+ *
+ * `violeta` está na lista de propósito. A regra «se um dia a cor voltar, que não seja roxo» vale
+ * para o ACCENT do app — uma escolha do usuário num trilho de 3px não lê como marca de banco.
+ */
+export const NoteColors = {
+  light: {
+    grafite: '#545F71',
+    oceano: '#00639C',
+    violeta: '#6750A4',
+    magenta: '#984061',
+    terra: '#8F4C38',
+    mostarda: '#6D5E00',
+    musgo: '#3F6939',
+    turquesa: '#00696E',
+  },
+  dark: {
+    grafite: '#BCC7DC',
+    oceano: '#9BCBFF',
+    violeta: '#D0BCFF',
+    magenta: '#FFB0C8',
+    terra: '#FFB5A0',
+    mostarda: '#E0C64B',
+    musgo: '#A4D394',
+    turquesa: '#4CD9E2',
+  },
+} as const;
+
+/** O que o banco aceita em `notes.color` e `note_folders.color` (CHECK na migration). */
+export type NoteColorName = keyof typeof NoteColors.light & keyof typeof NoteColors.dark;
+
+/** A ordem em que as amostras aparecem no seletor. Fonte única — a tela não reordena. */
+export const NOTE_COLOR_NAMES: readonly NoteColorName[] = [
+  'grafite', 'oceano', 'turquesa', 'musgo', 'mostarda', 'terra', 'magenta', 'violeta',
+] as const;
