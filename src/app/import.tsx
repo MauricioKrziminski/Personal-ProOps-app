@@ -34,6 +34,8 @@ import {
   useApproveImportItems,
   useDiscardImportItems,
   useImportItems,
+  useFixImportItemDate,
+  useUnmatchImportItem,
   useImportStatement,
   useUpdateImportItem,
   type ImportItem,
@@ -120,6 +122,8 @@ export default function ImportScreen() {
   const accountsQuery = useAccounts();
   const accounts = accountsQuery.data;
   const importar = useImportStatement();
+  const corrigirData = useFixImportItemDate();
+  const desparear = useUnmatchImportItem();
   const [batchId, setBatchId] = useState<string | undefined>(params.batch);
   const [accountId, setAccountId] = useState<string | null>(null);
   const [falha, setFalha] = useState<FalhaImport | null>(null);
@@ -136,6 +140,12 @@ export default function ImportScreen() {
   const lista = isError ? [] : (items ?? []);
   const paraRevisar = lista.filter((i) => i.status === 'pending');
   const repetidos = lista.filter((i) => i.status === 'duplicate');
+  /*
+    O quarto balde: o extrato achou o MESMO dinheiro alguns dias fora do que está no app. Ele não
+    entra em `paraRevisar` nem no "Importar assim mesmo" dos repetidos — importar um destes cria
+    exatamente a duplicata que esta seção existe para evitar.
+  */
+  const parecidos = lista.filter((i) => i.status === 'near_match');
   const revisados = lista.filter((i) => i.status === 'approved' || i.status === 'discarded');
 
   // O número do botão é o número que vai entrar. O cabeçalho antigo contava as duplicatas e o
@@ -228,6 +238,77 @@ export default function ImportScreen() {
         onPress: () => descartarItem(item),
       },
     ]);
+
+  /**
+   * As três saídas de um "parece que já está lançado". Nenhuma é automática: o app achou o par,
+   * quem decide se é a mesma compra é a pessoa — ela vê os dois lados na linha.
+   */
+  const acoesDoParecido = (item: ImportItem) => {
+    const alvo = item.transactions;
+    if (!alvo) return;
+    showItemActions(item.description ?? 'Lançamento', [
+      {
+        label: `Corrigir a data para ${formatDateBR(item.occurred_at)}`,
+        onPress: () =>
+          corrigirData.mutate(
+            { itemId: item.id, transactionId: alvo.id, occurredAt: item.occurred_at },
+            {
+              onSuccess: () =>
+                toast({
+                  message: `Data corrigida para ${formatDateBR(item.occurred_at)}.`,
+                  tone: 'success',
+                }),
+              onError: () => toast({ message: 'Não deu para corrigir a data.', tone: 'error' }),
+            }
+          ),
+      },
+      {
+        label: 'São coisas diferentes',
+        onPress: () =>
+          desparear.mutate(item.id, {
+            onSuccess: () => toast({ message: 'Vai entrar como lançamento novo.', tone: 'success' }),
+            onError: () => toast({ message: 'Não deu para separar.', tone: 'error' }),
+          }),
+      },
+      { label: 'Descartar', destructive: true, onPress: () => descartarItem(item) },
+    ]);
+  };
+
+  const linhaParecida = (item: ImportItem, index: number) => (
+    <Animated.View
+      key={item.id}
+      layout={LinearTransition.duration(Motion.duration.fast)}
+      entering={FadeInDown.duration(Motion.duration.slow).delay(
+        Math.min(index * 30, Motion.stagger.cap)
+      )}
+    >
+      <Row
+        title={item.description ?? 'Sem descrição'}
+        /*
+          Os DOIS lados na mesma linha: o que o app tem e o que o extrato mandou. É o que
+          transforma "parece já lançado" numa decisão possível em vez de um chute.
+        */
+        subtitle={`no app: ${item.transactions?.description ?? 'sem descrição'} em ${
+          item.transactions ? formatDateBR(item.transactions.occurred_at) : '—'
+        }\nno extrato: ${formatDateBR(item.occurred_at)}`}
+        icon="calendar.badge.exclamationmark"
+        chevron={false}
+        accessibilityLabel={`${item.description ?? 'Sem descrição'}, no app em ${
+          item.transactions ? formatDateBR(item.transactions.occurred_at) : 'data desconhecida'
+        }, no extrato em ${formatDateBR(item.occurred_at)}`}
+        onPress={() => acoesDoParecido(item)}
+        onLongPress={() => acoesDoParecido(item)}
+        trailing={
+          <Money
+            cents={item.kind === 'income' ? item.amount_cents : -item.amount_cents}
+            variant="ticker"
+            tone="auto"
+            signed
+          />
+        }
+      />
+    </Animated.View>
+  );
 
   const linha = (item: ImportItem, index: number) => (
     <Animated.View
@@ -416,6 +497,24 @@ export default function ImportScreen() {
             />
           </Card>
         </Animated.View>
+      ) : null}
+
+      {/*
+        Primeiro de todos: é o único balde em que NÃO decidir cria dado errado. Deixar passar um
+        repetido duplica uma linha; deixar passar um destes duplica a linha E mantém a data errada
+        que causou o desencontro.
+      */}
+      {parecidos.length > 0 ? (
+        <View style={styles.bloco}>
+          <Section title="Parece que já está lançado, com outra data">
+            {parecidos.map(linhaParecida)}
+          </Section>
+          <ThemedText type="footnote" themeColor="textSecondary" style={styles.rodape}>
+            Mesmo valor e mesma conta, poucos dias de diferença. Corrigir a data usa o extrato como
+            fonte — e pode mover a compra para outra fatura, porque é o dia que decide o ciclo.
+            Categoria, conta e nome ficam como você deixou.
+          </ThemedText>
+        </View>
       ) : null}
 
       {/* Primeiro na lista: é a única decisão que exige pensar. */}

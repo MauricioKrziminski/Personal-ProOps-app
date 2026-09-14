@@ -836,7 +836,15 @@ export type ImportItem = Pick<
   | 'transaction_id'
 > & {
   kind: 'expense' | 'income';
-  status: 'pending' | 'approved' | 'discarded' | 'duplicate';
+  status: 'pending' | 'approved' | 'discarded' | 'duplicate' | 'near_match';
+  /**
+   * O lançamento do app que este item do extrato PARECE ser — só em `near_match`.
+   *
+   * Vem embutido porque a tela precisa mostrar os dois lados para a pessoa decidir: o que o app
+   * tem (nome e data que ela mesma escreveu) contra o que o banco mandou. Sem isso a linha diria
+   * "parece já lançado" sem dizer com o quê, e a decisão viraria um chute.
+   */
+  transactions: { id: string; occurred_at: string; description: string | null } | null;
 };
 
 export type CategorizationRule = Pick<
@@ -901,7 +909,7 @@ export function useImportItems(batchId: string | undefined) {
       const { data, error } = await supabase
         .from('import_items')
         .select(
-          'id, batch_id, kind, amount_cents, occurred_at, description, merchant, suggested_category, status, transaction_id',
+          'id, batch_id, kind, amount_cents, occurred_at, description, merchant, suggested_category, status, transaction_id, transactions!import_items_transaction_id_fkey(id, occurred_at, description)',
         )
         .eq('batch_id', batchId!)
         .order('occurred_at', { ascending: false });
@@ -947,6 +955,58 @@ export function useUpdateImportItem() {
         .from('import_items')
         .update({ suggested_category: input.category })
         .eq('id', input.id);
+      if (error) throw error;
+    },
+    onSuccess: () => invalidateKeys(queryClient, [['import-items'], ['import-batches']]),
+  });
+}
+
+/**
+ * "Corrigir a data no app" — o extrato é a fonte da verdade sobre QUANDO, e só sobre isso.
+ *
+ * ⚠️ **Não toca em categoria, conta nem descrição.** Essas a pessoa já ajustou à mão, e o extrato
+ * não sabe mais do que ela sobre elas. O banco sabe o dia.
+ *
+ * ⚠️ **Isto pode TROCAR A FATURA da compra**, e é o comportamento certo: o trigger
+ * `tg_transactions_set_invoice` roda no `update` e recalcula `invoice_id` pela data nova. A tela
+ * avisa antes, porque o efeito aparece longe dali — foi assim que corrigir 6 datas mexeu no total
+ * do ciclo em 14/09/2026.
+ *
+ * ⚠️ **`update_transaction_scoped` NÃO serve aqui**: ela recusa `occurred_at` de propósito (data
+ * é de cada ocorrência; propagar empilharia a série no mesmo dia). O caminho é o mesmo
+ * `update` direto que `useSaveTransaction` já usa, sob RLS.
+ */
+export function useFixImportItemDate() {
+  const invalidate = useInvalidateFinance();
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (input: { itemId: string; transactionId: string; occurredAt: string }) => {
+      const { error } = await supabase
+        .from('transactions')
+        .update({ occurred_at: input.occurredAt })
+        .eq('id', input.transactionId);
+      if (error) throw error;
+      // Só depois de a correção passar: o item some da revisão porque o dinheiro já está no app.
+      const { error: e2 } = await supabase
+        .from('import_items')
+        .update({ status: 'discarded' })
+        .eq('id', input.itemId);
+      if (e2) throw e2;
+    },
+    onSuccess: () =>
+      Promise.all([invalidate(), invalidateKeys(queryClient, [['import-items'], ['import-batches']])]),
+  });
+}
+
+/** "São coisas diferentes": desfaz o palpite e devolve o item para a fila normal. */
+export function useUnmatchImportItem() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (id: string) => {
+      const { error } = await supabase
+        .from('import_items')
+        .update({ status: 'pending', transaction_id: null })
+        .eq('id', id);
       if (error) throw error;
     },
     onSuccess: () => invalidateKeys(queryClient, [['import-items'], ['import-batches']]),
