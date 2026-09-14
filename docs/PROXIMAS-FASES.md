@@ -15,7 +15,7 @@
 | | |
 |---|---|
 | Branch | `main`, limpa, tudo commitado e com push |
-| Último commit | `fb1756a feat(agente): expurgo diario dos checkpoints do langgraph` |
+| Último commit | `e0990aa fix(ui): a condicao do ciclo entra dentro do portao` |
 | Migrations no **staging** (`utkqoiigimqzeenxkxdl`) | até `20260914170000` — **em dia** |
 | Migrations em **produção** (`kwriuifcwyvdrxtspjiz`) | `20260911220000` — **11 atrás** (contadas no repo; confirme no SQL Editor de produção antes de decidir) |
 | `tsc`, `expo lint`, `npm test` | verdes (387 testes) · `pytest` **784** · `ruff` limpo |
