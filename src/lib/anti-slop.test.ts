@@ -712,3 +712,40 @@ test('toda tela de conteúdo usa <Screen>', () => {
     'o ritmo vertical mora no <Screen>: tela que escreve o próprio padding é a que diverge'
   );
 });
+
+/**
+ * `createAnimatedComponent(Pressable)` só onde o estilo é ESTÁTICO.
+ *
+ * ⚠️ **O `Pressable` recebe `style` como FUNÇÃO** (`({ pressed }) => [...]`), e o componente
+ * animado do Reanimated **não a aplica** — o estilo simplesmente não chega. Quando esse estilo é
+ * quem carrega o `flexDirection: 'row'`, a linha vira COLUNA: título, valor e botão empilhados,
+ * com o botão encostado na esquerda. Foi exatamente isso na tela Hoje em 13/09/2026, nas TRÊS
+ * seções de conta ao mesmo tempo, no Android e no iOS.
+ *
+ * ⚠️ **E não dá erro nenhum.** `uiautomator dump` continuava listando os três textos — só que em
+ * `bounds` diferentes. Conferir a PRESENÇA do texto deu verde num layout quebrado; layout se
+ * confere por geometria ou por imagem.
+ *
+ * O caminho certo é um `Animated.View` POR FORA, levando `layout`/`entering`/`exiting`, com o
+ * `Pressable` normal dentro.
+ */
+const PRESSABLE_ANIMADO_OK = new Set([
+  // Estilo ESTÁTICO (um objeto, não função): o atalho do painel não tem feedback por `pressed`,
+  // ele anima por `useAnimatedStyle`. Sem função, não há o que se perder.
+  'src/components/ui/quick-actions.tsx',
+]);
+
+test('createAnimatedComponent(Pressable) só com estilo estático', () => {
+  const fora: string[] = [];
+  for (const file of walk(SRC)) {
+    const rel = file.replace(SRC, 'src');
+    if (PRESSABLE_ANIMADO_OK.has(rel)) continue;
+    const code = stripComments(readFileSync(file, 'utf8'));
+    if (/createAnimatedComponent\(\s*Pressable\s*\)/.test(code)) fora.push(rel);
+  }
+  assert.deepEqual(
+    fora,
+    [],
+    'o style em função do Pressable não sobrevive ao componente animado: envolva num Animated.View'
+  );
+});
