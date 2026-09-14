@@ -20,6 +20,7 @@ import { DarkTheme, DefaultTheme, Stack, ThemeProvider, usePathname } from 'expo
 import * as SplashScreen from 'expo-splash-screen';
 import { StatusBar } from 'expo-status-bar';
 import { AppState, Platform } from 'react-native';
+import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { KeyboardProvider } from 'react-native-keyboard-controller';
 
 import { AnimatedSplashOverlay } from '@/components/animated-icon';
@@ -57,9 +58,21 @@ const queryClient = new QueryClient({
  */
 export default function RootLayout() {
   return (
-    <AppThemeProvider>
-      <AppTree />
-    </AppThemeProvider>
+    /*
+      `GestureHandlerRootView` envolve TUDO, e é requisito do `react-native-gesture-handler`:
+      sem ele nenhum `GestureDetector` recebe evento no Android — **sem erro, sem aviso, sem log**.
+      O expo-router não o monta (só a pilha JS dele, que este app não usa: a navegação é nativa
+      por `react-native-screens`), então a raiz é nossa.
+
+      Por fora do `AppThemeProvider` porque ele não depende de tema nenhum, e porque a raiz de
+      gesto precisa ser o ancestral comum de qualquer coisa que arraste — hoje a grade de pastas
+      e a lista de notas, amanhã o que vier.
+    */
+    <GestureHandlerRootView>
+      <AppThemeProvider>
+        <AppTree />
+      </AppThemeProvider>
+    </GestureHandlerRootView>
   );
 }
 
