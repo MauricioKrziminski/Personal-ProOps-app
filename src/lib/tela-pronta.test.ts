@@ -40,3 +40,11 @@ test('sem rede a tela abre e mostra o estado dela, não um skeleton eterno', () 
 test('refetch de fundo NÃO traz o skeleton de volta', () => {
   assert.equal(telaPronta(revalidando, revalidando), true);
 });
+
+test('condição que não é consulta segura ou libera como qualquer outra', () => {
+  // É por isso que ela entra AQUI e não num `&&` do lado de fora: dentro, a trava do
+  // `useTelaPronta` a cobre e a troca de mês não apaga a tela.
+  assert.equal(telaPronta(pronta, false), false);
+  assert.equal(telaPronta(pronta, true), true);
+  assert.equal(telaPronta(buscando, true), false);
+});

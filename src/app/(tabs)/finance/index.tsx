@@ -434,9 +434,12 @@ export default function FinanceScreen() {
     bloco continuam existindo: trocar de mês devolve `isPending` a três consultas, e sem a trava
     a tela inteira sumiria — inclusive a carteira e a tendência, que não dependem do mês.
   */
-  const pronta =
-    useTelaPronta(forecast, summary, previous, budgets, accounts, debts, cards, cashflow, recent, serie) &&
-    range.pronto;
+  const pronta = useTelaPronta(
+    forecast, summary, previous, budgets, accounts, debts, cards, cashflow, recent, serie,
+    // ⚠️ DENTRO da trava, não com `&&` fora dela: trocar de mês devolve `pronto` a `false`, e
+    // fora da trava isso apagaria a tela inteira — inclusive o seletor de mês recém-tocado.
+    range.pronto,
+  );
 
   const heroLoading = summary.isLoading || (isCurrent && forecast.isLoading);
   const heroError = summary.isError || (isCurrent && forecast.isError);

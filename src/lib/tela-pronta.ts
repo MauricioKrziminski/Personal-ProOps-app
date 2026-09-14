@@ -40,13 +40,19 @@ export interface Consulta {
  * `getOptimisticResult` do observer conta a busca que vai começar no mesmo tique. Então não há
  * janela em que uma query normal seja confundida com uma desligada.
  *
- * Condição que não é query (`range.pronto`, um `id` que ainda não existe) entra com `&&` na
- * chamada — não tem `fetchStatus` para oferecer:
+ * ⚠️ **Condição que não é consulta entra COMO ARGUMENTO, nunca com `&&` do lado de fora.** Um
+ * `telaPronta(...) && range.pronto` fica fora da trava do `useTelaPronta`, e aí trocar o mês —
+ * que dá chave nova a `cycle-range` e devolve `range.pronto` a `false` — apaga a tela INTEIRA,
+ * inclusive o seletor de mês que a pessoa acabou de tocar. É a mesma "pipoca ao contrário" que a
+ * trava existe para impedir, entrando pela porta dos fundos. Um `false` aqui segura o portão;
+ * um `true` não atrapalha.
  *
  * ```ts
- * const pronta = telaPronta(summary, cycle, accounts) && range.pronto;
+ * const pronta = useTelaPronta(summary, cycle, accounts, range.pronto);
  * ```
  */
-export function telaPronta(...consultas: Consulta[]): boolean {
-  return consultas.every((c) => !c.isPending || c.fetchStatus !== 'fetching');
+export function telaPronta(...condicoes: (Consulta | boolean)[]): boolean {
+  return condicoes.every((c) =>
+    typeof c === 'boolean' ? c : !c.isPending || c.fetchStatus !== 'fetching'
+  );
 }

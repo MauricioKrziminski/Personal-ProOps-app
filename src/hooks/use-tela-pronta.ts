@@ -32,14 +32,13 @@ export type { Consulta };
 /**
  * A tela já pode sair do skeleton? Uma vez `true`, sempre `true`.
  *
- * ⚠️ **Só entra aqui a consulta que a tela SEMPRE roda.** Query que nasce desligada
- * (`enabled: false`) fica `isPending` para sempre — `telaPronta` já trata isso pelo
- * `fetchStatus`, mas o hábito certo é não passar. Condição que não é consulta entra com `&&` na
- * chamada: `useTelaPronta(a, b) && range.pronto`.
+ * ⚠️ **Condição que não é consulta entra como ARGUMENTO** (`useTelaPronta(a, b, range.pronto)`),
+ * nunca com `&&` do lado de fora — ver `telaPronta`: do lado de fora ela escapa da trava e a
+ * troca de mês apaga a tela inteira.
  */
-export function useTelaPronta(...consultas: Consulta[]): boolean {
+export function useTelaPronta(...condicoes: (Consulta | boolean)[]): boolean {
   const [abriu, setAbriu] = useState(false);
-  const pronta = telaPronta(...consultas);
+  const pronta = telaPronta(...condicoes);
   /*
     `setState` durante o render, no PRÓPRIO componente: é o padrão que o React documenta para
     estado derivado ("ajustar o estado quando as props mudam"), e ele não causa render extra

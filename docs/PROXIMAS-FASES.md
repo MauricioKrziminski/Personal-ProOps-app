@@ -17,8 +17,8 @@
 | Branch | `main`, limpa, tudo commitado e com push |
 | Último commit | `fb1756a feat(agente): expurgo diario dos checkpoints do langgraph` |
 | Migrations no **staging** (`utkqoiigimqzeenxkxdl`) | até `20260914170000` — **em dia** |
-| Migrations em **produção** (`kwriuifcwyvdrxtspjiz`) | `20260911220000` — **12 atrás** |
-| `tsc`, `expo lint`, `npm test` | verdes (386 testes) · `pytest` **784** · `ruff` limpo |
+| Migrations em **produção** (`kwriuifcwyvdrxtspjiz`) | `20260911220000` — **11 atrás** (contadas no repo; confirme no SQL Editor de produção antes de decidir) |
+| `tsc`, `expo lint`, `npm test` | verdes (387 testes) · `pytest` **784** · `ruff` limpo |
 | Tags | **nenhuma criada** — é o Gabriel quem cria, depois de testar |
 
 ⚠️ **Confirme o número de produção na fonte antes de decidir qualquer coisa com base nele.** No
@@ -568,6 +568,10 @@ Com as 6 datas já corrigidas nesta sessão, o esperado é:
 > teclado numérico do overlay e o sheet de "trocar a senha". Menos 240 linhas, e uma senha a
 > menos para o usuário decorar — mais o caminho de recuperação, que deixou de ser problema nosso.
 >
+> - **`expo-secure-store` ficou no `package.json` e no `app.json` sem nenhum uso em `src/`.** Ele
+>   existia para o `lock-secret.ts`, que saiu. Tirar a dependência exige rebuild nativo (é plugin),
+>   e não vale um rebuild só por isso — mas ela está aqui escrita para não virar mistério: se um
+>   dia houver outro rebuild, ela sai junto.
 > - **`LockMode` virou `off` | `on`.** Preferência gravada como `'pin'` ou `'biometric'` cai em
 >   `off` na leitura — falha ABERTA de propósito: trancar o app num modo que não existe mais não
 >   tem saída.
@@ -744,9 +748,26 @@ quem abre o app, o olho protege quem olha por cima do ombro. Deixe independentes
 >    um `<>…</>` com vários blocos; embrulhado, ele vira uma caixa só e o espaço que o `gap` dava
 >    ENTRE eles some. Visto no Patrimônio: o rótulo "O QUE FORMA ESSE NÚMERO" encostou no herói.
 >
+> 6. ⚠️ **Condição que não é consulta entra DENTRO do portão, nunca com `&&` do lado de fora.**
+>    O Financeiro e Lançamentos nasceram com `useTelaPronta(...) && range.pronto` — e do lado de
+>    fora a condição escapa da trava: trocar o mês dá chave nova a `cycle-range`, `range.pronto`
+>    volta a `false` e a tela INTEIRA vira skeleton, inclusive o seletor de mês que a pessoa
+>    acabou de tocar. É exatamente a pipoca ao contrário do item 1, entrando pela porta dos
+>    fundos. `telaPronta` passou a aceitar `Consulta | boolean`, e a condição virou argumento.
+>
+>    **Provado nos dois sentidos no emulador**, com a rede cortada (`svc wifi disable`) para
+>    `range.pronto` ficar `false` tempo suficiente de ver: com o `&&` fora, tocar "›" apagava a
+>    tela toda (sobrou a dock); com a condição dentro, o seletor, o `Mês | Ciclo` e os blocos
+>    ficam de pé, cada bloco com o próprio "Algo deu errado · Tentar de novo" — que é o §7.
+>
 > **Verificado no aparelho**: Financeiro, Hoje e Patrimônio no emulador Android (medindo as
 > bordas com `uiautomator`, não a olho) e Financeiro + Hoje no simulador iOS. Zero sobreposição,
-> zero salto de layout.
+> zero salto de layout. A troca de mês com rede cortada foi verificada depois, no item 6.
+>
+> **Não é "zero pipoca" em toda tela, e o caso é um só**: no detalhe do lançamento (`[txId]`) a
+> consulta da fatura só liga depois de a transação chegar, e ela não tem skeleton próprio — o
+> bloco da fatura aparece depois do resto. O portão cobre a primeira carga da tela; esse bloco
+> continua entrando sozinho.
 >
 > **Não feito, e é decisão**: o shimmer em Skia do §5.4. O plano já mandava avaliar o custo — o
 > pulso de opacidade atual resolve, e shimmer é enfeite num estado que existe justamente quando o

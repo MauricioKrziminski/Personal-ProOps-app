@@ -278,7 +278,7 @@ export default function TransactionsScreen() {
     o portão de verdade. É a composição que torna a lista parte da primeira pintura em vez de
     chegar depois dela.
   */
-  const pronta = useTelaPronta(summary, serieCiclo, accounts, anyEver, list) && range.pronto;
+  const pronta = useTelaPronta(summary, serieCiclo, accounts, anyEver, list, range.pronto);
 
   // `toSections` agrupa em varredura linear, então o dia que atravessa a fronteira de duas
   // páginas continua sendo uma seção só depois do `flat()`.
