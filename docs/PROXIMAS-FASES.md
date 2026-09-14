@@ -15,10 +15,10 @@
 | | |
 |---|---|
 | Branch | `main`, limpa, tudo commitado e com push |
-| Último commit | `6027afe docs: a justificativa do OTA medida e o aviso do expurgo` |
+| Último commit | `54829c3 fix(importacao): importar extrato estava quebrado desde o corte para o python` |
 | Migrations no **staging** (`utkqoiigimqzeenxkxdl`) | até `20260914170000` — **em dia** |
 | Migrations em **produção** (`kwriuifcwyvdrxtspjiz`) | `20260911220000` — **11 atrás** (contadas no repo; confirme no SQL Editor de produção antes de decidir) |
-| `tsc`, `expo lint`, `npm test` | verdes (390 testes) · `pytest` **784** · `ruff` limpo |
+| `tsc`, `expo lint`, `npm test` | verdes (391 testes) · `pytest` **787** · `ruff` limpo |
 | Tags | **nenhuma criada** — é o Gabriel quem cria, depois de testar |
 
 ⚠️ **Confirme o número de produção na fonte antes de decidir qualquer coisa com base nele.** No
@@ -524,6 +524,53 @@ Com as 6 datas já corrigidas nesta sessão, o esperado é:
    de "o filtro de janela está quebrado".
 3. Qualquer coisa **além** dessas é sinal de que o filtro de conta está errado — a conciliação
    inversa tem que olhar só a conta importada, senão ela lista o financeiro inteiro.
+
+---
+
+### Importação testada com extrato REAL (14/09/2026) — e o que ela revelou
+
+Até aqui a importação só tinha sido exercitada por teste com OFX de brinquedo. Com dois arquivos
+de verdade (conta corrente do Banco do Brasil e fatura do Nubank), quatro coisas apareceram:
+
+1. 🔴 **`importar extrato` estava 100% QUEBRADO desde o corte para o Python.**
+   `agent/app/jobs/importer.py` escrevia `import_items (…, category)`, e a coluna se chama
+   `suggested_category` desde a `0017_import_and_rules.sql` — anos antes do agente. Toda
+   importação devolvia **500**, com o lote nascendo vazio. Ninguém pegou porque **não havia teste
+   nenhum cobrindo `importer.run`** e teste que fala com banco não entra no pytest.
+   A guarda nova não é um teste do importer: é `src/lib/agent-sql-columns.test.ts`, que confere
+   **todo `insert into public.<tabela> (...)` do agente** contra `database.types.ts` (gerado do
+   schema). Provado que morde: restaurando o nome errado, ele falha com a mensagem exata.
+
+2. 🔴 **O BB emite "Saldo Anterior" e "Saldo do dia" como `<STMTTRN>`.** São SALDO, não movimento
+   — no arquivo de agosto o "Saldo do dia" traz 0,11, que é exatamente o `<LEDGERBAL><BALAMT>`.
+   Importados, viravam duas receitas fantasma. O corte é estrutural (**`FITID` vazio**, campo
+   obrigatório pela especificação do OFX), nunca pelo nome da linha — e só vale quando o arquivo
+   usa `FITID`, senão um banco que não emita o campo teria o extrato inteiro descartado calado.
+
+3. 🔴 **`DTPOSTED = 00021130000000` — ano DOIS.** O "Saldo do dia" do BB traz essa data. Entrava
+   como `0002-11-30` e envenenava mês, ciclo e projeção sem erro nenhum na tela. `ofx_date` passou
+   a recusar ano fora de 1990..2100.
+
+4. 🟡 **O BB não expressa o sentido, e isso não dá para adivinhar.** "Pagto cartão crédito" sai
+   como `TRNTYPE=CREDIT` com valor POSITIVO, sendo saída. A aritmética prova nos dois meses:
+   `0,07 + 1.947,10 − 1.947,06 = 0,11` = `<LEDGERBAL>` (agosto); `0,11 + 1.432,50 − 1.432,51 =
+   0,10` (setembro). Somando como entrada dá R$ 2.865,12 contra um saldo de R$ 0,10.
+   Deduzir pelo texto da linha seria a lista de palavras que `.claude/rules/agent.md` proíbe —
+   então quem decide é quem confere: **o sheet de revisão ganhou `Segmented` Saída | Entrada**,
+   acima da categoria (o controle que decide vem antes do que ele decide). Vale para qualquer
+   banco que erre o sinal, não só o BB.
+
+**Resultado do fim a fim**, pela rota real (`/internal/import-statement`, JWT de verdade, agente
+do staging): BB devolveu **2 itens** (as duas linhas reais, sem os saldos) e a fatura do Nubank
+**27**, categorizados pelo Gemini com acerto bom (saúde, transporte, assinaturas, juros,
+restaurante). Os lotes foram apagados depois — **nada entrou em `transactions`**, porque
+importar só enfileira para revisão.
+
+⚠️ **Numa fatura de cartão, "Pagamento recebido" chega como ENTRADA e o Gemini chuta "salário".**
+Está certo como crédito NO CARTÃO e errado como receita do mês — mais um motivo para o sentido ser
+editável. Escolher o cartão em "Lançar na conta" é o que põe a compra na fatura certa.
+
+⚠️ **O paywall funciona**: no plano free a rota devolve **402** com a frase do produto.
 
 ---
 
