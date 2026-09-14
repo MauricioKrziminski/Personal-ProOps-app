@@ -2,6 +2,7 @@ import type { NotificationResponse } from 'expo-notifications';
 import { router } from 'expo-router';
 
 import { notifications } from '@/lib/push-module';
+import { routeFor } from '@/lib/push-routes';
 
 /**
  * Recepção de push.
@@ -26,38 +27,10 @@ export function configureNotificationHandler() {
   });
 }
 
-/**
- * Rotas que um push pode abrir.
- *
- * **Allowlist, não string livre.** O `data` vem de fora do app; navegar para uma rota arbitrária
- * a partir de payload externo é uma porta que não precisa existir.
- */
-const ALLOWED = {
-  reminders: '/reminders',
-  today: '/',
-  forecast: '/finance/forecast',
-  cards: '/finance/cards',
-  budgets: '/finance/budgets',
-  transactions: '/finance/transactions',
-} as const;
-
-type Target = keyof typeof ALLOWED;
-type AllowedHref = (typeof ALLOWED)[Target];
-
-function routeFor(data: unknown): AllowedHref | null {
-  if (!data || typeof data !== 'object') return null;
-  const target = (data as { target?: unknown }).target;
-  if (typeof target !== 'string') return null;
-  // `in` anda pela cadeia de protótipos: `'toString' in ALLOWED` é true e devolveria uma FUNÇÃO
-  // para o `router.push`. A allowlist continuaria impedindo rota arbitrária, mas o app crasharia
-  // ao tocar na notificação.
-  return Object.hasOwn(ALLOWED, target) ? ALLOWED[target as Target] : null;
-}
-
 function open(response: NotificationResponse) {
-  const href = routeFor(response.notification.request.content.data);
-  if (!href) return;
-  router.push(href);
+  const rota = routeFor(response.notification.request.content.data);
+  if (!rota) return;
+  router.push(rota);
 }
 
 /**

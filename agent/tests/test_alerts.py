@@ -183,3 +183,46 @@ async def test_teto_conta_alertas_logicos_e_nao_entregas(monkeypatch):
     assert len(pushes) == 4
     assert len(whatsapps) == 4
     assert result == {"candidatos": 5, "enviados": 8, "pulados": 1}
+
+
+@pytest.mark.asyncio
+async def test_fechamento_de_ciclo_vai_com_alvo_cycle_e_leva_o_mes(monkeypatch):
+    """O push do fechamento precisa abrir O CICLO QUE FECHOU, não o ciclo corrente.
+
+    O `ref` é a data de FIM do ciclo (`2026-09-10`) e viaja no `data` do push. Sem ele, tocar na
+    notificação de "Setembro fechou" abriria outubro — o mês em que a pessoa está — e o número da
+    tela não teria nada a ver com o número do aviso.
+    """
+    _, pushes, _ = _install(
+        monkeypatch,
+        [
+            _alert(
+                kind="cycle_closed",
+                ref="2026-09-10",
+                title="Setembro fechou",
+                body="Entrou 6330.62, saiu 7197.87. Sobrou na conta 0.72. Quer ver o detalhe?",
+                alerts_whatsapp_enabled=False,
+            )
+        ],
+    )
+
+    await alerts.run()
+
+    assert len(pushes) == 1
+    token, title, body, target, ref = pushes[0]
+    assert target == "cycle", "target_for não mapeou cycle_closed"
+    assert ref == "2026-09-10", "o mês do ciclo que fechou não chegou ao app"
+    assert title == "Setembro fechou"
+
+
+@pytest.mark.asyncio
+async def test_o_ref_de_todo_alerta_chega_ao_push(monkeypatch):
+    """`ref` é a chave de dedupe e agora também o ponteiro do item — vale para todos os kinds."""
+    _, pushes, _ = _install(
+        monkeypatch, [_alert(kind="invoice_due", ref="uuid-da-fatura", alerts_whatsapp_enabled=False)]
+    )
+
+    await alerts.run()
+
+    assert pushes[0][3] == "cards"
+    assert pushes[0][4] == "uuid-da-fatura"

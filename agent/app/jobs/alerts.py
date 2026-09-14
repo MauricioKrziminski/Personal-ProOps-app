@@ -79,6 +79,7 @@ async def run() -> dict:
                         alerta["title"],
                         alerta["body"],
                         push.target_for(alerta["kind"]),
+                        alerta["ref"],
                     )
                 else:
                     # Aviso inferido não pode usar o template que diz "você pediu".
