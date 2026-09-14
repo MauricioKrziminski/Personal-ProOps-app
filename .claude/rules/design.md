@@ -141,6 +141,26 @@ Montar um à mão é bloqueado por `anti-slop.test.ts` (todo `<Sheet>` abre com 
 > mortos de 72px**. Decisão do dono do produto: **✕ à esquerda, ação primária à direita, uma
 > regra para as duas superfícies.**
 
+**Arrastar para reordenar é `Reorderable`** (`src/components/ui/reorderable.tsx`), caminho único,
+com a aritmética de slot fora dele (`src/design/reorder-math.ts`, com teste em `node --test`) —
+um off-by-one ali não dá erro nenhum, só solta o cartão no lugar errado. Dois gatilhos, um por
+densidade: **alça** (`minDistance(4)` num punho próprio) na lista, porque no iOS o cartão já tem
+menu de contexto e dois toques longos brigam; **toque longo de 220 ms** no ladrilho inteiro na
+grade, que não tem menu — soltar sem ter andado abre o `showItemActions`, como na tela inicial do
+iOS.
+
+⚠️ **O scroll em volta tem que ser o `ScrollView` do `react-native-gesture-handler`**
+(`DragScrollView`, `src/components/ui/drag-scroll.tsx`). Com o `ScrollView` da RN o gesto do
+filho simplesmente **não ativa no Android** — o scroll nativo captura o toque antes dos 4px e o
+`onStart` nunca roda, sem erro e sem log. E o pan declara `.blocksExternalGesture(scrollRef)`: é
+a relação que o RNGH documenta para filho ganhar do pai, resolvida ANTES do primeiro frame.
+`scrollEnabled={false}` durante o arrasto continua, como segunda trava — ele responde ao
+`onStart`, que sai por `runOnJS` e chega um render depois.
+
+⚠️ **Na GRADE o slot mora DENTRO do transform.** Com `left`/`top` estáticos, soltar produzia dois
+movimentos ao mesmo tempo (o layout pulando para o slot novo e o transform voltando a zero) e o
+ladrilho teleportava. Uma expressão só para a posição, e não há salto.
+
 **Escolher CONTA é `AccountPicker`** (`src/components/finance/account-picker.tsx`), nunca uma
 lista de `Row` com o nome dentro. Eram quatro cópias de `<Row title={a.name} trailing={check}/>`,
 e nelas um cartão de crédito e uma conta corrente têm exatamente a mesma cara — foi assim que um
@@ -351,6 +371,19 @@ Nunca animar altura de header. `Reduce Motion` colapsa movimento espacial em cro
 
 Barra de progresso e gráfico **animam** quando o valor muda — valor que salta é bug visual.
 
+⚠️ **`exiting` não sabe POR QUE o componente desmontou — então saída que muda de lista é
+cross-fade** (14/09/2026). Em Notas, FIXADAS e SOLTAS são duas listas: fixar DESMONTA o cartão de
+uma e MONTA na outra, e o `SlideOutRight` planejado para "arquivar" disparava igual no fixar — o
+cartão voava para fora da tela antes de reaparecer no topo, contando "tirei isto daqui"
+justamente na ação que o traz para cima. Direção só pode ser usada quando o componente tem UMA
+razão possível para sair. Na dúvida, cross-fade, que é o que §5 já manda para saída sem direção.
+
+⚠️ **Animação presa ao MOUNT dispara em todo mount — o que quase nunca é o que se quis dizer.**
+O pulso do alfinete ("acabou de ser fixado") funcionava, mas abrir a aba fazia todos os
+alfinetes pularem de uma vez: movimento permanente sem propósito. E prendê-lo a uma transição
+false→true nunca dispararia, porque o cartão que chega na outra lista é NOVO. Quando o estado
+muda de lista, quem conta a chegada é o `entering` da linha — o ícone fica parado.
+
 ⚠️ **A tab bar do Android é a exceção declarada à regra da frequência** (07/09/2026, decisão do
 dono do produto). Ela usa `Motion.spring.tab` (1000 ms, `dampingRatio 0.62`), não `snap`: ~180 ms
 de percurso, ~10% de ultrapassagem e ~500 ms até assentar. Com `snap` o berço atravessava as cinco
@@ -370,6 +403,13 @@ do slot e a borda da pílula, calculada da geometria, não escolhida a dedo.
 - **Haptics é pontuação**, um por ação do usuário, no mesmo frame do visual: `selectionAsync` ao
   passar de opção, `impactAsync(Light)` ao encaixar, `notificationAsync` no resultado. Nunca em
   scroll, nunca em loop, nunca como único feedback.
+- ⚠️ **`refreshing` é do GESTO, nunca de `isRefetching`** (14/09/2026). `refreshing={x.isRefetching}`
+  parece a leitura óbvia e transforma toda invalidação em spinner: em Notas, cada fixar, colorir,
+  arquivar e arrastar abria o `RefreshControl` sozinho e empurrava a tela ~60pt para baixo — salto
+  de layout em toda ação, medido no simulador. O indicador nasce de um `useState` que o `onRefresh`
+  liga e o `finally` desliga (o precedente é a lista do Agente). O padrão errado ainda está em
+  Hoje, Financeiro, Busca, Lembretes, Importação, Histórico e Alertas, e o `Screen` aceita o prop
+  — tela nova não copia dali.
 - **Mutation que falha precisa aparecer.** Toast + rollback visível. Falha silenciosa é
   reprovação — vale para delete, toggle, arquivar e pagar, não só para salvar.
 - Confirmação destrutiva é **action sheet nativo**. Ação de item é **context menu nativo**.
@@ -681,6 +721,25 @@ as coisas se comunicam:
   abertura. É o que dá personalidade sem cor; sem isso o app fica "iOS bem feito" de novo.
 - **Cor semântica é a única cor da tela** e por isso grita mais do que gritaria num app colorido.
   Gastar `danger`/`success`/`warning` como decoração queima a última alavanca de cor que existe.
+
+### A cor de NOTA é conteúdo do usuário, e por isso não conta (14/09/2026)
+
+`notes.color` e `note_folders.color` existem, com oito tokens pareados light/dark em
+`theme.ts` — e isso **não** é uma segunda alavanca de cor do app. A regra continua: um accent só.
+O que a libera é a mesma régua que liberou a cor do emissor dentro da forma de um cartão de
+crédito:
+
+- **É escolha do USUÁRIO sobre o dado dele**, não a voz do produto. O app não escolhe cor de nota
+  nenhuma; o padrão é `null` e não desenha nada.
+- **Vive em geometria fechada**: trilho de 3px na borda do cartão e ladrilho do ícone da pasta.
+  Nunca pinta texto, superfície de card, botão ou estado.
+- **Nenhum dos oito valores é `tint`, `danger` ou `warning`** — cor de nota não pode ler como
+  "ação" nem como "erro", que são as únicas coisas que a cor significa neste app.
+- **A contagem anti-slop não muda**: continua UM accent na tela. Cor de conteúdo não entra na
+  conta pelo mesmo motivo que a foto de um comprovante não entraria.
+
+> `violeta` está na paleta, e a regra "se um dia a cor voltar, que não seja roxo" continua
+> valendo — ela é sobre o ACCENT do app. Aqui é escolha do usuário dentro de um trilho de 3px.
 
 ### O roxo foi testado e devolvido (30/08/2026)
 
