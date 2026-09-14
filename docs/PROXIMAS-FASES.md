@@ -1198,6 +1198,31 @@ gcloud beta billing projects describe personal-proops-agent
   container acordado não são os usuários — é o **cron de lembretes de 1 em 1 minuto**, que acorda
   1.440×/dia. Esse é custo **fixo**, independente de quantos usuários existem, e precisa sair da
   conta por usuário antes de qualquer divisão.
+
+  ✅ **Medido em 14/09/2026** (Cloud Monitoring, `run.googleapis.com/request_count`, serviço
+  `agente`), requests por dia em produção:
+
+  | dia | requests |
+  |---|---|
+  | 10/09 | 1.504 |
+  | 11/09 | 1.468 |
+  | 12/09 | 1.465 |
+  | 13/09 | 1.465 |
+  | 14/09 | 1.470 |
+
+  A aritmética dos crons dá **exatamente 1.465/dia** (1.440 de `reminders` + 24 de
+  `finance-scheduler` + 1 de `alerts`). Ou seja: **praticamente 100% do tráfego do Cloud Run em
+  produção é cron**, e a sobra de 3 a 39 requests é usuário mais o que eu bati de `/health`.
+  Os dias 08 e 09/09 (47 e 159) são o Scheduler recém-ligado.
+
+  **A conclusão que isso já fecha, sem esperar a fatura:** a divisão fixo × variável do Cloud Run
+  hoje é ~100/0. A fatura vai dizer quanto CUSTA esse fixo; ela não vai mudar a proporção. E o
+  primeiro usuário real só move o número quando o tráfego dele passar de ~1.465 requests/dia.
+
+  ⚠️ **Export de faturamento ligado em 14/09/2026** — "Custo de uso padrão" para
+  `personal-proops-agent.billing_export` (`southamerica-east1`). **Ele não é retroativo**: a
+  tabela `gcp_billing_export_v1_01ED4C_C3849B_0169D7` nasce na primeira carga, em até ~24h, e só
+  com o custo dali em diante.
 - **Cloud Tasks**: uma task por mensagem (o debounce de 3s). Escala com uso.
 - **Cloud Scheduler**: 3 jobs. Irrisório, mas conte.
 
