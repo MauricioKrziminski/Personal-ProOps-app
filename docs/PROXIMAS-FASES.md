@@ -1030,6 +1030,36 @@ Nenhum bloco pode aparecer enquanto outro ainda mostra skeleton.
 > 500 threads por execução e a trava de `pending_actions` no SQL. Rodado de verdade no staging:
 > 231 threads, 2.984 checkpoints, 16.747 writes e 6.969 blobs apagados, **os 11 vivos intactos**.
 >
+> ✅ **Produção subiu em 14/09/2026** (`agente-00059-pqn`, `/health` ok, zero erro no log), e a
+> linha de base foi tirada ANTES do primeiro expurgo automático, por leitura:
+>
+> | produção | |
+> |---|---|
+> | sessões vivas | 3 |
+> | threads em `langgraph.checkpoints` | 3 |
+> | **threads que o expurgo vai apagar** | **0** |
+> | schema `langgraph` | **1.680 kB** |
+>
+> Ou seja: **o inchaço de 18 MB era artefato de TESTE no staging, não do produto.** Em produção
+> os checkpoints são 1,6 MB, e a primeira execução automática não vai apagar nada. O job continua
+> valendo (é o que impede o inchaço de nascer), mas ele deixou de ser o item urgente da Fase 6.
+>
+> 🔴 **Quem ocupa a produção é outra coisa, e é 88% do banco: `cron.job_run_details`, 138 MB de
+> 157 MB**, com **167.490 linhas desde 13/07/2026**. É o histórico do **pg_cron**, de quando os
+> crons rodavam de minuto em minuto — antes de irem para o Cloud Scheduler. Não é vazamento: só
+> **um** job continua ativo (`delete from public.notes where deleted_at < …`, 1×/dia às 04:17),
+> então o crescimento hoje é ~1 linha/dia. É peso morto, e é o que chega perto dos 500 MB da
+> camada grátis primeiro — não os checkpoints.
+>
+> A limpeza é **escrita em produção**, então é do Gabriel:
+> `delete from cron.job_run_details where end_time < now() - interval '7 days';` — e, como
+> `pg_total_relation_size` não encolhe sozinho, um `vacuum full cron.job_run_details` depois
+> (tabela de log que ninguém lê; o lock é curto e não derruba o produto).
+>
+> ⚠️ **Antes de 14/09/2026 esta seção dizia** que a primeira execução automática seria em
+> produção e que isso precisava ser sabido antes de subir. Continua verdade, e a linha de base
+> acima é a resposta: ela apagaria **zero**. O aviso original, preservado:
+>
 > ⚠️ **A PRIMEIRA execução automática dele vai ser em PRODUÇÃO, e o Gabriel precisa saber disso
 > antes de subir.** `scripts/setup-gcp.sh staging` **não** chama `criar_crons` — está escrito na
 > linha 11 do próprio script ("sem crons") e confirmado em `main()`. Ou seja: `/cron/alerts`, que
