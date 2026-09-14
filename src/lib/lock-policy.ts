@@ -56,6 +56,37 @@ export function deveTrancarNoInicio(mode: LockMode): boolean {
 }
 
 /**
+ * Terminou uma operação que abriu UI do sistema — a bandeira `systemUiOpen` já pode cair?
+ *
+ * ⚠️ **Ela é consumida pelo `active` que o fechamento produz, NUNCA por um relógio.** Medido no
+ * simulador iOS em 14/09/2026, com a bandeira caindo por `setTimeout` de 1 s:
+ *
+ * ```
+ * 0,6s  autenticar()            → systemUiOpen = true
+ * 0,6s  appstate=inactive       → backgroundedAt gravado
+ * 13,4s resultado success:true  → app destrancado; timer de 1 s começa
+ * 14,7s appstate=active         → bandeira JÁ caiu: deveTrancar = true
+ * 14,7s autenticar()            → cortina de volta, pede de novo… e de novo
+ * ```
+ *
+ * O `active` chegou **1,3 s** depois de `authenticateAsync` resolver. Quem via isso concluía que
+ * o Face ID não funcionava — ele funcionava, e o app se trancava logo atrás. Esticar o prazo só
+ * moveria a corrida de lugar: quem sabe que a UI do sistema fechou é o evento que ela produz.
+ *
+ * A única vez em que cai na hora é quando o app **nunca saiu do primeiro plano** (o
+ * `BiometricPrompt` do Android é um diálogo, não uma tela): aí não vem `active` nenhum para
+ * consumi-la, e deixá-la de pé engoliria o próximo retorno de verdade.
+ */
+export function bandeiraCaiAoTerminar(emVoo: number, saiuDoPrimeiroPlano: boolean): boolean {
+  return emVoo === 0 && !saiuDoPrimeiroPlano;
+}
+
+/** E no `active`: ela cai assim que a última operação em voo terminou. */
+export function bandeiraCaiNoActive(emVoo: number): boolean {
+  return emVoo === 0;
+}
+
+/**
  * O prompt do sistema terminou — abre o app ou continua trancado?
  *
  * ⚠️ **Só `success` abre.** Com `disableDeviceFallback: false` o sistema já ofereceu a senha do

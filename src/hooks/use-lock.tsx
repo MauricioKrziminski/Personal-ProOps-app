@@ -34,6 +34,8 @@ import { AppState, Platform } from 'react-native';
 
 import {
   aposAutenticar,
+  bandeiraCaiAoTerminar,
+  bandeiraCaiNoActive,
   deveTrancar,
   deveTrancarNoInicio,
   podeTrancar,
@@ -158,6 +160,26 @@ export function LockProvider({ children }: { children: ReactNode }) {
   */
   const pedirRef = useRef<() => void>(() => {});
 
+  /*
+    Quantas operações de UI do sistema estão em voo (prompt, seletor de arquivo, câmera).
+
+    ⚠️ **É contador, não booleano**: o pedido automático da abertura e um toque no disco podem
+    se sobrepor, e um `false` escrito pelo primeiro a terminar destravaria a guarda do outro.
+  */
+  const aberturas = useRef(0);
+
+  const abrirUiDoSistema = useCallback(() => {
+    aberturas.current += 1;
+    vigia.current.systemUiOpen = true;
+  }, []);
+
+  const fecharUiDoSistema = useCallback(() => {
+    aberturas.current = Math.max(0, aberturas.current - 1);
+    if (bandeiraCaiAoTerminar(aberturas.current, vigia.current.backgroundedAt !== null)) {
+      vigia.current.systemUiOpen = false;
+    }
+  }, []);
+
   useEffect(() => {
     if (Platform.OS === 'web') return;
     const sub = AppState.addEventListener('change', (s) => {
@@ -177,6 +199,12 @@ export function LockProvider({ children }: { children: ReactNode }) {
           pedirRef.current();
         }
         vigia.current.backgroundedAt = null;
+        /*
+          ⚠️ **A bandeira é CONSUMIDA aqui, e é isso que tira o relógio da conta.** Este é o
+          `active` que o fechamento da UI do sistema produz — ele pode demorar (1,3 s medidos no
+          simulador). Se `pedirRef` acabou de abrir outro prompt, `aberturas` já subiu e ela fica.
+        */
+        if (bandeiraCaiNoActive(aberturas.current)) vigia.current.systemUiOpen = false;
       } else if (s === 'background' || s === 'inactive') {
         vigia.current.backgroundedAt = Date.now();
       }
@@ -210,9 +238,9 @@ export function LockProvider({ children }: { children: ReactNode }) {
     if (emVoo.current) return 'trancado' as const;
     emVoo.current = true;
     setEstado('autenticando');
-    // O prompt tira o app do primeiro plano no Android — sem a bandeira, voltar dele trancaria
-    // de novo por cima do overlay que já estava aberto.
-    vigia.current.systemUiOpen = true;
+    // O prompt tira o app do primeiro plano — sem a bandeira, voltar dele trancaria de novo por
+    // cima do overlay que já estava aberto.
+    abrirUiDoSistema();
     try {
       const r = await LocalAuthentication.authenticateAsync({
         promptMessage: 'Desbloquear o app',
@@ -230,37 +258,23 @@ export function LockProvider({ children }: { children: ReactNode }) {
       return saida;
     } finally {
       emVoo.current = false;
-      /*
-        ⚠️ **A bandeira cai um TIQUE depois, não aqui.** O `active` do AppState chega DEPOIS de
-        `authenticateAsync` resolver — é o sistema devolvendo o foco ao app quando o prompt sai —,
-        e com a bandeira já limpa esse evento é lido como "voltou do segundo plano": `deveTrancar`
-        devolve `true` e a cortina reabre POR CIMA do app que acabou de ser destravado.
-
-        Medido no simulador: Face ID aceito, app aberto, e o primeiro toque na tela trancava tudo
-        de novo. É exatamente a lição que `semTrancar` (logo abaixo) já carregava — ela só não
-        tinha sido aplicada aqui, que é o caminho mais usado dos dois.
-      */
-      setTimeout(() => {
-        vigia.current.systemUiOpen = false;
-      }, 1000);
+      // Quem baixa a bandeira é o `active` do fechamento, não um prazo — ver `bandeiraCaiAoTerminar`.
+      fecharUiDoSistema();
     }
-  }, []);
+  }, [abrirUiDoSistema, fecharUiDoSistema]);
 
   useEffect(() => {
     pedirRef.current = () => void autenticar();
   }, [autenticar]);
 
   const semTrancar = useCallback(async <T,>(fn: () => Promise<T>) => {
-    vigia.current.systemUiOpen = true;
+    abrirUiDoSistema();
     try {
       return await fn();
     } finally {
-      // Um tique depois: o `active` do AppState chega DEPOIS do `await` resolver.
-      setTimeout(() => {
-        vigia.current.systemUiOpen = false;
-      }, 1000);
+      fecharUiDoSistema();
     }
-  }, []);
+  }, [abrirUiDoSistema, fecharUiDoSistema]);
 
   const valor = useMemo(
     () => ({

@@ -5,6 +5,8 @@ import { test } from 'node:test';
 
 import {
   aposAutenticar,
+  bandeiraCaiAoTerminar,
+  bandeiraCaiNoActive,
   deveTrancar,
   deveTrancarNoInicio,
   podeTrancar,
@@ -57,4 +59,28 @@ test('celular sem bloqueio de tela não pode oferecer a trava', () => {
   assert.equal(podeTrancar(0), false);
   assert.equal(podeTrancar(1), true, 'só a senha do aparelho já basta');
   assert.equal(podeTrancar(3), true);
+});
+
+
+/*
+  O laço de 14/09/2026: Face ID aceito → app aberto → `active` 1,3 s depois → trancado de novo →
+  pede de novo. A bandeira caía por relógio, e o relógio perdeu a corrida.
+*/
+test('a bandeira NÃO cai ao terminar quando o app saiu do primeiro plano', () => {
+  assert.equal(bandeiraCaiAoTerminar(0, true), false, 'quem baixa é o `active` que ainda vem');
+  const s: LockState = { ...base, backgroundedAt: 1_000, systemUiOpen: true };
+  assert.equal(deveTrancar(s, 6_000), false, 'o `active` atrasado não pode trancar');
+  assert.equal(deveTrancar({ ...s, systemUiOpen: false }, 6_000), true, 'sem ela, trancava');
+});
+
+test('a bandeira cai na hora quando o app nunca saiu do primeiro plano', () => {
+  // O `BiometricPrompt` do Android é um diálogo: não vem `active` nenhum para consumi-la, e
+  // deixá-la de pé engoliria o próximo retorno de verdade.
+  assert.equal(bandeiraCaiAoTerminar(0, false), true);
+});
+
+test('operação ainda em voo segura a bandeira dos dois lados', () => {
+  assert.equal(bandeiraCaiAoTerminar(1, false), false);
+  assert.equal(bandeiraCaiNoActive(1), false, 'o `active` foi do prompt que JÁ fechou, não deste');
+  assert.equal(bandeiraCaiNoActive(0), true);
 });

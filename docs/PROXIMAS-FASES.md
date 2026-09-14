@@ -18,7 +18,7 @@
 | Último commit | `e0990aa fix(ui): a condicao do ciclo entra dentro do portao` |
 | Migrations no **staging** (`utkqoiigimqzeenxkxdl`) | até `20260914170000` — **em dia** |
 | Migrations em **produção** (`kwriuifcwyvdrxtspjiz`) | `20260911220000` — **11 atrás** (contadas no repo; confirme no SQL Editor de produção antes de decidir) |
-| `tsc`, `expo lint`, `npm test` | verdes (387 testes) · `pytest` **784** · `ruff` limpo |
+| `tsc`, `expo lint`, `npm test` | verdes (390 testes) · `pytest` **784** · `ruff` limpo |
 | Tags | **nenhuma criada** — é o Gabriel quem cria, depois de testar |
 
 ⚠️ **Confirme o número de produção na fonte antes de decidir qualquer coisa com base nele.** No
@@ -590,15 +590,27 @@ Com as 6 datas já corrigidas nesta sessão, o esperado é:
 > | a cortina desenha e o pedido sai sozinho ao abrir | ✅ tema claro | ✅ tema escuro |
 > | **a senha do APARELHO abre o app** | — simulador sem senha | ✅ PIN → Hoje montada |
 > | cancelar mostra "Não reconheci…" e o toque repete o pedido | — | ✅ |
-> | biometria certa abre / errada mantém trancado | ⚠️ **não verificável neste simulador** | — emulador não inscreve digital |
+> | **biometria certa abre e o app FICA aberto** | ✅ Matching Face | — emulador não inscreve digital |
+> | cancelar → tocar → senha → abre | — | ✅ |
 >
-> ⚠️ **A simulação de Face ID deste simulador não resolve, e isso não é do app.** Com Face ID
-> inscrito (Features → Face ID → Enrolled), a folha do sistema sobe e **Matching Face (⌥⌘M) não
-> devolve nada** — nem pelo menu, nem pelo atalho, nem por
-> `simctl spawn <udid> notifyutil -p com.apple.BiometricKit_Sim.pearl.match`, nem depois de
-> reinscrever. Reproduzido IGUAL com `disableDeviceFallback: true`, ou seja, independe da política
-> que o app escolhe. O que dá para afirmar no iOS é o que está na tabela; o caminho biométrico
-> ponta a ponta **só um iPhone de verdade fecha**.
+> ⚠️ **"O Face ID não resolve" era o app se trancando atrás dele — um LAÇO, e ele me enganou
+> primeiro.** Eu tinha lido a folha do sistema parada na tela como "o simulador não entrega o
+> evento". Ela ERA entregue: o app destrancava, trancava de novo 1,3 s depois e pedia outra vez,
+> e a folha nova é idêntica à velha. Quem apontou foi o dono do produto — *"ele entra e volta de
+> novo para a tela de bloqueio"*.
+>
+> A causa está inteira em `bandeiraCaiAoTerminar` (`lib/lock-policy.ts`), com o traço medido: a
+> bandeira `systemUiOpen` caía por `setTimeout` de 1 s e o `active` do AppState chegou em 1,3 s.
+> **Prazo não é estado.** Agora quem baixa a bandeira é o próprio `active` — e ela só cai na hora
+> quando o app nunca saiu do primeiro plano (o diálogo do Android), caso em que `active` nenhum
+> viria. `aberturas` é contador, não booleano: o pedido automático da abertura e um toque no disco
+> se sobrepõem, e um `false` escrito pelo primeiro a terminar destravaria a guarda do outro.
+>
+> ⚠️ **Só o que o simulador NÃO faz é a senha do aparelho:** ele não tem uma cadastrada, então o
+> alerta "Face Not Recognized" do iOS sai com *Try Face ID Again* e *Cancel* e **sem "Usar
+> código"** — não há para onde cair. E o *Try Face ID Again* rearma a leitura, ou seja, só sai do
+> lugar com outro ⌥⌘M. Nenhuma das duas coisas é do app; num iPhone com senha, o "Usar código"
+> aparece ali.
 >
 > ⚠️ **O módulo nativo não estava no APK de Android** (`Cannot find native module
 > 'ExpoLocalAuthentication'`) — o autolinking do Gradle estava com estado velho e a Fase 4 nunca
