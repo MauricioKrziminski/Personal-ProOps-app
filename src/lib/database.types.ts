@@ -2688,6 +2688,19 @@ export type Database = {
         }
         Returns: number
       }
+      import_unmatched: {
+        Args: { p_batch_id: string }
+        Returns: {
+          amount_cents: number
+          category: string
+          description: string
+          id: string
+          kind: string
+          occurred_at: string
+          source: string
+          status: string
+        }[]
+      }
       month_breakdown: {
         Args: { p_group_by?: string; p_month: string; p_view?: string }
         Returns: {

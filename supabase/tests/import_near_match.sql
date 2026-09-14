@@ -105,3 +105,56 @@ begin
 end $$;
 
 rollback;
+
+-- ── a outra metade: `import_unmatched` ──────────────────────────────────────────────────────
+-- O que está no APP e não veio no extrato. Cada filtro daqui existe para NÃO acusar uma linha
+-- legítima de estar sobrando — e acusar errado é o que faz o usuário parar de confiar na tela.
+
+begin;
+
+do $$
+declare
+  ws uuid; usr uuid; cartao uuid; conta uuid; lote uuid;
+  achados text[];
+begin
+  select id into usr from auth.users limit 1;
+  insert into public.workspaces (name, owner_id) values ('teste inverso', usr) returning id into ws;
+  insert into public.workspace_members (workspace_id, user_id, role) values (ws, usr, 'owner');
+  insert into public.accounts (workspace_id, user_id, name, type, closing_day, due_day, initial_balance_cents)
+    values (ws, usr, 'Cartao', 'credit_card', 3, 10, 0) returning id into cartao;
+  insert into public.accounts (workspace_id, user_id, name, type, initial_balance_cents)
+    values (ws, usr, 'Corrente', 'checking', 100000) returning id into conta;
+
+  insert into public.transactions (workspace_id, user_id, account_id, kind, amount_cents, occurred_at, description, status, source) values
+    (ws, usr, cartao, 'expense', 1000, '2026-08-10', 'So no app',        'cleared', 'app'),
+    (ws, usr, cartao, 'expense', 2000, '2026-08-06', 'Veio no extrato',  'cleared', 'app'),
+    (ws, usr, cartao, 'expense', 3000, '2026-08-07', 'Do whatsapp',      'cleared', 'whatsapp'),
+    (ws, usr, cartao, 'expense', 4000, '2026-08-08', 'Recorrente',       'cleared', 'recurring'),
+    (ws, usr, cartao, 'expense', 5000, '2026-08-09', 'Import anterior',  'cleared', 'import'),
+    (ws, usr, cartao, 'expense', 6000, '2026-08-25', 'Fora da janela',   'cleared', 'app');
+  -- Pagamento de fatura: `transfer`, e não é linha do extrato do cartão.
+  insert into public.transactions (workspace_id, user_id, account_id, counterparty_account_id, kind,
+                                   amount_cents, occurred_at, description, status, source)
+    values (ws, usr, conta, cartao, 'transfer', 9999, '2026-08-06', 'Pagamento da fatura', 'cleared', 'app');
+
+  insert into public.import_batches (workspace_id, user_id, source, filename, account_id, status)
+    values (ws, usr, 'ofx', 'inv.ofx', cartao, 'review') returning id into lote;
+  insert into public.import_items (batch_id, workspace_id, kind, amount_cents, occurred_at, description, status) values
+    (lote, ws, 'expense', 2000, '2026-08-06', 'Veio no extrato', 'pending'),
+    (lote, ws, 'expense', 7777, '2026-08-11', 'So no extrato',   'pending');
+  perform public._prepare_import_batch(lote);
+
+  select array_agg(description order by description) into achados
+  from private.import_unmatched_for(array[ws], lote);
+
+  if achados is distinct from array['Do whatsapp', 'So no app'] then
+    raise exception 'conciliacao inversa devolveu %, esperado {Do whatsapp, So no app}', achados;
+  end if;
+
+  -- A janela vem do LOTE (06 a 11/08): 25/08 não é acusada de faltar num extrato que nem a cobre.
+  -- `recurring` e `import` ficam de fora: nenhuma delas é "você digitou e o banco não cobrou".
+  -- `transfer` fica de fora: pagamento de fatura não é linha do extrato do cartão.
+  raise notice 'import_unmatched: 6 filtros OK';
+end $$;
+
+rollback;

@@ -1013,6 +1013,31 @@ export function useUnmatchImportItem() {
   });
 }
 
+export type UnmatchedTransaction = Fns['import_unmatched']['Returns'][number];
+
+/**
+ * A outra metade da conciliação: o que está no APP e não veio no extrato.
+ *
+ * Cada linha dessas é uma de três coisas, e a tela precisa dizer isso em vez de acusar: lançamento
+ * manual que ainda não caiu no banco (normal perto do fim do período), duplicata digitada à mão,
+ * ou erro de valor/data. **Nada aqui apaga sozinho.**
+ *
+ * ⚠️ Só faz sentido DEPOIS de o lote ser revisado — antes disso, tudo que está no extrato ainda
+ * está `pending` e a lista seria o financeiro inteiro do período. Por isso `enabled` exige o
+ * batch E a tela só monta a seção quando não há mais nada para revisar.
+ */
+export function useImportUnmatched(batchId: string | undefined, enabled: boolean) {
+  return useQuery({
+    enabled: Boolean(batchId) && enabled,
+    queryKey: ['import-unmatched', batchId ?? ''],
+    queryFn: async (): Promise<UnmatchedTransaction[]> => {
+      const { data, error } = await supabase.rpc('import_unmatched', { p_batch_id: batchId! });
+      if (error) throw error;
+      return data ?? [];
+    },
+  });
+}
+
 export function useRules() {
   useRealtimeInvalidate('categorization_rules', ['rules']);
   return useQuery({

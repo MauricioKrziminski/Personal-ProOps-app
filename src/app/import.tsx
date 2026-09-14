@@ -34,6 +34,8 @@ import {
   useApproveImportItems,
   useDiscardImportItems,
   useImportItems,
+  useImportUnmatched,
+  useDeleteTransaction,
   useFixImportItemDate,
   useUnmatchImportItem,
   useImportStatement,
@@ -123,6 +125,7 @@ export default function ImportScreen() {
   const accounts = accountsQuery.data;
   const importar = useImportStatement();
   const corrigirData = useFixImportItemDate();
+  const apagarLancamento = useDeleteTransaction();
   const desparear = useUnmatchImportItem();
   const [batchId, setBatchId] = useState<string | undefined>(params.batch);
   const [accountId, setAccountId] = useState<string | null>(null);
@@ -146,6 +149,15 @@ export default function ImportScreen() {
     exatamente a duplicata que esta seção existe para evitar.
   */
   const parecidos = lista.filter((i) => i.status === 'near_match');
+  /*
+    A conciliação inversa só faz sentido depois que o lote foi revisado: antes disso tudo que veio
+    no extrato ainda está `pending`, e a lista seria o financeiro inteiro do período acusado de
+    estar sobrando. Por isso ela espera a fila esvaziar — e é uma SEÇÃO à parte, não um quinto
+    balde de itens: o que ela lista são lançamentos do app, não linhas do arquivo.
+  */
+  const loteRevisado =
+    lista.length > 0 && paraRevisar.length === 0 && repetidos.length === 0 && parecidos.length === 0;
+  const sobrando = useImportUnmatched(batchId, loteRevisado);
   const revisados = lista.filter((i) => i.status === 'approved' || i.status === 'discarded');
 
   // O número do botão é o número que vai entrar. O cabeçalho antigo contava as duplicatas e o
@@ -574,6 +586,58 @@ export default function ImportScreen() {
               ))}
             </Section>
           ) : null}
+        </View>
+      ) : null}
+
+      {loteRevisado && (sobrando.data?.length ?? 0) > 0 ? (
+        <View style={styles.bloco}>
+          <Section title="Está no app e não veio no extrato">
+            {(sobrando.data ?? []).map((t) => (
+              <Row
+                key={t.id}
+                title={t.description}
+                subtitle={`${formatDateBR(t.occurred_at)} · ${t.category ?? 'sem categoria'}`}
+                chevron={false}
+                onPress={() =>
+                  showItemActions(t.description, [
+                    { label: 'Abrir', onPress: () => router.push(`/finance/${t.id}`) },
+                    {
+                      label: 'Apagar',
+                      destructive: true,
+                      onPress: () =>
+                        confirmDestructive(
+                          'Apagar lançamento',
+                          'Apagar',
+                          () =>
+                            apagarLancamento.mutate(t.id, {
+                              onSuccess: () => {
+                                void sobrando.refetch();
+                                toast({ message: 'Lançamento apagado.', tone: 'success' });
+                              },
+                              onError: () =>
+                                toast({ message: 'Não deu para apagar.', tone: 'error' }),
+                            }),
+                          'Ele some do financeiro. O extrato não o trouxe, mas isso não prova que ele não existiu.'
+                        ),
+                    },
+                  ])
+                }
+                trailing={
+                  <Money
+                    cents={t.kind === 'income' ? t.amount_cents : -t.amount_cents}
+                    variant="ticker"
+                    tone="auto"
+                    signed
+                  />
+                }
+              />
+            ))}
+          </Section>
+          <ThemedText type="footnote" themeColor="textSecondary" style={styles.rodape}>
+            Na conta e no período deste arquivo. Pode ser lançamento que ainda não caiu no banco,
+            algo digitado duas vezes, ou um valor errado — só você sabe qual. Deixar como está é
+            uma resposta válida.
+          </ThemedText>
         </View>
       ) : null}
 
