@@ -62,9 +62,31 @@ export function CycleSummaryCard({ ciclo, nomeDoMes, lancamentos, onAbrirCiclo }
         <HeroLabel>{d.label}</HeroLabel>
         <Money cents={d.cents} variant="money" tone={d.ruim ? 'danger' : 'text'} signed />
 
+        {/*
+          ⚠️ **O rodapé do `describeCycle` é RENDERIZADO aqui.** Ele existia e era descartado: num
+          ciclo que fechou devendo, a função devolve "Sobrou na conta R$ 0,72" junto com a dívida,
+          e este card mostrava só a dívida. A mesma função dando saídas diferentes em duas telas é
+          exatamente o defeito que `cycle-label.ts` existe para matar.
+        */}
+        {d.rodape ? (
+          <View style={styles.rodape}>
+            <ThemedText type="footnote" themeColor="textSecondary" style={styles.shrink}>
+              {d.rodape.label}
+            </ThemedText>
+            <Money cents={d.rodape.cents} variant="ticker" />
+          </View>
+        ) : null}
+
         <View style={styles.barras}>
-          <Fluxo rotulo="entrou" cents={entrou} max={escala} tone="success" />
-          <Fluxo rotulo="saiu" cents={saiu} max={escala} tone="danger" />
+          {/*
+            ⚠️ **Sem `success`/`danger` aqui.** O `CashBar` do Financeiro já decidiu o contrário
+            para ESTA MESMA comparação, e com o motivo escrito: *"cor semântica aqui seria
+            decoração, e é a última alavanca de cor que o app tem"*. Duas regras para o mesmo
+            gráfico em telas vizinhas é como elas divergem. Quem separa as barras é a PALAVRA à
+            esquerda e a claridade — que é o que funciona sem enxergar cor.
+          */}
+          <Fluxo rotulo="entrou" cents={entrou} max={escala} forte />
+          <Fluxo rotulo="saiu" cents={saiu} max={escala} />
         </View>
 
         <Pressable
@@ -95,12 +117,13 @@ function Fluxo({
   rotulo,
   cents,
   max,
-  tone,
+  forte = false,
 }: {
   rotulo: string;
   cents: number;
   max: number;
-  tone: 'success' | 'danger';
+  /** A barra de "entrou" leva o accent; "saiu" fica em cinza de dado. */
+  forte?: boolean;
 }) {
   return (
     <View style={styles.fluxo}>
@@ -108,9 +131,9 @@ function Fluxo({
         <ThemedText type="caption" themeColor="textSecondary">
           {rotulo}
         </ThemedText>
-        <Money cents={cents} variant="footnote" tone={tone} />
+        <Money cents={cents} variant="ticker" />
       </View>
-      <ProgressBar value={cents} max={max} tone={tone} />
+      <ProgressBar value={cents} max={max} tone={forte ? 'tint' : 'data'} />
     </View>
   );
 }
@@ -120,6 +143,13 @@ const styles = StyleSheet.create({
   card: { gap: Space.sm, overflow: 'hidden' },
   barras: { gap: Space.sm, paddingTop: Space.xs },
   fluxo: { gap: Space.xs },
+  rodape: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    gap: Space.sm,
+  },
+  shrink: { flex: 1, minWidth: 0 },
   fluxoTopo: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'baseline', gap: Space.sm },
   /*
     Sangra até as bordas: `Card` tem `padding: Space.lg`, então as margens negativas são o
