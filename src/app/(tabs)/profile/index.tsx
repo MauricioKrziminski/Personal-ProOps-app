@@ -13,7 +13,7 @@ import { Row, Section } from '@/components/ui/row';
 import { Segmented } from '@/components/ui/segmented';
 import { LockSection } from '@/components/profile/lock-section';
 import { Screen } from '@/components/ui/screen';
-import { SkeletonRow } from '@/components/ui/skeleton';
+import { SkeletonHero, SkeletonList, SkeletonRow } from '@/components/ui/skeleton';
 import { useToast } from '@/components/ui/toast';
 import { GradientSurface } from '@/components/ui/gradient';
 import { Button } from '@/components/ui/button';
@@ -30,6 +30,7 @@ import {
   usePlanStatus,
   useSetCycleCloseDay,
 } from '@/hooks/use-finance';
+import { useTelaPronta } from '@/hooks/use-tela-pronta';
 import { useAppUpdate } from '@/hooks/use-app-update';
 import { formatDateBR } from '@/hooks/use-items';
 import { isoToBR } from '@/lib/dates';
@@ -226,10 +227,27 @@ export default function ProfileScreen() {
     </Section>
   );
 
+  /*
+    O PORTÃO DA TELA (Fase 5) — 7 consultas, 3 portões antes disto. O cartão de identidade
+    ficava pronto e o plano, o consumo de IA e o ciclo chegavam depois, um a um.
+  */
+  const pronta = useTelaPronta(profile, plan, ia, cycle);
+
+  if (!pronta) {
+    return (
+      <Screen grouped topBar={<AppHeader title="Perfil" />}>
+        <SkeletonHero />
+        <SkeletonList linhas={3} />
+        <SkeletonList linhas={2} />
+      </Screen>
+    );
+  }
+
   return (
     <Screen
       grouped
       topBar={<AppHeader title="Perfil" />}
+      stagger
       onRefresh={() => {
         setNotificationRefreshKey((current) => current + 1);
 

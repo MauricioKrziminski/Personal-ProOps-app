@@ -15,7 +15,7 @@ import { Icon } from '@/components/ui/icon';
 import { Mark } from '@/components/ui/mark';
 import { CURVED_BAR_SPACE } from '@/components/ui/curved-tab-bar';
 import { Screen } from '@/components/ui/screen';
-import { Skeleton } from '@/components/ui/skeleton';
+import { Skeleton, SkeletonList } from '@/components/ui/skeleton';
 import { useToast } from '@/components/ui/toast';
 import { HitTarget, Radius, Space, Type, tabular } from '@/design/tokens';
 import {
@@ -29,6 +29,7 @@ import {
   type Note,
   type NoteFolder,
 } from '@/hooks/use-notes';
+import { useTelaPronta } from '@/hooks/use-tela-pronta';
 import { Fonts } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { noteTitle, notePreview, parseChecklist } from '@/lib/search';
@@ -359,6 +360,24 @@ export default function NotesScreen() {
       hint="Escreve aqui em cima — ou manda «anotar: ligar pro dentista» no WhatsApp."
     />
   );
+
+  /*
+    O PORTÃO DA TELA (Fase 5) — 7 consultas, 4 portões antes disto.
+
+    ⚠️ **`list` é `useInfiniteQuery`**, e o `isPending` dela vale para a PRIMEIRA página — que é
+    exatamente o que este portão quer. As páginas seguintes têm o spinner do rodapé da lista
+    (§5.4), nunca o skeleton de volta.
+  */
+  const pronta = useTelaPronta(list, foldersQuery, tagsQuery);
+
+  if (!pronta) {
+    return (
+      <Screen grouped topBar={<AppHeader title="Notas" />}>
+        <SkeletonList linhas={4} />
+        <SkeletonList linhas={3} />
+      </Screen>
+    );
+  }
 
   return (
     <Screen

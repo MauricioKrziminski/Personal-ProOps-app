@@ -1,7 +1,7 @@
 
 import { router } from 'expo-router';
 import { Pressable, StyleSheet, View } from 'react-native';
-import Animated, { FadeInDown, FadeOut, LinearTransition } from 'react-native-reanimated';
+import Animated, { FadeOut, LinearTransition } from 'react-native-reanimated';
 
 import { useBRL } from '@/components/ui/conceal';
 import { ThemedText } from '@/components/themed-text';
@@ -15,7 +15,8 @@ import { HeroPanel } from '@/components/ui/hero-panel';
 import { Screen } from '@/components/ui/screen';
 import { CountUpMoney } from '@/components/ui/count-up-money';
 import { SectionHead } from '@/components/ui/section-head';
-import { Skeleton } from '@/components/ui/skeleton';
+import { Skeleton, SkeletonHero, SkeletonList } from '@/components/ui/skeleton';
+import { useTelaPronta } from '@/hooks/use-tela-pronta';
 import { ProgressBar } from '@/components/ui/sparkline';
 import { useToast } from '@/components/ui/toast';
 import { Motion, Radius, Space, tabular } from '@/design/tokens';
@@ -95,12 +96,14 @@ function LinhaAnimada({
  */
 function Secao({ index, children }: { index: number; children: React.ReactNode }) {
   return (
-    <Animated.View
-      style={styles.section}
-      layout={linear}
-      entering={FadeInDown.duration(Motion.duration.base).delay(
-        Math.min(index * Motion.stagger.step, Motion.stagger.cap)
-      )}>
+    /*
+      ⚠️ **A entrada saiu daqui e foi para o `Screen`** (Fase 5): a Hoje era a única tela que
+      escalonava, com um passo próprio (30 ms) e contando um `index` que a tela tinha que
+      manter à mão. Agora a cascata é do primitivo, vale para as oito telas e o passo é um só.
+      O `layout` FICA: ele não é entrada, é o que faz uma seção que some não dar tranco na
+      lista inteira.
+    */
+    <Animated.View style={styles.section} layout={linear}>
       {children}
     </Animated.View>
   );
@@ -237,6 +240,18 @@ export default function TodayScreen() {
           ? { icon: 'calendar', negative: false, text: `≈ ${brl(porDia)} por dia · ${diasLivres} ${diasLivres === 1 ? 'dia' : 'dias'}` }
           : { icon: 'checkmark.circle', negative: false, text: `Nada vence hoje · ${diasLivres} ${diasLivres === 1 ? 'dia' : 'dias'} até entrar` };
 
+  /*
+    O PORTÃO DA TELA (Fase 5) — 8 consultas e 2 portões antes disto, que era a pior proporção do
+    app: o painel preenchia, e depois "Atrasado", "O que vence" e "Lembretes de hoje" entravam
+    cada um no seu tempo.
+
+    ⚠️ **`profile` pode nascer desligada** (`enabled: !!userId`) e mesmo assim entra: sem ela a
+    saudação — que é a PRIMEIRA linha da tela — aparecia depois do painel. `telaPronta` não se
+    prende numa consulta desligada porque lê `fetchStatus`, e aqui a sessão sempre existe (esta
+    tela vive dentro do `Stack.Protected`).
+  */
+  const pronta = useTelaPronta(cycle, profile, bills, reminders, budgets, recent, gasto);
+
   const loading = gasto.isLoading || bills.isLoading || reminders.isLoading;
   const nothing =
     !loading &&
@@ -259,6 +274,22 @@ export default function TodayScreen() {
       }
     );
 
+  /*
+    Uma forma de tela só: saudação, herói e as duas listas que a Hoje sempre tem. Sem `topBar`
+    diferente e sem o empty state — dizer "não tem nada" antes de ter perguntado é a mesma
+    mentira que o `isLoading` contava (§7).
+  */
+  if (!pronta) {
+    return (
+      <Screen topBar={<AppHeader title="Hoje" />}>
+        <Skeleton width="52%" height={22} />
+        <SkeletonHero />
+        <SkeletonList linhas={2} />
+        <SkeletonList linhas={3} />
+      </Screen>
+    );
+  }
+
   return (
     /*
       ⚠️ **`<Screen>`, e não um `ScrollView` à mão.** Esta era uma das DUAS telas de conteúdo que
@@ -268,6 +299,7 @@ export default function TodayScreen() {
       outras) e empilhava padding onde ninguém olhava.
     */
     <Screen
+      stagger
       topBar={<AppHeader title="Hoje" />}
       refreshing={gasto.isRefetching || bills.isRefetching || reminders.isRefetching || budgets.isRefetching || recent.isRefetching || profile.isRefetching}
       onRefresh={() => Promise.all([gasto.refetch(), bills.refetch(), reminders.refetch(), budgets.refetch(), recent.refetch(), profile.refetch()])}>

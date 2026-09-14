@@ -22,7 +22,7 @@ import { MonthRuler, useMonthRuler } from '@/components/finance/month-ruler';
 import { Calendar } from '@/components/finance/calendar';
 import { Sheet } from '@/components/ui/sheet';
 import { TaskHeader } from '@/components/ui/task-header';
-import { Skeleton, SkeletonRow } from '@/components/ui/skeleton';
+import { Skeleton, SkeletonChart, SkeletonList, SkeletonRow } from '@/components/ui/skeleton';
 import { Sparkline } from '@/components/ui/sparkline';
 import { useToast } from '@/components/ui/toast';
 import { Motion, Radius, Space, tabular } from '@/design/tokens';
@@ -37,6 +37,7 @@ import {
   useUpcomingBills,
   type Draft,
 } from '@/hooks/use-finance';
+import { useTelaPronta } from '@/hooks/use-tela-pronta';
 import { MonthPicker, currentMonth, monthTitle } from '@/components/finance/month-picker';
 import { mesDoCorte, veioDe, type MesProjetado } from '@/lib/forecast-months';
 import {
@@ -421,8 +422,28 @@ export default function ForecastScreen() {
       setCalendarioAberto((aberto) => !aberto);
   };
 
+  /*
+    O PORTÃO DA TELA (Fase 5) — 8 consultas, 5 portões antes disto.
+
+    ⚠️ **`forecast`, `simulado` e `historico` alternam por `!emMes`**, então uma delas está sempre
+    desligada. `simulado` fica FORA da lista (ela só existe com rascunho); as outras duas entram,
+    e a que estiver desligada é resolvida pelo `fetchStatus` em vez de prender a tela.
+  */
+  const pronta = useTelaPronta(forecast, bills, accounts, mensal, historico, mesCorrente);
+
+  if (!pronta) {
+    return (
+      <Screen grouped>
+        <SkeletonChart altura={168} />
+        <SkeletonList linhas={3} />
+        <SkeletonList linhas={2} />
+      </Screen>
+    );
+  }
+
   return (
     <Screen
+      stagger
       grouped
       onRefresh={() => Promise.all([forecast.refetch(), bills.refetch(), accounts.refetch(), historico.refetch()])}
       refreshing={forecast.isRefetching}>

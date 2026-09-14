@@ -275,6 +275,13 @@ function renderToday(bill: { kind: 'invoice' | 'transaction'; ref_id: string }) 
     if (name === '@/hooks/use-finance') return finance;
     if (name === '@/hooks/use-items') return { useTodayReminders: () => query, localISODate: () => '2026-09-08', formatDateBR: (s: string) => s, formatBRL: dates.formatBRL };
     if (name === '@/hooks/use-profile') return { useProfile: () => query };
+    /*
+      O portão da Fase 5 devolve `true` aqui: este teste existe para conferir o CONTEÚDO da Hoje
+      (para onde a fatura atrasada roteia, se o pull-to-refresh está exposto), e com o portão
+      fechado a tela renderiza a forma de carregamento — nenhum dos dois apareceria, e a falha
+      leria como regressão de produto.
+    */
+    if (name === '@/hooks/use-tela-pronta') return { useTelaPronta: () => true };
     if (name === '@/components/finance/month-picker') return { currentMonth: () => '2026-09' };
     if (name === '@/hooks/use-session') return { useSession: () => ({ session: null }) };
     if (name === '@/hooks/use-theme') return { useTheme: () => ({}) };

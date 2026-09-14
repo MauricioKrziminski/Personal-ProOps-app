@@ -24,7 +24,7 @@ import { SelectField } from '@/components/ui/select-field';
 import { Screen } from '@/components/ui/screen';
 import { HeroLabel } from '@/components/ui/section-head';
 import { Segmented } from '@/components/ui/segmented';
-import { Skeleton, SkeletonRow } from '@/components/ui/skeleton';
+import { Skeleton, SkeletonChart, SkeletonHero, SkeletonList, SkeletonRow } from '@/components/ui/skeleton';
 import { ProgressBar, Sparkline } from '@/components/ui/sparkline';
 import { useToast } from '@/components/ui/toast';
 import { Motion, Radius, Space, tabular } from '@/design/tokens';
@@ -38,6 +38,7 @@ import {
   useSaveAsset,
   type Asset,
 } from '@/hooks/use-finance';
+import { useTelaPronta } from '@/hooks/use-tela-pronta';
 import { formatBRL } from '@/hooks/use-items';
 import { formatNumberBR } from '@/lib/dates';
 import { confirmDestructive } from '@/lib/item-actions';
@@ -262,8 +263,24 @@ export default function NetWorthScreen() {
     />
   );
 
+  /*
+    O PORTÃO DA TELA (Fase 5) — 6 consultas, 5 portões antes disto.
+  */
+  const pronta = useTelaPronta(patrimonio, serie, saude, bens);
+
+  if (!pronta) {
+    return (
+      <Screen grouped>
+        <SkeletonHero />
+        <SkeletonChart />
+        <SkeletonList linhas={3} />
+      </Screen>
+    );
+  }
+
   return (
     <Screen
+      stagger
       grouped
       onRefresh={() => Promise.all([patrimonio.refetch(), serie.refetch(), saude.refetch(), bens.refetch()])}
       refreshing={patrimonio.isRefetching}>

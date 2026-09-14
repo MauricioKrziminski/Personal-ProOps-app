@@ -33,7 +33,14 @@ import { Segmented } from '@/components/ui/segmented';
 import { HeroPanel } from '@/components/ui/hero-panel';
 import { CountUpMoney } from '@/components/ui/count-up-money';
 import { Screen } from '@/components/ui/screen';
-import { Skeleton, SkeletonRow } from '@/components/ui/skeleton';
+import {
+  Skeleton,
+  SkeletonCards,
+  SkeletonChart,
+  SkeletonHero,
+  SkeletonList,
+  SkeletonRow,
+} from '@/components/ui/skeleton';
 import { isoToBR, mesmoMes } from '@/lib/dates';
 import { BarTrack, ProgressBar, Sparkline } from '@/components/ui/sparkline';
 import { useToast } from '@/components/ui/toast';
@@ -53,6 +60,7 @@ import {
   useTransactionsSummary,
   type Transaction,
 } from '@/hooks/use-finance';
+import { useTelaPronta } from '@/hooks/use-tela-pronta';
 import { categoryIcon } from '@/design/category-icons';
 import { formatBRL, formatDateBR, localISODate } from '@/hooks/use-items';
 import { confirmDestructive, showItemActions } from '@/lib/item-actions';
@@ -409,6 +417,27 @@ export default function FinanceScreen() {
     1
   );
 
+  /*
+    O PORTÃO DA TELA (Fase 5).
+
+    Queixa que originou: *"o que eu mais vi nesse app é tendo loader skeleton em alguns
+    componentes e durante o skeleton de um componente, o outro já está montado e pronto"*. Aqui
+    eram **14 consultas e 5 portões** — nove blocos apareciam cada um no seu tempo.
+
+    ⚠️ **Todas as consultas desta lista são SEMPRE ligadas.** Nenhuma nasce com `enabled: false`,
+    que é o caso que prenderia a tela no skeleton para sempre. `range.pronto` não é consulta: ele
+    diz se as bordas do ciclo já chegaram, e sem ele `summary`/`previous` respondem pela janela
+    do mês CIVIL — abrir a tela com esses números e trocá-los meio segundo depois é a mesma
+    pipoca com outro nome.
+
+    ⚠️ **O portão TRAVA depois de abrir** (`useTelaPronta`), e é por isso que os portões de cada
+    bloco continuam existindo: trocar de mês devolve `isPending` a três consultas, e sem a trava
+    a tela inteira sumiria — inclusive a carteira e a tendência, que não dependem do mês.
+  */
+  const pronta =
+    useTelaPronta(forecast, summary, previous, budgets, accounts, debts, cards, cashflow, recent, serie) &&
+    range.pronto;
+
   const heroLoading = summary.isLoading || (isCurrent && forecast.isLoading);
   const heroError = summary.isError || (isCurrent && forecast.isError);
   const isEmpty =
@@ -440,10 +469,29 @@ export default function FinanceScreen() {
   const openTransactions = (params: Record<string, string>) =>
     router.push({ pathname: '/finance/transactions', params: { month, ...params } });
 
+  /*
+    Uma forma de tela só, com o peso do conteúdo final: herói, as duas portas, a carteira e a
+    tendência. Sem o `floatingAction` e sem o FAB — oferecer "Lançar" antes de a tela existir é
+    prometer uma ação sobre um estado que ninguém viu ainda.
+  */
+  if (!pronta) {
+    return (
+      <View style={styles.root}>
+        <Screen grouped topBar={<AppHeader title="Financeiro" />}>
+          <SkeletonHero />
+          <SkeletonList linhas={2} />
+          <SkeletonCards />
+          <SkeletonChart />
+        </Screen>
+      </View>
+    );
+  }
+
   return (
     <View style={styles.root}>
       <Screen
       floatingAction
+        stagger
         grouped
         // Sem etiqueta: o seletor de mês fica logo abaixo e diria a mesma coisa duas vezes.
         topBar={<AppHeader title="Financeiro" />}

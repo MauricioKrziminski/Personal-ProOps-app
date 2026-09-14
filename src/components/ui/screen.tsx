@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { Children, isValidElement, useState, type ReactNode } from 'react';
 import {
   Platform,
   RefreshControl,
@@ -7,6 +7,7 @@ import {
   type StyleProp,
   type ViewStyle,
 } from 'react-native';
+import Animated, { FadeInDown } from 'react-native-reanimated';
 import { KeyboardAwareScrollView } from 'react-native-keyboard-controller';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Stack } from 'expo-router';
@@ -15,7 +16,7 @@ import { MaxContentWidth } from '@/constants/theme';
 import { useAppHeaderHeight } from '@/components/ui/app-header';
 import { CURVED_BAR_SPACE } from '@/components/ui/curved-tab-bar';
 
-import { Space } from '@/design/tokens';
+import { Motion, Space } from '@/design/tokens';
 import { useTheme } from '@/hooks/use-theme';
 
 /**
@@ -41,6 +42,19 @@ interface ScreenProps {
   refreshing?: boolean;
   /** Fundo agrupado para telas de lista; `background` para telas de conteúdo. */
   grouped?: boolean;
+  /**
+   * Entra em cascata: cada bloco de primeiro nível desce e aparece 60 ms depois do anterior.
+   *
+   * ⚠️ **Só com `scroll` (o padrão).** Sem ele o filho PRECISA ser a raiz da tela — envolvê-lo
+   * mata o large title do header nativo, que é o defeito documentado no bloco `SCROLL VIEW NA
+   * RAIZ` logo abaixo. Em tela sem scroll o conteúdo é uma lista, e quem escalona é a lista.
+   *
+   * ⚠️ **É o par do portão da Fase 5** (`useTelaPronta`). O portão faz a tela inteira montar de
+   * uma vez; sem a cascata, montar de uma vez lê como um corte seco — cinco blocos surgindo no
+   * mesmo quadro. Com ela, lê como a tela se montando. Ligar a cascata SEM o portão seria só
+   * atrasar a pipoca.
+   */
+  stagger?: boolean;
   /**
    * A barra de marca das raízes de aba (`AppHeader`).
    *
@@ -73,6 +87,7 @@ export function Screen({
   onRefresh,
   refreshing = false,
   grouped = false,
+  stagger = false,
   topBar,
   floatingAction = false,
   contentStyle,
@@ -191,7 +206,7 @@ export function Screen({
           }}
         /> : undefined
       }>
-      {children}
+      {stagger ? <Cascata>{children}</Cascata> : children}
     </KeyboardAwareScrollView>
   );
 
@@ -203,6 +218,34 @@ export function Screen({
       {/* Depois do scroll na árvore: ele precisa desenhar POR CIMA para o desfoque existir. */}
       {topBar}
     </View>
+  );
+}
+
+/**
+ * A cascata: um `FadeInDown` por bloco, atrasado pela POSIÇÃO.
+ *
+ * ⚠️ **Filho que não é elemento passa DIRETO.** `{cond ? <X/> : null}` é o padrão das telas
+ * daqui, e embrulhar o `null` criaria uma `View` vazia — que o `gap` do container espaçaria,
+ * abrindo um buraco do tamanho de um bloco onde não há bloco nenhum.
+ *
+ * ⚠️ **O teto é `Motion.stagger.cap`**, o mesmo da Hoje: numa tela de oito blocos, 60 ms por
+ * bloco acumularia meio segundo até o último — e aí a cascata deixa de ser "a tela montando" e
+ * vira "o rodapé está demorando".
+ */
+function Cascata({ children }: { children: ReactNode }) {
+  let i = 0;
+  return (
+    <>
+      {Children.map(children, (filho) => {
+        if (!isValidElement(filho)) return filho;
+        const atraso = Math.min(i++ * 60, Motion.stagger.cap);
+        return (
+          <Animated.View entering={FadeInDown.delay(atraso).duration(Motion.duration.slow)}>
+            {filho}
+          </Animated.View>
+        );
+      })}
+    </>
   );
 }
 

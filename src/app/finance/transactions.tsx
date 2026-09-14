@@ -21,7 +21,7 @@ import { Money } from '@/components/ui/money';
 import { Row } from '@/components/ui/row';
 import { Screen } from '@/components/ui/screen';
 import { Segmented } from '@/components/ui/segmented';
-import { Skeleton, SkeletonRow } from '@/components/ui/skeleton';
+import { Skeleton, SkeletonChart, SkeletonList, SkeletonRow } from '@/components/ui/skeleton';
 import { useToast } from '@/components/ui/toast';
 import { MaxContentWidth } from '@/constants/theme';
 import { Elevation, Motion, Radius, Space } from '@/design/tokens';
@@ -40,6 +40,7 @@ import {
   type TransactionKind,
   type TransactionSource,
 } from '@/hooks/use-finance';
+import { useTelaPronta } from '@/hooks/use-tela-pronta';
 import { formatBRL, formatDateBR, localISODate } from '@/hooks/use-items';
 import { mesmoMes } from '@/lib/dates';
 import { confirmDestructive } from '@/lib/item-actions';
@@ -267,6 +268,17 @@ export default function TransactionsScreen() {
     for (const a of accounts.data ?? []) map.set(a.id, accountLabel(a));
     return map;
   }, [accounts.data]);
+
+  /*
+    O PORTÃO DA TELA (Fase 5) — 9 consultas, 5 portões antes disto.
+
+    ⚠️ **`list` PODE nascer desligada** (`enabled: filters.pronto !== false`), e mesmo assim ela
+    entra aqui — porque `range.pronto` está na mesma conjunção. Enquanto ele é `false` o portão
+    já está fechado por ele; quando vira `true` a consulta liga no mesmo render e passa a segurar
+    o portão de verdade. É a composição que torna a lista parte da primeira pintura em vez de
+    chegar depois dela.
+  */
+  const pronta = useTelaPronta(summary, serieCiclo, accounts, anyEver, list) && range.pronto;
 
   // `toSections` agrupa em varredura linear, então o dia que atravessa a fronteira de duas
   // páginas continua sendo uma seção só depois do `flat()`.
@@ -541,6 +553,15 @@ export default function TransactionsScreen() {
     O FAB continua irmão da lista; o fundo vem do `contentStyle` que o `Screen` escreve no
     navegador, que é de onde ele sempre deveria ter vindo.
   */
+  if (!pronta) {
+    return (
+      <Screen grouped>
+        <SkeletonChart altura={96} />
+        <SkeletonList linhas={4} />
+      </Screen>
+    );
+  }
+
   return (
     <Screen floatingAction scroll={false} grouped>
         <Stack.Screen
