@@ -3,7 +3,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 
-import { describeCycle } from './cycle-label.ts';
+import { type CycleFlowLike, describeCycle, describeRealizado } from './cycle-label.ts';
 
 test('ciclo fechado devendo lidera com a DÍVIDA, e o caixa vai para o rodapé', () => {
   // O caso real de setembro/2026: R$ 0,72 na conta e R$ 371,64 de fatura não paga. Liderar com
@@ -65,4 +65,59 @@ test('os campos chegam como string do PostgREST e continuam somando', () => {
   );
   assert.equal(d.cents, -37164);
   assert.equal(d.ruim, true);
+});
+
+/* ───────── a sub-linha "já caiu / já saiu" ───────── */
+
+const brl = (c: number) => `R$ ${(c / 100).toFixed(2).replace('.', ',')}`;
+const ciclo = (over: Partial<CycleFlowLike>): CycleFlowLike => ({
+  estado: 'aberto', entrou: 756652, saiu: 827253, entrou_realizado: 0, saiu_realizado: 0, ...over,
+});
+
+test('a sub-linha escreve a LENTE — "na conta" / "da conta", nunca só "já saiu"', () => {
+  // Sem a lente escrita, esta linha (CAIXA, dia do pagamento) e o card de Lançamentos
+  // (COMPETÊNCIA, dia da compra) viram dois números com a mesma cara. Medido em 14/09/2026: as 5
+  // despesas de 11–14/09 são todas no cartão, então Lançamentos diz "já aconteceu R$ 355,54" e
+  // esta linha diz "nada saiu da conta ainda" — as duas certas.
+  const r = describeRealizado(ciclo({ entrou_realizado: 400000, saiu_realizado: 148500 }), brl);
+  assert.equal(r.entra, 'já caiu na conta R$ 4000,00');
+  assert.equal(r.sai, 'já saiu da conta R$ 1485,00');
+});
+
+test('zero realizado num ciclo ABERTO diz "nada ainda" — é informação, não ausência', () => {
+  // O caso do ciclo corrente em 14/09/2026: R$ 8.272,53 de saída e nada pago ainda. Sem a
+  // sub-linha, a tela não conta que os oito mil INTEIROS estão à frente.
+  const r = describeRealizado(ciclo({}), brl);
+  assert.equal(r.entra, 'nada caiu na conta ainda');
+  assert.equal(r.sai, 'nada saiu da conta ainda');
+});
+
+test('realizado == total some: repetir o <Money> ao lado é eco (§1)', () => {
+  // Setembro/2026 fechado e quitado: 6.330,62 de 6.330,62. "já caiu na conta R$ 6.330,62"
+  // debaixo de "R$ 6.330,62" foi visto na tela antes de virar regra.
+  const r = describeRealizado(
+    ciclo({ estado: 'fechado', entrou: 633062, entrou_realizado: 633062, saiu: 719787, saiu_realizado: 719787 }),
+    brl,
+  );
+  assert.equal(r.entra, 'salário, pix e o que mais cai na conta');
+  assert.equal(r.sai, 'faturas, parcelas, boletos e gastos');
+});
+
+test('ciclo PREVISTO fica com o subtítulo descritivo', () => {
+  // Lá o realizado é zero por definição: "nada ainda" diria só que o futuro não aconteceu.
+  const r = describeRealizado(ciclo({ estado: 'previsto' }), brl);
+  assert.equal(r.entra, 'salário, pix e o que mais cai na conta');
+  assert.equal(r.sai, 'faturas, parcelas, boletos e gastos');
+});
+
+test('sem série (primeiro frame) não inventa sub-linha', () => {
+  const r = describeRealizado(null, brl);
+  assert.equal(r.entra, 'salário, pix e o que mais cai na conta');
+  assert.equal(r.sai, 'faturas, parcelas, boletos e gastos');
+});
+
+test('o valor passa pelo brl recebido — é o useBRL, que obedece ao esconder saldo', () => {
+  // Chamar `formatBRL` dentro do helper vazaria o número com o olho fechado.
+  const r = describeRealizado(ciclo({ saiu_realizado: 148500 }), () => '••••••');
+  assert.equal(r.sai, 'já saiu da conta ••••••');
 });

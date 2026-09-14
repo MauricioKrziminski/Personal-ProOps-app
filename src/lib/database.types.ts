@@ -2262,6 +2262,7 @@ export type Database = {
           comecei_com: number
           confere: boolean
           entrou: number
+          entrou_realizado: number
           estado: string
           faltou_pagar: number
           fim: string
@@ -2269,6 +2270,7 @@ export type Database = {
           mes: string
           resultado: number
           saiu: number
+          saiu_realizado: number
         }[]
       }
       _default_workspace: { Args: { uid: string }; Returns: string }
@@ -2615,6 +2617,7 @@ export type Database = {
           comecei_com: number
           confere: boolean
           entrou: number
+          entrou_realizado: number
           estado: string
           faltou_pagar: number
           fim: string
@@ -2622,6 +2625,7 @@ export type Database = {
           mes: string
           resultado: number
           saiu: number
+          saiu_realizado: number
         }[]
       }
       debt_schedule: {

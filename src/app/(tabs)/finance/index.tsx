@@ -26,7 +26,7 @@ import { EmptyState } from '@/components/ui/empty-state';
 import { Icon } from '@/components/ui/icon';
 import { Money } from '@/components/ui/money';
 import { Note } from '@/components/ui/note';
-import { describeCycle } from '@/lib/cycle-label';
+import { describeCycle, describeRealizado } from '@/lib/cycle-label';
 import { Row, Section } from '@/components/ui/row';
 import { SectionHead } from '@/components/ui/section-head';
 import { Segmented } from '@/components/ui/segmented';
@@ -351,6 +351,12 @@ export default function FinanceScreen() {
     : null;
   /** Fechou devendo, ou vai fechar no vermelho. */
   const cicloRuim = descricao?.ruim ?? false;
+  /*
+    As sub-linhas de "O que entra" / "O que sai" — quanto do total JÁ passou pela conta. A cópia
+    mora em `cycle-label.ts` junto com `describeCycle`, pelo mesmo motivo dele: é aqui que
+    "cada lugar fala uma coisa" nasce.
+  */
+  const sub = describeRealizado(ciclo, brl);
   const variacaoSaida =
     ciclo && cicloAnterior && Number(cicloAnterior.saiu) > 0
       ? Math.round(((Number(ciclo.saiu) - Number(cicloAnterior.saiu)) / Number(cicloAnterior.saiu)) * 100)
@@ -581,14 +587,14 @@ export default function FinanceScreen() {
         */}
         <Row
           title="O que entra"
-          subtitle="salário, pix e o que mais cai na conta"
+          subtitle={sub.entra}
           icon="arrow.down.circle"
           onPress={() => router.push({ pathname: '/finance/cycle', params: { month, view: regua.view, tipo: 'entra' } })}
           trailing={ciclo ? <Money cents={Number(ciclo.entrou)} variant="ticker" tone="success" /> : undefined}
         />
         <Row
           title="O que sai"
-          subtitle="faturas, parcelas, boletos e gastos"
+          subtitle={sub.sai}
           icon="arrow.up.circle"
           onPress={() => router.push({ pathname: '/finance/cycle', params: { month, view: regua.view, tipo: 'sai' } })}
           trailing={ciclo ? <Money cents={Number(ciclo.saiu)} variant="ticker" tone="danger" /> : undefined}
