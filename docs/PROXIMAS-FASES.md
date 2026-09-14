@@ -612,6 +612,25 @@ Com as 6 datas já corrigidas nesta sessão, o esperado é:
 > lugar com outro ⌥⌘M. Nenhuma das duas coisas é do app; num iPhone com senha, o "Usar código"
 > aparece ali.
 >
+> ⚠️ **Módulo nativo ausente NÃO pode matar o app, e agora não mata.** A corrente é
+> `_layout.tsx → lock-overlay.tsx → use-lock.tsx`: um `import` estático de
+> `expo-local-authentication` lança em `requireNativeModule` durante a avaliação do módulo, ou
+> seja, **na raiz do app** — tela vermelha antes de qualquer rota montar, falando de um módulo que
+> quem abriu o app não conhece. Aconteceu duas vezes em 14/09/2026, a segunda porque o emulador
+> tem TRÊS ProOps instalados e o ícone tocado foi o de 04/09.
+>
+> O risco que decide a questão não é o emulador, é **OTA**: `expo-updates` entrega JS novo para
+> binário antigo, e um update com aquela linha derrubaria no boot todo aparelho que ainda não
+> tivesse o build com o módulo — sem caminho de volta pelo próprio app. Hoje o carregamento é
+> `require` dentro de `try/catch` (um `import` estático não dá para embrulhar: ele avalia antes de
+> qualquer linha do arquivo rodar). Sem o módulo, `podeTrancar(0)` é `false` → trava `off`,
+> `disponivel` `false`, e o Perfil mostra a explicação em vez do controle — o MESMO caminho de
+> quem tirou o bloqueio de tela do celular, que já existia e já era testado.
+>
+> Verificado nos dois builds do emulador no mesmo dia: o de 04/09 (sem
+> `expo.modules.localauthentication` no dex) abre na tela de login, e o de 14/09 (com) tranca,
+> abre com o PIN e **fica** aberto.
+>
 > ⚠️ **O módulo nativo não estava no APK de Android** (`Cannot find native module
 > 'ExpoLocalAuthentication'`) — o autolinking do Gradle estava com estado velho e a Fase 4 nunca
 > rodou de verdade ali. `expo run:android` depois de apagar `android/**/generated/autolinking`

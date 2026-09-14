@@ -19,7 +19,7 @@
  */
 
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import * as LocalAuthentication from 'expo-local-authentication';
+import type * as LocalAuthentication from 'expo-local-authentication';
 import {
   createContext,
   useCallback,
@@ -42,6 +42,35 @@ import {
   type LockDelay,
   type LockMode,
 } from '@/lib/lock-policy';
+
+/**
+ * O módulo nativo — ou `null` quando ele não está neste build.
+ *
+ * ⚠️ **`import` estático aqui MATA O APP INTEIRO num build sem o módulo**, e não é hipótese: em
+ * 14/09/2026 aconteceu duas vezes num dia. `expo-local-authentication` lança em
+ * `requireNativeModule` durante a AVALIAÇÃO do módulo, e a corrente é
+ * `_layout.tsx → lock-overlay.tsx → use-lock.tsx` — ou seja, a raiz do app. Tela vermelha antes
+ * de qualquer rota montar, e a mensagem fala de um módulo que quem abriu o app não conhece.
+ *
+ * O risco real não é o emulador com um APK velho: é **OTA**. `expo-updates` entrega JS novo para
+ * um binário antigo, e um update com esta linha derrubaria no boot todo aparelho que ainda não
+ * tivesse o build com o módulo — sem caminho de volta pelo próprio app.
+ *
+ * Sem ele, `podeTrancar(0)` é `false`: a trava cai para `off`, `disponivel` fica `false` e o
+ * Perfil mostra a explicação em vez do controle. É o MESMO caminho de quem tirou o bloqueio de
+ * tela do celular, que já existia e já era testado.
+ */
+const bio: typeof LocalAuthentication | null = (() => {
+  if (Platform.OS === 'web') return null;
+  try {
+    // `require` é o ponto todo: um `import` estático não dá para embrulhar em try/catch — ele
+    // avalia antes de qualquer linha deste arquivo rodar, que é exatamente o que derruba o app.
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    return require('expo-local-authentication') as typeof LocalAuthentication;
+  } catch {
+    return null;
+  }
+})();
 
 const CHAVE_MODO = 'lock-mode';
 const CHAVE_ESPERA = 'lock-delay';
@@ -90,10 +119,10 @@ const Ctx = createContext<LockContexto | null>(null);
  * caso contrário fala da senha, que é o que o prompt realmente vai pedir.
  */
 function descrever(tipos: LocalAuthentication.AuthenticationType[], temBiometria: boolean): string {
-  if (!temBiometria) return 'a senha do celular';
-  if (tipos.includes(LocalAuthentication.AuthenticationType.FACIAL_RECOGNITION))
+  if (!bio || !temBiometria) return 'a senha do celular';
+  if (tipos.includes(bio.AuthenticationType.FACIAL_RECOGNITION))
     return Platform.OS === 'ios' ? 'Face ID ou a senha do celular' : 'seu rosto ou a senha do celular';
-  if (tipos.includes(LocalAuthentication.AuthenticationType.FINGERPRINT))
+  if (tipos.includes(bio.AuthenticationType.FINGERPRINT))
     return 'sua digital ou a senha do celular';
   return 'a senha do celular';
 }
@@ -127,7 +156,7 @@ export function LockProvider({ children }: { children: ReactNode }) {
         abre — e desta vez não há PIN nosso para servir de saída. Nesse caso a trava cai para
         `off`, e a tela do Perfil explica o que houve.
       */
-      const nivel = Platform.OS === 'web' ? 0 : await LocalAuthentication.getEnrolledLevelAsync();
+      const nivel = bio ? await bio.getEnrolledLevelAsync() : 0;
       const podeUsar = podeTrancar(nivel);
       const modo = ((m as LockMode) ?? 'off') === 'on' && podeUsar ? 'on' : 'off';
       const espera = (Number(d) === 30 || Number(d) === 60 ? Number(d) : 0) as LockDelay;
@@ -138,10 +167,10 @@ export function LockProvider({ children }: { children: ReactNode }) {
       setLocked(deveTrancarNoInicio(modo));
       vigia.current = { ...vigia.current, mode: modo, delaySeconds: espera };
       setCarregando(false);
-      if (Platform.OS !== 'web') {
+      if (bio) {
         const [tipos, temBiometria] = await Promise.all([
-          LocalAuthentication.supportedAuthenticationTypesAsync(),
-          LocalAuthentication.isEnrolledAsync(),
+          bio.supportedAuthenticationTypesAsync(),
+          bio.isEnrolledAsync(),
         ]);
         if (vivo) setComo(descrever(tipos, temBiometria));
       }
@@ -242,14 +271,18 @@ export function LockProvider({ children }: { children: ReactNode }) {
     // cima do overlay que já estava aberto.
     abrirUiDoSistema();
     try {
-      const r = await LocalAuthentication.authenticateAsync({
-        promptMessage: 'Desbloquear o app',
-        // ⚠️ Sem `disableDeviceFallback: true`: é justamente o fallback do SISTEMA que queremos.
-        // Escrever a chave como `false` é redundante, mas é o comentário mais importante do
-        // arquivo — foi a linha que mudou de sentido.
-        disableDeviceFallback: false,
-        requireConfirmation: false,
-      });
+      // Sem o módulo nativo não há como provar quem é o dono — e a trava nem chega a ficar
+      // ligada (`podeTrancar(0)`), então este ramo é cinto de segurança, não caminho.
+      const r = bio
+        ? await bio.authenticateAsync({
+            promptMessage: 'Desbloquear o app',
+            // ⚠️ Sem `disableDeviceFallback: true`: é justamente o fallback do SISTEMA que
+            // queremos. Escrever a chave como `false` é redundante, mas é o comentário mais
+            // importante do arquivo — foi a linha que mudou de sentido.
+            disableDeviceFallback: false,
+            requireConfirmation: false,
+          })
+        : { success: false as const };
       const saida = aposAutenticar(r);
       if (saida === 'aberto') setLocked(false);
       // Falhou FICA falhado: o botão passa a dizer "Tentar de novo" e a cortina diz o porquê.
