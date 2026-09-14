@@ -7,7 +7,7 @@ import { Icon } from '@/components/ui/icon';
 import { Money } from '@/components/ui/money';
 import { HeroLabel } from '@/components/ui/section-head';
 import { ProgressBar } from '@/components/ui/sparkline';
-import { Motion, Radius, Space } from '@/design/tokens';
+import { Motion, Space } from '@/design/tokens';
 import { useTheme } from '@/hooks/use-theme';
 import type { CycleRow } from '@/hooks/use-finance';
 import { formatBRL } from '@/hooks/use-items';
@@ -116,7 +116,19 @@ export function PeriodSummaryCard({
               <View
                 style={[
                   styles.faixa,
-                  { backgroundColor: pressed ? theme.backgroundSelected : theme.backgroundElement },
+                  /*
+                    ⚠️ **`heroFooter`, não `backgroundElement`.** §1 pede a faixa "um degrau mais
+                    ESCURA", e `backgroundElement` só é isso no tema claro: no escuro ele é
+                    `#201F21` sobre um card `#1B1B1D` — 5/255 mais CLARO, ou seja, o degrau para
+                    o lado errado, invisível em metade das verificações. `heroFooter` é
+                    `rgba(0,0,0,.3)`: escurece o que estiver embaixo, nos dois temas. É o token
+                    que a faixa irmã do Financeiro já usa.
+
+                    O press escurece mais um degrau pelo mesmo motivo — `backgroundSelected` é
+                    mais CLARO que `heroFooter` no tema claro, então ele clarearia num tema e
+                    escureceria no outro.
+                  */
+                  { backgroundColor: pressed ? theme.heroFooterPress : theme.heroFooter },
                 ]}>
                 {/*
                   ⚠️ **Duas LINHAS, não uma frase que quebra.** Emendado com "·", o separador
@@ -211,8 +223,6 @@ const styles = StyleSheet.create({
     marginTop: Space.sm,
     paddingHorizontal: Space.lg,
     paddingVertical: Space.sm + 2,
-    borderBottomLeftRadius: Radius.md,
-    borderBottomRightRadius: Radius.md,
   },
   // Quebra em vez de truncar: nada aqui é prévia de corpo (§7).
   faixaTexto: { flex: 1, gap: Space.half },

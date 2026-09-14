@@ -104,6 +104,14 @@ export const Colors = {
     heroBottom: '#141517',
     /** A faixa do rodapé do card, que sangra até as bordas. `surface-container-lowest/50`. */
     heroFooter: 'rgba(0, 0, 0, 0.22)',
+    /**
+     * O press da faixa, quando ela é TOCÁVEL (o rodapé do card de Lançamentos leva ao ciclo).
+     *
+     * ⚠️ Precisa ser mais escuro que `heroFooter`, não `backgroundSelected`: aquele é uma cor
+     * SÓLIDA e mais clara que esta faixa no tema claro, então o toque clarearia num tema e
+     * escureceria no outro. Como `heroFooter`, esta escurece o que estiver embaixo nos dois.
+     */
+    heroFooterPress: 'rgba(0, 0, 0, 0.32)',
     onHero: '#FFFFFF',
     onHeroMuted: 'rgba(255, 255, 255, 0.64)',
     heroSeparator: 'rgba(255, 255, 255, 0.16)',
@@ -169,6 +177,7 @@ export const Colors = {
     heroTop: '#2A2A2C',
     heroBottom: '#1B1B1D',
     heroFooter: 'rgba(0, 0, 0, 0.30)',
+    heroFooterPress: 'rgba(0, 0, 0, 0.42)',
     onHero: '#E5E1E4',
     onHeroMuted: 'rgba(229, 225, 228, 0.60)',
     heroSeparator: 'rgba(255, 255, 255, 0.10)',

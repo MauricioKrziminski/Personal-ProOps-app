@@ -225,15 +225,26 @@ export default function TransactionsScreen() {
     Os totais do card saem de `transactions_summary`, que soma a MESMA janela da lista e exclui
     transferência (pagar fatura não é gasto novo: a compra já contou). Somar `rows` no cliente
     passaria a mentir na primeira página — a lista é paginada de 50 em 50.
+
+    ⚠️ **A CONTAGEM sai daqui pelo mesmo motivo, e ela já esteve errada.** Era `rows.length`, ou
+    seja, as linhas já baixadas: num período de 137 lançamentos o card escrevia
+    "R$ 8.326,63 · 50 lançamentos", e o 50 virava 100 e 150 enquanto a pessoa rolava, com o valor
+    parado do lado. Dinheiro do PERÍODO ao lado de contagem da PÁGINA é o mesmo defeito que este
+    card foi reescrito para matar.
+
+    `tx_count` conta na régua do dinheiro (competência, sem transferência) — que é o que o
+    "por data da compra" ao lado promete. `rows.length` não batia com essa régua nem com a outra.
   */
   const totais = useMemo(() => {
     let entrou = 0;
     let saiu = 0;
+    let linhas = 0;
     for (const r of summary.data ?? []) {
       if (r.kind === 'income') entrou += Number(r.total_cents);
       if (r.kind === 'expense') saiu += Number(r.total_cents);
+      linhas += Number(r.tx_count);
     }
-    return { entrou, saiu };
+    return { entrou, saiu, linhas };
   }, [summary.data]);
 
   const accounts = useAccounts();
@@ -283,7 +294,13 @@ export default function TransactionsScreen() {
    * 1 lançamento" sobre uma linha de R$ 88,85. É o mesmo defeito que o card acabou de perder.
    */
   const listaRecortada = hasFilters || Boolean(params.recurringId);
-  const neverHadAnything = (anyEver.data ?? []).length === 0 && !anyEver.isLoading;
+  /*
+    ⚠️ **`!anyEver.isError` junto.** Com a query falhando, `data` é undefined, `?? []` vira lista
+    vazia e quem tem anos de histórico recebia "Nenhum lançamento ainda" com a dica de
+    onboarding do WhatsApp — perdendo o "Nada em outubro / Ver setembro", que é o estado certo.
+  */
+  const neverHadAnything =
+    (anyEver.data ?? []).length === 0 && !anyEver.isLoading && !anyEver.isError;
 
   // Estado vazio que oferece BOTÃO ("Ver fevereiro", "Limpar filtros") cai exatamente na faixa
   // do FAB, que é desenhado por cima e come metade do alvo — visto no simulador com
@@ -297,6 +314,8 @@ export default function TransactionsScreen() {
   */
   const vazioComAcao =
     sections.length === 0 && !list.isPending && !list.isError && !neverHadAnything;
+  /** Não há o que resumir — inclui o mês sem movimento e o "nunca teve nada". */
+  const listaVazia = sections.length === 0 && !list.isPending;
 
   const clearFilters = () => {
     setKind('all');
@@ -364,7 +383,15 @@ export default function TransactionsScreen() {
         ⚠️ **A falha de `serieCiclo` não derruba o card.** O conteúdo dele é o resumo; o ciclo é
         só o link do rodapé, e `ciclo={null}` o omite. Estados separados por seção, §7.
       */}
-      {listaRecortada ? null : summary.isError ? (
+      {/*
+        ⚠️ **Zeros em cima de um empty state é a outra metade da mesma regra** (§1): *"card de
+        destaque que SOMA uma lista some quando a soma não informa nada — com a lista vazia
+        (zeros em cima de um empty state)... foi o caso de Cartões"*. Num mês sem movimento o
+        `ListHeaderComponent` desenhava `R$ 0,00 · 0 lançamentos` e duas barras vazias logo acima
+        de "Nada em outubro". Custo aceito: o link do ciclo também some no mês vazio, que é o que
+        a regra manda.
+      */}
+      {listaRecortada || listaVazia ? null : summary.isError ? (
         <ErrorCard onRetry={() => { void summary.refetch(); }} />
       ) : /*
           ⚠️ **`!range.pronto` junto.** Enquanto `cycle_range` não responde, `useMonthRange`
@@ -373,17 +400,20 @@ export default function TransactionsScreen() {
           aparece quando os dois falam da mesma janela.
         */
         summary.isPending || !range.pronto ? (
-        <View style={styles.summarySkeleton}>
-          <Skeleton width="40%" height={14} />
-          <Skeleton width="65%" height={40} />
-        </View>
+        /*
+          A FORMA do conteúdo final (§7), não duas barrinhas: o card tem ~230px e o esqueleto
+          tinha ~66px, então a lista inteira saltava ~165px quando o resumo chegava — e ela é o
+          `ListHeaderComponent`, então saltava tudo junto. É o mesmo padrão do card de tendência
+          do Financeiro e do pager da Fatura.
+        */
+        <Skeleton height={230} radius={Radius.md} />
       ) : (
         <PeriodSummaryCard
           entrou={totais.entrou}
           saiu={totais.saiu}
           ciclo={ciclo}
           nomeDoMes={monthTitle(month).replace(/ de \d{4}$/, '').toLowerCase()}
-          lancamentos={rows.length}
+          lancamentos={totais.linhas}
           onAbrirCiclo={() =>
             router.push({
               pathname: '/finance/cycle',
@@ -484,10 +514,20 @@ export default function TransactionsScreen() {
     />
   );
 
+  /*
+    ⚠️ **Sem `View` em volta do `<Screen>`, e isso NÃO é estilo.** Esta é uma tela EMPURRADA
+    (`scroll={false}`, sem `topBar`), e nesse caso `Screen` devolve um Fragment de propósito: o
+    iOS procura o scroll da interação do large title andando pelos PRIMEIROS subviews a partir da
+    raiz, e a busca é rasa. Com uma `View` no meio ele não acha o `SectionList`,
+    `prefersLargeTitles` fica ligado e o título nunca colapsa — fica cravado enquanto o conteúdo
+    rola por baixo. É a queixa "o título tá descendo junto com a tela", que custou 23 arquivos em
+    11/09/2026, e `screen.tsx` documenta a armadilha na própria linha que devolve o Fragment.
+
+    O FAB continua irmão da lista; o fundo vem do `contentStyle` que o `Screen` escreve no
+    navegador, que é de onde ele sempre deveria ter vindo.
+  */
   return (
-    <View style={styles.root}>
-      <Screen
-      floatingAction scroll={false} grouped>
+    <Screen floatingAction scroll={false} grouped>
         <Stack.Screen
           options={{ title: tituloDaConta ?? 'Lançamentos', headerLargeTitle: true }}
         />
@@ -685,7 +725,6 @@ export default function TransactionsScreen() {
             <View style={[styles.separator, { backgroundColor: theme.separator }]} />
           )}
         />
-      </Screen>
 
       {vazioComAcao ? null : (
         <Button
@@ -698,14 +737,11 @@ export default function TransactionsScreen() {
           ]}
         />
       )}
-    </View>
+    </Screen>
   );
 }
 
 const styles = StyleSheet.create({
-  root: {
-    flex: 1,
-  },
   listHost: {
     flex: 1,
   },
@@ -720,16 +756,8 @@ const styles = StyleSheet.create({
     paddingTop: Space.md,
     paddingBottom: Space.lg,
   },
-  summary: {
-    gap: Space.sm,
-  },
-  summarySkeleton: {
-    gap: Space.md,
-  },
-  summaryFacts: {
-    flexDirection: 'row',
-    gap: Space.lg,
-  },
+  // Sem uso: o esqueleto virou um bloco único com a altura do card.
+
   filters: {
     gap: Space.sm,
   },
