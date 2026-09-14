@@ -1,10 +1,18 @@
 import { useEffect, useMemo } from 'react';
 import { View } from 'react-native';
-import Animated, { useAnimatedStyle, useSharedValue, withTiming } from 'react-native-reanimated';
+import Animated, {
+  useAnimatedStyle,
+  useReducedMotion,
+  useSharedValue,
+  withDelay,
+  withSpring,
+  withTiming,
+} from 'react-native-reanimated';
 import { Circle, Line, LinearGradient, Path, Skia, vec } from '@shopify/react-native-skia';
 
 import { SkiaCanvas } from '@/components/ui/skia-canvas';
-import { Motion, Radius } from '@/design/tokens';
+import { type ThemeColor } from '@/constants/theme';
+import { Motion, Radius, Space } from '@/design/tokens';
 import { useTheme } from '@/hooks/use-theme';
 
 interface SparklineProps {
@@ -224,10 +232,19 @@ export function ProgressBar({
   value,
   max,
   tone = 'tint',
+  track = 'backgroundElement',
 }: {
   value: number;
   max: number;
-  tone?: 'tint' | 'data' | 'success' | 'warning' | 'danger';
+  tone?: 'tint' | 'data' | 'success' | 'warning' | 'danger' | 'onHeroSuccess' | 'onHeroDanger' | 'onHeroWarning';
+  /**
+   * A cor da PISTA (o que fica atrás do preenchimento).
+   *
+   * ⚠️ Dentro do painel de destaque, que é escuro nos DOIS temas, o padrão
+   * (`backgroundElement`) vira uma barra quase branca no tema claro — o mesmo defeito de §2 que
+   * entregava "um botão branco sólido com ícone branco dentro". Lá a pista é `heroChip`.
+   */
+  track?: ThemeColor;
 }) {
   const theme = useTheme();
   const pct = max > 0 ? Math.min(1, Math.max(0, value / max)) : 0;
@@ -247,7 +264,7 @@ export function ProgressBar({
         height: 6,
         borderRadius: Radius.xs,
         borderCurve: 'continuous',
-        backgroundColor: theme.backgroundElement,
+        backgroundColor: theme[track],
         overflow: 'hidden',
       }}>
       <Animated.View
@@ -256,12 +273,100 @@ export function ProgressBar({
             width: '100%',
             height: '100%',
             borderRadius: Radius.xs,
-            backgroundColor: tone === 'data' ? theme.textSecondary : theme[tone],
+            backgroundColor: tone === 'data' ? theme.textSecondary : theme[tone as ThemeColor],
             transformOrigin: 'left',
           },
           animated,
         ]}
       />
     </View>
+  );
+}
+
+/**
+ * Barra vertical que cresce da base — o primitivo das três colunas animadas do app.
+ *
+ * ## O que ele substitui
+ *
+ * Três implementações idênticas: a tendência mensal do Financeiro, o histórico de faturas e a
+ * linha do tempo de parcelas. As três faziam
+ * `withDelay(index * stagger, withSpring(ratio, settle))`, e **as três animavam `height`**.
+ *
+ * ⚠️ **`height` é LAYOUT a cada quadro.** §5 pede `transform` e `opacity`: são 24 barras na raiz
+ * do Financeiro e até 60 em Faturas, todas remedindo a árvore 60× por segundo. Aqui a pista tem
+ * altura FIXA e o que anima é `scaleY` com `transformOrigin: 'bottom'` — o mesmo mecanismo que a
+ * `ProgressBar` logo acima já usa no eixo X.
+ *
+ * ⚠️ **O piso vira FRAÇÃO.** Com `height` ele era `Space.xs` em pixels; com `scaleY` é
+ * `Space.xs / altura`. E **zero continua desenhando NADA**: um traço mínimo em valor zero lê
+ * como "entrou um pouquinho", que é o mesmo defeito de escrever "previsto R$ 0,00".
+ *
+ * ⚠️ **O filho escala junto, e é isso que mantém a tampa de "previsto" certa:** ela é `flex` da
+ * barra, então a altura final continua sendo `previsto/teto × altura`. O que a escala também
+ * afina é a BORDA de 1px da tampa — custo aceito, e o motivo de ela se separar do fundo por COR
+ * antes de por contorno.
+ */
+export function BarTrack({
+  ratio,
+  index = 0,
+  height,
+  color,
+  dim = false,
+  children,
+}: {
+  /** 0..1. Zero desenha nada. */
+  ratio: number;
+  /** Posição na fileira — governa o atraso do escalonamento. */
+  index?: number;
+  height: number;
+  color: string;
+  /** Barra de contexto (mês passado, fatura não selecionada): mesma geometria, menos presença. */
+  dim?: boolean;
+  children?: React.ReactNode;
+}) {
+  const grow = useSharedValue(0);
+  const fade = useSharedValue(1);
+  const reduzido = useReducedMotion();
+  const alvo = ratio <= 0 ? 0 : Math.max(Space.xs / height, Math.min(1, ratio));
+
+  useEffect(() => {
+    grow.set(
+      reduzido
+        ? alvo
+        : // O `cap` faltava nas três cópias: sem ele, a 24ª barra esperava 720ms para começar.
+          withDelay(
+            Math.min(index * Motion.stagger.step, Motion.stagger.cap),
+            withSpring(alvo, Motion.spring.settle)
+          )
+    );
+  }, [grow, alvo, index, reduzido]);
+
+  useEffect(() => {
+    fade.set(withTiming(dim ? 0.45 : 1, { duration: Motion.duration.fast }));
+  }, [fade, dim]);
+
+  const animado = useAnimatedStyle(() => ({
+    transform: [{ scaleY: grow.get() }],
+    opacity: fade.get(),
+  }));
+
+  return (
+    <Animated.View
+      style={[
+        {
+          width: '100%',
+          height,
+          backgroundColor: color,
+          transformOrigin: 'bottom',
+          justifyContent: 'flex-start',
+          overflow: 'hidden',
+          borderTopLeftRadius: Radius.xs,
+          borderTopRightRadius: Radius.xs,
+          borderCurve: 'continuous',
+        },
+        animado,
+      ]}>
+      {children}
+    </Animated.View>
   );
 }

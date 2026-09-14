@@ -1,20 +1,14 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 import { ScrollView, Pressable, StyleSheet, View } from 'react-native';
 import { Stack, router, useLocalSearchParams } from 'expo-router';
 import * as Haptics from 'expo-haptics';
-import Animated, {
-  FadeInDown,
-  useAnimatedStyle,
-  useSharedValue,
-  withDelay,
-  withSpring,
-  withTiming,
-} from 'react-native-reanimated';
+import Animated, { FadeInDown } from 'react-native-reanimated';
 
 import { Card } from '@/components/ui/card';
 import { monthTitle } from '@/components/finance/month-picker';
 import { ThemedText } from '@/components/themed-text';
 import { EmptyState } from '@/components/ui/empty-state';
+import { BarTrack } from '@/components/ui/sparkline';
 import { Money } from '@/components/ui/money';
 import { Row, Section } from '@/components/ui/row';
 import { Screen } from '@/components/ui/screen';
@@ -74,29 +68,13 @@ function estado(
 
 function Bar({ ratio, index, selecionada }: { ratio: number; index: number; selecionada: boolean }) {
   const theme = useTheme();
-  const grow = useSharedValue(0);
-  const fade = useSharedValue(1);
-
-  useEffect(() => {
-    grow.set(withDelay(index * Motion.stagger.step, withSpring(ratio, Motion.spring.settle)));
-  }, [grow, ratio, index]);
-
-  useEffect(() => {
-    fade.set(withTiming(selecionada ? 1 : 0.5, { duration: Motion.duration.fast }));
-  }, [fade, selecionada]);
-
-  const animado = useAnimatedStyle(() => ({
-    height: Math.max(Space.xs, grow.get() * ALTURA_BARRA),
-    opacity: fade.get(),
-  }));
-
   return (
-    <Animated.View
-      style={[
-        styles.bar,
-        animado,
-        { backgroundColor: selecionada ? theme.tint : theme.backgroundElement },
-      ]}
+    <BarTrack
+      ratio={ratio}
+      index={index}
+      height={ALTURA_BARRA}
+      dim={!selecionada}
+      color={selecionada ? theme.tint : theme.backgroundElement}
     />
   );
 }
@@ -406,11 +384,6 @@ const styles = StyleSheet.create({
     width: '100%',
     height: ALTURA_BARRA,
     justifyContent: 'flex-end',
-  },
-  bar: {
-    width: '100%',
-    borderRadius: Radius.xs,
-    borderCurve: 'continuous',
   },
   rodape: {
     paddingHorizontal: Space.lg,

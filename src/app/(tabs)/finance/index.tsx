@@ -1,12 +1,10 @@
 import { router, type Href } from 'expo-router';
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 import { Platform, Pressable, StyleSheet, View } from 'react-native';
 import Animated, {
   FadeInDown,
   useAnimatedStyle,
   useSharedValue,
-  withDelay,
-  withSpring,
   withTiming,
 } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -34,7 +32,7 @@ import { Segmented } from '@/components/ui/segmented';
 import { HeroPanel } from '@/components/ui/hero-panel';
 import { Screen } from '@/components/ui/screen';
 import { Skeleton, SkeletonRow } from '@/components/ui/skeleton';
-import { ProgressBar } from '@/components/ui/sparkline';
+import { BarTrack, ProgressBar } from '@/components/ui/sparkline';
 import { useToast } from '@/components/ui/toast';
 import { Elevation, Motion, Radius, Space, Type, tabular } from '@/design/tokens';
 import {
@@ -207,18 +205,6 @@ function CashBar({
   forte: boolean;
 }) {
   const theme = useTheme();
-  const grow = useSharedValue(0);
-
-  useEffect(() => {
-    grow.set(withDelay(index * Motion.stagger.step, withSpring(ratio, Motion.spring.settle)));
-  }, [grow, ratio, index]);
-
-  const animado = useAnimatedStyle(() => ({
-    // Piso de `Space.xs` só para valor que EXISTE — mês sem receita tem que desenhar nada.
-    // Com o piso aplicado ao zero, todo mês sem entrada ganhava um traço, e um traço lê como
-    // "entrou um pouquinho": é o mesmo "previsto R$ 0,00" que o painel já não escreve.
-    height: ratio <= 0 ? 0 : Math.max(Space.xs, grow.get() * ALTURA_BARRA),
-  }));
   /**
    * A fração da barra que é previsto. `flex` e não altura fixa: assim ela acompanha a mola da
    * barra inteira em vez de precisar de uma segunda animação que dessincroniza.
@@ -232,15 +218,14 @@ function CashBar({
   const fracaoPrevista = Number.isFinite(bruta) ? Math.min(1, Math.max(0, bruta)) : 0;
 
   return (
-    <Animated.View
-      style={[
-        styles.cashBar,
-        animado,
-        // O par do export: `primary` (a cor do texto) contra `surface-bright` (cinza claro).
-        // Sem matiz nenhuma — o accent fica reservado para ação e estado, e a comparação entre
-        // "entrou" e "saiu" se resolve por CLARIDADE, que é o que funciona sem enxergar cor.
-        { backgroundColor: forte ? theme.text : theme.surfaceRaised },
-      ]}>
+    <BarTrack
+      ratio={ratio}
+      index={index}
+      height={ALTURA_BARRA}
+      // O par do export: `primary` (a cor do texto) contra `surface-bright` (cinza claro).
+      // Sem matiz nenhuma — o accent fica reservado para ação e estado, e a comparação entre
+      // "entrou" e "saiu" se resolve por CLARIDADE, que é o que funciona sem enxergar cor.
+      color={forte ? theme.text : theme.surfaceRaised}>
       {fracaoPrevista > 0 ? (
         <View
           style={[
@@ -248,12 +233,11 @@ function CashBar({
             // `surface` é a cor do PRÓPRIO card: a tampa lê como o pedaço da barra que ainda não
             // foi preenchido, que é a convenção de "projetado" — e funciona nos dois temas, ao
             // contrário de um cinza fixo (no claro a barra é quase-preta, no escuro quase-branca).
-            // O contorno é o que a separa do fundo quando a barra encosta na borda do card.
             { flex: fracaoPrevista, backgroundColor: theme.surface, borderColor: theme.separator },
           ]}
         />
       ) : null}
-    </Animated.View>
+    </BarTrack>
   );
 }
 
@@ -1232,16 +1216,6 @@ const styles = StyleSheet.create({
     borderTopLeftRadius: Radius.xs,
     borderTopRightRadius: Radius.xs,
     borderWidth: 1,
-  },
-  cashBar: {
-    width: '100%',
-    // A tampa do previsto vive DENTRO da barra e ocupa o topo — daí `flex-start`.
-    justifyContent: 'flex-start',
-    // Só o topo é arredondado (`rounded-t-sm`): a base da barra tem que assentar numa linha reta,
-    // senão o eixo do gráfico fica ondulado.
-    borderTopLeftRadius: Radius.xs,
-    borderTopRightRadius: Radius.xs,
-    borderCurve: 'continuous',
   },
   cashMes: {
     textAlign: 'center',

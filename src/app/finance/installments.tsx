@@ -1,14 +1,7 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { Stack, router } from 'expo-router';
-import Animated, {
-  FadeInDown,
-  LinearTransition,
-  useAnimatedStyle,
-  useSharedValue,
-  withDelay,
-  withSpring,
-} from 'react-native-reanimated';
+import Animated, { FadeInDown, LinearTransition } from 'react-native-reanimated';
 
 import { monthLabel, monthShort, shiftMonth } from '@/components/finance/month-picker';
 import { ThemedText } from '@/components/themed-text';
@@ -19,7 +12,7 @@ import { Row, Section } from '@/components/ui/row';
 import { Screen } from '@/components/ui/screen';
 import { HeroLabel } from '@/components/ui/section-head';
 import { Skeleton, SkeletonRow } from '@/components/ui/skeleton';
-import { ProgressBar } from '@/components/ui/sparkline';
+import { BarTrack, ProgressBar } from '@/components/ui/sparkline';
 import { Motion, Radius, Space, tabular } from '@/design/tokens';
 import {
   useAccounts,
@@ -62,30 +55,15 @@ function Bar({
   passado: boolean;
 }) {
   const theme = useTheme();
-  const grow = useSharedValue(0);
-
-  useEffect(() => {
-    grow.set(withDelay(index * Motion.stagger.step, withSpring(ratio, Motion.spring.settle)));
-  }, [grow, ratio, index]);
-
-  const animado = useAnimatedStyle(() => ({
-    // Mês sem parcela desenha NADA — o piso é para valor que existe. Com a faixa cobrindo o
-    // plano inteiro, buraco no meio virou caso comum.
-    height: ratio <= 0 ? 0 : Math.max(Space.xs, grow.get() * ALTURA_BARRA),
-  }));
-
   return (
-    <Animated.View
-      style={[
-        styles.bar,
-        animado,
-        {
-          backgroundColor: destaque ? theme.tint : theme.backgroundElement,
-          // Parcela já paga fica mais fraca — mesma convenção da tendência da home: uma cor,
-          // duas intensidades. O que o usuário decide é o que vem pela frente.
-          opacity: passado ? 0.4 : 1,
-        },
-      ]}
+    <BarTrack
+      ratio={ratio}
+      index={index}
+      height={ALTURA_BARRA}
+      // Parcela já paga fica mais fraca — mesma convenção da tendência da home: uma cor,
+      // duas presenças, sem gastar uma segunda matiz.
+      dim={passado}
+      color={destaque ? theme.tint : theme.backgroundElement}
     />
   );
 }
@@ -511,11 +489,6 @@ const styles = StyleSheet.create({
     width: '100%',
     height: ALTURA_BARRA,
     justifyContent: 'flex-end',
-  },
-  bar: {
-    width: '100%',
-    borderRadius: Radius.xs,
-    borderCurve: 'continuous',
   },
   plano: {
     gap: Space.sm,
