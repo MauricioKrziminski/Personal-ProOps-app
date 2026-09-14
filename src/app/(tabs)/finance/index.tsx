@@ -14,7 +14,7 @@ import * as Haptics from 'expo-haptics';
 import type { SymbolViewProps } from 'expo-symbols';
 
 import { ErrorCard } from '@/components/error-card';
-import { currentMonth, monthLabel, monthShort, monthTitle, shiftMonth } from '@/components/finance/month-picker';
+import { monthLabel, monthShort, monthTitle, shiftMonth } from '@/components/finance/month-picker';
 import { useMonthRuler } from '@/components/finance/month-ruler';
 import { PeriodBar } from '@/components/finance/period-bar';
 import { ThemedText } from '@/components/themed-text';
@@ -40,6 +40,7 @@ import { Elevation, Motion, Radius, Space, Type, tabular } from '@/design/tokens
 import {
   useAccounts,
   useCycleSeries,
+  useCycleMonth,
   useBudgetsStatus,
   useDebts,
   useCardSummary,
@@ -287,7 +288,7 @@ export default function FinanceScreen() {
    * renderização em cascata para dizer o que já dava para calcular.
    */
   const [mesEscolhido, setMonth] = useState<string | null>(null);
-  const mesCorrente = cycle.data?.mes ?? currentMonth();
+  const mesCorrente = useCycleMonth(regua.view);
   const month = mesEscolhido ?? mesCorrente;
 
   // ⚠️ As bordas seguem o CICLO, não o mês civil. O painel acima soma a janela do ciclo; se a
@@ -485,10 +486,15 @@ export default function FinanceScreen() {
             */
             label={descricao?.label ?? 'Saldo projetado'}
             value={
+              /*
+                ⚠️ `danger` é token do TEMA; o painel é escuro nos DOIS temas, então quem vale
+                aqui é `onHeroDanger` (§2). Com `danger`, o modo claro pintava #BA1A1A — vermelho
+                escuro sobre superfície quase preta.
+              */
               <Money
                 cents={descricao?.cents ?? 0}
                 variant="heroMoney"
-                tone={cicloRuim ? 'danger' : 'onHero'}
+                tone={cicloRuim ? 'onHeroDanger' : 'onHero'}
                 concealable
               />
             }
@@ -498,7 +504,7 @@ export default function FinanceScreen() {
                   <ThemedText type="footnote" themeColor="onHeroMuted">
                     {descricao.rodape.label}
                   </ThemedText>
-                  <Money cents={descricao.rodape.cents} variant="footnote" />
+                  <Money cents={descricao.rodape.cents} variant="footnote" tone="onHero" concealable />
                 </View>
               ) : undefined
             }

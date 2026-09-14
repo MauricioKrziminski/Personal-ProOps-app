@@ -532,3 +532,27 @@ test('useRecentTransactions só lista o que já aconteceu', () => {
     'ordenar por created_at põe o que o cron acabou de materializar no topo'
   );
 });
+
+/**
+ * Mês de CICLO nunca sai de `currentMonth()`.
+ *
+ * O ciclo é nomeado pelo mês em que TERMINA: com fechamento no dia 10, o dia 13/09 já pertence
+ * ao ciclo chamado "outubro". `currentMonth()` devolve o mês CIVIL, e os dois são a mesma
+ * `string YYYY-MM` — nada no compilador separa um do outro.
+ *
+ * Passando o civil, `cycle_series` devolve o ciclo ANTERIOR, já FECHADO, e a tela carimba nele a
+ * data de fim do corrente. Aconteceu em duas telas ao mesmo tempo: a Hoje anunciava
+ * "R$ 0,72 · Projeção positiva" num ciclo que fecha em −R$ 759,39 (número, sinal, cor e palavra
+ * errados de uma vez), e Lançamentos abria um ciclo inteiro atrasada por até 20 dias/mês.
+ *
+ * Quem responde é `useCycleMonth`. Este teste é estreito de propósito: `currentMonth()` continua
+ * CERTO para o que é civil mesmo — consumo de IA do mês (a cota é por mês de calendário), o
+ * parâmetro de volta do detalhe e a semente de um seletor de mês.
+ */
+test('mês de ciclo nunca vem de currentMonth()', () => {
+  assert.deepEqual(
+    offenders(/use(?:CycleSeries|CycleLines|CycleRange)\([^)]*currentMonth\(\)/),
+    [],
+    'o mês que nomeia o ciclo vem de useCycleMonth(): currentMonth() é o mês CIVIL e devolve o ciclo anterior'
+  );
+});

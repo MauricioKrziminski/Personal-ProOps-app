@@ -1171,6 +1171,31 @@ export function useCycle(view?: CycleView) {
 }
 
 /**
+ * O mês que dá NOME ao ciclo corrente — `2026-10` no dia 13/09, com fechamento no dia 10.
+ *
+ * ⚠️ **Não é `currentMonth()`, e a diferença dura até 20 dias por mês.** Mês civil e
+ * mês-nome-de-ciclo são os dois uma `string YYYY-MM`, então nada no compilador separa os dois.
+ * Quem passou o civil para `useCycleSeries` recebeu de volta o ciclo ANTERIOR, **já fechado**, e
+ * carimbou nele a data de fim do corrente. Aconteceu em duas telas ao mesmo tempo: na Hoje
+ * (número, sinal, cor e palavra errados de uma vez — "R$ 0,72 · Projeção positiva" onde o ciclo
+ * fecha em −R$ 759,39) e em Lançamentos, a tela inteira um ciclo atrás.
+ *
+ * O idioma estava certo e DUPLICADO em `finance/index.tsx` e `budgets.tsx`, com a armadilha
+ * descrita em prosa numa terceira. Duplicado é o que ele deixa de ser.
+ *
+ * ⚠️ **Tem que ser hook, não semente.** `useState(() => currentMonth())` roda uma vez, na
+ * montagem, quando `cycle_now` ainda não respondeu — então ele fixaria o palpite civil e nunca
+ * se corrigiria. Quem escolhe um mês guarda a ESCOLHA (`string | null`) e cai neste valor
+ * enquanto ela for nula.
+ *
+ * Enquanto a resposta não chega, o mês civil é o palpite — e é o valor CERTO para quem nunca
+ * configurou dia de fechamento, que é o padrão.
+ */
+export function useCycleMonth(view?: CycleView): string {
+  return useCycle(view).data?.mes ?? localISODate().slice(0, 7);
+}
+
+/**
  * As bordas do ciclo de um mês QUALQUER — para as telas que navegam entre meses.
  *
  * `useCycle` responde pelo ciclo corrente e basta para o painel; a lista de lançamentos, o

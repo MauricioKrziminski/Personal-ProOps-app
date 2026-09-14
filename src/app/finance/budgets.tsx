@@ -5,7 +5,6 @@ import { Stack, router } from 'expo-router';
 import { useQuery } from '@tanstack/react-query';
 
 import { Chip } from '@/components/finance/chip';
-import { currentMonth } from '@/components/finance/month-picker';
 import { useMonthRuler } from '@/components/finance/month-ruler';
 import { PeriodBar } from '@/components/finance/period-bar';
 import { ThemedText } from '@/components/themed-text';
@@ -28,6 +27,7 @@ import {
   INCOME_CATEGORIES,
   SUGGESTED_CATEGORIES,
   useBudgetsStatus,
+  useCycleMonth,
   useDeleteBudget,
   useMonthRange,
   useSaveBudget,
@@ -124,14 +124,13 @@ export default function BudgetsScreen() {
    * ⚠️ **O mês corrente é o do CICLO, não o civil** — e a diferença aparece por até 20 dias.
    *
    * Com fechamento no dia 10, no dia 15/09 o ciclo corrente já se chama *outubro*. Abrindo
-   * `currentMonth()` (que é sempre `2026-09`) a tela nasceria um ciclo atrasada, mostrando o
-   * período que acabou de fechar como se fosse o que a pessoa está gastando agora. É o mesmo
-   * `cycle.data?.mes ?? currentMonth()` do Financeiro; no modo civil os dois coincidem.
+   * o mês civil a tela nasceria um ciclo atrasada, mostrando o período que acabou de fechar
+   * como se fosse o que a pessoa está gastando agora. Quem responde isso é `useCycleMonth` —
+   * era este idioma, copiado à mão aqui e no Financeiro, e esquecido na Hoje e em Lançamentos.
    */
   const regua = useMonthRuler();
-  const cycle = regua.cycle;
   const [mesEscolhido, setMesEscolhido] = useState<string | null>(null);
-  const mesCorrente = cycle.data?.mes ?? currentMonth();
+  const mesCorrente = useCycleMonth(regua.view);
   const month = mesEscolhido ?? mesCorrente;
   const setMonth = setMesEscolhido;
   const [form, setForm] = useState<FormState | null>(null);

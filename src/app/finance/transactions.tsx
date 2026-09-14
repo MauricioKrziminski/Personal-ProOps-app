@@ -6,7 +6,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { categoryIcon } from '@/design/category-icons';
 import { ErrorCard } from '@/components/error-card';
-import { currentMonth, monthTitle, shiftMonth } from '@/components/finance/month-picker';
+import { monthTitle, shiftMonth } from '@/components/finance/month-picker';
 import { useMonthRuler } from '@/components/finance/month-ruler';
 import { PeriodBar } from '@/components/finance/period-bar';
 import { ThemedText } from '@/components/themed-text';
@@ -34,6 +34,7 @@ import {
   useMonthRange,
   useTransactions,
   useCycleSeries,
+  useCycleMonth,
   useTransactionsSummary,
   type Transaction,
   type TransactionKind,
@@ -139,7 +140,16 @@ export default function TransactionsScreen() {
     accountId?: string;
   }>();
 
-  const [month, setMonth] = useState(() => params.month ?? currentMonth());
+  /*
+    ⚠️ **Guarda a ESCOLHA, não o mês.** Isto era `useState(() => params.month ?? currentMonth())`,
+    e o inicializador preguiçoso roda UMA vez, na montagem, quando `cycle_now` ainda não
+    respondeu — então a tela fixava o mês CIVIL e nunca se corrigia. Com fechamento no dia 10,
+    entre os dias 11 e 30 ela abria um ciclo inteiro atrasada, mostrando o período que acabou de
+    fechar como se fosse o que a pessoa está gastando agora.
+
+    `null` quer dizer "o ciclo corrente, seja ele qual for"; quem escolhe um mês grava a escolha.
+  */
+  const [mesEscolhido, setMesEscolhido] = useState<string | null>(params.month ?? null);
   const [kind, setKind] = useState<TransactionKind | 'all'>(
     params.kind === 'expense' || params.kind === 'income' || params.kind === 'transfer'
       ? params.kind
@@ -171,7 +181,7 @@ export default function TransactionsScreen() {
   const [linkAplicado, setLinkAplicado] = useState(link);
   if (link !== linkAplicado) {
     setLinkAplicado(link);
-    if (params.month) setMonth(params.month);
+    if (params.month) setMesEscolhido(params.month);
     if (params.kind === 'expense' || params.kind === 'income' || params.kind === 'transfer') {
       setKind(params.kind);
     }
@@ -180,6 +190,9 @@ export default function TransactionsScreen() {
   }
 
   const regua = useMonthRuler();
+  const mesCorrente = useCycleMonth(regua.view);
+  const month = mesEscolhido ?? mesCorrente;
+  const setMonth = setMesEscolhido;
   const range = useMonthRange(month, regua.view);
   const list = useTransactions({
     month,

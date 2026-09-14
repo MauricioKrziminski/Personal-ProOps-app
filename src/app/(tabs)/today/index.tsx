@@ -22,6 +22,7 @@ import {
   useAccountBalances,
   useCashFlowForecast,
   useCycleSeries,
+  useCycleMonth,
   useCycle,
   useMarkPaid,
   useRecentTransactions,
@@ -29,7 +30,6 @@ import {
 } from '@/hooks/use-finance';
 import { categoryIcon } from '@/design/category-icons';
 import { formatBRL, formatDateBR, localISODate, useTodayReminders } from '@/hooks/use-items';
-import { currentMonth } from '@/components/finance/month-picker';
 import { useProfile } from '@/hooks/use-profile';
 import { useSession } from '@/hooks/use-session';
 import { useTheme } from '@/hooks/use-theme';
@@ -97,7 +97,20 @@ export default function TodayScreen() {
     a queixa que abriu esta refatoração — a curva continua sendo o desenho, mas quem responde é
     `cycle_series`.
   */
-  const cicloAtual = useCycleSeries(currentMonth(), currentMonth()).data?.[0] ?? null;
+  /*
+    ⚠️ **O ciclo é NOMEADO pelo mês em que TERMINA, e isso NÃO é o mês civil.** Com fechamento
+    no dia 10, o dia 13/09 já pertence ao ciclo chamado "outubro" (11/09–10/10). Passando
+    `currentMonth()` a série voltava com UMA linha — setembro, `fechado`, R$ 0,72 — enquanto o
+    rótulo ao lado lia a data de fim de outubro. Número, sinal, cor e palavra errados de uma vez:
+    o card anunciava "Projeção positiva" num ciclo que fecha em −R$ 759,39.
+
+    ⚠️ E `.find()` sozinho não resolvia: com o mês errado no ARGUMENTO, a linha de outubro nem
+    vinha no resultado. Quem responde qual é o mês do ciclo é `useCycleMonth`.
+  */
+  const mesCorrente = useCycleMonth();
+  const cicloAtual =
+    useCycleSeries(mesCorrente, mesCorrente).data?.find((c) => c.mes.startsWith(mesCorrente)) ??
+    null;
   const leftover = Number(cicloAtual?.resultado ?? series.at(-1) ?? 0);
   /**
    * Os dois números que o card passou a mostrar lado a lado, a pedido do dono do produto.
@@ -145,6 +158,10 @@ export default function TodayScreen() {
     !loading &&
     overdue.length === 0 &&
     dueSoon.length === 0 &&
+    // ⚠️ `aReceber` tem SEÇÃO PRÓPRIA ("O que entra") e estava fora desta conta: com uma receita
+    // prevista e mais nada, a tela desenhava "Nada para hoje" LOGO ACIMA dela. Seção que
+    // renderiza conta para o vazio, sempre — é o mesmo defeito que `dueSoon` já teve.
+    aReceber.length === 0 &&
     todayReminders.length === 0 &&
     tight.length === 0 &&
     !captured;
