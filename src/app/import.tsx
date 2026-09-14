@@ -21,6 +21,7 @@ import { EmptyState } from '@/components/ui/empty-state';
 import { Icon } from '@/components/ui/icon';
 import { Money } from '@/components/ui/money';
 import { Row, Section } from '@/components/ui/row';
+import { Segmented } from '@/components/ui/segmented';
 import { Screen } from '@/components/ui/screen';
 import { HeroLabel, SectionHead } from '@/components/ui/section-head';
 import { Skeleton, SkeletonRow } from '@/components/ui/skeleton';
@@ -239,6 +240,15 @@ export default function ImportScreen() {
       // Descartar mudava a UI sem tratar erro: o banco não mudava e ninguém ficava sabendo.
       onError: () => toast({ message: 'Não deu para descartar o item.', tone: 'error' }),
     });
+
+  const trocarSentido = (item: ImportItem, kind: 'income' | 'expense') => {
+    if (item.kind === kind) return;
+    setEditando({ ...item, kind });
+    atualizar.mutate(
+      { id: item.id, kind },
+      { onError: () => toast({ message: 'Não deu para trocar o sentido.', tone: 'error' }) }
+    );
+  };
 
   const trocarCategoria = (item: ImportItem, cat: string | null) => {
     setEditando(null);
@@ -676,6 +686,23 @@ export default function ImportScreen() {
           <ScrollView
             contentContainerStyle={[styles.sheetBody, { paddingBottom: insets.bottom + Space.xxl }]}
           >
+            {/*
+              O sentido vem ANTES da categoria: ele muda o que a linha significa, e a ordem dos
+              campos do projeto manda o controle que decide vir antes do que ele decide.
+              Existe porque o OFX do BB marca saída como `CREDIT` — ver `useUpdateImportItem`.
+            */}
+            <View style={styles.sentido}>
+              <SectionHead title="O que é" />
+              <Segmented
+                options={[
+                  { value: 'expense', label: 'Saída' },
+                  { value: 'income', label: 'Entrada' },
+                ]}
+                value={editando?.kind === 'income' ? 'income' : 'expense'}
+                onChange={(k) => editando && trocarSentido(editando, k)}
+              />
+            </View>
+
             <View style={styles.chips}>
               {SUGGESTED_CATEGORIES.map((cat) => (
                 <Chip
@@ -714,6 +741,7 @@ const styles = StyleSheet.create({
   rodape: {
     paddingHorizontal: Space.lg,
   },
+  sentido: { gap: Space.sm, paddingHorizontal: Space.lg },
   chips: {
     flexDirection: 'row',
     flexWrap: 'wrap',

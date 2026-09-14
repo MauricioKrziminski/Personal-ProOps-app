@@ -950,11 +950,23 @@ export function useDiscardImportItems() {
 export function useUpdateImportItem() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: async (input: { id: string; category: string | null }) => {
-      const { error } = await supabase
-        .from('import_items')
-        .update({ suggested_category: input.category })
-        .eq('id', input.id);
+    mutationFn: async (input: {
+      id: string;
+      category?: string | null;
+      /**
+       * ⚠️ **O sentido precisa ser EDITÁVEL porque nem todo banco o expressa.** Medido em dois
+       * extratos reais do Banco do Brasil (agosto e setembro de 2026): a linha "Pagto cartão
+       * crédito" sai como `TRNTYPE=CREDIT` com valor POSITIVO, apesar de ser saída — o saldo só
+       * fecha tratando-a como despesa (0,07 + 1.947,10 − 1.947,06 = 0,11 = `<LEDGERBAL>`).
+       * Adivinhar pelo texto da linha é a lista de palavras que `agent.md` proíbe; quem decide é
+       * quem confere antes de entrar, que é o que esta tela existe para fazer.
+       */
+      kind?: 'income' | 'expense';
+    }) => {
+      const patch: { suggested_category?: string | null; kind?: string } = {};
+      if ('category' in input) patch.suggested_category = input.category ?? null;
+      if (input.kind) patch.kind = input.kind;
+      const { error } = await supabase.from('import_items').update(patch).eq('id', input.id);
       if (error) throw error;
     },
     onSuccess: () => invalidateKeys(queryClient, [['import-items'], ['import-batches']]),
