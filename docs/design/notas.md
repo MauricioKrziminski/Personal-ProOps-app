@@ -213,3 +213,73 @@ swipe sozinho não é acessível.
 
 Editor de blocos · markdown rico · pasta aninhada · ordenação manual · cor por nota · anexo ·
 tabela de tags · coluna `title` · `ts_rank` · colaboração em tempo real dentro da nota.
+
+---
+
+# A área de Notas virou um lugar organizável (14/09/2026)
+
+> **Esta seção reverte, com data e motivo, a linha do modelo acima que dizia "Sem cor por nota
+> (o design system tem um accent só), sem ordenação manual".** As duas voltaram. O resto da
+> tabela continua valendo — o que mudou não foi a arquitetura do dado, foi o que o usuário
+> controla dele.
+
+Pedido do dono do produto: *"muito mais personalizável e melhor organizável… 100% customizado e
+100% intuitivo, o usuário não se perde na interface"*.
+
+## O que mudou, e por que a objeção antiga não vale mais
+
+| corte antigo | o que existe agora | por que a razão antiga caiu |
+|---|---|---|
+| sem cor por nota | `notes.color` / `note_folders.color`, oito tokens pareados light/dark | "um accent só" é sobre a VOZ do app, não sobre o conteúdo do usuário. A cor aqui nunca pinta texto nem superfície: vive num trilho de 3px no cartão e no ladrilho do ícone da pasta, e nenhum dos oito valores é `tint`, `danger` ou `warning`. É o mesmo argumento que liberou a cor do emissor dentro da forma de um cartão de crédito. |
+| sem ordenação manual | `position double precision` + RPCs `notes_reorder` / `note_folders_reorder` | "a ordem é sempre a mais recente" descreve quem só recebe do WhatsApp. Quem usa a nota como lista quer a ordem DELE — e arrastar é o gesto que já existe na cabeça da pessoa. A ordem manual é um MODO (`Como eu arrumei`), não o padrão. |
+| pasta como chip de filtro | pasta é **lugar**: grade no topo da home, tela própria empurrada | Chip e grade seriam dois caminhos para a mesma pasta — o defeito que o app já removeu uma vez. |
+| arquivar não existia | `archived_at` em nota e pasta + tela `Arquivadas` | Sem ele a única saída para "isso não é mais do dia a dia" era a lixeira, que promete apagar. |
+| tag só em nota | `note_folders.tags text[]`, mesmo namespace | A tag de nota é GERADA do `#hashtag` do texto; pasta não tem texto, então precisa de coluna — e de um CHECK que aceite a MESMA forma que o gerador produz, acento incluído. |
+
+## A home, em ordem
+
+```
+AppHeader "Notas"  ·  ✎ nova nota  ·  ⋯ menu (Ordenar · Organizar pastas · Arquivadas · Lixeira)
+Anotar rápido…                                   ← intocado: é o coração do produto
+⌕ Buscar nas notas
+[#urgente] [#casa]                               ← chips só de TAG (nota e pasta, um namespace)
+PASTAS            Segure para mover              ← grade 2 col (3 em ≥520dp), só as raízes
+FIXADAS                                          ← escopo de notas SOLTAS, como no Apple Notes
+NOTAS                                            ← `folder_id is null`, arrastáveis pela alça
+```
+
+**FIXADAS é escopo de notas soltas.** O pin dentro de uma pasta aparece na tela daquela pasta —
+é o que mantém a consulta da home num filtro só e faz "arquivar pasta esconde as notas dela"
+sair de graça.
+
+**Ordenar vive no menu do header**, não num `Segmented`: é a convenção do Apple Notes e não gasta
+uma quarta fileira de controle antes da primeira nota. A escolha persiste em `AsyncStorage`
+(`notes:sort`), e o arrasto só liga em **Manual e sem busca ativa** — ordem manual sob uma
+consulta não quer dizer nada, e por isso a alça SOME nos outros modos.
+
+## Movimento — o que ficou e o que foi cortado
+
+| momento | o que acontece |
+|---|---|
+| grade entrando | cascata `FadeInDown` com `delay` limitado (`Motion.stagger`) |
+| levantar (toque longo, 220 ms) | `scale 1.04`, elevação `overlay`, `impactAsync(Medium)` |
+| irmãos abrindo espaço | cada um anda UM slot, derivado de UMA shared value |
+| soltar | mola até o slot, `impactAsync(Light)`, cache otimista já com a ordem nova |
+| fixar / arquivar / lixeira | **cross-fade**, nunca deslize — ver abaixo |
+| trocar de cor | cross-fade do trilho por `key` (não `interpolateColor`) |
+| abrir pasta | **não entregue**: sem host de elemento compartilhado no SDK 57 |
+
+⚠️ **A saída é cross-fade porque `exiting` não sabe por que desmontou.** FIXADAS e SOLTAS são dois
+`Reorderable`: fixar DESMONTA o cartão de uma lista e MONTA na outra. Com o deslize para a direita
+que o plano previa, fixar mandava o cartão para fora da tela antes de ele reaparecer no topo — a
+direção contava "tirei isto daqui" justamente na ação que o traz para cima. Cross-fade é honesto
+nos três casos.
+
+⚠️ **O alfinete não pulsa.** O pulso funcionava, mas ficava preso ao MOUNT: abrir a aba fazia todos
+os alfinetes pularem de uma vez. Quem conta a chegada é o `FadeIn` da linha.
+
+## Pronto, medido no aparelho (14/09/2026)
+
+Simulador iOS e emulador Android, claro e escuro: grade, arrasto pela alça dentro da rolagem (o
+caso disputado), ordem persistida depois de reiniciar, cor, arquivar com desfazer, chip de tag
+filtrando a tela inteira, e `Reduce Motion` — o arrasto funciona, a coreografia colapsa.
