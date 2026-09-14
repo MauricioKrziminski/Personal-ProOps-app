@@ -14,14 +14,7 @@ import { Segmented } from '@/components/ui/segmented';
 import { Screen } from '@/components/ui/screen';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Radius, Space } from '@/design/tokens';
-import {
-  useCycleLines,
-  useCycleSeries,
-  useInvoice,
-  type CycleLine,
-  type CycleRow,
-  type CycleView,
-} from '@/hooks/use-finance';
+import { type CycleLine, type CycleRow, type CycleView, useCycleLines, useCycleMonth, useCycleSeries, useInvoice } from '@/hooks/use-finance';
 import { formatBRL } from '@/hooks/use-items';
 import { describeCycle } from '@/lib/cycle-label';
 import { rotaDaLinha } from '@/lib/cycle-routes';
@@ -54,8 +47,16 @@ import { isoToBR } from '@/lib/dates';
  */
 export default function CycleDetailScreen() {
   const params = useLocalSearchParams<{ month?: string; view?: string; tipo?: string }>();
-  const month = params.month ?? '';
   const view = (params.view === 'civil' ? 'civil' : 'cycle') as CycleView;
+  /*
+    ⚠️ **Sem `month` no link, cai no ciclo CORRENTE — não em string vazia.**
+    Era `params.month ?? ''`, e `cycle_lines('')` quebra: a tela abria direto no "Algo deu
+    errado". Só não aparecia porque todo caminho de dentro do app passa o parâmetro — um deep
+    link, um atalho ou uma notificação não passam. Mesma classe do mês civil vs mês de ciclo:
+    mês sem padrão sensato vira erro ou período errado.
+  */
+  const mesCorrente = useCycleMonth(view);
+  const month = params.month || mesCorrente;
   const [modo, setModo] = useState(params.tipo === 'tudo' ? 'aberto' : 'resumo');
 
   const serie = useCycleSeries(month, month, view);
