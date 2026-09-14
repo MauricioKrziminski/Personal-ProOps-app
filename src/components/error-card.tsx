@@ -38,12 +38,20 @@ export function ErrorCard({ onRetry }: { onRetry: () => void }) {
       <ThemedText type="small" themeColor="textSecondary" style={styles.hint}>
         Não conseguimos carregar os dados agora.
       </ThemedText>
-      <Button label="Tentar de novo" onPress={onRetry} size="sm" />
+      {/*
+        ⚠️ `alignSelf` explícito: sem `block`, o `Button` traz `alignSelf: 'flex-start'` (para
+        um pai com `alignItems: 'stretch'` não o esticar) e isso GANHA do `alignItems: 'center'`
+        do card — o botão nascia colado na borda esquerda embaixo de um texto centralizado. É o
+        mesmo defeito que já estava corrigido no `EmptyState` e na cortina de bloqueio; este é o
+        terceiro e último lugar do app onde um `Button` mora dentro de um container centralizado.
+      */}
+      <Button label="Tentar de novo" onPress={onRetry} size="sm" style={styles.retry} />
     </Card>
   );
 }
 
 const styles = StyleSheet.create({
+  retry: { alignSelf: 'center' },
   card: {
     alignItems: 'center',
     gap: Space.sm,

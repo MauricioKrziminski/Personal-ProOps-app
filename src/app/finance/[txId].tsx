@@ -32,6 +32,7 @@ import {
   useTransaction,
   type Transaction,
 } from '@/hooks/use-finance';
+import { useTelaPronta } from '@/hooks/use-tela-pronta';
 import { formatBRL, formatDateBR, localISODate } from '@/hooks/use-items';
 import { confirmDestructive } from '@/lib/item-actions';
 import { dueLabel, settleDone, settleHint, settleLabel } from '@/lib/settle-labels';
@@ -197,7 +198,18 @@ export default function TransactionDetailScreen() {
     );
   };
 
-  if (list.isLoading) {
+  /*
+    O PORTÃO DA TELA (Fase 5) — 5 consultas e UM portão, que era a pior proporção das telas
+    empurradas: o valor e a descrição apareciam e, depois, o nome da conta, a fatura em que a
+    compra caiu e a série da recorrência entravam um a um por cima.
+
+    ⚠️ **`invoice` nasce desligada** quando o lançamento não é de cartão (`enabled:
+    Boolean(invoiceId)`), e é justamente por isso que `telaPronta` lê `fetchStatus`: sem isso,
+    todo lançamento em dinheiro ficaria no skeleton para sempre.
+  */
+  const pronta = useTelaPronta(list, accounts, invoice, plans, series);
+
+  if (!pronta) {
     return (
       <Screen grouped onRefresh={refresh} refreshing={list.isRefetching || accounts.isRefetching || invoice.isRefetching || plans.isRefetching}>
         <Stack.Screen options={{ title: 'Lançamento' }} />
