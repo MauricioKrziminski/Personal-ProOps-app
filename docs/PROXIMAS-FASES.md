@@ -592,6 +592,8 @@ Com as 6 datas já corrigidas nesta sessão, o esperado é:
 > | cancelar mostra "Não reconheci…" e o toque repete o pedido | — | ✅ |
 > | **biometria certa abre e o app FICA aberto** | ✅ Matching Face | — emulador não inscreve digital |
 > | cancelar → tocar → senha → abre | — | ✅ |
+> | `semTrancar`: seletor de arquivo não tranca o app | — | ✅ importação |
+> | …e a bandeira não fica presa: HOME depois disso **tranca** | — | ✅ |
 >
 > ⚠️ **"O Face ID não resolve" era o app se trancando atrás dele — um LAÇO, e ele me enganou
 > primeiro.** Eu tinha lido a folha do sistema parada na tela como "o simulador não entrega o
