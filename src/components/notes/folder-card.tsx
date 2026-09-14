@@ -101,9 +101,19 @@ function FolderCardBase({
             {folder.pinned ? <Icon name="pin.fill" size="sm" color="tint" /> : null}
           </View>
 
-          {/* Nome NUNCA trunca: é identificador (§7). Não coube em duas linhas, a fonte não é o
-              problema — o ladrilho é que está estreito, e aí quem cede é o layout. */}
-          <ThemedText type="smallBold">{folder.name}</ThemedText>
+          {/*
+            Nome NUNCA trunca: é identificador (§7). Não coube em duas linhas, a fonte não é o
+            problema — o ladrilho é que está estreito, e aí quem cede é o layout.
+
+            ⚠️ **`flexShrink: 0` porque a grade entra com `FadeInDown`** (§3, 15/09/2026): o Yoga
+            mede o filho enquanto o contêiner animado ainda está chegando e, com o `flexShrink: 1`
+            que o `ThemedText` traz na base, ele prefere ENCOLHER a quebrar — encolhido naquele
+            instante, o texto não se remede nunca mais. Foi assim que "App bloqueado" virou "App"
+            no APK de release, invisível no dev.
+          */}
+          <ThemedText type="smallBold" style={styles.nome}>
+            {folder.name}
+          </ThemedText>
 
           <ThemedText type="caption" themeColor="textSecondary" style={tabular}>
             {folder.notes_count}
@@ -138,4 +148,5 @@ const styles = StyleSheet.create({
   },
   /** Contorno na tinta cheia: no escuro, 18% de mistura sozinho quase não separa duas cores. */
   contornado: { borderWidth: 1.5 },
+  nome: { flexShrink: 0, maxWidth: '100%' },
 });
