@@ -130,18 +130,55 @@ async def ensure_session(phone: str, thread_id: str) -> dict[str, Any]:
     descobrir de quem é o telefone.
     """
     settings = get_settings()
-    # Árbitro no PHONE, não no thread_id. A tabela tem duas restrições únicas e o
-    # ON CONFLICT só trata a que for nomeada — conflitar pela outra vira 23505 cru.
-    # Com árbitro em `phone`, trocar o THREAD_SALT reescreve o thread_id em vez de
-    # quebrar toda mensagem de usuário existente. (Análise completa na 0040.)
+    # ⚠️ **A CONVERSA é o thread, e o telefone é só a forma como ela chegou
+    # desta vez.** A Meta às vezes entrega o número brasileiro SEM o 9º dígito
+    # (está escrito em `whatsapp.md`), e o `thread_id` é derivado da forma
+    # canônica — de propósito, para uma confirmação pendente não ficar órfã.
+    # Consequência que só aparece com dado real: a linha de sessão existia com
+    # uma grafia, a mensagem chegava com a outra, o `on conflict (phone)` não
+    # via conflito nenhum e o INSERT batia no unique do `thread_id`. Resultado:
+    # **23505 e a mensagem inteira perdida**, em toda mensagem, para sempre.
+    # Medido no staging em 14/09/2026 com a linha real do dono do produto
+    # (`553598744200` gravada, `5535998744200` chegando).
     #
-    # `as s` para o CASE poder ler o valor ANTERIOR sem ambiguidade: dentro do DO
-    # UPDATE, `s.x` é a linha que já existe e `excluded.x` é a proposta.
-    #
-    # A rotação de sessão acontece AQUI, no mesmo UPDATE. Num segundo passo era
-    # código morto: o primeiro update já teria gravado now().
+    # Casar pelo thread ANTES resolve sem tocar no árbitro: o `on conflict
+    # (phone)` continua sendo o caminho de quem é novo — e é ele que faz a
+    # troca de `THREAD_SALT` reescrever o thread_id em vez de quebrar todo
+    # mundo (a análise da `0040`, que continua valendo: salt novo não casa
+    # thread nenhum e cai no insert).
     row = await fetch_one(
         """
+        update public.user_sessions as s set
+          phone = %s,
+          last_message_at = now(),
+          session_epoch = case
+            when s.last_message_at < now() - make_interval(hours => %s)
+             and not exists (
+               select 1 from public.pending_actions p
+               where p.phone in (s.phone, %s) and p.status = 'awaiting'
+             )
+            then s.session_epoch + 1
+            else s.session_epoch
+          end
+        where s.thread_id = %s
+        returning *
+        """,
+        phone,
+        settings.session_idle_hours,
+        phone,
+        thread_id,
+    )
+    if row is None:
+        # Árbitro no PHONE, não no thread_id. A tabela tem duas restrições únicas
+        # e o ON CONFLICT só trata a que for nomeada — conflitar pela outra vira
+        # 23505 cru. Com árbitro em `phone`, trocar o THREAD_SALT reescreve o
+        # thread_id em vez de quebrar toda mensagem de usuário existente.
+        # (Análise completa na 0040.)
+        #
+        # `as s` para o CASE poder ler o valor ANTERIOR sem ambiguidade: dentro
+        # do DO UPDATE, `s.x` é a linha que já existe e `excluded.x` é a proposta.
+        row = await fetch_one(
+            """
         insert into public.user_sessions as s (thread_id, phone, last_message_at)
         values (%s, %s, now())
         on conflict (phone) do update
@@ -158,10 +195,10 @@ async def ensure_session(phone: str, thread_id: str) -> dict[str, Any]:
               end
         returning *
         """,
-        thread_id,
-        phone,
-        settings.session_idle_hours,
-    )
+            thread_id,
+            phone,
+            settings.session_idle_hours,
+        )
     assert row is not None
     if row["user_id"] is None:
         row = await _attach_profile(row)

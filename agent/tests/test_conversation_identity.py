@@ -175,13 +175,36 @@ async def test_reserva_de_execucao_e_do_turno_nao_da_meta(sql):
 
 
 @pytest.mark.asyncio
-async def test_ensure_session_continua_com_arbitro_no_telefone(sql):
-    linha = await db.ensure_session("5511999990001", "hash-x")
+async def test_ensure_session_continua_com_arbitro_no_telefone(sql, monkeypatch):
+    """O thread casa primeiro; quem é NOVO cai no upsert com árbitro no phone.
 
-    assert "on conflict (phone)" in sql[0][0], (
+    As duas metades importam e por motivos opostos: sem o árbitro no `phone`,
+    trocar o `THREAD_SALT` quebraria toda mensagem de usuário existente (`0040`);
+    sem casar pelo thread antes, a mesma pessoa escrevendo do número sem o 9º
+    dígito criava linha nova e batia no unique do thread_id — 23505 e mensagem
+    perdida, medido no staging em 14/09/2026.
+    """
+    # thread conhecido: casa no UPDATE e nem chega ao insert
+    linha = await db.ensure_session("5511999990001", "hash-x")
+    assert "update public.user_sessions" in sql[0][0]
+    assert "where s.thread_id = %s" in sql[0][0]
+    assert len(sql) == 1
+    assert linha["channel"] == "whatsapp"
+
+    # thread desconhecido (salt novo, ou usuário novo): o upsert de sempre
+    chamadas: list = []
+
+    async def sem_linha(query, *args):
+        chamadas.append((query, args))
+        return None if "update public.user_sessions" in query else {
+            "id": USER, "user_id": USER, "channel": "whatsapp"
+        }
+
+    monkeypatch.setattr(db, "fetch_one", sem_linha)
+    await db.ensure_session("5511999990001", "hash-novo")
+    assert "on conflict (phone)" in chamadas[1][0], (
         "trocar o árbitro do upsert quebra toda mensagem de usuário existente (ver 0040)"
     )
-    assert linha["channel"] == "whatsapp"
 
 
 @pytest.mark.asyncio
@@ -195,3 +218,23 @@ async def test_fila_da_meta_mantem_o_nome_da_meta(sql):
         payload={"text": "oi"},
     )
     assert "wa_message_id" in sql[0][0]
+
+
+@pytest.mark.asyncio
+async def test_mesmo_numero_sem_o_nono_digito_nao_cria_sessao_nova(sql):
+    """O 9º dígito que a Meta às vezes engole não pode partir a conversa em duas.
+
+    `thread_id` é derivado da forma CANÔNICA (sempre com o 9), então as duas
+    grafias chegam no mesmo thread. Antes, a com o 9 não conflitava em `phone`,
+    ia para o INSERT e batia no unique do `thread_id`: 23505, mensagem perdida.
+    """
+    from app.domain.phone import canonical
+
+    assert canonical("553598744200") == canonical("5535998744200")
+
+    await db.ensure_session("553598744200", "thread-canonico")
+    await db.ensure_session("5535998744200", "thread-canonico")
+
+    # os dois turnos casaram o MESMO thread e só atualizaram o telefone da vez
+    assert all("where s.thread_id = %s" in query for query, _ in sql)
+    assert sql[1][1][0] == "5535998744200"
