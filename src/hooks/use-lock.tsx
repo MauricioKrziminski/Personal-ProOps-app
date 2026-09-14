@@ -52,9 +52,12 @@ import {
  * `_layout.tsx → lock-overlay.tsx → use-lock.tsx` — ou seja, a raiz do app. Tela vermelha antes
  * de qualquer rota montar, e a mensagem fala de um módulo que quem abriu o app não conhece.
  *
- * O risco real não é o emulador com um APK velho: é **OTA**. `expo-updates` entrega JS novo para
- * um binário antigo, e um update com esta linha derrubaria no boot todo aparelho que ainda não
- * tivesse o build com o módulo — sem caminho de volta pelo próprio app.
+ * O risco real não é o emulador com um APK velho: é **OTA**, e isso é medido, não suposto.
+ * `app.json` usa `runtimeVersion: { policy: 'appVersion' }`, e o `version` ficou em `1.3.26`
+ * ANTES e DEPOIS do commit que somou `expo-local-authentication` (`3375cd0`) — ou seja, o binário
+ * sem o módulo e o JS que precisa dele compartilham a MESMA runtime version, e o update chega
+ * nele. Com esta linha como `import` estático, ele morria no boot, sem caminho de volta pelo
+ * próprio app. (Com a política `fingerprint` o update nem seria entregue; não é a daqui.)
  *
  * Sem ele, `podeTrancar(0)` é `false`: a trava cai para `off`, `disponivel` fica `false` e o
  * Perfil mostra a explicação em vez do controle. É o MESMO caminho de quem tirou o bloqueio de

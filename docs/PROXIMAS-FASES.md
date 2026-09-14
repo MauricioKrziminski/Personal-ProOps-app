@@ -621,9 +621,12 @@ Com as 6 datas já corrigidas nesta sessão, o esperado é:
 > quem abriu o app não conhece. Aconteceu duas vezes em 14/09/2026, a segunda porque o emulador
 > tem TRÊS ProOps instalados e o ícone tocado foi o de 04/09.
 >
-> O risco que decide a questão não é o emulador, é **OTA**: `expo-updates` entrega JS novo para
-> binário antigo, e um update com aquela linha derrubaria no boot todo aparelho que ainda não
-> tivesse o build com o módulo — sem caminho de volta pelo próprio app. Hoje o carregamento é
+> O risco que decide a questão não é o emulador, é **OTA** — e ele foi CONFERIDO, não suposto:
+> `app.json` usa `runtimeVersion: { policy: 'appVersion' }` e o `version` ficou em `1.3.26` antes
+> e depois do commit que somou o módulo (`3375cd0`). Binário sem o módulo e JS que precisa dele
+> dividem a mesma runtime version, então o update CHEGA nele e ele morre no boot, sem caminho de
+> volta pelo próprio app. (Com a política `fingerprint` o update não seria entregue — não é a
+> daqui, e valia checar antes de escrever.) Hoje o carregamento é
 > `require` dentro de `try/catch` (um `import` estático não dá para embrulhar: ele avalia antes de
 > qualquer linha do arquivo rodar). Sem o módulo, `podeTrancar(0)` é `false` → trava `off`,
 > `disponivel` `false`, e o Perfil mostra a explicação em vez do controle — o MESMO caminho de
@@ -979,6 +982,19 @@ Nenhum bloco pode aparecer enquanto outro ainda mostra skeleton.
 > pendurado no cron diário de alertas (como o `sweep` pega carona no de lembretes), com teto de
 > 500 threads por execução e a trava de `pending_actions` no SQL. Rodado de verdade no staging:
 > 231 threads, 2.984 checkpoints, 16.747 writes e 6.969 blobs apagados, **os 11 vivos intactos**.
+>
+> ⚠️ **A PRIMEIRA execução automática dele vai ser em PRODUÇÃO, e o Gabriel precisa saber disso
+> antes de subir.** `scripts/setup-gcp.sh staging` **não** chama `criar_crons` — está escrito na
+> linha 11 do próprio script ("sem crons") e confirmado em `main()`. Ou seja: `/cron/alerts`, que
+> é onde o expurgo pegou carona, só tem agendamento em produção. O que roda lá apaga **estado de
+> conversa** (checkpoints de épocas mortas), até 500 threads/dia. A execução manual no staging é a
+> prova de que a trava funciona — 231 mortos apagados, os 11 vivos intactos —, mas ela foi
+> manual.
+>
+> Para exercitar o agendamento no staging antes, o caminho é criar o job à mão (ou chamar
+> `/cron/alerts` com o segredo interno); nenhum dos dois é passo do dia a dia. E antes de qualquer
+> `gcloud`, confira a conta ATIVA: a que está ativa neste Mac não é a do projeto, e com ela o
+> script conclui que o projeto não existe.
 >
 > ⚠️ `pg_total_relation_size` não encolhe sem `VACUUM FULL`, que trava a tabela e não cabe num
 > cron. O espaço vira reutilizável pelo autovacuum; o que este job garante é que o crescimento
