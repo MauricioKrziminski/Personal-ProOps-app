@@ -1,17 +1,16 @@
 
 import { router } from 'expo-router';
-import { Platform, Pressable, RefreshControl, ScrollView, StyleSheet, View } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { Pressable, StyleSheet, View } from 'react-native';
 
 import { ThemedText } from '@/components/themed-text';
 import { ErrorCard } from '@/components/error-card';
-import { AppHeader, useAppHeaderHeight } from '@/components/ui/app-header';
-import { CURVED_BAR_SPACE } from '@/components/ui/curved-tab-bar';
+import { AppHeader } from '@/components/ui/app-header';
 import { Button } from '@/components/ui/button';
 import { EmptyState } from '@/components/ui/empty-state';
 import { Icon } from '@/components/ui/icon';
 import { Money } from '@/components/ui/money';
 import { HeroPanel } from '@/components/ui/hero-panel';
+import { Screen } from '@/components/ui/screen';
 import { CountUpMoney } from '@/components/ui/count-up-money';
 import { SectionHead } from '@/components/ui/section-head';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -51,8 +50,6 @@ const TIGHT = 0.8;
 export default function TodayScreen() {
   const theme = useTheme();
   const toast = useToast();
-  const insets = useSafeAreaInsets();
-  const headerHeight = useAppHeaderHeight();
 
   /**
    * A janela do painel é o CICLO do usuário, não o mês civil.
@@ -169,30 +166,18 @@ export default function TodayScreen() {
       }
     );
 
-  /** Largura útil do gráfico: tela menos a calha da tela menos a calha do painel. */
-
   return (
-    <View style={[styles.root, { backgroundColor: theme.background }]}>
-      <ScrollView
-        alwaysBounceVertical
-        refreshControl={<RefreshControl
-          progressViewOffset={headerHeight}
-          refreshing={gasto.isRefetching || bills.isRefetching || reminders.isRefetching || budgets.isRefetching || recent.isRefetching || profile.isRefetching}
-          onRefresh={() => Promise.all([gasto.refetch(), bills.refetch(), reminders.refetch(), budgets.refetch(), recent.refetch(), profile.refetch()])}
-        />}
-        contentContainerStyle={[
-          styles.scroll,
-          {
-            // A faixa de marca é sobreposta (ela desfoca o que passa por baixo) e a barra do
-            // Android é absoluta: nenhuma das duas reserva o próprio espaço.
-            paddingTop: headerHeight + Space.md,
-            paddingBottom:
-              insets.bottom +
-              Space.xxxl +
-              (Platform.OS === 'android' ? CURVED_BAR_SPACE : Space.xxl),
-          },
-        ]}
-        showsVerticalScrollIndicator={false}>
+    /*
+      ⚠️ **`<Screen>`, e não um `ScrollView` à mão.** Esta era uma das DUAS telas de conteúdo que
+      furavam o primitivo que governa o ritmo vertical (`gap: Space.xl`, calha `Space.lg`, o
+      respiro do topo calibrado no aparelho e o padding de baixo que soma safe area + dock). Por
+      isso ela tinha o próprio `paddingTop` (`+ Space.md` contra o `+ Space.sm` de todas as
+      outras) e empilhava padding onde ninguém olhava.
+    */
+    <Screen
+      topBar={<AppHeader title="Hoje" />}
+      refreshing={gasto.isRefetching || bills.isRefetching || reminders.isRefetching || budgets.isRefetching || recent.isRefetching || profile.isRefetching}
+      onRefresh={() => Promise.all([gasto.refetch(), bills.refetch(), reminders.refetch(), budgets.refetch(), recent.refetch(), profile.refetch()])}>
         {/*
           0. A saudação. Sem nome preenchido ela NÃO aparece — nem como "Bom dia," sozinho, nem
           como um espaço reservado: quem entrou por Phone OTP nunca informou nome, e um
@@ -341,15 +326,6 @@ export default function TodayScreen() {
           <View style={styles.section}>
             <Skeleton width="100%" height={92} radius={Radius.md} />
             <Skeleton width="100%" height={140} radius={Radius.md} />
-          </View>
-        ) : null}
-
-        {nothing ? (
-          <View style={styles.empty}>
-            <EmptyState
-              title="Nada para hoje"
-              hint="Mande um áudio ou uma mensagem no WhatsApp e o que você contar aparece aqui organizado."
-            />
           </View>
         ) : null}
 
@@ -767,11 +743,23 @@ export default function TodayScreen() {
             </View>
           </View>
         ) : null}
-      </ScrollView>
+        {/*
+          ⚠️ **O vazio é o ÚLTIMO filho, e isso é guarda estrutural.** Ele renderizava no meio da
+          lista e a flag `nothing` esquecia de contar as receitas a receber — então, com um
+          salário previsto e mais nada, a tela desenhava "Nada para hoje" LOGO ACIMA da seção "O
+          que entra" populada. Renderizando por último, ele não tem como aparecer acima de
+          conteúdo nem que a flag erre de novo.
 
-      {/* Depois do scroll na árvore: a faixa precisa desenhar POR CIMA para o desfoque existir. */}
-      <AppHeader title="Hoje" />
-    </View>
+          Sem `styles.empty`: o `EmptyState` já traz o próprio ritmo vertical, e o wrapper
+          somava mais 24dp em cima e embaixo de uma caixa que já tinha 48.
+        */}
+        {nothing ? (
+          <EmptyState
+            title="Nada para hoje"
+            hint="Mande um áudio ou uma mensagem no WhatsApp e o que você contar aparece aqui organizado."
+          />
+        ) : null}
+    </Screen>
   );
 }
 
@@ -829,8 +817,6 @@ function timeOf(iso: string | null | undefined): string {
 }
 
 const styles = StyleSheet.create({
-  root: { flex: 1 },
-  scroll: { padding: Space.lg, gap: Space.xl },
   shrink: { flex: 1, minWidth: 0 },
 
   heroSkeleton: { gap: Space.md, paddingVertical: Space.md },
@@ -855,7 +841,6 @@ const styles = StyleSheet.create({
   },
 
   section: { gap: Space.sm },
-  empty: { paddingVertical: Space.xl },
 
   card: {
     padding: Space.lg,

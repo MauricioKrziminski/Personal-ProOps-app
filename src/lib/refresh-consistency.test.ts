@@ -316,8 +316,13 @@ test('Today still marks a standalone transaction paid and exposes pull to refres
   nodes.find((n) => n.type === 'Button').props.onPress();
   assert.equal(routes.length, 0);
   assert.equal((writes[0] as any[])[0].id, 'transaction-1');
-  const scroll = nodes.find((n) => n.type === 'ScrollView');
-  assert.equal(typeof scroll.props.refreshControl.props.onRefresh, 'function');
+  /*
+    O pull-to-refresh mudou de dono: a Hoje deixou de montar o próprio `ScrollView` e passou a
+    usar `<Screen>`, que é quem carrega o ritmo vertical do app inteiro. O que este teste protege
+    continua sendo o mesmo — a tela EXPÕE atualizar puxando —, só que pelo prop do primitivo.
+  */
+  const screen = nodes.find((n) => n.type === 'Screen');
+  assert.equal(typeof screen.props.onRefresh, 'function');
 });
 
 test('mark paid rejects a zero-row write instead of reporting success', async () => {
