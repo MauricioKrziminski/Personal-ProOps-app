@@ -84,7 +84,7 @@ async def run(
         await db.execute(
             """
             insert into public.import_items
-              (batch_id, workspace_id, kind, amount_cents, occurred_at, description, category)
+              (batch_id, workspace_id, kind, amount_cents, occurred_at, description, suggested_category)
             values (%s, %s, %s, %s, %s, %s, %s)
             """,
             lote["id"], workspace_id, linha.kind, linha.amount_cents,
