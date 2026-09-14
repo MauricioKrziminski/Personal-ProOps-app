@@ -15,10 +15,10 @@
 | | |
 |---|---|
 | Branch | `main`, limpa, tudo commitado e com push |
-| Último commit | `3375cd0 feat(seguranca): bloqueio do app por senha de 6 digitos ou biometria` |
+| Último commit | `fb1756a feat(agente): expurgo diario dos checkpoints do langgraph` |
 | Migrations no **staging** (`utkqoiigimqzeenxkxdl`) | até `20260914170000` — **em dia** |
 | Migrations em **produção** (`kwriuifcwyvdrxtspjiz`) | `20260911220000` — **12 atrás** |
-| `tsc`, `expo lint`, `npm test` | verdes (382 testes) · `pytest` 780 |
+| `tsc`, `expo lint`, `npm test` | verdes (386 testes) · `pytest` **784** · `ruff` limpo |
 | Tags | **nenhuma criada** — é o Gabriel quem cria, depois de testar |
 
 ⚠️ **Confirme o número de produção na fonte antes de decidir qualquer coisa com base nele.** No
@@ -717,7 +717,42 @@ quem abre o app, o olho protege quem olha por cima do ombro. Deixe independentes
 
 ---
 
-## Fase 5 — Loaders e skeletons uniformes
+## Fase 5 — Loaders e skeletons uniformes ✅ FEITA em 14/09/2026 (commits `720eb09`, `e921182`, `374d1ad`)
+
+> Sem migration. O que o plano abaixo não previa:
+>
+> 1. ⚠️ **O portão precisa de TRAVA, e sem ela a cura é pior que a doença.** `isPending` não quer
+>    dizer "primeira carga", quer dizer "sem dado para esta CHAVE": trocar o mês no Financeiro
+>    devolve `pending` a três consultas, e um portão sem trava apagaria a tela inteira —
+>    incluindo a carteira, as dívidas e a tendência, que não dependem do mês. Seria a pipoca ao
+>    contrário: em vez de blocos chegando fora de hora, blocos SUMINDO. Daí a divisão em dois:
+>    `lib/tela-pronta.ts` é a regra pura (testada), `hooks/use-tela-pronta.ts` é a trava.
+> 2. ⚠️ **Por isso os portões de cada bloco FICARAM.** O plano dizia "em vez de cinco portões
+>    espalhados"; o certo é o portão de fora cobrir a primeira carga e os de dentro cobrirem a
+>    troca de mês.
+> 3. ⚠️ **`fetchStatus` em vez da regra "não passe query desligada".** O plano resolvia a
+>    armadilha do `enabled: false` por disciplina de quem chama; `telaPronta` resolve por
+>    construção (`!isPending || fetchStatus !== 'fetching'`). Foi conferido no fonte do TanStack:
+>    o `getOptimisticResult` já devolve `fetching` no primeiro render de uma query ligada, então
+>    não há janela em que uma normal seja confundida com uma desligada. Isso liberou passar `list`
+>    em Lançamentos e `invoice` no detalhe do lançamento — as duas nascem desligadas.
+> 4. **A cascata virou prop do `Screen`** (`stagger`), não código de tela. A Hoje era a única que
+>    escalonava, com passo próprio e um `index` mantido à mão; agora são oito telas com um passo
+>    só. `scroll={false}` não recebe a cascata: ali o filho precisa ser a raiz, senão morre o
+>    large title (o defeito de 11/09/2026).
+> 5. ⚠️ **A cascata PRECISA repetir o `gap` do container, e isso é bug medido.** Um filho pode ser
+>    um `<>…</>` com vários blocos; embrulhado, ele vira uma caixa só e o espaço que o `gap` dava
+>    ENTRE eles some. Visto no Patrimônio: o rótulo "O QUE FORMA ESSE NÚMERO" encostou no herói.
+>
+> **Verificado no aparelho**: Financeiro, Hoje e Patrimônio no emulador Android (medindo as
+> bordas com `uiautomator`, não a olho) e Financeiro + Hoje no simulador iOS. Zero sobreposição,
+> zero salto de layout.
+>
+> **Não feito, e é decisão**: o shimmer em Skia do §5.4. O plano já mandava avaliar o custo — o
+> pulso de opacidade atual resolve, e shimmer é enfeite num estado que existe justamente quando o
+> aparelho está ocupado. `notes/[id].tsx` também ficou fora: é um EDITOR, o corpo já tem skeleton
+> com a forma do texto, e a segunda consulta (pastas) alimenta um seletor que pode nem ser aberto.
+
 
 ### Por quê
 
@@ -859,6 +894,44 @@ Nenhum bloco pode aparecer enquanto outro ainda mostra skeleton.
 ---
 
 ## Fase 6 — Planos, limites e preço *(por último, depois de tudo)*
+
+> ### 🟡 Parcial em 14/09/2026 — o que é CÓDIGO foi feito; o resto depende do Gabriel
+>
+> Esta fase é **medição + decisão de preço**, e as duas metades têm donos diferentes.
+>
+> **Feito (commit `fb1756a`): o expurgo dos checkpoints do LangGraph.** O plano abaixo mandava
+> "veja se há política de expurgo" — não havia nenhuma, e a medição mostrou por que isso importa:
+>
+> | tabela | staging, 14/09/2026 |
+> |---|---|
+> | `langgraph.checkpoint_writes` | 8,5 MB |
+> | `langgraph.checkpoints` | 6,2 MB |
+> | `langgraph.checkpoint_blobs` | 3,6 MB |
+> | **as três** | **18 MB de um banco de 35 MB** |
+>
+> Metade do banco, com duas semanas de tráfego de TESTE. O teto da camada gratuita é 500 MB.
+>
+> A régua não precisa de data: sobrevive o thread que é a época ATUAL de alguma sessão viva
+> (`security.effective_thread_id`), e todo o resto é conversa que o produto já esqueceu — subir o
+> epoch é o app dizendo isso. Medido: 11 vivos contra 231 mortos. `agent/app/jobs/checkpoints.py`,
+> pendurado no cron diário de alertas (como o `sweep` pega carona no de lembretes), com teto de
+> 500 threads por execução e a trava de `pending_actions` no SQL. Rodado de verdade no staging:
+> 231 threads, 2.984 checkpoints, 16.747 writes e 6.969 blobs apagados, **os 11 vivos intactos**.
+>
+> ⚠️ `pg_total_relation_size` não encolhe sem `VACUUM FULL`, que trava a tabela e não cabe num
+> cron. O espaço vira reutilizável pelo autovacuum; o que este job garante é que o crescimento
+> **para**, não que o número na tela caia hoje.
+>
+> **O que falta, e por que precisa do Gabriel:**
+>
+> | o quê | por quê não dá para eu fazer |
+> |---|---|
+> | fatura do GCP por SKU | console de billing, conta dele |
+> | custo unitário do Gemini | Langfuse, e separar o que foi suíte do que foi usuário |
+> | proporção clicado × digitado no gate | precisa de tráfego real, não de staging |
+> | os limites de cada plano | decisão de produto em cima dos números acima |
+> | **o preço** | App Store Connect / Play Console + RevenueCat — **nenhum preço entra no código** |
+
 
 ### Por quê por último
 
