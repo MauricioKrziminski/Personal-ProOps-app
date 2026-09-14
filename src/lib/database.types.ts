@@ -2250,6 +2250,7 @@ export type Database = {
           method_label: string
           origin: string
           out_cents: number
+          realizado: boolean
           ref_id: string
           title: string
         }[]
@@ -2396,6 +2397,16 @@ export type Database = {
       _promote_due_transactions: { Args: never; Returns: number }
       _roll_overdue_invoices: { Args: never; Returns: number }
       _snapshot_net_worth: { Args: never; Returns: number }
+      _spendable: {
+        Args: { p_view?: string; uid: string }
+        Returns: {
+          a_receber_no_ciclo: number
+          caixa: number
+          comprometido_ate_entrada: number
+          comprometido_no_ciclo: number
+          proxima_entrada: string
+        }[]
+      }
       _tx_summary: {
         Args: { from_date: string; to_date: string; uid: string }
         Returns: {
@@ -2590,6 +2601,7 @@ export type Database = {
           method_label: string
           origin: string
           out_cents: number
+          realizado: boolean
           ref_id: string
           title: string
         }[]
@@ -2844,6 +2856,16 @@ export type Database = {
       settle_invoice: {
         Args: { p_invoice_id: string; p_paid_at?: string }
         Returns: string
+      }
+      spendable: {
+        Args: { p_view?: string }
+        Returns: {
+          a_receber_no_ciclo: number
+          caixa: number
+          comprometido_ate_entrada: number
+          comprometido_no_ciclo: number
+          proxima_entrada: string
+        }[]
       }
       transactions_summary: {
         Args: { from_date: string; to_date: string }

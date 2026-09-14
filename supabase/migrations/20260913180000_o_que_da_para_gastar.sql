@@ -157,8 +157,14 @@ as $$
   ),
   entrada as (select min(day) d from ev where in_cents > 0)
   select private.cash_total(ws_ids, current_date),
+         -- ⚠️ `<=`, não `<`. Fatura vencida (ramo 2, `greatest(due_date, current_date)`) e
+         -- lançamento atrasado (ramo 4, `select current_date`) são emitidos EM hoje. Com `<`, uma
+         -- receita prevista para hoje faria `entrada = current_date`, nada casaria, e o
+         -- comprometido voltaria ZERO com fatura vencida na tela — no dia do salário, que é
+         -- exatamente quando as contas se acumulam. `<=` erra para o lado conservador: a despesa
+         -- do dia da entrada conta, e a entrada em si não entra no `caixa`.
          coalesce((select sum(out_cents) from ev
-                   where day < coalesce((select d from entrada), 'infinity'::date)), 0)::bigint,
+                   where day <= coalesce((select d from entrada), 'infinity'::date)), 0)::bigint,
          coalesce((select sum(out_cents) from ev), 0)::bigint,
          coalesce((select sum(in_cents) from ev), 0)::bigint,
          (select d from entrada);
@@ -166,8 +172,10 @@ $$;
 revoke execute on function private.spendable_for(uuid[], text) from public, anon;
 grant execute on function private.spendable_for(uuid[], text) to authenticated, service_role;
 
--- Par interna/wrapper de `supabase.md`: o wrapper NÃO chama a interna (o `execute` dela foi
--- revogado do `authenticated`), ele repete a chamada com os workspaces do próprio chamador.
+-- Par interna/wrapper de `supabase.md`. O wrapper CHAMA a interna, e pode: o `execute` dela é
+-- concedido ao `authenticated` logo acima. O que a regra proíbe é o wrapper chamar a `public._*`
+-- (definer, revogada de `authenticated`) — duplicar a query aqui seria a segunda cópia da conta.
+-- Mesmo arranjo de `cycle_series` → `cycle_series_for`.
 create or replace function public.spendable(p_view text default null)
 returns table (caixa bigint, comprometido_ate_entrada bigint, comprometido_no_ciclo bigint,
                a_receber_no_ciclo bigint, proxima_entrada date)
