@@ -1,13 +1,22 @@
 /**
- * Quando o app precisa pedir o PIN de novo — lógica pura, em `lib/` porque é a regra que decide
- * se o dado financeiro fica exposto, e regra assim não pode depender de subir a tela para testar.
+ * Quando o app pede autenticação de novo — lógica pura, em `lib/` porque é a regra que decide se
+ * o dado financeiro fica exposto, e regra assim não pode depender de subir a tela para testar.
  *
  * Mesmo motivo de `app/graph/policy.py` no agente: *"regra de segurança que só dá para testar
  * subindo o grafo inteiro é regra que ninguém testa"*.
+ *
+ * ⚠️ **A trava NÃO tem senha própria — ela é a do celular** (decisão do dono do produto,
+ * 14/09/2026): *"a senha que eu queria é a que já usa no celular, igual bancos como banco do
+ * brasil, nubank, e outros usam. Ele usa a própria senha do celular e se tiver biometria ou
+ * faceID cadastrado ele reaproveita"*. A primeira versão tinha PIN de 6 dígitos guardado por
+ * nós, com contagem de erros e espera — tudo isso saiu, e com ele saiu a pior parte: **uma senha
+ * a mais para o usuário decorar, e um caminho de recuperação que nós teríamos que inventar.**
+ * Quem guarda segredo, conta tentativa e pune rajada agora é o sistema operacional, que faz isso
+ * em hardware (Secure Enclave / Keystore) e não em `AsyncStorage`.
  */
 
-/** O que o usuário escolheu no Perfil. `off` é o padrão e é o comportamento de hoje. */
-export type LockMode = 'off' | 'pin' | 'biometric';
+/** O usuário ligou a trava no Perfil? Não existe meio-termo: a forma de autenticar é do aparelho. */
+export type LockMode = 'off' | 'on';
 
 /** Depois de quantos segundos em segundo plano o app volta a pedir. */
 export type LockDelay = 0 | 30 | 60;
@@ -18,10 +27,10 @@ export interface LockState {
   /** `Date.now()` de quando o app foi para segundo plano; `null` = nunca saiu. */
   backgroundedAt: number | null;
   /**
-   * O app abriu um seletor de arquivo, a câmera ou o prompt de biometria?
+   * O app abriu um seletor de arquivo, a câmera ou o prompt de autenticação?
    *
    * ⚠️ **No Android isso dispara `background`**, e sem esta bandeira importar um extrato trancaria
-   * o app no meio da operação — a pessoa escolhe o arquivo, volta, e leva um pedido de PIN por
+   * o app no meio da operação — a pessoa escolhe o arquivo, volta, e leva um pedido de senha por
    * cima da tela de importação. Vale para `DocumentPicker`, foto de cupom e para o próprio
    * `authenticateAsync`, que também tira o app do primeiro plano.
    */
@@ -47,31 +56,26 @@ export function deveTrancarNoInicio(mode: LockMode): boolean {
 }
 
 /**
- * A biometria falhou/foi cancelada — cai no PIN ou segue trancado?
+ * O prompt do sistema terminou — abre o app ou continua trancado?
  *
- * ⚠️ **`user_fallback` NÃO é falha.** Com `disableDeviceFallback: true`, tocar em "Usar senha"
- * volta como `{ success: false, error: 'user_fallback' }`. Tratar tudo que não é `success` como
- * erro deixa esse botão MORTO — e ele é o caminho que mais gente usa quando a digital não pega de
- * primeira. `user_cancel` e `system_cancel` também não são erro: a pessoa desistiu da digital, o
- * PIN continua valendo.
+ * ⚠️ **Só `success` abre.** Com `disableDeviceFallback: false` o sistema já ofereceu a senha do
+ * aparelho DENTRO do próprio prompt, então não existe mais o "caiu no nosso PIN": qualquer coisa
+ * diferente de sucesso é a pessoa tendo desistido ou falhado, e a tela continua trancada com o
+ * botão de tentar de novo. `user_fallback` — que na versão com PIN próprio era o caminho mais
+ * usado e por pouco ficou morto — aqui nem chega: o "Usar senha" é resolvido pelo sistema.
  */
-export function aposBiometria(r: { success: boolean; error?: string }): 'aberto' | 'pedir-pin' {
-  if (r.success) return 'aberto';
-  return 'pedir-pin';
+export function aposAutenticar(r: { success: boolean }): 'aberto' | 'trancado' {
+  return r.success ? 'aberto' : 'trancado';
 }
 
-/** Quantas tentativas erradas antes de esperar, e quanto esperar. */
-export const TENTATIVAS_ATE_ESPERAR = 5;
-export const ESPERA_SEGUNDOS = 30;
-
 /**
- * ⚠️ **Sem limite, um PIN de 6 dígitos cai em minutos por tentativa e erro** — são 1 milhão de
- * combinações e o teclado é da própria tela. A espera não protege contra quem extraiu o
- * aparelho; protege contra quem pegou o celular destravado, que é a ameaça que esta feature
- * existe para cobrir.
+ * O aparelho consegue autenticar alguém?
+ *
+ * ⚠️ **O número é `SecurityLevel` do `expo-local-authentication`, e `NONE` é 0.** Celular sem
+ * bloqueio de tela nenhum não tem como provar quem é o dono — oferecer a trava ali é um botão
+ * que só sabe falhar, e pior: ligada, ela trancaria o app para SEMPRE, porque nenhum prompt
+ * conseguiria abrir. A tela mostra o que fazer (pôr um bloqueio no sistema) em vez do controle.
  */
-export function esperaRestante(erros: number, ultimoErroEm: number | null, agora: number): number {
-  if (erros < TENTATIVAS_ATE_ESPERAR || ultimoErroEm === null) return 0;
-  const fim = ultimoErroEm + ESPERA_SEGUNDOS * 1000;
-  return Math.max(0, Math.ceil((fim - agora) / 1000));
+export function podeTrancar(nivelDoAparelho: number): boolean {
+  return nivelDoAparelho > 0;
 }

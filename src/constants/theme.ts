@@ -127,6 +127,23 @@ export const Colors = {
     onHeroSuccess: '#6DDC9E',
     onHeroDanger: '#FFB4AB',
     onHeroWarning: '#FFB95F',
+    /**
+     * As três massas de luz da cortina de bloqueio (`components/lock/aurora.tsx`).
+     *
+     * ⚠️ **O alfa mora AQUI, não na tela.** As três precisam de intensidades diferentes em cada
+     * tema — sobre o quase-branco uma massa forte vira borrão sujo, e sobre o quase-preto uma
+     * massa fraca não existe —, e um `opacity` escrito no componente seria a decisão de cor
+     * acontecendo fora do arquivo de cor. Com o alfa no token, o componente pinta e pronto.
+     *
+     * ⚠️ **A cortina segue o TEMA, não é escura nos dois.** Tentador copiar o `hero*` (que é
+     * escuro sempre), e errado: o splash é branco no claro e preto no escuro, e a cortina aparece
+     * logo depois dele — escura no tema claro, ela é exatamente o "flash de cor errada na
+     * transição" que §9 do design proíbe. Medido: `heroTop` a 55% sobre `#F7F8F8` dá um borrão
+     * cinza no meio da tela.
+     */
+    auroraDeep: 'rgba(19, 19, 21, 0.09)',
+    auroraGlow: 'rgba(13, 143, 91, 0.24)',
+    auroraLift: 'rgba(255, 255, 255, 0.95)',
     cardBorder: 'rgba(19, 19, 21, 0.09)',
     dangerSoft: 'rgba(186, 26, 26, 0.10)',
     successSoft: 'rgba(13, 143, 91, 0.10)',
@@ -185,6 +202,9 @@ export const Colors = {
     onHeroSuccess: '#6DDC9E',
     onHeroDanger: '#FFB4AB',
     onHeroWarning: '#FFB95F',
+    auroraDeep: 'rgba(96, 116, 128, 0.24)',
+    auroraGlow: 'rgba(109, 220, 158, 0.22)',
+    auroraLift: 'rgba(255, 255, 255, 0.07)',
     cardBorder: 'rgba(255, 255, 255, 0.07)',
     dangerSoft: 'rgba(255, 180, 171, 0.14)',
     successSoft: 'rgba(109, 220, 158, 0.14)',

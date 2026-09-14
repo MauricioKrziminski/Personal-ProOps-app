@@ -1,114 +1,106 @@
 /**
- * A tela de bloqueio — irmã do `AnimatedSplashOverlay`, acima de tudo e dentro dos providers.
+ * A cortina de bloqueio — irmã do `AnimatedSplashOverlay`, acima de tudo e dentro dos providers.
  *
  * ⚠️ **Ela fica DEPOIS do `Stack.Protected` do `useSession`**: sem sessão não há o que trancar, e
  * a porta de entrada continua sendo o login. Esta trava protege quem já entrou.
+ *
+ * ⚠️ **Não há teclado aqui, e isso é o ponto.** Quem pede a senha é o SISTEMA, no prompt dele —
+ * esta tela é a cortina que esconde o conteúdo enquanto isso, o objeto que conta em que ponto a
+ * autenticação está, e o caminho de volta se a pessoa cancelar. A versão anterior desenhava um
+ * teclado numérico de PIN próprio; ele saiu junto com a senha própria.
+ *
+ * ## A composição
+ *
+ * `Aurora` (o fundo vivo) → `Keyhole` (o disco de vidro com a marca) → a frase → a ação. Um
+ * objeto, um verbo, e o resto é luz. A cortina inteira é **um** momento autoral: as massas de luz
+ * abrem de dentro para fora enquanto o disco assenta na mola, e o texto entra depois, escalonado.
  */
 
-import * as Haptics from 'expo-haptics';
-import { useEffect, useRef, useState } from 'react';
-import { Platform, Pressable, StyleSheet, View } from 'react-native';
-import Animated, { FadeIn } from 'react-native-reanimated';
+import { useEffect } from 'react';
+import { StyleSheet, View } from 'react-native';
+import Animated, { FadeIn, FadeInDown, withTiming } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { ThemedText } from '@/components/themed-text';
-import { Icon } from '@/components/ui/icon';
-import { Mark } from '@/components/ui/mark';
+import { Aurora } from '@/components/lock/aurora';
+import { Keyhole } from '@/components/lock/keyhole';
+import { Motion, Space } from '@/design/tokens';
 import { useLock } from '@/hooks/use-lock';
-import { esperaAgora, registrarErro, TAMANHO_PIN, zerarErros } from '@/lib/lock-secret';
-import { Radius, Space } from '@/design/tokens';
 import { useTheme } from '@/hooks/use-theme';
 
-const TECLAS = ['1', '2', '3', '4', '5', '6', '7', '8', '9', '', '0', 'apagar'] as const;
+/**
+ * A saída: a cortina CRESCE e dissolve, e o app aparece por dentro dela.
+ *
+ * ⚠️ **É continuidade espacial, não enfeite** (design §5). Sem isto, destravar é um corte seco de
+ * uma tela cheia para outra e o olho não liga as duas. 200 ms: `Motion.duration.exit` (140) é a
+ * régua de um ELEMENTO saindo; uma tela inteira precisa de um fio a mais para o crescimento ser
+ * lido como crescimento, e ainda fica abaixo do teto de saída do app.
+ *
+ * ⚠️ **Mora no escopo do módulo.** Um worklet recriado a cada render faz o Reanimated registrar
+ * uma animação de saída diferente da que ele vai procurar no desmonte — e ela simplesmente não
+ * roda, sem erro nenhum.
+ */
+function dissolver() {
+  'worklet';
+  return {
+    initialValues: { opacity: 1, transform: [{ scale: 1 }] },
+    animations: {
+      opacity: withTiming(0, { duration: 200, easing: Motion.easing.out }),
+      transform: [{ scale: withTiming(1.08, { duration: 220, easing: Motion.easing.out }) }],
+    },
+  };
+}
 
 /**
- * Casca de montagem: enquanto o app está aberto, `Tela` nem existe.
+ * Casca de montagem: enquanto o app está aberto, `Cortina` nem existe.
  *
- * ⚠️ **É montagem, não `if` dentro do componente.** Com `if (!locked) return null` o componente
- * fica montado guardando o PIN meio digitado e a contagem de erros, e limpar isso exigia um
- * `useEffect` com `setState` síncrono — que o lint barra, e com razão: desmontar já faz esse
- * trabalho, de graça e sem render em cascata.
+ * ⚠️ **É montagem, não `if` dentro do componente.** Com `if (!locked) return null` lá dentro, o
+ * componente fica montado guardando estado velho, e limpar isso exigiria um `useEffect` com
+ * `setState` síncrono — que o lint barra, e com razão: desmontar já faz esse trabalho. É também o
+ * gancho da animação de saída: quem some é a `Cortina`, e o Reanimated a segura viva até
+ * `dissolver` terminar.
  */
 export function LockOverlay() {
   const { locked } = useLock();
   if (!locked) return null;
-  return <Tela />;
+  return <Cortina />;
 }
 
-function Tela() {
-  const { mode, destravarComPin, tentarBiometria, biometriaDisponivel } = useLock();
+/**
+ * A linha de apoio conta o ESTADO e diz o que fazer; o título fica parado (design §7:
+ * identificador é estável, estado mora na linha de apoio).
+ *
+ * ⚠️ **Ela é a única coisa que ensina o gesto.** Com o botão fora, um disco com a marca dentro
+ * não anuncia sozinho que é tocável — a frase é a affordance, e por isso ela usa o verbo
+ * ("Toque") em vez de descrever o estado da trava.
+ */
+const FRASES = {
+  trancado: (como: string) => `Toque para usar ${como}.`,
+  autenticando: () => 'Confirmando…',
+  falhou: (como: string) => `Não reconheci. Toque para tentar de novo com ${como}.`,
+} as const;
+
+function Cortina() {
+  const { autenticar, comoAutentica, estado } = useLock();
   const theme = useTheme();
   const insets = useSafeAreaInsets();
-  const [pin, setPin] = useState('');
-  const [espera, setEspera] = useState(0);
-  const [errou, setErrou] = useState(false);
-
-  // A biometria é tentada assim que a tela aparece: pedir um toque a mais antes da digital é
-  // exatamente o atrito que faz a pessoa desligar a trava.
-  useEffect(() => {
-    if (mode === 'biometric' && biometriaDisponivel) void tentarBiometria();
-  }, [mode, biometriaDisponivel, tentarBiometria]);
 
   /*
-    O contador precisa ANDAR na tela; sem o tique ele só mudaria ao tocar numa tecla. E ele roda
-    sempre, não só depois de errar: a espera é PERSISTIDA, então reabrir o app durante a punição
-    tem que continuar mostrando quanto falta — se ela sumisse da tela, um force-quit pareceria
-    ter funcionado.
+    O prompt é chamado assim que a cortina aparece: pedir um toque a mais antes do Face ID é
+    exatamente o atrito que faz a pessoa desligar a trava.
 
-    ⚠️ `Date.now()` mora dentro de `esperaAgora()`, no módulo. No corpo do componente o React
-    Compiler recusa ("impure function during render"), e com razão.
+    ⚠️ **A guarda de reentrância mora no HOOK, não aqui** — `autenticar` recusa a segunda chamada
+    enquanto a primeira está em voo. É o que torna este efeito seguro sob o StrictMode (que monta,
+    desmonta e monta de novo) e sob um toque em "Desbloquear" com o prompt já aberto: dois
+    `authenticateAsync` empilhados devolvem `system_cancel` no primeiro.
   */
   useEffect(() => {
-    let vivo = true;
-    const ler = () => void esperaAgora().then((s) => vivo && setEspera(s));
-    ler();
-    const t = setInterval(ler, 500);
-    return () => {
-      vivo = false;
-      clearInterval(t);
-    };
-  }, []);
-
-  const bloqueado = espera > 0;
-
-  /*
-    ⚠️ **O valor digitado mora num `ref`, não no state — e isto é bug medido, não precaução.**
-    Cada chamada de `digitar` fecha sobre o `pin` DAQUELE render. Digitando rápido (que é como se
-    digita uma senha de 6 dígitos), vários toques caem no mesmo ciclo, todos leem a string velha e
-    **os dígitos se perdem**: no emulador, seis toques seguidos deixaram os seis pontos vazios e
-    `conferirPin` nunca chegou a ser chamado. Um toque por vez funcionava, que é exatamente o
-    disfarce que faz esse defeito passar num teste manual devagar.
-  */
-  const digitado = useRef('');
-
-  const digitar = async (t: string) => {
-    if (bloqueado) return;
-    if (t === 'apagar') {
-      digitado.current = digitado.current.slice(0, -1);
-      setPin(digitado.current);
-      return;
-    }
-    setErrou(false);
-    const novo = (digitado.current + t).slice(0, TAMANHO_PIN);
-    digitado.current = novo;
-    setPin(novo);
-    if (novo.length < TAMANHO_PIN) return;
-    digitado.current = '';
-
-    if (await destravarComPin(novo)) {
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-      await zerarErros();
-      return;
-    }
-    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
-    setErrou(true);
-    setPin('');
-    setEspera(await registrarErro());
-  };
+    void autenticar();
+  }, [autenticar]);
 
   return (
     <Animated.View
-      entering={FadeIn.duration(150)}
+      exiting={dissolver}
       style={[
         styles.tudo,
         {
@@ -116,94 +108,47 @@ function Tela() {
           paddingTop: insets.top + Space.xl,
           /*
             ⚠️ `Math.max`, não `insets.bottom +`: medido no emulador, o inset volta **0** com
-            navegação por gestos e a fileira do "0" encostava na barra — o nó da tecla terminava
-            em 2992 numa tela de 2992 px. A tecla mais usada do teclado não pode disputar espaço
-            com o gesto de voltar.
+            navegação por gestos e o botão encostava na barra do sistema.
           */
           paddingBottom: Math.max(insets.bottom, Space.xxl),
         },
       ]}
       accessibilityViewIsModal
     >
-      <View style={styles.topo}>
-        <Mark size={44} />
-        <ThemedText type="title">App bloqueado</ThemedText>
-        <ThemedText type="footnote" themeColor="textSecondary">
-          {bloqueado
-            ? `Muitas tentativas. Tente em ${espera}s.`
-            : errou
-              ? 'Senha incorreta.'
-              : 'Digite sua senha de 6 dígitos'}
-        </ThemedText>
-      </View>
+      <Aurora />
 
-      <View style={styles.bolinhas}>
-        {Array.from({ length: TAMANHO_PIN }).map((_, i) => (
-          <View
-            key={i}
-            style={[
-              styles.bolinha,
-              {
-                borderColor: errou ? theme.danger : theme.separator,
-                backgroundColor: i < pin.length ? (errou ? theme.danger : theme.text) : 'transparent',
-              },
-            ]}
-          />
-        ))}
-      </View>
-
-      {/*
-        O vazio fica ENTRE o cabeçalho e o teclado, não embaixo dele: teclado no meio da tela,
-        com metade da altura sobrando abaixo, obriga a esticar o polegar num gesto que a pessoa
-        faz várias vezes por dia. Toda tela de bloqueio de sistema põe as teclas na parte baixa.
-      */}
       <View style={styles.folga} />
 
-      <View style={styles.teclado}>
-        {TECLAS.map((t, i) =>
-          t === '' ? (
-            <View key={i} style={styles.tecla} />
-          ) : (
-            <Pressable
-              key={i}
-              accessibilityRole="button"
-              accessibilityLabel={t === 'apagar' ? 'Apagar' : t}
-              disabled={bloqueado}
-              style={({ pressed }) => [
-                styles.tecla,
-                {
-                  backgroundColor: pressed ? theme.backgroundSelected : 'transparent',
-                  opacity: bloqueado ? 0.4 : 1,
-                },
-              ]}
-              onPress={() => {
-                Haptics.selectionAsync();
-                void digitar(t);
-              }}
-            >
-              {t === 'apagar' ? (
-                <Icon name="delete.left" size="md" color="text" />
-              ) : (
-                <ThemedText type="title">{t}</ThemedText>
-              )}
-            </Pressable>
-          )
-        )}
+      {/*
+        O bloco é o único peso da tela, e fica no terço ÓTICO — as duas folgas não são iguais
+        (2 em cima, 3 embaixo). Centro geométrico exato lê como baixo demais quando o objeto é
+        redondo e o texto pende para baixo dele.
+      */}
+      <View style={styles.centro}>
+        <Keyhole estado={estado} onPress={() => void autenticar()} />
+        {/*
+          O texto entra DEPOIS do disco: a cortina monta como uma cascata curta, não como quatro
+          coisas aparecendo juntas.
+        */}
+        <Animated.View
+          entering={FadeInDown.delay(140).duration(Motion.duration.slow)}
+          style={styles.dizeres}>
+          <ThemedText type="title" style={styles.centrado}>
+            App bloqueado
+          </ThemedText>
+          {/*
+            `key={estado}`: a troca de frase é um corte com fade, não um texto mudando debaixo do
+            olho. Sem a chave, "Confirmando…" vira "Não reconheci" no meio de uma palavra.
+          */}
+          <Animated.View key={estado} entering={FadeIn.duration(Motion.duration.base)}>
+            <ThemedText type="footnote" themeColor="textSecondary" style={styles.centrado}>
+              {FRASES[estado](comoAutentica)}
+            </ThemedText>
+          </Animated.View>
+        </Animated.View>
       </View>
 
-      {mode === 'biometric' && biometriaDisponivel ? (
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel="Usar biometria"
-          style={styles.bio}
-          onPress={() => void tentarBiometria()}
-        >
-          <Icon name={Platform.OS === 'ios' ? 'faceid' : 'touchid'} size="md" color="tint" />
-          <ThemedText type="small" themeColor="tint">
-            Usar biometria
-          </ThemedText>
-        </Pressable>
-      ) : null}
+      <View style={styles.folgaBaixa} />
     </Animated.View>
   );
 }
@@ -219,8 +164,8 @@ const styles = StyleSheet.create({
       ⚠️ **`zIndex` sozinho NÃO cobre a pilha nativa no Android, e a falha é a pior possível:
       o overlay aparece e o app continua CLICÁVEL por baixo.** Medido em 14/09/2026 — a árvore
       de acessibilidade trazia "App bloqueado" E "Bom dia, Gabriel" ao mesmo tempo, e os toques
-      no teclado chegavam na tela de trás. Uma trava que desenha mas não tranca é pior que
-      nenhuma: ela promete o que não entrega.
+      chegavam na tela de trás. Uma trava que desenha mas não tranca é pior que nenhuma: ela
+      promete o que não entrega.
 
       `elevation` é o que ordena de verdade no Android (o `react-native-screens` desenha em
       ViewGroup nativo); `zIndex` resolve o iOS. 900 fica ABAIXO do splash (1000), que precisa
@@ -229,34 +174,11 @@ const styles = StyleSheet.create({
     zIndex: 900,
     elevation: 900,
     alignItems: 'center',
-    justifyContent: 'flex-start',
-    gap: Space.xl,
     paddingHorizontal: Space.lg,
   },
-  folga: { flex: 1 },
-  topo: { alignItems: 'center', gap: Space.sm },
-  bolinhas: { flexDirection: 'row', gap: Space.md },
-  bolinha: { width: 14, height: 14, borderRadius: Radius.pill, borderWidth: 1.5 },
-  teclado: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    justifyContent: 'center',
-    maxWidth: 320,
-    rowGap: Space.sm,
-  },
-  // 33% de 320 com folga: três colunas que não dependem de medir a tela.
-  tecla: {
-    width: '33%',
-    height: 68,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderRadius: Radius.md,
-  },
-  bio: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: Space.xs,
-    padding: Space.sm,
-    marginBottom: Space.xl,
-  },
+  folga: { flex: 2 },
+  folgaBaixa: { flex: 3 },
+  centro: { alignItems: 'center', gap: Space.xl },
+  dizeres: { alignItems: 'center', gap: Space.xs, maxWidth: 320 },
+  centrado: { textAlign: 'center' },
 });

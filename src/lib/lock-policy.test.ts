@@ -4,65 +4,57 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 
 import {
-  aposBiometria,
+  aposAutenticar,
   deveTrancar,
   deveTrancarNoInicio,
-  esperaRestante,
+  podeTrancar,
   type LockState,
 } from './lock-policy.ts';
 
 const base: LockState = {
-  mode: 'pin',
+  mode: 'on',
   delaySeconds: 0,
   backgroundedAt: null,
   systemUiOpen: false,
 };
 
-test('desligado nunca tranca — é o comportamento de hoje', () => {
-  assert.equal(deveTrancar({ ...base, mode: 'off', backgroundedAt: 0 }, 999999), false);
-  assert.equal(deveTrancarNoInicio('off'), false);
+test('trava desligada nunca tranca', () => {
+  assert.equal(deveTrancar({ ...base, mode: 'off', backgroundedAt: 0 }, 999_999), false);
 });
 
-test('ligado, o app SEMPRE abre trancado', () => {
-  assert.equal(deveTrancarNoInicio('pin'), true);
-  assert.equal(deveTrancarNoInicio('biometric'), true);
+test('sem ter saído do app não tranca', () => {
+  assert.equal(deveTrancar(base, 1000), false);
 });
 
-test('delay 0 é IMEDIATO — e 0 é falsy, que é a armadilha', () => {
-  // `if (delay)` faria o modo mais seguro ser o único que nunca tranca.
-  assert.equal(deveTrancar({ ...base, delaySeconds: 0, backgroundedAt: 1000 }, 1000), true);
+test('espera 0 tranca na hora — e `0` é falsy, que é onde isto quebra', () => {
+  assert.equal(deveTrancar({ ...base, backgroundedAt: 1000 }, 1000), true);
+  assert.equal(deveTrancar({ ...base, backgroundedAt: 1000 }, 1001), true);
 });
 
-test('com carência, só tranca depois do tempo', () => {
-  const s: LockState = { ...base, delaySeconds: 30, backgroundedAt: 1000 };
-  assert.equal(deveTrancar(s, 1000 + 29_000), false);
+test('espera de 30s só tranca depois dos 30s', () => {
+  const s = { ...base, delaySeconds: 30 as const, backgroundedAt: 1000 };
+  assert.equal(deveTrancar(s, 1000 + 29_999), false);
   assert.equal(deveTrancar(s, 1000 + 30_000), true);
 });
 
-test('⚠️ voltar do seletor de arquivo NÃO tranca', () => {
-  // No Android o DocumentPicker dispara `background`. Sem isto, importar extrato trancava o app
-  // no meio da operação — a pessoa escolhe o arquivo e volta para um pedido de PIN.
-  const s: LockState = { ...base, backgroundedAt: 1000, systemUiOpen: true };
+test('UI do sistema aberta (arquivo, câmera, o próprio prompt) não tranca', () => {
+  const s = { ...base, backgroundedAt: 1000, systemUiOpen: true };
   assert.equal(deveTrancar(s, 999_999), false);
 });
 
-test('nunca esteve em segundo plano = não tranca', () => {
-  assert.equal(deveTrancar({ ...base, backgroundedAt: null }, 999_999), false);
+test('ligada, o app abre trancado', () => {
+  assert.equal(deveTrancarNoInicio('on'), true);
+  assert.equal(deveTrancarNoInicio('off'), false);
 });
 
-test('biometria cancelada CAI NO PIN, não trava a pessoa fora', () => {
-  // `user_fallback` é o toque em "Usar senha" e não é erro. Tratar tudo que não é success como
-  // falha deixa esse botão morto — o caminho que mais gente usa quando a digital não pega.
-  assert.equal(aposBiometria({ success: true }), 'aberto');
-  assert.equal(aposBiometria({ success: false, error: 'user_fallback' }), 'pedir-pin');
-  assert.equal(aposBiometria({ success: false, error: 'user_cancel' }), 'pedir-pin');
-  assert.equal(aposBiometria({ success: false, error: 'lockout' }), 'pedir-pin');
+test('só sucesso abre — desistir ou falhar mantém trancado', () => {
+  assert.equal(aposAutenticar({ success: true }), 'aberto');
+  assert.equal(aposAutenticar({ success: false }), 'trancado');
 });
 
-test('cinco erros fazem esperar, e a espera anda', () => {
-  assert.equal(esperaRestante(4, 1000, 1000), 0, 'antes do limite não espera');
-  assert.equal(esperaRestante(5, 1000, 1000), 30);
-  assert.equal(esperaRestante(5, 1000, 1000 + 10_000), 20);
-  assert.equal(esperaRestante(5, 1000, 1000 + 30_000), 0, 'a espera termina');
-  assert.equal(esperaRestante(9, null, 999), 0, 'sem registro de erro não trava');
+test('celular sem bloqueio de tela não pode oferecer a trava', () => {
+  // `SecurityLevel.NONE` é 0; SECRET 1, BIOMETRIC_WEAK 2, BIOMETRIC_STRONG 3.
+  assert.equal(podeTrancar(0), false);
+  assert.equal(podeTrancar(1), true, 'só a senha do aparelho já basta');
+  assert.equal(podeTrancar(3), true);
 });
