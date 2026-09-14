@@ -1339,31 +1339,46 @@ export type Database = {
       }
       note_folders: {
         Row: {
+          archived_at: string | null
+          color: string | null
           created_at: string
           icon: string | null
           id: string
           name: string
           parent_id: string | null
+          pinned: boolean
+          position: number | null
+          tags: string[]
           updated_at: string
           user_id: string
           workspace_id: string
         }
         Insert: {
+          archived_at?: string | null
+          color?: string | null
           created_at?: string
           icon?: string | null
           id?: string
           name: string
           parent_id?: string | null
+          pinned?: boolean
+          position?: number | null
+          tags?: string[]
           updated_at?: string
           user_id: string
           workspace_id?: string
         }
         Update: {
+          archived_at?: string | null
+          color?: string | null
           created_at?: string
           icon?: string | null
           id?: string
           name?: string
           parent_id?: string | null
+          pinned?: boolean
+          position?: number | null
+          tags?: string[]
           updated_at?: string
           user_id?: string
           workspace_id?: string
@@ -1394,13 +1409,16 @@ export type Database = {
       }
       notes: {
         Row: {
+          archived_at: string | null
           category: string | null
+          color: string | null
           content: string
           created_at: string
           deleted_at: string | null
           folder_id: string | null
           id: string
           pinned: boolean
+          position: number | null
           search_tsv: unknown
           source: string
           tags: string[] | null
@@ -1409,13 +1427,16 @@ export type Database = {
           workspace_id: string
         }
         Insert: {
+          archived_at?: string | null
           category?: string | null
+          color?: string | null
           content: string
           created_at?: string
           deleted_at?: string | null
           folder_id?: string | null
           id?: string
           pinned?: boolean
+          position?: number | null
           search_tsv?: unknown
           source?: string
           tags?: string[] | null
@@ -1424,13 +1445,16 @@ export type Database = {
           workspace_id?: string
         }
         Update: {
+          archived_at?: string | null
           category?: string | null
+          color?: string | null
           content?: string
           created_at?: string
           deleted_at?: string | null
           folder_id?: string | null
           id?: string
           pinned?: boolean
+          position?: number | null
           search_tsv?: unknown
           source?: string
           tags?: string[] | null
@@ -2797,6 +2821,7 @@ export type Database = {
           notes_count: number
         }[]
       }
+      note_folders_reorder: { Args: { p_ids: string[] }; Returns: undefined }
       note_tag_counts: {
         Args: never
         Returns: {
@@ -2805,6 +2830,8 @@ export type Database = {
         }[]
       }
       note_tags_of: { Args: { txt: string }; Returns: string[] }
+      note_tags_valid: { Args: { p_tags: string[] }; Returns: boolean }
+      notes_reorder: { Args: { p_ids: string[] }; Returns: undefined }
       pay_debt_installment: {
         Args: {
           p_account_id?: string
