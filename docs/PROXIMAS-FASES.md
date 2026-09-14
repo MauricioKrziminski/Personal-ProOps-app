@@ -92,6 +92,11 @@ git rm src/types/database.types.ts
 npx tsc --noEmit   # tem que continuar limpo
 ```
 
+Conferido em 14/09/2026: **nenhum script do `package.json`, workflow do CI ou doc escreve nesse
+caminho** — o único `gen types` documentado aponta para `src/lib/`. Apagar não faz o órfão voltar
+na próxima geração. (`docs/PENDENCIAS.md:142` cita um `gen types --project-id` **de produção**, sem
+destino de arquivo; é linha velha, de quando os hooks usavam interfaces à mão.)
+
 `src/types/styles.d.ts` **fica** — esse é usado.
 
 ### 0.2 Alinhar os alvos de push entre servidor e app
@@ -170,6 +175,12 @@ opções, escolha ao ver na tela:
 Prefira a primeira: o subtítulo atual explica o que é a linha, e depois de um mês de uso ninguém
 mais lê isso — o número, sim.
 
+⚠️ **Escreva a LENTE na cópia: "já saiu **da conta**", não "já saiu".** Estas linhas são caixa
+(por data do pagamento) e a vizinha de Lançamentos é competência (por data da compra) — são
+números diferentes de propósito. `.claude/rules/finance.md` já obriga a lente a ser escrita quando
+ela difere da de um vizinho; é o que "por data da compra" / "por data do pagamento" fazem no card
+de Lançamentos.
+
 ### Armadilhas
 
 - **Não use `transactions_summary` aqui.** Ela lê só `transactions`; o ciclo inclui fatura,
@@ -182,10 +193,25 @@ mais lê isso — o número, sim.
 
 ### Como verificar
 
-1. No emulador, ciclo de outubro: `O que entra` tem que dizer **nada ainda** (nenhum salário caiu)
-   e `O que sai`, **R$ 126,97** — os mesmos números que o card de Lançamentos mostra hoje.
-2. Toque `Mês | Ciclo` e confira que os dois números mudam juntos.
-3. Aperte o olho (esconder saldo) e confirme que a sub-linha vira `••••••`.
+⚠️ **NÃO compare com o "já aconteceu" do card de Lançamentos.** São lentes diferentes e os números
+**não vão bater, por desenho**: em `cash_events` o ramo 3 filtra `t.invoice_id is null`, então uma
+compra de cartão já `cleared` **não** é `realizado` ali — ela só vira caixa quando o `transfer` de
+pagamento da fatura acontece (ramo 1). Lançamentos conta a compra; o ciclo conta o pagamento.
+Forçar os dois a concordar recria exatamente o defeito "dois números com a mesma cara".
+
+A verificação certa lê a MESMA fonte. No SQL Editor do staging:
+
+```sql
+select sum(in_cents)  filter (where realizado) as entrou_realizado,
+       sum(out_cents) filter (where realizado) as saiu_realizado
+from public.cycle_lines('2026-10-01');
+```
+
+1. Os dois números da tela têm que ser **idênticos** a esses. Se divergirem, o `filter` novo em
+   `cycle_series_for` não é o mesmo predicado — ou uma das três assinaturas ficou desalinhada.
+2. Confirme cruzando com a tela `/finance/cycle` em **"Tudo aberto"**, que lista as linhas uma a uma.
+3. Toque `Mês | Ciclo` e confira que os dois números mudam juntos.
+4. Aperte o olho (esconder saldo) e confirme que a sub-linha vira `••••••`.
 
 ---
 
@@ -226,8 +252,21 @@ isso dispara no dia 11; com `null` (mês civil), no dia 1º.
 **Corpo da mensagem** — o dado sai de `private.cycle_series_for(array[d.workspace_id], m, m, null)`
 para o mês que fechou, e de `private.cash_events` para saber o que pesou:
 
-> `Entrou 7.566,52, saiu 8.272,53. Fechou em -705,29 e isso já entrou no ciclo novo. O que mais
-> pesou foi a fatura do Nubank (3.749,10). Quer ver o detalhe?`
+> `Entrou 7.566,52, saiu 8.272,53. Sobrou na conta 0,72. Ficou faltando pagar 3.749,10 (fatura do
+> Nubank). Quer ver o detalhe?`
+
+⚠️ **O corpo usa as COLUNAS CRUAS, e nunca uma manchete de "fechou em X".** Qual número lidera um
+ciclo fechado é regra do produto e ela mora em **`describeCycle` (`src/lib/cycle-label.ts`)**: com
+`faltou_pagar > 0` ele lidera com **−`faltou_pagar`** (a dívida) e manda `caixa_no_fim` para o
+rodapé; sem dívida, lidera com `caixa_no_fim`. Escrever essa escolha dentro do SQL é a **segunda
+cópia da regra** — e ela diverge: o push diria um número e a tela que ele abre diria outro, que é
+literalmente a queixa que criou o `describeCycle` (*"cada lugar fala uma coisa"*, 13/09/2026).
+
+**Na v1, o corpo é a lista de linhas do card `Fechamento` da tela do ciclo, nesta ordem:**
+`Entrou`, `Saiu`, `Sobrou na conta` (= `caixa_no_fim`) e, **só quando `faltou_pagar > 0`**,
+`Ficou faltando pagar`. Nenhuma manchete, nenhuma escolha entre os dois. Se um dia a manchete
+virar requisito, o caminho é **mover a regra para `private.describe_cycle` e o TS passar a chamá-la**
+— não duplicar.
 
 Regras de conteúdo, que não são estilo:
 - **Todo alerta termina numa ação** (`.claude/rules/finance.md`): "alerta que só informa é o que
@@ -382,10 +421,22 @@ itens do lote, que é o que funciona também para CSV.
 
 ### Como verificar
 
-Reimporte o **mesmo OFX de outubro** que está em `docs/evidence/` (ou reexporte do Nubank). Com as
-6 datas já corrigidas, o lote inteiro tem que cair em `duplicate` e a conciliação inversa tem que
-devolver **só o DAS de R$ 88,85** — que é o único lançamento do app que não está na fatura, porque
-é boleto, não cartão. Se vier mais coisa, o filtro de conta ou a janela estão errados.
+⚠️ **O OFX não está versionado no repositório** (conferido: `find . -iname '*.ofx'` não devolve
+nada, e `docs/evidence/` só tem `chat-ui`). **Reexporte a fatura de outubro do Nubank** — é a mesma
+que serviu de fonte da verdade na conciliação de 14/09/2026: 23 débitos, **R$ 3.660,25**.
+
+Com as 6 datas já corrigidas nesta sessão, o esperado é:
+
+1. **O lote inteiro cai em `duplicate`** (casamento exato). Se algum cair em `near_match`, a
+   correção de data daquele lançamento não pegou — investigue antes de seguir.
+2. **A conciliação inversa devolve zero ou uma linha, e qual depende da janela do arquivo.** O
+   único lançamento do app fora da fatura é o **DAS de R$ 88,85** (boleto, não cartão) — e ele tem
+   data à frente. **Confira o `DTSTART`/`DTEND` do OFX antes de julgar o resultado**: se o DAS cai
+   dentro da janela, ele aparece (correto — está no app e não no extrato); se cai depois do
+   `DTEND`, o esperado é **lista vazia**. Um resultado sem essa checagem não distingue "funcionou"
+   de "o filtro de janela está quebrado".
+3. Qualquer coisa **além** dessas é sinal de que o filtro de conta está errado — a conciliação
+   inversa tem que olhar só a conta importada, senão ela lista o financeiro inteiro.
 
 ---
 
@@ -466,9 +517,18 @@ nosso, não o do sistema.
 
 ⚠️ **O PIN nunca vai para o `AsyncStorage`.** Guarde **o hash** no `SecureStore` (Keychain no iOS,
 Keystore no Android). Um PIN de 6 dígitos tem 1 milhão de combinações — sem salt e sem custo, o
-hash é quebrado numa tabela. Use `expo-crypto` com salt aleatório por instalação, **e trate isso
-como o que é: proteção contra quem pegou o celular, não contra quem extraiu o dispositivo.**
-Documente essa limitação no cabeçalho do arquivo, como o `conceal.tsx` documenta a dele.
+hash é quebrado numa tabela. Use salt aleatório por instalação, **e trate isso como o que é:
+proteção contra quem pegou o celular, não contra quem extraiu o dispositivo.** Documente essa
+limitação no cabeçalho do arquivo, como o `conceal.tsx` documenta a dele.
+
+⚠️ **`expo-crypto` também NÃO está instalado** (conferido no `package.json` em 14/09/2026) —
+`npx expo install expo-crypto`, na mesma leva do `expo-local-authentication`, para o rebuild
+nativo ser um só.
+
+⚠️ **Com `disableDeviceFallback: true`, o toque em "Usar senha" volta como
+`{ success: false, error: 'user_fallback' }`, não como erro.** Esse é o sinal de abrir o nosso PIN.
+Tratar tudo que não é `success` como falha deixa o botão morto — e é o caminho que mais gente usa
+quando a digital não pega de primeira.
 
 **Onde o portão mora:** `src/app/_layout.tsx` já tem o padrão exato —
 `<AnimatedSplashOverlay ready={!loading && fontsLoaded} />` é um overlay acima de tudo. O
@@ -555,6 +615,19 @@ export function useTelaPronta(...qs: { isPending: boolean }[]): boolean {
 
 ⚠️ **`isPending`, não `isLoading`.** Isto já mordeu nesta sessão: com a query gated por
 `enabled: false`, `isLoading` é `false` e a tela mostrou "Nada em outubro" com dados existindo.
+
+⚠️ **E por isso mesmo: NUNCA passe para cá uma query que pode nascer desligada.** No TanStack v5,
+`enabled: false` deixa a query em `status: 'pending'` com `fetchStatus: 'idle'` **para sempre** —
+`isPending` nunca vira `false` e a tela **fica no skeleton eternamente**. Os casos que existem hoje:
+`useInvoice(undefined)` em `cycle.tsx` (só busca quando a fatura é expandida) e `useTransactions`
+enquanto `range.pronto` é `false`. Para esses, o portão é a **condição**, não a query:
+
+```ts
+const pronta = useTelaPronta(summary, cycle, accounts) && range.pronto;
+```
+
+Regra curta: **só entra em `useTelaPronta` a query que a tela SEMPRE roda.** Query condicional
+desenha o próprio estado, no bloco dela.
 
 ⚠️ **Não espere `isFetching`.** Refetch de fundo (realtime, voltar do background, pull-to-refresh)
 não pode trazer o skeleton de volta — a tela já tem conteúdo. O portão é só a PRIMEIRA carga.
