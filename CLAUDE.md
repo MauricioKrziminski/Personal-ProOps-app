@@ -171,5 +171,12 @@ negócio viva "por segurança" é como a segunda cópia volta a divergir.
 
 ## Plano de desenvolvimento vigente
 
+**As próximas fases estão em [`docs/PROXIMAS-FASES.md`](docs/PROXIMAS-FASES.md)** (escrito em
+14/09/2026): higiene, "já caiu" no Financeiro, fechamento de ciclo, conciliação pelo extrato,
+bloqueio por senha/biometria, loaders uniformes e — por último — planos, limites e preço com custo
+medido. Cada fase traz o *por quê*, os arquivos exatos, as armadilhas e como verificar. As travas
+que valem para todas (produção nunca sem pedido, **não criar tags**, a trava das projeções) estão
+no topo do documento.
+
 Migração para o agente Python/LangGraph (fases 0 a 5, com auditoria do código antigo e
 especificação do grafo) em `~/.claude/plans/voc-um-engenheiro-glittery-pike.md`.
