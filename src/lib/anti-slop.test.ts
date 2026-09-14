@@ -414,6 +414,14 @@ const INPUT_CRU_PERMITIDO = new Set([
   'src/components/auth/phone-field.tsx',
   'src/components/finance/money-input.tsx',
   'src/app/notes/[id].tsx',
+  /*
+    NÃO é um campo: `editable={false}`, sem foco, escondido do leitor de tela. `TextInput` é a
+    ÚNICA primitiva do RN cujo texto é uma prop animável (`text`), e é assim que o número do
+    herói conta até o valor novo sem um `setState` por quadro. Entra aqui porque o regex abaixo
+    passou a pegar `createAnimatedComponent(TextInput)` — sem a entrada, a brecha seguiria
+    aberta para um campo escrito à mão de verdade.
+  */
+  'src/components/ui/count-up-money.tsx',
 ]);
 
 test('nenhuma tela desenha o próprio campo de texto', () => {
@@ -429,7 +437,11 @@ test('nenhuma tela desenha o próprio campo de texto', () => {
         // ref de foco e não desenha campo nenhum — cinco telas legítimas caíam
         // aqui quando ele estava dentro. O ELEMENTO vem seguido de espaço (as
         // props descem para a linha de baixo) ou de `/`.
-        if (/<TextInput([\s/]|$)/.test(line)) fora.push(`${rel}:${n + 1}`);
+        // `createAnimatedComponent(TextInput)` renderiza `<OutroNome>`, então o elemento sozinho
+        // não bastava — era por ali que um campo à mão passaria sem ninguém ver.
+        if (/<TextInput([\s/]|$)/.test(line) || /createAnimatedComponent\(\s*TextInput\s*\)/.test(line)) {
+          fora.push(`${rel}:${n + 1}`);
+        }
       });
   }
   assert.deepEqual(
