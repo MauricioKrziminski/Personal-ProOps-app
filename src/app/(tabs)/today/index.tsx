@@ -1,7 +1,7 @@
 
 import { router } from 'expo-router';
 import { Pressable, StyleSheet, View } from 'react-native';
-import Animated, { FadeInDown, LinearTransition } from 'react-native-reanimated';
+import Animated, { FadeInDown, FadeOut, LinearTransition } from 'react-native-reanimated';
 
 import { ThemedText } from '@/components/themed-text';
 import { ErrorCard } from '@/components/error-card';
@@ -50,6 +50,16 @@ const TIGHT = 0.8;
  */
 /** Uma instância só: `LinearTransition` recriado a cada render remonta a animação. */
 const linear = LinearTransition.duration(Motion.duration.base);
+
+/**
+ * A linha de conta, animada.
+ *
+ * ⚠️ **`exiting` só existe em componente do Reanimated**, e a linha É o `Pressable` — envolvê-lo
+ * numa `View` mudaria o layout. A palavra é **mudança de estado** (§5): você toca em "Paguei" e a
+ * linha some; sem a saída ela pisca fora e as de baixo saltam para ocupar o lugar. Saída mais
+ * rápida que entrada, também §5 — `duration.exit` é 140ms contra os 200 da entrada.
+ */
+const LinhaAnimada = Animated.createAnimatedComponent(Pressable);
 
 /**
  * Um bloco da Hoje, entrando escalonado.
@@ -417,13 +427,15 @@ export default function TodayScreen() {
                 caminho nenhum para corrigir antes de pagar. Fatura e dívida já tinham
                 destino próprio pelo botão; só o lançamento avulso ficava sem.
               */
-              <Pressable
+              <LinhaAnimada
                 key={b.ref_id}
+                layout={linear}
+                exiting={FadeOut.duration(Motion.duration.exit)}
                 accessibilityRole={b.kind === 'transaction' ? 'button' : undefined}
                 accessibilityLabel={b.kind === 'transaction' ? `Abrir ${b.title}` : undefined}
                 disabled={b.kind !== 'transaction'}
                 onPress={() => router.push({ pathname: '/finance/[txId]', params: { txId: b.ref_id } })}
-                style={({ pressed }) => [
+                style={({ pressed }: { pressed: boolean }) => [
                   styles.card,
                   styles.billCard,
                   {
@@ -477,7 +489,7 @@ export default function TodayScreen() {
                     }
                   }}
                 />
-              </Pressable>
+              </LinhaAnimada>
             ))}
           </Secao>
         ) : null}
@@ -511,13 +523,15 @@ export default function TodayScreen() {
               }
             />
             {dueSoon.map((b) => (
-              <Pressable
+              <LinhaAnimada
                 key={b.ref_id}
+                layout={linear}
+                exiting={FadeOut.duration(Motion.duration.exit)}
                 accessibilityRole={b.kind === 'transaction' ? 'button' : undefined}
                 accessibilityLabel={b.kind === 'transaction' ? `Abrir ${b.title}` : undefined}
                 disabled={b.kind !== 'transaction'}
                 onPress={() => router.push({ pathname: '/finance/[txId]', params: { txId: b.ref_id } })}
-                style={({ pressed }) => [
+                style={({ pressed }: { pressed: boolean }) => [
                   styles.card,
                   styles.billCard,
                   {
@@ -559,7 +573,7 @@ export default function TodayScreen() {
                     }
                   }}
                 />
-              </Pressable>
+              </LinhaAnimada>
             ))}
           </Secao>
         ) : null}
@@ -585,12 +599,14 @@ export default function TodayScreen() {
               }
             />
             {aReceber.map((b) => (
-              <Pressable
+              <LinhaAnimada
                 key={b.ref_id}
+                layout={linear}
+                exiting={FadeOut.duration(Motion.duration.exit)}
                 accessibilityRole="button"
                 accessibilityLabel={`Abrir ${b.title}`}
                 onPress={() => router.push({ pathname: '/finance/[txId]', params: { txId: b.ref_id } })}
-                style={({ pressed }) => [
+                style={({ pressed }: { pressed: boolean }) => [
                   styles.card,
                   styles.billCard,
                   {
@@ -620,7 +636,7 @@ export default function TodayScreen() {
                   variant="secondary"
                   onPress={() => pay(b.ref_id, b.title, b.kind)}
                 />
-              </Pressable>
+              </LinhaAnimada>
             ))}
           </Secao>
         ) : null}

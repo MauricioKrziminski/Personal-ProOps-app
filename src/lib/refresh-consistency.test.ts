@@ -285,7 +285,19 @@ function renderToday(bill: { kind: 'invoice' | 'transaction'; ref_id: string }) 
     // props, que é o que o `visit` do teste percorre.
     if (name === 'react-native-reanimated') {
       const anim = (n: string) => ({ duration: () => anim(n), delay: () => anim(n) });
-      return { default: { View: 'Animated.View' }, FadeInDown: anim('in'), FadeOut: anim('out'), LinearTransition: anim('layout') };
+      return {
+        /*
+          ⚠️ `__esModule: true` é obrigatório: sem ele o `__importDefault` do TS embrulha o dublê
+          mais uma vez (`{ default: <tudo isto> }`), e `Animated.createAnimatedComponent` vira
+          undefined — com a mensagem "is not a function", que parece dublê incompleto e não é.
+
+          `createAnimatedComponent` devolve o NOME do componente embrulhado: o `visit` do teste
+          procura por `type`, então a linha de conta continua sendo achada como 'Pressable'.
+        */
+        __esModule: true,
+        default: { View: 'Animated.View', createAnimatedComponent: (c: string) => c },
+        FadeInDown: anim('in'), FadeOut: anim('out'), LinearTransition: anim('layout'),
+      };
     }
     if (name === '@/constants/theme') return { Fonts: {} };
     // O módulo REAL, não o Proxy: o fallback devolve uma string para cada chave, e a tela
