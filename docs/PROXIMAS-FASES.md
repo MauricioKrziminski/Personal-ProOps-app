@@ -1155,6 +1155,10 @@ Nenhum bloco pode aparecer enquanto outro ainda mostra skeleton.
 > **Isto é RECOMENDAÇÃO, não decisão.** Preço e limites são do dono do produto; o que está abaixo
 > é a aritmética com os números medidos, para a decisão não ser chute.
 
+⚠️ **NÃO EXISTE PLANO GRÁTIS** (decisão do dono do produto, 14/09/2026): *"não vai ter mais free,
+vai ser obrigado a colocar cartão para ter 7 dias gratis e não vai ter como usar free"*. A porta
+de entrada é **trial de 7 dias com cartão**, e o que vem depois dele é assinatura ou nada.
+
 **Custo FIXO — não escala com usuário** (medido: 190 s/dia de `billable_instance_time`, preços do
 catálogo de faturamento do GCP para `southamerica-east1`, request-based, Tier 2):
 
@@ -1166,54 +1170,112 @@ catálogo de faturamento do GCP para `southamerica-east1`, request-based, Tier 2
 | Cloud Tasks · Scheduler · Supabase · push Expo | — | 0 (camada grátis) |
 | **total** | | **US$ 0,21 ≈ R$ 1,08/mês** |
 
-**Custo VARIÁVEL por usuário** — só IA; o resto é ruído: **US$ 0,00062/mensagem ≈ R$ 0,0032**.
+**Custo VARIÁVEL por mensagem de IA: ≈ R$ 0,0042** — Gemini US$ 0,00062 (**medido**, 11 traces de
+10/09/2026 no Langfuse) mais Cloud Run **não medido**: os 190 s/dia acima são ~1.465 chamadas de
+cron a ~0,13 s, e produção teve ~0 mensagem de usuário naquela janela. O worker segura a requisição
+aberta enquanto espera o Gemini (~2 chamadas, segundos cada) — na cobrança por requisição isso são
+~5 vCPU-s ≈ US$ 0,0002, uns **30% em cima da IA**. Confirmar com a fatura real.
 
 | mensagens de IA/mês | custo |
 |---|---|
-| 100 | R$ 0,32 |
-| 1.000 | R$ 3,17 |
-| 2.000 | R$ 6,35 |
+| 200 | R$ 0,84 |
+| 1.000 | R$ 4,20 |
+| 2.000 | R$ 8,40 |
 
 ⚠️ **O `gate` custa 3,7× uma mensagem inteira.** Medido em 08/09: 35 chamadas do
 `gemini-3.7-flash` por US$ 0,0809 = **US$ 0,0023 cada**, contra US$ 0,00062 de um turno completo
 no Lite. Ele só dispara em confirmação **digitada** — é a única variável que escala mal, e é por
 isso que a razão clicado × digitado importa para o preço.
 
-**Preço recomendado: `pro` R$ 19,90/mês ou R$ 149,90/ano; `family` R$ 29,90/mês ou R$ 229,90/ano.**
+**O trial de 7 dias não é risco de custo.** No uso real (~230 mensagens em 7 dias) ele custa
+**R$ 0,97**; um trial que estoure o teto do `pro` inteiro dentro da semana custa **R$ 4,20**. O
+teto do plano já é a trava — não precisa de segunda.
 
-Ancoragem de mercado (pesquisado em 14/09/2026): Organizze Pro ~R$ 17,90/mês e ~R$ 199,90/ano;
-Mobills Premium ~R$ 19,90/mês e R$ 119,90/ano. R$ 19,90 fica no meio do mensal, e R$ 149,90 fica
-entre os dois anuais — com desconto de 37% sobre o mensal, que é a faixa em que anual converte.
+#### O trial já está construído — é configuração, não código
 
-**Margem, já descontada a taxa de 15% da loja** (Apple Small Business / Google até US$ 1 M):
+O modelo "cartão obrigatório, 7 dias grátis" é exatamente o que App Store e Play Store chamam de
+*free trial* de uma assinatura: o produto é criado com o período introdutório na loja, o usuário
+assina normalmente e só é cobrado no 8º dia. **Isto não vira estado novo no nosso banco:**
 
-| preço | líquido | usuário no TETO de 1.000 msgs | margem |
+| peça | onde já está |
+|---|---|
+| oferta de 7 dias | App Store Connect / Play Console, no produto — **nenhum preço ou prazo entra no código** |
+| entitlement durante o trial | RevenueCat manda `INITIAL_PURCHASE` → `MANTEM_ACESSO` (`agent/app/domain/billing.py`) → plano `pro` |
+| saber que é trial | `subscriptions.is_trial`, já existe e já sai em `plan_status()` |
+| fim do trial sem pagar | `EXPIRATION` → `REVOGA` → `effective_plan` cai para `free`, e `plan_status` devolve `status = 'expired'` |
+
+#### A única decisão que "sem free" força: o que `free` passa a ser
+
+Hoje `private.plan_limits('free')` é `1 membro / 100 mensagens / sem importação` — um plano grátis
+utilizável. Sem free, essa linha deixa de ser um plano e passa a ser **o estado de quem não tem
+assinatura**: antes de assinar e depois de expirar.
+
+**Recomendação: `free` vira LEITURA, não porta trancada** — `1 / 0 / false`, dado visível e
+exportável, escrita de IA e importação bloqueadas.
+
+O motivo é o mesmo que já está em `.claude/rules/finance.md` sobre cancelamento: *"dificultar
+cancelamento é a reclamação nº1 contra os concorrentes no Reclame Aqui — não repetir"*. Trancar
+alguém para fora de meses do próprio dado financeiro, que ele digitou, é a versão pior disso — e
+é o tipo de coisa que volta como review de 1 estrela e como risco na revisão da loja.
+
+| | custo | código |
+|---|---|---|
+| `plan_limits('free')` → `1, 0, false` | uma migration de uma linha | o agente já recusa em 0 (`_check_limits` lê `max_ai_messages_month`) |
+| bloquear escrita MANUAL no app | decisão de produto ainda em aberto | **é código novo** — hoje nada gateia `insert` manual por plano |
+
+#### Preço recomendado
+
+**`pro` R$ 19,90/mês ou R$ 139,90/ano · `family` R$ 29,90/mês ou R$ 209,90/ano.**
+
+Ancoragem de mercado (14/09/2026): **Organizze Pro R$ 17,90/mês e R$ 134,90/ano** (−37%);
+**Mobills Premium R$ 19,90/mês e R$ 119,90/ano** (−50%). R$ 19,90 empata com o Mobills no mensal,
+e R$ 139,90 fica logo acima da faixa anual dos dois — o prêmio que o produto cobra é o agente por
+WhatsApp, que nenhum dos dois tem.
+
+⚠️ **Os dois concorrentes TÊM plano grátis e nós não teremos.** Somos mais exigentes na porta, o
+que é argumento para ficar *no* preço deles e não acima. Cobrar mais que os dois **e** exigir
+cartão antes de qualquer uso é empilhar as duas fricções na mesma decisão.
+
+⚠️ **O desconto anual é 41%, não 47%.** A margem do anual é definida pelo TETO de mensagens, não
+pelo preço: cada R$ 1 de desconto anual sai inteiro da margem, enquanto o custo de IA continua o
+mesmo todo mês. A 47% (R$ 129,90 / R$ 189,90) o `family` no teto chega a **16% de margem** no
+Simples mais caro. 41% mantém os quatro acima de 20%.
+
+**Margem depois da loja (15%, Apple Small Business / Google até US$ 1 M) E do imposto**
+(Simples Nacional, Anexo III a 6% e Anexo V a 16% — a faixa real depende do fator R):
+
+| plano | receita/mês | sobra (imp. 6% → 16%) | IA no TETO | **margem** |
+|---|---|---|---|---|
+| `pro` mensal R$ 19,90 | 19,90 | 15,72 → 13,73 | 4,20 | **11,52 → 9,53** (58% → 48%) |
+| `pro` anual R$ 139,90 | 11,66 | 9,21 → 8,04 | 4,20 | **5,01 → 3,85** (43% → 33%) |
+| `family` mensal R$ 29,90 | 29,90 | 23,62 → 20,63 | 8,40 | **15,22 → 12,23** (51% → 41%) |
+| `family` anual R$ 209,90 | 17,49 | 13,82 → 12,07 | 8,40 | **5,42 → 3,67** (31% → 21%) |
+
+⚠️ **A coluna "IA no teto" é o pior caso, não o esperado.** Um usuário em 200 mensagens/mês custa
+R$ 0,84, e aí o `pro` anual margina R$ 8,37 (72%). O teto existe para o custo ter fundo, não
+porque alguém vá encostar nele.
+
+O custo fixo de R$ 1,08/mês é pago pelo **primeiro** assinante, com folga de uma ordem de
+grandeza. Não existe ponto de equilíbrio a perseguir: o modelo é lucrativo no assinante nº 1.
+
+#### Limites propostos
+
+| | (sem assinatura) | pro | family |
 |---|---|---|---|
-| R$ 14,90 | R$ 12,66 | R$ 3,17 | R$ 9,49 (75%) |
-| **R$ 19,90** | **R$ 16,91** | **R$ 3,17** | **R$ 13,74 (81%)** |
-| R$ 24,90 | R$ 21,16 | R$ 3,17 | R$ 17,99 (85%) |
-
-O custo fixo de R$ 1,08/mês é pago pelo **primeiro** assinante, com 13× de folga. Não existe
-ponto de equilíbrio a perseguir: o modelo é lucrativo no assinante nº 1.
-
-**Limites propostos** (hoje: free 1/100/não · pro 3/1000/sim · family 5/2000/sim):
-
-| | free | pro | family |
-|---|---|---|---|
-| preço | R$ 0 | R$ 19,90/mês · R$ 149,90/ano | R$ 29,90/mês · R$ 229,90/ano |
+| preço | — | R$ 19,90/mês · R$ 139,90/ano | R$ 29,90/mês · R$ 209,90/ano |
 | membros | 1 | **1** (era 3) | 5 |
-| mensagens de IA/mês | 100 | 1.000 | 2.000 |
+| mensagens de IA/mês | **0** (era 100) | 1.000 | 2.000 |
 | importar extrato | não | sim | sim |
+| ver e exportar o próprio dado | **sim** | sim | sim |
 
 Duas mudanças, e o motivo de cada uma:
 
 1. **`pro` cai de 3 membros para 1.** Ter 3 no Pro apaga a razão de existir do Family — e o Family
    é o plano que justifica preço maior sem tocar em limite de IA. Dá para mudar sem custo: não há
    nenhum assinante pago hoje (produção tem 1 workspace, `free`).
-2. **O teto de 100 do `free` FICA, e é escolha de produto, não de custo.** 100 mensagens custam
-   R$ 0,32 — servir o plano grátis é irrelevante na conta. O limite existe para formar hábito sem
-   substituir o pago; mexer nele é decisão de conversão, e a alavanca forte já está no lugar
-   (**importar extrato é pago**).
+2. **`free` cai de 100 mensagens para 0**, que é a tradução literal de "não vai ter como usar
+   free". Servir 100 mensagens custaria R$ 0,42 — a mudança **não é de custo, é de produto**: com
+   trial de 7 dias, um teto grátis permanente competiria com o próprio trial.
 
 ⚠️ **NÃO acrescente uma quarta dimensão de limite.** Foi avaliado e recusado: as candidatas
 naturais (horizonte da projeção, "E se…?", conciliação inversa) são o CORAÇÃO do produto — o
@@ -1225,10 +1287,13 @@ custo real (IA), valor real (importação) e escopo real (membros).
 
 | buraco | por quê importa |
 |---|---|
+| **Cloud Run por mensagem** | estimado em ~30% sobre a IA, **não medido** — a janela medida era ~100% cron |
+| **imposto** | a faixa do Simples (Anexo III × V, fator R) é decisão contábil; a tabela usa 6% e 16% como extremos |
 | **Groq (áudio)** | não medido. Áudio vira texto antes do grafo, então some no custo de IA — mas a transcrição em si tem preço próprio |
 | **template do WhatsApp fora da janela de 24h** | é pago por mensagem. Hoje o proativo prefere push (grátis); se isso inverter, o custo por usuário muda de patamar |
 | **camada grátis do Langfuse** | staging e produção dividem um projeto só; se o volume crescer, ali aparece uma conta nova |
 | **fatura real do GCP** | o export para o BigQuery foi ligado em 14/09/2026 e não é retroativo. Ele vai CONFIRMAR os R$ 1,08, não descobri-los — a proporção fixo × variável já está medida |
+| **amostra da IA** | os US$ 0,00062 saem de 11 traces de UM dia. O preço por token do Lite é determinístico, então o erro provável é de mix de tamanho, não de ordem de grandeza |
 
 ### Por quê por último
 
