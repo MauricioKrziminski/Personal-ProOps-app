@@ -146,6 +146,25 @@ export default function InvoiceScreen() {
     .filter((t) => t.kind === 'expense')
     .reduce((soma, t) => soma + t.amount_cents, 0);
 
+  /**
+   * Quanto do total JÁ foi lançado, contra o que ainda vai entrar até o fechamento.
+   *
+   * ⚠️ **O corte é a DATA, nunca o `status`** — a régua está escrita em `finance.md`: compra de
+   * cartão fica `pending` até a fatura ser paga, então filtrar por `cleared` chamaria de
+   * "previsto" a compra que a pessoa fez semana passada.
+   *
+   * Isto existe porque a conta não fechava contra o extrato do banco e a pergunta foi literal
+   * (13/09/2026): a fatura do Nubank dizia R$ 3.660,28 e o app, R$ 3.760,20. A diferença era uma
+   * recorrente de R$ 88,85 com data 20/09 — ainda não aconteceu. **Os dois números estavam
+   * certos**: o banco mostra o que já foi lançado, o app mostra como a fatura vai FECHAR. O que
+   * faltava era a tela dizer qual dos dois ela estava mostrando.
+   */
+  const hoje = localISODate();
+  const jaLancado = compras
+    .filter((t) => t.kind === 'expense' && t.occurred_at <= hoje)
+    .reduce((soma, t) => soma + t.amount_cents, 0);
+  const aindaVem = total - jaLancado;
+
   const dias = useMemo(() => {
     const mapa = new Map<string, Transaction[]>();
     for (const t of compras) {
@@ -349,6 +368,17 @@ export default function InvoiceScreen() {
             <ThemedText type="small" themeColor="textSecondary" style={tabular}>
               fecha {formatDateBR(fatura.closing_date)} · vence {formatDateBR(fatura.due_date)}
             </ThemedText>
+            {/*
+                Só aparece quando há previsto: numa fatura já fechada esta linha repetiria o
+                número grande, e soma que repete a única parcela é eco, não resumo (§1).
+                "lançado / ainda vem" e não "pago / falta": as duas palavras de pagamento são da
+                linha logo abaixo, que fala de quanto da fatura já foi QUITADO.
+            */}
+            {aindaVem > 0 ? (
+              <ThemedText type="small" themeColor="textSecondary" style={tabular}>
+                Lançado {formatBRL(jaLancado)} · ainda vem {formatBRL(aindaVem)}
+              </ThemedText>
+            ) : null}
             {paga && fatura.paid_at ? (
               <View style={styles.pagaLinha}>
                 <Icon name="checkmark.circle.fill" size="md" color="success" />
