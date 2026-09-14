@@ -680,6 +680,15 @@ export default function RecurringScreen() {
                 />
               </Field>
 
+              <Field label="Conta">
+                <AccountPicker
+                  accounts={accounts.data ?? []}
+                  value={form.accountId}
+                  onChange={(accountId: string | null) => setForm({ ...form, accountId })}
+                  emptyLabel="Não informar"
+                />
+              </Field>
+
               {form.id ? (
                 // Editando: a frequência e a âncora saem da tela. `dtstart` é imutável
                 // por desenho e mudar a cadência implicaria remontar o que já foi
@@ -765,15 +774,6 @@ export default function RecurringScreen() {
                   placeholder="Sem fim"
                   accessibilityLabel="Data em que a série termina"
                   invalid={Boolean(form.fim) && !fimOk}
-                />
-              </Field>
-
-              <Field label="Conta">
-                <AccountPicker
-                  accounts={accounts.data ?? []}
-                  value={form.accountId}
-                  onChange={(accountId: string | null) => setForm({ ...form, accountId })}
-                  emptyLabel="Não informar"
                 />
               </Field>
 

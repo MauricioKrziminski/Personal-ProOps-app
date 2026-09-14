@@ -562,13 +562,12 @@ export default function BudgetsScreen() {
                 )}
               </Field>
 
-              <Field label="Limite">
-                <MoneyField
-                  valueCents={form.limitCents}
-                  onChangeCents={(limitCents) => setForm({ ...form, limitCents })}
-                />
-              </Field>
-
+              {/*
+                ⚠️ **Escopo ANTES do Limite: ele diz o que "Limite" SIGNIFICA.** "Todo mês" grava
+                o limite padrão, "Só este mês" sobrescreve um mês. Vindo depois, a pessoa digitava
+                o valor sem saber onde ele ia cair — é a régua de `frontend.md`, "controle que
+                muda o que os outros campos querem dizer vem antes deles".
+              */}
               <Field
                 label="Escopo"
                 hint={`Só este mês sobrescreve o limite padrão em ${nomeDoMes(month)} e não mexe nos outros.`}>
@@ -581,6 +580,14 @@ export default function BudgetsScreen() {
                   onChange={(scope) => setForm({ ...form, scope })}
                 />
               </Field>
+
+              <Field label="Limite">
+                <MoneyField
+                  valueCents={form.limitCents}
+                  onChangeCents={(limitCents) => setForm({ ...form, limitCents })}
+                />
+              </Field>
+
 
               <Field
                 label="Acumular sobra"

@@ -532,6 +532,19 @@ export default function AccountsScreen() {
 
               {form.type === 'credit_card' ? (
                 <>
+                  {/*
+                    ⚠️ **Valores antes do cronograma** (`frontend.md`: nome → tipo → valores →
+                    cronograma → conta). O limite ficava lá embaixo, depois do par fecha/vence e
+                    de três extras — ordem invertida, e diferente do ramo não-cartão do MESMO
+                    sheet, que é Nome → Tipo → Saldo inicial.
+                  */}
+                  <Field label="Limite do cartão">
+                    <MoneyField
+                      valueCents={form.limitCents}
+                      onChangeCents={(limitCents) => setForm({ ...form, limitCents })}
+                    />
+                  </Field>
+
                   <View style={styles.diaRow}>
                     <View style={styles.diaCampo}>
                       <Field
@@ -633,13 +646,6 @@ export default function AccountsScreen() {
                       }
                       keyboardType="decimal-pad"
                       placeholder="15,5"
-                    />
-                  </Field>
-
-                  <Field label="Limite do cartão">
-                    <MoneyField
-                      valueCents={form.limitCents}
-                      onChangeCents={(limitCents) => setForm({ ...form, limitCents })}
                     />
                   </Field>
 

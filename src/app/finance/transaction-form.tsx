@@ -425,32 +425,6 @@ function TransactionForm({ editing }: { editing?: Transaction }) {
         ) : null}
 
         {/*
-          ⚠️ **"Repetir lançamento" também no MODO EDIÇÃO**, quando o lançamento ainda não é de
-          série. Era só na criação, e por isso não havia caminho para transformar um gasto que já
-          existe em recorrente — foi a queixa *"queria colocar o Cabelo Marcelao como recorrente
-          mas quando vou em editar o lançamento, eu não consigo"*. Quem já tem série não vê o
-          botão: ali o caminho é editar a série, não criar uma segunda.
-        */}
-        {!editing || !(editing.recurring_id || editing.installment_plan_id) ? (
-          <View style={styles.errorActions}>
-            <Button label="Repetir lançamento" variant="secondary" size="sm" onPress={() => {
-              const values = getValues();
-              const destino = { pathname: '/finance/recurring' as const, params: {
-                create: '1', kind: values.kind === 'income' ? 'income' : 'expense',
-                amount: String(values.amount_cents), description: values.description ?? '',
-                category: values.category ?? '', account: values.account_id ?? '', start: values.occurred_at,
-              } };
-              // Criando, o formulário é descartável e `replace` evita voltar para um rascunho
-              // pela metade. Editando, o lançamento continua existindo — `push` devolve para ele.
-              if (editing) router.push(destino);
-              else router.replace(destino);
-            }} />
-            {!editing ? (
-              <Button label="Financiamento" variant="secondary" size="sm" onPress={() => router.push({ pathname: '/finance/debts', params: { create: 'financing' } })} />
-            ) : null}
-          </View>
-        ) : null}
-        {/*
           Tipo primeiro porque ele decide QUAIS campos existem: transferência troca
           "Categoria" por "Para a conta". Controle que remonta o formulário não pode vir
           depois do que ele remonta.
@@ -782,6 +756,39 @@ function TransactionForm({ editing }: { editing?: Transaction }) {
           </ThemedText>
         ) : null}
 
+
+        {/*
+          ⚠️ **Estes botões ficam no RODAPÉ, não no topo.** Eles não são campos — são ações
+          SOBRE o registro, como "Apagar lançamento" logo abaixo. No topo, o modo edição abria com
+          três blocos não-campo antes do primeiro campo, e o formulário começava por uma coisa que
+          leva para OUTRA tela. A régua de `frontend.md` é sobre campos; o que ela implica aqui é
+          que ação de ciclo de vida mora no fim, junto das outras.
+
+          ⚠️ **"Repetir lançamento" também no MODO EDIÇÃO**, quando o lançamento ainda não é de
+          série. Era só na criação, e por isso não havia caminho para transformar um gasto que já
+          existe em recorrente — foi a queixa *"queria colocar o Cabelo Marcelao como recorrente
+          mas quando vou em editar o lançamento, eu não consigo"*. Quem já tem série não vê o
+          botão: ali o caminho é editar a série, não criar uma segunda.
+        */}
+        {!editing || !(editing.recurring_id || editing.installment_plan_id) ? (
+          <View style={styles.errorActions}>
+            <Button label="Repetir lançamento" variant="secondary" size="sm" onPress={() => {
+              const values = getValues();
+              const destino = { pathname: '/finance/recurring' as const, params: {
+                create: '1', kind: values.kind === 'income' ? 'income' : 'expense',
+                amount: String(values.amount_cents), description: values.description ?? '',
+                category: values.category ?? '', account: values.account_id ?? '', start: values.occurred_at,
+              } };
+              // Criando, o formulário é descartável e `replace` evita voltar para um rascunho
+              // pela metade. Editando, o lançamento continua existindo — `push` devolve para ele.
+              if (editing) router.push(destino);
+              else router.replace(destino);
+            }} />
+            {!editing ? (
+              <Button label="Financiamento" variant="secondary" size="sm" onPress={() => router.push({ pathname: '/finance/debts', params: { create: 'financing' } })} />
+            ) : null}
+          </View>
+        ) : null}
 
         {editing ? (
           <Button

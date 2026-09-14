@@ -713,6 +713,12 @@ export default function DebtsScreen() {
                 </Card>}
                 <Button label={form.showDetails ? 'Ocultar detalhes' : 'Adicionar detalhes (opcional)'} variant="ghost" onPress={() => setForm({ ...form, showDetails: !form.showDetails })} />
                 {form.showDetails && <>
+                  {/*
+                    "Nome" fica AQUI, e isso é decisão testada, não descuido de ordem: o caminho
+                    rápido do financiamento pergunta só as três coisas de que ele precisa, e
+                    `name` cai em "Financiamento" quando vazio (`simple-finance-ui.test.ts`).
+                    Dentro do grupo opcional ele já é o primeiro — que é o que a régua pede.
+                  */}
                   <Field label="Nome (opcional)"><TextField value={form.name} onChangeText={(name) => setForm({ ...form, name })} placeholder="Financiamento do carro" /></Field>
                   {!form.id && <Field label="Parcelas já pagas" hint="Deixe zero se nenhuma foi paga. Esse histórico não movimenta dinheiro.">
                     <TextField value={String(form.installmentsPaid)} onChangeText={(value) => setForm({ ...form, installmentsPaid: Number(value.replace(/\D/g, '')), historyConfirmed: true })} keyboardType="number-pad" maxLength={3} />
@@ -819,24 +825,6 @@ export default function DebtsScreen() {
                 <MoneyField valueCents={form.installmentCents} onChangeCents={(installmentCents) => setForm({ ...form, installmentCents })} />
               </Field>
               <ThemedText type="small" themeColor="textSecondary">O cronograma é uma estimativa mensal. Cadastrar a dívida não cria prestações pendentes na projeção; registre cada pagamento nesta tela.</ThemedText>
-              {!form.id && form.parcelas !== '' && (
-                <Field label="Quantas parcelas já foram pagas?"
-                  hint="Já está no saldo devedor acima — não desconto de novo.">
-                  <View style={styles.duasColunas}>
-                    <Chip label="Nenhuma" selected={form.historyConfirmed && form.installmentsPaid === 0}
-                      onPress={() => setForm({ ...form, installmentsPaid: 0, historyConfirmed: true })} />
-                    <TextField value={form.historyConfirmed ? String(form.installmentsPaid) : ''}
-                      onChangeText={(v) => setForm({ ...form, installmentsPaid: Number(v.replace(/\D/g, '')), historyConfirmed: v.trim() !== '' })}
-                      placeholder="Informe, inclusive zero" maxLength={3} keyboardType="number-pad"
-                      accessibilityLabel="Parcelas do financiamento já pagas" />
-                  </View>
-                </Field>
-              )}
-              {form.parcelas !== '' && form.historyConfirmed && (
-                <ThemedText type="small" themeColor="textSecondary">
-                  {`${form.installmentsPaid} pagas + ${form.parcelas} restantes = ${Number(form.parcelas) + form.installmentsPaid} parcelas no total.`}
-                </ThemedText>
-              )}
               <View style={styles.duasColunas}>
                 <View style={styles.coluna}>
                   <Field label="Parcelas que faltam">
@@ -863,6 +851,31 @@ export default function DebtsScreen() {
                   </Field>
                 </View>
               </View>
+              {/*
+                ⚠️ **Vem DEPOIS de "Parcelas que faltam", porque é esse campo que o cria.**
+                Ele renderizava ACIMA, gated em `form.parcelas !== ''` — então digitar o número
+                de parcelas fazia um campo novo NASCER acima do dedo e empurrar o formulário
+                inteiro para baixo no meio da digitação. É a mesma frase da régua de
+                `frontend.md` ("a tela se remonta debaixo do dedo"), só que para cima.
+              */}
+              {!form.id && form.parcelas !== '' && (
+                <Field label="Quantas parcelas já foram pagas?"
+                  hint="Já está no saldo devedor acima — não desconto de novo.">
+                  <View style={styles.duasColunas}>
+                    <Chip label="Nenhuma" selected={form.historyConfirmed && form.installmentsPaid === 0}
+                      onPress={() => setForm({ ...form, installmentsPaid: 0, historyConfirmed: true })} />
+                    <TextField value={form.historyConfirmed ? String(form.installmentsPaid) : ''}
+                      onChangeText={(v) => setForm({ ...form, installmentsPaid: Number(v.replace(/\D/g, '')), historyConfirmed: v.trim() !== '' })}
+                      placeholder="Informe, inclusive zero" maxLength={3} keyboardType="number-pad"
+                      accessibilityLabel="Parcelas do financiamento já pagas" />
+                  </View>
+                </Field>
+              )}
+              {form.parcelas !== '' && form.historyConfirmed && (
+                <ThemedText type="small" themeColor="textSecondary">
+                  {`${form.installmentsPaid} pagas + ${form.parcelas} restantes = ${Number(form.parcelas) + form.installmentsPaid} parcelas no total.`}
+                </ThemedText>
+              )}
               {/*
                 A conta que paga vem DEPOIS do cronograma: ela estava no meio dos valores,
                 separando "valor da prestação" de "quantas parcelas". Campo longo (uma lista
