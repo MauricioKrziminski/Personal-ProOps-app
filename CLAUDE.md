@@ -30,9 +30,11 @@ App mobile pessoal de **notas rápidas, lembretes e controle financeiro operado 
   Isso já falhou **duas vezes** (03/09/2026): a `0049` e depois as `0050`/`0051` foram anunciadas
   como "aplicadas em produção" quando foram para o staging.
 
-  Produção está em **`20260914180000`** (a de Notas: cor, pin, arquivar e ordem manual), aplicada
-  em 15/09/2026 pelo Gabriel com `db push --project-ref` — e o repo não tem nenhuma migration fora
-  de lá. Conferido no `migration list` antes: exatamente UMA pendente.
+  Produção está em **`20260915120000`** (a coluna `atrasada` de `cycle_lines`), aplicada em
+  15/09/2026 pelo Gabriel, logo depois da `20260914180000` (Notas: cor, pin, arquivar e ordem
+  manual) — e o repo não tem nenhuma migration fora de lá. As duas foram conferidas na fonte
+  DEPOIS de aplicar: a `atrasada` é a última coluna de `cycle_lines`, `authenticated` mantém
+  `execute` nas duas portas públicas e `_cycle_lines` segue revogada.
 
   Conferido na fonte depois da leva de 14/09: as 43 RPCs que o app chama existem e continuam com `execute`
   para `authenticated` (é o modo de falha do par `200000`/`220000`, abaixo), e
