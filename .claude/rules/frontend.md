@@ -155,6 +155,27 @@ vocabulário comum das duas plataformas.
 **Sintoma de que a regra foi violada:** `Platform.OS` dentro de `src/app/`. Se apareceu ali e não
 é regra de negócio, o lugar certo é um primitivo em `src/components/ui/`.
 
+### Formulário que OUTRA tela abriu devolve para ela ao fechar
+
+⚠️ **Três telas hospedam formulário num `Sheet`, e chegar neles de fora é um `push` na tela da
+LISTA com um parâmetro** — `/finance/recurring?edit=`, `/finance/installments?edit=`,
+`/finance/debts?create=financing`. Fechando o sheet, a lista ficava: a pessoa era largada numa
+tela que ela nunca pediu. A queixa foi literal (15/09/2026): *"cliquei em editar a compra
+inteira e quando eu clico em voltar, ao invés de voltar para a tela onde eu estava, ele me leva
+para a tela de Parceladas"*.
+
+O `push` está certo — é como a pilha sabe voltar. O que faltava era **fechar o formulário fechar
+também a tela que só existia para hospedá-lo**: `useVoltarQuandoFechar`
+(`src/hooks/use-voltar-quando-fechar.ts`), usado nos TRÊS pontos de saída (o ✕ do `TaskHeader`, o
+`onClose` do `Sheet` e o sucesso do salvar). Quem abriu pela própria lista continua na lista —
+só volta quem veio de fora, e `simple-finance-ui.test.ts` prende os dois lados.
+
+⚠️ Não confundir com a guarda de `?edit=` já consumido (`edicaoAberta`), que existe para o sheet
+não reabrir no render seguinte. São duas perguntas diferentes sobre o mesmo parâmetro.
+
+**Formulário novo que se abre por parâmetro nasce com isso** — senão a régua volta a divergir
+tela a tela, que é como ela nasceu.
+
 ## Estado local
 
 - Preferir estado de servidor (Query) + `useState`. Zustand só se estado global de UI real aparecer (hoje não há nenhum) — não criar store "por via das dúvidas".

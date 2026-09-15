@@ -190,6 +190,14 @@ outra lente ocupar o topo desta.
 ⚠️ **Com filtro ativo o card SOME.** `transactions_summary` soma o período inteiro e a lista
 filtrada soma menos — mantê-lo ali recria o mesmo defeito com outra cara.
 
+⚠️ **E o PERCENTUAL é a mesma regra: numerador e denominador saem da MESMA coluna**
+(15/09/2026). "Onde o dinheiro foi" escrevia **"0% do mês" nas seis categorias** — o divisor era
+o REALIZADO (`total_cents − pending_cents`) enquanto cada linha mostrava `total_cents`. No ciclo
+corrente quase nada está `cleared` (compra no cartão só é baixada quando a fatura é paga), então
+o divisor era ZERO e o `> 0 ?` devolvia o mesmo 0% para todas. Não é "um pouco errado": um
+percentual igual em todas as linhas apaga exatamente a comparação que o bloco existe para fazer.
+O divisor é a soma das linhas mostradas.
+
 ⚠️ **A lista precisa da janela JÁ RESOLVIDA, nunca de um `YYYY-MM` para ela mesma recortar.**
 `useTransactions` chamava `monthBounds()` (o mês CIVIL) enquanto o resumo da mesma tela pedia a
 janela a `useMonthRange`, que respeita a régua. Com fechamento no dia 10 as duas discordavam em
