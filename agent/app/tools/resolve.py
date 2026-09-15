@@ -109,7 +109,10 @@ def _rotulo_plano(row: dict) -> str:
     e perderia exatamente o que distingue a compra inteira de uma parcela solta —
     as duas apareceriam na MESMA pergunta com rótulos quase idênticos.
     """
-    nome = (row.get("description") or "compra parcelada").strip()
+    # `merchant` no meio: mesma régua da linha de transação (`description ?? merchant`) e do
+    # app (`plan.merchant || plan.description`). Sem ele a compra cujo nome vive no
+    # estabelecimento aparecia na pergunta como "Tudo (2x) — compra parcelada".
+    nome = (row.get("description") or row.get("merchant") or "compra parcelada").strip()
     return f"Tudo ({row['installments']}x) — {nome}"
 
 
@@ -155,12 +158,18 @@ _FONTES: dict[str, dict] = {
                   order by created_at desc limit %s""",
         "label": lambda r: r["name"],
     },
+    # ⚠️ `merchant` entra na projeção E no filtro: o nome da compra pode estar só nele (quem
+    # preencheu "Estabelecimento" e deixou a descrição vazia). Sem isso, "apaga a nuuvem por
+    # completo" não achava o PLANO — só as parcelas, pelo texto delas —, e o rótulo saía
+    # "Tudo (2x) — compra parcelada", que é o genérico de novo.
     "planos": {
         "table": "installment_plans",
-        "sql": """select id, description, total_cents, installments, first_occurred_at
+        "sql": """select id, description, merchant, total_cents, installments, first_occurred_at
                   from public.installment_plans
-                  where workspace_id = %s and coalesce(description,'') ilike %s
+                  where workspace_id = %s
+                    and (coalesce(description,'') ilike %s or coalesce(merchant,'') ilike %s)
                   order by created_at desc limit %s""",
+        "dois_termos": True,
         "label": _rotulo_plano,
         "detalhe": _detalhe_plano,
     },
@@ -338,7 +347,7 @@ async def _com_plano(workspace_id, candidatos: list[dict]) -> list[dict]:
 
     rows = await db.fetch(
         """
-        select t.id as tx_id, p.id as plan_id, p.description, p.total_cents, p.installments, p.first_occurred_at
+        select t.id as tx_id, p.id as plan_id, p.description, p.merchant, p.total_cents, p.installments, p.first_occurred_at
         from public.transactions t
         join public.installment_plans p on p.id = t.installment_plan_id
         where t.id = any(%s) and t.workspace_id = %s and p.workspace_id = %s
