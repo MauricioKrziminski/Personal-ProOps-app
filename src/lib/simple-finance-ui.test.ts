@@ -133,11 +133,11 @@ const debtsFile = 'src/app/finance/debts.tsx';
 
 test('new financing saves from only the installment value and total count, without account/name/interest', () => {
   const ui = screen(debtsFile);
-  assert.deepEqual(ui.nodes().filter((n) => n.type === 'Field').map((n) => n.props.label), ['Valor da parcela', 'Quantidade total de parcelas', 'Vence dia']);
+  assert.deepEqual(ui.nodes().filter((n) => n.type === 'Field').map((n) => n.props.label), ['Valor da parcela', 'Total de parcelas', 'Vence dia']);
   assert.equal(ui.button('Salvar').props.disabled, true);
   ui.fill('Valor da parcela', 147000);
   assert.equal(ui.button('Salvar').props.disabled, true);
-  ui.fill('Quantidade total de parcelas', '48');
+  ui.fill('Total de parcelas', '48');
   // O cronograma ancora no vencimento: sem ele a projeção chuta o dia da saída.
   assert.equal(ui.button('Salvar').props.disabled, true);
   ui.fill('Vence dia', '10');
@@ -159,7 +159,7 @@ test('new financing saves from only the installment value and total count, witho
 test('optional history reduces remaining installments without changing the original contract total', () => {
   const ui = screen(debtsFile);
   ui.fill('Valor da parcela', 147000);
-  ui.fill('Quantidade total de parcelas', '48');
+  ui.fill('Total de parcelas', '48');
   ui.fill('Vence dia', '10');
   ui.press('Adicionar detalhes (opcional)');
   ui.fill('Parcelas já pagas', '8');
@@ -173,7 +173,7 @@ test('optional history reduces remaining installments without changing the origi
 test('history above the contract total prevents submission', () => {
   const ui = screen(debtsFile);
   ui.fill('Valor da parcela', 147000);
-  ui.fill('Quantidade total de parcelas', '48');
+  ui.fill('Total de parcelas', '48');
   ui.fill('Vence dia', '10');
   ui.press('Adicionar detalhes (opcional)');
   ui.fill('Parcelas já pagas', '49');

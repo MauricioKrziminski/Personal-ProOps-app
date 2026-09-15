@@ -700,7 +700,7 @@ export default function DebtsScreen() {
                 <Field label="Valor da parcela" hint="Use o valor que você paga todo mês, já com juros e taxas incluídos.">
                   <MoneyField valueCents={form.installmentCents} onChangeCents={(installmentCents) => setForm({ ...form, installmentCents })} />
                 </Field>
-                <Field label="Quantidade total de parcelas">
+                <Field label="Total de parcelas">
                   <TextField value={form.parcelas} onChangeText={(value) => setForm({ ...form, parcelas: value.replace(/\D/g, '').slice(0, 3) })} keyboardType="number-pad" placeholder="48" />
                 </Field>
                 {/* Saiu de "detalhes (opcional)": é o vencimento que ancora o cronograma.
@@ -727,11 +727,11 @@ export default function DebtsScreen() {
                     forma do lançamento que nasce "Compra parcelada". Campo com default mostra o
                     default.
                   */}
-                  <Field label="Nome (opcional)"><TextField value={form.name} onChangeText={(name) => setForm({ ...form, name })} placeholder="Financiamento" /></Field>
+                  <Field label="Nome"><TextField value={form.name} onChangeText={(name) => setForm({ ...form, name })} placeholder="Financiamento" /></Field>
                   {!form.id && <Field label="Parcelas já pagas" hint="Deixe zero se nenhuma foi paga. Esse histórico não movimenta dinheiro.">
                     <TextField value={String(form.installmentsPaid)} onChangeText={(value) => setForm({ ...form, installmentsPaid: Number(value.replace(/\D/g, '')), historyConfirmed: true })} keyboardType="number-pad" maxLength={3} />
                   </Field>}
-                  <Field label="Conta para pagar (opcional)">
+                  <Field label="Conta que paga" hint="Opcional — a parcela fica sem conta se você não escolher.">
                     <AccountPicker accounts={pagadoras} value={form.accountId} onChange={(accountId: string | null) => setForm({ ...form, accountId })} emptyLabel="Não informar" />
                   </Field>
                 </>}
@@ -829,7 +829,7 @@ export default function DebtsScreen() {
                 </View>
               ) : null}
 
-              <Field label="Valor da prestação" hint="O valor do contrato. A amortização é estimativa Price.">
+              <Field label="Valor da parcela" hint="O valor do contrato. A amortização é estimativa Price.">
                 <MoneyField valueCents={form.installmentCents} onChangeCents={(installmentCents) => setForm({ ...form, installmentCents })} />
               </Field>
               <ThemedText type="small" themeColor="textSecondary">O cronograma é uma estimativa mensal. Cadastrar a dívida não cria prestações pendentes na projeção; registre cada pagamento nesta tela.</ThemedText>
@@ -867,7 +867,7 @@ export default function DebtsScreen() {
                 `frontend.md` ("a tela se remonta debaixo do dedo"), só que para cima.
               */}
               {!form.id && form.parcelas !== '' && (
-                <Field label="Quantas parcelas já foram pagas?"
+                <Field label="Parcelas já pagas"
                   hint="Já está no saldo devedor acima — não desconto de novo.">
                   {/*
                     ⚠️ **Sem chip "Nenhuma", e o campo nasce em `0`** (15/09/2026, a mesma régua
@@ -893,7 +893,7 @@ export default function DebtsScreen() {
                 separando "valor da prestação" de "quantas parcelas". Campo longo (uma lista
                 de contas) partindo um grupo curto era o "ordem toda bagunçada" de 09/09/2026.
               */}
-              <Field label="Conta para pagar">
+              <Field label="Conta que paga">
                 <AccountPicker accounts={pagadoras} value={form.accountId} onChange={(accountId: string | null) => setForm({ ...form, accountId })} emptyLabel="Não informar" />
               </Field>
               </>}

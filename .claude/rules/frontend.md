@@ -42,19 +42,39 @@ Expo SDK 57 (managed), código em `src/`, paths `@/*` → `src/*` e `@/assets/*`
 - Decimal em texto (percentual, taxa, meses) só por `formatNumberBR` — vírgula, nunca ponto.
   Havia três cópias disso e uma tela sem nenhuma, escrevendo `90.4%` ao lado de `90,4%`.
 
+### O campo que NOMEIA o registro: "Nome" em entidade, "Título" em evento
+
+⚠️ **"Descrição" não é título, e ter os dois confunde** (15/09/2026). A queixa foi literal —
+*"tem que ter titulo obrigatorio, descricao nao é titulo… Esta muito confuso o que é titulo e o
+que é descriçao, normalmente o titulo vem em cima e com o label titulo… As vezes nao é
+estabelecimento que ele vai lançar e sim um titulo de uma compra"*.
+
+**`transactions.description` sempre FOI o título** — é o que toda lista desenha como nome da
+linha e o que a RPC de parcelamento emenda em "(1/2)". Ele estava com o rótulo errado, com
+`multiline` (cara de parágrafo) e opcional. Foi **renomeado, não duplicado**: uma coluna `title`
+nova seria o terceiro campo de nome, que é exatamente a confusão reclamada.
+
+| forma | rótulo do campo-nome | onde |
+|---|---|---|
+| **entidade** (conta, meta, bem, dívida, pasta) | **"Nome"**, primeiro campo | já estava certo |
+| **evento** (lançamento, recorrente, lembrete) | **"Título"**, primeiro do seu grupo | era "Descrição", "Descrição" e "O que lembrar" |
+
+**Estabelecimento é OUTRO dado e continua opcional.** Nem toda compra tem estabelecimento (uma
+transferência, um reembolso, um presente), e nem todo estabelecimento é o título que a pessoa
+quer ler na lista. Os dois lado a lado, um obrigatório e um não.
+
+A ordem não mudou (a régua de 09/09 acima): tipo → valor → **título** → estabelecimento →
+categoria → conta → como se divide → quando.
+
 ### Campo obrigatório é campo que BLOQUEIA — e "obrigatório" não é `NOT NULL`
 
-⚠️ **A régua não é o banco, é o registro sair USÁVEL** (15/09/2026). A queixa foi literal —
-*"tem campos que teoricamente são obrigatórios preencher mas me deixa eu salvar normalmente?
-Isso acontece em mais telas? Esse é um problema sério"* — e auditar por `NOT NULL sem default`
-respondia a pergunta errada: a compra parcelada que sumiu do app **salvou limpa no banco**, e era
-justamente esse o defeito. O que faltava não era uma coluna, era o NOME.
+⚠️ **A régua não é o banco, é o registro sair USÁVEL** (15/09/2026). Auditar por `NOT NULL sem
+default` responde a pergunta errada: a compra parcelada que sumiu do app **salvou limpa no
+banco**, e era justamente esse o defeito. O que faltava não era uma coluna, era o NOME.
 
 - **Todo registro que a lista mostra por um nome exige o campo que É esse nome.** Onde a tela cai
-  num fallback (`description ?? merchant ?? 'Sem descrição'`, `name || 'Financiamento'`), o
-  formulário tem que impedir que se chegue nele. No lançamento **nenhum dos dois** é obrigatório
-  sozinho — às vezes só se sabe o estabelecimento, às vezes só o motivo —, mas UM é: o `refine` é
-  sobre o par, com o erro embaixo da Descrição.
+  num fallback (`description ?? merchant ?? 'Sem descrição'`, `r.description ?? 'sem descrição'`,
+  `name || 'Financiamento'`), o formulário impede que se chegue nele.
 - **Valor que o registro existe para carregar entra na mesma régua.** Um bem em R$ 0,00 não soma
   no patrimônio nem informa nada na lista — `net-worth` só olhava o nome.
 - **Campo com default mostra o default no `placeholder`**, nunca um exemplo diferente dele. O nome
@@ -63,12 +83,31 @@ justamente esse o defeito. O que faltava não era uma coluna, era o NOME.
 - **Botão desabilitado sem dizer por quê é o defeito espelho** (§7b do design: erro abaixo do
   campo). Um "Salvar" cinza que não explica é a mesma frustração com outra cara.
 
-**Auditado tela a tela em 15/09/2026, e o resto do app já estava certo:** contas, orçamentos,
-metas, recorrentes, regras e membros bloqueiam por `disabled`; lembrete e as quatro telas de conta
-bloqueiam por zod com a mensagem; pasta e nota rápida retornam cedo com erro inline. **Não
-converter as ~8 telas que guardam à mão para zod** — elas guardam certo, e reescrever é o escopo
-que ninguém pediu. O que prende a classe é TESTE: `simple-finance-ui.test.ts` renderiza a tela e
-aperta Salvar, e o caso que vale é o formulário incompleto com `writes.length === 0`.
+⚠️ **`recurring` era o pior caso e passou batido na primeira varredura**: `podeSalvar` cobria
+valor e datas e **não** o nome, então a série nascia anônima e o materializador a transformava
+em doze linhas "sem descrição" — o defeito do lançamento multiplicado por 12.
+
+**Auditado tela a tela: o resto do app já bloqueia** — contas, orçamentos, metas, regras e
+membros por `disabled`; lembrete e as quatro telas de conta por zod com a mensagem; pasta e nota
+rápida retornam cedo com erro inline. **Não converter as ~8 telas que guardam à mão para zod** —
+elas guardam certo, e reescrever é escopo que ninguém pediu. O que prende a classe é TESTE:
+`simple-finance-ui.test.ts` renderiza a tela e aperta Salvar, e o caso que vale é o formulário
+incompleto com `writes.length === 0`.
+
+### Uma intenção, um rótulo — vale dentro do MESMO arquivo
+
+⚠️ `debts.tsx` sozinho tinha **três** rótulos para a conta pagadora ("Conta para pagar", "Conta
+para pagar (opcional)", "Conta que paga"), **dois** para o valor mensal do contrato ("Valor da
+parcela", "Valor da prestação") e **dois** para o histórico ("Parcelas já pagas", "Quantas
+parcelas já foram pagas?"). São modos diferentes do mesmo cadastro, não conceitos diferentes.
+
+- O sufixo **"(opcional)" não entra no rótulo** — é explicação, e explicação mora no `hint`
+  (§7b). O rótulo diz o que o campo É.
+- **Substantivo, não pergunta**, quando existe um rótulo-substantivo para o mesmo dado em outra
+  tela. Pergunta continua onde ela É a escolha da tela ("É bem ou dívida?", "Acontece uma vez ou
+  todo mês?") — ali não há duplicata para unificar.
+- `"Valor desta parcela"` (a tela de PAGAR) continua diferente de `"Valor da parcela"` (o
+  cadastro) **de propósito**: um é quanto está saindo agora, o outro é o contrato.
 
 ## Plataforma — a decisão mora no primitivo, nunca na tela
 

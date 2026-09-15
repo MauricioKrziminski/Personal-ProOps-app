@@ -69,7 +69,7 @@ const schema = z
     kind: z.enum(['expense', 'income', 'transfer']),
     amount_cents: z.number().int().positive('Informe o valor'),
     category: z.string().nullable(),
-    description: z.string().nullable(),
+    description: z.string().trim().min(1, 'Escreva um título para este lançamento'),
     merchant: z.string().nullable(),
     account_id: z.string().nullable(),
     counterparty_account_id: z.string().nullable(),
@@ -89,19 +89,6 @@ const schema = z
     if (data.installments <= 1 || !isValidBRDate(data.occurred_at)) return;
     try { installmentHistory(data.paid_installments, data.installments, brToISO(data.occurred_at), localISODate()); }
     catch (error) { ctx.addIssue({ code: 'custom', path: ['paid_installments'], message: (error as Error).message }); }
-  })
-  /*
-    ⚠️ Descrição e estabelecimento são os DOIS campos opcionais que, juntos, formam o nome do
-    lançamento — e sem nenhum dos dois a linha nasce ilegível. Toda lista do app cai no mesmo
-    fallback (`description ?? merchant ?? 'Sem descrição'`), e a parcelada era pior: a RPC
-    escrevia "Compra parcelada (1/2)", que parece um lançamento legítimo de outra pessoa.
-    Foi a queixa de 15/09/2026 — "cadastrei o lançamento nuuvem wardog e não encontrei nada no
-    app, mas parece que está contando no saldo do ciclo". Nenhum dos dois é obrigatório
-    sozinho (às vezes só se sabe o estabelecimento, às vezes só o motivo); UM deles é.
-  */
-  .refine((data) => !!data.description?.trim() || !!data.merchant?.trim(), {
-    message: 'Escreva a descrição ou o estabelecimento — sem um dos dois o lançamento fica sem nome',
-    path: ['description'],
   })
   .refine((data) => data.installments === 1 || (data.kind === 'expense' && !!data.account_id), {
     message: 'Parcelamento precisa de uma conta/cartão e só vale para gastos',
@@ -207,7 +194,7 @@ function TransactionForm({ editing }: { editing?: Transaction }) {
       kind: editing?.kind ?? 'expense',
       amount_cents: editing?.amount_cents ?? 0,
       category: editing?.category ?? null,
-      description: editing?.description ?? null,
+      description: editing?.description ?? '',
       merchant: editing?.merchant ?? null,
       account_id: editing?.account_id ?? null,
       counterparty_account_id: editing?.counterparty_account_id ?? null,
@@ -262,7 +249,7 @@ function TransactionForm({ editing }: { editing?: Transaction }) {
     const patch: Record<string, unknown> = {};
     if (values.amount_cents !== editing.amount_cents) patch.amount_cents = values.amount_cents;
     if ((values.category ?? null) !== editing.category) patch.category = values.category ?? null;
-    const desc = values.description?.trim() || null;
+    const desc = values.description.trim();
     if (desc !== editing.description) patch.description = desc;
     const merc = values.merchant?.trim() || null;
     if (merc !== editing.merchant) patch.merchant = merc;
@@ -281,7 +268,7 @@ function TransactionForm({ editing }: { editing?: Transaction }) {
           installments: values.installments,
           paidInstallments: installmentHistory(values.paid_installments, values.installments, brToISO(values.occurred_at), localISODate()),
           occurredAt: brToISO(values.occurred_at),
-          description: values.description?.trim() || null,
+          description: values.description.trim(),
           category: values.category,
           // Sem esta linha o campo "Estabelecimento" era preenchido e descartado: a compra
           // parcelada nascia como "Compra parcelada (1/N)" e o nome não existia em lugar
@@ -323,7 +310,7 @@ function TransactionForm({ editing }: { editing?: Transaction }) {
         kind: values.kind,
         amount_cents: values.amount_cents,
         category: values.kind === 'transfer' ? null : values.category,
-        description: values.description?.trim() || null,
+        description: values.description.trim(),
         merchant: values.merchant?.trim() || null,
         account_id: values.account_id,
         counterparty_account_id: values.kind === 'transfer' ? values.counterparty_account_id : null,
@@ -480,15 +467,13 @@ function TransactionForm({ editing }: { editing?: Transaction }) {
           control={control}
           name="description"
           render={({ field }) => (
-            <Field label="Descrição" error={errors.description?.message}>
+            <Field label="Título" error={errors.description?.message}>
               <TextField
-                value={field.value ?? ''}
-                onChangeText={(text) => field.onChange(text || null)}
-                placeholder="Ex.: compras da semana"
-                accessibilityLabel="Descrição"
+                value={field.value}
+                onChangeText={field.onChange}
+                placeholder="Ex.: Nuuvem Wardog"
+                accessibilityLabel="Título"
                 invalid={!!errors.description}
-                multiline
-                style={styles.multiline}
               />
             </Field>
           )}
@@ -795,7 +780,7 @@ function TransactionForm({ editing }: { editing?: Transaction }) {
               const values = getValues();
               const destino = { pathname: '/finance/recurring' as const, params: {
                 create: '1', kind: values.kind === 'income' ? 'income' : 'expense',
-                amount: String(values.amount_cents), description: values.description ?? '',
+                amount: String(values.amount_cents), description: values.description,
                 category: values.category ?? '', account: values.account_id ?? '', start: values.occurred_at,
               } };
               // Criando, o formulário é descartável e `replace` evita voltar para um rascunho
@@ -847,10 +832,6 @@ const styles = StyleSheet.create({
   dateField: {
     minWidth: 140,
     textAlign: 'center',
-  },
-  multiline: {
-    minHeight: 72,
-    textAlignVertical: 'top',
   },
   pendingCard: {
     gap: Space.lg,

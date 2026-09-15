@@ -449,13 +449,13 @@ function ReminderForm({
           control={control}
           name="title"
           render={({ field }) => (
-            <Field label="O que lembrar" error={errors.title?.message}>
+            <Field label="Título" error={errors.title?.message}>
               <TextField
                 value={field.value}
                 onChangeText={field.onChange}
                 placeholder="Ex.: pagar o aluguel"
                 autoFocus={!editing}
-                accessibilityLabel="O que lembrar"
+                accessibilityLabel="Título"
                 invalid={!!errors.title}
               />
             </Field>

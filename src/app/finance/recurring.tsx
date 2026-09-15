@@ -321,7 +321,13 @@ export default function RecurringScreen() {
   const inicioDate = form ? localDateTime(form.inicio, '09:00') : null;
   const inicioOk = Boolean(form && isValidBRDate(form.inicio) && inicioDate);
   const fimOk = form ? form.fim === '' || (isValidBRDate(form.fim) && inicioOk && brToISO(form.fim) >= brToISO(form.inicio)) : false;
-  const podeSalvar = Boolean(form && form.amountCents > 0 && inicioOk && fimOk && validRecurringRange(brToISO(form.inicio), form.fim ? brToISO(form.fim) : '', form.preset === 'monthly' ? form.intervalo : '1'));
+  /*
+    ⚠️ O título ficava de FORA da guarda e a lista caía em "sem descrição" — a série
+    nascia anônima e se materializava em uma linha por mês, todas sem nome. É o mesmo
+    defeito do lançamento (15/09/2026), e aqui ele se multiplica por 12.
+  */
+  const tituloOk = (form?.description.trim().length ?? 0) > 0;
+  const podeSalvar = Boolean(form && tituloOk && form.amountCents > 0 && inicioOk && fimOk && validRecurringRange(brToISO(form.inicio), form.fim ? brToISO(form.fim) : '', form.preset === 'monthly' ? form.intervalo : '1'));
   const rrulePrevia =
     form && inicioDate
       ? montaRRule(form.preset, inicioDate, Number(form.intervalo) || 1)
@@ -340,7 +346,7 @@ export default function RecurringScreen() {
       const patch: Parameters<typeof editar.mutate>[0]['patch'] = {};
       if (!antes || form.amountCents !== Number(antes.amount_cents)) patch.amount_cents = form.amountCents;
       if (!antes || form.category !== antes.category) patch.category = form.category;
-      const desc = form.description.trim() || null;
+      const desc = form.description.trim();
       if (!antes || desc !== antes.description) patch.description = desc;
       if (!antes || form.accountId !== antes.account_id) patch.account_id = form.accountId;
       if (!antes || form.autoConfirm !== antes.auto_confirm) patch.auto_confirm = form.autoConfirm;
@@ -372,7 +378,7 @@ export default function RecurringScreen() {
       {
         kind: form.kind,
         amount_cents: form.amountCents,
-        description: form.description.trim() || null,
+        description: form.description.trim(),
         category: form.category,
         account_id: form.accountId,
         rrule: rrulePrevia,
@@ -670,7 +676,7 @@ export default function RecurringScreen() {
                 loading={create.isPending || editar.isPending}
                 // Editando, a validação de calendário não se aplica: frequência e âncora
                 // não estão na tela. O que precisa valer é valor > 0 e o fim opcional.
-                disabled={form?.id ? !(form.amountCents > 0 && fimOk) : !podeSalvar}
+                disabled={form?.id ? !(tituloOk && form.amountCents > 0 && fimOk) : !podeSalvar}
                 onPress={salvar}
               />
             }
@@ -700,11 +706,14 @@ export default function RecurringScreen() {
                 />
               </Field>
 
-              <Field label="Descrição">
+              <Field
+                label="Título"
+                error={form.description.length > 0 && !tituloOk ? 'Escreva um título' : undefined}>
                 <TextField
                   value={form.description}
                   onChangeText={(description) => setForm({ ...form, description })}
-                  placeholder="Aluguel"
+                  placeholder="Ex.: Aluguel"
+                  invalid={form.description.length > 0 && !tituloOk}
                 />
               </Field>
 
