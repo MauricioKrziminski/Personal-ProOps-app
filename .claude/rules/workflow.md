@@ -65,6 +65,12 @@
 6. Mudou o agente → subir local (`docker compose up`) e mandar `scripts/fake_meta.py` com payload
    ASSINADO. Testar com o HMAC desligado esconderia justamente o erro mais caro daquele endpoint.
 
+   ⚠️ **Suba com o override de não-envio, senão o teste manda WhatsApp de verdade.** O telefone
+   do staging é o número REAL do Gabriel, e o agente responde no fim do caminho:
+   `docker compose -f docker-compose.yml -f docker-compose.sem-envio.yml up`. O override só troca
+   o `WHATSAPP_TOKEN` por um inválido — `try_send` é best-effort, então a resposta para no log e
+   todo o resto (HMAC, fila, debounce, grafo, escrita) continua real.
+
    **`agent/.env` é o STAGING** (desde 04/09/2026); produção mora em `agent/.env.production`.
    O padrão tem que ser o staging porque nada que lê `.env` escolhe ambiente — `docker compose
    up`, o `env_file=".env"` do pydantic e um `source` no terminal pegam o que estiver lá. Enquanto

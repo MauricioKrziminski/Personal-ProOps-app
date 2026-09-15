@@ -1,0 +1,16 @@
+# Override para o passo 6 do `workflow.md`: subir o agente local e mandar
+# `scripts/fake_meta.py` SEM mandar mensagem no WhatsApp de ninguém.
+#
+# ⚠️ **O telefone do staging é o número REAL do Gabriel.** `try_send` é
+# best-effort (falha de envio só loga, nunca reprocessa — `whatsapp.md`), então
+# um token inválido é exatamente o que faz a resposta parar no log em vez de
+# chegar no aparelho dele. Todo o resto do caminho continua real: HMAC, fila,
+# debounce, grafo, escrita no banco.
+#
+#   docker compose -f docker-compose.yml -f docker-compose.sem-envio.yml up
+#
+# Sem este arquivo, o primeiro `fake_meta.py` do dia manda WhatsApp de verdade.
+services:
+  api:
+    environment:
+      WHATSAPP_TOKEN: "token-invalido-de-proposito-nao-envia"
