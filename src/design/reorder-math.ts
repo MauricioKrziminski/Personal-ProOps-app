@@ -84,3 +84,31 @@ export function reordenar<T>(itens: readonly T[], de: number, para: number): T[]
   nova.splice(para, 0, movido);
   return nova;
 }
+
+/**
+ * Quanto o auto-scroll rola neste quadro, em px — negativo sobe, positivo desce, 0 não mexe.
+ *
+ * ⚠️ **`bottomInset` é o que torna a faixa de baixo ALCANÇÁVEL, e sem ele a falha é muda**
+ * (14/09/2026). Nas raízes de aba o scroll passa POR BAIXO da dock flutuante: ele mede 888dp de
+ * altura, mas os últimos ~98dp são a pílula e, abaixo dela, a área de gesto do sistema — que nem
+ * entrega o `MOVE` ao app. A faixa começava em `888 - 88 = 800` e o dedo só alcançava 777:
+ * `v` dava 0 para sempre, sem erro nenhum, e arrastar uma pasta para o fim de uma grade de 20
+ * era impossível.
+ *
+ * É função pura e fica aqui, ao lado do resto da aritmética de slot, pelo mesmo motivo: um
+ * off-by-one nesta conta não levanta exceção, só deixa de fazer uma coisa que ninguém testa.
+ */
+export function velocidadeAutoScroll(
+  y: number,
+  altura: number,
+  janela: number,
+  bottomInset: number,
+  borda: number,
+  velocidade: number
+): number {
+  'worklet';
+  const pe = janela - bottomInset;
+  if (y < borda) return -velocidade * ((borda - y) / borda);
+  if (y + altura > pe - borda) return velocidade * ((y + altura - (pe - borda)) / borda);
+  return 0;
+}

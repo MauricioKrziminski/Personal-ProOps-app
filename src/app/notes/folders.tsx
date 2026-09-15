@@ -307,11 +307,18 @@ export default function FoldersScreen() {
                     Haptics.selectionAsync();
                     setIcon(option.name);
                   }}
-                  style={[
-                    styles.iconCell,
-                    { backgroundColor: selected ? theme.accentSoft : theme.backgroundElement },
-                  ]}>
-                  <Icon name={symbol(option.name)} size="lg" color={selected ? 'tint' : 'textSecondary'} />
+                  style={styles.iconCellWrap}>
+                  <View
+                    style={[
+                      styles.iconCell,
+                      { backgroundColor: selected ? theme.accentSoft : theme.backgroundElement },
+                    ]}>
+                    <Icon
+                      name={symbol(option.name)}
+                      size="lg"
+                      color={selected ? 'tint' : 'textSecondary'}
+                    />
+                  </View>
                 </Pressable>
               );
             })}
@@ -455,14 +462,18 @@ const styles = StyleSheet.create({
   form: {
     gap: Space.lg,
   },
-  grid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: Space.sm,
-  },
+  /**
+   * Seis por linha, doze ícones, duas linhas exatas.
+   *
+   * ⚠️ Com `gap` + largura fixa a fileira embrulhava por largura e dava 7 em cima e 5 embaixo —
+   * lê como acidente, não como grade, e é o mesmo defeito que a paleta de cores tinha. A célula
+   * em porcentagem fecha a conta em qualquer tela sem medir nada; o respiro vem do padding dela,
+   * porque `gap` sobre porcentagem empurra a sexta para a linha seguinte.
+   */
+  grid: { flexDirection: 'row', flexWrap: 'wrap' },
+  iconCellWrap: { width: '16.666%', padding: Space.xs / 2 },
   /** Ícone menor que a área de toque: o alvo é 44, o símbolo é 24. */
   iconCell: {
-    width: HitTarget,
     height: HitTarget,
     alignItems: 'center',
     justifyContent: 'center',

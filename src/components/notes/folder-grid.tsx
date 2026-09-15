@@ -35,6 +35,7 @@ export function FolderGrid({
   scrollRef,
   topInset,
   viewportHeight,
+  bottomInset,
   onDragStateChange,
   onOpen,
   onMenu,
@@ -46,6 +47,8 @@ export function FolderGrid({
   topInset: number;
   /** Altura VISÍVEL da rolagem. Sem ela o auto-scroll mede pela janela e só dispara tarde. */
   viewportHeight: number;
+  /** Quanto do pé da rolagem a dock cobre — sem isto a faixa do auto-scroll fica fora do alcance. */
+  bottomInset?: number;
   onDragStateChange: (v: boolean) => void;
   onOpen: (folder: NoteFolder) => void;
   /** Toque longo sem arrastar. */
@@ -66,6 +69,7 @@ export function FolderGrid({
       scrollRef={scrollRef}
       topInset={topInset}
       viewportHeight={viewportHeight || undefined}
+      bottomInset={bottomInset}
       onDragStateChange={onDragStateChange}
       onTapItem={(i) => onMenu(pastas[i])}
       onReorder={onReorder}

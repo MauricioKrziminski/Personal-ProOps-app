@@ -297,7 +297,9 @@ export default function FolderScreen() {
 
             {fixadas.length > 0 ? (
               <View onLayout={(e) => setTopoFixadas(e.nativeEvent.layout.y)}>
-                <SectionHead title="Fixadas" inset={false} />
+                {/* Mesmo motivo do rótulo de baixo: sozinho ele nomearia a lista inteira, e o
+                    alfinete de cada cartão já diz o que a seção diria. */}
+                {soltas.length > 0 ? <SectionHead title="Fixadas" inset={false} /> : null}
                 <NoteList
                   notas={fixadas}
                   acoes={acoes}

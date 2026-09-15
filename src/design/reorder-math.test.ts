@@ -1,7 +1,14 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 
-import { posX, posY, reordenar, slotDoIrmao, slotSobODedo } from './reorder-math.ts';
+import {
+  posX,
+  posY,
+  reordenar,
+  slotDoIrmao,
+  slotSobODedo,
+  velocidadeAutoScroll,
+} from './reorder-math.ts';
 
 /**
  * Off-by-one aqui não dá erro nenhum: o cartão simplesmente pousa no lugar errado, e quem
@@ -89,4 +96,40 @@ test('o item arrastado acaba exatamente no slot que o leque abriu', () => {
       }
     }
   }
+});
+
+/*
+  Auto-scroll — os números são os MEDIDOS no emulador em 14/09/2026, com 20 pastas:
+  scroll de 888dp de altura, ladrilho de 114, faixa de 88, dock de 98.
+*/
+const JANELA = 888;
+const DOCK = 98;
+const BORDA = 88;
+const VEL = 10;
+const LADRILHO = 114;
+
+test('no meio da tela o auto-scroll fica parado', () => {
+  assert.equal(velocidadeAutoScroll(400, LADRILHO, JANELA, DOCK, BORDA, VEL), 0);
+});
+
+test('perto do topo ele sobe, e mais rápido quanto mais perto', () => {
+  const meio = velocidadeAutoScroll(44, LADRILHO, JANELA, DOCK, BORDA, VEL);
+  const quase = velocidadeAutoScroll(4, LADRILHO, JANELA, DOCK, BORDA, VEL);
+  assert.ok(meio < 0 && quase < 0);
+  assert.ok(quase < meio, 'mais perto da borda tem que puxar mais forte');
+});
+
+test('o pé da faixa desconta a DOCK — senão o dedo nunca alcança', () => {
+  // 663 é o TOPO do ladrilho no ponto mais fundo que o dedo alcançou no aparelho (a base fica
+  // em 777): abaixo disso é a área de gesto do sistema, e o `MOVE` nem chega ao app.
+  const alcancavel = 663;
+  assert.ok(
+    velocidadeAutoScroll(alcancavel, LADRILHO, JANELA, DOCK, BORDA, VEL) > 0,
+    'com a dock descontada o ponto alcançável tem que rolar'
+  );
+  assert.equal(
+    velocidadeAutoScroll(alcancavel, LADRILHO, JANELA, 0, BORDA, VEL),
+    0,
+    'sem descontar a dock a faixa fica fora do alcance — era este o bug'
+  );
 });

@@ -4,6 +4,7 @@ import Animated, { useAnimatedRef } from 'react-native-reanimated';
 import { router } from 'expo-router';
 import * as Haptics from 'expo-haptics';
 
+import { ThemedText } from '@/components/themed-text';
 import { Chip } from '@/components/finance/chip';
 import { ColorPicker } from '@/components/notes/color-picker';
 import { FolderGrid } from '@/components/notes/folder-grid';
@@ -22,6 +23,7 @@ import { DragScrollView } from '@/components/ui/drag-scroll';
 import { Screen } from '@/components/ui/screen';
 import { Skeleton, SkeletonList } from '@/components/ui/skeleton';
 import { useToast } from '@/components/ui/toast';
+import { useBoolPref } from '@/hooks/use-bool-pref';
 import { MaxContentWidth } from '@/constants/theme';
 import { HitTarget, Radius, Space } from '@/design/tokens';
 import {
@@ -44,6 +46,9 @@ import { SORT_LABEL, useNoteSort } from '@/hooks/use-note-sort';
 import { useTelaPronta } from '@/hooks/use-tela-pronta';
 import { useTheme } from '@/hooks/use-theme';
 import { showItemActions } from '@/lib/item-actions';
+
+/** O que a dock cobre do pé da rolagem — a MESMA conta do `paddingBottom` do conteúdo. */
+const DOCK = Platform.OS === 'android' ? CURVED_BAR_SPACE : 0;
 
 /**
  * Notas — a home da aba.
@@ -96,6 +101,7 @@ export default function NotesScreen() {
   const [q, setQ] = useState('');
   const [tag, setTag] = useState<string | null>(null);
   const [sort, setSort] = useNoteSort();
+  const [pastasRecolhidas, setPastasRecolhidas] = useBoolPref('notes:pastas-recolhidas');
   const [arrastando, setArrastando] = useState(false);
   const [puxando, setPuxando] = useState(false);
 
@@ -477,13 +483,50 @@ export default function NotesScreen() {
                 explica, e o slot é para ação. O gesto se ensina sozinho: segurar um ladrilho e
                 soltar sem andar abre o menu de ações, que é o mesmo idioma da tela inicial do
                 iOS. Quem não segurar nunca perde nada — todas as ações estão nesse menu. */}
-            <SectionHead title="Pastas" inset={false} />
+            {/*
+              A grade RECOLHE, e a escolha fica gravada.
+
+              ⚠️ **Com muitas pastas ela empurra a primeira nota para fora da tela.** Medido com
+              20 pastas: são dez fileiras antes da lista, e quem abre Notas para ler uma nota
+              rola a tela inteira toda vez. Recolhida, a contagem no cabeçalho diz o que está
+              escondido — esconder sem dizer quanto é o que faz a pessoa achar que sumiu.
+
+              O rótulo inteiro é o alvo (não só o galão): é a área que o dedo já mira, e §5 pede
+              alvo de 44pt. `LinearTransition` na grade fecha o buraco em vez de piscar.
+            */}
+            <Pressable
+              accessibilityRole="button"
+              accessibilityState={{ expanded: !pastasRecolhidas }}
+              accessibilityLabel={`Pastas, ${pastas.length}`}
+              onPress={() => {
+                Haptics.selectionAsync();
+                setPastasRecolhidas(!pastasRecolhidas);
+              }}>
+              <SectionHead
+                title="Pastas"
+                inset={false}
+                action={
+                  <View style={styles.recolher}>
+                    <ThemedText type="code" themeColor="textSecondary">
+                      {pastas.length}
+                    </ThemedText>
+                    <Icon
+                      name={pastasRecolhidas ? 'chevron.down' : 'chevron.up'}
+                      size="sm"
+                      color="textSecondary"
+                    />
+                  </View>
+                }
+              />
+            </Pressable>
+            {pastasRecolhidas ? null : (
             <FolderGrid
               pastas={pastas}
               enabled={podeArrastar}
               scrollRef={scrollRef}
               topInset={topoPastas}
               viewportHeight={alturaVisivel}
+              bottomInset={DOCK}
               onDragStateChange={setArrastando}
               onOpen={(f) => router.push(`/notes/folder/${f.id}`)}
               onMenu={menuDaPasta}
@@ -494,12 +537,15 @@ export default function NotesScreen() {
                 })
               }
             />
+            )}
           </View>
         ) : null}
 
         {fixadas.length > 0 ? (
           <View onLayout={(e) => setTopoFixadas(e.nativeEvent.layout.y)}>
-            <SectionHead title="Fixadas" inset={false} />
+            {/* Mesmo motivo do rótulo de baixo: sozinho ele nomearia a lista inteira, e o
+                alfinete de cada cartão já diz o que a seção diria. */}
+            {soltas.length > 0 ? <SectionHead title="Fixadas" inset={false} /> : null}
             <NoteList
               notas={fixadas}
               acoes={acoesDaNota}
@@ -508,6 +554,7 @@ export default function NotesScreen() {
               scrollRef={scrollRef}
               topInset={topoFixadas}
               viewportHeight={alturaVisivel}
+              bottomInset={DOCK}
               onDragStateChange={setArrastando}
               onReorder={(ids) =>
                 reorderNotes.mutate(ids, {
@@ -534,6 +581,7 @@ export default function NotesScreen() {
               scrollRef={scrollRef}
               topInset={topoSoltas}
               viewportHeight={alturaVisivel}
+              bottomInset={DOCK}
               onDragStateChange={setArrastando}
               onReorder={(ids) =>
                 reorderNotes.mutate(ids, {
@@ -608,6 +656,7 @@ export default function NotesScreen() {
 }
 
 const styles = StyleSheet.create({
+  recolher: { flexDirection: 'row', alignItems: 'center', gap: Space.xs },
   conteudo: {
     gap: Space.xl,
     paddingHorizontal: Space.lg,

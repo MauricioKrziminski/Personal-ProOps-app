@@ -25,7 +25,14 @@ import Animated, {
 } from 'react-native-reanimated';
 import * as Haptics from 'expo-haptics';
 
-import { posX, posY, reordenar, slotDoIrmao, slotSobODedo } from '@/design/reorder-math';
+import {
+  posX,
+  posY,
+  reordenar,
+  slotDoIrmao,
+  slotSobODedo,
+  velocidadeAutoScroll,
+} from '@/design/reorder-math';
 import { Elevation, Motion, Space } from '@/design/tokens';
 import { useScheme } from '@/hooks/use-theme';
 
@@ -142,6 +149,19 @@ export interface ReorderableProps<T> {
   topInset?: number;
   /** Altura visível do scroll. Sem ela, a janela — que é uma aproximação boa o bastante. */
   viewportHeight?: number;
+  /**
+   * Quanto do PÉ do scroll está coberto por algo flutuante — a dock, no caso das raízes de aba.
+   *
+   * ⚠️ **Sem isto o auto-scroll é inalcançável, e ele falha em silêncio.** Medido em 14/09/2026
+   * com 20 pastas: o scroll mede 888dp de altura porque ele passa POR BAIXO da dock, então a
+   * faixa de 88dp começava em 800 — mas o dedo não chega lá. Os últimos ~98dp são a pílula da
+   * dock e, abaixo dela, a área de gesto do sistema, que nem entrega o `MOVE` para o app. O item
+   * parava em 777 e a conta dava `v = 0`: nada rolava, sem erro nenhum.
+   *
+   * A tela é quem sabe o que cobre o pé dela — a mesma expressão que ela já usa no
+   * `paddingBottom` do conteúdo.
+   */
+  bottomInset?: number;
   style?: ViewStyle;
 }
 
@@ -160,6 +180,7 @@ export function Reorderable<T>({
   scrollRef,
   topInset = 0,
   viewportHeight,
+  bottomInset = 0,
   style,
 }: ReorderableProps<T>) {
   const grade = columns > 1;
@@ -173,6 +194,8 @@ export function Reorderable<T>({
   const dy = useSharedValue(0);
   /** Quanto o auto-scroll já andou nesta arrastada — soma ao dedo para o item não escapar. */
   const rolado = useSharedValue(0);
+  /** Offset do scroll no quadro anterior: é a diferença entre os dois que diz o que andou. */
+  const ultimoOffset = useSharedValue(0);
 
   /** Altura por ID (ver o aviso no cabeçalho). Só no modo lista. */
   const alturas = useSharedValue<Record<string, number>>({});
@@ -209,11 +232,36 @@ export function Reorderable<T>({
    * item parado na borda não rolaria nada — que é exatamente o gesto de "levar isto lá para
    * baixo". O callback nasce DESLIGADO e o gesto o liga; sempre ligado, seriam 60 execuções por
    * segundo em toda tela que monte uma lista reordenável.
+   *
+   * ⚠️ **O quanto o conteúdo andou é MEDIDO, nunca o quanto foi pedido** (14/09/2026). A versão
+   * anterior somava `andou = destino - offset` ao dedo no MESMO quadro em que pedia o `scrollTo`,
+   * assumindo que ele tinha acontecido. No fim do conteúdo o scroll não anda mais: o pedido é
+   * clampado e a soma continua. Medido com 20 pastas — `dy` foi de 433 para **181.534** em três
+   * quadros com o offset parado em 774, e o ladrilho saiu voando da tela.
+   *
+   * Comparar o offset com o do quadro anterior conserta os dois fins de uma vez, sem saber onde
+   * o conteúdo termina: se ele não andou, o delta é zero e nada é somado.
    */
   const quadro = useFrameCallback(() => {
     'worklet';
     if (arrastando.value < 0 || !scrollRef) return;
 
+    // 1. O que o auto-scroll de FATO andou desde o quadro passado. O dedo não se moveu, mas o
+    //    conteúdo sim: sem somar isto o item escorrega para fora da mão.
+    //
+    //    `rolado === 0` é o começo de uma arrastada (`levantar` zera) — e também o instante em
+    //    que o conteúdo voltou exatamente para onde estava, que dá no mesmo. Sincronizar aí
+    //    dispensa um estado de "armado" e impede que o primeiro quadro herde o offset da
+    //    arrastada anterior, somando de uma vez tudo que o dedo rolou entre as duas.
+    if (rolado.value === 0) ultimoOffset.value = offsetScroll.value;
+    const delta = offsetScroll.value - ultimoOffset.value;
+    if (delta !== 0) {
+      ultimoOffset.value = offsetScroll.value;
+      rolado.value += delta;
+      dy.value += delta;
+    }
+
+    // 2. Decidir a velocidade deste quadro.
     const topo =
       topInset + posY(arrastando.value, idsSV.value, alturas.value, tileHeight, gap, columns);
     const y = topo + dy.value - offsetScroll.value;
@@ -221,20 +269,10 @@ export function Reorderable<T>({
       ? tileHeight
       : alturas.value[idsSV.value[arrastando.value]] ?? 0;
 
-    let v = 0;
-    if (y < BORDA) v = -VELOCIDADE * ((BORDA - y) / BORDA);
-    else if (y + altura > janela - BORDA) {
-      v = VELOCIDADE * ((y + altura - (janela - BORDA)) / BORDA);
-    }
+    const v = velocidadeAutoScroll(y, altura, janela, bottomInset, BORDA, VELOCIDADE);
     if (v === 0) return;
 
-    const destino = Math.max(0, offsetScroll.value + v);
-    const andou = destino - offsetScroll.value;
-    if (andou === 0) return;
-    scrollTo(scrollRef, 0, destino, false);
-    // O dedo não se moveu, mas o conteúdo sim: sem isto o item escorrega para fora da mão.
-    rolado.value += andou;
-    dy.value += andou;
+    scrollTo(scrollRef, 0, Math.max(0, offsetScroll.value + v), false);
   }, false);
 
   /** `setActive` vem de um objeto do Reanimated; passar o método solto perderia o `this`. */

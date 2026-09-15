@@ -121,9 +121,14 @@ function FolderCardBase({
             </View>
             <View style={styles.metaDireita}>
               {folder.pinned ? <Icon name="pin.fill" size="sm" color="tint" /> : null}
-              <ThemedText type="code" themeColor="textSecondary" style={tabular}>
-                {folder.notes_count}
-              </ThemedText>
+              {/* ⚠️ **Pasta vazia não carimba "0".** É a mesma régua do badge de aba (§8):
+                  contagem real ou nada. Uma grade de pastas novas virava uma fileira de zeros —
+                  ruído no canto de cada ladrilho dizendo que não há o que ver ali. */}
+              {folder.notes_count > 0 ? (
+                <ThemedText type="code" themeColor="textSecondary" style={tabular}>
+                  {folder.notes_count}
+                </ThemedText>
+              ) : null}
             </View>
           </View>
 

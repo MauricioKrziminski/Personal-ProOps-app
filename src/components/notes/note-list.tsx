@@ -30,6 +30,7 @@ export function NoteList({
   scrollRef,
   topInset,
   viewportHeight,
+  bottomInset,
   onDragStateChange,
   onReorder,
 }: {
@@ -50,6 +51,8 @@ export function NoteList({
   topInset: number;
   /** Altura VISÍVEL da rolagem. Sem ela o auto-scroll mede pela janela e só dispara tarde. */
   viewportHeight: number;
+  /** Quanto do pé da rolagem a dock cobre — sem isto a faixa do auto-scroll fica fora do alcance. */
+  bottomInset?: number;
   onDragStateChange: (v: boolean) => void;
   onReorder: (ids: string[]) => void;
 }) {
@@ -62,6 +65,7 @@ export function NoteList({
       scrollRef={scrollRef}
       topInset={topInset}
       viewportHeight={viewportHeight || undefined}
+      bottomInset={bottomInset}
       onDragStateChange={onDragStateChange}
       onReorder={onReorder}
       renderItem={({ item, active, drag }) => {
