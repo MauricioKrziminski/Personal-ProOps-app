@@ -31,9 +31,15 @@ Expo SDK 57 (managed), código em `src/`, paths `@/*` → `src/*` e `@/assets/*`
   as duas. Hífen (`28-08-2026`) lembra ISO, que é como o dado é ARMAZENADO, não como se lê.
 - **Ordem dos campos, uma régua para o app inteiro** (09/09/2026 — a queixa foi literal, "a
   ordem dos campos está toda bagunçada"):
-  - **Form de EVENTO** (lançamento, recorrente): tipo → valor → descrição/estabelecimento →
+  - **Form de EVENTO** (lançamento, recorrente): tipo → **título → estabelecimento → valor** →
     categoria → conta → como se divide (parcelas, juros do Pix) → quando → extras.
   - **Form de ENTIDADE** (conta, dívida, meta, bem): nome → tipo → valores → cronograma → conta.
+  - ⚠️ **O campo que NOMEIA o registro vem primeiro e leva o `autoFocus`** — a régua de
+    entidade, generalizada em 15/09/2026. Ela já valia em 4 das 6 telas (`accounts`, `goals`,
+    `debts`, `net-worth` abrem no "Nome", com o foco nele); só os dois formulários de EVENTO
+    abriam pelo valor, e a linha acima dizia que estava certo. Eram duas decisões do mesmo repo
+    se contradizendo, e a pergunta foi literal: *"nao era melhor ser titulo, estabelecimento e
+    valor? Esse nao seria o padrao?"* Era.
   - **Controle que muda QUAIS campos existem vem antes dos que ele muda.** "Tipo" troca
     "Categoria" por "Para a conta"; "Parcelas" troca o rótulo de "Data" por "Data da primeira
     parcela". Vindo depois, a tela se remonta debaixo do dedo.
@@ -63,8 +69,8 @@ nova seria o terceiro campo de nome, que é exatamente a confusão reclamada.
 transferência, um reembolso, um presente), e nem todo estabelecimento é o título que a pessoa
 quer ler na lista. Os dois lado a lado, um obrigatório e um não.
 
-A ordem não mudou (a régua de 09/09 acima): tipo → valor → **título** → estabelecimento →
-categoria → conta → como se divide → quando.
+A ordem seguiu junto: **tipo → título → estabelecimento → valor** → categoria → conta → como se
+divide → quando (ver a régua acima).
 
 ### Campo obrigatório é campo que BLOQUEIA — e "obrigatório" não é `NOT NULL`
 

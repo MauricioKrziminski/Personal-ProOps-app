@@ -441,27 +441,12 @@ function TransactionForm({ editing }: { editing?: Transaction }) {
           )}
         />
 
-        {/* Único campo obrigatório, e o que abre o teclado — `autoFocus` continua aqui. */}
-        <Controller
-          control={control}
-          name="amount_cents"
-          render={({ field }) => (
-            <Field label="Valor" error={errors.amount_cents?.message}>
-              <MoneyField
-                valueCents={field.value}
-                onChangeCents={field.onChange}
-                autoFocus={!editing}
-                invalid={!!errors.amount_cents}
-              />
-            </Field>
-          )}
-        />
-
         {/*
-          Descrição e Estabelecimento moravam no FIM do formulário, depois da data e do
-          "vou pagar depois". A ordem agora é a mesma de Recorrentes, que já estava certa:
-          o que É (tipo, valor, nome) antes do que ele CLASSIFICA (categoria, conta) antes
-          do QUANDO. Era a queixa de 09/09/2026 — "a ordem dos campos está toda bagunçada".
+          ⚠️ O NOME vem antes do VALOR, e isso é a régua de ENTIDADE generalizada (15/09/2026).
+          Conta, meta, bem e dívida já abriam pelo "Nome", com o foco nele; só os dois
+          formulários de EVENTO abriam pelo valor — duas decisões do mesmo repo se
+          contradizendo. Hoje é uma só: **o campo que nomeia o registro vem primeiro e leva o
+          `autoFocus`.** O que muda QUAIS campos existem (o tipo) continua antes de tudo.
         */}
         <Controller
           control={control}
@@ -473,6 +458,7 @@ function TransactionForm({ editing }: { editing?: Transaction }) {
                 onChangeText={field.onChange}
                 placeholder="Ex.: Nuuvem Wardog"
                 accessibilityLabel="Título"
+                autoFocus={!editing}
                 invalid={!!errors.description}
               />
             </Field>
@@ -489,6 +475,20 @@ function TransactionForm({ editing }: { editing?: Transaction }) {
                 onChangeText={(text) => field.onChange(text || null)}
                 placeholder="Ex.: Padaria do Zé"
                 accessibilityLabel="Estabelecimento"
+              />
+            </Field>
+          )}
+        />
+
+        <Controller
+          control={control}
+          name="amount_cents"
+          render={({ field }) => (
+            <Field label="Valor" error={errors.amount_cents?.message}>
+              <MoneyField
+                valueCents={field.value}
+                onChangeCents={field.onChange}
+                invalid={!!errors.amount_cents}
               />
             </Field>
           )}

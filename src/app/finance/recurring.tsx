@@ -699,13 +699,6 @@ export default function RecurringScreen() {
                 />
               </Field>
 
-              <Field label="Valor">
-                <MoneyField
-                  valueCents={form.amountCents}
-                  onChangeCents={(amountCents) => setForm({ ...form, amountCents })}
-                />
-              </Field>
-
               <Field
                 label="Título"
                 error={form.description.length > 0 && !tituloOk ? 'Escreva um título' : undefined}>
@@ -714,6 +707,13 @@ export default function RecurringScreen() {
                   onChangeText={(description) => setForm({ ...form, description })}
                   placeholder="Ex.: Aluguel"
                   invalid={form.description.length > 0 && !tituloOk}
+                />
+              </Field>
+
+              <Field label="Valor">
+                <MoneyField
+                  valueCents={form.amountCents}
+                  onChangeCents={(amountCents) => setForm({ ...form, amountCents })}
                 />
               </Field>
 
