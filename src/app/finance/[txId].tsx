@@ -266,9 +266,27 @@ export default function TransactionDetailScreen() {
       <HeaderActions
         actions={[
           {
+            /**
+             * ⚠️ **Em parcela, "Editar" abre a COMPRA, não a linha** (15/09/2026). A pergunta
+             * foi literal: *"quando eu clico em editar uma compra parcelada, eu tenho que
+             * clicar em editar a compra inteira para poder editar ela completamente? Por que
+             * isso?"* — e ela estava certa. Desde que o VALOR da parcela passou a ser do
+             * contrato, o formulário da linha só edita campos que pertencem à compra (título,
+             * estabelecimento, categoria, conta) e ainda pergunta escopo para propagá-los: era
+             * um desvio pedindo o que a outra tela faz direto.
+             *
+             * Corrigir UMA parcela continua existindo, no menu "…" — vira escolha explícita,
+             * que é o que ela é. Ocorrência de recorrência **não** muda: lá a linha tem valor e
+             * data próprios, e a série tem porta separada logo abaixo.
+             */
             label: 'Editar',
             onPress: () =>
-              router.push({ pathname: '/finance/transaction-form', params: { id: tx.id, month } }),
+              tx.installment_plan_id
+                ? router.push({
+                    pathname: '/finance/installments',
+                    params: { edit: tx.installment_plan_id },
+                  })
+                : router.push({ pathname: '/finance/transaction-form', params: { id: tx.id, month } }),
           },
         ]}
         menu={{
@@ -284,27 +302,25 @@ export default function TransactionDetailScreen() {
               })),
             },
             { label: 'Duplicar', icon: 'plus.square.on.square', onPress: duplicate },
+            ...(tx.installment_plan_id
+              ? [
+                  {
+                    label: 'Editar só esta parcela',
+                    icon: 'pencil' as const,
+                    onPress: () =>
+                      router.push({
+                        pathname: '/finance/transaction-form' as const,
+                        params: { id: tx.id, month },
+                      }),
+                  },
+                ]
+              : []),
             {
               label: tx.installment_plan_id ? 'Apagar só esta parcela' : 'Apagar',
               icon: 'trash',
               destructive: true,
               onPress: confirmDelete,
             },
-            ...(tx.installment_plan_id
-              ? [
-                  {
-                    // Editar a COMPRA (total, número de parcelas, nome) é outra operação que
-                    // editar esta parcela — e antes ela não existia em lugar nenhum do app.
-                    label: 'Editar a compra inteira',
-                    icon: 'rectangle.split.3x1' as const,
-                    onPress: () =>
-                      router.push({
-                        pathname: '/finance/installments',
-                        params: { edit: tx.installment_plan_id! },
-                      }),
-                  },
-                ]
-              : []),
             ...(tx.installment_plan_id
               ? [
                   {

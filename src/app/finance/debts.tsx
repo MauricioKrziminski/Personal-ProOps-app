@@ -36,6 +36,7 @@ import {
   type Debt,
 } from '@/hooks/use-finance';
 import { useTheme } from '@/hooks/use-theme';
+import { useVoltarQuandoFechar } from '@/hooks/use-voltar-quando-fechar';
 import { formatBRL, formatNumberBR, isoToBR } from '@/lib/dates';
 import { paidInstallments } from '@/lib/debt-history';
 import { debtTerm, financeErrorMessage, simpleDebtValues } from '@/lib/finance-form';
@@ -129,6 +130,8 @@ export default function DebtsScreen() {
   const pagar = usePayDebtInstallment();
 
   const [form, setForm] = useState<FormState | null>(() => params.create === 'financing' ? { ...FORM_VAZIO, kind: 'financing' } : null);
+  // Quem chegou por `?create=financing` veio do lançamento ou do Financeiro — fechar devolve.
+  const volta = useVoltarQuandoFechar(params.create === 'financing');
   /**
    * `?id=<dívida>` já abre o detalhe. O extrato do mês mandava a prestação para a LISTA — o
    * `ref_id` de linha projetada é id de dívida, não de lançamento —, e quem tem cinco
@@ -250,7 +253,7 @@ export default function DebtsScreen() {
       {
         onSuccess: () => {
           toast({ message: form.id ? 'Dívida atualizada.' : 'Dívida cadastrada.', tone: 'success' });
-          setForm(null);
+          volta.aoFechar(() => setForm(null));
         },
         onError: (error) =>
           toast({
@@ -674,10 +677,10 @@ export default function DebtsScreen() {
       </Sheet>
 
       {/* Criar / editar */}
-      <Sheet visible={form !== null} onClose={() => setForm(null)}>
+      <Sheet visible={form !== null} onClose={() => volta.aoFechar(() => setForm(null))}>
           <TaskHeader
             title={form?.id ? 'Editar dívida' : 'Nova dívida'}
-            onClose={() => setForm(null)}
+            onClose={() => volta.aoFechar(() => setForm(null))}
             action={
               <Button
                 label="Salvar"

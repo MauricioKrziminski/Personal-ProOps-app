@@ -58,12 +58,16 @@ function screen(file: string, options: { debts?: any[]; invoiceStatus?: string; 
       if (name === 'react/jsx-runtime') return require(name);
       if (name === 'react-native') return { StyleSheet: { create: (value: unknown) => value }, View: 'View', Pressable: 'Pressable', ScrollView: 'ScrollView', FlatList: 'FlatList', useWindowDimensions: () => ({ width: 384, height: 800 }) };
       if (name === 'react-native-reanimated') return { default: { View: 'AnimatedView' }, FadeInDown: animation, LinearTransition: animation };
-      if (name === 'expo-router') return { Stack: { Screen: 'StackScreen' }, useLocalSearchParams: () => ({ id: 'invoice-1', ...(options.create !== false ? { create: 'financing' } : {}) }), router: { push: (to: any) => navigations.push(to) } };
+      // `back` é navegação como qualquer outra e ENTRA na lista: é o que prende o "fechar um
+      // formulário que outra tela abriu devolve para ela" (`useVoltarQuandoFechar`).
+      if (name === 'expo-router') return { Stack: { Screen: 'StackScreen' }, useLocalSearchParams: () => ({ id: 'invoice-1', ...(options.create !== false ? { create: 'financing' } : {}) }), router: { push: (to: any) => navigations.push(to), back: () => navigations.push({ back: true }) } };
       if (name === 'react-native-safe-area-context') return { useSafeAreaInsets: () => ({ bottom: 0 }) };
       if (name === '@/hooks/use-finance') return finance;
       if (name === '@/hooks/use-theme') return { useTheme: () => ({}) };
       // portão de "a tela está pronta": no harness nada carrega, então ele já nasce aberto
       if (name === '@/hooks/use-tela-pronta') return { useTelaPronta: () => true };
+      // Carregado DE VERDADE: ele é a regra que se quer testar, não um arredor da tela.
+      if (name === '@/hooks/use-voltar-quando-fechar') return load('src/hooks/use-voltar-quando-fechar.ts');
       if (name === '@/hooks/use-items') return { localISODate: () => '2026-09-08', formatDateBR: () => '08/09/2026', formatBRL: load('src/lib/dates.ts').formatBRL };
       if (name === '@/lib/finance-form' || name === '@/lib/dates' || name === '@/lib/month-view' || name === '@/lib/settle-labels') return load(`src/lib/${name.split('/').at(-1)}.ts`);
       // import relativo DENTRO de um módulo puro já carregado (month-view → ./dates.ts)
@@ -203,6 +207,27 @@ test('a debt without installments has no cadence, so it never demands a due day'
   ui.press('Salvar');
   assert.equal(ui.writes[0].value.due_day, null);
   assert.equal(ui.writes[0].value.remaining_cents, 50000);
+});
+
+test('fechar um formulário que OUTRA tela abriu devolve para aquela tela', () => {
+  // A queixa (15/09/2026): *"cliquei em editar a compra inteira e quando eu clico em voltar,
+  // ao invés de voltar para a tela onde eu estava, ele me leva para a tela de Parceladas"*.
+  // Chegar num formulário de sheet vindo de fora é um `push` na tela da LISTA com parâmetro;
+  // fechar o sheet tem que fechar também a tela que só existia para hospedá-lo.
+  const ui = screen(debtsFile);
+  const cabecalhos = ui.nodes().filter((n) => n.type === 'TaskHeader');
+  assert.equal(cabecalhos.length, 1, 'só o sheet do formulário está aberto');
+  ui.interact(() => cabecalhos[0].props.onClose());
+  assert.deepEqual(ui.navigations, [{ back: true }]);
+});
+
+test('e quem abriu o formulário PELA PRÓPRIA tela continua nela', () => {
+  // O espelho do caso acima, e o que quebra se alguém marcar "veio de fora" sem condição:
+  // fechar levaria a pessoa para fora de uma lista que ela abriu de propósito.
+  const ui = screen(debtsFile, { create: false });
+  ui.interact((nodes) => nodes.find((n) => n.type === 'EmptyState').props.action.onPress());
+  ui.interact((nodes) => nodes.find((n) => n.type === 'TaskHeader').props.onClose());
+  assert.deepEqual(ui.navigations, []);
 });
 
 test('editing a legacy amortized financing preserves its mode and remaining-term semantics', () => {

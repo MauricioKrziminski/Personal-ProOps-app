@@ -333,17 +333,6 @@ export default function FinanceScreen() {
   const recent = useRecentTransactions(5);
   const remove = useDeleteTransaction();
 
-  /**
-   * ⚠️ `total_cents - pending_cents`: o REALIZADO.
-   *
-   * Até 09/09/2026 isto somava `total_cents` e a faixa escrevia "entrou R$ 10.200,00" contando
-   * o Pix que ainda não tinha chegado — verbo no passado em cima de dinheiro que não entrou.
-   * `pending_cents` veio na `20260909160000` exatamente para esta subtração.
-   */
-  const totalOf = (rows: typeof summary.data, kind: 'expense' | 'income') =>
-    (rows ?? [])
-      .filter((r) => r.kind === kind)
-      .reduce((s, r) => s + Number(r.total_cents) - Number(r.pending_cents), 0);
   /*
     ⚠️ **O herói lê a linha do tempo, não `transactions_summary` + `cash_flow_forecast`.**
     Eram duas bases (compra × pagamento) alimentando o mesmo número, e foi a causa medida do
@@ -382,12 +371,29 @@ export default function FinanceScreen() {
   const chartWidth = width - Space.lg * 2 - Space.gutter * 2;
   const fimDoCiclo = ciclo?.fim ?? cycle.data?.ate ?? null;
 
-  const expense = totalOf(summary.data, 'expense');
-
   const categories = useMemo(() => {
     const rows = (summary.data ?? []).filter((r) => r.kind === 'expense');
     return [...rows].sort((a, b) => Number(b.total_cents) - Number(a.total_cents));
   }, [summary.data]);
+  /**
+   * O denominador do "% do mês" é a soma DESTAS linhas, e não outra leitura.
+   *
+   * ⚠️ **Era o REALIZADO (`total_cents - pending_cents`) e por isso o bloco inteiro escrevia
+   * "0% do mês" em todas as categorias** (15/09/2026). No ciclo corrente quase nada está
+   * `cleared` — compra no cartão só é baixada quando a fatura é paga —, então o divisor era
+   * ZERO enquanto cada linha mostrava centenas de reais. O número não estava "um pouco
+   * errado": ele era o mesmo para todas as seis, o que apaga justamente a comparação que o
+   * bloco existe para fazer.
+   *
+   * A régua é a de `finance.md`: **o total soma exatamente as linhas de baixo.** Numerador e
+   * denominador têm que sair da MESMA coluna — misturar previsto com realizado é como o
+   * divisor pôde ser zero. A subtração do realizado alimentava uma faixa "entrou/saiu" que não
+   * existe mais nesta tela, e ela saiu junto.
+   */
+  const expense = useMemo(
+    () => categories.reduce((soma, r) => soma + Number(r.total_cents), 0),
+    [categories],
+  );
   const maxCategory = Math.max(...categories.map((r) => Number(r.total_cents)), 1);
   const previousByCategory = useMemo(() => {
     const map = new Map<string, number>();

@@ -36,6 +36,7 @@ import { financeErrorMessage } from '@/lib/finance-form';
 import { useToast } from '@/components/ui/toast';
 import { confirmDestructive, showItemActions } from '@/lib/item-actions';
 import { useTheme } from '@/hooks/use-theme';
+import { useVoltarQuandoFechar } from '@/hooks/use-voltar-quando-fechar';
 import { nextPendingInstallment } from '@/lib/installment-progress';
 import { accountLabel } from '@/lib/accounts';
 
@@ -137,6 +138,7 @@ export default function InstallmentsScreen() {
   const [form, setForm] = useState<FormPlano | null>(null);
   /** Qual `?edit=` já foi consumido — sem isto, fechar o sheet reabriria no render seguinte. */
   const [edicaoAberta, setEdicaoAberta] = useState<string | null>(null);
+  const volta = useVoltarQuandoFechar();
 
   const contaPorId = useMemo(() => {
     const mapa = new Map<string, string>();
@@ -320,6 +322,8 @@ export default function InstallmentsScreen() {
     if (alvo) {
       setEdicaoAberta(params.edit);
       setForm(formDoPlano(alvo));
+      // Quem chegou por `?edit=` veio de outra tela, e é para lá que fechar devolve.
+      volta.marcar();
     }
   }
 
@@ -358,7 +362,7 @@ export default function InstallmentsScreen() {
       },
       {
         onSuccess: () => {
-          setForm(null);
+          volta.aoFechar(() => setForm(null));
           toast({
             message: `${nome}: ${form.installments}x de ${formatBRL(Math.floor(form.totalCents / form.installments))}.`,
             tone: 'success',
@@ -595,10 +599,10 @@ export default function InstallmentsScreen() {
         travado continua VISÍVEL — sumir com a conta e a data esconderia o dado de quem só
         queria conferir.
       */}
-      <Sheet visible={form !== null} onClose={() => setForm(null)}>
+      <Sheet visible={form !== null} onClose={() => volta.aoFechar(() => setForm(null))}>
         <TaskHeader
           title="Editar a compra"
-          onClose={() => setForm(null)}
+          onClose={() => volta.aoFechar(() => setForm(null))}
           action={
             <Button
               label="Salvar"

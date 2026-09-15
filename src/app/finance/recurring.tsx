@@ -33,6 +33,7 @@ import {
 } from '@/hooks/use-finance';
 import { useRealtimeInvalidate } from '@/hooks/use-items';
 import { useTheme } from '@/hooks/use-theme';
+import { useVoltarQuandoFechar } from '@/hooks/use-voltar-quando-fechar';
 import { useDebounced } from '@/hooks/use-debounced';
 import { semAcento } from '@/lib/text';
 import { brToISO, ehUltimoDiaDoMes, isValidBRDate, isoToBR, localDateTime, localISODate } from '@/lib/dates';
@@ -273,6 +274,8 @@ export default function RecurringScreen() {
   const editar = useSaveRecurringSeries();
   /** Qual `?edit=` já foi consumido — sem isto, fechar o sheet reabriria no render seguinte. */
   const [edicaoAberta, setEdicaoAberta] = useState<string | null>(null);
+  // `?create=1` já nasce vindo de fora (é o "Repetir lançamento" e o atalho do Financeiro).
+  const volta = useVoltarQuandoFechar(params.create === '1');
 
   const [form, setForm] = useState<FormState | null>(() => params.create === '1' ? {
     ...FORM_VAZIO, kind: params.kind === 'income' ? 'income' : 'expense',
@@ -353,7 +356,7 @@ export default function RecurringScreen() {
       const fim = form.fim ? brToISO(form.fim) : null;
       if (!antes || fim !== antes.end_date) patch.end_date = fim;
       if (Object.keys(patch).length === 0) {
-        setForm(null);
+        volta.aoFechar(() => setForm(null));
         return;
       }
       editar.mutate(
@@ -366,7 +369,7 @@ export default function RecurringScreen() {
                 : 'Série alterada.',
               tone: 'success',
             });
-            setForm(null);
+            volta.aoFechar(() => setForm(null));
           },
           onError: () => toast({ message: 'Não deu para alterar a série.', tone: 'error' }),
         },
@@ -389,7 +392,7 @@ export default function RecurringScreen() {
       {
         onSuccess: () => {
           toast({ message: 'Recorrência criada.', tone: 'success' });
-          setForm(null);
+          volta.aoFechar(() => setForm(null));
         },
         onError: () => toast({ message: 'Não deu para criar a recorrência.', tone: 'error' }),
       }
@@ -412,6 +415,7 @@ export default function RecurringScreen() {
     if (alvo) {
       setEdicaoAberta(params.edit);
       setForm(formDaSerie(alvo));
+      volta.marcar();
     }
   }
 
@@ -664,11 +668,11 @@ export default function RecurringScreen() {
         />
       ) : null}
 
-      <Sheet visible={form !== null} onClose={() => setForm(null)}>
+      <Sheet visible={form !== null} onClose={() => volta.aoFechar(() => setForm(null))}>
 
           <TaskHeader
             title={form?.id ? 'Editar recorrência' : 'Nova recorrência'}
-            onClose={() => setForm(null)}
+            onClose={() => volta.aoFechar(() => setForm(null))}
             action={
               <Button
                 label={form?.id ? 'Salvar' : 'Criar'}
