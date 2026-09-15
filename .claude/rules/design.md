@@ -470,6 +470,22 @@ do slot e a borda da pílula, calculada da geometria, não escolhida a dedo.
   — tela nova não copia dali.
 - **Mutation que falha precisa aparecer.** Toast + rollback visível. Falha silenciosa é
   reprovação — vale para delete, toggle, arquivar e pagar, não só para salvar.
+
+  ⚠️ **E o toast disparado de dentro de um `Sheet` não aparecia — nas 22 telas que usam sheet**
+  (medido no emulador em 15/09/2026: o `onError` recebeu o erro do banco e a tela não pintou um
+  pixel). O `Modal` do React Native é uma JANELA separada no Android e um view controller
+  apresentado no iOS; o host do toast vive na árvore raiz, então ele era desenhado ATRÁS da
+  folha. Toda mutation de sheet falhava em silêncio **por construção** — o pior modo de falha
+  desta seção, porque o código está certo e o teste de "chamei o toast" passaria.
+
+  A correção é o `Sheet` desenhar o MESMO toast dentro dele (`<ToastOutlet/>`, estado único).
+  **Não é pôr o toast num `Modal` próprio**: no Android uma janela transparente come todos os
+  toques enquanto está no ar, e o sheet ficaria intocável por 3,2 s.
+
+  ⚠️ **As três telas `presentation: 'modal'` provavelmente têm o mesmo defeito no iOS** — ali a
+  tela é um VC apresentado sobre a raiz, e é justamente onde o `transaction-form` promete que
+  "erro NUNCA fecha o modal". **Não medido** (o `idb` caiu na tentativa); se confirmar, a
+  correção é a mesma: `<ToastOutlet/>` no fim das três.
 - Confirmação destrutiva é **action sheet nativo**. Ação de item é **context menu nativo**.
   `Link.Menu` do expo-router é **iOS-only** — usar só ele deixa o Android sem ação nenhuma na
   linha. O caminho único é `showItemActions` / `confirmDestructive` (`src/lib/item-actions.ts`),

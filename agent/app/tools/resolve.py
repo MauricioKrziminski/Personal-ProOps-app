@@ -110,8 +110,9 @@ def _rotulo_plano(row: dict) -> str:
     as duas apareceriam na MESMA pergunta com rótulos quase idênticos.
     """
     # `merchant` no meio: mesma régua da linha de transação (`description ?? merchant`) e do
-    # app (`plan.merchant || plan.description`). Sem ele a compra cujo nome vive no
-    # estabelecimento aparecia na pergunta como "Tudo (2x) — compra parcelada".
+    # app (`plan.description || plan.merchant`, desde 15/09/2026 — ele era o INVERSO disto, e
+    # por isso a mesma compra tinha um nome em Parceladas e outro na fatura). Sem ele a compra
+    # cujo nome vive no estabelecimento aparecia na pergunta como "Tudo (2x) — compra parcelada".
     nome = (row.get("description") or row.get("merchant") or "compra parcelada").strip()
     return f"Tudo ({row['installments']}x) — {nome}"
 

@@ -452,7 +452,12 @@ compra, não a única tela que responde quanto resta.
   só `description`, e `_FONTES["planos"]` filtrava só por ela: "apaga a nuuvem por completo"
   não achava a compra inteira, e quando ela chegava pelo agrupamento das parcelas a pergunta
   saía escrita **"Tudo (2x) — compra parcelada"**. É a mesma régua da linha (`description ??
-  merchant`) e a mesma que o app já usava (`plan.merchant || plan.description`).
+  merchant`).
+
+  ⚠️ **Esta linha já afirmou que o app fazia igual, e ele NÃO fazia.** `useInstallmentPlans`
+  era `plan.merchant || plan.description` — invertido —, então uma compra com os dois
+  preenchidos aparecia com um nome em Parceladas e outro na fatura. Corrigido em 15/09/2026
+  junto com o reparcelamento: **`description || merchant` nos dois lados.**
 
   ⚠️ **A busca do agente tinha que acompanhar.** `resolve.por_transacao` casava só `description`
   e `category`, enquanto a busca do app (`use-finance.ts`) sempre casou os três — com o nome
