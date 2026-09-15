@@ -129,6 +129,8 @@ async def ensure_session(phone: str, thread_id: str) -> dict[str, Any]:
     guardada: o grafo não deve gastar uma ida ao banco por mensagem para
     descobrir de quem é o telefone.
     """
+    from app.domain.phone import candidates
+
     settings = get_settings()
     # ⚠️ **A CONVERSA é o thread, e o telefone é só a forma como ela chegou
     # desta vez.** A Meta às vezes entrega o número brasileiro SEM o 9º dígito
@@ -146,6 +148,14 @@ async def ensure_session(phone: str, thread_id: str) -> dict[str, Any]:
     # troca de `THREAD_SALT` reescrever o thread_id em vez de quebrar todo
     # mundo (a análise da `0040`, que continua valendo: salt novo não casa
     # thread nenhum e cai no insert).
+    #
+    # ⚠️ **A guarda do epoch procura a pendência pelas DUAS grafias, não pela
+    # que a linha guarda.** `phone` é reescrito a cada turno para a forma que
+    # chegou: `p.phone = s.phone` cobriria só a grafia da vez, e uma
+    # confirmação pendente escrita com a outra deixaria de segurar o epoch —
+    # a sessão renovaria e o "sim" cairia no vazio, que é exatamente o que o
+    # `thread_id` canônico existe para impedir.
+    grafias = candidates(phone)
     row = await fetch_one(
         """
         update public.user_sessions as s set
@@ -155,7 +165,8 @@ async def ensure_session(phone: str, thread_id: str) -> dict[str, Any]:
             when s.last_message_at < now() - make_interval(hours => %s)
              and not exists (
                select 1 from public.pending_actions p
-               where p.phone in (s.phone, %s) and p.status = 'awaiting'
+               where (p.phone = s.phone or p.phone = any(%s))
+                 and p.status = 'awaiting'
              )
             then s.session_epoch + 1
             else s.session_epoch
@@ -165,7 +176,7 @@ async def ensure_session(phone: str, thread_id: str) -> dict[str, Any]:
         """,
         phone,
         settings.session_idle_hours,
-        phone,
+        grafias,
         thread_id,
     )
     if row is None:
@@ -188,7 +199,8 @@ async def ensure_session(phone: str, thread_id: str) -> dict[str, Any]:
                 when s.last_message_at < now() - make_interval(hours => %s)
                  and not exists (
                    select 1 from public.pending_actions p
-                   where p.phone = s.phone and p.status = 'awaiting'
+                   where (p.phone = s.phone or p.phone = any(%s))
+                     and p.status = 'awaiting'
                  )
                 then s.session_epoch + 1
                 else s.session_epoch
@@ -198,6 +210,7 @@ async def ensure_session(phone: str, thread_id: str) -> dict[str, Any]:
             thread_id,
             phone,
             settings.session_idle_hours,
+            grafias,
         )
     assert row is not None
     if row["user_id"] is None:

@@ -238,3 +238,20 @@ async def test_mesmo_numero_sem_o_nono_digito_nao_cria_sessao_nova(sql):
     # os dois turnos casaram o MESMO thread e só atualizaram o telefone da vez
     assert all("where s.thread_id = %s" in query for query, _ in sql)
     assert sql[1][1][0] == "5535998744200"
+
+
+@pytest.mark.asyncio
+async def test_guarda_do_epoch_enxerga_a_pendencia_nas_duas_grafias(sql):
+    """Renovar a sessão em cima de uma confirmação pendente é perder o "sim".
+
+    `phone` é reescrito a cada turno para a grafia que chegou, então procurar a
+    pendência só por ela (ou só pelo valor atual da linha) deixa de fora a que
+    foi gravada com a outra — e a guarda do epoch libera a renovação justamente
+    quando havia algo esperando resposta.
+    """
+    await db.ensure_session("5535998744200", "thread-canonico")
+
+    query, args = sql[0]
+    assert "p.phone = any(%s)" in query, "a guarda voltou a olhar uma grafia só"
+    grafias = next(a for a in args if isinstance(a, list))
+    assert set(grafias) == {"5535998744200", "553598744200"}
