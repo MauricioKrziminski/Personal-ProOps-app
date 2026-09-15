@@ -42,6 +42,34 @@ Expo SDK 57 (managed), código em `src/`, paths `@/*` → `src/*` e `@/assets/*`
 - Decimal em texto (percentual, taxa, meses) só por `formatNumberBR` — vírgula, nunca ponto.
   Havia três cópias disso e uma tela sem nenhuma, escrevendo `90.4%` ao lado de `90,4%`.
 
+### Campo obrigatório é campo que BLOQUEIA — e "obrigatório" não é `NOT NULL`
+
+⚠️ **A régua não é o banco, é o registro sair USÁVEL** (15/09/2026). A queixa foi literal —
+*"tem campos que teoricamente são obrigatórios preencher mas me deixa eu salvar normalmente?
+Isso acontece em mais telas? Esse é um problema sério"* — e auditar por `NOT NULL sem default`
+respondia a pergunta errada: a compra parcelada que sumiu do app **salvou limpa no banco**, e era
+justamente esse o defeito. O que faltava não era uma coluna, era o NOME.
+
+- **Todo registro que a lista mostra por um nome exige o campo que É esse nome.** Onde a tela cai
+  num fallback (`description ?? merchant ?? 'Sem descrição'`, `name || 'Financiamento'`), o
+  formulário tem que impedir que se chegue nele. No lançamento **nenhum dos dois** é obrigatório
+  sozinho — às vezes só se sabe o estabelecimento, às vezes só o motivo —, mas UM é: o `refine` é
+  sobre o par, com o erro embaixo da Descrição.
+- **Valor que o registro existe para carregar entra na mesma régua.** Um bem em R$ 0,00 não soma
+  no patrimônio nem informa nada na lista — `net-worth` só olhava o nome.
+- **Campo com default mostra o default no `placeholder`**, nunca um exemplo diferente dele. O nome
+  da dívida sugeria "Financiamento do carro" e gravava "Financiamento": o campo parecia vazio,
+  salvava, e a dívida nascia com outro nome.
+- **Botão desabilitado sem dizer por quê é o defeito espelho** (§7b do design: erro abaixo do
+  campo). Um "Salvar" cinza que não explica é a mesma frustração com outra cara.
+
+**Auditado tela a tela em 15/09/2026, e o resto do app já estava certo:** contas, orçamentos,
+metas, recorrentes, regras e membros bloqueiam por `disabled`; lembrete e as quatro telas de conta
+bloqueiam por zod com a mensagem; pasta e nota rápida retornam cedo com erro inline. **Não
+converter as ~8 telas que guardam à mão para zod** — elas guardam certo, e reescrever é o escopo
+que ninguém pediu. O que prende a classe é TESTE: `simple-finance-ui.test.ts` renderiza a tela e
+aperta Salvar, e o caso que vale é o formulário incompleto com `writes.length === 0`.
+
 ## Plataforma — a decisão mora no primitivo, nunca na tela
 
 **iOS e Android não têm que ficar iguais.** Tela é onde o produto acontece; ela declara *o quê*

@@ -90,6 +90,19 @@ const schema = z
     try { installmentHistory(data.paid_installments, data.installments, brToISO(data.occurred_at), localISODate()); }
     catch (error) { ctx.addIssue({ code: 'custom', path: ['paid_installments'], message: (error as Error).message }); }
   })
+  /*
+    ⚠️ Descrição e estabelecimento são os DOIS campos opcionais que, juntos, formam o nome do
+    lançamento — e sem nenhum dos dois a linha nasce ilegível. Toda lista do app cai no mesmo
+    fallback (`description ?? merchant ?? 'Sem descrição'`), e a parcelada era pior: a RPC
+    escrevia "Compra parcelada (1/2)", que parece um lançamento legítimo de outra pessoa.
+    Foi a queixa de 15/09/2026 — "cadastrei o lançamento nuuvem wardog e não encontrei nada no
+    app, mas parece que está contando no saldo do ciclo". Nenhum dos dois é obrigatório
+    sozinho (às vezes só se sabe o estabelecimento, às vezes só o motivo); UM deles é.
+  */
+  .refine((data) => !!data.description?.trim() || !!data.merchant?.trim(), {
+    message: 'Escreva a descrição ou o estabelecimento — sem um dos dois o lançamento fica sem nome',
+    path: ['description'],
+  })
   .refine((data) => data.installments === 1 || (data.kind === 'expense' && !!data.account_id), {
     message: 'Parcelamento precisa de uma conta/cartão e só vale para gastos',
     path: ['installments'],
@@ -467,12 +480,13 @@ function TransactionForm({ editing }: { editing?: Transaction }) {
           control={control}
           name="description"
           render={({ field }) => (
-            <Field label="Descrição">
+            <Field label="Descrição" error={errors.description?.message}>
               <TextField
                 value={field.value ?? ''}
                 onChangeText={(text) => field.onChange(text || null)}
                 placeholder="Ex.: compras da semana"
                 accessibilityLabel="Descrição"
+                invalid={!!errors.description}
                 multiline
                 style={styles.multiline}
               />

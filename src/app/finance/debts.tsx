@@ -720,8 +720,14 @@ export default function DebtsScreen() {
                     rápido do financiamento pergunta só as três coisas de que ele precisa, e
                     `name` cai em "Financiamento" quando vazio (`simple-finance-ui.test.ts`).
                     Dentro do grupo opcional ele já é o primeiro — que é o que a régua pede.
+
+                    ⚠️ O placeholder mostra o NOME QUE SERÁ GRAVADO, não um exemplo do que
+                    escrever. Ele dizia "Financiamento do carro" e o default era "Financiamento":
+                    o campo parecia vazio, salvava, e a dívida nascia com outro nome — a mesma
+                    forma do lançamento que nasce "Compra parcelada". Campo com default mostra o
+                    default.
                   */}
-                  <Field label="Nome (opcional)"><TextField value={form.name} onChangeText={(name) => setForm({ ...form, name })} placeholder="Financiamento do carro" /></Field>
+                  <Field label="Nome (opcional)"><TextField value={form.name} onChangeText={(name) => setForm({ ...form, name })} placeholder="Financiamento" /></Field>
                   {!form.id && <Field label="Parcelas já pagas" hint="Deixe zero se nenhuma foi paga. Esse histórico não movimenta dinheiro.">
                     <TextField value={String(form.installmentsPaid)} onChangeText={(value) => setForm({ ...form, installmentsPaid: Number(value.replace(/\D/g, '')), historyConfirmed: true })} keyboardType="number-pad" maxLength={3} />
                   </Field>}

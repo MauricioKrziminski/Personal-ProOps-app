@@ -22,6 +22,7 @@ function screen(file: string, options: { debts?: any[]; invoiceStatus?: string; 
   const animation = { duration: () => animation, delay: () => animation };
   const finance = new Proxy({
     DEBT_KINDS: [{ value: 'financing', label: 'Financiamento' }, { value: 'loan', label: 'Empréstimo' }],
+    ASSET_CLASSES: [{ value: 'investment', label: 'Investimento', icon: 'chart.line.uptrend.xyaxis' }],
     useDebts: () => ({ ...query, data: options.debts ?? [] }),
     useMonthLines: () => ({ ...query, data: options.monthLines ?? [] }),
     useCycleLines: () => ({ ...query, data: options.cycleLines ?? [] }),
@@ -37,6 +38,8 @@ function screen(file: string, options: { debts?: any[]; invoiceStatus?: string; 
     useMonthSummary: () => ({ ...query, data: options.monthSummary ?? null }),
     useMonthBreakdown: () => ({ ...query, data: [] }),
     useSaveDebt: () => mutation('saveDebt'),
+    useSaveAsset: () => mutation('saveAsset'),
+    useArchiveAsset: () => mutation('archiveAsset'),
     useSettleInvoice: () => mutation('settleInvoice'),
     usePayInvoice: () => mutation('payInvoice'),
     useInvoice: () => ({ ...query, data: {
@@ -53,12 +56,14 @@ function screen(file: string, options: { debts?: any[]; invoiceStatus?: string; 
         useMemo: (fn: () => unknown) => fn(),
       };
       if (name === 'react/jsx-runtime') return require(name);
-      if (name === 'react-native') return { StyleSheet: { create: (value: unknown) => value }, View: 'View', Pressable: 'Pressable', ScrollView: 'ScrollView', FlatList: 'FlatList' };
+      if (name === 'react-native') return { StyleSheet: { create: (value: unknown) => value }, View: 'View', Pressable: 'Pressable', ScrollView: 'ScrollView', FlatList: 'FlatList', useWindowDimensions: () => ({ width: 384, height: 800 }) };
       if (name === 'react-native-reanimated') return { default: { View: 'AnimatedView' }, FadeInDown: animation, LinearTransition: animation };
       if (name === 'expo-router') return { Stack: { Screen: 'StackScreen' }, useLocalSearchParams: () => ({ id: 'invoice-1', ...(options.create !== false ? { create: 'financing' } : {}) }), router: { push: (to: any) => navigations.push(to) } };
       if (name === 'react-native-safe-area-context') return { useSafeAreaInsets: () => ({ bottom: 0 }) };
       if (name === '@/hooks/use-finance') return finance;
       if (name === '@/hooks/use-theme') return { useTheme: () => ({}) };
+      // portão de "a tela está pronta": no harness nada carrega, então ele já nasce aberto
+      if (name === '@/hooks/use-tela-pronta') return { useTelaPronta: () => true };
       if (name === '@/hooks/use-items') return { localISODate: () => '2026-09-08', formatDateBR: () => '08/09/2026', formatBRL: load('src/lib/dates.ts').formatBRL };
       if (name === '@/lib/finance-form' || name === '@/lib/dates' || name === '@/lib/month-view' || name === '@/lib/settle-labels') return load(`src/lib/${name.split('/').at(-1)}.ts`);
       // import relativo DENTRO de um módulo puro já carregado (month-view → ./dates.ts)
@@ -106,6 +111,12 @@ function screen(file: string, options: { debts?: any[]; invoiceStatus?: string; 
     // O "Salvar" do sheet mora no slot `action` do `SheetHeader`, não em `children` — sem esta
     // linha o botão existe na tela e some daqui, que foi o que estas seis asserções viram.
     visit(node.props.action);
+    // Ação de header é DECLARADA como dado (`actions={[{label, onPress}]}`) e desenhada como
+    // botão pela plataforma — o "+" que abre todo formulário de lista (§8 do design) mora aí.
+    // Sem esta linha nenhum sheet de criação é alcançável por este harness. `ItemLink` também
+    // tem `actions`, mas aquilo é menu de contexto, não botão visível: só `HeaderActions`.
+    if (node.type === 'HeaderActions' && Array.isArray(node.props.actions))
+      node.props.actions.forEach((a: any) => nodes.push({ type: 'Button', props: a }));
   };
   const render = () => { cursor = 0; nodes = []; visit(Component()); };
   render();
@@ -231,3 +242,25 @@ test('a paid invoice does not expose settlement or payment buttons', () => {
 // O roteamento das linhas é testado em `cycle-routes.test.ts`: ele é lógica PURA, e este harness
 // não desce em componente aninhado — a linha do ciclo mora dentro de `<Linha>`, não solta na
 // árvore da tela.
+
+
+// ── patrimônio: campo obrigatório é campo que BLOQUEIA ─────────────────────
+//
+// A queixa de 15/09/2026 foi de classe, não de tela: "tem campos que teoricamente são
+// obrigatórios preencher mas me deixa eu salvar normalmente?". `assets.current_value_cents` é
+// NOT NULL e o formulário só olhava o nome, então um bem nascia valendo R$ 0,00 — presente no
+// banco, mudo na lista, somando zero no patrimônio. O caso que prende a regressão é o Salvar
+// com nome válido e valor zerado: sem a guarda ele está habilitado e escreve.
+test('an asset with a valid name but no value cannot be saved', () => {
+  const ui = screen('src/app/finance/net-worth.tsx');
+  ui.press('Novo bem');
+  ui.fill('Nome', 'Tesouro Selic');
+  const salvar = ui.button('Salvar');
+  assert.equal(salvar.props.disabled, true, 'Salvar fica travado enquanto o valor é zero');
+  assert.equal(ui.writes.length, 0);
+
+  ui.fill('Valor atual', 150000);
+  ui.press('Salvar');
+  assert.equal(ui.writes.length, 1);
+  assert.equal(ui.writes[0].value.current_value_cents, 150000);
+});

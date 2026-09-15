@@ -202,9 +202,16 @@ export default function NetWorthScreen() {
   };
 
   const nomeOk = (form?.name.trim().length ?? 0) >= 2;
+  /*
+    ⚠️ `assets.current_value_cents` é NOT NULL e o campo nasce em 0 — sem esta guarda o Salvar
+    aceitava um bem de R$ 0,00, que não soma no patrimônio nem diz nada na lista. O erro só
+    aparece depois de o nome estar válido: num bem NOVO os dois campos nascem vazios, e acusar
+    na abertura do sheet seria o formulário reclamando antes de a pessoa digitar.
+  */
+  const valorOk = (form?.valor ?? 0) > 0;
 
   const salvar = () => {
-    if (!form || !nomeOk) return;
+    if (!form || !nomeOk || !valorOk) return;
     save.mutate(
       {
         id: form.id,
@@ -528,7 +535,7 @@ export default function NetWorthScreen() {
                 label="Salvar"
                 size="sm"
                 loading={save.isPending}
-                disabled={!nomeOk}
+                disabled={!nomeOk || !valorOk}
                 onPress={salvar}
               />
             }
@@ -573,6 +580,7 @@ export default function NetWorthScreen() {
 
               <Field
                 label="Valor atual"
+                error={nomeOk && !valorOk ? 'Informe quanto vale hoje' : undefined}
                 hint={
                   form.id
                     ? 'Valor novo entra como marcação de hoje no histórico. Igual ao anterior, nada é marcado.'
