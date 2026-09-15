@@ -72,8 +72,16 @@ function NoteCardBase({ note, folderName, folderColor, actions, drag, dragging }
   const tags = (note.tags ?? []).filter((t) => t.toLowerCase() !== folderName?.toLowerCase());
 
   const contagem = total > 0 ? `${done}/${total}` : null;
+  /*
+    ⚠️ **A data só encosta à direita quando há algo à ESQUERDA dela.** `marginLeft: 'auto'` é o
+    que faz a faixa de metadados ler como coluna quando ela tem pasta, checklist ou origem —
+    e é o que deixa a data BOIANDO sozinha no canto quando a nota não tem nenhum dos três, que
+    é o caso da nota de uma palavra escrita pelo campo rápido. Sozinha, ela é o único metadado:
+    o lugar dela é embaixo do título, alinhada com ele.
+  */
   const quando = relativeBR(note.updated_at);
   const trilho = noteRail(note.color ?? folderColor ?? null, scheme);
+  const temOutroMeta = Boolean(folderName) || Boolean(contagem) || note.source === 'whatsapp';
 
   const label = [
     titulo,
@@ -119,7 +127,7 @@ function NoteCardBase({ note, folderName, folderColor, actions, drag, dragging }
                 styles.cartao,
                 {
                   backgroundColor: pressed || dragging ? theme.backgroundSelected : theme.surface,
-                  borderColor: theme.separator,
+                  borderColor: theme.cardBorder,
                 },
               ]}>
               {/* `key` na COR: trocar a cor remonta o trilho e ele entra em fade, em vez de
@@ -187,7 +195,7 @@ function NoteCardBase({ note, folderName, folderColor, actions, drag, dragging }
                   <ThemedText
                     type="caption"
                     themeColor="textSecondary"
-                    style={[styles.quando, tabular]}>
+                    style={[temOutroMeta ? styles.quando : null, tabular]}>
                     {quando}
                   </ThemedText>
                 </View>
@@ -280,7 +288,7 @@ const styles = StyleSheet.create({
     fontFamily: Fonts.semibold,
   },
   pedaco: { flexDirection: 'row', alignItems: 'center', gap: Space.xs },
-  /** Encostada à direita: a data é a âncora que faz as linhas lerem como coluna. */
+  /** Encostada à direita — só quando existe outro metadado à esquerda para ela ancorar. */
   quando: { marginLeft: 'auto' },
   cresce: { flex: 1 },
   alca: {

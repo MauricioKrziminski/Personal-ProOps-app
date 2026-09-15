@@ -15,6 +15,13 @@ import type { NoteFolder } from '@/hooks/use-notes';
  * de uma pasta de duas palavras quebra em três linhas. Duas colunas dão 172, que é onde
  * "Universidade" cabe numa linha só. Acima de 520dp (tablet, paisagem) cabem três.
  *
+ * ## O vão entre ladrilhos é MAIOR que o respiro dentro deles
+ *
+ * ⚠️ Era `Space.sm` (8) contra `Space.md` (12) de padding interno: o nome de uma pasta ficava
+ * mais perto do ladrilho vizinho do que da própria contagem, e a grade lia como um bloco só —
+ * a metade de "está tudo grudado" que não estava dentro do cartão. Proximidade é agrupamento;
+ * vão externo menor que respiro interno agrupa as coisas erradas.
+ *
  * ## O toque longo, e por que ele não é o mesmo gesto da lista
  *
  * Ladrilho não tem menu de contexto — `ItemLink`, que é quem desenha o menu nativo, é para linha
@@ -53,7 +60,7 @@ export function FolderGrid({
       keyExtractor={(f) => f.id}
       columns={width >= 520 ? 3 : 2}
       tileHeight={folderTileHeight(fontScale)}
-      gap={Space.sm}
+      gap={Space.md}
       enabled={enabled}
       activation="toque-longo"
       scrollRef={scrollRef}

@@ -5,7 +5,6 @@ import { router } from 'expo-router';
 import * as Haptics from 'expo-haptics';
 
 import { Chip } from '@/components/finance/chip';
-import { ThemedText } from '@/components/themed-text';
 import { ColorPicker } from '@/components/notes/color-picker';
 import { FolderGrid } from '@/components/notes/folder-grid';
 import { FolderPicker } from '@/components/notes/folder-picker';
@@ -472,17 +471,13 @@ export default function NotesScreen() {
 
         {pastas.length > 0 ? (
           <View onLayout={(e) => setTopoPastas(e.nativeEvent.layout.y)}>
-            <SectionHead
-              title="Pastas"
-              inset={false}
-              action={
-                podeArrastar && pastas.length > 1 ? (
-                  <ThemedText type="caption" themeColor="textSecondary">
-                    Segure para mover
-                  </ThemedText>
-                ) : null
-              }
-            />
+            {/* ⚠️ **Sem "Segure para mover" aqui.** A dica morava no slot de AÇÃO do cabeçalho,
+                onde ela era permanente, mais longa que o próprio rótulo e competia com ele —
+                parte de "tela feia" em 14/09/2026. §7b já diz que explicação vai abaixo do que
+                explica, e o slot é para ação. O gesto se ensina sozinho: segurar um ladrilho e
+                soltar sem andar abre o menu de ações, que é o mesmo idioma da tela inicial do
+                iOS. Quem não segurar nunca perde nada — todas as ações estão nesse menu. */}
+            <SectionHead title="Pastas" inset={false} />
             <FolderGrid
               pastas={pastas}
               enabled={podeArrastar}

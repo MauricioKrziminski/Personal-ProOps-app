@@ -26,6 +26,17 @@ import { useScheme, useTheme } from '@/hooks/use-theme';
  *
  * ⚠️ "Sem cor" é a PRIMEIRA opção e é o padrão. Uma paleta sem saída obrigaria a escolher uma
  * cor para toda nota nova, e a maioria das notas não quer cor nenhuma.
+ *
+ * ## Três por linha, e cada uma com o NOME (14/09/2026)
+ *
+ * ⚠️ Antes as amostras eram discos nus embrulhando por largura — davam 6 numa linha e 3 órfãs na
+ * outra, o que lê como acidente, não como grade. Nove opções (sem cor + oito) fecham 3×3 exato
+ * em qualquer largura, e `33,333%` por célula não depende de medir a tela.
+ *
+ * O nome embaixo não é enfeite: **é o vocabulário que o agente entende**. Quem leu "turquesa"
+ * aqui sabe que dá para mandar *"pinta a lista de turquesa"* no WhatsApp — e é a única parte da
+ * interface que ensina isso. (O agente também aceita o apelido do dia a dia, "azul" e "verde",
+ * mas o nome canônico é o que fecha a volta com a tela.)
  */
 export function ColorPicker({
   visible,
@@ -68,7 +79,7 @@ export function ColorPicker({
               selecionada={value === cor}
               fundo={noteTile(cor, theme.surface, scheme) ?? theme.backgroundElement}
               tinta={noteInk(cor, scheme) ?? theme.textSecondary}
-              label={cor}
+              label={cor[0].toUpperCase() + cor.slice(1)}
               onPress={() => escolher(cor)}
             />
           ))}
@@ -105,6 +116,7 @@ function Amostra({
       onPress={onPress}
       style={styles.alvo}>
       {({ pressed }) => (
+        <>
         <View
           style={[
             styles.anel,
@@ -130,6 +142,12 @@ function Amostra({
             />
           )}
         </View>
+        {/* Sem `textTransform: 'capitalize'`: ele sobe a inicial de CADA palavra e escrevia
+            "Sem Cor". A maiúscula vem de quem monta o rótulo. */}
+        <ThemedText type="caption" themeColor={selecionada ? 'text' : 'textSecondary'}>
+          {label}
+        </ThemedText>
+        </>
       )}
     </Pressable>
   );
@@ -137,10 +155,13 @@ function Amostra({
 
 const styles = StyleSheet.create({
   corpo: { gap: Space.lg, paddingHorizontal: Space.lg, paddingBottom: Space.xxxl },
-  grade: { flexDirection: 'row', flexWrap: 'wrap', gap: Space.md },
-  alvo: { width: HitTarget + 8, height: HitTarget + 8 },
+  /** Sem `gap` no contêiner: com células em porcentagem ele empurra a terceira para a linha
+      seguinte. O respiro é `paddingVertical` de cada célula. */
+  grade: { flexDirection: 'row', flexWrap: 'wrap' },
+  alvo: { width: '33.333%', alignItems: 'center', gap: Space.sm, paddingVertical: Space.md },
   anel: {
-    flex: 1,
+    width: HitTarget + 8,
+    height: HitTarget + 8,
     alignItems: 'center',
     justifyContent: 'center',
     borderRadius: Radius.pill,
