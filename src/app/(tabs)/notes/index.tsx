@@ -47,8 +47,19 @@ import { useTelaPronta } from '@/hooks/use-tela-pronta';
 import { useTheme } from '@/hooks/use-theme';
 import { showItemActions } from '@/lib/item-actions';
 
-/** O que a dock cobre do pé da rolagem — a MESMA conta do `paddingBottom` do conteúdo. */
-const DOCK = Platform.OS === 'android' ? CURVED_BAR_SPACE : 0;
+/**
+ * O que a barra de abas cobre do pé da rolagem, para a faixa do auto-scroll ficar ALCANÇÁVEL.
+ *
+ * O mesmo número nos dois sistemas, de propósito. No Android é a geometria exata da pílula
+ * (`CURVED_BAR_SPACE`); no iOS é um PISO generoso para a barra flutuante do sistema, que eu não
+ * consegui medir no aparelho. Errar para mais só começa a faixa um pouco mais acima, o que
+ * ninguém percebe; errar para menos a coloca embaixo da barra, onde o dedo não chega — que é
+ * exatamente o bug medido no Android em 14/09/2026.
+ *
+ * ⚠️ Não trocar por `0` no iOS "porque o `paddingBottom` lá é 0": aquilo é sobre o CONTEÚDO
+ * passar por baixo da barra, e não diz nada sobre a altura do FRAME que o `onLayout` devolve.
+ */
+const DOCK = CURVED_BAR_SPACE;
 
 /**
  * Notas — a home da aba.
@@ -498,6 +509,7 @@ export default function NotesScreen() {
               accessibilityRole="button"
               accessibilityState={{ expanded: !pastasRecolhidas }}
               accessibilityLabel={`Pastas, ${pastas.length}`}
+              style={styles.alvoRecolher}
               onPress={() => {
                 Haptics.selectionAsync();
                 setPastasRecolhidas(!pastasRecolhidas);
@@ -657,6 +669,8 @@ export default function NotesScreen() {
 
 const styles = StyleSheet.create({
   recolher: { flexDirection: 'row', alignItems: 'center', gap: Space.xs },
+  /** O rótulo é um botão: alvo de 44pt (§11), não a altura natural de uma linha de `caption`. */
+  alvoRecolher: { minHeight: HitTarget, justifyContent: 'center' },
   conteudo: {
     gap: Space.xl,
     paddingHorizontal: Space.lg,
