@@ -408,3 +408,20 @@ class TestNaoAcheiCitaOTermo:
             acao,
         )
         assert "gasto A" in msg and "gasto B" in msg
+
+    def test_empate_de_linhas_iguais_mostra_a_data_que_as_separa(self):
+        """Medido no staging em 15/09/2026: nove linhas escritas "gasto de
+        R$ 55,90 em *lazer* (Assinatura de streaming)", idênticas — é o que uma
+        série recorrente sempre produz, já que o que muda é só a data. É a mesma
+        regra que `veredito` já aplica na lista do WhatsApp."""
+        from app.tools import registry
+
+        acao = FinanceAction(type=FinanceActionType.DELETE_TRANSACTION, description="streaming")
+        msg = registry._sem_alvo(
+            {"status": "ambiguous", "candidates": [
+                {"label": "gasto de R$ 55,90", "when": "10/09/2026"},
+                {"label": "gasto de R$ 55,90", "when": "10/10/2026"},
+            ]},
+            acao,
+        )
+        assert "10/09/2026" in msg and "10/10/2026" in msg

@@ -97,7 +97,15 @@ def _sem_alvo(alvo: dict, action) -> str:
     vira pergunta — sobre o que ELE disse.
     """
     if alvo.get("status") == "ambiguous":
-        opcoes = "\n".join(f"  • {c['label']}" for c in alvo.get("candidates", []))
+        # ⚠️ O `when` entra aqui pelo mesmo motivo que existe em `veredito`: uma
+        # série recorrente produz candidatos que só diferem na DATA, e sem ela
+        # esta lista sai com nove linhas escritas "gasto de R$ 55,90 em *lazer*
+        # (Assinatura de streaming)", letra por letra iguais. Escolher entre
+        # opções idênticas não é escolher.
+        opcoes = "\n".join(
+            f"  • {c['label']}" + (f" — {c['when']}" if c.get("when") else "")
+            for c in alvo.get("candidates", [])
+        )
         return f"🤔 Achei mais de um:\n{opcoes}\nMe diz qual."
     termo = resolve.termo_de(action)
     if termo:
