@@ -158,7 +158,7 @@ pergunta.** Deduzir é a terceira coisa, e ela não existe.
 | situação | o que fazer |
 |---|---|
 | não citou nada | preferência GRAVADA pelo usuário (`workspaces.default_account_id`, `accounts.payment_account_id`) — não é palpite, é configuração |
-| citou e não existe | pergunta, listando o que existe |
+| citou e não existe | pergunta, listando o que existe — **quando a lista é curta e útil** (contas, cartões). Para LANÇAMENTO ela não é: listar os 40 mais recentes é exatamente a queixa de 15/09/2026 (*"pedi para remover o nuuvem e ele me deu um monte de lançamento nada a ver"*), então ali a pergunta cita o termo — "não achei nada com «nuuvem»; confere o nome, ou me diz o valor ou a data?". Rationale em `ai-gemini.md`. |
 | citou e casa com duas | pergunta, com os dois nomes |
 | campo obrigatório faltando | pergunta ("Para cadastrar X, informe Y. **Ainda não salvei nada.**") |
 | dois itens candidatos | `interrupt()` com a lista — já era assim |
