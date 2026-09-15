@@ -425,3 +425,36 @@ class TestNaoAcheiCitaOTermo:
             acao,
         )
         assert "10/09/2026" in msg and "10/10/2026" in msg
+
+
+class TestTermoCasaOEstabelecimento:
+    """O nome pode morar em `merchant`, e a busca do APP já casava os três campos.
+
+    Até 15/09/2026 o agente casava só `description` e `category`. Com a correção do app —
+    que parou de descartar o "Estabelecimento" ao criar compra parcelada —, uma compra cujo
+    nome vive em `merchant` passaria a existir no banco e mesmo assim o agente responderia
+    "não achei nada com «nuuvem»". Duas pontas procurando coisas diferentes no mesmo dado.
+    """
+
+    @pytest.mark.asyncio
+    async def test_casa_pelo_estabelecimento(self, linhas):
+        linhas["linhas"] = [
+            {**_tx("a", 4500, "mercado", "Feira"), "merchant": None},
+            {**_tx("b", 10499, None, "Compra parcelada (1/2)"), "merchant": "nuuvem wardog"},
+        ]
+        acao = FinanceAction(type=FinanceActionType.DELETE_TRANSACTION, description="nuuvem")
+
+        estado, cands = await resolve.por_transacao("ws", acao, quer_recente=False)
+
+        assert estado == "found" and cands[0]["id"] == "b"
+
+    @pytest.mark.asyncio
+    async def test_linha_sem_a_coluna_nao_explode(self, linhas):
+        """`_antecedente_da_conversa` e outras consultas não trazem `merchant` — o filtro
+        lê com `.get`, então ausência da chave é ausência de casamento, nunca KeyError."""
+        linhas["linhas"] = [_tx("a", 4500, "mercado", "Feira")]
+        acao = FinanceAction(type=FinanceActionType.DELETE_TRANSACTION, description="feira")
+
+        estado, cands = await resolve.por_transacao("ws", acao, quer_recente=False)
+
+        assert estado == "found" and cands[0]["id"] == "a"

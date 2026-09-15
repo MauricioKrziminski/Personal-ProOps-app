@@ -426,6 +426,34 @@ compra, não a única tela que responde quanto resta.
   dois — a frase do SIM diz se o caixa se move.
 - Parcelamento só pela RPC `create_installment_plan` (nunca inserindo N linhas no app).
 
+  ⚠️ **A parcela herda o nome do ESTABELECIMENTO quando não há descrição**
+  (`20260915190000`). O texto de cada linha era `coalesce(p_description, 'Compra parcelada')`,
+  que força nome próprio sempre: quem preencheu só "Estabelecimento" via **"Compra parcelada
+  (1/2)"** na fatura, porque quem lê a linha é `tx.description ?? tx.merchant` e o primeiro
+  termo nunca era nulo. Hoje é `coalesce(p_description, p_merchant, 'Compra parcelada')`.
+
+  ⚠️ **E o app não mandava `p_merchant`.** `useCreateInstallmentPlan` monta o payload da RPC
+  campo a campo e o 8º parâmetro não estava lá — o formulário tem o campo, a pessoa preenche, e
+  o valor morria no hook, sem erro: a RPC tem default `null`, a compra entra no valor certo e na
+  fatura certa, só o nome some. Medido em produção em 15/09/2026: de 311 transações UMA tinha
+  `merchant` (e veio de `import`); dos 11 planos, ZERO. A queixa foi *"cadastrei o lançamento
+  nuuvem wardog e nao encontrei nada no app, mas parece que esta contando no saldo do ciclo"* —
+  e era exatamente isso.
+
+  **Os dois defeitos precisam cair juntos**: só o app faria o nome chegar numa coluna que a
+  fatura não lê; só o banco não teria o que ler. E `useSaveTransaction` (o caminho à vista)
+  nunca teve o problema porque ele ESPALHA o objeto — **payload montado campo a campo é payload
+  que esquece campo, em silêncio**.
+
+  ⚠️ **O passado não é reescrito.** Plano que nasceu sem nome continua sem nome; o caminho é
+  editar a parcela com escopo "esta e as futuras", que propaga `merchant`.
+
+  ⚠️ **A busca do agente tinha que acompanhar.** `resolve.por_transacao` casava só `description`
+  e `category`, enquanto a busca do app (`use-finance.ts`) sempre casou os três — com o nome
+  passando a existir em `merchant`, o agente responderia "não achei nada com «nuuvem»" para uma
+  compra que existe. `FinanceAction` **não** ganha campo `merchant` (o schema está no teto
+  medido de 252): o modelo já põe o nome em `description`, medido em 8 redações.
+
 ## Projeção de fluxo de caixa
 
 - **Horizonte da projeção: até 10 anos, e o teto num lugar só** (`20260910235500`).

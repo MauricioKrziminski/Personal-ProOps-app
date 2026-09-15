@@ -264,9 +264,16 @@ async def por_transacao(
     termo = clean_term(action.description)
     if termo:
         t_low = termo.lower().strip()
+        # ⚠️ `merchant` entra aqui porque ele é NOME, igual à descrição — e porque a busca do
+        # APP (`use-finance.ts`) já casa os três (`description`, `merchant`, `category`).
+        # Sem ele o agente respondia "não achei nada com «nuuvem»" para uma compra cujo
+        # estabelecimento é exatamente "nuuvem": as duas pontas procurando coisas diferentes
+        # no mesmo dado. Medido em 15/09/2026, junto com a correção do app que parou de
+        # descartar o campo (`create_installment_plan_with_history` nunca recebia `p_merchant`).
         por_texto_ = [
             t for t in linhas
             if t_low in (t["description"] or "").lower()
+            or t_low in ((t.get("merchant") or "")).lower()
             or t_low in (t["category"] or "").lower()
         ]
         if por_texto_:

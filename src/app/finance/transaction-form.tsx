@@ -270,6 +270,10 @@ function TransactionForm({ editing }: { editing?: Transaction }) {
           occurredAt: brToISO(values.occurred_at),
           description: values.description?.trim() || null,
           category: values.category,
+          // Sem esta linha o campo "Estabelecimento" era preenchido e descartado: a compra
+          // parcelada nascia como "Compra parcelada (1/N)" e o nome não existia em lugar
+          // nenhum. Ver o ⚠️ em `useCreateInstallmentPlan`.
+          merchant: values.merchant?.trim() || null,
         },
         {
           onSuccess: () => {

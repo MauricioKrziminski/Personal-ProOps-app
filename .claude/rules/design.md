@@ -153,6 +153,36 @@ Montar um à mão é bloqueado por `anti-slop.test.ts` (todo `<Sheet>` abre com 
 > mortos de 72px**. Decisão do dono do produto: **✕ à esquerda, ação primária à direita, uma
 > regra para as duas superfícies.**
 
+⚠️ **Ação NÃO fica ancorada sobre o scroll — ela mora no FIM do conteúdo** (15/09/2026,
+decisão do dono do produto, revertendo o desenho anterior). A tela da fatura tinha três botões
+com três legendas num bloco irmão da lista, fixo no rodapé da janela; o argumento escrito era
+"a ação primária não some quando a fatura tem 200 linhas". Na mão, ~180dp permanentes com as
+compras correndo por baixo e a última linha cortada ao meio para sempre — a queixa foi literal:
+*"esses botoes fixos na tela enquanto scrollo, ele tem que ficar la em baixo e nao fixo no
+scroll, ta ridiculo isso"*.
+
+Quem resolve "a ação some numa lista longa" é o **menu "…" do header**, que já existe e alcança
+de qualquer ponto do scroll — não uma faixa permanente.
+
+Continuam de fora da regra, por serem outra coisa: o **FAB** (idioma das duas plataformas, botão
+pequeno no canto), o **compositor do Agente** (é campo de entrada, como o do WhatsApp) e a
+**barra de formatação da nota** (toolbar acima do teclado). O que a regra proíbe é faixa de AÇÃO
+sobre conteúdo que rola.
+
+⚠️ **O rodapé do onboarding entrou junto, e ele mostra a armadilha.** Ele parecia exceção —
+é o avanço de um assistente, não ação sobre uma lista —, mas o próprio comentário do arquivo
+registrava que o passo dos avisos PASSA da tela em 384dp × fonte 1,3, que é o cenário de
+verificação do repo; ali o desenho é exatamente o recusado. O padrão que resolve já existia em
+`AuthScreen`: rodapé DENTRO do scroll, `flexGrow: 1` no `contentContainerStyle` e
+`marginTop: 'auto'` no rodapé — encostado na base quando o conteúdo é curto, rolando junto
+quando não é.
+
+⚠️ **E o irmão que cresce não pode ser `flex: 1`.** `flex: 1` é `grow 1 / shrink 1 / basis 0`:
+com um rodapé disputando a mesma coluna, o Yoga prefere ENCOLHER o bloco de cima a deixar o
+conteúdo transbordar — e num `ScrollView` encolher quer dizer que a barra nunca aparece e o
+conteúdo é cortado em silêncio. É a mesma mecânica do `flexShrink` do `ThemedText` (§3). O par é
+`flexGrow: 1` + `flexShrink: 0`.
+
 **Arrastar para reordenar é `Reorderable`** (`src/components/ui/reorderable.tsx`), caminho único,
 com a aritmética de slot fora dele (`src/design/reorder-math.ts`, com teste em `node --test`) —
 um off-by-one ali não dá erro nenhum, só solta o cartão no lugar errado. Dois gatilhos, um por

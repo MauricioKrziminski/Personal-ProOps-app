@@ -99,6 +99,10 @@ function screen(file: string, options: { debts?: any[]; invoiceStatus?: string; 
     nodes.push(node);
     visit(node.props.children);
     visit(node.props.ListHeaderComponent);
+    // Mesmo motivo do header: slot é conteúdo renderizado. As ações da fatura desceram para o
+    // FIM da lista em 15/09/2026 (botão fixo sobre o scroll foi recusado pelo dono do produto),
+    // e sem esta linha elas somem daqui enquanto continuam na tela.
+    visit(node.props.ListFooterComponent);
     // O "Salvar" do sheet mora no slot `action` do `SheetHeader`, não em `children` — sem esta
     // linha o botão existe na tela e some daqui, que foi o que estas seis asserções viram.
     visit(node.props.action);

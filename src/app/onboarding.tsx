@@ -245,20 +245,33 @@ export default function OnboardingScreen() {
             style={styles.passo}>
             {conteudo}
           </Animated.View>
-        </ScrollView>
 
-        <View style={[styles.rodape, { paddingBottom: insets.bottom + Space.lg }]}>
-          <Button
-            label={passo === TOTAL - 1 ? 'Começar a usar' : passo === 0 ? 'Vamos lá' : 'Continuar'}
-            onPress={avancar}
-            loading={saving}
-            block
-          />
-          {/* Pular existe só onde a resposta é opcional de verdade — nome e avisos. */}
-          {passo === 1 || passo === 2 ? (
-            <Button label="Agora não" variant="ghost" onPress={pular} block />
-          ) : null}
-        </View>
+          {/*
+            ⚠️ **O avanço fica DENTRO do scroll** (15/09/2026, decisão do dono do produto,
+            valendo para o app inteiro): *"esses botoes fixos na tela enquanto scrollo, ele
+            tem que ficar la em baixo e nao fixo no scroll"*. Ele era irmão do `ScrollView`,
+            e o comentário acima admite que o passo dos avisos PASSA da tela em 384dp ×
+            fonte 1,3 — que é justamente o cenário de verificação do repo. Ali o desenho
+            virava exatamente o que ele recusou: uma barra fixa com conteúdo correndo
+            por baixo.
+
+            Com `flexGrow: 1` no `contentContainerStyle` e `marginTop: 'auto'` aqui, o botão
+            encosta na base enquanto o passo é curto e desce junto com o conteúdo quando ele
+            cresce. É o mesmo desenho do `AuthScreen`, que já resolvia isto.
+          */}
+          <View style={[styles.rodape, { paddingBottom: insets.bottom + Space.lg }]}>
+            <Button
+              label={passo === TOTAL - 1 ? 'Começar a usar' : passo === 0 ? 'Vamos lá' : 'Continuar'}
+              onPress={avancar}
+              loading={saving}
+              block
+            />
+            {/* Pular existe só onde a resposta é opcional de verdade — nome e avisos. */}
+            {passo === 1 || passo === 2 ? (
+              <Button label="Agora não" variant="ghost" onPress={pular} block />
+            ) : null}
+          </View>
+        </ScrollView>
       </View>
     </View>
   );
@@ -554,9 +567,18 @@ const styles = StyleSheet.create({
     flexGrow: 1,
     paddingHorizontal: Space.lg,
     paddingTop: Space.xxl,
-    paddingBottom: Space.xl,
+    // Sem `paddingBottom`: quem fecha a coluna agora é o rodapé, que mora aqui dentro e já
+    // soma `insets.bottom`. Os dois juntos empilhavam respiro embaixo do botão.
   },
-  passo: { flex: 1, gap: Space.xl },
+  /*
+    ⚠️ **`flexGrow` + `flexShrink: 0`, nunca `flex: 1`, agora que o rodapé é IRMÃO dentro do
+    scroll.** `flex: 1` é `grow 1 / shrink 1 / basis 0`: com um irmão abaixo disputando a
+    mesma coluna, o Yoga prefere ENCOLHER este bloco a deixar o conteúdo transbordar — e num
+    `ScrollView` encolher significa que a barra de rolagem nunca aparece e o passo é cortado
+    em silêncio. É a mesma mecânica do `flexShrink` do `ThemedText` (§3 do design). Crescer
+    para ocupar a folga continua igual: ele é o único irmão que cresce.
+  */
+  passo: { flexGrow: 1, flexShrink: 0, flexBasis: 'auto', gap: Space.xl },
   /*
     **A folga da tela vira UM respiro, não uma poça de preto no fim.**
 
@@ -638,7 +660,9 @@ const styles = StyleSheet.create({
     borderCurve: 'continuous',
   },
   rodape: {
-    paddingHorizontal: Space.lg,
+    // `marginTop: 'auto'` é o que mantém o botão na base num passo curto agora que ele mora
+    // DENTRO do scroll. Sem isso ele sobe e cola no conteúdo.
+    marginTop: 'auto',
     paddingTop: Space.lg,
     gap: Space.xs,
   },

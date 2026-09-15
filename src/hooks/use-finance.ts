@@ -630,6 +630,20 @@ export function useSettleInvoice() {
 /**
  * Compra parcelada: a RPC cria N transações (uma por mês), as futuras como
  * `pending`, e o trigger do banco resolve a fatura de cada parcela.
+ *
+ * ⚠️ **Payload montado campo a campo é payload que ESQUECE campo, em silêncio.** Até
+ * 15/09/2026 este hook não mandava `p_merchant` — o 8º parâmetro da RPC —, então o campo
+ * "Estabelecimento" do formulário era preenchido pela pessoa e morria aqui. Nada quebrava:
+ * a RPC tem default `null`, o insert roda, a compra aparece no valor certo e na fatura
+ * certa. Só o NOME some. Medido na produção: de 311 transações, UMA tinha `merchant` (e
+ * veio de `import`); dos 11 planos, ZERO.
+ *
+ * Foi assim que "nuuvem wardog" virou **"Compra parcelada (1/2)"** na fatura de outubro —
+ * o dono do produto cadastrou, não achou no app e ainda viu o valor contando no ciclo. O
+ * caminho à vista (`useSaveTransaction`) nunca teve o defeito porque ele ESPALHA o objeto
+ * (`{...input}`): campo novo entra sozinho. Aqui cada parâmetro é uma linha escrita à mão,
+ * e é por isso que este comentário existe — **campo novo no formulário exige linha nova
+ * aqui**.
  */
 export function useCreateInstallmentPlan() {
   const invalidate = useInvalidateFinance();
@@ -642,6 +656,7 @@ export function useCreateInstallmentPlan() {
       occurredAt: string;
       description: string | null;
       category: string | null;
+      merchant: string | null;
     }) => {
       const { error } = await supabase.rpc('create_installment_plan_with_history', {
         p_account_id: input.accountId,
@@ -651,6 +666,7 @@ export function useCreateInstallmentPlan() {
         p_occurred_at: input.occurredAt,
         p_description: input.description ?? undefined,
         p_category: input.category ?? undefined,
+        p_merchant: input.merchant ?? undefined,
       });
       if (error) throw error;
     },

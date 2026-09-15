@@ -17,8 +17,16 @@ try {
  await db.exec(old.slice(old.indexOf('create or replace function public.create_installment_plan('),old.indexOf('/**\n * Paga a fatura:')));
  if (!process.argv.includes('--before')) {
   const files=await readdir(new URL('../migrations/',import.meta.url));
-  const file=files.find(f=>f.endsWith('_explicit_installment_history.sql'));
-  await db.exec(await readFile(new URL(`../migrations/${file}`,import.meta.url),'utf8'));
+  // ⚠️ Aplicar UMA migration pelo nome deixa o teste preso na definição daquele dia. Este
+  // arquivo exercitava só a `_explicit_installment_history`, então a correção de 15/09/2026
+  // (a parcela herdar o nome do estabelecimento) podia ser revertida com o teste verde.
+  // Cada migration que REDEFINE esta função entra na lista, em ordem.
+  for (const sufixo of ['_explicit_installment_history.sql',
+                        '_a_parcela_herda_o_nome_do_estabelecimento.sql']) {
+   const file=files.find(f=>f.endsWith(sufixo));
+   assert.ok(file,`migration ausente: ${sufixo}`);
+   await db.exec(await readFile(new URL(`../migrations/${file}`,import.meta.url),'utf8'));
+  }
  }
  const account='10000000-0000-0000-0000-000000000001';
  await assert.rejects(db.query(`select create_installment_plan($1,7056000,48,(current_date-interval '8 months')::date)`,[account]),/pagas|histórico/i,'legacy retrospective creation must ask paid history');
@@ -45,7 +53,29 @@ try {
  ],'scheduler must retain explicitly automatic recurrence without clearing manual or future entries');
  for(const count of [-1,49,null]) await assert.rejects(db.query(`select create_installment_plan_with_history($1,7056000,48,current_date,$2)`,[account,count]),/pagas|intervalo/i);
  await assert.rejects(db.query(`select create_installment_plan_with_history($1,1,48,current_date,0)`,[account]),/total|parcela/i);
+ // O nome da compra: sem descrição, a parcela herda o ESTABELECIMENTO. Era
+ // `coalesce(p_description,'Compra parcelada')`, e por isso "nuuvem wardog" digitado em
+ // Estabelecimento virava "Compra parcelada (1/2)" na fatura — o valor contava no ciclo e o
+ // nome não existia em tela nenhuma (produção, 15/09/2026).
+ {
+  const {rows:[{id}]}=await db.query(`select create_installment_plan_with_history($1,10499,2,current_date,0,null,null,'nuuvem wardog') as id`,[account]);
+  const {rows}=await db.query(`select description,merchant from transactions where installment_plan_id=$1 order by installment_no`,[id]);
+  assert.deepEqual(rows.map(r=>r.description),['nuuvem wardog (1/2)','nuuvem wardog (2/2)'],'sem descrição, a parcela herda o estabelecimento');
+  assert.ok(rows.every(r=>r.merchant==='nuuvem wardog'),'o estabelecimento também fica na coluna dele');
+ }
+ // A descrição continua ganhando do estabelecimento quando as duas existem.
+ {
+  const {rows:[{id}]}=await db.query(`select create_installment_plan_with_history($1,10499,2,current_date,0,'Presente','lazer','nuuvem') as id`,[account]);
+  const {rows}=await db.query(`select description from transactions where installment_plan_id=$1 order by installment_no`,[id]);
+  assert.deepEqual(rows.map(r=>r.description),['Presente (1/2)','Presente (2/2)']);
+ }
+ // Sem nenhum dos dois, o literal de sempre.
+ {
+  const {rows:[{id}]}=await db.query(`select create_installment_plan_with_history($1,10499,2,current_date,0) as id`,[account]);
+  const {rows}=await db.query(`select description from transactions where installment_plan_id=$1 order by installment_no`,[id]);
+  assert.deepEqual(rows.map(r=>r.description),['Compra parcelada (1/2)','Compra parcelada (2/2)']);
+ }
  await db.query(`update accounts set archived=true where id=$1`,[account]);
  await assert.rejects(db.query(`select create_installment_plan_with_history($1,4800,48,current_date,0)`,[account]),/conta/i);
- console.log('PASS: explicit paid history, amount conservation, scheduler preserves arrears, invalid input rollback');
+ console.log('PASS: explicit paid history, amount conservation, scheduler preserves arrears, invalid input rollback, parcela herda o nome');
 } finally { await db.close(); }

@@ -35,7 +35,6 @@ import {
 } from '@/hooks/use-finance';
 import { formatBRL, formatDateBR, localISODate } from '@/hooks/use-items';
 import { formatNumberBR } from '@/lib/dates';
-import { useTheme } from '@/hooks/use-theme';
 import { confirmDestructive } from '@/lib/item-actions';
 import { accountLabel } from '@/lib/accounts';
 import { AccountPicker } from '@/components/finance/account-picker';
@@ -112,7 +111,6 @@ function ErrorBand({ message, onRetry }: { message: string; onRetry: () => void 
 }
 
 export default function InvoiceScreen() {
-  const theme = useTheme();
   const toast = useToast();
   const insets = useSafeAreaInsets();
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -427,11 +425,82 @@ export default function InvoiceScreen() {
     </View>
   );
 
+  /**
+   * ⚠️ **As ações vivem NO FIM DA LISTA, nunca ancoradas sobre ela** (15/09/2026, decisão do
+   * dono do produto, revertendo o desenho anterior).
+   *
+   * Eram um bloco irmão do `FlatList`, fixo no rodapé da janela — o argumento escrito era "a
+   * ação primária não some quando a fatura tem 200 linhas". O custo real foi maior que o
+   * ganho: três botões com três legendas ocupavam ~180dp permanentes, as compras rolavam por
+   * baixo e a última linha ficava cortada ao meio para sempre. A queixa foi literal — *"esses
+   * botoes fixos na tela enquanto scrollo, ele tem que ficar la em baixo e nao fixo no scroll,
+   * ta ridiculo isso"*.
+   *
+   * Quem resolve "não some numa fatura longa" é o menu "…" do header, que já tem "Marcar como
+   * paga" e fica acessível de qualquer ponto do scroll.
+   */
   const rodape = fatura ? (
-    <ThemedText type="small" themeColor="textSecondary" style={styles.rodape}>
-      O pagamento entra como transferência: as compras já contaram como gasto quando foram feitas.
-      Pagando só uma parte, o resto continua na fatura.
-    </ThemedText>
+    <View style={styles.rodapeBloco}>
+      {podePagar ? (
+        <View style={styles.acoes}>
+          {/*
+            §7b: explicação ABAIXO do que ela explica. A frase era uma só e metade dela falava
+            do "Registrar pagamento", que só aparece lá embaixo — o leitor lia a explicação de
+            um botão que ainda não tinha visto. `finance.md` exige que a interface distinga os
+            dois efeitos, então as duas metades ficam, cada uma sob o seu botão.
+
+            Cada par vive no MESMO nó: o §7b se lê por proximidade, e irmãos soltos numa coluna
+            com um `gap` só ficam todos à mesma distância de tudo.
+          */}
+          <View style={styles.acaoExplicada}>
+            <Button
+              block
+              label="Marcar como paga"
+              variant="secondary"
+              loading={settle.isPending}
+              disabled={pay.isPending}
+              onPress={quitarSemCaixa}
+            />
+            <ThemedText type="footnote" themeColor="textSecondary">
+              Não altera o saldo: registra que a fatura foi paga fora do app.
+            </ThemedText>
+          </View>
+          {podeAdiar ? (
+            <View style={styles.acaoExplicada}>
+              <Button
+                block
+                label="Jogar para a próxima"
+                variant="secondary"
+                loading={roll.isPending}
+                disabled={settle.isPending || pay.isPending}
+                onPress={adiar}
+              />
+              {/* Uma linha, e curta. A explicação inteira dos encargos mora na CONFIRMAÇÃO,
+                  que é onde a pessoa está decidindo. */}
+              <ThemedText type="footnote" themeColor="textSecondary">
+                O saldo em aberto vira uma linha na próxima fatura, com juros e IOF estimados.
+              </ThemedText>
+            </View>
+          ) : null}
+          <View style={styles.acaoExplicada}>
+            <Button
+              block
+              size="lg"
+              label="Registrar pagamento"
+              disabled={settle.isPending || pay.isPending}
+              onPress={abrirPagamento}
+            />
+            <ThemedText type="footnote" themeColor="textSecondary">
+              Desconta da conta que você escolher.
+            </ThemedText>
+          </View>
+        </View>
+      ) : null}
+      <ThemedText type="small" themeColor="textSecondary" style={styles.rodape}>
+        O pagamento entra como transferência: as compras já contaram como gasto quando foram
+        feitas. Pagando só uma parte, o resto continua na fatura.
+      </ThemedText>
+    </View>
   ) : null;
 
   return (
@@ -541,71 +610,6 @@ export default function InvoiceScreen() {
           </Animated.View>
         )}
       />
-
-      {/* Ancorado fora do scroll: a ação primária não some quando a fatura tem 200 linhas. */}
-      {podePagar ? (
-        <View
-          style={[
-            styles.ancora,
-            { backgroundColor: theme.groupedBackground, paddingBottom: insets.bottom + Space.md },
-          ]}>
-          {/*
-            §7b: explicação ABAIXO do que ela explica. A frase era uma só e metade dela falava
-            do "Registrar pagamento", que só aparece lá embaixo — o leitor lia a explicação de
-            um botão que ainda não tinha visto. `finance.md` exige que a interface distinga os
-            dois efeitos, então as duas metades ficam, cada uma sob o seu botão.
-
-            Cada par vive no MESMO nó: o §7b se lê por proximidade, e irmãos soltos numa coluna
-            com um `gap` só ficam todos à mesma distância de tudo.
-          */}
-          <View style={styles.acaoExplicada}>
-            <Button
-              block
-              label="Marcar como paga"
-              variant="secondary"
-              loading={settle.isPending}
-              disabled={pay.isPending}
-              onPress={quitarSemCaixa}
-            />
-            <ThemedText type="footnote" themeColor="textSecondary">
-              Não altera o saldo: registra que a fatura foi paga fora do app.
-            </ThemedText>
-          </View>
-          {podeAdiar ? (
-            <View style={styles.acaoExplicada}>
-              <Button
-                block
-                label="Jogar para a próxima"
-                variant="secondary"
-                loading={roll.isPending}
-                disabled={settle.isPending || pay.isPending}
-                onPress={adiar}
-              />
-              {/*
-                Uma linha, e curta. A explicação inteira dos encargos mora na CONFIRMAÇÃO, que é
-                onde a pessoa está decidindo — aqui ela empurrava "Registrar pagamento", a ação
-                primária, para a beirada da tela. A âncora existe justamente para a primária não
-                sumir; enchê-la de texto desfaz o motivo de ela existir.
-              */}
-              <ThemedText type="footnote" themeColor="textSecondary">
-                O saldo em aberto vira uma linha na próxima fatura, com juros e IOF estimados.
-              </ThemedText>
-            </View>
-          ) : null}
-          <View style={styles.acaoExplicada}>
-            <Button
-              block
-              size="lg"
-              label="Registrar pagamento"
-              disabled={settle.isPending || pay.isPending}
-              onPress={abrirPagamento}
-            />
-            <ThemedText type="footnote" themeColor="textSecondary">
-              Desconta da conta que você escolher.
-            </ThemedText>
-          </View>
-        </View>
-      ) : null}
 
       <Sheet visible={pagando} onClose={() => setPagando(false)}>
 
@@ -748,11 +752,8 @@ const styles = StyleSheet.create({
     A regra "explicação abaixo do que ela explica" se lê por PROXIMIDADE — sem distância
     diferente, não há o que ler.
   */
-  ancora: {
-    paddingHorizontal: Space.lg,
-    paddingTop: Space.md,
-    gap: Space.md,
-  },
+  rodapeBloco: { gap: Space.xl },
+  acoes: { gap: Space.md },
   /** Botão e a legenda dele são um par: mais perto entre si do que do próximo botão. */
   acaoExplicada: { gap: Space.xs },
   sheetBody: {

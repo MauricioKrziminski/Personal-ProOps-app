@@ -169,19 +169,20 @@ async def reference_window(
         with pista as (
           select nullif(%s, '')::text as termo, %s::bigint as cents, %s::date as dia
         )
-        (select t.id, t.kind, t.amount_cents, t.category, t.description, t.occurred_at
+        (select t.id, t.kind, t.amount_cents, t.category, t.description, t.merchant, t.occurred_at
            from public.transactions t
           where t.workspace_id = %s and t.occurred_at <= current_date
           order by t.occurred_at desc, t.created_at desc
           limit %s)
         union all
-        (select t.id, t.kind, t.amount_cents, t.category, t.description, t.occurred_at
+        (select t.id, t.kind, t.amount_cents, t.category, t.description, t.merchant, t.occurred_at
            from public.transactions t cross join pista p
           where t.workspace_id = %s and t.occurred_at > current_date
             and (
               (p.termo is null and p.cents is null and p.dia is null)
               or (p.termo is not null
                   and (t.description ilike '%%' || p.termo || '%%'
+                       or t.merchant ilike '%%' || p.termo || '%%'
                        or t.category ilike '%%' || p.termo || '%%'))
               or (p.cents is not null and t.amount_cents = p.cents)
               or (p.dia is not null and t.occurred_at = p.dia)
