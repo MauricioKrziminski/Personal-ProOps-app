@@ -30,11 +30,13 @@ App mobile pessoal de **notas rápidas, lembretes e controle financeiro operado 
   Isso já falhou **duas vezes** (03/09/2026): a `0049` e depois as `0050`/`0051` foram anunciadas
   como "aplicadas em produção" quando foram para o staging.
 
-  Produção está em **`20260915120000`** (a coluna `atrasada` de `cycle_lines`), aplicada em
-  15/09/2026 pelo Gabriel, logo depois da `20260914180000` (Notas: cor, pin, arquivar e ordem
-  manual) — e o repo não tem nenhuma migration fora de lá. As duas foram conferidas na fonte
-  DEPOIS de aplicar: a `atrasada` é a última coluna de `cycle_lines`, `authenticated` mantém
-  `execute` nas duas portas públicas e `_cycle_lines` segue revogada.
+  Produção está em **`20260915190000`** (a parcela herda o nome do estabelecimento), aplicada em
+  15/09/2026 pelo Gabriel, depois da `20260915120000` (a coluna `atrasada` de `cycle_lines`) e da
+  `20260914180000` (Notas: cor, pin, arquivar e ordem manual) — e o repo não tem nenhuma
+  migration fora de lá. Todas conferidas na fonte DEPOIS de aplicar: a `atrasada` é a última
+  coluna de `cycle_lines`, `authenticated` mantém `execute` nas portas públicas, `_cycle_lines`
+  segue revogada, e na `20260915190000` o `create or replace` preservou os grants e o
+  `TimeZone=America/Sao_Paulo` da casca de 7 argumentos (que ela não toca).
 
   Conferido na fonte depois da leva de 14/09: as 43 RPCs que o app chama existem e continuam com `execute`
   para `authenticated` (é o modo de falha do par `200000`/`220000`, abaixo), e
