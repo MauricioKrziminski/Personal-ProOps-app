@@ -322,7 +322,8 @@ async def run_turn(
                     missing=pergunta, slot=slot,
                 )
                 return await _fechar(
-                    sessao, uso, await _perguntar_slot(sessao, novo_id, slot, pergunta)
+                    sessao, uso,
+                    await _perguntar_slot(sessao, novo_id, slot, pergunta, acao),
                 )
             await db.delete_draft(sessao["id"])
             # segue o fluxo normal com a ação COMPLETA: as validações de
@@ -358,12 +359,29 @@ async def _fechar(sessao: dict, uso: dict, resposta: str | dict) -> str | dict:
     return resposta
 
 
-async def _perguntar_slot(sessao: dict, draft_id: str, slot: str, pergunta: str) -> str | dict:
+def _so_cartoes(acao: dict | None) -> bool:
+    """A conta que este rascunho pede é um CARTÃO?
+
+    A régua mora em `_CONTAS_CITADAS` (`resolve.conta_e_cartao`) e é a MESMA que
+    decide contra o que a citação foi conferida — perguntar por uma lista
+    diferente da que validou seria oferecer opções que a validação recusa.
+    O default é cartão: o rascunho de slot `account` nasceu do parcelamento.
+    """
+    from app.tools.resolve import conta_e_cartao
+
+    decidido = conta_e_cartao((acao or {}).get("type"))
+    return True if decidido is None else decidido
+
+
+async def _perguntar_slot(
+    sessao: dict, draft_id: str, slot: str, pergunta: str, acao: dict | None = None
+) -> str | dict:
     """A pergunta do slot: menu quando dá para listar, texto quando não dá."""
     if slot != "account":
         return pergunta
-    cartoes = await db.accounts(sessao["workspace_id"], only_cards=True)
-    return _pergunta_cartao(draft_id, cartoes, pergunta)
+    so_cartoes = _so_cartoes(acao)
+    contas = await db.accounts(sessao["workspace_id"], only_cards=so_cartoes)
+    return _pergunta_cartao(draft_id, contas, pergunta, so_cartoes=so_cartoes)
 
 
 async def _financiamento_do_rascunho(
@@ -420,36 +438,53 @@ async def _financiamento_do_rascunho(
 async def _cartao_do_rascunho(
     sessao: dict, rascunho: dict, decidido: dict
 ) -> tuple[dict | None, str | dict | None]:
-    """Troca o que o usuário disse pelo cartão REAL. `(decidido, resposta)`.
+    """Troca o que o usuário disse pela conta REAL. `(decidido, resposta)`.
 
     Depois daqui `decidido["account"]` é o nome CANÔNICO do banco. Gravar o texto
     digitado era o defeito silencioso do fluxo: mesmo quando a validação passava,
     o `resolve_account` lá embaixo não achava a conta pelo que o usuário escreveu,
     devolvia None, e a compra parcelada nascia SEM cartão — exatamente o que a
     regra "cartão obrigatório em parcelado" existe para impedir.
+
+    ⚠️ **Nem todo slot `account` é CARTÃO.** Desde 15/09/2026 uma conta citada e
+    não encontrada num gasto comum também vira rascunho deste slot, e ali a
+    lista certa é a das contas — oferecer os cartões a quem escreveu "gastei 45
+    no bradesco" é oferecer o que a validação vai recusar.
     """
-    cartoes = await db.accounts(sessao["workspace_id"], only_cards=True)
+    so_cartoes = _so_cartoes(rascunho.get("action"))
+    contas = await db.accounts(sessao["workspace_id"], only_cards=so_cartoes)
     draft_id = rascunho["id"]
+    o_que = "cartão" if so_cartoes else "conta"
 
     if decidido["acao"] == "escolher_cartao":
-        if not cartoes:
-            return None, draft.sem_cartoes()
-        return None, _pergunta_cartao(draft_id, cartoes, "💳 Então me diz: qual cartão?")
+        if not contas:
+            return None, draft.sem_contas(so_cartoes=so_cartoes)
+        return None, _pergunta_cartao(
+            draft_id, contas, f"💳 Então me diz: qual {o_que}?", so_cartoes=so_cartoes
+        )
 
     if decidido["acao"] == "criar_cartao":
         from app.graph.build import graph
 
         nome = draft.nome_de_cartao(decidido.get("name"))
         if not nome:
-            return None, "Qual é o nome do cartão que você quer cadastrar?"
+            return None, f"Qual é o nome d{'o cartão' if so_cartoes else 'a conta'} que você quer cadastrar?"
         thread = effective_thread_id(sessao["thread_id"], sessao["session_epoch"])
+        # O cadastro segue pelo catálogo de recursos, que é quem sabe o que falta
+        # (fechamento e vencimento no cartão, tipo na conta) e pede uma coisa de
+        # cada vez. Um segundo fluxo aqui seria a cópia que diverge.
         pergunta = (
             f"Qual é o dia de fechamento e o dia de vencimento do cartão {nome}? "
             "Vou mostrar o cadastro para você confirmar. A compra continua guardada."
+            if so_cartoes else
+            f"A conta {nome} é corrente, poupança, dinheiro ou investimento? "
+            "Vou mostrar o cadastro para você confirmar. O lançamento continua guardado."
         )
         await graph().aupdate_state(
             {"configurable": {"thread_id": thread}},
-            {"resource_draft": [{"type": "resource_create", "resource": "cards", "name": nome, "fields": []}]},
+            {"resource_draft": [{"type": "resource_create",
+                                 "resource": "cards" if so_cartoes else "accounts",
+                                 "name": nome, "fields": []}]},
         )
         return None, pergunta
 
@@ -459,30 +494,34 @@ async def _cartao_do_rascunho(
         # isso, um id de outro workspace entraria como argumento — o mesmo IDOR
         # que `ensure_owned` fecha nos outros caminhos.
         escolhido = next(
-            (c for c in cartoes if str(c["id"]) == str(decidido["account_id"])), None
+            (c for c in contas if str(c["id"]) == str(decidido["account_id"])), None
         )
         if escolhido is None:
             return None, _pergunta_cartao(
-                draft_id, cartoes, "🤔 Esse cartão não é seu. Qual deles?"
+                draft_id, contas, f"🤔 Ess{'e cartão' if so_cartoes else 'a conta'} não é seu. Qual deles?",
+                so_cartoes=so_cartoes,
             )
         return {**decidido, "account": escolhido["name"]}, None
 
     nome = draft.nome_de_cartao(decidido.get("account"))
-    achados = matching.match_accounts(nome, cartoes)
+    achados = matching.match_accounts(
+        nome, contas, account_type="credit_card" if so_cartoes else None
+    )
     if len(achados) == 1:
         return {**decidido, "account": achados[0]["name"]}, None
     if achados:
         # Empate NUNCA vira escolha nossa: lançar no cartão errado é pior que uma
         # pergunta a mais.
         return None, _pergunta_cartao(
-            draft_id, achados, f"🤔 Achei mais de um parecido com *{nome}*. Qual deles?"
+            draft_id, achados, f"🤔 Achei mais de um parecido com *{nome}*. Qual deles?",
+            so_cartoes=so_cartoes,
         )
     if not nome:
-        return None, draft.sem_cartoes()
+        return None, draft.sem_contas(so_cartoes=so_cartoes)
     # Nada casou. Antes isto era um beco: listava os cartões existentes e, se não
     # houvesse nenhum, mandava o usuário cadastrar no app e voltar. Agora o
     # cadastro acontece aqui mesmo, sem sair da compra.
-    return None, _pergunta_criar_cartao(draft_id, nome, cartoes)
+    return None, _pergunta_criar_cartao(draft_id, nome, contas, so_cartoes=so_cartoes)
 
 
 # ⚠️ **`draft_id` no PAYLOAD, além de dentro de cada id de botão.** No WhatsApp o
@@ -492,11 +531,14 @@ async def _cartao_do_rascunho(
 # rascunho e mostrava "escolha ou diga o nome do cartão" sem nada para escolher.
 
 
-def _pergunta_criar_cartao(draft_id: str, nome: str, cartoes: list[dict]) -> dict:
-    """Cartão que não existe vira oferta de cadastro, não beco sem saída."""
+def _pergunta_criar_cartao(
+    draft_id: str, nome: str, cartoes: list[dict], *, so_cartoes: bool = True
+) -> dict:
+    """Conta que não existe vira oferta de cadastro, não beco sem saída."""
+    o_que, artigo = ("cartão", "um") if so_cartoes else ("conta", "uma")
     corpo = (
-        f"❌ Não achei o cartão *{nome}* cadastrado.\n"
-        "Quer que eu crie um cartão com esse nome agora mesmo?"
+        f"❌ Não achei {'o' if so_cartoes else 'a'} {o_que} *{nome}* cadastrad{'o' if so_cartoes else 'a'}.\n"
+        f"Quer que eu crie {artigo} {o_que} com esse nome agora mesmo?"
     )
     botoes = [(f"{draft.CLICK_PREFIX}{draft_id}:create_card:{nome}", "Sim, cadastrar")]
     if cartoes:
@@ -510,7 +552,7 @@ def _pergunta_criar_cartao(draft_id: str, nome: str, cartoes: list[dict]) -> dic
         "buttons": botoes,
         # promete só o que TEM handler: "criar" digitado viraria um cartão
         # chamado *criar*, que é o loop de promessa morta que a 2.6 deletou
-        "text": f"{corpo}\nToca num botão, digita o nome de outro cartão, ou *cancelar*.",
+        "text": f"{corpo}\nToca num botão, digita o nome de outr{'o cartão' if so_cartoes else 'a conta'}, ou *cancelar*.",
     }
 
 
@@ -538,29 +580,51 @@ def _pergunta_tipo_valor(draft_id: str, cents: int, parcelas: int) -> dict:
     }
 
 
-def _pergunta_cartao(draft_id: str, cartoes: list[dict], corpo: str) -> dict:
-    """Cartão ou financiamento: decisões distintas, ambas ainda sem escrita."""
+def _pergunta_cartao(
+    draft_id: str, cartoes: list[dict], corpo: str, *, so_cartoes: bool = True
+) -> dict:
+    """Cartão ou financiamento: decisões distintas, ambas ainda sem escrita.
+
+    ⚠️ **"É financiamento" só existe quando a pergunta é de CARTÃO.** Ela é a
+    bifurcação de uma compra parcelada; num gasto comum em conta corrente ela
+    ofereceria um caminho que não leva a lugar nenhum.
+    """
     mostrar = cartoes[:8]
     sobraram = len(cartoes) - len(mostrar)
+    o_que = "cartão" if so_cartoes else "conta"
     aviso = f"\n(+{sobraram} que não coube na lista — é só digitar o nome.)" if sobraram else ""
     explicacao = (
         "Se foi compra no cartão, escolha ou diga o nome do cartão. "
         "Se foi um contrato de financiamento, escolha É financiamento; vou pedir os dados do contrato."
+        if so_cartoes else
+        "Escolha uma das contas, ou digita o nome de outra que eu cadastro."
     )
     corpo = f"{corpo}\n{explicacao}{aviso}"
     cancelar = f"{draft.CLICK_PREFIX}{draft_id}:no"
     financiamento = f"{draft.CLICK_PREFIX}{draft_id}:financing"
+    saidas_texto = (
+        f"Digita o nome de um {o_que}, escolhe É financiamento, ou *cancelar*."
+        if so_cartoes else
+        f"Digita o nome de uma {o_que}, ou *cancelar*."
+    )
     texto = (
         f"{corpo}\n"
         + "\n".join(f"• {c['name']}" for c in mostrar)
-        + "\nDigita o nome de um cartão, escolhe É financiamento, ou *cancelar*."
+        + f"\n{saidas_texto}"
     )
+    extras_botao = ([(financiamento, "É financiamento")] if so_cartoes else []) + [
+        (cancelar, "Cancelar")
+    ]
+    extras_linha = (
+        [(financiamento, "É financiamento", "Informar os dados do contrato")]
+        if so_cartoes else []
+    ) + [(cancelar, "Cancelar", "Esquecer esse lançamento")]
     if len(mostrar) <= 1:
         return {
             "ui": "buttons", "draft_id": str(draft_id), "body": corpo,
             "buttons": [
                 *[(f"{draft.CLICK_PREFIX}{draft_id}:c:{c['id']}", c["name"]) for c in mostrar],
-                (financiamento, "É financiamento"), (cancelar, "Cancelar"),
+                *extras_botao,
             ],
             "text": texto,
         }
@@ -568,8 +632,7 @@ def _pergunta_cartao(draft_id: str, cartoes: list[dict], corpo: str) -> dict:
         "ui": "list", "draft_id": str(draft_id), "body": corpo, "label": "Escolher opção",
         "rows": [
             *[(f"{draft.CLICK_PREFIX}{draft_id}:c:{c['id']}", c["name"], "") for c in mostrar],
-            (financiamento, "É financiamento", "Informar os dados do contrato"),
-            (cancelar, "Cancelar", "Esquecer essa compra"),
+            *extras_linha,
         ],
         "text": texto,
     }
@@ -649,10 +712,13 @@ async def _resposta_do_estado(sessao: dict, estado: dict, thread: str) -> str | 
     # alcança. Com pausa, a pergunta pendente vence e o rascunho volta pelo
     # `lembrete`, como já era.
     if rascunho.get("slot") == "account" and draft_id:
-        cartoes = await db.accounts(sessao["workspace_id"], only_cards=True)
+        so_cartoes = _so_cartoes(rascunho.get("action"))
+        contas = await db.accounts(sessao["workspace_id"], only_cards=so_cartoes)
         # o corpo leva a resposta INTEIRA, não só a pergunta: o lote pode ter
         # salvo uma nota junto, e perder isso seria pior que o menu
-        return _pergunta_cartao(draft_id, cartoes, estado.get("reply", ""))
+        return _pergunta_cartao(
+            draft_id, contas, estado.get("reply", ""), so_cartoes=so_cartoes
+        )
 
     return estado.get("reply", "")
 

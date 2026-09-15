@@ -591,10 +591,12 @@ async def resolve_node(state: AgentState) -> dict:
     # "Confirma registrar R$ 3.000,00 no cartão santander?" para um cartão que
     # não existe, e a pessoa só descobria DEPOIS de dizer sim. Vale para os dois
     # ramos acima: criação pura nem passa por `for_actions`.
-    alvos = await resolve.contas_citadas(state["workspace_id"], acoes, alvos)
+    alvos = await resolve.contas_citadas(
+        state["workspace_id"], acoes, alvos, pular=set(_incompletas(state, acoes))
+    )
 
     return {"targets": with_resources(alvos), "results": esclarecimentos,
-            "draft": _rascunho(state, acoes)}
+            "draft": _rascunho(state, acoes, alvos)}
 
 
 def _incompletas(state: AgentState, acoes: list) -> dict[int, str]:
@@ -617,12 +619,19 @@ def _esclarecimentos(state: AgentState, acoes: list) -> list[str]:
             *(pergunta for _, pergunta in _incompletas(state, acoes).values())]
 
 
-def _rascunho(state: AgentState, acoes: list) -> dict:
+def _rascunho(state: AgentState, acoes: list, alvos: list[dict] | None = None) -> dict:
     """A extração incompleta que vale guardar, ou {}.
 
     Só a PRIMEIRA: dois rascunhos abertos tornariam "foi 5000" ambíguo, do mesmo
     jeito que duas perguntas abertas tornariam "sim" ambíguo. O grafo só monta o
     objeto — quem grava é o worker, como já faz com `pending_actions`.
+
+    ⚠️ **Conta citada que não bate também vira rascunho.** Ela não é "campo que
+    falta" (o modelo extraiu o nome; ele é que não existe), então `faltando` não
+    a vê — e sem rascunho a pergunta "qual delas?" não tinha onde encaixar a
+    resposta: o turno seguinte era uma mensagem nova, sem a compra. É o mesmo
+    formato que `resource_node` já usa para o cadastro incompleto (`_pergunta`
+    viajando junto da ação).
     """
     for i, (slot, pergunta) in _incompletas(state, acoes).items():
         return {
@@ -631,6 +640,14 @@ def _rascunho(state: AgentState, acoes: list) -> dict:
             "missing": pergunta,
             "slot": slot,
         }
+    for i, alvo in enumerate(alvos or []):
+        if i < len(acoes) and alvo.get("account_error"):
+            return {
+                "action": acoes[i].model_dump(mode="json"),
+                "raw_text": state.get("text", ""),
+                "missing": alvo["account_error"],
+                "slot": "account",
+            }
     return {}
 
 

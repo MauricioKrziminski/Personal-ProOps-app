@@ -256,7 +256,7 @@ class TestSemCartoes:
         tinha implementação: quem respondia isso era classificado `answer`,
         virava nome de cartão, falhava a validação e recebia a mesma mensagem em
         loop."""
-        msg = draft.sem_cartoes("nubank")
+        msg = draft.sem_contas("nubank")
         assert "nubank" in msg
         assert "cancelar" in msg.lower()
         assert "sem cartão" not in msg.lower()

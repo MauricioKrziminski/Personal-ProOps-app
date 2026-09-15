@@ -754,7 +754,27 @@ _CONTAS_CITADAS: dict[Any, tuple[tuple[str, bool, str], ...]] = {
 }
 
 
-async def contas_citadas(workspace_id, acoes: list, alvos: list[dict]) -> list[dict]:
+def conta_e_cartao(tipo) -> bool | None:
+    """A conta desta ação é um CARTÃO? `None` quando ela não pede conta nenhuma.
+
+    Aceita o enum ou a string gravada no rascunho. A régua já existia em
+    `_CONTAS_CITADAS` e estava sendo lida só aqui dentro; quem PERGUNTA "qual
+    conta?" precisa dela também, para não oferecer os dois cartões a quem lançou
+    um gasto em conta corrente. Uma tabela só — duas divergiriam no dia em que
+    uma ação nova entrasse numa e não na outra.
+    """
+    if not isinstance(tipo, FinanceActionType):
+        try:
+            tipo = FinanceActionType(tipo)
+        except ValueError:
+            return None
+    campos = _CONTAS_CITADAS.get(tipo)
+    return campos[0][1] if campos else None
+
+
+async def contas_citadas(
+    workspace_id, acoes: list, alvos: list[dict], pular: set[int] | None = None
+) -> list[dict]:
     """Marca `correction_error` onde o usuário citou uma conta que não bate.
 
     ⚠️ **Isto roda na fase de RESOLUÇÃO, e não dentro da tool, porque a
@@ -777,7 +797,13 @@ async def contas_citadas(workspace_id, acoes: list, alvos: list[dict]) -> list[d
     alvos = [*alvos] + [{}] * max(0, len(acoes) - len(alvos))
     for i, acao in enumerate(acoes):
         campos = _CONTAS_CITADAS.get(getattr(acao, "type", None))
-        if not campos or alvos[i].get("correction_error"):
+        # ⚠️ **Uma pergunta por turno.** Ação a que já falta VALOR não é
+        # perguntada duas vezes: "comprei uma tv em 10x no itau" respondia
+        # "faltou o valor" E "não achei o cartão itau" no mesmo balão, e a
+        # pessoa não sabe qual das duas responder. `faltando` já declara a
+        # ordem — valor primeiro, cartão depois —, e o cartão volta a ser
+        # perguntado no turno seguinte, quando o valor entrar.
+        if not campos or alvos[i].get("correction_error") or i in (pular or set()):
             continue
         for campo, so_cartoes, papel in campos:
             nome = getattr(acao, campo, None)
@@ -786,6 +812,15 @@ async def contas_citadas(workspace_id, acoes: list, alvos: list[dict]) -> list[d
             try:
                 await conta_citada(workspace_id, nome, only_cards=so_cartoes, papel=papel)
             except Level1Error as err:
-                alvos[i] = {**alvos[i], "correction_error": err.mensagem_usuario}
+                # `account_error` é o MESMO texto, com outro nome: `correction_error`
+                # é o que faz o gate parar, e este é o que diz que a parada tem
+                # resposta possível — um rascunho de slot `account`, com os
+                # botões das contas que existem. Sem ele a pergunta era um beco:
+                # medido em 15/09/2026, "paguei 45 no mercado com o cartao" →
+                # "qual delas?" → "nubank" respondia *"Para trocar a conta de uma
+                # compra parcelada, edite a parcela individual no app"*, e os
+                # R$ 45 nunca eram registrados.
+                alvos[i] = {**alvos[i], "correction_error": err.mensagem_usuario,
+                            "account_error": err.mensagem_usuario}
                 break
     return alvos

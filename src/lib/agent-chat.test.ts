@@ -444,6 +444,17 @@ test('a lista de cartões do rascunho vira botões', () => {
       ['Cancelar', 'draft', `ds:${DID}:no`],
     ],
   );
+  // É o `candidateId` que separa REGISTRO de SAÍDA, e é por ele que a tela
+  // decide entre "pílulas no balão" e "botão que abre a lista". Sem ele os
+  // cartões contariam como saída e oito deles virariam oito pílulas.
+  assert.deepEqual(
+    options.filter((o) => o.candidateId).map((o) => o.candidateId),
+    ['acc-1', 'acc-2'],
+  );
+  assert.deepEqual(
+    options.filter((o) => !o.candidateId).map((o) => o.label),
+    ['É financiamento', 'Cancelar'],
+  );
 });
 
 test('o sufixo do rascunho não é interpretado na tela', () => {
@@ -464,6 +475,8 @@ test('o sufixo do rascunho não é interpretado na tela', () => {
     `ds:${DID}:p:10499`,
     `ds:${DID}:create_card:Itaú`,
   ]);
+  // Nenhum destes é registro: `t:`, `p:` e `create_card:` são saídas, e por isso
+  // nenhum deles deve virar candidato de lista.
   assert.ok(options.every((o) => o.decision === 'draft' && !o.candidateId));
 });
 
@@ -474,6 +487,7 @@ test('botão de OUTRO rascunho é descartado', () => {
       [`ds:${DID}:c:acc-1`, 'Nubank'],
       ['ds:00000000-0000-4000-8000-0000000000ff:c:acc-9', 'Cartão de ontem'],
       [`ds:${DID}`, 'Sem sufixo'],
+      [`ds:${DID}:c:`, 'Escolha sem cartão'],
     ],
   });
   assert.deepEqual(options.map((o) => o.label), ['Nubank']);

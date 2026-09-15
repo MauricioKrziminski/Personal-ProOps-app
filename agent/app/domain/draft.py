@@ -245,8 +245,8 @@ def mesclar(acao_guardada: dict, decidido: dict) -> dict:
     return juntado
 
 
-def sem_cartoes(nome: str = "") -> str:
-    """Não há o que listar: o usuário não tem cartão nenhum cadastrado.
+def sem_contas(nome: str = "", *, so_cartoes: bool = True) -> str:
+    """Não há o que listar: o usuário não tem cartão (ou conta) nenhum cadastrado.
 
     Único caminho que continua sendo texto puro — Lista Interativa vazia não
     existe. Mantém o rascunho vivo de propósito: jogar no fallback genérico
@@ -257,10 +257,14 @@ def sem_cartoes(nome: str = "") -> str:
     nome de cartão, falhava a validação e recebia a mesma mensagem em loop.
     """
     alvo = f" *{nome}*" if nome else ""
+    o_que, artigo = ("cartão", "o") if so_cartoes else ("conta", "a")
     return (
-        f"❌ Não achei o cartão{alvo} — você ainda não tem nenhum cartão cadastrado.\n"
-        "Cadastra ele no app e me fala o nome, ou responde *cancelar* para desistir."
+        f"❌ Não achei {artigo} {o_que}{alvo} — você ainda não tem nenhum{'' if so_cartoes else 'a'} "
+        f"{o_que} cadastrad{'o' if so_cartoes else 'a'}.\n"
+        f"Cadastra {'ele' if so_cartoes else 'ela'} no app e me fala o nome, ou responde "
+        "*cancelar* para desistir."
     )
+
 
 
 # ---------------------------------------------------------------------------
@@ -371,6 +375,8 @@ def lembrete(rascunho: dict) -> str:
         oque = "o que foi comprado"
     elif slot == "category":
         oque = "a categoria"
+    elif slot == "already_paid_count":
+        oque = "quantas parcelas já foram pagas"
     else:
         oque = "o valor"
     return f"(Ainda tenho seu rascunho — *{trecho}*. É só me mandar {oque} quando quiser.)"

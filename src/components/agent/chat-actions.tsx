@@ -97,8 +97,12 @@ export const ChatActions = memo(function ChatActions({ payload, busy, onDecide }
     );
   }
 
-  const candidatos = options.filter((o) => o.decision === 'choose');
-  const saidas = options.filter((o) => o.decision !== 'choose');
+  // Quem é REGISTRO e quem é SAÍDA sai do `candidateId`, não da `decision`: o
+  // rascunho também lista registros (os cartões), e filtrar por `choose`
+  // deixava os oito cartões caírem no ramo de baixo como oito pílulas
+  // empilhadas — o desenho que esta seção recusou duas vezes.
+  const candidatos = options.filter((o) => Boolean(o.candidateId));
+  const saidas = options.filter((o) => !o.candidateId);
 
   if (candidatos.length > CABE_NO_BALAO) {
     const escolher = (o: UiOption) => {
@@ -157,7 +161,11 @@ export const ChatActions = memo(function ChatActions({ payload, busy, onDecide }
           // o botão do design system não tem segunda linha.
           label={o.description ? `${o.label} · ${o.description}` : o.label}
           // A primeira opção é a que o agente propôs; as outras são saídas.
-          variant={i === 0 ? 'primary' : 'secondary'}
+          // ⚠️ **Rascunho não propõe nada** — ele pergunta ("qual cartão?", "é o
+          // total ou cada parcela?"). Pintar a primeira de accent diria que o
+          // agente recomenda o Cartão da casa, que é a mesma mentira do `limit 1`
+          // que virou pergunta.
+          variant={i === 0 && o.decision !== 'draft' ? 'primary' : 'secondary'}
           block
           disabled={inerte}
           onPress={() => onDecide(o)}

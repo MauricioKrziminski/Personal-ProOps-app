@@ -349,12 +349,21 @@ export function parseUiActions(payload: UiPayloadShape | null | undefined): {
 
     let opcao: UiOption | null = null;
     if (partes[0] === 'ds') {
-      // Rascunho: o app não interpreta o sufixo (`c:<conta>`, `t:<centavos>`,
+      // Rascunho: o app não interpreta o sufixo (`t:<centavos>`,
       // `create_card:<nome>`, `financing`, `no`) — ele devolve o id CRU e quem
       // decide o que ele significa é `draft.parse_slot_click`, no servidor.
       // Interpretar aqui seria a segunda cópia dessa tabela.
       if (!draftId || partes[1] !== draftId || !partes[2]) continue;
-      opcao = { id, label, decision: 'draft' };
+      // A exceção é `c:` — ela é a MESMA convenção dos dois prefixos e é o que
+      // diz "esta opção é um REGISTRO, não uma saída". Sem ela a tela não
+      // distingue os cartões do "Cancelar" e desenha a lista inteira como
+      // pílulas empilhadas, que é o desenho recusado duas vezes em
+      // `chat-actions.tsx`.
+      const escolhido = partes[2] === 'c' ? partes.slice(3).join(':') : '';
+      if (partes[2] === 'c' && !escolhido) continue;
+      opcao = escolhido
+        ? { id, label, decision: 'draft', candidateId: escolhido }
+        : { id, label, decision: 'draft' };
     } else {
       // `pa` + o uuid do pendente + o sufixo. O uuid TEM que ser o desta pergunta.
       if (partes[0] !== 'pa' || !pendingId || partes[1] !== pendingId) continue;

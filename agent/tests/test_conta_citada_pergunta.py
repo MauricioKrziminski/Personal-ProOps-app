@@ -152,3 +152,72 @@ def test_dia_que_nao_existe_pergunta_em_vez_de_virar_hoje(texto, espera_pergunta
         assert resultado and "não existe" in resultado[1]
     else:
         assert resultado is None
+
+
+# ---------------------------------------------------------------------------
+# a pergunta tem que ter RESPOSTA: ela vira rascunho de slot `account`
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.asyncio
+async def test_conta_citada_que_nao_bate_marca_account_error(contas):
+    """`correction_error` faz o gate parar; `account_error` diz que a parada tem
+    saída — é o marcador que vira rascunho e, com ele, botões.
+
+    Sem isso a pergunta era um beco, medido em 15/09/2026: *"paguei 45 no
+    mercado com o cartao"* → "qual delas?" → "nubank" respondia sobre editar
+    parcela no app, e os R$ 45 nunca eram registrados.
+    """
+    from app.tools import resolve
+
+    acao = FinanceAction(
+        type=FinanceActionType.CREATE_EXPENSE, amount_cents=4500,
+        description="mercado", account="bradesco",
+    )
+    alvos = await resolve.contas_citadas(WS, [acao], [{}])
+    assert alvos[0]["account_error"] == alvos[0]["correction_error"]
+    assert "bradesco" in alvos[0]["account_error"]
+
+
+@pytest.mark.asyncio
+async def test_acao_a_que_ja_falta_valor_nao_ganha_a_segunda_pergunta(contas):
+    """Uma pergunta por turno. "comprei uma tv em 10x no itau" respondia
+    "faltou o valor" E "não achei o cartão itau" no mesmo balão, e a pessoa não
+    sabe qual das duas responder — `faltando` já declara a ordem."""
+    from app.tools import resolve
+
+    acao = FinanceAction(
+        type=FinanceActionType.CREATE_INSTALLMENT_PURCHASE,
+        installments=10, description="tv", account="itau",
+    )
+    alvos = await resolve.contas_citadas(WS, [acao], [{}], pular={0})
+    assert "account_error" not in alvos[0]
+
+
+def test_a_regua_de_cartao_ou_conta_sai_de_uma_tabela_so():
+    """Perguntar por uma lista diferente da que validou seria oferecer opções
+    que a validação recusa."""
+    from app.tools import resolve
+
+    assert resolve.conta_e_cartao(FinanceActionType.CREATE_INSTALLMENT_PURCHASE) is True
+    assert resolve.conta_e_cartao(FinanceActionType.CREATE_EXPENSE) is False
+    assert resolve.conta_e_cartao("create_expense") is False
+    # ação que não pede conta nenhuma, e lixo, não podem virar "cartão" por acaso
+    assert resolve.conta_e_cartao(FinanceActionType.DELETE_TRANSACTION) is None
+    assert resolve.conta_e_cartao("coisa_que_nao_existe") is None
+
+
+def test_o_erro_de_conta_vira_rascunho_com_a_lista_de_contas():
+    """O rascunho é o que dá onde encaixar a resposta — sem ele o turno seguinte
+    é uma mensagem nova, sem o lançamento."""
+    from app.graph import nodes
+
+    acao = FinanceAction(
+        type=FinanceActionType.CREATE_EXPENSE, amount_cents=4500,
+        description="mercado", account="bradesco",
+    )
+    estado = {"text": "gastei 45 no mercado no bradesco", "timezone": "America/Sao_Paulo"}
+    rascunho = nodes._rascunho(estado, [acao], [{"account_error": "🤔 Não achei..."}])
+    assert rascunho["slot"] == "account"
+    assert rascunho["action"]["account"] == "bradesco"
+    assert rascunho["raw_text"] == estado["text"]
