@@ -4,7 +4,6 @@ import Animated, { FadeInDown, LinearTransition } from 'react-native-reanimated'
 import { Stack, useLocalSearchParams } from 'expo-router';
 
 import { useBRL } from '@/components/ui/conceal';
-import { Chip } from '@/components/finance/chip';
 import { SelectField } from '@/components/ui/select-field';
 import { ThemedText } from '@/components/themed-text';
 import { HeaderActions } from '@/components/ui/header-actions';
@@ -97,7 +96,7 @@ const FORM_VAZIO: FormState = {
   parcelas: '',
   diaVencimento: '',
   installmentsPaid: 0,
-  historyConfirmed: false,
+  historyConfirmed: true,
   installmentCents: 0,
   accountId: null,
 };
@@ -864,14 +863,18 @@ export default function DebtsScreen() {
               {!form.id && form.parcelas !== '' && (
                 <Field label="Quantas parcelas já foram pagas?"
                   hint="Já está no saldo devedor acima — não desconto de novo.">
-                  <View style={styles.duasColunas}>
-                    <Chip label="Nenhuma" selected={form.historyConfirmed && form.installmentsPaid === 0}
-                      onPress={() => setForm({ ...form, installmentsPaid: 0, historyConfirmed: true })} />
-                    <TextField value={form.historyConfirmed ? String(form.installmentsPaid) : ''}
-                      onChangeText={(v) => setForm({ ...form, installmentsPaid: Number(v.replace(/\D/g, '')), historyConfirmed: v.trim() !== '' })}
-                      placeholder="Informe, inclusive zero" maxLength={3} keyboardType="number-pad"
-                      accessibilityLabel="Parcelas do financiamento já pagas" />
-                  </View>
+                  {/*
+                    ⚠️ **Sem chip "Nenhuma", e o campo nasce em `0`** (15/09/2026, a mesma régua
+                    do formulário de lançamento). O chip escrevia exatamente o valor que o campo
+                    ao lado passaria a mostrar — dois controles para um dado só. O que ele
+                    existia para resolver era o campo nascer VAZIO precisando de confirmação;
+                    com default o problema não existe, e a frase logo abaixo diz a conta que saiu
+                    disso ("N pagas + M restantes").
+                  */}
+                  <TextField value={String(form.installmentsPaid)}
+                    onChangeText={(v) => setForm({ ...form, installmentsPaid: Number(v.replace(/\D/g, '')), historyConfirmed: true })}
+                    placeholder="0" maxLength={3} keyboardType="number-pad"
+                    accessibilityLabel="Parcelas do financiamento já pagas" />
                 </Field>
               )}
               {form.parcelas !== '' && form.historyConfirmed && (
