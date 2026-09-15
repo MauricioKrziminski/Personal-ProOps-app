@@ -240,6 +240,12 @@ export function ConversationScreen({ conversationId, initialText = '', title }: 
         // id cru do botão. O rótulo vira o texto do balão do usuário, como no
         // HITL — quem reabrir a conversa amanhã precisa ver o que respondeu, não
         // um payload.
+        //
+        // O mesmo par que `disparar` faz antes de todo envio: sem ele o
+        // "demorou demais" do turno ANTERIOR fica na tela embaixo da resposta
+        // que acabou de chegar (visto no emulador em 15/09/2026).
+        setErro(null);
+        setDesistiu(false);
         enviar.mutate(
           { clientMessageId: turno.novoId(), content: opcao.label, clickedId: opcao.id },
           {

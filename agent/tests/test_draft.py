@@ -101,6 +101,18 @@ class TestMescla:
         guardado = {"type": "create_expense", "amount_cents": 100, "description": "x"}
         assert draft.mesclar(guardado, {"slot": "amount", "amount_cents": 999})["amount_cents"] == 100
 
+    def test_a_conta_respondida_VENCE_a_que_o_usuario_tinha_dito(self):
+        """O caso que a pergunta existe para resolver.
+
+        A conta guardada é o nome que o usuário disse e que NÃO existe ("com o
+        cartao"); a resposta é a escolha dele na lista. Mantendo a antiga, a
+        mesma pergunta voltava em loop — medido no emulador em 15/09/2026.
+        """
+        guardado = {"type": "create_expense", "amount_cents": 4500, "account": "cartao"}
+        mesclado = draft.mesclar(guardado, {"slot": "account", "account": "Nubank"})
+        assert mesclado["account"] == "Nubank"
+        assert mesclado["amount_cents"] == 4500, "o resto da ação fica intocado"
+
 
 class TestLembrete:
     def test_frase_cita_o_rascunho_sem_gastar_modelo(self):

@@ -335,7 +335,9 @@ class TestRascunhoComPergunta:
         """Era ela que o teste de usabilidade pegou saindo como texto livre."""
         spec = await conversation._resposta_do_estado(SESSAO, self._estado(False), "t:1")
         assert spec["ui"] == "list"
-        assert spec["rows"][0] == ("ds:d-novo:c:c1", "Itaú", "")
+        # A descrição carrega o TIPO: numa lista, um cartão e uma conta corrente
+        # têm a mesma cara, e foi assim que um salário caiu dentro da fatura.
+        assert spec["rows"][0] == ("ds:d-novo:c:c1", "Itaú", "Cartão de crédito")
         # o corpo leva a resposta inteira, não só a pergunta
         assert "Em qual cartão" in spec["body"]
 

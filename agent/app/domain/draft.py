@@ -226,16 +226,28 @@ def com_total(decidido: dict | None, acao: dict) -> dict | None:
 
 
 def mesclar(acao_guardada: dict, decidido: dict) -> dict:
-    """Preenche o slot respondido, sem sobrescrever o que já estava lá."""
+    """Preenche o slot respondido. **A resposta vence NO CAMPO perguntado.**
+
+    ⚠️ Era "sem sobrescrever o que já estava lá", e a guarda travava justamente
+    o caso que a pergunta existe para resolver. Desde 15/09/2026 o slot
+    `account` também nasce de um nome que o usuário DISSE e que não existe
+    ("paguei 45 no mercado com o cartao"): a ação guardada já tinha
+    `account = "cartao"`, escolher *Nubank* na lista era descartado, e a MESMA
+    pergunta voltava — medido no emulador, em loop.
+
+    O que continua intocado são os OUTROS campos (mesclar nunca apaga o que a
+    pergunta não era sobre) e o VALOR: ali a guarda fica, porque um valor já
+    preenchido quer dizer que a pergunta não era para existir, e para dinheiro
+    manter o que estava é o lado seguro do erro.
+    """
     juntado = dict(acao_guardada)
-    if decidido.get('slot') == 'already_paid_count':
+    slot = decidido.get("slot")
+    if slot == 'already_paid_count':
         juntado['already_paid_count']=decidido['already_paid_count']
-    elif decidido.get("slot") == "account":
-        if not juntado.get("account"):
-            juntado["account"] = decidido["account"]
-    elif decidido.get("slot") == "description":
-        if not juntado.get("description"):
-            juntado["description"] = decidido["description"]
+    elif slot == "account":
+        juntado["account"] = decidido["account"]
+    elif slot == "description":
+        juntado["description"] = decidido["description"]
     elif not juntado.get("amount_cents"):
         juntado["amount_cents"] = decidido["amount_cents"]
     if decidido.get("current_installment") is not None:

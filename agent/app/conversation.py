@@ -631,11 +631,34 @@ def _pergunta_cartao(
     return {
         "ui": "list", "draft_id": str(draft_id), "body": corpo, "label": "Escolher opção",
         "rows": [
-            *[(f"{draft.CLICK_PREFIX}{draft_id}:c:{c['id']}", c["name"], "") for c in mostrar],
+            *[(f"{draft.CLICK_PREFIX}{draft_id}:c:{c['id']}", c["name"], _tipo_da_conta(c))
+              for c in mostrar],
             *extras_linha,
         ],
         "text": texto,
     }
+
+
+# ⚠️ **Numa lista, um cartão e uma conta corrente têm a MESMA cara.** Foi assim
+# que um salário de R$ 4.000 foi lançado dentro da fatura pelo app em
+# 09/09/2026 ("aparece só nubank e eu achei que era a conta corrente nubank e
+# nao cartao nubank"), e a resposta de lá foi separar os dois por PALAVRA, além
+# do nome. Aqui a linha já tem onde escrever isso.
+_TIPOS = {
+    "credit_card": "Cartão de crédito",
+    "checking": "Conta corrente",
+    "savings": "Poupança",
+    "cash": "Dinheiro",
+    "investment": "Investimento",
+}
+
+
+def _tipo_da_conta(conta: dict) -> str:
+    """O tipo por extenso, com o dia de fechamento quando ele decide a fatura."""
+    tipo = _TIPOS.get(conta.get("type") or "", "")
+    if conta.get("type") == "credit_card" and conta.get("closing_day"):
+        return f"{tipo} · fecha dia {conta['closing_day']}"
+    return tipo
 
 
 async def _resposta_do_estado(sessao: dict, estado: dict, thread: str) -> str | dict:
