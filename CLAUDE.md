@@ -30,20 +30,29 @@ App mobile pessoal de **notas rápidas, lembretes e controle financeiro operado 
   Isso já falhou **duas vezes** (03/09/2026): a `0049` e depois as `0050`/`0051` foram anunciadas
   como "aplicadas em produção" quando foram para o staging.
 
-  Produção está em **`20260914170000`**, aplicado em 14/09/2026 pelo Gabriel (as ONZE de
-  `20260913120000` a `20260914170000` de uma vez) — e o repo não tem nenhuma migration fora de lá.
-  Conferido na fonte logo depois: as 43 RPCs que o app chama existem e continuam com `execute`
+  Produção está em **`20260914180000`** (a de Notas: cor, pin, arquivar e ordem manual), aplicada
+  em 15/09/2026 pelo Gabriel com `db push --project-ref` — e o repo não tem nenhuma migration fora
+  de lá. Conferido no `migration list` antes: exatamente UMA pendente.
+
+  Conferido na fonte depois da leva de 14/09: as 43 RPCs que o app chama existem e continuam com `execute`
   para `authenticated` (é o modo de falha do par `200000`/`220000`, abaixo), e
   `public._alerts_to_send()` ficou sem `execute` para `anon` e `authenticated` — era um vazamento
   de telefone e push token de todos os workspaces, alcançável com a anon key e sem login.
+
+  ⚠️ **`--project-ref` na escrita, não `link` → `push` → `link`.** O hook lê a flag
+  (`explicito`, em `supabase-target.sh`) e ela não mexe no `supabase/.temp/project-ref`. A
+  corrente com `link` tem um furo: falhando no meio, ela deixa o CLI apontado para PRODUÇÃO, e aí
+  `gen types`, `db diff` e `migration list` passam a ler prod em silêncio — o hook só barra
+  escrita.
 
   ⚠️ **A `200000` e a `220000` são um PAR e sobem juntas.** A primeira cria
   `private.debt_paid_in_cycle` com `revoke`, e a segunda devolve o `execute`; só a primeira
   derruba a Hoje e a Projeção com `42501 permission denied`, porque `debt_schedule_for` é
   `security invoker` e a chamada aninhada usa o privilégio do `authenticated`.
 
-  O caminho é `link --project-ref` + `db push` + `link` de volta para o staging, rodado pelo
-  Gabriel. **`--db-url` não serve**: o hook lê o projeto LINKADO e a
+  O caminho é `PROOPS_PROD_OK=1 npx supabase db push --project-ref kwriuifcwyvdrxtspjiz`, rodado
+  pelo Gabriel, e antes dele um `migration list --project-ref` para VER quantas estão
+  pendentes. **`--db-url` não serve**: o hook lê o projeto LINKADO e a
   flag passava por cima da trava em silêncio — buraco fechado no mesmo dia, com
   `scripts/supabase-target.test.sh` prendendo os sete casos.
 
