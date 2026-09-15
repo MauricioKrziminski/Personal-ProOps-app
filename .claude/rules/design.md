@@ -157,6 +157,22 @@ a relação que o RNGH documenta para filho ganhar do pai, resolvida ANTES do pr
 `scrollEnabled={false}` durante o arrasto continua, como segunda trava — ele responde ao
 `onStart`, que sai por `runOnJS` e chega um render depois.
 
+⚠️ **A faixa do auto-scroll mede a área ALCANÇÁVEL, não a altura do scroll** (14/09/2026). Nas
+raízes de aba o `ScrollView` passa POR BAIXO da dock flutuante: ele mede 888dp, mas os últimos
+~98dp são a pílula e, abaixo dela, a área de gesto do sistema — que nem entrega o `MOVE` ao app.
+Com a faixa de 88dp contada do pé do scroll ela começava em 800 e o dedo só chegava a 777: o
+auto-scroll **nunca disparava**, sem erro nenhum, e arrastar uma pasta para o fim de uma grade de
+20 era impossível. `Reorderable` recebe `bottomInset` e a tela passa a MESMA conta que ela já usa
+no `paddingBottom` do conteúdo. A aritmética é `velocidadeAutoScroll` em `reorder-math.ts`, com
+teste — o caso que prende o bug é o ponto alcançável dando `v > 0` com a dock descontada e `0`
+sem ela.
+
+⚠️ **E o quanto o conteúdo andou é MEDIDO, nunca o quanto foi pedido.** Somar
+`destino - offset` ao dedo no mesmo quadro em que se pede o `scrollTo` assume que ele aconteceu;
+no fim do conteúdo o pedido é clampado e a soma continua. Medido: `dy` foi de 433 para **181.534**
+em três quadros com o offset parado, e o ladrilho saiu voando da tela. Comparar o offset com o do
+quadro anterior conserta os dois fins sem saber onde o conteúdo termina.
+
 ⚠️ **Na GRADE o slot mora DENTRO do transform.** Com `left`/`top` estáticos, soltar produzia dois
 movimentos ao mesmo tempo (o layout pulando para o slot novo e o transform voltando a zero) e o
 ladrilho teleportava. Uma expressão só para a posição, e não há salto.
