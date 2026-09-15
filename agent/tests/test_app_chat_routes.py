@@ -455,3 +455,42 @@ def test_sem_token_e_401_no_formato_da_api(monkeypatch):
     r = sem_auth.get("/internal/chat/conversations")
     assert r.status_code == 401
     assert set(r.json()) == {"code", "message"}
+
+
+# ---------------------------------------------------------------------------
+# clique de rascunho pelo corpo da mensagem
+# ---------------------------------------------------------------------------
+
+
+def test_clique_de_rascunho_chega_ao_dominio(cliente, falso):
+    falso["resultado"] = _turno()
+    clique = f"ds:{uuid4()}:c:{uuid4()}"
+    r = cliente.post(
+        f"/internal/chat/conversations/{SID}/messages",
+        json={"client_message_id": str(uuid4()), "content": "Nubank",
+              "clicked_id": clique},
+    )
+    assert r.status_code == 200
+    assert falso["chamadas"][-1][1]["clicked_id"] == clique
+
+
+def test_clique_de_HITL_nao_entra_pela_rota_de_mensagem(cliente, falso):
+    """`pa:` tem rota própria, e é lá que o candidato é conferido contra a lista
+    CONGELADA da pergunta. Aceitá-lo aqui seria o atalho que pula essa cerca."""
+    falso["resultado"] = _turno()
+    r = cliente.post(
+        f"/internal/chat/conversations/{SID}/messages",
+        json={"client_message_id": str(uuid4()), "content": "Confirmar",
+              "clicked_id": f"pa:{uuid4()}:ok"},
+    )
+    assert r.status_code == 422
+    assert not falso["chamadas"]
+
+
+def test_mensagem_sem_clique_nao_inventa_um(cliente, falso):
+    falso["resultado"] = _turno()
+    cliente.post(
+        f"/internal/chat/conversations/{SID}/messages",
+        json={"client_message_id": str(uuid4()), "content": "gastei 45"},
+    )
+    assert falso["chamadas"][-1][1]["clicked_id"] is None

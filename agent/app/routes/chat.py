@@ -87,6 +87,20 @@ class NovaConversa(Corpo):
 class NovaMensagem(Corpo):
     client_message_id: UUID
     content: str = Field(min_length=1, max_length=MAX_CONTENT)
+    # O clique num botão de RASCUNHO (escolher o cartão, "é cada parcela",
+    # "sim, cadastrar"). Só `ds:` passa por aqui: `pa:` é HITL e tem rota
+    # própria, onde o candidato é conferido contra a lista CONGELADA da
+    # pergunta — aceitá-lo aqui seria um atalho em volta dessa conferência.
+    # O `ds:` continua validado no servidor (`draft.parse_slot_click` confere o
+    # uuid do rascunho aberto), então o pior que um id forjado consegue é
+    # "essa pergunta já expirou".
+    clicked_id: str | None = Field(default=None, max_length=300)
+
+    @model_validator(mode="after")
+    def _so_clique_de_rascunho(self):
+        if self.clicked_id is not None and not self.clicked_id.startswith("ds:"):
+            raise ValueError("clicked_id só aceita clique de rascunho (ds:)")
+        return self
 
 
 class Renomear(Corpo):
@@ -378,6 +392,7 @@ async def enviar(session_id: UUID, body: NovaMensagem, user_id: Usuario) -> Turn
             session_id=session_id,
             client_message_id=body.client_message_id,
             content=body.content,
+            clicked_id=body.clicked_id,
         )
     except app_chat.ChatError as err:
         raise _traduz(err) from err

@@ -172,13 +172,15 @@ async def create_conversation(
 
 
 async def send_message(
-    *, user_id: UUID, session_id: UUID, client_message_id: UUID, content: str
+    *, user_id: UUID, session_id: UUID, client_message_id: UUID, content: str,
+    clicked_id: str | None = None,
 ) -> TurnResult:
     return await _execute_turn(
         user_id=user_id,
         session_id=session_id,
         client_message_id=client_message_id,
         content=content,
+        clicked_id=clicked_id,
     )
 
 
@@ -261,6 +263,17 @@ async def _execute_turn(
         # toque numa pergunta antiga resolveria a nova.
         payload = {**payload, "pending_id": str(pendente["id"])}
 
+    # O balão que fez a pergunta de RASCUNHO é carimbado ANTES de o novo entrar:
+    # a pergunta seguinte costuma ser do MESMO rascunho ("é cada parcela" →
+    # "qual cartão?"), e carimbar depois apagaria os botões que acabaram de
+    # nascer. É o irmão do `resolve_chat_ui_payload` do HITL — sem ele os botões
+    # da pergunta já respondida seguiriam vivos convidando ao toque que o
+    # servidor vai recusar.
+    if (rascunho_clicado := _draft_do_clique(clicked_id)):
+        await repo.resolve_chat_draft_payload(
+            session_id=session_id, draft_id=rascunho_clicado, resolution="choose"
+        )
+
     assistente = await repo.finish_chat_turn(
         session_id=session_id,
         user_message_id=mensagem["id"],
@@ -268,6 +281,14 @@ async def _execute_turn(
         ui_payload=payload,
     )
     return TurnResult("completed", sessao, mensagem, assistente)
+
+
+def _draft_do_clique(clicked_id: str | None) -> str | None:
+    """O uuid do rascunho dentro de `ds:<uuid>:<sufixo>`, ou None."""
+    if not clicked_id or not clicked_id.startswith("ds:"):
+        return None
+    partes = clicked_id.split(":")
+    return partes[1] if len(partes) > 2 and partes[1] else None
 
 
 def _as_claim(bruto) -> TurnClaim:

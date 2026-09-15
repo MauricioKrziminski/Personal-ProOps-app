@@ -169,7 +169,15 @@ export function ConversationScreen({ conversationId, initialText = '', title }: 
 
   const ultima = mensagens[mensagens.length - 1];
   const pergunta = ultima?.role === 'assistant' ? ultima.ui_payload : null;
-  /** Uma pergunta aberta trava o campo: a resposta dela sai dos botões. */
+  /**
+   * Uma pergunta de HITL aberta trava o campo: a resposta dela sai dos botões.
+   *
+   * ⚠️ **Pergunta de RASCUNHO não trava, e isso é o desenho.** Ali os botões são
+   * atalho para o que já existe — digitar continua sendo resposta válida, e é
+   * assim que se escolhe um cartão que não coube na lista ou se cria um novo
+   * ("digita o nome de outro cartão"). Travar o campo transformaria a lista de
+   * cartões existentes na única resposta possível.
+   */
   const esperandoAcao = Boolean(pergunta?.pending_id && !pergunta.resolved);
 
   // O teto do lease. Sem ele, um turno que morreu no servidor deixaria a tela
@@ -227,6 +235,27 @@ export function ConversationScreen({ conversationId, initialText = '', title }: 
 
   const decidir = useCallback(
     (mensagem: AgentMessage, opcao: UiOption) => {
+      if (opcao.decision === 'draft') {
+        // Rascunho não tem rota de resolução: o clique é uma MENSAGEM levando o
+        // id cru do botão. O rótulo vira o texto do balão do usuário, como no
+        // HITL — quem reabrir a conversa amanhã precisa ver o que respondeu, não
+        // um payload.
+        enviar.mutate(
+          { clientMessageId: turno.novoId(), content: opcao.label, clickedId: opcao.id },
+          {
+            onError: (e: Error) => {
+              if (e instanceof AgentAuthExpiredError) return;
+              const api = e as AgentApiError;
+              if (api.policy?.paywall) {
+                router.push('/paywall');
+                return;
+              }
+              toast({ message: 'Não deu para responder agora.', tone: 'error' });
+            },
+          },
+        );
+        return;
+      }
       const pendingId = mensagem.ui_payload?.pending_id;
       if (!pendingId) return;
       resolver.mutate(
@@ -257,7 +286,7 @@ export function ConversationScreen({ conversationId, initialText = '', title }: 
         },
       );
     },
-    [resolver, toast, turno],
+    [enviar, resolver, toast, turno],
   );
 
   const itens = useMemo<Item[]>(() => {

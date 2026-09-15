@@ -263,7 +263,11 @@ export function retryPolicyFor(erro: { status: number; code?: string }): RetryPo
 // HITL
 // ---------------------------------------------------------------------------
 
-export type ChatDecision = 'approve' | 'reject' | 'choose';
+/**
+ * `draft` não é decisão de HITL: ela não passa pela rota de resolução (não há
+ * `pending_actions` por trás), vai como MENSAGEM levando o id cru do botão.
+ */
+export type ChatDecision = 'approve' | 'reject' | 'choose' | 'draft';
 
 /** Uma opção da pergunta, já traduzida para o que a API de resolução aceita. */
 export interface UiOption {
@@ -278,6 +282,8 @@ export interface UiOption {
 
 export interface UiPayloadShape {
   pending_id?: string;
+  /** A pergunta de RASCUNHO (qual cartão, total ou parcela, criar cartão). */
+  draft_id?: string;
   resolved?: string;
   body?: string;
   summary?: string;
@@ -297,10 +303,22 @@ export interface UiPayloadShape {
  *
  * **Duas travas de segurança**, e é por elas que esta função existe:
  *
- * 1. opção cujo `pending_id` não é o desta pergunta é DESCARTADA — sem isso um
- *    payload antigo ainda na tela poderia responder à pergunta nova;
+ * 1. opção cujo `pending_id` (ou `draft_id`) não é o desta pergunta é
+ *    DESCARTADA — sem isso um payload antigo ainda na tela poderia responder à
+ *    pergunta nova;
  * 2. o `candidateId` sai do próprio payload, nunca de digitação. O servidor
  *    revalida contra a lista congelada, e esta é a primeira das duas cercas.
+ *
+ * ⚠️ **São DOIS tipos de pergunta, com prefixos diferentes, e por muito tempo
+ * a tela só conhecia um.** `pa:` é HITL (`pending_actions`, rota de resolução,
+ * candidato congelado); `ds:` é RASCUNHO (escolher o cartão da compra, "é o
+ * total ou cada parcela?", "crio esse cartão?"). Um rascunho nunca tem
+ * `pending_id`, então a saída antecipada por ele DESCARTAVA todos os botões de
+ * rascunho: o mesmo payload que desenhava a lista de cartões no WhatsApp virava
+ * texto solto no app — "escolha ou diga o nome do cartão", sem nada para
+ * escolher. A resposta ao `ds:` não é a rota de resolução: é uma MENSAGEM com
+ * `clicked_id`, e o composer continua aberto de propósito (digitar o nome de um
+ * cartão que não existe é como se cria um).
  *
  * ponytail: `none` ("nenhuma dessas") vira `reject`, porque a API do app só
  * conhece approve/reject/choose. A diferença — `none_of_these` faz o motor
@@ -313,7 +331,8 @@ export function parseUiActions(payload: UiPayloadShape | null | undefined): {
 } {
   const body = payload?.body ?? payload?.summary ?? payload?.text ?? '';
   const pendingId = payload?.pending_id;
-  if (!pendingId) return { body, options: [] };
+  const draftId = payload?.draft_id;
+  if (!pendingId && !draftId) return { body, options: [] };
 
   const linhas = [
     ...(Array.isArray(payload?.buttons) ? payload.buttons : []),
@@ -327,17 +346,27 @@ export function parseUiActions(payload: UiPayloadShape | null | undefined): {
     if (typeof id !== 'string' || typeof label !== 'string') continue;
 
     const partes = id.split(':');
-    // `pa` + o uuid do pendente + o sufixo. O uuid TEM que ser o desta pergunta.
-    if (partes[0] !== 'pa' || partes[1] !== pendingId) continue;
-
-    const sufixo = partes[2];
-    // O id do candidato pode ter `:` no meio — junta o resto de volta.
-    const candidateId = partes.slice(3).join(':');
 
     let opcao: UiOption | null = null;
-    if (sufixo === 'ok') opcao = { id, label, decision: 'approve' };
-    else if (sufixo === 'no' || sufixo === 'none') opcao = { id, label, decision: 'reject' };
-    else if (sufixo === 'c' && candidateId) opcao = { id, label, decision: 'choose', candidateId };
+    if (partes[0] === 'ds') {
+      // Rascunho: o app não interpreta o sufixo (`c:<conta>`, `t:<centavos>`,
+      // `create_card:<nome>`, `financing`, `no`) — ele devolve o id CRU e quem
+      // decide o que ele significa é `draft.parse_slot_click`, no servidor.
+      // Interpretar aqui seria a segunda cópia dessa tabela.
+      if (!draftId || partes[1] !== draftId || !partes[2]) continue;
+      opcao = { id, label, decision: 'draft' };
+    } else {
+      // `pa` + o uuid do pendente + o sufixo. O uuid TEM que ser o desta pergunta.
+      if (partes[0] !== 'pa' || !pendingId || partes[1] !== pendingId) continue;
+
+      const sufixo = partes[2];
+      // O id do candidato pode ter `:` no meio — junta o resto de volta.
+      const candidateId = partes.slice(3).join(':');
+
+      if (sufixo === 'ok') opcao = { id, label, decision: 'approve' };
+      else if (sufixo === 'no' || sufixo === 'none') opcao = { id, label, decision: 'reject' };
+      else if (sufixo === 'c' && candidateId) opcao = { id, label, decision: 'choose', candidateId };
+    }
     if (!opcao) continue;
 
     // A descrição pertence à opção DESTA linha. Carimbar "a última empurrada"
@@ -369,10 +398,10 @@ export function markResolved<T extends UiPayloadShape>(payload: T, resolution: s
  * receber um erro por isso.
  */
 export function hitlControlsDisabled(
-  payload: { pending_id?: string; resolved?: string } | null | undefined,
+  payload: { pending_id?: string; draft_id?: string; resolved?: string } | null | undefined,
   estado: { busy?: boolean } = {},
 ): boolean {
-  if (!payload?.pending_id) return true;
+  if (!payload?.pending_id && !payload?.draft_id) return true;
   if (payload.resolved) return true;
   return Boolean(estado.busy);
 }

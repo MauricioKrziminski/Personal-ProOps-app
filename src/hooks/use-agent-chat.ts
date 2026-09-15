@@ -177,11 +177,27 @@ export function useCreateAgentConversation() {
 
 export function useSendAgentMessage(conversationId: string) {
   const aplicar = useAplicarTurno();
+  const qc = useQueryClient();
   return useMutation({
     retry: false,
-    mutationFn: ({ clientMessageId, content }: { clientMessageId: string; content: string }) =>
-      sendMessage(conversationId, clientMessageId, content),
-    onSuccess: aplicar,
+    mutationFn: ({
+      clientMessageId,
+      content,
+      clickedId,
+    }: {
+      clientMessageId: string;
+      content: string;
+      /** Clique num botão de rascunho: o id cru vai junto da mensagem. */
+      clickedId?: string;
+    }) => sendMessage(conversationId, clientMessageId, content, clickedId),
+    onSuccess: async (turno, v) => {
+      await aplicar(turno);
+      // Mesma razão do HITL: o balão ANTERIOR ganhou `resolved` no servidor e
+      // ele não vem no turno. Só no clique — mensagem digitada não carimba nada.
+      if (v.clickedId) {
+        await qc.invalidateQueries({ queryKey: agentKeys.messages(conversationId) });
+      }
+    },
   });
 }
 

@@ -43,6 +43,7 @@ export type AgentMessageStatus = 'processing' | 'completed' | 'failed';
  */
 export interface AgentUiPayload {
   pending_id?: string;
+  draft_id?: string;
   resolved?: string;
   summary?: string;
   text?: string;
@@ -231,10 +232,20 @@ export function listMessages(id: string, before?: number | null, limit = 40) {
   return agentFetch<Page<AgentMessage>>(`/internal/chat/conversations/${id}/messages?${q}`);
 }
 
-export function sendMessage(id: string, clientMessageId: string, content: string) {
+export function sendMessage(
+  id: string,
+  clientMessageId: string,
+  content: string,
+  /** O id CRU do botão de rascunho (`ds:…`). O servidor só aceita esse prefixo. */
+  clickedId?: string,
+) {
   return agentFetch<AgentTurn>(`/internal/chat/conversations/${id}/messages`, {
     method: 'POST',
-    body: JSON.stringify({ client_message_id: clientMessageId, content }),
+    body: JSON.stringify({
+      client_message_id: clientMessageId,
+      content,
+      ...(clickedId ? { clicked_id: clickedId } : {}),
+    }),
   });
 }
 

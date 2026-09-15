@@ -414,6 +414,85 @@ test('payload sem pendente não rende botão nenhum', () => {
   assert.deepEqual(parseUiActions(null).options, []);
 });
 
+// ---------------------------------------------------------------------------
+// RASCUNHO — a outra pergunta, com outro prefixo
+// ---------------------------------------------------------------------------
+
+const DID = 'e0a1b2c3-0000-4000-8000-0000000000d1';
+
+test('a lista de cartões do rascunho vira botões', () => {
+  // A regressão que isto prende: a tela exigia `pending_id` e rascunho não tem
+  // nenhum, então TODA pergunta de rascunho perdia os botões e virava
+  // "escolha ou diga o nome do cartão" sem nada para escolher.
+  const { body, options } = parseUiActions({
+    draft_id: DID,
+    body: '💳 Em qual cartão foi essa compra?',
+    rows: [
+      [`ds:${DID}:c:acc-1`, 'Nubank Cartão', ''],
+      [`ds:${DID}:c:acc-2`, 'Inter Cartão', ''],
+      [`ds:${DID}:financing`, 'É financiamento', 'Informar os dados do contrato'],
+      [`ds:${DID}:no`, 'Cancelar', 'Esquecer essa compra'],
+    ],
+  });
+  assert.equal(body, '💳 Em qual cartão foi essa compra?');
+  assert.deepEqual(
+    options.map((o) => [o.label, o.decision, o.id]),
+    [
+      ['Nubank Cartão', 'draft', `ds:${DID}:c:acc-1`],
+      ['Inter Cartão', 'draft', `ds:${DID}:c:acc-2`],
+      ['É financiamento', 'draft', `ds:${DID}:financing`],
+      ['Cancelar', 'draft', `ds:${DID}:no`],
+    ],
+  );
+});
+
+test('o sufixo do rascunho não é interpretado na tela', () => {
+  // `t:`, `create_card:`, `financing`… quem decide o que significam é
+  // `draft.parse_slot_click`, no servidor. A tela devolve o id CRU — uma
+  // segunda cópia daquela tabela divergiria da primeira.
+  const { options } = parseUiActions({
+    draft_id: DID,
+    body: 'é o total ou cada parcela?',
+    buttons: [
+      [`ds:${DID}:t:10499`, 'É o total'],
+      [`ds:${DID}:p:10499`, 'É cada parcela'],
+      [`ds:${DID}:create_card:Itaú`, 'Sim, cadastrar'],
+    ],
+  });
+  assert.deepEqual(options.map((o) => o.id), [
+    `ds:${DID}:t:10499`,
+    `ds:${DID}:p:10499`,
+    `ds:${DID}:create_card:Itaú`,
+  ]);
+  assert.ok(options.every((o) => o.decision === 'draft' && !o.candidateId));
+});
+
+test('botão de OUTRO rascunho é descartado', () => {
+  const { options } = parseUiActions({
+    draft_id: DID,
+    buttons: [
+      [`ds:${DID}:c:acc-1`, 'Nubank'],
+      ['ds:00000000-0000-4000-8000-0000000000ff:c:acc-9', 'Cartão de ontem'],
+      [`ds:${DID}`, 'Sem sufixo'],
+    ],
+  });
+  assert.deepEqual(options.map((o) => o.label), ['Nubank']);
+});
+
+test('um payload não empresta o id do outro', () => {
+  // `pa:` com só `draft_id` (e o espelho) não pode render botão: os dois
+  // prefixos respondem por rotas diferentes, com cercas diferentes.
+  assert.deepEqual(parseUiActions({ draft_id: DID, buttons: [[`pa:${PID}:ok`, 'Confirmar']] }).options, []);
+  assert.deepEqual(parseUiActions({ pending_id: PID, buttons: [[`ds:${DID}:no`, 'Cancelar']] }).options, []);
+});
+
+test('pergunta de rascunho respondida deixa os controles inertes', () => {
+  const aberta = { draft_id: DID };
+  assert.equal(hitlControlsDisabled(aberta), false);
+  assert.equal(hitlControlsDisabled(aberta, { busy: true }), true);
+  assert.equal(hitlControlsDisabled(markResolved(aberta, 'choose')), true);
+});
+
 test('resolvido e expirado deixam os controles inertes', () => {
   const aberta = { pending_id: PID };
   assert.equal(hitlControlsDisabled(aberta), false);

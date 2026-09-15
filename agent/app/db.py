@@ -1033,6 +1033,27 @@ async def resolve_chat_ui_payload(
     )
 
 
+async def resolve_chat_draft_payload(
+    *, session_id: UUID, draft_id: str, resolution: str
+) -> None:
+    """O mesmo carimbo, para a pergunta de RASCUNHO (escolher cartão, tipo do valor).
+
+    Rascunho não é `pending_actions` — ele tem prefixo próprio (`ds:`) e id
+    próprio —, então o carimbo do HITL não o alcança. Sem este, os botões da
+    pergunta respondida seguiriam vivos e o toque cairia em "essa pergunta já
+    expirou". A chave do `where` fica LITERAL nas duas: um nome de campo vindo
+    de argumento é o começo de uma query montada por concatenação.
+    """
+    await execute(
+        """
+        update public.app_chat_messages
+        set ui_payload = ui_payload || jsonb_build_object('resolved', %s::text)
+        where session_id = %s and ui_payload->>'draft_id' = %s
+        """,
+        resolution, session_id, draft_id,
+    )
+
+
 async def mark_chat_deleting(session_id: UUID, user_id: UUID) -> dict[str, Any] | None:
     """Esconde a conversa da lista e recusa se houver turno rodando.
 

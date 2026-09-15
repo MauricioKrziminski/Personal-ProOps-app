@@ -485,6 +485,13 @@ async def _cartao_do_rascunho(
     return None, _pergunta_criar_cartao(draft_id, nome, cartoes)
 
 
+# ⚠️ **`draft_id` no PAYLOAD, além de dentro de cada id de botão.** No WhatsApp o
+# id do botão volta inteiro e basta; o app precisa saber a QUAL pergunta os
+# botões pertencem antes de desenhá-los — é o mesmo papel do `pending_id` que o
+# `app_chat` carimba no HITL, e sem ele a tela descartava TODA pergunta de
+# rascunho e mostrava "escolha ou diga o nome do cartão" sem nada para escolher.
+
+
 def _pergunta_criar_cartao(draft_id: str, nome: str, cartoes: list[dict]) -> dict:
     """Cartão que não existe vira oferta de cadastro, não beco sem saída."""
     corpo = (
@@ -498,6 +505,7 @@ def _pergunta_criar_cartao(draft_id: str, nome: str, cartoes: list[dict]) -> dic
     botoes.append((f"{draft.CLICK_PREFIX}{draft_id}:no", "Cancelar"))
     return {
         "ui": "buttons",
+        "draft_id": str(draft_id),
         "body": corpo,
         "buttons": botoes,
         # promete só o que TEM handler: "criar" digitado viraria um cartão
@@ -520,6 +528,7 @@ def _pergunta_tipo_valor(draft_id: str, cents: int, parcelas: int) -> dict:
     )
     return {
         "ui": "buttons",
+        "draft_id": str(draft_id),
         "body": corpo,
         "buttons": [
             (f"{draft.CLICK_PREFIX}{draft_id}:t:{cents}", "É o total"),
@@ -548,7 +557,7 @@ def _pergunta_cartao(draft_id: str, cartoes: list[dict], corpo: str) -> dict:
     )
     if len(mostrar) <= 1:
         return {
-            "ui": "buttons", "body": corpo,
+            "ui": "buttons", "draft_id": str(draft_id), "body": corpo,
             "buttons": [
                 *[(f"{draft.CLICK_PREFIX}{draft_id}:c:{c['id']}", c["name"]) for c in mostrar],
                 (financiamento, "É financiamento"), (cancelar, "Cancelar"),
@@ -556,7 +565,7 @@ def _pergunta_cartao(draft_id: str, cartoes: list[dict], corpo: str) -> dict:
             "text": texto,
         }
     return {
-        "ui": "list", "body": corpo, "label": "Escolher opção",
+        "ui": "list", "draft_id": str(draft_id), "body": corpo, "label": "Escolher opção",
         "rows": [
             *[(f"{draft.CLICK_PREFIX}{draft_id}:c:{c['id']}", c["name"], "") for c in mostrar],
             (financiamento, "É financiamento", "Informar os dados do contrato"),

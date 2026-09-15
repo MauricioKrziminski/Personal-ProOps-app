@@ -174,6 +174,12 @@ class RepoFalso:
             if m["session_id"] == session_id and payload.get("pending_id") == str(pending_id):
                 m["ui_payload"] = {**payload, "resolved": resolution}
 
+    async def resolve_chat_draft_payload(self, *, session_id, draft_id, resolution):
+        for m in self.mensagens:
+            payload = m.get("ui_payload") or {}
+            if m["session_id"] == session_id and payload.get("draft_id") == str(draft_id):
+                m["ui_payload"] = {**payload, "resolved": resolution}
+
     async def drop_chat_session(self, session_id):
         self.sessoes.pop(session_id, None)
         self.mensagens = [m for m in self.mensagens if m["session_id"] != session_id]
@@ -769,3 +775,89 @@ async def test_exclusao_apaga_o_thread_EFETIVO(repo):
     esperado = effective_thread_id(repo.threads_apagadas and
                                    inicial.conversation["thread_id"], 4)
     assert repo.threads_apagadas == [esperado]
+
+
+# ---------------------------------------------------------------------------
+# clique num botão de RASCUNHO
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.asyncio
+async def test_clique_de_rascunho_chega_ao_motor(repo):
+    """O `ds:` viaja como `clicked_id` do turno, não como texto.
+
+    Sem ele o motor lê o RÓTULO ("Nubank Cartão") como mensagem nova — que é
+    exatamente o caminho que `conversation.run_turn` documenta como proibido,
+    porque o rótulo de um botão vira lançamento de verdade.
+    """
+    inicial = await app_chat.create_conversation(
+        user_id=USER, client_message_id=uuid4(), content="comprei uma tv em 2x"
+    )
+    sid = inicial.conversation["id"]
+    clique = f"ds:{uuid4()}:c:{uuid4()}"
+
+    await app_chat.send_message(
+        user_id=USER, session_id=sid, client_message_id=uuid4(),
+        content="Nubank Cartão", clicked_id=clique,
+    )
+
+    assert repo.turnos[-1]["conteudo"]["clicked_id"] == clique
+    assert repo.turnos[-1]["conteudo"]["text"] == "Nubank Cartão"
+
+
+@pytest.mark.asyncio
+async def test_pergunta_de_rascunho_respondida_para_de_parecer_viva(repo):
+    """O carimbo do HITL procura por `pending_id`, e rascunho não tem nenhum.
+
+    Sem o irmão que procura por `draft_id`, os botões da pergunta respondida
+    seguiriam vivos — e o toque cairia em "essa pergunta já expirou".
+    """
+    inicial = await app_chat.create_conversation(
+        user_id=USER, client_message_id=uuid4(), content="comprei uma tv em 2x"
+    )
+    sid = inicial.conversation["id"]
+    rascunho = uuid4()
+    repo.mensagens.append(
+        {"id": uuid4(), "session_id": sid, "client_message_id": None, "role": "assistant",
+         "content": "Em qual cartão?", "in_reply_to": repo.mensagens[0]["id"],
+         "status": "completed", "error_code": None,
+         "ui_payload": {"draft_id": str(rascunho), "buttons": []}, "sequence": 5}
+    )
+
+    await app_chat.send_message(
+        user_id=USER, session_id=sid, client_message_id=uuid4(),
+        content="Nubank", clicked_id=f"ds:{rascunho}:c:{uuid4()}",
+    )
+
+    balao = next(m for m in repo.mensagens
+                 if (m.get("ui_payload") or {}).get("draft_id") == str(rascunho))
+    assert balao["ui_payload"]["resolved"] == "choose"
+
+
+@pytest.mark.asyncio
+async def test_mensagem_digitada_nao_carimba_pergunta_nenhuma(repo):
+    """Digitar não responde o botão: a pergunta continua aberta.
+
+    É o outro lado do teste acima — o rascunho aceita texto livre ("digita o
+    nome de outro cartão"), e carimbar ali apagaria os botões de uma pergunta
+    que o motor ainda pode precisar repetir.
+    """
+    inicial = await app_chat.create_conversation(
+        user_id=USER, client_message_id=uuid4(), content="comprei uma tv em 2x"
+    )
+    sid = inicial.conversation["id"]
+    rascunho = uuid4()
+    repo.mensagens.append(
+        {"id": uuid4(), "session_id": sid, "client_message_id": None, "role": "assistant",
+         "content": "Em qual cartão?", "in_reply_to": repo.mensagens[0]["id"],
+         "status": "completed", "error_code": None,
+         "ui_payload": {"draft_id": str(rascunho), "buttons": []}, "sequence": 5}
+    )
+
+    await app_chat.send_message(
+        user_id=USER, session_id=sid, client_message_id=uuid4(), content="foi no itau"
+    )
+
+    balao = next(m for m in repo.mensagens
+                 if (m.get("ui_payload") or {}).get("draft_id") == str(rascunho))
+    assert "resolved" not in balao["ui_payload"]
