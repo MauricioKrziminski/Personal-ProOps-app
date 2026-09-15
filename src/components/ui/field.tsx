@@ -129,6 +129,8 @@ interface MoneyFieldProps {
   onChangeCents: (cents: number) => void;
   autoFocus?: boolean;
   invalid?: boolean;
+  /** Só leitura: o valor existe mas não é deste formulário (parcela de um plano). */
+  readOnly?: boolean;
 }
 
 /**
@@ -148,7 +150,7 @@ interface MoneyFieldProps {
  * que a digitação entra e é de lá que o backspace tira. O usuário vê o cursor e não consegue
  * colocá-lo no meio de um número formatado, que é o certo para um contador.
  */
-export function MoneyField({ valueCents, onChangeCents, autoFocus, invalid }: MoneyFieldProps) {
+export function MoneyField({ valueCents, onChangeCents, autoFocus, invalid, readOnly }: MoneyFieldProps) {
   const theme = useTheme();
   const reais = (valueCents / 100).toLocaleString('pt-BR', {
     minimumFractionDigits: 2,
@@ -173,8 +175,14 @@ export function MoneyField({ valueCents, onChangeCents, autoFocus, invalid }: Mo
         }}
         keyboardType="number-pad"
         autoFocus={autoFocus}
+        editable={!readOnly}
         accessibilityLabel="Valor em reais"
-        style={[styles.moneyInput, Type.title2, tabular, { color: theme.text }]}
+        style={[
+          styles.moneyInput,
+          Type.title2,
+          tabular,
+          { color: readOnly ? theme.textSecondary : theme.text },
+        ]}
       />
     </View>
   );
@@ -184,11 +192,21 @@ const styles = StyleSheet.create({
   field: {
     gap: Space.sm,
   },
+  /*
+    ⚠️ A borda do input é de 1dp, não `hairlineWidth` (15/09/2026). Ela é INVISÍVEL enquanto o
+    campo é válido (`borderColor: 'transparent'`) e só existe para carregar o estado de erro —
+    e `hairlineWidth` é 1 pixel FÍSICO, que não sobrevive a escala nenhuma: na janela reduzida
+    do emulador as arestas retas somem e restam quatro cantinhos vermelhos soltos, que foi a
+    queixa literal *"o vermelho em volta do input ta ficando sobreposto"*. Reproduzido
+    reamostrando o screenshot nativo em NEAREST. Indicador de erro não pode depender de um
+    pixel sobreviver. A largura é CONSTANTE nos dois estados, então trocar de cor não desloca
+    o conteúdo.
+  */
   input: {
     minHeight: HitTarget,
     borderRadius: Radius.sm,
     borderCurve: 'continuous',
-    borderWidth: StyleSheet.hairlineWidth,
+    borderWidth: 1,
     paddingHorizontal: Space.lg,
     paddingVertical: Space.md,
     fontSize: Type.body.fontSize,
@@ -200,7 +218,7 @@ const styles = StyleSheet.create({
     minHeight: 56,
     borderRadius: Radius.sm,
     borderCurve: 'continuous',
-    borderWidth: StyleSheet.hairlineWidth,
+    borderWidth: 1,
     paddingHorizontal: Space.lg,
   },
   moneyInput: {

@@ -519,6 +519,16 @@ nada dizia o que era campo e o que era explicação. O `hint` desceu para `footn
 um degrau abaixo do rótulo —, e `error` e `hint` deixaram de se excluir: o erro apagava a
 explicação justamente quando ela mais importa.
 
+⚠️ **Indicador de erro não pode depender de UM PIXEL sobreviver** (15/09/2026). A borda de
+`invalid` nos inputs era `StyleSheet.hairlineWidth` — 1 pixel FÍSICO, invisível enquanto o campo
+é válido e portanto sem custo aparente. Sob qualquer reescala ela se desfaz: na janela reduzida
+do emulador as arestas retas somem e restam **quatro cantinhos vermelhos soltos**, que foi a
+queixa literal (*"o vermelho em volta do input ta ficando sobreposto em todos inputs"*).
+Reproduzido reamostrando o screenshot NATIVO em NEAREST — o defeito não estava no layout, estava
+na espessura. Hoje é `borderWidth: 1` nos dois estilos de `field.tsx`, constante nos dois estados
+para trocar de cor não deslocar o conteúdo. É a mesma lição do contorno de 1px do `Card` (§2):
+o que separa duas superfícies não pode ser fino a ponto de sumir.
+
 - **Teto de 90 caracteres no `hint`**, preso por `anti-slop.test.ts`. Não é estilo: o que não cabe
   em uma linha não é ajuda de campo, é documentação — e documentação empilhada embaixo de cinco
   campos seguidos é o que o dono do produto chamou de *"muito texto explicativo"*.

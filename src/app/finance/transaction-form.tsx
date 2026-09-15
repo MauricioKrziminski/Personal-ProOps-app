@@ -28,6 +28,7 @@ import { Motion, Space, Type } from '@/design/tokens';
 import {
   useAccounts,
   useCreateInstallmentPlan,
+  useInstallmentPlans,
   useDeleteTransaction,
   useSaveTransaction,
   useSaveTransactionScoped,
@@ -233,6 +234,20 @@ function TransactionForm({ editing }: { editing?: Transaction }) {
    */
   const podeAdiar = kind !== 'transfer' && !isCard;
   // parcelar só faz sentido em gasto com conta escolhida (normalmente cartão)
+  /*
+    ⚠️ O VALOR de uma parcela não se edita aqui, e travá-lo é integridade, não estilo
+    (15/09/2026). O que o usuário sabe é o TOTAL da compra; o campo mostra a parcela. Digitar
+    104,99 numa parcela de 52,49 e salvar com escopo "esta e as futuras" faria
+    `update_transaction_scoped` recalcular `installment_plans.total_cents` para R$ 209,98 —
+    uma compra que nunca existiu, sem erro nenhum na tela. A queixa foi *"eu queria colocar o
+    valor total de novo e parcelado em 2x... nao consigo mudar a parcela"*: refazer o
+    parcelamento é outra operação (apagar e lançar de novo), e a tela passa a dizer isso.
+    Título, estabelecimento, categoria e conta continuam editáveis — é o que propaga.
+  */
+  const planos = useInstallmentPlans();
+  const plano = (planos.data ?? []).find((p) => p.id === editing?.installment_plan_id);
+  const valorTravado = Boolean(editing?.installment_plan_id);
+
   const podeParcelar = kind === 'expense' && !!accountId && !editing;
 
   const saving = save.isPending || createPlan.isPending;
@@ -484,10 +499,18 @@ function TransactionForm({ editing }: { editing?: Transaction }) {
           control={control}
           name="amount_cents"
           render={({ field }) => (
-            <Field label="Valor" error={errors.amount_cents?.message}>
+            <Field
+              label="Valor"
+              error={errors.amount_cents?.message}
+              hint={
+                valorTravado
+                  ? `Parcela ${editing?.installment_no ?? '?'} de ${plano?.installments ?? '?'}${plano ? ` · total ${formatBRL(plano.total_cents)}` : ''}. Para mudar, apague e lance de novo.`
+                  : undefined
+              }>
               <MoneyField
                 valueCents={field.value}
                 onChangeCents={field.onChange}
+                readOnly={valorTravado}
                 invalid={!!errors.amount_cents}
               />
             </Field>
