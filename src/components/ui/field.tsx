@@ -132,10 +132,21 @@ interface MoneyFieldProps {
 }
 
 /**
- * Entrada de dinheiro: digita da direita para a esquerda, em centavos.
+ * Entrada de dinheiro: digita da direita para a esquerda, em centavos. **Caminho ÚNICO** — havia
+ * um segundo (`components/finance/money-input.tsx`), com zero chamadores, e ele foi apagado.
  *
- * O caret fica escondido de propósito — o campo não é um texto editável, é um contador. Teto em
- * R$ 999.999.999,99 para não estourar `bigint` por dedo pesado.
+ * Teto em R$ 999.999.999,99 para não estourar `bigint` por dedo pesado.
+ *
+ * ⚠️ **O caret é VISÍVEL e fica preso no fim.** Ele era `caretHidden`, com o argumento de que o
+ * campo "não é um texto editável, é um contador" — e a queixa de 15/09/2026 foi literal: *"não
+ * tem o cursor que fica piscando para eu saber aonde eu tô digitando e o que estou apagando"*.
+ * Sem nada piscando, o campo não parece estar em foco.
+ *
+ * Mas mostrar o caret SEM prendê-lo quebra o apagar: com o cursor antes do `0` de `0,00`, o
+ * backspace não muda texto nenhum, `onChangeText` nem dispara e o campo trava sem erro. Como só
+ * os DÍGITOS importam (a máscara é recalculada a cada tecla), a seleção é fixada no fim — é lá
+ * que a digitação entra e é de lá que o backspace tira. O usuário vê o cursor e não consegue
+ * colocá-lo no meio de um número formatado, que é o certo para um contador.
  */
 export function MoneyField({ valueCents, onChangeCents, autoFocus, invalid }: MoneyFieldProps) {
   const theme = useTheme();
@@ -155,12 +166,12 @@ export function MoneyField({ valueCents, onChangeCents, autoFocus, invalid }: Mo
       </ThemedText>
       <TextInput
         value={reais}
+        selection={{ start: reais.length, end: reais.length }}
         onChangeText={(text) => {
           const digits = text.replace(/\D/g, '').slice(0, 11);
           onChangeCents(Number(digits || 0));
         }}
         keyboardType="number-pad"
-        caretHidden
         autoFocus={autoFocus}
         accessibilityLabel="Valor em reais"
         style={[styles.moneyInput, Type.title2, tabular, { color: theme.text }]}

@@ -247,6 +247,23 @@ remanejar número — era dizer, na linha, para onde ela vai.
 está agrupada por natureza, e abrir o recorte na mesma régua dizia a mesma coisa duas vezes na
 mesma tela. Por meio é o bloco "Saídas" da planilha do dono do produto.
 
+## A fatura é ATÔMICA no extrato do ciclo
+
+⚠️ **A tela do ciclo NÃO abre a fatura nas compras dela** (15/09/2026). Havia um modo "Tudo
+aberto" que fazia isso, e o sintoma foi imediato: no ciclo de 11/09 a 10/10 apareciam compras de
+**25/08 e 31/08**. A fatura atrasada cai neste ciclo pelo VENCIMENTO; as compras dela aconteceram
+no ciclo anterior, e expandi-las trazia datas de fora para dentro de um período fechado.
+
+A razão é de modelo, não de layout — e é a frase do dono do produto: *"a fatura é uma só, eu não
+escolho quais lançamentos eu fiquei de pagar da fatura"*. No caixa paga-se a FATURA, nunca a
+compra: ela é um movimento, e quebrar isso na tela sugere uma escolha que não existe. Quem quer
+ver o conteúdo toca na linha e vai para a tela da fatura, onde as compras aparecem no período
+delas.
+
+É a mesma régua que a tela do Mês já segue por outro caminho (a etiqueta "cai na fatura de DD/MM"
+em vez de remanejar linha), e o seletor daquela tela passou a filtrar o LADO (`Tudo | Entrou |
+Saiu`) — que era o que os três atalhos da home já prometiam e ninguém lia.
+
 ## A Projeção vai até a data que o usuário escolher
 
 Dois caminhos para a MESMA pergunta, e os dois aplicam num toque só, fechando o sheet: uma

@@ -469,12 +469,12 @@ function ReminderForm({
               name="date"
               render={({ field }) => (
                 <Field label="Quando" error={errors.date?.message}>
+                  {/*
+                    ⚠️ **O chip "Hoje" saiu** (15/09/2026, mesma régua do formulário de
+                    lançamento): o campo já nasce em hoje, então ele nascia aceso repetindo o que
+                    o seletor ao lado mostrava. "Amanhã" leva a um valor que o campo não tem.
+                  */}
                   <View style={styles.chipRow}>
-                    <Chip
-                      label="Hoje"
-                      selected={field.value === now.today}
-                      onPress={() => setValue('date', now.today, { shouldValidate: true })}
-                    />
                     <Chip
                       label="Amanhã"
                       selected={field.value === now.tomorrow}

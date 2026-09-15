@@ -117,6 +117,18 @@ O tipo de conta era `Segmented` de 5 e quebrava "Investimento" ao meio; o tipo d
 um formulário. Os três viraram `SelectField`, e o teste de anti-slop quebra o build se um
 `Segmented` passar de quatro opções.
 
+⚠️ **Chip ao lado de um campo só existe se levar a um valor que o campo NÃO tem** (15/09/2026).
+O padrão "fileira de chips + o input do mesmo dado logo abaixo" põe dois controles para uma
+informação só, e o chip que aponta para o DEFAULT nasce aceso repetindo o que o campo já mostra.
+A queixa foi literal: *"o campo de data já vem pré-selecionado hoje e tem o chip 'hoje'... não faz
+sentido"*. Saíram o chip "Hoje" do lançamento e do lembrete (o campo já nasce em hoje) e o chip
+"Nenhuma" das parcelas iniciais — este ganhando o remédio de raiz, que era o campo ter **default**
+(`'0'`) em vez de nascer vazio precisando de um chip para preenchê-lo.
+
+Ficaram "Ontem" e "Amanhã": levam a um valor que o campo não tem, então são atalho, não eco. E os
+presets de hora do lembrete, pelo mesmo motivo — o campo nasce na hora corrente, que não é
+nenhum deles.
+
 ⚠️ **O glifo mora na LISTA DE OPÇÕES, não na tela.** `ACCOUNT_TYPES`, `DEBT_KINDS` e
 `ASSET_CLASSES` carregam `icon`; o formulário e a linha da lista leem dali. Com o mapa na tela,
 duas telas mostravam formas diferentes para o mesmo tipo, e um tipo novo nascia caindo no `circle`

@@ -199,7 +199,7 @@ function TransactionForm({ editing }: { editing?: Transaction }) {
       account_id: editing?.account_id ?? null,
       counterparty_account_id: editing?.counterparty_account_id ?? null,
       installments: 1,
-      paid_installments: '',
+      paid_installments: '0',
       fee_cents: 0,
       auto_confirm: editing?.auto_confirm ?? false,
       occurred_at: isoToBR(editing?.occurred_at ?? localISODate()),
@@ -218,10 +218,10 @@ function TransactionForm({ editing }: { editing?: Transaction }) {
   const pending = useWatch({ control, name: 'pending' });
   const errors = formState.errors;
 
-  // "hoje"/"ontem" congelados na abertura do modal: ler o relógio durante o render é impuro
-  // (React Compiler) e o modal é efêmero.
-  const [{ today, yesterday }] = useState(() => ({
-    today: isoToBR(localISODate()),
+  // "ontem" congelado na abertura do modal: ler o relógio durante o render é impuro
+  // (React Compiler) e o modal é efêmero. "hoje" saiu junto com o chip dele — quem põe a data de
+  // hoje no campo é o `defaultValues`, uma vez só.
+  const [{ yesterday }] = useState(() => ({
     yesterday: isoToBR(localISODate(new Date(Date.now() - 86_400_000))),
   }));
 
@@ -597,11 +597,13 @@ function TransactionForm({ editing }: { editing?: Transaction }) {
           <Controller control={control} name="paid_installments" render={({ field }) => (
             <Field label="Quantas parcelas iniciais já foram pagas?" error={errors.paid_installments?.message}
               hint="Zero se nenhuma foi paga. Data passada não conta como pagamento.">
-              <View style={styles.chipRow}>
-                <Chip label="Nenhuma" selected={field.value === '0'} onPress={() => field.onChange('0')} />
-                <TextField value={field.value} onChangeText={field.onChange} keyboardType="number-pad" maxLength={2}
-                  placeholder="0" accessibilityLabel="Parcelas iniciais já pagas" />
-              </View>
+              {/*
+                ⚠️ **Sem chip "Nenhuma" ao lado.** O campo nasce em `0`, então o chip só podia
+                escrever o valor que já estava na tela — dois controles para o mesmo dado, e o
+                chip aparecendo aceso de saída. Default sensato no campo mata a necessidade dele.
+              */}
+              <TextField value={field.value} onChangeText={field.onChange} keyboardType="number-pad" maxLength={2}
+                placeholder="0" accessibilityLabel="Parcelas iniciais já pagas" />
               {paidHistory !== '' && /^\d+$/.test(paidHistory) && Number(paidHistory) <= installmentCount && (
                 <ThemedText type="small" themeColor="textSecondary">
                   {Number(paidHistory) === 0 ? `As ${installmentCount} parcelas ficam pendentes.` : `${paidHistory} parcelas iniciais pagas; ${installmentCount - Number(paidHistory)} pendentes.`}
@@ -646,18 +648,17 @@ function TransactionForm({ editing }: { editing?: Transaction }) {
           render={({ field }) => (
             <Field label={podeParcelar && installmentCount > 1 ? "Data da primeira parcela" : "Data"} error={errors.occurred_at?.message}>
               {/*
-                ⚠️ **O campo tem a linha inteira; os atalhos ficam ACIMA dele.** Espremido entre
-                "Hoje" e "Ontem" na mesma fileira, o valor quebrava no meio do ano
-                ("13/09/2 026") — o seletor tem ícone e chevron, e não é um `TextField` compacto.
-                Chip é atalho, campo é campo.
+                ⚠️ **O campo tem a linha inteira; o atalho fica ACIMA dele.** Espremido na mesma
+                fileira, o valor quebrava no meio do ano ("13/09/2 026") — o seletor tem ícone e
+                chevron, e não é um `TextField` compacto.
+
+                ⚠️ **E o chip "Hoje" SAIU** (15/09/2026). O campo já nasce em hoje, então ele
+                nascia aceso mostrando o mesmo que o campo logo abaixo: dois controles para um
+                dado só. "Ontem" fica porque leva a um valor que o campo NÃO tem — é atalho de
+                verdade, não eco do estado.
               */}
               <View style={styles.dateBlock}>
                 <View style={styles.chipRow}>
-                  <Chip
-                    label="Hoje"
-                    selected={occurredAt === today}
-                    onPress={() => setValue('occurred_at', today, { shouldValidate: true })}
-                  />
                   <Chip
                     label="Ontem"
                     selected={occurredAt === yesterday}

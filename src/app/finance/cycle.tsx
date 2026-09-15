@@ -15,7 +15,7 @@ import { Segmented } from '@/components/ui/segmented';
 import { Screen } from '@/components/ui/screen';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Radius, Space } from '@/design/tokens';
-import { type CycleLine, type CycleRow, type CycleView, useCycleLines, useCycleMonth, useCycleSeries, useInvoice } from '@/hooks/use-finance';
+import { type CycleLine, type CycleRow, type CycleView, useCycleLines, useCycleMonth, useCycleSeries } from '@/hooks/use-finance';
 import { describeCycle } from '@/lib/cycle-label';
 import { rotaDaLinha } from '@/lib/cycle-routes';
 import { isoToBR, mesmoMes } from '@/lib/dates';
@@ -41,9 +41,29 @@ import { isoToBR, mesmoMes } from '@/lib/dates';
  * nada dizer que são naturezas diferentes. Por natureza, "o que pesou foi o cartão" se lê num
  * relance — e o subtotal de cada grupo está no próprio cabeçalho.
  *
- * ⚠️ **"Tudo aberto" expande a fatura nas COMPRAS dela**, e cada fatura busca as suas na própria
- * linha, só quando aberta. Uma consulta que trouxesse as compras de todas as faturas do ciclo
- * pagaria o custo mesmo com ninguém abrindo nada.
+ * ## ⚠️ A FATURA É UMA LINHA SÓ — ela não se abre nas compras dela (15/09/2026)
+ *
+ * Havia um modo "Tudo aberto" que expandia cada fatura nas transações que a compõem. Ele parecia
+ * generosidade e era um erro de modelo, com um sintoma que o dono do produto pegou na hora: no
+ * ciclo de 11/09 a 10/10 apareciam compras de **25/08 e 31/08**. A fatura ATRASADA cai neste
+ * ciclo pelo vencimento — as compras dela aconteceram no ciclo anterior, e expandi-las trazia
+ * datas de fora para dentro de um período que se lê como fechado.
+ *
+ * A queixa nomeia a causa: *"a fatura é uma só, eu não escolho quais lançamentos eu fiquei de
+ * pagar da fatura"*. Fatura é **atômica no caixa** — paga-se a fatura, não a compra —, então no
+ * extrato do ciclo ela é UM movimento. Quem quer ver o que tem dentro toca nela e vai para a tela
+ * da fatura, que lista as compras no período CERTO, o dela.
+ *
+ * É a mesma régua que `finance.md` já escreve para a tela do Mês ("nenhum número muda; tirar as
+ * compras da lista para deixar só a fatura quebraria os subtotais") — só que aqui, ao contrário
+ * de lá, as compras nunca foram linha desta tela: eram um enfeite por cima da linha da fatura.
+ *
+ * ## O seletor passou a filtrar o LADO, que é o que os atalhos já prometiam
+ *
+ * Com a expansão fora, `Resumido | Tudo aberto` não tinha mais o que fazer — era o único uso do
+ * modo. E `tipo=entra` / `tipo=sai`, que a home e a Projeção MANDAM em três itens de menu ("O que
+ * entra", "O que sai"), eram lidos por ninguém: os três caíam na mesma lista sem filtro. O
+ * seletor agora é esse filtro, e o parâmetro escolhe a aba de entrada.
  */
 export default function CycleDetailScreen() {
   // Dinheiro no meio de frase obedece ao "esconder saldo" — `Money` não cabe em texto corrido.
@@ -59,13 +79,19 @@ export default function CycleDetailScreen() {
   */
   const mesCorrente = useCycleMonth(view);
   const month = params.month || mesCorrente;
-  const [modo, setModo] = useState(params.tipo === 'tudo' ? 'aberto' : 'resumo');
+  const [lado, setLado] = useState(params.tipo === 'entra' || params.tipo === 'sai' ? params.tipo : 'tudo');
 
   const serie = useCycleSeries(month, month, view);
   const linhas = useCycleLines(month, view);
   const ciclo = serie.data?.find((c) => mesmoMes(c.mes, month)) ?? null;
 
-  const grupos = useMemo(() => agrupar(linhas.data ?? [], brl), [linhas.data, brl]);
+  const grupos = useMemo(() => {
+    const todas = linhas.data ?? [];
+    const doLado = todas.filter((l) =>
+      lado === 'tudo' ? true : lado === 'entra' ? Number(l.in_cents) > 0 : Number(l.in_cents) === 0
+    );
+    return agrupar(doLado, brl);
+  }, [linhas.data, lado, brl]);
 
   if (serie.isError || linhas.isError) {
     return (
@@ -100,22 +126,30 @@ export default function CycleDetailScreen() {
 
       <Segmented
         options={[
-          { value: 'resumo', label: 'Resumido' },
-          { value: 'aberto', label: 'Tudo aberto' },
+          { value: 'tudo', label: 'Tudo' },
+          { value: 'entra', label: 'Entrou' },
+          { value: 'sai', label: 'Saiu' },
         ]}
-        value={modo}
-        onChange={setModo}
+        value={lado}
+        onChange={setLado}
       />
 
       {grupos.length === 0 ? (
-        <EmptyState title="Nada neste ciclo" hint="Nenhum movimento cai neste período." />
+        <EmptyState
+          title={lado === 'tudo' ? 'Nada neste ciclo' : lado === 'entra' ? 'Nada entrou' : 'Nada saiu'}
+          hint={
+            lado === 'tudo'
+              ? 'Nenhum movimento cai neste período.'
+              : 'O filtro acima mostra o outro lado do período.'
+          }
+        />
       ) : (
         grupos.map((g) => (
           <View key={g.titulo}>
             <SectionHead title={g.titulo} />
             <Section>
               {g.linhas.map((l, i) => (
-                <Linha key={`${l.origin}-${l.ref_id}-${i}`} linha={l} expandida={modo === 'aberto'} />
+                <Linha key={`${l.origin}-${l.ref_id}-${i}`} linha={l} />
               ))}
             </Section>
           </View>
@@ -181,38 +215,25 @@ function Conta({
   );
 }
 
-/** Uma linha do ciclo. Fatura vira o cabeçalho das compras dela no modo "Tudo aberto". */
-function Linha({ linha, expandida }: { linha: CycleLine; expandida: boolean }) {
-  const ehFatura = linha.origin === 'invoice' || linha.origin === 'invoice_payment';
-  // Só a fatura tem o que abrir, e só busca quando alguém abriu.
-  const fatura = useInvoice(ehFatura && expandida ? linha.ref_id : undefined);
+/**
+ * Uma linha do ciclo — **uma linha, e só**. A fatura não se abre aqui; tocá-la leva para a tela
+ * dela, que lista as compras no período a que elas pertencem. Ver o cabeçalho do arquivo.
+ */
+function Linha({ linha }: { linha: CycleLine }) {
   const entra = Number(linha.in_cents) > 0;
 
   return (
-    <>
-      <Row
-        title={linha.title}
-        subtitle={`${isoToBR(linha.day)} · ${linha.method_label}`}
-        trailing={
-          <Money
-            cents={entra ? Number(linha.in_cents) : Number(linha.out_cents)}
-            tone={entra ? 'success' : 'danger'}
-          />
-        }
-        onPress={destino(linha)}
-      />
-      {ehFatura && expandida
-        ? (fatura.data?.transactions ?? []).map((t) => (
-            <Row
-              key={t.id}
-              title={t.description ?? t.merchant ?? 'Compra'}
-              subtitle={`${isoToBR(t.occurred_at)}${t.category ? ` · ${t.category}` : ''}`}
-              trailing={<Money cents={Number(t.amount_cents)} variant="footnote" />}
-              onPress={() => router.push({ pathname: '/finance/[txId]', params: { txId: t.id } })}
-            />
-          ))
-        : null}
-    </>
+    <Row
+      title={linha.title}
+      subtitle={`${isoToBR(linha.day)} · ${linha.method_label}`}
+      trailing={
+        <Money
+          cents={entra ? Number(linha.in_cents) : Number(linha.out_cents)}
+          tone={entra ? 'success' : 'danger'}
+        />
+      }
+      onPress={destino(linha)}
+    />
   );
 }
 

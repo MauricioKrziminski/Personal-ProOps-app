@@ -239,7 +239,7 @@ from public.cycle_lines('2026-10-01');
 
 1. Os dois números da tela têm que ser **idênticos** a esses. Se divergirem, o `filter` novo em
    `cycle_series_for` não é o mesmo predicado — ou uma das três assinaturas ficou desalinhada.
-2. Confirme cruzando com a tela `/finance/cycle` em **"Tudo aberto"**, que lista as linhas uma a uma.
+2. Confirme cruzando com a tela `/finance/cycle`, que lista as linhas uma a uma.
 3. Toque `Mês | Ciclo` e confira que os dois números mudam juntos.
 4. Aperte o olho (esconder saldo) e confirme que a sub-linha vira `••••••`.
 

@@ -413,7 +413,6 @@ const INPUT_CRU_PERMITIDO = new Set([
   'src/components/ui/search-field.tsx',
   'src/components/auth/otp-input.tsx',
   'src/components/auth/phone-field.tsx',
-  'src/components/finance/money-input.tsx',
   'src/app/notes/[id].tsx',
   /*
     NÃO é um campo: `editable={false}`, sem foco, escondido do leitor de tela. `TextInput` é a
