@@ -674,6 +674,48 @@ export function useCreateInstallmentPlan() {
   });
 }
 
+/**
+ * Reparcelar: editar a COMPRA inteira, não uma parcela dela.
+ *
+ * ⚠️ **Manda o plano INTEIRO, sempre.** Campo omitido vira `null` na RPC (os parâmetros têm
+ * `default null`), então isto é um `set`, nunca um `patch` — é de propósito: o sheet que chama
+ * mostra todos os campos, e "não mandei" não pode significar duas coisas diferentes.
+ *
+ * As travas moram no banco (`update_installment_plan`), não aqui: parcela já paga — ou em
+ * fatura paga/adiada — nunca muda de valor, data ou conta, e com qualquer parcela paga o
+ * NÚMERO de parcelas deixa de ser editável. É a regra do nicho (o OnBalance desabilita o campo
+ * depois do primeiro pagamento; o Oracle só atualiza parcela com saldo em aberto), e ela é do
+ * banco porque o agente precisa da MESMA — duas cópias divergem.
+ */
+export function useUpdateInstallmentPlan() {
+  const invalidate = useInvalidateFinance();
+  return useMutation({
+    mutationFn: async (input: {
+      planId: string;
+      totalCents: number;
+      installments: number;
+      firstOccurredAt: string;
+      description: string | null;
+      category: string | null;
+      merchant: string | null;
+      accountId: string | null;
+    }) => {
+      const { error } = await supabase.rpc('update_installment_plan', {
+        p_plan_id: input.planId,
+        p_total_cents: input.totalCents,
+        p_installments: input.installments,
+        p_first_occurred_at: input.firstOccurredAt,
+        p_description: input.description ?? undefined,
+        p_category: input.category ?? undefined,
+        p_merchant: input.merchant ?? undefined,
+        p_account_id: input.accountId ?? undefined,
+      });
+      if (error) throw error;
+    },
+    onSuccess: invalidate,
+  });
+}
+
 // ── projeção de fluxo de caixa e contas a pagar ─────────────────────────────
 
 export type ForecastDay = Fns['cash_flow_forecast']['Returns'][number];
@@ -2308,21 +2350,50 @@ export interface InstallmentParcel {
 
 export interface InstallmentPlanSummary {
   id: string;
-  /** `merchant` quando existe, senão `description` — nunca vazio. */
+  /**
+   * O TÍTULO da compra, com o estabelecimento de reserva — `description || merchant`.
+   *
+   * ⚠️ **Era `merchant || description`, e essa era a segunda régua** (15/09/2026). A linha da
+   * parcela lê `description ?? merchant` e o agente lê `description or merchant`; só aqui o
+   * estabelecimento ganhava do título, então uma compra com os dois preenchidos aparecia com um
+   * nome em Parceladas e outro na fatura. Com "Título" obrigatório no formulário, quem nomeia o
+   * registro é ele — e uma intenção tem um rótulo só.
+   */
   title: string;
+  /** Os dois campos crus — o sheet de edição precisa saber qual é qual para reenviá-los. */
+  description: string | null;
+  merchant: string | null;
   category: string | null;
   account_id: string | null;
   total_cents: number;
   installments: number;
   paid: number;
   /**
-   * Valor da parcela normal. A **última** fecha a conta com o resto da divisão
-   * inteira (regra da RPC `create_installment_plan`), então a soma das parcelas
-   * bate exatamente com `total_cents`.
+   * Quanto cai POR MÊS daqui para a frente — o valor da próxima parcela em aberto.
+   *
+   * ⚠️ **Era `total / parcelas`, e isso deixou de ser verdade quando reparcelar existiu**
+   * (15/09/2026). A divisão só descreve o plano enquanto todas as parcelas são iguais; depois de
+   * `update_installment_plan` com parcela já fechada, o que sobrou se reparte apenas entre as
+   * EM ABERTO. Medido no emulador: uma compra de R$ 600,00 em 3x com R$ 140,12 já fechados
+   * escrevia "R$ 200,00 por mês" embaixo de parcelas de R$ 229,94. O valor vem da LINHA, e a
+   * divisão fica só de reserva para um plano sem parcela nenhuma.
    */
   installment_cents: number;
+  /** A última parcela — é ela que fecha os centavos da divisão. */
   last_installment_cents: number;
   remaining_cents: number;
+  /**
+   * Quantas parcelas **não podem mais mudar** — e não é a mesma coisa que `paid`.
+   *
+   * `paid` conta `status = 'cleared'`, que é o que a barra de progresso mostra. `locked` é a
+   * régua de `private.parcela_travada`: cleared **ou** dentro de uma fatura paga, adiada ou
+   * PARCIALMENTE paga. Medido no staging em 15/09/2026: a compra "Carro Peças" tinha `paid = 0`
+   * e uma parcela travada, então o editor oferecia mudar o número de parcelas e a RPC recusava —
+   * o defeito "botão habilitado que o servidor rejeita", que é o espelho do "botão desabilitado
+   * sem dizer por quê".
+   */
+  locked: number;
+  locked_cents: number;
   first_occurred_at: string;
   last_occurred_at: string | null;
   active: boolean;
@@ -2360,6 +2431,17 @@ export function useInstallmentPlans() {
             .range(from, to),
       );
 
+      /**
+       * As faturas FECHADAS para efeito de edição. Uma consulta só, e minúscula: a alternativa
+       * era perguntar o status de cada fatura por parcela.
+       */
+      const { data: fechadas, error: erroFaturas } = await supabase
+        .from('card_invoices')
+        .select('id')
+        .or('status.in.(paid,rolled),paid_cents.gt.0');
+      if (erroFaturas) throw erroFaturas;
+      const faturaFechada = new Set((fechadas ?? []).map((f) => f.id));
+
       const porPlano = new Map<string, InstallmentParcel[]>();
       for (const row of rows) {
         if (!row.installment_plan_id) continue;
@@ -2376,17 +2458,31 @@ export function useInstallmentPlans() {
         const pago = parcels
           .filter((p) => p.status === 'cleared')
           .reduce((soma, p) => soma + p.amount_cents, 0);
+        const travadas = parcels.filter(
+          (p) => p.status === 'cleared' || (p.invoice_id && faturaFechada.has(p.invoice_id)),
+        );
+        const emOrdem = [...parcels].sort(
+          (a, b) => (a.installment_no ?? 0) - (b.installment_no ?? 0),
+        );
+        const proxima = emOrdem.find(
+          (p) => !(p.status === 'cleared' || (p.invoice_id && faturaFechada.has(p.invoice_id))),
+        );
         return {
           id: plan.id,
-          title: plan.merchant || plan.description || 'Compra parcelada',
+          title: plan.description || plan.merchant || 'Compra parcelada',
+          description: plan.description,
+          merchant: plan.merchant,
           category: plan.category,
           account_id: plan.account_id,
           total_cents: plan.total_cents,
           installments: n,
           paid: parcels.filter((p) => p.status === 'cleared').length,
-          installment_cents: base,
-          last_installment_cents: plan.total_cents - base * (n - 1),
+          installment_cents: proxima?.amount_cents ?? emOrdem[0]?.amount_cents ?? base,
+          last_installment_cents:
+            emOrdem[emOrdem.length - 1]?.amount_cents ?? plan.total_cents - base * (n - 1),
           remaining_cents: Math.max(0, plan.total_cents - pago),
+          locked: travadas.length,
+          locked_cents: travadas.reduce((soma, p) => soma + p.amount_cents, 0),
           first_occurred_at: plan.first_occurred_at,
           last_occurred_at: parcels.reduce<string | null>(
             (maior, p) => (maior && maior > p.occurred_at ? maior : p.occurred_at),

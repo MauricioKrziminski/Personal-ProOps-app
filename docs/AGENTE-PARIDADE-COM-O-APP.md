@@ -466,3 +466,23 @@ WhatsApp (`*negrito*`), que é a mesma que o editor lê e escreve. Medido no sta
 *"anota na pasta ia: testar o agente, revisar o prompt e medir o custo"* virou três linhas
 `- [ ]` dentro da pasta `ia` — que já existia, porque as pastas do workspace entram no turno
 (delimitadas por `wrap_untrusted`, que nome de pasta é conteúdo do usuário).
+
+## Reparcelar a compra (15/09/2026)
+
+O app ganhou **`useUpdateInstallmentPlan`** — o sheet "Editar a compra" de Parceladas, que grava
+total, número de parcelas, título, estabelecimento, categoria, conta e data da primeira pela RPC
+`update_installment_plan`. Botão novo, linha nova:
+
+| botão novo no app | o agente faz? | por onde |
+|---|---|---|
+| `useUpdateInstallmentPlan` — **nome, estabelecimento e categoria** da compra | sim, e já fazia | `update_transaction` com escopo `future` sobre uma parcela: `update_transaction_scoped` propaga os três para a série inteira |
+| `useUpdateInstallmentPlan` — **total e número de parcelas** | **não — exclusão declarada** | não cabe. `FinanceAction` está no teto MEDIDO de 252 (`probe_rename_schema.py`), e reparcelar pede DOIS campos novos que não existem em lugar nenhum (`new_total_cents`, `new_installments`) mais um alvo em `installment_plans` — as duas ampliações possíveis já foram medidas e recusadas (19×14 = 266, 18×15 = 270). O caminho, se virar pedido, é o catálogo de `ResourceAction` com `installment_plans` como recurso, e não somar campo aqui. |
+
+⚠️ **E a exclusão tem um segundo motivo, que é melhor que o teto:** *"refaz a nuuvem em 3x de
+50"* é uma frase que reescreve N linhas de dinheiro de uma vez, algumas delas dentro de faturas
+já emitidas. O app faz isso com o contrato inteiro na tela — total, quantas já foram pagas, o que
+trava e por quê. Uma confirmação de uma linha no WhatsApp não mostra nada disso.
+
+**O que o agente NÃO perdeu:** apagar a compra inteira (`delete_transaction` com alvo em
+`installment_plans`) e renomear a série continuam funcionando, e continuam sendo as duas coisas
+que as pessoas pedem por voz.

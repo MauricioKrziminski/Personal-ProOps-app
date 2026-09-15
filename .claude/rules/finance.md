@@ -460,6 +460,67 @@ compra, não a única tela que responde quanto resta.
   compra que existe. `FinanceAction` **não** ganha campo `merchant` (o schema está no teto
   medido de 252): o modelo já põe o nome em `description`, medido em 8 redações.
 
+### Reparcelar: editar a COMPRA, não a parcela (`20260915210000`)
+
+⚠️ **O formulário do lançamento edita uma PARCELA, e por muito tempo esse era o único caminho.**
+A queixa foi literal: *"eu queria colocar o valor total de novo e parcelado em 2x mas ele veio
+com o valor 52,49 preenchido e nao consigo mudar a parcela"*. Total e número de parcelas são do
+CONTRATO; quem os edita é `public.update_installment_plan`, pelo sheet "Editar a compra" de
+Parceladas (`/finance/installments?edit=<plano>`).
+
+**É o padrão do nicho, e ele vem com uma qualificação que todos repetem** (pesquisado em
+15/09/2026): o Organizze recebe total + parcelas na criação (e põe o resto da divisão na
+PRIMEIRA parcela, onde este repo põe na ÚLTIMA); o Mobills edita com escopo; o **OnBalance
+desabilita o número de parcelas depois do primeiro pagamento**; o Oracle Financials só atualiza
+parcela com saldo em aberto. Daí as três regras:
+
+1. **Parcela travada não se move** — nem valor, nem data, nem conta, nem existência.
+2. **O número de parcelas, a data da primeira e a conta só mudam enquanto NADA foi pago.** Com
+   qualquer parcela travada, sobra editar o total (que redistribui só o saldo em aberto), o
+   título, o estabelecimento e a categoria.
+3. **A soma das parcelas é conferida no fim.** Não fechando com `total_cents`, a função levanta e
+   a transação inteira volta — o modo de falha desta classe não é erro na tela, é um total que
+   deixa de ser a soma do que está embaixo dele.
+
+⚠️ **"Travada" tem TRÊS causas, e a terceira é a que não aparece em teste nenhum**
+(`private.parcela_travada`, régua única): `status = 'cleared'`; fatura `paid` ou `rolled`; e
+fatura com **`paid_cents > 0`** — o pagamento PARCIAL, que deixa a fatura aberta e as linhas
+pendentes. Baixar o total de uma compra ali derruba `private.invoice_open_cents`
+(`sum(linhas) − paid_cents`) para negativo e `pay_invoice` passa a recusar a quitação com
+`aberto <= 0`: a fatura fica impossível de fechar, sem uma linha de erro em lugar nenhum.
+
+⚠️ **`travadas = 0` fala do estado de ANTES, não do destino.** Recuar a data da primeira parcela
+(ou trocar o cartão) faz o `set_invoice` pendurar uma parcela `pending` numa fatura já fechada —
+e ali ela SOME de toda leitura de caixa, porque todas filtram `status not in ('paid','rolled')`.
+É o espelho do bug que a `20260909071000` fechou. A função reconfere a régua depois de
+reescrever e recusa.
+
+⚠️ **Omitir a conta não pode ZERAR a conta.** Os parâmetros têm `default null` para o chamador
+não precisar mandar categoria nem estabelecimento; a conta é outra coisa — sem ela `set_invoice`
+apaga o `invoice_id` das N parcelas e a compra de cartão vira despesa solta. A função recusa
+quando o plano TINHA conta e o argumento veio nulo (plano que já nasceu sem conta continua
+editável).
+
+⚠️ **A categoria muda em TODAS as parcelas, inclusive as pagas, e isso é decisão declarada.**
+`update_transaction_scoped` diz "o passado só muda à mão", e ali está certo porque o que propaga
+é VALOR. Aqui a categoria é atributo da COMPRA: deixar 3 parcelas em "eletrônicos" e 9 em "lazer"
+parte o relatório dessa compra em dois para sempre. O efeito colateral conhecido é
+`budgets_status_for` remanejar o orçamento de um mês fechado — para a verdade, e sem número
+materializado.
+
+⚠️ **As parcelas em aberto são ATUALIZADAS, não recriadas.** Apagar e inserir trocaria os `id`s,
+e o `last_write_id` do agente, um `pending_actions` pendente e qualquer referência futura
+apontariam para linha morta. Insert só quando o número CRESCE; delete só quando ele encolhe.
+
+⚠️ **O título do plano é `description || merchant`, a mesma régua da linha.** Era
+`merchant || description` só em `useInstallmentPlans`, então uma compra com os dois preenchidos
+aparecia com um nome em Parceladas e outro na fatura.
+
+O agente **não** reparcela — exclusão declarada em `docs/AGENTE-PARIDADE-COM-O-APP.md`, com os
+dois motivos (o teto de 252 do `FinanceAction` e o fato de uma frase de uma linha reescrever N
+linhas de dinheiro sem mostrar o contrato). Renomear a série e apagar a compra inteira continuam
+valendo por lá.
+
 ## Projeção de fluxo de caixa
 
 - **Horizonte da projeção: até 10 anos, e o teto num lugar só** (`20260910235500`).

@@ -1,6 +1,7 @@
 import { Modal, StyleSheet, View } from 'react-native';
 import { KeyboardAvoidingView } from 'react-native-keyboard-controller';
 
+import { ToastOutlet } from '@/components/ui/toast';
 import { useTheme } from '@/hooks/use-theme';
 
 /**
@@ -61,6 +62,14 @@ export function Sheet({
         <KeyboardAvoidingView behavior="padding" automaticOffset style={styles.sheet}>
           {children}
         </KeyboardAvoidingView>
+        {/*
+          ⚠️ **O toast precisa ser desenhado AQUI DENTRO.** O `Modal` é janela separada no
+          Android e VC apresentado no iOS: o host da raiz fica atrás da folha, e toda mutation
+          que falha dentro de um sheet falhava em silêncio — §6 do design. Medido no emulador em
+          15/09/2026 com um erro que chegou no `onError` e não pintou um pixel. O estado é o
+          mesmo; ver o ⚠️ em `toast.tsx`.
+        */}
+        <ToastOutlet />
       </View>
     </Modal>
   );

@@ -293,6 +293,21 @@ export default function TransactionDetailScreen() {
             ...(tx.installment_plan_id
               ? [
                   {
+                    // Editar a COMPRA (total, número de parcelas, nome) é outra operação que
+                    // editar esta parcela — e antes ela não existia em lugar nenhum do app.
+                    label: 'Editar a compra inteira',
+                    icon: 'rectangle.split.3x1' as const,
+                    onPress: () =>
+                      router.push({
+                        pathname: '/finance/installments',
+                        params: { edit: tx.installment_plan_id! },
+                      }),
+                  },
+                ]
+              : []),
+            ...(tx.installment_plan_id
+              ? [
+                  {
                     label: 'Apagar a compra inteira',
                     icon: 'trash' as const,
                     destructive: true,

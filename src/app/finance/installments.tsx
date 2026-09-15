@@ -1,9 +1,17 @@
 import { useMemo, useRef, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
-import { Stack, router } from 'expo-router';
+import { Stack, router, useLocalSearchParams } from 'expo-router';
 import Animated, { FadeInDown, LinearTransition } from 'react-native-reanimated';
 
+import { AccountPicker } from '@/components/finance/account-picker';
+import { CategoryPicker } from '@/components/finance/category-picker';
+import { Chip } from '@/components/finance/chip';
+import { DatePickerField } from '@/components/finance/date-picker-field';
 import { useBRL } from '@/components/ui/conceal';
+import { Button } from '@/components/ui/button';
+import { Field, MoneyField, TextField } from '@/components/ui/field';
+import { Sheet } from '@/components/ui/sheet';
+import { TaskHeader } from '@/components/ui/task-header';
 import { monthLabel, monthShort, shiftMonth } from '@/components/finance/month-picker';
 import { ThemedText } from '@/components/themed-text';
 import { Card } from '@/components/ui/card';
@@ -19,9 +27,12 @@ import {
   useAccounts,
   useDeleteInstallmentPlan,
   useInstallmentPlans,
+  useUpdateInstallmentPlan,
   type InstallmentPlanSummary,
 } from '@/hooks/use-finance';
 import { formatBRL, formatDateBR, localISODate } from '@/hooks/use-items';
+import { brToISO, isValidBRDate, isoToBR } from '@/lib/dates';
+import { financeErrorMessage } from '@/lib/finance-form';
 import { useToast } from '@/components/ui/toast';
 import { confirmDestructive, showItemActions } from '@/lib/item-actions';
 import { useTheme } from '@/hooks/use-theme';
@@ -39,6 +50,48 @@ import { accountLabel } from '@/lib/accounts';
  */
 
 const MESES_COMPROMETIDOS = 12;
+/** As mesmas opções da criação (`transaction-form`) — reparcelar não inventa outra régua. */
+const OPCOES_PARCELAS = [2, 3, 4, 6, 10, 12, 18, 24];
+
+/**
+ * O formulário de REPARCELAR — a compra inteira, não uma parcela dela.
+ *
+ * ⚠️ `travadas` é `plano.locked`, **não** `plano.paid`. Elas divergem, e a primeira versão desta
+ * tela usou a errada: no staging a compra "Carro Peças" mostrava `paid = 0`, a tela oferecia
+ * trocar 3x por 4x e a RPC recusava com "já tem 1 parcela paga" — uma parcela dentro de fatura
+ * fechada. Botão habilitado que o servidor rejeita é o espelho do botão desabilitado que não
+ * explica: nos dois a pessoa não tem como saber o que fazer. A régua da tela é a MESMA do banco
+ * (`private.parcela_travada`).
+ */
+interface FormPlano {
+  id: string;
+  description: string;
+  merchant: string;
+  category: string | null;
+  accountId: string | null;
+  totalCents: number;
+  installments: number;
+  /** `dd/mm/aaaa`, como a pessoa digita. */
+  inicio: string;
+  /** Parcelas que não mudam mais (pagas ou em fatura fechada) e quanto elas somam. */
+  travadas: number;
+  travadoCents: number;
+}
+
+function formDoPlano(plano: InstallmentPlanSummary): FormPlano {
+  return {
+    id: plano.id,
+    description: plano.description ?? '',
+    merchant: plano.merchant ?? '',
+    category: plano.category,
+    accountId: plano.account_id,
+    totalCents: plano.total_cents,
+    installments: plano.installments,
+    inicio: isoToBR(plano.first_occurred_at),
+    travadas: plano.locked,
+    travadoCents: plano.locked_cents,
+  };
+}
 const ALTURA_BARRA = 88;
 /** Largura fixa de cada mês na faixa rolável. */
 const LARGURA_MES = 48;
@@ -79,6 +132,11 @@ export default function InstallmentsScreen() {
   const accounts = useAccounts();
   const [aberto, setAberto] = useState<string | null>(null);
   const [verTerminadas, setVerTerminadas] = useState(false);
+  const params = useLocalSearchParams<{ edit?: string }>();
+  const editar = useUpdateInstallmentPlan();
+  const [form, setForm] = useState<FormPlano | null>(null);
+  /** Qual `?edit=` já foi consumido — sem isto, fechar o sheet reabriria no render seguinte. */
+  const [edicaoAberta, setEdicaoAberta] = useState<string | null>(null);
 
   const contaPorId = useMemo(() => {
     const mapa = new Map<string, string>();
@@ -180,14 +238,23 @@ export default function InstallmentsScreen() {
   const acoes = (plano: InstallmentPlanSummary) => {
     const ordenadas = [...plano.parcels].sort((a, b) => (a.installment_no ?? 0) - (b.installment_no ?? 0));
     const primeira = ordenadas[0];
-    /**
-     * A âncora do "Editar" é a primeira parcela EM ABERTO, não a primeira do plano.
-     * A âncora é sempre reescrita — inclusive quando o escopo é "esta e as futuras" —
-     * e ancorar numa parcela já paga mexeria num mês fechado (e no total de uma fatura
-     * que já foi quitada) sem ninguém ter pedido. Sem nenhuma em aberto, resta a última.
-     */
-    const ancora = ordenadas.find((p) => p.status === 'pending') ?? ordenadas[ordenadas.length - 1];
     showItemActions(plano.title, [
+      {
+        /**
+         * ⚠️ **"Editar" aqui edita a COMPRA, não uma parcela** (15/09/2026).
+         *
+         * Até agora este item abria o formulário do LANÇAMENTO ancorado na primeira parcela em
+         * aberto, e por isso quem queria corrigir a compra caía num campo "Valor" que mostrava
+         * R$ 52,49 quando a compra foi de R$ 104,99. A queixa foi literal: *"eu queria colocar
+         * o valor total de novo e parcelado em 2x mas ele veio com o valor 52,49 preenchido e
+         * nao consigo mudar a parcela"*. Total e número de parcelas são do CONTRATO e agora
+         * moram no sheet abaixo; corrigir uma parcela sozinha continua existindo, por
+         * "Ver parcelas" → tocar na parcela → Editar, que é onde essa pergunta faz sentido.
+         */
+        label: 'Editar a compra',
+        icon: 'pencil' as const,
+        onPress: () => setForm(formDoPlano(plano)),
+      },
       {
         label: aberto === plano.id ? 'Esconder parcelas' : 'Ver parcelas',
         onPress: () => setAberto(aberto === plano.id ? null : plano.id),
@@ -200,19 +267,6 @@ export default function InstallmentsScreen() {
                 router.push({
                   pathname: '/finance/[txId]',
                   params: { txId: primeira.id, month: primeira.occurred_at.slice(0, 7) },
-                }),
-            },
-            {
-              // O menu do plano só sabia APAGAR a compra inteira. Editar exigia achar
-              // uma parcela, abrir o detalhe e só então achar o "Editar" — em 48x isso
-              // é um caminho que ninguém percorre. A escolha de escopo ("só esta" /
-              // "esta e as futuras") é feita no salvar, dentro do formulário.
-              label: 'Editar',
-              icon: 'pencil' as const,
-              onPress: () =>
-                router.push({
-                  pathname: '/finance/transaction-form',
-                  params: { id: ancora.id, month: ancora.occurred_at.slice(0, 7) },
                 }),
             },
           ]
@@ -250,6 +304,74 @@ export default function InstallmentsScreen() {
             toast({ message: 'Não deu para apagar a compra. Tenta de novo.', tone: 'error' }),
         }),
       `Some as ${plano.installments} parcelas de ${plano.title}, ${formatBRL(plano.total_cents)} no total — de todos os meses. Isso não volta.`,
+    );
+  };
+
+  /**
+   * Abrir o editor vindo de outra tela (`/finance/installments?edit=<plano>`).
+   *
+   * Ajuste de estado NO RENDER, não em efeito: o plano chega DEPOIS do primeiro render (a query
+   * ainda carregava), então nenhum inicializador de `useState` o alcança — e `setState` dentro
+   * de `useEffect` é o que o React Compiler recusa. Mesmo padrão (e mesmo motivo) do `?edit=`
+   * da tela de recorrentes.
+   */
+  if (params.edit && params.edit !== edicaoAberta && form === null) {
+    const alvo = lista.find((p) => p.id === params.edit);
+    if (alvo) {
+      setEdicaoAberta(params.edit);
+      setForm(formDoPlano(alvo));
+    }
+  }
+
+  // Com parcela paga, o que resta editar é o dinheiro em aberto e o nome — a regra do nicho
+  // (o OnBalance trava o número de parcelas depois do primeiro pagamento). Quem RECUSA é a
+  // RPC; aqui a tela só evita oferecer o que vai voltar como erro.
+  const travado = (form?.travadas ?? 0) > 0;
+  const tituloOk = (form?.description.trim().length ?? 0) > 0;
+  const emAberto = form ? Math.max(0, form.installments - form.travadas) : 0;
+  const restante = form ? form.totalCents - form.travadoCents : 0;
+  const totalOk = Boolean(
+    form && form.totalCents >= form.installments && (!travado || restante >= emAberto),
+  );
+  // Conta obrigatória: sem ela o `set_invoice` apaga o `invoice_id` das N parcelas e a compra
+  // de cartão vira despesa solta. O banco recusa; a tela evita chegar lá.
+  const contaOk = Boolean(form?.accountId);
+  const podeSalvar = Boolean(form && tituloOk && totalOk && contaOk && isValidBRDate(form.inicio));
+  const opcoesParcelas =
+    form && !OPCOES_PARCELAS.includes(form.installments)
+      ? [...OPCOES_PARCELAS, form.installments].sort((a, b) => a - b)
+      : OPCOES_PARCELAS;
+
+  const salvarPlano = () => {
+    if (!form || !podeSalvar) return;
+    const nome = form.description.trim();
+    editar.mutate(
+      {
+        planId: form.id,
+        totalCents: form.totalCents,
+        installments: form.installments,
+        firstOccurredAt: brToISO(form.inicio),
+        description: nome,
+        merchant: form.merchant.trim() || null,
+        category: form.category,
+        accountId: form.accountId,
+      },
+      {
+        onSuccess: () => {
+          setForm(null);
+          toast({
+            message: `${nome}: ${form.installments}x de ${formatBRL(Math.floor(form.totalCents / form.installments))}.`,
+            tone: 'success',
+          });
+        },
+        // A RPC recusa com a frase pronta (P0001) — "não deu para salvar" esconderia
+        // justamente o motivo, que é o que a pessoa precisa para decidir o que fazer.
+        onError: (error) =>
+          toast({
+            message: financeErrorMessage(error, 'Não deu para editar a compra. Tenta de novo.'),
+            tone: 'error',
+          }),
+      },
     );
   };
 
@@ -467,6 +589,134 @@ export default function InstallmentsScreen() {
         />
       ) : null}
 
+      {/*
+        **Reparcelar.** A ordem é a do formulário de EVENTO (`frontend.md`): o campo que NOMEIA
+        vem primeiro, depois o dinheiro, depois como ele se divide, depois quando. O que está
+        travado continua VISÍVEL — sumir com a conta e a data esconderia o dado de quem só
+        queria conferir.
+      */}
+      <Sheet visible={form !== null} onClose={() => setForm(null)}>
+        <TaskHeader
+          title="Editar a compra"
+          onClose={() => setForm(null)}
+          action={
+            <Button
+              label="Salvar"
+              size="sm"
+              loading={editar.isPending}
+              disabled={!podeSalvar || editar.isPending}
+              onPress={salvarPlano}
+            />
+          }
+        />
+        {form ? (
+          <ScrollView contentContainerStyle={styles.sheetBody} keyboardShouldPersistTaps="handled">
+            <Field
+              label="Título"
+              error={tituloOk ? undefined : 'Escreva um título para esta compra'}>
+              <TextField
+                value={form.description}
+                onChangeText={(description) => setForm({ ...form, description })}
+                placeholder="Ex.: Nuuvem Wardog"
+                accessibilityLabel="Título da compra"
+                invalid={!tituloOk}
+              />
+            </Field>
+
+            <Field label="Estabelecimento">
+              <TextField
+                value={form.merchant}
+                onChangeText={(merchant) => setForm({ ...form, merchant })}
+                placeholder="Ex.: Padaria do Zé"
+                accessibilityLabel="Estabelecimento"
+              />
+            </Field>
+
+            <Field
+              label="Valor total"
+              error={totalOk ? undefined : 'O total precisa cobrir o que já foi pago e as parcelas em aberto'}
+              hint={
+                travado
+                  ? `${brl(form.travadoCents)} em parcela fechada. O resto se divide nas em aberto.`
+                  : 'É o valor da compra inteira, não o da parcela.'
+              }>
+              <MoneyField
+                valueCents={form.totalCents}
+                onChangeCents={(totalCents) => setForm({ ...form, totalCents })}
+                invalid={!totalOk}
+              />
+            </Field>
+
+            <Field label="Categoria">
+              <CategoryPicker
+                value={form.category}
+                onChange={(category) => setForm({ ...form, category })}
+              />
+            </Field>
+
+            <Field label="Conta" error={contaOk ? undefined : 'Escolha a conta desta compra'}>
+              {travado ? (
+                <TextField
+                  editable={false}
+                  value={(form.accountId ? contaPorId.get(form.accountId) : null) ?? 'Sem conta'}
+                  accessibilityLabel="Conta da compra"
+                />
+              ) : (
+                <AccountPicker
+                  accounts={accounts.data ?? []}
+                  value={form.accountId}
+                  onChange={(accountId: string | null) => setForm({ ...form, accountId })}
+                  placeholder="Escolher a conta da compra"
+                />
+              )}
+            </Field>
+
+            <Field
+              label="Parcelas"
+              hint={
+                travado
+                  ? `${form.travadas} de ${form.installments} já fechadas — número, data e conta não mudam.`
+                  : `${form.installments}x de ${formatBRL(Math.floor(form.totalCents / form.installments))} — a última fecha os centavos.`
+              }>
+              {travado ? (
+                <TextField
+                  editable={false}
+                  value={`${form.installments}x`}
+                  accessibilityLabel="Número de parcelas"
+                />
+              ) : (
+                <View style={styles.chips}>
+                  {opcoesParcelas.map((n) => (
+                    <Chip
+                      key={n}
+                      label={`${n}x`}
+                      selected={form.installments === n}
+                      onPress={() => setForm({ ...form, installments: n })}
+                    />
+                  ))}
+                </View>
+              )}
+            </Field>
+
+            <Field label="Data da primeira parcela">
+              {travado ? (
+                <TextField
+                  editable={false}
+                  value={form.inicio}
+                  accessibilityLabel="Data da primeira parcela"
+                />
+              ) : (
+                <DatePickerField
+                  value={form.inicio}
+                  onChange={(inicio) => setForm({ ...form, inicio })}
+                  accessibilityLabel="Data da primeira parcela"
+                  invalid={!isValidBRDate(form.inicio)}
+                />
+              )}
+            </Field>
+          </ScrollView>
+        ) : null}
+      </Sheet>
     </Screen>
   );
 }
@@ -529,5 +779,15 @@ const styles = StyleSheet.create({
   nota: {
     paddingHorizontal: Space.xl,
     paddingTop: Space.xs,
+  },
+  sheetBody: {
+    gap: Space.xl,
+    padding: Space.lg,
+    paddingBottom: Space.xxxl,
+  },
+  chips: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: Space.sm,
   },
 });

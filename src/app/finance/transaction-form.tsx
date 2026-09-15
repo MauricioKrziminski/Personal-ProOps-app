@@ -239,10 +239,15 @@ function TransactionForm({ editing }: { editing?: Transaction }) {
     (15/09/2026). O que o usuário sabe é o TOTAL da compra; o campo mostra a parcela. Digitar
     104,99 numa parcela de 52,49 e salvar com escopo "esta e as futuras" faria
     `update_transaction_scoped` recalcular `installment_plans.total_cents` para R$ 209,98 —
-    uma compra que nunca existiu, sem erro nenhum na tela. A queixa foi *"eu queria colocar o
-    valor total de novo e parcelado em 2x... nao consigo mudar a parcela"*: refazer o
-    parcelamento é outra operação (apagar e lançar de novo), e a tela passa a dizer isso.
-    Título, estabelecimento, categoria e conta continuam editáveis — é o que propaga.
+    uma compra que nunca existiu, sem erro nenhum na tela.
+
+    A queixa foi *"eu queria colocar o valor total de novo e parcelado em 2x... nao consigo
+    mudar a parcela"*, e a resposta não é destravar este campo: **é outra operação, e ela
+    agora existe** — `update_installment_plan`, no sheet de Parceladas, que recebe o total e o
+    número de parcelas e reparte. O botão abaixo do campo leva direto para lá.
+
+    Título, estabelecimento, categoria e conta continuam editáveis AQUI — é o que propaga por
+    escopo, e é a correção de uma parcela só.
   */
   const planos = useInstallmentPlans();
   const plano = (planos.data ?? []).find((p) => p.id === editing?.installment_plan_id);
@@ -504,7 +509,7 @@ function TransactionForm({ editing }: { editing?: Transaction }) {
               error={errors.amount_cents?.message}
               hint={
                 valorTravado
-                  ? `Parcela ${editing?.installment_no ?? '?'} de ${plano?.installments ?? '?'}${plano ? ` · total ${formatBRL(plano.total_cents)}` : ''}. Para mudar, apague e lance de novo.`
+                  ? `Parcela ${editing?.installment_no ?? '?'} de ${plano?.installments ?? '?'}${plano ? ` · total ${formatBRL(plano.total_cents)}` : ''}. O valor é da compra.`
                   : undefined
               }>
               <MoneyField
@@ -513,6 +518,26 @@ function TransactionForm({ editing }: { editing?: Transaction }) {
                 readOnly={valorTravado}
                 invalid={!!errors.amount_cents}
               />
+              {/*
+                ⚠️ **`replace`, não `push`.** Editar a compra pode mudar o nome e o valor de
+                TODAS as parcelas; voltando para este formulário, ele ainda carregaria o texto
+                velho no campo Título e um "Salvar" desfaria parte do que acabou de ser feito —
+                sem erro nenhum. Trocar a tela fecha esse caminho. Quem só queria ver volta pelo
+                mesmo botão de sempre.
+              */}
+              {valorTravado && editing?.installment_plan_id ? (
+                <Button
+                  label="Editar a compra parcelada"
+                  variant="ghost"
+                  size="sm"
+                  onPress={() =>
+                    router.replace({
+                      pathname: '/finance/installments',
+                      params: { edit: editing.installment_plan_id! },
+                    })
+                  }
+                />
+              ) : null}
             </Field>
           )}
         />

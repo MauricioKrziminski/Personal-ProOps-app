@@ -2938,6 +2938,19 @@ export type Database = {
         Args: { p_as_of?: string; p_asset_id: string; p_value_cents: number }
         Returns: number
       }
+      update_installment_plan: {
+        Args: {
+          p_account_id?: string
+          p_category?: string
+          p_description?: string
+          p_first_occurred_at: string
+          p_installments: number
+          p_merchant?: string
+          p_plan_id: string
+          p_total_cents: number
+        }
+        Returns: number
+      }
       update_recurring_series: {
         Args: { p_patch: Json; p_propagate?: boolean; p_recurring_id: string }
         Returns: number

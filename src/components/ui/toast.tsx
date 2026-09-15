@@ -20,6 +20,32 @@ interface Toast {
 const ToastContext = createContext<(t: Toast) => void>(() => {});
 
 /**
+ * O toast VISÍVEL, para quem precisa desenhá-lo numa superfície própria.
+ *
+ * ⚠️ **Toast disparado de dentro de um `Sheet` não aparecia — em nenhuma das 22 telas que usam
+ * sheet** (medido no emulador em 15/09/2026, com o erro chegando no `onError` e nada na tela).
+ * O `Modal` do React Native é uma JANELA separada no Android e um view controller apresentado
+ * no iOS; o host do toast vive na árvore raiz, então ele era pintado ATRÁS da folha. Uma
+ * mutation que falha em silêncio é reprovação pelo §6 do design, e aqui ela falhava em silêncio
+ * por construção.
+ *
+ * A saída NÃO é pôr o toast dentro de um `Modal` próprio: no Android uma janela transparente
+ * come todos os toques enquanto está no ar, e o sheet ficaria intocável por 3,2 s. O `Sheet`
+ * desenha o MESMO toast dentro dele — o estado é um só, o `show` (e o haptics) roda uma vez, e
+ * a cópia da raiz fica escondida atrás da folha, que é onde ela já estava.
+ */
+const ToastStateContext = createContext<{ toast: Toast | null; dismiss: () => void }>({
+  toast: null,
+  dismiss: () => {},
+});
+
+/** Desenha o toast corrente. Vive na raiz e dentro de cada `Sheet`. */
+export function ToastOutlet() {
+  const { toast, dismiss } = useContext(ToastStateContext);
+  return toast ? <ToastView toast={toast} onDismiss={dismiss} /> : null;
+}
+
+/**
  * Mensagem transitória.
  *
  * Existe por um motivo concreto: hoje 15 mutations do app falham em **silêncio total**
@@ -55,11 +81,14 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const value = useMemo(() => show, [show]);
+  const estado = useMemo(() => ({ toast, dismiss }), [toast, dismiss]);
 
   return (
     <ToastContext.Provider value={value}>
-      {children}
-      {toast ? <ToastView toast={toast} onDismiss={dismiss} /> : null}
+      <ToastStateContext.Provider value={estado}>
+        {children}
+        <ToastOutlet />
+      </ToastStateContext.Provider>
     </ToastContext.Provider>
   );
 }
