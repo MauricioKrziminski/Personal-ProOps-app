@@ -2269,6 +2269,7 @@ export type Database = {
       _cycle_lines: {
         Args: { p_month: string; p_view?: string; uid: string }
         Returns: {
+          atrasada: boolean
           day: string
           in_cents: number
           method_label: string
@@ -2622,6 +2623,7 @@ export type Database = {
       cycle_lines: {
         Args: { p_month: string; p_view?: string }
         Returns: {
+          atrasada: boolean
           day: string
           in_cents: number
           method_label: string

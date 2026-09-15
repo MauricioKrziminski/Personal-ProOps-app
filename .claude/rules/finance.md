@@ -247,22 +247,32 @@ remanejar número — era dizer, na linha, para onde ela vai.
 está agrupada por natureza, e abrir o recorte na mesma régua dizia a mesma coisa duas vezes na
 mesma tela. Por meio é o bloco "Saídas" da planilha do dono do produto.
 
-## A fatura é ATÔMICA no extrato do ciclo
+## A fatura ATRASADA é atômica no ciclo; a do ciclo abre
 
-⚠️ **A tela do ciclo NÃO abre a fatura nas compras dela** (15/09/2026). Havia um modo "Tudo
-aberto" que fazia isso, e o sintoma foi imediato: no ciclo de 11/09 a 10/10 apareciam compras de
-**25/08 e 31/08**. A fatura atrasada cai neste ciclo pelo VENCIMENTO; as compras dela aconteceram
-no ciclo anterior, e expandi-las trazia datas de fora para dentro de um período fechado.
+⚠️ **A tela do ciclo abria TODA fatura nas compras dela** (15/09/2026), e o sintoma foi imediato:
+no ciclo de 11/09 a 10/10 apareciam compras de **25/08 e 31/08**. A fatura atrasada cai neste
+ciclo pelo VENCIMENTO; as compras dela aconteceram no ciclo anterior, e expandi-las trazia datas
+de fora para dentro de um período fechado.
 
-A razão é de modelo, não de layout — e é a frase do dono do produto: *"a fatura é uma só, eu não
-escolho quais lançamentos eu fiquei de pagar da fatura"*. No caixa paga-se a FATURA, nunca a
-compra: ela é um movimento, e quebrar isso na tela sugere uma escolha que não existe. Quem quer
-ver o conteúdo toca na linha e vai para a tela da fatura, onde as compras aparecem no período
-delas.
+A regra separa os dois casos, e a diferença é de MODELO, não de layout:
 
-É a mesma régua que a tela do Mês já segue por outro caminho (a etiqueta "cai na fatura de DD/MM"
-em vez de remanejar linha), e o seletor daquela tela passou a filtrar o LADO (`Tudo | Entrou |
-Saiu`) — que era o que os três atalhos da home já prometiam e ninguém lia.
+| fatura | na tela do ciclo | por quê |
+|---|---|---|
+| **atrasada** | um card, e nada mais | é dívida a quitar. *"A fatura é uma só, eu não escolho quais lançamentos eu fiquei de pagar da fatura"* — no caixa paga-se a fatura, nunca a compra, e abri-la sugere uma escolha que não existe |
+| **do ciclo** (a vencer) | abre nas compras dela | é o que ele está acumulando agora. Traz TODAS, **inclusive as de alguns dias antes do início do ciclo**: a fatura atual não começa na borda do ciclo, começa no fechamento do cartão |
+
+⚠️ **Quem separa é a coluna `atrasada` de `cycle_lines`** (`20260915120000`), não o sufixo
+"(atrasada)" do título nem o `day`. O título é frase, e ler estado de dentro de um rótulo quebra
+quando alguém reescreve a frase; o `day` chega clampado em `greatest(due_date, current_date)`,
+então fatura que vence HOJE e fatura vencida têm o mesmo dia.
+
+⚠️ **A consulta da expansão é condicionada ao que vai ser DESENHADO.** `useInvoice` recebe o id
+só quando a linha abre — com "é fatura" como condição, uma tela de seis faturas atrasadas dispara
+seis consultas cujo resultado é jogado fora.
+
+O seletor daquela tela passou a filtrar o LADO (`Tudo | Entrou | Saiu`), que era o que os três
+atalhos da home (`tipo=entra`, `tipo=sai`) já prometiam e ninguém lia — os três caíam na mesma
+lista sem filtro.
 
 ## A Projeção vai até a data que o usuário escolher
 

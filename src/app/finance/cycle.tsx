@@ -15,7 +15,7 @@ import { Segmented } from '@/components/ui/segmented';
 import { Screen } from '@/components/ui/screen';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Radius, Space } from '@/design/tokens';
-import { type CycleLine, type CycleRow, type CycleView, useCycleLines, useCycleMonth, useCycleSeries } from '@/hooks/use-finance';
+import { type CycleLine, type CycleRow, type CycleView, useCycleLines, useCycleMonth, useCycleSeries, useInvoice } from '@/hooks/use-finance';
 import { describeCycle } from '@/lib/cycle-label';
 import { rotaDaLinha } from '@/lib/cycle-routes';
 import { isoToBR, mesmoMes } from '@/lib/dates';
@@ -41,22 +41,25 @@ import { isoToBR, mesmoMes } from '@/lib/dates';
  * nada dizer que são naturezas diferentes. Por natureza, "o que pesou foi o cartão" se lê num
  * relance — e o subtotal de cada grupo está no próprio cabeçalho.
  *
- * ## ⚠️ A FATURA É UMA LINHA SÓ — ela não se abre nas compras dela (15/09/2026)
+ * ## ⚠️ A FATURA ATRASADA é uma linha só; a do ciclo abre (15/09/2026)
  *
- * Havia um modo "Tudo aberto" que expandia cada fatura nas transações que a compõem. Ele parecia
- * generosidade e era um erro de modelo, com um sintoma que o dono do produto pegou na hora: no
- * ciclo de 11/09 a 10/10 apareciam compras de **25/08 e 31/08**. A fatura ATRASADA cai neste
- * ciclo pelo vencimento — as compras dela aconteceram no ciclo anterior, e expandi-las trazia
- * datas de fora para dentro de um período que se lê como fechado.
+ * Havia um modo "Tudo aberto" que expandia TODA fatura nas transações que a compõem, e o sintoma
+ * que o dono do produto pegou na hora foi: no ciclo de 11/09 a 10/10 apareciam compras de
+ * **25/08 e 31/08**. A fatura ATRASADA cai neste ciclo pelo vencimento, mas as compras dela
+ * aconteceram no ciclo anterior — expandi-la trazia datas de fora para dentro de um período que
+ * se lê como fechado. E a queixa nomeia por que ela não deve abrir: *"a fatura é uma só, eu não
+ * escolho quais lançamentos eu fiquei de pagar da fatura"*. Atrasada, ela é dívida a quitar: UM
+ * card, e as compras ficam na tela da fatura.
  *
- * A queixa nomeia a causa: *"a fatura é uma só, eu não escolho quais lançamentos eu fiquei de
- * pagar da fatura"*. Fatura é **atômica no caixa** — paga-se a fatura, não a compra —, então no
- * extrato do ciclo ela é UM movimento. Quem quer ver o que tem dentro toca nela e vai para a tela
- * da fatura, que lista as compras no período CERTO, o dela.
+ * A fatura DO CICLO, ainda a vencer, é o contrário — ela abre, com todas as compras dela,
+ * **inclusive as de alguns dias antes do início do ciclo**. Não é inconsistência: é o que ele
+ * está acumulando agora, e a fatura atual não começa na borda do ciclo, começa no fechamento do
+ * cartão. Foi o pedido literal.
  *
- * É a mesma régua que `finance.md` já escreve para a tela do Mês ("nenhum número muda; tirar as
- * compras da lista para deixar só a fatura quebraria os subtotais") — só que aqui, ao contrário
- * de lá, as compras nunca foram linha desta tela: eram um enfeite por cima da linha da fatura.
+ * Quem separa os dois é `linha.atrasada`, coluna que veio na `20260915120000`. Ler o sufixo
+ * "(atrasada)" do título resolveria hoje e quebraria no dia em que alguém mexesse na frase, e o
+ * `day` não serve: ele chega clampado em `greatest(due_date, current_date)`, então fatura que
+ * vence HOJE e fatura vencida têm o mesmo dia.
  *
  * ## O seletor passou a filtrar o LADO, que é o que os atalhos já prometiam
  *
@@ -216,24 +219,42 @@ function Conta({
 }
 
 /**
- * Uma linha do ciclo — **uma linha, e só**. A fatura não se abre aqui; tocá-la leva para a tela
- * dela, que lista as compras no período a que elas pertencem. Ver o cabeçalho do arquivo.
+ * Uma linha do ciclo. A fatura A VENCER abre nas compras dela; a ATRASADA não — ver o cabeçalho.
+ *
+ * ⚠️ **A consulta só sai quando vai ser desenhada.** `useInvoice` recebe o id condicionado a
+ * `abre`, não a "é fatura": com o segundo, toda fatura atrasada dispararia um fetch cujo
+ * resultado é jogado fora, e numa tela com seis faturas isso é seis consultas para nada.
  */
 function Linha({ linha }: { linha: CycleLine }) {
+  const abre = linha.origin === 'invoice' && !linha.atrasada;
+  const fatura = useInvoice(abre ? linha.ref_id : undefined);
   const entra = Number(linha.in_cents) > 0;
 
   return (
-    <Row
-      title={linha.title}
-      subtitle={`${isoToBR(linha.day)} · ${linha.method_label}`}
-      trailing={
-        <Money
-          cents={entra ? Number(linha.in_cents) : Number(linha.out_cents)}
-          tone={entra ? 'success' : 'danger'}
-        />
-      }
-      onPress={destino(linha)}
-    />
+    <>
+      <Row
+        title={linha.title}
+        subtitle={`${isoToBR(linha.day)} · ${linha.method_label}`}
+        trailing={
+          <Money
+            cents={entra ? Number(linha.in_cents) : Number(linha.out_cents)}
+            tone={entra ? 'success' : 'danger'}
+          />
+        }
+        onPress={destino(linha)}
+      />
+      {abre
+        ? (fatura.data?.transactions ?? []).map((t) => (
+            <Row
+              key={t.id}
+              title={t.description ?? t.merchant ?? 'Compra'}
+              subtitle={`${isoToBR(t.occurred_at)}${t.category ? ` · ${t.category}` : ''}`}
+              trailing={<Money cents={Number(t.amount_cents)} variant="footnote" />}
+              onPress={() => router.push({ pathname: '/finance/[txId]', params: { txId: t.id } })}
+            />
+          ))
+        : null}
+    </>
   );
 }
 
