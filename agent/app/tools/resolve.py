@@ -269,13 +269,33 @@ async def por_transacao(
             if t_low in (t["description"] or "").lower()
             or t_low in (t["category"] or "").lower()
         ]
-        # termo que não casa não pode zerar uma busca que já achou por valor
         if por_texto_:
             linhas, filtrou = por_texto_, True
+        elif not filtrou:
+            # ⚠️ **O que o usuário DISSE e não existe é "não achei", nunca "então toma a
+            # lista".** O `elif` guarda o caso legítimo: com valor ou categoria já casando, um
+            # termo que não bate não pode ZERAR uma busca que achou — era só para isso que a
+            # guarda existia. Sem o `not filtrou` ela virava o contrário: quando o termo era a
+            # ÚNICA pista, o filtro se descartava em silêncio, `filtrou` ficava False e o
+            # código caía na janela dos 40 mais recentes.
+            #
+            # Medido em produção em 15/09/2026: *"remove o lançamento nuuvem"* — palavra que
+            # não existe no workspace — devolveu uma lista com IOF do rotativo, dentista,
+            # cabeleireiro e dois planos de parcelamento. A queixa foi literal: *"ele nunca
+            # deve generalizar algo que eu especifiquei"*.
+            #
+            # ⚠️ E a lista era o ramo MENOS perigoso. Com `quer_recente` junto ("apaga o
+            # último lançamento da nuuvem") o mesmo `filtrou=False` caía em `linhas[:1]` e
+            # devolvia `found` na transação mais recente — um DELETE confirmado com uma frase
+            # que nomeava outro lançamento.
+            return "none", []
     if action.occurred_at:
         por_data = [t for t in linhas if str(t["occurred_at"]) == action.occurred_at]
         if por_data:
             linhas, filtrou = por_data, True
+        elif not filtrou:
+            # Mesma régua para a data: "apaga o de 14/09" sem nada em 14/09 é "não achei".
+            return "none", []
 
     if not linhas:
         return "none", []
@@ -452,6 +472,40 @@ async def _antecedente_da_conversa(workspace_id, tx_id: str | None) -> list[dict
     return cands
 
 
+def _bruto_de(acao) -> str | None:
+    """De onde sai o termo de busca de cada tipo de ação, CRU.
+
+    `target_ref` é onde o nome da meta/bem vem em FinanceAction (ela não tem
+    search_term nem content). Sem ele, goal_deposit e update_asset_value
+    resolviam com termo vazio — ou seja, listavam TODAS as metas em vez de
+    achar "viagem".
+    """
+    if getattr(acao, "type", None) == FinanceActionType.PAY_INVOICE:
+        # O alvo aqui é a FATURA, e quem a identifica é o nome do cartão — que em
+        # FinanceAction mora em `account`, não em `description`. Sem esta linha o
+        # termo sairia de `description` ("fatura", vazio) e a resolução listaria
+        # as faturas de todos os cartões.
+        return getattr(acao, "account", None)
+    return (
+        getattr(acao, "search_term", None)
+        or getattr(acao, "content", None)
+        or getattr(acao, "target_ref", None)
+        or getattr(acao, "description", None)
+    )
+
+
+def termo_de(acao) -> str | None:
+    """O termo que o USUÁRIO disse, limpo de ponteiro ("esse lançamento").
+
+    Um lugar só, com DOIS leitores: `for_actions` resolve o alvo com ele e
+    `registry._sem_alvo` cita ele no "não achei". Duplicar a cadeia de campos
+    lá seria a segunda cópia que diverge — e divergir aqui é o "não achei
+    nenhum lançamento com «nuuvem»" virar "não achei esse item", genérico de
+    novo.
+    """
+    return clean_term(_bruto_de(acao))
+
+
 async def for_actions(
     workspace_id, acoes: list, texto_cru: str, antecedente: str | None = None
 ) -> list[dict]:
@@ -489,23 +543,7 @@ async def for_actions(
             saida.append({})
             continue
 
-        # `target_ref` é onde o nome da meta/bem vem em FinanceAction (ela não
-        # tem search_term nem content). Sem ele, goal_deposit e update_asset_value
-        # resolviam com termo vazio — ou seja, listavam TODAS as metas em vez de
-        # achar "viagem".
-        if getattr(acao, "type", None) == FinanceActionType.PAY_INVOICE:
-            # O alvo aqui é a FATURA, e quem a identifica é o nome do cartão —
-            # que em FinanceAction mora em `account`, não em `description`.
-            # Sem esta linha o termo sairia de `description` ("fatura", vazio) e
-            # a resolução listaria as faturas de todos os cartões.
-            bruto = getattr(acao, "account", None)
-        else:
-            bruto = (
-                getattr(acao, "search_term", None)
-                or getattr(acao, "content", None)
-                or getattr(acao, "target_ref", None)
-                or getattr(acao, "description", None)
-            )
+        bruto = _bruto_de(acao)
         termo = clean_term(bruto)
         # a recência só é lida do texto cru quando NÃO sobrou termo de busca
         recente = wants_latest(bruto, getattr(acao, "description", None)) or (

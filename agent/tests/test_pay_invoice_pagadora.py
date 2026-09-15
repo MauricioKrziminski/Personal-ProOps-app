@@ -148,13 +148,12 @@ def test_o_termo_da_fatura_vem_do_cartao_e_nao_da_descricao():
     fatura do nubank" resolveria com termo vazio e listaria as faturas de todos
     os cartões.
     """
-    import inspect
-
+    from app.graph.schemas import FinanceAction as FA
     from app.tools import resolve
 
-    fonte = inspect.getsource(resolve)
-    assert "FinanceActionType.PAY_INVOICE" in fonte
-    assert 'bruto = getattr(acao, "account", None)' in fonte
+    acao = FA(type=FinanceActionType.PAY_INVOICE, account="nubank",
+              description="fatura do cartão")
+    assert resolve.termo_de(acao) == "nubank"
 
 
 @pytest.mark.asyncio

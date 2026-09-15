@@ -91,8 +91,27 @@ Os equivalentes em Deno (`_shared/gemini.ts`, `process-jobs/index.ts`) foram **a
   é pior e silenciosa: o modelo procuraria pelo nome que o usuário AINDA NÃO DEU, e a correção
   volta vazia. `scripts/probe_rename_schema.py` mede a separação com o Gemini real, em quatro
   redações diferentes.
-- `resolve_transaction` (`app/tools/finance.py`) procura na janela dos 40 mais recentes. **Empate
-  pergunta, não chuta**: alterar o lançamento errado é pior que uma mensagem a mais.
+- `resolve.por_transacao` procura na janela dos 40 mais recentes (`finance.reference_window`).
+  **Empate pergunta, não chuta**: alterar o lançamento errado é pior que uma mensagem a mais.
+  (A cópia morta `finance.resolve_transaction` foi apagada em 15/09/2026 — ela tinha o mesmo
+  defeito abaixo e zero chamadores.)
+
+  ⚠️ **Termo que o usuário DEU e não casa com nada é "não achei", nunca "então toma a lista".**
+  O filtro por texto tinha uma guarda legítima — termo que não bate não pode ZERAR uma busca que
+  já achou por valor — e ela estava escrita como `if por_texto:` sem `else`: quando o termo era a
+  ÚNICA pista, o filtro se descartava em silêncio, `filtrou` ficava `False` e a função caía na
+  janela inteira. Medido em produção em 15/09/2026: *"remove o lançamento nuuvem"* devolveu IOF do
+  rotativo, dentista, cabeleireiro e dois planos de parcelamento, e a queixa foi literal — *"ele
+  nunca deve generalizar algo que eu especifiquei"*. A lista era o ramo MENOS perigoso: com
+  recência junto ("apaga o último da nuuvem") o mesmo `filtrou=False` devolvia `found` na
+  transação mais recente, ou seja, um DELETE confirmado com uma frase nomeando outro lançamento.
+  Hoje é `elif not filtrou: return "none", []`, no ramo do texto **e** no da data, e o `elif`
+  guarda o caso para o qual a guarda foi escrita.
+
+  ⚠️ **E o "não achei" CITA o termo** (`registry._sem_alvo`). "Não achei esse item por aqui" é a
+  frase de quem não apontou nada; devolvê-la a quem escreveu um nome faz a pessoa remandar a mesma
+  mensagem. O termo sai de `resolve.termo_de`, que é o MESMO caminho que `for_actions` usa para
+  resolver — duas cadeias de campos divergiriam, e divergir aqui é a frase voltar a ser genérica.
 
 ## Auditoria e custo
 

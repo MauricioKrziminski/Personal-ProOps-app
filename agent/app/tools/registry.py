@@ -87,11 +87,24 @@ def _tool(action: FinanceAction | FinanceQuery | NotesAction):
     return NOTES_TOOLS.get(action.type)
 
 
-def _sem_alvo(alvo: dict) -> str:
-    """Mensagem para alvo que não resolveu. Nunca executa, nunca reserva vaga."""
+def _sem_alvo(alvo: dict, action) -> str:
+    """Mensagem para alvo que não resolveu. Nunca executa, nunca reserva vaga.
+
+    ⚠️ **Quando o usuário DISSE um termo, a resposta cita o termo.** "Não achei
+    esse item por aqui" é a frase de quem não apontou nada; devolvê-la a quem
+    escreveu *"remove o lançamento nuuvem"* não diz o que falhou, e a pessoa
+    remanda a mesma frase. A régua é a de `agent.md`: o que ele disse e não bate
+    vira pergunta — sobre o que ELE disse.
+    """
     if alvo.get("status") == "ambiguous":
         opcoes = "\n".join(f"  • {c['label']}" for c in alvo.get("candidates", []))
         return f"🤔 Achei mais de um:\n{opcoes}\nMe diz qual."
+    termo = resolve.termo_de(action)
+    if termo:
+        return (
+            f"🤷 Não achei nada com «{termo}» por aqui. "
+            "Confere o nome, ou me diz o valor ou a data?"
+        )
     return "🤷 Não achei esse item por aqui. Me diz o valor ou a data?"
 
 
@@ -114,7 +127,7 @@ async def execute(ctx: ExecContext, action: FinanceAction | FinanceQuery | Notes
     if action.type in resolve.TARGETS:
         alvo = ctx.target or {}
         if alvo.get("status") != "found" or not alvo.get("candidates"):
-            return ToolResult(_sem_alvo(alvo), read_only=True)
+            return ToolResult(_sem_alvo(alvo, action), read_only=True)
         # `ensure_owned` ANTES de reservar a vaga de idempotência: id de outro
         # workspace não pode nem consumir a vaga. Roda dentro do try de baixo?
         # Não — aqui, para que a recusa seja explícita e não vire "erro ao

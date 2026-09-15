@@ -199,51 +199,6 @@ async def reference_window(
     )
 
 
-async def resolve_transaction(
-    workspace_id: UUID, action: FinanceAction
-) -> tuple[str, list[dict]]:
-    """Acha o lançamento citado ("o último", "o de 45", "o mercado de ontem").
-
-    Devolve ("found"|"ambiguous"|"none", candidatos). Empate PERGUNTA em vez de
-    chutar: alterar o lançamento errado é pior que uma mensagem a mais.
-    """
-    candidatos = await reference_window(workspace_id, action)
-    if not candidatos:
-        return "none", []
-
-    filtrou = False
-    if action.amount_cents:
-        candidatos = [t for t in candidatos if t["amount_cents"] == action.amount_cents]
-        filtrou = True
-    if action.category:
-        alvo = action.category.lower()
-        candidatos = [t for t in candidatos if (t["category"] or "").lower() == alvo]
-        filtrou = True
-    if action.description:
-        termo = action.description.lower().strip()
-        por_texto = [
-            t
-            for t in candidatos
-            if termo in (t["description"] or "").lower()
-            or termo in (t["category"] or "").lower()
-        ]
-        # termo que não casa com nada não pode zerar uma busca que já achou por valor
-        if por_texto:
-            candidatos, filtrou = por_texto, True
-    if action.occurred_at:
-        por_data = [t for t in candidatos if str(t["occurred_at"]) == action.occurred_at]
-        if por_data:
-            candidatos, filtrou = por_data, True
-
-    if not candidatos:
-        return "none", []
-    if not filtrou:
-        return "found", candidatos[:1]  # sem pista nenhuma, "o último" é a leitura certa
-    if len(candidatos) > 1:
-        return "ambiguous", candidatos[:3]
-    return "found", candidatos
-
-
 def describe(tx: dict) -> str:
     partes = f"{KIND_LABEL.get(tx['kind'], tx['kind'])} de {cents_to_brl(tx['amount_cents'])}"
     if tx.get("category"):

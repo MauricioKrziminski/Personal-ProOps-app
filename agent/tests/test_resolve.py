@@ -2,7 +2,7 @@
 
 Dois bugs que este módulo existe para matar, ambos medidos em 31/08/2026:
 
-1. `finance.resolve_transaction` devolvia `found` na transação MAIS RECENTE
+1. `resolve.por_transacao` devolvia `found` na transação MAIS RECENTE
    quando a ação não trazia nenhum campo de busca — então "apaga aquilo" apagava
    silenciosamente o último lançamento.
 2. A pergunta de confirmação era montada com os campos CRUS do modelo, então o
@@ -78,6 +78,120 @@ class TestPorTransacao:
         estado, cands = await resolve.por_transacao("ws", acao, quer_recente=False)
 
         assert estado == "found" and cands[0]["id"] == "b"
+
+    @pytest.mark.asyncio
+    async def test_termo_que_nao_casa_com_nada_e_NONE_nunca_a_lista(self, linhas):
+        """O defeito de 15/09/2026, na frase do dono do produto: *"eu pedi para
+        ele remover o lançamento nuuvem e ele me deu uma lista de um monte de
+        lançamento nada a ver junto"*.
+
+        O termo era a ÚNICA pista, não casava com nada, o filtro se descartava
+        em silêncio e `filtrou` ficava False — então a função caía na janela dos
+        40 mais recentes e devolvia `ambiguous` sobre lançamentos que a pessoa
+        nunca citou.
+        """
+        linhas["linhas"] = [_tx("a", 4500, "mercado"), _tx("b", 3000, "uber"),
+                            _tx("c", 1200, "cafe")]
+        acao = FinanceAction(type=FinanceActionType.DELETE_TRANSACTION,
+                             description="nuuvem")
+
+        estado, cands = await resolve.por_transacao("ws", acao, quer_recente=False)
+
+        assert estado == "none" and cands == []
+
+    @pytest.mark.asyncio
+    async def test_termo_que_nao_casa_NEM_COM_recencia_vira_a_mais_recente(self, linhas):
+        """Este é o ramo PERIGOSO do mesmo defeito, e por isso tem teste próprio.
+
+        "apaga o último lançamento da nuuvem" trazia `quer_recente=True`: com
+        `filtrou` False o código caía em `linhas[:1]` e devolvia **found** na
+        transação mais recente — um DELETE confirmado com uma frase que nomeava
+        outro lançamento. A lista era o ramo menos grave.
+        """
+        linhas["linhas"] = [_tx("a", 4500, "mercado"), _tx("b", 3000, "uber")]
+        acao = FinanceAction(type=FinanceActionType.DELETE_TRANSACTION,
+                             description="nuuvem")
+
+        estado, cands = await resolve.por_transacao("ws", acao, quer_recente=True)
+
+        assert estado == "none" and cands == []
+
+    @pytest.mark.asyncio
+    async def test_termo_que_casa_com_um_continua_achando(self, linhas):
+        linhas["linhas"] = [_tx("a", 4500, "mercado", "Feira do mercado"),
+                            _tx("b", 3000, "uber")]
+        acao = FinanceAction(type=FinanceActionType.DELETE_TRANSACTION,
+                             description="feira")
+
+        estado, cands = await resolve.por_transacao("ws", acao, quer_recente=False)
+
+        assert estado == "found" and cands[0]["id"] == "a"
+
+    @pytest.mark.asyncio
+    async def test_termo_que_casa_com_dois_continua_perguntando(self, linhas):
+        linhas["linhas"] = [_tx("a", 4500, "mercado", "Mercado Extra"),
+                            _tx("b", 3000, "mercado", "Mercado Dia"),
+                            _tx("c", 1200, "cafe")]
+        acao = FinanceAction(type=FinanceActionType.DELETE_TRANSACTION,
+                             description="mercado")
+
+        estado, cands = await resolve.por_transacao("ws", acao, quer_recente=False)
+
+        assert estado == "ambiguous" and {c["id"] for c in cands} == {"a", "b"}
+
+    @pytest.mark.asyncio
+    async def test_termo_casa_pela_CATEGORIA_e_isso_nao_pode_quebrar(self, linhas):
+        """A busca é em descrição OU categoria. "apaga o juros" acha pela
+        categoria mesmo sem a palavra na descrição — o `none` novo não pode
+        cortar esse caminho legítimo."""
+        linhas["linhas"] = [_tx("a", 4500, "mercado", "Feira"),
+                            _tx("b", 990, "juros", "IOF do rotativo")]
+        acao = FinanceAction(type=FinanceActionType.DELETE_TRANSACTION,
+                             description="juros")
+
+        estado, cands = await resolve.por_transacao("ws", acao, quer_recente=False)
+
+        assert estado == "found" and cands[0]["id"] == "b"
+
+    @pytest.mark.asyncio
+    async def test_termo_que_nao_casa_NAO_zera_uma_busca_por_VALOR(self, linhas):
+        """A guarda original continua de pé, e é para este caso que ela existe.
+
+        Com o valor já casando, um termo que não bate é ruído do modelo — não
+        pode apagar um candidato que o usuário REALMENTE deu. É por isso que o
+        `none` novo é `elif not filtrou`, nunca `else`.
+        """
+        linhas["linhas"] = [_tx("a", 4500, "mercado", "Feira"),
+                            _tx("b", 3000, "uber")]
+        acao = FinanceAction(type=FinanceActionType.DELETE_TRANSACTION,
+                             amount_cents=4500, description="nuuvem")
+
+        estado, cands = await resolve.por_transacao("ws", acao, quer_recente=False)
+
+        assert estado == "found" and cands[0]["id"] == "a"
+
+    @pytest.mark.asyncio
+    async def test_data_sem_nenhum_lancamento_naquele_dia_e_NONE(self, linhas):
+        """Mesma régua para a outra pista que o usuário pode dar sozinha:
+        "apaga o de 14/09" sem nada em 14/09 é "não achei", nunca a lista."""
+        linhas["linhas"] = [_tx("a", 4500, "mercado", data="2026-09-10"),
+                            _tx("b", 3000, "uber", data="2026-09-11")]
+        acao = FinanceAction(type=FinanceActionType.DELETE_TRANSACTION,
+                             occurred_at="2026-09-14")
+
+        estado, cands = await resolve.por_transacao("ws", acao, quer_recente=False)
+
+        assert estado == "none" and cands == []
+
+    @pytest.mark.asyncio
+    async def test_data_que_nao_casa_NAO_zera_uma_busca_por_texto(self, linhas):
+        linhas["linhas"] = [_tx("a", 4500, "mercado", "Feira", data="2026-09-10")]
+        acao = FinanceAction(type=FinanceActionType.DELETE_TRANSACTION,
+                             description="feira", occurred_at="2026-09-14")
+
+        estado, cands = await resolve.por_transacao("ws", acao, quer_recente=False)
+
+        assert estado == "found" and cands[0]["id"] == "a"
 
     @pytest.mark.asyncio
     async def test_banco_vazio_e_none(self, linhas):
@@ -255,3 +369,42 @@ class TestJanelaDeReferencia:
         assert "p.termo is null and p.cents is null and p.dia is null" in futuro, (
             "sem pista nenhuma o futuro entra por proximidade — ali ele é contexto, não alvo"
         )
+
+
+class TestNaoAcheiCitaOTermo:
+    """A resposta ao usuário diz o que FALHOU, e o que falhou é o que ele disse.
+
+    Medido em 15/09/2026: *"remove o lançamento nuuvem"* devolvia uma lista de
+    lançamentos que ele nunca citou. Com o `none` novo a lista some — e se a
+    frase continuasse genérica ("não achei esse item por aqui"), ele remandaria
+    a mesma mensagem sem saber que o problema era a palavra.
+    """
+
+    def _msg(self, **campos):
+        from app.tools import registry
+
+        acao = FinanceAction(type=FinanceActionType.DELETE_TRANSACTION, **campos)
+        return registry._sem_alvo({"status": "none", "candidates": []}, acao)
+
+    def test_cita_o_termo_que_o_usuario_deu(self):
+        assert "nuuvem" in self._msg(description="nuuvem")
+
+    def test_ponteiro_NAO_vira_termo_citado(self):
+        """"apaga esse lançamento" sem antecedente vivo não achou nada — mas
+        "esse lançamento" é ponteiro, não nome. Citá-lo seria devolver à pessoa
+        a palavra dela como se fosse um nome de estabelecimento."""
+        msg = self._msg(description="esse lançamento")
+        assert "esse lançamento" not in msg and "Não achei esse item" in msg
+
+    def test_sem_termo_nenhum_mantem_a_frase_antiga(self):
+        assert "Não achei esse item" in self._msg()
+
+    def test_empate_continua_listando(self):
+        from app.tools import registry
+
+        acao = FinanceAction(type=FinanceActionType.DELETE_TRANSACTION, description="mercado")
+        msg = registry._sem_alvo(
+            {"status": "ambiguous", "candidates": [{"label": "gasto A"}, {"label": "gasto B"}]},
+            acao,
+        )
+        assert "gasto A" in msg and "gasto B" in msg
