@@ -855,6 +855,75 @@ export function useUpcomingBills(days = 30) {
   });
 }
 
+/** Uma compra que ainda VAI entrar numa fatura aberta. */
+export interface UpcomingCardCharge {
+  id: string;
+  title: string;
+  occurred_at: string;
+  amount_cents: number;
+  card: string;
+  invoice_id: string;
+}
+
+/**
+ * O que ainda vai CAIR no cartão — a parcela e a assinatura com data futura.
+ *
+ * ⚠️ **Elas não aparecem em `upcoming_bills`, e isso é o desenho de lá, não um defeito.** O
+ * ramo avulso daquela RPC exige `invoice_id is null` justamente para não contar duas vezes o
+ * que já está somado dentro da fatura. O efeito colateral é que a compra que vai postar semana
+ * que vem some de toda tela que lê "o que vem" — medido na conta do dono do produto em
+ * 16/09/2026: `DAS` (20/09) e `Carro Peças (2/3)` (22/09) não estavam em lugar nenhum da Hoje.
+ *
+ * ⚠️ **A fatura em si NÃO serve de resposta** (a queixa foi literal: *"eu não quero a fatura em
+ * si, quero os próximos lançamentos previstos dentro da fatura"*). O total dela é um número
+ * fechado sobre o passado; o que ajuda a decidir hoje é ver o que ainda vai entrar nele.
+ *
+ * Duas idas, não um `!inner` com filtro embutido: o filtro de status do PostgREST sobre tabela
+ * EMBUTIDA tem semântica própria e silenciosa, e aqui o preço é uma consulta a mais numa tela
+ * que já espera por sete.
+ */
+export function useUpcomingCardCharges(limit = 4) {
+  useRealtimeInvalidate('transactions', ['upcoming-card-charges']);
+  useRealtimeInvalidate('card_invoices', ['upcoming-card-charges']);
+  return useQuery({
+    queryKey: ['upcoming-card-charges', String(limit)],
+    queryFn: async (): Promise<UpcomingCardCharge[]> => {
+      const hoje = localISODate();
+      const { data: faturas, error: erroFaturas } = await supabase
+        .from('card_invoices')
+        .select('id, due_date, accounts(name)')
+        .not('status', 'in', '("paid","rolled")')
+        .gte('due_date', hoje);
+      if (erroFaturas) throw erroFaturas;
+      const abertas = (faturas ?? []) as unknown as {
+        id: string;
+        due_date: string;
+        accounts: { name: string } | null;
+      }[];
+      if (abertas.length === 0) return [];
+
+      const cartaoDe = new Map(abertas.map((f) => [f.id, f.accounts?.name ?? 'Cartão']));
+      const { data, error } = await supabase
+        .from('transactions')
+        .select('id, description, merchant, occurred_at, amount_cents, invoice_id')
+        .in('invoice_id', [...cartaoDe.keys()])
+        .gte('occurred_at', hoje)
+        .order('occurred_at', { ascending: true })
+        .limit(limit);
+      if (error) throw error;
+      return (data ?? []).map((t) => ({
+        id: t.id,
+        // A MESMA régua da linha e do plano: `description || merchant`. Ver `finance.md`.
+        title: t.description || t.merchant || 'Compra no cartão',
+        occurred_at: t.occurred_at,
+        amount_cents: Number(t.amount_cents),
+        card: cartaoDe.get(t.invoice_id as string) ?? 'Cartão',
+        invoice_id: t.invoice_id as string,
+      }));
+    },
+  });
+}
+
 /**
  * Dá baixa num lançamento previsto (pending -> cleared).
  *

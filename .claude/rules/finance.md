@@ -207,6 +207,20 @@ O conserto é o item "Ver o que fecha o ciclo" no menu do painel, apontando para
 — a lista que já existe, agrupada, com a fatura abrindo nas compras. **Alargar a janela dos 7
 dias seria o conserto errado**: a Hoje viraria a tela do ciclo com outro nome.
 
+⚠️ **E o link não bastou: a COMPRA que ainda vai postar não estava em tela nenhuma.** O ramo
+avulso de `upcoming_bills` exige `invoice_id is null` — correto, é o que impede contar duas vezes
+o que já está somado dentro da fatura —, e o efeito colateral é que a parcela e a assinatura com
+data futura somem de toda leitura de "o que vem". Medido: `DAS` (20/09) e `Carro Peças (2/3)`
+(22/09) não apareciam em lugar nenhum da Hoje.
+
+⚠️ **E a FATURA não responde isso.** Mostrá-la ("Fatura Nubank · R$ 3.751,22") foi tentado e
+recusado: *"eu não quero a fatura em si, quero os próximos lançamentos previstos dentro da
+fatura"*. O total é um número fechado sobre o que já foi gasto; o que ajuda a decidir hoje é o
+que ainda vai ENTRAR nele. `useUpcomingCardCharges` lê isso direto (fatura aberta → transações
+com `occurred_at >= hoje`), **limitado** — a fatura tem dezenas de linhas e a Hoje não é o
+extrato do cartão —, e fica fora do contador "Vencendo" e do badge da aba: nada ali vence, é
+compra que vai postar, e badge é contagem do que dá para resolver agora.
+
 ⚠️ **O link carrega `mes` e `view` do próprio `cycle_now`, nunca um default.** Com `view` fixo,
 quem está na régua civil abriria um período diferente do que o rodapé acabou de nomear — a mesma
 discordância entre duas leituras que esta seção inteira persegue. E o `tipo` acompanha o que o
