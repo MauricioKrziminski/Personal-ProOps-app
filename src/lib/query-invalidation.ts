@@ -5,7 +5,16 @@ export const FINANCE_KEYS = [
   ['transactions'], ['tx-summary'], ['monthly-cashflow'], ['account-balances'],
   ['budgets-status'], ['accounts'], ['goals'], ['budgets'], ['recurring'],
   ['card-summary'], ['invoice'], ['card-invoices'], ['installments'], ['forecast'], ['forecast-drafts'],
-  ['upcoming-bills'], ['debts'], ['debt-schedule'], ['payoff'], ['assets'],
+  /*
+    ⚠️ **`upcoming-card-charges` faltou aqui no dia em que nasceu** (16/09/2026), e o sintoma foi
+    imediato: editar a data do `Wardogs (1/2)` para anteontem gravou certo no banco e a Hoje
+    continuou mostrando a compra em "Vai cair no cartão". Toda escrita financeira invalida as 30+
+    chaves desta lista; a que não está aqui só se conserta com o app reiniciando.
+    `refresh-consistency.test.ts` passou a comparar esta lista com as chaves reais de
+    `use-finance.ts` — era a terceira vez que uma chave nova ficava de fora (ver o bloco do CICLO
+    abaixo e a nota de `budgets-status` em `finance.md`).
+  */
+  ['upcoming-bills'], ['upcoming-card-charges'], ['debts'], ['debt-schedule'], ['payoff'], ['assets'],
   ['net-worth'], ['net-worth-series'], ['cash-history'], ['financial-health'],
   ['annual-report'], ['goal-contributions'], ['search', 'transactions'],
   ['ai-month-stats'], ['month-lines'], ['month-summary'], ['month-breakdown'], ['default-account'],

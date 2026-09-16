@@ -364,3 +364,67 @@ test('mark paid rejects a zero-row write instead of reporting success', async ()
   try { await assert.rejects(hook.mutationFn({ id: 'missing', paidAt: '2026-09-08' })); }
   finally { client.clear(); }
 });
+
+/*
+  ⚠️ **Chave de consulta nova que não entra em `FINANCE_KEYS` mostra dado velho até o app
+  reiniciar — e isso já aconteceu TRÊS vezes.** As de ciclo faltaram (o comentário está no
+  próprio `query-invalidation.ts`), `budgets-status` precisou de uma lista à parte
+  (`REGUA_MUDOU`, em `finance.md`), e em 16/09/2026 foi `upcoming-card-charges`: editar a data de
+  uma compra para anteontem gravou certo no banco e a Hoje continuou mostrando a compra em "Vai
+  cair no cartão".
+
+  O modo de falha é sempre o mesmo e nunca dá erro: a escrita funciona, a tela mente. Este teste
+  lê as DUAS fontes — as chaves reais de `use-finance.ts` e a lista — e obriga cada ausência a
+  ser uma decisão escrita, não um esquecimento.
+*/
+const FORA_DE_PROPOSITO: Record<string, string> = {
+  // Histórico de alertas enviados: não deriva do ledger, tem vida própria no cron.
+  'alerts-sent': 'não é derivada de lançamento',
+  // O fluxo de importação é dono do próprio ciclo (lote → itens → conciliação) e invalida sozinho.
+  'import-batches': 'o fluxo de importação invalida as próprias etapas',
+  'import-items': 'idem',
+  'import-unmatched': 'idem',
+  // Cadastro de gente, não de dinheiro.
+  invites: 'não é financeira',
+  'workspace-members': 'não é financeira',
+  // Regras de categorização: mudam quando o usuário edita a regra, não quando lança.
+  rules: 'muda com a regra, não com o lançamento',
+  // O paywall tem caminho próprio: `invalidateAgentData` a inclui, e o gate lê do servidor.
+  'plan-status': 'invalidada por `invalidateAgentData`',
+  /*
+    ⚠️ Estas duas são DISCUTÍVEIS e ficaram como estavam de propósito — mexer nelas é decisão de
+    produto, não consequência de um teste novo. `categories-used` não vê uma categoria inédita até
+    o refetch (o seletor mescla com as sugeridas, então o defeito é discreto), e `debt-payments` é
+    derivada de `pay_debt_installment`. Quem for mexer, mexa sabendo.
+  */
+  'categories-used': 'discutível: categoria inédita só aparece no próximo refetch',
+  'debt-payments': 'discutível: deriva de pagamento de dívida',
+};
+
+test('toda chave de consulta financeira está em FINANCE_KEYS, ou tem motivo escrito', async () => {
+  const { readFileSync } = await import('node:fs');
+  const hooks = readFileSync('src/hooks/use-finance.ts', 'utf8');
+  const invalidation = readFileSync('src/lib/query-invalidation.ts', 'utf8');
+
+  const usadas = new Set([...hooks.matchAll(/queryKey: \['([a-z0-9-]+)'/g)].map((m) => m[1]));
+  const bloco = invalidation.split('export const FINANCE_KEYS = [')[1].split('] as const;')[0];
+  const listadas = new Set([...bloco.matchAll(/\['([a-z0-9-]+)'\]/g)].map((m) => m[1]));
+
+  // O teste não pode passar por ler ZERO chave — foi assim que contagens já foram dadas por
+  // zeradas sem estar (ver `anti-slop.test.ts`).
+  assert.ok(usadas.size > 30, `esperava dezenas de chaves, li ${usadas.size}`);
+  assert.ok(listadas.size > 30, `esperava dezenas em FINANCE_KEYS, li ${listadas.size}`);
+
+  const esquecidas = [...usadas].filter((k) => !listadas.has(k) && !(k in FORA_DE_PROPOSITO));
+  assert.deepEqual(
+    esquecidas,
+    [],
+    `chave(s) de consulta fora de FINANCE_KEYS: ${esquecidas.join(', ')}. ` +
+      'Uma escrita financeira não vai atualizar essa tela — acrescente à lista, ou declare o ' +
+      'motivo em FORA_DE_PROPOSITO.'
+  );
+
+  // O outro lado: motivo escrito para uma chave que não existe mais é lixo que engana quem lê.
+  const orfas = Object.keys(FORA_DE_PROPOSITO).filter((k) => !usadas.has(k));
+  assert.deepEqual(orfas, [], `motivo escrito para chave inexistente: ${orfas.join(', ')}`);
+});
