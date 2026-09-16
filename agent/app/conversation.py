@@ -639,29 +639,26 @@ def _pergunta_cartao(
     }
 
 
-# ⚠️ **Numa lista, um cartão e uma conta corrente têm a MESMA cara.** Foi assim
-# que um salário de R$ 4.000 foi lançado dentro da fatura pelo app em
-# 09/09/2026 ("aparece só nubank e eu achei que era a conta corrente nubank e
-# nao cartao nubank"), e a resposta de lá foi separar os dois por PALAVRA, além
-# do nome. Aqui a linha já tem onde escrever isso.
-_TIPOS = {
-    "credit_card": "Cartão de crédito",
-    "checking": "Conta corrente",
-    "savings": "Poupança",
-    "cash": "Dinheiro",
-    "investment": "Investimento",
-}
-
-
 def _tipo_da_conta(conta: dict, *, so_cartoes: bool = False) -> str:
     """O tipo por extenso, com o dia de fechamento quando ele decide a fatura.
 
-    Numa lista só de cartões o tipo SOME: escrever "Cartão de crédito" em toda
+    ⚠️ **Numa lista, um cartão e uma conta corrente têm a MESMA cara.** Foi
+    assim que um salário de R$ 4.000 foi lançado dentro da fatura pelo app em
+    09/09/2026 (*"aparece só nubank e eu achei que era a conta corrente nubank e
+    nao cartao nubank"*), e a resposta de lá foi separar os dois por PALAVRA,
+    além do nome. Aqui a linha já tem onde escrever isso.
+
+    Numa lista só de cartões o tipo SOME: escrever "cartão de crédito" em toda
     linha de uma pergunta que já diz "em qual cartão" é a mesma palavra três
     vezes. Lá sobra o que distingue um cartão do outro, que é o fechamento.
+
+    O rótulo vem de `resources.ROTULO_DE_ENUM`, que é o mesmo que a frase de
+    confirmação do cadastro usa — duas tabelas de rótulo divergem.
     """
+    from app.tools.resources import ROTULO_DE_ENUM
+
     cartao = conta.get("type") == "credit_card"
-    tipo = "" if so_cartoes else _TIPOS.get(conta.get("type") or "", "")
+    tipo = "" if so_cartoes else ROTULO_DE_ENUM.get(conta.get("type") or "", "").capitalize()
     fecha = f"fecha dia {conta['closing_day']}" if cartao and conta.get("closing_day") else ""
     return " · ".join(p for p in (tipo, fecha) if p)
 

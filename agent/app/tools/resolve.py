@@ -820,7 +820,20 @@ async def contas_citadas(
                 # "qual delas?" → "nubank" respondia *"Para trocar a conta de uma
                 # compra parcelada, edite a parcela individual no app"*, e os
                 # R$ 45 nunca eram registrados.
-                alvos[i] = {**alvos[i], "correction_error": err.mensagem_usuario,
-                            "account_error": err.mensagem_usuario}
+                #
+                # ⚠️ **SÓ para o campo `account`, e a restrição é o que impede um
+                # loop pior que o beco.** O rascunho inteiro — `parse_slot_click`,
+                # `_cartao_do_rascunho`, `draft.mesclar`, o CHECK de
+                # `draft_actions.slot` — conhece UM campo. Marcando aqui a falha
+                # de `counterparty_account` (o destino de uma transferência, a
+                # conta que paga a fatura), a resposta do usuário seria gravada
+                # em `account`: "transferi 100 da nubank pro bradesco", sem
+                # Bradesco, escolher *Inter* na lista APAGARIA a origem correta e
+                # deixaria o destino quebrado — e a mesma pergunta voltaria para
+                # sempre. Campo novo exige slot novo e migration; até lá esses
+                # dois continuam sendo texto, como antes.
+                if campo == "account":
+                    alvos[i] = {**alvos[i], "account_error": err.mensagem_usuario}
+                alvos[i] = {**alvos[i], "correction_error": err.mensagem_usuario}
                 break
     return alvos

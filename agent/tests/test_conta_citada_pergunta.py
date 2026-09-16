@@ -265,3 +265,40 @@ def test_lista_so_de_cartoes_nao_repete_a_palavra_cartao():
     assert any("financiamento" in r[1] for r in spec["rows"])
     sem_cartao = conversation._pergunta_cartao("d1", linhas, "Qual conta?", so_cartoes=False)
     assert not any("financiamento" in r[1] for r in sem_cartao["rows"])
+
+
+# ---------------------------------------------------------------------------
+# o rascunho conhece UM campo, e marcar o outro criaria um loop
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.asyncio
+async def test_destino_de_transferencia_nao_vira_rascunho(contas):
+    """`counterparty_account` falhando NÃO pode marcar `account_error`.
+
+    O rascunho inteiro conhece um campo só. Com a marca, "transferi 100 da
+    Nubank Conta pro bradesco" perguntaria "qual delas?", e a escolha seria
+    gravada em `account` — apagando a ORIGEM correta e deixando o destino
+    quebrado. A pergunta voltaria para sempre, e cada resposta destruiria mais
+    um dado. A parada continua (é `correction_error`); o que não existe é o
+    atalho de resposta.
+    """
+    from app.tools import resolve
+
+    acao = FinanceAction(
+        type=FinanceActionType.CREATE_TRANSFER, amount_cents=10000,
+        account="Nubank Conta", counterparty_account="bradesco",
+    )
+    alvos = await resolve.contas_citadas(WS, [acao], [{}])
+    assert "bradesco" in alvos[0]["correction_error"], "o gate ainda para"
+    assert "account_error" not in alvos[0], "e não oferece um rascunho que corromperia a origem"
+
+
+def test_mesclar_nao_encosta_na_conta_de_destino():
+    """A outra metade da mesma trava, no lado que grava."""
+    from app.domain import draft
+
+    guardado = {"type": "create_transfer", "amount_cents": 10000,
+                "account": "Nubank Conta", "counterparty_account": "bradesco"}
+    mesclado = draft.mesclar(guardado, {"slot": "account", "account": "Inter"})
+    assert mesclado["counterparty_account"] == "bradesco"

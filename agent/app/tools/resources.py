@@ -242,6 +242,34 @@ ENUMS = {
     ("folders", "color"): NOTE_COLORS,
     ("folders", "icon"): FOLDER_ICONS,
 }
+# O valor do enum em português, para a frase que o usuário lê. **Tabela ÚNICA**:
+# `conversation._tipo_da_conta` lê daqui para escrever o tipo na linha da lista de
+# contas, e uma segunda cópia é como "cartão de crédito" e "cartão" passam a
+# nomear a mesma coisa em duas telas.
+ROTULO_DE_ENUM = {
+    "checking": "conta corrente",
+    "savings": "poupança",
+    "cash": "dinheiro",
+    "investment": "investimento",
+    "loan": "empréstimo",
+    "financing": "financiamento",
+    "credit_card": "cartão de crédito",
+    "person": "pessoa",
+    "other": "outro",
+    "real_estate": "imóvel",
+    "vehicle": "veículo",
+    "crypto": "criptoativo",
+    "equity": "participação",
+    "receivable": "valor a receber",
+    "expense": "gasto",
+    "income": "receita",
+    "push": "notificação no app",
+    "whatsapp": "WhatsApp",
+    "both": "notificação no app e WhatsApp",
+    "contains": "contém o termo",
+    "merchant": "estabelecimento",
+}
+
 BOOLS = {"archived", "active", "rollover", "is_liability", "auto_confirm", "pinned", "is_default",
          "trashed", "rotativo_auto"}
 LINKS = {
@@ -1016,29 +1044,7 @@ async def prepare(ctx: ExecContext, action: ResourceAction) -> dict:
         elif key == "interest_rate_monthly" and value is not None:
             shown = f"{Decimal(str(value)) * 100:g}%".replace(".", ",")
         elif (action.resource, key) in ENUMS:
-            shown = {
-                "checking": "conta corrente",
-                "savings": "poupança",
-                "cash": "dinheiro",
-                "investment": "investimento",
-                "loan": "empréstimo",
-                "financing": "financiamento",
-                "credit_card": "cartão",
-                "person": "pessoa",
-                "other": "outro",
-                "real_estate": "imóvel",
-                "vehicle": "veículo",
-                "crypto": "criptoativo",
-                "equity": "participação",
-                "receivable": "valor a receber",
-                "expense": "gasto",
-                "income": "receita",
-                "push": "notificação no app",
-                "whatsapp": "WhatsApp",
-                "both": "notificação no app e WhatsApp",
-                "contains": "contém o termo",
-                "merchant": "estabelecimento",
-            }.get(str(value), value)
+            shown = ROTULO_DE_ENUM.get(str(value), value)
         elif key in {"archived_at", "deleted_at"}:
             # O verbo já diz o que acontece quando a operação é o próprio
             # arquivar/apagar; repetir vira "mandar para a lixeira nota X —

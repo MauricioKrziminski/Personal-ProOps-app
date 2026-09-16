@@ -229,11 +229,23 @@ por extenso (e o dia de fechamento no cartão) — é a mesma resposta que o `Ac
 do app deu ao salário de R$ 4.000 lançado dentro da fatura. Em lista SÓ de cartões o
 tipo some: seria a mesma palavra em toda linha.
 
-**Ainda é texto, e é exclusão declarada:** `_conta_que_paga` (`app/tools/finance.py`),
-quando a pessoa NÃO cita conta nenhuma ao pagar uma fatura e o cartão não tem
-`payment_account_id`. Ela é levantada de dentro da tool, depois do gate, onde não há
-rascunho em que pendurar o clique — transformá-la em botões pede rotear o erro da
-`registry` para um rascunho, que é mecanismo novo. A lista de contas continua na frase.
+⚠️ **Só o campo `account` vira rascunho, e a restrição EVITA um loop pior que o beco.**
+O rascunho conhece um campo: `parse_slot_click`, `_cartao_do_rascunho`, `draft.mesclar` e
+o CHECK de `draft_actions.slot` falam todos de `account`. Marcando também a falha de
+`counterparty_account`, a resposta seria gravada no campo errado — em "transferi 100 da
+nubank pro bradesco" (sem Bradesco), escolher *Inter* na lista APAGARIA a origem correta
+e deixaria o destino quebrado, e a pergunta voltaria para sempre destruindo mais um dado
+a cada resposta. Campo novo exige slot novo e migration.
+
+**Continuam em TEXTO, exclusões declaradas** (a lista de contas continua na frase, mas
+sem botão e sem rascunho):
+
+| onde | por quê |
+|---|---|
+| destino de uma transferência (`counterparty_account`) | campo que o rascunho não sabe preencher — ver acima |
+| conta que paga a fatura, quando CITADA (`counterparty_account` de `pay_invoice`) | idem |
+| conta que paga a fatura, quando NÃO citada (`_conta_que_paga`, `app/tools/finance.py`) | é levantada dentro da tool, depois do gate, onde não há rascunho em que pendurar o clique; rotear o erro da `registry` para um rascunho é mecanismo novo |
+| **categoria** | é texto livre que o modelo normaliza, não registro cadastrado. Um seletor de 25 categorias dentro da conversa é exatamente o *"aparecer tudo"* que o dono do produto pediu para evitar |
 
 ## Proteção de propriedade (IDOR)
 
