@@ -631,8 +631,8 @@ def _pergunta_cartao(
     return {
         "ui": "list", "draft_id": str(draft_id), "body": corpo, "label": "Escolher opção",
         "rows": [
-            *[(f"{draft.CLICK_PREFIX}{draft_id}:c:{c['id']}", c["name"], _tipo_da_conta(c))
-              for c in mostrar],
+            *[(f"{draft.CLICK_PREFIX}{draft_id}:c:{c['id']}", c["name"],
+               _tipo_da_conta(c, so_cartoes=so_cartoes)) for c in mostrar],
             *extras_linha,
         ],
         "text": texto,
@@ -653,12 +653,17 @@ _TIPOS = {
 }
 
 
-def _tipo_da_conta(conta: dict) -> str:
-    """O tipo por extenso, com o dia de fechamento quando ele decide a fatura."""
-    tipo = _TIPOS.get(conta.get("type") or "", "")
-    if conta.get("type") == "credit_card" and conta.get("closing_day"):
-        return f"{tipo} · fecha dia {conta['closing_day']}"
-    return tipo
+def _tipo_da_conta(conta: dict, *, so_cartoes: bool = False) -> str:
+    """O tipo por extenso, com o dia de fechamento quando ele decide a fatura.
+
+    Numa lista só de cartões o tipo SOME: escrever "Cartão de crédito" em toda
+    linha de uma pergunta que já diz "em qual cartão" é a mesma palavra três
+    vezes. Lá sobra o que distingue um cartão do outro, que é o fechamento.
+    """
+    cartao = conta.get("type") == "credit_card"
+    tipo = "" if so_cartoes else _TIPOS.get(conta.get("type") or "", "")
+    fecha = f"fecha dia {conta['closing_day']}" if cartao and conta.get("closing_day") else ""
+    return " · ".join(p for p in (tipo, fecha) if p)
 
 
 async def _resposta_do_estado(sessao: dict, estado: dict, thread: str) -> str | dict:
@@ -685,6 +690,19 @@ async def _resposta_do_estado(sessao: dict, estado: dict, thread: str) -> str | 
                 rep["body"] = f"{rep.get('body', '')}\n\n{lembr}".strip()
                 rep["text"] = f"{rep.get('text', '')}\n\n{lembr}".strip()
                 estado = {**estado, "reply": rep}
+            elif antigo.get("slot") == "account":
+                # ⚠️ **O lembrete de conta volta com a LISTA, não como texto.**
+                # O caso que mostrou isso: a pessoa pediu para criar o cartão
+                # *itau* no meio da compra, o cadastro terminou e a resposta era
+                # *"é só me mandar o cartão quando quiser"* — sem nada para
+                # tocar, e sem o cartão recém-criado à vista. A lista é relida
+                # AGORA, então ela já traz o que acabou de nascer.
+                so_cartoes = _so_cartoes(antigo.get("action"))
+                contas = await db.accounts(sessao["workspace_id"], only_cards=so_cartoes)
+                corpo = f"{rep}\n\n{lembr}".strip() if isinstance(rep, str) and rep else lembr
+                return _pergunta_cartao(
+                    antigo["id"], contas, corpo, so_cartoes=so_cartoes
+                )
             elif isinstance(rep, str) and rep:
                 estado = {**estado, "reply": f"{rep}\n\n{lembr}".strip()}
             elif not rep:

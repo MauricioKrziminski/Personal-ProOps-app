@@ -221,3 +221,47 @@ def test_o_erro_de_conta_vira_rascunho_com_a_lista_de_contas():
     assert rascunho["slot"] == "account"
     assert rascunho["action"]["account"] == "bradesco"
     assert rascunho["raw_text"] == estado["text"]
+
+
+# ---------------------------------------------------------------------------
+# a linha diz se é cartão ou conta
+# ---------------------------------------------------------------------------
+
+
+def test_lista_mista_escreve_o_tipo_de_cada_conta():
+    """Numa lista, um cartão e uma conta corrente têm a MESMA cara.
+
+    Foi assim que um salário de R$ 4.000 foi lançado dentro da fatura pelo app
+    em 09/09/2026 (*"aparece só nubank e eu achei que era a conta corrente
+    nubank e nao cartao nubank"*). A resposta de lá foi separar os dois por
+    PALAVRA, além do nome; aqui a linha já tem onde escrever isso.
+    """
+    from app import conversation
+
+    linhas = [
+        {"id": "a1", "name": "Nubank", "type": "credit_card", "closing_day": 3},
+        {"id": "a2", "name": "Nubank", "type": "checking"},
+    ]
+    spec = conversation._pergunta_cartao("d1", linhas, "Qual é a conta?", so_cartoes=False)
+    assert [r[2] for r in spec["rows"][:2]] == [
+        "Cartão de crédito · fecha dia 3",
+        "Conta corrente",
+    ]
+
+
+def test_lista_so_de_cartoes_nao_repete_a_palavra_cartao():
+    """O tipo em toda linha de uma pergunta que já diz "em qual cartão" é a
+    mesma palavra três vezes; o que distingue um cartão do outro é o
+    fechamento, que é o dado que decide em qual fatura a compra cai."""
+    from app import conversation
+
+    linhas = [
+        {"id": "a1", "name": "Nubank", "type": "credit_card", "closing_day": 3},
+        {"id": "a2", "name": "BB", "type": "credit_card", "closing_day": 31},
+    ]
+    spec = conversation._pergunta_cartao("d1", linhas, "Em qual cartão?", so_cartoes=True)
+    assert [r[2] for r in spec["rows"][:2]] == ["fecha dia 3", "fecha dia 31"]
+    # "É financiamento" só existe na pergunta de CARTÃO
+    assert any("financiamento" in r[1] for r in spec["rows"])
+    sem_cartao = conversation._pergunta_cartao("d1", linhas, "Qual conta?", so_cartoes=False)
+    assert not any("financiamento" in r[1] for r in sem_cartao["rows"])
