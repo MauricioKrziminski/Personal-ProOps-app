@@ -1,5 +1,6 @@
 import { createContext, forwardRef, useContext, useEffect, useRef, useState } from 'react';
 import {
+  Platform,
   StyleSheet,
   TextInput,
   View,
@@ -19,8 +20,6 @@ import Animated, {
   withRepeat,
   withSequence,
   withTiming,
-  type EntryAnimationsValues,
-  type ExitAnimationsValues,
   type SharedValue,
 } from 'react-native-reanimated';
 
@@ -280,43 +279,63 @@ interface MoneyFieldProps {
 
 /**
  * Para onde os dígitos rolam: +1 quando o valor cresce (o novo entra por baixo), −1 quando
- * diminui (entra por cima).
- *
- * ⚠️ É um valor de MÓDULO, e não prop, de propósito: a animação de saída é escolhida quando o
- * dígito velho desmonta, e ele desmonta com as props do render ANTERIOR — a direção que ele
- * conhece é a da tecla que o criou. Lida aqui, dentro do worklet, ela é a da tecla de agora. Só
- * um campo de valor é digitado por vez, então compartilhar não mistura nada.
+ * diminui (entra por cima). Um valor de MÓDULO, gravado no handler da tecla antes do render:
+ * só um campo de valor é digitado por vez, então compartilhar não mistura nada.
  */
 const direcao = makeMutable(1);
 const ROLA = 0.62;
 
-function entraDigito(valores: EntryAnimationsValues) {
-  'worklet';
-  return {
-    initialValues: { opacity: 0, transform: [{ translateY: direcao.value * valores.targetHeight * ROLA }] },
-    animations: {
-      opacity: withTiming(1, { duration: 160 }),
-      transform: [{ translateY: withTiming(0, { duration: 260, easing: Easing.out(Easing.cubic) }) }],
-    },
-  };
-}
+/**
+ * Uma casa do odômetro: o dígito que sai e o que entra, trocados por `transform`.
+ *
+ * ⚠️ **Não é animação de layout (`entering`/`exiting`), e isso foi MEDIDO** (16/09/2026). Com uma
+ * chave por dígito e `exiting`, o Android nunca terminava a saída: os dígitos velhos ficavam por
+ * cima dos novos para sempre ("0,45" com um "0,04" fantasma). Cada posição é uma casa fixa que
+ * guarda o dígito anterior e o atual, e a troca é um valor de 0 a 1 — igual nas duas plataformas.
+ */
+function Digito({ ch, cor, animar }: { ch: string; cor: string; animar: boolean }) {
+  const reduzido = useReducedMotion();
+  const [atual, setAtual] = useState(ch);
+  const [antigo, setAntigo] = useState<string | null>(animar ? '' : null);
+  // Estado derivado da prop, ajustado no render (o padrão do React para "valor anterior").
+  if (ch !== atual) {
+    setAntigo(atual);
+    setAtual(ch);
+  }
+  const t = useSharedValue(animar && !reduzido ? 0 : 1);
+  useEffect(() => {
+    if (antigo === null || reduzido) {
+      t.set(1);
+      return;
+    }
+    t.set(0);
+    t.set(withTiming(1, { duration: 260, easing: Easing.out(Easing.cubic) }));
+  }, [atual, antigo, reduzido, t]);
 
-function saiDigito(valores: ExitAnimationsValues) {
-  'worklet';
-  return {
-    initialValues: { opacity: 1, transform: [{ translateY: 0 }] },
-    animations: {
-      opacity: withTiming(0, { duration: 140 }),
-      transform: [
-        {
-          translateY: withTiming(-direcao.value * valores.currentHeight * ROLA, {
-            duration: 220,
-            easing: Easing.out(Easing.cubic),
-          }),
-        },
-      ],
-    },
-  };
+  const altura = Type.money.lineHeight;
+  const entra = useAnimatedStyle(() => ({
+    opacity: t.get(),
+    transform: [{ translateY: (1 - t.get()) * direcao.value * altura * ROLA }],
+  }));
+  const sai = useAnimatedStyle(() => ({
+    opacity: 1 - t.get(),
+    transform: [{ translateY: -t.get() * direcao.value * altura * ROLA }],
+  }));
+  const estilo = [Type.money, tabular, styles.digito, { color: cor }];
+
+  return (
+    <View style={styles.casa}>
+      {/*
+        O dígito que entra fica NO FLUXO e dá a largura da casa; só o que sai flutua por cima.
+        Com uma terceira camada invisível só para medir, o Android desenhava as duas deslocadas —
+        "0,00" dobrado logo no primeiro quadro.
+      */}
+      <Animated.Text style={[estilo, entra]}>{atual}</Animated.Text>
+      {antigo ? (
+        <Animated.Text style={[estilo, styles.sobre, sai]}>{antigo}</Animated.Text>
+      ) : null}
+    </View>
+  );
 }
 
 /**
@@ -325,10 +344,11 @@ function saiDigito(valores: ExitAnimationsValues) {
  *
  * ## O odômetro
  *
- * O número que se vê não é o texto do `TextInput`: é uma fileira de dígitos, cada um identificado
- * pela POSIÇÃO a partir da direita e pelo próprio valor. Quando uma tecla muda um dígito, o velho
- * sai rolando e o novo entra — por baixo se o valor cresceu, por cima se diminuiu —, e os que não
- * mudaram ficam parados. O `TextInput` continua por cima, transparente, e é ele que recebe teclado,
+ * O número que se vê não é o texto do `TextInput`: é uma fileira de casas, uma por POSIÇÃO a
+ * partir da direita (a vírgula e o ponto caem sempre na mesma posição). Quando uma tecla muda o
+ * dígito de uma casa, o velho sai rolando e o novo entra — por baixo se o valor cresceu, por cima
+ * se diminuiu —, e as casas que não mudaram ficam paradas. Casa nova (o número ganhou um dígito)
+ * entra rolando; as do primeiro render, não. O `TextInput` continua por cima, transparente, e é ele que recebe teclado,
  * acessibilidade e foco.
  *
  * ⚠️ **O cursor é VISÍVEL e fica no fim.** A queixa de 15/09/2026 foi literal: *"não tem o cursor
@@ -342,6 +362,10 @@ export function MoneyField({ valueCents, onChangeCents, autoFocus, invalid, read
   const reduzido = useReducedMotion();
   const { focar, desfocar, moldura } = useCaixa(invalid);
   const [focado, setFocado] = useState(false);
+  /** Casas que nascem depois do primeiro render entram rolando; as iniciais, não. */
+  const [iniciais] = useState(() =>
+    (valueCents / 100).toLocaleString('pt-BR', { minimumFractionDigits: 2 }).length
+  );
   const reais = (valueCents / 100).toLocaleString('pt-BR', {
     minimumFractionDigits: 2,
     maximumFractionDigits: 2,
@@ -380,15 +404,7 @@ export function MoneyField({ valueCents, onChangeCents, autoFocus, invalid, read
       <View style={styles.digitos} pointerEvents="none">
         {caracteres.map((c, i) => {
           const posicao = caracteres.length - 1 - i;
-          return (
-            <Animated.Text
-              key={`${posicao}:${c}`}
-              entering={reduzido ? undefined : entraDigito}
-              exiting={reduzido ? undefined : saiDigito}
-              style={[Type.money, tabular, styles.digito, { color: cor }]}>
-              {c}
-            </Animated.Text>
-          );
+          return <Digito key={posicao} ch={c} cor={cor} animar={posicao >= iniciais} />;
         })}
         {focado && !readOnly ? (
           <Animated.View style={[styles.cursor, { backgroundColor: theme.tintFill }, cursor]} />
@@ -488,17 +504,27 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
   },
   digito: { flexShrink: 0 },
+  casa: { flexShrink: 0 },
+  sobre: { position: 'absolute', left: 0, top: 0 },
   cursor: {
     width: 2,
     height: Type.money.fontSize * 0.8,
     marginLeft: 3,
     borderRadius: 1,
   },
-  /** O input de verdade: cobre a caixa inteira, invisível, e é ele que recebe o toque. */
+  /**
+   * O input de verdade: cobre a caixa inteira, invisível, e é ele que recebe o toque.
+   *
+   * ⚠️ A invisibilidade é por OPACIDADE, e diferente por plataforma — a mesma régua do
+   * `OtpInput`. `color: 'transparent'` não esconde o texto no Android (o "0,00" do input saía por
+   * cima dos dígitos, em outra fonte), e opacidade 0 lá faz o input perder o toque; 0,01 mantém a
+   * área ativa sem nada visível.
+   */
   captura: {
     ...StyleSheet.absoluteFill,
     color: 'transparent',
     textAlign: 'right',
     fontSize: Type.money.fontSize,
+    opacity: Platform.OS === 'android' ? 0.01 : 0,
   },
 });
