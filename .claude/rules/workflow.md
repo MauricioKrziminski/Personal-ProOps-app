@@ -93,7 +93,21 @@
   `./scripts/setup-gcp.sh` sem argumento nenhum fazia deploy em produção sem perguntar nada.
 - Edge Functions: **não existem mais** (09/09/2026). Não há o que deployar; o que era delas é
   rota do agente.
-- App: builds via EAS (`eas.json`: development/preview/production).
+- App: builds via EAS (`eas.json`: development/preview/staging/distribution/production).
+
+  ⚠️ **A TAG é o build — não são dois passos.** `publish-android-release.yml` dispara em
+  `push` de tag `v*`: compila o APK, confere a assinatura contra `EXPECTED_SIGNER_SHA256` e
+  publica a release (APK + `update.json` + `native-compatibility.json`) no repositório de
+  distribuição. Ninguém roda `eas build` à mão para soltar versão. Leva ~10 min.
+
+  A receita é sempre a mesma: portão verde (`tsc`, `lint`, `npm test`, `ruff`, `pytest`) →
+  `app.json.version` para a nova → commit `chore: vX.Y.Z` → `push origin main` → tag LEVE nesse
+  commit → `push origin vX.Y.Z`.
+
+  ⚠️ **`runtimeVersion.policy` é `appVersion`, então bump de versão FECHA a porta do OTA.** Um
+  update publicado como 1.3.31 não alcança quem está em 1.3.30 — para isso existe
+  `publish-android-ota.yml`, que é `workflow_dispatch` e recebe a `native_tag` de uma nativa já
+  publicada. Mudança só de JS sem bump = OTA; com bump = build.
 - Fluxo WhatsApp ponta-a-ponta: usar o checklist do comando `/verify-whatsapp`.
 
 ## Observabilidade
