@@ -656,7 +656,7 @@ export default function FinanceScreen() {
                       {fimDoCiclo ? isoToBR(fimDoCiclo).slice(0, 5) : ''}
                     </ThemedText>
                   </View>
-                  <Sparkline values={series} width={chartWidth} height={48} />
+                  <Sparkline values={series} width={chartWidth} height={48} onHero />
                 </>
               ) : undefined
             }
@@ -1106,7 +1106,7 @@ export default function FinanceScreen() {
                   carrega a conta que o gráfico não faz sozinho: um gráfico de barras responde
                   "como foi variando", e ninguém subtrai duas barras de cabeça.
                 */}
-                <View style={[styles.cashRodape, { backgroundColor: theme.heroFooter }]}>
+                <View style={[styles.cashRodape, { backgroundColor: theme.cardFooter }]}>
                   <ThemedText type="footnote" themeColor="textSecondary">
                     {`Sobrou em ${monthShort(meses[meses.length - 1].month.slice(0, 7))}`}
                   </ThemedText>

@@ -1,7 +1,11 @@
-import { useEffect } from 'react';
-import { StyleSheet, View, type DimensionValue } from 'react-native';
+import { useEffect, useRef } from 'react';
+import { StyleSheet, View, useWindowDimensions, type DimensionValue } from 'react-native';
 import Animated, {
+  Easing,
+  cancelAnimation,
+  makeMutable,
   useAnimatedStyle,
+  useReducedMotion,
   useSharedValue,
   withRepeat,
   withTiming,
@@ -17,36 +21,91 @@ interface SkeletonProps {
 }
 
 /**
+ * O relógio da varredura — UM para a tela inteira.
+ *
+ * Cada bloco lê a mesma fase e desconta a própria posição na janela, então a faixa atravessa a
+ * tela como uma linha só, passando por todos os blocos na ordem — em vez de cada um piscar no seu
+ * ritmo. O relógio liga com o primeiro esqueleto montado e desliga com o último.
+ */
+const relogio = makeMutable(0);
+let montados = 0;
+const VARREDURA_MS = 1500;
+
+function ligar() {
+  montados += 1;
+  if (montados === 1) {
+    relogio.value = 0;
+    relogio.value = withRepeat(
+      withTiming(1, { duration: VARREDURA_MS, easing: Easing.inOut(Easing.quad) }),
+      -1,
+      false
+    );
+  }
+}
+
+function desligar() {
+  montados = Math.max(0, montados - 1);
+  if (montados === 0) cancelAnimation(relogio);
+}
+
+/**
  * Bloco de carregamento.
  *
  * Skeleton só existe se tiver **a forma do conteúdo final** — spinner de tela cheia para
  * atualização parcial é reprovação na regra de design §7. Componha vários para desenhar a tela.
+ *
+ * ## A varredura
+ *
+ * O pisca de opacidade virou uma FAIXA chapada de borda dura, inclinada, que atravessa o bloco —
+ * a leitura de um scanner, no vocabulário do Concreto (sem gradiente). Com Reduce Motion o bloco
+ * fica parado.
  */
 export function Skeleton({ width = '100%', height = 16, radius = Radius.xs }: SkeletonProps) {
   const theme = useTheme();
-  const pulse = useSharedValue(0.4);
+  const reduzido = useReducedMotion();
+  const { width: tela } = useWindowDimensions();
+  const caixa = useRef<View>(null);
+  /** A posição do bloco na janela, medida uma vez: é ela que sincroniza a faixa entre blocos. */
+  const origem = useSharedValue(0);
+  const faixa = tela * 0.35;
 
   useEffect(() => {
-    pulse.set(withRepeat(withTiming(0.9, { duration: 700 }), -1, true));
-  }, [pulse]);
+    if (reduzido) return;
+    ligar();
+    return desligar;
+  }, [reduzido]);
 
-  const animated = useAnimatedStyle(() => ({ opacity: pulse.get() }));
+  const varredura = useAnimatedStyle(() => ({
+    transform: [
+      { translateX: -faixa + relogio.value * (tela + faixa * 2) - origem.value },
+      { skewX: '-14deg' },
+    ],
+  }));
 
   return (
-    <Animated.View
+    <View
+      ref={caixa}
+      onLayout={() => caixa.current?.measureInWindow((x) => origem.set(x))}
       accessibilityElementsHidden
       importantForAccessibility="no-hide-descendants"
-      style={[
-        animated,
-        {
-          width,
-          height,
-          borderRadius: radius,
-          borderCurve: 'continuous',
-          backgroundColor: theme.backgroundElement,
-        },
-      ]}
-    />
+      style={{
+        width,
+        height,
+        borderRadius: radius,
+        borderCurve: 'continuous',
+        backgroundColor: theme.backgroundElement,
+        overflow: 'hidden',
+      }}>
+      {reduzido ? null : (
+        <Animated.View
+          style={[
+            styles.faixa,
+            { width: faixa, backgroundColor: theme.backgroundSelected },
+            varredura,
+          ]}
+        />
+      )}
+    </View>
   );
 }
 
@@ -61,6 +120,7 @@ export function SkeletonRow() {
 }
 
 const styles = StyleSheet.create({
+  faixa: { position: 'absolute', top: -4, bottom: -4, left: 0 },
   row: {
     gap: Space.sm,
     paddingVertical: Space.md,
@@ -73,7 +133,7 @@ const styles = StyleSheet.create({
     padding: Space.gutter,
     borderRadius: Radius.md,
     borderCurve: 'continuous',
-    borderWidth: StyleSheet.hairlineWidth,
+    borderWidth: 1,
   },
   /** Título de seção + corpo — o `gap` de dentro de um bloco (`Space.sm`), como no `Screen`. */
   bloco: { gap: Space.sm },
@@ -82,7 +142,7 @@ const styles = StyleSheet.create({
     padding: Space.lg,
     borderRadius: Radius.md,
     borderCurve: 'continuous',
-    borderWidth: StyleSheet.hairlineWidth,
+    borderWidth: 1,
   },
   pilha: { paddingTop: Space.sm },
   atras: {

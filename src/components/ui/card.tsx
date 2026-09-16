@@ -1,11 +1,11 @@
-import { StyleSheet, View, type StyleProp, type ViewStyle } from 'react-native';
+import { View, type StyleProp, type ViewStyle } from 'react-native';
 
 import { Elevation, Radius, Space, type ElevationLevel } from '@/design/tokens';
 import { useTheme, useScheme } from '@/hooks/use-theme';
 
 interface CardProps {
   children: React.ReactNode;
-  /** `raised` é o padrão de card de conteúdo; `overlay` só para sheet/popover. */
+  /** Card de conteúdo é chapado (`none`); `floating`/`overlay` só para o que flutua. */
   elevation?: ElevationLevel;
   style?: StyleProp<ViewStyle>;
 }
@@ -13,11 +13,11 @@ interface CardProps {
 /**
  * Card opaco — a superfície PADRÃO do app.
  *
- * `GlassCard` fica reservado para a CHROME. O destaque de uma raiz de aba é o `HeroPanel`
- * (tinta chapada); o de uma tela secundária é este `Card`
- * (`.claude/rules/design.md` §1). Card de lista é este aqui.
+ * No Concreto o card é CHAPADO: a hierarquia sai do fio de 1px e do degrau de cor, não de
+ * sombra. O destaque de uma raiz de aba é o `HeroPanel` (o negativo da página); o de uma tela
+ * secundária é este `Card`. Card de lista é este aqui.
  */
-export function Card({ children, elevation = 'raised', style }: CardProps) {
+export function Card({ children, elevation = 'none', style }: CardProps) {
   const theme = useTheme();
   const scheme = useScheme();
 
@@ -28,9 +28,9 @@ export function Card({ children, elevation = 'raised', style }: CardProps) {
           backgroundColor: theme.surface,
           borderRadius: Radius.md,
           borderCurve: 'continuous',
-          // O contorno de 1px é a assinatura do design: no fundo quase-preto a sombra some, e sem
-          // ele o card não tem onde terminar — era o que fazia a tela ler como um bloco só.
-          borderWidth: StyleSheet.hairlineWidth,
+          // O fio de 1px é a assinatura do Concreto: sem sombra, é ele que diz onde o card
+          // termina. 1dp e não `hairlineWidth`, que é um pixel físico e some em escala.
+          borderWidth: 1,
           borderColor: theme.cardBorder,
           padding: Space.lg,
           boxShadow: Elevation[scheme][elevation],

@@ -1,14 +1,17 @@
 import { useEffect, useMemo } from 'react';
 import { View } from 'react-native';
 import Animated, {
+  Easing,
   useAnimatedStyle,
+  useDerivedValue,
   useReducedMotion,
   useSharedValue,
   withDelay,
   withSpring,
   withTiming,
+  type SharedValue,
 } from 'react-native-reanimated';
-import { Circle, Line, LinearGradient, Path, Skia, vec } from '@shopify/react-native-skia';
+import { DashPathEffect, Group, Line, Path, Rect, Skia, vec } from '@shopify/react-native-skia';
 
 import { SkiaCanvas } from '@/components/ui/skia-canvas';
 import { type ThemeColor } from '@/constants/theme';
@@ -32,6 +35,11 @@ interface SparklineProps {
    * `0` (padrão) desenha exatamente o que desenhava antes.
    */
   pastCount?: number;
+  /**
+   * O gráfico mora DENTRO do herói, que é o negativo da página: as cores saem de `onHero*`.
+   * Com as cores normais, no escuro a linha verde clara ficava sobre o herói de papel e sumia.
+   */
+  onHero?: boolean;
 }
 
 /** Metade do traço + folga, para a linha não ser cortada no topo e no fundo do canvas. */
@@ -44,6 +52,13 @@ const PAD = 3;
  */
 const MIN_SPAN_RATIO = 0.05;
 
+/** Quanto a linha leva para se desenhar. */
+const DESENHO_MS = 900;
+/** Espaço entre as linhas da hachura. */
+const HACHURA = 5;
+/** Meio lado do losango de "hoje". */
+const R = 4.5;
+
 /**
  * Linha de tendência.
  *
@@ -54,6 +69,12 @@ const MIN_SPAN_RATIO = 0.05;
  *
  * A cor segue o sinal do último ponto: verde acima de zero, `danger` abaixo. É a leitura que a
  * pessoa faz em meio segundo — "vou ficar no vermelho?".
+ *
+ * ## O movimento
+ *
+ * A linha se DESENHA (o `end` do caminho vai de 0 a 1): o passado primeiro, o futuro depois, a
+ * hachura entra quando já há forma, e o marcador de hoje aparece no fim com um pulso único. Só
+ * redesenha quando a série muda de verdade.
  */
 export function Sparkline({
   values,
@@ -61,23 +82,13 @@ export function Sparkline({
   height = 56,
   showZero = false,
   pastCount = 0,
+  onHero = false,
 }: SparklineProps) {
   const theme = useTheme();
+  const reduzido = useReducedMotion();
 
-  const { line, past, splitX, area, zeroY, zeroVisible, negative, flat, pinY, endY } = useMemo(() => {
-    const empty = {
-      line: null,
-      past: null,
-      splitX: null as number | null,
-      area: null,
-      zeroY: 0,
-      zeroVisible: false,
-      negative: false,
-      flat: true,
-      pinY: 0,
-      endY: 0,
-    };
-    if (values.length < 2 || width <= 0) return empty;
+  const geo = useMemo(() => {
+    if (values.length < 2 || width <= 0) return null;
 
     const dataMin = Math.min(...values);
     const dataMax = Math.max(...values);
@@ -97,12 +108,9 @@ export function Sparkline({
     const temPassado = corte >= 2 && corte < values.length;
     const inicioFuturo = temPassado ? corte - 1 : 0;
 
-    // `Skia.Path.Make()` + `moveTo/lineTo` está depreciado no Skia 2.6 e some numa versão futura.
-    // O traço cheio começa no HOJE: desenhar a série inteira e repintar o passado por cima só
-    // deixaria o passado mais escuro, nunca mais fraco.
-    const stroke = Skia.PathBuilder.Make();
-    stroke.moveTo(inicioFuturo * step, y(values[inicioFuturo]));
-    for (let i = inicioFuturo + 1; i < values.length; i++) stroke.lineTo(i * step, y(values[i]));
+    const futuro = Skia.PathBuilder.Make();
+    futuro.moveTo(inicioFuturo * step, y(values[inicioFuturo]));
+    for (let i = inicioFuturo + 1; i < values.length; i++) futuro.lineTo(i * step, y(values[i]));
 
     let passado = null;
     if (temPassado) {
@@ -112,122 +120,163 @@ export function Sparkline({
       passado = p.detach();
     }
 
-    // Área preenchida: é ela que dá corpo ao gráfico. Uma linha de 2px sozinha, na largura de um
-    // card, lê como régua.
-    const fill = Skia.PathBuilder.Make();
-    fill.moveTo(0, height);
-    fill.lineTo(0, y(values[0]));
-    for (let i = 1; i < values.length; i++) fill.lineTo(i * step, y(values[i]));
-    fill.lineTo(width, height);
-    fill.close();
+    // A área embaixo da curva: é ela que dá corpo ao gráfico. Uma linha de 2px sozinha, na
+    // largura de um card, lê como régua.
+    const area = Skia.PathBuilder.Make();
+    area.moveTo(0, height);
+    area.lineTo(0, y(values[0]));
+    for (let i = 1; i < values.length; i++) area.lineTo(i * step, y(values[i]));
+    area.lineTo(width, height);
+    area.close();
 
+    // A hachura: diagonais a 45° cobrindo o canvas, recortadas pela área.
+    const hachura = Skia.PathBuilder.Make();
+    for (let k = -height; k < width; k += HACHURA) {
+      hachura.moveTo(k, height);
+      hachura.lineTo(k + height, 0);
+    }
+
+    const pinoX = temPassado ? (corte - 1) * step : width;
     return {
-      // Sem variação nenhuma, a área vira um retângulo cheio que finge ter forma. A linha sozinha
-      // diz a verdade: "não mudou".
-      flat: dataMax === dataMin,
-      line: stroke.detach(),
-      past: passado,
-      splitX: temPassado ? (corte - 1) * step : null,
-      area: fill.detach(),
+      // Sem variação nenhuma, a área vira um retângulo cheio que finge ter forma. A linha
+      // sozinha diz a verdade: "não mudou".
+      plano: dataMax === dataMin,
+      temPassado,
+      futuro: futuro.detach(),
+      passado,
+      area: area.detach(),
+      hachura: hachura.detach(),
       zeroY: y(0),
-      zeroVisible: lo <= 0 && hi >= 0,
-      negative: values[values.length - 1] < 0,
-      // A altura do alfinete tem que sair da MESMA escala da curva: recalcular `y` fora daqui
-      // daria um ponto flutuando ao lado da linha assim que o domínio mudasse.
-      pinY: y(values[inicioFuturo]),
-      endY: y(values[values.length - 1]),
+      zeroVisivel: lo <= 0 && hi >= 0,
+      negativo: values[values.length - 1] < 0,
+      // O `x` é preso dentro do canvas: na ponta exata o Skia cortaria o losango ao meio.
+      pinoX: Math.min(Math.max(pinoX, R + 1), width - R - 1),
+      // A altura do marcador sai da MESMA escala da curva.
+      pinoY: temPassado ? y(values[inicioFuturo]) : y(values[values.length - 1]),
     };
   }, [values, width, height, pastCount]);
 
-  if (!line) return <View style={{ width, height }} />;
-
-  const color = negative ? theme.danger : theme.success;
   /**
-   * O ponto de "hoje". Sem passado marcado, é a ponta da série — que é onde o olho já vai.
-   *
-   * O `x` é preso dentro do canvas pelo raio do disco: na ponta exata o Skia corta o alfinete ao
-   * meio, e meia bolinha na borda lê como defeito de render, não como marcador.
+   * O traço se desenha de novo quando a SÉRIE muda — não a cada render. A assinatura é o que
+   * decide: um array novo com os mesmos números não é mudança nenhuma.
    */
-  const R = 4.5;
-  const pinX = Math.min(Math.max(splitX ?? width, R), width - R);
-  const pinY2 = splitX !== null ? pinY : endY;
-  /** O degradê do traço começa no alfinete; sem passado marcado ele atravessa o gráfico todo. */
-  const gradStart = splitX ?? 0;
+  const assinatura = values.join(',');
+  const desenho = useSharedValue(reduzido ? 1 : 0);
+  const anel = useSharedValue(0);
+  useEffect(() => {
+    if (reduzido) {
+      desenho.set(1);
+      return;
+    }
+    desenho.set(0);
+    anel.set(0);
+    desenho.set(
+      withTiming(1, { duration: DESENHO_MS, easing: Easing.out(Easing.cubic) }, (fim) => {
+        // O pulso único do marcador: "é aqui", uma vez, e para.
+        if (fim) anel.set(withTiming(1, { duration: 700, easing: Easing.out(Easing.quad) }));
+      })
+    );
+  }, [assinatura, width, height, reduzido, desenho, anel]);
+
+  const temPassado = geo?.temPassado ?? false;
+  const fimPassado = useDerivedValue(() => (temPassado ? Math.min(1, desenho.value * 2) : 1));
+  const fimFuturo = useDerivedValue(() =>
+    temPassado ? Math.max(0, desenho.value * 2 - 1) : desenho.value
+  );
+  const opacidadeArea = useDerivedValue(() => Math.max(0, (desenho.value - 0.35) / 0.65));
+  const opacidadePino = useDerivedValue(() => Math.max(0, (desenho.value - 0.8) / 0.2));
+  const px = geo?.pinoX ?? 0;
+  const py = geo?.pinoY ?? 0;
+  const anelTransform = useDerivedValue(() => [{ rotate: Math.PI / 4 }, { scale: 1 + anel.value * 1.6 }]);
+  const anelOpacidade = useDerivedValue(() => (anel.value > 0 && anel.value < 1 ? (1 - anel.value) * 0.7 : 0));
+
+  if (!geo) return <View style={{ width, height }} />;
+
+  const cor = geo.negativo
+    ? theme[onHero ? 'onHeroDanger' : 'danger']
+    : theme[onHero ? 'onHeroSuccess' : 'success'];
+  const corPassado = theme[onHero ? 'onHeroMuted' : 'textSecondary'];
+  const corPino = theme[onHero ? 'onHero' : 'text'];
+  const corFuro = theme[onHero ? 'heroSurface' : 'surface'];
+  const corZero = theme[onHero ? 'heroSeparator' : 'separator'];
+  const losango = { x: px - R, y: py - R, width: R * 2, height: R * 2 };
+  const origem = vec(px, py);
 
   return (
     <SkiaCanvas style={{ width, height }}>
       {/*
-        A área é um GRADIENTE, não um preenchimento chapado (`from secondary/0.35 to /0`).
-        Chapada com 14% ela lia como uma sombra retangular embaixo da linha; com a queda para
-        transparente ela lê como luz saindo da curva — que é o que faz o gráfico do export ter
-        volume num card de 48px de altura.
+        A área é HACHURA, não mancha. O gradiente do desenho anterior lia como luz; no Concreto a
+        mesma informação ("isto é volume") vem de linhas finas, como gravura — e continua
+        chapada. Entra depois da linha, quando já há forma para preencher.
       */}
-      {flat ? null : (
-        <Path path={area!} style="fill">
-          <LinearGradient
-            start={vec(0, 0)}
-            end={vec(0, height)}
-            colors={[`${color}59`, `${color}00`]}
-          />
-        </Path>
+      {geo.plano ? null : (
+        <Group clip={geo.area} opacity={opacidadeArea}>
+          <Path path={geo.hachura} color={cor} style="stroke" strokeWidth={1} opacity={0.4} />
+        </Group>
       )}
-      {showZero && zeroVisible ? (
-        <Line
-          p1={vec(0, zeroY)}
-          p2={vec(width, zeroY)}
-          color={theme.separator}
-          strokeWidth={1}
-          style="stroke"
-        />
+      {showZero && geo.zeroVisivel ? (
+        <Line p1={vec(0, geo.zeroY)} p2={vec(width, geo.zeroY)} color={corZero} strokeWidth={1} style="stroke">
+          <DashPathEffect intervals={[2, 3]} />
+        </Line>
       ) : null}
       {/* Histórico: mesma forma, sem cor. O futuro é o que a tela afirma; o passado é contexto. */}
-      {past ? (
+      {geo.passado ? (
         <Path
-          path={past}
-          color={theme.textSecondary}
+          path={geo.passado}
+          color={corPassado}
           style="stroke"
-          strokeWidth={2.25}
-          strokeCap="round"
-          strokeJoin="round"
-          opacity={0.45}
+          strokeWidth={2}
+          strokeCap="square"
+          strokeJoin="miter"
+          end={fimPassado}
         />
       ) : null}
       {/*
-        O traço do futuro sai do cinza do texto e CHEGA no accent — o `strokeGradient` do export.
-        Uma cor só faz a linha inteira afirmar com a mesma confiança; o degradê diz onde a
-        projeção está indo.
+        O futuro, na cor do sinal. Com passado marcado ele é TRACEJADO: é projeção, e o traço
+        cheio fica para o que já aconteceu — a diferença que o dono do produto pediu que o gráfico
+        explicasse.
       */}
-      <Path path={line} style="stroke" strokeWidth={2.25} strokeCap="round" strokeJoin="round">
-        <LinearGradient start={vec(gradStart, 0)} end={vec(width, 0)} colors={[theme.text, color]} />
+      <Path
+        path={geo.futuro}
+        color={cor}
+        style="stroke"
+        strokeWidth={2.25}
+        strokeCap="square"
+        strokeJoin="miter"
+        end={fimFuturo}>
+        {geo.temPassado ? <DashPathEffect intervals={[6, 4]} /> : null}
       </Path>
-      {/* O alfinete do dia de hoje: disco na cor do texto com o miolo vazado na cor do fundo. */}
-      <Circle cx={pinX} cy={pinY2} r={R} color={theme.text} />
-      <Circle cx={pinX} cy={pinY2} r={1.75} color={theme.heroBottom} />
+      {/* "Hoje": um losango — o azulejo girado —, com o miolo vazado e um pulso único. */}
+      <Group transform={anelTransform} origin={origem} opacity={anelOpacidade}>
+        <Rect {...losango} color={cor} style="stroke" strokeWidth={1.5} />
+      </Group>
+      <Group transform={[{ rotate: Math.PI / 4 }]} origin={origem} opacity={opacidadePino}>
+        <Rect {...losango} color={corPino} />
+        <Rect x={px - 1.6} y={py - 1.6} width={3.2} height={3.2} color={corFuro} />
+      </Group>
     </SkiaCanvas>
   );
 }
 
 /**
- * Barra de progresso.
+ * Barra de progresso, em AZULEJOS.
+ *
+ * Dez peças com uma junta entre elas, que enchem em sequência: a proporção continua lida de uma
+ * vez (a junta é fina), e o enchimento ganha o ritmo do grid do Concreto em vez de um traço
+ * deslizando. Um valor compartilhado só governa as dez peças — cada uma lê a sua fatia dele.
  *
  * Anima com `scaleX` (não com `width`) para o movimento ficar no worklet e não disparar layout —
- * regra de movimento §5, que também é a que exige a animação: valor que salta é bug visual.
- */
-/**
- * Barra de progresso.
+ * e anima: valor que salta é bug visual.
  *
  * `tone` separa duas coisas que ANTES eram a mesma cor e não são a mesma informação:
  *
  * - **`tint`** é *estado* — quanto do orçamento já foi, quanto falta para a meta. Merece o
  *   accent, e `warning`/`danger` sobrescrevem quando o número passa do limite.
  * - **`data`** é *comparação* — "casa foi 44% do mês". Não há nada a fazer a respeito, é só a
- *   forma de ler a proporção.
- *
- * A distinção não existia enquanto o accent era azul: barra de dado em azul claro era discreta.
- * Com o accent monocromático ela virou **preto sólido de ponta a ponta**, e a lista de categorias
- * passou a ler como uma pilha de traços pesados que competia com os próprios valores. Dado não
- * grita; estado pode.
+ *   forma de ler a proporção. Dado não grita; estado pode.
  */
+const PECAS = 10;
+
 export function ProgressBar({
   value,
   max,
@@ -240,9 +289,7 @@ export function ProgressBar({
    * `data` é comparação (cinza), `tint` é estado que o usuário resolve (orçamento, meta).
    *
    * ⚠️ **`strong` é comparação que precisa de DOIS pesos.** Em "entrou × saiu" as duas barras
-   * comparam, então nenhuma delas é `tint` — gastar o accent ali o tira de ação e estado, que é
-   * a única alavanca de cor do app. Quem separa as duas é a CLARIDADE, que é a mesma decisão
-   * (e a mesma frase) do `CashBar` do Financeiro.
+   * comparam, então nenhuma delas é `tint` — quem separa as duas é a CLARIDADE.
    */
   tone?:
     | 'tint'
@@ -255,51 +302,60 @@ export function ProgressBar({
     | 'onHeroDanger'
     | 'onHeroWarning';
   /**
-   * A cor da PISTA (o que fica atrás do preenchimento).
-   *
-   * ⚠️ Dentro do painel de destaque, que é escuro nos DOIS temas, o padrão
-   * (`backgroundElement`) vira uma barra quase branca no tema claro — o mesmo defeito de §2 que
-   * entregava "um botão branco sólido com ícone branco dentro". Lá a pista é `heroChip`.
+   * A cor da PISTA (o que fica atrás do preenchimento). Dentro do herói, que é o negativo da
+   * página, a pista é `heroChip` — com a cor normal ela sumiria no bloco.
    */
   track?: ThemeColor;
 }) {
   const theme = useTheme();
+  const reduzido = useReducedMotion();
   const pct = max > 0 ? Math.min(1, Math.max(0, value / max)) : 0;
-  const progress = useSharedValue(pct);
+  const progresso = useSharedValue(reduzido ? pct : 0);
 
   useEffect(() => {
-    progress.set(withTiming(pct, { duration: Motion.duration.slow, easing: Motion.easing.out }));
-  }, [pct, progress]);
+    progresso.set(reduzido ? pct : withSpring(pct, Motion.spring.encaixe));
+  }, [pct, progresso, reduzido]);
 
-  const animated = useAnimatedStyle(() => ({ transform: [{ scaleX: progress.get() }] }));
+  const cor =
+    tone === 'data' ? theme.textSecondary : tone === 'strong' ? theme.text : theme[tone as ThemeColor];
+  const pista = theme[track];
 
   return (
     <View
       accessibilityRole="progressbar"
       accessibilityValue={{ min: 0, max: 100, now: Math.round(pct * 100) }}
+      style={{ height: 6, flexDirection: 'row', gap: 2 }}>
+      {Array.from({ length: PECAS }, (_, i) => (
+        <Peca key={i} indice={i} progresso={progresso} cor={cor} pista={pista} />
+      ))}
+    </View>
+  );
+}
+
+function Peca({
+  indice,
+  progresso,
+  cor,
+  pista,
+}: {
+  indice: number;
+  progresso: SharedValue<number>;
+  cor: string;
+  pista: string;
+}) {
+  const cheio = useAnimatedStyle(() => ({
+    transform: [{ scaleX: Math.min(1, Math.max(0, progresso.get() * PECAS - indice)) }],
+  }));
+  return (
+    <View
       style={{
-        height: 6,
-        borderRadius: Radius.xs,
-        borderCurve: 'continuous',
-        backgroundColor: theme[track],
+        flex: 1,
+        backgroundColor: pista,
+        borderRadius: Radius.xs / 2,
         overflow: 'hidden',
       }}>
       <Animated.View
-        style={[
-          {
-            width: '100%',
-            height: '100%',
-            borderRadius: Radius.xs,
-            backgroundColor:
-              tone === 'data'
-                ? theme.textSecondary
-                : tone === 'strong'
-                  ? theme.text
-                  : theme[tone as ThemeColor],
-            transformOrigin: 'left',
-          },
-          animated,
-        ]}
+        style={[{ width: '100%', height: '100%', backgroundColor: cor, transformOrigin: 'left' }, cheio]}
       />
     </View>
   );

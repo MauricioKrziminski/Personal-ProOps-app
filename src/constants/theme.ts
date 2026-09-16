@@ -99,6 +99,13 @@ export const Colors = {
      * A tecla: o botão tem uma BASE um tom abaixo da face, que aparece na borda de baixo e some
      * quando a face afunda no toque. `keyFace`/`keyBase` são o par do botão secundário.
      */
+    /**
+     * A faixa de rodapé de um CARD comum, que sangra até as bordas — um degrau mais escuro que o
+     * card, nos dois temas. Não é `heroFooter`: aquele é o degrau DENTRO do herói, que é o negativo
+     * da página e por isso clareia no tema claro.
+     */
+    cardFooter: 'rgba(13, 13, 12, 0.05)',
+    cardFooterPress: 'rgba(13, 13, 12, 0.10)',
     tintDeep: '#1A2DAE',
     dangerDeep: '#7A1712',
     keyFace: '#FFFFFF',
@@ -148,6 +155,8 @@ export const Colors = {
     tileInk: '#0D0D0C',
     tileMotif: '#4B63FF',
     tilePaper: '#F2F3F1',
+    cardFooter: 'rgba(0, 0, 0, 0.30)',
+    cardFooterPress: 'rgba(0, 0, 0, 0.42)',
     tintDeep: '#2A3BB8',
     dangerDeep: '#9E4038',
     keyFace: '#2A2A27',

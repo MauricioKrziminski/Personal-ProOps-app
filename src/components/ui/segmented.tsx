@@ -6,6 +6,7 @@ import Animated, {
   useReducedMotion,
   useSharedValue,
   withSpring,
+  type SharedValue,
 } from 'react-native-reanimated';
 import * as Haptics from 'expo-haptics';
 
@@ -89,14 +90,6 @@ export function Segmented<T extends string>({ options, value, onChange }: Segmen
   /** A largura de uma célula para o ESTILO do bloco (comum, não animado). */
   const [celula, setCelula] = useState(0);
   const index = Math.max(0, options.findIndex((o) => o.value === value));
-  /**
-   * A mesma largura, num valor COMPARTILHADO, para a conta do `translateX`.
-   *
-   * ⚠️ A largura do bloco é estilo COMUM, e só o `transform` anima. Com `width` animado (prop de
-   * layout vinda do worklet) o bloco nascia com largura zero no Android depois de um início a
-   * frio e o rótulo selecionado ficava da cor do fundo, sobre nada — invisível.
-   */
-  const slot = useSharedValue(0);
 
   /** As bordas do bloco, em unidades de célula. */
   const esquerda = useSharedValue(index);
@@ -121,16 +114,8 @@ export function Segmented<T extends string>({ options, value, onChange }: Segmen
     }
   }, [index, reduzido, esquerda, direita]);
 
-  const bloco = useAnimatedStyle(() => ({
-    transform: [
-      { translateX: esquerda.get() * slot.get() },
-      { scaleX: Math.max(0.2, direita.get() - esquerda.get()) },
-    ],
-  }));
-
   const onLayout = (e: LayoutChangeEvent) => {
     const w = (e.nativeEvent.layout.width - FOLGA * 2) / options.length;
-    slot.set(w);
     setCelula((antes) => (antes === w ? antes : w));
   };
 
@@ -140,7 +125,7 @@ export function Segmented<T extends string>({ options, value, onChange }: Segmen
       onLayout={onLayout}
       style={[styles.track, { backgroundColor: theme.backgroundElement }]}>
       {celula > 0 ? (
-        <Animated.View style={[styles.thumb, { width: celula, backgroundColor: theme.text }, bloco]} />
+        <Bloco key={celula} celula={celula} cor={theme.text} esquerda={esquerda} direita={direita} />
       ) : null}
       {options.map((option, i) => (
         <Celula
@@ -159,6 +144,35 @@ export function Segmented<T extends string>({ options, value, onChange }: Segmen
       ))}
     </View>
   );
+}
+
+/**
+ * O bloco de tinta. Nasce só depois da medida e com a largura como CONSTANTE — `key` o remonta se
+ * ela mudar (rotação, fonte).
+ *
+ * ⚠️ **A largura não pode ser valor compartilhado gravado no `onLayout`.** No Android ela chegava
+ * à thread de UI antes de o estilo animado existir, o estilo nunca recalculava e o bloco ficava
+ * parado na primeira célula enquanto o rótulo invertido já estava na certa. Com `width` animado
+ * foi pior: largura zero, bloco invisível. Constante na montagem, não há corrida.
+ */
+function Bloco({
+  celula,
+  cor,
+  esquerda,
+  direita,
+}: {
+  celula: number;
+  cor: string;
+  esquerda: SharedValue<number>;
+  direita: SharedValue<number>;
+}) {
+  const bloco = useAnimatedStyle(() => ({
+    transform: [
+      { translateX: esquerda.get() * celula },
+      { scaleX: Math.max(0.2, direita.get() - esquerda.get()) },
+    ],
+  }));
+  return <Animated.View style={[styles.thumb, { width: celula, backgroundColor: cor }, bloco]} />;
 }
 
 function Celula({

@@ -3,6 +3,7 @@ import { BlurView } from 'expo-blur';
 import { Platform, Pressable, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { ThemedText } from '@/components/themed-text';
 import { Icon } from '@/components/ui/icon';
 import { Mark } from '@/components/ui/mark';
 import { Fonts } from '@/constants/theme';
@@ -128,8 +129,18 @@ export function AppHeader({ title, action }: AppHeaderProps) {
           fileira, sendo que duas são toque e uma não. Sem o fundo a marca é a única coisa da
           barra que NÃO é controle, que é exatamente o que ela é.
         */}
-        <View pointerEvents="none" style={styles.markBox}>
-          <Mark size={34} color="text" />
+        <View pointerEvents="none" style={styles.left}>
+          <View style={styles.markBox}>
+            <Mark size={34} color="text" />
+          </View>
+          {/*
+            O nome da raiz, em minúsculas: a voz do Concreto, e o único texto da faixa. Não é um
+            bloco novo — o `title` sempre existiu (era só o rótulo de acessibilidade), e a faixa
+            tem a altura fixa de antes.
+          */}
+          <ThemedText type="subtitle" style={styles.titulo}>
+            {title.toLocaleLowerCase('pt-BR')}
+          </ThemedText>
         </View>
 
         <View pointerEvents="box-none" style={styles.right}>
@@ -170,7 +181,7 @@ export function HeaderIconButton({
       hitSlop={Space.sm}
       onPress={onPress}
       style={[
-        styles.round,
+        styles.tile,
         { backgroundColor: theme.backgroundSelected, borderColor: theme.cardBorder },
       ]}>
       <Icon name={icon} size="md" color="text" />
@@ -206,8 +217,20 @@ const styles = StyleSheet.create({
    * tela, metade do avatar de 32 do outro lado da faixa. A caixa cresce junto para o glifo não
    * ser cortado, que é o mesmo erro do `Icon`.
    */
+  left: { flexDirection: 'row', alignItems: 'center', gap: Space.sm, flexShrink: 1 },
   markBox: { width: 34, height: 34, alignItems: 'center', justifyContent: 'center' },
+  titulo: { flexShrink: 1 },
   right: { flexDirection: 'row', alignItems: 'center', gap: Space.sm },
+  /** Botão de ação da faixa: um azulejo de canto aparado. O avatar continua redondo. */
+  tile: {
+    width: HitTarget - 12,
+    height: HitTarget - 12,
+    borderRadius: Radius.sm,
+    borderCurve: 'continuous',
+    borderWidth: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   round: {
     width: HitTarget - 12,
     height: HitTarget - 12,

@@ -15,7 +15,6 @@ import { LockSection } from '@/components/profile/lock-section';
 import { Screen } from '@/components/ui/screen';
 import { SkeletonHero, SkeletonList, SkeletonRow } from '@/components/ui/skeleton';
 import { useToast } from '@/components/ui/toast';
-import { GradientSurface } from '@/components/ui/gradient';
 import { Button } from '@/components/ui/button';
 import { Field, TextField } from '@/components/ui/field';
 import { Sheet } from '@/components/ui/sheet';
@@ -258,16 +257,15 @@ export default function ProfileScreen() {
         Cartão de identidade — o topo da tela no desenho do Stitch.
 
         Responde "de quem é esta conta" antes de qualquer ajuste, e é o que separa uma tela de
-        perfil de uma lista de configurações. Fundo em gradiente com brilho, como o painel de
-        destaque: é o único bloco de destaque desta tela (§1, um por tela).
+        perfil de uma lista de configurações. É o bloco NEGATIVO da página, como o painel de
+        destaque das outras raízes: o único destaque desta tela (§1, um por tela).
 
         O nome vem de `profiles.display_name` (migration 0050) e o telefone desce para baixo dele,
         em mono, porque é DADO (§3). Sem nome preenchido — o caso de quem entrou por Phone OTP —
         o número volta a ser a linha principal: o card nunca fica com um vazio no lugar do nome.
         O selo verde no avatar diz o que o número significa aqui: está vinculado ao WhatsApp.
       */}
-      <View style={[styles.idCard, { borderColor: theme.cardBorder, backgroundColor: theme.heroBottom }]}>
-        <GradientSurface from={theme.heroTop} to={theme.heroBottom} sheen={`${theme.tint}1F`} />
+      <View style={[styles.idCard, { backgroundColor: theme.heroSurface }]}>
 
         <View style={styles.idTop}>
           <View>
@@ -281,7 +279,7 @@ export default function ProfileScreen() {
               mentindo é pior que ausência de cor (§2): sem telefone, sem selo.
             */}
             {phone ? (
-              <View style={[styles.idSelo, { backgroundColor: theme.tintFill, borderColor: theme.heroBottom }]}>
+              <View style={[styles.idSelo, { backgroundColor: theme.tintFill, borderColor: theme.heroSurface }]}>
                 <Icon name="checkmark" size="xs" color="onTint" />
               </View>
             ) : null}
@@ -667,7 +665,6 @@ const styles = StyleSheet.create({
     padding: Space.gutter,
     borderRadius: Radius.md,
     borderCurve: 'continuous',
-    borderWidth: StyleSheet.hairlineWidth,
     overflow: 'hidden',
   },
   idTop: { flexDirection: 'row', alignItems: 'center', gap: Space.md },

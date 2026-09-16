@@ -97,17 +97,21 @@ function ToastView({ toast, onDismiss }: { toast: Toast; onDismiss: () => void }
   const theme = useTheme();
   const insets = useSafeAreaInsets();
   const scheme = useScheme();
-
   const icon = {
     info: 'info.circle.fill',
     success: 'checkmark.circle.fill',
     error: 'exclamationmark.triangle.fill',
   } as const;
-  const tint = { info: 'tint', success: 'success', error: 'danger' } as const;
+  /**
+   * O toast é um bloco NEGATIVO (tinta no claro, papel no escuro), então tudo dentro dele usa as
+   * cores `onHero*`. A faixa de 3px na esquerda carrega o tom — é a única cor do bloco.
+   */
+  const tom = { info: 'onHero', success: 'onHeroSuccess', error: 'onHeroDanger' } as const;
+  const faixa = { info: theme.tintFill, success: theme.onHeroSuccess, error: theme.onHeroDanger };
 
   return (
     <Animated.View
-      entering={FadeInDown.duration(Motion.duration.base)}
+      entering={FadeInDown.duration(Motion.duration.base).easing(Motion.easing.out)}
       exiting={FadeOutDown.duration(Motion.duration.exit)}
       pointerEvents="box-none"
       style={[styles.host, { bottom: insets.bottom + Space.xxl }]}>
@@ -115,10 +119,11 @@ function ToastView({ toast, onDismiss }: { toast: Toast; onDismiss: () => void }
         accessibilityLiveRegion="polite"
         style={[
           styles.card,
-          { backgroundColor: theme.surfaceRaised, boxShadow: Elevation[scheme].overlay },
+          { backgroundColor: theme.heroSurface, boxShadow: Elevation[scheme].overlay },
         ]}>
-        <Icon name={icon[toast.tone]} size="md" color={tint[toast.tone]} />
-        <ThemedText type="small" style={styles.message}>
+        <View style={[styles.faixa, { backgroundColor: faixa[toast.tone] }]} />
+        <Icon name={icon[toast.tone]} size="md" color={tom[toast.tone]} />
+        <ThemedText type="small" themeColor="onHero" style={styles.message}>
           {toast.message}
         </ThemedText>
         {toast.action ? (
@@ -129,13 +134,13 @@ function ToastView({ toast, onDismiss }: { toast: Toast; onDismiss: () => void }
               toast.action?.onPress();
               onDismiss();
             }}>
-            <ThemedText type="smallBold" themeColor="tint">
+            <ThemedText type="linkPrimary" themeColor="onHero">
               {toast.action.label}
             </ThemedText>
           </Pressable>
         ) : (
           <Pressable accessibilityLabel="Fechar" hitSlop={12} onPress={onDismiss}>
-            <Icon name="xmark" size="sm" color="textSecondary" />
+            <Icon name="xmark" size="sm" color="onHeroMuted" />
           </Pressable>
         )}
       </View>
@@ -154,9 +159,12 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: Space.md,
     padding: Space.lg,
-    borderRadius: Radius.md,
+    paddingLeft: Space.lg + 3,
+    borderRadius: Radius.sm,
     borderCurve: 'continuous',
+    overflow: 'hidden',
   },
+  faixa: { position: 'absolute', left: 0, top: 0, bottom: 0, width: 3 },
   message: {
     flex: 1,
   },

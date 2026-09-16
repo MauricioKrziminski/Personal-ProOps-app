@@ -4,7 +4,7 @@ import type { SymbolViewProps } from 'expo-symbols';
 import { ThemedText } from '@/components/themed-text';
 import { Button } from '@/components/ui/button';
 import { Icon } from '@/components/ui/icon';
-import { Mark } from '@/components/ui/mark';
+import { TileGlyph } from '@/components/ui/tile-glyph';
 import { Space } from '@/design/tokens';
 
 interface EmptyStateProps {
@@ -42,7 +42,7 @@ export function EmptyState({ icon, title, hint, action }: EmptyStateProps) {
       {icon ? (
         <Icon name={icon} size="xl" color="textSecondary" />
       ) : (
-        <Mark size={44} color="textSecondary" />
+        <TileGlyph />
       )}
       <ThemedText type="headline" style={styles.centered}>
         {title}

@@ -8,7 +8,6 @@ import Animated, {
 
 import { ThemedText } from '@/components/themed-text';
 import { Icon } from '@/components/ui/icon';
-import { GradientSurface } from '@/components/ui/gradient';
 import { QuickActions, type QuickAction } from '@/components/ui/quick-actions';
 import { useConceal } from '@/components/ui/conceal';
 import { Motion, Radius, Space, Type } from '@/design/tokens';
@@ -55,23 +54,20 @@ interface HeroPanelProps {
 }
 
 /**
- * O painel de destaque — **o card do topo do Stitch**.
+ * O painel de destaque — o bloco do topo das raízes.
  *
- * ## Anatomia (medida do export)
+ * ## Anatomia
  *
- * `rounded-xl` (12) com `p-gutter-lg` (20), fundo em gradiente vertical
- * `surface-container-high → low`, um brilho verde difuso saindo pelo canto superior direito e um
- * fio de luz de 1px atravessando o topo. Dentro, nesta ordem: rótulo em caixa alta + botão de
- * olho, o número em `display-hero-mobile` (32/700), a linha de estado em mono colorido, o
- * gráfico, e a faixa de rodapé sangrada.
+ * Um bloco chapado com calha de 20. Dentro, nesta ordem: rótulo em caixa alta + os botões de
+ * "…" e de olho, o número em `heroMoney`, a linha de estado em mono colorido, o gráfico, os
+ * atalhos, e a faixa de rodapé sangrada.
  *
- * ## O que mudou em 03/09/2026
+ * ## O mundo Concreto (16/09/2026)
  *
- * Ele era **tinta chapada** (`heroSurface` sólido) com a espiral da marca como marca d'água. A
- * versão chapada existia para resolver o "sem graça" por contraste, mas continuava lendo como um
- * retângulo escuro com um número dentro. O export resolve o mesmo problema com luz: gradiente +
- * brilho + fio especular. O brilho ocupa o canto onde a marca d'água estava, então ela saiu — a
- * forma da marca continua nos outros quatro papéis (spinner, estado vazio, marcador de IA, ícone).
+ * O bloco é o NEGATIVO da página: tinta no tema claro, papel no escuro. É a jogada da Poesia
+ * Concreta — o destaque se separa por inversão, não por luz. Por isso o gradiente, o brilho verde
+ * e o fio especular do desenho anterior saíram, e tudo o que mora aqui dentro usa os tokens
+ * `onHero*`/`heroChip`, que trocam de valor junto com o bloco.
  *
  * A regra "um destaque por tela" não mudou.
  */
@@ -99,22 +95,8 @@ export function HeroPanel({
       style={[
         styles.panel,
         aoTocar,
-        {
-          borderColor: theme.cardBorder,
-          // Base embaixo do gradiente: o `GradientSurface` só monta o canvas depois que a `View`
-          // mede, e sem isto o painel pisca transparente no primeiro frame.
-          backgroundColor: theme.heroBottom,
-        },
+        { backgroundColor: theme.heroSurface },
       ]}>
-      <GradientSurface
-        from={theme.heroTop}
-        to={theme.heroBottom}
-        // O `bg-secondary/10` do export. Fica no accent, que é o único matiz grande do design.
-        sheen={`${theme.tint}1F`}
-      />
-      {/* O fio de luz do topo (`via-primary/20`): é ele que dá a impressão de superfície curva. */}
-      <View style={[styles.specular, { backgroundColor: theme.heroSeparator }]} />
-
       <View style={styles.inner}>
         {top ? <View style={styles.top}>{top}</View> : null}
 
@@ -221,10 +203,13 @@ export function HeroPanel({
 }
 
 const styles = StyleSheet.create({
+  /**
+   * O bloco do Concreto: chapado, o NEGATIVO da página (tinta no claro, papel no escuro), sem
+   * gradiente, sem brilho e sem contorno — o contraste com a página já é a borda.
+   */
   panel: {
     borderRadius: Radius.md,
     borderCurve: 'continuous',
-    borderWidth: StyleSheet.hairlineWidth,
     overflow: 'hidden',
   },
   /**
@@ -232,7 +217,6 @@ const styles = StyleSheet.create({
    * padding no card ela nasceria recuada — que era o `-mx-gutter-lg` do export sem o negativo.
    */
   inner: { padding: Space.gutter },
-  specular: { position: 'absolute', top: 0, left: 0, right: 0, height: StyleSheet.hairlineWidth },
   shrink: { flex: 1, minWidth: 0 },
   top: { marginBottom: Space.lg },
   body: { gap: Space.xs },
@@ -248,7 +232,8 @@ const styles = StyleSheet.create({
     flexShrink: 0,
     width: 28,
     height: 28,
-    borderRadius: Radius.pill,
+    borderRadius: Radius.sm,
+    borderCurve: 'continuous',
     alignItems: 'center',
     justifyContent: 'center',
   },

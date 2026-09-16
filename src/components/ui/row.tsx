@@ -4,8 +4,8 @@ import type { SymbolViewProps } from 'expo-symbols';
 
 import { ThemedText } from '@/components/themed-text';
 import { Icon } from '@/components/ui/icon';
-import { Elevation, HitTarget, Radius, Space, Type } from '@/design/tokens';
-import { useTheme, useScheme } from '@/hooks/use-theme';
+import { HitTarget, Radius, Space, Type } from '@/design/tokens';
+import { useTheme } from '@/hooks/use-theme';
 
 type RowBadgeTone = 'warning' | 'danger' | 'success' | 'textSecondary';
 
@@ -173,7 +173,6 @@ function fundoDoBadge(theme: ReturnType<typeof useTheme>, tone: RowBadgeTone | u
  */
 export function Section({ title, children }: { title?: string; children: ReactNode }) {
   const theme = useTheme();
-  const scheme = useScheme();
   const items = Children.toArray(children);
 
   return (
@@ -183,12 +182,11 @@ export function Section({ title, children }: { title?: string; children: ReactNo
           {title.toUpperCase()}
         </ThemedText>
       ) : null}
-      {/* Mesma elevação do `Card`. Branco sobre `groupedBackground` são 3% de diferença de
-          valor: sem a sombra o agrupamento praticamente não existe no tema claro. */}
+      {/* Mesma superfície do `Card`: chapada, com o fio de 1px fazendo a borda do grupo. */}
       <View
         style={[
           styles.group,
-          { backgroundColor: theme.surface, boxShadow: Elevation[scheme].raised },
+          { backgroundColor: theme.surface, borderColor: theme.cardBorder },
         ]}>
         {items.map((child, i) => (
           <Fragment key={i}>
@@ -264,10 +262,12 @@ const styles = StyleSheet.create({
     gap: Space.xs,
     marginLeft: 'auto',
   },
+  /** O chip do ícone é um azulejo: quadrado de canto aparado, a mesma peça do resto do app. */
   iconChip: {
     width: 38,
     height: 38,
-    borderRadius: Radius.pill,
+    borderRadius: Radius.sm,
+    borderCurve: 'continuous',
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -290,6 +290,7 @@ const styles = StyleSheet.create({
   group: {
     borderRadius: Radius.md,
     borderCurve: 'continuous',
+    borderWidth: 1,
     overflow: 'hidden',
   },
   separator: {

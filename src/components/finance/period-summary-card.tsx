@@ -127,18 +127,15 @@ export function PeriodSummaryCard({
                 style={[
                   styles.faixa,
                   /*
-                    ⚠️ **`heroFooter`, não `backgroundElement`.** §1 pede a faixa "um degrau mais
-                    ESCURA", e `backgroundElement` só é isso no tema claro: no escuro ele é
-                    `#201F21` sobre um card `#1B1B1D` — 5/255 mais CLARO, ou seja, o degrau para
-                    o lado errado, invisível em metade das verificações. `heroFooter` é
-                    `rgba(0,0,0,.3)`: escurece o que estiver embaixo, nos dois temas. É o token
-                    que a faixa irmã do Financeiro já usa.
+                    ⚠️ **`cardFooter`, não `backgroundElement` nem `heroFooter`.** A faixa é "um
+                    degrau mais ESCURA" que o card. `backgroundElement` só é isso no tema claro, e
+                    `heroFooter` é o degrau DENTRO do herói — que no Concreto é o negativo da
+                    página e clareia no tema claro. `cardFooter` escurece o que estiver embaixo,
+                    nos dois temas; é o token que a faixa irmã do Financeiro também usa.
 
-                    O press escurece mais um degrau pelo mesmo motivo — `backgroundSelected` é
-                    mais CLARO que `heroFooter` no tema claro, então ele clarearia num tema e
-                    escureceria no outro.
+                    O press escurece mais um degrau pelo mesmo motivo.
                   */
-                  { backgroundColor: pressed ? theme.heroFooterPress : theme.heroFooter },
+                  { backgroundColor: pressed ? theme.cardFooterPress : theme.cardFooter },
                 ]}>
                 {/*
                   ⚠️ **Duas LINHAS, não uma frase que quebra.** Emendado com "·", o separador
