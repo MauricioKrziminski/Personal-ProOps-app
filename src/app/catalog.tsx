@@ -19,6 +19,8 @@ import { useToast } from '@/components/ui/toast';
 import { Mark } from '@/components/ui/mark';
 import { TaskHeader } from '@/components/ui/task-header';
 import { CountUpMoney } from '@/components/ui/count-up-money';
+import { Reveal } from '@/components/motion/reveal';
+import { SplitReveal } from '@/components/motion/split-reveal';
 import { TileField } from '@/components/motion/tile-field';
 import { useTheme } from '@/hooks/use-theme';
 import { Motion, Radius, Space } from '@/design/tokens';
@@ -42,6 +44,8 @@ export default function CatalogScreen() {
   return (
     <Screen grouped>
       <ThemedText type="title">Catálogo</ThemedText>
+
+      <VitrineEntrada />
 
       <VitrineAzulejos />
 
@@ -355,6 +359,28 @@ function VitrineCampos() {
         value={modo}
         onChange={setModo}
       />
+    </View>
+  );
+}
+
+/** A entrada tipográfica e a cascata de blocos, com um botão para repetir. */
+function VitrineEntrada() {
+  const [rodada, setRodada] = useState(0);
+  return (
+    <View style={{ gap: Space.md }}>
+      <ThemedText type="headline">Entrada</ThemedText>
+      <View key={rodada} style={{ gap: Space.sm }}>
+        <SplitReveal text="bom dia, gabriel" variant="display" />
+        <SplitReveal text="R$ 2.450,00" variant="heroMoney" tabular delay={200} />
+        {[0, 1, 2].map((i) => (
+          <Reveal key={i} index={i + 4}>
+            <Card>
+              <ThemedText type="default">Bloco {i + 1}</ThemedText>
+            </Card>
+          </Reveal>
+        ))}
+      </View>
+      <Button label="Repetir entrada" variant="secondary" onPress={() => setRodada((r) => r + 1)} block />
     </View>
   );
 }
