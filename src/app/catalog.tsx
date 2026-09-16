@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Redirect } from 'expo-router';
-import { View } from 'react-native';
+import { StyleSheet, View } from 'react-native';
+import { Easing, useSharedValue, withTiming } from 'react-native-reanimated';
 
 import { ThemedText } from '@/components/themed-text';
 import { Button } from '@/components/ui/button';
@@ -18,8 +19,10 @@ import { useToast } from '@/components/ui/toast';
 import { Mark } from '@/components/ui/mark';
 import { TaskHeader } from '@/components/ui/task-header';
 import { CountUpMoney } from '@/components/ui/count-up-money';
+import { TileField } from '@/components/motion/tile-field';
 import { useTheme } from '@/hooks/use-theme';
-import { Radius, Space } from '@/design/tokens';
+import { Motion, Radius, Space } from '@/design/tokens';
+import type { WaveMode } from '@/design/tile-math';
 
 /**
  * Catálogo dos primitivos — rota de desenvolvimento.
@@ -39,6 +42,12 @@ export default function CatalogScreen() {
   return (
     <Screen grouped>
       <ThemedText type="title">Catálogo</ThemedText>
+
+      <VitrineAzulejos />
+
+      <VitrineBotao />
+
+      <VitrineCampos />
 
       {/*
         Os primitivos de 13/09/2026. Entram aqui porque é onde se olha um primitivo em claro E
@@ -230,5 +239,122 @@ export default function CatalogScreen() {
         </View>
       </Section>
     </Screen>
+  );
+}
+
+/**
+ * A onda de azulejos isolada: os quatro modos, com e sem canto, sobre um conteúdo qualquer.
+ * É onde a geometria de `tile-math` é conferida no aparelho antes de virar abertura e trava.
+ */
+function VitrineAzulejos() {
+  const theme = useTheme();
+  const progress = useSharedValue(0);
+  const [modo, setModo] = useState<WaveMode>('diagonal');
+  const [canto, setCanto] = useState<'0' | '3'>('3');
+  const [aberto, setAberto] = useState(false);
+
+  const alternar = () => {
+    const alvo = aberto ? 0 : 1;
+    progress.set(
+      withTiming(alvo, { duration: Motion.curtain.duration, easing: Easing.inOut(Easing.cubic) })
+    );
+    setAberto(!aberto);
+  };
+
+  return (
+    <View style={{ gap: Space.md }}>
+      <ThemedText type="headline">Campo de azulejos</ThemedText>
+      <View
+        style={{
+          height: 320,
+          borderRadius: Radius.md,
+          overflow: 'hidden',
+          backgroundColor: theme.surface,
+          justifyContent: 'center',
+          alignItems: 'center',
+        }}>
+        <ThemedText type="display">hoje</ThemedText>
+        <TileField
+          key={`${modo}-${canto}`}
+          progress={progress}
+          mode={modo}
+          origin={modo === 'radial' ? { x: 0.5, y: 0.5 } : { x: 0, y: 1 }}
+          corner={Number(canto)}
+          cover
+          style={StyleSheet.absoluteFill}
+        />
+      </View>
+      <Segmented
+        options={[
+          { value: 'diagonal', label: 'Diagonal' },
+          { value: 'radial', label: 'Radial' },
+          { value: 'up', label: 'Sobe' },
+          { value: 'down', label: 'Desce' },
+        ]}
+        value={modo}
+        onChange={setModo}
+      />
+      <Segmented
+        options={[
+          { value: '0', label: 'Sem canto' },
+          { value: '3', label: 'Com canto' },
+        ]}
+        value={canto}
+        onChange={setCanto}
+      />
+      <Button label={aberto ? 'Cobrir' : 'Revelar'} onPress={alternar} block />
+    </View>
+  );
+}
+
+/** O morph do botão: toque alterna entre ação e carregando, nas quatro variantes. */
+function VitrineBotao() {
+  const [carregando, setCarregando] = useState(false);
+  const alternar = () => setCarregando((v) => !v);
+  return (
+    <View style={{ gap: Space.md }}>
+      <ThemedText type="headline">Botão (morph)</ThemedText>
+      <Button label="Entrar" onPress={alternar} loading={carregando} block size="lg" />
+      <Button label="Registrar pagamento" variant="secondary" onPress={alternar} loading={carregando} block />
+      <View style={{ flexDirection: 'row', gap: Space.md }}>
+        <Button label="Apagar" variant="destructive" onPress={alternar} loading={carregando} />
+        <Button label="Salvar" size="sm" onPress={alternar} loading={carregando} />
+      </View>
+      <Button label={carregando ? 'Parar' : 'Carregar todos'} variant="ghost" onPress={alternar} />
+      {/* Guarda do Android: rótulo com espaço no tamanho pequeno já saiu cortado ("Trocar o"). */}
+      <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: Space.md }}>
+        <Button label="Trocar o valor" variant="secondary" size="sm" onPress={() => {}} />
+        <Button label="Trocar o valor" variant="secondary" onPress={() => {}} />
+        <Button label="Trocar o valor" size="sm" onPress={() => {}} />
+      </View>
+    </View>
+  );
+}
+
+/** Os campos: foco que desenha o traço, erro que treme, e o odômetro do valor. */
+function VitrineCampos() {
+  const [nome, setNome] = useState('');
+  const [centavos, setCentavos] = useState(0);
+  const [modo, setModo] = useState<'mes' | 'ciclo' | 'ano'>('ciclo');
+  const invalido = nome.length > 0 && nome.length < 3;
+  return (
+    <View style={{ gap: Space.lg }}>
+      <ThemedText type="headline">Campos</ThemedText>
+      <Field label="Título" error={invalido ? 'Pelo menos 3 letras.' : undefined} hint="O nome que aparece na lista.">
+        <TextField value={nome} onChangeText={setNome} placeholder="Ex.: Mercado" invalid={invalido} />
+      </Field>
+      <Field label="Valor">
+        <MoneyField valueCents={centavos} onChangeCents={setCentavos} />
+      </Field>
+      <Segmented
+        options={[
+          { value: 'mes', label: 'Mês' },
+          { value: 'ciclo', label: 'Ciclo' },
+          { value: 'ano', label: 'Ano' },
+        ]}
+        value={modo}
+        onChange={setModo}
+      />
+    </View>
   );
 }

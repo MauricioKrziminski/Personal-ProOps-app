@@ -1,19 +1,28 @@
-import * as Haptics from 'expo-haptics';
+import { useEffect } from 'react';
 import {
   ActivityIndicator,
   Platform,
-  Pressable,
   StyleSheet,
   View,
+  type LayoutChangeEvent,
   type StyleProp,
   type ViewStyle,
 } from 'react-native';
-import Animated, { useAnimatedStyle, useSharedValue, withTiming } from 'react-native-reanimated';
+import Animated, {
+  Easing,
+  interpolate,
+  useAnimatedStyle,
+  useReducedMotion,
+  useSharedValue,
+  withSpring,
+  withTiming,
+} from 'react-native-reanimated';
 
+import { PressableScale } from '@/components/motion/pressable-scale';
+import { TileSpinner } from '@/components/motion/tile-spinner';
 import { Icon } from '@/components/ui/icon';
-import { Mark } from '@/components/ui/mark';
 import { ThemedText } from '@/components/themed-text';
-import { HitTarget, Motion, Radius, Space } from '@/design/tokens';
+import { HitTarget, Motion, Radius, Space, Type } from '@/design/tokens';
 import { useTheme } from '@/hooks/use-theme';
 import type { ThemeColor } from '@/constants/theme';
 import type { SymbolViewProps } from 'expo-symbols';
@@ -34,26 +43,36 @@ interface ButtonProps {
   style?: StyleProp<ViewStyle>;
 }
 
-/**
- * Altura VISUAL. `sm` desceu de 44 para 36 (03/09/2026).
- *
- * 44 é o alvo mínimo de toque, não a altura mínima de um botão — e usar o alvo como altura
- * deixava "Paguei" com a mesma presença de um submit de formulário dentro de uma linha de lista.
- * O alvo continua em 44 pelo `hitSlop`, que é como o iOS resolve o mesmo problema em toda barra
- * de ferramentas. É o `h-10` do export, com o rótulo um degrau menor.
- */
+/** Altura VISUAL total (face + base). O alvo de toque chega em 44 pelo `hitSlop`. */
 const HEIGHT: Record<Size, number> = { sm: 36, md: 48, lg: 54 };
-/** Quanto falta para o alvo chegar em 44 quando o botão é menor que isso. */
+/** Profundidade da tecla: quanto da base aparece embaixo da face. */
+const DEPTH: Record<Size, number> = { sm: 2, md: 3, lg: 4 };
 const SLOP: Record<Size, number> = { sm: (HitTarget - HEIGHT.sm) / 2, md: 0, lg: 0 };
+/** O rótulo rola uma linha inteira a cada toque. */
+const ROLL_MS = 340;
 
 /**
- * O único botão do app.
+ * O único botão do app — no mundo Concreto, uma TECLA de canto aparado.
  *
- * Substitui ~20 `Pressable` estilizados à mão e, com eles, os 18 `color: '#fff'` hardcoded que
- * existiam só para escrever rótulo em cima do `tint`.
+ * ## A anatomia
  *
- * Press-in em 120 ms com `scale 0.97` (regra de movimento). Linha de lista NÃO usa este
- * componente — lá o feedback é highlight de fundo, não escala.
+ * Três camadas irmãs, e a separação é o que deixa cada animação barata e sem distorção:
+ *
+ * 1. **Base** — um tom abaixo da face (`tintDeep`, `dangerDeep`, `keyBase`), aparecendo só na
+ *    borda de baixo. É a profundidade de um azulejo assentado.
+ * 2. **Face** — a cor do botão. No toque ela AFUNDA até a base (`translateY`), que é o feedback
+ *    principal; a escala do `PressableScale` fica mínima, só para o dedo sentir o bloco inteiro.
+ * 3. **Conteúdo** — rótulo e ícone, que afundam junto com a face e ROLAM uma linha: o texto sobe
+ *    e uma cópia idêntica entra por baixo. A cópia é a mesma frase, então o reinício no fim da
+ *    rolagem é invisível.
+ *
+ * ## O morph de carregamento
+ *
+ * Carregando, face e base encolhem até um quadrado (`scaleX`, nunca `width`) e um azulejo gira
+ * dentro dele em quartos de volta. A caixa externa mantém a largura: o formulário não pula. Com
+ * Reduce Motion não há encolhimento nem rolagem — o rótulo só dá lugar ao azulejo parado.
+ *
+ * Desabilitado NÃO é "o mesmo botão mais claro": perde a cor, o peso e a profundidade.
  */
 export function Button({
   label,
@@ -67,120 +86,232 @@ export function Button({
   style,
 }: ButtonProps) {
   const theme = useTheme();
-  const scale = useSharedValue(1);
+  const reduzido = useReducedMotion();
   const inert = disabled || loading;
+  const altura = HEIGHT[size];
+  const fundo = variant === 'ghost' ? 0 : DEPTH[size];
+  const alturaFace = altura - fundo;
+  const tipo = size === 'sm' ? 'caption' : 'smallBold';
+  const linha = size === 'sm' ? Type.caption.lineHeight : Type.subhead.lineHeight;
+  /**
+   * A largura medida, num valor COMPARTILHADO: lida da captura do worklet, ela pode ficar presa no
+   * 0 do primeiro render, e o morph deixaria de encolher.
+   */
+  const largura = useSharedValue(0);
 
-  const animated = useAnimatedStyle(() => ({ transform: [{ scale: scale.get() }] }));
-
-  const surface: Record<Variant, string> = {
+  const off = disabled && !loading;
+  const face: Record<Variant, string> = {
     primary: theme.tintFill,
-    secondary: theme.backgroundElement,
+    secondary: theme.keyFace,
     ghost: 'transparent',
     destructive: theme.danger,
   };
-
-  // Desabilitado NÃO é "o mesmo botão mais claro": azul a 50% continua lendo como ação
-  // disponível. Perde a cor e o peso — em carregamento, ao contrário, a ação segue sendo
-  // aquela, então o accent fica.
-  const off = disabled && !loading;
-  // `ghost` levava o accent, porque sem superfície e sem cor ele não parecia ação. Com o `tint`
-  // monocromático isso deixou de funcionar: accent = cor do texto, então o ghost voltaria a ler
-  // como rótulo — e pior, calado.
-  //
-  // A correção não é dar cor de volta, é olhar o PAR: ghost é sempre "Cancelar"/"Fechar" ao
-  // lado de um primário, e o primário virou uma pílula preta sólida. Texto puro contra pílula
-  // preenchida é exatamente como o iOS desenha esse par. O contraste entre os dois é a
-  // affordance; pintar os dois seria duas ações disputando.
+  const base: Record<Variant, string> = {
+    primary: theme.tintDeep,
+    secondary: theme.keyBase,
+    ghost: 'transparent',
+    destructive: theme.dangerDeep,
+  };
+  // Ghost é texto puro ao lado do primário preenchido — o par Cancelar/Salvar.
   const labelColor: ThemeColor = off
     ? 'textSecondary'
     : variant === 'primary' || variant === 'destructive'
       ? 'onTint'
       : 'text';
 
+  /** 0 = botão, 1 = quadrado carregando. */
+  const morph = useSharedValue(loading ? 1 : 0);
+  /** 0 = em repouso, 1 = afundado. */
+  const afundado = useSharedValue(0);
+  /** 0 → 1 rola o rótulo uma linha. */
+  const rolagem = useSharedValue(0);
+
+  useEffect(() => {
+    morph.set(
+      loading
+        ? withSpring(1, Motion.spring.encaixe)
+        : withTiming(0, { duration: Motion.duration.base, easing: Motion.easing.out })
+    );
+  }, [loading, morph]);
+
+  const podeEncolher = !reduzido && variant !== 'ghost';
+  const escalaMorph = (m: number) => {
+    'worklet';
+    const w = largura.get();
+    const alvo = podeEncolher && w > alturaFace ? alturaFace / w : 1;
+    return interpolate(m, [0, 1], [1, alvo]);
+  };
+
+  const estiloBase = useAnimatedStyle(() => ({
+    transform: [{ scaleX: escalaMorph(morph.get()) }],
+  }));
+  const estiloFace = useAnimatedStyle(() => ({
+    transform: [
+      { translateY: afundado.get() * fundo },
+      { scaleX: escalaMorph(morph.get()) },
+    ],
+  }));
+  const estiloConteudo = useAnimatedStyle(() => ({
+    opacity: interpolate(morph.get(), [0, 0.35], [1, 0], 'clamp'),
+    transform: [
+      { translateY: afundado.get() * fundo },
+      { scale: interpolate(morph.get(), [0, 1], [1, 0.92]) },
+    ],
+  }));
+  const estiloRolo = useAnimatedStyle(() => ({
+    transform: [{ translateY: -rolagem.get() * linha }],
+  }));
+  const estiloGiro = useAnimatedStyle(() => ({
+    opacity: interpolate(morph.get(), [0.4, 1], [0, 1], 'clamp'),
+    transform: [
+      { translateY: afundado.get() * fundo },
+      { scale: interpolate(morph.get(), [0, 1], [0.5, 1]) },
+    ],
+  }));
+
+  const medir = (e: LayoutChangeEvent) => largura.set(e.nativeEvent.layout.width);
+
+  const rotulo = (copia: boolean) => (
+    <View
+      style={[styles.rotulo, size === 'sm' && styles.rotuloSm, { height: linha }]}
+      importantForAccessibility={copia ? 'no-hide-descendants' : 'auto'}
+      accessibilityElementsHidden={copia}>
+      {/* No `sm` o ícone acompanha o rótulo: 20px ao lado de um texto de 13 pesa demais. */}
+      {icon ? <Icon name={icon} size={size === 'sm' ? 'sm' : 'md'} color={labelColor} /> : null}
+      <ThemedText type={tipo} themeColor={labelColor} style={styles.semEncolher}>
+        {label}
+      </ThemedText>
+    </View>
+  );
+
   return (
-    <Animated.View style={[animated, block ? styles.block : styles.hug, style]}>
-      <Pressable
+    <View style={[block ? styles.block : styles.hug, style]}>
+      <PressableScale
         accessibilityRole="button"
         accessibilityLabel={label}
         accessibilityState={{ disabled: inert, busy: loading }}
         disabled={inert}
         hitSlop={SLOP[size]}
+        haptic="light"
+        scaleTo={0.985}
+        onPress={onPress}
         onPressIn={() => {
-          scale.set(withTiming(Motion.pressScale, { duration: Motion.duration.fast }));
+          afundado.set(withTiming(1, { duration: 70, easing: Easing.out(Easing.quad) }));
+          if (reduzido) return;
+          rolagem.set(0);
+          rolagem.set(
+            withTiming(1, { duration: ROLL_MS, easing: Motion.easing.out }, (fim) => {
+              // A cópia é idêntica: voltar a 0 no fim não se vê.
+              if (fim) rolagem.set(0);
+            })
+          );
         }}
         onPressOut={() => {
-          scale.set(withTiming(1, { duration: Motion.duration.fast }));
+          afundado.set(withSpring(0, Motion.spring.snap));
         }}
-        onPress={() => {
-          Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-          onPress();
-        }}
-        style={[
-          styles.base,
-          {
-            height: HEIGHT[size],
-            backgroundColor: off ? theme.backgroundElement : surface[variant],
-            opacity: loading ? 0.7 : 1,
-            paddingHorizontal: size === 'sm' ? Space.md + 2 : Space.xl,
-            // Secundário ganha borda porque o primário deixou de ser colorido: com o `tint`
-            // monocromático a distância entre primário e secundário aumentou, e a de secundário
-            // para DESABILITADO encolheu (os dois eram `backgroundElement` liso). A borda é o
-            // que separa "posso tocar" de "não posso" — desabilitado continua sem ela.
-            borderWidth: variant === 'secondary' && !off ? StyleSheet.hairlineWidth : 0,
-            borderColor: theme.separator,
-          },
-        ]}>
-        {loading && Platform.OS === 'web' ? (
-          // O CanvasKit do Skia não é inicializado pelo bundle web atual. O fallback mantém o
-          // estado de carregamento funcional sem alterar a marca usada nos apps nativos.
-          <ActivityIndicator size="small" color={theme[labelColor]} />
-        ) : loading ? (
-          // A espiral da marca no lugar do `ActivityIndicator`. Não é enfeite: com marca
-          // monocromática, a personalidade vem de **repetir a forma** em papéis utilitários —
-          // é o que torna a Vercel reconhecível pelo ▲ no prompt e no loading. Um spinner do
-          // sistema é de todo mundo; este é deste app.
-          <Mark size={20} color={labelColor} spinning />
-        ) : (
-          <View style={[styles.content, size === 'sm' && styles.contentSm]}>
-            {/* No `sm` o ícone acompanha o rótulo: 20px ao lado de um texto de 13 pesa demais. */}
-            {icon ? <Icon name={icon} size={size === 'sm' ? 'sm' : 'md'} color={labelColor} /> : null}
-            <ThemedText
-              type={size === 'sm' ? 'caption' : 'smallBold'}
-              themeColor={labelColor}
->
-              {label}
-            </ThemedText>
+        onLayout={medir}
+        style={{ height: altura }}>
+        {fundo > 0 ? (
+          <Animated.View
+            pointerEvents="none"
+            style={[
+              styles.camada,
+              { top: fundo, height: alturaFace, backgroundColor: off ? theme.backgroundSelected : base[variant] },
+              estiloBase,
+            ]}
+          />
+        ) : null}
+        {variant !== 'ghost' ? (
+          <Animated.View
+            pointerEvents="none"
+            style={[
+              styles.camada,
+              {
+                top: 0,
+                height: alturaFace,
+                backgroundColor: off ? theme.backgroundElement : face[variant],
+                // O secundário claro é branco sobre papel: o fio é o que desenha a borda da tecla.
+                borderWidth: variant === 'secondary' && !off ? 1 : 0,
+                borderColor: theme.cardBorder,
+              },
+              estiloFace,
+            ]}
+          />
+        ) : null}
+
+        <Animated.View
+          style={[
+            styles.conteudo,
+            { height: alturaFace, paddingHorizontal: size === 'sm' ? Space.md + 2 : Space.xl },
+            estiloConteudo,
+          ]}>
+          <View style={[styles.janela, { height: linha }]}>
+            <Animated.View style={estiloRolo}>
+              {rotulo(false)}
+              {rotulo(true)}
+            </Animated.View>
           </View>
-        )}
-      </Pressable>
-    </Animated.View>
+        </Animated.View>
+
+        {loading ? (
+          <Animated.View
+            pointerEvents="none"
+            style={[styles.giro, { height: alturaFace }, estiloGiro]}>
+            {Platform.OS === 'web' ? (
+              // O CanvasKit não é inicializado no bundle web; o spinner do sistema mantém o estado.
+              <ActivityIndicator size="small" color={theme[labelColor]} />
+            ) : (
+              <TileSpinner size={size === 'sm' ? 12 : 16} color={labelColor} />
+            )}
+          </Animated.View>
+        ) : null}
+      </PressableScale>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  base: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderRadius: Radius.pill,
+  camada: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    borderRadius: Radius.sm,
     borderCurve: 'continuous',
   },
-  content: {
+  conteudo: {
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  /** A janela da rolagem: mostra UMA linha e corta a outra. */
+  janela: { overflow: 'hidden' },
+  rotulo: {
     flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'center',
     gap: Space.sm,
   },
-  contentSm: { gap: Space.xs },
-  // O wrapper precisa do MESMO raio do miolo: `boxShadow` passado por `style` (o FAB do
-  // Financeiro faz isso) desenhava um retângulo claro atrás da pílula — o "fundo branco".
+  rotuloSm: { gap: Space.xs },
+  /** O rótulo do botão não encolhe: dentro da janela, encolher cortaria a palavra. */
+  semEncolher: { flexShrink: 0 },
+  giro: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  // O wrapper leva o MESMO raio da face: `boxShadow` passado por `style` (o FAB do Financeiro faz
+  // isso) desenharia um retângulo com outro canto atrás do botão.
   block: {
     alignSelf: 'stretch',
-    borderRadius: Radius.pill,
+    borderRadius: Radius.sm,
     borderCurve: 'continuous',
   },
   /** Sem `block`, o botão abraça o rótulo — senão o pai com `alignItems: stretch` o estica. */
   hug: {
     alignSelf: 'flex-start',
-    borderRadius: Radius.pill,
+    borderRadius: Radius.sm,
     borderCurve: 'continuous',
   },
 });

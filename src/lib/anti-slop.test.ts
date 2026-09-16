@@ -751,9 +751,9 @@ test('toda tela de conteúdo usa <Screen>', () => {
  * `Pressable` normal dentro.
  */
 const PRESSABLE_ANIMADO_OK = new Set([
-  // Estilo ESTÁTICO (um objeto, não função): o atalho do painel não tem feedback por `pressed`,
-  // ele anima por `useAnimatedStyle`. Sem função, não há o que se perder.
-  'src/components/ui/quick-actions.tsx',
+  // O press-in de bloco do app inteiro. O TIPO dele recusa `style` em função (`Omit<…, 'style'>`
+  // + `StyleProp<ViewStyle>`), então quem chama não tem como passar a forma que se perde.
+  'src/components/motion/pressable-scale.tsx',
 ]);
 
 test('createAnimatedComponent(Pressable) só com estilo estático', () => {

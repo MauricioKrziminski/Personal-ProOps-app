@@ -12,9 +12,9 @@
  *
  * ## Por que SEMENTE e não `Math.random`
  *
- * A cortina da abertura e o friso do login precisam desenhar **os mesmos azulejos no mesmo
- * lugar**: a abertura para no meio da onda e entrega a tela para o login, que redesenha o friso
- * sozinho. Com sorteio de verdade, os dois discordariam e a troca apareceria como um salto. O
+ * A cortina da abertura e o canto de azulejos do login precisam desenhar **os mesmos azulejos no
+ * mesmo lugar**: a abertura para no meio da onda e entrega a tela para o login, que redesenha o
+ * canto sozinho. Com sorteio de verdade, os dois discordariam e a troca apareceria como um salto. O
  * "assentado ao acaso" do Bulcão continua — só que o acaso é reproduzível.
  *
  * ## A onda
@@ -68,10 +68,10 @@ export function tileTurns(i: number, seed: number): number {
   return Math.floor(seeded(i, seed + 101) * 4);
 }
 
-/** Um terço dos azulejos PARADOS (o friso) mostra o motivo; o resto é tinta lisa. */
-export function patterned(i: number, seed: number): boolean {
+/** Quais azulejos PARADOS mostram o motivo; `share` é a fração (um terço, por padrão). */
+export function patterned(i: number, seed: number, share = 0.34): boolean {
   'worklet';
-  return seeded(i, seed + 202) < 0.34;
+  return seeded(i, seed + 202) < share;
 }
 
 /**
@@ -154,13 +154,14 @@ export function motifPose(t: number): { scale: number; angle: number } {
 }
 
 /**
- * Quantas linhas ficam no friso nesta coluna: um perfil em degraus que desce para a direita, com
- * um degrau extra aqui e ali pela semente. `depth` 0 = a onda limpa tudo.
+ * O que sobra da onda: um bloco em degraus no canto superior direito.
+ *
+ * `k` é quantos degraus: com 3, ficam 3 azulejos na linha de cima, 2 na segunda e 1 na terceira.
+ * Era uma faixa de largura inteira e virou canto por decisão do dono do produto (16/09/2026) —
+ * a faixa pesava no topo do login; o canto guarda a assinatura sem ocupar a tela.
  */
-export function friezeDepth(col: number, cols: number, depth: number, seed: number): number {
+export function cornerKeep(col: number, row: number, cols: number, k: number): boolean {
   'worklet';
-  if (depth <= 0) return 0;
-  const queda = Math.floor((col / Math.max(1, cols - 1)) * (depth - 1) * 0.6);
-  const salto = seeded(col, seed + 7) < 0.35 ? 1 : 0;
-  return Math.max(1, Math.min(depth, depth - queda - salto));
+  if (k <= 0) return false;
+  return cols - 1 - col + row < k;
 }

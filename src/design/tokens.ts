@@ -177,7 +177,14 @@ export const Type = {
   callout: { fontFamily: Fonts.regular, fontSize: 15, lineHeight: 20, letterSpacing: 0 },
   subhead: { fontFamily: Fonts.regular, fontSize: 15, lineHeight: 20, letterSpacing: 0 },
   footnote: { fontFamily: Fonts.regular, fontSize: 13, lineHeight: 18, letterSpacing: 0 },
-  caption: { fontFamily: Fonts.medium, fontSize: 12, lineHeight: 15, letterSpacing: 0.2 },
+  /**
+   * ⚠️ **Semibold, nunca a face 500, e isto foi MEDIDO no Android** (16/09/2026). Jost 500 a
+   * 12px é medido mais ESTREITO do que é desenhado: numa caixa que abraça o texto,
+   * "Trocar o valor" saía "Trocar o" e o resto sumia — sem erro, sem aviso. A mesma face a 15px
+   * e as faces 400 e 600 a 12px medem certo. O botão pequeno, os badges e os rótulos de célula
+   * usam este tipo, então a troca vale para o app inteiro.
+   */
+  caption: { fontFamily: Fonts.semibold, fontSize: 12, lineHeight: 15, letterSpacing: 0.2 },
   /** dinheiro de card — Jost tem numerais tabulares, então o valor não "dança" ao contar */
   money: { fontFamily: Fonts.semibold, fontSize: 32, lineHeight: 38, letterSpacing: -0.8 },
   /** o número do herói: o maior dado da tela */

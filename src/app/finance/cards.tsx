@@ -1,13 +1,8 @@
-import { Pressable, StyleSheet, View } from 'react-native';
-import Animated, {
-  FadeInDown,
-  useAnimatedStyle,
-  useSharedValue,
-  withTiming,
-} from 'react-native-reanimated';
+import { StyleSheet, View } from 'react-native';
+import Animated, { FadeInDown } from 'react-native-reanimated';
 import { Stack, router } from 'expo-router';
-import * as Haptics from 'expo-haptics';
 
+import { PressableScale } from '@/components/motion/pressable-scale';
 import { useBRL } from '@/components/ui/conceal';
 import { ThemedText } from '@/components/themed-text';
 import { HeaderActions } from '@/components/ui/header-actions';
@@ -93,23 +88,14 @@ function PressCard({
   accessibilityLabel: string;
   children: React.ReactNode;
 }) {
-  const scale = useSharedValue(1);
-  const animado = useAnimatedStyle(() => ({ transform: [{ scale: scale.get() }] }));
-
   return (
-    <Animated.View style={animado}>
-      <Pressable
-        accessibilityRole="button"
-        accessibilityLabel={accessibilityLabel}
-        onPressIn={() => scale.set(withTiming(Motion.pressScale, { duration: Motion.duration.fast }))}
-        onPressOut={() => scale.set(withTiming(1, { duration: Motion.duration.fast }))}
-        onPress={() => {
-          Haptics.selectionAsync();
-          onPress();
-        }}>
-        <Card style={styles.card}>{children}</Card>
-      </Pressable>
-    </Animated.View>
+    <PressableScale
+      accessibilityRole="button"
+      accessibilityLabel={accessibilityLabel}
+      haptic="selection"
+      onPress={onPress}>
+      <Card style={styles.card}>{children}</Card>
+    </PressableScale>
   );
 }
 

@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 
 import {
-  friezeDepth,
+  cornerKeep,
   inkPose,
   motifPose,
   patterned,
@@ -109,15 +109,13 @@ test('as poses são contínuas: nenhum salto maior que 5% entre dois quadros viz
   }
 });
 
-test('o friso fica entre 1 e depth, e é igual para a mesma semente', () => {
-  for (let c = 0; c < 8; c++) {
-    const d = friezeDepth(c, 8, 3, 11);
-    assert.ok(d >= 1 && d <= 3, `coluna ${c}: ${d}`);
-    assert.equal(d, friezeDepth(c, 8, 3, 11));
+test('o canto guarda um triângulo em degraus no alto à direita', () => {
+  const guardados: string[] = [];
+  for (let r = 0; r < 18; r++) {
+    for (let c = 0; c < 8; c++) if (cornerKeep(c, r, 8, 3)) guardados.push(`${c},${r}`);
   }
-  assert.equal(friezeDepth(0, 8, 0, 11), 0);
-  const perfil = Array.from({ length: 8 }, (_, c) => friezeDepth(c, 8, 4, 1952));
-  assert.ok(new Set(perfil).size > 1, `perfil sem degrau: ${perfil}`);
+  assert.deepEqual(guardados, ['5,0', '6,0', '7,0', '6,1', '7,1', '7,2']);
+  assert.equal(cornerKeep(7, 0, 8, 0), false);
 });
 
 test('cerca de um terço dos azulejos parados mostra o motivo', () => {

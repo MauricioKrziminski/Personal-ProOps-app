@@ -104,7 +104,7 @@ function AppTree() {
    * O app segura o splash até carregarem: `Type` aponta para as faces pelo NOME, e uma face
    * ausente não cai no system font — ela some, deixando a tela em branco por um frame.
    */
-  const [fontsLoaded] = useFonts({
+  const [fontsLoaded, fontError] = useFonts({
     Jost_400Regular,
     Jost_400Regular_Italic,
     Jost_500Medium,
@@ -157,7 +157,16 @@ function AppTree() {
               <AnimatedSplashOverlay ready={!loading && fontsLoaded} />
               <LockOverlay />
               <AndroidActionSheet />
-              {loading ? null : (
+              {/*
+                ⚠️ **Nada de tela antes de as fontes existirem** (16/09/2026). A árvore montava assim
+                que a sessão resolvia, e o Android mede cada texto na primeira vez que o vê: medido
+                com a fonte substituta (mais estreita) e desenhado depois com o Jost, "Trocar o
+                valor" virava "Trocar o" — o resto cortado, sem erro, e em faces diferentes a cada
+                recarregamento. A abertura cobre a tela nesse intervalo, então esperar não custa um
+                quadro visível. Com erro de fonte, segue: texto na fonte do sistema é melhor que app
+                parado.
+              */}
+              {loading || !(fontsLoaded || fontError) ? null : (
               /*
                * `statusBarStyle` mora AQUI, e só aqui.
                *

@@ -1,11 +1,10 @@
-import * as Haptics from 'expo-haptics';
-import { Pressable, StyleSheet, View } from 'react-native';
-import Animated, { useAnimatedStyle, useSharedValue, withTiming } from 'react-native-reanimated';
+import { StyleSheet, View } from 'react-native';
 import type { SymbolViewProps } from 'expo-symbols';
 
+import { PressableScale } from '@/components/motion/pressable-scale';
 import { ThemedText } from '@/components/themed-text';
 import { Icon } from '@/components/ui/icon';
-import { Motion, Radius, Space, tabular } from '@/design/tokens';
+import { Radius, Space, tabular } from '@/design/tokens';
 import { Fonts } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 
@@ -23,30 +22,21 @@ export interface QuickAction {
   count: number;
 }
 
-const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
-
 function Tile({ action }: { action: QuickAction }) {
   const theme = useTheme();
-  const scale = useSharedValue(1);
-  const animated = useAnimatedStyle(() => ({ transform: [{ scale: scale.get() }] }));
 
   return (
-    <AnimatedPressable
+    <PressableScale
       accessibilityRole="button"
       accessibilityLabel={`${action.label}, ${action.count}`}
-      onPressIn={() => scale.set(withTiming(Motion.pressScale, { duration: Motion.duration.fast }))}
-      onPressOut={() => scale.set(withTiming(1, { duration: Motion.duration.fast }))}
-      onPress={() => {
-        Haptics.selectionAsync();
-        action.onPress();
-      }}
+      haptic="selection"
+      onPress={action.onPress}
       style={[
         styles.tile,
         {
           borderColor: theme.heroSeparator,
           backgroundColor: theme.heroSeparator,
         },
-        animated,
       ]}>
       <View style={styles.head}>
         <Icon name={action.icon} size="md" color="onHero" />
@@ -57,7 +47,7 @@ function Tile({ action }: { action: QuickAction }) {
       <ThemedText type="caption" themeColor="onHeroMuted">
         {action.label}
       </ThemedText>
-    </AnimatedPressable>
+    </PressableScale>
   );
 }
 

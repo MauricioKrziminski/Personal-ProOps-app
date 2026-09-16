@@ -95,6 +95,14 @@ export const Colors = {
     tileInk: '#0D0D0C',
     tileMotif: '#2A45F0',
     tilePaper: '#F2F3F1',
+    /**
+     * A tecla: o botão tem uma BASE um tom abaixo da face, que aparece na borda de baixo e some
+     * quando a face afunda no toque. `keyFace`/`keyBase` são o par do botão secundário.
+     */
+    tintDeep: '#1A2DAE',
+    dangerDeep: '#7A1712',
+    keyFace: '#FFFFFF',
+    keyBase: '#C9CAC5',
   },
   dark: {
     text: '#F2F3F1',
@@ -140,6 +148,10 @@ export const Colors = {
     tileInk: '#0D0D0C',
     tileMotif: '#4B63FF',
     tilePaper: '#F2F3F1',
+    tintDeep: '#2A3BB8',
+    dangerDeep: '#9E4038',
+    keyFace: '#2A2A27',
+    keyBase: '#151514',
   },
 } as const;
 

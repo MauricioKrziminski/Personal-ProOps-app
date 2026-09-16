@@ -1,11 +1,17 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { LayoutChangeEvent, Pressable, StyleSheet, View } from 'react-native';
-import Animated, { useAnimatedStyle, withSpring } from 'react-native-reanimated';
+import Animated, {
+  interpolateColor,
+  useAnimatedStyle,
+  useReducedMotion,
+  useSharedValue,
+  withSpring,
+} from 'react-native-reanimated';
 import * as Haptics from 'expo-haptics';
 
-import { ThemedText } from '@/components/themed-text';
-import { Elevation, HitTarget, Motion, Radius, Space } from '@/design/tokens';
-import { useTheme, useScheme } from '@/hooks/use-theme';
+import { Fonts } from '@/constants/theme';
+import { HitTarget, Radius, Space, Type } from '@/design/tokens';
+import { useTheme } from '@/hooks/use-theme';
 
 type Opcao<T extends string> = { value: T; label: string };
 
@@ -53,98 +59,184 @@ interface SegmentedProps<T extends string> {
  * controle tocado o dia inteiro, lê como travada. O componente usava `settle` — contra o próprio
  * token, e em silêncio, porque as duas molas compilam igual.
  */
+/** Folga entre o trilho e o bloco. */
+const FOLGA = 3;
+/** A borda da FRENTE corre com esta mola… */
+const FRENTE = { duration: 300, dampingRatio: 0.84 };
+/** …e a de TRÁS vem com esta, mais lenta: é a diferença que estica o bloco. */
+const TRAS = { duration: 520, dampingRatio: 0.9 };
+
+/**
+ * Controle segmentado do mundo Concreto: um bloco de tinta que desliza por um trilho.
+ *
+ * ## O movimento
+ *
+ * O bloco é descrito por DUAS bordas, cada uma com a sua mola. Ao trocar de opção, a borda que
+ * aponta para o destino sai na frente e a outra vem atrás: o bloco se estica na direção do toque
+ * e assenta quando a de trás chega. É o que dá corpo ao gesto sem quicar — e continua sendo só
+ * `translateX` + `scaleX`, na thread de UI.
+ *
+ * ## O rótulo
+ *
+ * A cor de cada rótulo é função da DISTÂNCIA entre o centro do bloco e o centro da célula: o texto
+ * inverte (secundário → cor do fundo) exatamente quando a tinta passa por baixo dele, inclusive
+ * no meio do caminho. Por isso todos os rótulos usam o mesmo peso — trocar de face no selecionado
+ * mudaria a largura do texto no meio da animação.
+ */
 export function Segmented<T extends string>({ options, value, onChange }: SegmentedProps<T>) {
   const theme = useTheme();
-  const scheme = useScheme();
-  const [width, setWidth] = useState(0);
-
+  const reduzido = useReducedMotion();
+  /** A largura de uma célula para o ESTILO do bloco (comum, não animado). */
+  const [celula, setCelula] = useState(0);
   const index = Math.max(0, options.findIndex((o) => o.value === value));
-  const slot = width > 0 ? (width - 4) / options.length : 0;
+  /**
+   * A mesma largura, num valor COMPARTILHADO, para a conta do `translateX`.
+   *
+   * ⚠️ A largura do bloco é estilo COMUM, e só o `transform` anima. Com `width` animado (prop de
+   * layout vinda do worklet) o bloco nascia com largura zero no Android depois de um início a
+   * frio e o rótulo selecionado ficava da cor do fundo, sobre nada — invisível.
+   */
+  const slot = useSharedValue(0);
 
-  const thumb = useAnimatedStyle(() => ({
-    width: slot,
-    transform: [{ translateX: withSpring(index * slot, Motion.spring.snap) }],
+  /** As bordas do bloco, em unidades de célula. */
+  const esquerda = useSharedValue(index);
+  const direita = useSharedValue(index + 1);
+  const anterior = useRef(index);
+
+  useEffect(() => {
+    const de = anterior.current;
+    anterior.current = index;
+    if (de === index) return;
+    if (reduzido) {
+      esquerda.set(index);
+      direita.set(index + 1);
+      return;
+    }
+    if (index > de) {
+      direita.set(withSpring(index + 1, FRENTE));
+      esquerda.set(withSpring(index, TRAS));
+    } else {
+      esquerda.set(withSpring(index, FRENTE));
+      direita.set(withSpring(index + 1, TRAS));
+    }
+  }, [index, reduzido, esquerda, direita]);
+
+  const bloco = useAnimatedStyle(() => ({
+    transform: [
+      { translateX: esquerda.get() * slot.get() },
+      { scaleX: Math.max(0.2, direita.get() - esquerda.get()) },
+    ],
   }));
 
-  const onLayout = (e: LayoutChangeEvent) => setWidth(e.nativeEvent.layout.width);
+  const onLayout = (e: LayoutChangeEvent) => {
+    const w = (e.nativeEvent.layout.width - FOLGA * 2) / options.length;
+    slot.set(w);
+    setCelula((antes) => (antes === w ? antes : w));
+  };
 
   return (
     <View
       accessibilityRole="tablist"
       onLayout={onLayout}
       style={[styles.track, { backgroundColor: theme.backgroundElement }]}>
-      {slot > 0 ? (
-        <Animated.View
-          style={[
-            styles.thumb,
-            thumb,
-            { backgroundColor: theme.surface, boxShadow: Elevation[scheme].raised },
-          ]}
-        />
+      {celula > 0 ? (
+        <Animated.View style={[styles.thumb, { width: celula, backgroundColor: theme.text }, bloco]} />
       ) : null}
-      {options.map((option) => {
-        const selected = option.value === value;
-        return (
-          <Pressable
-            key={option.value}
-            accessibilityRole="tab"
-            accessibilityState={{ selected }}
-            onPress={() => {
-              if (selected) return;
-              Haptics.selectionAsync();
-              onChange(option.value);
-            }}
-            style={styles.option}>
-            <ThemedText
-              type={selected ? 'smallBold' : 'small'}
-              themeColor={selected ? 'text' : 'textSecondary'}
->
-              {option.label}
-            </ThemedText>
-          </Pressable>
-        );
-      })}
+      {options.map((option, i) => (
+        <Celula
+          key={option.value}
+          label={option.label}
+          index={i}
+          selected={i === index}
+          esquerda={esquerda}
+          direita={direita}
+          onPress={() => {
+            if (i === index) return;
+            Haptics.selectionAsync();
+            onChange(option.value);
+          }}
+        />
+      ))}
     </View>
+  );
+}
+
+function Celula({
+  label,
+  index,
+  selected,
+  esquerda,
+  direita,
+  onPress,
+}: {
+  label: string;
+  index: number;
+  selected: boolean;
+  esquerda: { get: () => number };
+  direita: { get: () => number };
+  onPress: () => void;
+}) {
+  const theme = useTheme();
+  const apagado = theme.textSecondary;
+  const aceso = theme.background;
+
+  const cor = useAnimatedStyle(() => {
+    const centro = (esquerda.get() + direita.get()) / 2;
+    const perto = Math.min(1, Math.max(0, 1 - Math.abs(centro - (index + 0.5))));
+    return { color: interpolateColor(perto, [0, 1], [apagado, aceso]) };
+  });
+
+  return (
+    <Pressable
+      accessibilityRole="tab"
+      accessibilityState={{ selected }}
+      accessibilityLabel={label}
+      onPress={onPress}
+      style={styles.option}>
+      <Animated.Text
+        allowFontScaling
+        android_hyphenationFrequency="none"
+        style={[styles.label, cor]}>
+        {label}
+      </Animated.Text>
+    </Pressable>
   );
 }
 
 const styles = StyleSheet.create({
   track: {
     flexDirection: 'row',
-    padding: 2,
-    borderRadius: Radius.xs,
+    padding: FOLGA,
+    borderRadius: Radius.sm,
     borderCurve: 'continuous',
   },
   thumb: {
     position: 'absolute',
-    top: 2,
-    bottom: 2,
-    left: 2,
-    borderRadius: Radius.xs - 2,
+    top: FOLGA,
+    bottom: FOLGA,
+    left: FOLGA,
+    borderRadius: Radius.xs,
     borderCurve: 'continuous',
+    transformOrigin: 'left',
+  },
+  label: {
+    ...Type.subhead,
+    fontFamily: Fonts.semibold,
+    textAlign: 'center',
   },
   option: {
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
     paddingVertical: Space.sm,
-    // Respiro lateral: sem ele o rótulo encosta na borda da célula e, com fonte grande, quebra
-    // no meio da palavra. O rótulo não trunca mais (design.md §7), então a célula é que precisa
-    // ter onde crescer — quem dá a largura é o `minWidth` de quem usa o controle.
     paddingHorizontal: Space.xs,
-    minHeight: 32,
+    minHeight: 34,
     /*
       ⚠️ **Piso de largura, senão o controle SOME quando o pai é uma linha.**
-
       `flex: 1` no React Native é `flexBasis: 0`, então a largura NATURAL da trilha é a soma das
-      células: zero. Num pai `column` isso não aparece (o filho estica), mas dentro de um
-      `flexDirection: 'row'` a trilha inteira colapsa para os 4pt do padding — uma lasquinha
-      branca vertical, sem erro nenhum no log. Foi exatamente o que apareceu no Financeiro
-      ("que toggle é esse no iOS?? eu nem tinha visto isso"): o `Mês | Ciclo` estava lá,
-      desenhado com 4pt de largura, ao lado do seletor de mês.
-
-      44 é o alvo de toque mínimo que design.md §11 já exige — o piso não é um número escolhido
-      para este bug, é a regra que o controle não estava cumprindo.
+      células: zero. Dentro de um `flexDirection: 'row'` a trilha inteira colapsava para os 4pt do
+      padding — foi o `Mês | Ciclo` "sumido" ao lado do seletor de mês no Financeiro. 44 é o alvo
+      de toque mínimo que design.md §11 já exige.
     */
     minWidth: HitTarget,
   },
