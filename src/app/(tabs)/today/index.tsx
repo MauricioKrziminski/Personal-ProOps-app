@@ -402,6 +402,38 @@ export default function TodayScreen() {
             }
             onPress={() =>
               showItemActions('Mais opções', [
+                /*
+                  ⚠️ **O rodapé afirmava um número e não levava a lugar nenhum.** Ele escreve
+                  "Compromissos até 10/10" e o painel escreve "comprometi mais do que entra";
+                  o que compõe isso ficava fora de alcance daqui — medido na conta do dono do
+                  produto em 16/09/2026: das seis saídas até o fim do ciclo, a maior (a fatura
+                  do Nubank, 45% do total) vence em 24 dias e a janela de "O que vence" é de 7,
+                  então ela não aparece na Hoje em ~23 dos 30 dias do mês.
+
+                  A lista que responde já existe inteira (`/finance/cycle`, agrupada, com a
+                  fatura abrindo nas compras dela) — faltava o caminho. **Alargar a janela de 7
+                  dias seria o conserto errado**: a Hoje viraria a tela do ciclo, e o comentário
+                  do `HeroPanel` acima decide o oposto ("aqui é quanto dá para gastar AGORA").
+
+                  `mes` e `view` saem do PRÓPRIO `cycle.data`, não de um default: com `view`
+                  fixo, quem está na régua civil veria no destino um período diferente do que o
+                  rodapé nomeou — a discordância muda de tela que `finance.md` persegue. E
+                  `tipo: 'sai'` porque `comprometido_no_ciclo` é `sum(out_cents)`: mandar para
+                  a lista completa mostraria entradas que aquele número não conta.
+                */
+                ...(cycle.data
+                  ? [
+                      {
+                        label: 'Ver o que fecha o ciclo',
+                        icon: 'list.bullet' as const,
+                        onPress: () =>
+                          router.push({
+                            pathname: '/finance/cycle',
+                            params: { month: cycle.data.mes, view: cycle.data.view, tipo: 'sai' },
+                          }),
+                      },
+                    ]
+                  : []),
                 { label: 'Projeção', icon: 'chart.line.uptrend.xyaxis', onPress: () => router.push('/finance/forecast') },
                 { label: 'Patrimônio', icon: 'building.columns', onPress: () => router.push('/finance/net-worth') },
                 { label: 'Metas', icon: 'target', onPress: () => router.push('/finance/goals') },

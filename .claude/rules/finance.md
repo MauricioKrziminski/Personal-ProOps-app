@@ -190,6 +190,28 @@ outra lente ocupar o topo desta.
 ⚠️ **Com filtro ativo o card SOME.** `transactions_summary` soma o período inteiro e a lista
 filtrada soma menos — mantê-lo ali recria o mesmo defeito com outra cara.
 
+⚠️ **Número de outra JANELA também precisa de caminho, não só número de outra lente**
+(16/09/2026). O painel da Hoje escreve "Compromissos até 10/10/2026 · R$ 8.274,68" e logo abaixo
+"O que vence" lista **7 dias**. Não é erro de soma — são perguntas diferentes, e a separação está
+decidida no comentário do `HeroPanel` ("aqui é quanto dá para gastar AGORA"). O defeito era a
+tela **afirmar** o total, dizer *"comprometi mais do que entra"*, e não ter como ver o que é
+aquilo: o menu do painel oferecia Projeção, Patrimônio e Metas.
+
+Medido na conta do dono do produto: das seis saídas até o fim do ciclo, a maior é a fatura do
+Nubank (R$ 3.751,22, **45% do total**), que vence em 24 dias — com janela de 7 e cartão fechando
+no dia 3 e vencendo no 10, ela some da Hoje em ~23 dos 30 dias do mês. `upcoming_bills` **já**
+traz a fatura (`kind = 'invoice'`, pelo `invoice_open_cents`, sem `paid`/`rolled` e sem duplicar
+a compra que está dentro dela): o que faltava não era dado nem seção, era o link.
+
+O conserto é o item "Ver o que fecha o ciclo" no menu do painel, apontando para `/finance/cycle`
+— a lista que já existe, agrupada, com a fatura abrindo nas compras. **Alargar a janela dos 7
+dias seria o conserto errado**: a Hoje viraria a tela do ciclo com outro nome.
+
+⚠️ **O link carrega `mes` e `view` do próprio `cycle_now`, nunca um default.** Com `view` fixo,
+quem está na régua civil abriria um período diferente do que o rodapé acabou de nomear — a mesma
+discordância entre duas leituras que esta seção inteira persegue. E o `tipo` acompanha o que o
+número CONTA: `comprometido_no_ciclo` é `sum(out_cents)`, então o destino abre em "Saiu".
+
 ⚠️ **E o PERCENTUAL é a mesma regra: numerador e denominador saem da MESMA coluna**
 (15/09/2026). "Onde o dinheiro foi" escrevia **"0% do mês" nas seis categorias** — o divisor era
 o REALIZADO (`total_cents − pending_cents`) enquanto cada linha mostrava `total_cents`. No ciclo
