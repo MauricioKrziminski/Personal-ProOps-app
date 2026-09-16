@@ -32,7 +32,7 @@ export function Chip({ label, selected, onPress, count }: ChipProps) {
       style={({ pressed }) => [
         styles.chip,
         {
-          backgroundColor: selected ? theme.tint : theme.backgroundElement,
+          backgroundColor: selected ? theme.tintFill : theme.backgroundElement,
           // O chip inativo leva contorno; o ativo não precisa, porque a cor já o separa. É o par
           // `bg-secondary text-black` / `bg-surface border-white/6` do export.
           borderColor: selected ? 'transparent' : theme.cardBorder,

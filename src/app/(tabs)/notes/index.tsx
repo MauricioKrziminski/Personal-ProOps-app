@@ -442,7 +442,7 @@ export default function NotesScreen() {
             style={({ pressed }) => [
               styles.enviar,
               {
-                backgroundColor: draft.trim() ? theme.tint : theme.backgroundElement,
+                backgroundColor: draft.trim() ? theme.tintFill : theme.backgroundElement,
                 opacity: pressed ? 0.5 : 1,
               },
             ]}>

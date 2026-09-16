@@ -112,6 +112,16 @@ test('nenhuma face do tipo antigo sobrou', () => {
   );
 });
 
+test('azul como FUNDO é tintFill, nunca tint', () => {
+  // `tint` é o azul de TEXTO e ícone; no escuro ele é claro demais para carregar rótulo branco.
+  // O campo azul (botão, célula escolhida, selo) é `tintFill`, com o rótulo em `onTint`.
+  assert.deepEqual(
+    offenders(/backgroundColor:[^,}\n]*theme\.tint\b/),
+    [],
+    'fundo azul usa theme.tintFill (rótulo onTint); theme.tint é texto, ícone e progresso'
+  );
+});
+
 test('rgba/hsl literais também não passam', () => {
   // A paleta local da aba Notas escapava por aqui: `accentSoft: 'rgba(139,92,246,0.18)'`.
   assert.deepEqual(

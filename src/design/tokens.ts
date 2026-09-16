@@ -14,21 +14,25 @@ import { Fonts } from '@/constants/theme';
 import { Easing } from 'react-native-reanimated';
 
 /**
- * Escala de raio. `borderCurve: 'continuous'` (squircle) acompanha TODO uso — é o detalhe mais
- * barato que faz a superfície parecer iOS.
+ * Escala de raio do mundo Concreto: geometria dura, com o canto só aparado.
+ *
+ * O desenho anterior era feito de pílulas (o Stitch tinha 113 `rounded-full`). No Concreto a
+ * pílula sobra para chip e avatar; botão é retângulo de `sm`, card é `md`. `borderCurve:
+ * 'continuous'` continua em todo uso — mesmo num raio de 4 ele é o que separa o canto aparado
+ * de um canto "arredondado de CSS".
  */
 export const Radius = {
-  /** menor raio permitido — badge, barra de progresso (`rounded` do Stitch) */
-  xs: 4,
-  /** input, linha de lista (`rounded-lg`) */
-  sm: 8,
-  /** card — o raio mais usado do design (`rounded-xl`, 46 ocorrências) */
-  md: 12,
-  /** card de destaque (`rounded-2xl`) */
-  lg: 16,
+  /** barra de progresso, badge */
+  xs: 2,
+  /** botão, input, célula, chip de ícone */
+  sm: 4,
+  /** card */
+  md: 6,
+  /** bloco de destaque */
+  lg: 8,
   /** sheet */
-  xl: 20,
-  /** botão, chip, FAB, avatar (`rounded-full`, 113 ocorrências: o Stitch é feito de pílulas) */
+  xl: 12,
+  /** chip e avatar — e só */
   pill: 999,
 } as const;
 
@@ -121,7 +125,19 @@ export const Motion = {
      * fazendo crossfade ao longo do caminho.
      */
     tab: { duration: 1000, dampingRatio: 0.62 },
+    /**
+     * Assentar no grid — o azulejo encaixando. Chega firme e sem quique: o Concreto não balança,
+     * ele trava no lugar. Usada no loader do botão, na carteira e em tudo que "encaixa".
+     */
+    encaixe: { duration: 420, dampingRatio: 0.86 },
+    /** O cartão atravessando telas: longa o bastante para o olho seguir o giro, sem ultrapassar. */
+    voo: { duration: 620, dampingRatio: 0.9 },
   },
+  /**
+   * A onda de azulejos (`TileField`): duração da onda, quanto as janelas dos azulejos se
+   * sobrepõem, e as duas versões da abertura (a curta do dia a dia e o show das primeiras vezes).
+   */
+  curtain: { duration: 900, overlap: 0.6, short: 600, full: 1800 },
   /**
    * Escalonamento de entrada em lista: `delay = min(index * step, cap)`.
    *
@@ -132,7 +148,7 @@ export const Motion = {
    */
   stagger: { step: 30, cap: 400 },
   /** Escala do press-in. Linha de lista NÃO usa scale — usa highlight de fundo. */
-  pressScale: 0.97,
+  pressScale: 0.96,
 } as const;
 
 /**
@@ -141,30 +157,43 @@ export const Motion = {
  * `tabular` liga `fontVariant: ['tabular-nums']` e é OBRIGATÓRIO em todo número que conta, mede
  * ou custa — sem ele o valor muda de largura enquanto anima.
  */
+/**
+ * ⚠️ **A altura de linha dos tamanhos grandes é ~1,17× o corpo, e isso é MEDIDO, não gosto.**
+ * Jost tem ascendente de 1,07em e descendente de 0,375em. No iOS, uma caixa de linha menor que
+ * `descendente + altura do glifo` desenha o glifo para FORA pelo topo — o "R$" do herói invadiu o
+ * rótulo de cima na primeira captura (16/09/2026). Apertar o display abaixo disso é refazer o bug.
+ */
 export const Type = {
-  largeTitle: { fontFamily: Fonts.bold, fontSize: 32, lineHeight: 38, letterSpacing: -0.8 },
-  title: { fontFamily: Fonts.semibold, fontSize: 26, lineHeight: 32, letterSpacing: -0.52 },
-  title2: { fontFamily: Fonts.semibold, fontSize: 20, lineHeight: 26, letterSpacing: -0.3 },
-  headline: { fontFamily: Fonts.semibold, fontSize: 17, lineHeight: 22, letterSpacing: -0.17 },
-  body: { fontFamily: Fonts.regular, fontSize: 17, lineHeight: 24, letterSpacing: -0.09 },
-  callout: { fontFamily: Fonts.regular, fontSize: 15, lineHeight: 21, letterSpacing: -0.05 },
-  subhead: { fontFamily: Fonts.regular, fontSize: 15, lineHeight: 21, letterSpacing: -0.05 },
+  /**
+   * Exibição do Concreto: título em minúsculas, grande e apertado — a palavra como bloco.
+   * Uma por tela, e só nas telas de exibição (conta, carteira, onboarding, saudação).
+   */
+  display: { fontFamily: Fonts.semibold, fontSize: 52, lineHeight: 60, letterSpacing: -2 },
+  largeTitle: { fontFamily: Fonts.semibold, fontSize: 34, lineHeight: 40, letterSpacing: -1 },
+  title: { fontFamily: Fonts.semibold, fontSize: 26, lineHeight: 30, letterSpacing: -0.6 },
+  title2: { fontFamily: Fonts.semibold, fontSize: 20, lineHeight: 24, letterSpacing: -0.3 },
+  headline: { fontFamily: Fonts.semibold, fontSize: 17, lineHeight: 22, letterSpacing: -0.1 },
+  body: { fontFamily: Fonts.regular, fontSize: 17, lineHeight: 24, letterSpacing: 0 },
+  callout: { fontFamily: Fonts.regular, fontSize: 15, lineHeight: 20, letterSpacing: 0 },
+  subhead: { fontFamily: Fonts.regular, fontSize: 15, lineHeight: 20, letterSpacing: 0 },
   footnote: { fontFamily: Fonts.regular, fontSize: 13, lineHeight: 18, letterSpacing: 0 },
-  caption: { fontFamily: Fonts.medium, fontSize: 11, lineHeight: 14, letterSpacing: 0.44 },
-  /** dinheiro em linha e no painel — o Stitch usa UM tamanho de display (`display-hero-mobile`) */
-  money: { fontFamily: Fonts.bold, fontSize: 32, lineHeight: 38, letterSpacing: -0.8 },
-  heroMoney: { fontFamily: Fonts.bold, fontSize: 32, lineHeight: 38, letterSpacing: -0.8 },
-  /** rótulo de seção em caixa alta — `caption-xs` + `tracking-widest` */
-  meta: { fontFamily: Fonts.semibold, fontSize: 11, lineHeight: 14, letterSpacing: 1.1 },
+  caption: { fontFamily: Fonts.medium, fontSize: 12, lineHeight: 15, letterSpacing: 0.2 },
+  /** dinheiro de card — Jost tem numerais tabulares, então o valor não "dança" ao contar */
+  money: { fontFamily: Fonts.semibold, fontSize: 32, lineHeight: 38, letterSpacing: -0.8 },
+  /** o número do herói: o maior dado da tela */
+  heroMoney: { fontFamily: Fonts.semibold, fontSize: 48, lineHeight: 56, letterSpacing: -1.6 },
+  /** rótulo de seção em caixa alta, aberto */
+  meta: { fontFamily: Fonts.semibold, fontSize: 11, lineHeight: 14, letterSpacing: 1.6 },
   /**
    * Mono, o segundo tipo do sistema. Hora, data, contador, unidade, badge de status.
    *
    * É o que carimba "isto é dado" sem gastar cor, e é metade da personalidade do design —
-   * sem ele o app volta a ser uma escala de cinza só com Jost.
+   * sem ele o app volta a ser uma escala de cinza só com Jost. Martian Mono é larga, por isso o
+   * tracking negativo.
    */
-  code: { fontFamily: Fonts.monoMedium, fontSize: 12, lineHeight: 16, letterSpacing: 0.24 },
+  code: { fontFamily: Fonts.monoMedium, fontSize: 12, lineHeight: 16, letterSpacing: -0.2 },
   /** mono um degrau acima: valor de dinheiro dentro de card e linha */
-  ticker: { fontFamily: Fonts.monoSemibold, fontSize: 14, lineHeight: 18, letterSpacing: -0.14 },
+  ticker: { fontFamily: Fonts.monoMedium, fontSize: 13, lineHeight: 18, letterSpacing: -0.3 },
 } as const;
 
 export type TypeVariant = keyof typeof Type;

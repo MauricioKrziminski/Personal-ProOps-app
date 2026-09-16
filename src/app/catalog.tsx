@@ -70,7 +70,7 @@ export default function CatalogScreen() {
         <View style={{ flexDirection: 'row', alignItems: 'flex-end', gap: Space.sm, padding: Space.lg, height: 120 }}>
           {[0.2, 0.55, 1, 0.4, 0, 0.8].map((r, i) => (
             <View key={i} style={{ flex: 1, height: 88, justifyContent: 'flex-end' }}>
-              <BarTrack ratio={r} index={i} height={88} color={i === 2 ? theme.tint : theme.backgroundElement} dim={i > 3} />
+              <BarTrack ratio={r} index={i} height={88} color={i === 2 ? theme.tintFill : theme.backgroundElement} dim={i > 3} />
             </View>
           ))}
         </View>

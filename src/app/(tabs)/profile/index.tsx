@@ -281,7 +281,7 @@ export default function ProfileScreen() {
               mentindo é pior que ausência de cor (§2): sem telefone, sem selo.
             */}
             {phone ? (
-              <View style={[styles.idSelo, { backgroundColor: theme.tint, borderColor: theme.heroBottom }]}>
+              <View style={[styles.idSelo, { backgroundColor: theme.tintFill, borderColor: theme.heroBottom }]}>
                 <Icon name="checkmark" size="xs" color="onTint" />
               </View>
             ) : null}

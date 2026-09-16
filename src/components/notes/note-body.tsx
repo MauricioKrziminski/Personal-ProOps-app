@@ -102,7 +102,7 @@ function Bloco({ bloco: b, onToggle }: { bloco: NoteBlock; onToggle: (i: number)
   if (b.kind === 'quote') {
     return (
       <View style={styles.linhaCitacao}>
-        <View style={[styles.barraCitacao, { backgroundColor: theme.tint }]} />
+        <View style={[styles.barraCitacao, { backgroundColor: theme.tintFill }]} />
         <Inline text={b.text} color={theme.textSecondary} style={styles.cresce} />
       </View>
     );

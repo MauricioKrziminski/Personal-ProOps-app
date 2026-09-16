@@ -7,6 +7,7 @@ import { useTheme } from '@/hooks/use-theme';
 export type ThemedTextProps = TextProps & {
   type?:
     | 'default'
+    | 'display'
     | 'title'
     | 'subtitle'
     | 'headline'
@@ -92,7 +93,9 @@ const styles = StyleSheet.create({
   shrink: { flexShrink: 1 },
   /** corpo — título de linha, parágrafo */
   default: Type.body,
-  /** display de tela; uma por tela */
+  /** exibição do Concreto: minúsculas grandes — conta, carteira, onboarding, saudação */
+  display: Type.display,
+  /** título de tela; um por tela */
   title: Type.largeTitle,
   /** cabeçalho de bloco dentro da tela */
   subtitle: Type.title2,

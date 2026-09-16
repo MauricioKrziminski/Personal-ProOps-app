@@ -75,7 +75,7 @@ function Bar({ ratio, index, selecionada }: { ratio: number; index: number; sele
       index={index}
       height={ALTURA_BARRA}
       dim={!selecionada}
-      color={selecionada ? theme.tint : theme.backgroundElement}
+      color={selecionada ? theme.tintFill : theme.backgroundElement}
     />
   );
 }

@@ -73,7 +73,7 @@ export function Button({
   const animated = useAnimatedStyle(() => ({ transform: [{ scale: scale.get() }] }));
 
   const surface: Record<Variant, string> = {
-    primary: theme.tint,
+    primary: theme.tintFill,
     secondary: theme.backgroundElement,
     ghost: 'transparent',
     destructive: theme.danger,

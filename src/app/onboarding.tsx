@@ -298,7 +298,7 @@ function Trilho({ cheio }: { cheio: boolean }) {
 
   return (
     <View style={[styles.trilho, { backgroundColor: theme.separator }]}>
-      <Animated.View style={[styles.trilhoCheio, { backgroundColor: theme.tint }, estilo]} />
+      <Animated.View style={[styles.trilhoCheio, { backgroundColor: theme.tintFill }, estilo]} />
     </View>
   );
 }
@@ -485,7 +485,7 @@ function PassoAvisos({
           mesma régua do `alerts.py`: aviso que só informa é o que faz desinstalar no segundo mês.
         */}
         <View style={[styles.exemplo, { borderColor: theme.cardBorder }]}>
-          <View style={[styles.exemploIcone, { backgroundColor: theme.tint }]}>
+          <View style={[styles.exemploIcone, { backgroundColor: theme.tintFill }]}>
             <Icon name="bell.badge" size="sm" color="onTint" />
           </View>
           <ThemedText type="footnote" style={styles.exemploTexto}>

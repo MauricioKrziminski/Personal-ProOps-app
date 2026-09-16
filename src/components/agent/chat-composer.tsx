@@ -97,7 +97,7 @@ export function ChatComposer({
             style={({ pressed }) => [
               styles.enviar,
               {
-                backgroundColor: pode ? theme.tint : theme.backgroundElement,
+                backgroundColor: pode ? theme.tintFill : theme.backgroundElement,
                 opacity: pressed && pode ? 0.85 : 1,
               },
             ]}>

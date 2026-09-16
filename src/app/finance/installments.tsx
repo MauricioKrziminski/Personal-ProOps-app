@@ -118,7 +118,7 @@ function Bar({
       // Parcela já paga fica mais fraca — mesma convenção da tendência da home: uma cor,
       // duas presenças, sem gastar uma segunda matiz.
       dim={passado}
-      color={destaque ? theme.tint : theme.backgroundElement}
+      color={destaque ? theme.tintFill : theme.backgroundElement}
     />
   );
 }

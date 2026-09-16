@@ -88,7 +88,7 @@ export function SelectField({
         style={[
           styles.ladrilho,
           {
-            backgroundColor: aceso ? theme.tint : theme.backgroundElement,
+            backgroundColor: aceso ? theme.tintFill : theme.backgroundElement,
             borderColor: aceso ? 'transparent' : theme.cardBorder,
           },
         ]}>
@@ -192,7 +192,7 @@ export function SelectField({
                         {/* Só a escolhida desenha algo: um círculo vazio em cada
                             linha é ruído, a ausência já diz "não é esta". */}
                         {marcada ? (
-                          <View style={[styles.marca, { backgroundColor: theme.tint }]}>
+                          <View style={[styles.marca, { backgroundColor: theme.tintFill }]}>
                             <Icon name="checkmark" size="xs" color="onTint" />
                           </View>
                         ) : null}

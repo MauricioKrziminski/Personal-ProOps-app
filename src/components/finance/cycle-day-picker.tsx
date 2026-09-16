@@ -58,8 +58,8 @@ export function CycleDayPicker({
               style={[
                 styles.dia,
                 {
-                  backgroundColor: escolhido ? theme.tint : theme.surface,
-                  borderColor: escolhido ? theme.tint : theme.cardBorder,
+                  backgroundColor: escolhido ? theme.tintFill : theme.surface,
+                  borderColor: escolhido ? theme.tintFill : theme.cardBorder,
                 },
               ]}>
               <ThemedText
@@ -86,8 +86,8 @@ export function CycleDayPicker({
         style={[
           styles.ultimo,
           {
-            backgroundColor: value == null ? theme.tint : theme.surface,
-            borderColor: value == null ? theme.tint : theme.cardBorder,
+            backgroundColor: value == null ? theme.tintFill : theme.surface,
+            borderColor: value == null ? theme.tintFill : theme.cardBorder,
           },
         ]}>
         <ThemedText type="default" style={value == null ? { color: theme.onTint } : undefined}>

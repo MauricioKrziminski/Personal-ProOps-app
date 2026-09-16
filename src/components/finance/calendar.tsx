@@ -146,7 +146,7 @@ export function Calendar({ value, onChange, min, max }: Props) {
                   style={[
                     styles.dia,
                     marcado
-                      ? { backgroundColor: theme.tint }
+                      ? { backgroundColor: theme.tintFill }
                       : pressed
                         ? { backgroundColor: theme.backgroundSelected }
                         : null,

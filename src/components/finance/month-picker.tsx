@@ -232,7 +232,7 @@ function MonthSheet({
                   styles.cell,
                   {
                     backgroundColor: ativo
-                      ? theme.tint
+                      ? theme.tintFill
                       : pressed
                         ? theme.backgroundSelected
                         : theme.backgroundElement,
