@@ -30,13 +30,20 @@ App mobile pessoal de **notas rápidas, lembretes e controle financeiro operado 
   Isso já falhou **duas vezes** (03/09/2026): a `0049` e depois as `0050`/`0051` foram anunciadas
   como "aplicadas em produção" quando foram para o staging.
 
-  Produção está em **`20260915190000`** (a parcela herda o nome do estabelecimento), aplicada em
-  15/09/2026 pelo Gabriel, depois da `20260915120000` (a coluna `atrasada` de `cycle_lines`) e da
-  `20260914180000` (Notas: cor, pin, arquivar e ordem manual) — e o repo não tem nenhuma
-  migration fora de lá. Todas conferidas na fonte DEPOIS de aplicar: a `atrasada` é a última
-  coluna de `cycle_lines`, `authenticated` mantém `execute` nas portas públicas, `_cycle_lines`
-  segue revogada, e na `20260915190000` o `create or replace` preservou os grants e o
-  `TimeZone=America/Sao_Paulo` da casca de 7 argumentos (que ela não toca).
+  Produção está em **`20260915230000`** (o quarto slot de rascunho cabe no CHECK), aplicada em
+  15/09/2026 pelo Gabriel junto da `20260915210000` (reparcelar a compra: `update_installment_plan`
+  e `private.parcela_travada`), depois da `20260915190000` (a parcela herda o nome do
+  estabelecimento) e da `20260915120000` (a coluna `atrasada` de `cycle_lines`) — e o repo não tem
+  nenhuma migration fora de lá. **Staging e produção estão no MESMO ponto**, sem pendência de
+  nenhum lado.
+
+  Todas conferidas na fonte DEPOIS de aplicar (`scripts/` não guarda isso; a conferência da leva
+  de 15/09 está no histórico desta linha): a `atrasada` é a última coluna de `cycle_lines`,
+  `_cycle_lines` segue revogada, o CHECK de `draft_actions.slot` lista os quatro valores,
+  `update_installment_plan` e `parcela_travada` existem em UMA versão cada com
+  `search_path=public`, `authenticated` mantém `execute` nas portas públicas e **`anon` não o
+  tem** — e o `create or replace` das duas levas preservou o `TimeZone=America/Sao_Paulo` da casca
+  de 7 argumentos de `create_installment_plan` (que nenhuma delas toca).
 
   Conferido na fonte depois da leva de 14/09: as 43 RPCs que o app chama existem e continuam com `execute`
   para `authenticated` (é o modo de falha do par `200000`/`220000`, abaixo), e
