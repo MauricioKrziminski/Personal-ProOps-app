@@ -274,7 +274,7 @@ function Fluxo({
             a ausência já é a informação. A palavra diz o que o zero diria, sem parecer defeito.
 
             `code` e não `caption`: no mesmo bloco o total é `ticker` (mono), e `caption` é
-            Hanken 11 com tracking POSITIVO — tracking desenhado para caixa alta, aplicado a
+            Jost 11 com tracking POSITIVO — tracking desenhado para caixa alta, aplicado a
             dígito.
           */}
           {jaAconteceu === 0 ? (

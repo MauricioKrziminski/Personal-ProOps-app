@@ -1,19 +1,19 @@
 import { createNativeQueryFocusHandler } from '@/lib/query-invalidation';
 import { useEffect, useRef } from 'react';
 import {
-  HankenGrotesk_400Regular,
-  HankenGrotesk_400Regular_Italic,
-  HankenGrotesk_500Medium,
-  HankenGrotesk_600SemiBold,
-  HankenGrotesk_600SemiBold_Italic,
-  HankenGrotesk_700Bold,
-  HankenGrotesk_700Bold_Italic,
-} from '@expo-google-fonts/hanken-grotesk';
+  Jost_400Regular,
+  Jost_400Regular_Italic,
+  Jost_500Medium,
+  Jost_600SemiBold,
+  Jost_600SemiBold_Italic,
+  Jost_700Bold,
+  Jost_700Bold_Italic,
+} from '@expo-google-fonts/jost';
 import {
-  JetBrainsMono_400Regular,
-  JetBrainsMono_500Medium,
-  JetBrainsMono_600SemiBold,
-} from '@expo-google-fonts/jetbrains-mono';
+  MartianMono_400Regular,
+  MartianMono_500Medium,
+  MartianMono_600SemiBold,
+} from '@expo-google-fonts/martian-mono';
 import { useFonts } from 'expo-font';
 import { focusManager, QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { DarkTheme, DefaultTheme, Stack, ThemeProvider, usePathname } from 'expo-router';
@@ -99,22 +99,22 @@ function AppTree() {
   useEffect(attachNotificationListeners, []);
 
   /**
-   * As duas famílias do design (Hanken Grotesk + JetBrains Mono).
+   * As duas famílias do design (Jost + Martian Mono).
    *
    * O app segura o splash até carregarem: `Type` aponta para as faces pelo NOME, e uma face
    * ausente não cai no system font — ela some, deixando a tela em branco por um frame.
    */
   const [fontsLoaded] = useFonts({
-    HankenGrotesk_400Regular,
-    HankenGrotesk_400Regular_Italic,
-    HankenGrotesk_500Medium,
-    HankenGrotesk_600SemiBold,
-    HankenGrotesk_600SemiBold_Italic,
-    HankenGrotesk_700Bold,
-    HankenGrotesk_700Bold_Italic,
-    JetBrainsMono_400Regular,
-    JetBrainsMono_500Medium,
-    JetBrainsMono_600SemiBold,
+    Jost_400Regular,
+    Jost_400Regular_Italic,
+    Jost_500Medium,
+    Jost_600SemiBold,
+    Jost_600SemiBold_Italic,
+    Jost_700Bold,
+    Jost_700Bold_Italic,
+    MartianMono_400Regular,
+    MartianMono_500Medium,
+    MartianMono_600SemiBold,
   });
 
   const { session, loading } = useSession();

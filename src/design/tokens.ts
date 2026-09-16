@@ -160,7 +160,7 @@ export const Type = {
    * Mono, o segundo tipo do sistema. Hora, data, contador, unidade, badge de status.
    *
    * É o que carimba "isto é dado" sem gastar cor, e é metade da personalidade do design —
-   * sem ele o app volta a ser uma escala de cinza só com Hanken Grotesk.
+   * sem ele o app volta a ser uma escala de cinza só com Jost.
    */
   code: { fontFamily: Fonts.monoMedium, fontSize: 12, lineHeight: 16, letterSpacing: 0.24 },
   /** mono um degrau acima: valor de dinheiro dentro de card e linha */

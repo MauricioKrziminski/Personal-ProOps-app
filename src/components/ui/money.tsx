@@ -65,7 +65,7 @@ export function Money({
       // baixo da máscara derrotaria o propósito.
       selectable={!oculto}
       accessibilityLabel={oculto ? 'Valor oculto' : undefined}
-      // `Type[variant]` já carrega a família certa (Hanken no display, JetBrains no `ticker`).
+      // `Type[variant]` já carrega a família certa (Jost no display, Martian Mono no `ticker`).
       // `flexShrink: 0` desfaz o padrão do `ThemedText`: numa linha "rótulo … R$ 1.350,00" os
       // dois encolheriam proporcionalmente e o VALOR quebraria no meio dos dígitos. Número não
       // cede — quem cede é o rótulo ao lado.

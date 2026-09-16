@@ -101,6 +101,17 @@ test('nenhum fontWeight solto — peso é FAMÍLIA, não número', () => {
   );
 });
 
+test('nenhuma face do tipo antigo sobrou', () => {
+  // O mundo Concreto (spec de 16/09/2026) trocou Hanken Grotesk + JetBrains Mono por Jost +
+  // Martian Mono. Uma face antiga esquecida não dá erro: ela SOME, porque `Type` aponta pelo nome
+  // e o pacote dela saiu do projeto.
+  assert.deepEqual(
+    offenders(/HankenGrotesk|JetBrainsMono|hanken-grotesk|jetbrains-mono/),
+    [],
+    'o tipo do app é Jost + Martian Mono'
+  );
+});
+
 test('rgba/hsl literais também não passam', () => {
   // A paleta local da aba Notas escapava por aqui: `accentSoft: 'rgba(139,92,246,0.18)'`.
   assert.deepEqual(
@@ -907,10 +918,11 @@ test('toda face de Fonts está carregada no _layout raiz', () => {
   const theme = readFileSync(join(SRC, 'constants', 'theme.ts'), 'utf8');
   const layout = readFileSync(join(SRC, 'app', '_layout.tsx'), 'utf8');
 
-  const faces = [...theme.matchAll(/^\s+\w+:\s+'((?:HankenGrotesk|JetBrainsMono)_\w+)',/gm)].map(
-    (m) => m[1]
-  );
-  assert.ok(faces.length >= 8, 'não achei as faces em theme.ts — o regex envelheceu');
+  // Lê as faces do bloco `Fonts` sem citar família: o regex não envelhece na próxima troca de tipo.
+  const inicio = theme.indexOf('export const Fonts');
+  const bloco = theme.slice(inicio, theme.indexOf('} as const', inicio));
+  const faces = [...bloco.matchAll(/^\s+\w+:\s+'([A-Za-z]+_\d{3}\w*)',/gm)].map((m) => m[1]);
+  assert.ok(faces.length >= 10, 'não achei as faces em theme.ts — o regex envelheceu');
 
   const faltando = faces.filter((face) => !layout.includes(face));
   assert.deepEqual(faltando, [], 'face declarada e não carregada faz o TEXTO SUMIR, sem erro');

@@ -23,7 +23,7 @@ export type FaceKey =
  * já é semibold precisa subir para 700, senão o `*negrito*` não faz nada visível ali.
  *
  * ⚠️ `code` ganha da combinação inteira — mono não tem itálico nem negrito no par do projeto, e
- * fingir um com outra família quebraria o alinhamento tabular que é o ponto do JetBrains Mono.
+ * fingir um com outra família quebraria o alinhamento tabular que é o ponto do Martian Mono.
  */
 export function faceKey(marks: readonly Mark[], base: 400 | 500 | 600 = 400): FaceKey {
   if (marks.includes('code')) return 'mono';

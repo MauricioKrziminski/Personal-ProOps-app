@@ -215,41 +215,45 @@ export const Colors = {
 export type ThemeColor = keyof typeof Colors.light & keyof typeof Colors.dark;
 
 /**
- * As famílias do design Stitch: **Hanken Grotesk** no texto, **JetBrains Mono** no número.
+ * As famílias do mundo Concreto (16/09/2026): **Jost** no texto e nos números grandes,
+ * **Martian Mono** no dado em linha.
  *
- * O par é o que dá voz a um sistema sem cor de marca — um tipo para ler, outro para carimbar
- * dado (hora, valor, percentual, telefone, badge). Era a régua da plataforma (`system-ui`), e
- * por isso o app lia como "iOS bem feito genérico" mesmo com o layout certo.
+ * Jost é a herdeira livre da Futura — o tipo da Poesia Concreta, que é a origem do desenho — e
+ * tem numerais tabulares (`tnum`), então carrega também o dinheiro do herói. Martian Mono tem a
+ * mesma geometria de círculo e quadrado e carimba hora, data, valor de linha e badge. Um tipo
+ * para ler, outro para dado: sem o mono o app vira uma escala de cinza com uma fonte só.
+ *
+ * Substituiu Hanken Grotesk + JetBrains Mono, que eram a voz do desenho do Stitch.
  *
  * **Nome por PESO, nunca `fontWeight`.** Fonte custom no Android ignora `fontWeight` e cai no
  * regular com bold sintético; no iOS a família também é resolvida pelo nome do arquivo. Quem
  * escolhe o peso é a variante de `Type`, apontando para a face exata.
  */
 export const Fonts = {
-  regular: 'HankenGrotesk_400Regular',
+  regular: 'Jost_400Regular',
   /**
    * Itálico é FACE, não `fontStyle` — mesma regra do peso.
    *
    * Com `fontStyle: 'italic'` o iOS sintetiza uma oblíqua e o Android troca pela itálica do
    * SISTEMA: a citação do WhatsApp sairia numa fonte diferente do resto do card.
    */
-  italic: 'HankenGrotesk_400Regular_Italic',
-  medium: 'HankenGrotesk_500Medium',
-  semibold: 'HankenGrotesk_600SemiBold',
-  bold: 'HankenGrotesk_700Bold',
+  italic: 'Jost_400Regular_Italic',
+  medium: 'Jost_500Medium',
+  semibold: 'Jost_600SemiBold',
+  bold: 'Jost_700Bold',
   /**
    * As duas faces que a marcação INLINE da nota precisa.
    *
    * `*negrito*` dentro de um `# título` (que já é semibold) e `_itálico_` dentro dele não têm
    * face sintética que preste: pela mesma regra do peso, o Android cairia no regular com bold
-   * falso e o iOS inclinaria a letra por transformação. `noteFace` (`src/design/note-colors.ts`)
-   * resolve peso × itálico para uma destas seis faces exatas.
+   * falso e o iOS inclinaria a letra por transformação. `faceKey` (`src/design/note-face.ts`)
+   * resolve peso × itálico para uma destas faces exatas.
    */
-  semiboldItalic: 'HankenGrotesk_600SemiBold_Italic',
-  boldItalic: 'HankenGrotesk_700Bold_Italic',
-  mono: 'JetBrainsMono_400Regular',
-  monoMedium: 'JetBrainsMono_500Medium',
-  monoSemibold: 'JetBrainsMono_600SemiBold',
+  semiboldItalic: 'Jost_600SemiBold_Italic',
+  boldItalic: 'Jost_700Bold_Italic',
+  mono: 'MartianMono_400Regular',
+  monoMedium: 'MartianMono_500Medium',
+  monoSemibold: 'MartianMono_600SemiBold',
 } as const;
 
 export const Spacing = {

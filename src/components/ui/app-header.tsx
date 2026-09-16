@@ -13,7 +13,7 @@ import { useScheme, useTheme } from '@/hooks/use-theme';
  * As opções de `<Stack>` que vestem o header NATIVO com a fonte do app.
  *
  * Sem isto o título das telas empurradas (Lançamentos, Contas, Cartões, Gerenciar, Pastas…) sai
- * em SF Pro sobre um corpo em Hanken Grotesk — duas famílias na mesma tela, que é exatamente o
+ * em SF Pro sobre um corpo em Jost — duas famílias na mesma tela, que é exatamente o
  * "quase nativo" que o design proíbe. `headerTitleStyle`/`headerLargeTitleStyle` viram
  * `titleFontFamily`/`largeTitleFontFamily` no `react-native-screens`.
  *
