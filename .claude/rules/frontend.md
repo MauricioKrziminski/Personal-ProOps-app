@@ -176,6 +176,31 @@ não reabrir no render seguinte. São duas perguntas diferentes sobre o mesmo pa
 **Formulário novo que se abre por parâmetro nasce com isso** — senão a régua volta a divergir
 tela a tela, que é como ela nasceu.
 
+### Os botões do Agente têm DOIS prefixos, e a tela conhecia um só
+
+⚠️ **`pa:` é HITL; `ds:` é RASCUNHO — e a tela descartava todo `ds:`** (15/09/2026). A queixa
+veio de um print: *"escolha ou diga o nome do cartão"* com nada para escolher. O motor já
+mandava a lista de cartões (o MESMO payload que vira botão no WhatsApp); `parseUiActions`
+(`src/lib/agent-chat.ts`) saía cedo quando não havia `pending_id`, e rascunho não tem nenhum.
+
+| prefixo | o que é | como se responde |
+|---|---|---|
+| `pa:<pendente>:…` | HITL (`pending_actions`): confirmar, recusar, escolher um registro | rota `/actions/<pending_id>`, que revalida o candidato contra a lista CONGELADA |
+| `ds:<rascunho>:…` | rascunho: qual cartão, "é o total ou cada parcela?", "crio esse cartão?" | MENSAGEM comum com `clicked_id`; o servidor só aceita `ds:` por ali |
+
+Três regras que caem disso:
+
+- **O sufixo do `ds:` não é interpretado na tela.** `t:`, `create_card:`, `financing` — quem
+  sabe o que significam é `draft.parse_slot_click`, no servidor. O app devolve o id CRU; uma
+  segunda cópia daquela tabela divergiria da primeira. A exceção é `c:`, que é a convenção
+  COMPARTILHADA e diz "esta opção é um registro".
+- **Registro x saída sai do `candidateId`, não da `decision`.** É ele que faz `ChatActions`
+  escolher entre pílulas no balão e o botão que abre a lista; filtrando por `choose`, os oito
+  cartões caíam como oito pílulas — o desenho que aquela seção recusou duas vezes.
+- **Pergunta de rascunho NÃO trava o campo de texto.** Os botões ali são atalho para o que já
+  existe; digitar continua valendo, e é assim que se escolhe um cartão que não coube na lista
+  ou se cria um novo. HITL continua travando: lá a resposta sai dos botões.
+
 ## Estado local
 
 - Preferir estado de servidor (Query) + `useState`. Zustand só se estado global de UI real aparecer (hoje não há nenhum) — não criar store "por via das dúvidas".

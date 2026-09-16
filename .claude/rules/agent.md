@@ -188,6 +188,53 @@ passou a resolver a fatura como alvo e herdou a frase de `mark_paid`: o agente
 perguntava *"marcar como paga, SEM tirar do caixa?"* para a ação que TIRA do caixa —
 na tela que o usuário aprova. Condição por `action.type`, sempre.
 
+### Perguntar não basta: a pergunta precisa ter RESPOSTA (15/09/2026)
+
+⚠️ **"Qual delas?" sem rascunho é um beco, e ele era pior que não perguntar.** Medido:
+
+    paguei 45 no mercado com o cartao
+    🤔 "cartao" casa com mais de uma: *Cartão da casa*, *Cartão da viagem*… Qual delas?
+    nubank
+    Para trocar a conta de uma compra parcelada, edite a parcela individual no app.
+
+Os R$ 45 nunca foram registrados. A pergunta saía como TEXTO e não guardava rascunho
+nenhum, então o turno seguinte era uma mensagem nova, sem a compra — o modelo tinha que
+adivinhar um gasto a partir da palavra "nubank".
+
+Hoje `contas_citadas` marca **`account_error`** junto do `correction_error`
+(`app/tools/resolve.py`), e `_rascunho` (`app/graph/nodes.py`) o transforma num rascunho
+de slot `account`. A partir daí tudo que já existia vale: a pergunta vira lista de
+botões, a resposta digitada cai em `draft.interpretar`, e um nome que não existe vira
+oferta de cadastro. Mesmo formato que `resource_node` já usava para cadastro incompleto.
+
+⚠️ **UMA pergunta por turno.** "comprei uma tv em 10x no itau" respondia *"faltou o
+valor"* **e** *"não achei o cartão itau"* no mesmo balão, e a pessoa não sabe qual das
+duas responder. `contas_citadas` recebe `pular` com os índices que `_incompletas` já
+bloqueou — `faltando` declara a ordem (valor primeiro, cartão depois) e a pergunta do
+cartão volta sozinha no turno seguinte.
+
+⚠️ **A resposta VENCE no campo perguntado** (`draft.mesclar`). A guarda "não sobrescreve
+o que já estava lá" travava exatamente o caso novo: a ação guardada tinha
+`account = "cartao"`, a escolha na lista era descartada e a mesma pergunta voltava em
+loop. Só o VALOR mantém a guarda — ali, um campo já preenchido quer dizer que a pergunta
+não era para existir, e para dinheiro manter o que estava é o lado seguro do erro.
+
+⚠️ **Nem todo slot `account` é CARTÃO.** A régua mora em `_CONTAS_CITADAS`
+(`resolve.conta_e_cartao`) e é a MESMA que valida a citação — perguntar por uma lista
+diferente da que valida é oferecer o que a validação vai recusar. Dela saem também a
+ausência de "É financiamento" fora do parcelamento e o texto ("conta" x "cartão").
+
+⚠️ **Numa lista, um cartão e uma conta corrente têm a mesma cara.** A linha leva o TIPO
+por extenso (e o dia de fechamento no cartão) — é a mesma resposta que o `AccountPicker`
+do app deu ao salário de R$ 4.000 lançado dentro da fatura. Em lista SÓ de cartões o
+tipo some: seria a mesma palavra em toda linha.
+
+**Ainda é texto, e é exclusão declarada:** `_conta_que_paga` (`app/tools/finance.py`),
+quando a pessoa NÃO cita conta nenhuma ao pagar uma fatura e o cartão não tem
+`payment_account_id`. Ela é levantada de dentro da tool, depois do gate, onde não há
+rascunho em que pendurar o clique — transformá-la em botões pede rotear o erro da
+`registry` para um rascunho, que é mecanismo novo. A lista de contas continua na frase.
+
 ## Proteção de propriedade (IDOR)
 
 **O serviço conecta no Postgres com papel que IGNORA RLS** (`auth.uid()` é null). Tudo que o banco
