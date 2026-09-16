@@ -28,6 +28,37 @@ Os primitivos de movimento (`TileField`, `PressableScale`, `Reveal`, `SplitRevea
 - Commit: uma linha, conventional, **sem** `Co-Authored-By`. Sem tag, sem produção.
 - Portão por tarefa: `npx tsc --noEmit`, `npx expo lint`, `npm test` (olhar o código de saída).
 
+## Emendas feitas durante a execução (16/09/2026)
+
+As tarefas abaixo descrevem o plano ORIGINAL. Onde o código entregue diverge, vale esta seção.
+
+**Pedidas pelo dono do produto no meio da fase** — *"o botão pode deixar mais bonito, os
+gráficos também, os inputs de texto e valor mais bonitos e animados, o segmentado também, e
+usar o diagonal sem friso ou o friso bem menor no canto"*:
+
+| era (Task) | ficou |
+|---|---|
+| friso em degraus no pé da tela (3, 4: `friezeDepth`, `frieze`, `friezeHeight`) | **removido**. No lugar, um aglomerado no CANTO superior direito: `cornerKeep(col, row, cols, k)` em `tile-math.ts` e `corner` + `cornerSize(width, k)` em `TileField`. O motivo dos azulejos do canto (share 0,66) só aparece entre 0,55 e 0,95 do progresso, com um quarto de volta |
+| botão pílula com escala (5) | **tecla**: base (`tintDeep` / `keyBase` / `dangerDeep`) + face que afunda `depth` (sm 2, md 3, lg 4) no toque, rótulo que rola numa janela recortada (340 ms), `TileSpinner` no carregamento. Tokens novos `keyFace`, `keyBase`, `tintDeep`, `dangerDeep` |
+| `Field` só com a pele nova (7) | `Field` com contexto de foco: rótulo e marcador de azulejo acendem, régua `tintFill` de 2px cresce da esquerda, tremida quando `invalid` liga. `MoneyField` com dígitos que rolam (odômetro) e cursor piscante |
+| `Segmented` com indicador em mola (7) | bloco de tinta que ESTICA (borda da frente 300 ms, de trás 520 ms) e rótulo com cor interpolada pela distância. O rótulo encolhe até caber (`adjustsFontSizeToFit`, piso 0,7) — "Transferência" partia a palavra em 384dp × 1,3 |
+| gráficos só recoloridos (7) | `Sparkline` desenha da esquerda, hachura na área, zero pontilhado, futuro tracejado e alfinete em losango com um pulso. `ProgressBar` em 10 peças que encaixam em mola |
+
+**Achados no Android, todos medidos no emulador:**
+
+- **As telas só montam depois das fontes** (`_layout.tsx`): texto medido antes de a Jost
+  carregar fica com a largura da fonte do sistema para sempre ("Trocar o valor" → "Trocar o").
+  O `caption` passou para `Fonts.semibold` pelo mesmo caminho.
+- **Atraso dentro do relógio, não `withDelay`**, na primeira montagem (`SplitReveal`).
+- **`exiting` não termina** — o odômetro do `MoneyField` usa espaços fixos, sem animação de
+  layout. Texto do `TextInput` de captura escondido por `opacity: 0.01`, não `color: 'transparent'`.
+- **A fonte dos símbolos é pré-carregada** no `useFonts` raiz: o `expo-symbols` carregava por
+  ícone e os ícones chegavam depois da tela.
+- **A `TextView` do Android 15+ quebra linha pela TINTA do glifo; o RN mede pelo avanço**
+  (`plugins/with-text-advance-width.js`). O gancho do "j" da Jost fazia "já aconteceu" virar
+  "já". Plugin de config nativo → exige build nativo novo e, no release, `version` novo (a
+  política de runtime é `appVersion`).
+
 ---
 
 ## Mapa de arquivos
