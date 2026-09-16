@@ -157,6 +157,10 @@ const TRUNCAGEM_PERMITIDA = new Set([
   'src/components/notes/note-card.tsx',
   // Prévia da última mensagem, na lista de conversas.
   'src/components/agent/conversation-row.tsx',
+  // Rótulo do segmentado: `numberOfLines={1}` vem com `adjustsFontSizeToFit`, então ele ENCOLHE
+  // até caber e não mostra reticências. A célula tem largura dividida, e partir a palavra ou
+  // quebrar a linha de uma célula só desalinharia a trilha.
+  'src/components/ui/segmented.tsx',
 ]);
 
 test('nenhum rótulo truncado — texto quebra, layout cede', () => {

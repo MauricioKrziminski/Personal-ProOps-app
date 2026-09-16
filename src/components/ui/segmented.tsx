@@ -207,8 +207,19 @@ function Celula({
       accessibilityLabel={label}
       onPress={onPress}
       style={styles.option}>
+      {/*
+        ⚠️ **O rótulo ENCOLHE para caber, nunca parte nem trunca.** Célula de segmentado tem
+        largura dividida, não natural: em 384dp × fonte 1,3 "Transferência" pede ~120dp numa
+        célula de ~107 e o Android partia a palavra ("Transferênci/a"). Quebrar a linha mudaria a
+        altura de uma célula só e desalinharia a trilha. É o que o `UISegmentedControl` do iOS
+        faz: a fonte desce até caber, com piso — abaixo de 0,7 o rótulo deixa de ser legível e a
+        regra dos quatro rótulos curtos (design.md §1) é que precisa ser revista.
+      */}
       <Animated.Text
         allowFontScaling
+        numberOfLines={1}
+        adjustsFontSizeToFit
+        minimumFontScale={0.7}
         android_hyphenationFrequency="none"
         style={[styles.label, cor]}>
         {label}
