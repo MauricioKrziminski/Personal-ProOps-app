@@ -15,6 +15,7 @@ import {
   MartianMono_600SemiBold,
 } from '@expo-google-fonts/martian-mono';
 import { useFonts } from 'expo-font';
+import simbolosAndroid from 'expo-symbols/androidWeights/regular';
 import { focusManager, QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { DarkTheme, DefaultTheme, Stack, ThemeProvider, usePathname } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
@@ -115,6 +116,14 @@ function AppTree() {
     MartianMono_400Regular,
     MartianMono_500Medium,
     MartianMono_600SemiBold,
+    /*
+      No Android o ícone é TEXTO na fonte Material Symbols, e o `SymbolView` só carrega essa fonte
+      quando monta — até lá ele desenha uma caixa vazia. Numa tela com dez linhas, os chips ficavam
+      vazios por alguns segundos e os ícones "pipocavam" depois. Carregada aqui, junto das outras,
+      ela já existe quando a primeira tela aparece. É o mesmo nome que o `expo-symbols` usa, então
+      o `loadAsync` dele encontra a fonte pronta.
+    */
+    ...(Platform.OS === 'android' ? { [simbolosAndroid.name]: simbolosAndroid.font } : {}),
   });
 
   const { session, loading } = useSession();
