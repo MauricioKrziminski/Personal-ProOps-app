@@ -94,6 +94,15 @@ function LinhaAnimada({
  * vez de a lista dar um salto. Mesma classe de mudança de estado que §5 já exige animar em barra
  * e gráfico ("valor que salta é bug visual").
  */
+/**
+ * A janela de URGÊNCIA da tela — o que "vencendo" quer dizer aqui.
+ *
+ * Ela já foi o argumento da consulta (`useUpcomingBills(7)`), e por isso ditava as duas coisas
+ * ao mesmo tempo: o que a tela CONSIDERA urgente e o que ela chega a SABER. Separar as duas é o
+ * que deixou a fatura do cartão aparecer sem inflar o contador nem o badge da aba.
+ */
+const DIAS_IMINENTES = 7;
+
 function Secao({ index, children }: { index: number; children: React.ReactNode }) {
   return (
     /*
@@ -139,7 +148,20 @@ export default function TodayScreen() {
   /** Só o primeiro nome: "Bom dia, Gabriel Almeida Dias" é um crachá, não um cumprimento. */
   const firstName = profile.data?.display_name?.trim().split(/\s+/)[0];
 
-  const bills = useUpcomingBills(7);
+  /*
+    ⚠️ **A consulta vai até o FIM DO CICLO; as SEÇÕES é que recortam.** Ela era de 7 dias fixos,
+    e com isso a maior conta do mês não aparecia nesta tela: com o cartão fechando dia 3 e
+    vencendo dia 10, a fatura só entra numa janela de 7 dias em ~7 dos 30 dias do mês. Medido na
+    conta do dono do produto em 16/09/2026 — das seis saídas até o fim do ciclo, a fatura do
+    Nubank era 45% do total (R$ 3.751,22) e vencia em 24 dias. A queixa foi literal: *"não está
+    aparecendo os próximos lançamentos do cartão"*, com o painel logo acima já escrevendo
+    "Compromissos até 10/10" — o número que a inclui.
+
+    O recorte de 7 dias CONTINUA onde ele quer dizer urgência (o contador, o badge da aba, o
+    veredito do herói): fatura que vence em três semanas não é "vencendo". Ela ganhou seção
+    própria porque não é conta desta semana — é o compromisso que está fechando.
+  */
+  const bills = useUpcomingBills(Math.max(DIAS_IMINENTES, cycle.data?.diasAteOFim ?? DIAS_IMINENTES));
   const reminders = useTodayReminders();
   const budgets = useBudgetsStatus();
   const recent = useRecentTransactions(5);
@@ -196,9 +218,17 @@ export default function TodayScreen() {
    * que é vocabulário de dívida — um Pix que não chegou não é culpa de ninguém e não gera juros.
    */
   const contas = (bills.data ?? []).filter((b) => b.kind !== 'income');
+  /** Dentro da janela de urgência — o que a tela chamava de "próximo" quando a consulta era 7. */
+  const iminente = (b: { due_date: string }) => diasAte(b.due_date) <= DIAS_IMINENTES;
   const overdue = contas.filter((b) => b.overdue);
-  const dueSoon = contas.filter((b) => !b.overdue);
-  const aReceber = (bills.data ?? []).filter((b) => b.kind === 'income');
+  const dueSoon = contas.filter((b) => !b.overdue && iminente(b));
+  /*
+    A fatura que ainda não venceu e está FORA dos 7 dias. Atrasada continua em "Atrasado" e
+    vencendo esta semana continua em "O que vence" — senão a mesma fatura apareceria duas vezes,
+    ou sairia de onde a urgência dela é lida.
+  */
+  const faturas = contas.filter((b) => !b.overdue && b.kind === 'invoice' && !iminente(b));
+  const aReceber = (bills.data ?? []).filter((b) => b.kind === 'income' && iminente(b));
   const todayReminders = reminders.data ?? [];
   // Gasto + comprometido: o aviso existe para o que AINDA dá para evitar. Ver a régua em
   // `budgets.tsx` e a `20260909180000`.
@@ -257,6 +287,8 @@ export default function TodayScreen() {
     !loading &&
     overdue.length === 0 &&
     dueSoon.length === 0 &&
+    // Seção que renderiza conta para o vazio, sempre — ver o comentário de `aReceber` abaixo.
+    faturas.length === 0 &&
     // ⚠️ `aReceber` tem SEÇÃO PRÓPRIA ("O que entra") e estava fora desta conta: com uma receita
     // prevista e mais nada, a tela desenhava "Nada para hoje" LOGO ACIMA dela. Seção que
     // renderiza conta para o vazio, sempre — é o mesmo defeito que `dueSoon` já teve.
@@ -715,6 +747,74 @@ export default function TodayScreen() {
                   size="sm"
                   variant="secondary"
                   onPress={() => pay(b.ref_id, b.title, b.kind)}
+                />
+              </LinhaAnimada>
+            ))}
+          </Secao>
+        ) : null}
+
+        {/*
+          3c. A FATURA DO CARTÃO que ainda não entrou na janela de urgência.
+
+          ⚠️ **Seção própria, e não uma linha em "O que vence".** Ela responde outra pergunta: não
+          é "o que eu pago esta semana", é "o que o cartão já comprometeu deste ciclo". Jogá-la
+          lá dentro faria o contador "Vencendo" e o badge da aba somarem uma conta que vence em
+          três semanas — badge é contagem real do que dá para resolver AGORA (design.md §8), e
+          esse é o mesmo argumento que tirou os zeros da fileira de contadores.
+
+          A pílula é NEUTRA pelo mesmo motivo da seção acima: fatura a vencer não é problema nem
+          aviso, e `danger`/`warning` são a única alavanca de cor do app.
+
+          A ação é **Ver fatura**, não "Pagar fatura": ela ainda vai fechar, e oferecer pagamento
+          de um valor que ainda vai mudar é oferecer a operação errada. Quando entrar nos 7 dias,
+          "O que vence" assume a linha e aí sim o botão é pagar.
+
+          (`index` é vestigial — o `Secao` o ignora desde que a cascata virou do `Screen`.)
+        */}
+        {faturas.length > 0 ? (
+          <Secao index={11}>
+            <SectionHead
+              title="Faturas de cartão"
+              inset={false}
+              action={
+                <ThemedText type="caption" themeColor="textSecondary">
+                  {`${faturas.length} ${faturas.length === 1 ? 'fatura' : 'faturas'}`}
+                </ThemedText>
+              }
+            />
+            {faturas.map((b) => (
+              <LinhaAnimada
+                key={b.ref_id}
+                accessibilityRole="button"
+                accessibilityLabel={`Abrir ${b.title}`}
+                onPress={() => router.push({ pathname: '/finance/invoice/[id]', params: { id: b.ref_id } })}
+                style={({ pressed }) => [
+                  styles.card,
+                  styles.billCard,
+                  {
+                    backgroundColor: pressed ? theme.backgroundSelected : theme.surface,
+                    borderColor: theme.cardBorder,
+                  },
+                ]}>
+                <View style={styles.billInfo}>
+                  <View style={styles.billTitleRow}>
+                    <ThemedText type="small" style={styles.billTitle}>
+                      {b.title}
+                    </ThemedText>
+                    <View style={[styles.duePill, { backgroundColor: theme.backgroundElement }]}>
+                      <ThemedText type="caption" themeColor="textSecondary">
+                        {`vence ${formatDateBR(b.due_date)}`}
+                      </ThemedText>
+                    </View>
+                  </View>
+                  <Money cents={Number(b.amount_cents)} variant="ticker" />
+                </View>
+                <Button
+                  label="Ver fatura"
+                  icon="chevron.right"
+                  size="sm"
+                  variant="secondary"
+                  onPress={() => router.push({ pathname: '/finance/invoice/[id]', params: { id: b.ref_id } })}
                 />
               </LinhaAnimada>
             ))}
