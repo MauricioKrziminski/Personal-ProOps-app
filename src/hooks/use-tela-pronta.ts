@@ -32,13 +32,12 @@ export type { Consulta };
 /**
  * A tela já pode sair do skeleton? Uma vez `true`, sempre `true`.
  *
- * ⚠️ **Condição que não é consulta entra como ARGUMENTO** (`useTelaPronta(a, b, range.pronto)`),
- * nunca com `&&` do lado de fora — ver `telaPronta`: do lado de fora ela escapa da trava e a
- * troca de mês apaga a tela inteira.
+ * ⚠️ **Só CONSULTAS, nunca booleano** — ver `telaPronta`. E nunca um `&&` do lado de fora: ali
+ * a condição escapa da trava e a troca de mês apaga a tela inteira.
  */
-export function useTelaPronta(...condicoes: (Consulta | boolean)[]): boolean {
+export function useTelaPronta(...consultas: Consulta[]): boolean {
   const [abriu, setAbriu] = useState(false);
-  const pronta = telaPronta(...condicoes);
+  const pronta = telaPronta(...consultas);
   /*
     `setState` durante o render, no PRÓPRIO componente: é o padrão que o React documenta para
     estado derivado ("ajustar o estado quando as props mudam"), e ele não causa render extra

@@ -213,7 +213,7 @@ export default function TransactionsScreen() {
     source,
     q: term,
   });
-  const summary = useTransactionsSummary(range.from, range.to);
+  const summary = useTransactionsSummary(range.from, range.to, range.pronto);
   /*
     ⚠️ **O card do topo soma a LISTA, e o ciclo virou o link do rodapé.** Ele já foi o contrário
     — lia `cycle_series` para bater com a home — e aí parou de bater com a lista logo abaixo
@@ -272,13 +272,33 @@ export default function TransactionsScreen() {
   /*
     O PORTÃO DA TELA (Fase 5) — 9 consultas, 5 portões antes disto.
 
-    ⚠️ **`list` PODE nascer desligada** (`enabled: filters.pronto !== false`), e mesmo assim ela
-    entra aqui — porque `range.pronto` está na mesma conjunção. Enquanto ele é `false` o portão
-    já está fechado por ele; quando vira `true` a consulta liga no mesmo render e passa a segurar
-    o portão de verdade. É a composição que torna a lista parte da primeira pintura em vez de
-    chegar depois dela.
+    ⚠️ **`list` e `summary` nascem desligadas** (`pronto`) e mesmo assim entram aqui — porque o
+    `range` está na mesma conjunção. Enquanto as bordas buscam, o range segura o portão; quando
+    chegam, as duas ligam no mesmo render e passam a segurá-lo de verdade. É a composição que
+    torna a lista parte da primeira pintura em vez de chegar depois dela.
+
+    ⚠️ **O range entra como CONSULTA, não como `range.pronto`** (16/09/2026). O booleano ficava
+    `false` para sempre quando o `cycle_range` falhava, e a tela parava no skeleton sem erro nem
+    "Tentar de novo". Como consulta, ele libera quando falha, e a falha aparece no card e na
+    lista. `regua.cycle` entra porque é ele que dá NOME ao mês. Ver `tela-pronta.ts`.
   */
-  const pronta = useTelaPronta(summary, serieCiclo, accounts, anyEver, list, range.pronto);
+  const pronta = useTelaPronta(summary, serieCiclo, accounts, anyEver, list, regua.cycle, range);
+
+  /** O ciclo corrente não veio: o mês exibido seria o palpite civil, com o nome errado. */
+  const cicloFalhou = regua.cycle.isError && !regua.cycle.data;
+  /** Sem período utilizável: nem o resumo nem a lista têm como responder. */
+  const periodoFalhou = cicloFalhou || range.isError;
+  /**
+   * Refaz o que o período precisa. `refetch` do TanStack ignora `enabled`, então resumo e lista
+   * só são refeitos com as bordas definitivas — sem elas, refazer o range basta: a chave muda e
+   * os dois ligam sozinhos.
+   */
+  const refazerPeriodo = () =>
+    Promise.all([
+      ...(cicloFalhou ? [regua.cycle.refetch()] : []),
+      ...(range.isError ? [range.refetch()] : []),
+      ...(range.pronto ? [summary.refetch(), list.refetch()] : []),
+    ]);
 
   // `toSections` agrupa em varredura linear, então o dia que atravessa a fronteira de duas
   // páginas continua sendo uma seção só depois do `flat()`.
@@ -412,8 +432,8 @@ export default function TransactionsScreen() {
         de "Nada em outubro". Custo aceito: o link do ciclo também some no mês vazio, que é o que
         a regra manda.
       */}
-      {listaRecortada || listaVazia ? null : summary.isError ? (
-        <ErrorCard onRetry={() => { void summary.refetch(); }} />
+      {listaRecortada || listaVazia ? null : periodoFalhou || summary.isError ? (
+        <ErrorCard onRetry={() => { void refazerPeriodo(); }} />
       ) : /*
           ⚠️ **`!range.pronto` junto.** Enquanto `cycle_range` não responde, `useMonthRange`
           devolve o palpite CIVIL — e o resumo, que não espera, voltaria com o total da janela
@@ -506,7 +526,14 @@ export default function TransactionsScreen() {
     </View>
   );
 
-  const empty = list.isPending ? (
+  /*
+    ⚠️ **A falha do período vem ANTES de `list.isPending`.** Sem bordas a lista não liga, e uma
+    consulta desligada fica `isPending` para sempre — o ramo de cima desenharia três linhas de
+    esqueleto indefinidamente, mesmo com o portão da tela já aberto.
+  */
+  const empty = periodoFalhou ? (
+    <ErrorCard onRetry={() => { void refazerPeriodo(); }} />
+  ) : list.isPending ? (
     <View>
       <SkeletonRow />
       <SkeletonRow />
@@ -634,7 +661,7 @@ export default function TransactionsScreen() {
             if (list.hasNextPage && !list.isFetchingNextPage) list.fetchNextPage();
           }}
           refreshing={(list.isRefetching && !list.isFetchingNextPage) || summary.isRefetching || accounts.isRefetching || anyEver.isRefetching}
-          onRefresh={() => Promise.all([list.refetch(), summary.refetch(), accounts.refetch(), anyEver.refetch()])}
+          onRefresh={() => Promise.all([refazerPeriodo(), accounts.refetch(), anyEver.refetch()])}
           renderSectionHeader={({ section }) => (
             <View style={[styles.dayHeader, { backgroundColor: theme.groupedBackground }]}>
               <ThemedText

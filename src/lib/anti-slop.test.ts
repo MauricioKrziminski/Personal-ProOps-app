@@ -765,6 +765,11 @@ test('createAnimatedComponent(Pressable) só com estilo estático', () => {
  *
  * O tipo já impede voltar a passar `month`. O que ele não vê é as duas leituras receberem
  * janelas de origens DIFERENTES, que é a forma que o defeito tinha.
+ *
+ * ⚠️ **E as duas esperam o MESMO `pronto`** (16/09/2026). A lista só liga com as bordas
+ * definitivas; o resumo buscava com o palpite civil. No caminho feliz isso era trabalho dobrado,
+ * e com o `cycle_range` falhando o card afirmava o total de setembro sobre uma lista de outubro
+ * que nunca chegava. Mesma janela e mesma prontidão são a mesma garantia.
  */
 test('o resumo e a lista de lançamentos leem a mesma janela', () => {
   const fora: string[] = [];
@@ -774,8 +779,8 @@ test('o resumo e a lista de lançamentos leem a mesma janela', () => {
     // Tela sem lista de lançamentos não tem o que casar — a home do Financeiro tem só o resumo.
     if (!lista) continue;
     const nome = file.replace(SRC, 'src');
-    const resumo = code.match(/useTransactionsSummary\(\s*([\w.]+)\.from\s*,\s*\1\.to\s*\)/);
-    if (!resumo) fora.push(`${nome}: a lista declara janela e o resumo não sai da mesma variável`);
+    const resumo = code.match(/useTransactionsSummary\(\s*([\w.]+)\.from\s*,\s*\1\.to\s*,\s*\1\.pronto\s*\)/);
+    if (!resumo) fora.push(`${nome}: o resumo não lê from/to/pronto da mesma variável da lista`);
     else if (resumo[1] !== lista[1]) fora.push(`${nome}: resumo lê ${resumo[1]}, lista lê ${lista[1]}`);
   }
   assert.deepEqual(
@@ -783,6 +788,42 @@ test('o resumo e a lista de lançamentos leem a mesma janela', () => {
     [],
     'o total do topo soma a lista de baixo: as duas leituras saem do MESMO useMonthRange'
   );
+});
+
+/**
+ * O portão de carregamento só aceita CONSULTA.
+ *
+ * ⚠️ Ele aceitava `Consulta | boolean` e o exemplo da própria doc era
+ * `useTelaPronta(summary, cycle, accounts, range.pronto)`. Um booleano não diz se ainda tem
+ * alguém tentando: `range.pronto` ficava `false` para sempre com o `cycle_range` falhando, e o
+ * Financeiro e os Lançamentos paravam no skeleton sem erro nem "Tentar de novo" (reproduzido no
+ * emulador em 16/09/2026, injetando a falha só naquela RPC).
+ *
+ * Este teste lê a FONTE e não o tipo porque o `tsconfig` exclui `*.test.ts` — uma asserção de
+ * tipo aqui dentro nunca seria conferida. As duas metades: a assinatura não reabre, e nenhuma
+ * tela volta a passar um `.pronto` (ou qualquer booleano derivado) ao portão.
+ */
+test('o portão de carregamento só aceita consulta, nunca booleano', () => {
+  const portao = stripComments(readFileSync(join(SRC, 'lib', 'tela-pronta.ts'), 'utf8'));
+  const assinatura = portao.match(/export function telaPronta\(([^)]*)\)/);
+  assert.ok(assinatura, 'não achei a assinatura de telaPronta');
+  assert.equal(
+    assinatura[1].replace(/\s+/g, ''),
+    '...consultas:Consulta[]',
+    'telaPronta voltou a aceitar algo além de Consulta'
+  );
+
+  const fora: string[] = [];
+  for (const file of walk(SRC)) {
+    const code = stripComments(readFileSync(file, 'utf8'));
+    // Só CHAMADAS: a definição (`function useTelaPronta(...): boolean {`) casaria o `boolean`.
+    for (const chamada of code.matchAll(/(?<!function\s)useTelaPronta\(([^;{}]*?)\)/g)) {
+      if (/\.pronto\b|\btrue\b|\bfalse\b|!/.test(chamada[1])) {
+        fora.push(`${file.replace(SRC, 'src')}: ${chamada[1].replace(/\s+/g, ' ').trim()}`);
+      }
+    }
+  }
+  assert.deepEqual(fora, [], 'passe a CONSULTA de onde a condição deriva, não o booleano');
 });
 
 /**

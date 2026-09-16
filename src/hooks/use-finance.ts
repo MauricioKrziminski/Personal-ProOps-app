@@ -5,6 +5,7 @@ import type { ProjecaoMensal } from '@/lib/forecast-months';
 import { supabase } from '@/lib/supabase';
 import type { Database } from '@/lib/database.types';
 import { localISODate, monthBounds, primeiroDiaDoMes } from '@/lib/dates';
+import type { Consulta } from '@/lib/tela-pronta';
 import type { DebtPaymentRow } from '@/lib/debt-history';
 import { agentFetch } from '@/lib/agent-api';
 import { toIlikeTerm } from '@/lib/search';
@@ -314,9 +315,18 @@ export function useRecentTransactions(limit = 5) {
   });
 }
 
-export function useTransactionsSummary(fromDate: string, toDate: string) {
+/**
+ * Entradas e saídas somadas numa janela.
+ *
+ * `pronto` é o mesmo contrato de `useTransactions`: com bordas vindas de `useMonthRange`, passe
+ * `range.pronto`, e a consulta só liga quando elas forem as definitivas. Sem isso ela buscava
+ * primeiro com o palpite civil e depois de novo com o ciclo — trabalho dobrado no caminho feliz,
+ * e o número do mês ERRADO no caminho em que as bordas falham.
+ */
+export function useTransactionsSummary(fromDate: string, toDate: string, pronto = true) {
   useRealtimeInvalidate('transactions', ['tx-summary']);
   return useQuery({
+    enabled: pronto,
     queryKey: ['tx-summary', fromDate, toDate],
     queryFn: async (): Promise<TxSummaryRow[]> => {
       const { data, error } = await supabase.rpc('transactions_summary', {
@@ -1469,22 +1479,58 @@ export function useCycleRange(month: string, view?: CycleView) {
 }
 
 /**
+ * As bordas do mês exibido — e o ESTADO da consulta que as resolve.
+ *
+ * É uma `Consulta` de propósito: o portão da tela (`useTelaPronta`) recebe o range inteiro, e
+ * não um booleano derivado dele. Ver `tela-pronta.ts` para o defeito que isso fecha.
+ */
+export interface MonthRange extends Consulta {
+  /** Início da janela. Enquanto `pronto` é `false`, é o PALPITE civil — nunca busque com ele. */
+  from: string;
+  /** Fim da janela, com a mesma ressalva de `from`. */
+  to: string;
+  /**
+   * As bordas já são as DEFINITIVAS — a única condição em que elas podem virar chave de consulta.
+   *
+   * ⚠️ `pronto` tem UM trabalho: decidir se uma consulta pode buscar com estas bordas
+   * (`enabled`). Ele já teve dois, e o segundo — decidir se a TELA sai do skeleton — era o
+   * defeito: com a consulta falhando ele fica `false` para sempre. Para o portão, passe o range.
+   */
+  pronto: boolean;
+  /**
+   * Não há bordas utilizáveis: a consulta falhou e não existe resposta anterior.
+   *
+   * ⚠️ **Não é o `isError` do TanStack.** Aquele continua `true` quando um REFETCH falha por
+   * cima de um dado bom, e as bordas de um mês nomeado só mudam quando o usuário troca o dia de
+   * fechamento — que invalida a chave. Um refetch de fundo que falhou não torna as bordas que já
+   * estão na tela erradas, então não pode trocá-las por um card de erro.
+   */
+  isError: boolean;
+  /** Refaz a consulta das bordas. É o "Tentar de novo" de todo bloco que depende delas. */
+  refetch: () => Promise<unknown>;
+}
+
+/**
  * As bordas do mês exibido: o ciclo quando ele já chegou, o mês civil enquanto não.
  *
- * ⚠️ **`pronto` diz se a resposta já é a definitiva.** O palpite civil serve para um número
- * aparecer no lugar de um esqueleto, mas uma LISTA que renderiza o palpite mostra linhas de
- * outro período por um quadro e depois as troca — que é o defeito que esta função existe para
- * evitar, só que piscando. Quem desenha linha espera; quem desenha total pode adiantar.
+ * ⚠️ **Quem desenha a partir destas bordas espera `pronto`.** O palpite civil existe para a
+ * chave de uma consulta ter um valor estável antes da resposta, não para ser buscado: uma lista
+ * que buscasse com ele mostraria linhas de outro período e depois as trocaria, e um total
+ * buscado com ele ficaria ERRADO para sempre se as bordas falhassem — números de setembro sob o
+ * rótulo "outubro", com fechamento no dia 10. Por isso `useTransactions` e
+ * `useTransactionsSummary` recebem `pronto` e só ligam com ele.
  */
-export function useMonthRange(
-  month: string,
-  view?: CycleView
-): { from: string; to: string; pronto: boolean } {
+export function useMonthRange(month: string, view?: CycleView): MonthRange {
   const ciclo = useCycleRange(month, view);
-  const civil = monthBounds(month);
-  return ciclo.data
-    ? { from: ciclo.data.de, to: ciclo.data.ate, pronto: true }
-    : { ...civil, pronto: false };
+  const bordas = ciclo.data ? { from: ciclo.data.de, to: ciclo.data.ate } : monthBounds(month);
+  return {
+    ...bordas,
+    pronto: Boolean(ciclo.data),
+    isPending: ciclo.isPending,
+    fetchStatus: ciclo.fetchStatus,
+    isError: ciclo.isError && !ciclo.data,
+    refetch: ciclo.refetch,
+  };
 }
 
 /**

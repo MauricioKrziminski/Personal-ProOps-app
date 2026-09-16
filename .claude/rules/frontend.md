@@ -22,6 +22,31 @@ Expo SDK 57 (managed), código em `src/`, paths `@/*` → `src/*` e `@/assets/*`
   - Mutações com `useMutation` + `invalidateQueries` no `onSuccess`. Inserts/updates diretos via supabase-js — RLS own-rows protege. **Não existe Edge Function neste projeto**; o que precisa de servidor vai para o agente, por `agentFetch` (`src/lib/agent-api.ts`), que manda o JWT e deixa o servidor tirar o usuário do `sub` — nunca do corpo.
 - Cliente Supabase único: `src/lib/supabase.ts` (anon key via `EXPO_PUBLIC_SUPABASE_*`). Nunca instanciar outro client, nunca usar service_role no app.
 
+### O portão da tela só aceita CONSULTA
+
+⚠️ **`useTelaPronta` recebia `Consulta | boolean`, e o booleano prendia a tela no skeleton para
+sempre** (16/09/2026). Financeiro e Lançamentos passavam `range.pronto`, que é
+`Boolean(cycle_range.data)`: com o `cycle_range` falhando ele ficava `false` e a tela não saía do
+esqueleto — sem card de erro, sem "Tentar de novo", sem log. Reproduzido no emulador injetando a
+falha. Um booleano não diz a única coisa que o portão precisa saber: **se ainda tem alguém
+tentando**. Uma consulta diz — pendente buscando segura, com erro libera, desligada libera.
+
+- **Condição derivada entra pela CONSULTA de onde ela deriva.** `useMonthRange` devolve uma
+  `Consulta` por isso, com `isError`, `refetch` e as bordas. A assinatura só aceita consulta, e
+  `anti-slop.test.ts` quebra se alguma tela voltar a passar `.pronto`, `true`, `false` ou `!x`.
+- **`range.pronto` tem UM trabalho: ligar a consulta que usa as bordas** (`enabled`).
+  `useTransactions` e `useTransactionsSummary` só buscam com ele; buscar com o palpite civil dava
+  o número de outro período sob o rótulo do ciclo, e para sempre se as bordas falhassem.
+- **Consulta desligada fica `isPending` para sempre.** Quem desenha skeleton por `isPending`
+  testa a falha do que a desliga ANTES — senão o bloco fica em esqueleto com o portão já aberto.
+- **`refetch()` do TanStack ignora `enabled`.** O "Tentar de novo" refaz as bordas quando elas
+  falharam e só refaz o que depende delas quando elas já chegaram (`refazerPeriodo`).
+- **Afirmar vazio exige `isSuccess`**, não `!isLoading`: com a consulta desligada ou com erro o
+  `!isLoading` é verdadeiro e a tela dizia "sem movimento" embaixo de um herói que falhou.
+
+`simple-finance-ui.test.ts` renderiza as três telas com o `cycle_range` falhando e prende o
+card de erro e a recuperação.
+
 ## Forms
 
 - Sempre **react-hook-form + zod** (`zodResolver`). Schema zod colocalizado com o form.

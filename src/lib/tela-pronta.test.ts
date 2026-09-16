@@ -13,6 +13,11 @@ const desligada: Consulta = { isPending: true, fetchStatus: 'idle' };
 const pausada: Consulta = { isPending: true, fetchStatus: 'paused' };
 /** Refetch de fundo por cima de dado que já existe. */
 const revalidando: Consulta = { isPending: false, fetchStatus: 'fetching' };
+/**
+ * Consulta que FALHOU e não tem dado anterior: o TanStack a tira de `pending` (`status: 'error'`)
+ * e para de buscar. Ninguém mais vai tentar sozinho — só o "Tentar de novo" da tela.
+ */
+const errou: Consulta = { isPending: false, fetchStatus: 'idle' };
 
 test('sem consulta nenhuma a tela está pronta', () => {
   assert.equal(telaPronta(), true);
@@ -41,10 +46,12 @@ test('refetch de fundo NÃO traz o skeleton de volta', () => {
   assert.equal(telaPronta(revalidando, revalidando), true);
 });
 
-test('condição que não é consulta segura ou libera como qualquer outra', () => {
-  // É por isso que ela entra AQUI e não num `&&` do lado de fora: dentro, a trava do
-  // `useTelaPronta` a cobre e a troca de mês não apaga a tela.
-  assert.equal(telaPronta(pronta, false), false);
-  assert.equal(telaPronta(pronta, true), true);
-  assert.equal(telaPronta(buscando, true), false);
+test('consulta que FALHOU libera a tela para ela mostrar o erro, não um skeleton eterno', () => {
+  // O defeito de 16/09/2026: o portão recebia `range.pronto`, um booleano derivado de
+  // `Boolean(ciclo.data)`. Com o `cycle_range` falhando ele ficava `false` para sempre e a tela
+  // parava no carregamento — sem card de erro e sem "Tentar de novo". Como CONSULTA, a mesma
+  // falha libera o portão, e quem desenha o erro é o bloco que depende dela.
+  assert.equal(telaPronta(pronta, errou), true);
+  assert.equal(telaPronta(errou, buscando), false, 'a que ainda busca continua segurando');
 });
+

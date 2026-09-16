@@ -1,6 +1,7 @@
 import { StyleSheet, View } from 'react-native';
 
 import { ThemedText } from '@/components/themed-text';
+import { Skeleton } from '@/components/ui/skeleton';
 import { MonthPicker } from '@/components/finance/month-picker';
 import { MonthRuler, type MonthRulerState } from '@/components/finance/month-ruler';
 import { Space } from '@/design/tokens';
@@ -59,14 +60,32 @@ export function PeriodBar({ month, onChangeMonth, ruler }: Props) {
   return (
     <MonthPicker month={month} onChange={onChangeMonth}>
       <View style={styles.linhaJanela}>
-        <ThemedText
-          type="code"
-          themeColor="textSecondary"
-          // Na tela, a data curta; para o leitor de tela, a frase inteira — "11/08 traço 10/09"
-          // não é o que a pessoa precisa ouvir.
-          accessibilityLabel={`De ${isoToBR(janela.from)} a ${isoToBR(janela.to)}`}>
-          {diaEMes(janela.from)} – {diaEMes(janela.to)}
-        </ThemedText>
+        {/*
+          ⚠️ **A janela só é ESCRITA quando é a definitiva.** Esta legenda existe para explicar a
+          régua ao lado, e o palpite civil explicaria a errada: com fechamento no dia 10 ela dizia
+          "01/09 – 30/09" debaixo de "Ciclo" até o `cycle_range` responder — e para sempre, se ele
+          falhasse. Enquanto busca, um esqueleto do mesmo tamanho (a linha não salta); se falhou,
+          um travessão, porque quem explica a falha é o bloco do período logo abaixo.
+        */}
+        {janela.pronto ? (
+          <ThemedText
+            type="code"
+            themeColor="textSecondary"
+            // Na tela, a data curta; para o leitor de tela, a frase inteira — "11/08 traço 10/09"
+            // não é o que a pessoa precisa ouvir.
+            accessibilityLabel={`De ${isoToBR(janela.from)} a ${isoToBR(janela.to)}`}>
+            {diaEMes(janela.from)} – {diaEMes(janela.to)}
+          </ThemedText>
+        ) : janela.isError ? (
+          <ThemedText
+            type="code"
+            themeColor="textSecondary"
+            accessibilityLabel="Período indisponível">
+            —
+          </ThemedText>
+        ) : (
+          <Skeleton width={96} height={14} />
+        )}
         <MonthRuler value={ruler.view} onChange={ruler.setView} visible={ruler.temCiclo} />
       </View>
     </MonthPicker>

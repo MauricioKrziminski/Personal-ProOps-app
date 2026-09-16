@@ -5,11 +5,13 @@ import { createRequire } from 'node:module';
 import { runInNewContext } from 'node:vm';
 import ts from 'typescript';
 
+import { telaPronta } from './tela-pronta.ts';
+
 const require = createRequire(import.meta.url);
 
 // Execute the screen JSX and its event handlers. Native components/query boundaries
 // are inert; state persists across renders so each interaction uses current props.
-function screen(file: string, options: { debts?: any[]; invoiceStatus?: string; create?: boolean; monthLines?: any[]; monthSummary?: any; cycleLines?: any[]; cycleRow?: any } = {}) {
+function screen(file: string, options: { debts?: any[]; invoiceStatus?: string; create?: boolean; monthLines?: any[]; monthSummary?: any; cycleLines?: any[]; cycleRow?: any; rangeError?: boolean; rangePending?: boolean; rangePendingMonths?: string[] } = {}) {
   const state: any[] = [];
   let cursor = 0;
   let nodes: any[] = [];
@@ -17,11 +19,17 @@ function screen(file: string, options: { debts?: any[]; invoiceStatus?: string; 
   const confirmations: (() => void)[] = [];
   const actions: { label: string; onPress: () => void }[] = [];
   const navigations: any[] = [];
+  /** Quais consultas o "Tentar de novo" refez — é assim que se sabe se ele refez a CERTA. */
+  const refetches: string[] = [];
+  /** O que cada chamada do portão da tela recebeu — o dublê dele abre sempre, então é por aqui que se confere a COMPOSIÇÃO. */
+  const gates: any[][] = [];
   const query = { data: [], isLoading: false, isError: false, isRefetching: false, refetch: async () => {} };
   const mutation = (operation: string) => ({ isPending: false, reset() {}, mutate(value: any) { writes.push({ operation, value }); } });
   const animation = { duration: () => animation, delay: () => animation };
   const finance = new Proxy({
     DEBT_KINDS: [{ value: 'financing', label: 'Financiamento' }, { value: 'loan', label: 'Empréstimo' }],
+    SUGGESTED_CATEGORIES: [],
+    INCOME_CATEGORIES: [],
     ASSET_CLASSES: [{ value: 'investment', label: 'Investimento', icon: 'chart.line.uptrend.xyaxis' }],
     useDebts: () => ({ ...query, data: options.debts ?? [] }),
     useMonthLines: () => ({ ...query, data: options.monthLines ?? [] }),
@@ -33,9 +41,37 @@ function screen(file: string, options: { debts?: any[]; invoiceStatus?: string; 
       comecei_com: 86797, entrou: 633062, saiu: 719787, resultado: 72,
       caixa_no_fim: 72, faltou_pagar: 37164, confere: true,
     }] }),
-    // Devolve as BORDAS direto, não um query — o Proxy abaixo assume "todo hook é query".
-    useMonthRange: (month: string) => ({ from: `${month}-01`, to: `${month}-30` }),
+    /*
+      O CONTRATO de `MonthRange`: bordas + o estado da consulta que as resolve. Devolver só
+      `{from, to}` passava pelo portão por ACASO (`!undefined`) e deixava `pronto` indefinido —
+      o card de resumo dos Lançamentos caía no esqueleto e nenhum teste via.
+    */
+    useMonthRange: (month: string) => {
+      const buscando = Boolean(options.rangePending || options.rangePendingMonths?.includes(month));
+      return {
+        from: `${month}-01`,
+        to: `${month}-30`,
+        pronto: !options.rangeError && !buscando,
+        isPending: buscando,
+        fetchStatus: buscando ? 'fetching' : 'idle',
+        isError: Boolean(options.rangeError),
+        refetch: async () => { refetches.push('range'); },
+      };
+    },
+    useTransactionsSummary: () => ({ ...query, refetch: async () => { refetches.push('summary'); } }),
+    /*
+      Consulta INFINITA (`{pages}`), e o mesmo `enabled` do hook real: com `pronto: false` ela
+      fica desligada — `isPending` para sempre, sem dado. É exatamente o estado que prendia a
+      lista no esqueleto quando as bordas falhavam, então o dublê tem que reproduzi-lo.
+    */
+    useTransactions: (filters: { pronto?: boolean }) => filters.pronto === false
+      ? { ...query, data: undefined, isPending: true, fetchStatus: 'idle', hasNextPage: false, isFetchingNextPage: false, fetchNextPage: () => {}, refetch: async () => { refetches.push('list'); } }
+      // Uma linha: com a lista vazia o card do resumo SOME de propósito (card que soma uma lista
+      // vazia é eco — design.md §1), e o caminho feliz não teria o que mostrar.
+      : { ...query, data: { pages: [[{ id: 'tx-1', kind: 'expense', amount_cents: 4500, occurred_at: '2026-09-15', description: 'Mercado', category: 'mercado', account_id: null, status: 'cleared' }]], pageParams: [] }, isPending: false, hasNextPage: false, isFetchingNextPage: false, fetchNextPage: () => {}, refetch: async () => { refetches.push('list'); } },
     useMonthSummary: () => ({ ...query, data: options.monthSummary ?? null }),
+    // O mês é uma STRING (`2026-09`); sem este dublê o Proxy devolvia um objeto-consulta.
+    useCycleMonth: () => '2026-09',
     useMonthBreakdown: () => ({ ...query, data: [] }),
     useSaveDebt: () => mutation('saveDebt'),
     useSaveAsset: () => mutation('saveAsset'),
@@ -56,26 +92,37 @@ function screen(file: string, options: { debts?: any[]; invoiceStatus?: string; 
         useMemo: (fn: () => unknown) => fn(),
       };
       if (name === 'react/jsx-runtime') return require(name);
-      if (name === 'react-native') return { StyleSheet: { create: (value: unknown) => value }, View: 'View', Pressable: 'Pressable', ScrollView: 'ScrollView', FlatList: 'FlatList', useWindowDimensions: () => ({ width: 384, height: 800 }) };
+      if (name === 'react-native') return { StyleSheet: { create: (value: unknown) => value }, View: 'View', Pressable: 'Pressable', ScrollView: 'ScrollView', FlatList: 'FlatList', useWindowDimensions: () => ({ width: 384, height: 800 }), Platform: { OS: 'android', select: (o: any) => o.android ?? o.default } };
       if (name === 'react-native-reanimated') return { default: { View: 'AnimatedView' }, FadeInDown: animation, LinearTransition: animation };
       // `back` é navegação como qualquer outra e ENTRA na lista: é o que prende o "fechar um
       // formulário que outra tela abriu devolve para ela" (`useVoltarQuandoFechar`).
       if (name === 'expo-router') return { Stack: { Screen: 'StackScreen' }, useLocalSearchParams: () => ({ id: 'invoice-1', ...(options.create !== false ? { create: 'financing' } : {}) }), router: { push: (to: any) => navigations.push(to), back: () => navigations.push({ back: true }) } };
       if (name === 'react-native-safe-area-context') return { useSafeAreaInsets: () => ({ bottom: 0 }) };
       if (name === '@/hooks/use-finance') return finance;
-      if (name === '@/hooks/use-theme') return { useTheme: () => ({}) };
+      if (name === '@/hooks/use-theme') return { useTheme: () => ({}), useScheme: () => 'light' };
       // portão de "a tela está pronta": no harness nada carrega, então ele já nasce aberto
-      if (name === '@/hooks/use-tela-pronta') return { useTelaPronta: () => true };
+      if (name === '@/hooks/use-tela-pronta') return { useTelaPronta: (...consultas: any[]) => { gates.push(consultas); return true; } };
       // Carregado DE VERDADE: ele é a regra que se quer testar, não um arredor da tela.
       if (name === '@/hooks/use-voltar-quando-fechar') return load('src/hooks/use-voltar-quando-fechar.ts');
-      if (name === '@/hooks/use-items') return { localISODate: () => '2026-09-08', formatDateBR: () => '08/09/2026', formatBRL: load('src/lib/dates.ts').formatBRL };
-      if (name === '@/lib/finance-form' || name === '@/lib/dates' || name === '@/lib/month-view' || name === '@/lib/settle-labels') return load(`src/lib/${name.split('/').at(-1)}.ts`);
+      if (name === '@/hooks/use-items') return { localISODate: () => '2026-09-08', formatDateBR: () => '08/09/2026', formatBRL: load('src/lib/dates.ts').formatBRL, useRealtimeInvalidate: () => {} };
+      // Orçamentos consulta direto (a lista de linhas): o mesmo resultado inerte dos hooks.
+      if (name === '@tanstack/react-query') return { useQuery: () => query };
+      if (name === '@/lib/finance-form' || name === '@/lib/dates' || name === '@/lib/month-view' || name === '@/lib/settle-labels' || name === '@/lib/accounts' || name === '@/lib/cycle-label') return load(`src/lib/${name.split('/').at(-1)}.ts`);
+      if (name === '@/hooks/use-debounced') return { useDebounced: (value: unknown) => value };
+      if (name === '@/design/category-icons') return { categoryIcon: () => 'circle' };
       // import relativo DENTRO de um módulo puro já carregado (month-view → ./dates.ts)
       if (name === './dates.ts' || name === './dates') return load('src/lib/dates.ts');
       // o `month-picker` é `.tsx` e importa React Native; aqui só as funções puras dele
       if (name === '@/components/finance/month-picker') return {
         MonthPicker: 'MonthPicker',
         currentMonth: () => '2026-09',
+        monthLabel: (m: string) => m,
+        monthShort: (m: string) => m,
+        shiftMonth: (m: string, delta: number) => {
+          const [y, mm] = m.split('-').map(Number);
+          const d = new Date(y, mm - 1 + delta, 1);
+          return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+        },
         monthTitle: (m: string) => {
           const [y, mm] = m.split('-').map(Number);
           const label = new Date(y, mm - 1, 1).toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' });
@@ -96,7 +143,7 @@ function screen(file: string, options: { debts?: any[]; invoiceStatus?: string; 
         concealText: () => '••••••',
         useBRL: () => (cents: number) => `R$ ${(cents / 100).toFixed(2)}`,
       };
-      if (name === '@/design/tokens') return { Motion: { duration: {}, stagger: {} }, Space: {}, Radius: {}, tabular: {} };
+      if (name === '@/design/tokens') return { Motion: { duration: {}, stagger: {} }, Space: {}, Radius: {}, tabular: {}, Elevation: { light: {}, dark: {} } };
       return new Proxy({}, { get: (_, key) => String(key) });
     } });
     return module.exports;
@@ -112,6 +159,9 @@ function screen(file: string, options: { debts?: any[]; invoiceStatus?: string; 
     // FIM da lista em 15/09/2026 (botão fixo sobre o scroll foi recusado pelo dono do produto),
     // e sem esta linha elas somem daqui enquanto continuam na tela.
     visit(node.props.ListFooterComponent);
+    // O estado vazio da lista também é slot renderizado — e é ONDE a lista dos Lançamentos
+    // desenhava três linhas de esqueleto para sempre quando as bordas do período falhavam.
+    visit(node.props.ListEmptyComponent);
     // O "Salvar" do sheet mora no slot `action` do `SheetHeader`, não em `children` — sem esta
     // linha o botão existe na tela e some daqui, que foi o que estas seis asserções viram.
     visit(node.props.action);
@@ -125,7 +175,7 @@ function screen(file: string, options: { debts?: any[]; invoiceStatus?: string; 
   const render = () => { cursor = 0; nodes = []; visit(Component()); };
   render();
   return {
-    writes, confirmations, actions, navigations,
+    writes, confirmations, actions, navigations, refetches, gates,
     nodes: () => nodes,
     button(label: string) { const node = nodes.find((n) => n.type === 'Button' && n.props.label === label); assert.ok(node, `visible button: ${label}`); return node; },
     press(label: string) { const node = this.button(label); assert.ok(!node.props.disabled, `${label} must be enabled`); node.props.onPress(); render(); },
@@ -288,4 +338,106 @@ test('an asset with a valid name but no value cannot be saved', () => {
   ui.press('Salvar');
   assert.equal(ui.writes.length, 1);
   assert.equal(ui.writes[0].value.current_value_cents, 150000);
+});
+
+
+/*
+  ⚠️ **O skeleton eterno de 16/09/2026.** Com o `cycle_range` falhando, `range.pronto` ficava
+  `false` para sempre: o portão da tela não abria, e mesmo com ele aberto o resumo (`!pronto`) e a
+  lista (desligada, `isPending` eterno) desenhavam esqueleto. Reproduzido no emulador injetando a
+  falha só naquela RPC — a tela parava no carregamento sem erro nem "Tentar de novo".
+
+  O portão agora recebe o range como CONSULTA (preso em `anti-slop.test.ts`); estes testes prendem
+  a outra metade: o que a tela DESENHA quando as bordas não vêm.
+*/
+const transacoesFile = 'src/app/finance/transactions.tsx';
+const tipos = (ui: ReturnType<typeof screen>) => ui.nodes().map((n: any) => n.type);
+
+test('Lançamentos com as bordas do período falhando mostra o erro, não um esqueleto eterno', () => {
+  const ui = screen(transacoesFile, { rangeError: true });
+  const t = tipos(ui);
+  assert.ok(t.includes('ErrorCard'), 'a falha do período precisa aparecer');
+  for (const esqueleto of ['Skeleton', 'SkeletonRow'])
+    assert.ok(!t.includes(esqueleto), `${esqueleto} com o período em erro é o defeito de volta`);
+  // Nem um total: sem bordas, qualquer número seria de OUTRA janela.
+  assert.ok(!t.includes('PeriodSummaryCard'));
+  // O card do resumo E a lista: as duas metades mostram a falha.
+  assert.equal(t.filter((x: string) => x === 'ErrorCard').length, 2);
+});
+
+test('o "Tentar de novo" do período refaz as BORDAS, não o resumo buscado com o palpite', () => {
+  // `refetch` do TanStack ignora `enabled`: refazer o resumo sem bordas definitivas buscaria o
+  // mês civil. Refeito o range, a chave muda e o resumo liga sozinho.
+  const ui = screen(transacoesFile, { rangeError: true });
+  ui.nodes().find((n: any) => n.type === 'ErrorCard').props.onRetry();
+  assert.deepEqual(ui.refetches, ['range']);
+});
+
+test('Lançamentos com o período resolvido desenha o resumo, sem erro', () => {
+  // A outra ponta, e é ela que o dublê antigo (`{from, to}`, sem `pronto`) escondia: com `pronto`
+  // indefinido o card caía no esqueleto e nenhum teste percebia.
+  const t = tipos(screen(transacoesFile));
+  assert.ok(t.includes('PeriodSummaryCard'), 'o card do resumo tem que aparecer');
+  assert.ok(!t.includes('ErrorCard'));
+});
+
+
+const semLimiteFalhou = (ui: ReturnType<typeof screen>) =>
+  ui.nodes().find((n: any) => n.props?.message === 'Não deu para ver em que você gastou sem limite.');
+
+test('Orçamentos com as bordas falhando avisa em "Sem limite", em vez de sumir com a seção', () => {
+  // Sem bordas o resumo não liga, `semLimite` fica vazio e a seção SUMIA calada — a pessoa lia
+  // "não há gasto sem limite" quando o que houve foi não conseguir perguntar.
+  const ui = screen('src/app/finance/budgets.tsx', { rangeError: true });
+  const aviso = semLimiteFalhou(ui);
+  assert.ok(aviso, 'a falha do período precisa aparecer');
+  aviso.props.onRetry();
+  assert.deepEqual(ui.refetches, ['range'], 'refaz as bordas, não o resumo com o palpite');
+});
+
+test('Orçamentos com o período resolvido não mostra falha nenhuma', () => {
+  assert.equal(semLimiteFalhou(screen('src/app/finance/budgets.tsx')), undefined);
+});
+
+
+const financeiroFile = 'src/app/(tabs)/finance/index.tsx';
+
+test('Financeiro com as bordas falhando mostra o erro no herói, não um esqueleto eterno', () => {
+  const ui = screen(financeiroFile, { rangeError: true });
+  const t = tipos(ui);
+  assert.ok(t.includes('ErrorCard'), 'o herói precisa mostrar a falha do período');
+  assert.ok(!t.includes('Skeleton'), 'esqueleto com o período em erro é o defeito de volta');
+  // "Ainda não tem movimento" é uma afirmação: sem resposta do resumo ela não pode aparecer.
+  assert.ok(!ui.nodes().some((n: any) => n.props?.title === 'Ainda não tem movimento'));
+});
+
+test('o "Tentar de novo" do herói refaz as bordas e nunca o resumo sem elas', () => {
+  const ui = screen(financeiroFile, { rangeError: true });
+  ui.nodes().find((n: any) => n.type === 'ErrorCard').props.onRetry();
+  assert.ok(ui.refetches.includes('range'), 'as bordas são o que falhou');
+  assert.ok(!ui.refetches.includes('summary'), '`refetch` ignora `enabled`: buscaria o mês civil');
+});
+
+test('trocando de mês, com as bordas ainda chegando, o herói espera em vez de desenhar zero', () => {
+  // O resumo só liga com as bordas definitivas, então `summary.isLoading` fica `false` enquanto
+  // elas buscam. Com o portão da tela já aberto — é o que acontece numa troca de mês —, sem
+  // `bordasChegando` o herói pintaria R$ 0,00 nesse intervalo.
+  const t = tipos(screen(financeiroFile, { rangePending: true }));
+  assert.ok(t.includes('Skeleton'), 'o herói fica no esqueleto');
+  assert.ok(!t.includes('ErrorCard'), 'buscando não é falha');
+});
+
+test('Financeiro segura a primeira pintura enquanto as bordas do mês ANTERIOR chegam', () => {
+  // `previous` só liga com `previousRange.pronto`, e desligado ele não segura o portão. Sem o
+  // `previousRange` na lista, a tela abria com o mês atual e o "vs agosto" chegava depois.
+  const buscandoAnterior = screen(financeiroFile, { rangePendingMonths: ['2026-08'] });
+  assert.equal(telaPronta(...buscandoAnterior.gates.at(-1)!), false, 'o range anterior buscando segura a tela');
+  const tudoPronto = screen(financeiroFile);
+  assert.equal(telaPronta(...tudoPronto.gates.at(-1)!), true, 'sem este, o de cima não distinguiria nada');
+});
+
+test('Financeiro com o período resolvido não mostra falha nem esqueleto no herói', () => {
+  const t = tipos(screen(financeiroFile));
+  assert.ok(!t.includes('ErrorCard'));
+  assert.ok(!t.includes('Skeleton'), 'sem este, o teste de cima não distinguiria nada');
 });

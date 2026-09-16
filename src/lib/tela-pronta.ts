@@ -40,19 +40,24 @@ export interface Consulta {
  * `getOptimisticResult` do observer conta a busca que vai começar no mesmo tique. Então não há
  * janela em que uma query normal seja confundida com uma desligada.
  *
- * ⚠️ **Condição que não é consulta entra COMO ARGUMENTO, nunca com `&&` do lado de fora.** Um
- * `telaPronta(...) && range.pronto` fica fora da trava do `useTelaPronta`, e aí trocar o mês —
- * que dá chave nova a `cycle-range` e devolve `range.pronto` a `false` — apaga a tela INTEIRA,
- * inclusive o seletor de mês que a pessoa acabou de tocar. É a mesma "pipoca ao contrário" que a
- * trava existe para impedir, entrando pela porta dos fundos. Um `false` aqui segura o portão;
- * um `true` não atrapalha.
+ * ⚠️ **Só entra CONSULTA — booleano não é aceito, e a assinatura existe para impedir isso**
+ * (16/09/2026). Esta função aceitava `Consulta | boolean`, com o exemplo
+ * `useTelaPronta(summary, cycle, accounts, range.pronto)` escrito aqui mesmo. Um booleano não
+ * consegue dizer a única coisa que este portão precisa saber — **se ainda tem alguém tentando**.
+ * `range.pronto` era `Boolean(ciclo.data)`: com o `cycle_range` falhando ele ficava `false` para
+ * sempre, e o portão com ele. Resultado medido no emulador: o Financeiro e os Lançamentos
+ * paravam no skeleton **indefinidamente**, sem card de erro, sem "Tentar de novo", sem log —
+ * exatamente o defeito que o parágrafo acima descreve para `enabled: false`, entrando por outra
+ * porta.
+ *
+ * Uma consulta carrega o estado inteiro: pendente-buscando segura, com erro libera, desligada
+ * libera. Quem tem uma condição derivada passa a CONSULTA de onde ela deriva (`useMonthRange`
+ * devolve uma `Consulta` por isso), nunca o booleano.
  *
  * ```ts
- * const pronta = useTelaPronta(summary, cycle, accounts, range.pronto);
+ * const pronta = useTelaPronta(summary, regua.cycle, accounts, range);
  * ```
  */
-export function telaPronta(...condicoes: (Consulta | boolean)[]): boolean {
-  return condicoes.every((c) =>
-    typeof c === 'boolean' ? c : !c.isPending || c.fetchStatus !== 'fetching'
-  );
+export function telaPronta(...consultas: Consulta[]): boolean {
+  return consultas.every((c) => !c.isPending || c.fetchStatus !== 'fetching');
 }

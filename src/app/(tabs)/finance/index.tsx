@@ -293,14 +293,17 @@ export default function FinanceScreen() {
   // sem nada na tela explicando por quê.
   const range = useMonthRange(month, regua.view);
   const previousMonth = useMemo(() => shiftMonth(month, -1), [month]);
-  const previousRange = useMonthRange(previousMonth);
+  // ⚠️ Na MESMA régua do mês exibido. Sem `regua.view` ele caía no padrão do workspace: com a
+  // régua trocada aqui para "Mês", o atual somava 01–30 e o anterior 11/08–10/09, e o "vs mês
+  // anterior" comparava dois tipos de período sem nada na tela dizendo isso.
+  const previousRange = useMonthRange(previousMonth, regua.view);
   const isCurrent = month === mesCorrente;
   const { width } = useWindowDimensions();
   const daysLeft = cycle.data?.diasAteOFim ?? daysToMonthEnd();
 
   const forecast = useCashFlowForecast(daysLeft);
-  const summary = useTransactionsSummary(range.from, range.to);
-  const previous = useTransactionsSummary(previousRange.from, previousRange.to);
+  const summary = useTransactionsSummary(range.from, range.to, range.pronto);
+  const previous = useTransactionsSummary(previousRange.from, previousRange.to, previousRange.pronto);
   const budgets = useBudgetsStatus(month, regua.view);
   const accounts = useAccounts();
   const debts = useDebts();
@@ -430,11 +433,23 @@ export default function FinanceScreen() {
     componentes e durante o skeleton de um componente, o outro já está montado e pronto"*. Aqui
     eram **14 consultas e 5 portões** — nove blocos apareciam cada um no seu tempo.
 
-    ⚠️ **Todas as consultas desta lista são SEMPRE ligadas.** Nenhuma nasce com `enabled: false`,
-    que é o caso que prenderia a tela no skeleton para sempre. `range.pronto` não é consulta: ele
-    diz se as bordas do ciclo já chegaram, e sem ele `summary`/`previous` respondem pela janela
-    do mês CIVIL — abrir a tela com esses números e trocá-los meio segundo depois é a mesma
-    pipoca com outro nome.
+    ⚠️ **As bordas entram como CONSULTA (`range`), não como `range.pronto`** (16/09/2026). O
+    booleano ficava `false` para sempre quando o `cycle_range` falhava, e a tela parava no
+    skeleton sem erro nem "Tentar de novo" — reproduzido no emulador injetando a falha. Como
+    consulta, o range segura enquanto busca e libera quando falha, e aí quem mostra a falha é o
+    herói (`heroError`). Ver `tela-pronta.ts`.
+
+    `cycle` entra pelo mesmo motivo: é ele que dá NOME ao mês (`useCycleMonth`). Fora do portão,
+    o range do palpite civil podia chegar antes, a tela abria com o ciclo anterior e trocava
+    quando o `cycle_now` respondesse.
+
+    `summary` e `previous` só ligam com as bordas definitivas (`pronto`); desligados, o portão já
+    os libera (`fetchStatus: 'idle'`), então não há consulta desligada prendendo nada.
+
+    ⚠️ **E por isso os DOIS ranges entram.** Desligado, `previous` não segura nada: sem
+    `previousRange` aqui, o portão abriria assim que o mês atual respondesse e o "vs setembro"
+    chegaria depois da primeira pintura. Quem segura o `previous` enquanto ele nem pode buscar é
+    o range de onde ele sai.
 
     ⚠️ **O portão TRAVA depois de abrir** (`useTelaPronta`), e é por isso que os portões de cada
     bloco continuam existindo: trocar de mês devolve `isPending` a três consultas, e sem a trava
@@ -442,18 +457,45 @@ export default function FinanceScreen() {
   */
   const pronta = useTelaPronta(
     forecast, summary, previous, budgets, accounts, debts, cards, cashflow, recent, serie,
-    // ⚠️ DENTRO da trava, não com `&&` fora dela: trocar de mês devolve `pronto` a `false`, e
-    // fora da trava isso apagaria a tela inteira — inclusive o seletor de mês recém-tocado.
-    range.pronto,
+    cycle, range, previousRange,
   );
 
-  const heroLoading = summary.isLoading || (isCurrent && forecast.isLoading);
-  const heroError = summary.isError || (isCurrent && forecast.isError);
+  /** O ciclo corrente não veio: o mês exibido seria o palpite civil, com o nome errado. */
+  const cicloFalhou = cycle.isError && !cycle.data;
+  /*
+    ⚠️ **Sem as bordas o resumo nem busca, então `summary.isLoading` fica `false` enquanto elas
+    chegam.** Com o portão já aberto — numa troca de mês — o herói desenharia R$ 0,00 nesse
+    intervalo. `bordasChegando` o mantém no esqueleto.
+  */
+  const bordasChegando = !range.pronto && !range.isError;
+  const heroLoading = bordasChegando || summary.isLoading || (isCurrent && forecast.isLoading);
+  const heroError = cicloFalhou || range.isError || summary.isError || (isCurrent && forecast.isError);
+  /*
+    "Ainda não tem movimento" é uma AFIRMAÇÃO, então exige resposta das duas consultas. Com
+    `!isLoading` ela era vacuamente verdadeira com o resumo desligado ou com erro — e a tela
+    dizia que não havia nada logo abaixo de um herói que não conseguiu carregar.
+  */
   const isEmpty =
-    !summary.isLoading &&
-    !recent.isLoading &&
+    summary.isSuccess &&
+    recent.isSuccess &&
     (summary.data ?? []).length === 0 &&
     (recent.data ?? []).length === 0;
+
+  /**
+   * Refaz o que o período precisa — e SÓ o que o período precisa.
+   *
+   * ⚠️ `refetch` do TanStack **ignora `enabled`**: chamar `summary.refetch()` sem as bordas
+   * definitivas buscaria com o palpite civil. Por isso o resumo só é refeito com `pronto`; sem
+   * ele, refazer o range basta, porque a chave muda e o resumo liga sozinho.
+   */
+  const refazerPeriodo = () =>
+    Promise.all([
+      ...(cicloFalhou ? [cycle.refetch()] : []),
+      ...(range.isError ? [range.refetch()] : []),
+      ...(previousRange.isError ? [previousRange.refetch()] : []),
+      ...(range.pronto ? [summary.refetch()] : []),
+      ...(previousRange.pronto ? [previous.refetch()] : []),
+    ]);
 
   /** Destrutivo = action sheet nativo (`confirmDestructive`), nunca `Alert` de long press. */
   const confirmDelete = (tx: Transaction) => {
@@ -504,7 +546,7 @@ export default function FinanceScreen() {
         grouped
         // Sem etiqueta: o seletor de mês fica logo abaixo e diria a mesma coisa duas vezes.
         topBar={<AppHeader title="Financeiro" />}
-        onRefresh={() => Promise.all([forecast.refetch(), summary.refetch(), previous.refetch(), budgets.refetch(), accounts.refetch(), cards.refetch(), recent.refetch(), cashflow.refetch()])}
+        onRefresh={() => Promise.all([refazerPeriodo(), forecast.refetch(), budgets.refetch(), accounts.refetch(), cards.refetch(), recent.refetch(), cashflow.refetch()])}
         refreshing={summary.isRefetching}>
         {/*
           O painel deixou de sangrar até as bordas e virou CARD FLUTUANTE (design Stitch,
@@ -527,8 +569,8 @@ export default function FinanceScreen() {
         ) : heroError ? (
           <ErrorCard
             onRetry={() => {
-              summary.refetch();
-              forecast.refetch();
+              void refazerPeriodo();
+              void forecast.refetch();
             }}
           />
         ) : (

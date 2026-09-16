@@ -148,8 +148,10 @@ export default function BudgetsScreen() {
    * 11/08–10/09 punha dois números de períodos diferentes na mesma tela, colados, sem nada
    * explicando por quê — era o defeito que esta tela tinha até 11/09/2026.
    */
-  const { from, to } = useMonthRange(month, regua.view);
-  const resumo = useTransactionsSummary(from, to);
+  const range = useMonthRange(month, regua.view);
+  // Só com as bordas definitivas: com o palpite civil, "Sem limite definido" listaria o gasto de
+  // outra janela — e ficaria assim para sempre se o `cycle_range` falhasse.
+  const resumo = useTransactionsSummary(range.from, range.to, range.pronto);
   const save = useSaveBudget();
   const remove = useDeleteBudget();
 
@@ -408,8 +410,21 @@ export default function BudgetsScreen() {
 
   /*
     O PORTÃO DA TELA (Fase 5) — 6 consultas, 4 portões antes disto.
+
+    `range` e `regua.cycle` entram como CONSULTA: o resumo espera as bordas, e o mês exibido sai
+    do ciclo. Ver `tela-pronta.ts` para o skeleton eterno que um booleano aqui produziria.
   */
-  const pronta = useTelaPronta(status, rows, resumo);
+  const pronta = useTelaPronta(status, rows, resumo, regua.cycle, range);
+
+  /** Sem período utilizável, "Sem limite definido" não tem como responder. */
+  const periodoFalhou = (regua.cycle.isError && !regua.cycle.data) || range.isError;
+  /** `refetch` ignora `enabled`: o resumo só é refeito com as bordas definitivas. */
+  const refazerResumo = () =>
+    Promise.all([
+      ...(regua.cycle.isError && !regua.cycle.data ? [regua.cycle.refetch()] : []),
+      ...(range.isError ? [range.refetch()] : []),
+      ...(range.pronto ? [resumo.refetch()] : []),
+    ]);
 
   if (!pronta) {
     return (
@@ -424,7 +439,7 @@ export default function BudgetsScreen() {
     <Screen
       stagger
       grouped
-      onRefresh={() => Promise.all([status.refetch(), rows.refetch(), resumo.refetch()])}
+      onRefresh={() => Promise.all([status.refetch(), rows.refetch(), refazerResumo()])}
       refreshing={status.isRefetching}>
       <Stack.Screen
         options={{
@@ -495,10 +510,10 @@ export default function BudgetsScreen() {
         </View>
       ) : null}
 
-      {resumo.isError ? (
+      {periodoFalhou || resumo.isError ? (
         <ErrorBand
           message="Não deu para ver em que você gastou sem limite."
-          onRetry={resumo.refetch}
+          onRetry={() => { void refazerResumo(); }}
         />
       ) : semLimite.length > 0 ? (
         <View style={styles.secao}>
