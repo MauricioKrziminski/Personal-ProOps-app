@@ -374,6 +374,29 @@ seções em `Stagger` (teto 400 ms). Reentrada: nada anima. Mudança de valor: `
   subtítulo quando há quanto já caiu, "Projeção" virou "Saldo mês a mês", a legenda da
   tendência saiu (o seletor já diz a janela), rótulos do cartão de identidade encurtados.
 
+#### Como ficou (ajustes pedidos em 17/09/2026) — vale acima dos dois blocos acima
+
+- **A passagem "marca → app" acontece em toda abertura**, com senha ou sem. A marca fica no
+  mínimo 0,9 s (no Android ela entra também na abertura curta). Com a trava ligada, a abertura
+  SEGURA a marca enquanto o sistema pede a senha (teto de 20 s) e, confirmada, a tinta sobe
+  direto na Hoje — a trava some por baixo, sem a onda dela. Cancelou, a abertura revela a trava.
+  Se a leitura da trava chegar depois do teto curto (2,5 s), a abertura já revelou e o
+  desbloqueio usa a onda da trava — o fim é o mesmo.
+- **A entrada das raízes toca sempre que o app fica visível** (`motion/entrada.tsx`): abertura,
+  entrada na conta e desbloqueio (também depois de voltar do segundo plano). Visível = cortina
+  saindo **e** trava aberta.
+- **Sem conta aberta a trava não existe**: ela cobria o login na abertura seguinte. Entrar ou
+  sair da conta destrava.
+- **O indicador de atualizar é só do gesto**: o `Screen` perdeu o prop `refreshing`. Fechar o
+  Face ID é uma retomada, as consultas recarregam, e a Hoje descia ~30pt sozinha.
+- **Carteira no Android é `transparentModal`**: fechar voltava a um Financeiro desanexado, com
+  dois quadros vazios e a barra de abas surgindo do nada.
+- **Tema escuro**: a capa das telas de conta sobe um degrau (`heroSurface`) depois que a cortina
+  abre — na cor da cortina ela sumia no fundo.
+- **Toast nas telas modais do iOS** (`ToastDoModal`) e o campo que não repete a dica quando o
+  erro diz a mesma frase.
+- Medido no emulador (dev): o desbloqueio roda com 0–2,3% de quadros atrasados, p90 17 ms.
+
 ### Transições por plataforma
 
 | | iOS | Android |
@@ -381,8 +404,8 @@ seções em `Stagger` (teto 400 ms). Reentrada: nada anima. Mudança de valor: `
 | detalhe | push nativo | `animation: 'default'` (eixo compartilhado Material no Android 13+) |
 | formulário modal | sheet nativo | `slide_from_bottom` |
 | conta | `fade` | `fade` |
-| Carteira | coreografia própria | coreografia própria |
-| tab bar | `NativeTabs` (vidro do sistema), `tintColor` = `tint` | `TileTabBar` |
+| Carteira | coreografia própria (`push` em `fade`) | coreografia própria (`transparentModal` em `fade`) |
+| tab bar | `NativeTabs` (vidro do sistema), `tintColor` = `tint` | `PillTabBar` |
 
 Diferenças moram em `.ios.tsx` / `.android.tsx` ou `Platform.select` dentro de primitivo, nunca
 na tela.
