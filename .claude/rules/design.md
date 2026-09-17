@@ -761,8 +761,9 @@ sobre fundo de baixo contraste. O lockup horizontal fica em `assets/images/logo/
 dentro do app.
 
 Splash e overlay animado usam **o mesmo par cor de fundo + variante da marca** (`app.json` →
-plugin `expo-splash-screen` e `src/components/animated-icon.tsx`), senão aparece um flash de cor
-errada na transição.
+plugin `expo-splash-screen` e `src/components/motion/session-curtain.tsx`), senão aparece um
+flash de cor errada na transição. No Concreto (16/09/2026) o par é tinta `#0D0D0C` +
+`mark-white.png` nos DOIS temas, e a cortina desenha o mesmo PNG no mesmo `imageWidth`.
 
 ## 10. Contagem anti-slop (mecânica, antes de dar qualquer tela como pronta)
 

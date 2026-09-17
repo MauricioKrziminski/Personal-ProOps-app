@@ -110,3 +110,22 @@ export function markDotPath(size: number): SkPath {
 
   return path;
 }
+
+/**
+ * A marca encaixada numa caixa qualquer, pelos limites REAIS da tinta.
+ *
+ * Existe para o traço da abertura cair exatamente sobre o PNG do splash: o PNG tem margem
+ * própria (a tinta ocupa 61..451 de 512 px), e `markPath(size)` centra pelo desenho, não por ela.
+ */
+export function markPathIn(x: number, y: number, w: number, h: number): SkPath {
+  const path = markPath(Math.max(w, h));
+  const b = path.getBounds();
+  const k = Math.min(w / b.width, h / b.height);
+  // Pós-concatenado: aplica da última para a primeira — volta à origem, escala, posiciona.
+  const m = Skia.Matrix();
+  m.translate(x + (w - b.width * k) / 2, y + (h - b.height * k) / 2);
+  m.scale(k, k);
+  m.translate(-b.x, -b.y);
+  path.transform(m);
+  return path;
+}

@@ -32,11 +32,11 @@
       [
         "expo-splash-screen",
         {
-          "backgroundColor": "#FFFFFF",
-          "image": "./assets/images/brand/mark-black.png",
+          "backgroundColor": "#0D0D0C",
+          "image": "./assets/images/brand/mark-white.png",
           "imageWidth": 96,
           "dark": {
-            "backgroundColor": "#000000",
+            "backgroundColor": "#0D0D0C",
             "image": "./assets/images/brand/mark-white.png"
           }
         }

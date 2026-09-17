@@ -24,7 +24,7 @@ import { AppState, Platform } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { KeyboardProvider } from 'react-native-keyboard-controller';
 
-import { AnimatedSplashOverlay } from '@/components/animated-icon';
+import { CortinaProvider, useCortina } from '@/components/motion/session-curtain';
 import { LockOverlay } from '@/components/ui/lock-overlay';
 import { LockProvider } from '@/hooks/use-lock';
 import { AndroidActionSheet } from '@/components/ui/action-sheet';
@@ -71,7 +71,9 @@ export default function RootLayout() {
     */
     <GestureHandlerRootView>
       <AppThemeProvider>
-        <AppTree />
+        <CortinaProvider>
+          <AppTree />
+        </CortinaProvider>
       </AppThemeProvider>
     </GestureHandlerRootView>
   );
@@ -127,6 +129,15 @@ function AppTree() {
   });
 
   const { session, loading } = useSession();
+  /*
+    A abertura revela quando fontes e sessão estão prontas (com teto dentro da cortina). A raiz
+    só avisa; quem decide o tempo é a cortina.
+  */
+  const cortina = useCortina();
+  const pronto = !loading && (fontsLoaded || !!fontError);
+  useEffect(() => {
+    if (pronto) cortina.marcarPronto();
+  }, [pronto, cortina]);
   const previousUser = useRef<string | null | undefined>(undefined);
   useEffect(() => {
     if (loading) return;
@@ -156,14 +167,13 @@ function AppTree() {
           <ConcealProvider>
           {/*
             A trava fica ACIMA do `<Stack>` e DENTRO dos providers (precisa de `useTheme` e de
-            `useSafeAreaInsets`). Irmã do `AnimatedSplashOverlay`, pelo mesmo motivo: é um overlay
-            sobre o app inteiro, não uma rota — rota tem "voltar", e voltar de uma tela de
-            bloqueio é a própria falha.
+            `useSafeAreaInsets`). Fica abaixo da cortina de sessão (900 < 1000), pelo mesmo
+            motivo dela: é um overlay sobre o app inteiro, não uma rota — rota tem "voltar", e
+            voltar de uma tela de bloqueio é a própria falha.
           */}
           <LockProvider>
           <ToastProvider>
             <AppUpdateProvider>
-              <AnimatedSplashOverlay ready={!loading && fontsLoaded} />
               <LockOverlay />
               <AndroidActionSheet />
               {/*
