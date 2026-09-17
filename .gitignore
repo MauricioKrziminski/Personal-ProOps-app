@@ -66,3 +66,6 @@ docs/bugs/evidence/
 
 # Checkpoints do banco: dado financeiro real, nunca versionado
 .checkpoints/
+
+# estado temporário do servidor de perguntas da skill impeccable
+.impeccable/questions/
