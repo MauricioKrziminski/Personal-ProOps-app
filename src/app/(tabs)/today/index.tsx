@@ -290,16 +290,18 @@ export default function TodayScreen() {
           caminho.refetch(),
         ])
       }>
+      {/* A data vem DEPOIS da saudação: etiqueta acima de título é o padrão que o acabamento
+          proíbe — ela rouba a primeira linha para dizer o que ninguém veio ler. */}
       <View style={styles.cabecalho}>
-        <ThemedText type="caption" themeColor="textSecondary">
-          {diaCurtoBR(hoje)}
-        </ThemedText>
         {/* Sem nome (entrou por Phone OTP), a saudação some inteira em vez de virar "Bom dia,". */}
         {primeiroNome ? (
           <ThemedText type="title" style={styles.semEncolher}>
             {`${greetingBR()}, ${primeiroNome}`}
           </ThemedText>
         ) : null}
+        <ThemedText type="caption" themeColor="textSecondary">
+          {diaCurtoBR(hoje)}
+        </ThemedText>
       </View>
 
       {gasto.isError ? (

@@ -127,7 +127,14 @@ const styles = StyleSheet.create({
     gap: Space.md,
     padding: Space.lg,
     minHeight: 112,
-    justifyContent: 'space-between',
+    /*
+      O conteúdo desce logo abaixo do ícone; a sobra fica no PÉ do ladrilho. Com
+      `space-between`, dois ladrilhos lado a lado de alturas iguais e conteúdos de tamanhos
+      diferentes empurravam o par de números para linhas de base diferentes — e abriam um vão
+      no meio do mais curto (medido nos dois: "Entra R$ 0,00" ao lado de "Sai", que tem legenda
+      e barra). Alinhados pelo topo, os dois valores ficam na mesma linha.
+    */
+    justifyContent: 'flex-start',
     borderRadius: Radius.md,
     borderCurve: 'continuous',
     borderWidth: 1,

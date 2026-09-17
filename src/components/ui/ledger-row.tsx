@@ -56,12 +56,12 @@ export function LedgerRow({
           </ThemedText>
         ) : null}
         {citacao ? (
-          <View style={styles.citacao}>
-            <View style={[styles.barra, { backgroundColor: theme.rail }]} />
-            <ThemedText type="footnote" themeColor="textSecondary" style={styles.italico}>
-              {`“${citacao}”`}
-            </ThemedText>
-          </View>
+          <ThemedText
+            type="footnote"
+            themeColor="textSecondary"
+            style={[styles.italico, styles.citacao]}>
+            {`“${citacao}”`}
+          </ThemedText>
         ) : null}
       </View>
       <View style={styles.direita}>
@@ -94,8 +94,8 @@ const styles = StyleSheet.create({
   },
   selo: { width: 40, height: 40, borderRadius: Radius.pill, alignItems: 'center', justifyContent: 'center' },
   textos: { flexGrow: 1, flexShrink: 1, minWidth: 134, gap: 2 },
-  citacao: { flexDirection: 'row', gap: Space.sm, marginTop: Space.xs },
-  barra: { width: 2, borderRadius: Radius.pill },
+  // As aspas já marcam a citação; um trilho colorido ao lado seria a segunda marca do mesmo fato.
+  citacao: { marginTop: Space.xs },
   italico: { flex: 1, fontFamily: Fonts.italic },
   direita: { alignItems: 'flex-end', gap: Space.half, marginLeft: 'auto' },
 });
