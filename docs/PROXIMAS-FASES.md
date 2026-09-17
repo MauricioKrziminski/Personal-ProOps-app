@@ -810,6 +810,20 @@ quem abre o app, o olho protege quem olha por cima do ombro. Deixe independentes
   nem aparece na tela de configuração).
 - Confirme que o app **não pede o PIN** ao voltar do `DocumentPicker`.
 
+#### Como ficou depois (17/09/2026) — vale acima do desenho acima
+
+- **Não há PIN próprio**: a senha é a do aparelho (`disableDeviceFallback: false`), ver
+  `use-lock.tsx`.
+- **Sem conta aberta a trava não existe** (`deveTrancar` exige `temSessao`), e entrar ou sair da
+  conta destrava. Antes ela cobria o login na abertura seguinte.
+- **A volta não mostra mais o dinheiro.** Trancar só no `active` deixava ~1 s da Hoje à mostra.
+  Agora, ao ir para o segundo plano, uma tinta cobre a tela viva (`velado`, `deveVelarAoSair`), e
+  o módulo local `modules/proops-privacidade` esconde a FOTO que o sistema tira na pausa (capa
+  nativa no `didEnterBackground` do iOS; `setRecentsScreenshotEnabled(false)` no Android 13+). Só
+  com a trava ligada e conta aberta. Dentro da espera de 30/60 s a tinta esmaece sem pedir senha.
+- **A abertura segura a marca enquanto o sistema pede a senha** e sobe direto no app (ver
+  `design.md` §5).
+
 ---
 
 ## Fase 5 — Loaders e skeletons uniformes ✅ FEITA em 14/09/2026 (commits `720eb09`, `e921182`, `374d1ad`)

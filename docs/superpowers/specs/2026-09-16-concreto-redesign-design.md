@@ -387,6 +387,9 @@ seções em `Stagger` (teto 400 ms). Reentrada: nada anima. Mudança de valor: `
   saindo **e** trava aberta.
 - **Sem conta aberta a trava não existe**: ela cobria o login na abertura seguinte. Entrar ou
   sair da conta destrava.
+- **A volta ao app não mostra o dinheiro**: com a trava ligada, uma tinta cobre a tela ao sair e
+  a foto do sistema (recentes, zoom da volta) é escondida no nativo
+  (`modules/proops-privacidade`). Dentro da espera, a tinta só esmaece.
 - **O indicador de atualizar é só do gesto**: o `Screen` perdeu o prop `refreshing`. Fechar o
   Face ID é uma retomada, as consultas recarregam, e a Hoje descia ~30pt sozinha.
 - **Carteira no Android é `transparentModal`**: fechar voltava a um Financeiro desanexado, com

@@ -64,8 +64,9 @@ Suave (não existe nos vídeos).
 - **A escolha do cartão da frente é o `account_id`**, gravado em `useCartaoEscolhido` (loja com
   assinatura + AsyncStorage): a Carteira troca por cima e a pilha de baixo se reordena sozinha.
 - **Voo entre telas** mora numa camada na raiz (`flight-layer.tsx`, irmã do `<Stack>`), e a
-  Carteira é `push` com `fade` — `transparentModal` no iOS é apresentado acima da raiz e
-  esconderia o voo. Quem navega espera a DECOLAGEM (a origem já escondida), porque o iOS congela
+  Carteira entra em `fade`: `push` no iOS (lá o `transparentModal` é apresentado acima da raiz e
+  esconderia o voo) e `transparentModal` no Android (como `push`, o Financeiro era desanexado e
+  voltava do zero ao fechar, com a barra de abas surgindo do nada). Quem navega espera a DECOLAGEM (a origem já escondida), porque o iOS congela
   a tela que sai no começo da transição.
 - **Na fatura o cartão fica ancorado** (`InvoiceDock`) com estado, contagem, total, fecha e
   vence; deslizar a face troca de fatura pelo mesmo caminho das setas.
