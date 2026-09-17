@@ -16,6 +16,33 @@ Referências de movimento: dois vídeos do dono do produto (abertura com cortina
 vira loader, cartão que voa e gira até um carrossel 3D, cartão que se ancora no topo da tela
 seguinte). Quadros extraídos e estudados; o vocabulário deles entra traduzido para o mundo abaixo.
 
+## ⚠️ Direção revisada no mesmo dia: **Suave** (vale acima do visual Concreto abaixo)
+
+Depois de ver a fundação no aparelho, o dono do produto recusou a forma: *"estou sentindo muito
+quadrado as coisas, quero algo moderno, minimalista, nível o vídeo que eu mandei, olha o design do
+vídeo, clean, bonito e minimalista… Arrume esses botões de novo, gráficos, esse ícone nada a ver"*.
+A ARQUITETURA desta spec continua (cortina na raiz, portão de sessão, camada de voo, rotas reais,
+Regra 0, fases). O que muda é a pele e o vocabulário de movimento, agora tirados dos vídeos:
+
+| tema | Concreto (recusado) | Suave (vale) |
+|---|---|---|
+| forma | raio 2–12, azulejos, botão tecla | raio 6/12/18/24/28 e pílula; botão, chip, segmentado e avatar em pílula ou círculo |
+| cor | papel/tinta + azul Bulcão | papel morno `#F2F1EE`, tinta `#0B0B0C`, superfície branca; **monocromático** — ação em tinta (branca no escuro); verde/vermelho/âmbar só como semântica |
+| herói | negativo da página (papel no escuro) | bloco escuro nos dois temas (`#1C1C1E` no escuro), canto 24 |
+| tipo | Jost + Martian Mono, títulos em minúsculas | **Plus Jakarta Sans**, pesos leves (título 600, número grande 500), caixa normal; Martian Mono 400 só no código inline das notas |
+| cortina | campo de azulejos (Skia Atlas) | **onda curva** (`WaveCurtain`, `design/wave-math.ts`): a tinta sobe com a borda em curva; de um botão, um círculo que cresce |
+| abertura | ondulação de azulejos + traço azul | a marca do splash e um anel fino que se desenha em volta dela (5 primeiras); depois a tinta sobe |
+| carregando | azulejo girando | a pílula encolhe até uma cápsula e dois pontos trocam de lugar (`DotsLoader`) |
+| campos | traço azul de 2px | caixa branca de canto 12 com fio claro; anel de tinta de 1,5px acende no foco |
+| gráficos | hachura, losango, barra em 10 peças | curva suave com área em degradê leve, ponto com pulso; barra em pílula contínua |
+| vazio | painel 2×2 de azulejos | selo redondo cinza com um símbolo do sistema |
+| trava | campo de azulejos + azulejo azul | tinta, a marca num círculo suave com halo; a tinta sobe ao destravar |
+
+Pendentes do vocabulário novo, nas fases que já os previam: a tab bar do Android vira a pílula
+flutuante escura com o círculo claro no ativo (vídeo); a face do cartão e a Carteira seguem o
+cartão metálico de canto 18 dos vídeos; as telas de conta ganham a curva de tinta no topo (o
+"SLATE" do vídeo) no lugar do canto de azulejos.
+
 ## Decisões tomadas com o dono do produto
 
 | pergunta | resposta |
