@@ -200,6 +200,11 @@ export default function CardsScreen() {
         const limite = Number(card.credit_limit_cents ?? 0);
         const livre = Number(card.available_limit_cents ?? 0);
         const pct = limite > 0 ? naoPago / limite : 0;
+        // A barra soma TODAS as faturas não pagas — inclusive as FUTURAS, das parcelas; o número
+        // grande é só a corrente. O que sobra e a faixa de atraso acima ainda não mostrou vira uma
+        // oração na linha do limite. ("Fatura anterior" era a frase antiga, e errada para parcela.)
+        const outras =
+          naoPago - totalFatura - (atrasadas > 0 ? Number(card.overdue_total_cents ?? 0) : 0);
         const podePagar = estado === 'Fechada' || estado === 'Atrasada';
 
         return (
@@ -284,8 +289,6 @@ export default function CardsScreen() {
                     max={limite}
                     tone={pct >= 1 ? 'danger' : pct >= 0.7 ? 'warning' : 'tint'}
                   />
-                  {/* Uma linha: quanto sobra do limite. A barra já conta o resto (inclusive fatura
-                      anterior em aberto, que era uma frase à parte). */}
                   <ThemedText
                     type="footnote"
                     themeColor={livre < 0 ? 'danger' : 'textSecondary'}
@@ -293,6 +296,7 @@ export default function CardsScreen() {
                     {livre < 0
                       ? `${brl(Math.abs(livre))} acima do limite de ${brl(limite)}`
                       : `${brl(livre)} livre de ${brl(limite)}`}
+                    {outras > 0 ? ` · inclui ${brl(outras)} de outras faturas` : ''}
                   </ThemedText>
                 </>
               ) : null}

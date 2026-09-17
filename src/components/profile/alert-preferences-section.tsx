@@ -47,7 +47,8 @@ function whatsappSubtitle({
 }): string {
   if (failed) return 'Não deu para verificar';
   if (!hasVerifiedPhone) return 'Conecte o WhatsApp para ativar';
-  return '';
+  // O que chega por aqui — o interruptor ao lado já diz se está ligado.
+  return 'Orçamento, faturas e saldo';
 }
 
 /** Preferências dos avisos inferidos; lembretes pessoais continuam independentes. */
