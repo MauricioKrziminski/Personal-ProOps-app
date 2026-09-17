@@ -1,14 +1,17 @@
 import { FlashList, type FlashListRef } from '@shopify/flash-list';
 import { Stack, router } from 'expo-router';
-import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Pressable, StyleSheet, View, type NativeScrollEvent, type NativeSyntheticEvent } from 'react-native';
+import { memo, useCallback, useEffect, useMemo, useRef, useState, type ReactElement, type RefObject } from 'react';
+import { ActivityIndicator, Pressable, StyleSheet, View, type NativeScrollEvent, type NativeSyntheticEvent } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { ChatActions } from '@/components/agent/chat-actions';
+import { AgentChatStart } from '@/components/agent/agent-chat-start';
+import { AgentThreadHeading } from '@/components/agent/agent-thread-heading';
 import { ChatComposer } from '@/components/agent/chat-composer';
 import { ChatMessage } from '@/components/agent/chat-message';
 import { RenameConversationSheet } from '@/components/agent/rename-conversation-sheet';
 import { ThemedText } from '@/components/themed-text';
+import { MaxContentWidth } from '@/constants/theme';
 import { Button } from '@/components/ui/button';
 import { EmptyState } from '@/components/ui/empty-state';
 import { HeaderMenu } from '@/components/ui/header-actions';
@@ -335,7 +338,9 @@ export function ConversationScreen({ conversationId, initialText = '', title }: 
 
   const desenharLinha = useCallback(
     ({ item }: { item: Item }) => (
-      <Linha item={item} busy={rodando} onDecide={decidir} onRetry={tentarDeNovo} />
+      <View style={styles.messageFrame}>
+        <Linha item={item} busy={rodando} onDecide={decidir} onRetry={tentarDeNovo} />
+      </View>
     ),
     // A identidade precisa ser estável: sem isso cada tecla digitada no composer
     // devolveria um `renderItem` novo e a conversa inteira remontaria.
@@ -353,6 +358,11 @@ export function ConversationScreen({ conversationId, initialText = '', title }: 
     // rolagem e um `setState` por evento remontaria a conversa inteira.
     setPerto((atual) => (atual === novo ? atual : novo));
   }, []);
+
+  const { hasNextPage, isFetchingNextPage, fetchNextPage } = historico;
+  const carregarAnteriores = useCallback(() => {
+    if (hasNextPage && !isFetchingNextPage) fetchNextPage();
+  }, [hasNextPage, isFetchingNextPage, fetchNextPage]);
 
   const acoesDoHeader = conversationId
     ? [
@@ -385,8 +395,10 @@ export function ConversationScreen({ conversationId, initialText = '', title }: 
 
   return (
     <View style={[styles.raiz, { backgroundColor: theme.background }]}>
-      <Stack.Screen options={{ title: title ?? '' }} />
-      <HeaderMenu title={title ?? 'Conversa'} actions={acoesDoHeader} />
+      <Stack.Screen options={{ title: 'Conversa' }} />
+      <HeaderMenu title="Conversa" actions={acoesDoHeader} />
+
+      {conversationId && title ? <AgentThreadHeading title={title} /> : null}
 
       <View style={[styles.lista, { paddingBottom: obstrucao }]}>
         {historico.isPending && conversationId ? (
@@ -405,43 +417,14 @@ export function ConversationScreen({ conversationId, initialText = '', title }: 
             action={{ label: 'Tentar novamente', onPress: () => historico.refetch() }}
           />
         ) : (
-          <FlashList
-            ref={lista}
-            // `flex: 1` explícito: sem ele a lista cresce com o conteúdo e o
-            // composer sai da tela em vez de a lista rolar por dentro.
-            style={styles.lista}
-            data={itens}
-            keyExtractor={(i) => i.key}
-            getItemType={(i) => i.kind}
+          <ConversationTimeline
+            key={conversationId ?? 'new'}
+            listRef={lista}
+            items={itens}
             renderItem={desenharLinha}
-            contentContainerStyle={{
-              paddingHorizontal: Space.lg,
-              paddingVertical: Space.md,
-            }}
             onScroll={aoRolar}
-            scrollEventThrottle={64}
-            /*
-              `startRenderingFromBottom`: a conversa abre na última mensagem, que é
-              onde ela parou. `autoscrollToBottomThreshold` faz a resposta que
-              chega seguir o fim SÓ quando a pessoa já estava lá — longe do fim ela
-              está lendo, e puxar a lista é arrancar a tela da mão dela.
-            */
-            maintainVisibleContentPosition={{
-              startRenderingFromBottom: true,
-              autoscrollToBottomThreshold: 0.2,
-            }}
-            onStartReachedThreshold={0.3}
-            onStartReached={() => {
-              if (historico.hasNextPage && !historico.isFetchingNextPage) {
-                historico.fetchNextPage();
-              }
-            }}
-            ListEmptyComponent={
-              <EmptyState
-                title="Pergunta o que quiser"
-                hint="“Gastei 45 no mercado”, “quanto sobrou esse mês?”, “me lembra do aluguel dia 5”."
-              />
-            }
+            onStartReached={carregarAnteriores}
+            onSelectPrompt={setTexto}
           />
         )}
 
@@ -493,6 +476,48 @@ export function ConversationScreen({ conversationId, initialText = '', title }: 
   );
 }
 
+/**
+ * A âncora inicial pertence ao ciclo de vida da lista, não ao número atual de
+ * mensagens. A quinta mensagem não muda a posição de uma conversa em leitura.
+ */
+function ConversationTimeline({
+  listRef,
+  items,
+  renderItem,
+  onScroll,
+  onStartReached,
+  onSelectPrompt,
+}: {
+  listRef: RefObject<FlashListRef<Item> | null>;
+  items: Item[];
+  renderItem: ({ item }: { item: Item }) => ReactElement;
+  onScroll: (event: NativeSyntheticEvent<NativeScrollEvent>) => void;
+  onStartReached: () => void;
+  onSelectPrompt: (prompt: string) => void;
+}) {
+  const [startAtBottom] = useState(() => items.length > 4);
+  return (
+    <FlashList
+      ref={listRef}
+      style={styles.lista}
+      data={items}
+      keyExtractor={(item) => item.key}
+      getItemType={(item) => item.kind}
+      renderItem={renderItem}
+      contentContainerStyle={{ paddingHorizontal: Space.lg, paddingVertical: Space.md }}
+      onScroll={onScroll}
+      scrollEventThrottle={64}
+      maintainVisibleContentPosition={{
+        startRenderingFromBottom: startAtBottom,
+        autoscrollToBottomThreshold: 0.2,
+      }}
+      onStartReachedThreshold={0.3}
+      onStartReached={onStartReached}
+      ListEmptyComponent={<AgentChatStart onSelectPrompt={onSelectPrompt} />}
+    />
+  );
+}
+
 /** Uma linha da conversa. Fora do componente-pai para não remontar a cada tecla. */
 const Linha = memo(function Linha({
   item,
@@ -505,14 +530,16 @@ const Linha = memo(function Linha({
   onDecide: (m: AgentMessage, o: UiOption) => void;
   onRetry: () => void;
 }) {
+  const theme = useTheme();
   if (item.kind === 'processing') {
     return (
       // Uma linha ESTÁVEL, sem bolha entrando e saindo: o que muda é o texto, e
       // a lista não se mexe. `polite` para o leitor de tela anunciar sem cortar
       // o que estava lendo.
-      <View style={styles.status} accessibilityLiveRegion="polite">
+      <View style={[styles.status, styles.statusBusy]} accessibilityLiveRegion="polite">
+        <ActivityIndicator size="small" color={theme.textSecondary} />
         <ThemedText type="footnote" themeColor="textSecondary">
-          Pensando…
+          Organizando sua resposta…
         </ThemedText>
       </View>
     );
@@ -557,8 +584,10 @@ const Linha = memo(function Linha({
 const styles = StyleSheet.create({
   raiz: { flex: 1 },
   lista: { flex: 1 },
-  item: { paddingVertical: Space.sm },
-  status: { paddingVertical: Space.sm, gap: Space.sm, alignItems: 'flex-start' },
+  messageFrame: { width: '100%', maxWidth: MaxContentWidth, alignSelf: 'center' },
+  item: { paddingVertical: Space.lg },
+  status: { paddingVertical: Space.lg, gap: Space.sm, alignItems: 'flex-start' },
+  statusBusy: { flexDirection: 'row', alignItems: 'center' },
   esqueleto: { padding: Space.lg, gap: Space.md },
   irAoFim: {
     position: 'absolute',

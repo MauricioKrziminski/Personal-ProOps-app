@@ -1,20 +1,21 @@
 import { FlashList } from '@shopify/flash-list';
 import { router } from 'expo-router';
 import { useCallback, useMemo, useState } from 'react';
-import { StyleSheet, View } from 'react-native';
+import { Pressable, StyleSheet, View } from 'react-native';
 
 import { ConversationRow } from '@/components/agent/conversation-row';
+import { AgentHomeHeader } from '@/components/agent/agent-home-header';
 import { RenameConversationSheet } from '@/components/agent/rename-conversation-sheet';
 import { ThemedText } from '@/components/themed-text';
 import { AppHeader, HeaderIconButton } from '@/components/ui/app-header';
 import { BlockHeader } from '@/components/ui/block-header';
 import { TAB_BAR_SPACE } from '@/components/ui/pill-tab-bar';
-import { EmptyState } from '@/components/ui/empty-state';
 import { Screen } from '@/components/ui/screen';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Tile, TileGrid } from '@/components/ui/tile';
 import { useToast } from '@/components/ui/toast';
+import { MaxContentWidth } from '@/constants/theme';
 import { Radius, Space } from '@/design/tokens';
+import { useTheme } from '@/hooks/use-theme';
 import {
   useAgentConversations,
   useDeleteAgentConversation,
@@ -22,12 +23,12 @@ import {
 } from '@/hooks/use-agent-chat';
 import type { AgentConversation } from '@/lib/agent-api';
 import { confirmDestructive, showItemActions } from '@/lib/item-actions';
-import { EXEMPLOS_DO_AGENTE } from '@/lib/agent-prompts';
 
 export default function AgentScreen() {
   const toast = useToast();
 
   const lista = useAgentConversations();
+  const { refetch, hasNextPage, isFetchingNextPage, fetchNextPage } = lista;
   const renomear = useRenameAgentConversation();
   const excluir = useDeleteAgentConversation();
 
@@ -40,6 +41,11 @@ export default function AgentScreen() {
   );
 
   const abrir = useCallback((id: string) => router.push(`/agent/${id}`), []);
+  const nova = useCallback(() => router.push('/agent/new'), []);
+  const abrirPrompt = useCallback(
+    (prompt: string) => router.push(`/agent/new?prompt=${encodeURIComponent(prompt)}`),
+    [],
+  );
 
   const pedirAcao = useCallback(
     (id: string) => {
@@ -74,112 +80,66 @@ export default function AgentScreen() {
     [conversas, excluir, toast],
   );
 
+  const renderConversa = useCallback(
+    ({ item }: { item: AgentConversation }) => (
+      <ConversationRow
+        id={item.id}
+        title={item.title}
+        preview={item.preview ?? null}
+        updatedAt={item.last_message_at}
+        onOpen={abrir}
+        onLongPress={pedirAcao}
+      />
+    ),
+    [abrir, pedirAcao],
+  );
+  const atualizar = useCallback(() => {
+    setPuxando(true);
+    refetch().finally(() => setPuxando(false));
+  }, [refetch]);
+  const carregarMais = useCallback(() => {
+    if (hasNextPage && !isFetchingNextPage) fetchNextPage();
+  }, [hasNextPage, isFetchingNextPage, fetchNextPage]);
+
   return (
     <Screen scroll={false} grouped topBar={<AppHeader title="Agente" action={<NovaConversa />} />}>
-      {lista.isPending ? (
-        <View style={styles.lista}>
-          {/* Seis esqueletos com a FORMA da linha, não um spinner: a tela que
-              aparece precisa ser a que vai ficar. */}
-          {Array.from({ length: 6 }, (_, i) => (
-            <Skeleton key={i} height={64} radius={Radius.md} />
-          ))}
-        </View>
-      ) : lista.isError ? (
-        <View>
-          <EmptyState
-            icon="exclamationmark.triangle"
-            title="Não consegui carregar suas conversas"
-            hint="Confere a conexão e tenta de novo."
-            action={{ label: 'Tentar de novo', onPress: () => lista.refetch() }}
-          />
-        </View>
-      ) : conversas.length === 0 ? (
-        <View>
-          <EmptyState
-            title="Crie sua primeira conversa"
-            hint="Peça o que quiser em português — eu anoto, lanço e respondo."
-          />
-          <View style={styles.prompts}>
-            {/*
-              Frases prontas, escritas como a pessoa pediria (a lista é a mesma da Hoje). O empty
-              state precisa de dica ACIONÁVEL (§7), e num chat a tela em branco com o cursor
-              piscando é onde a pessoa trava. Cada uma abre `new` com o texto no campo — nenhuma
-              cria linha no servidor, porque abrir e voltar não pode deixar conversa vazia.
-            */}
-            <TileGrid>
-              {EXEMPLOS_DO_AGENTE.map((p) => (
-                <Tile
-                  key={p}
-                  layout="half"
-                  icon="bubble.left"
-                  label="Pergunte"
-                  value={<ThemedText type="headline">{p}</ThemedText>}
-                  accessibilityLabel={p}
-                  onPress={() => router.push(`/agent/new?prompt=${encodeURIComponent(p)}`)}
-                />
-              ))}
-            </TileGrid>
+      <FlashList
+        data={conversas}
+        keyExtractor={(c) => c.id}
+        renderItem={renderConversa}
+        ListHeaderComponent={
+          <View style={styles.header}>
+            <AgentHomeHeader onNew={nova} onPrompt={abrirPrompt} />
+            <BlockHeader title="Suas conversas" count={conversas.length} />
           </View>
-        </View>
-      ) : (
-        <FlashList
-          data={conversas}
-          keyExtractor={(c) => c.id}
-          renderItem={({ item }) => (
-            <ConversationRow
-              id={item.id}
-              title={item.title}
-              preview={item.preview ?? null}
-              updatedAt={item.last_message_at}
-              onOpen={abrir}
-              onLongPress={pedirAcao}
-            />
-          )}
-          ItemSeparatorComponent={() => <View style={styles.separador} />}
-          ListHeaderComponent={
-            <View style={styles.cabecaLista}>
-              <BlockHeader title="Conversas" count={conversas.length} />
+        }
+        ListEmptyComponent={
+          lista.isPending ? (
+            <View style={styles.loading} accessibilityLabel="Carregando conversas">
+              <Skeleton height={56} />
+              <Skeleton height={56} />
             </View>
-          }
-          /*
-            Sem `paddingTop`: o `Screen` com `topBar` JÁ reserva a altura do
-            `AppHeader` — somar de novo aqui abria uma faixa vazia do tamanho do
-            header entre a barra e a primeira conversa. É o mesmo contrato que
-            `notes/index.tsx` documenta: a raiz de lista só acrescenta o rodapé,
-            porque a `PillTabBar` do Android é absoluta e o `Screen` não
-            alcança o `contentContainerStyle` de uma `FlashList`.
-          */
-          contentContainerStyle={{
-            paddingTop: Space.md,
-            paddingHorizontal: Space.lg,
-            paddingBottom: TAB_BAR_SPACE,
-          }}
-          /*
-            Puxar para atualizar. Esta aba não tem Realtime — as tabelas de
-            conversa são infraestrutura sem policy —, então uma conversa criada
-            em OUTRO aparelho só aparece quando alguém pede. Sem isto não havia
-            gesto nenhum para buscar de novo.
-          */
-          /*
-            O estado é LOCAL, não `isRefetching`: todo turno invalida esta lista
-            (`useAplicarTurno`), e amarrar o indicador ao refetch faria a lista se
-            puxar sozinha, com spinner, sempre que a pessoa voltasse de uma
-            conversa. O indicador é do GESTO, não da requisição.
-          */
-          refreshing={puxando}
-          onRefresh={() => {
-            setPuxando(true);
-            lista.refetch().finally(() => setPuxando(false));
-          }}
-          onEndReachedThreshold={0.5}
-          onEndReached={() => {
-            // `isFetchingNextPage` no guarda: sem ele o `onEndReached` dispara
-            // várias vezes durante a mesma rolagem e busca a mesma página em
-            // paralelo, duplicando linhas na tela.
-            if (lista.hasNextPage && !lista.isFetchingNextPage) lista.fetchNextPage();
-          }}
-        />
-      )}
+          ) : lista.isError ? (
+            <RetryConversations onPress={() => void refetch()} />
+          ) : (
+            <ThemedText type="small" themeColor="textSecondary" style={styles.empty}>
+              Suas conversas vão aparecer aqui.
+            </ThemedText>
+          )
+        }
+        contentContainerStyle={{
+          paddingTop: Space.sm,
+          paddingHorizontal: Space.lg,
+          paddingBottom: TAB_BAR_SPACE,
+          width: '100%',
+          maxWidth: MaxContentWidth,
+          alignSelf: 'center',
+        }}
+        refreshing={puxando}
+        onRefresh={atualizar}
+        onEndReachedThreshold={0.5}
+        onEndReached={carregarMais}
+      />
 
       <RenameConversationSheet
         // Remonta a cada conversa: é o que faz o campo abrir com o título CERTO
@@ -205,6 +165,26 @@ export default function AgentScreen() {
   );
 }
 
+function RetryConversations({ onPress }: { onPress: () => void }) {
+  const theme = useTheme();
+  return (
+    <View style={styles.retry}>
+      <ThemedText type="small" themeColor="textSecondary">
+        Não consegui carregar suas conversas.
+      </ThemedText>
+      <Pressable
+        accessibilityRole="button"
+        onPress={onPress}
+        style={({ pressed }) => [
+          styles.retryButton,
+          { backgroundColor: pressed ? theme.backgroundSelected : theme.backgroundElement },
+        ]}>
+        <ThemedText type="smallBold">Tentar de novo</ThemedText>
+      </Pressable>
+    </View>
+  );
+}
+
 function NovaConversa() {
   return (
     <HeaderIconButton
@@ -216,8 +196,15 @@ function NovaConversa() {
 }
 
 const styles = StyleSheet.create({
-  lista: { paddingHorizontal: Space.lg, gap: Space.sm },
-  separador: { height: Space.sm },
-  prompts: { paddingHorizontal: Space.lg },
-  cabecaLista: { paddingBottom: Space.md },
+  header: { gap: Space.xxl, paddingBottom: Space.sm },
+  loading: { gap: Space.sm },
+  empty: { paddingVertical: Space.md },
+  retry: { gap: Space.md, paddingVertical: Space.md, alignItems: 'flex-start' },
+  retryButton: {
+    minHeight: 44,
+    paddingHorizontal: Space.lg,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: Radius.pill,
+  },
 });

@@ -3,7 +3,7 @@ import { Pressable, StyleSheet, View } from 'react-native';
 
 import { ThemedText } from '@/components/themed-text';
 import { Icon } from '@/components/ui/icon';
-import { Radius, Space, tabular } from '@/design/tokens';
+import { Space, tabular } from '@/design/tokens';
 import { useTheme } from '@/hooks/use-theme';
 import { plainText } from '@/lib/agent-chat';
 import { relativeBR } from '@/lib/dates';
@@ -50,29 +50,16 @@ export const ConversationRow = memo(function ConversationRow({
       style={({ pressed }) => [
         styles.row,
         {
-          // `surface`, como `Card` e `Row`: `backgroundElement` é a cor do CHIP de
-          // ícone dentro de uma linha, não a da linha. No tema claro a diferença
-          // aparece — a linha inteira sumia no fundo da tela.
-          backgroundColor: pressed ? theme.backgroundSelected : theme.surface,
-          // O contorno é a assinatura do design e não é enfeite: no fundo
-          // quase-preto a sombra some, e sem ele a lista lê como um bloco só.
-          borderColor: theme.cardBorder,
+          backgroundColor: pressed ? theme.backgroundSelected : 'transparent',
+          borderBottomColor: theme.separator,
         },
       ]}>
-      <View style={[styles.glyph, { backgroundColor: theme.accentSoft }]}>
-        <Icon name="bubble.left.and.bubble.right" size="sm" color="tint" />
-      </View>
-
       <View style={styles.body}>
-        {/* Uma linha só: título longo é comum (ele sai da primeira frase da mensagem) e
-            quebrar em duas mudaria a altura da linha item a item. */}
-        <ThemedText type="default" style={styles.title}>
+        <ThemedText type="headline" style={styles.title}>
           {title}
         </ThemedText>
-        {/* PRÉVIA, e por isso é a única coisa desta linha que pode ficar pela metade: o texto
-            inteiro está a um toque. O título acima, não — ele identifica a conversa. */}
         {resumo ? (
-          <ThemedText type="caption" themeColor="textSecondary" numberOfLines={1}>
+          <ThemedText type="small" themeColor="textSecondary" numberOfLines={1}>
             {resumo}
           </ThemedText>
         ) : null}
@@ -83,7 +70,9 @@ export const ConversationRow = memo(function ConversationRow({
         ) : null}
       </View>
 
-      <Icon name="chevron.right" size="sm" color="textSecondary" />
+      <View style={styles.chevron}>
+        <Icon name="arrow.up.right" size="sm" color="textSecondary" />
+      </View>
     </Pressable>
   );
 });
@@ -92,21 +81,13 @@ const styles = StyleSheet.create({
   row: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: Space.md,
+    gap: Space.lg,
+    minHeight: 74,
     paddingVertical: Space.md,
-    paddingHorizontal: Space.lg,
-    borderRadius: Radius.md,
-    borderCurve: 'continuous',
-    borderWidth: StyleSheet.hairlineWidth,
+    paddingHorizontal: Space.sm,
+    borderBottomWidth: StyleSheet.hairlineWidth,
   },
-  glyph: {
-    width: 36,
-    height: 36,
-    borderRadius: Radius.sm,
-    borderCurve: 'continuous',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  body: { flex: 1, gap: 2 },
+  body: { flex: 1, gap: Space.xs },
   title: { flexShrink: 1 },
+  chevron: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center' },
 });

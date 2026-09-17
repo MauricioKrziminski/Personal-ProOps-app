@@ -3,6 +3,7 @@ import { Pressable, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { ThemedText } from '@/components/themed-text';
+import { MaxContentWidth } from '@/constants/theme';
 import { KeyboardStickyView } from 'react-native-keyboard-controller';
 
 import { TextField } from '@/components/ui/field';
@@ -71,7 +72,7 @@ export function ChatComposer({
         {restantes <= AVISO ? (
           <ThemedText
             type="caption"
-            style={[tabular, { color: restantes < 0 ? theme.danger : theme.textSecondary }]}>
+            style={[styles.counter, tabular, { color: restantes < 0 ? theme.danger : theme.textSecondary }]}>
             {restantes} caracteres restantes
           </ThemedText>
         ) : null}
@@ -120,7 +121,8 @@ const styles = StyleSheet.create({
     paddingTop: Space.sm,
     borderTopWidth: StyleSheet.hairlineWidth,
   },
-  linha: { flexDirection: 'row', alignItems: 'flex-end', gap: Space.sm },
+  linha: { width: '100%', maxWidth: MaxContentWidth, alignSelf: 'center', flexDirection: 'row', alignItems: 'flex-end', gap: Space.sm },
+  counter: { width: '100%', maxWidth: MaxContentWidth, alignSelf: 'center' },
   campo: {
     flex: 1,
     // O campo cresce até cinco linhas; a altura vem do conteúdo medido.

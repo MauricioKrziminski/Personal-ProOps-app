@@ -15,11 +15,8 @@ interface Props {
 /**
  * Um balão da conversa.
  *
- * **Só o que a pessoa escreveu vira balão.** A resposta do agente é texto
- * corrido à esquerda, como no Things e no Apple Mail: encaixotar os dois lados
- * transformaria a tela numa pilha de cards e faria a resposta — que é a parte
- * que se lê — competir por atenção com a pergunta, que a pessoa já conhece.
- * `design.md` §1: "todo o resto é opaco, hierarquia por elevação e espaço".
+ * A fala da pessoa é tinta sólida; a resposta fica no papel, com uma assinatura
+ * discreta de remetente. Isso separa as vozes sem empilhar cartões.
  *
  * `selectable`: um lançamento, um valor ou um nome de conta são coisas que se
  * copiam. Sem isso o texto do agente é a única parte do app da qual não dá para
@@ -39,10 +36,15 @@ export const ChatMessage = memo(function ChatMessage({ role, content }: Props) {
           styles.corpo,
           meu && [
             styles.balao,
-            { backgroundColor: theme.backgroundElement, borderColor: theme.cardBorder },
+            { backgroundColor: theme.bubble },
           ],
         ]}>
-        <ThemedText type="default" selectable>
+        {!meu ? (
+          <ThemedText type="caption" themeColor="textSecondary" style={styles.remetente}>
+            Agente
+          </ThemedText>
+        ) : null}
+        <ThemedText type="default" themeColor={meu ? 'onBubble' : 'text'} selectable>
           {/*
             O motor é compartilhado com o WhatsApp e escreve `*R$ 45,00*`. Sem
             esta tradução o app mostraria o asterisco em volta de todo valor.
@@ -69,13 +71,13 @@ const styles = StyleSheet.create({
     a tela. Sem teto, uma mensagem longa do usuário encosta nas duas bordas e a
     conversa perde o lado que diz quem falou.
   */
-  corpo: { maxWidth: '86%', flexShrink: 1 },
+  corpo: { maxWidth: '88%', flexShrink: 1 },
   forte: { fontFamily: Fonts.semibold },
+  remetente: { marginBottom: Space.sm },
   balao: {
     paddingHorizontal: Space.lg,
     paddingVertical: Space.md,
-    borderRadius: Radius.md,
+    borderRadius: Radius.lg,
     borderCurve: 'continuous',
-    borderWidth: StyleSheet.hairlineWidth,
   },
 });

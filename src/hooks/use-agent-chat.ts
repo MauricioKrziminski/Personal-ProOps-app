@@ -50,6 +50,9 @@ export function useAgentConversations() {
   return useInfiniteQuery({
     queryKey: agentKeys.conversations,
     enabled: isAgentConfigured,
+    // A lista não precisa refazer GET em toda ida e volta entre abas. Um turno,
+    // renomeação ou exclusão já invalida a chave; puxar atualiza manualmente.
+    staleTime: 120_000,
     initialPageParam: null as string | null,
     queryFn: ({ pageParam }) => listConversations(pageParam),
     getNextPageParam: (ultima: Page<AgentConversation>) => ultima.next_cursor,
@@ -84,6 +87,9 @@ export function useAgentMessages(conversationId: string | undefined) {
   const result = useInfiniteQuery({
     queryKey: agentKeys.messages(conversationId ?? ''),
     enabled: isAgentConfigured && Boolean(conversationId),
+    // Voltar rapidamente de um detalhe preserva a última página já vista.
+    // Processamento continua sendo relido pelo refetchInterval abaixo.
+    staleTime: 15_000,
     refetchInterval: (query) => {
       const itens = (query.state.data?.pages ?? []).flatMap((p) => p.items);
       const rodando = itens.find((m) => m.status === 'processing');
