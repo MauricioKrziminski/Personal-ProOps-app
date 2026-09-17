@@ -322,13 +322,25 @@ function AppTree() {
                     })}
                   />
                   {/*
-                    A Carteira é um `push` com `fade`, não um modal transparente: no iOS o modal
-                    é apresentado ACIMA da raiz React e esconderia a camada de voo. O gesto de
-                    voltar do iOS sai porque o fechar dela é o arraste para baixo.
+                    A Carteira entra e sai em `fade`, e a tela de baixo precisa CONTINUAR desenhada.
+
+                    - **Android: modal transparente.** Como `push`, o Financeiro era desanexado
+                      durante a Carteira e voltava esmaecendo do zero ao fechar — dois quadros de
+                      tela vazia e a barra de abas surgindo do nada (medido em 17/09/2026). No
+                      Android o modal mora no MESMO contêiner da pilha, então a camada de voo
+                      continua por cima.
+                    - **iOS: `push`.** Lá o modal transparente é apresentado ACIMA da raiz React e
+                      esconderia o voo; o `fade` do iOS cruza as duas telas, sem vazio. O gesto
+                      de voltar sai porque o fechar é o arraste para baixo.
                   */}
                   <Stack.Screen
                     name="finance/wallet"
-                    options={{ headerShown: false, animation: 'fade', gestureEnabled: Platform.OS !== 'ios' }}
+                    options={{
+                      headerShown: false,
+                      animation: 'fade',
+                      presentation: Platform.OS === 'android' ? 'transparentModal' : 'card',
+                      gestureEnabled: Platform.OS !== 'ios',
+                    }}
                   />
                   <Stack.Screen name="finance/invoices" options={{ title: 'Faturas' }} />
                   <Stack.Screen name="finance/installments" options={{ title: 'Parceladas' }} />
