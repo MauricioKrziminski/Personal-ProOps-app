@@ -468,6 +468,11 @@ compra, não a única tela que responde quanto resta.
   transferência, para o pagamento que aconteceu fora do app. No app são dois botões; no WhatsApp,
   `pay_invoice` e `mark_paid` com a fatura como alvo. Confirmar "a fatura do Nubank" não separa os
   dois — a frase do SIM diz se o caixa se move.
+- ⚠️ **`card_summary` tem dois números da fatura corrente, e eles não são o mesmo**
+  (`20260917120000`): `invoice_total_cents` é BRUTO (a soma das compras, o número grande do
+  cartão) e `invoice_open_cents` é o que FALTA (líquido do `paid_cents`). Quem subtrai a corrente
+  de `unpaid_total_cents` — que é líquido — usa o segundo; com o bruto, um pagamento parcial fazia
+  "outras faturas" sair menor que o real (`outrasFaturas`, `lib/card-status.ts`).
 - Parcelamento só pela RPC `create_installment_plan` (nunca inserindo N linhas no app).
 
   ⚠️ **A parcela herda o nome do ESTABELECIMENTO quando não há descrição**

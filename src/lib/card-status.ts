@@ -48,16 +48,24 @@ export function estadoDaFatura(
  * `unpaid_total_cents` soma TODAS as não pagas, inclusive as futuras das parcelas — por isso a
  * frase é "outras faturas", não "fatura anterior". E a corrente vencida já está DENTRO das
  * atrasadas: descontá-la duas vezes zerava o que sobra.
+ *
+ * ⚠️ **A corrente entra pelo que FALTA nela (`invoice_open_cents`), não pelo total.** O total é
+ * bruto; com um pagamento parcial na fatura corrente, subtrair o bruto de um total líquido
+ * devolvia menos do que existe em outras faturas (`20260917120000` levou a coluna à RPC).
  */
 export function outrasFaturas(
   c: {
     unpaid_total_cents: number | null;
+    /** Ausente numa RPC anterior à `20260917120000` — aí vale o total (a conta antiga). */
+    invoice_open_cents?: number | null;
     invoice_total_cents: number | null;
     overdue_total_cents: number | null;
   },
   estado: EstadoDaFatura | null
 ): number {
-  const corrente = estado === 'Atrasada' ? 0 : Number(c.invoice_total_cents ?? 0);
+  // ⚠️ Sem a coluna, cair no ZERO somaria a própria fatura corrente em "outras faturas".
+  const aberto = c.invoice_open_cents ?? c.invoice_total_cents;
+  const corrente = estado === 'Atrasada' ? 0 : Number(aberto ?? 0);
   return Math.max(
     0,
     Number(c.unpaid_total_cents ?? 0) - corrente - Number(c.overdue_total_cents ?? 0)

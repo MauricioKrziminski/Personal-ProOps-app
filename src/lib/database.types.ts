@@ -2246,6 +2246,7 @@ export type Database = {
           due_date: string
           due_day: number
           invoice_id: string
+          invoice_open_cents: number
           invoice_total_cents: number
           name: string
           oldest_overdue_invoice_id: string
@@ -2523,6 +2524,7 @@ export type Database = {
           due_date: string
           due_day: number
           invoice_id: string
+          invoice_open_cents: number
           invoice_total_cents: number
           name: string
           oldest_overdue_invoice_id: string

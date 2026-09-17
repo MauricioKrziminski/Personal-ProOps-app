@@ -21,9 +21,10 @@ test('estado sai das datas: atrasada vence antes de fechada', () => {
 });
 
 test('outras faturas: o que o limite usa fora da corrente e das atrasadas', () => {
-  const linha = (unpaid: number, invoice: number, overdue: number) => ({
+  const linha = (unpaid: number, aberto: number, overdue: number) => ({
     unpaid_total_cents: unpaid,
-    invoice_total_cents: invoice,
+    invoice_open_cents: aberto,
+    invoice_total_cents: aberto,
     overdue_total_cents: overdue,
   });
   // Corrente em dia: sai ela e sai a faixa de atraso.
@@ -32,5 +33,20 @@ test('outras faturas: o que o limite usa fora da corrente e das atrasadas', () =
   assert.equal(outrasFaturas(linha(192_500, 128_000, 128_000), 'Atrasada'), 64_500);
   assert.equal(outrasFaturas(linha(2_046_000, 243_000, 513_000), 'Atrasada'), 1_533_000);
   assert.equal(outrasFaturas(linha(100_000, 100_000, 0), 'Fechada'), 0);
-  assert.equal(outrasFaturas({ unpaid_total_cents: null, invoice_total_cents: null, overdue_total_cents: null }, null), 0);
+  // Pagamento parcial na corrente: 300 de compras com 120 pagos deixam 180 em aberto, e o que
+  // sobra em outras faturas são os 90 — com o BRUTO a linha dizia 0.
+  assert.equal(
+    outrasFaturas({ ...linha(270_000, 180_000, 0), invoice_total_cents: 300_000 }, 'Fechada'),
+    90_000
+  );
+  // RPC antiga (produção sem a `20260917120000`): sem a coluna vale o total, nunca o zero — com
+  // zero, a própria fatura corrente entrava em "outras faturas".
+  assert.equal(
+    outrasFaturas({ unpaid_total_cents: 400_000, invoice_total_cents: 100_000, overdue_total_cents: 0 }, 'Aberta'),
+    300_000
+  );
+  assert.equal(
+    outrasFaturas({ unpaid_total_cents: null, invoice_open_cents: null, invoice_total_cents: null, overdue_total_cents: null }, null),
+    0
+  );
 });

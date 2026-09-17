@@ -33,9 +33,16 @@ App mobile pessoal de **notas rápidas, lembretes e controle financeiro operado 
   Produção está em **`20260915230000`** (o quarto slot de rascunho cabe no CHECK), aplicada em
   15/09/2026 pelo Gabriel junto da `20260915210000` (reparcelar a compra: `update_installment_plan`
   e `private.parcela_travada`), depois da `20260915190000` (a parcela herda o nome do
-  estabelecimento) e da `20260915120000` (a coluna `atrasada` de `cycle_lines`) — e o repo não tem
-  nenhuma migration fora de lá. **Staging e produção estão no MESMO ponto**, sem pendência de
-  nenhum lado.
+  estabelecimento) e da `20260915120000` (a coluna `atrasada` de `cycle_lines`).
+
+  ⚠️ **O staging está UMA à frente: `20260917120000`** (17/09/2026, `card_summary` e
+  `_card_summary` ganham `invoice_open_cents` no fim — o que falta na fatura corrente, líquido do
+  pagamento parcial). Conferida no staging depois de aplicar: a coluna é a última das duas
+  assinaturas, `_card_summary` segue `security definer` e sem `execute` para `anon` e
+  `authenticated`, e `card_summary` tem os mesmos grants das outras portas públicas. **Produção
+  ainda não tem** — subir é decisão do Gabriel. O app novo lê a coluna em Cartões e, sem ela
+  em produção, volta à conta antiga pelo total bruto (`outrasFaturas`) — que só erra quando a
+  fatura corrente tem pagamento parcial. Nada quebra.
 
   Todas conferidas na fonte DEPOIS de aplicar (`scripts/` não guarda isso; a conferência da leva
   de 15/09 está no histórico desta linha): a `atrasada` é a última coluna de `cycle_lines`,
