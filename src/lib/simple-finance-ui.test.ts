@@ -11,7 +11,7 @@ const require = createRequire(import.meta.url);
 
 // Execute the screen JSX and its event handlers. Native components/query boundaries
 // are inert; state persists across renders so each interaction uses current props.
-function screen(file: string, options: { debts?: any[]; invoiceStatus?: string; create?: boolean; monthLines?: any[]; monthSummary?: any; cycleLines?: any[]; cycleRow?: any; rangeError?: boolean; rangePending?: boolean; rangePendingMonths?: string[]; bills?: any[]; billsError?: boolean; charges?: any[]; setupPassos?: any[]; activity?: any[]; activityError?: boolean } = {}) {
+function screen(file: string, options: { debts?: any[]; invoiceStatus?: string; create?: boolean; monthLines?: any[]; monthSummary?: any; cycleLines?: any[]; cycleRow?: any; rangeError?: boolean; rangePending?: boolean; rangePendingMonths?: string[]; bills?: any[]; billsError?: boolean; charges?: any[]; reminders?: any[]; budgets?: any[]; setupPassos?: any[]; activity?: any[]; activityError?: boolean } = {}) {
   const state: any[] = [];
   let cursor = 0;
   let nodes: any[] = [];
@@ -84,6 +84,7 @@ function screen(file: string, options: { debts?: any[]; invoiceStatus?: string; 
       refetch: async () => { refetches.push('bills'); },
     }),
     useUpcomingCardCharges: () => ({ ...query, isSuccess: true, data: options.charges ?? [] }),
+    useBudgetsStatus: () => ({ ...query, isSuccess: true, data: options.budgets ?? [] }),
     useSpendablePath: () => ({ ...query, isSuccess: true, data: [] }),
     useCycle: () => ({ ...query, isSuccess: true, data: options.cycle ?? { de: '2026-09-01', ate: '2026-09-30', mes: '2026-09', diasAteOFim: 22 } }),
     useAccountBalances: () => ({
@@ -131,7 +132,7 @@ function screen(file: string, options: { debts?: any[]; invoiceStatus?: string; 
       if (name === '@/hooks/use-tela-pronta') return { useTelaPronta: (...consultas: any[]) => { gates.push(consultas); return true; } };
       // Carregado DE VERDADE: ele é a regra que se quer testar, não um arredor da tela.
       if (name === '@/hooks/use-voltar-quando-fechar') return load('src/hooks/use-voltar-quando-fechar.ts');
-      if (name === '@/hooks/use-items') return { localISODate: () => '2026-09-08', formatDateBR: () => '08/09/2026', formatBRL: load('src/lib/dates.ts').formatBRL, useRealtimeInvalidate: () => {}, useTodayReminders: () => ({ ...query, isSuccess: true }) };
+      if (name === '@/hooks/use-items') return { localISODate: () => '2026-09-08', formatDateBR: () => '08/09/2026', formatBRL: load('src/lib/dates.ts').formatBRL, useRealtimeInvalidate: () => {}, useTodayReminders: () => ({ ...query, isSuccess: true, data: options.reminders ?? [] }) };
       if (name === '@/hooks/use-session') return { useSession: () => ({ session: { user: { id: 'user-1' } } }) };
       if (name === '@/hooks/use-profile') return { useProfile: () => ({ ...query, isSuccess: true, data: { display_name: 'Gabriel Almeida', phone: null } }) };
       if (name === '@/hooks/use-setup-progress') return { useSetupProgress: () => ({ passos: options.setupPassos ?? [], pronto: true, consultas: [] }) };
@@ -565,6 +566,30 @@ test('Hoje: dia sem nada diz que nada vence, sem inventar lista', () => {
   const ui = screen(hojeFile, {});
   assert.ok(!tipos(ui).includes('AgendaItem'));
   assert.ok(ui.nodes().some((n: any) => n.type === 'ThemedText' && String(n.props.children).startsWith('Nada vence')));
+});
+
+test('Hoje: o painel destaca só avisos acionáveis e cada linha mantém seu destino', () => {
+  const ui = screen(hojeFile, {
+    bills: [{ ref_id: 'luz-1', title: 'Luz', due_date: '2026-09-01', amount_cents: 21000, kind: 'transaction', overdue: true }],
+    reminders: [{ id: 'r-1', title: 'Comprar remédio' }],
+    budgets: [{ category: 'Mercado', limit_cents: 100_00, spent_cents: 85_00, committed_cents: 0 }],
+  });
+  const painel = ui.nodes().find((n: any) => n.type === 'TodaySignals');
+  assert.ok(painel);
+  assert.deepEqual(copia(painel.props.signals.map((s: any) => s.key)), ['bills', 'reminders', 'budgets']);
+  assert.equal(painel.props.signals[0].detail, '1 atrasada');
+  for (const sinal of painel.props.signals) sinal.onPress();
+  assert.deepEqual(copia(ui.navigations), ['/finance/transactions', '/reminders', '/finance/budgets']);
+
+  const semOrcamentoNoLimite = screen(hojeFile, {
+    bills: [{ ref_id: 'luz-1', title: 'Luz', due_date: '2026-09-01', amount_cents: 21000, kind: 'transaction', overdue: true }],
+    reminders: [{ id: 'r-1', title: 'Comprar remédio' }],
+  });
+  const doisAvisos = semOrcamentoNoLimite.nodes().find((n: any) => n.type === 'TodaySignals');
+  assert.deepEqual(copia(doisAvisos.props.signals.map((s: any) => s.key)), ['bills', 'reminders']);
+
+  const semAvisos = screen(hojeFile);
+  assert.ok(!semAvisos.nodes().some((n: any) => n.type === 'TodaySignals'), 'zero não vira card nem deixa vão na cascata');
 });
 
 const saldo = (nome: string, tipo: string, cents: number, aReceber = 0) => ({

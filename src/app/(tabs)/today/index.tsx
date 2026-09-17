@@ -7,6 +7,7 @@ import { ErrorCard } from '@/components/error-card';
 import { AgendaItem } from '@/components/feed/agenda-item';
 import { ReminderTimeline } from '@/components/feed/reminder-timeline';
 import { SetupChecklist } from '@/components/feed/setup-checklist';
+import { TodaySignals, type TodaySignal } from '@/components/feed/today-signals';
 import { BudgetRings } from '@/components/finance/budget-rings';
 import { CashAccounts } from '@/components/finance/cash-accounts';
 import { ThemedText } from '@/components/themed-text';
@@ -23,8 +24,7 @@ import { Screen } from '@/components/ui/screen';
 import { Skeleton, SkeletonHero, SkeletonList } from '@/components/ui/skeleton';
 import { Tile, TileRow } from '@/components/ui/tile';
 import { useToast } from '@/components/ui/toast';
-import type { ThemeColor } from '@/constants/theme';
-import { Motion, Radius, Space, tabular } from '@/design/tokens';
+import { Motion, Radius, Space } from '@/design/tokens';
 import { useBoolPref } from '@/hooks/use-bool-pref';
 import {
   useAccountBalances,
@@ -54,7 +54,7 @@ import { diasDoCiclo, ritmoDoDia } from '@/lib/today-spend';
 /**
  * A Hoje — "Conversa organizada" (spec 2026-09-17).
  *
- * A ordem é de URGÊNCIA: quanto dá para gastar, o que já saiu hoje, o que exige ação, quanto
+ * A ordem é de URGÊNCIA: quanto dá para gastar, o que exige ação, o que já saiu hoje, quanto
  * existe em conta, e só então o que vem.
  *
  * ⚠️ **A "Conversa" e o card "Diga ao agente" saíram em 17/09/2026**, a pedido do dono do
@@ -79,18 +79,6 @@ function Bloco({ children }: { children: React.ReactNode }) {
     <Animated.View style={styles.bloco} layout={linear} exiting={FadeOut.duration(Motion.duration.exit)}>
       {children}
     </Animated.View>
-  );
-}
-
-/** O número de um contador: cor só quando conta alguma coisa; `null` = a consulta falhou. */
-function Contagem({ valor, tom }: { valor: number | null; tom: ThemeColor }) {
-  return (
-    <ThemedText
-      type="subtitle"
-      themeColor={valor === null ? 'textSecondary' : valor > 0 ? tom : 'text'}
-      style={tabular}>
-      {valor ?? '—'}
-    </ThemedText>
   );
 }
 
@@ -191,6 +179,46 @@ export default function TodayScreen() {
     agenda.agora.length === 0 &&
     agenda.proximos.length === 0 &&
     lembretes.length === 0;
+
+  const vencidas = contas.filter((conta) => conta.overdue).length;
+  const orcamentosEstourados = apertados.filter((item) => item.estourou).length;
+  const sinais: TodaySignal[] = [
+    ...(!bills.isError && contas.length > 0
+      ? [{
+          key: 'bills' as const,
+          count: contas.length,
+          label: 'Vencendo',
+          detail: vencidas > 0 ? `${vencidas} ${vencidas === 1 ? 'atrasada' : 'atrasadas'}` : 'Próximos 7 dias',
+          tone: vencidas > 0 ? 'danger' as const : 'text' as const,
+          destination: 'lançamentos',
+          onPress: () => router.push('/finance/transactions'),
+        }]
+      : []),
+    ...(!reminders.isError && lembretes.length > 0
+      ? [{
+          key: 'reminders' as const,
+          count: lembretes.length,
+          label: 'Lembretes',
+          detail: 'Para hoje',
+          tone: 'text' as const,
+          destination: 'lembretes',
+          onPress: () => router.push('/reminders'),
+        }]
+      : []),
+    ...(!budgets.isError && apertados.length > 0
+      ? [{
+          key: 'budgets' as const,
+          count: apertados.length,
+          label: 'No limite',
+          detail: orcamentosEstourados > 0
+            ? `${orcamentosEstourados} ${orcamentosEstourados === 1 ? 'atingiu' : 'atingiram'} o limite`
+            : 'Perto do limite',
+          tone: 'warning' as const,
+          destination: 'orçamentos',
+          onPress: () => router.push('/finance/budgets'),
+        }]
+      : []),
+  ];
 
   /*
     O PORTÃO DA TELA (Fase 5 do redesenho anterior): a Hoje abre inteira ou não abre. `profile`
@@ -359,32 +387,7 @@ export default function TodayScreen() {
         />
       )}
 
-      {/* Os contadores só existem quando algum conta alguma coisa (badge é contagem real, §8). */}
-      {contas.length + lembretes.length + apertados.length > 0 ? (
-        <TileRow>
-          <Tile
-            compact
-            label="Vencendo"
-            value={<Contagem valor={contas.length} tom={atrasados.some((i) => i.kind !== 'income') ? 'danger' : 'text'} />}
-            accessibilityLabel={`Vencendo: ${contas.length}`}
-            onPress={() => router.push('/finance/transactions')}
-          />
-          <Tile
-            compact
-            label="Lembretes"
-            value={<Contagem valor={lembretes.length} tom="warning" />}
-            accessibilityLabel={`Lembretes: ${lembretes.length}`}
-            onPress={() => router.push('/reminders')}
-          />
-          <Tile
-            compact
-            label="No limite"
-            value={<Contagem valor={budgets.isError ? null : apertados.length} tom="warning" />}
-            accessibilityLabel={budgets.isError ? 'No limite: não deu para carregar' : `No limite: ${apertados.length}`}
-            onPress={() => router.push('/finance/budgets')}
-          />
-        </TileRow>
-      ) : null}
+      {sinais.length > 0 ? <TodaySignals signals={sinais} /> : null}
 
       {/*
         Quanto já saiu HOJE. O valor sozinho não muda decisão — R$ 210 é muito ou pouco? Quem
@@ -410,7 +413,7 @@ export default function TodayScreen() {
           {/*
             O par existe para o dia ter DOIS lados — e sai de graça: `transactions_summary` já
             devolve as duas naturezas na mesma leitura. Zerado 28 dias por mês ele é quieto e
-            verdadeiro, como o "No limite: 0" da fileira de cima; no dia do salário é a melhor
+            verdadeiro; no dia do salário é a melhor
             notícia do mês.
           */}
           <Tile

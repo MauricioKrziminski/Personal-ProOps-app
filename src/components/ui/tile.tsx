@@ -10,8 +10,6 @@ import { useScheme, useTheme } from '@/hooks/use-theme';
 export interface TileProps {
   /** `fill` divide uma `TileRow`; `half` e `wide` são células da `TileGrid`. */
   layout?: 'fill' | 'half' | 'wide';
-  /** Ladrilho baixo, só rótulo e valor (os contadores da Hoje). */
-  compact?: boolean;
   icon?: IconName;
   label: string;
   value?: ReactNode;
@@ -48,7 +46,6 @@ const LAYOUT: Record<NonNullable<TileProps['layout']>, ViewStyle> = {
  */
 export function Tile({
   layout = 'fill',
-  compact = false,
   icon,
   label,
   value,
@@ -68,23 +65,20 @@ export function Tile({
     <View
       style={[
         styles.tile,
-        compact && styles.compacto,
         { backgroundColor: theme.surface, borderColor: theme.cardBorder, boxShadow: Elevation[scheme].raised },
       ]}>
-      {compact ? null : (
-        <View style={styles.topo}>
-          {icon ? (
-            <View style={[styles.selo, { backgroundColor: theme.backgroundElement }]}>
-              <Icon name={icon} size="sm" color="text" />
-            </View>
-          ) : (
-            <View />
-          )}
-          {visual ?? (onPress ? <Icon name="arrow.up.right" size="xs" color="textSecondary" /> : null)}
-        </View>
-      )}
+      <View style={styles.topo}>
+        {icon ? (
+          <View style={[styles.selo, { backgroundColor: theme.backgroundElement }]}>
+            <Icon name={icon} size="sm" color="text" />
+          </View>
+        ) : (
+          <View />
+        )}
+        {visual ?? (onPress ? <Icon name="arrow.up.right" size="xs" color="textSecondary" /> : null)}
+      </View>
       <View style={styles.base}>
-        <ThemedText type={compact ? 'caption' : 'footnote'} themeColor="textSecondary">
+        <ThemedText type="footnote" themeColor="textSecondary">
           {label}
         </ThemedText>
         {value}
@@ -139,7 +133,6 @@ const styles = StyleSheet.create({
     borderCurve: 'continuous',
     borderWidth: 1,
   },
-  compacto: { minHeight: 0, paddingVertical: Space.md, paddingHorizontal: Space.md, gap: Space.xs },
   topo: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: Space.sm },
   selo: {
     width: 32,
