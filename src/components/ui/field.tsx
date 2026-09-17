@@ -73,14 +73,15 @@ export function Field({ label, error, hint, children }: FieldProps) {
         {/*
           O erro NÃO apaga o hint. Eles se excluíam por um ternário, e a explicação sumia
           exatamente quando mais importa. Mesma geometria (footnote) nos dois, então a altura não
-          pula na validação.
+          pula na validação. Quando o erro É a dica ("Pelo menos 8 caracteres"), só o erro fica —
+          a mesma frase duas vezes, uma vermelha e outra cinza, é ruído.
         */}
         {error ? (
           <ThemedText type="footnote" themeColor="danger">
             {error}
           </ThemedText>
         ) : null}
-        {hint ? (
+        {hint && hint !== error ? (
           <ThemedText type="footnote" themeColor="textSecondary">
             {hint}
           </ThemedText>
