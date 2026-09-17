@@ -324,8 +324,15 @@ automático com a guarda no hook, frases de estado, `flexShrink: 0` no título.
 - **O voo segue o pouso** enquanto voa: a fatura muda de lugar depois de medida (o seletor de
   meses chega depois, e o header nativo ajusta a rolagem).
 - **Giro do carrossel no meio da troca** (seno, pico 50°); vizinhos em repouso planos.
-- **Arraste para fechar** com ativação manual (só no topo da página, dedo descendo), página no
-  `ScrollView` do gesture-handler, volta no `onFinalize`.
+- **O carrossel é guiado pelo dedo, sem `ScrollView`**: um valor na UI thread, mola que parte da
+  velocidade do dedo (`Motion.spring.carrossel`), um cartão por deslize, borda elástica. O
+  `ScrollView` com `snapToInterval` terminava cada troca com um puxão (queixa do dono do
+  produto): o `contentOffset` mudava no meio do deslize e o encaixe nativo parava seco.
+- **Trocar e fechar são UM gesto** com ativação manual que decide o eixo no primeiro movimento
+  (horizontal troca; para baixo com a página no topo fecha; para cima a página rola). Aninhados,
+  no iOS o de fechar cancelava o deslize em todo arrasto que não fosse um peteleco.
+- **Posição e giro no mesmo transform de cada cartão** (a ordem da `perspective` difere por
+  plataforma).
 - **Menos texto** (pedido do dono do produto no meio da fase): estado numa palavra sob o nome,
   "R$ X livre de R$ Y" numa linha, rodapé da fatura sem legendas nem parágrafo, e a linha
   "Fatura do X" embaixo da pilha saiu — repetia nome, fechamento e total da face, cujo botão

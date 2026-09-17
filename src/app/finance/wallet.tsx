@@ -2,15 +2,11 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { router, useLocalSearchParams, useNavigation } from 'expo-router';
 import { StyleSheet, View } from 'react-native';
-import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import Animated, {
-  runOnJS,
   useAnimatedRef,
   useAnimatedScrollHandler,
   useAnimatedStyle,
   useSharedValue,
-  withSpring,
-  type AnimatedRef,
   type SharedValue,
 } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -35,16 +31,13 @@ import { TaskHeader } from '@/components/ui/task-header';
 import type { ThemeColor } from '@/constants/theme';
 import { distanciaDoItem } from '@/design/carousel-math';
 import { caixaArrastada, type Caixa } from '@/design/flight-math';
-import { Motion, Radius, Space, tabular } from '@/design/tokens';
+import { Radius, Space, tabular } from '@/design/tokens';
 import { escolherCartao, useCartaoEscolhido } from '@/hooks/use-cartao-escolhido';
 import { invoiceQuery, useCardSummary, type CardSummary } from '@/hooks/use-finance';
 import { formatDateBR } from '@/hooks/use-items';
 import { useTheme } from '@/hooks/use-theme';
 import { cartaoDaPilha, estadoDaFatura, prazoLabel } from '@/lib/card-status';
 
-/** Quanto arrastar para baixo (ou com que velocidade) para fechar. */
-const LIMIAR_DE_FECHAR = 120;
-const VELOCIDADE_DE_FECHAR = 800;
 
 /**
  * A Carteira — os cartões em pé, um de cada vez, e tudo que é do cartão num lugar só.
@@ -100,12 +93,15 @@ export default function WalletScreen() {
     if (card) escolherCartao(card);
   }, [card]);
 
-  const trocar = (i: number) => {
-    const id = lista[i]?.account_id;
-    if (!id) return;
-    setAtivoId(id);
-    escolherCartao(id);
-  };
+  const trocar = useCallback(
+    (i: number) => {
+      const id = lista[i]?.account_id;
+      if (!id) return;
+      setAtivoId(id);
+      escolherCartao(id);
+    },
+    [lista]
+  );
 
   /*
     O voo de volta. Todas as saídas passam por aqui (✕, voltar do Android, arraste), e a tela sai
@@ -249,21 +245,18 @@ export default function WalletScreen() {
           ))}
         </Animated.View>
 
-        <ArrasteParaFechar
+        <WalletCarousel
+          cards={lista}
+          indice={indice}
+          onIndice={trocar}
+          x={x}
+          arrasto={arrasto}
           pagina={pagina}
           topoDaPagina={topoDaPagina}
-          arrasto={arrasto}
-          onFechar={fecharArrastado}>
-          <WalletCarousel
-            cards={lista}
-            indiceInicial={indice}
-            onIndice={trocar}
-            x={x}
-            arrasto={arrasto}
-            prenderMoldura={moldura.prender}
-            molduraPosicionada={moldura.aoPosicionar}
-          />
-        </ArrasteParaFechar>
+          onFechar={fecharArrastado}
+          prenderMoldura={moldura.prender}
+          molduraPosicionada={moldura.aoPosicionar}
+        />
 
         <Animated.View style={[styles.miolo, esmaece]}>
           {lista.length > 1 ? <Pontos total={lista.length} x={x} passo={g.passo} /> : null}
@@ -294,80 +287,6 @@ export default function WalletScreen() {
         {corpo}
       </View>
     </Screen>
-  );
-}
-
-/**
- * O arraste para baixo que fecha a Carteira, em volta do carrossel.
- *
- * ⚠️ **Ele convive com a rolagem da página, e três coisas fazem isso funcionar nos dois sistemas:**
- *
- * - A página é o `ScrollView` do gesture-handler (`DragScrollView`) e a relação é declarada
- *   (`simultaneousWithExternalGesture`). Com o `ScrollView` comum, o Android rouba o toque no
- *   meio do arraste: o cartão ficava parado no meio do caminho, sem fechar nem voltar. E
- *   embrulhar o `DragScrollView` num `Gesture.Native()` parava a rolagem no Android.
- * - A ativação é MANUAL: só com a página no topo e o dedo descendo; subindo, ou com a página
- *   rolada, o gesto falha e a rolagem segue sozinha.
- * - A volta do cartão mora no `onFinalize`, que roda também quando o gesto é cancelado.
- *
- * Mora num componente próprio porque recebe a `ref` da página como prop (é assim que o
- * `Reorderable` faz): lida no render da tela, o compilador do React a recusa.
- */
-function ArrasteParaFechar({
-  pagina,
-  topoDaPagina,
-  arrasto,
-  onFechar,
-  children,
-}: {
-  pagina: AnimatedRef<Animated.ScrollView>;
-  topoDaPagina: SharedValue<number>;
-  arrasto: SharedValue<number>;
-  onFechar: (dy: number) => void;
-  children: React.ReactNode;
-}) {
-  const inicio = useSharedValue({ x: 0, y: 0 });
-  const fechando = useSharedValue(false);
-
-  const gesto = useMemo(
-    () =>
-      Gesture.Pan()
-        .manualActivation(true)
-        .simultaneousWithExternalGesture(pagina as unknown as React.RefObject<React.ComponentType>)
-        .onTouchesDown((e) => {
-          const t = e.allTouches[0];
-          if (t) inicio.set({ x: t.absoluteX, y: t.absoluteY });
-        })
-        .onTouchesMove((e, estado) => {
-          const t = e.allTouches[0];
-          if (!t) return;
-          const dx = t.absoluteX - inicio.get().x;
-          const dy = t.absoluteY - inicio.get().y;
-          if (Math.abs(dx) > 12 || dy < -8) estado.fail();
-          else if (dy > 14) {
-            if (topoDaPagina.get() <= 1) estado.activate();
-            else estado.fail();
-          }
-        })
-        .onUpdate((e) => {
-          arrasto.set(Math.max(0, e.translationY));
-        })
-        .onEnd((e) => {
-          if (e.translationY > LIMIAR_DE_FECHAR || e.velocityY > VELOCIDADE_DE_FECHAR) {
-            fechando.set(true);
-            runOnJS(onFechar)(Math.max(0, e.translationY));
-          }
-        })
-        .onFinalize(() => {
-          if (!fechando.get()) arrasto.set(withSpring(0, Motion.spring.encaixe));
-        }),
-    [pagina, inicio, topoDaPagina, arrasto, fechando, onFechar]
-  );
-
-  return (
-    <GestureDetector gesture={gesto}>
-      <View>{children}</View>
-    </GestureDetector>
   );
 }
 

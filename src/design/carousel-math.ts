@@ -35,3 +35,37 @@ export function quadroDoItem(d: number, reduzir: boolean) {
     opacidade: 1 - a * (1 - OPACIDADE_VIZINHO),
   };
 }
+
+/** Quanto de inércia entra na escolha do destino: a posição onde o dedo "jogaria" o cartão. */
+const INERCIA_S = 0.12;
+/** Quanto a borda cede quando se puxa além do primeiro ou do último cartão. */
+const ELASTICO = 0.35;
+
+/**
+ * Para onde o carrossel vai quando o dedo solta: a posição projetada com um pouco da velocidade,
+ * arredondada ao passo, e no máximo UM cartão a partir de onde o deslize começou — como a tela
+ * inicial do iOS. `velocidade` é a do deslocamento (px/s, positiva indo para o próximo).
+ */
+export function alvoDoDeslize(
+  inicio: number,
+  x: number,
+  velocidade: number,
+  passo: number,
+  total: number
+): number {
+  'worklet';
+  if (total <= 0 || passo <= 0) return 0;
+  const origem = Math.round(inicio / passo);
+  const projetado = Math.round((x + velocidade * INERCIA_S) / passo);
+  const umPasso = Math.min(origem + 1, Math.max(origem - 1, projetado));
+  return Math.min(total - 1, Math.max(0, umPasso));
+}
+
+/** O deslocamento com a borda elástica: além das pontas o dedo anda, o carrossel cede um terço. */
+export function comElastico(x: number, passo: number, total: number): number {
+  'worklet';
+  const fim = Math.max(0, total - 1) * passo;
+  if (x < 0) return x * ELASTICO;
+  if (x > fim) return fim + (x - fim) * ELASTICO;
+  return x;
+}

@@ -3,7 +3,7 @@ import { test } from 'node:test';
 
 import { brandColor, clarear, escurecer, tintaDoCartao } from './card-brands.ts';
 import { PROPORCAO_DO_CARTAO, alturaDoCartao, proporcaoDoCartao } from './card-geometry.ts';
-import { distanciaDoItem, indiceNoDeslocamento, quadroDoItem } from './carousel-math.ts';
+import { alvoDoDeslize, comElastico, distanciaDoItem, indiceNoDeslocamento, quadroDoItem } from './carousel-math.ts';
 import { caixaArrastada, quadroDaCaixa, quadroNoVoo } from './flight-math.ts';
 
 const pilha = { x: 16, y: 500, largura: 358, altura: 226 };
@@ -80,4 +80,26 @@ test('a tinta da face é a de maior contraste com a cor do emissor', () => {
   assert.equal(tintaDoCartao(brandColor('Cartão da casa')), 'clara');
   assert.equal(clarear('#000000', 1), '#ffffff');
   assert.equal(escurecer('#ffffff', 1), '#000000');
+});
+
+test('o deslize anda no máximo um cartão e respeita a intenção do dedo', () => {
+  const passo = 220;
+  // arrastou pouco e devagar: volta para onde estava
+  assert.equal(alvoDoDeslize(220, 250, 0, passo, 3), 1);
+  // arrastou pouco, mas rápido: vai para o próximo
+  assert.equal(alvoDoDeslize(220, 250, 1200, passo, 3), 2);
+  // um peteleco fortíssimo não pula dois cartões
+  assert.equal(alvoDoDeslize(0, 200, 9000, passo, 5), 1);
+  // rápido para trás a partir do meio
+  assert.equal(alvoDoDeslize(440, 400, -1500, passo, 5), 1);
+  // presos nas pontas
+  assert.equal(alvoDoDeslize(0, -60, -3000, passo, 3), 0);
+  assert.equal(alvoDoDeslize(440, 500, 3000, passo, 3), 2);
+  assert.equal(alvoDoDeslize(0, 0, 0, 0, 3), 0);
+});
+
+test('além das pontas o carrossel cede um terço do dedo', () => {
+  assert.equal(comElastico(-90, 220, 3), -90 * 0.35);
+  assert.equal(comElastico(300, 220, 3), 300);
+  assert.equal(comElastico(440 + 60, 220, 3), 440 + 60 * 0.35);
 });

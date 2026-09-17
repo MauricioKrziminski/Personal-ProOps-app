@@ -131,6 +131,12 @@ export const Motion = {
     encaixe: { duration: 420, dampingRatio: 0.86 },
     /** O cartão atravessando telas: longa o bastante para o olho seguir o giro, sem ultrapassar. */
     voo: { duration: 620, dampingRatio: 0.9 },
+    /**
+     * O carrossel da Carteira assentando depois do dedo. Parte da VELOCIDADE do deslize (quem
+     * chama passa `velocity`), então não há emenda entre o dedo e a mola; quase sem quique, para
+     * o cartão chegar e parar em vez de balançar.
+     */
+    carrossel: { duration: 560, dampingRatio: 0.94 },
   },
   /**
    * A cortina curva (`WaveCurtain`): duração da onda, e as duas versões da abertura — a curta do
