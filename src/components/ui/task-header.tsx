@@ -46,6 +46,9 @@ import { useTheme } from '@/hooks/use-theme';
  * janela inteira, e sem o inset o ✕ nasce em cima do relógio. É a mesma conta de antes — mudou de
  * dono, não de valor.
  *
+ * `telaCheia` é o terceiro caso: uma tela EMPURRADA sem header do navegador (a Carteira), que
+ * nas duas plataformas começa no topo da janela — o inset entra também no iOS.
+ *
  * O **pegador** fica nas duas: as duas fecham arrastando para baixo no iOS, e ele é a única coisa
  * na tela que diz isso. (No Android ele é decorativo — já era, nos 22 sheets.)
  */
@@ -54,6 +57,7 @@ export function TaskHeader({
   subtitle,
   onClose,
   action,
+  telaCheia = false,
 }: {
   title: string;
   /** Uma linha de estado sob o título ("de hoje até 10/12/2026"). */
@@ -66,6 +70,8 @@ export function TaskHeader({
    * `node.props.action` para achar o "Salvar" — seis asserções ficam cegas se virar objeto.
    */
   action?: React.ReactNode;
+  /** Tela cheia sem header do navegador: soma a safe area de cima também no iOS. */
+  telaCheia?: boolean;
 }) {
   const theme = useTheme();
   const insets = useSafeAreaInsets();
@@ -74,7 +80,7 @@ export function TaskHeader({
     <View
       style={[
         styles.head,
-        { paddingTop: (Platform.OS === 'android' ? insets.top : 0) + Space.sm },
+        { paddingTop: (telaCheia || Platform.OS === 'android' ? insets.top : 0) + Space.sm },
       ]}>
       <View style={[styles.grabber, { backgroundColor: theme.separator }]} />
       <View style={styles.headRow}>

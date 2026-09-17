@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { router, useLocalSearchParams, useNavigation } from 'expo-router';
-import { Platform, StyleSheet, View } from 'react-native';
+import { StyleSheet, View } from 'react-native';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import Animated, {
   runOnJS,
@@ -289,10 +289,8 @@ export default function WalletScreen() {
 
   return (
     <Screen scroll={false}>
-      {/* O `TaskHeader` nasceu para sheet e modal, onde o iOS já desceu a folha abaixo do relógio.
-          Aqui a tela é cheia: a safe area de cima é nossa (no Android ele já a soma). */}
-      <View style={[styles.flex, { paddingTop: Platform.OS === 'ios' ? insets.top : 0 }]}>
-        <TaskHeader title="Carteira" onClose={fechar} />
+      <View style={styles.flex}>
+        <TaskHeader title="Carteira" onClose={fechar} telaCheia />
         {corpo}
       </View>
     </Screen>
