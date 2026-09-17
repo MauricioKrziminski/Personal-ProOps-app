@@ -29,8 +29,13 @@ import { SkiaCanvas } from '@/components/ui/skia-canvas';
 import { Motion } from '@/design/tokens';
 import { progressoDaCapa } from '@/design/wave-math';
 import { useTheme } from '@/hooks/use-theme';
-import { comTeto } from '@/lib/com-teto';
-import { TETO_DA_ABERTURA_MS, origemValida, type Onda, type Ponto } from '@/lib/session-gate';
+import {
+  esperaDaAbertura,
+  esperaDaMarca,
+  origemValida,
+  type Onda,
+  type Ponto,
+} from '@/lib/session-gate';
 
 import type { CortinaApi } from './session-curtain.types';
 
@@ -49,6 +54,8 @@ const ONDA_DA_ABERTURA: Onda = { mode: 'up' };
 const TETO_DO_PNG_MS = 500;
 /** No Android a marca entra na camada; no iOS ela já está no splash nativo. */
 const ENTRA_NA_CAMADA = Platform.OS === 'android';
+/** No iOS a marca está na tela desde o splash nativo, antes deste módulo carregar. */
+const CARREGOU_EM = Date.now();
 
 type Fase = 'abertura' | 'cobrindo' | 'coberta' | 'revelando' | 'aberta';
 type Show = 'completa' | 'curta';
@@ -97,7 +104,8 @@ export function useCortinaSaindo(): boolean {
  * | 0 | splash nativo: tinta `#0B0B0C` + `mark-white.png` de 96 dp |
  * | camada pintou e o PNG carregou | `hideAsync()`: o nativo sai com a camada idêntica por cima |
  * | show (5 primeiras, 1,8 s) | um anel fino se desenha em volta da marca e some |
- * | pronto (fontes + sessão, teto 2,5 s) | a tinta sobe com a borda em curva e libera o app; a marca sobe e some no primeiro terço |
+ * | pronto (fontes + sessão + trava, teto 2,5 s; 20 s com a senha pedida) | a tinta sobe com a borda em curva e libera o app; a marca sobe e some no primeiro terço |
+ * | abertura curta | a marca fica ao menos 0,9 s antes da tinta subir |
  *
  * ## Por que `cobrir` espera dois quadros a mais
  *
@@ -125,11 +133,11 @@ export function CortinaProvider({ children }: { children: ReactNode }) {
   const [pintada, setPintada] = useState(false);
   const [aberturaFeita, setAberturaFeita] = useState(false);
 
-  const pronto = useRef<{
-    valor: boolean;
-    destino: 'app' | 'conta';
-    avisar: (() => void) | null;
-  }>({ valor: false, destino: 'app', avisar: null });
+  const pronto = useRef<{ valor: boolean; destino: 'app' | 'conta'; segurando: boolean }>({
+    valor: false,
+    destino: 'app',
+    segurando: false,
+  });
   const origem = useRef<{ ponto: Ponto; em: number } | null>(null);
   // No Android o splash nativo não tem a marca, então esconder não espera o PNG.
   const splash = useRef({ layout: false, png: ENTRA_NA_CAMADA, escondido: false });
@@ -206,7 +214,10 @@ export function CortinaProvider({ children }: { children: ReactNode }) {
     if (pronto.current.valor) return;
     pronto.current.valor = true;
     pronto.current.destino = destino;
-    pronto.current.avisar?.();
+  }, []);
+
+  const segurarAbertura = useCallback(() => {
+    pronto.current.segurando = true;
   }, []);
 
   const esconderSplash = useCallback(() => {
@@ -255,25 +266,27 @@ export function CortinaProvider({ children }: { children: ReactNode }) {
   /*
     A abertura roda UMA vez, quando a camada pintou e o contador voltou do disco. O teto conta
     daqui: com o app pronto antes do show acabar, o show termina; com o app atrasado, o teto
-    abre assim mesmo — tela de login atrasada é melhor que splash eterno.
+    abre assim mesmo — tela de login atrasada é melhor que splash eterno. Com a trava pedindo a
+    senha (`segurarAbertura`) o teto é longo: a marca fica enquanto o sistema pergunta e a tinta
+    sobe direto no app desbloqueado.
   */
   const comecou = useRef(false);
   useEffect(() => {
     if (!pintada || show === null || comecou.current) return;
     comecou.current = true;
-    const prontoOuTeto = comTeto(
-      new Promise<void>((ok) => {
-        if (pronto.current.valor) ok();
-        else pronto.current.avisar = ok;
-      }),
-      TETO_DA_ABERTURA_MS,
-      'abertura'
-    ).catch(() => {});
+    const desde = Date.now();
+    const marcaDesde = ENTRA_NA_CAMADA ? desde : CARREGOU_EM;
 
     void (async () => {
       // O show é o anel se desenhando em volta da marca (`MarcaDaAbertura`); aqui só se espera.
       if (show === 'completa' && !reduzido) await dormir(Motion.curtain.full);
-      await prontoOuTeto;
+      // ponytail: espera por sondagem (50 ms, só durante a abertura) — o teto muda de tamanho
+      // quando a trava segura, e um laço relê isso sem timer para rearmar.
+      const p = pronto.current;
+      while (!p.valor && esperaDaAbertura(desde, Date.now(), p.segurando) > 0) await dormir(50);
+      // A marca não pode ser um lampejo: a passagem "marca → app" acontece em toda abertura
+      // (também com Reduzir Movimento — ficar parada na tela não é movimento).
+      await dormir(esperaDaMarca(marcaDesde, Date.now()));
       // Teto estourado deixa o destino em `app`: revelar tudo é o lado seguro.
       const capa = pronto.current.destino === 'conta';
       await descobrir(
@@ -292,8 +305,9 @@ export function CortinaProvider({ children }: { children: ReactNode }) {
       lembrarOrigem,
       tomarOrigem,
       marcarPronto,
+      segurarAbertura,
     }),
-    [cobrir, descobrir, abrirJa, lembrarOrigem, tomarOrigem, marcarPronto]
+    [cobrir, descobrir, abrirJa, lembrarOrigem, tomarOrigem, marcarPronto, segurarAbertura]
   );
 
   const aoLayout = useCallback(() => {
@@ -402,8 +416,8 @@ function Camada({
  * Gravado em 16/09/2026: a marca nativa sumia, sobrava um quadro preto, e a nossa aparecia
  * (~250 ms de piscar). Por isso no Android o splash nativo é SÓ a tinta (`splash-vazio.png`) e a
  * marca ENTRA aqui, de propósito, quando a camada já pintou — um atraso de decodificação vira
- * atraso de uma entrada que começa invisível, e deixa de aparecer. Na abertura curta do Android
- * a marca nem entra: é tinta e onda.
+ * atraso de uma entrada que começa invisível, e deixa de aparecer. Nas duas aberturas: a curta
+ * segura a marca um mínimo (`MARCA_MINIMA_MS`) para a entrada não virar lampejo.
  */
 function MarcaDaAbertura({
   progresso,
@@ -422,13 +436,8 @@ function MarcaDaAbertura({
   const tracado = useSharedValue(0);
   const entrada = useSharedValue(ENTRA_NA_CAMADA ? 0 : 1);
 
-  /*
-    Só o show ganha a entrada. Na abertura curta a onda sai assim que o app está pronto — a marca
-    entrando e sendo levada logo depois era um lampejo de 100 ms (gravado em 16/09/2026). Ali a
-    abertura do Android é tinta e onda, como o splash nativo dele.
-  */
   useEffect(() => {
-    if (!ENTRA_NA_CAMADA || !pintada || show !== 'completa') return;
+    if (!ENTRA_NA_CAMADA || !pintada || show === null) return;
     entrada.set(withTiming(1, { duration: reduzido ? 0 : 360, easing: Motion.easing.out }));
   }, [pintada, show, reduzido, entrada]);
   /** O anel começa no topo e corre no sentido do relógio. */

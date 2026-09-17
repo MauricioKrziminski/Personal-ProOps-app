@@ -31,6 +31,7 @@ import Animated, {
 } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { useCortinaSaindo } from '@/components/motion/session-curtain';
 import { WaveCurtain } from '@/components/motion/wave-curtain';
 import { ThemedText } from '@/components/themed-text';
 import { Mark } from '@/components/ui/mark';
@@ -74,6 +75,7 @@ function Cortina({ saindo, onSaiu }: { saindo: boolean; onSaiu: () => void }) {
   const insets = useSafeAreaInsets();
   const reduzido = useReducedMotion();
   const progresso = useSharedValue(0);
+  const cortinaSaindo = useCortinaSaindo();
 
   /*
     O prompt é pedido assim que a cortina aparece. A guarda de reentrância mora no HOOK
@@ -88,6 +90,14 @@ function Cortina({ saindo, onSaiu }: { saindo: boolean; onSaiu: () => void }) {
       progresso.set(withTiming(0, { duration: Motion.duration.base }));
       return;
     }
+    /*
+      Destravou com a abertura ainda cobrindo (a senha pedida sobre a marca): a trava sai na hora,
+      por baixo da tinta, e quem conta a passagem é a abertura subindo direto no app.
+    */
+    if (!cortinaSaindo) {
+      onSaiu();
+      return;
+    }
     const duracao = reduzido ? Motion.duration.base : Motion.curtain.duration;
     progresso.set(
       withTiming(1, { duration: duracao, easing: Easing.linear }, (fim) => {
@@ -98,7 +108,7 @@ function Cortina({ saindo, onSaiu }: { saindo: boolean; onSaiu: () => void }) {
     // Se o callback da animação não vier, a trava sai do mesmo jeito: modal preso é pior que corte.
     const teto = setTimeout(onSaiu, duracao + 400);
     return () => clearTimeout(teto);
-  }, [saindo, reduzido, progresso, onSaiu]);
+  }, [saindo, cortinaSaindo, reduzido, progresso, onSaiu]);
 
   const conteudo = useAnimatedStyle(() => {
     const k = Math.min(1, progresso.get() / 0.35);

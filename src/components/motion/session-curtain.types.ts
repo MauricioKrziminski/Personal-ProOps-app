@@ -20,4 +20,9 @@ export interface CortinaApi {
    * destino `conta` (sem sessão), a abertura para na capa das telas de conta.
    */
   marcarPronto(destino: 'app' | 'conta'): void;
+  /**
+   * A trava está pedindo a senha do aparelho: a abertura segura a marca (com um teto longo) até
+   * `marcarPronto`, para a tinta subir direto no app desbloqueado.
+   */
+  segurarAbertura(): void;
 }

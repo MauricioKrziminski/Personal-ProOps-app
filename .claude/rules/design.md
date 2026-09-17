@@ -459,9 +459,22 @@ A ultrapassagem de uma mola é proporcional à DISTÂNCIA, então ir da primeira
 o círculo para fora da pílula. O desenho é preso por `folgaDaMola` (`design/tab-pill.ts`) — a
 sobra real entre o centro do slot e a borda da pílula, calculada da geometria.
 
-**Entradas das raízes esperam a cortina COMEÇAR a sair** (`useCortinaSaindo`): a cascata do
-`Screen` e a barra do Android chegam junto com a tinta. Montadas antes, tocavam inteiras por
-baixo dela.
+**Entradas das raízes tocam sempre que o app FICA VISÍVEL** (`useRelogioDeEntrada`,
+`motion/entrada.tsx`, 17/09/2026): a cascata do `Screen` e a barra do Android chegam junto com a
+tinta saindo — na abertura, ao entrar numa conta e ao desbloquear. "Visível" é a cortina saindo
+**e** a trava aberta; coberto por qualquer uma, o bloco se esconde e entra de novo sem remontar.
+Olhando só a cortina, com a trava ligada a cascata tocava inteira por baixo dela.
+
+- **O relógio começa num `useLayoutEffect`** e parte de um valor negativo (o atraso mora nele, sem
+  `withDelay`). Com efeito passivo, a tela que chega pesada ficava ~0,5 s com o corpo vazio.
+- **O tempo é o da montagem.** O atraso vem da posição do bloco, e ela muda quando um bloco
+  condicional aparece acima; com ele vivo nas dependências, os de baixo sumiam e entravam de novo.
+
+**A abertura passa pela marca em TODA abertura, com senha ou sem** (pedido do dono do produto,
+17/09/2026). A marca fica no mínimo 0,9 s (`MARCA_MINIMA_MS`) — no Android ela entra também na
+abertura curta. Com a trava ligada, `segurarAbertura()` estica o teto para 20 s: o sistema pede a
+senha sobre a marca e, confirmada, a tinta sobe DIRETO no app (a trava some por baixo, sem a onda
+dela). Cancelou, a abertura revela a trava, que tem o "tentar de novo".
 
 **O carrossel e o voo da Carteira** são momento raro (delight declarado): mola `voo` e
 `carrossel`, giro 3D só no meio da troca, e com Reduce Motion não há voo nem giro.
@@ -477,9 +490,10 @@ baixo dela.
   parece a leitura óbvia e transforma toda invalidação em spinner: em Notas, cada fixar, colorir,
   arquivar e arrastar abria o `RefreshControl` sozinho e empurrava a tela ~60pt para baixo — salto
   de layout em toda ação, medido no simulador. O indicador nasce de um `useState` que o `onRefresh`
-  liga e o `finally` desliga (o precedente é a lista do Agente). O padrão errado ainda está em
-  Hoje, Financeiro, Busca, Lembretes, Importação, Histórico e Alertas, e o `Screen` aceita o prop
-  — tela nova não copia dali.
+  liga e o `finally` desliga (o precedente é a lista do Agente). **O `Screen` não tem mais o prop
+  `refreshing`** (17/09/2026): ele segue o gesto sozinho, e o TypeScript barra a volta. Custava
+  também um salto na abertura com senha — fechar o Face ID é uma retomada, as consultas recarregam
+  e a Hoje descia ~30pt sozinha. Lista com `RefreshControl` próprio usa o mesmo `puxando`.
 - **Mutation que falha precisa aparecer.** Toast + rollback visível. Falha silenciosa é
   reprovação — vale para delete, toggle, arquivar e pagar, não só para salvar.
 

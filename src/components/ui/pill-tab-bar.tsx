@@ -1,11 +1,10 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect } from 'react';
 import * as Haptics from 'expo-haptics';
 import { Platform, Pressable, StyleSheet, View, useWindowDimensions } from 'react-native';
 import Animated, {
   interpolateColor,
   useAnimatedStyle,
   useDerivedValue,
-  useReducedMotion,
   useSharedValue,
   withSpring,
   type SharedValue,
@@ -13,7 +12,7 @@ import Animated, {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import type { SymbolViewProps } from 'expo-symbols';
 
-import { useCortinaSaindo } from '@/components/motion/session-curtain';
+import { progressoDeEntrada, useRelogioDeEntrada } from '@/components/motion/entrada';
 import { ThemedText } from '@/components/themed-text';
 import { Icon } from '@/components/ui/icon';
 import { centroDoSlot, distanciaDaAba, folgaDaMola, posicaoDesenhada } from '@/design/tab-pill';
@@ -30,6 +29,9 @@ const DIAMETRO = 36;
 const TOPO = 7;
 /** Calha lateral: a barra flutua, não encosta nas bordas. */
 const SIDE = Space.lg;
+/** A subida da barra na entrada: logo depois dos primeiros blocos da tela. */
+const ATRASO_DA_BARRA_MS = 120;
+const DURACAO_DA_BARRA_MS = 520;
 /** Quanto o rótulo pode passar da largura do slot (metade de cada lado). */
 const SOBRA = 14;
 
@@ -81,8 +83,8 @@ export interface PillTab {
  *
  * ## A entrada
  *
- * Na primeira vez que a cortina sai, a barra sobe de baixo da tela junto com ela — como no
- * vídeo. Depois disso ela só está lá.
+ * Toda vez que o app fica visível — a abertura, a entrada numa conta, o desbloqueio — a barra
+ * sobe de baixo da tela junto com a tinta saindo, como no vídeo (`useRelogioDeEntrada`).
  */
 export function PillTabBar({
   tabs,
@@ -96,7 +98,6 @@ export function PillTabBar({
   const theme = useTheme();
   const scheme = useScheme();
   const insets = useSafeAreaInsets();
-  const reduzir = useReducedMotion();
   const { width: tela } = useWindowDimensions();
 
   const barW = tela - SIDE * 2;
@@ -122,18 +123,13 @@ export function PillTabBar({
   const circulo = useAnimatedStyle(() => ({ transform: [{ translateX: esquerda.get() }] }));
   const contraCirculo = useAnimatedStyle(() => ({ transform: [{ translateX: -esquerda.get() }] }));
 
-  // A entrada: a barra sobe junto com a cortina saindo, na primeira vez. A trava mora no render
-  // (o padrão de `AuthScreen`): a cortina cobre de novo numa troca de conta, e a barra não pode
-  // descer junto.
-  const aberta = useCortinaSaindo();
-  const [jaAbriu, setJaAbriu] = useState(aberta);
-  if (aberta && !jaAbriu) setJaAbriu(true);
+  // A entrada: a barra sobe toda vez que o app fica visível (abertura, conta, desbloqueio) —
+  // o mesmo relógio da cascata das raízes. Coberta, ela desce por baixo da camada.
   const descida = BAR_H + insets.bottom + Space.lg;
-  const subida = useSharedValue(jaAbriu || reduzir ? 0 : descida);
-  useEffect(() => {
-    if (jaAbriu) subida.set(reduzir ? 0 : withSpring(0, Motion.spring.voo));
-  }, [jaAbriu, reduzir, subida]);
-  const entrada = useAnimatedStyle(() => ({ transform: [{ translateY: subida.get() }] }));
+  const relogio = useRelogioDeEntrada(ATRASO_DA_BARRA_MS, DURACAO_DA_BARRA_MS);
+  const entrada = useAnimatedStyle(() => ({
+    transform: [{ translateY: (1 - progressoDeEntrada(relogio.get())) * descida }],
+  }));
 
   return (
     <Animated.View

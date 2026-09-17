@@ -7,14 +7,14 @@ import {
   type StyleProp,
   type ViewStyle,
 } from 'react-native';
-import Animated, { FadeInDown } from 'react-native-reanimated';
+import Animated, { useAnimatedStyle, useReducedMotion } from 'react-native-reanimated';
 import { KeyboardAwareScrollView } from 'react-native-keyboard-controller';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Stack } from 'expo-router';
 
 import { MaxContentWidth } from '@/constants/theme';
 import { useAppHeaderHeight } from '@/components/ui/app-header';
-import { useCortinaSaindo } from '@/components/motion/session-curtain';
+import { progressoDeEntrada, useRelogioDeEntrada } from '@/components/motion/entrada';
 import { TAB_BAR_SPACE } from '@/components/ui/pill-tab-bar';
 
 import { Motion, Space } from '@/design/tokens';
@@ -38,9 +38,12 @@ interface ScreenProps {
    * no Financeiro vazio, com o "Lançar" cobrindo a última linha do estado vazio.
    */
   floatingAction?: boolean;
-  /** Liga pull-to-refresh. */
+  /**
+   * Liga pull-to-refresh. O indicador é do GESTO e mora aqui (§6 do design): não existe prop
+   * `refreshing`, porque a leitura óbvia (`isRefetching`) abre o spinner a cada revalidação e
+   * empurra a tela — inclusive ao voltar do Face ID.
+   */
   onRefresh?: () => unknown;
-  refreshing?: boolean;
   /** Fundo agrupado para telas de lista; `background` para telas de conteúdo. */
   grouped?: boolean;
   /**
@@ -86,7 +89,6 @@ export function Screen({
   children,
   scroll = true,
   onRefresh,
-  refreshing = false,
   grouped = false,
   stagger = false,
   topBar,
@@ -199,7 +201,7 @@ export function Screen({
       alwaysBounceVertical={Boolean(onRefresh)}
       refreshControl={
         onRefresh ? <RefreshControl
-          refreshing={pulling || refreshing}
+          refreshing={pulling}
           progressViewOffset={topBar ? headerHeight : 0}
           onRefresh={() => {
             setPulling(true);
@@ -223,7 +225,7 @@ export function Screen({
 }
 
 /**
- * A cascata: um `FadeInDown` por bloco, atrasado pela POSIÇÃO.
+ * A cascata: uma entrada por bloco, atrasada pela POSIÇÃO.
  *
  * ⚠️ **Filho que não é elemento passa DIRETO.** `{cond ? <X/> : null}` é o padrão das telas
  * daqui, e embrulhar o `null` criaria uma `View` vazia — que o `gap` do container espaçaria,
@@ -241,33 +243,41 @@ export function Screen({
  * vira "o rodapé está demorando".
  */
 function Cascata({ children }: { children: ReactNode }) {
-  /*
-    A cascata espera a cortina começar a SAIR (a abertura do app, a entrada numa conta). Montada
-    antes, ela tocaria inteira por baixo da tinta e a pessoa veria a tela já parada; montada
-    junto com a subida, os blocos chegam enquanto a tinta vai embora — a entrada do vídeo. A
-    trava não volta: a cortina cobre de novo numa troca de conta e a tela não pode sumir.
-  */
-  const saindo = useCortinaSaindo();
-  const [visto, setVisto] = useState(saindo);
-  if (saindo && !visto) setVisto(true);
-  if (!visto) return null;
-
   let i = 0;
   return (
     <>
       {Children.map(children, (filho) => {
         if (!isValidElement(filho)) return filho;
-        const atraso = Math.min(i++ * 60, Motion.stagger.cap);
-        return (
-          <Animated.View
-            style={styles.cascata}
-            entering={FadeInDown.delay(atraso).duration(Motion.duration.slow)}>
-            {filho}
-          </Animated.View>
-        );
+        const indice = i++;
+        return <BlocoDaCascata indice={indice}>{filho}</BlocoDaCascata>;
       })}
     </>
   );
+}
+
+/** Deslocamento de entrada de cada bloco, em dp. */
+const SUBIDA_DO_BLOCO = 12;
+
+/**
+ * Um bloco da cascata. A entrada toca sempre que o app FICA VISÍVEL (`useEntrada`): na abertura,
+ * ao entrar numa conta e ao desbloquear — pedido do dono do produto, 17/09/2026. Não é mais um
+ * `entering` (que só toca na montagem): coberto pela trava, o bloco se esconde e entra de novo
+ * quando ela sai, sem remontar a tela.
+ */
+function BlocoDaCascata({ indice, children }: { indice: number; children: ReactNode }) {
+  const reduzir = useReducedMotion();
+  const relogio = useRelogioDeEntrada(
+    Math.min(indice * 60, Motion.stagger.cap),
+    Motion.duration.slow
+  );
+  const estilo = useAnimatedStyle(() => {
+    const e = progressoDeEntrada(relogio.get());
+    return {
+      opacity: e,
+      transform: [{ translateY: reduzir ? 0 : (1 - e) * SUBIDA_DO_BLOCO }],
+    };
+  });
+  return <Animated.View style={[styles.cascata, estilo]}>{children}</Animated.View>;
 }
 
 const styles = StyleSheet.create({

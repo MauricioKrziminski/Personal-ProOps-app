@@ -31,6 +31,29 @@ export const TETO_DA_TROCA_MS = 1500;
 /** Teto da espera da abertura por fontes e sessão. */
 export const TETO_DA_ABERTURA_MS = 2500;
 /**
+ * Teto da abertura quando a TRAVA está pedindo a senha do aparelho: a marca fica na tela enquanto
+ * o sistema pergunta, e a tinta sobe direto para o app. É longo porque quem demora é a pessoa
+ * digitando; passado isso, a abertura revela a própria trava (que tem o "tentar de novo").
+ */
+export const TETO_DA_TRAVA_MS = 20000;
+/**
+ * O mínimo que a marca fica na tela antes de a tinta subir, na abertura curta. Sem isso, num
+ * aparelho rápido, a marca era um lampejo — e o pedido é que a passagem "logo → app" sempre
+ * aconteça (17/09/2026).
+ */
+export const MARCA_MINIMA_MS = 900;
+
+/** Quanto a abertura ainda espera por "pronto", dado desde quando espera e se a trava segura. */
+export function esperaDaAbertura(desde: number, agora: number, segurando: boolean): number {
+  const teto = segurando ? TETO_DA_TRAVA_MS : TETO_DA_ABERTURA_MS;
+  return Math.max(0, teto - (agora - desde));
+}
+
+/** Quanto falta para a marca ter ficado o mínimo na tela. */
+export function esperaDaMarca(visivelDesde: number, agora: number): number {
+  return Math.max(0, MARCA_MINIMA_MS - (agora - visivelDesde));
+}
+/**
  * Quanto a origem registrada por um botão continua valendo. O login pode levar alguns segundos
  * na rede; passado isso, o evento de sessão já não tem relação com o toque.
  */

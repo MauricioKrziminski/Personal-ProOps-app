@@ -2,7 +2,12 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 
 import {
+  MARCA_MINIMA_MS,
+  TETO_DA_ABERTURA_MS,
+  TETO_DA_TRAVA_MS,
   VALIDADE_DA_ORIGEM_MS,
+  esperaDaAbertura,
+  esperaDaMarca,
   ondaDaTroca,
   origemValida,
   precisaDeCortina,
@@ -42,4 +47,17 @@ test('a origem lembrada vence depois de um tempo', () => {
   assert.deepEqual(origemValida(r, 1000 + VALIDADE_DA_ORIGEM_MS), r.ponto);
   assert.equal(origemValida(r, 1001 + VALIDADE_DA_ORIGEM_MS), null);
   assert.equal(origemValida(null, 1000), null);
+});
+
+test('a abertura espera o teto curto, e o longo enquanto a trava pede a senha', () => {
+  assert.equal(esperaDaAbertura(0, 1000, false), TETO_DA_ABERTURA_MS - 1000);
+  assert.equal(esperaDaAbertura(0, TETO_DA_ABERTURA_MS + 1, false), 0);
+  // Segurar depois do teto curto ainda vale: o prompt costuma chegar perto dele.
+  assert.equal(esperaDaAbertura(0, TETO_DA_ABERTURA_MS + 1, true), TETO_DA_TRAVA_MS - TETO_DA_ABERTURA_MS - 1);
+  assert.equal(esperaDaAbertura(0, TETO_DA_TRAVA_MS, true), 0);
+});
+
+test('a marca fica um mínimo na tela, e não mais que isso', () => {
+  assert.equal(esperaDaMarca(1000, 1000), MARCA_MINIMA_MS);
+  assert.equal(esperaDaMarca(1000, 1000 + MARCA_MINIMA_MS + 5), 0);
 });

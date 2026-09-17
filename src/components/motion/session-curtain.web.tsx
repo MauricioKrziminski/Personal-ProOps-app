@@ -10,6 +10,7 @@ const SEM_CORTINA: CortinaApi = {
   lembrarOrigem: () => {},
   tomarOrigem: () => null,
   marcarPronto: () => {},
+  segurarAbertura: () => {},
 };
 
 export function CortinaProvider({ children }: { children: ReactNode }) {

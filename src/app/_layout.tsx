@@ -20,10 +20,11 @@ import { AppState, Platform } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { KeyboardProvider } from 'react-native-keyboard-controller';
 
+import { EntradaProvider } from '@/components/motion/entrada';
 import { CortinaProvider, useCortina } from '@/components/motion/session-curtain';
 import { FlightProvider } from '@/components/motion/flight-layer';
 import { LockOverlay } from '@/components/ui/lock-overlay';
-import { LockProvider } from '@/hooks/use-lock';
+import { LockProvider, useLock } from '@/hooks/use-lock';
 import { AndroidActionSheet } from '@/components/ui/action-sheet';
 import { stackHeaderFonts } from '@/components/ui/app-header';
 import { ConcealProvider } from '@/components/ui/conceal';
@@ -104,6 +105,24 @@ export default function RootLayout() {
   );
 }
 
+/**
+ * Diz à abertura quando revelar: fontes e sessão prontas, e a trava resolvida.
+ *
+ * Com a trava ligada a abertura SEGURA a marca enquanto o sistema pede a senha — desbloqueou, a
+ * tinta sobe direto no app (a mesma passagem de quem abre sem senha); cancelou, ela revela a
+ * trava, que tem o "tentar de novo". Pedido do dono do produto, 17/09/2026.
+ */
+function AvisoDaAbertura({ pronto, temSessao }: { pronto: boolean; temSessao: boolean }) {
+  const cortina = useCortina();
+  const { carregando, locked, estado } = useLock();
+  useEffect(() => {
+    if (!pronto || carregando) return;
+    if (temSessao && locked && estado !== 'falhou') cortina.segurarAbertura();
+    else cortina.marcarPronto(temSessao ? 'app' : 'conta');
+  }, [pronto, carregando, temSessao, locked, estado, cortina]);
+  return null;
+}
+
 function AppTree() {
   const scheme = useScheme();
   const pathname = usePathname();
@@ -152,16 +171,7 @@ function AppTree() {
   });
 
   const { session, loading } = useSession();
-  /*
-    A abertura revela quando fontes e sessão estão prontas (com teto dentro da cortina). A raiz
-    só avisa; quem decide o tempo é a cortina.
-  */
-  const cortina = useCortina();
   const pronto = !loading && (fontsLoaded || !!fontError);
-  const temSessao = !!session;
-  useEffect(() => {
-    if (pronto) cortina.marcarPronto(temSessao ? 'app' : 'conta');
-  }, [pronto, temSessao, cortina]);
   const previousUser = useRef<string | null | undefined>(undefined);
   useEffect(() => {
     if (loading) return;
@@ -196,6 +206,8 @@ function AppTree() {
             voltar de uma tela de bloqueio é a própria falha.
           */}
           <LockProvider>
+          <AvisoDaAbertura pronto={pronto} temSessao={!!session} />
+          <EntradaProvider>
           <ToastProvider>
             <AppUpdateProvider>
               <LockOverlay />
@@ -414,6 +426,7 @@ function AppTree() {
               )}
             </AppUpdateProvider>
           </ToastProvider>
+          </EntradaProvider>
           </LockProvider>
           </ConcealProvider>
         </KeyboardProvider>
