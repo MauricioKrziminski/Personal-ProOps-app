@@ -38,6 +38,12 @@
           "dark": {
             "backgroundColor": "#0B0B0C",
             "image": "./assets/images/brand/mark-white.png"
+          },
+          "android": {
+            "image": "./assets/images/brand/splash-vazio.png",
+            "dark": {
+              "image": "./assets/images/brand/splash-vazio.png"
+            }
           }
         }
       ],

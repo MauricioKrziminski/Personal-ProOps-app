@@ -11,7 +11,7 @@ import {
   useState,
   type ReactNode,
 } from 'react';
-import { Image, StyleSheet, View } from 'react-native';
+import { Image, Platform, StyleSheet, View } from 'react-native';
 import Animated, {
   Easing,
   cancelAnimation,
@@ -46,6 +46,8 @@ const ANEL = LADO * 1.5;
 /** A abertura recolhe a tinta para cima, como nos vídeos de referência. */
 const ONDA_DA_ABERTURA: Onda = { mode: 'up' };
 const TETO_DO_PNG_MS = 500;
+/** No Android a marca entra na camada; no iOS ela já está no splash nativo. */
+const ENTRA_NA_CAMADA = Platform.OS === 'android';
 
 type Fase = 'abertura' | 'cobrindo' | 'coberta' | 'revelando' | 'aberta';
 type Show = 'completa' | 'curta';
@@ -116,7 +118,8 @@ export function CortinaProvider({ children }: { children: ReactNode }) {
     avisar: null,
   });
   const origem = useRef<{ ponto: Ponto; em: number } | null>(null);
-  const splash = useRef({ layout: false, png: false, escondido: false });
+  // No Android o splash nativo não tem a marca, então esconder não espera o PNG.
+  const splash = useRef({ layout: false, png: ENTRA_NA_CAMADA, escondido: false });
 
   const animar = useCallback(
     (alvo: 0 | 1, duracao: number) =>
@@ -196,7 +199,14 @@ export function CortinaProvider({ children }: { children: ReactNode }) {
   }, []);
 
   useEffect(() => {
-    SplashScreen.setOptions({ duration: 0, fade: false });
+    /*
+      No Android o splash some com uma animação de opacidade da própria vista dele, e o conteúdo
+      só começa a desenhar DEPOIS do `hideAsync()`. Com duração 0 sobravam ~150 ms de preto puro
+      entre os dois (gravado em 16/09/2026). Com 300 ms a tinta do splash esmaece por cima da tinta
+      da cortina, que já está desenhando — a passagem some. No iOS o nosso quadro já existe quando
+      o nativo sai, e `fade: false` evita um segundo cross-fade.
+    */
+    SplashScreen.setOptions({ duration: Platform.OS === 'android' ? 300 : 0, fade: false });
     // PNG que não carrega não pode segurar o app no splash.
     const t = setTimeout(() => {
       splash.current.png = true;
@@ -286,6 +296,7 @@ export function CortinaProvider({ children }: { children: ReactNode }) {
             reduzido={reduzido}
             show={aberturaFeita ? null : show}
             comMarca={!aberturaFeita}
+            pintada={pintada}
             onLayout={aoLayout}
             onPng={aoPng}
           />
@@ -302,6 +313,7 @@ function Camada({
   reduzido,
   show,
   comMarca,
+  pintada,
   onLayout,
   onPng,
 }: {
@@ -311,6 +323,7 @@ function Camada({
   reduzido: boolean;
   show: Show | null;
   comMarca: boolean;
+  pintada: boolean;
   onLayout: () => void;
   onPng: () => void;
 }) {
@@ -339,7 +352,13 @@ function Camada({
         />
       )}
       {comMarca ? (
-        <MarcaDaAbertura progresso={progresso} show={show} onPng={onPng} reduzido={reduzido} />
+        <MarcaDaAbertura
+          progresso={progresso}
+          show={show}
+          pintada={pintada}
+          onPng={onPng}
+          reduzido={reduzido}
+        />
       ) : null}
     </View>
   );
@@ -348,20 +367,46 @@ function Camada({
 /**
  * A marca no centro da abertura: o MESMO PNG do splash nativo, no mesmo tamanho. No show, um anel
  * fino se desenha em volta dela e some; na saída, ela sobe e some junto com a tinta.
+ *
+ * ## A entrada é por plataforma, e isso é MEDIDO
+ *
+ * No iOS o splash nativo tem a marca e a camada nasce com ela visível: os dois quadros são iguais.
+ *
+ * No Android isso não se consegue garantir. O `expo-splash-screen` impede o conteúdo de DESENHAR
+ * enquanto o splash está na tela (um `OnPreDrawListener` que devolve `false`), então o primeiro
+ * quadro da camada só existe depois de o splash sair — e o `Image` entra um instante depois.
+ * Gravado em 16/09/2026: a marca nativa sumia, sobrava um quadro preto, e a nossa aparecia
+ * (~250 ms de piscar). Por isso no Android o splash nativo é SÓ a tinta (`splash-vazio.png`) e a
+ * marca ENTRA aqui, de propósito, quando a camada já pintou — um atraso de decodificação vira
+ * atraso de uma entrada que começa invisível, e deixa de aparecer. Na abertura curta do Android
+ * a marca nem entra: é tinta e onda.
  */
 function MarcaDaAbertura({
   progresso,
   show,
+  pintada,
   onPng,
   reduzido,
 }: {
   progresso: SharedValue<number>;
   show: Show | null;
+  pintada: boolean;
   onPng: () => void;
   reduzido: boolean;
 }) {
   const theme = useTheme();
   const tracado = useSharedValue(0);
+  const entrada = useSharedValue(ENTRA_NA_CAMADA ? 0 : 1);
+
+  /*
+    Só o show ganha a entrada. Na abertura curta a onda sai assim que o app está pronto — a marca
+    entrando e sendo levada logo depois era um lampejo de 100 ms (gravado em 16/09/2026). Ali a
+    abertura do Android é tinta e onda, como o splash nativo dele.
+  */
+  useEffect(() => {
+    if (!ENTRA_NA_CAMADA || !pintada || show !== 'completa') return;
+    entrada.set(withTiming(1, { duration: reduzido ? 0 : 360, easing: Motion.easing.out }));
+  }, [pintada, show, reduzido, entrada]);
   /** O anel começa no topo e corre no sentido do relógio. */
   const anel = useMemo(() => {
     const b = Skia.PathBuilder.Make();
@@ -372,17 +417,26 @@ function MarcaDaAbertura({
   }, []);
 
   useEffect(() => {
-    if (show !== 'completa' || reduzido) return;
-    tracado.set(withTiming(1, { duration: 1200, easing: Motion.easing.inOut }));
-  }, [show, reduzido, tracado]);
+    if (show !== 'completa' || reduzido || !pintada) return;
+    // O atraso mora no relógio (ele parte de um valor negativo), não num `withDelay` — a mesma
+    // lição do `SplitReveal`: no Android o atraso na montagem podia não disparar.
+    const atraso = ENTRA_NA_CAMADA ? 0.17 : 0;
+    tracado.set(-atraso);
+    tracado.set(withTiming(1, { duration: 1200 * (1 + atraso), easing: Motion.easing.inOut }));
+  }, [show, reduzido, pintada, tracado]);
 
   // O anel se fecha e some no último quarto — ele é um gesto, não um estado.
+  const fim = useDerivedValue(() => Math.max(0, tracado.get()));
   const brilho = useDerivedValue(() => 1 - Math.max(0, (tracado.get() - 0.75) / 0.25));
   const inicio = useDerivedValue(() => Math.max(0, (tracado.get() - 0.75) / 0.25));
 
   const sai = useAnimatedStyle(() => {
     const k = Math.min(1, progresso.get() / 0.35);
-    return { opacity: 1 - k, transform: [{ translateY: -k * 36 }, { scale: 1 - k * 0.06 }] };
+    const e = entrada.get();
+    return {
+      opacity: (1 - k) * e,
+      transform: [{ translateY: -k * 36 }, { scale: (1 - k * 0.06) * (0.92 + e * 0.08) }],
+    };
   });
 
   return (
@@ -397,7 +451,7 @@ function MarcaDaAbertura({
             strokeCap="round"
             color={theme.onCurtainMuted}
             start={inicio}
-            end={tracado}
+            end={fim}
             opacity={brilho}
           />
         </SkiaCanvas>
