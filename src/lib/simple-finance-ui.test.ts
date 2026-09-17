@@ -79,7 +79,7 @@ function screen(file: string, options: { debts?: any[]; invoiceStatus?: string; 
     useSettleInvoice: () => mutation('settleInvoice'),
     usePayInvoice: () => mutation('payInvoice'),
     useInvoice: () => ({ ...query, data: {
-      invoice: { id: 'invoice-1', account_id: 'card-1', status: options.invoiceStatus ?? 'closed', reference_month: '2026-08-01', closing_date: '2026-08-10', due_date: '2026-08-20' },
+      invoice: { id: 'invoice-1', account_id: 'card-1', status: options.invoiceStatus ?? 'closed', reference_month: '2026-08-01', closing_date: '2026-08-10', due_date: '2026-08-20', paid_at: options.invoiceStatus === 'paid' ? '2026-08-18' : null },
       transactions: [{ id: 'purchase-1', kind: 'expense', amount_cents: 147000, occurred_at: '2026-08-01' }],
     } }),
   }, { get: (target, key) => key in target ? target[key as keyof typeof target] : () => query });
@@ -107,7 +107,7 @@ function screen(file: string, options: { debts?: any[]; invoiceStatus?: string; 
       if (name === '@/hooks/use-items') return { localISODate: () => '2026-09-08', formatDateBR: () => '08/09/2026', formatBRL: load('src/lib/dates.ts').formatBRL, useRealtimeInvalidate: () => {} };
       // Orçamentos consulta direto (a lista de linhas): o mesmo resultado inerte dos hooks.
       if (name === '@tanstack/react-query') return { useQuery: () => query };
-      if (name === '@/lib/finance-form' || name === '@/lib/dates' || name === '@/lib/month-view' || name === '@/lib/settle-labels' || name === '@/lib/accounts' || name === '@/lib/cycle-label') return load(`src/lib/${name.split('/').at(-1)}.ts`);
+      if (name === '@/lib/finance-form' || name === '@/lib/dates' || name === '@/lib/month-view' || name === '@/lib/settle-labels' || name === '@/lib/accounts' || name === '@/lib/cycle-label' || name === '@/lib/card-status') return load(`src/lib/${name.split('/').at(-1)}.ts`);
       if (name === '@/hooks/use-debounced') return { useDebounced: (value: unknown) => value };
       if (name === '@/design/category-icons') return { categoryIcon: () => 'circle' };
       // import relativo DENTRO de um módulo puro já carregado (month-view → ./dates.ts)
@@ -304,6 +304,21 @@ test('visible invoice settlement confirms then marks paid without issuing an acc
   assert.equal(ui.writes.length, 1);
   assert.equal(ui.writes[0].operation, 'settleInvoice');
   assert.equal(ui.writes[0].value.invoiceId, 'invoice-1');
+});
+
+// A face ancorada carrega o que o card de total carregava (Regra 0 da fase 4): estado,
+// contagem, total, fecha e vence — e as linhas que explicam o total ficam DENTRO dela.
+test('the docked card carries the invoice summary and the explaining lines', () => {
+  const ui = screen('src/app/finance/invoice/[id].tsx', { invoiceStatus: 'paid' });
+  const doca = ui.nodes().find((n) => n.type === 'InvoiceDock');
+  assert.ok(doca, 'a fatura desenha a doca');
+  assert.deepEqual(
+    { ...doca.props.resumo },
+    { status: 'Paga', atrasada: false, contagem: 1, totalCents: 147000, fecha: '2026-08-10', vence: '2026-08-20' }
+  );
+  assert.equal(doca.props.atualId, 'invoice-1');
+  const texto = JSON.stringify(doca.props.children);
+  assert.ok(texto.includes('Paga em'), 'a linha "Paga em" mora sob a face');
 });
 
 test('a paid invoice does not expose settlement or payment buttons', () => {

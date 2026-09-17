@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { FlatList, ScrollView, StyleSheet, View } from 'react-native';
+import { FlatList, ScrollView, StyleSheet, View, useWindowDimensions } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Animated, { FadeInDown } from 'react-native-reanimated';
 import { Stack, router, useLocalSearchParams } from 'expo-router';
@@ -18,14 +18,17 @@ import { useBRL } from '@/components/ui/conceal';
 import { Money } from '@/components/ui/money';
 import { Row, Section } from '@/components/ui/row';
 import { HeaderMenu } from '@/components/ui/header-actions';
+import { InvoiceDock } from '@/components/finance/invoice-dock';
 import { InvoicePager } from '@/components/finance/invoice-pager';
 import { Screen } from '@/components/ui/screen';
 import { Skeleton, SkeletonRow } from '@/components/ui/skeleton';
 import { useToast } from '@/components/ui/toast';
+import { alturaDoCartao } from '@/design/card-geometry';
 import { HitTarget, Motion, Radius, Space, tabular } from '@/design/tokens';
 import {
   useAccounts,
   useCardInvoices,
+  useCardSummary,
   useDeleteTransaction,
   useInvoice,
   usePayInvoice,
@@ -36,6 +39,7 @@ import {
 import { formatBRL, formatDateBR, localISODate } from '@/hooks/use-items';
 import { formatNumberBR } from '@/lib/dates';
 import { confirmDestructive } from '@/lib/item-actions';
+import { STATUS_DA_FATURA } from '@/lib/card-status';
 import { accountLabel } from '@/lib/accounts';
 import { AccountPicker } from '@/components/finance/account-picker';
 
@@ -50,16 +54,6 @@ import { AccountPicker } from '@/components/finance/account-picker';
  * cliente sobre `useInvoice` (o doc pede uma RPC `invoice_total`, que não existe): os filtros são
  * os mesmos do banco (`kind='expense'`), mas o dia em que a lista for paginada essa soma encolhe.
  */
-
-const STATUS_LABEL: Record<string, string> = {
-  open: 'Aberta',
-  closed: 'Fechada',
-  paid: 'Paga',
-  // ⚠️ Nunca "Rolada". O dono do produto recusou o jargão — *"eu não saberia o que seria
-  // rolada"* —, e ele tem razão: o estado não precisa de substantivo novo. A linha logo abaixo
-  // diz para ONDE o saldo foi, que é o que a pessoa quer saber.
-  rolled: 'Adiada',
-};
 
 function mesLabel(iso: string): string {
   const [y, m] = iso.split('-').map(Number);
@@ -113,7 +107,8 @@ function ErrorBand({ message, onRetry }: { message: string; onRetry: () => void 
 export default function InvoiceScreen() {
   const toast = useToast();
   const insets = useSafeAreaInsets();
-  const { id } = useLocalSearchParams<{ id: string }>();
+  const { id, via } = useLocalSearchParams<{ id: string; via?: string }>();
+  const { width, fontScale } = useWindowDimensions();
   const invoice = useInvoice(id);
   const accounts = useAccounts();
   const pay = usePayInvoice();
@@ -122,6 +117,7 @@ export default function InvoiceScreen() {
   const remove = useDeleteTransaction();
 
   const [pagando, setPagando] = useState(false);
+  const [puxando, setPuxando] = useState(false);
   // quanto vai ser pago AGORA. Nasce igual ao que falta, então pagar tudo continua sendo um toque.
   const [valorCents, setValorCents] = useState(0);
   const [payerId, setPayerId] = useState<string | null>(null);
@@ -136,6 +132,13 @@ export default function InvoiceScreen() {
     [invoice.data, invoice.isError]
   );
   const cartao = (accounts.data ?? []).find((a) => a.id === fatura?.account_id);
+  // O nome pinta a face (a cor do emissor sai dele). Os cartões da Carteira já estão em cache;
+  // as contas talvez não — sem este segundo caminho o cartão chegaria cinza e trocaria de cor.
+  const resumoDosCartoes = useCardSummary();
+  const nomeDoCartao =
+    cartao?.name ??
+    (resumoDosCartoes.data ?? []).find((c) => c.account_id === fatura?.account_id)?.name ??
+    '';
   // o pagamento é transferência: só entram contas que guardam dinheiro, nunca o próprio cartão
   const pagadoras = (accounts.data ?? []).filter(
     (a) => a.type !== 'credit_card' && a.id !== fatura?.account_id
@@ -345,7 +348,7 @@ export default function InvoiceScreen() {
 
       {invoice.isLoading ? (
         <>
-          <Skeleton height={140} radius={Radius.lg} />
+          <Skeleton height={alturaDoCartao(width - Space.lg * 2, fontScale)} radius={Radius.md} />
           <SkeletonRow />
           <SkeletonRow />
         </>
@@ -355,23 +358,22 @@ export default function InvoiceScreen() {
         <ErrorBand message="Não deu para carregar esta fatura." onRetry={invoice.refetch} />
       ) : null}
 
-      {/* O único destaque da tela. */}
+      {/* O único destaque da tela: o cartão ancorado, com as linhas que explicam o total logo abaixo. */}
       {fatura ? (
-        <Animated.View entering={FadeInDown.duration(Motion.duration.slow)}>
-          <Card style={styles.hero}>
-            <View style={styles.heroTop}>
-              <ThemedText type="small" themeColor="textSecondary">
-                {STATUS_LABEL[fatura.status] ?? fatura.status}
-                {cartao ? ` · ${cartao.name}` : ''}
-              </ThemedText>
-              <ThemedText type="small" themeColor="textSecondary" style={tabular}>
-                {compras.length} {compras.length === 1 ? 'lançamento' : 'lançamentos'}
-              </ThemedText>
-            </View>
-            <Money cents={total} variant="money" />
-            <ThemedText type="small" themeColor="textSecondary" style={tabular}>
-              fecha {formatDateBR(fatura.closing_date)} · vence {formatDateBR(fatura.due_date)}
-            </ThemedText>
+        <Animated.View entering={via ? undefined : FadeInDown.duration(Motion.duration.slow)}>
+          <InvoiceDock
+            nome={nomeDoCartao}
+            resumo={{
+              status: STATUS_DA_FATURA[fatura.status] ?? fatura.status,
+              atrasada: vencida && !paga && !adiada,
+              contagem: compras.length,
+              totalCents: total,
+              fecha: fatura.closing_date,
+              vence: fatura.due_date,
+            }}
+            faturas={vizinhas.data ?? []}
+            atualId={fatura.id}
+            onChange={(destino) => router.setParams({ id: destino })}>
             {/*
                 Só aparece quando PARTE do total está à frente. Numa fatura já fechada não há
                 o que dizer; numa fatura inteiramente futura (a de dezembro, hoje) a linha
@@ -419,7 +421,7 @@ export default function InvoiceScreen() {
                 </ThemedText>
               </View>
             ) : null}
-          </Card>
+          </InvoiceDock>
         </Animated.View>
       ) : null}
     </View>
@@ -439,69 +441,43 @@ export default function InvoiceScreen() {
    * Quem resolve "não some numa fatura longa" é o menu "…" do header, que já tem "Marcar como
    * paga" e fica acessível de qualquer ponto do scroll.
    */
-  const rodape = fatura ? (
-    <View style={styles.rodapeBloco}>
-      {podePagar ? (
-        <View style={styles.acoes}>
-          {/*
-            §7b: explicação ABAIXO do que ela explica. A frase era uma só e metade dela falava
-            do "Registrar pagamento", que só aparece lá embaixo — o leitor lia a explicação de
-            um botão que ainda não tinha visto. `finance.md` exige que a interface distinga os
-            dois efeitos, então as duas metades ficam, cada uma sob o seu botão.
-
-            Cada par vive no MESMO nó: o §7b se lê por proximidade, e irmãos soltos numa coluna
-            com um `gap` só ficam todos à mesma distância de tudo.
-          */}
-          <View style={styles.acaoExplicada}>
-            <Button
-              block
-              label="Marcar como paga"
-              variant="secondary"
-              loading={settle.isPending}
-              disabled={pay.isPending}
-              onPress={quitarSemCaixa}
-            />
-            <ThemedText type="footnote" themeColor="textSecondary">
-              Não altera o saldo: registra que a fatura foi paga fora do app.
-            </ThemedText>
-          </View>
-          {podeAdiar ? (
-            <View style={styles.acaoExplicada}>
-              <Button
-                block
-                label="Jogar para a próxima"
-                variant="secondary"
-                loading={roll.isPending}
-                disabled={settle.isPending || pay.isPending}
-                onPress={adiar}
-              />
-              {/* Uma linha, e curta. A explicação inteira dos encargos mora na CONFIRMAÇÃO,
-                  que é onde a pessoa está decidindo. */}
-              <ThemedText type="footnote" themeColor="textSecondary">
-                O saldo em aberto vira uma linha na próxima fatura, com juros e IOF estimados.
-              </ThemedText>
-            </View>
-          ) : null}
-          <View style={styles.acaoExplicada}>
-            <Button
-              block
-              size="lg"
-              label="Registrar pagamento"
-              disabled={settle.isPending || pay.isPending}
-              onPress={abrirPagamento}
-            />
-            <ThemedText type="footnote" themeColor="textSecondary">
-              Desconta da conta que você escolher.
-            </ThemedText>
-          </View>
-        </View>
-      ) : null}
-      <ThemedText type="small" themeColor="textSecondary" style={styles.rodape}>
-        O pagamento entra como transferência: as compras já contaram como gasto quando foram
-        feitas. Pagando só uma parte, o resto continua na fatura.
-      </ThemedText>
-    </View>
-  ) : null;
+  /*
+    Três botões e nenhuma legenda (16/09/2026, decisão do dono do produto: *"ta muito texto,
+    somente o essencial"*). Cada botão tinha uma frase embaixo e o rodapé fechava com um
+    parágrafo; a diferença entre pagar e quitar (finance.md) continua dita, mas no lugar em que
+    a pessoa DECIDE: a confirmação de "Marcar como paga" diz que o saldo não muda, a de "Jogar
+    para a próxima" explica os encargos, e o sheet de pagamento diz que entra como transferência.
+  */
+  const rodape =
+    fatura && podePagar ? (
+      <View style={styles.acoes}>
+        <Button
+          block
+          size="lg"
+          label="Registrar pagamento"
+          disabled={settle.isPending || pay.isPending}
+          onPress={abrirPagamento}
+        />
+        <Button
+          block
+          label="Marcar como paga"
+          variant="secondary"
+          loading={settle.isPending}
+          disabled={pay.isPending}
+          onPress={quitarSemCaixa}
+        />
+        {podeAdiar ? (
+          <Button
+            block
+            label="Jogar para a próxima"
+            variant="secondary"
+            loading={roll.isPending}
+            disabled={settle.isPending || pay.isPending}
+            onPress={adiar}
+          />
+        ) : null}
+      </View>
+    ) : null;
 
   return (
     <Screen scroll={false} grouped>
@@ -534,8 +510,14 @@ export default function InvoiceScreen() {
 
       <FlatList
         alwaysBounceVertical
-        refreshing={invoice.isRefetching || accounts.isRefetching || vizinhas.isRefetching}
-        onRefresh={() => Promise.all([invoice.refetch(), accounts.refetch(), fatura?.account_id ? vizinhas.refetch() : Promise.resolve()])}
+        // O indicador é do GESTO (§6 do design): com `isRefetching` ele girava sozinho ao entrar
+        // pela Carteira, que já deixa a fatura carregada e dispara a revalidação das contas.
+        refreshing={puxando}
+        onRefresh={() => {
+          setPuxando(true);
+          Promise.all([invoice.refetch(), accounts.refetch(), fatura?.account_id ? vizinhas.refetch() : Promise.resolve()])
+            .finally(() => setPuxando(false));
+        }}
         data={dias}
         style={styles.flex}
         keyExtractor={(g) => g.data}
@@ -622,11 +604,7 @@ export default function InvoiceScreen() {
             <Field
               label="Valor"
               error={valorCents > falta ? `Falta ${formatBRL(falta)} nesta fatura.` : undefined}
-              hint={
-                parcial
-                  ? `Você já pagou ${formatBRL(jaPago)}. Vem preenchido com o que falta.`
-                  : 'Vem preenchido com o valor cheio. Pagou só uma parte? Troque aqui.'
-              }>
+              hint={parcial ? `Você já pagou ${formatBRL(jaPago)}.` : undefined}>
               {/* Superfície de DECISÃO: este é o valor que a pessoa está confirmando pagar, e
                   por isso o campo é editável e mostra o número por extenso. O que sobrar fica na
                   fatura, como fica no rotativo do cartão de verdade. */}
@@ -669,8 +647,7 @@ export default function InvoiceScreen() {
 
             <Field
               label="Data do pagamento"
-              error={dataISO ? undefined : 'Data em dd/mm/aaaa'}
-              hint="Pagou ontem e está registrando hoje? Corrija aqui.">
+              error={dataISO ? undefined : 'Data em dd/mm/aaaa'}>
               <DatePickerField
                 value={dataBR}
                 onChange={setDataBR}
@@ -721,22 +698,10 @@ const styles = StyleSheet.create({
   header: {
     gap: Space.lg,
   },
-  hero: {
-    gap: Space.sm,
-  },
-  heroTop: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    gap: Space.sm,
-  },
   pagaLinha: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: Space.sm,
-  },
-  rodape: {
-    paddingHorizontal: Space.lg,
-    paddingTop: Space.md,
   },
   band: {
     alignItems: 'center',
@@ -745,17 +710,8 @@ const styles = StyleSheet.create({
   centered: {
     textAlign: 'center',
   },
-  /*
-    ⚠️ **`gap` aqui não é respiro, é o que faz o §7b funcionar.** `Button` tem altura fixa e
-    nenhuma margem vertical, então sem isto os três botões e as três legendas empilhavam a 0px:
-    cada legenda ficava exatamente tão perto do botão que ela explica quanto do botão seguinte.
-    A regra "explicação abaixo do que ela explica" se lê por PROXIMIDADE — sem distância
-    diferente, não há o que ler.
-  */
-  rodapeBloco: { gap: Space.xl },
-  acoes: { gap: Space.md },
-  /** Botão e a legenda dele são um par: mais perto entre si do que do próximo botão. */
-  acaoExplicada: { gap: Space.xs },
+  // O fim da lista (§1 do design): as ações nunca ficam ancoradas sobre as compras.
+  acoes: { gap: Space.sm, paddingTop: Space.sm },
   sheetBody: {
     gap: Space.xl,
     padding: Space.lg,
