@@ -126,7 +126,7 @@ export function PillTabBar({
   // A entrada: a barra sobe toda vez que o app fica visível (abertura, conta, desbloqueio) —
   // o mesmo relógio da cascata das raízes. Coberta, ela desce por baixo da camada.
   const descida = BAR_H + insets.bottom + Space.lg;
-  const relogio = useRelogioDeEntrada(ATRASO_DA_BARRA_MS, DURACAO_DA_BARRA_MS);
+  const { relogio, assentado } = useRelogioDeEntrada(ATRASO_DA_BARRA_MS, DURACAO_DA_BARRA_MS);
   const entrada = useAnimatedStyle(() => ({
     transform: [{ translateY: (1 - progressoDeEntrada(relogio.get())) * descida }],
   }));
@@ -134,7 +134,7 @@ export function PillTabBar({
   return (
     <Animated.View
       pointerEvents="box-none"
-      style={[styles.raiz, { paddingBottom: insets.bottom + Space.sm }, entrada]}>
+      style={[styles.raiz, { paddingBottom: insets.bottom + Space.sm }, assentado ? styles.noLugar : entrada]}>
       <View
         style={[
           styles.pilula,
@@ -268,6 +268,8 @@ function Badge({ valor }: { valor: number | undefined }) {
 }
 
 const styles = StyleSheet.create({
+  /** O fim da subida, escrito pelo React (ver `useRelogioDeEntrada`). */
+  noLugar: { transform: [{ translateY: 0 }] },
   raiz: {
     position: 'absolute',
     left: 0,

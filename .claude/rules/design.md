@@ -470,6 +470,11 @@ Olhando só a cortina, com a trava ligada a cascata tocava inteira por baixo del
   `withDelay`). Com efeito passivo, a tela que chega pesada ficava ~0,5 s com o corpo vazio.
 - **O tempo é o da montagem.** O atraso vem da posição do bloco, e ela muda quando um bloco
   condicional aparece acima; com ele vivo nas dependências, os de baixo sumiam e entravam de novo.
+- ⚠️ **O repouso é escrito pelo React** (`assentado`). No Android uma atualização do Reanimated
+  já se perdeu: o Financeiro ficou com o corpo inteiro invisível depois de trocar de aba, com os
+  blocos na árvore. Terminada a entrada (ou estourado o teto), o bloco renderiza o estilo final
+  explícito — e isso não depende de o Reanimated chegar à tela. Mesma lição da barra de progresso
+  que nasce no valor real.
 
 **A abertura passa pela marca em TODA abertura, com senha ou sem** (pedido do dono do produto,
 17/09/2026). A marca fica no mínimo 0,9 s (`MARCA_MINIMA_MS`) — no Android ela entra também na

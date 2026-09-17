@@ -266,7 +266,7 @@ const SUBIDA_DO_BLOCO = 12;
  */
 function BlocoDaCascata({ indice, children }: { indice: number; children: ReactNode }) {
   const reduzir = useReducedMotion();
-  const relogio = useRelogioDeEntrada(
+  const { relogio, assentado } = useRelogioDeEntrada(
     Math.min(indice * 60, Motion.stagger.cap),
     Motion.duration.slow
   );
@@ -277,13 +277,17 @@ function BlocoDaCascata({ indice, children }: { indice: number; children: ReactN
       transform: [{ translateY: reduzir ? 0 : (1 - e) * SUBIDA_DO_BLOCO }],
     };
   });
-  return <Animated.View style={[styles.cascata, estilo]}>{children}</Animated.View>;
+  return (
+    <Animated.View style={[styles.cascata, assentado ? styles.noLugar : estilo]}>{children}</Animated.View>
+  );
 }
 
 const styles = StyleSheet.create({
   root: { flex: 1 },
   /** O mesmo `gap` do `content` — ver `Cascata`. */
   cascata: { gap: Space.xl },
+  /** O fim da entrada, escrito pelo React (ver `useRelogioDeEntrada`). */
+  noLugar: { opacity: 1, transform: [{ translateY: 0 }] },
   content: {
     gap: Space.xl,
     paddingHorizontal: Space.lg,
