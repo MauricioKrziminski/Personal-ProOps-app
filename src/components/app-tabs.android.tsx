@@ -3,12 +3,12 @@ import { TabList, TabSlot, TabTrigger, Tabs } from 'expo-router/ui';
 import { StyleSheet } from 'react-native';
 
 import { ThemedText } from '@/components/themed-text';
-import { CurvedTabBar, type CurvedTab } from '@/components/ui/curved-tab-bar';
+import { PillTabBar, type PillTab } from '@/components/ui/pill-tab-bar';
 import { useBudgetsStatus, useUpcomingBills } from '@/hooks/use-finance';
 import { useTodayReminders } from '@/hooks/use-items';
 import { useTheme } from '@/hooks/use-theme';
 
-const TABS: CurvedTab[] = [
+const TABS: PillTab[] = [
   { name: 'today', label: 'Hoje', icon: 'sun.max' },
   { name: 'notes', label: 'Notas', icon: 'note.text' },
   { name: 'finance', label: 'Financeiro', icon: 'chart.pie' },
@@ -17,13 +17,12 @@ const TABS: CurvedTab[] = [
 ];
 
 /* Indexado pela POSIÇÃO do slot: uma entrada fora de ordem em relação a `TABS` manda a pessoa
-   para a tela errada enquanto o berço anima para o lugar certo. `agent-navigation.test.ts`
-   prende as duas listas juntas. A matemática do `CurvedTabBar` não muda — ela deriva o slot de
-   `tabs.length`, então cinco abas já funcionam. */
+   para a tela errada enquanto o círculo anima para o lugar certo. `agent-navigation.test.ts`
+   prende as duas listas juntas. */
 const HREFS = ['/today', '/notes', '/finance', '/agent', '/profile'] as const;
 
 /**
- * A tab bar do **Android** — a pílula com berço deslizante (`CurvedTabBar`).
+ * A tab bar do **Android** — a pílula escura com o círculo que desliza (`PillTabBar`).
  *
  * Arquivo por plataforma porque o que muda é a IMPLEMENTAÇÃO inteira, não um valor: o iOS usa
  * `NativeTabs` (Liquid Glass do sistema, `app-tabs.tsx`) e aqui a árvore é outra — o `Tabs`
@@ -34,7 +33,7 @@ const HREFS = ['/today', '/notes', '/finance', '/agent', '/profile'] as const;
  * Escondê-la com `display: 'none'` é o padrão documentado pelo Expo para barra customizada.
  *
  * A aba ativa sai dos SEGMENTOS da rota, não de um estado local: assim uma navegação vinda de
- * qualquer outro lugar (notificação, link do WhatsApp, `router.push` de uma tela) move o berço
+ * qualquer outro lugar (notificação, link do WhatsApp, `router.push` de uma tela) move o círculo
  * junto. Estado próprio dessincronizaria em silêncio.
  */
 export default function AppTabs() {
@@ -70,7 +69,7 @@ export default function AppTabs() {
     <Tabs style={{ flex: 1, backgroundColor: theme.background }}>
       <TabSlot />
 
-      <CurvedTabBar
+      <PillTabBar
         tabs={tabs}
         activeIndex={atual}
         onSelect={(i) => router.navigate(HREFS[i])}

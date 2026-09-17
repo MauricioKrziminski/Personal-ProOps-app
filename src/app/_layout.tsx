@@ -37,10 +37,25 @@ import { attachNotificationListeners, configureNotificationHandler } from '@/lib
 SplashScreen.preventAutoHideAsync();
 configureNotificationHandler();
 
-/** As telas de conta: sem header e com a barra de status clara sobre a capa de tinta. */
+/**
+ * As telas de conta: sem header, barra de status clara sobre a capa de tinta, e passagem em
+ * `fade` entre elas — a capa é a mesma nas quatro, e um deslize a faria correr de lado.
+ */
 const contaOptions = {
   headerShown: false,
+  animation: 'fade' as const,
   statusBarStyle: Platform.OS === 'android' ? ('light' as const) : undefined,
+};
+
+/**
+ * Os formulários modais. No iOS a apresentação é o sheet nativo; no Android `modal` é uma tela
+ * cheia que entraria de lado como um detalhe, e a tarefa precisa ler como algo que SOBE sobre a
+ * tela (a mesma leitura do sheet).
+ */
+const modalOptions = {
+  presentation: 'modal' as const,
+  headerShown: false,
+  animation: Platform.OS === 'android' ? ('slide_from_bottom' as const) : undefined,
 };
 
 const queryClient = new QueryClient({
@@ -359,11 +374,11 @@ function AppTree() {
                   */}
                   <Stack.Screen
                     name="finance/transaction-form"
-                    options={{ presentation: 'modal', headerShown: false }}
+                    options={modalOptions}
                   />
                   <Stack.Screen
                     name="reminder-form"
-                    options={{ presentation: 'modal', headerShown: false }}
+                    options={modalOptions}
                   />
                   <Stack.Screen name="reminders" options={{ title: 'Lembretes' }} />
                   <Stack.Screen name="search" options={{ title: 'Buscar' }} />
@@ -372,7 +387,7 @@ function AppTree() {
                   {/* Paywall é modal fechável SEMPRE: paywall que não fecha é reprovação na App Review. */}
                   <Stack.Screen
                     name="paywall"
-                    options={{ presentation: 'modal', headerShown: false }}
+                    options={modalOptions}
                   />
                   <Stack.Screen name="link-phone" options={{ headerShown: false }} />
                   {/* O par de `link-phone`: cadastra e-mail e senha numa conta que só tem

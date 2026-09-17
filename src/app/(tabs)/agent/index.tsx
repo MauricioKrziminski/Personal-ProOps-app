@@ -7,7 +7,7 @@ import { ConversationRow } from '@/components/agent/conversation-row';
 import { RenameConversationSheet } from '@/components/agent/rename-conversation-sheet';
 import { ThemedText } from '@/components/themed-text';
 import { AppHeader, HeaderIconButton } from '@/components/ui/app-header';
-import { CURVED_BAR_SPACE } from '@/components/ui/curved-tab-bar';
+import { TAB_BAR_SPACE } from '@/components/ui/pill-tab-bar';
 import { EmptyState } from '@/components/ui/empty-state';
 import { Screen } from '@/components/ui/screen';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -153,13 +153,13 @@ export default function AgentScreen() {
             `AppHeader` — somar de novo aqui abria uma faixa vazia do tamanho do
             header entre a barra e a primeira conversa. É o mesmo contrato que
             `notes/index.tsx` documenta: a raiz de lista só acrescenta o rodapé,
-            porque a `CurvedTabBar` do Android é absoluta e o `Screen` não
+            porque a `PillTabBar` do Android é absoluta e o `Screen` não
             alcança o `contentContainerStyle` de uma `FlashList`.
           */
           contentContainerStyle={{
             paddingTop: Space.md,
             paddingHorizontal: Space.lg,
-            paddingBottom: CURVED_BAR_SPACE,
+            paddingBottom: TAB_BAR_SPACE,
           }}
           /*
             Puxar para atualizar. Esta aba não tem Realtime — as tabelas de

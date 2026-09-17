@@ -18,7 +18,7 @@ import { SearchField } from '@/components/ui/search-field';
 import { SectionHead } from '@/components/ui/section-head';
 import { TextField } from '@/components/ui/field';
 import { Icon } from '@/components/ui/icon';
-import { CURVED_BAR_SPACE } from '@/components/ui/curved-tab-bar';
+import { TAB_BAR_SPACE } from '@/components/ui/pill-tab-bar';
 import { DragScrollView } from '@/components/ui/drag-scroll';
 import { Screen } from '@/components/ui/screen';
 import { Skeleton, SkeletonList } from '@/components/ui/skeleton';
@@ -51,7 +51,7 @@ import { showItemActions } from '@/lib/item-actions';
  * O que a barra de abas cobre do pé da rolagem, para a faixa do auto-scroll ficar ALCANÇÁVEL.
  *
  * O mesmo número nos dois sistemas, de propósito. No Android é a geometria exata da pílula
- * (`CURVED_BAR_SPACE`); no iOS é um PISO generoso para a barra flutuante do sistema, que eu não
+ * (`TAB_BAR_SPACE`); no iOS é um PISO generoso para a barra flutuante do sistema, que eu não
  * consegui medir no aparelho. Errar para mais só começa a faixa um pouco mais acima, o que
  * ninguém percebe; errar para menos a coloca embaixo da barra, onde o dedo não chega — que é
  * exatamente o bug medido no Android em 14/09/2026.
@@ -59,7 +59,7 @@ import { showItemActions } from '@/lib/item-actions';
  * ⚠️ Não trocar por `0` no iOS "porque o `paddingBottom` lá é 0": aquilo é sobre o CONTEÚDO
  * passar por baixo da barra, e não diz nada sobre a altura do FRAME que o `onLayout` devolve.
  */
-const DOCK = CURVED_BAR_SPACE;
+const DOCK = TAB_BAR_SPACE;
 
 /**
  * Notas — a home da aba.
@@ -679,7 +679,7 @@ const styles = StyleSheet.create({
      * respiro no ramo COM rolagem própria dele; aqui a rolagem é nossa, então a conta é nossa.
      * Sem isto a última nota fica escondida atrás da pílula — não dá para ler nem tocar.
      */
-    paddingBottom: Space.xxxl + (Platform.OS === 'android' ? CURVED_BAR_SPACE : 0),
+    paddingBottom: Space.xxxl + (Platform.OS === 'android' ? TAB_BAR_SPACE : 0),
     width: '100%',
     maxWidth: MaxContentWidth,
     alignSelf: 'center',

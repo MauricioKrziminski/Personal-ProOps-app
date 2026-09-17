@@ -14,14 +14,15 @@ import { Stack } from 'expo-router';
 
 import { MaxContentWidth } from '@/constants/theme';
 import { useAppHeaderHeight } from '@/components/ui/app-header';
-import { CURVED_BAR_SPACE } from '@/components/ui/curved-tab-bar';
+import { useCortinaSaindo } from '@/components/motion/session-curtain';
+import { TAB_BAR_SPACE } from '@/components/ui/pill-tab-bar';
 
 import { Motion, Space } from '@/design/tokens';
 import { useTheme } from '@/hooks/use-theme';
 
 /**
  * Quanto um FAB come do fim do conteúdo: a altura do botão `md` (48) mais um respiro.
- * Não é `CURVED_BAR_CLEARANCE` — aquele é onde o FAB COMEÇA; este é o que ele OCUPA.
+ * Não é `TAB_BAR_CLEARANCE` — aquele é onde o FAB COMEÇA; este é o que ele OCUPA.
  */
 const FAB_CLEARANCE = 48 + 16;
 
@@ -71,7 +72,7 @@ interface ScreenProps {
  *
  * Substitui a pilha `ThemedView` + `SafeAreaView` + `ScrollView` que 21 telas repetem, cada uma
  * com um padding inferior diferente. O padding vem de `useSafeAreaInsets()`, não de constante
- * fixa, e o Android ainda soma a altura da `CurvedTabBar`, que é absoluta.
+ * fixa, e o Android ainda soma a altura da `PillTabBar`, que é absoluta.
  *
  * ⚠️ **A rolagem é `KeyboardAwareScrollView`, não `ScrollView`.** Toda tela que tem campo no meio
  * da página (Plano, Projeção, Membros, Pastas) tinha o mesmo defeito: o teclado abria por cima do
@@ -99,11 +100,11 @@ export function Screen({
 
   const background = grouped ? theme.groupedBackground : theme.background;
   /**
-   * No Android a raiz de aba precisa reservar a altura da `CurvedTabBar`, que é absoluta e
+   * No Android a raiz de aba precisa reservar a altura da `PillTabBar`, que é absoluta e
    * desenha POR CIMA do conteúdo. `topBar` é o sinal de que esta é uma raiz de aba — telas
    * empurradas não têm barra e não devem ganhar o respiro.
    */
-  const tabBarSpace = topBar && Platform.OS === 'android' ? CURVED_BAR_SPACE : 0;
+  const tabBarSpace = topBar && Platform.OS === 'android' ? TAB_BAR_SPACE : 0;
   /** A altura do FAB mais o respiro dele, para nenhum conteúdo terminar embaixo do botão. */
   const fabSpace = floatingAction ? FAB_CLEARANCE : 0;
   const padding = [
@@ -240,6 +241,17 @@ export function Screen({
  * vira "o rodapé está demorando".
  */
 function Cascata({ children }: { children: ReactNode }) {
+  /*
+    A cascata espera a cortina começar a SAIR (a abertura do app, a entrada numa conta). Montada
+    antes, ela tocaria inteira por baixo da tinta e a pessoa veria a tela já parada; montada
+    junto com a subida, os blocos chegam enquanto a tinta vai embora — a entrada do vídeo. A
+    trava não volta: a cortina cobre de novo numa troca de conta e a tela não pode sumir.
+  */
+  const saindo = useCortinaSaindo();
+  const [visto, setVisto] = useState(saindo);
+  if (saindo && !visto) setVisto(true);
+  if (!visto) return null;
+
   let i = 0;
   return (
     <>

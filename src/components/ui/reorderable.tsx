@@ -68,7 +68,7 @@ import { useScheme } from '@/hooks/use-theme';
  * ## Um shared value governa todo mundo
  *
  * `alvo` (o índice sob o dedo) é a única fonte: o deslocamento de cada irmão é DERIVADO dele.
- * Mesmo desenho do `CurvedTabBar`, e pelo mesmo motivo — duas molas independentes dessincronizam
+ * Mesmo desenho da barra de abas do Android, e pelo mesmo motivo — duas molas independentes dessincronizam
  * e no meio do caminho o vizinho fica num lugar que a conta não prevê.
  *
  * ## Acessibilidade

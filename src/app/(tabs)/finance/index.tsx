@@ -18,7 +18,7 @@ import { useMonthRuler } from '@/components/finance/month-ruler';
 import { PeriodBar } from '@/components/finance/period-bar';
 import { ThemedText } from '@/components/themed-text';
 import { CardStack, type StackedCard } from '@/components/finance/card-stack';
-import { CURVED_BAR_CLEARANCE } from '@/components/ui/curved-tab-bar';
+import { TAB_BAR_CLEARANCE } from '@/components/ui/pill-tab-bar';
 import { AppHeader } from '@/components/ui/app-header';
 import { ItemLink } from '@/components/ui/item-link';
 import { Button } from '@/components/ui/button';
@@ -108,7 +108,8 @@ import { useTheme, useScheme } from '@/hooks/use-theme';
 
 const SOURCE_LABEL: Record<Transaction['source'], string> = {
   whatsapp: 'via WhatsApp',
-  app: 'lançado no app',
+  // Vazio: quem lançou pelo app sabe disso, e a linha não precisa repetir (o mesmo de Lançamentos).
+  app: '',
   import: 'importado',
   recurring: 'recorrente',
 };
@@ -673,14 +674,14 @@ export default function FinanceScreen() {
         */}
         <Row
           title="O que entra"
-          subtitle={sub.entra}
+          subtitle={sub.entra || undefined}
           icon="arrow.down.circle"
           onPress={() => router.push({ pathname: '/finance/cycle', params: { month, view: regua.view, tipo: 'entra' } })}
           trailing={ciclo ? <Money cents={Number(ciclo.entrou)} variant="ticker" tone="success" /> : undefined}
         />
         <Row
           title="O que sai"
-          subtitle={sub.sai}
+          subtitle={sub.sai || undefined}
           icon="arrow.up.circle"
           onPress={() => router.push({ pathname: '/finance/cycle', params: { month, view: regua.view, tipo: 'sai' } })}
           trailing={ciclo ? <Money cents={Number(ciclo.saiu)} variant="ticker" tone="danger" /> : undefined}
@@ -703,7 +704,7 @@ export default function FinanceScreen() {
       <Section>
         <Row
           title="Projeção"
-          subtitle="Saldo mês a mês, carregando a sobra — e “e se…?” para supor uma entrada ou saída"
+          subtitle="Saldo mês a mês"
           icon="questionmark.circle"
           onPress={() => router.push('/finance/forecast')}
         />
@@ -882,7 +883,7 @@ export default function FinanceScreen() {
                 {/* O escopo, escrito. É a metade textual da correção — a outra é a linha da
                     fatura acima, que tira do cartão a expectativa de "isto é meu". */}
                 <ThemedText type="caption" themeColor="textSecondary" style={Type.meta}>
-                  TODAS AS CONTAS
+                  Todas as contas
                 </ThemedText>
               </View>
               <Pressable accessibilityRole="button" hitSlop={12} onPress={() => openTransactions({})}>
@@ -975,10 +976,8 @@ export default function FinanceScreen() {
                 */}
                 <View style={styles.cashHead}>
                   <View style={styles.shrink}>
+                    {/* A janela já está escrita no seletor logo abaixo ("6 meses"). */}
                     <ThemedText type="subtitle">Tendência mensal</ThemedText>
-                    <ThemedText type="footnote" themeColor="textSecondary">
-                      {`fluxo de caixa dos últimos ${janelaCashflow} meses`}
-                    </ThemedText>
                   </View>
                   <View style={styles.cashLegenda}>
                     <View style={styles.cashChave}>
@@ -1196,12 +1195,12 @@ export default function FinanceScreen() {
         style={[
           styles.fab,
           {
-            // No Android o FAB tem que subir ACIMA da `CurvedTabBar`, não encostar nela: a barra
+            // No Android o FAB tem que subir ACIMA da `PillTabBar`, não encostar nela: a barra
             // flutua e o FAB tem `elevation` maior, então qualquer sobreposição vira o botão
-            // desenhado por cima da pílula. `CURVED_BAR_CLEARANCE` já embute o respiro.
+            // desenhado por cima da pílula. `TAB_BAR_CLEARANCE` já embute o respiro.
             bottom:
               insets.bottom +
-              (Platform.OS === 'android' ? CURVED_BAR_CLEARANCE : Space.xxl),
+              (Platform.OS === 'android' ? TAB_BAR_CLEARANCE : Space.xxl),
             boxShadow: Elevation[scheme].floating,
             zIndex: 11,
             elevation: 11,

@@ -11,7 +11,7 @@ import { Stack } from 'expo-router';
  * entro em uma tela secundária ela deve ficar visível"*.
  *
  * **Não existe chave para esconder a barra numa tela.** No iOS a `NativeTabs` é a barra do
- * sistema e não expõe isso; no Android a `CurvedTabBar` é nossa, mas esconder só lá deixaria as
+ * sistema e não expõe isso; no Android a `PillTabBar` é nossa, mas esconder só lá deixaria as
  * duas plataformas com navegação diferente. O que a doc do Expo manda fazer para "detail screen
  * overlays the tab bar" é exatamente esta mudança: a rota de detalhe vai para o `<Stack>` da
  * RAIZ (`src/app/_layout.tsx`), que fica ACIMA do grupo de abas.

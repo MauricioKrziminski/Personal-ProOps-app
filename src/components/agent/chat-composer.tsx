@@ -50,7 +50,7 @@ export function ChatComposer({
 
   /*
     Só a safe area. A conversa saiu de dentro de `(tabs)` em 07/09/2026 e não tem mais tab bar
-    embaixo — somar `CURVED_BAR_SPACE` aqui deixaria uma faixa vazia da altura da dock entre o
+    embaixo — somar `TAB_BAR_SPACE` aqui deixaria uma faixa vazia da altura da dock entre o
     campo e a borda do aparelho, que é a marca de um espaço reservado para algo que não existe.
   */
   const reservado = insets.bottom;

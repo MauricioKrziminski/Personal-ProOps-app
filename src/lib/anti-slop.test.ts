@@ -168,8 +168,8 @@ test('nenhum onAuthStateChange fora de hooks/use-session.tsx', () => {
  */
 const TRUNCAGEM_PERMITIDA = new Set([
   // Slot de largura fixa: a barra inteira é geometria calculada e o rótulo já limita a escala
-  // da fonte. Duas linhas moveriam a bolha e o berço para fora do lugar.
-  'src/components/ui/curved-tab-bar.tsx',
+  // da fonte. Duas linhas moveriam o círculo para fora do lugar do ícone.
+  'src/components/ui/pill-tab-bar.tsx',
   // Prévia do corpo da nota, no cartão da lista. É PRÉVIA de um corpo, não identificador: o
   // texto inteiro está a um toque, e o título logo acima nunca trunca.
   'src/components/notes/note-card.tsx',

@@ -105,7 +105,7 @@ Desafiantes recusados e o que cada um doou (elevações):
 | **Trava** | prompt automático, toque para tentar de novo, frase de estado, título "App bloqueado" | aurora e disco de vidro viram campo de azulejos + azulejo central com a espiral |
 | **Onboarding** | os 4 passos e todo o conteúdo, voltar do Android, porta de mão única | cabeçalho com friso; progresso em 4 azulejos |
 | **Raízes de aba** | marca, título, ação e avatar do `AppHeader`; badge da Hoje (iOS e Android); menus do herói; olho de esconder saldo; FAB | título do `AppHeader` passa a minúsculas (sem bloco novo); coreografia de primeira entrada |
-| **Tab bar Android** | 5 abas na mesma ordem, rótulos, badge, re-tap volta à raiz, mola `tab` | berço recortado vira azulejo indicador |
+| **Tab bar Android** | 5 abas na mesma ordem, rótulos, badge, re-tap volta à raiz, mola `tab` | berço recortado vira pílula escura com círculo claro no ativo (Suave) |
 
 ## Arquitetura
 
@@ -354,6 +354,25 @@ a face gira no eixo Y na troca e o total conta. Entrada sem voo: `Reveal`.
 Primeira entrada por sessão, depois de `cortina aberta`: título do `AppHeader` com `SplitReveal`;
 herói desenrola (recorte vertical animado); número do herói com `SplitReveal` já no valor final;
 seções em `Stagger` (teto 400 ms). Reentrada: nada anima. Mudança de valor: `CountUpMoney`.
+
+#### Como ficou (fase 5, 17/09/2026) — vale acima do texto acima
+
+- **Entrada**: a cascata do `Screen` (Hoje, Financeiro, Perfil) e a barra do Android esperam a
+  cortina COMEÇAR a sair (`useCortinaSaindo`: fase revelando ou aberta) e chegam junto com a
+  tinta. Montadas antes, tocavam inteiras por baixo dela. O `SplitReveal` no número do herói
+  ficou de fora: a cascata já entrega a chegada, e o número não se move por estética (§5).
+- **Barra do Android = `PillTabBar`** (substitui o `CurvedTabBar` e o azulejo do Concreto):
+  pílula escura (`heroSurface`) nos dois temas, círculo claro atrás do ícone ativo, com a
+  fileira de ícones escuros RECORTADA dentro do círculo; rótulos nas cinco abas (Regra 0);
+  mola `tab` com a folga das pontas (`tab-pill.ts`); sobe na primeira entrada. Rótulo com
+  sobra de 14dp além do slot: a 384dp × 1,3 "Financeiro" não cabia na coluna.
+- **iOS**: `tintColor` da `NativeTabs` = `tint`.
+- **Transições**: formulários modais em `slide_from_bottom` no Android; telas de conta em
+  `fade`; detalhe fica no `default` (no Android 13+ é a animação do sistema).
+- **Menos texto nas raízes**: subtítulos que repetem o controle ao lado saíram (tema,
+  bloqueio, avisos), "lançado no app" e "no app" saíram das linhas, "Entra/Sai" só ganham
+  subtítulo quando há quanto já caiu, "Projeção" virou "Saldo mês a mês", a legenda da
+  tendência saiu (o seletor já diz a janela), rótulos do cartão de identidade encurtados.
 
 ### Transições por plataforma
 

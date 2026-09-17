@@ -10,7 +10,7 @@ import { test } from 'node:test';
  * `frontend.md`): a implementação diverge, o contrato não. E a divergência é
  * invisível na leitura — cada arquivo parece certo sozinho. O sintoma seria uma
  * aba que existe no iOS e some no Android, ou a ordem trocada entre as duas, o
- * que muda o índice do berço do `CurvedTabBar` e faz a bolha parar no slot
+ * que muda o índice do círculo da `PillTabBar` e faz ele parar no slot
  * errado.
  *
  * Lê os arquivos como TEXTO: eles importam React Native e não rodam no

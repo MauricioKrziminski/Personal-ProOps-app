@@ -77,6 +77,9 @@ export default function AppTabs() {
         },
         default: { minimizeBehavior: 'onScrollDown' as const },
       })}
+      // A seleção do vidro na tinta do app (preta no claro, branca no escuro), não no azul do
+      // sistema: o app tem um accent só.
+      tintColor={theme.tint}
       iconColor={{ default: theme.textSecondary, selected: theme.tint }}
       badgeBackgroundColor={theme.danger}
       labelStyle={{
@@ -92,7 +95,7 @@ export default function AppTabs() {
             do `Badge` não desliga nada — o iOS desenhava uma bolinha vermelha com
             "0" dentro, que é exatamente o enfeite que `design.md` §8 proíbe
             ("badge de aba é contagem real ou não existe"). Visto no simulador em
-            04/09/2026. O `CurvedTabBar` do Android já fazia assim.
+            04/09/2026. A `PillTabBar` do Android faz igual.
             O teto de "9+" é o mesmo do Android: contagem de dois dígitos deforma
             a bolha e ninguém age sobre "12" diferente de "9+".
           */}

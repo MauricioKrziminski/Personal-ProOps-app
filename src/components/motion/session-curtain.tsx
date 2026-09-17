@@ -59,6 +59,7 @@ const dormir = (ms: number) => new Promise<void>((ok) => setTimeout(ok, ms));
 
 const CortinaContext = createContext<CortinaApi | null>(null);
 const AbertaContext = createContext(false);
+const SaindoContext = createContext(false);
 
 export function useCortina(): CortinaApi {
   const cortina = useContext(CortinaContext);
@@ -69,6 +70,15 @@ export function useCortina(): CortinaApi {
 /** `true` quando a abertura já revelou e nada cobre a tela. */
 export function useCortinaAberta(): boolean {
   return useContext(AbertaContext);
+}
+
+/**
+ * `true` desde que a tinta COMEÇA a subir (e enquanto nada cobre a tela). É o sinal das entradas
+ * das raízes: a cascata e a barra de abas chegam junto com a cortina saindo, como no vídeo —
+ * esperar o fim da onda deixaria a tela vazia aparecendo por baixo dela.
+ */
+export function useCortinaSaindo(): boolean {
+  return useContext(SaindoContext);
 }
 
 /**
@@ -299,6 +309,7 @@ export function CortinaProvider({ children }: { children: ReactNode }) {
   return (
     <CortinaContext.Provider value={api}>
       <AbertaContext.Provider value={aberturaFeita && fase === 'aberta'}>
+      <SaindoContext.Provider value={fase === 'revelando' || fase === 'aberta'}>
         {children}
         {fase === 'aberta' ? null : (
           <Camada
@@ -313,6 +324,7 @@ export function CortinaProvider({ children }: { children: ReactNode }) {
             onPng={aoPng}
           />
         )}
+      </SaindoContext.Provider>
       </AbertaContext.Provider>
     </CortinaContext.Provider>
   );

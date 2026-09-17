@@ -3,7 +3,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { Platform, StyleSheet, View, useWindowDimensions } from 'react-native';
 
-import { CurvedTabBar, type CurvedTab } from '@/components/ui/curved-tab-bar';
+import { PillTabBar, type PillTab } from '@/components/ui/pill-tab-bar';
 import { localISODate } from '@/hooks/use-items';
 import { useTheme } from '@/hooks/use-theme';
 
@@ -91,7 +91,7 @@ const ABAS = ['Hoje', 'Finanças', 'Notas', 'Agente', 'Perfil', 'Dívidas', 'Fat
  * em TODO screenshot — chrome que o app não tem, no material que sai daqui. Foi removida em
  * 09/09/2026 depois de ninguém tocar nela em nenhuma verificação: quem sempre navegou foi o
  * passo no `AsyncStorage`, que é o mecanismo documentado e o único determinístico. No Android a
- * `CurvedTabBar` continua tocável, e é assim que se vê o berço animar (design.md §5).
+ * `PillTabBar` continua tocável, e é assim que se vê o círculo animar (design.md §5).
  *
  * Para print de DIVULGAÇÃO esta rota não serve: use o app real com "Entrar como teste (dev)".
  * Ver `.claude/rules/workflow.md` §5.
@@ -110,14 +110,14 @@ const PASSO_KEY = 'design-preview-step';
  * A tab bar do Android desenhada JUNTO da tela.
  *
  * Ela é o único pedaço de chrome que esta vitrine não mostrava — as raízes são montadas fora do
- * navegador de abas, então a `CurvedTabBar` nunca aparecia aqui. Era o buraco de verificação que
+ * navegador de abas, então a `PillTabBar` nunca aparecia aqui. Era o buraco de verificação que
  * deixou o berço passar 26px fora do lugar sem ninguém notar: o desenho da barra só existia no
  * app logado, que é exatamente o que esta rota existe para evitar.
  *
  * As mesmas entradas de `app-tabs.android.tsx` — copiar rótulo e ícone aqui faria a vitrine
  * mostrar uma barra que não é a de produção.
  */
-const TABS_ANDROID: CurvedTab[] = [
+const TABS_ANDROID: PillTab[] = [
   { name: 'today', label: 'Hoje', icon: 'sun.max' },
   { name: 'notes', label: 'Notas', icon: 'note.text' },
   { name: 'finance', label: 'Financeiro', icon: 'chart.pie' },
@@ -244,7 +244,7 @@ export default function DesignPreviewScreen() {
             ficava embaixo dela.
           */}
           {Platform.OS === 'android' && RAIZES.has(aba) ? (
-            <CurvedTabBar
+            <PillTabBar
               tabs={TABS_ANDROID}
               activeIndex={ABA_PARA_TAB[aba] ?? 0}
               onSelect={(i) => {

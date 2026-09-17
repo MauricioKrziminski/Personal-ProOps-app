@@ -23,3 +23,7 @@ export function useCortina(): CortinaApi {
 export function useCortinaAberta(): boolean {
   return true;
 }
+
+export function useCortinaSaindo(): boolean {
+  return true;
+}

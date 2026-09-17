@@ -3,7 +3,7 @@
  *
  * Mora aqui e não dentro do componente porque é O QUE ERRA: um off-by-one no cálculo do slot não
  * dá erro nenhum, só solta o cartão no lugar errado. Fora do componente, dá para testar em
- * `node --test` como o resto dos helpers do projeto (`tab-cradle.ts` é o precedente).
+ * `node --test` como o resto dos helpers do projeto (`wave-math.ts` e `carousel-math.ts` seguem o mesmo padrão).
  */
 
 /** Onde o topo do slot `i` cai, em px, contando do começo do container. */
