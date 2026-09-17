@@ -18,6 +18,7 @@ const base: LockState = {
   delaySeconds: 0,
   backgroundedAt: null,
   systemUiOpen: false,
+  temSessao: true,
 };
 
 test('trava desligada nunca tranca', () => {
@@ -83,4 +84,8 @@ test('operação ainda em voo segura a bandeira dos dois lados', () => {
   assert.equal(bandeiraCaiAoTerminar(1, false), false);
   assert.equal(bandeiraCaiNoActive(1), false, 'o `active` foi do prompt que JÁ fechou, não deste');
   assert.equal(bandeiraCaiNoActive(0), true);
+});
+
+test('sem conta aberta não tranca — a porta é o login', () => {
+  assert.equal(deveTrancar({ ...base, backgroundedAt: 1000, temSessao: false }, 999_999), false);
 });

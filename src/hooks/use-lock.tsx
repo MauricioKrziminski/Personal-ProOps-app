@@ -32,6 +32,8 @@ import {
 } from 'react';
 import { AppState, Platform } from 'react-native';
 
+import { useSession } from '@/hooks/use-session';
+
 import {
   aposAutenticar,
   bandeiraCaiAoTerminar,
@@ -81,7 +83,7 @@ const CHAVE_ESPERA = 'lock-delay';
 interface LockContexto {
   mode: LockMode;
   delaySeconds: LockDelay;
-  /** `true` = o overlay de bloqueio cobre o app. */
+  /** `true` = o overlay de bloqueio cobre o app. Nunca sem conta aberta. */
   locked: boolean;
   /** Ainda lendo a preferência: o app segura o conteúdo em vez de piscar destravado. */
   carregando: boolean;
@@ -144,7 +146,29 @@ export function LockProvider({ children }: { children: ReactNode }) {
     ⚠️ **`useRef`, não `useState`**: o listener é montado uma vez e fecharia sobre o estado
     congelado do primeiro render. É o mesmo motivo pelo qual `backgroundedAt` não pode ser state.
   */
-  const vigia = useRef({ mode: 'off' as LockMode, delaySeconds: 0 as LockDelay, backgroundedAt: null as number | null, systemUiOpen: false });
+  const vigia = useRef({ mode: 'off' as LockMode, delaySeconds: 0 as LockDelay, backgroundedAt: null as number | null, systemUiOpen: false, temSessao: false });
+
+  /*
+    ⚠️ **Sem sessão não há o que trancar** — a porta de entrada é o login. A trava ligada numa conta
+    que saiu cobria a tela de login na abertura seguinte e pedia a senha do celular para chegar nela.
+
+    Entrar ou sair da conta DESTRAVA: entrar já provou quem é, e sair não deixa nada para esconder.
+    O primeiro valor resolvido (a abertura) não é troca — `undefined` até o `getSession` voltar.
+  */
+  const { session, loading: sessaoCarregando } = useSession();
+  const temSessao = !!session;
+  const sessaoAgora = sessaoCarregando ? undefined : temSessao;
+  const [sessaoAntes, setSessaoAntes] = useState(sessaoAgora);
+  if (sessaoAntes !== sessaoAgora) {
+    setSessaoAntes(sessaoAgora);
+    if (sessaoAntes !== undefined && sessaoAgora !== undefined) {
+      setLocked(false);
+      setEstado('trancado');
+    }
+  }
+  useEffect(() => {
+    vigia.current.temSessao = temSessao;
+  }, [temSessao]);
 
   useEffect(() => {
     let vivo = true;
@@ -316,8 +340,8 @@ export function LockProvider({ children }: { children: ReactNode }) {
     () => ({
       mode,
       delaySeconds,
-      locked,
-      carregando,
+      locked: locked && temSessao,
+      carregando: carregando || sessaoCarregando,
       disponivel,
       comoAutentica,
       estado,
@@ -326,7 +350,7 @@ export function LockProvider({ children }: { children: ReactNode }) {
       autenticar,
       semTrancar,
     }),
-    [mode, delaySeconds, locked, carregando, disponivel, comoAutentica, estado, configurar, definirEspera, autenticar, semTrancar]
+    [mode, delaySeconds, locked, temSessao, carregando, sessaoCarregando, disponivel, comoAutentica, estado, configurar, definirEspera, autenticar, semTrancar]
   );
 
   return <Ctx.Provider value={valor}>{children}</Ctx.Provider>;

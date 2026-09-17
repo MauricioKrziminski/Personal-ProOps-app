@@ -35,6 +35,8 @@ export interface LockState {
    * `authenticateAsync`, que também tira o app do primeiro plano.
    */
   systemUiOpen: boolean;
+  /** Há conta aberta? Sem sessão não há o que trancar: a porta é o login. */
+  temSessao: boolean;
 }
 
 /**
@@ -45,6 +47,7 @@ export interface LockState {
  */
 export function deveTrancar(s: LockState, agora: number): boolean {
   if (s.mode === 'off') return false;
+  if (!s.temSessao) return false;
   if (s.systemUiOpen) return false;
   if (s.backgroundedAt === null) return false;
   return agora - s.backgroundedAt >= s.delaySeconds * 1000;
