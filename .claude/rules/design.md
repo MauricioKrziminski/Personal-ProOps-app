@@ -6,6 +6,13 @@ Nenhuma tela é entregue "crua", e nenhuma tela é entregue "quase nativa".
 **Uma frase:** *o app é o lugar calmo onde o que o usuário jogou no WhatsApp aparece organizado —
 e onde ele decide o que fazer com isso.*
 
+> **Direção visual desde 16/09/2026: Suave** (spec `docs/superpowers/specs/2026-09-16-concreto-redesign-design.md`,
+> seção "Direção revisada"). Papel morno, tinta quase-preta, superfície branca, **monocromático**
+> (a ação é tinta), Plus Jakarta Sans em pesos leves, cantos generosos e pílulas, movimento tirado
+> dos dois vídeos de referência do dono do produto. **Menos texto:** só o essencial — explicação
+> mora na confirmação da ação, não em legenda permanente (ver §7b). Onde este arquivo e a spec
+> discordarem, vale a spec.
+
 ---
 
 ## 1. Superfícies — glass é destaque, não papel de parede
@@ -16,20 +23,15 @@ e onde ele decide o que fazer com isso.*
 
 **O destaque das telas principais é `HeroPanel`, não glass** (29/08/2026). Vidro precisa de algo
 atrás para refratar; sobre o fundo chapado do app ele virava um retângulo cinza com um número
-dentro — a causa concreta do diagnóstico "corretas e sem graça". `GlassCard` continua na chrome e
-no destaque de telas secundárias. A contagem não mudou: **um destaque por tela**.
+dentro — a causa concreta do diagnóstico "corretas e sem graça". Vidro ficou só na chrome. A
+contagem não mudou: **um destaque por tela**.
 
-**E o `HeroPanel` deixou de ser tinta chapada** (03/09/2026). Ele é um card de raio 12 com
-**gradiente vertical** (`heroTop` → `heroBottom`), um **brilho verde difuso** saindo pelo canto
-superior direito e um fio especular de 1px no topo — `GradientSurface`
-(`src/components/ui/gradient.tsx`), em Skia, porque não há gradiente em `StyleSheet` e
-`expo-linear-gradient` seria dependência nova para dois nós. Chapado ele ainda lia como retângulo
-escuro com um número dentro; o export resolve o mesmo problema com LUZ, não com contraste.
+**O `HeroPanel` é um bloco de tinta** (`heroSurface`: `#0B0B0C` no claro, `#1C1C1E` no escuro),
+canto `Radius.lg`, sem degradê nem brilho (Suave, 16/09/2026). O degradê verde com brilho
+(`GradientSurface`) foi da direção anterior e saiu do código; a hierarquia agora vem da
+amplitude — um bloco escuro sobre papel claro — e do número grande em peso 500.
 
-O brilho ocupa o canto onde ficava a marca d'água da espiral, então ela saiu do painel — a forma
-da marca continua nos outros quatro papéis.
-
-⚠️ **`Canvas` do Skia NÃO aceita `onLayout`** (avisa "is not supported" em runtime e o gradiente
+⚠️ **`Canvas` do Skia NÃO aceita `onLayout`** (avisa "is not supported" em runtime e o desenho
 não posiciona). Quem mede é uma `View` em volta; o canvas só preenche.
 
 **A faixa de rodapé que SANGRA até as bordas** é o segundo padrão repetido do export (painel de
@@ -39,35 +41,45 @@ contexto. Em card comum sai por `marginHorizontal/-Bottom` negativos + `overflow
 - **Todo o resto é opaco.** Card de lista, linha, formulário: superfície sólida, hierarquia por
   **elevação e espaço**, nunca por blur.
 
-> Dois `GlassCard` na mesma tela é erro de revisão, não questão de gosto.
+> Vidro só na chrome (a `NativeTabs` do iOS e a faixa do `AppHeader`). Vidro em conteúdo é erro
+> de revisão, não questão de gosto.
 
-**Cartão de crédito é um CARTÃO, não um card** (`src/components/finance/card-stack.tsx`).
-Anatomia obrigatória, medida do export: chip EMV dourado, contactless, número mascarado, fatura
-atual em display, data de fechamento, barra de limite e rodapé com vencimento e disponível. Sem
-essas peças o bloco lê como card de conteúdo — foi a queixa de 03/09/2026 ("ele fez em formato de
-card ao expandir, ficando muito feio").
+**Cartão de crédito é um CARTÃO, não um card** (`src/components/finance/card-face.tsx`). A face
+é o cartão metálico dos vídeos: a cor do EMISSOR pura, um degradê diagonal curto e uma faixa de
+brilho, canto `Radius.md`, contactless, nome e o estado "Atrasada". A tinta do texto é escolhida
+por CONTRASTE com a cor do banco (`tintaDoCartao`: clara no roxo do Nubank, escura no amarelo do
+BB). O chip EMV saiu com a direção Suave (não existe nos vídeos).
 
-Fechada, os cartões de trás aparecem **ACIMA** do da frente e mais estreitos (`inset-x-2`,
-`inset-x-4`), que é como uma carteira de verdade e como o Wallet fazem: para BAIXO a pilha lê como
-lista. Ao toque ela abre em leque e **cada cartão continua sendo um cartão inteiro**, só deslocado
-por um passo de 92px; escolher um fecha a pilha com ele na frente. O corpo do cartão abre a
-carteira e a fatura tem botão próprio — um toque só não pode decidir entre "ver os outros" e
-"abrir a fatura".
+- **Um desenho, qualquer tamanho.** A face é desenhada em 340dp e ESCALADA (`card-geometry.ts`);
+  a proporção é 1,586 ÷ √fontScale. É o que deixa o voo sem salto e a miniatura de 56dp ser o
+  mesmo cartão.
+- **"Em pé" é a face deitada girada 90°** — o carrossel da Carteira e o voo usam o mesmo desenho.
+- **A pilha do Financeiro fica sempre fechada**: os de trás espiam ACIMA do da frente, mais
+  estreitos (`scaleX`), e tocar a pilha leva o cartão da frente voando até a **Carteira**
+  (`/finance/wallet`, carrossel 3D). O botão "fecha ›" da face abre a fatura — um toque só não
+  decide entre "ver os cartões" e "abrir a fatura". O leque que abria no lugar saiu.
+- **A escolha do cartão da frente é o `account_id`**, gravado em `useCartaoEscolhido` (loja com
+  assinatura + AsyncStorage): a Carteira troca por cima e a pilha de baixo se reordena sozinha.
+- **Voo entre telas** mora numa camada na raiz (`flight-layer.tsx`, irmã do `<Stack>`), e a
+  Carteira é `push` com `fade` — `transparentModal` no iOS é apresentado acima da raiz e
+  esconderia o voo. Quem navega espera a DECOLAGEM (a origem já escondida), porque o iOS congela
+  a tela que sai no começo da transição.
+- **Na fatura o cartão fica ancorado** (`InvoiceDock`) com estado, contagem, total, fecha e
+  vence; deslizar a face troca de fatura pelo mesmo caminho das setas.
+- **O carrossel é guiado pelo dedo, sem `ScrollView`**: um valor na UI thread e uma mola que parte
+  da velocidade do dedo. Com `snapToInterval` a troca terminava num puxão. Trocar de cartão e
+  arrastar para fechar são UM gesto que decide o eixo — aninhados, no iOS um cancelava o outro.
 
-⚠️ **A face do cartão CRESCE com a fonte do sistema** (07/09/2026). `CARD_H` é altura fixa com
-`overflow: 'hidden'` e o conteúdo é texto: a 1,3× o rodapé encostava na barra de limite. A mesma
-escala entra no passo do leque, no `peek` e na altura do palco — escalar só a face deixaria os
-cartões de trás para fora. Vale para qualquer bloco de altura fixa com texto dentro; a alternativa
-(apertar o teto de escala até caber) é desligar o Dynamic Type com outro nome.
+⚠️ **A face do cartão CRESCE com a fonte do sistema** (07/09/2026). Conteúdo de texto num bloco
+de proporção fixa: a mesma escala entra na altura da face, no `peek` da pilha e no carrossel.
+Vale para qualquer bloco de altura fixa com texto dentro; a alternativa (apertar o teto de escala
+até caber) é desligar o Dynamic Type com outro nome.
 
-⚠️ **A cor DO BANCO voltou** (03/09/2026, decisão do dono do produto, contra a regra anterior).
-O mapa nome → cor mora em `src/design/card-brands.ts`, que é allowlisted no `anti-slop.test.ts`:
-a cor de um emissor não tem par light/dark porque não é nossa. Ela entra **misturada com a
-superfície** (`blend`, nunca com preto puro — misturar com preto sumia o cartão no fundo escuro),
-mais o ponto da bandeira e a barra de limite. Fora do cartão, cor de terceiro continua proibida.
-A objeção antiga (roxo lê como Nubank) continua verdadeira e continua valendo em qualquer outro
-lugar da tela — o que mudou é que DENTRO da forma de um cartão de crédito o usuário já espera a
-marca do emissor.
+⚠️ **A cor DO BANCO** (03/09/2026, decisão do dono do produto) mora em
+`src/design/card-brands.ts`, allowlisted no `anti-slop.test.ts`: a cor de um emissor não tem par
+light/dark porque não é nossa. **Fora do cartão, cor de terceiro continua proibida** — roxo lê
+como Nubank em qualquer outro lugar da tela; dentro da forma de um cartão de crédito o usuário
+espera a marca do emissor.
 
 ⚠️ **`withSpring` só é interceptado quando é o valor DIRETO da propriedade de estilo.**
 `withSpring(a) * b` devolve `NaN` e a view some sem um único erro no log — foi assim que a
@@ -80,10 +92,6 @@ aparecendo quando acrescenta algo que a linha não diz (juros até quitar, em D�
 
 **Rótulo do herói vem ANTES do valor**, sempre, via `HeroLabel`. Era o único jeito de Plano ficar
 igual às outras seis telas com card de destaque.
-
-`src/components/glass/glass-card.tsx` (`GlassCard`) é o único caminho para glass. Ele resolve
-`isLiquidGlassAvailable()` → `GlassView` nativo (iOS 26+) com fallback `BlurView` em iOS antigo,
-Android e web. **Nunca** usar `GlassView`/`BlurView` direto numa tela.
 
 Card comum é `Card` (`src/components/ui/card.tsx`): opaco, `Elevation`, `Radius.md`.
 
@@ -246,7 +254,7 @@ pessoa a não ler o sufixo.
 | Token | Regra |
 |---|---|
 | **Cor** | Sempre via `useTheme()`. **Zero hex em tela.** Toda cor nova precisa de par light **e** dark. |
-| **Raio** | `Radius`: `xs 8` (nada menor), `sm 12` inputs e linhas, `md 16` cards, `lg 20`, `xl 28` sheets, `pill` ações. Sempre com `borderCurve: 'continuous'`. |
+| **Raio** | `Radius` (Suave): `xs 6`, `sm 12` inputs e linhas, `md 18` cards e cartão, `lg 24` herói, `xl 28` sheets, `pill` botões, chips, segmentado, avatar. Sempre com `borderCurve: 'continuous'`. |
 | **Espaço** | Escala `Space` (`design/tokens.ts`). Preferir `gap` do flexbox a empilhar margem. Padding de scroll vai em `contentContainerStyle`, nunca no `ScrollView`. |
 | **Elevação** | `Elevation` via `boxShadow`. **Nunca** `shadow*`/`elevation` legado. Um sistema de elevação só. |
 | **Movimento** | `Motion` (durações e curvas). Nada de `400` literal espalhado. |
@@ -274,22 +282,17 @@ nascer fora do `Screen`.
 **Um accent só** (`tint`), gasto em ação primária, estado ativo e progresso. `danger`, `success`
 e `warning` são semânticos — nunca decoração. Uma família de cinza no app inteiro.
 
-**O accent é VERDE desde 03/09/2026** — `#6DDC9E` no escuro, `#0D8F5B` no claro. É o `secondary`
-do Stitch, adotado por decisão do dono do produto junto com a paleta inteira. A seção "o roxo foi
-testado e devolvido", mais abaixo, continua valendo como registro do que NÃO fazer (roxo lê como
-Nubank em finanças no Brasil); o que mudou é que o accent deixou de ser tinta monocromática. Ação
-primária agora se comunica por superfície **e** matiz.
+**O accent é TINTA** (Suave, 16/09/2026): `tint`/`tintFill` é `#0B0B0C` no claro e `#F4F4F2` no
+escuro, e o rótulo por cima (`onTint`) inverte. Ação primária se comunica por SUPERFÍCIE, não por
+matiz. O verde de 03/09 saiu; verde, vermelho e âmbar são só semântica (dinheiro que entra, erro
+e atraso, atenção). A seção "o roxo foi testado e devolvido", mais abaixo, continua valendo como
+registro do que não fazer.
 
 ⚠️ **Superfície escura tem paleta PRÓPRIA: `heroChip`, `onHeroSuccess`, `onHeroDanger`,
 `onHeroWarning`.** O painel de destaque e o cartão de crédito aberto são escuros nos DOIS temas.
 Pintados com os tokens do tema ativo, o modo claro entregava um botão branco sólido com ícone
 branco dentro — invisível — e vermelho escuro sobre preto. Dentro de superfície escura, use os
 tokens `onHero*`; fora dela, os normais.
-
-**A escala de raio virou a do Stitch** (03/09/2026): `xs 4` badge e barra, `sm 8` input e linha,
-`md 12` card — o raio mais usado do design inteiro —, `lg 16` card de destaque, `xl 20` sheet,
-`pill` ação. Os nomes não mudaram, só os valores; cards de 16 liam macios demais ao lado do
-desenho.
 
 **Todo card leva contorno de 1px em `cardBorder`.** É a assinatura do design e não é enfeite: no
 fundo quase-preto a sombra desaparece, e sem o contorno o card não tem onde terminar — a tela
@@ -303,30 +306,27 @@ trava cobrou caro: metade da paleta ficou sem ninguém olhando.
 ⚠️ **`useColorScheme` do `react-native` é PROIBIDO em componente.** Quem responde qual esquema
 vale é `useScheme()` do provider; o hook da plataforma ignora a escolha do usuário e o componente
 que o usar fica com a elevação do tema errado — em silêncio, porque a cor ainda existe.
-`Card`, `Row`, `Toast`, `GlassCard` e `Segmented` já foram corrigidos.
+`Card`, `Row`, `Toast` e `Segmented` já foram corrigidos.
 
 ---
 
-## 3. Tipografia — Hanken Grotesk + JetBrains Mono (03/09/2026)
+## 3. Tipografia — Plus Jakarta Sans (Suave, 16/09/2026)
 
-**Duas famílias, e a régua da plataforma saiu.** O app usava `system-ui` e por isso lia como "iOS
-bem feito genérico" mesmo com o layout certo — era a queixa, e a causa era esta linha.
+**Uma família, pesos leves**: título em 600, número grande em 500, corpo em 400. Plus Jakarta tem
+numerais tabulares, então carrega texto, título e dinheiro. Martian Mono 400 fica só no código
+inline das notas. Rótulos em caixa normal (sem maiúsculas forçadas). A escala mora em `Type`
+(`design/tokens.ts`): display 36, largeTitle 30, title 24, title2 19, headline 16, body 16,
+callout 15, subhead 14, footnote 13, caption/meta 12, money 28, heroMoney 40.
 
-| papel | família | onde |
-|---|---|---|
-| texto | **Hanken Grotesk** 400/500/600/700 | tudo que se lê |
-| dado | **JetBrains Mono** 400/500/600 | hora, contador, unidade, badge, percentual, dinheiro em linha |
-
-O par é o que dá voz a um sistema **sem cor de marca**: um tipo para ler, outro para carimbar
-dado. Sem o mono o app volta a ser uma escala de cinza com uma fonte só.
+As direções anteriores (Hanken Grotesk + JetBrains Mono em 03/09; Jost + Martian Mono no
+Concreto) saíram; `anti-slop.test.ts` quebra se um nome de fonte antiga voltar.
 
 **Peso é FAMÍLIA, nunca `fontWeight`.** Fonte custom no Android ignora `fontWeight` e cai no
 regular com bold sintético. Quem escolhe a face é a variante de `Type`, que aponta para o nome
-exato (`HankenGrotesk_600SemiBold`). `fontWeight` numa tela é bug, não estilo.
+exato (`PlusJakartaSans_600SemiBold`). `fontWeight` numa tela é bug, não estilo.
 
-A escala é a do Stitch, medida do export, não inventada: 11 / 13 / 15 / 17 / 20 / 26 / 32, com
-`letterSpacing` negativo do 15 para cima e positivo no 11. O tracking faz parte do desenho —
-copiar só o `fontSize` não reproduz a tipografia.
+O `letterSpacing` negativo nos tamanhos grandes faz parte do desenho — copiar só o `fontSize` não
+reproduz a tipografia.
 
 As faces carregam por `useFonts` no `_layout.tsx` raiz e o splash segura até terminarem: `Type`
 aponta pelo NOME, e face ausente não cai no system font — ela some.
@@ -444,15 +444,22 @@ muda de lista, quem conta a chegada é o `entering` da linha — o ícone fica p
 
 ⚠️ **A tab bar do Android é a exceção declarada à regra da frequência** (07/09/2026, decisão do
 dono do produto). Ela usa `Motion.spring.tab` (1000 ms, `dampingRatio 0.62`), não `snap`: ~180 ms
-de percurso, ~10% de ultrapassagem e ~500 ms até assentar. Com `snap` o berço atravessava as cinco
-abas em **~130 ms** e parava seco — não lia como "rápido", lia como teleporte, e foi a queixa
+de percurso, ~10% de ultrapassagem e ~500 ms até assentar. Com `snap` o indicador atravessava as
+cinco abas em **~130 ms** e parava seco — não lia como "rápido", lia como teleporte, e foi a queixa
 "parece que foi de uma vez". Aqui o movimento É a resposta ao toque: ele carrega o ícone e o
 rótulo fazendo crossfade ao longo do caminho. **Não "corrigir" de volta para `snap`**, que
 continua sendo a mola do indicador do `Segmented`.
 
-A ultrapassagem de uma mola é proporcional à DISTÂNCIA, então ir da primeira à quinta aba jogava
-metade da bolha para fora da pílula. O desenho é preso por `folga` — a sobra real entre o centro
-do slot e a borda da pílula, calculada da geometria, não escolhida a dedo.
+A ultrapassagem de uma mola é proporcional à DISTÂNCIA, então ir da primeira à quinta aba jogaria
+o círculo para fora da pílula. O desenho é preso por `folgaDaMola` (`design/tab-pill.ts`) — a
+sobra real entre o centro do slot e a borda da pílula, calculada da geometria.
+
+**Entradas das raízes esperam a cortina COMEÇAR a sair** (`useCortinaSaindo`): a cascata do
+`Screen` e a barra do Android chegam junto com a tinta. Montadas antes, tocavam inteiras por
+baixo dela.
+
+**O carrossel e o voo da Carteira** são momento raro (delight declarado): mola `voo` e
+`carrossel`, giro 3D só no meio da troca, e com Reduce Motion não há voo nem giro.
 
 ---
 
@@ -576,9 +583,9 @@ que "voltar" faz depois.
   `ScrollView` continua precisando ser a raiz dela.
 
   Nas cinco raízes de aba quem desenha é o `AppHeader`
-  (`src/components/ui/app-header.tsx`): **a faixa de marca do Stitch** — 56px sobre a safe area,
-  fundo do app a 85% com desfoque, fio de 1px embaixo, e dentro dela a marca num quadrado de 28 à
-  esquerda e o avatar de 32 à direita. Ação de raiz vai no slot `action` (`HeaderIconButton`),
+  (`src/components/ui/app-header.tsx`): **a faixa de marca** — 56px sobre a safe area, fundo
+  do app com desfoque, fio de 1px embaixo, a marca e o título à esquerda, e ações e avatar em
+  círculos de 36 à direita. Ação de raiz vai no slot `action` (`HeaderIconButton`),
   antes do avatar.
 
   **A palavra "ProOps" saiu, e o token `Type.wordmark` com ela** (03/09/2026). O export escrevia o
@@ -691,48 +698,25 @@ que "voltar" faz depois.
   Efeito colateral a lembrar: quem reservava `CURVED_BAR_SPACE` numa tela secundária passou a
   deixar uma faixa vazia do tamanho da dock. Foi o caso do `ChatComposer`.
 - **A tab bar tem DUAS implementações, uma por plataforma.** No iOS é a `NativeTabs`
-  (`app-tabs.tsx`) em Liquid Glass, que o sistema desenha melhor do que qualquer coisa nossa —
-  inclusive o encolhimento ao rolar. No Android é o `CurvedTabBar` (`app-tabs.android.tsx`): uma
-  pílula com um **berço que desliza** até a aba ativa, com a bolha do ícone encaixada nele. Lá não
-  existe equivalente nativo — a barra do Material 3 é uma laje reta —, e é onde um desenho próprio
-  paga. O berço **anima em mola**, porque o que ele comunica é continuidade espacial; um recorte
-  fixo seria só enfeite. Uma posição só governa a curva e a bolha: duas molas dessincronizariam e
-  a bolha sairia do berço no meio do caminho.
+  (`app-tabs.tsx`) em Liquid Glass, com `tintColor` = `tint`. No Android é a `PillTabBar`
+  (`app-tabs.android.tsx` → `components/ui/pill-tab-bar.tsx`, Suave 16/09/2026): uma **pílula
+  escura** (`heroSurface`) com um **círculo claro que desliza** até o ícone ativo, rótulos nas
+  cinco abas, badge por cima. Substituiu o berço recortado (`CurvedTabBar`).
 
-  **O berço é um CÍRCULO SUBTRAÍDO, concêntrico com a bolha** (03/09/2026): raio `BUBBLE/2 + 7`,
-  então a folga é a mesma em volta inteira — foi exatamente o pedido ("a borda interna atrás do
-  ícone seguir o border radius do círculo"). No Skia: pinta a pílula, pinta o traço dela, e por
-  cima um disco da cor do FUNDO mais o traço do berço, os dois dentro de `Group clip={pílula}`.
-  O disco apaga o traço da barra onde a mordida passa (a antiga "linha em cima do ícone") e a
-  metade de cima do círculo some sozinha no clip. O que anda é o `cx` do círculo, um shared value
-  que o Skia aceita direto — nada é montado dentro de worklet.
-
-  ⚠️ **Duas construções anteriores falharam, e as duas eram invisíveis na leitura do código:**
-  1. `View` circular pintada da cor do fundo, com o centro em `LIFT + BUBBLE/2` enquanto o da
-     bolha estava em `LIFT` — **26px fora do lugar**, a bolha empoleirada na borda de um buraco
-     de 66px. O comentário dizia "concêntrico"; os números diziam outra coisa. Foi o que ficou
-     "muito diferente do que eu pedi".
-  2. Path único com o berço tecido no contorno e ombros tangentes. Quebrava na PRIMEIRA e na
-     ÚLTIMA aba, onde o berço cai dentro do canto arredondado: o `Math.max(..., r)` punha o
-     início do ombro DEPOIS do fim dele e o contorno se cruzava, apagando a mordida. (O export
-     tem o mesmo defeito: `C 0 19.7 19.7 0 44 0` seguido de `L 32.7 0`, andando para trás.)
+  ⚠️ **O ícone dentro do círculo é RECORTADO, não trocado.** O círculo tem `overflow: hidden` e
+  carrega uma segunda fileira de ícones escuros transladada ao contrário: o ícone escuro aparece
+  exatamente onde o círculo está, inclusive no meio do caminho. Trocar a cor por estado fazia o
+  indicador chegar carregando o ícone errado.
 
   ⚠️ **O CONTEÚDO da barra segue a POSIÇÃO, nunca a rota** (03/09/2026). A mola parte do dedo, na
   UI thread; `activeIndex` vem do expo-router e só chega quando a tela de destino monta. Tudo que
-  lia `activeIndex` para desenhar ficava, por isso, um pedaço da animação atrasado: a bolha
-  chegava no destino **carregando o ícone da origem**, com o rótulo errado ainda em verde e um
-  buraco no slot de onde ela saiu. Ícone da bolha, ícone do slot e cor do rótulo derivam de
-  `progresso` (`IconeDaBolha`, `IconeDoSlot`, `Rotulo`) — é a mesma regra do berço e da bolha,
-  estendida ao que está dentro delas. `activeIndex` fica só para a mola, o guarda do toque e a
-  acessibilidade.
+  desenha (círculo, ícones, cor do rótulo) deriva da posição; `activeIndex` fica para a mola, o
+  guarda do toque e a acessibilidade. Para VER isso: toque numa aba e capture um quadro
+  imediatamente — a barra deve LIDERAR a navegação, não segui-la.
 
-  O jeito de VER isso: toque numa aba e capture um quadro imediatamente. Se a tela ainda é a
-  antiga e a barra já é a nova, está certo — a barra deve LIDERAR a navegação, não segui-la.
+  ⚠️ **O rótulo tem sobra além do slot** (14dp): a 384dp × fonte 1,3 "Financeiro" não cabia na
+  coluna, e o `adjustsFontSizeToFit` do Android não encolhe um `Animated.Text` com confiança.
 
-  A bolha é da **cor da barra um degrau acima** (`backgroundSelected`) com o ícone no accent, mais
-  sombra — é o desenho do export. Preenchê-la de `tint` com o ícone invertido gastava o accent
-  inteiro num controle tocado 100× por dia. No escuro, barra, bolha e fundo ficam todos dentro de
-  20/255: **quem separa os três é o traço em `separator`**, não a diferença de superfície.
 - **`backgroundColor` na `NativeTabs` é proibido no iOS.** Dar cor de fundo torna a barra opaca e
   **desliga o Liquid Glass** — o material que é diretriz do projeto. Cor de fundo, indicador e
   ripple entram por `Platform.select` só no Android; no iOS quem desenha é o sistema, mais
@@ -741,9 +725,8 @@ que "voltar" faz depois.
 - **A quinta aba é o Agente** (04/09/2026), entre Financeiro e Perfil: ela é uso, não
   configuração. A ordem é a mesma nas TRÊS implementações de tab bar, e
   `src/lib/agent-navigation.test.ts` quebra o build se divergirem — no Android o índice do slot
-  vem da POSIÇÃO, então uma aba fora de ordem manda a pessoa para a tela errada enquanto o berço
-  anima para o lugar certo. A matemática do `CurvedTabBar` não mudou: ela já derivava o slot de
-  `tabs.length`.
+  vem da POSIÇÃO, então uma aba fora de ordem manda a pessoa para a tela errada enquanto o
+  círculo anima para o lugar certo.
 - **Badge de aba é contagem real ou não existe.** Mesma régua dos atalhos do painel: número que
   não muda decisão é enfeite. Hoje leva o que vence + lembrete do dia + orçamento estourado, e
   some com zero.
@@ -775,7 +758,7 @@ Contar, não julgar:
 - emoji na chrome: **0**
 - gradiente sem razão de marca: **0**
 - rótulos diferentes para a mesma intenção: **0**
-- blocos de destaque na tela (`HeroPanel` **ou** `GlassCard`): **1** (+ chrome)
+- blocos de destaque na tela (`HeroPanel`, cartão ancorado ou herói de tela secundária): **1** (+ chrome)
 - hex hardcoded: **0**
 - `fontSize` solto: **0**
 
@@ -800,10 +783,11 @@ as coisas se comunicam:
 - **Barra de progresso separa dado de estado**: `tone="data"` (cinza) para comparação —
   categoria, proporção; `tint` para estado que o usuário resolve — orçamento, meta. Barra de dado
   em preto sólido domina a lista e come o valor que estava do lado.
-- **A forma da marca é o accent que sobrou.** A espiral trabalha como spinner (`Button loading`),
-  glyph de estado vazio, marcador do que veio da IA e marca d'água do `HeroPanel` — geometria em
-  `src/design/mark-path.ts`, componente em `src/components/ui/mark.tsx`, a MESMA fonte usada pela
-  abertura. É o que dá personalidade sem cor; sem isso o app fica "iOS bem feito" de novo.
+- **A forma da marca** aparece no `AppHeader`, na abertura (o mesmo PNG do splash, com um anel
+  que se desenha em volta), na capa das telas de conta e na trava — geometria em
+  `src/design/mark-path.ts`, componente em `src/components/ui/mark.tsx`. O carregamento do botão
+  é o `DotsLoader` (a pílula encolhe e dois pontos trocam de lugar), e o estado vazio usa um
+  símbolo do sistema num selo redondo.
 - **Cor semântica é a única cor da tela** e por isso grita mais do que gritaria num app colorido.
   Gastar `danger`/`success`/`warning` como decoração queima a última alavanca de cor que existe.
 

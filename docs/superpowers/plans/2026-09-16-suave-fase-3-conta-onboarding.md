@@ -304,3 +304,15 @@ caixa.current?.measureInWindow((x, y, w, h) => {
 - [ ] Entrar com a conta `dev@` → círculo a partir do botão → Hoje.
 - [ ] Reduce Motion nos dois; claro e escuro; 384dp × 1,3 a frio.
 - [ ] Commit de ajustes, se houver.
+
+## Emendas depois da execução (16–17/09/2026)
+
+- **Placeholder do campo no iOS**: depois de sair da conta sem reiniciar o app, o `UITextField`
+  desenhava o placeholder 16pt abaixo e a metade de cima não recebia foco. O `TextField` passa o
+  placeholder um quadro DEPOIS de montar (só no iOS). Descartados na investigação: entrada com
+  `translateY`, `FadeInLeft`, props de autopreenchimento, troca de tema.
+- **Barra de status clara nas telas de conta**: a capa é tinta nos dois temas. No Android quem
+  manda é a opção da tela (`contaOptions`); no iOS, o `StatusBar` que o `AuthScreen` monta.
+- **Capa no tema escuro**: a curva tem a cor do fundo (`#0B0B0C` sobre `#0B0B0C`), então só a
+  marca aparece. Aceito como está; um degrau de superfície na capa seria a próxima mexida.
+- **Passagem entre as telas de conta em `fade`** (fase 5): a capa é a mesma nas quatro.

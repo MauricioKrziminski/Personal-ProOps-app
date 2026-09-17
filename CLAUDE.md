@@ -107,11 +107,11 @@ App mobile pessoal de **notas rápidas, lembretes e controle financeiro operado 
 | Camada | Escolha |
 |---|---|
 | App | Expo SDK 57 (managed) + expo-router + TypeScript, código em `src/` |
-| Glass/Design | expo-glass-effect + expo-blur (fallback), NativeTabs (tab bar liquid glass) |
-| Animações | react-native-reanimated v4, moti, expo-haptics |
+| Design | direção **Suave** (`.claude/rules/design.md`): Plus Jakarta Sans, monocromático, NativeTabs (Liquid Glass) no iOS e `PillTabBar` no Android; vidro só na chrome (expo-blur no `AppHeader`) |
+| Animações | react-native-reanimated v4, react-native-gesture-handler, expo-haptics |
 | Estado | TanStack Query (servidor) + useState local |
 | Forms | react-hook-form + zod |
-| Gráficos | barras custom com Views (consistentes com o design glass) |
+| Gráficos e movimento | Skia (curvas, cortina em onda, face do cartão) e barras com Views |
 | Backend | Python 3.12 + FastAPI em `agent/` — Docker, Cloud Run, Cloud Tasks |
 | Agente | LangGraph `StateGraph` + checkpointer Postgres (schema `langgraph`) |
 | Banco | Supabase Postgres — migrations em `supabase/migrations/` |
