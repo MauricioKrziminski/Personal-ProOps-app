@@ -65,3 +65,9 @@ test('does not invent an Android pill inset for pushed routes or iPad', () => {
   assert.equal(bottomPillInset('android', false, 'compact', 76), 0);
   assert.equal(bottomPillInset('ios', true, 'expanded', 76), 0);
 });
+
+test('Today uses measured content width to decide its editorial split', () => {
+  assert.equal(tabletPaneWidths(336).twoPane, false);
+  assert.equal(tabletPaneWidths(752).twoPane, false);
+  assert.equal(tabletPaneWidths(1144).twoPane, true);
+});

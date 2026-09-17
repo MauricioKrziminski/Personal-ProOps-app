@@ -5,6 +5,7 @@ import { Platform, StyleSheet, View, useWindowDimensions } from 'react-native';
 
 import { PillTabBar, type PillTab } from '@/components/ui/pill-tab-bar';
 import { TabletNavigationRail } from '@/components/ui/tablet-navigation-rail';
+import { previewAccountBalances } from '@/design/preview-account-balances';
 import { useAdaptiveWindow } from '@/hooks/use-adaptive-window';
 import { localISODate } from '@/hooks/use-items';
 import { useTheme } from '@/hooks/use-theme';
@@ -641,10 +642,7 @@ function seedClient() {
   client.setQueryData(['tx-summary', `${mes}-01`, ultimoDia], resumo(ultimoDia, 412000, 900000));
   client.setQueryData(['tx-summary', `${mesAnterior}-01`, ultimoDiaAnterior], resumo(ultimoDiaAnterior, 468000, 900000));
 
-  client.setQueryData(['account-balances'], [
-    { account_id: 'prev-a1', name: 'Conta corrente', type: 'checking', balance_cents: 892040 },
-    { account_id: 'prev-a2', name: 'Carteira', type: 'cash', balance_cents: 12000 },
-  ]);
+  client.setQueryData(['account-balances'], previewAccountBalances);
   client.setQueryData(['accounts'], [
     { id: 'prev-a1', name: 'Conta corrente', type: 'checking', initial_balance_cents: 0 },
     { id: 'prev-a2', name: 'Carteira', type: 'cash', initial_balance_cents: 0 },

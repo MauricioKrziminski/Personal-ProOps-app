@@ -8,6 +8,7 @@ import { AgendaItem } from '@/components/feed/agenda-item';
 import { ReminderTimeline } from '@/components/feed/reminder-timeline';
 import { SetupChecklist } from '@/components/feed/setup-checklist';
 import { TodaySignals, type TodaySignal } from '@/components/feed/today-signals';
+import { TodayTabletCanvas } from '@/components/feed/today-tablet-canvas';
 import { BudgetRings } from '@/components/finance/budget-rings';
 import { CashAccounts } from '@/components/finance/cash-accounts';
 import { ThemedText } from '@/components/themed-text';
@@ -26,6 +27,7 @@ import { Tile, TileRow } from '@/components/ui/tile';
 import { useToast } from '@/components/ui/toast';
 import { Motion, Radius, Space } from '@/design/tokens';
 import { useBoolPref } from '@/hooks/use-bool-pref';
+import { useAdaptiveWindow } from '@/hooks/use-adaptive-window';
 import {
   useAccountBalances,
   useBudgetsStatus,
@@ -83,6 +85,8 @@ function Bloco({ children }: { children: React.ReactNode }) {
 }
 
 export default function TodayScreen() {
+  const { windowClass } = useAdaptiveWindow();
+  const tablet = windowClass !== 'compact';
   // Dinheiro no meio de frase obedece ao "esconder saldo" — `Money` não cabe em texto corrido.
   const brl = useBRL();
   const toast = useToast();
@@ -313,7 +317,7 @@ export default function TodayScreen() {
 
   if (!pronta) {
     return (
-      <Screen topBar={<AppHeader title="Hoje" />}>
+      <Screen wide={tablet} topBar={<AppHeader title="Hoje" />}>
         <View style={styles.cabecalho}>
           <Skeleton width="28%" height={12} />
           <Skeleton width="60%" height={28} />
@@ -330,39 +334,16 @@ export default function TodayScreen() {
     );
   }
 
-  return (
-    <Screen
-      stagger
-      topBar={<AppHeader title="Hoje" />}
-      onRefresh={() =>
-        Promise.all([
-          gasto.refetch(),
-          bills.refetch(),
-          noCartao.refetch(),
-          reminders.refetch(),
-          budgets.refetch(),
-          profile.refetch(),
-          cycle.refetch(),
-          saldos.refetch(),
-          saiuHoje.refetch(),
-          saiuNoCiclo.refetch(),
-          caminho.refetch(),
-        ])
-      }>
-      {/* A data vem DEPOIS da saudação: etiqueta acima de título é o padrão que o acabamento
-          proíbe — ela rouba a primeira linha para dizer o que ninguém veio ler. */}
+  const heroBlock = (
+    <>
       <View style={styles.cabecalho}>
-        {/* Sem nome (entrou por Phone OTP), a saudação some inteira em vez de virar "Bom dia,". */}
         {primeiroNome ? (
           <ThemedText type="title" style={styles.semEncolher}>
             {`${greetingBR()}, ${primeiroNome}`}
           </ThemedText>
         ) : null}
-        <ThemedText type="caption" themeColor="textSecondary">
-          {diaCurtoBR(hoje)}
-        </ThemedText>
+        <ThemedText type="caption" themeColor="textSecondary">{diaCurtoBR(hoje)}</ThemedText>
       </View>
-
       {gasto.isError ? (
         <ErrorCard onRetry={() => gasto.refetch()} />
       ) : (
@@ -373,61 +354,46 @@ export default function TodayScreen() {
           value={<CountUpMoney cents={livre} variant="heroMoney" tone={livre < 0 ? 'onHeroDanger' : 'onHero'} />}
           secondary={veredito}
           chart={gasto.data ? <RunwayBar pista={pista} ate={ateQuando ?? hoje} entrada={proximaEntrada} /> : undefined}
-          footer={
-            cycle.data?.ate ? (
-              <View style={styles.rodapeHeroi}>
-                <ThemedText type="footnote" themeColor="onHeroMuted" style={styles.shrink}>
-                  {`Compromissos até ${isoToBR(cycle.data.ate)}`}
-                </ThemedText>
-                <Money cents={comprometidoNoCiclo} variant="ticker" tone="onHero" concealable />
-              </View>
-            ) : undefined
-          }
+          footer={cycle.data?.ate ? (
+            <View style={styles.rodapeHeroi}>
+              <ThemedText type="footnote" themeColor="onHeroMuted" style={styles.shrink}>
+                {`Compromissos até ${isoToBR(cycle.data.ate)}`}
+              </ThemedText>
+              <Money cents={comprometidoNoCiclo} variant="ticker" tone="onHero" concealable />
+            </View>
+          ) : undefined}
           onPress={abrirMenu}
         />
       )}
+    </>
+  );
 
-      {sinais.length > 0 ? <TodaySignals signals={sinais} /> : null}
+  const signalsBlock = sinais.length > 0 ? <TodaySignals signals={sinais} /> : null;
 
-      {/*
-        Quanto já saiu HOJE. O valor sozinho não muda decisão — R$ 210 é muito ou pouco? Quem
-        responde é a comparação com o ritmo da própria pessoa neste ciclo (`ritmoDoDia`), que
-        exclui hoje de propósito: incluído, um estouro levantaria a régua contra a qual ele
-        seria medido.
-      */}
-      {saiuHoje.isError ? null : (
-        <TileRow>
-          <Tile
-            icon="arrow.up.right"
-            label="Saiu hoje"
-            value={<Money cents={ritmo.hoje} variant="money" tone="text" concealable />}
-            caption={
-              ritmo.media === null
-                ? 'primeiro dia do ciclo'
-                : // Sem barra: "R$ 73,83/dia" quebrava DEPOIS da barra na coluna estreita.
-                  `${ritmo.acima ? 'acima' : 'abaixo'} do ritmo de ${brl(ritmo.media)} por dia`
-            }
-            accessibilityLabel={`Saiu hoje: ${brl(ritmo.hoje)}`}
-            onPress={() => router.push('/finance/transactions')}
-          />
-          {/*
-            O par existe para o dia ter DOIS lados — e sai de graça: `transactions_summary` já
-            devolve as duas naturezas na mesma leitura. Zerado 28 dias por mês ele é quieto e
-            verdadeiro; no dia do salário é a melhor
-            notícia do mês.
-          */}
-          <Tile
-            icon="arrow.down.left"
-            label="Entrou hoje"
-            value={
-              <Money cents={entrouHoje} variant="money" tone={entrouHoje > 0 ? 'success' : 'text'} concealable />
-            }
-            accessibilityLabel={`Entrou hoje: ${brl(entrouHoje)}`}
-            onPress={() => router.push('/finance/transactions')}
-          />
-        </TileRow>
-      )}
+  const pulseBlock = saiuHoje.isError ? null : (
+    <TileRow>
+      <Tile
+        icon="arrow.up.right"
+        label="Saiu hoje"
+        value={<Money cents={ritmo.hoje} variant="money" tone="text" concealable />}
+        caption={ritmo.media === null
+          ? 'primeiro dia do ciclo'
+          : `${ritmo.acima ? 'acima' : 'abaixo'} do ritmo de ${brl(ritmo.media)} por dia`}
+        accessibilityLabel={`Saiu hoje: ${brl(ritmo.hoje)}`}
+        onPress={() => router.push('/finance/transactions')}
+      />
+      <Tile
+        icon="arrow.down.left"
+        label="Entrou hoje"
+        value={<Money cents={entrouHoje} variant="money" tone={entrouHoje > 0 ? 'success' : 'text'} concealable />}
+        accessibilityLabel={`Entrou hoje: ${brl(entrouHoje)}`}
+        onPress={() => router.push('/finance/transactions')}
+      />
+    </TileRow>
+  );
 
+  const actionsBlock = (
+    <>
       {mostrarPassos ? (
         <Bloco>
           <SetupChecklist
@@ -437,7 +403,6 @@ export default function TodayScreen() {
           />
         </Bloco>
       ) : null}
-
       {bills.isError ? (
         <Bloco>
           <BlockHeader title="Agora" voice="app" />
@@ -460,37 +425,35 @@ export default function TodayScreen() {
           </View>
         </Bloco>
       ) : null}
+    </>
+  );
 
-      {/*
-        "Nas contas" é a outra metade do herói: ele diz quanto DÁ para gastar até o fim do ciclo,
-        este diz quanto EXISTE agora. A régua é a mesma da tela de Contas (`caixaDasContas`) —
-        duas telas vizinhas com números diferentes para o mesmo dinheiro é como a pessoa para de
-        confiar no app.
-      */}
-      {saldos.isError ? (
-        <Bloco>
-          <BlockHeader title="Nas contas" />
-          <ErrorCard onRetry={() => saldos.refetch()} />
-        </Bloco>
-      ) : emConta.linhas.length > 0 ? (
-        <Bloco>
-          <BlockHeader
-            title="Nas contas"
-            action={{ label: 'Contas', onPress: () => router.push('/finance/accounts') }}
-          />
-          <CashAccounts
-            caixa={emConta}
-            onOpen={(l: LinhaDeCaixa) =>
-              router.push(
-                l.id
-                  ? ({ pathname: '/finance/transactions', params: { accountId: l.id } } as Href)
-                  : ('/finance/transactions' as Href)
-              )
-            }
-          />
-        </Bloco>
-      ) : null}
+  const accountsBlock = saldos.isError ? (
+    <Bloco>
+      <BlockHeader title="Nas contas" />
+      <ErrorCard onRetry={() => saldos.refetch()} />
+    </Bloco>
+  ) : emConta.linhas.length > 0 ? (
+    <Bloco>
+      <BlockHeader
+        title="Nas contas"
+        action={{ label: 'Contas', onPress: () => router.push('/finance/accounts') }}
+      />
+      <CashAccounts
+        caixa={emConta}
+        onOpen={(l: LinhaDeCaixa) =>
+          router.push(
+            l.id
+              ? ({ pathname: '/finance/transactions', params: { accountId: l.id } } as Href)
+              : ('/finance/transactions' as Href)
+          )
+        }
+      />
+    </Bloco>
+  ) : null;
 
+  const comingBlock = (
+    <>
       {reminders.isError ? (
         <Bloco>
           <BlockHeader title="Lembretes" />
@@ -510,7 +473,6 @@ export default function TodayScreen() {
           />
         </Bloco>
       ) : null}
-
       {noCartao.isError ? (
         <Bloco>
           <BlockHeader title="Próximos dias" voice="app" />
@@ -532,7 +494,6 @@ export default function TodayScreen() {
           </View>
         </Bloco>
       ) : null}
-
       {budgets.isError ? (
         <Bloco>
           <BlockHeader title="No limite" />
@@ -548,8 +509,6 @@ export default function TodayScreen() {
           <BudgetRings itens={apertados} onPress={() => router.push('/finance/budgets')} />
         </Bloco>
       ) : null}
-
-      {/* O dia calmo é o ÚLTIMO filho: não tem como aparecer acima de conteúdo nem se a regra errar. */}
       {diaCalmo ? (
         <View style={styles.calmo}>
           <Icon name="checkmark.circle" size="sm" color="success" />
@@ -560,6 +519,41 @@ export default function TodayScreen() {
           </ThemedText>
         </View>
       ) : null}
+    </>
+  );
+
+  return (
+    <Screen
+      stagger
+      wide={tablet}
+      topBar={<AppHeader title="Hoje" />}
+      onRefresh={() =>
+        Promise.all([
+          gasto.refetch(),
+          bills.refetch(),
+          noCartao.refetch(),
+          reminders.refetch(),
+          budgets.refetch(),
+          profile.refetch(),
+          cycle.refetch(),
+          saldos.refetch(),
+          saiuHoje.refetch(),
+          saiuNoCiclo.refetch(),
+          caminho.refetch(),
+        ])
+      }>
+      {tablet ? (
+        <TodayTabletCanvas
+          hero={heroBlock}
+          signals={signalsBlock}
+          pulse={pulseBlock}
+          actions={actionsBlock}
+          accounts={accountsBlock}
+          coming={comingBlock}
+        />
+      ) : (
+        <>{heroBlock}{signalsBlock}{pulseBlock}{actionsBlock}{accountsBlock}{comingBlock}</>
+      )}
     </Screen>
   );
 }
