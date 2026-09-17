@@ -31,6 +31,21 @@ canto `Radius.lg`, sem degradê nem brilho (Suave, 16/09/2026). O degradê verde
 (`GradientSurface`) foi da direção anterior e saiu do código; a hierarquia agora vem da
 amplitude — um bloco escuro sobre papel claro — e do número grande em peso 500.
 
+> **Mudou em 17/09/2026 nas raízes, a pedido do dono do produto** (*"quero algo bem bonito… nada
+> de coisa comum"*; perguntado sobre as três regras abaixo: *"liberar o que ficar melhor"*).
+> Spec: `docs/superpowers/specs/2026-09-17-hoje-financeiro-conversa-design.md`.
+>
+> - **Um destaque por tela** → na Hoje convivem o herói e os Primeiros passos.
+> - **Sem degradê/brilho em conteúdo** → o herói das raízes usa `surface="live"`
+>   (`InkSurface`: luz larga que segue a rolagem + grão fino, dois canvases, custo zero parado).
+> - **Vidro só na chrome** → liberado e NÃO usado: sobre papel chapado não há o que refratar, e
+>   esse motivo continua verdadeiro.
+>
+> A estrutura das raízes passou a ser **"Conversa organizada"**: o app fala nos blocos com o selo
+> da marca (`BlockHeader voice="app"`), a pessoa fala em balões com o texto REAL que mandou, e o
+> registro que a fala virou encaixa embaixo. Cabeçalho de bloco nas raízes é `BlockHeader`, não
+> `SectionHead`.
+
 ⚠️ **`Canvas` do Skia NÃO aceita `onLayout`** (avisa "is not supported" em runtime e o desenho
 não posiciona). Quem mede é uma `View` em volta; o canvas só preenche.
 
