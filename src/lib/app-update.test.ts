@@ -12,8 +12,17 @@ import {
   hasNewerVersion,
   parseUpdateManifest,
   readTextStreamWithLimit,
+  supportsApkUpdate,
   type AppUpdateState,
 } from './app-update.ts';
+
+test('o atualizador de APK pertence apenas ao pacote Android de produção', () => {
+  assert.equal(supportsApkUpdate('android', 'com.proops.personal'), true);
+  assert.equal(supportsApkUpdate('android', 'com.proops.personal.staging'), false);
+  assert.equal(supportsApkUpdate('android', 'com.proops.personal.dev'), false);
+  assert.equal(supportsApkUpdate('android', null), false);
+  assert.equal(supportsApkUpdate('ios', 'com.proops.personal'), false);
+});
 
 const manifest = {
   versionCode: 7,

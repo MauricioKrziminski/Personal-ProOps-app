@@ -5,6 +5,11 @@ export const UPDATE_MANIFEST_URL =
   'https://github.com/almeidagabriel01/Personal-ProOps-app-releases/releases/latest/download/update.json';
 export const MAX_UPDATE_MANIFEST_BYTES = 64 * 1024;
 
+/** O manifesto acima distribui o pacote de produção; staging e dev recebem APKs próprios. */
+export function supportsApkUpdate(platform: string, applicationId: string | null): boolean {
+  return platform === 'android' && applicationId === 'com.proops.personal';
+}
+
 export class AppUpdateError extends Error {
   constructor(message: string) {
     super(message);

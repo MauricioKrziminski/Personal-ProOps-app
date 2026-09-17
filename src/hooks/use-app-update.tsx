@@ -8,11 +8,13 @@ import {
   useState,
   type ReactNode,
 } from 'react';
+import * as Application from 'expo-application';
 import { AppState, Platform } from 'react-native';
 
 import {
   AppUpdateError,
   appUpdateAction,
+  supportsApkUpdate,
   type AppUpdateState,
 } from '@/lib/app-update';
 import {
@@ -31,6 +33,7 @@ interface AppUpdateContextValue {
 }
 
 const AppUpdateContext = createContext<AppUpdateContextValue | null>(null);
+const supported = supportsApkUpdate(Platform.OS, Application.applicationId);
 
 function messageFrom(error: unknown, fallback: string): string {
   if (error instanceof AppUpdateError) return error.message;
@@ -40,7 +43,7 @@ function messageFrom(error: unknown, fallback: string): string {
 
 export function AppUpdateProvider({ children }: { children: ReactNode }) {
   const [state, setState] = useState<AppUpdateState>(
-    Platform.OS === 'android' ? { status: 'idle' } : { status: 'unsupported' },
+    supported ? { status: 'idle' } : { status: 'unsupported' },
   );
   const stateRef = useRef(state);
   const operationRef = useRef(false);
@@ -51,7 +54,7 @@ export function AppUpdateProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const check = useCallback(async () => {
-    if (Platform.OS !== 'android' || operationRef.current) return;
+    if (!supported || operationRef.current) return;
     const current = stateRef.current;
     if (
       current.status === 'downloading' ||
@@ -146,7 +149,7 @@ export function AppUpdateProvider({ children }: { children: ReactNode }) {
   }, [check, download, install]);
 
   useEffect(() => {
-    if (Platform.OS !== 'android') return;
+    if (!supported) return;
 
     const initialCheckTimer = setTimeout(() => {
       void check();

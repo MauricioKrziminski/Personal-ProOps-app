@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Platform, ScrollView, StyleSheet, View, useWindowDimensions } from 'react-native';
+import { ScrollView, StyleSheet, View, useWindowDimensions } from 'react-native';
 import { router } from 'expo-router';
 import * as Haptics from 'expo-haptics';
 import Animated, { FadeIn } from 'react-native-reanimated';
@@ -562,7 +562,7 @@ export default function ProfileScreen() {
 /** Só esta linha renderiza de novo a cada percentual; o Perfil inteiro fica fora desse ciclo. */
 function AppUpdateSection() {
   const appUpdate = useAppUpdate();
-  if (Platform.OS !== 'android') return null;
+  if (appUpdate.state.status === 'unsupported') return null;
 
   const action = appUpdateAction(appUpdate.state);
   return (

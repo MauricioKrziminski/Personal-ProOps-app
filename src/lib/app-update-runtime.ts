@@ -2,6 +2,7 @@ import * as Application from 'expo-application';
 import { fetch } from 'expo/fetch';
 import { Directory, File, FileMode, Paths } from 'expo-file-system';
 import * as IntentLauncher from 'expo-intent-launcher';
+import { Platform } from 'react-native';
 
 import {
   AppUpdateError,
@@ -11,6 +12,7 @@ import {
   hasNewerVersion,
   parseUpdateManifest,
   readTextStreamWithLimit,
+  supportsApkUpdate,
   type UpdateManifest,
 } from '@/lib/app-update';
 import {
@@ -21,6 +23,12 @@ import {
 const MANIFEST_TIMEOUT_MS = 15_000;
 const APK_MIME_TYPE = 'application/vnd.android.package-archive';
 const FLAG_GRANT_READ_URI_PERMISSION = 0x00000001;
+
+function requireSupportedApkUpdate(): void {
+  if (!supportsApkUpdate(Platform.OS, Application.applicationId)) {
+    throw new AppUpdateError('Este pacote recebe atualizações pelo seu canal de distribuição.');
+  }
+}
 
 function contentLengthOf(response: Response): number | null {
   const raw = response.headers.get('content-length');
@@ -49,6 +57,7 @@ export function installedVersionName(): string {
 }
 
 export async function checkForApkUpdate(): Promise<UpdateManifest | null> {
+  requireSupportedApkUpdate();
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), MANIFEST_TIMEOUT_MS);
 
@@ -92,6 +101,7 @@ export async function downloadApkUpdate(
   manifest: UpdateManifest,
   onProgress: (progress: number) => void,
 ): Promise<string> {
+  requireSupportedApkUpdate();
   const directory = resetUpdateCache();
   const file = new File(directory, `personal-proops-${manifest.versionCode}.apk`);
 
@@ -136,7 +146,7 @@ export async function downloadApkUpdate(
 }
 
 export function hasApkInstallPermission(): boolean {
-  return canRequestPackageInstalls();
+  return supportsApkUpdate(Platform.OS, Application.applicationId) && canRequestPackageInstalls();
 }
 
 function requireApplicationId(): string {
@@ -147,6 +157,7 @@ function requireApplicationId(): string {
 }
 
 export async function openApkInstallPermissionSettings(): Promise<void> {
+  requireSupportedApkUpdate();
   await IntentLauncher.startActivityAsync(
     IntentLauncher.ActivityAction.MANAGE_UNKNOWN_APP_SOURCES,
     { data: `package:${requireApplicationId()}` },
@@ -154,6 +165,7 @@ export async function openApkInstallPermissionSettings(): Promise<void> {
 }
 
 export async function launchApkInstaller(fileUri: string): Promise<void> {
+  requireSupportedApkUpdate();
   const contentUri = getApkContentUri(fileUri);
   await IntentLauncher.startActivityAsync('android.intent.action.VIEW', {
     data: contentUri,
