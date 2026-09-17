@@ -6,61 +6,59 @@ const {
 } = require('expo/config-plugins');
 
 /**
- * O fundo da JANELA e da TAREFA do Android na cor do papel do app (claro) e da tinta (escuro).
+ * As cores do TEMA NATIVO do Android nas cores do app, com variante noturna.
  *
- * O que isto resolve: com a trava ligada o app sai da foto dos recentes
- * (`modules/proops-privacidade`), e na volta o sistema mostra o fundo da janela enquanto ela
- * abre. O padrão do `Theme.AppCompat.DayNight` é `#303030` no escuro: a volta dentro da espera
- * piscava um cinza antes da Hoje (medido em 17/09/2026). Nas cores do `background` do
- * `theme.ts`, o quadro é o próprio papel do app. `with-android-window-background.test.js`
- * prende as duas cores às do tema.
+ * O React desenha quase tudo, mas três coisas saem do tema nativo e estavam no padrão do template:
  *
- * ⚠️ **São DOIS atributos.** O quadro da volta sem foto não usa o `windowBackground`: ele é a cor
- * de fundo da TAREFA, que a Activity tira do `android:colorBackground` do tema. Só com o primeiro
- * o cinza continuou (medido).
+ * - **O quadro da volta sem foto** (fundo da janela e da tarefa). Com a trava ligada o app sai da
+ *   foto dos recentes (`modules/proops-privacidade`), e na volta o sistema pinta esse quadro: era
+ *   um cinza `#303030` no escuro antes da Hoje (medido em 17/09/2026). Agora é o papel e a tinta.
+ *   ⚠️ São DOIS atributos: o quadro é a cor de fundo da TAREFA, que a Activity tira do
+ *   `android:colorBackground`; só com o `windowBackground` o cinza continuou (medido).
+ * - **O acento** (`colorAccent`): os botões dos diálogos do sistema ("Sair da conta?") e o
+ *   `Switch` ligado saíam em verde-azulado, o padrão do AppCompat. A ação do app é TINTA.
  *
- * Segue o modo noturno do SISTEMA (`values-night`); a escolha de tema dentro do app não chega
- * aqui.
+ * `with-android-theme-colors.test.js` prende as cores às do `theme.ts`. Segue o modo noturno
+ * nativo, que o `ThemeProvider` sincroniza com a escolha do usuário (`Appearance.setColorScheme`).
  */
-const COR = 'fundoDaJanela';
-const CLARO = '#F2F1EE';
-const ESCURO = '#0B0B0C';
+const CORES = {
+  fundoDaJanela: { claro: '#F2F1EE', escuro: '#0B0B0C' },
+  acento: { claro: '#0B0B0C', escuro: '#F4F4F2' },
+};
+
+const ITENS = [
+  ['android:windowBackground', 'fundoDaJanela'],
+  ['android:colorBackground', 'fundoDaJanela'],
+  ['colorAccent', 'acento'],
+];
 
 const { assignColorValue } = AndroidConfig.Colors;
 const { assignStylesValue, getAppThemeGroup } = AndroidConfig.Styles;
 
-const ATRIBUTOS = ['android:windowBackground', 'android:colorBackground'];
-
 function configureStyles(xml) {
-  return ATRIBUTOS.reduce(
-    (atual, name) =>
-      assignStylesValue(atual, {
-        add: true,
-        parent: getAppThemeGroup(),
-        name,
-        value: `@color/${COR}`,
-      }),
+  return ITENS.reduce(
+    (atual, [name, cor]) =>
+      assignStylesValue(atual, { add: true, parent: getAppThemeGroup(), name, value: `@color/${cor}` }),
     xml
   );
 }
 
-const withAndroidWindowBackground = (config) => {
-  config = withAndroidColors(config, (mod) => {
-    mod.modResults = assignColorValue(mod.modResults, { name: COR, value: CLARO });
-    return mod;
-  });
-  config = withAndroidColorsNight(config, (mod) => {
-    mod.modResults = assignColorValue(mod.modResults, { name: COR, value: ESCURO });
-    return mod;
-  });
+const pintar = (tom) => (mod) => {
+  for (const [name, par] of Object.entries(CORES)) {
+    mod.modResults = assignColorValue(mod.modResults, { name, value: par[tom] });
+  }
+  return mod;
+};
+
+const withAndroidThemeColors = (config) => {
+  config = withAndroidColors(config, pintar('claro'));
+  config = withAndroidColorsNight(config, pintar('escuro'));
   return withAndroidStyles(config, (mod) => {
     mod.modResults = configureStyles(mod.modResults);
     return mod;
   });
 };
 
-module.exports = withAndroidWindowBackground;
+module.exports = withAndroidThemeColors;
 module.exports.configureStyles = configureStyles;
-module.exports.COR = COR;
-module.exports.CLARO = CLARO;
-module.exports.ESCURO = ESCURO;
+module.exports.CORES = CORES;

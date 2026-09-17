@@ -7,6 +7,7 @@
     "icon": "./assets/images/icons/icon-512.png",
     "scheme": "appproops",
     "userInterfaceStyle": "automatic",
+    "primaryColor": "#0B0B0C",
     "ios": {
       "bundleIdentifier": "com.proops.personal",
       "supportsTablet": true,
@@ -60,7 +61,7 @@
       "./plugins/with-android-abis",
       "./plugins/with-apk-installer",
       "./plugins/with-text-advance-width",
-      "./plugins/with-android-window-background"
+      "./plugins/with-android-theme-colors"
     ],
     "experiments": {
       "typedRoutes": true,

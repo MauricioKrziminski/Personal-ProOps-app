@@ -307,6 +307,13 @@ padrão, mais `light` e `dark` explícitos, gravados no `AsyncStorage` e trocado
 travado em dark entre 02 e 03/09/2026 — o desenho do Stitch é OLED e o claro o desmontava —, e a
 trava cobrou caro: metade da paleta ficou sem ninguém olhando.
 
+⚠️ **A escolha vai também para o NATIVO** (`Appearance.setColorScheme`, 17/09/2026). Valendo só no
+React, com o app em Claro e o celular no Escuro o diálogo "Sair da conta?" chegava escuro sobre a
+tela clara (medido nos dois), e o mesmo valia para teclado e alertas. No Android o `uiMode` está
+no `configChanges`, então a troca não recria a tela. E o tema NATIVO do Android usa as cores do
+app (`plugins/with-android-theme-colors.js`): fundo da janela no papel/tinta e o acento na tinta
+— os botões dos diálogos e o `Switch` ligado saíam no verde-azulado do template.
+
 ⚠️ **`useColorScheme` do `react-native` é PROIBIDO em componente.** Quem responde qual esquema
 vale é `useScheme()` do provider; o hook da plataforma ignora a escolha do usuário e o componente
 que o usar fica com a elevação do tema errado — em silêncio, porque a cor ainda existe.
