@@ -33,7 +33,7 @@ import { ConcealProvider } from '@/components/ui/conceal';
 import { ToastProvider } from '@/components/ui/toast';
 import { AppUpdateProvider } from '@/hooks/use-app-update';
 import { ThemeProvider as AppThemeProvider, useBarStyle, useScheme } from '@/hooks/use-theme';
-import { useSession } from '@/hooks/use-session';
+import { SessionProvider, useSession } from '@/hooks/use-session';
 import { hasCompletedOnboarding } from '@/lib/onboarding';
 import { attachNotificationListeners, configureNotificationHandler } from '@/lib/notifications';
 
@@ -71,8 +71,15 @@ export default function RootLayout() {
     */
     <GestureHandlerRootView>
       <AppThemeProvider>
+        {/*
+          Tema → cortina (a camada usa tema) → sessão (o portão usa a cortina) → árvore. O efeito
+          que limpa o cache do TanStack na troca de usuário lê a sessão MOSTRADA, que só muda com
+          a cortina fechada.
+        */}
         <CortinaProvider>
-          <AppTree />
+          <SessionProvider>
+            <AppTree />
+          </SessionProvider>
         </CortinaProvider>
       </AppThemeProvider>
     </GestureHandlerRootView>

@@ -132,6 +132,20 @@ test('rgba/hsl literais também não passam', () => {
 });
 
 /**
+ * A sessão tem UMA assinatura, e ela mora em `use-session.tsx`.
+ *
+ * Cada `useSession()` abria a própria assinatura do Supabase, e o portão de sessão depende de
+ * que toda a árvore leia a sessão MOSTRADA — uma segunda assinatura trocaria a tela antes de a
+ * cortina cobrir, e `accept_pending_invites` rodava uma vez por instância.
+ */
+test('nenhum onAuthStateChange fora de hooks/use-session.tsx', () => {
+  const fora = offenders(/\bonAuthStateChange\s*\(/).filter(
+    (achado) => !achado.startsWith('src/hooks/use-session.tsx:')
+  );
+  assert.deepEqual(fora, [], 'leia a sessão por useSession(): uma assinatura só, a do provider');
+});
+
+/**
  * Truncar rótulo é esconder a informação que a linha existe para dar.
  *
  * Em 07/09/2026, num aparelho real, o Perfil mostrava "Avisos financeiros no c…", "Você negou a
