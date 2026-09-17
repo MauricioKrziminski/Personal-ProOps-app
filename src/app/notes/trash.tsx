@@ -128,7 +128,7 @@ export default function TrashScreen() {
   };
 
   return (
-    <Screen grouped onRefresh={() => Promise.all([list.refetch()])} refreshing={list.isRefetching}>
+    <Screen grouped onRefresh={() => Promise.all([list.refetch()])}>
       <Stack.Screen
         options={{
           title: 'Lixeira',

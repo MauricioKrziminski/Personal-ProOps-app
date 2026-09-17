@@ -249,8 +249,7 @@ export default function ProfileScreen() {
         setNotificationRefreshKey((current) => current + 1);
 
         return Promise.all([profile.refetch(), plan.refetch(), ia.refetch()]);
-      }}
-      refreshing={profile.isRefetching || plan.isRefetching}>
+      }}>
       {/*
         Cartão de identidade — o topo da tela no desenho do Stitch.
 

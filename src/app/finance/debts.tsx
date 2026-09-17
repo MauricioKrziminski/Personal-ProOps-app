@@ -339,8 +339,7 @@ export default function DebtsScreen() {
   return (
     <Screen
       grouped
-      onRefresh={() => Promise.all([debts.refetch(), payoff.refetch(), accounts.refetch(), ...(detalheId || pagandoId ? [schedule.refetch()] : [])])}
-      refreshing={debts.isRefetching || payoff.isRefetching || accounts.isRefetching || schedule.isRefetching}>
+      onRefresh={() => Promise.all([debts.refetch(), payoff.refetch(), accounts.refetch(), ...(detalheId || pagandoId ? [schedule.refetch()] : [])])}>
       <Stack.Screen
         options={{
           title: 'Dívidas',

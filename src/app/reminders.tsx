@@ -26,7 +26,7 @@ import { describeRRule } from '@/lib/rrule-text';
  * **Hoje**. Esta tela é o arquivo completo, incluindo os pausados, e vive no Stack raiz.
  */
 export default function RemindersScreen() {
-  const { data, isLoading, isError, refetch, isRefetching } = useReminders();
+  const { data, isLoading, isError, refetch } = useReminders();
   const toggle = useToggleReminder();
   const remove = useDeleteReminder();
   const toast = useToast();
@@ -78,7 +78,7 @@ export default function RemindersScreen() {
   );
 
   return (
-    <Screen grouped onRefresh={refetch} refreshing={isRefetching}>
+    <Screen grouped onRefresh={refetch}>
       <Stack.Screen
         options={{
           title: 'Lembretes',

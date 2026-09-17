@@ -289,8 +289,7 @@ export default function NetWorthScreen() {
     <Screen
       stagger
       grouped
-      onRefresh={() => Promise.all([patrimonio.refetch(), serie.refetch(), saude.refetch(), bens.refetch()])}
-      refreshing={patrimonio.isRefetching}>
+      onRefresh={() => Promise.all([patrimonio.refetch(), serie.refetch(), saude.refetch(), bens.refetch()])}>
       <Stack.Screen
         options={{
           title: 'Patrimônio',

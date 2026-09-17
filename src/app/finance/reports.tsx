@@ -72,7 +72,7 @@ export default function ReportsScreen() {
   const anoAtual = Number(localISODate().slice(0, 4));
   const [ano, setAno] = useState(anoAtual);
   const [verTodas, setVerTodas] = useState(false);
-  const { data, isLoading, isError, refetch, isRefetching } = useAnnualReport(ano);
+  const { data, isLoading, isError, refetch } = useAnnualReport(ano);
 
   const primeiroAno = useFirstTransactionYear();
   // Do ano corrente para TRÁS: o padrão é o ano corrente, e ele precisa estar visível sem rolar.
@@ -107,7 +107,7 @@ export default function ReportsScreen() {
   };
 
   return (
-    <Screen grouped onRefresh={refetch} refreshing={isRefetching}>
+    <Screen grouped onRefresh={refetch}>
       <Stack.Screen
         options={{
           title: 'Relatórios',

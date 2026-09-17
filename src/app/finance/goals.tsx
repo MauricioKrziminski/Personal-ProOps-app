@@ -306,7 +306,7 @@ export default function GoalsScreen() {
   };
 
   return (
-    <Screen grouped onRefresh={() => Promise.all([goals.refetch(), extrato?.id ? contribuicoes.refetch() : Promise.resolve()])} refreshing={goals.isRefetching}>
+    <Screen grouped onRefresh={() => Promise.all([goals.refetch(), extrato?.id ? contribuicoes.refetch() : Promise.resolve()])}>
       <Stack.Screen
         options={{
           title: 'Metas',

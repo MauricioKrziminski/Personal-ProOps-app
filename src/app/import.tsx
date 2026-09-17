@@ -136,7 +136,7 @@ export default function ImportScreen() {
   const [editando, setEditando] = useState<ImportItem | null>(null);
   const [verRevisados, setVerRevisados] = useState(false);
 
-  const { data: items, isLoading, isError, refetch, isRefetching } = useImportItems(batchId);
+  const { data: items, isLoading, isError, refetch } = useImportItems(batchId);
   const aprovar = useApproveImportItems();
   const descartar = useDiscardImportItems();
   const atualizar = useUpdateImportItem();
@@ -447,7 +447,7 @@ export default function ImportScreen() {
 
   // ── Etapa 2: revisar o lote ──────────────────────────────────────────────
   return (
-    <Screen grouped onRefresh={() => Promise.all([accountsQuery.refetch(), batchId ? refetch() : Promise.resolve()])} refreshing={isRefetching}>
+    <Screen grouped onRefresh={() => Promise.all([accountsQuery.refetch(), batchId ? refetch() : Promise.resolve()])}>
       <Stack.Screen
         options={{
           title: vaoEntrar > 0 ? `Revisar ${vaoEntrar}` : 'Revisar lote',

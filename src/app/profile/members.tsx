@@ -100,8 +100,7 @@ export default function MembersScreen() {
   return (
     <Screen
       grouped
-      onRefresh={() => Promise.all([membros.refetch(), convites.refetch(), plano.refetch()])}
-      refreshing={membros.isRefetching}>
+      onRefresh={() => Promise.all([membros.refetch(), convites.refetch(), plano.refetch()])}>
       <Stack.Screen options={{ title: 'Pessoas', headerLargeTitle: true }} />
 
       {membros.isLoading ? (

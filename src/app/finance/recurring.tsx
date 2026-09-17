@@ -522,8 +522,7 @@ export default function RecurringScreen() {
   return (
     <Screen
       grouped
-      onRefresh={() => Promise.all([series.refetch(), proximos.refetch()])}
-      refreshing={series.isRefetching}>
+      onRefresh={() => Promise.all([series.refetch(), proximos.refetch()])}>
       <Stack.Screen
         options={{
           title: 'Recorrentes',

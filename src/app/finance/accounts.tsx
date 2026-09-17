@@ -345,8 +345,7 @@ export default function AccountsScreen() {
   return (
     <Screen
       grouped
-      onRefresh={() => Promise.all([balances.refetch(), accounts.refetch()])}
-      refreshing={balances.isRefetching}>
+      onRefresh={() => Promise.all([balances.refetch(), accounts.refetch()])}>
       <Stack.Screen
         options={{
           title: 'Contas',

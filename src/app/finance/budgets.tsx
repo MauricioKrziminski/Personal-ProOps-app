@@ -439,8 +439,7 @@ export default function BudgetsScreen() {
     <Screen
       stagger
       grouped
-      onRefresh={() => Promise.all([status.refetch(), rows.refetch(), refazerResumo()])}
-      refreshing={status.isRefetching}>
+      onRefresh={() => Promise.all([status.refetch(), rows.refetch(), refazerResumo()])}>
       <Stack.Screen
         options={{
           title: 'Orçamentos',

@@ -60,7 +60,7 @@ const VAZIO: Rascunho = { pattern: '', category: null, accountId: null };
 export default function RulesScreen() {
   const toast = useToast();
   const insets = useSafeAreaInsets();
-  const { data: rules, isLoading, isError, refetch, isRefetching } = useRules();
+  const { data: rules, isLoading, isError, refetch } = useRules();
   const { data: accounts } = useAccounts();
   const save = useSaveRule();
   const remove = useDeleteRule();
@@ -164,7 +164,7 @@ export default function RulesScreen() {
   };
 
   return (
-    <Screen grouped onRefresh={refetch} refreshing={isRefetching}>
+    <Screen grouped onRefresh={refetch}>
       <Stack.Screen
         options={{
           title: 'Regras',

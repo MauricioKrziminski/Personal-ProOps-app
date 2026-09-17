@@ -445,8 +445,7 @@ export default function ForecastScreen() {
     <Screen
       stagger
       grouped
-      onRefresh={() => Promise.all([forecast.refetch(), bills.refetch(), accounts.refetch(), historico.refetch()])}
-      refreshing={forecast.isRefetching}>
+      onRefresh={() => Promise.all([forecast.refetch(), bills.refetch(), accounts.refetch(), historico.refetch()])}>
       <Stack.Screen
         options={{
           title: 'Projeção',

@@ -59,7 +59,7 @@ export default function SearchScreen() {
     !reminders.isError;
 
   return (
-    <Screen grouped onRefresh={enabled ? () => Promise.all([notes.refetch(), transactions.refetch(), reminders.refetch()]) : undefined} refreshing={notes.isRefetching || transactions.isRefetching || reminders.isRefetching}>
+    <Screen grouped onRefresh={enabled ? () => Promise.all([notes.refetch(), transactions.refetch(), reminders.refetch()]) : undefined}>
       <Stack.Screen
         options={{
           title: 'Buscar',

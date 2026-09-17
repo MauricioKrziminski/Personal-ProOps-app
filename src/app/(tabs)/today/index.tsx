@@ -311,7 +311,6 @@ export default function TodayScreen() {
     <Screen
       stagger
       topBar={<AppHeader title="Hoje" />}
-      refreshing={gasto.isRefetching || bills.isRefetching || reminders.isRefetching || budgets.isRefetching || recent.isRefetching || profile.isRefetching}
       onRefresh={() => Promise.all([gasto.refetch(), bills.refetch(), reminders.refetch(), budgets.refetch(), recent.refetch(), profile.refetch()])}>
         {/*
           0. A saudação. Sem nome preenchido ela NÃO aparece — nem como "Bom dia," sozinho, nem

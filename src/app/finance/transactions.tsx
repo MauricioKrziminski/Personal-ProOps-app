@@ -162,6 +162,7 @@ export default function TransactionsScreen() {
   const [accountId, setAccountId] = useState<string | undefined>(params.accountId);
   const [source, setSource] = useState<TransactionSource | undefined>(undefined);
   const [search, setSearch] = useState('');
+  const [puxando, setPuxando] = useState(false);
   // Busca-enquanto-digita sem uma requisição por tecla — agora ela vai ao banco.
   const term = useDebounced(search.trim(), 250);
 
@@ -660,8 +661,14 @@ export default function TransactionsScreen() {
           onEndReached={() => {
             if (list.hasNextPage && !list.isFetchingNextPage) list.fetchNextPage();
           }}
-          refreshing={(list.isRefetching && !list.isFetchingNextPage) || summary.isRefetching || accounts.isRefetching || anyEver.isRefetching}
-          onRefresh={() => Promise.all([refazerPeriodo(), accounts.refetch(), anyEver.refetch()])}
+          // O indicador é do GESTO (§6 do design), não do `isRefetching`.
+          refreshing={puxando}
+          onRefresh={() => {
+            setPuxando(true);
+            void Promise.all([refazerPeriodo(), accounts.refetch(), anyEver.refetch()]).finally(() =>
+              setPuxando(false)
+            );
+          }}
           renderSectionHeader={({ section }) => (
             <View style={[styles.dayHeader, { backgroundColor: theme.groupedBackground }]}>
               <ThemedText

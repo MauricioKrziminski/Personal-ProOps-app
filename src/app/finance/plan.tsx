@@ -76,7 +76,7 @@ function selo(status: string, ate: string | null): { texto: string; perigo: bool
 export default function PlanScreen() {
   const theme = useTheme();
   const toast = useToast();
-  const { data, isLoading, isError, refetch, isRefetching } = usePlanStatus();
+  const { data, isLoading, isError, refetch } = usePlanStatus();
   // `isError` e não só `data`: o TanStack GUARDA o resultado anterior quando o refetch
   // falha, e sem este corte o cartão seguia afirmando números embaixo da faixa que acabou
   // de dizer que não conseguiu carregar. Zerar aqui cobre destaque, cota e limites de
@@ -133,7 +133,7 @@ export default function PlanScreen() {
     );
 
   return (
-    <Screen grouped onRefresh={() => Promise.all([refetch(), convites.refetch()])} refreshing={isRefetching}>
+    <Screen grouped onRefresh={() => Promise.all([refetch(), convites.refetch()])}>
       <Stack.Screen options={{ title: 'Plano', headerLargeTitle: true }} />
 
       {/* Falhar aqui não pode virar "você é Free": sem dado, a tela diz que não conseguiu ler. */}
