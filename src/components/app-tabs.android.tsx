@@ -1,12 +1,14 @@
 import { router, useSegments } from 'expo-router';
 import { TabList, TabSlot, TabTrigger, Tabs } from 'expo-router/ui';
-import { StyleSheet } from 'react-native';
+import { StyleSheet, View } from 'react-native';
 
 import { ThemedText } from '@/components/themed-text';
 import { PillTabBar, type PillTab } from '@/components/ui/pill-tab-bar';
+import { TabletNavigationRail } from '@/components/ui/tablet-navigation-rail';
 import { useBudgetsStatus, useUpcomingBills } from '@/hooks/use-finance';
 import { useTodayReminders } from '@/hooks/use-items';
 import { useTheme } from '@/hooks/use-theme';
+import { useAdaptiveWindow } from '@/hooks/use-adaptive-window';
 
 const TABS: PillTab[] = [
   { name: 'today', label: 'Hoje', icon: 'sun.max' },
@@ -39,6 +41,7 @@ const HREFS = ['/today', '/notes', '/finance', '/agent', '/profile'] as const;
 export default function AppTabs() {
   const theme = useTheme();
   const segments = useSegments();
+  const { androidRail } = useAdaptiveWindow();
 
   // As mesmas queries das telas — o TanStack Query dedupe e serve do cache, então o badge não
   // custa requisição a mais.
@@ -62,18 +65,18 @@ export default function AppTabs() {
   );
 
   const tabs = TABS.map((t) => (t.name === 'today' ? { ...t, badge: pendentes } : t));
+  const goToTab = (index: number) => router.navigate(HREFS[index]);
 
   return (
     /* `flex: 1` explícito: `style` SOBRESCREVE o do componente, e sem ele a árvore de abas
        colapsa para altura zero — a tela fica em branco, sem erro nenhum no log. */
     <Tabs style={{ flex: 1, backgroundColor: theme.background }}>
-      <TabSlot />
+      <View style={styles.workspace}>
+        {androidRail ? <TabletNavigationRail tabs={tabs} activeIndex={atual} onSelect={goToTab} /> : null}
+        <View style={styles.screen}><TabSlot /></View>
+      </View>
 
-      <PillTabBar
-        tabs={tabs}
-        activeIndex={atual}
-        onSelect={(i) => router.navigate(HREFS[i])}
-      />
+      {androidRail ? null : <PillTabBar tabs={tabs} activeIndex={atual} onSelect={goToTab} />}
 
       <TabList style={styles.hidden}>
         {TABS.map((tab, i) => (
@@ -89,4 +92,6 @@ export default function AppTabs() {
 const styles = StyleSheet.create({
   /** Registra as rotas sem ocupar espaço — o padrão do Expo para barra customizada. */
   hidden: { display: 'none' },
+  workspace: { flex: 1, flexDirection: 'row' },
+  screen: { flex: 1, minWidth: 0 },
 });

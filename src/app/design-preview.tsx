@@ -4,6 +4,8 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { Platform, StyleSheet, View, useWindowDimensions } from 'react-native';
 
 import { PillTabBar, type PillTab } from '@/components/ui/pill-tab-bar';
+import { TabletNavigationRail } from '@/components/ui/tablet-navigation-rail';
+import { useAdaptiveWindow } from '@/hooks/use-adaptive-window';
 import { localISODate } from '@/hooks/use-items';
 import { useTheme } from '@/hooks/use-theme';
 
@@ -182,6 +184,7 @@ export default function DesignPreviewScreen() {
   // com dado falso.
   const dev = __DEV__;
   const { height } = useWindowDimensions();
+  const { androidRail } = useAdaptiveWindow();
   const [aba, setAba] = useState<(typeof ABAS)[number]>('Hoje');
   /**
    * A faixa vertical. Era derivada de `passo`, e por isso tocar na barra do Android trocava a
@@ -207,12 +210,28 @@ export default function DesignPreviewScreen() {
   const alturaTotal = height * FAIXAS[aba];
 
   const client = useMemo(() => seedClient(), []);
+  const showChrome = Platform.OS === 'android' && RAIZES.has(aba);
+  const showTabletRail = showChrome && androidRail;
+  const selectTab = (index: number) => {
+    const alvo = ABAS.find((nome) => ABA_PARA_TAB[nome] === index);
+    if (alvo) {
+      setAba(alvo);
+      setFaixa(0);
+    }
+  };
 
   if (!dev) return <View style={{ flex: 1, backgroundColor: theme.background }} />;
 
   return (
     <QueryClientProvider client={client}>
-      <View style={[styles.root, { backgroundColor: theme.background }]}>
+      <View style={[styles.root, showTabletRail && styles.withRail, { backgroundColor: theme.background }]}>
+        {showTabletRail ? (
+          <TabletNavigationRail
+            tabs={TABS_ANDROID}
+            activeIndex={ABA_PARA_TAB[aba] ?? 0}
+            onSelect={selectTab}
+          />
+        ) : null}
         <View style={styles.janela}>
           <View
             style={{
@@ -243,17 +262,11 @@ export default function DesignPreviewScreen() {
             justamente o que essas faixas existem para mostrar — o "Registrar pagamento" da Fatura
             ficava embaixo dela.
           */}
-          {Platform.OS === 'android' && RAIZES.has(aba) ? (
+          {showChrome && !showTabletRail ? (
             <PillTabBar
               tabs={TABS_ANDROID}
               activeIndex={ABA_PARA_TAB[aba] ?? 0}
-              onSelect={(i) => {
-                const alvo = ABAS.find((nome) => ABA_PARA_TAB[nome] === i);
-                if (alvo) {
-                  setAba(alvo);
-                  setFaixa(0);
-                }
-              }}
+              onSelect={selectTab}
             />
           ) : null}
         </View>
@@ -946,5 +959,6 @@ function seedClient() {
 
 const styles = StyleSheet.create({
   root: { flex: 1 },
+  withRail: { flexDirection: 'row' },
   janela: { flex: 1, overflow: 'hidden' },
 });

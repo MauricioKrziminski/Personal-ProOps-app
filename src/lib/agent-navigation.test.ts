@@ -64,6 +64,13 @@ test('o Android navega para os cinco hrefs, na mesma ordem', () => {
   assert.deepEqual(hrefs, [...ORDEM]);
 });
 
+test('rail e pílula do Android recebem a mesma lista e a mesma seleção da rota', () => {
+  const fonte = ler('components/app-tabs.android.tsx');
+  assert.match(fonte, /<TabletNavigationRail\s+tabs=\{tabs\}\s+activeIndex=\{atual\}/);
+  assert.match(fonte, /<PillTabBar\s+tabs=\{tabs\}\s+activeIndex=\{atual\}/);
+  assert.match(fonte, /t\.name === 'today' \? \{ \.\.\.t, badge: pendentes \} : t/);
+});
+
 test('a vitrine visual monta as cinco raízes', () => {
   // `design-preview` é como as raízes são vistas sem login. Uma raiz de fora
   // dela é uma tela que volta a ser entregue no escuro — já aconteceu duas vezes.
@@ -74,6 +81,12 @@ test('a vitrine visual monta as cinco raízes', () => {
       `design-preview não conhece a raiz ${nome}`,
     );
   }
+});
+
+test('a vitrine Android mostra o mesmo chrome adaptativo das raízes', () => {
+  const fonte = ler('app/design-preview.tsx');
+  assert.match(fonte, /<TabletNavigationRail\s+tabs=\{TABS_ANDROID\}/);
+  assert.match(fonte, /showChrome && !showTabletRail \? \(/);
 });
 
 test('a aba do agente usa os SF Symbols que estão no mapa do Icon', () => {
