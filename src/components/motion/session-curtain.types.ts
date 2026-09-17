@@ -15,6 +15,9 @@ export interface CortinaApi {
   lembrarOrigem(ponto: Ponto): void;
   /** Consome a origem lembrada, se ainda vale. */
   tomarOrigem(): Ponto | null;
-  /** A raiz avisa que fontes e sessão estão prontas; a abertura só revela depois disso. */
-  marcarPronto(): void;
+  /**
+   * A raiz avisa que fontes e sessão estão prontas; a abertura só revela depois disso. Com o
+   * destino `conta` (sem sessão), a abertura para na capa das telas de conta.
+   */
+  marcarPronto(destino: 'app' | 'conta'): void;
 }

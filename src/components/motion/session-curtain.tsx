@@ -11,7 +11,7 @@ import {
   useState,
   type ReactNode,
 } from 'react';
-import { Image, Platform, StyleSheet, View } from 'react-native';
+import { Image, Platform, StyleSheet, View, useWindowDimensions } from 'react-native';
 import Animated, {
   Easing,
   cancelAnimation,
@@ -27,6 +27,7 @@ import Animated, {
 import { WaveCurtain } from '@/components/motion/wave-curtain';
 import { SkiaCanvas } from '@/components/ui/skia-canvas';
 import { Motion } from '@/design/tokens';
+import { progressoDaCapa } from '@/design/wave-math';
 import { useTheme } from '@/hooks/use-theme';
 import { comTeto } from '@/lib/com-teto';
 import { TETO_DA_ABERTURA_MS, origemValida, type Onda, type Ponto } from '@/lib/session-gate';
@@ -106,6 +107,7 @@ export function useCortinaAberta(): boolean {
  */
 export function CortinaProvider({ children }: { children: ReactNode }) {
   const reduzido = useReducedMotion();
+  const { height: alturaDaTela } = useWindowDimensions();
   const progresso = useSharedValue(0);
   const [fase, setFase] = useState<Fase>('abertura');
   const [onda, setOnda] = useState<Onda>(ONDA_DA_ABERTURA);
@@ -113,16 +115,17 @@ export function CortinaProvider({ children }: { children: ReactNode }) {
   const [pintada, setPintada] = useState(false);
   const [aberturaFeita, setAberturaFeita] = useState(false);
 
-  const pronto = useRef<{ valor: boolean; avisar: (() => void) | null }>({
-    valor: false,
-    avisar: null,
-  });
+  const pronto = useRef<{
+    valor: boolean;
+    destino: 'app' | 'conta';
+    avisar: (() => void) | null;
+  }>({ valor: false, destino: 'app', avisar: null });
   const origem = useRef<{ ponto: Ponto; em: number } | null>(null);
   // No Android o splash nativo não tem a marca, então esconder não espera o PNG.
   const splash = useRef({ layout: false, png: ENTRA_NA_CAMADA, escondido: false });
 
   const animar = useCallback(
-    (alvo: 0 | 1, duracao: number) =>
+    (alvo: number, duracao: number) =>
       new Promise<void>((ok) => {
         progresso.set(
           withTiming(
@@ -158,12 +161,18 @@ export function CortinaProvider({ children }: { children: ReactNode }) {
       setOnda(o);
       setFase('revelando');
       // O React precisa aplicar a onda nova antes de o progresso andar: nos primeiros quadros a
-      // ordem velha revelaria outros azulejos.
+      // forma velha ainda estaria na tela.
       await doisQuadros();
-      await animar(1, duracao);
+      /*
+        Até a capa, a onda para no topo e a camada desmonta: por baixo, a tela de conta desenha a
+        MESMA curva (`AuthCap`), então a passagem não aparece. O caminho é mais curto, e o tempo
+        encolhe junto para a velocidade da borda ser a mesma.
+      */
+      const alvo = o.ate === 'capa' ? progressoDaCapa(alturaDaTela) : 1;
+      await animar(alvo, duracao * (0.35 + 0.65 * alvo));
       setFase('aberta');
     },
-    [animar]
+    [animar, alturaDaTela]
   );
 
   const abrirJa = useCallback(() => {
@@ -183,9 +192,10 @@ export function CortinaProvider({ children }: { children: ReactNode }) {
     return ponto;
   }, []);
 
-  const marcarPronto = useCallback(() => {
+  const marcarPronto = useCallback((destino: 'app' | 'conta') => {
     if (pronto.current.valor) return;
     pronto.current.valor = true;
+    pronto.current.destino = destino;
     pronto.current.avisar?.();
   }, []);
 
@@ -254,8 +264,10 @@ export function CortinaProvider({ children }: { children: ReactNode }) {
       // O show é o anel se desenhando em volta da marca (`MarcaDaAbertura`); aqui só se espera.
       if (show === 'completa' && !reduzido) await dormir(Motion.curtain.full);
       await prontoOuTeto;
+      // Teto estourado deixa o destino em `app`: revelar tudo é o lado seguro.
+      const capa = pronto.current.destino === 'conta';
       await descobrir(
-        ONDA_DA_ABERTURA,
+        capa ? { ...ONDA_DA_ABERTURA, ate: 'capa' } : ONDA_DA_ABERTURA,
         show === 'completa' ? Motion.curtain.duration : Motion.curtain.short
       );
       setAberturaFeita(true);

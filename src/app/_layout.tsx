@@ -136,9 +136,10 @@ function AppTree() {
   */
   const cortina = useCortina();
   const pronto = !loading && (fontsLoaded || !!fontError);
+  const temSessao = !!session;
   useEffect(() => {
-    if (pronto) cortina.marcarPronto();
-  }, [pronto, cortina]);
+    if (pronto) cortina.marcarPronto(temSessao ? 'app' : 'conta');
+  }, [pronto, temSessao, cortina]);
   const previousUser = useRef<string | null | undefined>(undefined);
   useEffect(() => {
     if (loading) return;
