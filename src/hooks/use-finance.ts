@@ -1676,6 +1676,26 @@ export function useSpendable(view?: CycleView) {
   });
 }
 
+/** Um evento que forma o "livre" da Hoje (`public.spendable_path`) — a Pista. */
+export type SpendablePathRow = Fns['spendable_path']['Returns'][number];
+
+/**
+ * A MESMA lista que produz `comprometido_ate_entrada`. Chaveada junto do `spendable` para as
+ * duas envelhecerem juntas; `montarPista` ainda confere a soma e não desenha se não bater.
+ */
+export function useSpendablePath(view?: CycleView) {
+  useRealtimeMonth('spendable-path');
+  useRealtimeInvalidate('card_invoices', ['spendable-path']);
+  return useQuery({
+    queryKey: ['spendable-path', view ?? ''],
+    queryFn: async (): Promise<SpendablePathRow[]> => {
+      const { data, error } = await supabase.rpc('spendable_path', { p_view: view ?? undefined });
+      if (error) throw error;
+      return (data ?? []) as SpendablePathRow[];
+    },
+  });
+}
+
 export function useCycleLines(month: string, view?: CycleView) {
   useRealtimeMonth('cycle-lines');
   return useQuery({
