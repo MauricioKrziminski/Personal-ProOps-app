@@ -2,6 +2,8 @@ import { StyleSheet, View } from 'react-native';
 import Animated, { FadeInDown } from 'react-native-reanimated';
 import { Stack, router } from 'expo-router';
 
+import { CardFace, FaceEmVoo } from '@/components/finance/card-face';
+import { useFlight, useFlightAnchor, useFlightHidden } from '@/components/motion/flight-layer';
 import { PressableScale } from '@/components/motion/pressable-scale';
 import { useBRL } from '@/components/ui/conceal';
 import { ThemedText } from '@/components/themed-text';
@@ -19,6 +21,7 @@ import { ProgressBar } from '@/components/ui/sparkline';
 import { Motion, Radius, Space, tabular } from '@/design/tokens';
 import { useCardSummary, type CardSummary } from '@/hooks/use-finance';
 import { formatBRL, formatDateBR } from '@/hooks/use-items';
+import { diasAte as daysUntil, estadoDaFatura as estadoFatura, prazoLabel } from '@/lib/card-status';
 
 /**
  * Cartões — "quanto vou pagar de cartão, e quando?".
@@ -31,39 +34,6 @@ import { formatBRL, formatDateBR } from '@/hooks/use-items';
  * **Cartão é conta comum em partida dobrada:** a compra já contou como gasto, e o pagamento da
  * fatura é uma transferência (`pay_invoice`). Esta tela nunca oferece lançar fatura como despesa.
  */
-
-/** Dias até a data (negativo = já passou). Compara data pura, sem hora. */
-function daysUntil(iso: string): number {
-  const hoje = new Date();
-  const alvo = new Date(`${iso}T00:00:00`);
-  const umDia = 24 * 60 * 60 * 1000;
-  return Math.round(
-    (alvo.getTime() - new Date(hoje.getFullYear(), hoje.getMonth(), hoje.getDate()).getTime()) /
-      umDia
-  );
-}
-
-function prazoLabel(iso: string, prefixo: 'vence' | 'fecha'): string {
-  const dias = daysUntil(iso);
-  if (dias === 0) return `${prefixo} hoje`;
-  if (dias === 1) return `${prefixo} amanhã`;
-  if (dias > 0) return `${prefixo} em ${dias} dias`;
-  return `${prefixo === 'vence' ? 'venceu' : 'fechou'} há ${Math.abs(dias)} dias`;
-}
-
-/**
- * Estado da fatura.
- *
- * `card_summary()` ainda **não devolve `status`** — enquanto a coluna não existir na RPC, o
- * estado é inferido das datas que ela devolve. É a inferência mais honesta possível; o rótulo
- * fixo "fatura aberta" da versão anterior mentia para quem tinha fatura vencida.
- */
-function estadoFatura(card: CardSummary): 'Aberta' | 'Fechada' | 'Atrasada' | null {
-  if (!card.invoice_id) return null;
-  if (card.due_date && daysUntil(card.due_date) < 0) return 'Atrasada';
-  if (card.closing_date && daysUntil(card.closing_date) < 0) return 'Fechada';
-  return 'Aberta';
-}
 
 /** Faixa de erro da tela. Não é o destaque — a tela já tem o dela. */
 function ErrorBand({ message, onRetry }: { message: string; onRetry: () => void }) {
@@ -99,6 +69,47 @@ function PressCard({
   );
 }
 
+const MINIATURA = 56;
+
+/**
+ * O cartão em miniatura no cabeçalho de cada bloco — a porta desta tela para a Carteira.
+ *
+ * Botão PRÓPRIO dentro do card: o card continua abrindo a fatura, e a miniatura leva o cartão
+ * voando até o carrossel (e o recebe de volta ao fechar, pela âncora `miniatura:<id>`).
+ */
+function Miniatura({ card }: { card: CardSummary }) {
+  const id = card.account_id;
+  const { voar } = useFlight();
+  const { prender, aoPosicionar } = useFlightAnchor(`miniatura:${id}`);
+  const oculto = useFlightHidden(`miniatura:${id}`);
+  const atrasada = Number(card.overdue_count ?? 0) > 0;
+
+  const abrir = () => {
+    void voar({
+      de: `miniatura:${id}`,
+      poseDe: 'deitado',
+      esconderDe: `miniatura:${id}`,
+      para: 'vitrine',
+      posePara: 'em-pe',
+      esconderPara: `vitrine:${id}`,
+      desenho: (progresso) => <FaceEmVoo nome={card.name} atrasada={atrasada} progresso={progresso} />,
+    }).then((ok) => ok && router.push({ pathname: '/finance/wallet', params: { card: id, origem: 'miniatura' } }));
+  };
+
+  return (
+    <PressableScale
+      accessibilityRole="button"
+      accessibilityLabel={`Abrir ${card.name} na carteira`}
+      haptic="light"
+      hitSlop={Space.sm}
+      onPress={abrir}>
+      <Animated.View ref={prender} onLayout={aoPosicionar} style={oculto}>
+        <CardFace nome={card.name} largura={MINIATURA} atrasada={atrasada} />
+      </Animated.View>
+    </PressableScale>
+  );
+}
+
 export default function CardsScreen() {
   // Dinheiro no meio de frase obedece ao "esconder saldo" — `Money` não cabe em texto corrido.
   const brl = useBRL();
@@ -127,7 +138,9 @@ export default function CardsScreen() {
   };
 
   return (
-    <Screen grouped onRefresh={() => cards.refetch()} refreshing={cards.isRefetching}>
+    // Sem `refreshing={isRefetching}` (§6 do design): o `Screen` já segue o gesto, e a revalidação
+    // que a Carteira dispara fazia o indicador girar sozinho ao voltar para cá.
+    <Screen grouped onRefresh={() => cards.refetch()}>
       <Stack.Screen
         options={{
           title: 'Cartões',
@@ -175,7 +188,6 @@ export default function CardsScreen() {
         const naoPago = Number(card.unpaid_total_cents ?? 0);
         const limite = Number(card.credit_limit_cents ?? 0);
         const livre = Number(card.available_limit_cents ?? 0);
-        const anterior = naoPago - totalFatura;
         const pct = limite > 0 ? naoPago / limite : 0;
         const podePagar = estado === 'Fechada' || estado === 'Atrasada';
 
@@ -219,6 +231,7 @@ export default function CardsScreen() {
               onPress={() => irParaFatura(card)}
               accessibilityLabel={`${card.name}, ${estado ? `fatura ${estado.toLowerCase()}` : 'sem fatura aberta'}, ${formatBRL(totalFatura)}${card.due_date ? `, ${prazoLabel(card.due_date, 'vence')}` : ''}`}>
               <View style={styles.cardHead}>
+                <Miniatura card={card} />
                 <ThemedText type="smallBold" style={styles.cardName}>
                   {card.name}
                 </ThemedText>
@@ -254,35 +267,17 @@ export default function CardsScreen() {
                     max={limite}
                     tone={pct >= 1 ? 'danger' : pct >= 0.7 ? 'warning' : 'tint'}
                   />
-                  <View style={styles.limitLine}>
-                    <ThemedText type="footnote" themeColor="textSecondary" style={tabular}>
-                      usado {brl(naoPago)} de {brl(limite)}
-                    </ThemedText>
-                    {livre < 0 ? (
-                      <View style={styles.badge}>
-                        <Icon name="exclamationmark.triangle.fill" size="sm" color="danger" />
-                        <ThemedText type="footnote" themeColor="danger" style={tabular}>
-                          {brl(Math.abs(livre))} acima do limite
-                        </ThemedText>
-                      </View>
-                    ) : (
-                      <ThemedText type="footnote" themeColor="textSecondary" style={tabular}>
-                        livre {brl(livre)}
-                      </ThemedText>
-                    )}
-                  </View>
+                  {/* Uma linha: quanto sobra do limite. A barra já conta o resto (inclusive fatura
+                      anterior em aberto, que era uma frase à parte). */}
+                  <ThemedText
+                    type="footnote"
+                    themeColor={livre < 0 ? 'danger' : 'textSecondary'}
+                    style={tabular}>
+                    {livre < 0
+                      ? `${brl(Math.abs(livre))} acima do limite de ${brl(limite)}`
+                      : `${brl(livre)} livre de ${brl(limite)}`}
+                  </ThemedText>
                 </>
-              ) : (
-                <ThemedText type="small" themeColor="tint">
-                  Cadastre o limite para acompanhar quanto sobra
-                </ThemedText>
-              )}
-
-              {/* "usado" soma TODAS as faturas não pagas; o número grande é só a desta. */}
-              {anterior > 0 ? (
-                <ThemedText type="footnote" themeColor="textSecondary">
-                  Inclui {brl(anterior)} de fatura anterior em aberto.
-                </ThemedText>
               ) : null}
 
               {podePagar && totalFatura > 0 ? (
@@ -305,7 +300,6 @@ export default function CardsScreen() {
           <Row
             icon="calendar"
             title="Faturas anteriores"
-            subtitle="Ver as faturas fechadas e pagas"
             onPress={() => router.push('/finance/invoices')}
           />
         </Section>
@@ -343,12 +337,6 @@ const styles = StyleSheet.create({
   badge: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: Space.xs,
-  },
-  limitLine: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    justifyContent: 'space-between',
     gap: Space.xs,
   },
   band: {

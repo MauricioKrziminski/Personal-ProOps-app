@@ -26,6 +26,7 @@ import { EmptyState } from '@/components/ui/empty-state';
 import { Icon } from '@/components/ui/icon';
 import { Money } from '@/components/ui/money';
 import { Note } from '@/components/ui/note';
+import { cartaoDaPilha } from '@/lib/card-status';
 import { describeCycle, describeRealizado } from '@/lib/cycle-label';
 import { Row, Section } from '@/components/ui/row';
 import { SectionHead } from '@/components/ui/section-head';
@@ -309,27 +310,13 @@ export default function FinanceScreen() {
   const debts = useDebts();
   const cards = useCardSummary();
   const [janelaCashflow, setJanelaCashflow] = useState('6');
-  /** O cartão que a carteira está mostrando — rotula a saída logo abaixo dela. */
-  const [cartaoFrente, setCartaoFrente] = useState<StackedCard | null>(null);
 
   /**
    * Memoizado: montado inline no JSX, o array nascia novo a cada render e a carteira inteira
    * remontava junto — inclusive o efeito que reporta o cartão da frente.
    */
   const cartoesDaCarteira = useMemo<StackedCard[]>(
-    () =>
-      (cards.data ?? []).map((c) => ({
-        account_id: c.account_id,
-        name: c.name,
-        invoice_id: c.invoice_id,
-        invoice_total_cents: Number(c.invoice_total_cents ?? 0),
-        credit_limit_cents: c.credit_limit_cents == null ? null : Number(c.credit_limit_cents),
-        available_limit_cents:
-          c.available_limit_cents == null ? null : Number(c.available_limit_cents),
-        closing_date: c.closing_date,
-        due_date: c.due_date,
-        overdue_count: Number(c.overdue_count ?? 0),
-      })),
+    () => (cards.data ?? []).map(cartaoDaPilha),
     [cards.data]
   );
   const cashflow = useMonthlyCashflow(Number(janelaCashflow));
@@ -861,37 +848,11 @@ export default function FinanceScreen() {
                 </Pressable>
               }
             />
-            <CardStack
-              cards={cartoesDaCarteira}
-              onFrontChange={setCartaoFrente}
-              onOpen={(card) => abrirFatura(card)}
-            />
+            {/* A fatura do cartão da frente abre pelo "fecha ›" da face. Havia uma linha "Fatura
+                do X" logo abaixo com o mesmo nome, fechamento e total — eco da face, e saiu com o
+                corte de texto de 16/09/2026. */}
+            <CardStack cards={cartoesDaCarteira} onOpen={(card) => abrirFatura(card)} />
 
-            {/*
-              A saída DO CARTÃO, colada na carteira.
-
-              Sem ela, a primeira coisa abaixo do cartão era "Últimos lançamentos" — e
-              proximidade sugere posse: a lista parecia ser daquele cartão, sendo que ela é de
-              tudo. Esta linha responde a pergunta que o cartão levanta ("e os gastos DELE?")
-              no lugar onde ela nasce, e por isso a seção seguinte pode começar do zero.
-            */}
-            {cartaoFrente ? (
-              <Section>
-                <Row
-                  title={`Fatura do ${cartaoFrente.name}`}
-                  subtitle={
-                    cartaoFrente.closing_date
-                      ? `fecha ${formatDateBR(cartaoFrente.closing_date)}`
-                      : 'sem fatura aberta'
-                  }
-                  icon="creditcard"
-                  onPress={() => abrirFatura(cartaoFrente)}
-                  trailing={
-                    <Money cents={Number(cartaoFrente.invoice_total_cents ?? 0)} variant="ticker" />
-                  }
-                />
-              </Section>
-            ) : null}
           </View>
         ) : null}
 

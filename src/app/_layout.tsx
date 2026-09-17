@@ -21,6 +21,7 @@ import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { KeyboardProvider } from 'react-native-keyboard-controller';
 
 import { CortinaProvider, useCortina } from '@/components/motion/session-curtain';
+import { FlightProvider } from '@/components/motion/flight-layer';
 import { LockOverlay } from '@/components/ui/lock-overlay';
 import { LockProvider } from '@/hooks/use-lock';
 import { AndroidActionSheet } from '@/components/ui/action-sheet';
@@ -221,6 +222,8 @@ function AppTree() {
                */
               <>
                 <StatusBar style={statusBarStyle} />
+                {/* A camada do voo do cartão mora ao lado do `<Stack>`, acima das telas (800). */}
+                <FlightProvider>
                 <Stack
                   screenOptions={{
                     statusBarStyle: Platform.OS === 'android' ? statusBarStyle : undefined,
@@ -291,7 +294,27 @@ function AppTree() {
                   <Stack.Screen name="finance/[txId]" options={{ title: 'Lançamento' }} />
                   <Stack.Screen name="finance/accounts" options={{ title: 'Contas' }} />
                   <Stack.Screen name="finance/cards" options={{ title: 'Cartões' }} />
-                  <Stack.Screen name="finance/invoice/[id]" options={{ title: 'Fatura' }} />
+                  {/*
+                    A fatura aberta pela Carteira entra em `fade`: o cartão chega voando por cima
+                    (camada de voo) e pousa no topo dela. Por qualquer outro caminho, o push
+                    normal da plataforma.
+                  */}
+                  <Stack.Screen
+                    name="finance/invoice/[id]"
+                    options={({ route }) => ({
+                      title: 'Fatura',
+                      animation: (route.params as { via?: string } | undefined)?.via === 'carteira' ? 'fade' : 'default',
+                    })}
+                  />
+                  {/*
+                    A Carteira é um `push` com `fade`, não um modal transparente: no iOS o modal
+                    é apresentado ACIMA da raiz React e esconderia a camada de voo. O gesto de
+                    voltar do iOS sai porque o fechar dela é o arraste para baixo.
+                  */}
+                  <Stack.Screen
+                    name="finance/wallet"
+                    options={{ headerShown: false, animation: 'fade', gestureEnabled: Platform.OS !== 'ios' }}
+                  />
                   <Stack.Screen name="finance/invoices" options={{ title: 'Faturas' }} />
                   <Stack.Screen name="finance/installments" options={{ title: 'Parceladas' }} />
                   <Stack.Screen name="finance/budgets" options={{ title: 'Orçamentos' }} />
@@ -359,6 +382,7 @@ function AppTree() {
                   <Stack.Screen name="catalog" options={{ title: 'Catálogo' }} />
                 </Stack.Protected>
               </Stack>
+              </FlightProvider>
             </>
               )}
             </AppUpdateProvider>

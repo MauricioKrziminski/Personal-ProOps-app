@@ -523,23 +523,24 @@ export function useCardSummary() {
 }
 
 /** Fatura + as compras dela (RLS já limita ao workspace). */
-export function useInvoice(invoiceId: string | undefined) {
-  useRealtimeInvalidate('card_invoices', ['invoice']);
-  useRealtimeInvalidate('transactions', ['invoice']);
-  return useQuery({
-    enabled: Boolean(invoiceId),
-    queryKey: ['invoice', invoiceId ?? ''],
+/**
+ * A consulta de UMA fatura, fora do hook: a Carteira pré-carrega a fatura do cartão da frente
+ * (`prefetchQuery`) para o cartão pousar na fatura já com o total, em vez de num esqueleto.
+ */
+export function invoiceQuery(invoiceId: string) {
+  return {
+    queryKey: ['invoice', invoiceId] as const,
     queryFn: async (): Promise<{ invoice: CardInvoice; transactions: Transaction[] }> => {
       const [invoiceRes, txRes] = await Promise.all([
         supabase
           .from('card_invoices')
           .select('id, account_id, reference_month, closing_date, due_date, status, paid_at, paid_cents')
-          .eq('id', invoiceId!)
+          .eq('id', invoiceId)
           .single(),
         supabase
           .from('transactions')
           .select(TRANSACTION_COLUMNS)
-          .eq('invoice_id', invoiceId!)
+          .eq('invoice_id', invoiceId)
           .order('occurred_at', { ascending: false }),
       ]);
       if (invoiceRes.error) throw invoiceRes.error;
@@ -549,7 +550,13 @@ export function useInvoice(invoiceId: string | undefined) {
         transactions: txRes.data as Transaction[],
       };
     },
-  });
+  };
+}
+
+export function useInvoice(invoiceId: string | undefined) {
+  useRealtimeInvalidate('card_invoices', ['invoice']);
+  useRealtimeInvalidate('transactions', ['invoice']);
+  return useQuery({ ...invoiceQuery(invoiceId ?? ''), enabled: Boolean(invoiceId) });
 }
 
 /**

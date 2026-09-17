@@ -1,5 +1,6 @@
 import { LinearGradient, Rect, vec } from '@shopify/react-native-skia';
 import { Pressable, StyleSheet, View, useWindowDimensions, type StyleProp, type ViewStyle } from 'react-native';
+import Animated, { interpolate, useAnimatedStyle, type SharedValue } from 'react-native-reanimated';
 
 import { ThemedText } from '@/components/themed-text';
 import { useBRL } from '@/components/ui/conceal';
@@ -10,8 +11,9 @@ import { ProgressBar } from '@/components/ui/sparkline';
 import { brandColor, clarear, escurecer, tintaDoCartao } from '@/design/card-brands';
 import { LARGURA_DE_DESENHO, alturaDoCartao } from '@/design/card-geometry';
 import { Radius, Space, tabular } from '@/design/tokens';
-import { formatBRL, formatDateBR } from '@/hooks/use-items';
+import { formatDateBR } from '@/hooks/use-items';
 import { useTheme } from '@/hooks/use-theme';
+import type { CartaoDaPilha } from '@/lib/card-status';
 
 /**
  * As três tintas de uma face: a do texto, a do texto secundário e a das pílulas.
@@ -65,7 +67,14 @@ export function CardFace({
   const t = tintasDoCartao(nome);
 
   return (
-    <View style={[styles.face, { width: largura, height: altura, backgroundColor: t.marca }, style]}>
+    <View
+      style={[
+        styles.face,
+        // O canto escala com o cartão, como o resto do desenho: a miniatura de 56 é um cartão
+        // pequeno, não uma pílula, e o clone do voo pousa com o mesmo canto que o destino.
+        { width: largura, height: altura, backgroundColor: t.marca, borderRadius: Radius.md * (largura / LARGURA_DE_DESENHO) },
+        style,
+      ]}>
       <Metal marca={t.marca} largura={largura} altura={altura} />
       <View
         style={[
@@ -128,17 +137,42 @@ function Metal({ marca, largura, altura }: { marca: string; largura: number; alt
   );
 }
 
-/** O mínimo que a base da pilha precisa de um cartão (um recorte do `card_summary`). */
-export interface CartaoDaPilha {
-  account_id: string;
-  name: string;
-  invoice_id: string | null;
-  invoice_total_cents: number;
-  credit_limit_cents: number | null;
-  available_limit_cents: number | null;
-  closing_date: string | null;
-  due_date: string | null;
-  overdue_count: number;
+/**
+ * O cartão do voo (`flight-layer.tsx`): a face em `LARGURA_DE_DESENHO`, com a base de ORIGEM
+ * saindo na primeira metade do caminho e a de DESTINO entrando na segunda. A pilha tem números e
+ * a vitrine não; sem a troca, o cartão pousaria com a base errada e ela sumiria num quadro.
+ */
+export function FaceEmVoo({
+  nome,
+  atrasada,
+  progresso,
+  baseDe,
+  basePara,
+}: {
+  nome: string;
+  atrasada?: boolean;
+  progresso: SharedValue<number>;
+  baseDe?: React.ReactNode;
+  basePara?: React.ReactNode;
+}) {
+  const sai = useAnimatedStyle(() => ({
+    opacity: interpolate(progresso.get(), [0, 0.45], [1, 0], 'clamp'),
+  }));
+  const entra = useAnimatedStyle(() => ({
+    opacity: interpolate(progresso.get(), [0.55, 1], [0, 1], 'clamp'),
+  }));
+  return (
+    <CardFace nome={nome} largura={LARGURA_DE_DESENHO} atrasada={atrasada}>
+      {baseDe || basePara ? (
+        <View>
+          {baseDe ? <Animated.View style={sai}>{baseDe}</Animated.View> : null}
+          {basePara ? (
+            <Animated.View style={[baseDe ? styles.sobreposta : null, entra]}>{basePara}</Animated.View>
+          ) : null}
+        </View>
+      ) : null}
+    </CardFace>
+  );
 }
 
 /**
@@ -152,19 +186,15 @@ export function BaseDaPilha({ card, onFatura }: { card: CartaoDaPilha; onFatura?
   const limite = Number(card.credit_limit_cents ?? 0);
   const usado = Number(card.invoice_total_cents ?? 0);
 
+  const livre = Number(card.available_limit_cents ?? 0);
+
+  // Uma linha só: a data é a informação e o chevron diz que é botão.
   const fecha = (
     <>
-      <ThemedText type="meta" themeColor={t.suave}>
-        {card.closing_date ? 'fecha em' : 'sem fatura'}
+      <ThemedText type="meta" themeColor={t.suave} style={tabular}>
+        {card.closing_date ? `fecha ${formatDateBR(card.closing_date)}` : 'sem fatura'}
       </ThemedText>
-      <View style={styles.fechaValor}>
-        {card.closing_date ? (
-          <ThemedText type="ticker" themeColor={t.tinta} style={tabular}>
-            {formatDateBR(card.closing_date)}
-          </ThemedText>
-        ) : null}
-        <Icon name="chevron.right" size="xs" color={t.suave} />
-      </View>
+      <Icon name="chevron.right" size="xs" color={t.suave} />
     </>
   );
 
@@ -197,12 +227,12 @@ export function BaseDaPilha({ card, onFatura }: { card: CartaoDaPilha; onFatura?
 
       <View style={styles.rodape}>
         {/* `flexShrink: 0`: a data é a informação, não o complemento (§3 do design). */}
-        <ThemedText type="meta" themeColor={t.suave} style={styles.rigido}>
+        <ThemedText type="meta" themeColor={t.suave} style={[styles.rigido, tabular]}>
           {card.due_date ? `vence ${formatDateBR(card.due_date)}` : 'sem vencimento'}
         </ThemedText>
         {limite > 0 ? (
           <ThemedText type="meta" themeColor={t.suave} style={tabular}>
-            disponível {brl(Number(card.available_limit_cents ?? 0))}
+            {livre < 0 ? `${brl(-livre)} acima do limite` : `${brl(livre)} livre`}
           </ThemedText>
         ) : null}
       </View>
@@ -210,14 +240,19 @@ export function BaseDaPilha({ card, onFatura }: { card: CartaoDaPilha; onFatura?
   );
 }
 
-/** O rótulo do cartão para leitor de tela — o mesmo em todo lugar em que a face é tocável. */
-export function rotuloDoCartao(card: Pick<CartaoDaPilha, 'name' | 'invoice_total_cents'>) {
-  return `${card.name}, fatura de ${formatBRL(Number(card.invoice_total_cents ?? 0))}`;
+/**
+ * O rótulo do cartão para leitor de tela. Recebe o formatador de quem chama (`useBRL`): o valor
+ * obedece ao "esconder saldo" também na voz.
+ */
+export function rotuloDoCartao(
+  card: Pick<CartaoDaPilha, 'name' | 'invoice_total_cents'>,
+  brl: (cents: number) => string
+) {
+  return `${card.name}, fatura de ${brl(Number(card.invoice_total_cents ?? 0))}`;
 }
 
 const styles = StyleSheet.create({
   face: {
-    borderRadius: Radius.md,
     borderCurve: 'continuous',
     overflow: 'hidden',
   },
@@ -241,10 +276,10 @@ const styles = StyleSheet.create({
     borderRadius: Radius.pill,
   },
   base: { gap: Space.sm },
+  sobreposta: { position: 'absolute', left: 0, right: 0, bottom: 0 },
   faturaLinha: { flexDirection: 'row', alignItems: 'flex-end', justifyContent: 'space-between', gap: Space.md },
   fatura: { flex: 1, minWidth: 0, gap: Space.half },
-  fecha: { alignItems: 'flex-end', gap: Space.half },
-  fechaValor: { flexDirection: 'row', alignItems: 'center', gap: Space.xs },
+  fecha: { flexDirection: 'row', alignItems: 'center', gap: Space.xs, paddingBottom: Space.xs },
   rodape: {
     flexDirection: 'row',
     alignItems: 'center',
