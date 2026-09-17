@@ -5,11 +5,14 @@ import { test } from 'node:test';
 
 import {
   brToISO,
+  diaCurtoBR,
   diasAte,
   ehUltimoDiaDoMes,
+  emQuantoTempo,
   formatBRL,
   formatDateBR,
   greetingBR,
+  horaBR,
   isValidBRDate,
   isValidTime,
   isoToBR,
@@ -22,6 +25,7 @@ import {
   monthGrid,
   primeiroDiaDoMes,
   relativeBR,
+  rotuloDoDia,
   somaDias,
   timeBR,
 } from './dates.ts';
@@ -237,4 +241,30 @@ test('mesmoMes casa qualquer dia do mês — o `startsWith` só acertava o dia 0
   assert.equal(mesmoMes('2026-09-01', '2026-09-01'), true);
   assert.equal(mesmoMes('2026-09-01', '2026-10-01'), false);
   assert.equal(mesmoMes('2026-09-01', '2027-09-01'), false, 'o ano conta');
+});
+
+test('diaCurtoBR escreve o dia da semana e o mês abreviados', () => {
+  assert.equal(diaCurtoBR('2026-09-17'), 'qui, 17 set');
+  assert.equal(diaCurtoBR('2026-01-04'), 'dom, 4 jan');
+});
+
+test('rotuloDoDia usa palavra perto de hoje e a data curta longe', () => {
+  assert.equal(rotuloDoDia('2026-09-17', '2026-09-17'), 'hoje');
+  assert.equal(rotuloDoDia('2026-09-18', '2026-09-17'), 'amanhã');
+  assert.equal(rotuloDoDia('2026-09-16', '2026-09-17'), 'ontem');
+  assert.equal(rotuloDoDia('2026-09-19', '2026-09-17'), 'sáb, 19 set');
+});
+
+test('horaBR não inventa hora', () => {
+  assert.equal(horaBR(null), '—');
+  assert.equal(horaBR('lixo'), '—');
+  const d = new Date(2026, 8, 17, 9, 5);
+  assert.equal(horaBR(d.toISOString()), '09:05');
+});
+
+test('emQuantoTempo fala em minutos até uma hora e em horas depois', () => {
+  const agora = new Date(2026, 8, 17, 9, 0).getTime();
+  assert.equal(emQuantoTempo(new Date(2026, 8, 17, 9, 20).toISOString(), agora), 'em 20 min');
+  assert.equal(emQuantoTempo(new Date(2026, 8, 17, 9, 0, 20).toISOString(), agora), 'em 1 min');
+  assert.equal(emQuantoTempo(new Date(2026, 8, 17, 11, 40).toISOString(), agora), 'em 3 h');
 });

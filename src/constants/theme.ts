@@ -104,6 +104,21 @@ export const Colors = {
     /** O polegar do segmentado: branco sobre o trilho cinza no claro, um degrau acima no escuro. */
     thumb: '#FFFFFF',
     cardFooterPress: 'rgba(11, 11, 12, 0.08)',
+    /** O balão de fala da pessoa na Hoje: tinta cheia, texto invertido. */
+    bubble: '#0B0B0C',
+    onBubble: '#F4F4F2',
+    /** O trilho vertical das agendas e da linha do tempo. */
+    rail: 'rgba(11, 11, 12, 0.10)',
+    /** A luz da tinta viva do herói, e o mesmo branco sem opacidade para o degradê. */
+    heroGlow: 'rgba(255, 255, 255, 0.16)',
+    heroGlowClear: 'rgba(255, 255, 255, 0)',
+    /** Escala tonal de tinta para parte-do-todo (a rosca). Do mais forte ao mais leve. */
+    chart1: '#0B0B0C',
+    chart2: '#3A3A3E',
+    chart3: '#6B6B70',
+    chart4: '#9B9BA0',
+    chart5: '#C7C6C0',
+    chart6: '#DDDCD7',
   },
   dark: {
     text: '#F4F4F2',
@@ -155,6 +170,17 @@ export const Colors = {
     cardFooter: 'rgba(0, 0, 0, 0.24)',
     thumb: '#3A3A3E',
     cardFooterPress: 'rgba(0, 0, 0, 0.36)',
+    bubble: '#F4F4F2',
+    onBubble: '#0B0B0C',
+    rail: 'rgba(244, 244, 242, 0.12)',
+    heroGlow: 'rgba(255, 255, 255, 0.11)',
+    heroGlowClear: 'rgba(255, 255, 255, 0)',
+    chart1: '#F4F4F2',
+    chart2: '#C7C6C0',
+    chart3: '#9B9BA0',
+    chart4: '#6B6B70',
+    chart5: '#4A4A4F',
+    chart6: '#303034',
   },
 } as const;
 

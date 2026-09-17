@@ -262,3 +262,42 @@ export function monthGrid(month: string): (string | null)[] {
 export function ehUltimoDiaDoMes(d: Date): boolean {
   return d.getDate() === new Date(d.getFullYear(), d.getMonth() + 1, 0).getDate();
 }
+
+const DIAS_CURTOS = ['dom', 'seg', 'ter', 'qua', 'qui', 'sex', 'sáb'] as const;
+const MESES_CURTOS = ['jan', 'fev', 'mar', 'abr', 'mai', 'jun', 'jul', 'ago', 'set', 'out', 'nov', 'dez'] as const;
+
+/**
+ * `2026-09-17` → `qui, 17 set`.
+ *
+ * Calendário puro, sem `Intl`: o Hermes não garante o locale pt-BR em todo Android, e a data
+ * da agenda não pode sair em inglês num aparelho e em português no outro.
+ */
+export function diaCurtoBR(iso: string): string {
+  const [y, m, d] = iso.split('-').map(Number);
+  const semana = new Date(Date.UTC(y, m - 1, d)).getUTCDay();
+  return `${DIAS_CURTOS[semana]}, ${d} ${MESES_CURTOS[m - 1]}`;
+}
+
+/** Como a agenda chama um dia: `hoje`, `amanhã`, `ontem` ou a data curta. */
+export function rotuloDoDia(iso: string, hoje = localISODate()): string {
+  const delta = diasAte(iso, hoje);
+  if (delta === 0) return 'hoje';
+  if (delta === 1) return 'amanhã';
+  if (delta === -1) return 'ontem';
+  return diaCurtoBR(iso);
+}
+
+/** `HH:MM` local de um timestamp ISO. Vazio ou inválido vira travessão, nunca "NaN:NaN". */
+export function horaBR(iso: string | null | undefined): string {
+  if (!iso) return '—';
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return '—';
+  return timeBR(d);
+}
+
+/** "em 20 min" / "em 3 h" — a distância até o próximo lembrete, sem fingir precisão de segundos. */
+export function emQuantoTempo(iso: string, agora: number): string {
+  const minutos = Math.round((new Date(iso).getTime() - agora) / 60000);
+  if (minutos < 60) return `em ${Math.max(1, minutos)} min`;
+  return `em ${Math.round(minutos / 60)} h`;
+}
