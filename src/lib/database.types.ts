@@ -808,24 +808,48 @@ export type Database = {
           action_index: number
           action_type: string
           executed_at: string
+          origin_text: string | null
           result_id: string | null
           source_message_id: string
+          user_id: string | null
+          workspace_id: string | null
         }
         Insert: {
           action_index: number
           action_type: string
           executed_at?: string
+          origin_text?: string | null
           result_id?: string | null
           source_message_id: string
+          user_id?: string | null
+          workspace_id?: string | null
         }
         Update: {
           action_index?: number
           action_type?: string
           executed_at?: string
+          origin_text?: string | null
           result_id?: string | null
           source_message_id?: string
+          user_id?: string | null
+          workspace_id?: string | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "executed_actions_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "executed_actions_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       goal_contributions: {
         Row: {
@@ -2479,6 +2503,21 @@ export type Database = {
           worst_day: string
         }[]
       }
+      agent_activity: {
+        Args: { p_limit?: number }
+        Returns: {
+          action_index: number
+          action_type: string
+          channel: string
+          executed_at: string
+          input_kind: string
+          origin_text: string
+          record: Json
+          result_id: string
+          session_id: string
+          source_message_id: string
+        }[]
+      }
       annual_by_category: {
         Args: { p_year: number }
         Returns: {
@@ -2913,6 +2952,16 @@ export type Database = {
           comprometido_ate_entrada: number
           comprometido_no_ciclo: number
           proxima_entrada: string
+        }[]
+      }
+      spendable_path: {
+        Args: { p_view?: string }
+        Returns: {
+          day: string
+          origin: string
+          out_cents: number
+          ref_id: string
+          title: string
         }[]
       }
       transactions_summary: {
