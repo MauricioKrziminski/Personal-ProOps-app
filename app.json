@@ -59,7 +59,8 @@
       "expo-web-browser",
       "./plugins/with-android-abis",
       "./plugins/with-apk-installer",
-      "./plugins/with-text-advance-width"
+      "./plugins/with-text-advance-width",
+      "./plugins/with-android-window-background"
     ],
     "experiments": {
       "typedRoutes": true,

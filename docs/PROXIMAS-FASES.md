@@ -821,6 +821,9 @@ quem abre o app, o olho protege quem olha por cima do ombro. Deixe independentes
   o módulo local `modules/proops-privacidade` esconde a FOTO que o sistema tira na pausa (capa
   nativa no `didEnterBackground` do iOS; `setRecentsScreenshotEnabled(false)` no Android 13+). Só
   com a trava ligada e conta aberta. Dentro da espera de 30/60 s a tinta esmaece sem pedir senha.
+  Sem a foto, o Android pinta o quadro da volta com o fundo da tarefa: o plugin
+  `with-android-window-background` o põe no papel do app (claro) e na tinta (escuro) — o padrão
+  era um cinza `#303030` no escuro.
 - **A abertura segura a marca enquanto o sistema pede a senha** e sobe direto no app (ver
   `design.md` §5).
 
