@@ -80,6 +80,9 @@ export function patterned(i: number, seed: number, share = 0.34): boolean {
  * `ox`/`oy` são a origem em fração da área (0..1). Com `seed`, um fio de ruído (15%) quebra a
  * régua para a onda não parecer uma persiana; as pontas (0 e 1) ficam exatas, porque é por elas
  * que a onda começa e termina no tempo certo.
+ *
+ * `invert` devolve `1 - ordem`. Quem COBRE a partir de um ponto passa `true`: com o progresso
+ * descendo, quem cobre primeiro é a ordem alta, e invertida a ordem alta fica perto da origem.
  */
 export function waveOrder(
   col: number,
@@ -89,7 +92,8 @@ export function waveOrder(
   mode: WaveMode,
   ox = 0.5,
   oy = 0.5,
-  seed = 0
+  seed = 0,
+  invert = false
 ): number {
   'worklet';
   const x = cols > 1 ? col / (cols - 1) : 0.5;
@@ -112,9 +116,10 @@ export function waveOrder(
     const sy = oy <= 0.5 ? y : 1 - y;
     base = (sx + sy) / 2;
   }
-  if (seed === 0 || base <= 0 || base >= 1) return base;
+  if (seed === 0 || base <= 0 || base >= 1) return invert ? 1 - base : base;
   const ruido = seeded(row * cols + col, seed + 303) * 0.15;
-  return Math.min(1, Math.max(0, base * 0.85 + ruido));
+  const ordem = Math.min(1, Math.max(0, base * 0.85 + ruido));
+  return invert ? 1 - ordem : ordem;
 }
 
 /** Progresso local do azulejo. Cada janela tem largura `1 - overlap`, e todas cabem em [0, 1]. */
@@ -164,4 +169,17 @@ export function cornerKeep(col: number, row: number, cols: number, k: number): b
   'worklet';
   if (k <= 0) return false;
   return cols - 1 - col + row < k;
+}
+
+/**
+ * Quartos de volta de um relógio linear: gira na fração `spin` de cada passo e assenta no resto.
+ *
+ * Um relógio só e aritmética no worklet — `withSequence` encadeado acumula erro de ângulo a cada
+ * volta. É o gesto do `TileSpinner` e do azulejo da trava.
+ */
+export function quarterStep(t: number, spin = 0.6): number {
+  'worklet';
+  const inteiro = Math.floor(t);
+  const k = Math.min(1, (t - inteiro) / spin);
+  return inteiro + (1 - Math.pow(1 - k, 3));
 }

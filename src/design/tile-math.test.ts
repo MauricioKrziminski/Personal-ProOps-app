@@ -6,6 +6,7 @@ import {
   inkPose,
   motifPose,
   patterned,
+  quarterStep,
   seeded,
   tileGrid,
   tilePhase,
@@ -121,4 +122,32 @@ test('o canto guarda um triângulo em degraus no alto à direita', () => {
 test('cerca de um terço dos azulejos parados mostra o motivo', () => {
   const n = Array.from({ length: 300 }, (_, i) => patterned(i, 3)).filter(Boolean).length;
   assert.ok(n > 60 && n < 150, String(n));
+});
+
+test('invertida, a onda começa onde a normal termina', () => {
+  for (const [c, r] of [[0, 0], [3, 5], [7, 11], [4, 0]]) {
+    for (const mode of ['diagonal', 'radial', 'up', 'down'] as const) {
+      const normal = waveOrder(c, r, 8, 12, mode, 0.2, 0.7, 1952);
+      const invertida = waveOrder(c, r, 8, 12, mode, 0.2, 0.7, 1952, true);
+      assert.ok(Math.abs(invertida - (1 - normal)) < 1e-9, `${mode} ${c},${r}`);
+    }
+  }
+});
+
+test('cobrir de baixo: com "up" invertido a linha de baixo tem a ordem mais alta', () => {
+  assert.equal(waveOrder(3, 11, 8, 12, 'up', 0.5, 0.5, 0, true), 1);
+  assert.equal(waveOrder(3, 0, 8, 12, 'up', 0.5, 0.5, 0, true), 0);
+});
+
+test('o degrau gira na primeira parte do passo e assenta no resto', () => {
+  assert.equal(quarterStep(0), 0);
+  assert.ok(Math.abs(quarterStep(0.6) - 1) < 1e-9);
+  assert.ok(Math.abs(quarterStep(0.99) - 1) < 1e-9);
+  assert.ok(Math.abs(quarterStep(3.6) - 4) < 1e-9);
+  let antes = -1;
+  for (let t = 0; t <= 4; t += 0.05) {
+    const v = quarterStep(t);
+    assert.ok(v >= antes - 1e-9, `desceu em ${t}`);
+    antes = v;
+  }
 });

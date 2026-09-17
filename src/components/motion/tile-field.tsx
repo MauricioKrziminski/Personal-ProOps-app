@@ -60,6 +60,11 @@ export interface TileFieldProps {
   /** Origem da onda em fração da área (0..1). */
   origin?: { x: number; y: number };
   /**
+   * Ordem da onda ao contrário (`waveOrder(..., invert)`). Quem COBRE a partir de um ponto passa
+   * `true`; quem revela, `false`. Trocar com o progresso em 0 ou 1 não aparece na tela.
+   */
+  invert?: boolean;
+  /**
    * Degraus do bloco de azulejos que fica no canto superior direito depois de revelar (3 = seis
    * azulejos em escada). 0 limpa tudo.
    */
@@ -129,6 +134,7 @@ export function TileField({
   progress,
   mode = 'diagonal',
   origin,
+  invert = false,
   corner = 0,
   seed = TILE_SEED,
   cover = false,
@@ -168,14 +174,14 @@ export function TileField({
       const r = Math.floor(i / g.cols);
       const fica = cornerKeep(c, r, g.cols, corner);
       // -1 marca o azulejo do canto: ele nunca entra na onda.
-      ordens.push(fica ? -1 : waveOrder(c, r, g.cols, g.rows, mode, ox, oy, seed));
+      ordens.push(fica ? -1 : waveOrder(c, r, g.cols, g.rows, mode, ox, oy, seed, invert));
       giros.push(tileTurns(i, seed));
       comMotivo.push(patterned(i, seed, 0.66));
       spritesTinta.push(rect(0, 0, S, S));
       spritesMotivo.push(rect(tilePiece(i, seed) * S, 0, S, S));
     }
     return { ordens, giros, comMotivo, spritesTinta, spritesMotivo };
-  }, [g, corner, seed, mode, ox, oy, S]);
+  }, [g, corner, seed, mode, ox, oy, invert, S]);
 
   const cores = useMemo(() => {
     const tinta = Skia.Color(theme.tileInk);

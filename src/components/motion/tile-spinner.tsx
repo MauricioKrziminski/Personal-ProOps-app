@@ -11,11 +11,11 @@ import Animated, {
 } from 'react-native-reanimated';
 
 import type { ThemeColor } from '@/constants/theme';
+import { quarterStep } from '@/design/tile-math';
 import { useTheme } from '@/hooks/use-theme';
 
-/** Um quarto de volta: 60% girando, 40% assentado. */
+/** Um quarto de volta: 60% girando, 40% assentado (`quarterStep`). */
 const PASSO_MS = 420;
-const GIRO = 0.6;
 
 /**
  * O indicador de carregamento do Concreto: um azulejo (quarto de círculo) que gira em quartos de
@@ -48,13 +48,9 @@ export function TileSpinner({
     return () => cancelAnimation(relogio);
   }, [relogio, reduzido]);
 
-  const giro = useAnimatedStyle(() => {
-    const t = relogio.get();
-    const inteiro = Math.floor(t);
-    const k = Math.min(1, (t - inteiro) / GIRO);
-    const e = 1 - Math.pow(1 - k, 3);
-    return { transform: [{ rotate: `${(inteiro + e) * 90}deg` }] };
-  });
+  const giro = useAnimatedStyle(() => ({
+    transform: [{ rotate: `${quarterStep(relogio.get()) * 90}deg` }],
+  }));
 
   return (
     <View
