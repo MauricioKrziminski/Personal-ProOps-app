@@ -4,7 +4,7 @@ import { ThemedText } from '@/components/themed-text';
 import { Icon } from '@/components/ui/icon';
 import { Radius, Space, tabular } from '@/design/tokens';
 import { useTheme } from '@/hooks/use-theme';
-import { emQuantoTempo, horaBR } from '@/lib/dates';
+import { emQuantoTempo, horaBR, localISODate, rotuloDoDia } from '@/lib/dates';
 
 export type LembreteDoDia = {
   id: string;
@@ -37,11 +37,13 @@ export function ReminderTimeline({
       {lembretes.map((r, i) => {
         const passou = new Date(r.next_run_at).getTime() < agora;
         const destaque = r.id === proximo;
+        // Lembrete ativo de OUTRO dia (ficou para trás): só a hora mentiria que é de hoje.
+        const dia = rotuloDoDia(localISODate(new Date(r.next_run_at)), localISODate(new Date(agora)));
         return (
           <Pressable
             key={r.id}
             accessibilityRole="button"
-            accessibilityLabel={`${r.title}, ${horaBR(r.next_run_at)}`}
+            accessibilityLabel={`${r.title}, ${dia === 'hoje' ? '' : `${dia}, `}${horaBR(r.next_run_at)}`}
             onPress={() => onOpen(r.id)}>
             {({ pressed }) => (
               <View style={[styles.linha, { backgroundColor: pressed ? theme.backgroundSelected : 'transparent' }]}>
@@ -52,6 +54,10 @@ export function ReminderTimeline({
                   {destaque ? (
                     <ThemedText type="caption" themeColor="success">
                       {emQuantoTempo(r.next_run_at, agora)}
+                    </ThemedText>
+                  ) : dia !== 'hoje' ? (
+                    <ThemedText type="caption" themeColor="warning">
+                      {dia}
                     </ThemedText>
                   ) : null}
                 </View>

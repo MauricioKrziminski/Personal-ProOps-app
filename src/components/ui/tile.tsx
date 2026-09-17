@@ -25,7 +25,12 @@ export interface TileProps {
 }
 
 const LAYOUT: Record<NonNullable<TileProps['layout']>, ViewStyle> = {
-  fill: { flex: 1, minWidth: 0 },
+  /*
+    `minWidth` é a válvula da régua 384dp × fonte 1,3: abaixo dela o rótulo partiria no meio da
+    palavra ("Vencend/o", medido no emulador). Com a fileira em `flexWrap`, o terceiro ladrilho
+    desce de linha antes disso.
+  */
+  fill: { flexGrow: 1, flexBasis: 0, minWidth: 96 },
   // `flexBasis` 40% + `flexGrow`: duas por linha repartindo o `gap`, e a última ímpar ocupa a linha.
   half: { flexGrow: 1, flexBasis: '40%', minWidth: 0 },
   wide: { flexBasis: '100%' },
@@ -70,7 +75,7 @@ export function Tile({
         </View>
       )}
       <View style={styles.base}>
-        <ThemedText type="footnote" themeColor="textSecondary">
+        <ThemedText type={compact ? 'caption' : 'footnote'} themeColor="textSecondary">
           {label}
         </ThemedText>
         {value}
@@ -118,7 +123,7 @@ const styles = StyleSheet.create({
     borderCurve: 'continuous',
     borderWidth: 1,
   },
-  compacto: { minHeight: 0, paddingVertical: Space.md, gap: Space.xs },
+  compacto: { minHeight: 0, paddingVertical: Space.md, paddingHorizontal: Space.md, gap: Space.xs },
   topo: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: Space.sm },
   selo: {
     width: 32,
@@ -128,6 +133,6 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   base: { gap: Space.half },
-  linha: { flexDirection: 'row', gap: Space.md },
+  linha: { flexDirection: 'row', flexWrap: 'wrap', gap: Space.md },
   grade: { flexDirection: 'row', flexWrap: 'wrap', gap: Space.md },
 });

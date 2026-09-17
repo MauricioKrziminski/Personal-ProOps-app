@@ -49,27 +49,35 @@ export function AgendaItem({ title, meta, metaTone, cents, valueTone, icon, cart
 
   const corpo = (
     <View style={[styles.card, { backgroundColor: theme.surface, borderColor: theme.cardBorder }]}>
-      <View style={styles.linha}>
-        {cartao ? (
-          <CardFace nome={cartao} largura={36} style={styles.mini} />
-        ) : (
-          <View style={[styles.selo, { backgroundColor: theme.backgroundElement }]}>
-            <Icon name={icon} size="sm" color="text" />
+      {cartao ? (
+        <CardFace nome={cartao} largura={36} style={styles.mini} />
+      ) : (
+        <View style={[styles.selo, { backgroundColor: theme.backgroundElement }]}>
+          <Icon name={icon} size="sm" color="text" />
+        </View>
+      )}
+      <View style={styles.coluna}>
+        {/* Título e valor na mesma linha; sem espaço, o valor desce — o título nunca parte (§3). */}
+        <View style={styles.topo}>
+          <ThemedText type="headline" style={styles.titulo}>
+            {title}
+          </ThemedText>
+          <View style={styles.valor}>
+            <Money cents={cents} variant="ticker" tone={valueTone} />
           </View>
-        )}
-        <View style={styles.textos}>
-          <ThemedText type="headline">{title}</ThemedText>
+        </View>
+        {/* O estado à esquerda e a ação que o resolve à direita, na mesma linha. */}
+        <View style={styles.base}>
           <ThemedText type="caption" themeColor={COR_DA_META[metaTone]}>
             {meta}
           </ThemedText>
+          {action ? (
+            <View style={styles.valor}>
+              <Button label={action.label} icon={action.icon} size="sm" variant="secondary" onPress={action.onPress} />
+            </View>
+          ) : null}
         </View>
-        <Money cents={cents} variant="ticker" tone={valueTone} />
       </View>
-      {action ? (
-        <View style={styles.acao}>
-          <Button label={action.label} icon={action.icon} size="sm" variant="secondary" onPress={action.onPress} />
-        </View>
-      ) : null}
     </View>
   );
 
@@ -96,14 +104,14 @@ export function AgendaItem({ title, meta, metaTone, cents, valueTone, icon, cart
 
 const styles = StyleSheet.create({
   card: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
     gap: Space.md,
     padding: Space.lg,
     borderRadius: Radius.md,
     borderCurve: 'continuous',
     borderWidth: 1,
   },
-  // `flexWrap` + `minWidth` nos textos: o valor desce de linha antes de o título partir (lição do `Row`).
-  linha: { flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: Space.md },
   selo: {
     width: 36,
     height: 36,
@@ -111,7 +119,11 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  mini: { flexShrink: 0 },
-  textos: { flexGrow: 1, flexShrink: 1, minWidth: 134, gap: Space.half },
-  acao: { flexDirection: 'row', justifyContent: 'flex-end' },
+  mini: { flexShrink: 0, marginTop: Space.xs },
+  coluna: { flex: 1, minWidth: 0, gap: Space.xs },
+  topo: { flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', columnGap: Space.md, rowGap: Space.half },
+  titulo: { flexShrink: 0, maxWidth: '100%' },
+  // `marginLeft: auto` mantém o valor e a ação encostados à direita mesmo quando descem de linha.
+  valor: { marginLeft: 'auto' },
+  base: { flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', columnGap: Space.md, rowGap: Space.sm, minHeight: 36 },
 });
