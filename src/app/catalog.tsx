@@ -13,6 +13,7 @@ import { Row, Section } from '@/components/ui/row';
 import { Screen } from '@/components/ui/screen';
 import { Field, MoneyField, TextField } from '@/components/ui/field';
 import { Segmented } from '@/components/ui/segmented';
+import { OtpInput } from '@/components/auth/otp-input';
 import { Skeleton, SkeletonRow } from '@/components/ui/skeleton';
 import { BarTrack, ProgressBar, Sparkline } from '@/components/ui/sparkline';
 import { useToast } from '@/components/ui/toast';
@@ -332,6 +333,7 @@ function VitrineCampos() {
   const [nome, setNome] = useState('');
   const [centavos, setCentavos] = useState(0);
   const [modo, setModo] = useState<'mes' | 'ciclo' | 'ano'>('ciclo');
+  const [codigo, setCodigo] = useState('');
   const invalido = nome.length > 0 && nome.length < 3;
   return (
     <View style={{ gap: Space.lg }}>
@@ -342,6 +344,13 @@ function VitrineCampos() {
       <Field label="Valor">
         <MoneyField valueCents={centavos} onChangeCents={setCentavos} />
       </Field>
+      {/* O código de 6 dígitos sem mandar e-mail nem WhatsApp: "000000" mostra o erro. */}
+      <OtpInput
+        value={codigo}
+        onChange={setCodigo}
+        onComplete={() => {}}
+        invalid={codigo === '000000'}
+      />
       <Segmented
         options={[
           { value: 'mes', label: 'Mês' },

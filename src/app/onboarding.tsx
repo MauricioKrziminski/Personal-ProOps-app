@@ -22,7 +22,6 @@ import { AlertPreferencesSection } from '@/components/profile/alert-preferences-
 import { CycleDayPicker } from '@/components/finance/cycle-day-picker';
 import { ThemedText } from '@/components/themed-text';
 import { Button } from '@/components/ui/button';
-import { GradientSurface } from '@/components/ui/gradient';
 import { Icon } from '@/components/ui/icon';
 import { Mark } from '@/components/ui/mark';
 import { TextField } from '@/components/ui/field';
@@ -297,7 +296,7 @@ function Trilho({ cheio }: { cheio: boolean }) {
   }));
 
   return (
-    <View style={[styles.trilho, { backgroundColor: theme.separator }]}>
+    <View style={[styles.trilho, { backgroundColor: theme.backgroundElement }]}>
       <Animated.View style={[styles.trilhoCheio, { backgroundColor: theme.tintFill }, estilo]} />
     </View>
   );
@@ -325,8 +324,7 @@ function PassoBoasVindas({ entra }: { entra: (a: BaseAnimationBuilder) => BaseAn
     <>
       <Animated.View
         entering={entra(FadeInDown.duration(Motion.duration.slow).easing(Motion.easing.out))}
-        style={[styles.hero, { borderColor: theme.cardBorder, backgroundColor: theme.heroBottom }]}>
-        <GradientSurface from={theme.heroTop} to={theme.heroBottom} sheen={`${theme.tint}2E`} />
+        style={[styles.hero, { backgroundColor: theme.heroSurface }]}>
         <Animated.View style={estiloMarca}>
           <Mark size={128} color="onHero" />
         </Animated.View>
@@ -549,11 +547,11 @@ const styles = StyleSheet.create({
   progresso: { flex: 1, flexDirection: 'row', gap: Space.xs },
   trilho: {
     flex: 1,
-    height: 3,
-    borderRadius: Radius.xs,
+    height: 4,
+    borderRadius: Radius.pill,
     overflow: 'hidden',
   },
-  trilhoCheio: { flex: 1, transformOrigin: 'left' },
+  trilhoCheio: { flex: 1, borderRadius: Radius.pill, transformOrigin: 'left' },
   corpo: { flex: 1 },
   /*
     ⚠️ **O conteúdo é ancorado no TOPO, e centrar foi testado e devolvido.**
@@ -634,7 +632,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     borderRadius: Radius.lg,
-    borderWidth: 1,
     borderCurve: 'continuous',
     overflow: 'hidden',
   },
@@ -647,7 +644,7 @@ const styles = StyleSheet.create({
     height: 40,
     alignItems: 'center',
     justifyContent: 'center',
-    borderRadius: Radius.sm,
+    borderRadius: Radius.pill,
     borderCurve: 'continuous',
   },
   promessaTexto: { flex: 1, gap: Space.half },
@@ -656,7 +653,7 @@ const styles = StyleSheet.create({
     height: 56,
     alignItems: 'center',
     justifyContent: 'center',
-    borderRadius: Radius.md,
+    borderRadius: Radius.pill,
     borderCurve: 'continuous',
   },
   rodape: {

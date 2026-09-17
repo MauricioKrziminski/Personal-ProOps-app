@@ -2,6 +2,8 @@ import * as Haptics from 'expo-haptics';
 import { useEffect, useRef } from 'react';
 import { Platform, Pressable, StyleSheet, TextInput, View } from 'react-native';
 import Animated, {
+  ReduceMotion,
+  ZoomIn,
   useAnimatedStyle,
   useSharedValue,
   withRepeat,
@@ -9,7 +11,6 @@ import Animated, {
   withTiming,
 } from 'react-native-reanimated';
 
-import { ThemedText } from '@/components/themed-text';
 import { Motion, Radius, Space, Type, tabular } from '@/design/tokens';
 import { useTheme } from '@/hooks/use-theme';
 
@@ -96,18 +97,29 @@ export function OtpInput({
               key={i}
               style={[
                 styles.box,
-                {
-                  backgroundColor: theme.backgroundElement,
-                  borderColor: invalid
-                    ? theme.danger
-                    : isActive
-                      ? theme.text
-                      : theme.separator,
-                  borderWidth: isActive || invalid ? 2 : StyleSheet.hairlineWidth,
-                },
+                { backgroundColor: theme.surface, borderColor: theme.separator },
               ]}>
+              {/*
+                O fio de 1dp é CONSTANTE (design.md §7b: indicador não pode depender de um pixel),
+                e o anel de foco/erro fica por cima — trocar de estado não desloca o dígito.
+              */}
+              <View
+                pointerEvents="none"
+                style={[
+                  styles.anel,
+                  {
+                    borderColor: invalid ? theme.danger : theme.tint,
+                    opacity: invalid || isActive ? 1 : 0,
+                  },
+                ]}
+              />
               {filled ? (
-                <ThemedText style={[Type.title2, tabular]}>{digits[i]}</ThemedText>
+                <Animated.Text
+                  key={`${i}:${digits[i]}`}
+                  entering={ZoomIn.springify().damping(16).reduceMotion(ReduceMotion.System)}
+                  style={[Type.title2, tabular, { color: theme.text }]}>
+                  {digits[i]}
+                </Animated.Text>
               ) : isActive ? (
                 <Animated.View style={[styles.caret, caretStyle, { backgroundColor: theme.text }]} />
               ) : null}
@@ -147,8 +159,19 @@ const styles = StyleSheet.create({
     height: 56,
     borderRadius: Radius.sm,
     borderCurve: 'continuous',
+    borderWidth: 1,
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  anel: {
+    position: 'absolute',
+    top: -1,
+    left: -1,
+    right: -1,
+    bottom: -1,
+    borderRadius: Radius.sm,
+    borderCurve: 'continuous',
+    borderWidth: 1.5,
   },
   caret: {
     width: 2,
