@@ -26,6 +26,12 @@ export const FINANCE_KEYS = [
     tela até o próximo foco.
   */
   ['cycle'], ['cycle-series'], ['cycle-lines'], ['cycle-range'], ['forecast-months'], ['spendable'],
+  /*
+    A Pista da Hoje (`spendable-path`) é a MESMA lista que forma o `spendable`: se só um dos dois
+    renovar, `montarPista` vê a soma discordar e apaga os entalhes. E a Conversa
+    (`agent-activity`) mostra o registro ATUAL — editar pelo app tem que atualizar o card.
+  */
+  ['spendable-path'], ['agent-activity'],
 ] as const;
 
 export function invalidateKeys(client: QueryClient, keys: readonly (readonly string[])[]) {
