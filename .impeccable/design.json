@@ -1,0 +1,183 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-09-17T03:22:01.179432+00:00",
+  "title": "Design System: Personal ProOps app",
+  "extensions": {
+    "colorMeta": {
+      "ink": {
+        "role": "primary",
+        "displayName": "Tinta",
+        "tonalRamp": [
+          "#0B0B0C",
+          "#1C1C1E",
+          "#2A2A2D",
+          "#3A3A3E",
+          "#6B6B70",
+          "#9B9BA0",
+          "#DDDCD7",
+          "#F4F4F2"
+        ]
+      },
+      "warm-paper": {
+        "role": "neutral",
+        "displayName": "Papel Morno",
+        "tonalRamp": [
+          "#3A3934",
+          "#5C5B55",
+          "#7F7E78",
+          "#A3A29C",
+          "#C7C6C0",
+          "#DDDCD7",
+          "#E8E7E3",
+          "#F2F1EE"
+        ]
+      },
+      "brick": {
+        "role": "semantic",
+        "displayName": "Tijolo"
+      },
+      "ledger-green": {
+        "role": "semantic",
+        "displayName": "Verde de Livro-Caixa"
+      },
+      "amber-note": {
+        "role": "semantic",
+        "displayName": "Âmbar de Nota"
+      }
+    },
+    "shadows": [
+      {
+        "name": "raised",
+        "value": "0 1px 2px rgba(0,0,0,0.06)",
+        "purpose": "Cards em repouso."
+      },
+      {
+        "name": "floating",
+        "value": "0 4px 12px rgba(0,0,0,0.10)",
+        "purpose": "FAB e barra de abas."
+      },
+      {
+        "name": "overlay",
+        "value": "0 12px 32px rgba(0,0,0,0.16)",
+        "purpose": "Sheet, menu e o cartão em voo."
+      }
+    ],
+    "motion": [
+      {
+        "name": "encaixe",
+        "value": "spring 420ms, damping ratio 0.86",
+        "purpose": "Assentar sem quique (pilha, barras)."
+      },
+      {
+        "name": "voo",
+        "value": "spring 620ms, damping ratio 0.9",
+        "purpose": "O cartão atravessando telas."
+      },
+      {
+        "name": "carrossel",
+        "value": "spring 560ms, damping ratio 0.94, velocity from finger",
+        "purpose": "O carrossel da Carteira assentando."
+      },
+      {
+        "name": "tab",
+        "value": "spring 1000ms, damping ratio 0.62",
+        "purpose": "O círculo da barra de abas do Android."
+      },
+      {
+        "name": "curtain",
+        "value": "900ms onda / 650ms curta / 1800ms show",
+        "purpose": "Cortina de sessão e abertura."
+      }
+    ]
+  },
+  "components": [
+    {
+      "name": "Primary Button",
+      "kind": "button",
+      "refersTo": "button-primary",
+      "description": "A única ação primária da tela.",
+      "html": "<button class=\"ds-btn-primary\">Entrar</button>",
+      "css": ".ds-btn-primary{background:#0B0B0C;color:#fff;height:50px;padding:0 24px;border:none;border-radius:999px;font:600 16px 'Plus Jakarta Sans';transition:transform .12s} .ds-btn-primary:active{transform:scale(.97)} .ds-btn-primary:focus-visible{outline:1.5px solid #0B0B0C;outline-offset:3px}"
+    },
+    {
+      "name": "Secondary Button",
+      "kind": "button",
+      "refersTo": "button-secondary",
+      "description": "Ação de apoio.",
+      "html": "<button class=\"ds-btn-secondary\">Faturas anteriores</button>",
+      "css": ".ds-btn-secondary{background:#E8E7E3;color:#0B0B0C;height:50px;padding:0 24px;border:none;border-radius:999px;font:600 16px 'Plus Jakarta Sans'} .ds-btn-secondary:hover{background:#DDDCD7}"
+    },
+    {
+      "name": "Text Field",
+      "kind": "input",
+      "refersTo": "text-field",
+      "description": "Campo com anel de tinta no foco.",
+      "html": "<input class=\"ds-input\" placeholder=\"voce@email.com\" />",
+      "css": ".ds-input{background:#fff;color:#0B0B0C;height:50px;padding:0 16px;border:1px solid rgba(11,11,12,.08);border-radius:12px;font:400 16px 'Plus Jakarta Sans'} .ds-input:focus-visible{outline:1.5px solid #0B0B0C;outline-offset:0}"
+    },
+    {
+      "name": "Card",
+      "kind": "card",
+      "refersTo": "card",
+      "description": "Superfície branca de canto 18.",
+      "html": "<div class=\"ds-card\"><div class=\"ds-card-label\">Fatura atual</div><div class=\"ds-card-value\">R$ 1.423,00</div></div>",
+      "css": ".ds-card{background:#fff;border:1px solid rgba(11,11,12,.06);border-radius:18px;padding:16px;box-shadow:0 1px 2px rgba(0,0,0,.06)} .ds-card-label{font:400 13px 'Plus Jakarta Sans';color:#6B6B70} .ds-card-value{font:600 28px 'Plus Jakarta Sans';letter-spacing:-.8px;color:#0B0B0C;font-variant-numeric:tabular-nums}"
+    },
+    {
+      "name": "Android Tab Bar",
+      "kind": "nav",
+      "refersTo": "tab-bar-android",
+      "description": "Pílula de tinta com círculo claro no ativo.",
+      "html": "<nav class=\"ds-tabs\"><span class=\"ds-tab ds-on\"><i></i>Hoje</span><span class=\"ds-tab\"><i></i>Notas</span><span class=\"ds-tab\"><i></i>Financeiro</span></nav>",
+      "css": ".ds-tabs{display:flex;background:#0B0B0C;border-radius:999px;height:68px;padding:0 6px;box-shadow:0 4px 12px rgba(0,0,0,.10)} .ds-tab{flex:1;display:flex;flex-direction:column;align-items:center;padding-top:7px;gap:1px;font:500 12px 'Plus Jakarta Sans';color:rgba(244,244,242,.6)} .ds-tab i{width:36px;height:36px;border-radius:999px} .ds-on{color:#F4F4F2} .ds-on i{background:#F4F4F2}"
+    }
+  ],
+  "narrative": {
+    "northStar": "Papel e Tinta",
+    "overview": "O app é uma folha de papel morno onde a tinta só aparece para o que importa: o número que responde a pergunta da tela, a ação que resolve, o estado que pede atenção.",
+    "keyCharacteristics": [
+      "Papel morno e superfície branca no claro; tinta quase-preta no escuro.",
+      "Ação primária é uma pílula de tinta.",
+      "Um bloco de destaque por tela.",
+      "Plus Jakarta Sans em pesos leves; números tabulares.",
+      "Cantos de 12 a 28 e pílulas.",
+      "Texto mínimo."
+    ],
+    "rules": [
+      {
+        "name": "The Ink Is The Accent Rule",
+        "body": "Nenhuma cor decora. Ação é tinta; cor é só semântica.",
+        "section": "colors"
+      },
+      {
+        "name": "The Issuer Inside The Card Rule",
+        "body": "A cor de um banco só existe dentro da forma de um cartão de crédito.",
+        "section": "colors"
+      },
+      {
+        "name": "The Label Before Value Rule",
+        "body": "O rótulo curto vem antes do número.",
+        "section": "typography"
+      },
+      {
+        "name": "The Glass Is Chrome Rule",
+        "body": "Vidro só na chrome do sistema; conteúdo é opaco.",
+        "section": "elevation"
+      }
+    ],
+    "dos": [
+      "Do usar a pílula de tinta para a única ação primária da tela.",
+      "Do manter um bloco de destaque por tela, em ink-hero.",
+      "Do escrever rótulo curto + valor; a explicação vai na confirmação da ação.",
+      "Do usar tabular-nums em todo número que conta, mede ou custa.",
+      "Do verificar em 384dp com fonte 1,3 e nos dois temas."
+    ],
+    "donts": [
+      "Don't colocar legenda embaixo de botão nem parágrafo explicativo em tela de conferir.",
+      "Don't usar cor como decoração — nem a do banco fora do cartão, nem roxo como accent.",
+      "Don't usar vidro, degradê ou brilho em conteúdo.",
+      "Don't truncar identificador; quebre a linha.",
+      "Don't mover dado que a pessoa está lendo por estética."
+    ]
+  }
+}
