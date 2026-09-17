@@ -8,7 +8,7 @@ import { Icon } from '@/components/ui/icon';
 import { Money } from '@/components/ui/money';
 import { SkiaCanvas } from '@/components/ui/skia-canvas';
 import { ProgressBar } from '@/components/ui/sparkline';
-import { brandColor, clarear, escurecer, tintaDoCartao } from '@/design/card-brands';
+import { brandColor, faceDoCartao } from '@/design/card-brands';
 import { LARGURA_DE_DESENHO, alturaDoCartao } from '@/design/card-geometry';
 import { Radius, Space, tabular } from '@/design/tokens';
 import { formatDateBR } from '@/hooks/use-items';
@@ -19,14 +19,16 @@ import type { CartaoDaPilha } from '@/lib/card-status';
  * As três tintas de uma face: a do texto, a do texto secundário e a das pílulas.
  *
  * A face é a cor do EMISSOR nos dois temas, então as tintas também não seguem o tema: sobre o
- * roxo do Nubank vai a clara (`onHero*`, a mesma do herói escuro), sobre o amarelo do BB vai a
- * escura. Quem decide é o contraste (`tintaDoCartao`), não uma lista de bancos.
+ * roxo do Nubank vai a clara, sobre o amarelo do BB vai a escura. Quem decide é o contraste
+ * (`faceDoCartao`), não uma lista de bancos — e ele também ajusta a base do metal quando a cor
+ * pura não deixaria o texto legível.
  */
 export function tintasDoCartao(nome: string) {
   const marca = brandColor(nome);
-  return tintaDoCartao(marca) === 'clara'
-    ? ({ marca, tinta: 'onHero', suave: 'onHeroMuted', chip: 'heroChip' } as const)
-    : ({ marca, tinta: 'onCardInk', suave: 'onCardInkMuted', chip: 'cardInkChip' } as const);
+  const face = faceDoCartao(marca);
+  return face.tinta === 'clara'
+    ? ({ ...face, tinta: 'onCardLight', suave: 'onCardLightMuted', chip: 'cardLightChip' } as const)
+    : ({ ...face, tinta: 'onCardInk', suave: 'onCardInkMuted', chip: 'cardInkChip' } as const);
 }
 
 /**
@@ -72,10 +74,10 @@ export function CardFace({
         styles.face,
         // O canto escala com o cartão, como o resto do desenho: a miniatura de 56 é um cartão
         // pequeno, não uma pílula, e o clone do voo pousa com o mesmo canto que o destino.
-        { width: largura, height: altura, backgroundColor: t.marca, borderRadius: Radius.md * (largura / LARGURA_DE_DESENHO) },
+        { width: largura, height: altura, backgroundColor: t.base, borderRadius: Radius.md * (largura / LARGURA_DE_DESENHO) },
         style,
       ]}>
-      <Metal marca={t.marca} largura={largura} altura={altura} />
+      <Metal base={t.base} fim={t.fim} largura={largura} altura={altura} />
       <View
         style={[
           styles.desenho,
@@ -110,20 +112,15 @@ export function CardFace({
 }
 
 /**
- * O metal: a cor do banco com um degradê diagonal curto (mais clara no canto de cima, mais escura
- * no de baixo) e uma faixa de brilho. Curto de propósito — a tinta foi escolhida pelo contraste
- * com a cor PURA, e um degradê largo tiraria o texto dessa faixa.
+ * O metal: a base do banco indo para o `fim` na diagonal (sempre para o lado que aumenta o
+ * contraste com a tinta) e uma faixa de brilho leve.
  */
-function Metal({ marca, largura, altura }: { marca: string; largura: number; altura: number }) {
+function Metal({ base, fim, largura, altura }: { base: string; fim: string; largura: number; altura: number }) {
   const theme = useTheme();
   return (
     <SkiaCanvas style={StyleSheet.absoluteFill} pointerEvents="none">
       <Rect x={0} y={0} width={largura} height={altura}>
-        <LinearGradient
-          start={vec(0, 0)}
-          end={vec(largura, altura)}
-          colors={[clarear(marca, 0.14), marca, escurecer(marca, 0.16)]}
-        />
+        <LinearGradient start={vec(0, 0)} end={vec(largura, altura)} colors={[base, fim]} />
       </Rect>
       <Rect x={0} y={0} width={largura} height={altura}>
         <LinearGradient

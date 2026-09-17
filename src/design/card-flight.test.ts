@@ -1,7 +1,22 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 
-import { brandColor, clarear, escurecer, tintaDoCartao } from './card-brands.ts';
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
+
+import {
+  ALFA_DA_TINTA_SUAVE,
+  ALFA_DO_BRILHO,
+  TINTA_CLARA,
+  TINTA_ESCURA,
+  blend,
+  brandColor,
+  clarear,
+  escurecer,
+  faceDoCartao,
+  tintaDoCartao,
+} from './card-brands.ts';
+import { contrast } from './contrast.ts';
 import { PROPORCAO_DO_CARTAO, alturaDoCartao, proporcaoDoCartao } from './card-geometry.ts';
 import { alvoDoDeslize, comElastico, distanciaDoItem, indiceNoDeslocamento, quadroDoItem } from './carousel-math.ts';
 import { caixaArrastada, quadroDaCaixa, quadroNoVoo } from './flight-math.ts';
@@ -74,12 +89,47 @@ test('a proporção cai com a fonte e nunca passa a do cartão de verdade', () =
   assert.ok(alturaDoCartao(358, 1.3) > alturaDoCartao(358, 1));
 });
 
-test('a tinta da face é a de maior contraste com a cor do emissor', () => {
+test('a tinta da face segue o contraste: clara no roxo, escura no amarelo', () => {
   assert.equal(tintaDoCartao(brandColor('Ourocard BB')), 'escura');
   assert.equal(tintaDoCartao(brandColor('Nubank')), 'clara');
   assert.equal(tintaDoCartao(brandColor('Cartão da casa')), 'clara');
   assert.equal(clarear('#000000', 1), '#ffffff');
   assert.equal(escurecer('#ffffff', 1), '#000000');
+});
+
+// Os nomes que casam com cada entrada de `BRANDS`, mais o neutro. Um emissor novo no mapa entra
+// aqui também — a face dele precisa passar pelo mesmo teste de leitura.
+const EMISSORES = [
+  'Nubank', 'Itaú', 'Inter', 'Bradesco', 'Santander', 'Caixa', 'Banco do Brasil', 'XP', 'C6',
+  'BTG', 'Safra', 'Sicredi', 'Sicoob', 'Porto Seguro', 'Mercado Pago', 'PicPay', 'Neon',
+  'Original', 'Pan', 'Will', 'Digio', 'Amex', 'Visa', 'Mastercard', 'Elo', 'Hipercard',
+  'Cartão da casa',
+];
+
+test('todo emissor tem texto principal e secundário legíveis (≥ 4,5:1) em todo o metal', () => {
+  const falhas: string[] = [];
+  for (const nome of EMISSORES) {
+    const face = faceDoCartao(brandColor(nome));
+    const tinta = face.tinta === 'clara' ? TINTA_CLARA : TINTA_ESCURA;
+    const brilho = blend('#FFFFFF', face.base, ALFA_DO_BRILHO);
+    for (const fundo of [face.base, face.fim, brilho]) {
+      const principal = contrast(tinta, fundo);
+      const secundario = contrast(blend(tinta, fundo, ALFA_DA_TINTA_SUAVE), fundo);
+      if (principal < 4.5 || secundario < 4.5)
+        falhas.push(`${nome} ${fundo}: ${principal.toFixed(2)} / ${secundario.toFixed(2)}`);
+    }
+  }
+  assert.deepEqual(falhas, []);
+});
+
+test('os tokens da face usam a mesma opacidade e o mesmo brilho que a conta de contraste', () => {
+  const theme = readFileSync(join(import.meta.dirname, '..', 'constants', 'theme.ts'), 'utf8');
+  const alfa = (token: string) =>
+    [...theme.matchAll(new RegExp(`${token}: 'rgba\\([^)]*,\\s*([0-9.]+)\\)'`, 'g'))].map((m) => Number(m[1]));
+  for (const token of ['onCardLightMuted', 'onCardInkMuted']) {
+    assert.deepEqual(alfa(token), [ALFA_DA_TINTA_SUAVE, ALFA_DA_TINTA_SUAVE], token);
+  }
+  assert.deepEqual(alfa('cardSheen'), [ALFA_DO_BRILHO, ALFA_DO_BRILHO]);
 });
 
 test('o deslize anda no máximo um cartão e respeita a intenção do dedo', () => {

@@ -76,14 +76,21 @@ export const Colors = {
     cardFace: '#141413',
     /**
      * A tinta ESCURA da face do cartão, para emissor de cor clara (o amarelo do BB). A face é a
-     * cor do banco nos dois temas, então estes três não mudam com o tema — a clara é `onHero*`.
-     * Quem escolhe entre as duas é `tintaDoCartao`, por contraste.
+     * cor do banco nos dois temas, então as tintas da face não mudam com o tema. Quem escolhe
+     * entre as duas é `faceDoCartao`, por contraste.
      */
     onCardInk: '#0B0B0C',
-    onCardInkMuted: 'rgba(11, 11, 12, 0.62)',
+    onCardInkMuted: 'rgba(11, 11, 12, 0.78)',
     cardInkChip: 'rgba(11, 11, 12, 0.10)',
+    /**
+     * A tinta CLARA da face (emissor escuro). O secundário é mais opaco que o do herói: sobre a
+     * cor de um banco, 60% não passava de 4,5:1 (`faceDoCartao`, `card-flight.test.ts`).
+     */
+    onCardLight: '#F4F4F2',
+    onCardLightMuted: 'rgba(244, 244, 242, 0.78)',
+    cardLightChip: 'rgba(255, 255, 255, 0.14)',
     /** A faixa de brilho do metal do cartão, e o mesmo branco sem opacidade para o degradê. */
-    cardSheen: 'rgba(255, 255, 255, 0.16)',
+    cardSheen: 'rgba(255, 255, 255, 0.08)',
     cardSheenClear: 'rgba(255, 255, 255, 0)',
     /** A cortina da abertura e das trocas de sessão. Igual ao splash nativo, nos dois temas. */
     curtain: '#0B0B0C',
@@ -135,10 +142,12 @@ export const Colors = {
 
     cardFace: '#141413',
     onCardInk: '#0B0B0C',
-    onCardInkMuted: 'rgba(11, 11, 12, 0.62)',
+    onCardInkMuted: 'rgba(11, 11, 12, 0.78)',
     cardInkChip: 'rgba(11, 11, 12, 0.10)',
-    /** A faixa de brilho do metal do cartão, e o mesmo branco sem opacidade para o degradê. */
-    cardSheen: 'rgba(255, 255, 255, 0.16)',
+    onCardLight: '#F4F4F2',
+    onCardLightMuted: 'rgba(244, 244, 242, 0.78)',
+    cardLightChip: 'rgba(255, 255, 255, 0.14)',
+    cardSheen: 'rgba(255, 255, 255, 0.08)',
     cardSheenClear: 'rgba(255, 255, 255, 0)',
     curtain: '#0B0B0C',
     onCurtain: '#F4F4F2',

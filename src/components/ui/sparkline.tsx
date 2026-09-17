@@ -1,4 +1,4 @@
-import { useEffect, useMemo } from 'react';
+import { useEffect, useMemo, useRef } from 'react';
 import { View } from 'react-native';
 import Animated, {
   Easing,
@@ -290,9 +290,19 @@ export function ProgressBar({
   const theme = useTheme();
   const reduzido = useReducedMotion();
   const pct = max > 0 ? Math.min(1, Math.max(0, value / max)) : 0;
-  const progresso = useSharedValue(reduzido ? pct : 0);
+  /*
+    ⚠️ **Nasce no valor verdadeiro; anima só quando ele MUDA** (a regra do `CountUpMoney`).
+    Crescer de zero na montagem dependia de a mola rodar: no Android, abrindo uma tela logo
+    depois de o app voltar ao primeiro plano, a mola ficou parada em zero e a barra do cartão
+    ficou VAZIA por dezenas de segundos (medido em 17/09/2026) — um limite usado de 0% que não
+    existe. A entrada da tela já é da cascata; a barra não precisa contar a própria chegada.
+  */
+  const progresso = useSharedValue(pct);
+  const anterior = useRef(pct);
 
   useEffect(() => {
+    if (anterior.current === pct) return;
+    anterior.current = pct;
     progresso.set(reduzido ? pct : withSpring(pct, Motion.spring.encaixe));
   }, [pct, progresso, reduzido]);
 

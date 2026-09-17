@@ -115,17 +115,72 @@ export function escurecer(hex: string, peso: number): string {
   return blend('#000000', hex, peso);
 }
 
-/** As duas tintas que a face do cartão pode usar — os mesmos valores de `onHero` e `onCardInk`. */
-const TINTA_CLARA = '#F4F4F2';
-const TINTA_ESCURA = '#0B0B0C';
+/** As duas tintas que a face do cartão pode usar — os mesmos valores de `onCardLight` e `onCardInk`. */
+export const TINTA_CLARA = '#F4F4F2';
+export const TINTA_ESCURA = '#0B0B0C';
+/** A opacidade do texto secundário na face (`onCardLightMuted` / `onCardInkMuted`). */
+export const ALFA_DA_TINTA_SUAVE = 0.78;
+/** O brilho diagonal do metal (`cardSheen`). */
+export const ALFA_DO_BRILHO = 0.08;
+/** Quanto o degradê do metal anda a partir da base, sempre para o lado que AUMENTA o contraste. */
+const PASSO_DO_METAL = 0.14;
+/** O mínimo AA para texto de 12–16px, nos dois textos da face. */
+const CONTRASTE_MINIMO = 4.5;
+
+export type FaceDoCartao = {
+  tinta: 'clara' | 'escura';
+  /** A cor de cima do metal (a do banco, ajustada só o que o contraste pede). */
+  base: string;
+  /** A cor de baixo do metal. */
+  fim: string;
+};
+
+const faces = new Map<string, FaceDoCartao>();
 
 /**
- * Qual tinta escreve sobre a cor do emissor: a de MAIOR contraste.
+ * A face de um emissor com o texto LEGÍVEL garantido por construção.
  *
- * O cartão é pintado com a cor da marca pura (é o cartão que está na carteira da pessoa), e a
- * cor da marca vai do amarelo do BB ao azul-marinho do BTG. Uma tinta fixa perderia metade dos
- * emissores; escolher por contraste é a mesma conta que `contrast.test.ts` faz com a paleta.
+ * A cor do banco é pura quando dá (a maioria), e desliza para o escuro (tinta clara) ou para o
+ * claro (tinta escura) só o quanto o contraste pede: texto principal E secundário ≥ 4,5:1 em
+ * todo o metal, brilho incluído. Medido em 17/09/2026: com a cor pura e o secundário a 60%, NENHUM
+ * banco passava no secundário, e Santander, Caixa, Amex e Mastercard não passavam nem no
+ * principal. Os vermelhos ficam um pouco mais fundos — continuam lendo como a marca.
+ *
+ * A tinta é a que precisa de MENOS ajuste; num empate curto (até 0,04) vence a clara, que é como
+ * os cartões de verdade dessas cores costumam ser.
  */
+export function faceDoCartao(marca: string): FaceDoCartao {
+  const guardada = faces.get(marca);
+  if (guardada) return guardada;
+
+  const ajuste = (tinta: 'clara' | 'escura') => {
+    const cor = tinta === 'clara' ? TINTA_CLARA : TINTA_ESCURA;
+    const lado = tinta === 'clara' ? '#000000' : '#FFFFFF';
+    for (let k = 0; k <= 0.8; k += 0.02) {
+      const base = blend(lado, marca, k);
+      const fim = blend(lado, base, PASSO_DO_METAL);
+      const brilho = blend('#FFFFFF', base, ALFA_DO_BRILHO);
+      const legivel = [base, fim, brilho].every(
+        (f) =>
+          contrast(cor, f) >= CONTRASTE_MINIMO &&
+          contrast(blend(cor, f, ALFA_DA_TINTA_SUAVE), f) >= CONTRASTE_MINIMO
+      );
+      if (legivel) return { k, base, fim };
+    }
+    return { k: 1, base: lado === '#000000' ? '#000000' : '#FFFFFF', fim: lado };
+  };
+
+  const clara = ajuste('clara');
+  const escura = ajuste('escura');
+  const face: FaceDoCartao =
+    clara.k <= escura.k + 0.04
+      ? { tinta: 'clara', base: clara.base, fim: clara.fim }
+      : { tinta: 'escura', base: escura.base, fim: escura.fim };
+  faces.set(marca, face);
+  return face;
+}
+
+/** Qual tinta escreve sobre a cor do emissor (ver `faceDoCartao`). */
 export function tintaDoCartao(hex: string): 'clara' | 'escura' {
-  return contrast(hex, TINTA_ESCURA) > contrast(hex, TINTA_CLARA) ? 'escura' : 'clara';
+  return faceDoCartao(hex).tinta;
 }
