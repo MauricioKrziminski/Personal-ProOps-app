@@ -23,7 +23,9 @@ const ALTURA_BARRA = 96;
 const LARGURA_BARRA = 10;
 
 /**
- * Entrou × saiu mês a mês. Tocar ou arrastar escolhe o mês, e o rodapé passa a dizer quanto
+ * Entrou × saiu mês a mês. "Saiu" é `chart4`: era `surfaceRaised`, que no tema claro é o MESMO
+ * branco do card — a barra sumia (medido em 17/09/2026; o defeito vinha da tela anterior).
+ * Tocar ou arrastar escolhe o mês, e o rodapé passa a dizer quanto
  * sobrou NAQUELE mês (antes dizia só do último). Os outros meses recuam (`dim`).
  *
  * A comparação é por CLARIDADE (tinta × cinza), nunca por cor semântica — a tampa clara é o
@@ -86,7 +88,7 @@ export function TrendCard({
     };
     const barra = (total: number, previsto: number, forte: boolean) => (
       <View style={styles.trilho}>
-        <BarTrack ratio={total / teto} index={i} height={ALTURA_BARRA} color={forte ? theme.text : theme.surfaceRaised} dim={i !== indice}>
+        <BarTrack ratio={total / teto} index={i} height={ALTURA_BARRA} color={forte ? theme.text : theme.chart4} dim={i !== indice}>
           {tampa(previsto, total) > 0 ? (
             <View
               style={[
@@ -131,7 +133,7 @@ export function TrendCard({
             <ThemedText type="caption" themeColor="textSecondary">entrou</ThemedText>
           </View>
           <View style={styles.chave}>
-            <View style={[styles.amostra, { backgroundColor: theme.surfaceRaised, borderColor: theme.separator, borderWidth: 1 }]} />
+            <View style={[styles.amostra, { backgroundColor: theme.chart4 }]} />
             <ThemedText type="caption" themeColor="textSecondary">saiu</ThemedText>
           </View>
           <View style={styles.chave}>

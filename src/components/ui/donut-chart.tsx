@@ -32,6 +32,10 @@ export function DonutChart({
   onSelect: (i: number) => void;
   children?: ReactNode;
 }) {
+  // ⚠️ As cores saem AQUI, fora do canvas: os filhos do `Canvas` do Skia rodam em outro
+  // reconciliador e não enxergam o contexto do React. Um `useTheme()` lá dentro devolveu a
+  // paleta padrão (a do escuro) com o app no claro — medido no simulador em 17/09/2026.
+  const theme = useTheme();
   const oval = useMemo(() => rect(espessura / 2 + 3, espessura / 2 + 3, size - espessura - 6, size - espessura - 6), [size, espessura]);
   const arcos = useMemo(
     () =>
@@ -61,7 +65,7 @@ export function DonutChart({
             <ArcoDaFatia
               key={fatias[i].chave}
               arco={arco}
-              tom={TONS_DA_ROSCA[fatias[i].tom]}
+              cor={theme[TONS_DA_ROSCA[fatias[i].tom]]}
               espessura={espessura}
               estado={selecionada < 0 ? 'neutro' : selecionada === i ? 'ativo' : 'recuado'}
             />
@@ -75,18 +79,18 @@ export function DonutChart({
   );
 }
 
+/** Um arco. Recebe a COR pronta: aqui dentro não há contexto do React (ver acima). */
 function ArcoDaFatia({
   arco,
-  tom,
+  cor,
   espessura,
   estado,
 }: {
   arco: SkPath;
-  tom: ThemeColor;
+  cor: string;
   espessura: number;
   estado: 'neutro' | 'ativo' | 'recuado';
 }) {
-  const theme = useTheme();
   const reduzido = useReducedMotion();
   const opacidade = useSharedValue(1);
   const largura = useSharedValue(espessura);
@@ -100,7 +104,7 @@ function ArcoDaFatia({
 
   return (
     <Group opacity={opacidade}>
-      <Path path={arco} color={theme[tom]} style="stroke" strokeWidth={largura} strokeCap="butt" />
+      <Path path={arco} color={cor} style="stroke" strokeWidth={largura} strokeCap="butt" />
     </Group>
   );
 }
