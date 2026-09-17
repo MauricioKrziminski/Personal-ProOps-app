@@ -12,6 +12,7 @@ interface Props {
   month: string;
   onChangeMonth: (month: string) => void;
   ruler: MonthRulerState;
+  variant?: 'card' | 'bare';
 }
 
 /** `2026-08-11` → `11/08`. O ANO já está escrito no título do mês, logo acima, no mesmo card. */
@@ -54,11 +55,11 @@ function diaEMes(iso: string): string {
  * 11/08 a 10/09. Quem explica é a janela escrita, e por isso ela fica COLADA no controle que a
  * produz, em toda tela que tem a régua — não só na de Mês, onde ela nasceu.
  */
-export function PeriodBar({ month, onChangeMonth, ruler }: Props) {
+export function PeriodBar({ month, onChangeMonth, ruler, variant }: Props) {
   const janela = useMonthRange(month, ruler.view);
 
   return (
-    <MonthPicker month={month} onChange={onChangeMonth}>
+    <MonthPicker month={month} onChange={onChangeMonth} variant={variant}>
       <View style={styles.linhaJanela}>
         {/*
           ⚠️ **A janela só é ESCRITA quando é a definitiva.** Esta legenda existe para explicar a

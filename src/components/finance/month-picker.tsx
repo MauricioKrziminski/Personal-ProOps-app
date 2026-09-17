@@ -60,6 +60,8 @@ interface MonthPickerProps {
    * que a produz (`PeriodBar`). Sem ele o controle é só o passo de mês.
    */
   children?: React.ReactNode;
+  /** `bare`: sem card em volta, título maior (raiz do Financeiro). As outras telas seguem `card`. */
+  variant?: 'card' | 'bare';
 }
 
 /**
@@ -83,7 +85,7 @@ interface MonthPickerProps {
  * geometria com `hitSlop` — o alvo continua acima dos 44pt exigidos (§11) e o bloco encolhe 16pt
  * de altura, que era metade do "espaço vazio".
  */
-export function MonthPicker({ month, onChange, children }: MonthPickerProps) {
+export function MonthPicker({ month, onChange, children, variant = 'card' }: MonthPickerProps) {
   const theme = useTheme();
   /** Ano aberto no sheet; `null` = sheet fechado. */
   const [sheet, setSheet] = useState<string | null>(null);
@@ -110,8 +112,13 @@ export function MonthPicker({ month, onChange, children }: MonthPickerProps) {
   );
 
   return (
-    <View style={[styles.card, { backgroundColor: theme.surface, borderColor: theme.cardBorder }]}>
-      <View style={styles.row}>
+    <View
+      style={
+        variant === 'bare'
+          ? styles.nu
+          : [styles.card, { backgroundColor: theme.surface, borderColor: theme.cardBorder }]
+      }>
+      <View style={[styles.row, variant === 'bare' && styles.rowNu]}>
         {arrow(-1)}
         {/*
           O título deixou de ser só rótulo e virou a PORTA do salto de ano. As setas resolvem ±1;
@@ -128,15 +135,15 @@ export function MonthPicker({ month, onChange, children }: MonthPickerProps) {
             setSheet(month.slice(0, 4));
           }}
           style={({ pressed }) => [styles.label, { opacity: pressed ? 0.5 : 1 }]}>
-          <ThemedText type="smallBold">{monthTitle(month)}</ThemedText>
+          <ThemedText type={variant === 'bare' ? 'subtitle' : 'smallBold'}>{monthTitle(month)}</ThemedText>
         </Pressable>
         {arrow(1)}
       </View>
 
       {children ? (
         <>
-          <View style={[styles.divisor, { backgroundColor: theme.separator }]} />
-          <View style={styles.rodape}>{children}</View>
+          {variant === 'card' ? <View style={[styles.divisor, { backgroundColor: theme.separator }]} /> : null}
+          <View style={variant === 'card' ? styles.rodape : styles.rodapeNu}>{children}</View>
         </>
       ) : null}
 
@@ -285,6 +292,9 @@ const styles = StyleSheet.create({
   divisor: {
     height: StyleSheet.hairlineWidth,
   },
+  nu: { gap: Space.sm },
+  rowNu: { paddingHorizontal: 0 },
+  rodapeNu: { paddingHorizontal: Space.xs },
   rodape: {
     paddingHorizontal: Space.md,
     paddingVertical: Space.sm,
