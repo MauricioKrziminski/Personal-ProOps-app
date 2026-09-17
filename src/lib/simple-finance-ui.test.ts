@@ -58,7 +58,6 @@ function screen(file: string, options: { debts?: any[]; invoiceStatus?: string; 
         refetch: async () => { refetches.push('range'); },
       };
     },
-    useTransactionsSummary: () => ({ ...query, refetch: async () => { refetches.push('summary'); } }),
     /*
       Consulta INFINITA (`{pages}`), e o mesmo `enabled` do hook real: com `pronto: false` ela
       fica desligada — `isPending` para sempre, sem dado. É exatamente o estado que prendia a
@@ -86,6 +85,21 @@ function screen(file: string, options: { debts?: any[]; invoiceStatus?: string; 
     }),
     useUpcomingCardCharges: () => ({ ...query, isSuccess: true, data: options.charges ?? [] }),
     useSpendablePath: () => ({ ...query, isSuccess: true, data: [] }),
+    useCycle: () => ({ ...query, isSuccess: true, data: options.cycle ?? { de: '2026-09-01', ate: '2026-09-30', mes: '2026-09', diasAteOFim: 22 } }),
+    useAccountBalances: () => ({
+      ...query,
+      isSuccess: !options.balancesError,
+      isError: Boolean(options.balancesError),
+      data: options.balancesError ? undefined : (options.balances ?? []),
+      refetch: async () => { refetches.push('balances'); },
+    }),
+    // A MESMA função serve as duas fatias da Hoje; o que as separa é a janela pedida.
+    useTransactionsSummary: (from: string, to: string) => ({
+      ...query,
+      isSuccess: true,
+      data: from === to ? (options.saiuHoje ?? []) : (options.saiuNoCiclo ?? []),
+      refetch: async () => { refetches.push('summary'); },
+    }),
     useMarkPaid: () => mutation('markPaid'),
     usePayInvoice: () => mutation('payInvoice'),
     useInvoice: () => ({ ...query, data: {
@@ -133,7 +147,7 @@ function screen(file: string, options: { debts?: any[]; invoiceStatus?: string; 
       };
       // Orçamentos consulta direto (a lista de linhas): o mesmo resultado inerte dos hooks.
       if (name === '@tanstack/react-query') return { useQuery: () => query };
-      if (name === '@/lib/finance-form' || name === '@/lib/dates' || name === '@/lib/month-view' || name === '@/lib/settle-labels' || name === '@/lib/accounts' || name === '@/lib/cycle-label' || name === '@/lib/card-status' || name === '@/lib/today-sections' || name === '@/lib/runway' || name === '@/lib/budget-tight' || name === '@/lib/setup-steps' || name === '@/lib/activity-feed') return load(`src/lib/${name.split('/').at(-1)}.ts`);
+      if (name === '@/lib/finance-form' || name === '@/lib/dates' || name === '@/lib/month-view' || name === '@/lib/settle-labels' || name === '@/lib/accounts' || name === '@/lib/cycle-label' || name === '@/lib/card-status' || name === '@/lib/today-sections' || name === '@/lib/runway' || name === '@/lib/budget-tight' || name === '@/lib/setup-steps' || name === '@/lib/activity-feed' || name === '@/lib/account-cash' || name === '@/lib/today-spend') return load(`src/lib/${name.split('/').at(-1)}.ts`);
       if (name === '@/hooks/use-debounced') return { useDebounced: (value: unknown) => value };
       if (name === '@/design/category-icons') return { categoryIcon: () => 'circle' };
       // import relativo DENTRO de um módulo puro já carregado (month-view → ./dates.ts)
@@ -520,7 +534,7 @@ test('Hoje: compra que vai cair no cartão aparece nos próximos dias e abre a f
   assert.deepEqual(copia(ui.navigations.at(-1)), { pathname: '/finance/invoice/[id]', params: { id: 'f-9' } });
 });
 
-test('Hoje: usuário novo vê os Primeiros passos, e a pílula do agente abre conversa nova', () => {
+test('Hoje: usuário novo vê os Primeiros passos', () => {
   const ui = screen(hojeFile, {
     setupPassos: [{ id: 'whatsapp', titulo: 'Ligar o WhatsApp', feito: false, href: '/link-phone' }],
   });
@@ -528,8 +542,6 @@ test('Hoje: usuário novo vê os Primeiros passos, e a pílula do agente abre co
   assert.ok(passos, 'o card de primeiros passos precisa aparecer');
   passos.props.onOpen(passos.props.passos[0]);
   assert.equal(ui.navigations.at(-1), '/link-phone');
-  ui.nodes().find((n: any) => n.type === 'AgentPrompt').props.onPress();
-  assert.equal(ui.navigations.at(-1), '/agent/new');
 });
 
 test('Hoje: com os passos todos feitos o card não aparece', () => {
@@ -555,41 +567,67 @@ test('Hoje: dia sem nada diz que nada vence, sem inventar lista', () => {
   assert.ok(ui.nodes().some((n: any) => n.type === 'ThemedText' && String(n.props.children).startsWith('Nada vence')));
 });
 
-const falaDoApp = {
-  source_message_id: 'app:1',
-  executed_at: '2026-09-08T12:00:00-03:00',
-  channel: 'app',
-  input_kind: 'text',
-  origin_text: 'gastei 45 no mercado',
-  session_id: 'sessao-1',
-  action_index: 0,
-  action_type: 'create_expense',
-  result_id: 'tx-1',
-  record: { kind: 'transaction', id: 'tx-1', title: 'Mercado', amount_cents: 4500, tx_kind: 'expense' },
-};
-
-test('Hoje: a Conversa mostra o texto real e abre o registro que ele virou', () => {
-  const ui = screen(hojeFile, { activity: [falaDoApp] });
-  const feed = ui.nodes().find((n: any) => n.type === 'ConversationFeed');
-  assert.ok(feed, 'a conversa precisa aparecer');
-  assert.equal(feed.props.pares[0].texto, 'gastei 45 no mercado');
-  feed.props.onOpenRecord(feed.props.pares[0].cards[0].destino);
-  assert.deepEqual(copia(ui.navigations.at(-1)), { pathname: '/finance/[txId]', params: { txId: 'tx-1' } });
-  feed.props.onOpenConversation('sessao-1');
-  assert.deepEqual(copia(ui.navigations.at(-1)), { pathname: '/agent/[id]', params: { id: 'sessao-1' } });
+const saldo = (nome: string, tipo: string, cents: number, aReceber = 0) => ({
+  account_id: nome, name: nome, type: tipo,
+  balance_cents: cents, cleared_cents: cents, pending_in_cents: aReceber, pending_out_cents: 0,
 });
 
-test('Hoje: falha na Conversa diz que falhou e refaz só ela', () => {
-  const ui = screen(hojeFile, { activityError: true });
+test('Hoje: "Nas contas" soma exatamente as linhas que mostra, e cartão fica de fora', () => {
+  const ui = screen(hojeFile, {
+    balances: [saldo('Nubank', 'checking', 120_00), saldo('Cofre', 'savings', 500_00), saldo('Cartão', 'credit_card', -900_00)],
+  });
+  const bloco = ui.nodes().find((n: any) => n.type === 'CashAccounts');
+  assert.ok(bloco, 'o bloco das contas precisa aparecer');
+  assert.equal(bloco.props.caixa.total, 620_00);
+  assert.equal(
+    bloco.props.caixa.linhas.reduce((t: number, l: any) => t + l.cents, 0),
+    bloco.props.caixa.total,
+    'o total do topo é a soma das linhas de baixo'
+  );
+  assert.ok(!bloco.props.caixa.linhas.some((l: any) => l.nome === 'Cartão'), 'cartão tem fatura, não saldo');
+});
+
+test('Hoje: tocar numa conta abre o extrato DELA', () => {
+  const ui = screen(hojeFile, { balances: [saldo('Nubank', 'checking', 120_00)] });
+  const bloco = ui.nodes().find((n: any) => n.type === 'CashAccounts');
+  bloco.props.onOpen(bloco.props.caixa.linhas[0]);
+  assert.deepEqual(copia(ui.navigations.at(-1)), { pathname: '/finance/transactions', params: { accountId: 'Nubank' } });
+});
+
+test('Hoje: falha nos saldos diz que falhou e refaz só os saldos', () => {
+  const ui = screen(hojeFile, { balancesError: true });
+  assert.ok(!tipos(ui).includes('CashAccounts'), 'sem resposta a tela não afirma saldo nenhum');
   const erro = ui.nodes().find((n: any) => n.type === 'ErrorCard');
   assert.ok(erro);
   erro.props.onRetry();
-  assert.deepEqual(ui.refetches, ['activity']);
+  assert.deepEqual(ui.refetches, ['balances']);
 });
 
-test('Hoje: sem fala nenhuma a Conversa não desenha bloco vazio', () => {
+test('Hoje: sem conta nenhuma o bloco não desenha um card vazio', () => {
   const ui = screen(hojeFile, {});
-  assert.ok(!tipos(ui).includes('ConversationFeed'));
+  assert.ok(!tipos(ui).includes('CashAccounts'));
+});
+
+test('Hoje: o ritmo do dia compara hoje com os dias ANTERIORES do ciclo', () => {
+  // ciclo começa 01/09, hoje é 08/09 → 8 dias decorridos, 7 anteriores.
+  const ui = screen(hojeFile, {
+    saiuHoje: [{ kind: 'expense', total_cents: 200_00 }],
+    saiuNoCiclo: [{ kind: 'expense', total_cents: 900_00 }],
+  });
+  const tile = ui.nodes().find((n: any) => n.type === 'Tile' && n.props.label === 'Saiu hoje');
+  assert.ok(tile, 'o ladrilho do dia precisa aparecer');
+  // (900 − 200) / 7 = 100 por dia; hoje ficou acima.
+  assert.match(String(tile.props.caption), /acima do ritmo/);
+  assert.match(String(tile.props.caption), /100/, "a média por dia aparece na legenda");
+});
+
+test('Hoje: receita não entra no que "saiu"', () => {
+  const ui = screen(hojeFile, {
+    saiuHoje: [{ kind: 'income', total_cents: 4_000_00 }, { kind: 'expense', total_cents: 30_00 }],
+    saiuNoCiclo: [{ kind: 'expense', total_cents: 100_00 }],
+  });
+  const tile = ui.nodes().find((n: any) => n.type === 'Tile' && n.props.label === 'Saiu hoje');
+  assert.equal(tile.props.value.props.cents, 30_00);
 });
 
 test('Financeiro: os atalhos do mosaico levam aos mesmos destinos de antes', () => {

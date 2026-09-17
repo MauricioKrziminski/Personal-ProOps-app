@@ -5,11 +5,10 @@ import Animated, { FadeOut, LinearTransition } from 'react-native-reanimated';
 
 import { ErrorCard } from '@/components/error-card';
 import { AgendaItem } from '@/components/feed/agenda-item';
-import { AgentPrompt } from '@/components/feed/agent-prompt';
-import { ConversationFeed } from '@/components/feed/conversation-feed';
 import { ReminderTimeline } from '@/components/feed/reminder-timeline';
 import { SetupChecklist } from '@/components/feed/setup-checklist';
 import { BudgetRings } from '@/components/finance/budget-rings';
+import { CashAccounts } from '@/components/finance/cash-accounts';
 import { ThemedText } from '@/components/themed-text';
 import { AppHeader } from '@/components/ui/app-header';
 import { BlockHeader } from '@/components/ui/block-header';
@@ -26,14 +25,15 @@ import { Tile, TileRow } from '@/components/ui/tile';
 import { useToast } from '@/components/ui/toast';
 import type { ThemeColor } from '@/constants/theme';
 import { Motion, Radius, Space, tabular } from '@/design/tokens';
-import { useAgentActivity } from '@/hooks/use-agent-activity';
 import { useBoolPref } from '@/hooks/use-bool-pref';
 import {
+  useAccountBalances,
   useBudgetsStatus,
   useCycle,
   useMarkPaid,
   useSpendable,
   useSpendablePath,
+  useTransactionsSummary,
   useUpcomingBills,
   useUpcomingCardCharges,
 } from '@/hooks/use-finance';
@@ -42,20 +42,28 @@ import { useProfile } from '@/hooks/use-profile';
 import { useSession } from '@/hooks/use-session';
 import { useSetupProgress } from '@/hooks/use-setup-progress';
 import { useTelaPronta } from '@/hooks/use-tela-pronta';
-import { paresDaConversa } from '@/lib/activity-feed';
+import { caixaDasContas, type LinhaDeCaixa } from '@/lib/account-cash';
 import { orcamentosApertados } from '@/lib/budget-tight';
 import { diaCurtoBR, diasAte, greetingBR, isoToBR, rotuloDoDia } from '@/lib/dates';
 import { showItemActions } from '@/lib/item-actions';
 import { montarPista } from '@/lib/runway';
 import { settleDone, settleLabel } from '@/lib/settle-labels';
 import { agendaDoDia, iconeDoItem, metaDoItem, type ItemDaAgenda } from '@/lib/today-sections';
+import { diasDoCiclo, ritmoDoDia } from '@/lib/today-spend';
 
 /**
  * A Hoje — "Conversa organizada" (spec 2026-09-17).
  *
- * Duas vozes: o app fala nos blocos com o selo da marca (o livre, Agora, Próximos dias) e a
- * pessoa fala na Conversa (Fase 2). A ordem continua sendo de URGÊNCIA: o que dá para gastar,
- * o que exige ação hoje, e só então o que vem.
+ * A ordem é de URGÊNCIA: quanto dá para gastar, o que já saiu hoje, o que exige ação, quanto
+ * existe em conta, e só então o que vem.
+ *
+ * ⚠️ **A "Conversa" e o card "Diga ao agente" saíram em 17/09/2026**, a pedido do dono do
+ * produto (*"ficou horrível… troque as seções pra algo que realmente faça sentido, informações
+ * úteis"*). Os dois eram os únicos blocos que não respondiam pergunta nenhuma: um repetia de
+ * volta o texto que a pessoa acabou de mandar, o outro anunciava uma aba que já existe na dock.
+ * No lugar entraram as duas perguntas que ela faz todo dia e a Hoje não respondia — **quanto já
+ * saiu hoje** e **quanto tem em conta agora**. A citação da fala continua, onde ela informa: na
+ * linha do lançamento, no Financeiro.
  *
  * O herói NÃO repete o Financeiro: aqui é "quanto dá para gastar até entrar dinheiro de novo"
  * (`caixa − comprometido_ate_entrada`); lá é "como o ciclo fecha". A identidade que amarra os
@@ -108,9 +116,15 @@ export default function TodayScreen() {
   const setup = useSetupProgress();
   const [passosEscondidos, esconderPassos] = useBoolPref(`hoje:passos-escondidos:${session?.user?.id ?? ''}`);
   const markPaid = useMarkPaid();
-  const atividade = useAgentActivity(6);
   const caminho = useSpendablePath();
-  const pares = useMemo(() => paresDaConversa(atividade.data ?? [], hoje), [atividade.data, hoje]);
+  const saldos = useAccountBalances();
+  /*
+    O que saiu HOJE e o que saiu no ciclo até hoje: duas fatias da mesma leitura, e é a segunda
+    que dá a régua ("seu ritmo"). A do ciclo só liga quando a borda chega — buscar com um palpite
+    de início daria o ritmo de outro período sob o rótulo deste.
+  */
+  const saiuHoje = useTransactionsSummary(hoje, hoje);
+  const saiuNoCiclo = useTransactionsSummary(cycle.data?.de ?? hoje, hoje, Boolean(cycle.data?.de));
 
   const caixa = Number(gasto.data?.caixa ?? 0);
   const comprometido = Number(gasto.data?.comprometido_ate_entrada ?? 0);
@@ -136,6 +150,21 @@ export default function TodayScreen() {
   const contas = (bills.data ?? []).filter((b) => b.kind !== 'income');
   const lembretes = reminders.data ?? [];
   const apertados = useMemo(() => orcamentosApertados(budgets.data ?? []), [budgets.data]);
+
+  /* `isError` e não só `data`: o TanStack guarda o resultado anterior quando o refetch falha. */
+  const emConta = useMemo(() => caixaDasContas(saldos.isError ? [] : (saldos.data ?? [])), [saldos.isError, saldos.data]);
+  const soma = (linhas: { kind: string; total_cents: number | string }[] | undefined, lado: string) =>
+    (linhas ?? []).filter((l) => l.kind === lado).reduce((t, l) => t + Number(l.total_cents), 0);
+  const entrouHoje = soma(saiuHoje.data, 'income');
+  const ritmo = useMemo(
+    () =>
+      ritmoDoDia({
+        hojeCents: soma(saiuHoje.data, 'expense'),
+        cicloCents: soma(saiuNoCiclo.data, 'expense'),
+        diasDecorridos: cycle.data?.de ? diasDoCiclo(cycle.data.de, hoje) : 1,
+      }),
+    [saiuHoje.data, saiuNoCiclo.data, cycle.data?.de, hoje]
+  );
 
   /*
     A segunda linha do herói é o VEREDITO DO DIA: obrigação (devo alguma coisa?) ganha de
@@ -168,7 +197,7 @@ export default function TodayScreen() {
     pode nascer desligada e mesmo assim entra — `telaPronta` lê `fetchStatus`.
   */
   const pronta = useTelaPronta(
-    cycle, profile, gasto, bills, noCartao, reminders, budgets, atividade, caminho, ...setup.consultas,
+    cycle, profile, gasto, bills, noCartao, reminders, budgets, saldos, saiuHoje, saiuNoCiclo, caminho, ...setup.consultas,
   );
 
   const pay = (id: string, title: string, kind: string | null | undefined) =>
@@ -286,7 +315,9 @@ export default function TodayScreen() {
           budgets.refetch(),
           profile.refetch(),
           cycle.refetch(),
-          atividade.refetch(),
+          saldos.refetch(),
+          saiuHoje.refetch(),
+          saiuNoCiclo.refetch(),
           caminho.refetch(),
         ])
       }>
@@ -355,6 +386,45 @@ export default function TodayScreen() {
         </TileRow>
       ) : null}
 
+      {/*
+        Quanto já saiu HOJE. O valor sozinho não muda decisão — R$ 210 é muito ou pouco? Quem
+        responde é a comparação com o ritmo da própria pessoa neste ciclo (`ritmoDoDia`), que
+        exclui hoje de propósito: incluído, um estouro levantaria a régua contra a qual ele
+        seria medido.
+      */}
+      {saiuHoje.isError ? null : (
+        <TileRow>
+          <Tile
+            icon="arrow.up.right"
+            label="Saiu hoje"
+            value={<Money cents={ritmo.hoje} variant="money" tone="text" concealable />}
+            caption={
+              ritmo.media === null
+                ? 'primeiro dia do ciclo'
+                : // Sem barra: "R$ 73,83/dia" quebrava DEPOIS da barra na coluna estreita.
+                  `${ritmo.acima ? 'acima' : 'abaixo'} do ritmo de ${brl(ritmo.media)} por dia`
+            }
+            accessibilityLabel={`Saiu hoje: ${brl(ritmo.hoje)}`}
+            onPress={() => router.push('/finance/transactions')}
+          />
+          {/*
+            O par existe para o dia ter DOIS lados — e sai de graça: `transactions_summary` já
+            devolve as duas naturezas na mesma leitura. Zerado 28 dias por mês ele é quieto e
+            verdadeiro, como o "No limite: 0" da fileira de cima; no dia do salário é a melhor
+            notícia do mês.
+          */}
+          <Tile
+            icon="arrow.down.left"
+            label="Entrou hoje"
+            value={
+              <Money cents={entrouHoje} variant="money" tone={entrouHoje > 0 ? 'success' : 'text'} concealable />
+            }
+            accessibilityLabel={`Entrou hoje: ${brl(entrouHoje)}`}
+            onPress={() => router.push('/finance/transactions')}
+          />
+        </TileRow>
+      )}
+
       {mostrarPassos ? (
         <Bloco>
           <SetupChecklist
@@ -364,8 +434,6 @@ export default function TodayScreen() {
           />
         </Bloco>
       ) : null}
-
-      <AgentPrompt onPress={() => router.push('/agent/new')} />
 
       {bills.isError ? (
         <Bloco>
@@ -391,21 +459,31 @@ export default function TodayScreen() {
       ) : null}
 
       {/*
-        A Conversa: o texto REAL que a pessoa mandou, com o registro que ele virou. Só o que ela
-        mesma disse (o RPC filtra pelo chamador); sem fala nenhuma, o bloco não existe.
+        "Nas contas" é a outra metade do herói: ele diz quanto DÁ para gastar até o fim do ciclo,
+        este diz quanto EXISTE agora. A régua é a mesma da tela de Contas (`caixaDasContas`) —
+        duas telas vizinhas com números diferentes para o mesmo dinheiro é como a pessoa para de
+        confiar no app.
       */}
-      {atividade.isError ? (
+      {saldos.isError ? (
         <Bloco>
-          <BlockHeader title="Conversa" />
-          <ErrorCard onRetry={() => atividade.refetch()} />
+          <BlockHeader title="Nas contas" />
+          <ErrorCard onRetry={() => saldos.refetch()} />
         </Bloco>
-      ) : pares.length > 0 ? (
+      ) : emConta.linhas.length > 0 ? (
         <Bloco>
-          <BlockHeader title="Conversa" action={{ label: 'Agente', onPress: () => router.push('/agent') }} />
-          <ConversationFeed
-            pares={pares}
-            onOpenRecord={(d) => router.push(d as Href)}
-            onOpenConversation={(id) => router.push({ pathname: '/agent/[id]', params: { id } })}
+          <BlockHeader
+            title="Nas contas"
+            action={{ label: 'Contas', onPress: () => router.push('/finance/accounts') }}
+          />
+          <CashAccounts
+            caixa={emConta}
+            onOpen={(l: LinhaDeCaixa) =>
+              router.push(
+                l.id
+                  ? ({ pathname: '/finance/transactions', params: { accountId: l.id } } as Href)
+                  : ('/finance/transactions' as Href)
+              )
+            }
           />
         </Bloco>
       ) : null}

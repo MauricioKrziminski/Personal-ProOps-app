@@ -11,6 +11,8 @@ import * as dates from './dates.ts';
 import * as todaySections from './today-sections.ts';
 import * as runway from './runway.ts';
 import * as budgetTight from './budget-tight.ts';
+import * as accountCash from './account-cash.ts';
+import * as todaySpend from './today-spend.ts';
 import * as activityFeed from './activity-feed.ts';
 
 const require = createRequire(import.meta.url);
@@ -268,7 +270,7 @@ function renderToday(bill: { kind: 'invoice' | 'transaction'; ref_id: string }) 
   const routes: unknown[] = [];
   const module = { exports: {} as any };
   const query = { data: [], isLoading: false, isRefetching: false, refetch: async () => {} };
-  const finance = { useCycle: () => ({ ...query, data: null }), useCycleMonth: () => '2026-01', useSpendable: () => ({ ...query, data: { caixa: 72, comprometido_ate_entrada: 0, comprometido_no_ciclo: 832663, a_receber_no_ciclo: 756652, proxima_entrada: '2026-01-20' } }), useCashFlowForecast: () => query, useCycleSeries: () => ({ ...query, data: [] }), useAccountBalances: () => ({ ...query, data: [] }), useUpcomingBills: () => ({ ...query, data: [{ ...bill, title: 'Fatura teste', amount_cents: 147000, due_date: '2026-01-20', overdue: true }] }), useUpcomingCardCharges: () => ({ ...query, data: [] }), useSpendablePath: () => ({ ...query, data: [] }), useBudgetsStatus: () => query, useRecentTransactions: () => query, useMarkPaid: () => ({ mutate: (...args: unknown[]) => writes.push(args) }) };
+  const finance = { useCycle: () => ({ ...query, data: null }), useCycleMonth: () => '2026-01', useSpendable: () => ({ ...query, data: { caixa: 72, comprometido_ate_entrada: 0, comprometido_no_ciclo: 832663, a_receber_no_ciclo: 756652, proxima_entrada: '2026-01-20' } }), useCashFlowForecast: () => query, useCycleSeries: () => ({ ...query, data: [] }), useAccountBalances: () => ({ ...query, data: [] }), useUpcomingBills: () => ({ ...query, data: [{ ...bill, title: 'Fatura teste', amount_cents: 147000, due_date: '2026-01-20', overdue: true }] }), useUpcomingCardCharges: () => ({ ...query, data: [] }), useSpendablePath: () => ({ ...query, data: [] }), useTransactionsSummary: () => ({ ...query, data: [] }), useBudgetsStatus: () => query, useRecentTransactions: () => query, useMarkPaid: () => ({ mutate: (...args: unknown[]) => writes.push(args) }) };
   const code = ts.transpileModule(readFileSync('src/app/(tabs)/today/index.tsx', 'utf8'), { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022, jsx: ts.JsxEmit.ReactJSX } }).outputText;
   runInNewContext(code, { module, exports: module.exports, require: (name: string) => {
     if (name === 'react') return { useMemo: (fn: () => unknown) => fn(), useState: (value: unknown) => [typeof value === 'function' ? value() : value, () => {}] };
@@ -286,6 +288,8 @@ function renderToday(bill: { kind: 'invoice' | 'transaction'; ref_id: string }) 
     if (name === '@/lib/today-sections') return todaySections;
     if (name === '@/lib/runway') return runway;
     if (name === '@/lib/budget-tight') return budgetTight;
+    if (name === '@/lib/account-cash') return accountCash;
+    if (name === '@/lib/today-spend') return todaySpend;
     if (name === '@/lib/activity-feed') return activityFeed;
     /*
       O portão da Fase 5 devolve `true` aqui: este teste existe para conferir o CONTEÚDO da Hoje
