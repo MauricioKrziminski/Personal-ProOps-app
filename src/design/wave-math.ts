@@ -72,3 +72,45 @@ export function raioDaCobertura(
   );
   return (1 - easeInOut(p)) * (longe + 2);
 }
+
+/** Onde a borda da capa do login descansa: a linha de base em 20% da altura da tela. */
+export const CAPA = 0.2;
+
+/**
+ * O progresso de REVELAR em que a linha de base cai em `CAPA`. A amplitude depende do progresso,
+ * então não há fórmula fechada: bisseção, que converge em 30 passos para bem menos de um pixel.
+ * A borda de revelar só sobe com `p`, então a função é monotônica e a bisseção é segura.
+ */
+export function progressoDaCapa(altura: number): number {
+  'worklet';
+  const alvo = altura * CAPA;
+  let lo = 0;
+  let hi = 1;
+  for (let i = 0; i < 30; i++) {
+    const meio = (lo + hi) / 2;
+    const base = bordaDaOnda(meio, 'revelar', altura, amplitude(meio, altura));
+    if (base > alvo) lo = meio;
+    else hi = meio;
+  }
+  return (lo + hi) / 2;
+}
+
+/**
+ * O ponto mais BAIXO da borda da capa — o fundo da barriga, que desce abaixo da ponta esquerda.
+ * O conteúdo da tela de conta começa depois dele. A cúbica não tem máximo fechado barato: 64
+ * amostras dão menos de meio pixel de erro nas alturas de tela reais.
+ */
+export function alturaDaCapa(altura: number): number {
+  'worklet';
+  const p = progressoDaCapa(altura);
+  const A = amplitude(p, altura);
+  const c = pontosDaCurva(bordaDaOnda(p, 'revelar', altura, A), 0, A);
+  let fundo = c.y0;
+  for (let i = 1; i <= 64; i++) {
+    const t = i / 64;
+    const u = 1 - t;
+    const y = u * u * u * c.y0 + 3 * u * u * t * c.c1y + 3 * u * t * t * c.c2y + t * t * t * c.y1;
+    if (y > fundo) fundo = y;
+  }
+  return fundo;
+}

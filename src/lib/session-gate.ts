@@ -19,6 +19,11 @@ export interface Ponto {
 export interface Onda {
   mode: WaveMode;
   origin?: Ponto;
+  /**
+   * Onde revelar PARA. `capa` deixa a tinta no topo, na curva que o `AuthScreen` desenha igual —
+   * é o cabeçalho das telas de conta. Sem o campo, a tinta sai da tela.
+   */
+  ate?: 'capa';
 }
 
 /** Teto de CADA passo da troca (cobrir, revelar). Passou disso, a troca acontece assim mesmo. */
@@ -37,11 +42,11 @@ export function precisaDeCortina(antes: string | null | undefined, depois: strin
 }
 
 /**
- * Sair cobre DE BAIXO (a tela desce como uma porta); entrar nasce no botão que disparou, e sem
- * botão (link, código colado) desce do topo. Quem inverte a ordem para cobrir é a cortina.
+ * Sair cobre DE BAIXO e revela até a capa do login; entrar nasce no botão que disparou, e sem
+ * botão (link, código colado) desce do topo.
  */
 export function ondaDaTroca(depois: string | null, origem: Ponto | null): Onda {
-  if (depois === null) return { mode: 'up' };
+  if (depois === null) return { mode: 'up', ate: 'capa' };
   if (origem) return { mode: 'radial', origin: origem };
   return { mode: 'down' };
 }

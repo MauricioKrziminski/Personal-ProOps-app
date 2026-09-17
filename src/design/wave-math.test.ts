@@ -2,10 +2,13 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 
 import {
+  CAPA,
+  alturaDaCapa,
   amplitude,
   bordaDaOnda,
   easeInOut,
   pontosDaCurva,
+  progressoDaCapa,
   raioDaCobertura,
 } from './wave-math.ts';
 
@@ -71,4 +74,28 @@ test('a curva de tempo vai de 0 a 1 sem sair do intervalo', () => {
   assert.equal(easeInOut(0), 0);
   assert.equal(easeInOut(1), 1);
   for (let t = 0; t <= 1; t += 0.1) assert.ok(easeInOut(t) >= 0 && easeInOut(t) <= 1);
+});
+
+test('a capa para com a linha de base em 20% da altura', () => {
+  for (const altura of [640, 874, 956]) {
+    const p = progressoDaCapa(altura);
+    assert.ok(p > 0 && p < 1);
+    const base = bordaDaOnda(p, 'revelar', altura, amplitude(p, altura));
+    assert.ok(Math.abs(base - altura * CAPA) < 0.5, `H=${altura}: base ${base}`);
+  }
+});
+
+test('a altura da capa é o ponto mais baixo da borda (o fundo da barriga)', () => {
+  const p = progressoDaCapa(H);
+  const A = amplitude(p, H);
+  const c = pontosDaCurva(bordaDaOnda(p, 'revelar', H, A), W, A);
+  // A cúbica de (0, y0) a (W, y1), amostrada fina.
+  let fundo = -Infinity;
+  for (let t = 0; t <= 1; t += 0.001) {
+    const u = 1 - t;
+    const y = u * u * u * c.y0 + 3 * u * u * t * c.c1y + 3 * u * t * t * c.c2y + t * t * t * c.y1;
+    fundo = Math.max(fundo, y);
+  }
+  assert.ok(Math.abs(alturaDaCapa(H) - fundo) < 0.5, `${alturaDaCapa(H)} contra ${fundo}`);
+  assert.ok(fundo > c.y0, 'a barriga desce abaixo da ponta esquerda');
 });
