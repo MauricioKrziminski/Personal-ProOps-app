@@ -21,20 +21,7 @@ import {
 import { useTheme } from '@/hooks/use-theme';
 import type { AgentConversation } from '@/lib/agent-api';
 import { confirmDestructive, showItemActions } from '@/lib/item-actions';
-
-/**
- * Três coisas que a pessoa pode pedir, escritas como ela pediria.
- *
- * O empty state precisa de uma dica ACIONÁVEL (`design.md` §7), e num chat a
- * dica é a frase pronta: a tela em branco com um cursor piscando é onde o
- * usuário trava. Cada uma abre `new` com o texto no campo — nenhuma cria linha
- * no servidor, porque abrir e voltar não pode deixar conversa vazia na lista.
- */
-const PROMPTS = [
-  'Quanto gastei este mês?',
-  'Registre R$ 45 no mercado',
-  'O que vence esta semana?',
-] as const;
+import { EXEMPLOS_DO_AGENTE } from '@/lib/agent-prompts';
 
 export default function AgentScreen() {
   const theme = useTheme();
@@ -113,7 +100,13 @@ export default function AgentScreen() {
             hint="Peça o que quiser em português — eu anoto, lanço e respondo."
           />
           <View style={styles.prompts}>
-            {PROMPTS.map((p) => (
+            {/*
+              Frases prontas, escritas como a pessoa pediria (a lista é a mesma da Hoje). O empty
+              state precisa de dica ACIONÁVEL (§7), e num chat a tela em branco com o cursor
+              piscando é onde a pessoa trava. Cada uma abre `new` com o texto no campo — nenhuma
+              cria linha no servidor, porque abrir e voltar não pode deixar conversa vazia.
+            */}
+            {EXEMPLOS_DO_AGENTE.map((p) => (
               <Pressable
                 key={p}
                 onPress={() => router.push(`/agent/new?prompt=${encodeURIComponent(p)}`)}
