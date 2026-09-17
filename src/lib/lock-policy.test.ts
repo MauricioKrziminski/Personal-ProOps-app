@@ -8,6 +8,7 @@ import {
   bandeiraCaiAoTerminar,
   bandeiraCaiNoActive,
   deveTrancar,
+  deveVelarAoSair,
   deveTrancarNoInicio,
   podeTrancar,
   type LockState,
@@ -88,4 +89,12 @@ test('operação ainda em voo segura a bandeira dos dois lados', () => {
 
 test('sem conta aberta não tranca — a porta é o login', () => {
   assert.equal(deveTrancar({ ...base, backgroundedAt: 1000, temSessao: false }, 999_999), false);
+});
+
+test('sair do app com a trava ligada cobre na hora — menos para a UI do sistema e sem conta', () => {
+  assert.equal(deveVelarAoSair(base), true);
+  assert.equal(deveVelarAoSair({ ...base, delaySeconds: 60 }), true);
+  assert.equal(deveVelarAoSair({ ...base, mode: 'off' }), false);
+  assert.equal(deveVelarAoSair({ ...base, systemUiOpen: true }), false);
+  assert.equal(deveVelarAoSair({ ...base, temSessao: false }), false);
 });

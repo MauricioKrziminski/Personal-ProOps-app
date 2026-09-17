@@ -53,6 +53,19 @@ export function deveTrancar(s: LockState, agora: number): boolean {
   return agora - s.backgroundedAt >= s.delaySeconds * 1000;
 }
 
+/**
+ * Cobrir o app ao ir para o segundo plano?
+ *
+ * ⚠️ **Trancar só no `active` deixava o dinheiro à mostra na volta** (medido em 17/09/2026: ~1 s
+ * da Hoje inteira antes de a trava cobrir, no Android). A decisão de trancar precisa do relógio
+ * da volta, mas a TINTA pode subir na saída: com ela na árvore, o primeiro quadro da volta já
+ * nasce coberto. Não cobre quando quem tirou o app da frente foi a UI do sistema (prompt,
+ * arquivo, câmera) — seria a mesma trava por cima do fluxo que a bandeira existe para proteger.
+ */
+export function deveVelarAoSair(s: Pick<LockState, 'mode' | 'systemUiOpen' | 'temSessao'>): boolean {
+  return s.mode !== 'off' && s.temSessao && !s.systemUiOpen;
+}
+
 /** O app abre trancado quando a trava está ligada — sempre, sem janela de carência. */
 export function deveTrancarNoInicio(mode: LockMode): boolean {
   return mode !== 'off';

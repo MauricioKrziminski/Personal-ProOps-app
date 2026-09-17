@@ -21,6 +21,7 @@ import { Pressable, StyleSheet, View } from 'react-native';
 import Animated, {
   Easing,
   FadeIn,
+  FadeOut,
   runOnJS,
   useAnimatedStyle,
   useReducedMotion,
@@ -51,12 +52,29 @@ const MARCA = 48;
  * efeito: o lint barra `setState` síncrono em `useEffect`, e com razão.
  */
 export function LockOverlay() {
-  const { locked } = useLock();
+  const { locked, velado } = useLock();
   const [montada, setMontada] = useState(locked);
   if (locked && !montada) setMontada(true);
   const aoSair = useCallback(() => setMontada(false), []);
-  if (!montada) return null;
-  return <Cortina saindo={!locked} onSaiu={aoSair} />;
+  if (montada) return <Cortina saindo={!locked} onSaiu={aoSair} />;
+  return velado ? <Veu /> : null;
+}
+
+/**
+ * A tinta lisa de quando o app saiu da frente (`velado`). Trancando na volta, a cortina monta no
+ * mesmo render e nasce coberta, então o véu some por baixo dela; dentro da espera, ele esmaece.
+ */
+function Veu() {
+  const theme = useTheme();
+  return (
+    <Animated.View
+      exiting={FadeOut.duration(Motion.duration.base)}
+      pointerEvents="none"
+      accessibilityElementsHidden
+      importantForAccessibility="no-hide-descendants"
+      style={[styles.veu, { backgroundColor: theme.curtain }]}
+    />
+  );
 }
 
 /**
@@ -263,6 +281,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingHorizontal: Space.lg,
   },
+  veu: { ...StyleSheet.absoluteFill, zIndex: 900, elevation: 900 },
   folga: { flex: 2 },
   folgaBaixa: { flex: 3 },
   centro: { alignItems: 'center', gap: Space.xl },

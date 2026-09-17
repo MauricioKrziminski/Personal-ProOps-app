@@ -34,12 +34,15 @@ import { AppState, Platform } from 'react-native';
 
 import { useSession } from '@/hooks/use-session';
 
+import { protegerAoSair } from '../../modules/proops-privacidade';
+
 import {
   aposAutenticar,
   bandeiraCaiAoTerminar,
   bandeiraCaiNoActive,
   deveTrancar,
   deveTrancarNoInicio,
+  deveVelarAoSair,
   podeTrancar,
   type LockDelay,
   type LockMode,
@@ -85,6 +88,11 @@ interface LockContexto {
   delaySeconds: LockDelay;
   /** `true` = o overlay de bloqueio cobre o app. Nunca sem conta aberta. */
   locked: boolean;
+  /**
+   * O app saiu da frente com a trava ligada: uma tinta lisa cobre tudo até a volta decidir se
+   * tranca (a trava entra por cima dela) ou não (ela esmaece).
+   */
+  velado: boolean;
   /** Ainda lendo a preferência: o app segura o conteúdo em vez de piscar destravado. */
   carregando: boolean;
   /** O aparelho tem bloqueio de tela? Sem isso não há como provar quem é o dono. */
@@ -140,6 +148,7 @@ export function LockProvider({ children }: { children: ReactNode }) {
   const [disponivel, setDisponivel] = useState(false);
   const [comoAutentica, setComo] = useState('a senha do celular');
   const [estado, setEstado] = useState<'trancado' | 'autenticando' | 'falhou'>('trancado');
+  const [velado, setVelado] = useState(false);
   /*
     O espelho que o listener de AppState lê.
 
@@ -163,12 +172,21 @@ export function LockProvider({ children }: { children: ReactNode }) {
     setSessaoAntes(sessaoAgora);
     if (sessaoAntes !== undefined && sessaoAgora !== undefined) {
       setLocked(false);
+      setVelado(false);
       setEstado('trancado');
     }
   }
   useEffect(() => {
     vigia.current.temSessao = temSessao;
   }, [temSessao]);
+
+  /*
+    A tinta do JS (`velado`) cobre a tela VIVA; a foto que o sistema tira na pausa — o cartão dos
+    recentes e o quadro da volta — sai antes dela e mostrava a Hoje. Quem esconde a foto é nativo.
+  */
+  useEffect(() => {
+    protegerAoSair(mode === 'on' && temSessao);
+  }, [mode, temSessao]);
 
   useEffect(() => {
     let vivo = true;
@@ -261,8 +279,12 @@ export function LockProvider({ children }: { children: ReactNode }) {
           simulador). Se `pedirRef` acabou de abrir outro prompt, `aberturas` já subiu e ela fica.
         */
         if (bandeiraCaiNoActive(aberturas.current)) vigia.current.systemUiOpen = false;
+        // Trancando, a trava monta no MESMO render e nasce coberta: não há quadro sem tinta.
+        setVelado(false);
       } else if (s === 'background' || s === 'inactive') {
         vigia.current.backgroundedAt = Date.now();
+        // Só `background`: no iOS `inactive` é também a central de controle e o próprio Face ID.
+        if (s === 'background' && deveVelarAoSair(vigia.current)) setVelado(true);
       }
     });
     return () => sub.remove();
@@ -341,6 +363,7 @@ export function LockProvider({ children }: { children: ReactNode }) {
       mode,
       delaySeconds,
       locked: locked && temSessao,
+      velado: velado && temSessao,
       carregando: carregando || sessaoCarregando,
       disponivel,
       comoAutentica,
@@ -350,7 +373,7 @@ export function LockProvider({ children }: { children: ReactNode }) {
       autenticar,
       semTrancar,
     }),
-    [mode, delaySeconds, locked, temSessao, carregando, sessaoCarregando, disponivel, comoAutentica, estado, configurar, definirEspera, autenticar, semTrancar]
+    [mode, delaySeconds, locked, velado, temSessao, carregando, sessaoCarregando, disponivel, comoAutentica, estado, configurar, definirEspera, autenticar, semTrancar]
   );
 
   return <Ctx.Provider value={valor}>{children}</Ctx.Provider>;
