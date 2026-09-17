@@ -169,6 +169,24 @@ async def test_reserva_de_execucao_e_do_turno_nao_da_meta(sql):
         )
 
 
+@pytest.mark.asyncio
+async def test_reserva_grava_dono_workspace_e_a_frase(sql):
+    """A Hoje mostra o texto REAL que virou o registro (`public.agent_activity`)."""
+    origem = "app:" + str(uuid4())
+    dono, ws = uuid4(), uuid4()
+
+    await db.reserve_execution(
+        origem, 0, "create_expense", user_id=dono, workspace_id=ws, origin_text="  gastei 45 no mercado "
+    )
+
+    texto = _texto(sql)
+    for coluna in ("user_id", "workspace_id", "origin_text"):
+        assert coluna in texto, f"a reserva não grava {coluna}"
+    args = sql[-1][1]
+    assert dono in args and ws in args
+    assert "gastei 45 no mercado" in args
+
+
 # ---------------------------------------------------------------------------
 # o que NÃO mudou
 # ---------------------------------------------------------------------------

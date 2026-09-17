@@ -408,7 +408,15 @@ async def resolve_pending(pending_id: UUID, status: str) -> None:
 # ---------------------------------------------------------------------------
 
 
-async def reserve_execution(source_message_id: str, action_index: int, action_type: str) -> bool:
+async def reserve_execution(
+    source_message_id: str,
+    action_index: int,
+    action_type: str,
+    *,
+    user_id: UUID | None = None,
+    workspace_id: UUID | None = None,
+    origin_text: str | None = None,
+) -> bool:
     """Reserva a vaga ANTES de executar. False = já foi feita (ou está sendo).
 
     A ordem importa e é a correção do bug do fluxo antigo: lá as ações rodavam e
@@ -416,18 +424,29 @@ async def reserve_execution(source_message_id: str, action_index: int, action_ty
     no retry. Reservando antes, a pior consequência de uma morte no meio é a ação
     NÃO acontecer — e o usuário reenvia. Para dinheiro, perder um registro que
     ele pode remandar é melhor que gravar dois que ele não pediu.
+
+    Dono, workspace e a frase de origem entram na MESMA linha: é o que a Hoje lê
+    para mostrar o balão com o texto real (`public.agent_activity`). A frase é o
+    `ExecContext.texto`, que já é a original numa retomada de SIM e o `raw_text`
+    num rascunho completado.
+
+    ⚠️ As três colunas nascem na `20260918120000`: este código num banco sem ela
+    quebra TODA escrita. A migration sobe ANTES do deploy.
     """
     row = await fetch_one(
         """
         insert into public.executed_actions
-          (source_message_id, action_index, action_type)
-        values (%s, %s, %s)
+          (source_message_id, action_index, action_type, user_id, workspace_id, origin_text)
+        values (%s, %s, %s, %s, %s, %s)
         on conflict (source_message_id, action_index) do nothing
         returning source_message_id
         """,
         source_message_id,
         action_index,
         action_type,
+        user_id,
+        workspace_id,
+        (origin_text or "").strip()[:2000] or None,
     )
     return row is not None
 

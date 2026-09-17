@@ -106,7 +106,7 @@ async def test_create_card_graph_waits_for_final_confirmation(monkeypatch):
         writes.append((sql, args))
         return {"id": "new-id"}
 
-    async def reserve(*a):
+    async def reserve(*a, **k):
         return True
 
     async def confirmed(*a):

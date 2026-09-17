@@ -147,7 +147,14 @@ async def execute(ctx: ExecContext, action: FinanceAction | FinanceQuery | Notes
 
     # Consulta pode repetir à vontade; escrita RESERVA a vaga antes de rodar.
     if not somente_leitura:
-        if not await db.reserve_execution(ctx.source_message_id, ctx.action_index, action.type.value):
+        if not await db.reserve_execution(
+            ctx.source_message_id,
+            ctx.action_index,
+            action.type.value,
+            user_id=ctx.user_id,
+            workspace_id=ctx.workspace_id,
+            origin_text=ctx.texto,
+        ):
             log.info(
                 "ação %s já executada (%s#%s) — pulando",
                 action.type, ctx.source_message_id, ctx.action_index,
