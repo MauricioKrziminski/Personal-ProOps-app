@@ -1,16 +1,18 @@
 import { FlashList } from '@shopify/flash-list';
 import { router } from 'expo-router';
 import { useCallback, useMemo, useState } from 'react';
-import { Pressable, StyleSheet, View } from 'react-native';
+import { StyleSheet, View } from 'react-native';
 
 import { ConversationRow } from '@/components/agent/conversation-row';
 import { RenameConversationSheet } from '@/components/agent/rename-conversation-sheet';
 import { ThemedText } from '@/components/themed-text';
 import { AppHeader, HeaderIconButton } from '@/components/ui/app-header';
+import { BlockHeader } from '@/components/ui/block-header';
 import { TAB_BAR_SPACE } from '@/components/ui/pill-tab-bar';
 import { EmptyState } from '@/components/ui/empty-state';
 import { Screen } from '@/components/ui/screen';
 import { Skeleton } from '@/components/ui/skeleton';
+import { Tile, TileGrid } from '@/components/ui/tile';
 import { useToast } from '@/components/ui/toast';
 import { Radius, Space } from '@/design/tokens';
 import {
@@ -18,13 +20,11 @@ import {
   useDeleteAgentConversation,
   useRenameAgentConversation,
 } from '@/hooks/use-agent-chat';
-import { useTheme } from '@/hooks/use-theme';
 import type { AgentConversation } from '@/lib/agent-api';
 import { confirmDestructive, showItemActions } from '@/lib/item-actions';
 import { EXEMPLOS_DO_AGENTE } from '@/lib/agent-prompts';
 
 export default function AgentScreen() {
-  const theme = useTheme();
   const toast = useToast();
 
   const lista = useAgentConversations();
@@ -106,24 +106,19 @@ export default function AgentScreen() {
               piscando é onde a pessoa trava. Cada uma abre `new` com o texto no campo — nenhuma
               cria linha no servidor, porque abrir e voltar não pode deixar conversa vazia.
             */}
-            {EXEMPLOS_DO_AGENTE.map((p) => (
-              <Pressable
-                key={p}
-                onPress={() => router.push(`/agent/new?prompt=${encodeURIComponent(p)}`)}
-                accessibilityRole="button"
-                accessibilityLabel={p}
-                style={({ pressed }) => [
-                  styles.prompt,
-                  {
-                    backgroundColor: pressed ? theme.backgroundSelected : theme.backgroundElement,
-                    borderColor: theme.cardBorder,
-                  },
-                ]}>
-                <ThemedText type="default">
-                  {p}
-                </ThemedText>
-              </Pressable>
-            ))}
+            <TileGrid>
+              {EXEMPLOS_DO_AGENTE.map((p) => (
+                <Tile
+                  key={p}
+                  layout="half"
+                  icon="bubble.left"
+                  label="Pergunte"
+                  value={<ThemedText type="headline">{p}</ThemedText>}
+                  accessibilityLabel={p}
+                  onPress={() => router.push(`/agent/new?prompt=${encodeURIComponent(p)}`)}
+                />
+              ))}
+            </TileGrid>
           </View>
         </View>
       ) : (
@@ -141,6 +136,11 @@ export default function AgentScreen() {
             />
           )}
           ItemSeparatorComponent={() => <View style={styles.separador} />}
+          ListHeaderComponent={
+            <View style={styles.cabecaLista}>
+              <BlockHeader title="Conversas" count={conversas.length} />
+            </View>
+          }
           /*
             Sem `paddingTop`: o `Screen` com `topBar` JÁ reserva a altura do
             `AppHeader` — somar de novo aqui abria uma faixa vazia do tamanho do
@@ -218,12 +218,6 @@ function NovaConversa() {
 const styles = StyleSheet.create({
   lista: { paddingHorizontal: Space.lg, gap: Space.sm },
   separador: { height: Space.sm },
-  prompts: { paddingHorizontal: Space.lg, gap: Space.sm },
-  prompt: {
-    paddingVertical: Space.md,
-    paddingHorizontal: Space.lg,
-    borderRadius: Radius.md,
-    borderCurve: 'continuous',
-    borderWidth: StyleSheet.hairlineWidth,
-  },
+  prompts: { paddingHorizontal: Space.lg },
+  cabecaLista: { paddingBottom: Space.md },
 });

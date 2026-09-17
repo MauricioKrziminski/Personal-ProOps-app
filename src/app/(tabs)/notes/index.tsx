@@ -4,7 +4,6 @@ import Animated, { useAnimatedRef } from 'react-native-reanimated';
 import { router } from 'expo-router';
 import * as Haptics from 'expo-haptics';
 
-import { ThemedText } from '@/components/themed-text';
 import { Chip } from '@/components/finance/chip';
 import { ColorPicker } from '@/components/notes/color-picker';
 import { FolderGrid } from '@/components/notes/folder-grid';
@@ -15,7 +14,7 @@ import { useFolderMenu } from '@/components/notes/use-folder-menu';
 import { AppHeader, HeaderIconButton } from '@/components/ui/app-header';
 import { EmptyState } from '@/components/ui/empty-state';
 import { SearchField } from '@/components/ui/search-field';
-import { SectionHead } from '@/components/ui/section-head';
+import { BlockHeader } from '@/components/ui/block-header';
 import { TextField } from '@/components/ui/field';
 import { Icon } from '@/components/ui/icon';
 import { TAB_BAR_SPACE } from '@/components/ui/pill-tab-bar';
@@ -514,20 +513,11 @@ export default function NotesScreen() {
                 Haptics.selectionAsync();
                 setPastasRecolhidas(!pastasRecolhidas);
               }}>
-              <SectionHead
+              <BlockHeader
                 title="Pastas"
-                inset={false}
-                action={
-                  <View style={styles.recolher}>
-                    <ThemedText type="code" themeColor="textSecondary">
-                      {pastas.length}
-                    </ThemedText>
-                    <Icon
-                      name={pastasRecolhidas ? 'chevron.down' : 'chevron.up'}
-                      size="sm"
-                      color="textSecondary"
-                    />
-                  </View>
+                count={pastas.length}
+                trailing={
+                  <Icon name={pastasRecolhidas ? 'chevron.down' : 'chevron.up'} size="sm" color="textSecondary" />
                 }
               />
             </Pressable>
@@ -557,7 +547,7 @@ export default function NotesScreen() {
           <View onLayout={(e) => setTopoFixadas(e.nativeEvent.layout.y)}>
             {/* Mesmo motivo do rótulo de baixo: sozinho ele nomearia a lista inteira, e o
                 alfinete de cada cartão já diz o que a seção diria. */}
-            {soltas.length > 0 ? <SectionHead title="Fixadas" inset={false} /> : null}
+            {soltas.length > 0 ? <BlockHeader title="Fixadas" count={fixadas.length} /> : null}
             <NoteList
               notas={fixadas}
               acoes={acoesDaNota}
@@ -581,7 +571,7 @@ export default function NotesScreen() {
           {/* O rótulo só existe quando há duas seções para separar — sozinho ele nomearia a
               tela inteira, que já tem nome no header. */}
           {fixadas.length > 0 && soltas.length > 0 ? (
-            <SectionHead title={procurando ? 'Resultados' : 'Notas'} inset={false} />
+            <BlockHeader title={procurando ? 'Resultados' : 'Notas'} count={soltas.length} />
           ) : null}
 
           {soltas.length > 0 ? (
@@ -668,7 +658,6 @@ export default function NotesScreen() {
 }
 
 const styles = StyleSheet.create({
-  recolher: { flexDirection: 'row', alignItems: 'center', gap: Space.xs },
   /** O rótulo é um botão: alvo de 44pt (§11), não a altura natural de uma linha de `caption`. */
   alvoRecolher: { minHeight: HitTarget, justifyContent: 'center' },
   conteudo: {
