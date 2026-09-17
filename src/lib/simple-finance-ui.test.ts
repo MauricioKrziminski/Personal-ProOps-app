@@ -591,3 +591,34 @@ test('Hoje: sem fala nenhuma a Conversa não desenha bloco vazio', () => {
   const ui = screen(hojeFile, {});
   assert.ok(!tipos(ui).includes('ConversationFeed'));
 });
+
+test('Financeiro: os atalhos do mosaico levam aos mesmos destinos de antes', () => {
+  const ui = screen(financeiroFile);
+  const tiles = ui.nodes().filter((n: any) => n.type === 'Tile' && n.props.onPress);
+  for (const t of tiles) t.props.onPress();
+  const destinos = JSON.stringify(ui.navigations);
+  for (const d of ['/finance/transactions', '/finance/accounts', '/finance/budgets', '/finance/forecast', '/finance/manage']) {
+    assert.ok(destinos.includes(d), `o mosaico perdeu ${d}`);
+  }
+});
+
+test('Financeiro: Entra e Sai abrem o ciclo filtrado pelo lado', () => {
+  const ui = screen(financeiroFile);
+  const entra = ui.nodes().find((n: any) => n.type === 'Tile' && n.props.label === 'Entra');
+  const sai = ui.nodes().find((n: any) => n.type === 'Tile' && n.props.label === 'Sai');
+  entra.props.onPress();
+  sai.props.onPress();
+  assert.equal(ui.navigations.at(-2).params.tipo, 'entra');
+  assert.equal(ui.navigations.at(-1).params.tipo, 'sai');
+  assert.equal(ui.navigations.at(-1).pathname, '/finance/cycle');
+});
+
+test('Financeiro: o FAB continua oferecendo as três formas de lançar', () => {
+  const ui = screen(financeiroFile);
+  const tela = ui.nodes().find((n: any) => n.type === 'Screen');
+  tela.props.overlay.props.onPress();
+  assert.deepEqual(
+    ui.actions.map((a) => a.label),
+    ['Gasto ou receita', 'Gasto ou receita que se repete', 'Financiamento']
+  );
+});
