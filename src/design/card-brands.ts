@@ -26,6 +26,8 @@
  * neutra do sistema — nunca chuta uma marca.
  */
 
+import { contrast } from './contrast.ts';
+
 /** `[padrão no nome, cor da marca]`. A ordem importa: o primeiro match ganha. */
 const BRANDS: [RegExp, string][] = [
   [/\bnubank\b|\bnu\b|ultravioleta|roxinho/, '#820AD1'],
@@ -101,6 +103,31 @@ export function alpha(hex: string, a: number): string {
   return `${hex}${Math.round(Math.min(1, Math.max(0, a)) * 255)
     .toString(16)
     .padStart(2, '0')}`;
+}
+
+/** Mistura com branco. `peso` é quanto de BRANCO entra. */
+export function clarear(hex: string, peso: number): string {
+  return blend('#FFFFFF', hex, peso);
+}
+
+/** Mistura com preto. `peso` é quanto de PRETO entra. */
+export function escurecer(hex: string, peso: number): string {
+  return blend('#000000', hex, peso);
+}
+
+/** As duas tintas que a face do cartão pode usar — os mesmos valores de `onHero` e `onCardInk`. */
+const TINTA_CLARA = '#F4F4F2';
+const TINTA_ESCURA = '#0B0B0C';
+
+/**
+ * Qual tinta escreve sobre a cor do emissor: a de MAIOR contraste.
+ *
+ * O cartão é pintado com a cor da marca pura (é o cartão que está na carteira da pessoa), e a
+ * cor da marca vai do amarelo do BB ao azul-marinho do BTG. Uma tinta fixa perderia metade dos
+ * emissores; escolher por contraste é a mesma conta que `contrast.test.ts` faz com a paleta.
+ */
+export function tintaDoCartao(hex: string): 'clara' | 'escura' {
+  return contrast(hex, TINTA_ESCURA) > contrast(hex, TINTA_CLARA) ? 'escura' : 'clara';
 }
 
 /**
