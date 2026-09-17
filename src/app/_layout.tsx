@@ -1,19 +1,15 @@
 import { createNativeQueryFocusHandler } from '@/lib/query-invalidation';
 import { useEffect, useRef } from 'react';
+import { MartianMono_400Regular } from '@expo-google-fonts/martian-mono';
 import {
-  Jost_400Regular,
-  Jost_400Regular_Italic,
-  Jost_500Medium,
-  Jost_600SemiBold,
-  Jost_600SemiBold_Italic,
-  Jost_700Bold,
-  Jost_700Bold_Italic,
-} from '@expo-google-fonts/jost';
-import {
-  MartianMono_400Regular,
-  MartianMono_500Medium,
-  MartianMono_600SemiBold,
-} from '@expo-google-fonts/martian-mono';
+  PlusJakartaSans_400Regular,
+  PlusJakartaSans_400Regular_Italic,
+  PlusJakartaSans_500Medium,
+  PlusJakartaSans_600SemiBold,
+  PlusJakartaSans_600SemiBold_Italic,
+  PlusJakartaSans_700Bold,
+  PlusJakartaSans_700Bold_Italic,
+} from '@expo-google-fonts/plus-jakarta-sans';
 import { useFonts } from 'expo-font';
 import simbolosAndroid from 'expo-symbols/androidWeights/regular';
 import { focusManager, QueryClient, QueryClientProvider } from '@tanstack/react-query';
@@ -109,22 +105,20 @@ function AppTree() {
   useEffect(attachNotificationListeners, []);
 
   /**
-   * As duas famílias do design (Jost + Martian Mono).
+   * A família do design (Plus Jakarta Sans) e a mono do código inline das notas.
    *
    * O app segura o splash até carregarem: `Type` aponta para as faces pelo NOME, e uma face
    * ausente não cai no system font — ela some, deixando a tela em branco por um frame.
    */
   const [fontsLoaded, fontError] = useFonts({
-    Jost_400Regular,
-    Jost_400Regular_Italic,
-    Jost_500Medium,
-    Jost_600SemiBold,
-    Jost_600SemiBold_Italic,
-    Jost_700Bold,
-    Jost_700Bold_Italic,
+    PlusJakartaSans_400Regular,
+    PlusJakartaSans_400Regular_Italic,
+    PlusJakartaSans_500Medium,
+    PlusJakartaSans_600SemiBold,
+    PlusJakartaSans_600SemiBold_Italic,
+    PlusJakartaSans_700Bold,
+    PlusJakartaSans_700Bold_Italic,
     MartianMono_400Regular,
-    MartianMono_500Medium,
-    MartianMono_600SemiBold,
     /*
       No Android o ícone é TEXTO na fonte Material Symbols, e o `SymbolView` só carrega essa fonte
       quando monta — até lá ele desenha uma caixa vazia. Numa tela com dez linhas, os chips ficavam

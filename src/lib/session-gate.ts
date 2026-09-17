@@ -1,4 +1,4 @@
-import type { WaveMode } from '@/design/tile-math';
+import type { WaveMode } from '@/design/wave-math';
 
 /**
  * Quando uma troca de sessão passa pela cortina, e de onde a onda nasce — a regra do portão,

@@ -10,7 +10,7 @@ import { ThemedText } from '@/components/themed-text';
 import { Icon } from '@/components/ui/icon';
 import { QuickActions, type QuickAction } from '@/components/ui/quick-actions';
 import { useConceal } from '@/components/ui/conceal';
-import { Motion, Radius, Space, Type } from '@/design/tokens';
+import { Motion, Radius, Space } from '@/design/tokens';
 import { useTheme } from '@/hooks/use-theme';
 
 interface HeroPanelProps {
@@ -18,7 +18,7 @@ interface HeroPanelProps {
   top?: React.ReactNode;
   /** Badge ou pílula de status opcional na linha do rótulo. */
   badge?: React.ReactNode;
-  /** Rótulo curto, caixa alta — **sempre antes do valor** (`HeroLabel`, §2 de design.md). */
+  /** Rótulo curto — **sempre antes do valor** (`HeroLabel`, §2 de design.md). */
   label: string;
   /** O número. Normalmente um `<Money variant="heroMoney" concealable />`. */
   value: React.ReactNode;
@@ -58,16 +58,15 @@ interface HeroPanelProps {
  *
  * ## Anatomia
  *
- * Um bloco chapado com calha de 20. Dentro, nesta ordem: rótulo em caixa alta + os botões de
+ * Um bloco chapado com calha de 20. Dentro, nesta ordem: rótulo pequeno + os botões de
  * "…" e de olho, o número em `heroMoney`, a linha de estado em mono colorido, o gráfico, os
  * atalhos, e a faixa de rodapé sangrada.
  *
- * ## O mundo Concreto (16/09/2026)
+ * ## O desenho (16/09/2026)
  *
- * O bloco é o NEGATIVO da página: tinta no tema claro, papel no escuro. É a jogada da Poesia
- * Concreta — o destaque se separa por inversão, não por luz. Por isso o gradiente, o brilho verde
- * e o fio especular do desenho anterior saíram, e tudo o que mora aqui dentro usa os tokens
- * `onHero*`/`heroChip`, que trocam de valor junto com o bloco.
+ * Um bloco escuro de canto 24 — tinta no tema claro, um degrau acima do fundo no escuro —, como
+ * o bloco do saldo dos vídeos de referência. Sem gradiente, brilho ou contorno; tudo o que mora
+ * aqui dentro usa os tokens `onHero*`/`heroChip`.
  *
  * A regra "um destaque por tela" não mudou.
  */
@@ -126,8 +125,8 @@ export function HeroPanel({
           }
           style={styles.body}>
           <View style={styles.labelRow}>
-            <ThemedText type="caption" themeColor="onHeroMuted" style={Type.meta}>
-              {label.toUpperCase()}
+            <ThemedText type="meta" themeColor="onHeroMuted" style={styles.shrinkLabel}>
+              {label}
             </ThemedText>
             {badge}
             {/*
@@ -208,7 +207,7 @@ const styles = StyleSheet.create({
    * gradiente, sem brilho e sem contorno — o contraste com a página já é a borda.
    */
   panel: {
-    borderRadius: Radius.md,
+    borderRadius: Radius.lg,
     borderCurve: 'continuous',
     overflow: 'hidden',
   },
@@ -218,6 +217,7 @@ const styles = StyleSheet.create({
    */
   inner: { padding: Space.gutter },
   shrink: { flex: 1, minWidth: 0 },
+  shrinkLabel: { flexShrink: 1 },
   top: { marginBottom: Space.lg },
   body: { gap: Space.xs },
   labelRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: Space.sm },
@@ -232,7 +232,7 @@ const styles = StyleSheet.create({
     flexShrink: 0,
     width: 28,
     height: 28,
-    borderRadius: Radius.sm,
+    borderRadius: Radius.pill,
     borderCurve: 'continuous',
     alignItems: 'center',
     justifyContent: 'center',

@@ -93,7 +93,7 @@ const styles = StyleSheet.create({
   shrink: { flexShrink: 1 },
   /** corpo — título de linha, parágrafo */
   default: Type.body,
-  /** exibição do Concreto: minúsculas grandes — conta, carteira, onboarding, saudação */
+  /** exibição: o título grande das telas de conta, carteira e onboarding */
   display: Type.display,
   /** título de tela; um por tela */
   title: Type.largeTitle,
@@ -119,10 +119,10 @@ const styles = StyleSheet.create({
   link: { ...Type.subhead, textDecorationLine: 'underline' },
   /** cor vem de `tint` no componente — nunca hex */
   linkPrimary: { ...Type.subhead, fontFamily: Fonts.semibold, textDecorationLine: 'underline' },
-  /** mono: hora, contador, unidade — o segundo tipo do sistema */
+  /** dado pequeno: hora, contador, unidade — numerais tabulares */
   code: Type.code,
-  /** mono um degrau acima: dinheiro dentro de card e linha */
+  /** dinheiro dentro de card e linha — numerais tabulares */
   ticker: Type.ticker,
-  /** rótulo de seção em caixa alta */
+  /** rótulo pequeno de seção e de bloco */
   meta: Type.meta,
 });

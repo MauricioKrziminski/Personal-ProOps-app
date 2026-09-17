@@ -12,7 +12,6 @@ import {
 import Animated, {
   Easing,
   cancelAnimation,
-  interpolateColor,
   makeMutable,
   useAnimatedStyle,
   useReducedMotion,
@@ -24,18 +23,19 @@ import Animated, {
 } from 'react-native-reanimated';
 
 import { ThemedText } from '@/components/themed-text';
+import { Fonts } from '@/constants/theme';
 import { HitTarget, Motion, Radius, Space, Type, tabular } from '@/design/tokens';
 import { useTheme } from '@/hooks/use-theme';
 import { maskBRDate } from '@/lib/dates';
 
-/** Quanto tempo o traço de foco leva para se desenhar. */
-const TRACO_MS = 280;
+/** Quanto tempo o anel de foco leva para acender. */
+const ANEL_MS = 160;
 
 /**
  * O foco do campo, compartilhado entre o `Field` (rótulo) e o input dentro dele.
  *
- * É um `SharedValue` e não estado React: o rótulo acompanha o foco na thread de UI, sem render.
- * Fora de um `Field` o input usa um valor próprio e só o traço anima.
+ * É um `SharedValue` e não estado React: o anel acompanha o foco na thread de UI, sem render.
+ * Fora de um `Field` o input usa um valor próprio.
  */
 const FocoDoCampo = createContext<SharedValue<number> | null>(null);
 
@@ -50,49 +50,25 @@ interface FieldProps {
 /**
  * Envelope de campo: label visível, erro inline junto do campo (não no topo do form) e hint.
  *
- * ## O foco
- *
- * Focado, o rótulo passa para o azul e anda para a direita, abrindo lugar para um azulejo de 6pt
- * que surge girando — a mesma peça do resto do app, dizendo "é aqui". Tudo em `transform`, sem
- * mexer no layout.
+ * O rótulo fica parado em cima da caixa, pequeno e em tinta, como nos vídeos de referência —
+ * quem conta o foco é o anel da caixa. O foco é compartilhado por contexto com a caixa de dentro.
  *
  * ## Label e hint NÃO podem ter o mesmo estilo
  *
  * Os dois eram `type="small"` + `textSecondary`, byte por byte — em 47 campos. Nada separava "o
- * que é o campo" de "explicação sobre o campo", e um formulário com quatro ou cinco hints virava
- * uma parede de cinza de 15px. A distinção anda em DOIS eixos, porque um só não sobrevive a
- * 1,3×: **tamanho** (15 → 13) e **cor** (`text` → `textSecondary`).
+ * que é o campo" de "explicação sobre o campo". A distinção anda em DOIS eixos, porque um só não
+ * sobrevive a 1,3×: **peso** (500 → 400) e **cor** (`text` → `textSecondary`).
  */
 export function Field({ label, error, hint, children }: FieldProps) {
-  const theme = useTheme();
   const foco = useSharedValue(0);
-  const corTexto = theme.text;
-  const corFoco = theme.tint;
-
-  const rotulo = useAnimatedStyle(() => ({
-    color: interpolateColor(foco.get(), [0, 1], [corTexto, corFoco]),
-    transform: [{ translateX: foco.get() * 12 }],
-  }));
-  const marca = useAnimatedStyle(() => ({
-    opacity: foco.get(),
-    transform: [{ scale: foco.get() }, { rotate: `${(1 - foco.get()) * -90}deg` }],
-  }));
 
   return (
     <FocoDoCampo.Provider value={foco}>
       <View style={styles.field}>
-        <View style={styles.cabeca}>
-          <Animated.View
-            pointerEvents="none"
-            style={[styles.marca, { backgroundColor: theme.tintFill }, marca]}
-          />
-          {/* O label é IDENTIFICADOR do campo, e por isso vai na cor cheia. */}
-          <Animated.Text
-            android_hyphenationFrequency="none"
-            style={[Type.subhead, styles.rotulo, rotulo]}>
-            {label}
-          </Animated.Text>
-        </View>
+        {/* O label é IDENTIFICADOR do campo, e por isso vai na cor cheia. */}
+        <ThemedText type="footnote" style={styles.rotulo}>
+          {label}
+        </ThemedText>
         {children}
         {/*
           O erro NÃO apaga o hint. Eles se excluíam por um ternário, e a explicação sumia
@@ -150,9 +126,9 @@ function repartir(style: StyleProp<TextStyle>): { caixa: ViewStyle; input: TextS
 }
 
 /**
- * A caixa do Concreto: superfície de tecla com fio de 1px, e um TRAÇO azul de 2px que se desenha
- * da esquerda para a direita no foco. Com erro, o fio e o traço ficam vermelhos e a caixa treme
- * uma vez — no momento em que o erro aparece, não a cada render.
+ * A caixa do campo: superfície branca de canto 12 com fio claro, e um ANEL de tinta de 1,5px que
+ * acende no foco — por opacidade, então o conteúdo não se move. Com erro, o anel fica vermelho e
+ * a caixa treme uma vez, no momento em que o erro aparece.
  */
 function useCaixa(invalid: boolean | undefined) {
   const theme = useTheme();
@@ -178,10 +154,10 @@ function useCaixa(invalid: boolean | undefined) {
   }, [invalid, reduzido, tremor]);
 
   const estiloCaixa = useAnimatedStyle(() => ({ transform: [{ translateX: tremor.get() }] }));
-  const estiloTraco = useAnimatedStyle(() => ({ transform: [{ scaleX: invalid ? 1 : foco.get() }] }));
+  const estiloAnel = useAnimatedStyle(() => ({ opacity: invalid ? 1 : foco.get() }));
 
   const focar = () =>
-    foco.set(withTiming(1, { duration: reduzido ? 0 : TRACO_MS, easing: Motion.easing.out }));
+    foco.set(withTiming(1, { duration: reduzido ? 0 : ANEL_MS, easing: Motion.easing.out }));
   const desfocar = () =>
     foco.set(withTiming(0, { duration: reduzido ? 0 : Motion.duration.base, easing: Motion.easing.out }));
 
@@ -189,14 +165,14 @@ function useCaixa(invalid: boolean | undefined) {
     <Animated.View
       style={[
         styles.caixa,
-        { backgroundColor: theme.keyFace, borderColor: invalid ? theme.danger : theme.cardBorder },
+        { backgroundColor: theme.surface, borderColor: theme.separator },
         estilo,
         estiloCaixa,
       ]}>
       {conteudo}
       <Animated.View
         pointerEvents="none"
-        style={[styles.traco, { backgroundColor: invalid ? theme.danger : theme.tintFill }, estiloTraco]}
+        style={[styles.anel, { borderColor: invalid ? theme.danger : theme.tint }, estiloAnel]}
       />
     </Animated.View>
   );
@@ -443,19 +419,7 @@ const styles = StyleSheet.create({
   field: {
     gap: Space.sm,
   },
-  cabeca: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  rotulo: { flexShrink: 1 },
-  /** O azulejo do foco: nasce no lugar onde o rótulo estava. */
-  marca: {
-    position: 'absolute',
-    left: 0,
-    width: 6,
-    height: 6,
-    borderTopRightRadius: 6,
-  },
+  rotulo: { fontFamily: Fonts.medium },
   /*
     ⚠️ A borda da caixa é de 1dp, não `hairlineWidth` (15/09/2026). `hairlineWidth` é 1 pixel
     FÍSICO e não sobrevive a escala: na janela reduzida do emulador as arestas somem e restam
@@ -468,17 +432,21 @@ const styles = StyleSheet.create({
     borderRadius: Radius.sm,
     borderCurve: 'continuous',
     borderWidth: 1,
-    overflow: 'hidden',
     justifyContent: 'center',
   },
-  /** O traço de foco: 2px na base, desenhado da esquerda. */
-  traco: {
+  /**
+   * O anel de foco: por cima do fio, no mesmo raio. Fica fora do fluxo, então acender não desloca
+   * o texto. `-1` cobre o fio de 1dp da caixa.
+   */
+  anel: {
     position: 'absolute',
-    left: 0,
-    right: 0,
-    bottom: 0,
-    height: 2,
-    transformOrigin: 'left',
+    top: -1,
+    left: -1,
+    right: -1,
+    bottom: -1,
+    borderRadius: Radius.sm,
+    borderCurve: 'continuous',
+    borderWidth: 1.5,
   },
   input: {
     minHeight: HitTarget + 6,

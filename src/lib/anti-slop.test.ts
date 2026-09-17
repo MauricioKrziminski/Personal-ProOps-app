@@ -102,23 +102,27 @@ test('nenhum fontWeight solto — peso é FAMÍLIA, não número', () => {
 });
 
 test('nenhuma face do tipo antigo sobrou', () => {
-  // O mundo Concreto (spec de 16/09/2026) trocou Hanken Grotesk + JetBrains Mono por Jost +
-  // Martian Mono. Uma face antiga esquecida não dá erro: ela SOME, porque `Type` aponta pelo nome
-  // e o pacote dela saiu do projeto.
+  // O tipo do app mudou duas vezes em 16/09/2026: Hanken + JetBrains Mono → Jost + Martian Mono
+  // (Concreto) → Plus Jakarta Sans (Suave), com a Martian Mono 400 ficando SÓ para o código
+  // inline das notas. Uma face antiga esquecida não dá erro: ela SOME, porque `Type` aponta pelo
+  // nome e o pacote dela saiu do projeto.
   assert.deepEqual(
-    offenders(/HankenGrotesk|JetBrainsMono|hanken-grotesk|jetbrains-mono/),
+    offenders(
+      /HankenGrotesk|JetBrainsMono|hanken-grotesk|jetbrains-mono|Jost_|google-fonts\/jost|MartianMono_(?!400Regular)/
+    ),
     [],
-    'o tipo do app é Jost + Martian Mono'
+    'o tipo do app é Plus Jakarta Sans (e Martian Mono 400 só no código das notas)'
   );
 });
 
-test('azul como FUNDO é tintFill, nunca tint', () => {
-  // `tint` é o azul de TEXTO e ícone; no escuro ele é claro demais para carregar rótulo branco.
-  // O campo azul (botão, célula escolhida, selo) é `tintFill`, com o rótulo em `onTint`.
+test('campo de ação como FUNDO é tintFill, nunca tint', () => {
+  // `tint` é a cor de TEXTO e ícone de ação; o campo cheio (botão, selo) é `tintFill`, com o
+  // rótulo em `onTint`. Hoje os dois têm o mesmo tom, e é exatamente por isso que a regra fica:
+  // quando um accent voltar, é esta separação que impede o texto de virar fundo sem contraste.
   assert.deepEqual(
     offenders(/backgroundColor:[^,}\n]*theme\.tint\b/),
     [],
-    'fundo azul usa theme.tintFill (rótulo onTint); theme.tint é texto, ícone e progresso'
+    'fundo de ação usa theme.tintFill (rótulo onTint); theme.tint é texto, ícone e progresso'
   );
 });
 
@@ -950,7 +954,7 @@ test('toda face de Fonts está carregada no _layout raiz', () => {
   const inicio = theme.indexOf('export const Fonts');
   const bloco = theme.slice(inicio, theme.indexOf('} as const', inicio));
   const faces = [...bloco.matchAll(/^\s+\w+:\s+'([A-Za-z]+_\d{3}\w*)',/gm)].map((m) => m[1]);
-  assert.ok(faces.length >= 10, 'não achei as faces em theme.ts — o regex envelheceu');
+  assert.ok(faces.length >= 8, 'não achei as faces em theme.ts — o regex envelheceu');
 
   const faltando = faces.filter((face) => !layout.includes(face));
   assert.deepEqual(faltando, [], 'face declarada e não carregada faz o TEXTO SUMIR, sem erro');

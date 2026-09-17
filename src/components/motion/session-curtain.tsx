@@ -1,5 +1,5 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { Path } from '@shopify/react-native-skia';
+import { Path, Skia } from '@shopify/react-native-skia';
 import * as SplashScreen from 'expo-splash-screen';
 import {
   createContext,
@@ -20,14 +20,12 @@ import Animated, {
   useDerivedValue,
   useReducedMotion,
   useSharedValue,
-  withSequence,
   withTiming,
   type SharedValue,
 } from 'react-native-reanimated';
 
-import { TileField } from '@/components/motion/tile-field';
+import { WaveCurtain } from '@/components/motion/wave-curtain';
 import { SkiaCanvas } from '@/components/ui/skia-canvas';
-import { markPathIn } from '@/design/mark-path';
 import { Motion } from '@/design/tokens';
 import { useTheme } from '@/hooks/use-theme';
 import { comTeto } from '@/lib/com-teto';
@@ -43,12 +41,10 @@ const SHOWS = 5;
 const CHAVE_SHOWS = 'proops.splash.shows';
 /** Lado da marca — é o `imageWidth` do `expo-splash-screen` no app.json. Os dois PRECISAM bater. */
 const LADO = 96;
-/** Onde a tinta começa e termina dentro do PNG de 512 px (medido: 61..451). */
-const TINTA = { de: (61 / 512) * LADO, ate: (451 / 512) * LADO };
-/** Nasce no canto inferior esquerdo e termina no superior direito, onde a Fase 3 põe o canto. */
-const ONDA_DA_ABERTURA: Onda = { mode: 'diagonal', origin: { x: 0, y: 1 } };
-const ONDA_DO_SHOW: Onda = { mode: 'radial', origin: { x: 0.5, y: 0.5 } };
-const TETO_DA_TEXTURA_MS = 300;
+/** O anel do show: um pouco maior que a marca, com folga para o traço respirar. */
+const ANEL = LADO * 1.5;
+/** A abertura recolhe a tinta para cima, como nos vídeos de referência. */
+const ONDA_DA_ABERTURA: Onda = { mode: 'up' };
 const TETO_DO_PNG_MS = 500;
 
 type Fase = 'abertura' | 'cobrindo' | 'coberta' | 'revelando' | 'aberta';
@@ -85,21 +81,20 @@ export function useCortinaAberta(): boolean {
  *
  * | t | o quê |
  * |---|---|
- * | 0 | splash nativo: tinta `#0D0D0C` + `mark-white.png` de 96 dp |
+ * | 0 | splash nativo: tinta `#0B0B0C` + `mark-white.png` de 96 dp |
  * | camada pintou e o PNG carregou | `hideAsync()`: o nativo sai com a camada idêntica por cima |
- * | show (5 primeiras, 1,8 s) | um traço azul corre o contorno da espiral; em volta, uma ondulação vira os azulejos e os assenta de novo |
- * | pronto (fontes + sessão, teto 2,5 s) | a onda diagonal recolhe os azulejos, do canto inferior esquerdo ao superior direito; a marca some no primeiro quarto |
+ * | show (5 primeiras, 1,8 s) | um anel fino se desenha em volta da marca e some |
+ * | pronto (fontes + sessão, teto 2,5 s) | a tinta sobe com a borda em curva e libera o app; a marca sobe e some no primeiro terço |
  *
- * ## Por que `cobrir` espera a textura
+ * ## Por que `cobrir` espera dois quadros a mais
  *
- * O `TileField` cria a textura das peças na thread de UI, um ou dois quadros depois de montar.
- * Andar o progresso antes disso não desenha nada: a cortina "chegaria" já fechada, de uma vez.
- * O teto (300 ms) garante que ela anda mesmo se a textura atrasar.
+ * O canvas do Skia pinta um ou dois quadros depois de montar. Andar o progresso antes disso não
+ * desenharia nada: a cortina "chegaria" já fechada, de uma vez.
  *
  * ## O hand-off com o splash nativo
  *
- * O primeiro quadro da camada é o splash: tinta lisa (o `cover` do campo enquanto não há
- * textura) e o MESMO PNG, no MESMO tamanho. `hideAsync()` só roda depois que a camada fez layout
+ * O primeiro quadro da camada é o splash: tinta lisa (o fundo da `WaveCurtain` com a cortina
+ * fechada) e o MESMO PNG, no MESMO tamanho. `hideAsync()` só roda depois que a camada fez layout
  * E o PNG carregou — sem isso o nativo sairia um quadro antes da marca existir, e ela piscaria.
  * `fade: false` pelo mesmo motivo: um cross-fade do sistema por cima do nosso.
  *
@@ -112,15 +107,10 @@ export function CortinaProvider({ children }: { children: ReactNode }) {
   const progresso = useSharedValue(0);
   const [fase, setFase] = useState<Fase>('abertura');
   const [onda, setOnda] = useState<Onda>(ONDA_DA_ABERTURA);
-  const [invert, setInvert] = useState(false);
   const [show, setShow] = useState<Show | null>(null);
   const [pintada, setPintada] = useState(false);
   const [aberturaFeita, setAberturaFeita] = useState(false);
 
-  const textura = useRef<{ pronta: boolean; avisar: (() => void) | null }>({
-    pronta: false,
-    avisar: null,
-  });
   const pronto = useRef<{ valor: boolean; avisar: (() => void) | null }>({
     valor: false,
     avisar: null,
@@ -146,44 +136,28 @@ export function CortinaProvider({ children }: { children: ReactNode }) {
     [progresso, reduzido]
   );
 
-  const esperarTextura = useCallback(() => {
-    if (reduzido || textura.current.pronta) return Promise.resolve();
-    const espera = new Promise<void>((ok) => {
-      textura.current.avisar = ok;
-    });
-    return comTeto(espera, TETO_DA_TEXTURA_MS, 'textura').catch(() => {});
-  }, [reduzido]);
-
-  const aoTexturaPronta = useCallback(() => {
-    textura.current.pronta = true;
-    textura.current.avisar?.();
-    textura.current.avisar = null;
-  }, []);
-
   const cobrir = useCallback(
     async (o: Onda) => {
       progresso.set(1);
       setOnda(o);
-      setInvert(true);
       setFase('cobrindo');
+      // O canvas pinta um ou dois quadros depois de montar: antes disso a onda não apareceria.
       await doisQuadros();
-      await esperarTextura();
+      await doisQuadros();
       await animar(0, Motion.curtain.duration);
       setFase('coberta');
     },
-    [animar, esperarTextura, progresso]
+    [animar, progresso]
   );
 
   const descobrir = useCallback(
     async (o: Onda, duracao: number) => {
       setOnda(o);
-      setInvert(false);
       setFase('revelando');
       // O React precisa aplicar a onda nova antes de o progresso andar: nos primeiros quadros a
       // ordem velha revelaria outros azulejos.
       await doisQuadros();
       await animar(1, duracao);
-      textura.current.pronta = false;
       setFase('aberta');
     },
     [animar]
@@ -192,7 +166,6 @@ export function CortinaProvider({ children }: { children: ReactNode }) {
   const abrirJa = useCallback(() => {
     cancelAnimation(progresso);
     progresso.set(1);
-    textura.current.pronta = false;
     setFase('aberta');
     setAberturaFeita(true);
   }, [progresso]);
@@ -268,18 +241,8 @@ export function CortinaProvider({ children }: { children: ReactNode }) {
     ).catch(() => {});
 
     void (async () => {
-      if (show === 'completa' && !reduzido) {
-        await esperarTextura();
-        setOnda(ONDA_DO_SHOW);
-        await doisQuadros();
-        progresso.set(
-          withSequence(
-            withTiming(0.16, { duration: 700, easing: Motion.easing.out }),
-            withTiming(0, { duration: 700, easing: Motion.easing.inOut })
-          )
-        );
-        await dormir(Motion.curtain.full);
-      }
+      // O show é o anel se desenhando em volta da marca (`MarcaDaAbertura`); aqui só se espera.
+      if (show === 'completa' && !reduzido) await dormir(Motion.curtain.full);
       await prontoOuTeto;
       await descobrir(
         ONDA_DA_ABERTURA,
@@ -287,7 +250,7 @@ export function CortinaProvider({ children }: { children: ReactNode }) {
       );
       setAberturaFeita(true);
     })();
-  }, [pintada, show, reduzido, esperarTextura, descobrir, progresso]);
+  }, [pintada, show, reduzido, descobrir]);
 
   const api = useMemo<CortinaApi>(
     () => ({
@@ -319,12 +282,10 @@ export function CortinaProvider({ children }: { children: ReactNode }) {
           <Camada
             fase={fase}
             onda={onda}
-            invert={invert}
             progresso={progresso}
             reduzido={reduzido}
             show={aberturaFeita ? null : show}
             comMarca={!aberturaFeita}
-            onTextura={aoTexturaPronta}
             onLayout={aoLayout}
             onPng={aoPng}
           />
@@ -337,23 +298,19 @@ export function CortinaProvider({ children }: { children: ReactNode }) {
 function Camada({
   fase,
   onda,
-  invert,
   progresso,
   reduzido,
   show,
   comMarca,
-  onTextura,
   onLayout,
   onPng,
 }: {
   fase: Fase;
   onda: Onda;
-  invert: boolean;
   progresso: SharedValue<number>;
   reduzido: boolean;
   show: Show | null;
   comMarca: boolean;
-  onTextura: () => void;
   onLayout: () => void;
   onPng: () => void;
 }) {
@@ -370,28 +327,16 @@ function Camada({
       importantForAccessibility="no-hide-descendants"
       style={styles.camada}>
       {reduzido ? (
-        <Animated.View
-          style={[StyleSheet.absoluteFill, { backgroundColor: theme.tileInk }, veu]}
-        />
+        <Animated.View style={[StyleSheet.absoluteFill, { backgroundColor: theme.curtain }, veu]} />
       ) : (
-        <>
-          {/*
-            Durante a abertura há tinta lisa POR TRÁS do campo: a ondulação do show vira os
-            azulejos, e sem este fundo o app apareceria pelas frestas antes da hora.
-          */}
-          {fase === 'abertura' ? (
-            <View style={[StyleSheet.absoluteFill, { backgroundColor: theme.tileInk }]} />
-          ) : null}
-          <TileField
-            progress={progresso}
-            mode={onda.mode}
-            origin={onda.origin}
-            invert={invert}
-            cover
-            onReady={onTextura}
-            style={StyleSheet.absoluteFill}
-          />
-        </>
+        <WaveCurtain
+          progress={progresso}
+          fase={fase === 'cobrindo' || fase === 'coberta' ? 'cobrir' : 'revelar'}
+          mode={onda.mode}
+          origin={onda.origin}
+          color={theme.curtain}
+          style={StyleSheet.absoluteFill}
+        />
       )}
       {comMarca ? (
         <MarcaDaAbertura progresso={progresso} show={show} onPng={onPng} reduzido={reduzido} />
@@ -400,6 +345,10 @@ function Camada({
   );
 }
 
+/**
+ * A marca no centro da abertura: o MESMO PNG do splash nativo, no mesmo tamanho. No show, um anel
+ * fino se desenha em volta dela e some; na saída, ela sobe e some junto com a tinta.
+ */
 function MarcaDaAbertura({
   progresso,
   show,
@@ -413,37 +362,41 @@ function MarcaDaAbertura({
 }) {
   const theme = useTheme();
   const tracado = useSharedValue(0);
-  const contorno = useMemo(
-    () => markPathIn(TINTA.de, TINTA.de, TINTA.ate - TINTA.de, TINTA.ate - TINTA.de),
-    []
-  );
+  /** O anel começa no topo e corre no sentido do relógio. */
+  const anel = useMemo(() => {
+    const b = Skia.PathBuilder.Make();
+    const r = ANEL / 2 - 2;
+    b.moveTo(ANEL / 2, ANEL / 2 - r);
+    b.arcToOval({ x: ANEL / 2 - r, y: ANEL / 2 - r, width: 2 * r, height: 2 * r }, -90, 359.9, false);
+    return b.detach();
+  }, []);
 
   useEffect(() => {
     if (show !== 'completa' || reduzido) return;
-    tracado.set(withTiming(1, { duration: 1100, easing: Motion.easing.inOut }));
+    tracado.set(withTiming(1, { duration: 1200, easing: Motion.easing.inOut }));
   }, [show, reduzido, tracado]);
 
-  // O traço aparece inteiro e some no último terço — ele é um gesto, não um estado.
-  const brilho = useDerivedValue(() => 1 - Math.max(0, (tracado.get() - 0.7) / 0.3));
+  // O anel se fecha e some no último quarto — ele é um gesto, não um estado.
+  const brilho = useDerivedValue(() => 1 - Math.max(0, (tracado.get() - 0.75) / 0.25));
+  const inicio = useDerivedValue(() => Math.max(0, (tracado.get() - 0.75) / 0.25));
 
   const sai = useAnimatedStyle(() => {
-    const k = Math.min(1, progresso.get() / 0.25);
-    return { opacity: 1 - k, transform: [{ scale: 1 - k * 0.08 }] };
+    const k = Math.min(1, progresso.get() / 0.35);
+    return { opacity: 1 - k, transform: [{ translateY: -k * 36 }, { scale: 1 - k * 0.06 }] };
   });
 
   return (
-    <Animated.View style={[styles.marca, sai]} pointerEvents="none">
+    <Animated.View style={[styles.palco, sai]} pointerEvents="none">
       <Image source={MARCA_BRANCA} onLoad={onPng} fadeDuration={0} style={styles.marca} />
       {show === 'completa' && !reduzido ? (
         <SkiaCanvas style={StyleSheet.absoluteFill}>
           <Path
-            path={contorno}
+            path={anel}
             style="stroke"
-            strokeWidth={2}
+            strokeWidth={1.5}
             strokeCap="round"
-            strokeJoin="round"
-            color={theme.tintFill}
-            start={0}
+            color={theme.onCurtainMuted}
+            start={inicio}
             end={tracado}
             opacity={brilho}
           />
@@ -462,5 +415,6 @@ const styles = StyleSheet.create({
     zIndex: 1000,
     elevation: 1000,
   },
+  palco: { width: ANEL, height: ANEL, alignItems: 'center', justifyContent: 'center' },
   marca: { width: LADO, height: LADO },
 });

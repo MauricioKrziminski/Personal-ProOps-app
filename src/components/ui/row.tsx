@@ -178,8 +178,8 @@ export function Section({ title, children }: { title?: string; children: ReactNo
   return (
     <View style={styles.section}>
       {title ? (
-        <ThemedText type="caption" themeColor="textSecondary" style={styles.sectionTitle}>
-          {title.toUpperCase()}
+        <ThemedText type="smallBold" style={styles.sectionTitle}>
+          {title}
         </ThemedText>
       ) : null}
       {/* Mesma superfície do `Card`: chapada, com o fio de 1px fazendo a borda do grupo. */}
@@ -262,11 +262,11 @@ const styles = StyleSheet.create({
     gap: Space.xs,
     marginLeft: 'auto',
   },
-  /** O chip do ícone é um azulejo: quadrado de canto aparado, a mesma peça do resto do app. */
+  /** O chip do ícone é um círculo suave, como nas listas dos vídeos de referência. */
   iconChip: {
     width: 38,
     height: 38,
-    borderRadius: Radius.sm,
+    borderRadius: Radius.pill,
     borderCurve: 'continuous',
     alignItems: 'center',
     justifyContent: 'center',
@@ -274,18 +274,10 @@ const styles = StyleSheet.create({
   section: {
     gap: Space.xs + 2,
   },
-  /**
-   * O rótulo de seção é `Type.meta`, não um `caption` com tracking à mão.
-   *
-   * `meta` existe no sistema exatamente para isto (etiqueta, metadado, unidade) — 12/600 com
-   * `letterSpacing: 0.8` — e estava sendo usado em UM lugar, o rótulo do painel. Aqui, no
-   * `SectionHead` e na Notas, três cópias reimplementavam a mesma ideia em peso 400 e tracking
-   * 0.6: a etiqueta lia como texto pequeno em vez de ler como etiqueta, e o app perdia o degrau
-   * tipográfico que substitui a cor num sistema sem accent colorido.
-   */
+  /** O título do grupo: tinta, 14/600, caixa normal — o mesmo do `SectionHead`. */
   sectionTitle: {
     paddingHorizontal: Space.lg,
-    ...Type.meta,
+    letterSpacing: Type.headline.letterSpacing,
   },
   group: {
     borderRadius: Radius.md,

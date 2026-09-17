@@ -134,12 +134,11 @@ export function AppHeader({ title, action }: AppHeaderProps) {
             <Mark size={34} color="text" />
           </View>
           {/*
-            O nome da raiz, em minúsculas: a voz do Concreto, e o único texto da faixa. Não é um
-            bloco novo — o `title` sempre existiu (era só o rótulo de acessibilidade), e a faixa
-            tem a altura fixa de antes.
+            O nome da raiz, o único texto da faixa. Não é um bloco novo — o `title` sempre existiu
+            (era só o rótulo de acessibilidade), e a faixa tem a altura fixa de antes.
           */}
           <ThemedText type="subtitle" style={styles.titulo}>
-            {title.toLocaleLowerCase('pt-BR')}
+            {title}
           </ThemedText>
         </View>
 
@@ -150,11 +149,8 @@ export function AppHeader({ title, action }: AppHeaderProps) {
             accessibilityLabel="Abrir perfil"
             hitSlop={Space.sm}
             onPress={() => router.push('/(tabs)/profile')}
-            style={[
-              styles.round,
-              { backgroundColor: theme.backgroundSelected, borderColor: theme.cardBorder },
-            ]}>
-            <Icon name="person.crop.circle" size="md" color="textSecondary" />
+            style={[styles.tile, { backgroundColor: theme.backgroundElement }]}>
+            <Icon name="person.fill" size="md" color="text" />
           </Pressable>
         </View>
       </View>
@@ -180,10 +176,7 @@ export function HeaderIconButton({
       accessibilityLabel={label}
       hitSlop={Space.sm}
       onPress={onPress}
-      style={[
-        styles.tile,
-        { backgroundColor: theme.backgroundSelected, borderColor: theme.cardBorder },
-      ]}>
+      style={[styles.tile, { backgroundColor: theme.backgroundElement }]}>
       <Icon name={icon} size="md" color="text" />
     </Pressable>
   );
@@ -221,21 +214,11 @@ const styles = StyleSheet.create({
   markBox: { width: 34, height: 34, alignItems: 'center', justifyContent: 'center' },
   titulo: { flexShrink: 1 },
   right: { flexDirection: 'row', alignItems: 'center', gap: Space.sm },
-  /** Botão de ação da faixa: um azulejo de canto aparado. O avatar continua redondo. */
+  /** Botão de ação da faixa: um círculo cinza, como o avatar ao lado. */
   tile: {
-    width: HitTarget - 12,
-    height: HitTarget - 12,
-    borderRadius: Radius.sm,
-    borderCurve: 'continuous',
-    borderWidth: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  round: {
-    width: HitTarget - 12,
-    height: HitTarget - 12,
+    width: HitTarget - 8,
+    height: HitTarget - 8,
     borderRadius: Radius.pill,
-    borderWidth: StyleSheet.hairlineWidth,
     alignItems: 'center',
     justifyContent: 'center',
   },

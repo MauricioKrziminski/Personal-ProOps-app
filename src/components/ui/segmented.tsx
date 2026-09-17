@@ -48,50 +48,40 @@ interface SegmentedProps<T extends string> {
   onChange: (value: T) => void;
 }
 
-/**
- * Seletor segmentado.
- *
- * ponytail: reconstruído em JS em vez de usar o controle nativo — o projeto tirou `@expo/ui` no
- * commit `de229d7` e nenhuma lib de segmented está aprovada. Se a diferença de timing incomodar,
- * o upgrade é `@react-native-segmented-control/segmented-control`, e a API não muda.
- *
- * O polegar desliza com `Motion.spring.snap`, que `tokens.ts` nomeia literalmente para "o
- * indicador de um segmented" e explica por quê: `settle` é criticamente amortecida e, num
- * controle tocado o dia inteiro, lê como travada. O componente usava `settle` — contra o próprio
- * token, e em silêncio, porque as duas molas compilam igual.
- */
-/** Folga entre o trilho e o bloco. */
+/** Folga entre o trilho e o polegar. */
 const FOLGA = 3;
 /** A borda da FRENTE corre com esta mola… */
 const FRENTE = { duration: 300, dampingRatio: 0.84 };
-/** …e a de TRÁS vem com esta, mais lenta: é a diferença que estica o bloco. */
+/** …e a de TRÁS vem com esta, mais lenta: é a diferença que estica o polegar. */
 const TRAS = { duration: 520, dampingRatio: 0.9 };
 
 /**
- * Controle segmentado do mundo Concreto: um bloco de tinta que desliza por um trilho.
+ * Controle segmentado: um polegar branco em pílula que desliza por um trilho cinza, como o do iOS.
+ *
+ * ponytail: reconstruído em JS em vez do controle nativo — o projeto tirou `@expo/ui` no commit
+ * `de229d7` e nenhuma lib de segmented está aprovada.
  *
  * ## O movimento
  *
- * O bloco é descrito por DUAS bordas, cada uma com a sua mola. Ao trocar de opção, a borda que
- * aponta para o destino sai na frente e a outra vem atrás: o bloco se estica na direção do toque
- * e assenta quando a de trás chega. É o que dá corpo ao gesto sem quicar — e continua sendo só
- * `translateX` + `scaleX`, na thread de UI.
+ * O polegar é descrito por DUAS bordas, cada uma com a sua mola. Ao trocar de opção, a borda que
+ * aponta para o destino sai na frente e a outra vem atrás: o polegar se estica na direção do toque
+ * e assenta quando a de trás chega. Para esticar sem achatar as pontas arredondadas, ele é feito de
+ * três peças da mesma cor — duas tampas que seguem cada borda e um miolo reto entre elas.
  *
  * ## O rótulo
  *
- * A cor de cada rótulo é função da DISTÂNCIA entre o centro do bloco e o centro da célula: o texto
- * inverte (secundário → cor do fundo) exatamente quando a tinta passa por baixo dele, inclusive
- * no meio do caminho. Por isso todos os rótulos usam o mesmo peso — trocar de face no selecionado
- * mudaria a largura do texto no meio da animação.
+ * A cor de cada rótulo é função da DISTÂNCIA entre o centro do polegar e o centro da célula, então
+ * o texto acende quando o polegar passa por baixo dele. Todos usam o mesmo peso: trocar de face no
+ * selecionado mudaria a largura do texto no meio da animação.
  */
 export function Segmented<T extends string>({ options, value, onChange }: SegmentedProps<T>) {
   const theme = useTheme();
   const reduzido = useReducedMotion();
-  /** A largura de uma célula para o ESTILO do bloco (comum, não animado). */
-  const [celula, setCelula] = useState(0);
+  /** Largura de uma célula e altura do polegar, para o ESTILO (comum, não animado). */
+  const [caixa, setCaixa] = useState({ celula: 0, altura: 0 });
   const index = Math.max(0, options.findIndex((o) => o.value === value));
 
-  /** As bordas do bloco, em unidades de célula. */
+  /** As bordas do polegar, em unidades de célula. */
   const esquerda = useSharedValue(index);
   const direita = useSharedValue(index + 1);
   const anterior = useRef(index);
@@ -115,8 +105,12 @@ export function Segmented<T extends string>({ options, value, onChange }: Segmen
   }, [index, reduzido, esquerda, direita]);
 
   const onLayout = (e: LayoutChangeEvent) => {
-    const w = (e.nativeEvent.layout.width - FOLGA * 2) / options.length;
-    setCelula((antes) => (antes === w ? antes : w));
+    const { width, height } = e.nativeEvent.layout;
+    const celula = (width - FOLGA * 2) / options.length;
+    const altura = height - FOLGA * 2;
+    setCaixa((antes) =>
+      antes.celula === celula && antes.altura === altura ? antes : { celula, altura }
+    );
   };
 
   return (
@@ -124,8 +118,15 @@ export function Segmented<T extends string>({ options, value, onChange }: Segmen
       accessibilityRole="tablist"
       onLayout={onLayout}
       style={[styles.track, { backgroundColor: theme.backgroundElement }]}>
-      {celula > 0 ? (
-        <Bloco key={celula} celula={celula} cor={theme.text} esquerda={esquerda} direita={direita} />
+      {caixa.celula > 0 ? (
+        <Polegar
+          key={`${caixa.celula}:${caixa.altura}`}
+          celula={caixa.celula}
+          altura={caixa.altura}
+          cor={theme.thumb}
+          esquerda={esquerda}
+          direita={direita}
+        />
       ) : null}
       {options.map((option, i) => (
         <Celula
@@ -147,32 +148,53 @@ export function Segmented<T extends string>({ options, value, onChange }: Segmen
 }
 
 /**
- * O bloco de tinta. Nasce só depois da medida e com a largura como CONSTANTE — `key` o remonta se
- * ela mudar (rotação, fonte).
+ * O polegar. Nasce só depois da medida e com as medidas como CONSTANTES — `key` o remonta se elas
+ * mudarem (rotação, fonte).
  *
  * ⚠️ **A largura não pode ser valor compartilhado gravado no `onLayout`.** No Android ela chegava
  * à thread de UI antes de o estilo animado existir, o estilo nunca recalculava e o bloco ficava
- * parado na primeira célula enquanto o rótulo invertido já estava na certa. Com `width` animado
- * foi pior: largura zero, bloco invisível. Constante na montagem, não há corrida.
+ * parado na primeira célula. Constante na montagem, não há corrida.
  */
-function Bloco({
+function Polegar({
   celula,
+  altura,
   cor,
   esquerda,
   direita,
 }: {
   celula: number;
+  altura: number;
   cor: string;
   esquerda: SharedValue<number>;
   direita: SharedValue<number>;
 }) {
-  const bloco = useAnimatedStyle(() => ({
-    transform: [
-      { translateX: esquerda.get() * celula },
-      { scaleX: Math.max(0.2, direita.get() - esquerda.get()) },
-    ],
+  const r = altura / 2;
+  const tampaEsquerda = useAnimatedStyle(() => ({
+    transform: [{ translateX: esquerda.get() * celula }],
   }));
-  return <Animated.View style={[styles.thumb, { width: celula, backgroundColor: cor }, bloco]} />;
+  const tampaDireita = useAnimatedStyle(() => ({
+    transform: [{ translateX: direita.get() * celula - altura }],
+  }));
+  const miolo = useAnimatedStyle(() => {
+    const largura = Math.max(0, (direita.get() - esquerda.get()) * celula - altura);
+    return {
+      transform: [
+        { translateX: esquerda.get() * celula + r },
+        { scaleX: largura / Math.max(1, celula - altura) },
+      ],
+    };
+  });
+  const tampa = { width: altura, height: altura, borderRadius: r, backgroundColor: cor };
+  return (
+    <>
+      <Animated.View
+        pointerEvents="none"
+        style={[styles.peca, { width: Math.max(1, celula - altura), height: altura, backgroundColor: cor }, miolo]}
+      />
+      <Animated.View pointerEvents="none" style={[styles.peca, tampa, tampaEsquerda]} />
+      <Animated.View pointerEvents="none" style={[styles.peca, tampa, tampaDireita]} />
+    </>
+  );
 }
 
 function Celula({
@@ -192,7 +214,7 @@ function Celula({
 }) {
   const theme = useTheme();
   const apagado = theme.textSecondary;
-  const aceso = theme.background;
+  const aceso = theme.text;
 
   const cor = useAnimatedStyle(() => {
     const centro = (esquerda.get() + direita.get()) / 2;
@@ -209,11 +231,9 @@ function Celula({
       style={styles.option}>
       {/*
         ⚠️ **O rótulo ENCOLHE para caber, nunca parte nem trunca.** Célula de segmentado tem
-        largura dividida, não natural: em 384dp × fonte 1,3 "Transferência" pede ~120dp numa
-        célula de ~107 e o Android partia a palavra ("Transferênci/a"). Quebrar a linha mudaria a
-        altura de uma célula só e desalinharia a trilha. É o que o `UISegmentedControl` do iOS
-        faz: a fonte desce até caber, com piso — abaixo de 0,7 o rótulo deixa de ser legível e a
-        regra dos quatro rótulos curtos (design.md §1) é que precisa ser revista.
+        largura dividida, não natural: em 384dp × fonte 1,3 "Transferência" pede mais que a célula
+        e o Android partia a palavra ("Transferênci/a"). Quebrar a linha mudaria a altura de uma
+        célula só. É o que o `UISegmentedControl` do iOS faz: a fonte desce até caber, com piso.
       */}
       <Animated.Text
         allowFontScaling
@@ -232,16 +252,13 @@ const styles = StyleSheet.create({
   track: {
     flexDirection: 'row',
     padding: FOLGA,
-    borderRadius: Radius.sm,
+    borderRadius: Radius.pill,
     borderCurve: 'continuous',
   },
-  thumb: {
+  peca: {
     position: 'absolute',
     top: FOLGA,
-    bottom: FOLGA,
     left: FOLGA,
-    borderRadius: Radius.xs,
-    borderCurve: 'continuous',
     transformOrigin: 'left',
   },
   label: {
@@ -254,7 +271,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     paddingVertical: Space.sm,
-    paddingHorizontal: Space.xs,
+    paddingHorizontal: Space.sm,
     minHeight: 34,
     /*
       ⚠️ **Piso de largura, senão o controle SOME quando o pai é uma linha.**

@@ -40,7 +40,7 @@ const PARES: [string, string, number][] = [
   ['onHeroDanger', 'heroSurface', 4.5],
   ['onHeroSuccess', 'heroSurface', 4.5],
   ['onHeroWarning', 'heroSurface', 4.5],
-  ['tilePaper', 'tileInk', 7],
+  ['onCurtain', 'curtain', 7],
 ];
 
 for (const modo of ['light', 'dark'] as const) {

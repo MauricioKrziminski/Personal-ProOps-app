@@ -14,25 +14,24 @@ import { Fonts } from '@/constants/theme';
 import { Easing } from 'react-native-reanimated';
 
 /**
- * Escala de raio do mundo Concreto: geometria dura, com o canto só aparado.
+ * Escala de raio do mundo Suave (16/09/2026): canto generoso, como nos vídeos de referência.
  *
- * O desenho anterior era feito de pílulas (o Stitch tinha 113 `rounded-full`). No Concreto a
- * pílula sobra para chip e avatar; botão é retângulo de `sm`, card é `md`. `borderCurve:
- * 'continuous'` continua em todo uso — mesmo num raio de 4 ele é o que separa o canto aparado
- * de um canto "arredondado de CSS".
+ * O Concreto tinha raios de 2 a 12 e foi recusado no mesmo dia — *"estou sentindo muito quadrado
+ * as coisas"*. Aqui ação é pílula, campo tem canto de 12, card de 18 e o bloco de destaque de 24.
+ * `borderCurve: 'continuous'` continua em todo uso: é o que faz o canto ler como o do iOS.
  */
 export const Radius = {
-  /** barra de progresso, badge */
-  xs: 2,
-  /** botão, input, célula, chip de ícone */
-  sm: 4,
-  /** card */
-  md: 6,
-  /** bloco de destaque */
-  lg: 8,
+  /** badge, marcador */
+  xs: 6,
+  /** campo, célula, chip de ícone quadrado */
+  sm: 12,
+  /** card, grupo de linhas */
+  md: 18,
+  /** bloco de destaque, cartão */
+  lg: 24,
   /** sheet */
-  xl: 12,
-  /** chip e avatar — e só */
+  xl: 28,
+  /** botão, chip, segmentado, avatar, trilho de progresso */
   pill: 999,
 } as const;
 
@@ -134,10 +133,10 @@ export const Motion = {
     voo: { duration: 620, dampingRatio: 0.9 },
   },
   /**
-   * A onda de azulejos (`TileField`): duração da onda, quanto as janelas dos azulejos se
-   * sobrepõem, e as duas versões da abertura (a curta do dia a dia e o show das primeiras vezes).
+   * A cortina curva (`WaveCurtain`): duração da onda, e as duas versões da abertura — a curta do
+   * dia a dia e o show das primeiras vezes.
    */
-  curtain: { duration: 900, overlap: 0.6, short: 600, full: 1800 },
+  curtain: { duration: 900, short: 650, full: 1800 },
   /**
    * Escalonamento de entrada em lista: `delay = min(index * step, cap)`.
    *
@@ -158,49 +157,39 @@ export const Motion = {
  * ou custa — sem ele o valor muda de largura enquanto anima.
  */
 /**
- * ⚠️ **A altura de linha dos tamanhos grandes é ~1,17× o corpo, e isso é MEDIDO, não gosto.**
- * Jost tem ascendente de 1,07em e descendente de 0,375em. No iOS, uma caixa de linha menor que
- * `descendente + altura do glifo` desenha o glifo para FORA pelo topo — o "R$" do herói invadiu o
- * rótulo de cima na primeira captura (16/09/2026). Apertar o display abaixo disso é refazer o bug.
+ * ⚠️ **A altura de linha é no mínimo 1,26× o tamanho, e isso é MEDIDO.** Plus Jakarta Sans tem
+ * ascendente de 1,038em e descendente de 0,222em. No iOS, uma caixa de linha menor que isso
+ * desenha o glifo para FORA pelo topo — foi como o "R$" do herói invadiu o rótulo de cima com a
+ * fonte anterior (16/09/2026).
+ *
+ * Os pesos são LEVES de propósito: título em 600, número grande em 500, corpo em 400. É o que dá
+ * o ar limpo dos vídeos — peso 700 em título pesa a tela inteira.
  */
+/** Número que conta, mede ou custa: largura fixa por dígito. */
+const NUMEROS = ['tabular-nums'] as TextStyle['fontVariant'];
+
 export const Type = {
-  /**
-   * Exibição do Concreto: título em minúsculas, grande e apertado — a palavra como bloco.
-   * Uma por tela, e só nas telas de exibição (conta, carteira, onboarding, saudação).
-   */
-  display: { fontFamily: Fonts.semibold, fontSize: 52, lineHeight: 60, letterSpacing: -2 },
-  largeTitle: { fontFamily: Fonts.semibold, fontSize: 34, lineHeight: 40, letterSpacing: -1 },
-  title: { fontFamily: Fonts.semibold, fontSize: 26, lineHeight: 30, letterSpacing: -0.6 },
-  title2: { fontFamily: Fonts.semibold, fontSize: 20, lineHeight: 24, letterSpacing: -0.3 },
-  headline: { fontFamily: Fonts.semibold, fontSize: 17, lineHeight: 22, letterSpacing: -0.1 },
-  body: { fontFamily: Fonts.regular, fontSize: 17, lineHeight: 24, letterSpacing: 0 },
-  callout: { fontFamily: Fonts.regular, fontSize: 15, lineHeight: 20, letterSpacing: 0 },
-  subhead: { fontFamily: Fonts.regular, fontSize: 15, lineHeight: 20, letterSpacing: 0 },
+  /** Exibição: uma por tela, só nas telas de conta, carteira e onboarding. */
+  display: { fontFamily: Fonts.semibold, fontSize: 36, lineHeight: 46, letterSpacing: -1.2 },
+  largeTitle: { fontFamily: Fonts.semibold, fontSize: 30, lineHeight: 38, letterSpacing: -0.9 },
+  title: { fontFamily: Fonts.semibold, fontSize: 24, lineHeight: 31, letterSpacing: -0.6 },
+  title2: { fontFamily: Fonts.semibold, fontSize: 19, lineHeight: 24, letterSpacing: -0.3 },
+  headline: { fontFamily: Fonts.semibold, fontSize: 16, lineHeight: 21, letterSpacing: -0.2 },
+  body: { fontFamily: Fonts.regular, fontSize: 16, lineHeight: 23, letterSpacing: -0.1 },
+  callout: { fontFamily: Fonts.regular, fontSize: 15, lineHeight: 21, letterSpacing: -0.1 },
+  subhead: { fontFamily: Fonts.regular, fontSize: 14, lineHeight: 19, letterSpacing: -0.1 },
   footnote: { fontFamily: Fonts.regular, fontSize: 13, lineHeight: 18, letterSpacing: 0 },
-  /**
-   * ⚠️ **Semibold, nunca a face 500, e isto foi MEDIDO no Android** (16/09/2026). Jost 500 a
-   * 12px é medido mais ESTREITO do que é desenhado: numa caixa que abraça o texto,
-   * "Trocar o valor" saía "Trocar o" e o resto sumia — sem erro, sem aviso. A mesma face a 15px
-   * e as faces 400 e 600 a 12px medem certo. O botão pequeno, os badges e os rótulos de célula
-   * usam este tipo, então a troca vale para o app inteiro.
-   */
-  caption: { fontFamily: Fonts.semibold, fontSize: 12, lineHeight: 15, letterSpacing: 0.2 },
-  /** dinheiro de card — Jost tem numerais tabulares, então o valor não "dança" ao contar */
-  money: { fontFamily: Fonts.semibold, fontSize: 32, lineHeight: 38, letterSpacing: -0.8 },
-  /** o número do herói: o maior dado da tela */
-  heroMoney: { fontFamily: Fonts.semibold, fontSize: 48, lineHeight: 56, letterSpacing: -1.6 },
-  /** rótulo de seção em caixa alta, aberto */
-  meta: { fontFamily: Fonts.semibold, fontSize: 11, lineHeight: 14, letterSpacing: 1.6 },
-  /**
-   * Mono, o segundo tipo do sistema. Hora, data, contador, unidade, badge de status.
-   *
-   * É o que carimba "isto é dado" sem gastar cor, e é metade da personalidade do design —
-   * sem ele o app volta a ser uma escala de cinza só com Jost. Martian Mono é larga, por isso o
-   * tracking negativo.
-   */
-  code: { fontFamily: Fonts.monoMedium, fontSize: 12, lineHeight: 16, letterSpacing: -0.2 },
-  /** mono um degrau acima: valor de dinheiro dentro de card e linha */
-  ticker: { fontFamily: Fonts.monoMedium, fontSize: 13, lineHeight: 18, letterSpacing: -0.3 },
+  caption: { fontFamily: Fonts.medium, fontSize: 12, lineHeight: 16, letterSpacing: 0 },
+  /** dinheiro de card — Plus Jakarta tem numerais tabulares, então o valor não "dança" ao contar */
+  money: { fontFamily: Fonts.semibold, fontSize: 28, lineHeight: 36, letterSpacing: -0.8, fontVariant: NUMEROS },
+  /** o número do herói: o maior dado da tela, em 500 como nos vídeos */
+  heroMoney: { fontFamily: Fonts.medium, fontSize: 40, lineHeight: 51, letterSpacing: -1.4, fontVariant: NUMEROS },
+  /** rótulo pequeno de seção e de bloco: caixa normal, cinza, sem tracking aberto */
+  meta: { fontFamily: Fonts.medium, fontSize: 12, lineHeight: 16, letterSpacing: 0 },
+  /** dado pequeno em linha: hora, data, contador, badge */
+  code: { fontFamily: Fonts.medium, fontSize: 12, lineHeight: 16, letterSpacing: 0, fontVariant: NUMEROS },
+  /** valor de dinheiro dentro de card e linha */
+  ticker: { fontFamily: Fonts.semibold, fontSize: 14, lineHeight: 19, letterSpacing: -0.2, fontVariant: NUMEROS },
 } as const;
 
 export type TypeVariant = keyof typeof Type;

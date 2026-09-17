@@ -21,10 +21,10 @@ import { TaskHeader } from '@/components/ui/task-header';
 import { CountUpMoney } from '@/components/ui/count-up-money';
 import { Reveal } from '@/components/motion/reveal';
 import { SplitReveal } from '@/components/motion/split-reveal';
-import { TileField } from '@/components/motion/tile-field';
+import { WaveCurtain } from '@/components/motion/wave-curtain';
 import { useTheme } from '@/hooks/use-theme';
 import { Motion, Radius, Space } from '@/design/tokens';
-import type { WaveMode } from '@/design/tile-math';
+import type { FaseDaOnda, WaveMode } from '@/design/wave-math';
 
 /**
  * Catálogo dos primitivos — rota de desenvolvimento.
@@ -47,7 +47,7 @@ export default function CatalogScreen() {
 
       <VitrineEntrada />
 
-      <VitrineAzulejos />
+      <VitrineCortina />
 
       <VitrineBotao />
 
@@ -247,27 +247,29 @@ export default function CatalogScreen() {
 }
 
 /**
- * A onda de azulejos isolada: os quatro modos, com e sem canto, sobre um conteúdo qualquer.
- * É onde a geometria de `tile-math` é conferida no aparelho antes de virar abertura e trava.
+ * A cortina curva isolada: os três modos, cobrindo e revelando, sobre um conteúdo qualquer.
+ * É onde a geometria de `wave-math` é conferida no aparelho antes de virar abertura e trava.
  */
-function VitrineAzulejos() {
+function VitrineCortina() {
   const theme = useTheme();
-  const progress = useSharedValue(0);
-  const [modo, setModo] = useState<WaveMode>('diagonal');
-  const [canto, setCanto] = useState<'0' | '3'>('3');
-  const [aberto, setAberto] = useState(false);
+  const progress = useSharedValue(1);
+  const [modo, setModo] = useState<WaveMode>('up');
+  const [fase, setFase] = useState<FaseDaOnda>('cobrir');
+  const [coberto, setCoberto] = useState(false);
 
+  // Cobrir anda de 1 a 0; revelar, de 0 a 1 — a mesma convenção da cortina da raiz.
   const alternar = () => {
-    const alvo = aberto ? 0 : 1;
+    setFase(coberto ? 'revelar' : 'cobrir');
+    setCoberto(!coberto);
+    progress.set(coberto ? 0 : 1);
     progress.set(
-      withTiming(alvo, { duration: Motion.curtain.duration, easing: Easing.inOut(Easing.cubic) })
+      withTiming(coberto ? 1 : 0, { duration: Motion.curtain.duration, easing: Easing.linear })
     );
-    setAberto(!aberto);
   };
 
   return (
     <View style={{ gap: Space.md }}>
-      <ThemedText type="headline">Campo de azulejos</ThemedText>
+      <ThemedText type="headline">Cortina</ThemedText>
       <View
         style={{
           height: 320,
@@ -277,36 +279,26 @@ function VitrineAzulejos() {
           justifyContent: 'center',
           alignItems: 'center',
         }}>
-        <ThemedText type="display">hoje</ThemedText>
-        <TileField
-          key={`${modo}-${canto}`}
+        <ThemedText type="display">Hoje</ThemedText>
+        <WaveCurtain
           progress={progress}
+          fase={fase}
           mode={modo}
-          origin={modo === 'radial' ? { x: 0.5, y: 0.5 } : { x: 0, y: 1 }}
-          corner={Number(canto)}
-          cover
+          origin={{ x: 0.5, y: 0.8 }}
+          color={theme.curtain}
           style={StyleSheet.absoluteFill}
         />
       </View>
       <Segmented
         options={[
-          { value: 'diagonal', label: 'Diagonal' },
-          { value: 'radial', label: 'Radial' },
           { value: 'up', label: 'Sobe' },
           { value: 'down', label: 'Desce' },
+          { value: 'radial', label: 'Do botão' },
         ]}
         value={modo}
         onChange={setModo}
       />
-      <Segmented
-        options={[
-          { value: '0', label: 'Sem canto' },
-          { value: '3', label: 'Com canto' },
-        ]}
-        value={canto}
-        onChange={setCanto}
-      />
-      <Button label={aberto ? 'Cobrir' : 'Revelar'} onPress={alternar} block />
+      <Button label={coberto ? 'Revelar' : 'Cobrir'} onPress={alternar} block />
     </View>
   );
 }
