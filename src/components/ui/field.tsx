@@ -181,10 +181,25 @@ function useCaixa(invalid: boolean | undefined) {
 }
 
 export const TextField = forwardRef<TextInput, TextInputProps & { invalid?: boolean }>(
-  function TextField({ invalid, style, onFocus, onBlur, ...rest }, ref) {
+  function TextField({ invalid, style, onFocus, onBlur, placeholder, ...rest }, ref) {
     const theme = useTheme();
     const { focar, desfocar, moldura } = useCaixa(invalid);
     const { caixa, input } = repartir(style);
+    /*
+      ⚠️ **No iOS o placeholder entra um quadro DEPOIS da montagem** (medido em 16/09/2026). Na tela
+      de login montada depois de sair da conta, o rótulo interno do `UITextField` nascia com o
+      layout de outro campo: o "voce@exemplo.com" ficava 16pt abaixo, cortado pela borda, e a
+      metade de cima da caixa nem dava foco. Com partida a frio o mesmo campo nascia certo, e nem
+      animação nem preenchimento automático mudavam nada (testados um a um). Aplicado no quadro
+      seguinte, o placeholder é recalculado com a geometria de agora — e o campo volta a responder
+      ao toque na caixa inteira.
+    */
+    const [marcador, setMarcador] = useState(Platform.OS === 'ios' ? undefined : placeholder);
+    useEffect(() => {
+      if (Platform.OS !== 'ios') return;
+      const id = requestAnimationFrame(() => setMarcador(placeholder));
+      return () => cancelAnimationFrame(id);
+    }, [placeholder]);
 
     return moldura(
       <TextInput
@@ -201,6 +216,7 @@ export const TextField = forwardRef<TextInput, TextInputProps & { invalid?: bool
           onBlur?.(e);
         }}
         style={[styles.input, { color: theme.text }, input]}
+        placeholder={Platform.OS === 'ios' ? marcador : placeholder}
         {...rest}
       />,
       caixa
