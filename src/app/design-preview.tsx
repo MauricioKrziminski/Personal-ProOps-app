@@ -300,6 +300,47 @@ function seedClient() {
 
   client.setQueryData(['forecast', String(diasRestantes)], forecast);
 
+  /*
+    As leituras das raízes em "conversa organizada" (17/09/2026). Chave EXATA de cada hook: chave
+    errada cai no estado de erro em silêncio. `spendable` guarda a LINHA (o hook devolve `[0]`), e
+    a soma de `spendable-path` é o `comprometido_ate_entrada` — senão a Pista apaga os entalhes.
+  */
+  const emQuatroDias = localISODate(new Date(agora.getFullYear(), agora.getMonth(), agora.getDate() + 4));
+  client.setQueryData(['cycle', ''], {
+    closeDay: null,
+    view: 'civil',
+    mes,
+    de: `${mes}-01`,
+    ate: ultimoDia,
+    diasAteOFim: diasRestantes,
+  });
+  client.setQueryData(['spendable', ''], {
+    caixa: 391000,
+    comprometido_ate_entrada: 201430,
+    comprometido_no_ciclo: 201430,
+    a_receber_no_ciclo: 42000,
+    proxima_entrada: null,
+  });
+  client.setQueryData(['spendable-path', ''], [
+    { day: hoje, out_cents: 21430, title: 'Energia', origin: 'transaction', ref_id: 'prev-energia' },
+    { day: emQuatroDias, out_cents: 180000, title: 'Aluguel', origin: 'transaction', ref_id: 'prev-aluguel' },
+  ]);
+  client.setQueryData(['upcoming-card-charges', '6'], []);
+  client.setQueryData(['agent-activity', '6'], [
+    {
+      source_message_id: 'wamid.prev-1',
+      executed_at: at(12, 44),
+      channel: 'whatsapp',
+      input_kind: 'audio',
+      origin_text: 'gastei 45 no almoço do Rangão',
+      session_id: null,
+      action_index: 0,
+      action_type: 'create_expense',
+      result_id: 'prev-tx',
+      record: { kind: 'transaction', id: 'prev-tx', title: 'Almoço', amount_cents: 4500, tx_kind: 'expense', category: 'alimentação' },
+    },
+  ]);
+
   client.setQueryData(
     ['upcoming-bills', '7'],
     [
