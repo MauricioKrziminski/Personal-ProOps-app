@@ -4,10 +4,16 @@ import {
   RefreshControl,
   StyleSheet,
   View,
+  type ScrollViewProps,
   type StyleProp,
   type ViewStyle,
 } from 'react-native';
-import Animated, { useAnimatedStyle, useReducedMotion } from 'react-native-reanimated';
+import Animated, {
+  useAnimatedScrollHandler,
+  useAnimatedStyle,
+  useReducedMotion,
+  useSharedValue,
+} from 'react-native-reanimated';
 import { KeyboardAwareScrollView } from 'react-native-keyboard-controller';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Stack } from 'expo-router';
@@ -16,6 +22,7 @@ import { MaxContentWidth } from '@/constants/theme';
 import { useAppHeaderHeight } from '@/components/ui/app-header';
 import { progressoDeEntrada, useRelogioDeEntrada } from '@/components/motion/entrada';
 import { TAB_BAR_SPACE } from '@/components/ui/pill-tab-bar';
+import { RolagemDaTela } from '@/components/ui/screen-scroll';
 
 import { Motion, Space } from '@/design/tokens';
 import { useTheme } from '@/hooks/use-theme';
@@ -67,6 +74,11 @@ interface ScreenProps {
    * slot deixaria a primeira linha da tela escondida atrás da faixa.
    */
   topBar?: React.ReactNode;
+  /**
+   * Camada por cima do conteúdo — o FAB do Financeiro. Mora aqui para ler a rolagem da tela
+   * (`useRolagemDaTela`). Só vale com `topBar`: tela empurrada não tem FAB.
+   */
+  overlay?: React.ReactNode;
   contentStyle?: StyleProp<ViewStyle>;
 }
 
@@ -93,12 +105,17 @@ export function Screen({
   stagger = false,
   topBar,
   floatingAction = false,
+  overlay,
   contentStyle,
 }: ScreenProps) {
   const theme = useTheme();
   const [pulling, setPulling] = useState(false);
   const insets = useSafeAreaInsets();
   const headerHeight = useAppHeaderHeight();
+  const rolagem = useSharedValue(0);
+  const aoRolar = useAnimatedScrollHandler((e) => {
+    rolagem.set(e.contentOffset.y);
+  });
 
   const background = grouped ? theme.groupedBackground : theme.background;
   /**
@@ -150,12 +167,15 @@ export function Screen({
       );
     }
     return (
-      <View style={[styles.root, { backgroundColor: background }]}>
-        <View style={[styles.root, { paddingTop: headerHeight }, contentStyle]}>
-          {children}
+      <RolagemDaTela.Provider value={rolagem}>
+        <View style={[styles.root, { backgroundColor: background }]}>
+          <View style={[styles.root, { paddingTop: headerHeight }, contentStyle]}>
+            {children}
+          </View>
+          {topBar}
+          {overlay}
         </View>
-        {topBar}
-      </View>
+      </RolagemDaTela.Provider>
     );
   }
 
@@ -197,6 +217,9 @@ export function Screen({
           Cartões, Orçamentos e companhia debaixo da barra de navegação.
         */
       contentInsetAdjustmentBehavior={topBar ? 'never' : 'automatic'}
+      // O scroll por dentro é o `Reanimated.ScrollView`, que aceita o handler da UI thread; o
+      // tipo público é o do `ScrollView` da RN.
+      onScroll={aoRolar as unknown as ScrollViewProps['onScroll']}
       showsVerticalScrollIndicator={false}
       alwaysBounceVertical={Boolean(onRefresh)}
       refreshControl={
@@ -213,14 +236,17 @@ export function Screen({
     </KeyboardAwareScrollView>
   );
 
-  if (!topBar) return conteudo;
+  if (!topBar) return <RolagemDaTela.Provider value={rolagem}>{conteudo}</RolagemDaTela.Provider>;
 
   return (
-    <View style={[styles.root, { backgroundColor: background }]}>
-      {conteudo}
-      {/* Depois do scroll na árvore: ele precisa desenhar POR CIMA para o desfoque existir. */}
-      {topBar}
-    </View>
+    <RolagemDaTela.Provider value={rolagem}>
+      <View style={[styles.root, { backgroundColor: background }]}>
+        {conteudo}
+        {/* Depois do scroll na árvore: ele precisa desenhar POR CIMA para o desfoque existir. */}
+        {topBar}
+        {overlay}
+      </View>
+    </RolagemDaTela.Provider>
   );
 }
 
