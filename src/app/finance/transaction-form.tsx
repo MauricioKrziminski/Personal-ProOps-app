@@ -22,7 +22,7 @@ import { Screen } from '@/components/ui/screen';
 import { TaskHeader } from '@/components/ui/task-header';
 import { Segmented } from '@/components/ui/segmented';
 import { Skeleton } from '@/components/ui/skeleton';
-import { useToast } from '@/components/ui/toast';
+import { ToastDoModal, useToast } from '@/components/ui/toast';
 import { MaxContentWidth } from '@/constants/theme';
 import { Motion, Space, Type } from '@/design/tokens';
 import {
@@ -852,6 +852,7 @@ function TransactionForm({ editing }: { editing?: Transaction }) {
           />
         ) : null}
       </KeyboardAwareScrollView>
+      <ToastDoModal />
     </Screen>
   );
 }

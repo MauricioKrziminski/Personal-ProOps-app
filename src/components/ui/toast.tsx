@@ -1,5 +1,5 @@
 import { createContext, useCallback, useContext, useMemo, useRef, useState } from 'react';
-import { Pressable, StyleSheet, View } from 'react-native';
+import { Platform, Pressable, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Animated, { FadeInDown, FadeOutDown } from 'react-native-reanimated';
 import * as Haptics from 'expo-haptics';
@@ -43,6 +43,18 @@ const ToastStateContext = createContext<{ toast: Toast | null; dismiss: () => vo
 export function ToastOutlet() {
   const { toast, dismiss } = useContext(ToastStateContext);
   return toast ? <ToastView toast={toast} onDismiss={dismiss} /> : null;
+}
+
+/**
+ * O toast de uma tela `presentation: 'modal'`, no fim da árvore dela.
+ *
+ * No iOS o modal é um view controller apresentado ACIMA da raiz, e o toast da raiz ficava atrás
+ * dele — medido em 17/09/2026 no formulário de lançamento: o toast disparou e a tela não pintou
+ * nada. No Android o modal mora no mesmo contêiner da pilha e o da raiz já aparece por cima; uma
+ * segunda cópia ali dobraria a sombra.
+ */
+export function ToastDoModal() {
+  return Platform.OS === 'ios' ? <ToastOutlet /> : null;
 }
 
 /**

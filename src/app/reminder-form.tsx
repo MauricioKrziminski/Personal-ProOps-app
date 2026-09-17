@@ -22,7 +22,7 @@ import { HeroLabel } from '@/components/ui/section-head';
 import { Segmented } from '@/components/ui/segmented';
 import { SelectField } from '@/components/ui/select-field';
 import { Skeleton } from '@/components/ui/skeleton';
-import { useToast } from '@/components/ui/toast';
+import { ToastDoModal, useToast } from '@/components/ui/toast';
 import { MaxContentWidth } from '@/constants/theme';
 import { Motion, Space, Type, tabular } from '@/design/tokens';
 import {
@@ -595,6 +595,7 @@ function ReminderForm({
           </View>
         ) : null}
       </KeyboardAwareScrollView>
+      <ToastDoModal />
     </Screen>
   );
 }

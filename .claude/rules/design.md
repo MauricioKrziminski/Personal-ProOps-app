@@ -508,10 +508,12 @@ dela). Cancelou, a abertura revela a trava, que tem o "tentar de novo".
   **Não é pôr o toast num `Modal` próprio**: no Android uma janela transparente come todos os
   toques enquanto está no ar, e o sheet ficaria intocável por 3,2 s.
 
-  ⚠️ **As três telas `presentation: 'modal'` provavelmente têm o mesmo defeito no iOS** — ali a
-  tela é um VC apresentado sobre a raiz, e é justamente onde o `transaction-form` promete que
-  "erro NUNCA fecha o modal". **Não medido** (o `idb` caiu na tentativa); se confirmar, a
-  correção é a mesma: `<ToastOutlet/>` no fim das três.
+  ⚠️ **As telas `presentation: 'modal'` tinham o mesmo defeito no iOS** — medido em 17/09/2026
+  no formulário de lançamento: o toast disparou e nada apareceu. Ali a tela é um VC apresentado
+  sobre a raiz. A correção é `<ToastDoModal/>` no fim da tela (`ui/toast.tsx`): no iOS ele desenha
+  o toast, no Android não desenha nada, porque lá o modal mora no mesmo contêiner e o da raiz já
+  aparece por cima. Está no `transaction-form` e no `reminder-form`; o paywall não dispara toast.
+  Tela modal nova que dispare toast leva o mesmo.
 - Confirmação destrutiva é **action sheet nativo**. Ação de item é **context menu nativo**.
   `Link.Menu` do expo-router é **iOS-only** — usar só ele deixa o Android sem ação nenhuma na
   linha. O caminho único é `showItemActions` / `confirmDestructive` (`src/lib/item-actions.ts`),
