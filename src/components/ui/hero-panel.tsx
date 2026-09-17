@@ -8,6 +8,7 @@ import Animated, {
 
 import { ThemedText } from '@/components/themed-text';
 import { Icon } from '@/components/ui/icon';
+import { InkSurface } from '@/components/ui/ink-surface';
 import { QuickActions, type QuickAction } from '@/components/ui/quick-actions';
 import { useConceal } from '@/components/ui/conceal';
 import { Motion, Radius, Space } from '@/design/tokens';
@@ -51,6 +52,8 @@ interface HeroPanelProps {
   /** Liga o botão de olho na linha do rótulo. */
   concealable?: boolean;
   onPress?: () => void;
+  /** `live` desenha a tinta viva por baixo do conteúdo (raízes). `flat` é a tinta chapada. */
+  surface?: 'flat' | 'live';
 }
 
 /**
@@ -81,6 +84,7 @@ export function HeroPanel({
   actions,
   concealable = false,
   onPress,
+  surface = 'flat',
 }: HeroPanelProps) {
   const theme = useTheme();
   const { concealed, toggle } = useConceal();
@@ -96,6 +100,7 @@ export function HeroPanel({
         aoTocar,
         { backgroundColor: theme.heroSurface },
       ]}>
+      {surface === 'live' ? <InkSurface /> : null}
       <View style={styles.inner}>
         {top ? <View style={styles.top}>{top}</View> : null}
 
@@ -182,9 +187,13 @@ export function HeroPanel({
               </ThemedText>
             </View>
           ) : null}
-
-          {chart ? <View style={styles.chart}>{chart}</View> : null}
         </Pressable>
+
+        {/*
+          O gráfico mora FORA da área tocável: ele agora se arrasta (a Pista, a curva do ciclo),
+          e um arraste dentro do `Pressable` abria o menu do herói ao soltar o dedo.
+        */}
+        {chart ? <View style={styles.chart}>{chart}</View> : null}
 
         {actions ? (
           <View style={styles.actions}>
