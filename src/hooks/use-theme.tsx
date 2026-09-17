@@ -1,6 +1,6 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { useColorScheme } from 'react-native';
+import { Appearance, useColorScheme } from 'react-native';
 
 import { Colors } from '@/constants/theme';
 
@@ -34,6 +34,11 @@ const Ctx = createContext<ThemeState>({ mode: 'system', scheme: 'dark', setMode:
  * A preferência é gravada no `AsyncStorage`, e **antes de ela carregar o app usa o esquema do
  * sistema** em vez de um padrão fixo: assim não há flash de tema errado em quem já escolheu igual
  * ao aparelho, que é o caso mais comum.
+ *
+ * ⚠️ **A escolha também vai para o NATIVO** (`Appearance.setColorScheme`, 17/09/2026). Sem isso
+ * ela valia só para o que o React desenha: com o app em Claro e o celular no Escuro, o diálogo de
+ * "Sair da conta?" chegava escuro por cima da tela clara (medido no simulador), e o mesmo valia
+ * para o teclado e para os alertas do sistema. `system` devolve a decisão ao aparelho (`null`).
  */
 export function ThemeProvider({ children }: { children: React.ReactNode }) {
   const system = useColorScheme();
@@ -48,6 +53,15 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
       vivo = false;
     };
   }, []);
+
+  /*
+    O `uiMode` está no `configChanges` da `MainActivity`, então no Android isto não recria a tela
+    (no iOS é o `overrideUserInterfaceStyle` da janela).
+  */
+  useEffect(() => {
+    // `unspecified` é o "volta a seguir o aparelho" do RN (não `null`).
+    Appearance.setColorScheme?.(mode === 'system' ? 'unspecified' : mode);
+  }, [mode]);
 
   const setMode = useCallback((next: ThemeMode) => {
     setModeState(next);
