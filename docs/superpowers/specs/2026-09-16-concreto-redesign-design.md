@@ -311,6 +311,31 @@ automático com a guarda no hook, frases de estado, `flexShrink: 0` no título.
 - Trocar de cartão grava a escolha (cache de módulo + AsyncStorage, como hoje); ao voltar, a
   pilha se reordena com `encaixe`.
 
+#### Como ficou (fase 4, 16/09/2026) — vale acima do texto acima
+
+- **A Carteira é `push` com `animation: 'fade'`**, não `transparentModal`: no iOS o modal é
+  apresentado acima da raiz React e esconderia a camada de voo, e todo `push` depois de um modal
+  vira modal no `react-native-screens` (a fatura perderia o header). Fechar não esmaece o fundo
+  (atrás de um `push` o iOS não desenha a tela de baixo); esmaece o conteúdo.
+- **Em pé = a face deitada girada 90°**; a face é desenhada em 340 e escalada, proporção
+  1,586 ÷ √fontScale. Sem chip EMV; metal na cor do emissor, tinta por contraste.
+- **Quem navega espera a decolagem** (`voar` resolve com a origem já escondida): no iOS a tela
+  que sai é congelada no começo da transição.
+- **O voo segue o pouso** enquanto voa: a fatura muda de lugar depois de medida (o seletor de
+  meses chega depois, e o header nativo ajusta a rolagem).
+- **Giro do carrossel no meio da troca** (seno, pico 50°); vizinhos em repouso planos.
+- **Arraste para fechar** com ativação manual (só no topo da página, dedo descendo), página no
+  `ScrollView` do gesture-handler, volta no `onFinalize`.
+- **Menos texto** (pedido do dono do produto no meio da fase): estado numa palavra sob o nome,
+  "R$ X livre de R$ Y" numa linha, rodapé da fatura sem legendas nem parágrafo, e a linha
+  "Fatura do X" embaixo da pilha saiu — repetia nome, fechamento e total da face, cujo botão
+  "fecha ›" abre a mesma fatura.
+- **Ações aninhadas viram ações de acessibilidade** do card (o leitor de tela não alcança botão
+  dentro de botão).
+- Medido no emulador: carrossel com 25% de quadros lentos contra 48% da rolagem comum do
+  Financeiro — o limite é o emulador em build de desenvolvimento. As flags estáticas do
+  Reanimated ficam como estão até uma medida em release.
+
 ### Fatura
 
 `InvoiceDock` no lugar do card de total, com as mesmas informações (ver inventário). Deslizar a
