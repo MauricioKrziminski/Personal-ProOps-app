@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react';
-import { StyleSheet, View, type ViewStyle } from 'react-native';
+import { StyleSheet, View, useWindowDimensions, type ViewStyle } from 'react-native';
 
 import { ThemedText } from '@/components/themed-text';
 import { PressableScale } from '@/components/motion/pressable-scale';
@@ -22,6 +22,12 @@ export interface TileProps {
   footer?: ReactNode;
   onPress?: () => void;
   accessibilityLabel?: string;
+  /**
+   * O valor é dinheiro em tamanho de título. Com a fonte do sistema grande, o ladrilho `fill`
+   * passa a ocupar a linha inteira: dividida em dois, a coluna não comporta o número e ele
+   * partiria no meio ("R$ 12.333,2 / 0", medido a 384dp × 1,3).
+   */
+  valorGrande?: boolean;
 }
 
 const LAYOUT: Record<NonNullable<TileProps['layout']>, ViewStyle> = {
@@ -51,9 +57,12 @@ export function Tile({
   footer,
   onPress,
   accessibilityLabel,
+  valorGrande = false,
 }: TileProps) {
   const theme = useTheme();
   const scheme = useScheme();
+  const { fontScale } = useWindowDimensions();
+  const forma = valorGrande && layout === 'fill' && fontScale > 1.15 ? LAYOUT.wide : LAYOUT[layout];
 
   const corpo = (
     <View
@@ -89,14 +98,14 @@ export function Tile({
     </View>
   );
 
-  if (!onPress) return <View style={LAYOUT[layout]}>{corpo}</View>;
+  if (!onPress) return <View style={forma}>{corpo}</View>;
   return (
     <PressableScale
       haptic="selection"
       accessibilityRole="button"
       accessibilityLabel={accessibilityLabel ?? label}
       onPress={onPress}
-      style={LAYOUT[layout]}>
+      style={forma}>
       {corpo}
     </PressableScale>
   );

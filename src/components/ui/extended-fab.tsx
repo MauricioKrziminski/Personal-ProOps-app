@@ -59,6 +59,10 @@ export function ExtendedFab({ label, icon, onPress }: { label: string; icon: Ico
 
   return (
     <View
+      // A âncora ocupa a linha inteira para o MEDIDOR abaixo não ser limitado pela largura do
+      // botão (com a fonte do sistema crescendo, a medida ficava presa na largura antiga e o
+      // rótulo saía cortado — "Lanc", medido a 384dp × 1,3). `box-none`: a faixa não rouba toque.
+      pointerEvents="box-none"
       style={[
         styles.ancora,
         {
@@ -96,7 +100,7 @@ export function ExtendedFab({ label, icon, onPress }: { label: string; icon: Ico
 }
 
 const styles = StyleSheet.create({
-  ancora: { position: 'absolute', right: Space.lg, zIndex: 11, elevation: 11 },
+  ancora: { position: 'absolute', left: 0, right: Space.lg, alignItems: 'flex-end', zIndex: 11, elevation: 11 },
   pilula: {
     height: ALTURA,
     flexDirection: 'row',
@@ -107,6 +111,6 @@ const styles = StyleSheet.create({
     borderCurve: 'continuous',
     overflow: 'hidden',
   },
-  medida: { position: 'absolute', opacity: 0, right: 0 },
+  medida: { position: 'absolute', opacity: 0, right: 0, flexShrink: 0 },
   semEncolher: { flexShrink: 0 },
 });

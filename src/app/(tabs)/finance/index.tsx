@@ -380,6 +380,7 @@ export default function FinanceScreen() {
       {/* Entra | Sai somam o MESMO número do herói — leem a mesma série. */}
       <TileRow>
         <Tile
+          valorGrande
           icon="arrow.down.left"
           label="Entra"
           value={ciclo ? <Money cents={entrou} variant="title2" tone="success" /> : undefined}
@@ -388,6 +389,7 @@ export default function FinanceScreen() {
           onPress={() => abrirCiclo('entra')}
         />
         <Tile
+          valorGrande
           icon="arrow.up.right"
           label="Sai"
           value={ciclo ? <Money cents={saiu} variant="title2" /> : undefined}
