@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Redirect } from 'expo-router';
-import { StyleSheet, View } from 'react-native';
+import { StyleSheet, View, useWindowDimensions } from 'react-native';
 import { Easing, useSharedValue, withTiming } from 'react-native-reanimated';
 
 import { ThemedText } from '@/components/themed-text';
@@ -14,6 +14,7 @@ import { Screen } from '@/components/ui/screen';
 import { Field, MoneyField, TextField } from '@/components/ui/field';
 import { Segmented } from '@/components/ui/segmented';
 import { OtpInput } from '@/components/auth/otp-input';
+import { BaseDaPilha, CardFace } from '@/components/finance/card-face';
 import { Skeleton, SkeletonRow } from '@/components/ui/skeleton';
 import { BarTrack, ProgressBar, Sparkline } from '@/components/ui/sparkline';
 import { useToast } from '@/components/ui/toast';
@@ -45,6 +46,8 @@ export default function CatalogScreen() {
   return (
     <Screen grouped>
       <ThemedText type="title">Catálogo</ThemedText>
+
+      <VitrineCartoes />
 
       <VitrineEntrada />
 
@@ -300,6 +303,41 @@ function VitrineCortina() {
         onChange={setModo}
       />
       <Button label={coberto ? 'Revelar' : 'Cobrir'} onPress={alternar} block />
+    </View>
+  );
+}
+
+/** A face do cartão: emissores de cor clara e escura, a base da pilha e a miniatura. */
+function VitrineCartoes() {
+  const { width } = useWindowDimensions();
+  const largura = width - Space.lg * 2;
+  const card = (name: string, extra: object = {}) => ({
+    account_id: name,
+    name,
+    invoice_id: 'x',
+    invoice_total_cents: 375122,
+    credit_limit_cents: 1200000,
+    available_limit_cents: 824878,
+    closing_date: '2026-10-03',
+    due_date: '2026-10-10',
+    overdue_count: 0,
+    ...extra,
+  });
+  return (
+    <View style={{ gap: Space.md }}>
+      <ThemedText type="headline">Cartão</ThemedText>
+      <CardFace nome="Nubank" largura={largura}>
+        <BaseDaPilha card={card('Nubank')} onFatura={() => {}} />
+      </CardFace>
+      <CardFace nome="Ourocard BB" largura={largura} atrasada>
+        <BaseDaPilha card={card('Ourocard BB', { closing_date: null })} onFatura={() => {}} />
+      </CardFace>
+      <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: Space.md }}>
+        {['Itaú Black', 'Inter', 'C6 Carbon', 'Cartão da casa', 'Mercado Pago'].map((n) => (
+          <CardFace key={n} nome={n} largura={(largura - Space.md) / 2} />
+        ))}
+        <CardFace nome="Nubank" largura={56} />
+      </View>
     </View>
   );
 }

@@ -283,16 +283,7 @@ export function ProgressBar({
    * ⚠️ **`strong` é comparação que precisa de DOIS pesos.** Em "entrou × saiu" as duas barras
    * comparam, então nenhuma delas é `tint` — quem separa as duas é a CLARIDADE.
    */
-  tone?:
-    | 'tint'
-    | 'data'
-    | 'strong'
-    | 'success'
-    | 'warning'
-    | 'danger'
-    | 'onHeroSuccess'
-    | 'onHeroDanger'
-    | 'onHeroWarning';
+  tone?: 'data' | 'strong' | ThemeColor;
   /** A cor da PISTA. Dentro do herói ela é `heroChip` — com a cor normal ela sumiria no bloco. */
   track?: ThemeColor;
 }) {

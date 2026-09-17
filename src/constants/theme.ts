@@ -79,6 +79,17 @@ export const Colors = {
 
     /** Face do cartão de crédito: escura nos dois temas (chip e contactless precisam). */
     cardFace: '#141413',
+    /**
+     * A tinta ESCURA da face do cartão, para emissor de cor clara (o amarelo do BB). A face é a
+     * cor do banco nos dois temas, então estes três não mudam com o tema — a clara é `onHero*`.
+     * Quem escolhe entre as duas é `tintaDoCartao`, por contraste.
+     */
+    onCardInk: '#0B0B0C',
+    onCardInkMuted: 'rgba(11, 11, 12, 0.62)',
+    cardInkChip: 'rgba(11, 11, 12, 0.10)',
+    /** A faixa de brilho do metal do cartão, e o mesmo branco sem opacidade para o degradê. */
+    cardSheen: 'rgba(255, 255, 255, 0.16)',
+    cardSheenClear: 'rgba(255, 255, 255, 0)',
     /** A cortina da abertura e das trocas de sessão. Igual ao splash nativo, nos dois temas. */
     curtain: '#0B0B0C',
     onCurtain: '#F4F4F2',
@@ -130,6 +141,12 @@ export const Colors = {
     warningSoft: 'rgba(242, 179, 86, 0.14)',
 
     cardFace: '#141413',
+    onCardInk: '#0B0B0C',
+    onCardInkMuted: 'rgba(11, 11, 12, 0.62)',
+    cardInkChip: 'rgba(11, 11, 12, 0.10)',
+    /** A faixa de brilho do metal do cartão, e o mesmo branco sem opacidade para o degradê. */
+    cardSheen: 'rgba(255, 255, 255, 0.16)',
+    cardSheenClear: 'rgba(255, 255, 255, 0)',
     curtain: '#0B0B0C',
     onCurtain: '#F4F4F2',
     onCurtainMuted: 'rgba(244, 244, 242, 0.60)',
