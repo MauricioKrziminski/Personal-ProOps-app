@@ -7,7 +7,7 @@ import { ConversationRow } from '@/components/agent/conversation-row';
 import { AgentHomeHeader } from '@/components/agent/agent-home-header';
 import { RenameConversationSheet } from '@/components/agent/rename-conversation-sheet';
 import { ThemedText } from '@/components/themed-text';
-import { AppHeader, HeaderIconButton } from '@/components/ui/app-header';
+import { AppHeader } from '@/components/ui/app-header';
 import { BlockHeader } from '@/components/ui/block-header';
 import { TAB_BAR_SPACE } from '@/components/ui/pill-tab-bar';
 import { Screen } from '@/components/ui/screen';
@@ -41,7 +41,6 @@ export default function AgentScreen() {
   );
 
   const abrir = useCallback((id: string) => router.push(`/agent/${id}`), []);
-  const nova = useCallback(() => router.push('/agent/new'), []);
   const abrirPrompt = useCallback(
     (prompt: string) => router.push(`/agent/new?prompt=${encodeURIComponent(prompt)}`),
     [],
@@ -102,15 +101,17 @@ export default function AgentScreen() {
   }, [hasNextPage, isFetchingNextPage, fetchNextPage]);
 
   return (
-    <Screen scroll={false} grouped topBar={<AppHeader title="Agente" action={<NovaConversa />} />}>
+    <Screen scroll={false} grouped topBar={<AppHeader title="Agente" />}>
       <FlashList
         data={conversas}
         keyExtractor={(c) => c.id}
         renderItem={renderConversa}
         ListHeaderComponent={
           <View style={styles.header}>
-            <AgentHomeHeader onNew={nova} onPrompt={abrirPrompt} />
-            <BlockHeader title="Suas conversas" count={conversas.length} />
+            <AgentHomeHeader onPrompt={abrirPrompt} />
+            {lista.isPending || lista.isError || conversas.length > 0 ? (
+              <BlockHeader title="Conversas recentes" />
+            ) : null}
           </View>
         }
         ListEmptyComponent={
@@ -121,11 +122,7 @@ export default function AgentScreen() {
             </View>
           ) : lista.isError ? (
             <RetryConversations onPress={() => void refetch()} />
-          ) : (
-            <ThemedText type="small" themeColor="textSecondary" style={styles.empty}>
-              Suas conversas vão aparecer aqui.
-            </ThemedText>
-          )
+          ) : null
         }
         contentContainerStyle={{
           paddingTop: Space.sm,
@@ -137,6 +134,7 @@ export default function AgentScreen() {
         }}
         refreshing={puxando}
         onRefresh={atualizar}
+        keyboardShouldPersistTaps="handled"
         onEndReachedThreshold={0.5}
         onEndReached={carregarMais}
       />
@@ -185,20 +183,9 @@ function RetryConversations({ onPress }: { onPress: () => void }) {
   );
 }
 
-function NovaConversa() {
-  return (
-    <HeaderIconButton
-      icon="plus"
-      label="Nova conversa"
-      onPress={() => router.push('/agent/new')}
-    />
-  );
-}
-
 const styles = StyleSheet.create({
   header: { gap: Space.xxl, paddingBottom: Space.sm },
   loading: { gap: Space.sm },
-  empty: { paddingVertical: Space.md },
   retry: { gap: Space.md, paddingVertical: Space.md, alignItems: 'flex-start' },
   retryButton: {
     minHeight: 44,

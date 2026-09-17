@@ -91,6 +91,19 @@ export function canSubmitMessage(
   return canSendMessage(text) && !estado.sending && !estado.awaitingAction;
 }
 
+/** A primeira mensagem reutiliza o UUID enquanto o texto do retry for o mesmo. */
+export function firstMessageAttempt(
+  text: string,
+  previous: { content: string; clientMessageId: string } | null,
+  makeId: () => string = newClientMessageId,
+): { content: string; clientMessageId: string } {
+  const content = text.trim();
+  return {
+    content,
+    clientMessageId: previous?.content === content ? previous.clientMessageId : makeId(),
+  };
+}
+
 export function canSaveTitle(title: string): boolean {
   const limpo = title.trim();
   return limpo.length > 0 && limpo.length <= MAX_TITLE_LENGTH;

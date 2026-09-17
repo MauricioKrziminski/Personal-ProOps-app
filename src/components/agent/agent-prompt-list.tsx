@@ -5,33 +5,35 @@ import { ThemedText } from '@/components/themed-text';
 import { Icon } from '@/components/ui/icon';
 import { Radius, Space } from '@/design/tokens';
 import { useTheme } from '@/hooks/use-theme';
-import { EXEMPLOS_DO_AGENTE } from '@/lib/agent-prompts';
+import { ATALHOS_DO_AGENTE } from '@/lib/agent-prompts';
 
 interface Props {
   onSelect: (prompt: string) => void;
 }
 
-/** Frases reais que o agente entende, compartilhadas pela entrada e pela conversa nova. */
+/** Atalhos compactos, compartilhados pela entrada e pela conversa nova. */
 export const AgentPromptList = memo(function AgentPromptList({ onSelect }: Props) {
   const theme = useTheme();
 
   return (
     <View style={styles.root}>
-      <ThemedText type="subtitle" accessibilityRole="header">Pode começar assim</ThemedText>
-      <View style={[styles.list, { borderColor: theme.separator }]}>
-        {EXEMPLOS_DO_AGENTE.map((prompt, index) => (
+      <ThemedText type="smallBold" themeColor="textSecondary">Atalhos</ThemedText>
+      <View style={styles.list}>
+        {ATALHOS_DO_AGENTE.map(({ label, prompt, icon }) => (
           <Pressable
-            key={prompt}
+            key={label}
             accessibilityRole="button"
-            accessibilityLabel={`Começar com: ${prompt}`}
+            accessibilityLabel={`${label}. Abre uma conversa com texto editável.`}
             onPress={() => onSelect(prompt)}
             style={({ pressed }) => [
               styles.prompt,
-              index > 0 && { borderTopColor: theme.separator, borderTopWidth: StyleSheet.hairlineWidth },
-              pressed && { backgroundColor: theme.backgroundSelected },
+              {
+                backgroundColor: pressed ? theme.backgroundSelected : theme.surface,
+                borderColor: theme.cardBorder,
+              },
             ]}>
-            <ThemedText type="small" style={styles.text}>{prompt}</ThemedText>
-            <Icon name="arrow.up.right" size="sm" color="textSecondary" />
+            <Icon name={icon} size="xs" color="textSecondary" />
+            <ThemedText type="small" style={styles.text}>{label}</ThemedText>
           </Pressable>
         ))}
       </View>
@@ -41,16 +43,18 @@ export const AgentPromptList = memo(function AgentPromptList({ onSelect }: Props
 
 const styles = StyleSheet.create({
   root: { gap: Space.md },
-  list: { borderTopWidth: StyleSheet.hairlineWidth, borderBottomWidth: StyleSheet.hairlineWidth },
+  list: { width: '100%', maxWidth: 450, flexDirection: 'row', flexWrap: 'wrap', gap: Space.sm },
   prompt: {
-    minHeight: 52,
+    width: '48%',
+    minWidth: 0,
+    minHeight: 48,
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
-    gap: Space.md,
-    paddingHorizontal: Space.sm,
+    gap: Space.sm,
+    paddingHorizontal: Space.md,
     paddingVertical: Space.sm,
-    borderRadius: Radius.sm,
+    borderRadius: Radius.pill,
+    borderWidth: 1,
   },
-  text: { flex: 1 },
+  text: { flexShrink: 1 },
 });

@@ -10,3 +10,11 @@ export const EXEMPLOS_DO_AGENTE = [
   'Quanto gastei este mês?',
   'O que vence esta semana?',
 ] as const;
+
+/** Atalhos curtos para a superfície de conversa; o texto continua editável. */
+export const ATALHOS_DO_AGENTE = [
+  { label: 'Registrar gasto', prompt: 'Gastei ', icon: 'arrow.up.right' },
+  { label: 'Criar lembrete', prompt: 'Me lembra de ', icon: 'bell' },
+  { label: 'Gastos do mês', prompt: 'Quanto gastei este mês?', icon: 'chart.bar' },
+  { label: 'Vencimentos', prompt: 'O que vence esta semana?', icon: 'calendar' },
+] as const;
