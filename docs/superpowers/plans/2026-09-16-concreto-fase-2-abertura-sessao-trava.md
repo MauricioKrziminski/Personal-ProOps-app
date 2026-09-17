@@ -48,6 +48,26 @@ seção *Emendas* dele: o friso virou CANTO (`corner`), e é esse o vocabulário
   nele, e o onboarding cobrindo a tela ao concluir (mesmo usuário → o portão não cobre sozinho).
   Nesta fase, entrar sem origem desce do topo.
 
+## Emendas feitas durante a execução (16/09/2026)
+
+No meio da fase o dono do produto recusou a forma do Concreto (ver a seção *Direção revisada* da
+spec). A lógica desta fase foi entregue como planejada — `session-gate`, `CortinaProvider`,
+`SessionProvider`, teto, fila, portão — e o DESENHO mudou assim:
+
+| era (Task) | ficou |
+|---|---|
+| `waveOrder(..., invert)` e `quarterStep` em `tile-math` (1) | `tile-math`, `TileField`, `TileSpinner` e `TileGlyph` **apagados**. A geometria da cortina é `design/wave-math.ts` (`bordaDaOnda`, `amplitude`, `pontosDaCurva`, `raioDaCobertura`, com teste) e o desenho é `components/motion/wave-curtain.tsx` |
+| `Onda.mode` com `diagonal` | `WaveMode = 'up' \| 'down' \| 'radial'`. Cobrir e revelar andam para CIMA; `down` é a mesma forma espelhada; `radial` cobre com um círculo e revela subindo |
+| abertura: ondulação de azulejos + traço azul (3) | a marca do splash e um anel fino que se desenha em volta dela; a tinta sobe. `Motion.curtain` perdeu `overlap` e o `short` virou 650 ms |
+| espera da textura do Atlas (3) | dois quadros a mais antes de andar: o canvas do Skia pinta um ou dois quadros depois de montar, e com a cortina fechada a `WaveCurtain` tem uma `View` de tinta por trás |
+| trava em azulejos com azulejo azul (5) | tinta nos dois temas, a marca num círculo `heroChip` com halo que respira, tranco + anel vermelho na falha, a tinta sobe ao destravar |
+| `tileInk`/`tilePaper`/`tilePaperMuted` | `curtain`, `onCurtain`, `onCurtainMuted`; splash nativo `#0B0B0C` |
+
+Verificado nos dois aparelhos em 16/09/2026: abertura curta; sair e entrar (iOS pelo Perfil com a
+conta `dev@`; Android com uma saída LOCAL temporária, para não revogar a sessão do `teste@`, e o
+armazenamento restaurado depois); trava — prompt automático, cancelar, falha, tentar de novo,
+destravar (PIN no Android, Face ID simulado no iOS).
+
 ---
 
 ## Mapa de arquivos
