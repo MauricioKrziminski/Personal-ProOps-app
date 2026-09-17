@@ -1412,7 +1412,7 @@ export function RingGauge({
 }
 
 const styles = StyleSheet.create({
-  centro: { ...StyleSheet.absoluteFillObject, alignItems: 'center', justifyContent: 'center' },
+  centro: { position: 'absolute', top: 0, right: 0, bottom: 0, left: 0, alignItems: 'center', justifyContent: 'center' },
 });
 ```
 
@@ -4939,7 +4939,7 @@ function ArcoDaFatia({
 }
 
 const styles = StyleSheet.create({
-  centro: { ...StyleSheet.absoluteFillObject, alignItems: 'center', justifyContent: 'center', gap: 2 },
+  centro: { position: 'absolute', top: 0, right: 0, bottom: 0, left: 0, alignItems: 'center', justifyContent: 'center', gap: 2 },
 });
 ```
 
