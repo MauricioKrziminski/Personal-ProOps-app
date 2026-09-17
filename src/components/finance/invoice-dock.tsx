@@ -1,4 +1,5 @@
 import { useEffect, useRef } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import * as Haptics from 'expo-haptics';
 import { StyleSheet, View, useWindowDimensions } from 'react-native';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
@@ -17,7 +18,7 @@ import { useFlightAnchor, useFlightHidden } from '@/components/motion/flight-lay
 import { ThemedText } from '@/components/themed-text';
 import { CountUpMoney } from '@/components/ui/count-up-money';
 import { Motion, Space, tabular } from '@/design/tokens';
-import type { CardInvoice, Transaction } from '@/hooks/use-finance';
+import { invoiceQuery, type CardInvoice, type Transaction } from '@/hooks/use-finance';
 import { formatDateBR, localISODate } from '@/hooks/use-items';
 import { STATUS_DA_FATURA, contagemDeLancamentos } from '@/lib/card-status';
 
@@ -106,6 +107,14 @@ export function InvoiceDock({
   const indice = faturas.findIndex((f) => f.id === atualId);
   const anterior = indice >= 0 ? faturas[indice + 1]?.id : undefined;
   const proxima = indice > 0 ? faturas[indice - 1]?.id : undefined;
+
+  // As vizinhas já carregadas: deslizar troca o cartão na hora, em vez de passar por esqueleto.
+  const queryClient = useQueryClient();
+  useEffect(() => {
+    for (const vizinha of [anterior, proxima]) {
+      if (vizinha) queryClient.prefetchQuery(invoiceQuery(vizinha));
+    }
+  }, [anterior, proxima, queryClient]);
 
   // A virada acontece quando a fatura MUDA — pelo deslize ou pelas setas —, na direção da troca.
   const ultima = useRef({ id: atualId, indice });

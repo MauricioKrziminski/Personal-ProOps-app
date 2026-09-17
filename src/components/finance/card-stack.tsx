@@ -93,6 +93,12 @@ export function CardStack({
     <PressableScale
       accessibilityRole="button"
       accessibilityLabel={`${rotuloDoCartao(naFrente, brl)}. Toque para abrir a carteira.`}
+      // O "fecha ›" mora DENTRO deste botão, e o leitor de tela não alcança botão aninhado: a
+      // fatura vira uma ação do próprio cartão.
+      accessibilityActions={[{ name: 'fatura', label: 'Abrir a fatura' }]}
+      onAccessibilityAction={(e) => {
+        if (e.nativeEvent.actionName === 'fatura') onOpen(naFrente);
+      }}
       scaleTo={0.985}
       onPress={abrirCarteira}
       onLayout={(e) => setLargura(e.nativeEvent.layout.width)}

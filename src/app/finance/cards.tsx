@@ -52,16 +52,21 @@ function ErrorBand({ message, onRetry }: { message: string; onRetry: () => void 
 function PressCard({
   onPress,
   accessibilityLabel,
+  acoes = [],
   children,
 }: {
   onPress: () => void;
   accessibilityLabel: string;
+  /** Os botões de DENTRO do card, que o leitor de tela não alcança aninhados. */
+  acoes?: { nome: string; rotulo: string; onPress: () => void }[];
   children: React.ReactNode;
 }) {
   return (
     <PressableScale
       accessibilityRole="button"
       accessibilityLabel={accessibilityLabel}
+      accessibilityActions={acoes.map((a) => ({ name: a.nome, label: a.rotulo }))}
+      onAccessibilityAction={(e) => acoes.find((a) => a.nome === e.nativeEvent.actionName)?.onPress()}
       haptic="selection"
       onPress={onPress}>
       <Card style={styles.card}>{children}</Card>
@@ -77,14 +82,12 @@ const MINIATURA = 56;
  * Botão PRÓPRIO dentro do card: o card continua abrindo a fatura, e a miniatura leva o cartão
  * voando até o carrossel (e o recebe de volta ao fechar, pela âncora `miniatura:<id>`).
  */
-function Miniatura({ card }: { card: CardSummary }) {
-  const id = card.account_id;
+/** Abrir a Carteira num cartão, voando a partir da miniatura dele. */
+function useAbrirNaCarteira() {
   const { voar } = useFlight();
-  const { prender, aoPosicionar } = useFlightAnchor(`miniatura:${id}`);
-  const oculto = useFlightHidden(`miniatura:${id}`);
-  const atrasada = Number(card.overdue_count ?? 0) > 0;
-
-  const abrir = () => {
+  return (card: CardSummary) => {
+    const id = card.account_id;
+    const atrasada = Number(card.overdue_count ?? 0) > 0;
     void voar({
       de: `miniatura:${id}`,
       poseDe: 'deitado',
@@ -95,6 +98,13 @@ function Miniatura({ card }: { card: CardSummary }) {
       desenho: (progresso) => <FaceEmVoo nome={card.name} atrasada={atrasada} progresso={progresso} />,
     }).then((ok) => ok && router.push({ pathname: '/finance/wallet', params: { card: id, origem: 'miniatura' } }));
   };
+}
+
+function Miniatura({ card, onPress }: { card: CardSummary; onPress: () => void }) {
+  const id = card.account_id;
+  const { prender, aoPosicionar } = useFlightAnchor(`miniatura:${id}`);
+  const oculto = useFlightHidden(`miniatura:${id}`);
+  const atrasada = Number(card.overdue_count ?? 0) > 0;
 
   return (
     <PressableScale
@@ -102,7 +112,7 @@ function Miniatura({ card }: { card: CardSummary }) {
       accessibilityLabel={`Abrir ${card.name} na carteira`}
       haptic="light"
       hitSlop={Space.sm}
-      onPress={abrir}>
+      onPress={onPress}>
       <Animated.View ref={prender} onLayout={aoPosicionar} style={oculto}>
         <CardFace nome={card.name} largura={MINIATURA} atrasada={atrasada} />
       </Animated.View>
@@ -114,6 +124,7 @@ export default function CardsScreen() {
   // Dinheiro no meio de frase obedece ao "esconder saldo" — `Money` não cabe em texto corrido.
   const brl = useBRL();
   const cards = useCardSummary();
+  const abrirNaCarteira = useAbrirNaCarteira();
 
   // Ordem de urgência, não alfabética: atrasada primeiro, depois quem vence antes.
   // `isError` e não só `data`: o TanStack GUARDA o resultado anterior quando o refetch
@@ -229,9 +240,15 @@ export default function CardsScreen() {
 
             <PressCard
               onPress={() => irParaFatura(card)}
+              acoes={[
+                { nome: 'carteira', rotulo: 'Abrir na carteira', onPress: () => abrirNaCarteira(card) },
+                ...(podePagar && totalFatura > 0
+                  ? [{ nome: 'paguei', rotulo: 'Paguei', onPress: () => irParaFatura(card) }]
+                  : []),
+              ]}
               accessibilityLabel={`${card.name}, ${estado ? `fatura ${estado.toLowerCase()}` : 'sem fatura aberta'}, ${formatBRL(totalFatura)}${card.due_date ? `, ${prazoLabel(card.due_date, 'vence')}` : ''}`}>
               <View style={styles.cardHead}>
-                <Miniatura card={card} />
+                <Miniatura card={card} onPress={() => abrirNaCarteira(card)} />
                 <ThemedText type="smallBold" style={styles.cardName}>
                   {card.name}
                 </ThemedText>
