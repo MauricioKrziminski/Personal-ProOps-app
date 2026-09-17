@@ -1,7 +1,12 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 
-import { classifyWindow, tabletPaneWidths } from './adaptive-window.ts';
+import {
+  bottomPillInset,
+  classifyWindow,
+  rootContentMaxWidth,
+  tabletPaneWidths,
+} from './adaptive-window.ts';
 
 test('classifies the available window width at both breakpoints', () => {
   assert.deepEqual(
@@ -43,4 +48,20 @@ test('normalizes invalid container measurements', () => {
     support: 0,
     twoPane: false,
   });
+});
+
+test('keeps compact roots at their existing width and pill clearance', () => {
+  assert.equal(rootContentMaxWidth(384, false), 800);
+  assert.equal(bottomPillInset('android', true, 'compact', 76), 76);
+});
+
+test('lets a tablet root spread without leaving phantom pill clearance', () => {
+  assert.equal(rootContentMaxWidth(1280, true), 1200);
+  assert.equal(bottomPillInset('android', true, 'medium', 76), 0);
+  assert.equal(bottomPillInset('android', true, 'expanded', 76), 0);
+});
+
+test('does not invent an Android pill inset for pushed routes or iPad', () => {
+  assert.equal(bottomPillInset('android', false, 'compact', 76), 0);
+  assert.equal(bottomPillInset('ios', true, 'expanded', 76), 0);
 });

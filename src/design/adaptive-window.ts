@@ -28,3 +28,18 @@ export function tabletPaneWidths(containerWidthDp: number) {
     twoPane,
   };
 }
+
+export function rootContentMaxWidth(windowWidthDp: number, wide: boolean) {
+  return wide && classifyWindow(windowWidthDp) !== 'compact' ? 1200 : 800;
+}
+
+export function bottomPillInset(
+  platform: string,
+  hasTopBar: boolean,
+  windowClass: WindowClass,
+  pillSpace: number,
+) {
+  return platform === 'android' && hasTopBar && windowClass === 'compact'
+    ? pillSpace
+    : 0;
+}
