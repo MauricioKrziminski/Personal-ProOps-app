@@ -338,3 +338,31 @@ iOS e Android, claro e escuro, 384dp × 1,3 → commit. Sem tag, sem produção.
 
 Regra de negócio, cálculo de caixa (além de expor a lista que já existe), `CardStack`, voo,
 Carteira, fatura, telas empurradas, tab bars, marca, ícone do app, produção.
+
+## Como ficou (17/09/2026)
+
+As cinco fases entraram. O que difere do desenho acima, e por quê:
+
+- **O shader do herói não existe.** A luz é um degradê que anda com a rolagem (`heroGlow` →
+  `heroGlowClear`, na UI thread por `RolagemDaTela`). Um `RuntimeEffect` por quadro pagaria
+  caro no Android para dizer a mesma coisa.
+- **A Pista virou escada de queima.** O desenho original misturava "% comprometido" com um eixo
+  de tempo — duas grandezas numa barra só. Hoje a altura é o que sobra LIVRE e ela desce a cada
+  saída (`degrausDaPista`), com o dia e o livre depois dele seguindo o dedo.
+- **A cor da rosca sai de fora do canvas.** Filho de `Canvas` do Skia roda noutro reconciliador e
+  não enxerga contexto do React: `useTheme()` lá dentro devolvia a paleta escura no tema claro,
+  sem erro. Vale para todo desenho novo.
+- **A data foi para baixo da saudação** e a citação perdeu o trilho de 2px (revisão de
+  acabamento): etiqueta acima de título e duas marcas para o mesmo fato.
+- **O ladrilho alinha pelo topo.** Com `space-between`, "Entra" e "Sai" lado a lado punham os
+  dois números em linhas de base diferentes e abriam um vão no meio do mais curto.
+- **`useTelaPronta` só aceita CONSULTA.** A regra já existia e a Hoje nova entrou por ela: as
+  novas leituras (`spendable_path`, `agent_activity`, primeiros passos) entram como consulta,
+  nunca como booleano derivado.
+
+Conferido nos dois sistemas, nos dois temas e em 384dp × fonte 1,3 — as dez capturas estão em
+`.impeccable/review/`. Portão verde: `tsc`, `expo lint`, 546 testes, `ruff`, `pytest`.
+
+**Migrations:** `20260918120000` (a conversa que virou registro) aplicada no STAGING, junto da
+`20260917120000` que já estava lá. Produção não tem nenhuma das duas — e a ordem é
+**migration ANTES do deploy do agente**, senão toda escrita quebra.

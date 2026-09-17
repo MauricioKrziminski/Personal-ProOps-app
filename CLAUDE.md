@@ -129,7 +129,8 @@ App mobile pessoal de **notas rápidas, lembretes e controle financeiro operado 
 | Animações | react-native-reanimated v4, react-native-gesture-handler, expo-haptics |
 | Estado | TanStack Query (servidor) + useState local |
 | Forms | react-hook-form + zod |
-| Gráficos e movimento | Skia (curvas, cortina em onda, face do cartão) e barras com Views |
+| Gráficos e movimento | Skia (curvas, cortina em onda, face do cartão, anel, rosca) e barras com Views |
+| Kit das raízes | `BlockHeader`, `Tile`/`TileRow`/`TileGrid`, `RingGauge`, `ScrubChart`, `DonutChart`, `RunwayBar`, `LedgerRow` — a Hoje é uma **conversa organizada** (o app fala em bloco; a fala da pessoa vem em balão com o registro encaixado embaixo) |
 | Backend | Python 3.12 + FastAPI em `agent/` — Docker, Cloud Run, Cloud Tasks |
 | Agente | LangGraph `StateGraph` + checkpointer Postgres (schema `langgraph`) |
 | Banco | Supabase Postgres — migrations em `supabase/migrations/` |

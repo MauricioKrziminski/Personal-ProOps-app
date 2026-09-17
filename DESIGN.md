@@ -150,6 +150,19 @@ Monocromático com três semânticas: a tinta faz o papel do accent.
 - **Bloco de Tinta** (`ink-hero`, `ink-hero-dark` no escuro): o herói de cada raiz, a barra de abas do Android, a cortina da abertura.
 - **Papel Noturno** (`night-paper`), **Superfície Noturna** (`night-surface`), **Degrau Noturno** (`night-step`), **Grafite Noturno** (`night-graphite`): os mesmos papéis no tema escuro.
 
+### Conversation
+- **Balão** (`bubble`, `onBubble`): a fala da pessoa. Tinta com o texto invertido — a mesma
+  superfície da ação primária, porque nas duas quem fala é quem manda.
+- **Trilho** (`rail`): o fio de 1px que liga uma fala ao registro que ela virou, e os dias da
+  agenda entre si. Nunca contorna nem sublinha: só LIGA.
+
+### Chart
+- **Faixa do gráfico** (`chart1`…`chart6`): seis degraus de tinta para a rosca e as barras, do
+  mais escuro ao mais claro. Não são seis cores — são seis intensidades da mesma, e é por isso
+  que a rosca continua legível em preto e branco.
+- **Luz do herói** (`heroGlow`, `heroGlowClear`): o clarão que atravessa o bloco de tinta e anda
+  com a rolagem. Só no herói, só com o degradê terminando em transparente.
+
 ### Semantic
 - **Tijolo** (`brick`): atraso, erro, destrutivo.
 - **Verde de Livro-Caixa** (`ledger-green`): dinheiro que entra, confirmado.
@@ -244,6 +257,33 @@ faz uma barriga e sobe para a direita.
   escuro é recortado dentro do círculo); rótulos nas cinco abas; sobe na primeira entrada.
 - **Raízes:** faixa com a marca, o título e ações em círculos de 36.
 
+### Block Header
+O cabeçalho de todo bloco de raiz: título, uma contagem num selo redondo quando ela informa, e
+uma ação de texto à direita. `voice="app"` troca o selo pela marca — é assim que se distingue o
+que o produto está dizendo do que a pessoa disse.
+
+### Tile
+O ladrilho do mosaico: selo do ícone, rótulo, valor, legenda e um slot de minigráfico no canto.
+Três formas — `fill` (divide a fileira), `half` e `wide` (a grade). `compact` é o contador de duas
+linhas. O conteúdo alinha pelo TOPO: dois ladrilhos da mesma altura com conteúdos de tamanhos
+diferentes precisam pôr os dois números na mesma linha de base.
+
+### Data Views
+- **Anel** (`RingGauge`): proporção de UM valor contra um limite. Skia, cor resolvida FORA do
+  canvas.
+- **Curva com dedo** (`ScrubChart`): a série do caixa, arrastável; o valor do dia segue o dedo.
+- **Rosca** (`DonutChart`): a repartição, nos seis degraus de tinta.
+- **Pista** (`RunwayBar`): a escada de queima de hoje até a próxima entrada — a altura é o que
+  sobra livre e ela desce a cada saída. Arrastar dá o dia e um háptico por degrau.
+- **Linha do livro-caixa** (`LedgerRow`): selo, título, legenda, a citação do que a pessoa disse,
+  valor e data. A citação vai entre aspas e sem trilho: as aspas já a marcam.
+
+### Conversation (signature)
+A Hoje é uma conversa organizada, em duas vozes. O que o app diz vem em bloco, com a marca no
+cabeçalho. O que a PESSOA disse vem num balão de tinta com o texto real da mensagem, e o registro
+que aquela fala virou fica encaixado logo abaixo, ligado por um fio de 1px. A chegada de uma fala
+nova toca o encaixe — e só ela: o que já estava na tela quando ela montou não se mexe.
+
 ### Credit Card (signature)
 A face é a cor do banco com um degradê curto e uma faixa de brilho, canto 18, contactless, nome e
 estado. Desenhada em 340dp e escalada; "em pé" é a mesma face girada 90°. A pilha do Financeiro voa
@@ -262,6 +302,8 @@ círculo que nasce dele. As raízes entram em cascata junto com a tinta saindo.
 - **Do** escrever rótulo curto + valor; a explicação vai na confirmação da ação.
 - **Do** usar `tabular-nums` em todo número que conta, mede ou custa.
 - **Do** verificar em 384dp com fonte 1,3 e nos dois temas.
+- **Do** resolver cor FORA do `Canvas` do Skia e passá-la por prop — lá dentro não há contexto do
+  React, e `useTheme()` devolve a paleta errada sem erro nenhum.
 
 ### Don't:
 - **Don't** colocar legenda embaixo de botão nem parágrafo explicativo em tela de conferir.
@@ -269,3 +311,7 @@ círculo que nasce dele. As raízes entram em cascata junto com a tinta saindo.
 - **Don't** usar vidro, degradê ou brilho em conteúdo.
 - **Don't** truncar identificador; quebre a linha.
 - **Don't** mover dado que a pessoa está lendo por estética.
+- **Don't** pôr etiqueta acima de um título: ela gasta a primeira linha dizendo o que ninguém veio
+  ler. A data vem DEPOIS da saudação.
+- **Don't** marcar o mesmo fato duas vezes — aspas e trilho colorido na mesma citação é uma marca
+  a mais.
