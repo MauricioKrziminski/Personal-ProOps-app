@@ -1,4 +1,4 @@
-import { Skia, type SkPath } from '@shopify/react-native-skia';
+import { Skia, type SkPath, type SkPathBuilder } from '@shopify/react-native-skia';
 
 /**
  * A marca do ProOps como geometria — **uma fonte só** para a abertura e para o app.
@@ -54,20 +54,21 @@ const G_TRANSLATE_Y = 900;
  * entre dois `<Canvas>` que a transformam levaria a marca a encolher a cada render.
  */
 export function markPath(size: number): SkPath {
-  const path = Skia.Path.MakeFromSVGString(RAW);
-  if (!path) throw new Error('mark-path: SVG da marca não parseou');
+  const svg = Skia.Path.MakeFromSVGString(RAW);
+  if (!svg) throw new Error('mark-path: SVG da marca não parseou');
 
   const k = size / VB.h;
   const dx = (size - VB.w * k) / 2;
 
   // Skia pós-concatena: o resultado aplica a ESCALA primeiro e a translação depois, que é a
-  // ordem que a conta do topo descreve.
+  // ordem que a conta do topo descreve. `PathBuilder` porque `SkPath.transform()` foi
+  // depreciado no Skia 2.6 (era o aviso amarelo do Metro a cada recarga).
   const m = Skia.Matrix();
   m.translate(-VB.x * k + dx, (G_TRANSLATE_Y - VB.y) * k);
   m.scale(G_SCALE * k, -G_SCALE * k);
-  path.transform(m);
+  const b = Skia.PathBuilder.MakeFromPath(svg).transform(m);
 
-  return center(path, size);
+  return center(b, size);
 }
 
 /**
@@ -78,54 +79,10 @@ export function markPath(size: number): SkPath {
  * defeito no catálogo, muito para uma marca sozinha no meio da tela, onde o olho compara com as
  * duas bordas.
  *
- * `getBounds()` devolve a caixa justa do que será pintado; a partir dela o centro é aritmética,
- * não confiança no arquivo. Vale para qualquer reexportação futura do SVG.
+ * `computeBounds()` devolve a caixa justa do que será pintado; a partir dela o centro é
+ * aritmética, não confiança no arquivo. Vale para qualquer reexportação futura do SVG.
  */
-function center(path: SkPath, size: number): SkPath {
-  const b = path.getBounds();
-  const m = Skia.Matrix();
-  m.translate((size - b.width) / 2 - b.x, (size - b.height) / 2 - b.y);
-  path.transform(m);
-  return path;
-}
-
-/**
- * O ponto central sozinho — o segundo subpath do `d`.
- *
- * Serve à abertura (ele entra com mola depois da espiral) e ao futuro spinner, onde é o eixo
- * fixo enquanto o resto gira.
- */
-export function markDotPath(size: number): SkPath {
-  const dot = RAW.slice(RAW.lastIndexOf('m317'));
-  // O subpath é relativo ao ponto final do anterior; reancorado no absoluto equivalente.
-  const path = Skia.Path.MakeFromSVGString(`M7817 4776 ${dot.slice(dot.indexOf('c'))}`);
-  if (!path) throw new Error('mark-path: subpath do ponto não parseou');
-
-  const k = size / VB.h;
-  const dx = (size - VB.w * k) / 2;
-  const m = Skia.Matrix();
-  m.translate(-VB.x * k + dx, (G_TRANSLATE_Y - VB.y) * k);
-  m.scale(G_SCALE * k, -G_SCALE * k);
-  path.transform(m);
-
-  return path;
-}
-
-/**
- * A marca encaixada numa caixa qualquer, pelos limites REAIS da tinta.
- *
- * Existe para o traço da abertura cair exatamente sobre o PNG do splash: o PNG tem margem
- * própria (a tinta ocupa 61..451 de 512 px), e `markPath(size)` centra pelo desenho, não por ela.
- */
-export function markPathIn(x: number, y: number, w: number, h: number): SkPath {
-  const path = markPath(Math.max(w, h));
-  const b = path.getBounds();
-  const k = Math.min(w / b.width, h / b.height);
-  // Pós-concatenado: aplica da última para a primeira — volta à origem, escala, posiciona.
-  const m = Skia.Matrix();
-  m.translate(x + (w - b.width * k) / 2, y + (h - b.height * k) / 2);
-  m.scale(k, k);
-  m.translate(-b.x, -b.y);
-  path.transform(m);
-  return path;
+function center(b: SkPathBuilder, size: number): SkPath {
+  const r = b.computeBounds();
+  return b.offset((size - r.width) / 2 - r.x, (size - r.height) / 2 - r.y).detach();
 }

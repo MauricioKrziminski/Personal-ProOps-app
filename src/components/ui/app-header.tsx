@@ -99,8 +99,7 @@ export function AppHeader({ title, action }: AppHeaderProps) {
       pointerEvents="box-none"
       style={[styles.bar, { paddingTop: insets.top, borderBottomColor: theme.cardBorder }]}>
       {/*
-        Glass de CHROME, que é onde o material é permitido (§1). Não passa pelo `GlassCard`
-        porque aquele primitivo é um card — raio, padding e sombra próprios; aqui a faixa é reta,
+        Vidro de CHROME, que é o único lugar onde o material é permitido (§1): a faixa é reta,
         encosta nas bordas e não tem elevação.
       */}
       <BlurView

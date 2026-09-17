@@ -129,12 +129,3 @@ const TINTA_ESCURA = '#0B0B0C';
 export function tintaDoCartao(hex: string): 'clara' | 'escura' {
   return contrast(hex, TINTA_ESCURA) > contrast(hex, TINTA_CLARA) ? 'escura' : 'clara';
 }
-
-/**
- * O chip EMV.
- *
- * Não é cor de tema (não muda com light/dark) nem de marca (é igual em todo cartão) — é a cor de
- * um chip de contato, e ela é dourada. Mora aqui pelo mesmo motivo das outras: um par light/dark
- * em `theme.ts` seria mentira.
- */
-export const CHIP_GOLD = { top: '#F7E7A9', bottom: '#B8860B' } as const;

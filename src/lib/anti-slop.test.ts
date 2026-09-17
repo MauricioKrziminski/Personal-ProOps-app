@@ -202,7 +202,7 @@ test('nenhum rótulo truncado — texto quebra, layout cede', () => {
  * 145,4dp com raio 38,5 quando o JS mandava 124,8 e 33 — os dois × 1,1667, que é 3,5/3,0 —, com a
  * bolha (uma `View`) no lugar certo ao lado. O código da barra estava correto o tempo todo.
  *
- * `SkiaCanvas` desfaz a escala errada, e são CINCO canvases no app. Mesma régua do `GlassCard`
+ * `SkiaCanvas` desfaz a escala errada, e são CINCO canvases no app. Mesma régua do caminho único para vidro
  * e do `Icon`: a decisão mora no primitivo, com o motivo escrito uma vez — um canvas novo
  * importado direto nasceria com o defeito de volta, em silêncio.
  */

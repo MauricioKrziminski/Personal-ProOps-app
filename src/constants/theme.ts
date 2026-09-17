@@ -29,9 +29,6 @@ import { Platform } from 'react-native';
  *    âmbar é atenção. Nenhum decora.
  *
  * Contraste de cada par é conferido por `src/design/contrast.test.ts`, que lê ESTE arquivo.
- *
- * `heroTop`/`heroBottom` são aliases de `heroSurface` enquanto o cartão de crédito e o
- * onboarding ainda os leem.
  */
 export const Colors = {
   light: {
@@ -55,8 +52,6 @@ export const Colors = {
     onTint: '#FFFFFF',
 
     heroSurface: '#0B0B0C',
-    heroTop: '#0B0B0C',
-    heroBottom: '#0B0B0C',
     /** A faixa do rodapé do herói, que sangra até as bordas: um degrau dentro do bloco. */
     heroFooter: 'rgba(255, 255, 255, 0.06)',
     /** O press da faixa quando ela é tocável — sempre um degrau além de `heroFooter`. */
@@ -124,8 +119,6 @@ export const Colors = {
     onTint: '#0B0B0C',
 
     heroSurface: '#1C1C1E',
-    heroTop: '#1C1C1E',
-    heroBottom: '#1C1C1E',
     heroFooter: 'rgba(255, 255, 255, 0.04)',
     heroFooterPress: 'rgba(255, 255, 255, 0.08)',
     onHero: '#F4F4F2',

@@ -77,7 +77,7 @@ export default function CatalogScreen() {
       </Section>
 
       <Section title="CountUpMoney (anima na MUDANÇA, não na montagem)">
-        <View style={{ gap: Space.md, padding: Space.lg, backgroundColor: theme.heroBottom, borderRadius: Radius.md }}>
+        <View style={{ gap: Space.md, padding: Space.lg, backgroundColor: theme.heroSurface, borderRadius: Radius.md }}>
           <CountUpMoney cents={valor} />
           <Button label="Trocar o valor" variant="secondary" size="sm" onPress={() => setValor((v) => (v > 500000 ? 4500 : v * 7 + 137))} />
         </View>
