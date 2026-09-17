@@ -5,10 +5,12 @@ import { Platform, StyleSheet, View } from 'react-native';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import Animated, {
   runOnJS,
+  useAnimatedRef,
   useAnimatedScrollHandler,
   useAnimatedStyle,
   useSharedValue,
   withSpring,
+  type AnimatedRef,
   type SharedValue,
 } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -147,14 +149,20 @@ export default function WalletScreen() {
     [navigation, origem, temAncora, voar, saida]
   );
 
+  // Aberta por link, sem nada atrás, "voltar" não tem destino: cai no Financeiro, a casa dela.
+  const fechar = useCallback(() => {
+    if (router.canGoBack()) router.back();
+    else router.replace('/finance');
+  }, []);
+
   const medirMoldura = moldura.medir;
   const fecharArrastado = useCallback(
     async (dy: number) => {
       const caixa = await medirMoldura();
       saida.set(caixa ? caixaArrastada(caixa, dy, 1 - Math.min(dy / 900, 0.25)) : null);
-      router.back();
+      fechar();
     },
-    [medirMoldura, saida]
+    [medirMoldura, saida, fechar]
   );
 
   const verFatura = () => {
@@ -189,41 +197,12 @@ export default function WalletScreen() {
     );
   };
 
-  /*
-    O arraste para fechar CONVIVE com a rolagem da página, que quase sempre existe (o conteúdo
-    passa da tela no iPhone). A página é o `ScrollView` do gesture-handler, para os dois
-    reconhecedores se resolverem em vez de o nativo ganhar sempre, e sem quique: puxar para baixo
-    no topo não rola nada, então quem responde é o cartão. Com a página rolada, o gesto é dela.
-  */
-  const rolagem = useMemo(() => Gesture.Native(), []);
+  // A página e o quanto ela rolou: o arraste para fechar só vale com ela no topo.
+  const pagina = useAnimatedRef<Animated.ScrollView>();
   const topoDaPagina = useSharedValue(0);
-  const arrastavel = useSharedValue(false);
   const aoRolarPagina = useAnimatedScrollHandler((e) => {
     topoDaPagina.set(e.contentOffset.y);
   });
-
-  const arraste = useMemo(
-    () =>
-      Gesture.Pan()
-        .activeOffsetY(14)
-        .failOffsetY(-8)
-        .failOffsetX([-12, 12])
-        .simultaneousWithExternalGesture(rolagem)
-        .onStart(() => {
-          arrastavel.set(topoDaPagina.get() <= 1);
-        })
-        .onUpdate((e) => {
-          if (arrastavel.get()) arrasto.set(Math.max(0, e.translationY));
-        })
-        .onEnd((e) => {
-          const fecha =
-            arrastavel.get() &&
-            (e.translationY > LIMIAR_DE_FECHAR || e.velocityY > VELOCIDADE_DE_FECHAR);
-          if (fecha) runOnJS(fecharArrastado)(Math.max(0, e.translationY));
-          else arrasto.set(withSpring(0, Motion.spring.encaixe));
-        }),
-    [rolagem, arrastavel, topoDaPagina, arrasto, fecharArrastado]
-  );
 
   const esmaece = useAnimatedStyle(() => ({
     opacity: 1 - Math.min(arrasto.get() / 240, 1) * 0.9,
@@ -255,8 +234,8 @@ export default function WalletScreen() {
     );
   } else {
     corpo = (
-      <GestureDetector gesture={rolagem}>
       <DragScrollView
+        ref={pagina}
         style={styles.flex}
         onScroll={aoRolarPagina}
         scrollEventThrottle={16}
@@ -270,19 +249,21 @@ export default function WalletScreen() {
           ))}
         </Animated.View>
 
-        <GestureDetector gesture={arraste}>
-          <View>
-            <WalletCarousel
-              cards={lista}
-              indiceInicial={indice}
-              onIndice={trocar}
-              x={x}
-              arrasto={arrasto}
-              prenderMoldura={moldura.prender}
-              molduraPosicionada={moldura.aoPosicionar}
-            />
-          </View>
-        </GestureDetector>
+        <ArrasteParaFechar
+          pagina={pagina}
+          topoDaPagina={topoDaPagina}
+          arrasto={arrasto}
+          onFechar={fecharArrastado}>
+          <WalletCarousel
+            cards={lista}
+            indiceInicial={indice}
+            onIndice={trocar}
+            x={x}
+            arrasto={arrasto}
+            prenderMoldura={moldura.prender}
+            molduraPosicionada={moldura.aoPosicionar}
+          />
+        </ArrasteParaFechar>
 
         <Animated.View style={[styles.miolo, esmaece]}>
           {lista.length > 1 ? <Pontos total={lista.length} x={x} passo={g.passo} /> : null}
@@ -303,7 +284,6 @@ export default function WalletScreen() {
           </Section>
         </Animated.View>
       </DragScrollView>
-      </GestureDetector>
     );
   }
 
@@ -312,10 +292,84 @@ export default function WalletScreen() {
       {/* O `TaskHeader` nasceu para sheet e modal, onde o iOS já desceu a folha abaixo do relógio.
           Aqui a tela é cheia: a safe area de cima é nossa (no Android ele já a soma). */}
       <View style={[styles.flex, { paddingTop: Platform.OS === 'ios' ? insets.top : 0 }]}>
-        <TaskHeader title="Carteira" onClose={() => router.back()} />
+        <TaskHeader title="Carteira" onClose={fechar} />
         {corpo}
       </View>
     </Screen>
+  );
+}
+
+/**
+ * O arraste para baixo que fecha a Carteira, em volta do carrossel.
+ *
+ * ⚠️ **Ele convive com a rolagem da página, e três coisas fazem isso funcionar nos dois sistemas:**
+ *
+ * - A página é o `ScrollView` do gesture-handler (`DragScrollView`) e a relação é declarada
+ *   (`simultaneousWithExternalGesture`). Com o `ScrollView` comum, o Android rouba o toque no
+ *   meio do arraste: o cartão ficava parado no meio do caminho, sem fechar nem voltar. E
+ *   embrulhar o `DragScrollView` num `Gesture.Native()` parava a rolagem no Android.
+ * - A ativação é MANUAL: só com a página no topo e o dedo descendo; subindo, ou com a página
+ *   rolada, o gesto falha e a rolagem segue sozinha.
+ * - A volta do cartão mora no `onFinalize`, que roda também quando o gesto é cancelado.
+ *
+ * Mora num componente próprio porque recebe a `ref` da página como prop (é assim que o
+ * `Reorderable` faz): lida no render da tela, o compilador do React a recusa.
+ */
+function ArrasteParaFechar({
+  pagina,
+  topoDaPagina,
+  arrasto,
+  onFechar,
+  children,
+}: {
+  pagina: AnimatedRef<Animated.ScrollView>;
+  topoDaPagina: SharedValue<number>;
+  arrasto: SharedValue<number>;
+  onFechar: (dy: number) => void;
+  children: React.ReactNode;
+}) {
+  const inicio = useSharedValue({ x: 0, y: 0 });
+  const fechando = useSharedValue(false);
+
+  const gesto = useMemo(
+    () =>
+      Gesture.Pan()
+        .manualActivation(true)
+        .simultaneousWithExternalGesture(pagina as unknown as React.RefObject<React.ComponentType>)
+        .onTouchesDown((e) => {
+          const t = e.allTouches[0];
+          if (t) inicio.set({ x: t.absoluteX, y: t.absoluteY });
+        })
+        .onTouchesMove((e, estado) => {
+          const t = e.allTouches[0];
+          if (!t) return;
+          const dx = t.absoluteX - inicio.get().x;
+          const dy = t.absoluteY - inicio.get().y;
+          if (Math.abs(dx) > 12 || dy < -8) estado.fail();
+          else if (dy > 14) {
+            if (topoDaPagina.get() <= 1) estado.activate();
+            else estado.fail();
+          }
+        })
+        .onUpdate((e) => {
+          arrasto.set(Math.max(0, e.translationY));
+        })
+        .onEnd((e) => {
+          if (e.translationY > LIMIAR_DE_FECHAR || e.velocityY > VELOCIDADE_DE_FECHAR) {
+            fechando.set(true);
+            runOnJS(onFechar)(Math.max(0, e.translationY));
+          }
+        })
+        .onFinalize(() => {
+          if (!fechando.get()) arrasto.set(withSpring(0, Motion.spring.encaixe));
+        }),
+    [pagina, inicio, topoDaPagina, arrasto, fechando, onFechar]
+  );
+
+  return (
+    <GestureDetector gesture={gesto}>
+      <View>{children}</View>
+    </GestureDetector>
   );
 }
 
