@@ -42,6 +42,29 @@ export function estadoDaFatura(
 }
 
 /**
+ * Quanto do limite usado está em faturas que a tela de Cartões NÃO mostra: nem a corrente (o
+ * número grande) nem as atrasadas (a faixa vermelha acima do cartão).
+ *
+ * `unpaid_total_cents` soma TODAS as não pagas, inclusive as futuras das parcelas — por isso a
+ * frase é "outras faturas", não "fatura anterior". E a corrente vencida já está DENTRO das
+ * atrasadas: descontá-la duas vezes zerava o que sobra.
+ */
+export function outrasFaturas(
+  c: {
+    unpaid_total_cents: number | null;
+    invoice_total_cents: number | null;
+    overdue_total_cents: number | null;
+  },
+  estado: EstadoDaFatura | null
+): number {
+  const corrente = estado === 'Atrasada' ? 0 : Number(c.invoice_total_cents ?? 0);
+  return Math.max(
+    0,
+    Number(c.unpaid_total_cents ?? 0) - corrente - Number(c.overdue_total_cents ?? 0)
+  );
+}
+
+/**
  * O estado da fatura como PALAVRA (a da `card_invoices.status`, não a inferida).
  *
  * ⚠️ Nunca "Rolada". O dono do produto recusou o jargão — *"eu não saberia o que seria

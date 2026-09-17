@@ -21,7 +21,12 @@ import { ProgressBar } from '@/components/ui/sparkline';
 import { Motion, Radius, Space, tabular } from '@/design/tokens';
 import { useCardSummary, type CardSummary } from '@/hooks/use-finance';
 import { formatBRL, formatDateBR } from '@/hooks/use-items';
-import { diasAte as daysUntil, estadoDaFatura as estadoFatura, prazoLabel } from '@/lib/card-status';
+import {
+  diasAte as daysUntil,
+  estadoDaFatura as estadoFatura,
+  outrasFaturas,
+  prazoLabel,
+} from '@/lib/card-status';
 
 /**
  * Cartões — "quanto vou pagar de cartão, e quando?".
@@ -200,11 +205,9 @@ export default function CardsScreen() {
         const limite = Number(card.credit_limit_cents ?? 0);
         const livre = Number(card.available_limit_cents ?? 0);
         const pct = limite > 0 ? naoPago / limite : 0;
-        // A barra soma TODAS as faturas não pagas — inclusive as FUTURAS, das parcelas; o número
-        // grande é só a corrente. O que sobra e a faixa de atraso acima ainda não mostrou vira uma
-        // oração na linha do limite. ("Fatura anterior" era a frase antiga, e errada para parcela.)
-        const outras =
-          naoPago - totalFatura - (atrasadas > 0 ? Number(card.overdue_total_cents ?? 0) : 0);
+        // A barra soma todas as não pagas; o que nem o número grande nem a faixa de atraso mostram
+        // vira uma oração na linha do limite.
+        const outras = outrasFaturas(card, estado);
         const podePagar = estado === 'Fechada' || estado === 'Atrasada';
 
         return (
