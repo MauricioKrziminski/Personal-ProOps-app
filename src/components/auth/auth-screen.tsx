@@ -1,11 +1,15 @@
-import { Platform, StyleSheet } from "react-native";
+import { StatusBar } from "expo-status-bar";
+import { useState } from "react";
+import { Platform, StyleSheet, useWindowDimensions } from "react-native";
 import { KeyboardAwareScrollView } from "react-native-keyboard-controller";
-import Animated, { FadeIn, FadeInDown } from "react-native-reanimated";
+import Animated, { FadeInDown, ReduceMotion } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
+import { AuthCap } from "@/components/auth/auth-cap";
+import { useCortinaAberta } from "@/components/motion/session-curtain";
 import { ThemedView } from "@/components/themed-view";
-import { Mark } from "@/components/ui/mark";
 import { Motion, Space } from "@/design/tokens";
+import { alturaDaCapa } from "@/design/wave-math";
 
 /**
  * A moldura das telas de conta (entrar, criar conta, recuperar senha).
@@ -34,16 +38,19 @@ import { Motion, Space } from "@/design/tokens";
  * teclado e rola o campo focado para a área visível. `bottomOffset` é a folga entre o campo e o
  * topo do teclado — sem ela o cursor encosta na borda.
  *
- * ⚠️ **O conteúdo é CENTRALIZADO como um bloco só** (`justifyContent: 'center'` sobre
- * `flexGrow: 1`), não espalhado entre o topo e o rodapé. A versão anterior tinha um espaçador de
- * `flex: 1` entre o formulário e o rodapé: com a tela sobrando, a marca e os campos colavam no
- * topo e o "Entrar" descia para a base, com um vão morto no meio — a tela parecia dois pedaços
- * soltos em vez de um formulário. Centralizado, a sobra fica igual em cima e embaixo.
+ * ## A capa (16/09/2026)
  *
- * Isso não conflita com o teclado: `flexGrow` só centraliza enquanto o conteúdo é MENOR que a
- * área visível. Quando o teclado sobe e o conteúdo passa a ser maior, o container volta a se
- * comportar como uma lista normal (alinhada ao topo, rolável) e o `KeyboardAwareScrollView`
- * leva o campo focado para a área visível.
+ * Com a marca (`showBrand`), o topo é a `AuthCap`: a tinta da abertura parada numa curva, como o
+ * login dos vídeos de referência. A cortina da raiz PARA nessa mesma curva quando o destino é uma
+ * tela de conta (abertura sem sessão, saída), e desmonta por cima dela sem salto. O conteúdo
+ * começa abaixo do ponto mais baixo da curva, e o rodapé encosta na base (`marginTop: 'auto'`)
+ * quando sobra tela — com teclado, a lista rola como antes.
+ *
+ * ## A entrada
+ *
+ * O conteúdo só MONTA depois que a cortina abriu pela primeira vez: por baixo da tinta não há o
+ * que mostrar, e montado antes ele "entraria" escondido. A trava (`visto`) nunca volta a `false` —
+ * sem ela, o formulário sumiria por baixo da cortina que cobre ao entrar na conta.
  */
 export function AuthScreen({
   children,
@@ -57,6 +64,17 @@ export function AuthScreen({
   showBrand?: boolean;
 }) {
   const insets = useSafeAreaInsets();
+  const { height } = useWindowDimensions();
+  const aberta = useCortinaAberta();
+  const [visto, setVisto] = useState(aberta);
+  if (aberta && !visto) setVisto(true);
+
+  const entrada = (indice: number) =>
+    FadeInDown.withInitialValues({ opacity: 0, transform: [{ translateY: 16 }] })
+      .duration(Motion.duration.slow + 80)
+      .easing(Motion.easing.out)
+      .delay(indice * Motion.stagger.step * 3)
+      .reduceMotion(ReduceMotion.System);
 
   return (
     <ThemedView style={styles.flex}>
@@ -65,7 +83,9 @@ export function AuthScreen({
         contentContainerStyle={[
           styles.content,
           {
-            paddingTop: insets.top + Space.xxxl,
+            paddingTop: showBrand
+              ? alturaDaCapa(height) + Space.xl
+              : insets.top + Space.xxxl,
             paddingBottom: insets.bottom + Space.lg,
           },
         ]}
@@ -78,23 +98,20 @@ export function AuthScreen({
         showsVerticalScrollIndicator={false}
       >
         {showBrand ? (
-          <Animated.View
-            entering={FadeIn.duration(Motion.duration.slow)}
-            style={styles.brand}
-          >
-            <Mark size={44} />
-          </Animated.View>
+          <>
+            {/* A capa é tinta nos dois temas: ícones claros por cima dela. */}
+            <StatusBar style="light" />
+            <AuthCap />
+          </>
         ) : null}
-        {children}
-
-        <Animated.View
-          entering={FadeInDown.duration(Motion.duration.slow).delay(
-            Motion.stagger.step * 2,
-          )}
-          style={styles.footer}
-        >
-          {footer}
-        </Animated.View>
+        {visto ? (
+          <>
+            <Animated.View entering={entrada(0)}>{children}</Animated.View>
+            <Animated.View entering={entrada(1)} style={styles.footer}>
+              {footer}
+            </Animated.View>
+          </>
+        ) : null}
       </KeyboardAwareScrollView>
     </ThemedView>
   );
@@ -104,10 +121,8 @@ const styles = StyleSheet.create({
   flex: { flex: 1 },
   content: {
     flexGrow: 1,
-    justifyContent: "center",
     paddingHorizontal: Space.xl,
     gap: Space.xxl,
   },
-  brand: { alignItems: "flex-start" },
-  footer: { gap: Space.sm, alignItems: "stretch" },
+  footer: { gap: Space.sm, alignItems: "stretch", marginTop: "auto" },
 });

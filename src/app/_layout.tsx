@@ -36,6 +36,12 @@ import { attachNotificationListeners, configureNotificationHandler } from '@/lib
 SplashScreen.preventAutoHideAsync();
 configureNotificationHandler();
 
+/** As telas de conta: sem header e com a barra de status clara sobre a capa de tinta. */
+const contaOptions = {
+  headerShown: false,
+  statusBarStyle: Platform.OS === 'android' ? ('light' as const) : undefined,
+};
+
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
@@ -244,11 +250,16 @@ function AppTree() {
 
                 {/* Porta de mão única nos dois sentidos: sem sessão só existe o login; com sessão
                   o login deixa de existir, então `back` nunca reentra nele. */}
+                {/*
+                  As telas de conta têm a capa de tinta no topo nos dois temas: a barra de status é
+                  CLARA nelas. No Android quem manda é a opção da tela (a declaração da raiz vale
+                  para o resto); no iOS, o `StatusBar` que o `AuthScreen` monta.
+                */}
                 <Stack.Protected guard={!session}>
-                  <Stack.Screen name="login" options={{ headerShown: false }} />
-                  <Stack.Screen name="login-whatsapp" options={{ headerShown: false }} />
-                  <Stack.Screen name="signup" options={{ headerShown: false }} />
-                  <Stack.Screen name="forgot-password" options={{ headerShown: false }} />
+                  <Stack.Screen name="login" options={contaOptions} />
+                  <Stack.Screen name="login-whatsapp" options={contaOptions} />
+                  <Stack.Screen name="signup" options={contaOptions} />
+                  <Stack.Screen name="forgot-password" options={contaOptions} />
                 </Stack.Protected>
 
                 <Stack.Protected guard={!!session && !hasCompletedOnboarding(session.user.user_metadata)}>
