@@ -2384,6 +2384,8 @@ git commit -m "feat(hoje): primeiros passos com progresso e a porta para o agent
 
 ```ts
 const hojeFile = 'src/app/(tabs)/today/index.tsx';
+/** Objetos criados dentro do `runInNewContext` têm outro protótipo: o `deepEqual` estrito os recusa. */
+const copia = (v: unknown) => JSON.parse(JSON.stringify(v));
 const agendaItem = (ui: ReturnType<typeof screen>, title?: string) =>
   ui.nodes().find((n: any) => n.type === 'AgendaItem' && (!title || n.props.title === title));
 
@@ -2405,7 +2407,7 @@ test('Hoje: fatura atrasada leva para a fatura, nunca dá baixa de lançamento',
   });
   agendaItem(ui).props.action.onPress();
   assert.equal(ui.writes.length, 0);
-  assert.deepEqual(ui.navigations.at(-1), { pathname: '/finance/invoice/[id]', params: { id: 'fat-1' } });
+  assert.deepEqual(copia(ui.navigations.at(-1)), { pathname: '/finance/invoice/[id]', params: { id: 'fat-1' } });
 });
 
 test('Hoje: compra que vai cair no cartão aparece nos próximos dias e abre a fatura', () => {
@@ -2415,7 +2417,7 @@ test('Hoje: compra que vai cair no cartão aparece nos próximos dias e abre a f
   const item = agendaItem(ui, 'DAS');
   assert.equal(item.props.cartao, 'Nubank');
   item.props.action.onPress();
-  assert.deepEqual(ui.navigations.at(-1), { pathname: '/finance/invoice/[id]', params: { id: 'f-9' } });
+  assert.deepEqual(copia(ui.navigations.at(-1)), { pathname: '/finance/invoice/[id]', params: { id: 'f-9' } });
 });
 
 test('Hoje: usuário novo vê os Primeiros passos, e a pílula do agente abre conversa nova', () => {
@@ -2691,7 +2693,7 @@ export default function TodayScreen() {
   */
   const abrirMenu = () =>
     showItemActions('Mais opções', [
-      ...(cycle.data
+      ...(cycle.data?.mes
         ? [
             {
               label: 'Ver o que fecha o ciclo',
@@ -2766,7 +2768,7 @@ export default function TodayScreen() {
           secondary={veredito}
           chart={gasto.data ? <RunwayBar pista={pista} ate={ateQuando ?? hoje} entrada={proximaEntrada} /> : undefined}
           footer={
-            cycle.data ? (
+            cycle.data?.ate ? (
               <View style={styles.rodapeHeroi}>
                 <ThemedText type="footnote" themeColor="onHeroMuted" style={styles.shrink}>
                   {`Compromissos até ${isoToBR(cycle.data.ate)}`}
@@ -4321,9 +4323,9 @@ test('Hoje: a Conversa mostra o texto real e abre o registro que ele virou', () 
   assert.ok(feed, 'a conversa precisa aparecer');
   assert.equal(feed.props.pares[0].texto, 'gastei 45 no mercado');
   feed.props.onOpenRecord(feed.props.pares[0].cards[0].destino);
-  assert.deepEqual(ui.navigations.at(-1), { pathname: '/finance/[txId]', params: { txId: 'tx-1' } });
+  assert.deepEqual(copia(ui.navigations.at(-1)), { pathname: '/finance/[txId]', params: { txId: 'tx-1' } });
   feed.props.onOpenConversation('sessao-1');
-  assert.deepEqual(ui.navigations.at(-1), { pathname: '/agent/[id]', params: { id: 'sessao-1' } });
+  assert.deepEqual(copia(ui.navigations.at(-1)), { pathname: '/agent/[id]', params: { id: 'sessao-1' } });
 });
 
 test('Hoje: falha na Conversa diz que falhou e refaz só ela', () => {
@@ -4391,6 +4393,11 @@ e apagar o comentário `// CONVERSA: na Fase 2…` acima dele.
 ```
 
 - [ ] **Step 4: Rodar**
+
+`src/lib/refresh-consistency.test.ts` também renderiza a Hoje (`renderToday`): acrescentar lá
+`import * as activityFeed from './activity-feed.ts';` e, no `require` do renderizador,
+`if (name === '@/lib/activity-feed') return activityFeed;` (sem isso o fallback devolve string e
+`paresDaConversa` "não é função").
 
 Run: `npx tsc --noEmit && npx expo lint && npm test`
 Expected: verde.

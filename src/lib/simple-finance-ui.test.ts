@@ -11,7 +11,7 @@ const require = createRequire(import.meta.url);
 
 // Execute the screen JSX and its event handlers. Native components/query boundaries
 // are inert; state persists across renders so each interaction uses current props.
-function screen(file: string, options: { debts?: any[]; invoiceStatus?: string; create?: boolean; monthLines?: any[]; monthSummary?: any; cycleLines?: any[]; cycleRow?: any; rangeError?: boolean; rangePending?: boolean; rangePendingMonths?: string[] } = {}) {
+function screen(file: string, options: { debts?: any[]; invoiceStatus?: string; create?: boolean; monthLines?: any[]; monthSummary?: any; cycleLines?: any[]; cycleRow?: any; rangeError?: boolean; rangePending?: boolean; rangePendingMonths?: string[]; bills?: any[]; billsError?: boolean; charges?: any[]; setupPassos?: any[]; activity?: any[]; activityError?: boolean } = {}) {
   const state: any[] = [];
   let cursor = 0;
   let nodes: any[] = [];
@@ -77,6 +77,16 @@ function screen(file: string, options: { debts?: any[]; invoiceStatus?: string; 
     useSaveAsset: () => mutation('saveAsset'),
     useArchiveAsset: () => mutation('archiveAsset'),
     useSettleInvoice: () => mutation('settleInvoice'),
+    useUpcomingBills: () => ({
+      ...query,
+      isSuccess: !options.billsError,
+      isError: Boolean(options.billsError),
+      data: options.billsError ? undefined : (options.bills ?? []),
+      refetch: async () => { refetches.push('bills'); },
+    }),
+    useUpcomingCardCharges: () => ({ ...query, isSuccess: true, data: options.charges ?? [] }),
+    useSpendablePath: () => ({ ...query, isSuccess: true, data: [] }),
+    useMarkPaid: () => mutation('markPaid'),
     usePayInvoice: () => mutation('payInvoice'),
     useInvoice: () => ({ ...query, data: {
       invoice: { id: 'invoice-1', account_id: 'card-1', status: options.invoiceStatus ?? 'closed', reference_month: '2026-08-01', closing_date: '2026-08-10', due_date: '2026-08-20', paid_at: options.invoiceStatus === 'paid' ? '2026-08-18' : null },
@@ -90,10 +100,13 @@ function screen(file: string, options: { debts?: any[]; invoiceStatus?: string; 
       if (name === 'react') return {
         useState(initial: any) { const index = cursor++; if (!(index in state)) state[index] = typeof initial === 'function' ? initial() : initial; return [state[index], (value: any) => { state[index] = typeof value === 'function' ? value(state[index]) : value; }]; },
         useMemo: (fn: () => unknown) => fn(),
+        useCallback: (fn: unknown) => fn,
+        useRef: (v: unknown) => ({ current: v }),
+        useEffect: () => {},
       };
       if (name === 'react/jsx-runtime') return require(name);
       if (name === 'react-native') return { StyleSheet: { create: (value: unknown) => value }, View: 'View', Pressable: 'Pressable', ScrollView: 'ScrollView', FlatList: 'FlatList', useWindowDimensions: () => ({ width: 384, height: 800 }), Platform: { OS: 'android', select: (o: any) => o.android ?? o.default } };
-      if (name === 'react-native-reanimated') return { default: { View: 'AnimatedView' }, FadeInDown: animation, LinearTransition: animation };
+      if (name === 'react-native-reanimated') return { default: { View: 'AnimatedView' }, FadeInDown: animation, FadeOut: animation, FadeIn: animation, LinearTransition: animation };
       // `back` é navegação como qualquer outra e ENTRA na lista: é o que prende o "fechar um
       // formulário que outra tela abriu devolve para ela" (`useVoltarQuandoFechar`).
       if (name === 'expo-router') return { Stack: { Screen: 'StackScreen' }, useLocalSearchParams: () => ({ id: 'invoice-1', ...(options.create !== false ? { create: 'financing' } : {}) }), router: { push: (to: any) => navigations.push(to), back: () => navigations.push({ back: true }) } };
@@ -104,10 +117,23 @@ function screen(file: string, options: { debts?: any[]; invoiceStatus?: string; 
       if (name === '@/hooks/use-tela-pronta') return { useTelaPronta: (...consultas: any[]) => { gates.push(consultas); return true; } };
       // Carregado DE VERDADE: ele é a regra que se quer testar, não um arredor da tela.
       if (name === '@/hooks/use-voltar-quando-fechar') return load('src/hooks/use-voltar-quando-fechar.ts');
-      if (name === '@/hooks/use-items') return { localISODate: () => '2026-09-08', formatDateBR: () => '08/09/2026', formatBRL: load('src/lib/dates.ts').formatBRL, useRealtimeInvalidate: () => {} };
+      if (name === '@/hooks/use-items') return { localISODate: () => '2026-09-08', formatDateBR: () => '08/09/2026', formatBRL: load('src/lib/dates.ts').formatBRL, useRealtimeInvalidate: () => {}, useTodayReminders: () => ({ ...query, isSuccess: true }) };
+      if (name === '@/hooks/use-session') return { useSession: () => ({ session: { user: { id: 'user-1' } } }) };
+      if (name === '@/hooks/use-profile') return { useProfile: () => ({ ...query, isSuccess: true, data: { display_name: 'Gabriel Almeida', phone: null } }) };
+      if (name === '@/hooks/use-setup-progress') return { useSetupProgress: () => ({ passos: options.setupPassos ?? [], pronto: true, consultas: [] }) };
+      if (name === '@/hooks/use-bool-pref') return { useBoolPref: () => [false, () => {}] };
+      if (name === '@/hooks/use-agent-activity') return {
+        useAgentActivity: () => ({
+          ...query,
+          isSuccess: !options.activityError,
+          isError: Boolean(options.activityError),
+          data: options.activityError ? undefined : (options.activity ?? []),
+          refetch: async () => { refetches.push('activity'); },
+        }),
+      };
       // Orçamentos consulta direto (a lista de linhas): o mesmo resultado inerte dos hooks.
       if (name === '@tanstack/react-query') return { useQuery: () => query };
-      if (name === '@/lib/finance-form' || name === '@/lib/dates' || name === '@/lib/month-view' || name === '@/lib/settle-labels' || name === '@/lib/accounts' || name === '@/lib/cycle-label' || name === '@/lib/card-status') return load(`src/lib/${name.split('/').at(-1)}.ts`);
+      if (name === '@/lib/finance-form' || name === '@/lib/dates' || name === '@/lib/month-view' || name === '@/lib/settle-labels' || name === '@/lib/accounts' || name === '@/lib/cycle-label' || name === '@/lib/card-status' || name === '@/lib/today-sections' || name === '@/lib/runway' || name === '@/lib/budget-tight' || name === '@/lib/setup-steps' || name === '@/lib/activity-feed') return load(`src/lib/${name.split('/').at(-1)}.ts`);
       if (name === '@/hooks/use-debounced') return { useDebounced: (value: unknown) => value };
       if (name === '@/design/category-icons') return { categoryIcon: () => 'circle' };
       // import relativo DENTRO de um módulo puro já carregado (month-view → ./dates.ts)
@@ -455,4 +481,76 @@ test('Financeiro com o período resolvido não mostra falha nem esqueleto no her
   const t = tipos(screen(financeiroFile));
   assert.ok(!t.includes('ErrorCard'));
   assert.ok(!t.includes('Skeleton'), 'sem este, o teste de cima não distinguiria nada');
+});
+
+const hojeFile = 'src/app/(tabs)/today/index.tsx';
+/** Objetos criados dentro do `runInNewContext` têm outro protótipo: o `deepEqual` estrito os recusa. */
+const copia = (v: unknown) => JSON.parse(JSON.stringify(v));
+const agendaItem = (ui: ReturnType<typeof screen>, title?: string) =>
+  ui.nodes().find((n: any) => n.type === 'AgendaItem' && (!title || n.props.title === title));
+
+test('Hoje: o atrasado aparece em Agora e o botão dá baixa no lançamento certo', () => {
+  const ui = screen(hojeFile, {
+    bills: [{ ref_id: 'luz-1', title: 'Luz', due_date: '2026-09-01', amount_cents: 21000, kind: 'transaction', overdue: true }],
+  });
+  const item = agendaItem(ui, 'Luz');
+  assert.ok(item, 'a conta atrasada precisa estar na tela');
+  assert.equal(item.props.meta, 'venceu 01/09');
+  item.props.action.onPress();
+  assert.deepEqual(ui.writes.map((w) => w.operation), ['markPaid']);
+  assert.equal(ui.writes[0].value.id, 'luz-1');
+});
+
+test('Hoje: fatura atrasada leva para a fatura, nunca dá baixa de lançamento', () => {
+  const ui = screen(hojeFile, {
+    bills: [{ ref_id: 'fat-1', title: 'Fatura Nubank', due_date: '2026-09-01', amount_cents: 135000, kind: 'invoice', overdue: true }],
+  });
+  agendaItem(ui).props.action.onPress();
+  assert.equal(ui.writes.length, 0);
+  assert.deepEqual(copia(ui.navigations.at(-1)), { pathname: '/finance/invoice/[id]', params: { id: 'fat-1' } });
+});
+
+test('Hoje: compra que vai cair no cartão aparece nos próximos dias e abre a fatura', () => {
+  const ui = screen(hojeFile, {
+    charges: [{ id: 'c-1', title: 'DAS', occurred_at: '2026-09-10', amount_cents: 7000, card: 'Nubank', invoice_id: 'f-9' }],
+  });
+  const item = agendaItem(ui, 'DAS');
+  assert.equal(item.props.cartao, 'Nubank');
+  item.props.action.onPress();
+  assert.deepEqual(copia(ui.navigations.at(-1)), { pathname: '/finance/invoice/[id]', params: { id: 'f-9' } });
+});
+
+test('Hoje: usuário novo vê os Primeiros passos, e a pílula do agente abre conversa nova', () => {
+  const ui = screen(hojeFile, {
+    setupPassos: [{ id: 'whatsapp', titulo: 'Ligar o WhatsApp', feito: false, href: '/link-phone' }],
+  });
+  const passos = ui.nodes().find((n: any) => n.type === 'SetupChecklist');
+  assert.ok(passos, 'o card de primeiros passos precisa aparecer');
+  passos.props.onOpen(passos.props.passos[0]);
+  assert.equal(ui.navigations.at(-1), '/link-phone');
+  ui.nodes().find((n: any) => n.type === 'AgentPrompt').props.onPress();
+  assert.equal(ui.navigations.at(-1), '/agent/new');
+});
+
+test('Hoje: com os passos todos feitos o card não aparece', () => {
+  const ui = screen(hojeFile, {
+    setupPassos: [{ id: 'whatsapp', titulo: 'Ligar o WhatsApp', feito: true, href: '/link-phone' }],
+  });
+  assert.ok(!tipos(ui).includes('SetupChecklist'));
+});
+
+test('Hoje: falha nas contas mostra o erro em Agora, e o "Tentar de novo" refaz as contas', () => {
+  const ui = screen(hojeFile, { billsError: true });
+  const erro = ui.nodes().find((n: any) => n.type === 'ErrorCard');
+  assert.ok(erro, 'seção que falha diz que falhou (§7)');
+  erro.props.onRetry();
+  assert.ok(ui.refetches.includes('bills'));
+  assert.ok(!ui.nodes().some((n: any) => n.type === 'ThemedText' && String(n.props.children).startsWith('Nada vence')),
+    'sem resposta das contas a tela não afirma que nada vence');
+});
+
+test('Hoje: dia sem nada diz que nada vence, sem inventar lista', () => {
+  const ui = screen(hojeFile, {});
+  assert.ok(!tipos(ui).includes('AgendaItem'));
+  assert.ok(ui.nodes().some((n: any) => n.type === 'ThemedText' && String(n.props.children).startsWith('Nada vence')));
 });
