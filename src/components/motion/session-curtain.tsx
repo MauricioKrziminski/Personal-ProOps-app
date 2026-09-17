@@ -33,6 +33,7 @@ import {
   esperaDaAbertura,
   esperaDaMarca,
   origemValida,
+  type FaseDaCortina,
   type Onda,
   type Ponto,
 } from '@/lib/session-gate';
@@ -57,7 +58,6 @@ const ENTRA_NA_CAMADA = Platform.OS === 'android';
 /** No iOS a marca está na tela desde o splash nativo, antes deste módulo carregar. */
 const CARREGOU_EM = Date.now();
 
-type Fase = 'abertura' | 'cobrindo' | 'coberta' | 'revelando' | 'aberta';
 type Show = 'completa' | 'curta';
 
 const doisQuadros = () =>
@@ -65,6 +65,7 @@ const doisQuadros = () =>
 const dormir = (ms: number) => new Promise<void>((ok) => setTimeout(ok, ms));
 
 const CortinaContext = createContext<CortinaApi | null>(null);
+const FaseContext = createContext<FaseDaCortina>('abertura');
 const AbertaContext = createContext(false);
 const SaindoContext = createContext(false);
 
@@ -72,6 +73,10 @@ export function useCortina(): CortinaApi {
   const cortina = useContext(CortinaContext);
   if (!cortina) throw new Error('useCortina precisa do CortinaProvider (raiz do app)');
   return cortina;
+}
+
+export function useCortinaFase(): FaseDaCortina {
+  return useContext(FaseContext);
 }
 
 /** `true` quando a abertura já revelou e nada cobre a tela. */
@@ -127,7 +132,7 @@ export function CortinaProvider({ children }: { children: ReactNode }) {
   const reduzido = useReducedMotion();
   const { height: alturaDaTela } = useWindowDimensions();
   const progresso = useSharedValue(0);
-  const [fase, setFase] = useState<Fase>('abertura');
+  const [fase, setFase] = useState<FaseDaCortina>('abertura');
   const [onda, setOnda] = useState<Onda>(ONDA_DA_ABERTURA);
   const [show, setShow] = useState<Show | null>(null);
   const [pintada, setPintada] = useState(false);
@@ -322,24 +327,26 @@ export function CortinaProvider({ children }: { children: ReactNode }) {
 
   return (
     <CortinaContext.Provider value={api}>
-      <AbertaContext.Provider value={aberturaFeita && fase === 'aberta'}>
-      <SaindoContext.Provider value={fase === 'revelando' || fase === 'aberta'}>
-        {children}
-        {fase === 'aberta' ? null : (
-          <Camada
-            fase={fase}
-            onda={onda}
-            progresso={progresso}
-            reduzido={reduzido}
-            show={aberturaFeita ? null : show}
-            comMarca={!aberturaFeita}
-            pintada={pintada}
-            onLayout={aoLayout}
-            onPng={aoPng}
-          />
-        )}
-      </SaindoContext.Provider>
-      </AbertaContext.Provider>
+      <FaseContext.Provider value={fase}>
+        <AbertaContext.Provider value={aberturaFeita && fase === 'aberta'}>
+          <SaindoContext.Provider value={fase === 'revelando' || fase === 'aberta'}>
+            {children}
+            {fase === 'aberta' ? null : (
+              <Camada
+                fase={fase}
+                onda={onda}
+                progresso={progresso}
+                reduzido={reduzido}
+                show={aberturaFeita ? null : show}
+                comMarca={!aberturaFeita}
+                pintada={pintada}
+                onLayout={aoLayout}
+                onPng={aoPng}
+              />
+            )}
+          </SaindoContext.Provider>
+        </AbertaContext.Provider>
+      </FaseContext.Provider>
     </CortinaContext.Provider>
   );
 }
@@ -355,7 +362,7 @@ function Camada({
   onLayout,
   onPng,
 }: {
-  fase: Fase;
+  fase: FaseDaCortina;
   onda: Onda;
   progresso: SharedValue<number>;
   reduzido: boolean;
@@ -383,7 +390,7 @@ function Camada({
         <WaveCurtain
           progress={progresso}
           fase={fase === 'cobrindo' || fase === 'coberta' ? 'cobrir' : 'revelar'}
-          mode={onda.mode}
+          mode={fase === 'revelando' ? onda.revealMode ?? onda.mode : onda.mode}
           origin={onda.origin}
           color={theme.curtain}
           style={StyleSheet.absoluteFill}

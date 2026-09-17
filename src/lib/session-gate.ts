@@ -19,11 +19,20 @@ export interface Ponto {
 export interface Onda {
   mode: WaveMode;
   origin?: Ponto;
+  /** O círculo pode cobrir a partir do botão, mas a tela nova é revelada de cima para baixo. */
+  revealMode?: WaveMode;
   /**
    * Onde revelar PARA. `capa` deixa a tinta no topo, na curva que o `AuthScreen` desenha igual —
    * é o cabeçalho das telas de conta. Sem o campo, a tinta sai da tela.
    */
   ate?: 'capa';
+}
+
+export type FaseDaCortina = 'abertura' | 'cobrindo' | 'coberta' | 'revelando' | 'aberta';
+
+/** Mantém a tela antiga visível até a tinta cobri-la; libera a nova quando a tinta começa a sair. */
+export function entradaLiberada(fase: FaseDaCortina, locked: boolean): boolean {
+  return !locked && (fase === 'cobrindo' || fase === 'revelando' || fase === 'aberta');
 }
 
 /** Teto de CADA passo da troca (cobrir, revelar). Passou disso, a troca acontece assim mesmo. */
@@ -70,7 +79,7 @@ export function precisaDeCortina(antes: string | null | undefined, depois: strin
  */
 export function ondaDaTroca(depois: string | null, origem: Ponto | null): Onda {
   if (depois === null) return { mode: 'up', ate: 'capa' };
-  if (origem) return { mode: 'radial', origin: origem };
+  if (origem) return { mode: 'radial', origin: origem, revealMode: 'down' };
   return { mode: 'down' };
 }
 

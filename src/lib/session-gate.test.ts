@@ -6,6 +6,7 @@ import {
   TETO_DA_ABERTURA_MS,
   TETO_DA_TRAVA_MS,
   VALIDADE_DA_ORIGEM_MS,
+  entradaLiberada,
   esperaDaAbertura,
   esperaDaMarca,
   ondaDaTroca,
@@ -38,8 +39,17 @@ test('entrar com botão nasce no botão; sem botão, do topo', () => {
   assert.deepEqual(ondaDaTroca('u1', { x: 0.5, y: 0.8 }), {
     mode: 'radial',
     origin: { x: 0.5, y: 0.8 },
+    revealMode: 'down',
   });
   assert.deepEqual(ondaDaTroca('u1', null), { mode: 'down' });
+});
+
+test('a tela antiga permanece visível enquanto a cortina chega; a nova só entra na revelação', () => {
+  assert.equal(entradaLiberada('cobrindo', false), true, 'não esvazia o Perfil sob a onda que chega');
+  assert.equal(entradaLiberada('coberta', false), false, 'troca a sessão com o conteúdo oculto');
+  assert.equal(entradaLiberada('revelando', false), true, 'a Hoje entra junto com a onda que sai');
+  assert.equal(entradaLiberada('abertura', false), false, 'a abertura espera a tinta sair');
+  assert.equal(entradaLiberada('revelando', true), false, 'a trava ainda segura o conteúdo');
 });
 
 test('a origem lembrada vence depois de um tempo', () => {

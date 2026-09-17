@@ -9,11 +9,12 @@ import {
   type SharedValue,
 } from 'react-native-reanimated';
 
-import { useCortinaSaindo } from '@/components/motion/session-curtain';
+import { useCortinaFase } from '@/components/motion/session-curtain';
 import { useLock } from '@/hooks/use-lock';
+import { entradaLiberada } from '@/lib/session-gate';
 
 type Entrada = {
-  /** Nada cobre o app: a cortina está saindo (ou saiu) e a trava está aberta (ou saindo). */
+  /** A tela pode desenhar: antes da cobertura completar ou durante a revelação, sem trava. */
   liberada: boolean;
   /**
    * Quantas vezes o app ficou visível. Muda a cada abertura, entrada numa conta e desbloqueio —
@@ -34,14 +35,14 @@ const EntradaContext = createContext<Entrada>({ liberada: true, geracao: 0 });
  * sem senha, e depois de desbloquear. Antes a cascata olhava só a cortina de sessão, então com o
  * bloqueio ligado ela tocava inteira por baixo da trava e o desbloqueio revelava uma tela parada.
  *
- * "Coberto" são as duas camadas que escondem o app: a cortina (abertura e troca de conta) e a
- * trava. Quando as duas saem, a geração sobe e a entrada toca; quando alguma volta a cobrir, as
- * raízes se escondem por baixo dela para poderem entrar de novo.
+ * Na troca de sessão, a tela antiga continua desenhada enquanto a cortina chega. Só depois de
+ * coberta ela se esconde e dá lugar à nova; a nova entra junto com a revelação. A trava continua
+ * segurando o conteúdo enquanto estiver ativa.
  */
 export function EntradaProvider({ children }: { children: ReactNode }) {
-  const saindo = useCortinaSaindo();
+  const fase = useCortinaFase();
   const { locked } = useLock();
-  const liberada = saindo && !locked;
+  const liberada = entradaLiberada(fase, locked);
 
   // Ajuste de estado no render (o padrão do React para "derivar de uma mudança").
   const [anterior, setAnterior] = useState(liberada);
