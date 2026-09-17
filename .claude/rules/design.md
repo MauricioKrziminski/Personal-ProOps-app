@@ -47,8 +47,11 @@ contexto. Em card comum sai por `marginHorizontal/-Bottom` negativos + `overflow
 **Cartão de crédito é um CARTÃO, não um card** (`src/components/finance/card-face.tsx`). A face
 é o cartão metálico dos vídeos: a cor do EMISSOR pura, um degradê diagonal curto e uma faixa de
 brilho, canto `Radius.md`, contactless, nome e o estado "Atrasada". A tinta do texto é escolhida
-por CONTRASTE com a cor do banco (`tintaDoCartao`: clara no roxo do Nubank, escura no amarelo do
-BB). O chip EMV saiu com a direção Suave (não existe nos vídeos).
+por CONTRASTE com a cor do banco (`faceDoCartao`: clara no roxo do Nubank, escura no amarelo do
+BB), e a base do metal desliza para o escuro ou o claro só o quanto for preciso para o texto
+principal E o secundário passarem de 4,5:1 — com a cor pura, nenhum banco passava no secundário
+(17/09/2026). `card-flight.test.ts` confere todos os emissores. O chip EMV saiu com a direção
+Suave (não existe nos vídeos).
 
 - **Um desenho, qualquer tamanho.** A face é desenhada em 340dp e ESCALADA (`card-geometry.ts`);
   a proporção é 1,586 ÷ √fontScale. É o que deixa o voo sem salto e a miniatura de 56dp ser o
@@ -427,7 +430,9 @@ de lista**; opacidade em botão de header.
 Animação roda em **worklet** (`useSharedValue` + `useAnimatedStyle`), só `transform` e `opacity`.
 Nunca animar altura de header. `Reduce Motion` colapsa movimento espacial em cross-fade.
 
-Barra de progresso e gráfico **animam** quando o valor muda — valor que salta é bug visual.
+Barra de progresso e gráfico **animam** quando o valor muda — valor que salta é bug visual. E a
+barra **nasce no valor real**: crescer de zero na montagem dependia de a mola rodar, e no Android
+ela ficou parada logo depois de o app voltar ao primeiro plano, com um limite usado de 0% na tela.
 
 ⚠️ **`exiting` não sabe POR QUE o componente desmontou — então saída que muda de lista é
 cross-fade** (14/09/2026). Em Notas, FIXADAS e SOLTAS são duas listas: fixar DESMONTA o cartão de
