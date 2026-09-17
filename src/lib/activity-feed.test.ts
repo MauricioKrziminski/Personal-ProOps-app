@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 
-import { paresDaConversa, type LinhaDaAtividade } from './activity-feed.ts';
+import { metaDoRegistro, paresDaConversa, type LinhaDaAtividade } from './activity-feed.ts';
 
 const linha = (o: Partial<LinhaDaAtividade>): LinhaDaAtividade => ({
   source_message_id: 'app:1',
@@ -67,4 +67,13 @@ test('texto vazio vira nulo — a tela decide o que dizer, nunca inventa a frase
   const [p] = paresDaConversa([linha({ origin_text: '   ', input_kind: 'image' })], '2026-09-17');
   assert.equal(p.texto, null);
   assert.equal(p.entrada, 'image');
+});
+
+test('a linha pequena do registro diz o que ele é, sem inventar', () => {
+  assert.equal(metaDoRegistro({ kind: 'transaction', id: 't', title: 'Mercado', category: 'mercado', account: 'Nubank' }), 'mercado · Nubank');
+  assert.equal(metaDoRegistro({ kind: 'transaction', id: 't', title: 'Mercado', category: null, account: null }), 'lançamento');
+  assert.equal(metaDoRegistro({ kind: 'installment_plan', id: 'p', title: 'TV', installments: 10, category: 'eletrônicos' }), '10× · eletrônicos');
+  assert.equal(metaDoRegistro({ kind: 'account', id: 'a', title: 'Nubank', account_type: 'credit_card' }), 'cartão');
+  assert.equal(metaDoRegistro({ kind: 'note', id: 'n', title: 'Wifi' }), 'nota');
+  assert.match(metaDoRegistro({ kind: 'reminder', id: 'r', title: 'Aluguel', next_run_at: '2026-10-05T12:00:00Z' }), /^seg, 5 out · \d{2}:\d{2}$/);
 });

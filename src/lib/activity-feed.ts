@@ -1,4 +1,4 @@
-import { horaBR, localISODate, rotuloDoDia } from './dates.ts';
+import { diaCurtoBR, horaBR, localISODate, rotuloDoDia } from './dates.ts';
 
 /**
  * As linhas de `public.agent_activity` viradas pares "o que a pessoa disse → o que virou".
@@ -157,4 +157,28 @@ export function paresDaConversa(linhas: readonly LinhaDaAtividade[], hoje: strin
       };
     })
     .sort((a, b) => new Date(b.quando).getTime() - new Date(a.quando).getTime());
+}
+
+/** A linha pequena embaixo do título do registro. */
+export function metaDoRegistro(r: RegistroResumido): string {
+  switch (r.kind) {
+    case 'transaction':
+      return [r.category, r.account].filter(Boolean).join(' · ') || 'lançamento';
+    case 'installment_plan':
+      return [r.installments ? `${r.installments}×` : null, r.category].filter(Boolean).join(' · ') || 'compra parcelada';
+    case 'recurring':
+      return ['todo mês', r.category].filter(Boolean).join(' · ');
+    case 'reminder':
+      return r.next_run_at
+        ? `${diaCurtoBR(localISODate(new Date(r.next_run_at)))} · ${horaBR(r.next_run_at)}`
+        : 'lembrete';
+    case 'note':
+      return 'nota';
+    case 'account':
+      return r.account_type === 'credit_card' ? 'cartão' : 'conta';
+    case 'goal':
+      return 'meta';
+    case 'debt':
+      return 'falta pagar';
+  }
 }
