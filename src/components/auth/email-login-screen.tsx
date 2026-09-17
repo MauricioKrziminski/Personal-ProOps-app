@@ -63,7 +63,7 @@ export function EmailLoginScreen() {
     <AuthScreen
       footer={
         <>
-          <Button label="Entrar" onPress={signIn} loading={busy} disabled={!valid} size="lg" block />
+          <Button label="Entrar" onPress={signIn} loading={busy} disabled={!valid} size="lg" block origemDaCortina />
           <Button
             label="Criar conta"
             variant="ghost"
@@ -72,7 +72,7 @@ export function EmailLoginScreen() {
             block
           />
           {__DEV__ && (
-            <Button label="Entrar como teste (dev)" variant="ghost" size="sm" onPress={devLogin} block />
+            <Button label="Entrar como teste (dev)" variant="ghost" size="sm" onPress={devLogin} block origemDaCortina />
           )}
         </>
       }>

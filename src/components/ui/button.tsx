@@ -1,5 +1,6 @@
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 import {
+  Dimensions,
   StyleSheet,
   View,
   type LayoutChangeEvent,
@@ -16,6 +17,7 @@ import Animated, {
 } from 'react-native-reanimated';
 
 import { DotsLoader } from '@/components/motion/dots-loader';
+import { useCortina } from '@/components/motion/session-curtain';
 import { PressableScale } from '@/components/motion/pressable-scale';
 import { Icon } from '@/components/ui/icon';
 import { ThemedText } from '@/components/themed-text';
@@ -37,6 +39,11 @@ interface ButtonProps {
   disabled?: boolean;
   /** Ocupa a largura disponível — submit de formulário. */
   block?: boolean;
+  /**
+   * O botão que ENTRA na conta: no toque ele registra o próprio centro na cortina, e a cobertura
+   * da troca de sessão nasce dele (o círculo de tinta dos vídeos de referência).
+   */
+  origemDaCortina?: boolean;
   style?: StyleProp<ViewStyle>;
 }
 
@@ -76,9 +83,12 @@ export function Button({
   loading = false,
   disabled = false,
   block = false,
+  origemDaCortina = false,
   style,
 }: ButtonProps) {
   const theme = useTheme();
+  const cortina = useCortina();
+  const caixa = useRef<View>(null);
   const reduzido = useReducedMotion();
   const inert = disabled || loading;
   const altura = HEIGHT[size];
@@ -146,7 +156,7 @@ export function Button({
   const tampa = { width: altura, height: altura, borderRadius: altura / 2, backgroundColor: cor };
 
   return (
-    <View style={[block ? styles.block : styles.hug, style]}>
+    <View ref={caixa} style={[block ? styles.block : styles.hug, style]}>
       <PressableScale
         accessibilityRole="button"
         accessibilityLabel={label}
@@ -155,7 +165,17 @@ export function Button({
         hitSlop={SLOP[size]}
         haptic="light"
         scaleTo={0.97}
-        onPress={onPress}
+        onPress={() => {
+          if (origemDaCortina) {
+            caixa.current?.measureInWindow((x, y, w, h) => {
+              const tela = Dimensions.get('window');
+              if (tela.width > 0 && tela.height > 0) {
+                cortina.lembrarOrigem({ x: (x + w / 2) / tela.width, y: (y + h / 2) / tela.height });
+              }
+            });
+          }
+          onPress();
+        }}
         onLayout={medir}
         style={[styles.pilula, { height: altura, borderRadius: altura / 2 }]}>
         {variant !== 'ghost' ? (

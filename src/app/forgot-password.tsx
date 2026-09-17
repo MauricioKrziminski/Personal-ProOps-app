@@ -112,6 +112,7 @@ export default function ForgotPasswordScreen() {
             disabled={footerDisabled}
             size="lg"
             block
+            origemDaCortina
           />
           <Button
             label={step === 'email' ? 'Voltar' : 'Trocar e-mail'}

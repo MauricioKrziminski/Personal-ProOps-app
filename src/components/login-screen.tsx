@@ -158,6 +158,7 @@ export function LoginScreen() {
             disabled={onPhone ? !valid : code.length < 6}
             size="lg"
             block
+            origemDaCortina
           />
           {/* A porta principal é e-mail e senha: esta tela é sempre EMPURRADA de lá, e sem
               este botão ela não tinha nenhuma volta visível — as outras três têm. */}
@@ -175,6 +176,7 @@ export function LoginScreen() {
               size="sm"
               onPress={devLogin}
               block
+              origemDaCortina
             />
           )}
         </>

@@ -147,6 +147,7 @@ export default function SignupScreen() {
             disabled={onForm ? false : code.length < 6}
             size="lg"
             block
+            origemDaCortina
           />
           <Button
             label={onForm ? 'Já tenho conta' : 'Trocar e-mail'}
