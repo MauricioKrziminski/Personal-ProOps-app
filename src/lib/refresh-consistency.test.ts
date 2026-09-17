@@ -11,6 +11,7 @@ import * as dates from './dates.ts';
 import * as todaySections from './today-sections.ts';
 import * as runway from './runway.ts';
 import * as budgetTight from './budget-tight.ts';
+import * as activityFeed from './activity-feed.ts';
 
 const require = createRequire(import.meta.url);
 function loadHooks(client: QueryClient, entry = 'src/hooks/use-finance.ts', dependencies: Record<string, unknown> = {}) {
@@ -285,6 +286,7 @@ function renderToday(bill: { kind: 'invoice' | 'transaction'; ref_id: string }) 
     if (name === '@/lib/today-sections') return todaySections;
     if (name === '@/lib/runway') return runway;
     if (name === '@/lib/budget-tight') return budgetTight;
+    if (name === '@/lib/activity-feed') return activityFeed;
     /*
       O portão da Fase 5 devolve `true` aqui: este teste existe para conferir o CONTEÚDO da Hoje
       (para onde a fatura atrasada roteia, se o pull-to-refresh está exposto), e com o portão

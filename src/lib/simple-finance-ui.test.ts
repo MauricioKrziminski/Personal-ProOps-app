@@ -554,3 +554,40 @@ test('Hoje: dia sem nada diz que nada vence, sem inventar lista', () => {
   assert.ok(!tipos(ui).includes('AgendaItem'));
   assert.ok(ui.nodes().some((n: any) => n.type === 'ThemedText' && String(n.props.children).startsWith('Nada vence')));
 });
+
+const falaDoApp = {
+  source_message_id: 'app:1',
+  executed_at: '2026-09-08T12:00:00-03:00',
+  channel: 'app',
+  input_kind: 'text',
+  origin_text: 'gastei 45 no mercado',
+  session_id: 'sessao-1',
+  action_index: 0,
+  action_type: 'create_expense',
+  result_id: 'tx-1',
+  record: { kind: 'transaction', id: 'tx-1', title: 'Mercado', amount_cents: 4500, tx_kind: 'expense' },
+};
+
+test('Hoje: a Conversa mostra o texto real e abre o registro que ele virou', () => {
+  const ui = screen(hojeFile, { activity: [falaDoApp] });
+  const feed = ui.nodes().find((n: any) => n.type === 'ConversationFeed');
+  assert.ok(feed, 'a conversa precisa aparecer');
+  assert.equal(feed.props.pares[0].texto, 'gastei 45 no mercado');
+  feed.props.onOpenRecord(feed.props.pares[0].cards[0].destino);
+  assert.deepEqual(copia(ui.navigations.at(-1)), { pathname: '/finance/[txId]', params: { txId: 'tx-1' } });
+  feed.props.onOpenConversation('sessao-1');
+  assert.deepEqual(copia(ui.navigations.at(-1)), { pathname: '/agent/[id]', params: { id: 'sessao-1' } });
+});
+
+test('Hoje: falha na Conversa diz que falhou e refaz só ela', () => {
+  const ui = screen(hojeFile, { activityError: true });
+  const erro = ui.nodes().find((n: any) => n.type === 'ErrorCard');
+  assert.ok(erro);
+  erro.props.onRetry();
+  assert.deepEqual(ui.refetches, ['activity']);
+});
+
+test('Hoje: sem fala nenhuma a Conversa não desenha bloco vazio', () => {
+  const ui = screen(hojeFile, {});
+  assert.ok(!tipos(ui).includes('ConversationFeed'));
+});

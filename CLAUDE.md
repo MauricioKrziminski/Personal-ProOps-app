@@ -35,7 +35,7 @@ App mobile pessoal de **notas rápidas, lembretes e controle financeiro operado 
   e `private.parcela_travada`), depois da `20260915190000` (a parcela herda o nome do
   estabelecimento) e da `20260915120000` (a coluna `atrasada` de `cycle_lines`).
 
-  ⚠️ **O staging está UMA à frente: `20260917120000`** (17/09/2026, `card_summary` e
+  ⚠️ **O staging está DUAS à frente: `20260917120000` e `20260918120000`.** A primeira (17/09/2026, `card_summary` e
   `_card_summary` ganham `invoice_open_cents` no fim — o que falta na fatura corrente, líquido do
   pagamento parcial). Conferida no staging depois de aplicar: a coluna é a última das duas
   assinaturas, `_card_summary` segue `security definer` e sem `execute` para `anon` e
@@ -43,6 +43,17 @@ App mobile pessoal de **notas rápidas, lembretes e controle financeiro operado 
   ainda não tem** — subir é decisão do Gabriel. O app novo lê a coluna em Cartões e, sem ela
   em produção, volta à conta antiga pelo total bruto (`outrasFaturas`) — que só erra quando a
   fatura corrente tem pagamento parcial. Nada quebra.
+
+  A `20260918120000` (aplicada no staging em 17/09/2026) dá dono e frase de origem a
+  `executed_actions`, abre `public.agent_activity` (a Conversa da Hoje, `security definer`, só as
+  falas do próprio chamador, sem `payload`) e `public.spendable_path` (a Pista, a mesma lista que
+  forma o "livre"). Conferida no staging depois de aplicar: `supabase/tests/agent_activity.sql`
+  verde (isolamento entre duas pessoas do mesmo workspace, registro apagado, lote com áudio,
+  `anon` sem execute), `da_para_gastar.sql` verde, e a soma da Pista igual ao comprometido na
+  conta `dev@`. Produção sem ela: a Hoje mostra a Conversa com erro e a Pista sem entalhes — o
+  resto funciona. ⚠️ **Ela sobe ANTES do deploy do agente que grava as colunas novas**
+  (`agent/app/db.py`, `reserve_execution`): o agente novo contra um banco sem
+  `user_id`/`workspace_id`/`origin_text` em `executed_actions` quebra TODA escrita.
 
   Todas conferidas na fonte DEPOIS de aplicar (`scripts/` não guarda isso; a conferência da leva
   de 15/09 está no histórico desta linha): a `atrasada` é a última coluna de `cycle_lines`,

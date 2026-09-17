@@ -1,54 +1,42 @@
 import * as Haptics from 'expo-haptics';
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useMemo, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
-import Animated, {
-  runOnJS,
-  useAnimatedStyle,
-  useReducedMotion,
-  useSharedValue,
-  withSpring,
-} from 'react-native-reanimated';
+import Animated, { runOnJS, useAnimatedStyle, useSharedValue } from 'react-native-reanimated';
 
 import { ThemedText } from '@/components/themed-text';
 import { useBRL } from '@/components/ui/conceal';
-import { Motion, Radius, Space } from '@/design/tokens';
+import { Radius, Space } from '@/design/tokens';
 import { useTheme } from '@/hooks/use-theme';
 import { isoToBR } from '@/lib/dates';
-import { entalheMaisProximo, fracaoComprometida, type Pista } from '@/lib/runway';
+import { degrausDaPista, entalheMaisProximo, type Pista } from '@/lib/runway';
 
-const ALTURA = 8;
-/** O alvo do dedo é bem maior que o trilho: arrastar um fio de 8dp é impossível. */
-const ALVO = 32;
+/** A altura útil da escada: o caixa inteiro. */
+const ALTURA = 40;
+/** O alvo do dedo inclui um respiro acima e abaixo da escada. */
+const ALVO = ALTURA + Space.md;
+/** O degrau nunca some: dinheiro zerado ainda é um trecho do caminho. */
+const PISO = 3;
 
 function ddmm(iso: string): string {
   return isoToBR(iso).slice(0, 5);
 }
 
 /**
- * A Pista: de hoje até a próxima entrada, com um entalhe em cada saída. Arrastar o dedo mostra
- * quanto fica livre depois de cada dia, com um toque háptico ao cruzar um entalhe.
+ * A Pista: de hoje até a próxima entrada, como uma ESCADA DE QUEIMA — a altura é quanto sobra
+ * livre, e ela desce a cada saída (`degrausDaPista`). Arrastar o dedo mostra o dia e o livre
+ * depois dele, com um toque háptico a cada saída; soltar volta à legenda.
  *
- * O preenchimento é quanto do caixa já está prometido antes da entrada. Sem entalhes (usuário
- * novo, ou a soma não conferiu com o herói — ver `montarPista`), ela é só a barra, sem arraste.
+ * Sem entalhes (usuário novo, ou a soma não conferiu com o herói — `montarPista`) ela é um
+ * degrau só, na altura do livre, e não se arrasta.
  */
 export function RunwayBar({ pista, ate, entrada }: { pista: Pista; ate: string; entrada: string | null }) {
   const theme = useTheme();
   const brl = useBRL();
-  const reduzido = useReducedMotion();
   const [largura, setLargura] = useState(0);
   const [ativo, setAtivo] = useState(-1);
 
-  const fracao = fracaoComprometida(pista);
-  const cheio = useSharedValue(fracao);
-  const anterior = useRef(fracao);
-  useEffect(() => {
-    if (anterior.current === fracao) return;
-    anterior.current = fracao;
-    cheio.set(reduzido ? fracao : withSpring(fracao, Motion.spring.encaixe));
-  }, [fracao, cheio, reduzido]);
-  const estiloCheio = useAnimatedStyle(() => ({ transform: [{ scaleX: cheio.get() }] }));
-
+  const degraus = useMemo(() => degrausDaPista(pista), [pista]);
   const posicoes = useMemo(() => pista.entalhes.map((e) => e.posicao), [pista.entalhes]);
   const dedo = useSharedValue(-1);
   const ultimo = useSharedValue(-1);
@@ -84,13 +72,22 @@ export function RunwayBar({ pista, ate, entrada }: { pista: Pista; ate: string; 
   const atual = ativo >= 0 ? pista.entalhes[ativo] : null;
   const fim = entrada ? `entra ${ddmm(entrada)}` : `até ${ddmm(ate)}`;
 
+  const corDoDegrau = (fracao: number, negativo: boolean, destacado: boolean) =>
+    negativo
+      ? theme.onHeroDanger
+      : destacado
+        ? theme.onHero
+        : fracao < 0.2
+          ? theme.onHeroWarning
+          : theme.onHeroMuted;
+
   return (
     <View
       accessible
       accessibilityRole="adjustable"
-      accessibilityLabel={`Pista até ${fim}`}
+      accessibilityLabel={`Dinheiro livre de hoje ${entrada ? `até entrar dinheiro em ${ddmm(entrada)}` : `até ${ddmm(ate)}`}`}
       accessibilityValue={{
-        text: atual ? `${ddmm(atual.day)}, livre ${brl(atual.livreDepois)}` : `${Math.round(fracao * 100)}% comprometido`,
+        text: atual ? `${ddmm(atual.day)}, livre ${brl(atual.livreDepois)}` : `livre ${brl(pista.livre)}`,
       }}
       accessibilityActions={posicoes.length ? [{ name: 'increment' }, { name: 'decrement' }] : undefined}
       onAccessibilityAction={(e) => {
@@ -102,24 +99,24 @@ export function RunwayBar({ pista, ate, entrada }: { pista: Pista; ate: string; 
       }}>
       <GestureDetector gesture={gesto}>
         <View style={styles.alvo} onLayout={(e) => setLargura(e.nativeEvent.layout.width)}>
-          <View style={[styles.trilho, { backgroundColor: theme.heroChip }]}>
-            <Animated.View
-              style={[
-                styles.cheio,
-                { backgroundColor: fracao >= 1 ? theme.onHeroDanger : theme.onHeroWarning },
-                estiloCheio,
-              ]}
-            />
-          </View>
-          {pista.entalhes.map((e, i) => (
+          <View style={[styles.base, { backgroundColor: theme.heroChip }]} />
+          {degraus.map((d) => (
             <View
-              key={e.day}
+              key={`${d.inicio}-${d.entalhe}`}
               pointerEvents="none"
-              style={[
-                styles.entalhe,
-                { left: `${e.posicao * 100}%`, backgroundColor: i === ativo ? theme.onHero : theme.onHeroMuted },
-              ]}
-            />
+              style={[styles.faixa, { left: `${d.inicio * 100}%`, width: `${(d.fim - d.inicio) * 100}%` }]}>
+              <View
+                style={[
+                  styles.degrau,
+                  {
+                    height: Math.max(PISO, d.fracao * ALTURA),
+                    // O nível é o traço do topo; o corpo é só um véu para o degrau ter chão.
+                    backgroundColor: ativo >= 0 && d.entalhe === ativo ? theme.heroFooterPress : theme.heroFooter,
+                    borderTopColor: corDoDegrau(d.fracao, d.negativo, ativo >= 0 && d.entalhe === ativo),
+                  },
+                ]}
+              />
+            </View>
           ))}
           <View
             pointerEvents="none"
@@ -152,31 +149,26 @@ export function RunwayBar({ pista, ate, entrada }: { pista: Pista; ate: string; 
 }
 
 const styles = StyleSheet.create({
-  alvo: { height: ALVO, justifyContent: 'center' },
-  trilho: { height: ALTURA, borderRadius: Radius.pill, overflow: 'hidden' },
-  cheio: { width: '100%', height: '100%', borderRadius: Radius.pill, transformOrigin: 'left' },
-  entalhe: {
-    position: 'absolute',
-    top: (ALVO - 16) / 2,
-    width: 2,
-    height: 16,
-    marginLeft: -1,
-    borderRadius: Radius.pill,
-  },
+  alvo: { height: ALVO, justifyContent: 'flex-end' },
+  base: { position: 'absolute', left: 0, right: 0, bottom: 0, height: 2, borderRadius: Radius.pill },
+  // O respiro entre degraus mora DENTRO da faixa: largura em % não aceita subtração.
+  faixa: { position: 'absolute', bottom: 0, height: ALTURA, justifyContent: 'flex-end', paddingRight: 2 },
+  degrau: { borderTopWidth: 2, borderTopLeftRadius: Radius.xs, borderTopRightRadius: Radius.xs },
   ponta: {
     position: 'absolute',
-    right: -2,
-    top: (ALVO - 16) / 2,
-    width: 16,
-    height: 16,
+    right: -4,
+    bottom: -5,
+    width: 12,
+    height: 12,
     borderRadius: Radius.pill,
-    borderWidth: 3,
+    borderWidth: 2,
   },
-  cursor: { position: 'absolute', left: 0, top: 2, width: 2, height: ALVO - 4, borderRadius: Radius.pill },
+  cursor: { position: 'absolute', left: 0, bottom: 0, width: 2, height: ALVO, borderRadius: Radius.pill },
   legenda: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
     gap: Space.sm,
+    marginTop: Space.sm,
   },
 });

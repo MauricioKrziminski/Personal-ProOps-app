@@ -1,4 +1,4 @@
-import { router } from 'expo-router';
+import { router, type Href } from 'expo-router';
 import { useMemo, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 import Animated, { FadeOut, LinearTransition } from 'react-native-reanimated';
@@ -6,6 +6,7 @@ import Animated, { FadeOut, LinearTransition } from 'react-native-reanimated';
 import { ErrorCard } from '@/components/error-card';
 import { AgendaItem } from '@/components/feed/agenda-item';
 import { AgentPrompt } from '@/components/feed/agent-prompt';
+import { ConversationFeed } from '@/components/feed/conversation-feed';
 import { ReminderTimeline } from '@/components/feed/reminder-timeline';
 import { SetupChecklist } from '@/components/feed/setup-checklist';
 import { BudgetRings } from '@/components/finance/budget-rings';
@@ -25,12 +26,14 @@ import { Tile, TileRow } from '@/components/ui/tile';
 import { useToast } from '@/components/ui/toast';
 import type { ThemeColor } from '@/constants/theme';
 import { Motion, Radius, Space, tabular } from '@/design/tokens';
+import { useAgentActivity } from '@/hooks/use-agent-activity';
 import { useBoolPref } from '@/hooks/use-bool-pref';
 import {
   useBudgetsStatus,
   useCycle,
   useMarkPaid,
   useSpendable,
+  useSpendablePath,
   useUpcomingBills,
   useUpcomingCardCharges,
 } from '@/hooks/use-finance';
@@ -39,6 +42,7 @@ import { useProfile } from '@/hooks/use-profile';
 import { useSession } from '@/hooks/use-session';
 import { useSetupProgress } from '@/hooks/use-setup-progress';
 import { useTelaPronta } from '@/hooks/use-tela-pronta';
+import { paresDaConversa } from '@/lib/activity-feed';
 import { orcamentosApertados } from '@/lib/budget-tight';
 import { diaCurtoBR, diasAte, greetingBR, isoToBR, rotuloDoDia } from '@/lib/dates';
 import { showItemActions } from '@/lib/item-actions';
@@ -104,6 +108,9 @@ export default function TodayScreen() {
   const setup = useSetupProgress();
   const [passosEscondidos, esconderPassos] = useBoolPref(`hoje:passos-escondidos:${session?.user?.id ?? ''}`);
   const markPaid = useMarkPaid();
+  const atividade = useAgentActivity(6);
+  const caminho = useSpendablePath();
+  const pares = useMemo(() => paresDaConversa(atividade.data ?? [], hoje), [atividade.data, hoje]);
 
   const caixa = Number(gasto.data?.caixa ?? 0);
   const comprometido = Number(gasto.data?.comprometido_ate_entrada ?? 0);
@@ -114,10 +121,10 @@ export default function TodayScreen() {
   const ateQuando = proximaEntrada ?? cycle.data?.ate ?? null;
   const diasLivres = Math.max(1, ateQuando ? diasAte(ateQuando, hoje) : (cycle.data?.diasAteOFim ?? 1));
 
-  // CONVERSA: na Fase 2 o terceiro argumento passa a ser `caminho.data` (`useSpendablePath`).
+  /* A Pista lê a MESMA lista que forma o "livre" (`spendable_path`); se a soma não bater, sem entalhes. */
   const pista = useMemo(
-    () => montarPista(caixa, comprometido, [], hoje, ateQuando ?? hoje),
-    [caixa, comprometido, hoje, ateQuando]
+    () => montarPista(caixa, comprometido, caminho.data ?? [], hoje, ateQuando ?? hoje),
+    [caixa, comprometido, caminho.data, hoje, ateQuando]
   );
   const agenda = useMemo(
     () => agendaDoDia(bills.data ?? [], noCartao.data ?? [], hoje),
@@ -160,7 +167,9 @@ export default function TodayScreen() {
     O PORTÃO DA TELA (Fase 5 do redesenho anterior): a Hoje abre inteira ou não abre. `profile`
     pode nascer desligada e mesmo assim entra — `telaPronta` lê `fetchStatus`.
   */
-  const pronta = useTelaPronta(cycle, profile, gasto, bills, noCartao, reminders, budgets, ...setup.consultas);
+  const pronta = useTelaPronta(
+    cycle, profile, gasto, bills, noCartao, reminders, budgets, atividade, caminho, ...setup.consultas,
+  );
 
   const pay = (id: string, title: string, kind: string | null | undefined) =>
     markPaid.mutate(
@@ -277,6 +286,8 @@ export default function TodayScreen() {
           budgets.refetch(),
           profile.refetch(),
           cycle.refetch(),
+          atividade.refetch(),
+          caminho.refetch(),
         ])
       }>
       <View style={styles.cabecalho}>
@@ -377,7 +388,25 @@ export default function TodayScreen() {
         </Bloco>
       ) : null}
 
-      {/* CONVERSA — entra aqui na Fase 2 (Task 17). */}
+      {/*
+        A Conversa: o texto REAL que a pessoa mandou, com o registro que ele virou. Só o que ela
+        mesma disse (o RPC filtra pelo chamador); sem fala nenhuma, o bloco não existe.
+      */}
+      {atividade.isError ? (
+        <Bloco>
+          <BlockHeader title="Conversa" />
+          <ErrorCard onRetry={() => atividade.refetch()} />
+        </Bloco>
+      ) : pares.length > 0 ? (
+        <Bloco>
+          <BlockHeader title="Conversa" action={{ label: 'Agente', onPress: () => router.push('/agent') }} />
+          <ConversationFeed
+            pares={pares}
+            onOpenRecord={(d) => router.push(d as Href)}
+            onOpenConversation={(id) => router.push({ pathname: '/agent/[id]', params: { id } })}
+          />
+        </Bloco>
+      ) : null}
 
       {reminders.isError ? (
         <Bloco>
