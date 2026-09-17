@@ -25,6 +25,7 @@ import {
 import { SkiaCanvas } from '@/components/ui/skia-canvas';
 import { type ThemeColor } from '@/constants/theme';
 import { alpha } from '@/design/card-brands';
+import { escalaDaSerie } from '@/design/sparkline-geometry';
 import { Motion, Radius, Space } from '@/design/tokens';
 import { useTheme } from '@/hooks/use-theme';
 
@@ -47,13 +48,6 @@ interface SparklineProps {
   onHero?: boolean;
 }
 
-/** Metade do traço + folga, para a linha e o marcador não serem cortados. */
-const PAD = 6;
-/**
- * Span mínimo, como fração da magnitude da série. Sem ele, uma série que oscila R$ 2 vira uma
- * onda dramática — o gráfico desenharia ruído de arredondamento como se fosse notícia.
- */
-const MIN_SPAN_RATIO = 0.05;
 /** Quanto a linha leva para se desenhar. */
 const DESENHO_MS = 900;
 /** Raio do marcador de "hoje". */
@@ -109,20 +103,13 @@ export function Sparkline({
   const reduzido = useReducedMotion();
 
   const geo = useMemo(() => {
-    if (values.length < 2 || width <= 0) return null;
-
+    // A escala é a MESMA do cursor do `ScrubChart` — duas cópias poriam o ponto fora da curva.
+    const escala = escalaDaSerie(values, width, height);
+    if (!escala) return null;
+    const { lo, hi, y } = escala;
     const dataMin = Math.min(...values);
     const dataMax = Math.max(...values);
-    const span = Math.max(dataMax - dataMin, Math.abs(dataMax) * MIN_SPAN_RATIO, 1);
-    const mid = (dataMin + dataMax) / 2;
-    const lo = mid - span / 2;
-    const hi = mid + span / 2;
-
-    const plot = height - PAD * 2;
-    const y = (v: number) => PAD + ((hi - v) / (hi - lo)) * plot;
-    const larguraUtil = width - PAD * 2;
-    const step = larguraUtil / (values.length - 1);
-    const pts = values.map((v, i) => ({ x: PAD + i * step, y: y(v) }));
+    const pts = values.map((v, i) => ({ x: escala.x(i), y: y(v) }));
 
     // Índice do "hoje": último ponto do passado e PRIMEIRO do futuro ao mesmo tempo, senão a
     // emenda ficaria com um buraco de um passo.
