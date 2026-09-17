@@ -53,7 +53,7 @@ export function LockSection() {
   };
 
   return (
-    <Section title="Bloqueio">
+    <Section heading="block" title="Bloqueio">
       <View style={styles.linha}>
         <View style={styles.texto}>
           <ThemedText type="default">Pedir para desbloquear ao abrir</ThemedText>

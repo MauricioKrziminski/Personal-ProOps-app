@@ -3,6 +3,7 @@ import { Pressable, StyleSheet, View, type AccessibilityState } from 'react-nati
 import type { SymbolViewProps } from 'expo-symbols';
 
 import { ThemedText } from '@/components/themed-text';
+import { BlockHeader } from '@/components/ui/block-header';
 import { Icon } from '@/components/ui/icon';
 import { HitTarget, Radius, Space, Type } from '@/design/tokens';
 import { useTheme } from '@/hooks/use-theme';
@@ -171,16 +172,29 @@ function fundoDoBadge(theme: ReturnType<typeof useTheme>, tone: RowBadgeTone | u
  * Agrupa `Row`s com hairline entre elas — o container de lista agrupada do iOS.
  * O separador começa depois do ícone, como no sistema.
  */
-export function Section({ title, children }: { title?: string; children: ReactNode }) {
+export function Section({
+  title,
+  heading = 'small',
+  children,
+}: {
+  title?: string;
+  /** `block`: o cabeçalho das raízes (`BlockHeader`). `small`: o título das telas empurradas. */
+  heading?: 'small' | 'block';
+  children: ReactNode;
+}) {
   const theme = useTheme();
   const items = Children.toArray(children);
 
   return (
-    <View style={styles.section}>
+    <View style={[styles.section, heading === 'block' && styles.sectionBloco]}>
       {title ? (
-        <ThemedText type="smallBold" style={styles.sectionTitle}>
-          {title}
-        </ThemedText>
+        heading === 'block' ? (
+          <BlockHeader title={title} />
+        ) : (
+          <ThemedText type="smallBold" style={styles.sectionTitle}>
+            {title}
+          </ThemedText>
+        )
       ) : null}
       {/* Mesma superfície do `Card`: chapada, com o fio de 1px fazendo a borda do grupo. */}
       <View
@@ -274,6 +288,7 @@ const styles = StyleSheet.create({
   section: {
     gap: Space.xs + 2,
   },
+  sectionBloco: { gap: Space.md },
   /** O título do grupo: tinta, 14/600, caixa normal — o mesmo do `SectionHead`. */
   sectionTitle: {
     paddingHorizontal: Space.lg,

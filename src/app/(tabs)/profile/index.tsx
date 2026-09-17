@@ -93,7 +93,7 @@ export default function ProfileScreen() {
   };
 
   const aparencia = (
-    <Section title="Aparência">
+    <Section heading="block" title="Aparência">
       <View style={styles.temaRow}>
         {/* Sem subtítulo: o segmentado ao lado já diz qual tema vale. */}
         <View style={styles.temaText}>
@@ -182,7 +182,7 @@ export default function ProfileScreen() {
   const rotuloCiclo = diaAtual == null ? 'Último dia do mês' : `Fecha todo dia ${diaAtual}`;
 
   const cicloConfig = (
-    <Section title="Meu mês">
+    <Section heading="block" title="Meu mês">
       <Row
         title={rotuloCiclo}
         subtitle={
@@ -375,7 +375,7 @@ export default function ProfileScreen() {
         Dentro da seção a ordem é **Nome → e-mail → WhatsApp**: é a ordem em que uma pessoa diz
         quem é, e vai do que ela escolheu para o que confirma o vínculo.
       */}
-      <Section title="Conta">
+      <Section heading="block" title="Conta">
         <Row
           title="Nome"
           subtitle={nome ?? 'Ninguém te chama pelo nome ainda'}
@@ -475,7 +475,7 @@ export default function ProfileScreen() {
         hasVerifiedPhone={!!phone}
       />
 
-      <Section title="Dados">
+      <Section heading="block" title="Dados">
         <Row title="Lixeira de notas" icon="trash" onPress={() => router.push('/notes/trash')} />
         <Row title="Regras" subtitle="Categoria automática por palavra" icon="wand.and.stars" onPress={() => router.push('/finance/rules')} />
         <Row title="Importar extrato" icon="square.and.arrow.down" onPress={() => router.push('/import')} />
@@ -566,7 +566,7 @@ function AppUpdateSection() {
 
   const action = appUpdateAction(appUpdate.state);
   return (
-    <Section title="App">
+    <Section heading="block" title="App">
       <Row
         title="Atualização do app"
         subtitle={appUpdateSubtitle(appUpdate.state, appUpdate.installedVersionName)}

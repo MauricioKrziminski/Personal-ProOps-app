@@ -100,7 +100,7 @@ export function AlertPreferencesSection({
   const busy = preferences.isLoading || setPreference.isPending;
 
   return (
-    <Section title="Notificações">
+    <Section heading="block" title="Notificações">
       <Row
         title="Avisos financeiros no celular"
         subtitle={pushSubtitle({
