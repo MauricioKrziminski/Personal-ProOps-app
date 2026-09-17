@@ -30,25 +30,24 @@ function pushSubtitle({
   blocker: string | null;
 }): string {
   if (failed) return 'Não deu para verificar';
-  if (enabled && registered) return 'Ativados como notificação';
+  // O estado ligado/desligado está no interruptor ao lado: o subtítulo só fala quando há algo a
+  // resolver.
+  if (enabled && registered) return '';
   if (enabled) return blocker ?? 'Este aparelho perdeu o token';
-  if (registered) return 'Desligados — o token continua disponível para seus lembretes';
-  return blocker ?? 'Desligados — ative para receber notificações';
+  if (registered) return '';
+  return blocker ?? '';
 }
 
 function whatsappSubtitle({
   failed,
-  enabled,
   hasVerifiedPhone,
 }: {
   failed: boolean;
-  enabled: boolean;
   hasVerifiedPhone: boolean;
 }): string {
   if (failed) return 'Não deu para verificar';
-  if (!hasVerifiedPhone) return 'Conecte e verifique um telefone para ativar';
-  if (enabled) return 'Ativados para orçamento, faturas e saldo';
-  return 'Desligados — você não receberá avisos por WhatsApp';
+  if (!hasVerifiedPhone) return 'Conecte o WhatsApp para ativar';
+  return '';
 }
 
 /** Preferências dos avisos inferidos; lembretes pessoais continuam independentes. */
@@ -131,7 +130,6 @@ export function AlertPreferencesSection({
         title="Avisos financeiros no WhatsApp"
         subtitle={whatsappSubtitle({
           failed: preferences.isError,
-          enabled: whatsappEnabled,
           hasVerifiedPhone,
         })}
         icon="bubble.left"

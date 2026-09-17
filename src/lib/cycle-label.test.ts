@@ -99,21 +99,21 @@ test('realizado == total some: repetir o <Money> ao lado é eco (§1)', () => {
     ciclo({ estado: 'fechado', entrou: 633062, entrou_realizado: 633062, saiu: 719787, saiu_realizado: 719787 }),
     brl,
   );
-  assert.equal(r.entra, 'salário, pix e o que mais cai na conta');
-  assert.equal(r.sai, 'faturas, parcelas, boletos e gastos');
+  assert.equal(r.entra, '');
+  assert.equal(r.sai, '');
 });
 
-test('ciclo PREVISTO fica com o subtítulo descritivo', () => {
+test('ciclo PREVISTO fica sem subtítulo', () => {
   // Lá o realizado é zero por definição: "nada ainda" diria só que o futuro não aconteceu.
   const r = describeRealizado(ciclo({ estado: 'previsto' }), brl);
-  assert.equal(r.entra, 'salário, pix e o que mais cai na conta');
-  assert.equal(r.sai, 'faturas, parcelas, boletos e gastos');
+  assert.equal(r.entra, '');
+  assert.equal(r.sai, '');
 });
 
 test('sem série (primeiro frame) não inventa sub-linha', () => {
   const r = describeRealizado(null, brl);
-  assert.equal(r.entra, 'salário, pix e o que mais cai na conta');
-  assert.equal(r.sai, 'faturas, parcelas, boletos e gastos');
+  assert.equal(r.entra, '');
+  assert.equal(r.sai, '');
 });
 
 test('o valor passa pelo brl recebido — é o useBRL, que obedece ao esconder saldo', () => {

@@ -844,19 +844,19 @@ export default function TodayScreen() {
                         <ThemedText type="code" themeColor="textSecondary">
                           {timeOf(r.next_run_at)}
                         </ThemedText>
-                        <View style={[styles.metaDot, { backgroundColor: theme.separator }]} />
+                        {/* Só o canal que foge do padrão ganha palavra: o lembrete comum chega no
+                            próprio app, e escrever "no app" em toda linha era ruído. */}
                         {r.channel === 'whatsapp' ? (
-                          <View style={styles.tag}>
-                            <Icon name="bubble.left" size="xs" color="success" />
-                            <ThemedText type="caption" themeColor="success">
-                              via WhatsApp
-                            </ThemedText>
-                          </View>
-                        ) : (
-                          <ThemedText type="caption" themeColor="textSecondary">
-                            no app
-                          </ThemedText>
-                        )}
+                          <>
+                            <View style={[styles.metaDot, { backgroundColor: theme.separator }]} />
+                            <View style={styles.tag}>
+                              <Icon name="bubble.left" size="xs" color="success" />
+                              <ThemedText type="caption" themeColor="success">
+                                via WhatsApp
+                              </ThemedText>
+                            </View>
+                          </>
+                        ) : null}
                       </View>
                     </View>
                     <Icon name={r.recurrence ? 'arrow.clockwise' : 'bell'} size="sm" color="textSecondary" />

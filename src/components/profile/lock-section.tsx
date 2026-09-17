@@ -57,9 +57,12 @@ export function LockSection() {
       <View style={styles.linha}>
         <View style={styles.texto}>
           <ThemedText type="default">Pedir para desbloquear ao abrir</ThemedText>
-          <ThemedText type="footnote" themeColor="textSecondary">
-            {disponivel ? (mode === 'off' ? 'desligado' : comoAutentica) : 'indisponível'}
-          </ThemedText>
+          {/* Desligado não ganha palavra: o segmentado ao lado já diz "Não". */}
+          {!disponivel || mode !== 'off' ? (
+            <ThemedText type="footnote" themeColor="textSecondary">
+              {disponivel ? comoAutentica : 'indisponível'}
+            </ThemedText>
+          ) : null}
         </View>
         {/*
           Sem bloqueio de tela no celular o controle nem aparece: ligado, ele trancaria o app num
@@ -85,9 +88,6 @@ export function LockSection() {
         <View style={styles.linha}>
           <View style={styles.texto}>
             <ThemedText type="default">Depois de sair do app</ThemedText>
-            <ThemedText type="footnote" themeColor="textSecondary">
-              quando volta a pedir
-            </ThemedText>
           </View>
           <View style={styles.controle}>
             <Segmented

@@ -95,11 +95,9 @@ export default function ProfileScreen() {
   const aparencia = (
     <Section title="Aparência">
       <View style={styles.temaRow}>
+        {/* Sem subtítulo: o segmentado ao lado já diz qual tema vale. */}
         <View style={styles.temaText}>
           <ThemedText type="default">Tema</ThemedText>
-          <ThemedText type="footnote" themeColor="textSecondary">
-            {mode === 'system' ? 'seguindo o aparelho' : mode === 'dark' ? 'sempre escuro' : 'sempre claro'}
-          </ThemedText>
         </View>
         <View style={styles.temaControl}>
           <Segmented
@@ -349,9 +347,9 @@ export default function ProfileScreen() {
         <View style={[styles.idStats, { flexWrap: 'wrap' }]}>
           <Stat
             valor={ia.data ? String(ia.data.lancamentos) : '—'}
-            rotulo="lançamentos por mensagem"
+            rotulo="lançamentos"
           />
-          <Stat valor={ia.data ? String(ia.data.notas) : '—'} rotulo="notas capturadas" />
+          <Stat valor={ia.data ? String(ia.data.notas) : '—'} rotulo="notas" />
           <Stat
             valor={plan.data ? String(plan.data.ai_messages_month) : '—'}
             rotulo={
@@ -482,7 +480,7 @@ export default function ProfileScreen() {
         <Row title="Lixeira de notas" icon="trash" onPress={() => router.push('/notes/trash')} />
         <Row title="Regras" subtitle="Categoria automática por palavra" icon="wand.and.stars" onPress={() => router.push('/finance/rules')} />
         <Row title="Importar extrato" icon="square.and.arrow.down" onPress={() => router.push('/import')} />
-        <Row title="Importações" subtitle="histórico e revisões pendentes" icon="clock.arrow.circlepath" onPress={() => router.push('/import-history')} />
+        <Row title="Importações" icon="clock.arrow.circlepath" onPress={() => router.push('/import-history')} />
       </Section>
 
       {aparencia}
@@ -528,7 +526,7 @@ export default function ProfileScreen() {
           }
         />
         <ScrollView contentContainerStyle={styles.sheetBody} keyboardShouldPersistTaps="handled">
-          <Field label="Nome" hint="É como o app vai te cumprimentar na Hoje.">
+          <Field label="Nome">
             <TextField
               value={nameDraft ?? ''}
               onChangeText={(v) => setNameDraft(v.slice(0, 60))}

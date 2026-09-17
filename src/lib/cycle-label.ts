@@ -62,11 +62,14 @@ export function describeCycle(c: CycleLike, nomeDoMes: string): CycleLabel {
   };
 }
 
-/** O que a linha É — o texto que fica quando o realizado não acrescenta nada. */
-const PADRAO = {
-  entra: 'salário, pix e o que mais cai na conta',
-  sai: 'faturas, parcelas, boletos e gastos',
-};
+/**
+ * Quando o realizado não acrescenta nada, a linha fica SEM subtítulo.
+ *
+ * Era uma frase descritiva ("salário, pix e o que mais cai na conta"), e ela explicava o que o
+ * título já diz. Saiu com o corte de texto de 16/09/2026 (*"ta muito texto, somente o
+ * essencial"*): o subtítulo só existe quando diz algo que a pessoa não sabe — quanto já caiu.
+ */
+const PADRAO = { entra: '', sai: '' };
 
 export interface CycleFlowLike {
   estado: string;
