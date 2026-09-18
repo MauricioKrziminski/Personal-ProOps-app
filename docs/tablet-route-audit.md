@@ -7,21 +7,23 @@ leitura ou tarefa com largura limitada. As URLs e ações compactas continuam se
 
 ## Navegação
 
-- Android compacto mantém a pílula; Android médio/amplo usa o rail próprio do Android.
+- Android compacto, médio e amplo usam a mesma `PillTabBar` inferior. A tentativa de rail no
+  tablet foi rejeitada por Gabriel em 18/09 e removida; a seleção continua ligada à rota.
 - iPhone e iPad usam `NativeTabs`. Por decisão de Gabriel em 18/09, a barra nativa do iPadOS
   permanece no topo. Os cinco SF Symbols estão declarados no `NativeTabs.Trigger.Icon`; na
   captura do iPadOS 26 a apresentação superior mostra só os rótulos.
-- Captura local atual: `/private/tmp/proops-ipad-native-restored.png`. Ela comprova renderização
-  da barra nativa em retrato, não toque, animação ou acessibilidade.
+- Capturas locais atuais: `/private/tmp/proops-ipad-notes-preview.png` e
+  `/private/tmp/proops-android-tablet-final.png`. Elas comprovam a posição das barras e a
+  composição de Notas/Hoje em retrato, não acessibilidade ou tato em aparelho físico.
 
 ## Rotas de uso
 
 | Rota | Tratamento | Evidência nesta sessão |
 |---|---|---|
 | `/today` | Reestruturada | Código; captura incremental anterior |
-| `/notes` | Reestruturada | Código e captura iPad atual da barra nativa |
+| `/notes` | Reestruturada | Código e captura iPad atual com duas colunas de pastas e prévia real |
 | `/finance` | Reestruturada | Código; captura incremental anterior |
-| `/agent` | Reestruturada | Código e captura iPad da lista e painel inicial |
+| `/agent` | Reestruturada | Código e capturas iPad/Android da lista e painel inicial |
 | `/profile` | Reestruturada | Código; captura incremental anterior |
 | `/finance/transactions` | Reestruturada | Código; captura incremental anterior |
 | `/finance/[txId]` | Reestruturada | Código; captura atual pendente |
@@ -71,15 +73,25 @@ normais de uso. O grupo Financeiro soma 21 destinos incluindo a raiz `/finance`.
 
 ## Verificação e pendências
 
-- Após as alterações desta etapa: `npm test` passou com **613/613**, `npx tsc --noEmit`,
+- Após as alterações desta etapa: `npm test` passou com **609/609**, `npx tsc --noEmit`,
   `npm run lint` e `git diff --check` saíram com código zero.
 - iPad Air 11 (M4), iPadOS 26.5: capturas locais em retrato da barra nativa, Notas, Agente e
   Pessoas. A tela de Pessoas atual está em `/private/tmp/proops-ipad-members-tablet.png`;
   Agente em `/private/tmp/proops-ipad-agent-root.png` e conversa nova em
   `/private/tmp/proops-ipad-agent-new.png`. Os PNGs são evidência local temporária, não foram
   colocados no Git porque mostram dados de staging.
-- Não havia emulador Android conectado na checagem de 18/09. Capturas Android anteriores
-  ajudam na revisão incremental, mas não provam o último diff.
+- O AVD Android tablet (1280×800 dp) foi apontado explicitamente para o Metro local
+  `10.0.2.2:8083`. Capturas anteriores à troca vinham da porta 8081 e foram descartadas. A
+  captura após o bundle atual, com Hoje em duas áreas e a pílula inferior, está em
+  `/private/tmp/proops-android-tablet-final.png`; a tela de Notas com a barra inferior está em
+  `/private/tmp/proops-android-notes-final.png`. As três escalas de animação do AVD estavam em
+  `0`; foram ativadas em `1` só nesse emulador. Com a barra inferior montada, a posição da mola
+  progrediu por valores intermediários de 0 a 1 e passou ligeiramente do destino antes de voltar.
+  Isso prova a transição no emulador com movimento habilitado; com movimento reduzido o sistema
+  elimina a transição, como documentado pelo Reanimated.
+- O AVD Android celular `s26` iniciou, mas o dev client já instalado nele não expôs uma Activity
+  inicial para lançamento. A preservação do fluxo compacto foi verificada pelo código e testes;
+  falta captura atual em um celular Android funcional.
 - Faltam percorrer cada rota no build atual, paisagem, janela estreita, tema escuro, fonte
   ampliada, teclado, estados vazio/erro, toque, Back, gestos e VoiceOver/TalkBack. O simulador
   desta sessão aceita deep links e capturas, mas não ofereceu controle de toque. Nenhum desses

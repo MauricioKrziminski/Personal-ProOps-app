@@ -132,7 +132,6 @@ function screen(file: string, options: { tablet?: boolean; debts?: any[]; invoic
         useAdaptiveWindow: () => ({
           width: options.tablet ? 1280 : 384,
           windowClass: options.tablet ? 'expanded' : 'compact',
-          androidRail: Boolean(options.tablet),
           fontScale: 1,
         }),
       };

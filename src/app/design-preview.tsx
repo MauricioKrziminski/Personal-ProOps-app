@@ -5,12 +5,10 @@ import { router, useLocalSearchParams } from 'expo-router';
 import { Platform, StyleSheet, View, useWindowDimensions } from 'react-native';
 
 import { PillTabBar, type PillTab } from '@/components/ui/pill-tab-bar';
-import { TabletNavigationRail } from '@/components/ui/tablet-navigation-rail';
 import { previewAccountBalances } from '@/design/preview-account-balances';
 import { seedFinanceAnalysisPreview } from '@/design/preview-finance-analysis';
 import { seedFinancePeriodPreview } from '@/design/preview-finance-cache';
 import { previewScreenFromParam } from '@/design/preview-root';
-import { useAdaptiveWindow } from '@/hooks/use-adaptive-window';
 import type { AiMonthStats, PlanStatus } from '@/hooks/use-finance';
 import { localISODate } from '@/hooks/use-items';
 import { useTheme } from '@/hooks/use-theme';
@@ -219,7 +217,6 @@ export default function DesignPreviewScreen() {
   const { screen } = useLocalSearchParams<{ screen?: string }>();
   const requestedRoot = previewScreenFromParam(screen);
   const { height } = useWindowDimensions();
-  const { androidRail } = useAdaptiveWindow();
   const [abaDoPasso, setAbaDoPasso] = useState<(typeof ABAS)[number]>('Hoje');
   /**
    * A faixa vertical. Era derivada de `passo`, e por isso tocar na barra do Android trocava a
@@ -252,11 +249,10 @@ export default function DesignPreviewScreen() {
 
   const client = useMemo(() => seedClient(), []);
   const showChrome = Platform.OS === 'android' && RAIZES.has(aba);
-  const showTabletRail = showChrome && androidRail;
   const selectTab = (index: number) => {
     if (requestedRoot) {
       const target = TABS_ANDROID[index];
-      // Keep the same preview instance alive: replacing the route remounts the rail mid-spring.
+      // Keep the same preview instance alive so the pill can finish its spring.
       if (target) router.setParams({ screen: target.name });
       return;
     }
@@ -271,14 +267,7 @@ export default function DesignPreviewScreen() {
 
   return (
     <QueryClientProvider client={client}>
-      <View style={[styles.root, showTabletRail && styles.withRail, { backgroundColor: theme.background }]}>
-        {showTabletRail ? (
-          <TabletNavigationRail
-            tabs={TABS_ANDROID}
-            activeIndex={ABA_PARA_TAB[aba] ?? 0}
-            onSelect={selectTab}
-          />
-        ) : null}
+      <View style={[styles.root, { backgroundColor: theme.background }]}>
         <View style={styles.janela}>
           <View
             style={{
@@ -318,7 +307,7 @@ export default function DesignPreviewScreen() {
             justamente o que essas faixas existem para mostrar — o "Registrar pagamento" da Fatura
             ficava embaixo dela.
           */}
-          {showChrome && !showTabletRail ? (
+          {showChrome ? (
             <PillTabBar
               tabs={TABS_ANDROID}
               activeIndex={ABA_PARA_TAB[aba] ?? 0}
@@ -1030,6 +1019,5 @@ function seedClient() {
 
 const styles = StyleSheet.create({
   root: { flex: 1 },
-  withRail: { flexDirection: 'row' },
   janela: { flex: 1, overflow: 'hidden' },
 });

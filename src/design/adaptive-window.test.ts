@@ -54,18 +54,18 @@ test('normalizes invalid container measurements', () => {
 
 test('keeps compact roots at their existing width and pill clearance', () => {
   assert.equal(rootContentMaxWidth(384, false), 800);
-  assert.equal(bottomPillInset('android', true, 'compact', 76), 76);
+  assert.equal(bottomPillInset('android', true, 76), 76);
 });
 
-test('lets a tablet root spread without leaving phantom pill clearance', () => {
+test('keeps bottom pill clearance on medium and expanded Android roots', () => {
+  assert.equal(rootContentMaxWidth(720, true), 1200);
   assert.equal(rootContentMaxWidth(1280, true), 1200);
-  assert.equal(bottomPillInset('android', true, 'medium', 76), 0);
-  assert.equal(bottomPillInset('android', true, 'expanded', 76), 0);
+  assert.equal(bottomPillInset('android', true, 76), 76);
 });
 
 test('does not invent an Android pill inset for pushed routes or iPad', () => {
-  assert.equal(bottomPillInset('android', false, 'compact', 76), 0);
-  assert.equal(bottomPillInset('ios', true, 'expanded', 76), 0);
+  assert.equal(bottomPillInset('android', false, 76), 0);
+  assert.equal(bottomPillInset('ios', true, 76), 0);
 });
 
 test('Today uses measured content width to decide its editorial split', () => {

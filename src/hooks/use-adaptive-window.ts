@@ -1,4 +1,4 @@
-import { Platform, useWindowDimensions } from 'react-native';
+import { useWindowDimensions } from 'react-native';
 
 import { classifyWindow } from '@/design/adaptive-window';
 
@@ -10,6 +10,5 @@ export function useAdaptiveWindow() {
     width,
     fontScale,
     windowClass,
-    androidRail: Platform.OS === 'android' && windowClass !== 'compact',
   };
 }

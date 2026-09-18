@@ -1,4 +1,5 @@
-import { StyleSheet, useWindowDimensions } from 'react-native';
+import { useState } from 'react';
+import { StyleSheet, View, useWindowDimensions } from 'react-native';
 import Animated, { FadeInDown, type useAnimatedRef } from 'react-native-reanimated';
 
 import { FolderCard, folderTileHeight } from '@/components/notes/folder-card';
@@ -9,11 +10,12 @@ import type { NoteFolder } from '@/hooks/use-notes';
 /**
  * A grade de pastas — a home (pastas raiz) e a tela de uma pasta (subpastas).
  *
- * ## Duas colunas, três só em tela larga
+ * ## Duas colunas, três só quando a própria grade é larga
  *
  * A 384dp com a calha de 16 sobram 352: em três colunas o ladrilho fica com 112, e nele o nome
  * de uma pasta de duas palavras quebra em três linhas. Duas colunas dão 172, que é onde
- * "Universidade" cabe numa linha só. Acima de 520dp (tablet, paisagem) cabem três.
+ * "Universidade" cabe numa linha só. Acima de 520dp na área da grade cabem três. A largura
+ * da janela não serve no iPad: a biblioteca ocupa só uma coluna ao lado da leitura.
  *
  * ## O vão entre ladrilhos é MAIOR que o respiro dentro deles
  *
@@ -55,37 +57,40 @@ export function FolderGrid({
   onMenu: (folder: NoteFolder) => void;
   onReorder: (ids: string[]) => void;
 }) {
-  const { width, fontScale } = useWindowDimensions();
+  const { fontScale } = useWindowDimensions();
+  const [gridWidth, setGridWidth] = useState(0);
 
   return (
-    <Reorderable
-      data={pastas}
-      keyExtractor={(f) => f.id}
-      columns={width >= 520 ? 3 : 2}
-      tileHeight={folderTileHeight(fontScale)}
-      gap={Space.md}
-      enabled={enabled}
-      activation="toque-longo"
-      scrollRef={scrollRef}
-      topInset={topInset}
-      viewportHeight={viewportHeight || undefined}
-      bottomInset={bottomInset}
-      onDragStateChange={onDragStateChange}
-      onTapItem={(i) => onMenu(pastas[i])}
-      onReorder={onReorder}
-      renderItem={({ item, index, active }) => (
-        // A grade se MONTA, em cascata — é explicação, não enfeite: o olho lê a ordem dos
-        // ladrilhos enquanto eles chegam, e o teto de `Motion.stagger.cap` impede que a última
-        // pasta de uma grade grande pareça atrasada.
-        <Animated.View
-          style={styles.celula}
-          entering={FadeInDown.delay(
-            Math.min(index * Motion.stagger.step, Motion.stagger.cap)
-          ).duration(Motion.duration.slow)}>
-          <FolderCard folder={item} dragging={active} onPress={() => onOpen(item)} />
-        </Animated.View>
-      )}
-    />
+    <View onLayout={(event) => setGridWidth(event.nativeEvent.layout.width)}>
+      <Reorderable
+        data={pastas}
+        keyExtractor={(f) => f.id}
+        columns={gridWidth >= 520 ? 3 : 2}
+        tileHeight={folderTileHeight(fontScale)}
+        gap={Space.md}
+        enabled={enabled}
+        activation="toque-longo"
+        scrollRef={scrollRef}
+        topInset={topInset}
+        viewportHeight={viewportHeight || undefined}
+        bottomInset={bottomInset}
+        onDragStateChange={onDragStateChange}
+        onTapItem={(i) => onMenu(pastas[i])}
+        onReorder={onReorder}
+        renderItem={({ item, index, active }) => (
+          // A grade se MONTA, em cascata — é explicação, não enfeite: o olho lê a ordem dos
+          // ladrilhos enquanto eles chegam, e o teto de `Motion.stagger.cap` impede que a última
+          // pasta de uma grade grande pareça atrasada.
+          <Animated.View
+            style={styles.celula}
+            entering={FadeInDown.delay(
+              Math.min(index * Motion.stagger.step, Motion.stagger.cap)
+            ).duration(Motion.duration.slow)}>
+            <FolderCard folder={item} dragging={active} onPress={() => onOpen(item)} />
+          </Animated.View>
+        )}
+      />
+    </View>
   );
 }
 

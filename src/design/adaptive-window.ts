@@ -1,6 +1,5 @@
 export type WindowClass = 'compact' | 'medium' | 'expanded';
 
-export const RAIL_WIDTH = 88;
 export const PANE_GAP = 24;
 
 const MIN_MAIN_WIDTH = 560;
@@ -55,10 +54,7 @@ export function chartWidthForPane(paneWidthDp: number, horizontalInsetDp: number
 export function bottomPillInset(
   platform: string,
   hasTopBar: boolean,
-  windowClass: WindowClass,
   pillSpace: number,
 ) {
-  return platform === 'android' && hasTopBar && windowClass === 'compact'
-    ? pillSpace
-    : 0;
+  return platform === 'android' && hasTopBar ? pillSpace : 0;
 }

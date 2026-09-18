@@ -49,6 +49,8 @@ import { SORT_LABEL, useNoteSort } from '@/hooks/use-note-sort';
 import { useTelaPronta } from '@/hooks/use-tela-pronta';
 import { useTheme } from '@/hooks/use-theme';
 import { showItemActions } from '@/lib/item-actions';
+import { relativeBR } from '@/lib/dates';
+import { notePreview, noteTitle } from '@/lib/search';
 
 /**
  * O que a barra de abas cobre do pé da rolagem, para a faixa do auto-scroll ficar ALCANÇÁVEL.
@@ -534,7 +536,7 @@ export default function NotesScreen() {
               scrollRef={scrollRef}
               topInset={topoPastas}
               viewportHeight={alturaVisivel}
-              bottomInset={tablet ? 0 : DOCK}
+              bottomInset={tablet && Platform.OS === 'ios' ? 0 : DOCK}
               onDragStateChange={setArrastando}
               onOpen={(f) => router.push(`/notes/folder/${f.id}`)}
               onMenu={menuDaPasta}
@@ -562,7 +564,7 @@ export default function NotesScreen() {
               scrollRef={scrollRef}
               topInset={topoFixadas}
               viewportHeight={alturaVisivel}
-              bottomInset={tablet ? 0 : DOCK}
+              bottomInset={tablet && Platform.OS === 'ios' ? 0 : DOCK}
               onDragStateChange={setArrastando}
               onReorder={(ids) =>
                 reorderNotes.mutate(ids, {
@@ -589,7 +591,7 @@ export default function NotesScreen() {
               scrollRef={scrollRef}
               topInset={topoSoltas}
               viewportHeight={alturaVisivel}
-              bottomInset={tablet ? 0 : DOCK}
+              bottomInset={tablet && Platform.OS === 'ios' ? 0 : DOCK}
               onDragStateChange={setArrastando}
               onReorder={(ids) =>
                 reorderNotes.mutate(ids, {
@@ -611,19 +613,44 @@ export default function NotesScreen() {
       {tablet ? (
         <NotesTabletLibrary
           library={biblioteca}
-          prompt={
-            <View style={[styles.readingPrompt, { backgroundColor: theme.surface, borderColor: theme.cardBorder }]}>
-              <View style={[styles.readingMark, { backgroundColor: theme.backgroundElement }]}>
-                <Icon name="book" size="xl" color="textSecondary" />
-              </View>
-              <View style={styles.readingCopy}>
-                <ThemedText type="subtitle">Um lugar para desenvolver ideias</ThemedText>
-                <ThemedText type="small" themeColor="textSecondary">
-                  Escolha uma nota na biblioteca para ler ou editar. Comece outra quando a ideia chegar.
-                </ThemedText>
-              </View>
-              <Button label="Nova nota" icon="square.and.pencil" variant="secondary" onPress={() => router.push('/notes/new')} />
-            </View>
+          reading={
+            <ScrollView
+              style={[styles.readingPane, { backgroundColor: theme.surface, borderColor: theme.cardBorder }]}
+              contentContainerStyle={styles.readingContent}
+              showsVerticalScrollIndicator={false}>
+              {notes[0] ? (
+                <View style={styles.notePreview}>
+                  <ThemedText type="caption" themeColor="textSecondary">PRÉVIA</ThemedText>
+                  <ThemedText type="title">{noteTitle(notes[0].content) || 'Sem título'}</ThemedText>
+                  <ThemedText type="small" themeColor="textSecondary">
+                    Atualizada {relativeBR(notes[0].updated_at)}
+                  </ThemedText>
+                  {notePreview(notes[0].content) ? (
+                    <ThemedText type="default" style={styles.previewBody}>
+                      {notePreview(notes[0].content)}
+                    </ThemedText>
+                  ) : null}
+                  <Button
+                    label="Abrir nota"
+                    icon="arrow.up.right"
+                    variant="secondary"
+                    onPress={() => router.push(`/notes/${notes[0].id}`)}
+                  />
+                </View>
+              ) : (
+                <View style={styles.readingEmpty}>
+                  <View style={[styles.readingMark, { backgroundColor: theme.backgroundElement }]}>
+                    <Icon name="book" size="xl" color="textSecondary" />
+                  </View>
+                  <View style={styles.readingCopy}>
+                    <ThemedText type="subtitle" style={styles.readingText}>Suas ideias começam aqui</ThemedText>
+                    <ThemedText type="small" themeColor="textSecondary" style={styles.readingText}>
+                      Escolha uma pasta ou crie uma nota para começar.
+                    </ThemedText>
+                  </View>
+                </View>
+              )}
+            </ScrollView>
           }
         />
       ) : biblioteca}
@@ -689,26 +716,35 @@ export default function NotesScreen() {
 const styles = StyleSheet.create({
   tabletShell: { paddingHorizontal: Space.lg },
   libraryScroll: { flex: 1 },
-  conteudoTablet: { maxWidth: undefined, paddingHorizontal: 0, paddingBottom: Space.xxxl },
-  readingPrompt: {
-    minHeight: 360,
+  conteudoTablet: { maxWidth: undefined, paddingHorizontal: 0 },
+  readingPane: {
+    flex: 1,
     borderRadius: Radius.md,
     borderCurve: 'continuous',
     borderWidth: StyleSheet.hairlineWidth,
+  },
+  readingContent: {
+    flexGrow: 1,
     padding: Space.xxl,
-    alignItems: 'flex-start',
+  },
+  notePreview: { alignItems: 'flex-start', gap: Space.md },
+  previewBody: { marginTop: Space.lg, lineHeight: 28 },
+  readingEmpty: {
+    flex: 1,
+    alignItems: 'center',
     justifyContent: 'center',
-    gap: Space.xl,
+    gap: Space.lg,
   },
   readingMark: {
-    width: 72,
-    height: 72,
+    width: 64,
+    height: 64,
     borderRadius: Radius.lg,
     borderCurve: 'continuous',
     alignItems: 'center',
     justifyContent: 'center',
   },
-  readingCopy: { gap: Space.sm, maxWidth: 480 },
+  readingCopy: { gap: Space.sm, maxWidth: 340, alignItems: 'center' },
+  readingText: { textAlign: 'center' },
   /** O rótulo é um botão: alvo de 44pt (§11), não a altura natural de uma linha de `caption`. */
   alvoRecolher: { minHeight: HitTarget, justifyContent: 'center' },
   conteudo: {

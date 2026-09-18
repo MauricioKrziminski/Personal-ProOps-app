@@ -114,7 +114,7 @@ export function Screen({
   wide = false,
 }: ScreenProps) {
   const theme = useTheme();
-  const { width, windowClass } = useAdaptiveWindow();
+  const { width } = useAdaptiveWindow();
   const [pulling, setPulling] = useState(false);
   const insets = useSafeAreaInsets();
   const headerHeight = useAppHeaderHeight();
@@ -129,7 +129,7 @@ export function Screen({
    * desenha POR CIMA do conteúdo. `topBar` é o sinal de que esta é uma raiz de aba — telas
    * empurradas não têm barra e não devem ganhar o respiro.
    */
-  const tabBarSpace = bottomPillInset(Platform.OS, Boolean(topBar), windowClass, TAB_BAR_SPACE);
+  const tabBarSpace = bottomPillInset(Platform.OS, Boolean(topBar), TAB_BAR_SPACE);
   /** A altura do FAB mais o respiro dele, para nenhum conteúdo terminar embaixo do botão. */
   const fabSpace = floatingAction ? FAB_CLEARANCE : 0;
   const padding = [

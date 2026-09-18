@@ -1,7 +1,7 @@
 import { FlashList } from '@shopify/flash-list';
 import { router } from 'expo-router';
 import { useCallback, useMemo, useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { Platform, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 
 import { ConversationRow } from '@/components/agent/conversation-row';
 import { AgentHomeHeader } from '@/components/agent/agent-home-header';
@@ -134,7 +134,9 @@ export default function AgentScreen() {
         contentContainerStyle={{
           paddingTop: Space.sm,
           paddingHorizontal: Space.lg,
-          paddingBottom: tablet ? Space.xxxl : TAB_BAR_SPACE,
+          paddingBottom: tablet
+            ? Space.xxxl + (Platform.OS === 'android' ? TAB_BAR_SPACE : 0)
+            : TAB_BAR_SPACE,
           width: '100%',
           maxWidth: tablet ? undefined : MaxContentWidth,
           alignSelf: 'center',

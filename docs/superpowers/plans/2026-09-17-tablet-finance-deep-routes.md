@@ -1,5 +1,8 @@
 # Tablet Finance Deep Routes Implementation Plan
 
+> **Revisão de 18/09/2026:** qualquer referência a rail Android abaixo está superada. A
+> navegação Android mantém a `PillTabBar` inferior no tablet.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Make every pushed Financeiro destination useful and readable on Android tablets and iPad without changing financial contracts or the compact flow.
@@ -13,7 +16,7 @@
 - Work only in `/private/tmp/personal-proops-tablet-20260917` on `feat/tablet-adaptive`; preserve the shared checkout and its uncommitted Agent work.
 - Read `AGENTS.md`, the approved `docs/superpowers/specs/2026-09-17-tablet-adaptive-design.md`, and exact Expo 57 docs before source edits.
 - Preserve cent-based money, query/cache keys, loading/empty/error states, destructive confirmations, concealment, VoiceOver/TalkBack labels, native iPad headers, and the compact view.
-- Android phone: compact pill. Android tablet: adaptive rail. iPad: native tab/sidebar semantics from Expo Router; no Android chrome on iOS.
+- Android phone and tablet: bottom pill. iPad: native tab semantics from Expo Router; no Android chrome on iOS.
 - Do not add a visual library unless an exact capability gap and Expo 57 compatibility are demonstrated.
 - Source edits use `apply_patch`; tests begin red; commit explicit paths only, never the `node_modules` symlink.
 

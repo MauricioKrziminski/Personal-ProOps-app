@@ -2,16 +2,16 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { test } from 'node:test';
 
-test('tablet rail enters on every app reveal and keeps the selection contents attached to the moving mask', () => {
-  const rail = readFileSync('src/components/ui/tablet-navigation-rail.tsx', 'utf8');
-  assert.match(rail, /useRelogioDeEntrada\(/, 'rail must share the root entrance clock');
-  assert.match(rail, /progressoDeEntrada\(relogio\.get\(\)\)/);
-  assert.match(rail, /overflow:\s*'hidden'/, 'selected surface clips the dark icon and label');
-  assert.match(rail, /translateY:\s*-selected\.get\(\)/, 'the selected contents counter-translate');
-  assert.doesNotMatch(rail, /active\s*\?\s*'heroSurface'/, 'text color cannot jump before the rail indicator arrives');
+test('the Android pill enters on app reveal and moves the selected icon with its circle', () => {
+  const pill = readFileSync('src/components/ui/pill-tab-bar.tsx', 'utf8');
+  assert.match(pill, /useRelogioDeEntrada\(/, 'pill must share the root entrance clock');
+  assert.match(pill, /progressoDeEntrada\(relogio\.get\(\)\)/);
+  assert.match(pill, /withSpring\(destino, Motion\.spring\.tab\)/, 'selection moves from the tap');
+  assert.match(pill, /overflow:\s*'hidden'/, 'selected surface clips the dark icon');
+  assert.match(pill, /translateX:\s*-esquerda\.get\(\)/, 'icon row counter-translates');
 });
 
-test('preview tab taps update params in place so the rail does not remount mid-flight', () => {
+test('preview tab taps update params in place so the pill does not remount mid-flight', () => {
   const preview = readFileSync('src/app/design-preview.tsx', 'utf8');
   assert.match(preview, /router\.setParams\(\{ screen: target\.name \}\)/);
 });
