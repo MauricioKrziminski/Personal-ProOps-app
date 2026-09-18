@@ -20,3 +20,12 @@ test('annual report puts year-end evidence beside the categories without changin
   assert.match(source, /setAno\(a\)/);
   assert.match(source, /data\.yearEnd/);
 });
+
+test('net worth keeps the trend beside the account and asset evidence', () => {
+  const source = readFileSync('src/app/finance/net-worth.tsx', 'utf8');
+  assert.match(source, /<FinanceAnalysisPanes/);
+  assert.match(source, /<Screen wide=\{tablet\}/);
+  assert.match(source, /useNetWorthSeries\(Number\(janela\)\)/);
+  assert.match(source, /confirmDestructive/);
+  assert.match(source, /onPress=\{salvar\}/);
+});
