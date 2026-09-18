@@ -21,6 +21,7 @@ import { Stack } from 'expo-router';
 import { MaxContentWidth } from '@/constants/theme';
 import { bottomPillInset, rootContentMaxWidth } from '@/design/adaptive-window';
 import { useAppHeaderHeight } from '@/components/ui/app-header';
+import { GlassReady } from '@/components/ui/glass-backdrop';
 import { progressoDeEntrada, useRelogioDeEntrada } from '@/components/motion/entrada';
 import { TAB_BAR_SPACE } from '@/components/ui/pill-tab-bar';
 import { RolagemDaTela } from '@/components/ui/screen-scroll';
@@ -311,7 +312,10 @@ function BlocoDaCascata({ indice, children }: { indice: number; children: ReactN
     };
   });
   return (
-    <Animated.View style={[styles.cascata, assentado ? styles.noLugar : estilo]}>{children}</Animated.View>
+    <Animated.View style={[styles.cascata, assentado ? styles.noLugar : estilo]}>
+      {/* iOS 26 does not render GlassView mounted below an ancestor at opacity 0. */}
+      <GlassReady ready={assentado}>{children}</GlassReady>
+    </Animated.View>
   );
 }
 

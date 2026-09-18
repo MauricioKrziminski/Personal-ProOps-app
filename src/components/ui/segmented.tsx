@@ -12,8 +12,8 @@ import * as Haptics from 'expo-haptics';
 
 import { GlassBackdrop, supportsLiquidGlass } from '@/components/ui/glass-backdrop';
 import { Fonts } from '@/constants/theme';
-import { HitTarget, Radius, Space, Type } from '@/design/tokens';
-import { useTheme } from '@/hooks/use-theme';
+import { Elevation, HitTarget, Radius, Space, Type } from '@/design/tokens';
+import { useScheme, useTheme } from '@/hooks/use-theme';
 
 type Opcao<T extends string> = { value: T; label: string };
 
@@ -75,6 +75,7 @@ const TRAS = { duration: 520, dampingRatio: 0.9 };
  */
 export function Segmented<T extends string>({ options, value, onChange }: SegmentedProps<T>) {
   const theme = useTheme();
+  const scheme = useScheme();
   const vidro = supportsLiquidGlass();
   const reduzido = useReducedMotion();
   /** Largura de uma célula e altura do polegar, para o ESTILO (comum, não animado). */
@@ -117,7 +118,16 @@ export function Segmented<T extends string>({ options, value, onChange }: Segmen
     <View
       accessibilityRole="tablist"
       onLayout={onLayout}
-      style={[styles.track, { backgroundColor: theme.backgroundElement }]}>
+      style={[
+        styles.track,
+        // The native material needs a transparent host to keep its refraction visible.
+        { backgroundColor: vidro ? 'transparent' : theme.backgroundElement },
+        vidro && {
+          borderWidth: 1,
+          borderColor: theme.glassRim,
+          boxShadow: Elevation[scheme].raised,
+        },
+      ]}>
       {vidro ? <GlassBackdrop fallbackColor={theme.backgroundElement} radius={Radius.pill} tintColor={theme.backgroundElement} /> : null}
       {caixa.celula > 0 ? (
         <Polegar
@@ -170,6 +180,8 @@ function Polegar({
   direita: SharedValue<number>;
 }) {
   const r = altura / 2;
+  const theme = useTheme();
+  const scheme = useScheme();
   const tampaEsquerda = useAnimatedStyle(() => ({
     transform: [{ translateX: esquerda.get() * celula }],
   }));
@@ -194,8 +206,18 @@ function Polegar({
     return (
       <Animated.View
         pointerEvents="none"
-        style={[styles.polegarVidro, { height: altura, borderRadius: r, backgroundColor: cor }, vidro]}>
-        <GlassBackdrop fallbackColor={cor} radius={r} tintColor={cor} />
+        style={[
+          styles.polegarVidro,
+          {
+            height: altura,
+            borderRadius: r,
+            borderWidth: 1,
+            borderColor: theme.glassRim,
+            boxShadow: Elevation[scheme].floating,
+          },
+          vidro,
+        ]}>
+        <GlassBackdrop fallbackColor={cor} radius={r} effectStyle="clear" />
       </Animated.View>
     );
   }
