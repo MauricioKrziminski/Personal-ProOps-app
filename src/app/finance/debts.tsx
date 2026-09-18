@@ -12,6 +12,7 @@ import { TaskHeader } from '@/components/ui/task-header';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { EmptyState } from '@/components/ui/empty-state';
+import { AdaptivePanes } from '@/components/ui/adaptive-panes';
 import { Field, MoneyField, TextField } from '@/components/ui/field';
 import { Icon } from '@/components/ui/icon';
 import { Money } from '@/components/ui/money';
@@ -42,6 +43,7 @@ import { paidInstallments } from '@/lib/debt-history';
 import { debtTerm, financeErrorMessage, simpleDebtValues } from '@/lib/finance-form';
 import { confirmDestructive, showItemActions } from '@/lib/item-actions';
 import { AccountPicker } from '@/components/finance/account-picker';
+import { useAdaptiveWindow } from '@/hooks/use-adaptive-window';
 
 /**
  * Dívidas — "quanto disso é juro, e por onde eu começo?".
@@ -118,6 +120,8 @@ function ErrorBand({ message, onRetry }: { message: string; onRetry: () => void 
 export default function DebtsScreen() {
   // Dinheiro no meio de frase obedece ao "esconder saldo" — `Money` não cabe em texto corrido.
   const brl = useBRL();
+  const { windowClass } = useAdaptiveWindow();
+  const tablet = windowClass !== 'compact';
   const params = useLocalSearchParams<{ create?: string; id?: string }>();
   const theme = useTheme();
   const toast = useToast();
@@ -336,29 +340,17 @@ export default function DebtsScreen() {
     );
   };
 
-  return (
-    <Screen
-      grouped
-      onRefresh={() => Promise.all([debts.refetch(), payoff.refetch(), accounts.refetch(), ...(detalheId || pagandoId ? [schedule.refetch()] : [])])}>
-      <Stack.Screen
-        options={{
-          title: 'Dívidas',
-          headerLargeTitle: true,
-        }}
-      />
+  const loading = debts.isLoading ? (
+    <>
+      <Skeleton height={120} radius={Radius.lg} />
+      <SkeletonRow />
+      <SkeletonRow />
+      <SkeletonRow />
+    </>
+  ) : null;
 
-      <HeaderActions actions={[{ label: 'Nova dívida', icon: 'plus', onPress: abrirNova }]} />
-
-      {debts.isLoading ? (
-        <>
-          <Skeleton height={120} radius={Radius.lg} />
-          <SkeletonRow />
-          <SkeletonRow />
-          <SkeletonRow />
-        </>
-      ) : null}
-
-      {/* O único destaque da tela: o juro total é o número que faz o usuário agir. */}
+  const debtContext = (
+    <View style={styles.paneBody}>
       {debts.isError ? (
         <ErrorBand message="Não deu para carregar suas dívidas." onRetry={debts.refetch} />
       ) : lista.length > 0 ? (
@@ -385,7 +377,6 @@ export default function DebtsScreen() {
         />
       ) : null}
 
-      {/* Com uma dívida só o seletor seria um controle que não muda nada. */}
       {lista.length > 1 && !payoff.isError ? (
         <Card style={styles.ordem}>
           <ThemedText type="smallBold">Por onde começar</ThemedText>
@@ -426,9 +417,12 @@ export default function DebtsScreen() {
           </ThemedText>
         </Card>
       ) : null}
+    </View>
+  );
 
+  const debtListContent = (
+    <View style={styles.paneBody}>
       {lista.map(cartaoDivida)}
-
       {!debts.isLoading && !debts.isError && lista.length === 0 ? (
         <EmptyState
           icon="creditcard.trianglebadge.exclamationmark"
@@ -437,6 +431,49 @@ export default function DebtsScreen() {
           action={{ label: 'Cadastrar dívida', onPress: abrirNova }}
         />
       ) : null}
+    </View>
+  );
+
+  const debtList = (
+    <View style={styles.paneBody}>
+      {loading}
+      {debtListContent}
+    </View>
+  );
+
+  const compactBody = (
+    <>
+      {loading}
+      {debtContext}
+      {debtListContent}
+    </>
+  );
+
+  const tabletBody = (
+    <AdaptivePanes
+      main={debtList}
+      support={debts.isError || lista.length > 0 ? debtContext : undefined}
+      singlePane="main-only"
+      singlePaneContent={compactBody}
+      testID="debts-tablet-workspace"
+    />
+  );
+
+  return (
+    <Screen
+      grouped
+      wide={tablet}
+      onRefresh={() => Promise.all([debts.refetch(), payoff.refetch(), accounts.refetch(), ...(detalheId || pagandoId ? [schedule.refetch()] : [])])}>
+      <Stack.Screen
+        options={{
+          title: 'Dívidas',
+          headerLargeTitle: !tablet,
+        }}
+      />
+
+      <HeaderActions actions={[{ label: 'Nova dívida', icon: 'plus', onPress: abrirNova }]} />
+
+      {tablet ? tabletBody : compactBody}
 
       {/* Amortização — sheet, não acordeão: um financiamento em 60x tem 60 linhas. */}
       <Sheet visible={detalhe !== null} onClose={() => setDetalhe(null)}>
@@ -907,6 +944,10 @@ export default function DebtsScreen() {
 }
 
 const styles = StyleSheet.create({
+  paneBody: {
+    gap: Space.xl,
+    minWidth: 0,
+  },
   hero: {
     gap: Space.sm,
   },

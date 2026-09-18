@@ -25,6 +25,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { ToastDoModal, useToast } from '@/components/ui/toast';
 import { MaxContentWidth } from '@/constants/theme';
 import { Motion, Space, Type, tabular } from '@/design/tokens';
+import { useAdaptiveWindow } from '@/hooks/use-adaptive-window';
 import {
   useDeleteReminder,
   useReminder,
@@ -226,6 +227,8 @@ const deviceTimezone = () => {
 };
 
 export default function ReminderFormScreen() {
+  const { windowClass } = useAdaptiveWindow();
+  const tablet = windowClass !== 'compact';
   // `title` chega do menu "Criar lembrete" do detalhe de nota — pré-preenche e nada mais.
   const params = useLocalSearchParams<{ id?: string; title?: string }>();
   const query = useReminder(params.id);
@@ -234,7 +237,7 @@ export default function ReminderFormScreen() {
     return (
       <Screen scroll={false}>
         <TaskHeader title="Editar lembrete" onClose={() => router.back()} />
-        <View style={[styles.body, styles.loading]}>
+        <View style={[styles.body, tablet && styles.tabletBody, styles.loading]}>
           <Skeleton height={48} />
           <Skeleton height={120} />
           <Skeleton height={120} />
@@ -250,7 +253,7 @@ export default function ReminderFormScreen() {
     return (
       <Screen scroll={false}>
         <TaskHeader title="Lembrete" onClose={() => router.back()} />
-        <View style={styles.body}>
+        <View style={[styles.body, tablet && styles.tabletBody]}>
           <Card>
             <View style={styles.errorCard}>
             <Icon name="bell.slash" size="xl" color="danger" />
@@ -274,15 +277,17 @@ export default function ReminderFormScreen() {
     );
   }
 
-  return <ReminderForm editing={query.data} fallbackTitle={params.title} />;
+  return <ReminderForm editing={query.data} fallbackTitle={params.title} tablet={tablet} />;
 }
 
 function ReminderForm({
   editing,
   fallbackTitle,
+  tablet,
 }: {
   editing?: Reminder;
   fallbackTitle?: string;
+  tablet: boolean;
 }) {
   const insets = useSafeAreaInsets();
   const toast = useToast();
@@ -405,7 +410,7 @@ function ReminderForm({
 
       <KeyboardAwareScrollView
         bottomOffset={Space.xxl}
-        contentContainerStyle={[styles.body, { paddingBottom: insets.bottom + Space.xxl }]}
+        contentContainerStyle={[styles.body, tablet && styles.tabletBody, { paddingBottom: insets.bottom + Space.xxl }]}
         keyboardShouldPersistTaps="handled"
         showsVerticalScrollIndicator={false}
         contentInsetAdjustmentBehavior="automatic">
@@ -848,6 +853,7 @@ const styles = StyleSheet.create({
     maxWidth: MaxContentWidth,
     alignSelf: 'center',
   },
+  tabletBody: { maxWidth: 560 },
   block: {
     gap: Space.lg,
   },
