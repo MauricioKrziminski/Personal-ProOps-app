@@ -16,6 +16,7 @@ import { EmptyState } from '@/components/ui/empty-state';
 import { SearchField } from '@/components/ui/search-field';
 import { BlockHeader } from '@/components/ui/block-header';
 import { TextField } from '@/components/ui/field';
+import { GlassBackdrop, supportsLiquidGlass } from '@/components/ui/glass-backdrop';
 import { Icon } from '@/components/ui/icon';
 import { TAB_BAR_SPACE } from '@/components/ui/pill-tab-bar';
 import { DragScrollView } from '@/components/ui/drag-scroll';
@@ -107,6 +108,7 @@ export default function NotesScreen() {
   const { windowClass } = useAdaptiveWindow();
   const tablet = windowClass !== 'compact';
   const theme = useTheme();
+  const vidro = supportsLiquidGlass();
   const toast = useToast();
 
   const [draft, setDraft] = useState('');
@@ -444,10 +446,17 @@ export default function NotesScreen() {
             style={({ pressed }) => [
               styles.enviar,
               {
-                backgroundColor: draft.trim() ? theme.tintFill : theme.backgroundElement,
+                backgroundColor: !draft.trim()
+                  ? theme.backgroundElement
+                  : vidro
+                    ? 'transparent'
+                    : theme.tintFill,
                 opacity: pressed ? 0.5 : 1,
               },
             ]}>
+            {draft.trim() && vidro ? (
+              <GlassBackdrop fallbackColor={theme.tintFill} radius={Radius.pill} tintColor={theme.glassActionTint} />
+            ) : null}
             {/*
               `onTint`, nunca `text`: a pílula é pintada de `tint`, que é TINTA (quase-preto no
               claro). Com `text` a seta saía preta sobre preto — um disco cego no tema claro.

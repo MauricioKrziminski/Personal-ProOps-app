@@ -5,6 +5,7 @@ import * as Haptics from 'expo-haptics';
 
 import { Calendar } from '@/components/finance/calendar';
 import { ThemedText } from '@/components/themed-text';
+import { GlassBackdrop, supportsLiquidGlass } from '@/components/ui/glass-backdrop';
 import { Icon } from '@/components/ui/icon';
 import { Elevation, Motion, Radius, Space } from '@/design/tokens';
 import { useScheme, useTheme } from '@/hooks/use-theme';
@@ -55,6 +56,7 @@ export function DatePickerField({
   const theme = useTheme();
   const scheme = useScheme();
   const [aberto, setAberto] = useState(false);
+  const vidro = supportsLiquidGlass() && !aberto;
 
   const iso = value && isValidBRDate(value) ? brToISO(value) : null;
 
@@ -64,11 +66,12 @@ export function DatePickerField({
         style={[
           styles.moldura,
           {
-            backgroundColor: theme.surface,
+            backgroundColor: vidro ? 'transparent' : theme.surface,
             borderColor: invalid ? theme.danger : theme.cardBorder,
             boxShadow: Elevation[scheme].raised,
           },
         ]}>
+        {vidro ? <GlassBackdrop fallbackColor={theme.surface} radius={Radius.sm} /> : null}
         <Pressable
           onPress={() => {
             Haptics.selectionAsync();

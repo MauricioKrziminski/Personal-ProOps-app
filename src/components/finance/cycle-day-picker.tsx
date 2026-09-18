@@ -2,6 +2,7 @@ import { Pressable, StyleSheet, View } from 'react-native';
 import * as Haptics from 'expo-haptics';
 
 import { ThemedText } from '@/components/themed-text';
+import { GlassBackdrop, supportsLiquidGlass } from '@/components/ui/glass-backdrop';
 import { Radius, Space, tabular } from '@/design/tokens';
 import { useTheme } from '@/hooks/use-theme';
 
@@ -39,10 +40,12 @@ export function CycleDayPicker({
   onChange: (dia: number | null) => void;
 }) {
   const theme = useTheme();
+  const vidro = supportsLiquidGlass();
 
   return (
     <>
       <View style={styles.grade}>
+        {vidro ? <GlassBackdrop fallbackColor={theme.surface} radius={Radius.sm} /> : null}
         {Array.from({ length: 28 }, (_, i) => i + 1).map((dia) => {
           const escolhido = value === dia;
           return (
@@ -58,10 +61,13 @@ export function CycleDayPicker({
               style={[
                 styles.dia,
                 {
-                  backgroundColor: escolhido ? theme.tintFill : theme.surface,
+                  backgroundColor: vidro ? 'transparent' : escolhido ? theme.tintFill : theme.surface,
                   borderColor: escolhido ? theme.tintFill : theme.cardBorder,
                 },
               ]}>
+              {vidro && escolhido ? (
+                <GlassBackdrop fallbackColor={theme.tintFill} radius={Radius.sm} tintColor={theme.glassActionTint} />
+              ) : null}
               <ThemedText
                 type="default"
                 style={[tabular, escolhido ? { color: theme.onTint } : undefined]}>
@@ -86,10 +92,17 @@ export function CycleDayPicker({
         style={[
           styles.ultimo,
           {
-            backgroundColor: value == null ? theme.tintFill : theme.surface,
+            backgroundColor: vidro ? 'transparent' : value == null ? theme.tintFill : theme.surface,
             borderColor: value == null ? theme.tintFill : theme.cardBorder,
           },
         ]}>
+        {vidro ? (
+          <GlassBackdrop
+            fallbackColor={value == null ? theme.tintFill : theme.surface}
+            radius={Radius.sm}
+            tintColor={value == null ? theme.glassActionTint : undefined}
+          />
+        ) : null}
         <ThemedText type="default" style={value == null ? { color: theme.onTint } : undefined}>
           Último dia do mês
         </ThemedText>

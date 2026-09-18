@@ -11,6 +11,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { ThemedText } from '@/components/themed-text';
 import { PressableScale } from '@/components/motion/pressable-scale';
+import { GlassBackdrop, supportsLiquidGlass } from '@/components/ui/glass-backdrop';
 import { Icon, type IconName } from '@/components/ui/icon';
 import { TAB_BAR_CLEARANCE } from '@/components/ui/pill-tab-bar';
 import { useRolagemDaTela } from '@/components/ui/screen-scroll';
@@ -29,6 +30,7 @@ const LIMIAR = 6;
  */
 export function ExtendedFab({ label, icon, onPress }: { label: string; icon: IconName; onPress: () => void }) {
   const theme = useTheme();
+  const vidro = supportsLiquidGlass();
   const scheme = useScheme();
   const insets = useSafeAreaInsets();
   const reduzido = useReducedMotion();
@@ -74,9 +76,10 @@ export function ExtendedFab({ label, icon, onPress }: { label: string; icon: Ico
         <Animated.View
           style={[
             styles.pilula,
-            { backgroundColor: theme.tintFill, boxShadow: Elevation[scheme].floating },
+            { backgroundColor: vidro ? 'transparent' : theme.tintFill, boxShadow: Elevation[scheme].floating },
             estiloPilula,
           ]}>
+          {vidro ? <GlassBackdrop fallbackColor={theme.tintFill} radius={Radius.pill} tintColor={theme.glassActionTint} /> : null}
           <Icon name={icon} size="md" color="onTint" />
           <Animated.View style={estiloRotulo}>
             <ThemedText type="smallBold" themeColor="onTint" style={styles.semEncolher}>

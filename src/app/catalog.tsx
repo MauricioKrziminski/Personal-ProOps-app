@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Redirect } from 'expo-router';
+import { Redirect, useLocalSearchParams } from 'expo-router';
 import { StyleSheet, View, useWindowDimensions } from 'react-native';
 import { Easing, useSharedValue, withTiming } from 'react-native-reanimated';
 
@@ -13,6 +13,8 @@ import { Row, Section } from '@/components/ui/row';
 import { Screen } from '@/components/ui/screen';
 import { Field, MoneyField, TextField } from '@/components/ui/field';
 import { Segmented } from '@/components/ui/segmented';
+import { Chip } from '@/components/finance/chip';
+import { supportsLiquidGlass } from '@/components/ui/glass-backdrop';
 import { OtpInput } from '@/components/auth/otp-input';
 import { BaseDaPilha, CardFace } from '@/components/finance/card-face';
 import { Skeleton, SkeletonRow } from '@/components/ui/skeleton';
@@ -38,10 +40,64 @@ export default function CatalogScreen() {
   const toast = useToast();
   const theme = useTheme();
   const [filtro, setFiltro] = useState('tudo');
+  const [temaVisual, setTemaVisual] = useState<'system' | 'light' | 'dark'>('system');
+  const [bloqueioVisual, setBloqueioVisual] = useState<'off' | 'on'>('off');
   const [valor, setValor] = useState(4500);
+  const { glass } = useLocalSearchParams<{ glass?: string }>();
 
   // Rota de desenvolvimento: não existe em build de produção.
   if (!__DEV__) return <Redirect href="/" />;
+
+  // Rota de inspeção: superfícies em cima de cores diferentes tornam a refração do
+  // material nativo visível no simulador, sem depender de dados da conta.
+  if (glass === '1') {
+    return (
+      <Screen grouped>
+        <ThemedText type="title">Controles de vidro</ThemedText>
+        <ThemedText type="small" themeColor="textSecondary">
+          API nativa: {supportsLiquidGlass() ? 'disponível' : 'indisponível'}
+        </ThemedText>
+        <View style={styles.glassStage}>
+          <View pointerEvents="none" style={[StyleSheet.absoluteFill, styles.glassStripes]}>
+            {[theme.dangerSoft, theme.warningSoft, theme.successSoft, theme.backgroundSelected].map((color) => (
+              <View key={color} style={{ flex: 1, backgroundColor: color }} />
+            ))}
+          </View>
+          <Button label="Primário" onPress={() => {}} block />
+          <Button label="Secundário" variant="secondary" onPress={() => {}} block />
+          <Button label="Fantasma" variant="ghost" onPress={() => {}} />
+          <Button label="Destrutivo" variant="destructive" onPress={() => {}} />
+          <Button label="Carregando" loading onPress={() => {}} block />
+          <Segmented
+            options={[{ value: 'tudo', label: 'Tudo' }, { value: 'gastos', label: 'Gastos' }]}
+            value={filtro === 'gastos' ? 'gastos' : 'tudo'}
+            onChange={setFiltro}
+          />
+          <View style={{ flexDirection: 'row', gap: Space.sm }}>
+            <Chip label="Ativo" selected onPress={() => {}} />
+            <Chip label="Inativo" selected={false} onPress={() => {}} />
+          </View>
+        </View>
+        <View style={[styles.glassSettings, { backgroundColor: theme.surface }]}>
+          <ThemedText type="smallBold">Seletores no cartão do Perfil</ThemedText>
+          <Segmented
+            options={[
+              { value: 'system', label: 'Sistema' },
+              { value: 'light', label: 'Claro' },
+              { value: 'dark', label: 'Escuro' },
+            ]}
+            value={temaVisual}
+            onChange={setTemaVisual}
+          />
+          <Segmented
+            options={[{ value: 'off', label: 'Não' }, { value: 'on', label: 'Sim' }]}
+            value={bloqueioVisual}
+            onChange={setBloqueioVisual}
+          />
+        </View>
+      </Screen>
+    );
+  }
 
   return (
     <Screen grouped>
@@ -249,6 +305,17 @@ export default function CatalogScreen() {
     </Screen>
   );
 }
+
+const styles = StyleSheet.create({
+  glassStage: {
+    gap: Space.md,
+    padding: Space.lg,
+    borderRadius: Radius.md,
+    overflow: 'hidden',
+  },
+  glassSettings: { gap: Space.md, padding: Space.lg, borderRadius: Radius.md },
+  glassStripes: { flexDirection: 'row' },
+});
 
 /**
  * A cortina curva isolada: os três modos, cobrindo e revelando, sobre um conteúdo qualquer.

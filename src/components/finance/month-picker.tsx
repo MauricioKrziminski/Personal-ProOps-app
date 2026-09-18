@@ -125,7 +125,7 @@ export function MonthPicker({ month, onChange, children, variant = 'card' }: Mon
       style={agrupado
         ? [styles.card, { backgroundColor: vidro ? 'transparent' : theme.surface, borderColor: theme.cardBorder }]
         : styles.nu}>
-      {vidro ? <GlassBackdrop fallbackColor={theme.surface} radius={Radius.md} tintColor={theme.surface} /> : null}
+      {vidro ? <GlassBackdrop fallbackColor={theme.surface} radius={Radius.md} /> : null}
       <View style={[styles.row, variant === 'bare' && !vidro && styles.rowNu]}>
         {arrow(-1)}
         {/*
@@ -249,16 +249,22 @@ function MonthSheet({
                 style={({ pressed }) => [
                   styles.cell,
                   {
-                    backgroundColor: ativo
-                      ? theme.tintFill
-                      : vidro
-                        ? 'transparent'
-                      : pressed
-                        ? theme.backgroundSelected
-                        : theme.backgroundElement,
+                    backgroundColor: vidro
+                      ? 'transparent'
+                      : ativo
+                        ? theme.tintFill
+                        : pressed
+                          ? theme.backgroundSelected
+                          : theme.backgroundElement,
                   },
                 ]}>
-                {vidro && !ativo ? <GlassBackdrop fallbackColor={theme.backgroundElement} radius={Radius.sm} /> : null}
+                {vidro ? (
+                  <GlassBackdrop
+                    fallbackColor={ativo ? theme.tintFill : theme.backgroundElement}
+                    radius={Radius.sm}
+                    tintColor={ativo ? theme.glassActionTint : undefined}
+                  />
+                ) : null}
                 <ThemedText type="smallBold" themeColor={ativo ? 'onTint' : 'text'}>
                   {monthShort(value)}
                 </ThemedText>

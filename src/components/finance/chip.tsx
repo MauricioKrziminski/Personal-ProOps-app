@@ -23,7 +23,7 @@ interface ChipProps {
 /** Chip de seleção (categorias, filtros, tipos de conta). */
 export function Chip({ label, selected, onPress, count }: ChipProps) {
   const theme = useTheme();
-  const vidro = supportsLiquidGlass() && !selected;
+  const vidro = supportsLiquidGlass();
   return (
     <Pressable
       hitSlop={8}
@@ -34,14 +34,20 @@ export function Chip({ label, selected, onPress, count }: ChipProps) {
       style={({ pressed }) => [
         styles.chip,
         {
-          backgroundColor: selected ? theme.tintFill : vidro ? 'transparent' : theme.backgroundElement,
+          backgroundColor: vidro ? 'transparent' : selected ? theme.tintFill : theme.backgroundElement,
           // O chip inativo leva contorno; o ativo não precisa, porque a cor já o separa. É o par
           // `bg-secondary text-black` / `bg-surface border-white/6` do export.
           borderColor: selected ? 'transparent' : theme.cardBorder,
           opacity: pressed ? 0.8 : 1,
         },
       ]}>
-      {vidro ? <GlassBackdrop fallbackColor={theme.backgroundElement} radius={Radius.pill} /> : null}
+      {vidro ? (
+        <GlassBackdrop
+          fallbackColor={selected ? theme.tintFill : theme.backgroundElement}
+          radius={Radius.pill}
+          tintColor={selected ? theme.glassActionTint : undefined}
+        />
+      ) : null}
       <ThemedText type="smallBold" themeColor={selected ? 'onTint' : 'text'}>
         {label}
       </ThemedText>

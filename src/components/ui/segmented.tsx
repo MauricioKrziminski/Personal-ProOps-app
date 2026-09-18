@@ -10,44 +10,10 @@ import Animated, {
 } from 'react-native-reanimated';
 import * as Haptics from 'expo-haptics';
 
-import { GlassBackdrop, supportsLiquidGlass } from '@/components/ui/glass-backdrop';
 import { Fonts } from '@/constants/theme';
-import { Elevation, HitTarget, Radius, Space, Type } from '@/design/tokens';
-import { useScheme, useTheme } from '@/hooks/use-theme';
-
-type Opcao<T extends string> = { value: T; label: string };
-
-interface SegmentedProps<T extends string> {
-  /**
-   * De duas a QUATRO opções, e quem trava é o TIPO.
-   *
-   * Medido a 384dp × fonte 1,3 (a régua de verificação do projeto): numa calha de
-   * 352pt, cinco células deixam ~62pt de texto e "Investimento" precisa de ~117 —
-   * a palavra parte no meio ("Investimen/to"), o que design.md §3 proíbe. Já
-   * aconteceu em três telas. O `minWidth` de quem chama não resolve: não existe
-   * largura que caiba cinco células num sheet, ela só empurraria o controle para
-   * fora da tela.
-   *
-   * Cinco ou mais é `SelectField` (quando o valor vai ser GRAVADO) ou uma fileira
-   * rolável de `Chip` (quando FILTRA uma lista). E quatro só com rótulo CURTO: a
-   * folga some rápido — em Lançamentos, "Transferências" já teve que virar
-   * "Transf." para caber, o que é truncar na copy em vez de no `numberOfLines`.
-   *
-   * ⚠️ Lista de tamanho VARIÁVEL nunca entra aqui, nem que hoje tenha três itens:
-   * em Faturas as opções eram os cartões do usuário, então a largura por célula
-   * era função de quantos cartões ele tinha.
-   *
-   * A trava é o tipo e não um teste porque ela precisa valer em tempo de
-   * compilação: um `.map()` sobre lista de tamanho desconhecido para de compilar
-   * aqui, que é onde o defeito nasce.
-   */
-  options:
-    | readonly [Opcao<T>, Opcao<T>]
-    | readonly [Opcao<T>, Opcao<T>, Opcao<T>]
-    | readonly [Opcao<T>, Opcao<T>, Opcao<T>, Opcao<T>];
-  value: T;
-  onChange: (value: T) => void;
-}
+import { HitTarget, Radius, Space, Type } from '@/design/tokens';
+import { useTheme } from '@/hooks/use-theme';
+import type { SegmentedProps } from './segmented.types';
 
 /** Folga entre o trilho e o polegar. */
 const FOLGA = 3;
@@ -57,9 +23,7 @@ const FRENTE = { duration: 300, dampingRatio: 0.84 };
 const TRAS = { duration: 520, dampingRatio: 0.9 };
 
 /**
- * Um controle para todos os seletores do app. No iOS 26+, só o polegar
- * usa Liquid Glass nativo, sem empilhar vidro no trilho; no Android,
- * ambos mantêm as superfícies do tema.
+ * Controle animado compartilhado pelo Android e web.
  *
  * ## O movimento
  *
@@ -76,7 +40,6 @@ const TRAS = { duration: 520, dampingRatio: 0.9 };
  */
 export function Segmented<T extends string>({ options, value, onChange }: SegmentedProps<T>) {
   const theme = useTheme();
-  const vidro = supportsLiquidGlass();
   const reduzido = useReducedMotion();
   /** Largura de uma célula e altura do polegar, para o ESTILO (comum, não animado). */
   const [caixa, setCaixa] = useState({ celula: 0, altura: 0 });
@@ -118,11 +81,7 @@ export function Segmented<T extends string>({ options, value, onChange }: Segmen
     <View
       accessibilityRole="tablist"
       onLayout={onLayout}
-      style={[
-        styles.track,
-        // The native material needs a transparent host to keep its refraction visible.
-        { backgroundColor: vidro ? 'transparent' : theme.backgroundElement },
-      ]}>
+      style={[styles.track, { backgroundColor: theme.backgroundElement }]}>
       {caixa.celula > 0 ? (
         <Polegar
           key={`${caixa.celula}:${caixa.altura}`}
@@ -174,8 +133,6 @@ function Polegar({
   direita: SharedValue<number>;
 }) {
   const r = altura / 2;
-  const theme = useTheme();
-  const scheme = useScheme();
   const tampaEsquerda = useAnimatedStyle(() => ({
     transform: [{ translateX: esquerda.get() * celula }],
   }));
@@ -191,30 +148,7 @@ function Polegar({
       ],
     };
   });
-  const vidro = useAnimatedStyle(() => ({
-    width: Math.max(1, (direita.get() - esquerda.get()) * celula),
-    transform: [{ translateX: esquerda.get() * celula }],
-  }));
   const tampa = { width: altura, height: altura, borderRadius: r, backgroundColor: cor };
-  if (supportsLiquidGlass()) {
-    return (
-      <Animated.View
-        pointerEvents="none"
-        style={[
-          styles.polegarVidro,
-          {
-            height: altura,
-            borderRadius: r,
-            borderWidth: 1,
-            borderColor: theme.separator,
-            boxShadow: Elevation[scheme].floating,
-          },
-          vidro,
-        ]}>
-        <GlassBackdrop fallbackColor={cor} radius={r} effectStyle="regular" />
-      </Animated.View>
-    );
-  }
   return (
     <>
       <Animated.View
@@ -291,7 +225,6 @@ const styles = StyleSheet.create({
     left: FOLGA,
     transformOrigin: 'left',
   },
-  polegarVidro: { position: 'absolute', top: FOLGA, left: FOLGA },
   label: {
     ...Type.subhead,
     fontFamily: Fonts.semibold,

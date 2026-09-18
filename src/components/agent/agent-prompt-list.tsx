@@ -3,6 +3,7 @@ import { Pressable, StyleSheet, View } from 'react-native';
 
 import { ThemedText } from '@/components/themed-text';
 import { Icon } from '@/components/ui/icon';
+import { GlassBackdrop, supportsLiquidGlass } from '@/components/ui/glass-backdrop';
 import { Radius, Space } from '@/design/tokens';
 import { useTheme } from '@/hooks/use-theme';
 import { ATALHOS_DO_AGENTE } from '@/lib/agent-prompts';
@@ -14,6 +15,7 @@ interface Props {
 /** Sugestões da conversa nova; tocar preenche o compositor sem enviar. */
 export const AgentPromptList = memo(function AgentPromptList({ onSelect }: Props) {
   const theme = useTheme();
+  const vidro = supportsLiquidGlass();
 
   return (
     <View style={styles.root}>
@@ -28,10 +30,11 @@ export const AgentPromptList = memo(function AgentPromptList({ onSelect }: Props
             style={({ pressed }) => [
               styles.prompt,
               {
-                backgroundColor: pressed ? theme.backgroundSelected : theme.surface,
+                backgroundColor: vidro ? 'transparent' : pressed ? theme.backgroundSelected : theme.surface,
                 borderColor: theme.cardBorder,
               },
             ]}>
+            {vidro ? <GlassBackdrop fallbackColor={theme.surface} radius={Radius.pill} /> : null}
             <Icon name={icon} size="xs" color="textSecondary" />
             <ThemedText type="small" style={styles.text}>{label}</ThemedText>
           </Pressable>

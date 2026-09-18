@@ -55,7 +55,8 @@ const SLOP: Record<Size, number> = { sm: (HitTarget - HEIGHT.sm) / 2, md: 0, lg:
 const CAPSULA = 1.9;
 
 /**
- * O único botão do app — uma pílula chapada, como nos vídeos de referência.
+ * Botão compartilhado do app. No iOS 26+ as variantes usam GlassView nativo;
+ * nas demais plataformas conservam a superfície do tema.
  *
  * ## As variantes
  *
@@ -68,7 +69,7 @@ const CAPSULA = 1.9;
  *
  * ## O carregamento
  *
- * A pílula ENCOLHE até uma cápsula e dois pontos trocam de lugar dentro dela; a caixa externa
+ * Nas plataformas sem vidro, a pílula ENCOLHE até uma cápsula e dois pontos trocam de lugar; a caixa externa
  * mantém a largura, então o formulário não pula. Encolher uma pílula com `scaleX` achataria as
  * pontas, então a pílula é feita de três peças da mesma cor: duas tampas circulares que deslizam
  * para o centro e um miolo reto que encolhe. Tudo em `transform`, nenhum `width` animado.
@@ -111,8 +112,12 @@ export function Button({
     : variant === 'primary' || variant === 'destructive'
       ? 'onTint'
       : 'text';
-  const vidro = supportsLiquidGlass() && variant === 'secondary' && !loading && !disabled;
+  // O material é decidido uma vez para todas as variantes. A cor comunica a ação; o
+  // GlassView nativo fornece a superfície no iOS 26+.
+  const vidro = supportsLiquidGlass() && !disabled;
   const cor = vidro ? 'transparent' : off ? theme.backgroundElement : fill[variant];
+  const glassTint =
+    variant === 'primary' ? theme.glassActionTint : variant === 'destructive' ? theme.glassDangerTint : undefined;
 
   /** 0 = botão, 1 = cápsula carregando. */
   const morph = useSharedValue(loading ? 1 : 0);
@@ -124,7 +129,9 @@ export function Button({
     );
   }, [loading, morph]);
 
-  const podeEncolher = !reduzido && variant !== 'ghost';
+  // A cápsula de carregamento é uma composição opaca. No iOS o vidro permanece estável
+  // enquanto o conteúdo troca pelo indicador de progresso.
+  const podeEncolher = !reduzido && !vidro && variant !== 'ghost';
   /** Quanto cada tampa anda para dentro quando a pílula vira cápsula. */
   const recuo = (m: number) => {
     'worklet';
@@ -180,8 +187,15 @@ export function Button({
         }}
         onLayout={medir}
         style={[styles.pilula, { height: altura, borderRadius: altura / 2 }]}>
-        {vidro ? <GlassBackdrop fallbackColor={theme.backgroundElement} radius={altura / 2} /> : null}
-        {variant !== 'ghost' ? (
+        {vidro ? (
+          <GlassBackdrop
+            fallbackColor={fill[variant]}
+            radius={altura / 2}
+            tintColor={glassTint}
+            effectStyle={variant === 'ghost' ? 'clear' : 'regular'}
+          />
+        ) : null}
+        {variant !== 'ghost' && !vidro ? (
           <>
             <Animated.View
               pointerEvents="none"

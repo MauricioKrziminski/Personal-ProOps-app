@@ -2,6 +2,7 @@ import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import * as Haptics from 'expo-haptics';
 
 import { Icon } from '@/components/ui/icon';
+import { GlassBackdrop, supportsLiquidGlass } from '@/components/ui/glass-backdrop';
 import { HitTarget, Radius, Space } from '@/design/tokens';
 import { useTheme } from '@/hooks/use-theme';
 import { classify, lineAt, type BlockKind } from '@/lib/note-blocks';
@@ -58,6 +59,7 @@ export function FormatBar({
   onBlock: (kind: BlockKind) => void;
 }) {
   const theme = useTheme();
+  const vidro = supportsLiquidGlass();
 
   const linha = lineAt(content, selection.start);
   const tipoDaLinha =
@@ -74,7 +76,8 @@ export function FormatBar({
   const ativas = marksAt(content, ondeLer);
 
   return (
-    <View style={[styles.barra, { backgroundColor: theme.surface, borderColor: theme.cardBorder }]}>
+    <View style={[styles.barra, { backgroundColor: vidro ? 'transparent' : theme.surface, borderColor: theme.cardBorder }]}>
+      {vidro ? <GlassBackdrop fallbackColor={theme.surface} radius={Radius.pill} /> : null}
       <ScrollView
         horizontal
         showsHorizontalScrollIndicator={false}
@@ -118,6 +121,7 @@ function Botao({
   onPress: () => void;
 }) {
   const theme = useTheme();
+  const vidro = supportsLiquidGlass();
   return (
     <Pressable
       accessibilityRole="button"
@@ -131,16 +135,21 @@ function Botao({
       style={({ pressed }) => [
         styles.botao,
         {
-          backgroundColor: ativo
-            ? theme.accentSoft
-            : pressed
-              ? theme.backgroundSelected
-              : 'transparent',
+          backgroundColor: vidro
+            ? 'transparent'
+            : ativo
+              ? theme.accentSoft
+              : pressed
+                ? theme.backgroundSelected
+                : 'transparent',
         },
       ]}>
+      {vidro && ativo ? (
+        <GlassBackdrop fallbackColor={theme.accentSoft} radius={Radius.pill} tintColor={theme.glassActionTint} effectStyle="clear" />
+      ) : null}
       {/* Estado por COR, não por glifo: `pin`/`pin.fill` já ensinaram que no Android duas
           variantes do mesmo símbolo colapsam no mesmo ícone do Material. */}
-      <Icon name={icon} size="md" color={ativo ? 'tint' : 'text'} />
+      <Icon name={icon} size="md" color={ativo && vidro ? 'onTint' : ativo ? 'tint' : 'text'} />
     </Pressable>
   );
 }

@@ -5,6 +5,7 @@ import { Pressable, StyleSheet, View } from 'react-native';
 import { ThemedText } from '@/components/themed-text';
 import { monthTitle, shiftMonth } from '@/components/finance/month-picker';
 import { Icon } from '@/components/ui/icon';
+import { GlassBackdrop, supportsLiquidGlass } from '@/components/ui/glass-backdrop';
 import { HitTarget, Radius, Space, tabular } from '@/design/tokens';
 import { useTheme } from '@/hooks/use-theme';
 import { isoToBR, localISODate, monthGrid } from '@/lib/dates';
@@ -66,6 +67,7 @@ interface Props {
  */
 export function Calendar({ value, onChange, min, max }: Props) {
   const theme = useTheme();
+  const vidro = supportsLiquidGlass();
   const hoje = localISODate();
   const [mes, setMes] = useState(() => (value ?? hoje).slice(0, 7));
 
@@ -94,10 +96,11 @@ export function Calendar({ value, onChange, min, max }: Props) {
         style={({ pressed }) => [
           styles.seta,
           {
-            backgroundColor: pressed ? theme.backgroundSelected : theme.backgroundElement,
+            backgroundColor: vidro && !bloqueado ? 'transparent' : pressed ? theme.backgroundSelected : theme.backgroundElement,
             opacity: bloqueado ? 0.35 : 1,
           },
         ]}>
+        {vidro && !bloqueado ? <GlassBackdrop fallbackColor={theme.backgroundElement} radius={Radius.pill} /> : null}
         <Icon name={delta < 0 ? 'chevron.left' : 'chevron.right'} size="sm" color="tint" />
       </Pressable>
     );
@@ -146,7 +149,7 @@ export function Calendar({ value, onChange, min, max }: Props) {
                   style={[
                     styles.dia,
                     marcado
-                      ? { backgroundColor: theme.tintFill }
+                      ? { backgroundColor: vidro ? 'transparent' : theme.tintFill }
                       : pressed
                         ? { backgroundColor: theme.backgroundSelected }
                         : null,
@@ -160,6 +163,9 @@ export function Calendar({ value, onChange, min, max }: Props) {
                       : null,
                     bloqueado ? styles.bloqueado : null,
                   ]}>
+                  {marcado && vidro ? (
+                    <GlassBackdrop fallbackColor={theme.tintFill} radius={Radius.pill} tintColor={theme.glassActionTint} />
+                  ) : null}
                   <ThemedText
                     type="ticker"
                     themeColor={marcado ? 'onTint' : iso === hoje ? 'tint' : 'text'}

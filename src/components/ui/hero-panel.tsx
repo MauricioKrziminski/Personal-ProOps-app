@@ -8,6 +8,7 @@ import Animated, {
 
 import { ThemedText } from '@/components/themed-text';
 import { Icon } from '@/components/ui/icon';
+import { GlassBackdrop, supportsLiquidGlass } from '@/components/ui/glass-backdrop';
 import { InkSurface } from '@/components/ui/ink-surface';
 import { QuickActions, type QuickAction } from '@/components/ui/quick-actions';
 import { useConceal } from '@/components/ui/conceal';
@@ -87,6 +88,7 @@ export function HeroPanel({
   surface = 'flat',
 }: HeroPanelProps) {
   const theme = useTheme();
+  const vidro = supportsLiquidGlass();
   const { concealed, toggle } = useConceal();
   // Press-in do card (§5): 0.97 em 120ms, o mesmo do `Shortcut`. Só existe quando há destino.
   const escala = useSharedValue(1);
@@ -94,7 +96,9 @@ export function HeroPanel({
 
   return (
     <Animated.View
-      entering={FadeIn.duration(Motion.duration.slow)}
+      // Montar um UIGlassEffectView sob opacity 0 pode deixá-lo invisível depois do fade.
+      // Nas raízes a cascata de Screen ainda anima o painel e libera o vidro ao assentar.
+      entering={vidro ? undefined : FadeIn.duration(Motion.duration.slow)}
       style={[
         styles.panel,
         aoTocar,
@@ -138,7 +142,8 @@ export function HeroPanel({
                       accessibilityLabel="Mais opções"
                       onPress={onPress}
                       hitSlop={Space.sm}
-                      style={[styles.eye, { backgroundColor: theme.heroChip }]}>
+                      style={[styles.eye, { backgroundColor: vidro ? 'transparent' : theme.heroChip }]}>
+                      {vidro ? <GlassBackdrop fallbackColor={theme.heroChip} radius={Radius.pill} colorScheme="dark" /> : null}
                       <Icon name="ellipsis" size="sm" color="onHero" />
                     </Pressable>
                   ) : null}
@@ -148,7 +153,8 @@ export function HeroPanel({
                       accessibilityLabel={concealed ? 'Mostrar valor' : 'Ocultar valor'}
                       onPress={toggle}
                       hitSlop={Space.sm}
-                      style={[styles.eye, { backgroundColor: theme.heroChip }]}>
+                      style={[styles.eye, { backgroundColor: vidro ? 'transparent' : theme.heroChip }]}>
+                      {vidro ? <GlassBackdrop fallbackColor={theme.heroChip} radius={Radius.pill} colorScheme="dark" /> : null}
                       <Icon name={concealed ? 'eye.slash' : 'eye'} size="sm" color="onHero" />
                     </Pressable>
                   ) : null}

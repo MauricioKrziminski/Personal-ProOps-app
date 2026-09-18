@@ -1,20 +1,20 @@
 import { FlashList } from '@shopify/flash-list';
 import { router } from 'expo-router';
 import { useCallback, useMemo, useState } from 'react';
-import { Pressable, StyleSheet, View } from 'react-native';
+import { StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { ConversationRow } from '@/components/agent/conversation-row';
 import { AgentHistoryHeader } from '@/components/agent/agent-history-header';
 import { RenameConversationSheet } from '@/components/agent/rename-conversation-sheet';
 import { ThemedText } from '@/components/themed-text';
+import { Button } from '@/components/ui/button';
 import { EmptyState } from '@/components/ui/empty-state';
 import { Screen } from '@/components/ui/screen';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useToast } from '@/components/ui/toast';
 import { MaxContentWidth } from '@/constants/theme';
-import { Radius, Space } from '@/design/tokens';
-import { useTheme } from '@/hooks/use-theme';
+import { Space } from '@/design/tokens';
 import {
   useAgentConversations,
   useDeleteAgentConversation,
@@ -163,21 +163,12 @@ export default function AgentHistoryScreen() {
 }
 
 function RetryConversations({ onPress }: { onPress: () => void }) {
-  const theme = useTheme();
   return (
     <View style={styles.retry}>
       <ThemedText type="small" themeColor="textSecondary">
         Não consegui carregar suas conversas.
       </ThemedText>
-      <Pressable
-        accessibilityRole="button"
-        onPress={onPress}
-        style={({ pressed }) => [
-          styles.retryButton,
-          { backgroundColor: pressed ? theme.backgroundSelected : theme.backgroundElement },
-        ]}>
-        <ThemedText type="smallBold">Tentar de novo</ThemedText>
-      </Pressable>
+      <Button label="Tentar de novo" variant="secondary" size="sm" onPress={onPress} />
     </View>
   );
 }
@@ -186,11 +177,4 @@ const styles = StyleSheet.create({
   header: { paddingBottom: Space.xl },
   loading: { gap: Space.sm },
   retry: { gap: Space.md, paddingVertical: Space.md, alignItems: 'flex-start' },
-  retryButton: {
-    minHeight: 44,
-    paddingHorizontal: Space.lg,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderRadius: Radius.pill,
-  },
 });

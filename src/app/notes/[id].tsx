@@ -15,6 +15,7 @@ import { TagPicker } from '@/components/notes/tag-picker';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { HeaderActions, type HeaderAction } from '@/components/ui/header-actions';
+import { GlassBackdrop, supportsLiquidGlass } from '@/components/ui/glass-backdrop';
 import { Icon } from '@/components/ui/icon';
 import { Screen } from '@/components/ui/screen';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -92,6 +93,7 @@ export default function NoteDetailScreen() {
   const tablet = windowClass !== 'compact';
   const params = useLocalSearchParams<{ id: string; folder?: string }>();
   const theme = useTheme();
+  const vidro = supportsLiquidGlass();
   const scheme = useScheme();
   const toast = useToast();
 
@@ -408,7 +410,8 @@ export default function NoteDetailScreen() {
               Haptics.selectionAsync();
               setPickerOpen(true);
             }}
-            style={[styles.chip, { backgroundColor: theme.accentSoft }]}>
+            style={[styles.chip, { backgroundColor: vidro ? 'transparent' : theme.accentSoft }]}>
+            {vidro ? <GlassBackdrop fallbackColor={theme.accentSoft} radius={Radius.pill} /> : null}
             <Icon name={symbol(folder?.icon)} size="sm" color="tint" />
             <ThemedText type="smallBold" themeColor="tint">
               {folder?.name ?? 'Sem pasta'}
@@ -425,7 +428,8 @@ export default function NoteDetailScreen() {
                 Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
                 setContent((current) => removeTag(current, tag));
               }}
-              style={[styles.tagChip, { backgroundColor: theme.backgroundElement }]}>
+              style={[styles.tagChip, { backgroundColor: vidro ? 'transparent' : theme.backgroundElement }]}>
+              {vidro ? <GlassBackdrop fallbackColor={theme.backgroundElement} radius={Radius.pill} /> : null}
               <ThemedText type="footnote">#{tag}</ThemedText>
               <Icon name="xmark" size={12} color="textSecondary" />
             </Pressable>
@@ -466,6 +470,7 @@ export default function NoteDetailScreen() {
               setTagPickerOpen(true);
             }}
             style={[styles.tagChip, { borderWidth: StyleSheet.hairlineWidth, borderColor: theme.separator }]}>
+            {vidro ? <GlassBackdrop fallbackColor={theme.backgroundElement} radius={Radius.pill} /> : null}
             <Icon name="plus" size={12} color="tint" />
             <ThemedText type="footnote" themeColor="tint">
               tag

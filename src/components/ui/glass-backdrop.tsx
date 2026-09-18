@@ -2,6 +2,7 @@ import { createContext, useContext, type ReactNode } from 'react';
 import { GlassView, isGlassEffectAPIAvailable, isLiquidGlassAvailable } from 'expo-glass-effect';
 import { Platform, StyleSheet, View, type StyleProp, type ViewStyle } from 'react-native';
 
+import { Colors } from '@/constants/theme';
 import { useScheme } from '@/hooks/use-theme';
 
 const GlassReadyContext = createContext(true);
@@ -23,24 +24,30 @@ export function GlassBackdrop({
   radius,
   style,
   tintColor,
+  colorScheme,
   effectStyle = 'regular',
 }: {
   fallbackColor: string;
   radius: number;
   style?: StyleProp<ViewStyle>;
   tintColor?: string;
+  colorScheme?: 'light' | 'dark';
   effectStyle?: 'regular' | 'clear';
 }) {
-  const scheme = useScheme();
+  const appScheme = useScheme();
   const ready = useContext(GlassReadyContext);
   const surfaceStyle = [StyleSheet.absoluteFill, { borderRadius: radius }, style];
+  const appearance = colorScheme ?? appScheme;
+  // Em modo escuro, o vidro regular pode ficar claro ao refratar conteúdo luminoso
+  // (por exemplo, um cartão colorido). Uma tinta escura translúcida mantém o texto legível.
+  const resolvedTint = tintColor ?? (appearance === 'dark' && radius > 0 ? Colors.dark.overlay : undefined);
 
   return supportsLiquidGlass() && ready ? (
     <GlassView
       pointerEvents="none"
       glassEffectStyle={effectStyle}
-      colorScheme={scheme}
-      tintColor={tintColor}
+      colorScheme={appearance}
+      tintColor={resolvedTint}
       style={surfaceStyle}
     />
   ) : (

@@ -2,6 +2,7 @@ import { StyleSheet, View } from 'react-native';
 import type { SymbolViewProps } from 'expo-symbols';
 
 import { PressableScale } from '@/components/motion/pressable-scale';
+import { GlassBackdrop, supportsLiquidGlass } from '@/components/ui/glass-backdrop';
 import { ThemedText } from '@/components/themed-text';
 import { Icon } from '@/components/ui/icon';
 import { Radius, Space, tabular } from '@/design/tokens';
@@ -24,6 +25,7 @@ export interface QuickAction {
 
 function Tile({ action }: { action: QuickAction }) {
   const theme = useTheme();
+  const vidro = supportsLiquidGlass();
 
   return (
     <PressableScale
@@ -35,9 +37,10 @@ function Tile({ action }: { action: QuickAction }) {
         styles.tile,
         {
           borderColor: theme.heroSeparator,
-          backgroundColor: theme.heroSeparator,
+          backgroundColor: vidro ? 'transparent' : theme.heroSeparator,
         },
       ]}>
+      {vidro ? <GlassBackdrop fallbackColor={theme.heroSeparator} radius={Radius.sm} colorScheme="dark" /> : null}
       <View style={styles.head}>
         <Icon name={action.icon} size="md" color="onHero" />
         <ThemedText type="caption" themeColor="onHero" style={[styles.count, tabular]}>

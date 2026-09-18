@@ -7,6 +7,7 @@ import { ThemedText } from '@/components/themed-text';
 import { MaxContentWidth } from '@/constants/theme';
 
 import { TextField } from '@/components/ui/field';
+import { GlassBackdrop, supportsLiquidGlass } from '@/components/ui/glass-backdrop';
 import { Icon } from '@/components/ui/icon';
 import { HitTarget, Radius, Space, Type, tabular } from '@/design/tokens';
 import { useTheme } from '@/hooks/use-theme';
@@ -54,6 +55,7 @@ export function ChatComposer({
 
   const reservado = insets.bottom;
   const pode = canSubmitMessage(value, { sending, awaitingAction });
+  const vidro = supportsLiquidGlass() && pode;
   const restantes = MAX_MESSAGE_LENGTH - value.trim().length;
 
   const conteudo = (
@@ -100,10 +102,13 @@ export function ChatComposer({
           style={({ pressed }) => [
             styles.enviar,
             {
-              backgroundColor: pode ? theme.tintFill : theme.backgroundElement,
+              backgroundColor: vidro ? 'transparent' : pode ? theme.tintFill : theme.backgroundElement,
               opacity: pressed && pode ? 0.85 : 1,
             },
           ]}>
+          {vidro ? (
+            <GlassBackdrop fallbackColor={theme.tintFill} radius={Radius.pill} tintColor={theme.glassActionTint} />
+          ) : null}
           <Icon
             name="arrow.up"
             size={20}
