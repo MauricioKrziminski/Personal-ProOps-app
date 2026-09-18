@@ -3,6 +3,7 @@ import { Pressable, StyleSheet, View } from 'react-native';
 import * as Haptics from 'expo-haptics';
 
 import { ThemedText } from '@/components/themed-text';
+import { GlassBackdrop, supportsLiquidGlass } from '@/components/ui/glass-backdrop';
 import { Icon } from '@/components/ui/icon';
 import { Mark } from '@/components/ui/mark';
 import { HitTarget, Radius, Space, tabular } from '@/design/tokens';
@@ -33,6 +34,7 @@ export interface BlockHeaderProps {
  */
 export function BlockHeader({ title, count, action, tag, voice, trailing }: BlockHeaderProps) {
   const theme = useTheme();
+  const vidro = supportsLiquidGlass();
   const direita =
     trailing ??
     (action ? (
@@ -46,8 +48,9 @@ export function BlockHeader({ title, count, action, tag, voice, trailing }: Bloc
         }}
         style={({ pressed }) => [
           styles.pilula,
-          { backgroundColor: pressed ? theme.backgroundSelected : theme.backgroundElement },
+          { backgroundColor: vidro ? 'transparent' : pressed ? theme.backgroundSelected : theme.backgroundElement },
         ]}>
+        {vidro ? <GlassBackdrop fallbackColor={theme.backgroundElement} radius={Radius.pill} /> : null}
         <ThemedText type="caption" style={styles.semEncolher}>
           {action.label}
         </ThemedText>

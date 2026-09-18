@@ -2,6 +2,7 @@ import { Platform, Pressable, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { ThemedText } from '@/components/themed-text';
+import { GlassBackdrop, supportsLiquidGlass } from '@/components/ui/glass-backdrop';
 import { Icon } from '@/components/ui/icon';
 import { useTabletSheetContext } from '@/components/ui/sheet';
 import { HitTarget, Radius, Space } from '@/design/tokens';
@@ -75,6 +76,7 @@ export function TaskHeader({
   telaCheia?: boolean;
 }) {
   const theme = useTheme();
+  const vidro = supportsLiquidGlass();
   const insets = useSafeAreaInsets();
   const insideTabletDialog = useTabletSheetContext();
 
@@ -93,8 +95,9 @@ export function TaskHeader({
           onPress={onClose}
           style={({ pressed }) => [
             styles.close,
-            { backgroundColor: pressed ? theme.backgroundSelected : theme.backgroundElement },
+            { backgroundColor: vidro ? 'transparent' : pressed ? theme.backgroundSelected : theme.backgroundElement },
           ]}>
+          {vidro ? <GlassBackdrop fallbackColor={theme.backgroundElement} radius={Radius.pill} /> : null}
           <Icon name="xmark" size="sm" color="textSecondary" />
         </Pressable>
         <View style={styles.headText}>

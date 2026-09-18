@@ -12,6 +12,7 @@ import Animated, {
 } from 'react-native-reanimated';
 
 import { Motion, Radius, Space, Type, tabular } from '@/design/tokens';
+import { GlassBackdrop, supportsLiquidGlass } from '@/components/ui/glass-backdrop';
 import { useTheme } from '@/hooks/use-theme';
 
 const LENGTH = 6;
@@ -56,6 +57,7 @@ export function OtpInput({
   const input = useRef<TextInput>(null);
   const digits = value.split('');
   const active = Math.min(value.length, LENGTH - 1);
+  const vidro = supportsLiquidGlass();
 
   const caret = useSharedValue(1);
   useEffect(() => {
@@ -98,10 +100,11 @@ export function OtpInput({
               style={[
                 styles.box,
                 {
-                  backgroundColor: theme.surface,
+                  backgroundColor: vidro && isActive ? 'transparent' : theme.surface,
                   borderColor: invalid ? theme.danger : isActive ? theme.tint : theme.separator,
                 },
               ]}>
+              {vidro && isActive ? <GlassBackdrop fallbackColor={theme.surface} radius={Radius.sm} /> : null}
               {/*
                 O fio de 1dp é constante: foco e erro mudam só sua cor,
                 sem mover o dígito nem sobrepor um segundo arco aos cantos.

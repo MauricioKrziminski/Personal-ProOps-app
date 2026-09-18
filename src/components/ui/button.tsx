@@ -19,6 +19,7 @@ import Animated, {
 import { DotsLoader } from '@/components/motion/dots-loader';
 import { useCortina } from '@/components/motion/session-curtain';
 import { PressableScale } from '@/components/motion/pressable-scale';
+import { GlassBackdrop, supportsLiquidGlass } from '@/components/ui/glass-backdrop';
 import { Icon } from '@/components/ui/icon';
 import { ThemedText } from '@/components/themed-text';
 import { HitTarget, Motion, Radius, Space } from '@/design/tokens';
@@ -110,7 +111,8 @@ export function Button({
     : variant === 'primary' || variant === 'destructive'
       ? 'onTint'
       : 'text';
-  const cor = off ? theme.backgroundElement : fill[variant];
+  const vidro = supportsLiquidGlass() && variant === 'secondary' && !loading && !disabled;
+  const cor = vidro ? 'transparent' : off ? theme.backgroundElement : fill[variant];
 
   /** 0 = botão, 1 = cápsula carregando. */
   const morph = useSharedValue(loading ? 1 : 0);
@@ -178,6 +180,7 @@ export function Button({
         }}
         onLayout={medir}
         style={[styles.pilula, { height: altura, borderRadius: altura / 2 }]}>
+        {vidro ? <GlassBackdrop fallbackColor={theme.backgroundElement} radius={altura / 2} /> : null}
         {variant !== 'ghost' ? (
           <>
             <Animated.View

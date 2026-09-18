@@ -15,9 +15,13 @@ e onde ele decide o que fazer com isso.*
 
 ---
 
-## 1. Superfícies — glass é destaque, não papel de parede
+## 1. Superfícies — glass nos controles, não nos cartões de conteúdo
 
-- **Glass fica na chrome**: tab bar nativa (`NativeTabs`), header, sheet e FAB.
+- **No iOS 26+, o Liquid Glass nativo também veste controles interativos**: tab bar nativa
+  (`NativeTabs`), header, busca, campos de formulário, seleção segmentada, chips de filtro,
+  botões secundários e navegação de mês. A pedido do dono do produto em 18/09/2026, esses
+  controles compartilham `GlassBackdrop` quando a API nativa está disponível. iOS antigo e Android
+  continuam com seus materiais próprios.
 - **Mais um único destaque por tela** — o bloco que responde a pergunta principal daquela tela
   (sobra do mês, patrimônio líquido, total da fatura, progresso da meta).
 
@@ -38,8 +42,8 @@ amplitude — um bloco escuro sobre papel claro — e do número grande em peso 
 > - **Um destaque por tela** → na Hoje convivem o herói e os Primeiros passos.
 > - **Sem degradê/brilho em conteúdo** → o herói das raízes usa `surface="live"`
 >   (`InkSurface`: luz larga que segue a rolagem + grão fino, dois canvases, custo zero parado).
-> - **Vidro só na chrome** → liberado e NÃO usado: sobre papel chapado não há o que refratar, e
->   esse motivo continua verdadeiro.
+> - **Vidro só na chrome** → era a decisão para conteúdo das raízes; em 18/09/2026 os controles
+>   interativos do iOS receberam Liquid Glass nativo. Os cartões de dados continuam opacos.
 >
 > A estrutura das raízes passou a ser **"Conversa organizada"**: o app fala nos blocos com o selo
 > da marca (`BlockHeader voice="app"`), a pessoa fala em balões com o texto REAL que mandou, e o
@@ -53,11 +57,11 @@ não posiciona). Quem mede é uma `View` em volta; o canvas só preenche.
 destaque e card de tendência): superfície um degrau mais escura (`heroFooter`), pílula com o delta
 à esquerda, comparação em texto à direita. Ela existe para o número grande não ter que carregar
 contexto. Em card comum sai por `marginHorizontal/-Bottom` negativos + `overflow: 'hidden'`.
-- **Todo o resto é opaco.** Card de lista, linha, formulário: superfície sólida, hierarquia por
-  **elevação e espaço**, nunca por blur.
+- **Conteúdo permanece opaco.** Cards de lista, linhas e painéis de formulário conservam
+  superfície sólida e hierarquia por **elevação e espaço**. O vidro fica nos controles do formulário.
 
-> Vidro só na chrome (a `NativeTabs` do iOS e a faixa do `AppHeader`). Vidro em conteúdo é erro
-> de revisão, não questão de gosto.
+> Cartões de conteúdo continuam opacos. Controles interativos do iOS podem usar Liquid Glass
+> nativo; a `NativeTabs` permanece a barra do sistema.
 
 **Cartão de crédito é um CARTÃO, não um card** (`src/components/finance/card-face.tsx`). A face
 é o cartão metálico dos vídeos: a cor do EMISSOR pura, um degradê diagonal curto e uma faixa de

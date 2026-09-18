@@ -4,6 +4,7 @@ import { Platform, Pressable, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { ThemedText } from '@/components/themed-text';
+import { GlassBackdrop, supportsLiquidGlass } from '@/components/ui/glass-backdrop';
 import { Icon } from '@/components/ui/icon';
 import { Mark } from '@/components/ui/mark';
 import { Fonts } from '@/constants/theme';
@@ -85,6 +86,7 @@ export function AppHeader({ title, action }: AppHeaderProps) {
   const theme = useTheme();
   const scheme = useScheme();
   const insets = useSafeAreaInsets();
+  const vidro = supportsLiquidGlass();
 
   return (
     <View
@@ -99,26 +101,29 @@ export function AppHeader({ title, action }: AppHeaderProps) {
       pointerEvents="box-none"
       style={[styles.bar, { paddingTop: insets.top, borderBottomColor: theme.cardBorder }]}>
       {/*
-        Vidro de CHROME, que é o único lugar onde o material é permitido (§1): a faixa é reta,
+        Vidro de CHROME (§1): a faixa é reta,
         encosta nas bordas e não tem elevação.
       */}
-      <BlurView
-        pointerEvents="none"
-        intensity={Platform.OS === 'android' ? 0 : 40}
-        tint={scheme === 'dark' ? 'systemChromeMaterialDark' : 'systemChromeMaterialLight'}
-        style={StyleSheet.absoluteFill}
-      />
-      {/*
-        A camada de cor por cima do blur. No Android o `BlurView` é caro e impreciso, então lá ela
-        é opaca (intensity 0 acima) — mesma decisão que a tab bar já toma por plataforma.
-      */}
-      <View
-        pointerEvents="none"
-        style={[
-          StyleSheet.absoluteFill,
-          { backgroundColor: theme.background, opacity: Platform.OS === 'android' ? 1 : 0.85 },
-        ]}
-      />
+      {vidro ? (
+        <GlassBackdrop fallbackColor={theme.background} radius={0} />
+      ) : (
+        <>
+          <BlurView
+            pointerEvents="none"
+            intensity={Platform.OS === 'android' ? 0 : 40}
+            tint={scheme === 'dark' ? 'systemChromeMaterialDark' : 'systemChromeMaterialLight'}
+            style={StyleSheet.absoluteFill}
+          />
+          {/* No Android o blur custa caro, então a camada de cor é opaca. */}
+          <View
+            pointerEvents="none"
+            style={[
+              StyleSheet.absoluteFill,
+              { backgroundColor: theme.background, opacity: Platform.OS === 'android' ? 1 : 0.85 },
+            ]}
+          />
+        </>
+      )}
 
       <View pointerEvents="box-none" style={styles.row}>
         {/*
@@ -148,7 +153,8 @@ export function AppHeader({ title, action }: AppHeaderProps) {
             accessibilityLabel="Abrir perfil"
             hitSlop={Space.sm}
             onPress={() => router.push('/(tabs)/profile')}
-            style={[styles.tile, { backgroundColor: theme.backgroundElement }]}>
+            style={[styles.tile, { backgroundColor: vidro ? 'transparent' : theme.backgroundElement }]}>
+            {vidro ? <GlassBackdrop fallbackColor={theme.backgroundElement} radius={Radius.pill} /> : null}
             <Icon name="person.fill" size="md" color="text" />
           </Pressable>
         </View>
@@ -168,6 +174,7 @@ export function HeaderIconButton({
   onPress: () => void;
 }) {
   const theme = useTheme();
+  const vidro = supportsLiquidGlass();
 
   return (
     <Pressable
@@ -175,7 +182,8 @@ export function HeaderIconButton({
       accessibilityLabel={label}
       hitSlop={Space.sm}
       onPress={onPress}
-      style={[styles.tile, { backgroundColor: theme.backgroundElement }]}>
+      style={[styles.tile, { backgroundColor: vidro ? 'transparent' : theme.backgroundElement }]}>
+      {vidro ? <GlassBackdrop fallbackColor={theme.backgroundElement} radius={Radius.pill} /> : null}
       <Icon name={icon} size="md" color="text" />
     </Pressable>
   );

@@ -2,6 +2,7 @@ import { Pressable, StyleSheet, View } from 'react-native';
 import * as Haptics from 'expo-haptics';
 
 import { ThemedText } from '@/components/themed-text';
+import { GlassBackdrop, supportsLiquidGlass } from '@/components/ui/glass-backdrop';
 import { Radius, Space } from '@/design/tokens';
 import { useTheme } from '@/hooks/use-theme';
 
@@ -22,6 +23,7 @@ interface ChipProps {
 /** Chip de seleção (categorias, filtros, tipos de conta). */
 export function Chip({ label, selected, onPress, count }: ChipProps) {
   const theme = useTheme();
+  const vidro = supportsLiquidGlass() && !selected;
   return (
     <Pressable
       hitSlop={8}
@@ -32,13 +34,14 @@ export function Chip({ label, selected, onPress, count }: ChipProps) {
       style={({ pressed }) => [
         styles.chip,
         {
-          backgroundColor: selected ? theme.tintFill : theme.backgroundElement,
+          backgroundColor: selected ? theme.tintFill : vidro ? 'transparent' : theme.backgroundElement,
           // O chip inativo leva contorno; o ativo não precisa, porque a cor já o separa. É o par
           // `bg-secondary text-black` / `bg-surface border-white/6` do export.
           borderColor: selected ? 'transparent' : theme.cardBorder,
           opacity: pressed ? 0.8 : 1,
         },
       ]}>
+      {vidro ? <GlassBackdrop fallbackColor={theme.backgroundElement} radius={Radius.pill} /> : null}
       <ThemedText type="smallBold" themeColor={selected ? 'onTint' : 'text'}>
         {label}
       </ThemedText>

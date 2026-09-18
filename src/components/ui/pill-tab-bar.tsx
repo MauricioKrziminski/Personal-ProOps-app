@@ -15,7 +15,7 @@ import type { SymbolViewProps } from 'expo-symbols';
 import { progressoDeEntrada, useRelogioDeEntrada } from '@/components/motion/entrada';
 import { ThemedText } from '@/components/themed-text';
 import { Icon } from '@/components/ui/icon';
-import { centroDoSlot, distanciaDaAba, folgaDaMola, posicaoDesenhada } from '@/design/tab-pill';
+import { centroDoSlot, distanciaDaAba, folgaDaMola, larguraDoAlvo, posicaoDesenhada } from '@/design/tab-pill';
 import { Elevation, Motion, Radius, Space, Type } from '@/design/tokens';
 import { useScheme, useTheme } from '@/hooks/use-theme';
 
@@ -103,6 +103,7 @@ export function PillTabBar({
   const barW = tela - SIDE * 2;
   const interna = barW - PAD * 2;
   const slot = interna / tabs.length;
+  const alvo = larguraDoAlvo(slot);
   const folga = folgaDaMola(slot, DIAMETRO, PAD);
 
   const progresso = useSharedValue(activeIndex);
@@ -150,32 +151,33 @@ export function PillTabBar({
           {tabs.map((tab, i) => {
             const ativo = i === activeIndex;
             return (
-              <Pressable
-                key={tab.name}
-                accessibilityRole="tab"
-                accessibilityState={{ selected: ativo }}
-                accessibilityLabel={tab.badge ? `${tab.label}, ${tab.badge} pendentes` : tab.label}
-                onPress={() => {
-                  if (ativo) return;
-                  Haptics.selectionAsync();
-                  // A mola primeiro, a navegação depois: invertido, o `navigate` ocupa a JS
-                  // thread antes de a animação existir.
-                  animarPara(i);
-                  onSelect(i);
-                }}
-                style={[styles.slot, { width: slot }]}>
-                <View style={styles.lugarDoIcone}>
-                  <Icon name={tab.icon} size="md" color="onHeroMuted" />
-                </View>
-                <Rotulo
-                  label={tab.label}
-                  largura={slot}
-                  indice={i}
-                  posicao={posicao}
-                  ativo={theme.onHero}
-                  inativo={theme.onHeroMuted}
-                />
-              </Pressable>
+              <View key={tab.name} style={[styles.slotFrame, { width: slot }]}>
+                <Pressable
+                  accessibilityRole="tab"
+                  accessibilityState={{ selected: ativo }}
+                  accessibilityLabel={tab.badge ? `${tab.label}, ${tab.badge} pendentes` : tab.label}
+                  onPress={() => {
+                    if (ativo) return;
+                    Haptics.selectionAsync();
+                    // A mola primeiro, a navegação depois: invertido, o `navigate` ocupa a JS
+                    // thread antes de a animação existir.
+                    animarPara(i);
+                    onSelect(i);
+                  }}
+                  style={[styles.slot, { width: alvo }]}>
+                  <View style={styles.lugarDoIcone}>
+                    <Icon name={tab.icon} size="md" color="onHeroMuted" />
+                  </View>
+                  <Rotulo
+                    label={tab.label}
+                    largura={slot <= 96 ? slot + SOBRA : alvo}
+                    indice={i}
+                    posicao={posicao}
+                    ativo={theme.onHero}
+                    inativo={theme.onHeroMuted}
+                  />
+                </Pressable>
+              </View>
             );
           })}
         </View>
@@ -233,11 +235,13 @@ function Rotulo({
     // a largura em partes iguais e não há para onde quebrar. O teto sozinho não bastou — a
     // 384dp × 1,3 "Financeiro" virava "Financei…" —, e o `adjustsFontSizeToFit` do Android não
     // encolhe um `Animated.Text` de forma confiável. O rótulo ganha `SOBRA` além do slot: os
-    // vizinhos dos nomes longos são curtos, e o texto não é recortado pela coluna.
+    // vizinhos dos nomes longos são curtos, e o texto não é recortado pela coluna. No tablet,
+    // a largura do rótulo fica dentro do alvo de toque, sem reabrir toda a faixa como alvo.
     <Animated.Text
+      pointerEvents="none"
       numberOfLines={1}
       maxFontSizeMultiplier={1.15}
-      style={[Type.caption, styles.rotulo, { width: largura + SOBRA }, estilo]}>
+      style={[Type.caption, styles.rotulo, { width: largura }, estilo]}>
       {label}
     </Animated.Text>
   );
@@ -289,7 +293,8 @@ const styles = StyleSheet.create({
     borderWidth: StyleSheet.hairlineWidth,
   },
   fileira: { flexDirection: 'row', height: BAR_H },
-  slot: { alignItems: 'center', paddingTop: TOPO, gap: 1 },
+  slotFrame: { alignItems: 'center' },
+  slot: { height: BAR_H, alignItems: 'center', paddingTop: TOPO, gap: 1 },
   lugarDoIcone: { width: DIAMETRO, height: DIAMETRO, alignItems: 'center', justifyContent: 'center' },
   circulo: {
     position: 'absolute',

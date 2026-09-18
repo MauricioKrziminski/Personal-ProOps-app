@@ -1,6 +1,7 @@
 import { Stack } from 'expo-router';
 
 import { useTheme } from '@/hooks/use-theme';
+import { supportsLiquidGlass } from '@/components/ui/glass-backdrop';
 import type { SearchProps } from './search.types';
 
 /**
@@ -22,12 +23,13 @@ export function Search({
   hideWhenScrolling,
 }: SearchProps) {
   const theme = useTheme();
+  const vidro = supportsLiquidGlass();
 
   return (
     <Stack.SearchBar
-      // A barra nativa NÃO herda o tema. `tintColor` é o caret e o "Cancelar" daqui;
-      // `hintTextColor` e `headerIconColor` existem para o Android e são inofensivos.
-      barTintColor={theme.backgroundElement}
+      // No iOS 26, deixar o fundo para o sistema preserva o Liquid Glass da busca nativa.
+      // `tintColor` é o caret e o "Cancelar"; as outras cores preservam a leitura.
+      barTintColor={vidro ? undefined : theme.backgroundElement}
       textColor={theme.text}
       hintTextColor={theme.textSecondary}
       headerIconColor={theme.text}

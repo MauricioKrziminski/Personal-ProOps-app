@@ -3,6 +3,7 @@ import { useState } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 
 import { ThemedText } from '@/components/themed-text';
+import { GlassBackdrop, supportsLiquidGlass } from '@/components/ui/glass-backdrop';
 import { Sheet } from '@/components/ui/sheet';
 import { TaskHeader } from '@/components/ui/task-header';
 import { Icon } from '@/components/ui/icon';
@@ -87,6 +88,7 @@ interface MonthPickerProps {
  */
 export function MonthPicker({ month, onChange, children, variant = 'card' }: MonthPickerProps) {
   const theme = useTheme();
+  const vidro = supportsLiquidGlass();
   /** Ano aberto no sheet; `null` = sheet fechado. */
   const [sheet, setSheet] = useState<string | null>(null);
 
@@ -105,8 +107,9 @@ export function MonthPicker({ month, onChange, children, variant = 'card' }: Mon
       onPress={step(delta)}
       style={({ pressed }) => [
         styles.arrow,
-        { backgroundColor: pressed ? theme.backgroundSelected : theme.backgroundElement },
+        { backgroundColor: vidro ? 'transparent' : pressed ? theme.backgroundSelected : theme.backgroundElement },
       ]}>
+      {vidro ? <GlassBackdrop fallbackColor={theme.backgroundElement} radius={Radius.pill} /> : null}
       <Icon name={delta < 0 ? 'chevron.left' : 'chevron.right'} size="sm" color="tint" />
     </Pressable>
   );
@@ -185,6 +188,7 @@ function MonthSheet({
   onClose: () => void;
 }) {
   const theme = useTheme();
+  const vidro = supportsLiquidGlass();
 
   return (
     <Sheet visible={year !== null} onClose={onClose}>
@@ -201,8 +205,9 @@ function MonthSheet({
             }}
             style={({ pressed }) => [
               styles.arrow,
-              { backgroundColor: pressed ? theme.backgroundSelected : theme.backgroundElement },
+              { backgroundColor: vidro ? 'transparent' : pressed ? theme.backgroundSelected : theme.backgroundElement },
             ]}>
+            {vidro ? <GlassBackdrop fallbackColor={theme.backgroundElement} radius={Radius.pill} /> : null}
             <Icon name="chevron.left" size="sm" color="tint" />
           </Pressable>
           <ThemedText type="subtitle" accessibilityRole="header" style={styles.yearLabel}>
@@ -218,8 +223,9 @@ function MonthSheet({
             }}
             style={({ pressed }) => [
               styles.arrow,
-              { backgroundColor: pressed ? theme.backgroundSelected : theme.backgroundElement },
+              { backgroundColor: vidro ? 'transparent' : pressed ? theme.backgroundSelected : theme.backgroundElement },
             ]}>
+            {vidro ? <GlassBackdrop fallbackColor={theme.backgroundElement} radius={Radius.pill} /> : null}
             <Icon name="chevron.right" size="sm" color="tint" />
           </Pressable>
         </View>
@@ -240,11 +246,14 @@ function MonthSheet({
                   {
                     backgroundColor: ativo
                       ? theme.tintFill
+                      : vidro
+                        ? 'transparent'
                       : pressed
                         ? theme.backgroundSelected
                         : theme.backgroundElement,
                   },
                 ]}>
+                {vidro && !ativo ? <GlassBackdrop fallbackColor={theme.backgroundElement} radius={Radius.sm} /> : null}
                 <ThemedText type="smallBold" themeColor={ativo ? 'onTint' : 'text'}>
                   {monthShort(value)}
                 </ThemedText>

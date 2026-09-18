@@ -11,6 +11,7 @@ import Animated, {
 import * as Haptics from 'expo-haptics';
 
 import { Fonts } from '@/constants/theme';
+import { GlassBackdrop, supportsLiquidGlass } from '@/components/ui/glass-backdrop';
 import { HitTarget, Radius, Space, Type } from '@/design/tokens';
 import { useTheme } from '@/hooks/use-theme';
 
@@ -184,7 +185,20 @@ function Polegar({
       ],
     };
   });
+  const vidro = useAnimatedStyle(() => ({
+    width: Math.max(1, (direita.get() - esquerda.get()) * celula),
+    transform: [{ translateX: esquerda.get() * celula }],
+  }));
   const tampa = { width: altura, height: altura, borderRadius: r, backgroundColor: cor };
+  if (supportsLiquidGlass()) {
+    return (
+      <Animated.View
+        pointerEvents="none"
+        style={[styles.polegarVidro, { height: altura, borderRadius: r }, vidro]}>
+        <GlassBackdrop fallbackColor={cor} radius={r} />
+      </Animated.View>
+    );
+  }
   return (
     <>
       <Animated.View
@@ -261,6 +275,7 @@ const styles = StyleSheet.create({
     left: FOLGA,
     transformOrigin: 'left',
   },
+  polegarVidro: { position: 'absolute', top: FOLGA, left: FOLGA },
   label: {
     ...Type.subhead,
     fontFamily: Fonts.semibold,

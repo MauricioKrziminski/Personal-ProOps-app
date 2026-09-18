@@ -4,6 +4,7 @@ import Animated, { FadeIn, LinearTransition } from 'react-native-reanimated';
 import * as Haptics from 'expo-haptics';
 
 import { Icon, type IconName } from '@/components/ui/icon';
+import { GlassBackdrop, supportsLiquidGlass } from '@/components/ui/glass-backdrop';
 import { ThemedText } from '@/components/themed-text';
 import { useScheme, useTheme } from '@/hooks/use-theme';
 import { Elevation, Motion, Radius, Space, Type } from '@/design/tokens';
@@ -65,6 +66,7 @@ export function SelectField({
   const theme = useTheme();
   const scheme = useScheme();
   const [aberto, setAberto] = useState(false);
+  const vidro = supportsLiquidGlass() && !aberto;
 
   const escolhida = options.find((o) => o.id === value);
 
@@ -102,11 +104,12 @@ export function SelectField({
         style={[
           styles.moldura,
           {
-            backgroundColor: theme.surface,
+            backgroundColor: vidro ? 'transparent' : theme.surface,
             borderColor: theme.cardBorder,
-            boxShadow: Elevation[scheme].raised,
+            boxShadow: vidro ? undefined : Elevation[scheme].raised,
           },
         ]}>
+        {vidro ? <GlassBackdrop fallbackColor={theme.surface} radius={Radius.md} /> : null}
         {/* --- o valor, que é o estado normal do campo ---
              Ele SOME enquanto a lista está aberta. Mantê-lo visível duplicava a
              opção escolhida: o valor em cima e a mesma linha marcada logo abaixo,

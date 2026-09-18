@@ -3,6 +3,7 @@ import { forwardRef } from 'react';
 import { Pressable, StyleSheet, TextInput, View } from 'react-native';
 
 import { Icon } from '@/components/ui/icon';
+import { GlassBackdrop, supportsLiquidGlass } from '@/components/ui/glass-backdrop';
 import { HitTarget, Radius, Space, Type } from '@/design/tokens';
 import { useTheme } from '@/hooks/use-theme';
 
@@ -45,9 +46,11 @@ export const SearchField = forwardRef<TextInput, SearchFieldProps>(function Sear
   ref
 ) {
   const theme = useTheme();
+  const vidro = supportsLiquidGlass();
 
   return (
-    <View style={[styles.wrap, { backgroundColor: theme.backgroundElement }]}>
+    <View style={[styles.wrap, { backgroundColor: vidro ? 'transparent' : theme.backgroundElement }]}>
+      {vidro ? <GlassBackdrop fallbackColor={theme.backgroundElement} radius={Radius.pill} /> : null}
       <Icon name="magnifyingglass" size="md" color="textSecondary" />
 
       <TextInput

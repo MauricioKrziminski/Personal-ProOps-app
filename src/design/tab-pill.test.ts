@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 
-import { centroDoSlot, distanciaDaAba, folgaDaMola, posicaoDesenhada } from './tab-pill.ts';
+import { centroDoSlot, distanciaDaAba, folgaDaMola, larguraDoAlvo, posicaoDesenhada } from './tab-pill.ts';
 
 // As medidas reais da barra: 384dp de tela, calha de 16, respiro interno de 6, cinco abas.
 const PAD = 6;
@@ -33,4 +33,10 @@ test('a distância da aba satura em um slot', () => {
   assert.equal(distanciaDaAba(2.25, 2), 0.25);
   assert.equal(distanciaDaAba(4, 2), 1);
   assert.equal(centroDoSlot(0, 64), 32);
+});
+
+test('o alvo ocupa o slot no celular, mas não a faixa vazia entre ícones no tablet', () => {
+  assert.equal(larguraDoAlvo(slot), slot);
+  assert.equal(larguraDoAlvo(247), 96);
+  assert.equal(larguraDoAlvo(0), 0);
 });

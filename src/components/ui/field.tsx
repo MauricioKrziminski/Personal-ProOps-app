@@ -24,6 +24,7 @@ import Animated, {
 } from 'react-native-reanimated';
 
 import { ThemedText } from '@/components/themed-text';
+import { GlassBackdrop, supportsLiquidGlass } from '@/components/ui/glass-backdrop';
 import { Fonts } from '@/constants/theme';
 import { HitTarget, Motion, Radius, Space, Type, tabular } from '@/design/tokens';
 import { useTheme } from '@/hooks/use-theme';
@@ -168,17 +169,27 @@ function useCaixa(invalid: boolean | undefined) {
   const desfocar = () =>
     foco.set(withTiming(0, { duration: reduzido ? 0 : Motion.duration.base, easing: Motion.easing.out }));
 
-  const moldura = (conteudo: React.ReactNode, estilo?: StyleProp<ViewStyle>) => (
-    <Animated.View
-      style={[
-        styles.caixa,
-        { backgroundColor: theme.surface },
-        estilo,
-        estiloCaixa,
-      ]}>
-      {conteudo}
-    </Animated.View>
-  );
+  const moldura = (conteudo: React.ReactNode, estilo?: StyleProp<ViewStyle>) => {
+    const vidro = supportsLiquidGlass();
+    const raio = StyleSheet.flatten(estilo)?.borderRadius;
+    return (
+      <Animated.View
+        style={[
+          styles.caixa,
+          { backgroundColor: vidro ? 'transparent' : theme.surface },
+          estilo,
+          estiloCaixa,
+        ]}>
+        {vidro ? (
+          <GlassBackdrop
+            fallbackColor={theme.surface}
+            radius={typeof raio === 'number' ? raio : Radius.sm}
+          />
+        ) : null}
+        {conteudo}
+      </Animated.View>
+    );
+  };
 
   return { focar, desfocar, moldura };
 }

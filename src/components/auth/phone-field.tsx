@@ -2,6 +2,7 @@ import { forwardRef } from 'react';
 import { StyleSheet, TextInput, View } from 'react-native';
 
 import { ThemedText } from '@/components/themed-text';
+import { GlassBackdrop, supportsLiquidGlass } from '@/components/ui/glass-backdrop';
 import { HitTarget, Radius, Space, Type, tabular } from '@/design/tokens';
 import { formatPhoneBR } from '@/lib/phone-br';
 import { useTheme } from '@/hooks/use-theme';
@@ -31,16 +32,18 @@ export const PhoneField = forwardRef<TextInput, PhoneFieldProps>(function PhoneF
   ref
 ) {
   const theme = useTheme();
+  const vidro = supportsLiquidGlass();
 
   return (
     <View
       style={[
         styles.wrap,
         {
-          backgroundColor: theme.backgroundElement,
+          backgroundColor: vidro ? 'transparent' : theme.backgroundElement,
           borderColor: invalid ? theme.danger : theme.separator,
         },
       ]}>
+      {vidro ? <GlassBackdrop fallbackColor={theme.backgroundElement} radius={Radius.sm} /> : null}
       <ThemedText themeColor="textSecondary" style={[Type.body, tabular]}>
         +55
       </ThemedText>

@@ -27,6 +27,11 @@ export function centroDoSlot(posicao: number, slot: number): number {
   return slot * (posicao + 0.5);
 }
 
+/** No tablet, o espaço entre os destinos não faz parte do alvo de toque. */
+export function larguraDoAlvo(slot: number): number {
+  return Math.max(0, Math.min(slot, 96));
+}
+
 /** Quanto uma aba está "sob" o círculo: 0 embaixo dele, 1 a um slot ou mais de distância. */
 export function distanciaDaAba(posicao: number, indice: number): number {
   'worklet';
