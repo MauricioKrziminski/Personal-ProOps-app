@@ -11,6 +11,7 @@ import { SkeletonRow } from '@/components/ui/skeleton';
 import { categoryIcon } from '@/design/category-icons';
 import { Radius, Space, tabular } from '@/design/tokens';
 import { useAlertsSent } from '@/hooks/use-finance';
+import { useAdaptiveWindow } from '@/hooks/use-adaptive-window';
 import { formatDateBR } from '@/hooks/use-items';
 import { useTheme } from '@/hooks/use-theme';
 import {
@@ -76,69 +77,73 @@ function porDia(rows: AlertHistoryItem[]): [string, AlertHistoryItem[]][] {
 }
 
 export default function AlertsScreen() {
+  const { windowClass } = useAdaptiveWindow();
+  const tablet = windowClass !== 'compact';
   const theme = useTheme();
   const alertas = useAlertsSent();
   const dias = porDia(combineAlertDeliveries(alertas.data ?? []));
 
   return (
-    <Screen grouped onRefresh={() => Promise.all([alertas.refetch()])}>
+    <Screen grouped wide={tablet} onRefresh={() => Promise.all([alertas.refetch()])}>
       <Stack.Screen options={{ title: 'Histórico de alertas' }} />
 
-      {alertas.isLoading ? (
-        <Section>
-          <SkeletonRow />
-          <SkeletonRow />
-          <SkeletonRow />
-        </Section>
-      ) : alertas.isError ? (
-        <ErrorCard onRetry={() => alertas.refetch()} />
-      ) : dias.length === 0 ? (
-        <EmptyState
-          title="Nenhum alerta ainda"
-          hint="Quando você ativar um canal e houver algo importante, o aviso aparece aqui."
-        />
-      ) : (
-        dias.map(([dia, doDia]) => (
-          <Section key={dia} title={formatDateBR(dia)}>
-            {doDia.map((a) => {
-              const meta = ALERTA[a.kind];
-              return (
-                <Row
-                  key={a.id}
-                  title={meta?.titulo ?? a.kind}
-                  subtitle={detalhe(a)}
-                  // Em orçamento o `ref` É a categoria, então o ícone dela diz mais que um sino.
-                  icon={
-                    a.kind.startsWith('budget_')
-                      ? categoryIcon(a.ref)
-                      : meta?.icone ?? 'bell'
-                  }
-                  chevron={false}
-                  trailing={
-                    <View style={[styles.pill, { backgroundColor: theme.backgroundElement }]}>
-                      <ThemedText
-                        type="code"
-                        themeColor={meta?.tom ?? 'textSecondary'}
-                        style={tabular}>
-                        {hora(a.created_at)}
-                      </ThemedText>
-                    </View>
-                  }
-                />
-              );
-            })}
+      <View style={tablet ? styles.tabletReading : null} testID="alerts-tablet-workspace">
+        {alertas.isLoading ? (
+          <Section>
+            <SkeletonRow />
+            <SkeletonRow />
+            <SkeletonRow />
           </Section>
-        ))
-      )}
+        ) : alertas.isError ? (
+          <ErrorCard onRetry={() => alertas.refetch()} />
+        ) : dias.length === 0 ? (
+          <EmptyState
+            title="Nenhum alerta ainda"
+            hint="Quando você ativar um canal e houver algo importante, o aviso aparece aqui."
+          />
+        ) : (
+          dias.map(([dia, doDia]) => (
+            <Section key={dia} title={formatDateBR(dia)}>
+              {doDia.map((a) => {
+                const meta = ALERTA[a.kind];
+                return (
+                  <Row
+                    key={a.id}
+                    title={meta?.titulo ?? a.kind}
+                    subtitle={detalhe(a)}
+                    // Em orçamento o `ref` É a categoria, então o ícone dela diz mais que um sino.
+                    icon={
+                      a.kind.startsWith('budget_')
+                        ? categoryIcon(a.ref)
+                        : meta?.icone ?? 'bell'
+                    }
+                    chevron={false}
+                    trailing={
+                      <View style={[styles.pill, { backgroundColor: theme.backgroundElement }]}>
+                        <ThemedText
+                          type="code"
+                          themeColor={meta?.tom ?? 'textSecondary'}
+                          style={tabular}>
+                          {hora(a.created_at)}
+                        </ThemedText>
+                      </View>
+                    }
+                  />
+                );
+              })}
+            </Section>
+          ))
+        )}
 
-      {dias.length > 0 ? (
-        <View style={styles.rodape}>
-          <Icon name="bell" size="sm" color="textSecondary" />
-          <ThemedText type="footnote" themeColor="textSecondary" style={styles.shrink}>
-            Se o mesmo aviso sair nos dois canais, ele aparece uma vez só aqui.
-          </ThemedText>
-        </View>
-      ) : null}
+        {dias.length > 0 ? (
+          <View style={styles.rodape}>
+            <Icon name="bell" size="sm" color="textSecondary" />
+            <ThemedText type="footnote" themeColor="textSecondary" style={styles.shrink}>
+              Se o mesmo aviso sair nos dois canais, ele aparece uma vez só aqui.
+            </ThemedText>
+          </View>
+        ) : null}
+      </View>
     </Screen>
   );
 }
@@ -164,4 +169,9 @@ const styles = StyleSheet.create({
     paddingHorizontal: Space.lg,
   },
   shrink: { flex: 1, minWidth: 0 },
+  tabletReading: {
+    width: '100%',
+    maxWidth: 800,
+    alignSelf: 'center',
+  },
 });

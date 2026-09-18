@@ -6,6 +6,7 @@ import Animated, { FadeInDown, LinearTransition } from 'react-native-reanimated'
 
 import { monthLabel } from '@/components/finance/month-picker';
 import { ThemedText } from '@/components/themed-text';
+import { AdaptivePanes } from '@/components/ui/adaptive-panes';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Field, TextField } from '@/components/ui/field';
@@ -14,6 +15,7 @@ import { Screen } from '@/components/ui/screen';
 import { SkeletonRow } from '@/components/ui/skeleton';
 import { useToast } from '@/components/ui/toast';
 import { Motion, Space, tabular } from '@/design/tokens';
+import { useAdaptiveWindow } from '@/hooks/use-adaptive-window';
 import {
   useInviteMember,
   useInvites,
@@ -54,6 +56,8 @@ const PAPEL: Record<string, string> = {
 };
 
 export default function MembersScreen() {
+  const { windowClass } = useAdaptiveWindow();
+  const tablet = windowClass !== 'compact';
   const { session } = useSession();
   const toast = useToast();
   const membros = useWorkspaceMembers();
@@ -97,12 +101,8 @@ export default function MembersScreen() {
       },
     );
 
-  return (
-    <Screen
-      grouped
-      onRefresh={() => Promise.all([membros.refetch(), convites.refetch(), plano.refetch()])}>
-      <Stack.Screen options={{ title: 'Pessoas', headerLargeTitle: true }} />
-
+  const people = (
+    <>
       {membros.isLoading ? (
         <Section title="Quem está aqui">
           <SkeletonRow />
@@ -169,7 +169,11 @@ export default function MembersScreen() {
           </View>
         </Card>
       ) : null}
+    </>
+  );
 
+  const management = (
+    <>
       {/* Sem plano lido, nada de afirmar limite: falhar aqui não pode virar "você é Free". */}
       {plano.isError ? (
         <Section title="Plano">
@@ -292,6 +296,28 @@ export default function MembersScreen() {
           dono. Remover alguém e renomear o espaço também ainda não existem nesta tela.
         </ThemedText>
       </View>
+    </>
+  );
+
+  // The compact body is the deterministic fallback for medium windows and preserves the phone
+  // reading order. Expanded tablets get the real supporting context beside the member list.
+  const compactBody = <>{people}{management}</>;
+  const tabletBody = (
+    <AdaptivePanes
+      main={<View style={styles.paneBody}>{people}</View>}
+      support={<View style={styles.paneBody}>{management}</View>}
+      singlePaneContent={compactBody}
+      testID="members-tablet-workspace"
+    />
+  );
+
+  return (
+    <Screen
+      grouped
+      wide={tablet}
+      onRefresh={() => Promise.all([membros.refetch(), convites.refetch(), plano.refetch()])}>
+      <Stack.Screen options={{ title: 'Pessoas', headerLargeTitle: true }} />
+      {tablet ? tabletBody : compactBody}
     </Screen>
   );
 }
@@ -302,6 +328,10 @@ const styles = StyleSheet.create({
   },
   bloco: {
     gap: Space.md,
+  },
+  paneBody: {
+    gap: Space.xl,
+    minWidth: 0,
   },
   rodape: {
     paddingHorizontal: Space.lg,

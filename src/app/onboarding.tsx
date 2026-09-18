@@ -534,6 +534,9 @@ const styles = StyleSheet.create({
   topo: {
     flexDirection: 'row',
     alignItems: 'center',
+    width: '100%',
+    maxWidth: 600,
+    alignSelf: 'center',
     paddingHorizontal: Space.xs,
     paddingTop: Space.md,
   },
@@ -563,6 +566,9 @@ const styles = StyleSheet.create({
   */
   corpoConteudo: {
     flexGrow: 1,
+    width: '100%',
+    maxWidth: 600,
+    alignSelf: 'center',
     paddingHorizontal: Space.lg,
     paddingTop: Space.xxl,
     // Sem `paddingBottom`: quem fecha a coluna agora é o rodapé, que mora aqui dentro e já
