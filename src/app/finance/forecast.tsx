@@ -40,6 +40,7 @@ import {
 } from '@/hooks/use-finance';
 import { useTelaPronta } from '@/hooks/use-tela-pronta';
 import { useAdaptiveWindow } from '@/hooks/use-adaptive-window';
+import { useTheme } from '@/hooks/use-theme';
 import { MonthPicker, currentMonth, monthTitle } from '@/components/finance/month-picker';
 import { mesDoCorte, veioDe, type MesProjetado } from '@/lib/forecast-months';
 import {
@@ -145,6 +146,7 @@ function ErrorBand({ message, onRetry }: { message: string; onRetry: () => void 
 export default function ForecastScreen() {
   // Dinheiro no meio de frase obedece ao "esconder saldo" — `Money` não cabe em texto corrido.
   const brl = useBRL();
+  const theme = useTheme();
   const toast = useToast();
   const { windowClass } = useAdaptiveWindow();
   const tablet = windowClass !== 'compact';
@@ -418,14 +420,39 @@ export default function ForecastScreen() {
     );
   };
 
-  /*
-    O corpo do "Somar", que morava inline dentro de um `<Pressable>` de 40 linhas no cabeçalho
-    escrito à mão. Com o `TaskHeader` a ação é um `<Button>`, e regra de negócio não cabe dentro
-    de um slot de cabeçalho.
-  */
-  const somarSuposicao = () => {
-      Haptics.selectionAsync();
-      setCalendarioAberto((aberto) => !aberto);
+  /** Adicionar mais uma prepara outra hipótese; ver resultado inclui a atual e encerra a montagem. */
+  const aplicarSuposicao = (verResultado: boolean) => {
+    if (novoValor <= 0 || novoMes === null) {
+      if (verResultado && rascunhos.length > 0) {
+        setSheetAberto(false);
+        setModo('mes');
+      }
+      return;
+    }
+    const primeiroDia = `${novoMes}-01`;
+    // A projeção começa hoje: uma hipótese no mês atual não pode entrar no passado.
+    const inicio = primeiroDia < localISODate() ? localISODate() : primeiroDia;
+    const hipotese: Draft = {
+      kind: novoTipo,
+      amount_cents: novoValor,
+      start: inicio,
+      installments: novoModo === 'monthly' ? 1 : novoParcelas,
+      mode: novoModo,
+    };
+    setRascunhos((anteriores) => [...anteriores, hipotese]);
+
+    // Uma hipótese num mês distante precisa ampliar a janela para aparecer no resultado.
+    const alvo = new Date(Number(novoMes.slice(0, 4)), Number(novoMes.slice(5, 7)), 0);
+    const precisa = Math.ceil((alvo.getTime() - Date.now()) / 86400000);
+    const maior = HORIZONTES.find((h) => h.dias >= precisa) ?? HORIZONTES[HORIZONTES.length - 1];
+    if (maior.dias > dias) setDias(maior.dias);
+
+    Haptics.selectionAsync();
+    setNovoValor(0);
+    if (verResultado) {
+      setSheetAberto(false);
+      setModo('mes');
+    }
   };
 
   /*
@@ -521,23 +548,39 @@ export default function ForecastScreen() {
   const scenario = !nadaParaProjetar ? (
     <Card style={styles.simulador}>
       <View style={styles.rascunhoTopo}>
-        <Icon name={simulando ? 'pencil.and.outline' : 'questionmark.circle'} size="md" color={simulando ? 'warning' : 'textSecondary'} />
-        <ThemedText type="smallBold" style={styles.bandText}>
-          {simulando ? 'Rascunho — nada disso está salvo' : 'E se…?'}
-        </ThemedText>
-        {simulando ? <Button label="Limpar" variant="secondary" size="sm" onPress={() => setRascunhos([])} /> : null}
+        <Icon
+          name={simulando ? 'pencil.and.outline' : 'questionmark.circle'}
+          size="md"
+          color={simulando ? 'warning' : 'textSecondary'}
+        />
+        <View style={styles.rascunhoTitulo}>
+          <ThemedText type="smallBold">
+            {simulando ? 'Rascunho' : 'E se…?'}
+          </ThemedText>
+          {simulando ? (
+            <ThemedText type="caption" themeColor="textSecondary">
+              {rascunhos.length} {rascunhos.length === 1 ? 'hipótese' : 'hipóteses'} · temporário
+            </ThemedText>
+          ) : null}
+        </View>
       </View>
       {simulando ? (
         rascunhos.map((d, i) => (
-          <View key={`${d.kind}-${d.start}-${d.amount_cents}-${i}`} style={styles.rascunhoLinha}>
-            <ThemedText type="small" themeColor="textSecondary" style={tabular}>
+          <View
+            key={`${d.kind}-${d.start}-${d.amount_cents}-${i}`}
+            style={[styles.rascunhoLinha, { borderTopColor: theme.separator }]}
+          >
+            <ThemedText
+              type="small"
+              themeColor="textSecondary"
+              style={[tabular, styles.rascunhoDescricao]}>
               {d.kind === 'income' ? 'entra' : 'sai'} {brl(d.amount_cents)}
               {d.mode === 'monthly' ? ' todo mês' : d.installments > 1 ? ` em ${d.installments}x` : ''}{' '}
               · a partir de {isoToBR(d.start)}
             </ThemedText>
             <Button
               label="Tirar"
-              variant="ghost"
+              variant="secondary"
               size="sm"
               onPress={() => setRascunhos((r) => r.filter((_, j) => j !== i))}
             />
@@ -555,23 +598,27 @@ export default function ForecastScreen() {
           onRetry={simulado.refetch}
         />
       ) : null}
-      <Button
-        label={simulando ? 'Somar outra suposição' : 'Supor um lançamento'}
-        variant={simulando ? 'secondary' : 'primary'}
-        size="sm"
-        onPress={() => {
-          setNovoTipo('income');
-          setNovoValor(0);
-          setNovoMes(currentMonth());
-          setNovoParcelas(1);
-          setNovoModo('total');
-          setSheetAberto(true);
-        }}
-      />
+      <View style={styles.rascunhoAcoes}>
+        <Button
+          label={simulando ? 'Adicionar outra hipótese' : 'Supor um lançamento'}
+          variant={simulando ? 'secondary' : 'primary'}
+          size="sm"
+          onPress={() => {
+            setNovoTipo('income');
+            setNovoValor(0);
+            setNovoMes(currentMonth());
+            setNovoParcelas(1);
+            setNovoModo('total');
+            setSheetAberto(true);
+          }}
+        />
+        {simulando ? (
+          <Button label="Limpar" variant="secondary" size="sm" onPress={() => setRascunhos([])} />
+        ) : null}
+      </View>
       {simulando ? (
         <ThemedText type="caption" themeColor="textSecondary">
-          Move o caixa. Não remonta fatura de cartão, orçamento nem cronograma de dívida.
-          Sair da tela apaga.
+          Só muda esta projeção. Nada é salvo.
         </ThemedText>
       ) : null}
     </Card>
@@ -857,25 +904,23 @@ export default function ForecastScreen() {
           </Card>
         ) : null}
       </View>
-      {/*
-        A suposição. `formSheet` porque é tarefa curta com Cancelar/Somar próprios (design.md §8),
-        e nada aqui escreve no banco — o "Somar" só empilha no estado local.
-      */}
+      {/* Ambas as ações existem desde a primeira hipótese; adicionar mais uma mantém o formulário aberto. */}
       <Sheet visible={sheetAberto} onClose={() => setSheetAberto(false)}>
         <TaskHeader
-          title="Supor um lançamento"
+          title="Nova hipótese"
+          subtitle={simulando ? `${rascunhos.length} ${rascunhos.length === 1 ? 'hipótese no cenário' : 'hipóteses no cenário'}` : undefined}
           onClose={() => setSheetAberto(false)}
           action={
             <Button
-              label="Somar"
+              label="Ver resultado"
               size="sm"
-              disabled={novoValor <= 0 || novoMes === null}
-              onPress={somarSuposicao}
+              disabled={!simulando && (novoValor <= 0 || novoMes === null)}
+              onPress={() => aplicarSuposicao(true)}
             />
           }
         />
 
-        <View style={styles.sheetCorpo}>
+        <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={styles.sheetCorpo}>
           <Field label="É entrada ou saída?">
             <Segmented
               options={[
@@ -942,14 +987,16 @@ export default function ForecastScreen() {
             </Field>
           ) : null}
 
-          <ThemedText type="caption" themeColor="textSecondary">
-            {novoModo === 'monthly'
-              ? 'Repete todo mês até o fim da projeção. '
-              : ''}
-            Some ao seu fluxo real — saldo de hoje, faturas, parcelas, financiamentos e
-            recorrentes — e recalcula os meses daqui para frente. Sair da tela apaga.
-          </ThemedText>
-        </View>
+          <Button
+            label="Adicionar mais uma"
+            icon="plus"
+            variant="secondary"
+            block
+            style={styles.sheetAction}
+            disabled={novoValor <= 0 || novoMes === null}
+            onPress={() => aplicarSuposicao(false)}
+          />
+        </ScrollView>
       </Sheet>
 
     </Screen>
@@ -1004,7 +1051,21 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: Space.sm,
   },
+  rascunhoTitulo: {
+    flex: 1,
+    gap: Space.half,
+  },
   rascunhoLinha: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Space.sm,
+    paddingTop: Space.sm,
+    borderTopWidth: StyleSheet.hairlineWidth,
+  },
+  rascunhoDescricao: {
+    flex: 1,
+  },
+  rascunhoAcoes: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
@@ -1013,6 +1074,9 @@ const styles = StyleSheet.create({
   sheetCorpo: {
     gap: Space.md,
     padding: Space.lg,
+  },
+  sheetAction: {
+    marginTop: Space.sm,
   },
   corte: {
     paddingHorizontal: Space.md,

@@ -11,7 +11,7 @@ const require = createRequire(import.meta.url);
 
 // Execute the screen JSX and its event handlers. Native components/query boundaries
 // are inert; state persists across renders so each interaction uses current props.
-function screen(file: string, options: { tablet?: boolean; debts?: any[]; invoiceStatus?: string; create?: boolean; monthLines?: any[]; monthSummary?: any; cycleLines?: any[]; cycleRow?: any; rangeError?: boolean; rangePending?: boolean; rangePendingMonths?: string[]; bills?: any[]; billsError?: boolean; charges?: any[]; reminders?: any[]; budgets?: any[]; setupPassos?: any[]; activity?: any[]; activityError?: boolean } = {}) {
+function screen(file: string, options: { tablet?: boolean; debts?: any[]; invoiceStatus?: string; create?: boolean; monthLines?: any[]; monthSummary?: any; cycleLines?: any[]; cycleRow?: any; rangeError?: boolean; rangePending?: boolean; rangePendingMonths?: string[]; bills?: any[]; billsError?: boolean; charges?: any[]; reminders?: any[]; budgets?: any[]; setupPassos?: any[]; activity?: any[]; activityError?: boolean; forecastAccounts?: any[] } = {}) {
   const state: any[] = [];
   let cursor = 0;
   let nodes: any[] = [];
@@ -21,6 +21,7 @@ function screen(file: string, options: { tablet?: boolean; debts?: any[]; invoic
   const navigations: any[] = [];
   /** Quais consultas o "Tentar de novo" refez — é assim que se sabe se ele refez a CERTA. */
   const refetches: string[] = [];
+  let forecastDrafts: any[] = [];
   /** O que cada chamada do portão da tela recebeu — o dublê dele abre sempre, então é por aqui que se confere a COMPOSIÇÃO. */
   const gates: any[][] = [];
   const query = { data: [], isLoading: false, isError: false, isRefetching: false, refetch: async () => {} };
@@ -69,6 +70,14 @@ function screen(file: string, options: { tablet?: boolean; debts?: any[]; invoic
       // vazia é eco — design.md §1), e o caminho feliz não teria o que mostrar.
       : { ...query, data: { pages: [[{ id: 'tx-1', kind: 'expense', amount_cents: 4500, occurred_at: '2026-09-15', description: 'Mercado', category: 'mercado', account_id: null, status: 'cleared' }]], pageParams: [] }, isPending: false, hasNextPage: false, isFetchingNextPage: false, fetchNextPage: () => {}, refetch: async () => { refetches.push('list'); } },
     useMonthSummary: () => ({ ...query, data: options.monthSummary ?? null }),
+    useAccounts: () => ({ ...query, data: options.forecastAccounts ?? [] }),
+    useCashFlowForecast: () => ({ ...query, data: [{ day: '2026-09-18', balance_cents: 10000, in_cents: 0, out_cents: 0 }] }),
+    useCashHistory: () => ({ ...query, data: [] }),
+    useForecastWithDrafts: (_days: number, drafts: any[]) => {
+      forecastDrafts = drafts;
+      return { ...query, data: [{ day: '2026-09-18', balance_cents: 10000, in_cents: 0, out_cents: 0 }] };
+    },
+    useForecastMonths: () => ({ ...query, data: { hoje: 10000, meses: [] }, isPlaceholderData: false }),
     // O mês é uma STRING (`2026-09`); sem este dublê o Proxy devolvia um objeto-consulta.
     useCycleMonth: () => '2026-09',
     useMonthBreakdown: () => ({ ...query, data: [] }),
@@ -123,6 +132,7 @@ function screen(file: string, options: { tablet?: boolean; debts?: any[]; invoic
       if (name === 'react/jsx-runtime') return require(name);
       if (name === 'react-native') return { StyleSheet: { create: (value: unknown) => value }, View: 'View', Pressable: 'Pressable', ScrollView: 'ScrollView', FlatList: 'FlatList', useWindowDimensions: () => ({ width: 384, height: 800 }), Platform: { OS: 'android', select: (o: any) => o.android ?? o.default } };
       if (name === 'react-native-reanimated') return { default: { View: 'AnimatedView' }, FadeInDown: animation, FadeOut: animation, FadeIn: animation, LinearTransition: animation };
+      if (name === 'expo-haptics') return { selectionAsync() {}, notificationAsync() {}, NotificationFeedbackType: { Success: 'success', Warning: 'warning' } };
       // `back` é navegação como qualquer outra e ENTRA na lista: é o que prende o "fechar um
       // formulário que outra tela abriu devolve para ela" (`useVoltarQuandoFechar`).
       if (name === 'expo-router') return { Stack: { Screen: 'StackScreen' }, useLocalSearchParams: () => ({ id: 'invoice-1', ...(options.create !== false ? { create: 'financing' } : {}) }), router: { push: (to: any) => navigations.push(to), back: () => navigations.push({ back: true }) } };
@@ -156,7 +166,7 @@ function screen(file: string, options: { tablet?: boolean; debts?: any[]; invoic
       };
       // Orçamentos consulta direto (a lista de linhas): o mesmo resultado inerte dos hooks.
       if (name === '@tanstack/react-query') return { useQuery: () => query };
-      if (name === '@/lib/finance-form' || name === '@/lib/dates' || name === '@/lib/month-view' || name === '@/lib/settle-labels' || name === '@/lib/accounts' || name === '@/lib/cycle-label' || name === '@/lib/card-status' || name === '@/lib/today-sections' || name === '@/lib/runway' || name === '@/lib/budget-tight' || name === '@/lib/setup-steps' || name === '@/lib/activity-feed' || name === '@/lib/account-cash' || name === '@/lib/today-spend') return load(`src/lib/${name.split('/').at(-1)}.ts`);
+      if (name === '@/lib/finance-form' || name === '@/lib/dates' || name === '@/lib/forecast-months' || name === '@/lib/month-view' || name === '@/lib/settle-labels' || name === '@/lib/accounts' || name === '@/lib/cycle-label' || name === '@/lib/card-status' || name === '@/lib/today-sections' || name === '@/lib/runway' || name === '@/lib/budget-tight' || name === '@/lib/setup-steps' || name === '@/lib/activity-feed' || name === '@/lib/account-cash' || name === '@/lib/today-spend') return load(`src/lib/${name.split('/').at(-1)}.ts`);
       if (name === '@/hooks/use-debounced') return { useDebounced: (value: unknown) => value };
       if (name === '@/design/category-icons') return { categoryIcon: () => 'circle' };
       if (name === '@/design/adaptive-window') return load('src/design/adaptive-window.ts');
@@ -212,6 +222,7 @@ function screen(file: string, options: { tablet?: boolean; debts?: any[]; invoic
     if (node.type === 'FinanceTabletCanvas') {
       for (const slot of ['cycle', 'actions', 'ledger', 'breakdown']) visit(node.props[slot]);
     }
+    if (node.type === 'FinanceAnalysisPanes') visit(node.props.compact);
     visit(node.props.ListHeaderComponent);
     // Mesmo motivo do header: slot é conteúdo renderizado. As ações da fatura desceram para o
     // FIM da lista em 15/09/2026 (botão fixo sobre o scroll foi recusado pelo dono do produto),
@@ -234,6 +245,7 @@ function screen(file: string, options: { tablet?: boolean; debts?: any[]; invoic
   render();
   return {
     writes, confirmations, actions, navigations, refetches, gates,
+    drafts: () => forecastDrafts,
     nodes: () => nodes,
     button(label: string) { const node = nodes.find((n) => n.type === 'Button' && n.props.label === label); assert.ok(node, `visible button: ${label}`); return node; },
     press(label: string) { const node = this.button(label); assert.ok(!node.props.disabled, `${label} must be enabled`); node.props.onPress(); render(); },
@@ -242,6 +254,51 @@ function screen(file: string, options: { tablet?: boolean; debts?: any[]; invoic
   };
 }
 const debtsFile = 'src/app/finance/debts.tsx';
+const forecastFile = 'src/app/finance/forecast.tsx';
+
+test('E se: Ver resultado funciona na primeira hipótese, com Adicionar mais uma disponível em paralelo', () => {
+  const ui = screen(forecastFile, { forecastAccounts: [{ id: 'conta-1' }] });
+  ui.press('Supor um lançamento');
+  ui.fill('Valor', 25000);
+  assert.equal(ui.button('Adicionar mais uma').props.disabled, false);
+  ui.press('Ver resultado');
+
+  assert.equal(ui.drafts().length, 1);
+  assert.equal(ui.drafts()[0].kind, 'income');
+  assert.equal(ui.drafts()[0].amount_cents, 25000);
+  assert.ok(ui.nodes().some((n: any) => n.type === 'ThemedText' && n.props.children === 'Rascunho'));
+  assert.equal(ui.nodes().some((n: any) => n.type === 'Sheet' && n.props.visible), false);
+  assert.deepEqual(ui.writes, []);
+});
+
+test('E se: Adicionar mais uma prepara várias hipóteses sem fechar; Ver resultado inclui a última', () => {
+  const ui = screen(forecastFile, { forecastAccounts: [{ id: 'conta-1' }] });
+  ui.press('Supor um lançamento');
+  ui.fill('Valor', 25000);
+  ui.press('Adicionar mais uma');
+  assert.ok(ui.nodes().some((n: any) => n.type === 'Sheet' && n.props.visible));
+  assert.equal(ui.button('Adicionar mais uma').props.disabled, true);
+  assert.equal(ui.button('Ver resultado').props.disabled, false);
+  ui.fill('Valor', 10000);
+  ui.press('Adicionar mais uma');
+  assert.deepEqual(Array.from(ui.drafts(), (d: any) => d.amount_cents), [25000, 10000]);
+
+  ui.fill('Valor', 5000);
+  ui.press('Ver resultado');
+  assert.deepEqual(Array.from(ui.drafts(), (d: any) => d.amount_cents), [25000, 10000, 5000]);
+  assert.equal(ui.nodes().some((n: any) => n.type === 'Sheet' && n.props.visible), false);
+  assert.deepEqual(ui.writes, []);
+});
+
+test('E se: Ver resultado depois de Somar não duplica a hipótese já adicionada', () => {
+  const ui = screen(forecastFile, { forecastAccounts: [{ id: 'conta-1' }] });
+  ui.press('Supor um lançamento');
+  ui.fill('Valor', 25000);
+  ui.press('Adicionar mais uma');
+  ui.press('Ver resultado');
+  assert.equal(ui.drafts().length, 1);
+  assert.equal(ui.nodes().some((n: any) => n.type === 'Sheet' && n.props.visible), false);
+});
 
 test('new financing saves from only the installment value and total count, without account/name/interest', () => {
   const ui = screen(debtsFile);
