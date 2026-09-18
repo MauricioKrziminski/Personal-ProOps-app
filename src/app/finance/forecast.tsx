@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, useMemo } from 'react';
-import { Pressable, ScrollView, StyleSheet, View, useWindowDimensions } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import Animated, { FadeIn, FadeInDown } from 'react-native-reanimated';
 import { Stack, router } from 'expo-router';
 import * as Haptics from 'expo-haptics';
@@ -23,7 +23,7 @@ import { Calendar } from '@/components/finance/calendar';
 import { Sheet } from '@/components/ui/sheet';
 import { TaskHeader } from '@/components/ui/task-header';
 import { Skeleton, SkeletonChart, SkeletonList, SkeletonRow } from '@/components/ui/skeleton';
-import { Sparkline } from '@/components/ui/sparkline';
+import { MeasuredSparkline } from '@/components/ui/measured-sparkline';
 import { useToast } from '@/components/ui/toast';
 import { Motion, Radius, Space, tabular } from '@/design/tokens';
 import {
@@ -144,7 +144,6 @@ export default function ForecastScreen() {
   // Dinheiro no meio de frase obedece ao "esconder saldo" — `Money` não cabe em texto corrido.
   const brl = useBRL();
   const toast = useToast();
-  const { width } = useWindowDimensions();
 
   const [dias, setDias] = useState(90);
   /**
@@ -567,9 +566,8 @@ export default function ForecastScreen() {
             <View
               accessible
               accessibilityLabel={`Saldo hoje ${formatBRL(hoje)}, no fim do período ${formatBRL(fim)}${primeiroNegativo ? `, negativo a partir de ${isoToBR(primeiroNegativo)}` : ''}`}>
-              <Sparkline
+              <MeasuredSparkline
                 values={valores}
-                width={width - Space.lg * 4}
                 height={96}
                 showZero
                 pastCount={passado.length + 1}

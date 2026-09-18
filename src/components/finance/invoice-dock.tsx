@@ -1,7 +1,7 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import * as Haptics from 'expo-haptics';
-import { StyleSheet, View, useWindowDimensions } from 'react-native';
+import { StyleSheet, View, type LayoutChangeEvent } from 'react-native';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import Animated, {
   runOnJS,
@@ -97,7 +97,7 @@ export function InvoiceDock({
   onChange: (invoiceId: string) => void;
   children?: React.ReactNode;
 }) {
-  const { width } = useWindowDimensions();
+  const [largura, setLargura] = useState(0);
   const reduzir = useReducedMotion();
   const { prender, aoPosicionar } = useFlightAnchor('doca');
   const oculto = useFlightHidden('doca');
@@ -153,26 +153,31 @@ export function InvoiceDock({
       else if (praDireita && anterior) runOnJS(trocar)(anterior);
     });
 
-  const largura = width - Space.lg * 2;
+  const medir = (event: LayoutChangeEvent) => {
+    const measured = event.nativeEvent.layout.width;
+    setLargura((previous) => previous === measured ? previous : measured);
+  };
   const movimento = useAnimatedStyle(() => ({
     transform: [
       { perspective: 900 },
       { translateX: dx.get() },
-      { rotateY: `${(reduzir ? 0 : -dx.get() / largura) * 25 + virada.get()}deg` },
+      { rotateY: `${(reduzir ? 0 : -dx.get() / Math.max(1, largura)) * 25 + virada.get()}deg` },
     ],
   }));
 
   return (
-    <View style={styles.bloco}>
-      <GestureDetector gesture={deslize}>
-        <Animated.View style={movimento}>
-          <Animated.View ref={prender} onLayout={aoPosicionar} style={oculto}>
-            <CardFace nome={nome} largura={largura} atrasada={resumo.atrasada}>
-              <BaseDaDoca nome={nome} resumo={resumo} />
-            </CardFace>
+    <View style={styles.bloco} onLayout={medir}>
+      {largura > 0 ? (
+        <GestureDetector gesture={deslize}>
+          <Animated.View style={movimento}>
+            <Animated.View ref={prender} onLayout={aoPosicionar} style={oculto}>
+              <CardFace nome={nome} largura={largura} atrasada={resumo.atrasada}>
+                <BaseDaDoca nome={nome} resumo={resumo} />
+              </CardFace>
+            </Animated.View>
           </Animated.View>
-        </Animated.View>
-      </GestureDetector>
+        </GestureDetector>
+      ) : null}
       {children}
     </View>
   );

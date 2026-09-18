@@ -3,7 +3,6 @@ import {
   ScrollView,
   StyleSheet,
   View,
-  useWindowDimensions,
 } from 'react-native';
 import Animated, { FadeInDown } from 'react-native-reanimated';
 import { Stack, router } from 'expo-router';
@@ -25,7 +24,8 @@ import { Screen } from '@/components/ui/screen';
 import { HeroLabel } from '@/components/ui/section-head';
 import { Segmented } from '@/components/ui/segmented';
 import { Skeleton, SkeletonChart, SkeletonHero, SkeletonList, SkeletonRow } from '@/components/ui/skeleton';
-import { ProgressBar, Sparkline } from '@/components/ui/sparkline';
+import { ProgressBar } from '@/components/ui/sparkline';
+import { MeasuredSparkline } from '@/components/ui/measured-sparkline';
 import { useToast } from '@/components/ui/toast';
 import { Motion, Radius, Space, tabular } from '@/design/tokens';
 import {
@@ -151,7 +151,6 @@ function ErrorBand({ message, onRetry }: { message: string; onRetry: () => void 
 
 export default function NetWorthScreen() {
   const toast = useToast();
-  const { width } = useWindowDimensions();
   const patrimonio = useNetWorth();
   const [janela, setJanela] = useState('12');
   const serie = useNetWorthSeries(Number(janela));
@@ -386,7 +385,7 @@ export default function NetWorthScreen() {
         <Card style={styles.bloco}>
           <ThemedText type="smallBold">Evolução</ThemedText>
           <Segmented options={JANELAS} value={janela} onChange={setJanela} />
-          <Sparkline values={valores} width={width - Space.lg * 4} height={80} showZero />
+          <MeasuredSparkline values={valores} height={80} showZero />
           <View style={styles.eixo}>
             <ThemedText type="small" themeColor="textSecondary">
               {monthShort(pontos[0].month, atravessaAno)}

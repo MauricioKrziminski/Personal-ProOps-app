@@ -1,5 +1,7 @@
 import { useMemo, useState } from 'react';
 import { FlatList, ScrollView, StyleSheet, View, useWindowDimensions } from 'react-native';
+import { MaxContentWidth } from '@/constants/theme';
+import { chartWidthForPane, rootContentMaxWidth } from '@/design/adaptive-window';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Animated, { FadeInDown } from 'react-native-reanimated';
 import { Stack, router, useLocalSearchParams } from 'expo-router';
@@ -348,7 +350,10 @@ export default function InvoiceScreen() {
 
       {invoice.isLoading ? (
         <>
-          <Skeleton height={alturaDoCartao(width - Space.lg * 2, fontScale)} radius={Radius.md} />
+          <Skeleton
+            height={alturaDoCartao(chartWidthForPane(Math.min(width, rootContentMaxWidth(width, false)), Space.lg), fontScale)}
+            radius={Radius.md}
+          />
           <SkeletonRow />
           <SkeletonRow />
         </>
@@ -694,6 +699,9 @@ const styles = StyleSheet.create({
     gap: Space.xl,
     paddingHorizontal: Space.lg,
     paddingTop: Space.md,
+    width: '100%',
+    maxWidth: MaxContentWidth,
+    alignSelf: 'center',
   },
   header: {
     gap: Space.lg,

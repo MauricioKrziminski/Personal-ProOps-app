@@ -15,5 +15,9 @@ export function previewRootFromParam(value: unknown): (typeof ROOTS)[keyof typeo
 
 /** A pushed route uses its own native header and never inherits tab chrome in visual QA. */
 export function previewScreenFromParam(value: unknown) {
-  return previewRootFromParam(value) ?? (value === 'invoice' ? 'Fatura' : null);
+  return previewRootFromParam(value) ?? (
+    value === 'invoice' ? 'Fatura' :
+    value === 'forecast' ? 'Projeção' :
+    value === 'net-worth' ? 'Patrimônio' : null
+  );
 }

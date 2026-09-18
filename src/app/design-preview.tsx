@@ -7,6 +7,7 @@ import { Platform, StyleSheet, View, useWindowDimensions } from 'react-native';
 import { PillTabBar, type PillTab } from '@/components/ui/pill-tab-bar';
 import { TabletNavigationRail } from '@/components/ui/tablet-navigation-rail';
 import { previewAccountBalances } from '@/design/preview-account-balances';
+import { seedFinanceAnalysisPreview } from '@/design/preview-finance-analysis';
 import { seedFinancePeriodPreview } from '@/design/preview-finance-cache';
 import { previewScreenFromParam } from '@/design/preview-root';
 import { useAdaptiveWindow } from '@/hooks/use-adaptive-window';
@@ -23,6 +24,8 @@ import BudgetsScreen from './finance/budgets';
 import TransactionsScreen from './finance/transactions';
 import TransactionFormScreen from './finance/transaction-form';
 import FinanceScreen from './(tabs)/finance/index';
+import ForecastScreen from './finance/forecast';
+import NetWorthScreen from './finance/net-worth';
 import NotesScreen from './(tabs)/notes/index';
 import ProfileScreen from './(tabs)/profile/index';
 import TodayScreen from './(tabs)/today/index';
@@ -79,7 +82,7 @@ import TodayScreen from './(tabs)/today/index';
  * FATURA, não do lançamento, e a tela escrevia "Vence em") e a linha "Repete …" que leva à
  * série. Numa parcela ou num lançamento solto, nenhuma das duas existe.
  */
-const ABAS = ['Hoje', 'Finanças', 'Notas', 'Agente', 'Perfil', 'Dívidas', 'Fatura', 'Recorrentes', 'Editar', 'Detalhe', 'Lançamentos', 'Orçamentos'] as const;
+const ABAS = ['Hoje', 'Finanças', 'Notas', 'Agente', 'Perfil', 'Dívidas', 'Fatura', 'Projeção', 'Patrimônio', 'Recorrentes', 'Editar', 'Detalhe', 'Lançamentos', 'Orçamentos'] as const;
 
 /**
  * A tela é montada numa caixa ALTA e deslocada para cima, em vez de rolada.
@@ -140,6 +143,8 @@ const ABA_PARA_TAB: Record<string, number> = {
   Perfil: 4,
   'Dívidas': 2,
   Fatura: 1,
+  Projeção: 2,
+  Patrimônio: 2,
   Recorrentes: 2,
   Editar: 2,
   Detalhe: 2,
@@ -159,6 +164,8 @@ const FAIXAS: Record<(typeof ABAS)[number], number> = {
   // `translateY` só funciona para tela que desenha a altura inteira.
   // Uma faixa: o herói e o começo da lista respondem se o parcial aparece.
   Fatura: 1,
+  Projeção: 1,
+  Patrimônio: 1,
   // Duas faixas: a lista de séries e o painel do que entra/sai no mês.
   Recorrentes: 2,
   // Uma faixa: o valor, a categoria e o botão Salvar cabem numa tela — é o que precisa
@@ -261,6 +268,8 @@ export default function DesignPreviewScreen() {
             {aba === 'Perfil' ? <ProfileScreen /> : null}
             {aba === 'Dívidas' ? <DebtsScreen /> : null}
             {aba === 'Fatura' ? <InvoiceScreen /> : null}
+            {aba === 'Projeção' ? <ForecastScreen /> : null}
+            {aba === 'Patrimônio' ? <NetWorthScreen /> : null}
             {aba === 'Recorrentes' ? <RecurringScreen /> : null}
             {aba === 'Editar' ? <TransactionFormScreen /> : null}
             {aba === 'Detalhe' ? <TransactionDetailScreen /> : null}
@@ -975,6 +984,7 @@ function seedClient() {
     { kind: 'income', amount_cents: 420000 },
   ]);
 
+  seedFinanceAnalysisPreview(client, agora);
   return client;
 }
 

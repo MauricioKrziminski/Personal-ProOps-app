@@ -91,3 +91,8 @@ test('library and reading panes only split when both reading minimums fit', () =
   assert.equal(result.list + result.reading + 24, 976);
   assert.deepEqual(readingPaneWidths(Number.NaN), { list: 0, reading: 0, twoPane: false });
 });
+
+test('an invoice card skeleton uses the bounded reading column, not the full tablet window', () => {
+  assert.equal(chartWidthForPane(Math.min(384, rootContentMaxWidth(384, false)), 16), 352);
+  assert.equal(chartWidthForPane(Math.min(1200, rootContentMaxWidth(1200, false)), 16), 768);
+});
