@@ -59,14 +59,16 @@ test('a curva é mais funda no meio do caminho do que nas pontas', () => {
 });
 
 test('o círculo cobre a tela inteira a partir de qualquer origem', () => {
-  for (const [ox, oy] of [[0.5, 0.8], [0, 0], [1, 1], [0.2, 0.5]]) {
-    const r = raioDaCobertura(0, ox, oy, W, H);
-    const cx = ox * W;
-    const cy = oy * H;
-    for (const [x, y] of [[0, 0], [W, 0], [0, H], [W, H]]) {
-      assert.ok(Math.hypot(x - cx, y - cy) <= r, `canto ${x},${y} fora do círculo de ${ox},${oy}`);
+  for (const [width, height] of [[W, H], [1280, 800], [800, 1280]]) {
+    for (const [ox, oy] of [[0.5, 0.8], [0, 0], [1, 1], [0.2, 0.5]]) {
+      const r = raioDaCobertura(0, ox, oy, width, height);
+      const cx = ox * width;
+      const cy = oy * height;
+      for (const [x, y] of [[0, 0], [width, 0], [0, height], [width, height]]) {
+        assert.ok(Math.hypot(x - cx, y - cy) <= r, `canto ${x},${y} fora do círculo de ${ox},${oy} em ${width}x${height}`);
+      }
+      assert.equal(raioDaCobertura(1, ox, oy, width, height), 0);
     }
-    assert.equal(raioDaCobertura(1, ox, oy, W, H), 0);
   }
 });
 
@@ -77,7 +79,7 @@ test('a curva de tempo vai de 0 a 1 sem sair do intervalo', () => {
 });
 
 test('a capa para com a linha de base em 20% da altura', () => {
-  for (const altura of [640, 874, 956]) {
+  for (const altura of [640, 874, 956, 800, 1280]) {
     const p = progressoDaCapa(altura);
     assert.ok(p > 0 && p < 1);
     const base = bordaDaOnda(p, 'revelar', altura, amplitude(p, altura));

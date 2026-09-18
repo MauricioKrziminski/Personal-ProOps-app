@@ -10,6 +10,7 @@ import Animated, {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { ThemedText } from '@/components/themed-text';
+import { progressoDeEntrada, useRelogioDeEntrada } from '@/components/motion/entrada';
 import { Icon } from '@/components/ui/icon';
 import { Mark } from '@/components/ui/mark';
 import type { PillTab } from '@/components/ui/pill-tab-bar';
@@ -20,6 +21,7 @@ import { useTheme } from '@/hooks/use-theme';
 
 const ITEM_SIZE = 72;
 const ITEM_GAP = Space.sm;
+const ENTRANCE_MS = 520;
 
 interface TabletNavigationRailProps {
   tabs: PillTab[];
@@ -33,6 +35,7 @@ export function TabletNavigationRail({ tabs, activeIndex, onSelect }: TabletNavi
   const insets = useSafeAreaInsets();
   const reduceMotion = useReducedMotion();
   const selected = useSharedValue(activeIndex);
+  const { relogio, assentado } = useRelogioDeEntrada(120, ENTRANCE_MS);
 
   useEffect(() => {
     selected.set(
@@ -43,11 +46,25 @@ export function TabletNavigationRail({ tabs, activeIndex, onSelect }: TabletNavi
   const indicatorStyle = useAnimatedStyle(() => ({
     transform: [{ translateY: selected.get() * (ITEM_SIZE + ITEM_GAP) }],
   }));
+  const indicatorContentsStyle = useAnimatedStyle(() => ({
+    transform: [{ translateY: -selected.get() * (ITEM_SIZE + ITEM_GAP) }],
+  }));
+  const entranceStyle = useAnimatedStyle(() => {
+    const progress = progressoDeEntrada(relogio.get());
+    return {
+      opacity: progress,
+      transform: [{ translateX: reduceMotion ? 0 : (progress - 1) * RAIL_WIDTH }],
+    };
+  });
 
   return (
-    <View
+    <Animated.View
       accessibilityRole="tablist"
-      style={[styles.root, { backgroundColor: theme.heroSurface, borderRightColor: theme.heroSeparator }]}>
+      style={[
+        styles.root,
+        { backgroundColor: theme.heroSurface, borderRightColor: theme.heroSeparator },
+        assentado ? null : entranceStyle,
+      ]}>
       <ScrollView
         showsVerticalScrollIndicator={false}
         contentContainerStyle={[
@@ -56,10 +73,6 @@ export function TabletNavigationRail({ tabs, activeIndex, onSelect }: TabletNavi
         ]}>
         <Mark size={28} color="onHero" />
         <View style={styles.items}>
-          <Animated.View
-            pointerEvents="none"
-            style={[styles.indicator, { backgroundColor: theme.onHero }, indicatorStyle]}
-          />
           {tabs.map((tab, index) => {
             const active = index === activeIndex;
             const badge = railBadge(tab.badge ?? 0);
@@ -76,26 +89,48 @@ export function TabletNavigationRail({ tabs, activeIndex, onSelect }: TabletNavi
                   onSelect(index);
                 }}
                 style={styles.item}>
-                <Icon name={tab.icon} size="md" color={active ? 'heroSurface' : 'onHeroMuted'} />
-                <ThemedText
-                  type="caption"
-                  themeColor={active ? 'heroSurface' : 'onHeroMuted'}
-                  style={styles.label}>
+                <Icon name={tab.icon} size="md" color="onHeroMuted" />
+                <ThemedText type="caption" themeColor="onHeroMuted" style={styles.label}>
                   {tab.label}
                 </ThemedText>
-                {badge ? (
-                  <View style={[styles.badge, { backgroundColor: theme.danger }]}>
-                    <ThemedText type="meta" style={[styles.badgeText, { color: theme.onHero }]}>
-                      {badge.visual}
-                    </ThemedText>
-                  </View>
-                ) : null}
               </Pressable>
             );
           })}
+          {/* A cópia escura anda AO CONTRÁRIO dentro do recorte claro. Assim o ícone e o
+              rótulo são revelados pelo indicador ao passar, sem saltar de cor com a rota. */}
+          <Animated.View
+            pointerEvents="none"
+            style={[styles.indicator, { backgroundColor: theme.onHero }, indicatorStyle]}>
+            <Animated.View style={[styles.indicatorContents, indicatorContentsStyle]}>
+              {tabs.map((tab) => (
+                <View key={tab.name} style={styles.item}>
+                  <Icon name={tab.icon} size="md" color="heroSurface" />
+                  <ThemedText type="caption" themeColor="heroSurface" style={styles.label}>
+                    {tab.label}
+                  </ThemedText>
+                </View>
+              ))}
+            </Animated.View>
+          </Animated.View>
+          <View pointerEvents="none" style={styles.badgeLayer}>
+            {tabs.map((tab) => {
+              const badge = railBadge(tab.badge ?? 0);
+              return (
+                <View key={tab.name} style={styles.badgeSlot}>
+                  {badge ? (
+                    <View style={[styles.badge, { backgroundColor: theme.danger }]}>
+                      <ThemedText type="meta" style={[styles.badgeText, { color: theme.onHero }]}>
+                        {badge.visual}
+                      </ThemedText>
+                    </View>
+                  ) : null}
+                </View>
+              );
+            })}
+          </View>
         </View>
       </ScrollView>
-    </View>
+    </Animated.View>
   );
 }
 
@@ -111,7 +146,11 @@ const styles = StyleSheet.create({
     height: ITEM_SIZE,
     borderRadius: Radius.lg,
     borderCurve: 'continuous',
+    overflow: 'hidden',
   },
+  indicatorContents: { width: ITEM_SIZE, gap: ITEM_GAP },
+  badgeLayer: { ...StyleSheet.absoluteFill, gap: ITEM_GAP },
+  badgeSlot: { width: ITEM_SIZE, height: ITEM_SIZE },
   item: {
     width: ITEM_SIZE,
     height: ITEM_SIZE,

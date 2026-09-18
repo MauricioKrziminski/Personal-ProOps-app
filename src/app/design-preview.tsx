@@ -8,7 +8,7 @@ import { PillTabBar, type PillTab } from '@/components/ui/pill-tab-bar';
 import { TabletNavigationRail } from '@/components/ui/tablet-navigation-rail';
 import { previewAccountBalances } from '@/design/preview-account-balances';
 import { seedFinancePeriodPreview } from '@/design/preview-finance-cache';
-import { previewRootFromParam } from '@/design/preview-root';
+import { previewScreenFromParam } from '@/design/preview-root';
 import { useAdaptiveWindow } from '@/hooks/use-adaptive-window';
 import type { AiMonthStats, PlanStatus } from '@/hooks/use-finance';
 import { localISODate } from '@/hooks/use-items';
@@ -189,7 +189,7 @@ export default function DesignPreviewScreen() {
   // com dado falso.
   const dev = __DEV__;
   const { screen } = useLocalSearchParams<{ screen?: string }>();
-  const requestedRoot = previewRootFromParam(screen);
+  const requestedRoot = previewScreenFromParam(screen);
   const { height } = useWindowDimensions();
   const { androidRail } = useAdaptiveWindow();
   const [abaDoPasso, setAbaDoPasso] = useState<(typeof ABAS)[number]>('Hoje');
@@ -225,7 +225,8 @@ export default function DesignPreviewScreen() {
   const selectTab = (index: number) => {
     if (requestedRoot) {
       const target = TABS_ANDROID[index];
-      if (target) router.replace({ pathname: '/design-preview', params: { screen: target.name } });
+      // Keep the same preview instance alive: replacing the route remounts the rail mid-spring.
+      if (target) router.setParams({ screen: target.name });
       return;
     }
     const alvo = ABAS.find((nome) => ABA_PARA_TAB[nome] === index);

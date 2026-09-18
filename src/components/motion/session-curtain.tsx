@@ -179,6 +179,12 @@ export function CortinaProvider({ children }: { children: ReactNode }) {
     [animar, progresso]
   );
 
+  const cobrirJa = useCallback(() => {
+    cancelAnimation(progresso);
+    progresso.set(0);
+    setFase('coberta');
+  }, [progresso]);
+
   const descobrir = useCallback(
     async (o: Onda, duracao: number) => {
       setOnda(o);
@@ -305,6 +311,7 @@ export function CortinaProvider({ children }: { children: ReactNode }) {
   const api = useMemo<CortinaApi>(
     () => ({
       cobrir,
+      cobrirJa,
       revelar: (o) => descobrir(o, Motion.curtain.duration),
       abrirJa,
       lembrarOrigem,
@@ -312,7 +319,7 @@ export function CortinaProvider({ children }: { children: ReactNode }) {
       marcarPronto,
       segurarAbertura,
     }),
-    [cobrir, descobrir, abrirJa, lembrarOrigem, tomarOrigem, marcarPronto, segurarAbertura]
+    [cobrir, cobrirJa, descobrir, abrirJa, lembrarOrigem, tomarOrigem, marcarPronto, segurarAbertura]
   );
 
   const aoLayout = useCallback(() => {

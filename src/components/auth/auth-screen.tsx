@@ -106,8 +106,8 @@ export function AuthScreen({
         ) : null}
         {visto ? (
           <>
-            <Animated.View entering={entrada(0)}>{children}</Animated.View>
-            <Animated.View entering={entrada(1)} style={styles.footer}>
+            <Animated.View entering={entrada(0)} style={styles.form}>{children}</Animated.View>
+            <Animated.View entering={entrada(1)} style={[styles.form, styles.footer]}>
               {footer}
             </Animated.View>
           </>
@@ -124,5 +124,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: Space.xl,
     gap: Space.xxl,
   },
+  form: { width: '100%', maxWidth: 560, alignSelf: 'center' },
   footer: { gap: Space.sm, alignItems: "stretch", marginTop: "auto" },
 });

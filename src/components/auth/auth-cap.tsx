@@ -1,6 +1,6 @@
 import { useEffect } from 'react';
 import { StyleSheet, View, useWindowDimensions } from 'react-native';
-import Animated, { useAnimatedStyle, useSharedValue, withTiming } from 'react-native-reanimated';
+import Animated, { useAnimatedStyle, useDerivedValue, useSharedValue, withTiming } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { useCortinaAberta } from '@/components/motion/session-curtain';
@@ -30,7 +30,8 @@ export function AuthCap() {
   const theme = useTheme();
   const insets = useSafeAreaInsets();
   const { width, height } = useWindowDimensions();
-  const progresso = useSharedValue(progressoDaCapa(height));
+  // A curva segue a altura em toda rotação/split view, na UI thread e sem um quadro de costura.
+  const progresso = useDerivedValue(() => progressoDaCapa(height));
   const aberta = useCortinaAberta();
   const degrau = theme.heroSurface !== theme.curtain;
   const acesa = useSharedValue(aberta ? 1 : 0);
