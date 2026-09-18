@@ -54,7 +54,7 @@ verde/tijolo/âmbar continuam exclusivamente semânticos. A marca permanece mono
 
 Há três papéis espaciais, usados somente quando o conteúdo pede:
 
-1. **Navegação** — cinco destinos e estado selecionado, junto à borda alcançável.
+1. **Navegação** — cinco destinos e estado selecionado; no iPad, a posição é a barra nativa do sistema no topo.
 2. **Área principal** — o que a pessoa está tentando compreender ou editar.
 3. **Painel de apoio** — lista, detalhe, compromissos ou contexto **real** relacionado ao foco.
 
@@ -85,9 +85,11 @@ necessário. Janelas estreitas em um tablet recebem a experiência compacta comp
   contextual. A seleção vem da rota, não de um estado paralelo. Rotas profundas mantêm retorno
   previsível; o rail permanece nas áreas de trabalho quando houver espaço e some em tarefas
   imersivas/modalizadas justificadas.
-- **iPhone/iPad:** preservar `NativeTabs`, Liquid Glass, SF Symbols e o gesto de voltar. No iPad,
-  o conteúdo ganha painéis e seleção persistente; a barra do sistema não é substituída por um
-  rail Android. Não usar o `SplitView` alpha do Expo como fundação.
+- **iPhone/iPad:** preservar `NativeTabs`, Liquid Glass, SF Symbols e o gesto de voltar.
+  **Decisão de 18/09/2026:** Gabriel escolheu manter a barra nativa do iPadOS no topo depois de
+  ver e rejeitar a pílula do Android no iPad. Os cinco ícones SF Symbols seguem configurados;
+  na captura do iPadOS 26, o sistema desenhou apenas os rótulos na barra superior. Não forçar
+  ícones com um controle próprio, nem usar o `SplitView` alpha do Expo como fundação.
 - **Lista-detalhe:** tocar em um item continua produzindo sua URL real (`/notes/[id]`,
   `/finance/[txId]`, `/agent/[id]` etc.). Em janela ampla, lista e detalhe podem ficar juntos;
   ao colapsar, o detalhe ocupa a tela e o Back volta à lista. Seleção visível, deep link direto,
