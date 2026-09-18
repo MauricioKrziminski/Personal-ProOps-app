@@ -8,6 +8,8 @@ import { ThemedText } from '@/components/themed-text';
 import { symbol } from '@/components/notes/note-actions';
 import { EmptyState } from '@/components/ui/empty-state';
 import { Icon } from '@/components/ui/icon';
+import { AdaptivePanes } from '@/components/ui/adaptive-panes';
+import { Card } from '@/components/ui/card';
 import { Row, Section } from '@/components/ui/row';
 import { Screen } from '@/components/ui/screen';
 import { SkeletonRow } from '@/components/ui/skeleton';
@@ -23,6 +25,7 @@ import {
 import { useArchivedFolders } from '@/hooks/use-archived-folders';
 import { relativeBR } from '@/lib/dates';
 import { noteTitle } from '@/lib/search';
+import { useAdaptiveWindow } from '@/hooks/use-adaptive-window';
 
 /**
  * Arquivadas — notas e pastas que saíram do caminho sem terem sido apagadas.
@@ -41,6 +44,8 @@ import { noteTitle } from '@/lib/search';
  * Aqui a lista é plana e sem arrasto de propósito: arquivo não tem ordem, tem data.
  */
 export default function ArchivedScreen() {
+  const { windowClass } = useAdaptiveWindow();
+  const tablet = windowClass !== 'compact';
   const toast = useToast();
 
   const notas = useNotesList({ archived: true, sort: 'recentes' });
@@ -77,10 +82,8 @@ export default function ArchivedScreen() {
     );
   };
 
-  return (
-    <Screen
-      grouped
-      onRefresh={() => Promise.all([notas.refetch(), pastas.refetch()])}>
+  const archiveList = (
+    <>
       {notas.isError || pastas.isError ? (
         <EmptyState
           icon="exclamationmark.triangle"
@@ -160,10 +163,59 @@ export default function ArchivedScreen() {
           </View>
         </>
       )}
+    </>
+  );
+
+  const tabletContext = (
+    <Card style={styles.context}>
+      <ThemedText type="subtitle">Arquivo</ThemedText>
+      <ThemedText type="small" themeColor="textSecondary">
+        Itens arquivados ficam fora da biblioteca principal até você decidir trazê-los de volta.
+      </ThemedText>
+      <View style={styles.contextStats}>
+        <View style={styles.contextStat}>
+          <ThemedText type="subtitle">{listaPastas.length}</ThemedText>
+          <ThemedText type="caption" themeColor="textSecondary">
+            {listaPastas.length === 1 ? 'pasta' : 'pastas'}
+          </ThemedText>
+        </View>
+        <View style={styles.contextStat}>
+          <ThemedText type="subtitle">{listaNotas.length}</ThemedText>
+          <ThemedText type="caption" themeColor="textSecondary">
+            {listaNotas.length === 1 ? 'nota' : 'notas'}
+          </ThemedText>
+        </View>
+      </View>
+      <ThemedText type="footnote" themeColor="textSecondary">
+        Toque em uma linha para devolver o item ao lugar onde estava.
+      </ThemedText>
+    </Card>
+  );
+
+  return (
+    <Screen
+      grouped
+      wide={tablet}
+      onRefresh={() => Promise.all([notas.refetch(), pastas.refetch()])}>
+      {tablet ? (
+        <AdaptivePanes
+          testID="archived-notes-panes"
+          main={archiveList}
+          support={tabletContext}
+          singlePane="main-only"
+          singlePaneContent={archiveList}
+        />
+      ) : archiveList}
     </Screen>
   );
 }
 
 const styles = StyleSheet.create({
   rodape: { gap: Space.md },
+  context: {
+    gap: Space.md,
+    padding: Space.xl,
+  },
+  contextStats: { flexDirection: 'row', gap: Space.xl },
+  contextStat: { gap: Space.xs },
 });

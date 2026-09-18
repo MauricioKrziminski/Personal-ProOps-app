@@ -8,6 +8,7 @@ import Animated, { FadeInDown, LinearTransition } from 'react-native-reanimated'
 import * as Haptics from 'expo-haptics';
 
 import { ThemedText } from '@/components/themed-text';
+import { AdaptivePanes } from '@/components/ui/adaptive-panes';
 import { HeaderActions } from '@/components/ui/header-actions';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
@@ -18,6 +19,7 @@ import { Screen } from '@/components/ui/screen';
 import { SkeletonRow } from '@/components/ui/skeleton';
 import { useToast } from '@/components/ui/toast';
 import { Motion, Space } from '@/design/tokens';
+import { useAdaptiveWindow } from '@/hooks/use-adaptive-window';
 import { usePurgeNote, useRestoreNote, useNotesList, type Note } from '@/hooks/use-notes';
 import { noteTitle, notePreview } from '@/lib/search';
 import { actionSheet } from '@/components/notes/note-actions';
@@ -54,6 +56,8 @@ function notesLabel(count: number): string {
 
 
 export default function TrashScreen() {
+  const { windowClass } = useAdaptiveWindow();
+  const tablet = windowClass !== 'compact';
   const toast = useToast();
   const list = useNotesList({ trash: true });
   const restore = useRestoreNote();
@@ -127,22 +131,8 @@ export default function TrashScreen() {
     );
   };
 
-  return (
-    <Screen grouped onRefresh={() => Promise.all([list.refetch()])}>
-      <Stack.Screen
-        options={{
-          title: 'Lixeira',
-        }}
-      />
-
-      <HeaderActions
-        actions={
-          notes.length === 0
-            ? []
-            : [{ label: 'Esvaziar', destructive: true, onPress: confirmEmpty }]
-        }
-      />
-
+  const trashBody = (
+    <>
       {/* Antes da lista: a pessoa precisa saber o prazo ANTES de decidir se corre. */}
       <ThemedText type="small" themeColor="textSecondary">
         Notas na lixeira são apagadas de vez depois de 30 dias.
@@ -211,6 +201,51 @@ export default function TrashScreen() {
           onPress={() => void list.fetchNextPage()}
         />
       ) : null}
+    </>
+  );
+
+  const tabletContext = (
+    <Card style={styles.context}>
+      <ThemedText type="subtitle">Recuperação</ThemedText>
+      <ThemedText type="small" themeColor="textSecondary">
+        Restaurar devolve a nota para a biblioteca. Apagar de vez remove o conteúdo sem volta.
+      </ThemedText>
+      <View style={styles.contextStat}>
+        <ThemedText type="subtitle">{notes.length}</ThemedText>
+        <ThemedText type="caption" themeColor="textSecondary">
+          {notes.length === 1 ? 'nota carregada' : 'notas carregadas'}
+        </ThemedText>
+      </View>
+      <ThemedText type="footnote" themeColor="textSecondary">
+        O prazo de cada nota aparece na própria linha.
+      </ThemedText>
+    </Card>
+  );
+
+  return (
+    <Screen grouped wide={tablet} onRefresh={() => Promise.all([list.refetch()])}>
+      <Stack.Screen
+        options={{
+          title: 'Lixeira',
+        }}
+      />
+
+      <HeaderActions
+        actions={
+          notes.length === 0
+            ? []
+            : [{ label: 'Esvaziar', destructive: true, onPress: confirmEmpty }]
+        }
+      />
+      {tablet ? (
+        <AdaptivePanes
+          testID="trash-notes-panes"
+          main={trashBody}
+          support={tabletContext}
+          singlePane="main-only"
+          singlePaneContent={trashBody}
+        />
+      ) : trashBody}
     </Screen>
   );
 }
@@ -220,4 +255,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: Space.md,
   },
+  context: {
+    gap: Space.md,
+    padding: Space.xl,
+  },
+  contextStat: { gap: Space.xs },
 });
