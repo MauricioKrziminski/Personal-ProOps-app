@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 
-import { railBadge } from './rail-badge.ts';
+import { railBadge, railLabel } from './rail-badge.ts';
 
 test('hides an empty navigation badge', () => {
   assert.equal(railBadge(0), null);
@@ -15,4 +15,9 @@ test('shows real pending counts and caps only the visual label', () => {
 test('rejects invalid pending counts instead of showing a false badge', () => {
   assert.equal(railBadge(Number.NaN), null);
   assert.equal(railBadge(-2), null);
+});
+
+test('uses a concise visible rail label while retaining the full destination name elsewhere', () => {
+  assert.equal(railLabel('finance', 'Financeiro'), 'Finanças');
+  assert.equal(railLabel('today', 'Hoje'), 'Hoje');
 });

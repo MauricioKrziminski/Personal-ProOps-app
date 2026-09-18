@@ -15,7 +15,7 @@ import { Icon } from '@/components/ui/icon';
 import { Mark } from '@/components/ui/mark';
 import type { PillTab } from '@/components/ui/pill-tab-bar';
 import { RAIL_WIDTH } from '@/design/adaptive-window';
-import { railBadge } from '@/design/rail-badge';
+import { railBadge, railLabel } from '@/design/rail-badge';
 import { Motion, Radius, Space } from '@/design/tokens';
 import { useTheme } from '@/hooks/use-theme';
 
@@ -91,7 +91,7 @@ export function TabletNavigationRail({ tabs, activeIndex, onSelect }: TabletNavi
                 style={styles.item}>
                 <Icon name={tab.icon} size="md" color="onHeroMuted" />
                 <ThemedText type="caption" themeColor="onHeroMuted" style={styles.label}>
-                  {tab.label}
+                  {railLabel(tab.name, tab.label)}
                 </ThemedText>
               </Pressable>
             );
@@ -106,7 +106,7 @@ export function TabletNavigationRail({ tabs, activeIndex, onSelect }: TabletNavi
                 <View key={tab.name} style={styles.item}>
                   <Icon name={tab.icon} size="md" color="heroSurface" />
                   <ThemedText type="caption" themeColor="heroSurface" style={styles.label}>
-                    {tab.label}
+                    {railLabel(tab.name, tab.label)}
                   </ThemedText>
                 </View>
               ))}

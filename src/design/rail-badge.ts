@@ -7,3 +7,8 @@ export function railBadge(count: number): { visual: string; accessible: string }
     accessible: `${pending} ${pending === 1 ? 'pendente' : 'pendentes'}`,
   };
 }
+
+/** The rail has 72dp slots; the accessible name still uses the full tab label. */
+export function railLabel(name: string, label: string): string {
+  return name === 'finance' ? 'Finanças' : label;
+}
