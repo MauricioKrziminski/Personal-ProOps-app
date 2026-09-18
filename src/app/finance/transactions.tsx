@@ -1,11 +1,12 @@
 import { Stack, router, useLocalSearchParams } from 'expo-router';
 import { useMemo, useState } from 'react';
-import { SectionList, StyleSheet, View } from 'react-native';
+import { ScrollView, SectionList, StyleSheet, View } from 'react-native';
 import Animated, { FadeInDown } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { categoryIcon } from '@/design/category-icons';
 import { ErrorCard } from '@/components/error-card';
+import { AdaptivePanes } from '@/components/ui/adaptive-panes';
 import { monthTitle, shiftMonth } from '@/components/finance/month-picker';
 import { useMonthRuler } from '@/components/finance/month-ruler';
 import { PeriodBar } from '@/components/finance/period-bar';
@@ -48,6 +49,8 @@ import { dueInline, settleDone, settleLabel } from '@/lib/settle-labels';
 import { useDebounced } from '@/hooks/use-debounced';
 import { useTheme, useScheme } from '@/hooks/use-theme';
 import { accountLabel } from '@/lib/accounts';
+import { useAdaptiveWindow } from '@/hooks/use-adaptive-window';
+import { tabletPaneWidths } from '@/design/adaptive-window';
 
 /**
  * Lançamentos — "cadê aquele lançamento, e o que entrou e saiu neste mês?".
@@ -133,6 +136,12 @@ export default function TransactionsScreen() {
   const scheme = useScheme();
   const toast = useToast();
   const insets = useSafeAreaInsets();
+  const { width, windowClass } = useAdaptiveWindow();
+  // A barra de filtros precisa caber AO LADO do livro-caixa. No intervalo 840–950dp a janela
+  // já é expanded, mas os dois painéis ainda não têm largura útil depois do respiro editorial.
+  // Nesse caso a lista nativa completa continua sendo a composição correta.
+  const wideWorkspace = windowClass === 'expanded' &&
+    tabletPaneWidths(Math.min(width, 1200) - Space.lg * 2).twoPane;
   const params = useLocalSearchParams<{
     month?: string;
     kind?: string;
@@ -590,12 +599,8 @@ export default function TransactionsScreen() {
     );
   }
 
-  return (
-    <Screen floatingAction scroll={false} grouped>
-        <Stack.Screen
-          options={{ title: tituloDaConta ?? 'Lançamentos', headerLargeTitle: true }}
-        />
-        <HeaderMenu
+  const menu = (
+    <HeaderMenu
           title="Mais opções"
           actions={[
             // Submenu, não uma fileira de chips: com oito contas cadastradas o corpo da tela
@@ -644,9 +649,11 @@ export default function TransactionsScreen() {
               onPress: () => router.push('/finance/rules'),
             },
           ]}
-        />
+    />
+  );
 
-        <SectionList<Transaction, DaySection>
+  const ledgerList = (
+    <SectionList<Transaction, DaySection>
           sections={sections}
           keyExtractor={(tx) => tx.id}
           style={styles.listHost}
@@ -654,7 +661,7 @@ export default function TransactionsScreen() {
           stickySectionHeadersEnabled
           showsVerticalScrollIndicator={false}
           contentContainerStyle={[styles.list, { paddingBottom: insets.bottom + Space.xxxl * 2 }]}
-          ListHeaderComponent={header}
+          ListHeaderComponent={wideWorkspace ? null : header}
           ListEmptyComponent={empty}
           ListFooterComponent={list.isFetchingNextPage ? <SkeletonRow /> : null}
           onEndReachedThreshold={0.5}
@@ -805,18 +812,63 @@ export default function TransactionsScreen() {
             <View style={[styles.separator, { backgroundColor: theme.separator }]} />
           )}
         />
+  );
 
-      {vazioComAcao ? null : (
-        <Button
-          label="Lançar"
-          icon="plus"
-          onPress={() => router.push({ pathname: '/finance/transaction-form', params: { month } })}
-          style={[
-            styles.fab,
-            { bottom: insets.bottom + Space.xxl, boxShadow: Elevation[scheme].floating },
-          ]}
-        />
+  const controls = (
+    <ScrollView
+      style={styles.controlsScroll}
+      contentContainerStyle={styles.controlsContent}
+      showsVerticalScrollIndicator={false}
+      keyboardShouldPersistTaps="handled">
+      {header}
+    </ScrollView>
+  );
+
+  const fab = vazioComAcao ? null : (
+    <Button
+      label="Lançar"
+      icon="plus"
+      onPress={() => router.push({ pathname: '/finance/transaction-form', params: { month } })}
+      style={[
+        styles.fab,
+        { bottom: insets.bottom + Space.xxl, boxShadow: Elevation[scheme].floating },
+      ]}
+    />
+  );
+
+  /*
+    A janela ampla separa apenas a apresentação: a mesma SectionList continua dona da
+    virtualização, paginação, refresh e ações. O wrapper só dá ao FAB uma coluna de referência;
+    em compacto/médio `ledger` é a SectionList literal para preservar o large title nativo.
+  */
+  const ledger = wideWorkspace ? (
+    <View style={styles.ledgerPane}>
+      {ledgerList}
+      {fab}
+    </View>
+  ) : ledgerList;
+
+  return (
+    <Screen floatingAction={!wideWorkspace} scroll={false} grouped wide={wideWorkspace}>
+      <Stack.Screen
+        options={{ title: tituloDaConta ?? 'Lançamentos', headerLargeTitle: windowClass === 'compact' }}
+      />
+      {menu}
+      {wideWorkspace ? (
+        <View style={styles.wideCanvas}>
+          <AdaptivePanes
+            main={ledger}
+            support={controls}
+            singlePane="main-only"
+            singlePaneContent={<View style={styles.singlePane}>{controls}{ledger}</View>}
+            fill
+            testID="transactions-tablet-workspace"
+          />
+        </View>
+      ) : (
+        ledger
       )}
+      {!wideWorkspace ? fab : null}
     </Screen>
   );
 }
@@ -830,6 +882,29 @@ const styles = StyleSheet.create({
     width: '100%',
     maxWidth: MaxContentWidth,
     alignSelf: 'center',
+  },
+  ledgerPane: {
+    flex: 1,
+    minWidth: 0,
+    position: 'relative',
+    width: '100%',
+  },
+  wideCanvas: {
+    flex: 1,
+    maxWidth: 1200,
+    width: '100%',
+    alignSelf: 'center',
+  },
+  singlePane: {
+    flex: 1,
+    minWidth: 0,
+  },
+  controlsScroll: {
+    flex: 1,
+  },
+  controlsContent: {
+    paddingHorizontal: Space.lg,
+    paddingBottom: Space.xxxl,
   },
   header: {
     gap: Space.lg,

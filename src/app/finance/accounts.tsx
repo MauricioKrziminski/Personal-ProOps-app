@@ -12,6 +12,7 @@ import { TaskHeader } from '@/components/ui/task-header';
 import { ItemLink } from '@/components/ui/item-link';
 import { Button } from '@/components/ui/button';
 import { AccountPicker } from '@/components/finance/account-picker';
+import { AdaptivePanes } from '@/components/ui/adaptive-panes';
 import { Card } from '@/components/ui/card';
 import { EmptyState } from '@/components/ui/empty-state';
 import { Field, MoneyField, TextField } from '@/components/ui/field';
@@ -27,6 +28,7 @@ import { Skeleton, SkeletonRow } from '@/components/ui/skeleton';
 import { useToast } from '@/components/ui/toast';
 import { Motion, Radius, Space, tabular } from '@/design/tokens';
 import { formatBRL } from '@/hooks/use-items';
+import { useAdaptiveWindow } from '@/hooks/use-adaptive-window';
 import {
   ACCOUNT_TYPES,
   NO_ACCOUNT,
@@ -140,6 +142,8 @@ function ErrorBand({ message, onRetry }: { message: string; onRetry: () => void 
 export default function AccountsScreen() {
   // Dinheiro no meio de frase obedece ao "esconder saldo" — `Money` não cabe em texto corrido.
   const brl = useBRL();
+  const { windowClass } = useAdaptiveWindow();
+  const tablet = windowClass !== 'compact';
   const toast = useToast();
   const balances = useAccountBalances();
   const accounts = useAccounts();
@@ -342,142 +346,182 @@ export default function AccountsScreen() {
     );
   };
 
-  return (
-    <Screen
-      grouped
-      onRefresh={() => Promise.all([balances.refetch(), accounts.refetch()])}>
-      <Stack.Screen
-        options={{
-          title: 'Contas',
-          headerLargeTitle: true,
-        }}
-      />
+  const loading = balances.isLoading ? (
+    <>
+      <Skeleton height={120} radius={Radius.lg} />
+      <SkeletonRow />
+      <SkeletonRow />
+      <SkeletonRow />
+    </>
+  ) : null;
 
-      <HeaderActions actions={[{ label: 'Nova conta', icon: 'plus', onPress: abrirNova }]} />
-
-      {balances.isLoading ? (
-        <>
-          <Skeleton height={120} radius={Radius.lg} />
-          <SkeletonRow />
-          <SkeletonRow />
-          <SkeletonRow />
-        </>
-      ) : null}
-
-      {/* O único destaque da tela. */}
-      {balances.isError ? (
-        <ErrorBand message="Não deu para carregar seus saldos." onRetry={balances.refetch} />
-      ) : balances.data && !semDadoNenhum ? (
-        <Animated.View entering={FadeInDown.duration(Motion.duration.slow)}>
-          <Card style={styles.hero}>
-            <HeroLabel>Dinheiro disponível</HeroLabel>
-            <Money cents={caixa} variant="money" tone={caixa < 0 ? 'danger' : 'text'} />
-            {/*
-              O que falta cair fica FORA do número grande e ao lado dele. Somar seria voltar ao
-              defeito que esta tela tinha: dizer que você tem um dinheiro que ainda não chegou.
-            */}
-            {aReceber > 0 ? (
-              <ThemedText type="footnote" themeColor="textSecondary" style={tabular}>
-                mais {brl(aReceber)} previstos, que entram quando você confirmar
-              </ThemedText>
-            ) : null}
-            <View style={styles.heroSplit}>
-              <View style={styles.heroPart}>
-                <HeroLabel>investido</HeroLabel>
-                <Money cents={investido} variant="subhead" tone="textSecondary" />
-              </View>
-              <View style={styles.heroPart}>
-                <HeroLabel>dívida de cartão</HeroLabel>
-                <Money
-                  cents={dividaCartao}
-                  variant="subhead"
-                  tone={dividaCartao < 0 ? 'danger' : 'textSecondary'}
-                  signed={dividaCartao < 0}
-                />
-              </View>
-            </View>
-            <ThemedText type="small" themeColor="textSecondary">
-              Cartão fica de fora do disponível: fatura é dívida, não saldo. Parcela futura já
-              lançada entra na conta.
+  const hero =
+    balances.isError ? (
+      <ErrorBand message="Não deu para carregar seus saldos." onRetry={balances.refetch} />
+    ) : balances.data && !semDadoNenhum ? (
+      <Animated.View entering={FadeInDown.duration(Motion.duration.slow)}>
+        <Card style={styles.hero}>
+          <HeroLabel>Dinheiro disponível</HeroLabel>
+          <Money cents={caixa} variant="money" tone={caixa < 0 ? 'danger' : 'text'} />
+          {aReceber > 0 ? (
+            <ThemedText type="footnote" themeColor="textSecondary" style={tabular}>
+              mais {brl(aReceber)} previstos, que entram quando você confirmar
             </ThemedText>
-          </Card>
-        </Animated.View>
-      ) : null}
+          ) : null}
+          <View style={styles.heroSplit}>
+            <View style={styles.heroPart}>
+              <HeroLabel>investido</HeroLabel>
+              <Money cents={investido} variant="subhead" tone="textSecondary" />
+            </View>
+            <View style={styles.heroPart}>
+              <HeroLabel>dívida de cartão</HeroLabel>
+              <Money
+                cents={dividaCartao}
+                variant="subhead"
+                tone={dividaCartao < 0 ? 'danger' : 'textSecondary'}
+                signed={dividaCartao < 0}
+              />
+            </View>
+          </View>
+          <ThemedText type="small" themeColor="textSecondary">
+            Cartão fica de fora do disponível: fatura é dívida, não saldo. Parcela futura já
+            lançada entra na conta.
+          </ThemedText>
+        </Card>
+      </Animated.View>
+    ) : null;
 
-      {accounts.isError ? (
-        <ErrorBand
-          message="Não deu para carregar suas contas. Os saldos acima continuam valendo; editar e arquivar voltam quando a lista carregar."
-          onRetry={accounts.refetch}
-        />
-      ) : null}
+  const accountsError = accounts.isError ? (
+    <ErrorBand
+      message="Não deu para carregar suas contas. Os saldos acima continuam valendo; editar e arquivar voltam quando a lista carregar."
+      onRetry={accounts.refetch}
+    />
+  ) : null;
 
+  const accountSections = (
+    <>
       {dinheiro.length > 0 ? <Section title="Dinheiro">{dinheiro.map(linhaConta)}</Section> : null}
       {investimentos.length > 0 ? (
         <Section title="Investimentos">{investimentos.map(linhaConta)}</Section>
       ) : null}
       {cartoes.length > 0 ? <Section title="Cartões">{cartoes.map(linhaConta)}</Section> : null}
+    </>
+  );
 
-      {/*
-        A conta padrão existe por causa do WhatsApp: "gastei 45 no mercado" não diz de onde saiu
-        o dinheiro, e o agente devolve conta nula de propósito — perder o registro é pior que
-        registrá-lo sem conta. O preço aparece quando se pergunta PARA ONDE o dinheiro foi: sem
-        padrão, tudo cai num balde chamado "Sem conta". Cartão de crédito não pode ser padrão
-        (toda compra do WhatsApp viraria dívida de fatura em silêncio) e o banco recusa.
-      */}
-      {guardamDinheiro.length > 0 ? (
-        <Section title="Conta padrão">
-          <Row
-            title="Não definir"
-            subtitle="lançamento sem conta continua sem conta"
-            onPress={() => definirPadrao.mutate(null)}
-            chevron={false}
-            accessibilityState={{ selected: contaPadrao.data == null }}
-            trailing={
-              contaPadrao.data == null ? <Icon name="checkmark" size="sm" color="tint" /> : undefined
-            }
-          />
-          {guardamDinheiro.map((a) => (
-            <Row
-              key={a.id}
-              title={a.name}
-              onPress={() => definirPadrao.mutate(a.id)}
-              chevron={false}
-              accessibilityState={{ selected: contaPadrao.data === a.id }}
-              trailing={
-                contaPadrao.data === a.id ? <Icon name="checkmark" size="sm" color="tint" /> : undefined
-              }
-            />
-          ))}
-        </Section>
-      ) : null}
-
-      {/* Fora do agrupamento de propósito: quem só usa o WhatsApp tem quase tudo aqui. */}
-      {semConta && Number(semConta.balance_cents) !== 0 ? (
-        <Section>
-          <Row
-            title="Sem conta"
-            subtitle="lançamentos que não citam conta"
-            icon="questionmark.circle"
-            onPress={() =>
-              router.push({ pathname: '/finance/transactions', params: { accountId: NO_ACCOUNT } })
-            }
-            trailing={<Money cents={Number(semConta.balance_cents)} variant="ticker" />}
-          />
-        </Section>
-      ) : null}
-
-      {semNadaCadastrado && !balances.isLoading && !balances.isError ? (
-        <EmptyState
-          icon="wallet.bifold"
-          title={soTemSemConta ? 'Seus lançamentos estão em “Sem conta”' : 'Nenhuma conta ainda'}
-          hint={
-            soTemSemConta
-              ? 'Cadastre suas contas para saber quanto tem em cada uma. O que já foi lançado continua valendo.'
-              : 'Cadastre onde o dinheiro fica — corrente, poupança, dinheiro, cartão. Depois é só mandar “gastei 45 no mercado no Nubank” no WhatsApp.'
+  const defaultAccount = guardamDinheiro.length > 0 ? (
+    <Section title="Conta padrão">
+      <Row
+        title="Não definir"
+        subtitle="lançamento sem conta continua sem conta"
+        onPress={() => definirPadrao.mutate(null)}
+        chevron={false}
+        accessibilityState={{ selected: contaPadrao.data == null }}
+        trailing={
+          contaPadrao.data == null ? <Icon name="checkmark" size="sm" color="tint" /> : undefined
+        }
+      />
+      {guardamDinheiro.map((a) => (
+        <Row
+          key={a.id}
+          title={a.name}
+          onPress={() => definirPadrao.mutate(a.id)}
+          chevron={false}
+          accessibilityState={{ selected: contaPadrao.data === a.id }}
+          trailing={
+            contaPadrao.data === a.id ? <Icon name="checkmark" size="sm" color="tint" /> : undefined
           }
-          action={{ label: 'Cadastrar conta', onPress: abrirNova }}
         />
+      ))}
+    </Section>
+  ) : null;
+
+  const noAccount = semConta && Number(semConta.balance_cents) !== 0 ? (
+    <Section>
+      <Row
+        title="Sem conta"
+        subtitle="lançamentos que não citam conta"
+        icon="questionmark.circle"
+        onPress={() =>
+          router.push({ pathname: '/finance/transactions', params: { accountId: NO_ACCOUNT } })
+        }
+        trailing={<Money cents={Number(semConta.balance_cents)} variant="ticker" />}
+      />
+    </Section>
+  ) : null;
+
+  const empty = semNadaCadastrado && !balances.isLoading && !balances.isError ? (
+    <EmptyState
+      icon="wallet.bifold"
+      title={soTemSemConta ? 'Seus lançamentos estão em “Sem conta”' : 'Nenhuma conta ainda'}
+      hint={
+        soTemSemConta
+          ? 'Cadastre suas contas para saber quanto tem em cada uma. O que já foi lançado continua valendo.'
+          : 'Cadastre onde o dinheiro fica — corrente, poupança, dinheiro, cartão. Depois é só mandar “gastei 45 no mercado no Nubank” no WhatsApp.'
+      }
+      action={{ label: 'Cadastrar conta', onPress: abrirNova }}
+    />
+  ) : null;
+
+  // The compact body keeps the original reading order. It is also the measured-pane fallback
+  // when a tablet is too narrow to fit both the ledger and decision-support columns.
+  const compactBody = (
+    <>
+      {loading}
+      {hero}
+      {accountsError}
+      {accountSections}
+      {defaultAccount}
+      {noAccount}
+      {empty}
+    </>
+  );
+
+  const ledger = (
+    <View style={styles.paneBody}>
+      {balances.isLoading ? (
+        <>
+          <SkeletonRow />
+          <SkeletonRow />
+          <SkeletonRow />
+        </>
       ) : null}
+      {!balances.isLoading ? accountSections : null}
+      {!balances.isLoading ? noAccount : null}
+      {!balances.isLoading ? empty : null}
+    </View>
+  );
+
+  const decisionSupport = (
+    <View style={styles.paneBody}>
+      {balances.isLoading ? <Skeleton height={120} radius={Radius.lg} /> : null}
+      {!balances.isLoading ? hero : null}
+      {accountsError}
+      {!balances.isLoading ? defaultAccount : null}
+    </View>
+  );
+
+  const tabletBody = (
+    <AdaptivePanes
+      main={ledger}
+      support={decisionSupport}
+      singlePane="main-only"
+      singlePaneContent={compactBody}
+      testID="accounts-tablet-workspace"
+    />
+  );
+
+  return (
+    <Screen grouped wide={tablet} onRefresh={() => Promise.all([balances.refetch(), accounts.refetch()])}>
+      <Stack.Screen
+        options={{
+          title: 'Contas',
+          headerLargeTitle: !tablet,
+        }}
+      />
+
+      <HeaderActions actions={[{ label: 'Nova conta', icon: 'plus', onPress: abrirNova }]} />
+
+      {tablet ? tabletBody : compactBody}
 
       <Sheet visible={form !== null} onClose={() => setForm(null)}>
 
@@ -691,6 +735,10 @@ export default function AccountsScreen() {
 }
 
 const styles = StyleSheet.create({
+  paneBody: {
+    gap: Space.xl,
+    minWidth: 0,
+  },
   switchRow: {
     flexDirection: 'row',
     alignItems: 'center',

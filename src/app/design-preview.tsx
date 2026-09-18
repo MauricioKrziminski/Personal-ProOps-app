@@ -21,6 +21,9 @@ import InvoiceScreen from './finance/invoice/[id]';
 import RecurringScreen from './finance/recurring';
 import TransactionDetailScreen from './finance/[txId]';
 import BudgetsScreen from './finance/budgets';
+import AccountsScreen from './finance/accounts';
+import CardsScreen from './finance/cards';
+import FoldersScreen from './notes/folders';
 import TransactionsScreen from './finance/transactions';
 import TransactionFormScreen from './finance/transaction-form';
 import FinanceScreen from './(tabs)/finance/index';
@@ -84,7 +87,7 @@ import TodayScreen from './(tabs)/today/index';
  * FATURA, não do lançamento, e a tela escrevia "Vence em") e a linha "Repete …" que leva à
  * série. Numa parcela ou num lançamento solto, nenhuma das duas existe.
  */
-const ABAS = ['Hoje', 'Finanças', 'Notas', 'Agente', 'Perfil', 'Dívidas', 'Fatura', 'Projeção', 'Patrimônio', 'Ciclo', 'Relatórios', 'Recorrentes', 'Editar', 'Detalhe', 'Lançamentos', 'Orçamentos'] as const;
+const ABAS = ['Hoje', 'Finanças', 'Notas', 'Agente', 'Perfil', 'Dívidas', 'Fatura', 'Projeção', 'Patrimônio', 'Ciclo', 'Relatórios', 'Recorrentes', 'Editar', 'Detalhe', 'Lançamentos', 'Contas', 'Cartões', 'Pastas', 'Orçamentos'] as const;
 
 /**
  * A tela é montada numa caixa ALTA e deslocada para cima, em vez de rolada.
@@ -153,6 +156,9 @@ const ABA_PARA_TAB: Record<string, number> = {
   Editar: 2,
   Detalhe: 2,
   'Lançamentos': 2,
+  Contas: 2,
+  Cartões: 2,
+  Pastas: 1,
   'Orçamentos': 2,
 };
 /** Quantas alturas de tela cada aba ocupa — medido, para não gastar frame em preto. */
@@ -184,6 +190,9 @@ const FAIXAS: Record<(typeof ABAS)[number], number> = {
   // porque o header de busca ficava CRAVADO no topo do Android enquanto o extrato rolava por
   // baixo, e a vitrine não montava esta tela — o defeito viveu meses sem ninguém ver.
   'Lançamentos': 2,
+  Contas: 1,
+  Cartões: 1,
+  Pastas: 1,
   // Duas faixas: o destaque e as categorias. Entrou em 09/09/2026 junto da separação entre
   // gasto e comprometido — a tela decide um AVISO, e aviso que ninguém olhou é aviso que erra.
   'Orçamentos': 2,
@@ -230,7 +239,10 @@ export default function DesignPreviewScreen() {
     };
   }, [requestedRoot]);
 
-  const alturaTotal = height * FAIXAS[aba];
+  // Deep links de QA devem ocupar a altura REAL da janela. As faixas extras só existem no
+  // roteiro sequencial de capturas; mantê-las no link empurrava FABs para fora da tela e
+  // transformava uma lista de uma tela em um canvas artificial de duas alturas.
+  const alturaTotal = requestedRoot ? height : height * FAIXAS[aba];
 
   const client = useMemo(() => seedClient(), []);
   const showChrome = Platform.OS === 'android' && RAIZES.has(aba);
@@ -282,6 +294,9 @@ export default function DesignPreviewScreen() {
             {aba === 'Editar' ? <TransactionFormScreen /> : null}
             {aba === 'Detalhe' ? <TransactionDetailScreen /> : null}
             {aba === 'Lançamentos' ? <TransactionsScreen /> : null}
+            {aba === 'Contas' ? <AccountsScreen /> : null}
+            {aba === 'Cartões' ? <CardsScreen /> : null}
+            {aba === 'Pastas' ? <FoldersScreen /> : null}
             {aba === 'Orçamentos' ? <BudgetsScreen /> : null}
           </View>
 
@@ -527,10 +542,11 @@ function seedClient() {
   client.setQueryData(['transactions', 'recent', '5', hoje], recentes);
   // Um item basta para a tela separar "nunca teve nada" de "este mês não teve nada".
   client.setQueryData(['transactions', 'recent', '1', hoje], recentes.slice(0, 1));
-  // ⚠️ `useTransactions` é `useInfiniteQuery`: o cache guarda `{pages, pageParams}`, não o
-  // array. Estava array cru aqui desde sempre e ninguém viu, porque nenhuma banda montava
-  // Lançamentos — chave/forma errada não quebra, cai no estado de erro em silêncio.
-  client.setQueryData(['transactions', 'list', { month: mes }], {
+  // A chave usa as bordas EFETIVAS do período e o termo de busca, não o rótulo do mês.
+  // `useTransactions` é `useInfiniteQuery`: o cache guarda `{pages, pageParams}`, não array.
+  // Uma chave antiga `{ month }` deixava a vitrine buscar o banco sem sessão e trocar o
+  // livro-caixa de exemplo por um erro — justamente quando a tela precisava de inspeção visual.
+  client.setQueryData(['transactions', 'list', { from: `${mes}-01`, to: ultimoDia, pronto: true, q: '' }], {
     pages: [comPrevista],
     pageParams: [0],
   });
@@ -675,6 +691,7 @@ function seedClient() {
   client.setQueryData(['tx-summary', `${mesAnterior}-01`, ultimoDiaAnterior], resumo(ultimoDiaAnterior, 468000, 900000));
 
   client.setQueryData(['account-balances'], previewAccountBalances);
+  client.setQueryData(['default-account'], null);
   client.setQueryData(['accounts'], [
     { id: 'prev-a1', name: 'Conta corrente', type: 'checking', initial_balance_cents: 0 },
     { id: 'prev-a2', name: 'Carteira', type: 'cash', initial_balance_cents: 0 },
@@ -908,6 +925,7 @@ function seedClient() {
     pasta({ id: 'prev-f3', name: 'ideias', icon: 'lightbulb', notes_count: 8, color: 'violeta' }),
     pasta({ id: 'prev-f4', name: 'casa', icon: 'house', notes_count: 2 }),
   ]);
+  client.setQueryData(['notes', 'folders', 'loose'], 2);
   client.setQueryData(['notes', 'tags'], [
     { tag: 'mercado', count: 4 },
     { tag: 'trabalho', count: 6 },

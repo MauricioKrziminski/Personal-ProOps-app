@@ -20,6 +20,10 @@ export function previewScreenFromParam(value: unknown) {
     value === 'forecast' ? 'Projeção' :
     value === 'net-worth' ? 'Patrimônio' :
     value === 'cycle' ? 'Ciclo' :
-    value === 'reports' ? 'Relatórios' : null
+    value === 'reports' ? 'Relatórios' :
+    value === 'transactions' ? 'Lançamentos' :
+    value === 'accounts' ? 'Contas' :
+    value === 'cards' ? 'Cartões' :
+    value === 'folders' ? 'Pastas' : null
   );
 }
