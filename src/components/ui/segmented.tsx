@@ -57,7 +57,8 @@ const FRENTE = { duration: 300, dampingRatio: 0.84 };
 const TRAS = { duration: 520, dampingRatio: 0.9 };
 
 /**
- * Controle segmentado do Android. O iOS usa o Picker nativo em segmented.ios.tsx.
+ * Um controle para todos os seletores do app. No iOS 26+, o trilho e o polegar
+ * usam Liquid Glass nativo; no Android, mantêm as superfícies do tema.
  *
  * ## O movimento
  *
