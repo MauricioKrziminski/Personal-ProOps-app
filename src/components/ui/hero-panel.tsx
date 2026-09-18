@@ -101,111 +101,96 @@ export function HeroPanel({
         { backgroundColor: theme.heroSurface },
       ]}>
       {surface === 'live' ? <InkSurface /> : null}
-      <View style={styles.inner}>
-        {top ? <View style={styles.top}>{top}</View> : null}
+      <Pressable
+        accessible={false}
+        onPress={onPress}
+        onPressIn={
+          onPress
+            ? () => escala.set(withTiming(Motion.pressScale, { duration: Motion.duration.fast }))
+            : undefined
+        }
+        onPressOut={
+          onPress ? () => escala.set(withTiming(1, { duration: Motion.duration.fast })) : undefined
+        }>
+        <View style={styles.inner}>
+          {top ? <View style={styles.top}>{top}</View> : null}
 
-        {/*
-          O toque existia desde sempre e NINGUÉM sabia: este `Pressable` não tinha chevron, nem
-          press-in, nem haptic, nem rótulo de acessibilidade — o dono do produto pediu "abrir
-          alguma coisa com mais opções" numa função que já estava lá, invisível.
+          {/* O cartão todo abre o menu; os controles internos mantêm suas ações próprias. */}
+          <View style={styles.body}>
+            <View style={styles.labelRow}>
+              <ThemedText type="meta" themeColor="onHeroMuted" style={styles.shrinkLabel}>
+                {label}
+              </ThemedText>
+              {badge}
+              {/*
+                Os dois chips andam JUNTOS, num grupo só.
 
-          O que ganhou: press-in de `scale 0.97` (§5 de design.md pede em card) e o chip "…" ao
-          lado do olho. **Não é chevron**: chevron é promessa de tela nova, e `row.tsx:20-24` já
-          registra essa regra — o glyph de menu do projeto é o "…" do `HeaderMenu`.
+                A `labelRow` é `space-between`, e com três filhos soltos (rótulo, "…", olho) ela
+                espalhava os TRÊS: o "…" caía no meio da linha, longe do olho e longe do rótulo,
+                parecendo um botão perdido. Agrupados, o `space-between` volta a ter dois lados —
+                rótulo de um, ações do outro.
+              */}
+              {onPress || concealable ? (
+                <View style={styles.acoes}>
+                  {onPress ? (
+                    <Pressable
+                      accessibilityRole="button"
+                      accessibilityLabel="Mais opções"
+                      onPress={onPress}
+                      hitSlop={Space.sm}
+                      style={[styles.eye, { backgroundColor: theme.heroChip }]}>
+                      <Icon name="ellipsis" size="sm" color="onHero" />
+                    </Pressable>
+                  ) : null}
+                  {concealable ? (
+                    <Pressable
+                      accessibilityRole="button"
+                      accessibilityLabel={concealed ? 'Mostrar valor' : 'Ocultar valor'}
+                      onPress={toggle}
+                      hitSlop={Space.sm}
+                      style={[styles.eye, { backgroundColor: theme.heroChip }]}>
+                      <Icon name={concealed ? 'eye.slash' : 'eye'} size="sm" color="onHero" />
+                    </Pressable>
+                  ) : null}
+                </View>
+              ) : null}
+            </View>
 
-          Haptic NÃO entra aqui: `showItemActions` já chama `selectionAsync()`, e dois no mesmo
-          frame quebra §6 ("um por ação do usuário").
-        */}
-        <Pressable
-          accessibilityRole={onPress ? 'button' : undefined}
-          accessibilityLabel={onPress ? `${label}, abre mais opções` : undefined}
-          onPress={onPress}
-          onPressIn={
-            onPress
-              ? () => escala.set(withTiming(Motion.pressScale, { duration: Motion.duration.fast }))
-              : undefined
-          }
-          onPressOut={
-            onPress ? () => escala.set(withTiming(1, { duration: Motion.duration.fast })) : undefined
-          }
-          style={styles.body}>
-          <View style={styles.labelRow}>
-            <ThemedText type="meta" themeColor="onHeroMuted" style={styles.shrinkLabel}>
-              {label}
-            </ThemedText>
-            {badge}
-            {/*
-              Os dois chips andam JUNTOS, num grupo só.
-              
-              A `labelRow` é `space-between`, e com três filhos soltos (rótulo, "…", olho) ela
-              espalhava os TRÊS: o "…" caía no meio da linha, longe do olho e longe do rótulo,
-              parecendo um botão perdido. Agrupados, o `space-between` volta a ter dois lados —
-              rótulo de um, ações do outro.
-            */}
-            {onPress || concealable ? (
-              <View style={styles.acoes}>
-                {onPress ? (
-                  <Pressable
-                    accessibilityRole="button"
-                    accessibilityLabel="Mais opções"
-                    onPress={onPress}
-                    hitSlop={Space.sm}
-                    style={[styles.eye, { backgroundColor: theme.heroChip }]}>
-                    <Icon name="ellipsis" size="sm" color="onHero" />
-                  </Pressable>
+            <View style={styles.valueRow}>{value}</View>
+
+            {secondary ? (
+              <View style={styles.secondaryRow}>
+                {secondary.icon ? (
+                  <Icon
+                    name={secondary.icon}
+                    size="sm"
+                    color={secondary.negative ? 'onHeroDanger' : 'onHeroSuccess'}
+                  />
                 ) : null}
-                {concealable ? (
-                  <Pressable
-                    accessibilityRole="button"
-                    accessibilityLabel={concealed ? 'Mostrar valor' : 'Ocultar valor'}
-                    onPress={toggle}
-                    hitSlop={Space.sm}
-                    style={[styles.eye, { backgroundColor: theme.heroChip }]}>
-                    <Icon name={concealed ? 'eye.slash' : 'eye'} size="sm" color="onHero" />
-                  </Pressable>
-                ) : null}
+                <ThemedText
+                  type="code"
+                  themeColor={secondary.negative ? 'onHeroDanger' : 'onHeroSuccess'}
+                  style={styles.shrink}>
+                  {secondary.text}
+                </ThemedText>
               </View>
             ) : null}
           </View>
 
-          <View style={styles.valueRow}>{value}</View>
+          {/* O gesto de arrastar o gráfico tem prioridade sobre o toque no cartão. */}
+          {chart ? <View style={styles.chart}>{chart}</View> : null}
 
-          {secondary ? (
-            <View style={styles.secondaryRow}>
-              {secondary.icon ? (
-                <Icon
-                  name={secondary.icon}
-                  size="sm"
-                  color={secondary.negative ? 'onHeroDanger' : 'onHeroSuccess'}
-                />
-              ) : null}
-              <ThemedText
-                type="code"
-                themeColor={secondary.negative ? 'onHeroDanger' : 'onHeroSuccess'}
-                style={styles.shrink}>
-                {secondary.text}
-              </ThemedText>
+          {actions ? (
+            <View style={styles.actions}>
+              <QuickActions actions={actions} />
             </View>
           ) : null}
-        </Pressable>
+        </View>
 
-        {/*
-          O gráfico mora FORA da área tocável: ele agora se arrasta (a Pista, a curva do ciclo),
-          e um arraste dentro do `Pressable` abria o menu do herói ao soltar o dedo.
-        */}
-        {chart ? <View style={styles.chart}>{chart}</View> : null}
-
-        {actions ? (
-          <View style={styles.actions}>
-            <QuickActions actions={actions} />
-          </View>
+        {footer ? (
+          <View style={[styles.footer, { backgroundColor: theme.heroFooter }]}>{footer}</View>
         ) : null}
-      </View>
-
-      {footer ? (
-        <View style={[styles.footer, { backgroundColor: theme.heroFooter }]}>{footer}</View>
-      ) : null}
-
+      </Pressable>
     </Animated.View>
   );
 }
