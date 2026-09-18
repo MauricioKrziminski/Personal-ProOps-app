@@ -6,6 +6,37 @@ const iso = (day: Date) =>
 /** Cache-only fixtures for visual QA of the real Projeção and Patrimônio routes. */
 export function seedFinanceAnalysisPreview(client: Pick<QueryClient, 'getQueryData' | 'setQueryData'>, today: Date) {
   const month = iso(today).slice(0, 7);
+  const year = today.getFullYear();
+  client.setQueryData(['transactions', 'first-year'], year - 1);
+  client.setQueryData(['annual-report', String(year)], {
+    summary: {
+      income_cents: 7_200_000, expense_cents: 5_200_000, balance_cents: 2_000_000,
+      savings_rate: 27.8, tx_count: 148,
+    },
+    categories: [
+      { category: 'Moradia', kind: 'expense', total_cents: 3_200_000, tx_count: 32 },
+      { category: 'Alimentação', kind: 'expense', total_cents: 1_300_000, tx_count: 74 },
+      { category: 'Transporte', kind: 'expense', total_cents: 700_000, tx_count: 18 },
+      { category: 'Salário', kind: 'income', total_cents: 6_000_000, tx_count: 12 },
+      { category: 'Freelance', kind: 'income', total_cents: 1_200_000, tx_count: 12 },
+    ],
+    yearEnd: [
+      { kind: 'account', name: 'Conta corrente', balance_cents: 1_200_000 },
+      { kind: 'asset', name: 'Tesouro Selic', balance_cents: 4_500_000 },
+    ],
+  });
+  client.setQueryData(['annual-report', String(year - 1)], {
+    summary: {
+      income_cents: 6_000_000, expense_cents: 4_800_000, balance_cents: 1_200_000,
+      savings_rate: 20, tx_count: 112,
+    },
+    categories: [
+      { category: 'Moradia', kind: 'expense', total_cents: 3_000_000, tx_count: 28 },
+      { category: 'Outros', kind: 'expense', total_cents: 1_800_000, tx_count: 64 },
+      { category: 'Salário', kind: 'income', total_cents: 6_000_000, tx_count: 12 },
+    ],
+    yearEnd: [{ kind: 'account', name: 'Conta corrente', balance_cents: 850_000 }],
+  });
   let balance = 391_000;
   const forecast = Array.from({ length: 91 }, (_, index) => {
     const income = index > 0 && index % 30 === 0 ? 900_000 : 0;

@@ -19,6 +19,7 @@ export function previewScreenFromParam(value: unknown) {
     value === 'invoice' ? 'Fatura' :
     value === 'forecast' ? 'Projeção' :
     value === 'net-worth' ? 'Patrimônio' :
-    value === 'cycle' ? 'Ciclo' : null
+    value === 'cycle' ? 'Ciclo' :
+    value === 'reports' ? 'Relatórios' : null
   );
 }
