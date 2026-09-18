@@ -19,6 +19,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Stack } from 'expo-router';
 
 import { MaxContentWidth } from '@/constants/theme';
+import { bottomPillInset, rootContentMaxWidth } from '@/design/adaptive-window';
 import { useAppHeaderHeight } from '@/components/ui/app-header';
 import { progressoDeEntrada, useRelogioDeEntrada } from '@/components/motion/entrada';
 import { TAB_BAR_SPACE } from '@/components/ui/pill-tab-bar';
@@ -26,6 +27,7 @@ import { RolagemDaTela } from '@/components/ui/screen-scroll';
 
 import { Motion, Space } from '@/design/tokens';
 import { useTheme } from '@/hooks/use-theme';
+import { useAdaptiveWindow } from '@/hooks/use-adaptive-window';
 
 /**
  * Quanto um FAB come do fim do conteúdo: a altura do botão `md` (48) mais um respiro.
@@ -80,6 +82,8 @@ interface ScreenProps {
    */
   overlay?: React.ReactNode;
   contentStyle?: StyleProp<ViewStyle>;
+  /** Let a tab root use a bounded tablet canvas; pushed routes keep their native scroll root. */
+  wide?: boolean;
 }
 
 /**
@@ -107,8 +111,10 @@ export function Screen({
   floatingAction = false,
   overlay,
   contentStyle,
+  wide = false,
 }: ScreenProps) {
   const theme = useTheme();
+  const { width } = useAdaptiveWindow();
   const [pulling, setPulling] = useState(false);
   const insets = useSafeAreaInsets();
   const headerHeight = useAppHeaderHeight();
@@ -123,12 +129,13 @@ export function Screen({
    * desenha POR CIMA do conteúdo. `topBar` é o sinal de que esta é uma raiz de aba — telas
    * empurradas não têm barra e não devem ganhar o respiro.
    */
-  const tabBarSpace = topBar && Platform.OS === 'android' ? TAB_BAR_SPACE : 0;
+  const tabBarSpace = bottomPillInset(Platform.OS, Boolean(topBar), TAB_BAR_SPACE);
   /** A altura do FAB mais o respiro dele, para nenhum conteúdo terminar embaixo do botão. */
   const fabSpace = floatingAction ? FAB_CLEARANCE : 0;
   const padding = [
     styles.content,
     {
+      maxWidth: wide ? rootContentMaxWidth(width, true) : MaxContentWidth,
       /*
         ⚠️ **O respiro do topo é UM número, para o app inteiro** — e ele foi calibrado no
         aparelho, nos dois sentidos: com `Space.md` o dono do produto reclamou do vazio embaixo
@@ -169,7 +176,7 @@ export function Screen({
     return (
       <RolagemDaTela.Provider value={rolagem}>
         <View style={[styles.root, { backgroundColor: background }]}>
-          <View style={[styles.root, { paddingTop: headerHeight }, contentStyle]}>
+          <View style={[styles.root, wide ? styles.wideContent : null, { paddingTop: headerHeight }, contentStyle]}>
             {children}
           </View>
           {topBar}
@@ -321,4 +328,5 @@ const styles = StyleSheet.create({
     maxWidth: MaxContentWidth,
     alignSelf: 'center',
   },
+  wideContent: { width: '100%', maxWidth: 1200, alignSelf: 'center' },
 });

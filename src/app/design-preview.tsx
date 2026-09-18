@@ -1,9 +1,15 @@
 import { useEffect, useMemo, useState } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { router, useLocalSearchParams } from 'expo-router';
 import { Platform, StyleSheet, View, useWindowDimensions } from 'react-native';
 
 import { PillTabBar, type PillTab } from '@/components/ui/pill-tab-bar';
+import { previewAccountBalances } from '@/design/preview-account-balances';
+import { seedFinanceAnalysisPreview } from '@/design/preview-finance-analysis';
+import { seedFinancePeriodPreview } from '@/design/preview-finance-cache';
+import { previewScreenFromParam } from '@/design/preview-root';
+import type { AiMonthStats, PlanStatus } from '@/hooks/use-finance';
 import { localISODate } from '@/hooks/use-items';
 import { useTheme } from '@/hooks/use-theme';
 
@@ -13,9 +19,18 @@ import InvoiceScreen from './finance/invoice/[id]';
 import RecurringScreen from './finance/recurring';
 import TransactionDetailScreen from './finance/[txId]';
 import BudgetsScreen from './finance/budgets';
+import AccountsScreen from './finance/accounts';
+import CardsScreen from './finance/cards';
+import InvoicesScreen from './finance/invoices';
+import WalletScreen from './finance/wallet';
+import FoldersScreen from './notes/folders';
 import TransactionsScreen from './finance/transactions';
 import TransactionFormScreen from './finance/transaction-form';
 import FinanceScreen from './(tabs)/finance/index';
+import ForecastScreen from './finance/forecast';
+import CycleDetailScreen from './finance/cycle';
+import NetWorthScreen from './finance/net-worth';
+import ReportsScreen from './finance/reports';
 import NotesScreen from './(tabs)/notes/index';
 import ProfileScreen from './(tabs)/profile/index';
 import TodayScreen from './(tabs)/today/index';
@@ -72,7 +87,7 @@ import TodayScreen from './(tabs)/today/index';
  * FATURA, não do lançamento, e a tela escrevia "Vence em") e a linha "Repete …" que leva à
  * série. Numa parcela ou num lançamento solto, nenhuma das duas existe.
  */
-const ABAS = ['Hoje', 'Finanças', 'Notas', 'Agente', 'Perfil', 'Dívidas', 'Fatura', 'Recorrentes', 'Editar', 'Detalhe', 'Lançamentos', 'Orçamentos'] as const;
+const ABAS = ['Hoje', 'Finanças', 'Notas', 'Agente', 'Perfil', 'Dívidas', 'Fatura', 'Projeção', 'Patrimônio', 'Ciclo', 'Relatórios', 'Recorrentes', 'Editar', 'Detalhe', 'Lançamentos', 'Contas', 'Cartões', 'Pastas', 'Carteira', 'Faturas', 'Orçamentos'] as const;
 
 /**
  * A tela é montada numa caixa ALTA e deslocada para cima, em vez de rolada.
@@ -133,10 +148,19 @@ const ABA_PARA_TAB: Record<string, number> = {
   Perfil: 4,
   'Dívidas': 2,
   Fatura: 1,
+  Projeção: 2,
+  Patrimônio: 2,
+  Ciclo: 2,
+  'Relatórios': 2,
   Recorrentes: 2,
   Editar: 2,
   Detalhe: 2,
   'Lançamentos': 2,
+  Contas: 2,
+  Cartões: 2,
+  Pastas: 1,
+  Carteira: 2,
+  Faturas: 2,
   'Orçamentos': 2,
 };
 /** Quantas alturas de tela cada aba ocupa — medido, para não gastar frame em preto. */
@@ -152,6 +176,10 @@ const FAIXAS: Record<(typeof ABAS)[number], number> = {
   // `translateY` só funciona para tela que desenha a altura inteira.
   // Uma faixa: o herói e o começo da lista respondem se o parcial aparece.
   Fatura: 1,
+  Projeção: 1,
+  Patrimônio: 1,
+  Ciclo: 1,
+  'Relatórios': 1,
   // Duas faixas: a lista de séries e o painel do que entra/sai no mês.
   Recorrentes: 2,
   // Uma faixa: o valor, a categoria e o botão Salvar cabem numa tela — é o que precisa
@@ -164,6 +192,11 @@ const FAIXAS: Record<(typeof ABAS)[number], number> = {
   // porque o header de busca ficava CRAVADO no topo do Android enquanto o extrato rolava por
   // baixo, e a vitrine não montava esta tela — o defeito viveu meses sem ninguém ver.
   'Lançamentos': 2,
+  Contas: 1,
+  Cartões: 1,
+  Pastas: 1,
+  Carteira: 1,
+  Faturas: 1,
   // Duas faixas: o destaque e as categorias. Entrou em 09/09/2026 junto da separação entre
   // gasto e comprometido — a tela decide um AVISO, e aviso que ninguém olhou é aviso que erra.
   'Orçamentos': 2,
@@ -181,32 +214,54 @@ export default function DesignPreviewScreen() {
   // ela fica FORA do portão de sessão, e uma tela do app aberta sem login não é aceitável nem
   // com dado falso.
   const dev = __DEV__;
+  const { screen } = useLocalSearchParams<{ screen?: string }>();
+  const requestedRoot = previewScreenFromParam(screen);
   const { height } = useWindowDimensions();
-  const [aba, setAba] = useState<(typeof ABAS)[number]>('Hoje');
+  const [abaDoPasso, setAbaDoPasso] = useState<(typeof ABAS)[number]>('Hoje');
   /**
    * A faixa vertical. Era derivada de `passo`, e por isso tocar na barra do Android trocava a
    * tela mas mantinha o deslocamento da aba anterior — numa aba de uma faixa só, dava tela
    * preta. Como estado, o toque volta para o topo.
    */
   const [faixa, setFaixa] = useState(0);
+  const aba = requestedRoot ?? abaDoPasso;
+  const faixaAtual = requestedRoot ? 0 : faixa;
 
   useEffect(() => {
+    if (requestedRoot) return;
     let vivo = true;
     AsyncStorage.getItem(PASSO_KEY).then((raw) => {
       if (!vivo) return;
       const atual = Number(raw ?? 0) % PASSOS.length;
-      setAba(PASSOS[atual].aba);
+      setAbaDoPasso(PASSOS[atual].aba);
       setFaixa(PASSOS[atual].faixa);
       AsyncStorage.setItem(PASSO_KEY, String(atual + 1));
     });
     return () => {
       vivo = false;
     };
-  }, []);
+  }, [requestedRoot]);
 
-  const alturaTotal = height * FAIXAS[aba];
+  // Deep links de QA devem ocupar a altura REAL da janela. As faixas extras só existem no
+  // roteiro sequencial de capturas; mantê-las no link empurrava FABs para fora da tela e
+  // transformava uma lista de uma tela em um canvas artificial de duas alturas.
+  const alturaTotal = requestedRoot ? height : height * FAIXAS[aba];
 
   const client = useMemo(() => seedClient(), []);
+  const showChrome = Platform.OS === 'android' && RAIZES.has(aba);
+  const selectTab = (index: number) => {
+    if (requestedRoot) {
+      const target = TABS_ANDROID[index];
+      // Keep the same preview instance alive so the pill can finish its spring.
+      if (target) router.setParams({ screen: target.name });
+      return;
+    }
+    const alvo = ABAS.find((nome) => ABA_PARA_TAB[nome] === index);
+    if (alvo) {
+      setAbaDoPasso(alvo);
+      setFaixa(0);
+    }
+  };
 
   if (!dev) return <View style={{ flex: 1, backgroundColor: theme.background }} />;
 
@@ -217,7 +272,7 @@ export default function DesignPreviewScreen() {
           <View
             style={{
               height: alturaTotal,
-              transform: [{ translateY: -faixa * height }],
+              transform: [{ translateY: -faixaAtual * height }],
             }}>
             {aba === 'Hoje' ? <TodayScreen /> : null}
             {aba === 'Finanças' ? <FinanceScreen /> : null}
@@ -226,10 +281,19 @@ export default function DesignPreviewScreen() {
             {aba === 'Perfil' ? <ProfileScreen /> : null}
             {aba === 'Dívidas' ? <DebtsScreen /> : null}
             {aba === 'Fatura' ? <InvoiceScreen /> : null}
+            {aba === 'Projeção' ? <ForecastScreen /> : null}
+            {aba === 'Patrimônio' ? <NetWorthScreen /> : null}
+            {aba === 'Ciclo' ? <CycleDetailScreen /> : null}
+            {aba === 'Relatórios' ? <ReportsScreen /> : null}
             {aba === 'Recorrentes' ? <RecurringScreen /> : null}
             {aba === 'Editar' ? <TransactionFormScreen /> : null}
             {aba === 'Detalhe' ? <TransactionDetailScreen /> : null}
             {aba === 'Lançamentos' ? <TransactionsScreen /> : null}
+            {aba === 'Contas' ? <AccountsScreen /> : null}
+            {aba === 'Cartões' ? <CardsScreen /> : null}
+            {aba === 'Pastas' ? <FoldersScreen /> : null}
+            {aba === 'Carteira' ? <WalletScreen /> : null}
+            {aba === 'Faturas' ? <InvoicesScreen /> : null}
             {aba === 'Orçamentos' ? <BudgetsScreen /> : null}
           </View>
 
@@ -243,17 +307,11 @@ export default function DesignPreviewScreen() {
             justamente o que essas faixas existem para mostrar — o "Registrar pagamento" da Fatura
             ficava embaixo dela.
           */}
-          {Platform.OS === 'android' && RAIZES.has(aba) ? (
+          {showChrome ? (
             <PillTabBar
               tabs={TABS_ANDROID}
               activeIndex={ABA_PARA_TAB[aba] ?? 0}
-              onSelect={(i) => {
-                const alvo = ABAS.find((nome) => ABA_PARA_TAB[nome] === i);
-                if (alvo) {
-                  setAba(alvo);
-                  setFaixa(0);
-                }
-              }}
+              onSelect={selectTab}
             />
           ) : null}
         </View>
@@ -306,13 +364,12 @@ function seedClient() {
     a soma de `spendable-path` é o `comprometido_ate_entrada` — senão a Pista apaga os entalhes.
   */
   const emQuatroDias = localISODate(new Date(agora.getFullYear(), agora.getMonth(), agora.getDate() + 4));
-  client.setQueryData(['cycle', ''], {
-    closeDay: null,
-    view: 'civil',
-    mes,
-    de: `${mes}-01`,
-    ate: ultimoDia,
-    diasAteOFim: diasRestantes,
+  seedFinancePeriodPreview(client, {
+    month: mes,
+    previousMonth: mesAnterior,
+    lastDate: ultimoDia,
+    previousLastDate: ultimoDiaAnterior,
+    daysLeft: diasRestantes,
   });
   client.setQueryData(['spendable', ''], {
     caixa: 391000,
@@ -425,8 +482,8 @@ function seedClient() {
         rollover_cents: 0,
       },
     ];
-  client.setQueryData(['budgets-status', hoje], statusOrcamento);
-  client.setQueryData(['budgets-status', `${mes}-01`], statusOrcamento);
+  client.setQueryData(['budgets-status', hoje, ''], statusOrcamento);
+  client.setQueryData(['budgets-status', `${mes}-01`, 'cycle'], statusOrcamento);
 
   const tx = (over: Record<string, unknown>) => ({
     id: 'prev-tx',
@@ -448,6 +505,7 @@ function seedClient() {
     merchant: null,
     recurring_id: null,
     debt_id: null,
+    auto_confirm: false,
     ...over,
   });
 
@@ -478,13 +536,14 @@ function seedClient() {
   });
   const comPrevista = [receitaPrevista, ...recentes];
 
-  client.setQueryData(['transactions', 'recent', '5'], comPrevista);
+  client.setQueryData(['transactions', 'recent', '5', hoje], recentes);
   // Um item basta para a tela separar "nunca teve nada" de "este mês não teve nada".
-  client.setQueryData(['transactions', 'recent', '1'], comPrevista.slice(0, 1));
-  // ⚠️ `useTransactions` é `useInfiniteQuery`: o cache guarda `{pages, pageParams}`, não o
-  // array. Estava array cru aqui desde sempre e ninguém viu, porque nenhuma banda montava
-  // Lançamentos — chave/forma errada não quebra, cai no estado de erro em silêncio.
-  client.setQueryData(['transactions', 'list', { month: mes }], {
+  client.setQueryData(['transactions', 'recent', '1', hoje], recentes.slice(0, 1));
+  // A chave usa as bordas EFETIVAS do período e o termo de busca, não o rótulo do mês.
+  // `useTransactions` é `useInfiniteQuery`: o cache guarda `{pages, pageParams}`, não array.
+  // Uma chave antiga `{ month }` deixava a vitrine buscar o banco sem sessão e trocar o
+  // livro-caixa de exemplo por um erro — justamente quando a tela precisava de inspeção visual.
+  client.setQueryData(['transactions', 'list', { from: `${mes}-01`, to: ultimoDia, pronto: true, q: '' }], {
     pages: [comPrevista],
     pageParams: [0],
   });
@@ -628,10 +687,8 @@ function seedClient() {
   client.setQueryData(['tx-summary', `${mes}-01`, ultimoDia], resumo(ultimoDia, 412000, 900000));
   client.setQueryData(['tx-summary', `${mesAnterior}-01`, ultimoDiaAnterior], resumo(ultimoDiaAnterior, 468000, 900000));
 
-  client.setQueryData(['account-balances'], [
-    { account_id: 'prev-a1', name: 'Conta corrente', type: 'checking', balance_cents: 892040 },
-    { account_id: 'prev-a2', name: 'Carteira', type: 'cash', balance_cents: 12000 },
-  ]);
+  client.setQueryData(['account-balances'], previewAccountBalances);
+  client.setQueryData(['default-account'], null);
   client.setQueryData(['accounts'], [
     { id: 'prev-a1', name: 'Conta corrente', type: 'checking', initial_balance_cents: 0 },
     { id: 'prev-a2', name: 'Carteira', type: 'cash', initial_balance_cents: 0 },
@@ -683,12 +740,18 @@ function seedClient() {
   });
   // A chave leva `months` como STRING e o default do hook é 60 — chave errada não quebra,
   // cai no estado de carregando e o pager some sem avisar.
-  client.setQueryData(['card-invoices', 'prev-c1', '60'], [
+  const previewInvoices = [
     { id: 'prev-i0', reference_month: `${mesAnterior}-01`, due_date: `${mesAnterior}-10`,
-      status: 'paid', total_cents: 292008 },
+      closing_date: `${mesAnterior}-03`, status: 'paid', paid_at: `${mesAnterior}-10`,
+      payment_transaction_id: null, rolled_into_invoice_id: null, total_cents: 292008, tx_count: 7 },
     { id: 'prev-i1', reference_month: `${mes}-01`, due_date: `${mes}-10`,
-      status: 'closed', total_cents: 324010 },
-  ]);
+      closing_date: `${mes}-03`, status: 'closed', paid_at: null,
+      payment_transaction_id: null, rolled_into_invoice_id: null, total_cents: 324010, tx_count: 8 },
+  ];
+  client.setQueryData(['card-invoices', 'prev-c1', '60'], previewInvoices);
+  // A vitrine do formulário mantém `prev-a3` como cartão; a tela Faturas seleciona esse
+  // primeiro cartão da lista de contas, não o id `prev-c1` usado pelo resumo da Carteira.
+  client.setQueryData(['card-invoices', 'prev-a3', '60'], previewInvoices);
 
   client.setQueryData(['card-summary'], [
     {
@@ -744,7 +807,7 @@ function seedClient() {
     },
   ]);
   client.setQueryData(
-    ['monthly-cashflow', '6'],
+    ['monthly-cashflow', '6', ''],
     ['2026-04', '2026-05', '2026-06', '2026-07', '2026-08', '2026-09'].map((m, i, todos) => ({
       month: `${m}-01`,
       income_cents: 780000 + i * 40000,
@@ -865,18 +928,27 @@ function seedClient() {
     pasta({ id: 'prev-f3', name: 'ideias', icon: 'lightbulb', notes_count: 8, color: 'violeta' }),
     pasta({ id: 'prev-f4', name: 'casa', icon: 'house', notes_count: 2 }),
   ]);
+  client.setQueryData(['notes', 'folders', 'loose'], 2);
   client.setQueryData(['notes', 'tags'], [
     { tag: 'mercado', count: 4 },
     { tag: 'trabalho', count: 6 },
   ]);
 
-  client.setQueryData(['plan-status'], {
+  client.setQueryData<PlanStatus>(['plan-status'], {
     plan: 'pro',
     members: 2,
     max_members: 5,
     ai_messages_month: 143,
+    ai_messages_whatsapp: 89,
+    ai_messages_app: 54,
     max_ai_messages_month: 1000,
+    can_import: true,
+    current_period_end: ultimoDia,
+    is_trial: false,
+    provider: 'preview',
+    status: 'active',
   });
+  client.setQueryData<AiMonthStats>(['ai-month-stats', mes], { lancamentos: 18, notas: 7 });
   client.setQueryData(['reminders'], []);
   client.setQueryData(['goals'], []);
   /**
@@ -941,6 +1013,7 @@ function seedClient() {
     { kind: 'income', amount_cents: 420000 },
   ]);
 
+  seedFinanceAnalysisPreview(client, agora);
   return client;
 }
 

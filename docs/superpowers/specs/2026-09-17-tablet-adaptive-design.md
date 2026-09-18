@@ -2,7 +2,9 @@
 
 ## Estado e decisão
 
-Gabriel aprovou a direção “mesa de decisões” para **Android tablet e iPad** em 17/09/2026. Este
+Gabriel aprovou a direção “mesa de decisões” para **Android tablet e iPad** em 17/09/2026. Em
+18/09, ele corrigiu a decisão de navegação: a barra Android deve continuar **embaixo também no
+tablet**, com a transição entre abas, sem rail lateral. Este
 documento estende a identidade **Papel e Tinta / Suave** de `PRODUCT.md` e `DESIGN.md`; não a troca.
 O produto continua sendo pessoal, em pt-BR, com dados financeiros reais e a mesma hierarquia de
 ações. O telefone continua sendo uma experiência completa, não uma versão reduzida do tablet.
@@ -20,7 +22,7 @@ simples precise apenas de largura de leitura e não de múltiplos painéis. `/`,
   `MaxContentWidth=800`; a raiz do Agente se estende quase de ponta a ponta. A tela de Lembretes
   deixa grandes áreas vazias. Capturas locais foram feitas das cinco raízes, login e lembretes.
 - O repositório tem 50 arquivos de rota além de sete layouts; 21 rotas pertencem ao Financeiro.
-  `FolderGrid` já troca de duas para três colunas, mas não existe uma composição de tablet para
+  `FolderGrid` já troca de duas para três colunas, mas não existia uma composição de tablet para
   navegação, lista-detalhe, formulários e área de análise como um sistema.
 - O app usa `expo-router`, `NativeTabs` no iOS, `expo-router/ui` e `PillTabBar` no Android,
   `Screen` para insets/rolagem/teclado, e já possui Reanimated 4, Skia, Gesture Handler e
@@ -36,7 +38,7 @@ simples precise apenas de largura de leitura e não de múltiplos painéis. `/`,
 | [Copilot Money no iPad](https://help.copilot.money/en/articles/10003978-copilot-money-for-ipad) | Busca global, revisão e edição contextual de transações sem abrir uma tela inteira para cada gesto. |
 | [Notion em tablet](https://www.notion.com/nl/releases/2020-04-07) | Barra lateral persistente em paisagem, colapso em retrato e menus proporcionais em vez de tela cheia. |
 | [Google Home adaptativo](https://design.google/library/google-home-ux-miche-alvarez) | Um sistema que muda a composição ao redimensionar, não layouts separados por modelo. |
-| [Android: navegação](https://developer.android.com/develop/adaptive-apps/guides/build-adaptive-navigation) e [lista-detalhe](https://developer.android.com/develop/adaptive-apps/guides/list-detail) | Barra compacta vira rail em janela ampla; lista e detalhe coexistem quando há largura. |
+| [Android: navegação](https://developer.android.com/develop/adaptive-apps/guides/build-adaptive-navigation) e [lista-detalhe](https://developer.android.com/develop/adaptive-apps/guides/list-detail) | Lista e detalhe coexistem quando há largura. O rail sugerido pelo padrão Android não foi adotado após a correção explícita de Gabriel. |
 | [Apple: split views](https://developer.apple.com/design/human-interface-guidelines/split-views) | Seleção persistente, larguras fluidas e retorno coerente quando a janela fica estreita. |
 | [Material: coreografia](https://m1.material.io/motion/choreography.html) | Uma transição guarda um foco visual reconhecível; não anima todos os elementos ao mesmo tempo. |
 
@@ -54,7 +56,7 @@ verde/tijolo/âmbar continuam exclusivamente semânticos. A marca permanece mono
 
 Há três papéis espaciais, usados somente quando o conteúdo pede:
 
-1. **Navegação** — cinco destinos e estado selecionado, junto à borda alcançável.
+1. **Navegação** — cinco destinos e estado selecionado; no iPad, a posição é a barra nativa do sistema no topo.
 2. **Área principal** — o que a pessoa está tentando compreender ou editar.
 3. **Painel de apoio** — lista, detalhe, compromissos ou contexto **real** relacionado ao foco.
 
@@ -69,7 +71,7 @@ herói de tinta por tela continua possível; em tablet ele pode ocupar só a ár
 Uma função pura classifica a **largura disponível da janela em dp**: compacta `<600`, média
 `600–839`, ampla `>=840`. `useWindowDimensions()` recalcula classe e geometria durante rotação,
 Split View/multi-window e mudanças de fonte; nenhuma decisão depende de `Device.modelName` ou
-de pixels físicos. A classe média pode mostrar rail + uma área; duas áreas só aparecem quando
+de pixels físicos. A classe média pode mostrar uma área; duas áreas só aparecem quando
 cada uma mantém largura legível e alvos de toque adequados. A área ampla pode usar dois ou três
 painéis conforme o fluxo, com limites mínimo/máximo por papel, não percentuais cegos.
 
@@ -80,14 +82,14 @@ necessário. Janelas estreitas em um tablet recebem a experiência compacta comp
 
 ### Navegação e rotas
 
-- **Android compacto:** a `PillTabBar` Suave existente continua. **Android médio/amplo:** rail
-  de tinta com cinco destinos rotulados, badge real de Hoje, indicador animado e a ação primária
-  contextual. A seleção vem da rota, não de um estado paralelo. Rotas profundas mantêm retorno
-  previsível; o rail permanece nas áreas de trabalho quando houver espaço e some em tarefas
-  imersivas/modalizadas justificadas.
-- **iPhone/iPad:** preservar `NativeTabs`, Liquid Glass, SF Symbols e o gesto de voltar. No iPad,
-  o conteúdo ganha painéis e seleção persistente; a barra do sistema não é substituída por um
-  rail Android. Não usar o `SplitView` alpha do Expo como fundação.
+- **Android compacto/médio/amplo:** a `PillTabBar` Suave permanece embaixo, com cinco destinos,
+  ícones, rótulos, badge real de Hoje e seleção animada. A seleção vem da rota e a transição
+  começa no toque. Rotas profundas mantêm retorno previsível e não exibem a barra de raiz.
+- **iPhone/iPad:** preservar `NativeTabs`, Liquid Glass, SF Symbols e o gesto de voltar.
+  **Decisão de 18/09/2026:** Gabriel escolheu manter a barra nativa do iPadOS no topo depois de
+  ver e rejeitar a pílula do Android no iPad. Os cinco ícones SF Symbols seguem configurados;
+  na captura do iPadOS 26, o sistema desenhou apenas os rótulos na barra superior. Não forçar
+  ícones com um controle próprio, nem usar o `SplitView` alpha do Expo como fundação.
 - **Lista-detalhe:** tocar em um item continua produzindo sua URL real (`/notes/[id]`,
   `/finance/[txId]`, `/agent/[id]` etc.). Em janela ampla, lista e detalhe podem ficar juntos;
   ao colapsar, o detalhe ocupa a tela e o Back volta à lista. Seleção visível, deep link direto,
@@ -105,8 +107,8 @@ necessário. Janelas estreitas em um tablet recebem a experiência compacta comp
    defaults compactos nem o manejo atual de safe area, teclado, pull-to-refresh e FAB.
 3. Um primitivo de **painéis** para lista/detalhe/apoio, com proporções limitadas, placeholder
    útil e colapso determinístico. Não será um “layout engine” genérico com dezenas de flags.
-4. Navegação Android por classe de janela no `app-tabs.android.tsx`, reaproveitando o registro
-   de rotas de `expo-router/ui`; componente de rail separado da pílula. Tokens, `Icon`, botões,
+4. Navegação Android pela mesma `PillTabBar` inferior em todas as larguras no
+   `app-tabs.android.tsx`, reaproveitando o registro de rotas de `expo-router/ui`. Tokens, `Icon`, botões,
    campos, cards, linhas e gráficos existentes são reutilizados.
 5. Superfícies de tarefa dimensionadas para formulários, importação, paywall e confirmação:
    modal/sheet apenas quando a semântica pede; não transformar tudo em dashboard.
@@ -117,7 +119,7 @@ necessário. Janelas estreitas em um tablet recebem a experiência compacta comp
 |---|---|---|
 | **Hoje** | Sequência por urgência atual, `Livre até`, sinais, saídas/entradas, contas, agenda e lembretes. | O `Livre até` e sua Pista ancoram a área principal; uma faixa de decisões mostra vencimentos e lembretes, e o restante se distribui por tempo e assunto sem mudar a prioridade dos dados. A lista de obrigações e o número compartilham o mesmo horizonte temporal. |
 | **Financeiro** | Ciclo, cartões, mosaico, lançamentos e gráficos atuais. | Uma mesa financeira com ciclo e curva no foco; cartões e tarefas à mão, e livro-caixa/explicações ao lado. Selecionar mês, conta, categoria ou ponto do gráfico atualiza o contexto visível sem criar valores novos nem consultas duplicadas. A Carteira, voo e fatura conservam sua identidade. |
-| **Notas** | Captura rápida, pastas e lista; detalhe abre por rota. | Biblioteca/filtro à esquerda e nota à direita; busca e captura rápida acessíveis no topo. Pastas, arquivadas e lixeira reutilizam o mesmo padrão. Editor não vira campo de largura ilimitada. |
+| **Notas** | Captura rápida, pastas e lista; detalhe abre por rota. | No iPad, biblioteca em grade de largura adaptável e nota pela rota existente: um painel de prévia sem edição ocupava a maior parte da tela vazia e foi rejeitado na revisão visual. No Android tablet, biblioteca à esquerda e prévia à direita. Busca e captura rápida continuam no topo; editor não vira campo de largura ilimitada. |
 | **Agente** | Lista, nova conversa e thread atuais. | Lista de conversas + thread; painel de resultados apenas quando uma ação retornou registro verificável. Mensagem e registro permanecem ligados; nada de resposta decorativa ou conteúdo inventado. A implementação incorpora, sem sobrescrever, as mudanças concorrentes da branch. |
 | **Perfil** | Seções e ações de conta atuais. | Grupos de configurações como índice; detalhe de membros/alertas em área de leitura, com estados e ações preservados. Dados sensíveis continuam sob trava e esconder saldo. |
 | **Telas de tarefa** | Login, cadastro, OTP, onboarding, busca, lembretes, lançamento, importação, plano, paywall e edições existentes. | Formulários e leitura em largura confortável, ações próximas aos campos, teclado sem ocultar foco; listas podem ganhar detalhe, mas telas de decisão permanecem concentradas. Nada de esticar inputs ou sheets até a borda. |
@@ -132,7 +134,7 @@ auditoria. Não se aceitará “passou no `MaxContentWidth`” como prova de lay
 
 ## Movimento, qualidade e dados
 
-- Movimento é continuidade: rail indica mudança de destino; lista → detalhe preserva um
+- Movimento é continuidade: a pílula indica mudança de destino; lista → detalhe preserva um
   elemento focal; gráficos respondem ao dedo e à seleção; overlays retornam para a origem
   quando houver origem real. A coreografia pode ser expressiva, mas a informação que alguém
   está lendo não se desloca só por ornamento.
@@ -157,7 +159,7 @@ recuperação nunca apaga dados. Back, deep link e fechamento de modal funcionam
 
 ## Aceite e sequência de implementação
 
-1. **Fundação + cinco raízes:** testes puros da classe de janela e geometria; Android rail;
+1. **Fundação + cinco raízes:** testes puros da classe de janela e geometria; pílula Android inferior;
    composição ampla de Hoje, Notas, Financeiro, Agente e Perfil; telefone sem regressão.
 2. **Fluxos profundos:** lista/detalhe e visualização/edição nas notas, agente e 21 rotas
    financeiras; URLs, ações e estados preservados. Revisão pontual do diff concorrente antes
@@ -168,7 +170,7 @@ recuperação nunca apaga dados. Back, deep link e fechamento de modal funcionam
 Verificação proporcional: `tsc`, lint e testes existentes + testes da lógica adaptativa;
 capturas e interação reais em emulador Android celular/tablet e simuladores iPhone/iPad, em
 retrato e paisagem, claro/escuro, fonte ampliada, janela estreita e teclado aberto. No Android,
-testar Back e rail; no iPad, tab bar, navegação e gestos. Cada rota voltada ao usuário terá um
+testar Back, pílula inferior e animação de seleção; no iPad, tab bar, navegação e gestos. Cada rota voltada ao usuário terá um
 registro de **mantida, reestruturada ou apenas contida**, com evidência de renderização; nenhum
 resultado de compilação será apresentado como prova de ergonomia ou movimento em hardware.
 Desempenho tátil, taxa de quadros e postura dependem de aparelho físico e serão reportados

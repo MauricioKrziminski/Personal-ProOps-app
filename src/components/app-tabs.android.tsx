@@ -62,18 +62,14 @@ export default function AppTabs() {
   );
 
   const tabs = TABS.map((t) => (t.name === 'today' ? { ...t, badge: pendentes } : t));
+  const goToTab = (index: number) => router.navigate(HREFS[index]);
 
   return (
     /* `flex: 1` explícito: `style` SOBRESCREVE o do componente, e sem ele a árvore de abas
        colapsa para altura zero — a tela fica em branco, sem erro nenhum no log. */
     <Tabs style={{ flex: 1, backgroundColor: theme.background }}>
       <TabSlot />
-
-      <PillTabBar
-        tabs={tabs}
-        activeIndex={atual}
-        onSelect={(i) => router.navigate(HREFS[i])}
-      />
+      <PillTabBar tabs={tabs} activeIndex={atual} onSelect={goToTab} />
 
       <TabList style={styles.hidden}>
         {TABS.map((tab, i) => (

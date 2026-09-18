@@ -1,8 +1,9 @@
 import { router, type Href } from 'expo-router';
-import { useMemo, useState } from 'react';
-import { StyleSheet, View, useWindowDimensions } from 'react-native';
+import { Fragment, useMemo, useState } from 'react';
+import { StyleSheet, View, type LayoutChangeEvent } from 'react-native';
 
 import { ErrorCard } from '@/components/error-card';
+import { FinanceTabletCanvas } from '@/components/finance/finance-tablet-canvas';
 import { BudgetRings } from '@/components/finance/budget-rings';
 import { CardStack, type StackedCard } from '@/components/finance/card-stack';
 import { monthLabel, monthTitle, shiftMonth } from '@/components/finance/month-picker';
@@ -30,8 +31,10 @@ import { ProgressBar, Sparkline } from '@/components/ui/sparkline';
 import { Tile, TileGrid, TileRow } from '@/components/ui/tile';
 import { useToast } from '@/components/ui/toast';
 import { categoryIcon } from '@/design/category-icons';
+import { chartWidthForPane } from '@/design/adaptive-window';
 import { Radius, Space } from '@/design/tokens';
 import { useAgentActivity } from '@/hooks/use-agent-activity';
+import { useAdaptiveWindow } from '@/hooks/use-adaptive-window';
 import {
   useAccounts,
   useBudgetsStatus,
@@ -91,6 +94,8 @@ function daysToMonthEnd(): number {
 }
 
 export default function FinanceScreen() {
+  const { windowClass } = useAdaptiveWindow();
+  const tablet = windowClass !== 'compact';
   const brl = useBRL();
   const toast = useToast();
   const regua = useMonthRuler();
@@ -108,7 +113,7 @@ export default function FinanceScreen() {
   // Na MESMA régua do mês exibido, senão o "vs mês anterior" compara dois tipos de período.
   const previousRange = useMonthRange(previousMonth, regua.view);
   const isCurrent = month === mesCorrente;
-  const { width } = useWindowDimensions();
+  const [heroPaneWidth, setHeroPaneWidth] = useState(0);
   const daysLeft = cycle.data?.diasAteOFim ?? daysToMonthEnd();
 
   const forecast = useCashFlowForecast(daysLeft);
@@ -147,7 +152,11 @@ export default function FinanceScreen() {
   /* `useMemo` não é micro-otimização: o `Sparkline` memoiza o desenho pela identidade da série. */
   const series = useMemo(() => (forecast.data ?? []).map((d) => Number(d.balance_cents)), [forecast.data]);
   const rotulos = useMemo(() => (forecast.data ?? []).map((d) => isoToBR(d.day).slice(0, 5)), [forecast.data]);
-  const chartWidth = width - Space.lg * 2 - Space.gutter * 2;
+  const chartWidth = chartWidthForPane(heroPaneWidth, Space.gutter);
+  const measureHeroPane = (event: LayoutChangeEvent) => {
+    const measured = event.nativeEvent.layout.width;
+    setHeroPaneWidth((previous) => previous === measured ? previous : measured);
+  };
   const fimDoCiclo = ciclo?.fim ?? cycle.data?.ate ?? null;
 
   /** A citação de cada lançamento que veio de uma fala (mesma chave da Hoje: sem consulta a mais). */
@@ -262,7 +271,7 @@ export default function FinanceScreen() {
 
   if (!pronta) {
     return (
-      <Screen grouped topBar={<AppHeader title="Financeiro" />}>
+      <Screen wide={tablet} grouped topBar={<AppHeader title="Financeiro" />}>
         <Skeleton width="55%" height={26} />
         <SkeletonHero />
         <View style={styles.linhaEsqueleto}>
@@ -282,68 +291,37 @@ export default function FinanceScreen() {
   const saiuRealizado = Number(ciclo?.saiu_realizado ?? 0);
   const debtsTotal = (debts.data ?? []).reduce((soma, d) => soma + Number(d.remaining_cents), 0);
 
-  return (
-    <Screen
-      floatingAction
-      stagger
-      grouped
-      topBar={<AppHeader title="Financeiro" />}
-      overlay={<ExtendedFab label="Lançar" icon="plus" onPress={lancar} />}
-      onRefresh={() =>
-        Promise.all([
-          refazerPeriodo(),
-          forecast.refetch(),
-          budgets.refetch(),
-          accounts.refetch(),
-          cards.refetch(),
-          recent.refetch(),
-          cashflow.refetch(),
-          atividade.refetch(),
-        ])
-      }>
+  const cycleBlock = (
+    <>
       <PeriodBar month={month} onChangeMonth={setMonth} ruler={regua} variant="bare" />
-
-      {heroLoading ? (
-        <View style={styles.heroSkeleton}>
-          <Skeleton width="55%" height={14} />
-          <Skeleton width="70%" height={46} />
-        </View>
-      ) : heroError ? (
-        <ErrorCard
-          onRetry={() => {
+      <View onLayout={measureHeroPane}>
+        {heroLoading ? (
+          <View style={styles.heroSkeleton}>
+            <Skeleton width="55%" height={14} />
+            <Skeleton width="70%" height={46} />
+          </View>
+        ) : heroError ? (
+          <ErrorCard onRetry={() => {
             void refazerPeriodo();
             void forecast.refetch();
-          }}
-        />
-      ) : (
-        <HeroPanel
-          surface="live"
-          label={descricao?.label ?? 'Saldo projetado'}
-          value={
-            <CountUpMoney cents={descricao?.cents ?? 0} variant="heroMoney" tone={cicloRuim ? 'onHeroDanger' : 'onHero'} />
-          }
-          footer={
-            descricao?.rodape ? (
+          }} />
+        ) : (
+          <HeroPanel
+            surface="live"
+            label={descricao?.label ?? 'Saldo projetado'}
+            value={<CountUpMoney cents={descricao?.cents ?? 0} variant="heroMoney" tone={cicloRuim ? 'onHeroDanger' : 'onHero'} />}
+            footer={descricao?.rodape ? (
               <View style={styles.heroRodape}>
-                <ThemedText type="footnote" themeColor="onHeroMuted">
-                  {descricao.rodape.label}
-                </ThemedText>
+                <ThemedText type="footnote" themeColor="onHeroMuted">{descricao.rodape.label}</ThemedText>
                 <Money cents={descricao.rodape.cents} variant="footnote" tone="onHero" concealable />
               </View>
-            ) : undefined
-          }
-          secondary={
-            variacaoSaida !== null
-              ? {
-                  icon: variacaoSaida > 0 ? 'arrow.up.right' : 'arrow.down.right',
-                  negative: variacaoSaida > 0,
-                  text: `${variacaoSaida > 0 ? '+' : ''}${variacaoSaida}% de gastos vs ${monthLabel(previousMonth)}`,
-                }
-              : undefined
-          }
-          chart={
-            // Em mês passado a curva não aparece: projeção de um período fechado é ficção.
-            isCurrent && series.length > 1 ? (
+            ) : undefined}
+            secondary={variacaoSaida !== null ? {
+              icon: variacaoSaida > 0 ? 'arrow.up.right' : 'arrow.down.right',
+              negative: variacaoSaida > 0,
+              text: `${variacaoSaida > 0 ? '+' : ''}${variacaoSaida}% de gastos vs ${monthLabel(previousMonth)}`,
+            } : undefined}
+            chart={isCurrent && series.length > 1 && chartWidth > 0 ? (
               <ScrubChart
                 values={series}
                 labels={rotulos}
@@ -361,23 +339,24 @@ export default function FinanceScreen() {
                   </>
                 }
               />
-            ) : undefined
-          }
-          concealable
-          onPress={() =>
-            showItemActions('Mais opções', [
+            ) : undefined}
+            concealable
+            onPress={() => showItemActions('Mais opções', [
               { label: 'Ver o que fecha o ciclo', icon: 'list.bullet', onPress: () => abrirCiclo('tudo') },
               { label: 'O que entra', icon: 'arrow.down.circle', onPress: () => abrirCiclo('entra') },
               { label: 'O que sai', icon: 'arrow.up.circle', onPress: () => abrirCiclo('sai') },
               { label: 'Projeção', icon: 'chart.line.uptrend.xyaxis', onPress: () => router.push('/finance/forecast') },
               { label: 'Patrimônio', icon: 'building.columns', onPress: () => router.push('/finance/net-worth') },
               { label: 'Metas', icon: 'target', onPress: () => router.push('/finance/goals') },
-            ])
-          }
-        />
-      )}
+            ])}
+          />
+        )}
+      </View>
+    </>
+  );
 
-      {/* Entra | Sai somam o MESMO número do herói — leem a mesma série. */}
+  const actionsBlock = (
+    <>
       <TileRow>
         <Tile
           valorGrande
@@ -398,7 +377,6 @@ export default function FinanceScreen() {
           onPress={() => abrirCiclo('sai')}
         />
       </TileRow>
-
       {cards.isError ? (
         <ErrorCard onRetry={cards.refetch} />
       ) : (cards.data ?? []).length > 0 ? (
@@ -408,15 +386,12 @@ export default function FinanceScreen() {
             count={cards.data!.length}
             action={{ label: 'Ver todos', accessibilityLabel: 'Ver todos os cartões', onPress: () => router.push('/finance/cards') }}
           />
-          {/* A fatura do cartão da frente abre pelo "fecha ›" da face; tocar no corpo abre a Carteira. */}
           <CardStack cards={cartoesDaCarteira} onOpen={abrirFatura} />
         </View>
       ) : null}
-
       <View style={styles.bloco}>
         <BlockHeader title="Atalhos" />
         <TileGrid>
-          {/* Sem contagem em Lançamentos: `summary` conta categorias, não lançamentos (§8). */}
           <Tile
             layout="half"
             icon="list.bullet"
@@ -436,40 +411,33 @@ export default function FinanceScreen() {
             layout="half"
             icon="wallet.pass"
             label="Contas"
-            value={
-              accounts.data ? (
-                <ThemedText type="headline">
-                  {`${accounts.data.length} ${accounts.data.length === 1 ? 'conta' : 'contas'}`}
-                </ThemedText>
-              ) : undefined
-            }
+            value={accounts.data ? (
+              <ThemedText type="headline">
+                {`${accounts.data.length} ${accounts.data.length === 1 ? 'conta' : 'contas'}`}
+              </ThemedText>
+            ) : undefined}
             onPress={() => router.push('/finance/accounts')}
           />
           <Tile
             layout="half"
             icon="chart.pie"
             label="Orçamentos"
-            value={
-              budgets.data ? (
-                <ThemedText type="headline">
-                  {`${budgets.data.length} ${budgets.data.length === 1 ? 'limite' : 'limites'}`}
-                </ThemedText>
-              ) : undefined
-            }
-            visual={
-              apertados.length > 0 ? (
-                <RingGauge
-                  value={maisApertado}
-                  size={28}
-                  stroke={4}
-                  tone={apertados.some((o) => o.estourou) ? 'danger' : 'warning'}
-                  accessibilityLabel={`Orçamento mais apertado em ${Math.round(maisApertado * 100)}%`}
-                />
-              ) : undefined
-            }
+            value={budgets.data ? (
+              <ThemedText type="headline">
+                {`${budgets.data.length} ${budgets.data.length === 1 ? 'limite' : 'limites'}`}
+              </ThemedText>
+            ) : undefined}
+            visual={apertados.length > 0 ? (
+              <RingGauge
+                value={maisApertado}
+                size={28}
+                stroke={4}
+                tone={apertados.some((o) => o.estourou) ? 'danger' : 'warning'}
+                accessibilityLabel={`Orçamento mais apertado em ${Math.round(maisApertado * 100)}%`}
+              />
+            ) : undefined}
             onPress={() => router.push('/finance/budgets')}
           />
-          {/* Dívida só existe no mosaico quando existe — e o número é o que falta pagar. */}
           {debts.data?.length ? (
             <Tile
               layout="half"
@@ -488,7 +456,6 @@ export default function FinanceScreen() {
           />
         </TileGrid>
       </View>
-
       {budgets.isError ? (
         <ErrorCard onRetry={budgets.refetch} />
       ) : apertados.length > 0 ? (
@@ -497,7 +464,11 @@ export default function FinanceScreen() {
           <BudgetRings itens={apertados} onPress={() => router.push('/finance/budgets')} />
         </View>
       ) : null}
+    </>
+  );
 
+  const ledgerBlock = (
+    <>
       {recent.isError ? (
         <ErrorCard onRetry={recent.refetch} />
       ) : recent.isLoading ? (
@@ -547,7 +518,11 @@ export default function FinanceScreen() {
           </Section>
         </View>
       ) : null}
+    </>
+  );
 
+  const breakdownBlock = (
+    <>
       {/* Por DATA DA COMPRA (o herói é por data do pagamento): a pílula diz a lente. */}
       {summary.isError ? null : itensDaRosca.length > 0 ? (
         <View style={styles.bloco}>
@@ -577,6 +552,44 @@ export default function FinanceScreen() {
           hint={'Manda “gastei 45 no mercado” no WhatsApp —\nou toca no + para lançar aqui'}
         />
       ) : null}
+    </>
+  );
+
+  return (
+    <Screen
+      floatingAction
+      stagger
+      wide={tablet}
+      grouped
+      topBar={<AppHeader title="Financeiro" />}
+      overlay={<ExtendedFab label="Lançar" icon="plus" onPress={lancar} />}
+      onRefresh={() =>
+        Promise.all([
+          refazerPeriodo(),
+          forecast.refetch(),
+          budgets.refetch(),
+          accounts.refetch(),
+          cards.refetch(),
+          recent.refetch(),
+          cashflow.refetch(),
+          atividade.refetch(),
+        ])
+      }>
+      {tablet ? (
+        <FinanceTabletCanvas
+          cycle={cycleBlock}
+          actions={actionsBlock}
+          ledger={ledgerBlock}
+          breakdown={breakdownBlock}
+        />
+      ) : (
+        [
+          <Fragment key="cycle">{cycleBlock}</Fragment>,
+          <Fragment key="actions">{actionsBlock}</Fragment>,
+          <Fragment key="ledger">{ledgerBlock}</Fragment>,
+          <Fragment key="breakdown">{breakdownBlock}</Fragment>,
+        ]
+      )}
     </Screen>
   );
 }

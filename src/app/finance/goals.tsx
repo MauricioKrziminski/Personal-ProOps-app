@@ -11,6 +11,7 @@ import { TaskHeader } from '@/components/ui/task-header';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { EmptyState } from '@/components/ui/empty-state';
+import { AdaptivePanes } from '@/components/ui/adaptive-panes';
 import { Field, MoneyField, TextField } from '@/components/ui/field';
 import { DatePickerField } from '@/components/finance/date-picker-field';
 import { Icon } from '@/components/ui/icon';
@@ -32,6 +33,7 @@ import {
 } from '@/hooks/use-finance';
 import { brToISO, formatBRL, isValidBRDate, isoToBR, localISODate } from '@/lib/dates';
 import { confirmDestructive, showItemActions } from '@/lib/item-actions';
+import { useAdaptiveWindow } from '@/hooks/use-adaptive-window';
 
 /**
  * Metas — "quanto falta, e em quanto tempo eu chego?".
@@ -87,6 +89,8 @@ function ErrorBand({ message, onRetry }: { message: string; onRetry: () => void 
 export default function GoalsScreen() {
   // Dinheiro no meio de frase obedece ao "esconder saldo" — `Money` não cabe em texto corrido.
   const brl = useBRL();
+  const { windowClass } = useAdaptiveWindow();
+  const tablet = windowClass !== 'compact';
   const toast = useToast();
   const goals = useGoals();
   const save = useSaveGoal();
@@ -305,27 +309,17 @@ export default function GoalsScreen() {
     return [...grupos.entries()];
   };
 
-  return (
-    <Screen grouped onRefresh={() => Promise.all([goals.refetch(), extrato?.id ? contribuicoes.refetch() : Promise.resolve()])}>
-      <Stack.Screen
-        options={{
-          title: 'Metas',
-          headerLargeTitle: true,
-        }}
-      />
+  const loading = goals.isLoading ? (
+    <>
+      <Skeleton height={120} radius={Radius.lg} />
+      <SkeletonRow />
+      <SkeletonRow />
+      <SkeletonRow />
+    </>
+  ) : null;
 
-      <HeaderActions actions={[{ label: 'Nova meta', icon: 'plus', onPress: abrirNova }]} />
-
-      {goals.isLoading ? (
-        <>
-          <Skeleton height={120} radius={Radius.lg} />
-          <SkeletonRow />
-          <SkeletonRow />
-          <SkeletonRow />
-        </>
-      ) : null}
-
-      {/* O único destaque da tela: é o número que o usuário guarda na cabeça. */}
+  const goalSummary = (
+    <View style={styles.paneBody}>
       {goals.isError ? (
         <ErrorBand message="Não deu para carregar suas metas." onRetry={goals.refetch} />
       ) : lista.length > 0 ? (
@@ -348,9 +342,12 @@ export default function GoalsScreen() {
           </Card>
         </Animated.View>
       ) : null}
+    </View>
+  );
 
+  const goalListContent = (
+    <View style={styles.paneBody}>
       {abertas.map(cartaoMeta)}
-
       {concluidas.length > 0 ? (
         <View style={styles.secao}>
           <Pressable
@@ -372,7 +369,6 @@ export default function GoalsScreen() {
           {concluidasAbertas ? concluidas.map(cartaoMeta) : null}
         </View>
       ) : null}
-
       {!goals.isLoading && !goals.isError && lista.length === 0 ? (
         <EmptyState
           icon="target"
@@ -381,6 +377,46 @@ export default function GoalsScreen() {
           action={{ label: 'Nova meta', onPress: abrirNova }}
         />
       ) : null}
+    </View>
+  );
+
+  const goalList = (
+    <View style={styles.paneBody}>
+      {loading}
+      {goalListContent}
+    </View>
+  );
+
+  const compactBody = (
+    <>
+      {loading}
+      {goalSummary}
+      {goalListContent}
+    </>
+  );
+
+  const tabletBody = (
+    <AdaptivePanes
+      main={goalList}
+      support={goals.isError || lista.length > 0 ? goalSummary : undefined}
+      singlePane="main-only"
+      singlePaneContent={compactBody}
+      testID="goals-tablet-workspace"
+    />
+  );
+
+  return (
+    <Screen grouped wide={tablet} onRefresh={() => Promise.all([goals.refetch(), extrato?.id ? contribuicoes.refetch() : Promise.resolve()])}>
+      <Stack.Screen
+        options={{
+          title: 'Metas',
+          headerLargeTitle: !tablet,
+        }}
+      />
+
+      <HeaderActions actions={[{ label: 'Nova meta', icon: 'plus', onPress: abrirNova }]} />
+
+      {tablet ? tabletBody : compactBody}
 
       {/* Aportar — detent pequeno: um valor, uma nota, dois botões de intenção. */}
       <Sheet visible={aporte !== null} onClose={() => setAporte(null)}>
@@ -555,6 +591,10 @@ export default function GoalsScreen() {
 }
 
 const styles = StyleSheet.create({
+  paneBody: {
+    gap: Space.xl,
+    minWidth: 0,
+  },
   hero: {
     gap: Space.sm,
   },

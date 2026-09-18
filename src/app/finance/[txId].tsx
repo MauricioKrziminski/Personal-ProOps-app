@@ -12,6 +12,7 @@ import { Button } from '@/components/ui/button';
 import { EmptyState } from '@/components/ui/empty-state';
 import { Money } from '@/components/ui/money';
 import { Row, Section } from '@/components/ui/row';
+import { AdaptivePanes } from '@/components/ui/adaptive-panes';
 import { HeaderActions } from '@/components/ui/header-actions';
 import { describeRRule } from '@/lib/rrule-text';
 import { Screen } from '@/components/ui/screen';
@@ -36,6 +37,7 @@ import { useTelaPronta } from '@/hooks/use-tela-pronta';
 import { formatBRL, formatDateBR, localISODate } from '@/hooks/use-items';
 import { confirmDestructive } from '@/lib/item-actions';
 import { dueLabel, settleDone, settleHint, settleLabel } from '@/lib/settle-labels';
+import { useAdaptiveWindow } from '@/hooks/use-adaptive-window';
 
 /**
  * Lançamento (detalhe) — a tela que faltava.
@@ -78,6 +80,8 @@ function longDate(iso: string): string {
 export default function TransactionDetailScreen() {
   // Dinheiro no meio de frase obedece ao "esconder saldo" — `Money` não cabe em texto corrido.
   const brl = useBRL();
+  const { windowClass } = useAdaptiveWindow();
+  const tablet = windowClass !== 'compact';
   const toast = useToast();
   const params = useLocalSearchParams<{ txId: string; month?: string }>();
   const txId = params.txId;
@@ -211,8 +215,8 @@ export default function TransactionDetailScreen() {
 
   if (!pronta) {
     return (
-      <Screen grouped onRefresh={refresh}>
-        <Stack.Screen options={{ title: 'Lançamento' }} />
+      <Screen grouped wide={tablet} onRefresh={refresh}>
+        <Stack.Screen options={{ title: 'Lançamento', headerLargeTitle: !tablet }} />
         <View style={styles.heroSkeleton}>
           <Skeleton width="45%" height={14} />
           <Skeleton width="70%" height={46} />
@@ -226,8 +230,8 @@ export default function TransactionDetailScreen() {
 
   if (list.isError) {
     return (
-      <Screen grouped onRefresh={refresh}>
-        <Stack.Screen options={{ title: 'Lançamento' }} />
+      <Screen grouped wide={tablet} onRefresh={refresh}>
+        <Stack.Screen options={{ title: 'Lançamento', headerLargeTitle: !tablet }} />
         <ErrorCard onRetry={list.refetch} />
       </Screen>
     );
@@ -235,8 +239,8 @@ export default function TransactionDetailScreen() {
 
   if (!tx) {
     return (
-      <Screen grouped onRefresh={refresh}>
-        <Stack.Screen options={{ title: 'Lançamento' }} />
+      <Screen grouped wide={tablet} onRefresh={refresh}>
+        <Stack.Screen options={{ title: 'Lançamento', headerLargeTitle: !tablet }} />
         <EmptyState
           icon="questionmark.folder"
           title="Esse lançamento não existe mais"
@@ -251,9 +255,164 @@ export default function TransactionDetailScreen() {
   const created = tx.created_at.slice(0, 10);
   const signedAmount = tx.kind === 'expense' ? -tx.amount_cents : tx.amount_cents;
 
+  const mainContent = (
+    <>
+      {/* O único destaque: é o que a pessoa veio conferir em três segundos. */}
+      <Animated.View entering={FadeInDown.duration(Motion.duration.slow)}>
+        <Card style={styles.hero}>
+          <HeroLabel accessibilityLabel={`${KIND_LABEL[tx.kind]} de ${formatBRL(tx.amount_cents)}`}>
+            {KIND_LABEL[tx.kind]}
+          </HeroLabel>
+          <Money
+            cents={signedAmount}
+            variant="money"
+            tone={tx.kind === 'income' ? 'success' : tx.kind === 'transfer' ? 'textSecondary' : 'text'}
+            signed={tx.kind !== 'transfer'}
+          />
+          <ThemedText type="small" themeColor="textSecondary" style={tabular}>
+            {[longDate(tx.occurred_at), tx.category, accountLabel].filter(Boolean).join(' · ')}
+          </ThemedText>
+        </Card>
+      </Animated.View>
+
+      {/* Previsto: a única faixa de status. `cleared` não precisa de rótulo. */}
+      {tx.status === 'pending' ? (
+        <Section title="Ainda não aconteceu">
+          <Row
+            title={dueLabel(tx.kind, tx.due_at ? formatDateBR(tx.due_at) : null, {
+              onCard: tx.invoice_id !== null,
+            })}
+            subtitle={settleHint(tx.kind, { onCard: tx.invoice_id !== null })}
+            icon="clock"
+            trailing={
+              <Button
+                label={settleLabel(tx.kind)}
+                size="sm"
+                variant="secondary"
+                loading={markPaid.isPending}
+                onPress={() =>
+                  markPaid.mutate(
+                    { id: tx.id, paidAt: localISODate() },
+                    {
+                      // A baixa move `occurred_at` para hoje: se o lançamento era de outro mês,
+                      // ficar aqui mostraria "esse lançamento não existe mais" logo após dar certo.
+                      onSuccess: () => {
+                        router.back();
+                        toast({ message: `${tx.description}: ${settleDone(tx.kind)}.`, tone: 'success' });
+                      },
+                      onError: () =>
+                        toast({ message: 'Não deu para dar baixa. Tenta de novo.', tone: 'error' }),
+                    }
+                  )
+                }
+              />
+            }
+          />
+        </Section>
+      ) : null}
+    </>
+  );
+
+  const supportContent = (
+    <>
+      <Section title="Como isso entrou">
+        <Row title={SOURCE_LABEL[tx.source]} subtitle="Origem" icon={SOURCE_ICON[tx.source]} />
+        {tx.merchant ? <Row title={tx.merchant} subtitle="Estabelecimento" icon="storefront" /> : null}
+        {created !== tx.occurred_at ? (
+          <Row title={formatDateBR(created)} subtitle="Registrado em" icon="calendar" />
+        ) : null}
+      </Section>
+
+      {(tx.invoice_id || tx.installment_plan_id || tx.recurring_id) && (
+        <Section title="Faz parte de">
+          {tx.invoice_id ? (
+            <Row
+              title={
+                invoice.data
+                  ? `Fatura de ${monthTitle(invoice.data.invoice.reference_month.slice(0, 7))}`
+                  : 'Fatura do cartão'
+              }
+              subtitle={
+                invoice.data ? `vence ${formatDateBR(invoice.data.invoice.due_date)}` : 'Ver fatura'
+              }
+              icon="creditcard"
+              accessibilityLabel="Ver a fatura em que essa compra caiu"
+              onPress={() =>
+                router.push({ pathname: '/finance/invoice/[id]', params: { id: tx.invoice_id! } })
+              }
+            />
+          ) : null}
+          {tx.recurring_id ? (
+            <Row
+              title={serie ? `Repete ${describeRRule(serie.rrule)}` : 'Faz parte de uma recorrência'}
+              subtitle={
+                serie
+                  ? `${brl(serie.amount_cents)} por vez · editar a série`
+                  : 'Editar a série que gera este lançamento'
+              }
+              icon="repeat"
+              accessibilityLabel="Editar a série recorrente que gerou este lançamento"
+              onPress={() =>
+                router.push({ pathname: '/finance/recurring', params: { edit: tx.recurring_id! } })
+              }
+            />
+          ) : null}
+          {tx.installment_plan_id ? (
+            <Row
+              title={
+                tx.installment_no && plano
+                  ? `Parcela ${tx.installment_no} de ${plano.installments}`
+                  : tx.installment_no
+                    ? `Parcela ${tx.installment_no}`
+                    : 'Compra parcelada'
+              }
+              subtitle={
+                plano
+                  ? `${brl(plano.total_cents)} no total · ver todas as parcelas`
+                  : 'Ver todas as parcelas'
+              }
+              icon="rectangle.split.3x1"
+              accessibilityLabel="Ver a compra parcelada inteira"
+              onPress={() => router.push('/finance/installments')}
+            />
+          ) : null}
+        </Section>
+      )}
+
+      {/* Comprovante: honesto sobre o que ainda não existe, em vez de um botão que não faz nada. */}
+      <Section title="Comprovante">
+        <Row
+          title="Nenhum comprovante guardado"
+          subtitle="Anexo ainda não é salvo pelo app nem pelo WhatsApp"
+          icon="paperclip"
+        />
+      </Section>
+    </>
+  );
+
+  const compactBody = (
+    <>
+      {mainContent}
+      {supportContent}
+    </>
+  );
+
+  const tabletBody = (
+    <AdaptivePanes
+      main={<View style={styles.paneBody}>{mainContent}</View>}
+      support={<View style={styles.paneBody}>{supportContent}</View>}
+      singlePane="main-only"
+      singlePaneContent={compactBody}
+      testID="transaction-detail-tablet-workspace"
+    />
+  );
+
   return (
-    <Screen grouped onRefresh={refresh}>
-      <Stack.Screen options={{ title }} />
+    <Screen
+      grouped
+      wide={tablet}
+      onRefresh={refresh}>
+      <Stack.Screen options={{ title, headerLargeTitle: !tablet }} />
 
       {/*
         UM componente desenha o header inteiro — botão e menu juntos.
@@ -335,139 +494,7 @@ export default function TransactionDetailScreen() {
         }}
       />
 
-      {/* O único destaque: é o que a pessoa veio conferir em três segundos. */}
-      <Animated.View entering={FadeInDown.duration(Motion.duration.slow)}>
-        <Card style={styles.hero}>
-          <HeroLabel accessibilityLabel={`${KIND_LABEL[tx.kind]} de ${formatBRL(tx.amount_cents)}`}>
-            {KIND_LABEL[tx.kind]}
-          </HeroLabel>
-          <Money
-            cents={signedAmount}
-            variant="money"
-            tone={tx.kind === 'income' ? 'success' : tx.kind === 'transfer' ? 'textSecondary' : 'text'}
-            signed={tx.kind !== 'transfer'}
-          />
-          <ThemedText type="small" themeColor="textSecondary" style={tabular}>
-            {[longDate(tx.occurred_at), tx.category, accountLabel].filter(Boolean).join(' · ')}
-          </ThemedText>
-        </Card>
-      </Animated.View>
-
-      {/* Previsto: a única faixa de status. `cleared` não precisa de rótulo. */}
-      {tx.status === 'pending' ? (
-        <Section title="Ainda não aconteceu">
-          <Row
-            title={dueLabel(tx.kind, tx.due_at ? formatDateBR(tx.due_at) : null, {
-              onCard: tx.invoice_id !== null,
-            })}
-            subtitle={settleHint(tx.kind, { onCard: tx.invoice_id !== null })}
-            icon="clock"
-            trailing={
-              <Button
-                label={settleLabel(tx.kind)}
-                size="sm"
-                variant="secondary"
-                loading={markPaid.isPending}
-                onPress={() =>
-                  markPaid.mutate(
-                    { id: tx.id, paidAt: localISODate() },
-                    {
-                      // A baixa move `occurred_at` para hoje: se o lançamento era de outro mês,
-                      // ficar aqui mostraria "esse lançamento não existe mais" logo após dar certo.
-                      onSuccess: () => {
-                        router.back();
-                        toast({ message: `${tx.description}: ${settleDone(tx.kind)}.`, tone: 'success' });
-                      },
-                      onError: () =>
-                        toast({ message: 'Não deu para dar baixa. Tenta de novo.', tone: 'error' }),
-                    }
-                  )
-                }
-              />
-            }
-          />
-        </Section>
-      ) : null}
-
-      <Section title="Como isso entrou">
-        <Row title={SOURCE_LABEL[tx.source]} subtitle="Origem" icon={SOURCE_ICON[tx.source]} />
-        {tx.merchant ? <Row title={tx.merchant} subtitle="Estabelecimento" icon="storefront" /> : null}
-        {created !== tx.occurred_at ? (
-          <Row title={formatDateBR(created)} subtitle="Registrado em" icon="calendar" />
-        ) : null}
-      </Section>
-
-      {(tx.invoice_id || tx.installment_plan_id || tx.recurring_id) && (
-        <Section title="Faz parte de">
-          {tx.invoice_id ? (
-            <Row
-              title={
-                invoice.data
-                  ? `Fatura de ${monthTitle(invoice.data.invoice.reference_month.slice(0, 7))}`
-                  : 'Fatura do cartão'
-              }
-              subtitle={
-                invoice.data ? `vence ${formatDateBR(invoice.data.invoice.due_date)}` : 'Ver fatura'
-              }
-              icon="creditcard"
-              accessibilityLabel="Ver a fatura em que essa compra caiu"
-              onPress={() =>
-                router.push({ pathname: '/finance/invoice/[id]', params: { id: tx.invoice_id! } })
-              }
-            />
-          ) : null}
-          {/*
-            A REGRA da série (o dia do mês, a frequência, quando acaba) só existia em
-            Recorrentes. O DAS é uma ocorrência de série no cartão: pelo lançamento dava
-            para mudar o valor daquele mês, mas não o que gera os próximos — era o
-            "tenho que ir até onde ele de fato foi criado" de 09/09/2026. São 25 das
-            pendências de cartão.
-          */}
-          {tx.recurring_id ? (
-            <Row
-              title={serie ? `Repete ${describeRRule(serie.rrule)}` : 'Faz parte de uma recorrência'}
-              subtitle={
-                serie
-                  ? `${brl(serie.amount_cents)} por vez · editar a série`
-                  : 'Editar a série que gera este lançamento'
-              }
-              icon="repeat"
-              accessibilityLabel="Editar a série recorrente que gerou este lançamento"
-              onPress={() =>
-                router.push({ pathname: '/finance/recurring', params: { edit: tx.recurring_id! } })
-              }
-            />
-          ) : null}
-          {tx.installment_plan_id ? (
-            <Row
-              title={
-                tx.installment_no && plano
-                  ? `Parcela ${tx.installment_no} de ${plano.installments}`
-                  : tx.installment_no
-                    ? `Parcela ${tx.installment_no}`
-                    : 'Compra parcelada'
-              }
-              subtitle={
-                plano
-                  ? `${brl(plano.total_cents)} no total · ver todas as parcelas`
-                  : 'Ver todas as parcelas'
-              }
-              icon="rectangle.split.3x1"
-              accessibilityLabel="Ver a compra parcelada inteira"
-              onPress={() => router.push('/finance/installments')}
-            />
-          ) : null}
-        </Section>
-      )}
-
-      {/* Comprovante: honesto sobre o que ainda não existe, em vez de um botão que não faz nada. */}
-      <Section title="Comprovante">
-        <Row
-          title="Nenhum comprovante guardado"
-          subtitle="Anexo ainda não é salvo pelo app nem pelo WhatsApp"
-          icon="paperclip"
-        />
-      </Section>
+      {tablet ? tabletBody : compactBody}
     </Screen>
   );
 }
@@ -478,5 +505,9 @@ const styles = StyleSheet.create({
   },
   heroSkeleton: {
     gap: Space.md,
+  },
+  paneBody: {
+    gap: Space.lg,
+    minWidth: 0,
   },
 });

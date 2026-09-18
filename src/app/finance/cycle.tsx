@@ -4,6 +4,7 @@ import { StyleSheet, View } from 'react-native';
 
 import { useBRL } from '@/components/ui/conceal';
 import { ErrorCard } from '@/components/error-card';
+import { FinanceAnalysisPanes } from '@/components/finance/finance-analysis-panes';
 import { monthTitle } from '@/components/finance/month-picker';
 import { ThemedText } from '@/components/themed-text';
 import { Card } from '@/components/ui/card';
@@ -15,6 +16,7 @@ import { Segmented } from '@/components/ui/segmented';
 import { Screen } from '@/components/ui/screen';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Radius, Space } from '@/design/tokens';
+import { useAdaptiveWindow } from '@/hooks/use-adaptive-window';
 import { type CycleLine, type CycleRow, type CycleView, useCycleLines, useCycleMonth, useCycleSeries, useInvoice } from '@/hooks/use-finance';
 import { describeCycle } from '@/lib/cycle-label';
 import { rotaDaLinha } from '@/lib/cycle-routes';
@@ -71,6 +73,8 @@ import { isoToBR, mesmoMes } from '@/lib/dates';
 export default function CycleDetailScreen() {
   // Dinheiro no meio de frase obedece ao "esconder saldo" — `Money` não cabe em texto corrido.
   const brl = useBRL();
+  const { windowClass } = useAdaptiveWindow();
+  const tablet = windowClass !== 'compact';
   const params = useLocalSearchParams<{ month?: string; view?: string; tipo?: string }>();
   const view = (params.view === 'civil' ? 'civil' : 'cycle') as CycleView;
   /*
@@ -117,6 +121,37 @@ export default function CycleDetailScreen() {
     );
   }
 
+  const fechamento = <Fechamento ciclo={ciclo} month={month} />;
+  const filtro = (
+    <Segmented
+      options={[
+        { value: 'tudo', label: 'Tudo' },
+        { value: 'entra', label: 'Entrou' },
+        { value: 'sai', label: 'Saiu' },
+      ]}
+      value={lado}
+      onChange={setLado}
+    />
+  );
+  const movimentos = grupos.length === 0 ? (
+    <EmptyState
+      title={lado === 'tudo' ? 'Nada neste ciclo' : lado === 'entra' ? 'Nada entrou' : 'Nada saiu'}
+      hint={lado === 'tudo'
+        ? 'Nenhum movimento cai neste período.'
+        : 'O filtro acima mostra o outro lado do período.'}
+    />
+  ) : grupos.map((g) => (
+    <View key={g.titulo}>
+      <SectionHead title={g.titulo} />
+      <Section>
+        {g.linhas.map((l, i) => (
+          <Linha key={`${l.origin}-${l.ref_id}-${i}`} linha={l} />
+        ))}
+      </Section>
+    </View>
+  ));
+  const compact = <>{fechamento}{filtro}{movimentos}</>;
+
   return (
     /*
       ⚠️ **`<Screen>`, não um `ScrollView` próprio.** Esta era a outra tela de conteúdo que furava
@@ -124,40 +159,10 @@ export default function CycleDetailScreen() {
       inteiro, e gap de 12 contra 24. Num app cuja queixa era "espaçamento bagunçado", a tela que
       escreve o próprio padding é a que diverge.
     */
-    <Screen>
-      <Fechamento ciclo={ciclo} month={month} />
-
-      <Segmented
-        options={[
-          { value: 'tudo', label: 'Tudo' },
-          { value: 'entra', label: 'Entrou' },
-          { value: 'sai', label: 'Saiu' },
-        ]}
-        value={lado}
-        onChange={setLado}
-      />
-
-      {grupos.length === 0 ? (
-        <EmptyState
-          title={lado === 'tudo' ? 'Nada neste ciclo' : lado === 'entra' ? 'Nada entrou' : 'Nada saiu'}
-          hint={
-            lado === 'tudo'
-              ? 'Nenhum movimento cai neste período.'
-              : 'O filtro acima mostra o outro lado do período.'
-          }
-        />
-      ) : (
-        grupos.map((g) => (
-          <View key={g.titulo}>
-            <SectionHead title={g.titulo} />
-            <Section>
-              {g.linhas.map((l, i) => (
-                <Linha key={`${l.origin}-${l.ref_id}-${i}`} linha={l} />
-              ))}
-            </Section>
-          </View>
-        ))
-      )}
+    <Screen wide={tablet}>
+      {tablet ? (
+        <FinanceAnalysisPanes primary={fechamento} support={<>{filtro}{movimentos}</>} compact={compact} />
+      ) : compact}
     </Screen>
   );
 }

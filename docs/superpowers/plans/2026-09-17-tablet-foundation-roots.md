@@ -1,5 +1,8 @@
 # Tablet Foundation and Root Screens Implementation Plan
 
+> **Revisão de 18/09/2026:** as etapas abaixo que pedem um rail Android estão superadas. Gabriel
+> determinou a `PillTabBar` inferior no Android em todas as larguras; ver a especificação atual.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Give the five main Personal ProOps destinations an Android/iPad tablet composition while preserving every phone flow and preparing reusable primitives for the remaining routes.

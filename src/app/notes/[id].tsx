@@ -30,6 +30,7 @@ import {
   useTrashNote,
 } from '@/hooks/use-notes';
 import { useScheme, useTheme } from '@/hooks/use-theme';
+import { useAdaptiveWindow } from '@/hooks/use-adaptive-window';
 import { noteInk } from '@/design/note-colors';
 import { relativeBR } from '@/lib/dates';
 import {
@@ -87,6 +88,8 @@ function actionSheet(
 }
 
 export default function NoteDetailScreen() {
+  const { windowClass } = useAdaptiveWindow();
+  const tablet = windowClass !== 'compact';
   const params = useLocalSearchParams<{ id: string; folder?: string }>();
   const theme = useTheme();
   const scheme = useScheme();
@@ -330,8 +333,8 @@ export default function NoteDetailScreen() {
 
   if (note.isError) {
     return (
-      <Screen>
-        <Stack.Screen options={{ title: 'Nota' }} />
+      <Screen wide={tablet}>
+        <Stack.Screen options={{ title: 'Nota', headerLargeTitle: !tablet }} />
         <Card>
           <View style={styles.errorCard}>
             <Icon name="exclamationmark.triangle" size="xl" color="danger" />
@@ -383,8 +386,8 @@ export default function NoteDetailScreen() {
   };
 
   return (
-    <Screen scroll={false}>
-      <Stack.Screen options={{ title: screenTitle }} />
+    <Screen scroll={false} wide={tablet}>
+      <Stack.Screen options={{ title: screenTitle, headerLargeTitle: !tablet }} />
       <HeaderActions actions={headerActions} />
 
       <KeyboardAwareScrollView

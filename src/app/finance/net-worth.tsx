@@ -3,12 +3,12 @@ import {
   ScrollView,
   StyleSheet,
   View,
-  useWindowDimensions,
 } from 'react-native';
 import Animated, { FadeInDown } from 'react-native-reanimated';
 import { Stack, router } from 'expo-router';
 
 import { monthShort } from '@/components/finance/month-picker';
+import { FinanceAnalysisPanes } from '@/components/finance/finance-analysis-panes';
 import { ThemedText } from '@/components/themed-text';
 import { HeaderActions } from '@/components/ui/header-actions';
 import { Sheet } from '@/components/ui/sheet';
@@ -25,7 +25,8 @@ import { Screen } from '@/components/ui/screen';
 import { HeroLabel } from '@/components/ui/section-head';
 import { Segmented } from '@/components/ui/segmented';
 import { Skeleton, SkeletonChart, SkeletonHero, SkeletonList, SkeletonRow } from '@/components/ui/skeleton';
-import { ProgressBar, Sparkline } from '@/components/ui/sparkline';
+import { ProgressBar } from '@/components/ui/sparkline';
+import { MeasuredSparkline } from '@/components/ui/measured-sparkline';
 import { useToast } from '@/components/ui/toast';
 import { Motion, Radius, Space, tabular } from '@/design/tokens';
 import {
@@ -39,6 +40,7 @@ import {
   type Asset,
 } from '@/hooks/use-finance';
 import { useTelaPronta } from '@/hooks/use-tela-pronta';
+import { useAdaptiveWindow } from '@/hooks/use-adaptive-window';
 import { formatBRL } from '@/hooks/use-items';
 import { formatNumberBR } from '@/lib/dates';
 import { confirmDestructive } from '@/lib/item-actions';
@@ -151,7 +153,8 @@ function ErrorBand({ message, onRetry }: { message: string; onRetry: () => void 
 
 export default function NetWorthScreen() {
   const toast = useToast();
-  const { width } = useWindowDimensions();
+  const { windowClass } = useAdaptiveWindow();
+  const tablet = windowClass !== 'compact';
   const patrimonio = useNetWorth();
   const [janela, setJanela] = useState('12');
   const serie = useNetWorthSeries(Number(janela));
@@ -285,8 +288,204 @@ export default function NetWorthScreen() {
     );
   }
 
+  const hero = patrimonio.isError ? (
+    <ErrorBand message="Não deu para calcular seu patrimônio." onRetry={patrimonio.refetch} />
+  ) : hoje && !vazioAbsoluto ? (
+    <Animated.View entering={FadeInDown.duration(Motion.duration.slow)}>
+      <Card style={styles.hero}>
+        <HeroLabel>Patrimônio líquido</HeroLabel>
+        <Money
+          cents={liquido}
+          variant="money"
+          tone={liquido < 0 ? 'danger' : 'text'}
+          signed={liquido < 0}
+        />
+        {variacao === null ? (
+          <ThemedText type="small" themeColor="textSecondary">
+            A variação aparece quando houver mais de uma foto do seu patrimônio.
+          </ThemedText>
+        ) : (
+          <View style={styles.variacao}>
+            <Icon
+              name={variacao >= 0 ? 'arrow.up.right' : 'arrow.down.right'}
+              size="sm"
+              color={variacao >= 0 ? 'success' : 'danger'}
+            />
+            <Money
+              cents={variacao}
+              variant="subhead"
+              tone={variacao >= 0 ? 'success' : 'danger'}
+              signed
+            />
+            <ThemedText type="small" themeColor="textSecondary">
+              em {mesesDeSerie} {mesesDeSerie === 1 ? 'mês' : 'meses'}
+            </ThemedText>
+          </View>
+        )}
+      </Card>
+    </Animated.View>
+  ) : null;
+
+  // A soma fica visível, inclusive parcelas zeradas; erro de refetch nunca reutiliza um total
+  // antigo como se fosse atual. O mesmo bloco troca de coluna sem refazer a conta.
+  const composition = hoje && !vazioAbsoluto && !patrimonio.isError ? (
+    <Section title="O que forma esse número">
+      {COMPONENTES.map((c) => {
+        const bruto = Number(hoje[c.key] ?? 0);
+        const cents = c.passivo ? -bruto : bruto;
+        return (
+          <Row
+            key={c.key}
+            title={c.title}
+            subtitle={c.subtitle}
+            icon={c.icon}
+            accessibilityLabel={`${c.title}, ${c.passivo ? 'menos' : 'mais'} ${formatBRL(bruto)}`}
+            trailing={
+              <Money
+                cents={cents}
+                variant="ticker"
+                tone={c.passivo && bruto > 0 ? 'danger' : 'text'}
+                signed={c.passivo && bruto > 0}
+              />
+            }
+          />
+        );
+      })}
+    </Section>
+  ) : null;
+
+  // O histórico é snapshot: sem duas fotos, explicamos a ausência da curva em vez de inventar
+  // retrospectiva. O gráfico mede a largura do card que o recebe em cada orientação.
+  const trend = serie.isError ? (
+    <ErrorBand message="Não deu para carregar a evolução." onRetry={serie.refetch} />
+  ) : pontos.length > 1 ? (
+    <Card style={styles.bloco}>
+      <ThemedText type="smallBold">Evolução</ThemedText>
+      <Segmented options={JANELAS} value={janela} onChange={setJanela} />
+      <MeasuredSparkline values={valores} height={80} showZero />
+      <View style={styles.eixo}>
+        <ThemedText type="small" themeColor="textSecondary">
+          {monthShort(pontos[0].month, atravessaAno)}
+        </ThemedText>
+        <View style={styles.eixoFim}>
+          <ThemedText type="small" themeColor="textSecondary">
+            {monthShort(pontos[pontos.length - 1].month, atravessaAno)}
+          </ThemedText>
+          <Money
+            cents={Number(pontos[pontos.length - 1].net_cents)}
+            variant="footnote"
+            tone="textSecondary"
+          />
+        </View>
+      </View>
+      <ThemedText type="small" themeColor="textSecondary">
+        A linha do zero é a de referência: abaixo dela o patrimônio é negativo.
+      </ThemedText>
+    </Card>
+  ) : !serie.isLoading ? (
+    <Card style={styles.bloco}>
+      <ThemedText type="smallBold">A curva ainda não tem história</ThemedText>
+      <ThemedText type="small" themeColor="textSecondary">
+        A foto do seu patrimônio é tirada todo dia. A curva aparece a partir do segundo mês —
+        não dá para reconstruir o valor de um bem no passado sem inventar número.
+      </ThemedText>
+    </Card>
+  ) : null;
+
+  // Os pesos são explicados na mesma escala da nota, sem expor unidade interna do algoritmo.
+  const health = saude.isError ? (
+    <ErrorBand message="Não deu para calcular sua saúde financeira." onRetry={saude.refetch} />
+  ) : saude.data ? (
+    <Section title="Saúde financeira">
+      <Row
+        title="Nota"
+        subtitle="de 0 a 100"
+        trailing={
+          <ThemedText
+            type="subtitle"
+            themeColor={
+              saude.data.score >= 70 ? 'success' : saude.data.score >= 40 ? 'warning' : 'danger'
+            }
+            style={tabular}>
+            {saude.data.score}
+          </ThemedText>
+        }
+      />
+      <View style={styles.scoreBar}>
+        <ProgressBar
+          value={saude.data.score}
+          max={100}
+          tone={
+            saude.data.score >= 70 ? 'success' : saude.data.score >= 40 ? 'warning' : 'danger'
+          }
+        />
+      </View>
+      <Row
+        title="Poupança"
+        subtitle="vale 40 pontos"
+        trailing={<ThemedText type="small" style={tabular}>{formatNumberBR(saude.data.savings_rate)}%</ThemedText>}
+      />
+      <Row
+        title="Limites respeitados"
+        subtitle="vale 25 pontos"
+        trailing={<ThemedText type="small" style={tabular}>{formatNumberBR(saude.data.budget_adherence)}%</ThemedText>}
+      />
+      <Row
+        title="Reserva"
+        subtitle="vale 20 pontos"
+        trailing={<ThemedText type="small" style={tabular}>{formatNumberBR(saude.data.months_of_reserve)} meses</ThemedText>}
+      />
+      <Row
+        title="Quanto da renda vai para dívida"
+        subtitle="vale 15 pontos"
+        trailing={<ThemedText type="small" style={tabular}>{formatNumberBR(saude.data.debt_ratio)}%</ThemedText>}
+      />
+      <Row title="Ver relatórios" icon="chart.bar" onPress={() => router.push('/finance/reports')} />
+    </Section>
+  ) : null;
+
+  const assetEvidence = (
+    <>
+      {bens.isError ? (
+        <ErrorBand message="Não deu para carregar seus bens." onRetry={bens.refetch} />
+      ) : null}
+      {ativos.length > 0 ? <Section title="Bens">{ativos.map(linhaBem)}</Section> : null}
+      {passivos.length > 0 ? <Section title="O que eu devo">{passivos.map(linhaBem)}</Section> : null}
+      <Section>
+        <Row
+          title="Dívidas"
+          subtitle="financiamentos e empréstimos entram no passivo"
+          icon="banknote"
+          onPress={() => router.push('/finance/debts')}
+        />
+      </Section>
+      {!bens.isLoading && !bens.isError && (bens.data ?? []).length === 0 ? (
+        <EmptyState
+          icon="chart.line.uptrend.xyaxis"
+          title={vazioAbsoluto ? 'Seu patrimônio começa aqui' : 'Nenhum bem cadastrado'}
+          hint={
+            vazioAbsoluto
+              ? 'Cadastre o que você tem — investimento, imóvel, carro. O dinheiro em conta e as faturas já entram sozinhos.'
+              : 'O dinheiro em conta já está contado acima. Cadastre investimento, imóvel ou carro para completar a conta.'
+          }
+          action={{ label: 'Cadastrar bem', onPress: abrirNovo }}
+        />
+      ) : null}
+    </>
+  );
+
+  const content = (
+    <>
+      {hero}
+      {composition}
+      {trend}
+      {health}
+      {assetEvidence}
+    </>
+  );
+
   return (
-    <Screen
+    <Screen wide={tablet}
       stagger
       grouped
       onRefresh={() => Promise.all([patrimonio.refetch(), serie.refetch(), saude.refetch(), bens.refetch()])}>
@@ -308,222 +507,11 @@ export default function NetWorthScreen() {
         </>
       ) : null}
 
-      {/* O único destaque da tela. */}
-      {patrimonio.isError ? (
-        <ErrorBand message="Não deu para calcular seu patrimônio." onRetry={patrimonio.refetch} />
-      ) : hoje && !vazioAbsoluto ? (
-        <Animated.View entering={FadeInDown.duration(Motion.duration.slow)}>
-          <Card style={styles.hero}>
-            <HeroLabel>Patrimônio líquido</HeroLabel>
-            <Money
-              cents={liquido}
-              variant="money"
-              tone={liquido < 0 ? 'danger' : 'text'}
-              signed={liquido < 0}
-            />
-            {variacao === null ? (
-              <ThemedText type="small" themeColor="textSecondary">
-                A variação aparece quando houver mais de uma foto do seu patrimônio.
-              </ThemedText>
-            ) : (
-              <View style={styles.variacao}>
-                <Icon
-                  name={variacao >= 0 ? 'arrow.up.right' : 'arrow.down.right'}
-                  size="sm"
-                  color={variacao >= 0 ? 'success' : 'danger'}
-                />
-                <Money
-                  cents={variacao}
-                  variant="subhead"
-                  tone={variacao >= 0 ? 'success' : 'danger'}
-                  signed
-                />
-                <ThemedText type="small" themeColor="textSecondary">
-                  em {mesesDeSerie} {mesesDeSerie === 1 ? 'mês' : 'meses'}
-                </ThemedText>
-              </View>
-            )}
-          </Card>
-        </Animated.View>
-      ) : null}
-
-      {/* A conta por trás do número: os quatro somam (passivo entra negativo) o valor do herói.
-          Linha com R$ 0,00 FICA — é ela que diz "você não cadastrou investimento nenhum", e
-          esconder uma parcela faria a soma não fechar aos olhos de quem confere. */}
-      {/* `patrimonio.isError` também some com o bloco: `data` do TanStack SOBREVIVE ao erro de
-          refetch, então offline a faixa "Não deu para calcular seu patrimônio" ficava em cima de
-          quatro linhas exibindo o patrimônio com toda a confiança. A seção que falhou já diz que
-          falhou — quem depende da MESMA query não repete o aviso nem finge que tem número. */}
-      {hoje && !vazioAbsoluto && !patrimonio.isError ? (
-        <Section title="O que forma esse número">
-          {COMPONENTES.map((c) => {
-            const bruto = Number(hoje[c.key] ?? 0);
-            const cents = c.passivo ? -bruto : bruto;
-            return (
-              <Row
-                key={c.key}
-                title={c.title}
-                subtitle={c.subtitle}
-                icon={c.icon}
-                accessibilityLabel={`${c.title}, ${c.passivo ? 'menos' : 'mais'} ${formatBRL(bruto)}`}
-                trailing={
-                  <Money
-                    cents={cents}
-                    variant="ticker"
-                    tone={c.passivo && bruto > 0 ? 'danger' : 'text'}
-                    signed={c.passivo && bruto > 0}
-                  />
-                }
-              />
-            );
-          })}
-        </Section>
-      ) : null}
-
-      {serie.isError ? (
-        <ErrorBand message="Não deu para carregar a evolução." onRetry={serie.refetch} />
-      ) : pontos.length > 1 ? (
-        <Card style={styles.bloco}>
-          <ThemedText type="smallBold">Evolução</ThemedText>
-          <Segmented options={JANELAS} value={janela} onChange={setJanela} />
-          <Sparkline values={valores} width={width - Space.lg * 4} height={80} showZero />
-          <View style={styles.eixo}>
-            <ThemedText type="small" themeColor="textSecondary">
-              {monthShort(pontos[0].month, atravessaAno)}
-            </ThemedText>
-            <View style={styles.eixoFim}>
-              <ThemedText type="small" themeColor="textSecondary">
-                {monthShort(pontos[pontos.length - 1].month, atravessaAno)}
-              </ThemedText>
-              <Money
-                cents={Number(pontos[pontos.length - 1].net_cents)}
-                variant="footnote"
-                tone="textSecondary"
-              />
-            </View>
-          </View>
-          <ThemedText type="small" themeColor="textSecondary">
-            A linha do zero é a de referência: abaixo dela o patrimônio é negativo.
-          </ThemedText>
-        </Card>
-      ) : !serie.isLoading ? (
-        /* O estado mais importante da tela: é o de TODO usuário novo. */
-        <Card style={styles.bloco}>
-          <ThemedText type="smallBold">A curva ainda não tem história</ThemedText>
-          <ThemedText type="small" themeColor="textSecondary">
-            A foto do seu patrimônio é tirada todo dia. A curva aparece a partir do segundo mês —
-            não dá para reconstruir o valor de um bem no passado sem inventar número.
-          </ThemedText>
-        </Card>
-      ) : null}
-
-      {saude.isError ? (
-        <ErrorBand message="Não deu para calcular sua saúde financeira." onRetry={saude.refetch} />
-      ) : saude.data ? (
-        <Section title="Saúde financeira">
-          <Row
-            title="Nota"
-            subtitle="de 0 a 100"
-            trailing={
-              <ThemedText
-                type="subtitle"
-                themeColor={
-                  saude.data.score >= 70 ? 'success' : saude.data.score >= 40 ? 'warning' : 'danger'
-                }
-                style={tabular}>
-                {saude.data.score}
-              </ThemedText>
-            }
-          />
-          <View style={styles.scoreBar}>
-            <ProgressBar
-              value={saude.data.score}
-              max={100}
-              tone={
-                saude.data.score >= 70 ? 'success' : saude.data.score >= 40 ? 'warning' : 'danger'
-              }
-            />
-          </View>
-          {/*
-            O peso é o que diz ao usuário O QUE MEXER primeiro — antes era um parágrafo corrido.
-            Ele fica, mas escrito em português: "peso 40 pts" é a unidade do ALGORITMO e não
-            significava nada para quem lê ("peso de quê? pts de quê?"). "vale 40 pontos" diz a
-            mesma coisa com as palavras da nota que está logo acima.
-          */}
-          <Row
-            title="Poupança"
-            subtitle="vale 40 pontos"
-            trailing={
-              <ThemedText type="small" style={tabular}>
-                {formatNumberBR(saude.data.savings_rate)}%
-              </ThemedText>
-            }
-          />
-          <Row
-            title="Limites respeitados"
-            subtitle="vale 25 pontos"
-            trailing={
-              <ThemedText type="small" style={tabular}>
-                {formatNumberBR(saude.data.budget_adherence)}%
-              </ThemedText>
-            }
-          />
-          <Row
-            title="Reserva"
-            subtitle="vale 20 pontos"
-            trailing={
-              <ThemedText type="small" style={tabular}>
-                {formatNumberBR(saude.data.months_of_reserve)} meses
-              </ThemedText>
-            }
-          />
-          <Row
-            title="Quanto da renda vai para dívida"
-            subtitle="vale 15 pontos"
-            trailing={
-              <ThemedText type="small" style={tabular}>
-                {formatNumberBR(saude.data.debt_ratio)}%
-              </ThemedText>
-            }
-          />
-          <Row
-            title="Ver relatórios"
-            icon="chart.bar"
-            onPress={() => router.push('/finance/reports')}
-          />
-        </Section>
-      ) : null}
-
-      {bens.isError ? (
-        <ErrorBand message="Não deu para carregar seus bens." onRetry={bens.refetch} />
-      ) : null}
-
-      {ativos.length > 0 ? <Section title="Bens">{ativos.map(linhaBem)}</Section> : null}
-      {passivos.length > 0 ? (
-        <Section title="O que eu devo">{passivos.map(linhaBem)}</Section>
-      ) : null}
-
-      <Section>
-        <Row
-          title="Dívidas"
-          subtitle="financiamentos e empréstimos entram no passivo"
-          icon="banknote"
-          onPress={() => router.push('/finance/debts')}
-        />
-      </Section>
-
-      {!bens.isLoading && !bens.isError && (bens.data ?? []).length === 0 ? (
-        <EmptyState
-          icon="chart.line.uptrend.xyaxis"
-          title={vazioAbsoluto ? 'Seu patrimônio começa aqui' : 'Nenhum bem cadastrado'}
-          hint={
-            vazioAbsoluto
-              ? 'Cadastre o que você tem — investimento, imóvel, carro. O dinheiro em conta e as faturas já entram sozinhos.'
-              : 'O dinheiro em conta já está contado acima. Cadastre investimento, imóvel ou carro para completar a conta.'
-          }
-          action={{ label: 'Cadastrar bem', onPress: abrirNovo }}
-        />
-      ) : null}
+      <FinanceAnalysisPanes
+        primary={<>{hero}{trend}</>}
+        support={<>{composition}{health}{assetEvidence}</>}
+        compact={content}
+      />
 
       <Sheet visible={form !== null} onClose={() => setForm(null)}>
           <TaskHeader

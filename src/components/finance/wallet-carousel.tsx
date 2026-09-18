@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import * as Haptics from 'expo-haptics';
 import { Platform, StyleSheet, View, useWindowDimensions } from 'react-native';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
@@ -16,7 +16,7 @@ import Animated, {
 
 import { CardFace } from '@/components/finance/card-face';
 import { useFlightHidden } from '@/components/motion/flight-layer';
-import { alturaDoCartao, proporcaoDoCartao } from '@/design/card-geometry';
+import { alturaDoCartao, proporcaoDoCartao, walletStageWidth } from '@/design/card-geometry';
 import {
   alvoDoDeslize,
   comElastico,
@@ -42,12 +42,13 @@ const LIMIAR_DE_FECHAR = 120;
 const VELOCIDADE_DE_FECHAR = 800;
 
 /** A geometria do carrossel numa tela — a Carteira usa a mesma conta para o resto do layout. */
-export function useGeometriaDaVitrine() {
+export function useGeometriaDaVitrine(availableWidth?: number) {
   const { width, fontScale } = useWindowDimensions();
-  const emPe = Math.round(width * LARGURA_EM_PE);
+  const largura = walletStageWidth(width, availableWidth);
+  const emPe = Math.round(largura * LARGURA_EM_PE);
   // Em pé, a altura da caixa é o LADO LONGO do cartão deitado.
   const deitado = emPe * proporcaoDoCartao(fontScale);
-  return { largura: width, emPe, deitado, passo: emPe + VAO, altura: deitado + FOLGA * 2 };
+  return { largura, emPe, deitado, passo: emPe + VAO, altura: deitado + FOLGA * 2 };
 }
 
 /**
@@ -79,6 +80,7 @@ export function useGeometriaDaVitrine() {
  * aqui pousa sem salto. A `moldura` é o lugar do cartão do centro, parada — a âncora `vitrine`.
  */
 export function WalletCarousel({
+  geometry: g,
   cards,
   indice,
   onIndice,
@@ -90,6 +92,7 @@ export function WalletCarousel({
   prenderMoldura,
   molduraPosicionada,
 }: {
+  geometry: ReturnType<typeof useGeometriaDaVitrine>;
   cards: CartaoDaVitrine[];
   /** O cartão ativo. A posição inicial sai dele só na montagem; depois quem manda é o dedo. */
   indice: number;
@@ -107,18 +110,31 @@ export function WalletCarousel({
   prenderMoldura: (v: View | null) => void;
   molduraPosicionada: () => void;
 }) {
-  const g = useGeometriaDaVitrine();
   const reduzir = useReducedMotion();
   const total = cards.length;
-  const [inicial] = useState(indice);
+  const [inicioDaVitrine] = useState(() => ({ indice, passo: g.passo }));
+  const indiceAtual = useRef(indice);
+  const passoAnterior = useRef(g.passo);
   const inicio = useSharedValue(0);
   const folga = useSharedValue(0);
   const toque = useSharedValue({ x: 0, y: 0 });
   const modo = useSharedValue<'nenhum' | 'deslize' | 'fechar' | 'fechando'>('nenhum');
 
   useEffect(() => {
-    x.set(inicial * g.passo);
-  }, [inicial, g.passo, x]);
+    x.set(inicioDaVitrine.indice * inicioDaVitrine.passo);
+  }, [inicioDaVitrine, x]);
+
+  useEffect(() => {
+    indiceAtual.current = indice;
+  }, [indice]);
+
+  // Rotação/Split View muda o passo físico, não o cartão escolhido. Reposiciona apenas nessa
+  // mudança de geometria; uma mudança normal de índice continua sendo guiada pela mola do gesto.
+  useEffect(() => {
+    if (passoAnterior.current === g.passo) return;
+    passoAnterior.current = g.passo;
+    x.set(indiceAtual.current * g.passo);
+  }, [g.passo, x]);
 
   const tique = () => Haptics.selectionAsync();
 
@@ -228,7 +244,7 @@ export function WalletCarousel({
         accessibilityValue={{ text: cards[indice]?.name ?? '' }}
         accessibilityActions={[{ name: 'increment' }, { name: 'decrement' }]}
         onAccessibilityAction={(e) => passarPara(e.nativeEvent.actionName === 'increment' ? 1 : -1)}
-        style={[styles.palco, { height: g.altura }, arrastado]}>
+        style={[styles.palco, { width: g.largura, height: g.altura }, arrastado]}>
         {cards.map((card, i) => (
           <CartaoEmPe
             key={card.account_id}
@@ -317,7 +333,7 @@ function CartaoEmPe({
 
 const styles = StyleSheet.create({
   // Sem `overflow: hidden`: os vizinhos passam das bordas da tela, e o giro, da caixa.
-  palco: { width: '100%' },
+  palco: { alignSelf: 'center' },
   cartao: { position: 'absolute', top: FOLGA },
   moldura: { position: 'absolute' },
   deitada: { position: 'absolute', transform: [{ rotate: '90deg' }] },

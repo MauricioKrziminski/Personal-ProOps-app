@@ -1,6 +1,7 @@
 import { useLocalSearchParams } from 'expo-router';
 
 import { ConversationScreen } from '@/components/agent/conversation-screen';
+import { ConversationWorkspace } from '@/components/agent/conversation-workspace';
 import { useAgentConversations } from '@/hooks/use-agent-chat';
 
 /**
@@ -17,5 +18,9 @@ export default function ConversationRoute() {
     .flatMap((p) => p.items)
     .find((c) => c.id === id)?.title;
 
-  return <ConversationScreen conversationId={id} title={titulo} />;
+  return (
+    <ConversationWorkspace selectedId={id}>
+      <ConversationScreen conversationId={id} title={titulo} />
+    </ConversationWorkspace>
+  );
 }

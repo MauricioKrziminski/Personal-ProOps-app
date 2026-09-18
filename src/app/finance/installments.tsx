@@ -18,6 +18,7 @@ import { Card } from '@/components/ui/card';
 import { EmptyState } from '@/components/ui/empty-state';
 import { Money } from '@/components/ui/money';
 import { Row, Section } from '@/components/ui/row';
+import { AdaptivePanes } from '@/components/ui/adaptive-panes';
 import { Screen } from '@/components/ui/screen';
 import { HeroLabel } from '@/components/ui/section-head';
 import { Skeleton, SkeletonRow } from '@/components/ui/skeleton';
@@ -39,6 +40,7 @@ import { useTheme } from '@/hooks/use-theme';
 import { useVoltarQuandoFechar } from '@/hooks/use-voltar-quando-fechar';
 import { nextPendingInstallment } from '@/lib/installment-progress';
 import { accountLabel } from '@/lib/accounts';
+import { useAdaptiveWindow } from '@/hooks/use-adaptive-window';
 
 /**
  * Parceladas — "o que eu já comprometi nos próximos meses, e quanto falta para acabar?".
@@ -127,6 +129,8 @@ export default function InstallmentsScreen() {
   // Dinheiro no meio de frase obedece ao "esconder saldo" — `Money` não cabe em texto corrido.
   const brl = useBRL();
   const theme = useTheme();
+  const { windowClass } = useAdaptiveWindow();
+  const tablet = windowClass !== 'compact';
   const toast = useToast();
   const plans = useInstallmentPlans();
   const removePlan = useDeleteInstallmentPlan();
@@ -484,94 +488,86 @@ export default function InstallmentsScreen() {
     );
   };
 
-  return (
-    <Screen grouped onRefresh={() => Promise.all([plans.refetch(), accounts.refetch()])}>
-      {/* Sem headerRight de propósito: parcelamento nasce da compra, não desta tela. */}
-      <Stack.Screen options={{ title: 'Parceladas', headerLargeTitle: true }} />
+  const loading = plans.isLoading ? (
+    <>
+      <Skeleton height={132} radius={Radius.lg} />
+      <Skeleton height={ALTURA_BARRA + Space.xxl} radius={Radius.md} />
+      <SkeletonRow />
+      <SkeletonRow />
+    </>
+  ) : null;
 
-      {plans.isLoading ? (
-        <>
-          <Skeleton height={132} radius={Radius.lg} />
-          <Skeleton height={ALTURA_BARRA + Space.xxl} radius={Radius.md} />
-          <SkeletonRow />
-          <SkeletonRow />
-        </>
-      ) : null}
+  const erro = plans.isError ? (
+    <Section title="Parceladas">
+      <Row
+        title="Não deu para carregar suas compras parceladas"
+        subtitle="Toque para tentar de novo"
+        icon="exclamationmark.triangle"
+        onPress={() => plans.refetch()}
+      />
+    </Section>
+  ) : null;
 
-      {plans.isError ? (
-        <Section title="Parceladas">
-          <Row
-            title="Não deu para carregar suas compras parceladas"
-            subtitle="Toque para tentar de novo"
-            icon="exclamationmark.triangle"
-            onPress={() => plans.refetch()}
-          />
-        </Section>
-      ) : null}
+  const destaque = !plans.isError && lista.length > 0 ? (
+    <Animated.View entering={FadeInDown.duration(Motion.duration.slow)}>
+      <Card style={styles.hero}>
+        <HeroLabel>Comprometido nos próximos 12 meses</HeroLabel>
+        <Money cents={comprometido} variant="money" />
+        <ThemedText type="small" themeColor="textSecondary" style={tabular}>
+          {comprometido > 0
+            ? `${brl(media)} por mês em média${ultimaParcela ? ` · última parcela em ${monthLabel(ultimaParcela)}` : ''}`
+            : 'Nada parcelado em aberto.'}
+        </ThemedText>
+      </Card>
+    </Animated.View>
+  ) : null;
 
-      {/* O único destaque da tela: é o número que muda a decisão de parcelar de novo. */}
-      {!plans.isError && lista.length > 0 ? (
-        <Animated.View entering={FadeInDown.duration(Motion.duration.slow)}>
-          <Card style={styles.hero}>
-            <HeroLabel>Comprometido nos próximos 12 meses</HeroLabel>
-            <Money cents={comprometido} variant="money" />
-            <ThemedText type="small" themeColor="textSecondary" style={tabular}>
-              {comprometido > 0
-                ? `${brl(media)} por mês em média${ultimaParcela ? ` · última parcela em ${monthLabel(ultimaParcela)}` : ''}`
-                : 'Nada parcelado em aberto.'}
+  const faixaMensal = temFaixa ? (
+    <Card style={styles.faixa}>
+      <ThemedText type="smallBold">Quanto cai por mês</ThemedText>
+      <ScrollView
+        ref={faixaRef}
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        onContentSizeChange={() =>
+          faixaRef.current?.scrollTo({
+            x: Math.max(0, (indexAtual - 1) * (LARGURA_MES + Space.sm)),
+            animated: false,
+          })
+        }
+        contentContainerStyle={styles.bars}>
+        {faixa.map((mes, index) => (
+          <Pressable
+            key={mes.month}
+            accessibilityRole="button"
+            accessibilityLabel={`${monthLabel(mes.month)}, ${formatBRL(mes.cents)} em parcelas${mes.month < mesAtual ? ', já passou' : ''}`}
+            style={styles.barSlot}
+            onPress={() =>
+              router.push({ pathname: '/finance/transactions', params: { month: mes.month } })
+            }>
+            <View style={styles.barTrack}>
+              <Bar
+                ratio={maiorDaFaixa > 0 ? mes.cents / maiorDaFaixa : 0}
+                index={index}
+                destaque={maiorEhUnico && mes.cents === maiorDaFaixa && mes.cents > 0}
+                passado={mes.month < mesAtual}
+              />
+            </View>
+            <ThemedText type="small" themeColor="textSecondary">
+              {monthShort(mes.month)}
             </ThemedText>
-          </Card>
-        </Animated.View>
-      ) : null}
+          </Pressable>
+        ))}
+      </ScrollView>
+      <ThemedText type="small" themeColor="textSecondary" style={tabular}>
+        {`Mês mais pesado: ${brl(maiorDaFaixa)}`}
+      </ThemedText>
+    </Card>
+  ) : null;
 
-      {temFaixa ? (
-        <Card style={styles.faixa}>
-          <ThemedText type="smallBold">Quanto cai por mês</ThemedText>
-          <ScrollView
-            ref={faixaRef}
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            onContentSizeChange={() =>
-              faixaRef.current?.scrollTo({
-                // Um mês de folga à esquerda para o corrente não colar na borda.
-                x: Math.max(0, (indexAtual - 1) * (LARGURA_MES + Space.sm)),
-                animated: false,
-              })
-            }
-            contentContainerStyle={styles.bars}>
-            {faixa.map((mes, index) => (
-              <Pressable
-                key={mes.month}
-                accessibilityRole="button"
-                accessibilityLabel={`${monthLabel(mes.month)}, ${formatBRL(mes.cents)} em parcelas${mes.month < mesAtual ? ', já passou' : ''}`}
-                style={styles.barSlot}
-                onPress={() =>
-                  router.push({ pathname: '/finance/transactions', params: { month: mes.month } })
-                }>
-                <View style={styles.barTrack}>
-                  <Bar
-                    ratio={maiorDaFaixa > 0 ? mes.cents / maiorDaFaixa : 0}
-                    index={index}
-                    destaque={maiorEhUnico && mes.cents === maiorDaFaixa && mes.cents > 0}
-                    passado={mes.month < mesAtual}
-                  />
-                </View>
-                <ThemedText type="small" themeColor="textSecondary">
-                  {monthShort(mes.month)}
-                </ThemedText>
-              </Pressable>
-            ))}
-          </ScrollView>
-          <ThemedText type="small" themeColor="textSecondary" style={tabular}>
-            {`Mês mais pesado: ${brl(maiorDaFaixa)}`}
-          </ThemedText>
-        </Card>
-      ) : null}
-
-      {emAndamento.length > 0 ? (
-        <Section title="Em andamento">{emAndamento.map(bloco)}</Section>
-      ) : null}
-
+  const listaParcelas = (
+    <>
+      {emAndamento.length > 0 ? <Section title="Em andamento">{emAndamento.map(bloco)}</Section> : null}
       {terminadas.length > 0 ? (
         <Section title="Terminadas">
           <Row
@@ -584,7 +580,6 @@ export default function InstallmentsScreen() {
           {verTerminadas ? terminadas.map(bloco) : null}
         </Section>
       ) : null}
-
       {!plans.isLoading && !plans.isError && lista.length === 0 ? (
         <EmptyState
           icon="creditcard"
@@ -592,6 +587,28 @@ export default function InstallmentsScreen() {
           hint={'Quando você lançar uma compra em 10x,\nela aparece aqui com quanto falta.'}
         />
       ) : null}
+    </>
+  );
+
+  const parcelList = <View style={styles.paneBody}>{loading}{erro}{listaParcelas}</View>;
+  const parcelContext = <View style={styles.paneBody}>{destaque}{faixaMensal}</View>;
+  const compactBody = <>{loading}{erro}{destaque}{faixaMensal}{listaParcelas}</>;
+  const tabletBody = (
+    <AdaptivePanes
+      main={parcelList}
+      support={destaque || faixaMensal ? parcelContext : undefined}
+      singlePane="main-only"
+      singlePaneContent={compactBody}
+      testID="installments-tablet-workspace"
+    />
+  );
+
+  return (
+    <Screen grouped wide={tablet} onRefresh={() => Promise.all([plans.refetch(), accounts.refetch()])}>
+      {/* Sem headerRight de propósito: parcelamento nasce da compra, não desta tela. */}
+      <Stack.Screen options={{ title: 'Parceladas', headerLargeTitle: !tablet }} />
+
+      {tablet ? tabletBody : compactBody}
 
       {/*
         **Reparcelar.** A ordem é a do formulário de EVENTO (`frontend.md`): o campo que NOMEIA
@@ -726,6 +743,10 @@ export default function InstallmentsScreen() {
 }
 
 const styles = StyleSheet.create({
+  paneBody: {
+    gap: Space.xl,
+    minWidth: 0,
+  },
   hero: {
     gap: Space.sm,
   },

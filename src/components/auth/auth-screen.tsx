@@ -8,6 +8,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { AuthCap } from "@/components/auth/auth-cap";
 import { useCortinaAberta } from "@/components/motion/session-curtain";
 import { ThemedView } from "@/components/themed-view";
+import { classifyWindow } from "@/design/adaptive-window";
 import { Motion, Space } from "@/design/tokens";
 import { alturaDaCapa } from "@/design/wave-math";
 
@@ -45,6 +46,9 @@ import { alturaDaCapa } from "@/design/wave-math";
  * tela de conta (abertura sem sessão, saída), e desmonta por cima dela sem salto. O conteúdo
  * começa abaixo do ponto mais baixo da curva, e o rodapé encosta na base (`marginTop: 'auto'`)
  * quando sobra tela — com teclado, a lista rola como antes.
+ * No tablet, os campos já têm largura limitada; o rodapé deixa de ser ancorado no extremo da
+ * tela e acompanha o formulário no mesmo eixo central. Assim, a ação não se separa da senha
+ * por centenas de pontos em paisagem, sem alterar a composição compacta.
  *
  * ## A entrada
  *
@@ -64,7 +68,8 @@ export function AuthScreen({
   showBrand?: boolean;
 }) {
   const insets = useSafeAreaInsets();
-  const { height } = useWindowDimensions();
+  const { width, height } = useWindowDimensions();
+  const tablet = classifyWindow(width) !== 'compact';
   const aberta = useCortinaAberta();
   const [visto, setVisto] = useState(aberta);
   if (aberta && !visto) setVisto(true);
@@ -82,6 +87,7 @@ export function AuthScreen({
         style={styles.flex}
         contentContainerStyle={[
           styles.content,
+          tablet && styles.tabletContent,
           {
             paddingTop: showBrand
               ? alturaDaCapa(height) + Space.xl
@@ -106,8 +112,8 @@ export function AuthScreen({
         ) : null}
         {visto ? (
           <>
-            <Animated.View entering={entrada(0)}>{children}</Animated.View>
-            <Animated.View entering={entrada(1)} style={styles.footer}>
+            <Animated.View entering={entrada(0)} style={styles.form}>{children}</Animated.View>
+            <Animated.View entering={entrada(1)} style={[styles.form, styles.footer, tablet && styles.tabletFooter]}>
               {footer}
             </Animated.View>
           </>
@@ -124,5 +130,8 @@ const styles = StyleSheet.create({
     paddingHorizontal: Space.xl,
     gap: Space.xxl,
   },
+  tabletContent: { justifyContent: 'center' },
+  form: { width: '100%', maxWidth: 560, alignSelf: 'center' },
   footer: { gap: Space.sm, alignItems: "stretch", marginTop: "auto" },
+  tabletFooter: { marginTop: 0 },
 });

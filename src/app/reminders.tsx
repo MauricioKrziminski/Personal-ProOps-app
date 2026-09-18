@@ -1,14 +1,17 @@
-import { StyleSheet } from 'react-native';
+import { StyleSheet, View } from 'react-native';
 import { Stack, router } from 'expo-router';
 
 import { ErrorCard } from '@/components/error-card';
 import { ThemedText } from '@/components/themed-text';
 import { HeaderActions } from '@/components/ui/header-actions';
+import { AdaptivePanes } from '@/components/ui/adaptive-panes';
 import { EmptyState } from '@/components/ui/empty-state';
 import { Row, Section } from '@/components/ui/row';
 import { Screen } from '@/components/ui/screen';
 import { SkeletonRow } from '@/components/ui/skeleton';
 import { useToast } from '@/components/ui/toast';
+import { Space } from '@/design/tokens';
+import { useAdaptiveWindow } from '@/hooks/use-adaptive-window';
 import {
   formatDateBR,
   useDeleteReminder,
@@ -26,6 +29,8 @@ import { describeRRule } from '@/lib/rrule-text';
  * **Hoje**. Esta tela é o arquivo completo, incluindo os pausados, e vive no Stack raiz.
  */
 export default function RemindersScreen() {
+  const { windowClass } = useAdaptiveWindow();
+  const tablet = windowClass !== 'compact';
   const { data, isLoading, isError, refetch } = useReminders();
   const toggle = useToggleReminder();
   const remove = useDeleteReminder();
@@ -77,12 +82,23 @@ export default function RemindersScreen() {
     />
   );
 
+  const activeSection = active.length > 0 ? <Section title="Ativos">{active.map(line)}</Section> : null;
+  const pausedSection = paused.length > 0 ? (
+    <View style={styles.pausedPane}>
+      <Section title="Pausados">{paused.map(line)}</Section>
+      <ThemedText type="small" themeColor="textSecondary" style={styles.hint}>
+        Lembrete pausado não dispara e não gasta mensagem.
+      </ThemedText>
+    </View>
+  ) : null;
+  const list = <>{activeSection}{pausedSection}</>;
+
   return (
-    <Screen grouped onRefresh={refetch}>
+    <Screen grouped wide={tablet} onRefresh={refetch}>
       <Stack.Screen
         options={{
           title: 'Lembretes',
-          headerLargeTitle: true,
+          headerLargeTitle: !tablet,
         }}
       />
 
@@ -103,8 +119,14 @@ export default function RemindersScreen() {
         </>
       ) : null}
 
-      {active.length > 0 ? <Section title="Ativos">{active.map(line)}</Section> : null}
-      {paused.length > 0 ? <Section title="Pausados">{paused.map(line)}</Section> : null}
+      {tablet && activeSection && pausedSection ? (
+        <AdaptivePanes
+          main={activeSection}
+          support={pausedSection}
+          singlePaneContent={list}
+          testID="reminders-tablet-workspace"
+        />
+      ) : list}
 
       {!isLoading && !isError && reminders.length === 0 ? (
         <EmptyState
@@ -115,16 +137,12 @@ export default function RemindersScreen() {
         />
       ) : null}
 
-      {paused.length > 0 ? (
-        <ThemedText type="small" themeColor="textSecondary" style={styles.hint}>
-          Lembrete pausado não dispara e não gasta mensagem.
-        </ThemedText>
-      ) : null}
     </Screen>
   );
 }
 
 const styles = StyleSheet.create({
+  pausedPane: { gap: Space.lg, minWidth: 0 },
   hint: {
     textAlign: 'center',
   },

@@ -6,6 +6,7 @@ import Animated, { FadeIn } from 'react-native-reanimated';
 
 import { ThemedText } from '@/components/themed-text';
 import { AlertPreferencesSection } from '@/components/profile/alert-preferences-section';
+import { ProfileTabletCanvas } from '@/components/profile/profile-tablet-canvas';
 import { AppHeader } from '@/components/ui/app-header';
 import { EmptyState } from '@/components/ui/empty-state';
 import { Icon } from '@/components/ui/icon';
@@ -30,6 +31,7 @@ import {
   useSetCycleCloseDay,
 } from '@/hooks/use-finance';
 import { useTelaPronta } from '@/hooks/use-tela-pronta';
+import { useAdaptiveWindow } from '@/hooks/use-adaptive-window';
 import { useAppUpdate } from '@/hooks/use-app-update';
 import { formatDateBR } from '@/hooks/use-items';
 import { isoToBR } from '@/lib/dates';
@@ -51,6 +53,8 @@ const APP_UPDATE_ICON: Partial<
  * Perfil — tela de manutenção. O sucesso dela é a pessoa achar o que veio buscar e sair.
  */
 export default function ProfileScreen() {
+  const { windowClass } = useAdaptiveWindow();
+  const tablet = windowClass !== 'compact';
   const cycle = useCycle();
   const setCloseDay = useSetCycleCloseDay();
   const theme = useTheme();
@@ -232,7 +236,7 @@ export default function ProfileScreen() {
 
   if (!pronta) {
     return (
-      <Screen grouped topBar={<AppHeader title="Perfil" />}>
+      <Screen wide={tablet} grouped topBar={<AppHeader title="Perfil" />}>
         <SkeletonHero />
         <SkeletonList linhas={3} />
         <SkeletonList linhas={2} />
@@ -240,16 +244,8 @@ export default function ProfileScreen() {
     );
   }
 
-  return (
-    <Screen
-      grouped
-      topBar={<AppHeader title="Perfil" />}
-      stagger
-      onRefresh={() => {
-        setNotificationRefreshKey((current) => current + 1);
-
-        return Promise.all([profile.refetch(), plan.refetch(), ia.refetch()]);
-      }}>
+  const account = (
+    <>
       {/*
         Cartão de identidade — o topo da tela no desenho do Stitch.
 
@@ -461,6 +457,11 @@ export default function ProfileScreen() {
           </View>
         </View>
       ) : null}
+    </>
+  );
+
+  const settings = (
+    <>
 
       {/*
         Notificações tem UM lugar: depois de Conta e Plano, antes de Dados.
@@ -495,6 +496,21 @@ export default function ProfileScreen() {
       {!session ? (
         <EmptyState icon="person.crop.circle.badge.questionmark" title="Sem sessão" hint="Entre para ver seu perfil." />
       ) : null}
+    </>
+  );
+
+  return (
+    <Screen
+      wide={tablet}
+      grouped
+      topBar={<AppHeader title="Perfil" />}
+      stagger
+      onRefresh={() => {
+        setNotificationRefreshKey((current) => current + 1);
+
+        return Promise.all([profile.refetch(), plan.refetch(), ia.refetch()]);
+      }}>
+      {tablet ? <ProfileTabletCanvas account={account} settings={settings} /> : <>{account}{settings}</>}
 
       {/*
         Um campo só, no mesmo desenho de sheet que Contas, Metas e Orçamentos já usam — nada de

@@ -1,10 +1,11 @@
 import { useEffect, useRef, useState, useMemo } from 'react';
-import { Pressable, ScrollView, StyleSheet, View, useWindowDimensions } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import Animated, { FadeIn, FadeInDown } from 'react-native-reanimated';
 import { Stack, router } from 'expo-router';
 import * as Haptics from 'expo-haptics';
 
 import { useBRL } from '@/components/ui/conceal';
+import { FinanceAnalysisPanes } from '@/components/finance/finance-analysis-panes';
 import { ThemedText } from '@/components/themed-text';
 import { HeaderActions } from '@/components/ui/header-actions';
 import { Button } from '@/components/ui/button';
@@ -23,7 +24,7 @@ import { Calendar } from '@/components/finance/calendar';
 import { Sheet } from '@/components/ui/sheet';
 import { TaskHeader } from '@/components/ui/task-header';
 import { Skeleton, SkeletonChart, SkeletonList, SkeletonRow } from '@/components/ui/skeleton';
-import { Sparkline } from '@/components/ui/sparkline';
+import { MeasuredSparkline } from '@/components/ui/measured-sparkline';
 import { useToast } from '@/components/ui/toast';
 import { Motion, Radius, Space, tabular } from '@/design/tokens';
 import {
@@ -38,6 +39,7 @@ import {
   type Draft,
 } from '@/hooks/use-finance';
 import { useTelaPronta } from '@/hooks/use-tela-pronta';
+import { useAdaptiveWindow } from '@/hooks/use-adaptive-window';
 import { MonthPicker, currentMonth, monthTitle } from '@/components/finance/month-picker';
 import { mesDoCorte, veioDe, type MesProjetado } from '@/lib/forecast-months';
 import {
@@ -144,7 +146,8 @@ export default function ForecastScreen() {
   // Dinheiro no meio de frase obedece ao "esconder saldo" — `Money` não cabe em texto corrido.
   const brl = useBRL();
   const toast = useToast();
-  const { width } = useWindowDimensions();
+  const { windowClass } = useAdaptiveWindow();
+  const tablet = windowClass !== 'compact';
 
   const [dias, setDias] = useState(90);
   /**
@@ -441,8 +444,120 @@ export default function ForecastScreen() {
     );
   }
 
+  const curveDecision = forecast.isError ? (
+    <ErrorBand message="Não deu para carregar a projeção." onRetry={forecast.refetch} />
+  ) : serie.length > 0 && !nadaParaProjetar ? (
+    <Animated.View entering={FadeInDown.duration(Motion.duration.slow)}>
+      <Card style={styles.hero}>
+        <View style={styles.heroTitulo}>
+          {primeiroNegativo ? <Icon name="exclamationmark.triangle" size="md" color="danger" /> : null}
+          <ThemedText
+            type="smallBold"
+            themeColor={primeiroNegativo ? 'danger' : 'text'}
+            style={styles.heroTexto}>
+            {primeiroNegativo
+              ? `Você fica no vermelho em ${isoToBR(primeiroNegativo)}`
+              : `Não fica negativo nos próximos ${rotuloHorizonte(dias)}`}
+          </ThemedText>
+        </View>
+        <View
+          accessible
+          accessibilityLabel={`Saldo hoje ${formatBRL(hoje)}, no fim do período ${formatBRL(fim)}${primeiroNegativo ? `, negativo a partir de ${isoToBR(primeiroNegativo)}` : ''}`}>
+          <MeasuredSparkline
+            values={valores}
+            height={96}
+            showZero
+            pastCount={passado.length + 1}
+          />
+        </View>
+        <View style={styles.legenda}>
+          <ThemedText type="caption" themeColor="textSecondary">
+            {passado.length > 0 ? '━ o que já caiu na conta' : '━ saldo de hoje'}
+          </ThemedText>
+          <ThemedText type="caption" themeColor="textSecondary">
+            ┄ previsto: o real, mais o que entra e sai
+          </ThemedText>
+        </View>
+        <View style={styles.heroSplit}>
+          <View style={styles.heroParte}>
+            <HeroLabel>tenho hoje</HeroLabel>
+            <Money cents={hoje} variant="title2" tone={hoje < 0 ? 'danger' : 'text'} />
+          </View>
+          <View style={styles.heroParte}>
+            <HeroLabel>em {rotuloHorizonte(dias)}</HeroLabel>
+            <Money cents={fim} variant="title2" tone={fim < 0 ? 'danger' : 'text'} />
+          </View>
+        </View>
+        {entra > 0 || sai > 0 ? (
+          <ThemedText type="footnote" themeColor="textSecondary" style={tabular}>
+            entra {brl(entra)} · sai {brl(sai)} em {rotuloHorizonte(dias)}
+          </ThemedText>
+        ) : null}
+      </Card>
+    </Animated.View>
+  ) : null;
+
+  const scenario = !nadaParaProjetar ? (
+    <Card style={styles.simulador}>
+      <View style={styles.rascunhoTopo}>
+        <Icon name={simulando ? 'pencil.and.outline' : 'questionmark.circle'} size="md" color={simulando ? 'warning' : 'textSecondary'} />
+        <ThemedText type="smallBold" style={styles.bandText}>
+          {simulando ? 'Rascunho — nada disso está salvo' : 'E se…?'}
+        </ThemedText>
+        {simulando ? <Button label="Limpar" variant="secondary" size="sm" onPress={() => setRascunhos([])} /> : null}
+      </View>
+      {simulando ? (
+        rascunhos.map((d, i) => (
+          <View key={`${d.kind}-${d.start}-${d.amount_cents}-${i}`} style={styles.rascunhoLinha}>
+            <ThemedText type="small" themeColor="textSecondary" style={tabular}>
+              {d.kind === 'income' ? 'entra' : 'sai'} {brl(d.amount_cents)}
+              {d.mode === 'monthly' ? ' todo mês' : d.installments > 1 ? ` em ${d.installments}x` : ''}{' '}
+              · a partir de {isoToBR(d.start)}
+            </ThemedText>
+            <Button
+              label="Tirar"
+              variant="ghost"
+              size="sm"
+              onPress={() => setRascunhos((r) => r.filter((_, j) => j !== i))}
+            />
+          </View>
+        ))
+      ) : (
+        <ThemedText type="small" themeColor="textSecondary">
+          Suponha uma entrada ou uma saída — uma vez, parcelada ou todo mês — e veja os
+          meses recalculados como se você tivesse lançado de verdade.
+        </ThemedText>
+      )}
+      {simulado.isError ? (
+        <ErrorBand
+          message="Não deu para calcular o rascunho — os números acima são os reais."
+          onRetry={simulado.refetch}
+        />
+      ) : null}
+      <Button
+        label={simulando ? 'Somar outra suposição' : 'Supor um lançamento'}
+        variant={simulando ? 'secondary' : 'primary'}
+        size="sm"
+        onPress={() => {
+          setNovoTipo('income');
+          setNovoValor(0);
+          setNovoMes(currentMonth());
+          setNovoParcelas(1);
+          setNovoModo('total');
+          setSheetAberto(true);
+        }}
+      />
+      {simulando ? (
+        <ThemedText type="caption" themeColor="textSecondary">
+          Move o caixa. Não remonta fatura de cartão, orçamento nem cronograma de dívida.
+          Sair da tela apaga.
+        </ThemedText>
+      ) : null}
+    </Card>
+  ) : null;
+
   return (
-    <Screen
+    <Screen wide={tablet}
       stagger
       grouped
       onRefresh={() => Promise.all([forecast.refetch(), bills.refetch(), accounts.refetch(), historico.refetch()])}>
@@ -543,157 +658,12 @@ export default function ForecastScreen() {
         </>
       ) : null}
 
-      {/* O único destaque da tela: o título é a resposta, não o rótulo. */}
-      {forecast.isError ? (
-        <ErrorBand message="Não deu para carregar a projeção." onRetry={forecast.refetch} />
-      ) : serie.length > 0 && !nadaParaProjetar ? (
-        <Animated.View entering={FadeInDown.duration(Motion.duration.slow)}>
-          <Card style={styles.hero}>
-            <View style={styles.heroTitulo}>
-              {primeiroNegativo ? (
-                <Icon name="exclamationmark.triangle" size="md" color="danger" />
-              ) : null}
-              <ThemedText
-                type="smallBold"
-                themeColor={primeiroNegativo ? 'danger' : 'text'}
-                style={styles.heroTexto}>
-                {primeiroNegativo
-                  ? `Você fica no vermelho em ${isoToBR(primeiroNegativo)}`
-                  : `Não fica negativo nos próximos ${rotuloHorizonte(dias)}`}
-              </ThemedText>
-            </View>
-
-            {/* Skia não gera árvore de acessibilidade: sem este label a tela fica muda. */}
-            <View
-              accessible
-              accessibilityLabel={`Saldo hoje ${formatBRL(hoje)}, no fim do período ${formatBRL(fim)}${primeiroNegativo ? `, negativo a partir de ${isoToBR(primeiroNegativo)}` : ''}`}>
-              <Sparkline
-                values={valores}
-                width={width - Space.lg * 4}
-                height={96}
-                showZero
-                pastCount={passado.length + 1}
-              />
-            </View>
-
-            {/*
-              A legenda que o gráfico nunca teve. Ele desenha passado e futuro na MESMA linha
-              (o traço muda de estilo em `pastCount`), e nada dizia onde um acaba — a pedido do
-              dono do produto: *"nos gráficos, tem que ter alguma coisa explicando a diferença"*.
-            */}
-            <View style={styles.legenda}>
-              <ThemedText type="caption" themeColor="textSecondary">
-                {passado.length > 0 ? '━ o que já caiu na conta' : '━ saldo de hoje'}
-              </ThemedText>
-              <ThemedText type="caption" themeColor="textSecondary">
-                ┄ previsto: o real, mais o que entra e sai
-              </ThemedText>
-            </View>
-
-            <View style={styles.heroSplit}>
-              <View style={styles.heroParte}>
-                <HeroLabel>tenho hoje</HeroLabel>
-                <Money cents={hoje} variant="title2" tone={hoje < 0 ? 'danger' : 'text'} />
-              </View>
-              <View style={styles.heroParte}>
-                <HeroLabel>em {rotuloHorizonte(dias)}</HeroLabel>
-                <Money cents={fim} variant="title2" tone={fim < 0 ? 'danger' : 'text'} />
-              </View>
-            </View>
-
-            {/*
-              `in_cents` vinha do banco desde sempre e o arquivo inteiro não usava — a projeção
-              SOMA entradas previstas e a tela só falava de subtrair. É esta linha que explica
-              por que a curva sobe.
-            */}
-            {entra > 0 || sai > 0 ? (
-              <ThemedText type="footnote" themeColor="textSecondary" style={tabular}>
-                entra {brl(entra)} · sai {brl(sai)} em {rotuloHorizonte(dias)}
-              </ThemedText>
-            ) : null}
-          </Card>
-        </Animated.View>
-      ) : null}
-
-      {/*
-        "E se…?" — o simulador de cenário.
-        
-        Era "Posso comprar isso?", e o nome contava a limitação: a conta vivia dentro do
-        `affordability`, que SEMPRE subtrai. Perguntar "e se eu passar a receber 1.500 por mês?"
-        não tinha como. Desde `20260910170000` a aritmética é `private.draft_effect`, com
-        `kind` — e aí o nome do bloco não podia mais falar só de compra.
-        
-        Ele é o SEGUNDO bloco e sempre visível: é a pergunta mais frequente do produto.
-      */}
-      {!nadaParaProjetar ? (
-        <Card style={styles.simulador}>
-          <View style={styles.rascunhoTopo}>
-            <Icon name={simulando ? 'pencil.and.outline' : 'questionmark.circle'} size="md" color={simulando ? 'warning' : 'textSecondary'} />
-            <ThemedText type="smallBold" style={styles.bandText}>
-              {simulando ? 'Rascunho — nada disso está salvo' : 'E se…?'}
-            </ThemedText>
-            {simulando ? (
-              <Button label="Limpar" variant="secondary" size="sm" onPress={() => setRascunhos([])} />
-            ) : null}
-          </View>
-
-          {simulando ? (
-            rascunhos.map((d, i) => (
-              <View key={`${d.kind}-${d.start}-${d.amount_cents}-${i}`} style={styles.rascunhoLinha}>
-                <ThemedText type="small" themeColor="textSecondary" style={tabular}>
-                  {d.kind === 'income' ? 'entra' : 'sai'} {brl(d.amount_cents)}
-                  {d.mode === 'monthly'
-                    ? ' todo mês'
-                    : d.installments > 1
-                      ? ` em ${d.installments}x`
-                      : ''}{' '}
-                  · a partir de {isoToBR(d.start)}
-                </ThemedText>
-                <Button
-                  label="Tirar"
-                  variant="ghost"
-                  size="sm"
-                  onPress={() => setRascunhos((r) => r.filter((_, j) => j !== i))}
-                />
-              </View>
-            ))
-          ) : (
-            <ThemedText type="small" themeColor="textSecondary">
-              Suponha uma entrada ou uma saída — uma vez, parcelada ou todo mês — e veja os
-              meses recalculados como se você tivesse lançado de verdade.
-            </ThemedText>
-          )}
-
-          {/* Falhou o cálculo? DIZ. Cair calado na projeção real mostraria o número sem a
-              hipótese, com o rótulo por cima jurando que está simulando. */}
-          {simulado.isError ? (
-            <ErrorBand
-              message="Não deu para calcular o rascunho — os números acima são os reais."
-              onRetry={simulado.refetch}
-            />
-          ) : null}
-
-          <Button
-            label={simulando ? 'Somar outra suposição' : 'Supor um lançamento'}
-            variant={simulando ? 'secondary' : 'primary'}
-            size="sm"
-            onPress={() => {
-              setNovoTipo('income');
-              setNovoValor(0);
-              setNovoMes(currentMonth());
-              setNovoParcelas(1);
-              setNovoModo('total');
-              setSheetAberto(true);
-            }}
-          />
-
-          {simulando ? (
-            <ThemedText type="caption" themeColor="textSecondary">
-              Move o caixa. Não remonta fatura de cartão, orçamento nem cronograma de dívida.
-              Sair da tela apaga.
-            </ThemedText>
-          ) : null}
-        </Card>
+      {curveDecision || scenario ? (
+        <FinanceAnalysisPanes
+          primary={curveDecision}
+          support={scenario}
+          compact={<>{curveDecision}{scenario}</>}
+        />
       ) : null}
 
       {/*

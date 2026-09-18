@@ -18,9 +18,11 @@ import { Screen } from '@/components/ui/screen';
 import { HeroLabel } from '@/components/ui/section-head';
 import { Skeleton } from '@/components/ui/skeleton';
 import { ProgressBar } from '@/components/ui/sparkline';
+import { AdaptivePanes } from '@/components/ui/adaptive-panes';
 import { Motion, Radius, Space, tabular } from '@/design/tokens';
 import { useCardSummary, type CardSummary } from '@/hooks/use-finance';
 import { formatBRL, formatDateBR } from '@/hooks/use-items';
+import { useAdaptiveWindow } from '@/hooks/use-adaptive-window';
 import {
   diasAte as daysUntil,
   estadoDaFatura as estadoFatura,
@@ -128,6 +130,8 @@ function Miniatura({ card, onPress }: { card: CardSummary; onPress: () => void }
 export default function CardsScreen() {
   // Dinheiro no meio de frase obedece ao "esconder saldo" — `Money` não cabe em texto corrido.
   const brl = useBRL();
+  const { windowClass } = useAdaptiveWindow();
+  const tablet = windowClass !== 'compact';
   const cards = useCardSummary();
   const abrirNaCarteira = useAbrirNaCarteira();
 
@@ -144,6 +148,11 @@ export default function CardsScreen() {
 
   const totalAPagar = lista.reduce((s, c) => s + Number(c.unpaid_total_cents ?? 0), 0);
   const proximo = lista.find((c) => c.due_date && Number(c.unpaid_total_cents ?? 0) > 0);
+  // `unpaid_total_cents` inclui OUTRAS faturas e parcelas futuras. O painel lateral fala de
+  // UMA fatura, então só pode mostrar o saldo aberto da fatura escolhida pela RPC.
+  const contexto = lista.find(
+    (c) => c.invoice_id && c.due_date && Number(c.invoice_open_cents ?? c.invoice_total_cents ?? 0) > 0
+  );
 
   const irParaFatura = (card: CardSummary) => {
     if (!card.invoice_id) {
@@ -153,50 +162,37 @@ export default function CardsScreen() {
     router.push({ pathname: '/finance/invoice/[id]', params: { id: card.invoice_id } });
   };
 
-  return (
-    // Sem `refreshing={isRefetching}` (§6 do design): o `Screen` já segue o gesto, e a revalidação
-    // que a Carteira dispara fazia o indicador girar sozinho ao voltar para cá.
-    <Screen grouped onRefresh={() => cards.refetch()}>
-      <Stack.Screen
-        options={{
-          title: 'Cartões',
-          headerLargeTitle: true,
-        }}
-      />
+  const loading = cards.isLoading ? (
+    <>
+      <Skeleton height={120} radius={Radius.lg} />
+      <Skeleton height={160} radius={Radius.md} />
+      <Skeleton height={160} radius={Radius.md} />
+    </>
+  ) : null;
 
-      <HeaderActions
-        actions={[{ label: 'Novo cartão', icon: 'plus', onPress: () => router.push('/finance/accounts') }]}
-      />
+  const error = cards.isError ? (
+    <ErrorBand message="Não deu para carregar seus cartões." onRetry={cards.refetch} />
+  ) : null;
 
-      {cards.isLoading ? (
-        <>
-          <Skeleton height={120} radius={Radius.lg} />
-          <Skeleton height={160} radius={Radius.md} />
-          <Skeleton height={160} radius={Radius.md} />
-        </>
-      ) : null}
+  {/* O único destaque da tela: com N cartões, a pergunta da tela não tem resposta visível.
+      Com UM cartão ele repetia o mesmo número do card logo abaixo, palavra por palavra
+      (total, nome e vencimento) — soma de um item não é resumo, é eco. */}
+  const hero = !cards.isError && lista.length > 1 ? (
+    <Animated.View entering={FadeInDown.duration(Motion.duration.slow)}>
+      <Card style={styles.hero}>
+        <HeroLabel>Total a pagar</HeroLabel>
+        <Money cents={totalAPagar} variant="money" />
+        <ThemedText type="small" themeColor="textSecondary" style={tabular}>
+          {proximo?.due_date
+            ? `${proximo.name} ${prazoLabel(proximo.due_date, 'vence')} · ${formatDateBR(proximo.due_date)}`
+            : 'Nenhuma fatura em aberto'}
+        </ThemedText>
+      </Card>
+    </Animated.View>
+  ) : null;
 
-      {cards.isError ? (
-        <ErrorBand message="Não deu para carregar seus cartões." onRetry={cards.refetch} />
-      ) : null}
-
-      {/* O único destaque da tela: com N cartões, a pergunta da tela não tem resposta visível.
-          Com UM cartão ele repetia o mesmo número do card logo abaixo, palavra por palavra
-          (total, nome e vencimento) — soma de um item não é resumo, é eco. */}
-      {!cards.isError && lista.length > 1 ? (
-        <Animated.View entering={FadeInDown.duration(Motion.duration.slow)}>
-          <Card style={styles.hero}>
-            <HeroLabel>Total a pagar</HeroLabel>
-            <Money cents={totalAPagar} variant="money" />
-            <ThemedText type="small" themeColor="textSecondary" style={tabular}>
-              {proximo?.due_date
-                ? `${proximo.name} ${prazoLabel(proximo.due_date, 'vence')} · ${formatDateBR(proximo.due_date)}`
-                : 'Nenhuma fatura em aberto'}
-            </ThemedText>
-          </Card>
-        </Animated.View>
-      ) : null}
-
+  const portfolio = (
+    <>
       {lista.map((card, index) => {
         const estado = estadoFatura(card);
         const atrasadas = Number(card.overdue_count ?? 0);
@@ -337,6 +333,102 @@ export default function CardsScreen() {
           action={{ label: 'Cadastrar cartão', onPress: () => router.push('/finance/accounts') }}
         />
       ) : null}
+    </>
+  );
+
+  /**
+   * No tablet, a decisão fica ao lado da vitrine: a lista mantém cartões e ações intactos,
+   * enquanto este painel responde qual fatura merece atenção agora. O valor vem do resumo
+   * servido pelo banco; não existe total estimado ou cálculo de ciclo nesta tela.
+   */
+  const currentStatement = cards.isLoading ? (
+    <Skeleton height={196} radius={Radius.md} />
+  ) : cards.isError ? null : (
+    <Card style={styles.contextCard}>
+      <HeroLabel>Fatura em foco</HeroLabel>
+      {contexto ? (
+        <>
+          <View style={styles.contextHead}>
+            <View style={styles.contextLabels}>
+              <ThemedText type="smallBold">{contexto.name}</ThemedText>
+              <ThemedText type="footnote" themeColor={estadoFatura(contexto) === 'Atrasada' ? 'danger' : 'textSecondary'}>
+                {estadoFatura(contexto) ?? 'Sem fatura aberta'}
+              </ThemedText>
+            </View>
+            <Money
+              cents={Number(contexto.invoice_open_cents ?? contexto.invoice_total_cents ?? 0)}
+              variant="subhead"
+              tone={estadoFatura(contexto) === 'Atrasada' ? 'danger' : 'text'}
+            />
+          </View>
+          <ThemedText type="footnote" themeColor="textSecondary">
+            em aberto nesta fatura
+          </ThemedText>
+          <ThemedText type="footnote" themeColor="textSecondary" style={tabular}>
+            {contexto.closing_date && contexto.due_date
+              ? `${prazoLabel(contexto.closing_date, 'fecha')} · vence ${formatDateBR(contexto.due_date)}`
+              : 'Nenhuma compra neste ciclo'}
+          </ThemedText>
+          {contexto.invoice_id ? (
+            <Button label="Abrir fatura" variant="secondary" size="sm" onPress={() => irParaFatura(contexto)} />
+          ) : null}
+        </>
+      ) : (
+        <ThemedText type="small" themeColor="textSecondary">
+          Nenhuma fatura em aberto. Os cartões continuam disponíveis para consultar a carteira.
+        </ThemedText>
+      )}
+    </Card>
+  );
+
+  const decisionSupport = (
+    <View style={styles.paneBody}>
+      {hero}
+      {currentStatement}
+    </View>
+  );
+
+  const compactBody = (
+    <>
+      {loading}
+      {error}
+      {hero}
+      {portfolio}
+    </>
+  );
+
+  const tabletBody = (
+    <AdaptivePanes
+      main={
+        <View style={styles.paneBody}>
+          {loading}
+          {error}
+          {portfolio}
+        </View>
+      }
+      support={decisionSupport}
+      singlePane="main-only"
+      singlePaneContent={compactBody}
+      testID="cards-tablet-workspace"
+    />
+  );
+
+  return (
+    // Sem `refreshing={isRefetching}` (§6 do design): o `Screen` já segue o gesto, e a revalidação
+    // que a Carteira dispara fazia o indicador girar sozinho ao voltar para cá.
+    <Screen grouped wide={tablet} onRefresh={() => cards.refetch()}>
+      <Stack.Screen
+        options={{
+          title: 'Cartões',
+          headerLargeTitle: !tablet,
+        }}
+      />
+
+      <HeaderActions
+        actions={[{ label: 'Novo cartão', icon: 'plus', onPress: () => router.push('/finance/accounts') }]}
+      />
+
+      {tablet ? tabletBody : compactBody}
     </Screen>
   );
 }
@@ -348,6 +440,22 @@ const styles = StyleSheet.create({
   },
   card: {
     gap: Space.sm,
+  },
+  paneBody: {
+    gap: Space.lg,
+  },
+  contextCard: {
+    gap: Space.sm,
+  },
+  contextHead: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    justifyContent: 'space-between',
+    gap: Space.md,
+  },
+  contextLabels: {
+    flex: 1,
+    gap: Space.xs,
   },
   cardHead: {
     flexDirection: 'row',

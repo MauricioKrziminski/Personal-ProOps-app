@@ -13,6 +13,7 @@ import { TaskHeader } from '@/components/ui/task-header';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { EmptyState } from '@/components/ui/empty-state';
+import { AdaptivePanes } from '@/components/ui/adaptive-panes';
 import { Field, MoneyField, TextField } from '@/components/ui/field';
 import { DatePickerField } from '@/components/finance/date-picker-field';
 import { Icon } from '@/components/ui/icon';
@@ -34,6 +35,7 @@ import {
 import { useRealtimeInvalidate } from '@/hooks/use-items';
 import { useTheme } from '@/hooks/use-theme';
 import { useVoltarQuandoFechar } from '@/hooks/use-voltar-quando-fechar';
+import { useAdaptiveWindow } from '@/hooks/use-adaptive-window';
 import { useDebounced } from '@/hooks/use-debounced';
 import { semAcento } from '@/lib/text';
 import { brToISO, ehUltimoDiaDoMes, isValidBRDate, isoToBR, localDateTime, localISODate } from '@/lib/dates';
@@ -264,6 +266,8 @@ const FORM_VAZIO: FormState = {
 export default function RecurringScreen() {
   const params = useLocalSearchParams<{ create?: string; edit?: string; kind?: string; amount?: string; description?: string; category?: string; account?: string; start?: string }>();
   const theme = useTheme();
+  const { windowClass } = useAdaptiveWindow();
+  const tablet = windowClass !== 'compact';
   const toast = useToast();
   const series = useRecurringTransactions();
   const proximos = useRecurringUpcoming(30);
@@ -519,82 +523,48 @@ export default function RecurringScreen() {
     );
   };
 
-  return (
-    <Screen
-      grouped
-      onRefresh={() => Promise.all([series.refetch(), proximos.refetch()])}>
-      <Stack.Screen
-        options={{
-          title: 'Recorrentes',
-          headerLargeTitle: true,
-        }}
-      />
+  const loading = series.isLoading ? (
+    <>
+      <Skeleton height={120} radius={Radius.lg} />
+      <SkeletonRow />
+      <SkeletonRow />
+      <SkeletonRow />
+    </>
+  ) : null;
 
-      <HeaderActions
-        actions={[
-          {
-            label: 'Nova recorrência',
-            icon: 'plus',
-            onPress: () => setForm({ ...FORM_VAZIO, inicio: isoToBR(localISODate()) }),
-          },
-        ]}
-      />
+  const upcomingContext = lista.length === 0 || termo ? null : proximos.isError ? (
+    <ErrorBand
+      message="Não deu para somar os próximos 30 dias. A lista abaixo continua valendo."
+      onRetry={proximos.refetch}
+    />
+  ) : proximos.data ? (
+    <Animated.View entering={FadeInDown.duration(Motion.duration.slow)}>
+      <Card style={styles.hero}>
+        <HeroLabel>Próximos 30 dias</HeroLabel>
+        <View style={styles.heroSplit}>
+          <View style={styles.heroParte}>
+            <HeroLabel>sai</HeroLabel>
+            <Money cents={sai} variant="title2" />
+          </View>
+          <View style={styles.heroParte}>
+            <HeroLabel>entra</HeroLabel>
+            <Money cents={entra} variant="title2" tone="success" />
+          </View>
+        </View>
+        <ThemedText type="small" themeColor="textSecondary">
+          Só o que já foi materializado pelas suas séries — os lançamentos ainda não confirmados
+          dos próximos 30 dias.
+        </ThemedText>
+      </Card>
+    </Animated.View>
+  ) : null;
 
-      {series.isLoading ? (
-        <>
-          <Skeleton height={120} radius={Radius.lg} />
-          <SkeletonRow />
-          <SkeletonRow />
-          <SkeletonRow />
-        </>
-      ) : null}
+  const seriesError = series.isError ? (
+    <ErrorBand message="Não deu para carregar as recorrências." onRetry={series.refetch} />
+  ) : null;
 
-      {/* O único destaque da tela. Some quando não há série: "SAI R$ 0,00 / ENTRA R$ 0,00" em
-          cima de um empty state é cabeçalho vazio para a tela parecer cheia — exatamente o que a
-          regra da aba Hoje proíbe. */}
-      <Search
-        value={busca}
-        onChangeText={setBusca}
-        placeholder="Buscar por nome ou categoria"
-        accessibilityLabel="Buscar recorrências"
-      />
-
-      {/*
-        ⚠️ **Com busca ativa o destaque SOME.** Ele soma os próximos 30 dias da carteira inteira;
-        a lista filtrada mostra uma série. Deixá-lo ali é o mesmo defeito que o card de
-        Lançamentos acabou de perder: um total no topo que não é o total do que está embaixo.
-      */}
-      {lista.length === 0 || termo ? null : proximos.isError ? (
-        <ErrorBand
-          message="Não deu para somar os próximos 30 dias. A lista abaixo continua valendo."
-          onRetry={proximos.refetch}
-        />
-      ) : proximos.data ? (
-        <Animated.View entering={FadeInDown.duration(Motion.duration.slow)}>
-          <Card style={styles.hero}>
-            <HeroLabel>Próximos 30 dias</HeroLabel>
-            <View style={styles.heroSplit}>
-              <View style={styles.heroParte}>
-                <HeroLabel>sai</HeroLabel>
-                <Money cents={sai} variant="title2" />
-              </View>
-              <View style={styles.heroParte}>
-                <HeroLabel>entra</HeroLabel>
-                <Money cents={entra} variant="title2" tone="success" />
-              </View>
-            </View>
-            <ThemedText type="small" themeColor="textSecondary">
-              Só o que já foi materializado pelas suas séries — os lançamentos ainda não confirmados
-              dos próximos 30 dias.
-            </ThemedText>
-          </Card>
-        </Animated.View>
-      ) : null}
-
-      {series.isError ? (
-        <ErrorBand message="Não deu para carregar as recorrências." onRetry={series.refetch} />
-      ) : null}
-
+  const recurringSections = (
+    <>
       {/* Vem primeiro: série parada = conta que não vai aparecer na projeção. */}
       {comErro.length > 0 ? (
         <View style={styles.secao}>
@@ -666,6 +636,54 @@ export default function RecurringScreen() {
           }}
         />
       ) : null}
+    </>
+  );
+
+  const recurringList = <View style={styles.paneBody}>{loading}{seriesError}{recurringSections}</View>;
+  const recurringSummary = <View style={styles.paneBody}>{upcomingContext}</View>;
+  const compactBody = <>{upcomingContext}{seriesError}{recurringSections}</>;
+  const tabletBody = (
+    <AdaptivePanes
+      main={recurringList}
+      support={upcomingContext ? recurringSummary : undefined}
+      singlePane="main-only"
+      singlePaneContent={compactBody}
+      testID="recurring-tablet-workspace"
+    />
+  );
+
+  return (
+    <Screen
+      grouped
+      wide={tablet}
+      onRefresh={() => Promise.all([series.refetch(), proximos.refetch()])}>
+      <Stack.Screen
+        options={{
+          title: 'Recorrentes',
+          headerLargeTitle: !tablet,
+        }}
+      />
+
+      <HeaderActions
+        actions={[
+          {
+            label: 'Nova recorrência',
+            icon: 'plus',
+            onPress: () => setForm({ ...FORM_VAZIO, inicio: isoToBR(localISODate()) }),
+          },
+        ]}
+      />
+
+      {!tablet ? loading : null}
+
+      <Search
+        value={busca}
+        onChangeText={setBusca}
+        placeholder="Buscar por nome ou categoria"
+        accessibilityLabel="Buscar recorrências"
+      />
+
+      {tablet ? tabletBody : compactBody}
 
       <Sheet visible={form !== null} onClose={() => volta.aoFechar(() => setForm(null))}>
 
@@ -873,6 +891,10 @@ export default function RecurringScreen() {
 }
 
 const styles = StyleSheet.create({
+  paneBody: {
+    gap: Space.xl,
+    minWidth: 0,
+  },
   hero: {
     gap: Space.sm,
   },

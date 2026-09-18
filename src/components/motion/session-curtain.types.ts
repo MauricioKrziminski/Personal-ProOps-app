@@ -7,6 +7,8 @@ import type { Onda, Ponto } from '@/lib/session-gate';
 export interface CortinaApi {
   /** Cobre a tela a partir da onda; resolve quando o último azulejo assentou. */
   cobrir(onda: Onda): Promise<void>;
+  /** Fecha imediatamente se a animação de cobertura falhar ou exceder o teto de segurança. */
+  cobrirJa(): void;
   /** Descobre; resolve quando o último azulejo saiu e a camada desmontou. */
   revelar(onda: Onda): Promise<void>;
   /** Abre à força, sem animação — a saída de quem estourou o teto. */

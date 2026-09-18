@@ -18,6 +18,7 @@ import { EmptyState } from '@/components/ui/empty-state';
 import { Field, MoneyField } from '@/components/ui/field';
 import { Icon } from '@/components/ui/icon';
 import { Money } from '@/components/ui/money';
+import { AdaptivePanes } from '@/components/ui/adaptive-panes';
 import { Screen } from '@/components/ui/screen';
 import { HeroLabel, SectionHead } from '@/components/ui/section-head';
 import { Segmented } from '@/components/ui/segmented';
@@ -41,6 +42,7 @@ import { useRealtimeInvalidate } from '@/hooks/use-items';
 import { formatBRL } from '@/lib/dates';
 import { showItemActions, type ItemAction } from '@/lib/item-actions';
 import { supabase } from '@/lib/supabase';
+import { useAdaptiveWindow } from '@/hooks/use-adaptive-window';
 
 /**
  * Orçamentos — "quanto ainda posso gastar em cada categoria este mês?".
@@ -124,6 +126,8 @@ function ErrorBand({ message, onRetry }: { message: string; onRetry: () => void 
 export default function BudgetsScreen() {
   // Dinheiro no meio de frase obedece ao "esconder saldo" — `Money` não cabe em texto corrido.
   const brl = useBRL();
+  const { windowClass } = useAdaptiveWindow();
+  const tablet = windowClass !== 'compact';
   const toast = useToast();
   /**
    * ⚠️ **O mês corrente é o do CICLO, não o civil** — e a diferença aparece por até 20 dias.
@@ -435,51 +439,36 @@ export default function BudgetsScreen() {
     );
   }
 
-  return (
-    <Screen
-      stagger
-      grouped
-      onRefresh={() => Promise.all([status.refetch(), rows.refetch(), refazerResumo()])}>
-      <Stack.Screen
-        options={{
-          title: 'Orçamentos',
-          headerLargeTitle: true,
-        }}
-      />
+  const loading = status.isLoading ? (
+    <>
+      <Skeleton height={120} radius={Radius.lg} />
+      <SkeletonRow />
+      <SkeletonRow />
+      <SkeletonRow />
+    </>
+  ) : null;
 
-      <HeaderActions actions={[{ label: 'Novo limite', icon: 'plus', onPress: () => abrirNovo() }]} />
+  const hero = status.isError ? (
+    <ErrorBand message="Não deu para carregar os orçamentos." onRetry={status.refetch} />
+  ) : linhas.length > 0 ? (
+    <Animated.View entering={FadeInDown.duration(Motion.duration.slow)}>
+      <Card style={styles.hero}>
+        <HeroLabel>Ainda dá para gastar</HeroLabel>
+        <Money
+          cents={limite - gasto}
+          variant="money"
+          tone={limite - gasto < 0 ? 'danger' : 'text'}
+        />
+        <ThemedText type="small" themeColor="textSecondary" style={tabular}>
+          {noLimite} de {linhas.length}{' '}
+          {linhas.length === 1 ? 'categoria no limite' : 'categorias no limite'}
+        </ThemedText>
+      </Card>
+    </Animated.View>
+  ) : null;
 
-      <PeriodBar month={month} onChangeMonth={setMonth} ruler={regua} />
-
-      {status.isLoading ? (
-        <>
-          <Skeleton height={120} radius={Radius.lg} />
-          <SkeletonRow />
-          <SkeletonRow />
-          <SkeletonRow />
-        </>
-      ) : null}
-
-      {/* O único destaque da tela: é o número que decide o comportamento de hoje à noite. */}
-      {status.isError ? (
-        <ErrorBand message="Não deu para carregar os orçamentos." onRetry={status.refetch} />
-      ) : linhas.length > 0 ? (
-        <Animated.View entering={FadeInDown.duration(Motion.duration.slow)}>
-          <Card style={styles.hero}>
-            <HeroLabel>Ainda dá para gastar</HeroLabel>
-            <Money
-              cents={limite - gasto}
-              variant="money"
-              tone={limite - gasto < 0 ? 'danger' : 'text'}
-            />
-            <ThemedText type="small" themeColor="textSecondary" style={tabular}>
-              {noLimite} de {linhas.length}{' '}
-              {linhas.length === 1 ? 'categoria no limite' : 'categorias no limite'}
-            </ThemedText>
-          </Card>
-        </Animated.View>
-      ) : null}
-
+  const budgetSections = (
+    <>
       {apertando.length > 0 ? (
         <View style={styles.secao}>
           <SectionHead title="Passando do limite" />
@@ -508,7 +497,11 @@ export default function BudgetsScreen() {
           {noControleAberto ? tranquilas.map(linhaOrcamento) : null}
         </View>
       ) : null}
+    </>
+  );
 
+  const budgetContextContent = (
+    <>
       {periodoFalhou || resumo.isError ? (
         <ErrorBand
           message="Não deu para ver em que você gastou sem limite."
@@ -535,26 +528,82 @@ export default function BudgetsScreen() {
           ))}
         </View>
       ) : null}
+    </>
+  );
 
-      {!status.isLoading && !status.isError && linhas.length === 0 ? (
-        <EmptyState
-          icon="chart.bar.doc.horizontal"
-          title={
-            mesFuturo
-              ? `${nomeDoMes(month).charAt(0).toUpperCase()}${nomeDoMes(month).slice(1)} ainda usa seus limites padrão`
-              : 'Você ainda não tem limite nenhum'
-          }
-          hint={
-            mesFuturo
-              ? 'Toque em + para sobrescrever só este mês.'
-              : 'Comece pelo que mais aperta: mercado. Toque em + e defina quanto quer gastar por mês.'
-          }
-          action={{
-            label: 'Definir limite',
-            onPress: () => abrirNovo(semLimite[0]?.category),
-          }}
-        />
-      ) : null}
+  const budgetContext = (
+    <View style={styles.paneBody}>
+      {hero}
+      {budgetContextContent}
+    </View>
+  );
+
+  const empty = !status.isLoading && !status.isError && linhas.length === 0 ? (
+    <EmptyState
+      icon="chart.bar.doc.horizontal"
+      title={
+        mesFuturo
+          ? `${nomeDoMes(month).charAt(0).toUpperCase()}${nomeDoMes(month).slice(1)} ainda usa seus limites padrão`
+          : 'Você ainda não tem limite nenhum'
+      }
+      hint={
+        mesFuturo
+          ? 'Toque em + para sobrescrever só este mês.'
+          : 'Comece pelo que mais aperta: mercado. Toque em + e defina quanto quer gastar por mês.'
+      }
+      action={{
+        label: 'Definir limite',
+        onPress: () => abrirNovo(semLimite[0]?.category),
+      }}
+    />
+  ) : null;
+
+  const compactBody = (
+    <>
+      {loading}
+      {hero}
+      {budgetSections}
+      {budgetContextContent}
+      {empty}
+    </>
+  );
+
+  const budgetList = (
+    <View style={styles.paneBody}>
+      {loading}
+      {budgetSections}
+      {empty}
+    </View>
+  );
+
+  const tabletBody = (
+    <AdaptivePanes
+      main={budgetList}
+      support={status.isError || linhas.length > 0 || periodoFalhou || resumo.isError || semLimite.length > 0 ? budgetContext : undefined}
+      singlePane="main-only"
+      singlePaneContent={compactBody}
+      testID="budgets-tablet-workspace"
+    />
+  );
+
+  return (
+    <Screen
+      stagger
+      grouped
+      wide={tablet}
+      onRefresh={() => Promise.all([status.refetch(), rows.refetch(), refazerResumo()])}>
+      <Stack.Screen
+        options={{
+          title: 'Orçamentos',
+          headerLargeTitle: !tablet,
+        }}
+      />
+
+      <HeaderActions actions={[{ label: 'Novo limite', icon: 'plus', onPress: () => abrirNovo() }]} />
+
+      <PeriodBar month={month} onChangeMonth={setMonth} ruler={regua} />
+
+      {tablet ? tabletBody : compactBody}
 
       <Sheet visible={form !== null} onClose={() => setForm(null)}>
 
@@ -648,6 +697,10 @@ export default function BudgetsScreen() {
 }
 
 const styles = StyleSheet.create({
+  paneBody: {
+    gap: Space.xl,
+    minWidth: 0,
+  },
   hero: {
     gap: Space.sm,
   },

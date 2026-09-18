@@ -3,6 +3,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { ThemedText } from '@/components/themed-text';
 import { Icon } from '@/components/ui/icon';
+import { useTabletSheetContext } from '@/components/ui/sheet';
 import { HitTarget, Radius, Space } from '@/design/tokens';
 import { useTheme } from '@/hooks/use-theme';
 
@@ -75,12 +76,13 @@ export function TaskHeader({
 }) {
   const theme = useTheme();
   const insets = useSafeAreaInsets();
+  const insideTabletDialog = useTabletSheetContext();
 
   return (
     <View
       style={[
         styles.head,
-        { paddingTop: (telaCheia || Platform.OS === 'android' ? insets.top : 0) + Space.sm },
+        { paddingTop: (telaCheia || (Platform.OS === 'android' && !insideTabletDialog) ? insets.top : 0) + Space.sm },
       ]}>
       <View style={[styles.grabber, { backgroundColor: theme.separator }]} />
       <View style={styles.headRow}>

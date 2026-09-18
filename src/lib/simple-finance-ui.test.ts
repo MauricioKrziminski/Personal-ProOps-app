@@ -11,7 +11,7 @@ const require = createRequire(import.meta.url);
 
 // Execute the screen JSX and its event handlers. Native components/query boundaries
 // are inert; state persists across renders so each interaction uses current props.
-function screen(file: string, options: { debts?: any[]; invoiceStatus?: string; create?: boolean; monthLines?: any[]; monthSummary?: any; cycleLines?: any[]; cycleRow?: any; rangeError?: boolean; rangePending?: boolean; rangePendingMonths?: string[]; bills?: any[]; billsError?: boolean; charges?: any[]; reminders?: any[]; budgets?: any[]; setupPassos?: any[]; activity?: any[]; activityError?: boolean } = {}) {
+function screen(file: string, options: { tablet?: boolean; debts?: any[]; invoiceStatus?: string; create?: boolean; monthLines?: any[]; monthSummary?: any; cycleLines?: any[]; cycleRow?: any; rangeError?: boolean; rangePending?: boolean; rangePendingMonths?: string[]; bills?: any[]; billsError?: boolean; charges?: any[]; reminders?: any[]; budgets?: any[]; setupPassos?: any[]; activity?: any[]; activityError?: boolean } = {}) {
   const state: any[] = [];
   let cursor = 0;
   let nodes: any[] = [];
@@ -113,6 +113,7 @@ function screen(file: string, options: { debts?: any[]; invoiceStatus?: string; 
     const code = ts.transpileModule(readFileSync(path, 'utf8'), { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022, jsx: ts.JsxEmit.ReactJSX } }).outputText;
     runInNewContext(code, { module, exports: module.exports, require: (name: string) => {
       if (name === 'react') return {
+        Fragment: Symbol.for('react.fragment'),
         useState(initial: any) { const index = cursor++; if (!(index in state)) state[index] = typeof initial === 'function' ? initial() : initial; return [state[index], (value: any) => { state[index] = typeof value === 'function' ? value(state[index]) : value; }]; },
         useMemo: (fn: () => unknown) => fn(),
         useCallback: (fn: unknown) => fn,
@@ -127,6 +128,13 @@ function screen(file: string, options: { debts?: any[]; invoiceStatus?: string; 
       if (name === 'expo-router') return { Stack: { Screen: 'StackScreen' }, useLocalSearchParams: () => ({ id: 'invoice-1', ...(options.create !== false ? { create: 'financing' } : {}) }), router: { push: (to: any) => navigations.push(to), back: () => navigations.push({ back: true }) } };
       if (name === 'react-native-safe-area-context') return { useSafeAreaInsets: () => ({ bottom: 0 }) };
       if (name === '@/hooks/use-finance') return finance;
+      if (name === '@/hooks/use-adaptive-window') return {
+        useAdaptiveWindow: () => ({
+          width: options.tablet ? 1280 : 384,
+          windowClass: options.tablet ? 'expanded' : 'compact',
+          fontScale: 1,
+        }),
+      };
       if (name === '@/hooks/use-theme') return { useTheme: () => ({}), useScheme: () => 'light' };
       // portão de "a tela está pronta": no harness nada carrega, então ele já nasce aberto
       if (name === '@/hooks/use-tela-pronta') return { useTelaPronta: (...consultas: any[]) => { gates.push(consultas); return true; } };
@@ -151,6 +159,7 @@ function screen(file: string, options: { debts?: any[]; invoiceStatus?: string; 
       if (name === '@/lib/finance-form' || name === '@/lib/dates' || name === '@/lib/month-view' || name === '@/lib/settle-labels' || name === '@/lib/accounts' || name === '@/lib/cycle-label' || name === '@/lib/card-status' || name === '@/lib/today-sections' || name === '@/lib/runway' || name === '@/lib/budget-tight' || name === '@/lib/setup-steps' || name === '@/lib/activity-feed' || name === '@/lib/account-cash' || name === '@/lib/today-spend') return load(`src/lib/${name.split('/').at(-1)}.ts`);
       if (name === '@/hooks/use-debounced') return { useDebounced: (value: unknown) => value };
       if (name === '@/design/category-icons') return { categoryIcon: () => 'circle' };
+      if (name === '@/design/adaptive-window') return load('src/design/adaptive-window.ts');
       // import relativo DENTRO de um módulo puro já carregado (month-view → ./dates.ts)
       if (name === './dates.ts' || name === './dates') return load('src/lib/dates.ts');
       // o `month-picker` é `.tsx` e importa React Native; aqui só as funções puras dele
@@ -195,6 +204,14 @@ function screen(file: string, options: { debts?: any[]; invoiceStatus?: string; 
     if (!node?.props || (node.type === 'Sheet' && !node.props.visible)) return;
     nodes.push(node);
     visit(node.props.children);
+    // Tablet adapters hold the existing blocks in named slots, not children. Visit those slots
+    // too so the same behavior assertions cover both compositions.
+    if (node.type === 'TodayTabletCanvas') {
+      for (const slot of ['hero', 'signals', 'pulse', 'actions', 'accounts', 'coming']) visit(node.props[slot]);
+    }
+    if (node.type === 'FinanceTabletCanvas') {
+      for (const slot of ['cycle', 'actions', 'ledger', 'breakdown']) visit(node.props[slot]);
+    }
     visit(node.props.ListHeaderComponent);
     // Mesmo motivo do header: slot é conteúdo renderizado. As ações da fatura desceram para o
     // FIM da lista em 15/09/2026 (botão fixo sobre o scroll foi recusado pelo dono do produto),
@@ -684,4 +701,27 @@ test('Financeiro: o FAB continua oferecendo as três formas de lançar', () => {
     ui.actions.map((a) => a.label),
     ['Gasto ou receita', 'Gasto ou receita que se repete', 'Financiamento']
   );
+});
+
+test('Hoje tablet reuses its real blocks and retains their destinations', () => {
+  const ui = screen(hojeFile, { tablet: true, balances: [saldo('Conta', 'checking', 120_00)] });
+  const tela = ui.nodes().find((n: any) => n.type === 'Screen');
+  assert.equal(tela.props.wide, true);
+  const canvas = ui.nodes().find((n: any) => n.type === 'TodayTabletCanvas');
+  assert.ok(canvas);
+  assert.ok(tipos(ui).includes('CashAccounts'));
+  assert.ok(ui.nodes().some((n: any) => n.type === 'Tile' && n.props.label === 'Saiu hoje'));
+});
+
+test('Financeiro tablet keeps the cycle, analysis and all management actions', () => {
+  const ui = screen(financeiroFile, { tablet: true });
+  const tela = ui.nodes().find((n: any) => n.type === 'Screen');
+  assert.equal(tela.props.wide, true);
+  const canvas = ui.nodes().find((n: any) => n.type === 'FinanceTabletCanvas');
+  assert.ok(canvas);
+  assert.ok(ui.nodes().some((n: any) => n.type === 'Tile' && n.props.label === 'Entra'));
+  assert.ok(ui.nodes().some((n: any) => n.type === 'Tile' && n.props.label === 'Sai'));
+  tela.props.overlay.props.onPress();
+  assert.deepEqual(ui.actions.map((a) => a.label),
+    ['Gasto ou receita', 'Gasto ou receita que se repete', 'Financiamento']);
 });

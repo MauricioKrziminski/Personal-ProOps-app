@@ -20,6 +20,7 @@ import { SkeletonList } from '@/components/ui/skeleton';
 import { useToast } from '@/components/ui/toast';
 import { MaxContentWidth } from '@/constants/theme';
 import { Space } from '@/design/tokens';
+import { useAdaptiveWindow } from '@/hooks/use-adaptive-window';
 import {
   useNoteFolders,
   useNotesList,
@@ -51,6 +52,8 @@ import type { NoteCardActions } from '@/components/notes/note-card';
  * telas de uma vez).
  */
 export default function FolderScreen() {
+  const { windowClass } = useAdaptiveWindow();
+  const tablet = windowClass !== 'compact';
   const params = useLocalSearchParams<{ id: string }>();
   const toast = useToast();
 
@@ -186,8 +189,10 @@ export default function FolderScreen() {
   };
 
   return (
-    <Screen scroll={false} grouped>
-      <Stack.Screen options={{ title: folder?.name ?? 'Pasta' }} />
+    <Screen scroll={false} grouped wide={tablet}>
+      <Stack.Screen
+        options={{ title: folder?.name ?? 'Pasta', headerLargeTitle: !tablet }}
+      />
 
       {/*
         ⚠️ **UMA chamada, com botão e menu juntos.** `HeaderActions` e `HeaderMenu` lado a lado

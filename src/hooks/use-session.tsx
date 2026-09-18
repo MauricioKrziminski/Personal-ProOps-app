@@ -75,7 +75,12 @@ export function SessionProvider({ children }: { children: ReactNode }) {
 
     const trocar = async (next: Session | null, depois: string | null) => {
       const onda = ondaDaTroca(depois, cortina.tomarOrigem());
-      await comTeto(cortina.cobrir(onda), TETO_DA_TROCA_MS, 'cortina').catch(() => {});
+      await comTeto(cortina.cobrir(onda), TETO_DA_TROCA_MS, 'cortina').catch(async () => {
+        // Nunca substitua a sessão mostrada com a cobertura ainda incompleta. Num tablet, o
+        // canvas maior pode perder quadros; o fallback fecha a tinta e deixa-a pintar primeiro.
+        cortina.cobrirJa();
+        await doisQuadros();
+      });
       if (!vivo) return;
       setEstado({ session: next, loading: false });
       await doisQuadros();

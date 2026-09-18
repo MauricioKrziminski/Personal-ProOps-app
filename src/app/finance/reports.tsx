@@ -5,6 +5,7 @@ import Animated, { FadeInDown } from 'react-native-reanimated';
 import * as Haptics from 'expo-haptics';
 
 import { ErrorCard } from '@/components/error-card';
+import { FinanceAnalysisPanes } from '@/components/finance/finance-analysis-panes';
 import { Card } from '@/components/ui/card';
 import { ThemedText } from '@/components/themed-text';
 import { HeaderActions } from '@/components/ui/header-actions';
@@ -20,6 +21,7 @@ import { ProgressBar } from '@/components/ui/sparkline';
 import { useToast } from '@/components/ui/toast';
 import { Motion, Space, tabular } from '@/design/tokens';
 import { localISODate } from '@/hooks/use-items';
+import { useAdaptiveWindow } from '@/hooks/use-adaptive-window';
 import { formatNumberBR } from '@/lib/dates';
 import {
   useAnnualReport,
@@ -69,6 +71,8 @@ function montaCsv(ano: number, categorias: AnnualCategoryRow[], saldos: YearEndB
  */
 export default function ReportsScreen() {
   const toast = useToast();
+  const { windowClass } = useAdaptiveWindow();
+  const tablet = windowClass !== 'compact';
   const anoAtual = Number(localISODate().slice(0, 4));
   const [ano, setAno] = useState(anoAtual);
   const [verTodas, setVerTodas] = useState(false);
@@ -106,8 +110,134 @@ export default function ReportsScreen() {
     }
   };
 
+  const hero = !isError && temMovimento && summary ? (
+    <Animated.View entering={FadeInDown.duration(Motion.duration.slow)}>
+      <Card style={styles.hero}>
+        <HeroLabel>Sobrou em {ano}</HeroLabel>
+        <Money
+          cents={Number(summary.balance_cents)}
+          variant="money"
+          tone={Number(summary.balance_cents) < 0 ? 'danger' : 'text'}
+        />
+        <View style={styles.heroLinha}>
+          <View style={styles.heroMetade}>
+            <HeroLabel>Recebido</HeroLabel>
+            <Money cents={Number(summary.income_cents)} variant="headline" tone="success" />
+          </View>
+          <View style={styles.heroMetade}>
+            <HeroLabel>Gasto</HeroLabel>
+            <Money cents={Number(summary.expense_cents)} variant="headline" />
+          </View>
+        </View>
+        <ThemedText type="small" themeColor="textSecondary" style={tabular}>
+          Guardou {formatNumberBR(Number(summary.savings_rate))}% do que entrou · {summary.tx_count}{' '}
+          {Number(summary.tx_count) === 1 ? 'lançamento' : 'lançamentos'}
+        </ThemedText>
+      </Card>
+    </Animated.View>
+  ) : null;
+
+  const yearEnd = !isError && !isLoading && temConteudo ? (
+    <Animated.View
+      entering={FadeInDown.duration(Motion.duration.slow).delay(Motion.stagger.step)}
+      style={styles.bloco}
+    >
+      <ThemedText type="small" themeColor="textSecondary" style={styles.nota}>
+        Contas e bens no último dia do ano — é o que a ficha “Bens e Direitos” da declaração
+        pede. Dívidas e financiamentos entram em outra ficha e não aparecem aqui.
+      </ThemedText>
+      <Section title={`Bens e direitos em 31/12/${ano}`}>
+        {(data?.yearEnd ?? []).length > 0 ? (
+          (data?.yearEnd ?? []).map((s) => (
+            <Row
+              key={`${s.kind}-${s.name}`}
+              title={s.name}
+              icon={s.kind === 'account' ? 'banknote' : 'chart.line.uptrend.xyaxis'}
+              chevron={false}
+              accessibilityLabel={`${s.name}, ${(Number(s.balance_cents) / 100).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })} em 31 de dezembro`}
+              trailing={<Money cents={Number(s.balance_cents)} variant="headline" />}
+            />
+          ))
+        ) : (
+          <Row
+            title="Nenhuma conta cadastrada"
+            subtitle="Cadastre para o saldo de 31/12 sair aqui"
+            icon="banknote"
+            onPress={() => router.push('/finance/accounts')}
+          />
+        )}
+      </Section>
+    </Animated.View>
+  ) : null;
+
+  const expenses = !isError && despesas.length > 0 ? (
+    <Animated.View
+      entering={FadeInDown.duration(Motion.duration.slow).delay(Motion.stagger.step * 2)}
+      style={styles.bloco}
+    >
+      <Section title="Para onde foi">
+        {visiveis.map((c) => (
+          <View key={c.category} style={styles.categoria}>
+            <View style={styles.categoriaTopo}>
+              <ThemedText type="default" style={styles.categoriaNome}>
+                {c.category}
+              </ThemedText>
+              <Money cents={Number(c.total_cents)} variant="headline" />
+            </View>
+            <ProgressBar value={Number(c.total_cents)} max={maiorDespesa} />
+            <ThemedText type="small" themeColor="textSecondary" style={tabular}>
+              {Math.round((Number(c.total_cents) / maiorDespesa) * 100)}% do maior ·{' '}
+              {c.tx_count} {Number(c.tx_count) === 1 ? 'lançamento' : 'lançamentos'}
+            </ThemedText>
+          </View>
+        ))}
+      </Section>
+      {despesas.length > TOP_CATEGORIES && !verTodas ? (
+        <Button
+          label={`Ver todas as ${despesas.length}`}
+          variant="secondary"
+          size="sm"
+          onPress={() => setVerTodas(true)}
+        />
+      ) : null}
+    </Animated.View>
+  ) : null;
+
+  const income = !isError && receitas.length > 0 ? (
+    <Animated.View
+      entering={FadeInDown.duration(Motion.duration.slow).delay(Motion.stagger.step * 3)}
+    >
+      <Section title="De onde veio">
+        {receitas.map((c) => (
+          <Row
+            key={c.category}
+            title={c.category}
+            chevron={false}
+            trailing={<Money cents={Number(c.total_cents)} variant="headline" tone="success" />}
+          />
+        ))}
+      </Section>
+    </Animated.View>
+  ) : null;
+
+  const footnote = !isLoading && !isError && temConteudo ? (
+    <ThemedText type="footnote" themeColor="textSecondary" style={styles.rodape}>
+      Só lançamentos confirmados, sem transferências entre suas contas.
+    </ThemedText>
+  ) : null;
+
+  const reportContent = (
+    <>
+      {hero}
+      {yearEnd}
+      {expenses}
+      {income}
+      {footnote}
+    </>
+  );
+
   return (
-    <Screen grouped onRefresh={refetch}>
+    <Screen wide={tablet} grouped onRefresh={refetch}>
       <Stack.Screen
         options={{
           title: 'Relatórios',
@@ -131,22 +261,22 @@ export default function ReportsScreen() {
           no destaque ("Sobrou em 2026") e no título de Bens e Direitos. Mesma régua do badge de
           aba e do card que soma uma lista de um item. */}
       {anos.length > 1 ? (
-      <ScrollView
-        horizontal
-        showsHorizontalScrollIndicator={false}
-        contentContainerStyle={styles.anos}>
-        {anos.map((a) => (
-          <Chip
-            key={a}
-            label={String(a)}
-            selected={a === ano}
-            onPress={() => {
-              setAno(a);
-              setVerTodas(false);
-            }}
-          />
-        ))}
-      </ScrollView>
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={styles.anos}>
+          {anos.map((a) => (
+            <Chip
+              key={a}
+              label={String(a)}
+              selected={a === ano}
+              onPress={() => {
+                setAno(a);
+                setVerTodas(false);
+              }}
+            />
+          ))}
+        </ScrollView>
       ) : null}
 
       {isError ? <ErrorCard onRetry={refetch} /> : null}
@@ -160,120 +290,12 @@ export default function ReportsScreen() {
         </>
       ) : null}
 
-      {/* O único destaque da tela: responde a pergunta do ano em um olhar. */}
-      {!isError && temMovimento && summary ? (
-        <Animated.View entering={FadeInDown.duration(Motion.duration.slow)}>
-          <Card style={styles.hero}>
-            <HeroLabel>Sobrou em {ano}</HeroLabel>
-            <Money
-              cents={Number(summary.balance_cents)}
-              variant="money"
-              tone={Number(summary.balance_cents) < 0 ? 'danger' : 'text'}
-            />
-            <View style={styles.heroLinha}>
-              <View style={styles.heroMetade}>
-                <HeroLabel>Recebido</HeroLabel>
-                <Money cents={Number(summary.income_cents)} variant="headline" tone="success" />
-              </View>
-              <View style={styles.heroMetade}>
-                <HeroLabel>Gasto</HeroLabel>
-                <Money cents={Number(summary.expense_cents)} variant="headline" />
-              </View>
-            </View>
-            <ThemedText type="small" themeColor="textSecondary" style={tabular}>
-              Guardou {formatNumberBR(Number(summary.savings_rate))}% do que entrou · {summary.tx_count}{' '}
-              {Number(summary.tx_count) === 1 ? 'lançamento' : 'lançamentos'}
-            </ThemedText>
-          </Card>
-        </Animated.View>
-      ) : null}
-
-      {/* Segundo lugar, e não quarto: é a ficha que a pessoa veio copiar. */}
       {!isError && !isLoading && temConteudo ? (
-        <Animated.View
-          entering={FadeInDown.duration(Motion.duration.slow).delay(Motion.stagger.step)}
-          style={styles.bloco}
-        >
-          <ThemedText type="small" themeColor="textSecondary" style={styles.nota}>
-            Contas e bens no último dia do ano — é o que a ficha “Bens e Direitos” da declaração
-            pede. Dívidas e financiamentos entram em outra ficha e não aparecem aqui.
-          </ThemedText>
-
-          {(data?.yearEnd ?? []).length > 0 ? (
-            <Section title={`Bens e direitos em 31/12/${ano}`}>
-              {(data?.yearEnd ?? []).map((s) => (
-                <Row
-                  key={`${s.kind}-${s.name}`}
-                  title={s.name}
-                  icon={s.kind === 'account' ? 'banknote' : 'chart.line.uptrend.xyaxis'}
-                  chevron={false}
-                  accessibilityLabel={`${s.name}, ${(Number(s.balance_cents) / 100).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })} em 31 de dezembro`}
-                  trailing={<Money cents={Number(s.balance_cents)} variant="headline" />}
-                />
-              ))}
-            </Section>
-          ) : (
-            <Section title={`Bens e direitos em 31/12/${ano}`}>
-              <Row
-                title="Nenhuma conta cadastrada"
-                subtitle="Cadastre para o saldo de 31/12 sair aqui"
-                icon="banknote"
-                onPress={() => router.push('/finance/accounts')}
-              />
-            </Section>
-          )}
-        </Animated.View>
-      ) : null}
-
-      {!isError && despesas.length > 0 ? (
-        <Animated.View
-          entering={FadeInDown.duration(Motion.duration.slow).delay(Motion.stagger.step * 2)}
-          style={styles.bloco}
-        >
-          <Section title="Para onde foi">
-            {visiveis.map((c) => (
-              <View key={c.category} style={styles.categoria}>
-                <View style={styles.categoriaTopo}>
-                  <ThemedText type="default" style={styles.categoriaNome}>
-                    {c.category}
-                  </ThemedText>
-                  <Money cents={Number(c.total_cents)} variant="headline" />
-                </View>
-                <ProgressBar value={Number(c.total_cents)} max={maiorDespesa} />
-                <ThemedText type="small" themeColor="textSecondary" style={tabular}>
-                  {Math.round((Number(c.total_cents) / maiorDespesa) * 100)}% do maior ·{' '}
-                  {c.tx_count} {Number(c.tx_count) === 1 ? 'lançamento' : 'lançamentos'}
-                </ThemedText>
-              </View>
-            ))}
-          </Section>
-          {despesas.length > TOP_CATEGORIES && !verTodas ? (
-            <Button
-              label={`Ver todas as ${despesas.length}`}
-              variant="secondary"
-              size="sm"
-              onPress={() => setVerTodas(true)}
-            />
-          ) : null}
-        </Animated.View>
-      ) : null}
-
-      {!isError && receitas.length > 0 ? (
-        <Animated.View
-          entering={FadeInDown.duration(Motion.duration.slow).delay(Motion.stagger.step * 3)}
-        >
-          {/* Sem barra: quem tem duas fontes de renda não precisa de gráfico para compará-las. */}
-          <Section title="De onde veio">
-            {receitas.map((c) => (
-              <Row
-                key={c.category}
-                title={c.category}
-                chevron={false}
-                trailing={<Money cents={Number(c.total_cents)} variant="headline" tone="success" />}
-              />
-            ))}
-          </Section>
-        </Animated.View>
+        <FinanceAnalysisPanes
+          primary={<>{hero}{yearEnd}</>}
+          support={<>{expenses}{income}{footnote}</>}
+          compact={reportContent}
+        />
       ) : null}
 
       {!isLoading && !isError && !temConteudo ? (
@@ -286,11 +308,6 @@ export default function ReportsScreen() {
         />
       ) : null}
 
-      {!isLoading && !isError && temConteudo ? (
-        <ThemedText type="footnote" themeColor="textSecondary" style={styles.rodape}>
-          Só lançamentos confirmados, sem transferências entre suas contas.
-        </ThemedText>
-      ) : null}
     </Screen>
   );
 }

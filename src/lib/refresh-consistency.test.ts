@@ -298,6 +298,9 @@ function renderToday(bill: { kind: 'invoice' | 'transaction'; ref_id: string }) 
       leria como regressão de produto.
     */
     if (name === '@/hooks/use-tela-pronta') return { useTelaPronta: () => true };
+    if (name === '@/hooks/use-adaptive-window') return {
+      useAdaptiveWindow: () => ({ width: 400, fontScale: 1, windowClass: 'compact' }),
+    };
     if (name === '@/components/finance/month-picker') return { currentMonth: () => '2026-09' };
     if (name === '@/hooks/use-session') return { useSession: () => ({ session: null }) };
     if (name === '@/hooks/use-theme') return { useTheme: () => ({}) };

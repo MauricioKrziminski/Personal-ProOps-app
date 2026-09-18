@@ -16,7 +16,8 @@ interface Props {
   preview: string | null;
   updatedAt: string | null;
   onOpen: (id: string) => void;
-  onLongPress: (id: string) => void;
+  onLongPress?: (id: string) => void;
+  selected?: boolean;
 }
 
 /**
@@ -34,6 +35,7 @@ export const ConversationRow = memo(function ConversationRow({
   updatedAt,
   onOpen,
   onLongPress,
+  selected = false,
 }: Props) {
   const theme = useTheme();
   // O motor escreve `*R$ 45,00*` (negrito do WhatsApp). Numa linha de resumo
@@ -43,14 +45,15 @@ export const ConversationRow = memo(function ConversationRow({
   return (
     <Pressable
       onPress={() => onOpen(id)}
-      onLongPress={() => onLongPress(id)}
+      onLongPress={onLongPress ? () => onLongPress(id) : undefined}
       accessibilityRole="button"
+      accessibilityState={{ selected }}
       accessibilityLabel={resumo ? `${title}. ${resumo}` : title}
       accessibilityHint="Abre a conversa"
       style={({ pressed }) => [
         styles.row,
         {
-          backgroundColor: pressed ? theme.backgroundSelected : 'transparent',
+          backgroundColor: pressed || selected ? theme.backgroundSelected : 'transparent',
           borderBottomColor: theme.separator,
         },
       ]}>

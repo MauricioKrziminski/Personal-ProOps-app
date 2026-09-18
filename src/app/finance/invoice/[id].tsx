@@ -1,5 +1,7 @@
 import { useMemo, useState } from 'react';
 import { FlatList, ScrollView, StyleSheet, View, useWindowDimensions } from 'react-native';
+import { MaxContentWidth } from '@/constants/theme';
+import { chartWidthForPane, rootContentMaxWidth } from '@/design/adaptive-window';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Animated, { FadeInDown } from 'react-native-reanimated';
 import { Stack, router, useLocalSearchParams } from 'expo-router';
@@ -25,6 +27,7 @@ import { Skeleton, SkeletonRow } from '@/components/ui/skeleton';
 import { useToast } from '@/components/ui/toast';
 import { alturaDoCartao } from '@/design/card-geometry';
 import { HitTarget, Motion, Radius, Space, tabular } from '@/design/tokens';
+import { useAdaptiveWindow } from '@/hooks/use-adaptive-window';
 import {
   useAccounts,
   useCardInvoices,
@@ -109,6 +112,8 @@ export default function InvoiceScreen() {
   const insets = useSafeAreaInsets();
   const { id, via } = useLocalSearchParams<{ id: string; via?: string }>();
   const { width, fontScale } = useWindowDimensions();
+  const { windowClass } = useAdaptiveWindow();
+  const tablet = windowClass !== 'compact';
   const invoice = useInvoice(id);
   const accounts = useAccounts();
   const pay = usePayInvoice();
@@ -348,7 +353,10 @@ export default function InvoiceScreen() {
 
       {invoice.isLoading ? (
         <>
-          <Skeleton height={alturaDoCartao(width - Space.lg * 2, fontScale)} radius={Radius.md} />
+          <Skeleton
+            height={alturaDoCartao(chartWidthForPane(Math.min(width, rootContentMaxWidth(width, false)), Space.lg), fontScale)}
+            radius={Radius.md}
+          />
           <SkeletonRow />
           <SkeletonRow />
         </>
@@ -480,10 +488,11 @@ export default function InvoiceScreen() {
     ) : null;
 
   return (
-    <Screen scroll={false} grouped>
+    <Screen scroll={false} grouped wide={tablet}>
       <Stack.Screen
         options={{
           title: fatura ? `Fatura de ${mesLabel(fatura.reference_month)}` : 'Fatura',
+          headerLargeTitle: !tablet,
         }}
       />
 
@@ -694,6 +703,9 @@ const styles = StyleSheet.create({
     gap: Space.xl,
     paddingHorizontal: Space.lg,
     paddingTop: Space.md,
+    width: '100%',
+    maxWidth: MaxContentWidth,
+    alignSelf: 'center',
   },
   header: {
     gap: Space.lg,

@@ -14,6 +14,7 @@ import { TaskHeader } from '@/components/ui/task-header';
 import { ThemedText } from '@/components/themed-text';
 import { HeaderActions } from '@/components/ui/header-actions';
 import { EmptyState } from '@/components/ui/empty-state';
+import { AdaptivePanes } from '@/components/ui/adaptive-panes';
 import { Field, TextField } from '@/components/ui/field';
 import { Row, Section } from '@/components/ui/row';
 import { Screen } from '@/components/ui/screen';
@@ -30,6 +31,7 @@ import {
   type CategorizationRule,
 } from '@/hooks/use-finance';
 import { AccountPicker } from '@/components/finance/account-picker';
+import { useAdaptiveWindow } from '@/hooks/use-adaptive-window';
 
 /** Postgres: violação de unique. Aqui só pode ser `(workspace_id, match_type, pattern)` da `0017`. */
 const UNIQUE_VIOLATION = '23505';
@@ -60,6 +62,8 @@ const VAZIO: Rascunho = { pattern: '', category: null, accountId: null };
 export default function RulesScreen() {
   const toast = useToast();
   const insets = useSafeAreaInsets();
+  const { windowClass } = useAdaptiveWindow();
+  const tablet = windowClass !== 'compact';
   const { data: rules, isLoading, isError, refetch } = useRules();
   const { data: accounts } = useAccounts();
   const save = useSaveRule();
@@ -163,90 +167,96 @@ export default function RulesScreen() {
       .join(' · ');
   };
 
+  const faixa = lista.length > 0 ? (
+    <View style={styles.faixa}>
+      <ThemedText type="small" themeColor="textSecondary">
+        Sua regra ganha da IA. Vale no WhatsApp e na importação de extrato.
+      </ThemedText>
+      <ThemedText type="small" themeColor="textSecondary">
+        Dá para criar por mensagem: “sempre que eu falar ifood, põe em restaurante”.
+      </ThemedText>
+    </View>
+  ) : null;
+
+  const erro = isError ? <ErrorCard onRetry={refetch} /> : null;
+  const loading = isLoading && !isError ? (
+    <>
+      <SkeletonRow />
+      <SkeletonRow />
+      <SkeletonRow />
+      <SkeletonRow />
+    </>
+  ) : null;
+  const destaque = totalHits > 0 ? (
+    <Animated.View entering={FadeInDown.duration(Motion.duration.slow)}>
+      <Card style={styles.hero}>
+        <HeroLabel>O que suas regras já pouparam</HeroLabel>
+        <ThemedText style={[Type.title, tabular]}>{totalHits}</ThemedText>
+        <ThemedText type="small" themeColor="textSecondary">
+          {totalHits === 1 ? 'lançamento categorizado' : 'lançamentos categorizados'} sem
+          precisar da IA, por {ativas} {ativas === 1 ? 'regra' : 'regras'}.
+        </ThemedText>
+      </Card>
+    </Animated.View>
+  ) : null;
+  const regraRows = lista.length > 0 ? (
+    <Section title="Suas regras">
+      {lista.map((rule, index) => (
+        <Animated.View
+          key={rule.id}
+          layout={LinearTransition.duration(Motion.duration.base)}
+          entering={FadeInDown.duration(Motion.duration.slow).delay(
+            Math.min(index * Motion.stagger.step, Motion.stagger.cap)
+          )}
+        >
+          <Row
+            title={`${rule.pattern}  →  ${rule.category ?? 'sem categoria'}`}
+            subtitle={legenda(rule)}
+            icon="text.badge.checkmark"
+            chevron={false}
+            accessibilityLabel={`Quando contiver ${rule.pattern}, categorizar como ${rule.category ?? 'sem categoria'}, ${legenda(rule)}`}
+            onPress={() => abrir(rule)}
+            onLongPress={() => acoes(rule)}
+          />
+        </Animated.View>
+      ))}
+    </Section>
+  ) : null;
+  const vazio = !isLoading && !isError && lista.length === 0 ? (
+    <EmptyState
+      icon="text.badge.checkmark"
+      title="Nenhuma regra ainda"
+      hint={
+        'Crie uma para o que a IA sempre erra — “posto” vira transporte.\nOu manda no WhatsApp: “sempre que eu falar ifood, põe em restaurante”.'
+      }
+      action={{ label: 'Nova regra', onPress: () => abrir() }}
+    />
+  ) : null;
+  const ruleList = <View style={styles.paneBody}>{erro}{loading}{regraRows}{vazio}</View>;
+  const ruleContext = <View style={styles.paneBody}>{faixa}{destaque}</View>;
+  const compactBody = <>{faixa}{erro}{loading}{destaque}{regraRows}{vazio}</>;
+  const tabletBody = (
+    <AdaptivePanes
+      main={ruleList}
+      support={faixa || destaque ? ruleContext : undefined}
+      singlePane="main-only"
+      singlePaneContent={compactBody}
+      testID="rules-tablet-workspace"
+    />
+  );
+
   return (
-    <Screen grouped onRefresh={refetch}>
+    <Screen grouped wide={tablet} onRefresh={refetch}>
       <Stack.Screen
         options={{
           title: 'Regras',
-          headerLargeTitle: true,
+          headerLargeTitle: !tablet,
         }}
       />
 
       <HeaderActions actions={[{ label: 'Nova regra', icon: 'plus', onPress: () => abrir() }]} />
 
-      {/* Texto, não card: a explicação não pode competir de tamanho com o dado. */}
-      {/* Só com regras na lista: no vazio, o `EmptyState` abaixo já diz as duas coisas — e a
-          frase do WhatsApp aparecia LITERALMENTE duas vezes na mesma tela. */}
-      {lista.length > 0 ? (
-        <View style={styles.faixa}>
-          <ThemedText type="small" themeColor="textSecondary">
-            Sua regra ganha da IA. Vale no WhatsApp e na importação de extrato.
-          </ThemedText>
-          <ThemedText type="small" themeColor="textSecondary">
-            Dá para criar por mensagem: “sempre que eu falar ifood, põe em restaurante”.
-          </ThemedText>
-        </View>
-      ) : null}
-
-      {isError ? <ErrorCard onRetry={refetch} /> : null}
-
-      {isLoading && !isError ? (
-        <>
-          <SkeletonRow />
-          <SkeletonRow />
-          <SkeletonRow />
-          <SkeletonRow />
-        </>
-      ) : null}
-
-      {/* O único destaque da tela — e só quando existe número para mostrar. */}
-      {totalHits > 0 ? (
-        <Animated.View entering={FadeInDown.duration(Motion.duration.slow)}>
-          <Card style={styles.hero}>
-            <HeroLabel>O que suas regras já pouparam</HeroLabel>
-            <ThemedText style={[Type.title, tabular]}>{totalHits}</ThemedText>
-            <ThemedText type="small" themeColor="textSecondary">
-              {totalHits === 1 ? 'lançamento categorizado' : 'lançamentos categorizados'} sem
-              precisar da IA, por {ativas} {ativas === 1 ? 'regra' : 'regras'}.
-            </ThemedText>
-          </Card>
-        </Animated.View>
-      ) : null}
-
-      {lista.length > 0 ? (
-        <Section title="Suas regras">
-          {lista.map((rule, index) => (
-            <Animated.View
-              key={rule.id}
-              layout={LinearTransition.duration(Motion.duration.base)}
-              entering={FadeInDown.duration(Motion.duration.slow).delay(
-                Math.min(index * Motion.stagger.step, Motion.stagger.cap)
-              )}
-            >
-              <Row
-                title={`${rule.pattern}  →  ${rule.category ?? 'sem categoria'}`}
-                subtitle={legenda(rule)}
-                icon="text.badge.checkmark"
-                chevron={false}
-                accessibilityLabel={`Quando contiver ${rule.pattern}, categorizar como ${rule.category ?? 'sem categoria'}, ${legenda(rule)}`}
-                onPress={() => abrir(rule)}
-                onLongPress={() => acoes(rule)}
-              />
-            </Animated.View>
-          ))}
-        </Section>
-      ) : null}
-
-      {!isLoading && !isError && lista.length === 0 ? (
-        <EmptyState
-          icon="text.badge.checkmark"
-          title="Nenhuma regra ainda"
-          hint={
-            'Crie uma para o que a IA sempre erra — “posto” vira transporte.\nOu manda no WhatsApp: “sempre que eu falar ifood, põe em restaurante”.'
-          }
-          action={{ label: 'Nova regra', onPress: () => abrir() }}
-        />
-      ) : null}
+      {tablet ? tabletBody : compactBody}
 
       {/* Form sheet: o formulário deixa de empurrar a lista para baixo quando abre. */}
       <Sheet visible={rascunho !== null} onClose={fechar}>
@@ -318,6 +328,10 @@ export default function RulesScreen() {
 }
 
 const styles = StyleSheet.create({
+  paneBody: {
+    gap: Space.xl,
+    minWidth: 0,
+  },
   faixa: {
     gap: Space.xs,
     paddingHorizontal: Space.lg,

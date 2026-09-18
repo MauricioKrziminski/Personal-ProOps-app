@@ -1,11 +1,23 @@
-import { Modal, StyleSheet, View } from 'react-native';
+import { useIsFocused } from 'expo-router';
+import { createContext, useContext, useEffect } from 'react';
+import { Modal, Platform, Pressable, StyleSheet, View, useWindowDimensions } from 'react-native';
 import { KeyboardAvoidingView } from 'react-native-keyboard-controller';
 
 import { ToastOutlet } from '@/components/ui/toast';
+import { classifyWindow } from '@/design/adaptive-window';
+import { tabletSheetFrame } from '@/design/adaptive-sheet';
 import { useTheme } from '@/hooks/use-theme';
 
+const TabletSheetContext = createContext(false);
+
+/** TaskHeader omits the Android status-bar inset only inside a centered tablet dialog. */
+export function useTabletSheetContext() {
+  return useContext(TabletSheetContext);
+}
+
 /**
- * Sheet modal — o único caminho para `Modal presentationStyle="pageSheet"` no app.
+ * Sheet modal compartilhado: pageSheet no telefone, formSheet no iPad e diálogo limitado
+ * no Android tablet. Conteúdo e ações continuam pertencendo a cada tarefa.
  *
  * Existiam TREZE cópias do mesmo par `<Modal><View style={[styles.sheet, { backgroundColor }]}>`,
  * uma por tela, e todas carregavam o mesmo defeito: no iOS o `pageSheet` desce sozinho abaixo da
@@ -13,9 +25,9 @@ import { useTheme } from '@/hooks/use-theme';
  * relógio e dos ícones de bateria. Em Patrimônio isso deixava o **"Salvar" atrás do ícone de
  * wifi** — ação primária inalcançável, num sheet que grava no banco.
  *
- * Consertar treze vezes era garantir que a décima quarta tela nascesse errada. A diferença entre
- * as plataformas é um VALOR (o respiro do topo) e a árvore é a mesma, então ela mora aqui dentro
- * por `Platform.select` — mecanismo 2 de `frontend.md`.
+ * Consertar treze vezes era garantir que a décima quarta tela nascesse errada. O respiro do topo
+ * e a apresentação da janela ficam centralizados aqui; no tablet Android, o painel limitado e
+ * o fundo escurecido deixam a tarefa contextual sem esticar os campos por toda a tela.
  *
  * Envolve a moldura e o TECLADO. **O cabeçalho é obrigatório e é o `TaskHeader`** — a rolagem
  * continua sendo decisão de cada tela, porque ela é diferente de verdade entre um form de conta e
@@ -51,26 +63,63 @@ export function Sheet({
   children: React.ReactNode;
 }) {
   const theme = useTheme();
+  const { width, height } = useWindowDimensions();
+  const focused = useIsFocused();
+  const tablet = classifyWindow(width) !== 'compact';
+  const iosTablet = Platform.OS === 'ios' && tablet;
+  const androidTablet = Platform.OS === 'android' && tablet;
+  const frame = tabletSheetFrame(width, height);
+
+  // A tela anterior pode continuar montada no Stack depois de um deep link ou logout. Um
+  // Modal nativo sobrevive à troca da rota por baixo dele; o foco do navegador o esconde no
+  // mesmo render, e em seguida limpamos o estado para que não reapareça ao voltar.
+  useEffect(() => {
+    if (!focused && visible) onClose();
+  }, [focused, visible, onClose]);
 
   return (
     <Modal
-      visible={visible}
-      animationType="slide"
-      presentationStyle="pageSheet"
+      visible={visible && focused}
+      animationType={androidTablet ? 'fade' : 'slide'}
+      presentationStyle={iosTablet ? 'formSheet' : androidTablet ? 'overFullScreen' : 'pageSheet'}
+      transparent={androidTablet}
+      supportedOrientations={iosTablet ? ['portrait', 'landscape'] : undefined}
       onRequestClose={onClose}>
-      <View style={[styles.sheet, { backgroundColor: theme.groupedBackground }]}>
-        <KeyboardAvoidingView behavior="padding" automaticOffset style={styles.sheet}>
-          {children}
+      {androidTablet ? (
+        <KeyboardAvoidingView
+          behavior="padding"
+          automaticOffset
+          style={[styles.dialogHost, { backgroundColor: theme.overlay }]}>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Fechar janela"
+            onPress={onClose}
+            style={StyleSheet.absoluteFill}
+          />
+          <TabletSheetContext.Provider value>
+            <View
+              accessibilityViewIsModal
+              style={[
+                styles.dialogPanel,
+                {
+                  width: frame.width,
+                  maxHeight: frame.height,
+                  backgroundColor: theme.groupedBackground,
+                },
+              ]}>
+              {children}
+              <ToastOutlet />
+            </View>
+          </TabletSheetContext.Provider>
         </KeyboardAvoidingView>
-        {/*
-          ⚠️ **O toast precisa ser desenhado AQUI DENTRO.** O `Modal` é janela separada no
-          Android e VC apresentado no iOS: o host da raiz fica atrás da folha, e toda mutation
-          que falha dentro de um sheet falhava em silêncio — §6 do design. Medido no emulador em
-          15/09/2026 com um erro que chegou no `onError` e não pintou um pixel. O estado é o
-          mesmo; ver o ⚠️ em `toast.tsx`.
-        */}
-        <ToastOutlet />
-      </View>
+      ) : (
+        <View style={[styles.sheet, { backgroundColor: theme.groupedBackground }]}>
+          <KeyboardAvoidingView behavior="padding" automaticOffset style={styles.sheet}>
+            {children}
+          </KeyboardAvoidingView>
+          <ToastOutlet />
+        </View>
+      )}
     </Modal>
   );
 }
@@ -78,5 +127,15 @@ export function Sheet({
 const styles = StyleSheet.create({
   sheet: {
     flex: 1,
+  },
+  dialogHost: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  dialogPanel: {
+    flex: 1,
+    borderRadius: 24,
+    overflow: 'hidden',
   },
 });

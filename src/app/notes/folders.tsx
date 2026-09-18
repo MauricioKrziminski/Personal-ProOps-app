@@ -10,6 +10,7 @@ import Animated, { FadeInDown, LinearTransition } from 'react-native-reanimated'
 import * as Haptics from 'expo-haptics';
 
 import { ThemedText } from '@/components/themed-text';
+import { AdaptivePanes } from '@/components/ui/adaptive-panes';
 import { HeaderActions } from '@/components/ui/header-actions';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
@@ -256,26 +257,9 @@ export default function FoldersScreen() {
   const list = folders.data ?? [];
   const arvore = folderTree(list);
 
-  return (
-    <Screen grouped onRefresh={() => Promise.all([folders.refetch(), loose.refetch()])}>
-      <Stack.Screen options={{ title: 'Organizar pastas' }} />
-
-      <HeaderActions
-        actions={[]}
-        menu={{
-          title: 'Pastas',
-          actions: [
-            {
-              label: 'Arquivadas',
-              icon: 'archivebox',
-              onPress: () => router.push('/notes/archived'),
-            },
-            { label: 'Lixeira', icon: 'trash', onPress: () => router.push('/notes/trash') },
-          ],
-        }}
-      />
-
-      {/* Ação primária: criar. Campo no topo, sem modal. */}
+  // One editor instance: on a wide window it stays beside the hierarchy; on a narrow window
+  // it returns above the list, preserving the existing creation flow and keyboard behavior.
+  const folderEditor = (
       <Card>
         <View style={styles.form}>
           <Field label={editing ? `Renomear «${editing.name}»` : 'Nova pasta'} error={error ?? undefined}>
@@ -335,7 +319,10 @@ export default function FoldersScreen() {
           </View>
         </View>
       </Card>
+  );
 
+  const folderLibrary = (
+    <>
       {folders.isError ? (
         <Card>
           <View style={styles.errorCard}>
@@ -419,6 +406,42 @@ export default function FoldersScreen() {
           />
         </Section>
       )}
+    </>
+  );
+
+  const compactOrganizer = (
+    <>
+      {folderEditor}
+      {folderLibrary}
+    </>
+  );
+
+  return (
+    <Screen grouped wide onRefresh={() => Promise.all([folders.refetch(), loose.refetch()])}>
+      <Stack.Screen options={{ title: 'Organizar pastas' }} />
+
+      <HeaderActions
+        actions={[]}
+        menu={{
+          title: 'Pastas',
+          actions: [
+            {
+              label: 'Arquivadas',
+              icon: 'archivebox',
+              onPress: () => router.push('/notes/archived'),
+            },
+            { label: 'Lixeira', icon: 'trash', onPress: () => router.push('/notes/trash') },
+          ],
+        }}
+      />
+
+      <AdaptivePanes
+        testID="folder-organizer-panes"
+        main={folderLibrary}
+        support={folderEditor}
+        singlePaneContent={compactOrganizer}
+      />
+
       <ColorPicker
         visible={pintando !== null}
         value={pintando?.color ?? null}
