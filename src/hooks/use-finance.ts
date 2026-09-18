@@ -1433,6 +1433,9 @@ export function useCycle(view?: CycleView) {
      * a virada.
      */
     staleTime: 5 * 60 * 1000,
+    // São só duas respostas pequenas (Mês e Ciclo). Conservar a régua inativa
+    // evita que o primeiro toque após alguns minutos volte a uma chave vazia.
+    gcTime: Infinity,
     refetchOnWindowFocus: true,
   });
 }

@@ -25,7 +25,7 @@ import { Segmented } from '@/components/ui/segmented';
 import { Skeleton, SkeletonHero, SkeletonList, SkeletonRow } from '@/components/ui/skeleton';
 import { ProgressBar } from '@/components/ui/sparkline';
 import { useToast } from '@/components/ui/toast';
-import { Motion, Radius, Space, tabular } from '@/design/tokens';
+import { Motion, Space, tabular } from '@/design/tokens';
 import {
   INCOME_CATEGORIES,
   SUGGESTED_CATEGORIES,
@@ -441,7 +441,6 @@ export default function BudgetsScreen() {
 
   const loading = status.isLoading ? (
     <>
-      <Skeleton height={120} radius={Radius.lg} />
       <SkeletonRow />
       <SkeletonRow />
       <SkeletonRow />
@@ -450,6 +449,12 @@ export default function BudgetsScreen() {
 
   const hero = status.isError ? (
     <ErrorBand message="Não deu para carregar os orçamentos." onRetry={status.refetch} />
+  ) : status.isLoading ? (
+    <Card style={styles.hero}>
+      <HeroLabel>Ainda dá para gastar</HeroLabel>
+      <Skeleton width="70%" height={32} />
+      <Skeleton width="45%" height={18} />
+    </Card>
   ) : linhas.length > 0 ? (
     <Animated.View entering={FadeInDown.duration(Motion.duration.slow)}>
       <Card style={styles.hero}>
@@ -560,8 +565,8 @@ export default function BudgetsScreen() {
 
   const compactBody = (
     <>
-      {loading}
       {hero}
+      {loading}
       {budgetSections}
       {budgetContextContent}
       {empty}
@@ -579,7 +584,7 @@ export default function BudgetsScreen() {
   const tabletBody = (
     <AdaptivePanes
       main={budgetList}
-      support={status.isError || linhas.length > 0 || periodoFalhou || resumo.isError || semLimite.length > 0 ? budgetContext : undefined}
+      support={status.isLoading || status.isError || linhas.length > 0 || periodoFalhou || resumo.isError || semLimite.length > 0 ? budgetContext : undefined}
       singlePane="main-only"
       singlePaneContent={compactBody}
       testID="budgets-tablet-workspace"

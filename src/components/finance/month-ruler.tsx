@@ -1,6 +1,5 @@
 import { useState } from 'react';
 import { StyleSheet, View } from 'react-native';
-import * as Haptics from 'expo-haptics';
 
 import { Segmented } from '@/components/ui/segmented';
 import { useCycle, type CycleView } from '@/hooks/use-finance';
@@ -39,12 +38,18 @@ export type MonthRulerState = ReturnType<typeof useMonthRuler>;
 export function useMonthRuler() {
   const [view, setView] = useState<CycleView>('cycle');
   const cycle = useCycle(view);
+  const [knownCloseDay, setKnownCloseDay] = useState<number | null>(null);
+  // A chave da outra régua pode estar pendente no primeiro toque. Não esconda o
+  // controle que acabou de receber o toque enquanto essa consulta responde.
+  if (cycle.data && cycle.data.closeDay !== knownCloseDay) {
+    setKnownCloseDay(cycle.data.closeDay);
+  }
   /**
    * Sem dia de fechamento configurado as duas réguas descrevem o MESMO período
    * (`cycle_bounds(null, m)` É o `date_trunc('month')`), e um controle cujas duas opções fazem a
    * mesma coisa ensina a pessoa a não confiar nos controles da tela. Então ele não aparece.
    */
-  const temCiclo = cycle.data?.closeDay != null;
+  const temCiclo = (cycle.data ? cycle.data.closeDay : knownCloseDay) != null;
   return { view, setView, temCiclo, cycle };
 }
 
@@ -61,10 +66,7 @@ export function MonthRuler({ value, onChange, visible }: Props) {
     <View style={styles.wrap}>
       <Segmented
         value={value}
-        onChange={(v) => {
-          Haptics.selectionAsync();
-          onChange(v);
-        }}
+        onChange={onChange}
         options={[
           { value: 'civil', label: 'Mês' },
           { value: 'cycle', label: 'Ciclo' },

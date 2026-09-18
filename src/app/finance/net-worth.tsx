@@ -358,6 +358,19 @@ export default function NetWorthScreen() {
   // retrospectiva. O gráfico mede a largura do card que o recebe em cada orientação.
   const trend = serie.isError ? (
     <ErrorBand message="Não deu para carregar a evolução." onRetry={serie.refetch} />
+  ) : serie.isLoading ? (
+    <Card style={styles.bloco}>
+      <ThemedText type="smallBold">Evolução</ThemedText>
+      <Segmented options={JANELAS} value={janela} onChange={setJanela} />
+      <Skeleton height={80} radius={Radius.sm} />
+      <View style={styles.eixo}>
+        <Skeleton width="24%" height={16} />
+        <Skeleton width="24%" height={16} />
+      </View>
+      <ThemedText type="small" themeColor="textSecondary">
+        A linha do zero é a de referência: abaixo dela o patrimônio é negativo.
+      </ThemedText>
+    </Card>
   ) : pontos.length > 1 ? (
     <Card style={styles.bloco}>
       <ThemedText type="smallBold">Evolução</ThemedText>

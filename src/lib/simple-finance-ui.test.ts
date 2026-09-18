@@ -495,8 +495,12 @@ test('trocando de mês, com as bordas ainda chegando, o herói espera em vez de 
   // O resumo só liga com as bordas definitivas, então `summary.isLoading` fica `false` enquanto
   // elas buscam. Com o portão da tela já aberto — é o que acontece numa troca de mês —, sem
   // `bordasChegando` o herói pintaria R$ 0,00 nesse intervalo.
-  const t = tipos(screen(financeiroFile, { rangePending: true }));
-  assert.ok(t.includes('Skeleton'), 'o herói fica no esqueleto');
+  const ui = screen(financeiroFile, { rangePending: true });
+  const t = tipos(ui);
+  const hero = ui.nodes().find((n: any) => n.type === 'HeroPanel');
+  assert.ok(hero, 'o cartão permanece montado durante a troca');
+  assert.equal(hero.props.value.type, 'Skeleton', 'o valor ainda não confirmado fica oculto');
+  assert.equal(hero.props.onPress, undefined, 'ações do período aguardam os dados');
   assert.ok(!t.includes('ErrorCard'), 'buscando não é falha');
 });
 

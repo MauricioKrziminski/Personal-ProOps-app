@@ -18,6 +18,7 @@ interface SkeletonProps {
   width?: DimensionValue;
   height?: number;
   radius?: number;
+  tone?: 'surface' | 'hero';
 }
 
 /**
@@ -60,7 +61,7 @@ function desligar() {
  * a leitura de um scanner, no vocabulário do Concreto (sem gradiente). Com Reduce Motion o bloco
  * fica parado.
  */
-export function Skeleton({ width = '100%', height = 16, radius = Radius.xs }: SkeletonProps) {
+export function Skeleton({ width = '100%', height = 16, radius = Radius.xs, tone = 'surface' }: SkeletonProps) {
   const theme = useTheme();
   const reduzido = useReducedMotion();
   const { width: tela } = useWindowDimensions();
@@ -93,14 +94,14 @@ export function Skeleton({ width = '100%', height = 16, radius = Radius.xs }: Sk
         height,
         borderRadius: radius,
         borderCurve: 'continuous',
-        backgroundColor: theme.backgroundElement,
+        backgroundColor: tone === 'hero' ? theme.heroChip : theme.backgroundElement,
         overflow: 'hidden',
       }}>
       {reduzido ? null : (
         <Animated.View
           style={[
             styles.faixa,
-            { width: faixa, backgroundColor: theme.backgroundSelected },
+            { width: faixa, backgroundColor: tone === 'hero' ? theme.heroSeparator : theme.backgroundSelected },
             varredura,
           ]}
         />

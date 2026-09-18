@@ -57,8 +57,7 @@ const FRENTE = { duration: 300, dampingRatio: 0.84 };
 const TRAS = { duration: 520, dampingRatio: 0.9 };
 
 /**
- * Controle segmentado: no iOS, a calha e a seleção recebem o material nativo
- * do Liquid Glass; no Android, mantêm as superfícies e animações próprias.
+ * Controle segmentado do Android. O iOS usa o Picker nativo em segmented.ios.tsx.
  *
  * ## O movimento
  *

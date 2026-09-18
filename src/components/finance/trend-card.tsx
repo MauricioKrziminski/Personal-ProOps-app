@@ -8,6 +8,7 @@ import { monthShort, monthTitle } from '@/components/finance/month-picker';
 import { ThemedText } from '@/components/themed-text';
 import { Money } from '@/components/ui/money';
 import { Segmented } from '@/components/ui/segmented';
+import { Skeleton } from '@/components/ui/skeleton';
 import { BarTrack } from '@/components/ui/sparkline';
 import { Radius, Space } from '@/design/tokens';
 import type { MonthlyCashflow } from '@/hooks/use-finance';
@@ -36,10 +37,12 @@ export function TrendCard({
   meses,
   janela,
   onJanela,
+  loading = false,
 }: {
   meses: readonly MonthlyCashflow[];
   janela: string;
   onJanela: (v: string) => void;
+  loading?: boolean;
 }) {
   const theme = useTheme();
   const [escolhido, setEscolhido] = useState<number | null>(null);
@@ -144,17 +147,25 @@ export function TrendCard({
         <Segmented options={JANELAS} value={janela} onChange={onJanela} />
       </View>
 
-      <GestureDetector gesture={gesto}>
-        <View style={styles.barras} onLayout={(e) => setLargura(e.nativeEvent.layout.width)}>
-          {meses.map(par)}
-        </View>
-      </GestureDetector>
+      {loading ? <Skeleton height={ALTURA_BARRA + 26} radius={Radius.sm} /> : (
+        <GestureDetector gesture={gesto}>
+          <View style={styles.barras} onLayout={(e) => setLargura(e.nativeEvent.layout.width)}>
+            {meses.map(par)}
+          </View>
+        </GestureDetector>
+      )}
 
       <View style={[styles.rodape, { backgroundColor: theme.cardFooter }]}>
-        <ThemedText type="footnote" themeColor="textSecondary">
-          {`Sobrou em ${monthShort(mes.month.slice(0, 7))}`}
-        </ThemedText>
-        <Money cents={Number(mes.income_cents) - Number(mes.expense_cents)} variant="ticker" tone="auto" signed />
+        {loading ? (
+          <Skeleton width="60%" height={17} />
+        ) : (
+          <>
+            <ThemedText type="footnote" themeColor="textSecondary">
+              {`Sobrou em ${monthShort(mes.month.slice(0, 7))}`}
+            </ThemedText>
+            <Money cents={Number(mes.income_cents) - Number(mes.expense_cents)} variant="ticker" tone="auto" signed />
+          </>
+        )}
       </View>
     </View>
   );

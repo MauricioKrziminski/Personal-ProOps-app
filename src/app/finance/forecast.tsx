@@ -23,7 +23,7 @@ import { MonthRuler, useMonthRuler } from '@/components/finance/month-ruler';
 import { Calendar } from '@/components/finance/calendar';
 import { Sheet } from '@/components/ui/sheet';
 import { TaskHeader } from '@/components/ui/task-header';
-import { Skeleton, SkeletonChart, SkeletonList, SkeletonRow } from '@/components/ui/skeleton';
+import { Skeleton, SkeletonChart, SkeletonList } from '@/components/ui/skeleton';
 import { MeasuredSparkline } from '@/components/ui/measured-sparkline';
 import { useToast } from '@/components/ui/toast';
 import { Motion, Radius, Space, tabular } from '@/design/tokens';
@@ -288,8 +288,11 @@ export default function ForecastScreen() {
    * inteira em zero. `serie.length === 0` nunca acontece — `generate_series` devolve uma linha por
    * dia mesmo sem nenhum lançamento, e o empty antigo era inalcançável.
    */
+  const projecaoCarregando = emMes
+    ? mensal.isLoading || mensal.isPlaceholderData
+    : forecast.isLoading;
   const nadaParaProjetar =
-    !forecast.isLoading &&
+    !projecaoCarregando &&
     !accounts.isLoading &&
     !bills.isLoading &&
     !bills.isError &&
@@ -444,55 +447,73 @@ export default function ForecastScreen() {
     );
   }
 
-  const curveDecision = forecast.isError ? (
-    <ErrorBand message="Não deu para carregar a projeção." onRetry={forecast.refetch} />
-  ) : serie.length > 0 && !nadaParaProjetar ? (
+  const curveDecision = (emMes ? mensal.isError : forecast.isError) ? (
+    <ErrorBand
+      message="Não deu para carregar a projeção."
+      onRetry={emMes ? mensal.refetch : forecast.refetch}
+    />
+  ) : (projecaoCarregando || (emMes ? meses.length > 0 : serie.length > 0)) && !nadaParaProjetar ? (
     <Animated.View entering={FadeInDown.duration(Motion.duration.slow)}>
       <Card style={styles.hero}>
-        <View style={styles.heroTitulo}>
-          {primeiroNegativo ? <Icon name="exclamationmark.triangle" size="md" color="danger" /> : null}
-          <ThemedText
-            type="smallBold"
-            themeColor={primeiroNegativo ? 'danger' : 'text'}
-            style={styles.heroTexto}>
-            {primeiroNegativo
-              ? `Você fica no vermelho em ${isoToBR(primeiroNegativo)}`
-              : `Não fica negativo nos próximos ${rotuloHorizonte(dias)}`}
-          </ThemedText>
-        </View>
-        <View
-          accessible
-          accessibilityLabel={`Saldo hoje ${formatBRL(hoje)}, no fim do período ${formatBRL(fim)}${primeiroNegativo ? `, negativo a partir de ${isoToBR(primeiroNegativo)}` : ''}`}>
-          <MeasuredSparkline
-            values={valores}
-            height={96}
-            showZero
-            pastCount={passado.length + 1}
-          />
-        </View>
-        <View style={styles.legenda}>
-          <ThemedText type="caption" themeColor="textSecondary">
-            {passado.length > 0 ? '━ o que já caiu na conta' : '━ saldo de hoje'}
-          </ThemedText>
-          <ThemedText type="caption" themeColor="textSecondary">
-            ┄ previsto: o real, mais o que entra e sai
-          </ThemedText>
-        </View>
-        <View style={styles.heroSplit}>
-          <View style={styles.heroParte}>
-            <HeroLabel>tenho hoje</HeroLabel>
-            <Money cents={hoje} variant="title2" tone={hoje < 0 ? 'danger' : 'text'} />
-          </View>
-          <View style={styles.heroParte}>
-            <HeroLabel>em {rotuloHorizonte(dias)}</HeroLabel>
-            <Money cents={fim} variant="title2" tone={fim < 0 ? 'danger' : 'text'} />
-          </View>
-        </View>
-        {entra > 0 || sai > 0 ? (
-          <ThemedText type="footnote" themeColor="textSecondary" style={tabular}>
-            entra {brl(entra)} · sai {brl(sai)} em {rotuloHorizonte(dias)}
-          </ThemedText>
-        ) : null}
+        {projecaoCarregando ? (
+          <>
+            <Skeleton width="72%" height={24} />
+            <Skeleton height={96} radius={Radius.sm} />
+            <Skeleton width="65%" height={32} />
+            <View style={styles.heroSplit}>
+              <Skeleton width="36%" height={58} />
+              <Skeleton width="36%" height={58} />
+            </View>
+            <Skeleton width="60%" height={18} />
+          </>
+        ) : (
+          <>
+            <View style={styles.heroTitulo}>
+              {primeiroNegativo ? <Icon name="exclamationmark.triangle" size="md" color="danger" /> : null}
+              <ThemedText
+                type="smallBold"
+                themeColor={primeiroNegativo ? 'danger' : 'text'}
+                style={styles.heroTexto}>
+                {primeiroNegativo
+                  ? `Você fica no vermelho em ${isoToBR(primeiroNegativo)}`
+                  : `Não fica negativo nos próximos ${rotuloHorizonte(dias)}`}
+              </ThemedText>
+            </View>
+            <View
+              accessible
+              accessibilityLabel={`Saldo hoje ${formatBRL(hoje)}, no fim do período ${formatBRL(fim)}${primeiroNegativo ? `, negativo a partir de ${isoToBR(primeiroNegativo)}` : ''}`}>
+              <MeasuredSparkline
+                values={valores}
+                height={96}
+                showZero
+                pastCount={passado.length + 1}
+              />
+            </View>
+            <View style={styles.legenda}>
+              <ThemedText type="caption" themeColor="textSecondary">
+                {passado.length > 0 ? '━ o que já caiu na conta' : '━ saldo de hoje'}
+              </ThemedText>
+              <ThemedText type="caption" themeColor="textSecondary">
+                ┄ previsto: o real, mais o que entra e sai
+              </ThemedText>
+            </View>
+            <View style={styles.heroSplit}>
+              <View style={styles.heroParte}>
+                <HeroLabel>tenho hoje</HeroLabel>
+                <Money cents={hoje} variant="title2" tone={hoje < 0 ? 'danger' : 'text'} />
+              </View>
+              <View style={styles.heroParte}>
+                <HeroLabel>em {rotuloHorizonte(dias)}</HeroLabel>
+                <Money cents={fim} variant="title2" tone={fim < 0 ? 'danger' : 'text'} />
+              </View>
+            </View>
+            {entra > 0 || sai > 0 ? (
+              <ThemedText type="footnote" themeColor="textSecondary" style={tabular}>
+                entra {brl(entra)} · sai {brl(sai)} em {rotuloHorizonte(dias)}
+              </ThemedText>
+            ) : null}
+          </>
+        )}
       </Card>
     </Animated.View>
   ) : null;
@@ -649,15 +670,6 @@ export default function ForecastScreen() {
         </ScrollView>
       </Sheet>
 
-      {forecast.isLoading ? (
-        <>
-          <Skeleton height={180} radius={Radius.lg} />
-          <Skeleton height={140} radius={Radius.md} />
-          <SkeletonRow />
-          <SkeletonRow />
-        </>
-      ) : null}
-
       {curveDecision || scenario ? (
         <FinanceAnalysisPanes
           primary={curveDecision}
@@ -680,7 +692,7 @@ export default function ForecastScreen() {
         língua em sete telas, e mudar o texto só aqui criaria dois nomes para a mesma intenção
         (contagem anti-slop §10).
       */}
-      {!nadaParaProjetar && serie.length > 0 ? (
+      {!nadaParaProjetar && (projecaoCarregando || (emMes ? meses.length > 0 : serie.length > 0)) ? (
         <View style={styles.modo}>
           <View style={styles.modoGranularidade}>
             <Segmented

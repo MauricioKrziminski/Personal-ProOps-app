@@ -393,7 +393,16 @@ export default function DebtsScreen() {
               ? 'Ordenado pelas taxas conhecidas. Parcelas simples ficam ao fim, pois a taxa não foi informada.'
               : 'Atacar a de saldo menor primeiro quita a primeira mais rápido.'}
           </ThemedText>
-          {(payoff.data ?? []).map((p, i) => (
+          {payoff.isLoading ? lista.map((d) => (
+            <View key={d.id} style={styles.ordemLinha}>
+              <Skeleton width={18} height={18} />
+              <View style={styles.ordemTexto}>
+                <Skeleton width="70%" height={18} />
+                <Skeleton width="50%" height={14} />
+              </View>
+              <Skeleton width={76} height={22} />
+            </View>
+          )) : (payoff.data ?? []).map((p, i) => (
             <Animated.View
               key={p.debt_id}
               layout={LinearTransition.duration(Motion.duration.base)}

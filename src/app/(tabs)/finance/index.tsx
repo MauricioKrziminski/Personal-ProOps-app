@@ -295,12 +295,7 @@ export default function FinanceScreen() {
     <>
       <PeriodBar month={month} onChangeMonth={setMonth} ruler={regua} variant="bare" />
       <View onLayout={measureHeroPane}>
-        {heroLoading ? (
-          <View style={styles.heroSkeleton}>
-            <Skeleton width="55%" height={14} />
-            <Skeleton width="70%" height={46} />
-          </View>
-        ) : heroError ? (
+        {heroError ? (
           <ErrorCard onRetry={() => {
             void refazerPeriodo();
             void forecast.refetch();
@@ -308,20 +303,24 @@ export default function FinanceScreen() {
         ) : (
           <HeroPanel
             surface="live"
-            label={descricao?.label ?? 'Saldo projetado'}
-            value={<CountUpMoney cents={descricao?.cents ?? 0} variant="heroMoney" tone={cicloRuim ? 'onHeroDanger' : 'onHero'} />}
-            footer={descricao?.rodape ? (
+            label={heroLoading ? 'Atualizando período' : descricao?.label ?? 'Saldo projetado'}
+            value={heroLoading
+              ? <Skeleton width="70%" height={46} tone="hero" />
+              : <CountUpMoney cents={descricao?.cents ?? 0} variant="heroMoney" tone={cicloRuim ? 'onHeroDanger' : 'onHero'} />}
+            footer={!heroLoading && descricao?.rodape ? (
               <View style={styles.heroRodape}>
                 <ThemedText type="footnote" themeColor="onHeroMuted">{descricao.rodape.label}</ThemedText>
                 <Money cents={descricao.rodape.cents} variant="footnote" tone="onHero" concealable />
               </View>
             ) : undefined}
-            secondary={variacaoSaida !== null ? {
+            secondary={!heroLoading && variacaoSaida !== null ? {
               icon: variacaoSaida > 0 ? 'arrow.up.right' : 'arrow.down.right',
               negative: variacaoSaida > 0,
               text: `${variacaoSaida > 0 ? '+' : ''}${variacaoSaida}% de gastos vs ${monthLabel(previousMonth)}`,
             } : undefined}
-            chart={isCurrent && series.length > 1 && chartWidth > 0 ? (
+            chart={heroLoading ? (
+              <Skeleton height={88} radius={Radius.sm} tone="hero" />
+            ) : isCurrent && series.length > 1 && chartWidth > 0 ? (
               <ScrubChart
                 values={series}
                 labels={rotulos}
@@ -341,7 +340,7 @@ export default function FinanceScreen() {
               />
             ) : undefined}
             concealable
-            onPress={() => showItemActions('Mais opções', [
+            onPress={heroLoading ? undefined : () => showItemActions('Mais opções', [
               { label: 'Ver o que fecha o ciclo', icon: 'list.bullet', onPress: () => abrirCiclo('tudo') },
               { label: 'O que entra', icon: 'arrow.down.circle', onPress: () => abrirCiclo('entra') },
               { label: 'O que sai', icon: 'arrow.up.circle', onPress: () => abrirCiclo('sai') },
@@ -537,12 +536,10 @@ export default function FinanceScreen() {
 
       {cashflow.isError ? (
         <ErrorCard onRetry={cashflow.refetch} />
-      ) : cashflow.isLoading ? (
-        <Skeleton height={180} radius={Radius.md} />
-      ) : meses.length > 1 ? (
+      ) : cashflow.isLoading || meses.length > 1 ? (
         <View style={styles.bloco}>
           <BlockHeader title="Tendência" />
-          <TrendCard meses={meses} janela={janelaCashflow} onJanela={setJanelaCashflow} />
+          <TrendCard meses={meses} janela={janelaCashflow} onJanela={setJanelaCashflow} loading={cashflow.isLoading} />
         </View>
       ) : null}
 
@@ -596,7 +593,6 @@ export default function FinanceScreen() {
 
 const styles = StyleSheet.create({
   bloco: { gap: Space.md },
-  heroSkeleton: { gap: Space.md },
   heroRodape: {
     flex: 1,
     flexDirection: 'row',
