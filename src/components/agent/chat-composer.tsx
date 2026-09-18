@@ -76,7 +76,7 @@ export function ChatComposer({
         </ThemedText>
       ) : null}
 
-      <View style={styles.linha}>
+      <View style={[styles.linha, inline && styles.linhaInline]}>
         <TextField
           value={value}
           onChangeText={onChangeText}
@@ -127,6 +127,7 @@ const styles = StyleSheet.create({
   },
   inline: { paddingHorizontal: 0, paddingTop: 0, paddingBottom: 0, borderTopWidth: 0 },
   linha: { width: '100%', maxWidth: MaxContentWidth, alignSelf: 'center', flexDirection: 'row', alignItems: 'flex-end', gap: Space.sm },
+  linhaInline: { alignItems: 'center' },
   counter: { width: '100%', maxWidth: MaxContentWidth, alignSelf: 'center' },
   campo: {
     flex: 1,
