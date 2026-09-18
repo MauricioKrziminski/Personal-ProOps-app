@@ -82,9 +82,9 @@ normais de uso. O grupo Financeiro soma 21 destinos incluindo a raiz `/finance`.
   Agente em `/private/tmp/proops-ipad-agent-root.png` e conversa nova em
   `/private/tmp/proops-ipad-agent-new.png`. Os PNGs são evidência local temporária, não foram
   colocados no Git porque mostram dados de staging.
-- Na raiz de Notas do iPad, a biblioteca ocupa a largura disponível em vez de reservar um painel
-  de prévia que não era editável. As pastas ficam em quatro colunas nessa largura e a nota abre
-  pela rota existente. No Android tablet, a composição em duas áreas continua.
+- Na raiz de Notas do iPad e do Android tablet, a biblioteca ocupa a largura disponível em vez
+  de reservar um painel de prévia que não era editável. As pastas ficam em quatro colunas nessa
+  largura e a nota abre pela rota existente.
 - O AVD Android tablet (1280×800 dp) foi apontado explicitamente para o Metro local
   `10.0.2.2:8083`. Capturas anteriores à troca vinham da porta 8081 e foram descartadas. A
   captura após o bundle atual, com Hoje em duas áreas e a pílula inferior, está em
@@ -96,7 +96,9 @@ normais de uso. O grupo Financeiro soma 21 destinos incluindo a raiz `/finance`.
   elimina a transição, como documentado pelo Reanimated.
 - Após o merge, o Metro do worktree principal ficou na porta `8081` e os dois AVDs foram
   apontados para `10.0.2.2:8081` com o deep link do dev client. O tablet abriu Notas com a barra
-  inferior em `/private/tmp/proops-android-tablet-main.png`. No celular `s26`, uma reinstalação
+  inferior em `/private/tmp/proops-android-tablet-main.png`. Após alinhar a biblioteca do Android
+  à do iPad, a captura `/private/tmp/proops-android-tablet-notes-library.png` mostra quatro
+  pastas na mesma linha, a lista abaixo e a barra inferior preservada. No celular `s26`, uma reinstalação
   limpa apenas do APK de desenvolvimento reparou o launcher; a tela Hoje e a barra inferior
   aparecem em `/private/tmp/proops-android-phone-ready.png`.
 - Faltam percorrer cada rota no build atual, paisagem, janela estreita, tema escuro, fonte

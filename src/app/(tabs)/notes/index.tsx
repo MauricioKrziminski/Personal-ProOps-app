@@ -5,16 +5,13 @@ import { router } from 'expo-router';
 import * as Haptics from 'expo-haptics';
 
 import { Chip } from '@/components/finance/chip';
-import { ThemedText } from '@/components/themed-text';
 import { ColorPicker } from '@/components/notes/color-picker';
 import { FolderGrid } from '@/components/notes/folder-grid';
 import { FolderPicker } from '@/components/notes/folder-picker';
 import type { NoteCardActions } from '@/components/notes/note-card';
 import { NoteList } from '@/components/notes/note-list';
-import { NotesTabletLibrary } from '@/components/notes/notes-tablet-library';
 import { useFolderMenu } from '@/components/notes/use-folder-menu';
 import { AppHeader, HeaderIconButton } from '@/components/ui/app-header';
-import { Button } from '@/components/ui/button';
 import { EmptyState } from '@/components/ui/empty-state';
 import { SearchField } from '@/components/ui/search-field';
 import { BlockHeader } from '@/components/ui/block-header';
@@ -49,8 +46,6 @@ import { SORT_LABEL, useNoteSort } from '@/hooks/use-note-sort';
 import { useTelaPronta } from '@/hooks/use-tela-pronta';
 import { useTheme } from '@/hooks/use-theme';
 import { showItemActions } from '@/lib/item-actions';
-import { relativeBR } from '@/lib/dates';
-import { notePreview, noteTitle } from '@/lib/search';
 
 /**
  * O que a barra de abas cobre do pé da rolagem, para a faixa do auto-scroll ficar ALCANÇÁVEL.
@@ -111,7 +106,6 @@ function NoteSkeleton() {
 export default function NotesScreen() {
   const { windowClass } = useAdaptiveWindow();
   const tablet = windowClass !== 'compact';
-  const ipadLibrary = tablet && Platform.OS === 'ios';
   const theme = useTheme();
   const toast = useToast();
 
@@ -417,11 +411,7 @@ export default function NotesScreen() {
         }
         keyboardDismissMode="on-drag"
         showsVerticalScrollIndicator={false}
-        contentContainerStyle={[
-          styles.conteudo,
-          tablet && styles.conteudoTablet,
-          ipadLibrary && styles.conteudoIpad,
-        ]}
+        contentContainerStyle={[styles.conteudo, tablet && styles.conteudoTablet]}
         scrollEventThrottle={16}
         onScroll={({ nativeEvent: e }) => {
           const fim = e.contentSize.height - e.layoutMeasurement.height - e.contentOffset.y;
@@ -581,9 +571,9 @@ export default function NotesScreen() {
         ) : null}
 
         <View onLayout={(e) => setTopoSoltas(e.nativeEvent.layout.y)}>
-          {/* O rótulo só existe quando há duas seções para separar — sozinho ele nomearia a
-              tela inteira, que já tem nome no header. */}
-          {(fixadas.length > 0 && soltas.length > 0) || (ipadLibrary && soltas.length > 0) ? (
+          {/* No tablet, o rótulo identifica a lista abaixo da grade de pastas; no celular,
+              aparece apenas quando há duas seções de notas para separar. */}
+          {(fixadas.length > 0 && soltas.length > 0) || (tablet && soltas.length > 0) ? (
             <View style={styles.cabecalhoNotas}>
               <BlockHeader title={procurando ? 'Resultados' : 'Notas'} count={soltas.length} />
             </View>
@@ -617,50 +607,7 @@ export default function NotesScreen() {
 
   return (
     <Screen scroll={false} wide={tablet} grouped topBar={cabecalho} contentStyle={tablet && styles.tabletShell}>
-      {tablet && !ipadLibrary ? (
-        <NotesTabletLibrary
-          library={biblioteca}
-          reading={
-            <ScrollView
-              style={[styles.readingPane, { backgroundColor: theme.surface, borderColor: theme.cardBorder }]}
-              contentContainerStyle={styles.readingContent}
-              showsVerticalScrollIndicator={false}>
-              {notes[0] ? (
-                <View style={styles.notePreview}>
-                  <ThemedText type="caption" themeColor="textSecondary">PRÉVIA</ThemedText>
-                  <ThemedText type="title">{noteTitle(notes[0].content) || 'Sem título'}</ThemedText>
-                  <ThemedText type="small" themeColor="textSecondary">
-                    Atualizada {relativeBR(notes[0].updated_at)}
-                  </ThemedText>
-                  {notePreview(notes[0].content) ? (
-                    <ThemedText type="default" style={styles.previewBody}>
-                      {notePreview(notes[0].content)}
-                    </ThemedText>
-                  ) : null}
-                  <Button
-                    label="Abrir nota"
-                    icon="arrow.up.right"
-                    variant="secondary"
-                    onPress={() => router.push(`/notes/${notes[0].id}`)}
-                  />
-                </View>
-              ) : (
-                <View style={styles.readingEmpty}>
-                  <View style={[styles.readingMark, { backgroundColor: theme.backgroundElement }]}>
-                    <Icon name="book" size="xl" color="textSecondary" />
-                  </View>
-                  <View style={styles.readingCopy}>
-                    <ThemedText type="subtitle" style={styles.readingText}>Suas ideias começam aqui</ThemedText>
-                    <ThemedText type="small" themeColor="textSecondary" style={styles.readingText}>
-                      Escolha uma pasta ou crie uma nota para começar.
-                    </ThemedText>
-                  </View>
-                </View>
-              )}
-            </ScrollView>
-          }
-        />
-      ) : biblioteca}
+      {biblioteca}
 
       <ColorPicker
         visible={pintando !== null}
@@ -723,36 +670,7 @@ export default function NotesScreen() {
 const styles = StyleSheet.create({
   tabletShell: { paddingHorizontal: Space.lg },
   libraryScroll: { flex: 1 },
-  conteudoTablet: { maxWidth: undefined, paddingHorizontal: 0 },
-  conteudoIpad: { maxWidth: 960, alignSelf: 'center' },
-  readingPane: {
-    flex: 1,
-    borderRadius: Radius.md,
-    borderCurve: 'continuous',
-    borderWidth: StyleSheet.hairlineWidth,
-  },
-  readingContent: {
-    flexGrow: 1,
-    padding: Space.xxl,
-  },
-  notePreview: { alignItems: 'flex-start', gap: Space.md },
-  previewBody: { marginTop: Space.lg, lineHeight: 28 },
-  readingEmpty: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: Space.lg,
-  },
-  readingMark: {
-    width: 64,
-    height: 64,
-    borderRadius: Radius.lg,
-    borderCurve: 'continuous',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  readingCopy: { gap: Space.sm, maxWidth: 340, alignItems: 'center' },
-  readingText: { textAlign: 'center' },
+  conteudoTablet: { maxWidth: 960, paddingHorizontal: 0, alignSelf: 'center' },
   /** O rótulo é um botão: alvo de 44pt (§11), não a altura natural de uma linha de `caption`. */
   alvoRecolher: { minHeight: HitTarget, justifyContent: 'center' },
   /** Mesmo respiro vertical do cabeçalho de Pastas, sem tornar Notas um botão. */
