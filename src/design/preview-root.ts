@@ -18,6 +18,7 @@ export function previewScreenFromParam(value: unknown) {
   return previewRootFromParam(value) ?? (
     value === 'invoice' ? 'Fatura' :
     value === 'forecast' ? 'Projeção' :
-    value === 'net-worth' ? 'Patrimônio' : null
+    value === 'net-worth' ? 'Patrimônio' :
+    value === 'cycle' ? 'Ciclo' : null
   );
 }

@@ -45,4 +45,22 @@ export function seedFinancePeriodPreview(client: QueryClient, period: PreviewPer
     },
   ];
   client.setQueryData(['cycle-series', previousMonth, month, 'cycle'], series);
+  client.setQueryData(['cycle-series', month, month, 'cycle'], [series[1]]);
+  client.setQueryData(['cycle-lines', month, 'cycle'], [
+    {
+      origin: 'invoice', ref_id: 'prev-i1', title: 'Nubank Ultravioleta',
+      day: `${month}-10`, method_label: 'Nubank Ultravioleta', atrasada: true,
+      in_cents: 0, out_cents: 208000,
+    },
+    {
+      origin: 'transaction', ref_id: 'prev-aluguel', title: 'Casa e compromissos',
+      day: `${month}-15`, method_label: 'Conta corrente', atrasada: false,
+      in_cents: 0, out_cents: 838000,
+    },
+    {
+      origin: 'transaction', ref_id: 'prev-salario', title: 'Salário',
+      day: `${month}-01`, method_label: 'Conta corrente', atrasada: false,
+      in_cents: 900000, out_cents: 0,
+    },
+  ]);
 }

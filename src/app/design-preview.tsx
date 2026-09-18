@@ -25,6 +25,7 @@ import TransactionsScreen from './finance/transactions';
 import TransactionFormScreen from './finance/transaction-form';
 import FinanceScreen from './(tabs)/finance/index';
 import ForecastScreen from './finance/forecast';
+import CycleDetailScreen from './finance/cycle';
 import NetWorthScreen from './finance/net-worth';
 import NotesScreen from './(tabs)/notes/index';
 import ProfileScreen from './(tabs)/profile/index';
@@ -82,7 +83,7 @@ import TodayScreen from './(tabs)/today/index';
  * FATURA, não do lançamento, e a tela escrevia "Vence em") e a linha "Repete …" que leva à
  * série. Numa parcela ou num lançamento solto, nenhuma das duas existe.
  */
-const ABAS = ['Hoje', 'Finanças', 'Notas', 'Agente', 'Perfil', 'Dívidas', 'Fatura', 'Projeção', 'Patrimônio', 'Recorrentes', 'Editar', 'Detalhe', 'Lançamentos', 'Orçamentos'] as const;
+const ABAS = ['Hoje', 'Finanças', 'Notas', 'Agente', 'Perfil', 'Dívidas', 'Fatura', 'Projeção', 'Patrimônio', 'Ciclo', 'Recorrentes', 'Editar', 'Detalhe', 'Lançamentos', 'Orçamentos'] as const;
 
 /**
  * A tela é montada numa caixa ALTA e deslocada para cima, em vez de rolada.
@@ -145,6 +146,7 @@ const ABA_PARA_TAB: Record<string, number> = {
   Fatura: 1,
   Projeção: 2,
   Patrimônio: 2,
+  Ciclo: 2,
   Recorrentes: 2,
   Editar: 2,
   Detalhe: 2,
@@ -166,6 +168,7 @@ const FAIXAS: Record<(typeof ABAS)[number], number> = {
   Fatura: 1,
   Projeção: 1,
   Patrimônio: 1,
+  Ciclo: 1,
   // Duas faixas: a lista de séries e o painel do que entra/sai no mês.
   Recorrentes: 2,
   // Uma faixa: o valor, a categoria e o botão Salvar cabem numa tela — é o que precisa
@@ -270,6 +273,7 @@ export default function DesignPreviewScreen() {
             {aba === 'Fatura' ? <InvoiceScreen /> : null}
             {aba === 'Projeção' ? <ForecastScreen /> : null}
             {aba === 'Patrimônio' ? <NetWorthScreen /> : null}
+            {aba === 'Ciclo' ? <CycleDetailScreen /> : null}
             {aba === 'Recorrentes' ? <RecurringScreen /> : null}
             {aba === 'Editar' ? <TransactionFormScreen /> : null}
             {aba === 'Detalhe' ? <TransactionDetailScreen /> : null}

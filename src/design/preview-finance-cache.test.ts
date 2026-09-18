@@ -23,4 +23,6 @@ test('preview seeds the period queries Finance actually requests', () => {
   });
   const series = client.getQueryData<unknown[]>(['cycle-series', '2026-08', '2026-09', 'cycle']);
   assert.equal(series?.length, 2);
+  assert.equal(client.getQueryData<unknown[]>(['cycle-series', '2026-09', '2026-09', 'cycle'])?.length, 1);
+  assert.ok(client.getQueryData<unknown[]>(['cycle-lines', '2026-09', 'cycle'])?.length);
 });
