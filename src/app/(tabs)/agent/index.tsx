@@ -1,13 +1,14 @@
 import { FlashList } from '@shopify/flash-list';
 import { router } from 'expo-router';
 import { useCallback, useMemo, useState } from 'react';
-import { Pressable, StyleSheet, View } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
 
 import { ConversationRow } from '@/components/agent/conversation-row';
 import { AgentHomeHeader } from '@/components/agent/agent-home-header';
 import { RenameConversationSheet } from '@/components/agent/rename-conversation-sheet';
 import { ThemedText } from '@/components/themed-text';
 import { AppHeader, HeaderIconButton } from '@/components/ui/app-header';
+import { AdaptivePanes } from '@/components/ui/adaptive-panes';
 import { BlockHeader } from '@/components/ui/block-header';
 import { TAB_BAR_SPACE } from '@/components/ui/pill-tab-bar';
 import { Screen } from '@/components/ui/screen';
@@ -15,6 +16,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { useToast } from '@/components/ui/toast';
 import { MaxContentWidth } from '@/constants/theme';
 import { Radius, Space } from '@/design/tokens';
+import { useAdaptiveWindow } from '@/hooks/use-adaptive-window';
 import { useTheme } from '@/hooks/use-theme';
 import {
   useAgentConversations,
@@ -25,6 +27,8 @@ import type { AgentConversation } from '@/lib/agent-api';
 import { confirmDestructive, showItemActions } from '@/lib/item-actions';
 
 export default function AgentScreen() {
+  const { windowClass } = useAdaptiveWindow();
+  const tablet = windowClass !== 'compact';
   const toast = useToast();
 
   const lista = useAgentConversations();
@@ -101,15 +105,15 @@ export default function AgentScreen() {
     if (hasNextPage && !isFetchingNextPage) fetchNextPage();
   }, [hasNextPage, isFetchingNextPage, fetchNextPage]);
 
-  return (
-    <Screen scroll={false} grouped topBar={<AppHeader title="Agente" action={<NovaConversa />} />}>
-      <FlashList
+  const conversationList = (withIntro: boolean) => (
+    <FlashList
+        style={styles.list}
         data={conversas}
         keyExtractor={(c) => c.id}
         renderItem={renderConversa}
         ListHeaderComponent={
           <View style={styles.header}>
-            <AgentHomeHeader onNew={nova} onPrompt={abrirPrompt} />
+            {withIntro ? <AgentHomeHeader onNew={nova} onPrompt={abrirPrompt} /> : null}
             <BlockHeader title="Suas conversas" count={conversas.length} />
           </View>
         }
@@ -130,9 +134,9 @@ export default function AgentScreen() {
         contentContainerStyle={{
           paddingTop: Space.sm,
           paddingHorizontal: Space.lg,
-          paddingBottom: TAB_BAR_SPACE,
+          paddingBottom: tablet ? Space.xxxl : TAB_BAR_SPACE,
           width: '100%',
-          maxWidth: MaxContentWidth,
+          maxWidth: tablet ? undefined : MaxContentWidth,
           alignSelf: 'center',
         }}
         refreshing={puxando}
@@ -140,6 +144,29 @@ export default function AgentScreen() {
         onEndReachedThreshold={0.5}
         onEndReached={carregarMais}
       />
+  );
+
+  return (
+    <Screen
+      scroll={false}
+      wide={tablet}
+      grouped
+      topBar={<AppHeader title="Agente" action={<NovaConversa />} />}
+      contentStyle={tablet && styles.tabletFrame}>
+      {tablet ? (
+        <AdaptivePanes
+          fill
+          variant="library-reading"
+          main={conversationList(false)}
+          support={
+            <ScrollView contentContainerStyle={styles.tabletStart} showsVerticalScrollIndicator={false}>
+              <AgentHomeHeader onNew={nova} onPrompt={abrirPrompt} />
+            </ScrollView>
+          }
+          singlePaneContent={conversationList(true)}
+          testID="agent-tablet-workspace"
+        />
+      ) : conversationList(true)}
 
       <RenameConversationSheet
         // Remonta a cada conversa: é o que faz o campo abrir com o título CERTO
@@ -196,7 +223,10 @@ function NovaConversa() {
 }
 
 const styles = StyleSheet.create({
+  list: { flex: 1 },
   header: { gap: Space.xxl, paddingBottom: Space.sm },
+  tabletFrame: { paddingHorizontal: Space.lg },
+  tabletStart: { paddingHorizontal: Space.lg, paddingBottom: Space.xxxl },
   loading: { gap: Space.sm },
   empty: { paddingVertical: Space.md },
   retry: { gap: Space.md, paddingVertical: Space.md, alignItems: 'flex-start' },

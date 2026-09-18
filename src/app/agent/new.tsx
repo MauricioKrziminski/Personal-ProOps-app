@@ -1,6 +1,7 @@
 import { useLocalSearchParams } from 'expo-router';
 
 import { ConversationScreen } from '@/components/agent/conversation-screen';
+import { ConversationWorkspace } from '@/components/agent/conversation-workspace';
 
 /**
  * Conversa nova.
@@ -12,5 +13,9 @@ import { ConversationScreen } from '@/components/agent/conversation-screen';
  */
 export default function NewConversationScreen() {
   const { prompt } = useLocalSearchParams<{ prompt?: string }>();
-  return <ConversationScreen initialText={prompt ?? ''} />;
+  return (
+    <ConversationWorkspace>
+      <ConversationScreen initialText={prompt ?? ''} />
+    </ConversationWorkspace>
+  );
 }
