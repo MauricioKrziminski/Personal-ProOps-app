@@ -12,7 +12,7 @@ leitura ou tarefa com largura limitada. As URLs e ações compactas continuam se
 - iPhone e iPad usam `NativeTabs`. Por decisão de Gabriel em 18/09, a barra nativa do iPadOS
   permanece no topo. Os cinco SF Symbols estão declarados no `NativeTabs.Trigger.Icon`; na
   captura do iPadOS 26 a apresentação superior mostra só os rótulos.
-- Capturas locais atuais: `/private/tmp/proops-ipad-notes-final.png` e
+- Capturas locais atuais: `/private/tmp/proops-ipad-notes-library.png` e
   `/private/tmp/proops-android-tablet-final.png`. Elas comprovam a posição das barras e a
   composição de Notas/Hoje em retrato, não acessibilidade ou tato em aparelho físico.
 
@@ -21,7 +21,7 @@ leitura ou tarefa com largura limitada. As URLs e ações compactas continuam se
 | Rota | Tratamento | Evidência nesta sessão |
 |---|---|---|
 | `/today` | Reestruturada | Código; captura incremental anterior |
-| `/notes` | Reestruturada | Código e captura iPad atual com duas colunas de pastas e prévia real |
+| `/notes` | Reestruturada | Código e captura iPad atual com quatro pastas na mesma linha e lista de notas; sem painel vazio de prévia |
 | `/finance` | Reestruturada | Código; captura incremental anterior |
 | `/agent` | Reestruturada | Código e capturas iPad/Android da lista e painel inicial |
 | `/profile` | Reestruturada | Código; captura incremental anterior |
@@ -80,6 +80,9 @@ normais de uso. O grupo Financeiro soma 21 destinos incluindo a raiz `/finance`.
   Agente em `/private/tmp/proops-ipad-agent-root.png` e conversa nova em
   `/private/tmp/proops-ipad-agent-new.png`. Os PNGs são evidência local temporária, não foram
   colocados no Git porque mostram dados de staging.
+- Na raiz de Notas do iPad, a biblioteca ocupa a largura disponível em vez de reservar um painel
+  de prévia que não era editável. As pastas ficam em quatro colunas nessa largura e a nota abre
+  pela rota existente. No Android tablet, a composição em duas áreas continua.
 - O AVD Android tablet (1280×800 dp) foi apontado explicitamente para o Metro local
   `10.0.2.2:8083`. Capturas anteriores à troca vinham da porta 8081 e foram descartadas. A
   captura após o bundle atual, com Hoje em duas áreas e a pílula inferior, está em

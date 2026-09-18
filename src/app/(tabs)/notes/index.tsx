@@ -111,6 +111,7 @@ function NoteSkeleton() {
 export default function NotesScreen() {
   const { windowClass } = useAdaptiveWindow();
   const tablet = windowClass !== 'compact';
+  const ipadLibrary = tablet && Platform.OS === 'ios';
   const theme = useTheme();
   const toast = useToast();
 
@@ -416,7 +417,11 @@ export default function NotesScreen() {
         }
         keyboardDismissMode="on-drag"
         showsVerticalScrollIndicator={false}
-        contentContainerStyle={[styles.conteudo, tablet && styles.conteudoTablet]}
+        contentContainerStyle={[
+          styles.conteudo,
+          tablet && styles.conteudoTablet,
+          ipadLibrary && styles.conteudoIpad,
+        ]}
         scrollEventThrottle={16}
         onScroll={({ nativeEvent: e }) => {
           const fim = e.contentSize.height - e.layoutMeasurement.height - e.contentOffset.y;
@@ -578,7 +583,7 @@ export default function NotesScreen() {
         <View onLayout={(e) => setTopoSoltas(e.nativeEvent.layout.y)}>
           {/* O rótulo só existe quando há duas seções para separar — sozinho ele nomearia a
               tela inteira, que já tem nome no header. */}
-          {fixadas.length > 0 && soltas.length > 0 ? (
+          {(fixadas.length > 0 && soltas.length > 0) || (ipadLibrary && soltas.length > 0) ? (
             <BlockHeader title={procurando ? 'Resultados' : 'Notas'} count={soltas.length} />
           ) : null}
 
@@ -610,7 +615,7 @@ export default function NotesScreen() {
 
   return (
     <Screen scroll={false} wide={tablet} grouped topBar={cabecalho} contentStyle={tablet && styles.tabletShell}>
-      {tablet ? (
+      {tablet && !ipadLibrary ? (
         <NotesTabletLibrary
           library={biblioteca}
           reading={
@@ -717,6 +722,7 @@ const styles = StyleSheet.create({
   tabletShell: { paddingHorizontal: Space.lg },
   libraryScroll: { flex: 1 },
   conteudoTablet: { maxWidth: undefined, paddingHorizontal: 0 },
+  conteudoIpad: { maxWidth: 960, alignSelf: 'center' },
   readingPane: {
     flex: 1,
     borderRadius: Radius.md,

@@ -10,12 +10,12 @@ import type { NoteFolder } from '@/hooks/use-notes';
 /**
  * A grade de pastas — a home (pastas raiz) e a tela de uma pasta (subpastas).
  *
- * ## Duas colunas, três só quando a própria grade é larga
+ * ## Colunas conforme a largura da própria grade
  *
  * A 384dp com a calha de 16 sobram 352: em três colunas o ladrilho fica com 112, e nele o nome
  * de uma pasta de duas palavras quebra em três linhas. Duas colunas dão 172, que é onde
- * "Universidade" cabe numa linha só. Acima de 520dp na área da grade cabem três. A largura
- * da janela não serve no iPad: a biblioteca ocupa só uma coluna ao lado da leitura.
+ * "Universidade" cabe numa linha só. Acima de 520dp cabem três, e acima de 760dp quatro.
+ * A largura da janela não serve: a grade pode ocupar uma coluna ao lado de outro conteúdo.
  *
  * ## O vão entre ladrilhos é MAIOR que o respiro dentro deles
  *
@@ -65,7 +65,7 @@ export function FolderGrid({
       <Reorderable
         data={pastas}
         keyExtractor={(f) => f.id}
-        columns={gridWidth >= 520 ? 3 : 2}
+        columns={gridWidth >= 760 ? 4 : gridWidth >= 520 ? 3 : 2}
         tileHeight={folderTileHeight(fontScale)}
         gap={Space.md}
         enabled={enabled}
