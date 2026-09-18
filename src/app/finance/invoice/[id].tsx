@@ -27,6 +27,7 @@ import { Skeleton, SkeletonRow } from '@/components/ui/skeleton';
 import { useToast } from '@/components/ui/toast';
 import { alturaDoCartao } from '@/design/card-geometry';
 import { HitTarget, Motion, Radius, Space, tabular } from '@/design/tokens';
+import { useAdaptiveWindow } from '@/hooks/use-adaptive-window';
 import {
   useAccounts,
   useCardInvoices,
@@ -111,6 +112,8 @@ export default function InvoiceScreen() {
   const insets = useSafeAreaInsets();
   const { id, via } = useLocalSearchParams<{ id: string; via?: string }>();
   const { width, fontScale } = useWindowDimensions();
+  const { windowClass } = useAdaptiveWindow();
+  const tablet = windowClass !== 'compact';
   const invoice = useInvoice(id);
   const accounts = useAccounts();
   const pay = usePayInvoice();
@@ -485,10 +488,11 @@ export default function InvoiceScreen() {
     ) : null;
 
   return (
-    <Screen scroll={false} grouped>
+    <Screen scroll={false} grouped wide={tablet}>
       <Stack.Screen
         options={{
           title: fatura ? `Fatura de ${mesLabel(fatura.reference_month)}` : 'Fatura',
+          headerLargeTitle: !tablet,
         }}
       />
 
