@@ -97,22 +97,15 @@ export function OtpInput({
               key={i}
               style={[
                 styles.box,
-                { backgroundColor: theme.surface, borderColor: theme.separator },
+                {
+                  backgroundColor: theme.surface,
+                  borderColor: invalid ? theme.danger : isActive ? theme.tint : theme.separator,
+                },
               ]}>
               {/*
-                O fio de 1dp é CONSTANTE (design.md §7b: indicador não pode depender de um pixel),
-                e o anel de foco/erro fica por cima — trocar de estado não desloca o dígito.
+                O fio de 1dp é constante: foco e erro mudam só sua cor,
+                sem mover o dígito nem sobrepor um segundo arco aos cantos.
               */}
-              <View
-                pointerEvents="none"
-                style={[
-                  styles.anel,
-                  {
-                    borderColor: invalid ? theme.danger : theme.tint,
-                    opacity: invalid || isActive ? 1 : 0,
-                  },
-                ]}
-              />
               {filled ? (
                 <Animated.Text
                   key={`${i}:${digits[i]}`}
@@ -162,16 +155,6 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     alignItems: 'center',
     justifyContent: 'center',
-  },
-  anel: {
-    position: 'absolute',
-    top: -1,
-    left: -1,
-    right: -1,
-    bottom: -1,
-    borderRadius: Radius.sm,
-    borderCurve: 'continuous',
-    borderWidth: 1.5,
   },
   caret: {
     width: 2,

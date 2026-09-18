@@ -12,6 +12,7 @@ import {
 import Animated, {
   Easing,
   cancelAnimation,
+  interpolateColor,
   makeMutable,
   useAnimatedStyle,
   useReducedMotion,
@@ -28,13 +29,13 @@ import { HitTarget, Motion, Radius, Space, Type, tabular } from '@/design/tokens
 import { useTheme } from '@/hooks/use-theme';
 import { maskBRDate } from '@/lib/dates';
 
-/** Quanto tempo o anel de foco leva para acender. */
-const ANEL_MS = 160;
+/** Duração da transição da borda ao focar. */
+const FOCUS_BORDER_MS = 160;
 
 /**
  * O foco do campo, compartilhado entre o `Field` (rótulo) e o input dentro dele.
  *
- * É um `SharedValue` e não estado React: o anel acompanha o foco na thread de UI, sem render.
+ * É um `SharedValue` e não estado React: a borda acompanha o foco na thread de UI, sem render.
  * Fora de um `Field` o input usa um valor próprio.
  */
 const FocoDoCampo = createContext<SharedValue<number> | null>(null);
@@ -51,7 +52,7 @@ interface FieldProps {
  * Envelope de campo: label visível, erro inline junto do campo (não no topo do form) e hint.
  *
  * O rótulo fica parado em cima da caixa, pequeno e em tinta, como nos vídeos de referência —
- * quem conta o foco é o anel da caixa. O foco é compartilhado por contexto com a caixa de dentro.
+ * quem conta o foco é a borda da caixa. O foco é compartilhado por contexto com a caixa de dentro.
  *
  * ## Label e hint NÃO podem ter o mesmo estilo
  *
@@ -127,9 +128,10 @@ function repartir(style: StyleProp<TextStyle>): { caixa: ViewStyle; input: TextS
 }
 
 /**
- * A caixa do campo: superfície branca de canto 12 com fio claro, e um ANEL de tinta de 1,5px que
- * acende no foco — por opacidade, então o conteúdo não se move. Com erro, o anel fica vermelho e
- * a caixa treme uma vez, no momento em que o erro aparece.
+ * A caixa do campo: a própria borda muda de cor no foco, sem mudar de largura.
+ * O contorno acompanha o raio de cada campo, inclusive o compositor arredondado
+ * do Agente, sem desenhar um segundo arco por cima. Com erro, a borda fica
+ * vermelha e a caixa treme uma vez.
  */
 function useCaixa(invalid: boolean | undefined) {
   const theme = useTheme();
@@ -154,11 +156,15 @@ function useCaixa(invalid: boolean | undefined) {
     antes.current = invalid;
   }, [invalid, reduzido, tremor]);
 
-  const estiloCaixa = useAnimatedStyle(() => ({ transform: [{ translateX: tremor.get() }] }));
-  const estiloAnel = useAnimatedStyle(() => ({ opacity: invalid ? 1 : foco.get() }));
+  const estiloCaixa = useAnimatedStyle(() => ({
+    borderColor: invalid
+      ? theme.danger
+      : interpolateColor(foco.get(), [0, 1], [theme.separator, theme.tint]),
+    transform: [{ translateX: tremor.get() }],
+  }));
 
   const focar = () =>
-    foco.set(withTiming(1, { duration: reduzido ? 0 : ANEL_MS, easing: Motion.easing.out }));
+    foco.set(withTiming(1, { duration: reduzido ? 0 : FOCUS_BORDER_MS, easing: Motion.easing.out }));
   const desfocar = () =>
     foco.set(withTiming(0, { duration: reduzido ? 0 : Motion.duration.base, easing: Motion.easing.out }));
 
@@ -166,15 +172,11 @@ function useCaixa(invalid: boolean | undefined) {
     <Animated.View
       style={[
         styles.caixa,
-        { backgroundColor: theme.surface, borderColor: theme.separator },
+        { backgroundColor: theme.surface },
         estilo,
         estiloCaixa,
       ]}>
       {conteudo}
-      <Animated.View
-        pointerEvents="none"
-        style={[styles.anel, { borderColor: invalid ? theme.danger : theme.tint }, estiloAnel]}
-      />
     </Animated.View>
   );
 
@@ -450,20 +452,6 @@ const styles = StyleSheet.create({
     borderCurve: 'continuous',
     borderWidth: 1,
     justifyContent: 'center',
-  },
-  /**
-   * O anel de foco: por cima do fio, no mesmo raio. Fica fora do fluxo, então acender não desloca
-   * o texto. `-1` cobre o fio de 1dp da caixa.
-   */
-  anel: {
-    position: 'absolute',
-    top: -1,
-    left: -1,
-    right: -1,
-    bottom: -1,
-    borderRadius: Radius.sm,
-    borderCurve: 'continuous',
-    borderWidth: 1.5,
   },
   input: {
     minHeight: HitTarget + 6,

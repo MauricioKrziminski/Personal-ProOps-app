@@ -39,7 +39,6 @@ export const PhoneField = forwardRef<TextInput, PhoneFieldProps>(function PhoneF
         {
           backgroundColor: theme.backgroundElement,
           borderColor: invalid ? theme.danger : theme.separator,
-          borderWidth: invalid ? 2 : StyleSheet.hairlineWidth,
         },
       ]}>
       <ThemedText themeColor="textSecondary" style={[Type.body, tabular]}>
@@ -75,6 +74,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: Space.lg,
     borderRadius: Radius.sm,
     borderCurve: 'continuous',
+    borderWidth: 1,
   },
   divider: {
     width: StyleSheet.hairlineWidth,
