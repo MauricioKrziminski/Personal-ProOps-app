@@ -18,3 +18,10 @@ test('shared sheets use native iPad form presentation and Android tablet dialog 
   assert.match(sheet, /tabletSheetFrame\(width, height\)/);
   assert.match(header, /useTabletSheetContext/);
 });
+
+test('a sheet cannot remain presented over a different route', () => {
+  const sheet = readFileSync('src/components/ui/sheet.tsx', 'utf8');
+  assert.match(sheet, /useIsFocused\(\)/);
+  assert.match(sheet, /visible=\{visible && focused\}/);
+  assert.match(sheet, /!focused && visible/);
+});

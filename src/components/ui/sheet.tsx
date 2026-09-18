@@ -1,4 +1,5 @@
-import { createContext, useContext } from 'react';
+import { useIsFocused } from 'expo-router';
+import { createContext, useContext, useEffect } from 'react';
 import { Modal, Platform, Pressable, StyleSheet, View, useWindowDimensions } from 'react-native';
 import { KeyboardAvoidingView } from 'react-native-keyboard-controller';
 
@@ -63,14 +64,22 @@ export function Sheet({
 }) {
   const theme = useTheme();
   const { width, height } = useWindowDimensions();
+  const focused = useIsFocused();
   const tablet = classifyWindow(width) !== 'compact';
   const iosTablet = Platform.OS === 'ios' && tablet;
   const androidTablet = Platform.OS === 'android' && tablet;
   const frame = tabletSheetFrame(width, height);
 
+  // A tela anterior pode continuar montada no Stack depois de um deep link ou logout. Um
+  // Modal nativo sobrevive à troca da rota por baixo dele; o foco do navegador o esconde no
+  // mesmo render, e em seguida limpamos o estado para que não reapareça ao voltar.
+  useEffect(() => {
+    if (!focused && visible) onClose();
+  }, [focused, visible, onClose]);
+
   return (
     <Modal
-      visible={visible}
+      visible={visible && focused}
       animationType={androidTablet ? 'fade' : 'slide'}
       presentationStyle={iosTablet ? 'formSheet' : androidTablet ? 'overFullScreen' : 'pageSheet'}
       transparent={androidTablet}
