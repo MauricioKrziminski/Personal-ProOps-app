@@ -584,7 +584,9 @@ export default function NotesScreen() {
           {/* O rótulo só existe quando há duas seções para separar — sozinho ele nomearia a
               tela inteira, que já tem nome no header. */}
           {(fixadas.length > 0 && soltas.length > 0) || (ipadLibrary && soltas.length > 0) ? (
-            <BlockHeader title={procurando ? 'Resultados' : 'Notas'} count={soltas.length} />
+            <View style={styles.cabecalhoNotas}>
+              <BlockHeader title={procurando ? 'Resultados' : 'Notas'} count={soltas.length} />
+            </View>
           ) : null}
 
           {soltas.length > 0 ? (
@@ -753,6 +755,8 @@ const styles = StyleSheet.create({
   readingText: { textAlign: 'center' },
   /** O rótulo é um botão: alvo de 44pt (§11), não a altura natural de uma linha de `caption`. */
   alvoRecolher: { minHeight: HitTarget, justifyContent: 'center' },
+  /** Mesmo respiro vertical do cabeçalho de Pastas, sem tornar Notas um botão. */
+  cabecalhoNotas: { minHeight: HitTarget, justifyContent: 'center' },
   conteudo: {
     gap: Space.xl,
     paddingHorizontal: Space.lg,
