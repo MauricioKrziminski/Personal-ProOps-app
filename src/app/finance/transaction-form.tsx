@@ -24,6 +24,7 @@ import { Segmented } from '@/components/ui/segmented';
 import { Skeleton } from '@/components/ui/skeleton';
 import { ToastDoModal, useToast } from '@/components/ui/toast';
 import { MaxContentWidth } from '@/constants/theme';
+import { useAdaptiveWindow } from '@/hooks/use-adaptive-window';
 import { Motion, Space, Type } from '@/design/tokens';
 import {
   useAccounts,
@@ -180,6 +181,8 @@ export default function TransactionFormScreen() {
 
 function TransactionForm({ editing }: { editing?: Transaction }) {
   const insets = useSafeAreaInsets();
+  const { windowClass } = useAdaptiveWindow();
+  const tablet = windowClass !== 'compact';
   const toast = useToast();
   const { data: accounts } = useAccounts();
 
@@ -407,7 +410,7 @@ function TransactionForm({ editing }: { editing?: Transaction }) {
   };
 
   return (
-    <Screen scroll={false}>
+    <Screen scroll={false} wide={tablet}>
       <TaskHeader
         title={editing ? 'Editar lançamento' : 'Novo lançamento'}
         onClose={() => router.back()}

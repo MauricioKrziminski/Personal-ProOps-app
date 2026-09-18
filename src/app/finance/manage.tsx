@@ -3,6 +3,7 @@ import type { SymbolViewProps } from 'expo-symbols';
 
 import { Row, Section } from '@/components/ui/row';
 import { Screen } from '@/components/ui/screen';
+import { useAdaptiveWindow } from '@/hooks/use-adaptive-window';
 
 /**
  * Gerenciar — o menu que terminava a aba Financeiro.
@@ -79,9 +80,12 @@ const GROUPS: { title: string; items: ManageItem[] }[] = [
 ];
 
 export default function ManageScreen() {
+  const { windowClass } = useAdaptiveWindow();
+  const tablet = windowClass !== 'compact';
+
   return (
-    <Screen grouped>
-      <Stack.Screen options={{ title: 'Gerenciar', headerLargeTitle: true }} />
+    <Screen grouped wide={tablet}>
+      <Stack.Screen options={{ title: 'Gerenciar', headerLargeTitle: !tablet }} />
 
       {GROUPS.map((group) => (
         <Section key={group.title} title={group.title}>

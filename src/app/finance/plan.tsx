@@ -6,6 +6,7 @@ import * as Haptics from 'expo-haptics';
 
 import { ErrorCard } from '@/components/error-card';
 import { Card } from '@/components/ui/card';
+import { AdaptivePanes } from '@/components/ui/adaptive-panes';
 import { ThemedText } from '@/components/themed-text';
 import { Button } from '@/components/ui/button';
 import { Field, TextField } from '@/components/ui/field';
@@ -27,6 +28,7 @@ import {
 } from '@/hooks/use-finance';
 import { formatDateBR } from '@/hooks/use-items';
 import { useTheme } from '@/hooks/use-theme';
+import { useAdaptiveWindow } from '@/hooks/use-adaptive-window';
 
 /** 5551999998888 -> (51) 99999-8888 */
 function telefoneBR(digitos: string): string {
@@ -75,6 +77,8 @@ function selo(status: string, ate: string | null): { texto: string; perigo: bool
  */
 export default function PlanScreen() {
   const theme = useTheme();
+  const { windowClass } = useAdaptiveWindow();
+  const tablet = windowClass !== 'compact';
   const toast = useToast();
   const { data, isLoading, isError, refetch } = usePlanStatus();
   // `isError` e não só `data`: o TanStack GUARDA o resultado anterior quando o refetch
@@ -132,241 +136,72 @@ export default function PlanScreen() {
         : 'Seu plano volta para o Free no fim do período. Nenhum dado é apagado — e dá para voltar quando quiser, aqui mesmo.'
     );
 
-  return (
-    <Screen grouped onRefresh={() => Promise.all([refetch(), convites.refetch()])}>
-      <Stack.Screen options={{ title: 'Plano', headerLargeTitle: true }} />
-
-      {/* Falhar aqui não pode virar "você é Free": sem dado, a tela diz que não conseguiu ler. */}
-      {isError ? <ErrorCard onRetry={refetch} /> : null}
-
-      {isLoading && !isError ? (
-        <>
-          <Skeleton height={148} />
-          <SkeletonRow />
-          <SkeletonRow />
-          <SkeletonRow />
-        </>
-      ) : null}
-
-      {/* O único destaque da tela: a cota é o único número aqui que muda comportamento. */}
-      {plano ? (
-        <Animated.View entering={FadeInDown.duration(Motion.duration.slow)}>
-          <Card style={styles.hero}>
-            <View style={styles.heroTopo}>
-              <ThemedText type="smallBold">{nomePlano}</ThemedText>
-              {estado ? (
-                <ThemedText type="small" themeColor={estado.perigo ? 'danger' : 'textSecondary'}>
-                  {estado.texto}
-                </ThemedText>
-              ) : null}
-            </View>
-
-            {/* Rótulo ANTES do número, como em todo card de destaque do app. Aqui estava
-                invertido — valor em cima, etiqueta embaixo — e era o único assim. */}
-            <HeroLabel>mensagens da IA usadas este mês</HeroLabel>
-            <ThemedText type="subtitle" style={tabular}>
-              {usadas} de {teto}
-            </ThemedText>
-            <ProgressBar
-              value={usadas}
-              max={teto}
-              tone={estourou ? 'danger' : proporcao >= 0.9 ? 'warning' : 'tint'}
-            />
-
-            {estourou ? (
-              <ThemedText type="small" themeColor="danger">
-                A IA para de responder até virar o mês. Subir de plano libera mais mensagens.
-              </ThemedText>
-            ) : null}
-
-            {plano.status === 'expired' ? (
-              <ThemedText type="small" themeColor="danger">
-                Sua assinatura expirou
-                {plano.current_period_end ? ` em ${formatDateBR(plano.current_period_end)}` : ''}.
-                Você voltou para o Free e nada foi apagado.
-              </ThemedText>
-            ) : null}
-
-            {plano.status === 'past_due' ? (
-              <ThemedText type="small" themeColor="danger">
-                A loja não conseguiu cobrar. Atualize a forma de pagamento por lá.
-              </ThemedText>
-            ) : null}
-          </Card>
-        </Animated.View>
-      ) : null}
-
-      {/* As três linhas são exatamente as três colunas de `private.plan_limits`. */}
-      {plano ? (
-        <Section title="O que seu plano dá">
-          <Row
-            title="Pessoas"
-            subtitle={noLimite ? 'no limite do plano' : 'convide pelo telefone do WhatsApp'}
-            icon="person.2"
-            chevron={false}
-            trailing={
-              <ThemedText type="smallBold" style={tabular}>
-                {plano.members} de {plano.max_members}
-              </ThemedText>
-            }
-          />
-          <Row
-            title="Mensagens da IA"
-            subtitle="zera na virada do mês"
-            icon="sparkles"
-            chevron={false}
-            trailing={
-              <ThemedText type="smallBold" style={tabular}>
-                {usadas} de {teto}
-              </ThemedText>
-            }
-          />
-          <Row
-            title="Importar extrato"
-            subtitle={plano.can_import ? 'liberada' : 'não entra no Free'}
-            icon="arrow.down.doc"
-            chevron={false}
-            trailing={
-              <ThemedText type="small" themeColor={plano.can_import ? 'success' : 'textSecondary'}>
-                {plano.can_import ? 'liberada' : 'bloqueada'}
-              </ThemedText>
-            }
-          />
-        </Section>
-      ) : null}
-
-      {plano && plano.plan !== 'free' ? (
-        <Section title="Cobrança">
-          <Row
-            title="Onde você assinou"
-            icon="creditcard"
-            chevron={false}
-            trailing={
-              <ThemedText type="small" themeColor="textSecondary">
-                {plano.provider === 'apple'
-                  ? 'App Store'
-                  : plano.provider === 'google'
-                    ? 'Google Play'
-                    : (plano.provider ?? '—')}
-              </ThemedText>
-            }
-          />
-          {plano.current_period_end ? (
-            <Row
-              title={plano.status === 'canceled' ? 'Ativo até' : 'Renova em'}
-              icon="calendar"
-              chevron={false}
-              trailing={
-                <ThemedText type="small" themeColor="textSecondary" style={tabular}>
-                  {formatDateBR(plano.current_period_end)}
-                </ThemedText>
-              }
-            />
-          ) : null}
-          {plano.status !== 'canceled' ? (
-            <Row
-              title={naLoja ? 'Gerenciar assinatura' : 'Cancelar assinatura'}
-              subtitle={naLoja ? 'abre a loja, onde a cobrança vive' : 'um toque, sem formulário'}
-              icon="xmark.circle"
-              destructive={!naLoja}
-              chevron={false}
-              onPress={confirmarCancelamento}
-            />
-          ) : null}
-        </Section>
-      ) : null}
-
-      {/* Convite é por telefone: é o mesmo vínculo que o WhatsApp usa. */}
-      <View style={styles.bloco}>
-        <Field
-          label="Convidar alguém"
-          hint="Quem entrar enxerga e lança no mesmo financeiro."
-        >
-          <TextField
-            value={telefone}
-            onChangeText={setTelefone}
-            placeholder="(51) 99999-8888"
-            keyboardType="phone-pad"
-            autoComplete="tel"
-          />
-        </Field>
-        <Button
-          label={convidar.isPending ? 'Convidando…' : 'Convidar'}
-          icon="person.badge.plus"
-          loading={convidar.isPending}
-          disabled={!podeConvidar}
-          onPress={() =>
-            convidar.mutate(
-              { phone: telefone, role: 'member' },
-              {
-                onSuccess: () => {
-                  Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-                  setTelefone('');
-                  toast({ message: 'Convite enviado.', tone: 'success' });
-                },
-                onError: () =>
-                  toast({
-                    message: 'Não deu para convidar. Confira se o número já não tem convite.',
-                    tone: 'error',
-                  }),
-              }
-            )
-          }
-          block
-        />
-        {noLimite ? (
-          <ThemedText type="footnote" themeColor="textSecondary">
-            Seu plano já está no limite de pessoas.
-          </ThemedText>
-        ) : null}
-      </View>
-
-      {convites.isError ? (
-        <View style={[styles.aviso, { backgroundColor: theme.surface }]}>
-          <ThemedText type="small" themeColor="danger">
-            Não deu para ler os convites.
-          </ThemedText>
-          <Button
-            label="Tentar de novo"
-            variant="secondary"
-            size="sm"
-            onPress={() => convites.refetch()}
-          />
+  const planHero = plano ? (
+    <Animated.View entering={FadeInDown.duration(Motion.duration.slow)}>
+      <Card style={styles.hero}>
+        <View style={styles.heroTopo}>
+          <ThemedText type="smallBold">{nomePlano}</ThemedText>
+          {estado ? <ThemedText type="small" themeColor={estado.perigo ? 'danger' : 'textSecondary'}>{estado.texto}</ThemedText> : null}
         </View>
-      ) : null}
+        <HeroLabel>mensagens da IA usadas este mês</HeroLabel>
+        <ThemedText type="subtitle" style={tabular}>{usadas} de {teto}</ThemedText>
+        <ProgressBar value={usadas} max={teto} tone={estourou ? 'danger' : proporcao >= 0.9 ? 'warning' : 'tint'} />
+        {estourou ? <ThemedText type="small" themeColor="danger">A IA para de responder até virar o mês. Subir de plano libera mais mensagens.</ThemedText> : null}
+        {plano.status === 'expired' ? <ThemedText type="small" themeColor="danger">Sua assinatura expirou{plano.current_period_end ? ` em ${formatDateBR(plano.current_period_end)}` : ''}. Você voltou para o Free e nada foi apagado.</ThemedText> : null}
+        {plano.status === 'past_due' ? <ThemedText type="small" themeColor="danger">A loja não conseguiu cobrar. Atualize a forma de pagamento por lá.</ThemedText> : null}
+      </Card>
+    </Animated.View>
+  ) : null;
 
+  const planLimits = plano ? (
+    <Section title="O que seu plano dá">
+      <Row title="Pessoas" subtitle={noLimite ? 'no limite do plano' : 'convide pelo telefone do WhatsApp'} icon="person.2" chevron={false} trailing={<ThemedText type="smallBold" style={tabular}>{plano.members} de {plano.max_members}</ThemedText>} />
+      <Row title="Mensagens da IA" subtitle="zera na virada do mês" icon="sparkles" chevron={false} trailing={<ThemedText type="smallBold" style={tabular}>{usadas} de {teto}</ThemedText>} />
+      <Row title="Importar extrato" subtitle={plano.can_import ? 'liberada' : 'não entra no Free'} icon="arrow.down.doc" chevron={false} trailing={<ThemedText type="small" themeColor={plano.can_import ? 'success' : 'textSecondary'}>{plano.can_import ? 'liberada' : 'bloqueada'}</ThemedText>} />
+    </Section>
+  ) : null;
+
+  const planBilling = plano && plano.plan !== 'free' ? (
+    <Section title="Cobrança">
+      <Row title="Onde você assinou" icon="creditcard" chevron={false} trailing={<ThemedText type="small" themeColor="textSecondary">{plano.provider === 'apple' ? 'App Store' : plano.provider === 'google' ? 'Google Play' : (plano.provider ?? '—')}</ThemedText>} />
+      {plano.current_period_end ? <Row title={plano.status === 'canceled' ? 'Ativo até' : 'Renova em'} icon="calendar" chevron={false} trailing={<ThemedText type="small" themeColor="textSecondary" style={tabular}>{formatDateBR(plano.current_period_end)}</ThemedText>} /> : null}
+      {plano.status !== 'canceled' ? <Row title={naLoja ? 'Gerenciar assinatura' : 'Cancelar assinatura'} subtitle={naLoja ? 'abre a loja, onde a cobrança vive' : 'um toque, sem formulário'} icon="xmark.circle" destructive={!naLoja} chevron={false} onPress={confirmarCancelamento} /> : null}
+    </Section>
+  ) : null;
+
+  const people = (
+    <>
+      <View style={styles.bloco}>
+        <Field label="Convidar alguém" hint="Quem entrar enxerga e lança no mesmo financeiro.">
+          <TextField value={telefone} onChangeText={setTelefone} placeholder="(51) 99999-8888" keyboardType="phone-pad" autoComplete="tel" />
+        </Field>
+        <Button label={convidar.isPending ? 'Convidando…' : 'Convidar'} icon="person.badge.plus" loading={convidar.isPending} disabled={!podeConvidar} onPress={() => convidar.mutate({ phone: telefone, role: 'member' }, { onSuccess: () => { Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success); setTelefone(''); toast({ message: 'Convite enviado.', tone: 'success' }); }, onError: () => toast({ message: 'Não deu para convidar. Confira se o número já não tem convite.', tone: 'error' }) })} block />
+        {noLimite ? <ThemedText type="footnote" themeColor="textSecondary">Seu plano já está no limite de pessoas.</ThemedText> : null}
+      </View>
+      {convites.isError ? <View style={[styles.aviso, { backgroundColor: theme.surface }]}><ThemedText type="small" themeColor="danger">Não deu para ler os convites.</ThemedText><Button label="Tentar de novo" variant="secondary" size="sm" onPress={() => convites.refetch()} /></View> : null}
       {convites.isLoading ? <SkeletonRow /> : null}
+      {pendentes.length > 0 ? <Section title="Convites pendentes">{pendentes.map((convite) => <Row key={convite.id} title={telefoneBR(convite.phone)} subtitle="esperando a pessoa se cadastrar" icon="paperplane" chevron={false} onPress={() => confirmDestructive('Revogar este convite?', 'Revogar', () => revogar.mutate(convite.id, { onSuccess: () => toast({ message: 'Convite revogado.', tone: 'success' }), onError: () => toast({ message: 'Não deu para revogar o convite.', tone: 'error' }) }))} />)}</Section> : null}
+    </>
+  );
 
-      {pendentes.length > 0 ? (
-        <Section title="Convites pendentes">
-          {pendentes.map((convite) => (
-            <Row
-              key={convite.id}
-              title={telefoneBR(convite.phone)}
-              subtitle="esperando a pessoa se cadastrar"
-              icon="paperplane"
-              chevron={false}
-              onPress={() =>
-                confirmDestructive('Revogar este convite?', 'Revogar', () =>
-                  revogar.mutate(convite.id, {
-                    onSuccess: () => toast({ message: 'Convite revogado.', tone: 'success' }),
-                    onError: () =>
-                      toast({
-                        message: 'Não deu para revogar o convite.',
-                        tone: 'error',
-                      }),
-                  })
-                )
-              }
-            />
-          ))}
-        </Section>
-      ) : null}
+  const status = <View style={styles.paneBody}>{isError ? <ErrorCard onRetry={refetch} /> : null}{isLoading && !isError ? <><Skeleton height={148} /><SkeletonRow /><SkeletonRow /><SkeletonRow /></> : null}{planHero}{planLimits}{planBilling}</View>;
+  const planPeople = <View style={styles.paneBody}>{people}</View>;
+  const compactBody = <>{isError ? <ErrorCard onRetry={refetch} /> : null}{isLoading && !isError ? <><Skeleton height={148} /><SkeletonRow /><SkeletonRow /><SkeletonRow /></> : null}{planHero}{planLimits}{planBilling}{people}</>;
+  const tabletBody = <AdaptivePanes main={planPeople} support={isError || isLoading || plano ? status : undefined} singlePane="main-only" singlePaneContent={compactBody} testID="plan-tablet-workspace" />;
+
+  return (
+    <Screen grouped wide={tablet} onRefresh={() => Promise.all([refetch(), convites.refetch()])}>
+      <Stack.Screen options={{ title: 'Plano', headerLargeTitle: !tablet }} />
+      {tablet ? tabletBody : compactBody}
     </Screen>
   );
 }
 
 const styles = StyleSheet.create({
+  paneBody: {
+    gap: Space.xl,
+    minWidth: 0,
+  },
   hero: {
     gap: Space.sm,
   },
