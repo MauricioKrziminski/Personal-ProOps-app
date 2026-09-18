@@ -1,6 +1,7 @@
 # Auditoria de rotas em tablet — 18/09/2026
 
-Branch: `feat/tablet-adaptive` no worktree `/private/tmp/personal-proops-tablet-20260917`.
+Integrado em `gabriel/concreto` no worktree principal em 18/09/2026 (`711f155`). O worktree
+isolado e a branch temporária foram removidos após a integração.
 Esta é uma matriz de implementação e evidência, não um aceite de interação em aparelho físico.
 `Reestruturada` significa composição por largura disponível; `contida` significa superfície de
 leitura ou tarefa com largura limitada. As URLs e ações compactas continuam sendo as mesmas.
@@ -12,9 +13,10 @@ leitura ou tarefa com largura limitada. As URLs e ações compactas continuam se
 - iPhone e iPad usam `NativeTabs`. Por decisão de Gabriel em 18/09, a barra nativa do iPadOS
   permanece no topo. Os cinco SF Symbols estão declarados no `NativeTabs.Trigger.Icon`; na
   captura do iPadOS 26 a apresentação superior mostra só os rótulos.
-- Capturas locais atuais: `/private/tmp/proops-ipad-notes-library.png` e
-  `/private/tmp/proops-android-tablet-final.png`. Elas comprovam a posição das barras e a
-  composição de Notas/Hoje em retrato, não acessibilidade ou tato em aparelho físico.
+- Capturas locais atuais: `/private/tmp/proops-ipad-notes-spacing.png`,
+  `/private/tmp/proops-android-tablet-main.png` e `/private/tmp/proops-android-phone-ready.png`.
+  Elas comprovam a posição das barras e a composição de Notas/Hoje em retrato, não acessibilidade
+  ou tato em aparelho físico.
 
 ## Rotas de uso
 
@@ -92,10 +94,11 @@ normais de uso. O grupo Financeiro soma 21 destinos incluindo a raiz `/finance`.
   progrediu por valores intermediários de 0 a 1 e passou ligeiramente do destino antes de voltar.
   Isso prova a transição no emulador com movimento habilitado; com movimento reduzido o sistema
   elimina a transição, como documentado pelo Reanimated.
-- O AVD Android celular `s26` iniciou. Reinstalei o APK de desenvolvimento local e confirmei no
-  manifesto e no gerenciador de pacotes a Activity principal, mas o launcher e `am start` ainda
-  retornaram que ela não estava disponível. A preservação do fluxo compacto foi verificada pelo
-  código e testes; falta captura atual em um celular Android funcional.
+- Após o merge, o Metro do worktree principal ficou na porta `8081` e os dois AVDs foram
+  apontados para `10.0.2.2:8081` com o deep link do dev client. O tablet abriu Notas com a barra
+  inferior em `/private/tmp/proops-android-tablet-main.png`. No celular `s26`, uma reinstalação
+  limpa apenas do APK de desenvolvimento reparou o launcher; a tela Hoje e a barra inferior
+  aparecem em `/private/tmp/proops-android-phone-ready.png`.
 - Faltam percorrer cada rota no build atual, paisagem, janela estreita, tema escuro, fonte
   ampliada, teclado, estados vazio/erro, toque, Back, gestos e VoiceOver/TalkBack. O simulador
   desta sessão aceita deep links e capturas, mas não ofereceu controle de toque. Nenhum desses

@@ -13,7 +13,9 @@
 
 ## Global Constraints
 
-- Work only in `/private/tmp/personal-proops-tablet-20260917` on `feat/tablet-adaptive`; preserve the shared checkout and its uncommitted Agent work.
+- Historical execution note: work was isolated in `/private/tmp/personal-proops-tablet-20260917`
+  on `feat/tablet-adaptive`; it was integrated into `gabriel/concreto` on 18/09/2026 and that
+  worktree and branch were removed. Preserve the current main worktree for future changes.
 - Read `AGENTS.md`, the approved `docs/superpowers/specs/2026-09-17-tablet-adaptive-design.md`, and exact Expo 57 docs before source edits.
 - Preserve cent-based money, query/cache keys, loading/empty/error states, destructive confirmations, concealment, VoiceOver/TalkBack labels, native iPad headers, and the compact view.
 - Android phone and tablet: bottom pill. iPad: native tab semantics from Expo Router; no Android chrome on iOS.
