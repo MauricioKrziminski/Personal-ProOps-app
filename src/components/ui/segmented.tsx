@@ -77,6 +77,8 @@ export function Segmented<T extends string>({ options, value, onChange }: Segmen
   const theme = useTheme();
   const scheme = useScheme();
   const vidro = supportsLiquidGlass();
+  // Tinta opaca fazia o material nativo parecer um seletor cinza chapado.
+  const tintaDoVidro = theme.glassSelectionTint;
   const reduzido = useReducedMotion();
   /** Largura de uma célula e altura do polegar, para o ESTILO (comum, não animado). */
   const [caixa, setCaixa] = useState({ celula: 0, altura: 0 });
@@ -128,13 +130,20 @@ export function Segmented<T extends string>({ options, value, onChange }: Segmen
           boxShadow: Elevation[scheme].raised,
         },
       ]}>
-      {vidro ? <GlassBackdrop fallbackColor={theme.backgroundElement} radius={Radius.pill} tintColor={theme.backgroundElement} /> : null}
+      {vidro ? (
+        <GlassBackdrop
+          fallbackColor={theme.backgroundElement}
+          radius={Radius.pill}
+          effectStyle="clear"
+        />
+      ) : null}
       {caixa.celula > 0 ? (
         <Polegar
           key={`${caixa.celula}:${caixa.altura}`}
           celula={caixa.celula}
           altura={caixa.altura}
           cor={theme.thumb}
+          tintaDoVidro={tintaDoVidro}
           esquerda={esquerda}
           direita={direita}
         />
@@ -170,12 +179,14 @@ function Polegar({
   celula,
   altura,
   cor,
+  tintaDoVidro,
   esquerda,
   direita,
 }: {
   celula: number;
   altura: number;
   cor: string;
+  tintaDoVidro: string;
   esquerda: SharedValue<number>;
   direita: SharedValue<number>;
 }) {
@@ -217,7 +228,12 @@ function Polegar({
           },
           vidro,
         ]}>
-        <GlassBackdrop fallbackColor={cor} radius={r} effectStyle="clear" />
+        <GlassBackdrop
+          fallbackColor={cor}
+          radius={r}
+          effectStyle="regular"
+          tintColor={tintaDoVidro}
+        />
       </Animated.View>
     );
   }
