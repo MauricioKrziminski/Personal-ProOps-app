@@ -29,3 +29,13 @@ test('net worth keeps the trend beside the account and asset evidence', () => {
   assert.match(source, /confirmDestructive/);
   assert.match(source, /onPress=\{salvar\}/);
 });
+
+test('forecast presents the measured curve beside its scenario while preserving model and horizon actions', () => {
+  const source = readFileSync('src/app/finance/forecast.tsx', 'utf8');
+  assert.match(source, /<FinanceAnalysisPanes/);
+  assert.match(source, /<Screen wide=\{tablet\}/);
+  assert.match(source, /useCashFlowForecast\(dias, !emMes\)/);
+  assert.match(source, /useForecastWithDrafts\(dias, rascunhos, !emMes\)/);
+  assert.match(source, /setHorizonteAberto\(true\)/);
+  assert.match(source, /MeasuredSparkline/);
+});
