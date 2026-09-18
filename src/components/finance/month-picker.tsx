@@ -61,7 +61,7 @@ interface MonthPickerProps {
    * que a produz (`PeriodBar`). Sem ele o controle é só o passo de mês.
    */
   children?: React.ReactNode;
-  /** `bare`: sem card em volta, título maior (raiz do Financeiro). As outras telas seguem `card`. */
+  /** `bare`: sem card fora do iOS com vidro, título maior (raiz do Financeiro). */
   variant?: 'card' | 'bare';
 }
 
@@ -89,6 +89,7 @@ interface MonthPickerProps {
 export function MonthPicker({ month, onChange, children, variant = 'card' }: MonthPickerProps) {
   const theme = useTheme();
   const vidro = supportsLiquidGlass();
+  const agrupado = variant === 'card' || vidro;
   /** Ano aberto no sheet; `null` = sheet fechado. */
   const [sheet, setSheet] = useState<string | null>(null);
 
@@ -107,21 +108,25 @@ export function MonthPicker({ month, onChange, children, variant = 'card' }: Mon
       onPress={step(delta)}
       style={({ pressed }) => [
         styles.arrow,
-        { backgroundColor: vidro ? 'transparent' : pressed ? theme.backgroundSelected : theme.backgroundElement },
+        {
+          backgroundColor: pressed
+            ? theme.backgroundSelected
+            : vidro
+              ? 'transparent'
+              : theme.backgroundElement,
+        },
       ]}>
-      {vidro ? <GlassBackdrop fallbackColor={theme.backgroundElement} radius={Radius.pill} /> : null}
       <Icon name={delta < 0 ? 'chevron.left' : 'chevron.right'} size="sm" color="tint" />
     </Pressable>
   );
 
   return (
     <View
-      style={
-        variant === 'bare'
-          ? styles.nu
-          : [styles.card, { backgroundColor: theme.surface, borderColor: theme.cardBorder }]
-      }>
-      <View style={[styles.row, variant === 'bare' && styles.rowNu]}>
+      style={agrupado
+        ? [styles.card, { backgroundColor: vidro ? 'transparent' : theme.surface, borderColor: theme.cardBorder }]
+        : styles.nu}>
+      {vidro ? <GlassBackdrop fallbackColor={theme.surface} radius={Radius.md} tintColor={theme.surface} /> : null}
+      <View style={[styles.row, variant === 'bare' && !vidro && styles.rowNu]}>
         {arrow(-1)}
         {/*
           O título deixou de ser só rótulo e virou a PORTA do salto de ano. As setas resolvem ±1;
@@ -145,8 +150,8 @@ export function MonthPicker({ month, onChange, children, variant = 'card' }: Mon
 
       {children ? (
         <>
-          {variant === 'card' ? <View style={[styles.divisor, { backgroundColor: theme.separator }]} /> : null}
-          <View style={variant === 'card' ? styles.rodape : styles.rodapeNu}>{children}</View>
+          {agrupado ? <View style={[styles.divisor, { backgroundColor: theme.separator }]} /> : null}
+          <View style={agrupado ? styles.rodape : styles.rodapeNu}>{children}</View>
         </>
       ) : null}
 

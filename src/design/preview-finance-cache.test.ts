@@ -15,11 +15,15 @@ test('preview seeds the period queries Finance actually requests', () => {
   });
 
   assert.ok(client.getQueryData(['cycle', 'cycle']));
+  assert.equal(client.getQueryData<{ closeDay: number }>(['cycle', 'cycle'])?.closeDay, 10);
   assert.deepEqual(client.getQueryData(['cycle-range', '2026-09', 'cycle']), {
-    de: '2026-09-01', ate: '2026-09-30',
+    de: '2026-08-11', ate: '2026-09-10',
   });
   assert.deepEqual(client.getQueryData(['cycle-range', '2026-08', 'cycle']), {
-    de: '2026-08-01', ate: '2026-08-31',
+    de: '2026-07-11', ate: '2026-08-10',
+  });
+  assert.deepEqual(client.getQueryData(['cycle-range', '2026-09', 'civil']), {
+    de: '2026-09-01', ate: '2026-09-30',
   });
   const series = client.getQueryData<unknown[]>(['cycle-series', '2026-08', '2026-09', 'cycle']);
   assert.equal(series?.length, 2);

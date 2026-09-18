@@ -10,8 +10,8 @@ import Animated, {
 } from 'react-native-reanimated';
 import * as Haptics from 'expo-haptics';
 
-import { Fonts } from '@/constants/theme';
 import { GlassBackdrop, supportsLiquidGlass } from '@/components/ui/glass-backdrop';
+import { Fonts } from '@/constants/theme';
 import { HitTarget, Radius, Space, Type } from '@/design/tokens';
 import { useTheme } from '@/hooks/use-theme';
 
@@ -57,10 +57,8 @@ const FRENTE = { duration: 300, dampingRatio: 0.84 };
 const TRAS = { duration: 520, dampingRatio: 0.9 };
 
 /**
- * Controle segmentado: um polegar branco em pílula que desliza por um trilho cinza, como o do iOS.
- *
- * ponytail: reconstruído em JS em vez do controle nativo — o projeto tirou `@expo/ui` no commit
- * `de229d7` e nenhuma lib de segmented está aprovada.
+ * Controle segmentado: no iOS, a calha e a seleção recebem o material nativo
+ * do Liquid Glass; no Android, mantêm as superfícies e animações próprias.
  *
  * ## O movimento
  *
@@ -77,6 +75,7 @@ const TRAS = { duration: 520, dampingRatio: 0.9 };
  */
 export function Segmented<T extends string>({ options, value, onChange }: SegmentedProps<T>) {
   const theme = useTheme();
+  const vidro = supportsLiquidGlass();
   const reduzido = useReducedMotion();
   /** Largura de uma célula e altura do polegar, para o ESTILO (comum, não animado). */
   const [caixa, setCaixa] = useState({ celula: 0, altura: 0 });
@@ -119,6 +118,7 @@ export function Segmented<T extends string>({ options, value, onChange }: Segmen
       accessibilityRole="tablist"
       onLayout={onLayout}
       style={[styles.track, { backgroundColor: theme.backgroundElement }]}>
+      {vidro ? <GlassBackdrop fallbackColor={theme.backgroundElement} radius={Radius.pill} tintColor={theme.backgroundElement} /> : null}
       {caixa.celula > 0 ? (
         <Polegar
           key={`${caixa.celula}:${caixa.altura}`}
@@ -194,8 +194,8 @@ function Polegar({
     return (
       <Animated.View
         pointerEvents="none"
-        style={[styles.polegarVidro, { height: altura, borderRadius: r }, vidro]}>
-        <GlassBackdrop fallbackColor={cor} radius={r} />
+        style={[styles.polegarVidro, { height: altura, borderRadius: r, backgroundColor: cor }, vidro]}>
+        <GlassBackdrop fallbackColor={cor} radius={r} tintColor={cor} />
       </Animated.View>
     );
   }

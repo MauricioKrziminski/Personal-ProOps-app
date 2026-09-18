@@ -14,21 +14,27 @@ export function seedFinancePeriodPreview(client: QueryClient, period: PreviewPer
   const { month, previousMonth, lastDate, previousLastDate, daysLeft } = period;
   const currentStart = `${month}-01`;
   const previousStart = `${previousMonth}-01`;
+  const beforePrevious = new Date(`${previousMonth}-01T12:00:00`);
+  beforePrevious.setMonth(beforePrevious.getMonth() - 1);
+  const beforePreviousMonth = `${beforePrevious.getFullYear()}-${String(beforePrevious.getMonth() + 1).padStart(2, '0')}`;
   const cycle: Cycle = {
-    closeDay: null,
-    view: 'civil',
+    closeDay: 10,
+    view: 'cycle',
     mes: month,
-    de: currentStart,
-    ate: lastDate,
+    de: `${previousMonth}-11`,
+    ate: `${month}-10`,
     diasAteOFim: daysLeft,
   };
   client.setQueryData(['cycle', ''], cycle);
   client.setQueryData(['cycle', 'cycle'], cycle);
-  client.setQueryData(['cycle-range', month, 'cycle'], { de: currentStart, ate: lastDate });
+  client.setQueryData(['cycle', 'civil'], { ...cycle, view: 'civil', de: currentStart, ate: lastDate });
+  client.setQueryData(['cycle-range', month, 'cycle'], { de: `${previousMonth}-11`, ate: `${month}-10` });
   client.setQueryData(['cycle-range', previousMonth, 'cycle'], {
-    de: previousStart,
-    ate: previousLastDate,
+    de: `${beforePreviousMonth}-11`,
+    ate: `${previousMonth}-10`,
   });
+  client.setQueryData(['cycle-range', month, 'civil'], { de: currentStart, ate: lastDate });
+  client.setQueryData(['cycle-range', previousMonth, 'civil'], { de: previousStart, ate: previousLastDate });
 
   const series: CycleRow[] = [
     {
