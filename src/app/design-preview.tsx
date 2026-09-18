@@ -1,11 +1,14 @@
 import { useEffect, useMemo, useState } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { router, useLocalSearchParams } from 'expo-router';
 import { Platform, StyleSheet, View, useWindowDimensions } from 'react-native';
 
 import { PillTabBar, type PillTab } from '@/components/ui/pill-tab-bar';
 import { TabletNavigationRail } from '@/components/ui/tablet-navigation-rail';
 import { previewAccountBalances } from '@/design/preview-account-balances';
+import { seedFinancePeriodPreview } from '@/design/preview-finance-cache';
+import { previewRootFromParam } from '@/design/preview-root';
 import { useAdaptiveWindow } from '@/hooks/use-adaptive-window';
 import { localISODate } from '@/hooks/use-items';
 import { useTheme } from '@/hooks/use-theme';
@@ -184,29 +187,34 @@ export default function DesignPreviewScreen() {
   // ela fica FORA do portão de sessão, e uma tela do app aberta sem login não é aceitável nem
   // com dado falso.
   const dev = __DEV__;
+  const { screen } = useLocalSearchParams<{ screen?: string }>();
+  const requestedRoot = previewRootFromParam(screen);
   const { height } = useWindowDimensions();
   const { androidRail } = useAdaptiveWindow();
-  const [aba, setAba] = useState<(typeof ABAS)[number]>('Hoje');
+  const [abaDoPasso, setAbaDoPasso] = useState<(typeof ABAS)[number]>('Hoje');
   /**
    * A faixa vertical. Era derivada de `passo`, e por isso tocar na barra do Android trocava a
    * tela mas mantinha o deslocamento da aba anterior — numa aba de uma faixa só, dava tela
    * preta. Como estado, o toque volta para o topo.
    */
   const [faixa, setFaixa] = useState(0);
+  const aba = requestedRoot ?? abaDoPasso;
+  const faixaAtual = requestedRoot ? 0 : faixa;
 
   useEffect(() => {
+    if (requestedRoot) return;
     let vivo = true;
     AsyncStorage.getItem(PASSO_KEY).then((raw) => {
       if (!vivo) return;
       const atual = Number(raw ?? 0) % PASSOS.length;
-      setAba(PASSOS[atual].aba);
+      setAbaDoPasso(PASSOS[atual].aba);
       setFaixa(PASSOS[atual].faixa);
       AsyncStorage.setItem(PASSO_KEY, String(atual + 1));
     });
     return () => {
       vivo = false;
     };
-  }, []);
+  }, [requestedRoot]);
 
   const alturaTotal = height * FAIXAS[aba];
 
@@ -214,9 +222,14 @@ export default function DesignPreviewScreen() {
   const showChrome = Platform.OS === 'android' && RAIZES.has(aba);
   const showTabletRail = showChrome && androidRail;
   const selectTab = (index: number) => {
+    if (requestedRoot) {
+      const target = TABS_ANDROID[index];
+      if (target) router.replace({ pathname: '/design-preview', params: { screen: target.name } });
+      return;
+    }
     const alvo = ABAS.find((nome) => ABA_PARA_TAB[nome] === index);
     if (alvo) {
-      setAba(alvo);
+      setAbaDoPasso(alvo);
       setFaixa(0);
     }
   };
@@ -237,7 +250,7 @@ export default function DesignPreviewScreen() {
           <View
             style={{
               height: alturaTotal,
-              transform: [{ translateY: -faixa * height }],
+              transform: [{ translateY: -faixaAtual * height }],
             }}>
             {aba === 'Hoje' ? <TodayScreen /> : null}
             {aba === 'Finanças' ? <FinanceScreen /> : null}
@@ -320,13 +333,12 @@ function seedClient() {
     a soma de `spendable-path` é o `comprometido_ate_entrada` — senão a Pista apaga os entalhes.
   */
   const emQuatroDias = localISODate(new Date(agora.getFullYear(), agora.getMonth(), agora.getDate() + 4));
-  client.setQueryData(['cycle', ''], {
-    closeDay: null,
-    view: 'civil',
-    mes,
-    de: `${mes}-01`,
-    ate: ultimoDia,
-    diasAteOFim: diasRestantes,
+  seedFinancePeriodPreview(client, {
+    month: mes,
+    previousMonth: mesAnterior,
+    lastDate: ultimoDia,
+    previousLastDate: ultimoDiaAnterior,
+    daysLeft: diasRestantes,
   });
   client.setQueryData(['spendable', ''], {
     caixa: 391000,
@@ -439,8 +451,8 @@ function seedClient() {
         rollover_cents: 0,
       },
     ];
-  client.setQueryData(['budgets-status', hoje], statusOrcamento);
-  client.setQueryData(['budgets-status', `${mes}-01`], statusOrcamento);
+  client.setQueryData(['budgets-status', hoje, ''], statusOrcamento);
+  client.setQueryData(['budgets-status', `${mes}-01`, 'cycle'], statusOrcamento);
 
   const tx = (over: Record<string, unknown>) => ({
     id: 'prev-tx',
@@ -462,6 +474,7 @@ function seedClient() {
     merchant: null,
     recurring_id: null,
     debt_id: null,
+    auto_confirm: false,
     ...over,
   });
 
@@ -492,9 +505,9 @@ function seedClient() {
   });
   const comPrevista = [receitaPrevista, ...recentes];
 
-  client.setQueryData(['transactions', 'recent', '5'], comPrevista);
+  client.setQueryData(['transactions', 'recent', '5', hoje], recentes);
   // Um item basta para a tela separar "nunca teve nada" de "este mês não teve nada".
-  client.setQueryData(['transactions', 'recent', '1'], comPrevista.slice(0, 1));
+  client.setQueryData(['transactions', 'recent', '1', hoje], recentes.slice(0, 1));
   // ⚠️ `useTransactions` é `useInfiniteQuery`: o cache guarda `{pages, pageParams}`, não o
   // array. Estava array cru aqui desde sempre e ninguém viu, porque nenhuma banda montava
   // Lançamentos — chave/forma errada não quebra, cai no estado de erro em silêncio.
@@ -755,7 +768,7 @@ function seedClient() {
     },
   ]);
   client.setQueryData(
-    ['monthly-cashflow', '6'],
+    ['monthly-cashflow', '6', ''],
     ['2026-04', '2026-05', '2026-06', '2026-07', '2026-08', '2026-09'].map((m, i, todos) => ({
       month: `${m}-01`,
       income_cents: 780000 + i * 40000,

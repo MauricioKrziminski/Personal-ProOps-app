@@ -3,6 +3,7 @@ import { test } from 'node:test';
 
 import {
   bottomPillInset,
+  chartWidthForPane,
   classifyWindow,
   rootContentMaxWidth,
   tabletPaneWidths,
@@ -70,4 +71,12 @@ test('Today uses measured content width to decide its editorial split', () => {
   assert.equal(tabletPaneWidths(336).twoPane, false);
   assert.equal(tabletPaneWidths(752).twoPane, false);
   assert.equal(tabletPaneWidths(1144).twoPane, true);
+});
+
+test('Finance chart fits inside the measured hero panel at phone and tablet widths', () => {
+  assert.equal(chartWidthForPane(336, 20), 296);
+  const pane = tabletPaneWidths(1144).main;
+  assert.equal(chartWidthForPane(pane, 20), pane - 40);
+  assert.equal(chartWidthForPane(0, 20), 0);
+  assert.equal(chartWidthForPane(Number.NaN, 20), 0);
 });

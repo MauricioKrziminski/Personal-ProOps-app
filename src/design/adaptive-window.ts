@@ -33,6 +33,12 @@ export function rootContentMaxWidth(windowWidthDp: number, wide: boolean) {
   return wide && classifyWindow(windowWidthDp) !== 'compact' ? 1200 : 800;
 }
 
+export function chartWidthForPane(paneWidthDp: number, horizontalInsetDp: number) {
+  const pane = Number.isFinite(paneWidthDp) ? Math.max(0, paneWidthDp) : 0;
+  const inset = Number.isFinite(horizontalInsetDp) ? Math.max(0, horizontalInsetDp) : 0;
+  return Math.max(0, pane - inset * 2);
+}
+
 export function bottomPillInset(
   platform: string,
   hasTopBar: boolean,

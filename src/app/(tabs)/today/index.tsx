@@ -1,5 +1,5 @@
 import { router, type Href } from 'expo-router';
-import { useMemo, useState } from 'react';
+import { Fragment, useMemo, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 import Animated, { FadeOut, LinearTransition } from 'react-native-reanimated';
 
@@ -552,7 +552,14 @@ export default function TodayScreen() {
           coming={comingBlock}
         />
       ) : (
-        <>{heroBlock}{signalsBlock}{pulseBlock}{actionsBlock}{accountsBlock}{comingBlock}</>
+        [
+          <Fragment key="hero">{heroBlock}</Fragment>,
+          <Fragment key="signals">{signalsBlock}</Fragment>,
+          <Fragment key="pulse">{pulseBlock}</Fragment>,
+          <Fragment key="actions">{actionsBlock}</Fragment>,
+          <Fragment key="accounts">{accountsBlock}</Fragment>,
+          <Fragment key="coming">{comingBlock}</Fragment>,
+        ]
       )}
     </Screen>
   );
