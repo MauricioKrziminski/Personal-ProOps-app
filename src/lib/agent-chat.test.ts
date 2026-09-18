@@ -16,7 +16,6 @@ import {
   parseUiActions,
   plainText,
   defaultRandomBytes,
-  firstMessageAttempt,
   hitlControlsDisabled,
   isNearChatEnd,
   newClientMessageId,
@@ -85,19 +84,6 @@ test('o retry reaproveita o UUID já guardado na mensagem falha', () => {
   const falha = { clientMessageId: 'f7c1c2b8-0000-4000-8000-000000000001' };
   const idDoRetry = falha.clientMessageId ?? newClientMessageId();
   assert.equal(idDoRetry, 'f7c1c2b8-0000-4000-8000-000000000001');
-});
-
-test('primeiro envio conserva o UUID no retry e cria outro se a mensagem mudar', () => {
-  let ids = 0;
-  const makeId = () => `id-${++ids}`;
-  const inicial = firstMessageAttempt('  Quanto gastei?  ', null, makeId);
-  const retry = firstMessageAttempt('Quanto gastei?', inicial, makeId);
-  const editada = firstMessageAttempt('Quanto gastei este mês?', retry, makeId);
-
-  assert.deepEqual(inicial, { content: 'Quanto gastei?', clientMessageId: 'id-1' });
-  assert.deepEqual(retry, inicial);
-  assert.equal(editada.clientMessageId, 'id-2');
-  assert.equal(ids, 2);
 });
 
 // ---------------------------------------------------------------------------

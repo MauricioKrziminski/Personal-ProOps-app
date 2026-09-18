@@ -383,6 +383,7 @@ function AppTree() {
                       `[id]` o nome da conversa só é conhecido depois da query. */}
                   <Stack.Screen name="agent/new" options={{ title: '' }} />
                   <Stack.Screen name="agent/[id]" options={{ title: '' }} />
+                  <Stack.Screen name="agent/history" options={{ title: 'Histórico' }} />
 
                   {/*
                     Atenção total: formulário com etapas vive acima das abas.

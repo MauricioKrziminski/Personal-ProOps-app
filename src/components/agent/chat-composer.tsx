@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Pressable, StyleSheet, View } from 'react-native';
+import { Platform, Pressable, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { ThemedText } from '@/components/themed-text';
@@ -20,6 +20,8 @@ interface Props {
   sending?: boolean;
   /** Uma pergunta espera resposta nos botões. */
   awaitingAction?: boolean;
+  /** No Android, a aba reserva a dock fora do compositor. */
+  tabMode?: boolean;
 }
 
 /** Cinco linhas de 24pt mais o respiro do campo — daí em diante o campo rola. */
@@ -43,18 +45,14 @@ export function ChatComposer({
   onSubmit,
   sending = false,
   awaitingAction = false,
+  tabMode = false,
 }: Props) {
   const theme = useTheme();
   const insets = useSafeAreaInsets();
   const [altura, setAltura] = useState(0);
 
-
-  /*
-    Só a safe area. A conversa saiu de dentro de `(tabs)` em 07/09/2026 e não tem mais tab bar
-    embaixo — somar `TAB_BAR_SPACE` aqui deixaria uma faixa vazia da altura da dock entre o
-    campo e a borda do aparelho, que é a marca de um espaço reservado para algo que não existe.
-  */
-  const reservado = insets.bottom;
+  // Na aba Android a dock já é reservada pela tela. Nas rotas de detalhe, só a safe area.
+  const reservado = tabMode && Platform.OS === 'android' ? 0 : insets.bottom;
   const pode = canSubmitMessage(value, { sending, awaitingAction });
   const restantes = MAX_MESSAGE_LENGTH - value.trim().length;
 

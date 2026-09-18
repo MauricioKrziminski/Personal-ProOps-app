@@ -11,7 +11,7 @@ interface Props {
   onSelect: (prompt: string) => void;
 }
 
-/** Atalhos compactos, compartilhados pela entrada e pela conversa nova. */
+/** Sugestões da conversa nova; tocar preenche o compositor sem enviar. */
 export const AgentPromptList = memo(function AgentPromptList({ onSelect }: Props) {
   const theme = useTheme();
 
@@ -23,7 +23,7 @@ export const AgentPromptList = memo(function AgentPromptList({ onSelect }: Props
           <Pressable
             key={label}
             accessibilityRole="button"
-            accessibilityLabel={`${label}. Abre uma conversa com texto editável.`}
+            accessibilityLabel={`${label}. Preenche a mensagem com texto editável.`}
             onPress={() => onSelect(prompt)}
             style={({ pressed }) => [
               styles.prompt,

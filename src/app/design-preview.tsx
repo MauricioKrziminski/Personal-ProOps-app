@@ -144,7 +144,7 @@ const FAIXAS: Record<(typeof ABAS)[number], number> = {
   Hoje: 2,
   'Finanças': 3,
   Notas: 3,
-  // Uma faixa: a lista de conversas cabe inteira numa tela.
+  // Uma faixa: a abertura da conversa do agente cabe inteira numa tela.
   Agente: 1,
   Perfil: 3,
   'Dívidas': 2,

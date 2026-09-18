@@ -1,7 +1,7 @@
 import { FlashList, type FlashListRef } from '@shopify/flash-list';
 import { Stack, router } from 'expo-router';
 import { memo, useCallback, useEffect, useMemo, useRef, useState, type ReactElement, type RefObject } from 'react';
-import { ActivityIndicator, Pressable, StyleSheet, View, type NativeScrollEvent, type NativeSyntheticEvent } from 'react-native';
+import { ActivityIndicator, Platform, Pressable, StyleSheet, View, type NativeScrollEvent, type NativeSyntheticEvent } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { ChatActions } from '@/components/agent/chat-actions';
@@ -14,8 +14,9 @@ import { ThemedText } from '@/components/themed-text';
 import { MaxContentWidth } from '@/constants/theme';
 import { Button } from '@/components/ui/button';
 import { EmptyState } from '@/components/ui/empty-state';
-import { HeaderMenu } from '@/components/ui/header-actions';
+import { HeaderActions } from '@/components/ui/header-actions';
 import { Icon } from '@/components/ui/icon';
+import { TAB_BAR_SPACE } from '@/components/ui/pill-tab-bar';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useToast } from '@/components/ui/toast';
 import { Radius, Space } from '@/design/tokens';
@@ -49,9 +50,11 @@ import { confirmDestructive } from '@/lib/item-actions';
 interface Props {
   /** `undefined` na tela `new`: a conversa ainda não existe. */
   conversationId?: string;
-  /** Frase pronta vinda do estado vazio da lista. Só semeia o campo. */
+  /** Frase pronta vinda de um atalho. Só semeia o campo. */
   initialText?: string;
   title?: string;
+  /** A conversa nova mora na própria aba e deixa a dock visível. */
+  tabMode?: boolean;
 }
 
 /** O lease do turno no servidor dura 300s. Depois disso ninguém está rodando. */
@@ -87,7 +90,7 @@ type Item =
  * `new` não grava nada antes do primeiro envio: abrir e voltar não deixa
  * conversa vazia na lista, e é por isso que a criação carrega a mensagem junto.
  */
-export function ConversationScreen({ conversationId, initialText = '', title }: Props) {
+export function ConversationScreen({ conversationId, initialText = '', title, tabMode = false }: Props) {
   const theme = useTheme();
   const toast = useToast();
   const lista = useRef<FlashListRef<Item>>(null);
@@ -205,7 +208,14 @@ export function ConversationScreen({ conversationId, initialText = '', title }: 
           // nada a reenviar; o `Pensando...` continua porque a mensagem no
           // cache continua `processing`, e a releitura o encerra.
           if (resultado.status !== 'processing') turno.concluir();
-          if (!conversationId) router.replace(conversationRoute(resultado.conversation.id));
+          if (!conversationId) {
+            const destino = conversationRoute(resultado.conversation.id);
+            // A raiz da aba precisa continuar na pilha para o Android voltar
+            // à conversa nova. A rota /agent/new, por sua vez, já ocupa um
+            // detalhe e deve ser substituída pelo diálogo recém-criado.
+            if (tabMode) router.push(destino);
+            else router.replace(destino);
+          }
         },
         onError: (e: Error) => {
           // A sessão acabou: o `signOut()` já rodou e o portão do `_layout` vai
@@ -220,7 +230,7 @@ export function ConversationScreen({ conversationId, initialText = '', title }: 
       if (conversationId) enviar.mutate(variaveis, opcoes);
       else criar.mutate(variaveis, opcoes);
     },
-    [conversationId, criar, enviar, turno],
+    [conversationId, criar, enviar, tabMode, turno],
   );
 
   const submeter = useCallback(() => {
@@ -377,7 +387,7 @@ export function ConversationScreen({ conversationId, initialText = '', title }: 
               'Excluir',
               () =>
                 excluir.mutate(conversationId, {
-                  onSuccess: () => router.replace('/agent'),
+                  onSuccess: () => router.replace('/agent/history'),
                   onError: (e) =>
                     toast({
                       message:
@@ -394,9 +404,28 @@ export function ConversationScreen({ conversationId, initialText = '', title }: 
     : [];
 
   return (
-    <View style={[styles.raiz, { backgroundColor: theme.background }]}>
-      <Stack.Screen options={{ title: 'Conversa' }} />
-      <HeaderMenu title="Conversa" actions={acoesDoHeader} />
+    <View style={[
+      styles.raiz,
+      { backgroundColor: theme.background },
+      tabMode && Platform.OS === 'android' ? { paddingBottom: TAB_BAR_SPACE + insets.bottom } : null,
+    ]}>
+      {!tabMode ? <Stack.Screen options={{ title: conversationId ? 'Conversa' : 'Nova conversa' }} /> : null}
+      {!tabMode ? <HeaderActions
+        actions={[
+          {
+            label: 'Histórico de conversas',
+            icon: 'clock.arrow.circlepath',
+            onPress: () => router.push('/agent/history'),
+          },
+        ]}
+        menu={conversationId ? {
+          title: 'Conversa',
+          actions: [
+            { label: 'Nova conversa', icon: 'square.and.pencil', onPress: () => router.replace('/agent/new') },
+            ...acoesDoHeader,
+          ],
+        } : undefined}
+      /> : null}
 
       {conversationId && title ? <AgentThreadHeading title={title} /> : null}
 
@@ -452,6 +481,7 @@ export function ConversationScreen({ conversationId, initialText = '', title }: 
         onSubmit={submeter}
         sending={rodando}
         awaitingAction={esperandoAcao}
+        tabMode={tabMode}
       />
 
       <RenameConversationSheet
