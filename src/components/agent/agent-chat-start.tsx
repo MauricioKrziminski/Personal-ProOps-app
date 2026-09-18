@@ -1,4 +1,4 @@
-import { memo } from 'react';
+import { memo, type ReactNode } from 'react';
 import { StyleSheet, View } from 'react-native';
 
 import { AgentPromptList } from '@/components/agent/agent-prompt-list';
@@ -8,10 +8,12 @@ import { Space } from '@/design/tokens';
 
 interface Props {
   onSelectPrompt: (prompt: string) => void;
+  composer?: ReactNode;
+  turn?: ReactNode;
 }
 
 /** Estado inicial da conversa; tocar uma frase apenas preenche o campo. */
-export const AgentChatStart = memo(function AgentChatStart({ onSelectPrompt }: Props) {
+export const AgentChatStart = memo(function AgentChatStart({ onSelectPrompt, composer, turn }: Props) {
   return (
     <View style={styles.root}>
       <View style={styles.intro}>
@@ -22,12 +24,13 @@ export const AgentChatStart = memo(function AgentChatStart({ onSelectPrompt }: P
           Conte o que aconteceu ou pergunte o que precisa saber. O agente ajuda a organizar.
         </ThemedText>
       </View>
-      <AgentPromptList onSelect={onSelectPrompt} />
+      {composer}
+      {turn ?? <AgentPromptList onSelect={onSelectPrompt} />}
     </View>
   );
 });
 
 const styles = StyleSheet.create({
-  root: { width: '100%', maxWidth: MaxContentWidth, alignSelf: 'center', paddingHorizontal: Space.lg, paddingTop: Space.xxxl, gap: Space.xxxl },
+  root: { width: '100%', maxWidth: MaxContentWidth, alignSelf: 'center', paddingHorizontal: Space.lg, paddingTop: Space.xxxl, gap: Space.xxl },
   intro: { gap: Space.md, maxWidth: 330 },
 });

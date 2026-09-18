@@ -2,6 +2,7 @@ import { FlashList, type FlashListRef } from '@shopify/flash-list';
 import { Stack, router } from 'expo-router';
 import { memo, useCallback, useEffect, useMemo, useRef, useState, type ReactElement, type RefObject } from 'react';
 import { ActivityIndicator, Platform, Pressable, StyleSheet, View, type NativeScrollEvent, type NativeSyntheticEvent } from 'react-native';
+import { KeyboardAwareScrollView } from 'react-native-keyboard-controller';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { ChatActions } from '@/components/agent/chat-actions';
@@ -106,6 +107,7 @@ export function ConversationScreen({ conversationId, initialText = '', title, ta
   const alturaDoTeclado = useKeyboardHeight();
   const insets = useSafeAreaInsets();
   const obstrucao = Math.max(0, alturaDoTeclado - insets.bottom);
+  const entradaDaAba = tabMode && !conversationId;
 
   const turno = useTurnoLocal();
   const criar = useCreateAgentConversation();
@@ -429,60 +431,97 @@ export function ConversationScreen({ conversationId, initialText = '', title, ta
 
       {conversationId && title ? <AgentThreadHeading title={title} /> : null}
 
-      <View style={[styles.lista, { paddingBottom: obstrucao }]}>
-        {historico.isPending && conversationId ? (
-          <View style={styles.esqueleto}>
-            {/* Alturas diferentes de propósito: o esqueleto tem a FORMA da
-                conversa (pergunta curta, resposta longa), não três barras iguais. */}
-            {[70, 44, 90].map((h) => (
-              <Skeleton key={h} height={h} radius={Radius.md} />
-            ))}
-          </View>
-        ) : historico.isError ? (
-          <EmptyState
-            icon="exclamationmark.triangle"
-            title="Não consegui carregar essa conversa"
-            hint="Confere a conexão e tenta de novo."
-            action={{ label: 'Tentar novamente', onPress: () => historico.refetch() }}
-          />
-        ) : (
-          <ConversationTimeline
-            key={conversationId ?? 'new'}
-            listRef={lista}
-            items={itens}
-            renderItem={desenharLinha}
-            onScroll={aoRolar}
-            onStartReached={carregarAnteriores}
+      {entradaDaAba ? (
+        <KeyboardAwareScrollView
+          style={styles.lista}
+          contentContainerStyle={styles.entradaScroll}
+          contentInsetAdjustmentBehavior="never"
+          keyboardShouldPersistTaps="handled"
+          bottomOffset={Space.xl}>
+          <AgentChatStart
             onSelectPrompt={setTexto}
+            composer={
+              <ChatComposer
+                inline
+                value={texto}
+                onChangeText={setTexto}
+                onSubmit={submeter}
+                sending={rodando}
+                awaitingAction={esperandoAcao}
+              />
+            }
+            turn={itens.length > 0 ? (
+              <View style={styles.entradaTurno}>
+                {itens.map((item) => (
+                  <Linha
+                    key={item.key}
+                    item={item}
+                    busy={rodando}
+                    onDecide={decidir}
+                    onRetry={tentarDeNovo}
+                  />
+                ))}
+              </View>
+            ) : undefined}
           />
-        )}
+        </KeyboardAwareScrollView>
+      ) : (
+        <>
+          <View style={[styles.lista, { paddingBottom: obstrucao }]}>
+            {historico.isPending && conversationId ? (
+              <View style={styles.esqueleto}>
+                {/* Alturas diferentes de propósito: o esqueleto tem a FORMA da
+                    conversa (pergunta curta, resposta longa), não três barras iguais. */}
+                {[70, 44, 90].map((h) => (
+                  <Skeleton key={h} height={h} radius={Radius.md} />
+                ))}
+              </View>
+            ) : historico.isError ? (
+              <EmptyState
+                icon="exclamationmark.triangle"
+                title="Não consegui carregar essa conversa"
+                hint="Confere a conexão e tenta de novo."
+                action={{ label: 'Tentar novamente', onPress: () => historico.refetch() }}
+              />
+            ) : (
+              <ConversationTimeline
+                key={conversationId ?? 'new'}
+                listRef={lista}
+                items={itens}
+                renderItem={desenharLinha}
+                onScroll={aoRolar}
+                onStartReached={carregarAnteriores}
+                onSelectPrompt={setTexto}
+              />
+            )}
 
-        {!perto ? (
-          <Pressable
-            onPress={() => lista.current?.scrollToEnd({ animated: true })}
-            accessibilityRole="button"
-            accessibilityLabel="Ir para a mensagem mais recente"
-            style={[
-              styles.irAoFim,
-              {
-                bottom: obstrucao + Space.sm,
-                backgroundColor: theme.backgroundElement,
-                borderColor: theme.cardBorder,
-              },
-            ]}>
-            <Icon name="arrow.down" size={18} color="text" />
-          </Pressable>
-        ) : null}
-      </View>
+            {!perto ? (
+              <Pressable
+                onPress={() => lista.current?.scrollToEnd({ animated: true })}
+                accessibilityRole="button"
+                accessibilityLabel="Ir para a mensagem mais recente"
+                style={[
+                  styles.irAoFim,
+                  {
+                    bottom: obstrucao + Space.sm,
+                    backgroundColor: theme.backgroundElement,
+                    borderColor: theme.cardBorder,
+                  },
+                ]}>
+                <Icon name="arrow.down" size={18} color="text" />
+              </Pressable>
+            ) : null}
+          </View>
 
-      <ChatComposer
-        value={texto}
-        onChangeText={setTexto}
-        onSubmit={submeter}
-        sending={rodando}
-        awaitingAction={esperandoAcao}
-        tabMode={tabMode}
-      />
+          <ChatComposer
+            value={texto}
+            onChangeText={setTexto}
+            onSubmit={submeter}
+            sending={rodando}
+            awaitingAction={esperandoAcao}
+          />
+        </>
+      )}
 
       <RenameConversationSheet
         key={renomeando ? 'aberto' : 'fechado'}
@@ -614,6 +653,8 @@ const Linha = memo(function Linha({
 const styles = StyleSheet.create({
   raiz: { flex: 1 },
   lista: { flex: 1 },
+  entradaScroll: { paddingBottom: Space.xxxl },
+  entradaTurno: { width: '100%' },
   messageFrame: { width: '100%', maxWidth: MaxContentWidth, alignSelf: 'center' },
   item: { paddingVertical: Space.lg },
   status: { paddingVertical: Space.lg, gap: Space.sm, alignItems: 'flex-start' },
