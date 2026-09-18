@@ -24,6 +24,8 @@ export function previewScreenFromParam(value: unknown) {
     value === 'transactions' ? 'Lançamentos' :
     value === 'accounts' ? 'Contas' :
     value === 'cards' ? 'Cartões' :
-    value === 'folders' ? 'Pastas' : null
+    value === 'folders' ? 'Pastas' :
+    value === 'wallet' ? 'Carteira' :
+    value === 'invoices' ? 'Faturas' : null
   );
 }

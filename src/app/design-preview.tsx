@@ -23,6 +23,8 @@ import TransactionDetailScreen from './finance/[txId]';
 import BudgetsScreen from './finance/budgets';
 import AccountsScreen from './finance/accounts';
 import CardsScreen from './finance/cards';
+import InvoicesScreen from './finance/invoices';
+import WalletScreen from './finance/wallet';
 import FoldersScreen from './notes/folders';
 import TransactionsScreen from './finance/transactions';
 import TransactionFormScreen from './finance/transaction-form';
@@ -87,7 +89,7 @@ import TodayScreen from './(tabs)/today/index';
  * FATURA, não do lançamento, e a tela escrevia "Vence em") e a linha "Repete …" que leva à
  * série. Numa parcela ou num lançamento solto, nenhuma das duas existe.
  */
-const ABAS = ['Hoje', 'Finanças', 'Notas', 'Agente', 'Perfil', 'Dívidas', 'Fatura', 'Projeção', 'Patrimônio', 'Ciclo', 'Relatórios', 'Recorrentes', 'Editar', 'Detalhe', 'Lançamentos', 'Contas', 'Cartões', 'Pastas', 'Orçamentos'] as const;
+const ABAS = ['Hoje', 'Finanças', 'Notas', 'Agente', 'Perfil', 'Dívidas', 'Fatura', 'Projeção', 'Patrimônio', 'Ciclo', 'Relatórios', 'Recorrentes', 'Editar', 'Detalhe', 'Lançamentos', 'Contas', 'Cartões', 'Pastas', 'Carteira', 'Faturas', 'Orçamentos'] as const;
 
 /**
  * A tela é montada numa caixa ALTA e deslocada para cima, em vez de rolada.
@@ -159,6 +161,8 @@ const ABA_PARA_TAB: Record<string, number> = {
   Contas: 2,
   Cartões: 2,
   Pastas: 1,
+  Carteira: 2,
+  Faturas: 2,
   'Orçamentos': 2,
 };
 /** Quantas alturas de tela cada aba ocupa — medido, para não gastar frame em preto. */
@@ -193,6 +197,8 @@ const FAIXAS: Record<(typeof ABAS)[number], number> = {
   Contas: 1,
   Cartões: 1,
   Pastas: 1,
+  Carteira: 1,
+  Faturas: 1,
   // Duas faixas: o destaque e as categorias. Entrou em 09/09/2026 junto da separação entre
   // gasto e comprometido — a tela decide um AVISO, e aviso que ninguém olhou é aviso que erra.
   'Orçamentos': 2,
@@ -297,6 +303,8 @@ export default function DesignPreviewScreen() {
             {aba === 'Contas' ? <AccountsScreen /> : null}
             {aba === 'Cartões' ? <CardsScreen /> : null}
             {aba === 'Pastas' ? <FoldersScreen /> : null}
+            {aba === 'Carteira' ? <WalletScreen /> : null}
+            {aba === 'Faturas' ? <InvoicesScreen /> : null}
             {aba === 'Orçamentos' ? <BudgetsScreen /> : null}
           </View>
 
@@ -743,12 +751,18 @@ function seedClient() {
   });
   // A chave leva `months` como STRING e o default do hook é 60 — chave errada não quebra,
   // cai no estado de carregando e o pager some sem avisar.
-  client.setQueryData(['card-invoices', 'prev-c1', '60'], [
+  const previewInvoices = [
     { id: 'prev-i0', reference_month: `${mesAnterior}-01`, due_date: `${mesAnterior}-10`,
-      status: 'paid', total_cents: 292008 },
+      closing_date: `${mesAnterior}-03`, status: 'paid', paid_at: `${mesAnterior}-10`,
+      payment_transaction_id: null, rolled_into_invoice_id: null, total_cents: 292008, tx_count: 7 },
     { id: 'prev-i1', reference_month: `${mes}-01`, due_date: `${mes}-10`,
-      status: 'closed', total_cents: 324010 },
-  ]);
+      closing_date: `${mes}-03`, status: 'closed', paid_at: null,
+      payment_transaction_id: null, rolled_into_invoice_id: null, total_cents: 324010, tx_count: 8 },
+  ];
+  client.setQueryData(['card-invoices', 'prev-c1', '60'], previewInvoices);
+  // A vitrine do formulário mantém `prev-a3` como cartão; a tela Faturas seleciona esse
+  // primeiro cartão da lista de contas, não o id `prev-c1` usado pelo resumo da Carteira.
+  client.setQueryData(['card-invoices', 'prev-a3', '60'], previewInvoices);
 
   client.setQueryData(['card-summary'], [
     {

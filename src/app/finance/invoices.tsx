@@ -5,6 +5,7 @@ import * as Haptics from 'expo-haptics';
 import Animated, { FadeInDown } from 'react-native-reanimated';
 
 import { useBRL } from '@/components/ui/conceal';
+import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { monthTitle } from '@/components/finance/month-picker';
 import { ThemedText } from '@/components/themed-text';
@@ -14,10 +15,12 @@ import { Money } from '@/components/ui/money';
 import { Row, Section } from '@/components/ui/row';
 import { Screen } from '@/components/ui/screen';
 import { HeroLabel } from '@/components/ui/section-head';
+import { AdaptivePanes } from '@/components/ui/adaptive-panes';
 import { Chip } from '@/components/finance/chip';
 import { Skeleton, SkeletonRow } from '@/components/ui/skeleton';
 import { Motion, Radius, Space, tabular } from '@/design/tokens';
 import { useAccounts, useCardInvoices, type CardInvoiceHistory } from '@/hooks/use-finance';
+import { useAdaptiveWindow } from '@/hooks/use-adaptive-window';
 import { formatBRL, formatDateBR, localISODate } from '@/hooks/use-items';
 import { showItemActions } from '@/lib/item-actions';
 import { useTheme } from '@/hooks/use-theme';
@@ -84,20 +87,25 @@ export default function InvoicesScreen() {
   // Dinheiro no meio de frase obedece ao "esconder saldo" — `Money` não cabe em texto corrido.
   const brl = useBRL();
   const theme = useTheme();
+  const { windowClass } = useAdaptiveWindow();
+  const tablet = windowClass !== 'compact';
   const params = useLocalSearchParams<{ account?: string }>();
   const accounts = useAccounts();
   const [cartaoId, setCartaoId] = useState<string | undefined>(params.account);
   const [mesSelecionado, setMesSelecionado] = useState<string | null>(null);
 
   const cartoes = useMemo(
-    () => (accounts.data ?? []).filter((c) => c.type === 'credit_card'),
-    [accounts.data],
+    () => (accounts.isError ? [] : accounts.data ?? []).filter((c) => c.type === 'credit_card'),
+    [accounts.data, accounts.isError],
   );
   const atual = cartoes.find((c) => c.id === cartaoId) ?? cartoes[0];
   const invoices = useCardInvoices(atual?.id, MESES);
 
   const hoje = localISODate();
-  const lista = useMemo(() => invoices.data ?? [], [invoices.data]);
+  const lista = useMemo(
+    () => (invoices.isError ? [] : invoices.data ?? []),
+    [invoices.data, invoices.isError],
+  );
 
   // "Últimas" é sobre o PASSADO. Compra parcelada cria fatura FUTURA (uma por mês
   // até a última parcela), então sem este corte o gráfico mostrava 2027, as
@@ -119,6 +127,23 @@ export default function InvoicesScreen() {
     ultimos.length > 0
       ? Math.round(ultimos.reduce((soma, i) => soma + i.total_cents, 0) / ultimos.length)
       : 0;
+
+  // The support pane is a truthful reading of a real invoice from this list. It never invents a
+  // total and its action keeps the same deep link used by each row on the compact screen.
+  const selectedInvoice = useMemo(
+    () =>
+      lista.find((invoice) => invoice.reference_month === mesSelecionado) ??
+      passadas[0] ??
+      futuras[0],
+    [futuras, lista, mesSelecionado, passadas],
+  );
+  const selectedState = selectedInvoice
+    ? estado(
+        selectedInvoice,
+        hoje,
+        lista.find((invoice) => invoice.id === selectedInvoice.rolled_into_invoice_id)?.due_date,
+      )
+    : null;
 
   const acoes = (invoice: CardInvoiceHistory) =>
     showItemActions(monthTitle(invoice.reference_month.slice(0, 7)), [
@@ -144,15 +169,50 @@ export default function InvoicesScreen() {
         : []),
     ]);
 
-  return (
-    <Screen grouped onRefresh={() => Promise.all([accounts.refetch(), atual?.id ? invoices.refetch() : Promise.resolve()])}>
-      <Stack.Screen
-        options={{
-          title: 'Faturas',
-          headerLargeTitle: true,
-        }}
+  const selectedSupport = accounts.isError ? (
+    <Card style={styles.supportCard}>
+      <HeroLabel>Fatura em foco</HeroLabel>
+      <ThemedText type="small" themeColor="textSecondary">
+        Não foi possível carregar seus cartões. Tente novamente para escolher uma fatura real.
+      </ThemedText>
+    </Card>
+  ) : invoices.isError ? (
+    <Card style={styles.supportCard}>
+      <HeroLabel>Fatura em foco</HeroLabel>
+      <ThemedText type="small" themeColor="textSecondary">
+        Não foi possível carregar as faturas. Tente novamente para abrir um contexto real.
+      </ThemedText>
+    </Card>
+  ) : selectedInvoice ? (
+    <Card style={styles.supportCard}>
+      <HeroLabel>Fatura em foco</HeroLabel>
+      <ThemedText type="title">{monthTitle(selectedInvoice.reference_month.slice(0, 7))}</ThemedText>
+      <ThemedText type="footnote" themeColor="textSecondary">Total de compras</ThemedText>
+      <Money cents={selectedInvoice.total_cents} variant="money" tone={selectedState?.atrasada ? 'danger' : 'text'} />
+      <ThemedText type="small" themeColor={selectedState?.atrasada ? 'danger' : 'textSecondary'}>
+        {selectedState?.texto} · vence {formatDateBR(selectedInvoice.due_date)}
+      </ThemedText>
+      <ThemedText type="small" themeColor="textSecondary" style={tabular}>
+        {selectedInvoice.tx_count} {selectedInvoice.tx_count === 1 ? 'compra' : 'compras'} nesta fatura
+      </ThemedText>
+      <Button
+        label="Abrir fatura"
+        variant="secondary"
+        size="sm"
+        onPress={() => router.push({ pathname: '/finance/invoice/[id]', params: { id: selectedInvoice.id } })}
       />
+    </Card>
+  ) : (
+    <Card style={styles.supportCard}>
+      <HeroLabel>Fatura em foco</HeroLabel>
+      <ThemedText type="small" themeColor="textSecondary">
+        Selecione uma fatura para ver seu total, situação e caminho de leitura aqui.
+      </ThemedText>
+    </Card>
+  );
 
+  const compactBody = (
+    <>
       {accounts.isError ? (
         <Section title="Cartões">
           <Row
@@ -363,6 +423,29 @@ export default function InvoicesScreen() {
           O total soma as compras da fatura; o pagamento é transferência e não entra na conta.
         </ThemedText>
       ) : null}
+    </>
+  );
+
+  const tabletBody = (
+    <AdaptivePanes
+      main={<View style={styles.paneBody}>{compactBody}</View>}
+      support={selectedSupport}
+      singlePane="main-only"
+      singlePaneContent={compactBody}
+      testID="invoices-tablet-workspace"
+    />
+  );
+
+  return (
+    <Screen grouped wide={tablet}
+      onRefresh={() => Promise.all([accounts.refetch(), atual?.id ? invoices.refetch() : Promise.resolve()])}>
+      <Stack.Screen
+        options={{
+          title: 'Faturas',
+          headerLargeTitle: !tablet,
+        }}
+      />
+      {tablet ? tabletBody : compactBody}
     </Screen>
   );
 }
@@ -373,6 +456,12 @@ const styles = StyleSheet.create({
     gap: Space.sm,
   },
   hero: {
+    gap: Space.sm,
+  },
+  paneBody: {
+    gap: Space.lg,
+  },
+  supportCard: {
     gap: Space.sm,
   },
   bars: {

@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { router, useLocalSearchParams, useNavigation } from 'expo-router';
-import { StyleSheet, View } from 'react-native';
+import { StyleSheet, View, type LayoutChangeEvent } from 'react-native';
 import Animated, {
   useAnimatedRef,
   useAnimatedScrollHandler,
@@ -19,6 +19,7 @@ import { useFlight, useFlightAnchor } from '@/components/motion/flight-layer';
 import { ThemedText } from '@/components/themed-text';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
+import { AdaptivePanes } from '@/components/ui/adaptive-panes';
 import { useBRL } from '@/components/ui/conceal';
 import { CountUpMoney } from '@/components/ui/count-up-money';
 import { DragScrollView } from '@/components/ui/drag-scroll';
@@ -36,6 +37,7 @@ import { escolherCartao, useCartaoEscolhido } from '@/hooks/use-cartao-escolhido
 import { invoiceQuery, useCardSummary, type CardSummary } from '@/hooks/use-finance';
 import { formatDateBR } from '@/hooks/use-items';
 import { useTheme } from '@/hooks/use-theme';
+import { useAdaptiveWindow } from '@/hooks/use-adaptive-window';
 import { cartaoDaPilha, estadoDaFatura, prazoLabel } from '@/lib/card-status';
 
 
@@ -64,9 +66,16 @@ export default function WalletScreen() {
   const insets = useSafeAreaInsets();
   const navigation = useNavigation();
   const queryClient = useQueryClient();
+  const { windowClass } = useAdaptiveWindow();
+  const tablet = windowClass !== 'compact';
+  const [stageWidth, setStageWidth] = useState<number | undefined>();
+  const measureStage = useCallback((event: LayoutChangeEvent) => {
+    const width = event.nativeEvent.layout.width;
+    if (width > 0) setStageWidth((previous) => previous === width ? previous : width);
+  }, []);
   const { voar, temAncora } = useFlight();
   const moldura = useFlightAnchor('vitrine');
-  const g = useGeometriaDaVitrine();
+  const g = useGeometriaDaVitrine(tablet ? stageWidth : undefined);
 
   const cards = useCardSummary();
   const lista = useMemo(() => (cards.isError ? [] : (cards.data ?? [])), [cards.data, cards.isError]);
@@ -229,6 +238,75 @@ export default function WalletScreen() {
       </View>
     );
   } else {
+    const walletActions = (
+      <Animated.View style={[styles.acoes, esmaece]}>
+        <Button block size="lg" label={ativo.invoice_id ? 'Ver fatura' : 'Ver cartões'} onPress={verFatura} />
+        <Section>
+          <Row
+            icon="calendar"
+            title="Faturas anteriores"
+            onPress={() =>
+              router.push({ pathname: '/finance/invoices', params: { account: ativo.account_id } })
+            }
+          />
+          <Row icon="creditcard" title="Todos os cartões" onPress={() => router.push('/finance/cards')} />
+        </Section>
+      </Animated.View>
+    );
+    const walletDetails = (
+      <Animated.View style={[styles.miolo, esmaece]}>
+        <Detalhes card={ativo} />
+      </Animated.View>
+    );
+    const carousel = (
+      <WalletCarousel
+        geometry={g}
+        cards={lista}
+        indice={indice}
+        onIndice={trocar}
+        x={x}
+        arrasto={arrasto}
+        pagina={pagina}
+        topoDaPagina={topoDaPagina}
+        onFechar={fecharArrastado}
+        prenderMoldura={moldura.prender}
+        molduraPosicionada={moldura.aoPosicionar}
+      />
+    );
+    const walletVisual = (
+      <View style={styles.stage} onLayout={tablet ? measureStage : undefined}>
+        <Animated.View style={[styles.titulos, esmaece]}>
+          {lista.map((c, i) => (
+            <Titulo key={c.account_id} card={c} indice={i} x={x} passo={g.passo} emFluxo={i === indice} />
+          ))}
+        </Animated.View>
+        {tablet ? <View style={styles.carouselViewport}>{carousel}</View> : carousel}
+        {lista.length > 1 ? <Pontos total={lista.length} x={x} passo={g.passo} /> : null}
+      </View>
+    );
+    const walletContext = (
+      <View style={styles.context}>
+        {walletDetails}
+        {walletActions}
+      </View>
+    );
+    const compactBody = (
+      <>
+        {walletVisual}
+        {walletDetails}
+        {walletActions}
+      </>
+    );
+    const tabletBody = (
+      <AdaptivePanes
+        main={walletVisual}
+        support={walletContext}
+        singlePane="main-only"
+        singlePaneContent={compactBody}
+        testID="wallet-tablet-workspace"
+      />
+    );
+
     corpo = (
       <DragScrollView
         ref={pagina}
@@ -239,49 +317,13 @@ export default function WalletScreen() {
         overScrollMode="never"
         showsVerticalScrollIndicator={false}
         contentContainerStyle={[styles.conteudo, { paddingBottom: insets.bottom + Space.lg }]}>
-        <Animated.View style={[styles.titulos, esmaece]}>
-          {lista.map((c, i) => (
-            <Titulo key={c.account_id} card={c} indice={i} x={x} passo={g.passo} emFluxo={i === indice} />
-          ))}
-        </Animated.View>
-
-        <WalletCarousel
-          cards={lista}
-          indice={indice}
-          onIndice={trocar}
-          x={x}
-          arrasto={arrasto}
-          pagina={pagina}
-          topoDaPagina={topoDaPagina}
-          onFechar={fecharArrastado}
-          prenderMoldura={moldura.prender}
-          molduraPosicionada={moldura.aoPosicionar}
-        />
-
-        <Animated.View style={[styles.miolo, esmaece]}>
-          {lista.length > 1 ? <Pontos total={lista.length} x={x} passo={g.passo} /> : null}
-          <Detalhes card={ativo} />
-        </Animated.View>
-
-        <Animated.View style={[styles.acoes, esmaece]}>
-          <Button block size="lg" label={ativo.invoice_id ? 'Ver fatura' : 'Ver cartões'} onPress={verFatura} />
-          <Section>
-            <Row
-              icon="calendar"
-              title="Faturas anteriores"
-              onPress={() =>
-                router.push({ pathname: '/finance/invoices', params: { account: ativo.account_id } })
-              }
-            />
-            <Row icon="creditcard" title="Todos os cartões" onPress={() => router.push('/finance/cards')} />
-          </Section>
-        </Animated.View>
+        {tablet ? tabletBody : compactBody}
       </DragScrollView>
     );
   }
 
   return (
-    <Screen scroll={false}>
+    <Screen wide={tablet} scroll={false}>
       <View style={styles.flex}>
         <TaskHeader title="Carteira" onClose={fechar} telaCheia />
         {corpo}
@@ -425,6 +467,9 @@ const styles = StyleSheet.create({
   aviso: { padding: Space.lg },
   esqueleto: { alignItems: 'center', paddingTop: Space.xxl },
   conteudo: { flexGrow: 1, gap: Space.md, paddingTop: Space.sm },
+  stage: { gap: Space.md, minWidth: 0 },
+  carouselViewport: { width: '100%', maxWidth: 640, alignSelf: 'center', overflow: 'hidden' },
+  context: { gap: Space.xl, minWidth: 0 },
   titulos: { paddingHorizontal: Space.lg },
   titulo: { gap: Space.half, alignItems: 'center' },
   sobreposto: { position: 'absolute', top: 0, left: Space.lg, right: Space.lg },

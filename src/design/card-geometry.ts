@@ -14,6 +14,13 @@
 export const PROPORCAO_DO_CARTAO = 1.586;
 export const LARGURA_DE_DESENHO = 340;
 
+/** O cartão cabe no painel que o contém, inclusive após Split View ou rotação. */
+export function walletStageWidth(windowWidthDp: number, availableWidthDp = windowWidthDp): number {
+  if (!Number.isFinite(windowWidthDp)) return 0;
+  const available = Number.isFinite(availableWidthDp) ? availableWidthDp : windowWidthDp;
+  return Math.min(640, Math.max(0, windowWidthDp), Math.max(0, available));
+}
+
 /** Largura ÷ altura da face. */
 export function proporcaoDoCartao(fontScale: number): number {
   'worklet';
