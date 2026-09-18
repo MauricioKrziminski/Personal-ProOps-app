@@ -12,7 +12,7 @@ leitura ou tarefa com largura limitada. As URLs e ações compactas continuam se
 - iPhone e iPad usam `NativeTabs`. Por decisão de Gabriel em 18/09, a barra nativa do iPadOS
   permanece no topo. Os cinco SF Symbols estão declarados no `NativeTabs.Trigger.Icon`; na
   captura do iPadOS 26 a apresentação superior mostra só os rótulos.
-- Capturas locais atuais: `/private/tmp/proops-ipad-notes-preview.png` e
+- Capturas locais atuais: `/private/tmp/proops-ipad-notes-final.png` e
   `/private/tmp/proops-android-tablet-final.png`. Elas comprovam a posição das barras e a
   composição de Notas/Hoje em retrato, não acessibilidade ou tato em aparelho físico.
 
@@ -89,9 +89,10 @@ normais de uso. O grupo Financeiro soma 21 destinos incluindo a raiz `/finance`.
   progrediu por valores intermediários de 0 a 1 e passou ligeiramente do destino antes de voltar.
   Isso prova a transição no emulador com movimento habilitado; com movimento reduzido o sistema
   elimina a transição, como documentado pelo Reanimated.
-- O AVD Android celular `s26` iniciou, mas o dev client já instalado nele não expôs uma Activity
-  inicial para lançamento. A preservação do fluxo compacto foi verificada pelo código e testes;
-  falta captura atual em um celular Android funcional.
+- O AVD Android celular `s26` iniciou. Reinstalei o APK de desenvolvimento local e confirmei no
+  manifesto e no gerenciador de pacotes a Activity principal, mas o launcher e `am start` ainda
+  retornaram que ela não estava disponível. A preservação do fluxo compacto foi verificada pelo
+  código e testes; falta captura atual em um celular Android funcional.
 - Faltam percorrer cada rota no build atual, paisagem, janela estreita, tema escuro, fonte
   ampliada, teclado, estados vazio/erro, toque, Back, gestos e VoiceOver/TalkBack. O simulador
   desta sessão aceita deep links e capturas, mas não ofereceu controle de toque. Nenhum desses
