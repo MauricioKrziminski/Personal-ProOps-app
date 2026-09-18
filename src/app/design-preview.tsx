@@ -10,6 +10,7 @@ import { previewAccountBalances } from '@/design/preview-account-balances';
 import { seedFinancePeriodPreview } from '@/design/preview-finance-cache';
 import { previewRootFromParam } from '@/design/preview-root';
 import { useAdaptiveWindow } from '@/hooks/use-adaptive-window';
+import type { AiMonthStats, PlanStatus } from '@/hooks/use-finance';
 import { localISODate } from '@/hooks/use-items';
 import { useTheme } from '@/hooks/use-theme';
 
@@ -894,13 +895,21 @@ function seedClient() {
     { tag: 'trabalho', count: 6 },
   ]);
 
-  client.setQueryData(['plan-status'], {
+  client.setQueryData<PlanStatus>(['plan-status'], {
     plan: 'pro',
     members: 2,
     max_members: 5,
     ai_messages_month: 143,
+    ai_messages_whatsapp: 89,
+    ai_messages_app: 54,
     max_ai_messages_month: 1000,
+    can_import: true,
+    current_period_end: ultimoDia,
+    is_trial: false,
+    provider: 'preview',
+    status: 'active',
   });
+  client.setQueryData<AiMonthStats>(['ai-month-stats', mes], { lancamentos: 18, notas: 7 });
   client.setQueryData(['reminders'], []);
   client.setQueryData(['goals'], []);
   /**

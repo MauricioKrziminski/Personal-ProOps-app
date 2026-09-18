@@ -29,6 +29,19 @@ export function tabletPaneWidths(containerWidthDp: number) {
   };
 }
 
+/** A library stays scan-friendly while the reading area never becomes a narrow text strip. */
+export function readingPaneWidths(containerWidthDp: number) {
+  const available = Number.isFinite(containerWidthDp) ? Math.max(0, containerWidthDp) : 0;
+  const requestedList = Math.max(280, Math.min(360, available * 0.36));
+  const twoPane = available - requestedList - PANE_GAP >= 480;
+
+  return {
+    list: twoPane ? requestedList : available,
+    reading: twoPane ? available - requestedList - PANE_GAP : 0,
+    twoPane,
+  };
+}
+
 export function rootContentMaxWidth(windowWidthDp: number, wide: boolean) {
   return wide && classifyWindow(windowWidthDp) !== 'compact' ? 1200 : 800;
 }

@@ -6,6 +6,7 @@ import {
   chartWidthForPane,
   classifyWindow,
   rootContentMaxWidth,
+  readingPaneWidths,
   tabletPaneWidths,
 } from './adaptive-window.ts';
 
@@ -79,4 +80,14 @@ test('Finance chart fits inside the measured hero panel at phone and tablet widt
   assert.equal(chartWidthForPane(pane, 20), pane - 40);
   assert.equal(chartWidthForPane(0, 20), 0);
   assert.equal(chartWidthForPane(Number.NaN, 20), 0);
+});
+
+test('library and reading panes only split when both reading minimums fit', () => {
+  assert.deepEqual(readingPaneWidths(720), { list: 720, reading: 0, twoPane: false });
+  const result = readingPaneWidths(976);
+  assert.equal(result.twoPane, true);
+  assert.ok(result.list >= 280 && result.list <= 360);
+  assert.ok(result.reading >= 480);
+  assert.equal(result.list + result.reading + 24, 976);
+  assert.deepEqual(readingPaneWidths(Number.NaN), { list: 0, reading: 0, twoPane: false });
 });
