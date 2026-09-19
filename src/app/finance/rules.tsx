@@ -250,7 +250,6 @@ export default function RulesScreen() {
       <Stack.Screen
         options={{
           title: 'Regras',
-          headerLargeTitle: !tablet,
         }}
       />
 

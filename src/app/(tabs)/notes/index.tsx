@@ -422,8 +422,9 @@ export default function NotesScreen() {
         {/*
           ## A ordem: AÇÃO, depois FILTRO, depois conteúdo
 
-          A captura fica no topo porque é o que este app É — "anotar rápido" é a razão de o
-          produto existir, e busca só acontece depois de já haver o que buscar.
+          A captura abre o conteúdo porque é o que este app É — "anotar rápido" é a razão de o
+          produto existir. A busca saiu daqui em 19/09/2026: ela é FIXA sob o `AppHeader` (slot
+          `search` do `Screen`, pedido do dono do produto) e não rola com as notas.
         */}
         <View style={styles.grupoDeEntrada}>
         <View style={styles.captura}>
@@ -469,13 +470,6 @@ export default function NotesScreen() {
             />
           </Pressable>
         </View>
-
-        <SearchField
-          value={typed}
-          onChangeText={setTyped}
-          placeholder="Buscar nas notas"
-          accessibilityLabel="Buscar nas notas"
-        />
 
         {chips.length > 0 ? (
           <ScrollView
@@ -615,7 +609,20 @@ export default function NotesScreen() {
   );
 
   return (
-    <Screen scroll={false} wide={tablet} grouped topBar={cabecalho} contentStyle={tablet && styles.tabletShell}>
+    <Screen
+      scroll={false}
+      wide={tablet}
+      grouped
+      topBar={cabecalho}
+      contentStyle={tablet && styles.tabletShell}
+      search={
+        <SearchField
+          value={typed}
+          onChangeText={setTyped}
+          placeholder="Buscar nas notas"
+          accessibilityLabel="Buscar nas notas"
+        />
+      }>
       {biblioteca}
 
       <ColorPicker

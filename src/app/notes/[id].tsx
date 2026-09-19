@@ -336,7 +336,7 @@ export default function NoteDetailScreen() {
   if (note.isError) {
     return (
       <Screen wide={tablet}>
-        <Stack.Screen options={{ title: 'Nota', headerLargeTitle: !tablet }} />
+        <Stack.Screen options={{ title: 'Nota' }} />
         <Card>
           <View style={styles.errorCard}>
             <Icon name="exclamationmark.triangle" size="xl" color="danger" />
@@ -389,7 +389,7 @@ export default function NoteDetailScreen() {
 
   return (
     <Screen scroll={false} wide={tablet}>
-      <Stack.Screen options={{ title: screenTitle, headerLargeTitle: !tablet }} />
+      <Stack.Screen options={{ title: screenTitle }} />
       <HeaderActions actions={headerActions} />
 
       <KeyboardAwareScrollView

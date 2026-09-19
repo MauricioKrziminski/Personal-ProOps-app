@@ -15,7 +15,7 @@ test('task list routes keep compact content and expose measured tablet workspace
     assert.match(source, /useAdaptiveWindow/);
     assert.match(source, /const tablet = windowClass !== 'compact'/);
     assert.match(source, /<Screen[\s\S]*wide=\{tablet\}/);
-    assert.match(source, /headerLargeTitle: !tablet/);
+    assert.doesNotMatch(source, /headerLargeTitle/);
     assert.match(source, /<AdaptivePanes/);
     assert.match(source, /singlePaneContent=\{compactBody\}/);
     assert.match(source, new RegExp(`testID="${testId}"`));

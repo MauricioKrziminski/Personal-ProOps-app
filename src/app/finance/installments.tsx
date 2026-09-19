@@ -606,7 +606,7 @@ export default function InstallmentsScreen() {
   return (
     <Screen grouped wide={tablet} onRefresh={() => Promise.all([plans.refetch(), accounts.refetch()])}>
       {/* Sem headerRight de propósito: parcelamento nasce da compra, não desta tela. */}
-      <Stack.Screen options={{ title: 'Parceladas', headerLargeTitle: !tablet }} />
+      <Stack.Screen options={{ title: 'Parceladas' }} />
 
       {tablet ? tabletBody : compactBody}
 

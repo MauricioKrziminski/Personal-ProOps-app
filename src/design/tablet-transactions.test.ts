@@ -16,5 +16,6 @@ test('transactions uses a virtualized ledger beside contextual controls only in 
   assert.match(source, /main=\{ledger\}/);
   assert.match(source, /support=\{controls\}/);
   assert.match(source, /ListHeaderComponent=\{wideWorkspace \? null : header\}/);
-  assert.match(source, /headerLargeTitle: windowClass === 'compact'/);
+  // O header é fixo (sem título grande) desde 19/09/2026 — ver anti-slop.test.ts.
+  assert.doesNotMatch(source, /headerLargeTitle/);
 });

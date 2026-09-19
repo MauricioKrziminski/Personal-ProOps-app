@@ -59,21 +59,23 @@ export default function SearchScreen() {
     !reminders.isError;
 
   return (
-    <Screen grouped onRefresh={enabled ? () => Promise.all([notes.refetch(), transactions.refetch(), reminders.refetch()]) : undefined}>
+    <Screen
+      grouped
+      onRefresh={enabled ? () => Promise.all([notes.refetch(), transactions.refetch(), reminders.refetch()]) : undefined}
+      search={
+        <Search
+          autoFocus
+          value={text}
+          onChangeText={setText}
+          placeholder="Buscar em tudo"
+          accessibilityLabel="Buscar em notas, lançamentos e lembretes"
+        />
+      }>
       <Stack.Screen
         options={{
           title: 'Buscar',
-          headerLargeTitle: false,
         }}
       />
-      <Search
-        autoFocus
-        value={text}
-        onChangeText={setText}
-        placeholder="Buscar em tudo"
-        accessibilityLabel="Buscar em notas, lançamentos e lembretes"
-      />
-
       <View style={styles.chips}>
         {(
           [

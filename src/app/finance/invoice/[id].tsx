@@ -492,7 +492,6 @@ export default function InvoiceScreen() {
       <Stack.Screen
         options={{
           title: fatura ? `Fatura de ${mesLabel(fatura.reference_month)}` : 'Fatura',
-          headerLargeTitle: !tablet,
         }}
       />
 

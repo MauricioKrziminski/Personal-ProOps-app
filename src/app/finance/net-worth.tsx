@@ -505,7 +505,6 @@ export default function NetWorthScreen() {
       <Stack.Screen
         options={{
           title: 'Patrimônio',
-          headerLargeTitle: true,
         }}
       />
 

@@ -316,7 +316,7 @@ export default function MembersScreen() {
       grouped
       wide={tablet}
       onRefresh={() => Promise.all([membros.refetch(), convites.refetch(), plano.refetch()])}>
-      <Stack.Screen options={{ title: 'Pessoas', headerLargeTitle: true }} />
+      <Stack.Screen options={{ title: 'Pessoas' }} />
       {tablet ? tabletBody : compactBody}
     </Screen>
   );

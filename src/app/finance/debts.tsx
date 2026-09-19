@@ -476,7 +476,6 @@ export default function DebtsScreen() {
       <Stack.Screen
         options={{
           title: 'Dívidas',
-          headerLargeTitle: !tablet,
         }}
       />
 

@@ -410,7 +410,6 @@ export default function GoalsScreen() {
       <Stack.Screen
         options={{
           title: 'Metas',
-          headerLargeTitle: !tablet,
         }}
       />
 

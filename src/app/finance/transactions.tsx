@@ -401,28 +401,24 @@ export default function TransactionsScreen() {
     );
   };
 
+  /*
+    A busca é FIXA (pedido do dono do produto, 19/09/2026): no telefone ela vai para o slot
+    `search` do `Screen` — barra nativa no iOS, faixa acima da lista no Android — e o extrato rola
+    por baixo dela. No iPad ela continua no painel lateral, junto dos outros filtros, que já não
+    rola com a lista.
+  */
+  const busca = (
+    <Search
+      value={search}
+      onChangeText={setSearch}
+      placeholder="Buscar por descrição, lugar ou categoria"
+      accessibilityLabel="Buscar lançamentos"
+    />
+  );
+
   const header = (
     <View style={styles.header}>
-      {/*
-        A busca vive DENTRO do `ListHeaderComponent`, não ao lado da lista. Irmã do
-        `SectionList` numa `Screen scroll={false}`, a pílula do Android ficava cravada no
-        topo enquanto o extrato passava por baixo — a queixa de 09/09/2026, com foto. No
-        iOS ela é `Stack.SearchBar`, que escreve opções por hook e devolve `null`: a
-        posição na árvore não muda nada de lá.
-      */}
-      {/*
-        Sem `gutter`: dentro do `ListHeaderComponent` quem já dá a calha lateral é o
-        `contentContainerStyle` da lista (`styles.list`). Ele existia para IGUALAR o recuo da
-        lista quando a busca era irmã dela — aqui ele DOBRARIA, e a pílula sairia mais estreita
-        que o MonthPicker logo abaixo.
-      */}
-      <Search
-        value={search}
-        onChangeText={setSearch}
-        hideWhenScrolling={false}
-        placeholder="Buscar por descrição, lugar ou categoria"
-        accessibilityLabel="Buscar lançamentos"
-      />
+      {wideWorkspace ? busca : null}
 
       <PeriodBar month={month} onChangeMonth={setMonth} ruler={regua} />
 
@@ -818,6 +814,8 @@ export default function TransactionsScreen() {
     <ScrollView
       style={styles.controlsScroll}
       contentContainerStyle={styles.controlsContent}
+      // O painel lateral do iPad também corre sob o header translúcido (`app/_layout.tsx`).
+      contentInsetAdjustmentBehavior="automatic"
       showsVerticalScrollIndicator={false}
       keyboardShouldPersistTaps="handled">
       {header}
@@ -849,9 +847,14 @@ export default function TransactionsScreen() {
   ) : ledgerList;
 
   return (
-    <Screen floatingAction={!wideWorkspace} scroll={false} grouped wide={wideWorkspace}>
+    <Screen
+      floatingAction={!wideWorkspace}
+      scroll={false}
+      grouped
+      wide={wideWorkspace}
+      search={wideWorkspace ? undefined : busca}>
       <Stack.Screen
-        options={{ title: tituloDaConta ?? 'Lançamentos', headerLargeTitle: windowClass === 'compact' }}
+        options={{ title: tituloDaConta ?? 'Lançamentos' }}
       />
       {menu}
       {wideWorkspace ? (

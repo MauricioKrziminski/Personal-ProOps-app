@@ -12,15 +12,9 @@ export interface SearchProps {
   autoFocus?: boolean;
   /** O campo é só-ícone à esquerda e o placeholder some ao digitar. */
   accessibilityLabel?: string;
-  /** iOS: deixar a barra sumir ao rolar. Ignorado onde o campo mora no corpo da tela. */
-  hideWhenScrolling?: boolean;
   /**
-   * A tela NÃO recua o próprio conteúdo (lista com `Screen scroll={false}`, header de
-   * `FlashList`): o campo põe a calha padrão por conta.
-   *
-   * É prop e não um `<View>` em volta no call site de propósito — envolvendo por fora, o padding
-   * sobreviveria no **iOS**, onde a busca não desenha nada no corpo, e abriria um buraco de 12 px
-   * no topo da tela.
+   * iOS: deixar a barra sumir ao rolar. Padrão `false` — a busca é FIXA sob o título (pedido do
+   * dono do produto, 19/09/2026). Ignorado no Android, onde ela é uma faixa do `Screen`.
    */
-  gutter?: boolean;
+  hideWhenScrolling?: boolean;
 }

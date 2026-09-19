@@ -116,7 +116,6 @@ export default function ImportHistoryScreen() {
       <Stack.Screen
         options={{
           title: 'Importações',
-          headerLargeTitle: true,
         }}
       />
 

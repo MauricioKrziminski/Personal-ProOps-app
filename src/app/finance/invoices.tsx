@@ -442,7 +442,6 @@ export default function InvoicesScreen() {
       <Stack.Screen
         options={{
           title: 'Faturas',
-          headerLargeTitle: !tablet,
         }}
       />
       {tablet ? tabletBody : compactBody}

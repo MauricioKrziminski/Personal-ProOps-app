@@ -656,11 +656,18 @@ export default function RecurringScreen() {
     <Screen
       grouped
       wide={tablet}
-      onRefresh={() => Promise.all([series.refetch(), proximos.refetch()])}>
+      onRefresh={() => Promise.all([series.refetch(), proximos.refetch()])}
+      search={
+        <Search
+          value={busca}
+          onChangeText={setBusca}
+          placeholder="Buscar por nome ou categoria"
+          accessibilityLabel="Buscar recorrências"
+        />
+      }>
       <Stack.Screen
         options={{
           title: 'Recorrentes',
-          headerLargeTitle: !tablet,
         }}
       />
 
@@ -675,13 +682,6 @@ export default function RecurringScreen() {
       />
 
       {!tablet ? loading : null}
-
-      <Search
-        value={busca}
-        onChangeText={setBusca}
-        placeholder="Buscar por nome ou categoria"
-        accessibilityLabel="Buscar recorrências"
-      />
 
       {tablet ? tabletBody : compactBody}
 

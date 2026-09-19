@@ -515,7 +515,6 @@ export default function AccountsScreen() {
       <Stack.Screen
         options={{
           title: 'Contas',
-          headerLargeTitle: !tablet,
         }}
       />
 

@@ -632,7 +632,6 @@ export default function ForecastScreen() {
       <Stack.Screen
         options={{
           title: 'Projeção',
-          headerLargeTitle: true,
         }}
       />
 

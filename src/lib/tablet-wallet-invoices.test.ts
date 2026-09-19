@@ -37,6 +37,6 @@ test('invoice history uses a bounded tablet list and truthful selected invoice c
   assert.match(source, /invoices\.isError/);
   assert.match(source, /invoices\.isLoading/);
   assert.match(source, /Nenhuma fatura ainda/);
-  assert.match(source, /headerLargeTitle: !tablet/);
+  assert.doesNotMatch(source, /headerLargeTitle/);
 }
 );

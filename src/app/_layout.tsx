@@ -27,6 +27,7 @@ import { LockOverlay } from '@/components/ui/lock-overlay';
 import { LockProvider, useLock } from '@/hooks/use-lock';
 import { AndroidActionSheet } from '@/components/ui/action-sheet';
 import { stackHeaderFonts } from '@/components/ui/app-header';
+import { IOS_26_OU_MAIS } from '@/constants/platform';
 import { ConcealProvider } from '@/components/ui/conceal';
 import { ToastProvider } from '@/components/ui/toast';
 import { AppUpdateProvider } from '@/hooks/use-app-update';
@@ -266,6 +267,28 @@ function AppTree() {
                         chevron, que é o que estas telas precisam. (No Android é ignorado.)
                     */
                     headerShadowVisible: false,
+                    /*
+                      ⚠️ **Header translúcido desde o PRIMEIRO quadro no iOS 26 — é o que impede o
+                      app de travar** (19/09/2026). No iOS ≥ 26 o `react-native-screens` embrulha
+                      toda tela de header opaco num `SafeAreaView` de topo, e o `expo-router` só
+                      torna o header translúcido quando a tela declara título grande ou busca — pelo
+                      `<Stack.Screen options>` de DENTRO dela, ou seja, depois do primeiro commit. A
+                      tela nascia opaca e virava translúcida no meio da transição; o
+                      `UINavigationController` reajustava o inset do scroll, o `SafeAreaView` e o
+                      `RNSScreenState` recomitavam, e o ciclo não parava: main thread a 100% e
+                      `ShadowTree::commit` estourando `attempts < 1024` (abort no Debug; no Release o
+                      app congela e o watchdog mata). Medido no simulador: 5 de 6 aberturas de
+                      Orçamentos, Projeção, Patrimônio e Lançamentos travavam; com esta linha, 0 de 24.
+
+                      Com a translucidez constante, o conteúdo corre por baixo do vidro e o inset vem
+                      do próprio scroll (`contentInsetAdjustmentBehavior="automatic"`, que o
+                      `Screen` usa). Tela empurrada cuja raiz não é scroll precisa somar
+                      `useHeaderHeight()` — ver `ConversationWorkspace`. Abaixo do iOS 26 o
+                      `SafeAreaView` não existe, e translúcido lá seria só perder o fundo da barra.
+                      Nenhuma tela pode sobrescrever com `headerTransparent: false`
+                      (`anti-slop.test.ts`).
+                    */
+                    headerTransparent: IOS_26_OU_MAIS,
                     headerBackButtonDisplayMode: 'minimal',
                     ...stackHeaderFonts,
                   }}>
@@ -289,14 +312,14 @@ function AppTree() {
                   <Stack.Screen name="login" options={contaOptions} />
                   <Stack.Screen name="login-whatsapp" options={contaOptions} />
                   <Stack.Screen name="signup" options={contaOptions} />
+                  {/*
+                    A recuperação mora NO portão de conta (19/09/2026): o código e a senha nova
+                    rodam num cliente descartável, que não grava sessão nenhuma; só depois da troca
+                    a sessão chega ao cliente principal, como num login. Aí o portão fecha esta tela
+                    e abre o app — e `back` nunca volta para ela.
+                  */}
+                  <Stack.Screen name="forgot-password" options={contaOptions} />
                 </Stack.Protected>
-
-                {/*
-                  A recuperação fica fora do portão de conta porque validar o código de recuperação
-                  cria uma sessão no Supabase. A tela precisa continuar montada para deixar a pessoa
-                  definir a senha depois do código; ela mesma manda para `/` ao concluir.
-                */}
-                <Stack.Screen name="forgot-password" options={contaOptions} />
 
                 <Stack.Protected guard={!!session && !hasCompletedOnboarding(session.user.user_metadata)}>
                   <Stack.Screen name="onboarding" options={{ headerShown: false }} />

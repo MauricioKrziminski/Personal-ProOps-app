@@ -600,7 +600,6 @@ export default function BudgetsScreen() {
       <Stack.Screen
         options={{
           title: 'Orçamentos',
-          headerLargeTitle: !tablet,
         }}
       />
 

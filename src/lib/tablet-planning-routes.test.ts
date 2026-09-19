@@ -10,7 +10,7 @@ test('budgets keeps the compact reading order and exposes category context in a 
   assert.match(source, /useAdaptiveWindow/);
   assert.match(source, /const tablet = windowClass !== 'compact'/);
   assert.match(source, /<Screen[\s\S]*wide=\{tablet\}/);
-  assert.match(source, /headerLargeTitle: !tablet/);
+  assert.doesNotMatch(source, /headerLargeTitle/);
   assert.match(source, /<AdaptivePanes/);
   assert.match(source, /main=\{budgetList\}/);
   assert.match(source, /support=\{[^}]+\? budgetContext : undefined\}/);
@@ -29,7 +29,7 @@ test('goals keeps contribution and archive actions while placing the aggregate b
   assert.match(source, /useAdaptiveWindow/);
   assert.match(source, /const tablet = windowClass !== 'compact'/);
   assert.match(source, /<Screen[\s\S]*wide=\{tablet\}/);
-  assert.match(source, /headerLargeTitle: !tablet/);
+  assert.doesNotMatch(source, /headerLargeTitle/);
   assert.match(source, /<AdaptivePanes/);
   assert.match(source, /main=\{goalList\}/);
   assert.match(source, /support=\{[^}]+\? goalSummary : undefined\}/);
@@ -48,7 +48,7 @@ test('debts keeps payment and destructive confirmations while putting payoff str
   assert.match(source, /useAdaptiveWindow/);
   assert.match(source, /const tablet = windowClass !== 'compact'/);
   assert.match(source, /<Screen[\s\S]*wide=\{tablet\}/);
-  assert.match(source, /headerLargeTitle: !tablet/);
+  assert.doesNotMatch(source, /headerLargeTitle/);
   assert.match(source, /<AdaptivePanes/);
   assert.match(source, /main=\{debtList\}/);
   assert.match(source, /support=\{[^}]+\? debtContext : undefined\}/);

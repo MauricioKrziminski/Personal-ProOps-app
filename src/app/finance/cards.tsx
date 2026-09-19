@@ -87,7 +87,9 @@ const MINIATURA = 56;
  * O cartão em miniatura no cabeçalho de cada bloco — a porta desta tela para a Carteira.
  *
  * Botão PRÓPRIO dentro do card: o card continua abrindo a fatura, e a miniatura leva o cartão
- * voando até o carrossel (e o recebe de volta ao fechar, pela âncora `miniatura:<id>`).
+ * voando até o carrossel (e o recebe de volta ao fechar, pela âncora `miniatura:<id>`, quando o
+ * cartão mostrado ainda é ele — deslizou para outro, a Carteira sai só no `fade`). Abrir por aqui
+ * NÃO muda o cartão da frente da pilha: só o toque num cartão da Carteira escolhe.
  */
 /** Abrir a Carteira num cartão, voando a partir da miniatura dele. */
 function useAbrirNaCarteira() {
@@ -420,7 +422,6 @@ export default function CardsScreen() {
       <Stack.Screen
         options={{
           title: 'Cartões',
-          headerLargeTitle: !tablet,
         }}
       />
 

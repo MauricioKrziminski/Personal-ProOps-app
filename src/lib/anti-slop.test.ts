@@ -716,7 +716,7 @@ test('Segmented não passa de 4 opções', () => {
  * `Screen` é quem carrega o ritmo vertical do app: `gap: Space.xl` entre blocos, calha
  * `Space.lg`, o respiro do topo calibrado no aparelho (`+ Space.sm`, nos dois sentidos) e o
  * padding de baixo que soma safe area + dock + FAB. Ele também resolve o teclado e a heurística
- * do large title do iOS, que exige o `ScrollView` na RAIZ da tela.
+ * do scroll edge effect do iOS 26, que exige o `ScrollView` na RAIZ da tela.
  *
  * ⚠️ **Espaçamento neste app já era todo tokenizado** — 13 literais crus no repo inteiro. O
  * desvio nunca foi "faltam tokens"; era tela escrevendo o PRÓPRIO padding. Eram duas: a Hoje
@@ -991,4 +991,23 @@ test('a paleta de nota e o CHECK do banco dizem a mesma coisa', () => {
       'paleta e CHECK divergiram: ou a tela oferece cor que o banco recusa, ou o contrário'
     );
   }
+});
+
+/**
+ * O header da pilha raiz é translúcido desde o primeiro quadro no iOS 26, e nenhuma tela desfaz.
+ *
+ * ⚠️ **Era isto que "crashava em qualquer coisa"** (19/09/2026). A tela nascia com header opaco
+ * (o `react-native-screens` a embrulha num `SafeAreaView` de topo) e virava translúcida no meio
+ * da transição, quando o `<Stack.Screen options>` de dentro dela pedia título grande ou busca: o
+ * inset do scroll e o estado da tela se realimentavam até o `ShadowTree::commit` estourar. O
+ * mecanismo está no comentário do `headerTransparent` em `app/_layout.tsx`.
+ *
+ * E o título grande saiu do app: no iOS era ele que "descia junto com a tela" ao puxar — o header
+ * é fixo por pedido do dono do produto. `headerLargeTitleEnabled` é o nome novo da mesma opção.
+ */
+test('header translúcido na raiz, nenhum título grande, nenhuma tela opaca por cima', () => {
+  const layout = readFileSync(join(SRC, 'app', '_layout.tsx'), 'utf8');
+  assert.match(stripComments(layout), /headerTransparent:\s*IOS_26_OU_MAIS/);
+  assert.deepEqual(offenders(/headerLargeTitle(Enabled)?\s*:/), []);
+  assert.deepEqual(offenders(/headerTransparent\s*:\s*false/), []);
 });

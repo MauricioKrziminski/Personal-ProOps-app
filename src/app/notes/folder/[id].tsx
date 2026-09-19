@@ -191,7 +191,7 @@ export default function FolderScreen() {
   return (
     <Screen scroll={false} grouped wide={tablet}>
       <Stack.Screen
-        options={{ title: folder?.name ?? 'Pasta', headerLargeTitle: !tablet }}
+        options={{ title: folder?.name ?? 'Pasta' }}
       />
 
       {/*

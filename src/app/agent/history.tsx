@@ -101,6 +101,9 @@ export default function AgentHistoryScreen() {
     <Screen scroll={false} grouped>
       <FlashList
         data={conversas}
+        // Sob o header translúcido do iOS 26 (`app/_layout.tsx`) quem desce a primeira linha é o
+        // próprio scroll; o padrão da RN é `never`, e ela nasceria debaixo da barra.
+        contentInsetAdjustmentBehavior="automatic"
         keyExtractor={(c) => c.id}
         renderItem={renderConversa}
         ListHeaderComponent={

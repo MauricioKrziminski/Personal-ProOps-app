@@ -85,7 +85,7 @@ export default function ManageScreen() {
 
   return (
     <Screen grouped wide={tablet}>
-      <Stack.Screen options={{ title: 'Gerenciar', headerLargeTitle: !tablet }} />
+      <Stack.Screen options={{ title: 'Gerenciar' }} />
 
       {GROUPS.map((group) => (
         <Section key={group.title} title={group.title}>

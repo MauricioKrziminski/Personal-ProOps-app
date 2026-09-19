@@ -80,8 +80,18 @@ Suave (não existe nos vídeos).
   estreitos (`scaleX`), e tocar a pilha leva o cartão da frente voando até a **Carteira**
   (`/finance/wallet`, carrossel 3D). O botão "fecha ›" da face abre a fatura — um toque só não
   decide entre "ver os cartões" e "abrir a fatura". O leque que abria no lugar saiu.
-- **A escolha do cartão da frente é o `account_id`**, gravado em `useCartaoEscolhido` (loja com
-  assinatura + AsyncStorage): a Carteira troca por cima e a pilha de baixo se reordena sozinha.
+- **Na Carteira, deslizar FOLHEIA e TOCAR ESCOLHE** (19/09/2026, decisão do dono do produto).
+  Tocar num cartão — o do centro ou um vizinho, que antes vem ao centro e só escolhe se a mola
+  terminar — o põe na frente da pilha e volta ao Financeiro. Deslizar, abrir pela miniatura de
+  Cartões e fechar sem tocar (✕, arraste, voltar) **não mudam a pilha**. O voo de volta só
+  acontece quando é verdade: para a pilha, se o cartão mostrado É a frente dela; para a
+  miniatura, se ele É o cartão que saiu dela. Senão, a tela sai só no `fade`.
+- **A escolha do cartão da frente é o `account_id`, POR USUÁRIO**, gravado em
+  `useCartaoEscolhido` (loja com assinatura + AsyncStorage em `card-stack-front:<userId>`): o
+  toque na Carteira grava por cima e a pilha de baixo se reordena sozinha. A chave era global, e
+  outra conta no mesmo aparelho herdava um id que não existia na lista dela. A ordem é
+  `ordemDaPilha` (`lib/card-status.ts`): o escolhido na frente, SEMPRE desenhado, e o resto na
+  ordem original.
 - **Voo entre telas** mora numa camada na raiz (`flight-layer.tsx`, irmã do `<Stack>`), e a
   Carteira entra em `fade`: `push` no iOS (lá o `transparentModal` é apresentado acima da raiz e
   esconderia o voo) e `transparentModal` no Android (como `push`, o Financeiro era desanexado e
@@ -632,8 +642,24 @@ que "voltar" faz depois.
   "Cancelar" e a pílula de vidro do `Stack.Toolbar` no "Salvar" nessas três.
   `anti-slop.test.ts` quebra o build se `headerLeft` voltar (allowlist ZERO).
 
-  **Tela EMPURRADA continua com o header do navegador**, `<Stack.Title>` e large title — e o
-  `ScrollView` continua precisando ser a raiz dela.
+  **Tela EMPURRADA continua com o header do navegador** e `<Stack.Title>` — **título compacto e
+  FIXO, sem large title** — e o `ScrollView` continua precisando ser a raiz dela.
+
+  ⚠️ **O header não desce com a tela, e no iOS 26 ele é translúcido desde o primeiro quadro**
+  (19/09/2026, decisão do dono do produto: *"nunca vi o header descer junto com a tela"*). Duas
+  mudanças, uma de produto e uma de estabilidade:
+
+  - **Sem `headerLargeTitle` em tela nenhuma.** Era o título grande que expandia ao puxar e
+    arrastava header e busca junto. `anti-slop.test.ts` barra `headerLargeTitle`/`...Enabled`.
+  - **`headerTransparent` no iOS ≥ 26, na raiz (`app/_layout.tsx`).** Era isto que "crashava em
+    qualquer coisa": no iOS 26 o `react-native-screens` embrulha tela de header OPACO num
+    `SafeAreaView` de topo, e a tela nascia opaca e virava translúcida no meio da transição (as
+    opções de título grande/busca chegavam depois do primeiro commit). Inset do scroll e estado da
+    tela se realimentavam até o `ShadowTree::commit` estourar — abort no Debug, congelamento +
+    watchdog no Release. Medido: 5 de 6 aberturas travavam; 0 de 24 com a linha. Nenhuma tela
+    pode declarar `headerTransparent: false`. Tela empurrada cuja raiz não é scroll soma
+    `useHeaderHeight()` (`ConversationWorkspace`); lista própria declara
+    `contentInsetAdjustmentBehavior="automatic"` (o padrão da RN é `never`).
 
   Nas cinco raízes de aba quem desenha é o `AppHeader`
   (`src/components/ui/app-header.tsx`): **a faixa de marca** — 56px sobre a safe area, fundo
@@ -660,12 +686,13 @@ que "voltar" faz depois.
   O avatar leva o ícone de pessoa, não iniciais. `profiles.display_name` existe desde a `0050`, mas
   é ANULÁVEL — quem entrou por Phone OTP não tem nome —, e um avatar que às vezes é letra e às
   vezes é ícone muda de forma conforme o cadastro. Um desenho só, para todo mundo.
-  **Tela EMPURRADA continua com `<Stack.Title>` + large title** — lá o título e o "voltar" são a
+  **Tela EMPURRADA continua com `<Stack.Title>`** — lá o título e o "voltar" são a
   informação. Barra desenhada à mão dentro do `ScrollView` continua proibida: o `AppHeader` fica
   FORA dele.
 
-  ⚠️ **E o scroll da tela empurrada tem que ser a RAIZ dela — uma `View` em volta mata o large
-  title** (11/09/2026). O iOS procura o scroll view da interação do título grande andando pelos
+  ⚠️ **E o scroll da tela empurrada tem que ser a RAIZ dela.** Hoje o motivo é o scroll edge
+  effect do vidro no iOS 26, que procura o scroll pelo mesmo caminho raso; o registro abaixo é de
+  quando o sintoma era o large title (11/09/2026). O iOS procura o scroll view da interação do título grande andando pelos
   PRIMEIROS SUBVIEWS a partir da raiz, e a busca é rasa: com uma `View` no meio ele não acha,
   `prefersLargeTitles` fica ligado e o título **nunca colapsa** — fica cravado no lugar do large
   title enquanto o conteúdo rola por baixo, sem fundo, os dois sobrepostos. O
@@ -693,10 +720,13 @@ que "voltar" faz depois.
   O prop `dot` do `SectionHead` foi REMOVIDO para não voltar por descuido. Continuam válidos: o
   separador de 3px entre metadados (é pontuação) e a bolinha da bandeira no cartão de crédito
   (identifica o emissor).
-- **Busca é `<Search>`** (`src/components/ui/search-field.tsx`), em Notas, Lançamentos e
-  `/search`. Um componente, dois desenhos: no **iOS** ele renderiza o `<Stack.SearchBar>` nativo,
-  que integra com o large title e some no scroll; no **Android** renderiza uma pílula
-  (`SearchField`) no corpo da tela. A divisão existe porque no Android o nativo desenha uma laje
+- **Busca é FIXA e mora no slot `search` do `<Screen>`** (19/09/2026) — Lançamentos,
+  Recorrentes, `/search` e Notas. O conteúdo rola; a busca não. Um componente, dois desenhos: no
+  **iOS** o `<Search>` renderiza o `<Stack.SearchBar>` nativo, fixo sob o título
+  (`hideWhenScrolling` nasce `false`); no **Android** o `Screen` põe a pílula (`SearchField`)
+  numa faixa com o fundo da tela entre o header e o conteúdo — o header do Android tem esse mesmo
+  fundo, e os dois leem como uma peça. Nas raízes de aba (sem barra nativa) a faixa vale nos dois
+  sistemas e recebe um `SearchField`. No iPad, Lançamentos mantém a busca no painel lateral. A divisão existe porque no Android o nativo desenha uma laje
   de **canto 0** — o único elemento fora da escala `Radius`, encostado num input de raio 12 e numa
   fileira de chips em pílula — e a API expõe cor (`barTintColor`, `textColor`, `hintTextColor`,
   `headerIconColor`) e **não expõe forma**. O mesmo `<Search>` pode ficar onde o campo deve

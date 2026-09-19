@@ -216,7 +216,7 @@ export default function TransactionDetailScreen() {
   if (!pronta) {
     return (
       <Screen grouped wide={tablet} onRefresh={refresh}>
-        <Stack.Screen options={{ title: 'Lançamento', headerLargeTitle: !tablet }} />
+        <Stack.Screen options={{ title: 'Lançamento' }} />
         <View style={styles.heroSkeleton}>
           <Skeleton width="45%" height={14} />
           <Skeleton width="70%" height={46} />
@@ -231,7 +231,7 @@ export default function TransactionDetailScreen() {
   if (list.isError) {
     return (
       <Screen grouped wide={tablet} onRefresh={refresh}>
-        <Stack.Screen options={{ title: 'Lançamento', headerLargeTitle: !tablet }} />
+        <Stack.Screen options={{ title: 'Lançamento' }} />
         <ErrorCard onRetry={list.refetch} />
       </Screen>
     );
@@ -240,7 +240,7 @@ export default function TransactionDetailScreen() {
   if (!tx) {
     return (
       <Screen grouped wide={tablet} onRefresh={refresh}>
-        <Stack.Screen options={{ title: 'Lançamento', headerLargeTitle: !tablet }} />
+        <Stack.Screen options={{ title: 'Lançamento' }} />
         <EmptyState
           icon="questionmark.folder"
           title="Esse lançamento não existe mais"
@@ -412,7 +412,7 @@ export default function TransactionDetailScreen() {
       grouped
       wide={tablet}
       onRefresh={refresh}>
-      <Stack.Screen options={{ title, headerLargeTitle: !tablet }} />
+      <Stack.Screen options={{ title }} />
 
       {/*
         UM componente desenha o header inteiro — botão e menu juntos.

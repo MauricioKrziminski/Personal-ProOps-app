@@ -191,7 +191,7 @@ export default function PlanScreen() {
 
   return (
     <Screen grouped wide={tablet} onRefresh={() => Promise.all([refetch(), convites.refetch()])}>
-      <Stack.Screen options={{ title: 'Plano', headerLargeTitle: !tablet }} />
+      <Stack.Screen options={{ title: 'Plano' }} />
       {tablet ? tabletBody : compactBody}
     </Screen>
   );

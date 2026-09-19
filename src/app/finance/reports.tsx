@@ -241,7 +241,6 @@ export default function ReportsScreen() {
       <Stack.Screen
         options={{
           title: 'Relatórios',
-          headerLargeTitle: true,
         }}
       />
 

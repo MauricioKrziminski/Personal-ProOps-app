@@ -380,7 +380,7 @@ export default function ImportScreen() {
   if (!batchId) {
     return (
       <Screen grouped>
-        <Stack.Screen options={{ title: 'Importar extrato', headerLargeTitle: true }} />
+        <Stack.Screen options={{ title: 'Importar extrato' }} />
 
         {/* O único destaque da etapa: a instrução é o conteúdo da tela. */}
         <Card style={styles.hero}>
@@ -451,7 +451,6 @@ export default function ImportScreen() {
       <Stack.Screen
         options={{
           title: vaoEntrar > 0 ? `Revisar ${vaoEntrar}` : 'Revisar lote',
-          headerLargeTitle: true,
         }}
       />
 

@@ -60,7 +60,7 @@ interface ScreenProps {
    * Entra em cascata: cada bloco de primeiro nível desce e aparece 60 ms depois do anterior.
    *
    * ⚠️ **Só com `scroll` (o padrão).** Sem ele o filho PRECISA ser a raiz da tela — envolvê-lo
-   * mata o large title do header nativo, que é o defeito documentado no bloco `SCROLL VIEW NA
+   * esconde o scroll do header nativo, que é o defeito documentado no bloco `SCROLL VIEW NA
    * RAIZ` logo abaixo. Em tela sem scroll o conteúdo é uma lista, e quem escalona é a lista.
    *
    * ⚠️ **É o par do portão da Fase 5** (`useTelaPronta`). O portão faz a tela inteira montar de
@@ -82,6 +82,23 @@ interface ScreenProps {
    * (`useRolagemDaTela`). Só vale com `topBar`: tela empurrada não tem FAB.
    */
   overlay?: React.ReactNode;
+  /**
+   * A busca FIXA da tela (19/09/2026, pedido do dono do produto: *"header com o input de busca
+   * fixo ao scrollar"*). O conteúdo rola; a busca não.
+   *
+   * - **Tela empurrada no iOS:** passe o `<Search>`, que vira a barra NATIVA do header e não
+   *   desenha nada no corpo — o slot o renderiza sem `View` em volta, e o scroll continua sendo a
+   *   raiz da tela (ver `SCROLL VIEW NA RAIZ`).
+   * - **Tela empurrada no Android e raiz de aba (`topBar`) nos dois:** o slot vira uma faixa com o
+   *   fundo da tela entre o header e o conteúdo — no Android o header do navegador tem esse mesmo
+   *   fundo, então os dois leem como uma peça só. Na raiz de aba o header é o `AppHeader`, que não
+   *   tem barra nativa: passe um `SearchField`.
+   *
+   * ⚠️ A busca dentro do conteúdo rolável foi o desenho de 09/09 (quando a pílula era IRMÃ solta
+   * da lista e o extrato passava por baixo dela sem fundo). A faixa tem fundo e fica ACIMA do
+   * scroll, e é isso que a faz ler como parte do header, não como um campo flutuando na lista.
+   */
+  search?: React.ReactNode;
   contentStyle?: StyleProp<ViewStyle>;
   /** Let a tab root use a bounded tablet canvas; pushed routes keep their native scroll root. */
   wide?: boolean;
@@ -113,6 +130,7 @@ export function Screen({
   overlay,
   contentStyle,
   wide = false,
+  search,
 }: ScreenProps) {
   const theme = useTheme();
   const { width } = useAdaptiveWindow();
@@ -156,11 +174,28 @@ export function Screen({
     contentStyle,
   ];
 
+  /** Onde a busca vira faixa — ver o prop `search`. No iOS empurrado ela é a barra nativa. */
+  const buscaNoHeader = Platform.OS === 'ios' && !topBar;
+  const faixa = search ? (
+    buscaNoHeader ? (
+      search
+    ) : (
+      <View style={[styles.faixa, { backgroundColor: background }]}>
+        <View style={styles.faixaConteudo}>{search}</View>
+      </View>
+    )
+  ) : null;
+  if (__DEV__ && search && scroll && topBar) {
+    // Nenhuma raiz rolável tem busca hoje; ali a faixa precisaria somar a própria altura ao
+    // `paddingTop` do scroll. Falhar alto aqui é melhor que desenhar o campo sobre a lista.
+    console.error('Screen: `search` com `topBar` exige `scroll={false}`.');
+  }
+
   if (!scroll) {
     /*
       ⚠️ **Sem `topBar`, o filho precisa ser a RAIZ da tela.** Ver o bloco `SCROLL VIEW NA RAIZ`
-      abaixo: aqui o filho é a lista (SectionList/FlatList), e envolvê-la numa `View` mata o
-      large title do header nativo exatamente do mesmo jeito.
+      abaixo: aqui o filho é a lista (SectionList/FlatList), e envolvê-la numa `View` esconde o
+      scroll do header nativo do iOS exatamente do mesmo jeito (o Android pode — ver `faixa`).
 
       O fundo, que era o da `View` que sumiu, passa a vir do `contentStyle` do navegador — que é
       onde ele deveria estar desde sempre: quem pinta o container da tela é a pilha, não um
@@ -170,7 +205,18 @@ export function Screen({
       return (
         <>
           <Stack.Screen options={{ contentStyle: { backgroundColor: background } }} />
-          {children}
+          {faixa && !buscaNoHeader ? (
+            // Android: não há header nativo procurando o scroll, a lista pode morar numa coluna.
+            <View style={styles.root}>
+              {faixa}
+              {children}
+            </View>
+          ) : (
+            <>
+              {faixa}
+              {children}
+            </>
+          )}
         </>
       );
     }
@@ -178,6 +224,7 @@ export function Screen({
       <RolagemDaTela.Provider value={rolagem}>
         <View style={[styles.root, { backgroundColor: background }]}>
           <View style={[styles.root, wide ? styles.wideContent : null, { paddingTop: headerHeight }, contentStyle]}>
+            {faixa}
             {children}
           </View>
           {topBar}
@@ -190,6 +237,12 @@ export function Screen({
   /*
     ══ SCROLL VIEW NA RAIZ ═══════════════════════════════════════════════════════════════════
     ⚠️ **O `ScrollView` só pode ser embrulhado numa `View` quando a tela NÃO tem header nativo.**
+
+    Desde 19/09/2026 o app não usa título grande (o header é fixo, e no iOS 26 ele é translúcido
+    desde o primeiro quadro — ver `app/_layout.tsx`). A regra continua pelo mesmo mecanismo: o
+    iOS 26 procura o scroll view pelos primeiros subviews para desenhar o scroll edge effect sob o
+    vidro, e sem ele o conteúdo passa ilegível por baixo da barra. O histórico abaixo é de quando
+    o sintoma era o título grande.
 
     O iOS procura o scroll view da interação do título grande andando pelos PRIMEIROS SUBVIEWS a
     partir da raiz da tela, e a busca é rasa — uma `View` no meio já esconde o scroll. Sem achar,
@@ -220,7 +273,7 @@ export function Screen({
           `paddingTop` acima — deixar o iOS ajustar por cima disso soma duas vezes.
 
           Nas telas EMPURRADAS quem desenha o topo é o header nativo, e é o `automatic` que faz o
-          conteúdo começar embaixo do large title em vez de correr por baixo dele. Trocar isso por
+          conteúdo começar embaixo da barra (translúcida no iOS 26) em vez de correr por baixo dela. Trocar isso por
           `never` para todo mundo (o que eu tinha feito) enfiava a primeira linha de Contas,
           Cartões, Orçamentos e companhia debaixo da barra de navegação.
         */
@@ -244,7 +297,23 @@ export function Screen({
     </KeyboardAwareScrollView>
   );
 
-  if (!topBar) return <RolagemDaTela.Provider value={rolagem}>{conteudo}</RolagemDaTela.Provider>;
+  if (!topBar) {
+    return (
+      <RolagemDaTela.Provider value={rolagem}>
+        {faixa && !buscaNoHeader ? (
+          <View style={[styles.root, { backgroundColor: background }]}>
+            {faixa}
+            {conteudo}
+          </View>
+        ) : (
+          <>
+            {faixa}
+            {conteudo}
+          </>
+        )}
+      </RolagemDaTela.Provider>
+    );
+  }
 
   return (
     <RolagemDaTela.Provider value={rolagem}>
@@ -333,4 +402,12 @@ const styles = StyleSheet.create({
     alignSelf: 'center',
   },
   wideContent: { width: '100%', maxWidth: 1200, alignSelf: 'center' },
+  /** A faixa ocupa a largura toda (o fundo encosta nas bordas); o campo respeita a calha. */
+  faixa: { paddingTop: Space.sm, paddingBottom: Space.sm },
+  faixaConteudo: {
+    paddingHorizontal: Space.lg,
+    width: '100%',
+    maxWidth: MaxContentWidth,
+    alignSelf: 'center',
+  },
 });

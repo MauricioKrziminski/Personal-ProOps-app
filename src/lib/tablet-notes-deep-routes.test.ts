@@ -19,7 +19,7 @@ test('notes deep editor and folder stay readable when a tablet window is wide', 
     const source = readRoute(route);
     assert.match(source, /useAdaptiveWindow/);
     assert.match(source, /wide=\{tablet\}/);
-    assert.match(source, /headerLargeTitle: !tablet/);
+    assert.doesNotMatch(source, /headerLargeTitle/);
     assert.doesNotMatch(source, /Device\.modelName/);
   }
 

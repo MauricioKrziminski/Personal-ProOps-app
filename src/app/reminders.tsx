@@ -98,7 +98,6 @@ export default function RemindersScreen() {
       <Stack.Screen
         options={{
           title: 'Lembretes',
-          headerLargeTitle: !tablet,
         }}
       />
 
