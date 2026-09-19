@@ -10,6 +10,7 @@
     "primaryColor": "#0B0B0C",
     "ios": {
       "bundleIdentifier": "com.proops.personal",
+      "appleTeamId": "7FKQLD9MCJ",
       "supportsTablet": true,
       "infoPlist": {
         "ITSAppUsesNonExemptEncryption": false,

@@ -30,12 +30,17 @@ App mobile pessoal de **notas rápidas, lembretes e controle financeiro operado 
   Isso já falhou **duas vezes** (03/09/2026): a `0049` e depois as `0050`/`0051` foram anunciadas
   como "aplicadas em produção" quando foram para o staging.
 
-  Produção está em **`20260915230000`** (o quarto slot de rascunho cabe no CHECK), aplicada em
+  **Produção e staging estão ALINHADOS em `20260918220000`** — conferido na fonte em 19/09/2026
+  (`schema_migrations` de produção devolve `20260918220000`, `20260918120000`, `20260917120000`, e
+  `executed_actions` já tem `user_id`/`workspace_id`/`origin_text`). Os parágrafos abaixo são o
+  histórico da subida.
+
+  Produção estava em **`20260915230000`** (o quarto slot de rascunho cabe no CHECK), aplicada em
   15/09/2026 pelo Gabriel junto da `20260915210000` (reparcelar a compra: `update_installment_plan`
   e `private.parcela_travada`), depois da `20260915190000` (a parcela herda o nome do
   estabelecimento) e da `20260915120000` (a coluna `atrasada` de `cycle_lines`).
 
-  ⚠️ **O staging está DUAS à frente: `20260917120000` e `20260918120000`.** A primeira (17/09/2026, `card_summary` e
+  (Histórico) **O staging esteve DUAS à frente: `20260917120000` e `20260918120000`.** A primeira (17/09/2026, `card_summary` e
   `_card_summary` ganham `invoice_open_cents` no fim — o que falta na fatura corrente, líquido do
   pagamento parcial). Conferida no staging depois de aplicar: a coluna é a última das duas
   assinaturas, `_card_summary` segue `security definer` e sem `execute` para `anon` e

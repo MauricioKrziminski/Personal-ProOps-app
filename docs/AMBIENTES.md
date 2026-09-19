@@ -109,6 +109,17 @@ npx eas-cli build --platform android --profile distribution   # APK
   foi um cron ligado sem dono que gerou os "lembretes fantasma" de 07/09. A aba Agente **não
   depende deles** — as rotas `/internal/chat` são síncronas e não passam pela fila.
 
+#### iPhone: Debug precisa do Mac; Release abre sozinho
+
+`npx expo run:ios --device` instala um build **Debug**, que não embute o JavaScript: toda abertura
+baixa o bundle do Metro (a barra de download a cada vez) e, sem rede ou sem Metro ligado, abre com
+*"No script URL provided … unsanitizedScriptURLString = (null)"*. Não é defeito do app.
+
+Para usar o iPhone como aparelho do dia a dia: **`npm run ios:device`**
+(`scripts/ios-release-device.sh`) — Release, JS embutido, banco e agente de PRODUÇÃO lidos do
+`.env` (o `.env.local` de staging fica de fora), e confere no `main.jsbundle` instalado que o ref é
+o de produção. Build local **não recebe OTA** (sem header de canal); para isso é TestFlight/EAS.
+
 ---
 
 ## 3. O que muda, na prática
