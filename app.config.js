@@ -69,6 +69,10 @@ const IDENTIDADE = {
 
 module.exports = ({ config }) => {
   const { id, nome } = IDENTIDADE[VARIANTE] || IDENTIDADE.development;
+  const publicConfig = {
+    supabaseUrl: process.env.EXPO_PUBLIC_SUPABASE_URL || '',
+    supabaseAnonKey: process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY || '',
+  };
 
   return {
     ...config,
@@ -86,5 +90,15 @@ module.exports = ({ config }) => {
     ],
     ios: { ...config.ios, bundleIdentifier: id },
     android: { ...config.android, package: id },
+    // O Metro v57 ainda pode encontrar um .env.local no diretório mesmo quando o processo foi
+    // iniciado com EXPO_NO_DOTENV=1. Gravar a configuração pública no app config, que é resolvido
+    // pela variante nativa, impede que staging substitua produção no bundle JavaScript.
+    extra: {
+      ...(config.extra || {}),
+      proops: {
+        ...(config.extra?.proops || {}),
+        ...publicConfig,
+      },
+    },
   };
 };

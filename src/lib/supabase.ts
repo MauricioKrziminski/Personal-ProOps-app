@@ -1,14 +1,23 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import Constants from 'expo-constants';
 import { createClient } from '@supabase/supabase-js';
 
 import type { Database } from '@/lib/database.types';
 import { comTeto } from '@/lib/com-teto';
+import { resolvePublicRuntimeConfig, type PublicRuntimeConfig } from '@/lib/runtime-config';
 import { Platform } from 'react-native';
 
 // Apenas anon key no app. Não existe service_role neste repositório desde 09/09/2026: quem
 // precisa de privilégio é o agente, com papel próprio, e o que protege o cliente é a RLS.
-export const supabaseUrl = process.env.EXPO_PUBLIC_SUPABASE_URL ?? '';
-const supabaseAnonKey = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY ?? '';
+const publicConfig = resolvePublicRuntimeConfig(
+  (Constants.expoConfig?.extra as { proops?: PublicRuntimeConfig } | undefined)?.proops,
+  {
+    supabaseUrl: process.env.EXPO_PUBLIC_SUPABASE_URL,
+    supabaseAnonKey: process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY,
+  },
+);
+export const supabaseUrl = publicConfig.supabaseUrl;
+const supabaseAnonKey = publicConfig.supabaseAnonKey;
 
 export const isSupabaseConfigured = Boolean(supabaseUrl && supabaseAnonKey);
 
