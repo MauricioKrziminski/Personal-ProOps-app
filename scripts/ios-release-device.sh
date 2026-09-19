@@ -42,8 +42,10 @@ export EXPO_PUBLIC_AGENT_URL="$PROD_AGENT_URL"
 # de bundle do Xcode roda (`export:embed`), numa pasta temporária.
 conferir() {
   # URLs, não o ref solto: `lib/environment.ts` carrega o mapa ref → rótulo dos DOIS projetos.
-  if ! grep -q "https://$PROD_REF.supabase.co" "$1" ||
-    grep -q "https://utkqoiigimqzeenxkxdl.supabase.co\|agente-staging\|127.0.0.1:54321\|10.0.2.2:54321" "$1"; then
+  # `strings`: no Release o bundle é bytecode Hermes, e o `grep` direto não acha o texto nele.
+  local texto; texto="$(strings "$1")"
+  if ! grep -q "https://$PROD_REF.supabase.co" <<<"$texto" ||
+    grep -q "https://utkqoiigimqzeenxkxdl.supabase.co\|agente-staging\|127.0.0.1:54321\|10.0.2.2:54321" <<<"$texto"; then
     echo "✗ O JavaScript não aponta só para a produção ($1). Nada foi instalado." >&2
     exit 1
   fi
@@ -58,8 +60,20 @@ npx expo prebuild -p ios --no-install
 printf 'export NODE_BINARY=%s\n' "$(command -v node | sed 's#/Cellar/node/[^/]*/bin/node#/bin/node#')" > ios/.xcode.env.local
 (cd ios && pod install)
 
+# Time pessoal (Apple ID gratuito) não assina a capability de Push: o perfil recusa o
+# `aps-environment` que o plugin do expo-notifications grava, e o build morre na assinatura.
+# Sem um certificado de distribuição, este build local sai SEM push remoto — registrar o aparelho
+# em Perfil → Avisos mostra o erro na tela; notificações locais e o resto do app seguem iguais.
+# Push de verdade no iPhone é pelo build do EAS/TestFlight, com a conta paga.
+ent="ios/ProOps/ProOps.entitlements"
+if ! security find-identity -v -p codesigning | grep -q "Apple Distribution" && [[ -f "$ent" ]]; then
+  /usr/libexec/PlistBuddy -c "Delete :aps-environment" "$ent" 2>/dev/null || true
+  echo "⚠ Time pessoal: build local sem Push Notifications (aps-environment removido de $ent)."
+fi
+
 marco="$previa/inicio"; touch "$marco"
-args=(--configuration Release)
+# `--no-bundler`: Release não usa o Metro, e com ele o comando fica preso mostrando logs.
+args=(--configuration Release --no-bundler)
 if [[ -n "${1:-}" ]]; then args+=(--device "$1"); else args+=(--device); fi
 npx expo run:ios "${args[@]}"
 
