@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
+import * as Haptics from 'expo-haptics';
 import { router, useLocalSearchParams, useNavigation } from 'expo-router';
 import { StyleSheet, View, type LayoutChangeEvent } from 'react-native';
 import Animated, {
@@ -33,12 +34,13 @@ import type { ThemeColor } from '@/constants/theme';
 import { distanciaDoItem } from '@/design/carousel-math';
 import { caixaArrastada, type Caixa } from '@/design/flight-math';
 import { Radius, Space, tabular } from '@/design/tokens';
-import { escolherCartao, useCartaoEscolhido } from '@/hooks/use-cartao-escolhido';
+import { cartaoEscolhido, escolherCartao, useCartaoEscolhido } from '@/hooks/use-cartao-escolhido';
 import { invoiceQuery, useCardSummary, type CardSummary } from '@/hooks/use-finance';
 import { formatDateBR } from '@/hooks/use-items';
 import { useTheme } from '@/hooks/use-theme';
 import { useAdaptiveWindow } from '@/hooks/use-adaptive-window';
-import { cartaoDaPilha, estadoDaFatura, prazoLabel } from '@/lib/card-status';
+import { useSession } from '@/hooks/use-session';
+import { cartaoDaPilha, estadoDaFatura, ordemDaPilha, prazoLabel } from '@/lib/card-status';
 
 
 /**
@@ -55,8 +57,16 @@ import { cartaoDaPilha, estadoDaFatura, prazoLabel } from '@/lib/card-status';
  * atual, fechamento, vencimento, limite, disponível, atraso — ficam legíveis embaixo do cartão,
  * que em pé mostra só o nome (como no vídeo).
  *
- * Trocar de cartão grava a escolha (`escolherCartao`): a pilha do Financeiro, montada por baixo,
- * se reordena, e o cartão volta voando para a frente dela.
+ * ## Deslizar folheia, tocar escolhe
+ *
+ * Deslizar só troca o cartão MOSTRADO — não grava nada. TOCAR num cartão (o do centro ou um
+ * vizinho, que antes vem ao centro) grava a escolha (`escolherCartao`) e fecha: a pilha do
+ * Financeiro, montada por baixo, se reordena e o cartão volta voando para a frente dela.
+ *
+ * Fechar sem tocar (✕, arraste, voltar do Android) deixa a pilha como estava. E o voo de volta
+ * só acontece quando é VERDADE: o cartão mostrado volta voando para a pilha se ele É a frente
+ * dela, e para a miniatura se ele É o cartão que saiu dela. Outro cartão, a tela sai só no
+ * `fade` — voar um cartão para um lugar onde ele não está seria o cartão errado pousando.
  *
  * ⚠️ **É um `push` com `fade`, não um modal transparente** — ver o plano da fase 4. O custo: atrás
  * de um `push` o iOS não desenha a tela de baixo, então o arraste esmaece o CONTEÚDO, não o fundo.
@@ -79,6 +89,7 @@ export default function WalletScreen() {
 
   const cards = useCardSummary();
   const lista = useMemo(() => (cards.isError ? [] : (cards.data ?? [])), [cards.data, cards.isError]);
+  const userId = useSession().session?.user.id;
   const escolhido = useCartaoEscolhido();
   const [ativoId, setAtivoId] = useState<string | null>(card ?? null);
   const idAtivo = ativoId ?? escolhido ?? null;
@@ -96,18 +107,12 @@ export default function WalletScreen() {
     if (invoiceId) queryClient.prefetchQuery(invoiceQuery(invoiceId));
   }, [invoiceId, queryClient]);
 
-  // Abrir a Carteira num cartão é escolhê-lo: a pilha de baixo precisa mostrar o mesmo cartão
-  // para onde ele vai voltar voando (vale também para quem chega pela miniatura de Cartões).
-  useEffect(() => {
-    if (card) escolherCartao(card);
-  }, [card]);
-
+  // Abrir a Carteira num cartão NÃO é escolhê-lo: pela pilha ele já é a frente, e pela miniatura
+  // de Cartões a pessoa foi olhar um cartão, não trocar o padrão. Deslizar também só mostra.
   const trocar = useCallback(
     (i: number) => {
       const id = lista[i]?.account_id;
-      if (!id) return;
-      setAtivoId(id);
-      escolherCartao(id);
+      if (id) setAtivoId(id);
     },
     [lista]
   );
@@ -123,13 +128,24 @@ export default function WalletScreen() {
     ativoAgora.current = ativo;
   }, [ativo]);
   const saindo = useRef(false);
+  // Qualquer saída, com voo ou sem: a mola de um toque que termina depois disso não escolhe.
+  const saiu = useRef(false);
   useEffect(
     () =>
       navigation.addListener('beforeRemove', (e) => {
+        saiu.current = true;
         const c = ativoAgora.current;
         if (saindo.current || !c) return;
         const id = c.account_id;
-        const para = origem === 'pilha' ? 'pilha' : origem === 'miniatura' ? `miniatura:${id}` : null;
+        // Lido AGORA da loja, não do render: o toque que escolheu acabou de gravar, e a pilha de
+        // baixo ainda não re-renderizou.
+        const frente = ordemDaPilha(lista, cartaoEscolhido(userId), 1)[0];
+        const para =
+          origem === 'pilha' && frente?.account_id === id
+            ? 'pilha'
+            : origem === 'miniatura' && card === id
+              ? `miniatura:${id}`
+              : null;
         if (!para || !temAncora(para)) return;
         // A tela só sai depois que o cartão decolou — ver `voar` em `flight-layer.tsx`.
         e.preventDefault();
@@ -151,7 +167,7 @@ export default function WalletScreen() {
           ),
         }).then(() => navigation.dispatch(e.data.action));
       }),
-    [navigation, origem, temAncora, voar, saida]
+    [navigation, origem, card, lista, userId, temAncora, voar, saida]
   );
 
   // Aberta por link, sem nada atrás, "voltar" não tem destino: cai no Financeiro, a casa dela.
@@ -159,6 +175,28 @@ export default function WalletScreen() {
     if (router.canGoBack()) router.back();
     else router.replace('/finance');
   }, []);
+
+  /*
+    O toque que escolhe. `ativoAgora` é trocado aqui, na mão, porque o `beforeRemove` roda DENTRO
+    do `router.back()` — antes de o efeito que o acompanha o `ativo` ter visto o re-render.
+
+    Não precisa esperar um quadro antes de fechar: `escolherCartao` avisa a loja na hora e a pilha
+    re-renderiza no próximo commit, muito antes do pouso (a mola do voo leva centenas de ms). O
+    voo mede a âncora `pilha` — o LUGAR da frente, que não muda com a ordem — e esconde
+    `pilha:<id>`, que a essa altura já é o cartão da frente, ou está indo para lá por baixo dele.
+  */
+  const escolher = useCallback(
+    (i: number) => {
+      const c = lista[i];
+      if (!c || saiu.current) return;
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+      setAtivoId(c.account_id);
+      ativoAgora.current = c;
+      escolherCartao(userId, c.account_id);
+      fechar();
+    },
+    [lista, userId, fechar]
+  );
 
   const medirMoldura = moldura.medir;
   const fecharArrastado = useCallback(
@@ -264,6 +302,7 @@ export default function WalletScreen() {
         cards={lista}
         indice={indice}
         onIndice={trocar}
+        onEscolher={escolher}
         x={x}
         arrasto={arrasto}
         pagina={pagina}

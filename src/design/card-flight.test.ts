@@ -18,7 +18,14 @@ import {
 } from './card-brands.ts';
 import { contrast } from './contrast.ts';
 import { PROPORCAO_DO_CARTAO, alturaDoCartao, proporcaoDoCartao } from './card-geometry.ts';
-import { alvoDoDeslize, comElastico, distanciaDoItem, indiceNoDeslocamento, quadroDoItem } from './carousel-math.ts';
+import {
+  alvoDoDeslize,
+  comElastico,
+  distanciaDoItem,
+  indiceNoDeslocamento,
+  indiceTocado,
+  quadroDoItem,
+} from './carousel-math.ts';
 import { caixaArrastada, quadroDaCaixa, quadroNoVoo } from './flight-math.ts';
 
 const pilha = { x: 16, y: 500, largura: 358, altura: 226 };
@@ -152,4 +159,19 @@ test('além das pontas o carrossel cede um terço do dedo', () => {
   assert.equal(comElastico(-90, 220, 3), -90 * 0.35);
   assert.equal(comElastico(300, 220, 3), 300);
   assert.equal(comElastico(440 + 60, 220, 3), 440 + 60 * 0.35);
+});
+
+test('o toque acha o cartão que está debaixo do dedo, com o carrossel onde ele está', () => {
+  // Palco de 390, cartão em pé de 195 e vão de 16: passo 211, o centro em 195.
+  const [largura, passo, total] = [390, 211, 5];
+  assert.equal(indiceTocado(195, largura, 0, passo, total), 0, 'o centro, em repouso no primeiro');
+  assert.equal(indiceTocado(195 + passo, largura, 0, passo, total), 1, 'o vizinho da direita');
+  assert.equal(indiceTocado(40, largura, 2 * passo, passo, total), 1, 'a borda do vizinho da esquerda');
+  assert.equal(indiceTocado(350, largura, 2 * passo, passo, total), 3, 'a borda do vizinho da direita');
+  // No meio da mola (1,4 passo): o que está sob o dedo, não o destino.
+  assert.equal(indiceTocado(195, largura, 1.4 * passo, passo, total), 1);
+  assert.equal(indiceTocado(195 + 0.2 * passo, largura, 1.4 * passo, passo, total), 2);
+  assert.equal(indiceTocado(380, largura, 4 * passo, passo, total), 4, 'nada além do último');
+  assert.equal(indiceTocado(0, largura, 0, passo, total), 0, 'nada antes do primeiro');
+  assert.equal(indiceTocado(195, largura, 0, passo, 0), 0);
 });

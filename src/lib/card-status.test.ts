@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 
-import { diasAte, estadoDaFatura, outrasFaturas, prazoLabel } from './card-status.ts';
+import { diasAte, estadoDaFatura, ordemDaPilha, outrasFaturas, prazoLabel } from './card-status.ts';
 
 const hoje = new Date(2026, 8, 16, 22, 30);
 
@@ -49,4 +49,18 @@ test('outras faturas: o que o limite usa fora da corrente e das atrasadas', () =
     outrasFaturas({ unpaid_total_cents: null, invoice_open_cents: null, invoice_total_cents: null, overdue_total_cents: null }, null),
     0
   );
+});
+
+test('pilha: o escolhido vai para a frente e o resto fica na ordem original', () => {
+  const cards = ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h'].map((account_id) => ({ account_id }));
+  const ids = (escolhido: string | null | undefined, max = 6) =>
+    ordemDaPilha(cards, escolhido, max).map((c) => c.account_id).join('');
+  assert.equal(ids('a'), 'abcdef', 'o primeiro já é a frente');
+  assert.equal(ids('c'), 'cabdef', 'do meio: sai do lugar e os outros não se mexem');
+  assert.equal(ids('g'), 'gabcde', 'além do corte ele ENTRA, senão a pilha fica sem frente');
+  assert.equal(ids('h', 3), 'hab');
+  assert.equal(ids('zz'), 'abcdef', 'id desconhecido cai no primeiro');
+  assert.equal(ids(null), 'abcdef');
+  assert.equal(ids(undefined), 'abcdef');
+  assert.deepEqual(ordemDaPilha([], 'a', 6), []);
 });

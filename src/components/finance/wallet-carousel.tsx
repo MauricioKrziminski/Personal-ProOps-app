@@ -22,6 +22,7 @@ import {
   comElastico,
   distanciaDoItem,
   indiceNoDeslocamento,
+  indiceTocado,
   quadroDoItem,
 } from '@/design/carousel-math';
 import { Motion, Space } from '@/design/tokens';
@@ -74,7 +75,19 @@ export function useGeometriaDaVitrine(availableWidth?: number) {
  * Agora o deslocamento é UM valor na UI thread (`x`): o dedo o move, e ao soltar uma mola parte
  * da velocidade do dedo e assenta no cartão escolhido (`alvoDoDeslize`, um cartão por deslize).
  * Sem emenda entre o dedo e a mola, e igual nas duas plataformas. Tocar durante a mola segura o
- * cartão onde ele está.
+ * cartão onde ele está — e só segura: não escolhe (`parouAMola`).
+ *
+ * ## Tocar é escolher (19/09/2026, decisão do dono do produto)
+ *
+ * Deslizar é FOLHEAR: não grava nada. Tocar num cartão — o do centro ou um vizinho — o faz o
+ * cartão da frente da pilha e fecha a Carteira (`onEscolher`). O vizinho primeiro vem ao centro
+ * e só escolhe quando a mola TERMINA: um toque novo no meio dela cancela a mola (`onBegin` do
+ * pan) e com ela a escolha, então dá para mudar de ideia. Os textos embaixo trocam já no toque
+ * (`onIndice`), junto com a mola, como no deslize.
+ *
+ * O `Tap` e o `Pan` são exclusivos, com o pan na frente: o toque só vale se o dedo não andou o
+ * bastante para decidir um eixo. Qual cartão foi tocado sai do ponto do toque e do deslocamento
+ * VIVO (`indiceTocado`), não do cartão ativo — com a mola andando, é o que está sob o dedo.
  *
  * Cada cartão em pé é a face DEITADA girada 90°: o mesmo desenho da pilha, então o voo que chega
  * aqui pousa sem salto. A `moldura` é o lugar do cartão do centro, parada — a âncora `vitrine`.
@@ -84,6 +97,7 @@ export function WalletCarousel({
   cards,
   indice,
   onIndice,
+  onEscolher,
   x,
   arrasto,
   pagina,
@@ -97,6 +111,8 @@ export function WalletCarousel({
   /** O cartão ativo. A posição inicial sai dele só na montagem; depois quem manda é o dedo. */
   indice: number;
   onIndice: (indice: number) => void;
+  /** O toque num cartão: escolhê-lo para a frente da pilha e fechar. Chamado uma vez só. */
+  onEscolher: (indice: number) => void;
   /** O deslocamento horizontal — da Carteira, porque os títulos e os pontos também leem dele. */
   x: SharedValue<number>;
   /** O deslocamento do arraste para fechar (a Carteira controla o gesto). */
@@ -119,6 +135,14 @@ export function WalletCarousel({
   const folga = useSharedValue(0);
   const toque = useSharedValue({ x: 0, y: 0 });
   const modo = useSharedValue<'nenhum' | 'deslize' | 'fechar' | 'fechando'>('nenhum');
+  // Fora do `modo` porque o `onBegin` o zera a cada toque: fechando, nenhum toque escolhe mais.
+  const fechando = useSharedValue(false);
+  // O cartão que a Carteira mostra, na UI thread: o assentar só avisa quando ele muda.
+  const mostrado = useSharedValue(indice);
+  // Este toque terminou como TOQUE: o assentar do pan não pode passar por cima da mola dele.
+  const tocou = useSharedValue(false);
+  // O toque pegou o carrossel ANDANDO: ele só segura (e o pan assenta no mais perto), não escolhe.
+  const parouAMola = useSharedValue(false);
 
   useEffect(() => {
     x.set(inicioDaVitrine.indice * inicioDaVitrine.passo);
@@ -126,7 +150,8 @@ export function WalletCarousel({
 
   useEffect(() => {
     indiceAtual.current = indice;
-  }, [indice]);
+    mostrado.set(indice);
+  }, [indice, mostrado]);
 
   // Rotação/Split View muda o passo físico, não o cartão escolhido. Reposiciona apenas nessa
   // mudança de geometria; uma mudança normal de índice continua sendo guiada pela mola do gesto.
@@ -148,17 +173,27 @@ export function WalletCarousel({
   );
 
   const passo = g.passo;
+  const largura = g.largura;
   const gesto = useMemo(() => {
     const assentar = (destino: number, velocidade: number) => {
       'worklet';
       x.set(withSpring(destino * passo, { ...Motion.spring.carrossel, velocity: velocidade }));
     };
+    const escolher = (i: number) => {
+      'worklet';
+      if (fechando.get()) return;
+      fechando.set(true);
+      runOnJS(onEscolher)(i);
+    };
     const pan = Gesture.Pan()
       .manualActivation(true)
       .onBegin(() => {
-        // O dedo segura o cartão onde ele estiver, inclusive no meio da mola.
+        // O dedo segura o cartão onde ele estiver, inclusive no meio da mola. Medido ANTES de
+        // cancelar: fora de um múltiplo do passo, o carrossel estava em movimento.
+        parouAMola.set(Math.abs(x.get() - Math.round(x.get() / passo) * passo) >= 1);
         cancelAnimation(x);
         modo.set('nenhum');
+        tocou.set(false);
       })
       .onTouchesDown((e) => {
         const t = e.allTouches[0];
@@ -199,11 +234,13 @@ export function WalletCarousel({
           assentar(alvo, velocidade);
           // A troca do cartão ativo (números, fatura pré-carregada) sai JUNTO com a mola, não no
           // meio do arraste: um re-render no meio do gesto não disputa quadro com o dedo.
+          mostrado.set(alvo);
           runOnJS(onIndice)(alvo);
         } else if (modo.get() === 'fechar' && onFechar) {
           const dy = Math.max(0, e.translationY - folga.get());
           if (dy > LIMIAR_DE_FECHAR || e.velocityY > VELOCIDADE_DE_FECHAR) {
             modo.set('fechando');
+            fechando.set(true);
             runOnJS(onFechar)(dy);
           }
         }
@@ -212,14 +249,71 @@ export function WalletCarousel({
         const m = modo.get();
         if (m === 'fechando') return;
         if (m === 'fechar') arrasto.set(withSpring(0, Motion.spring.encaixe));
-        // Um toque sem deslize pode ter parado a mola no meio: volta ao cartão mais perto.
-        if (m !== 'deslize') assentar(indiceNoDeslocamento(x.get(), passo, total), 0);
+        // Um toque sem deslize pode ter parado a mola no meio: volta ao cartão mais perto — e
+        // AVISA, senão o carrossel pousava num cartão e os números embaixo mostravam outro.
+        // ⚠️ No Android o orquestrador do RNGH ativa o toque que esperava (`onEnd` dele) ANTES de
+        // entregar o fim do pan que falhou: sem `tocou`, este assentar substituía a mola do toque,
+        // o callback dela vinha com `terminou = false`, e o vizinho tocado nunca escolhia.
+        if (m !== 'deslize' && !tocou.get()) {
+          const perto = indiceNoDeslocamento(x.get(), passo, total);
+          assentar(perto, 0);
+          if (perto !== mostrado.get()) {
+            mostrado.set(perto);
+            runOnJS(onIndice)(perto);
+          }
+        }
       });
     // Com a página: os dois andam juntos até o eixo ser decidido, e a rolagem vence para cima.
-    return pagina
+    const panComPagina = pagina
       ? pan.simultaneousWithExternalGesture(pagina as unknown as React.RefObject<React.ComponentType>)
       : pan;
-  }, [x, inicio, folga, toque, modo, arrasto, passo, total, onIndice, onFechar, pagina, topoDaPagina]);
+    /*
+      O toque só vale depois de o pan falhar (é o que o `Exclusive` garante); a ordem entre o
+      `onFinalize` do pan e este `onEnd` varia por plataforma, e `tocou` a torna irrelevante. O
+      centro escolhe na hora; o vizinho vem ao centro e escolhe no fim da mola — só se ela
+      terminou (`terminou`): um toque novo no meio a cancela, e cancelar é mudar de ideia.
+    */
+    const tap = Gesture.Tap().onEnd((e, sucesso) => {
+      // Tocar para PARAR um deslize em curso é segurar, não escolher: a pessoa quer olhar o
+      // cartão, e fechar a Carteira ali trocaria o padrão sem ela ter pedido.
+      if (!sucesso || fechando.get() || parouAMola.get()) return;
+      tocou.set(true);
+      const i = indiceTocado(e.x, largura, x.get(), passo, total);
+      if (i !== mostrado.get()) {
+        mostrado.set(i);
+        runOnJS(onIndice)(i);
+      }
+      if (Math.abs(x.get() - i * passo) < 1) {
+        escolher(i);
+        return;
+      }
+      x.set(
+        withSpring(i * passo, Motion.spring.carrossel, (terminou) => {
+          if (terminou) escolher(i);
+        })
+      );
+    });
+    return Gesture.Exclusive(panComPagina, tap);
+  }, [
+    x,
+    inicio,
+    folga,
+    toque,
+    modo,
+    fechando,
+    mostrado,
+    tocou,
+    parouAMola,
+    arrasto,
+    passo,
+    largura,
+    total,
+    onIndice,
+    onEscolher,
+    onFechar,
+    pagina,
+    topoDaPagina,
+  ]);
 
   // Arrastar para baixo: o cartão desce e encolhe em volta do próprio centro.
   const arrastado = useAnimatedStyle(() => {
@@ -227,12 +321,19 @@ export function WalletCarousel({
     return { transform: [{ translateY: dy }, { scale: 1 - Math.min(dy / 900, 0.25) }] };
   });
 
-  // Leitor de tela: o carrossel é um controle ajustável, com o nome do cartão como valor.
+  // Leitor de tela: o carrossel é um controle ajustável, com o nome do cartão como valor, e o
+  // toque duplo (`activate`) escolhe o cartão mostrado — o mesmo caminho do toque no centro.
   const passarPara = (delta: number) => {
     const destino = Math.min(total - 1, Math.max(0, indice + delta));
     if (destino === indice) return;
     x.set(withSpring(destino * passo, Motion.spring.carrossel));
     onIndice(destino);
+  };
+  const escolherPeloLeitor = () => {
+    if (fechando.get()) return;
+    fechando.set(true);
+    x.set(indice * passo);
+    onEscolher(indice);
   };
 
   return (
@@ -242,8 +343,13 @@ export function WalletCarousel({
         accessibilityRole="adjustable"
         accessibilityLabel="Cartões"
         accessibilityValue={{ text: cards[indice]?.name ?? '' }}
-        accessibilityActions={[{ name: 'increment' }, { name: 'decrement' }]}
-        onAccessibilityAction={(e) => passarPara(e.nativeEvent.actionName === 'increment' ? 1 : -1)}
+        accessibilityHint="Toque duas vezes para pôr este cartão na frente."
+        accessibilityActions={[{ name: 'increment' }, { name: 'decrement' }, { name: 'activate' }]}
+        onAccessibilityAction={(e) => {
+          const acao = e.nativeEvent.actionName;
+          if (acao === 'activate') escolherPeloLeitor();
+          else passarPara(acao === 'increment' ? 1 : -1);
+        }}
         style={[styles.palco, { width: g.largura, height: g.altura }, arrastado]}>
         {cards.map((card, i) => (
           <CartaoEmPe

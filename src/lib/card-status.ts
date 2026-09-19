@@ -129,3 +129,21 @@ export function cartaoDaPilha(c: LinhaDoResumo): CartaoDaPilha {
     overdue_count: Number(c.overdue_count ?? 0),
   };
 }
+
+/**
+ * A ordem da pilha do Financeiro, da FRENTE para trás, com no máximo `max` cartões.
+ *
+ * O escolhido vai para a frente e **o resto NÃO se mexe** — os outros ficam na ordem original
+ * logo atrás. E o escolhido entra SEMPRE, mesmo além de `max`: cortar a lista antes de pôr o
+ * escolhido na frente deixava a pilha sem face da frente quando ele era o sétimo cartão. Id
+ * desconhecido (cartão apagado, escolha de antes) cai no primeiro, que é a pilha sem escolha.
+ */
+export function ordemDaPilha<T extends { account_id: string }>(
+  cards: readonly T[],
+  escolhidoId: string | null | undefined,
+  max: number
+): T[] {
+  const i = cards.findIndex((c) => c.account_id === escolhidoId);
+  if (i <= 0) return cards.slice(0, max);
+  return [cards[i], ...cards.slice(0, i), ...cards.slice(i + 1)].slice(0, max);
+}

@@ -69,3 +69,24 @@ export function comElastico(x: number, passo: number, total: number): number {
   if (x > fim) return fim + (x - fim) * ELASTICO;
   return x;
 }
+
+/**
+ * Qual cartão está debaixo de um toque, com o carrossel onde ele está AGORA (inclusive no meio
+ * da mola). `xLocal` é o ponto no palco, que tem `largura` e o cartão do centro no meio dele.
+ *
+ * O cartão `i` é desenhado com `translateX = -d·passo = i·passo − deslocamento` a partir do
+ * lugar do centro, então o centro dele fica em `largura/2 + i·passo − deslocamento`. Invertendo,
+ * `i = (deslocamento + xLocal − largura/2) / passo`, arredondado: o vão entre dois cartões conta
+ * para o mais perto. A escala dos vizinhos (0,86, em volta do próprio centro) não muda o centro.
+ */
+export function indiceTocado(
+  xLocal: number,
+  largura: number,
+  deslocamento: number,
+  passo: number,
+  total: number
+): number {
+  'worklet';
+  if (total <= 0 || passo <= 0) return 0;
+  return Math.min(total - 1, Math.max(0, Math.round((deslocamento + xLocal - largura / 2) / passo)));
+}

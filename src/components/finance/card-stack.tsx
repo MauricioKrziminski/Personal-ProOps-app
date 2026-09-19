@@ -10,7 +10,7 @@ import { PressableScale } from '@/components/motion/pressable-scale';
 import { alturaDoCartao } from '@/design/card-geometry';
 import { Motion, Space } from '@/design/tokens';
 import { useCartaoEscolhido } from '@/hooks/use-cartao-escolhido';
-import type { CartaoDaPilha } from '@/lib/card-status';
+import { ordemDaPilha, type CartaoDaPilha } from '@/lib/card-status';
 import { useBRL } from '@/components/ui/conceal';
 
 /** O que a pilha precisa de um cartão. Um recorte do `card_summary`, não a linha inteira. */
@@ -30,15 +30,23 @@ const VISIVEIS = 6;
  *
  * Tocar na pilha LEVANTA o cartão da frente e o leva voando até a Carteira, onde ele fica em pé
  * num carrossel — o vídeo de referência. O leque que abria aqui e a alça ▾/▴ saíram: trocar de
- * cartão é deslizar na Carteira, a um toque. O botão da fatura continua NA face ("fecha em ›"),
- * separado do resto do cartão: um toque só não decide entre "ver os cartões" e "abrir a fatura".
+ * cartão é, na Carteira, deslizar até ele e TOCÁ-LO — o toque o escolhe e o traz voando de volta
+ * para a frente daqui. Deslizar e fechar sem tocar não mexe na pilha. O botão da fatura continua
+ * NA face ("fecha em ›"), separado do resto do cartão: um toque só não decide entre "ver os
+ * cartões" e "abrir a fatura".
  *
  * ## A ordem
  *
  * O escolhido vai para a frente e **o resto NÃO se mexe** — os outros ficam na ordem original
- * logo atrás. Numa carteira o usuário memoriza a posição ("o laranja é o do meio"), e uma rotação
- * de baralho apagaria essa memória. A escolha vem de `useCartaoEscolhido`, a mesma loja que a
- * Carteira grava: trocar lá reordena aqui por baixo, e o cartão volta voando para a frente certa.
+ * logo atrás (`ordemDaPilha`, que também garante o escolhido entre os desenhados quando ele está
+ * além dos seis). Numa carteira o usuário memoriza a posição ("o laranja é o do meio"), e uma
+ * rotação de baralho apagaria essa memória. A escolha vem de `useCartaoEscolhido`, a mesma loja
+ * que a Carteira grava: escolher lá reordena aqui por baixo, e o cartão volta voando para a
+ * frente certa.
+ *
+ * Enquanto o disco não respondeu (`undefined`), a pilha reserva a altura e não desenha cartão:
+ * desenhar o primeiro e trocar um instante depois fazia o escolhido subir numa mola na abertura,
+ * como se alguém tivesse mexido na carteira.
  *
  * Fechada, os de trás aparecem ACIMA e mais estreitos — como uma carteira de verdade e como o
  * Wallet. Para baixo, a pilha leria como lista.
@@ -53,14 +61,13 @@ export function CardStack({
 }) {
   const brl = useBRL();
   const escolhido = useCartaoEscolhido();
-  const frente = Math.max(0, cards.findIndex((c) => c.account_id === escolhido));
-  const naFrente = cards[frente];
+  const ordem = ordemDaPilha(cards, escolhido, VISIVEIS);
+  const naFrente = ordem[0];
 
   const { width, fontScale } = useWindowDimensions();
   const [largura, setLargura] = useState(width - Space.lg * 2);
   const cardH = alturaDoCartao(largura, fontScale);
-  const visiveis = cards.slice(0, VISIVEIS);
-  const atras = visiveis.length - 1;
+  const atras = ordem.length - 1;
 
   const { voar } = useFlight();
   const { prender, aoPosicionar } = useFlightAnchor('pilha');
@@ -88,6 +95,7 @@ export function CardStack({
   };
 
   if (!naFrente) return null;
+  if (escolhido === undefined) return <View style={{ height: atras * PEEK + cardH }} />;
 
   return (
     <PressableScale
@@ -103,14 +111,13 @@ export function CardStack({
       onPress={abrirCarteira}
       onLayout={(e) => setLargura(e.nativeEvent.layout.width)}
       style={{ height: atras * PEEK + cardH }}>
-      {visiveis.map((card, i) => {
-        const profundidade = i === frente ? 0 : 1 + (i < frente ? i : i - 1);
+      {ordem.map((card, profundidade) => {
         return (
           <CartaoNaPilha
             key={card.account_id}
             card={card}
             profundidade={profundidade}
-            total={visiveis.length}
+            total={ordem.length}
             y={(atras - profundidade) * PEEK}
             encolhe={largura > 0 ? (largura - profundidade * RECUO * 2) / largura : 1}
             largura={largura}
