@@ -14,16 +14,28 @@ interface AuthLike {
   message?: string;
   code?: string;
   status?: number;
+  name?: string;
+  /** `AuthWeakPasswordError.reasons`: o que o servidor recusou na senha. */
+  reasons?: readonly string[];
 }
 
 /** Fallback: nunca vazar inglês técnico, mesmo em erro que não foi previsto. */
 const GENERIC = 'Não deu para continuar agora. Tente de novo em instantes.';
+const SEM_CONEXAO = 'Sem conexão. Confira a internet e tente de novo.';
 
 export function authErrorMessage(err: AuthLike | null | undefined): string | null {
   if (!err) return null;
 
   const code = err.code ?? '';
   const msg = (err.message ?? '').toLowerCase();
+
+  // O auth-js embrulha em `AuthRetryableFetchError` tudo que não chegou a ser resposta do
+  // GoTrue: rede caída, 5xx e o teto de `fetchComTeto` (status 0). A mensagem dessa última é
+  // NOSSA, em português, e não casa com nenhum dos textos em inglês lá embaixo — sem esta linha
+  // o teto de 15 s virava o genérico "Não deu para continuar".
+  if (err.name === 'AuthRetryableFetchError' || err.status === 0) {
+    return SEM_CONEXAO;
+  }
 
   // Rate limit do Supabase: a mensagem carrega os segundos que faltam, e devolver esse número é
   // a diferença entre "espere" e "espere 39 segundos".
@@ -48,11 +60,17 @@ export function authErrorMessage(err: AuthLike | null | undefined): string | nul
   if (code === 'phone_exists') {
     return 'Esse número já está vinculado a outra conta. Entre com o WhatsApp para acessar os dados dela.';
   }
-  if (code === 'weak_password' || msg.includes('password should')) {
-    return 'Senha fraca. Use pelo menos 8 caracteres.';
-  }
+  // Pelo `code`, nunca pelo texto: a frase da senha repetida é "New password SHOULD be
+  // different…", e casar `password should` mandava quem repetiu a senha fortalecê-la.
   if (code === 'same_password') {
     return 'A senha nova é igual à antiga.';
+  }
+  if (code === 'weak_password') {
+    const reasons = err.reasons ?? [];
+    // Vazada primeiro: é a única que nenhum ajuste de tamanho ou caractere conserta.
+    if (reasons.includes('pwned')) return 'Essa senha apareceu em vazamentos de dados. Escolha outra.';
+    if (reasons.includes('characters')) return 'A senha precisa misturar tipos de caractere: letras, números e símbolos.';
+    return 'Senha fraca. Use pelo menos 8 caracteres.';
   }
   if (code === 'invalid_credentials' && msg.includes('login')) {
     // `Invalid login credentials` — e-mail ou senha. Não dizemos qual: é enumeração de conta.
@@ -76,7 +94,7 @@ export function authErrorMessage(err: AuthLike | null | undefined): string | nul
   }
 
   if (msg.includes('network') || msg.includes('fetch') || msg.includes('timeout')) {
-    return 'Sem conexão. Confira a internet e tente de novo.';
+    return SEM_CONEXAO;
   }
 
   return GENERIC;

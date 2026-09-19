@@ -33,9 +33,11 @@ const RESEND_SECONDS = 45;
  *
  * ## A senha vem antes do código, e isso é de propósito
  *
- * Mesma lição da `forgot-password`: o formulário pede a senha nova ANTES de verificar o código,
- * e `verifyOtp` + `updateUser({ password })` rodam na MESMA função assíncrona. Pedir a senha
- * depois seria uma segunda etapa separada por um `await` que pode mudar a sessão embaixo da tela.
+ * O formulário pede a senha nova ANTES de verificar o código, e `verifyOtp` + `updateUser({
+ * password })` rodam na MESMA função assíncrona. Pedir a senha depois seria uma segunda etapa
+ * separada por um `await` que pode mudar a sessão embaixo da tela. (A `forgot-password` resolveu
+ * o mesmo problema por outro caminho: lá a pessoa está deslogada, então código e senha rodam num
+ * cliente descartável e a sessão só chega ao principal depois da troca.)
  *
  * ## `updateUser`, nunca `signUp`
  *

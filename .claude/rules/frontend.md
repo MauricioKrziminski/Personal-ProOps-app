@@ -9,9 +9,13 @@ Expo SDK 57 (managed), código em `src/`, paths `@/*` → `src/*` e `@/assets/*`
 - Auth gate fica no `_layout.tsx` raiz (`Stack.Protected` por `useSession`). Sem sessão existem
   `login` (e-mail e senha), `signup`, `forgot-password` e `login-whatsapp` (Phone OTP); com sessão
   nenhuma delas existe. Não duplicar checagem de sessão em telas.
-  ⚠️ **`verifyOtp` de recuperação já devolve SESSÃO** e o portão desmonta a tela no mesmo
-  instante: por isso `forgot-password` pede a senha nova ANTES do código, e `verifyOtp` +
-  `updateUser` rodam na mesma função assíncrona. Nada de `setState` depois desse `await`.
+  ⚠️ **`verifyOtp` de recuperação já devolve SESSÃO**, e no cliente principal o portão
+  desmontaria a tela com a senha ainda por escolher. Por isso `forgot-password` (e-mail →
+  código → senha nova) roda `verifyOtp` e `updateUser` num cliente DESCARTÁVEL
+  (`criarClienteDeRecuperacao`, só memória) e só depois da troca entrega a sessão ao principal
+  com `setSession` — daí é um `SIGNED_IN` comum. "Cancelar" revoga a sessão de recuperação; a
+  entregue nunca é revogada. Nada de `setState` depois do `setSession` que deu certo: a tela já
+  está saindo.
   As três telas de conta compartilham a moldura `AuthScreen` (`src/components/auth/`).
 
 ## Dados (TanStack Query)

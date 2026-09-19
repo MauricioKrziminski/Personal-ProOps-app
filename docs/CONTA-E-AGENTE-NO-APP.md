@@ -147,8 +147,12 @@ a senha nova.
    entra pelo OTP do Perfil (Fase 4).
 2. **Confirmação e recuperação por CÓDIGO (`verifyOtp` + `{{ .Token }}`), não por link.** Link
    exigiria deep link, allow-list de redirect e tratamento de URL; código reaproveita o
-   `OtpInput`. Na recuperação a senha nova é pedida ANTES do código, porque `verifyOtp` já
-   devolve sessão e o portão desmonta a tela (ver `frontend.md`).
+   `OtpInput`. Na recuperação a ordem é e-mail → código → senha nova, e `verifyOtp` +
+   `updateUser` rodam num cliente Supabase DESCARTÁVEL (só memória): `verifyOtp` já devolve
+   sessão, e no cliente principal o portão desmontaria a tela antes da senha nova. Só depois da
+   troca a sessão vai para o principal (`setSession`). Versões anteriores pediam a senha ANTES do
+   código pelo mesmo motivo; depois a tela ficou fora do portão e prendia quem tinha o
+   `updateUser` recusado (ver `frontend.md`).
 
 ⚠️ **Pré-requisitos no dashboard, sem os quais as telas não funcionam — não dá para fazer pelo
 CLI. Fazer primeiro no STAGING (`utkqoiigimqzeenxkxdl`) e de novo em produção quando promover:**

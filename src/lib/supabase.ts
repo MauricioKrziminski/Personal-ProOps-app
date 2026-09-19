@@ -68,3 +68,32 @@ export const supabase = createClient<Database>(
     },
   },
 );
+
+/**
+ * Cliente DESCARTÁVEL para a recuperação de senha (`forgot-password`).
+ *
+ * `verifyOtp({ type: 'recovery' })` devolve uma sessão. No cliente principal ela seria gravada
+ * no AsyncStorage e anunciada ao `SessionProvider` na hora — o portão trocaria de pilha com a
+ * senha ainda por escolher, e fechar o app ali deixava a pessoa DENTRO da conta sem ter trocado
+ * nada. Aqui a sessão vive só na memória deste objeto: nada é persistido nem anunciado até
+ * `updateUser({ password })` dar certo, e só então a tela a entrega ao cliente principal com
+ * `setSession`.
+ *
+ * Mesma URL, mesma anon key, mesmo teto de tempo. `storageKey` próprio para não disputar a
+ * chave do cliente principal.
+ */
+export function criarClienteDeRecuperacao() {
+  return createClient<Database>(
+    supabaseUrl || 'https://placeholder.supabase.co',
+    supabaseAnonKey || 'placeholder',
+    {
+      global: { fetch: fetchComTeto },
+      auth: {
+        persistSession: false,
+        autoRefreshToken: false,
+        detectSessionInUrl: false,
+        storageKey: 'proops-recuperacao-de-senha',
+      },
+    },
+  );
+}

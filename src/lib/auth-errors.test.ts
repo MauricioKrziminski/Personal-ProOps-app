@@ -72,3 +72,46 @@ test('telefone já vinculado orienta entrar pela conta existente', () => {
     'Esse número já está vinculado a outra conta. Entre com o WhatsApp para acessar os dados dela.'
   );
 });
+
+// As strings abaixo são as do GoTrue, copiadas como chegam — a frase da senha repetida começa
+// com "New password SHOULD", e era isso que a jogava no ramo de "senha fraca".
+test('senha igual à antiga não vira "senha fraca"', () => {
+  assert.equal(
+    authErrorMessage({
+      code: 'same_password',
+      status: 422,
+      message: 'New password should be different from the old password.',
+    }),
+    'A senha nova é igual à antiga.'
+  );
+});
+
+test('senha fraca diz o MOTIVO que o servidor deu', () => {
+  const fraca = (reasons: string[], message: string) =>
+    authErrorMessage({ code: 'weak_password', status: 422, message, reasons });
+  assert.match(fraca(['length'], 'Password should be at least 8 characters.')!, /8 caracteres/);
+  assert.match(
+    fraca(
+      ['characters'],
+      'Password should contain at least one character of each: abcdefghijklmnopqrstuvwxyz, ABCDEFGHIJKLMNOPQRSTUVWXYZ, 0123456789.'
+    )!,
+    /tipos de caractere/
+  );
+  assert.match(
+    fraca(['pwned'], 'Password is known to be weak and easy to guess, please choose a different one.')!,
+    /vazamento/
+  );
+});
+
+test('teto de tempo do cliente e rede caída falam de conexão', () => {
+  // `fetchComTeto` rejeita com a frase dele, e o auth-js embrulha em AuthRetryableFetchError, status 0.
+  assert.match(
+    authErrorMessage({
+      name: 'AuthRetryableFetchError',
+      status: 0,
+      message: 'Sem resposta do servidor. Verifique sua conexão e tente de novo.',
+    })!,
+    /conexão/
+  );
+  assert.match(authErrorMessage({ name: 'AuthRetryableFetchError', status: 503, message: '{}' })!, /conexão/);
+});
