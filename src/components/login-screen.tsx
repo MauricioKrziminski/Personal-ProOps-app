@@ -13,13 +13,14 @@ import { Button } from "@/components/ui/button";
 import { Field } from "@/components/ui/field";
 import { Motion, Space } from "@/design/tokens";
 import { authErrorMessage } from "@/lib/auth-errors";
+import { showDevLogin } from "@/lib/environment";
 import {
   displayPhoneBR,
   isValidPhoneBR,
   phoneDigits,
   toE164BR,
 } from "@/lib/phone-br";
-import { isSupabaseConfigured, supabase } from "@/lib/supabase";
+import { isSupabaseConfigured, supabase, supabaseUrl } from "@/lib/supabase";
 
 /** Janela antes de liberar o reenvio. Curta o bastante para não parecer castigo. */
 const RESEND_SECONDS = 45;
@@ -148,6 +149,7 @@ export function LoginScreen() {
   };
 
   const onPhone = step === "phone";
+  const mostrarLoginDev = showDevLogin(__DEV__, supabaseUrl);
 
   return (
     <AuthScreen
@@ -170,7 +172,7 @@ export function LoginScreen() {
             disabled={busy}
             block
           />
-          {__DEV__ && (
+          {mostrarLoginDev && (
             <Button
               label="Entrar como teste (dev)"
               variant="ghost"

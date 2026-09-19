@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 
-import { environmentLabel } from './environment.ts';
+import { environmentLabel, showDevLogin } from './environment.ts';
 
 /**
  * O rótulo sai do REF do Supabase, não de uma variável à parte — é o que garante que ele não
@@ -27,4 +27,11 @@ test('ref desconhecido se identifica em vez de se passar por produção', () => 
 test('o ref é lido sem depender de caixa nem do sufixo do domínio', () => {
   assert.equal(environmentLabel('https://KWRIUIFCWYVDRXTSPJIZ.supabase.co'), null);
   assert.equal(environmentLabel('https://utkqoiigimqzeenxkxdl.supabase.in'), 'staging');
+});
+
+test('login de teste só aparece em runtime dev fora de produção', () => {
+  assert.equal(showDevLogin(true, 'https://utkqoiigimqzeenxkxdl.supabase.co'), true);
+  assert.equal(showDevLogin(true, 'http://127.0.0.1:54321'), true);
+  assert.equal(showDevLogin(true, 'https://kwriuifcwyvdrxtspjiz.supabase.co'), false);
+  assert.equal(showDevLogin(false, 'https://utkqoiigimqzeenxkxdl.supabase.co'), false);
 });

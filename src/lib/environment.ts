@@ -48,3 +48,14 @@ export function environmentLabel(url: string): string | null {
   // Ref desconhecido: mostra o ref para a pessoa poder conferir, em vez de mentir "produção".
   return nome ?? `outro (${ref.slice(0, 6)}…)`;
 }
+
+/**
+ * O atalho de login de teste é uma ferramenta do runtime de desenvolvimento, não da produção.
+ *
+ * `__DEV__` também fica verdadeiro num build Debug apontado para produção (como o que usamos
+ * para testar no iPhone via Metro). Por isso ele sozinho não protege o botão: o banco efetivo é
+ * a segunda parte da regra. Em produção, o atalho nunca aparece, mesmo durante um build Debug.
+ */
+export function showDevLogin(runtimeDev: boolean, url: string): boolean {
+  return runtimeDev && environmentLabel(url) !== null;
+}

@@ -9,7 +9,8 @@ import { Button } from '@/components/ui/button';
 import { Field, TextField } from '@/components/ui/field';
 import { Space } from '@/design/tokens';
 import { authErrorMessage } from '@/lib/auth-errors';
-import { isSupabaseConfigured, supabase } from '@/lib/supabase';
+import { showDevLogin } from '@/lib/environment';
+import { isSupabaseConfigured, supabase, supabaseUrl } from '@/lib/supabase';
 
 /**
  * Entrar com e-mail e senha — a porta principal desde 03/09/2026.
@@ -29,6 +30,7 @@ export function EmailLoginScreen() {
   const passwordRef = useRef<TextInput>(null);
 
   const valid = email.includes('@') && password.length > 0;
+  const mostrarLoginDev = showDevLogin(__DEV__, supabaseUrl);
 
   const signIn = async () => {
     if (!valid || busy) return;
@@ -72,7 +74,7 @@ export function EmailLoginScreen() {
             disabled={busy}
             block
           />
-          {__DEV__ && (
+          {mostrarLoginDev && (
             <Button label="Entrar como teste (dev)" variant="ghost" size="sm" onPress={devLogin} block origemDaCortina />
           )}
         </>
