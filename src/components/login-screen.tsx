@@ -115,9 +115,9 @@ export function LoginScreen() {
       token,
       type: "sms",
     });
-    setBusy(false);
 
     if (err) {
+      setBusy(false);
       setError(authErrorMessage(err));
       setCode("");
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
@@ -141,8 +141,10 @@ export function LoginScreen() {
       email: "dev@proops.local",
       password: "devtest123",
     });
-    setBusy(false);
-    if (err) setError(authErrorMessage(err));
+    if (err) {
+      setBusy(false);
+      setError(authErrorMessage(err));
+    }
   };
 
   const onPhone = step === "phone";
@@ -154,8 +156,7 @@ export function LoginScreen() {
           <Button
             label={onPhone ? "Continuar" : "Entrar"}
             onPress={onPhone ? () => requestCode() : () => verifyCode()}
-            loading={busy}
-            disabled={onPhone ? !valid : code.length < 6}
+            disabled={onPhone ? !valid || busy : code.length < 6 || busy}
             size="lg"
             block
             origemDaCortina

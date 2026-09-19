@@ -1,5 +1,5 @@
 import { forwardRef } from 'react';
-import { StyleSheet, TextInput, View } from 'react-native';
+import { Platform, StyleSheet, TextInput, View } from 'react-native';
 
 import { ThemedText } from '@/components/themed-text';
 import { GlassBackdrop, supportsLiquidGlass } from '@/components/ui/glass-backdrop';
@@ -86,6 +86,10 @@ const styles = StyleSheet.create({
   },
   input: {
     flex: 1,
+    height: HitTarget,
     minHeight: HitTarget,
+    paddingVertical: 0,
+    textAlignVertical: 'center',
+    transform: [{ translateY: Platform.OS === 'ios' ? -2 : 0 }],
   },
 });

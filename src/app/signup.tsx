@@ -80,14 +80,15 @@ export default function SignupScreen() {
       password: values.password,
       options: { data: { display_name: values.name } },
     });
-    setBusy(false);
 
     if (err) {
+      setBusy(false);
       setError(authErrorMessage(err));
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
       return;
     }
     if (data.user && data.user.identities?.length === 0) {
+      setBusy(false);
       setError('Já existe uma conta com esse e-mail. Entre ou recupere a senha.');
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
       return;
@@ -97,7 +98,10 @@ export default function SignupScreen() {
     setCooldown(RESEND_SECONDS);
     setCode('');
     // Com confirmação desligada o signUp já devolve sessão e o layout raiz troca a tela sozinho.
-    if (!data.session) setStep('code');
+    if (!data.session) {
+      setBusy(false);
+      setStep('code');
+    }
   });
 
   const resend = async () => {
@@ -125,8 +129,8 @@ export default function SignupScreen() {
       token,
       type: 'signup',
     });
-    setBusy(false);
     if (err) {
+      setBusy(false);
       setError(authErrorMessage(err));
       setCode('');
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);

@@ -1,5 +1,5 @@
 ---
-name: Personal ProOps app
+name: ProOps
 description: Notas, lembretes e finanças pessoais operados por conversa — o lugar calmo onde tudo aparece organizado.
 colors:
   ink: "#0B0B0C"
@@ -108,7 +108,7 @@ components:
     height: "68px"
 ---
 
-# Design System: Personal ProOps app
+# Design System: ProOps
 
 ## Overview
 

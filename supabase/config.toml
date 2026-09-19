@@ -1,4 +1,4 @@
-# Projeto Supabase do Personal ProOps app.
+# Projeto Supabase do ProOps.
 #
 # ⚠️ **Não há mais Edge Functions** (09/09/2026). Este arquivo tinha oito blocos
 # `[functions.*]` com a política de JWT de cada uma; todas foram apagadas quando o corte

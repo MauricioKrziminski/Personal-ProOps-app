@@ -19,11 +19,11 @@ E o app tem **três identidades** que convivem no mesmo aparelho (`app.config.js
 
 | variante | package | nome no ícone |
 |---|---|---|
-| `development` | `com.proops.personal.dev` | ProOps (dev) |
-| `preview` / `staging` | `com.proops.personal.staging` | ProOps (staging) |
-| `production` / `distribution` | `com.proops.personal` | Personal ProOps app |
+| `development` | `com.proops.personal.dev` | ProOps |
+| `preview` / `staging` | `com.proops.personal.staging` | ProOps |
+| `production` / `distribution` | `com.proops.personal` | ProOps |
 
-⚠️ **O nome do ícone NÃO diz em qual banco você está.** "ProOps (dev)" segue o `.env.local` da
+⚠️ **O nome do ícone NÃO diz em qual banco você está.** Todos os ambientes exibem "ProOps" e seguem o `.env.local` da
 máquina — que pode apontar para local, staging ou produção. É o par variante × env, não a
 variante sozinha.
 

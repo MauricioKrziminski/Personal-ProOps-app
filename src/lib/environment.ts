@@ -5,8 +5,9 @@
  *
  * São três apps que convivem no mesmo aparelho (`app.config.js`) e três bancos distintos. Até
  * 07/09/2026 o ÚNICO sinal de qual era qual era o nome do ícone na tela inicial — e o nome não
- * acompanha o banco: um `expo run:android` local instala "ProOps (dev)" apontando para o
- * `.env` que estiver na máquina, que pode ser qualquer um dos três.
+ * acompanha o banco: um `expo run:android` local instala "ProOps" apontando para o
+ * `.env` que estiver na máquina, que pode ser qualquer um dos três. Todos os três exibem ProOps;
+ * o selo de ambiente no Perfil é a indicação segura do banco ativo.
  *
  * Num app de dinheiro isso é como se lança despesa no banco errado sem perceber. O rótulo sai do
  * **ref do próprio Supabase que o cliente está usando**, não de uma variável separada que alguém

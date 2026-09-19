@@ -2,13 +2,12 @@ import * as Haptics from 'expo-haptics';
 import { router } from 'expo-router';
 import { useRef, useState } from 'react';
 import { StyleSheet, TextInput, View } from 'react-native';
-import Animated, { FadeInLeft } from 'react-native-reanimated';
 
 import { AuthScreen } from '@/components/auth/auth-screen';
 import { ThemedText } from '@/components/themed-text';
 import { Button } from '@/components/ui/button';
 import { Field, TextField } from '@/components/ui/field';
-import { Motion, Space } from '@/design/tokens';
+import { Space } from '@/design/tokens';
 import { authErrorMessage } from '@/lib/auth-errors';
 import { isSupabaseConfigured, supabase } from '@/lib/supabase';
 
@@ -39,8 +38,8 @@ export function EmailLoginScreen() {
       email: email.trim(),
       password,
     });
-    setBusy(false);
     if (err) {
+      setBusy(false);
       setError(authErrorMessage(err));
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
     }
@@ -55,15 +54,17 @@ export function EmailLoginScreen() {
       email: 'dev@proops.local',
       password: 'devtest123',
     });
-    setBusy(false);
-    if (err) setError(authErrorMessage(err));
+    if (err) {
+      setBusy(false);
+      setError(authErrorMessage(err));
+    }
   };
 
   return (
     <AuthScreen
       footer={
         <>
-          <Button label="Entrar" onPress={signIn} loading={busy} disabled={!valid} size="lg" block origemDaCortina />
+          <Button label="Entrar" onPress={signIn} disabled={!valid || busy} size="lg" block origemDaCortina />
           <Button
             label="Criar conta"
             variant="ghost"
@@ -76,9 +77,7 @@ export function EmailLoginScreen() {
           )}
         </>
       }>
-      <Animated.View
-        entering={FadeInLeft.duration(Motion.duration.slow).easing(Motion.easing.out)}
-        style={styles.step}>
+      <View style={styles.step}>
         <View style={styles.copy}>
           <ThemedText type="title">Entrar</ThemedText>
           <ThemedText type="small" themeColor="textSecondary">
@@ -146,7 +145,7 @@ export function EmailLoginScreen() {
             disabled={busy}
           />
         </View>
-      </Animated.View>
+      </View>
     </AuthScreen>
   );
 }

@@ -82,25 +82,21 @@ _avisados: set[str] = set()
 
 
 def modelo(papel: str) -> str:
-    """O modelo de um papel — com a troca de TESTE aplicada, se houver.
+    """O modelo de um papel — com a troca de TESTE/AMBIENTE aplicada, se houver.
 
-    `GEMINI_MODEL_<PAPEL>` (`GEMINI_MODEL_GATE`, `GEMINI_MODEL_PARSE`, ...) troca
-    o modelo daquele papel sem tocar em código. Vazias em produção.
+    - `GEMINI_MODEL`: se definido (no .env ou ambiente), define o modelo para
+      TODOS os papéis (100% dos fluxos do agente usam este modelo).
+    - `GEMINI_MODEL_<PAPEL>` (`GEMINI_MODEL_GATE`, `GEMINI_MODEL_PARSE`, ...):
+      troca especificamente o modelo daquele papel, com precedência sobre o global.
 
-    Elas existem por causa do custo, e o custo tem um formato específico: o
-    Flash-Lite tem **500** requisições/dia no nível gratuito e o Flash tem **20**.
-    Uma execução de `evaluate_answer_forms.py` manda ~40 no gate — da segunda do
-    dia em diante, ela inteira é paga. Com a troca, uma execução de ITERAÇÃO cabe
-    no gratuito.
-
-    ⚠️ O nome do papel é o contrato: papel desconhecido levanta, em vez de cair
-    num default silencioso. Era exatamente assim que `settings.gemini_model`
-    mudava o modelo do sistema inteiro sem ninguém pedir.
+    Se nenhuma variável estiver definida, usa a tabela padrão `MODELOS`.
     """
     if papel not in MODELOS:
         raise ValueError(f"papel de modelo desconhecido: {papel!r} (tenho {sorted(MODELOS)})")
     padrao = MODELOS[papel]
-    trocado = os.environ.get(f"GEMINI_MODEL_{papel.upper()}", "").strip()
+    especifico = os.environ.get(f"GEMINI_MODEL_{papel.upper()}", "").strip()
+    global_mod = os.environ.get("GEMINI_MODEL", "").strip() or get_settings().gemini_model.strip()
+    trocado = especifico or global_mod
     if not trocado or trocado == padrao:
         return padrao
     if papel not in _avisados:

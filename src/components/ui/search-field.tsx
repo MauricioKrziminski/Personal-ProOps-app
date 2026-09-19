@@ -1,6 +1,6 @@
 import * as Haptics from 'expo-haptics';
 import { forwardRef } from 'react';
-import { Pressable, StyleSheet, TextInput, View } from 'react-native';
+import { Platform, Pressable, StyleSheet, TextInput, View } from 'react-native';
 
 import { Icon } from '@/components/ui/icon';
 import { GlassBackdrop, supportsLiquidGlass } from '@/components/ui/glass-backdrop';
@@ -99,5 +99,7 @@ const styles = StyleSheet.create({
     minHeight: HitTarget,
     // O padding vertical do RN no Android empurra o texto para cima dentro da pílula.
     paddingVertical: 0,
+    textAlignVertical: 'center',
+    transform: [{ translateY: Platform.OS === 'ios' ? -2 : 0 }],
   },
 });

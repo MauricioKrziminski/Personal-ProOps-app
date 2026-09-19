@@ -139,10 +139,10 @@ export const Motion = {
     carrossel: { duration: 560, dampingRatio: 0.94 },
   },
   /**
-   * A cortina curva (`WaveCurtain`): duração da onda, e as duas versões da abertura — a curta do
-   * dia a dia e o show das primeiras vezes.
+   * A cortina curva (`WaveCurtain`): cada movimento usa a mesma duração. O show das primeiras
+   * aberturas mantém sua espera própria antes da onda.
    */
-  curtain: { duration: 900, short: 650, full: 1800 },
+  curtain: { duration: 1150, full: 1800 },
   /**
    * Escalonamento de entrada em lista: `delay = min(index * step, cap)`.
    *

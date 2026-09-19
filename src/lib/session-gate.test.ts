@@ -30,18 +30,18 @@ test('entrar, sair e trocar de conta passam pela cortina', () => {
   assert.equal(precisaDeCortina('u1', 'u2'), true);
 });
 
-test('sair cobre de baixo e revela até a capa do login', () => {
-  assert.deepEqual(ondaDaTroca(null, null), { mode: 'up', ate: 'capa' });
-  assert.deepEqual(ondaDaTroca(null, { x: 0.5, y: 0.8 }), { mode: 'up', ate: 'capa' });
+test('sair cobre descendo e revela subindo até a capa do login', () => {
+  assert.deepEqual(ondaDaTroca(null, null), { mode: 'down', revealMode: 'up', ate: 'capa' });
+  assert.deepEqual(ondaDaTroca(null, { x: 0.5, y: 0.8 }), { mode: 'down', revealMode: 'up', ate: 'capa' });
 });
 
-test('entrar com botão nasce no botão; sem botão, do topo', () => {
+test('troca direta de conta pode usar o botão; sem origem, desce do topo', () => {
   assert.deepEqual(ondaDaTroca('u1', { x: 0.5, y: 0.8 }), {
     mode: 'radial',
     origin: { x: 0.5, y: 0.8 },
     revealMode: 'down',
   });
-  assert.deepEqual(ondaDaTroca('u1', null), { mode: 'down' });
+  assert.deepEqual(ondaDaTroca('u1', null), { mode: 'down', revealMode: 'up' });
 });
 
 test('a tela antiga permanece visível enquanto a cortina chega; a nova só entra na revelação', () => {

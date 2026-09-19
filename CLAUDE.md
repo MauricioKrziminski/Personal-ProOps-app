@@ -1,8 +1,8 @@
 @AGENTS.md
 
-# Personal ProOps app
+# ProOps
 
-> **Nomenclatura:** este repositório **não é "o ProOps"**. ProOps é o produto/marca maior; este é um **aplicativo pessoal que faz parte do produto ProOps**. Enquanto não houver nome definitivo, usar o nome genérico **"Personal ProOps app"** (em código, docs e UI).
+> **Nomenclatura:** o nome exibido do app é **"ProOps"** em desenvolvimento, staging e produção. Os IDs de bundle e os nomes dos projetos de infraestrutura continuam separados para não misturar ambientes.
 
 App mobile pessoal de **notas rápidas, lembretes e controle financeiro operado via WhatsApp**. O usuário manda mensagens em linguagem natural ("gastei 45 no mercado", "recebi 500 de freela", "me lembra de pagar aluguel todo dia 5", "quanto gastei esse mês?") e a IA cria/consulta **notas, lembretes e o financeiro completo** (transações, contas, metas, orçamentos), que aparecem organizados no app em tempo real. Lembretes são disparados de volta (push e/ou WhatsApp).
 

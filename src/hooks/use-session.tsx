@@ -73,29 +73,40 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       });
     };
 
-    const trocar = async (next: Session | null, depois: string | null) => {
+    const trocar = async (next: Session | null, depois: string | null, antes: string | null | undefined) => {
       const onda = ondaDaTroca(depois, cortina.tomarOrigem());
-      await comTeto(cortina.cobrir(onda), TETO_DA_TROCA_MS, 'cortina').catch(async () => {
-        // Nunca substitua a sessão mostrada com a cobertura ainda incompleta. Num tablet, o
-        // canvas maior pode perder quadros; o fallback fecha a tinta e deixa-a pintar primeiro.
-        cortina.cobrirJa();
-        await doisQuadros();
-      });
+      const entrandoPelaCapa = antes === null && depois !== null;
+      if (entrandoPelaCapa) {
+        await comTeto(cortina.cobrirDaCapa(), TETO_DA_TROCA_MS, 'cortina').catch(async () => {
+          cortina.cobrirJa();
+          await doisQuadros();
+        });
+      } else {
+        await comTeto(cortina.cobrir(onda), TETO_DA_TROCA_MS, 'cortina').catch(async () => {
+          // Nunca substitua a sessão mostrada com a cobertura ainda incompleta. Num tablet, o
+          // canvas maior pode perder quadros; o fallback fecha a tinta e deixa-a pintar primeiro.
+          cortina.cobrirJa();
+          await doisQuadros();
+        });
+      }
       if (!vivo) return;
       setEstado({ session: next, loading: false });
       await doisQuadros();
-      await comTeto(cortina.revelar(onda), TETO_DA_TROCA_MS, 'cortina').catch(() =>
+      // A cobertura desce e a revelação sobe. A capa estática recebe a onda da saída.
+      const revelacao = entrandoPelaCapa ? { mode: 'up' as const } : onda;
+      await comTeto(cortina.revelar(revelacao), TETO_DA_TROCA_MS, 'cortina').catch(() =>
         cortina.abrirJa()
       );
     };
 
     const receber = (next: Session | null) => {
       const depois = next?.user.id ?? null;
-      const comCortina = precisaDeCortina(mostrado.current, depois);
+      const antes = mostrado.current;
+      const comCortina = precisaDeCortina(antes, depois);
       mostrado.current = depois;
       fila.current = fila.current
         .then(async () => {
-          if (comCortina) await trocar(next, depois);
+          if (comCortina) await trocar(next, depois, antes);
           else if (vivo) setEstado({ session: next, loading: false });
         })
         .catch(() => {});

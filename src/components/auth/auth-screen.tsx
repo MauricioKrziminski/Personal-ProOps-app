@@ -1,15 +1,12 @@
 import { StatusBar } from "expo-status-bar";
-import { useState } from "react";
-import { Platform, StyleSheet, useWindowDimensions } from "react-native";
+import { Platform, StyleSheet, View, useWindowDimensions } from "react-native";
 import { KeyboardAwareScrollView } from "react-native-keyboard-controller";
-import Animated, { FadeInDown, ReduceMotion } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { AuthCap } from "@/components/auth/auth-cap";
-import { useCortinaAberta } from "@/components/motion/session-curtain";
 import { ThemedView } from "@/components/themed-view";
 import { classifyWindow } from "@/design/adaptive-window";
-import { Motion, Space } from "@/design/tokens";
+import { Space } from "@/design/tokens";
 import { alturaDaCapa } from "@/design/wave-math";
 
 /**
@@ -42,9 +39,9 @@ import { alturaDaCapa } from "@/design/wave-math";
  * ## A capa (16/09/2026)
  *
  * Com a marca (`showBrand`), o topo é a `AuthCap`: a tinta da abertura parada numa curva, como o
- * login dos vídeos de referência. A cortina da raiz PARA nessa mesma curva quando o destino é uma
- * tela de conta (abertura sem sessão, saída), e desmonta por cima dela sem salto. O conteúdo
- * começa abaixo do ponto mais baixo da curva, e o rodapé encosta na base (`marginTop: 'auto'`)
+ * login dos vídeos de referência. Na abertura e no logout, a onda sobe até essa mesma curva. Ao
+ * entrar no app, a curva desce e cobre o formulário uma vez. O conteúdo começa
+ * abaixo do ponto mais baixo da curva, e o rodapé encosta na base (`marginTop: 'auto'`)
  * quando sobra tela — com teclado, a lista rola como antes.
  * No tablet, os campos já têm largura limitada; o rodapé deixa de ser ancorado no extremo da
  * tela e acompanha o formulário no mesmo eixo central. Assim, a ação não se separa da senha
@@ -52,9 +49,8 @@ import { alturaDaCapa } from "@/design/wave-math";
  *
  * ## A entrada
  *
- * O conteúdo só MONTA depois que a cortina abriu pela primeira vez: por baixo da tinta não há o
- * que mostrar, e montado antes ele "entraria" escondido. A trava (`visto`) nunca volta a `false` —
- * sem ela, o formulário sumiria por baixo da cortina que cobre ao entrar na conta.
+ * Formulário e rodapé já estão montados sob a cortina. Assim a subida nunca entrega uma capa
+ * isolada com o resto da tela vazio, nem soma um segundo movimento ao da onda.
  */
 export function AuthScreen({
   children,
@@ -70,17 +66,6 @@ export function AuthScreen({
   const insets = useSafeAreaInsets();
   const { width, height } = useWindowDimensions();
   const tablet = classifyWindow(width) !== 'compact';
-  const aberta = useCortinaAberta();
-  const [visto, setVisto] = useState(aberta);
-  if (aberta && !visto) setVisto(true);
-
-  const entrada = (indice: number) =>
-    FadeInDown.withInitialValues({ opacity: 0, transform: [{ translateY: 16 }] })
-      .duration(Motion.duration.slow + 80)
-      .easing(Motion.easing.out)
-      .delay(indice * Motion.stagger.step * 3)
-      .reduceMotion(ReduceMotion.System);
-
   return (
     <ThemedView style={styles.flex}>
       <KeyboardAwareScrollView
@@ -110,14 +95,8 @@ export function AuthScreen({
             <AuthCap />
           </>
         ) : null}
-        {visto ? (
-          <>
-            <Animated.View entering={entrada(0)} style={styles.form}>{children}</Animated.View>
-            <Animated.View entering={entrada(1)} style={[styles.form, styles.footer, tablet && styles.tabletFooter]}>
-              {footer}
-            </Animated.View>
-          </>
-        ) : null}
+        <View style={styles.form}>{children}</View>
+        <View style={[styles.form, styles.footer, tablet && styles.tabletFooter]}>{footer}</View>
       </KeyboardAwareScrollView>
     </ThemedView>
   );

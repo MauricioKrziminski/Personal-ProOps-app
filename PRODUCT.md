@@ -48,7 +48,7 @@ em que o usuário paga, não no dia 31.
 
 ## Brand Commitments
 
-- Nome provisório "Personal ProOps app" — faz parte do produto ProOps, não é "o ProOps".
+- Nome do app: "ProOps".
 - A marca (a espiral, `assets/images/brand/`) é monocromática: preta no claro, branca no escuro;
   nunca colorida.
 - Cor de emissor aparece só dentro da forma de um cartão de crédito. Roxo como cor do app está

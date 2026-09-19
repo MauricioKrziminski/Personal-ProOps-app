@@ -92,9 +92,12 @@ export function Button({
   const cortina = useCortina();
   const caixa = useRef<View>(null);
   const reduzido = useReducedMotion();
+  // A própria cortina comunica a troca de sessão. O botão só mostra loader quando a ação
+  // explicitamente pede isso; assim ele não faz um segundo movimento enquanto a onda cobre a tela.
+  const loadingVisual = loading;
   const inert = disabled || loading;
   const altura = HEIGHT[size];
-  const off = disabled && !loading;
+  const off = disabled && !loadingVisual;
   /**
    * A largura medida num valor COMPARTILHADO: lida da captura do worklet, ela ficaria presa no 0
    * do primeiro render e a cápsula não encolheria.
@@ -120,14 +123,14 @@ export function Button({
     variant === 'primary' ? theme.glassActionTint : variant === 'destructive' ? theme.glassDangerTint : undefined;
 
   /** 0 = botão, 1 = cápsula carregando. */
-  const morph = useSharedValue(loading ? 1 : 0);
+  const morph = useSharedValue(loadingVisual ? 1 : 0);
   useEffect(() => {
     morph.set(
-      loading
+      loadingVisual
         ? withSpring(1, Motion.spring.encaixe)
         : withTiming(0, { duration: Motion.duration.base, easing: Motion.easing.out })
     );
-  }, [loading, morph]);
+  }, [loadingVisual, morph]);
 
   // A cápsula de carregamento é uma composição opaca. No iOS o vidro permanece estável
   // enquanto o conteúdo troca pelo indicador de progresso.
@@ -169,7 +172,7 @@ export function Button({
       <PressableScale
         accessibilityRole="button"
         accessibilityLabel={label}
-        accessibilityState={{ disabled: inert, busy: loading }}
+        accessibilityState={{ disabled: inert, busy: loadingVisual }}
         disabled={inert}
         hitSlop={SLOP[size]}
         haptic="light"
@@ -222,7 +225,7 @@ export function Button({
           </ThemedText>
         </Animated.View>
 
-        {loading ? (
+        {loadingVisual ? (
           <Animated.View pointerEvents="none" style={[styles.pontos, { height: altura }, pontos]}>
             <DotsLoader size={size === 'sm' ? 5 : 7} color={labelColor} />
           </Animated.View>

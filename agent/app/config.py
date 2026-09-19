@@ -34,11 +34,9 @@ class Settings(BaseSettings):
 
     # --- IA ---
     gemini_api_key: str = ""
-    # ⚠️ **Não existe `gemini_model` aqui, e é de propósito.** Ele existia, com
-    # default Flash, e era lido em `llm()` ANTES do padrão de cada papel: uma
-    # chamada sem argumento — ou `GEMINI_MODEL` no ambiente — tirava router e
-    # parse do Lite (500/dia grátis) e punha no Flash (20/dia), calado. A
-    # escolha de modelo mora em `services/gemini.MODELOS`, e só lá.
+    # Vazio = usa os padrões de `services/gemini.MODELOS`. Se preenchido (ex: GEMINI_MODEL no .env),
+    # define o modelo usado por TODOS os papéis do agente (100% dos fluxos).
+    gemini_model: str = ""
     groq_api_key: str = ""
 
     # --- Cloud Tasks ---

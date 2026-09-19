@@ -32,7 +32,7 @@ VISION_MIME = re.compile(r"^(image/(jpeg|png|webp|heic|heif)|application/pdf)$")
 MAX_MEDIA_BYTES = 8 * 1024 * 1024
 
 SEM_CONTA = (
-    "👋 Ainda não encontrei sua conta. Baixa o Personal ProOps app e se cadastra "
+    "👋 Ainda não encontrei sua conta. Baixa o ProOps e se cadastra "
     "com este número para começar!"
 )
 SEM_WORKSPACE = "😕 Sua conta ainda não tem um espaço criado. Abre o app uma vez e me chama de novo!"

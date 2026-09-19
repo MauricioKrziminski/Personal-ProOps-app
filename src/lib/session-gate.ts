@@ -19,8 +19,10 @@ export interface Ponto {
 export interface Onda {
   mode: WaveMode;
   origin?: Ponto;
-  /** O círculo pode cobrir a partir do botão, mas a tela nova é revelada de cima para baixo. */
+  /** O círculo pode cobrir a partir do botão, mas a tela nova pode usar uma geometria própria. */
   revealMode?: WaveMode;
+  /** A cobertura do login continua a curva da capa em vez de começar fora da tela. */
+  fromCap?: boolean;
   /**
    * Onde revelar PARA. `capa` deixa a tinta no topo, na curva que o `AuthScreen` desenha igual —
    * é o cabeçalho das telas de conta. Sem o campo, a tinta sai da tela.
@@ -35,7 +37,7 @@ export function entradaLiberada(fase: FaseDaCortina, locked: boolean): boolean {
   return !locked && (fase === 'cobrindo' || fase === 'revelando' || fase === 'aberta');
 }
 
-/** Teto de CADA passo da troca (cobrir, revelar). Passou disso, a troca acontece assim mesmo. */
+/** Teto de cada passo animado da troca (cobertura e revelação). */
 export const TETO_DA_TROCA_MS = 1500;
 /** Teto da espera da abertura por fontes e sessão. */
 export const TETO_DA_ABERTURA_MS = 2500;
@@ -74,13 +76,17 @@ export function precisaDeCortina(antes: string | null | undefined, depois: strin
 }
 
 /**
- * Sair cobre DE BAIXO e revela até a capa do login; entrar nasce no botão que disparou, e sem
- * botão (link, código colado) desce do topo.
+ * A sessão nova sempre entra depois que a tela foi coberta. A cobertura desce e a revelação
+ * sobe. Ao sair, a segunda passagem para na capa fixa do login; ao entrar, a primeira parte
+ * dessa capa e a segunda descobre o app.
+ *
+ * Uma troca direta entre contas ainda pode usar a origem do botão. A abertura inicial também
+ * para na capa para casar com o `AuthCap` estático.
  */
 export function ondaDaTroca(depois: string | null, origem: Ponto | null): Onda {
-  if (depois === null) return { mode: 'up', ate: 'capa' };
+  if (depois === null) return { mode: 'down', revealMode: 'up', ate: 'capa' };
   if (origem) return { mode: 'radial', origin: origem, revealMode: 'down' };
-  return { mode: 'down' };
+  return { mode: 'down', revealMode: 'up' };
 }
 
 export function origemValida(

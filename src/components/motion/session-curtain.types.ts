@@ -5,8 +5,12 @@ import type { Onda, Ponto } from '@/lib/session-gate';
  * arquivo por plataforma com o tipo compartilhado).
  */
 export interface CortinaApi {
+  /** Pré-monta a camada invisível para uma ação que abrirá a cortina logo depois. */
+  preparar(): void;
   /** Cobre a tela a partir da onda; resolve quando o último azulejo assentou. */
   cobrir(onda: Onda): Promise<void>;
+  /** Continua a curva do cabeçalho do login para baixo ao cobrir a tela. */
+  cobrirDaCapa(): Promise<void>;
   /** Fecha imediatamente se a animação de cobertura falhar ou exceder o teto de segurança. */
   cobrirJa(): void;
   /** Descobre; resolve quando o último azulejo saiu e a camada desmontou. */

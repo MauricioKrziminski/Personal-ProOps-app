@@ -12,25 +12,26 @@ import { Field, TextField } from '@/components/ui/field';
 import { Motion, Space } from '@/design/tokens';
 import { authErrorMessage } from '@/lib/auth-errors';
 import { supabase } from '@/lib/supabase';
+import { useSession } from '@/hooks/use-session';
 
 const RESEND_SECONDS = 45;
 const MIN_PASSWORD = 8;
 
-type Step = 'email' | 'password' | 'code';
+type Step = 'email' | 'code' | 'password';
 
 /**
- * Recuperar senha em três passos: e-mail → senha nova → código.
+ * Recuperar senha em três passos: e-mail → código → senha nova.
  *
- * A ordem é essa, e não "código → senha nova", por causa do portão de sessão: `verifyOtp` de
- * recuperação já devolve SESSÃO, e no mesmo instante o `Stack.Protected guard={!session}` do
- * layout raiz desmonta esta tela — antes de o usuário conseguir digitar a senha nova. Pedindo a
- * senha ANTES do código, o `verifyOtp` e o `updateUser` rodam na mesma função assíncrona, que
- * sobrevive ao unmount, e a pessoa cai no app já com a senha trocada.
+ * O código é validado antes de revelar os campos da senha. `verifyOtp` de recuperação abre uma
+ * sessão, então esta rota fica fora do `Stack.Protected guard={!session}`. Assim a tela não é
+ * desmontada no momento em que o código é aceito e a pessoa consegue concluir a troca; a saída
+ * para o app só acontece depois de `updateUser({ password })` retornar com sucesso.
  *
  * Código, não link — mesma decisão e mesmo motivo do cadastro (`signup.tsx`). Exige o template
  * "Reset password" do projeto Supabase com `{{ .Token }}` no corpo.
  */
 export default function ForgotPasswordScreen() {
+  const { session } = useSession();
   const [step, setStep] = useState<Step>('email');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -39,6 +40,7 @@ export default function ForgotPasswordScreen() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [cooldown, setCooldown] = useState(0);
+  const [senhaTrocada, setSenhaTrocada] = useState(false);
   const confirmRef = useRef<TextInput>(null);
 
   useEffect(() => {
@@ -47,10 +49,16 @@ export default function ForgotPasswordScreen() {
     return () => clearInterval(id);
   }, [cooldown]);
 
-  const emailOk = email.includes('@');
+  // `updateUser` dispara o evento de sessão antes de a cortina terminar. Esperar o estado exibido
+  // pelo SessionProvider evita mandar o usuário de volta ao login durante a própria transição.
+  useEffect(() => {
+    if (senhaTrocada && session) router.replace('/');
+  }, [senhaTrocada, session]);
+
+  const emailOk = email.trim().includes('@');
   const passwordOk = password.length >= MIN_PASSWORD && password === confirm;
 
-  const requestCode = async (resend = false) => {
+  const requestCode = async () => {
     if (!emailOk || busy) return;
     setBusy(true);
     setError(null);
@@ -63,11 +71,17 @@ export default function ForgotPasswordScreen() {
     }
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     setCooldown(RESEND_SECONDS);
-    if (!resend) setStep('password');
+    setCode('');
+    setStep('code');
+  };
+
+  const resend = async () => {
+    if (cooldown > 0 || busy) return;
+    await requestCode();
   };
 
   /** Recebe o código por parâmetro: no auto-submit o `useState` ainda não assentou. */
-  const verifyAndChange = async (submitted?: string) => {
+  const verifyCode = async (submitted?: string) => {
     const token = submitted ?? code;
     if (token.length < 6 || busy) return;
     setBusy(true);
@@ -77,29 +91,54 @@ export default function ForgotPasswordScreen() {
       token,
       type: 'recovery',
     });
+    setBusy(false);
     if (err) {
-      setBusy(false);
       setError(authErrorMessage(err));
       setCode('');
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
       return;
     }
-    // A partir daqui esta tela pode já ter sido desmontada — nada de setState depois do await.
-    const { error: upd } = await supabase.auth.updateUser({ password });
-    if (upd) {
-      // Sessão existe (o código valeu) mas a senha não trocou: a pessoa entra e troca no Perfil.
-      console.warn('updateUser depois da recuperação:', upd.message);
-    }
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    setStep('password');
   };
 
-  const footerLabel = { email: 'Enviar código', password: 'Continuar', code: 'Trocar senha' }[step];
+  const changePassword = async () => {
+    if (!passwordOk || busy) return;
+    setBusy(true);
+    setError(null);
+    const { error: err } = await supabase.auth.updateUser({ password });
+    if (err) {
+      setBusy(false);
+      setError(authErrorMessage(err));
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+      return;
+    }
+    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    setSenhaTrocada(true);
+  };
+
+  const footerLabel = { email: 'Enviar código', code: 'Validar código', password: 'Trocar senha' }[step];
   const footerAction = {
-    email: () => requestCode(),
-    password: () => setStep('code'),
-    code: () => verifyAndChange(),
+    email: requestCode,
+    code: verifyCode,
+    password: changePassword,
   }[step];
-  const footerDisabled = { email: !emailOk, password: !passwordOk, code: code.length < 6 }[step];
+  const footerDisabled = { email: !emailOk, code: code.length < 6, password: !passwordOk }[step];
+
+  const voltar = () => {
+    if (step === 'email') {
+      router.back();
+      return;
+    }
+    if (step === 'code') {
+      setStep('email');
+    } else {
+      setStep('code');
+    }
+    setError(null);
+  };
+
+  const backLabel = step === 'email' ? 'Voltar' : step === 'code' ? 'Trocar e-mail' : 'Voltar ao código';
 
   return (
     <AuthScreen
@@ -114,13 +153,7 @@ export default function ForgotPasswordScreen() {
             block
             origemDaCortina
           />
-          <Button
-            label={step === 'email' ? 'Voltar' : 'Trocar e-mail'}
-            variant="ghost"
-            onPress={step === 'email' ? () => router.back() : () => { setStep('email'); setError(null); }}
-            disabled={busy}
-            block
-          />
+          <Button label={backLabel} variant="ghost" onPress={voltar} disabled={busy} block />
         </>
       }>
       {step === 'email' ? (
@@ -154,7 +187,41 @@ export default function ForgotPasswordScreen() {
             />
           </Field>
         </Animated.View>
-      ) : step === 'password' ? (
+      ) : step === 'code' ? (
+        <Animated.View
+          key="code"
+          entering={FadeInRight.duration(Motion.duration.slow).easing(Motion.easing.out)}
+          style={styles.step}>
+          <View style={styles.copy}>
+            <ThemedText type="title">Confira o e-mail</ThemedText>
+            <ThemedText type="small" themeColor="textSecondary">
+              Mandamos um código de 6 dígitos para {email.trim()}.
+            </ThemedText>
+          </View>
+          <Field label="Código" error={error ?? undefined}>
+            <OtpInput
+              value={code}
+              onChange={(next) => {
+                setCode(next);
+                if (error) setError(null);
+              }}
+              onComplete={(next) => verifyCode(next)}
+              invalid={!!error}
+              editable={!busy}
+              autoFocus
+            />
+          </Field>
+          <View style={styles.note}>
+            {cooldown > 0 ? (
+              <ThemedText type="footnote" themeColor="textSecondary">
+                Não chegou? Você pode reenviar em {cooldown}s
+              </ThemedText>
+            ) : (
+              <Button label="Reenviar código" variant="ghost" size="sm" onPress={resend} disabled={busy} />
+            )}
+          </View>
+        </Animated.View>
+      ) : (
         <Animated.View
           key="password"
           entering={FadeInRight.duration(Motion.duration.slow).easing(Motion.easing.out)}
@@ -162,7 +229,7 @@ export default function ForgotPasswordScreen() {
           <View style={styles.copy}>
             <ThemedText type="title">Senha nova</ThemedText>
             <ThemedText type="small" themeColor="textSecondary">
-              Escolha a senha agora; o código do e-mail vem no próximo passo.
+              Código validado. Agora escolha a senha que você vai usar para entrar.
             </ThemedText>
           </View>
           <Field label="Senha nova" hint={`Pelo menos ${MIN_PASSWORD} caracteres`}>
@@ -188,52 +255,12 @@ export default function ForgotPasswordScreen() {
               secureTextEntry
               autoComplete="new-password"
               textContentType="newPassword"
-              returnKeyType="next"
-              onSubmitEditing={() => passwordOk && setStep('code')}
+              returnKeyType="go"
+              onSubmitEditing={() => passwordOk && changePassword()}
               invalid={confirm.length > 0 && password !== confirm}
               editable={!busy}
             />
           </Field>
-        </Animated.View>
-      ) : (
-        <Animated.View
-          key="code"
-          entering={FadeInRight.duration(Motion.duration.slow).easing(Motion.easing.out)}
-          style={styles.step}>
-          <View style={styles.copy}>
-            <ThemedText type="title">Confira o e-mail</ThemedText>
-            <ThemedText type="small" themeColor="textSecondary">
-              Mandamos um código de 6 dígitos para {email.trim()}.
-            </ThemedText>
-          </View>
-          <Field label="Código" error={error ?? undefined}>
-            <OtpInput
-              value={code}
-              onChange={(next) => {
-                setCode(next);
-                if (error) setError(null);
-              }}
-              onComplete={(next) => verifyAndChange(next)}
-              invalid={!!error}
-              editable={!busy}
-              autoFocus
-            />
-          </Field>
-          <View style={styles.note}>
-            {cooldown > 0 ? (
-              <ThemedText type="footnote" themeColor="textSecondary">
-                Não chegou? Você pode reenviar em {cooldown}s
-              </ThemedText>
-            ) : (
-              <Button
-                label="Reenviar código"
-                variant="ghost"
-                size="sm"
-                onPress={() => requestCode(true)}
-                disabled={busy}
-              />
-            )}
-          </View>
         </Animated.View>
       )}
     </AuthScreen>

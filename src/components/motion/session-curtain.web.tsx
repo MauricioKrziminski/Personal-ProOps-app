@@ -5,7 +5,9 @@ import type { CortinaApi } from './session-curtain.types';
 
 /** No web não há splash nativo nem troca que precise esconder: a cortina é transparente. */
 const SEM_CORTINA: CortinaApi = {
+  preparar: () => {},
   cobrir: async () => {},
+  cobrirDaCapa: async () => {},
   cobrirJa: () => {},
   revelar: async () => {},
   abrirJa: () => {},

@@ -1,4 +1,4 @@
-# Personal ProOps app
+# ProOps
 
 App mobile pessoal de **notas rápidas, lembretes e controle financeiro operado via WhatsApp**, parte do produto ProOps. Você manda uma mensagem em linguagem natural — texto ou áudio — e a IA cria e organiza tudo no app:
 

@@ -4,7 +4,7 @@ Pod::Spec.new do |s|
   s.summary        = 'Esconde o app da foto do seletor de apps quando a trava está ligada.'
   s.description    = s.summary
   s.license        = 'UNLICENSED'
-  s.author         = 'Personal ProOps app'
+  s.author         = 'ProOps'
   s.homepage       = 'https://docs.expo.dev/modules/'
   s.platforms      = { :ios => '16.4' }
   s.swift_version  = '5.9'

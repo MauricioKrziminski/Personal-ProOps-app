@@ -71,7 +71,7 @@ def _checa_producao() -> None:
         )
 
 
-app = FastAPI(title="Personal ProOps — agente", lifespan=lifespan)
+app = FastAPI(title="ProOps — agente", lifespan=lifespan)
 
 app.include_router(inbound.router)
 app.include_router(worker.router)

@@ -650,9 +650,9 @@ Agora são três apps que **convivem** (`app.config.js`, por `APP_VARIANT`):
 
 | perfil EAS | variante | package | nome | banco | agente |
 |---|---|---|---|---|---|
-| `development` | `development` | `com.proops.personal.dev` | ProOps (dev) | staging | `agente-staging` |
-| `staging` / `preview` | `preview` | `com.proops.personal.staging` | ProOps (staging) | staging | `agente-staging` |
-| `production` / `distribution` | `production` | `com.proops.personal` | Personal ProOps app | produção | *(sem URL até o deploy)* |
+| `development` | `development` | `com.proops.personal.dev` | ProOps | staging | `agente-staging` |
+| `staging` / `preview` | `preview` | `com.proops.personal.staging` | ProOps | staging | `agente-staging` |
+| `production` / `distribution` | `production` | `com.proops.personal` | ProOps | produção | *(sem URL até o deploy)* |
 
 ⚠️ **`APP_VARIANT` sem valor = `development`**, nunca produção — mesma regra do `agent/.env`:
 "sem variável" quer dizer "alguém rodou `expo run:android` na própria máquina", e isso não pode

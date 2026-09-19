@@ -95,7 +95,7 @@ export const Colors = {
     /** A faixa de brilho do metal do cartão, e o mesmo branco sem opacidade para o degradê. */
     cardSheen: 'rgba(255, 255, 255, 0.08)',
     cardSheenClear: 'rgba(255, 255, 255, 0)',
-    /** A cortina da abertura e das trocas de sessão. Igual ao splash nativo, nos dois temas. */
+    /** A cortina da abertura e das trocas de sessão. */
     curtain: '#0B0B0C',
     onCurtain: '#F4F4F2',
     onCurtainMuted: 'rgba(244, 244, 242, 0.60)',
@@ -170,7 +170,11 @@ export const Colors = {
     cardLightChip: 'rgba(255, 255, 255, 0.14)',
     cardSheen: 'rgba(255, 255, 255, 0.08)',
     cardSheenClear: 'rgba(255, 255, 255, 0)',
-    curtain: '#0B0B0C',
+    /**
+     * No escuro a cortina sobe um degrau para continuar visível sobre o fundo OLED. O splash
+     * nativo continua preto; esta cor é aplicada assim que a camada React entra na tela.
+     */
+    curtain: '#1C1C1E',
     onCurtain: '#F4F4F2',
     onCurtainMuted: 'rgba(244, 244, 242, 0.60)',
     cardFooter: 'rgba(0, 0, 0, 0.24)',

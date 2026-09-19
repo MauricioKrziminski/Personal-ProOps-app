@@ -73,8 +73,8 @@ export function raioDaCobertura(
   return (1 - easeInOut(p)) * (longe + 2);
 }
 
-/** Onde a borda da capa do login descansa: a linha de base em 20% da altura da tela. */
-export const CAPA = 0.2;
+/** Onde a borda da capa do login descansa: uma faixa curta no topo, em 17% da altura da tela. */
+export const CAPA = 0.17;
 
 /**
  * O progresso de REVELAR em que a linha de base cai em `CAPA`. A amplitude depende do progresso,

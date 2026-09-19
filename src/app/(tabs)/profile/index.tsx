@@ -5,6 +5,7 @@ import * as Haptics from 'expo-haptics';
 import Animated, { FadeIn } from 'react-native-reanimated';
 
 import { ThemedText } from '@/components/themed-text';
+import { useCortina } from '@/components/motion/session-curtain';
 import { AlertPreferencesSection } from '@/components/profile/alert-preferences-section';
 import { ProfileTabletCanvas } from '@/components/profile/profile-tablet-canvas';
 import { AppHeader } from '@/components/ui/app-header';
@@ -39,6 +40,7 @@ import { useProfile, useUpdateProfile } from '@/hooks/use-profile';
 import { useSession } from '@/hooks/use-session';
 import { useTheme, useThemeMode } from '@/hooks/use-theme';
 import { confirmDestructive } from '@/lib/item-actions';
+import { ondaDaTroca } from '@/lib/session-gate';
 import { appUpdateAction, appUpdateSubtitle, type AppUpdateState } from '@/lib/app-update';
 import { supabase, supabaseUrl } from '@/lib/supabase';
 
@@ -61,6 +63,7 @@ export default function ProfileScreen() {
   const ambiente = environmentLabel(supabaseUrl);
   const { mode, setMode } = useThemeMode();
   const { session } = useSession();
+  const cortina = useCortina();
   const toast = useToast();
   const userId = session?.user?.id;
 
@@ -72,6 +75,7 @@ export default function ProfileScreen() {
   /** `null` = sheet fechado. String vazia é um estado válido (apagar o nome). */
   const [nameDraft, setNameDraft] = useState<string | null>(null);
   const [notificationRefreshKey, setNotificationRefreshKey] = useState(0);
+  const [saindo, setSaindo] = useState(false);
   const nome = profile.data?.display_name?.trim() || null;
 
   /**
@@ -89,9 +93,23 @@ export default function ProfileScreen() {
   const emailDaConta = session?.user?.email ?? null;
 
   const confirmSignOut = () => {
+    // O ActionSheetIOS fecha com uma animação própria. Deixe a camada pronta enquanto ele está aberto
+    // para a cortina começar no mesmo instante em que o usuário confirma.
+    cortina.preparar();
     const doIt = async () => {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
-      await supabase.auth.signOut();
+      setSaindo(true);
+      // Começa no toque. O evento de sessão reutiliza esta cobertura enquanto a rede responde.
+      void cortina.cobrir(ondaDaTroca(null, null));
+      try {
+        const { error } = await supabase.auth.signOut();
+        if (error) throw error;
+      } catch {
+        setSaindo(false);
+        cortina.cobrirJa();
+        void cortina.revelar({ mode: 'up' }).catch(() => cortina.abrirJa());
+        toast({ message: 'Não foi possível sair agora.', tone: 'error' });
+      }
     };
     confirmDestructive('Sair da conta?', 'Sair', doIt);
   };
@@ -490,7 +508,13 @@ export default function ProfileScreen() {
       <AppUpdateSection />
 
       <Section>
-        <Row title="Sair da conta" icon="rectangle.portrait.and.arrow.right" destructive chevron={false} onPress={confirmSignOut} />
+        <Row
+          title="Sair da conta"
+          icon="rectangle.portrait.and.arrow.right"
+          destructive
+          chevron={false}
+          onPress={saindo ? undefined : confirmSignOut}
+        />
       </Section>
 
       {!session ? (
@@ -556,7 +580,7 @@ export default function ProfileScreen() {
 
       <View style={styles.footer}>
         <ThemedText type="small" themeColor="textSecondary">
-          Personal ProOps app
+          ProOps
         </ThemedText>
         {/*
           Em qual banco este build escreve. Some em produção de propósito — ver

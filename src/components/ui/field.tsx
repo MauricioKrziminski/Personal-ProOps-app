@@ -465,11 +465,20 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   input: {
+    height: HitTarget + 6,
     minHeight: HitTarget + 6,
     paddingHorizontal: Space.lg,
-    paddingVertical: Space.md,
+    // O padding vertical do TextInput nativo deixava o placeholder abaixo do centro no iOS.
+    // A caixa já centraliza o campo; manter o padding em zero faz placeholder e valor usarem a
+    // mesma linha em todos os formulários. Campos multiline podem sobrescrever este valor.
+    paddingVertical: 0,
+    textAlignVertical: 'center',
     fontFamily: Type.body.fontFamily,
     fontSize: Type.body.fontSize,
+    lineHeight: Type.body.lineHeight,
+    // O baseline nativo do UITextField fica abaixo do centro geométrico da caixa. O mesmo ajuste
+    // vale para o texto digitado e para o placeholder, sem mexer na área de toque.
+    transform: [{ translateY: Platform.OS === 'ios' ? -2 : 0 }],
   },
   valor: {
     flexDirection: 'row',

@@ -11,17 +11,7 @@ public class ProOpsPrivacidadeModule: Module {
     Name("ProOpsPrivacidade")
 
     OnCreate {
-      let centro = NotificationCenter.default
-      // `queue: nil` roda no mesmo instante em que o UIKit avisa (thread principal): a capa
-      // precisa estar na janela ANTES de a foto ser tirada.
-      self.observadores = [
-        centro.addObserver(forName: UIApplication.didEnterBackgroundNotification, object: nil, queue: nil) { [weak self] _ in
-          self?.cobrir()
-        },
-        centro.addObserver(forName: UIApplication.didBecomeActiveNotification, object: nil, queue: nil) { [weak self] _ in
-          self?.descobrir()
-        },
-      ]
+      self.observadores = registrarObservadores()
     }
 
     OnDestroy {
@@ -35,6 +25,20 @@ public class ProOpsPrivacidadeModule: Module {
         if !ativa { self.descobrir() }
       }
     }
+  }
+
+  private func registrarObservadores() -> [NSObjectProtocol] {
+    let centro = NotificationCenter.default
+    // `queue: nil` roda no mesmo instante em que o UIKit avisa (thread principal): a capa
+    // precisa estar na janela ANTES de a foto ser tirada.
+    return [
+      centro.addObserver(forName: UIApplication.didEnterBackgroundNotification, object: nil, queue: nil) { [weak self] _ in
+        self?.cobrir()
+      },
+      centro.addObserver(forName: UIApplication.didBecomeActiveNotification, object: nil, queue: nil) { [weak self] _ in
+        self?.descobrir()
+      },
+    ]
   }
 
   private func cobrir() {

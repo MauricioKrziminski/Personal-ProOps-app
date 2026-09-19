@@ -1,4 +1,4 @@
-# Personal ProOps — agente (FastAPI + LangGraph)
+# ProOps — agente (FastAPI + LangGraph)
 
 Serviço Python que substitui as Edge Functions `whatsapp-webhook` e `process-jobs`
 (e, na Fase 4, as demais). O Supabase segue sendo o Postgres — nada mais.

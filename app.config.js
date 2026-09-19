@@ -7,6 +7,9 @@
  * APK tinha sido instalado por último. Num app de dinheiro isso é um jeito de gravar
  * lançamento no lugar errado sem perceber.
  *
+ * Os três ícones agora exibem somente "ProOps". O selo de ambiente dentro do app e os IDs de
+ * bundle continuam sendo a forma correta de distinguir os bancos sem poluir o nome da marca.
+ *
  * | variante      | package                       | banco      | agente          |
  * |---------------|-------------------------------|------------|-----------------|
  * | `development` | `com.proops.personal.dev`     | o do .env  | o do .env       |
@@ -59,9 +62,9 @@
 const VARIANTE = process.env.APP_VARIANT || 'development';
 
 const IDENTIDADE = {
-  development: { id: 'com.proops.personal.dev', nome: 'ProOps (dev)' },
-  preview: { id: 'com.proops.personal.staging', nome: 'ProOps (staging)' },
-  production: { id: 'com.proops.personal', nome: 'Personal ProOps app' },
+  development: { id: 'com.proops.personal.dev', nome: 'ProOps' },
+  preview: { id: 'com.proops.personal.staging', nome: 'ProOps' },
+  production: { id: 'com.proops.personal', nome: 'ProOps' },
 };
 
 module.exports = ({ config }) => {
@@ -70,6 +73,17 @@ module.exports = ({ config }) => {
   return {
     ...config,
     name: nome,
+    plugins: [
+      ...(config.plugins || []),
+      [
+        'expo-build-properties',
+        {
+          ios: {
+            enableSceneSupport: true,
+          },
+        },
+      ],
+    ],
     ios: { ...config.ios, bundleIdentifier: id },
     android: { ...config.android, package: id },
   };

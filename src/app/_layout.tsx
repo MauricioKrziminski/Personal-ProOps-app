@@ -289,8 +289,14 @@ function AppTree() {
                   <Stack.Screen name="login" options={contaOptions} />
                   <Stack.Screen name="login-whatsapp" options={contaOptions} />
                   <Stack.Screen name="signup" options={contaOptions} />
-                  <Stack.Screen name="forgot-password" options={contaOptions} />
                 </Stack.Protected>
+
+                {/*
+                  A recuperação fica fora do portão de conta porque validar o código de recuperação
+                  cria uma sessão no Supabase. A tela precisa continuar montada para deixar a pessoa
+                  definir a senha depois do código; ela mesma manda para `/` ao concluir.
+                */}
+                <Stack.Screen name="forgot-password" options={contaOptions} />
 
                 <Stack.Protected guard={!!session && !hasCompletedOnboarding(session.user.user_metadata)}>
                   <Stack.Screen name="onboarding" options={{ headerShown: false }} />

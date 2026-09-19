@@ -50,13 +50,15 @@ const CHAVE_SHOWS = 'proops.splash.shows';
 const LADO = 96;
 /** O anel do show: um pouco maior que a marca, com folga para o traço respirar. */
 const ANEL = LADO * 1.5;
-/** A abertura recolhe a tinta para cima, como nos vídeos de referência. */
+/** Abertura e logout terminam na mesma curva fixa da tela de conta. */
 const ONDA_DA_ABERTURA: Onda = { mode: 'up' };
 const TETO_DO_PNG_MS = 500;
 /** No Android a marca entra na camada; no iOS ela já está no splash nativo. */
 const ENTRA_NA_CAMADA = Platform.OS === 'android';
 /** No iOS a marca está na tela desde o splash nativo, antes deste módulo carregar. */
 const CARREGOU_EM = Date.now();
+/** Tempo máximo para manter um canvas pré-montado enquanto uma confirmação nativa está aberta. */
+const TETO_DO_PREPARO_MS = 4000;
 
 type Show = 'completa' | 'curta';
 
@@ -85,9 +87,9 @@ export function useCortinaAberta(): boolean {
 }
 
 /**
- * `true` desde que a tinta COMEÇA a subir (e enquanto nada cobre a tela). É o sinal das entradas
- * das raízes: a cascata e a barra de abas chegam junto com a cortina saindo, como no vídeo —
- * esperar o fim da onda deixaria a tela vazia aparecendo por baixo dela.
+ * `true` desde que a tinta COMEÇA A SAIR (subindo ou descendo) e enquanto nada cobre a tela. É o
+ * sinal das entradas das raízes: a cascata, a barra de abas e as telas de conta chegam junto com
+ * a cortina, como no vídeo — esperar o fim da onda deixaria a tela vazia aparecendo por baixo.
  */
 export function useCortinaSaindo(): boolean {
   return useContext(SaindoContext);
@@ -98,9 +100,9 @@ export function useCortinaSaindo(): boolean {
  *
  * ## Uma camada, dona de um progresso
  *
- * `progresso` vai de 0 (coberto) a 1 (revelado) e é o único valor que anda. A camada só existe
- * enquanto cobre alguma coisa: aberta, ela desmonta — um canvas do tamanho da tela por cima do
- * app custaria composição em todo quadro de todas as telas.
+ * `progresso` vai de 0 (coberto) a 1 (revelado) e é o único valor que anda. Aberta, a camada só
+ * fica montada durante o preparo curto de uma confirmação nativa; no uso normal ela desmonta —
+ * um canvas do tamanho da tela por cima do app custaria composição em todo quadro.
  *
  * ## A abertura
  *
@@ -137,6 +139,7 @@ export function CortinaProvider({ children }: { children: ReactNode }) {
   const [show, setShow] = useState<Show | null>(null);
   const [pintada, setPintada] = useState(false);
   const [aberturaFeita, setAberturaFeita] = useState(false);
+  const [camadaMontada, setCamadaMontada] = useState(false);
 
   const pronto = useRef<{ valor: boolean; destino: 'app' | 'conta'; segurando: boolean }>({
     valor: false,
@@ -144,6 +147,9 @@ export function CortinaProvider({ children }: { children: ReactNode }) {
     segurando: false,
   });
   const origem = useRef<{ ponto: Ponto; em: number } | null>(null);
+  /** A cobertura iniciada pelo gesto de logout é consumida pelo evento de sessão, sem reiniciar. */
+  const coberturaAtual = useRef<Promise<void> | null>(null);
+  const preparo = useRef<ReturnType<typeof setTimeout> | null>(null);
   // No Android o splash nativo não tem a marca, então esconder não espera o PNG.
   const splash = useRef({ layout: false, png: ENTRA_NA_CAMADA, escondido: false });
 
@@ -165,21 +171,64 @@ export function CortinaProvider({ children }: { children: ReactNode }) {
     [progresso, reduzido]
   );
 
+  const cancelarPreparo = useCallback(() => {
+    if (preparo.current !== null) {
+      clearTimeout(preparo.current);
+      preparo.current = null;
+    }
+  }, []);
+
+  /** Monta e mede o canvas antes de uma confirmação nativa, sem interceptar toques nem aparecer. */
+  const preparar = useCallback(() => {
+    cancelarPreparo();
+    setCamadaMontada(true);
+    preparo.current = setTimeout(() => {
+      preparo.current = null;
+      setCamadaMontada(false);
+    }, TETO_DO_PREPARO_MS);
+  }, [cancelarPreparo]);
+
+  useEffect(() => cancelarPreparo, [cancelarPreparo]);
+
   const cobrir = useCallback(
-    async (o: Onda) => {
-      progresso.set(1);
-      setOnda(o);
-      setFase('cobrindo');
-      // O canvas pinta um ou dois quadros depois de montar: antes disso a onda não apareceria.
-      await doisQuadros();
-      await doisQuadros();
-      await animar(0, Motion.curtain.duration);
-      setFase('coberta');
+    (o: Onda) => {
+      // O logout começa a cobrir no toque; o evento do Supabase chega depois e reutiliza esta
+      // mesma promessa. Reiniciar aqui faria a onda esperar a rede duas vezes.
+      if (coberturaAtual.current) {
+        setOnda(o);
+        return coberturaAtual.current;
+      }
+      cancelarPreparo();
+      const cobertura = (async () => {
+        progresso.set(1);
+        setOnda(o);
+        setFase('cobrindo');
+        // A camada pode ter acabado de montar; dois quadros bastam para layout e primeiro paint.
+        await doisQuadros();
+        await animar(0, Motion.curtain.duration);
+        setFase('coberta');
+      })();
+      coberturaAtual.current = cobertura;
+      return cobertura;
     },
-    [animar, progresso]
+    [animar, cancelarPreparo, progresso]
   );
 
+  const cobrirDaCapa = useCallback(async () => {
+    cancelarPreparo();
+    coberturaAtual.current = null;
+    cancelAnimation(progresso);
+    progresso.set(progressoDaCapa(alturaDaTela));
+    setOnda({ mode: 'up', fromCap: true });
+    setFase('cobrindo');
+    // A borda parte exatamente da capa, com a marca presa à mesma curva durante a descida.
+    await doisQuadros();
+    await animar(0, Motion.curtain.duration);
+    setFase('coberta');
+  }, [alturaDaTela, animar, cancelarPreparo, progresso]);
+
   const cobrirJa = useCallback(() => {
+    coberturaAtual.current = null;
     cancelAnimation(progresso);
     progresso.set(0);
     setFase('coberta');
@@ -187,29 +236,31 @@ export function CortinaProvider({ children }: { children: ReactNode }) {
 
   const descobrir = useCallback(
     async (o: Onda, duracao: number) => {
+      coberturaAtual.current = null;
       setOnda(o);
       setFase('revelando');
       // O React precisa aplicar a onda nova antes de o progresso andar: nos primeiros quadros a
       // forma velha ainda estaria na tela.
       await doisQuadros();
-      /*
-        Até a capa, a onda para no topo e a camada desmonta: por baixo, a tela de conta desenha a
-        MESMA curva (`AuthCap`), então a passagem não aparece. O caminho é mais curto, e o tempo
-        encolhe junto para a velocidade da borda ser a mesma.
-      */
+      // A revelação da conta termina na curva da AuthCap, com a marca na mesma posição.
+      // As duas metades da transição têm a mesma duração, mesmo com distâncias diferentes.
       const alvo = o.ate === 'capa' ? progressoDaCapa(alturaDaTela) : 1;
-      await animar(alvo, duracao * (0.35 + 0.65 * alvo));
+      await animar(alvo, duracao);
       setFase('aberta');
+      setCamadaMontada(false);
     },
     [animar, alturaDaTela]
   );
 
   const abrirJa = useCallback(() => {
+    cancelarPreparo();
+    coberturaAtual.current = null;
     cancelAnimation(progresso);
     progresso.set(1);
     setFase('aberta');
+    setCamadaMontada(false);
     setAberturaFeita(true);
-  }, [progresso]);
+  }, [cancelarPreparo, progresso]);
 
   const lembrarOrigem = useCallback((ponto: Ponto) => {
     origem.current = { ponto, em: Date.now() };
@@ -302,7 +353,7 @@ export function CortinaProvider({ children }: { children: ReactNode }) {
       const capa = pronto.current.destino === 'conta';
       await descobrir(
         capa ? { ...ONDA_DA_ABERTURA, ate: 'capa' } : ONDA_DA_ABERTURA,
-        show === 'completa' ? Motion.curtain.duration : Motion.curtain.short
+        Motion.curtain.duration
       );
       setAberturaFeita(true);
     })();
@@ -310,7 +361,9 @@ export function CortinaProvider({ children }: { children: ReactNode }) {
 
   const api = useMemo<CortinaApi>(
     () => ({
+      preparar,
       cobrir,
+      cobrirDaCapa,
       cobrirJa,
       revelar: (o) => descobrir(o, Motion.curtain.duration),
       abrirJa,
@@ -319,7 +372,7 @@ export function CortinaProvider({ children }: { children: ReactNode }) {
       marcarPronto,
       segurarAbertura,
     }),
-    [cobrir, cobrirJa, descobrir, abrirJa, lembrarOrigem, tomarOrigem, marcarPronto, segurarAbertura]
+    [preparar, cobrir, cobrirDaCapa, cobrirJa, descobrir, abrirJa, lembrarOrigem, tomarOrigem, marcarPronto, segurarAbertura]
   );
 
   const aoLayout = useCallback(() => {
@@ -338,7 +391,7 @@ export function CortinaProvider({ children }: { children: ReactNode }) {
         <AbertaContext.Provider value={aberturaFeita && fase === 'aberta'}>
           <SaindoContext.Provider value={fase === 'revelando' || fase === 'aberta'}>
             {children}
-            {fase === 'aberta' ? null : (
+            {fase === 'aberta' && !camadaMontada ? null : (
               <Camada
                 fase={fase}
                 onda={onda}
@@ -387,7 +440,7 @@ function Camada({
       onLayout={onLayout}
       // Enquanto cobre, a camada engole o toque (ela é o alvo, e não tem responder). Revelando,
       // o app de baixo já é o destino.
-      pointerEvents={fase === 'revelando' ? 'none' : 'auto'}
+      pointerEvents={fase === 'aberta' || fase === 'revelando' ? 'none' : 'auto'}
       accessibilityElementsHidden
       importantForAccessibility="no-hide-descendants"
       style={styles.camada}>
@@ -396,7 +449,7 @@ function Camada({
       ) : (
         <WaveCurtain
           progress={progresso}
-          fase={fase === 'cobrindo' || fase === 'coberta' ? 'cobrir' : 'revelar'}
+          fase={fase === 'cobrindo' && !onda.fromCap ? 'cobrir' : 'revelar'}
           mode={fase === 'revelando' ? onda.revealMode ?? onda.mode : onda.mode}
           origin={onda.origin}
           color={theme.curtain}

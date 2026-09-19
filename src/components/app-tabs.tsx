@@ -6,7 +6,7 @@ import { useTodayReminders } from '@/hooks/use-items';
 import { useTheme } from '@/hooks/use-theme';
 
 // No iOS 26+ a NativeTabs renderiza a tab bar nativa em Liquid Glass —
-// diretriz central de design do Personal ProOps app. SF Symbols no iOS; Material glyphs no Android.
+// diretriz central de design do ProOps. SF Symbols no iOS; Material glyphs no Android.
 const TABS = [
   { name: 'today', label: 'Hoje', sf: { default: 'sun.max', selected: 'sun.max.fill' }, md: 'today' },
   { name: 'notes', label: 'Notas', sf: { default: 'note.text', selected: 'note.text' }, md: 'description' },

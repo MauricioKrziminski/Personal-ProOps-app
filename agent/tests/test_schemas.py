@@ -136,9 +136,21 @@ def test_os_modelos_de_producao_sao_os_documentados():
 def test_sem_variavel_de_ambiente_o_modelo_nao_muda(monkeypatch):
     from app.services import gemini
 
+    monkeypatch.delenv("GEMINI_MODEL", raising=False)
     monkeypatch.delenv("GEMINI_MODEL_GATE", raising=False)
     assert gemini.modelo("gate") == "gemini-3.7-flash"
     monkeypatch.setenv("GEMINI_MODEL_GATE", "gemini-3.1-flash-lite")
+    assert gemini.modelo("gate") == "gemini-3.1-flash-lite"
+
+
+def test_gemini_model_global_troca_todos_os_papeis(monkeypatch):
+    from app.services import gemini
+
+    monkeypatch.delenv("GEMINI_MODEL_GATE", raising=False)
+    monkeypatch.setenv("GEMINI_MODEL", "gemini-3.1-flash-lite")
+    assert gemini.modelo("router") == "gemini-3.1-flash-lite"
+    assert gemini.modelo("parse") == "gemini-3.1-flash-lite"
+    assert gemini.modelo("batch") == "gemini-3.1-flash-lite"
     assert gemini.modelo("gate") == "gemini-3.1-flash-lite"
 
 

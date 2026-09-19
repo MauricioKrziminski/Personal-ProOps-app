@@ -78,7 +78,7 @@ test('a curva de tempo vai de 0 a 1 sem sair do intervalo', () => {
   for (let t = 0; t <= 1; t += 0.1) assert.ok(easeInOut(t) >= 0 && easeInOut(t) <= 1);
 });
 
-test('a capa para com a linha de base em 20% da altura', () => {
+test('a capa para com a linha de base em 17% da altura', () => {
   for (const altura of [640, 874, 956, 800, 1280]) {
     const p = progressoDaCapa(altura);
     assert.ok(p > 0 && p < 1);
