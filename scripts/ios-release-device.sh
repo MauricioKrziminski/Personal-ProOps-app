@@ -41,7 +41,9 @@ export EXPO_PUBLIC_AGENT_URL="$PROD_AGENT_URL"
 # instalado e só depois recusado já estaria no iPhone. Mesmo ambiente, mesmo comando que a fase
 # de bundle do Xcode roda (`export:embed`), numa pasta temporária.
 conferir() {
-  if ! grep -q "$PROD_REF" "$1" || grep -q "utkqoiigimqzeenxkxdl\|127.0.0.1:54321\|10.0.2.2:54321" "$1"; then
+  # URLs, não o ref solto: `lib/environment.ts` carrega o mapa ref → rótulo dos DOIS projetos.
+  if ! grep -q "https://$PROD_REF.supabase.co" "$1" ||
+    grep -q "https://utkqoiigimqzeenxkxdl.supabase.co\|agente-staging\|127.0.0.1:54321\|10.0.2.2:54321" "$1"; then
     echo "✗ O JavaScript não aponta só para a produção ($1). Nada foi instalado." >&2
     exit 1
   fi
