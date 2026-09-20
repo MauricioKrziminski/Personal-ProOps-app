@@ -72,6 +72,18 @@ def corpo(arquivo: pathlib.Path) -> str:
 
     O `begin`/`end` SEM ponto-e-vírgula dos blocos plpgsql não é controle de transação e passa
     intacto — o que se procura é a linha inteira.
+
+    ⚠️ **"A linha inteira" não bastava, e o achado é de 21/09/2026 (revisão da Tarefa 0).**
+    `select 1; commit;` numa linha só escapava: a checagem via só a linha COMPLETA, e um
+    `commit`/`rollback` dividindo espaço com outra instrução não é a linha inteira. Testado de
+    verdade contra o staging: esse arquivo saía `PASSOU:`, com um COMMIT de verdade rodando
+    dentro da transação do runner — e o `conexao.rollback()` do `finally` não desfaz nada porque
+    a transação já tinha sido fechada pelo próprio SQL. Hoje a linha também é quebrada por `;` e
+    cada SEGMENTO, normalizado (minúsculo, sem espaço nas pontas), é comparado:
+    `commit`/`rollback` sozinhos recusam, e `begin|commit|rollback|end` seguido de `transaction`
+    recusa. **`begin` e `end` SOZINHOS continuam passando** — são abridor e fechador de bloco
+    plpgsql (`begin ... end;`, `end if;`, `end loop;`, `end $$;`), e aparecem em quase todo teste
+    do repo; recusá-los quebraria os 26 arquivos existentes.
     """
     fora = {"begin;", "commit;", "rollback;"}
     limpas: list[str] = []
@@ -88,6 +100,15 @@ def corpo(arquivo: pathlib.Path) -> str:
                 f"recusado: {arquivo.name}:{numero} controla a transação fora do padrão "
                 f"(«{nua}»). Quem abre e desfaz é o runner — ver o cabeçalho."
             )
+        for pedaco in nua.split(";"):
+            piece = pedaco.strip().lower()
+            if piece in ("commit", "rollback") or re.match(
+                r"^(begin|commit|rollback|end)\s+transaction\b", piece, re.I
+            ):
+                raise SystemExit(
+                    f"recusado: {arquivo.name}:{numero} controla a transação fora do padrão "
+                    f"(«{nua}»). Quem abre e desfaz é o runner — ver o cabeçalho."
+                )
         limpas.append(linha)
     return "\n".join(limpas)
 
