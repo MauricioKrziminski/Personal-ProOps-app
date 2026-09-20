@@ -60,57 +60,155 @@ def url() -> str:
     raise SystemExit(f"sem DATABASE_URL em {arquivo}")
 
 
+def instrucoes(sql: str) -> list[str]:
+    """Quebra o SQL em instruções de nível superior — ciente de aspas, dollar-quote e comentário.
+
+    Só corta em `;` quando ele está FORA de string (`'...'`, com `''` como aspa escapada),
+    dollar-quote (`$$ ... $$` ou `$tag$ ... $tag$`, a tag tem que casar na abertura e no
+    fechamento), comentário de linha (`-- ...`) e comentário de bloco (`/* ... */`). Devolve cada
+    instrução sem os comentários de fora dessas zonas, com espaço aparado nas pontas, descartando
+    as vazias. A última instrução pode não ter `;`.
+
+    ⚠️ **Isto existe porque uma LISTA DE SINÔNIMOS falhou duas vezes seguidas** (revisão da
+    Tarefa 0, 20/09/2026): a primeira rodada cobria `commit`/`rollback` sozinhos e escapou por
+    `commit work` e `abort` (sinônimos válidos de COMMIT/ROLLBACK que a lista não conhecia) e por
+    `commit -- fecha` como última linha sem `;` (o segmento não batia com o texto exato). A
+    terceira lentidão seria `end work` ou `prepare transaction` — sempre mais um sinônimo que
+    ninguém lembrou. Um PARSER que separa instruções de verdade não depende de conhecer o nome de
+    cada comando: quem decide se algo é "controle de transação" é `_encerra_transacao`, pela
+    PRIMEIRA PALAVRA da instrução — aqui só a separação precisa estar certa.
+
+    Dentro de `do $$ ... $$`, nada é examinado: o texto inteiro entre as tags é UMA instrução
+    opaca, então `begin`/`end`/`;` internos (inclusive dentro de uma string como
+    `raise notice 'a;commit;b'`) nunca viram instruções separadas. É isso que torna a regra certa
+    sem precisar abrir exceção para `begin`/`end` soltos — eles só aparecem aqui como instrução de
+    nível superior quando SÃO de nível superior de verdade.
+    """
+    partes: list[str] = []
+    buffer: list[str] = []
+    tag_dolar: str | None = None
+    dentro_de_string = False
+    i, n = 0, len(sql)
+
+    def fechar() -> None:
+        texto = "".join(buffer).strip()
+        if texto:
+            partes.append(texto)
+        buffer.clear()
+
+    while i < n:
+        ch = sql[i]
+
+        if tag_dolar is not None:
+            fechador = f"${tag_dolar}$"
+            if sql.startswith(fechador, i):
+                buffer.append(fechador)
+                i += len(fechador)
+                tag_dolar = None
+            else:
+                buffer.append(ch)
+                i += 1
+            continue
+
+        if dentro_de_string:
+            if ch == "'" and sql[i : i + 2] == "''":
+                buffer.append("''")
+                i += 2
+                continue
+            buffer.append(ch)
+            i += 1
+            if ch == "'":
+                dentro_de_string = False
+            continue
+
+        if ch == "'":
+            dentro_de_string = True
+            buffer.append(ch)
+            i += 1
+            continue
+
+        m = re.match(r"\$([A-Za-z0-9_]*)\$", sql[i:])
+        if m:
+            tag_dolar = m.group(1)
+            buffer.append(m.group(0))
+            i += len(m.group(0))
+            continue
+
+        if sql[i : i + 2] == "--":
+            fim = sql.find("\n", i)
+            i = n if fim == -1 else fim
+            continue
+
+        if sql[i : i + 2] == "/*":
+            fim = sql.find("*/", i + 2)
+            i = n if fim == -1 else fim + 2
+            continue
+
+        if ch == ";":
+            fechar()
+            i += 1
+            continue
+
+        buffer.append(ch)
+        i += 1
+
+    fechar()
+    return partes
+
+
+_PALAVRAS_QUE_ENCERRAM = {"commit", "end", "abort", "rollback", "begin"}
+_FRASES_QUE_ENCERRAM = {"start transaction", "prepare transaction"}
+
+
+def _encerra_transacao(normalizada: str) -> bool:
+    """A instrução (já em minúsculo, espaços colapsados) controla a transação por fora daqui?
+
+    Decide pela PRIMEIRA PALAVRA, contra a lista finita do Postgres — `commit` cobre sozinho
+    `commit work`/`commit transaction`/`commit and chain`/`commit prepared` sem precisar listar
+    cada um. `rollback to savepoint x` é a única exceção dentro de `rollback`: ele NÃO encerra a
+    transação, move um savepoint.
+    """
+    palavras = normalizada.split(" ")
+    primeira = palavras[0] if palavras else ""
+    if primeira == "rollback" and normalizada.startswith("rollback to"):
+        return False
+    if primeira in _PALAVRAS_QUE_ENCERRAM:
+        return True
+    return " ".join(palavras[:2]) in _FRASES_QUE_ENCERRAM
+
+
 def corpo(arquivo: pathlib.Path) -> str:
-    """O SQL sem as diretivas do psql e sem o controle de transação do próprio arquivo.
+    """O SQL sem as diretivas do psql, sem o controle de transação do próprio arquivo — e sem
+    NENHUMA outra instrução de nível superior que controle a transação por fora do runner.
 
-    ⚠️ **Controle de transação fora do padrão é RECUSA, nunca filtro silencioso.** Tirar só a
-    linha que casa exatamente `begin;`/`commit;`/`rollback;` deixa passar `COMMIT ;`,
-    `commit; -- fecha` e qualquer variação — e um `commit` que passa GRAVA no staging, onde o
-    rollback de fora não alcança mais. Conferido em 20/09/2026: nenhum dos 28 arquivos de
-    `supabase/tests/` tem `commit;` hoje. É por isso mesmo que a trava entra agora, antes de o
-    primeiro aparecer.
-
-    O `begin`/`end` SEM ponto-e-vírgula dos blocos plpgsql não é controle de transação e passa
-    intacto — o que se procura é a linha inteira.
-
-    ⚠️ **"A linha inteira" não bastava, e o achado é de 21/09/2026 (revisão da Tarefa 0).**
-    `select 1; commit;` numa linha só escapava: a checagem via só a linha COMPLETA, e um
-    `commit`/`rollback` dividindo espaço com outra instrução não é a linha inteira. Testado de
-    verdade contra o staging: esse arquivo saía `PASSOU:`, com um COMMIT de verdade rodando
-    dentro da transação do runner — e o `conexao.rollback()` do `finally` não desfaz nada porque
-    a transação já tinha sido fechada pelo próprio SQL. Hoje a linha também é quebrada por `;` e
-    cada SEGMENTO, normalizado (minúsculo, sem espaço nas pontas), é comparado:
-    `commit`/`rollback` sozinhos recusam, e `begin|commit|rollback|end` seguido de `transaction`
-    recusa. **`begin` e `end` SOZINHOS continuam passando** — são abridor e fechador de bloco
-    plpgsql (`begin ... end;`, `end if;`, `end loop;`, `end $$;`), e aparecem em quase todo teste
-    do repo; recusá-los quebraria os 26 arquivos existentes.
+    O `begin;`/`commit;`/`rollback;` do cabeçalho/rodapé do arquivo, sozinhos na LINHA (o padrão
+    de todo teste do repo), são removidos aqui — igual sempre foi. Tudo mais passa por
+    `instrucoes()` e por `_encerra_transacao`: qualquer instrução de nível superior que comece
+    com um verbo que encerra transação é RECUSA, nunca filtro silencioso — inclusive quando ela
+    compartilha linha com outra instrução (`select 1; commit;`), usa sinônimo (`commit work`,
+    `abort`) ou não tem `;` porque a linha acabou num comentário (`commit -- fecha`).
     """
     fora = {"begin;", "commit;", "rollback;"}
-    limpas: list[str] = []
-    for numero, linha in enumerate(arquivo.read_text().splitlines(), 1):
+    linhas: list[str] = []
+    for linha in arquivo.read_text().splitlines():
         nua = linha.strip()
         if nua.startswith("\\"):
             continue
         if nua.lower() in fora:
             continue
-        if re.match(r"^(begin|commit|rollback|end)\s+transaction\b", nua, re.I) or re.match(
-            r"^(commit|rollback)\s*;\s*(--.*)?$", nua, re.I
-        ):
+        linhas.append(linha)
+    texto = "\n".join(linhas)
+
+    aceitas: list[str] = []
+    for instrucao in instrucoes(texto):
+        normalizada = re.sub(r"\s+", " ", instrucao.strip().lower())
+        if _encerra_transacao(normalizada):
             raise SystemExit(
-                f"recusado: {arquivo.name}:{numero} controla a transação fora do padrão "
-                f"(«{nua}»). Quem abre e desfaz é o runner — ver o cabeçalho."
+                f"recusado: {arquivo.name} controla a transação fora do padrão "
+                f"(«{instrucao.strip()}»). Quem abre e desfaz é o runner — ver o cabeçalho."
             )
-        for pedaco in nua.split(";"):
-            piece = pedaco.strip().lower()
-            if piece in ("commit", "rollback") or re.match(
-                r"^(begin|commit|rollback|end)\s+transaction\b", piece, re.I
-            ):
-                raise SystemExit(
-                    f"recusado: {arquivo.name}:{numero} controla a transação fora do padrão "
-                    f"(«{nua}»). Quem abre e desfaz é o runner — ver o cabeçalho."
-                )
-        limpas.append(linha)
-    return "\n".join(limpas)
+        aceitas.append(instrucao)
+    return "\n".join(f"{i};" for i in aceitas)
 
 
 def main() -> None:
@@ -125,18 +223,37 @@ def main() -> None:
     conexao = psycopg.connect(url(), connect_timeout=20, autocommit=False)
     conexao.add_notice_handler(lambda aviso: avisos.append(aviso.message_primary))
     falhou: str | None = None
+    encerrou_sozinha = False
     try:
         with conexao.cursor() as cursor:
             cursor.execute("set local timezone to 'America/Sao_Paulo'")
             cursor.execute(corpo(arquivo))
+        # ⚠️ Defesa em profundidade, independente do parser (revisão da Tarefa 0, 20/09/2026):
+        # `instrucoes()` + `_encerra_transacao` são o que TEMOS, não o que o Postgres aceita — já
+        # foi lista de duas palavras, depois de cinco, e a próxima rodada seria a sexta. Isto não
+        # depende de o parser ter acertado a sintaxe certa: com `autocommit=False`, a transação
+        # TEM que continuar aberta (`INTRANS`) depois de qualquer SQL que rodou sem erro. Se ela
+        # virou `IDLE`, alguma coisa a encerrou por fora daqui — não importa como foi escrita —,
+        # e o que veio antes já pode estar gravado (`conexao.rollback()` do `finally` não desfaz
+        # um commit que já aconteceu). `INERROR` é outro caminho (uma exceção foi levantada) e já
+        # cai no `FALHOU` de baixo — não confundir os dois.
+        if conexao.info.transaction_status == psycopg.pq.TransactionStatus.IDLE:
+            encerrou_sozinha = True
     except Exception as erro:  # noqa: BLE001 — qualquer falha é falha do teste
         falhou = f"{type(erro).__name__}: {erro}"
     finally:
-        # Nesta ordem, e em QUALQUER saída: é o que garante que nada ficou gravado.
+        # Nesta ordem, e em QUALQUER saída: é o que garante que nada ficou gravado (quando ainda
+        # havia o que desfazer — ver o ⚠️ acima para o caso em que já era tarde).
         conexao.rollback()
         conexao.close()
 
     print("\n".join(avisos))
+    if encerrou_sozinha:
+        print(
+            f"FALHOU: {arquivo.name} encerrou a transação por conta própria — o que veio antes "
+            f"do fim PODE TER SIDO GRAVADO no staging. Confira à mão."
+        )
+        sys.exit(1)
     if falhou:
         print(f"FALHOU: {arquivo.name}\n  {falhou}")
         sys.exit(1)
