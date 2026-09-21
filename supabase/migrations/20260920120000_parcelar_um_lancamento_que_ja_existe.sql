@@ -50,11 +50,17 @@
 -- e continua sem.
 
 -- --------------------------------------------------------------------------
--- o valor de UMA parcela — uma régua, três chamadores
+-- o valor de UMA parcela — régua da edição e da conversão
 -- --------------------------------------------------------------------------
--- A conta estava escrita à mão em `create_installment_plan_with_history` e em
--- `update_installment_plan`; com a conversão seriam TRÊS cópias da mesma expressão, e o modo de
--- falha dela é mudo: um total que deixa de ser a soma do que está embaixo dele.
+-- A conta estava escrita à mão em `update_installment_plan`; com a conversão seriam DUAS cópias
+-- da mesma expressão, e o modo de falha dela é mudo: um total que deixa de ser a soma do que está
+-- embaixo dele.
+--
+-- ⚠️ **`create_installment_plan_with_history` (a CRIAÇÃO) continua com a expressão inline**
+-- (`20260915190000_a_parcela_herda_o_nome_do_estabelecimento.sql:89`) — ela não foi tocada aqui,
+-- de propósito: está fora do escopo desta tarefa. Restam DUAS cópias da conta, não zero, e
+-- unificá-las é migration própria, com `reparcelar_a_compra.sql` como não-regressão (ele cria
+-- planos por essa função em 6 pontos).
 create or replace function private.valor_da_parcela(
   p_total_cents bigint, p_installments int, p_indice int
 )
@@ -75,7 +81,7 @@ revoke execute on function private.valor_da_parcela(bigint, int, int) from publi
 grant execute on function private.valor_da_parcela(bigint, int, int) to authenticated, service_role;
 
 comment on function private.valor_da_parcela(bigint, int, int) is
-  'O valor da i-ésima parcela: divisão inteira, com o resto na última. Régua única da criação, da edição e da conversão.';
+  'O valor da i-ésima parcela: divisão inteira, com o resto na última. Régua da edição e da conversão. A criação ainda tem a cópia dela em create_installment_plan_with_history (20260915190000:89) — unificar é migration própria.';
 
 -- --------------------------------------------------------------------------
 -- converter: o lançamento que existe vira a parcela 1 de uma compra parcelada
@@ -287,17 +293,24 @@ begin
    * errada.** O comentário da `20260915210000` dizia que o `for update` no plano protegia contra
    * "um `pay_invoice` que commita no meio". Ele NÃO protege: `pay_invoice` escreve em
    * `card_invoices` e em `transactions` e **nunca toca em `installment_plans`** (conferido na
-   * `20260911070000`), então o lock não serializa nada.
+   * `20260911070000`), então o lock no plano não serializa nada.
    *
-   * A janela real: mede `travadas = 0` → um `pay_invoice` concorrente commita na fatura de uma
-   * parcela irmã (soma `paid_cents`, marca as linhas) → o `update`/`delete` daqui mexe numa linha
-   * de fatura já paga → `private.invoice_open_cents` (`sum(linhas) − paid_cents`) fica NEGATIVO e
-   * `pay_invoice` passa a recusar a quitação com `aberto <= 0`. A fatura fica impossível de
-   * fechar, sem uma linha de erro em lugar nenhum — é o terceiro caso de `parcela_travada`,
-   * justamente o que o cabeçalho da `20260915210000` chama de "o que não aparece em teste nenhum".
+   * ⚠️ **E este `perform … for update` nas linhas TAMBÉM não fecha a janela inteira — só metade
+   * dela.** `pay_invoice` (`20260909060000_partial_invoice_payment.sql:107-128`) tem dois ramos:
+   * a QUITAÇÃO (`valor = aberto`) faz `update transactions set status = 'cleared' … where
+   * invoice_id = …`, e É NESSE ramo que travar as linhas serializa — ele espera este lock, e o
+   * `if exists (…parcela_travada…)` no fim vê o estado final certo. O pagamento PARCIAL
+   * (`paid_cents > 0`, o terceiro caso de `parcela_travada`) **nunca toca em `transactions`**: ele
+   * só faz `insert` da transferência e `update card_invoices set paid_cents = paid_cents + valor`
+   * — trocar o lock para `card_invoices` também não fecharia, porque `pay_invoice` lê `aberto` num
+   * `select ci.* from card_invoices ci …` SEM lock (linha 79) antes de decidir o ramo, e só toca a
+   * linha da fatura no `update paid_cents` (linha 115); bloqueado ali, ele não relê `aberto`.
    *
-   * Travando as LINHAS antes de medir, o `pay_invoice` concorrente espera. `for update` não vale
-   * em consulta com agregado, então é um `perform` à parte.
+   * Isto NÃO é regressão: o código anterior (`20260915210000`) estava igualmente exposto a este
+   * caso — nenhuma versão travou a fatura. Fechar a janela do pagamento parcial exige `for update`
+   * no `select ci.*` inicial de `pay_invoice`, que é outra migration.
+   *
+   * `for update` não vale em consulta com agregado, então travar as linhas é um `perform` à parte.
    */
   perform 1 from public.transactions t
    where t.installment_plan_id = p_plan_id and t.workspace_id = plano.workspace_id
@@ -472,6 +485,16 @@ begin
       end if;
     end loop;
 
+    /*
+     * ⚠️ **`travadas = 0` fala do estado de ANTES, não do destino.** Recuar a data da primeira
+     * parcela (ou trocar o cartão) faz o `set_invoice` pendurar uma parcela `pending` numa
+     * fatura que já foi paga, adiada ou parcialmente paga — e ali ela some de toda leitura de
+     * caixa, porque todas filtram `status not in ('paid','rolled')`. É o espelho do bug que a
+     * `20260909071000` fechou no caminho da edição com escopo.
+     *
+     * A checagem reaproveita a régua: depois de reescrever, nenhuma parcela deste plano pode
+     * estar travada — se estiver, ela caiu num lugar fechado e a transação inteira volta.
+     */
     if exists (
       select 1 from public.transactions t
       where t.installment_plan_id = p_plan_id

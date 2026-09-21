@@ -166,12 +166,14 @@ begin
   end if;
 
   -- 4a. e com parcela paga o número de parcelas trava — inclusive para dissolver.
+  --     ⚠️ a frase confere 'o número de parcelas não muda mais', não só 'não muda mais': essa
+  --     segunda aparece em TRÊS mensagens (número, data, conta) e passaria com qualquer uma.
   begin
     perform public.update_installment_plan(plano, 30000, 1, '2026-06-05', 'Pneu', null, null, corrente);
     raise exception 'FALHOU: 4a. dissolver com parcela paga tinha que ser recusado';
   exception when others then
-    if sqlerrm like 'FALHOU:%' or position('não muda mais' in sqlerrm) = 0 then
-      raise exception '4a. recusa errada (esperava «não muda mais»): %', sqlerrm;
+    if sqlerrm like 'FALHOU:%' or position('o número de parcelas não muda mais' in sqlerrm) = 0 then
+      raise exception '4a. recusa errada (esperava «o número de parcelas não muda mais»): %', sqlerrm;
     end if;
   end;
 
@@ -427,9 +429,55 @@ begin
       raise exception '9. recusa errada: %', sqlerrm;
     end if;
   end;
+
+  -- ══ 10. o pós-check do DISSOLVE, e o piso/teto do `update_installment_plan` ══════
+  --     `fat` continua `paid` deste grupo 9. Sem este bloco, apagar o `if
+  --     (select private.parcela_travada('pending', t.invoice_id) …) then raise` inteiro do
+  --     ramo `p_installments = 1` deixaria `converter_parcelamento.sql` verde do mesmo jeito —
+  --     os dissolves dos casos 3 e 8c usam a data ORIGINAL e nunca trocam de fatura.
+  insert into public.transactions
+    (workspace_id, user_id, kind, amount_cents, description, account_id, occurred_at, source, status)
+  values (ws, usr, 'expense', 30000, 'Espelho', cartao, '2026-12-05', 'app', 'pending')
+  returning id into tx;
+  plano := public.convert_transaction_to_installments(tx, 30000, 3, '2026-12-05', 'Espelho', null, null, cartao);
+
+  -- 10a. dissolver jogando o sobrevivente para dentro da fatura de `fat`, que está `paid`.
+  begin
+    perform public.update_installment_plan(
+      plano, 30000, 1,
+      (select closing_date - 1 from public.card_invoices where id = fat),
+      'Espelho', null, null, cartao);
+    raise exception 'FALHOU: 10a. dissolver jogando a linha em fatura fechada tinha que ser recusado';
+  exception when others then
+    if sqlerrm like 'FALHOU:%' or position('fatura já fechada' in sqlerrm) = 0 then
+      raise exception '10a. recusa errada: %', sqlerrm;
+    end if;
+  end;
+
+  -- 10b. o piso: 0 não é "à vista", é ausência de parcela — e sem esta trava
+  --      `for i in 1..0 loop` não roda e o `delete` apagaria TODAS as parcelas.
+  begin
+    perform public.update_installment_plan(plano, 30000, 0, '2026-12-05', 'Espelho', null, null, cartao);
+    raise exception 'FALHOU: 10b. 0 parcelas tinha que ser recusado';
+  exception when others then
+    if sqlerrm like 'FALHOU:%' or position('entre 1 e 72' in sqlerrm) = 0 then
+      raise exception '10b. recusa errada: %', sqlerrm;
+    end if;
+  end;
+
+  -- 10c. o teto: 73 passa do limite também na edição, não só na conversão.
+  begin
+    perform public.update_installment_plan(plano, 730000, 73, '2026-12-05', 'Espelho', null, null, cartao);
+    raise exception 'FALHOU: 10c. 73 parcelas tinha que ser recusado';
+  exception when others then
+    if sqlerrm like 'FALHOU:%' or position('entre 1 e 72' in sqlerrm) = 0 then
+      raise exception '10c. recusa errada: %', sqlerrm;
+    end if;
+  end;
+
   update public.card_invoices set status = 'open', paid_at = null where id = fat;
 
-  raise notice 'OK: converter e dissolver — 9 grupos de asserção';
+  raise notice 'OK: converter e dissolver — 10 grupos de asserção';
 end $$;
 
 rollback;
