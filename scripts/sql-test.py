@@ -41,6 +41,7 @@ from __future__ import annotations
 import pathlib
 import re
 import sys
+import uuid
 
 import psycopg
 
@@ -60,34 +61,53 @@ def url() -> str:
     raise SystemExit(f"sem DATABASE_URL em {arquivo}")
 
 
+def _prefixo_e(sql: str, i: int) -> bool:
+    """A aspa simples em `sql[i]` abre uma escape string (`E'...'`)?
+
+    Só backslash DENTRO de `E'...'` escapa. Com `standard_conforming_strings=on` (o padrão do
+    Supabase), `'a\\'` FECHA a string comum — tratar barra como escape ali seria o espelho do
+    bug: o lexer engoliria um `commit` que o Postgres executa de verdade.
+    """
+    if i == 0 or sql[i - 1] not in ("E", "e"):
+        return False
+    if i >= 2 and (sql[i - 2].isalnum() or sql[i - 2] == "_"):
+        return False  # o "e" é o fim de outro identificador (ex.: `type'`), não um prefixo
+    return True
+
+
 def instrucoes(sql: str) -> list[str]:
     """Quebra o SQL em instruções de nível superior — ciente de aspas, dollar-quote e comentário.
 
-    Só corta em `;` quando ele está FORA de string (`'...'`, com `''` como aspa escapada),
-    dollar-quote (`$$ ... $$` ou `$tag$ ... $tag$`, a tag tem que casar na abertura e no
-    fechamento), comentário de linha (`-- ...`) e comentário de bloco (`/* ... */`). Devolve cada
-    instrução sem os comentários de fora dessas zonas, com espaço aparado nas pontas, descartando
-    as vazias. A última instrução pode não ter `;`.
+    Só corta em `;` quando ele está FORA de: string (`'...'`, com `''` como aspa escapada e
+    backslash como escape adicional só dentro de `E'...'`), identificador entre aspas duplas
+    (`"..."`, com `""` como aspa escapada), dollar-quote (`$$ ... $$` ou `$tag$ ... $tag$`, tag
+    casada na abertura e no fechamento) e comentário — de linha (`-- ...`) ou de bloco
+    (`/* ... */`, com profundidade: o Postgres aceita `/* /* */ */` aninhado). Devolve cada
+    instrução sem os comentários de fora dessas zonas, com espaço aparado, descartando vazias. A
+    última instrução pode não ter `;`.
 
-    ⚠️ **Isto existe porque uma LISTA DE SINÔNIMOS falhou duas vezes seguidas** (revisão da
-    Tarefa 0, 20/09/2026): a primeira rodada cobria `commit`/`rollback` sozinhos e escapou por
-    `commit work` e `abort` (sinônimos válidos de COMMIT/ROLLBACK que a lista não conhecia) e por
-    `commit -- fecha` como última linha sem `;` (o segmento não batia com o texto exato). A
-    terceira lentidão seria `end work` ou `prepare transaction` — sempre mais um sinônimo que
-    ninguém lembrou. Um PARSER que separa instruções de verdade não depende de conhecer o nome de
-    cada comando: quem decide se algo é "controle de transação" é `_encerra_transacao`, pela
-    PRIMEIRA PALAVRA da instrução — aqui só a separação precisa estar certa.
+    ⚠️ **Isto NÃO é fronteira de segurança — é só onde `corpo()` tenta cortar.** Já foi lista de
+    sinônimos (round 1/2 da Tarefa 0, 20/09/2026) e virou parser; o parser também escapou —
+    `select 1 as "x'y", 2; commit; begin; ...` (aspas duplas não existiam aqui), `E'a\\' b'`
+    (backslash não tratado) e `1 as x$y$` (`$` é caractere válido de identificador e não abria
+    dollar-quote de propósito nenhum: o lexer entrava em dollar-quote por engano, engolindo o
+    `commit; begin;` escondido). Escrever um lexer de SQL 100% correto é a MESMA corrida dos
+    sinônimos, só mais cara — por isso quem garante que nada escapa não é este parser, é o
+    Postgres: `main()` executa cada instrução daqui, uma por vez, com `prepare=True`, e um corte
+    ERRADO vira erro do servidor (`cannot insert multiple commands into a prepared statement`),
+    não um escape. Os três consertos abaixo (aspas duplas, guarda do dollar-quote, profundidade do
+    comentário) reduzem quanto SQL legítimo cai nesse erro chato — não são a trava.
 
     Dentro de `do $$ ... $$`, nada é examinado: o texto inteiro entre as tags é UMA instrução
     opaca, então `begin`/`end`/`;` internos (inclusive dentro de uma string como
-    `raise notice 'a;commit;b'`) nunca viram instruções separadas. É isso que torna a regra certa
-    sem precisar abrir exceção para `begin`/`end` soltos — eles só aparecem aqui como instrução de
-    nível superior quando SÃO de nível superior de verdade.
+    `raise notice 'a;commit;b'`) nunca viram instruções separadas.
     """
     partes: list[str] = []
     buffer: list[str] = []
     tag_dolar: str | None = None
     dentro_de_string = False
+    string_escapada = False
+    dentro_de_aspas_duplas = False
     i, n = 0, len(sql)
 
     def fechar() -> None:
@@ -110,7 +130,23 @@ def instrucoes(sql: str) -> list[str]:
                 i += 1
             continue
 
+        if dentro_de_aspas_duplas:
+            if ch == '"' and sql[i : i + 2] == '""':
+                buffer.append('""')
+                i += 2
+                continue
+            buffer.append(ch)
+            i += 1
+            if ch == '"':
+                dentro_de_aspas_duplas = False
+            continue
+
         if dentro_de_string:
+            if string_escapada and ch == "\\" and i + 1 < n:
+                buffer.append(ch)
+                buffer.append(sql[i + 1])
+                i += 2
+                continue
             if ch == "'" and sql[i : i + 2] == "''":
                 buffer.append("''")
                 i += 2
@@ -121,18 +157,32 @@ def instrucoes(sql: str) -> list[str]:
                 dentro_de_string = False
             continue
 
-        if ch == "'":
-            dentro_de_string = True
+        if ch == '"':
+            dentro_de_aspas_duplas = True
             buffer.append(ch)
             i += 1
             continue
 
-        m = re.match(r"\$([A-Za-z0-9_]*)\$", sql[i:])
-        if m:
-            tag_dolar = m.group(1)
-            buffer.append(m.group(0))
-            i += len(m.group(0))
+        if ch == "'":
+            dentro_de_string = True
+            string_escapada = _prefixo_e(sql, i)
+            buffer.append(ch)
+            i += 1
             continue
+
+        if ch == "$":
+            anterior = sql[i - 1] if i > 0 else ""
+            # ⚠️ `$` é caractere VÁLIDO de identificador em Postgres (depois do primeiro
+            # caractere) — `x$y$` é um nome só, não abre dollar-quote. Só tenta abrir quando o
+            # caractere anterior não poderia ser parte do mesmo identificador, e a tag (se
+            # houver) não começa com dígito — a mesma regra do Postgres para o nome da tag.
+            if not re.match(r"[A-Za-z0-9_$]", anterior):
+                m = re.match(r"\$([A-Za-z_][A-Za-z0-9_]*)?\$", sql[i:])
+                if m:
+                    tag_dolar = m.group(1) or ""
+                    buffer.append(m.group(0))
+                    i += len(m.group(0))
+                    continue
 
         if sql[i : i + 2] == "--":
             fim = sql.find("\n", i)
@@ -140,8 +190,17 @@ def instrucoes(sql: str) -> list[str]:
             continue
 
         if sql[i : i + 2] == "/*":
-            fim = sql.find("*/", i + 2)
-            i = n if fim == -1 else fim + 2
+            profundidade = 1
+            i += 2
+            while i < n and profundidade > 0:
+                if sql[i : i + 2] == "/*":
+                    profundidade += 1
+                    i += 2
+                elif sql[i : i + 2] == "*/":
+                    profundidade -= 1
+                    i += 2
+                else:
+                    i += 1
             continue
 
         if ch == ";":
@@ -177,38 +236,58 @@ def _encerra_transacao(normalizada: str) -> bool:
     return " ".join(palavras[:2]) in _FRASES_QUE_ENCERRAM
 
 
-def corpo(arquivo: pathlib.Path) -> str:
-    """O SQL sem as diretivas do psql, sem o controle de transação do próprio arquivo — e sem
-    NENHUMA outra instrução de nível superior que controle a transação por fora do runner.
+def corpo(arquivo: pathlib.Path) -> list[str]:
+    """A LISTA de instruções que `main()` vai executar, uma por vez com `prepare=True`.
 
-    O `begin;`/`commit;`/`rollback;` do cabeçalho/rodapé do arquivo, sozinhos na LINHA (o padrão
-    de todo teste do repo), são removidos aqui — igual sempre foi. Tudo mais passa por
-    `instrucoes()` e por `_encerra_transacao`: qualquer instrução de nível superior que comece
-    com um verbo que encerra transação é RECUSA, nunca filtro silencioso — inclusive quando ela
-    compartilha linha com outra instrução (`select 1; commit;`), usa sinônimo (`commit work`,
-    `abort`) ou não tem `;` porque a linha acabou num comentário (`commit -- fecha`).
+    Um `begin` exato (a instrução inteira, normalizada) ABRE o boilerplate do próprio arquivo — é
+    removido, nunca enviado ao Postgres, igual sempre foi. Enquanto estiver aberto, um
+    `commit`/`rollback` exato FECHA — também removido. Fora dessas duas transições (um
+    `begin` enquanto JÁ está aberto, ou um `commit`/`rollback` enquanto NÃO está aberto), a mesma
+    palavra é RECUSA — nunca filtro silencioso.
+
+    ⚠️ **Por que par ABERTO/FECHADO, e não "só a PRIMEIRA instrução pode ser begin, só a ÚLTIMA
+    pode ser commit/rollback"** (a régua mais simples, testada e devolvida): dois arquivos REAIS
+    do repo quebram com ela. `import_near_match.sql` tem DOIS blocos `begin;...rollback;`
+    sequenciais no mesmo arquivo (um por cenário, para não vazar dado de um teste para o outro) —
+    o segundo `begin;` não é a primeira instrução, seria recusado. `agent_migrations.sql` tem um
+    `rollback;` no MEIO (fecha uma seção "0040/0041 verificadas" antiga; seções novas foram
+    acrescentadas depois, sem mover o fechamento) — não é a última instrução, o `begin;` de
+    abertura seria recusado por não ter par ao final. Isso não é inseguro de relaxar: uma
+    instrução classificada como boilerplate é DESCARTADA, nunca chega a rodar como SQL de
+    verdade contra o Postgres — não existe um COMMIT real "a mais" só porque o par apareceu de
+    novo no meio do arquivo. O que teria que continuar impossível — e continua — é `commit`/
+    `rollback`/`begin` aparecerem FORA de uma transição de par válida (a régua que pega
+    `select 1; commit;`: nunca existiu um `begin` aberto antes daquele `commit`).
     """
-    fora = {"begin;", "commit;", "rollback;"}
     linhas: list[str] = []
     for linha in arquivo.read_text().splitlines():
         nua = linha.strip()
         if nua.startswith("\\"):
             continue
-        if nua.lower() in fora:
-            continue
         linhas.append(linha)
     texto = "\n".join(linhas)
 
+    todas = instrucoes(texto)
+    total = len(todas)
     aceitas: list[str] = []
-    for instrucao in instrucoes(texto):
+    aberto = False
+    for indice, instrucao in enumerate(todas):
         normalizada = re.sub(r"\s+", " ", instrucao.strip().lower())
+        if not aberto and normalizada == "begin":
+            aberto = True
+            continue
+        if aberto and normalizada in ("commit", "rollback"):
+            aberto = False
+            continue
         if _encerra_transacao(normalizada):
+            trecho = instrucao.strip()[:60]
             raise SystemExit(
-                f"recusado: {arquivo.name} controla a transação fora do padrão "
-                f"(«{instrucao.strip()}»). Quem abre e desfaz é o runner — ver o cabeçalho."
+                f"recusado: {arquivo.name}, instrução {indice + 1}/{total} controla a "
+                f"transação fora do padrão («{trecho}»). Quem abre e desfaz é o runner — ver "
+                f"o cabeçalho."
             )
         aceitas.append(instrucao)
-    return "\n".join(f"{i};" for i in aceitas)
+    return aceitas
 
 
 def main() -> None:
@@ -218,32 +297,59 @@ def main() -> None:
     if not arquivo.is_file():
         raise SystemExit(f"não achei {arquivo}")
 
+    # Pode recusar (SystemExit) sem ter tocado o banco — o lexer ainda decide onde cortar.
+    aceitas = corpo(arquivo)
+    total = len(aceitas)
+
     avisos: list[str] = []
     # ⚠️ SEM `with` na conexão, de propósito — ver o ⚠️ do cabeçalho.
     conexao = psycopg.connect(url(), connect_timeout=20, autocommit=False)
     conexao.add_notice_handler(lambda aviso: avisos.append(aviso.message_primary))
+    marca = uuid.uuid4().hex
     falhou: str | None = None
     encerrou_sozinha = False
+    indice_atual = 0
     try:
         with conexao.cursor() as cursor:
             cursor.execute("set local timezone to 'America/Sao_Paulo'")
-            cursor.execute(corpo(arquivo))
-        # ⚠️ Defesa em profundidade, independente do parser (revisão da Tarefa 0, 20/09/2026):
-        # `instrucoes()` + `_encerra_transacao` são o que TEMOS, não o que o Postgres aceita — já
-        # foi lista de duas palavras, depois de cinco, e a próxima rodada seria a sexta. Isto não
-        # depende de o parser ter acertado a sintaxe certa: com `autocommit=False`, a transação
-        # TEM que continuar aberta (`INTRANS`) depois de qualquer SQL que rodou sem erro. Se ela
-        # virou `IDLE`, alguma coisa a encerrou por fora daqui — não importa como foi escrita —,
-        # e o que veio antes já pode estar gravado (`conexao.rollback()` do `finally` não desfaz
-        # um commit que já aconteceu). `INERROR` é outro caminho (uma exceção foi levantada) e já
-        # cai no `FALHOU` de baixo — não confundir os dois.
-        if conexao.info.transaction_status == psycopg.pq.TransactionStatus.IDLE:
-            encerrou_sozinha = True
+            # ⚠️ Camada 2 (revisão da Tarefa 0, round 3): um marcador ALEATÓRIO por execução,
+            # gravado com `SET LOCAL`. Qualquer COMMIT descarta um `SET LOCAL` — inclusive um
+            # `begin` escondido logo em seguida, que abriria uma transação NOVA sem o marcador.
+            # Sorteado a cada execução: com valor fixo, um arquivo malicioso forjaria o
+            # `set_config` depois do commit escondido e a comparação passaria calada.
+            cursor.execute("select set_config('sql_test.marca', %s, true)", (marca,))
+            for indice_atual, instrucao in enumerate(aceitas, 1):
+                # ⚠️ Camada 1: cada instrução roda SOZINHA, com `prepare=True` (protocolo
+                # estendido). O revisor MEDIU: o servidor recusa mais de um comando por Parse
+                # (`cannot insert multiple commands into a prepared statement`) — um corte
+                # ERRADO do lexer (`instrucoes()` continua decidindo onde cortar) deixa de ser
+                # um escape e vira um erro do servidor, nunca SQL rodando sem passar pela
+                # checagem de `_encerra_transacao`.
+                cursor.execute(instrucao, prepare=True)
+            cursor.execute("select current_setting('sql_test.marca', true)")
+            valor = (cursor.fetchone() or [None])[0]
+            # ⚠️ `!= marca`, nunca `is None`: `current_setting(..., true)` devolve `''` (vazio),
+            # não `null`, quando a config não existe mais.
+            if valor != marca:
+                encerrou_sozinha = True
+            # Camada 3 (round 2, mantida): independente das outras duas. Com `autocommit=False`
+            # a transação TEM que continuar `INTRANS`; se virou `IDLE`, algo a encerrou por
+            # fora — não importa como foi escrito. `INERROR` (uma exceção foi levantada) já cai
+            # no `FALHOU` de baixo, não se confunde com este caminho.
+            elif conexao.info.transaction_status == psycopg.pq.TransactionStatus.IDLE:
+                encerrou_sozinha = True
     except Exception as erro:  # noqa: BLE001 — qualquer falha é falha do teste
-        falhou = f"{type(erro).__name__}: {erro}"
+        if indice_atual:
+            trecho = aceitas[indice_atual - 1].strip()[:60]
+            falhou = (
+                f"instrução {indice_atual}/{total} («{trecho}»): "
+                f"{type(erro).__name__}: {erro}"
+            )
+        else:
+            falhou = f"{type(erro).__name__}: {erro}"
     finally:
         # Nesta ordem, e em QUALQUER saída: é o que garante que nada ficou gravado (quando ainda
-        # havia o que desfazer — ver o ⚠️ acima para o caso em que já era tarde).
+        # havia o que desfazer — as três camadas acima existem para o caso em que já era tarde).
         conexao.rollback()
         conexao.close()
 
@@ -251,7 +357,7 @@ def main() -> None:
     if encerrou_sozinha:
         print(
             f"FALHOU: {arquivo.name} encerrou a transação por conta própria — o que veio antes "
-            f"do fim PODE TER SIDO GRAVADO no staging. Confira à mão."
+            f"PODE TER SIDO GRAVADO no staging. Confira à mão."
         )
         sys.exit(1)
     if falhou:
