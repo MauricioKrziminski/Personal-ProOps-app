@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { debtTerm, validRecurringRange, simpleDebtValues } from './finance-form.ts';
+import { debtTerm, validRecurringRange, simpleDebtValues, destinoDoSalvar, podeParcelar, temContrato } from './finance-form.ts';
 test('remaining installments are added to already paid, never subtracted twice', () => {
   assert.equal(debtTerm('8', 4), 12);
   assert.equal(debtTerm('', 4), null);
@@ -46,8 +46,6 @@ test('simple financing rejects fractional counts, absent amounts, excess history
     assert.throws(() => simpleDebtValues(amount, count, paid));
   }
 });
-
-import { destinoDoSalvar, podeParcelar, temContrato } from './finance-form.ts';
 
 const simples = { id: 'tx-1', installment_plan_id: null, recurring_id: null, debt_id: null };
 const parcela = { id: 'tx-1', installment_plan_id: 'plano-1', recurring_id: null, debt_id: null };

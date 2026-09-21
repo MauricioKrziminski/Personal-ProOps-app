@@ -6,7 +6,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-import { dueInline, dueLabel, settleHint, settleLabel } from './settle-labels.ts';
+import { dueInline, dueLabel, settleHint, settleLabel, estadoDaLinha } from './settle-labels.ts';
 
 const AQUI = path.dirname(fileURLToPath(import.meta.url));
 
@@ -128,8 +128,6 @@ test('nenhuma tela escreve "Paguei" à mão', () => {
   );
 });
 
-import { estadoDaLinha } from './settle-labels.ts';
-
 /**
  * ⚠️ **"previsto" é DATA, nunca `status`.** A régua já estava escrita e aplicada em UMA tela
  * (`finance/invoice/[id].tsx`): *"compra de cartão fica `pending` até a fatura ser paga, então
@@ -220,5 +218,21 @@ test('lançamento efetivado não tem estado nenhum', () => {
   assert.equal(
     estadoDaLinha({ kind: 'expense', status: 'cleared', occurred_at: '2026-09-25', due_at: null, invoice_id: null }, HOJE),
     null,
+  );
+});
+
+test('fora do cartão quem manda é o vencimento, mesmo com a data do lançamento à frente', () => {
+  /**
+   * ⚠️ Combinação que a tela não deveria produzir (`due_at` antes de `occurred_at`), mas que o
+   * tipo permite. O rótulo sai do VENCIMENTO — é a régua escrita em `estadoDaLinha` —, e este
+   * caso existe para que mudá-la seja uma decisão, não um efeito colateral.
+   */
+  assert.equal(
+    estadoDaLinha({ kind: 'expense', status: 'pending', occurred_at: '2026-09-25', due_at: '2026-09-01', invoice_id: null }, HOJE),
+    'atrasado',
+  );
+  assert.equal(
+    estadoDaLinha({ kind: 'income', status: 'pending', occurred_at: '2026-09-25', due_at: '2026-09-01', invoice_id: null }, HOJE),
+    'não caiu',
   );
 });
