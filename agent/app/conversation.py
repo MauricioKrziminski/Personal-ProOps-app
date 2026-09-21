@@ -220,12 +220,7 @@ async def run_turn(
             # e trata como mensagem nova — insistir prenderia a conversa.
             await db.resolve_pending(pendente["id"], "expired")
         else:
-            await db.resolve_pending(
-                pendente["id"], "approved" if decisao.get("approved") else "rejected"
-            )
             cadastro = str((pendente.get("action") or {}).get("action_type", "")).startswith("resource_")
-            if not cadastro:
-                await db.delete_draft(sessao["id"])
             # O id CONGELADO vem de `pending_actions`, não de uma busca nova: é o
             # que garante que o SIM execute o registro que o usuário LEU, mesmo
             # que outro lançamento tenha entrado entre a pergunta e a resposta.
@@ -235,6 +230,23 @@ async def run_turn(
             retomada = {**config, "configurable": {"thread_id": pendente["thread_id"]}}
             with telemetry.trace(thread_id=pendente["thread_id"], user_id=sessao["user_id"]):
                 estado = await graph().ainvoke(entrada, config=retomada)
+            # A pendência só é consumida DEPOIS que o resume terminou. Resolvida
+            # antes, um resume que caísse no meio (402, banco, container) deixava
+            # o retry sem pendência: o "sim" virava mensagem nova e a ação
+            # aprovada sumia calada. Aberta, o retry retoma o mesmo thread, e a
+            # escrita parcial é pulada por `executed_actions` (a chave é o
+            # `source_message_id` do turno da PERGUNTA, que o checkpoint guarda).
+            # Dois resumes juntos não acontecem: o claim da conversa (lease no
+            # app, `claim_thread_batch` no WhatsApp) serializa o turno. Recusa
+            # entra na mesma regra — não escreve, repetir é inofensivo.
+            # Tem que vir ANTES de `_resposta_do_estado`: o índice parcial da
+            # 0055 aceita UMA pendência aberta por sessão, e a pergunta seguinte
+            # do resume colidiria com esta.
+            await db.resolve_pending(
+                pendente["id"], "approved" if decisao.get("approved") else "rejected"
+            )
+            if not cadastro:
+                await db.delete_draft(sessao["id"])
             # SÓ o que este turno gastou. O estado que volta do checkpoint ainda
             # carrega o `llm_calls` do turno da PERGUNTA, que já virou linha em
             # `ai_events` lá atrás — somá-lo aqui cobraria de novo, e um CLIQUE
