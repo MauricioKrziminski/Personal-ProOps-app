@@ -80,6 +80,10 @@ class Corpo(BaseModel):
 
 
 class NovaConversa(Corpo):
+    # O id que o app gerou para abrir a tela da conversa NA HORA, antes do turno.
+    # Opcional: APK antigo não manda. Não é escopo — o dono continua saindo do
+    # token, e um id alheio vira 404 (`db.create_chat_session`).
+    id: UUID | None = None
     client_message_id: UUID
     content: str = Field(min_length=1, max_length=MAX_CONTENT)
 
@@ -333,6 +337,7 @@ async def criar(body: NovaConversa, user_id: Usuario) -> TurnOut:
             user_id=user_id,
             client_message_id=body.client_message_id,
             content=body.content,
+            session_id=body.id,
         )
     except app_chat.ChatError as err:
         raise _traduz(err) from err

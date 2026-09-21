@@ -226,6 +226,40 @@ def test_o_user_id_vem_do_token(cliente, falso):
     assert falso["chamadas"][0][1]["user_id"] == USER
 
 
+def test_id_da_conversa_vai_para_o_dominio(cliente, falso):
+    falso["resultado"] = _turno()
+    sid = uuid4()
+    r = cliente.post("/internal/chat/conversations",
+                     json={"id": str(sid), "client_message_id": str(uuid4()),
+                           "content": "oi"})
+    assert r.status_code == 200
+    assert falso["chamadas"][0][1]["session_id"] == sid
+
+
+def test_sem_id_o_dominio_recebe_none(cliente, falso):
+    """APK antigo não manda `id`: o comportamento é o de sempre."""
+    falso["resultado"] = _turno()
+    cliente.post("/internal/chat/conversations",
+                 json={"client_message_id": str(uuid4()), "content": "oi"})
+    assert falso["chamadas"][0][1]["session_id"] is None
+
+
+def test_id_que_nao_e_uuid_e_422(cliente, falso):
+    r = cliente.post("/internal/chat/conversations",
+                     json={"id": "nao-e-uuid", "client_message_id": str(uuid4()),
+                           "content": "oi"})
+    assert r.status_code == 422
+
+
+def test_id_alheio_e_404_conversation_not_found(cliente, falso):
+    falso["erro"] = app_chat.ConversationNotFound()
+    r = cliente.post("/internal/chat/conversations",
+                     json={"id": str(uuid4()), "client_message_id": str(uuid4()),
+                           "content": "oi"})
+    assert r.status_code == 404
+    assert r.json()["code"] == "conversation_not_found"
+
+
 # ---------------------------------------------------------------------------
 # validação
 # ---------------------------------------------------------------------------

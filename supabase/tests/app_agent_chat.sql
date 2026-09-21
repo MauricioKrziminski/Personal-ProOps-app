@@ -443,5 +443,102 @@ begin
     'messages_queue perdeu wa_message_id sem motivo';
 end $$;
 
+-- ===========================================================================
+-- Id da conversa escolhido pelo APP (Task 7): o mesmo SQL de `db.create_chat_session`.
+--   insert ... (coalesce(id, gen_random_uuid()), ...) on conflict do nothing
+--   select ... where user_id = <do token> and first_client_message_id = <cmid>
+-- O `do nothing` engole conflito de id (sessão alheia) sem entregá-la: o select
+-- filtra pelo dono, então id de outro usuário ou de WhatsApp volta VAZIO (→ 404).
+-- ===========================================================================
+do $$
+declare
+  v_a uuid := '00000000-0000-0000-0000-00000000c001';
+  v_b uuid := '00000000-0000-0000-0000-00000000c002';
+  v_ws_a uuid := public._default_workspace('00000000-0000-0000-0000-00000000c001');
+  v_ws_b uuid := public._default_workspace('00000000-0000-0000-0000-00000000c002');
+  v_alheia uuid := '00000000-0000-0000-0000-0000000007a1';
+  v_nova uuid := '00000000-0000-0000-0000-0000000007a2';
+  v_wa uuid;
+  v_id uuid;
+  n integer;
+begin
+  -- a conversa de B, com id conhecido
+  insert into public.user_sessions
+    (id, thread_id, channel, user_id, workspace_id, title, first_client_message_id,
+     timezone, last_message_at)
+  values (coalesce(v_alheia, gen_random_uuid()), 'app-t7-b', 'app', v_b, v_ws_b, 'de B',
+          '00000000-0000-0000-0000-0000000007b1', 'America/Sao_Paulo', now())
+  on conflict do nothing;
+
+  -- (a) A manda o id da conversa de B: nada é criado e nada volta
+  insert into public.user_sessions
+    (id, thread_id, channel, user_id, workspace_id, title, first_client_message_id,
+     timezone, last_message_at)
+  values (coalesce(v_alheia, gen_random_uuid()), 'app-t7-a1', 'app', v_a, v_ws_a, 'roubo',
+          '00000000-0000-0000-0000-0000000007c1', 'America/Sao_Paulo', now())
+  on conflict do nothing;
+  select id into v_id from public.user_sessions
+   where user_id = v_a and first_client_message_id = '00000000-0000-0000-0000-0000000007c1';
+  assert v_id is null, format('id de outro usuário devolveu linha %s', v_id);
+  assert (select user_id from public.user_sessions where id = v_alheia) = v_b,
+    'a conversa de B mudou de dono';
+
+  -- (b) A manda o id da própria sessão de WhatsApp: idem
+  -- (a do bloco 1 foi aposentada no 8 pela troca de telefone; esta é nova)
+  insert into public.user_sessions (thread_id, phone, user_id, workspace_id, last_message_at)
+  values ('app-t7-wa', '5511988880002', v_a, v_ws_a, now())
+  returning id into v_wa;
+  insert into public.user_sessions
+    (id, thread_id, channel, user_id, workspace_id, title, first_client_message_id,
+     timezone, last_message_at)
+  values (coalesce(v_wa, gen_random_uuid()), 'app-t7-a2', 'app', v_a, v_ws_a, 'wa',
+          '00000000-0000-0000-0000-0000000007c2', 'America/Sao_Paulo', now())
+  on conflict do nothing;
+  select id into v_id from public.user_sessions
+   where user_id = v_a and first_client_message_id = '00000000-0000-0000-0000-0000000007c2';
+  assert v_id is null, format('id de sessão WhatsApp devolveu linha %s', v_id);
+  assert (select channel from public.user_sessions where id = v_wa) = 'whatsapp',
+    'a sessão de WhatsApp foi alterada';
+
+  -- (c) o mesmo (id, cmid) duas vezes: UMA linha, com o id do app
+  for i in 1..2 loop
+    insert into public.user_sessions
+      (id, thread_id, channel, user_id, workspace_id, title, first_client_message_id,
+       timezone, last_message_at)
+    values (coalesce(v_nova, gen_random_uuid()), 'app-t7-a3-' || i, 'app', v_a, v_ws_a,
+            'nova', '00000000-0000-0000-0000-0000000007c3', 'America/Sao_Paulo', now())
+    on conflict do nothing;
+  end loop;
+  select count(*), min(id::text)::uuid into n, v_id from public.user_sessions
+   where user_id = v_a and first_client_message_id = '00000000-0000-0000-0000-0000000007c3';
+  assert n = 1, format('o retry com o mesmo id criou %s linhas', n);
+  assert v_id = v_nova, format('a conversa nasceu com outro id: %s', v_id);
+
+  -- (d) sem id (APK antigo): coalesce gera um, e o retry pelo cmid não duplica
+  for i in 1..2 loop
+    insert into public.user_sessions
+      (id, thread_id, channel, user_id, workspace_id, title, first_client_message_id,
+       timezone, last_message_at)
+    values (coalesce(null::uuid, gen_random_uuid()), 'app-t7-a4-' || i, 'app', v_a, v_ws_a,
+            'antigo', '00000000-0000-0000-0000-0000000007c4', 'America/Sao_Paulo', now())
+    on conflict do nothing;
+  end loop;
+  select count(*) into n from public.user_sessions
+   where user_id = v_a and first_client_message_id = '00000000-0000-0000-0000-0000000007c4';
+  assert n = 1, format('sem id, o retry criou %s linhas', n);
+
+  -- (e) o `do nothing` NÃO engole CHECK: sessão do app com telefone continua levantando
+  begin
+    insert into public.user_sessions
+      (id, thread_id, channel, phone, user_id, workspace_id, title, first_client_message_id,
+       timezone, last_message_at)
+    values (gen_random_uuid(), 'app-t7-ruim', 'app', '5511988880077', v_a, v_ws_a, 'x',
+            '00000000-0000-0000-0000-0000000007c5', 'America/Sao_Paulo', now())
+    on conflict do nothing;
+    raise exception 'on conflict do nothing engoliu a violação de CHECK';
+  exception when check_violation then null;
+  end;
+end $$;
+
 rollback;
 \echo '✓ conversas do agente no app verificadas'

@@ -726,30 +726,46 @@ async def create_chat_session(
     first_client_message_id: UUID,
     thread_id: str,
     timezone_: str,
-) -> tuple[dict[str, Any], bool]:
-    """A sessão, e se ela nasceu agora.
+    session_id: UUID | None = None,
+) -> tuple[dict[str, Any] | None, bool]:
+    """A sessão (ou None), e se ela nasceu agora.
 
-    `on conflict (user_id, first_client_message_id)` é o que faz um retry do app
-    devolver a MESMA conversa em vez de abrir uma segunda com a mesma mensagem
-    dentro. O `do update` sem efeito existe só para o `returning` trazer a linha
-    quando ela já existia.
+    `session_id` é o id que o APP escolheu, para abrir a tela da conversa antes de
+    o turno rodar. Sem ele (APK antigo), o banco gera.
+
+    ⚠️ **`do nothing` + `select` pelo DONO, nunca `do update ... returning`.** Com o
+    id vindo do cliente, o conflito pode ser com a conversa de OUTRA pessoa (ou uma
+    sessão de WhatsApp): um `returning` a entregaria. O `select` filtra por
+    `(user_id, first_client_message_id)`, então id alheio volta vazio — e quem
+    decide que isso é 404 é `app_chat`. O `do nothing` só engole conflito de
+    unicidade (id, cmid; `thread_id` é aleatório e `phone` é nulo no app): CHECK
+    continua levantando. São duas instruções de propósito: em autocommit cada uma
+    tem snapshot próprio, e o `select` enxerga a linha de um retry concorrente que
+    o `insert` esperou terminar.
     """
     async with pool().connection() as conn:
         cur = await conn.execute(
             """
             insert into public.user_sessions
-              (thread_id, channel, user_id, workspace_id, title,
+              (id, thread_id, channel, user_id, workspace_id, title,
                first_client_message_id, timezone, last_message_at)
-            values (%s, 'app', %s, %s, %s, %s, %s, now())
-            on conflict (user_id, first_client_message_id)
-              do update set last_message_at = public.user_sessions.last_message_at
-            returning *, (xmax = 0) as criada
+            values (coalesce(%s::uuid, gen_random_uuid()), %s, 'app', %s, %s, %s, %s, %s, now())
+            on conflict do nothing
+            returning id
             """,
-            (thread_id, user_id, workspace_id, title, first_client_message_id, timezone_),
+            (session_id, thread_id, user_id, workspace_id, title,
+             first_client_message_id, timezone_),
         )
-        linha = (await cur.fetchall())[0]
-    criada = bool(linha.pop("criada"))
-    return linha, criada
+        criada = bool(await cur.fetchall())
+        cur = await conn.execute(
+            """
+            select * from public.user_sessions
+            where user_id = %s and first_client_message_id = %s
+            """,
+            (user_id, first_client_message_id),
+        )
+        linhas = await cur.fetchall()
+    return (linhas[0] if linhas else None), criada
 
 
 async def chat_session(session_id: UUID, user_id: UUID) -> dict[str, Any] | None:

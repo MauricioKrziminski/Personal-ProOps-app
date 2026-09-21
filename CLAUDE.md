@@ -40,6 +40,11 @@ App mobile pessoal de **notas rápidas, lembretes e controle financeiro operado 
   bate na `update_installment_plan` antiga, cujo piso ainda é 2. **Nada corrompe; os dois botões
   simplesmente não funcionam.**
 
+  ⚠️ **OTA/build do chat exige a revisão nova do agente em produção** (21/09/2026): o app novo
+  manda `id` no `POST /internal/chat/conversations` para abrir a conversa na hora, e o agente
+  antigo (`extra='forbid'`) recusa com 422 — TODA primeira mensagem falha. Sem migration: é só
+  a ordem dos deploys (agente antes do app).
+
   ⚠️ **O AGENTE também depende das duas, desde 21/09/2026** (Task 4 do plano "agente sem
   engessar": `finance._parcelar`, `agent/app/tools/finance.py:1085`, chama a MESMA
   `convert_transaction_to_installments`). A ordem de deploy em produção é

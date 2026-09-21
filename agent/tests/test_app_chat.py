@@ -63,16 +63,19 @@ class RepoFalso:
 
     # --- sessões ---
     async def create_chat_session(self, *, user_id, workspace_id, title,
-                             first_client_message_id, thread_id, timezone_):
+                             first_client_message_id, thread_id, timezone_,
+                             session_id=None):
+        # Espelha o SQL: `insert ... on conflict do nothing` (conflito de id OU
+        # de cmid) e depois `select` por (user_id, cmid) — nada ou a linha dele.
         existente = next(
             (s for s in self.sessoes.values()
              if s["user_id"] == user_id
              and s["first_client_message_id"] == first_client_message_id),
             None,
         )
-        if existente:
+        if existente or (session_id is not None and session_id in self.sessoes):
             return existente, False
-        sid = uuid4()
+        sid = session_id or uuid4()
         s = {"id": sid, "user_id": user_id, "workspace_id": workspace_id,
              "channel": "app", "phone": None, "title": title, "thread_id": thread_id,
              "first_client_message_id": first_client_message_id,
@@ -269,6 +272,46 @@ async def test_criacao_com_o_mesmo_uuid_devolve_a_mesma_conversa(repo):
 
     assert a.conversation["id"] == b.conversation["id"]
     assert len(repo.sessoes) == 1, "o retry criou uma segunda conversa"
+
+
+@pytest.mark.asyncio
+async def test_criacao_com_id_do_cliente_usa_esse_id(repo):
+    """O app gera o UUID e navega NA HORA; o servidor tem que criar com ele."""
+    sid, cid = uuid4(), uuid4()
+    a = await app_chat.create_conversation(
+        user_id=USER, client_message_id=cid, content="oi", session_id=sid
+    )
+    b = await app_chat.create_conversation(
+        user_id=USER, client_message_id=cid, content="oi", session_id=sid
+    )
+    assert a.conversation["id"] == sid == b.conversation["id"]
+    assert len(repo.sessoes) == 1, "o retry com id criou uma segunda conversa"
+
+
+@pytest.mark.asyncio
+async def test_id_de_conversa_de_outro_usuario_e_404(repo):
+    alheia = await app_chat.create_conversation(
+        user_id=OUTRO_USER, client_message_id=uuid4(), content="minha"
+    )
+    with pytest.raises(app_chat.ConversationNotFound):
+        await app_chat.create_conversation(
+            user_id=USER, client_message_id=uuid4(), content="oi",
+            session_id=alheia.conversation["id"],
+        )
+    assert [m for m in repo.mensagens if m["content"] == "oi"] == [], \
+        "o id alheio chegou a reservar turno"
+
+
+@pytest.mark.asyncio
+async def test_mesmo_cmid_com_outro_id_e_404(repo):
+    """O cmid já abriu uma conversa com OUTRO id: devolver aquela seria o app
+    navegar para uma tela e receber os dados de outra."""
+    cid = uuid4()
+    await app_chat.create_conversation(user_id=USER, client_message_id=cid, content="oi")
+    with pytest.raises(app_chat.ConversationNotFound):
+        await app_chat.create_conversation(
+            user_id=USER, client_message_id=cid, content="oi", session_id=uuid4()
+        )
 
 
 # ---------------------------------------------------------------------------

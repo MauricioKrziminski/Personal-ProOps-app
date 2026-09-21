@@ -141,7 +141,8 @@ SEM_TEXTO = "…"
 
 
 async def create_conversation(
-    *, user_id: UUID, client_message_id: UUID, content: str
+    *, user_id: UUID, client_message_id: UUID, content: str,
+    session_id: UUID | None = None,
 ) -> TurnResult:
     """Cria a conversa JÁ com a primeira mensagem dentro.
 
@@ -161,7 +162,13 @@ async def create_conversation(
         first_client_message_id=client_message_id,
         thread_id=f"app-{secrets.token_urlsafe(16)}",
         timezone_=perfil.get("timezone") or "America/Sao_Paulo",
+        session_id=session_id,
     )
+    # O id veio do cliente e não voltou como a conversa DELE com este cmid: é de
+    # outra pessoa, de uma sessão de WhatsApp, ou o cmid já abriu outra conversa.
+    # 404 nos três — nunca a linha alheia, nunca 500.
+    if sessao is None or (session_id is not None and sessao["id"] != session_id):
+        raise ConversationNotFound()
 
     return await _execute_turn(
         user_id=user_id,
