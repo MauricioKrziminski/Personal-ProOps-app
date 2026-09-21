@@ -81,7 +81,7 @@ revoke execute on function private.valor_da_parcela(bigint, int, int) from publi
 grant execute on function private.valor_da_parcela(bigint, int, int) to authenticated, service_role;
 
 comment on function private.valor_da_parcela(bigint, int, int) is
-  'O valor da i-ésima parcela: divisão inteira, com o resto na última. Régua da edição e da conversão. A criação ainda tem a cópia dela em create_installment_plan_with_history (20260915190000:89) — unificar é migration própria.';
+  'O valor da i-ésima parcela: divisão inteira, com o resto na última. Régua única da criação, da edição e da conversão.';
 
 -- --------------------------------------------------------------------------
 -- converter: o lançamento que existe vira a parcela 1 de uma compra parcelada
