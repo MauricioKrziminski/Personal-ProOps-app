@@ -1084,12 +1084,13 @@ async def conta_padrao(workspace_id, acoes: list, alvos: list[dict]) -> list[dic
     padrao = {"id": None, "name": None}
     if indices:
         linha = await db.fetch_one(
-            "select a.id, a.name from public.workspaces w "
+            "select a.id, a.name, a.archived from public.workspaces w "
             "left join public.accounts a on a.id = w.default_account_id "
-            "and a.workspace_id = w.id and not a.archived where w.id = %s",
+            "and a.workspace_id = w.id where w.id = %s",
             workspace_id,
         )
-        if linha and linha.get("id"):
+        # conta padrão arquivada = sem padrão: a frase diz "sem conta", nunca a arquivada
+        if linha and linha.get("id") and not linha.get("archived"):
             padrao = {"id": str(linha["id"]), "name": linha["name"]}
     for i in indices:
         alvos[i] = {**alvos[i], "default_account": padrao}

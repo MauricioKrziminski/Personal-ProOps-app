@@ -158,12 +158,12 @@ async def default_account(workspace_id: UUID) -> UUID | None:
     """
     # conta arquivada não é padrão: o lançamento cairia numa conta que sumiu da tela
     linha = await db.fetch_one(
-        "select a.id as default_account_id from public.workspaces w "
+        "select a.id as default_account_id, a.archived from public.workspaces w "
         "join public.accounts a on a.id = w.default_account_id "
-        "and a.workspace_id = w.id and not a.archived where w.id = %s",
+        "and a.workspace_id = w.id where w.id = %s",
         workspace_id,
     )
-    return linha["default_account_id"] if linha else None
+    return linha["default_account_id"] if linha and not linha.get("archived") else None
 
 
 async def _conta_padrao(ctx: ExecContext) -> UUID | None:

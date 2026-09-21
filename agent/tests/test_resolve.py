@@ -639,19 +639,24 @@ async def test_apagar_nota_sem_dizer_qual_pergunta_em_vez_de_listar(monkeypatch)
 
 @pytest.mark.asyncio
 async def test_conta_padrao_arquivada_nao_entra_na_frase(monkeypatch):
-    """X1: a query do congelamento só aceita conta padrão ATIVA."""
+    """X1: o padrão arquivado vira "sem conta" na frase, nunca o nome da arquivada."""
     from app import db
 
-    sqls = []
+    async def arquivada(sql, *args):
+        return {"id": "acc-nu", "name": "Nubank", "archived": True}
 
-    async def fetch_one(sql, *args):
-        sqls.append(sql)
-        return {"id": None, "name": None}
+    monkeypatch.setattr(db, "fetch_one", arquivada)
+    gasto = FinanceAction(type=FinanceActionType.CREATE_EXPENSE, amount_cents=100)
+    (alvo,) = await resolve.conta_padrao("w1", [gasto], [{}])
+    assert alvo["default_account"] == {"id": None, "name": None}
+    from app.graph.policy import describe_for_confirmation
+    assert describe_for_confirmation(gasto, alvo).endswith(", sem conta")
 
-    monkeypatch.setattr(db, "fetch_one", fetch_one)
-    await resolve.conta_padrao("w1", [FinanceAction(type=FinanceActionType.CREATE_EXPENSE,
-                                                    amount_cents=100)], [{}])
-    assert "not a.archived" in sqls[0]
+    # transferência sem origem com o padrão arquivado: recusa antes do SIM
+    transf = FinanceAction(type=FinanceActionType.CREATE_TRANSFER, amount_cents=100,
+                           counterparty_account="Poupança")
+    (alvo,) = await resolve.conta_padrao("w1", [transf], [{}])
+    assert alvo["correction_error"] == resolve.SEM_DUAS_CONTAS
 
 
 @pytest.mark.asyncio
@@ -675,12 +680,8 @@ async def test_tool_recusa_conta_padrao_arquivada_depois_da_pergunta(monkeypatch
 async def test_padrao_relido_ignora_conta_arquivada(monkeypatch):
     from app import db
 
-    sqls = []
+    async def arquivada(sql, *args):
+        return {"default_account_id": "acc-nu", "archived": True}
 
-    async def fetch_one(sql, *args):
-        sqls.append(sql)
-        return None
-
-    monkeypatch.setattr(db, "fetch_one", fetch_one)
+    monkeypatch.setattr(db, "fetch_one", arquivada)
     assert await finance.default_account("w1") is None
-    assert "not a.archived" in sqls[0]
