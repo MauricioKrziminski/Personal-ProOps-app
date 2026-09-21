@@ -191,3 +191,22 @@ async def test_undo_last_sem_alvo_nao_repete_o_verbo(monkeypatch, banco):
     texto = "\n".join(ret["results"])
     assert "Não fiz: apagar o seu lançamento mais recente" in texto, texto
     assert "apaguei apagar" not in texto
+
+
+@pytest.mark.asyncio
+async def test_no_par_o_antecedente_do_proximo_turno_e_a_CRIACAO(monkeypatch, banco):
+    """I3: com a criação rodando primeiro, o último id escrito era o do APAGADO — e
+    "corrige esse para 60" no turno seguinte não achava nada."""
+    chamadas, _ = banco
+
+    async def apagar(ctx, acao):
+        chamadas.append(f"delete#{ctx.action_index}")
+        return ToolResult("🗑️ Apaguei wardogs.", result_id="tx-w")
+
+    monkeypatch.setitem(registry.FINANCE_TOOLS, FinanceActionType.DELETE_TRANSACTION, apagar)
+    _criar(monkeypatch, chamadas, ToolResult("💸 Gasto de R$ 104,99.", result_id="tx-nova"))
+
+    ret = await nodes.execute_node(_estado(PAR, [ALVO, {}]))
+
+    assert chamadas == ["create#1", "delete#0"]
+    assert ret["last_write_id"] == "tx-nova"

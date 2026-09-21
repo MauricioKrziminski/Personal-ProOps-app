@@ -979,7 +979,8 @@ async def test_par_com_cartao_que_nao_existe_tambem_nao_guarda_rascunho(monkeypa
     assert estado["draft"] == {}
     assert "EXECUTOU" not in estado.get("results", [])
     assert "Não achei o cartão *itau*" in estado["reply"]
-    assert "Ainda não apaguei nem criei nada." in estado["reply"]
+    # M1: sem rascunho a pergunta "qual deles?" não tem resposta — diz como seguir
+    assert "Me manda de novo dizendo o cartão. Ainda não apaguei nem criei nada." in estado["reply"]
 
 
 @pytest.mark.asyncio

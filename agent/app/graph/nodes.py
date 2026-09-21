@@ -819,7 +819,15 @@ async def _gate(state: AgentState) -> dict:
         # entra o erro de conta e a garantia de que nada mudou. `draft: {}`
         # explícito: rascunho do par perderia a outra metade (ver `_rascunho`).
         falta_valor = any(slot == "amount" for slot, _ in _incompletas(state, acoes).values())
-        fim = f"Me manda de novo com o valor. {NADA_DO_PAR}" if falta_valor else NADA_DO_PAR
+        conta_errada = next((a for a, t in zip(acoes, alvos) if t.get("account_error")), None)
+        if falta_valor:
+            fim = f"Me manda de novo com o valor. {NADA_DO_PAR}"
+        elif conta_errada is not None:
+            # sem rascunho no par, "qual delas?" não tem onde encaixar a resposta
+            papel = "o cartão" if resolve.conta_e_cartao(conta_errada.type) else "a conta"
+            fim = f"Me manda de novo dizendo {papel}. {NADA_DO_PAR}"
+        else:
+            fim = NADA_DO_PAR
         return {"approved": False, "halted": True, "draft": {},
                 "results": [*state.get("results", []), *correction_errors, fim]}
     if correction_errors:
@@ -1081,6 +1089,9 @@ async def _executar(
     if par:
         indexadas = sorted(indexadas, key=lambda ia: not _cria(ia[1]))
     criacao_falhou = None
+    # I3: no par o antecedente do próximo turno é a CRIAÇÃO, não o apagado (que roda
+    # por último e seria `escritos[-1]`). `ctx.created[:marca]` corta o que veio depois.
+    marca = None
 
     linhas: list[str] = []
     spec_interativo: dict | None = None
@@ -1098,13 +1109,16 @@ async def _executar(
         if (par and _cria(acao) and criacao_falhou is None
                 and resultado.read_only and not resultado.ja_executada):
             criacao_falhou = acao
+        if par and _cria(acao) and not resultado.read_only:
+            marca = len(ctx.created)
         if resultado.message:
             linhas.append(resultado.message)
         if resultado.interactive_spec:
             spec_interativo = resultado.interactive_spec
         if resultado.data:
             ultimo_data = resultado.data
-    return linhas, spec_interativo, ultimo_data, ctx.created
+    escritos = ctx.created[:marca] if marca else ctx.created
+    return linhas, spec_interativo, ultimo_data, escritos
 
 
 def _cria(acao) -> bool:
