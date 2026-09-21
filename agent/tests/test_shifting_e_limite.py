@@ -218,5 +218,5 @@ async def test_aviso_de_limite_diz_o_efeito_da_compra_parcelada(monkeypatch):
     resumo = await _aviso_de_limite(monkeypatch, {
         "type": "create_installment_purchase", "amount_cents": 300000, "installments": 10,
         "account": "Nubank Cartão", "description": "tv"}, "lim-parcelado")
-    assert "Registrar R$ 3.000,00 de tv em 10x no cartão Nubank Cartão" in resumo
+    assert "Registrar R$ 3.000,00 de tv em 10x de R$ 300,00 no cartão Nubank Cartão" in resumo
     assert "mesmo assim" in resumo

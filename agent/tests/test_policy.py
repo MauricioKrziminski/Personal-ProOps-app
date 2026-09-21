@@ -490,3 +490,16 @@ def test_frase_do_gasto_diz_a_data_quando_nao_e_hoje_e_a_repeticao():
     frase = describe_for_confirmation(aluguel, alvo, hoje="2026-09-21")
     assert frase.startswith("registrar gasto de R$ 1.500,00 em aluguel, na conta Nubank, repete ")
     assert "dia 5" in frase
+
+
+def test_frase_da_parcelada_mostra_o_valor_da_parcela_quando_divide_exato():
+    """Fix round 1: total e parcela lado a lado, para um erro de fator N aparecer no SIM."""
+    from app.graph.schemas import FinanceAction, FinanceActionType as T
+
+    exata = FinanceAction(type=T.CREATE_INSTALLMENT_PURCHASE, amount_cents=180000, installments=12,
+                          description="celular", account="Nubank")
+    assert describe_for_confirmation(exata).startswith(
+        "registrar R$ 1.800,00 de celular em 12x de R$ 150,00 no cartão Nubank")
+    # com resto a parcela não é uniforme (o banco põe o resto na última): não afirma valor
+    resto = exata.model_copy(update={"amount_cents": 100000, "installments": 3})
+    assert describe_for_confirmation(resto).startswith("registrar R$ 1.000,00 de celular em 3x no cartão")

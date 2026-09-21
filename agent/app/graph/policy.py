@@ -404,7 +404,13 @@ def describe_for_confirmation(
         if tipo == "create_installment_purchase":
             paid=action.already_paid_count or 0
             nome = f" de {action.description}" if action.description else ""
-            return f"registrar {valor}{nome} em {action.installments}x no cartão {action.account or 'a informar'}: {paid} parcelas iniciais pagas e {(action.installments or 0)-paid} pendentes"
+            # a parcela ao lado do total: um erro de fator N (total lido como parcela) aparece
+            # na frase do SIM. Só com divisão exata — com resto o banco põe a sobra na última e
+            # a parcela não é uniforme; aqui não se reimplementa essa regra.
+            n = action.installments or 0
+            cada = (f" de {cents_to_brl(action.amount_cents // n)}"
+                    if n and action.amount_cents and action.amount_cents % n == 0 else "")
+            return f"registrar {valor}{nome} em {action.installments}x{cada} no cartão {action.account or 'a informar'}: {paid} parcelas iniciais pagas e {(action.installments or 0)-paid} pendentes"
         if tipo == "pay_invoice":
             # com valor a frase precisa dizer QUANTO: pagamento parcial e quitação são efeitos
             # diferentes, e confirmar "o pagamento da fatura" não distingue os dois

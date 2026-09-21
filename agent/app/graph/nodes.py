@@ -260,18 +260,26 @@ async def finance_node(state: AgentState) -> dict:
     acoes = [a for a in plano.actions if a.type.value != "unknown"]
     texto_orig = state.get("text", "")
     for a in acoes:
+        # "no cartão" sem nome não é conta: vazio deixa o sistema usar o da linha ou perguntar
+        if a.new_account and a.new_account.strip().casefold() in _CARTAO_GENERICO:
+            a.new_account = None
         if a.type.value.startswith("create_"):
             # Campo de correção numa CRIAÇÃO é só o dado trocado de lugar (bateria de
             # 21/09/2026: "parcelei o notebook em 6 vezes, 4200 no inter" chegava em
             # new_amount_cents/new_account e o sistema perguntava o que já foi dito).
+            # Exceções: na transferência `new_account` seria o DESTINO, não a origem; e na
+            # parcelada o `new_amount_cents` pode ser a PARCELA — virar total direto erraria
+            # por um fator N, então lá quem fala é a rede `parse_installment_total` abaixo.
             for campo in _CAMPOS_CORRECAO:
                 novo = getattr(a, f"new_{campo}")
-                if novo is not None and getattr(a, campo) is None:
+                pula = (
+                    (campo == "account" and a.type == FinanceActionType.CREATE_TRANSFER)
+                    or (campo == "amount_cents"
+                        and a.type == FinanceActionType.CREATE_INSTALLMENT_PURCHASE)
+                )
+                if novo is not None and getattr(a, campo) is None and not pula:
                     setattr(a, campo, novo)
                 setattr(a, f"new_{campo}", None)
-        # "no cartão" sem nome não é conta: vazio deixa o sistema usar o da linha ou perguntar
-        if a.new_account and a.new_account.strip().casefold() in _CARTAO_GENERICO:
-            a.new_account = None
         if a.type in (
             FinanceActionType.CREATE_EXPENSE,
             FinanceActionType.CREATE_INCOME,

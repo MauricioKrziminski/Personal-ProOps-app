@@ -185,7 +185,8 @@ async def test_criacao_com_dados_nos_campos_de_correcao_volta_para_os_de_criacao
     saida = await nodes.finance_node({**ESTADO, "text": "parcelei o notebook em 6 vezes, 4200 no inter"})
 
     (acao,) = saida["finance_actions"]
-    assert acao["amount_cents"] == 420000 and acao["account"] == "inter"
+    # o valor da parcelada NÃO é movido (pode ser a parcela): sem "Nx de V" o sistema pergunta
+    assert acao["amount_cents"] is None and acao["account"] == "inter"
     assert acao["category"] == "eletrônicos" and acao["occurred_at"] == "2026-09-01"
     assert acao["description"] == "notebook"  # o de criação que já veio não é sobrescrito
     assert not any(acao[k] for k in ("new_amount_cents", "new_account", "new_category",
@@ -201,3 +202,63 @@ async def test_correcao_mantem_os_campos_new(sem_gemini):
 
     (acao,) = saida["finance_actions"]
     assert acao["new_amount_cents"] == 5400 and acao["amount_cents"] is None
+
+
+@pytest.mark.asyncio
+async def test_parcelada_new_amount_nao_vira_total_direto(sem_gemini):
+    """Fix round 1: o `new_amount_cents` pode ser a PARCELA; com "12x de 150" vale o parse."""
+    sem_gemini(FinancePlan(actions=[FinanceAction(
+        type=FinanceActionType.CREATE_INSTALLMENT_PURCHASE, installments=12, description="celular",
+        new_amount_cents=15000, account="nubank")], confidence=0.9))
+
+    saida = await nodes.finance_node({**ESTADO, "text": "comprei um celular em 12x de 150 no nubank"})
+
+    assert saida["finance_actions"][0]["amount_cents"] == 180000
+
+
+@pytest.mark.asyncio
+async def test_parcelada_new_amount_sem_padrao_fica_vazio_e_pergunta(sem_gemini):
+    from app.domain import required
+
+    texto = "comprei um celular em 12 vezes, 150 cada no nubank"
+    sem_gemini(FinancePlan(actions=[FinanceAction(
+        type=FinanceActionType.CREATE_INSTALLMENT_PURCHASE, installments=12, description="celular",
+        new_amount_cents=15000, account="nubank")], confidence=0.9))
+
+    (acao,) = (await nodes.finance_node({**ESTADO, "text": texto}))["finance_actions"]
+
+    assert acao["amount_cents"] is None and acao["new_amount_cents"] is None
+    assert required.faltando(FinanceAction(**acao), texto)[0] == "amount"
+
+
+@pytest.mark.asyncio
+async def test_transferencia_nao_troca_destino_por_origem(sem_gemini):
+    sem_gemini(FinancePlan(actions=[FinanceAction(
+        type=FinanceActionType.CREATE_TRANSFER, amount_cents=10000, new_account="poupança")],
+        confidence=0.9))
+
+    (acao,) = (await nodes.finance_node({**ESTADO, "text": "transferi 100 pra poupança"}))["finance_actions"]
+
+    assert acao["account"] is None and acao["new_account"] is None
+
+
+@pytest.mark.asyncio
+async def test_new_account_generico_nao_vira_account_na_criacao(sem_gemini):
+    sem_gemini(FinancePlan(actions=[FinanceAction(
+        type=FinanceActionType.CREATE_EXPENSE, amount_cents=4500, new_account="cartão")],
+        confidence=0.9))
+
+    (acao,) = (await nodes.finance_node({**ESTADO, "text": "gastei 45 no cartão"}))["finance_actions"]
+
+    assert acao["account"] is None
+
+
+@pytest.mark.asyncio
+async def test_gasto_com_valor_no_campo_de_correcao_volta_para_amount(sem_gemini):
+    sem_gemini(FinancePlan(actions=[FinanceAction(
+        type=FinanceActionType.CREATE_EXPENSE, new_amount_cents=4500, new_account="nubank")],
+        confidence=0.9))
+
+    (acao,) = (await nodes.finance_node({**ESTADO, "text": "gastei 45 no nubank"}))["finance_actions"]
+
+    assert acao["amount_cents"] == 4500 and acao["account"] == "nubank"
