@@ -216,6 +216,15 @@ def _frase_conversao(action: FinanceAction, target: dict, escolhido: dict) -> st
     )
 
 
+def pede_desparcelar(action, target: dict | None) -> bool:
+    """Desparcelar com uma COMPRA entre os alvos, em qualquer status — no empate a
+    escolha ainda não aconteceu, e as recusas (que exigem `found`) voltam depois dela."""
+    target = target or {}
+    return e_desparcelar(action) and (
+        target.get("table") == "installment_plans"
+        or any(c.get("table") == "installment_plans" for c in target.get("candidates") or []))
+
+
 def _nome_do_plano(escolhido: dict) -> str:
     return escolhido["label"].split(" — ", 1)[-1]
 
@@ -266,7 +275,8 @@ def erro_de_correcao(action, target: dict | None) -> str | None:
     muda_parcelas = (bool(action.installments) and action.installments != n_plano
                      and not desparcela and (n_plano is not None or action.installments >= 2))
     if not any([action.new_amount_cents is not None, action.new_category, action.new_occurred_at,
-                action.new_description, action.new_account, muda_parcelas, desparcela]):
+                action.new_description, action.new_account, muda_parcelas, desparcela,
+                pede_desparcelar(action, target)]):
         return SEM_CORRECAO
     if n_plano is not None and muda_parcelas:
         return MUDAR_PARCELAS
@@ -412,7 +422,10 @@ def describe_for_confirmation(
         # que vai acontecer. Cair no texto do modelo aqui reintroduzia o eco que
         # este desenho existe para eliminar ("apagar a nota sobre esse item").
         if e_desparcelar(action):
-            return f"desparcelar {action.description or 'a compra'} — qual?"
+            # escolher no empate é o consentimento para seguir: a pergunta já diz o efeito
+            # (o SIM final, com total, data e cartão, vem depois em `_confirm_selection`)
+            return (f"desparcelar {action.description or 'a compra'} — a compra volta a ser "
+                    "à vista num lançamento só. Qual delas?")
         if e_conversao(action):
             return f"parcelar {action.description or 'o lançamento'} em {action.installments}x — qual?"
         if isinstance(action, FinanceAction) and action.type == FinanceActionType.UPDATE_TRANSACTION:

@@ -121,7 +121,7 @@ def test_parcela_travada_recusa_antes_do_sim():
 def test_valor_novo_junto_recusa():
     erro = erro_de_correcao(FinanceAction(type=UPD, installments=1, new_amount_cents=320000),
                             _plano())
-    assert "Desparcela primeiro, depois corrige o valor" in erro
+    assert erro.startswith("Não entendi se é para voltar a compra para à vista ou corrigir o valor")
 
 
 def test_reparcelar_para_outro_n_continua_exclusao():
@@ -147,7 +147,22 @@ def test_frase_do_empate():
     alvo = {"table": "installment_plans", "status": "ambiguous",
             "candidates": [_plano()["candidates"][0], {**_plano()["candidates"][0], "id": "p2"}]}
     assert describe_for_confirmation(
-        FinanceAction(type=UPD, description="tv", installments=1), alvo) == "desparcelar tv — qual?"
+        FinanceAction(type=UPD, description="tv", installments=1), alvo) == (
+        "desparcelar tv — a compra volta a ser à vista num lançamento só. Qual delas?")
+
+
+def test_empate_de_compras_nao_cai_em_o_que_mudar():
+    alvo = {"table": "installment_plans", "status": "ambiguous",
+            "candidates": [_plano()["candidates"][0], {**_plano()["candidates"][0], "id": "p2"}]}
+    assert erro_de_correcao(FinanceAction(type=UPD, description="tv", installments=1), alvo) is None
+
+
+def test_um_espurio_com_categoria_o_sim_denuncia():
+    """`installments=1` de ruído em "a tv é casa": o SIM começa com "desparcelar", e a
+    pessoa vê antes de aprovar."""
+    frase = describe_for_confirmation(
+        FinanceAction(type=UPD, description="tv", installments=1, new_category="casa"), _plano())
+    assert frase.startswith("desparcelar TV")
 
 
 # ---------------------------------------------------------------------------
@@ -294,4 +309,55 @@ async def test_grafo_parcela_travada_para_antes_do_sim(monkeypatch, grafo):  # n
     )
     assert "__interrupt__" not in final
     assert any("não dá para voltar para à vista" in r for r in final["results"])
+    assert "EXECUTOU" not in final["results"]
+
+
+def _empate(monkeypatch, segundo):
+    from app.graph import nodes
+
+    cand = _plano()["candidates"][0]
+
+    async def empate(workspace_id, acoes, texto_cru, antecedente=None):
+        return [{"table": "installment_plans", "status": "ambiguous",
+                 "candidates": [cand, {**cand, "id": "p-tv2", "label": "Tudo (6x) — TV sala",
+                                       **segundo}]}]
+
+    monkeypatch.setattr(nodes.resolve, "for_actions", empate)
+
+
+@pytest.mark.asyncio
+async def test_grafo_empate_escolha_confirma_e_executa(monkeypatch, grafo):  # noqa: F811
+    _empate(monkeypatch, {"plan_installments": 6, "total_cents": 120000})
+    cfg = {"configurable": {"thread_id": "desparcelar-empate"}}
+    estado = await grafo.ainvoke(
+        _estado([{"type": "update_transaction", "description": "tv", "installments": 1}]),
+        config=cfg)
+    pausa = _valor(estado)
+    assert pausa["kind"] == "choice"
+    assert pausa["summary"] == (
+        "desparcelar tv — a compra volta a ser à vista num lançamento só. Qual delas?")
+    estado = await grafo.ainvoke(Command(resume={"approved": True, "candidate_id": "p-tv2"}),
+                                 config=cfg)
+    pausa = _valor(estado)
+    assert pausa["kind"] == "confirmation"
+    assert pausa["summary"] == (
+        "desparcelar TV sala: a compra de R$ 1.200,00 volta a ser à vista em 05/09/2026 no "
+        "cartão Nubank (as 6 parcelas viram um lançamento só)")
+    assert "EXECUTOU" not in estado.get("results", [])
+    final = await grafo.ainvoke(Command(resume=True), config=cfg)
+    assert "EXECUTOU" in final["results"]
+    assert final["targets"][0]["candidates"][0]["id"] == "p-tv2"
+
+
+@pytest.mark.asyncio
+async def test_grafo_empate_escolha_de_plano_travado_recusa_antes_de_escrever(monkeypatch, grafo):  # noqa: F811
+    _empate(monkeypatch, {"editaveis": 4, "travado_cents": 40000})
+    cfg = {"configurable": {"thread_id": "desparcelar-empate-travado"}}
+    await grafo.ainvoke(
+        _estado([{"type": "update_transaction", "description": "tv", "installments": 1}]),
+        config=cfg)
+    final = await grafo.ainvoke(Command(resume={"approved": True, "candidate_id": "p-tv2"}),
+                                config=cfg)
+    assert "__interrupt__" not in final
+    assert any("A compra TV sala tem parcela já paga" in r for r in final["results"])
     assert "EXECUTOU" not in final["results"]

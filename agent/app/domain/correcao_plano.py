@@ -36,7 +36,9 @@ def e_conversao(action) -> bool:
 # Desparcelar (21/09/2026) — `update_installment_plan` com `p_installments = 1`, o chip
 # "À vista" do app. Só a volta para 1x: reparcelar para outro N continua `MUDAR_PARCELAS`.
 JA_A_VISTA = "Esse lançamento já é à vista." + NADA
-VALOR_COM_DESPARCELAR = "Desparcela primeiro, depois corrige o valor." + NADA
+# neutra: o 1 pode ser ruído do modelo numa correção de valor ("a tv foi 3000")
+VALOR_COM_DESPARCELAR = ("Não entendi se é para voltar a compra para à vista ou corrigir o "
+                         "valor. Me diz uma coisa de cada vez." + NADA)
 
 
 def desparcelar_travada(nome: str) -> str:

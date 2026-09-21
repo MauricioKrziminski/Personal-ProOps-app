@@ -167,8 +167,11 @@ Ele foi removido (`agent/app/tools/finance.py:856`); dar baixa é caminho de `ma
   cartão e a trava (`private.parcela_travada`); a frase do SIM diz o efeito inteiro, e
   `finance._desparcelar` chama `update_installment_plan(..., 1, ...)` com os 8 argumentos
   atuais — a parcela 1 fica com o total e o MESMO id, o plano some. Recusas antes do SIM:
-  parcela travada, valor novo junto ("desparcela primeiro, depois corrige o valor"; nome e
-  categoria entram junto, a RPC os grava), data/conta. Sobre linha AVULSA, o 1 sozinho é "já é
+  parcela travada, valor novo junto (mensagem NEUTRA — o 1 pode ser ruído de "a tv foi 3000",
+  e atribuir "desparcelar" a quem não pediu é o erro; nome e categoria entram junto, a RPC os
+  grava), data/conta. Num EMPATE de duas compras, o desparcelar conta como correção em qualquer
+  status (senão caía em "o que você quer mudar?" e a escolha nunca vinha); a pergunta do empate
+  já diz o efeito e as recusas voltam depois da escolha. Sobre linha AVULSA, o 1 sozinho é "já é
   à vista"; com outra correção junto ele é ruído e a correção segue. **Reparcelar para outro N
   continua exclusão** (`MUDAR_PARCELAS`).
 
