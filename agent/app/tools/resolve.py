@@ -364,6 +364,26 @@ _SEM_ALVO_PERGUNTA = {
         "🤔 Qual lembrete você quer cancelar? Me diz o assunto dele. Ainda não cancelei nada.",
 }
 
+def sem_alvo(acao, texto_cru: str) -> str | None:
+    """A pergunta "o quê?" para corrigir/apagar sem NENHUMA pista (bateria de 21/09/2026).
+
+    "foi 50" sem termo, sem valor/data/parcela de busca e sem "o último": ninguém foi
+    apontado. Listar os 9 recentes é a lista "nada a ver" de 15/09, e eleger um é
+    deduzir. Só estrutura (campos vazios); o antecedente da conversa é conferido
+    ANTES por quem chama — com ele, "esse" tem dono e isto não se aplica.
+    """
+    if getattr(acao, "type", None) not in _SEM_ALVO_PERGUNTA:
+        return None
+    bruto = _bruto_de(acao)
+    if clean_term(bruto) is not None or wants_latest(bruto, getattr(acao, "description", None)) \
+            or wants_latest(texto_cru):
+        return None
+    if any(getattr(acao, c, None) for c in ("amount_cents", "category", "occurred_at",
+                                            "installment_scope", "current_installment")):
+        return None
+    return _SEM_ALVO_PERGUNTA[acao.type]
+
+
 # Ações em que "a compra inteira" é uma resposta possível.
 _ACEITA_PLANO = {
     FinanceActionType.DELETE_TRANSACTION,
@@ -622,8 +642,8 @@ async def for_actions(
 
         # Demonstrativo ("esse", "isso", "esse lançamento") sem termo de busca e
         # sem pedido de recência: quem responde é o que a conversa acabou de
-        # escrever. Sem antecedente vivo, segue para a pergunta de sempre — a
-        # lista continua sendo a resposta certa para quem não apontou nada.
+        # escrever. Sem antecedente vivo, `sem_alvo` pergunta O QUÊ (21/09/2026:
+        # a lista dos 9 recentes para quem não apontou nada era ruído).
         #
         # Isto NÃO afrouxa a trava destrutiva: apagar e corrigir passam pelo
         # `interrupt()` de `policy.py` de qualquer jeito, e a confirmação diz
@@ -631,7 +651,8 @@ async def for_actions(
         # muda é só o usuário parar de escolher entre nove opções para dizer o
         # que ele já tinha dito.
         # ponytail: o antecedente só resolve TRANSAÇÃO. Para nota, lembrete, meta
-        # e bem o ponteiro cai no ramo "sem termo utilizável" mais abaixo, que
+        # e bem o ponteiro cai no ramo "sem termo utilizável" mais abaixo (apagar
+        # nota/lembrete sem pista pergunta em `sem_alvo`), que
         # lista os recentes daquela fonte para escolher — resposta pior que o
         # alvo direto, melhor que a busca literal por "%essa nota%" que era o
         # comportamento anterior. Estender exige uma consulta de existência por
@@ -648,15 +669,9 @@ async def for_actions(
                 saida.append({"status": "found", "candidates": ante,
                               "table": "transactions"})
                 continue
-            # "foi 50" sem pista, sem "o último" e sem antecedente (bateria de
-            # 21/09/2026): ninguém foi apontado. Pergunta o QUÊ — listar os 9
-            # recentes é a lista "nada a ver" de 15/09, e eleger um é deduzir.
-            if (not ante and acao.type in _SEM_ALVO_PERGUNTA
-                    and not (acao.amount_cents or acao.category or acao.occurred_at
-                             or acao.installment_scope or acao.current_installment)):
-                saida.append({"status": "none", "candidates": [],
-                              "correction_error": _SEM_ALVO_PERGUNTA[acao.type]})
-                continue
+        if not ante and (pergunta := sem_alvo(acao, texto_cru)):
+            saida.append({"status": "none", "candidates": [], "correction_error": pergunta})
+            continue
 
         # Resolve bounded payment directly from plans, beyond the recent-40 window.
         if not ante and (acao.type == FinanceActionType.MARK_PAID or (
@@ -724,11 +739,6 @@ async def for_actions(
         elif termo:
             estado, cands = await por_texto(fonte, workspace_id, termo)
             tabela = _FONTES[fonte]["table"]
-        elif acao.type in _SEM_ALVO_PERGUNTA and not recente:
-            # apagar nota/lembrete sem dizer qual (P6, 21/09/2026): pergunta, não lista
-            saida.append({"status": "none", "candidates": [],
-                          "correction_error": _SEM_ALVO_PERGUNTA[acao.type]})
-            continue
         else:
             # sem termo utilizável: mostra os recentes daquela fonte para escolher
             estado, cands = await por_texto(fonte, workspace_id, "")
