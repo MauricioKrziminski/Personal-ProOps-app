@@ -69,7 +69,32 @@ async def test_parcelada_sem_conta_nem_descricao_completa_pelo_texto(sem_gemini)
 
     (acao,) = saida["finance_actions"]
     assert acao["description"] == "tv"
-    assert acao["account"] == "nubank"
+    # "no nubank" sem a palavra "cartão" não é estrutura: a conta fica vazia e `faltando`
+    # pergunta. Inferir daqui fazia "Na verdade..." virar o cartão *verdade*.
+    assert acao["account"] is None
+
+
+@pytest.mark.asyncio
+async def test_na_verdade_no_cartao_generico_nao_vira_cartao_verdade(sem_gemini):
+    """O incidente de 21/09/2026: "cartão" genérico + "Na verdade" no começo da frase."""
+    sem_gemini(
+        FinancePlan(
+            actions=[
+                FinanceAction(
+                    type=FinanceActionType.CREATE_INSTALLMENT_PURCHASE,
+                    amount_cents=10499,
+                    installments=2,
+                    account="cartão",
+                )
+            ],
+            confidence=0.9,
+        )
+    )
+
+    saida = await nodes.finance_node({**ESTADO, "text": "Na verdade eu comprei em 2x no cartao"})
+
+    (acao,) = saida["finance_actions"]
+    assert acao["account"] is None
 
 
 @pytest.mark.asyncio

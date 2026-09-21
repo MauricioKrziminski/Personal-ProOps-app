@@ -2,6 +2,7 @@
 
 import pytest
 
+from app.tools import guards
 from app.tools.guards import (
     require_current_installment,
     Level1Error,
@@ -89,3 +90,37 @@ def test_clean_rrule_aceita_ultimo_dia_do_mes():
     """
     assert clean_rrule("FREQ=MONTHLY;BYMONTHDAY=-1") == "FREQ=MONTHLY;BYMONTHDAY=-1"
     assert clean_rrule("RRULE:FREQ=MONTHLY;BYMONTHDAY=-1") == "FREQ=MONTHLY;BYMONTHDAY=-1"
+
+
+class TestContaSoPelaEstrutura:
+    """`extract_account_fallback` valida ESTRUTURA ("no cartão <nome>"), nunca infere conta.
+
+    O genérico "no|na|pelo <palavra>" transformou "Na verdade eu comprei em 2x no cartão" no
+    cartão *verdade* (21/09/2026). Conta que o texto não estrutura fica vazia e vira pergunta.
+    """
+
+    @pytest.mark.parametrize(
+        "texto",
+        [
+            "Na verdade eu comprei em 2x no cartao",
+            "paguei na hora",
+            "gastei 45 na padaria",
+            "comprei uma tv em 10x de 300 no nubank",
+            "comprei pelo app em 3x",
+            "Na verdade eu comprei no cartao em 2x",
+            "comprei no cartão de crédito ontem",
+        ],
+    )
+    def test_texto_sem_cartao_nomeado_nao_vira_conta(self, texto):
+        assert guards.extract_account_fallback(texto) is None
+
+    @pytest.mark.parametrize(
+        "texto,conta",
+        [
+            ("comprei uma tv em 10x no cartão nubank", "nubank"),
+            ("na verdade foi em 2x no cartao do inter", "inter"),
+            ("paguei pelo cartão de crédito itaú em 3x", "itaú"),
+        ],
+    )
+    def test_cartao_nomeado_vira_conta(self, texto, conta):
+        assert guards.extract_account_fallback(texto) == conta

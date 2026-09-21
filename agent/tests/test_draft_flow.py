@@ -595,7 +595,9 @@ class TestDescriptionSlotAndFallback:
 
         texto = "comprei uma tv em 10x de 300 no nubank"
         assert guards.extract_description_fallback(texto) == "tv"
-        assert guards.extract_account_fallback(texto) == "nubank"
+        # sem "cartão" o nome não é estrutura: conta vazia vira pergunta, não palpite
+        assert guards.extract_account_fallback(texto) is None
+        assert guards.extract_account_fallback("comprei uma tv em 10x no cartão nubank") == "nubank"
 
     def test_lembrete_de_rascunho_com_slot_de_descricao(self):
         rascunho = {
