@@ -117,3 +117,49 @@ class TestTimezoneBlindagem:
         assert str(tz("UTC")) == DEFAULT_TZ
         assert str(tz("invalido/xyz")) == DEFAULT_TZ
         assert str(tz("America/Sao_Paulo")) == "America/Sao_Paulo"
+
+
+@pytest.mark.asyncio
+async def test_gasto_na_conta_nubank_nao_avisa_limite_do_nubank_cartao(monkeypatch):
+    """E3 (emulador, 21/09/2026): o aviso resolvia a conta SÓ entre cartões, e
+    "Nubank" (conta corrente) casava por semelhança com "Nubank Cartão" — aviso de
+    limite FALSO para um gasto que a tool grava na conta corrente."""
+    from langgraph.checkpoint.memory import InMemorySaver
+    from app.graph import build as graph_module, nodes
+
+    contas = [{"id": "chk-nu", "name": "Nubank", "type": "checking"},
+              {"id": "card-nu", "name": "Nubank Cartão", "type": "credit_card"}]
+
+    async def accounts(workspace_id, *, only_cards=False):
+        return [c for c in contas if not only_cards or c["type"] == "credit_card"]
+
+    consultados = []
+
+    async def limite(ws, user, account_id, valor):
+        consultados.append(str(account_id))
+        return {"excedeu": account_id == "card-nu", "card_name": "Nubank Cartão",
+                "limite_centavos": 100, "disponivel_centavos": 0}
+
+    async def noop(state):
+        return {}
+
+    async def writes(state, actions):
+        return ["WROTE" for _ in actions], None, None, []
+
+    monkeypatch.setattr(db, "accounts", accounts)
+    monkeypatch.setattr(finance, "verificar_limite_disponivel", limite)
+    monkeypatch.setattr(graph_module, "route", noop)
+    monkeypatch.setattr(graph_module, "finance_node", noop)
+    monkeypatch.setattr(nodes, "_executar", writes)
+    grafo = graph_module.build(InMemorySaver())
+    final = await grafo.ainvoke(
+        {"preset": True, "domains": ["financas"], "workspace_id": "w", "user_id": "u",
+         "phone": None, "timezone": "America/Sao_Paulo", "text": "gastei 50 no nubank",
+         "finance_actions": [{"type": "create_expense", "amount_cents": 5000,
+                              "account": "Nubank", "description": "mercado"}],
+         "results": [], "source_message_id": "app:e3", "confidence": 1.0},
+        {"configurable": {"thread_id": "e3"}},
+    )
+    assert "__interrupt__" not in final
+    assert consultados == ["chk-nu"]
+    assert "WROTE" in final["results"]

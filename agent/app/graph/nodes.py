@@ -913,7 +913,12 @@ async def _gate(state: AgentState) -> dict:
             and acao.amount_cents
         ):
             from app.tools.finance import resolve_account, verificar_limite_disponivel
-            acc_id = await resolve_account(state["workspace_id"], acao.account, only_cards=True)
+            # a MESMA régua da tool que grava (`_CONTAS_CITADAS`): num gasto comum,
+            # "Nubank" é a conta corrente, e só entre cartões ela casava com
+            # "Nubank Cartão" — aviso falso. Conta que não é cartão não tem linha em
+            # `_card_summary`, então não avisa.
+            acc_id = await resolve_account(state["workspace_id"], acao.account,
+                                           only_cards=bool(resolve.conta_e_cartao(acao.type)))
             if acc_id:
                 limite_res = await verificar_limite_disponivel(
                     state["workspace_id"], state["user_id"], acc_id, acao.amount_cents
