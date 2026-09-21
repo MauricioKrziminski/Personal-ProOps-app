@@ -232,6 +232,9 @@ def pick_domains(state: AgentState) -> list[str]:
 # ---------------------------------------------------------------------------
 
 
+_CARTAO_GENERICO = {"cartão", "cartao", "crédito", "credito"}
+
+
 async def finance_node(state: AgentState) -> dict:
     if state.get("preset") or state.get("halted"):
         return {}  # ações semeadas ou turno cancelado: não reextrair
@@ -256,13 +259,14 @@ async def finance_node(state: AgentState) -> dict:
     acoes = [a for a in plano.actions if a.type.value != "unknown"]
     texto_orig = state.get("text", "")
     for a in acoes:
+        # "no cartão" sem nome não é conta: vazio deixa o sistema usar o da linha ou perguntar
+        if a.new_account and a.new_account.strip().casefold() in _CARTAO_GENERICO:
+            a.new_account = None
         if a.type in (
             FinanceActionType.CREATE_EXPENSE,
             FinanceActionType.CREATE_INCOME,
             FinanceActionType.CREATE_INSTALLMENT_PURCHASE,
         ):
-            if not a.description:
-                a.description = guards.extract_description_fallback(texto_orig)
             if a.type == FinanceActionType.CREATE_INSTALLMENT_PURCHASE:
                 if not a.amount_cents:
                     from app.domain.money import parse_installment_total
@@ -279,8 +283,7 @@ async def finance_node(state: AgentState) -> dict:
                     )
             if a.type == FinanceActionType.CREATE_INSTALLMENT_PURCHASE and (
                 not a.account
-                or a.account.strip().casefold()
-                in {"cartão", "cartao", "crédito", "credito"}
+                or a.account.strip().casefold() in _CARTAO_GENERICO
             ):
                 a.account = guards.extract_account_fallback(texto_orig)
     return {

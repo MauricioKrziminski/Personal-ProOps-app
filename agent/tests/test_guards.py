@@ -109,6 +109,10 @@ class TestContaSoPelaEstrutura:
             "comprei pelo app em 3x",
             "Na verdade eu comprei no cartao em 2x",
             "comprei no cartão de crédito ontem",
+            "comprei no cartão de crédito",
+            "paguei no cartão de crédito",
+            "comprei no cartão de débito em 2x",
+            "comprei no cartão do",
         ],
     )
     def test_texto_sem_cartao_nomeado_nao_vira_conta(self, texto):
@@ -118,6 +122,7 @@ class TestContaSoPelaEstrutura:
         "texto,conta",
         [
             ("comprei uma tv em 10x no cartão nubank", "nubank"),
+            ("comprei no cartão de crédito nubank", "nubank"),
             ("na verdade foi em 2x no cartao do inter", "inter"),
             ("paguei pelo cartão de crédito itaú em 3x", "itaú"),
         ],

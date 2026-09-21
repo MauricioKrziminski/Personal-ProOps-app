@@ -145,23 +145,6 @@ def split_installment_total(total_cents: int, parcelas: int) -> list[int]:
     return valores
 
 
-_NOUN_EXTRACTOR = re.compile(
-    r"\b(?:comprei|compramos|paguei|pagamos|gastei|gastamos|lancei|anota(?: aí)?|compra(?: de)?)\s+(?:um|uma|uns|umas|o|a|os|as)?\s*([a-zA-Z0-9_\-áéíóúâêîôûãõçÁÉÍÓÚÂÊÎÔÛÃÕÇ]{2,30})",
-    re.IGNORECASE,
-)
-_IGNORE_NOUNS = {"em", "no", "na", "para", "pra", "de", "com", "por", "ontem", "hoje", "reais", "parcelado", "parcelada"}
-
-def extract_description_fallback(texto: str) -> str | None:
-    if not texto:
-        return None
-    m = _NOUN_EXTRACTOR.search(texto)
-    if m:
-        candidato = m.group(1).strip()
-        if candidato.lower() not in _IGNORE_NOUNS and not candidato.isdigit():
-            return candidato
-    return None
-
-
 def extract_account_fallback(texto: str) -> str | None:
     """Só a ESTRUTURA "no cartão <nome>" vira conta; o resto fica vazio e vira pergunta.
 
@@ -172,12 +155,18 @@ def extract_account_fallback(texto: str) -> str | None:
     if not texto:
         return None
     explicit = re.search(
-        r"\b(?:no|na|pelo|pela|com o|com a)\s+cart[aã]o\s+(?:de cr[eé]dito\s+)?(?:d[oa]\s+)?([^,.;!?]+)",
-        texto,
-        re.IGNORECASE,
+        r"\b(?:no|na|pelo|pela|com o|com a)\s+cart[aã]o\b([^,.;!?]*)", texto, re.IGNORECASE
     )
     if explicit:
-        candidate = re.split(r"(?:^|\s+)(?:em|e|que|com|para|pra|ontem|hoje)(?:\s+|$)", explicit.group(1), maxsplit=1, flags=re.IGNORECASE)[0].strip()
-        if candidate and candidate.casefold() not in {"crédito", "credito", "débito", "debito"}:
+        # "de crédito"/"de débito" e a preposição do nome ("do inter") não são nome
+        resto = re.sub(
+            r"^\s*(?:de\s+(?:cr[eé]dito|d[eé]bito)\b)?\s*(?:d[oae]\b)?",
+            "", explicit.group(1), flags=re.IGNORECASE,
+        )
+        candidate = re.split(
+            r"(?:^|\s+)(?:em|e|que|com|para|pra|ontem|hoje)(?:\s+|$)",
+            resto, maxsplit=1, flags=re.IGNORECASE,
+        )[0].strip()
+        if candidate:
             return candidate
     return None

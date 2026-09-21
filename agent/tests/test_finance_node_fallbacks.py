@@ -68,7 +68,8 @@ async def test_parcelada_sem_conta_nem_descricao_completa_pelo_texto(sem_gemini)
     saida = await nodes.finance_node(dict(ESTADO))
 
     (acao,) = saida["finance_actions"]
-    assert acao["description"] == "tv"
+    # sem descrição do modelo não se inventa uma do texto: `required.py` pergunta "Do que se trata?"
+    assert acao["description"] is None
     # "no nubank" sem a palavra "cartão" não é estrutura: a conta fica vazia e `faltando`
     # pergunta. Inferir daqui fazia "Na verdade..." virar o cartão *verdade*.
     assert acao["account"] is None
@@ -121,3 +122,51 @@ async def test_despesa_simples_atravessa_o_no_sem_estourar(sem_gemini):
     # `account` só é preenchido na compra parcelada: sem cartão citado o lançamento nasce sem
     # conta (`finance.md`) em vez de adivinhar uma.
     assert acao["account"] is None
+
+
+@pytest.mark.asyncio
+async def test_comprei_isso_nao_vira_descricao_isso(sem_gemini):
+    sem_gemini(FinancePlan(actions=[FinanceAction(
+        type=FinanceActionType.CREATE_INSTALLMENT_PURCHASE, amount_cents=20000, installments=2,
+        account="nubank")], confidence=0.9))
+
+    saida = await nodes.finance_node({**ESTADO, "text": "comprei isso em 2x de 100 no nubank"})
+
+    (acao,) = saida["finance_actions"]
+    assert acao["description"] is None
+    from app.domain import required
+    assert required.faltando(FinanceAction(**acao), "comprei isso em 2x de 100 no nubank")[0] == "description"
+
+
+@pytest.mark.asyncio
+async def test_nome_do_modelo_fica(sem_gemini):
+    sem_gemini(FinancePlan(actions=[FinanceAction(
+        type=FinanceActionType.CREATE_EXPENSE, amount_cents=8000, description="fone")],
+        confidence=0.9))
+
+    saida = await nodes.finance_node({**ESTADO, "text": "comprei um fone por 80"})
+
+    assert saida["finance_actions"][0]["description"] == "fone"
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("generico", ["cartão", "cartao", "Crédito", "credito", " cartão "])
+async def test_new_account_generico_vira_vazio(sem_gemini, generico):
+    """"na verdade foi em 2x no cartão": cartão sem nome não é conta — o sistema usa o da linha."""
+    sem_gemini(FinancePlan(actions=[FinanceAction(
+        type=FinanceActionType.UPDATE_TRANSACTION, installments=2, new_account=generico)],
+        confidence=0.9))
+
+    saida = await nodes.finance_node({**ESTADO, "text": "na verdade foi em 2x no cartão"})
+
+    assert saida["finance_actions"][0]["new_account"] is None
+
+
+@pytest.mark.asyncio
+async def test_new_account_nomeado_fica(sem_gemini):
+    sem_gemini(FinancePlan(actions=[FinanceAction(
+        type=FinanceActionType.UPDATE_TRANSACTION, new_account="Nubank")], confidence=0.9))
+
+    saida = await nodes.finance_node({**ESTADO, "text": "na verdade foi no Nubank"})
+
+    assert saida["finance_actions"][0]["new_account"] == "Nubank"
