@@ -34,19 +34,70 @@ def test_destrutiva_sempre_pergunta():
     ) == "destrutiva"
 
 
-def test_gasto_comum_nao_pergunta():
+def test_gasto_comum_tambem_pergunta():
+    # 21/09/2026, decisão do dono: toda escrita pede SIM, inclusive o café
     acao = FinanceAction(type=FinanceActionType.CREATE_EXPENSE, amount_cents=4500)
-    assert needs_confirmation(acao, 1.0) is None
+    assert needs_confirmation(acao, 1.0) == "registro novo"
+
+
+def test_nota_e_lembrete_tambem_perguntam():
+    nota = NotesAction(type=NotesActionType.CREATE_NOTE, content="ligar pro dentista")
+    lembrete = NotesAction(type=NotesActionType.CREATE_REMINDER, content="pagar aluguel",
+                           remind_at="2026-09-22T09:00:00")
+    assert needs_confirmation(nota, 1.0) == "registro novo"
+    assert needs_confirmation(lembrete, 1.0) == "registro novo"
+
+
+def test_unknown_nao_pergunta_porque_nao_escreve():
+    # o registry devolve a ajuda sem tocar no banco; perguntar "confirma?" seria nada
+    assert needs_confirmation(FinanceAction(type=FinanceActionType.UNKNOWN), 1.0) is None
+    assert needs_confirmation(NotesAction(type=NotesActionType.UNKNOWN), 1.0) is None
+
+
+def test_conta_padrao_congelada_no_alvo_nao_vira_item_existente():
+    acao = FinanceAction(type=FinanceActionType.CREATE_EXPENSE, amount_cents=4500)
+    alvo = {"default_account": {"name": "Nubank"}}
+    assert needs_confirmation(acao, 1.0, alvo) == "registro novo"
+
+
+def test_frase_do_gasto_diz_o_efeito_e_a_conta_padrao():
+    acao = FinanceAction(type=FinanceActionType.CREATE_EXPENSE, amount_cents=4500,
+                         category="mercado")
+    frase = describe_for_confirmation(acao, {"default_account": {"name": "Nubank"}})
+    assert frase == "registrar gasto de R$ 45,00 em mercado, na conta Nubank"
+
+
+def test_frase_da_receita_sem_conta_padrao_diz_sem_conta():
+    acao = FinanceAction(type=FinanceActionType.CREATE_INCOME, amount_cents=50000,
+                         description="freela")
+    frase = describe_for_confirmation(acao, {"default_account": {"name": None}})
+    assert frase == "registrar receita de R$ 500,00 em freela, sem conta"
+
+
+def test_frase_com_conta_citada_usa_a_citada():
+    acao = FinanceAction(type=FinanceActionType.CREATE_EXPENSE, amount_cents=4500,
+                         category="mercado", account="Itaú")
+    assert describe_for_confirmation(acao) == "registrar gasto de R$ 45,00 em mercado, no Itaú"
+
+
+def test_frase_da_nota_e_do_lembrete():
+    nota = NotesAction(type=NotesActionType.CREATE_NOTE, content="ligar pro dentista",
+                       folder="saúde")
+    assert describe_for_confirmation(nota) == "criar a nota «ligar pro dentista» na pasta saúde"
+    lembrete = NotesAction(type=NotesActionType.CREATE_REMINDER, content="pagar aluguel",
+                           remind_at="2026-09-22T09:00:00")
+    assert describe_for_confirmation(lembrete) == (
+        "criar o lembrete «pagar aluguel» para 22/09/2026 às 09:00")
 
 
 def test_valor_acima_do_teto_pergunta():
     assert needs_confirmation(
         FinanceAction(type=FinanceActionType.CREATE_EXPENSE, amount_cents=100_001), 1.0
     ) == "valor alto"
-    # exatamente no teto ainda passa
+    # exatamente no teto não é "valor alto" — mas ainda pede SIM, como todo registro
     assert needs_confirmation(
         FinanceAction(type=FinanceActionType.CREATE_EXPENSE, amount_cents=100_000), 1.0
-    ) is None
+    ) == "registro novo"
 
 
 def test_baixa_confianca_pergunta_em_vez_de_escalar():

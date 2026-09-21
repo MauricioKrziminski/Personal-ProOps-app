@@ -1004,3 +1004,43 @@ async def contas_citadas(
                 alvos[i] = {**alvos[i], "correction_error": err.mensagem_usuario}
                 break
     return alvos
+
+
+# As três que caem na conta padrão quando o usuário não cita conta (`default_account`
+# em `app/tools/finance.py`). Compra parcelada e fatura pedem cartão e não caem nela.
+_USAM_CONTA_PADRAO = {
+    FinanceActionType.CREATE_EXPENSE,
+    FinanceActionType.CREATE_INCOME,
+    FinanceActionType.CREATE_TRANSFER,
+}
+
+
+async def conta_padrao(workspace_id, acoes: list, alvos: list[dict]) -> list[dict]:
+    """Congela no alvo o NOME da conta padrão, para a frase do SIM dizer para onde vai.
+
+    Desde 21/09/2026 todo registro pede SIM, e "a resposta diz o que foi decidido
+    por ela" (agent.md) passou a valer na PERGUNTA: quem escreveu "gastei 45 no
+    mercado" lê "…, na conta Nubank" antes de aprovar. A política é pura, então o
+    nome vem daqui, junto dos outros alvos congelados. `{"name": None}` = o
+    workspace não tem conta padrão e o lançamento vai sem conta.
+
+    Uma query por turno, e só quando alguma ação vai cair na conta padrão.
+    """
+    indices = [
+        i for i, a in enumerate(acoes)
+        if getattr(a, "type", None) in _USAM_CONTA_PADRAO and not a.account
+        and not (alvos[i] if i < len(alvos) else {}).get("correction_error")
+    ]
+    if not indices:
+        return alvos
+    linha = await db.fetch_one(
+        "select a.name from public.workspaces w "
+        "left join public.accounts a on a.id = w.default_account_id "
+        "and a.workspace_id = w.id where w.id = %s",
+        workspace_id,
+    )
+    nome = linha["name"] if linha else None
+    alvos = [*alvos] + [{}] * max(0, len(acoes) - len(alvos))
+    for i in indices:
+        alvos[i] = {**alvos[i], "default_account": {"name": nome}}
+    return alvos

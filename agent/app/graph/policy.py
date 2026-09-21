@@ -72,14 +72,19 @@ def needs_confirmation(
     `target` vem por último para os testes existentes seguirem chamando com dois
     argumentos.
 
-    A regra "teve alvo resolvido -> confirma" é DERIVADA, não uma lista: ela
-    cobre update, delete, undo, mark_paid, goal_deposit, update_asset_value,
-    append_note e delete_reminder de uma vez — e cobre o que for acrescentado
-    depois sem ninguém precisar lembrar de atualizar um conjunto.
+    ⚠️ **Toda escrita pede SIM** (21/09/2026, decisão do dono do produto). Até
+    então gasto/receita abaixo de `hitl_amount_threshold_cents`, nota e lembrete
+    simples gravavam direto. Os motivos específicos continuam (são o que diz ao
+    worker POR QUE perguntou); o que não tem nenhum cai em "registro novo". Só
+    consulta (`READ_ONLY`) e `unknown` — que o registry transforma em ajuda sem
+    tocar no banco — passam sem pergunta.
+
+    "Item existente" é alvo RESOLVIDO (tem `status`), não qualquer dict: a conta
+    padrão congelada no alvo de uma criação (`resolve.conta_padrao`) não é alvo.
     """
     settings = get_settings()
 
-    if action.type in READ_ONLY:
+    if action.type in READ_ONLY or action.type.value == "unknown":
         return None
     if isinstance(action, ResourceAction):
         return "cadastro ou alteração estrutural"
@@ -87,7 +92,7 @@ def needs_confirmation(
         return "compromisso futuro"
     if action.type in DESTRUCTIVE:
         return "destrutiva"
-    if target:
+    if target and target.get("status"):
         return "alterar item existente"
     if action.type in ALWAYS_CONFIRM:
         return "alterar item existente"
@@ -97,7 +102,7 @@ def needs_confirmation(
             return "valor alto"
     if confidence < CONFIDENCE_MINIMA:
         return "baixa confiança"
-    return None
+    return "registro novo"
 
 
 _VERBO = {
@@ -405,16 +410,40 @@ def describe_for_confirmation(
                 f"registrar {valor} de pagamento na fatura do {cartao}" if valor
                 else f"registrar o pagamento da fatura do {cartao}"
             )
-        # A conta entra na frase quando o usuário citou uma: é o que permite corrigir o meio
-        # ("não, foi no Itaú") antes da escrita, sem custar uma pergunta a mais. Quando ele não
-        # citou, a frase CALA em vez de afirmar "na conta padrão" — pode não haver nenhuma, e
-        # este módulo é puro de propósito: descobrir isso exigiria ir ao banco.
-        onde = f", no {action.account}" if action.account else ""
-        return f"registrar {valor} em {alvo}{onde}" if valor else f"registrar {alvo}{onde}"
+        # A conta entra na frase: é o que permite corrigir o meio ("não, foi no Itaú")
+        # antes da escrita. Citada, é a citada. Não citada, é a conta padrão que
+        # `resolve.conta_padrao` congelou no alvo (21/09/2026 — "a resposta diz o que
+        # foi decidido por ela" vale também na pergunta). Sem o nome congelado (ação
+        # que não cai na conta padrão), a frase cala em vez de adivinhar.
+        padrao = (target or {}).get("default_account")
+        if action.account:
+            onde = f", no {action.account}"
+        elif padrao is not None:
+            onde = f", na conta {padrao['name']}" if padrao.get("name") else ", sem conta"
+        else:
+            onde = ""
+        if tipo == "create_transfer":
+            origem = action.account or (padrao or {}).get("name") or "a conta padrão"
+            destino = action.counterparty_account or "a conta de destino"
+            return f"transferir {valor or 'o valor'} de {origem} para {destino}"
+        o_que = {"create_expense": "gasto de ", "create_income": "receita de "}.get(tipo, "")
+        if valor:
+            return f"registrar {o_que}{valor} em {alvo}{onde}"
+        return f"registrar {alvo}{onde}"
 
     alvo = action.search_term or action.content or "esse item"
     if tipo == "delete_note":
         return f"apagar a nota sobre {alvo}"
     if tipo == "delete_reminder":
         return f"cancelar o lembrete de {alvo}"
+    if tipo == "create_note":
+        pasta = f" na pasta {action.folder}" if action.folder else ""
+        return f"criar a nota «{action.content or ''}»{pasta}"
+    if tipo == "create_reminder":
+        quando = ""
+        if action.remind_at:
+            hora = str(action.remind_at)[11:16]
+            quando = f" para {format_date_br(action.remind_at)}" + (f" às {hora}" if hora else "")
+        repete = " (repete)" if action.recurrence else ""
+        return f"criar o lembrete «{action.content or ''}»{quando}{repete}"
     return f"salvar {alvo}"

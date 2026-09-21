@@ -160,6 +160,10 @@ async def test_gasto_na_conta_nubank_nao_avisa_limite_do_nubank_cartao(monkeypat
          "results": [], "source_message_id": "app:e3", "confidence": 1.0},
         {"configurable": {"thread_id": "e3"}},
     )
-    assert "__interrupt__" not in final
+    # sem aviso de limite: a única pausa é o SIM que toda escrita pede (21/09/2026)
+    pausa = getattr(final["__interrupt__"][0], "value", final["__interrupt__"][0])
+    assert pausa["kind"] == "confirmation"
     assert consultados == ["chk-nu"]
+    from langgraph.types import Command
+    final = await grafo.ainvoke(Command(resume=True), {"configurable": {"thread_id": "e3"}})
     assert "WROTE" in final["results"]

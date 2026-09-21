@@ -53,7 +53,7 @@ def build(checkpointer: AsyncPostgresSaver):
     builder.add_node("cadastros", resource_node)
     # Fase Cognitiva: resolve e CONGELA os alvos antes de qualquer decisão
     builder.add_node("alvos", resolve_node)
-    # fase segura: o que não precisa de confirmação grava ANTES da pergunta
+    # fase segura: só LEITURA roda antes da pergunta (toda escrita pede SIM, 21/09/2026)
     builder.add_node("seguras", safe_node)
     builder.add_node("gate", gate)
     builder.add_node("executar", execute_node)

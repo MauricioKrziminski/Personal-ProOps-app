@@ -64,6 +64,18 @@ def grafo(monkeypatch):
         ]
 
     monkeypatch.setattr(nodes.resolve, "for_actions", alvos_falso)
+
+    async def conta_padrao_falsa(workspace_id, acoes, alvos):
+        # a conta padrão congelada no alvo é o que a frase do SIM cita
+        from app.graph.schemas import FinanceAction, FinanceActionType as T
+        return [
+            {**a, "default_account": {"name": "Nubank"}}
+            if isinstance(x, FinanceAction) and x.type in (T.CREATE_EXPENSE, T.CREATE_INCOME)
+            and not x.account else a
+            for x, a in zip(acoes, alvos)
+        ]
+
+    monkeypatch.setattr(nodes.resolve, "conta_padrao", conta_padrao_falsa)
     monkeypatch.setattr(nodes, "route", router_falso)
     async def notas_falso(state):
         return {}
@@ -88,13 +100,96 @@ def _estado(acoes):
     } | {"finance_actions": acoes}
 
 
+def _pausa(estado):
+    pausa = estado["__interrupt__"][0]
+    return getattr(pausa, "value", pausa)
+
+
 @pytest.mark.asyncio
-async def test_gasto_comum_executa_sem_perguntar(grafo):
-    config = {"configurable": {"thread_id": "sem-pergunta"}}
+async def test_gasto_comum_pede_sim_com_a_frase_do_efeito(grafo):
+    """21/09/2026: toda escrita pede SIM — inclusive o café de R$ 45."""
+    config = {"configurable": {"thread_id": "gasto-pequeno"}}
     estado = await grafo.ainvoke(
         _estado([{"type": FinanceActionType.CREATE_EXPENSE.value, "amount_cents": 4500,
              "category": "mercado"}]),
         config=config,
+    )
+    valor = _pausa(estado)
+    assert valor["kind"] == "confirmation"
+    assert valor["reason"] == "registro novo"
+    # a conta que o usuário NÃO citou aparece na pergunta
+    assert valor["summary"] == "registrar gasto de R$ 45,00 em mercado, na conta Nubank"
+    assert "EXECUTOU" not in (estado.get("reply") or "")
+
+    retomado = await grafo.ainvoke(Command(resume=True), config=config)
+    assert "EXECUTOU" in retomado["reply"]
+
+
+@pytest.mark.asyncio
+async def test_nota_pede_sim(grafo):
+    config = {"configurable": {"thread_id": "nota"}}
+    estado = await grafo.ainvoke(
+        {**_estado([]), "notes_actions": [{"type": "create_note", "content": "ligar pro dentista"}]},
+        config=config,
+    )
+    valor = _pausa(estado)
+    assert valor["summary"] == "criar a nota «ligar pro dentista»"
+    retomado = await grafo.ainvoke(Command(resume=True), config=config)
+    assert "EXECUTOU" in retomado["reply"]
+
+
+@pytest.mark.asyncio
+async def test_lembrete_pede_sim_e_recusa_nao_grava(grafo):
+    config = {"configurable": {"thread_id": "lembrete"}}
+    estado = await grafo.ainvoke(
+        {**_estado([]), "notes_actions": [{"type": "create_reminder", "content": "pagar aluguel",
+                                           "remind_at": "2026-09-22T09:00:00"}]},
+        config=config,
+    )
+    assert _pausa(estado)["summary"] == "criar o lembrete «pagar aluguel» para 22/09/2026 às 09:00"
+    recusado = await grafo.ainvoke(Command(resume=False), config=config)
+    assert "EXECUTOU" not in recusado["reply"]
+
+
+@pytest.mark.asyncio
+async def test_lote_de_dois_gastos_e_UMA_pergunta_com_os_dois(grafo):
+    config = {"configurable": {"thread_id": "lote-dois"}}
+    estado = await grafo.ainvoke(
+        _estado([
+            {"type": "create_expense", "amount_cents": 4500, "category": "mercado"},
+            {"type": "create_expense", "amount_cents": 3000, "category": "uber"},
+        ]),
+        config=config,
+    )
+    assert len(estado["__interrupt__"]) == 1
+    itens = _pausa(estado)["items"]
+    assert itens == ["registrar gasto de R$ 45,00 em mercado, na conta Nubank",
+                     "registrar gasto de R$ 30,00 em uber, na conta Nubank"]
+    retomado = await grafo.ainvoke(Command(resume=True), config=config)
+    assert retomado["reply"].count("EXECUTOU") == 2
+
+
+@pytest.mark.asyncio
+async def test_rascunho_completado_pede_sim_antes_de_gravar(grafo):
+    """O estado que `_rodar_com_acoes` monta: ação pronta, `preset`, sem modelo."""
+    config = {"configurable": {"thread_id": "rascunho-completo"}}
+    estado = await grafo.ainvoke(
+        {**_estado([{"type": "create_expense", "amount_cents": 4500,
+                     "category": "mercado"}]),
+         "preset": True, "domains": ["financas"]},
+        config=config,
+    )
+    assert _pausa(estado)["kind"] == "confirmation"
+    assert "EXECUTOU" not in (estado.get("reply") or "")
+    retomado = await grafo.ainvoke(Command(resume=True), config=config)
+    assert "EXECUTOU" in retomado["reply"]
+
+
+@pytest.mark.asyncio
+async def test_consulta_nao_pergunta(grafo):
+    config = {"configurable": {"thread_id": "consulta"}}
+    estado = await grafo.ainvoke(
+        {**_estado([]), "finance_queries": [{"type": "query_balance"}]}, config=config,
     )
     assert "__interrupt__" not in estado
     assert "EXECUTOU" in estado["reply"]
@@ -874,6 +969,8 @@ async def test_o_antecedente_atravessa_DOIS_turnos_no_grafo_de_verdade(monkeypat
                   "amount_cents": 2000, "category": "café"}]) | {"last_write_id": ""},
         config=cfg,
     )
+    # toda escrita pede SIM (21/09/2026): o rastro nasce quando o SIM executa
+    await grafo.ainvoke(Command(resume=True), config=cfg)
     # `create_expense` não mira registro existente, então `alvos` nem consulta:
     # o rastro do turno 1 é o que o executor gravou, não uma resolução.
     assert vistos == [], "criar um gasto não devia resolver alvo nenhum"
@@ -1033,20 +1130,23 @@ async def test_par_com_alvo_ambiguo_a_confirmacao_lista_tambem_a_criacao(monkeyp
 
 @pytest.mark.asyncio
 async def test_dois_gastos_sem_mutacao_seguem_como_antes(monkeypatch, grafo):
-    """Sem registro existente em jogo não há par: o completo grava, o incompleto
-    vira rascunho — o comportamento de sempre."""
+    """Sem registro existente em jogo não há par: o completo pede SIM (toda escrita
+    pede, 21/09/2026) e só ele entra na frase; o incompleto vira rascunho."""
     _alvo_wardogs(monkeypatch)
+    cfg = {"configurable": {"thread_id": "dois-gastos"}}
     estado = await grafo.ainvoke(
         _estado([
             {"type": FinanceActionType.CREATE_EXPENSE.value, "amount_cents": 4500,
              "category": "mercado"},
             {"type": FinanceActionType.CREATE_EXPENSE.value, "category": "uber"},
         ]),
-        config={"configurable": {"thread_id": "dois-gastos"}},
+        config=cfg,
     )
-    assert "__interrupt__" not in estado
-    assert "EXECUTOU" in estado.get("results", [])
+    pausa = getattr(estado["__interrupt__"][0], "value", estado["__interrupt__"][0])
+    assert pausa["items"] == ["registrar gasto de R$ 45,00 em mercado, na conta Nubank"]
     assert estado["draft"].get("slot") == "amount"
+    retomado = await grafo.ainvoke(Command(resume=True), config=cfg)
+    assert "EXECUTOU" in retomado.get("results", [])
 
 
 @pytest.mark.asyncio

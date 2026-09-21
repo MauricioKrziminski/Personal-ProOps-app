@@ -163,9 +163,35 @@ Ele foi removido (`agent/app/tools/finance.py:856`); dar baixa é caminho de `ma
 
 ## Human-In-The-Loop
 
-- Disparam `interrupt()` no LangGraph: **deleções** (`delete_transaction`, `undo_last`,
-  `delete_note`, `delete_reminder`), **valor acima de `HITL_AMOUNT_THRESHOLD_CENTS`** (R$ 1.000
-  por padrão) e **confiança < 0,6**.
+- **Toda escrita pede SIM** (21/09/2026, decisão do dono do produto: *"toda escrita pede SIM"*).
+  Gasto, receita, transferência, nota, lembrete, cadastro — nada é gravado sem aprovação. Só
+  consulta (`READ_ONLY`) e `unknown` (que o registry vira ajuda sem tocar no banco) passam direto.
+  `needs_confirmation` continua devolvendo o motivo específico quando ele existe — destrutiva,
+  alterar item existente, valor acima de `HITL_AMOUNT_THRESHOLD_CENTS`, compromisso futuro,
+  confiança < 0,6 — e o resto cai em **"registro novo"**.
+
+  > **Era diferente até 21/09/2026:** só deleções, valor acima de R$ 1.000, alvo resolvido e
+  > confiança < 0,6 disparavam `interrupt()`; o gasto do dia a dia, a nota e o lembrete simples
+  > gravavam direto (e o `safe_node` os gravava ANTES da pergunta num lote misto). Hoje o
+  > `safe_node` só roda leitura.
+
+  **Custos aceitos:** cada registro custa um toque a mais. No WhatsApp a confirmação sai como
+  botão dentro da janela de 24h (grátis), e o clique é igualdade exata (zero modelo). A
+  confirmação **digitada** passa pelo gate semântico (`GEMINI_GATE`, Flash, ~US$ 0,002 por
+  resposta) — um "sim" escrito em cada café é o custo que a decisão aceita.
+
+  **Todo caminho de escrita termina no `gate`:** o turno normal, o rascunho completado
+  (`conversation._rodar_com_acoes`, com `preset`), o clique `ds:` (ele só completa o slot e cai
+  no mesmo `_rodar_com_acoes`), o financiamento vindo do rascunho e o "cadastra esse cartão"
+  (`ResourceAction`, que já confirmava). O **aviso de limite** ("Confirmar mesmo assim", que
+  cita valor e cartão) É o SIM daquele item — perguntar de novo seria dois SIMs para a mesma
+  compra.
+
+  **A frase diz a conta que o usuário NÃO citou.** A regra "a resposta diz o que foi decidido
+  por ela" passou a valer na pergunta: `resolve.conta_padrao` congela o nome da conta padrão
+  no alvo (a política é pura e não vai ao banco) e a frase sai "registrar gasto de R$ 45,00 em
+  mercado, na conta Nubank" — ou "…, sem conta" quando o workspace não tem padrão. ⚠️ Por
+  isso "item existente" em `needs_confirmation` é alvo com `status`, não qualquer dict.
 - A política vive em `app/graph/policy.py`, **pura e sem LangGraph**: regra de segurança que só dá
   para testar subindo o grafo inteiro é regra que ninguém testa.
 - O grafo **para**; quem fala com o mundo é o worker — manda a pergunta e grava `pending_actions`.

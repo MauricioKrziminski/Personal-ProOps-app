@@ -604,6 +604,9 @@ async def resolve_node(state: AgentState) -> dict:
     alvos = await resolve.contas_citadas(
         state["workspace_id"], acoes, alvos, pular=set(_incompletas(state, acoes))
     )
+    # toda escrita pede SIM (21/09/2026): a frase diz qual conta recebe o que
+    # o usuário não disse de onde saiu
+    alvos = await resolve.conta_padrao(state["workspace_id"], acoes, alvos)
 
     return {"targets": with_resources(alvos), "results": esclarecimentos,
             "draft": _rascunho(state, acoes, alvos)}
@@ -669,7 +672,12 @@ def _rascunho(state: AgentState, acoes: list, alvos: list[dict] | None = None) -
 
 
 async def safe_node(state: AgentState) -> dict:
-    """Executa AGORA o que não precisa de confirmação. Fase segura do lote."""
+    """Executa AGORA o que não precisa de confirmação. Fase segura do lote.
+
+    Desde 21/09/2026 toda escrita pede SIM, então aqui só sobram LEITURAS (e
+    `unknown`, que vira ajuda): num lote misto a consulta responde antes da
+    pergunta, e nada é gravado antes dela.
+    """
     if state.get("halted"):
         return {}
     acoes = _actions(state)
@@ -994,13 +1002,13 @@ async def _gate(state: AgentState) -> dict:
     # Ação incompleta não vira pergunta: o usuário já recebeu o pedido do que
     # falta, e confirmar "registrar None" não é uma decisão que dá para tomar.
     bloqueadas = _incompletas(state, acoes)
-    # No par, a criação sem motivo próprio entra como "lote" (o SIM a grava
-    # junto), e o aviso de limite já aceito não a tira da frase: um SIM, tudo nele.
-    # ⚠️ "lote" NÃO é motivo de segurança (por isso não mora em
-    # `needs_confirmation`): a criação sozinha passaria direto. Ele só existe para
-    # a pergunta ENUMERAR tudo o que o SIM vai gravar.
+    # Toda escrita tem motivo desde 21/09/2026 (`needs_confirmation`), então a
+    # pergunta ENUMERA tudo o que o SIM vai gravar. No par, o aviso de limite já
+    # aceito não tira a criação da frase: um SIM, tudo nele. Fora do par, aceitar
+    # o aviso de limite ("Confirmar mesmo assim", que cita valor e cartão) É o SIM
+    # daquele item — perguntar de novo seria dois SIMs para a mesma compra.
     motivos = [
-        (a, alvo, needs_confirmation(a, confidence, alvo or None) or ("lote" if i in par else None))
+        (a, alvo, needs_confirmation(a, confidence, alvo or None))
         for i, (a, alvo) in enumerate(zip(acoes, alvos))
         if i not in bloqueadas and (i not in avisos_confirmados or i in par)
     ]

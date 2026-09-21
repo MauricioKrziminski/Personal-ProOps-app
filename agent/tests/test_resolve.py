@@ -539,3 +539,32 @@ class TestSnapshotDeCorrecao:
             InstallmentScope(mode="range", start=7, end=7), correcao=True,
         )
         assert alvo["correction_error"] and "pag" not in alvo["correction_error"].lower()
+
+
+@pytest.mark.asyncio
+async def test_conta_padrao_congela_o_nome_so_onde_ela_vai_valer(monkeypatch):
+    """Toda escrita pede SIM (21/09/2026): a frase diz a conta que o usuário não citou."""
+    from app import db
+
+    consultas = []
+
+    async def fetch_one(sql, *args):
+        consultas.append(args)
+        return {"name": "Nubank"}
+
+    monkeypatch.setattr(db, "fetch_one", fetch_one)
+    acoes = [
+        FinanceAction(type=FinanceActionType.CREATE_EXPENSE, amount_cents=4500),
+        FinanceAction(type=FinanceActionType.CREATE_EXPENSE, amount_cents=100, account="Itaú"),
+        FinanceAction(type=FinanceActionType.CREATE_INSTALLMENT_PURCHASE, amount_cents=100),
+        FinanceAction(type=FinanceActionType.CREATE_INCOME, amount_cents=100),
+    ]
+    alvos = await resolve.conta_padrao("w1", acoes, [{}, {}, {}, {"correction_error": "x"}])
+    assert alvos[0] == {"default_account": {"name": "Nubank"}}
+    assert alvos[1] == {} and alvos[2] == {}  # citou conta; parcelado pede cartão
+    assert "default_account" not in alvos[3]  # já vai parar antes do SIM
+    assert len(consultas) == 1  # uma query por turno
+
+    consultas.clear()
+    assert await resolve.conta_padrao("w1", acoes[1:3], [{}, {}]) == [{}, {}]
+    assert consultas == []
