@@ -341,6 +341,14 @@ function TransactionForm({ editing }: { editing?: Transaction }) {
           onSuccess: () => {
             Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
             router.back();
+            // O `hint` do campo encurtou para caber no teto de 90 caracteres (design.md §7b), e
+            // explicação passou a morar na confirmação da ação. Sem esta linha, quem CRIA uma
+            // compra parcelada deixa de saber que as futuras já entram nas próximas faturas —
+            // a frase existia antes e sumiria sem substituto.
+            toast({
+              message: `Parcelei em ${values.installments}x. As futuras já entram nas próximas faturas.`,
+              tone: 'success',
+            });
           },
           onError: (error) =>
             toast({ message: financeErrorMessage(error, 'Não deu para parcelar. Tenta de novo.'), tone: 'error' }),
