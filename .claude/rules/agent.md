@@ -32,9 +32,10 @@ O serviço que recebe do WhatsApp, decide e escreve. Substituiu o par
 - **Resposta ao usuário é template Python.** Zero segunda chamada de LLM para escrever texto sobre
   números que já lemos: um modelo escrevendo "você gastou aproximadamente" em cima de um valor
   exato é alucinação com custo extra. O nó `geral` (saudação, ajuda) também não chama modelo.
-- **Teto MEDIDO do schema: 15 propriedades e UM enum por objeto.** A 16ª devolve
-  `400 INVALID_ARGUMENT` sem detalhe. `tests/test_schemas.py` prende o limite — somar campo exige
-  tirar outro.
+- **Teto MEDIDO do schema: o PRODUTO propriedades × valores de enum, não cada um.** O
+  `FinanceAction` está no teto de **252** (soma 32); os outros seguem em 198/31. Passar disso
+  devolve `400 INVALID_ARGUMENT` sem detalhe. `tests/test_schemas.py` prende o limite — somar campo
+  exige tirar outro, ou rodar o probe antes. Números e histórico em `ai-gemini.md`.
 
 ## Padrão de texto: valida estrutura, nunca infere sentido
 

@@ -314,6 +314,21 @@ async def test_mesmo_cmid_com_outro_id_e_404(repo):
         )
 
 
+@pytest.mark.asyncio
+async def test_id_da_propria_conversa_com_outro_cmid_e_404(repo):
+    """O id é MEU, mas o cmid é outro: a criação não pode virar mensagem nova dentro da
+    conversa existente por esta porta (quem manda mensagem é `send_message`)."""
+    sid = uuid4()
+    await app_chat.create_conversation(
+        user_id=USER, client_message_id=uuid4(), content="oi", session_id=sid
+    )
+    with pytest.raises(app_chat.ConversationNotFound):
+        await app_chat.create_conversation(
+            user_id=USER, client_message_id=uuid4(), content="de novo", session_id=sid
+        )
+    assert [m for m in repo.mensagens if m["content"] == "de novo"] == []
+
+
 # ---------------------------------------------------------------------------
 # 4 a 8. dedupe e recuperação
 # ---------------------------------------------------------------------------
