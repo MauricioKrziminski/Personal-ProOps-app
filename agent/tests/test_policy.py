@@ -474,3 +474,19 @@ def test_frase_da_transferencia_nao_inventa_origem():
         "transferir R$ 100,00 de Nubank para Poupança")
     assert describe_for_confirmation(acao, {"default_account": {"name": None}}) == (
         "transferir R$ 100,00 para Poupança")
+
+
+def test_frase_do_gasto_diz_a_data_quando_nao_e_hoje_e_a_repeticao():
+    acao = FinanceAction(type=FinanceActionType.CREATE_EXPENSE, amount_cents=4500,
+                         category="mercado", occurred_at="2026-09-20")
+    alvo = {"default_account": {"id": "a", "name": "Nubank"}}
+    assert describe_for_confirmation(acao, alvo, hoje="2026-09-21") == (
+        "registrar gasto de R$ 45,00 em mercado em 20/09/2026, na conta Nubank")
+    assert describe_for_confirmation(acao, alvo, hoje="2026-09-20") == (
+        "registrar gasto de R$ 45,00 em mercado, na conta Nubank")
+    aluguel = FinanceAction(type=FinanceActionType.CREATE_EXPENSE, amount_cents=150000,
+                            category="aluguel", occurred_at="2026-09-21",
+                            recurrence="FREQ=MONTHLY;BYMONTHDAY=5")
+    frase = describe_for_confirmation(aluguel, alvo, hoje="2026-09-21")
+    assert frase.startswith("registrar gasto de R$ 1.500,00 em aluguel, na conta Nubank, repete ")
+    assert "dia 5" in frase

@@ -183,15 +183,22 @@ Ele foi removido (`agent/app/tools/finance.py:856`); dar baixa é caminho de `ma
   **Todo caminho de escrita termina no `gate`:** o turno normal, o rascunho completado
   (`conversation._rodar_com_acoes`, com `preset`), o clique `ds:` (ele só completa o slot e cai
   no mesmo `_rodar_com_acoes`), o financiamento vindo do rascunho e o "cadastra esse cartão"
-  (`ResourceAction`, que já confirmava). O **aviso de limite** ("Confirmar mesmo assim", que
-  cita valor e cartão) É o SIM daquele item — perguntar de novo seria dois SIMs para a mesma
-  compra.
+  (`ResourceAction`, que já confirmava). O **aviso de limite** É o SIM daquele item —
+  perguntar de novo seria dois SIMs para a mesma compra —, e por isso ele termina com a MESMA
+  frase de efeito da confirmação comum ("Registrar R$ 3.000,00 de tv em 10x no cartão Nubank
+  Cartão… mesmo assim?"). Só o estouro do limite não diz o que está sendo aprovado.
 
   **A frase diz a conta que o usuário NÃO citou.** A regra "a resposta diz o que foi decidido
   por ela" passou a valer na pergunta: `resolve.conta_padrao` congela o nome da conta padrão
   no alvo (a política é pura e não vai ao banco) e a frase sai "registrar gasto de R$ 45,00 em
   mercado, na conta Nubank" — ou "…, sem conta" quando o workspace não tem padrão. ⚠️ Por
   isso "item existente" em `needs_confirmation` é alvo com `status`, não qualquer dict.
+  **O ID vai congelado junto, e é ele que a tool grava** (`finance._conta_padrao`, com
+  `ensure_owned`): relendo o padrão no SIM, trocá-lo no app entre a pergunta e a resposta
+  gravaria numa conta que a frase não disse. A frase também diz a **data quando não é hoje**
+  (no fuso do usuário) e **"repete …"** quando há recorrência. **Transferência sem origem (nem
+  citada, nem padrão) ou sem destino** vira `correction_error` antes da pergunta — aprovar e só
+  então ouvir "preciso das duas contas" é a pergunta sem resposta.
 - A política vive em `app/graph/policy.py`, **pura e sem LangGraph**: regra de segurança que só dá
   para testar subindo o grafo inteiro é regra que ninguém testa.
 - O grafo **para**; quem fala com o mundo é o worker — manda a pergunta e grava `pending_actions`.

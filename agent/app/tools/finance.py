@@ -162,6 +162,23 @@ async def default_account(workspace_id: UUID) -> UUID | None:
     return linha["default_account_id"] if linha else None
 
 
+async def _conta_padrao(ctx: ExecContext) -> UUID | None:
+    """A conta padrão que a frase do SIM citou — congelada no alvo, nunca relida.
+
+    Relendo aqui, trocar o padrão no app entre a pergunta e a resposta gravaria numa
+    conta que o usuário não aprovou. O id congelado ainda passa por `ensure_owned`:
+    ele veio do checkpoint, e escopo de workspace é código neste serviço. Alvo sem a
+    chave (pendência de antes deste deploy) cai na leitura de sempre.
+    """
+    congelada = (ctx.target or {}).get("default_account")
+    if congelada is None:
+        return await default_account(ctx.workspace_id)
+    if not congelada.get("id"):
+        return None
+    await ensure_owned("accounts", congelada["id"], ctx.workspace_id)
+    return congelada["id"]
+
+
 async def reference_window(
     workspace_id: UUID, action: FinanceAction | None = None
 ) -> list[dict]:
@@ -282,9 +299,7 @@ async def create_transaction(ctx: ExecContext, action: FinanceAction) -> ToolRes
     categoria = guards.clean_category(action.category)
     # Citou conta que não existe (ou ambígua) -> pergunta. Só quem NÃO citou cai
     # na conta padrão, que é preferência do usuário e não dedução nossa.
-    conta = await conta_citada(ctx.workspace_id, action.account) or await default_account(
-        ctx.workspace_id
-    )
+    conta = await conta_citada(ctx.workspace_id, action.account) or await _conta_padrao(ctx)
     rrule = guards.clean_rrule(action.recurrence)
 
     if rrule:
@@ -335,7 +350,7 @@ async def create_transfer(ctx: ExecContext, action: FinanceAction) -> ToolResult
     quando = guards.require_date(action.occurred_at, ctx.timezone)
     origem = await conta_citada(
         ctx.workspace_id, action.account, papel="a conta de onde saiu"
-    ) or await default_account(ctx.workspace_id)
+    ) or await _conta_padrao(ctx)
     destino = await conta_citada(
         ctx.workspace_id, action.counterparty_account, papel="a conta de destino"
     )

@@ -19,6 +19,7 @@ from app.domain.correcao_plano import (
 )
 from app.domain.dates import format_date_br
 from app.domain.money import cents_to_brl
+from app.domain.recurrence import descreve_rrule
 from app.graph.schemas import (
     DESTRUCTIVE,
     MONEY_WRITES,
@@ -294,7 +295,8 @@ def par_de_substituicao(acoes: list, alvos: list[dict | None]) -> set[int]:
 
 
 def describe_for_confirmation(
-    action: FinanceAction | FinanceQuery | NotesAction, target: dict | None = None
+    action: FinanceAction | FinanceQuery | NotesAction, target: dict | None = None,
+    hoje: str | None = None,
 ) -> str:
     """A frase que o usuário LÊ antes de dizer sim.
 
@@ -401,7 +403,8 @@ def describe_for_confirmation(
             return f"corrigir {alvo}: {changes}" if changes else f"corrigir {alvo}"
         if tipo == "create_installment_purchase":
             paid=action.already_paid_count or 0
-            return f"registrar {valor} em {action.installments}x no cartão {action.account or 'a informar'}: {paid} parcelas iniciais pagas e {(action.installments or 0)-paid} pendentes"
+            nome = f" de {action.description}" if action.description else ""
+            return f"registrar {valor}{nome} em {action.installments}x no cartão {action.account or 'a informar'}: {paid} parcelas iniciais pagas e {(action.installments or 0)-paid} pendentes"
         if tipo == "pay_invoice":
             # com valor a frase precisa dizer QUANTO: pagamento parcial e quitação são efeitos
             # diferentes, e confirmar "o pagamento da fatura" não distingue os dois
@@ -429,9 +432,15 @@ def describe_for_confirmation(
             destino = action.counterparty_account or "a conta de destino"
             return f"transferir {valor or 'o valor'}{de} para {destino}"
         o_que = {"create_expense": "gasto de ", "create_income": "receita de "}.get(tipo, "")
+        # A data só entra quando NÃO é hoje (`hoje` vem do fuso do usuário, pelo gate):
+        # "gastei 45 ontem" aprovado como se fosse hoje é o efeito que a frase esconde.
+        # Sem `hoje` (chamador que não sabe o fuso), a data aparece sempre que existir.
+        quando = (f" em {format_date_br(action.occurred_at)}"
+                  if action.occurred_at and action.occurred_at[:10] != hoje else "")
+        repete = f", repete {descreve_rrule(action.recurrence)}" if action.recurrence else ""
         if valor:
-            return f"registrar {o_que}{valor} em {alvo}{onde}"
-        return f"registrar {alvo}{onde}"
+            return f"registrar {o_que}{valor} em {alvo}{quando}{onde}{repete}"
+        return f"registrar {alvo}{quando}{onde}{repete}"
 
     alvo = action.search_term or action.content or "esse item"
     if tipo == "delete_note":

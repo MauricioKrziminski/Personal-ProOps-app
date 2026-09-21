@@ -550,7 +550,7 @@ async def test_conta_padrao_congela_o_nome_so_onde_ela_vai_valer(monkeypatch):
 
     async def fetch_one(sql, *args):
         consultas.append(args)
-        return {"name": "Nubank"}
+        return {"id": "acc-nu", "name": "Nubank"}
 
     monkeypatch.setattr(db, "fetch_one", fetch_one)
     acoes = [
@@ -560,7 +560,8 @@ async def test_conta_padrao_congela_o_nome_so_onde_ela_vai_valer(monkeypatch):
         FinanceAction(type=FinanceActionType.CREATE_INCOME, amount_cents=100),
     ]
     alvos = await resolve.conta_padrao("w1", acoes, [{}, {}, {}, {"correction_error": "x"}])
-    assert alvos[0] == {"default_account": {"name": "Nubank"}}
+    # o ID vai junto: é ele que a tool grava, sem reler o padrão no SIM
+    assert alvos[0] == {"default_account": {"id": "acc-nu", "name": "Nubank"}}
     assert alvos[1] == {} and alvos[2] == {}  # citou conta; parcelado pede cartão
     assert "default_account" not in alvos[3]  # já vai parar antes do SIM
     assert len(consultas) == 1  # uma query por turno
@@ -568,3 +569,49 @@ async def test_conta_padrao_congela_o_nome_so_onde_ela_vai_valer(monkeypatch):
     consultas.clear()
     assert await resolve.conta_padrao("w1", acoes[1:3], [{}, {}]) == [{}, {}]
     assert consultas == []
+
+
+
+@pytest.mark.asyncio
+async def test_transferencia_sem_origem_nem_padrao_recusa_antes_do_sim(monkeypatch):
+    from app import db
+
+    async def sem_padrao(sql, *args):
+        return {"id": None, "name": None}
+
+    monkeypatch.setattr(db, "fetch_one", sem_padrao)
+    sem_origem = FinanceAction(type=FinanceActionType.CREATE_TRANSFER, amount_cents=100,
+                               counterparty_account="Poupança")
+    sem_destino = FinanceAction(type=FinanceActionType.CREATE_TRANSFER, amount_cents=100,
+                                account="Nubank")
+    com_as_duas = FinanceAction(type=FinanceActionType.CREATE_TRANSFER, amount_cents=100,
+                                account="Nubank", counterparty_account="Poupança")
+    alvos = await resolve.conta_padrao("w1", [sem_origem, sem_destino, com_as_duas], [{}, {}, {}])
+    assert alvos[0]["correction_error"] == resolve.SEM_DUAS_CONTAS
+    assert alvos[1]["correction_error"] == resolve.SEM_DUAS_CONTAS
+    assert "correction_error" not in alvos[2]
+
+
+@pytest.mark.asyncio
+async def test_tool_grava_na_conta_padrao_CONGELADA_e_confere_a_posse(monkeypatch):
+    """A frase disse Nubank: o SIM grava na Nubank mesmo se o padrão mudou no meio."""
+    from app import db
+    from app.tools.base import ExecContext
+
+    donos = []
+
+    async def ensure_owned(tabela, row_id, workspace_id):
+        donos.append((tabela, row_id, workspace_id))
+
+    async def releu(*a, **k):
+        raise AssertionError("não relê o padrão: ele foi congelado na pergunta")
+
+    monkeypatch.setattr(finance, "ensure_owned", ensure_owned)
+    monkeypatch.setattr(finance, "default_account", releu)
+    ctx = ExecContext("u1", "w1", None, "America/Sao_Paulo", "gastei 45", "m1")
+    ctx.target = {"default_account": {"id": "acc-nu", "name": "Nubank"}}
+    assert await finance._conta_padrao(ctx) == "acc-nu"
+    assert donos == [("accounts", "acc-nu", "w1")]
+
+    ctx.target = {"default_account": {"id": None, "name": None}}
+    assert await finance._conta_padrao(ctx) is None

@@ -11,7 +11,7 @@ import logging
 
 from langgraph.types import interrupt
 
-from app.domain.dates import local_datetime_iso
+from app.domain.dates import local_datetime_iso, local_iso_date
 from app.graph.policy import (
     describe_for_confirmation,
     dominio_incerto,
@@ -725,7 +725,8 @@ def _confirm_selection(state: AgentState, update: dict) -> dict:
     targets=proposed.get('targets') or [{}]*len(actions)
     # no par a criação entra na frase mesmo sem motivo próprio: o SIM a grava junto
     par=par_de_substituicao(actions,targets)
-    descriptions=[describe_for_confirmation(action,target or None)
+    hoje=local_iso_date(proposed.get('timezone','America/Sao_Paulo'))
+    descriptions=[describe_for_confirmation(action,target or None,hoje=hoje)
                   for i,(action,target) in enumerate(zip(actions,targets))
                   if i not in _incompletas(proposed,actions)
                   and (i in par or needs_confirmation(action,proposed.get('confidence',1),target or None))
@@ -936,10 +937,16 @@ async def _gate(state: AgentState) -> dict:
                     limite_str = cents_to_brl(limite_res["limite_centavos"])
                     disp_str = cents_to_brl(limite_res["disponivel_centavos"])
                     novo_disp = cents_to_brl(limite_res["disponivel_centavos"] - acao.amount_cents)
+                    # Este aviso É o SIM da compra ("Confirmar mesmo assim" a tira da
+                    # pergunta final), então ele diz o efeito inteiro: valor, o quê,
+                    # parcelas, cartão, conta — a mesma frase da confirmação comum.
+                    efeito = describe_for_confirmation(
+                        acao, alvos[i] or None, hoje=local_iso_date(state.get("timezone", "America/Sao_Paulo"))
+                    ).removeprefix("registrar ")
                     aviso = (
                         f"⚠️ *Aviso:* Esta compra excede o limite disponível do seu {card_name} "
                         f"(Limite: {limite_str}, Disponível atual: {disp_str} → ficaria {novo_disp}). "
-                        "Deseja registrar mesmo assim ou prefere trocar de cartão?"
+                        f"Registrar {efeito} mesmo assim, ou prefere trocar de cartão?"
                     )
                     escolha = interrupt(
                         {
@@ -1023,8 +1030,9 @@ async def _gate(state: AgentState) -> dict:
     #    sobre a primeira ação e o SIM liberava o lote inteiro, calado.
     #    Ação com alvo `none` fica de fora: confirmar "apagar o lançamento" e
     #    receber "não achei" é pior que não ter perguntado.
+    hoje = local_iso_date(state.get("timezone", "America/Sao_Paulo"))
     itens = [
-        describe_for_confirmation(a, t or None)
+        describe_for_confirmation(a, t or None, hoje=hoje)
         for a, t, _ in pendentes
         if (t or {}).get("status") != "none"
     ]

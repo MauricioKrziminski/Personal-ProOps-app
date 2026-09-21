@@ -1015,6 +1015,12 @@ _USAM_CONTA_PADRAO = {
 }
 
 
+SEM_DUAS_CONTAS = (
+    "❌ Para transferir eu preciso das duas contas. "
+    "Tenta \"passei 200 da corrente pra poupança\". Ainda não registrei nada."
+)
+
+
 async def conta_padrao(workspace_id, acoes: list, alvos: list[dict]) -> list[dict]:
     """Congela no alvo o NOME da conta padrão, para a frase do SIM dizer para onde vai.
 
@@ -1025,22 +1031,36 @@ async def conta_padrao(workspace_id, acoes: list, alvos: list[dict]) -> list[dic
     workspace não tem conta padrão e o lançamento vai sem conta.
 
     Uma query por turno, e só quando alguma ação vai cair na conta padrão.
+
+    O ID vai junto e é ele que a tool grava (`finance._conta_padrao`): relendo o
+    padrão no SIM, trocar a conta padrão no app entre a pergunta e a resposta
+    faria a frase dizer uma conta e o lançamento cair noutra.
+
+    Transferência sem origem (nem citada, nem padrão) ou sem destino não tem
+    como acontecer: vira `correction_error` aqui, ANTES da pergunta — senão o
+    usuário aprovaria e só então ouviria "preciso das duas contas".
     """
+    alvos = [*alvos] + [{}] * max(0, len(acoes) - len(alvos))
     indices = [
         i for i, a in enumerate(acoes)
         if getattr(a, "type", None) in _USAM_CONTA_PADRAO and not a.account
-        and not (alvos[i] if i < len(alvos) else {}).get("correction_error")
+        and not alvos[i].get("correction_error")
     ]
-    if not indices:
-        return alvos
-    linha = await db.fetch_one(
-        "select a.name from public.workspaces w "
-        "left join public.accounts a on a.id = w.default_account_id "
-        "and a.workspace_id = w.id where w.id = %s",
-        workspace_id,
-    )
-    nome = linha["name"] if linha else None
-    alvos = [*alvos] + [{}] * max(0, len(acoes) - len(alvos))
+    padrao = {"id": None, "name": None}
+    if indices:
+        linha = await db.fetch_one(
+            "select a.id, a.name from public.workspaces w "
+            "left join public.accounts a on a.id = w.default_account_id "
+            "and a.workspace_id = w.id where w.id = %s",
+            workspace_id,
+        )
+        if linha and linha.get("id"):
+            padrao = {"id": str(linha["id"]), "name": linha["name"]}
     for i in indices:
-        alvos[i] = {**alvos[i], "default_account": {"name": nome}}
+        alvos[i] = {**alvos[i], "default_account": padrao}
+    for i, a in enumerate(acoes):
+        if (getattr(a, "type", None) == FinanceActionType.CREATE_TRANSFER
+                and not alvos[i].get("correction_error")
+                and (not a.counterparty_account or (not a.account and not padrao["id"]))):
+            alvos[i] = {**alvos[i], "correction_error": SEM_DUAS_CONTAS}
     return alvos

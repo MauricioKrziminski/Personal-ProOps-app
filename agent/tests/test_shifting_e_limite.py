@@ -167,3 +167,56 @@ async def test_gasto_na_conta_nubank_nao_avisa_limite_do_nubank_cartao(monkeypat
     from langgraph.types import Command
     final = await grafo.ainvoke(Command(resume=True), {"configurable": {"thread_id": "e3"}})
     assert "WROTE" in final["results"]
+
+
+async def _aviso_de_limite(monkeypatch, acao, thread):
+    """O aviso de limite com o cartão estourado — ele É o SIM da compra."""
+    from langgraph.checkpoint.memory import InMemorySaver
+    from app.graph import build as graph_module, nodes
+
+    async def accounts(workspace_id, *, only_cards=False):
+        return [{"id": "card-nu", "name": "Nubank Cartão", "type": "credit_card"}]
+
+    async def limite(ws, user, account_id, valor):
+        return {"excedeu": True, "card_name": "Nubank Cartão",
+                "limite_centavos": 100, "disponivel_centavos": 0}
+
+    async def noop(state):
+        return {}
+
+    async def writes(state, actions):
+        return ["WROTE" for _ in actions], None, None, []
+
+    monkeypatch.setattr(db, "accounts", accounts)
+    monkeypatch.setattr(finance, "verificar_limite_disponivel", limite)
+    monkeypatch.setattr(graph_module, "route", noop)
+    monkeypatch.setattr(graph_module, "finance_node", noop)
+    monkeypatch.setattr(nodes, "_executar", writes)
+    grafo = graph_module.build(InMemorySaver())
+    final = await grafo.ainvoke(
+        {"preset": True, "domains": ["financas"], "workspace_id": "w", "user_id": "u",
+         "phone": None, "timezone": "America/Sao_Paulo", "text": "comprei",
+         "finance_actions": [acao], "results": [], "source_message_id": f"app:{thread}",
+         "confidence": 1.0},
+        {"configurable": {"thread_id": thread}},
+    )
+    pausa = getattr(final["__interrupt__"][0], "value", final["__interrupt__"][0])
+    assert pausa["kind"] == "soft_warning"
+    return pausa["summary"]
+
+
+@pytest.mark.asyncio
+async def test_aviso_de_limite_diz_o_efeito_do_gasto(monkeypatch):
+    resumo = await _aviso_de_limite(monkeypatch, {
+        "type": "create_expense", "amount_cents": 5000, "account": "Nubank Cartão",
+        "description": "tênis"}, "lim-gasto")
+    assert "Registrar gasto de R$ 50,00 em tênis, no Nubank Cartão mesmo assim" in resumo
+
+
+@pytest.mark.asyncio
+async def test_aviso_de_limite_diz_o_efeito_da_compra_parcelada(monkeypatch):
+    resumo = await _aviso_de_limite(monkeypatch, {
+        "type": "create_installment_purchase", "amount_cents": 300000, "installments": 10,
+        "account": "Nubank Cartão", "description": "tv"}, "lim-parcelado")
+    assert "Registrar R$ 3.000,00 de tv em 10x no cartão Nubank Cartão" in resumo
+    assert "mesmo assim" in resumo
