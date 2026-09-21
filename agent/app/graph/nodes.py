@@ -868,6 +868,11 @@ async def _gate(state: AgentState) -> dict:
                 cand_table = escolhidos[0].get("table", alvo.get("table"))
                 congelado[i] = {**alvo, "status": "found", "candidates": escolhidos,
                                 "table": cand_table}
+                # D1: o cartão (ou a recusa) da conversão é POR candidato no empate
+                if escolhidos[0].get("convert_error"):
+                    congelado[i]["correction_error"] = escolhidos[0]["convert_error"]
+                elif escolhidos[0].get("convert_account"):
+                    congelado[i]["convert_account"] = escolhidos[0]["convert_account"]
                 congelado[i], parada = _perguntar_unidade(state, i, acao, congelado[i])
                 if parada:
                     return parada

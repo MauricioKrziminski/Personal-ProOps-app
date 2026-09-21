@@ -11,6 +11,7 @@ from app.config import get_settings
 from app.domain.correcao_plano import (
     CONTA_DO_PLANO,
     DATA_DO_PLANO,
+    MUDAR_PARCELAS,
     PARCELA_TRAVADA,
     SEM_CORRECAO,
     VARIAS_PARCELAS,
@@ -175,20 +176,36 @@ def _frase_correcao_plano(action: FinanceAction, target: dict, escolhido: dict) 
     )
 
 
+def e_conversao(action) -> bool:
+    """D1: `update_transaction` com 2+ parcelas pode ser "parcelar um lançamento que já
+    existe" — quem decide se o ALVO aceita é o resolvedor (`resolve.conversoes`)."""
+    return (getattr(action, "type", None) == FinanceActionType.UPDATE_TRANSACTION
+            and (getattr(action, "installments", None) or 0) >= 2)
+
+
 def _frase_conversao(action: FinanceAction, target: dict, escolhido: dict) -> str:
     """D1 — adotar um lançamento avulso como parcela 1 de uma compra parcelada nova.
 
     Sem valor por parcela de propósito: o cálculo mora no banco
-    (`convert_transaction_to_installments`).
+    (`convert_transaction_to_installments`). `nome`, `amount_cents` e `occurred_at`
+    vêm congelados no candidato pelo resolvedor — o `label` é a sentença inteira de
+    `describe()` e repetiria o valor. Nome e categoria novos entram na frase porque a
+    RPC os grava: o SIM não aprova efeito que a frase não disse. A data nova é a da
+    1ª parcela, e o cartão já está na frase — por isso nem "data →" nem "conta →".
     """
     valor = action.new_amount_cents if action.new_amount_cents is not None else escolhido.get("amount_cents")
     valor_str = f" ({cents_to_brl(valor)})" if valor is not None else ""
     cartao = target["convert_account"]["name"]
-    quando = escolhido.get("when")
+    data = action.new_occurred_at or escolhido.get("occurred_at")
+    quando = format_date_br(data) if data else escolhido.get("when")
     quando_str = f", 1ª parcela em {quando}" if quando else ""
+    outras = [o for o in _outras_correcoes(action, target)
+              if not o.startswith(("data →", "conta →"))]
+    outras_str = f"; {', '.join(outras)}" if outras else ""
+    nome = escolhido.get("nome") or escolhido["label"]
     return (
-        f"parcelar {escolhido['label']}{valor_str} em {action.installments}x "
-        f"no cartão {cartao}{quando_str}"
+        f"parcelar {nome}{valor_str} em {action.installments}x "
+        f"no cartão {cartao}{quando_str}{outras_str}"
     )
 
 
@@ -210,9 +227,21 @@ def erro_de_correcao(action, target: dict | None) -> str | None:
     """
     if getattr(action, "type", None) != FinanceActionType.UPDATE_TRANSACTION:
         return None
+    # recusa congelada no candidato escolhido num empate (ex.: conversão sem cartão)
+    if (target or {}).get("correction_error"):
+        return target["correction_error"]
+    cands = (target or {}).get("candidates") or []
+    n_plano = (cands[0].get("plan_installments")
+               if (target or {}).get("status") == "found" and cands else None)
+    # `installments` só é correção quando MUDA algo: igual ao N do plano é pista de
+    # busca, e 1 sozinho não parcela nada.
+    muda_parcelas = bool(action.installments) and action.installments != n_plano and (
+        n_plano is not None or action.installments >= 2)
     if not any([action.new_amount_cents is not None, action.new_category, action.new_occurred_at,
-                action.new_description, action.new_account, action.installments]):
+                action.new_description, action.new_account, muda_parcelas]):
         return SEM_CORRECAO
+    if n_plano is not None and muda_parcelas:
+        return MUDAR_PARCELAS
     if plano_inteiro(target):
         if action.new_occurred_at:
             return DATA_DO_PLANO

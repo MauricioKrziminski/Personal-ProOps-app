@@ -17,8 +17,10 @@ import psycopg
 from app import db
 from app.domain import matching
 from app.domain.correcao_plano import (
+    CARTAO_FALTANDO,
     CONTA_DO_PLANO,
     DATA_DO_PLANO,
+    LINHA_SUMIU,
     NADA_EDITAVEL,
     PARCELA_TRAVADA,
     VARIAS_PARCELAS,
@@ -855,6 +857,11 @@ async def update_transaction(ctx: ExecContext, action: FinanceAction) -> ToolRes
     # correção ("muda a 3ª parcela") marcar parcelas como pagas.
     alvo_id = cands[0]["id"]
     parcela_do_snapshot = False
+    # D1: parcelar o lançamento. Candidato com `plan_installments` já é parcela de um
+    # plano (installments igual ao N é só pista) e segue a correção comum.
+    if (not _alvo_e_plano(ctx) and (action.installments or 0) >= 2
+            and not cands[0].get("plan_installments")):
+        return await _parcelar(ctx, action)
     if _alvo_e_plano(ctx):
         snapshot = cands[0].get("installment_snapshot")
         if not snapshot:
@@ -1040,6 +1047,55 @@ async def _corrigir_plano(ctx: ExecContext, action: FinanceAction) -> ToolResult
     if outras:
         texto += f"; {outras} em todas as parcelas"
     return ToolResult(texto + ".", result_id=str(plano["id"]))
+
+
+async def _parcelar(ctx: ExecContext, action: FinanceAction) -> ToolResult:
+    """D1 — o lançamento avulso vira a parcela 1 de uma compra parcelada, pela MESMA
+    RPC do botão "Parcelar" do app (`convert_transaction_to_installments`). O id não
+    muda, e chamar de novo é recusa da RPC, nunca um segundo plano.
+
+    ⚠️ A RPC SOBRESCREVE com nulo: description, category e merchant vão com o que está
+    na linha AGORA, trocando só o que a pessoa pediu — omitir virava "Compra parcelada
+    (1/2)" sem categoria. A releitura com `workspace_id` é a checagem de dono (a RPC é
+    `security invoker` e acha a linha só pelo id; o agente ignora RLS). As parcelas
+    2..N nascem `source='app'` na RPC.
+    """
+    cartao = (ctx.target or {}).get("convert_account") or {}
+    if not cartao.get("id"):
+        # segunda trava: o resolvedor já pergunta o cartão antes do SIM
+        return ToolResult(CARTAO_FALTANDO, read_only=True)
+    linha = await db.fetch_one(
+        """
+        select id, amount_cents, occurred_at, description, category, merchant
+        from public.transactions where id = %s and workspace_id = %s
+        """,
+        ctx.target["candidates"][0]["id"], ctx.workspace_id,
+    )
+    if not linha:
+        return ToolResult(LINHA_SUMIU, read_only=True)
+    total = (guards.require_amount(action.new_amount_cents, o_que="o valor novo")
+             if action.new_amount_cents is not None else linha["amount_cents"])
+    primeira = (guards.require_date(action.new_occurred_at, ctx.timezone, default_hoje=False)
+                if action.new_occurred_at else str(linha["occurred_at"]))
+    descricao = (guards.require_text(action.new_description, o_que="a descrição nova", maximo=200)
+                 if action.new_description else linha["description"])
+    categoria = guards.clean_category(action.new_category) if action.new_category else linha["category"]
+    try:
+        await db.fetch_one(
+            "select public.convert_transaction_to_installments(%s, %s, %s, %s, %s, %s, %s, %s) as plano",
+            linha["id"], total, action.installments, primeira,
+            descricao, categoria, linha["merchant"], cartao["id"],
+        )
+    except psycopg.errors.RaiseException as err:
+        # P0001: a recusa da RPC já está escrita para a pessoa (mesmo padrão de _corrigir_plano)
+        motivo = (err.diag.message_primary or str(err)).strip().rstrip(".")
+        raise Level1Error(f"❌ {motivo}. Ainda não mudei nada.") from err
+    nome = descricao or linha["merchant"] or "o lançamento"
+    return ToolResult(
+        f"✂️ Parcelei *{nome}*: {cents_to_brl(total)} em {action.installments}x no cartão "
+        f"*{cartao['name']}*, 1ª parcela em {format_date_br(primeira)}.",
+        result_id=linha["id"],
+    )
 
 
 def _nome_e_categoria(action: FinanceAction, descricao, categoria) -> str:

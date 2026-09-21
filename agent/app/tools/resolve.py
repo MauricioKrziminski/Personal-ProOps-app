@@ -18,11 +18,19 @@ from typing import Any, Literal
 
 from app import db
 from app.domain import matching
-from app.domain.correcao_plano import CONTA_DO_PLANO, QUAL_PARCELA
+from app.domain.correcao_plano import (
+    CONTA_DO_PLANO,
+    LINHA_SUMIU,
+    QUAL_PARCELA,
+    SEM_CARTAO,
+    qual_cartao,
+    recusa_de_conversao,
+)
 from app.domain.reference import clean_term, wants_latest, wants_whole_plan
 from app.tools import finance
 from app.tools.base import FATURA_ABERTA
 from app.tools.guards import Level1Error
+from app.graph.policy import e_conversao
 from app.graph.schemas import (
     FinanceAction,
     FinanceActionType,
@@ -736,9 +744,12 @@ async def for_actions(
             continue
 
         resolved = {"table": tabela, "status": estado, "candidates": cands}
+        # Na conversão (D1) a conta citada é o CARTÃO da compra, não uma troca de conta:
+        # quem a resolve é `conversoes`, só entre cartões.
         if (
             acao.type == FinanceActionType.UPDATE_TRANSACTION
             and acao.new_account
+            and not e_conversao(acao)
             and (
                 tabela == "installment_plans"
                 or any(c.get("table") == "installment_plans" for c in cands)
@@ -747,7 +758,8 @@ async def for_actions(
             resolved["correction_error"] = (
                 CONTA_DO_PLANO
             )
-        elif acao.type == FinanceActionType.UPDATE_TRANSACTION and acao.new_account:
+        elif (acao.type == FinanceActionType.UPDATE_TRANSACTION and acao.new_account
+              and not e_conversao(acao)):
             name = acao.new_account
             if matching.normalize(name) in {"sem conta", "nenhuma conta"}:
                 resolved["new_account"] = {"id": None, "name": "Sem conta"}
@@ -773,7 +785,113 @@ async def for_actions(
                         f"Não encontrei uma conta ativa chamada {name}. Diga o nome de uma conta ou cartão cadastrado."
                     )
         saida.append(resolved)
-    return saida
+    return await conversoes(workspace_id, acoes, saida)
+
+
+# ---------------------------------------------------------------------------
+# D1: parcelar um lançamento que já existe
+# ---------------------------------------------------------------------------
+
+# O estado da linha que a `convert_transaction_to_installments` recusa, lido ANTES do
+# SIM. `parcela_travada('pending', ...)` isola o lado da FATURA, igual à RPC (a linha
+# `cleared` é liberada lá). `workspace_id` porque o agente ignora RLS.
+_DETALHE_DA_LINHA = """
+    select t.id, t.kind, t.amount_cents, t.occurred_at, t.description, t.merchant, t.category,
+           t.installment_plan_id, p.installments as plan_installments,
+           t.recurring_id, t.debt_id, t.rollover_of_invoice_id,
+           private.parcela_travada('pending', t.invoice_id) as fatura_travada,
+           a.id as account_id, a.name as account_name, a.type as account_type
+    from public.transactions t
+    left join public.installment_plans p
+      on p.id = t.installment_plan_id and p.workspace_id = t.workspace_id
+    left join public.accounts a
+      on a.id = t.account_id and a.workspace_id = t.workspace_id and not a.archived
+    where t.id = any(%s::uuid[]) and t.workspace_id = %s
+"""
+
+
+async def _cartao_citado(workspace_id, nome: str, cartoes: list[dict]):
+    """(cartão, None) ou (None, pergunta). Só entre CARTÕES: conta corrente não parcela.
+
+    Sem rascunho de propósito (exclusão declarada): `draft.mesclar` grava em `account`
+    e completar o rascunho re-resolveria o alvo sem congelar. A pessoa manda de novo.
+    """
+    if not cartoes:
+        return None, SEM_CARTAO
+    achado = await finance.resolve_account(workspace_id, nome, only_cards=True)
+    if achado:
+        c = next((c for c in cartoes if str(c["id"]) == str(achado)), None)
+        if c:
+            return {"id": str(c["id"]), "name": c["name"]}, None
+    parecidas = matching.match_accounts(nome, cartoes, account_type="credit_card")
+    if len(parecidas) > 1:
+        opcoes = ", ".join(f"*{c['name']}*" for c in parecidas[:6])
+        return None, f"🤔 “{nome}” casa com mais de um cartão: {opcoes}. Me manda de novo dizendo qual."
+    return None, f"🤔 Não achei cartão com o nome “{nome}”. " + qual_cartao([c["name"] for c in cartoes])
+
+
+async def conversoes(workspace_id, acoes: list, alvos: list[dict]) -> list[dict]:
+    """Congela no candidato de transação o que a conversão lê: `nome` curto,
+    `amount_cents`, `occurred_at` e `convert_account` ({id, name}) — ou `convert_error`.
+
+    Recusa ANTES do SIM tudo que o estado da linha já decide (as recusas da RPC) e a
+    falta de cartão. Com alvo `found` o resultado sobe para o alvo (`convert_account` /
+    `correction_error`); no empate fica no candidato e o `gate` levanta o do escolhido.
+    """
+    for i, acao in enumerate(acoes):
+        alvo = alvos[i] if i < len(alvos) else {}
+        if (not e_conversao(acao) or alvo.get("correction_error")
+                or alvo.get("status") not in ("found", "ambiguous")):
+            continue
+        def e_tx(c):
+            return c.get("table", alvo.get("table")) == "transactions"
+        ids = [str(c["id"]) for c in alvo.get("candidates") or [] if e_tx(c)]
+        if not ids:
+            continue
+        linhas = {str(r["id"]): r for r in await db.fetch(_DETALHE_DA_LINHA, ids, workspace_id)}
+        cartoes = await db.accounts(workspace_id, only_cards=True)
+        citado, erro_citado = (await _cartao_citado(workspace_id, acao.new_account, cartoes)
+                               if acao.new_account else (None, None))
+        cands = []
+        for c in alvo["candidates"]:
+            if not e_tx(c):
+                cands.append(c)
+                continue
+            linha = linhas.get(str(c["id"]))
+            if not linha:
+                cands.append({**c, "convert_error": LINHA_SUMIU})
+                continue
+            recusa = recusa_de_conversao(linha, acao.installments)
+            if linha.get("installment_plan_id"):
+                # já é parcela: igual ao N do plano é pista de busca (segue a correção comum)
+                cands.append({**c, "plan_installments": linha.get("plan_installments"),
+                              **({"convert_error": recusa} if recusa else {})})
+                continue
+            cartao = None
+            if not recusa:
+                recusa = erro_citado
+            if not recusa:
+                cartao = citado or (
+                    {"id": str(linha["account_id"]), "name": linha["account_name"]}
+                    if linha.get("account_type") == "credit_card" else None)
+                if not cartao:
+                    recusa = qual_cartao([k["name"] for k in cartoes]) if cartoes else SEM_CARTAO
+            cands.append({
+                **c,
+                "nome": linha.get("description") or linha.get("merchant") or linha.get("category")
+                or "lançamento",
+                "amount_cents": linha["amount_cents"],
+                "occurred_at": str(linha["occurred_at"]),
+                **({"convert_error": recusa} if recusa else {"convert_account": cartao}),
+            })
+        novo = {**alvo, "candidates": cands}
+        if alvo["status"] == "found":
+            if cands[0].get("convert_error"):
+                novo["correction_error"] = cands[0]["convert_error"]
+            elif cands[0].get("convert_account"):
+                novo["convert_account"] = cands[0]["convert_account"]
+        alvos[i] = novo
+    return alvos
 
 
 # ---------------------------------------------------------------------------
