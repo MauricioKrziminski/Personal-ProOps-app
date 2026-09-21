@@ -170,3 +170,34 @@ async def test_new_account_nomeado_fica(sem_gemini):
     saida = await nodes.finance_node({**ESTADO, "text": "na verdade foi no Nubank"})
 
     assert saida["finance_actions"][0]["new_account"] == "Nubank"
+
+
+@pytest.mark.asyncio
+async def test_criacao_com_dados_nos_campos_de_correcao_volta_para_os_de_criacao(sem_gemini):
+    """Bateria de 21/09/2026: "parcelei o notebook em 6 vezes, 4200 no inter" chegava com
+    `new_amount_cents`/`new_account` e o sistema perguntava o que a pessoa acabou de dizer.
+    Numa criação os `new_*` não existem; é só o campo trocado de lugar (estrutura)."""
+    sem_gemini(FinancePlan(actions=[FinanceAction(
+        type=FinanceActionType.CREATE_INSTALLMENT_PURCHASE, installments=6, description="notebook",
+        new_amount_cents=420000, new_account="inter", new_category="eletrônicos",
+        new_description="outro", new_occurred_at="2026-09-01")], confidence=0.9))
+
+    saida = await nodes.finance_node({**ESTADO, "text": "parcelei o notebook em 6 vezes, 4200 no inter"})
+
+    (acao,) = saida["finance_actions"]
+    assert acao["amount_cents"] == 420000 and acao["account"] == "inter"
+    assert acao["category"] == "eletrônicos" and acao["occurred_at"] == "2026-09-01"
+    assert acao["description"] == "notebook"  # o de criação que já veio não é sobrescrito
+    assert not any(acao[k] for k in ("new_amount_cents", "new_account", "new_category",
+                                      "new_description", "new_occurred_at"))
+
+
+@pytest.mark.asyncio
+async def test_correcao_mantem_os_campos_new(sem_gemini):
+    sem_gemini(FinancePlan(actions=[FinanceAction(
+        type=FinanceActionType.UPDATE_TRANSACTION, new_amount_cents=5400)], confidence=0.9))
+
+    saida = await nodes.finance_node({**ESTADO, "text": "na verdade foi 54"})
+
+    (acao,) = saida["finance_actions"]
+    assert acao["new_amount_cents"] == 5400 and acao["amount_cents"] is None

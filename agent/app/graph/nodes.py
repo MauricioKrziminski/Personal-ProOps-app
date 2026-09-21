@@ -233,6 +233,7 @@ def pick_domains(state: AgentState) -> list[str]:
 
 
 _CARTAO_GENERICO = {"cartão", "cartao", "crédito", "credito"}
+_CAMPOS_CORRECAO = ("amount_cents", "account", "category", "description", "occurred_at")
 
 
 async def finance_node(state: AgentState) -> dict:
@@ -259,6 +260,15 @@ async def finance_node(state: AgentState) -> dict:
     acoes = [a for a in plano.actions if a.type.value != "unknown"]
     texto_orig = state.get("text", "")
     for a in acoes:
+        if a.type.value.startswith("create_"):
+            # Campo de correção numa CRIAÇÃO é só o dado trocado de lugar (bateria de
+            # 21/09/2026: "parcelei o notebook em 6 vezes, 4200 no inter" chegava em
+            # new_amount_cents/new_account e o sistema perguntava o que já foi dito).
+            for campo in _CAMPOS_CORRECAO:
+                novo = getattr(a, f"new_{campo}")
+                if novo is not None and getattr(a, campo) is None:
+                    setattr(a, campo, novo)
+                setattr(a, f"new_{campo}", None)
         # "no cartão" sem nome não é conta: vazio deixa o sistema usar o da linha ou perguntar
         if a.new_account and a.new_account.strip().casefold() in _CARTAO_GENERICO:
             a.new_account = None
