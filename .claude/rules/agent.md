@@ -147,8 +147,10 @@ Ele foi removido (`agent/app/tools/finance.py:856`); dar baixa é caminho de `ma
   pergunta "é o total da compra ou cada parcela?" (`interrupt` `kind=choice,
   purpose=amount_unit`, helper `_perguntar_unidade`) em vez de abrir um menu de ações — a
   resposta congela `amount_unit` no alvo, e só então o SIM confirma. Sem a unidade — checkpoint
-  antigo, sem `editaveis` — a pergunta volta a ser feita; nunca há default (parcela × total é uma
-  ordem de grandeza de diferença).
+  antigo, de antes do deploy, sem `editaveis` — a correção é RECUSADA ("Não sei se o valor era o
+  total da compra ou cada parcela... me pede a correção de novo.", `agent/app/tools/finance.py:992-993`),
+  nunca executada com um default (parcela × total é uma ordem de grandeza de diferença); a
+  pergunta só volta a aparecer se a pessoa reenviar a correção.
 - **Toda correção da compra inteira passa por `update_installment_plan`** (valor em qualquer
   unidade, nome, categoria — `finance._corrigir_plano`); renomear/categoria SEM valor é um UPDATE
   direto (`finance._renomear_plano`, sem RPC, sem mexer em dinheiro, data ou conta). Corrigir UMA
@@ -180,12 +182,24 @@ Ele foi removido (`agent/app/tools/finance.py:856`); dar baixa é caminho de `ma
   "delete_transaction"; todo mundo entende "apagar o gasto de R$ 45".
 
 ⚠️ **Lote que CRIA algo novo e MUDA o que já existe é UM SIM atômico** (`policy.par_de_substituicao`,
-21/09/2026). "Na verdade eu comprei em 2x no cartão" gera `delete_transaction` (achou o gasto
-errado) + `create_installment_purchase` (a compra certa) — dois efeitos, uma frase. Três regras:
+21/09/2026) — é a REDE DE SEGURANÇA para quando o modelo devolve apagar/corrigir + criar no
+MESMO lote, não o caminho normal de uma correção. Hoje o prompt já ensina que "na verdade eu
+comprei em 2x no cartão" é UMA `update_transaction` com `installments=2` (`agent/app/graph/prompts.py:141-143`,
+"NUNCA delete_transaction + create_*: a compra é a mesma, só muda a forma de pagar"), mas antes
+da Task 5 o modelo respondia com o par — foi o incidente das wardogs: "Na verdade eu comprei em
+2x no cartao" voltou `[delete_transaction(wardogs, found), create_installment_purchase(2x)]`, e
+sem esta regra o `_gate` perguntava só o apagar, escondendo a criação da frase de confirmação.
+Um lote pode legitimamente misturar as duas coisas quando são DUAS intenções explícitas na
+mesma mensagem — "apaga o café de ontem e lança 30 no almoço" também cai na regra (um
+`delete_transaction` com alvo achado + um `create_expense`), e mesmo aí o SIM tem que cobrir os
+dois efeitos juntos. Três regras:
 
 - **Nada é gravado antes da pergunta.** Com o par incompleto (falta valor, cartão não existe), o
   `_gate` para ANTES do `interrupt()`, sem montar rascunho — "Ainda não apaguei nem criei nada."
-  Rascunho aqui reconstruiria o apagar a partir de uma frase nova, sem o contexto da criação.
+  O motivo de não montar rascunho é estrutural, não de contexto perdido: `_rascunho`
+  (`agent/app/graph/nodes.py:632-650`) guarda **uma** ação só. Guardando a criação, a outra
+  metade (apagar/corrigir) se perderia — completar o rascunho depois criaria a compra nova ao
+  lado da antiga, ou, se o apagar já tivesse rodado, a compra nunca nasceria.
 - **Criação primeiro, e o resto só roda se ela escreveu** (`nodes._executar`,
   `agent/app/graph/nodes.py:1082`): as ações do par são reordenadas com os `create_*` na frente
   antes de rodar; se uma criação volta `read_only` (erro, exceção), o apagar/corrigir E as
