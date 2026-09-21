@@ -1,6 +1,8 @@
 """Dinheiro é a parte que não pode errar: valor errado no banco é dado errado
 para sempre, e o usuário só descobre no fim do mês."""
 
+import pytest
+
 from app.domain.money import cents_to_brl, format_number_br, parse_valor_em_centavos
 
 
@@ -39,3 +41,30 @@ def test_formatacao_br():
     assert cents_to_brl(0) == "R$ 0,00"
     # decimal com vírgula, nunca ponto: "90.4%" ao lado de "90,4%" foi defeito real
     assert format_number_br(90.44) == "90,4"
+
+
+class TestParcelaVezesValor:
+    """Fix round 2: "N parcelas de V" e "N vezes de V" são o mesmo padrão estrutural de "Nx de V"."""
+
+    @pytest.mark.parametrize("texto", [
+        "comprei um celular 12 parcelas de 150",
+        "comprei um celular em 12 vezes de 150",
+        "comprei um celular em 12x de 150",
+        "comprei um celular em 12 parcelas de R$ 150",
+    ])
+    def test_parcela_vezes_n(self, texto):
+        from app.domain.money import parse_installment_total
+        assert parse_installment_total(texto, 12) == 180000
+
+    def test_n_diferente_das_parcelas_nao_aplica(self):
+        from app.domain.money import parse_installment_total
+        assert parse_installment_total("comprei um celular 12 parcelas de 150", 10) is None
+
+    def test_sem_padrao_devolve_none(self):
+        from app.domain.money import parse_installment_total
+        assert parse_installment_total("comprei um celular em 12 vezes, 150 cada", 12) is None
+
+    def test_vezes_sem_de_nao_e_padrao_de_parcela(self):
+        from app.domain.money import parse_installment_total
+        # sem "de" o número pode ser o total: o padrão não afirma "cada parcela"
+        assert parse_installment_total("parcelei em 12 vezes 3000", 12) != 3600000

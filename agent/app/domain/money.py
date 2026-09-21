@@ -78,13 +78,23 @@ def parse_valor_em_centavos(texto: str | None) -> int | None:
 
 
 def parse_installment_total(text: str, installments: int | None) -> int | None:
-    """The explicit Nx de R$ amount pattern denotes each installment."""
+    """"Nx de V", "N vezes de V" e "N parcelas de V": V é o valor DE CADA parcela.
+
+    Estrutura, não sentido: o N tem que ser o `installments` que o modelo extraiu.
+    Com o padrão presente e N diferente (ou mais de um), devolve None — cair em
+    `parse_valor_em_centavos` leria o V da parcela como TOTAL (fator N). "em N de V"
+    fica de fora de propósito: "dia 12 de 150"/"12 de setembro" usam a mesma forma. Em
+    "vezes"/"parcelas" o "de" é obrigatório: "12 vezes 3000" pode ser o total.
+    """
     matches = re.findall(
-        r"\b(\d{1,3})\s*x\s*(?:de\s*)?(?:R\$\s*)?(\d[\d.,]*)", text or "", re.IGNORECASE
+        r"\b(\d{1,3})\s*(?:x\s*(?:de\s*)?|(?:vezes|parcelas)\s+de\s*)(?:R\$\s*)?(\d[\d.,]*)",
+        text or "", re.IGNORECASE,
     )
-    if len(matches) == 1 and int(matches[0][0]) == installments:
-        each = parse_valor_em_centavos(matches[0][1].rstrip(".,"))
-        return each * installments if each else None
+    if matches:
+        if len(matches) == 1 and int(matches[0][0]) == installments:
+            each = parse_valor_em_centavos(matches[0][1].rstrip(".,"))
+            return each * installments if each else None
+        return None
     return parse_valor_em_centavos(text)
 
 
