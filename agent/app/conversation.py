@@ -239,6 +239,11 @@ async def run_turn(
             # Dois resumes juntos não acontecem: o claim da conversa (lease no
             # app, `claim_thread_batch` no WhatsApp) serializa o turno. Recusa
             # entra na mesma regra — não escreve, repetir é inofensivo.
+            # LIMITE: cobre falha FORA das tools (checkpoint, nós, entre um nó e
+            # outro, entre ações). Se o processo morre DENTRO da tool depois de
+            # reservar a vaga, a reserva fica órfã e o retry pula a ação: ela
+            # não acontece. É a política de `executed_actions` — não acontecer
+            # é melhor que duplicar dinheiro.
             # Tem que vir ANTES de `_resposta_do_estado`: o índice parcial da
             # 0055 aceita UMA pendência aberta por sessão, e a pergunta seguinte
             # do resume colidiria com esta.
