@@ -30,7 +30,11 @@ App mobile pessoal de **notas rápidas, lembretes e controle financeiro operado 
   Isso já falhou **duas vezes** (03/09/2026): a `0049` e depois as `0050`/`0051` foram anunciadas
   como "aplicadas em produção" quando foram para o staging.
 
-  **Staging está em `20260920130000`; produção segue em `20260918220000`.** As pendentes são
+  **Produção e staging ALINHADOS em `20260920130000`** — aplicadas em produção pelo Gabriel em
+  21/09/2026 e conferidas na fonte (`schema_migrations` devolve `20260920130000`,
+  `20260920120000`, `20260918220000`; as duas RPCs existem em uma versão cada, com `execute` para
+  `authenticated` e sem para `anon`). Agente de produção `agente-00074` e app `v1.3.42` subiram
+  depois. O parágrafo abaixo é o histórico da subida: (Histórico) as pendentes eram
   `20260920120000` e `20260920130000` (parcelar um lançamento que já existe, e desparcelar —
   `convert_transaction_to_installments` e a nova `update_installment_plan` que aceita
   `p_installments = 1`). As duas sobem juntas, e sobem ANTES do build/OTA que leva os dois botões
