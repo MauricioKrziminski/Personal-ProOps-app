@@ -287,6 +287,9 @@ class TestEdicaoPlano:
         assert "description = nome || ' (' || t.installment_no || '/' || p_installments || ')'" in rpc
         assert "coalesce(p_description, p_merchant, 'Compra parcelada')" in rpc
         assert finance._SUFIXO_DA_PARCELA == "|| ' (' || t.installment_no || '/' || p.installments || ')'"
+        # terceira cópia: renomear UMA parcela pelo snapshot
+        fonte = Path(finance.__file__).read_text()
+        assert "({antes['installment_no']}/{antes['plan_installments']})" in fonte
 
     @pytest.mark.asyncio
     async def test_valor_sem_unidade_nunca_cai_em_parcela(self, monkeypatch):
@@ -391,6 +394,75 @@ class TestEdicaoPlano:
         assert "parcela_travada" in update[0][0]
         assert not any("cleared" in c[0] for c in chamadas)
         assert not r.read_only
+
+    @pytest.mark.asyncio
+    async def test_valor_do_plano_manda_a_data_REAL_da_parcela_1(self, monkeypatch):
+        """I1: sem parcela travada a RPC reescreve TODAS as datas a partir da que recebe.
+        Com `first_occurred_at` do plano, uma parcela 1 editada à mão voltava ao
+        calendário antigo e trocava de fatura em silêncio."""
+        chamadas = []
+
+        async def fetch_one(sql, *args):
+            chamadas.append((" ".join(sql.split()), args))
+            if "from public.installment_plans" in sql:
+                return {**PLANO_COMPLETO, "editaveis": 10, "travado_cents": 0,
+                        "primeira": "2026-05-20"}
+            return {"mexidas": 10}
+
+        monkeypatch.setattr(finance.db, "fetch_one", fetch_one)
+        await finance.update_transaction(
+            _ctx_plano(amount_unit="total", candidates=[
+                {"id": "plano-1", "label": "TV", "table": "installment_plans", "editaveis": 10}]),
+            FinanceAction(type=FinanceActionType.UPDATE_TRANSACTION, new_amount_cents=240000),
+        )
+        leitura = chamadas[0][0]
+        assert "t1.installment_no = 1" in leitura and "t1.workspace_id = p.workspace_id" in leitura
+        rpc = [a for q, a in chamadas if "update_installment_plan" in q]
+        assert rpc[0][3] == "2026-05-20"
+
+    @staticmethod
+    def _duble_snapshot(monkeypatch, *, installment_no=3):
+        chamadas = []
+        LINHA = "aaaaaaaa-0000-0000-0000-000000000003"
+
+        async def fetch_one(sql, *args):
+            chamadas.append((" ".join(sql.split()), args))
+            if sql.strip().startswith("select id, kind"):
+                return {"id": LINHA, "kind": "expense", "amount_cents": 25000,
+                        "category": "eletrônicos", "description": f"TV ({installment_no}/10)",
+                        "occurred_at": "2026-07-15", "installment_no": installment_no,
+                        "plan_installments": 10}
+            return {"id": LINHA}
+
+        monkeypatch.setattr(finance.db, "fetch_one", fetch_one)
+        return chamadas, LINHA
+
+    @pytest.mark.asyncio
+    async def test_snapshot_renomear_uma_parcela_mantem_o_sufixo_e_nao_mexe_no_total(self, monkeypatch):
+        """M4: o nome saía sem "(k/N)" e o total do plano era recalculado à toa."""
+        chamadas, linha = self._duble_snapshot(monkeypatch)
+        await finance.update_transaction(
+            _ctx_snapshot({"id": linha, "installment_no": 3}),
+            FinanceAction(type=FinanceActionType.UPDATE_TRANSACTION, new_description="TV da sala"),
+        )
+        update = [c for c in chamadas if "update public.transactions" in c[0]]
+        assert "TV da sala (3/10)" in update[0][1]
+        assert "update public.installment_plans" not in update[0][0]
+
+    @pytest.mark.asyncio
+    async def test_snapshot_data_da_parcela_1_move_a_data_do_plano(self, monkeypatch):
+        """I1: a data da parcela 1 É a `first_occurred_at` do plano — mudar uma sem a
+        outra fazia o próximo "Editar a compra" devolver a parcela à data velha."""
+        chamadas, linha = self._duble_snapshot(monkeypatch, installment_no=1)
+        await finance.update_transaction(
+            _ctx_snapshot({"id": linha, "installment_no": 1}),
+            FinanceAction(type=FinanceActionType.UPDATE_TRANSACTION, new_occurred_at="2026-07-20"),
+        )
+        update = [c for c in chamadas if "update public.transactions" in c[0]][0][0]
+        assert ("first_occurred_at = case when u.installment_no = 1 then u.occurred_at "
+                "else p.first_occurred_at end") in update
+        assert "p.workspace_id = u.workspace_id" in update
+        assert "total_cents" not in update
 
     @pytest.mark.asyncio
     async def test_snapshot_de_varias_linhas_nao_corrige(self, sql):

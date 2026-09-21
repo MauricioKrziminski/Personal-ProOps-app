@@ -901,13 +901,20 @@ async def update_transaction(ctx: ExecContext, action: FinanceAction) -> ToolRes
     # usuário pode ter lançado outra coisa, e o "último" mudaria de dono.
     antes = await db.fetch_one(
         """
-        select id, kind, amount_cents, category, description, occurred_at
-        from public.transactions where id = %s and workspace_id = %s
+        select id, kind, amount_cents, category, description, occurred_at, installment_no,
+               (select p.installments from public.installment_plans p
+                 where p.id = t.installment_plan_id and p.workspace_id = t.workspace_id
+               ) as plan_installments
+        from public.transactions t where id = %s and workspace_id = %s
         """,
         alvo_id, ctx.workspace_id,
     )
     if not antes:
         return ToolResult("🤷 Esse lançamento não está mais aqui.", read_only=True)
+    if "description" in patch and antes.get("installment_no") and antes.get("plan_installments"):
+        # ponytail: terceira cópia do formato "(k/N)" (ver `_SUFIXO_DA_PARCELA`);
+        # `test_o_sufixo_da_parcela_e_o_mesmo_da_rpc` prende as três
+        patch["description"] += f" ({antes['installment_no']}/{antes['plan_installments']})"
     colunas = ", ".join(f"{c} = %s" for c in patch)
     args = [*patch.values(), antes["id"], ctx.workspace_id]
     account_guard = ""
@@ -922,23 +929,32 @@ async def update_transaction(ctx: ExecContext, action: FinanceAction) -> ToolRes
     # Linha de compra parcelada: o total do plano acompanha, na MESMA operação (a
     # soma é "as outras linhas + o valor novo", porque um CTE não enxerga o update do
     # irmão). Sem isto a tela mostrava um total que não é a soma do que está embaixo.
+    # A data da parcela 1 É a `first_occurred_at` do plano: mudar só a linha fazia o
+    # próximo "Editar a compra" (a RPC recalcula as datas dela) devolvê-la à velha.
     # Não é `update_transaction_scoped(..., 'one', ...)`, que também recalcula: ela
     # copia nome/categoria da PARCELA para o PLANO e não aceita data.
+    do_plano = []
+    if "amount_cents" in patch:
+        do_plano.append("""total_cents = u.amount_cents + coalesce((select sum(t.amount_cents)
+                     from public.transactions t
+                     where t.installment_plan_id = p.id and t.workspace_id = p.workspace_id
+                       and t.id <> u.id), 0)""")
+    if "occurred_at" in patch:
+        do_plano.append("first_occurred_at = case when u.installment_no = 1 then u.occurred_at "
+                        "else p.first_occurred_at end")
+    plano_cte = (f""", plano as (
+            update public.installment_plans p
+               set {", ".join(do_plano)}, updated_at = now()
+            from u where p.id = u.installment_plan_id and p.workspace_id = u.workspace_id
+        )""" if do_plano else "")
     updated = await db.fetch_one(
         f"""
         with u as (
             update public.transactions set {colunas}
             where id = %s and workspace_id = %s{trava}{account_guard}
-            returning id, amount_cents, installment_plan_id, workspace_id
-        ), plano as (
-            update public.installment_plans p
-               set total_cents = u.amount_cents + coalesce((select sum(t.amount_cents)
-                     from public.transactions t
-                     where t.installment_plan_id = p.id and t.workspace_id = p.workspace_id
-                       and t.id <> u.id), 0),
-                   updated_at = now()
-            from u where p.id = u.installment_plan_id and p.workspace_id = u.workspace_id
-        )
+            returning id, amount_cents, occurred_at, installment_no, installment_plan_id,
+                      workspace_id
+        ){plano_cte}
         select id from u
         """,
         *args,
@@ -1005,7 +1021,14 @@ async def _corrigir_plano(ctx: ExecContext, action: FinanceAction) -> ToolResult
     plano = await db.fetch_one(
         f"""
         select p.id, p.total_cents, p.installments, p.first_occurred_at, p.description,
-               p.category, p.merchant, p.account_id, x.editaveis, x.travado_cents
+               p.category, p.merchant, p.account_id, x.editaveis, x.travado_cents,
+               -- a data REAL da parcela 1 (editada à mão ou não): sem parcela travada a
+               -- RPC recalcula TODAS as datas a partir desta. Com parcela travada a RPC
+               -- exige a do plano (e não mexe em data nenhuma), daí o `case`.
+               case when x.travado_cents = 0 then (
+                 select t1.occurred_at from public.transactions t1
+                 where t1.installment_plan_id = p.id and t1.workspace_id = p.workspace_id
+                   and t1.installment_no = 1) end as primeira
         from public.installment_plans p
         {TRAVAS_DO_PLANO}
         where p.id = %s and p.workspace_id = %s
@@ -1031,7 +1054,8 @@ async def _corrigir_plano(ctx: ExecContext, action: FinanceAction) -> ToolResult
     try:
         await db.fetch_one(
             "select public.update_installment_plan(%s, %s, %s, %s, %s, %s, %s, %s) as mexidas",
-            plano["id"], total, plano["installments"], plano["first_occurred_at"],
+            plano["id"], total, plano["installments"],
+            plano.get("primeira") or plano["first_occurred_at"],
             descricao, categoria, plano["merchant"], plano["account_id"],
         )
     except psycopg.errors.RaiseException as err:
