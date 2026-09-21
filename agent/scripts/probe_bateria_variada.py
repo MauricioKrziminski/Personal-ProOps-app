@@ -324,7 +324,7 @@ LEITURA = ("query_",)
 
 def _eh_escrita(a):
     t = a["type"]
-    return not t.startswith(LEITURA) and t not in ("resource_list", "unknown")
+    return not t.startswith(LEITURA) and t not in ("resource_list", "unknown", "simulate_scenario")
 
 
 async def rodar(texto, historico):
@@ -342,7 +342,9 @@ async def rodar(texto, historico):
         return saida
     nos = {"financas": nodes.finance_node, "financas_consulta": nodes.finance_query_node,
            "notas": nodes.notes_node, "cadastros": nodes.resource_node}
-    for dominio in nodes.pick_domains(estado):
+    # O router às vezes repete o domínio (["financas", "financas"]); o fan-out do
+    # LangGraph roda o nó UMA vez, então aqui também.
+    for dominio in dict.fromkeys(nodes.pick_domains(estado)):
         if dominio not in nos:
             continue
         out = await nos[dominio](estado)
