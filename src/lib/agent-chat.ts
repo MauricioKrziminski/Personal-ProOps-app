@@ -131,14 +131,42 @@ export function abrirConversaNova(
     semear: (id: string, turno: { clientMessageId: string; content: string }) => void;
     enviar: (v: { id: string; clientMessageId: string; content: string }) => unknown;
     navegar: (id: string) => void;
+    /** Trava do toque: o segundo disparo no mesmo quadro não abre outra conversa. */
+    trava?: TravaDeToque;
   },
-): { id: string; clientMessageId: string } {
+): { id: string; clientMessageId: string } | null {
+  if (deps.trava && !deps.trava.tentar()) return null;
   const id = deps.gerarId();
   const clientMessageId = deps.gerarId();
   deps.semear(id, { clientMessageId, content });
   deps.enviar({ id, clientMessageId, content });
   deps.navegar(id);
   return { id, clientMessageId };
+}
+
+export interface TravaDeToque {
+  /** `true` na primeira vez; `false` até alguém `liberar`. */
+  tentar: () => boolean;
+  liberar: () => void;
+}
+
+/**
+ * Um toque, uma conversa. O `setTexto('')` só chega no próximo render, e dois
+ * toques no mesmo quadro leriam o mesmo texto — duas conversas com a mesma
+ * pergunta. Quem libera é a tela, no quadro seguinte.
+ */
+export function novaTravaDeToque(): TravaDeToque {
+  let ocupada = false;
+  return {
+    tentar: () => {
+      if (ocupada) return false;
+      ocupada = true;
+      return true;
+    },
+    liberar: () => {
+      ocupada = false;
+    },
+  };
 }
 
 export interface MensagemLocal {
@@ -178,7 +206,7 @@ interface ComSeq {
   client_message_id?: string | null;
 }
 
-/** Só mensagem local (sem `sequence`) no cache: o servidor ainda não tem o que devolver. */
+/** Só mensagem local (sem `sequence`) no cache: o servidor ainda não confirmou a conversa. */
 function soLocal(itens: readonly { sequence?: number }[]): boolean {
   return itens.length > 0 && itens.every((m) => m.sequence == null);
 }
@@ -190,8 +218,24 @@ function soLocal(itens: readonly { sequence?: number }[]): boolean {
  * não busca: a conversa pode nem existir ainda, e um GET ali voltaria 404 ou
  * vazio por cima da mensagem que a pessoa acabou de mandar.
  */
-export function historicoPrecisaBuscar(itens: readonly { sequence?: number }[]): boolean {
-  return !soLocal(itens);
+export function historicoPrecisaBuscar(
+  itens: readonly { sequence?: number; status?: string }[],
+): boolean {
+  // Só segura enquanto a criação está EM VOO. A local `failed` (ex.: reabrir
+  // depois de um 402, que grava a conversa) deixa buscar o que o servidor tem.
+  return !(soLocal(itens) && itens.every((m) => m.status === 'processing'));
+}
+
+/**
+ * O compositor trava enquanto o servidor não tem a conversa: uma segunda
+ * mensagem iria por `enviar` para um id que ainda não existe. Ali a única ação
+ * é "Tentar novamente" (que recria com o mesmo par).
+ */
+export function compositorTravado(
+  itens: readonly { sequence?: number }[],
+  estado: { awaitingAction: boolean },
+): boolean {
+  return estado.awaitingAction || soLocal(itens);
 }
 
 /** "Tentar novamente": sem nada do servidor, recria (mesmo id + cmid); depois, envia. */
@@ -239,7 +283,13 @@ export function aplicarTurno<M extends ComSeq>(
 export function marcarTurnoLocal<M extends ComSeq>(
   cache: CacheDePaginas<M>,
   clientMessageId: string,
-  patch: { status: MensagemLocal['status']; error_code?: string | null; error_status?: number | null },
+  patch: {
+    status: MensagemLocal['status'];
+    error_code?: string | null;
+    error_status?: number | null;
+    /** No retry: o teto de 5 min do "Pensando…" recomeça daqui. */
+    created_at?: string;
+  },
 ): CacheDePaginas<M> {
   return {
     ...cache,
@@ -275,6 +325,9 @@ export function falhaDoTurno(m: { error_code?: string | null; error_status?: num
 } {
   const conhecida = FALHA[m.error_code ?? ''];
   if (conhecida) return { ...conhecida, sair: false };
+  if (m.error_code === 'not_configured') {
+    return { texto: 'O agente não está configurado neste app.', retryable: false, sair: false };
+  }
   if (m.error_status == null) return { ...FALHA.internal, sair: false };
   const { retryable } = retryPolicyFor({ status: m.error_status, code: m.error_code ?? undefined });
   const texto =
@@ -416,6 +469,8 @@ export interface RetryPolicy {
  * fácil de perder um usuário.
  */
 export function retryPolicyFor(erro: { status: number; code?: string }): RetryPolicy {
+  // `status 0` sem URL do agente não é rede: repetir dá o mesmo erro.
+  if (erro.code === 'not_configured') return { retryable: false, paywall: false, blockComposer: false };
   switch (erro.status) {
     case 402:
       return { retryable: false, paywall: true, blockComposer: false };

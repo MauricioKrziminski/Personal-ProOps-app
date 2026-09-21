@@ -182,7 +182,12 @@ export function useCreateAgentConversation() {
     // O retry parte de uma mensagem `failed`: sem isto a tela mostraria a falha
     // antiga, e não "Pensando…", enquanto o novo POST roda.
     onMutate: (v: NovaConversa) => {
-      marcar(v, { status: 'processing', error_code: null, error_status: null });
+      marcar(v, {
+        status: 'processing',
+        error_code: null,
+        error_status: null,
+        created_at: new Date().toISOString(),
+      });
     },
     onSuccess: aplicar,
     onError: (e: Error, v: NovaConversa) => {

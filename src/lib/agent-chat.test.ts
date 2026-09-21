@@ -30,6 +30,8 @@ import {
   retryDoTurno,
   falhaDoTurno,
   tituloProvisorio,
+  novaTravaDeToque,
+  compositorTravado,
 } from './agent-chat.ts';
 
 // ---------------------------------------------------------------------------
@@ -604,6 +606,8 @@ test('a semente tem o formato do useInfiniteQuery e a mensagem local sem sequenc
 test('histórico: cache vazio busca; só a mensagem local não busca; com servidor busca', () => {
   assert.equal(historicoPrecisaBuscar([]), true);
   assert.equal(historicoPrecisaBuscar(sementeDaConversa('c', 'oi').pages[0].items), false);
+  // local que FALHOU (ex.: reabrir depois de um 402) busca: o servidor pode ter a conversa
+  assert.equal(historicoPrecisaBuscar([{ id: 'local:c', status: 'failed' }]), true);
   assert.equal(historicoPrecisaBuscar([{ id: 'u', sequence: 1 }]), true);
 });
 
@@ -672,4 +676,48 @@ test('título provisório segue a regra do servidor: 1ª linha não vazia, colap
   assert.equal(tituloProvisorio('\n  gastei   45\tno mercado  \nsegunda'), 'gastei 45 no mercado');
   assert.equal(tituloProvisorio('x'.repeat(60)).length, 48);
   assert.equal(tituloProvisorio('   '), 'Nova conversa');
+});
+
+test('duplo toque no mesmo quadro abre UMA conversa só', () => {
+  const trava = novaTravaDeToque();
+  let enviou = 0;
+  let navegou = 0;
+  let n = 0;
+  const deps = {
+    gerarId: () => `id-${++n}`,
+    semear: () => {},
+    enviar: () => { enviou += 1; },
+    navegar: () => { navegou += 1; },
+    trava,
+  };
+  assert.ok(abrirConversaNova('oi', deps));
+  assert.equal(abrirConversaNova('oi', deps), null);
+  assert.equal(enviou, 1);
+  assert.equal(navegou, 1);
+  trava.liberar();
+  assert.ok(abrirConversaNova('outra', deps));
+  assert.equal(enviou, 2);
+});
+
+test('compositor trava enquanto a conversa não existe no servidor', () => {
+  const soLocal = sementeDaConversa('c', 'oi').pages[0].items;
+  assert.equal(compositorTravado(soLocal, { awaitingAction: false }), true);
+  assert.equal(compositorTravado([{ id: 'local:c', status: 'failed' }], { awaitingAction: false }), true);
+  assert.equal(compositorTravado([], { awaitingAction: false }), false);
+  assert.equal(compositorTravado([{ id: 'u', sequence: 1 }], { awaitingAction: false }), false);
+  assert.equal(compositorTravado([{ id: 'u', sequence: 1 }], { awaitingAction: true }), true);
+});
+
+test('marcarTurnoLocal renova o created_at quando o patch traz um', () => {
+  const cache = sementeDaConversa('c1', 'oi', new Date('2026-09-21T10:00:00.000Z'));
+  const r = marcarTurnoLocal(cache, 'c1', { status: 'processing', created_at: '2026-09-21T10:07:00.000Z' });
+  assert.equal(r.pages[0].items[0].created_at, '2026-09-21T10:07:00.000Z');
+});
+
+test('not_configured não vira "sem conexão" com retry', () => {
+  const f = falhaDoTurno({ error_code: 'not_configured', error_status: 0 });
+  assert.equal(f.retryable, false);
+  assert.doesNotMatch(f.texto, /conex/i);
+  assert.equal(retryPolicyFor({ status: 0, code: 'not_configured' }).retryable, false);
+  assert.equal(retryPolicyFor({ status: 0, code: 'network' }).retryable, true);
 });

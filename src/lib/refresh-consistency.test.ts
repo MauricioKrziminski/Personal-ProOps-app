@@ -139,7 +139,7 @@ test('criar conversa: onMutate volta a local para processing; onError marca fail
   });
   const key = ['agent', 'messages', 'conv-1'];
   const v = { id: 'conv-1', clientMessageId: 'c1', content: 'oi' };
-  client.setQueryData(key, { pages: [{ items: [{ id: 'local:c1', client_message_id: 'c1', role: 'user', content: 'oi', status: 'failed', error_code: 'network', error_status: 0 }], next_cursor: null }], pageParams: [null] });
+  client.setQueryData(key, { pages: [{ items: [{ id: 'local:c1', client_message_id: 'c1', role: 'user', content: 'oi', status: 'failed', error_code: 'network', error_status: 0, created_at: '2020-01-01T00:00:00.000Z' }], next_cursor: null }], pageParams: [null] });
   client.setQueryData(['agent', 'conversations'], 'old');
   try {
     const m = hooks.useCreateAgentConversation();
@@ -147,6 +147,8 @@ test('criar conversa: onMutate volta a local para processing; onError marca fail
     let item = (client.getQueryData(key) as any).pages[0].items[0];
     assert.equal(item.status, 'processing');
     assert.equal(item.error_code, null);
+    // o teto de 5 min recomeça no retry
+    assert.ok(Date.now() - Date.parse(item.created_at) < 5_000);
 
     await m.onError({ status: 402, code: 'plan_limit', policy: { paywall: true } }, v);
     item = (client.getQueryData(key) as any).pages[0].items[0];

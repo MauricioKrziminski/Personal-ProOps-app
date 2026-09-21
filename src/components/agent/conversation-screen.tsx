@@ -42,6 +42,7 @@ import {
 } from '@/lib/agent-api';
 import {
   abrirConversaNova,
+  compositorTravado,
   conversationRoute,
   falhaDoTurno,
   newClientMessageId,
@@ -49,6 +50,7 @@ import {
   sementeDaConversa,
   tituloProvisorio,
   isNearChatEnd,
+  novaTravaDeToque,
   parseUiActions,
   prependMessagePage,
   type UiOption,
@@ -184,7 +186,11 @@ export function ConversationScreen({ conversationId, initialText = '', title, ta
    * ("digita o nome de outro cartão"). Travar o campo transformaria a lista de
    * cartões existentes na única resposta possível.
    */
-  const esperandoAcao = Boolean(pergunta?.pending_id && !pergunta.resolved);
+  // Conversa que o servidor ainda não confirmou também trava: a saída é o
+  // "Tentar novamente", que recria com o mesmo par de ids.
+  const esperandoAcao = compositorTravado(mensagens, {
+    awaitingAction: Boolean(pergunta?.pending_id && !pergunta.resolved),
+  });
 
   // O teto do lease. Sem ele, um turno que morreu no servidor deixaria a tela
   // com "Pensando..." para sempre, e ele nunca viraria um botão. A contagem sai
@@ -225,6 +231,8 @@ export function ConversationScreen({ conversationId, initialText = '', title, ta
     [enviar, turno],
   );
 
+  const [trava] = useState(novaTravaDeToque);
+
   const submeter = useCallback(() => {
     const conteudo = texto.trim();
     setTexto('');
@@ -235,7 +243,8 @@ export function ConversationScreen({ conversationId, initialText = '', title, ta
     // Conversa nova: a tela da conversa abre NO TOQUE, com a mensagem já no
     // cache dela. Nenhum callback no `.mutate()` — o resultado chega pelo cache
     // (callbacks do hook), e na aba um callback aqui abriria o paywall duas vezes.
-    abrirConversaNova(conteudo, {
+    const aberta = abrirConversaNova(conteudo, {
+      trava,
       gerarId: newClientMessageId,
       semear: (id, t) =>
         qc.setQueryData(agentKeys.messages(id), sementeDaConversa(t.clientMessageId, t.content)),
@@ -244,7 +253,9 @@ export function ConversationScreen({ conversationId, initialText = '', title, ta
       // conversa nova. A rota /agent/new já ocupa um detalhe e é substituída.
       navegar: (id) => (tabMode ? router.push(conversationRoute(id)) : router.replace(conversationRoute(id))),
     });
-  }, [conversationId, criar, disparar, qc, tabMode, texto, turno]);
+    // O segundo toque do mesmo quadro já foi barrado; o próximo, legítimo, não.
+    if (aberta) requestAnimationFrame(trava.liberar);
+  }, [conversationId, criar, disparar, qc, tabMode, texto, trava, turno]);
 
   const tentarDeNovo = useCallback(() => {
     // O MESMO UUID de antes. Gerar um novo criaria um segundo lançamento do que
