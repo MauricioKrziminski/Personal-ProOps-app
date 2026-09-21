@@ -267,9 +267,6 @@ async def finance_node(state: AgentState) -> dict:
             FinanceActionType.CREATE_INCOME,
             FinanceActionType.CREATE_INSTALLMENT_PURCHASE,
         ):
-            # conta que a pessoa não escreveu não é citação (E1); antes do fallback do
-            # cartão, para uma invenção anulada ainda poder sair de "no cartão X"
-            a.account = guards.conta_do_texto(a.account, texto_orig)
             if a.type == FinanceActionType.CREATE_INSTALLMENT_PURCHASE:
                 if not a.amount_cents:
                     from app.domain.money import parse_installment_total

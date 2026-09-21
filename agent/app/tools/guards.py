@@ -145,31 +145,6 @@ def split_installment_total(total_cents: int, parcelas: int) -> list[int]:
     return valores
 
 
-def conta_do_texto(conta: str | None, texto: str) -> str | None:
-    """A conta que o MODELO devolveu só vale se a pessoa a escreveu.
-
-    Estrutura, não sentido: algum token do nome (sem acento, minúsculo, 3+ letras, ou o
-    nome inteiro — "BB") tem que estar no texto. Senão é `None` = "não citou", que cai
-    na preferência gravada (agent.md, "Na dúvida, PERGUNTA"). Medido no emulador em
-    21/09/2026: "gastei 30 no cafe teste" voltou `account="carteira"`, palavra que
-    ninguém escreveu, e a pessoa recebeu "não achei conta carteira".
-
-    Custo aceito: apelido que não é token do nome ("no roxinho" → Nubank) vira "não
-    citou". E ela não pega palavra do PRÓPRIO texto lida como conta ("teste"): decidir
-    qual palavra é conta é sentido, e esse vira a pergunta de conta com botões.
-    """
-    if not conta:
-        return None
-    from app.domain.matching import normalize
-
-    palavras = set(normalize(texto).split())
-    nome = normalize(conta)
-    tokens = [t for t in nome.split() if len(t) >= 3]
-    if f" {nome} " in f" {normalize(texto)} " or palavras.intersection(tokens):
-        return conta
-    return None
-
-
 def extract_account_fallback(texto: str) -> str | None:
     """Só a ESTRUTURA "no cartão <nome>" vira conta; o resto fica vazio e vira pergunta.
 
