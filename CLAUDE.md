@@ -40,6 +40,17 @@ App mobile pessoal de **notas rápidas, lembretes e controle financeiro operado 
   bate na `update_installment_plan` antiga, cujo piso ainda é 2. **Nada corrompe; os dois botões
   simplesmente não funcionam.**
 
+  ⚠️ **O AGENTE também depende das duas, desde 21/09/2026** (Task 4 do plano "agente sem
+  engessar": `finance._parcelar`, `agent/app/tools/finance.py:1085`, chama a MESMA
+  `convert_transaction_to_installments`). A ordem de deploy em produção é
+  **migrations → agente → app**: subir o agente novo em produção antes das duas migrations faz
+  "parcela isso em 2x" (sobre um lançamento avulso) devolver o mesmo P0001/erro de função
+  inexistente do app — RPC chamada direto pelo agente, sem o toast do app para amortecer.
+
+  **Este parágrafo é sobre a PENDÊNCIA em si; não altere os números de versão de staging/produção
+  aqui em cima ao mexer nesta seção** — quem atualiza `20260920130000`/`20260918220000` é quem de
+  fato aplicou a migration, com a fonte conferida (ver a régua desta seção).
+
   (Histórico) **Produção e staging estiveram ALINHADOS em `20260918220000`** — conferido na fonte
   em 19/09/2026 (`schema_migrations` de produção devolve `20260918220000`, `20260918120000`,
   `20260917120000`, e `executed_actions` já tem `user_id`/`workspace_id`/`origin_text`). Os

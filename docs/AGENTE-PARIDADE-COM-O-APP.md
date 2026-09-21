@@ -81,15 +81,24 @@ parcelas futuras... Note que nao edita as passadas."*
 
 O app ganhou a pergunta "Aplicar em: só esta / esta e as futuras" no salvar, e o agente **entrou
 junto no mesmo lugar**: `update_transaction` com alvo numa compra parcelada era um beco
-(*"você pode mudar as parcelas pagas ou excluir o plano"*) e agora chama
-`public.update_transaction_scoped`, a MESMA RPC do botão. A frase da confirmação diz o escopo —
+(*"você pode mudar as parcelas pagas ou excluir o plano"*) e passou a chamar
+`public.update_transaction_scoped`, a MESMA RPC do botão. A frase da confirmação dizia o escopo —
 *"só as parcelas em aberto; as pagas ficam como estão"*.
+
+⚠️ **Isto mudou em 21/09/2026 (Task 3, "correção de compra parcelada sem menu"): o agente não
+chama mais `update_transaction_scoped` para compra parcelada.** O menu ("Mudar parcelas
+pagas"/"Excluir plano") saiu de vez; corrigir a COMPRA inteira (valor, nome, categoria) passa por
+`update_installment_plan` (`finance._corrigir_plano`/`_renomear_plano`), e corrigir UMA parcela
+sincroniza `installment_plans.total_cents` num UPDATE direto — ver "Reparcelar a compra"
+abaixo, seção atualizada. `update_transaction_scoped` continua existindo para outros escopos
+(ver a régua em `finance.md`), mas não é mais chamada pelo agente para plano nenhum
+(`agent/app/tools/finance.py:925` registra o porquê).
 
 | app | agente |
 |---|---|
-| escolher "esta e as futuras" no formulário | `update_transaction` sobre a compra parcelada |
+| escolher "esta e as futuras" no formulário, numa compra parcelada | `update_transaction` sobre a compra parcelada → `update_installment_plan` (valor/nome/categoria) ou UPDATE direto (uma parcela) |
 | "Editar" no menu do plano | idem — a âncora é a primeira parcela EM ABERTO nos dois |
-| "Editar" numa recorrência | `resource_update recurring` — roteado para `update_recurring_series` |
+| "Editar" numa recorrência | `resource_update recurring` — roteado para `update_recurring_series` (isto não mudou) |
 
 A recorrência fechou no mesmo dia: `resource_update` sobre `recurring` já existia, mas fazia um
 UPDATE só na REGRA. Como o `finance-scheduler` materializa 90 dias à frente e o unique
@@ -467,24 +476,33 @@ WhatsApp (`*negrito*`), que é a mesma que o editor lê e escreve. Medido no sta
 `- [ ]` dentro da pasta `ia` — que já existia, porque as pastas do workspace entram no turno
 (delimitadas por `wrap_untrusted`, que nome de pasta é conteúdo do usuário).
 
-## Reparcelar a compra (15/09/2026)
+## Reparcelar a compra (15/09/2026) — ATUALIZADO em 21/09/2026 (Tasks 3 e 4)
 
 O app ganhou **`useUpdateInstallmentPlan`** — o sheet "Editar a compra" de Parceladas, que grava
 total, número de parcelas, título, estabelecimento, categoria, conta e data da primeira pela RPC
-`update_installment_plan`. Botão novo, linha nova:
+`update_installment_plan`. Em 15/09/2026 a linha abaixo dizia "exclusão declarada" para quase
+tudo, por causa do teto de 252 do `FinanceAction`. **A Task 3 entrou por outro caminho: sem campo
+novo**, reaproveitando `new_amount_cents`/`new_description`/`new_category` que já existiam, e uma
+pergunta extra ("é o total ou cada parcela?") para decidir a unidade — que é `choice`, não schema.
+Botão novo, linha atualizada:
 
 | botão novo no app | o agente faz? | por onde |
 |---|---|---|
-| `useUpdateInstallmentPlan` — **nome, estabelecimento e categoria** da compra | sim, e já fazia | `update_transaction` com escopo `future` sobre uma parcela: `update_transaction_scoped` propaga os três para a série inteira |
-| `useUpdateInstallmentPlan` — **total e número de parcelas** | **não — exclusão declarada** | não cabe. `FinanceAction` está no teto MEDIDO de 252 (`probe_rename_schema.py`), e reparcelar pede DOIS campos novos que não existem em lugar nenhum (`new_total_cents`, `new_installments`) mais um alvo em `installment_plans` — as duas ampliações possíveis já foram medidas e recusadas (19×14 = 266, 18×15 = 270). O caminho, se virar pedido, é o catálogo de `ResourceAction` com `installment_plans` como recurso, e não somar campo aqui. |
-| `useUpdateInstallmentPlan` — **"À vista" (`p_installments = 1`, dissolve o plano)** | **não — mesma exclusão declarada** | mesmo motivo da linha acima: `new_installments = 1` é o mesmo campo que já não coube no teto de 252, e desfazer um parcelamento apaga N−1 linhas de dinheiro numa tacada só — a mesma confirmação de uma linha que o parágrafo abaixo já recusa para reparcelar. |
-| `useConvertToInstallments` (20/09/2026) — parcelar um lançamento QUE JÁ EXISTE, pela RPC `convert_transaction_to_installments` | **não — exclusão declarada, mesmo teto** | é a metade oposta de reparcelar (converte 1 linha em N, em vez de reescrever N), mas pede o MESMO par de campos que faltou acima (`new_total_cents` já existe como `new_amount_cents`; `new_installments` continua sem caber) e tem a mesma exigência de tela: mostrar o contrato — quantas parcelas, de quanto — antes do usuário confirmar. |
+| `useUpdateInstallmentPlan` — **nome, estabelecimento e categoria** da compra | sim | `update_transaction` sobre a compra parcelada, sem valor → `finance._renomear_plano` (UPDATE direto no plano e em todas as linhas, inclusive as pagas; não mexe em dinheiro, data nem conta). **Não é mais `update_transaction_scoped`** — ver a seção acima. |
+| `useUpdateInstallmentPlan` — **total** (valor) | **sim, desde 21/09/2026 (Task 3)** | `update_transaction` sobre a compra parcelada, com valor → pergunta "é o total da compra ou cada parcela?" (`interrupt` `kind=choice, purpose=amount_unit`); a resposta some no alvo (`amount_unit`) e `finance._corrigir_plano` chama `update_installment_plan` com o MESMO número de parcelas, redistribuindo só o saldo em aberto (`agent/app/tools/finance.py:1033`). |
+| `useUpdateInstallmentPlan` — **número de parcelas** (reparcelar de verdade, N muda) | **não — exclusão declarada, continua** | `update_installment_plan` aceita `new_installments`, mas o agente não pede N novo em lugar nenhum: mudar N é redesenhar o cronograma inteiro (quais parcelas nascem, qual soma cada uma), e a Task 4 (abaixo) resolveu o caso mais comum ("virou parcelado") por outra porta. Se virar pedido, o caminho é uma pergunta de schema nova, não um campo no `FinanceAction` (que segue no teto de 252). |
+| `useUpdateInstallmentPlan` — **"À vista" (`p_installments = 1`, dissolve o plano)** | **não — mesma exclusão declarada** | é o caso extremo da linha acima (N vira 1): desfaz o parcelamento e apaga N−1 linhas de dinheiro numa tacada só — a mesma confirmação de uma linha que a exclusão abaixo já recusa. |
+| `useConvertToInstallments` (20/09/2026) — parcelar um lançamento QUE JÁ EXISTE, pela RPC `convert_transaction_to_installments` | **sim, desde 21/09/2026 (Task 4)** | `update_transaction` com `installments >= 2` sobre um lançamento AVULSO (não é parcela de plano nenhum) → `finance._parcelar` (`agent/app/tools/finance.py:1052`). **Cartão é obrigatório** (`cartao.get("id")` senão `CARTAO_FALTANDO`, read_only) e resolvido só entre cartões (`resolve.conversoes`/`_cartao_citado`); **sem rascunho** para essa pergunta — exclusão declarada em `_cartao_citado` (a pessoa remanda a frase com o nome do cartão). |
 
-⚠️ **E a exclusão tem um segundo motivo, que é melhor que o teto:** *"refaz a nuuvem em 3x de
+⚠️ **A exclusão de mudar N continua com o mesmo motivo de fundo:** *"refaz a nuuvem em 3x de
 50"* é uma frase que reescreve N linhas de dinheiro de uma vez, algumas delas dentro de faturas
 já emitidas. O app faz isso com o contrato inteiro na tela — total, quantas já foram pagas, o que
-trava e por quê. Uma confirmação de uma linha no WhatsApp não mostra nada disso.
+trava e por quê. Uma confirmação de uma linha no WhatsApp não mostra nada disso. **Corrigir o
+TOTAL não tem esse problema**: o número de parcelas não muda, só o quanto cada uma (ou a soma)
+vale, e a frase do SIM já diz o total novo e "as pagas ficam como estão" — o contrato continua
+visível numa linha.
 
 **O que o agente NÃO perdeu:** apagar a compra inteira (`delete_transaction` com alvo em
-`installment_plans`) e renomear a série continuam funcionando, e continuam sendo as duas coisas
-que as pessoas pedem por voz.
+`installment_plans`) e renomear a série continuam funcionando, e continuam sendo duas das coisas
+que as pessoas pedem por voz — ao lado, agora, de corrigir o total e de parcelar um lançamento
+avulso.

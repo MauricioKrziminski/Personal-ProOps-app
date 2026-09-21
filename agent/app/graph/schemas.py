@@ -98,7 +98,7 @@ CompactInstallmentScope = Annotated[
 
 
 class FinanceAction(BaseModel):
-    """17 propriedades × 14 valores de enum = 238, aceito no Gemini em 08/09/2026.
+    """18 propriedades × 14 valores de enum = 252, o TETO medido (ver ai-gemini.md).
 
     Escrita e correção ficam JUNTAS de propósito. Separá-las obrigaria o router a
     decidir se "o mercado de ontem foi 120" é lançamento novo ou correção — e

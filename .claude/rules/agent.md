@@ -100,6 +100,18 @@ classificador de escolha pescar "Confirmar" de uma hesitação ressuscita o defe
 inferir o que a pessoa quis dizer PORQUE ela vê o efeito e aprova antes da escrita.
 Afrouxar um lado sem o outro é o que transforma "entendeu bem" em "apagou errado".
 
+⚠️ **Duas cópias do mesmo defeito saíram em 21/09/2026: regex generalizando conta e nome
+a partir de qualquer palavra.** `extract_account_fallback` (`agent/app/tools/guards.py:148`, único
+chamador `nodes.py:288`) tinha um ramo genérico `no|na|pelo <palavra>` que virava conta: "Na
+verdade eu comprei em 2x no cartão" inferia o cartão *verdade*, "paguei na hora" virava *hora*.
+Hoje ele só aceita a ESTRUTURA `no|na|pelo|pela|com o|com a cartão [de crédito/débito] [do|da]
+<nome>` — fora dela, `account` fica vazio e `required.py` pergunta. `extract_description_fallback`
+tinha o mesmo defeito para a descrição ("comprei mais um em 3x" → *mais*, "gastei tudo, 200
+reais" → *tudo*) e foi REMOVIDO por inteiro (junto com `_NOUN_EXTRACTOR`/`_IGNORE_NOUNS`): medido
+com o fallback desligado, ele só acrescentava valor quando estava INVENTANDO um nome — nas frases
+com nome de verdade, o próprio modelo já preenchia. Sem ele, a pergunta "Do que se trata?" volta
+a aparecer quando falta.
+
 ## Avaliação: "funciona de infinitas formas" é medido, não afirmado
 
 `scripts/evaluate_answer_forms.py` roda o Gemini REAL sobre muitas redações por
@@ -124,6 +136,28 @@ folga, e campo virtual traduzido no `prepare` não precisa nem existir como colu
 resolvido** para uma ação que já existe → tipo de ação novo, que hoje **não cabe** em
 `FinanceAction` (teto medido de 252/32).
 
+## Correção de compra parcelada, sem menu (21/09/2026)
+
+⚠️ **`update_transaction` NUNCA dá baixa.** Havia um desvio para `_baixa_em_parcelas` dentro
+dela — corrigir ("muda a 3ª parcela para 300") também marcava parcelas como pagas, em silêncio.
+Ele foi removido (`agent/app/tools/finance.py:856`); dar baixa é caminho de `mark_paid`
+(`agent/app/tools/finance.py:724`), nunca efeito colateral de um UPDATE.
+
+- **O menu "Mudar parcelas pagas" / "Excluir plano" saiu.** Corrigir o VALOR da compra inteira
+  pergunta "é o total da compra ou cada parcela?" (`interrupt` `kind=choice,
+  purpose=amount_unit`, helper `_perguntar_unidade`) em vez de abrir um menu de ações — a
+  resposta congela `amount_unit` no alvo, e só então o SIM confirma. Sem a unidade — checkpoint
+  antigo, sem `editaveis` — a pergunta volta a ser feita; nunca há default (parcela × total é uma
+  ordem de grandeza de diferença).
+- **Toda correção da compra inteira passa por `update_installment_plan`** (valor em qualquer
+  unidade, nome, categoria — `finance._corrigir_plano`); renomear/categoria SEM valor é um UPDATE
+  direto (`finance._renomear_plano`, sem RPC, sem mexer em dinheiro, data ou conta). Corrigir UMA
+  parcela sincroniza `installment_plans.total_cents` na mesma operação, para o total continuar
+  sendo a soma do que está embaixo dele.
+- **Recusas antes do SIM, não depois:** várias parcelas no snapshot, parcela travada (paga ou em
+  fatura fechada/paga em parte), data ou conta da compra inteira. `policy.erro_de_correcao` roda
+  no `gate` e de novo dentro do helper de unidade (no empate a data só some depois da escolha).
+
 ## Human-In-The-Loop
 
 - Disparam `interrupt()` no LangGraph: **deleções** (`delete_transaction`, `undo_last`,
@@ -144,6 +178,23 @@ resolvido** para uma ação que já existe → tipo de ação novo, que hoje **n
   confirmação digitada; o clique continua custando zero.
 - A pergunta descreve o **efeito**, não o nome interno da ação. Ninguém confirma
   "delete_transaction"; todo mundo entende "apagar o gasto de R$ 45".
+
+⚠️ **Lote que CRIA algo novo e MUDA o que já existe é UM SIM atômico** (`policy.par_de_substituicao`,
+21/09/2026). "Na verdade eu comprei em 2x no cartão" gera `delete_transaction` (achou o gasto
+errado) + `create_installment_purchase` (a compra certa) — dois efeitos, uma frase. Três regras:
+
+- **Nada é gravado antes da pergunta.** Com o par incompleto (falta valor, cartão não existe), o
+  `_gate` para ANTES do `interrupt()`, sem montar rascunho — "Ainda não apaguei nem criei nada."
+  Rascunho aqui reconstruiria o apagar a partir de uma frase nova, sem o contexto da criação.
+- **Criação primeiro, e o resto só roda se ela escreveu** (`nodes._executar`,
+  `agent/app/graph/nodes.py:1082`): as ações do par são reordenadas com os `create_*` na frente
+  antes de rodar; se uma criação volta `read_only` (erro, exceção), o apagar/corrigir E as
+  criações seguintes do par são PULADOS — "⚠️ Não apaguei X porque não consegui registrar Y."
+- **Retentativa sem `result_id` não conta como escrita.** A idempotência (`executed_actions`)
+  reserva ANTES de executar; se o worker morre entre a reserva e o fim da tool, a reserva fica
+  ÓRFÃ (sem `result_id`). `db.execution_result_id` (`agent/app/db.py:454`) distingue os dois
+  casos, e `registry.execute` só marca `ja_executada=True` quando `result_id` não é nulo — senão
+  a retentativa rodaria o apagar sozinho, sem a criação ter de fato acontecido.
 
 ## Na dúvida, PERGUNTA — nunca deduz
 
