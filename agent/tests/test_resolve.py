@@ -458,3 +458,41 @@ class TestTermoCasaOEstabelecimento:
         estado, cands = await resolve.por_transacao("ws", acao, quer_recente=False)
 
         assert estado == "found" and cands[0]["id"] == "a"
+
+
+class TestPlanoCongelaOQueAFraseLe:
+    """A frase do SIM e a pergunta da unidade leem `editaveis`/`travado_cents`/
+    `total_cents`/`plan_installments` do candidato — congelados na resolução, pela
+    régua do BANCO (`private.parcela_travada`), nunca contando `status` em Python."""
+
+    def test_as_duas_consultas_de_plano_usam_a_regua_do_banco(self):
+        from app.tools.resolve import _FONTES, _TRAVAS_DO_PLANO
+
+        assert "private.parcela_travada(t.status, t.invoice_id)" in _TRAVAS_DO_PLANO
+        assert "t.workspace_id = p.workspace_id" in _TRAVAS_DO_PLANO
+        assert _TRAVAS_DO_PLANO in _FONTES["planos"]["sql"]
+
+    @pytest.mark.asyncio
+    async def test_com_plano_congela_os_campos(self, monkeypatch):
+        consultas = []
+
+        async def fake_fetch(query, *args):
+            consultas.append(query)
+            return [{"tx_id": "tx-1", "plan_id": "p1", "description": "TV", "installments": 10,
+                     "total_cents": 300000, "first_occurred_at": "2026-05-31",
+                     "editaveis": 8, "travado_cents": 60000}]
+
+        monkeypatch.setattr(resolve.db, "fetch", fake_fetch)
+        cand = (await resolve._com_plano("ws", [{"id": "tx-1", "table": "transactions"}]))[0]
+        assert "parcela_travada" in consultas[0]
+        assert (cand["editaveis"], cand["travado_cents"], cand["total_cents"],
+                cand["plan_installments"]) == (8, 60000, 300000, 10)
+
+    def test_veredito_de_plano_congela_os_campos(self):
+        _, cands = resolve.veredito(
+            [{"id": "p1", "description": "TV", "installments": 10, "total_cents": 300000,
+              "editaveis": 8, "travado_cents": 60000}],
+            resolve._rotulo_plano, "installment_plans", resolve._detalhe_plano,
+        )
+        assert (cands[0]["editaveis"], cands[0]["travado_cents"],
+                cands[0]["total_cents"]) == (8, 60000, 300000)

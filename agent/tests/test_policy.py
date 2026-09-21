@@ -354,3 +354,13 @@ def test_par_de_substituicao_undo_last_conta_mesmo_sem_alvo():
     ]
     alvos = [{}, {}]
     assert par_de_substituicao(acoes, alvos) == {0, 1}
+
+
+def test_uma_parcela_do_snapshot_nao_pergunta_total_ou_parcela():
+    """"muda a 3ª parcela para 300": o alvo é UMA linha congelada; perguntar "é o total
+    da compra ou cada parcela?" ali não tem resposta que faça sentido."""
+    acao = FinanceAction(type=FinanceActionType.UPDATE_TRANSACTION, new_amount_cents=30000)
+    alvo = _alvo_plano(installment_snapshot={"rows": [{"id": "tx3"}]}, label="parcela 3 — TV")
+    frase = describe_for_confirmation(acao, alvo)
+    assert "total da compra" not in frase and "parcelas em aberto" not in frase
+    assert "R$ 300,00" in frase

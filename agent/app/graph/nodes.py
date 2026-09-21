@@ -15,8 +15,10 @@ from app.domain.dates import local_datetime_iso
 from app.graph.policy import (
     describe_for_confirmation,
     dominio_incerto,
+    erro_de_correcao,
     needs_confirmation,
     par_de_substituicao,
+    plano_inteiro,
 )
 from app.graph.prompts import FINANCE, FINANCE_QUERY, NOTES, ROUTER, user_turn
 from app.graph.schemas import (
@@ -727,6 +729,54 @@ def _confirm_selection(state: AgentState, update: dict) -> dict:
             'results':[*state.get('results',[]),'Ok, não fiz essas alterações.']}
 
 
+UNIDADE_OPCOES = {"unidade:total": "total", "unidade:parcela": "parcela"}
+
+
+def _perguntar_unidade(state: AgentState, i: int, acao, alvo: dict) -> tuple[dict, dict | None]:
+    """D2: o valor novo de uma compra parcelada é o TOTAL ou CADA parcela?
+
+    Um helper para os dois caminhos (alvo `found` e depois da escolha no empate),
+    sempre ANTES da confirmação: a frase do SIM diz o efeito, e o efeito depende disto.
+    A escolha congela `amount_unit` no ALVO — é o que a tool lê; sem ela a tool recusa
+    ("peça de novo"), nunca assume "parcela". Devolve (alvo, None) ou (alvo, parada).
+    """
+    # no empate a data do plano só aparece depois da escolha
+    if erro := erro_de_correcao(acao, alvo):
+        return alvo, {"approved": False, "halted": True,
+                      "results": [*state.get("results", []), erro]}
+    if (getattr(acao, "type", None) != FinanceActionType.UPDATE_TRANSACTION
+            or acao.new_amount_cents is None or not plano_inteiro(alvo)
+            or alvo.get("amount_unit")):
+        return alvo, None
+    cand = alvo["candidates"][0]
+    if cand.get("editaveis") is None:
+        # candidato de antes do deploy (checkpoint/pendência velha): sem os números
+        # congelados a frase do SIM não tem como dizer o efeito
+        return alvo, {"approved": False, "halted": True,
+                      "results": [*state.get("results", []),
+                                  "Ainda não mudei nada. Me pede a correção de novo."]}
+    novo = acao.new_amount_cents
+    por_parcela = cand["travado_cents"] + novo * cand["editaveis"]
+    escolha = interrupt({
+        "kind": "choice",
+        "purpose": "amount_unit",
+        "action_index": i,
+        "action_type": acao.type.value,
+        "summary": (
+            f"{cents_to_brl(novo)} em {cand['label']} é o total da compra "
+            f"(fica {cents_to_brl(novo)} em {cand['plan_installments']}x) ou o valor de "
+            f"cada parcela (o total vira {cents_to_brl(por_parcela)})?"
+        ),
+        "options": [{"id": "unidade:total", "label": "Total da compra"},
+                    {"id": "unidade:parcela", "label": "Cada parcela"}],
+    })
+    escolhido = escolha.get("candidate_id") if isinstance(escolha, dict) else escolha
+    if escolhido in UNIDADE_OPCOES:
+        return {**alvo, "amount_unit": UNIDADE_OPCOES[escolhido]}, None
+    return alvo, {"approved": False, "halted": True,
+                  "results": [*state.get("results", []), "👌 Ok, não mudei nada."]}
+
+
 async def gate(state: AgentState) -> dict:
     # A revision finishes this node before the next confirmation, so its exact
     # targets are checkpointed and are not re-read on approval replay.
@@ -757,7 +807,8 @@ async def _gate(state: AgentState) -> dict:
     # zip defensivo: comprimento diferente = não resolvido = não executa
     alvos = (alvos + [{}] * len(acoes))[: len(acoes)]
 
-    correction_errors = [t["correction_error"] for t in alvos if t.get("correction_error")]
+    correction_errors = [e for e in (t.get("correction_error") or erro_de_correcao(a, t)
+                                     for a, t in zip(acoes, alvos)) if e]
     par = par_de_substituicao(acoes, alvos)
     if par and (correction_errors or _incompletas(state, acoes)):
         # Par com uma metade que não fecha: para ANTES de qualquer interrupt. A
@@ -771,6 +822,16 @@ async def _gate(state: AgentState) -> dict:
     if correction_errors:
         return {"approved": False, "halted": True,
                 "results": [*state.get("results", []), *correction_errors]}
+
+    # 0) Valor numa compra parcelada: "total ou cada parcela?" antes de qualquer SIM.
+    #    Posição fixa (antes do empate) para a ordem dos interrupts não mudar no replay.
+    alvos = [dict(t) for t in alvos]
+    for i, (acao, alvo) in enumerate(zip(acoes, alvos)):
+        if i in _incompletas(state, acoes):
+            continue
+        alvos[i], parada = _perguntar_unidade(state, i, acao, alvo)
+        if parada:
+            return parada
 
     # 1) Empate tem precedência: escolher o alvo JÁ É o consentimento explícito,
     #    numa ida e volta só. Perguntar "qual?" e depois "confirma?" seria duas.
@@ -807,49 +868,9 @@ async def _gate(state: AgentState) -> dict:
                 cand_table = escolhidos[0].get("table", alvo.get("table"))
                 congelado[i] = {**alvo, "status": "found", "candidates": escolhidos,
                                 "table": cand_table}
-                if cand_table == "installment_plans" and acao.type == FinanceActionType.UPDATE_TRANSACTION and not escolhidos[0].get("installment_snapshot"):
-                    p_id = escolhido
-                    p_label = escolhidos[0]["label"]
-                    mut_escolha = interrupt(
-                        {
-                            "kind": "choice",
-                            "action_index": i,
-                            "action_type": acao.type.value,
-                            "summary": f"O que você deseja fazer com {p_label}?",
-                            "options": [
-                                {"id": f"change_paid:{p_id}", "label": "Mudar parcelas pagas"},
-                                {"id": f"delete_plan:{p_id}", "label": "Excluir plano completo"},
-                            ],
-                        }
-                    )
-                    mut_id = mut_escolha.get("candidate_id") if isinstance(mut_escolha, dict) else mut_escolha
-                    if isinstance(mut_id, str):
-                        if mut_id.startswith("delete_plan") or mut_id in {"delete_plan", "excluir", "apagar", "2"}:
-                            acoes_mutadas = list(state.get("finance_actions") or [])
-                            acoes_mutadas[i] = FinanceAction(type=FinanceActionType.DELETE_TRANSACTION).model_dump()
-                            return _confirm_selection(state, {"approved": True, "targets": congelado, "finance_actions": acoes_mutadas})
-                        if mut_id.startswith("change_paid") or mut_id in {"change_paid", "mudar", "pagas", "1"}:
-                            if acao.current_installment:
-                                acoes_mutadas = list(state.get("finance_actions") or [])
-                                acoes_mutadas[i] = FinanceAction(
-                                    type=FinanceActionType.MARK_PAID,
-                                    current_installment=acao.current_installment,
-                                ).model_dump()
-                                return _confirm_selection(state, {"approved": True, "targets": congelado, "finance_actions": acoes_mutadas})
-                            return {
-                                "approved": False,
-                                "results": [
-                                    *state.get("results", []),
-                                    f"📝 Quantas parcelas de *{p_label}* você já pagou? (Ex: 'já paguei 3' ou me diz o número)",
-                                ],
-                                "halted": True,
-                            }
-                    return {
-                        "approved": False,
-                        "results": [*state.get("results", []), "👍 Beleza, não mexi em nada."],
-                        "halted": True,
-                    }
-
+                congelado[i], parada = _perguntar_unidade(state, i, acao, congelado[i])
+                if parada:
+                    return parada
                 return _confirm_selection(state, {"approved": True, "chosen_id": escolhido, "targets": congelado})
             # SOMA em vez de substituir: `results` tem reducer `_replace`, e
             # sobrescrever aqui apagaria o que a fase segura já gravou — o
@@ -861,65 +882,6 @@ async def _gate(state: AgentState) -> dict:
                     *state.get("results", []),
                     "👌 Beleza, não mexi em nada. Me diz de outro jeito qual era — pelo valor ou pela data.",
                 ],
-                "halted": True,
-            }
-
-    # 1.1) Mutação direta de plano de parcelamento em UPDATE_TRANSACTION
-    for i, (acao, alvo) in enumerate(zip(acoes, alvos)):
-        if i in _incompletas(state, acoes):
-            continue
-        if (
-            alvo.get("status") == "found"
-            and alvo.get("table") == "installment_plans"
-            and acao.type == FinanceActionType.UPDATE_TRANSACTION
-            and not alvo["candidates"][0].get("installment_snapshot")
-        ):
-            cand = alvo["candidates"][0]
-            p_id = cand["id"]
-            p_label = cand["label"]
-            escolha = interrupt(
-                {
-                    "kind": "choice",
-                    "action_index": i,
-                    "action_type": acao.type.value,
-                    "summary": f"O que você deseja fazer com {p_label}?",
-                    "options": [
-                        {"id": f"change_paid:{p_id}", "label": "Mudar parcelas pagas"},
-                        {"id": f"delete_plan:{p_id}", "label": "Excluir plano completo"},
-                    ],
-                }
-            )
-            escolhido = (
-                escolha.get("candidate_id") if isinstance(escolha, dict) else escolha
-            )
-            if isinstance(escolhido, str):
-                if escolhido.startswith("delete_plan") or escolhido in {"delete_plan", "excluir", "apagar", "2"}:
-                    congelado = [dict(t) for t in alvos]
-                    congelado[i] = {**alvo, "status": "found", "table": "installment_plans"}
-                    acoes_mutadas = list(state.get("finance_actions") or [])
-                    acoes_mutadas[i] = FinanceAction(type=FinanceActionType.DELETE_TRANSACTION).model_dump()
-                    return _confirm_selection(state, {"approved": True, "targets": congelado, "finance_actions": acoes_mutadas})
-                if escolhido.startswith("change_paid") or escolhido in {"change_paid", "mudar", "pagas", "1"}:
-                    congelado = [dict(t) for t in alvos]
-                    congelado[i] = {**alvo, "status": "found", "table": "installment_plans"}
-                    if acao.current_installment:
-                        acoes_mutadas = list(state.get("finance_actions") or [])
-                        acoes_mutadas[i] = FinanceAction(
-                            type=FinanceActionType.MARK_PAID,
-                            current_installment=acao.current_installment,
-                        ).model_dump()
-                        return _confirm_selection(state, {"approved": True, "targets": congelado, "finance_actions": acoes_mutadas})
-                    return {
-                        "approved": False,
-                        "results": [
-                            *state.get("results", []),
-                            f"📝 Quantas parcelas de *{p_label}* você já pagou? (Ex: 'já paguei 3' ou me diz o número)",
-                        ],
-                        "halted": True,
-                    }
-            return {
-                "approved": False,
-                "results": [*state.get("results", []), "👍 Beleza, não mexi em nada."],
                 "halted": True,
             }
 
@@ -972,7 +934,8 @@ async def _gate(state: AgentState) -> dict:
                             revised[i] = acao.model_copy(update={"account": new_account}).model_dump(mode="json")
                             # Replay the gate with the replacement card. Choosing it is
                             # not permission: its own limit and final summary must run.
-                            return {"finance_actions": revised, "approved": False, "revision_pending": True}
+                            return {"finance_actions": revised, "targets": alvos,
+                                    "approved": False, "revision_pending": True}
                         if par:
                             # sem rascunho no par (ver `_rascunho`): a frase refeita
                             # com o cartão certo recomeça as duas metades juntas
@@ -1021,8 +984,10 @@ async def _gate(state: AgentState) -> dict:
         if i not in bloqueadas and (i not in avisos_confirmados or i in par)
     ]
     pendentes = [(a, t, m) for a, t, m in motivos if m]
+    # `amount_unit` mora nos alvos: sem devolvê-los ele não chega ao checkpoint e a
+    # execução, logo depois do SIM, responderia "peça de novo".
     if not pendentes:
-        return {"approved": True}
+        return {"approved": True, "targets": alvos}
 
     # 2) UMA pergunta por execução, enumerando TUDO que o SIM vai executar.
     #    Um laço de perguntas cansaria; e o bug antigo era o oposto — perguntava
@@ -1035,7 +1000,7 @@ async def _gate(state: AgentState) -> dict:
         if (t or {}).get("status") != "none"
     ]
     if not itens:
-        return {"approved": True}
+        return {"approved": True, "targets": alvos}
 
     acao, alvo, motivo = pendentes[0]
     resposta = interrupt(
@@ -1060,9 +1025,9 @@ async def _gate(state: AgentState) -> dict:
         return {"approved": False, "halted": True, "results": [*state.get("results", []), "Diga uma compra e o intervalo de parcelas para revisar a baixa. Nada foi alterado."]}
 
     if resposta is True or (isinstance(resposta, str) and resposta.lower() in {"sim", "s", "true"}):
-        return {"approved": True}
+        return {"approved": True, "targets": alvos}
     if isinstance(resposta, dict) and resposta.get("approved") and not resposta.get("candidate_id"):
-        return {"approved": True, "chosen_id": resposta.get("candidate_id") or ""}
+        return {"approved": True, "chosen_id": resposta.get("candidate_id") or "", "targets": alvos}
     # idem: preserva o que a fase segura executou antes da pergunta
     return {
         "approved": False,

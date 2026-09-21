@@ -126,6 +126,29 @@ def _detalhe_plano(row: dict) -> str:
     return f"{cents_to_brl(row['total_cents'])} total" + (f" · desde {desde}" if desde else "")
 
 
+# O que a frase do SIM e a pergunta "total ou cada parcela?" leem do plano, congelado
+# na resolução. "Travada" é a régua do BANCO (`private.parcela_travada`: baixa, fatura
+# paga/adiada ou com pagamento parcial) — contar por `status` aqui seria a segunda cópia
+# da regra que a RPC `update_installment_plan` aplica, e a que diverge é a que mexe em
+# dinheiro. `workspace_id` porque o agente conecta com papel que ignora RLS.
+_TRAVAS_DO_PLANO = """cross join lateral (
+            select count(*) filter (where not private.parcela_travada(t.status, t.invoice_id)) as editaveis,
+                   coalesce(sum(t.amount_cents) filter (
+                     where private.parcela_travada(t.status, t.invoice_id)), 0) as travado_cents
+            from public.transactions t
+            where t.installment_plan_id = p.id and t.workspace_id = p.workspace_id) x"""
+
+
+def _candidato_plano(row: dict) -> dict:
+    """Os campos congelados de um plano; `.get` porque candidato de antes do deploy não os tem."""
+    return {
+        "plan_installments": row.get("installments"),
+        "total_cents": row.get("total_cents"),
+        "editaveis": row.get("editaveis"),
+        "travado_cents": row.get("travado_cents"),
+    }
+
+
 # chave lógica -> tabela REAL + SQL + rotulador.
 #
 # ⚠️ `table` é a tabela DE VERDADE, não a chave lógica: ela vai para o
@@ -165,11 +188,13 @@ _FONTES: dict[str, dict] = {
     # "Tudo (2x) — compra parcelada", que é o genérico de novo.
     "planos": {
         "table": "installment_plans",
-        "sql": """select id, description, merchant, total_cents, installments, first_occurred_at
-                  from public.installment_plans
-                  where workspace_id = %s
-                    and (coalesce(description,'') ilike %s or coalesce(merchant,'') ilike %s)
-                  order by created_at desc limit %s""",
+        "sql": f"""select p.id, p.description, p.merchant, p.total_cents, p.installments,
+                         p.first_occurred_at, x.editaveis, x.travado_cents
+                  from public.installment_plans p
+                  {_TRAVAS_DO_PLANO}
+                  where p.workspace_id = %s
+                    and (coalesce(p.description,'') ilike %s or coalesce(p.merchant,'') ilike %s)
+                  order by p.created_at desc limit %s""",
         "dois_termos": True,
         "label": _rotulo_plano,
         "detalhe": _detalhe_plano,
@@ -225,7 +250,7 @@ def veredito(
             "label": rotulo(r),
             "table": tabela,
             **({"when": detalhe(r)} if detalhe else {}),
-            **({"plan_installments":r["installments"]} if tabela=="installment_plans" else {}),
+            **(_candidato_plano(r) if tabela == "installment_plans" else {}),
         }
         for r in linhas[:MOSTRAR]
     ]
@@ -348,9 +373,11 @@ async def _com_plano(workspace_id, candidatos: list[dict]) -> list[dict]:
 
     rows = await db.fetch(
         """
-        select t.id as tx_id, p.id as plan_id, p.description, p.merchant, p.total_cents, p.installments, p.first_occurred_at
+        select t.id as tx_id, p.id as plan_id, p.description, p.merchant, p.total_cents, p.installments,
+               p.first_occurred_at, x.editaveis, x.travado_cents
         from public.transactions t
         join public.installment_plans p on p.id = t.installment_plan_id
+        """ + _TRAVAS_DO_PLANO + """
         where t.id = any(%s) and t.workspace_id = %s and p.workspace_id = %s
         order by p.created_at desc
         """,
@@ -372,6 +399,7 @@ async def _com_plano(workspace_id, candidatos: list[dict]) -> list[dict]:
                 "label": _rotulo_plano(r),
                 "table": "installment_plans",
                 "when": _detalhe_plano(r),
+                **_candidato_plano(r),
             }
 
     plan_cands = list(planos_unicos.values())

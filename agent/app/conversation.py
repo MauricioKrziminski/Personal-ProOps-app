@@ -736,6 +736,7 @@ async def _resposta_do_estado(sessao: dict, estado: dict, thread: str) -> str | 
                 "reason": pausa.get("reason"),
                 "action_type": pausa.get("action_type"),
                 "kind": pausa.get("kind"),
+                "purpose": pausa.get("purpose"),
                 "candidates": candidatos,
             },
             summary=pausa["summary"],
@@ -789,6 +790,20 @@ def _pergunta(pausa: dict, candidatos: list[dict], pendente: dict | None) -> dic
         }
 
     numerado = "\n".join(f"{i}) {c['label']}" for i, c in enumerate(candidatos, 1))
+
+    if pausa.get("purpose") == "amount_unit":
+        # A pessoa já disse QUAL compra: a saída aqui é desistir, não "nenhuma dessas"
+        # nem "me diz pelo valor ou pela data", que são textos de busca.
+        corpo = f"🤔 {pausa['summary']}"
+        return {
+            "ui": "buttons", "body": corpo,
+            "buttons": [
+                *[(f"pa:{pid}:c:{c['id']}", f"{i}) {c['label']}")
+                  for i, c in enumerate(candidatos, 1)],
+                (f"pa:{pid}:no", "Cancelar"),
+            ],
+            "text": f"{corpo}\n{numerado}\nResponde com o número, ou *NÃO* para cancelar.",
+        }
 
     if not candidatos:
         corpo = "⚠️ Confirma " + ("; ".join(itens) if len(itens) > 1 else pausa["summary"]) + "?"

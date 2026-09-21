@@ -10,6 +10,8 @@ from __future__ import annotations
 
 import json
 import logging
+
+import psycopg
 from uuid import UUID
 
 from app import db
@@ -832,10 +834,24 @@ async def update_transaction(ctx: ExecContext, action: FinanceAction) -> ToolRes
     if not cands:
         return ToolResult("🤷 Esse lançamento não está mais aqui.", read_only=True)
 
+    # Update NUNCA dá baixa: o desvio para `_baixa_em_parcelas` que morava aqui fazia uma
+    # correção ("muda a 3ª parcela") marcar parcelas como pagas.
+    alvo_id = cands[0]["id"]
+    parcela_do_snapshot = False
     if _alvo_e_plano(ctx):
-        if action.installment_scope or action.current_installment:
-            return await _baixa_em_parcelas(ctx, action)
-        return await _corrigir_parcelas_futuras(ctx, action)
+        snapshot = cands[0].get("installment_snapshot")
+        if not snapshot:
+            return await _corrigir_plano(ctx, action)
+        linhas = snapshot.get("rows") or []
+        if len(linhas) != 1:
+            return ToolResult(
+                "Consigo corrigir a compra inteira (as parcelas em aberto) ou uma parcela por vez.",
+                read_only=True,
+            )
+        # O id congelado no snapshot é o que a pessoa leu no SIM; buscar de novo aqui
+        # abriria a janela entre a pergunta e a execução.
+        alvo_id = linhas[0]["id"]
+        parcela_do_snapshot = True
 
     patch: dict = {}
     if action.new_amount_cents is not None:
@@ -862,7 +878,6 @@ async def update_transaction(ctx: ExecContext, action: FinanceAction) -> ToolRes
     # antes de chegar aqui se não estivesse `found`. Buscar de novo aqui abriria a
     # janela que este desenho existe para fechar: entre a pergunta e o SIM o
     # usuário pode ter lançado outra coisa, e o "último" mudaria de dono.
-    alvo_id = cands[0]["id"]
     antes = await db.fetch_one(
         """
         select id, kind, amount_cents, category, description, occurred_at
@@ -878,10 +893,21 @@ async def update_transaction(ctx: ExecContext, action: FinanceAction) -> ToolRes
     if frozen_account and frozen_account["id"] is not None:
         account_guard = " and exists (select 1 from public.accounts a where a.id = %s and a.workspace_id = %s and not a.archived)"
         args.extend([frozen_account["id"], ctx.workspace_id])
+    # Parcela travada não se move (valor, data, conta) — a régua do banco, a mesma de
+    # `update_installment_plan`. Mexer nela deixa a fatura paga/parcial sem fechar.
+    trava = ""
+    if parcela_do_snapshot and patch.keys() & {"amount_cents", "occurred_at", "account_id"}:
+        trava = " and not private.parcela_travada(status, invoice_id)"
     updated = await db.fetch_one(
-        f"update public.transactions set {colunas} where id = %s and workspace_id = %s{account_guard} returning id",
+        f"update public.transactions set {colunas} where id = %s and workspace_id = %s{trava}{account_guard} returning id",
         *args,
     )
+    if not updated and trava:
+        return ToolResult(
+            "Essa parcela já foi paga (ou a fatura dela foi paga): o valor, a data e a conta "
+            "dela não mudam mais. Não alterei nada.",
+            read_only=True,
+        )
     if not updated:
         return ToolResult("O lançamento ou a conta mudou desde a confirmação. Não alterei nada; peça a correção novamente.", read_only=True)
 
@@ -898,6 +924,74 @@ async def update_transaction(ctx: ExecContext, action: FinanceAction) -> ToolRes
         mudancas.append(f"nome → *{patch['description']}*")
     return ToolResult(
         f"✏️ Corrigido ({describe(antes)}): {', '.join(mudancas)}.", result_id=antes["id"]
+    )
+
+
+async def _corrigir_plano(ctx: ExecContext, action: FinanceAction) -> ToolResult:
+    """A COMPRA inteira: o valor novo vai para o total ou para cada parcela (D2).
+
+    Quem decidiu foi a pessoa, na pergunta do `gate`, e a resposta está congelada no
+    alvo (`amount_unit`). Sem ela — checkpoint ou pendência de antes do deploy — NÃO
+    há default: "parcela" num total de R$ 2.400 em 10x vira R$ 24.000.
+    """
+    if action.new_occurred_at:
+        from app.graph.policy import DATA_DO_PLANO
+
+        raise Level1Error(DATA_DO_PLANO)
+    if action.new_amount_cents is None:
+        return await _corrigir_parcelas_futuras(ctx, action)
+    unidade = (ctx.target or {}).get("amount_unit")
+    if unidade == "parcela":
+        return await _corrigir_parcelas_futuras(ctx, action)
+    if unidade != "total":
+        return ToolResult(
+            "Não sei se o valor era o total da compra ou cada parcela. Ainda não mudei nada; "
+            "me pede a correção de novo.",
+            read_only=True,
+        )
+    return await _corrigir_total_do_plano(ctx, action)
+
+
+async def _corrigir_total_do_plano(ctx: ExecContext, action: FinanceAction) -> ToolResult:
+    """Novo TOTAL, mesmo número de parcelas, pela RPC do "Editar a compra" do app.
+
+    ⚠️ A RPC SOBRESCREVE com nulo (description, category, merchant, account): os 8
+    argumentos vão sempre, com o que está no plano AGORA, trocando só o que a pessoa
+    pediu. A releitura com `workspace_id` é a checagem de dono: a RPC é `security
+    invoker` e acha o plano só pelo id, e o agente conecta com papel que ignora RLS.
+    Quem decide o que está travado e redistribui o saldo é a RPC — não este código.
+    """
+    cands = (ctx.target or {}).get("candidates") or []
+    plano = await db.fetch_one(
+        """
+        select id, total_cents, installments, first_occurred_at, description, category,
+               merchant, account_id
+        from public.installment_plans where id = %s and workspace_id = %s
+        """,
+        cands[0]["id"], ctx.workspace_id,
+    )
+    if not plano:
+        return ToolResult("🤷 Essa compra parcelada não está mais aqui.", read_only=True)
+    total = guards.require_amount(action.new_amount_cents, o_que="o total novo")
+    descricao = (guards.require_text(action.new_description, o_que="a descrição nova", maximo=200)
+                 if action.new_description else plano["description"])
+    categoria = guards.clean_category(action.new_category) if action.new_category else plano["category"]
+    try:
+        await db.fetch_one(
+            "select public.update_installment_plan(%s, %s, %s, %s, %s, %s, %s, %s) as mexidas",
+            plano["id"], total, plano["installments"], plano["first_occurred_at"],
+            descricao, categoria, plano["merchant"], plano["account_id"],
+        )
+    except psycopg.errors.RaiseException as err:
+        # Só P0001 (o `raise exception` da RPC, escrito para a pessoa). Aqui e não no
+        # registry: nem toda RPC do repo escreve a recusa em português de usuário.
+        motivo = (err.diag.message_primary or str(err)).strip().rstrip(".")
+        raise Level1Error(f"❌ {motivo}. Ainda não mudei nada.") from err
+    nome = descricao or plano["merchant"] or "a compra"
+    return ToolResult(
+        f"✏️ Corrigi o total de *{nome}*: {cents_to_brl(int(plano['total_cents']))} → "
+        f"{cents_to_brl(total)} em {plano['installments']}x. As já pagas ficaram como estavam.",
+        result_id=str(plano["id"]),
     )
 
 

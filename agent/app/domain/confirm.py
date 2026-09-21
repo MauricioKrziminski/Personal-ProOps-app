@@ -422,6 +422,11 @@ def _relembrar_opcoes(pendente: dict) -> str:
         f"{i}) {c.get('label','')}" + (f" ({c['when']})" if c.get("when") else "")
         for i, c in enumerate(candidatos, 1)
     )
+    if (pendente.get("action") or {}).get("purpose") == "amount_unit":
+        return (
+            "🤔 Ainda não mexi em nada — preciso saber se é o total da compra ou cada parcela.\n"
+            f"{numerado}\nResponde com o número, ou *NÃO* para cancelar."
+        )
     return (
         "🤔 Ainda não mexi em nada — preciso saber qual.\n"
         f"{numerado}\nResponde com o número, ou *NENHUMA*."

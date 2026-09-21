@@ -556,117 +556,174 @@ async def test_escolher_a_parcela_mantem_a_tabela_de_transacoes(monkeypatch, gra
     assert final["targets"][0]["table"] == "transactions"
 
 
-@pytest.mark.asyncio
-async def test_update_em_plano_mostra_menu_interativo_e_exclui_se_selecionado(monkeypatch, grafo):
+PLANO_TV = {"id": "p1", "label": "Tudo (10x) — TV", "table": "installment_plans",
+            "plan_installments": 10, "total_cents": 300000, "editaveis": 8,
+            "travado_cents": 60000}
+
+
+def _plano_found(monkeypatch):
     from app.graph import nodes
 
     async def plano_alvo(workspace_id, acoes, texto_cru, antecedente=None):
-        return [
-            {
-                "table": "installment_plans",
-                "status": "found",
-                "candidates": [
-                    {"id": "p1", "label": "Tudo (12x) — Macbook", "table": "installment_plans"}
-                ],
-            }
-        ]
+        return [{"table": "installment_plans", "status": "found",
+                 "candidates": [dict(PLANO_TV)]} for _ in acoes]
 
     monkeypatch.setattr(nodes.resolve, "for_actions", plano_alvo)
-    cfg = {"configurable": {"thread_id": "mut-plano-1"}}
+
+
+def _valor(estado):
+    pausa = estado["__interrupt__"][0]
+    return getattr(pausa, "value", pausa)
+
+
+@pytest.mark.asyncio
+async def test_valor_em_plano_pergunta_a_unidade_e_so_depois_confirma(monkeypatch, grafo):
+    """D2: "a TV é 2400" não diz se é o total ou cada parcela — e errar isso é o bug de
+    R$ 24.000. A pergunta vem com botões e a escolha congela no ALVO."""
+    _plano_found(monkeypatch)
+    cfg = {"configurable": {"thread_id": "unidade-found"}}
 
     estado = await grafo.ainvoke(
-        _estado([{"type": FinanceActionType.UPDATE_TRANSACTION.value, "description": "mac"}]),
+        _estado([{"type": "update_transaction", "description": "tv", "new_amount_cents": 240000}]),
         config=cfg,
     )
-    assert "__interrupt__" in estado
-    interrupt_val = estado["__interrupt__"][0].value
-    assert interrupt_val["kind"] == "choice"
-    assert "Macbook" in interrupt_val["summary"]
-    assert any("Excluir plano" in opt["label"] for opt in interrupt_val["options"])
-    assert any("Mudar parcelas" in opt["label"] for opt in interrupt_val["options"])
+    pausa = _valor(estado)
+    assert pausa["kind"] == "choice" and pausa["purpose"] == "amount_unit"
+    assert {o["id"] for o in pausa["options"]} == {"unidade:total", "unidade:parcela"}
+    # os dois números no corpo: o total pedido e o total se for por parcela
+    assert "R$ 2.400,00" in pausa["summary"] and "R$ 19.800,00" in pausa["summary"]
 
-    # Usuário seleciona excluir plano
-    final = await grafo.ainvoke(Command(resume="delete_plan:p1"), config=cfg)
-    assert '__interrupt__' in final  # seleção não é consentimento final
-    assert 'EXECUTOU' not in final.get('results', [])
+    estado = await grafo.ainvoke(Command(resume={"approved": True, "candidate_id": "unidade:total"}), config=cfg)
+    pausa = _valor(estado)
+    assert pausa["kind"] == "confirmation"
+    assert "total de" in pausa["summary"]
+    assert "EXECUTOU" not in estado.get("results", [])
+
     final = await grafo.ainvoke(Command(resume=True), config=cfg)
-
     assert final["approved"] is True
-    assert final["finance_actions"][0]["type"] == FinanceActionType.DELETE_TRANSACTION.value
-    assert final["targets"][0]["table"] == "installment_plans"
+    assert final["targets"][0]["amount_unit"] == "total"
+    assert "EXECUTOU" in final["results"]
 
 
 @pytest.mark.asyncio
-async def test_update_em_plano_mudar_parcelas_com_current_installment_atualiza_para_mark_paid(
-    monkeypatch, grafo
-):
+async def test_valor_em_plano_no_empate_escolhe_depois_unidade_depois_confirma(monkeypatch, grafo):
     from app.graph import nodes
 
-    async def plano_alvo(workspace_id, acoes, texto_cru, antecedente=None):
-        return [
-            {
-                "table": "installment_plans",
-                "status": "found",
-                "candidates": [
-                    {"id": "p1", "label": "Tudo (12x) — Macbook", "table": "installment_plans"}
-                ],
-            }
-        ]
+    async def plano_e_parcela(workspace_id, acoes, texto_cru, antecedente=None):
+        return [{"table": "transactions", "status": "ambiguous",
+                 "candidates": [dict(PLANO_TV),
+                                {"id": "tx1", "label": "TV (3/10)", "table": "transactions"}]}
+                for _ in acoes]
 
-    monkeypatch.setattr(nodes.resolve, "for_actions", plano_alvo)
-    cfg = {"configurable": {"thread_id": "mut-plano-2"}}
-
-    estado = await grafo.ainvoke(
-        _estado(
-            [
-                {
-                    "type": FinanceActionType.UPDATE_TRANSACTION.value,
-                    "description": "mac",
-                    "current_installment": 3,
-                }
-            ]
-        ),
-        config=cfg,
-    )
-    assert "__interrupt__" in estado
-
-    final = await grafo.ainvoke(Command(resume="change_paid:p1"), config=cfg)
-    assert '__interrupt__' in final  # seleção não é consentimento final
-    assert 'EXECUTOU' not in final.get('results', [])
-    final = await grafo.ainvoke(Command(resume=True), config=cfg)
-
-    assert final["approved"] is True
-    assert final["finance_actions"][0]["type"] == FinanceActionType.MARK_PAID.value
-    assert final["finance_actions"][0]["current_installment"] == 3
-
-
-@pytest.mark.asyncio
-async def test_update_em_plano_mudar_parcelas_sem_numero_pede_quantidade(monkeypatch, grafo):
-    from app.graph import nodes
-
-    async def plano_alvo(workspace_id, acoes, texto_cru, antecedente=None):
-        return [
-            {
-                "table": "installment_plans",
-                "status": "found",
-                "candidates": [
-                    {"id": "p1", "label": "Tudo (12x) — Macbook", "table": "installment_plans"}
-                ],
-            }
-        ]
-
-    monkeypatch.setattr(nodes.resolve, "for_actions", plano_alvo)
-    cfg = {"configurable": {"thread_id": "mut-plano-3"}}
+    monkeypatch.setattr(nodes.resolve, "for_actions", plano_e_parcela)
+    cfg = {"configurable": {"thread_id": "unidade-empate"}}
 
     await grafo.ainvoke(
-        _estado([{"type": FinanceActionType.UPDATE_TRANSACTION.value, "description": "mac"}]),
+        _estado([{"type": "update_transaction", "description": "tv", "new_amount_cents": 30000}]),
         config=cfg,
     )
+    estado = await grafo.ainvoke(Command(resume="p1"), config=cfg)
+    assert _valor(estado)["purpose"] == "amount_unit"
+    estado = await grafo.ainvoke(Command(resume="unidade:parcela"), config=cfg)
+    pausa = _valor(estado)
+    assert pausa["kind"] == "confirmation" and "por parcela" in pausa["summary"]
+    final = await grafo.ainvoke(Command(resume=True), config=cfg)
+    assert final["targets"][0]["table"] == "installment_plans"
+    assert final["targets"][0]["amount_unit"] == "parcela"
+    assert "EXECUTOU" in final["results"]
 
-    final = await grafo.ainvoke(Command(resume="change_paid:p1"), config=cfg)
+
+@pytest.mark.asyncio
+async def test_resposta_fora_das_opcoes_da_unidade_nao_muda_nada(monkeypatch, grafo):
+    """Pendência antiga do menu (`change_paid:`/`delete_plan:`, vive 10 min) cai aqui
+    depois do deploy: o id não é uma das opções novas, então nada acontece."""
+    _plano_found(monkeypatch)
+    cfg = {"configurable": {"thread_id": "unidade-velha"}}
+    await grafo.ainvoke(
+        _estado([{"type": "update_transaction", "description": "tv", "new_amount_cents": 240000}]),
+        config=cfg,
+    )
+    final = await grafo.ainvoke(
+        Command(resume={"approved": True, "candidate_id": "change_paid:p1"}), config=cfg
+    )
+    assert final["halted"] is True and final["approved"] is False
+    assert "EXECUTOU" not in final.get("results", [])
+    assert "não mudei nada" in " ".join(final["results"])
+
+
+@pytest.mark.asyncio
+async def test_pendencia_antiga_do_menu_numa_renomeacao_nao_executa(monkeypatch, grafo):
+    _plano_found(monkeypatch)
+    cfg = {"configurable": {"thread_id": "menu-velho"}}
+    await grafo.ainvoke(
+        _estado([{"type": "update_transaction", "description": "tv", "new_description": "TV sala"}]),
+        config=cfg,
+    )
+    final = await grafo.ainvoke(Command(resume="delete_plan:p1"), config=cfg)
+    assert "EXECUTOU" not in final.get("results", [])
     assert final["approved"] is False
+
+
+@pytest.mark.asyncio
+async def test_renomear_plano_e_uma_confirmacao_so(monkeypatch, grafo):
+    _plano_found(monkeypatch)
+    cfg = {"configurable": {"thread_id": "renomear-plano"}}
+    estado = await grafo.ainvoke(
+        _estado([{"type": "update_transaction", "description": "tv", "new_description": "TV sala"}]),
+        config=cfg,
+    )
+    pausa = _valor(estado)
+    assert pausa["kind"] == "confirmation" and "TV sala" in pausa["summary"]
+    final = await grafo.ainvoke(Command(resume=True), config=cfg)
+    assert "__interrupt__" not in final
+    assert "EXECUTOU" in final["results"]
+
+
+@pytest.mark.asyncio
+async def test_editar_sem_dizer_o_que_pergunta_sem_interrupt(monkeypatch, grafo):
+    """"edite a TV" abria um menu de "mudar parcelas pagas / excluir o plano"."""
+    _plano_found(monkeypatch)
+    cfg = {"configurable": {"thread_id": "edite-a-tv"}}
+    final = await grafo.ainvoke(
+        _estado([{"type": "update_transaction", "description": "tv"}]), config=cfg
+    )
+    assert "__interrupt__" not in final
     assert final["halted"] is True
-    assert "Quantas parcelas" in " ".join(final.get("results", []))
+    assert "O que você quer mudar: o valor, o nome, a categoria ou a data? Ainda não mudei nada." in final["results"]
+
+
+@pytest.mark.asyncio
+async def test_data_de_compra_parcelada_nao_e_prometida(monkeypatch, grafo):
+    _plano_found(monkeypatch)
+    cfg = {"configurable": {"thread_id": "data-plano"}}
+    final = await grafo.ainvoke(
+        _estado([{"type": "update_transaction", "description": "tv",
+                  "new_amount_cents": 30000, "new_occurred_at": "2026-10-01"}]),
+        config=cfg,
+    )
+    assert "__interrupt__" not in final
+    assert any("Editar a compra no app" in r for r in final["results"])
+
+@pytest.mark.asyncio
+async def test_data_de_plano_escolhido_no_empate_para_antes_do_sim(monkeypatch, grafo):
+    from app.graph import nodes
+
+    async def empate(workspace_id, acoes, texto_cru, antecedente=None):
+        return [{"table": "transactions", "status": "ambiguous",
+                 "candidates": [dict(PLANO_TV),
+                                {"id": "tx1", "label": "TV (3/10)", "table": "transactions"}]}
+                for _ in acoes]
+
+    monkeypatch.setattr(nodes.resolve, "for_actions", empate)
+    cfg = {"configurable": {"thread_id": "data-empate"}}
+    await grafo.ainvoke(
+        _estado([{"type": "update_transaction", "description": "tv",
+                  "new_occurred_at": "2026-10-01"}]),
+        config=cfg,
+    )
+    final = await grafo.ainvoke(Command(resume="p1"), config=cfg)
+    assert "__interrupt__" not in final
+    assert any("Editar a compra no app" in r for r in final["results"])
 
 
 @pytest.mark.asyncio

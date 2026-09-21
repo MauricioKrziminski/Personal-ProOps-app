@@ -22,6 +22,7 @@ from app import db
 from app.graph.schemas import FinanceAction, FinanceActionType
 from app.tools import finance
 from app.tools.base import ExecContext
+from app.tools.guards import Level1Error
 
 WS = UUID("22222222-2222-2222-2222-222222222222")
 
@@ -174,24 +175,42 @@ class TestBaixaEmLancamentoUnico:
         assert "workspace_id = %s" in sql[0][0]
 
 
+def _ctx_plano(**alvo) -> ExecContext:
+    ctx = _ctx("installment_plans")
+    ctx.target = {**ctx.target, **alvo}
+    return ctx
+
+
+def _ctx_snapshot(*linhas) -> ExecContext:
+    ctx = _ctx("installment_plans")
+    cand = {**ctx.target["candidates"][0],
+            "installment_snapshot": {"version": 2, "rows": list(linhas), "total_cents": 0}}
+    ctx.target = {**ctx.target, "candidates": [cand]}
+    return ctx
+
+
+PLANO_COMPLETO = {
+    "id": "plano-1", "total_cents": 300000, "installments": 10,
+    "first_occurred_at": "2026-05-15", "description": "TV", "category": "eletrônicos",
+    "merchant": "Magalu", "account_id": "acc-1",
+}
+
+
 class TestEdicaoPlano:
     @pytest.mark.asyncio
-    async def test_update_antigo_sem_snapshot_exige_nova_confirmacao(self, sql):
-        r = await finance.update_transaction(
-            _ctx("installment_plans"),
-            FinanceAction(type=FinanceActionType.UPDATE_TRANSACTION, current_installment=3),
-        )
-        assert sql == []
-        assert r.read_only
+    async def test_update_sem_correcao_nunca_da_baixa(self, sql):
+        """`current_installment` numa correção era desviado para `_baixa_em_parcelas`:
+        um update que marcava parcela como paga."""
+        with pytest.raises(Level1Error):
+            await finance.update_transaction(
+                _ctx("installment_plans"),
+                FinanceAction(type=FinanceActionType.UPDATE_TRANSACTION, current_installment=3),
+            )
+        assert not any("cleared" in q for q, _ in sql)
 
     @pytest.mark.asyncio
-    async def test_update_em_plano_corrige_as_parcelas_em_aberto(self, monkeypatch):
-        """Isto era um beco: "mudar as parcelas pagas ou excluir o plano".
-
-        Em 48x a única saída era abrir parcela por parcela no app. Agora cai na MESMA
-        RPC do botão do app, que é quem sabe o que é "futura" — repetir a regra aqui
-        criaria a segunda cópia, e a que diverge é a que mexe em dinheiro.
-        """
+    async def test_valor_por_parcela_corrige_as_parcelas_em_aberto(self, monkeypatch):
+        """Unidade "parcela": a MESMA RPC do botão do app, que é quem sabe o que é "futura"."""
         chamadas = []
 
         async def fetch_one(sql, *args):
@@ -202,27 +221,153 @@ class TestEdicaoPlano:
 
         monkeypatch.setattr(finance.db, "fetch_one", fetch_one)
         r = await finance.update_transaction(
-            _ctx("installment_plans"),
+            _ctx_plano(amount_unit="parcela"),
             FinanceAction(type=FinanceActionType.UPDATE_TRANSACTION, new_amount_cents=5000),
         )
         assert "6 parcelas" in r.message and "já pagas ficaram" in r.message
         assert any("update_transaction_scoped" in sql for sql, _ in chamadas)
-        # a âncora é a primeira EM ABERTO: a RPC sempre reescreve a âncora, e ancorar
-        # numa parcela paga mexeria num mês fechado
         assert any("status = 'pending'" in sql and "order by occurred_at" in sql
                    for sql, _ in chamadas)
 
     @pytest.mark.asyncio
-    async def test_update_em_plano_sem_parcela_em_aberto_nao_mexe(self, monkeypatch):
+    async def test_valor_por_parcela_sem_parcela_em_aberto_nao_mexe(self, monkeypatch):
         async def fetch_one(sql, *args):
             return None if "status = 'pending'" in sql else {"mexidas": 0}
+
+        monkeypatch.setattr(finance.db, "fetch_one", fetch_one)
+        r = await finance.update_transaction(
+            _ctx_plano(amount_unit="parcela"),
+            FinanceAction(type=FinanceActionType.UPDATE_TRANSACTION, new_amount_cents=5000),
+        )
+        assert r.read_only and "só mudam uma a uma" in r.message
+
+    @pytest.mark.asyncio
+    async def test_renomear_plano_vai_pela_rpc_com_escopo(self, monkeypatch):
+        chamadas = []
+
+        async def fetch_one(sql, *args):
+            chamadas.append((sql, args))
+            if "status = 'pending'" in sql:
+                return {"id": "aaaaaaaa-0000-0000-0000-000000000001", "installment_no": 3}
+            return {"mexidas": 8}
+
+        monkeypatch.setattr(finance.db, "fetch_one", fetch_one)
+        await finance.update_transaction(
+            _ctx_plano(),
+            FinanceAction(type=FinanceActionType.UPDATE_TRANSACTION, new_description="TV sala"),
+        )
+        rpc = [a for q, a in chamadas if "update_transaction_scoped" in q]
+        assert rpc and '"description": "TV sala"' in rpc[0][1]
+
+    @pytest.mark.asyncio
+    async def test_valor_sem_unidade_nunca_cai_em_parcela(self, monkeypatch):
+        """Checkpoint/pendência de antes do deploy: sem `amount_unit` não há default."""
+        chamadas = []
+
+        async def fetch_one(sql, *args):
+            chamadas.append(sql)
+            return None
 
         monkeypatch.setattr(finance.db, "fetch_one", fetch_one)
         r = await finance.update_transaction(
             _ctx("installment_plans"),
             FinanceAction(type=FinanceActionType.UPDATE_TRANSACTION, new_amount_cents=5000),
         )
-        assert r.read_only and "só mudam uma a uma" in r.message
+        assert r.read_only and "de novo" in r.message
+        assert chamadas == []
+
+    @pytest.mark.asyncio
+    async def test_valor_total_chama_update_installment_plan_com_os_8_argumentos(self, monkeypatch):
+        """A RPC SOBRESCREVE com nulo: os campos que a pessoa não citou vão com o valor atual."""
+        chamadas = []
+
+        async def fetch_one(sql, *args):
+            chamadas.append((" ".join(sql.split()), args))
+            if "from public.installment_plans" in sql:
+                return dict(PLANO_COMPLETO)
+            return {"mexidas": 10}
+
+        monkeypatch.setattr(finance.db, "fetch_one", fetch_one)
+        r = await finance.update_transaction(
+            _ctx_plano(amount_unit="total"),
+            FinanceAction(type=FinanceActionType.UPDATE_TRANSACTION, new_amount_cents=240000,
+                          new_description="TV da sala"),
+        )
+        leitura = chamadas[0]
+        assert "workspace_id = %s" in leitura[0] and WS in leitura[1]
+        rpc = [c for c in chamadas if "update_installment_plan" in c[0]]
+        assert len(rpc) == 1
+        assert rpc[0][1] == ("plano-1", 240000, 10, "2026-05-15", "TV da sala",
+                             "eletrônicos", "Magalu", "acc-1")
+        assert not r.read_only and "R$ 2.400,00" in r.message
+
+    @pytest.mark.asyncio
+    async def test_recusa_da_rpc_vira_a_mensagem_dela(self, monkeypatch):
+        import psycopg
+
+        class Recusa(psycopg.errors.RaiseException):
+            pass
+
+        async def fetch_one(sql, *args):
+            if "update_installment_plan" in sql:
+                erro = Recusa("Todas as parcelas já foram pagas: o total não muda mais.")
+                raise erro
+            return dict(PLANO_COMPLETO)
+
+        monkeypatch.setattr(finance.db, "fetch_one", fetch_one)
+        with pytest.raises(Level1Error) as err:
+            await finance.update_transaction(
+                _ctx_plano(amount_unit="total"),
+                FinanceAction(type=FinanceActionType.UPDATE_TRANSACTION, new_amount_cents=1000),
+            )
+        assert "o total não muda mais" in err.value.mensagem_usuario
+
+    @pytest.mark.asyncio
+    async def test_data_de_plano_nao_e_engolida(self, sql):
+        with pytest.raises(Level1Error) as err:
+            await finance.update_transaction(
+                _ctx_plano(),
+                FinanceAction(type=FinanceActionType.UPDATE_TRANSACTION, new_description="x",
+                              new_occurred_at="2026-10-01"),
+            )
+        assert "Editar a compra no app" in err.value.mensagem_usuario
+
+    @pytest.mark.asyncio
+    async def test_snapshot_de_uma_linha_corrige_so_aquela_linha(self, monkeypatch):
+        """"muda a 3ª parcela para 300": o id vem do snapshot congelado, nunca de uma busca."""
+        chamadas = []
+        LINHA = "aaaaaaaa-0000-0000-0000-000000000003"
+
+        async def fetch_one(sql, *args):
+            chamadas.append((" ".join(sql.split()), args))
+            if sql.strip().startswith("select id, kind"):
+                return {"id": LINHA, "kind": "expense", "amount_cents": 25000,
+                        "category": "eletrônicos", "description": "TV (3/10)",
+                        "occurred_at": "2026-07-15"}
+            return {"id": LINHA}
+
+        monkeypatch.setattr(finance.db, "fetch_one", fetch_one)
+        r = await finance.update_transaction(
+            _ctx_snapshot({"id": LINHA, "installment_no": 3, "amount_cents": 25000}),
+            FinanceAction(type=FinanceActionType.UPDATE_TRANSACTION, new_amount_cents=30000),
+        )
+        update = [c for c in chamadas if c[0].startswith("update public.transactions")]
+        assert len(update) == 1
+        assert LINHA in update[0][1] and WS in update[0][1]
+        assert "workspace_id = %s" in update[0][0]
+        assert "parcela_travada" in update[0][0]
+        assert not any("cleared" in c[0] for c in chamadas)
+        assert not r.read_only
+
+    @pytest.mark.asyncio
+    async def test_snapshot_de_varias_linhas_nao_corrige(self, sql):
+        r = await finance.update_transaction(
+            _ctx_snapshot({"id": "a", "installment_no": 1}, {"id": "b", "installment_no": 2}),
+            FinanceAction(type=FinanceActionType.UPDATE_TRANSACTION, new_amount_cents=30000),
+        )
+        assert r.read_only
+        assert "Consigo corrigir a compra inteira (as parcelas em aberto) ou uma parcela por vez." in r.message
+        assert sql == []
 
 
 class TestAlvoDefensivo:

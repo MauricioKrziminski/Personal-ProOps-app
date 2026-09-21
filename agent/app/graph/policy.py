@@ -183,6 +183,36 @@ def _frase_conversao(action: FinanceAction, target: dict, escolhido: dict) -> st
     )
 
 
+SEM_CORRECAO = "O que você quer mudar: o valor, o nome, a categoria ou a data? Ainda não mudei nada."
+DATA_DO_PLANO = (
+    "A data de uma compra parcelada muda em Editar a compra no app. Ainda não mudei nada."
+)
+
+
+def plano_inteiro(target: dict | None) -> bool:
+    """O alvo é a COMPRA inteira (não uma parcela congelada no snapshot)."""
+    target = target or {}
+    cands = target.get("candidates") or []
+    return (target.get("table") == "installment_plans" and target.get("status") == "found"
+            and bool(cands) and not cands[0].get("installment_snapshot"))
+
+
+def erro_de_correcao(action, target: dict | None) -> str | None:
+    """Correção que não dá para confirmar: nada a mudar, ou a data de um plano inteiro.
+
+    Pura, e roda no `gate` (a cada resume, inclusive de pendência antiga). A data do
+    plano não entra na RPC com escopo: ela aparecia na frase do SIM e sumia na execução.
+    """
+    if getattr(action, "type", None) != FinanceActionType.UPDATE_TRANSACTION:
+        return None
+    if not any([action.new_amount_cents is not None, action.new_category, action.new_occurred_at,
+                action.new_description, action.new_account, action.installments]):
+        return SEM_CORRECAO
+    if action.new_occurred_at and plano_inteiro(target):
+        return DATA_DO_PLANO
+    return None
+
+
 def par_de_substituicao(acoes: list, alvos: list[dict | None]) -> set[int]:
     """Índices do lote quando ele mistura CRIAR algo novo com MUDAR o que já existe.
 
@@ -246,6 +276,8 @@ def describe_for_confirmation(
                 and isinstance(action, FinanceAction)
                 and action.type == FinanceActionType.UPDATE_TRANSACTION
                 and action.new_amount_cents is not None
+                # UMA parcela congelada ("muda a 3ª para 300") não tem "total ou cada?"
+                and not escolhido.get("installment_snapshot")
             ):
                 return _frase_correcao_plano(action, target, escolhido)
             if (
@@ -279,6 +311,7 @@ def describe_for_confirmation(
             # que é o alvo da BUSCA — sem esta linha o usuário confirmaria entendendo
             # que as dez mudam.
             if (target.get("table") == "installment_plans" and corrections
+                    and not escolhido.get("installment_snapshot")
                     and isinstance(action, FinanceAction)
                     and action.type == FinanceActionType.UPDATE_TRANSACTION):
                 suffix += " (só as parcelas em aberto; as pagas ficam como estão)"

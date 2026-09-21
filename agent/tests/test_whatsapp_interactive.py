@@ -248,3 +248,18 @@ def test_resumo_que_ja_e_pergunta_nao_ganha_outra():
         {"id": "p1"},
     )
     assert dois["body"].startswith("🤔 apagar o gasto — qual deles?")
+
+
+def test_pergunta_da_unidade_tem_saida_propria():
+    """"Nenhuma dessas" / "pelo valor ou pela data" são textos de BUSCA; aqui a
+    pessoa já disse qual compra — a saída é cancelar."""
+    opcoes = [{"id": "unidade:total", "label": "Total da compra"},
+              {"id": "unidade:parcela", "label": "Cada parcela"}]
+    saida = conversation._pergunta(
+        {"kind": "choice", "purpose": "amount_unit",
+         "summary": "R$ 300,00 é o total ou cada parcela?"}, opcoes, {"id": "p1"},
+    )
+    ids = [b[0] for b in saida["buttons"]]
+    assert ids == ["pa:p1:c:unidade:total", "pa:p1:c:unidade:parcela", "pa:p1:no"]
+    assert "Nenhuma" not in str(saida) and "NENHUMA" not in saida["text"]
+    assert saida["buttons"][2][1] == "Cancelar"
