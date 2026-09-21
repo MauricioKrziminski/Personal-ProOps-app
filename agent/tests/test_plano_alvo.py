@@ -208,56 +208,56 @@ class TestEdicaoPlano:
             )
         assert not any("cleared" in q for q, _ in sql)
 
-    @pytest.mark.asyncio
-    async def test_valor_por_parcela_corrige_as_parcelas_em_aberto(self, monkeypatch):
-        """Unidade "parcela": a MESMA RPC do botão do app, que é quem sabe o que é "futura"."""
+    @staticmethod
+    def _duble(monkeypatch, *, editaveis=8, travado=60000):
         chamadas = []
 
         async def fetch_one(sql, *args):
-            chamadas.append((sql, args))
-            if "status = 'pending'" in sql:
-                return {"id": "aaaaaaaa-0000-0000-0000-000000000001", "installment_no": 3}
-            return {"mexidas": 6}
+            chamadas.append((" ".join(sql.split()), args))
+            if "from public.installment_plans" in sql:
+                return {**PLANO_COMPLETO, "editaveis": editaveis, "travado_cents": travado}
+            return {"mexidas": 10}
 
         monkeypatch.setattr(finance.db, "fetch_one", fetch_one)
+        return chamadas
+
+    @pytest.mark.asyncio
+    async def test_valor_por_parcela_com_fatura_paga_em_parte_passa_o_total_pela_rpc(self, monkeypatch):
+        """`update_transaction_scoped` mexia em parcela pendente de fatura paga em PARTE.
+        Agora o total é travado_agora + X × editáveis_agora, e a RPC redistribui."""
+        chamadas = self._duble(monkeypatch, editaveis=7, travado=90000)
+        r = await finance.update_transaction(
+            _ctx_plano(amount_unit="parcela"),
+            FinanceAction(type=FinanceActionType.UPDATE_TRANSACTION, new_amount_cents=30000),
+        )
+        leitura = chamadas[0]
+        assert "parcela_travada" in leitura[0] and "workspace_id = %s" in leitura[0]
+        rpc = [a for q, a in chamadas if "update_installment_plan" in q]
+        assert rpc == [("plano-1", 90000 + 30000 * 7, 10, "2026-05-15", "TV",
+                        "eletrônicos", "Magalu", "acc-1")]
+        assert not any("update_transaction_scoped" in q for q, _ in chamadas)
+        assert not r.read_only
+
+    @pytest.mark.asyncio
+    async def test_valor_por_parcela_sem_parcela_editavel_nao_mexe(self, monkeypatch):
+        chamadas = self._duble(monkeypatch, editaveis=0, travado=300000)
         r = await finance.update_transaction(
             _ctx_plano(amount_unit="parcela"),
             FinanceAction(type=FinanceActionType.UPDATE_TRANSACTION, new_amount_cents=5000),
         )
-        assert "6 parcelas" in r.message and "já pagas ficaram" in r.message
-        assert any("update_transaction_scoped" in sql for sql, _ in chamadas)
-        assert any("status = 'pending'" in sql and "order by occurred_at" in sql
-                   for sql, _ in chamadas)
+        assert r.read_only and "nenhuma parcela dessa compra pode mudar mais" in r.message.lower()
+        assert not any("update_installment_plan" in q for q, _ in chamadas)
 
     @pytest.mark.asyncio
-    async def test_valor_por_parcela_sem_parcela_em_aberto_nao_mexe(self, monkeypatch):
-        async def fetch_one(sql, *args):
-            return None if "status = 'pending'" in sql else {"mexidas": 0}
-
-        monkeypatch.setattr(finance.db, "fetch_one", fetch_one)
-        r = await finance.update_transaction(
-            _ctx_plano(amount_unit="parcela"),
-            FinanceAction(type=FinanceActionType.UPDATE_TRANSACTION, new_amount_cents=5000),
-        )
-        assert r.read_only and "só mudam uma a uma" in r.message
-
-    @pytest.mark.asyncio
-    async def test_renomear_plano_vai_pela_rpc_com_escopo(self, monkeypatch):
-        chamadas = []
-
-        async def fetch_one(sql, *args):
-            chamadas.append((sql, args))
-            if "status = 'pending'" in sql:
-                return {"id": "aaaaaaaa-0000-0000-0000-000000000001", "installment_no": 3}
-            return {"mexidas": 8}
-
-        monkeypatch.setattr(finance.db, "fetch_one", fetch_one)
+    async def test_renomear_plano_passa_o_total_atual_pela_rpc(self, monkeypatch):
+        chamadas = self._duble(monkeypatch)
         await finance.update_transaction(
             _ctx_plano(),
-            FinanceAction(type=FinanceActionType.UPDATE_TRANSACTION, new_description="TV sala"),
+            FinanceAction(type=FinanceActionType.UPDATE_TRANSACTION, new_description="TV sala",
+                          new_category="casa"),
         )
-        rpc = [a for q, a in chamadas if "update_transaction_scoped" in q]
-        assert rpc and '"description": "TV sala"' in rpc[0][1]
+        rpc = [a for q, a in chamadas if "update_installment_plan" in q]
+        assert rpc == [("plano-1", 300000, 10, "2026-05-15", "TV sala", "casa", "Magalu", "acc-1")]
 
     @pytest.mark.asyncio
     async def test_valor_sem_unidade_nunca_cai_em_parcela(self, monkeypatch):

@@ -10,12 +10,19 @@ from __future__ import annotations
 
 import json
 import logging
+from uuid import UUID
 
 import psycopg
-from uuid import UUID
 
 from app import db
 from app.domain import matching
+from app.domain.correcao_plano import (
+    CONTA_DO_PLANO,
+    DATA_DO_PLANO,
+    NADA_EDITAVEL,
+    PARCELA_TRAVADA,
+    VARIAS_PARCELAS,
+)
 from app.domain.dates import add_months, format_date_br, local_iso_date, now_utc
 from app.domain.money import cents_to_brl, parse_valor_em_centavos
 from app.domain.recurrence import next_occurrence
@@ -25,6 +32,17 @@ from app.tools.base import FATURA_ABERTA, ExecContext, ToolResult, ensure_owned
 from app.tools.guards import Level1Error
 
 log = logging.getLogger(__name__)
+
+# Quantas parcelas do plano `p` ainda podem mudar e quanto já está travado, pela régua
+# do BANCO (`private.parcela_travada`: baixa, fatura paga/adiada ou paga em parte).
+# Contar por `status` aqui seria a segunda cópia da regra de `update_installment_plan`.
+# `workspace_id` porque o agente conecta com papel que ignora RLS.
+TRAVAS_DO_PLANO = """cross join lateral (
+            select count(*) filter (where not private.parcela_travada(t.status, t.invoice_id)) as editaveis,
+                   coalesce(sum(t.amount_cents) filter (
+                     where private.parcela_travada(t.status, t.invoice_id)), 0) as travado_cents
+            from public.transactions t
+            where t.installment_plan_id = p.id and t.workspace_id = p.workspace_id) x"""
 
 KIND_LABEL = {"expense": "gasto", "income": "receita", "transfer": "transferência"}
 REFERENCE_WINDOW = 40
@@ -655,7 +673,6 @@ async def _baixa_em_parcelas(ctx: ExecContext, action: FinanceAction) -> ToolRes
             "Essa confirmação antiga não detalha as parcelas. Peça a baixa novamente para revisar o intervalo e o valor.",
             read_only=True,
         )
-    import json
 
     # One statement locks and checks EVERY reviewed record before updating ANY.
     # A changed amount/date/status, removed row or ownership mismatch rejects all.
@@ -844,10 +861,7 @@ async def update_transaction(ctx: ExecContext, action: FinanceAction) -> ToolRes
             return await _corrigir_plano(ctx, action)
         linhas = snapshot.get("rows") or []
         if len(linhas) != 1:
-            return ToolResult(
-                "Consigo corrigir a compra inteira (as parcelas em aberto) ou uma parcela por vez.",
-                read_only=True,
-            )
+            return ToolResult(VARIAS_PARCELAS, read_only=True)
         # O id congelado no snapshot é o que a pessoa leu no SIM; buscar de novo aqui
         # abriria a janela entre a pergunta e a execução.
         alvo_id = linhas[0]["id"]
@@ -903,11 +917,7 @@ async def update_transaction(ctx: ExecContext, action: FinanceAction) -> ToolRes
         *args,
     )
     if not updated and trava:
-        return ToolResult(
-            "Essa parcela já foi paga (ou a fatura dela foi paga): o valor, a data e a conta "
-            "dela não mudam mais. Não alterei nada.",
-            read_only=True,
-        )
+        return ToolResult(PARCELA_TRAVADA, read_only=True)
     if not updated:
         return ToolResult("O lançamento ou a conta mudou desde a confirmação. Não alterei nada; peça a correção novamente.", read_only=True)
 
@@ -928,51 +938,66 @@ async def update_transaction(ctx: ExecContext, action: FinanceAction) -> ToolRes
 
 
 async def _corrigir_plano(ctx: ExecContext, action: FinanceAction) -> ToolResult:
-    """A COMPRA inteira: o valor novo vai para o total ou para cada parcela (D2).
+    """A COMPRA inteira — valor (total ou por parcela), nome, categoria — pela RPC do
+    "Editar a compra" do app, `update_installment_plan`, com o MESMO número de parcelas.
 
-    Quem decidiu foi a pessoa, na pergunta do `gate`, e a resposta está congelada no
-    alvo (`amount_unit`). Sem ela — checkpoint ou pendência de antes do deploy — NÃO
-    há default: "parcela" num total de R$ 2.400 em 10x vira R$ 24.000.
-    """
-    if action.new_occurred_at:
-        from app.graph.policy import DATA_DO_PLANO
+    Por que não `update_transaction_scoped`: ela mexe em parcela `pending` de fatura
+    paga EM PARTE, e a frase do SIM promete que as pagas ficam como estão. Quem decide
+    o que está travado e redistribui o saldo é a RPC, pela mesma régua.
 
-        raise Level1Error(DATA_DO_PLANO)
-    if action.new_amount_cents is None:
-        return await _corrigir_parcelas_futuras(ctx, action)
-    unidade = (ctx.target or {}).get("amount_unit")
-    if unidade == "parcela":
-        return await _corrigir_parcelas_futuras(ctx, action)
-    if unidade != "total":
-        return ToolResult(
-            "Não sei se o valor era o total da compra ou cada parcela. Ainda não mudei nada; "
-            "me pede a correção de novo.",
-            read_only=True,
-        )
-    return await _corrigir_total_do_plano(ctx, action)
-
-
-async def _corrigir_total_do_plano(ctx: ExecContext, action: FinanceAction) -> ToolResult:
-    """Novo TOTAL, mesmo número de parcelas, pela RPC do "Editar a compra" do app.
+    A unidade (D2) foi escolhida no `gate` e está congelada no alvo (`amount_unit`).
+    Sem ela — checkpoint ou pendência de antes do deploy — NÃO há default: "parcela"
+    num total de R$ 2.400 em 10x vira R$ 24.000.
 
     ⚠️ A RPC SOBRESCREVE com nulo (description, category, merchant, account): os 8
     argumentos vão sempre, com o que está no plano AGORA, trocando só o que a pessoa
     pediu. A releitura com `workspace_id` é a checagem de dono: a RPC é `security
     invoker` e acha o plano só pelo id, e o agente conecta com papel que ignora RLS.
-    Quem decide o que está travado e redistribui o saldo é a RPC — não este código.
     """
+    # segunda trava: o `gate` já recusa isto antes do SIM (`policy.erro_de_correcao`)
+    if action.new_occurred_at:
+        raise Level1Error(DATA_DO_PLANO)
+    if action.new_account:
+        raise Level1Error(CONTA_DO_PLANO)
+    unidade = (ctx.target or {}).get("amount_unit")
+    if action.new_amount_cents is not None and unidade not in ("total", "parcela"):
+        return ToolResult(
+            "Não sei se o valor era o total da compra ou cada parcela. Ainda não mudei nada; "
+            "me pede a correção de novo.",
+            read_only=True,
+        )
+    if action.new_amount_cents is None and not (action.new_description or action.new_category):
+        raise Level1Error(
+            "❌ Numa compra parcelada dá para corrigir valor, categoria ou nome. "
+            "Tenta \"muda o notebook para 300 por parcela\"."
+        )
+
     cands = (ctx.target or {}).get("candidates") or []
     plano = await db.fetch_one(
-        """
-        select id, total_cents, installments, first_occurred_at, description, category,
-               merchant, account_id
-        from public.installment_plans where id = %s and workspace_id = %s
+        f"""
+        select p.id, p.total_cents, p.installments, p.first_occurred_at, p.description,
+               p.category, p.merchant, p.account_id, x.editaveis, x.travado_cents
+        from public.installment_plans p
+        {TRAVAS_DO_PLANO}
+        where p.id = %s and p.workspace_id = %s
         """,
         cands[0]["id"], ctx.workspace_id,
     )
     if not plano:
         return ToolResult("🤷 Essa compra parcelada não está mais aqui.", read_only=True)
-    total = guards.require_amount(action.new_amount_cents, o_que="o total novo")
+
+    total = int(plano["total_cents"])
+    if action.new_amount_cents is not None:
+        valor = guards.require_amount(action.new_amount_cents, o_que="o valor novo")
+        if unidade == "total":
+            total = valor
+        else:
+            # lido AGORA, não do que a frase do SIM congelou: entre a pergunta e o SIM
+            # uma fatura pode ter sido paga
+            editaveis = int(plano["editaveis"] or 0)
+            if editaveis == 0:
+                return ToolResult(NADA_EDITAVEL, read_only=True)
+            total = int(plano["travado_cents"] or 0) + valor * editaveis
     descricao = (guards.require_text(action.new_description, o_que="a descrição nova", maximo=200)
                  if action.new_description else plano["description"])
     categoria = guards.clean_category(action.new_category) if action.new_category else plano["category"]
@@ -987,71 +1012,20 @@ async def _corrigir_total_do_plano(ctx: ExecContext, action: FinanceAction) -> T
         # registry: nem toda RPC do repo escreve a recusa em português de usuário.
         motivo = (err.diag.message_primary or str(err)).strip().rstrip(".")
         raise Level1Error(f"❌ {motivo}. Ainda não mudei nada.") from err
+
     nome = descricao or plano["merchant"] or "a compra"
-    return ToolResult(
-        f"✏️ Corrigi o total de *{nome}*: {cents_to_brl(int(plano['total_cents']))} → "
-        f"{cents_to_brl(total)} em {plano['installments']}x. As já pagas ficaram como estavam.",
-        result_id=str(plano["id"]),
-    )
-
-
-async def _corrigir_parcelas_futuras(ctx: ExecContext, action: FinanceAction) -> ToolResult:
-    """Corrigir a compra parcelada: a parcela em aberto e as seguintes.
-
-    Até 09/09/2026 isto era um beco — "você pode mudar as parcelas pagas ou excluir o
-    plano" — e a única saída era abrir parcela por parcela no app. Em 48x isso não é
-    uma saída.
-
-    Quem decide o que é "futura" é a RPC `update_transaction_scoped`, a MESMA que o
-    botão do app usa: `pending` e a partir da âncora. Repetir a regra aqui criaria a
-    segunda cópia, e a que diverge é sempre a que mexe em dinheiro.
-
-    A âncora é a primeira parcela EM ABERTO, nunca a primeira do plano: a RPC sempre
-    reescreve a âncora, e ancorar numa parcela paga mexeria num mês fechado.
-    """
-    cands = (ctx.target or {}).get("candidates") or []
-    if not cands:
-        return ToolResult("🤷 Essa compra parcelada não está mais aqui.", read_only=True)
-
-    patch: dict = {}
-    if action.new_amount_cents is not None:
-        patch["amount_cents"] = guards.require_amount(action.new_amount_cents, o_que="o valor novo")
-    if action.new_category:
-        patch["category"] = guards.clean_category(action.new_category)
+    mudancas = []
+    if total != int(plano["total_cents"]):
+        mudancas.append(f"total {cents_to_brl(int(plano['total_cents']))} → {cents_to_brl(total)} "
+                        f"em {plano['installments']}x")
     if action.new_description:
-        patch["description"] = guards.require_text(action.new_description, o_que="a descrição nova", maximo=200)
-    if not patch:
-        # Trocar a CONTA de um plano inteiro continua fora: cada parcela mora numa
-        # fatura, e mover todas de cartão é outra operação, não uma correção.
-        raise Level1Error(
-            "❌ Numa compra parcelada dá para corrigir valor, categoria ou nome. "
-            "Tenta \"muda o notebook para 300 por parcela\"."
-        )
-
-    ancora = await db.fetch_one(
-        """
-        select id, installment_no from public.transactions
-        where installment_plan_id = %s and workspace_id = %s and status = 'pending'
-        order by occurred_at limit 1
-        """,
-        cands[0]["id"], ctx.workspace_id,
-    )
-    if not ancora:
-        return ToolResult(
-            "🤷 Essa compra não tem parcela em aberto — as passadas só mudam uma a uma.",
-            read_only=True,
-        )
-
-    row = await db.fetch_one(
-        "select public.update_transaction_scoped(%s, 'future', %s::jsonb) as mexidas",
-        ancora["id"], json.dumps(patch),
-    )
-    mexidas = int((row or {}).get("mexidas") or 0)
-    nome = cands[0].get("label") or "a compra"
+        mudancas.append(f"nome → *{descricao}*")
+    if action.new_category:
+        mudancas.append(f"categoria → *{categoria}*")
     return ToolResult(
-        f"✏️ Corrigi {mexidas} {'parcela' if mexidas == 1 else 'parcelas'} em aberto de *{nome}*. "
+        f"✏️ Corrigi *{nome}*: {', '.join(mudancas) or 'sem mudança'}. "
         "As já pagas ficaram como estavam.",
-        result_id=str(ancora["id"]),
+        result_id=str(plano["id"]),
     )
 
 

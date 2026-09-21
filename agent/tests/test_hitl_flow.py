@@ -13,6 +13,7 @@ from langgraph.types import Command
 from app.config import get_settings
 from app.graph import build as build_mod
 from app.graph.schemas import FinanceActionType
+from app.tools.resolve import for_actions as _for_actions_real
 
 
 @pytest.fixture(autouse=True)
@@ -724,6 +725,111 @@ async def test_data_de_plano_escolhido_no_empate_para_antes_do_sim(monkeypatch, 
     final = await grafo.ainvoke(Command(resume="p1"), config=cfg)
     assert "__interrupt__" not in final
     assert any("Editar a compra no app" in r for r in final["results"])
+
+
+def _snapshot(*linhas):
+    cand = {**PLANO_TV, "label": "parcela 3 — TV",
+            "installment_snapshot": {"version": 2, "rows": list(linhas), "total_cents": 0}}
+    return {"table": "installment_plans", "status": "found", "candidates": [cand]}
+
+
+def _alvo_fixo(monkeypatch, alvo):
+    from app.graph import nodes
+
+    async def fixo(workspace_id, acoes, texto_cru, antecedente=None):
+        return [dict(alvo) for _ in acoes]
+
+    monkeypatch.setattr(nodes.resolve, "for_actions", fixo)
+
+
+@pytest.mark.asyncio
+async def test_varias_parcelas_do_snapshot_recusam_antes_do_sim(monkeypatch, grafo):
+    _alvo_fixo(monkeypatch, _snapshot({"id": "a", "installment_no": 1, "travada": False},
+                                      {"id": "b", "installment_no": 2, "travada": False}))
+    final = await grafo.ainvoke(
+        _estado([{"type": "update_transaction", "description": "tv", "new_amount_cents": 30000}]),
+        config={"configurable": {"thread_id": "snap-varias"}},
+    )
+    assert "__interrupt__" not in final
+    assert "Consigo corrigir a compra inteira (as parcelas em aberto) ou uma parcela por vez." in final["results"]
+
+
+@pytest.mark.asyncio
+async def test_parcela_travada_nao_muda_valor_antes_do_sim(monkeypatch, grafo):
+    _alvo_fixo(monkeypatch, _snapshot({"id": "a", "installment_no": 3, "travada": True}))
+    final = await grafo.ainvoke(
+        _estado([{"type": "update_transaction", "description": "tv", "new_amount_cents": 30000}]),
+        config={"configurable": {"thread_id": "snap-travada"}},
+    )
+    assert "__interrupt__" not in final
+    assert any("não mudam mais" in r for r in final["results"])
+
+
+@pytest.mark.asyncio
+async def test_parcela_travada_ainda_muda_de_nome(monkeypatch, grafo):
+    _alvo_fixo(monkeypatch, _snapshot({"id": "a", "installment_no": 3, "travada": True}))
+    estado = await grafo.ainvoke(
+        _estado([{"type": "update_transaction", "description": "tv", "new_description": "TV sala"}]),
+        config={"configurable": {"thread_id": "snap-travada-nome"}},
+    )
+    assert _valor(estado)["kind"] == "confirmation"
+
+
+@pytest.mark.asyncio
+async def test_conta_de_plano_inteiro_recusa_antes_do_sim(monkeypatch, grafo):
+    _plano_found(monkeypatch)
+    final = await grafo.ainvoke(
+        _estado([{"type": "update_transaction", "description": "tv", "new_account": "Inter"}]),
+        config={"configurable": {"thread_id": "conta-plano"}},
+    )
+    assert "__interrupt__" not in final
+    assert any("A conta de uma compra parcelada muda em Editar a compra no app" in r
+               for r in final["results"])
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("campos", [
+    {"installment_scope": "range:3:3"},
+    {"current_installment": 3},
+])
+async def test_muda_a_3a_parcela_corrige_so_aquela_linha(monkeypatch, grafo, campos):
+    """Pelo resolvedor DE VERDADE: `for_actions → _bounded_plan_target → gate`."""
+    from app import db
+    from app.graph import nodes
+
+    monkeypatch.setattr(nodes.resolve, "for_actions", _for_actions_real)
+    consultas = []
+
+    async def fetch(query, *args):
+        consultas.append(query)
+        if "from public.installment_plans p" in query:
+            return [{"id": "p1", "description": "TV", "merchant": None, "total_cents": 300000,
+                     "installments": 10, "first_occurred_at": "2026-05-15",
+                     "editaveis": 8, "travado_cents": 60000}]
+        if "installment_plan_id = %s" in query:
+            return [{"id": f"tx{n}", "installment_no": n, "amount_cents": 30000,
+                     "occurred_at": f"2026-{n + 4:02d}-15", "status": "pending",
+                     "paid_at": None, "account_id": None, "invoice_id": None,
+                     "account_name": None, "travada": False} for n in range(1, 11)]
+        return []
+
+    monkeypatch.setattr(db, "fetch", fetch)
+    cfg = {"configurable": {"thread_id": f"terceira-{sorted(campos)[0]}"}}
+    estado = await grafo.ainvoke(
+        _estado([{"type": "update_transaction", "description": "tv",
+                  "new_amount_cents": 30000, **campos}])
+        | {"text": "muda a 3ª parcela da TV para 300"},
+        config=cfg,
+    )
+    pausa = _valor(estado)
+    assert pausa["kind"] == "confirmation"
+    assert "parcela 3" in pausa["summary"] and "R$ 300,00" in pausa["summary"]
+    assert "total da compra" not in pausa["summary"]
+    final = await grafo.ainvoke(Command(resume=True), config=cfg)
+    linhas = final["targets"][0]["candidates"][0]["installment_snapshot"]["rows"]
+    assert [r["id"] for r in linhas] == ["tx3"]
+    assert "EXECUTOU" in final["results"]
+    assert any("parcela_travada" in q for q in consultas)
 
 
 @pytest.mark.asyncio

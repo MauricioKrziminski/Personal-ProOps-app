@@ -8,6 +8,13 @@ subindo o grafo inteiro é regra que ninguém testa.
 from __future__ import annotations
 
 from app.config import get_settings
+from app.domain.correcao_plano import (
+    CONTA_DO_PLANO,
+    DATA_DO_PLANO,
+    PARCELA_TRAVADA,
+    SEM_CORRECAO,
+    VARIAS_PARCELAS,
+)
 from app.domain.dates import format_date_br
 from app.domain.money import cents_to_brl
 from app.graph.schemas import (
@@ -183,12 +190,6 @@ def _frase_conversao(action: FinanceAction, target: dict, escolhido: dict) -> st
     )
 
 
-SEM_CORRECAO = "O que você quer mudar: o valor, o nome, a categoria ou a data? Ainda não mudei nada."
-DATA_DO_PLANO = (
-    "A data de uma compra parcelada muda em Editar a compra no app. Ainda não mudei nada."
-)
-
-
 def plano_inteiro(target: dict | None) -> bool:
     """O alvo é a COMPRA inteira (não uma parcela congelada no snapshot)."""
     target = target or {}
@@ -198,18 +199,37 @@ def plano_inteiro(target: dict | None) -> bool:
 
 
 def erro_de_correcao(action, target: dict | None) -> str | None:
-    """Correção que não dá para confirmar: nada a mudar, ou a data de um plano inteiro.
+    """Correção que não dá para confirmar — recusada ANTES do SIM, não depois dele.
 
-    Pura, e roda no `gate` (a cada resume, inclusive de pendência antiga). A data do
-    plano não entra na RPC com escopo: ela aparecia na frase do SIM e sumia na execução.
+    Pura, e roda no `gate` (a cada resume, inclusive de pendência antiga) e de novo
+    depois da escolha no empate. Plano inteiro: data e conta só em "Editar a compra"
+    do app. Snapshot: uma parcela por vez, e parcela travada não muda de dinheiro.
+    A tool repete as recusas como segunda trava.
     """
     if getattr(action, "type", None) != FinanceActionType.UPDATE_TRANSACTION:
         return None
     if not any([action.new_amount_cents is not None, action.new_category, action.new_occurred_at,
                 action.new_description, action.new_account, action.installments]):
         return SEM_CORRECAO
-    if action.new_occurred_at and plano_inteiro(target):
-        return DATA_DO_PLANO
+    if plano_inteiro(target):
+        if action.new_occurred_at:
+            return DATA_DO_PLANO
+        if action.new_account:
+            return CONTA_DO_PLANO
+        return None
+    target = target or {}
+    cands = target.get("candidates") or []
+    snapshot = cands[0].get("installment_snapshot") if cands else None
+    if target.get("status") == "found" and snapshot:
+        linhas = snapshot.get("rows") or []
+        if len(linhas) != 1:
+            return VARIAS_PARCELAS
+        # Reparcelar, regra 1: parcela travada não muda valor, data nem conta; nome e
+        # categoria sim. A trava vem congelada do banco (`private.parcela_travada`).
+        mexe_dinheiro = (action.new_amount_cents is not None or action.new_occurred_at
+                         or action.new_account)
+        if linhas[0].get("travada") and mexe_dinheiro:
+            return PARCELA_TRAVADA
     return None
 
 
@@ -306,15 +326,15 @@ def describe_for_confirmation(
                 if action.new_description:
                     corrections.append(f"nome → {action.new_description}")
             suffix = f": {', '.join(corrections)}" if corrections else ""
-            # Numa compra parcelada a correção vale para a parcela em aberto e as
-            # seguintes, nunca para as já pagas. O rótulo do candidato diz "Tudo (10x)",
-            # que é o alvo da BUSCA — sem esta linha o usuário confirmaria entendendo
-            # que as dez mudam.
+            # Compra inteira sem valor = nome/categoria (data e conta são recusadas em
+            # `erro_de_correcao`), e a `update_installment_plan` aplica os dois a TODAS
+            # as parcelas, inclusive as pagas — a frase diz isso em vez de prometer o
+            # contrário.
             if (target.get("table") == "installment_plans" and corrections
                     and not escolhido.get("installment_snapshot")
                     and isinstance(action, FinanceAction)
                     and action.type == FinanceActionType.UPDATE_TRANSACTION):
-                suffix += " (só as parcelas em aberto; as pagas ficam como estão)"
+                suffix += " (vale para todas as parcelas, inclusive as pagas)"
             return f"{verbo} {escolhido['label']}{extra}{suffix}"
         # Empate: as opções REAIS vão na lista, então a frase só precisa dizer o
         # que vai acontecer. Cair no texto do modelo aqui reintroduzia o eco que

@@ -364,3 +364,11 @@ def test_uma_parcela_do_snapshot_nao_pergunta_total_ou_parcela():
     frase = describe_for_confirmation(acao, alvo)
     assert "total da compra" not in frase and "parcelas em aberto" not in frase
     assert "R$ 300,00" in frase
+
+
+def test_renomear_a_compra_inteira_diz_que_vale_para_todas_as_parcelas():
+    """Nome e categoria vão pela `update_installment_plan`, que os aplica também às
+    pagas (Reparcelar, finance.md) — a frase não pode prometer o contrário."""
+    acao = FinanceAction(type=FinanceActionType.UPDATE_TRANSACTION, new_description="TV sala")
+    frase = describe_for_confirmation(acao, _alvo_plano())
+    assert "inclusive as pagas" in frase and "só as parcelas em aberto" not in frase

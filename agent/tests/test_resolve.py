@@ -496,3 +496,46 @@ class TestPlanoCongelaOQueAFraseLe:
         )
         assert (cands[0]["editaveis"], cands[0]["travado_cents"],
                 cands[0]["total_cents"]) == (8, 60000, 300000)
+
+
+class TestSnapshotDeCorrecao:
+    @staticmethod
+    def _linhas(query, *args):
+        return [{"id": f"tx{n}", "installment_no": n, "amount_cents": 1000,
+                 "occurred_at": "2026-05-15", "status": "pending", "paid_at": None,
+                 "account_id": None, "invoice_id": None, "account_name": None,
+                 "travada": n == 3} for n in range(1, 5)]
+
+    @pytest.mark.asyncio
+    async def test_congela_a_trava_do_banco_e_rotulo_no_singular(self, monkeypatch):
+        from app.graph.schemas import InstallmentScope
+
+        consultas = []
+
+        async def fetch(query, *args):
+            consultas.append(query)
+            return self._linhas(query)
+
+        monkeypatch.setattr(resolve.db, "fetch", fetch)
+        alvo = await resolve._bounded_plan_target(
+            "ws", [{"id": "p1", "label": "Tudo (4x) — TV", "plan_installments": 4}],
+            InstallmentScope(mode="range", start=3, end=3), correcao=True,
+        )
+        assert "private.parcela_travada(t.status, t.invoice_id) as travada" in consultas[0]
+        cand = alvo["candidates"][0]
+        assert cand["installment_snapshot"]["rows"][0]["travada"] is True
+        assert cand["label"] == "parcela 3 — TV"
+
+    @pytest.mark.asyncio
+    async def test_erro_de_escopo_na_correcao_nao_fala_em_pagar(self, monkeypatch):
+        from app.graph.schemas import InstallmentScope
+
+        async def fetch(query, *args):
+            return self._linhas(query)
+
+        monkeypatch.setattr(resolve.db, "fetch", fetch)
+        alvo = await resolve._bounded_plan_target(
+            "ws", [{"id": "p1", "label": "Tudo (4x) — TV", "plan_installments": 4}],
+            InstallmentScope(mode="range", start=7, end=7), correcao=True,
+        )
+        assert alvo["correction_error"] and "pag" not in alvo["correction_error"].lower()

@@ -18,6 +18,7 @@ from typing import Any, Literal
 
 from app import db
 from app.domain import matching
+from app.domain.correcao_plano import CONTA_DO_PLANO, QUAL_PARCELA
 from app.domain.reference import clean_term, wants_latest, wants_whole_plan
 from app.tools import finance
 from app.tools.base import FATURA_ABERTA
@@ -131,12 +132,7 @@ def _detalhe_plano(row: dict) -> str:
 # paga/adiada ou com pagamento parcial) — contar por `status` aqui seria a segunda cópia
 # da regra que a RPC `update_installment_plan` aplica, e a que diverge é a que mexe em
 # dinheiro. `workspace_id` porque o agente conecta com papel que ignora RLS.
-_TRAVAS_DO_PLANO = """cross join lateral (
-            select count(*) filter (where not private.parcela_travada(t.status, t.invoice_id)) as editaveis,
-                   coalesce(sum(t.amount_cents) filter (
-                     where private.parcela_travada(t.status, t.invoice_id)), 0) as travado_cents
-            from public.transactions t
-            where t.installment_plan_id = p.id and t.workspace_id = p.workspace_id) x"""
+_TRAVAS_DO_PLANO = finance.TRAVAS_DO_PLANO
 
 
 def _candidato_plano(row: dict) -> dict:
@@ -408,7 +404,12 @@ async def _com_plano(workspace_id, candidatos: list[dict]) -> list[dict]:
     return [*plan_cands, *outras_txs][:MOSTRAR]
 
 
-async def _bounded_plan_target(workspace_id, candidates, scope):
+async def _bounded_plan_target(workspace_id, candidates, scope, *, correcao: bool = False):
+    """As parcelas escolhidas, CONGELADAS (id, valor, data, status, trava).
+
+    `correcao`: o escopo veio de um update, não de uma baixa — os erros de
+    `select_rows` falam em "pagar", e ali a pessoa quer corrigir.
+    """
     from app.domain.installment_scope import select_rows
     from app.domain.money import cents_to_brl
     from app.domain.dates import format_date_br
@@ -416,7 +417,8 @@ async def _bounded_plan_target(workspace_id, candidates, scope):
     result = []
     for candidate in candidates:
         rows = await db.fetch(
-            "select t.id, t.installment_no, t.amount_cents, t.occurred_at, t.status, t.paid_at, t.account_id, t.invoice_id, a.name as account_name "
+            "select t.id, t.installment_no, t.amount_cents, t.occurred_at, t.status, t.paid_at, t.account_id, t.invoice_id, a.name as account_name, "
+            "private.parcela_travada(t.status, t.invoice_id) as travada "
             "from public.transactions t left join public.accounts a on a.id=t.account_id and a.workspace_id=t.workspace_id "
             "where t.installment_plan_id = %s and t.workspace_id = %s order by t.installment_no",
             candidate["id"],
@@ -431,7 +433,7 @@ async def _bounded_plan_target(workspace_id, candidates, scope):
                 "table": "installment_plans",
                 "status": "none",
                 "candidates": [],
-                "correction_error": str(error),
+                "correction_error": QUAL_PARCELA if correcao else str(error),
             }
         frozen = [
             {
@@ -451,6 +453,7 @@ async def _bounded_plan_target(workspace_id, candidates, scope):
                     "paid_at",
                     "account_id",
                     "invoice_id",
+                    "travada",
                 )
             }
             for row in selected
@@ -471,7 +474,8 @@ async def _bounded_plan_target(workspace_id, candidates, scope):
         result.append(
             {
                 **candidate,
-                "label": f"{len(frozen)} parcelas ({span}) — {name}",
+                "label": (f"parcela {first['installment_no']} — {name}" if len(frozen) == 1
+                          else f"{len(frozen)} parcelas ({span}) — {name}"),
                 "when": f"{cents_to_brl(total)} · {format_date_br(first['occurred_at'])} a {format_date_br(last['occurred_at'])} · {accounts}",
                 "installment_snapshot": {
                     "version": 2,
@@ -629,6 +633,12 @@ async def for_actions(
             from app.graph.schemas import InstallmentScope
 
             scope = scope_from_text(texto_cru, acao.installment_scope)
+            corrige = acao.type == FinanceActionType.UPDATE_TRANSACTION
+            if (corrige and acao.current_installment and not acao.installment_scope
+                    and (scope is None or scope.mode == "unclear")):
+                # "muda a 3ª parcela": numa CORREÇÃO a parcela citada é a própria linha
+                n = acao.current_installment
+                scope = InstallmentScope(mode="range", start=n, end=n)
             if scope is not None or acao.current_installment:
                 _, candidates = await por_texto("planos", workspace_id, termo or "")
                 if candidates:
@@ -637,6 +647,7 @@ async def for_actions(
                             workspace_id,
                             candidates,
                             scope or InstallmentScope(mode="unclear"),
+                            correcao=corrige,
                         )
                     )
                 else:
@@ -666,7 +677,7 @@ async def for_actions(
                     and acao.new_account
                 ):
                     resolved["correction_error"] = (
-                        "Para trocar a conta de uma compra parcelada, edite a parcela individual no app. O plano inteiro não foi alterado."
+                        CONTA_DO_PLANO
                     )
                 saida.append(resolved)
                 continue
@@ -734,7 +745,7 @@ async def for_actions(
             )
         ):
             resolved["correction_error"] = (
-                "Para trocar a conta de uma compra parcelada, edite a parcela individual no app. O plano inteiro não foi alterado."
+                CONTA_DO_PLANO
             )
         elif acao.type == FinanceActionType.UPDATE_TRANSACTION and acao.new_account:
             name = acao.new_account
