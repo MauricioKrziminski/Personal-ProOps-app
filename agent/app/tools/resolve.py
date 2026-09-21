@@ -23,6 +23,7 @@ from app.domain.correcao_plano import (
     LINHA_SUMIU,
     QUAL_PARCELA,
     SEM_CARTAO,
+    e_conversao,
     qual_cartao,
     recusa_de_conversao,
 )
@@ -30,7 +31,6 @@ from app.domain.reference import clean_term, wants_latest, wants_whole_plan
 from app.tools import finance
 from app.tools.base import FATURA_ABERTA
 from app.tools.guards import Level1Error
-from app.graph.policy import e_conversao
 from app.graph.schemas import (
     FinanceAction,
     FinanceActionType,
@@ -864,6 +864,8 @@ async def conversoes(workspace_id, acoes: list, alvos: list[dict]) -> list[dict]
             recusa = recusa_de_conversao(linha, acao.installments)
             if linha.get("installment_plan_id"):
                 # já é parcela: igual ao N do plano é pista de busca (segue a correção comum)
+                if not recusa and acao.new_account:
+                    recusa = CONTA_DO_PLANO
                 cands.append({**c, "plan_installments": linha.get("plan_installments"),
                               **({"convert_error": recusa} if recusa else {})})
                 continue

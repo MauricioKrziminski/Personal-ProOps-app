@@ -176,13 +176,6 @@ def _frase_correcao_plano(action: FinanceAction, target: dict, escolhido: dict) 
     )
 
 
-def e_conversao(action) -> bool:
-    """D1: `update_transaction` com 2+ parcelas pode ser "parcelar um lançamento que já
-    existe" — quem decide se o ALVO aceita é o resolvedor (`resolve.conversoes`)."""
-    return (getattr(action, "type", None) == FinanceActionType.UPDATE_TRANSACTION
-            and (getattr(action, "installments", None) or 0) >= 2)
-
-
 def _frase_conversao(action: FinanceAction, target: dict, escolhido: dict) -> str:
     """D1 — adotar um lançamento avulso como parcela 1 de uma compra parcelada nova.
 

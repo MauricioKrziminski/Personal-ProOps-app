@@ -151,6 +151,13 @@ async def test_linha_de_plano_com_o_mesmo_n_nao_e_conversao(monkeypatch):
 
 
 @pytest.mark.asyncio
+async def test_linha_de_plano_com_o_mesmo_n_e_conta_citada_recusa_antes_do_sim(monkeypatch):
+    _banco(monkeypatch, [{**LINHA, "installment_plan_id": "p1", "plan_installments": 2}])
+    alvo = await _alvo(FinanceAction(type=UPD, installments=2, new_account="nubank"))
+    assert alvo["correction_error"].startswith("A conta de uma compra parcelada muda")
+
+
+@pytest.mark.asyncio
 @pytest.mark.parametrize("n", [73, 99])
 async def test_parcelas_fora_do_limite_da_rpc(monkeypatch, n):
     _banco(monkeypatch)

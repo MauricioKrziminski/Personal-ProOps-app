@@ -26,6 +26,13 @@ CARTAO_FALTANDO = "Não sei em qual cartão parcelar." + NADA + " Me manda de no
 LINHA_SUMIU = "🤷 Esse lançamento não está mais aqui." + NADA
 
 
+def e_conversao(action) -> bool:
+    """D1: `update_transaction` com 2+ parcelas pode ser "parcelar um lançamento que já
+    existe" — quem decide se o ALVO aceita é o resolvedor (`resolve.conversoes`)."""
+    return (getattr(getattr(action, "type", None), "value", None) == "update_transaction"
+            and (getattr(action, "installments", None) or 0) >= 2)
+
+
 def qual_cartao(nomes: list[str]) -> str:
     return f"Em qual cartão? Você tem: {', '.join(f'*{n}*' for n in nomes)}. Me manda de novo dizendo o cartão."
 
