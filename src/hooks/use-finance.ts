@@ -703,6 +703,11 @@ export function useCreateInstallmentPlan() {
  * NÚMERO de parcelas deixa de ser editável. É a regra do nicho (o OnBalance desabilita o campo
  * depois do primeiro pagamento; o Oracle só atualiza parcela com saldo em aberto), e ela é do
  * banco porque o agente precisa da MESMA — duas cópias divergem.
+ *
+ * ⚠️ **`installments: 1` DISSOLVE o plano** (20/09/2026): a parcela 1 sobrevive — com o mesmo
+ * `id` — virando um lançamento à vista pelo total, as outras somem e o plano é apagado. Com
+ * qualquer parcela paga a RPC recusa, porque `1 <> N` cai no mesmo guarda que já protege o
+ * número de parcelas. Quem chama isso é o chip "À vista" de Parceladas.
  */
 export function useUpdateInstallmentPlan() {
   const invalidate = useInvalidateFinance();
@@ -726,6 +731,52 @@ export function useUpdateInstallmentPlan() {
         p_category: input.category ?? undefined,
         p_merchant: input.merchant ?? undefined,
         p_account_id: input.accountId ?? undefined,
+      });
+      if (error) throw error;
+    },
+    onSuccess: invalidate,
+  });
+}
+
+/**
+ * Um lançamento que já existe vira compra parcelada.
+ *
+ * ⚠️ **A linha original é ADOTADA como parcela 1 — o `id` não muda.** Quem faz isso é a RPC; o
+ * hook não tem como saber. É o que torna a operação idempotente: chamar duas vezes é RECUSA
+ * (`Esse lançamento já é uma compra parcelada`), nunca um segundo plano. Sem isso, o caminho para
+ * a duplicação era o próprio usuário — sem esta porta, ele lançava de novo, e ficava com as duas
+ * compras na fatura (19/09/2026).
+ *
+ * ⚠️ **`totalCents` é o TOTAL da compra, não o valor da parcela** — a mesma convenção da criação
+ * (`useCreateInstallmentPlan`) e da edição (`useUpdateInstallmentPlan`). A tela escreve isso no
+ * `hint` do campo.
+ *
+ * ⚠️ **Payload montado campo a campo é payload que ESQUECE campo, em silêncio** — foi assim que
+ * `p_merchant` sumiu por meses e "nuuvem wardog" virou "Compra parcelada (1/2)". **Campo novo no
+ * formulário exige linha nova aqui.**
+ */
+export function useConvertToInstallments() {
+  const invalidate = useInvalidateFinance();
+  return useMutation({
+    mutationFn: async (input: {
+      transactionId: string;
+      totalCents: number;
+      installments: number;
+      firstOccurredAt: string;
+      description: string | null;
+      category: string | null;
+      merchant: string | null;
+      accountId: string;
+    }) => {
+      const { error } = await supabase.rpc('convert_transaction_to_installments', {
+        p_transaction_id: input.transactionId,
+        p_total_cents: input.totalCents,
+        p_installments: input.installments,
+        p_first_occurred_at: input.firstOccurredAt,
+        p_description: input.description ?? undefined,
+        p_category: input.category ?? undefined,
+        p_merchant: input.merchant ?? undefined,
+        p_account_id: input.accountId,
       });
       if (error) throw error;
     },
