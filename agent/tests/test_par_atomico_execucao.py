@@ -212,3 +212,14 @@ async def test_no_par_o_antecedente_do_proximo_turno_e_a_CRIACAO(monkeypatch, ba
 
     assert chamadas == ["create#1", "delete#0"]
     assert ret["last_write_id"] == "tx-nova"
+
+
+def test_nao_fiz_nao_repete_a_data_de_hoje():
+    """X2: a frase do "não fiz" usa o `hoje` do usuário, como a do SIM."""
+    from app.graph import nodes
+    from app.graph.schemas import FinanceAction, FinanceActionType
+
+    acao = FinanceAction(type=FinanceActionType.MARK_PAID, description="luz", occurred_at="2026-09-21")
+    criacao = FinanceAction(type=FinanceActionType.CREATE_EXPENSE, amount_cents=100, description="x")
+    frase = nodes._nao_fiz(acao, {}, criacao, hoje="2026-09-21")
+    assert "21/09/2026" not in frase

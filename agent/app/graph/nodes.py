@@ -874,7 +874,8 @@ async def _gate(state: AgentState) -> dict:
                     "kind": "choice",
                     "action_index": i,
                     "action_type": acao.type.value,
-                    "summary": describe_for_confirmation(acao, alvo),
+                    "summary": describe_for_confirmation(
+                        acao, alvo, hoje=local_iso_date(state.get("timezone", "America/Sao_Paulo"))),
                     "options": alvo["candidates"],
                 }
             )
@@ -1130,7 +1131,8 @@ async def _executar(
     for indice, acao in indexadas:
         if criacao_falhou is not None:
             # nada parcial: nem o apagar, nem as criações seguintes do par
-            linhas.append(_nao_fiz(acao, alvos[indice], criacao_falhou))
+            linhas.append(_nao_fiz(acao, alvos[indice], criacao_falhou,
+                                   hoje=local_iso_date(ctx.timezone)))
             continue
         ctx.action_index = indice
         ctx.target = alvos[indice] or None
@@ -1165,7 +1167,7 @@ def _rotulo_novo(criacao: FinanceAction) -> str:
     return f"{nome} ({cents_to_brl(criacao.amount_cents)})" if criacao.amount_cents else nome
 
 
-def _nao_fiz(acao, alvo: dict, criacao: FinanceAction) -> str:
+def _nao_fiz(acao, alvo: dict, criacao: FinanceAction, hoje: str | None = None) -> str:
     novo = _rotulo_novo(criacao)
     if _cria(acao):
         return f"⚠️ Não registrei {_rotulo_novo(acao)} porque não consegui registrar {novo}."
@@ -1174,7 +1176,7 @@ def _nao_fiz(acao, alvo: dict, criacao: FinanceAction) -> str:
     candidatos = (alvo or {}).get("candidates") or []
     if not candidatos:
         # a frase de confirmação já começa com verbo ("apagar o seu…")
-        return f"⚠️ Não fiz: {describe_for_confirmation(acao, alvo or None)} — porque não consegui registrar {novo}."
+        return f"⚠️ Não fiz: {describe_for_confirmation(acao, alvo or None, hoje=hoje)} — porque não consegui registrar {novo}."
     return f"⚠️ Não {verbo} {candidatos[0]['label']} porque não consegui registrar {novo}."
 
 
