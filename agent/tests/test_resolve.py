@@ -600,18 +600,19 @@ async def test_tool_grava_na_conta_padrao_CONGELADA_e_confere_a_posse(monkeypatc
 
     donos = []
 
-    async def ensure_owned(tabela, row_id, workspace_id):
-        donos.append((tabela, row_id, workspace_id))
+    async def fetch_one(sql, *args):
+        donos.append(args)
+        return {"archived": False}
 
     async def releu(*a, **k):
         raise AssertionError("não relê o padrão: ele foi congelado na pergunta")
 
-    monkeypatch.setattr(finance, "ensure_owned", ensure_owned)
+    monkeypatch.setattr(db, "fetch_one", fetch_one)
     monkeypatch.setattr(finance, "default_account", releu)
     ctx = ExecContext("u1", "w1", None, "America/Sao_Paulo", "gastei 45", "m1")
     ctx.target = {"default_account": {"id": "acc-nu", "name": "Nubank"}}
     assert await finance._conta_padrao(ctx) == "acc-nu"
-    assert donos == [("accounts", "acc-nu", "w1")]
+    assert donos == [("acc-nu", "w1")]  # posse conferida no workspace da conversa
 
     ctx.target = {"default_account": {"id": None, "name": None}}
     assert await finance._conta_padrao(ctx) is None
@@ -634,3 +635,52 @@ async def test_apagar_nota_sem_dizer_qual_pergunta_em_vez_de_listar(monkeypatch)
     # "a última" é pedido explícito de recência: segue resolvendo
     (alvo,) = await resolve.for_actions("w1", [sem_alvo], "apaga a última nota")
     assert "correction_error" not in alvo
+
+
+@pytest.mark.asyncio
+async def test_conta_padrao_arquivada_nao_entra_na_frase(monkeypatch):
+    """X1: a query do congelamento só aceita conta padrão ATIVA."""
+    from app import db
+
+    sqls = []
+
+    async def fetch_one(sql, *args):
+        sqls.append(sql)
+        return {"id": None, "name": None}
+
+    monkeypatch.setattr(db, "fetch_one", fetch_one)
+    await resolve.conta_padrao("w1", [FinanceAction(type=FinanceActionType.CREATE_EXPENSE,
+                                                    amount_cents=100)], [{}])
+    assert "not a.archived" in sqls[0]
+
+
+@pytest.mark.asyncio
+async def test_tool_recusa_conta_padrao_arquivada_depois_da_pergunta(monkeypatch):
+    """X1: a frase disse Nubank e ela foi arquivada antes do SIM: recusa, não grava nela."""
+    from app import db
+    from app.tools.base import ExecContext
+    from app.tools.guards import Level1Error
+
+    async def arquivada(sql, *args):
+        return {"archived": True}
+
+    monkeypatch.setattr(db, "fetch_one", arquivada)
+    ctx = ExecContext("u1", "w1", None, "America/Sao_Paulo", "gastei 45", "m1")
+    ctx.target = {"default_account": {"id": "acc-nu", "name": "Nubank"}}
+    with pytest.raises(Level1Error):
+        await finance._conta_padrao(ctx)
+
+
+@pytest.mark.asyncio
+async def test_padrao_relido_ignora_conta_arquivada(monkeypatch):
+    from app import db
+
+    sqls = []
+
+    async def fetch_one(sql, *args):
+        sqls.append(sql)
+        return None
+
+    monkeypatch.setattr(db, "fetch_one", fetch_one)
+    assert await finance.default_account("w1") is None
+    assert "not a.archived" in sqls[0]

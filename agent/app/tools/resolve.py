@@ -1076,7 +1076,7 @@ async def conta_padrao(workspace_id, acoes: list, alvos: list[dict]) -> list[dic
         linha = await db.fetch_one(
             "select a.id, a.name from public.workspaces w "
             "left join public.accounts a on a.id = w.default_account_id "
-            "and a.workspace_id = w.id where w.id = %s",
+            "and a.workspace_id = w.id and not a.archived where w.id = %s",
             workspace_id,
         )
         if linha and linha.get("id"):

@@ -156,8 +156,12 @@ async def default_account(workspace_id: UUID) -> UUID | None:
     a conta padrão nunca é cartão (o banco recusa) — cair nela ali seria trocar o
     contrato por outro em silêncio.
     """
+    # conta arquivada não é padrão: o lançamento cairia numa conta que sumiu da tela
     linha = await db.fetch_one(
-        "select default_account_id from public.workspaces where id = %s", workspace_id
+        "select a.id as default_account_id from public.workspaces w "
+        "join public.accounts a on a.id = w.default_account_id "
+        "and a.workspace_id = w.id and not a.archived where w.id = %s",
+        workspace_id,
     )
     return linha["default_account_id"] if linha else None
 
@@ -175,7 +179,20 @@ async def _conta_padrao(ctx: ExecContext) -> UUID | None:
         return await default_account(ctx.workspace_id)
     if not congelada.get("id"):
         return None
-    await ensure_owned("accounts", congelada["id"], ctx.workspace_id)
+    # posse (o id veio do checkpoint) e atividade numa consulta só: arquivada entre a
+    # pergunta e o SIM, a frase citou uma conta que não pode mais receber lançamento
+    linha = await db.fetch_one(
+        "select archived from public.accounts where id = %s and workspace_id = %s",
+        congelada["id"], ctx.workspace_id,
+    )
+    if linha is None:
+        raise Level1Error("🤷 Não achei esse item por aqui.",
+                          f"accounts:{congelada['id']} fora do workspace")
+    if linha["archived"]:
+        raise Level1Error(
+            f"❌ A conta {congelada.get('name') or 'padrão'} foi arquivada. "
+            "Me manda de novo dizendo a conta. Ainda não registrei nada."
+        )
     return congelada["id"]
 
 
