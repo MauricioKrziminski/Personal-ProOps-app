@@ -148,15 +148,18 @@ def test_gemini_model_global_nao_existe_mais(monkeypatch):
 
     Só `GEMINI_MODEL_<PAPEL>` troca modelo — o global não é mais lido em lugar
     nenhum, nem pelo ambiente, nem por `settings.gemini_model` (que não existe
-    mais).
+    mais). O valor injetado não pode coincidir com NENHUM padrão de `MODELOS`
+    (nem Lite nem Flash) — senão as asserções de router/parse/batch passariam
+    por coincidência mesmo com o bug de volta (o global sempre bateu com o
+    próprio padrão deles).
     """
     from app.services import gemini
 
     monkeypatch.delenv("GEMINI_MODEL_GATE", raising=False)
-    monkeypatch.setenv("GEMINI_MODEL", "gemini-3.1-flash-lite")
-    assert gemini.modelo("router") == "gemini-3.1-flash-lite"  # já era o padrão
-    assert gemini.modelo("parse") == "gemini-3.1-flash-lite"  # já era o padrão
-    assert gemini.modelo("batch") == "gemini-3.1-flash-lite"  # já era o padrão
+    monkeypatch.setenv("GEMINI_MODEL", "modelo-que-nao-pode-aparecer")
+    assert gemini.modelo("router") == "gemini-3.1-flash-lite"  # global NÃO alcança
+    assert gemini.modelo("parse") == "gemini-3.1-flash-lite"  # global NÃO alcança
+    assert gemini.modelo("batch") == "gemini-3.1-flash-lite"  # global NÃO alcança
     assert gemini.modelo("gate") == "gemini-3.7-flash"  # global NÃO alcança
 
 
