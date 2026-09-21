@@ -28,6 +28,7 @@ import { useAdaptiveWindow } from '@/hooks/use-adaptive-window';
 import { Motion, Space, Type } from '@/design/tokens';
 import {
   useAccounts,
+  useConvertToInstallments,
   useCreateInstallmentPlan,
   useInstallmentPlans,
   useDeleteTransaction,
@@ -38,7 +39,7 @@ import {
   type TransactionKind,
 } from '@/hooks/use-finance';
 import { brToISO, formatBRL, isValidBRDate, isoToBR, localISODate } from '@/lib/dates';
-import { financeErrorMessage, installmentHistory } from '@/lib/finance-form';
+import { destinoDoSalvar, financeErrorMessage, installmentHistory, podeParcelar } from '@/lib/finance-form';
 import {
   autoConfirmHint,
   autoConfirmLabel,
@@ -190,6 +191,7 @@ function TransactionForm({ editing }: { editing?: Transaction }) {
   const save = useSaveTransaction();
   const salvarSerie = useSaveTransactionScoped();
   const createPlan = useCreateInstallmentPlan();
+  const converter = useConvertToInstallments();
   const remove = useDeleteTransaction();
 
   const { control, handleSubmit, setValue, getValues, formState } = useForm<FormValues>({
@@ -235,8 +237,13 @@ function TransactionForm({ editing }: { editing?: Transaction }) {
   /**
    * Conta a pagar não existe em cartão: a compra já entra na fatura e o caixa sai quando a
    * fatura vence. Marcar `pending` aqui contaria o MESMO gasto duas vezes na projeção.
+   *
+   * ⚠️ **"Vou pagar depois" e "parcelar" não convivem no mesmo salvamento.** A conversão é uma
+   * RPC própria e não carrega `status`, `due_at` nem `auto_confirm`: oferecer os dois faria a
+   * pessoa preencher um vencimento que seria descartado em silêncio — o mesmo defeito do achado
+   * A, com outra cara. Parcelar já diz quando cada parcela acontece.
    */
-  const podeAdiar = kind !== 'transfer' && !isCard;
+  const podeAdiar = kind !== 'transfer' && !isCard && installmentCount <= 1;
   // parcelar só faz sentido em gasto com conta escolhida (normalmente cartão)
   /*
     ⚠️ O VALOR de uma parcela não se edita aqui, e travá-lo é integridade, não estilo
@@ -257,9 +264,18 @@ function TransactionForm({ editing }: { editing?: Transaction }) {
   const plano = (planos.data ?? []).find((p) => p.id === editing?.installment_plan_id);
   const valorTravado = Boolean(editing?.installment_plan_id);
 
-  const podeParcelar = kind === 'expense' && !!accountId && !editing;
+  /**
+   * ⚠️ **Parcelar também vale EDITANDO.** A régua mora em `finance-form.ts`, com teste — aqui
+   * era `kind === 'expense' && !!accountId && !editing`, e o `!editing` é o que fez a mesma
+   * compra aparecer duas vezes na fatura (19/09/2026).
+   */
+  const podeParcelarAqui = podeParcelar(kind, accountId, editing);
+  /** Histórico ("3 das 12 já foram pagas") é da CRIAÇÃO. Ver o ⚠️ da migration. */
+  const podeInformarHistorico = podeParcelarAqui && !editing;
+  /** Achado B: esconde o Segmented de tipo numa linha de série — ver o ⚠️ no Controller de `kind`. */
+  const naSerieEditada = Boolean(editing?.installment_plan_id || editing?.recurring_id);
 
-  const saving = save.isPending || createPlan.isPending;
+  const saving = save.isPending || createPlan.isPending || converter.isPending;
 
   /**
    * O que mudou E vale para a série inteira. Data fica de fora: ela é de cada
@@ -282,9 +298,18 @@ function TransactionForm({ editing }: { editing?: Transaction }) {
   };
 
   const onSubmit = handleSubmit((values) => {
-    // parcelado: quem cria as N transações (e resolve a fatura de cada uma) é o
-    // banco, não o app — mesma regra usada pelo WhatsApp.
-    if (!editing && values.installments > 1 && values.account_id) {
+    /**
+     * UMA escrita, e qual delas é decisão pura (`destinoDoSalvar`, com teste). As três são
+     * exclusivas de propósito: duas escritas para uma intenção é a compra duplicada na fatura.
+     */
+    const destino = destinoDoSalvar(editing, {
+      installments: values.installments,
+      account_id: values.account_id,
+    });
+
+    // parcelado NOVO: quem cria as N transações (e resolve a fatura de cada uma) é o banco, não
+    // o app — mesma regra usada pelo WhatsApp.
+    if (destino === 'criarPlano' && values.account_id) {
       createPlan.mutate(
         {
           accountId: values.account_id,
@@ -306,6 +331,46 @@ function TransactionForm({ editing }: { editing?: Transaction }) {
           },
           onError: (error) =>
             toast({ message: financeErrorMessage(error, 'Não deu para parcelar. Tenta de novo.'), tone: 'error' }),
+        },
+      );
+      return;
+    }
+
+    /**
+     * Um lançamento que já existe virando compra parcelada.
+     *
+     * ⚠️ **A RPC ADOTA a linha existente como parcela 1** — não há "apaga e cria de novo", o
+     * `id` não muda, e chamar duas vezes é recusa. É o que impede a duplicação de existir.
+     *
+     * `values.amount_cents` é o TOTAL da compra aqui, como na criação; o `hint` do campo escreve
+     * isso na tela.
+     */
+    if (destino === 'converter' && editing && values.account_id) {
+      converter.mutate(
+        {
+          transactionId: editing.id,
+          totalCents: values.amount_cents,
+          installments: values.installments,
+          firstOccurredAt: brToISO(values.occurred_at),
+          description: values.description.trim(),
+          category: values.category,
+          merchant: values.merchant?.trim() || null,
+          accountId: values.account_id,
+        },
+        {
+          onSuccess: () => {
+            Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+            router.back();
+            toast({
+              message: `Parcelei em ${values.installments}x. As futuras já entram nas próximas faturas.`,
+              tone: 'success',
+            });
+          },
+          onError: (error) =>
+            toast({
+              message: financeErrorMessage(error, 'Não deu para parcelar. Tenta de novo.'),
+              tone: 'error',
+            }),
         },
       );
       return;
@@ -342,8 +407,16 @@ function TransactionForm({ editing }: { editing?: Transaction }) {
         status,
         due_at: adiado && values.due_at ? brToISO(values.due_at) : editing?.due_at ?? null,
         fee_cents: editing ? 0 : values.fee_cents,
-        // Só faz diferença em previsto: `_promote_due_transactions` só olha `pending`.
-        auto_confirm: adiado ? values.auto_confirm : false,
+        /**
+         * ⚠️ **Mesma regra do `status` logo acima, e pelo mesmo motivo.** Em cartão e em
+         * transferência o campo "vou pagar depois" não existe (`podeAdiar` é false), então
+         * `adiado` é sempre false ali — e escrever `false` a partir disso DESLIGAVA o automático
+         * de um lançamento só porque alguém corrigiu o nome dele. **Onde o campo não aparece, o
+         * valor é o que já era.**
+         */
+        auto_confirm: podeAdiar
+          ? (adiado ? values.auto_confirm : false)
+          : (editing?.auto_confirm ?? false),
       },
       {
         onSuccess: () => {
@@ -456,14 +529,22 @@ function TransactionForm({ editing }: { editing?: Transaction }) {
           Tipo primeiro porque ele decide QUAIS campos existem: transferência troca
           "Categoria" por "Para a conta". Controle que remonta o formulário não pode vir
           depois do que ele remonta.
+
+          ⚠️ **Linha de série não troca de tipo.** `gravar('one')` vai pelo `.update()` cru, que
+          carrega `kind` — justamente a coluna que `update_transaction_scoped` recusa de
+          propósito. Com o Segmented na tela, dava para virar uma parcela de cartão em receita, e
+          a fatura ficava com uma linha que soma para o outro lado. O valor gravado continua
+          sendo `editing.kind`, que é o que o `defaultValues` já traz.
         */}
-        <Controller
-          control={control}
-          name="kind"
-          render={({ field }) => (
-            <Segmented options={KINDS} value={field.value} onChange={field.onChange} />
-          )}
-        />
+        {!naSerieEditada && (
+          <Controller
+            control={control}
+            name="kind"
+            render={({ field }) => (
+              <Segmented options={KINDS} value={field.value} onChange={field.onChange} />
+            )}
+          />
+        )}
 
         {/*
           ⚠️ O NOME vem antes do VALOR, e isso é a régua de ENTIDADE generalizada (15/09/2026).
@@ -618,7 +699,7 @@ function TransactionForm({ editing }: { editing?: Transaction }) {
           </Animated.View>
         )}
 
-        {podeParcelar && (
+        {podeParcelarAqui && (
           <Animated.View entering={FadeIn.duration(Motion.duration.base)} layout={linear}>
             <Controller
               control={control}
@@ -629,7 +710,7 @@ function TransactionForm({ editing }: { editing?: Transaction }) {
                   error={errors.installments?.message}
                   hint={
                     field.value > 1 && amountCents > 0
-                      ? `${field.value}x de ${formatBRL(Math.floor(amountCents / field.value))} — o valor acima é o TOTAL da compra. As parcelas futuras já entram nas próximas faturas.`
+                      ? `${field.value}x de ${formatBRL(Math.floor(amountCents / field.value))} — o valor acima é o TOTAL`
                       : undefined
                   }>
                   <View style={styles.chipRow}>
@@ -638,7 +719,16 @@ function TransactionForm({ editing }: { editing?: Transaction }) {
                         key={n}
                         label={n === 1 ? 'À vista' : `${n}x`}
                         selected={field.value === n}
-                        onPress={() => field.onChange(n)}
+                        onPress={() => {
+                          field.onChange(n);
+                          // Mesma reação da troca para cartão no `AccountPicker` acima: "vou
+                          // pagar depois" e "parcelar" não convivem (ver `podeAdiar`), senão o
+                          // zod continua exigindo `due_at` de um campo que sumiu da tela.
+                          if (n > 1) {
+                            setValue('pending', false);
+                            setValue('due_at', null);
+                          }
+                        }}
                       />
                     ))}
                   </View>
@@ -648,7 +738,7 @@ function TransactionForm({ editing }: { editing?: Transaction }) {
           </Animated.View>
         )}
 
-        {podeParcelar && installmentCount > 1 && (
+        {podeInformarHistorico && installmentCount > 1 && (
           <Controller control={control} name="paid_installments" render={({ field }) => (
             <Field label="Quantas parcelas iniciais já foram pagas?" error={errors.paid_installments?.message}
               hint="Zero se nenhuma foi paga. Data passada não conta como pagamento.">
@@ -701,7 +791,7 @@ function TransactionForm({ editing }: { editing?: Transaction }) {
           control={control}
           name="occurred_at"
           render={({ field }) => (
-            <Field label={podeParcelar && installmentCount > 1 ? "Data da primeira parcela" : "Data"} error={errors.occurred_at?.message}>
+            <Field label={podeParcelarAqui && installmentCount > 1 ? "Data da primeira parcela" : "Data"} error={errors.occurred_at?.message}>
               {/*
                 ⚠️ **O campo tem a linha inteira; o atalho fica ACIMA dele.** Espremido na mesma
                 fileira, o valor quebrava no meio do ano ("13/09/2 026") — o seletor tem ícone e
