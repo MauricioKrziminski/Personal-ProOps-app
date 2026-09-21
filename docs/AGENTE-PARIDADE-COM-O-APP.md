@@ -3,7 +3,7 @@
 > Pedido do dono do produto: *"garanta que o agente consiga fazer tudo que o usuário possa fazer
 > manualmente dentro do app, sem perder na segurança e sempre validando com o usuário."*
 
-Método: enumerar **toda** mutação do app (`useMutation` em `src/hooks/`, 52) e casar cada uma com
+Método: enumerar **toda** mutação do app (`useMutation` em `src/hooks/`, 53) e casar cada uma com
 o caminho do agente que faz a mesma coisa. Nada de amostragem — a queixa que originou esta
 auditoria foi *"se deixou passar o nome, com certeza tem mais coisas"*, e amostragem é como o
 nome tinha passado.
@@ -171,7 +171,7 @@ números reais do staging; a cópia Deno é a mesma aritmética, linha a linha.
 > Pedido do dono do produto: *"Corrija o agente completamente... ele tem que saber de tudo, mas
 > cuidado com os guard rails e segurança de dados daquele user."*
 
-A auditoria de cima enumerou as 52 **mutações** e parou aí. Leitura nunca foi auditada, e a
+A auditoria de cima enumerou as 53 **mutações** e parou aí. Leitura nunca foi auditada, e a
 lacuna apareceu do jeito mais caro possível: o dono cadastrou um salário recorrente, ele não
 apareceu no mês seguinte, e a pergunta natural — *"o agente saberia me ajudar com isso?"* — tinha
 como resposta **não**.

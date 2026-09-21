@@ -113,7 +113,7 @@ têm que passar: regressão em "aceitar" é o agente ficando surdo; regressão e
 
 ## Paridade com o app
 
-**O agente faz tudo que o usuário faz com o dedo.** As 52 mutações do app (`useMutation` em
+**O agente faz tudo que o usuário faz com o dedo.** As 53 mutações do app (`useMutation` em
 `src/hooks/`) foram casadas uma a uma com o caminho do agente em 09/09/2026; a tabela, as quatro
 lacunas fechadas e as dez exclusões com motivo estão em `docs/AGENTE-PARIDADE-COM-O-APP.md`.
 **Botão novo no app = linha nova naquela tabela**, senão a diferença volta a crescer sozinha —

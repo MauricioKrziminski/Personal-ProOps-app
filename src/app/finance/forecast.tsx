@@ -970,8 +970,8 @@ export default function ForecastScreen() {
             <Field label="Em quantas vezes">
               {/*
                 `Chip`, não `Segmented`: cinco opções, e o formulário do lançamento
-                já escolhe parcela assim (`INSTALLMENT_OPTIONS`, nove chips). Eram
-                dois desenhos para a mesma pergunta no mesmo app.
+                já escolhe parcela assim (`opcoesDeParcelas`, `src/lib/finance-form.ts`, nove
+                chips). Eram dois desenhos para a mesma pergunta no mesmo app.
               */}
               <View style={styles.chips}>
                 {PARCELAS.map((n) => (
