@@ -51,6 +51,13 @@ const simples = { id: 'tx-1', installment_plan_id: null, recurring_id: null, deb
 const parcela = { id: 'tx-1', installment_plan_id: 'plano-1', recurring_id: null, debt_id: null };
 const ocorrencia = { id: 'tx-1', installment_plan_id: null, recurring_id: 'serie-1', debt_id: null };
 const financiamento = { id: 'tx-1', installment_plan_id: null, recurring_id: null, debt_id: 'divida-1' };
+const saldoAdiado = {
+  id: 'tx-1',
+  installment_plan_id: null,
+  recurring_id: null,
+  debt_id: null,
+  rollover_of_invoice_id: 'fatura-1',
+};
 
 /**
  * ⚠️ A fileira de parcelas era escondida na edição (`!editing`), e o jeito de contornar era
@@ -69,6 +76,17 @@ test('o que já tem outro contrato não se parcela por aqui', () => {
   assert.equal(podeParcelar('expense', 'card-1', financiamento), false);
   assert.equal(temContrato(parcela) && temContrato(ocorrencia) && temContrato(financiamento), true);
   assert.equal(temContrato(simples) || temContrato(null), false);
+});
+
+/**
+ * ⚠️ **Achado da revisão final (20/09/2026).** O saldo adiado de fatura ("Saldo em rotativo de
+ * Julho") é `expense`, tem cartão e não tinha nenhum dos três contratos originais — o chip "2x"
+ * aparecia e a RPC recusava (`rollover_of_invoice_id is not null`, a coluna não é herdada pelas
+ * parcelas).
+ */
+test('saldo adiado de fatura não se parcela por aqui', () => {
+  assert.equal(podeParcelar('expense', 'card-1', saldoAdiado), false);
+  assert.equal(temContrato(saldoAdiado), true);
 });
 
 test('parcelar continua exigindo gasto e conta', () => {

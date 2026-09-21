@@ -56,17 +56,24 @@ type ComContrato = {
   installment_plan_id?: string | null;
   recurring_id?: string | null;
   debt_id?: string | null;
+  rollover_of_invoice_id?: string | null;
 };
 
 /**
- * Um lançamento que já é parcela, ocorrência de recorrência ou parcela de financiamento.
+ * Um lançamento que já é parcela, ocorrência de recorrência, parcela de financiamento ou o
+ * principal de um saldo adiado de fatura.
  *
- * Nos três casos a divisão do dinheiro é de outro dono: a COMPRA (editável em
- * `/finance/installments`), a REGRA da série, e o CRONOGRAMA da dívida. As três recusas também
- * existem no banco — aqui elas evitam mostrar um botão que vai dar erro.
+ * Nos quatro casos a divisão do dinheiro é de outro dono: a COMPRA (editável em
+ * `/finance/installments`), a REGRA da série, o CRONOGRAMA da dívida, e o ADIAMENTO
+ * (`roll_invoice`). O quarto não tem RPC de conversão: `rollover_of_invoice_id` não seria
+ * copiado para as parcelas 2..N, e o principal — já contado quando as compras foram feitas —
+ * voltaria como despesa NOVA em N−1 meses. As quatro recusas também existem no banco — aqui
+ * elas evitam mostrar um botão que vai dar erro.
  */
 export function temContrato(editing?: ComContrato | null): boolean {
-  return Boolean(editing?.installment_plan_id || editing?.recurring_id || editing?.debt_id);
+  return Boolean(
+    editing?.installment_plan_id || editing?.recurring_id || editing?.debt_id || editing?.rollover_of_invoice_id,
+  );
 }
 
 /**

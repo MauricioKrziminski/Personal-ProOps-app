@@ -55,6 +55,9 @@ export type Transaction = Pick<
   // A série da recorrência: é o que diz se "esta e as futuras" faz sentido nesta linha.
   // Já vinha no select desde sempre; faltava só no tipo.
   | 'recurring_id'
+  // O saldo adiado de uma fatura (`roll_invoice`): a coluna não é herdada pelas parcelas de um
+  // plano, então `temContrato` (`finance-form.ts`) usa isto para esconder "Parcelas" aqui.
+  | 'rollover_of_invoice_id'
   // `20260909110000`: entra sozinho na data em vez de esperar baixa. Em receita o padrão é
   // false — Pix de terceiro precisa de comprovação; salário é onde ligar faz sentido.
   | 'auto_confirm'
@@ -153,7 +156,7 @@ export type TxSummaryRow = Omit<Fns['transactions_summary']['Returns'][number], 
 };
 
 const TRANSACTION_COLUMNS =
-  'id, kind, amount_cents, currency, category, description, account_id, counterparty_account_id, occurred_at, source, created_at, status, due_at, invoice_id, installment_plan_id, installment_no, merchant, recurring_id, debt_id, auto_confirm';
+  'id, kind, amount_cents, currency, category, description, account_id, counterparty_account_id, occurred_at, source, created_at, status, due_at, invoice_id, installment_plan_id, installment_no, merchant, recurring_id, debt_id, auto_confirm, rollover_of_invoice_id';
 
 export interface TransactionFilters {
   /**

@@ -39,7 +39,7 @@ import {
   type TransactionKind,
 } from '@/hooks/use-finance';
 import { brToISO, formatBRL, isValidBRDate, isoToBR, localISODate } from '@/lib/dates';
-import { destinoDoSalvar, financeErrorMessage, installmentHistory, podeParcelar } from '@/lib/finance-form';
+import { destinoDoSalvar, financeErrorMessage, installmentHistory, opcoesDeParcelas, podeParcelar } from '@/lib/finance-form';
 import {
   autoConfirmHint,
   autoConfirmLabel,
@@ -64,9 +64,6 @@ const KINDS = [
   { value: 'income', label: 'Receita' },
   { value: 'transfer', label: 'Transferência' },
 ] as const satisfies readonly { value: TransactionKind; label: string }[];
-
-/** Opções de parcelamento mais comuns no varejo brasileiro. */
-const INSTALLMENT_OPTIONS = [1, 2, 3, 4, 6, 10, 12, 18, 24] as const;
 
 const schema = z
   .object({
@@ -770,7 +767,7 @@ function TransactionForm({ editing }: { editing?: Transaction }) {
                       : undefined
                   }>
                   <View style={styles.chipRow}>
-                    {INSTALLMENT_OPTIONS.map((n) => (
+                    {opcoesDeParcelas(0).map((n) => (
                       <Chip
                         key={n}
                         label={n === 1 ? 'À vista' : `${n}x`}
