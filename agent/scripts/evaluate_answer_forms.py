@@ -203,14 +203,11 @@ def _so_corrige(**campos):
     def checa(acoes):
         if not acoes or any(a.get("type") != "update_transaction" for a in acoes):
             return False
-        a = acoes[0]
-        for campo, esperado in campos.items():
-            v = a.get(campo)
-            if callable(esperado):
-                if not esperado(v):
+        for a in acoes:
+            for campo, esperado in campos.items():
+                v = a.get(campo)
+                if not (esperado(v) if callable(esperado) else v == esperado):
                     return False
-            elif v != esperado:
-                return False
         return True
 
     return checa
@@ -221,6 +218,12 @@ def _so_cria(tipo):
         return bool(acoes) and all(a.get("type") == tipo for a in acoes)
 
     return checa
+
+
+def _terceira_parcela(acao):
+    escopo = acao.get("installment_scope") or {}
+    return acao.get("current_installment") == 3 or (
+        escopo.get("mode") == "range" and escopo.get("start") == 3 and escopo.get("end") == 3)
 
 
 UNIDADE = {"id": "p3", "thread_id": "t",
@@ -443,11 +446,11 @@ def secoes():
                 ("o mercado foi 120, não 100", (), _so_corrige(amount_cents=10000,
                  new_amount_cents=12000), "busca 10000 new 12000"),
                 ("na verdade eu comprei em 2x no cartão", H_WARDOGS,
-                 _so_corrige(installments=2), "update installments=2"),
+                 _so_corrige(installments=2, new_account=None), "update 2x, sem conta"),
                 ("Na verdade eu comprei em 2x no cartao", H_WARDOGS,
-                 _so_corrige(installments=2), "update installments=2"),
+                 _so_corrige(installments=2, new_account=None), "update 2x, sem conta"),
                 ("Na verdade eu comprei em 2x no cartao", (),
-                 _so_corrige(installments=2), "update installments=2"),
+                 _so_corrige(installments=2, new_account=None), "update 2x, sem conta"),
                 ("na verdade foi no Nubank", H_MERCADO,
                  _so_corrige(new_account=lambda v: "nubank" in (v or "").lower()),
                  "update new_account"),
@@ -455,6 +458,9 @@ def secoes():
                  "update new=6000"),
                 ("corrigindo: foi 45,90", H_MERCADO, _so_corrige(new_amount_cents=4590),
                  "update new=4590"),
+                ("muda a 3ª parcela da TV para 300", (),
+                 lambda acoes: _so_corrige(installments=None)(acoes)
+                 and all(_terceira_parcela(a) for a in acoes), "3ª parcela, sem installments"),
                 ("gastei 120 no mercado", H_WARDOGS, _so_cria("create_expense"),
                  "create_expense"),
                 ("comprei um fone em 2x de 50", H_MERCADO,
