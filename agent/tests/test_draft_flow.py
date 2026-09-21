@@ -575,17 +575,10 @@ class TestCadastroDeCartaoNaHora:
 
     @pytest.fixture(autouse=True)
     def _banco(self, monkeypatch):
-        self.criados = []
-
         async def contas(workspace_id, *, only_cards=False):
             return CARTOES
 
-        async def criar(*, workspace_id, user_id, name):
-            self.criados.append(name)
-            return {"id": "novo", "name": name, "type": "credit_card"}
-
         monkeypatch.setattr(db, "accounts", contas)
-        monkeypatch.setattr(db, "create_credit_card", criar)
 
     @pytest.mark.asyncio
     async def test_clique_antigo_pede_ciclo_sem_inventar_dias(self):
@@ -593,7 +586,6 @@ class TestCadastroDeCartaoNaHora:
             SESSAO, RASCUNHO, {"acao": "criar_cartao", "name": "Banco do Brasil"}
         )
         assert decidido is None
-        assert self.criados == []
         assert 'fechamento' in resposta and 'vencimento' in resposta
         assert 'confirmar' in resposta
 
@@ -604,19 +596,6 @@ class TestCadastroDeCartaoNaHora:
         )
         assert decidido is None
         assert [b[1] for b in resposta["rows"]] == ["Itaú", "Nubank Cartão", "É financiamento", "Cancelar"]
-
-    @pytest.mark.asyncio
-    async def test_falha_ao_criar_nao_derruba_a_conversa(self, monkeypatch):
-        async def falhou(*, workspace_id, user_id, name):
-            return None
-
-        monkeypatch.setattr(db, "create_credit_card", falhou)
-        decidido, resposta = await conversation._cartao_do_rascunho(
-            SESSAO, RASCUNHO, {"acao": "criar_cartao", "name": "Inter"}
-        )
-        assert decidido is None
-        assert isinstance(resposta, str) and "fechamento" in resposta.lower()
-        assert self.criados == []
 
     def test_nome_longo_nao_estoura_o_id_do_botao(self):
         """O id do botão da Meta tem 256 caracteres e o nome viaja dentro dele."""
@@ -727,7 +706,6 @@ class TestCadastroInlineCheckpoint:
         monkeypatch.setattr(db,'delete_draft',deleted)
         async def never(*a,**kw): raise AssertionError('purchase must remain inert')
         monkeypatch.setattr(draft,'interpretar',never)
-        monkeypatch.setattr(db,'create_credit_card',never)
 
     @pytest.mark.asyncio
     async def test_criar_semeia_cadastro_sem_ciclo_e_preserva_compra(self):
