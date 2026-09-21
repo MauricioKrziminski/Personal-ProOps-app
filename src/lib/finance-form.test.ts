@@ -46,3 +46,64 @@ test('simple financing rejects fractional counts, absent amounts, excess history
     assert.throws(() => simpleDebtValues(amount, count, paid));
   }
 });
+
+import { destinoDoSalvar, podeParcelar, temContrato } from './finance-form.ts';
+
+const simples = { id: 'tx-1', installment_plan_id: null, recurring_id: null, debt_id: null };
+const parcela = { id: 'tx-1', installment_plan_id: 'plano-1', recurring_id: null, debt_id: null };
+const ocorrencia = { id: 'tx-1', installment_plan_id: null, recurring_id: 'serie-1', debt_id: null };
+const financiamento = { id: 'tx-1', installment_plan_id: null, recurring_id: null, debt_id: 'divida-1' };
+
+/**
+ * ⚠️ A fileira de parcelas era escondida na edição (`!editing`), e o jeito de contornar era
+ * LANÇAR DE NOVO — foi assim que a mesma compra apareceu duas vezes na fatura (19/09/2026).
+ */
+test('parcelar vale também EDITANDO um lançamento simples', () => {
+  assert.equal(podeParcelar('expense', 'card-1', undefined), true, 'criando');
+  assert.equal(podeParcelar('expense', 'card-1', simples), true, 'editando um simples');
+});
+
+test('o que já tem outro contrato não se parcela por aqui', () => {
+  // A parcela: quem manda no contrato é a tela da compra. A ocorrência: quem manda é a regra.
+  // A parcela de financiamento: quem manda é o cronograma. As três também são recusadas no banco.
+  assert.equal(podeParcelar('expense', 'card-1', parcela), false);
+  assert.equal(podeParcelar('expense', 'card-1', ocorrencia), false);
+  assert.equal(podeParcelar('expense', 'card-1', financiamento), false);
+  assert.equal(temContrato(parcela) && temContrato(ocorrencia) && temContrato(financiamento), true);
+  assert.equal(temContrato(simples) || temContrato(null), false);
+});
+
+test('parcelar continua exigindo gasto e conta', () => {
+  assert.equal(podeParcelar('income', 'card-1', simples), false);
+  assert.equal(podeParcelar('transfer', 'card-1', simples), false);
+  assert.equal(podeParcelar('expense', null, simples), false);
+});
+
+/**
+ * ⚠️ **UMA escrita, sempre.** O caminho que duplica é justamente "converter E salvar": duas
+ * escritas para uma intenção. O destino é exclusivo por construção.
+ */
+test('criar com 1x salva; criar com 2x cria o plano', () => {
+  assert.equal(destinoDoSalvar(null, { installments: 1, account_id: 'card-1' }), 'salvar');
+  assert.equal(destinoDoSalvar(null, { installments: 2, account_id: 'card-1' }), 'criarPlano');
+});
+
+test('editar um simples com 2x CONVERTE — não cria um segundo lançamento', () => {
+  assert.equal(destinoDoSalvar(simples, { installments: 2, account_id: 'card-1' }), 'converter');
+});
+
+test('editar sem mexer em parcelas continua sendo só o update', () => {
+  assert.equal(destinoDoSalvar(simples, { installments: 1, account_id: 'card-1' }), 'salvar');
+});
+
+test('editar uma parcela nunca converte, nem com o campo forçado', () => {
+  // A fileira nem aparece; isto é o cinto. Converter uma parcela criaria plano dentro de plano.
+  assert.equal(destinoDoSalvar(parcela, { installments: 3, account_id: 'card-1' }), 'salvar');
+  assert.equal(destinoDoSalvar(ocorrencia, { installments: 3, account_id: 'card-1' }), 'salvar');
+  assert.equal(destinoDoSalvar(financiamento, { installments: 3, account_id: 'card-1' }), 'salvar');
+});
+
+test('sem conta não há para onde parcelar', () => {
+  assert.equal(destinoDoSalvar(simples, { installments: 3, account_id: null }), 'salvar');
+  assert.equal(destinoDoSalvar(null, { installments: 3, account_id: null }), 'salvar');
+});
