@@ -22,6 +22,14 @@ import {
   prependMessagePage,
   authorizedRequest,
   retryPolicyFor,
+  abrirConversaNova,
+  sementeDaConversa,
+  historicoPrecisaBuscar,
+  aplicarTurno,
+  marcarTurnoLocal,
+  retryDoTurno,
+  falhaDoTurno,
+  tituloProvisorio,
 } from './agent-chat.ts';
 
 // ---------------------------------------------------------------------------
@@ -550,4 +558,118 @@ test('o preview da lista sai sem a marcação', () => {
     plainText('💸 Gasto de *R$ 2.300,00* em *casa* em 04/09/2026.'),
     '💸 Gasto de R$ 2.300,00 em casa em 04/09/2026.',
   );
+});
+
+// ---------------------------------------------------------------------------
+// conversa nova: a tela abre no toque, antes do servidor responder
+// ---------------------------------------------------------------------------
+
+test('abrirConversaNova navega no mesmo toque, mesmo com o envio nunca resolvendo', () => {
+  const ordem: string[] = [];
+  let n = 0;
+  const enviados: { id: string; clientMessageId: string; content: string }[] = [];
+  let semeado: { id: string; clientMessageId: string } | null = null;
+  let navegou: string | null = null;
+  const r = abrirConversaNova('gastei 45', {
+    gerarId: () => `id-${++n}`,
+    semear: (id, t) => { ordem.push('semear'); semeado = { id, clientMessageId: t.clientMessageId }; },
+    enviar: (v) => { ordem.push('enviar'); enviados.push(v); return new Promise(() => {}); },
+    navegar: (id) => { ordem.push('navegar'); navegou = id; },
+  });
+  // síncrono: já navegou quando a função volta, sem esperar o servidor
+  assert.equal(navegou, r.id);
+  assert.deepEqual(ordem, ['semear', 'enviar', 'navegar']);
+  assert.equal(enviados.length, 1);
+  assert.deepEqual(enviados[0], { id: r.id, clientMessageId: r.clientMessageId, content: 'gastei 45' });
+  assert.deepEqual(semeado, { id: r.id, clientMessageId: r.clientMessageId });
+  assert.notEqual(r.id, r.clientMessageId);
+});
+
+test('a semente tem o formato do useInfiniteQuery e a mensagem local sem sequence', () => {
+  const agora = new Date('2026-09-21T12:00:00.000Z');
+  const s = sementeDaConversa('cmid-1', 'oi', agora);
+  assert.deepEqual(s, {
+    pages: [{
+      items: [{
+        id: 'local:cmid-1', client_message_id: 'cmid-1', role: 'user', content: 'oi',
+        status: 'processing', created_at: '2026-09-21T12:00:00.000Z',
+      }],
+      next_cursor: null,
+    }],
+    pageParams: [null],
+  });
+  assert.equal('sequence' in s.pages[0].items[0], false);
+});
+
+test('histórico: cache vazio busca; só a mensagem local não busca; com servidor busca', () => {
+  assert.equal(historicoPrecisaBuscar([]), true);
+  assert.equal(historicoPrecisaBuscar(sementeDaConversa('c', 'oi').pages[0].items), false);
+  assert.equal(historicoPrecisaBuscar([{ id: 'u', sequence: 1 }]), true);
+});
+
+test('aplicarTurno troca a local pela do servidor sem duplicar e sem apagar resposta do agente', () => {
+  const cache = sementeDaConversa('c1', 'oi');
+  const turno = {
+    user_message: { id: 'u1', sequence: 1, client_message_id: 'c1', role: 'user', content: 'oi', status: 'completed' },
+    assistant_message: { id: 'a1', sequence: 2, client_message_id: null, role: 'assistant', content: 'olá', status: 'completed' },
+  } as const;
+  const depois = aplicarTurno(cache, turno);
+  assert.deepEqual(depois.pages[0].items.map((m) => m.id), ['u1', 'a1']);
+  // o mesmo turno de novo (retry) não duplica
+  assert.deepEqual(aplicarTurno(depois, turno).pages[0].items.map((m) => m.id), ['u1', 'a1']);
+  // turno seguinte: as respostas do agente (cmid nulo) continuam
+  const seguinte = aplicarTurno(depois, {
+    user_message: { id: 'u2', sequence: 3, client_message_id: 'c2', role: 'user', content: 'e?', status: 'processing' },
+    assistant_message: null,
+  });
+  assert.deepEqual(seguinte.pages[0].items.map((m) => m.id), ['u1', 'a1', 'u2']);
+});
+
+test('aplicarTurno encaixa na página MAIS NOVA (a primeira), não na mais antiga', () => {
+  const cache = {
+    pages: [
+      { items: [{ id: 'n', sequence: 10 }], next_cursor: '10' },
+      { items: [{ id: 'v', sequence: 1 }], next_cursor: null },
+    ],
+    pageParams: [null, 10],
+  };
+  const r = aplicarTurno(cache, { user_message: { id: 'u', sequence: 11 }, assistant_message: null });
+  assert.deepEqual(r.pages[0].items.map((m) => m.id), ['n', 'u']);
+  assert.deepEqual(r.pages[1].items.map((m) => m.id), ['v']);
+});
+
+test('marcarTurnoLocal muda só a mensagem daquele turno', () => {
+  const cache = sementeDaConversa('c1', 'oi');
+  const falhou = marcarTurnoLocal(cache, 'c1', { status: 'failed', error_code: 'network', error_status: 0 });
+  assert.equal(falhou.pages[0].items[0].status, 'failed');
+  assert.equal(falhou.pages[0].items[0].error_code, 'network');
+  const denovo = marcarTurnoLocal(falhou, 'c1', { status: 'processing', error_code: null, error_status: null });
+  assert.equal(denovo.pages[0].items[0].status, 'processing');
+  assert.equal(marcarTurnoLocal(cache, 'outro', { status: 'failed' }).pages[0].items[0].status, 'processing');
+});
+
+test('retry: sem nada do servidor recria com o mesmo id; depois, envia', () => {
+  assert.equal(retryDoTurno(sementeDaConversa('c', 'oi').pages[0].items), 'criar');
+  assert.equal(retryDoTurno([{ id: 'u', sequence: 1 }]), 'enviar');
+});
+
+test('falha do turno: 404 sai sem retry, 422 sem retry, rede com texto de rede', () => {
+  const nf = falhaDoTurno({ error_code: 'conversation_not_found', error_status: 404 });
+  assert.equal(nf.retryable, false);
+  assert.equal(nf.sair, true);
+  const inv = falhaDoTurno({ error_code: 'invalid', error_status: 422 });
+  assert.equal(inv.retryable, false);
+  assert.equal(inv.sair, false);
+  const rede = falhaDoTurno({ error_code: 'network', error_status: 0 });
+  assert.equal(rede.retryable, true);
+  assert.match(rede.texto, /conex/i);
+  assert.equal(falhaDoTurno({ error_code: 'plan_limit' }).retryable, false);
+  assert.equal(falhaDoTurno({ error_code: 'rate_limit' }).retryable, true);
+  assert.equal(falhaDoTurno({ error_code: null }).retryable, true);
+});
+
+test('título provisório segue a regra do servidor: 1ª linha não vazia, colapsada, 48', () => {
+  assert.equal(tituloProvisorio('\n  gastei   45\tno mercado  \nsegunda'), 'gastei 45 no mercado');
+  assert.equal(tituloProvisorio('x'.repeat(60)).length, 48);
+  assert.equal(tituloProvisorio('   '), 'Nova conversa');
 });

@@ -24,7 +24,7 @@ function loadHooks(client: QueryClient, entry = 'src/hooks/use-finance.ts', depe
       if (name in dependencies) return dependencies[name];
       if (name === '@tanstack/react-query') return { ...require(name), useQueryClient: () => client, useMutation: (options: unknown) => options };
       if (name === 'react') return { useCallback: (fn: unknown) => fn };
-      if (name === '@/lib/agent-api' || name === '@/lib/agent-chat') return {};
+      if (name === '@/lib/agent-api') return {};
       if (name === '@/lib/supabase') return { supabase: { rpc: async () => ({ error: null }) } };
       if (name.startsWith('@/lib/') && existsSync(`src/lib/${name.slice(6)}.ts`)) return load(`src/lib/${name.slice(6)}.ts`);
       return {};
@@ -126,6 +126,40 @@ test('agent processing response preserves domain caches until completion', async
       status: 'processing', conversation: { id: 'chat' }, user_message: { id: 'u' }, assistant_message: null,
     });
     assert.equal(client.getQueryState(['card-invoices', 'card'])?.isInvalidated, false);
+  } finally { client.clear(); }
+});
+
+test('criar conversa: onMutate volta a local para processing; onError marca failed, invalida a lista e abre o paywall', async () => {
+  const client = new QueryClient();
+  const pushes: string[] = [];
+  class AgentAuthExpiredError extends Error {}
+  const hooks = loadHooks(client, 'src/hooks/use-agent-chat.ts', {
+    '@/lib/agent-api': { AgentAuthExpiredError },
+    'expo-router': { router: { push: (r: string) => pushes.push(r) } },
+  });
+  const key = ['agent', 'messages', 'conv-1'];
+  const v = { id: 'conv-1', clientMessageId: 'c1', content: 'oi' };
+  client.setQueryData(key, { pages: [{ items: [{ id: 'local:c1', client_message_id: 'c1', role: 'user', content: 'oi', status: 'failed', error_code: 'network', error_status: 0 }], next_cursor: null }], pageParams: [null] });
+  client.setQueryData(['agent', 'conversations'], 'old');
+  try {
+    const m = hooks.useCreateAgentConversation();
+    m.onMutate(v);
+    let item = (client.getQueryData(key) as any).pages[0].items[0];
+    assert.equal(item.status, 'processing');
+    assert.equal(item.error_code, null);
+
+    await m.onError({ status: 402, code: 'plan_limit', policy: { paywall: true } }, v);
+    item = (client.getQueryData(key) as any).pages[0].items[0];
+    assert.equal(item.status, 'failed');
+    assert.equal(item.error_code, 'plan_limit');
+    assert.equal(item.error_status, 402);
+    assert.equal(client.getQueryState(['agent', 'conversations'])?.isInvalidated, true);
+    assert.deepEqual(pushes, ['/paywall']);
+
+    m.onMutate(v);
+    await m.onError(new AgentAuthExpiredError(), v);
+    assert.equal((client.getQueryData(key) as any).pages[0].items[0].status, 'processing');
+    assert.deepEqual(pushes, ['/paywall']);
   } finally { client.clear(); }
 });
 

@@ -13,11 +13,13 @@ import {
   useQueryClient,
   type InfiniteData,
 } from '@tanstack/react-query';
+import { router } from 'expo-router';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { invalidateAgentData, invalidateKeys } from '@/lib/query-invalidation';
 
 import {
   type AgentApiError,
+  AgentAuthExpiredError,
   type AgentConversation,
   type AgentDecision,
   type AgentMessage,
@@ -32,7 +34,13 @@ import {
   resolvePending,
   sendMessage,
 } from '@/lib/agent-api';
-import { markResolved, newClientMessageId } from '@/lib/agent-chat';
+import {
+  aplicarTurno,
+  historicoPrecisaBuscar,
+  marcarTurnoLocal,
+  markResolved,
+  newClientMessageId,
+} from '@/lib/agent-chat';
 
 export const agentKeys = {
   conversations: ['agent', 'conversations'] as const,
@@ -86,7 +94,12 @@ export function useAgentMessages(conversationId: string | undefined) {
   const seen = useRef(new Set<string>());
   const result = useInfiniteQuery({
     queryKey: agentKeys.messages(conversationId ?? ''),
-    enabled: isAgentConfigured && Boolean(conversationId),
+    // Cache só com a mensagem semeada no toque não busca: a conversa pode nem
+    // existir no servidor ainda. Cache VAZIO busca (conversa aberta a frio).
+    enabled: (q) =>
+      isAgentConfigured &&
+      Boolean(conversationId) &&
+      historicoPrecisaBuscar((q.state.data?.pages ?? []).flatMap((p) => p.items)),
     // Voltar rapidamente de um detalhe preserva a última página já vista.
     // Processamento continua sendo relido pelo refetchInterval abaixo.
     staleTime: 15_000,
@@ -125,35 +138,14 @@ export function useAgentMessages(conversationId: string | undefined) {
 
 type CacheMensagens = InfiniteData<Page<AgentMessage>, number | null>;
 
-/**
- * Encaixa o turno que voltou no cache, sem refetch.
- *
- * O servidor devolve as duas mensagens do turno; buscar de novo só para vê-las
- * gastaria uma viagem e deixaria a resposta piscando enquanto chega.
- */
-function aplicarTurno(cache: CacheMensagens | undefined, turno: AgentTurn): CacheMensagens {
-  const novas = [turno.user_message, turno.assistant_message].filter(
-    Boolean,
-  ) as AgentMessage[];
-  if (!cache) {
-    return { pages: [{ items: novas, next_cursor: null }], pageParams: [null] };
-  }
-  const paginas = [...cache.pages];
-  const ultima = paginas[paginas.length - 1];
-  // Substitui por `id` em vez de acrescentar: o retry de um turno devolve as
-  // MESMAS mensagens, e um append cego duplicaria a bolha na tela.
-  const porId = new Map(ultima.items.map((m) => [m.id, m]));
-  for (const m of novas) porId.set(m.id, m);
-  paginas[paginas.length - 1] = { ...ultima, items: [...porId.values()] };
-  return { ...cache, pages: paginas };
-}
-
 function useAplicarTurno() {
   const qc = useQueryClient();
   return useCallback(
     (turno: AgentTurn) => {
-      qc.setQueryData<CacheMensagens>(agentKeys.messages(turno.conversation.id), (c) =>
-        aplicarTurno(c, turno),
+      // O turno encaixa no cache e a mensagem semeada no toque (`local:<cmid>`) sai.
+      qc.setQueryData<CacheMensagens>(
+        agentKeys.messages(turno.conversation.id),
+        (c) => aplicarTurno(c, turno) as CacheMensagens,
       );
       return Promise.all([
         invalidateKeys(qc, [agentKeys.conversations, PLAN_STATUS]),
@@ -170,15 +162,46 @@ function useAplicarTurno() {
  * `retry: false` em toda escrita: o TanStack retentaria com o MESMO corpo, e o
  * servidor deduplica pelo `client_message_id` — mas repetir sozinho esconde do
  * usuário que algo falhou. Quem decide tentar de novo é ele, no botão.
+ *
+ * ⚠️ **Tudo mora nos callbacks do HOOK, nada no `.mutate()`.** A tela navega
+ * para a conversa no mesmo toque; callback do `.mutate()` não roda depois do
+ * desmonte (TanStack v5), e o do hook roda sempre. O resultado vai para o CACHE
+ * da conversa — é de lá que a tela de destino lê "Pensando…" ou a falha.
  */
 export function useCreateAgentConversation() {
   const aplicar = useAplicarTurno();
+  const qc = useQueryClient();
+  const marcar = (v: NovaConversa, patch: Parameters<typeof marcarTurnoLocal>[2]) =>
+    qc.setQueryData<CacheMensagens>(agentKeys.messages(v.id), (c) =>
+      c ? (marcarTurnoLocal(c, v.clientMessageId, patch) as CacheMensagens) : c,
+    );
   return useMutation({
     retry: false,
-    mutationFn: ({ clientMessageId, content }: { clientMessageId: string; content: string }) =>
-      createConversation(clientMessageId, content),
+    mutationFn: ({ id, clientMessageId, content }: NovaConversa) =>
+      createConversation(clientMessageId, content, id),
+    // O retry parte de uma mensagem `failed`: sem isto a tela mostraria a falha
+    // antiga, e não "Pensando…", enquanto o novo POST roda.
+    onMutate: (v: NovaConversa) => {
+      marcar(v, { status: 'processing', error_code: null, error_status: null });
+    },
     onSuccess: aplicar,
+    onError: (e: Error, v: NovaConversa) => {
+      // A sessão acabou: o portão do `_layout` já está levando ao login.
+      if (e instanceof AgentAuthExpiredError) return;
+      const api = e as AgentApiError;
+      marcar(v, { status: 'failed', error_code: api.code, error_status: api.status });
+      if (api.policy?.paywall) router.push('/paywall');
+      // A conversa pode já existir mesmo com erro (o 402 grava a mensagem).
+      return qc.invalidateQueries({ queryKey: agentKeys.conversations });
+    },
   });
+}
+
+interface NovaConversa {
+  /** O id da conversa, gerado no toque junto do `clientMessageId`. */
+  id: string;
+  clientMessageId: string;
+  content: string;
 }
 
 export function useSendAgentMessage(conversationId: string) {

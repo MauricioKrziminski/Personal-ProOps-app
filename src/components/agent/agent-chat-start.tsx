@@ -9,11 +9,10 @@ import { Space } from '@/design/tokens';
 interface Props {
   onSelectPrompt: (prompt: string) => void;
   composer?: ReactNode;
-  turn?: ReactNode;
 }
 
 /** Estado inicial da conversa; tocar uma frase apenas preenche o campo. */
-export const AgentChatStart = memo(function AgentChatStart({ onSelectPrompt, composer, turn }: Props) {
+export const AgentChatStart = memo(function AgentChatStart({ onSelectPrompt, composer }: Props) {
   return (
     <View style={styles.root}>
       <View style={styles.intro}>
@@ -25,7 +24,7 @@ export const AgentChatStart = memo(function AgentChatStart({ onSelectPrompt, com
         </ThemedText>
       </View>
       {composer}
-      {turn ?? <AgentPromptList onSelect={onSelectPrompt} />}
+      <AgentPromptList onSelect={onSelectPrompt} />
     </View>
   );
 });

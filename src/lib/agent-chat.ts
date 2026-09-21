@@ -112,6 +112,184 @@ export function conversationRoute(id: string): `/agent/${string}` {
 }
 
 // ---------------------------------------------------------------------------
+// conversa nova: a tela abre no toque
+// ---------------------------------------------------------------------------
+
+/**
+ * Abre a conversa nova NO TOQUE, sem esperar o servidor.
+ *
+ * O `id` da conversa e o `client_message_id` nascem juntos aqui e viajam juntos
+ * em todo retry — regenerar um sem o outro faria o servidor ver outra conversa
+ * (404) ou outro turno (duplicata). A ordem é o contrato: o cache é semeado
+ * ANTES do envio (a tela chega já com a mensagem) e a navegação não espera a
+ * promessa do envio — era essa espera que a queixa descrevia.
+ */
+export function abrirConversaNova(
+  content: string,
+  deps: {
+    gerarId: () => string;
+    semear: (id: string, turno: { clientMessageId: string; content: string }) => void;
+    enviar: (v: { id: string; clientMessageId: string; content: string }) => unknown;
+    navegar: (id: string) => void;
+  },
+): { id: string; clientMessageId: string } {
+  const id = deps.gerarId();
+  const clientMessageId = deps.gerarId();
+  deps.semear(id, { clientMessageId, content });
+  deps.enviar({ id, clientMessageId, content });
+  deps.navegar(id);
+  return { id, clientMessageId };
+}
+
+export interface MensagemLocal {
+  id: string;
+  client_message_id: string;
+  role: 'user';
+  content: string;
+  status: 'processing' | 'completed' | 'failed';
+  created_at: string;
+  error_code?: string | null;
+  /** Só na mensagem local: o status HTTP que a derrubou, para `retryPolicyFor`. */
+  error_status?: number | null;
+}
+
+/**
+ * O cache de mensagens de uma conversa que ainda não voltou do servidor.
+ *
+ * No formato REAL do `useInfiniteQuery` — outro formato quebraria a tela na
+ * primeira leitura. SEM `sequence` (quem numera é o banco) e com `created_at`,
+ * que ancora o teto de 5 minutos do "Pensando…".
+ */
+export function sementeDaConversa(clientMessageId: string, content: string, agora = new Date()) {
+  const mensagem: MensagemLocal = {
+    id: `local:${clientMessageId}`,
+    client_message_id: clientMessageId,
+    role: 'user',
+    content,
+    status: 'processing',
+    created_at: agora.toISOString(),
+  };
+  return { pages: [{ items: [mensagem], next_cursor: null }], pageParams: [null] };
+}
+
+interface ComSeq {
+  id: string;
+  sequence?: number;
+  client_message_id?: string | null;
+}
+
+/** Só mensagem local (sem `sequence`) no cache: o servidor ainda não tem o que devolver. */
+function soLocal(itens: readonly { sequence?: number }[]): boolean {
+  return itens.length > 0 && itens.every((m) => m.sequence == null);
+}
+
+/**
+ * O histórico deve ir ao servidor?
+ *
+ * Cache VAZIO busca — é a conversa aberta a frio. Cache só com a mensagem local
+ * não busca: a conversa pode nem existir ainda, e um GET ali voltaria 404 ou
+ * vazio por cima da mensagem que a pessoa acabou de mandar.
+ */
+export function historicoPrecisaBuscar(itens: readonly { sequence?: number }[]): boolean {
+  return !soLocal(itens);
+}
+
+/** "Tentar novamente": sem nada do servidor, recria (mesmo id + cmid); depois, envia. */
+export function retryDoTurno(itens: readonly { sequence?: number }[]): 'criar' | 'enviar' {
+  return soLocal(itens) ? 'criar' : 'enviar';
+}
+
+interface CacheDePaginas<M> {
+  pages: { items: M[]; next_cursor: string | null }[];
+  pageParams: unknown[];
+}
+
+/**
+ * Encaixa o turno que voltou no cache, sem refetch.
+ *
+ * Substitui por `id` em vez de acrescentar: o retry devolve as MESMAS
+ * mensagens. A mensagem local (`local:<cmid>`) sai quando a do servidor chega —
+ * mas só com cmid NÃO nulo: as respostas do agente têm `client_message_id` nulo,
+ * e sem essa guarda o filtro apagaria todas.
+ *
+ * A página que recebe é a PRIMEIRA: a paginação anda para trás, então
+ * `pages[0]` é a mais nova.
+ */
+export function aplicarTurno<M extends ComSeq>(
+  cache: CacheDePaginas<M> | undefined,
+  turno: { user_message: M; assistant_message: M | null },
+): CacheDePaginas<M> {
+  const novas = [turno.user_message, turno.assistant_message].filter(Boolean) as M[];
+  if (!cache) return { pages: [{ items: novas, next_cursor: null }], pageParams: [null] };
+  const cmid = turno.user_message.client_message_id;
+  const pages = cache.pages.map((p) => ({
+    ...p,
+    items: cmid
+      ? p.items.filter((m) => !(m.client_message_id === cmid && m.id !== turno.user_message.id))
+      : p.items,
+  }));
+  const primeira = pages[0];
+  const porId = new Map(primeira.items.map((m) => [m.id, m]));
+  for (const m of novas) porId.set(m.id, m);
+  pages[0] = { ...primeira, items: [...porId.values()] };
+  return { ...cache, pages };
+}
+
+/** Muda o estado da mensagem LOCAL daquele turno (retry → processing, erro → failed). */
+export function marcarTurnoLocal<M extends ComSeq>(
+  cache: CacheDePaginas<M>,
+  clientMessageId: string,
+  patch: { status: MensagemLocal['status']; error_code?: string | null; error_status?: number | null },
+): CacheDePaginas<M> {
+  return {
+    ...cache,
+    pages: cache.pages.map((p) => ({
+      ...p,
+      items: p.items.map((m) =>
+        m.id === `local:${clientMessageId}` ? { ...m, ...patch } : m,
+      ),
+    })),
+  };
+}
+
+/**
+ * O que a tela diz de um turno falho.
+ *
+ * `plan_limit` é o único código do servidor que não oferece retry: repetir daria
+ * 402 de novo. Os outros são transitórios — o retry reusa o mesmo UUID e o
+ * servidor recupera o turno pelo checkpoint em vez de reexecutar. Código que a
+ * tabela não conhece (erro HTTP da CRIAÇÃO, gravado só na mensagem local) cai em
+ * `retryPolicyFor`: 404 e 422 não têm retry, e o 404 da criação tira a pessoa da
+ * conversa — ela nunca existiu para este usuário.
+ */
+const FALHA: Record<string, { texto: string; retryable: boolean }> = {
+  plan_limit: { texto: 'Você usou todas as mensagens do plano este mês.', retryable: false },
+  rate_limit: { texto: 'Muitas mensagens seguidas. Espera um pouco.', retryable: true },
+  internal: { texto: 'Não consegui processar essa mensagem.', retryable: true },
+};
+
+export function falhaDoTurno(m: { error_code?: string | null; error_status?: number | null }): {
+  texto: string;
+  retryable: boolean;
+  sair: boolean;
+} {
+  const conhecida = FALHA[m.error_code ?? ''];
+  if (conhecida) return { ...conhecida, sair: false };
+  if (m.error_status == null) return { ...FALHA.internal, sair: false };
+  const { retryable } = retryPolicyFor({ status: m.error_status, code: m.error_code ?? undefined });
+  const texto =
+    m.error_status === 0 ? 'Sem conexão com o agente.' : FALHA.internal.texto;
+  return { texto, retryable, sair: m.error_code === 'conversation_not_found' };
+}
+
+/** Espelho de `derive_title` do servidor: 1ª linha não vazia, espaços colapsados, 48. */
+export function tituloProvisorio(content: string): string {
+  const primeira = content.split(/\r\n|\r|\n/).find((l) => l.trim()) ?? '';
+  const limpo = primeira.replace(/\s+/g, ' ').trim();
+  return limpo ? Array.from(limpo).slice(0, 48).join('') : 'Nova conversa';
+}
+
+// ---------------------------------------------------------------------------
 // paginação
 // ---------------------------------------------------------------------------
 

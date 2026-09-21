@@ -63,6 +63,8 @@ export interface AgentMessage {
   in_reply_to?: string | null;
   status: AgentMessageStatus;
   error_code?: string | null;
+  /** Só na mensagem LOCAL da criação: o status HTTP que a derrubou. */
+  error_status?: number | null;
   created_at?: string | null;
 }
 
@@ -208,10 +210,14 @@ export function listConversations(cursor?: string | null, limit = 20) {
   return agentFetch<Page<AgentConversation>>(`/internal/chat/conversations?${q}`);
 }
 
-export function createConversation(clientMessageId: string, content: string) {
+/**
+ * `id`, quando vem, é o da conversa que a tela JÁ abriu: o servidor cria com ele
+ * (ou devolve a mesma, no retry com o mesmo `clientMessageId`). Id alheio → 404.
+ */
+export function createConversation(clientMessageId: string, content: string, id?: string) {
   return agentFetch<AgentTurn>('/internal/chat/conversations', {
     method: 'POST',
-    body: JSON.stringify({ client_message_id: clientMessageId, content }),
+    body: JSON.stringify({ ...(id ? { id } : {}), client_message_id: clientMessageId, content }),
   });
 }
 

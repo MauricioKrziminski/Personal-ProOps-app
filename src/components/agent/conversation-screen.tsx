@@ -1,4 +1,5 @@
 import { FlashList, type FlashListRef } from '@shopify/flash-list';
+import { useQueryClient } from '@tanstack/react-query';
 import { Stack, router } from 'expo-router';
 import { memo, useCallback, useEffect, useMemo, useRef, useState, type ReactElement, type RefObject } from 'react';
 import { ActivityIndicator, Platform, Pressable, StyleSheet, View, type NativeScrollEvent, type NativeSyntheticEvent } from 'react-native';
@@ -22,6 +23,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { useToast } from '@/components/ui/toast';
 import { Radius, Space } from '@/design/tokens';
 import {
+  agentKeys,
   useAgentMessages,
   useCreateAgentConversation,
   useDeleteAgentConversation,
@@ -39,7 +41,13 @@ import {
   type AgentTurn,
 } from '@/lib/agent-api';
 import {
+  abrirConversaNova,
   conversationRoute,
+  falhaDoTurno,
+  newClientMessageId,
+  retryDoTurno,
+  sementeDaConversa,
+  tituloProvisorio,
   isNearChatEnd,
   parseUiActions,
   prependMessagePage,
@@ -61,19 +69,6 @@ interface Props {
 /** O lease do turno no servidor dura 300s. Depois disso ninguém está rodando. */
 const LEASE_MS = 300_000;
 
-/**
- * O que a tela diz de um turno que o SERVIDOR marcou como falho.
- *
- * `plan_limit` é o único que não oferece retry: repetir daria 402 de novo. Os
- * outros são transitórios — o retry reusa o mesmo UUID e o servidor recupera o
- * turno pelo checkpoint em vez de reexecutar.
- */
-const FALHA: Record<string, { texto: string; retryable: boolean }> = {
-  plan_limit: { texto: 'Você usou todas as mensagens do plano este mês.', retryable: false },
-  rate_limit: { texto: 'Muitas mensagens seguidas. Espera um pouco.', retryable: true },
-  internal: { texto: 'Não consegui processar essa mensagem.', retryable: true },
-};
-
 type Item =
   | { key: string; kind: 'user' | 'assistant'; message: AgentMessage }
   | { key: string; kind: 'processing' }
@@ -94,6 +89,7 @@ type Item =
 export function ConversationScreen({ conversationId, initialText = '', title, tabMode = false }: Props) {
   const theme = useTheme();
   const toast = useToast();
+  const qc = useQueryClient();
   const lista = useRef<FlashListRef<Item>>(null);
 
   const [texto, setTexto] = useState(initialText);
@@ -172,8 +168,10 @@ export function ConversationScreen({ conversationId, initialText = '', title, ta
 
   const noBanco = local ? espelho : ultimaDoUsuario;
   const noServidor = noBanco?.status === 'processing';
-  const rodando =
-    criar.isPending || enviar.isPending || resolver.isPending || noServidor;
+  // `criar` fica de fora: a criação navega no toque, e o estado dela chega à
+  // tela de destino pelo CACHE (`noServidor`). Contá-lo aqui deixaria o
+  // compositor da aba travado enquanto a conversa roda em outra tela.
+  const rodando = enviar.isPending || resolver.isPending || noServidor;
 
   const ultima = mensagens[mensagens.length - 1];
   const pergunta = ultima?.role === 'assistant' ? ultima.ui_payload : null;
@@ -204,49 +202,87 @@ export function ConversationScreen({ conversationId, initialText = '', title, ta
     (t: { clientMessageId: string; content: string }) => {
       setErro(null);
       setDesistiu(false);
-      const opcoes = {
-        onSuccess: (resultado: AgentTurn) => {
-          // `processing` significa que outro worker já roda ESTE turno. Não há
-          // nada a reenviar; o `Pensando...` continua porque a mensagem no
-          // cache continua `processing`, e a releitura o encerra.
-          if (resultado.status !== 'processing') turno.concluir();
-          if (!conversationId) {
-            const destino = conversationRoute(resultado.conversation.id);
-            // A raiz da aba precisa continuar na pilha para o Android voltar
-            // à conversa nova. A rota /agent/new, por sua vez, já ocupa um
-            // detalhe e deve ser substituída pelo diálogo recém-criado.
-            if (tabMode) router.push(destino);
-            else router.replace(destino);
-          }
+      enviar.mutate(
+        { clientMessageId: t.clientMessageId, content: t.content },
+        {
+          onSuccess: (resultado: AgentTurn) => {
+            // `processing` significa que outro worker já roda ESTE turno. Não há
+            // nada a reenviar; o `Pensando...` continua porque a mensagem no
+            // cache continua `processing`, e a releitura o encerra.
+            if (resultado.status !== 'processing') turno.concluir();
+          },
+          onError: (e: Error) => {
+            // A sessão acabou: o `signOut()` já rodou e o portão do `_layout` vai
+            // desmontar esta tela. Um toast aqui apareceria depois dela sumir.
+            if (e instanceof AgentAuthExpiredError) return;
+            const api = e as AgentApiError;
+            setErro(api);
+            if (api.policy?.paywall) router.push('/paywall');
+          },
         },
-        onError: (e: Error) => {
-          // A sessão acabou: o `signOut()` já rodou e o portão do `_layout` vai
-          // desmontar esta tela. Um toast aqui apareceria depois dela sumir.
-          if (e instanceof AgentAuthExpiredError) return;
-          const api = e as AgentApiError;
-          setErro(api);
-          if (api.policy?.paywall) router.push('/paywall');
-        },
-      };
-      const variaveis = { clientMessageId: t.clientMessageId, content: t.content };
-      if (conversationId) enviar.mutate(variaveis, opcoes);
-      else criar.mutate(variaveis, opcoes);
+      );
     },
-    [conversationId, criar, enviar, tabMode, turno],
+    [enviar, turno],
   );
 
   const submeter = useCallback(() => {
-    const t = turno.iniciar(texto.trim());
+    const conteudo = texto.trim();
     setTexto('');
-    disparar(t);
-  }, [disparar, texto, turno]);
+    if (conversationId) {
+      disparar(turno.iniciar(conteudo));
+      return;
+    }
+    // Conversa nova: a tela da conversa abre NO TOQUE, com a mensagem já no
+    // cache dela. Nenhum callback no `.mutate()` — o resultado chega pelo cache
+    // (callbacks do hook), e na aba um callback aqui abriria o paywall duas vezes.
+    abrirConversaNova(conteudo, {
+      gerarId: newClientMessageId,
+      semear: (id, t) =>
+        qc.setQueryData(agentKeys.messages(id), sementeDaConversa(t.clientMessageId, t.content)),
+      enviar: (v) => criar.mutate(v),
+      // A raiz da aba precisa continuar na pilha para o Android voltar à
+      // conversa nova. A rota /agent/new já ocupa um detalhe e é substituída.
+      navegar: (id) => (tabMode ? router.push(conversationRoute(id)) : router.replace(conversationRoute(id))),
+    });
+  }, [conversationId, criar, disparar, qc, tabMode, texto, turno]);
 
   const tentarDeNovo = useCallback(() => {
     // O MESMO UUID de antes. Gerar um novo criaria um segundo lançamento do que
     // talvez já tenha rodado no servidor — a idempotência mora nessa chave, e o
     // servidor responde a ela com `recover_turn` em vez de reexecutar.
-    if (emVoo) disparar(emVoo);
-  }, [disparar, emVoo]);
+    if (!emVoo) return;
+    if (conversationId && retryDoTurno(mensagens) === 'criar') {
+      // A criação ainda não voltou do servidor: repete o POST com o MESMO par
+      // (id da conversa + cmid). O estado sai do cache, como no primeiro envio.
+      setDesistiu(false);
+      criar.mutate({ id: conversationId, clientMessageId: emVoo.clientMessageId, content: emVoo.content });
+      return;
+    }
+    disparar(emVoo);
+  }, [conversationId, criar, disparar, emVoo, mensagens]);
+
+  // 404 na criação: este id não é uma conversa desta pessoa. Ficar aqui seria
+  // uma tela vazia sem saída; volta para o Agente e diz o que houve.
+  const saiu = useRef(false);
+  const sair = conversationId && noBanco?.status === 'failed' && falhaDoTurno(noBanco).sair;
+  useEffect(() => {
+    if (!sair || saiu.current) return;
+    saiu.current = true;
+    toast({ message: 'Não deu para abrir essa conversa.', tone: 'error' });
+    if (router.canGoBack()) router.back();
+    else router.replace('/agent');
+  }, [sair, toast]);
+
+  // O cabeçalho nasce com o título que o servidor VAI dar (mesma regra) e não
+  // some enquanto a lista de conversas é relida — sem salto de layout.
+  const provisorio =
+    mensagens.length > 0 && retryDoTurno(mensagens) === 'criar'
+      ? tituloProvisorio(mensagens[0].content)
+      : undefined;
+  const [tituloVisto, setTituloVisto] = useState<string | undefined>(undefined);
+  const tituloAtual = title ?? provisorio;
+  if (tituloAtual && tituloAtual !== tituloVisto) setTituloVisto(tituloAtual);
+  const titulo = tituloAtual ?? tituloVisto;
 
   const decidir = useCallback(
     (mensagem: AgentMessage, opcao: UiOption) => {
@@ -332,7 +368,7 @@ export function ConversationScreen({ conversationId, initialText = '', title, ta
       : desistiu
         ? { texto: 'Essa mensagem demorou demais.', retryable: true }
         : noBanco?.status === 'failed'
-          ? FALHA[noBanco.error_code ?? ''] ?? FALHA.internal
+          ? falhaDoTurno(noBanco)
           : null;
 
     if (falha) {
@@ -429,7 +465,7 @@ export function ConversationScreen({ conversationId, initialText = '', title, ta
         } : undefined}
       /> : null}
 
-      {conversationId && title ? <AgentThreadHeading title={title} /> : null}
+      {conversationId && titulo ? <AgentThreadHeading title={titulo} /> : null}
 
       {entradaDaAba ? (
         <KeyboardAwareScrollView
@@ -450,19 +486,6 @@ export function ConversationScreen({ conversationId, initialText = '', title, ta
                 awaitingAction={esperandoAcao}
               />
             }
-            turn={itens.length > 0 ? (
-              <View style={styles.entradaTurno}>
-                {itens.map((item) => (
-                  <Linha
-                    key={item.key}
-                    item={item}
-                    busy={rodando}
-                    onDecide={decidir}
-                    onRetry={tentarDeNovo}
-                  />
-                ))}
-              </View>
-            ) : undefined}
           />
         </KeyboardAwareScrollView>
       ) : (
@@ -476,7 +499,7 @@ export function ConversationScreen({ conversationId, initialText = '', title, ta
                   <Skeleton key={h} height={h} radius={Radius.md} />
                 ))}
               </View>
-            ) : historico.isError ? (
+            ) : historico.isError && !historico.data ? (
               <EmptyState
                 icon="exclamationmark.triangle"
                 title="Não consegui carregar essa conversa"
@@ -526,7 +549,7 @@ export function ConversationScreen({ conversationId, initialText = '', title, ta
       <RenameConversationSheet
         key={renomeando ? 'aberto' : 'fechado'}
         visible={renomeando}
-        initialTitle={title ?? ''}
+        initialTitle={titulo ?? ''}
         saving={renomear.isPending}
         onClose={() => setRenomeando(false)}
         onSave={(novo) => {
@@ -654,7 +677,6 @@ const styles = StyleSheet.create({
   raiz: { flex: 1 },
   lista: { flex: 1 },
   entradaScroll: { paddingBottom: Space.xxxl },
-  entradaTurno: { width: '100%' },
   messageFrame: { width: '100%', maxWidth: MaxContentWidth, alignSelf: 'center' },
   item: { paddingVertical: Space.lg },
   status: { paddingVertical: Space.lg, gap: Space.sm, alignItems: 'flex-start' },
