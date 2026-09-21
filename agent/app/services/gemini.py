@@ -61,7 +61,8 @@ from app.config import get_settings
 # lido em `llm()` ANTES do padrão do papel: bastava alguém chamar `llm()` sem
 # argumento — ou preencher `GEMINI_MODEL` no ambiente — para todo o router e todo
 # o parse migrarem do Lite para o Flash em silêncio, que é 25× menos cota grátis.
-# Ele saiu do caminho em 11/09/2026.
+# Ele saiu do caminho em 11/09/2026, voltou em `2c849a4` (19/09/2026) e saiu de
+# novo: só `GEMINI_MODEL_<PAPEL>` troca modelo, e só daquele papel.
 #
 # A divisão entre Lite e Flash veio de MEDIÇÃO, não de preferência (09/09/2026):
 # a suíte inteira no Lite deu 86/94, e uma das quedas é do lado que não pode cair
@@ -84,19 +85,17 @@ _avisados: set[str] = set()
 def modelo(papel: str) -> str:
     """O modelo de um papel — com a troca de TESTE/AMBIENTE aplicada, se houver.
 
-    - `GEMINI_MODEL`: se definido (no .env ou ambiente), define o modelo para
-      TODOS os papéis (100% dos fluxos do agente usam este modelo).
-    - `GEMINI_MODEL_<PAPEL>` (`GEMINI_MODEL_GATE`, `GEMINI_MODEL_PARSE`, ...):
-      troca especificamente o modelo daquele papel, com precedência sobre o global.
+    Só `GEMINI_MODEL_<PAPEL>` (`GEMINI_MODEL_GATE`, `GEMINI_MODEL_PARSE`, ...)
+    troca modelo, e só daquele papel. Não existe global: `GEMINI_MODEL` já foi
+    isso duas vezes e as duas vezes virou modelo trocado em produção sem
+    ninguém pedir — não reintroduzir.
 
-    Se nenhuma variável estiver definida, usa a tabela padrão `MODELOS`.
+    Se a variável do papel não estiver definida, usa a tabela padrão `MODELOS`.
     """
     if papel not in MODELOS:
         raise ValueError(f"papel de modelo desconhecido: {papel!r} (tenho {sorted(MODELOS)})")
     padrao = MODELOS[papel]
-    especifico = os.environ.get(f"GEMINI_MODEL_{papel.upper()}", "").strip()
-    global_mod = os.environ.get("GEMINI_MODEL", "").strip() or get_settings().gemini_model.strip()
-    trocado = especifico or global_mod
+    trocado = os.environ.get(f"GEMINI_MODEL_{papel.upper()}", "").strip()
     if not trocado or trocado == padrao:
         return padrao
     if papel not in _avisados:

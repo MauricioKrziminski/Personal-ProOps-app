@@ -354,12 +354,11 @@ deploy() {
   # devolve 401 em toda rota autenticada do app — dela sai o JWKS que valida o
   # JWT. Ficou de fora do primeiro deploy e a rota /internal/import-statement
   # respondia 401 achando que era permissão.
-  local supabase_url wa_alert_template gemini_model
+  local supabase_url wa_alert_template
   supabase_url="$(ler_env SUPABASE_URL)"
   [[ -n "$supabase_url" ]] || warn "SUPABASE_URL vazio em $ENV_FILE — /internal/* vai devolver 401"
   wa_alert_template="$(ler_env WA_ALERT_TEMPLATE)"
   wa_alert_template="${wa_alert_template:-personal_proops_alert}"
-  gemini_model="$(ler_env GEMINI_MODEL)"
 
   local numero url_prevista
   numero="$(gcloud projects describe "$PROJECT_ID" --format='value(projectNumber)')"
@@ -378,7 +377,7 @@ deploy() {
     --timeout 300 \
     --quiet \
     --set-secrets "$secrets" \
-    --set-env-vars "GCP_PROJECT=${PROJECT_ID},GCP_LOCATION=${REGION},TASKS_QUEUE=${QUEUE},TASKS_SA_EMAIL=${SA_EMAIL},DEBOUNCE_BACKEND=cloud_tasks,DEBOUNCE_SECONDS=3,WORKER_URL=${url_prevista}/worker/process-thread,OIDC_AUDIENCE=${url_prevista},SUPABASE_URL=${supabase_url},WA_ALERT_TEMPLATE=${wa_alert_template}${gemini_model:+,GEMINI_MODEL=${gemini_model}}"
+    --set-env-vars "GCP_PROJECT=${PROJECT_ID},GCP_LOCATION=${REGION},TASKS_QUEUE=${QUEUE},TASKS_SA_EMAIL=${SA_EMAIL},DEBOUNCE_BACKEND=cloud_tasks,DEBOUNCE_SECONDS=3,WORKER_URL=${url_prevista}/worker/process-thread,OIDC_AUDIENCE=${url_prevista},SUPABASE_URL=${supabase_url},WA_ALERT_TEMPLATE=${wa_alert_template}"
 
   URL="$(gcloud run services describe "$SERVICE" --project "$PROJECT_ID" \
           --region "$REGION" --format='value(status.url)')"

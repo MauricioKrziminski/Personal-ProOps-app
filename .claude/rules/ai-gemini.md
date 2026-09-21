@@ -134,6 +134,15 @@ Os equivalentes em Deno (`_shared/gemini.ts`, `process-jobs/index.ts`) foram **a
   `tests/test_schemas.py` quebra o build se um nome de modelo voltar a aparecer fora da
   tabela.
 
+  ⚠️ **E voltou** — commit `2c849a4` (19/09/2026) reintroduziu `GEMINI_MODEL` global (código,
+  `.env.example`, `agent/.env`, `agent/.env.production`), e ele chegou a rodar em produção e
+  staging (o gate de confirmação inteiro migrou para o Lite, a combinação que a suíte já tinha
+  medido reprovando "apaga todos"). Removido de novo em 21/09/2026 (Task 0 de
+  `docs/superpowers/sdd/2026-09-21-agente-sem-engessar-e-conversa-na-hora/`): `settings.gemini_model`
+  saiu de `config.py`, `gemini.modelo()` só lê `GEMINI_MODEL_<PAPEL>`, e a variável saiu do Cloud
+  Run dos dois serviços (`--remove-env-vars GEMINI_MODEL`). **Não recriar.** Se a necessidade
+  voltar a aparecer, o mecanismo já existe por papel — global é o que já quebrou duas vezes.
+
   | quando | comando |
   |---|---|
   | iterando em prompt | `evaluate_answer_forms.py --secao <x> --barato` (gate no Lite, de graça) |

@@ -143,15 +143,21 @@ def test_sem_variavel_de_ambiente_o_modelo_nao_muda(monkeypatch):
     assert gemini.modelo("gate") == "gemini-3.1-flash-lite"
 
 
-def test_gemini_model_global_troca_todos_os_papeis(monkeypatch):
+def test_gemini_model_global_nao_existe_mais(monkeypatch):
+    """`GEMINI_MODEL` era a arma carregada: voltou em `2c849a4` e saiu de novo.
+
+    Só `GEMINI_MODEL_<PAPEL>` troca modelo — o global não é mais lido em lugar
+    nenhum, nem pelo ambiente, nem por `settings.gemini_model` (que não existe
+    mais).
+    """
     from app.services import gemini
 
     monkeypatch.delenv("GEMINI_MODEL_GATE", raising=False)
     monkeypatch.setenv("GEMINI_MODEL", "gemini-3.1-flash-lite")
-    assert gemini.modelo("router") == "gemini-3.1-flash-lite"
-    assert gemini.modelo("parse") == "gemini-3.1-flash-lite"
-    assert gemini.modelo("batch") == "gemini-3.1-flash-lite"
-    assert gemini.modelo("gate") == "gemini-3.1-flash-lite"
+    assert gemini.modelo("router") == "gemini-3.1-flash-lite"  # já era o padrão
+    assert gemini.modelo("parse") == "gemini-3.1-flash-lite"  # já era o padrão
+    assert gemini.modelo("batch") == "gemini-3.1-flash-lite"  # já era o padrão
+    assert gemini.modelo("gate") == "gemini-3.7-flash"  # global NÃO alcança
 
 
 def test_papel_desconhecido_levanta_em_vez_de_cair_num_default():

@@ -34,9 +34,6 @@ class Settings(BaseSettings):
 
     # --- IA ---
     gemini_api_key: str = ""
-    # Vazio = usa os padrões de `services/gemini.MODELOS`. Se preenchido (ex: GEMINI_MODEL no .env),
-    # define o modelo usado por TODOS os papéis do agente (100% dos fluxos).
-    gemini_model: str = ""
     groq_api_key: str = ""
 
     # --- Cloud Tasks ---
