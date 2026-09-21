@@ -467,6 +467,24 @@ def secoes():
                  _so_cria("create_installment_purchase"), "create_installment"),
             ]
         ],
+        # Desparcelar (21/09/2026): "desparcela a compra da tv" propunha delete_transaction
+        # e apagava a compra. É update com installments=1 e o nome na busca. O adversarial
+        # é o outro lado: apagar continua apagar.
+        "corrigir/desparcelar": [
+            (t, checa, rotulo, lambda t=t: _acoes(t))
+            for t, checa, rotulo in [
+                *[(t, _so_corrige(installments=1,
+                                  description=lambda v, n=n: n in (v or "").lower()),
+                   f"update installments=1 description~{n}")
+                  for t, n in [("desparcela a compra da tv", "tv"),
+                               ("tira o parcelamento do celular", "celular"),
+                               ("a tv foi à vista, não parcelada", "tv"),
+                               ("junta as parcelas da geladeira", "geladeira")]],
+                ("apaga a compra da tv",
+                 lambda acoes: bool(acoes) and all(a.get("type") == "delete_transaction"
+                                                   for a in acoes), "delete_transaction"),
+            ]
+        ],
         "escolha/unidade do valor": [
             (t, lambda r, e=e: bool(r) and r.get("candidate_id") == e, f"->{e}",
              lambda t=t: _resposta(t, UNIDADE))

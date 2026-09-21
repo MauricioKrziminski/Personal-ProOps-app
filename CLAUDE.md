@@ -38,7 +38,9 @@ App mobile pessoal de **notas rápidas, lembretes e controle financeiro operado 
   elas em produção, `convert_transaction_to_installments` não existe
   (`supabase.rpc` volta `PGRST202` e o toast cai em "Não deu para parcelar") e o chip "À vista"
   bate na `update_installment_plan` antiga, cujo piso ainda é 2. **Nada corrompe; os dois botões
-  simplesmente não funcionam.**
+  simplesmente não funcionam.** O mesmo vale para o AGENTE: parcelar um lançamento e desparcelar
+  ("desparcela a compra da tv" → `update_installment_plan` com 1 parcela) dependem das duas —
+  sem elas a chamada falha (função ausente, ou o piso 2 da `update_installment_plan` antiga) e nada muda.
 
   ⚠️ **OTA/build do chat exige a revisão nova do agente em produção** (21/09/2026): o app novo
   manda `id` no `POST /internal/chat/conversations` para abrir a conversa na hora, e o agente

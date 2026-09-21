@@ -582,14 +582,16 @@ guarda de `parcela_travada` que já protege o número de parcelas: `1 <> N` cai 
 converter um lançamento JÁ BAIXADO uma operação de MÃO ÚNICA — daí o aviso destrutivo na tela.
 
 ⚠️ **"O agente não reparcela" mudou de escopo em 21/09/2026.** A exclusão que segue vale só para
-MUDAR O NÚMERO de parcelas (reparcelar de verdade, `p_installments` diferente do N atual, e o
-caso extremo "À vista" desta seção) — exclusão declarada em `docs/AGENTE-PARIDADE-COM-O-APP.md`,
+MUDAR O NÚMERO de parcelas para outro N ≥ 2 (reparcelar de verdade, `p_installments` diferente
+do N atual) — exclusão declarada em `docs/AGENTE-PARIDADE-COM-O-APP.md`,
 com os dois motivos (o teto de 252 do `FinanceAction`, sem campo para N novo, e o fato de uma
 frase de uma linha reescrever N linhas de dinheiro sem mostrar o contrato). **Corrigir o TOTAL da
 compra (mesmo N) o agente FAZ**, pela mesma `update_installment_plan`, perguntando antes se o
 valor dito é o total ou por parcela (`amount_unit`). Renomear a série, apagar a compra inteira e,
 desde a mesma data, **parcelar um lançamento avulso que já existe** (`convert_transaction_to_installments`,
-cartão obrigatório) continuam valendo por lá.
+cartão obrigatório) continuam valendo por lá. **E desde 21/09/2026 o agente DESPARCELA** — o
+"À vista" desta seção, `update_installment_plan` com `p_installments = 1` (`finance._desparcelar`),
+com as mesmas recusas do banco levantadas antes do SIM (ver `agent.md`).
 
 ## Projeção de fluxo de caixa
 

@@ -160,6 +160,17 @@ Ele foi removido (`agent/app/tools/finance.py:856`); dar baixa é caminho de `ma
 - **Recusas antes do SIM, não depois:** várias parcelas no snapshot, parcela travada (paga ou em
   fatura fechada/paga em parte), data ou conta da compra inteira. `policy.erro_de_correcao` roda
   no `gate` e de novo dentro do helper de unidade (no empate a data só some depois da escolha).
+- **Desparcelar É correção, nunca apagar** (21/09/2026, *"desparcelar tem que tirar a parcela do
+  lançamento"*). "desparcela a compra da tv" propunha `delete_transaction` e apagava a compra.
+  Hoje é `update_transaction` com `installments = 1` (sem campo novo) sobre o PLANO: o resolvedor
+  busca direto em `installment_plans` (fora da janela dos 40) e congela total, data da parcela 1,
+  cartão e a trava (`private.parcela_travada`); a frase do SIM diz o efeito inteiro, e
+  `finance._desparcelar` chama `update_installment_plan(..., 1, ...)` com os 8 argumentos
+  atuais — a parcela 1 fica com o total e o MESMO id, o plano some. Recusas antes do SIM:
+  parcela travada, valor novo junto ("desparcela primeiro, depois corrige o valor"; nome e
+  categoria entram junto, a RPC os grava), data/conta. Sobre linha AVULSA, o 1 sozinho é "já é
+  à vista"; com outra correção junto ele é ruído e a correção segue. **Reparcelar para outro N
+  continua exclusão** (`MUDAR_PARCELAS`).
 
 ## Human-In-The-Loop
 

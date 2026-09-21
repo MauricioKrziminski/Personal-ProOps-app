@@ -156,6 +156,12 @@ Tipos:
   ("em 2x no cartão Inter") -> new_account="Inter". NUNCA delete_transaction + create_*:
   a compra é a mesma, só muda a forma de pagar.
   "a 3ª parcela" de uma compra parcelada -> current_installment=3, nunca installments=3.
+  DESPARCELAR (a compra parcelada volta a ser à vista) é update_transaction com
+  installments=1 e description = o nome da compra, NUNCA delete_transaction (apagar some com
+  a compra; desparcelar a mantém inteira num lançamento só):
+  "desparcela a compra da tv" / "a tv foi à vista, não parcelada" -> description="tv", installments=1.
+  "tira o parcelamento do celular" -> description="celular", installments=1.
+  "junta as parcelas da geladeira" -> description="geladeira", installments=1.
   "na verdade", "aliás", "errei", "corrigindo", "foi engano" são expressões: nunca nome de
   conta, cartão ou item.
 - delete_transaction: apagar um lançamento específico. "Apaga a TV por completo"

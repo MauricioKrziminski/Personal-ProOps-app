@@ -236,8 +236,9 @@ CASOS = [
          [S("mark_paid", w="celular", scope="first:3")]),
         ("comprei um fone em 3x", (), DUVIDA),
         ("comprei uma bike em 5x de 200", (), DUVIDA),  # sem cartão: pergunta
-        ("na verdade foi à vista", H_TV, TETO("update_transaction", 1)),
-        ("desparcela a compra da tv", (), TETO("update_transaction", 1)),
+        # desparcelar (21/09/2026): update com 1 parcela, nunca delete
+        ("na verdade foi à vista", H_TV, [S("update_transaction", inst=1)]),
+        ("desparcela a compra da tv", (), [S("update_transaction", w="tv", inst=1)]),
         ("quita todas as parcelas da geladeira", (), [S("mark_paid", w="geladeira", scope="all")]),
         ("comprei um ar condicionado de 2.400 em 12 vezes no cartão", (),
          [S("create_installment_purchase", amount=240000, inst=12, noacc=True)]),
