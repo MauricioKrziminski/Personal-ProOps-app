@@ -42,6 +42,7 @@ import { financeErrorMessage, installmentHistory } from '@/lib/finance-form';
 import {
   autoConfirmHint,
   autoConfirmLabel,
+  caixaLabels,
   dueFieldHint,
   dueFieldLabel,
 } from '@/lib/settle-labels';
@@ -740,9 +741,15 @@ function TransactionForm({ editing }: { editing?: Transaction }) {
                   name="pending"
                   render={({ field }) => (
                     <Segmented
+                      /*
+                        ⚠️ **Fala de CAIXA, não de tempo.** Era "Já aconteceu | Ainda vai
+                        acontecer", e o tempo é a coisa errada para descrever esta coluna: a
+                        compra de cartão de ontem aconteceu E está `pending`. Quem responde
+                        "aconteceu?" agora é a pílula da lista, pela data.
+                      */
                       options={[
-                        { value: 'no', label: 'Já aconteceu' },
-                        { value: 'yes', label: 'Ainda vai acontecer' },
+                        { value: 'no', label: caixaLabels(kind).feito },
+                        { value: 'yes', label: caixaLabels(kind).aFazer },
                       ]}
                       value={field.value ? 'yes' : 'no'}
                       onChange={(v) => field.onChange(v === 'yes')}

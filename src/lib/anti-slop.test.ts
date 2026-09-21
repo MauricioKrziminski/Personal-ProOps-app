@@ -1011,3 +1011,31 @@ test('header translúcido na raiz, nenhum título grande, nenhuma tela opaca por
   assert.deepEqual(offenders(/headerLargeTitle(Enabled)?\s*:/), []);
   assert.deepEqual(offenders(/headerTransparent\s*:\s*false/), []);
 });
+
+/**
+ * ⚠️ **Nenhuma tela de finanças decide "previsto" a partir do `status`.**
+ *
+ * A régua é a de `finance.md` e já estava escrita em `finance/invoice/[id].tsx`: compra de cartão
+ * fica `pending` até a FATURA ser paga, então o `status` chama de "previsto" a compra que a
+ * pessoa fez semana passada. A queixa foi literal (19/09/2026). Quem responde isso é
+ * `estadoDaLinha` (`src/lib/settle-labels.ts`), e ele olha a DATA.
+ *
+ * Esta regra existe porque a condição já esteve copiada em quatro telas com três respostas
+ * diferentes — é a mesma lição do `settle-labels.ts`, que nasceu de quatro cópias de
+ * `status === 'pending'` decidindo se o botão dizia "Paguei" ou "Recebi".
+ *
+ * O que continua PERMITIDO: `status === 'pending'` para decidir a AÇÃO de dar baixa, e o filtro
+ * de status da lista. O que a regra proíbe é ele virar rótulo.
+ */
+test('nenhuma tela decide "previsto" pelo status', () => {
+  const previstoPorStatus =
+    /const\s+(previst[oa]|prevista|atrasad[oa])\s*=\s*[\w.]*status\s*[=!]==?\s*'(pending|cleared)'/;
+  const encontrados = offenders(previstoPorStatus).filter((linha) =>
+    linha.startsWith('src/app/finance') || linha.startsWith('src/app/(tabs)'),
+  );
+  assert.deepEqual(
+    encontrados,
+    [],
+    `"previsto" sai de estadoDaLinha() (settle-labels.ts), nunca do status:\n${encontrados.join('\n')}`,
+  );
+});

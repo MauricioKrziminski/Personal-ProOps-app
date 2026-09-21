@@ -34,6 +34,7 @@ import {
 import { formatBRL, formatDateBR, localISODate } from '@/hooks/use-items';
 import { brToISO, isValidBRDate, isoToBR } from '@/lib/dates';
 import { financeErrorMessage } from '@/lib/finance-form';
+import { estadoDaLinha } from '@/lib/settle-labels';
 import { useToast } from '@/components/ui/toast';
 import { confirmDestructive, showItemActions } from '@/lib/item-actions';
 import { useTheme } from '@/hooks/use-theme';
@@ -143,6 +144,9 @@ export default function InstallmentsScreen() {
   /** Qual `?edit=` já foi consumido — sem isto, fechar o sheet reabriria no render seguinte. */
   const [edicaoAberta, setEdicaoAberta] = useState<string | null>(null);
   const volta = useVoltarQuandoFechar();
+  // Congelado na montagem, como em `transactions.tsx`: todas as parcelas da tela são julgadas
+  // pelo MESMO "hoje".
+  const [hoje] = useState(() => localISODate());
 
   const contaPorId = useMemo(() => {
     const mapa = new Map<string, string>();
@@ -444,39 +448,56 @@ export default function InstallmentsScreen() {
             layout={LinearTransition.duration(Motion.duration.base)}
             entering={FadeInDown.duration(Motion.duration.base)}
             style={styles.parcelas}>
-            {parcelas.map((parcela) => (
-              <Pressable
-                key={parcela.id}
-                accessibilityRole="button"
-                accessibilityLabel={`Parcela ${parcela.installment_no ?? ''} de ${plano.installments}, ${formatBRL(parcela.amount_cents)}, ${parcela.status === 'cleared' ? 'paga' : 'prevista'}, ${formatDateBR(parcela.occurred_at)}`}
-                onPress={() =>
-                  router.push({
-                    pathname: '/finance/[txId]',
-                    params: { txId: parcela.id, month: parcela.occurred_at.slice(0, 7) },
-                  })
-                }>
-                {({ pressed }) => (
-                  <View
-                    style={[
-                      styles.parcela,
-                      { backgroundColor: pressed ? theme.backgroundSelected : 'transparent' },
-                    ]}>
-                    <ThemedText type="small" style={tabular}>
-                      {parcela.installment_no ?? '—'}/{plano.installments} ·{' '}
-                      {formatDateBR(parcela.occurred_at)}
-                    </ThemedText>
-                    <View style={styles.parcelaValor}>
-                      <ThemedText
-                        type="small"
-                        themeColor={parcela.status === 'cleared' ? 'success' : 'textSecondary'}>
-                        {parcela.status === 'cleared' ? 'paga' : 'prevista'}
+            {parcelas.map((parcela) => {
+              /*
+                A parcela de cartão fica `pending` até a fatura ser paga: chamar de "prevista" a
+                parcela do mês passado é a mesma mentira que a lista de Lançamentos contava.
+
+                ⚠️ `InstallmentParcel` não tem `due_at`, e o tipo de `estadoDaLinha` o exige desde
+                a Tarefa 2 — escrito assim de propósito: parcela de compra é sempre despesa. A
+                consequência é real: uma parcela sem cartão e com data passada agora lê
+                "atrasada", onde antes lia "prevista". É o certo — ninguém a pagou.
+              */
+              const estado = estadoDaLinha({ ...parcela, kind: 'expense', due_at: null }, hoje);
+              const rotulo =
+                parcela.status === 'cleared' ? 'paga'
+                : estado === 'atrasado' ? 'atrasada'
+                : estado === 'previsto' ? 'prevista'
+                : 'na fatura';
+              return (
+                <Pressable
+                  key={parcela.id}
+                  accessibilityRole="button"
+                  accessibilityLabel={`Parcela ${parcela.installment_no ?? ''} de ${plano.installments}, ${formatBRL(parcela.amount_cents)}, ${rotulo}, ${formatDateBR(parcela.occurred_at)}`}
+                  onPress={() =>
+                    router.push({
+                      pathname: '/finance/[txId]',
+                      params: { txId: parcela.id, month: parcela.occurred_at.slice(0, 7) },
+                    })
+                  }>
+                  {({ pressed }) => (
+                    <View
+                      style={[
+                        styles.parcela,
+                        { backgroundColor: pressed ? theme.backgroundSelected : 'transparent' },
+                      ]}>
+                      <ThemedText type="small" style={tabular}>
+                        {parcela.installment_no ?? '—'}/{plano.installments} ·{' '}
+                        {formatDateBR(parcela.occurred_at)}
                       </ThemedText>
-                      <Money cents={parcela.amount_cents} variant="subhead" />
+                      <View style={styles.parcelaValor}>
+                        <ThemedText
+                          type="small"
+                          themeColor={parcela.status === 'cleared' ? 'success' : 'textSecondary'}>
+                          {rotulo}
+                        </ThemedText>
+                        <Money cents={parcela.amount_cents} variant="subhead" />
+                      </View>
                     </View>
-                  </View>
-                )}
-              </Pressable>
-            ))}
+                  )}
+                </Pressable>
+              );
+            })}
             {plano.last_installment_cents !== plano.installment_cents ? (
               <ThemedText type="footnote" themeColor="textSecondary" style={styles.nota}>
                 A última parcela fecha a conta com os centavos da divisão.

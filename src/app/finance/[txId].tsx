@@ -36,7 +36,7 @@ import {
 import { useTelaPronta } from '@/hooks/use-tela-pronta';
 import { formatBRL, formatDateBR, localISODate } from '@/hooks/use-items';
 import { confirmDestructive } from '@/lib/item-actions';
-import { dueLabel, settleDone, settleHint, settleLabel } from '@/lib/settle-labels';
+import { dueLabel, estadoDaLinha, settleDone, settleHint, settleLabel } from '@/lib/settle-labels';
 import { useAdaptiveWindow } from '@/hooks/use-adaptive-window';
 
 /**
@@ -254,6 +254,7 @@ export default function TransactionDetailScreen() {
   const title = tx.description || tx.merchant || tx.category || 'Lançamento';
   const created = tx.created_at.slice(0, 10);
   const signedAmount = tx.kind === 'expense' ? -tx.amount_cents : tx.amount_cents;
+  const hoje = localISODate();
 
   const mainContent = (
     <>
@@ -277,7 +278,20 @@ export default function TransactionDetailScreen() {
 
       {/* Previsto: a única faixa de status. `cleared` não precisa de rótulo. */}
       {tx.status === 'pending' ? (
-        <Section title="Ainda não aconteceu">
+        <Section
+          /*
+           * ⚠️ A CONDIÇÃO é o `status` — esta seção carrega o botão de dar baixa, e o dinheiro de
+           * uma compra de cartão ainda não saiu. O que o `estadoDaLinha` decide é só o TÍTULO:
+           * "Ainda não aconteceu" em cima de uma compra de semana passada era a mesma mentira da
+           * pílula da lista.
+           */
+          title={
+            estadoDaLinha(tx, hoje) === 'atrasado'
+              ? 'Passou da data'
+              : estadoDaLinha(tx, hoje) === 'previsto'
+                ? 'Ainda não aconteceu'
+                : 'Já aconteceu, mas ainda não saiu do caixa'
+          }>
           <Row
             title={dueLabel(tx.kind, tx.due_at ? formatDateBR(tx.due_at) : null, {
               onCard: tx.invoice_id !== null,

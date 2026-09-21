@@ -42,6 +42,7 @@ import {
 import { formatBRL, formatDateBR, localISODate } from '@/hooks/use-items';
 import { formatNumberBR } from '@/lib/dates';
 import { confirmDestructive } from '@/lib/item-actions';
+import { estadoDaLinha } from '@/lib/settle-labels';
 import { STATUS_DA_FATURA } from '@/lib/card-status';
 import { accountLabel } from '@/lib/accounts';
 import { AccountPicker } from '@/components/finance/account-picker';
@@ -550,7 +551,7 @@ export default function InvoiceScreen() {
             )}>
             <Section title={formatDateBR(item.data)}>
               {item.itens.map((tx) => {
-                const prevista = tx.status === 'pending';
+                const prevista = estadoDaLinha(tx, hoje) !== null;
                 const parcela =
                   tx.installment_no && tx.installment_plan_id ? `${tx.installment_no}ª parcela` : null;
                 return (

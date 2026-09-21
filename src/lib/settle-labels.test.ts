@@ -6,7 +6,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-import { dueInline, dueLabel, settleHint, settleLabel, estadoDaLinha } from './settle-labels.ts';
+import { caixaLabels, dueInline, dueLabel, settleHint, settleLabel, estadoDaLinha } from './settle-labels.ts';
 
 const AQUI = path.dirname(fileURLToPath(import.meta.url));
 
@@ -34,6 +34,12 @@ test('kind ausente cai no rótulo de despesa, não em texto vazio', () => {
   for (const valor of [null, undefined, '']) {
     assert.equal(settleLabel(valor), 'Paguei');
   }
+});
+
+test('caixaLabels: receita CAI, despesa SAI', () => {
+  assert.deepEqual(caixaLabels('income'), { feito: 'Já caiu', aFazer: 'Ainda vai cair' });
+  assert.deepEqual(caixaLabels('expense'), { feito: 'Já saiu do caixa', aFazer: 'Ainda vai sair' });
+  assert.deepEqual(caixaLabels('transfer'), { feito: 'Já foi', aFazer: 'Ainda vai ser' });
 });
 
 test('receita não vence — ela é esperada', () => {

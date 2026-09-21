@@ -45,7 +45,7 @@ import { useTelaPronta } from '@/hooks/use-tela-pronta';
 import { formatBRL, formatDateBR, localISODate } from '@/hooks/use-items';
 import { mesmoMes } from '@/lib/dates';
 import { confirmDestructive } from '@/lib/item-actions';
-import { dueInline, settleDone, settleLabel } from '@/lib/settle-labels';
+import { dueInline, estadoDaLinha, settleDone, settleLabel } from '@/lib/settle-labels';
 import { useDebounced } from '@/hooks/use-debounced';
 import { useTheme, useScheme } from '@/hooks/use-theme';
 import { accountLabel } from '@/lib/accounts';
@@ -77,17 +77,15 @@ const KIND_OPTIONS = [
 ] as const satisfies readonly { value: TransactionKind | 'all'; label: string }[];
 
 /**
- * ⚠️ **"Efetivado" é palavra de extrato bancário, e o app já usava OUTRA para a mesma coisa.**
- *
- * O botão que muda este estado diz **"Paguei"** / **"Recebi"** (`settle-labels.ts`), e o
- * formulário chama os dois lados de **"Já aconteceu"** / **"Ainda vai acontecer"**
- * (`transaction-form.tsx`). Eram três vocabulários para um campo só (`status`). Estes chips
- * passam a falar a língua do formulário — quem filtra e quem cadastra dizem o mesmo.
+ * ⚠️ **O filtro é do `status`, e por isso ele NÃO diz "ainda vai acontecer".** Era essa a
+ * palavra, e ela virou mentira quando a pílula passou a sair da data: a compra de cartão de
+ * ontem é `pending` e JÁ aconteceu. O que o `status` responde é outra coisa — se o dinheiro já
+ * se mexeu.
  */
 const STATUS_OPTIONS: { value: 'all' | 'pending' | 'cleared'; label: string }[] = [
-  { value: 'all', label: 'Todos' },
-  { value: 'pending', label: 'Ainda vai acontecer' },
-  { value: 'cleared', label: 'Já aconteceu' },
+  { value: 'all', label: 'Tudo' },
+  { value: 'pending', label: 'Em aberto' },
+  { value: 'cleared', label: 'Concluído' },
 ];
 
 /** Rótulo da ORIGEM como filtro. `SOURCE_LABEL` é o subtítulo da linha e deixa `app` vazio. */
@@ -174,6 +172,9 @@ export default function TransactionsScreen() {
   const [puxando, setPuxando] = useState(false);
   // Busca-enquanto-digita sem uma requisição por tecla — agora ela vai ao banco.
   const term = useDebounced(search.trim(), 250);
+  // Congelado na montagem: todas as linhas da lista são julgadas pelo MESMO "hoje". Lido por
+  // linha, duas vizinhas poderiam cair em dias diferentes na virada da meia-noite.
+  const [hoje] = useState(() => localISODate());
 
   /**
    * Deep link para uma tela JÁ montada.
@@ -691,14 +692,26 @@ export default function TransactionsScreen() {
               mesmo peso do nome do cartão — seis palavras cinzas em que só a primeira diz se
               aquilo aconteceu. Quem abre o app pela primeira vez não tem como saber qual olhar.
 
-              O "vence DD/MM" continua no subtítulo: ele é DETALHE do estado, não o estado.
+              ⚠️ **E o que ela diz sai da DATA, não do `status`** (`estadoDaLinha`, 20/09/2026).
+              Com `status === 'pending'` toda compra de cartão do mês aparecia como "previsto",
+              inclusive a de ontem — a queixa foi literal. A ação de dar baixa, logo abaixo,
+              continua sendo do `status`: o dinheiro dela ainda não saiu.
             */
-            const previsto = tx.status === 'pending';
+            const estado = estadoDaLinha(tx, hoje);
+            const emAberto = tx.status === 'pending';
+            /**
+             * ⚠️ **"na fatura de 10/10" NÃO pode sumir junto com a pílula.** Com o antigo
+             * `previsto = status === 'pending'`, a compra de cartão caía no ramo do `dueInline` e
+             * mostrava a data da fatura. Trocando a condição pela pílula, a compra de ontem
+             * perderia a data e ganharia a palavra solta "fatura" — o conserto tiraria a tag
+             * errada e levaria embora o único dado que restava na linha.
+             *
+             * Quem decide a PÍLULA é o estado (data); quem decide o SUBTÍTULO é o `status`, que é
+             * o que responde "esse dinheiro já saiu?".
+             */
             const badges = [
               tx.installment_no ? `parcela ${tx.installment_no}` : null,
-              // "na fatura de 10/09" já diz que é do cartão; a pílula solta viraria eco
-              tx.invoice_id && !previsto ? 'fatura' : null,
-              previsto
+              emAberto
                 ? dueInline(tx.kind, tx.due_at ? formatDateBR(tx.due_at) : null, {
                     onCard: tx.invoice_id !== null,
                   }).replace(/^previsto( · )?/, '')
@@ -772,23 +785,49 @@ export default function TransactionsScreen() {
                         router.push({ pathname: '/finance/[txId]', params: { txId: tx.id, month } }),
                     },
                     {
+                      /**
+                       * ⚠️ **Em parcela, "Editar" abre a COMPRA, não a linha** — a mesma régua de
+                       * `finance/[txId].tsx`. As duas telas respondiam coisas diferentes para a
+                       * mesma palavra, e o valor da parcela é do contrato desde 15/09/2026.
+                       */
                       label: 'Editar',
                       icon: 'pencil',
                       onPress: () =>
-                        router.push({
-                          pathname: '/finance/transaction-form',
-                          params: { id: tx.id, month },
-                        }),
+                        tx.installment_plan_id
+                          ? router.push({
+                              pathname: '/finance/installments',
+                              params: { edit: tx.installment_plan_id },
+                            })
+                          : router.push({
+                              pathname: '/finance/transaction-form',
+                              params: { id: tx.id, month },
+                            }),
                     },
                     { label: 'Apagar', icon: 'trash', destructive: true, onPress: () => confirmDelete(tx) },
                   ]}>
                   {({ onLongPress }) => (
                     <Row
                       title={tx.description || tx.merchant || tx.category || 'Sem descrição'}
-                      badge={previsto ? { label: 'previsto' } : undefined}
+                      /*
+                        ⚠️ `atrasado` leva `danger`. `design.md §2`: vermelho é semântica — "erro
+                        e atraso" —, e é a última alavanca de cor que este app tem. Atraso em
+                        cinza-neutro ao lado de um número é o estado que mais pede ação lido como
+                        o que menos pede.
+                      */
+                      badge={
+                        estado
+                          ? {
+                              label: estado,
+                              tone:
+                                estado === 'atrasado' ? 'danger'
+                                : estado === 'não caiu' ? 'warning'
+                                : undefined,
+                            }
+                          : undefined
+                      }
                       subtitle={[...badges, ...context].join(' · ')}
                       icon={categoryIcon(tx.category, tx.kind)}
-                      accessibilityLabel={`${tx.description || tx.merchant || tx.category || 'Lançamento'}, ${formatBRL(tx.amount_cents)}, ${tx.kind === 'income' ? 'receita' : tx.kind === 'expense' ? 'despesa' : 'transferência'}, ${dayTitle(tx.occurred_at)}${tx.status === 'pending' ? ', previsto' : ''}`}
+                      accessibilityLabel={`${tx.description || tx.merchant || tx.category || 'Lançamento'}, ${formatBRL(tx.amount_cents)}, ${tx.kind === 'income' ? 'receita' : tx.kind === 'expense' ? 'despesa' : 'transferência'}, ${dayTitle(tx.occurred_at)}${estado ? `, ${estado}` : ''}`}
                       onLongPress={onLongPress}
                       trailing={
                         <Money

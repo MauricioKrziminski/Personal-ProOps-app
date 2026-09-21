@@ -141,6 +141,21 @@ export function unsettledLabel(bucket: string): string {
 }
 
 /**
+ * O interruptor "isto já se efetivou?" no formulário. Era "Já aconteceu | Ainda vai acontecer",
+ * e tempo é a régua errada para `transactions.status`: a compra de cartão de ontem aconteceu e
+ * continua `pending`. O que a coluna responde é se o dinheiro se MEXEU — e o verbo depende do
+ * lado, como em todo o resto deste arquivo.
+ */
+export function caixaLabels(kind: SettleKind | string | null | undefined): {
+  feito: string;
+  aFazer: string;
+} {
+  if (kind === 'income') return { feito: 'Já caiu', aFazer: 'Ainda vai cair' };
+  if (kind === 'transfer') return { feito: 'Já foi', aFazer: 'Ainda vai ser' };
+  return { feito: 'Já saiu do caixa', aFazer: 'Ainda vai sair' };
+}
+
+/**
  * O estado de uma linha de lançamento — a pílula que o `Row` desenha.
  *
  * ⚠️ **O corte é a DATA, nunca o `status`.** A régua é a de `finance.md` e já estava escrita em
