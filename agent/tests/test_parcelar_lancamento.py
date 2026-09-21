@@ -437,3 +437,35 @@ async def test_grafo_empate_escolhido_sem_cartao_para_antes_do_sim(monkeypatch, 
     assert "__interrupt__" not in final
     assert any("Em qual cartão?" in r for r in final["results"])
     assert "EXECUTOU" not in final["results"]
+
+
+@pytest.mark.asyncio
+async def test_grafo_wardogs_parcelado_na_verdade_foi_120_pergunta_a_unidade(monkeypatch, grafo):  # noqa: F811
+    """I2 — roteiro wardogs, 3º turno: criar → parcelar → "na verdade foi 120", sem nome.
+    O antecedente é a parcela 1; sem passar pelo plano, o update ia direto numa linha só,
+    pulando a pergunta total/parcela e a trava de parcela paga."""
+    from app.graph import nodes
+    from tests.test_hitl_flow import _for_actions_real
+
+    monkeypatch.setattr(nodes.resolve, "for_actions", _for_actions_real)
+    _banco(monkeypatch, [{**LINHA, "installment_plan_id": "plano-w", "plan_installments": 2}])
+    base = resolve.db.fetch
+    plano = {"tx_id": "tx-w", "plan_id": "plano-w", "description": "Wardogs",
+             "merchant": "Nuuvem", "total_cents": 10499, "installments": 2,
+             "first_occurred_at": "2026-09-20", "editaveis": 2, "travado_cents": 0}
+
+    async def fetch(sql, *args):
+        if "join public.installment_plans p on p.id = t.installment_plan_id" in sql:
+            assert "t.workspace_id = %s" in sql
+            return [plano]
+        return await base(sql, *args)
+
+    monkeypatch.setattr(resolve.db, "fetch", fetch)
+    estado = await grafo.ainvoke(
+        _estado([{"type": "update_transaction", "new_amount_cents": 12000}])
+        | {"text": "na verdade foi 120", "last_write_id": "tx-w"},
+        config={"configurable": {"thread_id": "wardogs-120"}},
+    )
+    pausa = _valor(estado)
+    assert pausa["kind"] == "choice" and pausa.get("purpose") == "amount_unit"
+    assert "EXECUTOU" not in estado.get("results", [])

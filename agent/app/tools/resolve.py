@@ -625,18 +625,24 @@ async def for_actions(
         # alvo direto, melhor que a busca literal por "%essa nota%" que era o
         # comportamento anterior. Estender exige uma consulta de existência por
         # fonte; vale a pena quando alguém reclamar de nota, não antes.
+        #
+        # ⚠️ O antecedente pode ser PARCELA de um plano (logo depois de "parcela em
+        # 2x"): nas ações que aceitam plano ele segue o caminho comum lá embaixo
+        # (`_com_plano`), senão "na verdade foi 120" corrigia UMA linha, sem a
+        # pergunta total/parcela e sem a trava de parcela paga.
+        ante = None
         if fonte == "transactions" and termo is None and not recente:
-            cands = await _antecedente_da_conversa(workspace_id, antecedente)
-            if cands:
-                saida.append({"status": "found", "candidates": cands,
+            ante = await _antecedente_da_conversa(workspace_id, antecedente)
+            if ante and acao.type not in _ACEITA_PLANO:
+                saida.append({"status": "found", "candidates": ante,
                               "table": "transactions"})
                 continue
 
         # Resolve bounded payment directly from plans, beyond the recent-40 window.
-        if acao.type == FinanceActionType.MARK_PAID or (
+        if not ante and (acao.type == FinanceActionType.MARK_PAID or (
             acao.type == FinanceActionType.UPDATE_TRANSACTION
             and (acao.installment_scope or acao.current_installment)
-        ):
+        )):
             from app.domain.installment_scope import scope_from_text
             from app.graph.schemas import InstallmentScope
 
@@ -672,7 +678,7 @@ async def for_actions(
         # transações: `por_transacao` só enxerga os 40 lançamentos mais recentes,
         # e as parcelas de uma compra antiga estão fora dessa janela justamente
         # quando alguém quer apagar tudo.
-        if acao.type in _ACEITA_PLANO and wants_whole_plan(bruto, texto_cru):
+        if not ante and acao.type in _ACEITA_PLANO and wants_whole_plan(bruto, texto_cru):
             estado, cands = await por_texto("planos", workspace_id, termo or "")
             if cands:
                 resolved = {
@@ -690,7 +696,9 @@ async def for_actions(
                 saida.append(resolved)
                 continue
 
-        if fonte == "transactions":
+        if ante:
+            estado, cands, tabela = "found", ante, "transactions"
+        elif fonte == "transactions":
             estado, cands = await por_transacao(workspace_id, acao, recente)
             tabela = "transactions"
         elif termo:

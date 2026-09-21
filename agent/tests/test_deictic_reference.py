@@ -74,7 +74,10 @@ async def test_esse_lancamento_aponta_para_o_que_a_conversa_criou(monkeypatch):
 
     monkeypatch.setattr(resolve.db, "fetch_one", fetch_one)
     # se cair na janela dos 40, o teste falha em vez de passar por acaso
-    async def nunca(*a, **kw):
+    # (a consulta de PLANO pode rodar: o antecedente pode ser parcela de um plano)
+    async def nunca(sql, *a, **kw):
+        if "join public.installment_plans p on p.id = t.installment_plan_id" in sql:
+            return []
         raise AssertionError("não devia varrer a janela: havia antecedente")
 
     monkeypatch.setattr(resolve.db, "fetch", nunca)
