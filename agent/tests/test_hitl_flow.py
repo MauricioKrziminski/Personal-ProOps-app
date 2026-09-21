@@ -1178,3 +1178,64 @@ async def test_par_trocar_de_cartao_no_aviso_de_limite_nao_monta_rascunho(monkey
     assert final["draft"] == {}
     assert "EXECUTOU" not in final.get("results", [])
     assert "Ainda não apaguei nem criei nada." in final["reply"]
+
+
+# ---------------------------------------------------------------------------
+# P4 (bateria de 21/09/2026): "foi 50" sem ninguém apontado pergunta o QUÊ
+# ---------------------------------------------------------------------------
+
+_CAFE_P4 = "11111111-1111-4111-8111-111111111111"
+
+
+def _banco_p4(monkeypatch):
+    from app import db
+
+    async def fetch_one(sql, *args):
+        if str(args[0]) == _CAFE_P4:
+            return {"id": _CAFE_P4, "kind": "expense", "amount_cents": 2000,
+                    "category": "café", "description": None, "occurred_at": "2026-09-20"}
+        return None
+
+    async def fetch(sql, *args):
+        if "installment_plans" in sql:
+            return []
+        # a janela dos recentes: se o resolvedor listasse, haveria o que escolher
+        return [{"id": f"tx{i}", "kind": "expense", "amount_cents": 1000 * i, "category": "x",
+                 "description": None, "occurred_at": "2026-09-1{}".format(i)} for i in range(1, 4)]
+
+    monkeypatch.setattr(db, "fetch_one", fetch_one)
+    monkeypatch.setattr(db, "fetch", fetch)
+
+
+@pytest.mark.asyncio
+async def test_foi_50_sem_antecedente_pergunta_o_que_corrigir(monkeypatch, grafo):
+    from app.graph import nodes
+
+    monkeypatch.setattr(nodes.resolve, "for_actions", _for_actions_real)
+    _banco_p4(monkeypatch)
+    cfg = {"configurable": {"thread_id": "p4-sem"}}
+    estado = await grafo.ainvoke(
+        _estado([{"type": "update_transaction", "new_amount_cents": 5000}])
+        | {"text": "foi 50", "last_write_id": ""},
+        config=cfg,
+    )
+    assert "__interrupt__" not in estado
+    assert "O que você quer corrigir?" in estado["reply"]
+    assert "EXECUTOU" not in estado["reply"]
+
+
+@pytest.mark.asyncio
+async def test_foi_50_com_antecedente_corrige_o_que_a_conversa_escreveu(monkeypatch, grafo):
+    from app.graph import nodes
+
+    monkeypatch.setattr(nodes.resolve, "for_actions", _for_actions_real)
+    _banco_p4(monkeypatch)
+    cfg = {"configurable": {"thread_id": "p4-com"}}
+    estado = await grafo.ainvoke(
+        _estado([{"type": "update_transaction", "new_amount_cents": 5000}])
+        | {"text": "foi 50", "last_write_id": _CAFE_P4},
+        config=cfg,
+    )
+    pausa = _pausa(estado)
+    assert pausa["kind"] == "confirmation"
+    assert "R$ 50,00" in pausa["summary"] and "café" in pausa["summary"]

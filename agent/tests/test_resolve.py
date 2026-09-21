@@ -615,3 +615,22 @@ async def test_tool_grava_na_conta_padrao_CONGELADA_e_confere_a_posse(monkeypatc
 
     ctx.target = {"default_account": {"id": None, "name": None}}
     assert await finance._conta_padrao(ctx) is None
+
+
+@pytest.mark.asyncio
+async def test_apagar_nota_sem_dizer_qual_pergunta_em_vez_de_listar(monkeypatch):
+    """P6 (bateria de 21/09/2026): um `delete_note` sem alvo não vira lista de notas."""
+    from app.graph.schemas import NotesAction, NotesActionType
+
+    async def fetch(sql, *args):
+        return [{"id": "n1", "title": "reunião", "content": "x", "created_at": "2026-09-20"},
+                {"id": "n2", "title": "mercado", "content": "y", "created_at": "2026-09-19"}]
+
+    monkeypatch.setattr(resolve.db, "fetch", fetch)
+    sem_alvo = NotesAction(type=NotesActionType.DELETE_NOTE)
+    (alvo,) = await resolve.for_actions("w1", [sem_alvo], "apaga a nota")
+    assert alvo["status"] == "none" and "Qual nota" in alvo["correction_error"]
+
+    # "a última" é pedido explícito de recência: segue resolvendo
+    (alvo,) = await resolve.for_actions("w1", [sem_alvo], "apaga a última nota")
+    assert "correction_error" not in alvo

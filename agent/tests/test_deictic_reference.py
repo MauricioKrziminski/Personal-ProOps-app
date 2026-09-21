@@ -108,7 +108,9 @@ async def test_sem_antecedente_continua_perguntando(monkeypatch):
         "ws", [_acao(description="esse lançamento")], "apague esse lançamento",
         antecedente=None,
     )
-    assert alvos[0]["status"] == "ambiguous"
+    # pergunta O QUÊ (21/09/2026): listar os 9 recentes era a lista "nada a ver"
+    assert alvos[0]["status"] == "none"
+    assert "O que você quer apagar?" in alvos[0]["correction_error"]
 
 
 @pytest.mark.asyncio
@@ -132,7 +134,8 @@ async def test_antecedente_ja_apagado_pergunta_em_vez_de_mirar_no_vazio(monkeypa
     alvos = await resolve.for_actions(
         "ws", [_acao(description="isso")], "apaga isso", antecedente=CAFE
     )
-    assert alvos[0]["status"] == "ambiguous"
+    assert alvos[0]["status"] == "none"
+    assert "O que você quer apagar?" in alvos[0]["correction_error"]
 
 
 @pytest.mark.asyncio

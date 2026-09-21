@@ -353,6 +353,17 @@ async def por_transacao(
     return veredito(linhas, _rotulo_tx, "transactions", _detalhe_tx)
 
 
+_SEM_ALVO_PERGUNTA = {
+    FinanceActionType.UPDATE_TRANSACTION:
+        "🤔 O que você quer corrigir? Me diz o nome, o valor ou a data. Ainda não mudei nada.",
+    FinanceActionType.DELETE_TRANSACTION:
+        "🤔 O que você quer apagar? Me diz o nome, o valor ou a data. Ainda não apaguei nada.",
+    NotesActionType.DELETE_NOTE:
+        "🤔 Qual nota você quer apagar? Me diz o assunto dela. Ainda não apaguei nada.",
+    NotesActionType.DELETE_REMINDER:
+        "🤔 Qual lembrete você quer cancelar? Me diz o assunto dele. Ainda não cancelei nada.",
+}
+
 # Ações em que "a compra inteira" é uma resposta possível.
 _ACEITA_PLANO = {
     FinanceActionType.DELETE_TRANSACTION,
@@ -637,6 +648,15 @@ async def for_actions(
                 saida.append({"status": "found", "candidates": ante,
                               "table": "transactions"})
                 continue
+            # "foi 50" sem pista, sem "o último" e sem antecedente (bateria de
+            # 21/09/2026): ninguém foi apontado. Pergunta o QUÊ — listar os 9
+            # recentes é a lista "nada a ver" de 15/09, e eleger um é deduzir.
+            if (not ante and acao.type in _SEM_ALVO_PERGUNTA
+                    and not (acao.amount_cents or acao.category or acao.occurred_at
+                             or acao.installment_scope or acao.current_installment)):
+                saida.append({"status": "none", "candidates": [],
+                              "correction_error": _SEM_ALVO_PERGUNTA[acao.type]})
+                continue
 
         # Resolve bounded payment directly from plans, beyond the recent-40 window.
         if not ante and (acao.type == FinanceActionType.MARK_PAID or (
@@ -704,6 +724,11 @@ async def for_actions(
         elif termo:
             estado, cands = await por_texto(fonte, workspace_id, termo)
             tabela = _FONTES[fonte]["table"]
+        elif acao.type in _SEM_ALVO_PERGUNTA and not recente:
+            # apagar nota/lembrete sem dizer qual (P6, 21/09/2026): pergunta, não lista
+            saida.append({"status": "none", "candidates": [],
+                          "correction_error": _SEM_ALVO_PERGUNTA[acao.type]})
+            continue
         else:
             # sem termo utilizável: mostra os recentes daquela fonte para escolher
             estado, cands = await por_texto(fonte, workspace_id, "")

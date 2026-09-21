@@ -173,7 +173,7 @@ async def test_whole_installment_plan_does_not_promise_account_correction(monkey
 
     monkeypatch.setattr(resolve, 'por_transacao', transaction)
     monkeypatch.setattr(resolve, '_com_plano', plans)
-    resolved = (await resolve.for_actions(WS, [action(new_account='Nubank')], 'muda a TV'))[0]
+    resolved = (await resolve.for_actions(WS, [action(description='TV', new_account='Nubank')], 'muda a TV'))[0]
     assert 'Editar a compra no app' in resolved['correction_error']
     assert 'new_account' not in resolved
 
