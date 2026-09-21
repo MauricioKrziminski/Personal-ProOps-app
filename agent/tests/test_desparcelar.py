@@ -361,3 +361,27 @@ async def test_grafo_empate_escolha_de_plano_travado_recusa_antes_de_escrever(mo
     assert "__interrupt__" not in final
     assert any("A compra TV sala tem parcela já paga" in r for r in final["results"])
     assert "EXECUTOU" not in final["results"]
+
+
+@pytest.mark.asyncio
+async def test_grafo_empate_misto_escolhendo_a_avulsa_diz_que_ja_e_a_vista(monkeypatch, grafo):  # noqa: F811
+    from app.graph import nodes
+
+    plano = _plano()["candidates"][0]
+    avulsa = {"id": "tx-tv", "label": "gasto de R$ 3.000,00 em *eletrônicos* (TV)",
+              "table": "transactions", "when": "05/09/2026"}
+
+    async def empate(workspace_id, acoes, texto_cru, antecedente=None):
+        return [{"table": "transactions", "status": "ambiguous", "candidates": [plano, avulsa]}]
+
+    monkeypatch.setattr(nodes.resolve, "for_actions", empate)
+    cfg = {"configurable": {"thread_id": "desparcelar-empate-misto"}}
+    estado = await grafo.ainvoke(
+        _estado([{"type": "update_transaction", "description": "tv", "installments": 1}]),
+        config=cfg)
+    assert _valor(estado)["kind"] == "choice"
+    final = await grafo.ainvoke(Command(resume={"approved": True, "candidate_id": "tx-tv"}),
+                                config=cfg)
+    assert "__interrupt__" not in final
+    assert "Esse lançamento já é à vista. Ainda não mudei nada." in final["results"]
+    assert "EXECUTOU" not in final["results"]

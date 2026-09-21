@@ -11,6 +11,7 @@ from app.config import get_settings
 from app.domain.correcao_plano import (
     CONTA_DO_PLANO,
     DATA_DO_PLANO,
+    JA_A_VISTA,
     MUDAR_PARCELAS,
     PARCELA_TRAVADA,
     SEM_CORRECAO,
@@ -277,6 +278,12 @@ def erro_de_correcao(action, target: dict | None) -> str | None:
     if not any([action.new_amount_cents is not None, action.new_category, action.new_occurred_at,
                 action.new_description, action.new_account, muda_parcelas, desparcela,
                 pede_desparcelar(action, target)]):
+        # linha AVULSA escolhida (inclusive num empate misto com uma compra): nada a desparcelar
+        if (e_desparcelar(action) and (target or {}).get("status") == "found" and cands
+                and cands[0].get("table", target.get("table")) == "transactions"
+                and not cands[0].get("plan_installments")
+                and not cands[0].get("installment_snapshot")):
+            return JA_A_VISTA
         return SEM_CORRECAO
     if n_plano is not None and muda_parcelas:
         return MUDAR_PARCELAS

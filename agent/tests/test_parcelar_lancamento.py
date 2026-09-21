@@ -238,9 +238,9 @@ def test_installments_diferente_do_plano_recusa():
         FinanceAction(type=UPD, installments=12), PLANO)
 
 
-def test_uma_parcela_sozinha_nao_e_correcao():
-    assert erro_de_correcao(FinanceAction(type=UPD, installments=1), ALVO_CONV).startswith(
-        "O que você quer mudar")
+def test_uma_parcela_sozinha_em_linha_avulsa_ja_e_a_vista():
+    assert erro_de_correcao(FinanceAction(type=UPD, installments=1), ALVO_CONV) == (
+        "Esse lançamento já é à vista. Ainda não mudei nada.")
 
 
 def test_erro_congelado_no_alvo_escolhido_volta():
