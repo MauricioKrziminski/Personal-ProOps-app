@@ -127,3 +127,98 @@ test('nenhuma tela escreve "Paguei" à mão', () => {
     `use settleLabel(tx.kind) em vez de cravar o rótulo: ${suspeitos.join(', ')}`,
   );
 });
+
+import { estadoDaLinha } from './settle-labels.ts';
+
+/**
+ * ⚠️ **"previsto" é DATA, nunca `status`.** A régua já estava escrita e aplicada em UMA tela
+ * (`finance/invoice/[id].tsx`): *"compra de cartão fica `pending` até a fatura ser paga, então
+ * filtrar por `cleared` chamaria de 'previsto' a compra que a pessoa fez semana passada"*. A
+ * lista de Lançamentos fazia o contrário, e a queixa foi literal (19/09/2026): *"veio com a tag
+ * previsto se hoje é 19 de setembro e ali está dia 15 e 14"*.
+ */
+const HOJE = '2026-09-19';
+
+test('compra de cartão que já aconteceu não é previsto, mesmo pendente', () => {
+  assert.equal(
+    estadoDaLinha(
+      { kind: 'expense', status: 'pending', occurred_at: '2026-09-15', due_at: '2026-10-10', invoice_id: 'fat-1' },
+      HOJE,
+    ),
+    null,
+  );
+});
+
+test('compra de cartão com data à frente continua previsto', () => {
+  assert.equal(
+    estadoDaLinha(
+      { kind: 'expense', status: 'pending', occurred_at: '2026-09-22', due_at: '2026-10-10', invoice_id: 'fat-1' },
+      HOJE,
+    ),
+    'previsto',
+  );
+});
+
+test('conta a pagar que venceu é ATRASADA, não prevista', () => {
+  assert.equal(
+    estadoDaLinha(
+      { kind: 'expense', status: 'pending', occurred_at: '2026-09-01', due_at: '2026-09-10', invoice_id: null },
+      HOJE,
+    ),
+    'atrasado',
+  );
+});
+
+test('conta que vence hoje ainda é prevista — vencer hoje não é atrasar', () => {
+  assert.equal(
+    estadoDaLinha(
+      { kind: 'expense', status: 'pending', occurred_at: '2026-09-01', due_at: HOJE, invoice_id: null },
+      HOJE,
+    ),
+    'previsto',
+  );
+});
+
+test('sem vencimento, quem decide é a data do lançamento', () => {
+  assert.equal(
+    estadoDaLinha({ kind: 'expense', status: 'pending', occurred_at: '2026-09-25', due_at: null, invoice_id: null }, HOJE),
+    'previsto',
+  );
+  assert.equal(
+    estadoDaLinha({ kind: 'expense', status: 'pending', occurred_at: '2026-09-10', due_at: null, invoice_id: null }, HOJE),
+    'atrasado',
+  );
+});
+
+test('receita que passou da data NÃO CAIU — ela não atrasa', () => {
+  /**
+   * ⚠️ Ninguém "deve" um salário. `finance.md` já fixou a palavra: a receita prevista vencida
+   * *"some do número, não da tela — continua em «O que entra» com a pílula «não caiu»"*. Escrever
+   * "atrasado" ali é o mesmo erro de vocabulário que fez este arquivo existir ("Paguei" em cima
+   * de uma receita).
+   */
+  assert.equal(
+    estadoDaLinha({ kind: 'income', status: 'pending', occurred_at: '2026-09-05', due_at: null, invoice_id: null }, HOJE),
+    'não caiu',
+  );
+  assert.equal(
+    estadoDaLinha({ kind: 'expense', status: 'pending', occurred_at: '2026-09-05', due_at: null, invoice_id: null }, HOJE),
+    'atrasado',
+  );
+});
+
+test('parcela de plano SEM cartão e com data passada lê atrasada', () => {
+  // A RPC de parcelamento aceita conta corrente, e ali não há fatura para segurar o estado. É a
+  // mudança de comportamento que o tipo obrigatório deixou à vista (antes lia "prevista").
+  assert.equal(
+    estadoDaLinha({ kind: 'expense', status: 'pending', occurred_at: '2026-09-05', due_at: null, invoice_id: null }, HOJE),
+    'atrasado',
+  );
+});
+
+test('lançamento efetivado não tem estado nenhum', () => {
+  assert.equal(
+    estadoDaLinha({ kind: 'expense', status: 'cleared', occurred_at: '2026-09-25', due_at: null, invoice_id: null }, HOJE),
+    null,
+  );
+});

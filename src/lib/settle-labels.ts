@@ -139,3 +139,52 @@ export function autoConfirmHint(
 export function unsettledLabel(bucket: string): string {
   return bucket === 'entrada' ? 'falta receber' : 'falta pagar';
 }
+
+/**
+ * O estado de uma linha de lançamento — a pílula que o `Row` desenha.
+ *
+ * ⚠️ **O corte é a DATA, nunca o `status`.** A régua é a de `finance.md` e já estava escrita em
+ * `finance/invoice/[id].tsx`: compra de cartão fica `pending` até a FATURA ser paga, então usar
+ * o status chama de "previsto" a compra que a pessoa fez semana passada. A queixa foi literal
+ * (19/09/2026): *"veio com a tag previsto se hoje é 19 de setembro e ali está dia 15 e 14"*.
+ *
+ * Três estados, e cada um responde uma coisa diferente:
+ *
+ * | estado | quando | o que ele diz |
+ * |---|---|---|
+ * | `null` | efetivado, **ou** compra de cartão que já aconteceu | nada a decidir. No cartão o subtítulo já escreve "na fatura de DD/MM", que é a informação que sobra |
+ * | `previsto` | ainda vai acontecer | conta na projeção, não no saldo |
+ * | `atrasado` | DESPESA que passou da data | é o que pede ação |
+ * | `não caiu` | RECEITA que passou da data | ninguém "deve" um salário — e é a palavra que
+ *   `finance.md` já usa para a receita prevista que some do número e fica na tela |
+ *
+ * ⚠️ **No cartão quem decide é `occurred_at`, e nunca `due_at`.** Ali o `due_at` é o vencimento da
+ * FATURA (o trigger `set_invoice` é dono da coluna): a compra de 15/09 tem `due_at` 10/10, e
+ * olhar para ele faria toda compra do mês parecer futura. Fora do cartão é o contrário —
+ * `due_at` É o vencimento daquela conta, e é ele que decide.
+ *
+ * ⚠️ **Isto NÃO substitui o `status` na ação de dar baixa.** "Paguei"/"Recebi" continua
+ * aparecendo para toda linha `pending`, inclusive a compra de cartão que já aconteceu: o dinheiro
+ * ainda não saiu, e dar baixa nela continua sendo uma coisa que existe.
+ */
+export type EstadoDaLinha = 'previsto' | 'atrasado' | 'não caiu' | null;
+
+export function estadoDaLinha(
+  tx: {
+    kind: string;
+    status: string;
+    occurred_at: string;
+    due_at: string | null;
+    invoice_id: string | null;
+  },
+  hoje: string,
+): EstadoDaLinha {
+  if (tx.status !== 'pending') return null;
+  // Datas ISO (`YYYY-MM-DD`) comparam como string — é como o resto do app já compara.
+  if (tx.invoice_id) return tx.occurred_at > hoje ? 'previsto' : null;
+  const quando = tx.due_at ?? tx.occurred_at;
+  if (quando >= hoje) return 'previsto';
+  // ⚠️ Receita não ATRASA — ela não CAIU. Ninguém "deve" um salário, e este arquivo nasceu
+  // justamente de quatro telas escrevendo "Paguei" em cima de uma receita.
+  return tx.kind === 'income' ? 'não caiu' : 'atrasado';
+}
