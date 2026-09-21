@@ -12,10 +12,10 @@ nome tinha passado.
 
 | | |
 |---|---|
-| mutações do app | 52 |
+| mutações do app | 53 |
 | já cobertas antes desta auditoria | 39 |
 | **lacunas fechadas aqui** | **4** |
-| fora do escopo por decisão, com motivo | 9 |
+| fora do escopo por decisão, com motivo | 10 |
 
 ## As quatro lacunas fechadas
 
@@ -477,6 +477,8 @@ total, número de parcelas, título, estabelecimento, categoria, conta e data da
 |---|---|---|
 | `useUpdateInstallmentPlan` — **nome, estabelecimento e categoria** da compra | sim, e já fazia | `update_transaction` com escopo `future` sobre uma parcela: `update_transaction_scoped` propaga os três para a série inteira |
 | `useUpdateInstallmentPlan` — **total e número de parcelas** | **não — exclusão declarada** | não cabe. `FinanceAction` está no teto MEDIDO de 252 (`probe_rename_schema.py`), e reparcelar pede DOIS campos novos que não existem em lugar nenhum (`new_total_cents`, `new_installments`) mais um alvo em `installment_plans` — as duas ampliações possíveis já foram medidas e recusadas (19×14 = 266, 18×15 = 270). O caminho, se virar pedido, é o catálogo de `ResourceAction` com `installment_plans` como recurso, e não somar campo aqui. |
+| `useUpdateInstallmentPlan` — **"À vista" (`p_installments = 1`, dissolve o plano)** | **não — mesma exclusão declarada** | mesmo motivo da linha acima: `new_installments = 1` é o mesmo campo que já não coube no teto de 252, e desfazer um parcelamento apaga N−1 linhas de dinheiro numa tacada só — a mesma confirmação de uma linha que o parágrafo abaixo já recusa para reparcelar. |
+| `useConvertToInstallments` (20/09/2026) — parcelar um lançamento QUE JÁ EXISTE, pela RPC `convert_transaction_to_installments` | **não — exclusão declarada, mesmo teto** | é a metade oposta de reparcelar (converte 1 linha em N, em vez de reescrever N), mas pede o MESMO par de campos que faltou acima (`new_total_cents` já existe como `new_amount_cents`; `new_installments` continua sem caber) e tem a mesma exigência de tela: mostrar o contrato — quantas parcelas, de quanto — antes do usuário confirmar. |
 
 ⚠️ **E a exclusão tem um segundo motivo, que é melhor que o teto:** *"refaz a nuuvem em 3x de
 50"* é uma frase que reescreve N linhas de dinheiro de uma vez, algumas delas dentro de faturas

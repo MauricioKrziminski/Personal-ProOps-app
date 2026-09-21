@@ -473,7 +473,10 @@ compra, não a única tela que responde quanto resta.
   cartão) e `invoice_open_cents` é o que FALTA (líquido do `paid_cents`). Quem subtrai a corrente
   de `unpaid_total_cents` — que é líquido — usa o segundo; com o bruto, um pagamento parcial fazia
   "outras faturas" sair menor que o real (`outrasFaturas`, `lib/card-status.ts`).
-- Parcelamento só pela RPC `create_installment_plan` (nunca inserindo N linhas no app).
+- Parcelamento tem DUAS portas, nunca inserindo N linhas no app: `create_installment_plan` para
+  a compra nova, e `convert_transaction_to_installments` (`20260920120000`) para adotar um
+  lançamento QUE JÁ EXISTE como parcela 1 — o `id` não muda, e chamar de novo é recusa, nunca um
+  segundo plano.
 
   ⚠️ **A parcela herda o nome do ESTABELECIMENTO quando não há descrição**
   (`20260915190000`). O texto de cada linha era `coalesce(p_description, 'Compra parcelada')`,
@@ -569,6 +572,14 @@ apontariam para linha morta. Insert só quando o número CRESCE; delete só quan
 ⚠️ **O título do plano é `description || merchant`, a mesma régua da linha.** Era
 `merchant || description` só em `useInstallmentPlans`, então uma compra com os dois preenchidos
 aparecia com um nome em Parceladas e outro na fatura.
+
+⚠️ **`p_installments = 1` é "À vista", e DISSOLVE o plano** (`20260920120000`). A parcela 1
+sobrevive com o TOTAL e o MESMO `id` (referência viva para o agente e para o HITL); as outras
+somem. A ordem importa por causa do `on delete cascade` de `transactions.installment_plan_id`:
+solta o sobrevivente → apaga as parcelas irmãs → apaga o plano — apagar o plano primeiro levaria
+o sobrevivente junto, em silêncio. **Com qualquer parcela travada o banco recusa** (o mesmo
+guarda de `parcela_travada` que já protege o número de parcelas: `1 <> N` cai nele), o que torna
+converter um lançamento JÁ BAIXADO uma operação de MÃO ÚNICA — daí o aviso destrutivo na tela.
 
 O agente **não** reparcela — exclusão declarada em `docs/AGENTE-PARIDADE-COM-O-APP.md`, com os
 dois motivos (o teto de 252 do `FinanceAction` e o fato de uma frase de uma linha reescrever N

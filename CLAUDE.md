@@ -30,10 +30,20 @@ App mobile pessoal de **notas rápidas, lembretes e controle financeiro operado 
   Isso já falhou **duas vezes** (03/09/2026): a `0049` e depois as `0050`/`0051` foram anunciadas
   como "aplicadas em produção" quando foram para o staging.
 
-  **Produção e staging estão ALINHADOS em `20260918220000`** — conferido na fonte em 19/09/2026
-  (`schema_migrations` de produção devolve `20260918220000`, `20260918120000`, `20260917120000`, e
-  `executed_actions` já tem `user_id`/`workspace_id`/`origin_text`). Os parágrafos abaixo são o
-  histórico da subida.
+  **Staging está em `20260920130000`; produção segue em `20260918220000`.** As pendentes são
+  `20260920120000` e `20260920130000` (parcelar um lançamento que já existe, e desparcelar —
+  `convert_transaction_to_installments` e a nova `update_installment_plan` que aceita
+  `p_installments = 1`). As duas sobem juntas, e sobem ANTES do build/OTA que leva os dois botões
+  novos ("Parcelar" na linha e "À vista" no editor da compra) para o telefone do usuário: sem
+  elas em produção, `convert_transaction_to_installments` não existe
+  (`supabase.rpc` volta `PGRST202` e o toast cai em "Não deu para parcelar") e o chip "À vista"
+  bate na `update_installment_plan` antiga, cujo piso ainda é 2. **Nada corrompe; os dois botões
+  simplesmente não funcionam.**
+
+  (Histórico) **Produção e staging estiveram ALINHADOS em `20260918220000`** — conferido na fonte
+  em 19/09/2026 (`schema_migrations` de produção devolve `20260918220000`, `20260918120000`,
+  `20260917120000`, e `executed_actions` já tem `user_id`/`workspace_id`/`origin_text`). Os
+  parágrafos abaixo são o histórico da subida.
 
   Produção estava em **`20260915230000`** (o quarto slot de rascunho cabe no CHECK), aplicada em
   15/09/2026 pelo Gabriel junto da `20260915210000` (reparcelar a compra: `update_installment_plan`
