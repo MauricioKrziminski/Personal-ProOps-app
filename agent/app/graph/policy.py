@@ -101,6 +101,88 @@ _VERBO = {
 }
 
 
+def _frase_correcao_plano(action: FinanceAction, target: dict, escolhido: dict) -> str:
+    """Correção de VALOR num plano de parcelamento — por parcela, no total, ou sem dizer qual.
+
+    `editaveis`/`travado_cents`/`total_cents`/`plan_installments` vêm CONGELADOS no
+    candidato pelo resolvedor (via `private.parcela_travada`) — esta função só
+    formata. `amount_unit` mora no ALVO, não na ação: só existe depois que o
+    usuário escolheu entre os dois caminhos.
+
+    ⚠️ Lê `editaveis`/`travado_cents` só DENTRO dos ramos que precisam deles: o
+    candidato de hoje (antes de T3/T4 congelarem os campos novos) não os carrega,
+    e o ramo sem `amount_unit` é exatamente o que roda nesse estado intermediário
+    — ele não pode explodir num `KeyError` no meio de uma confirmação.
+    """
+    label = escolhido["label"]
+    novo = action.new_amount_cents
+    unit = target.get("amount_unit")
+    if unit == "parcela":
+        editaveis = escolhido["editaveis"]
+        novo_total = escolhido["travado_cents"] + novo * editaveis
+        return (
+            f"corrigir {label}: {cents_to_brl(novo)} por parcela nas {editaveis} que ainda podem "
+            f"mudar (novo total {cents_to_brl(novo_total)}); as pagas ficam como estão"
+        )
+    if unit == "total":
+        editaveis = escolhido["editaveis"]
+        diferenca = novo - escolhido["travado_cents"]
+        return (
+            f"corrigir o total de {label}: {cents_to_brl(escolhido['total_cents'])} → "
+            f"{cents_to_brl(novo)} em {escolhido['plan_installments']}x "
+            f"({cents_to_brl(diferenca)} divididos nas {editaveis} que podem mudar)"
+        )
+    # Sem unidade a frase não pode ler como "nada muda": diz o valor novo e
+    # pergunta qual dos dois caminhos é — T3 garante que a execução recusa sem
+    # `amount_unit`, então a pergunta aqui é honesta, não decorativa.
+    return (
+        f"corrigir {label}: novo valor {cents_to_brl(novo)} — é o total da compra ou o valor de "
+        f"cada parcela? As pagas ficam como estão de qualquer forma"
+    )
+
+
+def _frase_conversao(action: FinanceAction, target: dict, escolhido: dict) -> str:
+    """D1 — adotar um lançamento avulso como parcela 1 de uma compra parcelada nova.
+
+    Sem valor por parcela de propósito: o cálculo mora no banco
+    (`convert_transaction_to_installments`).
+    """
+    valor = action.new_amount_cents if action.new_amount_cents is not None else escolhido.get("amount_cents")
+    valor_str = f" ({cents_to_brl(valor)})" if valor is not None else ""
+    cartao = target["convert_account"]["name"]
+    quando = escolhido.get("when", "")
+    return (
+        f"parcelar {escolhido['label']}{valor_str} em {action.installments}x "
+        f"no cartão {cartao}, 1ª parcela em {quando}"
+    )
+
+
+def par_de_substituicao(acoes: list, alvos: list[dict | None]) -> set[int]:
+    """Índices do lote quando ele mistura CRIAR algo novo com MUDAR o que já existe.
+
+    Pura, sem I/O: `acoes`/`alvos` já vêm resolvidos. `undo_last` conta SEMPRE —
+    ele sempre mira "o mais recente", com ou sem alvo resolvido. `delete_transaction`
+    e `update_transaction` só contam com alvo `found` ou `ambiguous`: alvo `none`
+    é busca que não achou nada, não uma mutação real.
+    """
+    tem_create = any(
+        isinstance(getattr(a, "type", None), FinanceActionType) and a.type.value.startswith("create_")
+        for a in acoes
+    )
+    if not tem_create:
+        return set()
+
+    muta_existente = {FinanceActionType.DELETE_TRANSACTION, FinanceActionType.UPDATE_TRANSACTION}
+    for indice, acao in enumerate(acoes):
+        tipo = getattr(acao, "type", None)
+        if tipo == FinanceActionType.UNDO_LAST:
+            return set(range(len(acoes)))
+        alvo = alvos[indice] if indice < len(alvos) else None
+        if tipo in muta_existente and (alvo or {}).get("status") in ("found", "ambiguous"):
+            return set(range(len(acoes)))
+    return set()
+
+
 def describe_for_confirmation(
     action: FinanceAction | FinanceQuery | NotesAction, target: dict | None = None
 ) -> str:
@@ -133,6 +215,20 @@ def describe_for_confirmation(
             verbo = "marcar como paga, SEM tirar do caixa,"
         if target.get("status") == "found":
             escolhido = target["candidates"][0]
+            if (
+                target.get("table") == "installment_plans"
+                and isinstance(action, FinanceAction)
+                and action.type == FinanceActionType.UPDATE_TRANSACTION
+                and action.new_amount_cents is not None
+            ):
+                return _frase_correcao_plano(action, target, escolhido)
+            if (
+                target.get("convert_account")
+                and isinstance(action, FinanceAction)
+                and action.type == FinanceActionType.UPDATE_TRANSACTION
+                and (action.installments or 0) >= 2
+            ):
+                return _frase_conversao(action, target, escolhido)
             # O detalhe (valor, data) só existe onde o rótulo não coube — hoje o
             # plano de parcelamento. Numa confirmação DESTRUTIVA o usuário precisa
             # ver o dinheiro antes de dizer sim, não só o nome.
@@ -148,6 +244,8 @@ def describe_for_confirmation(
                 if action.new_account:
                     account_name = (target.get("new_account") or {}).get("name", action.new_account)
                     corrections.append(f"conta → {account_name}")
+                if action.new_description:
+                    corrections.append(f"nome → {action.new_description}")
             suffix = f": {', '.join(corrections)}" if corrections else ""
             # Numa compra parcelada a correção vale para a parcela em aberto e as
             # seguintes, nunca para as já pagas. O rótulo do candidato diz "Tudo (10x)",
@@ -182,6 +280,7 @@ def describe_for_confirmation(
                 f"conta → {account}" if account else None,
                 f"categoria → {action.new_category}" if action.new_category else None,
                 f"data → {format_date_br(action.new_occurred_at)}" if action.new_occurred_at else None,
+                f"nome → {action.new_description}" if action.new_description else None,
             ) if x)
             return f"corrigir {alvo}: {changes}" if changes else f"corrigir {alvo}"
         if tipo == "create_installment_purchase":
