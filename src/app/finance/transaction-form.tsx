@@ -275,6 +275,19 @@ function TransactionForm({ editing }: { editing?: Transaction }) {
   /** Achado B: esconde o Segmented de tipo numa linha de série — ver o ⚠️ no Controller de `kind`. */
   const naSerieEditada = Boolean(editing?.installment_plan_id || editing?.recurring_id);
 
+  /**
+   * ⚠️ **A fileira de parcelas sumir não pode deixar `installments` inválido para trás.**
+   * `podeParcelarAqui` cai para `false` ao trocar o tipo para algo que não é gasto, ou ao
+   * limpar a conta — e sem este reset o zod reprova um `installments > 1` que não está mais na
+   * tela, deixando o "Salvar" desabilitado sem dizer por quê (o defeito espelho do §7b).
+   */
+  const resetParcelasSeEscondeu = () => {
+    if (installmentCount > 1) {
+      setValue('installments', 1);
+      setValue('paid_installments', '0');
+    }
+  };
+
   const saving = save.isPending || createPlan.isPending || converter.isPending;
 
   /**
@@ -346,33 +359,55 @@ function TransactionForm({ editing }: { editing?: Transaction }) {
      * isso na tela.
      */
     if (destino === 'converter' && editing && values.account_id) {
-      converter.mutate(
-        {
-          transactionId: editing.id,
-          totalCents: values.amount_cents,
-          installments: values.installments,
-          firstOccurredAt: brToISO(values.occurred_at),
-          description: values.description.trim(),
-          category: values.category,
-          merchant: values.merchant?.trim() || null,
-          accountId: values.account_id,
-        },
-        {
-          onSuccess: () => {
-            Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-            router.back();
-            toast({
-              message: `Parcelei em ${values.installments}x. As futuras já entram nas próximas faturas.`,
-              tone: 'success',
-            });
+      const contaParaConverter = values.account_id;
+      const parcelar = () =>
+        converter.mutate(
+          {
+            transactionId: editing.id,
+            totalCents: values.amount_cents,
+            installments: values.installments,
+            firstOccurredAt: brToISO(values.occurred_at),
+            description: values.description.trim(),
+            category: values.category,
+            merchant: values.merchant?.trim() || null,
+            accountId: contaParaConverter,
           },
-          onError: (error) =>
-            toast({
-              message: financeErrorMessage(error, 'Não deu para parcelar. Tenta de novo.'),
-              tone: 'error',
-            }),
-        },
-      );
+          {
+            onSuccess: () => {
+              Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+              router.back();
+              toast({
+                message: `Parcelei em ${values.installments}x. As futuras já entram nas próximas faturas.`,
+                tone: 'success',
+              });
+            },
+            onError: (error) =>
+              toast({
+                message: financeErrorMessage(error, 'Não deu para parcelar. Tenta de novo.'),
+                tone: 'error',
+              }),
+          },
+        );
+
+      /**
+       * ⚠️ **Converter um lançamento JÁ BAIXADO é de mão única.** A parcela 1 continua paga, e
+       * com parcela paga o banco RECUSA desparcelar (`1 <> installments` cai no mesmo guarda que
+       * protege o número de parcelas). Desfazer só apagando a compra inteira e lançando de novo.
+       * Decisão do dono do produto em 20/09/2026, com o custo aceito na mesma frase — e é por
+       * isso que ele aparece aqui, como confirmação destrutiva e não como `hint`.
+       *
+       * Lançamento em aberto não pergunta nada: ali o desparcelar continua valendo.
+       */
+      if (editing.status === 'cleared') {
+        confirmDestructive(
+          'Parcelar um lançamento já baixado?',
+          'Parcelar',
+          parcelar,
+          `A 1ª parcela continua paga e as outras ${values.installments - 1} ficam pendentes. Isso não dá para desfazer depois.`,
+        );
+        return;
+      }
+      parcelar();
       return;
     }
 
@@ -541,7 +576,15 @@ function TransactionForm({ editing }: { editing?: Transaction }) {
             control={control}
             name="kind"
             render={({ field }) => (
-              <Segmented options={KINDS} value={field.value} onChange={field.onChange} />
+              <Segmented
+                options={KINDS}
+                value={field.value}
+                onChange={(next) => {
+                  field.onChange(next);
+                  // A fileira de parcelas só existe em gasto (`podeParcelarAqui`).
+                  if (next !== 'expense') resetParcelasSeEscondeu();
+                }}
+              />
             )}
           />
         )}
@@ -672,6 +715,9 @@ function TransactionForm({ editing }: { editing?: Transaction }) {
                       setValue('pending', false);
                       setValue('due_at', null);
                     }
+                    // Limpar a conta esconde a fileira de parcelas (`podeParcelarAqui`);
+                    // escolher OUTRA conta (inclusive cartão) mantém `installments`.
+                    if (!next) resetParcelasSeEscondeu();
                   }}
                   emptyLabel="Sem conta"
                 />
