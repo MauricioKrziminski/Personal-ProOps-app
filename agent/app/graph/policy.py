@@ -14,8 +14,11 @@ from app.domain.correcao_plano import (
     MUDAR_PARCELAS,
     PARCELA_TRAVADA,
     SEM_CORRECAO,
+    VALOR_COM_DESPARCELAR,
     VARIAS_PARCELAS,
+    desparcelar_travada,
     e_conversao,
+    e_desparcelar,
 )
 from app.domain.dates import format_date_br
 from app.domain.money import cents_to_brl
@@ -213,6 +216,25 @@ def _frase_conversao(action: FinanceAction, target: dict, escolhido: dict) -> st
     )
 
 
+def _nome_do_plano(escolhido: dict) -> str:
+    return escolhido["label"].split(" — ", 1)[-1]
+
+
+def _frase_desparcelar(action: FinanceAction, target: dict, escolhido: dict) -> str:
+    """Desparcelar: o efeito inteiro, com o que o resolvedor CONGELOU (total, parcela 1,
+    cartão, N). Sem cartão congelado a frase cala sobre ele em vez de inventar."""
+    quando = (f" em {format_date_br(escolhido['parcela1_em'])}"
+              if escolhido.get("parcela1_em") else "")
+    cartao = f" no cartão {escolhido['account_name']}" if escolhido.get("account_name") else ""
+    outras = _outras_correcoes(action, target)
+    outras_str = f"; {', '.join(outras)}" if outras else ""
+    return (
+        f"desparcelar {_nome_do_plano(escolhido)}: a compra de "
+        f"{cents_to_brl(escolhido['total_cents'])} volta a ser à vista{quando}{cartao} "
+        f"(as {escolhido['plan_installments']} parcelas viram um lançamento só){outras_str}"
+    )
+
+
 def plano_inteiro(target: dict | None) -> bool:
     """O alvo é a COMPRA inteira (não uma parcela congelada no snapshot)."""
     target = target or {}
@@ -239,10 +261,12 @@ def erro_de_correcao(action, target: dict | None) -> str | None:
                if (target or {}).get("status") == "found" and cands else None)
     # `installments` só é correção quando MUDA algo: igual ao N do plano é pista de
     # busca, e 1 sozinho não parcela nada.
-    muda_parcelas = bool(action.installments) and action.installments != n_plano and (
-        n_plano is not None or action.installments >= 2)
+    # 1 sobre a compra inteira é DESPARCELAR (chip "À vista"), não reparcelar.
+    desparcela = e_desparcelar(action) and plano_inteiro(target)
+    muda_parcelas = (bool(action.installments) and action.installments != n_plano
+                     and not desparcela and (n_plano is not None or action.installments >= 2))
     if not any([action.new_amount_cents is not None, action.new_category, action.new_occurred_at,
-                action.new_description, action.new_account, muda_parcelas]):
+                action.new_description, action.new_account, muda_parcelas, desparcela]):
         return SEM_CORRECAO
     if n_plano is not None and muda_parcelas:
         return MUDAR_PARCELAS
@@ -251,6 +275,15 @@ def erro_de_correcao(action, target: dict | None) -> str | None:
             return DATA_DO_PLANO
         if action.new_account:
             return CONTA_DO_PLANO
+        if desparcela:
+            cand = cands[0]
+            if action.new_amount_cents is not None:
+                return VALOR_COM_DESPARCELAR
+            if cand.get("travado_cents") is None:
+                # candidato de antes do deploy: sem a trava congelada o SIM não sabe o efeito
+                return "Ainda não mudei nada. Me pede de novo."
+            if cand["travado_cents"] > 0:
+                return desparcelar_travada(_nome_do_plano(cand))
         return None
     target = target or {}
     cands = target.get("candidates") or []
@@ -336,6 +369,9 @@ def describe_for_confirmation(
                 and not escolhido.get("installment_snapshot")
             ):
                 return _frase_correcao_plano(action, target, escolhido)
+            if (isinstance(action, FinanceAction) and e_desparcelar(action)
+                    and plano_inteiro(target)):
+                return _frase_desparcelar(action, target, escolhido)
             if (
                 target.get("table") == "transactions"
                 and target.get("convert_account")
@@ -375,6 +411,8 @@ def describe_for_confirmation(
         # Empate: as opções REAIS vão na lista, então a frase só precisa dizer o
         # que vai acontecer. Cair no texto do modelo aqui reintroduzia o eco que
         # este desenho existe para eliminar ("apagar a nota sobre esse item").
+        if e_desparcelar(action):
+            return f"desparcelar {action.description or 'a compra'} — qual?"
         if e_conversao(action):
             return f"parcelar {action.description or 'o lançamento'} em {action.installments}x — qual?"
         if isinstance(action, FinanceAction) and action.type == FinanceActionType.UPDATE_TRANSACTION:

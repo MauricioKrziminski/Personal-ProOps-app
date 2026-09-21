@@ -23,7 +23,9 @@ from app.domain.correcao_plano import (
     LINHA_SUMIU,
     QUAL_PARCELA,
     SEM_CARTAO,
+    JA_A_VISTA,
     e_conversao,
+    e_desparcelar,
     qual_cartao,
     recusa_de_conversao,
 )
@@ -150,6 +152,9 @@ def _candidato_plano(row: dict) -> dict:
         "total_cents": row.get("total_cents"),
         "editaveis": row.get("editaveis"),
         "travado_cents": row.get("travado_cents"),
+        # a frase do desparcelar: a data da parcela 1 e o cartão, congelados
+        "parcela1_em": str(row["parcela1_em"]) if row.get("parcela1_em") else None,
+        "account_name": row.get("account_name"),
     }
 
 
@@ -193,9 +198,12 @@ _FONTES: dict[str, dict] = {
     "planos": {
         "table": "installment_plans",
         "sql": f"""select p.id, p.description, p.merchant, p.total_cents, p.installments,
-                         p.first_occurred_at, x.editaveis, x.travado_cents
+                         p.first_occurred_at, x.editaveis, x.travado_cents, x.parcela1_em,
+                         a.name as account_name
                   from public.installment_plans p
                   {_TRAVAS_DO_PLANO}
+                  left join public.accounts a
+                    on a.id = p.account_id and a.workspace_id = p.workspace_id
                   where p.workspace_id = %s
                     and (coalesce(p.description,'') ilike %s or coalesce(p.merchant,'') ilike %s)
                   order by p.created_at desc limit %s""",
@@ -409,10 +417,12 @@ async def _com_plano(workspace_id, candidatos: list[dict]) -> list[dict]:
     rows = await db.fetch(
         """
         select t.id as tx_id, p.id as plan_id, p.description, p.merchant, p.total_cents, p.installments,
-               p.first_occurred_at, x.editaveis, x.travado_cents
+               p.first_occurred_at, x.editaveis, x.travado_cents, x.parcela1_em,
+               a.name as account_name
         from public.transactions t
         join public.installment_plans p on p.id = t.installment_plan_id
         """ + _TRAVAS_DO_PLANO + """
+        left join public.accounts a on a.id = p.account_id and a.workspace_id = p.workspace_id
         where t.id = any(%s) and t.workspace_id = %s and p.workspace_id = %s
         order by p.created_at desc
         """,
@@ -713,7 +723,10 @@ async def for_actions(
         # transações: `por_transacao` só enxerga os 40 lançamentos mais recentes,
         # e as parcelas de uma compra antiga estão fora dessa janela justamente
         # quando alguém quer apagar tudo.
-        if not ante and acao.type in _ACEITA_PLANO and wants_whole_plan(bruto, texto_cru):
+        # Desparcelar também busca direto nos PLANOS: a TV de 10 meses atrás está fora da
+        # janela dos 40. Sem plano com o nome, segue para a linha avulsa (e "já é à vista").
+        if not ante and acao.type in _ACEITA_PLANO and (
+                wants_whole_plan(bruto, texto_cru) or e_desparcelar(acao)):
             estado, cands = await por_texto("planos", workspace_id, termo or "")
             if cands:
                 resolved = {
@@ -787,6 +800,13 @@ async def for_actions(
             continue
 
         resolved = {"table": tabela, "status": estado, "candidates": cands}
+        # "foi à vista" sobre linha avulsa: nada a desparcelar. Só com o 1 SOZINHO — de
+        # ruído numa correção comum ("a tv é casa") ele não pode virar recusa.
+        if (e_desparcelar(acao) and estado in ("found", "ambiguous")
+                and not any(c.get("table") == "installment_plans" for c in cands)
+                and not any(getattr(acao, f) for f in ("new_amount_cents", "new_category",
+                            "new_occurred_at", "new_description", "new_account"))):
+            resolved["correction_error"] = JA_A_VISTA
         # Na conversão (D1) a conta citada é o CARTÃO da compra, não uma troca de conta:
         # quem a resolve é `conversoes`, só entre cartões.
         if (

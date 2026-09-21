@@ -23,7 +23,9 @@ from app.domain.correcao_plano import (
     LINHA_SUMIU,
     NADA_EDITAVEL,
     PARCELA_TRAVADA,
+    VALOR_COM_DESPARCELAR,
     VARIAS_PARCELAS,
+    desparcelar_travada,
 )
 from app.domain.dates import add_months, format_date_br, local_iso_date, now_utc
 from app.domain.money import cents_to_brl, parse_valor_em_centavos
@@ -42,7 +44,10 @@ log = logging.getLogger(__name__)
 TRAVAS_DO_PLANO = """cross join lateral (
             select count(*) filter (where not private.parcela_travada(t.status, t.invoice_id)) as editaveis,
                    coalesce(sum(t.amount_cents) filter (
-                     where private.parcela_travada(t.status, t.invoice_id)), 0) as travado_cents
+                     where private.parcela_travada(t.status, t.invoice_id)), 0) as travado_cents,
+                   -- a parcela 1 REAL (editada à mão ou não): o desparcelar a mantém, com o id
+                   min(t.occurred_at) filter (where t.installment_no = 1) as parcela1_em,
+                   (array_agg(t.id) filter (where t.installment_no = 1))[1] as parcela1_id
             from public.transactions t
             where t.installment_plan_id = p.id and t.workspace_id = p.workspace_id) x"""
 
@@ -1037,6 +1042,8 @@ async def _corrigir_plano(ctx: ExecContext, action: FinanceAction) -> ToolResult
         raise Level1Error(DATA_DO_PLANO)
     if action.new_account:
         raise Level1Error(CONTA_DO_PLANO)
+    if action.installments == 1:
+        return await _desparcelar(ctx, action)
     unidade = (ctx.target or {}).get("amount_unit")
     if action.new_amount_cents is not None and unidade not in ("total", "parcela"):
         return ToolResult(
@@ -1110,6 +1117,66 @@ async def _corrigir_plano(ctx: ExecContext, action: FinanceAction) -> ToolResult
     if outras:
         texto += f"; {outras} em todas as parcelas"
     return ToolResult(texto + ".", result_id=str(plano["id"]))
+
+
+async def _desparcelar(ctx: ExecContext, action: FinanceAction) -> ToolResult:
+    """A compra volta a ser à vista — o chip "À vista" do app: `update_installment_plan`
+    com `p_installments = 1`. A parcela 1 sobrevive com o total e o MESMO id; as outras e
+    o plano somem (a RPC cuida da ordem por causa do `on delete cascade`).
+
+    ⚠️ A RPC SOBRESCREVE com nulo: os 8 argumentos vão sempre, com o que está no plano
+    AGORA (e a data REAL da parcela 1), trocando só nome/categoria se pedidos. A releitura
+    com `workspace_id` é a checagem de dono (RPC `security invoker`, agente sem RLS).
+    Valor novo junto é recusa: o SIM mostrou o total atual.
+    """
+    if action.new_amount_cents is not None:
+        # segunda trava: `policy.erro_de_correcao` já recusa antes do SIM
+        raise Level1Error(VALOR_COM_DESPARCELAR)
+    cand = ((ctx.target or {}).get("candidates") or [{}])[0]
+    plano = await db.fetch_one(
+        f"""
+        select p.id, p.total_cents, p.installments, p.first_occurred_at, p.description,
+               p.category, p.merchant, p.account_id, x.editaveis, x.travado_cents,
+               x.parcela1_em, x.parcela1_id
+        from public.installment_plans p
+        {TRAVAS_DO_PLANO}
+        where p.id = %s and p.workspace_id = %s
+        """,
+        cand.get("id"), ctx.workspace_id,
+    )
+    if not plano:
+        return ToolResult("🤷 Essa compra parcelada não está mais aqui.", read_only=True)
+    nome_atual = plano["description"] or plano["merchant"] or "a compra"
+    if int(plano["travado_cents"] or 0) > 0:
+        # lido AGORA: entre a pergunta e o SIM uma fatura pode ter sido paga
+        return ToolResult(desparcelar_travada(nome_atual), read_only=True)
+    total = int(plano["total_cents"])
+    congelado = cand.get("total_cents")
+    if congelado is not None and int(congelado) != total:
+        return ToolResult(
+            f"O total dessa compra mudou desde a confirmação ({cents_to_brl(int(congelado))} → "
+            f"{cents_to_brl(total)}). Ainda não mudei nada; me pede de novo.",
+            read_only=True,
+        )
+    primeira = str(plano.get("parcela1_em") or plano["first_occurred_at"])
+    descricao = (guards.require_text(action.new_description, o_que="a descrição nova", maximo=200)
+                 if action.new_description else plano["description"])
+    categoria = guards.clean_category(action.new_category) if action.new_category else plano["category"]
+    try:
+        await db.fetch_one(
+            "select public.update_installment_plan(%s, %s, %s, %s, %s, %s, %s, %s) as mexidas",
+            plano["id"], total, 1, primeira,
+            descricao, categoria, plano["merchant"], plano["account_id"],
+        )
+    except psycopg.errors.RaiseException as err:
+        motivo = (err.diag.message_primary or str(err)).strip().rstrip(".")
+        raise Level1Error(f"❌ {motivo}. Ainda não mudei nada.") from err
+    nome = descricao or plano["merchant"] or "A compra"
+    texto = f"✅ {nome} voltou a ser à vista: {cents_to_brl(total)} em {format_date_br(primeira)}"
+    outras = _nome_e_categoria(action, descricao, categoria)
+    if outras:
+        texto += f"; {outras}"
+    return ToolResult(texto + ".", result_id=str(plano["parcela1_id"]) if plano.get("parcela1_id") else None)
 
 
 async def _parcelar(ctx: ExecContext, action: FinanceAction) -> ToolResult:

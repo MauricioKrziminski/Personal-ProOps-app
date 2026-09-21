@@ -33,6 +33,24 @@ def e_conversao(action) -> bool:
             and (getattr(action, "installments", None) or 0) >= 2)
 
 
+# Desparcelar (21/09/2026) — `update_installment_plan` com `p_installments = 1`, o chip
+# "À vista" do app. Só a volta para 1x: reparcelar para outro N continua `MUDAR_PARCELAS`.
+JA_A_VISTA = "Esse lançamento já é à vista." + NADA
+VALOR_COM_DESPARCELAR = "Desparcela primeiro, depois corrige o valor." + NADA
+
+
+def desparcelar_travada(nome: str) -> str:
+    return (f"A compra {nome} tem parcela já paga ou numa fatura fechada — não dá para "
+            "voltar para à vista." + NADA)
+
+
+def e_desparcelar(action) -> bool:
+    """`update_transaction` com 1 parcela: sobre um PLANO é desparcelar; quem decide se o
+    alvo é plano é o resolvedor. Nenhum campo novo no schema (teto de 252)."""
+    return (getattr(getattr(action, "type", None), "value", None) == "update_transaction"
+            and getattr(action, "installments", None) == 1)
+
+
 def qual_cartao(nomes: list[str]) -> str:
     return f"Em qual cartão? Você tem: {', '.join(f'*{n}*' for n in nomes)}. Me manda de novo dizendo o cartão."
 
