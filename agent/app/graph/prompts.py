@@ -132,6 +132,19 @@ Tipos:
   new_description="Mercado do Zé". Trocar o NOME é correção como qualquer outra.
   Em parcelamentos, "edite a moto pois já paguei 10"
   -> type=mark_paid, description="moto", installment_scope="first:10". Nada citado = o último lançamento.
+  Correção DITA COMO FATO também é update_transaction:
+  "na verdade foi 50" / "errei, era 54" / "foi engano, era 54" -> new_amount_cents=5000 / 5400.
+  Valor ERRADO citado ("não 100", "e não 100", "em vez de 100") é o que está registrado:
+  vai na BUSCA. "o mercado foi 120, não 100" -> amount_cents=10000, description="mercado",
+  new_amount_cents=12000.
+  "na verdade foi no Nubank" -> new_account="Nubank".
+  "na verdade eu comprei em 2x no cartão" -> UMA ação update_transaction, installments=2,
+  new_account VAZIO (cartão sem nome; o sistema usa o da compra ou pergunta). Com o nome
+  ("em 2x no cartão Inter") -> new_account="Inter". NUNCA delete_transaction + create_*:
+  a compra é a mesma, só muda a forma de pagar.
+  "a 3ª parcela" de uma compra parcelada -> current_installment=3, nunca installments=3.
+  "na verdade", "aliás", "errei", "corrigindo", "foi engano" são expressões: nunca nome de
+  conta, cartão ou item.
 - delete_transaction: apagar um lançamento específico. "Apaga a TV por completo"
   / "a compra inteira" TAMBÉM é delete_transaction — não existe tipo separado
   para compra parcelada; quem decide o escopo é o sistema.
@@ -139,7 +152,7 @@ Tipos:
   NÃO vai em campo de busca: deixe search_term/description VAZIOS. O sistema
   resolve o alvo e mostra as opções reais. Preencher com a palavra faz buscar
   literalmente por ela, e não acha nada.
-- undo_last: "apaga o último", "foi engano".
+- undo_last: "apaga o último", "foi engano" SEM valor novo ("foi engano, era 54" é correção).
 - create_goal: meta de poupança. target_ref = nome, amount_cents = alvo.
 - goal_deposit: aporte numa meta existente. target_ref = nome da meta.
 - update_asset_value: valor novo de um bem/investimento. target_ref = nome.
@@ -154,7 +167,7 @@ Regras:
   informada na mensagem. Não recalcule fuso.
 - Categoria curta e minúscula, preferindo: {", ".join(SUGGESTED_CATEGORIES)}.
 - Corrigir algo que já existe é update_transaction ou delete_transaction —
-  NUNCA crie um lançamento novo para "consertar" outro.
+  NUNCA crie um lançamento novo para "consertar" outro, nem apague e recrie.
 - Campo que não se aplica: omita.
 - Não invente valor. Mas se o valor simplesmente NÃO ESTIVER na mensagem
   ("comprei um mac em 12x"), devolva a ação assim mesmo com amount_cents vazio —

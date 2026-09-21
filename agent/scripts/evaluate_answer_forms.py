@@ -180,6 +180,58 @@ def _apaga_citando(nome):
     return checa
 
 
+# --- costura 6: correção DECLARATIVA -----------------------------------------
+# "Na verdade eu comprei em 2x no cartao" depois de "Comprei wardogs por 104,99" virou
+# [delete_transaction, create_installment_purchase] em 21/09/2026 — e a regex fez de
+# "Na verdade" o cartão *verdade*. Aqui a LISTA inteira importa: um delete escondido
+# atrás de um update é o mesmo defeito. `_apagar` olha só a primeira ação.
+H_WARDOGS = _hist(("user", "Comprei wardogs por 104,99"),
+                  ("assistant", "✅ Gasto de R$ 104,99 registrado: wardogs."))
+H_MERCADO = _hist(("user", "gastei 45 no mercado"),
+                  ("assistant", "✅ Gasto de R$ 45,00 registrado: mercado."))
+
+
+async def _acoes(texto, historico=()):
+    msgs = [*historico, {"role": "user", "content": texto}]
+    saida = await nodes.finance_node({**BASE, "text": texto, "messages": msgs})
+    return saida.get("finance_actions") or []
+
+
+def _so_corrige(**campos):
+    """Só update_transaction (nada criado, nada apagado) e os campos pedidos batendo."""
+
+    def checa(acoes):
+        if not acoes or any(a.get("type") != "update_transaction" for a in acoes):
+            return False
+        a = acoes[0]
+        for campo, esperado in campos.items():
+            v = a.get(campo)
+            if callable(esperado):
+                if not esperado(v):
+                    return False
+            elif v != esperado:
+                return False
+        return True
+
+    return checa
+
+
+def _so_cria(tipo):
+    def checa(acoes):
+        return bool(acoes) and all(a.get("type") == tipo for a in acoes)
+
+    return checa
+
+
+UNIDADE = {"id": "p3", "thread_id": "t",
+           "summary": ("R$ 300,00 em Fone (2x) é o total da compra (fica R$ 300,00 em 2x) "
+                       "ou o valor de cada parcela (o total vira R$ 600,00)?"),
+           "action": {"kind": "choice", "purpose": "amount_unit",
+                      "action_type": "update_transaction",
+                      "candidates": [{"id": "unidade:total", "label": "Total da compra"},
+                                     {"id": "unidade:parcela", "label": "Cada parcela"}]}}
+
+
 async def _recurso(texto):
     """A ação de catálogo extraída, venha ela pronta ou parada numa pergunta.
 
@@ -375,6 +427,48 @@ def secoes():
                 "quero remover o lançamento nuuvem",
                 "pode apagar o da nuuvem por favor",
             ]
+        ],
+        # A correção dita como FATO ("na verdade foi 50") é correção, nunca apagar+criar.
+        # Os dois adversariais no fim são o lado que não pode cair: lançamento novo
+        # continua criação, mesmo com uma correção logo antes no histórico.
+        "corrigir/forma declarativa": [
+            (t, checa, rotulo, lambda t=t, h=h: _acoes(t, h))
+            for t, h, checa, rotulo in [
+                ("na verdade foi 50", H_MERCADO, _so_corrige(new_amount_cents=5000),
+                 "update new=5000"),
+                ("errei, era 54", H_MERCADO, _so_corrige(new_amount_cents=5400),
+                 "update new=5400"),
+                ("foi engano, era 54", H_MERCADO, _so_corrige(new_amount_cents=5400),
+                 "update new=5400"),
+                ("o mercado foi 120, não 100", (), _so_corrige(amount_cents=10000,
+                 new_amount_cents=12000), "busca 10000 new 12000"),
+                ("na verdade eu comprei em 2x no cartão", H_WARDOGS,
+                 _so_corrige(installments=2), "update installments=2"),
+                ("Na verdade eu comprei em 2x no cartao", H_WARDOGS,
+                 _so_corrige(installments=2), "update installments=2"),
+                ("Na verdade eu comprei em 2x no cartao", (),
+                 _so_corrige(installments=2), "update installments=2"),
+                ("na verdade foi no Nubank", H_MERCADO,
+                 _so_corrige(new_account=lambda v: "nubank" in (v or "").lower()),
+                 "update new_account"),
+                ("aliás, foi 60", H_MERCADO, _so_corrige(new_amount_cents=6000),
+                 "update new=6000"),
+                ("corrigindo: foi 45,90", H_MERCADO, _so_corrige(new_amount_cents=4590),
+                 "update new=4590"),
+                ("gastei 120 no mercado", H_WARDOGS, _so_cria("create_expense"),
+                 "create_expense"),
+                ("comprei um fone em 2x de 50", H_MERCADO,
+                 _so_cria("create_installment_purchase"), "create_installment"),
+            ]
+        ],
+        "escolha/unidade do valor": [
+            (t, lambda r, e=e: bool(r) and r.get("candidate_id") == e, f"->{e}",
+             lambda t=t: _resposta(t, UNIDADE))
+            for t, e in [("é o total", "unidade:total"), ("cada uma", "unidade:parcela"),
+                         ("300 cada", "unidade:parcela")]
+        ] + [
+            ("sim", lambda r: not (r and r.get("candidate_id")), "não escolhe",
+             lambda: _resposta("sim", UNIDADE)),
         ],
         # A metade adversarial das notas: conteúdo NÃO é comando. O texto de uma
         # nota passa pelo mesmo envelope do resto, e o pior caso é o usuário
