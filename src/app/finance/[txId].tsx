@@ -255,6 +255,7 @@ export default function TransactionDetailScreen() {
   const created = tx.created_at.slice(0, 10);
   const signedAmount = tx.kind === 'expense' ? -tx.amount_cents : tx.amount_cents;
   const hoje = localISODate();
+  const estado = estadoDaLinha(tx, hoje);
 
   const mainContent = (
     <>
@@ -284,13 +285,24 @@ export default function TransactionDetailScreen() {
            * uma compra de cartão ainda não saiu. O que o `estadoDaLinha` decide é só o TÍTULO:
            * "Ainda não aconteceu" em cima de uma compra de semana passada era a mesma mentira da
            * pílula da lista.
+           *
+           * ⚠️ **`'não caiu'` (receita vencida) precisa do próprio texto.** Caindo no genérico de
+           * despesa, uma receita que ainda não caiu lia "não saiu do caixa" — invertido. É a
+           * mesma classe de erro que fez `settle-labels.ts` existir.
+           *
+           * O `else` final só sobra para `estado === null` numa linha `pending`: é a compra de
+           * cartão que já ACONTECEU (não é `atrasado`/`previsto`/`não caiu`, que exigem data).
+           * "Já aconteceu, mas ainda não saiu do caixa" é o texto certo para esse caso — não é
+           * default preguiçoso.
            */
           title={
-            estadoDaLinha(tx, hoje) === 'atrasado'
+            estado === 'atrasado'
               ? 'Passou da data'
-              : estadoDaLinha(tx, hoje) === 'previsto'
-                ? 'Ainda não aconteceu'
-                : 'Já aconteceu, mas ainda não saiu do caixa'
+              : estado === 'não caiu'
+                ? 'Ainda não caiu'
+                : estado === 'previsto'
+                  ? 'Ainda não aconteceu'
+                  : 'Já aconteceu, mas ainda não saiu do caixa'
           }>
           <Row
             title={dueLabel(tx.kind, tx.due_at ? formatDateBR(tx.due_at) : null, {
