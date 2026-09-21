@@ -51,7 +51,8 @@ from app.domain.money import parse_valor_em_centavos  # noqa: E402
 from app.domain.required import faltando  # noqa: E402
 from app.graph import nodes  # noqa: E402
 from app.graph.policy import dominio_incerto, needs_confirmation  # noqa: E402
-from app.graph.schemas import FinanceAction, FinanceQuery, NotesAction  # noqa: E402
+from app.graph.schemas import FinanceAction, FinanceActionType, FinanceQuery, NotesAction  # noqa: E402
+from app.tools import resolve  # noqa: E402
 
 HOJE = date.fromisoformat(local_iso_date(BASE["timezone"]))
 ONTEM = (HOJE - timedelta(days=1)).isoformat()
@@ -304,7 +305,7 @@ CASOS = [
         ("quanto gastei com ifood em agosto", "query_transactions"),
         ("quanto falta do carro", "query_debts|query_transactions"),
         ("quanto ainda tenho pra gastar até o fim do mês", "query_cycle|query_forecast|query_budgets|query_balance"),
-        ("quais contas vencem essa semana", "query_forecast|query_cycle|query_recurring|query_invoice"),
+        ("quais contas vencem essa semana", "query_transactions|query_invoice|query_forecast|query_recurring"),
         ("to no vermelho?", "query_balance|query_forecast|query_cycle"),
         ("quanto entrou esse mês", "query_transactions|query_cycle"),
         ("quanto gastei ontem", "query_transactions"),
@@ -340,6 +341,14 @@ async def rodar(texto, historico):
     if saida["incerto"] or r.get("halted"):
         saida["chamadas"] = chamadas
         return saida
+    def _sem_alvo(acao):
+        # o resolvedor pergunta "o quê?" sem pista e sem antecedente; aqui todo
+        # histórico (`H_*`) é confirmação de escrita, que deixa `last_write_id`
+        if (getattr(acao, "type", None) == FinanceActionType.CREATE_TRANSFER
+                and not acao.counterparty_account):
+            return resolve.SEM_DUAS_CONTAS  # `conta_padrao` recusa antes do SIM
+        return None if historico else resolve.sem_alvo(acao, texto)
+
     nos = {"financas": nodes.finance_node, "financas_consulta": nodes.finance_query_node,
            "notas": nodes.notes_node, "cadastros": nodes.resource_node}
     # O router às vezes repete o domínio (["financas", "financas"]); o fan-out do
@@ -353,12 +362,14 @@ async def rodar(texto, historico):
         for a in out.get("finance_actions") or []:
             fa = FinanceAction.model_validate(a)
             falta = faltando(fa, texto, BASE["timezone"])
-            saida["acoes"].append({**_limpo(a), "_pergunta": falta and falta[1],
+            saida["acoes"].append({**_limpo(a), "_pergunta": (falta and falta[1]) or _sem_alvo(fa),
                                    "_sim": needs_confirmation(fa, conf)})
         for a in out.get("finance_queries") or []:
             saida["acoes"].append({**_limpo(a), "_sim": needs_confirmation(FinanceQuery.model_validate(a), conf)})
         for a in out.get("notes_actions") or []:
-            saida["acoes"].append({**_limpo(a), "_sim": needs_confirmation(NotesAction.model_validate(a), conf)})
+            na = NotesAction.model_validate(a)
+            saida["acoes"].append({**_limpo(a), "_pergunta": _sem_alvo(na),
+                                   "_sim": needs_confirmation(na, conf)})
         for a in out.get("resource_actions") or []:
             saida["acoes"].append({**_limpo(a), "_sim": "cadastro"})
         for a in out.get("resource_draft") or []:
