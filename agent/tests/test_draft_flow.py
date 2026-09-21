@@ -462,6 +462,52 @@ class TestCustoDoTurno:
         assert r == "apagado"
         assert eventos == []
 
+    @pytest.mark.asyncio
+    async def test_sim_de_um_item_nao_apaga_o_rascunho_do_outro(self, eventos, monkeypatch):
+        """Toda escrita pede SIM (21/09/2026): "gastei 45 no mercado e no uber" sai
+        com a pergunta do mercado E o rascunho do uber. O SIM do mercado não pode
+        levar o uber junto — o rascunho volta do checkpoint e é regravado."""
+        uber = {"action": {"type": "create_expense", "category": "uber"},
+                "raw_text": "gastei 45 no mercado e no uber",
+                "missing": "Quanto foi o uber?", "slot": "amount"}
+        eventos_db = []
+
+        async def rascunho_aberto(phone):
+            return {"id": "d1", **uber}
+
+        async def pendencia(phone):
+            return {"id": "p1", "thread_id": "t:1", "summary": "registrar mercado", "action": {}}
+
+        async def nada(*a, **k):
+            return None
+
+        async def apagar(*a, **k):
+            eventos_db.append("delete_draft")
+
+        async def salvar(**k):
+            eventos_db.append(("save_draft", k["action"], k["slot"]))
+            return "d2"
+
+        monkeypatch.setattr(db, "open_draft", rascunho_aberto)
+        monkeypatch.setattr(db, "open_pending", pendencia)
+        monkeypatch.setattr(db, "resolve_pending", nada)
+        monkeypatch.setattr(db, "delete_draft", apagar)
+        monkeypatch.setattr(db, "save_draft", salvar)
+
+        class _Grafo:
+            async def ainvoke(self, entrada, config=None):
+                return {"reply": "Gasto de R$ 45,00\nQuanto foi o uber?", "draft": uber}
+
+        import app.graph.build as build
+
+        monkeypatch.setattr(build, "graph", lambda: _Grafo())
+
+        r = await conversation.run_turn(
+            SESSAO, source_message_id="w2", conteudo={"clicked_id": "pa:p1:ok", "text": "Confirmar"}
+        )
+        assert "Quanto foi o uber?" in r
+        assert eventos_db[-1] == ("save_draft", uber["action"], "amount")
+
 
 class TestPerguntaDoTipoDeValor:
     """A ambiguidade vira botão, e o valor viaja no payload."""

@@ -1147,6 +1147,10 @@ async def test_dois_gastos_sem_mutacao_seguem_como_antes(monkeypatch, grafo):
     assert estado["draft"].get("slot") == "amount"
     retomado = await grafo.ainvoke(Command(resume=True), config=cfg)
     assert "EXECUTOU" in retomado.get("results", [])
+    # o SIM do mercado não engole o uber: o rascunho segue no estado (o worker o
+    # regrava em `_resposta_do_estado`) e a pergunta do valor volta na resposta
+    assert retomado["draft"].get("slot") == "amount"
+    assert retomado["draft"]["missing"] in retomado["reply"]
 
 
 @pytest.mark.asyncio

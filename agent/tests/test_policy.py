@@ -465,3 +465,12 @@ def test_renomear_a_compra_inteira_diz_que_vale_para_todas_as_parcelas():
     acao = FinanceAction(type=FinanceActionType.UPDATE_TRANSACTION, new_description="TV sala")
     frase = describe_for_confirmation(acao, _alvo_plano())
     assert "inclusive as pagas" in frase and "só as parcelas em aberto" not in frase
+
+
+def test_frase_da_transferencia_nao_inventa_origem():
+    acao = FinanceAction(type=FinanceActionType.CREATE_TRANSFER, amount_cents=10000,
+                         counterparty_account="Poupança")
+    assert describe_for_confirmation(acao, {"default_account": {"name": "Nubank"}}) == (
+        "transferir R$ 100,00 de Nubank para Poupança")
+    assert describe_for_confirmation(acao, {"default_account": {"name": None}}) == (
+        "transferir R$ 100,00 para Poupança")

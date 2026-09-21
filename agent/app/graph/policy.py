@@ -423,9 +423,11 @@ def describe_for_confirmation(
         else:
             onde = ""
         if tipo == "create_transfer":
-            origem = action.account or (padrao or {}).get("name") or "a conta padrão"
+            # sem origem conhecida a frase cala sobre ela — a tool recusa sem as duas contas
+            origem = action.account or (padrao or {}).get("name")
+            de = f" de {origem}" if origem else ""
             destino = action.counterparty_account or "a conta de destino"
-            return f"transferir {valor or 'o valor'} de {origem} para {destino}"
+            return f"transferir {valor or 'o valor'}{de} para {destino}"
         o_que = {"create_expense": "gasto de ", "create_income": "receita de "}.get(tipo, "")
         if valor:
             return f"registrar {o_que}{valor} em {alvo}{onde}"
