@@ -403,7 +403,9 @@ function TransactionForm({ editing }: { editing?: Transaction }) {
           'Parcelar um lançamento já baixado?',
           'Parcelar',
           parcelar,
-          `A 1ª parcela continua paga e as outras ${values.installments - 1} ficam pendentes. Isso não dá para desfazer depois.`,
+          values.installments === 2
+            ? 'A 1ª parcela continua paga e a 2ª fica pendente. Isso não dá para desfazer depois.'
+            : `A 1ª parcela continua paga e as outras ${values.installments - 1} ficam pendentes. Isso não dá para desfazer depois.`,
         );
         return;
       }
