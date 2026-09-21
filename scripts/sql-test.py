@@ -11,8 +11,9 @@ como uma migration de dinheiro vai para o staging sem nenhuma prova.
 
 ## Por que é seguro apontar para o staging
 
-O controle de transação sai de DENTRO do arquivo e vem para cá: `begin;`/`commit;`/`rollback;` são
-removidos do texto e a conexão abre com `autocommit=False`, com `rollback()` + `close()` num
+O controle de transação sai de DENTRO do arquivo e vem para cá: o `begin;`/`commit;`/`rollback;`
+que abre e fecha o boilerplate do próprio arquivo vira `savepoint`/`rollback to savepoint` (ver o
+docstring de `corpo()`), e a conexão abre com `autocommit=False`, com `rollback()` + `close()` num
 `finally`. Não existe caminho de saída que grave — nem sucesso, nem exceção, nem `sys.exit`.
 
 ⚠️ **`with psycopg.connect(...)` COMMITA na saída limpa, e isso não é teoria.** Medido em
@@ -41,7 +42,6 @@ from __future__ import annotations
 import pathlib
 import re
 import sys
-import uuid
 
 import psycopg
 
@@ -239,25 +239,32 @@ def _encerra_transacao(normalizada: str) -> bool:
 def corpo(arquivo: pathlib.Path) -> list[str]:
     """A LISTA de instruções que `main()` vai executar, uma por vez com `prepare=True`.
 
-    Um `begin` exato (a instrução inteira, normalizada) ABRE o boilerplate do próprio arquivo — é
-    removido, nunca enviado ao Postgres, igual sempre foi. Enquanto estiver aberto, um
-    `commit`/`rollback` exato FECHA — também removido. Fora dessas duas transições (um
-    `begin` enquanto JÁ está aberto, ou um `commit`/`rollback` enquanto NÃO está aberto), a mesma
-    palavra é RECUSA — nunca filtro silencioso.
+    Um `begin` exato (a instrução inteira, normalizada) ABRE o boilerplate do próprio arquivo —
+    vira `savepoint sql_test_N`, nunca chega ao Postgres como `begin` de verdade. Enquanto
+    estiver aberto, um `commit`/`rollback` exato FECHA — vira `rollback to savepoint sql_test_N`,
+    SEMPRE rollback, mesmo quando o arquivo fecha aquele bloco com `commit;`: um `commit;` de
+    boilerplate neste repo nunca quis dizer "grave isto", quis dizer "termine o bloco", e este
+    runner nunca confirma nada. Fora dessas duas transições (um `begin` enquanto JÁ está aberto,
+    ou um `commit`/`rollback` enquanto NÃO está aberto), a mesma palavra é RECUSA — nunca filtro
+    silencioso.
+
+    ⚠️ **Por que savepoint, e não descartar a linha como antes** (round 4 da Tarefa 0): descartar
+    tirava o ISOLAMENTO que o par existia para dar. `import_near_match.sql` tem dois blocos
+    `begin;...rollback;` sequenciais (um cenário, limpo, o próximo cenário) — sem savepoint o
+    dado do primeiro sobrevivia na MESMA transação externa e vazava para o segundo.
+    `agent_migrations.sql` tem um `rollback;` no meio (fecha a verificação de 0040/0041) seguido
+    de mais seções, inclusive um `update public.draft_actions set expires_at = …` na seção 8 —
+    sem savepoint essa seção rodava na mesma transação das seções 1–6, por sorte, não por
+    desenho. `savepoint`/`rollback to savepoint` restauram o isolamento sem encerrar a transação
+    externa: a trava do xid em `main()` continua vendo a MESMA transação do início ao fim.
 
     ⚠️ **Por que par ABERTO/FECHADO, e não "só a PRIMEIRA instrução pode ser begin, só a ÚLTIMA
-    pode ser commit/rollback"** (a régua mais simples, testada e devolvida): dois arquivos REAIS
-    do repo quebram com ela. `import_near_match.sql` tem DOIS blocos `begin;...rollback;`
-    sequenciais no mesmo arquivo (um por cenário, para não vazar dado de um teste para o outro) —
-    o segundo `begin;` não é a primeira instrução, seria recusado. `agent_migrations.sql` tem um
-    `rollback;` no MEIO (fecha uma seção "0040/0041 verificadas" antiga; seções novas foram
-    acrescentadas depois, sem mover o fechamento) — não é a última instrução, o `begin;` de
-    abertura seria recusado por não ter par ao final. Isso não é inseguro de relaxar: uma
-    instrução classificada como boilerplate é DESCARTADA, nunca chega a rodar como SQL de
-    verdade contra o Postgres — não existe um COMMIT real "a mais" só porque o par apareceu de
-    novo no meio do arquivo. O que teria que continuar impossível — e continua — é `commit`/
-    `rollback`/`begin` aparecerem FORA de uma transição de par válida (a régua que pega
-    `select 1; commit;`: nunca existiu um `begin` aberto antes daquele `commit`).
+    pode ser commit/rollback"** (a régua mais simples, testada e devolvida): os mesmos dois
+    arquivos acima quebram com ela — o segundo `begin;` de `import_near_match.sql` não é a
+    primeira instrução do arquivo, e o `rollback;` do meio de `agent_migrations.sql` não é a
+    última. O que teria que continuar impossível — e continua — é `commit`/`rollback`/`begin`
+    aparecerem FORA de uma transição de par válida (a régua que pega `select 1; commit;`: nunca
+    existiu um `begin` aberto antes daquele `commit`).
     """
     linhas: list[str] = []
     for linha in arquivo.read_text().splitlines():
@@ -271,13 +278,17 @@ def corpo(arquivo: pathlib.Path) -> list[str]:
     total = len(todas)
     aceitas: list[str] = []
     aberto = False
+    contador_savepoint = 0
     for indice, instrucao in enumerate(todas):
         normalizada = re.sub(r"\s+", " ", instrucao.strip().lower())
         if not aberto and normalizada == "begin":
             aberto = True
+            contador_savepoint += 1
+            aceitas.append(f"savepoint sql_test_{contador_savepoint}")
             continue
         if aberto and normalizada in ("commit", "rollback"):
             aberto = False
+            aceitas.append(f"rollback to savepoint sql_test_{contador_savepoint}")
             continue
         if _encerra_transacao(normalizada):
             trecho = instrucao.strip()[:60]
@@ -305,39 +316,35 @@ def main() -> None:
     # ⚠️ SEM `with` na conexão, de propósito — ver o ⚠️ do cabeçalho.
     conexao = psycopg.connect(url(), connect_timeout=20, autocommit=False)
     conexao.add_notice_handler(lambda aviso: avisos.append(aviso.message_primary))
-    marca = uuid.uuid4().hex
     falhou: str | None = None
     encerrou_sozinha = False
+    erro_ao_fechar: str | None = None
     indice_atual = 0
+    xid_inicial: int | None = None
     try:
         with conexao.cursor() as cursor:
             cursor.execute("set local timezone to 'America/Sao_Paulo'")
-            # ⚠️ Camada 2 (revisão da Tarefa 0, round 3): um marcador ALEATÓRIO por execução,
-            # gravado com `SET LOCAL`. Qualquer COMMIT descarta um `SET LOCAL` — inclusive um
-            # `begin` escondido logo em seguida, que abriria uma transação NOVA sem o marcador.
-            # Sorteado a cada execução: com valor fixo, um arquivo malicioso forjaria o
-            # `set_config` depois do commit escondido e a comparação passaria calada.
-            cursor.execute("select set_config('sql_test.marca', %s, true)", (marca,))
+            # ⚠️ DUAS camadas agora, não três (revisão da Tarefa 0, round 4 — o marcador de
+            # sessão saiu). (1) PREVINE: cada instrução roda SOZINHA, com `prepare=True`
+            # (protocolo estendido). O revisor MEDIU: o servidor recusa mais de um comando por
+            # Parse (`cannot insert multiple commands into a prepared statement`) — um corte
+            # ERRADO do lexer vira um erro do servidor, nunca um escape silencioso. (2) DETECTA:
+            # `pg_current_xact_id()`, lido aqui e de novo no `finally`. Era um marcador de sessão
+            # (`set_config('sql_test.marca', <uuid>, true)`) mais a checagem de
+            # `transaction_status` — e os dois eram forjáveis/cegos: `select
+            # set_config('sql_test.marca', current_setting('sql_test.marca', true), false)`
+            # republica o marcador em escopo de SESSÃO (que sobrevive a COMMIT) numa única
+            # instrução, e um `begin` escondido logo depois do commit devolve `transaction_status
+            # = INTRANS`, igual ao caminho normal — nenhum dos dois via o commit escondido.
+            # `pg_current_xact_id()` é atribuído pelo SERVIDOR, não forjável por `set_config`, e
+            # sozinho substitui os dois: medido em 20/09/2026 contra o staging, xid antes do
+            # laço 45194, depois de um `commit; begin;` escondido 45195 — a comparação detecta,
+            # e a mesma forja do marcador acima (`set_config` republicado em escopo de sessão)
+            # não muda o xid em nada.
+            cursor.execute("select pg_current_xact_id()")
+            xid_inicial = (cursor.fetchone() or [None])[0]
             for indice_atual, instrucao in enumerate(aceitas, 1):
-                # ⚠️ Camada 1: cada instrução roda SOZINHA, com `prepare=True` (protocolo
-                # estendido). O revisor MEDIU: o servidor recusa mais de um comando por Parse
-                # (`cannot insert multiple commands into a prepared statement`) — um corte
-                # ERRADO do lexer (`instrucoes()` continua decidindo onde cortar) deixa de ser
-                # um escape e vira um erro do servidor, nunca SQL rodando sem passar pela
-                # checagem de `_encerra_transacao`.
                 cursor.execute(instrucao, prepare=True)
-            cursor.execute("select current_setting('sql_test.marca', true)")
-            valor = (cursor.fetchone() or [None])[0]
-            # ⚠️ `!= marca`, nunca `is None`: `current_setting(..., true)` devolve `''` (vazio),
-            # não `null`, quando a config não existe mais.
-            if valor != marca:
-                encerrou_sozinha = True
-            # Camada 3 (round 2, mantida): independente das outras duas. Com `autocommit=False`
-            # a transação TEM que continuar `INTRANS`; se virou `IDLE`, algo a encerrou por
-            # fora — não importa como foi escrito. `INERROR` (uma exceção foi levantada) já cai
-            # no `FALHOU` de baixo, não se confunde com este caminho.
-            elif conexao.info.transaction_status == psycopg.pq.TransactionStatus.IDLE:
-                encerrou_sozinha = True
     except Exception as erro:  # noqa: BLE001 — qualquer falha é falha do teste
         if indice_atual:
             trecho = aceitas[indice_atual - 1].strip()[:60]
@@ -348,20 +355,66 @@ def main() -> None:
         else:
             falhou = f"{type(erro).__name__}: {erro}"
     finally:
+        # A checagem do xid mora AQUI, ANTES do rollback — não só no caminho feliz. Um teste que
+        # estoura DEPOIS de um commit escondido (`falhou` já setado acima) ainda precisa avisar
+        # do commit; sem isto a checagem ficava dentro do `try` e qualquer exceção pulava as
+        # duas. Só roda se deu para ler o xid inicial e a conexão ainda está viva — sem essas
+        # guardas, um `pg_terminate_backend` na própria conexão (que já matou o socket) faria
+        # esta leitura levantar de novo, sem ganhar nada.
+        if xid_inicial is not None and not conexao.closed:
+            try:
+                if conexao.info.transaction_status == psycopg.pq.TransactionStatus.INERROR:
+                    # A instrução que estourou (dentro do `except` acima) deixou a transação em
+                    # ERRO — o Postgres recusa QUALQUER comando nela além de ROLLBACK/COMMIT
+                    # (`InFailedSqlTransaction`), então reler `pg_current_xact_id()` aqui
+                    # levantaria de novo, calado, e um commit escondido seguido de erro passaria
+                    # sem aviso. `pg_xact_status()` não lê o estado da CONEXÃO, lê o registro de
+                    # commit no WAL — por isso ele enxerga um commit real mesmo depois do
+                    # `rollback()` que o tira do erro. Medido: `commit; begin;` escondido seguido
+                    # de `select 1/0` → `pg_xact_status(xid_inicial)` = `committed`; o mesmo erro
+                    # SEM commit escondido → `aborted`; caminho feliz sem erro → `in progress`.
+                    conexao.rollback()
+                    with conexao.cursor() as cursor:
+                        cursor.execute("select pg_xact_status(%s::xid8)", (str(xid_inicial),))
+                        status_xid = (cursor.fetchone() or [None])[0]
+                    if status_xid == "committed":
+                        encerrou_sozinha = True
+                else:
+                    with conexao.cursor() as cursor:
+                        cursor.execute("select pg_current_xact_id()")
+                        xid_final = (cursor.fetchone() or [None])[0]
+                    if xid_final != xid_inicial:
+                        encerrou_sozinha = True
+            except Exception:
+                pass  # conexão pode já estar morta; o rollback()/close() abaixo relata isso
+            # ⚠️ Gap residual, honesto: um SEGUNDO escape depois do commit escondido — por
+            # exemplo `rollback; begin; <grava algo>; commit; begin;` sem erro nenhum no fim —
+            # comita sob um xid DIFERENTE de `xid_inicial` (que fica `aborted`, não `committed`)
+            # e esta camada não vê. Quem impede o escape em si é a camada 1 (`prepare=True`);
+            # esta é só detecção do que já passou por ela, e fica mais fraca depois de um erro.
         # Nesta ordem, e em QUALQUER saída: é o que garante que nada ficou gravado (quando ainda
-        # havia o que desfazer — as três camadas acima existem para o caso em que já era tarde).
-        conexao.rollback()
-        conexao.close()
+        # havia o que desfazer). `pg_terminate_backend(pg_backend_pid())` derruba o próprio
+        # socket, e `rollback()`/`close()` numa conexão morta LEVANTAM — sem o try/except aqui
+        # isso virava um traceback do psycopg em vez de um `FALHOU:` legível.
+        try:
+            conexao.rollback()
+            conexao.close()
+        except Exception as erro_fechamento:  # noqa: BLE001
+            erro_ao_fechar = f"{type(erro_fechamento).__name__}: {erro_fechamento}"
 
     print("\n".join(avisos))
+    mensagens: list[str] = []
     if encerrou_sozinha:
-        print(
+        mensagens.append(
             f"FALHOU: {arquivo.name} encerrou a transação por conta própria — o que veio antes "
             f"PODE TER SIDO GRAVADO no staging. Confira à mão."
         )
-        sys.exit(1)
     if falhou:
-        print(f"FALHOU: {arquivo.name}\n  {falhou}")
+        mensagens.append(f"FALHOU: {arquivo.name}\n  {falhou}")
+    if erro_ao_fechar:
+        mensagens.append(f"FALHOU: {arquivo.name}\n  ao desfazer a transação: {erro_ao_fechar}")
+    if mensagens:
+        print("\n".join(mensagens))
         sys.exit(1)
     print(f"PASSOU: {arquivo.name}")
 
