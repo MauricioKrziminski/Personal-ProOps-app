@@ -159,10 +159,13 @@ async def execute(ctx: ExecContext, action: FinanceAction | FinanceQuery | Notes
                 "ação %s já executada (%s#%s) — pulando",
                 action.type, ctx.source_message_id, ctx.action_index,
             )
-            # ponytail: "reserva existe" vale como "escreveu" — morrer entre a
-            # reserva e o fim da tool faz o par atômico seguir para o apagar no
-            # retry. Distinguir exige coluna de "confirmada" em executed_actions.
-            return ToolResult("", read_only=True, ja_executada=True)
+            # Só conta como "já escreveu" com `result_id` carimbado: reserva sem
+            # ele é órfã (worker morreu no meio) ou está rodando agora, e o par
+            # atômico não pode seguir para o apagar em cima disso. Não libera a
+            # vaga aqui: não dá para saber se outro worker a está usando.
+            # (Toda tool `create_*` devolve `result_id` quando escreve.)
+            escrito = await db.execution_result_id(ctx.source_message_id, ctx.action_index)
+            return ToolResult("", read_only=True, ja_executada=escrito is not None)
 
     try:
         resultado = await tool(ctx, action)

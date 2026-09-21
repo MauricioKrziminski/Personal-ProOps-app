@@ -451,6 +451,21 @@ async def reserve_execution(
     return row is not None
 
 
+async def execution_result_id(source_message_id: str, action_index: int) -> UUID | None:
+    """O `result_id` de uma reserva que já existe: não nulo = a ação ESCREVEU.
+
+    Nulo quer dizer reserva órfã (o worker morreu no meio) ou outro worker
+    executando agora — nos dois casos não dá para afirmar que escreveu.
+    """
+    row = await fetch_one(
+        "select result_id from public.executed_actions "
+        "where source_message_id = %s and action_index = %s",
+        source_message_id,
+        action_index,
+    )
+    return row["result_id"] if row else None
+
+
 async def confirm_execution(
     source_message_id: str, action_index: int, result_id: UUID | None
 ) -> None:

@@ -764,8 +764,10 @@ async def _gate(state: AgentState) -> dict:
         # pergunta do que falta já está em `results` (veio de `alvos`); aqui só
         # entra o erro de conta e a garantia de que nada mudou. `draft: {}`
         # explícito: rascunho do par perderia a outra metade (ver `_rascunho`).
+        falta_valor = any(slot == "amount" for slot, _ in _incompletas(state, acoes).values())
+        fim = f"Me manda de novo com o valor. {NADA_DO_PAR}" if falta_valor else NADA_DO_PAR
         return {"approved": False, "halted": True, "draft": {},
-                "results": [*state.get("results", []), *correction_errors, NADA_DO_PAR]}
+                "results": [*state.get("results", []), *correction_errors, fim]}
     if correction_errors:
         return {"approved": False, "halted": True,
                 "results": [*state.get("results", []), *correction_errors]}
@@ -1010,6 +1012,9 @@ async def _gate(state: AgentState) -> dict:
     bloqueadas = _incompletas(state, acoes)
     # No par, a criação sem motivo próprio entra como "lote" (o SIM a grava
     # junto), e o aviso de limite já aceito não a tira da frase: um SIM, tudo nele.
+    # ⚠️ "lote" NÃO é motivo de segurança (por isso não mora em
+    # `needs_confirmation`): a criação sozinha passaria direto. Ele só existe para
+    # a pergunta ENUMERAR tudo o que o SIM vai gravar.
     motivos = [
         (a, alvo, needs_confirmation(a, confidence, alvo or None) or ("lote" if i in par else None))
         for i, (a, alvo) in enumerate(zip(acoes, alvos))
@@ -1108,7 +1113,8 @@ async def _executar(
     spec_interativo: dict | None = None
     ultimo_data: dict | None = None
     for indice, acao in indexadas:
-        if criacao_falhou is not None and not _cria(acao):
+        if criacao_falhou is not None:
+            # nada parcial: nem o apagar, nem as criações seguintes do par
             linhas.append(_nao_fiz(acao, alvos[indice], criacao_falhou))
             continue
         ctx.action_index = indice
@@ -1133,11 +1139,19 @@ def _cria(acao) -> bool:
     return isinstance(acao, FinanceAction) and acao.type.value.startswith("create_")
 
 
+def _rotulo_novo(criacao: FinanceAction) -> str:
+    """Nome + valor: "wardogs" sozinho não distingue a compra nova da velha."""
+    nome = criacao.description or criacao.category or "o lançamento novo"
+    return f"{nome} ({cents_to_brl(criacao.amount_cents)})" if criacao.amount_cents else nome
+
+
 def _nao_fiz(acao, alvo: dict, criacao: FinanceAction) -> str:
+    novo = _rotulo_novo(criacao)
+    if _cria(acao):
+        return f"⚠️ Não registrei {_rotulo_novo(acao)} porque não consegui registrar {novo}."
     verbo = {"delete_transaction": "apaguei", "undo_last": "apaguei",
              "update_transaction": "corrigi"}.get(acao.type.value, "mexi em")
     candidatos = (alvo or {}).get("candidates") or []
-    novo = criacao.description or criacao.category or "o lançamento novo"
     if not candidatos:
         # a frase de confirmação já começa com verbo ("apagar o seu…")
         return f"⚠️ Não fiz: {describe_for_confirmation(acao, alvo or None)} — porque não consegui registrar {novo}."

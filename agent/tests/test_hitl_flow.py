@@ -779,7 +779,7 @@ async def test_replay_do_incidente_wardogs_nao_apaga_nem_guarda_rascunho(monkeyp
     assert "__interrupt__" not in estado
     assert estado["draft"] == {}
     assert "EXECUTOU" not in estado.get("results", [])
-    assert "Ainda não apaguei nem criei nada." in estado["reply"]
+    assert "Me manda de novo com o valor. Ainda não apaguei nem criei nada." in estado["reply"]
     # a pergunta do valor aparece UMA vez (já vinha do `alvos`)
     assert estado["reply"].count("faltou o valor") == 1, estado["reply"]
 

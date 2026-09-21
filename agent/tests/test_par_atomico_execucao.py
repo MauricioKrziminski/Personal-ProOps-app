@@ -31,12 +31,16 @@ def _estado(acoes, alvos):
 
 @pytest.fixture
 def banco(monkeypatch):
-    """Reserva por índice ORIGINAL; `ja_feitas` simula a retentativa."""
+    """Reserva por índice ORIGINAL; `ja_feitas` simula a retentativa
+    (índice -> `result_id` carimbado na reserva, ou None se ela ficou órfã)."""
     chamadas: list[str] = []
-    ja_feitas: set[int] = set()
+    ja_feitas: dict[int, str | None] = {}
 
     async def reserve(msg, indice, tipo, **kw):
         return indice not in ja_feitas
+
+    async def carimbo(msg, indice):
+        return ja_feitas.get(indice)
 
     async def nada(*a, **k):
         return None
@@ -49,6 +53,7 @@ def banco(monkeypatch):
         return ToolResult("🗑️ Apaguei wardogs.", result_id=None)
 
     monkeypatch.setattr(registry.db, "reserve_execution", reserve)
+    monkeypatch.setattr(registry.db, "execution_result_id", carimbo)
     monkeypatch.setattr(registry.db, "release_execution", nada)
     monkeypatch.setattr(registry.db, "confirm_execution", nada)
     monkeypatch.setattr(registry, "ensure_owned", dono)
@@ -122,12 +127,42 @@ async def test_retentativa_com_a_criacao_ja_gravada_segue_para_o_apagar(monkeypa
     (read_only, sem escrever de novo). Tratar isso como falha deixaria a compra
     nova ao lado da antiga para sempre."""
     chamadas, ja_feitas = banco
-    ja_feitas.add(1)
+    ja_feitas[1] = "tx-nova"
     _criar(monkeypatch, chamadas, ToolResult("nunca", result_id=None))
 
     await nodes.execute_node(_estado(PAR, [ALVO, {}]))
 
     assert chamadas == ["delete#0"]
+
+
+@pytest.mark.asyncio
+async def test_retentativa_com_reserva_ORFA_nao_segue_para_o_apagar(monkeypatch, banco):
+    """Reserva sem `result_id`: o worker morreu entre reservar e escrever (ou
+    outro está escrevendo agora). Não dá para afirmar que a compra nova existe,
+    então o apagar não roda."""
+    chamadas, ja_feitas = banco
+    ja_feitas[1] = None
+    _criar(monkeypatch, chamadas, ToolResult("nunca", result_id=None))
+
+    ret = await nodes.execute_node(_estado(PAR, [ALVO, {}]))
+
+    assert chamadas == []
+    assert "porque não consegui registrar" in "\n".join(ret["results"])
+
+
+@pytest.mark.asyncio
+async def test_criacao_que_falha_pula_tambem_as_criacoes_seguintes_do_par(monkeypatch, banco):
+    chamadas, _ = banco
+    _criar(monkeypatch, chamadas, RuntimeError("x"))
+    acoes = [PAR[0], PAR[1], {"type": FinanceActionType.CREATE_EXPENSE.value,
+                              "amount_cents": 2000, "description": "frete"}]
+
+    ret = await nodes.execute_node(_estado(acoes, [ALVO, {}, {}]))
+
+    assert chamadas == ["create#1"]
+    texto = "\n".join(ret["results"])
+    assert "Não registrei frete (R$ 20,00) porque não consegui registrar wardogs (R$ 104,99)" in texto, texto
+    assert "Não apaguei gasto de R$ 104,99 em *wardogs*" in texto, texto
 
 
 @pytest.mark.asyncio
