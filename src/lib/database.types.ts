@@ -2636,6 +2636,19 @@ export type Database = {
           isSetofReturn: true
         }
       }
+      convert_transaction_to_installments: {
+        Args: {
+          p_account_id?: string
+          p_category?: string
+          p_description?: string
+          p_first_occurred_at: string
+          p_installments: number
+          p_merchant?: string
+          p_total_cents: number
+          p_transaction_id: string
+        }
+        Returns: string
+      }
       create_installment_plan: {
         Args: {
           p_account_id: string
