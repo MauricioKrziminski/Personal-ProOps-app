@@ -260,7 +260,8 @@ class TestEdicaoPlano:
 
         monkeypatch.setattr(finance.db, "fetch_one", fetch_one)
         r = await finance.update_transaction(
-            _ctx_plano(),
+            _ctx_plano(candidates=[{"id": "plano-1", "label": "TV — tudo (10x)",
+                                    "table": "installment_plans", "editaveis": 8}]),
             FinanceAction(type=FinanceActionType.UPDATE_TRANSACTION, new_description="TV sala",
                           new_category="casa"),
         )
@@ -277,6 +278,24 @@ class TestEdicaoPlano:
         assert WS in args
         assert "TV sala" in args and "casa" in args
         assert "já pagas ficaram" not in r.message and "todas as parcelas" in r.message
+
+    @pytest.mark.asyncio
+    async def test_renomear_de_pendencia_antiga_nao_escreve(self, monkeypatch):
+        """M2: a frase de antes do deploy dizia "(só as parcelas em aberto…)" e o SIM
+        renomearia TODAS. Sem o marcador que só o gate novo congela (`editaveis`), pede de novo."""
+        chamadas = []
+
+        async def fetch_one(sql, *args):
+            chamadas.append(sql)
+            return {"id": "plano-1", "linhas": 10}
+
+        monkeypatch.setattr(finance.db, "fetch_one", fetch_one)
+        r = await finance.update_transaction(
+            _ctx_plano(),
+            FinanceAction(type=FinanceActionType.UPDATE_TRANSACTION, new_description="TV sala"),
+        )
+        assert r.read_only and r.message == "Ainda não mudei nada. Me pede a correção de novo."
+        assert chamadas == []
 
     def test_o_sufixo_da_parcela_e_o_mesmo_da_rpc(self):
         """Segunda cópia do formato "(k/N)": se a RPC mudar, este teste quebra."""

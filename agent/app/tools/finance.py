@@ -1017,6 +1017,10 @@ async def _corrigir_plano(ctx: ExecContext, action: FinanceAction) -> ToolResult
 
     cands = (ctx.target or {}).get("candidates") or []
     if action.new_amount_cents is None:
+        if cands[0].get("editaveis") is None:
+            # pendência de antes do deploy: a frase que ela mostrou prometia "só as
+            # parcelas em aberto", e renomear muda TODAS — o SIM não cobre isso
+            return ToolResult("Ainda não mudei nada. Me pede a correção de novo.", read_only=True)
         return await _renomear_plano(ctx, action, cands[0])
     plano = await db.fetch_one(
         f"""
@@ -1097,6 +1101,15 @@ async def _parcelar(ctx: ExecContext, action: FinanceAction) -> ToolResult:
     )
     if not linha:
         return ToolResult(LINHA_SUMIU, read_only=True)
+    congelado = ctx.target["candidates"][0].get("amount_cents")
+    if (action.new_amount_cents is None and congelado is not None
+            and int(linha["amount_cents"]) != int(congelado)):
+        # a frase do SIM disse o valor congelado; o da linha agora é outro
+        return ToolResult(
+            f"O valor desse lançamento mudou desde a confirmação ({cents_to_brl(int(congelado))} → "
+            f"{cents_to_brl(int(linha['amount_cents']))}). Ainda não mudei nada; me pede de novo.",
+            read_only=True,
+        )
     total = (guards.require_amount(action.new_amount_cents, o_que="o valor novo")
              if action.new_amount_cents is not None else linha["amount_cents"])
     primeira = (guards.require_date(action.new_occurred_at, ctx.timezone, default_hoje=False)

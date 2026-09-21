@@ -319,6 +319,24 @@ async def test_tool_sem_cartao_congelado_nao_escreve(monkeypatch):
 
 
 @pytest.mark.asyncio
+async def test_tool_valor_da_linha_mudou_depois_do_sim_nao_escreve(monkeypatch):
+    """M3: a frase do SIM disse R$ 104,99; se a linha mudou entre a pergunta e o SIM,
+    parcelar o valor novo seria aprovar o que a pessoa não leu."""
+    chamadas = _rpc(monkeypatch, linha={**LINHA, "amount_cents": 20000})
+    r = await finance.update_transaction(_ctx(), FinanceAction(type=UPD, installments=2))
+    assert r.read_only and "mudou" in r.message
+    assert not any("convert_transaction_to_installments" in q for q, _ in chamadas)
+
+
+@pytest.mark.asyncio
+async def test_tool_valor_novo_dito_na_frase_ignora_o_congelado(monkeypatch):
+    chamadas = _rpc(monkeypatch, linha={**LINHA, "amount_cents": 20000})
+    await finance.update_transaction(_ctx(), FinanceAction(type=UPD, installments=2,
+                                                           new_amount_cents=30000))
+    assert any("convert_transaction_to_installments" in q for q, _ in chamadas)
+
+
+@pytest.mark.asyncio
 async def test_tool_recusa_da_rpc_vira_mensagem(monkeypatch):
     import psycopg
 
