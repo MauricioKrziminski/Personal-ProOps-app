@@ -217,6 +217,46 @@ def test_correcao_de_plano_sem_unidade_nao_explode_com_candidato_de_hoje():
     assert "R$ 3.400,00" in frase
 
 
+def test_correcao_de_plano_com_uma_editavel_fala_no_singular():
+    """E4: "divididos nas 1 que podem mudar" — medido no emulador em 21/09/2026."""
+    acao = FinanceAction(type=FinanceActionType.UPDATE_TRANSACTION, new_amount_cents=13500)
+    frase = describe_for_confirmation(
+        acao, _alvo_plano(amount_unit="total", editaveis=1, travado_cents=6749,
+                          total_cents=13498, plan_installments=2))
+    assert frase == (
+        "corrigir o total de TV: R$ 134,98 → R$ 135,00 em 2x "
+        "(R$ 67,51 na única que pode mudar)"
+    )
+    frase = describe_for_confirmation(
+        FinanceAction(type=FinanceActionType.UPDATE_TRANSACTION, new_amount_cents=7000),
+        _alvo_plano(amount_unit="parcela", editaveis=1, travado_cents=6749))
+    assert frase == (
+        "corrigir TV: R$ 70,00 por parcela na única que ainda pode mudar "
+        "(novo total R$ 137,49; as pagas ficam como estão)"
+    )
+
+
+def test_correcao_de_plano_sem_unidade_com_nome_diz_que_o_nome_vale_para_todas():
+    """T-a: nome e categoria mudam em TODAS as parcelas, inclusive as pagas; "as pagas
+    ficam como estão de qualquer forma" prometia o contrário."""
+    acao = FinanceAction(type=FinanceActionType.UPDATE_TRANSACTION, new_amount_cents=340000,
+                         new_description="Nova TV")
+    frase = describe_for_confirmation(acao, _alvo_plano())
+    assert frase == (
+        "corrigir TV: novo valor R$ 3.400,00 — é o total da compra ou o valor de cada "
+        "parcela? No valor, as pagas ficam como estão; nome → Nova TV em todas as parcelas"
+    )
+
+
+def test_empate_de_conversao_pergunta_parcelar_qual():
+    """T-b: o empate da conversão perguntava "corrigir … qual?"."""
+    acao = FinanceAction(type=FinanceActionType.UPDATE_TRANSACTION, installments=2,
+                         description="wardogs")
+    alvo = {"table": "transactions", "status": "ambiguous",
+            "candidates": [{"id": "a", "label": "x"}, {"id": "b", "label": "y"}]}
+    assert describe_for_confirmation(acao, alvo) == "parcelar wardogs em 2x — qual?"
+
+
 # ---------------------------------------------------------------------------
 # D1 — adotar um lançamento avulso como parcela 1 de uma compra parcelada nova
 # ---------------------------------------------------------------------------

@@ -15,6 +15,7 @@ from app.domain.correcao_plano import (
     PARCELA_TRAVADA,
     SEM_CORRECAO,
     VARIAS_PARCELAS,
+    e_conversao,
 )
 from app.domain.dates import format_date_br
 from app.domain.money import cents_to_brl
@@ -140,9 +141,9 @@ def _frase_correcao_plano(action: FinanceAction, target: dict, escolhido: dict) 
     usuário escolheu entre os dois caminhos.
 
     ⚠️ Lê `editaveis`/`travado_cents` só DENTRO dos ramos que precisam deles: o
-    candidato de hoje (antes de T3/T4 congelarem os campos novos) não os carrega,
-    e o ramo sem `amount_unit` é exatamente o que roda nesse estado intermediário
-    — ele não pode explodir num `KeyError` no meio de uma confirmação.
+    candidato de uma pendência de antes do deploy não os carrega, e o ramo sem
+    `amount_unit` é exatamente o que roda nesse estado — ele não pode explodir num
+    `KeyError` no meio de uma confirmação.
     """
     label = escolhido["label"]
     novo = action.new_amount_cents
@@ -154,25 +155,29 @@ def _frase_correcao_plano(action: FinanceAction, target: dict, escolhido: dict) 
     if unit == "parcela":
         editaveis = escolhido["editaveis"]
         novo_total = escolhido["travado_cents"] + novo * editaveis
+        onde = ("na única que ainda pode mudar" if editaveis == 1
+                else f"nas {editaveis} que ainda podem mudar")
         return (
-            f"corrigir {label}: {cents_to_brl(novo)} por parcela nas {editaveis} que ainda podem "
-            f"mudar (novo total {cents_to_brl(novo_total)}; as pagas ficam como estão){suffix}"
+            f"corrigir {label}: {cents_to_brl(novo)} por parcela {onde} "
+            f"(novo total {cents_to_brl(novo_total)}; as pagas ficam como estão){suffix}"
         )
     if unit == "total":
         editaveis = escolhido["editaveis"]
         diferenca = novo - escolhido["travado_cents"]
+        onde = ("na única que pode mudar" if editaveis == 1
+                else f"divididos nas {editaveis} que podem mudar")
         return (
             f"corrigir o total de {label}: {cents_to_brl(escolhido['total_cents'])} → "
             f"{cents_to_brl(novo)} em {escolhido['plan_installments']}x "
-            f"({cents_to_brl(diferenca)} divididos nas {editaveis} que podem mudar){suffix}"
+            f"({cents_to_brl(diferenca)} {onde}){suffix}"
         )
-    # Sem unidade a frase não pode ler como "nada muda": diz o valor novo e
-    # pergunta qual dos dois caminhos é — T3 garante que a execução recusa sem
-    # `amount_unit`, então a pergunta aqui é honesta, não decorativa.
-    outras_str = f" ({', '.join(outras)})" if outras else ""
+    # Sem unidade: só a pendência de antes do deploy chega aqui — hoje o `gate`
+    # pergunta "total ou cada parcela?" (`_perguntar_unidade`) antes do SIM, e
+    # `_corrigir_plano` recusa sem `amount_unit`. A frase diz o valor novo e a
+    # pergunta; "as pagas ficam" vale só para o VALOR (nome e categoria mudam em todas).
     return (
-        f"corrigir {label}: novo valor {cents_to_brl(novo)}{outras_str} — é o total da compra ou "
-        f"o valor de cada parcela? As pagas ficam como estão de qualquer forma"
+        f"corrigir {label}: novo valor {cents_to_brl(novo)} — é o total da compra ou "
+        f"o valor de cada parcela? No valor, as pagas ficam como estão{suffix}"
     )
 
 
@@ -363,6 +368,8 @@ def describe_for_confirmation(
         # Empate: as opções REAIS vão na lista, então a frase só precisa dizer o
         # que vai acontecer. Cair no texto do modelo aqui reintroduzia o eco que
         # este desenho existe para eliminar ("apagar a nota sobre esse item").
+        if e_conversao(action):
+            return f"parcelar {action.description or 'o lançamento'} em {action.installments}x — qual?"
         if isinstance(action, FinanceAction) and action.type == FinanceActionType.UPDATE_TRANSACTION:
             corrected = action.model_copy(update={"new_account": (target.get("new_account") or {}).get("name", action.new_account)})
             return describe_for_confirmation(corrected)

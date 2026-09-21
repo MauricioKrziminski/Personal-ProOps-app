@@ -397,6 +397,7 @@ async def test_grafo_empate_escolha_frase_de_conversao_sim(monkeypatch, grafo): 
     estado = await grafo.ainvoke(_estado([{"type": "update_transaction", "installments": 2}]),
                                  config=cfg)
     assert _valor(estado)["kind"] == "choice"
+    assert _valor(estado)["summary"] == "parcelar o lançamento em 2x — qual?"
     estado = await grafo.ainvoke(Command(resume={"approved": True, "candidate_id": "tx-2"}),
                                  config=cfg)
     pausa = _valor(estado)
