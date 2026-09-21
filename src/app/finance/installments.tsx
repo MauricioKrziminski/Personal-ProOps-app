@@ -395,11 +395,14 @@ export default function InstallmentsScreen() {
      */
     if (form.installments === 1) {
       const original = lista.find((p) => p.id === form.id)?.installments ?? 0;
+      const somem = Math.max(original - 1, 0);
       confirmDestructive(
         'Desfazer o parcelamento?',
         'Desfazer',
         () => editar.mutate(payload(), acoes),
-        `As outras ${Math.max(original - 1, 0)} parcelas somem e sobra um lançamento de ${formatBRL(form.totalCents)} em ${form.inicio}. Isso não volta.`,
+        somem === 1
+          ? `A outra parcela some e sobra um lançamento de ${formatBRL(form.totalCents)} em ${form.inicio}. Isso não volta.`
+          : `As outras ${somem} parcelas somem e sobra um lançamento de ${formatBRL(form.totalCents)} em ${form.inicio}. Isso não volta.`,
       );
       return;
     }
@@ -737,7 +740,9 @@ export default function InstallmentsScreen() {
               hint={
                 travado
                   ? `${form.travadas} de ${form.installments} já fechadas — número, data e conta não mudam.`
-                  : `${form.installments}x de ${formatBRL(Math.floor(form.totalCents / form.installments))} — a última fecha os centavos.`
+                  : form.installments === 1
+                    ? `À vista: um lançamento só de ${formatBRL(form.totalCents)}.`
+                    : `${form.installments}x de ${formatBRL(Math.floor(form.totalCents / form.installments))} — a última fecha os centavos.`
               }>
               {travado ? (
                 <TextField
@@ -750,7 +755,7 @@ export default function InstallmentsScreen() {
                   {opcoesParcelas.map((n) => (
                     <Chip
                       key={n}
-                      label={`${n}x`}
+                      label={n === 1 ? 'À vista' : `${n}x`}
                       selected={form.installments === n}
                       onPress={() => setForm({ ...form, installments: n })}
                     />
