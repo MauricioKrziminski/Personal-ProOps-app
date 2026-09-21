@@ -33,7 +33,7 @@ import {
 } from '@/hooks/use-finance';
 import { formatBRL, formatDateBR, localISODate } from '@/hooks/use-items';
 import { brToISO, isValidBRDate, isoToBR } from '@/lib/dates';
-import { financeErrorMessage } from '@/lib/finance-form';
+import { financeErrorMessage, opcoesDeParcelas } from '@/lib/finance-form';
 import { estadoDaLinha } from '@/lib/settle-labels';
 import { useToast } from '@/components/ui/toast';
 import { confirmDestructive, showItemActions } from '@/lib/item-actions';
@@ -54,8 +54,6 @@ import { useAdaptiveWindow } from '@/hooks/use-adaptive-window';
  */
 
 const MESES_COMPROMETIDOS = 12;
-/** As mesmas opções da criação (`transaction-form`) — reparcelar não inventa outra régua. */
-const OPCOES_PARCELAS = [2, 3, 4, 6, 10, 12, 18, 24];
 
 /**
  * O formulário de REPARCELAR — a compra inteira, não uma parcela dela.
@@ -349,42 +347,63 @@ export default function InstallmentsScreen() {
   // de cartão vira despesa solta. O banco recusa; a tela evita chegar lá.
   const contaOk = Boolean(form?.accountId);
   const podeSalvar = Boolean(form && tituloOk && totalOk && contaOk && isValidBRDate(form.inicio));
+  // ⚠️ `opcoesDeParcelas` é a régua (`finance-form.ts`): some o "À vista" com parcela travada,
+  // porque a RPC recusaria. Aqui só se soma o número atual quando ele está fora da lista fixa.
+  const basePcelas = opcoesDeParcelas(form?.travadas ?? 0);
   const opcoesParcelas =
-    form && !OPCOES_PARCELAS.includes(form.installments)
-      ? [...OPCOES_PARCELAS, form.installments].sort((a, b) => a - b)
-      : OPCOES_PARCELAS;
+    form && !basePcelas.includes(form.installments)
+      ? [...basePcelas, form.installments].sort((a, b) => a - b)
+      : basePcelas;
 
   const salvarPlano = () => {
     if (!form || !podeSalvar) return;
     const nome = form.description.trim();
-    editar.mutate(
-      {
-        planId: form.id,
-        totalCents: form.totalCents,
-        installments: form.installments,
-        firstOccurredAt: brToISO(form.inicio),
-        description: nome,
-        merchant: form.merchant.trim() || null,
-        category: form.category,
-        accountId: form.accountId,
+    const payload = () => ({
+      planId: form.id,
+      totalCents: form.totalCents,
+      installments: form.installments,
+      firstOccurredAt: brToISO(form.inicio),
+      description: nome,
+      merchant: form.merchant.trim() || null,
+      category: form.category,
+      accountId: form.accountId,
+    });
+    const acoes = {
+      onSuccess: () => {
+        volta.aoFechar(() => setForm(null));
+        toast({
+          message:
+            form.installments === 1
+              ? `Desfiz o parcelamento: sobrou um lançamento de ${formatBRL(form.totalCents)}.`
+              : `${nome}: ${form.installments}x de ${formatBRL(Math.floor(form.totalCents / form.installments))}.`,
+          tone: 'success',
+        });
       },
-      {
-        onSuccess: () => {
-          volta.aoFechar(() => setForm(null));
-          toast({
-            message: `${nome}: ${form.installments}x de ${formatBRL(Math.floor(form.totalCents / form.installments))}.`,
-            tone: 'success',
-          });
-        },
-        // A RPC recusa com a frase pronta (P0001) — "não deu para salvar" esconderia
-        // justamente o motivo, que é o que a pessoa precisa para decidir o que fazer.
-        onError: (error) =>
-          toast({
-            message: financeErrorMessage(error, 'Não deu para editar a compra. Tenta de novo.'),
-            tone: 'error',
-          }),
-      },
-    );
+      // A RPC recusa com a frase pronta (P0001) — "não deu para salvar" esconderia
+      // justamente o motivo, que é o que a pessoa precisa para decidir o que fazer.
+      onError: (error: unknown) =>
+        toast({
+          message: financeErrorMessage(error, 'Não deu para editar a compra. Tenta de novo.'),
+          tone: 'error',
+        }),
+    };
+
+    /**
+     * ⚠️ **Desfazer o parcelamento APAGA as outras parcelas**, e o cascade não volta. A régua é
+     * a de `design.md §6`: confirmação destrutiva NOMEIA o estrago. A parcela 1 sobrevive com o
+     * total — é a mesma linha, com o mesmo `id`.
+     */
+    if (form.installments === 1) {
+      const original = lista.find((p) => p.id === form.id)?.installments ?? 0;
+      confirmDestructive(
+        'Desfazer o parcelamento?',
+        'Desfazer',
+        () => editar.mutate(payload(), acoes),
+        `As outras ${Math.max(original - 1, 0)} parcelas somem e sobra um lançamento de ${formatBRL(form.totalCents)} em ${form.inicio}. Isso não volta.`,
+      );
+      return;
+    }
+    editar.mutate(payload(), acoes);
   };
 
   const bloco = (plano: InstallmentPlanSummary, index: number) => {

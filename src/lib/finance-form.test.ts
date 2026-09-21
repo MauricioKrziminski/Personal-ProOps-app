@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { debtTerm, validRecurringRange, simpleDebtValues, destinoDoSalvar, podeParcelar, temContrato } from './finance-form.ts';
+import { debtTerm, validRecurringRange, simpleDebtValues, destinoDoSalvar, podeParcelar, temContrato, opcoesDeParcelas } from './finance-form.ts';
 test('remaining installments are added to already paid, never subtracted twice', () => {
   assert.equal(debtTerm('8', 4), 12);
   assert.equal(debtTerm('', 4), null);
@@ -104,4 +104,22 @@ test('editar uma parcela nunca converte, nem com o campo forçado', () => {
 test('sem conta não há para onde parcelar', () => {
   assert.equal(destinoDoSalvar(simples, { installments: 3, account_id: null }), 'salvar');
   assert.equal(destinoDoSalvar(null, { installments: 3, account_id: null }), 'salvar');
+});
+
+/**
+ * ⚠️ **Sem o `1` não havia como desfazer um parcelamento** — só apagar a compra inteira e lançar
+ * de novo, que é a mesma armadilha do formulário. O comentário de `installments.tsx` dizia "as
+ * mesmas opções da criação" e a criação SEMPRE teve "À vista".
+ */
+test('o editor da compra oferece "À vista" quando nada foi pago', () => {
+  assert.deepEqual(opcoesDeParcelas(0), [1, 2, 3, 4, 6, 10, 12, 18, 24]);
+});
+
+/**
+ * ⚠️ Com parcela travada o banco recusa (`1 <> N` cai no guarda que já existia). Botão que só
+ * existe para dar erro é defeito — some.
+ */
+test('com parcela paga, "À vista" nem aparece', () => {
+  assert.deepEqual(opcoesDeParcelas(1), [2, 3, 4, 6, 10, 12, 18, 24]);
+  assert.equal(opcoesDeParcelas(3).includes(1), false);
 });

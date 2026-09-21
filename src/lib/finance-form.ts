@@ -108,3 +108,19 @@ export function destinoDoSalvar(
   // plano dentro de plano.
   return temContrato(editing) ? 'salvar' : 'converter';
 }
+
+/**
+ * As opções da fileira "Parcelas" do editor da COMPRA.
+ *
+ * ⚠️ **`1` é "À vista", e ele DISSOLVE o plano** — a parcela 1 sobrevive com o total, as outras
+ * somem. Ele não existia, e por isso desfazer um parcelamento significava apagar a compra inteira
+ * e lançar de novo. O comentário de `installments.tsx` já dizia "as mesmas opções da criação", e
+ * a criação sempre teve "À vista": era a lista que estava incompleta.
+ *
+ * ⚠️ **Com qualquer parcela travada ele some**, porque a RPC recusa (`1 <> N` cai no guarda que
+ * já protege o número de parcelas). Botão que só existe para dar erro é defeito.
+ */
+export function opcoesDeParcelas(travadas: number): number[] {
+  const todas = [1, 2, 3, 4, 6, 10, 12, 18, 24];
+  return travadas > 0 ? todas.filter((n) => n > 1) : todas;
+}
