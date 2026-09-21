@@ -679,7 +679,8 @@ test('título provisório segue a regra do servidor: 1ª linha não vazia, colap
 });
 
 test('duplo toque no mesmo quadro abre UMA conversa só', () => {
-  const trava = novaTravaDeToque();
+  const agendados: (() => void)[] = [];
+  const trava = novaTravaDeToque((fn) => agendados.push(fn));
   let enviou = 0;
   let navegou = 0;
   let n = 0;
@@ -694,15 +695,41 @@ test('duplo toque no mesmo quadro abre UMA conversa só', () => {
   assert.equal(abrirConversaNova('oi', deps), null);
   assert.equal(enviou, 1);
   assert.equal(navegou, 1);
-  trava.liberar();
+  // libera sozinha no próximo quadro
+  assert.equal(agendados.length, 1);
+  agendados.shift()!();
   assert.ok(abrirConversaNova('outra', deps));
   assert.equal(enviou, 2);
 });
 
+test('trava do toque libera no próximo quadro mesmo se o envio lançar', () => {
+  const agendados: (() => void)[] = [];
+  const trava = novaTravaDeToque((fn) => agendados.push(fn));
+  let n = 0;
+  const deps = {
+    gerarId: () => `id-${++n}`,
+    semear: () => {},
+    enviar: () => { throw new Error('boom'); },
+    navegar: () => {},
+    trava,
+  };
+  assert.throws(() => abrirConversaNova('oi', deps), /boom/);
+  assert.equal(agendados.length, 1);
+  agendados.shift()!();
+  assert.equal(trava.tentar(), true);
+});
+
 test('compositor trava enquanto a conversa não existe no servidor', () => {
   const soLocal = sementeDaConversa('c', 'oi').pages[0].items;
+  const falha = (error_code: string, error_status: number) =>
+    [{ id: 'local:c', status: 'failed', error_code, error_status }];
   assert.equal(compositorTravado(soLocal, { awaitingAction: false }), true);
-  assert.equal(compositorTravado([{ id: 'local:c', status: 'failed' }], { awaitingAction: false }), true);
+  // falha retentável: a saída é o "Tentar novamente"
+  assert.equal(compositorTravado(falha('network', 0), { awaitingAction: false }), true);
+  // 402: a conversa JÁ existe no servidor; quem volta do paywall manda de novo
+  assert.equal(compositorTravado(falha('plan_limit', 402), { awaitingAction: false }), false);
+  // 422 (servidor antigo): nada a retentar
+  assert.equal(compositorTravado(falha('invalid', 422), { awaitingAction: false }), false);
   assert.equal(compositorTravado([], { awaitingAction: false }), false);
   assert.equal(compositorTravado([{ id: 'u', sequence: 1 }], { awaitingAction: false }), false);
   assert.equal(compositorTravado([{ id: 'u', sequence: 1 }], { awaitingAction: true }), true);

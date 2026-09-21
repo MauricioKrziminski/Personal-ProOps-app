@@ -243,7 +243,8 @@ export function ConversationScreen({ conversationId, initialText = '', title, ta
     // Conversa nova: a tela da conversa abre NO TOQUE, com a mensagem já no
     // cache dela. Nenhum callback no `.mutate()` — o resultado chega pelo cache
     // (callbacks do hook), e na aba um callback aqui abriria o paywall duas vezes.
-    const aberta = abrirConversaNova(conteudo, {
+    // A trava barra o 2º toque do mesmo quadro e se libera sozinha no seguinte.
+    abrirConversaNova(conteudo, {
       trava,
       gerarId: newClientMessageId,
       semear: (id, t) =>
@@ -253,8 +254,6 @@ export function ConversationScreen({ conversationId, initialText = '', title, ta
       // conversa nova. A rota /agent/new já ocupa um detalhe e é substituída.
       navegar: (id) => (tabMode ? router.push(conversationRoute(id)) : router.replace(conversationRoute(id))),
     });
-    // O segundo toque do mesmo quadro já foi barrado; o próximo, legítimo, não.
-    if (aberta) requestAnimationFrame(trava.liberar);
   }, [conversationId, criar, disparar, qc, tabMode, texto, trava, turno]);
 
   const tentarDeNovo = useCallback(() => {

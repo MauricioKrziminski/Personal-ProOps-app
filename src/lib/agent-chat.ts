@@ -136,18 +136,25 @@ export function abrirConversaNova(
   },
 ): { id: string; clientMessageId: string } | null {
   if (deps.trava && !deps.trava.tentar()) return null;
-  const id = deps.gerarId();
-  const clientMessageId = deps.gerarId();
-  deps.semear(id, { clientMessageId, content });
-  deps.enviar({ id, clientMessageId, content });
-  deps.navegar(id);
-  return { id, clientMessageId };
+  try {
+    const id = deps.gerarId();
+    const clientMessageId = deps.gerarId();
+    deps.semear(id, { clientMessageId, content });
+    deps.enviar({ id, clientMessageId, content });
+    deps.navegar(id);
+    return { id, clientMessageId };
+  } finally {
+    // Libera no quadro SEGUINTE — inclusive quando algo acima lança; sem isso
+    // uma exceção deixaria o botão de enviar morto para sempre.
+    deps.trava?.liberarNoProximoQuadro();
+  }
 }
 
 export interface TravaDeToque {
   /** `true` na primeira vez; `false` até alguém `liberar`. */
   tentar: () => boolean;
   liberar: () => void;
+  liberarNoProximoQuadro: () => void;
 }
 
 /**
@@ -155,16 +162,22 @@ export interface TravaDeToque {
  * toques no mesmo quadro leriam o mesmo texto — duas conversas com a mesma
  * pergunta. Quem libera é a tela, no quadro seguinte.
  */
-export function novaTravaDeToque(): TravaDeToque {
+export function novaTravaDeToque(
+  agendar: (fn: () => void) => unknown = (fn) => requestAnimationFrame(fn),
+): TravaDeToque {
   let ocupada = false;
+  const liberar = () => {
+    ocupada = false;
+  };
   return {
     tentar: () => {
       if (ocupada) return false;
       ocupada = true;
       return true;
     },
-    liberar: () => {
-      ocupada = false;
+    liberar,
+    liberarNoProximoQuadro: () => {
+      agendar(liberar);
     },
   };
 }
@@ -227,15 +240,29 @@ export function historicoPrecisaBuscar(
 }
 
 /**
- * O compositor trava enquanto o servidor não tem a conversa: uma segunda
- * mensagem iria por `enviar` para um id que ainda não existe. Ali a única ação
- * é "Tentar novamente" (que recria com o mesmo par).
+ * O compositor trava enquanto a criação está em voo ou falhou de um jeito que
+ * se retenta: uma segunda mensagem iria por `enviar` para um id que talvez não
+ * exista. Ali a única ação é "Tentar novamente" (que recria com o mesmo par).
  */
 export function compositorTravado(
-  itens: readonly { sequence?: number }[],
+  itens: readonly {
+    sequence?: number;
+    status?: string;
+    error_code?: string | null;
+    error_status?: number | null;
+  }[],
   estado: { awaitingAction: boolean },
 ): boolean {
-  return estado.awaitingAction || soLocal(itens);
+  if (estado.awaitingAction) return true;
+  // Falha NÃO retentável (402: o servidor grava a conversa antes de recusar o
+  // turno; 422 de servidor antigo) deixa o campo livre — ali não há retry, e
+  // quem volta do paywall manda de novo pelo `enviar`.
+  return (
+    soLocal(itens) &&
+    itens.some(
+      (m) => m.status === 'processing' || (m.status === 'failed' && falhaDoTurno(m).retryable),
+    )
+  );
 }
 
 /** "Tentar novamente": sem nada do servidor, recria (mesmo id + cmid); depois, envia. */
