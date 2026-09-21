@@ -274,9 +274,13 @@ async def test_id_inventado_no_resume_nao_executa(monkeypatch, grafo):
 
 
 @pytest.mark.asyncio
-async def test_lote_misto_grava_o_seguro_e_pergunta_o_sensivel(monkeypatch, grafo):
-    """"gastei 45 no mercado e apaga o último" não pode segurar o gasto de 45
-    esperando uma decisão sobre OUTRA coisa — e um NÃO não pode desfazê-lo."""
+async def test_par_criar_e_apagar_NAO_grava_nada_antes_do_sim(monkeypatch, grafo):
+    """Era `test_lote_misto_grava_o_seguro_e_pergunta_o_sensivel` e MUDOU DE SINAL
+    (D3, 21/09/2026). O lote é criar + apagar um registro que EXISTE — um par de
+    substituição ("na verdade foi em 2x"). Gravar a criação na hora e perguntar
+    só o apagar é o incidente das wardogs ao contrário: um NÃO deixaria a compra
+    nova ao lado da antiga. Um SIM para tudo; nada gravado antes dele. Lote sem
+    mutação de existente continua gravando na hora (teste dos dois gastos)."""
     from app.graph import nodes
 
     async def alvos(workspace_id, acoes, texto_cru, antecedente=None):
@@ -301,14 +305,18 @@ async def test_lote_misto_grava_o_seguro_e_pergunta_o_sensivel(monkeypatch, graf
         config=cfg,
     )
 
-    # a criação JÁ rodou — está no estado ANTES de qualquer pergunta
-    assert "EXECUTOU" in estado.get("results", []), estado.get("results")
-    # e a deleção está esperando
-    assert "__interrupt__" in estado
+    assert "EXECUTOU" not in estado.get("results", []), estado.get("results")
+    valor = getattr(estado["__interrupt__"][0], "value", estado["__interrupt__"][0])
+    # a MESMA pergunta lista as duas coisas — inclusive o gasto pequeno
+    assert len(valor["items"]) == 2, valor["items"]
+    assert any("R$ 45,00" in i for i in valor["items"]), valor["items"]
+    assert any("apagar" in i for i in valor["items"]), valor["items"]
 
 
 @pytest.mark.asyncio
-async def test_nao_no_lote_misto_preserva_o_que_ja_foi_gravado(monkeypatch, grafo):
+async def test_nao_no_par_nao_grava_nenhuma_das_duas(monkeypatch, grafo):
+    """Era `test_nao_no_lote_misto_preserva_o_que_ja_foi_gravado`: no par não há
+    o que preservar, porque nada foi gravado antes do SIM (D3)."""
     from app.graph import nodes
 
     async def alvos(workspace_id, acoes, texto_cru, antecedente=None):
@@ -334,8 +342,7 @@ async def test_nao_no_lote_misto_preserva_o_que_ja_foi_gravado(monkeypatch, graf
     )
     final = await grafo.ainvoke(Command(resume=False), config=cfg)
 
-    # cancelar a deleção não pode apagar o gasto que já foi gravado
-    assert "EXECUTOU" in final.get("results", []), final.get("results")
+    assert "EXECUTOU" not in final.get("results", []), final.get("results")
     assert "não fiz nada" in " ".join(final.get("results", []))
 
 
@@ -718,3 +725,188 @@ async def test_o_antecedente_atravessa_DOIS_turnos_no_grafo_de_verdade(monkeypat
         f"o antecedente não sobreviveu ao turno: {vistos!r}. "
         "Sem isso, 'apague esse lançamento' volta a listar os 9 mais recentes."
     )
+
+
+# ---------------------------------------------------------------------------
+# Par de substituição (apagar/corrigir + criar) é ATÔMICO — D3, 21/09/2026
+# ---------------------------------------------------------------------------
+# O incidente (staging, 21/09): "Comprei wardogs por 104,99" e depois "Na verdade
+# eu comprei em 2x no cartao". O modelo devolveu [apagar wardogs, criar 2x sem
+# valor]; a criação ficou incompleta, o gate perguntou SÓ o apagar, o usuário
+# disse sim, a compra sumiu e a nova nunca nasceu.
+
+_WARDOGS = [
+    {"type": FinanceActionType.DELETE_TRANSACTION.value, "description": "wardogs"},
+    {"type": FinanceActionType.CREATE_INSTALLMENT_PURCHASE.value, "installments": 2,
+     "amount_cents": None, "account": "cartao", "description": "wardogs"},
+]
+
+
+def _alvo_wardogs(monkeypatch, contas=None):
+    from app.graph import nodes
+
+    async def alvos(workspace_id, acoes, texto_cru, antecedente=None):
+        from app.tools import resolve as _r
+
+        return [
+            {"table": "transactions", "status": "found",
+             "candidates": [{"id": "tx-w", "label": "gasto de R$ 104,99 em *wardogs*"}]}
+            if a.type in _r.TARGETS else {}
+            for a in acoes
+        ]
+
+    async def sem_banco(workspace_id, acoes, alvos, pular=None):
+        return alvos
+
+    async def sem_cartao(*a, **k):
+        return None  # sem cartão resolvido, o aviso de limite não consulta o banco
+
+    from app.tools import finance
+
+    monkeypatch.setattr(nodes.resolve, "for_actions", alvos)
+    monkeypatch.setattr(nodes.resolve, "contas_citadas", contas or sem_banco)
+    monkeypatch.setattr(finance, "resolve_account", sem_cartao)
+
+
+@pytest.mark.asyncio
+async def test_replay_do_incidente_wardogs_nao_apaga_nem_guarda_rascunho(monkeypatch, grafo):
+    _alvo_wardogs(monkeypatch)
+    estado = await grafo.ainvoke(
+        _estado(_WARDOGS) | {"text": "Na verdade eu comprei em 2x no cartao"},
+        config={"configurable": {"thread_id": "wardogs-1"}},
+    )
+
+    assert "__interrupt__" not in estado
+    assert estado["draft"] == {}
+    assert "EXECUTOU" not in estado.get("results", [])
+    assert "Ainda não apaguei nem criei nada." in estado["reply"]
+    # a pergunta do valor aparece UMA vez (já vinha do `alvos`)
+    assert estado["reply"].count("faltou o valor") == 1, estado["reply"]
+
+    # e o worker não grava rascunho: é o rascunho que transformava a compra
+    # num beco depois do apagar ter acontecido
+    from app import conversation
+
+    async def nao_pode(**kwargs):
+        raise AssertionError("save_draft chamado num par de substituição")
+
+    async def nada(*a, **k):
+        return None
+
+    monkeypatch.setattr(conversation.db, "save_draft", nao_pode)
+    monkeypatch.setattr(conversation.db, "delete_draft", nada)
+    sessao = {"id": "s1", "phone": "5551999999999", "user_id": "u1", "workspace_id": "w1"}
+    await conversation._resposta_do_estado(sessao, estado, "wardogs-1")
+
+
+@pytest.mark.asyncio
+async def test_par_com_cartao_que_nao_existe_tambem_nao_guarda_rascunho(monkeypatch, grafo):
+    async def cartao_inexistente(workspace_id, acoes, alvos, pular=None):
+        erro = "💳 Não achei o cartão *itau*. Qual deles?"
+        return [a if i != 1 else {"correction_error": erro, "account_error": erro}
+                for i, a in enumerate(alvos)]
+
+    _alvo_wardogs(monkeypatch, cartao_inexistente)
+    acoes = [dict(_WARDOGS[0]), {**_WARDOGS[1], "amount_cents": 10499, "account": "itau"}]
+    estado = await grafo.ainvoke(
+        _estado(acoes), config={"configurable": {"thread_id": "wardogs-2"}},
+    )
+
+    assert "__interrupt__" not in estado
+    assert estado["draft"] == {}
+    assert "EXECUTOU" not in estado.get("results", [])
+    assert "Não achei o cartão *itau*" in estado["reply"]
+    assert "Ainda não apaguei nem criei nada." in estado["reply"]
+
+
+@pytest.mark.asyncio
+async def test_par_completo_pergunta_UMA_vez_e_o_sim_executa_as_duas(monkeypatch, grafo):
+    _alvo_wardogs(monkeypatch)
+    acoes = [dict(_WARDOGS[0]), {**_WARDOGS[1], "amount_cents": 10499}]
+    cfg = {"configurable": {"thread_id": "wardogs-3"}}
+    estado = await grafo.ainvoke(_estado(acoes), config=cfg)
+
+    valor = getattr(estado["__interrupt__"][0], "value", estado["__interrupt__"][0])
+    assert len(valor["items"]) == 2, valor["items"]
+    assert "EXECUTOU" not in estado.get("results", [])
+
+    final = await grafo.ainvoke(Command(resume=True), config=cfg)
+    assert "__interrupt__" not in final
+    assert final["results"].count("EXECUTOU") == 2, final["results"]
+
+
+@pytest.mark.asyncio
+async def test_par_com_alvo_ambiguo_a_confirmacao_lista_tambem_a_criacao(monkeypatch, grafo):
+    """`_confirm_selection` filtrava por `needs_confirmation`: o gasto de R$ 45
+    ficaria fora da frase e seria gravado pelo mesmo SIM sem ter sido lido."""
+    from app.graph import nodes
+
+    async def dois(workspace_id, acoes, texto_cru, antecedente=None):
+        from app.tools import resolve as _r
+
+        return [
+            {"table": "transactions", "status": "ambiguous",
+             "candidates": [{"id": "a", "label": "R$ 45"}, {"id": "b", "label": "R$ 80"}]}
+            if a.type in _r.TARGETS else {}
+            for a in acoes
+        ]
+
+    monkeypatch.setattr(nodes.resolve, "for_actions", dois)
+    cfg = {"configurable": {"thread_id": "wardogs-4"}}
+    await grafo.ainvoke(
+        _estado([
+            {"type": "delete_transaction"},
+            {"type": FinanceActionType.CREATE_EXPENSE.value, "amount_cents": 4500,
+             "category": "mercado"},
+        ]),
+        config=cfg,
+    )
+    estado = await grafo.ainvoke(Command(resume="b"), config=cfg)
+    valor = getattr(estado["__interrupt__"][0], "value", estado["__interrupt__"][0])
+    assert len(valor["items"]) == 2, valor["items"]
+    assert "EXECUTOU" not in estado.get("results", [])
+
+
+@pytest.mark.asyncio
+async def test_dois_gastos_sem_mutacao_seguem_como_antes(monkeypatch, grafo):
+    """Sem registro existente em jogo não há par: o completo grava, o incompleto
+    vira rascunho — o comportamento de sempre."""
+    _alvo_wardogs(monkeypatch)
+    estado = await grafo.ainvoke(
+        _estado([
+            {"type": FinanceActionType.CREATE_EXPENSE.value, "amount_cents": 4500,
+             "category": "mercado"},
+            {"type": FinanceActionType.CREATE_EXPENSE.value, "category": "uber"},
+        ]),
+        config={"configurable": {"thread_id": "dois-gastos"}},
+    )
+    assert "__interrupt__" not in estado
+    assert "EXECUTOU" in estado.get("results", [])
+    assert estado["draft"].get("slot") == "amount"
+
+
+@pytest.mark.asyncio
+async def test_par_trocar_de_cartao_no_aviso_de_limite_nao_monta_rascunho(monkeypatch, grafo):
+    _alvo_wardogs(monkeypatch)
+    from app.tools import finance
+
+    async def cartao(*a, **k):
+        return "acc-1"
+
+    async def estourado(*a, **k):
+        return {"excedeu": True, "card_name": "Nubank", "limite_centavos": 10000,
+                "disponivel_centavos": 5000}
+
+    monkeypatch.setattr(finance, "resolve_account", cartao)
+    monkeypatch.setattr(finance, "verificar_limite_disponivel", estourado)
+    acoes = [dict(_WARDOGS[0]), {**_WARDOGS[1], "amount_cents": 10499}]
+    cfg = {"configurable": {"thread_id": "wardogs-5"}}
+    estado = await grafo.ainvoke(_estado(acoes), config=cfg)
+    valor = getattr(estado["__interrupt__"][0], "value", estado["__interrupt__"][0])
+    assert valor["kind"] == "soft_warning"
+
+    final = await grafo.ainvoke(Command(resume={"candidate_id": "change_card"}), config=cfg)
+    assert "__interrupt__" not in final
+    assert final["draft"] == {}
+    assert "EXECUTOU" not in final.get("results", [])
+    assert "Ainda não apaguei nem criei nada." in final["reply"]

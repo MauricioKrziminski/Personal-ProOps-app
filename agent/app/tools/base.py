@@ -60,6 +60,9 @@ class ToolResult:
     # True quando nada foi escrito (consulta, erro tratado, nada encontrado):
     # não gasta linha em executed_actions nem entra no desfazer.
     read_only: bool = False
+    # True quando a reserva de idempotência achou a ação JÁ executada (retentativa):
+    # não escreveu agora, mas escreveu antes — o par atômico conta como escrita.
+    ja_executada: bool = False
     # Especificação interativa para WhatsApp (botões/listas de paginação/filtros)
     interactive_spec: dict | None = None
     # Dados brutos estruturados (para cache de estado de consultas)

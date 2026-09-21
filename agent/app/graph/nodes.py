@@ -16,6 +16,7 @@ from app.graph.policy import (
     describe_for_confirmation,
     dominio_incerto,
     needs_confirmation,
+    par_de_substituicao,
 )
 from app.graph.prompts import FINANCE, FINANCE_QUERY, NOTES, ROUTER, user_turn
 from app.graph.schemas import (
@@ -41,6 +42,10 @@ from app.tools.finance import apply_rules
 from app.tools.registry import AJUDA, execute
 
 log = logging.getLogger(__name__)
+
+# D3 (21/09/2026): apagar/corrigir + criar é UM SIM, atômico. Quando o par para
+# antes da pergunta, esta é a frase que diz que nada mudou.
+NADA_DO_PAR = "Ainda não apaguei nem criei nada."
 
 AJUDA_GERAL = (
     "👋 Eu organizo suas finanças e suas notas por aqui. Manda coisas como:\n"
@@ -632,7 +637,14 @@ def _rascunho(state: AgentState, acoes: list, alvos: list[dict] | None = None) -
     resposta: o turno seguinte era uma mensagem nova, sem a compra. É o mesmo
     formato que `resource_node` já usa para o cadastro incompleto (`_pergunta`
     viajando junto da ação).
+
+    ⚠️ **Rascunho nunca nasce de um par de substituição** (D3). O rascunho guarda
+    só a criação; a outra metade (apagar/corrigir) se perderia, e completar o
+    rascunho depois criaria a compra nova ao lado da antiga — ou, como no
+    incidente das wardogs, o apagar já teria acontecido e a compra nunca nasceria.
     """
+    if par_de_substituicao(acoes, alvos or []):
+        return {}
     for i, (slot, pergunta) in _incompletas(state, acoes).items():
         return {
             "action": acoes[i].model_dump(mode="json"),
@@ -661,6 +673,9 @@ async def safe_node(state: AgentState) -> dict:
 
     confidence = state.get("confidence", 1.0)
     alvos = (list(state.get("targets") or []) + [{}] * len(acoes))[: len(acoes)]
+    if par_de_substituicao(acoes, alvos):
+        # par apagar/corrigir + criar: nada grava antes do SIM que cobre os dois
+        return {}
     bloqueadas = _incompletas(state, acoes)
     seguras = [
         (i, a) for i, (a, t) in enumerate(zip(acoes, alvos))
@@ -695,10 +710,12 @@ def _confirm_selection(state: AgentState, update: dict) -> dict:
     proposed={**state, **update}
     actions=_actions(proposed)
     targets=proposed.get('targets') or [{}]*len(actions)
+    # no par a criação entra na frase mesmo sem motivo próprio: o SIM a grava junto
+    par=par_de_substituicao(actions,targets)
     descriptions=[describe_for_confirmation(action,target or None)
                   for i,(action,target) in enumerate(zip(actions,targets))
                   if i not in _incompletas(proposed,actions)
-                  and needs_confirmation(action,proposed.get('confidence',1),target or None)
+                  and (i in par or needs_confirmation(action,proposed.get('confidence',1),target or None))
                   and target.get('status')!='none']
     if not descriptions:
         return update
@@ -741,6 +758,14 @@ async def _gate(state: AgentState) -> dict:
     alvos = (alvos + [{}] * len(acoes))[: len(acoes)]
 
     correction_errors = [t["correction_error"] for t in alvos if t.get("correction_error")]
+    par = par_de_substituicao(acoes, alvos)
+    if par and (correction_errors or _incompletas(state, acoes)):
+        # Par com uma metade que não fecha: para ANTES de qualquer interrupt. A
+        # pergunta do que falta já está em `results` (veio de `alvos`); aqui só
+        # entra o erro de conta e a garantia de que nada mudou. `draft: {}`
+        # explícito: rascunho do par perderia a outra metade (ver `_rascunho`).
+        return {"approved": False, "halted": True, "draft": {},
+                "results": [*state.get("results", []), *correction_errors, NADA_DO_PAR]}
     if correction_errors:
         return {"approved": False, "halted": True,
                 "results": [*state.get("results", []), *correction_errors]}
@@ -946,6 +971,14 @@ async def _gate(state: AgentState) -> dict:
                             # Replay the gate with the replacement card. Choosing it is
                             # not permission: its own limit and final summary must run.
                             return {"finance_actions": revised, "approved": False, "revision_pending": True}
+                        if par:
+                            # sem rascunho no par (ver `_rascunho`): a frase refeita
+                            # com o cartão certo recomeça as duas metades juntas
+                            return {
+                                "approved": False, "halted": True, "draft": {},
+                                "results": [*state.get("results", []),
+                                            f"💳 Me manda de novo dizendo o cartão. {NADA_DO_PAR}"],
+                            }
                         pergunta = f"💳 Qual outro cartão você prefere usar para esta compra de {cents_to_brl(acao.amount_cents)}?"
                         return {
                             "approved": False,
@@ -975,10 +1008,12 @@ async def _gate(state: AgentState) -> dict:
     # Ação incompleta não vira pergunta: o usuário já recebeu o pedido do que
     # falta, e confirmar "registrar None" não é uma decisão que dá para tomar.
     bloqueadas = _incompletas(state, acoes)
+    # No par, a criação sem motivo próprio entra como "lote" (o SIM a grava
+    # junto), e o aviso de limite já aceito não a tira da frase: um SIM, tudo nele.
     motivos = [
-        (a, alvo, needs_confirmation(a, confidence, alvo or None))
+        (a, alvo, needs_confirmation(a, confidence, alvo or None) or ("lote" if i in par else None))
         for i, (a, alvo) in enumerate(zip(acoes, alvos))
-        if i not in bloqueadas and i not in avisos_confirmados
+        if i not in bloqueadas and (i not in avisos_confirmados or i in par)
     ]
     pendentes = [(a, t, m) for a, t, m in motivos if m]
     if not pendentes:
@@ -1060,15 +1095,30 @@ async def _executar(
     alvos = (list(state.get("targets") or []) + [{}] * len(acoes))[: len(acoes)]
     ctx.siblings = list(indexadas)
 
+    # ⚠️ **Par de substituição é atômico** (D3): as criações rodam PRIMEIRO, e o
+    # apagar/corrigir só roda se todas escreveram. Ordem estável e índice
+    # ORIGINAL (é a chave de `executed_actions`). Lote comum: ordem e "falha
+    # isolada não derruba as outras" de sempre.
+    par = par_de_substituicao(acoes, alvos)
+    if par:
+        indexadas = sorted(indexadas, key=lambda ia: not _cria(ia[1]))
+    criacao_falhou = None
+
     linhas: list[str] = []
     spec_interativo: dict | None = None
     ultimo_data: dict | None = None
     for indice, acao in indexadas:
+        if criacao_falhou is not None and not _cria(acao):
+            linhas.append(_nao_fiz(acao, alvos[indice], criacao_falhou))
+            continue
         ctx.action_index = indice
         ctx.target = alvos[indice] or None
         if isinstance(acao, FinanceAction) and acao.type in RULE_APPLIES:
             acao = await apply_rules(ctx.workspace_id, acao)
         resultado = await execute(ctx, acao)
+        if (par and _cria(acao) and criacao_falhou is None
+                and resultado.read_only and not resultado.ja_executada):
+            criacao_falhou = acao
         if resultado.message:
             linhas.append(resultado.message)
         if resultado.interactive_spec:
@@ -1076,6 +1126,22 @@ async def _executar(
         if resultado.data:
             ultimo_data = resultado.data
     return linhas, spec_interativo, ultimo_data, ctx.created
+
+
+def _cria(acao) -> bool:
+    """A mesma régua de `par_de_substituicao`: `create_*` de finanças."""
+    return isinstance(acao, FinanceAction) and acao.type.value.startswith("create_")
+
+
+def _nao_fiz(acao, alvo: dict, criacao: FinanceAction) -> str:
+    verbo = {"delete_transaction": "apaguei", "undo_last": "apaguei",
+             "update_transaction": "corrigi"}.get(acao.type.value, "mexi em")
+    candidatos = (alvo or {}).get("candidates") or []
+    novo = criacao.description or criacao.category or "o lançamento novo"
+    if not candidatos:
+        # a frase de confirmação já começa com verbo ("apagar o seu…")
+        return f"⚠️ Não fiz: {describe_for_confirmation(acao, alvo or None)} — porque não consegui registrar {novo}."
+    return f"⚠️ Não {verbo} {candidatos[0]['label']} porque não consegui registrar {novo}."
 
 
 async def execute_node(state: AgentState) -> dict:
