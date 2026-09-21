@@ -101,6 +101,28 @@ _VERBO = {
 }
 
 
+def _outras_correcoes(action: FinanceAction, target: dict) -> list[str]:
+    """Os `new_*` que a correção comum mostra, MENOS o valor — que quem chama já
+    trata sozinho (editaveis/travado ou o valor cru da conversão).
+
+    A frase de plano tem que listar `nome → X`/`categoria → X`/etc. igual à
+    correção comum: um SIM que muda valor E nome só pode aprovar os dois se a
+    frase falar dos dois — perder um aqui é o usuário aprovando um efeito que
+    não leu.
+    """
+    outras = []
+    if action.new_category:
+        outras.append(f"categoria → {action.new_category}")
+    if action.new_occurred_at:
+        outras.append(f"data → {format_date_br(action.new_occurred_at)}")
+    if action.new_account:
+        account_name = (target.get("new_account") or {}).get("name", action.new_account)
+        outras.append(f"conta → {account_name}")
+    if action.new_description:
+        outras.append(f"nome → {action.new_description}")
+    return outras
+
+
 def _frase_correcao_plano(action: FinanceAction, target: dict, escolhido: dict) -> str:
     """Correção de VALOR num plano de parcelamento — por parcela, no total, ou sem dizer qual.
 
@@ -117,12 +139,14 @@ def _frase_correcao_plano(action: FinanceAction, target: dict, escolhido: dict) 
     label = escolhido["label"]
     novo = action.new_amount_cents
     unit = target.get("amount_unit")
+    outras = _outras_correcoes(action, target)
+    suffix = f", {', '.join(outras)}" if outras else ""
     if unit == "parcela":
         editaveis = escolhido["editaveis"]
         novo_total = escolhido["travado_cents"] + novo * editaveis
         return (
             f"corrigir {label}: {cents_to_brl(novo)} por parcela nas {editaveis} que ainda podem "
-            f"mudar (novo total {cents_to_brl(novo_total)}); as pagas ficam como estão"
+            f"mudar (novo total {cents_to_brl(novo_total)}){suffix}; as pagas ficam como estão"
         )
     if unit == "total":
         editaveis = escolhido["editaveis"]
@@ -130,14 +154,15 @@ def _frase_correcao_plano(action: FinanceAction, target: dict, escolhido: dict) 
         return (
             f"corrigir o total de {label}: {cents_to_brl(escolhido['total_cents'])} → "
             f"{cents_to_brl(novo)} em {escolhido['plan_installments']}x "
-            f"({cents_to_brl(diferenca)} divididos nas {editaveis} que podem mudar)"
+            f"({cents_to_brl(diferenca)} divididos nas {editaveis} que podem mudar){suffix}"
         )
     # Sem unidade a frase não pode ler como "nada muda": diz o valor novo e
     # pergunta qual dos dois caminhos é — T3 garante que a execução recusa sem
     # `amount_unit`, então a pergunta aqui é honesta, não decorativa.
+    outras_str = f" ({', '.join(outras)})" if outras else ""
     return (
-        f"corrigir {label}: novo valor {cents_to_brl(novo)} — é o total da compra ou o valor de "
-        f"cada parcela? As pagas ficam como estão de qualquer forma"
+        f"corrigir {label}: novo valor {cents_to_brl(novo)}{outras_str} — é o total da compra ou "
+        f"o valor de cada parcela? As pagas ficam como estão de qualquer forma"
     )
 
 
@@ -150,10 +175,11 @@ def _frase_conversao(action: FinanceAction, target: dict, escolhido: dict) -> st
     valor = action.new_amount_cents if action.new_amount_cents is not None else escolhido.get("amount_cents")
     valor_str = f" ({cents_to_brl(valor)})" if valor is not None else ""
     cartao = target["convert_account"]["name"]
-    quando = escolhido.get("when", "")
+    quando = escolhido.get("when")
+    quando_str = f", 1ª parcela em {quando}" if quando else ""
     return (
         f"parcelar {escolhido['label']}{valor_str} em {action.installments}x "
-        f"no cartão {cartao}, 1ª parcela em {quando}"
+        f"no cartão {cartao}{quando_str}"
     )
 
 
@@ -223,7 +249,8 @@ def describe_for_confirmation(
             ):
                 return _frase_correcao_plano(action, target, escolhido)
             if (
-                target.get("convert_account")
+                target.get("table") == "transactions"
+                and target.get("convert_account")
                 and isinstance(action, FinanceAction)
                 and action.type == FinanceActionType.UPDATE_TRANSACTION
                 and (action.installments or 0) >= 2

@@ -175,6 +175,32 @@ def test_correcao_de_plano_sem_unidade_nao_finge_que_nada_muda():
     assert "nada muda" not in frase
 
 
+def test_correcao_de_plano_por_parcela_com_nome_nao_perde_a_outra_correcao():
+    acao = FinanceAction(
+        type=FinanceActionType.UPDATE_TRANSACTION,
+        new_amount_cents=35000,
+        new_description="Nova TV",
+    )
+    frase = describe_for_confirmation(acao, _alvo_plano(amount_unit="parcela"))
+    assert frase == (
+        "corrigir TV: R$ 350,00 por parcela nas 8 que ainda podem mudar "
+        "(novo total R$ 3.400,00), nome → Nova TV; as pagas ficam como estão"
+    )
+
+
+def test_correcao_de_plano_no_total_com_categoria_nao_perde_a_outra_correcao():
+    acao = FinanceAction(
+        type=FinanceActionType.UPDATE_TRANSACTION,
+        new_amount_cents=340000,
+        new_category="eletronicos",
+    )
+    frase = describe_for_confirmation(acao, _alvo_plano(amount_unit="total"))
+    assert frase == (
+        "corrigir o total de TV: R$ 3.000,00 → R$ 3.400,00 em 10x "
+        "(R$ 2.800,00 divididos nas 8 que podem mudar), categoria → eletronicos"
+    )
+
+
 def test_correcao_de_plano_sem_unidade_nao_explode_com_candidato_de_hoje():
     """Estado intermediário entre T1 e T3: o resolvedor ainda não congela
     `editaveis`/`travado_cents` no candidato — só o ramo sem `amount_unit` roda
@@ -224,6 +250,52 @@ def test_conversao_em_parcelas_sem_valor_nao_inventa_zero():
     }
     frase = describe_for_confirmation(acao, alvo)
     assert "R$ 0,00" not in frase
+
+
+def test_conversao_exige_tabela_transactions():
+    """`convert_account` sozinho não basta — alvo fora de `transactions` (ex.:
+    um plano) não é a conversão D1, mesmo com `installments >= 2`."""
+    acao = FinanceAction(type=FinanceActionType.UPDATE_TRANSACTION, installments=2)
+    alvo = {
+        "table": "installment_plans",
+        "status": "found",
+        "convert_account": {"id": "acc1", "name": "Nubank"},
+        "candidates": [
+            {"id": "p1", "label": "TV", "table": "installment_plans", "plan_installments": 10}
+        ],
+    }
+    frase = describe_for_confirmation(acao, alvo)
+    assert "parcelar" not in frase
+    assert "cartão Nubank" not in frase
+
+
+def test_conversao_com_uma_parcela_nao_dispara():
+    acao = FinanceAction(type=FinanceActionType.UPDATE_TRANSACTION, installments=1, new_amount_cents=10499)
+    alvo = {
+        "table": "transactions",
+        "status": "found",
+        "convert_account": {"id": "acc1", "name": "Nubank"},
+        "candidates": [
+            {"id": "t1", "label": "wardogs", "table": "transactions", "when": "21/09/2026"}
+        ],
+    }
+    frase = describe_for_confirmation(acao, alvo)
+    assert "parcelar" not in frase
+
+
+def test_conversao_sem_data_omite_o_trecho():
+    acao = FinanceAction(
+        type=FinanceActionType.UPDATE_TRANSACTION, installments=2, new_amount_cents=10499
+    )
+    alvo = {
+        "table": "transactions",
+        "status": "found",
+        "convert_account": {"id": "acc1", "name": "Nubank"},
+        "candidates": [{"id": "t1", "label": "wardogs", "table": "transactions"}],  # sem "when"
+    }
+    frase = describe_for_confirmation(acao, alvo)
+    assert frase == "parcelar wardogs (R$ 104,99) em 2x no cartão Nubank"
+    assert "1ª parcela em" not in frase
 
 
 # ---------------------------------------------------------------------------
