@@ -147,13 +147,15 @@ def _frase_correcao_plano(action: FinanceAction, target: dict, escolhido: dict) 
     novo = action.new_amount_cents
     unit = target.get("amount_unit")
     outras = _outras_correcoes(action, target)
-    suffix = f", {', '.join(outras)}" if outras else ""
+    # "as pagas ficam como estão" vale para o VALOR; nome e categoria da compra mudam
+    # em todas as parcelas, inclusive as pagas (Reparcelar, finance.md)
+    suffix = f"; {', '.join(outras)} em todas as parcelas" if outras else ""
     if unit == "parcela":
         editaveis = escolhido["editaveis"]
         novo_total = escolhido["travado_cents"] + novo * editaveis
         return (
             f"corrigir {label}: {cents_to_brl(novo)} por parcela nas {editaveis} que ainda podem "
-            f"mudar (novo total {cents_to_brl(novo_total)}){suffix}; as pagas ficam como estão"
+            f"mudar (novo total {cents_to_brl(novo_total)}; as pagas ficam como estão){suffix}"
         )
     if unit == "total":
         editaveis = escolhido["editaveis"]

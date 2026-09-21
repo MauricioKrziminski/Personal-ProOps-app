@@ -154,7 +154,7 @@ def test_correcao_de_plano_por_parcela():
     frase = describe_for_confirmation(acao, _alvo_plano(amount_unit="parcela"))
     assert frase == (
         "corrigir TV: R$ 350,00 por parcela nas 8 que ainda podem mudar "
-        "(novo total R$ 3.400,00); as pagas ficam como estão"
+        "(novo total R$ 3.400,00; as pagas ficam como estão)"
     )
 
 
@@ -184,7 +184,8 @@ def test_correcao_de_plano_por_parcela_com_nome_nao_perde_a_outra_correcao():
     frase = describe_for_confirmation(acao, _alvo_plano(amount_unit="parcela"))
     assert frase == (
         "corrigir TV: R$ 350,00 por parcela nas 8 que ainda podem mudar "
-        "(novo total R$ 3.400,00), nome → Nova TV; as pagas ficam como estão"
+        "(novo total R$ 3.400,00; as pagas ficam como estão); "
+        "nome → Nova TV em todas as parcelas"
     )
 
 
@@ -197,7 +198,8 @@ def test_correcao_de_plano_no_total_com_categoria_nao_perde_a_outra_correcao():
     frase = describe_for_confirmation(acao, _alvo_plano(amount_unit="total"))
     assert frase == (
         "corrigir o total de TV: R$ 3.000,00 → R$ 3.400,00 em 10x "
-        "(R$ 2.800,00 divididos nas 8 que podem mudar), categoria → eletronicos"
+        "(R$ 2.800,00 divididos nas 8 que podem mudar); "
+        "categoria → eletronicos em todas as parcelas"
     )
 
 

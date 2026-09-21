@@ -912,8 +912,28 @@ async def update_transaction(ctx: ExecContext, action: FinanceAction) -> ToolRes
     trava = ""
     if parcela_do_snapshot and patch.keys() & {"amount_cents", "occurred_at", "account_id"}:
         trava = " and not private.parcela_travada(status, invoice_id)"
+    # Linha de compra parcelada: o total do plano acompanha, na MESMA operação (a
+    # soma é "as outras linhas + o valor novo", porque um CTE não enxerga o update do
+    # irmão). Sem isto a tela mostrava um total que não é a soma do que está embaixo.
+    # Não é `update_transaction_scoped(..., 'one', ...)`, que também recalcula: ela
+    # copia nome/categoria da PARCELA para o PLANO e não aceita data.
     updated = await db.fetch_one(
-        f"update public.transactions set {colunas} where id = %s and workspace_id = %s{trava}{account_guard} returning id",
+        f"""
+        with u as (
+            update public.transactions set {colunas}
+            where id = %s and workspace_id = %s{trava}{account_guard}
+            returning id, amount_cents, installment_plan_id, workspace_id
+        ), plano as (
+            update public.installment_plans p
+               set total_cents = u.amount_cents + coalesce((select sum(t.amount_cents)
+                     from public.transactions t
+                     where t.installment_plan_id = p.id and t.workspace_id = p.workspace_id
+                       and t.id <> u.id), 0),
+                   updated_at = now()
+            from u where p.id = u.installment_plan_id and p.workspace_id = u.workspace_id
+        )
+        select id from u
+        """,
         *args,
     )
     if not updated and trava:
@@ -973,6 +993,8 @@ async def _corrigir_plano(ctx: ExecContext, action: FinanceAction) -> ToolResult
         )
 
     cands = (ctx.target or {}).get("candidates") or []
+    if action.new_amount_cents is None:
+        return await _renomear_plano(ctx, action, cands[0])
     plano = await db.fetch_one(
         f"""
         select p.id, p.total_cents, p.installments, p.first_occurred_at, p.description,
@@ -986,18 +1008,16 @@ async def _corrigir_plano(ctx: ExecContext, action: FinanceAction) -> ToolResult
     if not plano:
         return ToolResult("🤷 Essa compra parcelada não está mais aqui.", read_only=True)
 
-    total = int(plano["total_cents"])
-    if action.new_amount_cents is not None:
-        valor = guards.require_amount(action.new_amount_cents, o_que="o valor novo")
-        if unidade == "total":
-            total = valor
-        else:
-            # lido AGORA, não do que a frase do SIM congelou: entre a pergunta e o SIM
-            # uma fatura pode ter sido paga
-            editaveis = int(plano["editaveis"] or 0)
-            if editaveis == 0:
-                return ToolResult(NADA_EDITAVEL, read_only=True)
-            total = int(plano["travado_cents"] or 0) + valor * editaveis
+    valor = guards.require_amount(action.new_amount_cents, o_que="o valor novo")
+    if unidade == "total":
+        total = valor
+    else:
+        # lido AGORA, não do que a frase do SIM congelou: entre a pergunta e o SIM
+        # uma fatura pode ter sido paga
+        editaveis = int(plano["editaveis"] or 0)
+        if editaveis == 0:
+            return ToolResult(NADA_EDITAVEL, read_only=True)
+        total = int(plano["travado_cents"] or 0) + valor * editaveis
     descricao = (guards.require_text(action.new_description, o_que="a descrição nova", maximo=200)
                  if action.new_description else plano["description"])
     categoria = guards.clean_category(action.new_category) if action.new_category else plano["category"]
@@ -1014,18 +1034,68 @@ async def _corrigir_plano(ctx: ExecContext, action: FinanceAction) -> ToolResult
         raise Level1Error(f"❌ {motivo}. Ainda não mudei nada.") from err
 
     nome = descricao or plano["merchant"] or "a compra"
-    mudancas = []
-    if total != int(plano["total_cents"]):
-        mudancas.append(f"total {cents_to_brl(int(plano['total_cents']))} → {cents_to_brl(total)} "
-                        f"em {plano['installments']}x")
+    texto = (f"✏️ Corrigi *{nome}*: total {cents_to_brl(int(plano['total_cents']))} → "
+             f"{cents_to_brl(total)} em {plano['installments']}x — as já pagas ficaram como estavam")
+    outras = _nome_e_categoria(action, descricao, categoria)
+    if outras:
+        texto += f"; {outras} em todas as parcelas"
+    return ToolResult(texto + ".", result_id=str(plano["id"]))
+
+
+def _nome_e_categoria(action: FinanceAction, descricao, categoria) -> str:
+    partes = []
     if action.new_description:
-        mudancas.append(f"nome → *{descricao}*")
+        partes.append(f"nome → *{descricao}*")
     if action.new_category:
-        mudancas.append(f"categoria → *{categoria}*")
+        partes.append(f"categoria → *{categoria}*")
+    return ", ".join(partes)
+
+
+# ponytail: segunda cópia do formato "(k/N)" da descrição da parcela — a primeira é o
+# ramo `else` de `update_installment_plan` (20260920120000). A RPC não tem modo "só
+# nome": sem parcela travada ela reescreve valor, data e conta de todas as linhas.
+# `test_o_sufixo_da_parcela_e_o_mesmo_da_rpc` prende as duas; mudou lá, muda aqui.
+_SUFIXO_DA_PARCELA = "|| ' (' || t.installment_no || '/' || p.installments || ')'"
+
+
+async def _renomear_plano(ctx: ExecContext, action: FinanceAction, cand: dict) -> ToolResult:
+    """Nome e categoria da compra inteira — no plano e em TODAS as linhas, inclusive as
+    pagas (Reparcelar, finance.md: nome e categoria são da COMPRA). Dinheiro, data e
+    conta não são tocados. Um statement só: o plano e as linhas mudam juntos ou nada."""
+    descricao = (guards.require_text(action.new_description, o_que="a descrição nova", maximo=200)
+                 if action.new_description else None)
+    categoria = guards.clean_category(action.new_category) if action.new_category else None
+    row = await db.fetch_one(
+        f"""
+        with p as (
+            update public.installment_plans p
+               set description = coalesce(%s, p.description),
+                   category = coalesce(%s, p.category),
+                   updated_at = now()
+            where p.id = %s and p.workspace_id = %s
+            returning p.id, p.workspace_id, p.description, p.merchant, p.category, p.installments
+        ), linhas as (
+            update public.transactions t
+               set description = coalesce(p.description, p.merchant, 'Compra parcelada')
+                                 {_SUFIXO_DA_PARCELA},
+                   merchant = p.merchant,
+                   category = p.category
+            from p
+            where t.installment_plan_id = p.id and t.workspace_id = p.workspace_id
+              and t.installment_no is not null
+            returning t.id
+        )
+        select p.id, p.description, p.merchant, (select count(*) from linhas) as linhas from p
+        """,
+        descricao, categoria, cand["id"], ctx.workspace_id,
+    )
+    if not row:
+        return ToolResult("🤷 Essa compra parcelada não está mais aqui.", read_only=True)
+    nome = row.get("description") or row.get("merchant") or cand.get("label") or "a compra"
     return ToolResult(
-        f"✏️ Corrigi *{nome}*: {', '.join(mudancas) or 'sem mudança'}. "
-        "As já pagas ficaram como estavam.",
-        result_id=str(plano["id"]),
+        f"✏️ Corrigi *{nome}*: {_nome_e_categoria(action, descricao, categoria)} "
+        "em todas as parcelas.",
+        result_id=str(row["id"]),
     )
 
 

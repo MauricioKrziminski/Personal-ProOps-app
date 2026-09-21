@@ -249,15 +249,44 @@ class TestEdicaoPlano:
         assert not any("update_installment_plan" in q for q, _ in chamadas)
 
     @pytest.mark.asyncio
-    async def test_renomear_plano_passa_o_total_atual_pela_rpc(self, monkeypatch):
-        chamadas = self._duble(monkeypatch)
-        await finance.update_transaction(
+    async def test_renomear_plano_nao_passa_pela_rpc_nem_toca_dinheiro_data_ou_conta(self, monkeypatch):
+        """Sem parcela travada a RPC reescreve o contrato inteiro: uma parcela editada à
+        mão voltaria à divisão igual só porque a pessoa trocou o nome."""
+        chamadas = []
+
+        async def fetch_one(sql, *args):
+            chamadas.append((" ".join(sql.split()), args))
+            return {"id": "plano-1", "linhas": 10}
+
+        monkeypatch.setattr(finance.db, "fetch_one", fetch_one)
+        r = await finance.update_transaction(
             _ctx_plano(),
             FinanceAction(type=FinanceActionType.UPDATE_TRANSACTION, new_description="TV sala",
                           new_category="casa"),
         )
-        rpc = [a for q, a in chamadas if "update_installment_plan" in q]
-        assert rpc == [("plano-1", 300000, 10, "2026-05-15", "TV sala", "casa", "Magalu", "acc-1")]
+        assert not any("update_installment_plan" in q for q, _ in chamadas)
+        assert len(chamadas) == 1
+        sql, args = chamadas[0]
+        import re
+
+        sets = " ".join(parte.split(" where ")[0] for parte in sql.split(" set ")[1:])
+        atribuidas = set(re.findall(r"(?:^|,)\s*(\w+) =", sets))
+        assert atribuidas == {"description", "category", "merchant", "updated_at"}
+        assert "update public.installment_plans" in sql and "update public.transactions" in sql
+        assert "p.workspace_id = %s" in sql and "t.workspace_id = p.workspace_id" in sql
+        assert WS in args
+        assert "TV sala" in args and "casa" in args
+        assert "já pagas ficaram" not in r.message and "todas as parcelas" in r.message
+
+    def test_o_sufixo_da_parcela_e_o_mesmo_da_rpc(self):
+        """Segunda cópia do formato "(k/N)": se a RPC mudar, este teste quebra."""
+        from pathlib import Path
+
+        rpc = (Path(__file__).parents[2] / "supabase/migrations"
+               / "20260920120000_parcelar_um_lancamento_que_ja_existe.sql").read_text()
+        assert "description = nome || ' (' || t.installment_no || '/' || p_installments || ')'" in rpc
+        assert "coalesce(p_description, p_merchant, 'Compra parcelada')" in rpc
+        assert finance._SUFIXO_DA_PARCELA == "|| ' (' || t.installment_no || '/' || p.installments || ')'"
 
     @pytest.mark.asyncio
     async def test_valor_sem_unidade_nunca_cai_em_parcela(self, monkeypatch):
@@ -351,8 +380,12 @@ class TestEdicaoPlano:
             _ctx_snapshot({"id": LINHA, "installment_no": 3, "amount_cents": 25000}),
             FinanceAction(type=FinanceActionType.UPDATE_TRANSACTION, new_amount_cents=30000),
         )
-        update = [c for c in chamadas if c[0].startswith("update public.transactions")]
+        update = [c for c in chamadas if "update public.transactions" in c[0]]
         assert len(update) == 1
+        # o total do plano acompanha a linha, na MESMA operação e com workspace
+        assert "update public.installment_plans" in update[0][0]
+        assert "total_cents = u.amount_cents + coalesce((select sum(t.amount_cents)" in update[0][0]
+        assert "p.workspace_id = u.workspace_id" in update[0][0]
         assert LINHA in update[0][1] and WS in update[0][1]
         assert "workspace_id = %s" in update[0][0]
         assert "parcela_travada" in update[0][0]
