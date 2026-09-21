@@ -73,6 +73,38 @@ async def test_reaproveita_a_resposta_do_mesmo_turno(monkeypatch):
 
 
 @pytest.mark.asyncio
+async def test_turno_que_parou_no_MEIO_nao_e_recuperado(monkeypatch):
+    """O modelo caiu (402) depois de o input virar checkpoint: o estado tem o
+    `source_message_id` deste turno, mas o grafo NUNCA terminou — há nós
+    pendentes. Reaproveitar devolvia `reply=""`, que virava "…" gravado como
+    turno concluído, e a mensagem nunca era processada. Tem que reexecutar."""
+    instantaneo = SimpleNamespace(
+        values={"source_message_id": "app:abc", "reply": ""},
+        interrupts=[],
+        next=("router",),
+    )
+    _grafo(monkeypatch, instantaneo)
+
+    assert await conversation.recover_turn(SESSAO, source_message_id="app:abc") is None
+
+
+@pytest.mark.asyncio
+async def test_turno_TERMINADO_sem_pendencia_e_recuperado(monkeypatch):
+    instantaneo = SimpleNamespace(
+        values={"source_message_id": "app:abc", "reply": "R$ 1.234,00", "results": []},
+        interrupts=[],
+        next=(),
+    )
+    _grafo(monkeypatch, instantaneo)
+
+    async def sem_rascunho(session_id):
+        return None
+
+    monkeypatch.setattr(conversation.db, "open_draft", sem_rascunho)
+    assert await conversation.recover_turn(SESSAO, source_message_id="app:abc") == "R$ 1.234,00"
+
+
+@pytest.mark.asyncio
 async def test_checkpoint_de_OUTRO_turno_nao_serve(monkeypatch):
     """A trava do mecanismo. Sem ela, um retry com UUID novo receberia a resposta
     do turno anterior — pior que reexecutar e pior que devolver erro."""
@@ -104,6 +136,7 @@ async def test_turno_pausado_no_HITL_devolve_a_pergunta(monkeypatch):
     instantaneo = SimpleNamespace(
         values={"source_message_id": "app:abc"},
         interrupts=[SimpleNamespace(value=pausa)],
+        next=("gate",),  # parado num interrupt() também tem nó pendente
     )
     _grafo(monkeypatch, instantaneo)
 

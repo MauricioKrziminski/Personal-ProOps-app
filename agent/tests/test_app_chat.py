@@ -25,6 +25,9 @@ import pytest
 from app import app_chat
 from app.config import get_settings
 
+# o `recover_turn` REAL, guardado antes de a fixture `repo` trocá-lo por dublê
+_RECOVER_REAL = app_chat.conversation.recover_turn
+
 USER = UUID("11111111-1111-1111-1111-111111111111")
 WORKSPACE = UUID("22222222-2222-2222-2222-222222222222")
 OUTRO_USER = UUID("99999999-9999-9999-9999-999999999999")
@@ -408,6 +411,53 @@ async def test_turno_falho_recupera_o_checkpoint_antes_de_reexecutar(repo):
     assert repo.recuperacoes == [f"app:{falho}"]
     assert repo.turnos == [], "o turno recuperado rodou o grafo de novo e duplicaria"
     assert r.assistant_message["content"] == "✅ Anotei: R$ 45,00 no mercado."
+
+
+@pytest.mark.asyncio
+async def test_retry_de_turno_que_caiu_no_modelo_reexecuta_em_vez_de_responder_reticencias(
+    repo, monkeypatch
+):
+    """Reproduzido no emulador (21/09/2026), Gemini em 402: o input virou
+    checkpoint com o `source_message_id` e o grafo morreu no primeiro nó. O
+    "Tentar novamente" achava esse checkpoint, devolvia `reply=""` e o turno
+    fechava como concluído com "…" — a mensagem nunca era processada."""
+    from types import SimpleNamespace
+
+    import app.graph.build as build_mod
+
+    cid = uuid4()
+    inicial = await app_chat.create_conversation(
+        user_id=USER, client_message_id=cid, content="oi"
+    )
+    sid = inicial.conversation["id"]
+
+    falho = uuid4()
+    repo.mensagens.append(
+        {"id": uuid4(), "session_id": sid, "client_message_id": falho, "role": "user",
+         "content": "gastei 45", "in_reply_to": None, "status": "failed",
+         "error_code": "internal", "ui_payload": None, "sequence": 9}
+    )
+    repo.turnos.clear()
+
+    parcial = SimpleNamespace(
+        values={"source_message_id": f"app:{falho}", "reply": ""},
+        interrupts=[],
+        next=("router",),
+    )
+
+    async def aget_state(config):
+        return parcial
+
+    monkeypatch.setattr(build_mod, "graph", lambda: SimpleNamespace(aget_state=aget_state))
+    monkeypatch.setattr(app_chat.conversation, "recover_turn", _RECOVER_REAL)
+
+    r = await app_chat.send_message(
+        user_id=USER, session_id=sid, client_message_id=falho, content="gastei 45"
+    )
+
+    assert len(repo.turnos) == 1, "o turno que parou no meio não foi reexecutado"
+    assert repo.turnos[0]["source_message_id"] == f"app:{falho}"
+    assert r.assistant_message["content"] == "R$ 1.234,00"
 
 
 @pytest.mark.asyncio

@@ -943,7 +943,8 @@ async def recover_turn(sessao: dict, *, source_message_id: str) -> str | dict | 
     lançamento que já entrou.
 
     A trava é o `source_message_id`: só reaproveita o checkpoint quando ele é do
-    MESMO turno. De outro turno, devolve None e o chamador executa normalmente.
+    MESMO turno E o grafo terminou (ou parou num `interrupt()`). De outro turno,
+    ou parado no meio por exceção, devolve None e o chamador executa de novo.
     """
     from app.graph.build import graph
 
@@ -964,6 +965,15 @@ async def recover_turn(sessao: dict, *, source_message_id: str) -> str | dict | 
     if pausa:
         pendente = await db.open_pending(sessao["id"])
         return _pergunta(pausa, pausa.get("options") or [], pendente)
+
+    # Nó pendente SEM interrupt = o grafo morreu no meio (modelo em 402, banco
+    # caído). O LangGraph grava o input como checkpoint antes do primeiro nó,
+    # então o `source_message_id` bate — mas o `reply` é o "" do estado base, e
+    # devolvê-lo fechava o turno com "…" sem processar nada. None reexecuta: o
+    # input novo no mesmo thread descarta as tarefas inacabadas, e o que já
+    # escreveu é pulado pela reserva em `executed_actions` (mesma chave).
+    if getattr(instantaneo, "next", None):
+        return None
 
     return await _resposta_do_estado(sessao, estado, thread)
 
