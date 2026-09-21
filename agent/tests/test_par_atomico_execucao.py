@@ -50,7 +50,7 @@ def banco(monkeypatch):
 
     async def apagar(ctx, acao):
         chamadas.append(f"delete#{ctx.action_index}")
-        return ToolResult("🗑️ Apaguei wardogs.", result_id=None)
+        return ToolResult("🗑️ Apaguei wardogs.", result_id="tx-w")
 
     monkeypatch.setattr(registry.db, "reserve_execution", reserve)
     monkeypatch.setattr(registry.db, "execution_result_id", carimbo)
@@ -130,9 +130,11 @@ async def test_retentativa_com_a_criacao_ja_gravada_segue_para_o_apagar(monkeypa
     ja_feitas[1] = "tx-nova"
     _criar(monkeypatch, chamadas, ToolResult("nunca", result_id=None))
 
-    await nodes.execute_node(_estado(PAR, [ALVO, {}]))
+    ret = await nodes.execute_node(_estado(PAR, [ALVO, {}]))
 
     assert chamadas == ["delete#0"]
+    # I3: o id do apagado não vira antecedente na retentativa
+    assert "last_write_id" not in ret
 
 
 @pytest.mark.asyncio

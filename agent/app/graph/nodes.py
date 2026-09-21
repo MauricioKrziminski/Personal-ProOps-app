@@ -1117,7 +1117,9 @@ async def _executar(
         if (par and _cria(acao) and criacao_falhou is None
                 and resultado.read_only and not resultado.ja_executada):
             criacao_falhou = acao
-        if par and _cria(acao) and not resultado.read_only:
+        if par and _cria(acao) and (not resultado.read_only or resultado.ja_executada):
+            # retentativa (`ja_executada`): a criação é de outra tentativa; sem o id
+            # dela aqui, `[:marca]` fica vazio e o antecedente anterior é preservado
             marca = len(ctx.created)
         if resultado.message:
             linhas.append(resultado.message)
@@ -1125,7 +1127,7 @@ async def _executar(
             spec_interativo = resultado.interactive_spec
         if resultado.data:
             ultimo_data = resultado.data
-    escritos = ctx.created[:marca] if marca else ctx.created
+    escritos = ctx.created[:marca] if marca is not None else ctx.created
     return linhas, spec_interativo, ultimo_data, escritos
 
 
