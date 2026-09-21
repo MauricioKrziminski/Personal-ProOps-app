@@ -981,8 +981,11 @@ async def update_transaction(ctx: ExecContext, action: FinanceAction) -> ToolRes
 
 
 async def _corrigir_plano(ctx: ExecContext, action: FinanceAction) -> ToolResult:
-    """A COMPRA inteira — valor (total ou por parcela), nome, categoria — pela RPC do
-    "Editar a compra" do app, `update_installment_plan`, com o MESMO número de parcelas.
+    """A COMPRA inteira. Com VALOR (total ou por parcela, e nome/categoria junto) vai
+    pela RPC do "Editar a compra" do app, `update_installment_plan`, com o MESMO número
+    de parcelas e a data REAL da parcela 1. Só nome/categoria vai por `_renomear_plano`
+    (sem parcela travada a RPC reescreveria valor, data e conta de todas as linhas) — e
+    só com candidato do gate novo (`editaveis`): a frase de antes prometia outra coisa.
 
     Por que não `update_transaction_scoped`: ela mexe em parcela `pending` de fatura
     paga EM PARTE, e a frase do SIM promete que as pagas ficam como estão. Quem decide
