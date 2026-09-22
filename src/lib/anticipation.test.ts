@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 
 import {
+  adiantaveisNoMes,
   agruparHipoteses,
   quantasQueCabem,
   substituirGrupo,
@@ -96,4 +97,27 @@ test('8 parcelas escolhidas em setembro assentam no que cabe em dezembro, sem er
   assert.equal(quantasQueCabem({ ...carro, events: carro.events.slice(0, 1) }, 2), 1);
   assert.equal(quantasQueCabem(carro, 0), 1, 'nunca abaixo de 1');
   assert.equal(quantasQueCabem(null, 99), 99, 'sem item, guarda o que foi pedido');
+});
+
+test('cada mês à frente tira UMA parcela, e ir e voltar dá sempre o mesmo número', () => {
+  // a tv do print: 9 parcelas a vencer, a primeira em 10/10
+  const tv: Adiantavel = {
+    source: 'plan', ref_id: 'tv', title: 'tv', account_name: 'Nubank Cartão', total_n: 10, taxa: null,
+    events: Array.from({ length: 9 }, (_, k) => {
+      const mes = 10 + k;
+      const ano = mes > 12 ? 2027 : 2026;
+      const day = `${ano}-${String(((mes - 1) % 12) + 1).padStart(2, '0')}-10`;
+      return { n: k + 2, day, cents: 30000, pv_cents: 30000 };
+    }),
+  };
+  const n = (pagarEm: string) => adiantaveisNoMes([tv], pagarEm)[0]?.events.length ?? 0;
+  assert.equal(n('2026-09-22'), 9, 'setembro (hoje): as 9');
+  assert.equal(n('2026-10-01'), 8, 'outubro: a de 10/10 sai no próprio mês');
+  assert.equal(n('2026-11-01'), 7);
+  assert.equal(n('2026-10-01'), 8, 'voltar devolve o mesmo');
+  assert.equal(n('2027-06-01'), 0, 'no mês da última, nada a adiantar');
+  assert.equal(adiantaveisNoMes([tv], '2027-06-01').length, 0, 'item sem nada depois some');
+  // e a quantidade pedida assenta junto, guardando a escolha
+  assert.equal(quantasQueCabem(adiantaveisNoMes([tv], '2026-10-01')[0], 9), 8);
+  assert.equal(quantasQueCabem(adiantaveisNoMes([tv], '2026-09-22')[0], 9), 9);
 });

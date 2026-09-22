@@ -11,7 +11,7 @@ import type { DebtPaymentRow } from '@/lib/debt-history';
 import { agentFetch } from '@/lib/agent-api';
 import { toIlikeTerm } from '@/lib/search';
 import { ACCOUNT_TYPES } from '@/lib/accounts';
-import type { Adiantavel, EscolhaDeAdiantamento } from '@/lib/anticipation';
+import { adiantaveisNoMes, type Adiantavel, type EscolhaDeAdiantamento } from '@/lib/anticipation';
 import { useRealtimeInvalidate, workspaceId } from '@/hooks/use-items';
 
 // Categorias vivem em @/lib/categories (fonte única, travada por teste contra o
@@ -885,6 +885,9 @@ export function useAnticipationCandidates(pagarEm: string, enabled = true) {
       if (error) throw error;
       return (data ?? []) as unknown as Adiantavel[];
     },
+    // A régua do MÊS (`adiantaveisNoMes`) vale também sobre o placeholder: enquanto o mês novo
+    // carrega, a lista do anterior já aparece recortada no mês novo, sem piscar o número velho.
+    select: (lista) => adiantaveisNoMes(lista, pagarEm),
   });
 }
 
@@ -1084,7 +1087,7 @@ export type ImportItem = Pick<
    * tem (nome e data que ela mesma escreveu) contra o que o banco mandou. Sem isso a linha diria
    * "parece já lançado" sem dizer com o quê, e a decisão viraria um chute.
    */
-  transactions: { id: string; occurred_at: string; description: string | null } | null;
+  transactions: { id: string; occurred_at: string; description: string | null; amount_cents: number } | null;
 };
 
 export type CategorizationRule = Pick<
@@ -1149,7 +1152,7 @@ export function useImportItems(batchId: string | undefined) {
       const { data, error } = await supabase
         .from('import_items')
         .select(
-          'id, batch_id, kind, amount_cents, occurred_at, description, merchant, suggested_category, status, transaction_id, nature, installment_no, installments, match_layer, match_note, adopt_ids, transactions!import_items_transaction_id_fkey(id, occurred_at, description)',
+          'id, batch_id, kind, amount_cents, occurred_at, description, merchant, suggested_category, status, transaction_id, nature, installment_no, installments, match_layer, match_note, adopt_ids, transactions!import_items_transaction_id_fkey(id, occurred_at, description, amount_cents)',
         )
         .eq('batch_id', batchId!)
         .order('occurred_at', { ascending: false });
@@ -1276,14 +1279,30 @@ export function useUpdateImportItem() {
  * é de cada ocorrência; propagar empilharia a série no mesmo dia). O caminho é o mesmo
  * `update` direto que `useSaveTransaction` já usa, sob RLS.
  */
-export function useFixImportItemDate() {
+/**
+ * "O extrato é a fonte da verdade": o lançamento do app que o item É passa a ter a data e o
+ * valor do banco — o previsto do dentista (R$ 177,01 em 10/09) vira o que foi cobrado
+ * (R$ 193,57 em 13/09). Na CONTA o banco ainda prova que aconteceu, e o previsto é baixado; no
+ * cartão a baixa continua sendo da fatura.
+ */
+export function useApplyImportToExisting() {
   const invalidate = useInvalidateFinance();
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: async (input: { itemId: string; transactionId: string; occurredAt: string }) => {
+    mutationFn: async (input: {
+      itemId: string;
+      transactionId: string;
+      occurredAt: string;
+      amountCents: number;
+      baixar: boolean;
+    }) => {
       const { error } = await supabase
         .from('transactions')
-        .update({ occurred_at: input.occurredAt })
+        .update({
+          occurred_at: input.occurredAt,
+          amount_cents: input.amountCents,
+          ...(input.baixar ? { status: 'cleared' as const } : {}),
+        })
         .eq('id', input.transactionId);
       if (error) throw error;
       // Só depois de a correção passar: o item some da revisão porque o dinheiro já está no app.

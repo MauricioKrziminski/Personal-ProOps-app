@@ -39,7 +39,7 @@ import {
   useImportItems,
   useImportUnmatched,
   useDeleteTransaction,
-  useFixImportItemDate,
+  useApplyImportToExisting,
   useImportStatement,
   useUpdateImportItem,
   type ImportItem,
@@ -139,7 +139,7 @@ export default function ImportScreen() {
   const accountsQuery = useAccounts();
   const accounts = accountsQuery.data;
   const importar = useImportStatement();
-  const corrigirData = useFixImportItemDate();
+  const usarDoExtrato = useApplyImportToExisting();
   const { semTrancar } = useLock();
   const apagarLancamento = useDeleteTransaction();
   const [batchId, setBatchId] = useState<string | undefined>(params.batch);
@@ -286,7 +286,7 @@ export default function ImportScreen() {
 
   /**
    * As saídas de uma linha. Nenhuma é automática: o app achou o par, quem decide é a pessoa.
-   * "Corrigir a data" só existe onde o par está com OUTRO dia — o extrato é a fonte de QUANDO.
+   * "Usar no app" só existe onde o par difere no dia ou no VALOR — o extrato é a fonte dos dois.
    */
   const acoes = useCallback((id: string) => {
     const item = (items ?? []).find((i) => i.id === id);
@@ -297,20 +297,25 @@ export default function ImportScreen() {
       ...(alvo
         ? [{ label: 'Abrir o lançamento do app', onPress: () => router.push(`/finance/${alvo.id}`) }]
         : []),
-      ...(alvo && item.status === 'near_match' && alvo.occurred_at !== item.occurred_at
+      ...(alvo && (item.status === 'near_match' || item.status === 'uncertain') &&
+      (alvo.occurred_at !== item.occurred_at || alvo.amount_cents !== item.amount_cents)
         ? [
             {
-              label: `Corrigir a data no app para ${formatDateBR(item.occurred_at)}`,
+              label: alvo.amount_cents !== item.amount_cents
+                ? `Usar no app o valor do extrato (${brl(item.amount_cents)})`
+                : `Corrigir a data no app para ${formatDateBR(item.occurred_at)}`,
               onPress: () =>
-                corrigirData.mutate(
-                  { itemId: item.id, transactionId: alvo.id, occurredAt: item.occurred_at },
+                usarDoExtrato.mutate(
                   {
-                    onSuccess: () =>
-                      toast({
-                        message: `Data corrigida para ${formatDateBR(item.occurred_at)}.`,
-                        tone: 'success',
-                      }),
-                    onError: () => toast({ message: 'Não deu para corrigir a data.', tone: 'error' }),
+                    itemId: item.id,
+                    transactionId: alvo.id,
+                    occurredAt: item.occurred_at,
+                    amountCents: item.amount_cents,
+                    baixar: !cartao,
+                  },
+                  {
+                    onSuccess: () => toast({ message: 'Lançamento do app atualizado pelo extrato.', tone: 'success' }),
+                    onError: () => toast({ message: 'Não deu para atualizar o lançamento.', tone: 'error' }),
                   }
                 ),
             },
@@ -318,7 +323,7 @@ export default function ImportScreen() {
         : []),
     ]);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [items]);
+  }, [items, cartao, brl]);
 
   // ── Etapa 1: trazer o arquivo ────────────────────────────────────────────
   if (!batchId) {

@@ -33,10 +33,28 @@ export type Adiantavel = {
 export type Quais = 'ultimas' | 'proximas';
 
 /**
+ * O que dá para adiantar pagando no MÊS de `pagarEm`: só o que vence DEPOIS desse mês.
+ *
+ * ⚠️ A régua é o mês, não o dia (22/09/2026). O "Pagar em" escolhe um MÊS e o pagamento cai no
+ * 1º dia dele; com a régua do dia, a parcela de 10/10 continuava "adiantável" pagando em
+ * outubro, e a tv mostrava 9 parcelas em setembro E em outubro — a queixa foi literal: *"se eu
+ * passo para outubro ele ainda fica com 9 parcelas"*. A parcela do próprio mês sai nele de todo
+ * jeito; adiantar é trazer as dos meses SEGUINTES. Item sem nada depois do mês some da lista.
+ *
+ * Idempotente e só função do mês: ir e voltar entre meses sempre dá a mesma lista.
+ */
+export function adiantaveisNoMes(lista: Adiantavel[], pagarEm: string): Adiantavel[] {
+  const mes = pagarEm.slice(0, 7);
+  return lista
+    .map((i) => ({ ...i, events: i.events.filter((e) => e.day.slice(0, 7) > mes) }))
+    .filter((i) => i.events.length > 0);
+}
+
+/**
  * Quantas parcelas valem de fato: a pedida, ASSENTADA no que ainda dá para adiantar.
  *
- * ⚠️ O que dá para adiantar DEPENDE do dia do pagamento: só entra parcela que vence depois dele
- * (`anticipation_candidates`). Escolher 8 pagando em setembro e trocar para dezembro deixa 3.
+ * ⚠️ O que dá para adiantar DEPENDE do mês do pagamento: só entra parcela dos meses seguintes
+ * (`adiantaveisNoMes`). Escolher 8 pagando em setembro e trocar para dezembro deixa 5.
  * Em 22/09/2026 isso virou um erro que travava a hipótese; o dono do produto pediu o contrário —
  * *"o número de parcelas tem que diminuir automaticamente e não mostrar erro"*. O campo, o valor
  * sugerido e a hipótese leem ESTE número, então nenhum deles diz 8 enquanto outro grava 3. A
