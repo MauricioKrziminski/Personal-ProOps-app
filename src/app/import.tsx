@@ -20,6 +20,7 @@ import { Button } from '@/components/ui/button';
 import { EmptyState } from '@/components/ui/empty-state';
 import { Icon } from '@/components/ui/icon';
 import { Money } from '@/components/ui/money';
+import { Note } from '@/components/ui/note';
 import { Row, Section } from '@/components/ui/row';
 import { Segmented } from '@/components/ui/segmented';
 import { Screen } from '@/components/ui/screen';
@@ -29,21 +30,33 @@ import { useToast } from '@/components/ui/toast';
 import { useLock } from '@/hooks/use-lock';
 import { Motion, Radius, Space } from '@/design/tokens';
 import { formatDateBR } from '@/hooks/use-items';
+import { useBRL } from '@/components/ui/conceal';
 import { confirmDestructive, showItemActions } from '@/lib/item-actions';
 import { SUGGESTED_CATEGORIES } from '@/lib/categories';
 import {
   useAccounts,
-  useApproveImportItems,
-  useDiscardImportItems,
+  useFinishImport,
+  useImportBatch,
   useImportItems,
   useImportUnmatched,
   useDeleteTransaction,
   useFixImportItemDate,
-  useUnmatchImportItem,
   useImportStatement,
   useUpdateImportItem,
   type ImportItem,
 } from '@/hooks/use-finance';
+import { ImportRow } from '@/components/finance/import-row';
+import {
+  TITULO_DO_GRUPO,
+  agrupar,
+  fraseDaParcela,
+  grupoDe,
+  motivoDaLinha,
+  nomeDoItem,
+  selecaoInicial,
+  totais,
+  type Grupo,
+} from '@/lib/import-preview';
 import { useTheme } from '@/hooks/use-theme';
 import { AccountPicker } from '@/components/finance/account-picker';
 
@@ -111,15 +124,18 @@ function traduzErro(err: unknown): FalhaImport {
 }
 
 /**
- * Importar extrato — o substituto do Open Finance.
+ * Importar extrato ou fatura — o substituto do Open Finance.
  *
- * Duas etapas, cada uma uma tela inteira: escolher o arquivo, depois revisar o lote. **Duplicata
- * é marcação, não bloqueio** (dois cafés iguais no mesmo dia são legítimos): elas ficam numa
- * seção própria no topo e quem decide é o usuário.
+ * Duas etapas: escolher conta e arquivo, depois a PRÉVIA. Na prévia tudo aparece e tudo se
+ * marca: o que é novo nasce marcado, o que já está no app (sete camadas de conciliação, no
+ * agente) e o que não é gasto nem receita nascem desmarcados, com o motivo na linha. "Importar N"
+ * grava exatamente o marcado — compra parcelada inteira — e descarta o resto numa transação só.
+ * Plano: `docs/superpowers/plans/2026-09-22-importacao-inteligente.md`.
  */
 export default function ImportScreen() {
   const theme = useTheme();
   const toast = useToast();
+  const brl = useBRL();
   const insets = useSafeAreaInsets();
   const params = useLocalSearchParams<{ batch?: string }>();
 
@@ -129,52 +145,54 @@ export default function ImportScreen() {
   const corrigirData = useFixImportItemDate();
   const { semTrancar } = useLock();
   const apagarLancamento = useDeleteTransaction();
-  const desparear = useUnmatchImportItem();
   const [batchId, setBatchId] = useState<string | undefined>(params.batch);
   const [accountId, setAccountId] = useState<string | null>(null);
   const [falha, setFalha] = useState<FalhaImport | null>(null);
   const [editando, setEditando] = useState<ImportItem | null>(null);
-  const [verRevisados, setVerRevisados] = useState(false);
+  /** `null` = ainda a seleção sugerida (`selecaoInicial`); tocar numa linha a torna explícita. */
+  const [marcados, setMarcados] = useState<Set<string> | null>(null);
 
   const { data: items, isLoading, isError, refetch } = useImportItems(batchId);
-  const aprovar = useApproveImportItems();
-  const descartar = useDiscardImportItems();
+  const lote = useImportBatch(batchId);
+  const finalizar = useFinishImport();
   const atualizar = useUpdateImportItem();
 
   // `isError` e não só `data`: o TanStack guarda o resultado anterior quando o refetch
   // falha, e sem este corte a tela seguia afirmando números embaixo da faixa de erro.
   const lista = isError ? [] : (items ?? []);
-  const paraRevisar = lista.filter((i) => i.status === 'pending');
-  const repetidos = lista.filter((i) => i.status === 'duplicate');
+  const cartao = lote.data?.accounts?.type === 'credit_card';
+  const grupos = agrupar(lista, cartao);
+  const escolhidos = marcados ?? selecaoInicial(lista, cartao);
+  const soma = totais(lista, escolhidos, cartao);
+  const fechado = lote.data?.status === 'done';
+  const decididos = lista.filter((i) => i.status === 'approved' || i.status === 'discarded');
+  const importados = decididos.filter((i) => i.status === 'approved').length;
   /*
-    O quarto balde: o extrato achou o MESMO dinheiro alguns dias fora do que está no app. Ele não
-    entra em `paraRevisar` nem no "Importar assim mesmo" dos repetidos — importar um destes cria
-    exatamente a duplicata que esta seção existe para evitar.
+    A conciliação inversa só faz sentido depois que o lote foi fechado: antes disso tudo que veio
+    no extrato ainda está na prévia, e a lista seria o financeiro inteiro do período acusado de
+    estar sobrando. É uma SEÇÃO à parte: o que ela lista são lançamentos do app, não do arquivo.
   */
-  const parecidos = lista.filter((i) => i.status === 'near_match');
-  /*
-    A conciliação inversa só faz sentido depois que o lote foi revisado: antes disso tudo que veio
-    no extrato ainda está `pending`, e a lista seria o financeiro inteiro do período acusado de
-    estar sobrando. Por isso ela espera a fila esvaziar — e é uma SEÇÃO à parte, não um quinto
-    balde de itens: o que ela lista são lançamentos do app, não linhas do arquivo.
-  */
-  const loteRevisado =
-    lista.length > 0 && paraRevisar.length === 0 && repetidos.length === 0 && parecidos.length === 0;
-  const sobrando = useImportUnmatched(batchId, loteRevisado);
-  const revisados = lista.filter((i) => i.status === 'approved' || i.status === 'discarded');
+  const sobrando = useImportUnmatched(batchId, fechado);
 
-  // O número do botão é o número que vai entrar. O cabeçalho antigo contava as duplicatas e o
-  // "confirmar todos" as ignorava: confirmar 12 importava 10 sem explicar os 2.
-  const vaoEntrar = paraRevisar.length;
-  const somaDespesas = paraRevisar.reduce(
-    (soma, i) => soma + (i.kind === 'expense' ? i.amount_cents : 0),
-    0
-  );
-  const porRegra = paraRevisar.filter((i) => i.suggested_category).length;
-  const semCategoria = paraRevisar.filter((i) => !i.suggested_category).length;
+  const alternar = (id: string) => {
+    const proximo = new Set(escolhidos);
+    if (proximo.has(id)) proximo.delete(id);
+    else proximo.add(id);
+    setMarcados(proximo);
+  };
+  const marcarGrupo = (ids: string[], marcar: boolean) => {
+    Haptics.selectionAsync();
+    const proximo = new Set(escolhidos);
+    for (const id of ids) {
+      if (marcar) proximo.add(id);
+      else proximo.delete(id);
+    }
+    setMarcados(proximo);
+  };
 
   const escolherArquivo = async () => {
     setFalha(null);
+    if (!accountId) return;
     /*
       ⚠️ **`semTrancar` não é opcional aqui.** No Android abrir o seletor de arquivo dispara
       `AppState: background`, e sem a bandeira a trava do app pediria o PIN no meio da
@@ -201,6 +219,7 @@ export default function ImportScreen() {
         accountId,
       });
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      setMarcados(null);
       setBatchId(resultado.batch_id);
     } catch (err) {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
@@ -208,38 +227,35 @@ export default function ImportScreen() {
     }
   };
 
-  const confirmarLote = () => {
-    if (!vaoEntrar) return;
-    const ids = paraRevisar.map((i) => i.id);
+  const confirmar = () => {
+    if (!batchId || soma.quantos === 0) return;
+    const ids = lista.filter((i) => escolhidos.has(i.id) && grupoDe(i, cartao)).map((i) => i.id);
+    const quantos = soma.quantos;
     confirmDestructive(
-      `Lançar ${vaoEntrar} ${vaoEntrar === 1 ? 'item' : 'itens'} no seu financeiro?`,
-      `Confirmar ${vaoEntrar}`,
+      `Lançar ${quantos} ${quantos === 1 ? 'item' : 'itens'} no seu financeiro?`,
+      `Importar ${quantos}`,
       () =>
-        aprovar.mutate(ids, {
-          onSuccess: () => {
-            Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-            toast({
-              message: `${vaoEntrar} ${vaoEntrar === 1 ? 'lançamento importado' : 'lançamentos importados'}.`,
-              tone: 'success',
-            });
-          },
-          onError: () => toast({ message: 'Não deu para importar o lote.', tone: 'error' }),
-        }),
-      repetidos.length
-        ? `Os ${repetidos.length} possíveis repetidos ficam de fora — decida um por um.`
-        : undefined
+        finalizar.mutate(
+          { batchId, itemIds: ids },
+          {
+            onSuccess: (n) => {
+              Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+              toast({
+                message: `${n} ${n === 1 ? 'lançamento importado' : 'lançamentos importados'}.`,
+                tone: 'success',
+              });
+            },
+            onError: () => toast({ message: 'Não deu para importar. Nada foi gravado.', tone: 'error' }),
+          }
+        ),
+      [
+        soma.compras > 0
+          ? `${soma.compras} ${soma.compras === 1 ? 'compra parcelada entra completa' : 'compras parceladas entram completas'}.`
+          : null,
+        'O que ficou desmarcado não entra.',
+      ].filter(Boolean).join(' ')
     );
   };
-
-  const descartarItem = (item: ImportItem) =>
-    descartar.mutate([item.id], {
-      onSuccess: () => {
-        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-        toast({ message: 'Item descartado.', tone: 'success' });
-      },
-      // Descartar mudava a UI sem tratar erro: o banco não mudava e ninguém ficava sabendo.
-      onError: () => toast({ message: 'Não deu para descartar o item.', tone: 'error' }),
-    });
 
   const trocarSentido = (item: ImportItem, kind: 'income' | 'expense') => {
     if (item.kind === kind) return;
@@ -260,121 +276,38 @@ export default function ImportScreen() {
     );
   };
 
-  const acoes = (item: ImportItem) =>
-    showItemActions(item.description ?? 'Lançamento', [
-      { label: 'Trocar categoria', onPress: () => setEditando(item) },
-      {
-        label: 'Descartar',
-        destructive: true,
-        onPress: () => descartarItem(item),
-      },
-    ]);
-
   /**
-   * As três saídas de um "parece que já está lançado". Nenhuma é automática: o app achou o par,
-   * quem decide se é a mesma compra é a pessoa — ela vê os dois lados na linha.
+   * As saídas de uma linha. Nenhuma é automática: o app achou o par, quem decide é a pessoa.
+   * "Corrigir a data" só existe onde o par está com OUTRO dia — o extrato é a fonte de QUANDO.
    */
-  const acoesDoParecido = (item: ImportItem) => {
+  const acoes = (item: ImportItem) => {
     const alvo = item.transactions;
-    if (!alvo) return;
-    showItemActions(item.description ?? 'Lançamento', [
-      {
-        label: `Corrigir a data para ${formatDateBR(item.occurred_at)}`,
-        onPress: () =>
-          corrigirData.mutate(
-            { itemId: item.id, transactionId: alvo.id, occurredAt: item.occurred_at },
+    showItemActions(nomeDoItem(item), [
+      { label: 'Trocar categoria ou sentido', onPress: () => setEditando(item) },
+      ...(alvo
+        ? [{ label: 'Abrir o lançamento do app', onPress: () => router.push(`/finance/${alvo.id}`) }]
+        : []),
+      ...(alvo && item.status === 'near_match' && alvo.occurred_at !== item.occurred_at
+        ? [
             {
-              onSuccess: () =>
-                toast({
-                  message: `Data corrigida para ${formatDateBR(item.occurred_at)}.`,
-                  tone: 'success',
-                }),
-              onError: () => toast({ message: 'Não deu para corrigir a data.', tone: 'error' }),
-            }
-          ),
-      },
-      {
-        label: 'São coisas diferentes',
-        onPress: () =>
-          desparear.mutate(item.id, {
-            onSuccess: () => toast({ message: 'Vai entrar como lançamento novo.', tone: 'success' }),
-            onError: () => toast({ message: 'Não deu para separar.', tone: 'error' }),
-          }),
-      },
-      { label: 'Descartar', destructive: true, onPress: () => descartarItem(item) },
+              label: `Corrigir a data no app para ${formatDateBR(item.occurred_at)}`,
+              onPress: () =>
+                corrigirData.mutate(
+                  { itemId: item.id, transactionId: alvo.id, occurredAt: item.occurred_at },
+                  {
+                    onSuccess: () =>
+                      toast({
+                        message: `Data corrigida para ${formatDateBR(item.occurred_at)}.`,
+                        tone: 'success',
+                      }),
+                    onError: () => toast({ message: 'Não deu para corrigir a data.', tone: 'error' }),
+                  }
+                ),
+            },
+          ]
+        : []),
     ]);
   };
-
-  const linhaParecida = (item: ImportItem, index: number) => (
-    <Animated.View
-      key={item.id}
-      layout={LinearTransition.duration(Motion.duration.fast)}
-      entering={FadeInDown.duration(Motion.duration.slow).delay(
-        Math.min(index * 30, Motion.stagger.cap)
-      )}
-    >
-      <Row
-        title={item.description ?? 'Sem descrição'}
-        /*
-          Os DOIS lados na mesma linha: o que o app tem e o que o extrato mandou. É o que
-          transforma "parece já lançado" numa decisão possível em vez de um chute.
-        */
-        subtitle={`no app: ${item.transactions?.description ?? 'sem descrição'} em ${
-          item.transactions ? formatDateBR(item.transactions.occurred_at) : '—'
-        }\nno extrato: ${formatDateBR(item.occurred_at)}`}
-        icon="calendar.badge.exclamationmark"
-        chevron={false}
-        accessibilityLabel={`${item.description ?? 'Sem descrição'}, no app em ${
-          item.transactions ? formatDateBR(item.transactions.occurred_at) : 'data desconhecida'
-        }, no extrato em ${formatDateBR(item.occurred_at)}`}
-        onPress={() => acoesDoParecido(item)}
-        onLongPress={() => acoesDoParecido(item)}
-        trailing={
-          <Money
-            cents={item.kind === 'income' ? item.amount_cents : -item.amount_cents}
-            variant="ticker"
-            tone="auto"
-            signed
-          />
-        }
-      />
-    </Animated.View>
-  );
-
-  const linha = (item: ImportItem, index: number) => (
-    <Animated.View
-      key={item.id}
-      layout={LinearTransition.duration(Motion.duration.fast)}
-      entering={FadeInDown.duration(Motion.duration.slow).delay(
-        Math.min(index * 30, Motion.stagger.cap)
-      )}
-    >
-      <Row
-        title={item.description ?? 'Sem descrição'}
-        subtitle={`${formatDateBR(item.occurred_at)} · ${item.suggested_category ?? 'sem categoria'}`}
-        icon={item.status === 'duplicate' ? 'exclamationmark.triangle' : undefined}
-        chevron={false}
-        accessibilityLabel={`${item.description ?? 'Sem descrição'}, ${formatDateBR(item.occurred_at)}, ${item.suggested_category ?? 'sem categoria'}${item.status === 'duplicate' ? ', possível repetido' : ''}`}
-        onPress={() => setEditando(item)}
-        onLongPress={() => acoes(item)}
-        trailing={
-          <View style={styles.trailing}>
-            <Money
-              cents={item.kind === 'income' ? item.amount_cents : -item.amount_cents}
-              variant="ticker"
-              tone="auto"
-              signed
-            />
-            {!item.suggested_category ? (
-              <ThemedText type="small" themeColor="warning">
-                sem categoria
-              </ThemedText>
-            ) : null}
-          </View>
-        }
-      />
-    </Animated.View>
-  );
 
   // ── Etapa 1: trazer o arquivo ────────────────────────────────────────────
   if (!batchId) {
@@ -385,13 +318,10 @@ export default function ImportScreen() {
         {/* O único destaque da etapa: a instrução é o conteúdo da tela. */}
         <Card style={styles.hero}>
           <Icon name="arrow.down.doc" size="xl" color="tint" />
-          <ThemedText type="smallBold">Traga o extrato do seu banco</ThemedText>
+          <ThemedText type="smallBold">Traga a fatura ou o extrato</ThemedText>
           <ThemedText type="small" themeColor="textSecondary" style={styles.centro}>
-            Exporte em OFX ou CSV no app do banco. Eu categorizo tudo e você confere antes de
-            entrar.
-          </ThemedText>
-          <ThemedText type="small" themeColor="textSecondary" style={styles.centro}>
-            Foto de cupom e PDF de fatura? Manda direto no WhatsApp.
+            Em OFX ou CSV, exportado no app do banco. Você vê tudo antes de entrar, e o que já está
+            no app fica de fora.
           </ThemedText>
         </Card>
 
@@ -408,18 +338,21 @@ export default function ImportScreen() {
 
         {(accounts ?? []).length > 0 ? (
           <View style={styles.bloco}>
-            <SectionHead title="Lançar na conta" />
-            <AccountPicker
-              accounts={accounts ?? []}
-              value={accountId}
-              onChange={setAccountId}
-              emptyLabel="Sem conta"
-            />
-            <ThemedText type="footnote" themeColor="textSecondary" style={styles.rodape}>
-              Opcional — sem conta escolhida o lançamento nasce sem conta.
-            </ThemedText>
+            <SectionHead title="De qual conta ou cartão é o arquivo?" />
+            {/*
+              ⚠️ Obrigatória desde 22/09/2026: a conta decide o SENTIDO das linhas (numa fatura a
+              compra vem positiva) e é contra ela que a prévia procura o que já está lançado.
+            */}
+            <AccountPicker accounts={accounts ?? []} value={accountId} onChange={setAccountId} />
           </View>
-        ) : null}
+        ) : (
+          <EmptyState
+            icon="creditcard"
+            title="Cadastre a conta ou o cartão primeiro"
+            hint="A importação precisa saber de onde é o arquivo."
+            action={{ label: 'Cadastrar', onPress: () => router.push('/finance/accounts') }}
+          />
+        )}
 
         {importar.isPending ? (
           <>
@@ -434,33 +367,29 @@ export default function ImportScreen() {
           label={importar.isPending ? 'Lendo o arquivo…' : 'Escolher arquivo'}
           icon="doc.badge.plus"
           loading={importar.isPending}
+          disabled={!accountId}
           onPress={escolherArquivo}
           block
         />
 
         <ThemedText type="footnote" themeColor="textSecondary" style={styles.rodape}>
-          Até {MAX_ITENS} lançamentos por arquivo.
+          {accountId ? `Até ${MAX_ITENS} lançamentos por arquivo.` : 'Escolha a conta ou o cartão para continuar.'}
         </ThemedText>
       </Screen>
     );
   }
 
-  // ── Etapa 2: revisar o lote ──────────────────────────────────────────────
+  // ── Etapa 2: a prévia ────────────────────────────────────────────────────
   return (
-    <Screen grouped onRefresh={() => Promise.all([accountsQuery.refetch(), batchId ? refetch() : Promise.resolve()])}>
-      <Stack.Screen
-        options={{
-          title: vaoEntrar > 0 ? `Revisar ${vaoEntrar}` : 'Revisar lote',
-        }}
-      />
+    <Screen grouped onRefresh={() => Promise.all([accountsQuery.refetch(), lote.refetch(), refetch()])}>
+      <Stack.Screen options={{ title: fechado ? 'Importação' : 'Revisar importação' }} />
 
       {/* Montado SEMPRE, com a lista condicional: `Stack.Screen` não desfaz `setOptions` no
-          unmount, então `{cond ? <HeaderMenu/> : null}` deixaria o "…" no header do Android
-          depois que o lote esvaziasse, apontando para ações de um lote que não existe mais. */}
+          unmount, então `{cond ? <HeaderMenu/> : null}` deixaria o "…" no header do Android. */}
       <HeaderMenu
-        title="Lote de importação"
+        title="Importação"
         actions={
-          lista.length === 0
+          fechado || lista.length === 0
             ? []
             : [
                 {
@@ -468,36 +397,15 @@ export default function ImportScreen() {
                   icon: 'arrow.uturn.backward',
                   onPress: () => router.back(),
                 },
-                {
-                  label: 'Descartar o lote',
-                  icon: 'trash',
-                  destructive: true,
-                  onPress: () =>
-                    confirmDestructive(
-                      'Descartar tudo que ainda não foi confirmado?',
-                      'Descartar lote',
-                      () =>
-                        descartar.mutate(
-                          [...paraRevisar, ...repetidos].map((i) => i.id),
-                          {
-                            onSuccess: () =>
-                              toast({ message: 'Lote descartado.', tone: 'success' }),
-                            onError: () =>
-                              toast({ message: 'Não deu para descartar o lote.', tone: 'error' }),
-                          }
-                        ),
-                      'Nada entra no financeiro. Os já confirmados continuam lá.'
-                    ),
-                },
               ]
         }
       />
 
-      {isError ? <ErrorCard onRetry={refetch} /> : null}
+      {isError || lote.isError ? <ErrorCard onRetry={() => { void refetch(); void lote.refetch(); }} /> : null}
 
-      {isLoading && !isError ? (
+      {(isLoading || lote.isPending) && !isError && !lote.isError ? (
         <>
-          <Skeleton height={140} />
+          <Skeleton height={160} />
           <SkeletonRow />
           <SkeletonRow />
           <SkeletonRow />
@@ -505,111 +413,111 @@ export default function ImportScreen() {
         </>
       ) : null}
 
-      {/* O único destaque da etapa: o resumo do lote, com o número de verdade no botão. */}
-      {vaoEntrar > 0 ? (
-        <Animated.View entering={FadeInDown.duration(Motion.duration.slow)}>
-          <Card style={styles.resumo}>
-            <HeroLabel>
-              {vaoEntrar === 1 ? '1 lançamento entra' : `${vaoEntrar} lançamentos entram`}
-            </HeroLabel>
-            <Money cents={-somaDespesas} variant="money" />
-            <ThemedText type="small" themeColor="textSecondary">
-              {porRegra} com categoria · {semCategoria} sem
-              {repetidos.length
-                ? ` · ${repetidos.length} ${repetidos.length === 1 ? 'possível repetido de fora' : 'possíveis repetidos de fora'}`
-                : ''}
-            </ThemedText>
-            <Button
-              label={aprovar.isPending ? 'Importando…' : `Confirmar ${vaoEntrar}`}
-              loading={aprovar.isPending}
-              onPress={confirmarLote}
-              block
-            />
-          </Card>
-        </Animated.View>
-      ) : null}
+      {!fechado && lote.isSuccess && lista.length > 0 ? (
+        <>
+          {/* O único destaque da etapa: o que VAI entrar, com o número de verdade no botão. */}
+          <Animated.View entering={FadeInDown.duration(Motion.duration.slow)}>
+            <Card style={styles.resumo}>
+              <HeroLabel>
+                {soma.quantos === 0
+                  ? 'Nada marcado'
+                  : soma.quantos === 1 ? '1 lançamento entra' : `${soma.quantos} lançamentos entram`}
+              </HeroLabel>
+              <Money cents={-soma.saiCents} variant="money" />
+              <ThemedText type="small" themeColor="textSecondary">
+                {[
+                  soma.entraCents > 0 ? `entra ${brl(soma.entraCents)}` : null,
+                  soma.compras > 0
+                    ? `${soma.compras} ${soma.compras === 1 ? 'compra parcelada completa' : 'compras parceladas completas'}`
+                    : null,
+                  `${lista.filter((i) => grupoDe(i, cartao) === 'no_app').length} já no app`,
+                ].filter(Boolean).join(' · ')}
+              </ThemedText>
+              <Button
+                label={finalizar.isPending ? 'Importando…' : `Importar ${soma.quantos}`}
+                loading={finalizar.isPending}
+                disabled={soma.quantos === 0}
+                onPress={confirmar}
+                block
+              />
+            </Card>
+          </Animated.View>
 
-      {/*
-        Primeiro de todos: é o único balde em que NÃO decidir cria dado errado. Deixar passar um
-        repetido duplica uma linha; deixar passar um destes duplica a linha E mantém a data errada
-        que causou o desencontro.
-      */}
-      {parecidos.length > 0 ? (
-        <View style={styles.bloco}>
-          <Section title="Parece que já está lançado, com outra data">
-            {parecidos.map(linhaParecida)}
-          </Section>
-          <ThemedText type="footnote" themeColor="textSecondary" style={styles.rodape}>
-            Mesmo valor e mesma conta, poucos dias de diferença. Corrigir a data usa o extrato como
-            fonte — e pode mover a compra para outra fatura, porque é o dia que decide o ciclo.
-            Categoria, conta e nome ficam como você deixou.
-          </ThemedText>
-        </View>
-      ) : null}
-
-      {/* Primeiro na lista: é a única decisão que exige pensar. */}
-      {repetidos.length > 0 ? (
-        <View style={styles.bloco}>
-          <Section title="Possíveis repetidos">{repetidos.map(linha)}</Section>
-          <ThemedText type="footnote" themeColor="textSecondary" style={styles.rodape}>
-            Parecidos com algo que já está no seu financeiro. Dois cafés iguais no mesmo dia são
-            legítimos — quem decide é você: toque para revisar, segure para descartar ou confirme um
-            por um.
-          </ThemedText>
-          <Button
-            label={`Importar os ${repetidos.length} assim mesmo`}
-            variant="secondary"
-            size="sm"
-            onPress={() =>
-              aprovar.mutate(
-                repetidos.map((i) => i.id),
-                {
-                  onSuccess: () =>
-                    toast({
-                      message: 'Repetidos importados.',
-                      tone: 'success',
-                    }),
-                  onError: () => toast({ message: 'Não deu para importar.', tone: 'error' }),
-                }
-              )
-            }
-          />
-        </View>
-      ) : null}
-
-      {paraRevisar.length > 0 ? (
-        <Section title="Para revisar">{paraRevisar.map(linha)}</Section>
-      ) : null}
-
-      {revisados.length > 0 ? (
-        <View style={styles.bloco}>
-          <Button
-            label={`Já revisados (${revisados.length})`}
-            icon={verRevisados ? 'chevron.up' : 'chevron.down'}
-            variant="ghost"
-            size="sm"
-            onPress={() => setVerRevisados((v) => !v)}
-          />
-          {verRevisados ? (
-            <Section>
-              {revisados.map((item) => (
-                <Row
-                  key={item.id}
-                  title={item.description ?? 'Sem descrição'}
-                  subtitle={item.status === 'approved' ? 'importado' : 'descartado'}
-                  icon={item.status === 'approved' ? 'checkmark.circle' : 'xmark.circle'}
-                  chevron={false}
-                  trailing={<Money cents={item.amount_cents} variant="ticker" tone="plain" />}
-                />
-              ))}
-            </Section>
+          {/*
+            A IA marca toda compra como `compra` e todo dinheiro recebido como `receita`: sem
+            nenhum dos dois, ela não respondeu (o Gemini devolveu 503 por horas em 22/09/2026). A
+            prévia continua certa no que é ESTRUTURA — o que já está no app, o crédito da fatura,
+            o par que entrou e saiu no mesmo dia —, mas aplicação e transferência para outra conta
+            podem ter nascido marcadas. Dizer isso é o que evita importar sem olhar.
+          */}
+          {!lista.some((i) => i.nature === 'compra' || i.nature === 'receita') ? (
+            <Note icon="exclamationmark.triangle">
+              Não consegui classificar as linhas agora. Confira aplicações e transferências entre as
+              suas contas antes de importar.
+            </Note>
           ) : null}
-        </View>
+
+          {grupos.map(({ grupo, itens }) => {
+            const ids = itens.map((i) => i.id);
+            const todos = ids.every((id) => escolhidos.has(id));
+            return (
+              <Animated.View key={grupo} layout={LinearTransition.duration(Motion.duration.fast)} style={styles.bloco}>
+                <SectionHead
+                  title={`${TITULO_DO_GRUPO[grupo]} · ${itens.length}`}
+                  action={
+                    <Button
+                      label={todos ? 'Desmarcar' : 'Marcar todos'}
+                      variant="ghost"
+                      size="sm"
+                      onPress={() => marcarGrupo(ids, !todos)}
+                    />
+                  }
+                />
+                <Section>
+                  {itens.map((item) => (
+                    <ImportRow
+                      key={item.id}
+                      titulo={nomeDoItem(item)}
+                      dia={item.occurred_at}
+                      categoria={item.suggested_category}
+                      kind={item.kind}
+                      cents={item.amount_cents}
+                      marcado={escolhidos.has(item.id)}
+                      parcela={fraseDaParcela(item, cartao)}
+                      motivo={motivoDaLinha(item, cartao)}
+                      onToggle={() => alternar(item.id)}
+                      onLongPress={() => acoes(item)}
+                    />
+                  ))}
+                </Section>
+                <ThemedText type="footnote" themeColor="textSecondary" style={styles.rodape}>
+                  {EXPLICACAO[grupo]}
+                </ThemedText>
+              </Animated.View>
+            );
+          })}
+        </>
       ) : null}
 
-      {loteRevisado && (sobrando.data?.length ?? 0) > 0 ? (
+      {fechado ? (
+        <EmptyState
+          icon="checkmark.circle"
+          title={importados === 0 ? 'Nada importado' : `${importados} ${importados === 1 ? 'lançamento importado' : 'lançamentos importados'}`}
+          hint={`${decididos.length - importados} ficaram de fora.`}
+          action={{
+            label: 'Importar outro arquivo',
+            onPress: () => {
+              setBatchId(undefined);
+              setMarcados(null);
+              setFalha(null);
+            },
+          }}
+        />
+      ) : null}
+
+      {fechado && (sobrando.data?.length ?? 0) > 0 ? (
         <View style={styles.bloco}>
-          <Section title="Está no app e não veio no extrato">
+          <Section title="Está no app e não veio no arquivo">
             {(sobrando.data ?? []).map((t) => (
               <Row
                 key={t.id}
@@ -635,7 +543,7 @@ export default function ImportScreen() {
                               onError: () =>
                                 toast({ message: 'Não deu para apagar.', tone: 'error' }),
                             }),
-                          'Ele some do financeiro. O extrato não o trouxe, mas isso não prova que ele não existiu.'
+                          'Ele some do financeiro. O arquivo não o trouxe, mas isso não prova que ele não existiu.'
                         ),
                     },
                   ])
@@ -652,33 +560,15 @@ export default function ImportScreen() {
             ))}
           </Section>
           <ThemedText type="footnote" themeColor="textSecondary" style={styles.rodape}>
-            Na conta e no período deste arquivo. Pode ser lançamento que ainda não caiu no banco,
-            algo digitado duas vezes, ou um valor errado — só você sabe qual. Deixar como está é
-            uma resposta válida.
+            Na conta e no período do arquivo. Pode não ter caído ainda, ou ter sido lançado duas vezes.
           </ThemedText>
         </View>
       ) : null}
 
-      {!isLoading && !isError && vaoEntrar === 0 && repetidos.length === 0 ? (
-        <EmptyState
-          icon="checkmark.circle"
-          title="Tudo revisado"
-          hint="O lote fica salvo — dá para voltar nele depois."
-          action={{
-            label: 'Importar outro arquivo',
-            onPress: () => {
-              setBatchId(undefined);
-              setAccountId(null);
-              setFalha(null);
-            },
-          }}
-        />
-      ) : null}
-
-      {/* Trocar categoria: sheet, não accordion que empurra a lista. */}
+      {/* Trocar categoria e sentido: sheet, não accordion que empurra a lista. */}
       <Sheet visible={editando !== null} onClose={() => setEditando(null)}>
           <TaskHeader
-            title={editando?.description ?? 'Categoria'}
+            title={editando ? nomeDoItem(editando) : 'Categoria'}
             onClose={() => setEditando(null)}
           />
 
@@ -720,6 +610,14 @@ export default function ImportScreen() {
     </Screen>
   );
 }
+
+/** Uma linha por grupo, embaixo dele: o que o grupo É, sem ensinar a tela (§7b). */
+const EXPLICACAO: Record<Grupo, string> = {
+  entram: 'Não achei nada igual no app. Toque para desmarcar.',
+  talvez: 'Parecidos com algo do app, sem certeza. Segure para abrir o do app.',
+  no_app: 'Já estão lançados. Marcar importa de novo.',
+  fora: 'Não são gasto nem receita. Marque só se quiser lançar.',
+};
 
 const styles = StyleSheet.create({
   hero: {

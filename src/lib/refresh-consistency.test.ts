@@ -438,6 +438,7 @@ const FORA_DE_PROPOSITO: Record<string, string> = {
   'alerts-sent': 'não é derivada de lançamento',
   // O fluxo de importação é dono do próprio ciclo (lote → itens → conciliação) e invalida sozinho.
   'import-batches': 'o fluxo de importação invalida as próprias etapas',
+  'import-batch': 'idem',
   'import-items': 'idem',
   'import-unmatched': 'idem',
   // Cadastro de gente, não de dinheiro.

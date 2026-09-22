@@ -1,4 +1,5 @@
 import { invalidateFinance, invalidateKeys } from '@/lib/query-invalidation';
+import type { Natureza } from '@/lib/import-preview';
 import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
 import type { ProjecaoMensal } from '@/lib/forecast-months';
@@ -1068,7 +1069,14 @@ export type ImportItem = Pick<
   | 'transaction_id'
 > & {
   kind: 'expense' | 'income';
-  status: 'pending' | 'approved' | 'discarded' | 'duplicate' | 'near_match';
+  status: 'pending' | 'approved' | 'discarded' | 'duplicate' | 'near_match' | 'uncertain';
+  /** Os campos da conciliação (`20260922150000`) — ver `src/lib/import-preview.ts`. */
+  nature: Natureza | null;
+  installment_no: number | null;
+  installments: number | null;
+  match_layer: string | null;
+  match_note: string | null;
+  adopt_ids: (string | null)[] | null;
   /**
    * O lançamento do app que este item do extrato PARECE ser — só em `near_match`.
    *
@@ -1141,7 +1149,7 @@ export function useImportItems(batchId: string | undefined) {
       const { data, error } = await supabase
         .from('import_items')
         .select(
-          'id, batch_id, kind, amount_cents, occurred_at, description, merchant, suggested_category, status, transaction_id, transactions!import_items_transaction_id_fkey(id, occurred_at, description)',
+          'id, batch_id, kind, amount_cents, occurred_at, description, merchant, suggested_category, status, transaction_id, nature, installment_no, installments, match_layer, match_note, adopt_ids, transactions!import_items_transaction_id_fkey(id, occurred_at, description)',
         )
         .eq('batch_id', batchId!)
         .order('occurred_at', { ascending: false });
@@ -1161,6 +1169,54 @@ export function useApproveImportItems() {
       if (error) throw error;
     },
     onSuccess: () => Promise.all([invalidate(), invalidateKeys(queryClient, [['import-items'], ['import-batches'], ['plan-status']])]),
+  });
+}
+
+/**
+ * "Importar N" da prévia: grava os MARCADOS e descarta o resto numa transação só
+ * (`finish_import_batch`). Compra parcelada nasce inteira, e chamar de novo num lote fechado
+ * devolve 0 — dois toques não gravam duas vezes.
+ */
+export function useFinishImport() {
+  const invalidate = useInvalidateFinance();
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (input: { batchId: string; itemIds: string[] }): Promise<number> => {
+      const { data, error } = await supabase.rpc('finish_import_batch', {
+        p_batch_id: input.batchId,
+        p_item_ids: input.itemIds,
+      });
+      if (error) throw error;
+      return data ?? 0;
+    },
+    onSuccess: () =>
+      Promise.all([
+        invalidate(),
+        invalidateKeys(queryClient, [['import-items'], ['import-batch'], ['import-batches'], ['plan-status'], ['installments']]),
+      ]),
+  });
+}
+
+/** O lote: a CONTA decide o sentido das linhas e se "Parcela k/N" vira compra parcelada. */
+export function useImportBatch(batchId: string | undefined) {
+  return useQuery({
+    enabled: Boolean(batchId),
+    queryKey: ['import-batch', batchId ?? ''],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('import_batches')
+        .select('id, status, account_id, filename, accounts(type, name)')
+        .eq('id', batchId!)
+        .single();
+      if (error) throw error;
+      return data as {
+        id: string;
+        status: 'parsing' | 'review' | 'done' | 'failed';
+        account_id: string | null;
+        filename: string | null;
+        accounts: { type: string; name: string } | null;
+      };
+    },
   });
 }
 

@@ -40,6 +40,8 @@ const MATERIAL: Record<string, MaterialName> = {
   briefcase: 'work',
   car: 'directions_car',
   circle: 'circle',
+  /** O motivo de uma linha da prévia de importação ter nascido desmarcada. */
+  'info.circle': 'info',
   /** Contactless do cartão de crédito — as ondas de NFC. */
   'wave.3.right': 'contactless',
   dumbbell: 'fitness_center',

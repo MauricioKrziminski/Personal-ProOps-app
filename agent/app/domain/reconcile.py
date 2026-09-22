@@ -381,3 +381,38 @@ def conciliar(
                 v.adotar.append(None)
 
     return [vereditos[i.idx] for i in itens]
+
+
+def natureza_estrutural(
+    linhas: list[tuple[str, int, date, str]], *, cartao: bool, titular: str | None
+) -> list[str | None]:
+    """A rede de quando a IA não responde: só ESTRUTURA, nunca palavra decorada.
+
+    `linhas` = `(kind, cents, dia, descrição)`. Duas regras, ambas só no extrato de CONTA:
+
+    - **entrou e saiu o mesmo valor no mesmo dia** — o "Pix no crédito" do Nubank põe +25 e −25
+      na conta; lançados, viram uma receita e um gasto que não existiram. Casamento 1-para-1.
+    - **o nome do titular na linha** — transferência para si mesmo. O nome vem do PERFIL (dado da
+      pessoa), exige 2+ palavras e todas presentes: "Gabriel" sozinho casaria com qualquer Gabriel.
+
+    Só desmarca por padrão (natureza `transferencia_propria`); a pessoa vê e marca se quiser.
+    """
+    saida: list[str | None] = [None] * len(linhas)
+    if cartao:
+        return saida
+    abertas: dict[tuple[int, date, str], list[int]] = {}
+    for i, (kind, cents, dia, _) in enumerate(linhas):
+        oposto = "income" if kind == "expense" else "expense"
+        par = abertas.get((cents, dia, oposto))
+        if par:
+            j = par.pop(0)
+            saida[i] = saida[j] = "transferencia_propria"
+        else:
+            abertas.setdefault((cents, dia, kind), []).append(i)
+    nome = [p for p in normalize(titular).split() if len(p) >= 2]
+    if len(nome) >= 2:
+        for i, (_, _, _, descricao) in enumerate(linhas):
+            palavras = set(normalize(descricao).split())
+            if saida[i] is None and all(p in palavras for p in nome):
+                saida[i] = "transferencia_propria"
+    return saida

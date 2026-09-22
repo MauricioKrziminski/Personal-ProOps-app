@@ -208,10 +208,17 @@ async def classify_statement_lines(
     )
     entrada = "\n".join(f"{i + 1}. [{s}] {d}" for i, (s, d) in enumerate(linhas))
 
-    modelo = llm(GEMINI_BATCH).with_structured_output(_Linhas)
-    resposta: _Linhas = await modelo.ainvoke(
-        [("system", prompt), ("human", wrap_untrusted("user_input", entrada))]
-    )
+    mensagens = [("system", prompt), ("human", wrap_untrusted("user_input", entrada))]
+    try:
+        resposta: _Linhas = await llm(modelo("batch")).with_structured_output(_Linhas).ainvoke(mensagens)
+    except Exception:  # noqa: BLE001
+        # ⚠️ Sem a natureza, "Aplicação RDB" e a transferência para a própria conta nascem
+        # MARCADAS como gasto e receita — o Lite respondeu 503 "high demand" por horas em
+        # 22/09/2026. Importar é raro (uma chamada por arquivo), então vale UMA tentativa no
+        # modelo do portão antes de desistir. Não é escalonamento por confiança (`ai-gemini.md`):
+        # é disponibilidade.
+        log.warning("classificação do extrato: %s fora do ar, tentando %s", modelo("batch"), modelo("gate"))
+        resposta = await llm(modelo("gate")).with_structured_output(_Linhas).ainvoke(mensagens)
 
     # o modelo pode devolver menos itens: alinhar por índice e completar com None
     saida: list[tuple[str | None, str | None]] = []

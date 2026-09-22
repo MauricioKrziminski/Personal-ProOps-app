@@ -142,3 +142,35 @@ def test_reimportar_o_mesmo_arquivo_nao_traz_nada_novo():
     criados = [tx(f"t{i}", l.description, l.amount_cents, l.occurred_at) for i, l in enumerate(linhas)]
     v = conciliar(linhas, criados, conta_id=CARTAO, cartao=True)
     assert all(x.status == "duplicate" for x in v)
+
+
+def test_o_caso_wardogs_compra_parcelada_criada_a_mao_casa_com_a_linha_da_fatura():
+    """App: "Wardogs" 2x de R$ 52,49 a partir de 21/09 (lançada à mão). Fatura Nubank:
+    "Nuuvem *Nuuvem - Parcela 1/2", R$ 52,50 em 15/09. Nome, valor e dia diferentes — é a mesma
+    compra, e a camada de parcela a reconhece pelo contrato (1 de 2, centavo de arredondamento)."""
+    existentes = [
+        tx("w1", "Wardogs (1/2)", 5249, D(2026, 9, 21), merchant="Nuuvem",
+           installment_plan_id="pw", installment_no=1, plan_installments=2),
+        tx("w2", "Wardogs (2/2)", 5249, D(2026, 10, 21), merchant="Nuuvem",
+           installment_plan_id="pw", installment_no=2, plan_installments=2),
+        tx("tv1", "tv (1/2)", 5250, D(2026, 9, 10), installment_plan_id="ptv", installment_no=1, plan_installments=2),
+    ]
+    v = conciliar([item(0, "Nuuvem *Nuuvem - Parcela 1/2", 5250, D(2026, 9, 15))],
+                  existentes, conta_id=CARTAO, cartao=True)[0]
+    um(v, camada="parcela", transaction_id="w1")
+
+
+def test_sem_ia_a_estrutura_ainda_tira_o_que_nao_e_gasto_nem_receita():
+    from app.domain.reconcile import natureza_estrutural
+
+    linhas = [
+        ("income", 2500, D(2026, 8, 1), "Valor adicionado na conta por cartão de crédito"),
+        ("expense", 2500, D(2026, 8, 1), "Transferência enviada pelo Pix - Fulana"),
+        ("expense", 2500, D(2026, 8, 2), "Mercado"),  # mesmo valor, OUTRO dia: é gasto
+        ("expense", 194710, D(2026, 8, 5), "Transferência enviada pelo Pix - GABRIEL ALMEIDA DIAS - BB"),
+        ("expense", 9000, D(2026, 8, 29), "Pix - Gabriel Souza"),  # só o primeiro nome: não é ele
+    ]
+    n = natureza_estrutural(linhas, cartao=False, titular="Gabriel Almeida Dias")
+    assert n == ["transferencia_propria", "transferencia_propria", None, "transferencia_propria", None]
+    assert natureza_estrutural(linhas, cartao=True, titular="Gabriel Almeida Dias") == [None] * 5
+    assert natureza_estrutural(linhas[3:4], cartao=False, titular="Gabriel") == [None], "um nome só não basta"

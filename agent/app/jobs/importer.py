@@ -19,7 +19,7 @@ from uuid import UUID
 
 from app import db
 from app.domain.matching import normalize
-from app.domain.reconcile import Existente, Item, conciliar, parse_parcela
+from app.domain.reconcile import Existente, Item, conciliar, natureza_estrutural, parse_parcela
 from app.domain.statement import ParsedLine, ofx_tipo, parse_csv, parse_ofx
 from app.services.gemini import classify_statement_lines
 
@@ -129,6 +129,15 @@ async def run(
     except Exception:  # noqa: BLE001
         # sem sugestão a prévia continua útil: a pré-seleção cai na régua estrutural
         log.exception("classificação em lote falhou — itens ficam sem categoria/natureza")
+    # A rede estrutural cobre só o que a IA NÃO respondeu (fora do ar, ou item a menos).
+    titular = await db.fetch_one("select display_name from public.profiles where id = %s", user_id)
+    estrutural = natureza_estrutural(
+        [(l.kind, l.amount_cents, date.fromisoformat(l.occurred_at), l.description) for l in linhas],
+        cartao=cartao,
+        titular=(titular or {}).get("display_name"),
+    )
+    naturezas = [n or e for n, e in zip(naturezas, estrutural, strict=True)]
+
     for i, linha in enumerate(linhas):
         # regra do usuário GANHA da IA (é a decisão que ele já tomou)
         regra = await db.fetch_one(
