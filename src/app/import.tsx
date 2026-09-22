@@ -1,8 +1,8 @@
-import { useState } from 'react';
+import { useCallback, useState } from 'react';
 import { ScrollView, StyleSheet, View } from 'react-native';
 import { Stack, router, useLocalSearchParams } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import Animated, { FadeInDown, LinearTransition } from 'react-native-reanimated';
+import Animated, { LinearTransition } from 'react-native-reanimated';
 import * as DocumentPicker from 'expo-document-picker';
 import { File } from 'expo-file-system';
 import * as Haptics from 'expo-haptics';
@@ -10,7 +10,6 @@ import * as Haptics from 'expo-haptics';
 import { AgentApiError } from '@/lib/agent-api';
 
 import { ErrorCard } from '@/components/error-card';
-import { Chip } from '@/components/finance/chip';
 import { Card } from '@/components/ui/card';
 import { Sheet } from '@/components/ui/sheet';
 import { TaskHeader } from '@/components/ui/task-header';
@@ -28,11 +27,11 @@ import { HeroLabel, SectionHead } from '@/components/ui/section-head';
 import { Skeleton, SkeletonRow } from '@/components/ui/skeleton';
 import { useToast } from '@/components/ui/toast';
 import { useLock } from '@/hooks/use-lock';
-import { Motion, Radius, Space } from '@/design/tokens';
+import { Motion, Space, tabular } from '@/design/tokens';
 import { formatDateBR } from '@/hooks/use-items';
 import { useBRL } from '@/components/ui/conceal';
 import { confirmDestructive, showItemActions } from '@/lib/item-actions';
-import { SUGGESTED_CATEGORIES } from '@/lib/categories';
+import { CategoryPicker } from '@/components/finance/category-picker';
 import {
   useAccounts,
   useFinishImport,
@@ -57,7 +56,6 @@ import {
   totais,
   type Grupo,
 } from '@/lib/import-preview';
-import { useTheme } from '@/hooks/use-theme';
 import { AccountPicker } from '@/components/finance/account-picker';
 
 /**
@@ -133,7 +131,6 @@ function traduzErro(err: unknown): FalhaImport {
  * Plano: `docs/superpowers/plans/2026-09-22-importacao-inteligente.md`.
  */
 export default function ImportScreen() {
-  const theme = useTheme();
   const toast = useToast();
   const brl = useBRL();
   const insets = useSafeAreaInsets();
@@ -165,6 +162,7 @@ export default function ImportScreen() {
   const escolhidos = marcados ?? selecaoInicial(lista, cartao);
   const soma = totais(lista, escolhidos, cartao);
   const fechado = lote.data?.status === 'done';
+  const jaNoApp = lista.filter((i) => grupoDe(i, cartao) === 'no_app').length;
   const decididos = lista.filter((i) => i.status === 'approved' || i.status === 'discarded');
   const importados = decididos.filter((i) => i.status === 'approved').length;
   /*
@@ -174,12 +172,20 @@ export default function ImportScreen() {
   */
   const sobrando = useImportUnmatched(batchId, fechado);
 
-  const alternar = (id: string) => {
-    const proximo = new Set(escolhidos);
-    if (proximo.has(id)) proximo.delete(id);
-    else proximo.add(id);
-    setMarcados(proximo);
-  };
+  // Estáveis (`useCallback` + atualização funcional): a linha é `memo` e a lista vai a 500.
+  const selecaoSugerida = selecaoInicial(lista, cartao);
+  const alternar = useCallback(
+    (id: string) =>
+      setMarcados((atual) => {
+        const proximo = new Set(atual ?? selecaoSugerida);
+        if (proximo.has(id)) proximo.delete(id);
+        else proximo.add(id);
+        return proximo;
+      }),
+    // a sugestão só importa enquanto não houve toque; depois `atual` manda
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [items, cartao],
+  );
   const marcarGrupo = (ids: string[], marcar: boolean) => {
     Haptics.selectionAsync();
     const proximo = new Set(escolhidos);
@@ -227,33 +233,29 @@ export default function ImportScreen() {
     }
   };
 
+  /*
+    Sem diálogo de confirmação: o botão já diz "Importar N" em cima do total, e importar não
+    destrói nada (o diálogo do app é o destrutivo, vermelho). Dois toques não gravam duas vezes —
+    `finish_import_batch` trava o lote e devolve 0 no segundo.
+  */
   const confirmar = () => {
-    if (!batchId || soma.quantos === 0) return;
+    if (!batchId || soma.quantos === 0 || finalizar.isPending) return;
     const ids = lista.filter((i) => escolhidos.has(i.id) && grupoDe(i, cartao)).map((i) => i.id);
-    const quantos = soma.quantos;
-    confirmDestructive(
-      `Lançar ${quantos} ${quantos === 1 ? 'item' : 'itens'} no seu financeiro?`,
-      `Importar ${quantos}`,
-      () =>
-        finalizar.mutate(
-          { batchId, itemIds: ids },
-          {
-            onSuccess: (n) => {
-              Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-              toast({
-                message: `${n} ${n === 1 ? 'lançamento importado' : 'lançamentos importados'}.`,
-                tone: 'success',
-              });
-            },
-            onError: () => toast({ message: 'Não deu para importar. Nada foi gravado.', tone: 'error' }),
-          }
-        ),
-      [
-        soma.compras > 0
-          ? `${soma.compras} ${soma.compras === 1 ? 'compra parcelada entra completa' : 'compras parceladas entram completas'}.`
-          : null,
-        'O que ficou desmarcado não entra.',
-      ].filter(Boolean).join(' ')
+    finalizar.mutate(
+      { batchId, itemIds: ids },
+      {
+        onSuccess: (n) => {
+          Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+          toast({
+            message: `${n} ${n === 1 ? 'lançamento importado' : 'lançamentos importados'}.`,
+            tone: 'success',
+          });
+        },
+        onError: () => {
+          Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+          toast({ message: 'Não deu para importar. Nada foi gravado.', tone: 'error' });
+        },
+      }
     );
   };
 
@@ -262,7 +264,13 @@ export default function ImportScreen() {
     setEditando({ ...item, kind });
     atualizar.mutate(
       { id: item.id, kind },
-      { onError: () => toast({ message: 'Não deu para trocar o sentido.', tone: 'error' }) }
+      {
+        onError: () => {
+          // volta o controle para o que o banco tem: ele não gravou
+          setEditando((e) => (e?.id === item.id ? { ...e, kind: item.kind } : e));
+          toast({ message: 'Não deu para trocar o tipo.', tone: 'error' });
+        },
+      }
     );
   };
 
@@ -280,10 +288,12 @@ export default function ImportScreen() {
    * As saídas de uma linha. Nenhuma é automática: o app achou o par, quem decide é a pessoa.
    * "Corrigir a data" só existe onde o par está com OUTRO dia — o extrato é a fonte de QUANDO.
    */
-  const acoes = (item: ImportItem) => {
+  const acoes = useCallback((id: string) => {
+    const item = (items ?? []).find((i) => i.id === id);
+    if (!item) return;
     const alvo = item.transactions;
     showItemActions(nomeDoItem(item), [
-      { label: 'Trocar categoria ou sentido', onPress: () => setEditando(item) },
+      { label: 'Trocar categoria ou tipo', onPress: () => setEditando(item) },
       ...(alvo
         ? [{ label: 'Abrir o lançamento do app', onPress: () => router.push(`/finance/${alvo.id}`) }]
         : []),
@@ -307,7 +317,8 @@ export default function ImportScreen() {
           ]
         : []),
     ]);
-  };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [items]);
 
   // ── Etapa 1: trazer o arquivo ────────────────────────────────────────────
   if (!batchId) {
@@ -326,17 +337,24 @@ export default function ImportScreen() {
         </Card>
 
         {falha ? (
-          <View style={[styles.falha, { backgroundColor: theme.surface }]}>
+          <Card style={styles.falha}>
             <ThemedText type="smallBold" themeColor="danger">
               {falha.titulo}
             </ThemedText>
             <ThemedText type="small" themeColor="textSecondary">
               {falha.detalhe}
             </ThemedText>
-          </View>
+          </Card>
         ) : null}
 
-        {(accounts ?? []).length > 0 ? (
+        {accountsQuery.isPending ? (
+          <>
+            <SkeletonRow />
+            <SkeletonRow />
+          </>
+        ) : accountsQuery.isError ? (
+          <ErrorCard onRetry={() => void accountsQuery.refetch()} />
+        ) : (accounts ?? []).length > 0 ? (
           <View style={styles.bloco}>
             <SectionHead title="De qual conta ou cartão é o arquivo?" />
             {/*
@@ -353,15 +371,6 @@ export default function ImportScreen() {
             action={{ label: 'Cadastrar', onPress: () => router.push('/finance/accounts') }}
           />
         )}
-
-        {importar.isPending ? (
-          <>
-            <Skeleton height={20} width="70%" />
-            <SkeletonRow />
-            <SkeletonRow />
-            <SkeletonRow />
-          </>
-        ) : null}
 
         <Button
           label={importar.isPending ? 'Lendo o arquivo…' : 'Escolher arquivo'}
@@ -416,21 +425,25 @@ export default function ImportScreen() {
       {!fechado && lote.isSuccess && lista.length > 0 ? (
         <>
           {/* O único destaque da etapa: o que VAI entrar, com o número de verdade no botão. */}
-          <Animated.View entering={FadeInDown.duration(Motion.duration.slow)}>
+          {/*
+            Sem `entering`: texto dentro de contêiner com animação de entrada já foi pintado pela
+            metade no APK de release (§3 do design), e aqui ela não teria propósito nomeável.
+            O rótulo diz o que o NÚMERO é; a contagem mora no botão.
+          */}
+          <View>
             <Card style={styles.resumo}>
-              <HeroLabel>
-                {soma.quantos === 0
-                  ? 'Nada marcado'
-                  : soma.quantos === 1 ? '1 lançamento entra' : `${soma.quantos} lançamentos entram`}
-              </HeroLabel>
-              <Money cents={-soma.saiCents} variant="money" />
-              <ThemedText type="small" themeColor="textSecondary">
+              <HeroLabel>{soma.saiCents > 0 || soma.entraCents === 0 ? 'Sai' : 'Entra'}</HeroLabel>
+              <Money
+                cents={soma.saiCents > 0 || soma.entraCents === 0 ? -soma.saiCents : soma.entraCents}
+                variant="money"
+              />
+              <ThemedText type="small" themeColor="textSecondary" style={tabular}>
                 {[
-                  soma.entraCents > 0 ? `entra ${brl(soma.entraCents)}` : null,
+                  soma.saiCents > 0 && soma.entraCents > 0 ? `entra ${brl(soma.entraCents)}` : null,
                   soma.compras > 0
                     ? `${soma.compras} ${soma.compras === 1 ? 'compra parcelada completa' : 'compras parceladas completas'}`
                     : null,
-                  `${lista.filter((i) => grupoDe(i, cartao) === 'no_app').length} já no app`,
+                  jaNoApp > 0 ? `${jaNoApp} já no app` : null,
                 ].filter(Boolean).join(' · ')}
               </ThemedText>
               <Button
@@ -441,7 +454,7 @@ export default function ImportScreen() {
                 block
               />
             </Card>
-          </Animated.View>
+          </View>
 
           {/*
             A IA marca toda compra como `compra` e todo dinheiro recebido como `receita`: sem
@@ -466,7 +479,7 @@ export default function ImportScreen() {
                   title={`${TITULO_DO_GRUPO[grupo]} · ${itens.length}`}
                   action={
                     <Button
-                      label={todos ? 'Desmarcar' : 'Marcar todos'}
+                      label={todos ? 'Desmarcar todos' : 'Marcar todos'}
                       variant="ghost"
                       size="sm"
                       onPress={() => marcarGrupo(ids, !todos)}
@@ -477,6 +490,7 @@ export default function ImportScreen() {
                   {itens.map((item) => (
                     <ImportRow
                       key={item.id}
+                      id={item.id}
                       titulo={nomeDoItem(item)}
                       dia={item.occurred_at}
                       categoria={item.suggested_category}
@@ -485,21 +499,31 @@ export default function ImportScreen() {
                       marcado={escolhidos.has(item.id)}
                       parcela={fraseDaParcela(item, cartao)}
                       motivo={motivoDaLinha(item, cartao)}
-                      onToggle={() => alternar(item.id)}
-                      onLongPress={() => acoes(item)}
+                      onToggle={alternar}
+                      onLongPress={acoes}
                     />
                   ))}
                 </Section>
-                <ThemedText type="footnote" themeColor="textSecondary" style={styles.rodape}>
-                  {EXPLICACAO[grupo]}
-                </ThemedText>
+                {EXPLICACAO[grupo] ? (
+                  <ThemedText type="footnote" themeColor="textSecondary" style={styles.rodape}>
+                    {EXPLICACAO[grupo]}
+                  </ThemedText>
+                ) : null}
               </Animated.View>
             );
           })}
         </>
       ) : null}
 
-      {fechado ? (
+      {!fechado && lote.isSuccess && !isLoading && !isError && lista.length === 0 ? (
+        <EmptyState
+          icon="arrow.down.doc"
+          title="Nada para revisar neste arquivo"
+          action={{ label: 'Importar outro arquivo', onPress: () => { setBatchId(undefined); setMarcados(null); } }}
+        />
+      ) : null}
+
+      {fechado && !isError && !isLoading ? (
         <EmptyState
           icon="checkmark.circle"
           title={importados === 0 ? 'Nada importado' : `${importados} ${importados === 1 ? 'lançamento importado' : 'lançamentos importados'}`}
@@ -514,6 +538,8 @@ export default function ImportScreen() {
           }}
         />
       ) : null}
+
+      {fechado && sobrando.isError ? <ErrorCard onRetry={() => void sobrando.refetch()} /> : null}
 
       {fechado && (sobrando.data?.length ?? 0) > 0 ? (
         <View style={styles.bloco}>
@@ -581,29 +607,23 @@ export default function ImportScreen() {
               Existe porque o OFX do BB marca saída como `CREDIT` — ver `useUpdateImportItem`.
             */}
             <View style={styles.sentido}>
-              <SectionHead title="O que é" />
+              <SectionHead title="Tipo" />
               <Segmented
                 options={[
-                  { value: 'expense', label: 'Saída' },
-                  { value: 'income', label: 'Entrada' },
+                  { value: 'expense', label: 'Gasto' },
+                  { value: 'income', label: 'Receita' },
                 ]}
                 value={editando?.kind === 'income' ? 'income' : 'expense'}
                 onChange={(k) => editando && trocarSentido(editando, k)}
               />
             </View>
 
-            <View style={styles.chips}>
-              {SUGGESTED_CATEGORIES.map((cat) => (
-                <Chip
-                  key={cat}
-                  label={cat}
-                  selected={editando?.suggested_category === cat}
-                  onPress={() =>
-                    editando &&
-                    trocarCategoria(editando, editando.suggested_category === cat ? null : cat)
-                  }
-                />
-              ))}
+            {/* As categorias que a pessoa USA, mais as sugeridas (`finance.md`), como no lançamento. */}
+            <View style={styles.sentido}>
+              <CategoryPicker
+                value={editando?.suggested_category ?? null}
+                onChange={(cat) => editando && trocarCategoria(editando, cat)}
+              />
             </View>
           </ScrollView>
       </Sheet>
@@ -611,11 +631,9 @@ export default function ImportScreen() {
   );
 }
 
-/** Uma linha por grupo, embaixo dele: o que o grupo É, sem ensinar a tela (§7b). */
-const EXPLICACAO: Record<Grupo, string> = {
-  entram: 'Não achei nada igual no app. Toque para desmarcar.',
-  talvez: 'Parecidos com algo do app, sem certeza. Segure para abrir o do app.',
-  no_app: 'Já estão lançados. Marcar importa de novo.',
+/** Só onde a linha pede um cuidado que o título não diz (§7b: menos texto). */
+const EXPLICACAO: Partial<Record<Grupo, string>> = {
+  no_app: 'Marcar importa de novo.',
   fora: 'Não são gasto nem receita. Marque só se quiser lançar.',
 };
 
@@ -639,24 +657,8 @@ const styles = StyleSheet.create({
     paddingHorizontal: Space.lg,
   },
   sentido: { gap: Space.sm, paddingHorizontal: Space.lg },
-  chips: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: Space.sm,
-    paddingHorizontal: Space.lg,
-  },
   falha: {
     gap: Space.xs,
-    padding: Space.lg,
-    borderRadius: Radius.md,
-    borderCurve: 'continuous',
-  },
-  trailing: {
-    alignItems: 'flex-end',
-    gap: Space.xs,
-  },
-  sheet: {
-    flex: 1,
   },
   sheetBody: {
     gap: Space.xl,

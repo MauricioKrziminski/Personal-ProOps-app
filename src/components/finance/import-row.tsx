@@ -1,7 +1,9 @@
 import * as Haptics from 'expo-haptics';
+import { memo } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 
 import { ThemedText } from '@/components/themed-text';
+import { useBRL } from '@/components/ui/conceal';
 import { Icon } from '@/components/ui/icon';
 import { Money } from '@/components/ui/money';
 import { HitTarget, Space } from '@/design/tokens';
@@ -9,6 +11,7 @@ import { formatDateBR } from '@/hooks/use-items';
 import { useTheme } from '@/hooks/use-theme';
 
 interface Props {
+  id: string;
   titulo: string;
   dia: string;
   categoria: string | null;
@@ -19,8 +22,9 @@ interface Props {
   parcela?: string | null;
   /** Por que ela nasceu desmarcada ("mesmo valor — «Posto»", "Pagamento da fatura"). */
   motivo?: string | null;
-  onToggle: () => void;
-  onLongPress: () => void;
+  /** Recebem o `id`: callbacks ESTÁVEIS, para o `memo` valer numa lista de até 500 linhas. */
+  onToggle: (id: string) => void;
+  onLongPress: (id: string) => void;
 }
 
 /**
@@ -31,25 +35,28 @@ interface Props {
  * padrão da plataforma). Trocar categoria e as outras saídas moram no toque longo, como no resto
  * do app. Mesmo desenho e mesmas medidas do `Row`, para a lista ler como as outras.
  *
- * O check é FORMA e não só cor: círculo vazio × círculo cheio com o visto — o estado continua
- * legível sem cor e é dito ao leitor de tela (`accessibilityState.checked`).
+ * O check é FORMA e não só cor: círculo vazio × círculo com o visto — o estado continua legível
+ * sem cor e é dito ao leitor de tela (`accessibilityState.checked`).
  */
-export function ImportRow({
-  titulo, dia, categoria, kind, cents, marcado, parcela, motivo, onToggle, onLongPress,
+export const ImportRow = memo(function ImportRow({
+  id, titulo, dia, categoria, kind, cents, marcado, parcela, motivo, onToggle, onLongPress,
 }: Props) {
   const theme = useTheme();
+  const brl = useBRL();
   const subtitulo = [formatDateBR(dia), categoria ?? 'sem categoria'].join(' · ');
+  const valor = `${kind === 'income' ? 'entrada' : 'saída'} de ${brl(cents)}`;
   return (
     <Pressable
       onPress={() => {
         Haptics.selectionAsync();
-        onToggle();
+        onToggle(id);
       }}
-      onLongPress={onLongPress}
+      onLongPress={() => onLongPress(id)}
       accessibilityRole="checkbox"
       accessibilityState={{ checked: marcado }}
-      accessibilityLabel={[titulo, subtitulo, parcela, motivo].filter(Boolean).join(', ')}
-      accessibilityHint="Toque para marcar ou desmarcar. Segure para mais opções.">
+      accessibilityLabel={[titulo, valor, subtitulo, parcela, motivo].filter(Boolean).join(', ')}
+      accessibilityActions={[{ name: 'longpress', label: 'Mais opções' }]}
+      onAccessibilityAction={() => onLongPress(id)}>
       {({ pressed }) => (
         <View style={[styles.row, { backgroundColor: pressed ? theme.backgroundSelected : 'transparent' }]}>
           <Icon
@@ -78,12 +85,15 @@ export function ImportRow({
               </View>
             ) : null}
           </View>
-          <Money cents={kind === 'income' ? cents : -cents} variant="ticker" tone="auto" signed />
+          {/* `marginLeft: auto`: quando a linha quebra, o valor fica à DIREITA, como no `Row`. */}
+          <View style={styles.valor}>
+            <Money cents={kind === 'income' ? cents : -cents} variant="ticker" tone="auto" signed />
+          </View>
         </View>
       )}
     </Pressable>
   );
-}
+});
 
 const styles = StyleSheet.create({
   // As medidas do `Row` (inclusive a válvula de `flexWrap` + `minWidth` medida a 384dp).
@@ -96,7 +106,8 @@ const styles = StyleSheet.create({
     paddingVertical: Space.md,
     paddingHorizontal: Space.lg,
   },
-  labels: { flexGrow: 1, flexShrink: 1, minWidth: 134, gap: 2 },
-  motivo: { flexDirection: 'row', alignItems: 'flex-start', gap: Space.xs, marginTop: 2 },
+  labels: { flexGrow: 1, flexShrink: 1, minWidth: 134, gap: Space.half },
+  motivo: { flexDirection: 'row', alignItems: 'flex-start', gap: Space.xs, marginTop: Space.half },
   motivoTexto: { flexShrink: 1 },
+  valor: { marginLeft: 'auto' },
 });
