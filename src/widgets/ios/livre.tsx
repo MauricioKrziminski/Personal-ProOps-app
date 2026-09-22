@@ -3,12 +3,12 @@
 // app (Android: RemoteViews; iOS: runtime isolado). Compilado, o componente vira hook e quebra
 // com "Invalid Hook Call" — medido no emulador em 22/09/2026.
 
-import { HStack, Spacer, Text, VStack } from '@expo/ui/swift-ui';
+import { HStack, Rectangle, Spacer, Text, VStack } from '@expo/ui/swift-ui';
 import {
   containerBackground,
-  fixedSize,
   font,
   foregroundStyle,
+  frame,
   lineLimit,
   minimumScaleFactor,
   monospacedDigit,
@@ -23,7 +23,7 @@ import type { PropsDoWidget } from '@/widgets/props';
  * ⚠️ Roda num runtime ISOLADO (`'widget'`): nada de hook, de constante de módulo nem de conta. Tudo
  * chega pronto nas props (`lib/widget-snapshot.ts` + `widgets/props.ts`), inclusive as cores.
  *
- * Pequeno: o número e a frase do dia. Médio: + as três próximas contas. Bloqueio: uma linha
+ * Pequeno: o número e a frase do dia. Médio: + compromissos e a próxima conta. Bloqueio: uma linha
  * (inline) ou três (retangular), sem cor própria — lá o sistema pinta (`vibrant`).
  */
 // A diretiva 'widget' vira STRING no Babel (`babel-preset-expo`, plugin do expo-widgets), e o preset só
@@ -79,30 +79,39 @@ function Livre(p: PropsDoWidget, env: WidgetEnvironment) {
 
   const fundo = [containerBackground(p.cor.fundo, 'widget')];
 
-  if (env.widgetFamily === 'systemMedium' && !semSessao && p.contas.length > 0) {
+  // Médio: o herói + DOIS números à direita, não uma lista (a lista é o "O que vence"). O que
+  // pesa até a próxima entrada e a próxima conta — o suficiente para decidir sem abrir o app.
+  const proxima = p.proximas[0];
+  if (env.widgetFamily === 'systemMedium' && !semSessao && (p.compromissos || proxima)) {
     return (
-      <HStack spacing={16} modifiers={fundo}>
+      <HStack spacing={14} modifiers={fundo}>
         {heroi}
-        <Spacer />
-        <VStack alignment="leading" spacing={8}>
-          {p.contas.slice(0, 3).map((c, i) => (
-            <VStack key={i} alignment="leading" spacing={0}>
-              <Text modifiers={[font({ size: 13, weight: 'medium' }), lineLimit(1), minimumScaleFactor(0.8), foregroundStyle(p.cor.texto)]}>
-                {c.titulo}
+        <Spacer minLength={0} />
+        <Rectangle modifiers={[frame({ width: 1 }), foregroundStyle(p.cor.faixa)]} />
+        <VStack alignment="leading" spacing={12} modifiers={[frame({ width: 140, alignment: 'leading' })]}>
+          {p.compromissos ? (
+            <VStack alignment="leading" spacing={1}>
+              <Text modifiers={[font({ size: 11 }), lineLimit(1), foregroundStyle(p.cor.apagado)]}>
+                {`Compromissos ${p.compromissos.ate}`}
               </Text>
-              {/* Nem o valor nem o "quando" truncam (`fixedSize`): na vistoria de 22/09/2026 saíam
-                  "R$ 1.35…" e depois "venceu 1…". Quem cede é o herói, que tem minimumScaleFactor. */}
-              <HStack spacing={4}>
-                <Text modifiers={[font({ size: 11 }), lineLimit(1), fixedSize({ horizontal: true }), foregroundStyle(c.atrasada ? p.cor.perigo : p.cor.apagado)]}>
-                  {c.quando}
-                </Text>
-                <Spacer minLength={2} />
-                <Text modifiers={[font({ size: 11, weight: 'semibold' }), monospacedDigit(), fixedSize({ horizontal: true }), foregroundStyle(c.atrasada ? p.cor.perigo : p.cor.texto)]}>
-                  {c.valor}
-                </Text>
-              </HStack>
+              <Text modifiers={[font({ size: 17, weight: 'semibold' }), monospacedDigit(), minimumScaleFactor(0.7), lineLimit(1), foregroundStyle(p.cor.texto)]}>
+                {p.compromissos.valor}
+              </Text>
             </VStack>
-          ))}
+          ) : null}
+          {proxima ? (
+            <VStack alignment="leading" spacing={1}>
+              <Text modifiers={[font({ size: 11 }), foregroundStyle(p.cor.apagado)]}>
+                {proxima.hoje ? 'Vence hoje' : `Próxima · ${proxima.dia} ${proxima.mes}`}
+              </Text>
+              <Text modifiers={[font({ size: 14, weight: 'medium' }), lineLimit(2), minimumScaleFactor(0.8), foregroundStyle(p.cor.texto)]}>
+                {proxima.titulo}
+              </Text>
+              <Text modifiers={[font({ size: 12, weight: 'semibold' }), monospacedDigit(), foregroundStyle(proxima.hoje ? p.cor.perigo : p.cor.apagado)]}>
+                {proxima.valor}
+              </Text>
+            </VStack>
+          ) : null}
         </VStack>
       </HStack>
     );

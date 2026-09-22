@@ -278,6 +278,11 @@ export function diaCurtoBR(iso: string): string {
   return `${DIAS_CURTOS[semana]}, ${d} ${MESES_CURTOS[m - 1]}`;
 }
 
+/** `2026-09-17` → `set` — o mês do selo de data (widget), da mesma tabela da agenda. */
+export function mesCurto(iso: string): string {
+  return MESES_CURTOS[Number(iso.slice(5, 7)) - 1];
+}
+
 /** Como a agenda chama um dia: `hoje`, `amanhã`, `ontem` ou a data curta. */
 export function rotuloDoDia(iso: string, hoje = localISODate()): string {
   const delta = diasAte(iso, hoje);

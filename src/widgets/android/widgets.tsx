@@ -33,18 +33,38 @@ function Texto(p: { texto: string; tamanho: number; cor: `#${string}`; forte?: b
     <TextWidget
       text={p.texto}
       maxLines={p.linhas ?? 1}
-      // Só NOME de conta pode ficar pela metade (a lista inteira está a um toque); valor não —
-      // o número grande passa por `tamanhoQueCabe`.
+      // Nome de conta quebra em até 2 linhas antes de cortar; valor nunca corta — o número grande
+      // passa por `tamanhoQueCabe`.
       truncate="END"
       style={{ fontSize: p.tamanho, color: p.cor, fontFamily: p.forte ? SANS_FORTE : SANS }}
     />
   );
 }
 
-/** "Livre": pequeno = o número e a frase do dia; largo (≥ 250dp) = + as próximas contas. */
+/** O selo de data de uma conta: o dia grande, o mês embaixo. Hoje inverte. */
+function Selo({ p, dia, mes, hoje }: { p: PropsDoWidget; dia: string; mes: string; hoje: boolean }) {
+  return (
+    <FlexWidget
+      style={{
+        width: 34,
+        height: 34,
+        borderRadius: 10,
+        backgroundColor: hoje ? p.cor.texto : p.cor.faixa,
+        flexDirection: 'column',
+        alignItems: 'center',
+        justifyContent: 'center',
+      }}>
+      <Texto texto={dia} tamanho={13} forte cor={hoje ? p.cor.fundo : p.cor.texto} />
+      <Texto texto={mes} tamanho={9} cor={hoje ? p.cor.fundo : p.cor.apagado} />
+    </FlexWidget>
+  );
+}
+
+/** "Livre": pequeno = o número e a frase do dia; largo (≥ 250dp) = + compromissos e a próxima conta. */
 export function LivreWidget({ p, largura }: { p: PropsDoWidget; largura: number }) {
   const semSessao = p.estado !== 'ok';
-  const largo = largura >= 250 && !semSessao && p.contas.length > 0;
+  const proxima = p.proximas[0];
+  const largo = largura >= 250 && !semSessao && Boolean(p.compromissos || proxima);
   return (
     <FlexWidget
       // `OPEN_APP`, não `OPEN_URI`: o scheme `appproops` é o MESMO nas três variantes, e com mais
@@ -59,7 +79,7 @@ export function LivreWidget({ p, largura }: { p: PropsDoWidget; largura: number 
         borderRadius: RAIO,
         padding: 16,
         flexDirection: 'row',
-        flexGap: 16,
+        flexGap: 14,
       }}>
       <FlexWidget style={{ flex: 1, height: 'match_parent', flexDirection: 'column', justifyContent: 'space-between' }}>
         <FlexWidget style={{ width: 'match_parent', flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
@@ -78,34 +98,44 @@ export function LivreWidget({ p, largura }: { p: PropsDoWidget; largura: number 
         <Texto texto={semSessao ? '' : `atualizado às ${p.atualizado}`} tamanho={11} cor={p.cor.apagado} />
       </FlexWidget>
       {largo ? (
-        <FlexWidget style={{ flex: 1, height: 'match_parent', flexDirection: 'column', justifyContent: 'center', flexGap: 10 }}>
-          {p.contas.slice(0, 3).map((c, i) => (
-            <FlexWidget key={i} style={{ width: 'match_parent', flexDirection: 'column' }}>
-              <Texto texto={c.titulo} tamanho={13} cor={p.cor.texto} />
-              {/* O VALOR não divide texto com o "quando": juntos, o fim truncava no valor. */}
-              <FlexWidget style={{ width: 'match_parent', flexDirection: 'row', justifyContent: 'space-between' }}>
-                <FlexWidget style={{ flex: 1 }}>
-                  <Texto texto={c.quando} tamanho={11} cor={c.atrasada ? p.cor.perigo : p.cor.apagado} />
-                </FlexWidget>
-                <Texto texto={c.valor} tamanho={11} forte cor={c.atrasada ? p.cor.perigo : p.cor.texto} />
+        <FlexWidget style={{ width: 1, height: 'match_parent', backgroundColor: p.cor.faixa }} />
+      ) : null}
+      {largo ? (
+        // Dois números, não uma lista (a lista é o "O que vence"): o que pesa até o fim do ciclo
+        // e a próxima conta.
+        <FlexWidget style={{ flex: 1, height: 'match_parent', flexDirection: 'column', justifyContent: 'center', flexGap: 14 }}>
+          {p.compromissos ? (
+            <FlexWidget style={{ width: 'match_parent', flexDirection: 'column', flexGap: 1 }}>
+              <Texto texto={`Compromissos ${p.compromissos.ate}`} tamanho={11} cor={p.cor.apagado} />
+              <Texto texto={p.compromissos.valor} tamanho={17} forte cor={p.cor.texto} />
+            </FlexWidget>
+          ) : null}
+          {proxima ? (
+            <FlexWidget style={{ width: 'match_parent', flexDirection: 'row', alignItems: 'center', flexGap: 10 }}>
+              <Selo p={p} dia={proxima.dia} mes={proxima.mes} hoje={proxima.hoje} />
+              <FlexWidget style={{ flex: 1, flexDirection: 'column' }}>
+                <Texto texto={proxima.titulo} tamanho={13} linhas={2} cor={p.cor.texto} />
+                <Texto texto={proxima.valor} tamanho={12} forte cor={proxima.hoje ? p.cor.perigo : p.cor.apagado} />
               </FlexWidget>
             </FlexWidget>
-          ))}
+          ) : null}
         </FlexWidget>
       ) : null}
     </FlexWidget>
   );
 }
 
-/** "O que vence": as próximas contas, atrasadas primeiro. Cabe o que a altura deixar. */
+/**
+ * "O que vence": o total, o atrasado como UMA faixa e as próximas com o selo de data — o mesmo
+ * desenho do iOS (`widgets/ios/vence.tsx`). Cabe o que a altura deixar.
+ */
 export function VenceWidget({ p, altura }: { p: PropsDoWidget; altura: number }) {
-  // Cabeçalho (~40dp) + a linha do "+N" (~20dp) ficam reservados: sem isso o rodapé sumia
-  // embaixo da última conta (medido no emulador, 4×2).
-  const total = p.contas.length + p.maisContas;
-  const cabem = Math.floor((altura - 40 - 32) / 44);
-  const quantas = Math.max(1, Math.min(p.contas.length, total > cabem ? cabem - 1 : cabem));
-  const contas = p.contas.slice(0, quantas);
-  const resto = total - contas.length;
+  // Cabeçalho (~24dp), a faixa do atrasado (~30dp) e o "+N" (~20dp) ficam reservados; cada conta
+  // é um selo de 34dp + 8 de respiro.
+  const reservado = 32 + 24 + (p.atrasado ? 38 : 0) + 22;
+  const cabem = Math.max(1, Math.floor((altura - reservado) / 42));
+  const lista = p.proximas.slice(0, cabem);
+  const resto = p.proximas.length + p.maisProximas - lista.length;
   return (
     <FlexWidget
       clickAction="OPEN_APP"
@@ -119,26 +149,46 @@ export function VenceWidget({ p, altura }: { p: PropsDoWidget; altura: number })
         flexDirection: 'column',
         flexGap: 10,
       }}>
-      <FlexWidget style={{ width: 'match_parent', flexDirection: 'row', justifyContent: 'space-between' }}>
-        <Texto texto="O que vence" tamanho={13} forte cor={p.cor.texto} />
-        <Texto texto={p.totalContas} tamanho={13} cor={p.cor.apagado} />
+      <FlexWidget style={{ width: 'match_parent', flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+        <Texto texto="O que vence" tamanho={13} cor={p.cor.apagado} />
+        <Texto texto={p.totalContas} tamanho={15} forte cor={p.cor.texto} />
       </FlexWidget>
       {p.estado !== 'ok' ? (
         <Texto texto={p.veredito.texto} tamanho={13} cor={p.cor.apagado} />
-      ) : contas.length === 0 ? (
-        <Texto texto="Nada vencendo nos próximos 30 dias." tamanho={13} cor={p.cor.apagado} linhas={2} />
       ) : (
-        contas.map((c, i) => (
-          <FlexWidget key={i} style={{ width: 'match_parent', flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-            <FlexWidget style={{ flex: 1, flexDirection: 'column' }}>
-              <Texto texto={c.titulo} tamanho={14} cor={p.cor.texto} />
-              <Texto texto={c.quando} tamanho={11} cor={c.atrasada ? p.cor.perigo : p.cor.apagado} />
+        <FlexWidget style={{ width: 'match_parent', flexDirection: 'column', flexGap: 8 }}>
+          {p.atrasado ? (
+            <FlexWidget
+              style={{
+                width: 'match_parent',
+                flexDirection: 'row',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                backgroundColor: p.cor.faixa,
+                borderRadius: 15,
+                paddingHorizontal: 12,
+                paddingVertical: 6,
+              }}>
+              <Texto texto={`${p.atrasado.qtd} ${p.atrasado.qtd === 1 ? 'atrasada' : 'atrasadas'}`} tamanho={12} forte cor={p.cor.perigo} />
+              <Texto texto={p.atrasado.valor} tamanho={12} forte cor={p.cor.perigo} />
             </FlexWidget>
-            <Texto texto={c.valor} tamanho={14} forte cor={c.atrasada ? p.cor.perigo : p.cor.texto} />
-          </FlexWidget>
-        ))
+          ) : null}
+          {lista.length === 0 ? (
+            <Texto texto="Nada mais vence nos próximos 30 dias." tamanho={13} cor={p.cor.apagado} linhas={2} />
+          ) : (
+            lista.map((c, i) => (
+              <FlexWidget key={i} style={{ width: 'match_parent', flexDirection: 'row', alignItems: 'center', flexGap: 10 }}>
+                <Selo p={p} dia={c.dia} mes={c.mes} hoje={c.hoje} />
+                <FlexWidget style={{ flex: 1 }}>
+                  <Texto texto={c.titulo} tamanho={14} linhas={2} cor={p.cor.texto} />
+                </FlexWidget>
+                <Texto texto={c.valor} tamanho={14} forte cor={p.cor.texto} />
+              </FlexWidget>
+            ))
+          )}
+        </FlexWidget>
       )}
-      {resto > 0 ? <Texto texto={`+${resto} no ciclo`} tamanho={11} cor={p.cor.apagado} /> : null}
+      {resto > 0 && p.estado === 'ok' ? <Texto texto={`+${resto} a vencer`} tamanho={11} cor={p.cor.apagado} /> : null}
     </FlexWidget>
   );
 }

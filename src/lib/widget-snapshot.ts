@@ -9,9 +9,14 @@
  *
  * ⚠️ **"Esconder saldo" vale na tela de início também.** Widget fica à vista de quem pega o
  * celular; com o olho fechado no app, o retrato leva a máscara no lugar dos valores.
+ *
+ * **Versão 2 (22/09/2026): menos texto.** A v1 listava toda conta atrasada numa linha vermelha
+ * com "venceu dd/mm" embaixo — seis linhas vermelhas iguais eram o widget inteiro, e a queixa foi
+ * *"quero algo bem bonito, organizado e não esse monte de texto"*. Agora o atrasado é UM resumo
+ * (quantas e quanto) e a lista é só o que ainda vai vencer, cada uma com um selo de data.
  */
 
-import { diasAte, formatBRL, isoToBR, rotuloDoDia } from './dates.ts';
+import { diasAte, formatBRL, isoToBR, mesCurto } from './dates.ts';
 
 export const MASCARA = 'R$ ••••';
 
@@ -47,27 +52,35 @@ export function vereditoDoDia(v: {
   return { tom: 'neutro', icone: 'checkmark.circle', texto: `Nada vence hoje · ${dias} até entrar` };
 }
 
+/** Uma conta que ainda vai vencer, pronta para o selo de data: `23` + `set`. */
 export interface ContaDoRetrato {
   titulo: string;
-  quando: string;
+  dia: string;
+  mes: string;
   valor: string;
-  atrasada: boolean;
+  /** Vence hoje — o único destaque que uma conta em dia recebe. */
+  hoje: boolean;
 }
 
 export interface Retrato {
   /** Quem desenha confere a versão: retrato de formato velho vira "abra o app", nunca lixo. */
-  versao: 1;
+  versao: 2;
   estado: 'ok' | 'sem-sessao';
   rotulo: string;
   livre: string;
   livreNegativo: boolean;
   veredito: Veredito;
-  /** "até 10/10 · R$ 12.333,20" — os compromissos do ciclo, a faixa de baixo do herói. */
-  compromissos: string | null;
-  contas: ContaDoRetrato[];
-  /** Quantas contas há além das mostradas. */
-  maisContas: number;
+  /** Os compromissos do ciclo, a faixa de baixo do herói: `até 10/10` + o valor. */
+  compromissos: { ate: string; valor: string } | null;
+  /** O atrasado como UM resumo — nunca uma linha por conta. */
+  atrasado: { qtd: number; valor: string } | null;
+  /** O que ainda vai vencer, por data. */
+  proximas: ContaDoRetrato[];
+  /** Quantas contas a vencer há além das mostradas. */
+  maisProximas: number;
+  /** Tudo que sai na janela (atrasado + a vencer). */
   totalContas: string;
+  qtdContas: number;
   atualizado: string;
 }
 
@@ -88,6 +101,8 @@ export interface EntradaDoRetrato {
   limiteContas?: number;
 }
 
+const ddmm = (iso: string) => isoToBR(iso).slice(0, 5);
+
 export function montarRetrato(e: EntradaDoRetrato): Retrato {
   const brl = (cents: number) => (e.oculto ? MASCARA : formatBRL(cents));
   const caixa = Number(e.spendable.caixa ?? 0);
@@ -96,32 +111,37 @@ export function montarRetrato(e: EntradaDoRetrato): Retrato {
   const ate = e.spendable.proxima_entrada ?? e.cicloAte ?? null;
   const diasLivres = Math.max(1, ate ? diasAte(ate, e.hoje) : 1);
 
-  const saidas = e.contas
-    .filter((c) => c.kind !== 'income')
-    .sort((a, b) => Number(b.overdue) - Number(a.overdue) || a.due_date.localeCompare(b.due_date));
-  const atrasado = saidas.filter((c) => c.overdue).reduce((s, c) => s + c.amount_cents, 0);
-  const venceHoje = saidas.filter((c) => !c.overdue && c.due_date === e.hoje).reduce((s, c) => s + c.amount_cents, 0);
+  const saidas = e.contas.filter((c) => c.kind !== 'income');
+  const atrasadas = saidas.filter((c) => c.overdue);
+  const proximas = saidas
+    .filter((c) => !c.overdue)
+    .sort((a, b) => a.due_date.localeCompare(b.due_date) || b.amount_cents - a.amount_cents);
+  const soma = (l: typeof saidas) => l.reduce((s, c) => s + c.amount_cents, 0);
+  const venceHoje = soma(proximas.filter((c) => c.due_date === e.hoje));
   const limite = e.limiteContas ?? 8;
   const comprometidoNoCiclo = Number(e.spendable.comprometido_no_ciclo ?? 0);
 
   return {
-    versao: 1,
+    versao: 2,
     estado: 'ok',
-    rotulo: ate ? `Livre até ${isoToBR(ate).slice(0, 5)}` : 'Livre',
+    rotulo: ate ? `Livre até ${ddmm(ate)}` : 'Livre',
     livre: brl(livre),
     livreNegativo: livre < 0,
-    veredito: vereditoDoDia({ atrasadoCents: atrasado, venceHojeCents: venceHoje, livreCents: livre, diasLivres, brl }),
+    veredito: vereditoDoDia({ atrasadoCents: soma(atrasadas), venceHojeCents: venceHoje, livreCents: livre, diasLivres, brl }),
     compromissos: e.cicloAte && comprometidoNoCiclo > 0
-      ? `Compromissos até ${isoToBR(e.cicloAte).slice(0, 5)} · ${brl(comprometidoNoCiclo)}`
+      ? { ate: `até ${ddmm(e.cicloAte)}`, valor: brl(comprometidoNoCiclo) }
       : null,
-    contas: saidas.slice(0, limite).map((c) => ({
+    atrasado: atrasadas.length > 0 ? { qtd: atrasadas.length, valor: brl(soma(atrasadas)) } : null,
+    proximas: proximas.slice(0, limite).map((c) => ({
       titulo: c.title,
-      quando: c.overdue ? `venceu ${isoToBR(c.due_date).slice(0, 5)}` : rotuloDoDia(c.due_date, e.hoje),
+      dia: String(Number(c.due_date.slice(8, 10))),
+      mes: mesCurto(c.due_date),
       valor: brl(c.amount_cents),
-      atrasada: c.overdue,
+      hoje: c.due_date === e.hoje,
     })),
-    maisContas: Math.max(0, saidas.length - limite),
-    totalContas: brl(saidas.reduce((s, c) => s + c.amount_cents, 0)),
+    maisProximas: Math.max(0, proximas.length - limite),
+    totalContas: brl(soma(saidas)),
+    qtdContas: saidas.length,
     atualizado: e.agora,
   };
 }
@@ -129,16 +149,18 @@ export function montarRetrato(e: EntradaDoRetrato): Retrato {
 /** Sem sessão (saiu da conta): o widget não pode seguir mostrando o dinheiro de quem saiu. */
 export function retratoSemSessao(agora: string): Retrato {
   return {
-    versao: 1,
+    versao: 2,
     estado: 'sem-sessao',
     rotulo: 'ProOps',
     livre: '',
     livreNegativo: false,
     veredito: { tom: 'neutro', icone: 'checkmark.circle', texto: 'Entre no app para ver o seu dia' },
     compromissos: null,
-    contas: [],
-    maisContas: 0,
+    atrasado: null,
+    proximas: [],
+    maisProximas: 0,
     totalContas: '',
+    qtdContas: 0,
     atualizado: agora,
   };
 }

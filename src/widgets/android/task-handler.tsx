@@ -13,7 +13,7 @@ export async function lerRetrato(): Promise<PropsDoWidget> {
   try {
     const cru = await AsyncStorage.getItem(CHAVE_DO_RETRATO);
     const r = cru ? JSON.parse(cru) : null;
-    if (r?.versao === 1) return r as PropsDoWidget;
+    if (r?.versao === 2) return r as PropsDoWidget;
   } catch {
     // retrato ilegível desenha o estado neutro — nunca dinheiro velho de formato errado
   }

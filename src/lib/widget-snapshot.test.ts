@@ -26,14 +26,28 @@ test('o livre é caixa menos o que vence antes da próxima entrada — o número
   const r = montarRetrato(base);
   assert.equal(n(r.livre), 'R$ 3.800,00');
   assert.equal(r.rotulo, 'Livre até 05/10');
-  assert.equal(n(r.compromissos), 'Compromissos até 10/10 · R$ 3.000,00');
+  assert.deepEqual({ ...r.compromissos, valor: n(r.compromissos!.valor) }, { ate: 'até 10/10', valor: 'R$ 3.000,00' });
 });
 
-test('as contas: só saídas, atrasadas primeiro, depois por data; receita não vence', () => {
+test('o atrasado é UM resumo; a lista é só o que vai vencer, com o selo de data', () => {
   const r = montarRetrato(base);
-  assert.deepEqual(r.contas.map((c) => c.titulo), ['Aluguel', 'Internet', 'Energia']);
-  assert.deepEqual(r.contas.map((c) => c.quando), ['venceu 01/09', 'hoje', 'amanhã']);
-  assert.equal(n(r.totalContas), 'R$ 2.049,90');
+  assert.deepEqual({ ...r.atrasado, valor: n(r.atrasado!.valor) }, { qtd: 1, valor: 'R$ 1.800,00' });
+  assert.deepEqual(r.proximas.map((c) => [c.titulo, c.dia, c.mes, c.hoje]), [
+    ['Internet', '22', 'set', true],
+    ['Energia', '23', 'set', false],
+  ]);
+  assert.equal(n(r.totalContas), 'R$ 2.049,90', 'o total é tudo que sai: atrasado + a vencer; receita fora');
+  assert.equal(r.qtdContas, 3);
+});
+
+test('a lista tem teto e conta o que sobrou', () => {
+  const muitas = Array.from({ length: 11 }, (_, k) => ({
+    title: `Conta ${k}`, due_date: `2026-10-${String(k + 1).padStart(2, '0')}`, amount_cents: 1000, kind: 'expense', overdue: false,
+  }));
+  const r = montarRetrato({ ...base, contas: muitas });
+  assert.equal(r.proximas.length, 8);
+  assert.equal(r.maisProximas, 3);
+  assert.equal(r.atrasado, null);
 });
 
 test('o veredito é o da Hoje: atrasado ganha de tudo', () => {
@@ -52,7 +66,8 @@ test('esconder saldo vale no widget: nenhum valor sai no retrato', () => {
 test('saiu da conta: o widget para de mostrar o dinheiro', () => {
   const r = retratoSemSessao('13:05');
   assert.equal(r.estado, 'sem-sessao');
-  assert.equal(r.contas.length, 0);
+  assert.equal(r.proximas.length, 0);
+  assert.equal(r.atrasado, null);
   assert.equal(r.livre, '');
 });
 
