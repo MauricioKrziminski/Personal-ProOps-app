@@ -1023,14 +1023,21 @@ export type Database = {
       }
       import_items: {
         Row: {
+          adopt_ids: string[] | null
           amount_cents: number
           batch_id: string
           created_at: string
           dedupe_hash: string | null
           description: string | null
+          external_id: string | null
           id: string
+          installment_no: number | null
+          installments: number | null
           kind: string
+          match_layer: string | null
+          match_note: string | null
           merchant: string | null
+          nature: string | null
           occurred_at: string
           raw: Json | null
           status: string
@@ -1040,14 +1047,21 @@ export type Database = {
           workspace_id: string
         }
         Insert: {
+          adopt_ids?: string[] | null
           amount_cents: number
           batch_id: string
           created_at?: string
           dedupe_hash?: string | null
           description?: string | null
+          external_id?: string | null
           id?: string
+          installment_no?: number | null
+          installments?: number | null
           kind?: string
+          match_layer?: string | null
+          match_note?: string | null
           merchant?: string | null
+          nature?: string | null
           occurred_at: string
           raw?: Json | null
           status?: string
@@ -1057,14 +1071,21 @@ export type Database = {
           workspace_id: string
         }
         Update: {
+          adopt_ids?: string[] | null
           amount_cents?: number
           batch_id?: string
           created_at?: string
           dedupe_hash?: string | null
           description?: string | null
+          external_id?: string | null
           id?: string
+          installment_no?: number | null
+          installments?: number | null
           kind?: string
+          match_layer?: string | null
+          match_note?: string | null
           merchant?: string | null
+          nature?: string | null
           occurred_at?: string
           raw?: Json | null
           status?: string
@@ -2749,6 +2770,10 @@ export type Database = {
           savings_rate: number
           score: number
         }[]
+      }
+      finish_import_batch: {
+        Args: { p_batch_id: string; p_item_ids: string[] }
+        Returns: number
       }
       forecast_json: { Args: { days: number; drafts?: Json }; Returns: Json }
       forecast_with_drafts: {

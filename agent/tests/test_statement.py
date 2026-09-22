@@ -84,3 +84,59 @@ def test_banco_que_nao_usa_fitid_nao_perde_o_extrato_inteiro():
     <STMTTRN><TRNTYPE>CREDIT<DTPOSTED>20260806<TRNAMT>100.00<MEMO>Salario</STMTTRN>
     """
     assert len(parse_ofx(sem_fitid)) == 2
+
+
+# ── Estrutura dos arquivos REAIS do Nubank (22/09/2026), com dados fictícios ─────────────────
+# Os arquivos de verdade têm nome e CPF de terceiros: a estrutura entra no teste, o dado não.
+
+CSV_FATURA_NUBANK = """date,title,amount
+2026-09-21,Pix no Crédito - FULANO,"88,68"
+2026-09-15,Loja X - Parcela 1/2,"52,50"
+2026-09-08,Pagamento recebido,"- 160,00"
+2026-09-04,Posto Y,"70,00"
+"""
+
+
+def test_csv_da_fatura_nubank_compra_positiva_e_gasto():
+    """O defeito medido: lida pela régua da conta, a fatura virava 26 receitas em 30 linhas."""
+    linhas = parse_csv(CSV_FATURA_NUBANK, cartao=True)
+    assert [l.kind for l in linhas] == ["expense", "expense", "income", "expense"]
+    # a coluna `title` É o nome — antes todas saíam "Lançamento importado"
+    assert linhas[1].description == "Loja X - Parcela 1/2"
+    assert linhas[2].amount_cents == 16000
+
+
+def test_csv_de_cartao_que_escreve_a_compra_negativa_tambem_funciona():
+    """A régua é a MAIORIA dos sinais, não o formato de um banco."""
+    csv = "Data;Descrição;Valor\n01/09/2026;Compra A;-10,00\n02/09/2026;Compra B;-20,00\n03/09/2026;Pagamento;30,00\n"
+    linhas = parse_csv(csv, cartao=True)
+    assert [l.kind for l in linhas] == ["expense", "expense", "income"]
+
+
+def test_csv_da_conta_nubank_traz_o_identificador():
+    csv = "Data,Valor,Identificador,Descrição\n01/08/2026,-25.00,abc-1,Transferência enviada\n"
+    [linha] = parse_csv(csv)
+    assert linha.kind == "expense" and linha.external_id == "abc-1"
+
+
+def test_ofx_diz_se_o_arquivo_e_de_cartao_ou_de_conta_e_traz_o_fitid():
+    from app.domain.statement import ofx_tipo
+
+    cartao = "<OFX><CREDITCARDMSGSRSV1><CCSTMTRS><BANKTRANLIST><STMTTRN><TRNTYPE>DEBIT<DTPOSTED>20260908<TRNAMT>-19.90<FITID>f-1<MEMO>Loja   Z</STMTTRN></BANKTRANLIST></CCSTMTRS></CREDITCARDMSGSRSV1></OFX>"
+    assert ofx_tipo(cartao) == "cartao"
+    assert ofx_tipo("<OFX><BANKMSGSRSV1><STMTRS></STMTRS></BANKMSGSRSV1></OFX>") == "conta"
+    assert ofx_tipo("lixo") is None
+    [linha] = parse_ofx(cartao)
+    assert linha.external_id == "f-1"
+    assert linha.description == "Loja Z", "espaço repetido sai: o nome é chave de comparação"
+
+
+def test_impressao_digital_do_csv_e_estavel_e_separa_linhas_iguais():
+    """Reimportar a mesma fatura em CSV (sem id do banco) tem que dar as MESMAS chaves; dois
+    postos iguais no mesmo dia são duas chaves."""
+    from app.jobs.importer import impressao_digital
+
+    csv = 'date,title,amount\n2026-09-07,Posto,"70,00"\n2026-09-07,Posto,"70,00"\n2026-09-08,Loja,"10,00"\n'
+    a = impressao_digital(parse_csv(csv, cartao=True))
+    b = impressao_digital(parse_csv(csv, cartao=True))
+    assert a == b and len(set(a)) == 3

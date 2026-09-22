@@ -15,10 +15,32 @@ from dataclasses import dataclass
 
 @dataclass
 class ParsedLine:
-    kind: str  # expense | income
+    kind: str  # expense | income — do ponto de vista de QUEM É DONO da conta (débito = expense)
     amount_cents: int
     occurred_at: str  # YYYY-MM-DD
     description: str
+    # O id que o BANCO dá à linha (`FITID` no OFX, "Identificador" no CSV da conta Nubank).
+    # É a camada mais forte da conciliação: sobrevive a renome e a correção de data no app.
+    external_id: str | None = None
+
+
+def _limpa(texto: str) -> str:
+    """Espaço repetido e quebra de linha saem: o nome é chave de comparação e rótulo de tela."""
+    return re.sub(r"\s+", " ", texto or "").strip()
+
+
+def ofx_tipo(conteudo: str) -> str | None:
+    """`cartao` | `conta` | None — ESTRUTURAL, pelo bloco que a especificação do OFX manda usar.
+
+    `<CREDITCARDMSGSRSV1>` é o extrato de cartão; `<BANKMSGSRSV1>` o de conta. Serve para barrar o
+    arquivo do cartão importado dentro da conta corrente (e o contrário), que troca o sentido de
+    todas as linhas sem erro nenhum.
+    """
+    if re.search(r"<CREDITCARDMSGSRSV1>|<CCSTMTRS>", conteudo or "", re.I):
+        return "cartao"
+    if re.search(r"<BANKMSGSRSV1>|<STMTRS>", conteudo or "", re.I):
+        return "conta"
+    return None
 
 
 def to_cents(raw: str) -> int | None:
@@ -113,15 +135,24 @@ def parse_ofx(conteudo: str) -> list[ParsedLine]:
                 kind="expense" if negativo else "income",
                 amount_cents=cents,
                 occurred_at=data,
-                description=tag("MEMO") or tag("NAME") or "Lançamento importado",
+                description=_limpa(tag("MEMO") or tag("NAME")) or "Lançamento importado",
+                external_id=tag("FITID") or None,
             )
         )
     return linhas
 
 
-def parse_csv(conteudo: str) -> list[ParsedLine]:
+def parse_csv(conteudo: str, *, cartao: bool = False) -> list[ParsedLine]:
     """CSV de banco brasileiro não tem padrão: descobre as colunas pelo cabeçalho
-    e cai para posicional (0,1,2) quando não acha."""
+    e cai para posicional (0,1,2) quando não acha.
+
+    ⚠️ **No CSV de FATURA o sinal é o contrário do extrato de conta.** O Nubank exporta a compra
+    POSITIVA e o pagamento negativo (`2026-09-20,Auto Posto,"70,00"` / `Pagamento recebido,
+    "- 160,00"`); lido pela régua da conta, 26 de 30 compras de uma fatura real viravam RECEITA.
+    Com `cartao=True` quem decide é a MAIORIA dos sinais — numa fatura as cobranças são quase tudo
+    — e não um formato de banco decorado: o sinal da maioria é "cobrança". Estrutural, sem ler o
+    texto da linha.
+    """
     texto = (conteudo or "").strip()
     if not texto:
         return []
@@ -143,27 +174,39 @@ def parse_csv(conteudo: str) -> list[ParsedLine]:
 
     i_data = acha("data", "date")
     i_descr = acha(
-        "descri", "histórico", "historico", "memo", "lançamento", "lancamento", "estabelecimento"
+        "descri", "histórico", "historico", "memo", "lançamento", "lancamento", "estabelecimento",
+        "title", "título", "titulo",
     )
     i_valor = acha("valor", "amount", "montante")
+    i_id = acha("identificador", "fitid")
     tem_cabecalho = i_data >= 0 and i_valor >= 0
     if not tem_cabecalho:
         i_data, i_descr, i_valor = 0, 1, 2
 
+    corpo = linhas[1:] if tem_cabecalho else linhas
+    valores = [campos[i_valor] if i_valor < len(campos) else "" for campos in corpo]
+    # Cartão: o sinal da MAIORIA é cobrança. Empate (fatura só com um pagamento e uma compra)
+    # cai no convencional da fatura, positivo = cobrança.
+    negativos = sum(1 for v in valores if to_cents(v) and is_negative(v))
+    positivos = sum(1 for v in valores if to_cents(v) and not is_negative(v))
+    cobranca_negativa = cartao and negativos > positivos
+
     saida: list[ParsedLine] = []
-    for campos in linhas[1:] if tem_cabecalho else linhas:
+    for campos, valor_raw in zip(corpo, valores, strict=True):
         data = any_date(campos[i_data] if i_data < len(campos) else "")
-        valor_raw = campos[i_valor] if i_valor < len(campos) else ""
         cents = to_cents(valor_raw)
         if not data or not cents:
             continue
-        descricao = campos[i_descr].strip() if 0 <= i_descr < len(campos) else ""
+        descricao = _limpa(campos[i_descr]) if 0 <= i_descr < len(campos) else ""
+        negativo = is_negative(valor_raw)
+        debito = (negativo == cobranca_negativa) if cartao else negativo
         saida.append(
             ParsedLine(
-                kind="expense" if is_negative(valor_raw) else "income",
+                kind="expense" if debito else "income",
                 amount_cents=cents,
                 occurred_at=data,
                 description=descricao or "Lançamento importado",
+                external_id=(campos[i_id].strip() or None) if 0 <= i_id < len(campos) else None,
             )
         )
     return saida
