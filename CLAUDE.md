@@ -59,6 +59,10 @@ App mobile pessoal de **notas rápidas, lembretes e controle financeiro operado 
   `anticipation_candidates` em uma versão, fuso no cabeçalho, `execute` para `authenticated` e
   sem para `anon`). App `v1.3.45`.
 
+  ⚠️ **Staging UMA à frente: `20260922130000`** (22/09/2026, `goal_deposit` recusa retirar mais
+  do que está guardado na meta — antes o saldo ia a 0 em silêncio e o próximo aporte sumia).
+  Sem ela em produção nada quebra: a tela já desliga o "Retirar", só a trava do banco falta.
+
   ⚠️ **OTA/build do chat exige a revisão nova do agente em produção** (21/09/2026): o app novo
   manda `id` no `POST /internal/chat/conversations` para abrir a conversa na hora, e o agente
   antigo (`extra='forbid'`) recusa com 422 — TODA primeira mensagem falha. Sem migration: é só
