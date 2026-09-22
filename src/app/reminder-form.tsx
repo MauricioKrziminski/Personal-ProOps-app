@@ -19,6 +19,7 @@ import { Icon } from '@/components/ui/icon';
 import { Screen } from '@/components/ui/screen';
 import { TaskHeader } from '@/components/ui/task-header';
 import { HeroLabel } from '@/components/ui/section-head';
+import { QuantityField } from '@/components/ui/quantity-field';
 import { Segmented } from '@/components/ui/segmented';
 import { SelectField } from '@/components/ui/select-field';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -214,6 +215,18 @@ const schema = z.object({
   time: z.string().refine(isValidTime, 'Hora em HH:MM'),
   recurrence: z.string().nullable(),
   channel: z.enum(['push', 'whatsapp', 'both']),
+}).superRefine((v, ctx) => {
+  // Repetição que termina ANTES do primeiro lembrete: a série dispararia uma vez (ou nenhuma) e
+  // morreria — e nada na tela dizia isso, porque o resumo da regra não mostra o UNTIL.
+  const until = parseRRule(v.recurrence).until;
+  if (!until || !isValidBRDate(v.date)) return;
+  if (until.slice(0, 8) < v.date.split('/').reverse().join('')) {
+    ctx.addIssue({
+      code: 'custom',
+      path: ['recurrence'],
+      message: `A repetição termina antes do primeiro lembrete (${v.date}). Escolha um “Até” a partir dessa data.`,
+    });
+  }
 });
 
 type FormValues = z.infer<typeof schema>;
@@ -538,8 +551,13 @@ function ReminderForm({
         <Controller
           control={control}
           name="recurrence"
-          render={({ field }) => (
-            <RecurrenceEditor value={field.value} onChange={field.onChange} />
+          render={({ field, fieldState }) => (
+            <RecurrenceEditor
+              value={field.value}
+              onChange={field.onChange}
+              inicio={date}
+              erro={fieldState.error?.message}
+            />
           )}
         />
 
@@ -612,22 +630,27 @@ function ReminderForm({
 function RecurrenceEditor({
   value,
   onChange,
+  inicio,
+  erro,
 }: {
   value: string | null;
   onChange: (next: string | null) => void;
+  /** A data do lembrete (dd/mm/aaaa): o "Até" nasce nela e não pode vir antes dela. */
+  inicio: string;
+  erro?: string;
 }) {
   const editable = isEditableRRule(value);
   const state = parseRRule(value);
   const patch = (changes: Partial<RecurrenceState>) => onChange(buildRRule({ ...state, ...changes }));
   /*
-    O "até" precisa de texto PRÓPRIO: a regra só aceita a data quando ela fica válida, e um campo
-    controlado pela regra devolveria o valor antigo no primeiro dígito — ou seja, indigitável.
-    Era o motivo do `defaultValue` de antes; com a máscara, o texto tem que voltar para a tela.
+    O "até" precisa de texto PRÓPRIO enquanto se digita: a regra só aceita a data quando ela fica
+    válida, e um campo controlado pela regra devolveria o valor antigo no primeiro dígito.
+    ⚠️ Mas SÓ enquanto se digita. O texto era inicializado uma vez e nunca mais seguia a regra:
+    escolher "Numa data" gravava UNTIL = hoje com o campo mostrando vazio, e voltar de "Nunca"
+    mostrava a data antiga gravando outra (22/09/2026). Fora da digitação, o campo mostra a regra.
   */
-  const [ateTexto, setAteTexto] = useState(() => {
-    const until = parseRRule(value).until;
-    return until ? untilToBR(until) : '';
-  });
+  const [ateDigitando, setAteDigitando] = useState<string | null>(null);
+  const ateTexto = ateDigitando ?? (state.until ? untilToBR(state.until) : '');
 
   const endMode = state.count ? 'count' : state.until ? 'until' : 'never';
 
@@ -693,16 +716,13 @@ function RecurrenceEditor({
           <Animated.View entering={FadeIn.duration(Motion.duration.base)} layout={linear}>
             <Field
               label={`A cada ${state.interval} ${FREQ_UNIT[state.freq][state.interval === 1 ? 0 : 1]}`}>
-              <View style={styles.chipRow}>
-                {[1, 2, 3, 4, 6, 12].map((n) => (
-                  <Chip
-                    key={n}
-                    label={String(n)}
-                    selected={state.interval === n}
-                    onPress={() => patch({ interval: n })}
-                  />
-                ))}
-              </View>
+              {/* Campo aberto (22/09/2026): "1, 2, 3, 4, 6, 12" não deixava "a cada 5 semanas". */}
+              <QuantityField
+                value={state.interval}
+                max={99}
+                onChange={(n) => patch({ interval: n })}
+                accessibilityLabel="Intervalo da repetição"
+              />
             </Field>
           </Animated.View>
         ) : null}
@@ -792,12 +812,16 @@ function RecurrenceEditor({
                   { value: 'count', label: 'Depois de N' },
                 ]}
                 value={endMode}
-                onChange={(next) =>
+                onChange={(next) => {
+                  setAteDigitando(null);
                   patch({
                     count: next === 'count' ? 12 : null,
-                    until: next === 'until' ? localISODate().replace(/-/g, '') : null,
-                  })
-                }
+                    // nasce na data do próprio lembrete — a primeira que vale — e APARECE no campo
+                    until: next === 'until'
+                      ? (isValidBRDate(inicio) ? inicio.split('/').reverse().join('') : localISODate().replace(/-/g, ''))
+                      : null,
+                  });
+                }}
               />
             </Field>
           </Animated.View>
@@ -805,12 +829,16 @@ function RecurrenceEditor({
 
         {state.until ? (
           <Animated.View entering={FadeIn.duration(Motion.duration.base)} layout={linear}>
-            <Field label="Até">
+            <Field label="Até" error={erro}>
               <DatePickerField
                 value={ateTexto}
                 onChange={(texto) => {
-                  setAteTexto(texto);
-                  if (isValidBRDate(texto)) patch({ until: texto.split('/').reverse().join('') });
+                  if (isValidBRDate(texto)) {
+                    setAteDigitando(null);
+                    patch({ until: texto.split('/').reverse().join('') });
+                  } else {
+                    setAteDigitando(texto);
+                  }
                 }}
                 accessibilityLabel="Repetir até a data"
               />
@@ -821,16 +849,13 @@ function RecurrenceEditor({
         {state.count ? (
           <Animated.View entering={FadeIn.duration(Motion.duration.base)} layout={linear}>
             <Field label="Quantas vezes">
-              <View style={styles.chipRow}>
-                {[3, 6, 12, 24, 36].map((n) => (
-                  <Chip
-                    key={n}
-                    label={`${n}x`}
-                    selected={state.count === n}
-                    onPress={() => patch({ count: n })}
-                  />
-                ))}
-              </View>
+              {/* Campo aberto, não atalhos fixos (22/09/2026): "3, 6, 12, 24, 36" não deixava
+                  escolher 10 lembretes. */}
+              <QuantityField
+                value={state.count}
+                onChange={(n) => patch({ count: n })}
+                accessibilityLabel="Quantas vezes repetir"
+              />
             </Field>
           </Animated.View>
         ) : null}

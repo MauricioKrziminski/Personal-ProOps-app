@@ -706,18 +706,24 @@ export default function RecurringScreen() {
           {form ? (
             <ScrollView contentContainerStyle={styles.sheetBody} keyboardShouldPersistTaps="handled">
               <Field label="Tipo">
-                <Segmented
-                  options={[
-                    { value: 'expense', label: 'Despesa' },
-                    { value: 'income', label: 'Receita' },
-                  ]}
-                  value={form.kind}
-                  onChange={(kind) =>
-                    // Trocar o tipo leva o padrão junto ENQUANTO a série é nova. Numa série
-                    // existente o valor é escolha dele e não pode ser reescrito por baixo.
-                    setForm({ ...form, kind, ...(form.id ? {} : { autoConfirm: kind !== 'income' }) })
-                  }
-                />
+                {/*
+                  ⚠️ Na EDIÇÃO o tipo é só leitura: `update_recurring_series` não grava `kind`, e
+                  o controle trocava os rótulos da tela sem mudar a série — "Série alterada." com
+                  ela ainda despesa (22/09/2026). Controle que não grava não aparece.
+                */}
+                {form.id ? (
+                  <ThemedText type="default">{form.kind === 'income' ? 'Receita' : 'Despesa'}</ThemedText>
+                ) : (
+                  <Segmented
+                    options={[
+                      { value: 'expense', label: 'Despesa' },
+                      { value: 'income', label: 'Receita' },
+                    ]}
+                    value={form.kind}
+                    // Trocar o tipo leva o padrão junto: a série é nova.
+                    onChange={(kind) => setForm({ ...form, kind, autoConfirm: kind !== 'income' })}
+                  />
+                )}
               </Field>
 
               <Field

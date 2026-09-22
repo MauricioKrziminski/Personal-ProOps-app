@@ -117,17 +117,18 @@ export function destinoDoSalvar(
 }
 
 /**
- * As opções da fileira "Parcelas" do editor da COMPRA.
+ * A faixa do número de parcelas — campo ABERTO, nunca uma lista fixa.
  *
- * ⚠️ **`1` é "À vista", e ele DISSOLVE o plano** — a parcela 1 sobrevive com o total, as outras
- * somem. Ele não existia, e por isso desfazer um parcelamento significava apagar a compra inteira
- * e lançar de novo. O comentário de `installments.tsx` já dizia "as mesmas opções da criação", e
- * a criação sempre teve "À vista": era a lista que estava incompleta.
+ * ⚠️ **Era uma lista (1, 2, 3, 4, 6, 10, 12, 18, 24)**, e não havia como lançar uma compra em
+ * 5x, 7x ou 8x. O dono do produto (22/09/2026): *"essas coisas assim nunca devem ser fixadas,
+ * deve ser totalmente aberta"*. O teto é o do banco (`installment_plans`: 2..72).
  *
- * ⚠️ **Com qualquer parcela travada ele some**, porque a RPC recusa (`1 <> N` cai no guarda que
- * já protege o número de parcelas). Botão que só existe para dar erro é defeito.
+ * ⚠️ **`1` é "À vista", e no editor da compra ele DISSOLVE o plano** — a parcela 1 sobrevive com
+ * o total, as outras somem. **Com qualquer parcela travada o mínimo vira 2**, porque a RPC recusa
+ * (`1 <> N` cai no guarda que já protege o número de parcelas). Número que só existe para dar
+ * erro é defeito.
  */
-export function opcoesDeParcelas(travadas: number): number[] {
-  const todas = [1, 2, 3, 4, 6, 10, 12, 18, 24];
-  return travadas > 0 ? todas.filter((n) => n > 1) : todas;
+export const MAX_PARCELAS = 72;
+export function faixaDeParcelas(travadas: number): { min: number; max: number } {
+  return { min: travadas > 0 ? 2 : 1, max: MAX_PARCELAS };
 }

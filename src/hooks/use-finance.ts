@@ -2269,7 +2269,9 @@ export function useSaveTransaction() {
       const uid = await userId();
       const compra = { ...input, user_id: uid, source: 'app' as const };
       const linhas = [compra];
-      if (fee_cents && fee_cents > 0) {
+      // Segunda trava: juro do Pix no crédito é custo de um GASTO. Numa receita ou transferência
+      // ele viraria dinheiro entrando, ou movido, com o nome de juro.
+      if (fee_cents && fee_cents > 0 && input.kind === 'expense') {
         linhas.push({
           ...compra,
           amount_cents: fee_cents,

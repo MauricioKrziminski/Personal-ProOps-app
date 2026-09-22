@@ -77,6 +77,37 @@ card de erro e a recuperação.
 - Decimal em texto (percentual, taxa, meses) só por `formatNumberBR` — vírgula, nunca ponto.
   Havia três cópias disso e uma tela sem nenhuma, escrevendo `90.4%` ao lado de `90,4%`.
 
+### Quantidade é campo ABERTO, nunca lista de atalhos (22/09/2026)
+
+⚠️ *"essas coisas assim nunca devem ser fixadas, deve ser totalmente aberta"* — do "Adiantar"
+que ia do 3 direto para o 6. Havia a mesma lista em mais cinco lugares: parcelas do lançamento
+(sem 5x, 7x, 8x), do editor da compra e do "E se…", e "a cada N" / "quantas vezes" do lembrete.
+O caminho único é `QuantityField` (`src/components/ui/quantity-field.tsx`): digita qualquer
+número, − / + para o ajuste, `min`/`max` da régua real (`faixaDeParcelas`: 1..72, mínimo 2 com
+parcela travada).
+
+⚠️ **O teto que CAI por causa de outro campo não corta em silêncio.** Escolher 8 parcelas e mudar
+o mês do pagamento para um em que restam 5 fazia o campo dizer 8 e a hipótese gravar 5. Quem
+chama marca `invalid`, explica no `Field` e trava o salvar (`erroDeQuantidade`). E o texto
+digitado é largado quando − / + mudam o valor — senão o campo mostra um número e vale outro.
+
+### Campo que some não escreve, e controle que não grava não aparece (22/09/2026)
+
+Varredura dos formulários depois do bug acima, mesma classe — valor que ficava no estado quando o
+campo sumia, ou tela que mostrava uma coisa e gravava outra:
+
+- **Juros do Pix** seguia no payload depois de trocar a conta para corrente, o tipo para receita
+  ou parcelar: gravava uma segunda linha de juros invisível. Uma condição só (`mostraJuros`) no
+  campo e no payload, e o hook recusa juro fora de gasto.
+- **"Até" do lembrete** mostrava vazio (ou a data antiga) com o UNTIL = hoje gravado por baixo.
+  O texto próprio vale só durante a digitação; fora dela o campo mostra a regra, e repetição que
+  termina antes do primeiro lembrete trava o salvar.
+- **"Tipo" na edição de recorrente** trocava a tela e não a série (a RPC não grava `kind`): virou
+  só leitura.
+- **Retirar da meta** além do guardado: o banco recusa (`20260922130000`), a tela desliga o botão.
+- Transferência zera o "vou pagar depois" (o vencimento escondido travava o Salvar); a dívida diz
+  por que o total não pode ficar abaixo das já pagas; o tipo escondido volta ao padrão.
+
 ### O campo que NOMEIA o registro: "Nome" em entidade, "Título" em evento
 
 ⚠️ **"Descrição" não é título, e ter os dois confunde** (15/09/2026). A queixa foi literal —

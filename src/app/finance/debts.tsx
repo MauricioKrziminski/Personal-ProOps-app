@@ -741,13 +741,26 @@ export default function DebtsScreen() {
               {!form.id && <Segmented
                 options={[{ value: 'fixed_installments', label: 'Parcela fixa' }, { value: 'amortized', label: 'Com juros ao mês' }]}
                 value={form.calculationMode}
-                onChange={(calculationMode) => setForm({ ...form, calculationMode })}
+                // O "Tipo" só aparece no modo com juros. Voltando para parcela fixa, o tipo escolhido
+                // lá ficaria escondido e seria gravado; volta ao padrão com que o formulário abriu.
+                onChange={(calculationMode) => setForm({
+                  ...form,
+                  calculationMode,
+                  ...(calculationMode === 'fixed_installments'
+                    ? { kind: params.create === 'financing' ? 'financing' : FORM_VAZIO.kind }
+                    : {}),
+                })}
               />}
               {form.calculationMode === 'fixed_installments' ? <>
                 <Field label="Valor da parcela" hint="Use o valor que você paga todo mês, já com juros e taxas incluídos.">
                   <MoneyField valueCents={form.installmentCents} onChangeCents={(installmentCents) => setForm({ ...form, installmentCents })} />
                 </Field>
-                <Field label="Total de parcelas">
+                <Field
+                  label="Total de parcelas"
+                  // Editando, as já pagas não aparecem — e o "Salvar" desligava sem dizer por quê.
+                  error={/^\d+$/.test(form.parcelas) && Number(form.parcelas) < form.installmentsPaid
+                    ? `Já foram pagas ${form.installmentsPaid} parcelas: o total não pode ser menor.`
+                    : undefined}>
                   <TextField value={form.parcelas} onChangeText={(value) => setForm({ ...form, parcelas: value.replace(/\D/g, '').slice(0, 3) })} keyboardType="number-pad" placeholder="48" />
                 </Field>
                 {/* Saiu de "detalhes (opcional)": é o vencimento que ancora o cronograma.

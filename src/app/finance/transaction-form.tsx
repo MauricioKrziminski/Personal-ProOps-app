@@ -39,7 +39,8 @@ import {
   type TransactionKind,
 } from '@/hooks/use-finance';
 import { brToISO, formatBRL, isValidBRDate, isoToBR, localISODate } from '@/lib/dates';
-import { destinoDoSalvar, financeErrorMessage, installmentHistory, opcoesDeParcelas, podeParcelar } from '@/lib/finance-form';
+import { destinoDoSalvar, financeErrorMessage, installmentHistory, faixaDeParcelas, podeParcelar } from '@/lib/finance-form';
+import { QuantityField } from '@/components/ui/quantity-field';
 import {
   autoConfirmHint,
   autoConfirmLabel,
@@ -231,6 +232,13 @@ function TransactionForm({ editing }: { editing?: Transaction }) {
 
   const account = (accounts ?? []).find((a) => a.id === accountId);
   const isCard = account?.type === 'credit_card';
+  /**
+   * Onde o campo "Juros do Pix no crédito" EXISTE. É a mesma condição no campo e no payload: o
+   * valor ficava no formulário quando o campo sumia (trocar a conta para a corrente, o tipo para
+   * receita, ou parcelar), e o salvar gravava uma segunda linha de juros que a tela não mostrava
+   * mais — virando receita de juros, ou transferência (22/09/2026).
+   */
+  const mostraJuros = isCard && kind === 'expense' && !editing && installmentCount === 1;
   /**
    * Conta a pagar não existe em cartão: a compra já entra na fatura e o caixa sai quando a
    * fatura vence. Marcar `pending` aqui contaria o MESMO gasto duas vezes na projeção.
@@ -448,7 +456,8 @@ function TransactionForm({ editing }: { editing?: Transaction }) {
         occurred_at: brToISO(values.occurred_at),
         status,
         due_at: adiado && values.due_at ? brToISO(values.due_at) : editing?.due_at ?? null,
-        fee_cents: editing ? 0 : values.fee_cents,
+        // Campo que não aparece não escreve (finance.md): juro só onde a pergunta existe
+        fee_cents: mostraJuros ? values.fee_cents : 0,
         /**
          * ⚠️ **Mesma regra do `status` logo acima, e pelo mesmo motivo.** Em cartão e em
          * transferência o campo "vou pagar depois" não existe (`podeAdiar` é false), então
@@ -590,6 +599,13 @@ function TransactionForm({ editing }: { editing?: Transaction }) {
                   field.onChange(next);
                   // A fileira de parcelas só existe em gasto (`podeParcelarAqui`).
                   if (next !== 'expense') resetParcelasSeEscondeu();
+                  // Transferência não tem "vou pagar depois" (`podeAdiar`): mesma reação da troca
+                  // para cartão. Sem ela o zod seguia exigindo o vencimento de um campo que sumiu,
+                  // e o "Salvar" não fazia nada, com o erro escondido (22/09/2026).
+                  if (next === 'transfer') {
+                    setValue('pending', false);
+                    setValue('due_at', null);
+                  }
                 }}
               />
             )}
@@ -764,27 +780,26 @@ function TransactionForm({ editing }: { editing?: Transaction }) {
                   hint={
                     field.value > 1 && amountCents > 0
                       ? `${field.value}x de ${formatBRL(Math.floor(amountCents / field.value))} — o valor acima é o TOTAL`
-                      : undefined
+                      : field.value === 1
+                        ? 'À vista.'
+                        : undefined
                   }>
-                  <View style={styles.chipRow}>
-                    {opcoesDeParcelas(0).map((n) => (
-                      <Chip
-                        key={n}
-                        label={n === 1 ? 'À vista' : `${n}x`}
-                        selected={field.value === n}
-                        onPress={() => {
-                          field.onChange(n);
-                          // Mesma reação da troca para cartão no `AccountPicker` acima: "vou
-                          // pagar depois" e "parcelar" não convivem (ver `podeAdiar`), senão o
-                          // zod continua exigindo `due_at` de um campo que sumiu da tela.
-                          if (n > 1) {
-                            setValue('pending', false);
-                            setValue('due_at', null);
-                          }
-                        }}
-                      />
-                    ))}
-                  </View>
+                  <QuantityField
+                    value={field.value}
+                    min={faixaDeParcelas(0).min}
+                    max={faixaDeParcelas(0).max}
+                    accessibilityLabel="Número de parcelas"
+                    onChange={(n) => {
+                      field.onChange(n);
+                      // Mesma reação da troca para cartão no `AccountPicker` acima: "vou
+                      // pagar depois" e "parcelar" não convivem (ver `podeAdiar`), senão o
+                      // zod continua exigindo `due_at` de um campo que sumiu da tela.
+                      if (n > 1) {
+                        setValue('pending', false);
+                        setValue('due_at', null);
+                      }
+                    }}
+                  />
                 </Field>
               )}
             />
@@ -819,7 +834,7 @@ function TransactionForm({ editing }: { editing?: Transaction }) {
           Vazio = compra normal. Não é um modo: é um campo a mais que só aparece onde a
           pergunta faz sentido (gasto em cartão, à vista, sendo criado agora).
         */}
-        {isCard && kind === 'expense' && !editing && installmentCount === 1 && (
+        {mostraJuros && (
           <Animated.View entering={FadeIn.duration(Motion.duration.base)} layout={linear}>
             <Controller
               control={control}

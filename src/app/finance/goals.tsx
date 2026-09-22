@@ -159,8 +159,16 @@ export default function GoalsScreen() {
     );
   };
 
+  /**
+   * Retirar mais do que está guardado: o banco somava o ledger com `greatest(sum, 0)` e o saldo
+   * virava 0 sem aviso — o próximo "Guardar" sumia (22/09/2026). O banco agora recusa
+   * (`20260922130000`); aqui o botão desliga antes e a dica diz até quanto dá.
+   */
+  const passaDoGuardado = aporte !== null && aporteCents > Number(aporte.saved_cents);
+
   const lancarAporte = (sinal: 1 | -1) => {
     if (!aporte || aporteCents <= 0) return;
+    if (sinal < 0 && passaDoGuardado) return;
     const antes = Number(aporte.saved_cents);
     const depois = antes + sinal * aporteCents;
     deposit.mutate(
@@ -179,7 +187,8 @@ export default function GoalsScreen() {
           setAporte(null);
         },
         // o sheet FICA aberto com o valor: fechar num erro faz o usuário achar que guardou
-        onError: () => toast({ message: 'Não deu para guardar.', tone: 'error' }),
+        onError: () =>
+          toast({ message: sinal > 0 ? 'Não deu para guardar.' : 'Não deu para retirar.', tone: 'error' }),
       }
     );
   };
@@ -426,7 +435,11 @@ export default function GoalsScreen() {
 
           {aporte ? (
             <ScrollView contentContainerStyle={styles.sheetBody} keyboardShouldPersistTaps="handled">
-              <Field label="Valor">
+              <Field
+                label="Valor"
+                hint={passaDoGuardado
+                  ? `Guardado nesta meta: ${formatBRL(Number(aporte.saved_cents))}. Retirar vai até esse valor.`
+                  : undefined}>
                 <MoneyField valueCents={aporteCents} onChangeCents={setAporteCents} autoFocus />
               </Field>
 
@@ -452,7 +465,7 @@ export default function GoalsScreen() {
                   variant="secondary"
                   block
                   loading={deposit.isPending}
-                  disabled={aporteCents <= 0}
+                  disabled={aporteCents <= 0 || passaDoGuardado}
                   onPress={() => lancarAporte(-1)}
                 />
               </View>

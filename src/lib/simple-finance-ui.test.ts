@@ -401,7 +401,8 @@ test('E se: editar uma entrada troca o valor e as parcelas no mesmo lugar da lis
   ui.interact(() => linhas()[0].props.onPress());
   assert.equal(ui.button('Salvar').props.disabled, false);
   ui.fill('Valor', 30000);
-  ui.interact((nodes) => nodes.find((n: any) => n.type === 'Chip' && n.props.label === '3x').props.onPress());
+  ui.interact((nodes) => nodes.find((n: any) => n.type === 'QuantityField'
+    && n.props.accessibilityLabel === 'Em quantas vezes').props.onChange(3));
   ui.press('Salvar');
 
   assert.deepEqual(JSON.parse(JSON.stringify(ui.drafts().map((d: any) => [d.amount_cents, d.installments]))),

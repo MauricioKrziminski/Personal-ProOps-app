@@ -5,7 +5,6 @@ import Animated, { FadeInDown, LinearTransition } from 'react-native-reanimated'
 
 import { AccountPicker } from '@/components/finance/account-picker';
 import { CategoryPicker } from '@/components/finance/category-picker';
-import { Chip } from '@/components/finance/chip';
 import { DatePickerField } from '@/components/finance/date-picker-field';
 import { useBRL } from '@/components/ui/conceal';
 import { Button } from '@/components/ui/button';
@@ -33,7 +32,8 @@ import {
 } from '@/hooks/use-finance';
 import { formatBRL, formatDateBR, localISODate } from '@/hooks/use-items';
 import { brToISO, isValidBRDate, isoToBR } from '@/lib/dates';
-import { financeErrorMessage, opcoesDeParcelas } from '@/lib/finance-form';
+import { faixaDeParcelas, financeErrorMessage } from '@/lib/finance-form';
+import { QuantityField } from '@/components/ui/quantity-field';
 import { estadoDaLinha } from '@/lib/settle-labels';
 import { useToast } from '@/components/ui/toast';
 import { confirmDestructive, showItemActions } from '@/lib/item-actions';
@@ -347,13 +347,9 @@ export default function InstallmentsScreen() {
   // de cartão vira despesa solta. O banco recusa; a tela evita chegar lá.
   const contaOk = Boolean(form?.accountId);
   const podeSalvar = Boolean(form && tituloOk && totalOk && contaOk && isValidBRDate(form.inicio));
-  // ⚠️ `opcoesDeParcelas` é a régua (`finance-form.ts`): some o "À vista" com parcela travada,
-  // porque a RPC recusaria. Aqui só se soma o número atual quando ele está fora da lista fixa.
-  const basePcelas = opcoesDeParcelas(form?.travadas ?? 0);
-  const opcoesParcelas =
-    form && !basePcelas.includes(form.installments)
-      ? [...basePcelas, form.installments].sort((a, b) => a - b)
-      : basePcelas;
+  // ⚠️ `faixaDeParcelas` é a régua (`finance-form.ts`): sem "À vista" com parcela travada,
+  // porque a RPC recusaria.
+  const faixaParcelas = faixaDeParcelas(form?.travadas ?? 0);
 
   const salvarPlano = () => {
     if (!form || !podeSalvar) return;
@@ -751,16 +747,13 @@ export default function InstallmentsScreen() {
                   accessibilityLabel="Número de parcelas"
                 />
               ) : (
-                <View style={styles.chips}>
-                  {opcoesParcelas.map((n) => (
-                    <Chip
-                      key={n}
-                      label={n === 1 ? 'À vista' : `${n}x`}
-                      selected={form.installments === n}
-                      onPress={() => setForm({ ...form, installments: n })}
-                    />
-                  ))}
-                </View>
+                <QuantityField
+                  value={form.installments}
+                  min={faixaParcelas.min}
+                  max={faixaParcelas.max}
+                  accessibilityLabel="Número de parcelas"
+                  onChange={(n) => setForm({ ...form, installments: n })}
+                />
               )}
             </Field>
 
@@ -854,10 +847,5 @@ const styles = StyleSheet.create({
     gap: Space.xl,
     padding: Space.lg,
     paddingBottom: Space.xxxl,
-  },
-  chips: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: Space.sm,
   },
 });

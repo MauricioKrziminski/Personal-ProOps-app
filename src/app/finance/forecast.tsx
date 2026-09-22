@@ -63,6 +63,8 @@ import {
   type Quais,
 } from '@/lib/anticipation';
 import { AdiantarCampos } from '@/components/finance/anticipation-fields';
+import { QuantityField } from '@/components/ui/quantity-field';
+import { faixaDeParcelas } from '@/lib/finance-form';
 import { settleDone, settleLabel } from '@/lib/settle-labels';
 
 /**
@@ -140,7 +142,6 @@ function rotuloHorizonte(dias: number): string {
   return HORIZONTES.find((h) => h.dias === dias)?.label ?? `${dias} dias`;
 }
 
-const PARCELAS = [1, 3, 6, 10, 12];
 
 /** O dia do pagamento suposto: o 1º do mês escolhido — ou hoje, no mês corrente. */
 function diaDoPagamento(mes: string | null): string {
@@ -1127,21 +1128,14 @@ export default function ForecastScreen() {
           {/* Parcelar só faz sentido em "uma vez": "todo mês" já é a repetição. */}
           {novoModo === 'total' ? (
             <Field label="Em quantas vezes">
-              {/*
-                `Chip`, não `Segmented`: cinco opções, e o formulário do lançamento
-                já escolhe parcela assim (`opcoesDeParcelas`, `src/lib/finance-form.ts`, nove
-                chips). Eram dois desenhos para a mesma pergunta no mesmo app.
-              */}
-              <View style={styles.chips}>
-                {PARCELAS.map((n) => (
-                  <Chip
-                    key={n}
-                    label={n === 1 ? 'À vista' : `${n}x`}
-                    selected={novoParcelas === n}
-                    onPress={() => setNovoParcelas(n)}
-                  />
-                ))}
-              </View>
+              {/* O mesmo campo aberto do lançamento (`faixaDeParcelas`): lista fixa não deixava 5x. */}
+              <QuantityField
+                value={novoParcelas}
+                min={faixaDeParcelas(0).min}
+                max={faixaDeParcelas(0).max}
+                accessibilityLabel="Em quantas vezes"
+                onChange={setNovoParcelas}
+              />
             </Field>
           ) : null}
           </>
@@ -1184,7 +1178,6 @@ const styles = StyleSheet.create({
     flexWrap: 'wrap',
     gap: Space.sm,
   },
-  chips: { flexDirection: 'row', flexWrap: 'wrap', gap: Space.sm },
   hero: {
     gap: Space.md,
   },
