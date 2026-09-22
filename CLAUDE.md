@@ -53,10 +53,11 @@ App mobile pessoal de **notas rápidas, lembretes e controle financeiro operado 
   `authenticated` e sem para `anon`). Agente `agente-00078-k5f` (produção) e
   `agente-staging-00146-7nr` subiram no mesmo dia; app `v1.3.43`.
 
-  ⚠️ **Staging UMA à frente: `20260922120000`** (22/09/2026, "E se… adiantar": a conta fixa
-  passa a ser listada até o teto da Projeção, 10 anos, em vez de 2 — a quantidade virou campo
-  aberto e o corte de 24 meses seria um limite invisível). Sem ela em produção nada quebra: a
-  conta fixa só não passa de 24 meses no "Adiantar". Sobe antes do build que leva o campo aberto.
+  **Produção e staging ALINHADOS em `20260922120000`** — aplicada em produção pelo Gabriel em
+  22/09/2026 ("E se… adiantar": conta fixa listada até o teto da Projeção, 10 anos) e conferida
+  na fonte (`schema_migrations` devolve `20260922120000`, `20260921120000`, `20260920130000`;
+  `anticipation_candidates` em uma versão, fuso no cabeçalho, `execute` para `authenticated` e
+  sem para `anon`). App `v1.3.45`.
 
   ⚠️ **OTA/build do chat exige a revisão nova do agente em produção** (21/09/2026): o app novo
   manda `id` no `POST /internal/chat/conversations` para abrir a conversa na hora, e o agente
