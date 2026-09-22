@@ -58,6 +58,9 @@ test('o motivo do "já está no app" mostra com o quê', () => {
   const d = it({ status: 'near_match', match_note: 'mesmo valor, no app em 08/09/2026',
     transactions: { id: 't', occurred_at: '2026-09-08', description: 'Posto' } });
   assert.equal(motivoDaLinha(d, true), 'mesmo valor, no app em 08/09/2026 — «Posto»');
+  const s = it({ status: 'uncertain', match_note: 'é Energia no app, lá R$ 214,30, em 08/09/2026',
+    transactions: { id: 't', occurred_at: '2026-09-08', description: 'Energia' } });
+  assert.equal(motivoDaLinha(s, true), 'é Energia no app, lá R$ 214,30, em 08/09/2026', 'a nota já nomeia: sem eco');
 });
 
 test('o total é o que está MARCADO, e conta as compras parceladas que nascem', () => {

@@ -312,6 +312,7 @@ export default function ImportScreen() {
                     occurredAt: item.occurred_at,
                     amountCents: item.amount_cents,
                     baixar: !cartao,
+                    contaId: alvo.account_id ? null : lote.data?.account_id,
                   },
                   {
                     onSuccess: () => toast({ message: 'Lançamento do app atualizado pelo extrato.', tone: 'success' }),
@@ -323,7 +324,7 @@ export default function ImportScreen() {
         : []),
     ]);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [items, cartao, brl]);
+  }, [items, cartao, brl, lote.data?.account_id]);
 
   // ── Etapa 1: trazer o arquivo ────────────────────────────────────────────
   if (!batchId) {

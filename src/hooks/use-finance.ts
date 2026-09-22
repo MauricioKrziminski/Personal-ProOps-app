@@ -1087,7 +1087,7 @@ export type ImportItem = Pick<
    * tem (nome e data que ela mesma escreveu) contra o que o banco mandou. Sem isso a linha diria
    * "parece já lançado" sem dizer com o quê, e a decisão viraria um chute.
    */
-  transactions: { id: string; occurred_at: string; description: string | null; amount_cents: number } | null;
+  transactions: { id: string; occurred_at: string; description: string | null; amount_cents: number; account_id: string | null } | null;
 };
 
 export type CategorizationRule = Pick<
@@ -1152,7 +1152,7 @@ export function useImportItems(batchId: string | undefined) {
       const { data, error } = await supabase
         .from('import_items')
         .select(
-          'id, batch_id, kind, amount_cents, occurred_at, description, merchant, suggested_category, status, transaction_id, nature, installment_no, installments, match_layer, match_note, adopt_ids, transactions!import_items_transaction_id_fkey(id, occurred_at, description, amount_cents)',
+          'id, batch_id, kind, amount_cents, occurred_at, description, merchant, suggested_category, status, transaction_id, nature, installment_no, installments, match_layer, match_note, adopt_ids, transactions!import_items_transaction_id_fkey(id, occurred_at, description, amount_cents, account_id)',
         )
         .eq('batch_id', batchId!)
         .order('occurred_at', { ascending: false });
@@ -1283,7 +1283,8 @@ export function useUpdateImportItem() {
  * "O extrato é a fonte da verdade": o lançamento do app que o item É passa a ter a data e o
  * valor do banco — o previsto do dentista (R$ 177,01 em 10/09) vira o que foi cobrado
  * (R$ 193,57 em 13/09). Na CONTA o banco ainda prova que aconteceu, e o previsto é baixado; no
- * cartão a baixa continua sendo da fatura.
+ * cartão a baixa continua sendo da fatura. Lançamento SEM conta ganha a do lote: o extrato prova
+ * onde ele foi pago, e no cartão é isso que o põe na fatura certa (`set_invoice`).
  */
 export function useApplyImportToExisting() {
   const invalidate = useInvalidateFinance();
@@ -1295,6 +1296,8 @@ export function useApplyImportToExisting() {
       occurredAt: string;
       amountCents: number;
       baixar: boolean;
+      /** A conta do lote, para o lançamento que não tinha conta (veio do WhatsApp sem dizer). */
+      contaId?: string | null;
     }) => {
       const { error } = await supabase
         .from('transactions')
@@ -1302,6 +1305,7 @@ export function useApplyImportToExisting() {
           occurred_at: input.occurredAt,
           amount_cents: input.amountCents,
           ...(input.baixar ? { status: 'cleared' as const } : {}),
+          ...(input.contaId ? { account_id: input.contaId } : {}),
         })
         .eq('id', input.transactionId);
       if (error) throw error;

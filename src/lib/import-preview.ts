@@ -133,7 +133,9 @@ export function motivoDaLinha(item: ItemDaPrevia, cartao: boolean): string | nul
   if (g === 'no_app' || g === 'talvez') {
     const alvo = item.transactions;
     const nota = item.match_note ?? (g === 'talvez' ? 'parecido com um lançamento do app' : 'já está no app');
-    return alvo?.description ? `${nota} — «${alvo.description}»` : nota;
+    // A nota da camada semântica já nomeia o lançamento ("é Energia no app, …"): repetir o nome
+    // no fim dizia a mesma coisa duas vezes na mesma linha.
+    return alvo?.description && !nota.includes(alvo.description) ? `${nota} — «${alvo.description}»` : nota;
   }
   return null;
 }
