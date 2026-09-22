@@ -476,7 +476,10 @@ export default function ForecastScreen() {
 
   /** Adicionar mais uma prepara outra hipótese; ver resultado inclui a atual e encerra a montagem. */
   const aplicarSuposicao = (verResultado: boolean) => {
-    const grupo = editando ?? `h${Date.now()}`;
+    // ⚠️ Não só o relógio: `h${Date.now()}` dava o MESMO grupo a duas hipóteses criadas no mesmo
+    // milissegundo, e elas viravam uma linha só (e "Tirar" levava as duas). Era a intermitência
+    // de `simple-finance-ui.test.ts` ("esperava 2 hipóteses, veio 1"), anterior a 22/09/2026.
+    const grupo = editando ?? `h${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
     // editar sempre fecha: "Salvar" é o único caminho da edição
     const fecha = verResultado || editando !== null;
     if (novoTipo === 'adiantar') {
