@@ -1,3 +1,8 @@
+'use no memo';
+// O React Compiler NÃO pode tocar aqui: widget é função crua renderizada fora da árvore do
+// app (Android: RemoteViews; iOS: runtime isolado). Compilado, o componente vira hook e quebra
+// com "Invalid Hook Call" — medido no emulador em 22/09/2026.
+
 import { HStack, Spacer, Text, VStack } from '@expo/ui/swift-ui';
 import {
   containerBackground,
@@ -5,7 +10,6 @@ import {
   foregroundStyle,
   lineLimit,
   monospacedDigit,
-  widgetURL,
 } from '@expo/ui/swift-ui/modifiers';
 import { createWidget, type WidgetEnvironment } from 'expo-widgets';
 
@@ -27,7 +31,7 @@ const Vence = (p: PropsDoWidget, env: WidgetEnvironment) => {
     <VStack
       alignment="leading"
       spacing={10}
-      modifiers={[containerBackground(p.cor.fundo, 'widget'), widgetURL('appproops:///finance/cycle')]}>
+      modifiers={[containerBackground(p.cor.fundo, 'widget')]}>
       <HStack>
         <Text modifiers={[font({ size: 13, weight: 'semibold' }), foregroundStyle(p.cor.texto)]}>O que vence</Text>
         <Spacer />

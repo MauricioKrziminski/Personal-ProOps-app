@@ -63,7 +63,8 @@
       "./plugins/with-android-abis",
       "./plugins/with-apk-installer",
       "./plugins/with-text-advance-width",
-      "./plugins/with-android-theme-colors"
+      "./plugins/with-android-theme-colors",
+      "./plugins/with-work-runtime-alinhado"
     ],
     "experiments": {
       "typedRoutes": true,

@@ -1,3 +1,8 @@
+'use no memo';
+// O React Compiler NÃO pode tocar aqui: widget é função crua renderizada fora da árvore do
+// app (Android: RemoteViews; iOS: runtime isolado). Compilado, o componente vira hook e quebra
+// com "Invalid Hook Call" — medido no emulador em 22/09/2026.
+
 import { HStack, Spacer, Text, VStack } from '@expo/ui/swift-ui';
 import {
   containerBackground,
@@ -6,7 +11,6 @@ import {
   lineLimit,
   minimumScaleFactor,
   monospacedDigit,
-  widgetURL,
 } from '@expo/ui/swift-ui/modifiers';
 import { createWidget, type WidgetEnvironment } from 'expo-widgets';
 
@@ -30,7 +34,7 @@ const Livre = (p: PropsDoWidget, env: WidgetEnvironment) => {
   }
   if (env.widgetFamily === 'accessoryRectangular') {
     return (
-      <VStack alignment="leading" spacing={1} modifiers={[widgetURL('appproops:///')]}>
+      <VStack alignment="leading" spacing={1}>
         <Text modifiers={[font({ textStyle: 'caption' })]}>{p.rotulo}</Text>
         <Text modifiers={[font({ textStyle: 'headline', weight: 'semibold' }), monospacedDigit(), minimumScaleFactor(0.6), lineLimit(1)]}>
           {semSessao ? 'Entre no app' : p.livre}
@@ -69,7 +73,7 @@ const Livre = (p: PropsDoWidget, env: WidgetEnvironment) => {
     </VStack>
   );
 
-  const fundo = [containerBackground(p.cor.fundo, 'widget'), widgetURL('appproops:///')];
+  const fundo = [containerBackground(p.cor.fundo, 'widget')];
 
   if (env.widgetFamily === 'systemMedium' && !semSessao && p.contas.length > 0) {
     return (

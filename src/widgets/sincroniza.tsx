@@ -14,7 +14,9 @@ function usePublicar() {
     if (chave === ultimo.current) return;
     ultimo.current = chave;
     // Widget é vitrine: falhar em publicar nunca pode derrubar o app.
-    publicarRetrato(r).catch(() => {});
+    publicarRetrato(r).catch((erro) => {
+      if (__DEV__) console.warn('[widgets] publicar falhou', erro);
+    });
   };
 }
 
