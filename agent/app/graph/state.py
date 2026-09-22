@@ -133,6 +133,11 @@ class AgentState(TypedDict, total=False):
     # as ações semeadas — que foi exatamente o que aconteceu no staging.
     preset: bool
 
+    # A proposta (o resumo que a pessoa leu) quando o turno refaz um pedido corrigido
+    # ANTES do SIM (`conversation.run_turn`, `revise`); "" nos outros turnos. O modelo
+    # lê "original + correção" como registro novo, não como edição de um existente.
+    corrigindo: str
+
     # execução
     revision_pending: bool  # Persist revised proposal before asking for approval.
     approved: bool

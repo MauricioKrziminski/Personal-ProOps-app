@@ -4,9 +4,11 @@ A mesma recusa sai de dois pontos — `policy.erro_de_correcao` (antes do SIM) e
 tool (segunda trava) —, e duas cópias do texto divergiriam.
 """
 
-SEM_CORRECAO = "O que você quer mudar: o valor, o nome, a categoria ou a data? Ainda não mudei nada."
-DATA_DO_PLANO = "A data de uma compra parcelada muda em Editar a compra no app. Ainda não mudei nada."
-CONTA_DO_PLANO = "A conta de uma compra parcelada muda em Editar a compra no app. Ainda não mudei nada."
+SEM_CORRECAO = ("O que você quer mudar: o valor, o nome, a categoria, a data, a conta ou o "
+                "número de parcelas? Ainda não mudei nada.")
+# Uma PARCELA solta (não a compra inteira) não troca de conta: a compra é uma só, num cartão.
+CONTA_DO_PLANO = ("A conta é da compra inteira, não de uma parcela. Me pede para mudar a "
+                  "conta da compra toda. Ainda não mudei nada.")
 VARIAS_PARCELAS = "Consigo corrigir a compra inteira (as parcelas em aberto) ou uma parcela por vez."
 PARCELA_TRAVADA = (
     "Essa parcela já foi paga (ou a fatura dela foi paga): o valor, a data e a conta "
@@ -18,7 +20,8 @@ NADA_EDITAVEL = "Nenhuma parcela dessa compra pode mudar mais — todas já fora
 # D1 — parcelar um lançamento que já existe (`convert_transaction_to_installments`).
 # As recusas da RPC que dá para saber ANTES do SIM, com o texto dela.
 NADA = " Ainda não mudei nada."
-MUDAR_PARCELAS = "Mudar o número de parcelas é em Editar a compra no app." + NADA
+# Uma PARCELA solta não reparcela nada; a compra inteira sim (`erro_de_correcao`).
+MUDAR_PARCELAS = "Para mudar o número de parcelas, me pede sobre a compra inteira." + NADA
 LIMITE_PARCELAS = "Escolha pelo menos 2 parcelas (e no máximo 72)." + NADA
 SEM_CARTAO = ("Você não tem cartão cadastrado, e uma compra parcelada precisa de um. "
               "Cadastre o cartão no app e me pede de novo." + NADA)
@@ -39,6 +42,19 @@ JA_A_VISTA = "Esse lançamento já é à vista." + NADA
 # neutra: o 1 pode ser ruído do modelo numa correção de valor ("a tv foi 3000")
 VALOR_COM_DESPARCELAR = ("Não entendi se é para voltar a compra para à vista ou corrigir o "
                          "valor. Me diz uma coisa de cada vez." + NADA)
+
+
+def plano_travado(nome: str) -> str:
+    """Conta, data da 1ª parcela e nº de parcelas travam com QUALQUER parcela paga (ou
+    em fatura fechada/paga em parte) — a regra 2 de `update_installment_plan`."""
+    return (f"A compra {nome} já tem parcela paga ou numa fatura fechada: a conta, a data e "
+            "o número de parcelas não mudam mais. Dá para corrigir o total, o nome e a "
+            "categoria." + NADA)
+
+
+def conta_ambigua(nomes: list[str]) -> str:
+    return (f"Encontrei mais de uma conta: {', '.join(nomes)}. Diga qual conta ou cartão "
+            "deve ficar na compra." + NADA)
 
 
 def desparcelar_travada(nome: str) -> str:
@@ -78,3 +94,32 @@ def recusa_de_conversao(linha: dict, parcelas: int) -> str | None:
         return ("A fatura desse lançamento já foi paga, adiada ou paga em parte: ele não pode "
                 "ser parcelado agora." + NADA)
     return None
+
+
+def conta_nova_do_plano(action, target: dict | None, cand: dict) -> tuple[dict | None, str | None]:
+    """(conta nova, erro) de uma correção de CONTA na compra inteira. Pura.
+
+    `new_account_opcoes` são as contas que casam com o nome citado, congeladas pelo
+    resolvedor (`resolve._opcoes_de_conta`). A conta que a compra JÁ tem entre elas é
+    DESCRIÇÃO, não troca: "foi à vista no nubank" com a compra no Nubank Cartão (e uma
+    conta Nubank ao lado) não muda conta nenhuma — era o caso que caía em "muda no app".
+    """
+    if not getattr(action, "new_account", None):
+        return None, None
+    opcoes = (target or {}).get("new_account_opcoes")
+    if opcoes is None:
+        # alvo de antes do deploy: sem as opções congeladas o SIM não sabe qual conta
+        return None, "Ainda não mudei nada. Me pede de novo."
+    atual = cand.get("account_id")
+    casa = {o.get("id") for o in opcoes} | set((target or {}).get("new_account_casa") or [])
+    if atual and str(atual) in casa:
+        return None, None
+    if len(opcoes) == 1:
+        return opcoes[0], None
+    return None, conta_ambigua([o["name"] for o in opcoes])
+
+
+def muda_numero_de_parcelas(action, cand: dict) -> bool:
+    """N → M (2..72) na compra inteira. Igual ao N atual é pista de busca; 1 é desparcelar."""
+    n = getattr(action, "installments", None)
+    return bool(n) and n >= 2 and n != cand.get("plan_installments")

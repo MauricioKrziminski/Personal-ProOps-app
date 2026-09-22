@@ -164,17 +164,28 @@ async def test_gate_halts_ambiguous_account_without_consent_or_write():
 
 
 @pytest.mark.asyncio
-async def test_whole_installment_plan_does_not_promise_account_correction(monkeypatch):
+async def test_whole_installment_plan_freezes_account_options(monkeypatch):
+    """21/09/2026: a conta da compra inteira muda pelo agente. O resolvedor congela TODAS
+    as contas que casam; quem decide troca x descrição é a política, por candidato."""
     async def transaction(*a):
         return 'found', target()['candidates']
 
     async def plans(ws, candidates):
         return [{'id': str(TX), 'label': 'TV em 12x', 'table': 'installment_plans'}]
 
+    async def accounts(*a, **kw):
+        return [{'id': ACCOUNT, 'name': 'Nubank', 'type': 'checking'},
+                {'id': TX, 'name': 'Nubank Cartão', 'type': 'credit_card'}]
+
     monkeypatch.setattr(resolve, 'por_transacao', transaction)
     monkeypatch.setattr(resolve, '_com_plano', plans)
+    monkeypatch.setattr(resolve.db, 'accounts', accounts)
     resolved = (await resolve.for_actions(WS, [action(description='TV', new_account='Nubank')], 'muda a TV'))[0]
-    assert 'Editar a compra no app' in resolved['correction_error']
+    assert 'correction_error' not in resolved
+    # o casador prioriza o nome exato; quem casa por conter vai à parte, para a política
+    # reconhecer "no nubank" como a conta que a compra JÁ tem (o Nubank Cartão)
+    assert [o['name'] for o in resolved['new_account_opcoes']] == ['Nubank']
+    assert set(resolved['new_account_casa']) == {str(ACCOUNT), str(TX)}
     assert 'new_account' not in resolved
 
 

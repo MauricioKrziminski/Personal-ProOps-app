@@ -10,16 +10,19 @@ from __future__ import annotations
 from app.config import get_settings
 from app.domain.correcao_plano import (
     CONTA_DO_PLANO,
-    DATA_DO_PLANO,
     JA_A_VISTA,
+    LIMITE_PARCELAS,
     MUDAR_PARCELAS,
     PARCELA_TRAVADA,
     SEM_CORRECAO,
     VALOR_COM_DESPARCELAR,
     VARIAS_PARCELAS,
+    conta_nova_do_plano,
     desparcelar_travada,
     e_conversao,
     e_desparcelar,
+    muda_numero_de_parcelas,
+    plano_travado,
 )
 from app.domain.dates import format_date_br
 from app.domain.money import cents_to_brl
@@ -158,13 +161,27 @@ def _frase_correcao_plano(action: FinanceAction, target: dict, escolhido: dict) 
     label = escolhido["label"]
     novo = action.new_amount_cents
     unit = target.get("amount_unit")
-    outras = _outras_correcoes(action, target)
+    # conta, data e nº de parcelas só chegam aqui sem parcela travada (`erro_de_correcao`)
+    estrutura = []
+    muda_n = muda_numero_de_parcelas(action, escolhido)
+    if action.new_occurred_at:
+        estrutura.append(f"1ª parcela em {format_date_br(action.new_occurred_at)}")
+    conta, _ = conta_nova_do_plano(action, target, escolhido)
+    if conta:
+        estrutura.append(f"conta → {conta['name']}")
+    outras = [o for o in _outras_correcoes(action, target)
+              if not o.startswith(("conta →", "data →"))]
     # "as pagas ficam como estão" vale para o VALOR; nome e categoria da compra mudam
     # em todas as parcelas, inclusive as pagas (Reparcelar, finance.md)
-    suffix = f"; {', '.join(outras)} em todas as parcelas" if outras else ""
+    suffix = "".join(f"; {e}" for e in estrutura)
+    suffix += f"; {', '.join(outras)} em todas as parcelas" if outras else ""
+    n = action.installments if muda_n else escolhido.get("plan_installments")
     if unit == "parcela":
-        editaveis = escolhido["editaveis"]
+        editaveis = n if muda_n else escolhido["editaveis"]
         novo_total = escolhido["travado_cents"] + novo * editaveis
+        if muda_n:
+            return (f"corrigir {label}: {n}x de {cents_to_brl(novo)} "
+                    f"(novo total {cents_to_brl(novo_total)}){suffix}")
         onde = ("na única que ainda pode mudar" if editaveis == 1
                 else f"nas {editaveis} que ainda podem mudar")
         return (
@@ -172,13 +189,16 @@ def _frase_correcao_plano(action: FinanceAction, target: dict, escolhido: dict) 
             f"(novo total {cents_to_brl(novo_total)}; as pagas ficam como estão){suffix}"
         )
     if unit == "total":
+        if muda_n:
+            return (f"corrigir o total de {label}: {cents_to_brl(escolhido['total_cents'])} → "
+                    f"{cents_to_brl(novo)} em {n}x{suffix}")
         editaveis = escolhido["editaveis"]
         diferenca = novo - escolhido["travado_cents"]
         onde = ("na única que pode mudar" if editaveis == 1
                 else f"divididos nas {editaveis} que podem mudar")
         return (
             f"corrigir o total de {label}: {cents_to_brl(escolhido['total_cents'])} → "
-            f"{cents_to_brl(novo)} em {escolhido['plan_installments']}x "
+            f"{cents_to_brl(novo)} em {n}x "
             f"({cents_to_brl(diferenca)} {onde}){suffix}"
         )
     # Sem unidade: só a pendência de antes do deploy chega aqui — hoje o `gate`
@@ -235,14 +255,46 @@ def _frase_desparcelar(action: FinanceAction, target: dict, escolhido: dict) -> 
     cartão, N). Sem cartão congelado a frase cala sobre ele em vez de inventar."""
     quando = (f" em {format_date_br(escolhido['parcela1_em'])}"
               if escolhido.get("parcela1_em") else "")
-    cartao = f" no cartão {escolhido['account_name']}" if escolhido.get("account_name") else ""
-    outras = _outras_correcoes(action, target)
+    conta, _ = conta_nova_do_plano(action, target, escolhido)
+    if conta:
+        cartao = f" na conta {conta['name']}"
+    else:
+        cartao = f" no cartão {escolhido['account_name']}" if escolhido.get("account_name") else ""
+    outras = [o for o in _outras_correcoes(action, target) if not o.startswith("conta →")]
     outras_str = f"; {', '.join(outras)}" if outras else ""
     return (
         f"desparcelar {_nome_do_plano(escolhido)}: a compra de "
         f"{cents_to_brl(escolhido['total_cents'])} volta a ser à vista{quando}{cartao} "
         f"(as {escolhido['plan_installments']} parcelas viram um lançamento só){outras_str}"
     )
+
+
+def _frase_plano(action: FinanceAction, target: dict, escolhido: dict) -> str:
+    """Compra inteira SEM valor novo: nº de parcelas, 1ª parcela, conta, nome, categoria.
+
+    Os números vêm congelados no candidato; a divisão aqui é só de EXIBIÇÃO — quem grava
+    é `update_installment_plan`, que põe o resto na última parcela, e a frase diz isso.
+    """
+    partes = []
+    if muda_numero_de_parcelas(action, escolhido):
+        total, n = escolhido.get("total_cents"), action.installments
+        if total is None:
+            # candidato de antes do deploy (a política recusa antes; aqui só não quebra)
+            partes.append(f"de {escolhido['plan_installments']}x para {n}x")
+        else:
+            resto = " (a última acerta os centavos)" if total % n else ""
+            partes.append(f"de {escolhido['plan_installments']}x para {n}x de "
+                          f"{cents_to_brl(total // n)}{resto}")
+    if action.new_occurred_at:
+        partes.append(f"1ª parcela em {format_date_br(action.new_occurred_at)}")
+    conta, _ = conta_nova_do_plano(action, target, escolhido)
+    if conta:
+        partes.append(f"conta → {conta['name']}")
+    if action.new_description:
+        partes.append(f"nome → {action.new_description}")
+    if action.new_category:
+        partes.append(f"categoria → {action.new_category}")
+    return f"corrigir a compra {_nome_do_plano(escolhido)}: {', '.join(partes)}"
 
 
 def plano_inteiro(target: dict | None) -> bool:
@@ -285,23 +337,35 @@ def erro_de_correcao(action, target: dict | None) -> str | None:
                 and not cands[0].get("installment_snapshot")):
             return JA_A_VISTA
         return SEM_CORRECAO
-    if n_plano is not None and muda_parcelas:
-        return MUDAR_PARCELAS
     if plano_inteiro(target):
-        if action.new_occurred_at:
-            return DATA_DO_PLANO
-        if action.new_account:
-            return CONTA_DO_PLANO
-        if desparcela:
-            cand = cands[0]
-            if action.new_amount_cents is not None:
-                return VALOR_COM_DESPARCELAR
+        # A compra INTEIRA muda pela RPC do "Editar a compra" do app, com as mesmas
+        # travas: conta, data da 1ª parcela e nº de parcelas só enquanto nenhuma parcela
+        # está paga ou numa fatura fechada (regra 2 de `update_installment_plan`). Até
+        # 21/09/2026 as três eram recusadas com "muda no app" — inclusive quando a conta
+        # dita era a que a compra já tinha ("foi à vista no nubank").
+        cand = cands[0]
+        conta, erro_conta = conta_nova_do_plano(action, target, cand)
+        if erro_conta:
+            return erro_conta
+        if muda_parcelas and not 2 <= action.installments <= 72:
+            return LIMITE_PARCELAS
+        if desparcela and action.new_amount_cents is not None:
+            return VALOR_COM_DESPARCELAR
+        estrutura = bool(action.new_occurred_at or conta or muda_parcelas or desparcela)
+        if not (estrutura or action.new_amount_cents is not None or action.new_description
+                or action.new_category):
+            # a conta dita é a que a compra já tem, e não sobrou mais nada a mudar
+            return SEM_CORRECAO
+        if estrutura:
             if cand.get("travado_cents") is None:
                 # candidato de antes do deploy: sem a trava congelada o SIM não sabe o efeito
                 return "Ainda não mudei nada. Me pede de novo."
             if cand["travado_cents"] > 0:
-                return desparcelar_travada(_nome_do_plano(cand))
+                nome = _nome_do_plano(cand)
+                return desparcelar_travada(nome) if desparcela else plano_travado(nome)
         return None
+    if n_plano is not None and muda_parcelas:
+        return MUDAR_PARCELAS
     target = target or {}
     cands = target.get("candidates") or []
     snapshot = cands[0].get("installment_snapshot") if cands else None
@@ -309,6 +373,8 @@ def erro_de_correcao(action, target: dict | None) -> str | None:
         linhas = snapshot.get("rows") or []
         if len(linhas) != 1:
             return VARIAS_PARCELAS
+        if action.new_account:
+            return CONTA_DO_PLANO
         # Reparcelar, regra 1: parcela travada não muda valor, data nem conta; nome e
         # categoria sim. A trava vem congelada do banco (`private.parcela_travada`).
         mexe_dinheiro = (action.new_amount_cents is not None or action.new_occurred_at
@@ -389,6 +455,11 @@ def describe_for_confirmation(
             if (isinstance(action, FinanceAction) and e_desparcelar(action)
                     and plano_inteiro(target)):
                 return _frase_desparcelar(action, target, escolhido)
+            if (isinstance(action, FinanceAction) and plano_inteiro(target)
+                    and action.type == FinanceActionType.UPDATE_TRANSACTION
+                    and (muda_numero_de_parcelas(action, escolhido) or action.new_occurred_at
+                         or conta_nova_do_plano(action, target, escolhido)[0])):
+                return _frase_plano(action, target, escolhido)
             if (
                 target.get("table") == "transactions"
                 and target.get("convert_account")
@@ -409,7 +480,9 @@ def describe_for_confirmation(
                     corrections.append(f"categoria → {action.new_category}")
                 if action.new_occurred_at:
                     corrections.append(f"data → {format_date_br(action.new_occurred_at)}")
-                if action.new_account:
+                # na compra inteira, a troca de conta real tem frase própria (`_frase_plano`);
+                # chegar aqui com conta é a conta que ela JÁ tem — descrição, não troca
+                if action.new_account and not plano_inteiro(target):
                     account_name = (target.get("new_account") or {}).get("name", action.new_account)
                     corrections.append(f"conta → {account_name}")
                 if action.new_description:

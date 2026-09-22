@@ -374,14 +374,60 @@ class TestEdicaoPlano:
         assert "o total não muda mais" in err.value.mensagem_usuario
 
     @pytest.mark.asyncio
-    async def test_data_de_plano_nao_e_engolida(self, sql):
-        with pytest.raises(Level1Error) as err:
-            await finance.update_transaction(
-                _ctx_plano(),
-                FinanceAction(type=FinanceActionType.UPDATE_TRANSACTION, new_description="x",
-                              new_occurred_at="2026-10-01"),
-            )
-        assert "Editar a compra no app" in err.value.mensagem_usuario
+    @pytest.mark.parametrize("campos, esperado", [
+        # (correção, (total, parcelas, 1ª parcela, conta))
+        ({"new_occurred_at": "2026-10-01"}, (300000, 10, "2026-10-01", "acc-1")),
+        ({"installments": 12}, (300000, 12, "2026-05-15", "acc-1")),
+        ({"new_account": "Inter"}, (300000, 10, "2026-05-15", "acc-inter")),
+        # a conta dita é a que a compra já tem: descrição, não troca
+        ({"new_account": "Nubank", "new_occurred_at": "2026-10-01"},
+         (300000, 10, "2026-10-01", "acc-1")),
+    ])
+    async def test_data_conta_e_parcelas_da_compra_vao_pela_rpc(self, monkeypatch, campos, esperado):
+        """21/09/2026: eram "muda em Editar a compra no app". Agora vão pela MESMA RPC,
+        com os 8 argumentos e só o pedido trocado."""
+        rpc = []
+
+        async def fetch_one(sql, *args):
+            if "update_installment_plan" in sql:
+                rpc.append(args)
+                return {"mexidas": 10}
+            return {**PLANO_COMPLETO, "editaveis": 10, "travado_cents": 0,
+                    "primeira": "2026-05-15"}
+
+        monkeypatch.setattr(finance.db, "fetch_one", fetch_one)
+        # "Nubank" casa EXATO com a conta corrente; a compra está no Nubank Cartão
+        opcoes = ([{"id": "acc-inter", "name": "Inter"}] if campos.get("new_account") == "Inter"
+                  else [{"id": "acc-nu", "name": "Nubank"}])
+        casa = [] if campos.get("new_account") == "Inter" else ["acc-nu", "acc-1"]
+        ctx = _ctx_plano(new_account_opcoes=opcoes, new_account_casa=casa)
+        ctx.target["candidates"][0].update(plan_installments=10, total_cents=300000,
+                                           editaveis=10, travado_cents=0, account_id="acc-1")
+        r = await finance.update_transaction(
+            ctx, FinanceAction(type=FinanceActionType.UPDATE_TRANSACTION, **campos))
+        assert not r.read_only, r.message
+        total, parcelas, primeira, conta = esperado
+        (plano, t, n, p1, desc, cat, merch, acc), = rpc
+        assert (t, n, str(p1), acc) == (total, parcelas, primeira, conta)
+        assert (desc, cat, merch) == ("TV", "eletrônicos", "Magalu")
+
+    @pytest.mark.asyncio
+    async def test_estrutura_com_parcela_paga_agora_nao_chama_a_rpc(self, monkeypatch):
+        """Entre a pergunta e o SIM uma fatura foi paga: a trava é relida e recusa."""
+        rpc = []
+
+        async def fetch_one(sql, *args):
+            if "update_installment_plan" in sql:
+                rpc.append(args)
+            return {**PLANO_COMPLETO, "editaveis": 9, "travado_cents": 30000, "primeira": None}
+
+        monkeypatch.setattr(finance.db, "fetch_one", fetch_one)
+        ctx = _ctx_plano()
+        ctx.target["candidates"][0].update(plan_installments=10, total_cents=300000,
+                                           editaveis=10, travado_cents=0)
+        r = await finance.update_transaction(
+            ctx, FinanceAction(type=FinanceActionType.UPDATE_TRANSACTION, installments=12))
+        assert r.read_only and "não mudam mais" in r.message and rpc == []
 
     @pytest.mark.asyncio
     async def test_snapshot_de_uma_linha_corrige_so_aquela_linha(self, monkeypatch):

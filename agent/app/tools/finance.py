@@ -18,14 +18,15 @@ from app import db
 from app.domain import matching
 from app.domain.correcao_plano import (
     CARTAO_FALTANDO,
-    CONTA_DO_PLANO,
-    DATA_DO_PLANO,
     LINHA_SUMIU,
     NADA_EDITAVEL,
     PARCELA_TRAVADA,
     VALOR_COM_DESPARCELAR,
     VARIAS_PARCELAS,
+    conta_nova_do_plano,
     desparcelar_travada,
+    muda_numero_de_parcelas,
+    plano_travado,
 )
 from app.domain.dates import add_months, format_date_br, local_iso_date, now_utc
 from app.domain.money import cents_to_brl, parse_valor_em_centavos
@@ -1018,11 +1019,14 @@ async def update_transaction(ctx: ExecContext, action: FinanceAction) -> ToolRes
 
 
 async def _corrigir_plano(ctx: ExecContext, action: FinanceAction) -> ToolResult:
-    """A COMPRA inteira. Com VALOR (total ou por parcela, e nome/categoria junto) vai
-    pela RPC do "Editar a compra" do app, `update_installment_plan`, com o MESMO número
-    de parcelas e a data REAL da parcela 1. Só nome/categoria vai por `_renomear_plano`
-    (sem parcela travada a RPC reescreveria valor, data e conta de todas as linhas) — e
-    só com candidato do gate novo (`editaveis`): a frase de antes prometia outra coisa.
+    """A COMPRA inteira, pela RPC do "Editar a compra" do app, `update_installment_plan`:
+    valor (total ou por parcela), nº de parcelas, data da 1ª parcela, conta, nome e
+    categoria. Só nome/categoria vai por `_renomear_plano` (sem parcela travada a RPC
+    reescreveria valor, data e conta de todas as linhas) — e só com candidato do gate
+    novo (`editaveis`): a frase de antes prometia outra coisa.
+
+    Conta, data e nº de parcelas só mudam sem parcela travada (regra 2 da RPC). A
+    política recusa antes do SIM; a trava é relida AGORA e a RPC recusa de novo.
 
     Por que não `update_transaction_scoped`: ela mexe em parcela `pending` de fatura
     paga EM PARTE, e a frase do SIM promete que as pagas ficam como estão. Quem decide
@@ -1037,13 +1041,14 @@ async def _corrigir_plano(ctx: ExecContext, action: FinanceAction) -> ToolResult
     pediu. A releitura com `workspace_id` é a checagem de dono: a RPC é `security
     invoker` e acha o plano só pelo id, e o agente conecta com papel que ignora RLS.
     """
-    # segunda trava: o `gate` já recusa isto antes do SIM (`policy.erro_de_correcao`)
-    if action.new_occurred_at:
-        raise Level1Error(DATA_DO_PLANO)
-    if action.new_account:
-        raise Level1Error(CONTA_DO_PLANO)
     if action.installments == 1:
         return await _desparcelar(ctx, action)
+    cands = (ctx.target or {}).get("candidates") or []
+    conta, erro_conta = conta_nova_do_plano(action, ctx.target, cands[0])
+    if erro_conta:
+        raise Level1Error(erro_conta)
+    muda_n = muda_numero_de_parcelas(action, cands[0])
+    estrutura = bool(muda_n or action.new_occurred_at or conta)
     unidade = (ctx.target or {}).get("amount_unit")
     if action.new_amount_cents is not None and unidade not in ("total", "parcela"):
         return ToolResult(
@@ -1051,14 +1056,12 @@ async def _corrigir_plano(ctx: ExecContext, action: FinanceAction) -> ToolResult
             "me pede a correção de novo.",
             read_only=True,
         )
-    if action.new_amount_cents is None and not (action.new_description or action.new_category):
-        raise Level1Error(
-            "❌ Numa compra parcelada dá para corrigir valor, categoria ou nome. "
-            "Tenta \"muda o notebook para 300 por parcela\"."
-        )
-
-    cands = (ctx.target or {}).get("candidates") or []
-    if action.new_amount_cents is None:
+    if action.new_amount_cents is None and not estrutura:
+        if not (action.new_description or action.new_category):
+            raise Level1Error(
+                "❌ Numa compra parcelada dá para corrigir valor, nº de parcelas, data, conta, "
+                "categoria ou nome. Tenta \"muda o notebook para 300 por parcela\"."
+            )
         if cands[0].get("editaveis") is None:
             # pendência de antes do deploy: a frase que ela mostrou prometia "só as
             # parcelas em aberto", e renomear muda TODAS — o SIM não cobre isso
@@ -1083,26 +1086,45 @@ async def _corrigir_plano(ctx: ExecContext, action: FinanceAction) -> ToolResult
     )
     if not plano:
         return ToolResult("🤷 Essa compra parcelada não está mais aqui.", read_only=True)
+    nome_atual = plano["description"] or plano["merchant"] or "a compra"
+    if estrutura and int(plano["travado_cents"] or 0) > 0:
+        # lido AGORA: entre a pergunta e o SIM uma fatura pode ter sido paga
+        return ToolResult(plano_travado(nome_atual), read_only=True)
+    congelado = cands[0].get("total_cents")
+    if (estrutura and action.new_amount_cents is None and congelado is not None
+            and int(congelado) != int(plano["total_cents"])):
+        # a frase do SIM dividiu o total congelado; o de agora é outro
+        return ToolResult(
+            f"O total dessa compra mudou desde a confirmação ({cents_to_brl(int(congelado))} → "
+            f"{cents_to_brl(int(plano['total_cents']))}). Ainda não mudei nada; me pede de novo.",
+            read_only=True,
+        )
 
-    valor = guards.require_amount(action.new_amount_cents, o_que="o valor novo")
-    if unidade == "total":
-        total = valor
+    parcelas = action.installments if muda_n else plano["installments"]
+    if action.new_amount_cents is None:
+        total = int(plano["total_cents"])
     else:
-        # lido AGORA, não do que a frase do SIM congelou: entre a pergunta e o SIM
-        # uma fatura pode ter sido paga
-        editaveis = int(plano["editaveis"] or 0)
-        if editaveis == 0:
-            return ToolResult(NADA_EDITAVEL, read_only=True)
-        total = int(plano["travado_cents"] or 0) + valor * editaveis
+        valor = guards.require_amount(action.new_amount_cents, o_que="o valor novo")
+        if unidade == "total":
+            total = valor
+        else:
+            # lido AGORA, não do que a frase do SIM congelou: entre a pergunta e o SIM
+            # uma fatura pode ter sido paga. N novo só existe sem trava: todas mudam.
+            editaveis = parcelas if muda_n else int(plano["editaveis"] or 0)
+            if editaveis == 0:
+                return ToolResult(NADA_EDITAVEL, read_only=True)
+            total = int(plano["travado_cents"] or 0) + valor * editaveis
+    primeira = (guards.require_date(action.new_occurred_at, ctx.timezone, default_hoje=False)
+                if action.new_occurred_at else (plano.get("primeira") or plano["first_occurred_at"]))
     descricao = (guards.require_text(action.new_description, o_que="a descrição nova", maximo=200)
                  if action.new_description else plano["description"])
     categoria = guards.clean_category(action.new_category) if action.new_category else plano["category"]
+    conta_id = conta["id"] if conta else plano["account_id"]
     try:
         await db.fetch_one(
             "select public.update_installment_plan(%s, %s, %s, %s, %s, %s, %s, %s) as mexidas",
-            plano["id"], total, plano["installments"],
-            plano.get("primeira") or plano["first_occurred_at"],
-            descricao, categoria, plano["merchant"], plano["account_id"],
+            plano["id"], total, parcelas, primeira,
+            descricao, categoria, plano["merchant"], conta_id,
         )
     except psycopg.errors.RaiseException as err:
         # Só P0001 (o `raise exception` da RPC, escrito para a pessoa). Aqui e não no
@@ -1111,8 +1133,18 @@ async def _corrigir_plano(ctx: ExecContext, action: FinanceAction) -> ToolResult
         raise Level1Error(f"❌ {motivo}. Ainda não mudei nada.") from err
 
     nome = descricao or plano["merchant"] or "a compra"
-    texto = (f"✏️ Corrigi *{nome}*: total {cents_to_brl(int(plano['total_cents']))} → "
-             f"{cents_to_brl(total)} em {plano['installments']}x — as já pagas ficaram como estavam")
+    partes = []
+    if total != int(plano["total_cents"]):
+        partes.append(f"total {cents_to_brl(int(plano['total_cents']))} → {cents_to_brl(total)}")
+    if muda_n:
+        partes.append(f"{plano['installments']}x → {parcelas}x")
+    if action.new_occurred_at:
+        partes.append(f"1ª parcela em {format_date_br(primeira)}")
+    if conta:
+        partes.append(f"conta → *{conta['name']}*")
+    texto = f"✏️ Corrigi *{nome}*: {', '.join(partes) or 'sem mudança de valor'}"
+    if action.new_amount_cents is not None and not muda_n:
+        texto += f" em {parcelas}x — as já pagas ficaram como estavam"
     outras = _nome_e_categoria(action, descricao, categoria)
     if outras:
         texto += f"; {outras} em todas as parcelas"
@@ -1133,6 +1165,11 @@ async def _desparcelar(ctx: ExecContext, action: FinanceAction) -> ToolResult:
         # segunda trava: `policy.erro_de_correcao` já recusa antes do SIM
         raise Level1Error(VALOR_COM_DESPARCELAR)
     cand = ((ctx.target or {}).get("candidates") or [{}])[0]
+    # "foi à vista na conta corrente": a linha que sobra vai para a conta nova (a RPC
+    # grava `p_account_id` no sobrevivente e o `set_invoice` refaz a fatura)
+    conta, erro_conta = conta_nova_do_plano(action, ctx.target, cand)
+    if erro_conta:
+        raise Level1Error(erro_conta)
     plano = await db.fetch_one(
         f"""
         select p.id, p.total_cents, p.installments, p.first_occurred_at, p.description,
@@ -1166,13 +1203,16 @@ async def _desparcelar(ctx: ExecContext, action: FinanceAction) -> ToolResult:
         await db.fetch_one(
             "select public.update_installment_plan(%s, %s, %s, %s, %s, %s, %s, %s) as mexidas",
             plano["id"], total, 1, primeira,
-            descricao, categoria, plano["merchant"], plano["account_id"],
+            descricao, categoria, plano["merchant"],
+            conta["id"] if conta else plano["account_id"],
         )
     except psycopg.errors.RaiseException as err:
         motivo = (err.diag.message_primary or str(err)).strip().rstrip(".")
         raise Level1Error(f"❌ {motivo}. Ainda não mudei nada.") from err
     nome = descricao or plano["merchant"] or "A compra"
     texto = f"✅ {nome} voltou a ser à vista: {cents_to_brl(total)} em {format_date_br(primeira)}"
+    if conta:
+        texto += f", na conta *{conta['name']}*"
     outras = _nome_e_categoria(action, descricao, categoria)
     if outras:
         texto += f"; {outras}"

@@ -154,6 +154,7 @@ def _estado_base(
         "chosen_id": "",
         "draft": {},
         "preset": False,
+        "corrigindo": conteudo.get("corrigindo") or "",
         "confidence": 1.0,
         "llm_calls": 0,
         "revision_pending": False,
@@ -211,8 +212,29 @@ async def run_turn(
         return await _fechar(
             sessao, uso,
             decisao.get("clarification")
-            or "Ainda não alterei nada e mantive a proposta. Confirme, cancele ou diga exatamente o que deseja mudar.",
+            or confirm.MANTIDA,
         )
+
+    revisao = isinstance(decisao, dict) and decisao.get("revise")
+    if revisao:
+        # A pessoa corrigiu a proposta que ainda NÃO foi executada ("comprei em 2x no
+        # cartão"). Refazer o pedido com a correção é o único jeito de ela valer: o
+        # modelo lê as duas frases juntas e monta a proposta nova, que passa pelo mesmo
+        # `gate` e pede SIM de novo. O texto original vem do checkpoint da PERGUNTA — é
+        # ele que o grafo leu; `pending_actions` só guarda o resumo.
+        snapshot = await graph().aget_state(
+            {"configurable": {"thread_id": pendente["thread_id"]}})
+        original = ((getattr(snapshot, "values", None) or {}).get("text") or "").strip()
+        if not original:
+            # pedido que era só anexo (foto, PDF): a URL da mídia já expirou e a
+            # correção sozinha não diz o que registrar — mantém a proposta
+            return await _fechar(sessao, uso, confirm.MANTIDA)
+        await db.resolve_pending(pendente["id"], "expired")
+        correcao = conteudo.get("text", "")
+        conteudo = {**conteudo, "text": f"{original}\n{correcao}",
+                    "raw_texts": [original, correcao],
+                    "corrigindo": pendente.get("summary") or "a proposta anterior"}
+        pendente = None
 
     if pendente:
         if decisao is None:
@@ -274,7 +296,9 @@ async def run_turn(
     # clique `pa:` é do HITL e nunca é do rascunho; `ds:` é o oposto. Sem esta
     # separação, um clique na lista de cartões cairia em `confirm.decide` sem
     # pendência aberta e viraria "essa confirmação expirou".
-    if rascunho and not cadastro_incompleto and (not clique or clique.startswith(draft.CLICK_PREFIX)):
+    # a correção de uma proposta é do pedido que a gerou, nunca resposta a um rascunho
+    if (rascunho and not revisao and not cadastro_incompleto
+            and (not clique or clique.startswith(draft.CLICK_PREFIX))):
         decidido = (
             draft.parse_slot_click(clique, rascunho["id"])
             if clique

@@ -133,7 +133,7 @@ async def test_conta_corrente_citada_nao_serve_e_pergunta_o_cartao(monkeypatch):
     ({"rollover_of_invoice_id": "i1"}, "saldo adiado"),
     ({"fatura_travada": True}, "fatura desse lançamento já foi paga"),
     ({"installment_plan_id": "p1", "plan_installments": 3},
-     "Mudar o número de parcelas é em Editar a compra no app"),
+     "Para mudar o número de parcelas, me pede sobre a compra inteira"),
 ])
 async def test_recusas_da_rpc_saem_antes_do_sim(monkeypatch, campos, trecho):
     _banco(monkeypatch, [{**LINHA, **campos}])
@@ -154,7 +154,7 @@ async def test_linha_de_plano_com_o_mesmo_n_nao_e_conversao(monkeypatch):
 async def test_linha_de_plano_com_o_mesmo_n_e_conta_citada_recusa_antes_do_sim(monkeypatch):
     _banco(monkeypatch, [{**LINHA, "installment_plan_id": "p1", "plan_installments": 2}])
     alvo = await _alvo(FinanceAction(type=UPD, installments=2, new_account="nubank"))
-    assert alvo["correction_error"].startswith("A conta de uma compra parcelada muda")
+    assert alvo["correction_error"].startswith("A conta é da compra inteira")
 
 
 @pytest.mark.asyncio
@@ -233,9 +233,10 @@ def test_installments_igual_ao_do_plano_com_nome_segue():
                             PLANO) is None
 
 
-def test_installments_diferente_do_plano_recusa():
-    assert "Mudar o número de parcelas é em Editar a compra no app" in erro_de_correcao(
-        FinanceAction(type=UPD, installments=12), PLANO)
+def test_installments_diferente_do_plano_sem_trava_congelada_pede_de_novo():
+    """Candidato de antes do deploy (sem `travado_cents`): o SIM não sabe o efeito."""
+    assert erro_de_correcao(FinanceAction(type=UPD, installments=12), PLANO) == (
+        "Ainda não mudei nada. Me pede de novo.")
 
 
 def test_uma_parcela_sozinha_em_linha_avulsa_ja_e_a_vista():

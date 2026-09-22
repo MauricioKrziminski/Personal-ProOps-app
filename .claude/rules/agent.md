@@ -158,8 +158,19 @@ Ele foi removido (`agent/app/tools/finance.py:856`); dar baixa é caminho de `ma
   parcela sincroniza `installment_plans.total_cents` na mesma operação, para o total continuar
   sendo a soma do que está embaixo dele.
 - **Recusas antes do SIM, não depois:** várias parcelas no snapshot, parcela travada (paga ou em
-  fatura fechada/paga em parte), data ou conta da compra inteira. `policy.erro_de_correcao` roda
-  no `gate` e de novo dentro do helper de unidade (no empate a data só some depois da escolha).
+  fatura fechada/paga em parte), conta de UMA parcela, e conta/data/nº de parcelas da compra
+  inteira quando ela tem parcela travada. `policy.erro_de_correcao` roda no `gate` e de novo
+  dentro do helper de unidade (no empate a data só some depois da escolha).
+- **Conta, data da 1ª parcela e nº de parcelas da COMPRA INTEIRA o agente muda** (21/09/2026,
+  *"ele tem que mudar diretamente pelo agente mesmo, sem eu precisar abrir o app"*). Eram
+  recusados com "muda em Editar a compra no app" — até quando a conta dita era a que a compra
+  JÁ tinha ("foi à vista no nubank" com a compra no Nubank Cartão). Vão pela mesma
+  `update_installment_plan` (`finance._corrigir_plano`, 8 argumentos, só o pedido trocado), com a
+  regra 2 da RPC levantada ANTES do SIM (`plano_travado`). A conta: o resolvedor congela
+  `new_account_opcoes` (o casador, que prioriza o nome exato) e `new_account_casa` (quem casa por
+  conter); **a conta que a compra já tem entre elas é descrição, não troca**
+  (`correcao_plano.conta_nova_do_plano`). O nº: `installments` diferente do N atual (2..72) na
+  compra inteira reparcela; igual é pista de busca; 1 é desparcelar.
 - **Desparcelar É correção, nunca apagar** (21/09/2026, *"desparcelar tem que tirar a parcela do
   lançamento"*). "desparcela a compra da tv" propunha `delete_transaction` e apagava a compra.
   Hoje é `update_transaction` com `installments = 1` (sem campo novo) sobre o PLANO: o resolvedor
@@ -172,8 +183,8 @@ Ele foi removido (`agent/app/tools/finance.py:856`); dar baixa é caminho de `ma
   grava), data/conta. Num EMPATE de duas compras, o desparcelar conta como correção em qualquer
   status (senão caía em "o que você quer mudar?" e a escolha nunca vinha); a pergunta do empate
   já diz o efeito e as recusas voltam depois da escolha. Sobre linha AVULSA, o 1 sozinho é "já é
-  à vista"; com outra correção junto ele é ruído e a correção segue. **Reparcelar para outro N
-  continua exclusão** (`MUDAR_PARCELAS`).
+  à vista"; com outra correção junto ele é ruído e a correção segue. Desparcelar com conta
+  nova ("foi à vista no débito do Nubank") grava a conta no lançamento que sobra.
 
 ## Human-In-The-Loop
 
@@ -213,6 +224,17 @@ Ele foi removido (`agent/app/tools/finance.py:856`); dar baixa é caminho de `ma
   (no fuso do usuário) e **"repete …"** quando há recorrência. **Transferência sem origem (nem
   citada, nem padrão) ou sem destino** vira `correction_error` antes da pergunta — aprovar e só
   então ouvir "preciso das duas contas" é a pergunta sem resposta.
+- **Corrigir a proposta ANTES do SIM refaz o pedido** (21/09/2026). "Comprei em 2x no cartão"
+  em resposta a "Confirma registrar gasto de R$ 104,99 na conta Poupança?" caía em
+  `keep_pending` com "diga o que deseja mudar" — e o código DESCARTAVA o que a pessoa dizia; só
+  "cancelar" saía do laço. Hoje `_classificar_aviso` tem `revise_proposal` (também para
+  `soft_warning`; `revise_purchase` é o mesmo caminho): a pendência expira (nada foi escrito) e
+  o turno roda o grafo com o texto da PERGUNTA (lido do checkpoint dela) + a correção, com
+  `state.corrigindo` = a proposta lida. `user_turn` diz, FORA do envelope, que o pedido não foi
+  registrado, e manda a proposta ENVELOPADA (`pending_proposal`) — é ela que carrega o cartão
+  escolhido por clique, que o texto não tem. A proposta nova pede SIM de novo. Exclusões:
+  cadastro (`resource_*`, montado em vários turnos) e pedido só com anexo (URL da mídia já
+  expirou) continuam em `keep_pending`, com a frase `confirm.MANTIDA`, que dá a saída.
 - A política vive em `app/graph/policy.py`, **pura e sem LangGraph**: regra de segurança que só dá
   para testar subindo o grafo inteiro é regra que ninguém testa.
 - O grafo **para**; quem fala com o mundo é o worker — manda a pergunta e grava `pending_actions`.

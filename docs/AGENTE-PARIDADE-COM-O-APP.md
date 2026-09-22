@@ -490,17 +490,15 @@ Botão novo, linha atualizada:
 |---|---|---|
 | `useUpdateInstallmentPlan` — **nome, estabelecimento e categoria** da compra | sim | `update_transaction` sobre a compra parcelada, sem valor → `finance._renomear_plano` (UPDATE direto no plano e em todas as linhas, inclusive as pagas; não mexe em dinheiro, data nem conta). **Não é mais `update_transaction_scoped`** — ver a seção acima. |
 | `useUpdateInstallmentPlan` — **total** (valor) | **sim, desde 21/09/2026 (Task 3)** | `update_transaction` sobre a compra parcelada, com valor → pergunta "é o total da compra ou cada parcela?" (`interrupt` `kind=choice, purpose=amount_unit`); a resposta some no alvo (`amount_unit`) e `finance._corrigir_plano` chama `update_installment_plan` com o MESMO número de parcelas, redistribuindo só o saldo em aberto (`agent/app/tools/finance.py:1033`). |
-| `useUpdateInstallmentPlan` — **número de parcelas** (reparcelar de verdade, N muda) | **não — exclusão declarada, continua** | `update_installment_plan` aceita `new_installments`, mas o agente não pede N novo em lugar nenhum: mudar N é redesenhar o cronograma inteiro (quais parcelas nascem, qual soma cada uma), e a Task 4 (abaixo) resolveu o caso mais comum ("virou parcelado") por outra porta. Se virar pedido, o caminho é uma pergunta de schema nova, não um campo no `FinanceAction` (que segue no teto de 252). |
+| `useUpdateInstallmentPlan` — **número de parcelas, conta e data da 1ª parcela** | **sim, desde 21/09/2026 (virou pedido)** | `update_transaction` sobre a compra inteira: `installments` diferente do N atual (2..72), `new_account`, `new_occurred_at` — sem campo novo. `finance._corrigir_plano` chama `update_installment_plan` com os 8 argumentos atuais trocando só o pedido. Recusado antes do SIM com qualquer parcela travada (`plano_travado`, a regra 2 da RPC). A conta que a compra JÁ tem, citada, é descrição e não troca. A frase do SIM mostra o contrato novo ("de 10x para 12x de R$ 250,00"). |
 | `useUpdateInstallmentPlan` — **"À vista" (`p_installments = 1`, dissolve o plano)** | **sim, desde 21/09/2026** | `update_transaction` com `installments = 1` sobre a compra parcelada (sem campo novo) → `finance._desparcelar` chama `update_installment_plan(plano, total atual, 1, data real da parcela 1, …)` com os 8 argumentos atuais; a parcela 1 fica com o total e o MESMO id. Recusado ANTES do SIM (também depois da escolha num empate de duas compras): parcela travada (`private.parcela_travada`, congelada pelo resolvedor), valor novo junto (mensagem neutra, o 1 pode ser ruído), data/conta. No empate a pergunta já diz o efeito ("volta a ser à vista num lançamento só. Qual delas?") e, escolhida a compra, o SIM diz total, data da parcela 1, cartão e quantas parcelas viram uma. Antes, "desparcela a compra da tv" virava `delete_transaction`. |
 | `useConvertToInstallments` (20/09/2026) — parcelar um lançamento QUE JÁ EXISTE, pela RPC `convert_transaction_to_installments` | **sim, desde 21/09/2026 (Task 4)** | `update_transaction` com `installments >= 2` sobre um lançamento AVULSO (não é parcela de plano nenhum) → `finance._parcelar` (`agent/app/tools/finance.py:1052`). **Cartão é obrigatório** (`cartao.get("id")` senão `CARTAO_FALTANDO`, read_only) e resolvido só entre cartões (`resolve.conversoes`/`_cartao_citado`); **sem rascunho** para essa pergunta — exclusão declarada em `_cartao_citado` (a pessoa remanda a frase com o nome do cartão). |
 
-⚠️ **A exclusão de mudar N continua com o mesmo motivo de fundo:** *"refaz a nuuvem em 3x de
-50"* é uma frase que reescreve N linhas de dinheiro de uma vez, algumas delas dentro de faturas
-já emitidas. O app faz isso com o contrato inteiro na tela — total, quantas já foram pagas, o que
-trava e por quê. Uma confirmação de uma linha no WhatsApp não mostra nada disso. **Corrigir o
-TOTAL não tem esse problema**: o número de parcelas não muda, só o quanto cada uma (ou a soma)
-vale, e a frase do SIM já diz o total novo e "as pagas ficam como estão" — o contrato continua
-visível numa linha.
+⚠️ **Mudar N deixou de ser exclusão em 21/09/2026.** O motivo antigo — *"refaz a nuuvem em 3x"*
+reescreve N linhas, algumas em faturas já emitidas, sem o contrato na tela — é resolvido pelas
+duas travas que já existiam: com QUALQUER parcela travada o N não muda (recusado antes do SIM,
+como na RPC), e sem trava nenhuma parcela está em fatura fechada; a frase do SIM mostra o
+contrato novo numa linha ("de 2x para 3x de R$ 34,99 (a última acerta os centavos)").
 
 **O que o agente NÃO perdeu:** apagar a compra inteira (`delete_transaction` com alvo em
 `installment_plans`) e renomear a série continuam funcionando, e continuam sendo duas das coisas

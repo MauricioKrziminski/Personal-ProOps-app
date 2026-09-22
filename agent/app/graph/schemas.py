@@ -360,7 +360,7 @@ class CandidateChoice(BaseModel):
 
 class PendingReplyDecision(BaseModel):
     """A typed reply to available proposal options, never a new financial write."""
-    decision: Literal["approve", "reject", "change_card", "revise_scope", "revise_purchase", "new_intent", "unclear"]
+    decision: Literal["approve", "reject", "change_card", "revise_scope", "revise_purchase", "revise_proposal", "new_intent", "unclear"]
     new_installments: int | None = Field(None, description="Explicit revised purchase installment count, never a payment scope.")
     new_account: str | None = Field(None, description="Only the explicitly named replacement card; null for an unspecified other card.")
     installment_scope: CompactInstallmentScope | None = Field(None, description="Only a revised existing-installment bound: first:8, last:2, range:3:8, dates::2026-08-31. Never infer all.")

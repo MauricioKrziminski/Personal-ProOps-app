@@ -785,11 +785,13 @@ async def test_editar_sem_dizer_o_que_pergunta_sem_interrupt(monkeypatch, grafo)
     )
     assert "__interrupt__" not in final
     assert final["halted"] is True
-    assert "O que você quer mudar: o valor, o nome, a categoria ou a data? Ainda não mudei nada." in final["results"]
+    assert ("O que você quer mudar: o valor, o nome, a categoria, a data, a conta ou o "
+            "número de parcelas? Ainda não mudei nada.") in final["results"]
 
 
 @pytest.mark.asyncio
-async def test_data_de_compra_parcelada_nao_e_prometida(monkeypatch, grafo):
+async def test_data_de_compra_com_parcela_paga_recusa_antes_do_sim(monkeypatch, grafo):
+    """PLANO_TV tem R$ 600 travados: a data da 1ª parcela não muda mais (regra da RPC)."""
     _plano_found(monkeypatch)
     cfg = {"configurable": {"thread_id": "data-plano"}}
     final = await grafo.ainvoke(
@@ -798,7 +800,8 @@ async def test_data_de_compra_parcelada_nao_e_prometida(monkeypatch, grafo):
         config=cfg,
     )
     assert "__interrupt__" not in final
-    assert any("Editar a compra no app" in r for r in final["results"])
+    assert any("a conta, a data e o número de parcelas não mudam mais" in r
+               for r in final["results"])
 
 @pytest.mark.asyncio
 async def test_data_de_plano_escolhido_no_empate_para_antes_do_sim(monkeypatch, grafo):
@@ -819,7 +822,8 @@ async def test_data_de_plano_escolhido_no_empate_para_antes_do_sim(monkeypatch, 
     )
     final = await grafo.ainvoke(Command(resume="p1"), config=cfg)
     assert "__interrupt__" not in final
-    assert any("Editar a compra no app" in r for r in final["results"])
+    assert any("a conta, a data e o número de parcelas não mudam mais" in r
+               for r in final["results"])
 
 
 def _snapshot(*linhas):
@@ -871,15 +875,33 @@ async def test_parcela_travada_ainda_muda_de_nome(monkeypatch, grafo):
 
 
 @pytest.mark.asyncio
-async def test_conta_de_plano_inteiro_recusa_antes_do_sim(monkeypatch, grafo):
-    _plano_found(monkeypatch)
+async def test_conta_de_plano_com_parcela_paga_recusa_antes_do_sim(monkeypatch, grafo):
+    _alvo_fixo(monkeypatch, {"table": "installment_plans", "status": "found",
+                             "candidates": [dict(PLANO_TV)],
+                             "new_account_opcoes": [{"id": "acc-inter", "name": "Inter"}]})
     final = await grafo.ainvoke(
         _estado([{"type": "update_transaction", "description": "tv", "new_account": "Inter"}]),
         config={"configurable": {"thread_id": "conta-plano"}},
     )
     assert "__interrupt__" not in final
-    assert any("A conta de uma compra parcelada muda em Editar a compra no app" in r
+    assert any("a conta, a data e o número de parcelas não mudam mais" in r
                for r in final["results"])
+
+
+@pytest.mark.asyncio
+async def test_conta_de_plano_sem_parcela_paga_pede_sim_com_a_conta(monkeypatch, grafo):
+    """21/09/2026: "muda a conta da tv para o Inter" é feito pelo agente, com SIM."""
+    livre = {**PLANO_TV, "editaveis": 10, "travado_cents": 0, "account_id": "acc-nu"}
+    _alvo_fixo(monkeypatch, {"table": "installment_plans", "status": "found",
+                             "candidates": [livre],
+                             "new_account_opcoes": [{"id": "acc-inter", "name": "Inter"}]})
+    estado = await grafo.ainvoke(
+        _estado([{"type": "update_transaction", "description": "tv", "new_account": "Inter"}]),
+        config={"configurable": {"thread_id": "conta-plano-livre"}},
+    )
+    pausa = _valor(estado)
+    assert pausa["kind"] == "confirmation"
+    assert pausa["summary"] == "corrigir a compra TV: conta → Inter"
 
 
 @pytest.mark.asyncio

@@ -16,6 +16,7 @@ from app.graph.policy import (
     describe_for_confirmation,
     dominio_incerto,
     erro_de_correcao,
+    muda_numero_de_parcelas,
     needs_confirmation,
     par_de_substituicao,
     plano_inteiro,
@@ -120,6 +121,7 @@ async def route(state: AgentState) -> dict:
                     local_datetime_iso(state["timezone"]),
                     state["timezone"],
                     history=historico,
+                    corrigindo=state.get("corrigindo") or "",
                 ),
             ),
         ]
@@ -253,6 +255,7 @@ async def finance_node(state: AgentState) -> dict:
                     state["timezone"],
                     tem_anexo=bool(state.get("media")),
                     history=historico,
+                    corrigindo=state.get("corrigindo") or "",
                 ),
             ),
         ]
@@ -329,6 +332,7 @@ async def finance_query_node(state: AgentState) -> dict:
                     local_datetime_iso(state["timezone"]),
                     state["timezone"],
                     history=historico,
+                    corrigindo=state.get("corrigindo") or "",
                 ),
             ),
         ]
@@ -380,6 +384,7 @@ async def notes_node(state: AgentState) -> dict:
                     local_datetime_iso(state["timezone"]),
                     state["timezone"],
                     history=historico,
+                    corrigindo=state.get("corrigindo") or "",
                     pastas=pastas,
                 ),
             ),
@@ -427,7 +432,8 @@ Para atualizar valor de bem use o domínio financeiro específico, não este cad
 Catálogo:
 """ + resources.prompt_catalogue() + "\n" + _ANTI_INJECTION
     user = user_turn(state.get('text',''), local_datetime_iso(state['timezone']),
-                     state['timezone'], history=(state.get('messages') or [])[:-1])
+                     state['timezone'], history=(state.get('messages') or [])[:-1],
+                     corrigindo=state.get('corrigindo') or '')
     if state.get('resource_draft'):
         user += "\n" + wrap_untrusted('document_content', json.dumps(state['resource_draft'],ensure_ascii=False))
         # A PERGUNTA que ficou pendente, fora do envelope porque é texto NOSSO.
@@ -786,7 +792,11 @@ def _perguntar_unidade(state: AgentState, i: int, acao, alvo: dict) -> tuple[dic
                       "results": [*state.get("results", []),
                                   "Ainda não mudei nada. Me pede a correção de novo."]}
     novo = acao.new_amount_cents
-    por_parcela = cand["travado_cents"] + novo * cand["editaveis"]
+    # nº de parcelas novo junto ("a tv foi 3000 em 12x"): só chega aqui sem parcela
+    # travada, então "cada parcela" multiplica pelo N NOVO
+    n = acao.installments if muda_numero_de_parcelas(acao, cand) else cand["plan_installments"]
+    editaveis = n if muda_numero_de_parcelas(acao, cand) else cand["editaveis"]
+    por_parcela = cand["travado_cents"] + novo * editaveis
     escolha = interrupt({
         "kind": "choice",
         "purpose": "amount_unit",
@@ -794,7 +804,7 @@ def _perguntar_unidade(state: AgentState, i: int, acao, alvo: dict) -> tuple[dic
         "action_type": acao.type.value,
         "summary": (
             f"{cents_to_brl(novo)} em {cand['label']} é o total da compra "
-            f"(fica {cents_to_brl(novo)} em {cand['plan_installments']}x) ou o valor de "
+            f"(fica {cents_to_brl(novo)} em {n}x) ou o valor de "
             f"cada parcela (o total vira {cents_to_brl(por_parcela)})?"
         ),
         "options": [{"id": "unidade:total", "label": "Total da compra"},

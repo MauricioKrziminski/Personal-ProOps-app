@@ -21,6 +21,7 @@ from app.domain import matching
 from app.domain.correcao_plano import (
     CONTA_DO_PLANO,
     LINHA_SUMIU,
+    NADA,
     QUAL_PARCELA,
     SEM_CARTAO,
     JA_A_VISTA,
@@ -155,6 +156,9 @@ def _candidato_plano(row: dict) -> dict:
         # a frase do desparcelar: a data da parcela 1 e o cartão, congelados
         "parcela1_em": str(row["parcela1_em"]) if row.get("parcela1_em") else None,
         "account_name": row.get("account_name"),
+        # a conta ATUAL da compra: "foi à vista no nubank" com a compra já no Nubank
+        # Cartão é descrição, não troca (`policy.conta_nova_do_plano`)
+        "account_id": str(row["account_id"]) if row.get("account_id") else None,
     }
 
 
@@ -199,7 +203,7 @@ _FONTES: dict[str, dict] = {
         "table": "installment_plans",
         "sql": f"""select p.id, p.description, p.merchant, p.total_cents, p.installments,
                          p.first_occurred_at, x.editaveis, x.travado_cents, x.parcela1_em,
-                         a.name as account_name
+                         a.name as account_name, p.account_id
                   from public.installment_plans p
                   {_TRAVAS_DO_PLANO}
                   left join public.accounts a
@@ -418,7 +422,7 @@ async def _com_plano(workspace_id, candidatos: list[dict]) -> list[dict]:
         """
         select t.id as tx_id, p.id as plan_id, p.description, p.merchant, p.total_cents, p.installments,
                p.first_occurred_at, x.editaveis, x.travado_cents, x.parcela1_em,
-               a.name as account_name
+               a.name as account_name, p.account_id
         from public.transactions t
         join public.installment_plans p on p.id = t.installment_plan_id
         """ + _TRAVAS_DO_PLANO + """
@@ -734,13 +738,8 @@ async def for_actions(
                     "status": estado,
                     "candidates": cands,
                 }
-                if (
-                    acao.type == FinanceActionType.UPDATE_TRANSACTION
-                    and acao.new_account
-                ):
-                    resolved["correction_error"] = (
-                        CONTA_DO_PLANO
-                    )
+                if acao.type == FinanceActionType.UPDATE_TRANSACTION and acao.new_account:
+                    resolved.update(await _opcoes_de_conta(workspace_id, acao.new_account))
                 saida.append(resolved)
                 continue
 
@@ -818,9 +817,8 @@ async def for_actions(
                 or any(c.get("table") == "installment_plans" for c in cands)
             )
         ):
-            resolved["correction_error"] = (
-                CONTA_DO_PLANO
-            )
+            # compra inteira: quem decide troca x descrição é a política, por candidato
+            resolved.update(await _opcoes_de_conta(workspace_id, acao.new_account))
         elif (acao.type == FinanceActionType.UPDATE_TRANSACTION and acao.new_account
               and not e_conversao(acao)):
             name = acao.new_account
@@ -849,6 +847,30 @@ async def for_actions(
                     )
         saida.append(resolved)
     return await conversoes(workspace_id, acoes, saida)
+
+
+async def _opcoes_de_conta(workspace_id, nome: str) -> dict:
+    """As contas (de QUALQUER tipo — à vista pode ir para a conta corrente) que casam com
+    o nome citado numa correção da compra inteira: `{"new_account_opcoes": [...]}`, ou
+    `{"correction_error": ...}` quando nenhuma casa. Mais de uma NÃO é erro aqui: se a
+    compra já está numa delas, é descrição (`policy.conta_nova_do_plano`)."""
+    if matching.normalize(nome) in {"sem conta", "nenhuma conta"}:
+        # a RPC recusa zerar a conta de uma compra que tem conta (o cartão viraria despesa solta)
+        return {"correction_error": "Uma compra parcelada precisa de uma conta. Diga qual." + NADA}
+    contas = await db.accounts(workspace_id)
+    achadas = matching.match_accounts(nome, contas, account_type=matching.infer_account_type(nome))
+    if not achadas:
+        return {"correction_error": (f"Não encontrei uma conta ativa chamada {nome}. Diga o "
+                                     "nome de uma conta ou cartão cadastrado." + NADA)}
+    # O casador dá prioridade ao nome EXATO: "nubank" devolve só a conta "Nubank",
+    # nunca o "Nubank Cartão" onde a compra está. Para saber se a pessoa está só
+    # DESCREVENDO a compra, conta também quem casa por conter o nome, nos dois sentidos.
+    alvo = matching.normalize(nome)
+    casa = [str(a["id"]) for a in contas
+            if alvo and (alvo in matching.normalize(a["name"])
+                         or matching.normalize(a["name"]) in alvo)]
+    return {"new_account_opcoes": [{"id": str(a["id"]), "name": a["name"]} for a in achadas],
+            "new_account_casa": casa}
 
 
 # ---------------------------------------------------------------------------

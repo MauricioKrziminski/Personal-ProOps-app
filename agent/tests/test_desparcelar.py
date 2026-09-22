@@ -124,9 +124,15 @@ def test_valor_novo_junto_recusa():
     assert erro.startswith("Não entendi se é para voltar a compra para à vista ou corrigir o valor")
 
 
-def test_reparcelar_para_outro_n_continua_exclusao():
-    assert "Mudar o número de parcelas é em Editar a compra no app" in erro_de_correcao(
-        FinanceAction(type=UPD, installments=12), _plano())
+def test_reparcelar_para_outro_n_sem_parcela_paga_segue_para_o_sim():
+    """21/09/2026: o nº de parcelas da compra inteira muda pelo agente (era "no app")."""
+    assert erro_de_correcao(FinanceAction(type=UPD, installments=12), _plano()) is None
+
+
+def test_reparcelar_com_parcela_paga_recusa_antes_do_sim():
+    erro = erro_de_correcao(FinanceAction(type=UPD, installments=12),
+                            _plano(editaveis=7, travado_cents=90000))
+    assert "o número de parcelas não mudam mais" in erro or "não mudam mais" in erro
 
 
 def test_frase_do_sim_diz_o_efeito_inteiro():
@@ -385,3 +391,83 @@ async def test_grafo_empate_misto_escolhendo_a_avulsa_diz_que_ja_e_a_vista(monke
     assert "__interrupt__" not in final
     assert "Esse lançamento já é à vista. Ainda não mudei nada." in final["results"]
     assert "EXECUTOU" not in final["results"]
+
+
+# --- 21/09/2026: "editar lançamento wardogs, foi a vista no nubank" -------------------
+# A compra estava no Nubank Cartão, e o workspace tem também a conta "Nubank". O agente
+# respondia "A conta de uma compra parcelada muda em Editar a compra no app".
+
+def _no_cartao(**alvo):
+    t = _plano(account_id="acc-cartao", account_name="Nubank Cartão")
+    return {**t, **alvo}
+
+
+def test_a_vista_no_nubank_com_a_compra_no_nubank_cartao_e_so_descricao():
+    acao = FinanceAction(type=UPD, installments=1, new_account="nubank")
+    alvo = _no_cartao(new_account_opcoes=[{"id": "acc-conta", "name": "Nubank"}],
+                      new_account_casa=["acc-conta", "acc-cartao"])
+    assert erro_de_correcao(acao, alvo) is None
+    assert describe_for_confirmation(acao, alvo) == (
+        "desparcelar TV: a compra de R$ 3.000,00 volta a ser à vista em 05/09/2026 no "
+        "cartão Nubank Cartão (as 10 parcelas viram um lançamento só)")
+
+
+def test_a_vista_em_outra_conta_diz_a_conta_nova():
+    acao = FinanceAction(type=UPD, installments=1, new_account="inter")
+    alvo = _no_cartao(new_account_opcoes=[{"id": "acc-inter", "name": "Inter"}],
+                      new_account_casa=["acc-inter"])
+    assert erro_de_correcao(acao, alvo) is None
+    assert describe_for_confirmation(acao, alvo) == (
+        "desparcelar TV: a compra de R$ 3.000,00 volta a ser à vista em 05/09/2026 na "
+        "conta Inter (as 10 parcelas viram um lançamento só)")
+
+
+def test_conta_que_casa_com_duas_e_nenhuma_e_a_da_compra_pergunta():
+    acao = FinanceAction(type=UPD, installments=1, new_account="banco")
+    alvo = _no_cartao(new_account_opcoes=[{"id": "a", "name": "Banco A"},
+                                          {"id": "b", "name": "Banco B"}],
+                      new_account_casa=["a", "b"])
+    assert erro_de_correcao(acao, alvo).startswith("Encontrei mais de uma conta: Banco A, Banco B")
+
+
+def test_mudar_conta_com_parcela_paga_recusa_com_a_regra_da_rpc():
+    acao = FinanceAction(type=UPD, new_account="inter")
+    alvo = _no_cartao(new_account_opcoes=[{"id": "acc-inter", "name": "Inter"}])
+    alvo["candidates"][0].update(travado_cents=30000, editaveis=9)
+    assert "a conta, a data e o número de parcelas não mudam mais" in erro_de_correcao(acao, alvo)
+
+
+def test_reparcelar_diz_o_contrato_novo():
+    acao = FinanceAction(type=UPD, installments=12)
+    assert describe_for_confirmation(acao, _plano()) == (
+        "corrigir a compra TV: de 10x para 12x de R$ 250,00")
+    assert describe_for_confirmation(FinanceAction(type=UPD, installments=7), _plano()) == (
+        "corrigir a compra TV: de 10x para 7x de R$ 428,57 (a última acerta os centavos)")
+
+
+@pytest.mark.parametrize("n", [73, 99])
+def test_reparcelar_fora_do_limite_da_rpc(n):
+    assert "no máximo 72" in erro_de_correcao(FinanceAction(type=UPD, installments=n), _plano())
+
+
+def test_valor_e_numero_de_parcelas_juntos_multiplicam_pelo_n_novo():
+    """"a tv foi 3000 em 12x" com "cada parcela" é 12 × 3000, não 10 ×."""
+    acao = FinanceAction(type=UPD, installments=12, new_amount_cents=30000)
+    alvo = {**_plano(), "amount_unit": "parcela"}
+    assert describe_for_confirmation(acao, alvo) == (
+        "corrigir Tudo (10x) — TV: 12x de R$ 300,00 (novo total R$ 3.600,00)")
+
+
+def test_so_a_conta_que_a_compra_ja_tem_nao_e_correcao():
+    acao = FinanceAction(type=UPD, new_account="nubank")
+    alvo = _no_cartao(new_account_opcoes=[{"id": "acc-conta", "name": "Nubank"}],
+                      new_account_casa=["acc-conta", "acc-cartao"])
+    assert erro_de_correcao(acao, alvo).startswith("O que você quer mudar")
+
+
+def test_conta_que_ja_e_a_da_compra_com_nome_novo_so_renomeia():
+    acao = FinanceAction(type=UPD, new_account="nubank", new_description="Televisão")
+    alvo = _no_cartao(new_account_opcoes=[{"id": "acc-conta", "name": "Nubank"}],
+                      new_account_casa=["acc-conta", "acc-cartao"])
+    assert erro_de_correcao(acao, alvo) is None
+    assert "conta" not in describe_for_confirmation(acao, alvo)
