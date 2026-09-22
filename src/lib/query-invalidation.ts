@@ -4,7 +4,7 @@ import { focusManager, type QueryClient } from '@tanstack/react-query';
 export const FINANCE_KEYS = [
   ['transactions'], ['tx-summary'], ['monthly-cashflow'], ['account-balances'],
   ['budgets-status'], ['accounts'], ['goals'], ['budgets'], ['recurring'],
-  ['card-summary'], ['invoice'], ['card-invoices'], ['installments'], ['forecast'], ['forecast-drafts'],
+  ['card-summary'], ['invoice'], ['card-invoices'], ['installments'], ['forecast'], ['forecast-drafts'], ['anticipation-candidates'],
   /*
     ⚠️ **`upcoming-card-charges` faltou aqui no dia em que nasceu** (16/09/2026), e o sintoma foi
     imediato: editar a data do `Wardogs (1/2)` para anteontem gravou certo no banco e a Hoje

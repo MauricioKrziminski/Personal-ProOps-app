@@ -2537,6 +2537,7 @@ export type Database = {
           tx_count: number
         }[]
       }
+      anticipation_candidates: { Args: { p_pay_on?: string }; Returns: Json }
       approve_import_items: { Args: { p_item_ids: string[] }; Returns: number }
       budgets_status: {
         Args: { p_view?: string; ref_month?: string }

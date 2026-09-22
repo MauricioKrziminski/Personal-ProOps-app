@@ -46,6 +46,11 @@ App mobile pessoal de **notas rápidas, lembretes e controle financeiro operado 
   ("desparcela a compra da tv" → `update_installment_plan` com 1 parcela) dependem das duas —
   sem elas a chamada falha (função ausente, ou o piso 2 da `update_installment_plan` antiga) e nada muda.
 
+  ⚠️ **Staging UMA à frente: `20260921120000`** (21/09/2026, "E se…" adiantando parcelas:
+  `draft_ocorrencias` ganha `mode = 'cancel'` e nasce `anticipation_candidates`). Produção
+  ainda não tem — subir é decisão do Gabriel, e ANTES do build/OTA que leva o botão "Adiantar":
+  sem ela a lista do "Adiantar" cai no erro (`PGRST202`) e o resto da Projeção segue normal.
+
   ⚠️ **OTA/build do chat exige a revisão nova do agente em produção** (21/09/2026): o app novo
   manda `id` no `POST /internal/chat/conversations` para abrir a conversa na hora, e o agente
   antigo (`extra='forbid'`) recusa com 422 — TODA primeira mensagem falha. Sem migration: é só

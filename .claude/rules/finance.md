@@ -670,6 +670,19 @@ com as mesmas recusas do banco levantadas antes do SIM (ver `agent.md`).
   contrato com o usuário. A hipótese nunca começa ANTES de hoje (a projeção começa hoje, e uma
   data passada entrava no saldo sem ter dia na janela para aparecer em "entra/sai").
 
+  **Adiantar parcelas é a terceira forma, e ela MOVE dinheiro em vez de somar**
+  (`20260921120000`, spec `2026-09-21-e-se-adiantar-parcelas-design.md`). Compra parcelada,
+  financiamento e recorrente de saída: uma saída no dia do pagamento + um `mode: 'cancel'` (uma
+  ocorrência, valor NEGATIVO) por parcela tirada, todos com o mesmo `grupo` — a lista mostra
+  uma linha e "Tirar" leva o grupo. ⚠️ **O dia do cancelamento vem do banco**
+  (`anticipation_candidates`), pela régua de `cash_flow_forecast`: parcela de cartão sai no
+  vencimento da FATURA. Cancelar no dia da parcela criaria uma saída fantasma num dia e deixaria
+  a verdadeira no outro — sem erro, só saldo errado. Provado no staging: pelo valor nominal, o
+  saldo final é IDÊNTICO ao real nas 7 fontes do `dev@`, e nenhum dia fica com saída negativa.
+  Só entra parcela que vence DEPOIS do pagamento (antes seria adiar). O valor sugerido do
+  financiamento é o valor presente pela taxa do contrato, por meses inteiros (CDC art. 52 §2º),
+  e é EDITÁVEL — é estimativa.
+
 
 - **Receita atrasada sai da projeção depois de 3 dias; despesa atrasada NÃO** (`20260909200000`).
   `greatest(coalesce(due_at, occurred_at), current_date)` empurra todo previsto vencido para hoje.

@@ -11,7 +11,7 @@ const require = createRequire(import.meta.url);
 
 // Execute the screen JSX and its event handlers. Native components/query boundaries
 // are inert; state persists across renders so each interaction uses current props.
-function screen(file: string, options: { tablet?: boolean; debts?: any[]; invoiceStatus?: string; create?: boolean; monthLines?: any[]; monthSummary?: any; cycleLines?: any[]; cycleRow?: any; rangeError?: boolean; rangePending?: boolean; rangePendingMonths?: string[]; bills?: any[]; billsError?: boolean; charges?: any[]; reminders?: any[]; budgets?: any[]; setupPassos?: any[]; activity?: any[]; activityError?: boolean; forecastAccounts?: any[] } = {}) {
+function screen(file: string, options: { tablet?: boolean; debts?: any[]; invoiceStatus?: string; create?: boolean; monthLines?: any[]; monthSummary?: any; cycleLines?: any[]; cycleRow?: any; rangeError?: boolean; rangePending?: boolean; rangePendingMonths?: string[]; bills?: any[]; billsError?: boolean; charges?: any[]; reminders?: any[]; budgets?: any[]; setupPassos?: any[]; activity?: any[]; activityError?: boolean; forecastAccounts?: any[]; anticipation?: any[] } = {}) {
   const state: any[] = [];
   let cursor = 0;
   let nodes: any[] = [];
@@ -73,6 +73,7 @@ function screen(file: string, options: { tablet?: boolean; debts?: any[]; invoic
     useAccounts: () => ({ ...query, data: options.forecastAccounts ?? [] }),
     useCashFlowForecast: () => ({ ...query, data: [{ day: '2026-09-18', balance_cents: 10000, in_cents: 0, out_cents: 0 }] }),
     useCashHistory: () => ({ ...query, data: [] }),
+    useAnticipationCandidates: () => ({ ...query, isSuccess: true, data: options.anticipation ?? [] }),
     useForecastWithDrafts: (_days: number, drafts: any[]) => {
       forecastDrafts = drafts;
       return { ...query, data: [{ day: '2026-09-18', balance_cents: 10000, in_cents: 0, out_cents: 0 }] };
@@ -166,7 +167,7 @@ function screen(file: string, options: { tablet?: boolean; debts?: any[]; invoic
       };
       // Orçamentos consulta direto (a lista de linhas): o mesmo resultado inerte dos hooks.
       if (name === '@tanstack/react-query') return { useQuery: () => query };
-      if (name === '@/lib/finance-form' || name === '@/lib/dates' || name === '@/lib/forecast-months' || name === '@/lib/month-view' || name === '@/lib/settle-labels' || name === '@/lib/accounts' || name === '@/lib/cycle-label' || name === '@/lib/card-status' || name === '@/lib/today-sections' || name === '@/lib/runway' || name === '@/lib/budget-tight' || name === '@/lib/setup-steps' || name === '@/lib/activity-feed' || name === '@/lib/account-cash' || name === '@/lib/today-spend') return load(`src/lib/${name.split('/').at(-1)}.ts`);
+      if (name === '@/lib/finance-form' || name === '@/lib/dates' || name === '@/lib/forecast-months' || name === '@/lib/month-view' || name === '@/lib/settle-labels' || name === '@/lib/accounts' || name === '@/lib/cycle-label' || name === '@/lib/card-status' || name === '@/lib/today-sections' || name === '@/lib/runway' || name === '@/lib/budget-tight' || name === '@/lib/setup-steps' || name === '@/lib/activity-feed' || name === '@/lib/account-cash' || name === '@/lib/today-spend' || name === '@/lib/anticipation') return load(`src/lib/${name.split('/').at(-1)}.ts`);
       if (name === '@/hooks/use-debounced') return { useDebounced: (value: unknown) => value };
       if (name === '@/design/category-icons') return { categoryIcon: () => 'circle' };
       if (name === '@/design/adaptive-window') return load('src/design/adaptive-window.ts');
@@ -288,6 +289,46 @@ test('E se: Adicionar mais uma prepara várias hipóteses sem fechar; Ver result
   assert.deepEqual(Array.from(ui.drafts(), (d: any) => d.amount_cents), [25000, 10000, 5000]);
   assert.equal(ui.nodes().some((n: any) => n.type === 'Sheet' && n.props.visible), false);
   assert.deepEqual(ui.writes, []);
+});
+
+test('E se: adiantar vira UMA hipótese — o pagamento e um cancelamento por parcela, no dia de cada uma', () => {
+  const carro = {
+    source: 'debt', ref_id: 'd1', title: 'Carro', account_name: null, total_n: 48, taxa: 0.0199,
+    events: [
+      { n: 46, day: '2029-01-15', cents: 124500, pv_cents: 80000 },
+      { n: 47, day: '2029-02-15', cents: 124500, pv_cents: 79000 },
+      { n: 48, day: '2029-03-15', cents: 124500, pv_cents: 78000 },
+    ],
+  };
+  const ui = screen(forecastFile, { forecastAccounts: [{ id: 'conta-1' }], anticipation: [carro] });
+  ui.press('Supor um lançamento');
+  const tipo = () => ui.nodes().find((n: any) => n.type === 'Segmented'
+    && n.props.options.some((o: any) => o.value === 'adiantar'));
+  ui.interact(() => tipo().props.onChange('adiantar'));
+  const campos = () => ui.nodes().find((n: any) => n.type === 'AdiantarCampos');
+  assert.equal(ui.button('Ver resultado').props.disabled, true, 'sem item escolhido não há hipótese');
+
+  ui.interact(() => campos().props.onItem('d1'));
+  ui.interact(() => campos().props.onQuantas(2));
+  // o padrão é "as últimas", e o valor nasce na soma dos valores presentes
+  assert.equal(campos().props.valor, 79000 + 78000);
+  ui.press('Ver resultado');
+
+  const drafts = ui.drafts();
+  assert.equal(drafts.length, 3);
+  assert.deepEqual(JSON.parse(JSON.stringify(drafts.map((d: any) => [d.mode, d.amount_cents, d.start]).slice(1))), [
+    ['cancel', 124500, '2029-02-15'],
+    ['cancel', 124500, '2029-03-15'],
+  ]);
+  assert.equal(drafts[0].mode, 'total');
+  assert.equal(drafts[0].amount_cents, 157000);
+  assert.ok(ui.nodes().some((n: any) => n.type === 'ThemedText'
+    && String(n.props.children).includes('adianta 2 parcelas de Carro')), 'a lista mostra uma linha');
+  assert.deepEqual(ui.writes, []);
+
+  // "Tirar" leva o grupo inteiro
+  ui.interact((nodes) => nodes.find((n: any) => n.type === 'Button' && n.props.label === 'Tirar').props.onPress());
+  assert.equal(ui.drafts().length, 0);
 });
 
 test('E se: Ver resultado depois de Somar não duplica a hipótese já adicionada', () => {

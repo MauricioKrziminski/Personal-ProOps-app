@@ -29,6 +29,7 @@ import { useToast } from '@/components/ui/toast';
 import { Motion, Radius, Space, tabular } from '@/design/tokens';
 import {
   useAccounts,
+  useAnticipationCandidates,
   useCashFlowForecast,
   useCashHistory,
   useForecastMonths,
@@ -51,6 +52,15 @@ import {
   somaDias,
 } from '@/lib/dates';
 import { showItemActions } from '@/lib/item-actions';
+import {
+  agruparHipoteses,
+  draftsDoAdiantamento,
+  escolherParcelas,
+  ultimoDia,
+  valorSugerido,
+  type Quais,
+} from '@/lib/anticipation';
+import { AdiantarCampos } from '@/components/finance/anticipation-fields';
 import { settleDone, settleLabel } from '@/lib/settle-labels';
 
 /**
@@ -130,6 +140,13 @@ function rotuloHorizonte(dias: number): string {
 
 const PARCELAS = [1, 3, 6, 10, 12];
 
+/** O dia do pagamento suposto: o 1º do mês escolhido — ou hoje, no mês corrente. */
+function diaDoPagamento(mes: string | null): string {
+  const primeiro = `${mes ?? currentMonth()}-01`;
+  const hoje = localISODate();
+  return primeiro < hoje ? hoje : primeiro;
+}
+
 /** Faixa de erro por seção. Seção que falha DIZ que falhou — nunca some. */
 function ErrorBand({ message, onRetry }: { message: string; onRetry: () => void }) {
   return (
@@ -184,11 +201,20 @@ export default function ForecastScreen() {
    */
   const [rascunhos, setRascunhos] = useState<Draft[]>([]);
   const [sheetAberto, setSheetAberto] = useState(false);
-  const [novoTipo, setNovoTipo] = useState<'income' | 'expense'>('income');
+  const [novoTipo, setNovoTipo] = useState<'income' | 'expense' | 'adiantar'>('income');
   const [novoValor, setNovoValor] = useState(0);
   const [novoMes, setNovoMes] = useState<string | null>(null);
   const [novoParcelas, setNovoParcelas] = useState(1);
   const [novoModo, setNovoModo] = useState<'total' | 'monthly'>('total');
+  /*
+    Adiantar parcelas (spec 2026-09-21): QUAL item, QUANTAS parcelas, as últimas ou as
+    próximas, e o valor a pagar — `null` segue a sugestão do banco (valor presente no
+    financiamento); digitar fixa o valor até a escolha mudar, e a escolha nova volta à sugestão.
+  */
+  const [adiantarId, setAdiantarId] = useState<string | null>(null);
+  const [adiantarQtd, setAdiantarQtd] = useState(1);
+  const [adiantarQuais, setAdiantarQuais] = useState<Quais>('ultimas');
+  const [adiantarValor, setAdiantarValor] = useState<number | null>(null);
 
   /**
    * ⚠️ **Cada modo busca a SUA granularidade, e só a sua.**
@@ -211,6 +237,16 @@ export default function ForecastScreen() {
   const regua = useMonthRuler();
   const mensal = useForecastMonths(dias, rascunhos, emMes, regua.view);
   const simulando = rascunhos.length > 0;
+  const hipoteses = useMemo(() => agruparHipoteses(rascunhos), [rascunhos]);
+
+  const pagarEm = diaDoPagamento(novoMes);
+  const adiantaveis = useAnticipationCandidates(pagarEm, sheetAberto && novoTipo === 'adiantar');
+  const itemAdiantar = adiantaveis.data?.find((i) => i.ref_id === adiantarId) ?? null;
+  const parcelasAdiantar = itemAdiantar ? escolherParcelas(itemAdiantar, adiantarQtd, adiantarQuais) : [];
+  const valorAdiantar = adiantarValor ?? valorSugerido(parcelasAdiantar);
+  const podeAplicar = novoTipo === 'adiantar'
+    ? parcelasAdiantar.length > 0 && valorAdiantar > 0
+    : novoValor > 0 && novoMes !== null;
   // `?? forecast.data` enquanto a simulação carrega: sem isso a tela PISCA vazia a cada
   // suposição somada, e o destaque salta de um número real para nada e de volta.
   const serie = (simulando ? (simulado.data ?? forecast.data) : forecast.data) ?? [];
@@ -422,6 +458,32 @@ export default function ForecastScreen() {
 
   /** Adicionar mais uma prepara outra hipótese; ver resultado inclui a atual e encerra a montagem. */
   const aplicarSuposicao = (verResultado: boolean) => {
+    if (novoTipo === 'adiantar') {
+      if (!itemAdiantar || !podeAplicar) {
+        if (verResultado && rascunhos.length > 0) {
+          setSheetAberto(false);
+          setModo('mes');
+        }
+        return;
+      }
+      setRascunhos((anteriores) => [
+        ...anteriores,
+        ...draftsDoAdiantamento(itemAdiantar, parcelasAdiantar, valorAdiantar, pagarEm, `a${Date.now()}`),
+      ]);
+      // O ganho de adiantar "as últimas" está no FIM do contrato: a janela vai até a última
+      // parcela tirada, senão a projeção mostraria só o custo.
+      const precisa = diasAte(ultimoDia(parcelasAdiantar, pagarEm));
+      const maior = HORIZONTES.find((h) => h.dias >= precisa) ?? HORIZONTES[HORIZONTES.length - 1];
+      if (maior.dias > dias) setDias(maior.dias);
+      Haptics.selectionAsync();
+      setAdiantarId(null);
+      setAdiantarValor(null);
+      if (verResultado) {
+        setSheetAberto(false);
+        setModo('mes');
+      }
+      return;
+    }
     if (novoValor <= 0 || novoMes === null) {
       if (verResultado && rascunhos.length > 0) {
         setSheetAberto(false);
@@ -559,37 +621,39 @@ export default function ForecastScreen() {
           </ThemedText>
           {simulando ? (
             <ThemedText type="caption" themeColor="textSecondary">
-              {rascunhos.length} {rascunhos.length === 1 ? 'hipótese' : 'hipóteses'} · temporário
+              {hipoteses.length} {hipoteses.length === 1 ? 'hipótese' : 'hipóteses'} · temporário
             </ThemedText>
           ) : null}
         </View>
       </View>
       {simulando ? (
-        rascunhos.map((d, i) => (
+        hipoteses.map(({ chave, principal: d, indices }) => (
           <View
-            key={`${d.kind}-${d.start}-${d.amount_cents}-${i}`}
+            key={chave}
             style={[styles.rascunhoLinha, { borderTopColor: theme.separator }]}
           >
             <ThemedText
               type="small"
               themeColor="textSecondary"
               style={[tabular, styles.rascunhoDescricao]}>
-              {d.kind === 'income' ? 'entra' : 'sai'} {brl(d.amount_cents)}
-              {d.mode === 'monthly' ? ' todo mês' : d.installments > 1 ? ` em ${d.installments}x` : ''}{' '}
-              · a partir de {isoToBR(d.start)}
+              {d.rotulo
+                ? `sai ${brl(d.amount_cents)} · ${d.rotulo} · em ${isoToBR(d.start)}`
+                : `${d.kind === 'income' ? 'entra' : 'sai'} ${brl(d.amount_cents)}${
+                    d.mode === 'monthly' ? ' todo mês' : d.installments > 1 ? ` em ${d.installments}x` : ''
+                  } · a partir de ${isoToBR(d.start)}`}
             </ThemedText>
             <Button
               label="Tirar"
               variant="secondary"
               size="sm"
-              onPress={() => setRascunhos((r) => r.filter((_, j) => j !== i))}
+              onPress={() => setRascunhos((r) => r.filter((_, k) => !indices.includes(k)))}
             />
           </View>
         ))
       ) : (
         <ThemedText type="small" themeColor="textSecondary">
-          Suponha uma entrada ou uma saída — uma vez, parcelada ou todo mês — e veja os
-          meses recalculados como se você tivesse lançado de verdade.
+          Suponha uma entrada, uma saída ou adiantar parcelas, e veja os meses recalculados
+          como se tivesse acontecido de verdade.
         </ThemedText>
       )}
       {simulado.isError ? (
@@ -907,29 +971,63 @@ export default function ForecastScreen() {
       <Sheet visible={sheetAberto} onClose={() => setSheetAberto(false)}>
         <TaskHeader
           title="Nova hipótese"
-          subtitle={simulando ? `${rascunhos.length} ${rascunhos.length === 1 ? 'hipótese no cenário' : 'hipóteses no cenário'}` : undefined}
+          subtitle={simulando ? `${hipoteses.length} ${hipoteses.length === 1 ? 'hipótese no cenário' : 'hipóteses no cenário'}` : undefined}
           onClose={() => setSheetAberto(false)}
           action={
             <Button
               label="Ver resultado"
               size="sm"
-              disabled={!simulando && (novoValor <= 0 || novoMes === null)}
+              disabled={!simulando && !podeAplicar}
               onPress={() => aplicarSuposicao(true)}
             />
           }
         />
 
         <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={styles.sheetCorpo}>
-          <Field label="É entrada ou saída?">
+          <Field label="O que você quer supor?">
             <Segmented
               options={[
                 { value: 'income', label: 'Entra' },
                 { value: 'expense', label: 'Sai' },
+                { value: 'adiantar', label: 'Adiantar' },
               ]}
               value={novoTipo}
               onChange={(v) => setNovoTipo(v)}
             />
           </Field>
+
+          {novoTipo === 'adiantar' ? (
+            <AdiantarCampos
+              consulta={adiantaveis}
+              item={itemAdiantar}
+              itemId={adiantarId}
+              onItem={(id) => {
+                setAdiantarId(id);
+                setAdiantarQtd(1);
+                setAdiantarQuais('ultimas');
+                setAdiantarValor(null);
+              }}
+              quantas={adiantarQtd}
+              onQuantas={(n) => {
+                setAdiantarQtd(n);
+                setAdiantarValor(null);
+              }}
+              quais={adiantarQuais}
+              onQuais={(q) => {
+                setAdiantarQuais(q);
+                setAdiantarValor(null);
+              }}
+              mes={novoMes}
+              onMes={(m) => {
+                setNovoMes(m);
+                setAdiantarValor(null);
+              }}
+              parcelas={parcelasAdiantar}
+              valor={valorAdiantar}
+              onValor={setAdiantarValor}
+            />
+          ) : (
+          <>
 
           {/*
             ⚠️ Vem ANTES do valor e das parcelas de propósito (`frontend.md`): é o controle que
@@ -985,6 +1083,8 @@ export default function ForecastScreen() {
               </View>
             </Field>
           ) : null}
+          </>
+          )}
 
           <Button
             label="Adicionar mais uma"
@@ -992,7 +1092,7 @@ export default function ForecastScreen() {
             variant="secondary"
             block
             style={styles.sheetAction}
-            disabled={novoValor <= 0 || novoMes === null}
+            disabled={!podeAplicar}
             onPress={() => aplicarSuposicao(false)}
           />
         </ScrollView>

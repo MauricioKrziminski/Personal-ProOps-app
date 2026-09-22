@@ -10,6 +10,7 @@ import type { DebtPaymentRow } from '@/lib/debt-history';
 import { agentFetch } from '@/lib/agent-api';
 import { toIlikeTerm } from '@/lib/search';
 import { ACCOUNT_TYPES } from '@/lib/accounts';
+import type { Adiantavel } from '@/lib/anticipation';
 import { useRealtimeInvalidate, workspaceId } from '@/hooks/use-items';
 
 // Categorias vivem em @/lib/categories (fonte única, travada por teste contra o
@@ -849,9 +850,40 @@ export type Draft = {
    * - `monthly`: 1.500 por mês → 1.500 todo mês, até o fim da projeção. Uma RECORRÊNCIA.
    *
    * Ausente = `total`, que é o que mantém `affordability` funcionando sem tocar nela.
+   *
+   * - `cancel`: DESFAZ uma saída que a projeção já tem, no dia dela (adiantar parcelas,
+   *   `20260921120000`). Uma ocorrência, valor negativo; `installments` é ignorado.
    */
-  mode?: 'total' | 'monthly';
+  mode?: 'total' | 'monthly' | 'cancel';
+  /** Liga os drafts de uma hipótese composta (adiantar). Só do app — não vai ao banco. */
+  grupo?: string;
+  /** O texto da linha da hipótese composta. Só do app — não vai ao banco. */
+  rotulo?: string;
 };
+
+/** O que vai ao banco: `grupo`/`rotulo` são da tela e mudariam a chave do cache à toa. */
+function paraOBanco(drafts: Draft[]) {
+  return drafts.map(({ grupo: _g, rotulo: _r, ...d }) => d);
+}
+
+/**
+ * O que dá para adiantar no "E se…" — compra parcelada, financiamento, recorrente — com o dia
+ * em que cada parcela sai do caixa e o valor presente no dia do pagamento (`pagarEm`). JSON de
+ * propósito: a lista passa das 1000 linhas que o PostgREST corta em silêncio.
+ */
+export function useAnticipationCandidates(pagarEm: string, enabled = true) {
+  useRealtimeInvalidate('transactions', ['anticipation-candidates']);
+  return useQuery({
+    enabled,
+    queryKey: ['anticipation-candidates', pagarEm],
+    placeholderData: (anterior) => anterior,
+    queryFn: async (): Promise<Adiantavel[]> => {
+      const { data, error } = await supabase.rpc('anticipation_candidates', { p_pay_on: pagarEm });
+      if (error) throw error;
+      return (data ?? []) as unknown as Adiantavel[];
+    },
+  });
+}
 
 /**
  * A projeção com hipóteses aplicadas — o Rascunho.
@@ -871,9 +903,9 @@ export function useForecastWithDrafts(days: number, drafts: Draft[], enabled = t
     // ressuscite do cache quando o usuário voltar — que é justamente o que ele pediu que NÃO
     // acontecesse ("se eu voltar, ele some").
     gcTime: 0,
-    queryKey: ['forecast-drafts', String(days), JSON.stringify(drafts)],
+    queryKey: ['forecast-drafts', String(days), JSON.stringify(paraOBanco(drafts))],
     queryFn: async (): Promise<ForecastDay[]> => {
-      const { data, error } = await supabase.rpc('forecast_json', { days, drafts });
+      const { data, error } = await supabase.rpc('forecast_json', { days, drafts: paraOBanco(drafts) });
       if (error) throw error;
       return (data ?? []) as unknown as ForecastDay[];
     },
@@ -903,9 +935,9 @@ export function useForecastMonths(days: number, drafts: Draft[], enabled = true,
     placeholderData: (anterior) => anterior,
     // Mesmo contrato efêmero do rascunho: sair da tela apaga.
     gcTime: drafts.length > 0 ? 0 : undefined,
-    queryKey: ['forecast-months', String(days), JSON.stringify(drafts), view ?? ''],
+    queryKey: ['forecast-months', String(days), JSON.stringify(paraOBanco(drafts)), view ?? ''],
     queryFn: async (): Promise<ProjecaoMensal> => {
-      const { data, error } = await supabase.rpc('month_forecast_json', { days, drafts, p_view: view ?? undefined });
+      const { data, error } = await supabase.rpc('month_forecast_json', { days, drafts: paraOBanco(drafts), p_view: view ?? undefined });
       if (error) throw error;
       return (data ?? { hoje: 0, meses: [] }) as unknown as ProjecaoMensal;
     },
