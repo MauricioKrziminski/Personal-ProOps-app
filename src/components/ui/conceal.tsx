@@ -3,7 +3,8 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useState } 
 
 import { formatBRL } from '@/hooks/use-items';
 
-const KEY = 'proops.conceal';
+export const CONCEAL_KEY = 'proops.conceal';
+const KEY = CONCEAL_KEY;
 
 interface ConcealValue {
   /** Todo valor monetário do app está oculto agora? */
