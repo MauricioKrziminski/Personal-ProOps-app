@@ -46,10 +46,12 @@ App mobile pessoal de **notas rápidas, lembretes e controle financeiro operado 
   ("desparcela a compra da tv" → `update_installment_plan` com 1 parcela) dependem das duas —
   sem elas a chamada falha (função ausente, ou o piso 2 da `update_installment_plan` antiga) e nada muda.
 
-  ⚠️ **Staging UMA à frente: `20260921120000`** (21/09/2026, "E se…" adiantando parcelas:
-  `draft_ocorrencias` ganha `mode = 'cancel'` e nasce `anticipation_candidates`). Produção
-  ainda não tem — subir é decisão do Gabriel, e ANTES do build/OTA que leva o botão "Adiantar":
-  sem ela a lista do "Adiantar" cai no erro (`PGRST202`) e o resto da Projeção segue normal.
+  **Produção e staging ALINHADOS em `20260921120000`** — aplicada em produção pelo Gabriel em
+  21/09/2026 ("E se…" adiantando parcelas: `draft_ocorrencias` com `mode = 'cancel'` e
+  `anticipation_candidates`) e conferida na fonte (`schema_migrations` devolve `20260921120000`,
+  `20260920130000`, `20260920120000`; as duas funções com fuso no cabeçalho, `execute` para
+  `authenticated` e sem para `anon`). Agente `agente-00078-k5f` (produção) e
+  `agente-staging-00146-7nr` subiram no mesmo dia; app `v1.3.43`.
 
   ⚠️ **OTA/build do chat exige a revisão nova do agente em produção** (21/09/2026): o app novo
   manda `id` no `POST /internal/chat/conversations` para abrir a conversa na hora, e o agente
