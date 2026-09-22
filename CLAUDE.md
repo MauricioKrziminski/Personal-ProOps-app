@@ -68,6 +68,13 @@ App mobile pessoal de **notas rápidas, lembretes e controle financeiro operado 
   as parcelas 1 que já nasceram assim (backfill idempotente, só fatura aberta). Mesma assinatura
   de RPC: não exige deploy de agente nem de app. Subir é decisão do Gabriel.
 
+  **E `20260922150000`** (importação inteligente, só no staging): colunas novas em `import_items`,
+  status `uncertain`, `finish_import_batch` e a fatura do histórico nascendo quitada (vale também
+  para o "já pagas" do formulário de parcelado). ⚠️ **Ordem em produção: migrations → app →
+  agente.** O agente novo exige a conta no import (o app antigo a deixava opcional → 422 claro) e
+  grava `uncertain`, que o app antigo não mostra; o app novo com o agente antigo funciona (sem as
+  camadas novas). O agente de staging já está com a versão nova.
+
   ⚠️ **OTA/build do chat exige a revisão nova do agente em produção** (21/09/2026): o app novo
   manda `id` no `POST /internal/chat/conversations` para abrir a conversa na hora, e o agente
   antigo (`extra='forbid'`) recusa com 422 — TODA primeira mensagem falha. Sem migration: é só

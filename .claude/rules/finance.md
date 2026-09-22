@@ -824,3 +824,25 @@ motivo (teto de `FinanceAction`) e o custo aceito.
 - Transferência não conta como receita nem despesa em resumos (excluir `kind='transfer'` das agregações de fluxo).
 - Undo via WhatsApp (`undo_last`) apaga apenas a transação mais recente do usuário e responde o que apagou.
 - Conta citada por nome no WhatsApp resolve por `ilike`; sem match → `account_id null` (o lançamento nunca falha por conta desconhecida).
+
+## Importação de extrato/fatura — prévia e conciliação em cascata (22/09/2026)
+
+Plano: `docs/superpowers/plans/2026-09-22-importacao-inteligente.md`.
+
+- **A conta do lote é obrigatória e decide o SENTIDO.** No CSV de fatura a compra vem positiva
+  (medido no Nubank: 26 de 30 compras viravam receita); o OFX diz se é cartão ou conta pelo bloco
+  (`CREDITCARDMSGSRSV1`), e arquivo de cartão numa conta corrente é recusado com a frase certa.
+- **"Já está no app?" é conciliação em cascata e 1-para-1**, em Python puro
+  (`agent/app/domain/reconcile.py`, com teste): id do banco → idêntico → parcela k/N →
+  saldo adiado → transferência/pagamento de fatura → mesmo valor em 3 dias → nome parecido →
+  `talvez` (empate NUNCA escolhe: pergunta). Lançamento SEM conta (WhatsApp) é candidato.
+- **A prévia sugere, a pessoa decide.** Novo nasce marcado; já no app, talvez e "fora do
+  financeiro" (crédito na fatura, transferência entre contas, aplicação, saldo anterior) nascem
+  desmarcados com o motivo. A natureza vem da IA e só mexe na pré-seleção; sem IA, uma rede
+  estrutural (entrou e saiu o mesmo valor no mesmo dia; o nome do titular) e um aviso na tela.
+- **"Parcela k/N" em cartão vira a compra inteira** (`private.importar_parcelado`): 1..k−1 pagas
+  (histórico), k..N pendentes, parcela antiga solta no app é ADOTADA (mesmas travas da conversão).
+  Fatura criada só pelo histórico e já vencida nasce quitada — sem ela, "Atrasado" fantasma.
+- **`finish_import_batch` grava o marcado e descarta o resto numa transação**, com `for update`
+  no lote: dois toques não gravam duas vezes. Reimportar o mesmo arquivo dá zero novos (FITID, ou
+  a impressão digital da linha de CSV).
