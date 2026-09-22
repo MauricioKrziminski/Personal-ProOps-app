@@ -9,10 +9,13 @@ import { Space } from '@/design/tokens';
 interface Props {
   onSelectPrompt: (prompt: string) => void;
   composer?: ReactNode;
+  /** As últimas conversas — só na entrada da aba. Vem DEPOIS dos atalhos: a lista chega da
+   *  rede, e carregando acima deles empurraria o compositor e os atalhos para baixo. */
+  recent?: ReactNode;
 }
 
 /** Estado inicial da conversa; tocar uma frase apenas preenche o campo. */
-export const AgentChatStart = memo(function AgentChatStart({ onSelectPrompt, composer }: Props) {
+export const AgentChatStart = memo(function AgentChatStart({ onSelectPrompt, composer, recent }: Props) {
   return (
     <View style={styles.root}>
       <View style={styles.intro}>
@@ -25,6 +28,7 @@ export const AgentChatStart = memo(function AgentChatStart({ onSelectPrompt, com
       </View>
       {composer}
       <AgentPromptList onSelect={onSelectPrompt} />
+      {recent}
     </View>
   );
 });

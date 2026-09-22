@@ -8,6 +8,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { ChatActions } from '@/components/agent/chat-actions';
 import { AgentChatStart } from '@/components/agent/agent-chat-start';
+import { AgentRecentConversations } from '@/components/agent/agent-recent-conversations';
 import { AgentThreadHeading } from '@/components/agent/agent-thread-heading';
 import { ChatComposer } from '@/components/agent/chat-composer';
 import { ChatMessage } from '@/components/agent/chat-message';
@@ -480,12 +481,19 @@ export function ConversationScreen({ conversationId, initialText = '', title, ta
       {entradaDaAba ? (
         <KeyboardAwareScrollView
           style={styles.lista}
-          contentContainerStyle={styles.entradaScroll}
+          // No iOS a `NativeTabs` põe a barra dentro da área segura: sem somar `insets.bottom`
+          // (a mesma conta do `Screen`), o fim da entrada — o "Ver todas" das recentes — ficava
+          // atrás da barra. No Android quem reserva a pílula é o `paddingBottom` da raiz.
+          contentContainerStyle={[
+            styles.entradaScroll,
+            Platform.OS === 'ios' ? { paddingBottom: Space.xxxl + insets.bottom } : null,
+          ]}
           contentInsetAdjustmentBehavior="never"
           keyboardShouldPersistTaps="handled"
           bottomOffset={Space.xl}>
           <AgentChatStart
             onSelectPrompt={setTexto}
+            recent={<AgentRecentConversations />}
             composer={
               <ChatComposer
                 inline
