@@ -37,6 +37,8 @@ interface Props {
   mes: string | null;
   onMes: (mes: string) => void;
   parcelas: ParcelaAdiantavel[];
+  /** A quantidade não cabe no que resta a vencer (`erroDeQuantidade`). Trava a hipótese. */
+  erroQuantidade: string | null;
   valor: number;
   onValor: (cents: number) => void;
 }
@@ -116,8 +118,9 @@ export function AdiantarCampos(p: Props) {
       {p.item ? (
         <Field
           label={recorrente ? 'Quantos meses' : 'Quantas parcelas'}
-          hint={recorrente ? undefined : `De ${total} ${total === 1 ? 'parcela' : 'parcelas'} a vencer.`}>
-          <Quantidade valor={p.quantas} maximo={total} onChange={p.onQuantas} />
+          error={p.erroQuantidade ?? undefined}
+          hint={recorrente || p.erroQuantidade ? undefined : `De ${total} ${total === 1 ? 'parcela' : 'parcelas'} a vencer.`}>
+          <Quantidade valor={p.quantas} maximo={total} invalido={Boolean(p.erroQuantidade)} onChange={p.onQuantas} />
         </Field>
       ) : null}
 
@@ -125,7 +128,8 @@ export function AdiantarCampos(p: Props) {
         <MonthPicker month={p.mes ?? currentMonth()} onChange={p.onMes} />
       </Field>
 
-      {p.item && p.parcelas.length > 0 ? (
+      {/* Com a quantidade inválida, valor e resumo seriam do que SOBROU, não do que foi pedido. */}
+      {p.item && p.parcelas.length > 0 && !p.erroQuantidade ? (
         <>
           <Field
             label="Valor para pagar"
@@ -149,7 +153,9 @@ export function AdiantarCampos(p: Props) {
  * (as parcelas a vencer; na conta fixa, a janela da Projeção) — passar dele assenta no teto ao
  * sair do campo, e o campo mostra o número que valeu.
  */
-function Quantidade({ valor, maximo, onChange }: { valor: number; maximo: number; onChange: (n: number) => void }) {
+function Quantidade({ valor, maximo, invalido, onChange }: {
+  valor: number; maximo: number; invalido: boolean; onChange: (n: number) => void;
+}) {
   const theme = useTheme();
   // Só DURANTE a digitação o campo mostra o texto cru: apagar para digitar outro número não pode
   // virar "0" no meio do caminho. Fora dela, mostra o número que valeu.
@@ -157,6 +163,9 @@ function Quantidade({ valor, maximo, onChange }: { valor: number; maximo: number
   const muda = (n: number) => {
     const certo = Math.max(1, Math.min(n, maximo));
     if (certo !== valor) Haptics.selectionAsync();
+    // − / + com o campo ainda em foco: sem largar o texto digitado, o campo continuava mostrando
+    // o número antigo enquanto o valor já era outro (visto no simulador, 22/09/2026)
+    setDigitando(null);
     onChange(certo);
   };
   const botao = (icone: 'minus' | 'plus', rotulo: string, alvo: number, desligado: boolean) => (
@@ -175,7 +184,8 @@ function Quantidade({ valor, maximo, onChange }: { valor: number; maximo: number
   );
   return (
     <View style={styles.quantidade}>
-      {botao('minus', 'Uma a menos', valor - 1, valor <= 1)}
+      {/* acima do teto, "−" leva direto ao teto: é a correção que o aviso pede */}
+      {botao('minus', 'Uma a menos', valor > maximo ? maximo : valor - 1, valor <= 1)}
       <TextField
         value={digitando ?? String(valor)}
         onChangeText={(t) => {
@@ -188,6 +198,7 @@ function Quantidade({ valor, maximo, onChange }: { valor: number; maximo: number
         keyboardType="number-pad"
         selectTextOnFocus
         accessibilityLabel="Quantidade"
+        invalid={invalido}
         style={[styles.numero, tabular]}
       />
       {botao('plus', 'Uma a mais', valor + 1, valor >= maximo)}

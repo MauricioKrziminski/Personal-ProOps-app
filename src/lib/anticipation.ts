@@ -32,6 +32,25 @@ export type Adiantavel = {
 
 export type Quais = 'ultimas' | 'proximas';
 
+/**
+ * A quantidade pedida cabe no que ainda dá para adiantar? `null` = cabe.
+ *
+ * ⚠️ O que dá para adiantar DEPENDE do dia do pagamento: só entra parcela que vence depois dele
+ * (`anticipation_candidates`). Escolher 8 pagando em setembro e trocar para dezembro deixa menos
+ * de 8 — e `escolherParcelas` corta sem avisar. Antes desta checagem o campo dizia 8 e a hipótese
+ * gravava o que sobrou (22/09/2026). Não corrigimos o número pela pessoa: a tela avisa e trava.
+ */
+export function erroDeQuantidade(item: Adiantavel | null, quantas: number, quando: string): string | null {
+  if (!item) return null;
+  if (!Number.isInteger(quantas) || quantas < 1) return 'Escolha pelo menos 1.';
+  const cabe = item.events.length;
+  if (quantas <= cabe) return null;
+  const resta = item.source === 'recurring'
+    ? `${cabe} ${cabe === 1 ? 'mês' : 'meses'}`
+    : `${cabe} ${cabe === 1 ? 'parcela' : 'parcelas'}`;
+  return `Pagando em ${quando}, ${cabe === 1 ? 'resta' : 'restam'} ${resta} a vencer. Diminua a quantidade.`;
+}
+
 /** As `quantas` parcelas escolhidas. Recorrente não tem fim: sempre as próximas. */
 export function escolherParcelas(item: Adiantavel, quantas: number, quais: Quais): ParcelaAdiantavel[] {
   const n = Math.max(0, Math.min(quantas, item.events.length));

@@ -3,6 +3,7 @@ import { test } from 'node:test';
 
 import {
   agruparHipoteses,
+  erroDeQuantidade,
   substituirGrupo,
   draftsDoAdiantamento,
   escolherParcelas,
@@ -87,4 +88,16 @@ test('a escolha do adiantamento viaja no draft do pagamento, para a edição vol
   const d = draftsDoAdiantamento(carro, carro.events.slice(0, 1), 1000, '2026-10-01', 'g', { quantas: 1, quais: 'proximas' });
   assert.deepEqual(JSON.parse(JSON.stringify(d[0].adiantar)), { ref_id: 'd1', quantas: 1, quais: 'proximas' });
   assert.equal('adiantar' in d[1], false);
+});
+
+test('8 parcelas escolhidas em setembro não cabem em dezembro: avisa, não corta calado', () => {
+  assert.equal(erroDeQuantidade(carro, 3, 'setembro de 2026'), null);
+  assert.equal(erroDeQuantidade(carro, 8, 'dezembro de 2026'),
+    'Pagando em dezembro de 2026, restam 3 parcelas a vencer. Diminua a quantidade.');
+  assert.equal(erroDeQuantidade({ ...carro, events: carro.events.slice(0, 1) }, 2, 'x'),
+    'Pagando em x, resta 1 parcela a vencer. Diminua a quantidade.');
+  assert.equal(erroDeQuantidade({ ...carro, source: 'recurring' }, 5, 'x'),
+    'Pagando em x, restam 3 meses a vencer. Diminua a quantidade.');
+  assert.equal(erroDeQuantidade(carro, 0, 'x'), 'Escolha pelo menos 1.');
+  assert.equal(erroDeQuantidade(null, 99, 'x'), null);
 });

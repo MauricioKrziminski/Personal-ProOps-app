@@ -11,7 +11,7 @@ const require = createRequire(import.meta.url);
 
 // Execute the screen JSX and its event handlers. Native components/query boundaries
 // are inert; state persists across renders so each interaction uses current props.
-function screen(file: string, options: { tablet?: boolean; debts?: any[]; invoiceStatus?: string; create?: boolean; monthLines?: any[]; monthSummary?: any; cycleLines?: any[]; cycleRow?: any; rangeError?: boolean; rangePending?: boolean; rangePendingMonths?: string[]; bills?: any[]; billsError?: boolean; charges?: any[]; reminders?: any[]; budgets?: any[]; setupPassos?: any[]; activity?: any[]; activityError?: boolean; forecastAccounts?: any[]; anticipation?: any[] } = {}) {
+function screen(file: string, options: { tablet?: boolean; debts?: any[]; invoiceStatus?: string; create?: boolean; monthLines?: any[]; monthSummary?: any; cycleLines?: any[]; cycleRow?: any; rangeError?: boolean; rangePending?: boolean; rangePendingMonths?: string[]; bills?: any[]; billsError?: boolean; charges?: any[]; reminders?: any[]; budgets?: any[]; setupPassos?: any[]; activity?: any[]; activityError?: boolean; forecastAccounts?: any[]; anticipation?: any[] | ((pagarEm: string) => any[]) } = {}) {
   const state: any[] = [];
   let cursor = 0;
   let nodes: any[] = [];
@@ -73,7 +73,8 @@ function screen(file: string, options: { tablet?: boolean; debts?: any[]; invoic
     useAccounts: () => ({ ...query, data: options.forecastAccounts ?? [] }),
     useCashFlowForecast: () => ({ ...query, data: [{ day: '2026-09-18', balance_cents: 10000, in_cents: 0, out_cents: 0 }] }),
     useCashHistory: () => ({ ...query, data: [] }),
-    useAnticipationCandidates: () => ({ ...query, isSuccess: true, data: options.anticipation ?? [] }),
+    useAnticipationCandidates: (pagarEm: string) => ({ ...query, isSuccess: true,
+      data: typeof options.anticipation === 'function' ? options.anticipation(pagarEm) : options.anticipation ?? [] }),
     useForecastWithDrafts: (_days: number, drafts: any[]) => {
       forecastDrafts = drafts;
       return { ...query, data: [{ day: '2026-09-18', balance_cents: 10000, in_cents: 0, out_cents: 0 }] };
@@ -351,6 +352,39 @@ test('E se: adiantar vira UMA hipótese — o pagamento e um cancelamento por pa
   ui.interact(() => linha().props.onPress());
   ui.press('Tirar hipótese');
   assert.equal(ui.drafts().length, 0);
+});
+
+test('E se: trocar o mês do pagamento para depois das parcelas escolhidas trava a hipótese', () => {
+  // O bug de 22/09/2026: 8x escolhidas em setembro, pagar em dezembro, e a hipótese nascia com
+  // o que sobrou enquanto o campo dizia 8. O banco só devolve o que vence DEPOIS do pagamento.
+  const eventos = [
+    { n: 5, day: '2026-10-10', cents: 10000, pv_cents: 10000 },
+    { n: 6, day: '2026-11-10', cents: 10000, pv_cents: 10000 },
+    { n: 7, day: '2026-12-10', cents: 10000, pv_cents: 10000 },
+    { n: 8, day: '2027-01-10', cents: 10000, pv_cents: 10000 },
+  ];
+  const tv = (pagarEm: string) => [{ source: 'plan', ref_id: 'p1', title: 'TV', account_name: null,
+    total_n: 8, taxa: null, events: eventos.filter((e) => e.day > pagarEm) }];
+  const ui = screen(forecastFile, { forecastAccounts: [{ id: 'conta-1' }], anticipation: tv });
+  ui.press('Supor um lançamento');
+  ui.interact((nodes) => nodes.find((n: any) => n.type === 'Segmented'
+    && n.props.options.some((o: any) => o.value === 'adiantar')).props.onChange('adiantar'));
+  const campos = () => ui.nodes().find((n: any) => n.type === 'AdiantarCampos');
+  ui.interact(() => campos().props.onItem('p1'));
+  ui.interact(() => campos().props.onQuantas(4));
+  assert.equal(campos().props.erroQuantidade, null);
+  assert.equal(ui.button('Ver resultado').props.disabled, false);
+
+  ui.interact(() => campos().props.onMes('2026-12'));
+  assert.equal(campos().props.erroQuantidade,
+    'Pagando em dezembro de 2026, restam 2 parcelas a vencer. Diminua a quantidade.');
+  assert.equal(ui.button('Ver resultado').props.disabled, true, 'não cria com o número errado');
+  assert.equal(ui.button('Adicionar mais uma').props.disabled, true);
+
+  ui.interact(() => campos().props.onQuantas(2));
+  assert.equal(campos().props.erroQuantidade, null);
+  ui.press('Ver resultado');
+  assert.equal(ui.drafts().filter((d: any) => d.mode === 'cancel').length, 2);
 });
 
 test('E se: editar uma entrada troca o valor e as parcelas no mesmo lugar da lista', () => {

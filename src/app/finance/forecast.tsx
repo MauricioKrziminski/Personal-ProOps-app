@@ -55,6 +55,7 @@ import { showItemActions } from '@/lib/item-actions';
 import {
   agruparHipoteses,
   draftsDoAdiantamento,
+  erroDeQuantidade,
   substituirGrupo,
   escolherParcelas,
   ultimoDia,
@@ -252,8 +253,10 @@ export default function ForecastScreen() {
   const itemAdiantar = adiantaveis.data?.find((i) => i.ref_id === adiantarId) ?? null;
   const parcelasAdiantar = itemAdiantar ? escolherParcelas(itemAdiantar, adiantarQtd, adiantarQuais) : [];
   const valorAdiantar = adiantarValor ?? valorSugerido(parcelasAdiantar);
+  const erroAdiantar = erroDeQuantidade(itemAdiantar, adiantarQtd,
+    monthTitle(novoMes ?? currentMonth()).toLowerCase());
   const podeAplicar = novoTipo === 'adiantar'
-    ? parcelasAdiantar.length > 0 && valorAdiantar > 0
+    ? !erroAdiantar && parcelasAdiantar.length > 0 && valorAdiantar > 0
     : novoValor > 0 && novoMes !== null;
   // `?? forecast.data` enquanto a simulação carrega: sem isso a tela PISCA vazia a cada
   // suposição somada, e o destaque salta de um número real para nada e de volta.
@@ -1080,6 +1083,7 @@ export default function ForecastScreen() {
                 setAdiantarValor(null);
               }}
               parcelas={parcelasAdiantar}
+              erroQuantidade={erroAdiantar}
               valor={valorAdiantar}
               onValor={setAdiantarValor}
             />
