@@ -56,7 +56,11 @@ export type DraftDeAdiantamento = {
   grupo: string;
   /** Só no draft do pagamento: o texto da linha da hipótese. */
   rotulo?: string;
+  /** Só no draft do pagamento: a ESCOLHA, para editar a hipótese voltar ao que foi escolhido. */
+  adiantar?: EscolhaDeAdiantamento;
 };
+
+export type EscolhaDeAdiantamento = { ref_id: string; quantas: number; quais: Quais };
 
 /**
  * A hipótese inteira: pagar `valor` em `pagarEm` e desfazer cada parcela escolhida no dia dela.
@@ -68,6 +72,7 @@ export function draftsDoAdiantamento(
   valor: number,
   pagarEm: string,
   grupo: string,
+  escolha: Omit<EscolhaDeAdiantamento, 'ref_id'> = { quantas: parcelas.length, quais: 'ultimas' },
 ): DraftDeAdiantamento[] {
   if (parcelas.length === 0 || valor <= 0) return [];
   const qtd = parcelas.length;
@@ -76,7 +81,7 @@ export function draftsDoAdiantamento(
     : `${qtd} ${qtd === 1 ? 'parcela' : 'parcelas'} de ${item.title}`;
   return [
     { kind: 'expense', amount_cents: valor, start: pagarEm, installments: 1, mode: 'total', grupo,
-      rotulo: `adianta ${oQue}` },
+      rotulo: `adianta ${oQue}`, adiantar: { ref_id: item.ref_id, ...escolha } },
     ...parcelas.map((p) => ({
       kind: 'expense' as const, amount_cents: p.cents, start: p.day, installments: 1,
       mode: 'cancel' as const, grupo,
@@ -114,4 +119,16 @@ export function agruparHipoteses<T extends { grupo?: string; rotulo?: string }>(
     }
   });
   return saida;
+}
+
+/**
+ * Editar uma hipótese: os drafts do `grupo` dão lugar aos `novos`, NA MESMA POSIÇÃO — a lista
+ * não pula a linha editada para o fim. Grupo que não existe mais (tirado no meio) entra no fim.
+ */
+export function substituirGrupo<T extends { grupo?: string }>(drafts: T[], grupo: string, novos: T[]): T[] {
+  const primeiro = drafts.findIndex((d) => d.grupo === grupo);
+  if (primeiro < 0) return [...drafts, ...novos];
+  const resto = drafts.filter((d) => d.grupo !== grupo);
+  const antes = drafts.slice(0, primeiro).filter((d) => d.grupo !== grupo).length;
+  return [...resto.slice(0, antes), ...novos, ...resto.slice(antes)];
 }

@@ -10,7 +10,7 @@ import type { DebtPaymentRow } from '@/lib/debt-history';
 import { agentFetch } from '@/lib/agent-api';
 import { toIlikeTerm } from '@/lib/search';
 import { ACCOUNT_TYPES } from '@/lib/accounts';
-import type { Adiantavel } from '@/lib/anticipation';
+import type { Adiantavel, EscolhaDeAdiantamento } from '@/lib/anticipation';
 import { useRealtimeInvalidate, workspaceId } from '@/hooks/use-items';
 
 // Categorias vivem em @/lib/categories (fonte única, travada por teste contra o
@@ -859,11 +859,13 @@ export type Draft = {
   grupo?: string;
   /** O texto da linha da hipótese composta. Só do app — não vai ao banco. */
   rotulo?: string;
+  /** A escolha do adiantamento, para editar a hipótese. Só do app — não vai ao banco. */
+  adiantar?: EscolhaDeAdiantamento;
 };
 
 /** O que vai ao banco: `grupo`/`rotulo` são da tela e mudariam a chave do cache à toa. */
 function paraOBanco(drafts: Draft[]) {
-  return drafts.map(({ grupo: _g, rotulo: _r, ...d }) => d);
+  return drafts.map(({ grupo: _g, rotulo: _r, adiantar: _a, ...d }) => d);
 }
 
 /**

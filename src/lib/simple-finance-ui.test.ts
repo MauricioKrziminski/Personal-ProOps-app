@@ -326,9 +326,54 @@ test('E se: adiantar vira UMA hipótese — o pagamento e um cancelamento por pa
     && String(n.props.children).includes('adianta 2 parcelas de Carro')), 'a lista mostra uma linha');
   assert.deepEqual(ui.writes, []);
 
-  // "Tirar" leva o grupo inteiro
-  ui.interact((nodes) => nodes.find((n: any) => n.type === 'Button' && n.props.label === 'Tirar').props.onPress());
+  // Tocar na linha EDITA: o sheet volta com a escolha feita e o valor aprovado
+  const linha = () => ui.nodes().find((n: any) => n.type === 'Pressable'
+    && String(n.props.accessibilityLabel).startsWith('Editar hipótese'));
+  assert.equal(ui.nodes().some((n: any) => n.type === 'Button' && n.props.label === 'Tirar'), false,
+    'o card não tem um botão por linha');
+  ui.interact(() => linha().props.onPress());
+  assert.ok(ui.nodes().some((n: any) => n.type === 'TaskHeader' && n.props.title === 'Editar hipótese'));
+  assert.equal(campos().props.itemId, 'd1');
+  assert.equal(campos().props.quantas, 2);
+  assert.equal(campos().props.valor, 157000);
+  assert.equal(ui.nodes().some((n: any) => n.type === 'Button' && n.props.label === 'Adicionar mais uma'), false);
+
+  // mudar a quantidade volta à sugestão e Salvar TROCA a hipótese, não soma outra
+  ui.interact(() => campos().props.onQuantas(3));
+  assert.equal(campos().props.valor, 80000 + 79000 + 78000);
+  ui.press('Salvar');
+  assert.equal(ui.drafts().length, 4, 'um pagamento e três cancelamentos, a hipótese antiga saiu');
+  assert.equal(ui.drafts().filter((d: any) => d.mode === 'total').length, 1);
+  assert.ok(ui.nodes().some((n: any) => n.type === 'ThemedText'
+    && String(n.props.children).includes('adianta 3 parcelas de Carro')));
+
+  // "Tirar hipótese" mora no sheet de edição e leva o grupo inteiro
+  ui.interact(() => linha().props.onPress());
+  ui.press('Tirar hipótese');
   assert.equal(ui.drafts().length, 0);
+});
+
+test('E se: editar uma entrada troca o valor e as parcelas no mesmo lugar da lista', () => {
+  const ui = screen(forecastFile, { forecastAccounts: [{ id: 'conta-1' }] });
+  ui.press('Supor um lançamento');
+  ui.fill('Valor', 25000);
+  ui.press('Adicionar mais uma');
+  ui.fill('Valor', 10000);
+  ui.press('Ver resultado');
+  const linhas = () => ui.nodes().filter((n: any) => n.type === 'Pressable'
+    && String(n.props.accessibilityLabel).startsWith('Editar hipótese'));
+  assert.equal(linhas().length, 2);
+
+  ui.interact(() => linhas()[0].props.onPress());
+  assert.equal(ui.button('Salvar').props.disabled, false);
+  ui.fill('Valor', 30000);
+  ui.interact((nodes) => nodes.find((n: any) => n.type === 'Chip' && n.props.label === '3x').props.onPress());
+  ui.press('Salvar');
+
+  assert.deepEqual(JSON.parse(JSON.stringify(ui.drafts().map((d: any) => [d.amount_cents, d.installments]))),
+    [[30000, 3], [10000, 1]]);
+  assert.equal(ui.nodes().some((n: any) => n.type === 'Sheet' && n.props.visible), false);
+  assert.deepEqual(ui.writes, []);
 });
 
 test('E se: Ver resultado depois de Somar não duplica a hipótese já adicionada', () => {

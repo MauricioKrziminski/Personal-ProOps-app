@@ -3,6 +3,7 @@ import { test } from 'node:test';
 
 import {
   agruparHipoteses,
+  substituirGrupo,
   draftsDoAdiantamento,
   escolherParcelas,
   ultimoDia,
@@ -43,7 +44,8 @@ test('a hipótese é um pagamento e um cancelamento por parcela, no dia de cada 
   const drafts = draftsDoAdiantamento(carro, parcelas, 280000, '2026-10-01', 'g1');
   assert.deepEqual(drafts, [
     { kind: 'expense', amount_cents: 280000, start: '2026-10-01', installments: 1, mode: 'total',
-      grupo: 'g1', rotulo: 'adianta 2 parcelas de Carro' },
+      grupo: 'g1', rotulo: 'adianta 2 parcelas de Carro',
+      adiantar: { ref_id: 'd1', quantas: 2, quais: 'ultimas' } },
     { kind: 'expense', amount_cents: 148500, start: '2026-11-10', installments: 1, mode: 'cancel', grupo: 'g1' },
     { kind: 'expense', amount_cents: 148500, start: '2026-12-10', installments: 1, mode: 'cancel', grupo: 'g1' },
   ]);
@@ -70,4 +72,19 @@ test('a lista mostra um adiantamento como UMA hipótese, e tirar leva o grupo in
   assert.equal(lista[1].principal.rotulo, 'adianta 2 parcelas de Carro');
   assert.deepEqual(lista[1].indices, [1, 2, 3]);
   assert.deepEqual(lista[2].indices, [4]);
+});
+
+test('editar troca a hipótese no mesmo lugar da lista, e grupo sumido entra no fim', () => {
+  const lista = [
+    { grupo: 'a', v: 1 }, { grupo: 'b', v: 2 }, { grupo: 'b', v: 3 }, { grupo: 'c', v: 4 },
+  ];
+  assert.deepEqual(substituirGrupo(lista, 'b', [{ grupo: 'b', v: 9 }]).map((d) => d.v), [1, 9, 4]);
+  assert.deepEqual(substituirGrupo(lista, 'a', [{ grupo: 'a', v: 7 }, { grupo: 'a', v: 8 }]).map((d) => d.v), [7, 8, 2, 3, 4]);
+  assert.deepEqual(substituirGrupo(lista, 'z', [{ grupo: 'z', v: 5 }]).map((d) => d.v), [1, 2, 3, 4, 5]);
+});
+
+test('a escolha do adiantamento viaja no draft do pagamento, para a edição voltar a ela', () => {
+  const d = draftsDoAdiantamento(carro, carro.events.slice(0, 1), 1000, '2026-10-01', 'g', { quantas: 1, quais: 'proximas' });
+  assert.deepEqual(JSON.parse(JSON.stringify(d[0].adiantar)), { ref_id: 'd1', quantas: 1, quais: 'proximas' });
+  assert.equal('adiantar' in d[1], false);
 });

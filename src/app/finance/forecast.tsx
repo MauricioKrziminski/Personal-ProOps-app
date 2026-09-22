@@ -26,7 +26,7 @@ import { TaskHeader } from '@/components/ui/task-header';
 import { Skeleton, SkeletonChart, SkeletonList } from '@/components/ui/skeleton';
 import { MeasuredSparkline } from '@/components/ui/measured-sparkline';
 import { useToast } from '@/components/ui/toast';
-import { Motion, Radius, Space, tabular } from '@/design/tokens';
+import { HitTarget, Motion, Radius, Space, tabular } from '@/design/tokens';
 import {
   useAccounts,
   useAnticipationCandidates,
@@ -55,6 +55,7 @@ import { showItemActions } from '@/lib/item-actions';
 import {
   agruparHipoteses,
   draftsDoAdiantamento,
+  substituirGrupo,
   escolherParcelas,
   ultimoDia,
   valorSugerido,
@@ -215,6 +216,13 @@ export default function ForecastScreen() {
   const [adiantarQtd, setAdiantarQtd] = useState(1);
   const [adiantarQuais, setAdiantarQuais] = useState<Quais>('ultimas');
   const [adiantarValor, setAdiantarValor] = useState<number | null>(null);
+  /**
+   * O `grupo` da hipótese aberta para edição; `null` = o sheet cria uma nova.
+   * Editar é refazer a hipótese com o formulário preenchido e TROCAR os drafts dela no mesmo
+   * lugar da lista (`substituirGrupo`) — um adiantamento tem 1 + N drafts, e mexer draft a draft
+   * deixaria parcela cancelada sem o pagamento, ou o contrário.
+   */
+  const [editando, setEditando] = useState<string | null>(null);
 
   /**
    * ⚠️ **Cada modo busca a SUA granularidade, e só a sua.**
@@ -456,8 +464,16 @@ export default function ForecastScreen() {
     );
   };
 
+  /** Grava a hipótese: nova vai para o fim; editada troca a antiga no mesmo lugar. */
+  const gravar = (novos: Draft[]) =>
+    setRascunhos((anteriores) =>
+      editando ? substituirGrupo(anteriores, editando, novos) : [...anteriores, ...novos]);
+
   /** Adicionar mais uma prepara outra hipótese; ver resultado inclui a atual e encerra a montagem. */
   const aplicarSuposicao = (verResultado: boolean) => {
+    const grupo = editando ?? `h${Date.now()}`;
+    // editar sempre fecha: "Salvar" é o único caminho da edição
+    const fecha = verResultado || editando !== null;
     if (novoTipo === 'adiantar') {
       if (!itemAdiantar || !podeAplicar) {
         if (verResultado && rascunhos.length > 0) {
@@ -466,10 +482,8 @@ export default function ForecastScreen() {
         }
         return;
       }
-      setRascunhos((anteriores) => [
-        ...anteriores,
-        ...draftsDoAdiantamento(itemAdiantar, parcelasAdiantar, valorAdiantar, pagarEm, `a${Date.now()}`),
-      ]);
+      gravar(draftsDoAdiantamento(itemAdiantar, parcelasAdiantar, valorAdiantar, pagarEm, grupo,
+        { quantas: adiantarQtd, quais: adiantarQuais }));
       // O ganho de adiantar "as últimas" está no FIM do contrato: a janela vai até a última
       // parcela tirada, senão a projeção mostraria só o custo.
       const precisa = diasAte(ultimoDia(parcelasAdiantar, pagarEm));
@@ -478,8 +492,9 @@ export default function ForecastScreen() {
       Haptics.selectionAsync();
       setAdiantarId(null);
       setAdiantarValor(null);
-      if (verResultado) {
+      if (fecha) {
         setSheetAberto(false);
+        setEditando(null);
         setModo('mes');
       }
       return;
@@ -500,8 +515,9 @@ export default function ForecastScreen() {
       start: inicio,
       installments: novoModo === 'monthly' ? 1 : novoParcelas,
       mode: novoModo,
+      grupo,
     };
-    setRascunhos((anteriores) => [...anteriores, hipotese]);
+    gravar([hipotese]);
 
     // Uma hipótese num mês distante precisa ampliar a janela para aparecer no resultado.
     const alvo = new Date(Number(novoMes.slice(0, 4)), Number(novoMes.slice(5, 7)), 0);
@@ -511,10 +527,50 @@ export default function ForecastScreen() {
 
     Haptics.selectionAsync();
     setNovoValor(0);
-    if (verResultado) {
+    if (fecha) {
       setSheetAberto(false);
+      setEditando(null);
       setModo('mes');
     }
+  };
+
+  const abrirNova = () => {
+    setEditando(null);
+    setNovoTipo('income');
+    setNovoValor(0);
+    setNovoMes(currentMonth());
+    setNovoParcelas(1);
+    setNovoModo('total');
+    setAdiantarId(null);
+    setAdiantarValor(null);
+    setSheetAberto(true);
+  };
+
+  /** Abre o sheet com a hipótese do jeito que ela foi feita. */
+  const abrirEdicao = (grupo: string, d: Draft) => {
+    setEditando(grupo);
+    setNovoMes(d.start.slice(0, 7));
+    if (d.adiantar) {
+      setNovoTipo('adiantar');
+      setAdiantarId(d.adiantar.ref_id);
+      setAdiantarQtd(d.adiantar.quantas);
+      setAdiantarQuais(d.adiantar.quais);
+      // o valor que a pessoa aprovou — escolher outra coisa volta à sugestão
+      setAdiantarValor(d.amount_cents);
+    } else {
+      setNovoTipo(d.kind);
+      setNovoValor(d.amount_cents);
+      setNovoModo(d.mode === 'monthly' ? 'monthly' : 'total');
+      setNovoParcelas(d.installments);
+    }
+    setSheetAberto(true);
+  };
+
+  const tirarEditando = () => {
+    if (!editando) return;
+    setRascunhos((r) => r.filter((d) => d.grupo !== editando));
+    setEditando(null);
+    setSheetAberto(false);
   };
 
   /*
@@ -627,29 +683,37 @@ export default function ForecastScreen() {
         </View>
       </View>
       {simulando ? (
-        hipoteses.map(({ chave, principal: d, indices }) => (
-          <View
-            key={chave}
-            style={[styles.rascunhoLinha, { borderTopColor: theme.separator }]}
-          >
-            <ThemedText
-              type="small"
-              themeColor="textSecondary"
-              style={[tabular, styles.rascunhoDescricao]}>
-              {d.rotulo
-                ? `sai ${brl(d.amount_cents)} · ${d.rotulo} · em ${isoToBR(d.start)}`
-                : `${d.kind === 'income' ? 'entra' : 'sai'} ${brl(d.amount_cents)}${
-                    d.mode === 'monthly' ? ' todo mês' : d.installments > 1 ? ` em ${d.installments}x` : ''
-                  } · a partir de ${isoToBR(d.start)}`}
-            </ThemedText>
-            <Button
-              label="Tirar"
-              variant="secondary"
-              size="sm"
-              onPress={() => setRascunhos((r) => r.filter((_, k) => !indices.includes(k)))}
-            />
-          </View>
-        ))
+        hipoteses.map(({ chave, principal: d }) => {
+          const texto = d.rotulo
+            ? `sai ${brl(d.amount_cents)} · ${d.rotulo} · em ${isoToBR(d.start)}`
+            : `${d.kind === 'income' ? 'entra' : 'sai'} ${brl(d.amount_cents)}${
+                d.mode === 'monthly' ? ' todo mês' : d.installments > 1 ? ` em ${d.installments}x` : ''
+              } · a partir de ${isoToBR(d.start)}`;
+          return (
+            // A linha É o botão de editar: um botão por linha ("Tirar") poluía o card, e tirar
+            // mora no sheet de edição, ao lado do que se está desistindo.
+            <Pressable
+              key={chave}
+              accessibilityRole="button"
+              accessibilityLabel={`Editar hipótese: ${texto}`}
+              onPress={() => abrirEdicao(chave, d)}
+              style={({ pressed }) => [
+                styles.rascunhoLinha,
+                {
+                  borderTopColor: theme.separator,
+                  backgroundColor: pressed ? theme.backgroundSelected : 'transparent',
+                },
+              ]}>
+              <ThemedText
+                type="small"
+                themeColor="textSecondary"
+                style={[tabular, styles.rascunhoDescricao]}>
+                {texto}
+              </ThemedText>
+              <Icon name="chevron.right" size="sm" color="textSecondary" />
+            </Pressable>
+          );
+        })
       ) : (
         <ThemedText type="small" themeColor="textSecondary">
           Suponha uma entrada, uma saída ou adiantar parcelas, e veja os meses recalculados
@@ -667,14 +731,7 @@ export default function ForecastScreen() {
           label={simulando ? 'Adicionar outra hipótese' : 'Supor um lançamento'}
           variant={simulando ? 'secondary' : 'primary'}
           size="sm"
-          onPress={() => {
-            setNovoTipo('income');
-            setNovoValor(0);
-            setNovoMes(currentMonth());
-            setNovoParcelas(1);
-            setNovoModo('total');
-            setSheetAberto(true);
-          }}
+          onPress={abrirNova}
         />
         {simulando ? (
           <Button label="Limpar" variant="secondary" size="sm" onPress={() => setRascunhos([])} />
@@ -968,16 +1025,16 @@ export default function ForecastScreen() {
         ) : null}
       </View>
       {/* Ambas as ações existem desde a primeira hipótese; adicionar mais uma mantém o formulário aberto. */}
-      <Sheet visible={sheetAberto} onClose={() => setSheetAberto(false)}>
+      <Sheet visible={sheetAberto} onClose={() => { setSheetAberto(false); setEditando(null); }}>
         <TaskHeader
-          title="Nova hipótese"
-          subtitle={simulando ? `${hipoteses.length} ${hipoteses.length === 1 ? 'hipótese no cenário' : 'hipóteses no cenário'}` : undefined}
-          onClose={() => setSheetAberto(false)}
+          title={editando ? 'Editar hipótese' : 'Nova hipótese'}
+          subtitle={!editando && simulando ? `${hipoteses.length} ${hipoteses.length === 1 ? 'hipótese no cenário' : 'hipóteses no cenário'}` : undefined}
+          onClose={() => { setSheetAberto(false); setEditando(null); }}
           action={
             <Button
-              label="Ver resultado"
+              label={editando ? 'Salvar' : 'Ver resultado'}
               size="sm"
-              disabled={!simulando && !podeAplicar}
+              disabled={editando ? !podeAplicar : !simulando && !podeAplicar}
               onPress={() => aplicarSuposicao(true)}
             />
           }
@@ -1086,15 +1143,25 @@ export default function ForecastScreen() {
           </>
           )}
 
-          <Button
-            label="Adicionar mais uma"
-            icon="plus"
-            variant="secondary"
-            block
-            style={styles.sheetAction}
-            disabled={!podeAplicar}
-            onPress={() => aplicarSuposicao(false)}
-          />
+          {editando ? (
+            <Button
+              label="Tirar hipótese"
+              variant="ghost"
+              block
+              style={styles.sheetAction}
+              onPress={tirarEditando}
+            />
+          ) : (
+            <Button
+              label="Adicionar mais uma"
+              icon="plus"
+              variant="secondary"
+              block
+              style={styles.sheetAction}
+              disabled={!podeAplicar}
+              onPress={() => aplicarSuposicao(false)}
+            />
+          )}
         </ScrollView>
       </Sheet>
 
@@ -1158,6 +1225,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: Space.sm,
+    minHeight: HitTarget,
     paddingTop: Space.sm,
     borderTopWidth: StyleSheet.hairlineWidth,
   },
