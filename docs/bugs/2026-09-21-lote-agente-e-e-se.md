@@ -102,3 +102,41 @@ escolhida e o cancelamento de cada parcela no dia em que ela sairia. Financiamen
 sugere o valor presente (CDC art. 52 §2º: quitação antecipada com redução proporcional dos
 juros); cartão e recorrente, o nominal. O valor é editável — quem sabe o valor exato é o
 banco.
+
+---
+
+## Depois (mesmo roteiro, motor real, staging)
+
+**3.** `Comprei Wardogs por 104,99` → `Comprei em 2x no cartão` → *"💳 Em qual cartão foi essa
+compra?"* com a lista de cartões. Com o modelo substituto (3.5-lite) o valor saiu DOBRADO
+(R$ 209,98) 2–4 de 5 vezes — e a MESMA frase numa mensagem só ("…por 104,99 no cartão em 2x"),
+sem correção nenhuma, também dobrou 2 de 5. A resposta "não, 104,99 foi o total" corrigiu o valor
+pelo mesmo caminho. **Falta medir com os modelos de produção** (ver pendências).
+
+**4.** `editar lançamento wardogs, foi a vista no nubank` → *"Confirma desparcelar wardogs: a compra
+de R$ 104,99 volta a ser à vista em 21/09/2026 no cartão Nubank Cartão (as 2 parcelas viram um
+lançamento só)?"* → uma linha de R$ 104,99 no Nubank Cartão, plano dissolvido. Também:
+à vista → 2x (D1), 2x → 3x (R$ 34,99 + 34,99 + 35,01), conta → Cartão da casa (faturas refeitas),
+e à vista no débito da conta Nubank — todos conferidos no banco.
+
+**1.** Aba Agente com "Recentes" (3) + "Ver todas", Android e iOS, claro e escuro, 384dp × 1,3.
+Achado junto: no iOS o fim da entrada ficava atrás da `NativeTabs` (faltava `insets.bottom`).
+
+**2.** "Adiantar" no "E se…": 3 últimas parcelas do financiamento com o valor presente sugerido
+→ ganho no fim de 3 anos de R$ 4.160,62, exatamente R$ 9.655,45 − R$ 5.494,83. No SQL,
+pelo valor nominal, saldo final idêntico ao real nas 7 fontes do `dev@`.
+
+## Pendências
+
+- **Medir os itens 3 e 4 com os modelos de PRODUÇÃO** (parse `gemini-3.1-flash-lite`, gate
+  `gemini-3.7-flash`) e rodar `agent/scripts/evaluate_answer_forms.py` sem flag, uma vez — o prompt
+  e o schema do classificador mudaram. Bloqueado em 21/09 pela cota grátis diária da chave do
+  staging; volta à meia-noite do Pacífico (~04h BRT). Se o valor dobrar no pedido corrigido com
+  o 3.1-lite, tirar do `prompt_history` do turno de revisão a mensagem original (ela já está em
+  `text`).
+- `GEMINI_MODEL_ROUTER`/`GEMINI_MODEL_PARSE` não têm efeito: `_PAPEL_POR_NOME`
+  (`agent/app/services/gemini.py`) mapeia o nome repetido para o último papel (`batch`). Só
+  `GEMINI_MODEL_BATCH` troca router e parse juntos. Afeta sondas, não produção.
+- Desparcelar para uma conta que não é cartão deixa a linha `pending` (igual ao chip "À vista"
+  do app): "foi à vista no débito" talvez devesse nascer `cleared`. Regra de produto, não mexida.
+- Produção: `20260921120000` → agente → app/OTA, nessa ordem.
