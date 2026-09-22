@@ -101,7 +101,7 @@ export function montarRetrato(e: EntradaDoRetrato): Retrato {
     .sort((a, b) => Number(b.overdue) - Number(a.overdue) || a.due_date.localeCompare(b.due_date));
   const atrasado = saidas.filter((c) => c.overdue).reduce((s, c) => s + c.amount_cents, 0);
   const venceHoje = saidas.filter((c) => !c.overdue && c.due_date === e.hoje).reduce((s, c) => s + c.amount_cents, 0);
-  const limite = e.limiteContas ?? 6;
+  const limite = e.limiteContas ?? 8;
   const comprometidoNoCiclo = Number(e.spendable.comprometido_no_ciclo ?? 0);
 
   return {

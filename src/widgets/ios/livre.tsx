@@ -6,6 +6,7 @@
 import { HStack, Spacer, Text, VStack } from '@expo/ui/swift-ui';
 import {
   containerBackground,
+  fixedSize,
   font,
   foregroundStyle,
   lineLimit,
@@ -25,7 +26,10 @@ import type { PropsDoWidget } from '@/widgets/props';
  * Pequeno: o número e a frase do dia. Médio: + as três próximas contas. Bloqueio: uma linha
  * (inline) ou três (retangular), sem cor própria — lá o sistema pinta (`vibrant`).
  */
-const Livre = (p: PropsDoWidget, env: WidgetEnvironment) => {
+// A diretiva 'widget' vira STRING no Babel (`babel-preset-expo`, plugin do expo-widgets), e o preset só
+// liga o plugin se o pacote existia quando o Metro subiu: Metro antigo = createWidget recebe a função
+// e quebra com "2nd argument cannot be cast to String". Depois de instalar, `expo start --clear`.
+function Livre(p: PropsDoWidget, env: WidgetEnvironment) {
   'widget';
   const semSessao = p.estado !== 'ok';
 
@@ -83,12 +87,20 @@ const Livre = (p: PropsDoWidget, env: WidgetEnvironment) => {
         <VStack alignment="leading" spacing={8}>
           {p.contas.slice(0, 3).map((c, i) => (
             <VStack key={i} alignment="leading" spacing={0}>
-              <Text modifiers={[font({ size: 13, weight: 'medium' }), lineLimit(1), foregroundStyle(p.cor.texto)]}>
+              <Text modifiers={[font({ size: 13, weight: 'medium' }), lineLimit(1), minimumScaleFactor(0.8), foregroundStyle(p.cor.texto)]}>
                 {c.titulo}
               </Text>
-              <Text modifiers={[font({ size: 11 }), monospacedDigit(), lineLimit(1), foregroundStyle(c.atrasada ? p.cor.perigo : p.cor.apagado)]}>
-                {`${c.quando} · ${c.valor}`}
-              </Text>
+              {/* Nem o valor nem o "quando" truncam (`fixedSize`): na vistoria de 22/09/2026 saíam
+                  "R$ 1.35…" e depois "venceu 1…". Quem cede é o herói, que tem minimumScaleFactor. */}
+              <HStack spacing={4}>
+                <Text modifiers={[font({ size: 11 }), lineLimit(1), fixedSize({ horizontal: true }), foregroundStyle(c.atrasada ? p.cor.perigo : p.cor.apagado)]}>
+                  {c.quando}
+                </Text>
+                <Spacer minLength={2} />
+                <Text modifiers={[font({ size: 11, weight: 'semibold' }), monospacedDigit(), fixedSize({ horizontal: true }), foregroundStyle(c.atrasada ? p.cor.perigo : p.cor.texto)]}>
+                  {c.valor}
+                </Text>
+              </HStack>
             </VStack>
           ))}
         </VStack>
@@ -102,6 +114,6 @@ const Livre = (p: PropsDoWidget, env: WidgetEnvironment) => {
       <Spacer />
     </HStack>
   );
-};
+}
 
 export default createWidget('Livre', Livre);

@@ -972,3 +972,10 @@ Dois, e só dois — o que os apps do nicho (Copilot, Monarch, YNAB) põem na te
   extensão antes de plataforma, e com a base em `.ts` o Android rodava o no-op.
 - É **nativo**: entra em build (tag), não em OTA. `plugins/with-work-runtime-alinhado.js` segura
   o conflito de `work-runtime-ktx` que o Glance do `expo-widgets` traz no Android.
+- ⚠️ **As libs de widget só carregam com o módulo NATIVO presente** (`index.js`,
+  `publicar.*.tsx`): as duas o exigem na importação, e JS novo num binário de antes dos widgets
+  (OTA para a nativa errada) fechava o app na abertura — medido no simulador. `try` em volta do
+  `require` NÃO serve: o Metro manda o erro ao `reportFatalError` e não relança. Pergunta antes
+  (`requireOptionalNativeModule('ExpoWidgets')`, `TurboModuleRegistry.get('AndroidWidget')`).
+- Instalou pacote com plugin de Babel (o `'widget'` do `expo-widgets`)? `expo start --clear`:
+  Metro antigo não liga o plugin e o iOS quebra com "2nd argument cannot be cast to String".

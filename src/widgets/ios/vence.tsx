@@ -21,16 +21,22 @@ import type { PropsDoWidget } from '@/widgets/props';
  *
  * ⚠️ Runtime isolado (`'widget'`): ver `livre.tsx`.
  */
-const Vence = (p: PropsDoWidget, env: WidgetEnvironment) => {
+// A diretiva 'widget' vira STRING no Babel (`babel-preset-expo`, plugin do expo-widgets), e o preset só
+// liga o plugin se o pacote existia quando o Metro subiu: Metro antigo = createWidget recebe a função
+// e quebra com "2nd argument cannot be cast to String". Depois de instalar, `expo start --clear`.
+function Vence(p: PropsDoWidget, env: WidgetEnvironment) {
   'widget';
-  const quantas = env.widgetFamily === 'systemLarge' ? 6 : 3;
-  const contas = p.contas.slice(0, quantas);
-  const resto = p.contas.length - contas.length + p.maisContas;
+  // O "+N no ciclo" ocupa a linha de uma conta: no médio, 3 contas + ele transbordavam e cortavam
+  // o cabeçalho e o rodapé (vistoria no simulador, 22/09/2026). Com resto, cabe uma conta a menos.
+  const cabem = env.widgetFamily === 'systemLarge' ? 7 : 3;
+  const total = p.contas.length + p.maisContas;
+  const contas = p.contas.slice(0, total > cabem ? cabem - 1 : cabem);
+  const resto = total - contas.length;
 
   return (
     <VStack
       alignment="leading"
-      spacing={10}
+      spacing={8}
       modifiers={[containerBackground(p.cor.fundo, 'widget')]}>
       <HStack>
         <Text modifiers={[font({ size: 13, weight: 'semibold' }), foregroundStyle(p.cor.texto)]}>O que vence</Text>
@@ -67,6 +73,6 @@ const Vence = (p: PropsDoWidget, env: WidgetEnvironment) => {
       ) : null}
     </VStack>
   );
-};
+}
 
 export default createWidget('Vence', Vence);

@@ -80,9 +80,15 @@ export function LivreWidget({ p, largura }: { p: PropsDoWidget; largura: number 
       {largo ? (
         <FlexWidget style={{ flex: 1, height: 'match_parent', flexDirection: 'column', justifyContent: 'center', flexGap: 10 }}>
           {p.contas.slice(0, 3).map((c, i) => (
-            <FlexWidget key={i} style={{ flexDirection: 'column' }}>
+            <FlexWidget key={i} style={{ width: 'match_parent', flexDirection: 'column' }}>
               <Texto texto={c.titulo} tamanho={13} cor={p.cor.texto} />
-              <Texto texto={`${c.quando} · ${c.valor}`} tamanho={11} cor={c.atrasada ? p.cor.perigo : p.cor.apagado} />
+              {/* O VALOR não divide texto com o "quando": juntos, o fim truncava no valor. */}
+              <FlexWidget style={{ width: 'match_parent', flexDirection: 'row', justifyContent: 'space-between' }}>
+                <FlexWidget style={{ flex: 1 }}>
+                  <Texto texto={c.quando} tamanho={11} cor={c.atrasada ? p.cor.perigo : p.cor.apagado} />
+                </FlexWidget>
+                <Texto texto={c.valor} tamanho={11} forte cor={c.atrasada ? p.cor.perigo : p.cor.texto} />
+              </FlexWidget>
             </FlexWidget>
           ))}
         </FlexWidget>
