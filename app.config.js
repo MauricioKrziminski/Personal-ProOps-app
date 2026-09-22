@@ -79,6 +79,66 @@ module.exports = ({ config }) => {
     name: nome,
     plugins: [
       ...(config.plugins || []),
+      /*
+        Widgets (22/09/2026). Os identificadores DERIVAM da variante: o widget do app de dev não
+        pode ler o App Group de produção — seria o dinheiro de um banco na tela do outro app.
+        O desenho e os dados: `src/widgets/` e `src/lib/widget-snapshot.ts`.
+      */
+      [
+        'expo-widgets',
+        {
+          bundleIdentifier: `${id}.widgets`,
+          groupIdentifier: `group.${id}`,
+          widgets: [
+            {
+              name: 'Livre',
+              displayName: 'Livre',
+              description: 'Quanto dá para gastar até a próxima entrada.',
+              ios: { supportedFamilies: ['systemSmall', 'systemMedium', 'accessoryRectangular', 'accessoryInline'] },
+            },
+            {
+              name: 'Vence',
+              displayName: 'O que vence',
+              description: 'As próximas contas, com o atrasado primeiro.',
+              ios: { supportedFamilies: ['systemMedium', 'systemLarge'] },
+            },
+          ],
+        },
+      ],
+      [
+        'react-native-android-widget',
+        {
+          fonts: [
+            './node_modules/@expo-google-fonts/plus-jakarta-sans/500Medium/PlusJakartaSans_500Medium.ttf',
+            './node_modules/@expo-google-fonts/plus-jakarta-sans/600SemiBold/PlusJakartaSans_600SemiBold.ttf',
+          ],
+          widgets: [
+            {
+              name: 'Livre',
+              label: 'Livre',
+              description: 'Quanto dá para gastar até a próxima entrada.',
+              minWidth: '110dp',
+              minHeight: '110dp',
+              targetCellWidth: 2,
+              targetCellHeight: 2,
+              maxResizeWidth: '420dp',
+              resizeMode: 'horizontal|vertical',
+              updatePeriodMillis: 1800000,
+            },
+            {
+              name: 'Vence',
+              label: 'O que vence',
+              description: 'As próximas contas, com o atrasado primeiro.',
+              minWidth: '250dp',
+              minHeight: '110dp',
+              targetCellWidth: 4,
+              targetCellHeight: 2,
+              resizeMode: 'horizontal|vertical',
+              updatePeriodMillis: 1800000,
+            },
+          ],
+        },
+      ],
       [
         'expo-build-properties',
         {

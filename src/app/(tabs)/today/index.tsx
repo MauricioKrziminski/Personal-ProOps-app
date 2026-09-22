@@ -1,3 +1,4 @@
+import { vereditoDoDia } from '@/lib/widget-snapshot';
 import { router, type Href } from 'expo-router';
 import { Fragment, useMemo, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
@@ -165,16 +166,12 @@ export default function TodayScreen() {
   */
   const atrasadoCents = atrasados.filter((i) => i.kind !== 'income').reduce((s, i) => s + i.cents, 0);
   const venceHojeCents = doDia.filter((i) => i.kind !== 'income').reduce((s, i) => s + i.cents, 0);
-  const porDia = livre > 0 ? Math.floor(livre / diasLivres) : 0;
-  const dias = `${diasLivres} ${diasLivres === 1 ? 'dia' : 'dias'}`;
+  // A MESMA frase dos widgets (`vereditoDoDia`, `lib/widget-snapshot.ts`).
+  const doVeredito = vereditoDoDia({
+    atrasadoCents, venceHojeCents, livreCents: livre, diasLivres, brl,
+  });
   const veredito: { icon: React.ComponentProps<typeof Icon>['name']; negative: boolean; text: string } =
-    atrasadoCents > 0
-      ? { icon: 'exclamationmark.triangle', negative: true, text: `${brl(atrasadoCents)} atrasado` }
-      : venceHojeCents > 0
-        ? { icon: 'clock', negative: true, text: `${brl(venceHojeCents)} vence hoje` }
-        : porDia >= 100
-          ? { icon: 'calendar', negative: false, text: `≈ ${brl(porDia)} por dia · ${dias}` }
-          : { icon: 'checkmark.circle', negative: false, text: `Nada vence hoje · ${dias} até entrar` };
+    { icon: doVeredito.icone, negative: doVeredito.tom === 'perigo', text: doVeredito.texto };
 
   const mostrarPassos = setup.pronto && !passosEscondidos && setup.passos.some((p) => !p.feito);
   const diaCalmo =

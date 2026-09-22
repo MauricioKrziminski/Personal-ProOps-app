@@ -29,6 +29,7 @@ import { AndroidActionSheet } from '@/components/ui/action-sheet';
 import { stackHeaderFonts } from '@/components/ui/app-header';
 import { IOS_26_OU_MAIS } from '@/constants/platform';
 import { ConcealProvider } from '@/components/ui/conceal';
+import { SincronizaWidgets } from '@/widgets/sincroniza';
 import { ToastProvider } from '@/components/ui/toast';
 import { AppUpdateProvider } from '@/hooks/use-app-update';
 import { ThemeProvider as AppThemeProvider, useBarStyle, useScheme } from '@/hooks/use-theme';
@@ -208,6 +209,7 @@ function AppTree() {
           */}
           <LockProvider>
           <AvisoDaAbertura pronto={pronto} temSessao={!!session} />
+          <SincronizaWidgets temSessao={!!session} carregando={loading} />
           <EntradaProvider>
           <ToastProvider>
             <AppUpdateProvider>

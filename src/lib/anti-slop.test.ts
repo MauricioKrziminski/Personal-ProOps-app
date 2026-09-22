@@ -894,6 +894,7 @@ test('valor em texto visível passa por Money ou useBRL', () => {
     'lib/dates.ts': 'é onde formatBRL nasce',
     'lib/brl-worklet.ts': 'deriva o separador do formatador, não mostra valor',
     'lib/month-view.ts': 'helper puro, sem tela chamando — quando tiver, recebe o brl por parâmetro',
+    'lib/widget-snapshot.ts': 'o retrato dos widgets aplica a máscara ele mesmo (`oculto`): widget não tem <Money>',
   };
   const fora: string[] = [];
   for (const file of walk(SRC)) {
