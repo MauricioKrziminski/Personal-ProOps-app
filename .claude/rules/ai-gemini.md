@@ -49,6 +49,14 @@ Os equivalentes em Deno (`_shared/gemini.ts`, `process-jobs/index.ts`) foram **a
   requisições/dia no nível gratuito, e escalonamento automático estourava isso rápido; perguntar
   "confirma?" é grátis e, quando o modelo entendeu errado, é a resposta mais útil de qualquer
   forma.
+- ⚠️ **Modelo FORA DO AR é outra coisa: router, parse e batch têm reserva no Flash**
+  (`gemini.structured` → `with_fallbacks`, 22/09/2026). O Lite respondeu `503 high demand` e
+  `ReadTimeout` por horas, e sem reserva TODA mensagem virava "Não consegui processar". A reserva
+  só roda quando a chamada FALHA — não é escalonamento por confiança, e não remover achando que
+  é. **Custo a conhecer:** durante uma queda do Lite, todo turno de produção vai para o Flash
+  (4,9× o preço, conta pré-paga). O **portão não tem reserva** de propósito: a reserva natural
+  seria o Lite, medido aprovando "apaga todos". Timeout 30 s e UMA nova tentativa por modelo
+  (o Lite degradado levou 15,7 s para "diga ok").
 - **Valor de dinheiro tem rede de segurança determinística.** Se a ação exige `amount_cents` e a
   IA omitiu, `parse_valor_em_centavos` (`app/domain/money.py`) tira do texto cru — mas só com UM
   número plausível. Nunca chutar entre dois: pedir para reformular é melhor que gravar errado.

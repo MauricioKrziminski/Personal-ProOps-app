@@ -953,8 +953,15 @@ Dois, e só dois — o que os apps do nicho (Copilot, Monarch, YNAB) põem na te
 
 | widget | tamanhos | o que mostra |
 |---|---|---|
-| **Livre** | iOS pequeno/médio + bloqueio (inline, retangular); Android 2×2 redimensionável | o herói da Hoje: "Livre até dd/mm", o valor, o veredito do dia; largo = + 3 contas |
-| **O que vence** | iOS médio/grande; Android 4×2 | as próximas contas, atrasadas primeiro, total no topo, "+N no ciclo" |
+| **Livre** | iOS pequeno/médio + bloqueio (inline, retangular); Android 2×2 redimensionável | o herói da Hoje: "Livre até dd/mm", o valor, o veredito do dia; largo = + compromissos do ciclo e a próxima conta |
+| **O que vence** | iOS médio/grande; Android 4×2 | o total, o atrasado numa FAIXA só, as próximas com selo de data, "+N a vencer" |
+
+⚠️ **Retrato v2 (22/09/2026): menos texto.** A v1 listava cada atrasada numa linha vermelha com
+"venceu dd/mm" — seis linhas vermelhas iguais eram o widget inteiro (*"não esse monte de
+texto"*). O atrasado virou UM resumo (quantas e quanto) e a lista é só o que vai vencer, cada
+uma com um selo de data (dia grande, mês pequeno; hoje inverte). Nome de conta nunca corta:
+no iOS `lineLimit(2)` + `fixedSize` vertical na linha E na lista (sem ele o WidgetKit comprimia
+para uma linha e cortava); `minimumScaleFactor` foi medido e devolvido — encolhia TODOS os nomes.
 
 - **Um retrato, dois desenhos.** `lib/widget-snapshot.ts` (puro, testado) monta tudo JÁ
   formatado a partir de `spendable` + `cycle_now` + `upcoming_bills`; o veredito é

@@ -213,6 +213,14 @@ Ele foi removido (`agent/app/tools/finance.py:856`); dar baixa é caminho de `ma
   frase de efeito da confirmação comum ("Registrar R$ 3.000,00 de tv em 10x no cartão Nubank
   Cartão… mesmo assim?"). Só o estouro do limite não diz o que está sendo aprovado.
 
+  ⚠️ **E a CITADA sai resolvida, com o tipo** (22/09/2026): "gastei 104,99 no nubank cartão" foi
+  gravado na CONTA corrente "Nubank" e a frase dizia só "no nubank". Duas causas, as duas
+  corrigidas: o prompt mandava tirar a palavra "cartão" do nome (agora preserva), e o casador
+  achava "Nubank" por substring em "cartão do nubank". `resolve_account` passa o tipo ESCRITO no
+  nome (`infer_account_type`: "cartão", "crédito", "conta", "débito") e `match_accounts` procura
+  primeiro naquele grupo, sem as palavras de tipo. A frase lê `cited_account`
+  (`resolve.contas_citadas`): "na conta Nubank" / "no Nubank Cartão".
+
   **A frase diz a conta que o usuário NÃO citou.** A regra "a resposta diz o que foi decidido
   por ela" passou a valer na pergunta: `resolve.conta_padrao` congela o nome da conta padrão
   no alvo (a política é pura e não vai ao banco) e a frase sai "registrar gasto de R$ 45,00 em

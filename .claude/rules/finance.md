@@ -836,6 +836,15 @@ Plano: `docs/superpowers/plans/2026-09-22-importacao-inteligente.md`.
   (`agent/app/domain/reconcile.py`, com teste): id do banco → idêntico → parcela k/N →
   saldo adiado → transferência/pagamento de fatura → mesmo valor em 3 dias → nome parecido →
   `talvez` (empate NUNCA escolhe: pergunta). Lançamento SEM conta (WhatsApp) é candidato.
+- ⚠️ **Nome diferente E valor diferente: a camada SEMÂNTICA** (22/09/2026). Na fatura real da
+  conta `teste@` três linhas passavam como novas: "ANDREA F M SILVA ODONTOLOGIA" R$ 193,57 ×
+  "Manutenção dentista" previsto R$ 177,01; "RECEITA FEDERAL" 88,68 × "DAS" 88,85; rotativo
+  371,66 × 371,64. Palavra nenhuma liga razão social a apelido. O que as camadas de estrutura não
+  resolveram vai ao modelo numa chamada só (`pares_para_julgar` → `judge_statement_pairs`: par a
+  até 10 dias e 30% de valor), e a cascata roda de novo. Só `mesmo` casa; com valor diferente o
+  item fica `uncertain` (desmarcado) e a linha oferece **"Usar no app o valor do extrato"** —
+  o previsto vira o que o banco cobrou (`useApplyImportToExisting`; na conta, baixa junto).
+  Modelo fora do ar = fica o resultado da estrutura. O saldo adiado casa com ≤ 1% de diferença.
 - **A prévia sugere, a pessoa decide.** Novo nasce marcado; já no app, talvez e "fora do
   financeiro" (crédito na fatura, transferência entre contas, aplicação, saldo anterior) nascem
   desmarcados com o motivo. A natureza vem da IA e só mexe na pré-seleção; sem IA, uma rede

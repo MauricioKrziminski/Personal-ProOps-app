@@ -97,6 +97,10 @@ número assentado é UM só e todos leem dele:
   toda quantidade do app, sem a tela lembrar.
 - No Adiantar, `quantasQueCabem` (`lib/anticipation.ts`) alimenta campo, valor e hipótese; a
   escolha original fica guardada e voltar o mês devolve as 8.
+  ⚠️ **A régua do que dá para adiantar é o MÊS, não o dia** (`adiantaveisNoMes`, no `select` de
+  `useAnticipationCandidates`). O pagamento cai no dia 1º do mês escolhido, e com a régua do dia
+  a parcela de 10/10 seguia "adiantável" pagando em outubro — a tv mostrava 9 em setembro E em
+  outubro. A parcela do próprio mês sai nele de todo jeito; cada mês à frente tira uma.
 - Data de FIM que o início ultrapassou anda junto (`fimQueSegueOInicio`, `lib/dates.ts`), e o
   calendário do fim recebe `min` = início: recorrente ("Termina em") e lembrete ("Até").
 - Contagem que depende de outra (dívida: pagas ≤ total) assenta no teto; digitação em curso não é
