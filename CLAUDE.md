@@ -61,6 +61,13 @@ App mobile pessoal de **notas rápidas, lembretes e controle financeiro operado 
   `anticipation_candidates` em uma versão, fuso no cabeçalho, `execute` para `authenticated` e
   sem para `anon`). App `v1.3.46`.
 
+  **Staging UMA à frente: `20260922140000`** (22/09/2026, aplicada só no staging). Parcelar no
+  cartão um lançamento que já existe gravava a parcela 1 `cleared` (o default da compra à vista),
+  e `parcela_travada` a lia como paga: a compra inteira travava (sem 1x, data, conta) com a
+  fatura aberta — a queixa da wardogs. A migration grava `pending` na adoção em cartão e conserta
+  as parcelas 1 que já nasceram assim (backfill idempotente, só fatura aberta). Mesma assinatura
+  de RPC: não exige deploy de agente nem de app. Subir é decisão do Gabriel.
+
   ⚠️ **OTA/build do chat exige a revisão nova do agente em produção** (21/09/2026): o app novo
   manda `id` no `POST /internal/chat/conversations` para abrir a conversa na hora, e o agente
   antigo (`extra='forbid'`) recusa com 422 — TODA primeira mensagem falha. Sem migration: é só

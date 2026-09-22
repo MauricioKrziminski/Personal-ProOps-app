@@ -2629,6 +2629,12 @@ export interface InstallmentPlanSummary {
    */
   locked: number;
   locked_cents: number;
+  /**
+   * Das `locked`, quantas travam por estarem PAGAS (`cleared`). As outras travam pela FATURA
+   * (paga em parte, adiada ou quitada sem baixa) — a tela diz qual, porque "fechada" sozinho não
+   * diz o que a pessoa pode fazer a respeito.
+   */
+  locked_paid: number;
   first_occurred_at: string;
   last_occurred_at: string | null;
   active: boolean;
@@ -2718,6 +2724,7 @@ export function useInstallmentPlans() {
           remaining_cents: Math.max(0, plan.total_cents - pago),
           locked: travadas.length,
           locked_cents: travadas.reduce((soma, p) => soma + p.amount_cents, 0),
+          locked_paid: travadas.filter((p) => p.status === 'cleared').length,
           first_occurred_at: plan.first_occurred_at,
           last_occurred_at: parcels.reduce<string | null>(
             (maior, p) => (maior && maior > p.occurred_at ? maior : p.occurred_at),

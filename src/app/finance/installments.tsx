@@ -77,6 +77,7 @@ interface FormPlano {
   inicio: string;
   /** Parcelas que não mudam mais (pagas ou em fatura fechada) e quanto elas somam. */
   travadas: number;
+  travadasPagas: number;
   travadoCents: number;
 }
 
@@ -91,9 +92,22 @@ function formDoPlano(plano: InstallmentPlanSummary): FormPlano {
     installments: plano.installments,
     inicio: isoToBR(plano.first_occurred_at),
     travadas: plano.locked,
+    travadasPagas: plano.locked_paid,
     travadoCents: plano.locked_cents,
   };
 }
+/**
+ * POR QUE a compra travou, em vez de "já fechadas": parcela paga e fatura paga em parte pedem
+ * saídas diferentes (22/09/2026 — a trava da wardogs tinha duas causas possíveis e a dica era a
+ * mesma frase para as duas).
+ */
+function motivoDaTrava(travadas: number, pagas: number, total: number): string {
+  const naFatura = travadas - pagas;
+  if (naFatura === 0) return `${pagas} de ${total} já ${pagas === 1 ? 'paga' : 'pagas'}`;
+  const fatura = `${naFatura} em fatura paga em parte ou adiada`;
+  return pagas === 0 ? `${naFatura} de ${total} ${naFatura === 1 ? 'está' : 'estão'} em fatura paga em parte ou adiada` : `${pagas} já ${pagas === 1 ? 'paga' : 'pagas'} e ${fatura}`;
+}
+
 const ALTURA_BARRA = 88;
 /** Largura fixa de cada mês na faixa rolável. */
 const LARGURA_MES = 48;
@@ -735,7 +749,7 @@ export default function InstallmentsScreen() {
               label="Parcelas"
               hint={
                 travado
-                  ? `${form.travadas} de ${form.installments} já fechadas — número, data e conta não mudam.`
+                  ? `${motivoDaTrava(form.travadas, form.travadasPagas, form.installments)} — número, data e conta não mudam.`
                   : form.installments === 1
                     ? `À vista: um lançamento só de ${formatBRL(form.totalCents)}.`
                     : `${form.installments}x de ${formatBRL(Math.floor(form.totalCents / form.installments))} — a última fecha os centavos.`
