@@ -34,8 +34,6 @@ interface Props {
   mes: string | null;
   onMes: (mes: string) => void;
   parcelas: ParcelaAdiantavel[];
-  /** A quantidade não cabe no que resta a vencer (`erroDeQuantidade`). Trava a hipótese. */
-  erroQuantidade: string | null;
   valor: number;
   onValor: (cents: number) => void;
 }
@@ -115,9 +113,8 @@ export function AdiantarCampos(p: Props) {
       {p.item ? (
         <Field
           label={recorrente ? 'Quantos meses' : 'Quantas parcelas'}
-          error={p.erroQuantidade ?? undefined}
-          hint={recorrente || p.erroQuantidade ? undefined : `De ${total} ${total === 1 ? 'parcela' : 'parcelas'} a vencer.`}>
-          <QuantityField value={p.quantas} max={total} invalid={Boolean(p.erroQuantidade)} onChange={p.onQuantas} />
+          hint={recorrente ? undefined : `De ${total} ${total === 1 ? 'parcela' : 'parcelas'} a vencer.`}>
+          <QuantityField value={p.quantas} max={total} onChange={p.onQuantas} />
         </Field>
       ) : null}
 
@@ -125,8 +122,7 @@ export function AdiantarCampos(p: Props) {
         <MonthPicker month={p.mes ?? currentMonth()} onChange={p.onMes} />
       </Field>
 
-      {/* Com a quantidade inválida, valor e resumo seriam do que SOBROU, não do que foi pedido. */}
-      {p.item && p.parcelas.length > 0 && !p.erroQuantidade ? (
+      {p.item && p.parcelas.length > 0 ? (
         <>
           <Field
             label="Valor para pagar"

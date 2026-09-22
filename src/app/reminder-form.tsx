@@ -35,6 +35,8 @@ import {
   type Reminder,
 } from '@/hooks/use-items';
 import {
+  brToISO,
+  fimQueSegueOInicio,
   isValidBRDate,
   isValidTime,
   isoToBR,
@@ -321,7 +323,7 @@ function ReminderForm({
     };
   });
 
-  const { control, handleSubmit, setValue, formState } = useForm<FormValues>({
+  const { control, handleSubmit, setValue, getValues, formState } = useForm<FormValues>({
     resolver: zodResolver(schema),
     defaultValues: {
       title: editing?.title ?? fallbackTitle ?? '',
@@ -340,6 +342,25 @@ function ReminderForm({
   });
 
   const date = useWatch({ control, name: 'date' });
+
+  /**
+   * Mudar a DATA leva o "Até" da repetição junto quando ela passaria dele — o fim anda o mesmo
+   * tanto (`fimQueSegueOInicio`). Era um erro ("a repetição termina antes do primeiro lembrete")
+   * esperando a pessoa ajustar à mão uma consequência de outro campo (22/09/2026). O
+   * `superRefine` do schema continua como rede: só regra que não é editável chega nele.
+   */
+  const mudarData = (br: string) => {
+    const antes = getValues('date');
+    setValue('date', br, { shouldValidate: true });
+    const regra = getValues('recurrence');
+    const st = parseRRule(regra);
+    if (!st.until || !isEditableRRule(regra) || !isValidBRDate(br) || !isValidBRDate(antes)) return;
+    const fimISO = `${st.until.slice(0, 4)}-${st.until.slice(4, 6)}-${st.until.slice(6, 8)}`;
+    const novo = fimQueSegueOInicio(brToISO(antes), brToISO(br), fimISO);
+    if (novo === fimISO) return;
+    setValue('recurrence', buildRRule({ ...st, until: novo.replace(/-/g, '') + st.until.slice(8) }),
+      { shouldValidate: true });
+  };
   const time = useWatch({ control, name: 'time' });
   const recurrence = useWatch({ control, name: 'recurrence' });
   const channel = useWatch({ control, name: 'channel' });
@@ -496,11 +517,11 @@ function ReminderForm({
                     <Chip
                       label="Amanhã"
                       selected={field.value === now.tomorrow}
-                      onPress={() => setValue('date', now.tomorrow, { shouldValidate: true })}
+                      onPress={() => mudarData(now.tomorrow)}
                     />
                     <DatePickerField
                       value={field.value}
-                      onChange={(br) => setValue('date', br, { shouldValidate: true })}
+                      onChange={mudarData}
                       accessibilityLabel="Data do lembrete"
                       invalid={!!errors.date}
                     />
@@ -841,6 +862,8 @@ function RecurrenceEditor({
                   }
                 }}
                 accessibilityLabel="Repetir até a data"
+                // o calendário nem oferece dia antes do primeiro lembrete
+                min={isValidBRDate(inicio) ? brToISO(inicio) : undefined}
               />
             </Field>
           </Animated.View>

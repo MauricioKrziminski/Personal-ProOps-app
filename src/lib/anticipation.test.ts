@@ -3,7 +3,7 @@ import { test } from 'node:test';
 
 import {
   agruparHipoteses,
-  erroDeQuantidade,
+  quantasQueCabem,
   substituirGrupo,
   draftsDoAdiantamento,
   escolherParcelas,
@@ -90,14 +90,10 @@ test('a escolha do adiantamento viaja no draft do pagamento, para a edição vol
   assert.equal('adiantar' in d[1], false);
 });
 
-test('8 parcelas escolhidas em setembro não cabem em dezembro: avisa, não corta calado', () => {
-  assert.equal(erroDeQuantidade(carro, 3, 'setembro de 2026'), null);
-  assert.equal(erroDeQuantidade(carro, 8, 'dezembro de 2026'),
-    'Pagando em dezembro de 2026, restam 3 parcelas a vencer. Diminua a quantidade.');
-  assert.equal(erroDeQuantidade({ ...carro, events: carro.events.slice(0, 1) }, 2, 'x'),
-    'Pagando em x, resta 1 parcela a vencer. Diminua a quantidade.');
-  assert.equal(erroDeQuantidade({ ...carro, source: 'recurring' }, 5, 'x'),
-    'Pagando em x, restam 3 meses a vencer. Diminua a quantidade.');
-  assert.equal(erroDeQuantidade(carro, 0, 'x'), 'Escolha pelo menos 1.');
-  assert.equal(erroDeQuantidade(null, 99, 'x'), null);
+test('8 parcelas escolhidas em setembro assentam no que cabe em dezembro, sem erro', () => {
+  assert.equal(quantasQueCabem(carro, 3), 3);
+  assert.equal(quantasQueCabem(carro, 8), carro.events.length);
+  assert.equal(quantasQueCabem({ ...carro, events: carro.events.slice(0, 1) }, 2), 1);
+  assert.equal(quantasQueCabem(carro, 0), 1, 'nunca abaixo de 1');
+  assert.equal(quantasQueCabem(null, 99), 99, 'sem item, guarda o que foi pedido');
 });

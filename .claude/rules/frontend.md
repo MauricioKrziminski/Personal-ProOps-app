@@ -86,10 +86,25 @@ O caminho único é `QuantityField` (`src/components/ui/quantity-field.tsx`): di
 número, − / + para o ajuste, `min`/`max` da régua real (`faixaDeParcelas`: 1..72, mínimo 2 com
 parcela travada).
 
-⚠️ **O teto que CAI por causa de outro campo não corta em silêncio.** Escolher 8 parcelas e mudar
-o mês do pagamento para um em que restam 5 fazia o campo dizer 8 e a hipótese gravar 5. Quem
-chama marca `invalid`, explica no `Field` e trava o salvar (`erroDeQuantidade`). E o texto
-digitado é largado quando − / + mudam o valor — senão o campo mostra um número e vale outro.
+⚠️ **O limite que MUDA por causa de outro campo ajusta o valor sozinho — nunca vira erro**
+(22/09/2026, segunda decisão do mesmo dia). Escolher 8 parcelas e mudar o mês do pagamento para
+um em que restam 5 primeiro virou erro que travava a hipótese; o dono do produto pediu o
+contrário: *"sempre que for possível ser automático, fazer automático ao invés de mostrar erro"*.
+O que NÃO pode voltar é o defeito original: o campo dizer 8 e a hipótese gravar 5. Por isso o
+número assentado é UM só e todos leem dele:
+
+- `QuantityField` devolve por `onChange` o valor assentado quando `min`/`max` mudam — vale para
+  toda quantidade do app, sem a tela lembrar.
+- No Adiantar, `quantasQueCabem` (`lib/anticipation.ts`) alimenta campo, valor e hipótese; a
+  escolha original fica guardada e voltar o mês devolve as 8.
+- Data de FIM que o início ultrapassou anda junto (`fimQueSegueOInicio`, `lib/dates.ts`), e o
+  calendário do fim recebe `min` = início: recorrente ("Termina em") e lembrete ("Até").
+- Contagem que depende de outra (dívida: pagas ≤ total) assenta no teto; digitação em curso não é
+  mexida — "1" é o caminho para "12" —, o ajuste vem no `onBlur`.
+
+**Dinheiro digitado NÃO entra nesta regra**: trocar o valor que a pessoa escreveu (retirar da meta
+além do guardado, pagar mais que a fatura) seria decidir quanto dinheiro se move por ela. Ali o
+campo explica e o botão espera.
 
 ### Campo que some não escreve, e controle que não grava não aparece (22/09/2026)
 

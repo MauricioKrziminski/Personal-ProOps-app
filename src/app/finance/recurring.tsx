@@ -38,7 +38,8 @@ import { useVoltarQuandoFechar } from '@/hooks/use-voltar-quando-fechar';
 import { useAdaptiveWindow } from '@/hooks/use-adaptive-window';
 import { useDebounced } from '@/hooks/use-debounced';
 import { semAcento } from '@/lib/text';
-import { brToISO, ehUltimoDiaDoMes, isValidBRDate, isoToBR, localDateTime, localISODate } from '@/lib/dates';
+import { QuantityField } from '@/components/ui/quantity-field';
+import { brToISO, ehUltimoDiaDoMes, fimQueSegueOInicio, isValidBRDate, isoToBR, localDateTime, localISODate } from '@/lib/dates';
 import { confirmDestructive, showItemActions } from '@/lib/item-actions';
 import { validRecurringRange } from '@/lib/finance-form';
 import { describeRRule } from '@/lib/rrule-text';
@@ -788,14 +789,13 @@ export default function RecurringScreen() {
               )}
 
               {!form.id && form.preset === 'monthly' ? (
-                <Field label="A cada quantos meses" hint="1 = todo mês. 2 = mês sim, mês não." error={Number(form.intervalo) < 1 ? 'Informe um intervalo de 1 a 99 meses' : undefined}>
-                  <TextField
-                    value={form.intervalo}
-                    onChangeText={(v) =>
-                      setForm({ ...form, intervalo: v.replace(/\D/g, '').slice(0, 2) })
-                    }
-                    placeholder="1"
-                    keyboardType="number-pad"
+                <Field label="A cada quantos meses" hint="1 = todo mês. 2 = mês sim, mês não.">
+                  {/* Campo de quantidade (`QuantityField`): "0" não existe, então não há erro a mostrar. */}
+                  <QuantityField
+                    value={Number(form.intervalo) || 1}
+                    max={99}
+                    accessibilityLabel="A cada quantos meses"
+                    onChange={(n) => setForm({ ...form, intervalo: String(n) })}
                   />
                 </Field>
               ) : null}
@@ -807,7 +807,15 @@ export default function RecurringScreen() {
                 error={form.inicio && !inicioOk ? 'Data inválida (dd/mm/aaaa)' : undefined}>
                 <DatePickerField
                   value={form.inicio}
-                  onChange={(inicio) => setForm({ ...form, inicio })}
+                  // O "Termina em" anda junto quando o início passaria dele (`fimQueSegueOInicio`):
+                  // era um erro esperando a pessoa consertar à mão (22/09/2026).
+                  onChange={(inicio) => setForm({
+                    ...form,
+                    inicio,
+                    fim: isValidBRDate(inicio) && isValidBRDate(form.inicio) && isValidBRDate(form.fim)
+                      ? isoToBR(fimQueSegueOInicio(brToISO(form.inicio), brToISO(inicio), brToISO(form.fim)))
+                      : form.fim,
+                  })}
                   placeholder="Escolher o início"
                   accessibilityLabel="Data de início da série"
                   invalid={Boolean(form.inicio) && !inicioOk}
@@ -844,6 +852,7 @@ export default function RecurringScreen() {
                   onChange={(fim) => setForm({ ...form, fim })}
                   placeholder="Sem fim"
                   accessibilityLabel="Data em que a série termina"
+                  min={inicioOk ? brToISO(form.inicio) : undefined}
                   invalid={Boolean(form.fim) && !fimOk}
                 />
               </Field>

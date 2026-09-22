@@ -1,5 +1,5 @@
 import * as Haptics from 'expo-haptics';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 
 import { TextField } from '@/components/ui/field';
@@ -13,8 +13,12 @@ import { useTheme } from '@/hooks/use-theme';
  * pula para o 6"). Nasceu no "Adiantar" do E se… e é o caminho para toda quantidade do app.
  *
  * `max` é o que EXISTE (as parcelas a vencer, por exemplo): digitar além assenta no teto, e o
- * campo mostra o número que valeu. Quando o teto CAI por causa de outro campo, o valor pode ficar
- * acima dele — quem chama marca `invalid` e explica; o "−" leva direto ao teto, que é a correção.
+ * campo mostra o número que valeu.
+ *
+ * ⚠️ **Quando o teto (ou o piso) MUDA por causa de outro campo, o valor se ajusta sozinho** —
+ * nunca vira erro (22/09/2026, *"sempre que for possível ser automático, fazer automático ao
+ * invés de mostrar erro"*). O ajuste é devolvido por `onChange`, então o estado de quem chama
+ * passa a ser o número que a tela mostra: nunca "o campo diz 8 e grava 3".
  */
 export function QuantityField({
   value,
@@ -35,6 +39,10 @@ export function QuantityField({
   // Só DURANTE a digitação o campo mostra o texto cru: apagar para digitar outro número não pode
   // virar o mínimo no meio do caminho. Fora dela, mostra o número que valeu.
   const [digitando, setDigitando] = useState<string | null>(null);
+  const assentado = Math.max(min, Math.min(value, max));
+  useEffect(() => {
+    if (assentado !== value) onChange(assentado);
+  }, [assentado, value, onChange]);
   const muda = (n: number) => {
     const certo = Math.max(min, Math.min(n, max));
     if (certo !== value) Haptics.selectionAsync();
@@ -59,9 +67,9 @@ export function QuantityField({
   );
   return (
     <View style={styles.linha}>
-      {botao('minus', 'Um a menos', value > max ? max : value - 1, value <= min)}
+      {botao('minus', 'Um a menos', assentado - 1, assentado <= min)}
       <TextField
-        value={digitando ?? String(value)}
+        value={digitando ?? String(assentado)}
         onChangeText={(t) => {
           const digitos = t.replace(/\D/g, '').slice(0, String(max).length);
           setDigitando(digitos);
@@ -75,7 +83,7 @@ export function QuantityField({
         invalid={invalid}
         style={[styles.numero, tabular]}
       />
-      {botao('plus', 'Um a mais', value + 1, value >= max)}
+      {botao('plus', 'Um a mais', assentado + 1, assentado >= max)}
     </View>
   );
 }

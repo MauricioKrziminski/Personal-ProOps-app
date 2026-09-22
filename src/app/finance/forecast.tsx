@@ -55,7 +55,7 @@ import { showItemActions } from '@/lib/item-actions';
 import {
   agruparHipoteses,
   draftsDoAdiantamento,
-  erroDeQuantidade,
+  quantasQueCabem,
   substituirGrupo,
   escolherParcelas,
   ultimoDia,
@@ -252,12 +252,13 @@ export default function ForecastScreen() {
   const pagarEm = diaDoPagamento(novoMes);
   const adiantaveis = useAnticipationCandidates(pagarEm, sheetAberto && novoTipo === 'adiantar');
   const itemAdiantar = adiantaveis.data?.find((i) => i.ref_id === adiantarId) ?? null;
-  const parcelasAdiantar = itemAdiantar ? escolherParcelas(itemAdiantar, adiantarQtd, adiantarQuais) : [];
+  // A quantidade ASSENTA no que ainda vence depois do pagamento (`quantasQueCabem`): trocar o
+  // mês para mais tarde diminui o número na tela, em vez de travar a hipótese com um erro.
+  const qtdAdiantar = quantasQueCabem(itemAdiantar, adiantarQtd);
+  const parcelasAdiantar = itemAdiantar ? escolherParcelas(itemAdiantar, qtdAdiantar, adiantarQuais) : [];
   const valorAdiantar = adiantarValor ?? valorSugerido(parcelasAdiantar);
-  const erroAdiantar = erroDeQuantidade(itemAdiantar, adiantarQtd,
-    monthTitle(novoMes ?? currentMonth()).toLowerCase());
   const podeAplicar = novoTipo === 'adiantar'
-    ? !erroAdiantar && parcelasAdiantar.length > 0 && valorAdiantar > 0
+    ? parcelasAdiantar.length > 0 && valorAdiantar > 0
     : novoValor > 0 && novoMes !== null;
   // `?? forecast.data` enquanto a simulação carrega: sem isso a tela PISCA vazia a cada
   // suposição somada, e o destaque salta de um número real para nada e de volta.
@@ -487,7 +488,7 @@ export default function ForecastScreen() {
         return;
       }
       gravar(draftsDoAdiantamento(itemAdiantar, parcelasAdiantar, valorAdiantar, pagarEm, grupo,
-        { quantas: adiantarQtd, quais: adiantarQuais }));
+        { quantas: qtdAdiantar, quais: adiantarQuais }));
       // O ganho de adiantar "as últimas" está no FIM do contrato: a janela vai até a última
       // parcela tirada, senão a projeção mostraria só o custo.
       const precisa = diasAte(ultimoDia(parcelasAdiantar, pagarEm));
@@ -1068,7 +1069,7 @@ export default function ForecastScreen() {
                 setAdiantarQuais('ultimas');
                 setAdiantarValor(null);
               }}
-              quantas={adiantarQtd}
+              quantas={qtdAdiantar}
               onQuantas={(n) => {
                 setAdiantarQtd(n);
                 setAdiantarValor(null);
@@ -1084,7 +1085,6 @@ export default function ForecastScreen() {
                 setAdiantarValor(null);
               }}
               parcelas={parcelasAdiantar}
-              erroQuantidade={erroAdiantar}
               valor={valorAdiantar}
               onValor={setAdiantarValor}
             />

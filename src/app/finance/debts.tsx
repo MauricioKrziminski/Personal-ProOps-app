@@ -757,11 +757,23 @@ export default function DebtsScreen() {
                 </Field>
                 <Field
                   label="Total de parcelas"
-                  // Editando, as já pagas não aparecem — e o "Salvar" desligava sem dizer por quê.
-                  error={/^\d+$/.test(form.parcelas) && Number(form.parcelas) < form.installmentsPaid
-                    ? `Já foram pagas ${form.installmentsPaid} parcelas: o total não pode ser menor.`
-                    : undefined}>
-                  <TextField value={form.parcelas} onChangeText={(value) => setForm({ ...form, parcelas: value.replace(/\D/g, '').slice(0, 3) })} keyboardType="number-pad" placeholder="48" />
+                  hint={form.installmentsPaid > 0 ? `Já foram pagas ${form.installmentsPaid}.` : undefined}>
+                  {/*
+                    Menor que as já pagas não existe: ao sair do campo o total assenta nelas, em vez
+                    de um erro esperando a pessoa descobrir o piso (22/09/2026). Durante a
+                    digitação não mexe — "1" é o caminho para "12".
+                  */}
+                  <TextField
+                    value={form.parcelas}
+                    onChangeText={(value) => setForm({ ...form, parcelas: value.replace(/\D/g, '').slice(0, 3) })}
+                    onBlur={() => {
+                      if (/^\d+$/.test(form.parcelas) && Number(form.parcelas) < form.installmentsPaid) {
+                        setForm({ ...form, parcelas: String(form.installmentsPaid) });
+                      }
+                    }}
+                    keyboardType="number-pad"
+                    placeholder="48"
+                  />
                 </Field>
                 {/* Saiu de "detalhes (opcional)": é o vencimento que ancora o cronograma.
                     Sem ele a projeção de caixa chuta em que dia o dinheiro sai. */}
@@ -789,7 +801,12 @@ export default function DebtsScreen() {
                   */}
                   <Field label="Nome"><TextField value={form.name} onChangeText={(name) => setForm({ ...form, name })} placeholder="Financiamento" /></Field>
                   {!form.id && <Field label="Parcelas já pagas" hint="Deixe zero se nenhuma foi paga. Esse histórico não movimenta dinheiro.">
-                    <TextField value={String(form.installmentsPaid)} onChangeText={(value) => setForm({ ...form, installmentsPaid: Number(value.replace(/\D/g, '')), historyConfirmed: true })} keyboardType="number-pad" maxLength={3} />
+                    {/* Pagas além do total assentam no total: é o teto que existe. */}
+                    <TextField value={String(form.installmentsPaid)} onChangeText={(value) => {
+                      const n = Number(value.replace(/\D/g, ''));
+                      const total = /^\d+$/.test(form.parcelas) ? Number(form.parcelas) : Infinity;
+                      setForm({ ...form, installmentsPaid: Math.min(n, total), historyConfirmed: true });
+                    }} keyboardType="number-pad" maxLength={3} />
                   </Field>}
                   <Field label="Conta que paga" hint="Opcional — a parcela fica sem conta se você não escolher.">
                     <AccountPicker accounts={pagadoras} value={form.accountId} onChange={(accountId: string | null) => setForm({ ...form, accountId })} emptyLabel="Não informar" />

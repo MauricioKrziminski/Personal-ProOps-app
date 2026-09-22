@@ -354,9 +354,10 @@ test('E se: adiantar vira UMA hipótese — o pagamento e um cancelamento por pa
   assert.equal(ui.drafts().length, 0);
 });
 
-test('E se: trocar o mês do pagamento para depois das parcelas escolhidas trava a hipótese', () => {
-  // O bug de 22/09/2026: 8x escolhidas em setembro, pagar em dezembro, e a hipótese nascia com
-  // o que sobrou enquanto o campo dizia 8. O banco só devolve o que vence DEPOIS do pagamento.
+test('E se: trocar o mês do pagamento para depois das parcelas escolhidas DIMINUI a quantidade sozinho', () => {
+  // 22/09/2026: 4x escolhidas em setembro, pagar em dezembro. Primeiro virou um erro que travava
+  // a hipótese; o dono do produto pediu o número diminuindo sozinho. Campo, valor e hipótese
+  // leem o MESMO número assentado.
   const eventos = [
     { n: 5, day: '2026-10-10', cents: 10000, pv_cents: 10000 },
     { n: 6, day: '2026-11-10', cents: 10000, pv_cents: 10000 },
@@ -372,17 +373,12 @@ test('E se: trocar o mês do pagamento para depois das parcelas escolhidas trava
   const campos = () => ui.nodes().find((n: any) => n.type === 'AdiantarCampos');
   ui.interact(() => campos().props.onItem('p1'));
   ui.interact(() => campos().props.onQuantas(4));
-  assert.equal(campos().props.erroQuantidade, null);
-  assert.equal(ui.button('Ver resultado').props.disabled, false);
+  assert.equal(campos().props.quantas, 4);
 
   ui.interact(() => campos().props.onMes('2026-12'));
-  assert.equal(campos().props.erroQuantidade,
-    'Pagando em dezembro de 2026, restam 2 parcelas a vencer. Diminua a quantidade.');
-  assert.equal(ui.button('Ver resultado').props.disabled, true, 'não cria com o número errado');
-  assert.equal(ui.button('Adicionar mais uma').props.disabled, true);
-
-  ui.interact(() => campos().props.onQuantas(2));
-  assert.equal(campos().props.erroQuantidade, null);
+  assert.equal(campos().props.quantas, 2, 'assentou nas 2 que ainda vencem');
+  assert.equal('erroQuantidade' in campos().props, false, 'não existe mais erro');
+  assert.equal(ui.button('Ver resultado').props.disabled, false);
   ui.press('Ver resultado');
   assert.equal(ui.drafts().filter((d: any) => d.mode === 'cancel').length, 2);
 });
@@ -460,16 +456,16 @@ test('optional history reduces remaining installments without changing the origi
   assert.equal(ui.writes[0].value.installments_paid, 8);
 });
 
-test('history above the contract total prevents submission', () => {
+test('history above the contract total settles on the total instead of blocking (22/09/2026)', () => {
   const ui = screen(debtsFile);
   ui.fill('Valor da parcela', 147000);
   ui.fill('Total de parcelas', '48');
   ui.fill('Vence dia', '10');
   ui.press('Adicionar detalhes (opcional)');
   ui.fill('Parcelas já pagas', '49');
-  assert.equal(ui.button('Salvar').props.disabled, true);
-  ui.button('Salvar').props.onPress();
-  assert.equal(ui.writes.length, 0);
+  ui.press('Salvar');
+  assert.equal(ui.writes[0].value.installments_paid, 48, 'nunca mais pagas que o contrato');
+  assert.equal(ui.writes[0].value.installments, 48);
 });
 
 test('detailed mode still exposes the financial inputs', () => {

@@ -301,3 +301,16 @@ export function emQuantoTempo(iso: string, agora: number): string {
   if (minutos < 60) return `em ${Math.max(1, minutos)} min`;
   return `em ${Math.round(minutos / 60)} h`;
 }
+
+/**
+ * O FIM de um período quando o INÍCIO muda (ISO). Se o início passou do fim, o fim anda o mesmo
+ * tanto que o início andou — a duração que a pessoa escolheu continua a mesma, e o formulário
+ * nunca fica com "termina antes de começar" esperando ela consertar à mão (22/09/2026: *"sempre
+ * que for possível ser automático, fazer automático ao invés de mostrar erro"*). Fim que ainda
+ * cabe não se mexe.
+ */
+export function fimQueSegueOInicio(inicioAntes: string, inicioDepois: string, fim: string): string {
+  if (fim >= inicioDepois) return fim;
+  const movido = somaDias(fim, Math.max(0, diasAte(inicioDepois, inicioAntes)));
+  return movido >= inicioDepois ? movido : inicioDepois;
+}

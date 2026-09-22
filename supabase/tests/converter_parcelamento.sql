@@ -177,6 +177,33 @@ begin
     end if;
   end;
 
+  -- ══ 4b. o caso wardogs: compra à vista no CARTÃO (status default `cleared`) ═════
+  --     Parcelada depois, a parcela 1 NÃO pode nascer "paga": quem baixa linha de cartão é a
+  --     fatura. Antes da `20260922140000` ela mantinha o `cleared` do default e a compra inteira
+  --     travava — sem 1x, sem data, sem conta — com a fatura aberta e nada pago.
+  insert into public.transactions
+    (workspace_id, user_id, kind, amount_cents, description, account_id, occurred_at, source)
+  values (ws, usr, 'expense', 10498, 'Wardogs', cartao, '2026-09-21', 'app')
+  returning id into tx;
+  if (select status from public.transactions where id = tx) <> 'cleared' then
+    raise exception '4b. premissa: compra à vista no cartão nasce cleared pelo default';
+  end if;
+  plano := public.convert_transaction_to_installments(
+    tx, 10498, 2, '2026-09-21', 'Wardogs', null, 'Nuuvem', cartao);
+  if (select status from public.transactions where id = tx) <> 'pending' then
+    raise exception '4b. no cartão a parcela 1 adotada tinha que virar pending';
+  end if;
+  if exists (select 1 from public.transactions
+             where installment_plan_id = plano and private.parcela_travada(status, invoice_id)) then
+    raise exception '4b. nenhuma parcela podia nascer travada com a fatura aberta';
+  end if;
+  -- e o que o usuário não conseguia fazer: desfazer para à vista
+  perform public.update_installment_plan(plano, 10498, 1, '2026-09-21', 'Wardogs', null, 'Nuuvem', cartao);
+  if (select installment_plan_id from public.transactions where id = tx) is not null
+     or (select amount_cents from public.transactions where id = tx) <> 10498 then
+    raise exception '4b. à vista devia sobrar UMA linha de 10498 com o mesmo id';
+  end if;
+
   -- ══ 5. fatura FECHADA recusa a conversão ════════════════════════════════
   -- 5a. fatura `paid`.
   insert into public.transactions
@@ -477,7 +504,7 @@ begin
 
   update public.card_invoices set status = 'open', paid_at = null where id = fat;
 
-  raise notice 'OK: converter e dissolver — 10 grupos de asserção';
+  raise notice 'OK: converter e dissolver — 11 grupos de asserção';
 end $$;
 
 rollback;

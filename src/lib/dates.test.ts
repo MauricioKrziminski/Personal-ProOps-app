@@ -9,6 +9,7 @@ import {
   diasAte,
   ehUltimoDiaDoMes,
   emQuantoTempo,
+  fimQueSegueOInicio,
   formatBRL,
   formatDateBR,
   greetingBR,
@@ -267,4 +268,15 @@ test('emQuantoTempo fala em minutos até uma hora e em horas depois', () => {
   assert.equal(emQuantoTempo(new Date(2026, 8, 17, 9, 20).toISOString(), agora), 'em 20 min');
   assert.equal(emQuantoTempo(new Date(2026, 8, 17, 9, 0, 20).toISOString(), agora), 'em 1 min');
   assert.equal(emQuantoTempo(new Date(2026, 8, 17, 11, 40).toISOString(), agora), 'em 3 h');
+});
+
+test('fimQueSegueOInicio: o fim anda junto só quando o início passaria dele', () => {
+  // cabe: não mexe
+  assert.equal(fimQueSegueOInicio('2026-09-01', '2026-09-10', '2026-12-31'), '2026-12-31');
+  // passou: anda os mesmos 30 dias, mantendo a duração
+  assert.equal(fimQueSegueOInicio('2026-09-01', '2026-10-01', '2026-09-20'), '2026-10-20');
+  // voltar o início não mexe no fim
+  assert.equal(fimQueSegueOInicio('2026-09-10', '2026-09-01', '2026-09-05'), '2026-09-05');
+  // igual ao início é válido
+  assert.equal(fimQueSegueOInicio('2026-09-01', '2026-09-20', '2026-09-20'), '2026-09-20');
 });
