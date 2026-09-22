@@ -101,7 +101,7 @@ function Vence(p: PropsDoWidget, env: WidgetEnvironment) {
       {lista.length === 0 ? (
         <Text modifiers={[font({ size: 13 }), foregroundStyle(p.cor.apagado)]}>Nada mais vence nos próximos 30 dias.</Text>
       ) : (
-        <VStack alignment="leading" spacing={grande ? 10 : 6}>
+        <VStack alignment="leading" spacing={grande ? 10 : 6} modifiers={[fixedSize({ horizontal: false, vertical: true })]}>
           {lista.map((c, i) => (
             <HStack key={i} spacing={10}>
               {/* O selo de data: o dia é o que se procura numa lista de contas. Hoje inverte. */}
@@ -118,11 +118,11 @@ function Vence(p: PropsDoWidget, env: WidgetEnvironment) {
                   {c.mes}
                 </Text>
               </VStack>
-              {/* O nome ENCOLHE antes de cortar ("Parcela Financiamento…" na vistoria). */}
-              <Text modifiers={[font({ size: 14, weight: 'medium' }), lineLimit(1), minimumScaleFactor(0.7), foregroundStyle(p.cor.texto)]}>
+              {/* O nome QUEBRA em até 2 linhas em vez de cortar ("Parcela Financiamento…" na vistoria).
+                  `minimumScaleFactor` foi medido e devolvido: no WidgetKit ele encolhia TODOS os nomes. */}
+              <Text modifiers={[font({ size: 14, weight: 'medium' }), lineLimit(2), fixedSize({ horizontal: false, vertical: true }), frame({ maxWidth: Infinity, alignment: 'leading' }), foregroundStyle(p.cor.texto)]}>
                 {c.titulo}
               </Text>
-              <Spacer minLength={6} />
               <Text modifiers={[font({ size: 14, weight: 'semibold' }), monospacedDigit(), fixedSize({ horizontal: true }), foregroundStyle(p.cor.texto)]}>
                 {c.valor}
               </Text>

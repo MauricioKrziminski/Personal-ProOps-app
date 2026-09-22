@@ -104,7 +104,7 @@ function Livre(p: PropsDoWidget, env: WidgetEnvironment) {
               <Text modifiers={[font({ size: 11 }), foregroundStyle(p.cor.apagado)]}>
                 {proxima.hoje ? 'Vence hoje' : `Próxima · ${proxima.dia} ${proxima.mes}`}
               </Text>
-              <Text modifiers={[font({ size: 14, weight: 'medium' }), lineLimit(2), minimumScaleFactor(0.8), foregroundStyle(p.cor.texto)]}>
+              <Text modifiers={[font({ size: 14, weight: 'medium' }), lineLimit(2), foregroundStyle(p.cor.texto)]}>
                 {proxima.titulo}
               </Text>
               <Text modifiers={[font({ size: 12, weight: 'semibold' }), monospacedDigit(), foregroundStyle(proxima.hoje ? p.cor.perigo : p.cor.apagado)]}>
