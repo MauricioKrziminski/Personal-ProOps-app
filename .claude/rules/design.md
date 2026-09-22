@@ -945,3 +945,30 @@ As duas outras alavancas, que são as que marcas sem cor usam:
 - [ ] Dynamic Type XL não quebra o layout
 - [ ] Alvos de toque ≥ 44pt; `accessibilityLabel` em todo botão só-ícone
 - [ ] Contagem anti-slop zerada
+
+## 12. Widgets (22/09/2026)
+
+Dois, e só dois — o que os apps do nicho (Copilot, Monarch, YNAB) põem na tela de início é
+"quanto dá para gastar" e "o que vem aí":
+
+| widget | tamanhos | o que mostra |
+|---|---|---|
+| **Livre** | iOS pequeno/médio + bloqueio (inline, retangular); Android 2×2 redimensionável | o herói da Hoje: "Livre até dd/mm", o valor, o veredito do dia; largo = + 3 contas |
+| **O que vence** | iOS médio/grande; Android 4×2 | as próximas contas, atrasadas primeiro, total no topo, "+N no ciclo" |
+
+- **Um retrato, dois desenhos.** `lib/widget-snapshot.ts` (puro, testado) monta tudo JÁ
+  formatado a partir de `spendable` + `cycle_now` + `upcoming_bills`; o veredito é
+  `vereditoDoDia`, a MESMA função da Hoje. `widgets/sincroniza.tsx` publica quando o conteúdo
+  muda (iOS `updateSnapshot`; Android guarda em AsyncStorage + `requestWidgetUpdate`).
+- **"Esconder saldo" vale no widget**, e sem sessão o retrato vira neutro ("Entre no app").
+- **O desenho é o herói**: bloco de tinta nos dois temas, `onHero*` por cima (as cores viajam
+  nas props, resolvidas para hex sólido), Plus Jakarta no Android (embutida pelo plugin),
+  vermelho só para atrasado. O número NUNCA trunca: `tamanhoQueCabe` reduz a fonte.
+- ⚠️ **`'use no memo'` no topo dos arquivos de widget.** O React Compiler transformava o
+  componente em hook e o Android quebrava com "Invalid Hook Call".
+- ⚠️ **Toque abre o app DONO, sem URL** (`OPEN_APP`; iOS sem `widgetURL`): o scheme
+  `appproops` é o mesmo nas três variantes e o sistema abria o seletor de app.
+- ⚠️ **`publicar.tsx`, `.ios.tsx` e `.android.tsx` na MESMA extensão**: o Metro resolve por
+  extensão antes de plataforma, e com a base em `.ts` o Android rodava o no-op.
+- É **nativo**: entra em build (tag), não em OTA. `plugins/with-work-runtime-alinhado.js` segura
+  o conflito de `work-runtime-ktx` que o Glance do `expo-widgets` traz no Android.
