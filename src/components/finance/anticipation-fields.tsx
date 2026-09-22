@@ -1,22 +1,22 @@
 import type { UseQueryResult } from '@tanstack/react-query';
-import { StyleSheet, View } from 'react-native';
+import * as Haptics from 'expo-haptics';
+import { useState } from 'react';
+import { Pressable, StyleSheet, View } from 'react-native';
 
-import { Chip } from '@/components/finance/chip';
 import { MonthPicker, currentMonth } from '@/components/finance/month-picker';
 import { ThemedText } from '@/components/themed-text';
 import { Button } from '@/components/ui/button';
 import { useBRL } from '@/components/ui/conceal';
-import { Field, MoneyField } from '@/components/ui/field';
+import { Field, MoneyField, TextField } from '@/components/ui/field';
+import { Icon } from '@/components/ui/icon';
 import { Note } from '@/components/ui/note';
 import { Segmented } from '@/components/ui/segmented';
 import { SelectField, type SelectOption } from '@/components/ui/select-field';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Space } from '@/design/tokens';
+import { HitTarget, Radius, Space, tabular } from '@/design/tokens';
+import { useTheme } from '@/hooks/use-theme';
 import type { Adiantavel, ParcelaAdiantavel, Quais } from '@/lib/anticipation';
 import { isoToBR } from '@/lib/dates';
-
-/** Atalhos de quantas adiantar; "Todas" entra à parte, com o número de verdade. */
-const QUANTAS = [1, 2, 3, 6, 12];
 
 /** `ordem`: o `SelectField` junta só cabeçalhos CONSECUTIVOS — a lista vem do banco por data. */
 const FONTE: Record<Adiantavel['source'], { grupo: string; icone: SelectOption['icon']; ordem: number }> = {
@@ -54,13 +54,14 @@ export function AdiantarCampos(p: Props) {
   const ordenada = [...lista].sort((a, b) => FONTE[a.source].ordem - FONTE[b.source].ordem);
   const opcoes: SelectOption[] = ordenada.map((i) => {
     const n = i.events.length;
-    const unidade = i.source === 'recurring' ? (n === 1 ? 'mês' : 'meses') : n === 1 ? 'parcela' : 'parcelas';
+    // Conta fixa não tem fim: "120 meses a vencer" seria o tamanho da JANELA, não um fato dela.
+    const quanto = i.source === 'recurring'
+      ? `todo mês · ${brl(i.events[0].cents)}`
+      : `${n} ${n === 1 ? 'parcela' : 'parcelas'} a vencer · ${brl(i.events[0].cents)}`;
     return {
       id: i.ref_id,
       label: i.title,
-      meta: [`${n} ${unidade} a vencer · ${brl(i.events[0].cents)}`, i.account_name]
-        .filter(Boolean)
-        .join(' · '),
+      meta: [quanto, i.account_name].filter(Boolean).join(' · '),
       icon: FONTE[i.source].icone,
       group: FONTE[i.source].grupo,
     };
@@ -113,17 +114,10 @@ export function AdiantarCampos(p: Props) {
       ) : null}
 
       {p.item ? (
-        <Field label={recorrente ? 'Quantos meses' : 'Quantas parcelas'}>
-          <View style={styles.chips}>
-            {QUANTAS.filter((n) => n < total).map((n) => (
-              <Chip key={n} label={String(n)} selected={p.quantas === n} onPress={() => p.onQuantas(n)} />
-            ))}
-            <Chip
-              label={`Todas (${total})`}
-              selected={p.quantas >= total}
-              onPress={() => p.onQuantas(total)}
-            />
-          </View>
+        <Field
+          label={recorrente ? 'Quantos meses' : 'Quantas parcelas'}
+          hint={recorrente ? undefined : `De ${total} ${total === 1 ? 'parcela' : 'parcelas'} a vencer.`}>
+          <Quantidade valor={p.quantas} maximo={total} onChange={p.onQuantas} />
         </Field>
       ) : null}
 
@@ -149,7 +143,67 @@ export function AdiantarCampos(p: Props) {
   );
 }
 
+/**
+ * Quantidade ABERTA: digita qualquer número, e − / + para o ajuste fino. Sem atalhos fixos
+ * (pedido do dono do produto: *"essas coisas nunca devem ser fixadas"*). O teto é o que existe
+ * (as parcelas a vencer; na conta fixa, a janela da Projeção) — passar dele assenta no teto ao
+ * sair do campo, e o campo mostra o número que valeu.
+ */
+function Quantidade({ valor, maximo, onChange }: { valor: number; maximo: number; onChange: (n: number) => void }) {
+  const theme = useTheme();
+  // Só DURANTE a digitação o campo mostra o texto cru: apagar para digitar outro número não pode
+  // virar "0" no meio do caminho. Fora dela, mostra o número que valeu.
+  const [digitando, setDigitando] = useState<string | null>(null);
+  const muda = (n: number) => {
+    const certo = Math.max(1, Math.min(n, maximo));
+    if (certo !== valor) Haptics.selectionAsync();
+    onChange(certo);
+  };
+  const botao = (icone: 'minus' | 'plus', rotulo: string, alvo: number, desligado: boolean) => (
+    <Pressable
+      accessibilityRole="button"
+      accessibilityLabel={rotulo}
+      accessibilityState={{ disabled: desligado }}
+      disabled={desligado}
+      onPress={() => muda(alvo)}
+      style={({ pressed }) => [
+        styles.passo,
+        { backgroundColor: pressed ? theme.backgroundSelected : theme.backgroundElement, opacity: desligado ? 0.4 : 1 },
+      ]}>
+      <Icon name={icone} size="sm" color="text" />
+    </Pressable>
+  );
+  return (
+    <View style={styles.quantidade}>
+      {botao('minus', 'Uma a menos', valor - 1, valor <= 1)}
+      <TextField
+        value={digitando ?? String(valor)}
+        onChangeText={(t) => {
+          const digitos = t.replace(/\D/g, '').slice(0, 3);
+          setDigitando(digitos);
+          const n = Number(digitos);
+          if (n >= 1) onChange(Math.min(n, maximo));
+        }}
+        onBlur={() => setDigitando(null)}
+        keyboardType="number-pad"
+        selectTextOnFocus
+        accessibilityLabel="Quantidade"
+        style={[styles.numero, tabular]}
+      />
+      {botao('plus', 'Uma a mais', valor + 1, valor >= maximo)}
+    </View>
+  );
+}
+
 const styles = StyleSheet.create({
-  chips: { flexDirection: 'row', flexWrap: 'wrap', gap: Space.sm },
+  quantidade: { flexDirection: 'row', alignItems: 'center', gap: Space.sm },
+  passo: {
+    width: HitTarget,
+    height: HitTarget,
+    borderRadius: Radius.pill,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  numero: { flex: 1, textAlign: 'center' },
   erro: { gap: Space.md, alignItems: 'flex-start' },
 });
