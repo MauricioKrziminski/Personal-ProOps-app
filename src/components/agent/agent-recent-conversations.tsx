@@ -35,13 +35,16 @@ export const AgentRecentConversations = memo(function AgentRecentConversations()
   // Afirmar "não há conversa" exige a consulta ter dado certo (frontend.md): desligada ou com
   // erro, `!isLoading` também é verdade.
   if (lista.isSuccess && recentes.length === 0) return null;
+  // Consulta DESLIGADA (agente não configurado neste build) fica `isPending` para sempre:
+  // sem este corte o bloco seria um esqueleto eterno (frontend.md, "O portão da tela").
+  if (lista.isPending && lista.fetchStatus === 'idle') return null;
 
   return (
     <View style={styles.root}>
       <ThemedText type="smallBold" themeColor="textSecondary" accessibilityRole="header">
         Recentes
       </ThemedText>
-      {lista.isPending ? (
+      {lista.isLoading ? (
         <Card style={styles.card}>
           <View style={styles.esqueleto} accessibilityLabel="Carregando conversas recentes">
             {Array.from({ length: RECENTES }, (_, i) => <Skeleton key={i} height={56} />)}

@@ -165,7 +165,8 @@ def _frase_correcao_plano(action: FinanceAction, target: dict, escolhido: dict) 
     estrutura = []
     muda_n = muda_numero_de_parcelas(action, escolhido)
     if action.new_occurred_at:
-        estrutura.append(f"1ª parcela em {format_date_br(action.new_occurred_at)}")
+        estrutura.append(f"1ª parcela em {format_date_br(action.new_occurred_at)} "
+                         "(as outras seguem de mês em mês)")
     conta, _ = conta_nova_do_plano(action, target, escolhido)
     if conta:
         estrutura.append(f"conta → {conta['name']}")
@@ -286,7 +287,9 @@ def _frase_plano(action: FinanceAction, target: dict, escolhido: dict) -> str:
             partes.append(f"de {escolhido['plan_installments']}x para {n}x de "
                           f"{cents_to_brl(total // n)}{resto}")
     if action.new_occurred_at:
-        partes.append(f"1ª parcela em {format_date_br(action.new_occurred_at)}")
+        # sem parcela travada a RPC refaz TODAS as datas a partir da 1ª: a frase diz isso
+        partes.append(f"1ª parcela em {format_date_br(action.new_occurred_at)} "
+                      "(as outras seguem de mês em mês)")
     conta, _ = conta_nova_do_plano(action, target, escolhido)
     if conta:
         partes.append(f"conta → {conta['name']}")

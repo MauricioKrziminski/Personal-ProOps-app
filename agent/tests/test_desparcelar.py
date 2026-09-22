@@ -471,3 +471,10 @@ def test_conta_que_ja_e_a_da_compra_com_nome_novo_so_renomeia():
                       new_account_casa=["acc-conta", "acc-cartao"])
     assert erro_de_correcao(acao, alvo) is None
     assert "conta" not in describe_for_confirmation(acao, alvo)
+
+
+def test_data_da_primeira_parcela_diz_que_as_outras_acompanham():
+    frase = describe_for_confirmation(
+        FinanceAction(type=UPD, new_occurred_at="2026-10-10"), _plano())
+    assert frase == ("corrigir a compra TV: 1ª parcela em 10/10/2026 "
+                     "(as outras seguem de mês em mês)")

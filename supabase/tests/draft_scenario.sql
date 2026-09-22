@@ -226,4 +226,42 @@ begin
   raise notice 'OK: rascunho de cenário — 18 asserções';
 end $$;
 
+
+-- `cancel` (20260921120000, adiantar parcelas): UMA ocorrência, valor NEGATIVO, no dia dado;
+-- e os modos antigos não mudam uma linha — o resto continua indo para a última parcela.
+do $$
+declare
+  hoje date := current_date;
+  r record;
+  n int;
+begin
+  select * into r from private.draft_effect(jsonb_build_array(jsonb_build_object(
+    'kind','expense','amount_cents',50000,'installments',12,'mode','cancel','start', hoje + 10)),
+    hoje + 10);
+  if r.out_cents <> -50000 or r.delta_cents <> 50000 then
+    raise exception 'cancel: esperado out -50000 / delta +50000, veio % / %', r.out_cents, r.delta_cents;
+  end if;
+  select count(*) into n from private.draft_ocorrencias(jsonb_build_array(jsonb_build_object(
+    'kind','expense','amount_cents',50000,'installments',12,'mode','cancel','start', hoje + 10)),
+    hoje + 3650);
+  if n <> 1 then
+    raise exception 'cancel: uma ocorrência só, vieram %', n;
+  end if;
+  -- pagar e cancelar o MESMO valor: o saldo final não muda (dinheiro movido, não criado)
+  select * into r from private.draft_effect(jsonb_build_array(
+    jsonb_build_object('kind','expense','amount_cents',30000,'installments',1,'start', hoje + 1),
+    jsonb_build_object('kind','expense','amount_cents',30000,'mode','cancel','start', hoje + 60)),
+    hoje + 90);
+  if r.delta_cents <> 0 then
+    raise exception 'pagar + cancelar o mesmo valor devia dar delta 0, veio %', r.delta_cents;
+  end if;
+  -- os modos antigos: 1000 em 3x ainda é 333 + 333 + 334
+  if (select array_agg(cents order by vence) from private.draft_ocorrencias(jsonb_build_array(
+        jsonb_build_object('kind','expense','amount_cents',1000,'installments',3,'start', hoje + 5)),
+        hoje + 365)) <> array[333, 333, 334]::bigint[] then
+    raise exception 'o resto da divisão saiu da última parcela';
+  end if;
+  raise notice 'OK: cancel do rascunho — 4 asserções';
+end $$;
+
 rollback;
