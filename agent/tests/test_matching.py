@@ -220,3 +220,22 @@ class TestColisaoDeNome:
         with pytest.raises(Level1Error) as erro:
             await conta_citada("ws", "itau")
         assert "mais de uma" in str(erro.value)
+
+
+def test_palavra_de_tipo_no_nome_citado_escolhe_o_grupo():
+    """22/09/2026: "cartão do nubank" casava a conta corrente "Nubank" por substring."""
+    from app.domain.matching import infer_account_type, match_accounts
+    contas = [
+        {"id": 1, "name": "Nubank", "type": "checking"},
+        {"id": 2, "name": "Nubank Cartão", "type": "credit_card"},
+        {"id": 3, "name": "Cartão da casa", "type": "credit_card"},
+        {"id": 4, "name": "Poupança", "type": "savings"},
+    ]
+    def casa(termo):
+        return [c["name"] for c in match_accounts(termo, contas, semelhanca=False, account_type=infer_account_type(termo))]
+    for termo in ("nubank cartão", "cartão nubank", "cartão do nubank", "cartão de crédito do nubank"):
+        assert casa(termo) == ["Nubank Cartão"], termo
+    assert casa("conta nubank") == ["Nubank"]
+    assert casa("nubank") == ["Nubank"], "sem palavra de tipo, o nome exato continua ganhando"
+    assert casa("cartão da casa") == ["Cartão da casa"]
+    assert len(casa("cartão")) == 2, "só 'cartão' é ambíguo: pergunta"

@@ -1054,7 +1054,21 @@ async def contas_citadas(
             if not nome:
                 continue
             try:
-                await conta_citada(workspace_id, nome, only_cards=so_cartoes, papel=papel)
+                achada = await conta_citada(workspace_id, nome, only_cards=so_cartoes, papel=papel)
+                if achada and campo == "account":
+                    # A frase do SIM diz a conta RESOLVIDA, não o texto citado: "no nubank"
+                    # escondia que o gasto ia para a conta corrente e não para o cartão.
+                    # Só a FRASE depende disto: sem a leitura, ela cai no texto citado, como antes.
+                    try:
+                        conta = next(
+                            (c for c in await db.accounts(workspace_id, only_cards=so_cartoes)
+                             if str(c.get("id")) == str(achada)),
+                            None,
+                        )
+                    except Exception:  # noqa: BLE001
+                        conta = None
+                    if conta:
+                        alvos[i] = {**alvos[i], "cited_account": {"name": conta["name"], "type": conta["type"]}}
             except Level1Error as err:
                 # `account_error` é o MESMO texto, com outro nome: `correction_error`
                 # é o que faz o gate parar, e este é o que diz que a parada tem

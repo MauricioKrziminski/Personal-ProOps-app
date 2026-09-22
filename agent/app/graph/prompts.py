@@ -93,8 +93,10 @@ Tipos:
   description = item/serviço comprado (ex: "comprei uma tv em 10x de 300 no nubank" -> description="tv", installments=10, amount_cents=300000, account="nubank").
   amount_cents = valor TOTAL (se o usuário disser o valor DA PARCELA, multiplique pela quantidade de parcelas).
   installments = nº de parcelas.
-  account = nome do cartão/banco citado, com ou sem a palavra cartão ("no nubank",
-  "no itau", "no cartão inter" -> account="nubank"/"itau"/"inter").
+  account = o cartão/banco como a pessoa ESCREVEU, com a palavra cartão/conta se ela disse
+  ("no nubank" -> "nubank"; "no cartão inter" -> "cartão inter"; "no nubank cartão" ->
+  "nubank cartão"). Vale para TODA ação com account: "cartão" e "conta" separam contas de
+  mesmo nome — nunca apague essas palavras.
   Use amount_cents e account, NUNCA new_amount_cents/new_account (esses são só de correção):
   "comprei uma bike em 10x de 120 no inter" -> amount_cents=120000, installments=10, account="inter".
   "tô na 3ª de 8 da cama, 200 cada" -> amount_cents=160000, installments=8, current_installment=3.

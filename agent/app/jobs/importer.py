@@ -19,9 +19,11 @@ from uuid import UUID
 
 from app import db
 from app.domain.matching import normalize
-from app.domain.reconcile import Existente, Item, conciliar, natureza_estrutural, parse_parcela
+from app.domain.reconcile import (
+    Existente, Item, conciliar, natureza_estrutural, pares_para_julgar, parse_parcela,
+)
 from app.domain.statement import ParsedLine, ofx_tipo, parse_csv, parse_ofx
-from app.services.gemini import classify_statement_lines
+from app.services.gemini import classify_statement_lines, judge_statement_pairs
 
 log = logging.getLogger(__name__)
 
@@ -29,6 +31,23 @@ MAX_ITEMS = 500
 # Lançamentos do app até esta distância do período do arquivo entram como candidatos: cobre a
 # parcela que o app datou pela compra e o banco postou no fechamento (`JANELA_PARCELA`).
 MARGEM_CANDIDATOS = 62
+# Teto de pares numa chamada de julgamento: uma fatura normal dá uma dezena.
+MAX_PARES = 80
+
+
+def _brl(cents: int) -> str:
+    inteiro, centavos = divmod(abs(cents), 100)
+    return f"R$ {inteiro:,}".replace(",", ".") + f",{centavos:02d}"
+
+
+def _par_em_texto(i: Item, t: Existente) -> str:
+    """A linha que o modelo julga — só o que distingue: nome, valor, dia e se é previsto."""
+    nome_app = " / ".join(x for x in (t.description, t.merchant) if x) or "(sem nome)"
+    extra = " (conta fixa, valor previsto)" if t.previsto else ""
+    return (
+        f'EXTRATO: "{i.description}" {_brl(i.amount_cents)} em {i.occurred_at:%d/%m/%Y} | '
+        f'APP: "{nome_app}" {_brl(t.amount_cents)} em {t.occurred_at:%d/%m/%Y}{extra}'
+    )
 
 
 class ImportError_(Exception):
@@ -158,14 +177,15 @@ async def run(
             counterparty_account_id=str(r["counterparty_account_id"]) if r["counterparty_account_id"] else None,
             installment_plan_id=str(r["installment_plan_id"]) if r["installment_plan_id"] else None,
             installment_no=r["installment_no"], plan_installments=r["plan_installments"],
-            rollover=bool(r["rollover"]),
+            rollover=bool(r["rollover"]), previsto=bool(r["previsto"]),
         )
         for r in await db.fetch(
             """
             select t.id, t.kind, t.amount_cents, t.occurred_at, t.description, t.merchant,
                    t.account_id, t.counterparty_account_id, t.installment_plan_id,
                    t.installment_no, p.installments as plan_installments,
-                   t.rollover_of_invoice_id is not null as rollover
+                   t.rollover_of_invoice_id is not null as rollover,
+                   (t.recurring_id is not null and t.status = 'pending') as previsto
             from public.transactions t
             left join public.installment_plans p on p.id = t.installment_plan_id
             where t.workspace_id = %s
@@ -200,14 +220,26 @@ async def run(
             workspace_id, lote["id"],
         )
     }
-    vereditos = conciliar(
-        [Item(i, l.kind, l.amount_cents, datas[i], l.description, chaves[i]) for i, l in enumerate(linhas)],
-        existentes,
-        conta_id=str(account_id),
-        cartao=cartao,
-        ja_importados=ja_importados,
-        reservadas=reservadas,
-    )
+    itens = [Item(i, l.kind, l.amount_cents, datas[i], l.description, chaves[i]) for i, l in enumerate(linhas)]
+
+    def _conciliar(julgamentos=None):
+        return conciliar(
+            itens, existentes, conta_id=str(account_id), cartao=cartao,
+            ja_importados=ja_importados, reservadas=reservadas, julgamentos=julgamentos,
+        )
+
+    vereditos = _conciliar()
+    # A camada de SENTIDO: o que a estrutura não resolveu vai ao modelo numa chamada só, e a
+    # cascata roda de novo com o julgamento. Falhou o modelo, fica o resultado da estrutura —
+    # o pior caso é o item aparecer como novo ou "talvez", que a pessoa vê e decide.
+    pares = pares_para_julgar(itens, existentes, vereditos, conta_id=str(account_id))[:MAX_PARES]
+    if pares:
+        por_id = {t.id: t for t in existentes}
+        try:
+            respostas = await judge_statement_pairs([_par_em_texto(itens[i], por_id[t]) for i, t in pares])
+            vereditos = _conciliar({p: r for p, r in zip(pares, respostas, strict=True) if r})
+        except Exception:  # noqa: BLE001
+            log.exception("julgamento dos pares falhou — fica a conciliação por estrutura")
 
     for linha, v, chave, cat, nat in zip(linhas, vereditos, chaves, categorias, naturezas, strict=True):
         # Só compra no CARTÃO vira compra parcelada; "1/2" num Pix da conta é outra coisa.

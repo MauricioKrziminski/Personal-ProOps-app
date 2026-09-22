@@ -503,3 +503,14 @@ def test_frase_da_parcelada_mostra_o_valor_da_parcela_quando_divide_exato():
     # com resto a parcela não é uniforme (o banco põe o resto na última): não afirma valor
     resto = exata.model_copy(update={"amount_cents": 100000, "installments": 3})
     assert describe_for_confirmation(resto).startswith("registrar R$ 1.000,00 de celular em 3x no cartão")
+
+
+def test_frase_diz_a_conta_resolvida_com_o_tipo():
+    """ "gastei 104,99 no nubank cartão" foi para a CONTA Nubank, e a frase dizia só "no nubank"."""
+    acao = FinanceAction(type=FinanceActionType.CREATE_EXPENSE, amount_cents=10499, account="nubank")
+    conta = describe_for_confirmation(acao, {"cited_account": {"name": "Nubank", "type": "checking"}})
+    assert "na conta Nubank" in conta, conta
+    cartao = describe_for_confirmation(acao, {"cited_account": {"name": "Nubank Cartão", "type": "credit_card"}})
+    assert "no Nubank Cartão" in cartao and "cartão Nubank Cartão" not in cartao, cartao
+    inter = describe_for_confirmation(acao, {"cited_account": {"name": "Inter", "type": "credit_card"}})
+    assert "no cartão Inter" in inter, inter

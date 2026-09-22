@@ -46,6 +46,13 @@ def normalize(texto: str | None) -> str:
     return _NAO_ALFANUM.sub(" ", sem_acento.lower()).strip()
 
 
+_PALAVRAS_DE_TIPO = {"cartao", "cartoes", "credito", "debito", "conta", "corrente", "de", "do", "da"}
+
+
+def _sem_palavras_de_tipo(termo: str | None) -> str:
+    return " ".join(p for p in normalize(termo).split() if p not in _PALAVRAS_DE_TIPO)
+
+
 def infer_account_type(texto: str | None) -> str | None:
     """Infere o subtipo de conta (credit_card vs checking) a partir de modificadores na frase."""
     if not texto:
@@ -104,11 +111,18 @@ def match_accounts(
                 if l.get("type") in ("checking", "checking_account", "savings", "cash", "other")
             ]
         if filtradas:
-            achados_tipo = match_accounts(
-                termo, filtradas, key=key, semelhanca=semelhanca, account_type=None
-            )
-            if achados_tipo:
-                return achados_tipo
+            # O termo como veio e, se nada casar, SEM as palavras de tipo: "cartão do nubank"
+            # não contém "nubank cartao" nem está contido nele, e caía na conta corrente
+            # "Nubank" por substring (22/09/2026, "gastei 104,99 no nubank cartão" gravado na
+            # conta). A palavra de tipo já fez o trabalho dela — escolher o grupo.
+            for t in (termo, _sem_palavras_de_tipo(termo)):
+                if not t:
+                    continue
+                achados_tipo = match_accounts(
+                    t, filtradas, key=key, semelhanca=semelhanca, account_type=None
+                )
+                if achados_tipo:
+                    return achados_tipo
     alvo = normalize(termo)
     if not alvo or not linhas:
         return []

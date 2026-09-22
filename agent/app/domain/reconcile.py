@@ -19,6 +19,7 @@ serem "já lançados"; havendo um, o segundo é novo.
 | `transferencia` | pagamento de fatura / transferência que o app já registrou entre as contas |
 | `perto` | mesmo valor e sentido, até 3 dias — um só candidato, ou um claramente mais parecido |
 | `nome` | nome parecido, valor igual (ou 1%), até 10 dias |
+| `semantico` | a IA julgou o par o MESMO gasto com nomes diferentes ("Odontologia" ↔ "dentista") |
 | `talvez` | sobrou candidato de mesmo valor em 10 dias, ou empate: NÃO decide, pergunta |
 
 ⚠️ **Na dúvida, pergunta** (`agent.md`): empate nunca vira escolha nossa. `talvez` sai desmarcado
@@ -43,6 +44,10 @@ JANELA_PARCELA = 62
 JANELA_TRANSFERENCIA = 5
 JANELA_SALDO = 40
 JANELA_ADOCAO = 10
+JANELA_SEMANTICA = 10
+# O previsto (ocorrência de conta fixa) pode vir do banco com outro valor: o DAS e o dentista
+# mudam todo mês. Par com diferença maior que isto nem vai ao modelo.
+VARIACAO_SEMANTICA = 0.3
 NOME_PARECIDO = 0.72
 NOME_DESEMPATE = 0.5
 MARGEM_DESEMPATE = 0.2
@@ -154,6 +159,9 @@ class Existente:
     installment_no: int | None = None
     plan_installments: int | None = None
     rollover: bool = False
+    # Ocorrência ainda PREVISTA de uma conta fixa (`recurring_id` + `pending`): o valor real
+    # costuma diferir do previsto, e é a pista que a camada semântica recebe.
+    previsto: bool = False
 
 
 @dataclass
@@ -173,6 +181,42 @@ def _dias(a: date, b: date) -> int:
     return abs((a - b).days)
 
 
+def valor_proximo(i: "Item", t: "Existente") -> bool:
+    """Igual, ou até 1% de diferença (IOF 19,86 contra 19,89; rotativo 371,66 contra 371,64)."""
+    return abs(t.amount_cents - i.amount_cents) <= max(1, i.amount_cents // 100)
+
+
+def _compativel_base(i: "Item", t: "Existente", conta_id: str) -> bool:
+    """Mesmo sentido e mesma conta (ou sem conta) — o mínimo para um par sequer ser candidato."""
+    return t.kind != "transfer" and t.kind == i.kind and t.account_id in (None, conta_id)
+
+
+def pares_para_julgar(
+    itens: list["Item"], existentes: list["Existente"], vereditos: list["Veredito"], *, conta_id: str
+) -> list[tuple[int, str]]:
+    """Os pares (item, lançamento) que as camadas de estrutura NÃO resolveram e que só um
+    julgamento de SENTIDO decide: item sem casamento, lançamento livre, perto no tempo e no valor.
+
+    A saída alimenta `conciliar(..., julgamentos=...)` numa segunda passada.
+    """
+    tomados = {v.transaction_id for v in vereditos if v.status in ("duplicate", "near_match") and v.transaction_id}
+    tomados |= {t for v in vereditos for t in v.adotar if t}
+    abertos = {v.idx for v in vereditos if v.status in ("novo", "uncertain")}
+    pares = []
+    for i in itens:
+        if i.idx not in abertos:
+            continue
+        for t in existentes:
+            if t.id in tomados or not _compativel_base(i, t, conta_id):
+                continue
+            if _dias(i.occurred_at, t.occurred_at) > JANELA_SEMANTICA:
+                continue
+            if abs(t.amount_cents - i.amount_cents) > i.amount_cents * VARIACAO_SEMANTICA:
+                continue
+            pares.append((i.idx, t.id))
+    return pares
+
+
 def _brl(cents: int) -> str:
     inteiro, centavos = divmod(abs(cents), 100)
     return f"R$ {inteiro:,}".replace(",", ".") + f",{centavos:02d}"
@@ -190,15 +234,18 @@ def conciliar(
     cartao: bool,
     ja_importados: dict[str, str] | None = None,
     reservadas: set[str] | None = None,
+    julgamentos: dict[tuple[int, str], str] | None = None,
 ) -> list[Veredito]:
     """Um veredito por item, na ordem dos itens.
 
     `ja_importados`: `external_id` → id do lançamento que um lote ANTERIOR criou (e que ainda
     existe). `reservadas`: lançamentos que outro lote em revisão já oferece como "data diferente"
-    — o índice parcial `import_items_near_match_unico` recusaria o segundo.
+    — o índice parcial `import_items_near_match_unico` recusaria o segundo. `julgamentos`: o que
+    a IA disse de cada par de `pares_para_julgar` (`mesmo` | `diferente` | `incerto`).
     """
     ja_importados = ja_importados or {}
     reservadas = reservadas or set()
+    julgamentos = julgamentos or {}
     vereditos: dict[int, Veredito] = {}
     tomados: set[str] = set()
     parcelas = {i.idx: parse_parcela(i.description) for i in itens}
@@ -209,11 +256,8 @@ def conciliar(
     def compativel(i: Item, t: Existente) -> bool:
         if t.id in tomados:
             return False
-        if t.kind == "transfer":
-            return False  # transferência só pela camada própria
-        if t.kind != i.kind:
-            return False
-        if t.account_id not in (None, conta_id):
+        # transferência só pela camada própria
+        if not _compativel_base(i, t, conta_id):
             return False
         p = parcelas[i.idx]
         if p and t.installment_plan_id and (t.installment_no, t.plan_installments) != (p[1], p[2]):
@@ -224,6 +268,10 @@ def conciliar(
         tomados.add(t.id)
         mesmo_dia = t.occurred_at == i.occurred_at
         status = "duplicate" if mesmo_dia or t.id in reservadas else "near_match"
+        if camada == "semantico" and not valor_proximo(i, t):
+            # O modelo diz que é o mesmo gasto, mas o VALOR mudou: a pessoa confere. Fica
+            # desmarcado (não duplica) e a linha oferece usar o valor do extrato no app.
+            status = "uncertain"
         p = parcelas[i.idx]
         vereditos[i.idx] = Veredito(
             i.idx, status, camada, t.id, nota, parcela=(p[1], p[2]) if p else None
@@ -288,10 +336,12 @@ def conciliar(
     )
 
     # 2b. o saldo que o app já adiou para esta fatura (`roll_invoice`)
+    # Valor "próximo", não igual: o app grava o saldo adiado pela conta dele e o banco pelo
+    # centavo dele (371,64 × 371,66 na fatura real de 10/2026).
     camada(
         "saldo_anterior",
         lambda i, t: cartao and i.kind == "expense" and t.rollover and compativel(i, t)
-        and t.amount_cents == i.amount_cents and _dias(i.occurred_at, t.occurred_at) <= JANELA_SALDO,
+        and valor_proximo(i, t) and _dias(i.occurred_at, t.occurred_at) <= JANELA_SALDO,
         lambda i, t: "saldo adiado da fatura anterior, já no app",
     )
 
@@ -322,9 +372,6 @@ def conciliar(
     )
 
     # 5. nome parecido
-    def valor_proximo(i: Item, t: Existente) -> bool:
-        return abs(t.amount_cents - i.amount_cents) <= max(1, i.amount_cents // 100)
-
     camada(
         "nome",
         lambda i, t: compativel(i, t) and valor_proximo(i, t)
@@ -332,6 +379,24 @@ def conciliar(
         lambda i, t: "nome parecido"
         + ("" if t.amount_cents == i.amount_cents else f", no app {_brl(t.amount_cents)}")
         + ("" if t.occurred_at == i.occurred_at else f", em {_data(t.occurred_at)}"),
+    )
+
+    # 5b. o modelo julgou o par o MESMO gasto — nomes que palavra nenhuma liga ("ANDREA F M SILVA
+    # ODONTOLOGIA" ↔ "Manutenção dentista", "RECEITA FEDERAL" ↔ "DAS"). Só `mesmo` casa; `incerto`
+    # cai no talvez logo abaixo, e `diferente` não impede nada (o talvez olha valor, não nome).
+    def _nota_semantica(i: Item, t: Existente) -> str:
+        nome_app = t.description or t.merchant or "um lançamento"
+        partes = [f"é {nome_app} no app"]
+        if not valor_proximo(i, t):
+            partes.append(f"previsto {_brl(t.amount_cents)}" if t.previsto else f"lá {_brl(t.amount_cents)}")
+        if t.occurred_at != i.occurred_at:
+            partes.append(f"em {_data(t.occurred_at)}")
+        return ", ".join(partes)
+
+    camada(
+        "semantico",
+        lambda i, t: compativel(i, t) and julgamentos.get((i.idx, t.id)) == "mesmo",
+        _nota_semantica,
     )
 
     # 6. talvez — NÃO reivindica: só aponta o candidato mais provável para a pessoa decidir

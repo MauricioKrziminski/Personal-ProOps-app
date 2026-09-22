@@ -60,6 +60,15 @@ DOMINIO_MINIMO = 0.8
 _AMBIGUOS = {"financas", "notas"}
 
 
+
+def onde_fica(conta: dict) -> str:
+    """ "no cartão Inter" / "no Nubank Cartão" / "na conta Nubank" — o TIPO vai junto do nome,
+    porque "Nubank" e "Nubank Cartão" são contas diferentes e a frase precisa separá-las."""
+    nome = conta.get("name") or ""
+    if conta.get("type") == "credit_card":
+        return f"no {nome}" if "cart" in nome.lower() else f"no cartão {nome}"
+    return f"na conta {nome}"
+
 def dominio_incerto(domains: list[str], confidence: float) -> bool:
     """O roteador ficou em cima do muro entre gasto e nota?"""
     if confidence >= DOMINIO_MINIMO:
@@ -559,7 +568,10 @@ def describe_for_confirmation(
         # foi decidido por ela" vale também na pergunta). Sem o nome congelado (ação
         # que não cai na conta padrão), a frase cala em vez de adivinhar.
         padrao = (target or {}).get("default_account")
-        if action.account:
+        citada = (target or {}).get("cited_account")
+        if action.account and citada:
+            onde = f", {onde_fica(citada)}"
+        elif action.account:
             onde = f", no {action.account}"
         elif padrao is not None:
             onde = f", na conta {padrao['name']}" if padrao.get("name") else ", sem conta"

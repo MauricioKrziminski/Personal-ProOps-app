@@ -174,3 +174,49 @@ def test_sem_ia_a_estrutura_ainda_tira_o_que_nao_e_gasto_nem_receita():
     assert n == ["transferencia_propria", "transferencia_propria", None, "transferencia_propria", None]
     assert natureza_estrutural(linhas, cartao=True, titular="Gabriel Almeida Dias") == [None] * 5
     assert natureza_estrutural(linhas[3:4], cartao=False, titular="Gabriel") == [None], "um nome só não basta"
+
+
+def test_saldo_adiado_casa_com_diferenca_de_centavos():
+    """Fatura real de 10/2026: o banco disse 371,66 e o app adiou 371,64."""
+    v = conciliar([item(0, "Valor pendente do mês anterior (rotativo)", 37166, D(2026, 9, 10))],
+                  [tx("t", "Saldo em rotativo de setembro", 37164, D(2026, 9, 10), rollover=True)],
+                  conta_id=CARTAO, cartao=True)
+    um(v[0], status="duplicate", camada="saldo_anterior", transaction_id="t")
+
+
+def test_camada_semantica_liga_nomes_que_palavra_nenhuma_liga():
+    from app.domain.reconcile import pares_para_julgar
+    itens = [
+        item(0, "Boleto no Crédito - ANDREA F M SILVA ODONTOLOGIA", 19357, D(2026, 9, 13)),
+        item(1, "Pix no Crédito - RECEITA FEDERAL", 8868, D(2026, 9, 21)),
+        item(2, "Mercadolivre*Mercadol", 4997, D(2026, 9, 11)),
+        item(3, "Posto Y", 7000, D(2026, 9, 7)),
+    ]
+    existentes = [
+        tx("dent", "Manutenção dentista", 17701, D(2026, 9, 10), previsto=True),
+        tx("das", "DAS", 8885, D(2026, 9, 20), previsto=True),
+        tx("longe", "Algo caro", 90000, D(2026, 9, 11)),       # valor longe: nem vai ao modelo
+        tx("posto", "Posto Y", 7000, D(2026, 9, 7)),           # já casa por estrutura
+    ]
+    antes = conciliar(itens, existentes, conta_id=CARTAO, cartao=True)
+    pares = pares_para_julgar(itens, existentes, antes, conta_id=CARTAO)
+    assert (0, "dent") in pares and (1, "das") in pares
+    assert not any(t in ("longe", "posto") for _, t in pares), pares
+
+    v = conciliar(itens, existentes, conta_id=CARTAO, cartao=True,
+                  julgamentos={(0, "dent"): "mesmo", (1, "das"): "mesmo"})
+    # valor diferente do previsto: a pessoa confere — fica desmarcado e aponta o lançamento
+    um(v[0], status="uncertain", camada="semantico", transaction_id="dent")
+    assert "Manutenção dentista" in v[0].nota and "previsto R$ 177,01" in v[0].nota
+    # 88,68 × 88,85 é valor próximo (≤ 1%): casa como "já está no app", com a data do app
+    um(v[1], status="near_match", camada="semantico", transaction_id="das")
+    um(v[2], status="novo")
+    um(v[3], status="duplicate", camada="identico")
+
+
+def test_semantica_incerto_ou_diferente_nao_casa():
+    itens = [item(0, "Loja A", 5000, D(2026, 9, 1))]
+    existentes = [tx("t", "Loja B", 5400, D(2026, 9, 2))]
+    for j in ("incerto", "diferente"):
+        v = conciliar(itens, existentes, conta_id=CARTAO, cartao=True, julgamentos={(0, "t"): j})
+        assert v[0].camada != "semantico", j

@@ -86,7 +86,9 @@ async def resolve_account(
     if not name:
         return None
     linhas = await db.accounts(workspace_id, only_cards=only_cards)
-    tipo = "credit_card" if only_cards else account_type
+    # O tipo que a pessoa ESCREVEU no nome ("cartão do nubank", "conta nubank") é estrutura do
+    # nome citado, não inferência de intenção: sem ele, "cartão nubank" casava a conta corrente.
+    tipo = "credit_card" if only_cards else (account_type or matching.infer_account_type(name))
 
     certos = matching.match_accounts(
         name, linhas, semelhanca=False, account_type=tipo
