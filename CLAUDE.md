@@ -53,15 +53,13 @@ App mobile pessoal de **notas rápidas, lembretes e controle financeiro operado 
   `authenticated` e sem para `anon`). Agente `agente-00078-k5f` (produção) e
   `agente-staging-00146-7nr` subiram no mesmo dia; app `v1.3.43`.
 
-  **Produção e staging ALINHADOS em `20260922120000`** — aplicada em produção pelo Gabriel em
+  **Produção e staging ALINHADOS em `20260922130000`** — aplicada em produção pelo Gabriel em
+  22/09/2026 (`goal_deposit` recusa retirar mais que o guardado; conferida na fonte: uma versão,
+  `search_path=public`, `execute` para `authenticated`), junto com a `20260922120000`, aplicada em
   22/09/2026 ("E se… adiantar": conta fixa listada até o teto da Projeção, 10 anos) e conferida
   na fonte (`schema_migrations` devolve `20260922120000`, `20260921120000`, `20260920130000`;
   `anticipation_candidates` em uma versão, fuso no cabeçalho, `execute` para `authenticated` e
-  sem para `anon`). App `v1.3.45`.
-
-  ⚠️ **Staging UMA à frente: `20260922130000`** (22/09/2026, `goal_deposit` recusa retirar mais
-  do que está guardado na meta — antes o saldo ia a 0 em silêncio e o próximo aporte sumia).
-  Sem ela em produção nada quebra: a tela já desliga o "Retirar", só a trava do banco falta.
+  sem para `anon`). App `v1.3.46`.
 
   ⚠️ **OTA/build do chat exige a revisão nova do agente em produção** (21/09/2026): o app novo
   manda `id` no `POST /internal/chat/conversations` para abrir a conversa na hora, e o agente
