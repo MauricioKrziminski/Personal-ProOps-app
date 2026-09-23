@@ -511,6 +511,39 @@ test('editing the paid count keeps the contract calendar: the next date follows 
   assert.equal(saved.due_day, 5);
 });
 
+test('long press on an active debt offers the full set, including delete for good', () => {
+  const ui = screen(debtsFile, { create: false, debts: [carro] });
+  ui.interact((nodes: any[]) => nodes.find((n) => n.type === 'Pressable' && n.props.onLongPress).props.onLongPress());
+  assert.deepEqual(ui.actions.map((a: any) => a.label), ['Ver as parcelas', 'Editar', 'Arquivar', 'Excluir por completo']);
+});
+
+test('archived debts have a place to come back from', () => {
+  const ui = screen(debtsFile, { create: false, debts: [carro], archivedDebts: [{ ...carro, id: 'd2', name: 'Moto', archived: true }] });
+  const linha = ui.nodes().find((n) => n.type === 'Row' && n.props.title === 'Arquivadas · 1');
+  assert.ok(linha, 'a seção das arquivadas existe');
+  ui.interact(() => linha.props.onPress());
+  ui.interact((nodes: any[]) => nodes.find((n) => n.type === 'Pressable' && String(n.props.accessibilityLabel).startsWith('Moto')).props.onPress());
+  assert.deepEqual(ui.actions.map((a: any) => a.label), ['Desarquivar', 'Excluir por completo']);
+  ui.interact(() => ui.actions[0].onPress());
+  assert.deepEqual(ui.writes.at(-1), { operation: 'unarchiveDebt', value: 'd2' });
+});
+
+test('without archived debts there is no empty "Arquivadas" row', () => {
+  const ui = screen(debtsFile, { create: false, debts: [carro] });
+  assert.equal(ui.nodes().some((n) => n.type === 'Row' && String(n.props.title).startsWith('Arquivadas')), false);
+});
+
+test('delete for good asks with the consequence first, then deletes', async () => {
+  const ui = screen(debtsFile, { create: false, debts: [carro] });
+  ui.interact((nodes: any[]) => nodes.find((n) => n.type === 'Pressable' && n.props.onLongPress).props.onLongPress());
+  ui.interact(() => ui.actions.find((a: any) => a.label === 'Excluir por completo').onPress());
+  await new Promise((r) => setTimeout(r, 0));
+  assert.equal(ui.writes.some((w: any) => w.operation === 'deleteDebt'), false, 'nada sai antes do SIM');
+  assert.equal(ui.confirmations.length, 1);
+  ui.interact(() => ui.confirmations[0]());
+  assert.deepEqual(ui.writes.at(-1), { operation: 'deleteDebt', value: 'd1' });
+});
+
 test('editing an OLD debt without its schedule loaded never invents an anchor', () => {
   const ui = screen(debtsFile, { create: false, debts: [{ ...carro, first_due_date: null }] });
   editar(ui);

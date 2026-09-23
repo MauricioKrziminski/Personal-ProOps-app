@@ -29,13 +29,17 @@ import { Motion, Radius, Space, tabular } from '@/design/tokens';
 import {
   DEBT_KINDS,
   useAccounts,
+  pagamentosDaDivida,
   useArchiveDebt,
+  useArchivedDebts,
   useDebtPayments,
+  useDeleteDebt,
   useDebtSchedule,
   useDebts,
   usePayDebtInstallment,
   usePayoffStrategy,
   useSaveDebt,
+  useUnarchiveDebt,
   type Debt,
 } from '@/hooks/use-finance';
 import { useTheme } from '@/hooks/use-theme';
@@ -166,6 +170,10 @@ export default function DebtsScreen() {
   const accounts = useAccounts();
   const save = useSaveDebt();
   const archive = useArchiveDebt();
+  const unarchive = useUnarchiveDebt();
+  const excluirDivida = useDeleteDebt();
+  const arquivadas = useArchivedDebts();
+  const [verArquivadas, setVerArquivadas] = useState(false);
   const pagar = usePayDebtInstallment();
 
   const [form, setForm] = useState<FormState | null>(() => params.create === 'financing' ? { ...FORM_VAZIO, kind: 'financing' } : null);
@@ -370,23 +378,78 @@ export default function DebtsScreen() {
     );
   };
 
+  /**
+   * Arquivar deixou de pedir confirmação (23/09/2026): agora tem volta — o "Desfazer" do toast e
+   * a seção "Arquivadas" no fim da lista. Confirmar o que se desfaz com um toque é atrito sem
+   * proteção nenhuma.
+   */
   const arquivar = (d: Debt) =>
-    confirmDestructive(
-      `Arquivar "${d.name}"?`,
-      'Arquivar',
-      () =>
-        archive.mutate(d.id, {
-          onSuccess: () => toast({ message: `${d.name} arquivada.`, tone: 'success' }),
-          onError: () => toast({ message: `Não deu para arquivar ${d.name}.`, tone: 'error' }),
+    archive.mutate(d.id, {
+      onSuccess: () =>
+        toast({
+          message: `${d.name} arquivada.`,
+          tone: 'success',
+          action: { label: 'Desfazer', onPress: () => unarchive.mutate(d.id) },
         }),
-      'A dívida sai da lista. Os pagamentos já lançados continuam nos seus lançamentos.'
-    );
+      onError: () => toast({ message: `Não deu para arquivar ${d.name}.`, tone: 'error' }),
+    });
 
-  const acoes = (d: Debt) =>
+  const desarquivar = (d: Debt) =>
+    unarchive.mutate(d.id, {
+      onSuccess: () => toast({ message: `${d.name} voltou para a lista.`, tone: 'success' }),
+      onError: () => toast({ message: `Não deu para desarquivar ${d.name}.`, tone: 'error' }),
+    });
+
+  /**
+   * "Excluir por completo" (23/09/2026): a dívida, os pagamentos já lançados e as parcelas
+   * futuras da projeção. A confirmação diz a consequência CONTADA — quantos pagamentos e quanto
+   * volta ao saldo —, porque é isso que muda o passado da pessoa.
+   */
+  const excluir = async (d: Debt) => {
+    let consequencia = 'Apaga o financiamento e as parcelas futuras da projeção. Não dá para desfazer.';
+    try {
+      const { count, totalCents } = await pagamentosDaDivida(d.id);
+      if (count > 0) {
+        consequencia = `Apaga o financiamento, ${count === 1 ? 'o pagamento já lançado' : `os ${count} pagamentos já lançados`} (${brl(totalCents)}, que ${count === 1 ? 'volta' : 'voltam'} ao saldo das contas) e as parcelas futuras da projeção. Não dá para desfazer.`;
+      }
+    } catch {
+      /* Sem a contagem, a frase genérica ainda diz o que some. */
+    }
+    confirmDestructive(
+      `Excluir "${d.name}" por completo?`,
+      'Excluir',
+      () =>
+        excluirDivida.mutate(d.id, {
+          onSuccess: () => {
+            if (detalheId === d.id) setDetalhe(null);
+            toast({ message: `${d.name} excluída.`, tone: 'success' });
+          },
+          onError: (error) =>
+            toast({ message: financeErrorMessage(error, `Não deu para excluir ${d.name}.`), tone: 'error' }),
+        }),
+      consequencia
+    );
+  };
+
+  /** Uma lista só de ações: o toque longo e o "…" do detalhe leem daqui. */
+  const acoesDaDivida = (d: Debt) =>
     showItemActions(d.name, [
       { label: 'Ver as parcelas', onPress: () => setDetalhe(d) },
-      { label: 'Editar', onPress: () => abrirEdicao(d) },
-      { label: 'Arquivar', destructive: true, onPress: () => arquivar(d) },
+      {
+        label: 'Editar',
+        onPress: () => {
+          setDetalhe(null);
+          abrirEdicao(d);
+        },
+      },
+      { label: 'Arquivar', onPress: () => arquivar(d) },
+      { label: 'Excluir por completo', destructive: true, onPress: () => void excluir(d) },
+    ]);
+
+  const acoesDaArquivada = (d: Debt) =>
+    showItemActions(d.name, [
+      { label: 'Desarquivar', onPress: () => desarquivar(d) },
+      { label: 'Excluir por completo', destructive: true, onPress: () => void excluir(d) },
     ]);
 
   const cartaoDivida = (d: Debt, index: number) => {
@@ -408,7 +471,7 @@ export default function DebtsScreen() {
           accessibilityRole="button"
           accessibilityLabel={`${d.name}, ${tipo}, deve ${formatBRL(restante)}, ${juros}${parcelas ? `, ${parcelas}` : ''}`}
           onPress={() => setDetalhe(d)}
-          onLongPress={() => acoes(d)}>
+          onLongPress={() => acoesDaDivida(d)}>
           <Card style={styles.divida}>
             <View style={styles.dividaTopo}>
               <ThemedText type="default" style={styles.dividaNome}>
@@ -516,6 +579,38 @@ export default function DebtsScreen() {
     </View>
   );
 
+  const listaArquivadas = arquivadas.isError ? [] : (arquivadas.data ?? []);
+  const secaoArquivadas =
+    listaArquivadas.length > 0 ? (
+      <Section>
+        <Row
+          icon="archivebox"
+          title={`Arquivadas · ${listaArquivadas.length}`}
+          chevron={false}
+          trailing={<Icon name={verArquivadas ? 'chevron.up' : 'chevron.down'} size="sm" color="textSecondary" />}
+          onPress={() => setVerArquivadas((v) => !v)}
+          accessibilityState={{ expanded: verArquivadas }}
+        />
+        {verArquivadas
+          ? listaArquivadas.map((d) => (
+              <Pressable
+                key={d.id}
+                accessibilityRole="button"
+                accessibilityLabel={`${d.name}, arquivada. Toque para desarquivar ou excluir.`}
+                onPress={() => acoesDaArquivada(d)}
+                onLongPress={() => acoesDaArquivada(d)}>
+                <View style={[styles.arquivada, { borderTopColor: theme.separator }]}>
+                  <ThemedText type="default" themeColor="textSecondary" style={styles.dividaNome}>
+                    {d.name}
+                  </ThemedText>
+                  <Money cents={Number(d.remaining_cents)} variant="subhead" tone="textSecondary" />
+                </View>
+              </Pressable>
+            ))
+          : null}
+      </Section>
+    ) : null;
+
   const debtListContent = (
     <View style={styles.paneBody}>
       {lista.map(cartaoDivida)}
@@ -527,6 +622,7 @@ export default function DebtsScreen() {
           action={{ label: 'Cadastrar dívida', onPress: abrirNova }}
         />
       ) : null}
+      {secaoArquivadas}
     </View>
   );
 
@@ -867,7 +963,7 @@ export default function DebtsScreen() {
                 </Field>
                 <Field
                   label="Parcelas já pagas"
-                  hint={pagamentosLancados > 0 ? `${pagamentosLancados} lançadas pelo app.` : undefined}>
+                  hint={pagamentosLancados > 0 ? `${pagamentosLancados} ${pagamentosLancados === 1 ? 'lançada' : 'lançadas'} pelo app.` : undefined}>
                   <QuantityField
                     value={form.installmentsPaid}
                     min={pagamentosLancados}
@@ -1119,6 +1215,16 @@ const styles = StyleSheet.create({
   },
   dividaNome: {
     flexShrink: 1,
+  },
+  arquivada: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: Space.sm,
+    paddingVertical: Space.md,
+    // a mesma calha do `Row` acima dela
+    paddingHorizontal: Space.lg,
+    borderTopWidth: StyleSheet.hairlineWidth,
   },
   proxima: {
     gap: Space.md,
