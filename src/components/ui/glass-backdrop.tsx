@@ -42,14 +42,25 @@ export function GlassBackdrop({
   // (por exemplo, um cartão colorido). Uma tinta escura translúcida mantém o texto legível.
   const resolvedTint = tintColor ?? (appearance === 'dark' && radius > 0 ? Colors.dark.overlay : undefined);
 
+  /*
+    ⚠️ Com `tintColor`, o conteúdo por cima foi escolhido para a TINTA (o `onTint` do dia escolhido,
+    do chip ativo, do botão de enviar). O vidro montado dentro de um ancestral ainda em `FadeIn` não
+    pinta — medido no iPhone escuro: o dia escolhido do "Meu mês" ficou preto sobre preto. A cor
+    sólida por baixo garante o estado mesmo quando o vidro falha; quando ele pinta, fica por cima.
+  */
   return supportsLiquidGlass() && ready ? (
-    <GlassView
-      pointerEvents="none"
-      glassEffectStyle={effectStyle}
-      colorScheme={appearance}
-      tintColor={resolvedTint}
-      style={surfaceStyle}
-    />
+    <>
+      {tintColor ? (
+        <View pointerEvents="none" style={[surfaceStyle, { backgroundColor: fallbackColor }]} />
+      ) : null}
+      <GlassView
+        pointerEvents="none"
+        glassEffectStyle={effectStyle}
+        colorScheme={appearance}
+        tintColor={resolvedTint}
+        style={surfaceStyle}
+      />
+    </>
   ) : (
     <View pointerEvents="none" style={[surfaceStyle, { backgroundColor: fallbackColor }]} />
   );

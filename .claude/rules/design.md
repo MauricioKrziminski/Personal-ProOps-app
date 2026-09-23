@@ -63,6 +63,13 @@ contexto. Em card comum sai por `marginHorizontal/-Bottom` negativos + `overflow
 > Cartões de conteúdo continuam opacos. Controles interativos do iOS podem usar Liquid Glass
 > nativo; a `NativeTabs` permanece a barra do sistema.
 
+⚠️ **Estado que depende da TINTA do vidro nunca depende de o vidro pintar** (23/09/2026). Um
+`GlassView` montado enquanto um ancestral ainda está em `FadeIn` não pinta — no iPhone escuro o
+dia escolhido do "Meu mês" ficou com o número `onTint` (escuro) sobre vidro escuro, invisível.
+Por isso `GlassBackdrop` com `tintColor` pinta a cor sólida (`fallbackColor`) POR BAIXO do vidro:
+dia escolhido, chip ativo, mês ativo, FAB, enviar. Vidro sem tinta (controle comum) segue só vidro.
+Conferir estado selecionado no iPhone ESCURO abrindo o controle do zero, não só trocando a opção.
+
 **Cartão de crédito é um CARTÃO, não um card** (`src/components/finance/card-face.tsx`). A face
 é o cartão metálico dos vídeos: a cor do EMISSOR pura, um degradê diagonal curto e uma faixa de
 brilho, canto `Radius.md`, contactless, nome e o estado "Atrasada". A tinta do texto é escolhida
