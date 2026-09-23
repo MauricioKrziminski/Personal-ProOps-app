@@ -179,6 +179,10 @@ const TRUNCAGEM_PERMITIDA = new Set([
   // até caber e não mostra reticências. A célula tem largura dividida, e partir a palavra ou
   // quebrar a linha de uma célula só desalinharia a trilha.
   'src/components/ui/segmented.tsx',
+  // Dinheiro: `numberOfLines={1}` vem com `adjustsFontSizeToFit`, então o valor ENCOLHE até
+  // caber e nunca mostra reticências. Sem o limite ele partia no meio dos dígitos numa coluna
+  // estreita ("R$ 1.423,0" / "0"), que é pior que qualquer tamanho de fonte.
+  'src/components/ui/money.tsx',
 ]);
 
 test('nenhum rótulo truncado — texto quebra, layout cede', () => {

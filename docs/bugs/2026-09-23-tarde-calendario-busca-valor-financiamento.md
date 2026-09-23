@@ -57,6 +57,11 @@ COLUNA (`fatura`, `flex: 1, minWidth: 0`), e o texto é medido na largura do pai
 linhas, ele quebra no meio dos dígitos. Qualquer `Money` dentro de uma coluna estreita (tile,
 card, célula) tem o mesmo modo de falha.
 
+**Correção.** No primitivo, e só nele: `numberOfLines={1}` + `adjustsFontSizeToFit`
+(`minimumFontScale 0.5`), o mesmo par que o `Segmented` já usa. Dinheiro fica numa linha e, se não
+couber, ENCOLHE; nunca parte e nunca mostra reticência. `money.tsx` entrou na allowlist de
+`numberOfLines` do `anti-slop.test.ts` com esse motivo. Os ~96 `<Money>` do app herdam.
+
 ## 4. No iPhone o campo Valor não aceita toque, em nenhuma tela
 
 **Sintoma.** Tocar no Valor não abre o teclado nem deixa editar, em todos os formulários.
@@ -108,6 +113,6 @@ component that hasn't mounted yet" no login do Android.
 | # | teste automatizado | no aparelho |
 |---|---|---|
 | 4 | — (é o `hitTest` nativo; não há o que simular em `node --test`) | iOS: toque no Valor → teclado numérico, borda de foco, "45,99" digitado; também dentro do Sheet de Dívidas ("1.500,00"), e com partida a frio tocando pelo rótulo. Android: "1.234,56" sem o fantasma do input à direita (ele existia antes, com 0,01, e sumiu com o texto na cor da caixa). |
-| 3 | | |
+| 3 | `anti-slop.test.ts` (allowlist com o motivo) | Android 375dp × 1,3: face do cartão "R$ 1.423,00" numa linha (`3-depois-…png`), Hoje, Financeiro (tiles Entra/Sai), Cartões e Lançamentos sem quebra no meio de valor. iOS: Financeiro e face inalterados no tamanho padrão. |
 | 2 | | |
 | 1 | | |

@@ -65,10 +65,16 @@ export function Money({
       // baixo da máscara derrotaria o propósito.
       selectable={!oculto}
       accessibilityLabel={oculto ? 'Valor oculto' : undefined}
-      // `Type[variant]` já carrega a família certa (Jost no display, Martian Mono no `ticker`).
-      // `flexShrink: 0` desfaz o padrão do `ThemedText`: numa linha "rótulo … R$ 1.350,00" os
-      // dois encolheriam proporcionalmente e o VALOR quebraria no meio dos dígitos. Número não
-      // cede — quem cede é o rótulo ao lado.
+      // `flexShrink: 0` desfaz o padrão do `ThemedText`: numa LINHA "rótulo … R$ 1.350,00" quem
+      // cede é o rótulo ao lado, não o número.
+      //
+      // ⚠️ Isso NÃO basta numa COLUNA estreita (23/09/2026): ali o texto é medido na largura do
+      // pai e, sem limite de linhas, partia no meio dos dígitos — "R$ 1.423,0" / "0" na face do
+      // cartão a 375dp × fonte 1,3. Dinheiro fica em UMA linha e, se não couber, encolhe até
+      // caber; reticência nunca aparece, porque `adjustsFontSizeToFit` reduz antes de cortar.
+      numberOfLines={1}
+      adjustsFontSizeToFit
+      minimumFontScale={0.5}
       style={[Type[variant], tabular, { flexShrink: 0 }]}>
       {oculto ? concealText() : `${prefix}${texto}`}
     </ThemedText>
