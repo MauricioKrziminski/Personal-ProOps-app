@@ -247,8 +247,9 @@ const deviceTimezone = () => {
 export default function ReminderFormScreen() {
   const { windowClass } = useAdaptiveWindow();
   const tablet = windowClass !== 'compact';
-  // `title` chega do menu "Criar lembrete" do detalhe de nota — pré-preenche e nada mais.
-  const params = useLocalSearchParams<{ id?: string; title?: string }>();
+  // `title` e `noteId` chegam do menu "Criar lembrete" da nota: o título pré-preenche, e o
+  // `noteId` vincula — é ele que faz a nota passar a oferecer "Editar lembrete".
+  const params = useLocalSearchParams<{ id?: string; title?: string; noteId?: string }>();
   const query = useReminder(params.id);
 
   if (params.id && query.isLoading) {
@@ -295,16 +296,25 @@ export default function ReminderFormScreen() {
     );
   }
 
-  return <ReminderForm editing={query.data} fallbackTitle={params.title} tablet={tablet} />;
+  return (
+    <ReminderForm
+      editing={query.data}
+      fallbackTitle={params.title}
+      noteId={params.noteId}
+      tablet={tablet}
+    />
+  );
 }
 
 function ReminderForm({
   editing,
   fallbackTitle,
+  noteId,
   tablet,
 }: {
   editing?: Reminder;
   fallbackTitle?: string;
+  noteId?: string;
   tablet: boolean;
 }) {
   const insets = useSafeAreaInsets();
@@ -384,6 +394,8 @@ function ReminderForm({
         next_run_at: at.toISOString(),
         channel: values.channel,
         timezone: deviceTimezone(),
+        // só na criação: editar nunca mexe no vínculo
+        ...(editing ? {} : { note_id: noteId ?? null }),
       },
       {
         onSuccess: () => {
@@ -391,7 +403,15 @@ function ReminderForm({
           router.back();
         },
         // Erro NUNCA fecha o modal nem limpa os campos.
-        onError: () => toast({ message: 'Não deu para salvar. Tenta de novo.', tone: 'error' }),
+        onError: (error) =>
+          toast({
+            // 23505 = `reminders_note_id_key`: dois toques (ou dois aparelhos) no "Criar lembrete"
+            message:
+              error && typeof error === 'object' && 'code' in error && error.code === '23505'
+                ? 'Essa nota já tem um lembrete. Abra ele pelo menu da nota.'
+                : 'Não deu para salvar. Tenta de novo.',
+            tone: 'error',
+          }),
       },
     );
   });

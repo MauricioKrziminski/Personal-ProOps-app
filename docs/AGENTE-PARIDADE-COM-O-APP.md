@@ -124,6 +124,13 @@ interface do próprio agente — ele operar isso é ele operar a si mesmo.
 nem faz sentido fora do aparelho (grava o token daquele device). Convite de membro dá acesso ao
 dinheiro de outra pessoa e a porta certa para isso é a tela, não uma frase interpretada.
 
+**Lembrete VINCULADO a uma nota** (`useSaveReminder` com `note_id`, 23/09/2026). "Criar lembrete"
+no menu da nota grava `reminders.note_id` (um por nota), e a nota passa a oferecer "Editar
+lembrete". O agente cria lembrete (`create_reminder`) mas sem vínculo: "me lembra da nota do
+mercado amanhã" gera um lembrete solto, com o título que a pessoa disse. Lacuna declarada — o
+vínculo pede resolver QUAL nota (alvo em `notes`) dentro de uma ação de lembrete, e `NotesAction`
+não tem campo para isso; o custo é a nota não mostrar o lembrete criado pelo WhatsApp.
+
 **`useCancelSubscription` — decisão do dono do produto, não omissão.** A regra do domínio diz que
 cancelamento é uma chamada sem formulário, porque dificultar cancelamento é a queixa nº 1 contra
 os concorrentes. Pelo mesmo argumento, "cancela minha assinatura" pelo WhatsApp seria o caminho

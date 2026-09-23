@@ -1728,6 +1728,7 @@ export type Database = {
           id: string
           last_error: string | null
           next_run_at: string
+          note_id: string | null
           recurrence: string | null
           send_attempts: number
           source: string
@@ -1744,6 +1745,7 @@ export type Database = {
           id?: string
           last_error?: string | null
           next_run_at: string
+          note_id?: string | null
           recurrence?: string | null
           send_attempts?: number
           source?: string
@@ -1760,6 +1762,7 @@ export type Database = {
           id?: string
           last_error?: string | null
           next_run_at?: string
+          note_id?: string | null
           recurrence?: string | null
           send_attempts?: number
           source?: string
@@ -1770,6 +1773,13 @@ export type Database = {
           workspace_id?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "reminders_note_fk"
+            columns: ["note_id", "workspace_id"]
+            isOneToOne: false
+            referencedRelation: "notes"
+            referencedColumns: ["id", "workspace_id"]
+          },
           {
             foreignKeyName: "reminders_user_id_fkey"
             columns: ["user_id"]

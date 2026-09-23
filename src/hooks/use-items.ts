@@ -110,13 +110,18 @@ export interface ReminderInput {
   next_run_at: string; // ISO absoluto
   channel: Reminder['channel'];
   timezone: string;
+  /**
+   * A nota de onde o lembrete nasceu ("Criar lembrete" no menu da nota). Só na CRIAÇÃO: editar
+   * não mexe no vínculo — mandar `null` ali soltaria o lembrete da nota em silêncio.
+   */
+  note_id?: string | null;
 }
 
 /** Cria ou edita (com `id` vira update), no mesmo formato de useSaveTransaction. */
 export function useSaveReminder() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: async ({ id, ...input }: ReminderInput) => {
+    mutationFn: async ({ id, note_id, ...input }: ReminderInput) => {
       if (id) {
         // reagendar reativa e zera o contador: a série volta a valer do zero
         const { error } = await supabase
@@ -125,9 +130,21 @@ export function useSaveReminder() {
           .eq('id', id);
         if (error) throw error;
       } else {
-        const { error } = await supabase
-          .from('reminders')
-          .insert({ ...input, user_id: await userId(), source: 'app' });
+        /**
+         * ⚠️ **O lembrete da nota mora no espaço DA NOTA** (a FK é `(note_id, workspace_id)`).
+         * O `default` de `workspace_id` é o espaço de quem cria — num espaço compartilhado, o
+         * membro convidado gravaria o lembrete no espaço dele, e a FK recusaria.
+         */
+        const daNota = note_id
+          ? await supabase.from('notes').select('workspace_id').eq('id', note_id).single()
+          : null;
+        if (daNota?.error) throw daNota.error;
+        const { error } = await supabase.from('reminders').insert({
+          ...input,
+          user_id: await userId(),
+          source: 'app',
+          ...(note_id && daNota?.data ? { note_id, workspace_id: daNota.data.workspace_id } : {}),
+        });
         if (error) throw error;
       }
     },
@@ -185,6 +202,27 @@ export function useTodayReminders() {
 }
 
 /** Um lembrete por id — mesmo motivo do `useTransaction`: cache de lista não é fonte de verdade. */
+/**
+ * O lembrete de uma nota — UM por nota (`reminders_note_id_key`). Com ele, a nota oferece "Editar
+ * lembrete" em vez de "Criar lembrete" e mostra quando ele toca.
+ */
+export function useNoteReminder(noteId: string | null | undefined) {
+  useRealtimeInvalidate('reminders', ['reminders']);
+  return useQuery({
+    queryKey: ['reminders', 'da-nota', noteId],
+    enabled: !!noteId && noteId !== 'new',
+    queryFn: async (): Promise<Reminder | null> => {
+      const { data, error } = await supabase
+        .from('reminders')
+        .select('id, title, recurrence, next_run_at, channel, active')
+        .eq('note_id', noteId!)
+        .maybeSingle();
+      if (error) throw error;
+      return data as Reminder | null;
+    },
+  });
+}
+
 export function useReminder(id: string | undefined) {
   return useQuery({
     queryKey: ['reminders', 'item', id],

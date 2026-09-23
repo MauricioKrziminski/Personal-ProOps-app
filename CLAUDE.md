@@ -72,6 +72,13 @@ App mobile pessoal de **notas rápidas, lembretes e controle financeiro operado 
   agente.** O agente novo exige a conta no import (o app antigo a deixava opcional → 422 claro).
   Seguida nessa ordem no mesmo dia: build de produção no iPhone e agente `agente-00080-4cl`.
 
+  ⚠️ **PENDENTE em produção: `20260923120000`** (lembrete vinculado à nota — `reminders.note_id`,
+  FK composta `(note_id, workspace_id)` e um lembrete por nota). Aplicada e conferida no STAGING
+  em 23/09/2026. **Ordem: migration → app.** O app novo lê `reminders.note_id` na tela da nota e o
+  grava ao criar o lembrete por ela; sem a coluna em produção, a nota perde o chip do lembrete e
+  "Criar lembrete" pela nota falha com "Não deu para salvar" (a coluna não existe). O resto do app
+  e o agente não dependem dela.
+
   ⚠️ **OTA/build do chat exige a revisão nova do agente em produção** (21/09/2026): o app novo
   manda `id` no `POST /internal/chat/conversations` para abrir a conversa na hora, e o agente
   antigo (`extra='forbid'`) recusa com 422 — TODA primeira mensagem falha. Sem migration: é só
