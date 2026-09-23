@@ -3,7 +3,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 
-import { addMonthsISO, paidInstallments } from './debt-history.ts';
+import { addMonthsISO, linhaDoTempo, paidInstallments } from './debt-history.ts';
 
 test('a cadência anda para trás sem estourar o fim do mês', () => {
   assert.equal(addMonthsISO('2026-10-08', -1), '2026-09-08');
@@ -68,7 +68,6 @@ test('quitada não tem próxima parcela e ainda assim mostra o histórico', () =
   );
 });
 
-import { linhaDoTempo } from './debt-history.ts';
 
 test('linha do tempo agrupa por ano e marca paga, estimada, próxima e futura', () => {
   const anos = linhaDoTempo(

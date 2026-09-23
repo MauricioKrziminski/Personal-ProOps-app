@@ -11,7 +11,7 @@ const require = createRequire(import.meta.url);
 
 // Execute the screen JSX and its event handlers. Native components/query boundaries
 // are inert; state persists across renders so each interaction uses current props.
-function screen(file: string, options: { tablet?: boolean; debts?: any[]; invoiceStatus?: string; create?: boolean; monthLines?: any[]; monthSummary?: any; cycleLines?: any[]; cycleRow?: any; rangeError?: boolean; rangePending?: boolean; rangePendingMonths?: string[]; bills?: any[]; billsError?: boolean; charges?: any[]; reminders?: any[]; budgets?: any[]; setupPassos?: any[]; activity?: any[]; activityError?: boolean; forecastAccounts?: any[]; anticipation?: any[] | ((pagarEm: string) => any[]) } = {}) {
+function screen(file: string, options: { tablet?: boolean; debts?: any[]; archivedDebts?: any[]; debtSchedule?: any[]; invoiceStatus?: string; create?: boolean; monthLines?: any[]; monthSummary?: any; cycleLines?: any[]; cycleRow?: any; rangeError?: boolean; rangePending?: boolean; rangePendingMonths?: string[]; bills?: any[]; billsError?: boolean; charges?: any[]; reminders?: any[]; budgets?: any[]; setupPassos?: any[]; activity?: any[]; activityError?: boolean; forecastAccounts?: any[]; anticipation?: any[] | ((pagarEm: string) => any[]) } = {}) {
   const state: any[] = [];
   let cursor = 0;
   let nodes: any[] = [];
@@ -84,6 +84,12 @@ function screen(file: string, options: { tablet?: boolean; debts?: any[]; invoic
     useCycleMonth: () => '2026-09',
     useMonthBreakdown: () => ({ ...query, data: [] }),
     useSaveDebt: () => mutation('saveDebt'),
+    useArchiveDebt: () => mutation('archiveDebt'),
+    useUnarchiveDebt: () => mutation('unarchiveDebt'),
+    useDeleteDebt: () => mutation('deleteDebt'),
+    useArchivedDebts: () => ({ ...query, data: options.archivedDebts ?? [] }),
+    useDebtSchedule: () => ({ ...query, data: options.debtSchedule ?? [] }),
+    pagamentosDaDivida: async () => ({ count: 0, totalCents: 0 }),
     useSaveAsset: () => mutation('saveAsset'),
     useArchiveAsset: () => mutation('archiveAsset'),
     useSettleInvoice: () => mutation('settleInvoice'),
@@ -168,12 +174,13 @@ function screen(file: string, options: { tablet?: boolean; debts?: any[]; invoic
       };
       // Orçamentos consulta direto (a lista de linhas): o mesmo resultado inerte dos hooks.
       if (name === '@tanstack/react-query') return { useQuery: () => query };
-      if (name === '@/lib/finance-form' || name === '@/lib/dates' || name === '@/lib/forecast-months' || name === '@/lib/month-view' || name === '@/lib/settle-labels' || name === '@/lib/accounts' || name === '@/lib/cycle-label' || name === '@/lib/card-status' || name === '@/lib/today-sections' || name === '@/lib/runway' || name === '@/lib/budget-tight' || name === '@/lib/setup-steps' || name === '@/lib/activity-feed' || name === '@/lib/account-cash' || name === '@/lib/today-spend' || name === '@/lib/anticipation' || name === '@/lib/widget-snapshot') return load(`src/lib/${name.split('/').at(-1)}.ts`);
+      if (name === '@/lib/finance-form' || name === '@/lib/dates' || name === '@/lib/forecast-months' || name === '@/lib/month-view' || name === '@/lib/settle-labels' || name === '@/lib/accounts' || name === '@/lib/cycle-label' || name === '@/lib/card-status' || name === '@/lib/today-sections' || name === '@/lib/runway' || name === '@/lib/budget-tight' || name === '@/lib/setup-steps' || name === '@/lib/activity-feed' || name === '@/lib/account-cash' || name === '@/lib/today-spend' || name === '@/lib/anticipation' || name === '@/lib/widget-snapshot' || name === '@/lib/debt-history') return load(`src/lib/${name.split('/').at(-1)}.ts`);
       if (name === '@/hooks/use-debounced') return { useDebounced: (value: unknown) => value };
       if (name === '@/design/category-icons') return { categoryIcon: () => 'circle' };
       if (name === '@/design/adaptive-window') return load('src/design/adaptive-window.ts');
       // import relativo DENTRO de um módulo puro já carregado (month-view → ./dates.ts)
       if (name === './dates.ts' || name === './dates') return load('src/lib/dates.ts');
+      if (name === './debt-history.ts' || name === './debt-history') return load('src/lib/debt-history.ts');
       // o `month-picker` é `.tsx` e importa React Native; aqui só as funções puras dele
       if (name === '@/components/finance/month-picker') return {
         MonthPicker: 'MonthPicker',
@@ -251,7 +258,7 @@ function screen(file: string, options: { tablet?: boolean; debts?: any[]; invoic
     nodes: () => nodes,
     button(label: string) { const node = nodes.find((n) => n.type === 'Button' && n.props.label === label); assert.ok(node, `visible button: ${label}`); return node; },
     press(label: string) { const node = this.button(label); assert.ok(!node.props.disabled, `${label} must be enabled`); node.props.onPress(); render(); },
-    fill(label: string, value: string | number) { const field = nodes.find((n) => n.type === 'Field' && n.props.label === label); assert.ok(field, `visible field: ${label}`); const children: any[] = []; const collect = (n: any) => { if (Array.isArray(n)) return n.forEach(collect); if (n?.props) { children.push(n); collect(n.props.children); } }; collect(field); const input = children.find((n) => n.type === 'TextField' || n.type === 'MoneyField'); assert.ok(input); (input.props.onChangeText ?? input.props.onChangeCents)(value); render(); },
+    fill(label: string, value: string | number) { const field = nodes.find((n) => n.type === 'Field' && n.props.label === label); assert.ok(field, `visible field: ${label}`); const children: any[] = []; const collect = (n: any) => { if (Array.isArray(n)) return n.forEach(collect); if (n?.props) { children.push(n); collect(n.props.children); } }; collect(field); const input = children.find((n) => ['TextField', 'MoneyField', 'QuantityField', 'DatePickerField'].includes(n.type)); assert.ok(input); if (input.type === 'QuantityField') input.props.onChange(Number(value)); else (input.props.onChangeText ?? input.props.onChangeCents ?? input.props.onChange)(value); render(); },
     interact(callback: (nodes: any[]) => void) { callback(nodes); render(); },
   };
 }
@@ -417,16 +424,15 @@ test('E se: Ver resultado depois de Somar não duplica a hipótese já adicionad
   assert.equal(ui.nodes().some((n: any) => n.type === 'Sheet' && n.props.visible), false);
 });
 
-test('new financing saves from only the installment value and total count, without account/name/interest', () => {
+test('new financing saves from the installment value, the count and the first due date', () => {
   const ui = screen(debtsFile);
-  assert.deepEqual(ui.nodes().filter((n) => n.type === 'Field').map((n) => n.props.label), ['Valor da parcela', 'Total de parcelas', 'Vence dia']);
+  assert.deepEqual(ui.nodes().filter((n) => n.type === 'Field').map((n) => n.props.label), ['Valor', 'Total de parcelas', 'Parcelas já pagas', 'Primeira parcela']);
   assert.equal(ui.button('Salvar').props.disabled, true);
-  ui.fill('Valor da parcela', 147000);
-  assert.equal(ui.button('Salvar').props.disabled, true);
+  ui.fill('Valor', 147000);
   ui.fill('Total de parcelas', '48');
-  // O cronograma ancora no vencimento: sem ele a projeção chuta o dia da saída.
+  // A data ancora o cronograma: sem ela a projeção chuta quando o dinheiro sai.
   assert.equal(ui.button('Salvar').props.disabled, true);
-  ui.fill('Vence dia', '10');
+  ui.fill('Primeira parcela', '05/12/2026');
   ui.press('Salvar');
   const saved = ui.writes[0].value;
   assert.equal(ui.writes.length, 1);
@@ -435,37 +441,84 @@ test('new financing saves from only the installment value and total count, witho
   assert.equal(saved.calculation_mode, 'fixed_installments');
   assert.equal(saved.installments, 48);
   assert.equal(saved.installments_paid, 0);
+  assert.equal(saved.installment_cents, 147000);
   assert.equal(saved.principal_cents, 7056000);
   assert.equal(saved.remaining_cents, 7056000);
   assert.equal(saved.interest_rate_monthly, 0);
-  assert.equal(saved.due_day, 10);
+  assert.equal(saved.due_day, 5);
+  assert.equal(saved.first_due_date, '2026-12-05');
   assert.equal(saved.account_id, null);
 });
 
-test('optional history reduces remaining installments without changing the original contract total', () => {
+test('"Total a pagar" divides by the count and saves the contract that the check accepts', () => {
   const ui = screen(debtsFile);
-  ui.fill('Valor da parcela', 147000);
+  ui.interact((nodes) => nodes.find((n) => n.type === 'Segmented' && n.props.options.some((o: any) => o.value === 'total')).props.onChange('total'));
+  ui.fill('Valor', 7000000);
   ui.fill('Total de parcelas', '48');
-  ui.fill('Vence dia', '10');
-  ui.press('Adicionar detalhes (opcional)');
-  ui.fill('Parcelas já pagas', '8');
+  ui.fill('Primeira parcela', '05/12/2026');
   ui.press('Salvar');
+  assert.equal(ui.writes[0].value.installment_cents, 145833);
+  assert.equal(ui.writes[0].value.principal_cents, 145833 * 48, 'grava parcela × N, nunca o digitado');
+});
+
+test('paid history moves the anchor: the date asked is the NEXT one, and the first is derived', () => {
+  const ui = screen(debtsFile);
+  ui.fill('Valor', 147000);
+  ui.fill('Total de parcelas', '48');
+  ui.fill('Parcelas já pagas', '8');
+  ui.fill('Próxima parcela (a 9ª)', '05/10/2026');
+  ui.press('Salvar');
+  assert.equal(ui.writes[0].value.installments_paid, 8);
   assert.equal(ui.writes[0].value.remaining_cents, 5880000);
   assert.equal(ui.writes[0].value.principal_cents, 7056000);
-  assert.equal(ui.writes[0].value.installments, 48);
-  assert.equal(ui.writes[0].value.installments_paid, 8);
+  assert.equal(ui.writes[0].value.first_due_date, '2026-02-05');
 });
 
 test('history above the contract total settles on the total instead of blocking (22/09/2026)', () => {
   const ui = screen(debtsFile);
-  ui.fill('Valor da parcela', 147000);
+  ui.fill('Valor', 147000);
   ui.fill('Total de parcelas', '48');
-  ui.fill('Vence dia', '10');
-  ui.press('Adicionar detalhes (opcional)');
   ui.fill('Parcelas já pagas', '49');
+  ui.fill('Próxima parcela (a 49ª)', '05/10/2026');
   ui.press('Salvar');
   assert.equal(ui.writes[0].value.installments_paid, 48, 'nunca mais pagas que o contrato');
   assert.equal(ui.writes[0].value.installments, 48);
+});
+
+const carro = {
+  id: 'd1', name: 'Carro', kind: 'financing', calculation_mode: 'fixed_installments',
+  principal_cents: 7056000, remaining_cents: 5880000, interest_rate_monthly: 0, installments: 48,
+  installments_paid: 8, installment_cents: 147000, account_id: null, due_day: 5, archived: false,
+  first_due_date: '2026-02-05',
+};
+const editar = (ui: any) => {
+  ui.interact((nodes: any[]) => nodes.find((n) => n.type === 'Pressable' && n.props.onLongPress).props.onLongPress());
+  ui.interact(() => ui.actions.find((a: any) => a.label === 'Editar').onPress());
+};
+
+test('editing the paid count keeps the contract calendar: the next date follows the anchor', () => {
+  const ui = screen(debtsFile, { create: false, debts: [carro] });
+  editar(ui);
+  ui.fill('Parcelas já pagas', '10');
+  const data = ui.nodes().find((n) => n.type === 'Field' && n.props.label === 'Próxima parcela (a 11ª)');
+  assert.ok(data, 'o rótulo segue as pagas');
+  ui.press('Salvar');
+  const saved = ui.writes[0].value;
+  assert.equal(saved.id, 'd1');
+  assert.equal(saved.installments_paid, 10);
+  assert.equal(saved.remaining_cents, 147000 * 38);
+  assert.equal(saved.first_due_date, '2026-02-05');
+  assert.equal(saved.due_day, 5);
+});
+
+test('editing an OLD debt without its schedule loaded never invents an anchor', () => {
+  const ui = screen(debtsFile, { create: false, debts: [{ ...carro, first_due_date: null }] });
+  editar(ui);
+  ui.fill('Nome', 'Carro novo');
+  ui.press('Salvar');
+  assert.equal(ui.writes[0].value.name, 'Carro novo');
+  assert.equal('first_due_date' in ui.writes[0].value, false);
+  assert.equal(ui.writes[0].value.due_day, 5);
 });
 
 test('detailed mode still exposes the financial inputs', () => {

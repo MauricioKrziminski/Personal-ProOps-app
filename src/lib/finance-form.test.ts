@@ -3,6 +3,7 @@ import test from 'node:test';
 import {
   debtTerm, validRecurringRange, simpleDebtValues, destinoDoSalvar, podeParcelar, temContrato, faixaDeParcelas,
   totalDigitado, totalPorParcela, parcelaDoTotal, valorExibido, digitarValor, nomeDaCompra, type Contrato,
+  ancoraDoContrato, parcelaDoTotalDoContrato, proximaDoContrato,
 } from './finance-form.ts';
 test('remaining installments are added to already paid, never subtracted twice', () => {
   assert.equal(debtTerm('8', 4), 12);
@@ -194,7 +195,6 @@ test('mudar o valor de uma parcela edita a COMPRA; o resto continua no update da
 });
 
 // ── financiamento maleável (23/09/2026) ────────────────────────────────────
-import { ancoraDoContrato, parcelaDoTotalDoContrato, proximaDoContrato } from './finance-form.ts';
 
 test('total a pagar vira parcela arredondada; o total gravado é parcela × N', () => {
   assert.equal(parcelaDoTotalDoContrato(7056000, 48), 147000);

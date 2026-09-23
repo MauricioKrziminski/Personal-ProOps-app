@@ -14,6 +14,8 @@ import { Card } from '@/components/ui/card';
 import { EmptyState } from '@/components/ui/empty-state';
 import { AdaptivePanes } from '@/components/ui/adaptive-panes';
 import { Field, MoneyField, TextField } from '@/components/ui/field';
+import { QuantityField } from '@/components/ui/quantity-field';
+import { DatePickerField } from '@/components/finance/date-picker-field';
 import { Icon } from '@/components/ui/icon';
 import { Money } from '@/components/ui/money';
 import { Row, Section } from '@/components/ui/row';
@@ -38,9 +40,17 @@ import {
 } from '@/hooks/use-finance';
 import { useTheme } from '@/hooks/use-theme';
 import { useVoltarQuandoFechar } from '@/hooks/use-voltar-quando-fechar';
-import { formatBRL, formatNumberBR, isoToBR } from '@/lib/dates';
+import { brToISO, formatBRL, formatNumberBR, isoToBR } from '@/lib/dates';
 import { paidInstallments } from '@/lib/debt-history';
-import { debtTerm, financeErrorMessage, simpleDebtValues } from '@/lib/finance-form';
+import {
+  ancoraDoContrato,
+  debtTerm,
+  financeErrorMessage,
+  parcelaDoTotalDoContrato,
+  proximaDoContrato,
+  simpleDebtValues,
+  type UnidadeDoValor,
+} from '@/lib/finance-form';
 import { confirmDestructive, showItemActions } from '@/lib/item-actions';
 import { AccountPicker } from '@/components/finance/account-picker';
 import { useAdaptiveWindow } from '@/hooks/use-adaptive-window';
@@ -87,7 +97,27 @@ interface FormState {
   historyConfirmed: boolean;
   installmentCents: number;
   accountId: string | null;
+  /** Parcela fixa: o valor DIGITADO, na unidade escolhida (cada parcela ou total a pagar). */
+  unidade: UnidadeDoValor;
+  valorCents: number;
+  /**
+   * A data da parcela nº 1 do contrato (`debts.first_due_date`). O campo mostra a PRÓXIMA
+   * (`pagas + 1`), e escolher uma data refaz a âncora a partir dela — então mudar as pagas
+   * anda pelo calendário do contrato, em vez de arrastar a data junto.
+   */
+  ancora: string | null;
+  /** As pagas de quando o formulário abriu: é com elas que o cronograma do banco foi feito. */
+  pagasOriginal: number;
 }
+
+/**
+ * "Cada parcela | Total a pagar" (23/09/2026, decisão do dono do produto: o total é a SOMA DAS
+ * PARCELAS, com os juros dentro — o "48× de R$ 1.470" do carnê).
+ */
+const UNIDADES_DA_DIVIDA = [
+  { value: 'parcela', label: 'Cada parcela' },
+  { value: 'total', label: 'Total a pagar' },
+] as const satisfies readonly { value: UnidadeDoValor; label: string }[];
 
 const FORM_VAZIO: FormState = {
   calculationMode: 'fixed_installments',
@@ -103,6 +133,10 @@ const FORM_VAZIO: FormState = {
   historyConfirmed: true,
   installmentCents: 0,
   accountId: null,
+  unidade: 'parcela',
+  valorCents: 0,
+  ancora: null,
+  pagasOriginal: 0,
 };
 
 /** Faixa de erro por seção. Seção que falha DIZ que falhou — nunca some. */
@@ -152,8 +186,10 @@ export default function DebtsScreen() {
   const [contaId, setContaId] = useState<string | null>(null);
 
   // Lazy: só a dívida aberta (detalhe ou pagamento) puxa a tabela Price.
-  const schedule = useDebtSchedule(detalhe?.id ?? pagando?.id);
-  const payments = useDebtPayments(detalhe?.id ?? pagando?.id);
+  // O formulário de edição também lê os dois: o cronograma dá a próxima parcela de quem não tem
+  // âncora, e os pagamentos lançados são o piso das "pagas".
+  const schedule = useDebtSchedule(detalhe?.id ?? pagando?.id ?? form?.id);
+  const payments = useDebtPayments(detalhe?.id ?? pagando?.id ?? form?.id);
 
   // `isError` e não só `data`: o TanStack GUARDA o resultado anterior quando o refetch
   // falha, e sem este corte a lista seguia afirmando números embaixo da faixa que acabou
@@ -187,7 +223,12 @@ export default function DebtsScreen() {
   const abrirEdicao = (d: Debt) =>
     setForm({
       calculationMode: d.calculation_mode,
-      showDetails: d.calculation_mode !== 'fixed_installments',
+      // No editar, nome e conta já aparecem: quem abriu o editar veio mudar alguma coisa.
+      showDetails: true,
+      unidade: 'parcela',
+      valorCents: Number(d.installment_cents ?? 0),
+      ancora: d.first_due_date ?? null,
+      pagasOriginal: d.installments_paid,
       id: d.id,
       name: d.name,
       kind: d.kind,
@@ -213,19 +254,62 @@ export default function DebtsScreen() {
   };
 
   const fracao = form ? parseTaxa(form.taxa) : 0;
+  const totalDeParcelas = form && /^\d+$/.test(form.parcelas) ? Number(form.parcelas) : 0;
+  /** A parcela do contrato fixo, venha o valor digitado como parcela ou como total a pagar. */
+  const parcelaCents = form
+    ? form.unidade === 'total'
+      ? parcelaDoTotalDoContrato(form.valorCents, totalDeParcelas)
+      : form.valorCents
+    : 0;
   let simpleValues: ReturnType<typeof simpleDebtValues> | null = null;
   if (form?.calculationMode === 'fixed_installments') {
-    try { simpleValues = simpleDebtValues(form.installmentCents, form.parcelas, form.installmentsPaid); } catch { /* Invalid input keeps Save disabled. */ }
+    try { simpleValues = simpleDebtValues(parcelaCents, form.parcelas, form.installmentsPaid); } catch { /* Invalid input keeps Save disabled. */ }
   }
+  /** Pagamento lançado pelo app é fato: dizer menos pagas do que isso é contradição. */
+  const pagamentosLancados = form?.id ? (payments.data ?? []).length : 0;
+  /**
+   * A âncora que vale: a do formulário, ou — dívida antiga, sem `first_due_date` — a que o
+   * cronograma do banco implica (a próxima dele, andando para trás as pagas de ABERTURA). Sem
+   * cronograma carregado não se inventa nada: o salvar não mexe na data.
+   */
+  const ancoraEfetiva =
+    form?.ancora ??
+    (form?.id && schedule.data?.[0]
+      ? ancoraDoContrato(schedule.data[0].due_date, form.pagasOriginal)
+      : null);
+  const diaDoContrato = form?.diaVencimento ? Number(form.diaVencimento) : null;
+  const proximaISO =
+    ancoraEfetiva && diaDoContrato && form
+      ? proximaDoContrato(ancoraEfetiva, form.installmentsPaid, diaDoContrato)
+      : null;
+  const rotuloDaData = !form || form.installmentsPaid === 0 ? 'Primeira parcela' : `Próxima parcela (a ${form.installmentsPaid + 1}ª)`;
+  const escolherData = (br: string) => {
+    if (!form) return;
+    const iso = brToISO(br);
+    setForm({ ...form, ancora: ancoraDoContrato(iso, form.installmentsPaid), diaVencimento: String(Number(iso.slice(8))) });
+  };
+  const mudarPagas = (n: number) => {
+    if (!form) return;
+    // Pagas além do total assentam no total: é o teto que existe.
+    const teto = totalDeParcelas > 0 ? totalDeParcelas : Infinity;
+    setForm({ ...form, installmentsPaid: Math.max(pagamentosLancados, Math.min(n, teto)), historyConfirmed: true });
+  };
+  const mudarUnidade = (unidade: UnidadeDoValor) => {
+    if (!form || unidade === form.unidade) return;
+    // Trocar a unidade sem digitar não move dinheiro: o número muda de régua, o contrato fica.
+    const valorCents =
+      unidade === 'total' ? form.valorCents * totalDeParcelas : parcelaDoTotalDoContrato(form.valorCents, totalDeParcelas);
+    setForm({ ...form, unidade, valorCents: totalDeParcelas > 0 ? valorCents : form.valorCents });
+  };
   const nomeOk = (form?.name.trim().length ?? 0) >= 2;
   /**
    * Contrato com parcelas TEM dia de vencimento — sem ele o cronograma ancora numa
    * data arbitrária e a projeção de caixa passa a mentir sobre quando o dinheiro sai.
    * Dívida sem parcelas ("devo 500 pro João") não tem cadência e continua sem exigir.
    */
-  const validDueDay = form?.diaVencimento
-    ? Number(form.diaVencimento) >= 1 && Number(form.diaVencimento) <= 31
-    : !form?.parcelas;
+  const validDueDay = form?.parcelas
+    ? Boolean(ancoraEfetiva) || Boolean(form.id && diaDoContrato && diaDoContrato >= 1 && diaDoContrato <= 31)
+    : true;
   const advancedValid = form && nomeOk && (!form.parcelas || form.historyConfirmed) &&
     Number.isInteger(form.installmentsPaid) && form.installmentsPaid >= 0 && form.remainingCents > 0 &&
     (!form.parcelas || Number(form.parcelas) > 0) &&
@@ -249,11 +333,13 @@ export default function DebtsScreen() {
         remaining_cents: form.remainingCents,
         interest_rate_monthly: fracao,
         installments: debtTerm(form.parcelas, form.installmentsPaid),
-        ...(!form.id ? { installments_paid: form.installmentsPaid } : {}),
+        installments_paid: form.installmentsPaid,
         installment_cents: form.installmentCents || null,
         ...(form.calculationMode === 'fixed_installments' && simpleValues ? simpleValues : {}),
         account_id: form.accountId,
-        due_day: form.diaVencimento ? Number(form.diaVencimento) : null,
+        due_day: diaDoContrato,
+        // Só com âncora conhecida: sem ela o cronograma segue o jeito antigo, sem data inventada.
+        ...(ancoraEfetiva ? { first_due_date: ancoraEfetiva } : {}),
       },
       {
         onSuccess: () => {
@@ -753,16 +839,19 @@ export default function DebtsScreen() {
                 })}
               />}
               {form.calculationMode === 'fixed_installments' ? <>
-                <Field label="Valor da parcela" hint="Use o valor que você paga todo mês, já com juros e taxas incluídos.">
-                  <MoneyField valueCents={form.installmentCents} onChangeCents={(installmentCents) => setForm({ ...form, installmentCents })} />
+                <Field label="Valor">
+                  <Segmented options={UNIDADES_DA_DIVIDA} value={form.unidade} onChange={mudarUnidade} />
+                  <MoneyField
+                    valueCents={form.valorCents}
+                    onChangeCents={(valorCents) => setForm({ ...form, valorCents })}
+                    accessibilityLabel={form.unidade === 'total' ? 'Total a pagar, em reais' : 'Valor de cada parcela, em reais'}
+                  />
                 </Field>
-                <Field
-                  label="Total de parcelas"
-                  hint={form.installmentsPaid > 0 ? `Já foram pagas ${form.installmentsPaid}.` : undefined}>
+                <Field label="Total de parcelas">
                   {/*
-                    Menor que as já pagas não existe: ao sair do campo o total assenta nelas, em vez
-                    de um erro esperando a pessoa descobrir o piso (22/09/2026). Durante a
-                    digitação não mexe — "1" é o caminho para "12".
+                    Texto, não `QuantityField`: o prazo do contrato não tem valor padrão honesto, e
+                    o passo a passo nasceria num "1" que salva um contrato que ninguém disse. Menor
+                    que as já pagas não existe: ao sair do campo o total assenta nelas.
                   */}
                   <TextField
                     value={form.parcelas}
@@ -776,39 +865,53 @@ export default function DebtsScreen() {
                     placeholder="48"
                   />
                 </Field>
-                {/* Saiu de "detalhes (opcional)": é o vencimento que ancora o cronograma.
-                    Sem ele a projeção de caixa chuta em que dia o dinheiro sai. */}
-                <Field label="Vence dia" hint="O dia do mês em que a parcela é cobrada.">
-                  <TextField value={form.diaVencimento} onChangeText={(value) => setForm({ ...form, diaVencimento: value.replace(/\D/g, '').slice(0, 2) })} keyboardType="number-pad" placeholder="10" />
+                <Field
+                  label="Parcelas já pagas"
+                  hint={pagamentosLancados > 0 ? `${pagamentosLancados} lançadas pelo app.` : undefined}>
+                  <QuantityField
+                    value={form.installmentsPaid}
+                    min={pagamentosLancados}
+                    max={totalDeParcelas > 0 ? totalDeParcelas : 999}
+                    onChange={mudarPagas}
+                    accessibilityLabel="Parcelas já pagas"
+                  />
+                </Field>
+                <Field label={rotuloDaData}>
+                  <DatePickerField
+                    value={proximaISO ? isoToBR(proximaISO) : null}
+                    onChange={escolherData}
+                    accessibilityLabel={rotuloDaData}
+                  />
                 </Field>
                 {simpleValues && <Card>
-                  <ThemedText type="small">{`${simpleValues.installments - form.installmentsPaid} parcelas de ${brl(form.installmentCents)} a pagar`}</ThemedText>
+                  <ThemedText type="small">{`${simpleValues.installments}× de ${brl(parcelaCents)} = ${brl(simpleValues.principal_cents)}`}</ThemedText>
                   <Money cents={simpleValues.remaining_cents} variant="headline" />
-                  <ThemedText type="caption" themeColor="textSecondary">Total das parcelas restantes. Não é uma simulação de juros.</ThemedText>
+                  <ThemedText type="caption" themeColor="textSecondary">{`Faltam ${simpleValues.installments - form.installmentsPaid} parcelas. Não é uma simulação de juros.`}</ThemedText>
                 </Card>}
-                <Button label={form.showDetails ? 'Ocultar detalhes' : 'Adicionar detalhes (opcional)'} variant="ghost" onPress={() => setForm({ ...form, showDetails: !form.showDetails })} />
+                {/*
+                  "Nome e conta" era um botão SÓ DE TEXTO ("Adicionar detalhes (opcional)") solto no
+                  formulário — não parecia clicável (23/09/2026). É uma linha que abre no lugar e já
+                  diz o que está lá. O caminho rápido continua pedindo só o necessário, e o nome cai
+                  em "Financiamento" quando vazio.
+                */}
+                <Section>
+                  <Row
+                    icon="pencil"
+                    title="Nome e conta"
+                    subtitle={`${form.name.trim() || 'Financiamento'} · ${pagadoras.find((a) => a.id === form.accountId)?.name ?? 'sem conta'}`}
+                    chevron={false}
+                    trailing={<Icon name={form.showDetails ? 'chevron.up' : 'chevron.down'} size="sm" color="textSecondary" />}
+                    onPress={() => setForm({ ...form, showDetails: !form.showDetails })}
+                    accessibilityState={{ expanded: form.showDetails }}
+                  />
+                </Section>
                 {form.showDetails && <>
                   {/*
-                    "Nome" fica AQUI, e isso é decisão testada, não descuido de ordem: o caminho
-                    rápido do financiamento pergunta só as três coisas de que ele precisa, e
-                    `name` cai em "Financiamento" quando vazio (`simple-finance-ui.test.ts`).
-                    Dentro do grupo opcional ele já é o primeiro — que é o que a régua pede.
-
                     ⚠️ O placeholder mostra o NOME QUE SERÁ GRAVADO, não um exemplo do que
                     escrever. Ele dizia "Financiamento do carro" e o default era "Financiamento":
-                    o campo parecia vazio, salvava, e a dívida nascia com outro nome — a mesma
-                    forma do lançamento que nasce "Compra parcelada". Campo com default mostra o
-                    default.
+                    o campo parecia vazio, salvava, e a dívida nascia com outro nome.
                   */}
                   <Field label="Nome"><TextField value={form.name} onChangeText={(name) => setForm({ ...form, name })} placeholder="Financiamento" /></Field>
-                  {!form.id && <Field label="Parcelas já pagas" hint="Deixe zero se nenhuma foi paga. Esse histórico não movimenta dinheiro.">
-                    {/* Pagas além do total assentam no total: é o teto que existe. */}
-                    <TextField value={String(form.installmentsPaid)} onChangeText={(value) => {
-                      const n = Number(value.replace(/\D/g, ''));
-                      const total = /^\d+$/.test(form.parcelas) ? Number(form.parcelas) : Infinity;
-                      setForm({ ...form, installmentsPaid: Math.min(n, total), historyConfirmed: true });
-                    }} keyboardType="number-pad" maxLength={3} />
-                  </Field>}
                   <Field label="Conta que paga" hint="Opcional — a parcela fica sem conta se você não escolher.">
                     <AccountPicker accounts={pagadoras} value={form.accountId} onChange={(accountId: string | null) => setForm({ ...form, accountId })} emptyLabel="Não informar" />
                   </Field>
@@ -924,19 +1027,16 @@ export default function DebtsScreen() {
                     />
                   </Field>
                 </View>
-                <View style={styles.coluna}>
-                  <Field label="Vence dia">
-                    <TextField
-                      value={form.diaVencimento}
-                      onChangeText={(v) =>
-                        setForm({ ...form, diaVencimento: v.replace(/\D/g, '').slice(0, 2) })
-                      }
-                      placeholder="10"
-                      keyboardType="number-pad"
-                    />
-                  </Field>
-                </View>
               </View>
+              {form.parcelas !== '' ? (
+                <Field label={rotuloDaData}>
+                  <DatePickerField
+                    value={proximaISO ? isoToBR(proximaISO) : null}
+                    onChange={escolherData}
+                    accessibilityLabel={rotuloDaData}
+                  />
+                </Field>
+              ) : null}
               {/*
                 ⚠️ **Vem DEPOIS de "Parcelas que faltam", porque é esse campo que o cria.**
                 Ele renderizava ACIMA, gated em `form.parcelas !== ''` — então digitar o número
@@ -944,7 +1044,7 @@ export default function DebtsScreen() {
                 inteiro para baixo no meio da digitação. É a mesma frase da régua de
                 `frontend.md` ("a tela se remonta debaixo do dedo"), só que para cima.
               */}
-              {!form.id && form.parcelas !== '' && (
+              {form.parcelas !== '' && (
                 <Field label="Parcelas já pagas"
                   hint="Já está no saldo devedor acima — não desconto de novo.">
                   {/*
