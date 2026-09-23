@@ -1,5 +1,6 @@
 import { Link } from 'expo-router';
 
+import { Deslizavel } from '@/components/ui/deslizavel';
 import { showItemActions } from '@/lib/item-actions';
 import type { ItemLinkProps } from './item-link.types';
 
@@ -17,10 +18,13 @@ import type { ItemLinkProps } from './item-link.types';
  * Decisão de plataforma espalhada por tela é como as duas plataformas divergem sem ninguém
  * decidir: cada tela nova copia a de antes, e a que esquecer fica sem ação no Android.
  */
-export function ItemLink({ href, actions, title, children }: ItemLinkProps) {
+export function ItemLink({ href, actions, title, forma, children }: ItemLinkProps) {
+  // O arrasto fica POR FORA do `Link`: o `Link.Trigger` engole o `style` do filho direto.
   return (
-    <Link asChild href={href}>
-      <Link.Trigger>{children({ onLongPress: () => showItemActions(title, actions) })}</Link.Trigger>
-    </Link>
+    <Deslizavel titulo={title} acoes={actions} forma={forma}>
+      <Link asChild href={href}>
+        <Link.Trigger>{children({ onLongPress: () => showItemActions(title, actions) })}</Link.Trigger>
+      </Link>
+    </Deslizavel>
   );
 }

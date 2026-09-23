@@ -774,6 +774,7 @@ export default function TransactionsScreen() {
                           {
                             label: settleLabel(tx.kind),
                             icon: 'checkmark.circle' as const,
+                            arrasto: 'direita' as const,
                             onPress: () => pay(tx),
                           },
                         ]
@@ -781,6 +782,7 @@ export default function TransactionsScreen() {
                     {
                       label: 'Ver detalhe',
                       icon: 'doc.text.magnifyingglass',
+                      arrasto: 'fora' as const,
                       onPress: () =>
                         router.push({ pathname: '/finance/[txId]', params: { txId: tx.id, month } }),
                     },
@@ -792,6 +794,8 @@ export default function TransactionsScreen() {
                        */
                       label: 'Editar',
                       icon: 'pencil',
+                      // Pendente, a direita é o "Paguei"; efetivado, é o Editar.
+                      arrasto: tx.status === 'pending' ? undefined : ('direita' as const),
                       onPress: () =>
                         tx.installment_plan_id
                           ? router.push({
@@ -803,7 +807,7 @@ export default function TransactionsScreen() {
                               params: { id: tx.id, month },
                             }),
                     },
-                    { label: 'Apagar', icon: 'trash', destructive: true, onPress: () => confirmDelete(tx) },
+                    { label: 'Apagar', icon: 'trash', destructive: true, arrasto: 'esquerda', onPress: () => confirmDelete(tx) },
                   ]}>
                   {({ onLongPress }) => (
                     <Row

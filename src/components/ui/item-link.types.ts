@@ -14,8 +14,13 @@ export interface ItemLinkProps {
    * que divergem.
    */
   actions: ItemAction[];
-  /** Título do sheet no Android. O menu do iOS não tem título. */
+  /** Título do sheet no Android e do "Mais" do arrasto. O menu do iOS não tem título. */
   title: string;
+  /**
+   * Como o arrasto recorta o card (`Deslizavel`): `linha` dentro de uma `Section` (padrão), ou
+   * `card` quando o item é um cartão com canto próprio (a nota).
+   */
+  forma?: 'linha' | 'card';
   /**
    * A linha. Recebe `onLongPress` para pendurar no elemento tocável (`Row`, `Pressable`).
    *

@@ -12,7 +12,7 @@ const require = createRequire(import.meta.url);
 
 // Execute the screen JSX and its event handlers. Native components/query boundaries
 // are inert; state persists across renders so each interaction uses current props.
-function screen(file: string, options: { tablet?: boolean; debts?: any[]; archivedDebts?: any[]; debtSchedule?: any[]; invoiceStatus?: string; create?: boolean; monthLines?: any[]; monthSummary?: any; cycleLines?: any[]; cycleRow?: any; rangeError?: boolean; rangePending?: boolean; rangePendingMonths?: string[]; bills?: any[]; billsError?: boolean; charges?: any[]; reminders?: any[]; budgets?: any[]; setupPassos?: any[]; proximo?: any; activity?: any[]; activityError?: boolean; forecastAccounts?: any[]; anticipation?: any[] | ((pagarEm: string) => any[]); cards?: any[]; params?: Record<string, string>; plan?: string; planPending?: boolean } = {}) {
+function screen(file: string, options: { tablet?: boolean; debts?: any[]; archivedDebts?: any[]; debtSchedule?: any[]; invoiceStatus?: string; create?: boolean; monthLines?: any[]; monthSummary?: any; cycleLines?: any[]; cycleRow?: any; rangeError?: boolean; rangePending?: boolean; rangePendingMonths?: string[]; bills?: any[]; billsError?: boolean; charges?: any[]; reminders?: any[]; budgets?: any[]; setupPassos?: any[]; proximo?: any; activity?: any[]; activityError?: boolean; forecastAccounts?: any[]; anticipation?: any[] | ((pagarEm: string) => any[]); cards?: any[]; params?: Record<string, string>; plan?: string; planPending?: boolean; txStatus?: string; recent?: any[] } = {}) {
   const state: any[] = [];
   let cursor = 0;
   let nodes: any[] = [];
@@ -31,10 +31,14 @@ function screen(file: string, options: { tablet?: boolean; debts?: any[]; archiv
   const finance = new Proxy({
     DEBT_KINDS: [{ value: 'financing', label: 'Financiamento' }, { value: 'loan', label: 'Empréstimo' }],
     SUGGESTED_CATEGORIES: [],
+    ACCOUNT_TYPES: [{ value: 'checking', label: 'Conta corrente', icon: 'building.columns' }],
     INCOME_CATEGORIES: [],
     ASSET_CLASSES: [{ value: 'investment', label: 'Investimento', icon: 'chart.line.uptrend.xyaxis' }],
     useDebts: () => ({ ...query, data: options.debts ?? [] }),
     useCardSummary: () => ({ ...query, isSuccess: true, data: options.cards ?? [] }),
+    // Só responde quando o teste dá os lançamentos: respondido e vazio, o Financeiro afirmaria
+    // "Ainda não tem movimento", e o teste das bordas falhando depende de ele NÃO afirmar.
+    useRecentTransactions: () => (options.recent ? { ...query, isSuccess: true, data: options.recent } : query),
     usePlanStatus: () => options.planPending
       ? { ...query, isPending: true, data: undefined }
       : { ...query, isPending: false, isSuccess: true, data: { plan: options.plan ?? 'pro' } },
@@ -73,7 +77,7 @@ function screen(file: string, options: { tablet?: boolean; debts?: any[]; archiv
       ? { ...query, data: undefined, isPending: true, fetchStatus: 'idle', hasNextPage: false, isFetchingNextPage: false, fetchNextPage: () => {}, refetch: async () => { refetches.push('list'); } }
       // Uma linha: com a lista vazia o card do resumo SOME de propósito (card que soma uma lista
       // vazia é eco — design.md §1), e o caminho feliz não teria o que mostrar.
-      : { ...query, data: { pages: [[{ id: 'tx-1', kind: 'expense', amount_cents: 4500, occurred_at: '2026-09-15', description: 'Mercado', category: 'mercado', account_id: null, status: 'cleared' }]], pageParams: [] }, isPending: false, hasNextPage: false, isFetchingNextPage: false, fetchNextPage: () => {}, refetch: async () => { refetches.push('list'); } },
+      : { ...query, data: { pages: [[{ id: 'tx-1', kind: 'expense', amount_cents: 4500, occurred_at: '2026-09-15', description: 'Mercado', category: 'mercado', account_id: null, status: options.txStatus ?? 'cleared' }]], pageParams: [] }, isPending: false, hasNextPage: false, isFetchingNextPage: false, fetchNextPage: () => {}, refetch: async () => { refetches.push('list'); } },
     useMonthSummary: () => ({ ...query, data: options.monthSummary ?? null }),
     useAccounts: () => ({ ...query, data: options.forecastAccounts ?? [] }),
     useCashFlowForecast: () => ({ ...query, data: [{ day: '2026-09-18', balance_cents: 10000, in_cents: 0, out_cents: 0 }] }),
@@ -250,6 +254,14 @@ function screen(file: string, options: { tablet?: boolean; debts?: any[]; archiv
     // O estado vazio da lista também é slot renderizado — e é ONDE a lista dos Lançamentos
     // desenhava três linhas de esqueleto para sempre quando as bordas do período falhavam.
     visit(node.props.ListEmptyComponent);
+    // As linhas de `FlatList`/`SectionList` são `renderItem` — é nelas que mora o card de uma
+    // lista longa (Lançamentos, fatura), e sem isto nenhum teste enxergava a linha.
+    if (typeof node.props.renderItem === 'function') {
+      const itens = Array.isArray(node.props.sections)
+        ? node.props.sections.flatMap((section: any) => (section.data ?? []).map((item: any) => ({ item, section })))
+        : (Array.isArray(node.props.data) ? node.props.data : []).map((item: any) => ({ item }));
+      itens.forEach((x: any, index: number) => visit(node.props.renderItem({ ...x, index })));
+    }
     // O "Salvar" do sheet mora no slot `action` do `SheetHeader`, não em `children` — sem esta
     // linha o botão existe na tela e some daqui, que foi o que estas seis asserções viram.
     visit(node.props.action);
@@ -1130,4 +1142,34 @@ test('Lembretes: arrastar à direita pausa (até o fim, com Desfazer), à esquer
   // o toque longo continua com todas as ações
   ui.interact((nodes: any[]) => nodes.find((n) => n.type === 'Row' && n.props.onLongPress).props.onLongPress());
   assert.deepEqual(JSON.parse(JSON.stringify(ui.actions.map((a: any) => a.label))), ['Editar', 'Pausar', 'Apagar']);
+});
+
+const itemLinks = (ui: any) => ui.nodes().filter((n: any) => n.type === 'ItemLink');
+const ladosDoLink = (node: any) => ladosDe({ props: { acoes: node.props.actions } });
+
+test('Lançamentos: pendente arrasta Paguei à direita; efetivado arrasta Editar; Apagar à esquerda', () => {
+  const pendente = itemLinks(screen(transacoesFile, { txStatus: 'pending' }))[0];
+  assert.deepEqual(ladosDoLink(pendente), { direita: ['Paguei'], esquerda: ['Apagar'], mais: true, pontaDireita: null, pontaEsquerda: null });
+  const efetivado = itemLinks(screen(transacoesFile))[0];
+  assert.deepEqual(ladosDoLink(efetivado), { direita: ['Editar'], esquerda: ['Apagar'], mais: false, pontaDireita: null, pontaEsquerda: null });
+});
+
+test('Financeiro: o último lançamento arrasta Editar e Apagar (Ver detalhe é o toque)', () => {
+  const ui = screen(financeiroFile, { recent: [{ id: 't1', kind: 'expense', amount_cents: 4500, occurred_at: '2026-09-15', description: 'Mercado', status: 'cleared' }] });
+  assert.deepEqual(ladosDoLink(itemLinks(ui)[0]), { direita: ['Editar'], esquerda: ['Apagar'], mais: false, pontaDireita: null, pontaEsquerda: null });
+});
+
+test('Fatura: a compra arrasta Editar e Apagar', () => {
+  const ui = screen('src/app/finance/invoice/[id].tsx');
+  assert.deepEqual(ladosDoLink(itemLinks(ui)[0]), { direita: ['Editar'], esquerda: ['Apagar'], mais: false, pontaDireita: null, pontaEsquerda: null });
+});
+
+test('Contas: a conta arrasta Editar e Arquivar (Ver extrato é o toque)', () => {
+  const ui = screen('src/app/finance/accounts.tsx', {
+    balances: [{ account_id: 'a1', name: 'Nubank', type: 'checking', balance_cents: 10000, cleared_cents: 10000, pending_in_cents: 0, pending_out_cents: 0 }],
+    forecastAccounts: [{ id: 'a1', name: 'Nubank', type: 'checking', archived: false }],
+  });
+  const [link] = itemLinks(ui);
+  assert.ok(link, 'a conta está num ItemLink');
+  assert.deepEqual(ladosDoLink(link), { direita: ['Editar'], esquerda: ['Arquivar'], mais: false, pontaDireita: null, pontaEsquerda: null });
 });

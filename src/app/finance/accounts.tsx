@@ -303,6 +303,7 @@ export default function AccountsScreen() {
           {
             label: 'Ver extrato',
             icon: 'list.bullet',
+            arrasto: 'fora',
             onPress: () =>
               router.push({
                 pathname: '/finance/transactions',
@@ -312,6 +313,7 @@ export default function AccountsScreen() {
           {
             label: 'Editar',
             icon: 'pencil',
+            arrasto: 'direita',
             disabled: !conta,
             onPress: () => conta && abrirEdicao(conta),
           },
@@ -319,6 +321,7 @@ export default function AccountsScreen() {
             label: 'Arquivar',
             icon: 'archivebox',
             destructive: true,
+            arrasto: 'esquerda',
             disabled: !conta,
             onPress: () => conta && arquivar(conta),
           },

@@ -579,9 +579,10 @@ export default function InvoiceScreen() {
                       {
                         label: 'Editar',
                         icon: 'pencil',
+                        arrasto: 'direita',
                         onPress: () => router.push(`/finance/transaction-form?id=${tx.id}`),
                       },
-                      { label: 'Apagar', icon: 'trash', destructive: true, onPress: () => apagar(tx) },
+                      { label: 'Apagar', icon: 'trash', destructive: true, arrasto: 'esquerda', onPress: () => apagar(tx) },
                     ]}>
                     {({ onLongPress }) => (
                       <Row

@@ -489,13 +489,14 @@ export default function FinanceScreen() {
                   href={destino}
                   title={titulo}
                   actions={[
-                    { label: 'Ver detalhe', icon: 'doc.text.magnifyingglass', onPress: () => router.push(destino) },
+                    { label: 'Ver detalhe', icon: 'doc.text.magnifyingglass', arrasto: 'fora', onPress: () => router.push(destino) },
                     {
                       label: 'Editar',
                       icon: 'pencil',
+                      arrasto: 'direita',
                       onPress: () => router.push({ pathname: '/finance/transaction-form', params: { id: tx.id, month } }),
                     },
-                    { label: 'Apagar', icon: 'trash', destructive: true, onPress: () => confirmDelete(tx) },
+                    { label: 'Apagar', icon: 'trash', destructive: true, arrasto: 'esquerda', onPress: () => confirmDelete(tx) },
                   ]}>
                   {({ onLongPress }) => (
                     <LedgerRow

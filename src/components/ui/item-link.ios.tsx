@@ -1,5 +1,6 @@
 import { Link } from 'expo-router';
 
+import { Deslizavel } from '@/components/ui/deslizavel';
 import type { ItemAction } from '@/lib/item-actions';
 import type { ItemLinkProps } from './item-link.types';
 
@@ -13,12 +14,15 @@ import type { ItemLinkProps } from './item-link.types';
  * Sem `onLongPress`: quem escuta o gesto aqui é o `Link.Menu`. Pendurar o nosso competiria com o
  * do sistema e abriria os dois.
  */
-export function ItemLink({ href, actions, children }: ItemLinkProps) {
+export function ItemLink({ href, actions, title, forma, children }: ItemLinkProps) {
+  // O arrasto fica POR FORA do `Link`: o `Link.Trigger` engole o `style` do filho direto.
   return (
-    <Link asChild href={href}>
-      <Link.Trigger>{children({})}</Link.Trigger>
-      <Link.Menu>{actions.map(renderAction)}</Link.Menu>
-    </Link>
+    <Deslizavel titulo={title} acoes={actions} forma={forma}>
+      <Link asChild href={href}>
+        <Link.Trigger>{children({})}</Link.Trigger>
+        <Link.Menu>{actions.map(renderAction)}</Link.Menu>
+      </Link>
+    </Deslizavel>
   );
 }
 

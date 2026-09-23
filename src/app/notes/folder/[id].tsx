@@ -110,7 +110,16 @@ export default function FolderScreen() {
         Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
         togglePin.mutate(
           { id: note.id, pinned: !note.pinned },
-          { onError: () => toast({ message: 'Não deu para fixar a nota.', tone: 'error' }) }
+          {
+            // Com "Desfazer": é o que deixa fixar valer ao arrastar até o fim (Deslizavel).
+            onSuccess: () =>
+              toast({
+                message: note.pinned ? 'Nota desafixada.' : 'Nota fixada.',
+                tone: 'success',
+                action: { label: 'Desfazer', onPress: () => togglePin.mutate({ id: note.id, pinned: note.pinned }) },
+              }),
+            onError: () => toast({ message: 'Não deu para fixar a nota.', tone: 'error' }),
+          }
         );
       },
       onColor: setPintandoNota,

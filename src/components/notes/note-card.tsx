@@ -105,16 +105,18 @@ function NoteCardBase({ note, folderName, folderColor, actions, drag, dragging }
     {
       label: note.pinned ? 'Desafixar' : 'Fixar',
       icon: note.pinned ? 'pin.slash' : 'pin',
+      arrasto: 'direita',
+      desfaz: true,
       onPress: () => actions.onPin(note),
     },
     { label: 'Cor', icon: 'paintpalette', onPress: () => actions.onColor(note) },
     { label: 'Mover para pasta', icon: 'folder', onPress: () => actions.onMove(note) },
-    { label: 'Arquivar', icon: 'archivebox', onPress: () => actions.onArchive(note) },
+    { label: 'Arquivar', icon: 'archivebox', arrasto: 'esquerda', desfaz: true, onPress: () => actions.onArchive(note) },
     { label: 'Lixeira', icon: 'trash', destructive: true, onPress: () => actions.onTrash(note) },
   ];
 
   return (
-    <ItemLink href={`/notes/${note.id}`} title={titulo} actions={menu}>
+    <ItemLink href={`/notes/${note.id}`} title={titulo} actions={menu} forma="card">
       {({ onLongPress }) => (
         <Pressable
           accessibilityRole="button"
