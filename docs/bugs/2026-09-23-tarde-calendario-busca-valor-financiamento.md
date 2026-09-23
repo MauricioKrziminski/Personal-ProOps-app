@@ -113,14 +113,51 @@ o primitivo corrige todas as telas.
 
 - **5. Onboarding**: pesquisa de referências e direções em aberto. Ver seção própria abaixo
   quando decidido.
-- **6–10. Financiamento**: o cronograma (`private.debt_schedule_for`) ancora a próxima parcela
-  em HOJE/`due_day`, sem âncora futura (6). `useDebts` filtra `archived` e não há caminho de
-  volta (7). `transactions.debt_id` é `on delete set null`, e o `tg_transactions_debt_payment`
-  recusa desvincular pagamento, então apagar uma dívida com pagamento registrado falha hoje (8).
-  A edição não manda `installments_paid` (só no criar) e `tg_debts_calculation_mode` barra o
-  contrato de parcela fixa com pagamento registrado (10).
+- **6–10. Financiamento**: ver a seção própria abaixo.
 - **11. Botão só texto**: ver a seção própria abaixo.
 - **12. Ver mais → Planejamento**: ver a seção própria abaixo.
+
+## 6–10. Financiamento maleável
+
+Spec `docs/superpowers/specs/2026-09-23-financiamento-maleavel-design.md`, plano
+`docs/superpowers/plans/2026-09-23-financiamento-maleavel.md`.
+
+**Causa raiz.**
+- **6.** O cronograma (`private.debt_schedule_for`) ancorava a próxima parcela em HOJE/`due_day`,
+  e não existia âncora no futuro.
+- **7.** `useDebts` filtra `archived`, e não havia caminho de volta.
+- **8.** Apagar a dívida com pagamento FALHAVA. A FK `on delete set null` dispara o
+  `tg_transactions_debt_payment`, que recusa "desvincular".
+- **9.** O detalhe era uma tabela de seis colunas em `footnote`, rolando na horizontal.
+- **10.** A edição não mandava `installments_paid`, não existia "total a pagar", e o
+  `tg_debts_calculation_mode` barrava o contrato fixo depois do primeiro "Paguei".
+
+**Decisões do dono do produto.**
+- "Total" é o total a pagar (a soma das parcelas).
+- O detalhe vira uma linha do tempo.
+- Com "Paguei" lançado, o contrato é liberado e recalculado.
+
+**Correção.**
+- **Migration `20260923160000`:**
+  - `debts.first_due_date` ancora o contrato dentro de `debt_schedule_for`, a fonte única da
+    projeção, do mês, da Hoje, do ciclo e do "E se…";
+  - as travas do contrato fixo caem;
+  - `delete_debt` trava a dívida e apaga pagamentos e dívida numa transação, com um desvio local
+    no trigger.
+  - Revisada pelo `migration-reviewer` e aplicada no STAGING.
+- **Formulário:**
+  - "Cada parcela | Total a pagar";
+  - pagas editáveis no criar e no editar;
+  - "Primeira/Próxima parcela (a Nª)" com calendário no lugar do "Vence dia";
+  - "Nome e conta" numa linha que abre no lugar.
+- **Lista:**
+  - "Arquivadas · N" no fim, com Desarquivar e Excluir por completo;
+  - arquivar mostra toast com Desfazer;
+  - excluir pede confirmação e conta os pagamentos e o valor que voltam ao saldo.
+- **Detalhe:** herói com anel, "Falta pagar" e "N de M pagas"; linha do tempo por ano (paga,
+  estimada, próxima e futura pela forma do nó); "…" no alto com Editar, Arquivar e Excluir.
+- **Agente:** `first_due_date`, contrato fixo rederivado, `resource_delete` com `trashed=true` →
+  `delete_debt` (paridade em `docs/AGENTE-PARIDADE-COM-O-APP.md`).
 
 ## 11. Botão só texto, "sem nada atrás"
 
@@ -178,4 +215,5 @@ component that hasn't mounted yet" no login do Android.
 | 2 | `anti-slop.test.ts` — placeholder de busca até 20 caracteres (falha com o texto antigo) | Android 375dp × 1,3: Lançamentos e Recorrentes numa linha (`2-antes/depois-…png`); digitado "gasolinapq" sem corte nas descendentes. |
 | 11 | `anti-slop.test.ts` (ghost só como par do primário; falha com o `ghost` de volta no lembrete) | iOS claro: "Fechar" do Meu mês virou pílula; iOS escuro: "Gerenciar plano" + "Pessoas" pílulas; Android 384dp × 1,3: "Apagar lançamento" em pílula cinza com rótulo vermelho. |
 | 12 | — | Android 384dp × 1,3: Dia a dia (4), Compromissos (3), Planejamento (2), sem quebra de título. |
+| 6–10 | `supabase/tests/financiamento_maleavel.sql` (âncora a 3 meses, paga adiantada, pagas 1→10, contrato fixo editado com pagamento e o pagamento novo coerente, `delete_debt` idempotente, RLS de outro workspace, privilégio); `finance-form.test.ts` e `debt-history.test.ts` (âncora ida e volta no dia 31, total → parcela, linha do tempo); `simple-finance-ui.test.ts` (criar com data, "Total a pagar" grava parcela × N, pagas movem a âncora, editar dívida antiga sem cronograma não inventa âncora, arquivadas com Desarquivar, excluir só depois do SIM, "…" do detalhe); `pytest` do agente (1107). | Android 384dp × 1,3: criar "Total a pagar" R$ 70.000 / 48× com 1ª em 05/12/2026 → gravou 145833 × 48 e o cronograma começa em 05/12 (out/nov sem linha em "O mês inteiro"); editar a data → 05/01/2027 e o cronograma andou; pagas 0→2 → 3ª em 05/03/2027; com um "Paguei" lançado, pagas 3→4 gravou (saldo 44×); arquivar → toast Desfazer; Arquivadas · N → Desarquivar; excluir por completo → 0 dívidas e 0 pagamentos no banco. Detalhe em linha do tempo no Android (claro/escuro) e iOS (claro/escuro), com o "…". Dados de teste apagados pelo ID. |
 | 1 | `supabase/tests/mes_fecha_ate_o_31.sql` (falhava na definição antiga: "fecha 30 em 2027-02-01: deu … a 2027-03-02"; verde no staging depois da migration), mais as bordas do dia 10 inalteradas; `agent/tests/test_mes_e_rotativo.py` (29/30 passam, 31 = último dia, 0/32 recusados). Regressão no staging: `regua_e_dia_do_fechamento`, `parcela_paga_no_ciclo` e `fluxo_do_financeiro` verdes. `linha_do_tempo` já falhava por dado do staging (ciclo 11/08–10/09, que tem as mesmas bordas antes e depois). | Android 384dp × 1,3, claro e escuro: grade 1–31 em 7 colunas; escolher o 30 gravou `30` e o ciclo corrente virou 31/08–30/09; o 31 gravou `null` ("Último dia do mês", 01/09–30/09) e acende o 31 ao reabrir; workspace devolvido ao dia 10. iOS claro e escuro: sem a placa atrás da grade. Pendente: `probe_mes_vs_cartao.py` (Gemini do staging em 503). |
