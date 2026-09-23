@@ -89,7 +89,7 @@ test('every ledger mutation invalidates historical derived reads and search', as
   const hooks = loadHooks(client);
   const mutations = [
     'usePayInvoice', 'useSettleInvoice', 'useCreateInstallmentPlan', 'useMarkPaid',
-    'useApproveImportItems', 'useSaveDebt', 'usePayDebtInstallment', 'useArchiveDebt',
+    'useApproveImportItems', 'useSaveDebt', 'usePayDebtInstallment', 'useArchiveDebt', 'useUnarchiveDebt', 'useDeleteDebt',
     'useSaveAsset', 'useArchiveAsset', 'useSaveTransaction', 'useDeleteTransaction',
     'useDeleteInstallmentPlan', 'useSaveAccount', 'useArchiveAccount', 'useSaveGoal',
     'useGoalDeposit', 'useArchiveGoal', 'useToggleRecurring', 'useDeleteRecurring',

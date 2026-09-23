@@ -1496,6 +1496,7 @@ export type Debt = Pick<
   | 'account_id'
   | 'due_day'
   | 'archived'
+  | 'first_due_date'
 > & { kind: (typeof DEBT_KINDS)[number]['value']; calculation_mode: 'amortized' | 'fixed_installments' };
 
 export type DebtScheduleRow = Omit<Fns['debt_schedule']['Returns'][number], 'interest_cents' | 'principal_cents'> & { interest_cents: number | null; principal_cents: number | null };
@@ -1509,7 +1510,7 @@ export function useDebts() {
       const { data, error } = await supabase
         .from('debts')
         .select(
-          'id, name, kind, calculation_mode, principal_cents, remaining_cents, interest_rate_monthly, installments, installments_paid, installment_cents, account_id, due_day, archived',
+          DEBT_COLUMNS,
         )
         .eq('archived', false)
         .order('remaining_cents', { ascending: false });
@@ -1517,6 +1518,43 @@ export function useDebts() {
       return data as Debt[];
     },
   });
+}
+
+const DEBT_COLUMNS =
+  'id, name, kind, calculation_mode, principal_cents, remaining_cents, interest_rate_monthly, installments, installments_paid, installment_cents, account_id, due_day, archived, first_due_date';
+
+/**
+ * As arquivadas (23/09/2026). Arquivar tirava a dívida da lista e não havia volta em lugar
+ * nenhum — *"financiamento arquivado vai para onde?"*. Chave debaixo de `['debts']`, então a
+ * mesma invalidação das ativas alcança esta.
+ */
+export function useArchivedDebts() {
+  useRealtimeInvalidate('debts', ['debts', 'archived']);
+  return useQuery({
+    queryKey: ['debts', 'archived'],
+    queryFn: async (): Promise<Debt[]> => {
+      const { data, error } = await supabase
+        .from('debts')
+        .select(DEBT_COLUMNS)
+        .eq('archived', true)
+        .order('name');
+      if (error) throw error;
+      return data as Debt[];
+    },
+  });
+}
+
+/**
+ * Quantos pagamentos um "Excluir por completo" leva junto, e quanto voltam ao saldo — a
+ * confirmação diz a consequência contada, não "tem certeza?".
+ */
+export async function pagamentosDaDivida(debtId: string): Promise<{ count: number; totalCents: number }> {
+  const { data, error } = await supabase.from('transactions').select('amount_cents').eq('debt_id', debtId);
+  if (error) throw error;
+  return {
+    count: data.length,
+    totalCents: data.reduce((soma, t) => soma + Number(t.amount_cents), 0),
+  };
 }
 
 /** Tabela de amortização do que ainda falta pagar (Price, calculada no banco). */
@@ -1996,6 +2034,8 @@ export function useSaveDebt() {
       installment_cents: number | null;
       account_id: string | null;
       due_day: number | null;
+      /** A âncora do contrato (`debts.first_due_date`) — só vai quando a tela a conhece. */
+      first_due_date?: string | null;
     }) => {
       const { id, ...resto } = input;
       if (id) {
@@ -2033,6 +2073,34 @@ export function useArchiveDebt() {
     mutationFn: async (id: string) => {
       const { error } = await supabase.from('debts').update({ archived: true }).eq('id', id);
       if (error) throw error;
+    },
+    onSuccess: invalidate,
+  });
+}
+
+/**
+ * Sem `.single()` de propósito: o "Desfazer" do toast pode chegar depois de a dívida ter sido
+ * apagada por outro caminho, e aí não há o que desarquivar — zero linhas, sem erro.
+ */
+export function useUnarchiveDebt() {
+  const invalidate = useInvalidateFinance();
+  return useMutation({
+    mutationFn: async (id: string) => {
+      const { error } = await supabase.from('debts').update({ archived: false }).eq('id', id);
+      if (error) throw error;
+    },
+    onSuccess: invalidate,
+  });
+}
+
+/** "Excluir por completo": pagamentos lançados e dívida, numa transação (`delete_debt`). */
+export function useDeleteDebt() {
+  const invalidate = useInvalidateFinance();
+  return useMutation({
+    mutationFn: async (id: string): Promise<number> => {
+      const { data, error } = await supabase.rpc('delete_debt', { p_debt_id: id });
+      if (error) throw error;
+      return data;
     },
     onSuccess: invalidate,
   });
