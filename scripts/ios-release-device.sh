@@ -71,17 +71,21 @@ if ! security find-identity -v -p codesigning | grep -q "Apple Distribution" && 
   echo "⚠ Time pessoal: build local sem Push Notifications (aps-environment removido de $ent)."
 fi
 
-marco="$previa/inicio"; touch "$marco"
-# `--no-bundler`: Release não usa o Metro, e com ele o comando fica preso mostrando logs.
-args=(--configuration Release --no-bundler)
-if [[ -n "${1:-}" ]]; then args+=(--device "$1"); else args+=(--device); fi
-npx expo run:ios "${args[@]}"
-
-# E confere o que foi de fato EMBUTIDO nesta execução (mais novo que o marco), não um build velho.
-bundle="$(find ~/Library/Developer/Xcode/DerivedData -path '*Release-iphoneos/ProOps.app/main.jsbundle' -newer "$marco" 2>/dev/null | head -1)"
-if [[ -z "$bundle" ]]; then
-  echo "⚠ main.jsbundle deste build não encontrado para conferir o ambiente." >&2
+# ⚠️ `xcodebuild -allowProvisioningUpdates`, não `expo run:ios` (22/09/2026): com os widgets o app
+# tem um App Group e uma extensão (`com.proops.personal.widgets`), e o perfil de desenvolvimento
+# antigo não tinha nenhum dos dois — o build morria na assinatura com "doesn't support the App
+# Groups capability". O Xcode só gera os perfis novos com essa flag, e o `expo run:ios` não a passa.
+udid="${1:-$(xcrun devicectl list devices 2>/dev/null | awk '/physical/ && /available/ {for (i=1;i<=NF;i++) if ($i ~ /^[0-9A-F]{8}-[0-9A-F]{16}$/) print $i}' | head -1)}"
+if [[ -z "$udid" ]]; then
+  echo "✗ Nenhum iPhone conectado e disponível (xcrun devicectl list devices)." >&2
   exit 1
 fi
-conferir "$bundle"
+dd="$previa/dd"
+xcodebuild -workspace ios/ProOps.xcworkspace -scheme ProOps -configuration Release \
+  -destination "id=$udid" -derivedDataPath "$dd" -allowProvisioningUpdates build | tail -5
+
+# E confere o que foi de fato EMBUTIDO neste build, antes de ir para o aparelho.
+app="$dd/Build/Products/Release-iphoneos/ProOps.app"
+conferir "$app/main.jsbundle"
+xcrun devicectl device install app --device "$udid" "$app"
 echo "✓ Release de produção instalado; JS embutido aponta para $PROD_REF."

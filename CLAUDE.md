@@ -61,19 +61,15 @@ App mobile pessoal de **notas rápidas, lembretes e controle financeiro operado 
   `anticipation_candidates` em uma versão, fuso no cabeçalho, `execute` para `authenticated` e
   sem para `anon`). App `v1.3.46`.
 
-  **Staging UMA à frente: `20260922140000`** (22/09/2026, aplicada só no staging). Parcelar no
-  cartão um lançamento que já existe gravava a parcela 1 `cleared` (o default da compra à vista),
-  e `parcela_travada` a lia como paga: a compra inteira travava (sem 1x, data, conta) com a
-  fatura aberta — a queixa da wardogs. A migration grava `pending` na adoção em cartão e conserta
-  as parcelas 1 que já nasceram assim (backfill idempotente, só fatura aberta). Mesma assinatura
-  de RPC: não exige deploy de agente nem de app. Subir é decisão do Gabriel.
-
-  **E `20260922150000`** (importação inteligente, só no staging): colunas novas em `import_items`,
-  status `uncertain`, `finish_import_batch` e a fatura do histórico nascendo quitada (vale também
-  para o "já pagas" do formulário de parcelado). ⚠️ **Ordem em produção: migrations → app →
-  agente.** O agente novo exige a conta no import (o app antigo a deixava opcional → 422 claro) e
-  grava `uncertain`, que o app antigo não mostra; o app novo com o agente antigo funciona (sem as
-  camadas novas). O agente de staging já está com a versão nova.
+  **Produção e staging ALINHADOS em `20260922150000`** — aplicadas em produção pelo Gabriel em
+  22/09/2026 (`db push --project-ref`) e conferidas na fonte (`migration list --project-ref`
+  devolve `20260922150000` e `20260922140000` com `remote` preenchido).
+  `20260922140000`: parcelar no cartão um lançamento que já existe gravava a parcela 1 `cleared`,
+  e `parcela_travada` a lia como paga — a compra inteira travava (a queixa da wardogs); a
+  migration grava `pending` na adoção em cartão e conserta as parcelas 1 que já nasceram assim.
+  `20260922150000`: importação inteligente (colunas novas em `import_items`, status `uncertain`,
+  `finish_import_batch`, fatura do histórico nascendo quitada). ⚠️ **Ordem: migrations → app →
+  agente.** O agente novo exige a conta no import (o app antigo a deixava opcional → 422 claro).
 
   ⚠️ **OTA/build do chat exige a revisão nova do agente em produção** (21/09/2026): o app novo
   manda `id` no `POST /internal/chat/conversations` para abrir a conversa na hora, e o agente
