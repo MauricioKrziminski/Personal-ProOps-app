@@ -912,6 +912,9 @@ async def _audit(sessao: dict, estado: dict, uso: dict | None = None) -> None:
             "domains": estado.get("domains", []),
             "finance_actions": estado.get("finance_actions", []),
             "notes_actions": estado.get("notes_actions", []),
+            # sem ela, um lote com cadastros (pasta, cartão, meta) era invisível na auditoria:
+            # o incidente de 23/09/2026 só se provou pela metade daqui
+            "resource_actions": estado.get("resource_actions", []),
             "llm_calls": total,
         },
     )

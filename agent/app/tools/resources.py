@@ -9,6 +9,7 @@ from __future__ import annotations
 import re
 from datetime import date, datetime
 from decimal import Decimal, InvalidOperation
+from uuid import UUID
 
 from app import db
 from app.domain.dates import format_date_br, now_utc, to_instant, local_iso_date
@@ -282,6 +283,25 @@ LINKS = {
 
 def _error(text):
     raise Level1Error(text)
+
+
+def _parece_id(valor) -> bool:
+    """Um UUID que não casou é id inventado ou de outro espaço — nunca nome de pasta nova."""
+    try:
+        UUID(str(valor))
+    except ValueError:
+        return False
+    return True
+
+
+class JaExiste(Level1Error):
+    """O cadastro pedido já está lá — não falta dado, não há o que perguntar.
+
+    Separado de `Level1Error` porque quem chama trata diferente: a recusa comum vira
+    rascunho ("cadastro incompleto") e a pergunta volta no turno seguinte; isto vira só
+    uma frase. Guardar "crie a pasta app" como rascunho de uma pasta que existe faria o
+    próximo turno tentar completá-la.
+    """
 
 
 def validate_fields(action: ResourceAction) -> dict:
@@ -931,6 +951,14 @@ async def prepare(ctx: ExecContext, action: ResourceAction) -> dict:
         merged = {**old, **values}
     else:
         merged = values
+        if action.resource == "folders":
+            # O unique `(workspace_id, name)` recusaria na EXECUÇÃO, depois do SIM, com a
+            # frase genérica "deu erro ao processar". Aqui a pessoa lê o motivo antes.
+            if await db.fetch(
+                "select id from public.note_folders where workspace_id = %s and name = %s",
+                ctx.workspace_id, values["name"],
+            ):
+                raise JaExiste(f"📁 A pasta *{values['name']}* já existe.")
     # Never let a new non-nullable value become null during an edit.
     if action.type != Op.DELETE:
         protegidos = REQUIRED[action.resource]
@@ -954,6 +982,17 @@ async def prepare(ctx: ExecContext, action: ResourceAction) -> dict:
                 values[key],
                 values[key],
             )
+            if (not rows and key == "folder_id" and action.resource == "notes"
+                    and action.type == Op.CREATE and not _parece_id(values[key])):
+                if not 1 <= len(normalize(values[key])) <= 40:
+                    _error("Nome de pasta deve ter entre 1 e 40 caracteres.")
+                # Nota nova numa pasta que ainda não existe: a pasta nasce junto, na
+                # execução — é o que `notes.create_note` sempre fez. Recusar aqui era o
+                # "Não encontrei pasta" de "crie a pasta X e ponha a nota Y": a pasta do
+                # MESMO lote só existe depois do SIM.
+                prepared["pasta_nova"] = normalize(values[key])
+                display[key] = f"{prepared['pasta_nova']} (nova)"
+                continue
             if len(rows) != 1:
                 _error(
                     f"Não encontrei {LABELS[key]} nesse espaço. Informe o nome exato."
@@ -1038,6 +1077,10 @@ async def prepare(ctx: ExecContext, action: ResourceAction) -> dict:
             continue
         if key in derivados:
             continue
+        if (action.type == Op.CREATE and key == identity and action.name
+                and str(value).strip().casefold() == action.name.strip().casefold()):
+            # O nome já está na frase ("criar pasta App"); repetir virava "— nome: app".
+            continue
         shown = display.get(key, value)
         if key.endswith("_cents") and value is not None:
             shown = cents_to_brl(value)
@@ -1061,8 +1104,8 @@ async def prepare(ctx: ExecContext, action: ResourceAction) -> dict:
         details.append(
             f"{LABELS.get(key, key)}: {shown if shown is not None else 'não informado'}"
         )
-    prepared["summary"] = (
-        f"{verb} {LABELS[action.resource]} {action.name or ''} — " + "; ".join(details)
+    prepared["summary"] = f"{verb} {LABELS[action.resource]} {action.name or ''}".rstrip() + (
+        " — " + "; ".join(details) if details else ""
     )
     if prepared.get("calculation_mode") == "fixed_installments":
         prepared["summary"] += "; parcelas fixas, juros incluídos no valor e taxa não informada"
@@ -1229,6 +1272,15 @@ async def execute(ctx: ExecContext, action: ResourceAction) -> ToolResult:
             f"📋 Seus cadastros de {LABELS[action.resource]}:\n{corpo}", read_only=True
         )
     values = dict(proposal["values"])
+    if proposal.get("pasta_nova"):
+        # A pasta que a frase de confirmação chamou de "(nova)". `ensure_folder` é o mesmo
+        # caminho de `notes.create_note`: cria, ou acha a que outra ação do lote já criou.
+        from app.tools.notes import ensure_folder
+
+        pasta = await ensure_folder(ctx.workspace_id, ctx.user_id, proposal["pasta_nova"])
+        if not pasta:
+            _error("Não consegui criar a pasta dessa nota. Nada foi salvo.")
+        values["folder_id"] = str(pasta["id"])
     guards, link_args = [], []
     for key, linked_table in LINKS.items():
         if values.get(key):
@@ -1278,10 +1330,15 @@ async def execute(ctx: ExecContext, action: ResourceAction) -> ToolResult:
         row = await db.fetch_one(
             f"insert into public.{table} ({', '.join(keys)}) select {', '.join(['%s'] * len(keys))} where true"
             + reference_guard
+            # Pasta criada por outra ação do mesmo lote (ou no app, entre a pergunta e o
+            # SIM): o unique não vira "deu erro ao processar", vira a frase de baixo.
+            + (" on conflict (workspace_id, name) do nothing" if action.resource == "folders" else "")
             + " returning id",
             *values.values(),
             *link_args,
         )
+        if not row and action.resource == "folders":
+            return ToolResult(f"📁 A pasta *{values['name']}* já existe.", read_only=True)
     else:
         # MVCC token freezes every column, not only a timestamp updated by some tables.
         args = [proposal["id"], ctx.workspace_id, proposal["version"]]

@@ -33,7 +33,7 @@ from app.graph.schemas import (
     NotesAction,
     NotesPlan,
     RouterDecision,
-    ResourceAction, ResourcePlan,
+    ResourceAction, ResourceActionType, ResourcePlan,
 )
 from app.domain.required import faltando
 from app.domain.money import cents_to_brl
@@ -459,11 +459,24 @@ Catálogo:
     else:
         plan = await gemini.structured(ResourcePlan, gemini.GEMINI_PARSE).ainvoke([('system',prompt),('human',user)])
         planned, calls = plan.actions, 1
+    if Domain.NOTAS.value in (state.get('domains') or []):
+        # ⚠️ **Nota e lembrete NOVOS têm um dono só: o nó de notas** (23/09/2026). Os dois
+        # extratores rodam em paralelo sobre a MESMA frase, e "crie a pasta App e ponha a
+        # nota X" voltava daqui com a pasta E a nota — que o nó de notas também criava. Era a
+        # nota em dobro (a daqui sem pasta) e, do lado da pasta, o unique estourando. Com
+        # notas no lote, criar nota/lembrete aqui é sempre eco; editar continua sendo daqui.
+        planned = [a for a in planned
+                   if not (a.type == ResourceActionType.CREATE and a.resource in {'notes', 'reminders'})]
     context=ExecContext(state['user_id'],state['workspace_id'],state.get('phone'),state['timezone'],state.get('text',''),state['source_message_id'])
     actions, prepared, incomplete, questions = [], [], [], []
     for action in planned:
         try:
             proposal=await resources.prepare(context,action)
+        except resources.JaExiste as aviso:
+            # Não falta dado nenhum: vira frase, nunca rascunho (rascunho envenenaria o
+            # próximo turno com um "cadastro incompleto" que não existe).
+            questions.append(aviso.mensagem_usuario)
+            continue
         except Level1Error as err:
             # A pergunta viaja junto do cadastro pendente: é o que deixa o
             # próximo turno saber o que foi perguntado e, se a MESMA pergunta
@@ -1062,7 +1075,8 @@ async def _gate(state: AgentState) -> dict:
     hoje = local_iso_date(state.get("timezone", "America/Sao_Paulo"))
     itens = [
         describe_for_confirmation(a, t or None, hoje=hoje)
-        for a, t, _ in pendentes
+        # na ordem em que o SIM executa (`_executar`): a pasta antes da nota que mora nela
+        for a, t, _ in sorted(pendentes, key=lambda p: not _cria_pasta(p[0]))
         if (t or {}).get("status") != "none"
     ]
     if not itens:
@@ -1136,8 +1150,12 @@ async def _executar(
     # ORIGINAL (é a chave de `executed_actions`). Lote comum: ordem e "falha
     # isolada não derruba as outras" de sempre.
     par = par_de_substituicao(acoes, alvos)
-    if par:
-        indexadas = sorted(indexadas, key=lambda ia: not _cria(ia[1]))
+    # Pasta nova do lote vem antes de tudo: "crie a pasta App e ponha a nota X" tem a nota
+    # (nó de notas) na frente da pasta (nó de cadastros) em `_actions`, e a nota criava a
+    # pasta antes — o cadastro da pasta batia no unique logo depois.
+    indexadas = sorted(
+        indexadas, key=lambda ia: (not _cria_pasta(ia[1]), bool(par) and not _cria(ia[1]))
+    )
     criacao_falhou = None
     # I3: no par o antecedente do próximo turno é a CRIAÇÃO, não o apagado (que roda
     # por último e seria `escritos[-1]`). `ctx.created[:marca]` corta o que veio depois.
@@ -1177,6 +1195,11 @@ async def _executar(
 def _cria(acao) -> bool:
     """A mesma régua de `par_de_substituicao`: `create_*` de finanças."""
     return isinstance(acao, FinanceAction) and acao.type.value.startswith("create_")
+
+
+def _cria_pasta(acao) -> bool:
+    return (isinstance(acao, ResourceAction) and acao.type == ResourceActionType.CREATE
+            and acao.resource == "folders")
 
 
 def _rotulo_novo(criacao: FinanceAction) -> str:
