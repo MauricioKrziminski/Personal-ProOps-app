@@ -18,6 +18,14 @@ export interface ItemAction {
    * natural lá, e melhor do que despejar dez pastas na lista principal.
    */
   actions?: ItemAction[];
+  /**
+   * Em que lado a ação aparece ao ARRASTAR o card (`Deslizavel`, spec 2026-09-23-arrastar-card).
+   * `fora` é a ação que repete o toque curto ("Ver detalhe"): não entra no arrasto e não faz o
+   * "Mais" aparecer.
+   */
+  arrasto?: 'direita' | 'esquerda' | 'fora';
+  /** Pode executar ao arrastar até o fim — só quando a tela oferece "Desfazer" no aviso. */
+  desfaz?: boolean;
 }
 
 interface SheetRequest {
