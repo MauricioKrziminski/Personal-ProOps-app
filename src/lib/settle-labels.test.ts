@@ -6,7 +6,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-import { caixaLabels, dueInline, dueLabel, settleHint, settleLabel, estadoDaLinha } from './settle-labels.ts';
+import { caixaLabels, dueInline, dueLabel, settleLabel, estadoDaLinha } from './settle-labels.ts';
 
 const AQUI = path.dirname(fileURLToPath(import.meta.url));
 
@@ -52,11 +52,6 @@ test('receita não vence — ela é esperada', () => {
   assert.equal(dueInline('income', null), 'previsto');
 });
 
-test('a dica também para de falar só em pagar', () => {
-  assert.match(settleHint('income'), /receber/);
-  assert.match(settleHint('expense'), /pagar/);
-});
-
 /**
  * O DAS é comprado dia 20 e a fatura vence dia 10 do mês seguinte. A linha
  * escrevia "vence 10/09" em cima de uma compra de 20/08 — a data da FATURA
@@ -79,14 +74,8 @@ test('fatura sem data ainda diz que é do cartão', () => {
   assert.equal(dueLabel('expense', null, { onCard: true }), 'Entra na próxima fatura');
 });
 
-test('no cartão a baixa não tira nada do caixa, e a dica não promete isso', () => {
-  assert.match(settleHint('expense', { onCard: true }), /fatura/);
-  assert.doesNotMatch(settleHint('expense', { onCard: true }), /projeção/);
-});
-
 test('fora do cartão nada mudou', () => {
   assert.equal(dueInline('expense', '05/10/2026', {}), 'previsto · vence 05/10/2026');
-  assert.equal(settleHint('income', {}), settleHint('income'));
 });
 
 /**

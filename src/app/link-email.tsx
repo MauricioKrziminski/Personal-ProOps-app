@@ -332,7 +332,7 @@ export default function LinkEmailScreen() {
           <View style={styles.note}>
             {cooldown > 0 ? (
               <ThemedText type="footnote" themeColor="textSecondary">
-                Não chegou? Você pode reenviar em {cooldown}s
+                Reenviar em {cooldown}s
               </ThemedText>
             ) : (
               <Button

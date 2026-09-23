@@ -1138,3 +1138,17 @@ test('título de seção fica a Space.md do conteúdo, no Section e em volta de 
   }
   assert.deepEqual(fora, [], 'SectionHead sem gap Space.md no View em volta');
 });
+
+/**
+ * Interruptor de formulário é `SwitchRow`: UMA linha e o switch (23/09/2026). Quatro
+ * formulários montavam à mão rótulo do `Field` + legenda + dica que trocava com o estado — três
+ * textos para um toggle só, a queixa de "texto demais".
+ *
+ * Fica de fora a lista de avisos do Perfil: lá o switch é o `trailing` de uma `Row` de lista, com
+ * título e subtítulo da linha — é o idioma de Ajustes, não de formulário.
+ */
+test('Switch de formulário só pelo SwitchRow', () => {
+  const permitidos = new Set(['src/components/ui/switch-row.tsx', 'src/components/profile/alert-preferences-section.tsx']);
+  const fora = offenders(/<Switch\b/).filter((o) => !permitidos.has(o.split(':')[0]));
+  assert.deepEqual(fora, [], 'monte o interruptor com <SwitchRow>');
+});

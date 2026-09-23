@@ -119,7 +119,7 @@ export function CycleDayPicker({
         {value == null
           ? 'do dia 1 ao último dia de cada mês'
           : value >= 29
-            ? `até o dia ${value} de cada mês, ou o último dia no mês mais curto`
+            ? `até o dia ${value} (ou o último)`
             : `do dia ${value + 1} de um mês ao dia ${value} do seguinte`}
       </ThemedText>
     </>

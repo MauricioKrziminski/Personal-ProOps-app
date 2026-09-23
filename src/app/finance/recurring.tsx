@@ -1,6 +1,6 @@
 import { useInvalidateFinance } from '@/hooks/use-finance';
 import { useMemo, useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, Switch, View } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import Animated, { FadeIn, FadeInDown } from 'react-native-reanimated';
 import { Stack, router, useLocalSearchParams } from 'expo-router';
 import { useMutation, useQuery } from '@tanstack/react-query';
@@ -22,6 +22,7 @@ import { Screen } from '@/components/ui/screen';
 import { Deslizavel } from '@/components/ui/deslizavel';
 import { HeroLabel, SectionHead } from '@/components/ui/section-head';
 import { Search } from '@/components/ui/search';
+import { SwitchRow } from '@/components/ui/switch-row';
 import { Segmented } from '@/components/ui/segmented';
 import { Skeleton, SkeletonRow } from '@/components/ui/skeleton';
 import { useToast } from '@/components/ui/toast';
@@ -559,10 +560,6 @@ export default function RecurringScreen() {
             <Money cents={entra} variant="title2" tone="success" />
           </View>
         </View>
-        <ThemedText type="small" themeColor="textSecondary">
-          Só o que já foi materializado pelas suas séries — os lançamentos ainda não confirmados
-          dos próximos 30 dias.
-        </ThemedText>
       </Card>
     </Animated.View>
   ) : null;
@@ -597,7 +594,7 @@ export default function RecurringScreen() {
                   {r.last_error}
                 </ThemedText>
                 <ThemedText type="small" themeColor="textSecondary" style={tabular}>
-                  tentativa {r.run_attempts} de 5 · retomar zera o contador
+                  tentativa {r.run_attempts} de 5
                 </ThemedText>
                 <View style={styles.acoesErro}>
                   <Button
@@ -773,8 +770,7 @@ export default function RecurringScreen() {
                 // por desenho e mudar a cadência implicaria remontar o que já foi
                 // materializado — o resumo fica, para a pessoa saber o que está mexendo.
                 <ThemedText type="small" themeColor="textSecondary">
-                  {describeRRule(form.rrule ?? '')}, desde {form.inicio}. Para mudar a
-                  frequência, apague a série e crie outra.
+                  {describeRRule(form.rrule ?? '')} · desde {form.inicio}
                 </ThemedText>
               ) : (
               <Field label="Repete">
@@ -796,7 +792,7 @@ export default function RecurringScreen() {
               )}
 
               {!form.id && form.preset === 'monthly' ? (
-                <Field label="A cada quantos meses" hint="1 = todo mês. 2 = mês sim, mês não.">
+                <Field label="A cada quantos meses">
                   {/* Campo de quantidade (`QuantityField`): "0" não existe, então não há erro a mostrar. */}
                   <QuantityField
                     value={Number(form.intervalo) || 1}
@@ -810,7 +806,7 @@ export default function RecurringScreen() {
               {form.id ? null : (
               <Field
                 label="Começa em"
-                hint="Âncora da série, não muda depois. No passado, lança as antigas de uma vez."
+                hint={inicioOk && brToISO(form.inicio) < localISODate() ? 'Já lança as passadas' : undefined}
                 error={form.inicio && !inicioOk ? 'Data inválida (dd/mm/aaaa)' : undefined}>
                 <DatePickerField
                   value={form.inicio}
@@ -830,14 +826,6 @@ export default function RecurringScreen() {
               </Field>
               )}
 
-              {!form.id && rrulePrevia ? (
-                <Animated.View key={rrulePrevia} entering={FadeIn.duration(Motion.duration.fast)}>
-                  <ThemedText type="small" themeColor="tint">
-                    {describeRRule(rrulePrevia)}, a partir de {form.inicio}.
-                  </ThemedText>
-                </Animated.View>
-              ) : null}
-
               {/*
                 ⚠️ **O placeholder era uma DATA PLAUSÍVEL (`31/12/2026`), e o campo lia como
                 preenchido.** `placeholderTextColor` é `textSecondary`, a mesma cor de subtítulo:
@@ -846,13 +834,12 @@ export default function RecurringScreen() {
                 assim 'Termina em'? Se é recorrente não termina"* —, ou seja, ele entendeu que o
                 salário dele pararia no fim do ano.
 
-                Placeholder diz FORMATO; a dica diz o que o vazio SIGNIFICA. A série sem fim é o
+                O placeholder diz o que o vazio SIGNIFICA ("Sem fim"). A série sem fim é o
                 caso normal (salário, aluguel); a data existe para as que realmente acabam —
                 financiamento de 48x, assinatura com cancelamento marcado.
               */}
               <Field
                 label="Termina em"
-                hint="Em branco não tem fim. Preencha só se a série acaba."
                 error={form.fim && !fimOk ? 'Informe data válida igual ou posterior ao início' : undefined}>
                 <DatePickerField
                   value={form.fim}
@@ -874,37 +861,11 @@ export default function RecurringScreen() {
                 de terceiro é Pix que pode não chegar. Por isso receita nova nasce DESLIGADA —
                 ver `FORM_VAZIO` e o `20260909110000`.
               */}
-              <Field
-                label={form.kind === 'income' ? 'Receber automático' : 'Confirmar automático'}
-                hint={
-                  form.kind === 'income'
-                    ? form.autoConfirm
-                      ? 'Ligado, entra no saldo sozinho na data — serve para salário, que cai sem falta.'
-                      : 'Desligado, fica esperando você confirmar que o dinheiro caiu. É o certo para Pix de terceiro.'
-                    : form.autoConfirm
-                      ? 'Ligado, o lançamento já entra como pago na data.'
-                      : 'Desligado, ele fica esperando você dizer que pagou.'
-                }>
-                <View style={styles.switchRow}>
-                  <ThemedText type="small" themeColor="textSecondary">
-                    {form.kind === 'income' ? 'Entrar como recebido na data' : 'Entrar como pago na data'}
-                  </ThemedText>
-                  <Switch
-                    accessibilityLabel={
-                      form.kind === 'income'
-                        ? 'Marcar como recebido automaticamente na data'
-                        : 'Confirmar automaticamente na data'
-                    }
-                    accessibilityHint="Desligado, o lançamento fica pendente esperando você confirmar"
-                    value={form.autoConfirm}
-                    onValueChange={(autoConfirm) => setForm({ ...form, autoConfirm })}
-                  />
-                </View>
-              </Field>
-
-              <ThemedText type="small" themeColor="textSecondary">
-                Os lançamentos aparecem após o processamento da série. Criar aqui não registra um gasto avulso.
-              </ThemedText>
+              <SwitchRow
+                label={form.kind === 'income' ? 'Entra como recebido na data' : 'Entra como pago na data'}
+                value={form.autoConfirm}
+                onValueChange={(autoConfirm) => setForm({ ...form, autoConfirm })}
+              />
             </ScrollView>
           ) : null}
       </Sheet>
@@ -974,11 +935,5 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     flexWrap: 'wrap',
     gap: Space.sm,
-  },
-  switchRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    gap: Space.md,
   },
 });

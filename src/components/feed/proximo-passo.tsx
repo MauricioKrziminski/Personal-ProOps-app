@@ -66,9 +66,6 @@ export function ProximoPassoCard({
           <Icon name="ellipsis" size="sm" color="text" />
         </Pressable>
       </View>
-      <ThemedText type="small" themeColor="textSecondary" style={styles.semEncolher}>
-        {passo.texto}
-      </ThemedText>
       <View style={styles.acao}>
         <Button label={passo.acao} variant="secondary" size="sm" onPress={onAbrir} />
       </View>

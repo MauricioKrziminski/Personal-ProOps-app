@@ -563,11 +563,11 @@ export default function DebtsScreen() {
             value={estrategia}
             onChange={setEstrategia}
           />
-          <ThemedText type="small" themeColor="textSecondary">
-            {estrategia === 'avalanche'
-              ? 'Ordenado pelas taxas conhecidas. Parcelas simples ficam ao fim, pois a taxa não foi informada.'
-              : 'Atacar a de saldo menor primeiro quita a primeira mais rápido.'}
-          </ThemedText>
+          {estrategia === 'avalanche' ? (
+            <ThemedText type="small" themeColor="textSecondary">
+              Sem taxa informada fica por último
+            </ThemedText>
+          ) : null}
           {payoff.isLoading ? lista.map((d) => (
             <View key={d.id} style={styles.ordemLinha}>
               <Skeleton width={18} height={18} />
@@ -596,9 +596,6 @@ export default function DebtsScreen() {
               <Money cents={Number(p.remaining_cents)} variant="subhead" tone="danger" />
             </Animated.View>
           ))}
-          <ThemedText type="small" themeColor="textSecondary">
-            Cada dívida contada sozinha, sem supor que você joga a parcela quitada na próxima.
-          </ThemedText>
         </Card>
       ) : null}
     </View>
@@ -815,7 +812,7 @@ export default function DebtsScreen() {
             <ScrollView contentContainerStyle={styles.sheetBody} keyboardShouldPersistTaps="handled">
               {pagando.calculation_mode === 'fixed_installments' ? <Field label="Valor desta parcela">
                 <Money cents={pagoCents} variant="headline" concealable={false} />
-              </Field> : <Field label="Quanto você pagou" hint="Pagar a mais abate mais do saldo.">
+              </Field> : <Field label="Quanto você pagou">
                 <MoneyField valueCents={pagoCents} onChangeCents={setPagoCents} />
               </Field>}
 
@@ -861,7 +858,7 @@ export default function DebtsScreen() {
                 </Card>
               ) : null}
 
-              <Field label="Conta que paga" hint="Opcional — o lançamento fica sem conta se você não escolher.">
+              <Field label="Conta que paga">
                 <AccountPicker
                   accounts={pagadoras}
                   value={contaId}
@@ -1012,16 +1009,14 @@ export default function DebtsScreen() {
 
               <Field
                 label="Valor original"
-                hint="Deixe zerado se você ainda não pagou nada. É daqui que sai a barra de progresso.">
+                hint="Zero se ainda não pagou nada">
                 <MoneyField
                   valueCents={form.principalCents}
                   onChangeCents={(principalCents) => setForm({ ...form, principalCents })}
                 />
               </Field>
 
-              <Field
-                label="Juros por mês"
-                hint="A taxa mensal do contrato. Zero só se não houver juros.">
+              <Field label="Juros por mês">
                 <View>
                   <TextField
                     value={form.taxa}
@@ -1067,12 +1062,12 @@ export default function DebtsScreen() {
                 <View style={styles.aviso}>
                   <Icon name="exclamationmark.triangle" size="sm" color="warning" />
                   <ThemedText type="small" themeColor="textSecondary" style={styles.avisoTexto}>
-                    Confira se a taxa do contrato é mensal. Taxa anual efetiva não deve ser dividida por 12.
+                    Taxa alta: confira se é ao mês
                   </ThemedText>
                 </View>
               ) : null}
 
-              <Field label="Valor da parcela" hint="O valor do contrato. A amortização é estimativa Price.">
+              <Field label="Valor da parcela">
                 <MoneyField valueCents={form.installmentCents} onChangeCents={(installmentCents) => setForm({ ...form, installmentCents })} />
               </Field>
               <Field label="Parcelas que faltam">
@@ -1103,8 +1098,7 @@ export default function DebtsScreen() {
                 `frontend.md` ("a tela se remonta debaixo do dedo"), só que para cima.
               */}
               {form.parcelas !== '' && (
-                <Field label="Parcelas já pagas"
-                  hint="Já está no saldo devedor acima — não desconto de novo.">
+                <Field label="Parcelas já pagas">
                   {/*
                     ⚠️ **Sem chip "Nenhuma", e o campo nasce em `0`** (15/09/2026, a mesma régua
                     do formulário de lançamento). O chip escrevia exatamente o valor que o campo
@@ -1124,7 +1118,7 @@ export default function DebtsScreen() {
               )}
               {form.parcelas !== '' && form.historyConfirmed && (
                 <ThemedText type="small" themeColor="textSecondary">
-                  {`${form.installmentsPaid} pagas + ${form.parcelas} restantes = ${Number(form.parcelas) + form.installmentsPaid} parcelas no total.`}
+                  {`${Number(form.parcelas) + form.installmentsPaid} parcelas no total`}
                 </ThemedText>
               )}
               </>}

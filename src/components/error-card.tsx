@@ -34,10 +34,7 @@ export function ErrorCard({ onRetry }: { onRetry: () => void }) {
   return (
     <Card style={styles.card}>
       <Icon name="exclamationmark.triangle" size="xl" color="warning" />
-      <ThemedText type="headline">Algo deu errado</ThemedText>
-      <ThemedText type="small" themeColor="textSecondary" style={styles.hint}>
-        Não conseguimos carregar os dados agora.
-      </ThemedText>
+      <ThemedText type="headline">Não deu para carregar</ThemedText>
       {/*
         ⚠️ `alignSelf` explícito: sem `block`, o `Button` traz `alignSelf: 'flex-start'` (para
         um pai com `alignItems: 'stretch'` não o esticar) e isso GANHA do `alignItems: 'center'`
@@ -56,8 +53,5 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: Space.sm,
     paddingVertical: Space.xxl,
-  },
-  hint: {
-    textAlign: 'center',
   },
 });

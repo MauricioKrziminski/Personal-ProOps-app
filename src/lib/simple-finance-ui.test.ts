@@ -903,7 +903,7 @@ test('Hoje: com os passos todos feitos o card não aparece', () => {
   assert.ok(!tipos(ui).includes('SetupChecklist'));
 });
 
-const passoImportar = { id: 'importar', titulo: 'Traga a fatura do cartão', texto: 'x', acao: 'Importar fatura', icon: 'square.and.arrow.down', href: '/import?conta=c1' };
+const passoImportar = { id: 'importar', titulo: 'Traga a fatura do cartão', acao: 'Importar fatura', icon: 'square.and.arrow.down', href: '/import?conta=c1' };
 
 test('Hoje: o Próximo passo espera os Primeiros passos acabarem', () => {
   const ui = screen(hojeFile, {

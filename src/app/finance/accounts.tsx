@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { ScrollView, StyleSheet, Switch, View } from 'react-native';
+import { ScrollView, StyleSheet, View } from 'react-native';
 import Animated, { FadeInDown } from 'react-native-reanimated';
 import { Stack, router } from 'expo-router';
 import type { SymbolViewProps } from 'expo-symbols';
@@ -20,6 +20,7 @@ import { formatNumberBR } from '@/lib/dates';
 import { Icon } from '@/components/ui/icon';
 import { Money } from '@/components/ui/money';
 import { Row, Section } from '@/components/ui/row';
+import { SwitchRow } from '@/components/ui/switch-row';
 import { Segmented } from '@/components/ui/segmented';
 import { Screen } from '@/components/ui/screen';
 import { HeroLabel } from '@/components/ui/section-head';
@@ -368,7 +369,7 @@ export default function AccountsScreen() {
           <Money cents={caixa} variant="money" tone={caixa < 0 ? 'danger' : 'text'} />
           {aReceber > 0 ? (
             <ThemedText type="footnote" themeColor="textSecondary" style={tabular}>
-              mais {brl(aReceber)} previstos, que entram quando você confirmar
+              + {brl(aReceber)} previstos
             </ThemedText>
           ) : null}
           <View style={styles.heroSplit}>
@@ -386,10 +387,6 @@ export default function AccountsScreen() {
               />
             </View>
           </View>
-          <ThemedText type="small" themeColor="textSecondary">
-            Cartão fica de fora do disponível: fatura é dívida, não saldo. Parcela futura já
-            lançada entra na conta.
-          </ThemedText>
         </Card>
       </Animated.View>
     ) : null;
@@ -415,7 +412,6 @@ export default function AccountsScreen() {
     <Section title="Conta padrão">
       <Row
         title="Não definir"
-        subtitle="lançamento sem conta continua sem conta"
         onPress={() => definirPadrao.mutate(null)}
         chevron={false}
         accessibilityState={{ selected: contaPadrao.data == null }}
@@ -442,7 +438,6 @@ export default function AccountsScreen() {
     <Section>
       <Row
         title="Sem conta"
-        subtitle="lançamentos que não citam conta"
         icon="questionmark.circle"
         onPress={() =>
           router.push({ pathname: '/finance/transactions', params: { accountId: NO_ACCOUNT } })
@@ -569,7 +564,6 @@ export default function AccountsScreen() {
                     id: t.value,
                     label: t.label,
                     icon: t.icon,
-                    meta: 'meta' in t ? t.meta : undefined,
                   }))}
                   value={form.type}
                   /* Nenhuma opção tem `id: null`, então o campo nunca devolve nulo. */
@@ -639,7 +633,7 @@ export default function AccountsScreen() {
                   */}
                   <Field
                     label="Compra no dia do fechamento"
-                    hint="Varia por banco. Só vale para compras novas.">
+                    hint="Só vale para compras novas">
                     <Segmented
                       value={form.fechamentoInclusivo ? 'atual' : 'seguinte'}
                       onChange={(v) =>
@@ -659,29 +653,14 @@ export default function AccountsScreen() {
                     precisa da feature. Por isso é escolha, e é aqui: junto do ciclo, que é o
                     outro campo que só existe em cartão.
                   */}
-                  <Field
-                    label="Fatura não paga vai para a próxima"
-                    hint={
-                      form.rotativoAuto
-                        ? 'No dia seguinte ao vencimento, o saldo em aberto vira uma linha na próxima fatura.'
-                        : 'Desligado, a fatura fica em aberto e você decide na tela dela.'
-                    }>
-                    <View style={styles.switchRow}>
-                      <ThemedText type="small" themeColor="textSecondary">
-                        Adiar sozinho depois do vencimento
-                      </ThemedText>
-                      <Switch
-                        accessibilityLabel="Adiar a fatura não paga automaticamente"
-                        accessibilityHint="Desligado, a fatura vencida fica em aberto até você decidir"
-                        value={form.rotativoAuto}
-                        onValueChange={(rotativoAuto: boolean) => setForm({ ...form, rotativoAuto })}
-                      />
-                    </View>
-                  </Field>
+                  <SwitchRow
+                    label="Adiar fatura vencida sozinho"
+                    value={form.rotativoAuto}
+                    onValueChange={(rotativoAuto: boolean) => setForm({ ...form, rotativoAuto })}
+                  />
 
                   <Field
-                    label="Juros do rotativo de partida (% ao mês)"
-                    hint="Serve de partida: na primeira cobrança real o app passa a usar a taxa deste cartão."
+                    label="Juros do rotativo (% ao mês)"
                     error={
                       form.rotativoRate.trim() && !taxaValida(form.rotativoRate)
                         ? 'Use um número de 0 a 100, como 15,5'
@@ -697,9 +676,7 @@ export default function AccountsScreen() {
                     />
                   </Field>
 
-                  <Field
-                    label="Conta que paga a fatura"
-                    hint="Já vem sugerida na hora de registrar o pagamento.">
+                  <Field label="Conta que paga a fatura">
                     {/*
                       `AccountPicker`, não uma `Section` de `Row` com checkmark:
                       era a sexta implementação do mesmo campo no app, e ela nasce
@@ -716,7 +693,7 @@ export default function AccountsScreen() {
                   </Field>
                 </>
               ) : (
-                <Field label="Saldo inicial" hint="O que já estava na conta antes de você usar o app.">
+                <Field label="Saldo inicial">
                   <MoneyField
                     valueCents={form.initialCents}
                     onChangeCents={(initialCents) => setForm({ ...form, initialCents })}
@@ -740,12 +717,6 @@ const styles = StyleSheet.create({
   paneBody: {
     gap: Space.xl,
     minWidth: 0,
-  },
-  switchRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    gap: Space.md,
   },
   hero: {
     gap: Space.sm,

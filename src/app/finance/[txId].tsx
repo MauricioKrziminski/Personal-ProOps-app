@@ -36,7 +36,7 @@ import {
 import { useTelaPronta } from '@/hooks/use-tela-pronta';
 import { formatBRL, formatDateBR, localISODate } from '@/hooks/use-items';
 import { confirmDestructive } from '@/lib/item-actions';
-import { dueLabel, estadoDaLinha, settleDone, settleHint, settleLabel } from '@/lib/settle-labels';
+import { dueLabel, estadoDaLinha, settleDone, settleLabel } from '@/lib/settle-labels';
 import { useAdaptiveWindow } from '@/hooks/use-adaptive-window';
 
 /**
@@ -302,13 +302,12 @@ export default function TransactionDetailScreen() {
                 ? 'Ainda não caiu'
                 : estado === 'previsto'
                   ? 'Ainda não aconteceu'
-                  : 'Já aconteceu, mas ainda não saiu do caixa'
+                  : 'Ainda não saiu do caixa'
           }>
           <Row
             title={dueLabel(tx.kind, tx.due_at ? formatDateBR(tx.due_at) : null, {
               onCard: tx.invoice_id !== null,
             })}
-            subtitle={settleHint(tx.kind, { onCard: tx.invoice_id !== null })}
             icon="clock"
             trailing={
               <Button
@@ -373,8 +372,8 @@ export default function TransactionDetailScreen() {
               title={serie ? `Repete ${describeRRule(serie.rrule)}` : 'Faz parte de uma recorrência'}
               subtitle={
                 serie
-                  ? `${brl(serie.amount_cents)} por vez · editar a série`
-                  : 'Editar a série que gera este lançamento'
+                  ? `${brl(serie.amount_cents)} por vez`
+                  : 'Ver série'
               }
               icon="repeat"
               accessibilityLabel="Editar a série recorrente que gerou este lançamento"
@@ -394,8 +393,8 @@ export default function TransactionDetailScreen() {
               }
               subtitle={
                 plano
-                  ? `${brl(plano.total_cents)} no total · ver todas as parcelas`
-                  : 'Ver todas as parcelas'
+                  ? `${brl(plano.total_cents)} no total`
+                  : 'Ver parcelas'
               }
               icon="rectangle.split.3x1"
               accessibilityLabel="Ver a compra parcelada inteira"
@@ -404,15 +403,6 @@ export default function TransactionDetailScreen() {
           ) : null}
         </Section>
       )}
-
-      {/* Comprovante: honesto sobre o que ainda não existe, em vez de um botão que não faz nada. */}
-      <Section title="Comprovante">
-        <Row
-          title="Nenhum comprovante guardado"
-          subtitle="Anexo ainda não é salvo pelo app nem pelo WhatsApp"
-          icon="paperclip"
-        />
-      </Section>
     </>
   );
 

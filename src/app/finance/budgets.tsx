@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, Switch, View } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import Animated, { FadeInDown } from 'react-native-reanimated';
 import { Stack, router } from 'expo-router';
 import { useQuery } from '@tanstack/react-query';
@@ -22,6 +22,7 @@ import { AdaptivePanes } from '@/components/ui/adaptive-panes';
 import { Screen } from '@/components/ui/screen';
 import { Deslizavel } from '@/components/ui/deslizavel';
 import { HeroLabel, SectionHead } from '@/components/ui/section-head';
+import { SwitchRow } from '@/components/ui/switch-row';
 import { Segmented } from '@/components/ui/segmented';
 import { Skeleton, SkeletonHero, SkeletonList, SkeletonRow } from '@/components/ui/skeleton';
 import { ProgressBar } from '@/components/ui/sparkline';
@@ -633,11 +634,7 @@ export default function BudgetsScreen() {
 
           {form ? (
             <ScrollView contentContainerStyle={styles.sheetBody} keyboardShouldPersistTaps="handled">
-              <Field
-                label="Categoria"
-                hint={
-                  form.editing ? 'A categoria é a identidade do orçamento e não muda.' : undefined
-                }>
+              <Field label="Categoria">
                 {form.editing ? (
                   <ThemedText type="default">{form.category}</ThemedText>
                 ) : (
@@ -660,9 +657,7 @@ export default function BudgetsScreen() {
                 o valor sem saber onde ele ia cair — é a régua de `frontend.md`, "controle que
                 muda o que os outros campos querem dizer vem antes deles".
               */}
-              <Field
-                label="Escopo"
-                hint={`Só este mês sobrescreve o limite padrão em ${nomeDoMes(month)} e não mexe nos outros.`}>
+              <Field label="Vale para">
                 <Segmented
                   options={[
                     { value: 'default', label: 'Todo mês' },
@@ -680,25 +675,11 @@ export default function BudgetsScreen() {
                 />
               </Field>
 
-
-              <Field
-                label="Acumular sobra"
-                hint={
-                  form.rollover
-                    ? 'A sobra do mês soma no limite do seguinte. Um mês só, sem empilhar.'
-                    : 'Sem acúmulo: cada mês começa do zero.'
-                }>
-                <View style={styles.switchRow}>
-                  <ThemedText type="small" themeColor="textSecondary">
-                    Somar a sobra do mês anterior
-                  </ThemedText>
-                  <Switch
-                    accessibilityLabel="Acumular a sobra do mês anterior"
-                    value={form.rollover}
-                    onValueChange={(rollover) => setForm({ ...form, rollover })}
-                  />
-                </View>
-              </Field>
+              <SwitchRow
+                label="Somar a sobra do mês anterior"
+                value={form.rollover}
+                onValueChange={(rollover) => setForm({ ...form, rollover })}
+              />
             </ScrollView>
           ) : null}
       </Sheet>
@@ -760,11 +741,5 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     flexWrap: 'wrap',
     gap: Space.sm,
-  },
-  switchRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    gap: Space.md,
   },
 });

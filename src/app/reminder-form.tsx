@@ -489,11 +489,6 @@ function ReminderForm({
                   Último erro: {editing.last_error}
                 </ThemedText>
               ) : null}
-              <ThemedText type="small" themeColor="textSecondary">
-                {editing?.active
-                  ? 'Vamos tentar de novo no próximo horário.'
-                  : 'Salvar ou reativar zera o contador e a série volta a valer.'}
-              </ThemedText>
               {editing?.active ? null : (
                 <Button
                   label="Reativar"
@@ -538,7 +533,7 @@ function ReminderForm({
           {isPast && !errors.date && !errors.time ? (
             <Animated.View entering={FadeIn.duration(Motion.duration.base)}>
               <ThemedText type="small" themeColor="warning">
-                Esse horário já passou — o lembrete dispara no próximo minuto.
+                Já passou: dispara no próximo minuto
               </ThemedText>
             </Animated.View>
           ) : null}
@@ -567,8 +562,8 @@ function ReminderForm({
                   label="Onde avisar"
                   hint={
                     field.value === 'push'
-                      ? 'Push é grátis. Se a notificação estiver desligada no aparelho, esse lembrete não chega.'
-                      : 'Push é grátis; WhatsApp usa um template pago e só sai com "Avisos financeiros no WhatsApp" ligado no Perfil.'
+                      ? 'Precisa das notificações ligadas'
+                      : 'Exige avisos de WhatsApp no Perfil'
                   }>
                   <Segmented options={CHANNELS} value={field.value} onChange={field.onChange} />
                 </Field>
@@ -819,7 +814,7 @@ function RecurrenceEditor({
         <View style={styles.block}>
           <ThemedText type="smallBold">Repetir</ThemedText>
           <ThemedText type="small" themeColor="textSecondary">
-            Regra avançada, criada pelo WhatsApp: {describeRRule(value)}
+            Criada pelo WhatsApp: {describeRRule(value)}
           </ThemedText>
           {/* Um toque não pode apagar uma regra que a IA acertou — daí a confirmação. */}
           <Button
@@ -843,7 +838,7 @@ function RecurrenceEditor({
   return (
     <Card>
       <View style={styles.block}>
-        <Field label="Repetir" hint={describeRRule(value)}>
+        <Field label="Repetir">
           {/*
             Cinco opções não cabem num `Segmented`: a 384dp × 1,3 cada célula fica
             com ~62pt e "Não repete" precisa de ~97 — a mesma medida que tirou o
@@ -888,7 +883,7 @@ function RecurrenceEditor({
           <Animated.View entering={FadeIn.duration(Motion.duration.base)} layout={linear}>
             <Field
               label="Em quais dias"
-              hint={state.byday.length === 0 ? 'Sem nenhum dia marcado, repete no dia da semana escolhido acima.' : undefined}>
+              hint={state.byday.length === 0 ? 'Vazio: o dia da data acima' : undefined}>
               <View style={styles.chipRow}>
                 {WEEKDAYS.map((day) => (
                   <Chip
@@ -919,7 +914,7 @@ function RecurrenceEditor({
                   : state.bymonthday.length > 4
                     ? `Isso vai disparar ${state.bymonthday.length} vezes por mês.`
                     : state.bymonthday.length === 0
-                      ? 'Sem nenhum dia marcado, repete no dia escolhido acima.'
+                      ? 'Vazio: o dia da data acima'
                       : undefined
               }>
               <View style={styles.chipRow}>

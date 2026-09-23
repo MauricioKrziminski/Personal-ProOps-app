@@ -14,7 +14,6 @@ export type ProximoId = 'importar' | 'projecao' | 'lembrete' | 'parcelada' | 'no
 export type Proximo = {
   id: ProximoId;
   titulo: string;
-  texto: string;
   acao: string;
   icon: 'square.and.arrow.down' | 'chart.line.uptrend.xyaxis' | 'bell' | 'creditcard.and.123' | 'note.text';
   href: string;
@@ -29,7 +28,6 @@ export function proximoPasso(
       id: 'importar',
       aplica: Boolean(i.cartaoId) && !i.importou,
       titulo: 'Traga a fatura do cartão',
-      texto: 'O arquivo do banco vira lançamentos organizados.',
       acao: 'Importar fatura',
       icon: 'square.and.arrow.down',
       href: `/import?conta=${i.cartaoId ?? ''}`,
@@ -38,7 +36,6 @@ export function proximoPasso(
       id: 'projecao',
       aplica: true,
       titulo: 'Veja até quando o dinheiro dura',
-      texto: 'Mês a mês, com o que já está contratado.',
       acao: 'Ver projeção',
       icon: 'chart.line.uptrend.xyaxis',
       href: '/finance/forecast',
@@ -47,7 +44,6 @@ export function proximoPasso(
       id: 'lembrete',
       aplica: i.lembretes === 0,
       titulo: 'Peça um lembrete',
-      texto: '“Me lembra do aluguel todo dia 5.”',
       acao: 'Criar lembrete',
       icon: 'bell',
       href: '/reminder-form',
@@ -56,7 +52,6 @@ export function proximoPasso(
       id: 'parcelada',
       aplica: Boolean(i.cartaoId) && i.parceladas === 0,
       titulo: 'Compra parcelada se organiza sozinha',
-      texto: 'Lance uma vez: as parcelas caem em cada fatura.',
       acao: 'Lançar compra',
       icon: 'creditcard.and.123',
       href: '/finance/transaction-form',
@@ -65,7 +60,6 @@ export function proximoPasso(
       id: 'nota',
       aplica: i.notas === 0,
       titulo: 'Anote do seu jeito',
-      texto: 'Lista, ideia, recado — tudo no mesmo lugar.',
       acao: 'Abrir notas',
       icon: 'note.text',
       href: '/notes',

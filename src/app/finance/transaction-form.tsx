@@ -2,7 +2,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useState } from 'react';
 import { Controller, useForm, useWatch } from 'react-hook-form';
-import { StyleSheet, Switch, View } from 'react-native';
+import { StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Animated, { FadeIn } from 'react-native-reanimated';
 import { KeyboardAwareScrollView } from 'react-native-keyboard-controller';
@@ -20,6 +20,7 @@ import { Field, MoneyField, TextField } from '@/components/ui/field';
 import { Icon } from '@/components/ui/icon';
 import { Screen } from '@/components/ui/screen';
 import { TaskHeader } from '@/components/ui/task-header';
+import { SwitchRow } from '@/components/ui/switch-row';
 import { Segmented } from '@/components/ui/segmented';
 import { Skeleton } from '@/components/ui/skeleton';
 import { ToastDoModal, useToast } from '@/components/ui/toast';
@@ -60,10 +61,8 @@ import {
 } from '@/lib/finance-form';
 import { QuantityField } from '@/components/ui/quantity-field';
 import {
-  autoConfirmHint,
   autoConfirmLabel,
   caixaLabels,
-  dueFieldHint,
   dueFieldLabel,
 } from '@/lib/settle-labels';
 import { confirmDestructive, showItemActions } from '@/lib/item-actions';
@@ -260,7 +259,6 @@ function TransactionForm({
   const accountId = useWatch({ control, name: 'account_id' });
   const amountCents = useWatch({ control, name: 'amount_cents' });
   const installmentCount = useWatch({ control, name: 'installments' });
-  const paidHistory = useWatch({ control, name: 'paid_installments' });
   const pending = useWatch({ control, name: 'pending' });
   const errors = formState.errors;
 
@@ -339,7 +337,7 @@ function TransactionForm({
   const dicaDoValorDaCompra = ((): string | undefined => {
     if (!naCompra) return undefined;
     if (!plano || !contrato || !compra) return 'Não deu para carregar a compra desta parcela.';
-    if (abertas === 0) return `As ${plano.installments} parcelas já foram pagas: o valor não muda mais.`;
+    if (abertas === 0) return 'Tudo pago: valor travado';
     if (!valorDaCompraMudou) {
       return unidade === 'parcela'
         ? `Parcela ${editing?.installment_no ?? '?'} de ${plano.installments} · compra de ${formatBRL(totalOriginal)}`
@@ -704,7 +702,7 @@ function TransactionForm({
         contentInsetAdjustmentBehavior="automatic">
         {editing?.debt_id ? (
           <Card>
-            <ThemedText type="small" themeColor="textSecondary">Pagamento de dívida. Correções de valor recalculam o saldo somente no pagamento mais recente com histórico de amortização.</ThemedText>
+            <ThemedText type="small" themeColor="textSecondary">É pagamento de uma dívida.</ThemedText>
             <Button label="Ver dívidas" icon="arrow.up.right" variant="secondary" size="sm" onPress={() => router.push('/finance/debts')} />
           </Card>
         ) : null}
@@ -717,8 +715,8 @@ function TransactionForm({
         {editing && (editing.recurring_id || editing.installment_plan_id) ? (
           <Note icon="arrow.triangle.branch">
             {editing.recurring_id
-              ? 'Faz parte de uma série. Ao salvar, você escolhe se muda só esta ou as futuras.'
-              : 'É uma parcela: o valor muda a compra; o resto, você escolhe se vale só para esta ou as futuras.'}
+              ? 'Faz parte de uma série.'
+              : 'É parcela de uma compra.'}
           </Note>
         ) : null}
 
@@ -855,11 +853,7 @@ function TransactionForm({
           render={({ field }) => (
             <Field
               label={kind === 'transfer' ? 'Da conta' : 'Conta'}
-              hint={
-                (accounts ?? []).length === 0
-                  ? 'Lançamento sem conta também vale — ele entra no caixa.'
-                  : undefined
-              }>
+>
               {(accounts ?? []).length === 0 ? (
                 <Button
                   label="Cadastrar uma conta"
@@ -917,8 +911,7 @@ function TransactionForm({
               render={({ field }) => (
                 <Field
                   label="Parcelas"
-                  error={errors.installments?.message}
-                  hint={field.value === 1 ? 'À vista.' : undefined}>
+                  error={errors.installments?.message}>
                   <QuantityField
                     value={field.value}
                     min={faixaDeParcelas(0).min}
@@ -953,7 +946,7 @@ function TransactionForm({
                 amountCents > 0
                   ? unidade === 'parcela'
                     ? `${installmentCount}x de ${formatBRL(amountCents)} · total ${formatBRL(totalDigitado(amountCents, 'parcela', installmentCount))}`
-                    : `${installmentCount}x de ${formatBRL(Math.floor(amountCents / installmentCount))} — a última fecha os centavos`
+                    : `${installmentCount}x de ${formatBRL(Math.floor(amountCents / installmentCount))}`
                   : undefined
               }>
               <Segmented options={UNIDADES_DO_VALOR} value={unidade} onChange={setUnidade} />
@@ -963,8 +956,7 @@ function TransactionForm({
 
         {podeInformarHistorico && installmentCount > 1 && (
           <Controller control={control} name="paid_installments" render={({ field }) => (
-            <Field label="Quantas parcelas iniciais já foram pagas?" error={errors.paid_installments?.message}
-              hint="Zero se nenhuma foi paga. Data passada não conta como pagamento.">
+            <Field label="Parcelas já pagas" error={errors.paid_installments?.message}>
               {/*
                 ⚠️ **Sem chip "Nenhuma" ao lado.** O campo nasce em `0`, então o chip só podia
                 escrever o valor que já estava na tela — dois controles para o mesmo dado, e o
@@ -972,11 +964,6 @@ function TransactionForm({
               */}
               <TextField value={field.value} onChangeText={field.onChange} keyboardType="number-pad" maxLength={2}
                 placeholder="0" accessibilityLabel="Parcelas iniciais já pagas" />
-              {paidHistory !== '' && /^\d+$/.test(paidHistory) && Number(paidHistory) <= installmentCount && (
-                <ThemedText type="small" themeColor="textSecondary">
-                  {Number(paidHistory) === 0 ? `As ${installmentCount} parcelas ficam pendentes.` : `${paidHistory} parcelas iniciais pagas; ${installmentCount - Number(paidHistory)} pendentes.`}
-                </ThemedText>
-              )}
             </Field>
           )} />
         )}
@@ -999,8 +986,8 @@ function TransactionForm({
                   label="Juros do Pix no crédito"
                   hint={
                     field.value > 0
-                      ? `Duas linhas na fatura: ${formatBRL(amountCents)} da compra e ${formatBRL(field.value)} de juros — ${formatBRL(amountCents + field.value)} no total.`
-                      : 'Só se você pagou por Pix usando o limite do cartão. Acima fica o valor original; aqui, o que o banco cobrou a mais.'
+                      ? `Total na fatura: ${formatBRL(amountCents + field.value)}`
+                      : 'Só para Pix pago no cartão'
                   }>
                   <MoneyField valueCents={field.value} onChangeCents={field.onChange} />
                 </Field>
@@ -1070,15 +1057,14 @@ function TransactionForm({
                   )}
                 />
                 {pending ? (
-                  <Animated.View entering={FadeIn.duration(Motion.duration.base)}>
+                  <Animated.View entering={FadeIn.duration(Motion.duration.base)} style={styles.pendingCard}>
                     <Controller
                       control={control}
                       name="due_at"
                       render={({ field }) => (
                         <Field
                           label={dueFieldLabel(kind)}
-                          error={errors.due_at?.message}
-                          hint={errors.due_at ? undefined : dueFieldHint(kind)}>
+                          error={errors.due_at?.message}>
                           <DatePickerField
                             value={field.value}
                             onChange={(br) => field.onChange(br)}
@@ -1094,7 +1080,7 @@ function TransactionForm({
                       O interruptor de "entra sozinho na data". Só existe em PREVISTO porque é
                       só ali que ele muda algo — `_promote_due_transactions` só olha `pending`.
 
-                      O padrão inverte entre os dois lados (ver `autoConfirmHint`): despesa
+                      O padrão inverte entre os dois lados: despesa
                       recorrente é boleto que sai; receita de terceiro é Pix que pode não
                       chegar. Foi o pedido literal do dono do produto em 09/09/2026.
                     */}
@@ -1102,20 +1088,7 @@ function TransactionForm({
                       control={control}
                       name="auto_confirm"
                       render={({ field }) => (
-                        <Field
-                          label={kind === 'income' ? 'Receber automático' : 'Confirmar automático'}
-                          hint={autoConfirmHint(kind, field.value)}>
-                          <View style={styles.switchRow}>
-                            <ThemedText type="small" themeColor="textSecondary">
-                              {autoConfirmLabel(kind)}
-                            </ThemedText>
-                            <Switch
-                              value={field.value}
-                              onValueChange={field.onChange}
-                              accessibilityLabel={autoConfirmLabel(kind)}
-                            />
-                          </View>
-                        </Field>
+                        <SwitchRow label={autoConfirmLabel(kind)} value={field.value} onValueChange={field.onChange} />
                       )}
                     />
                   </Animated.View>
@@ -1125,11 +1098,6 @@ function TransactionForm({
           </Animated.View>
         )}
 
-        {isCard ? (
-          <ThemedText type="small" themeColor="textSecondary">
-            Compra no cartão entra na fatura. O dinheiro sai da conta quando você registra o pagamento da fatura.
-          </ThemedText>
-        ) : null}
 
 
         {/*
@@ -1241,11 +1209,5 @@ const styles = StyleSheet.create({
   },
   centered: {
     textAlign: 'center',
-  },
-  switchRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    gap: Space.md,
   },
 });

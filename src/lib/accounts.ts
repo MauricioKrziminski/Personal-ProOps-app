@@ -53,12 +53,7 @@ import { semAcento } from './text.ts';
 export const ACCOUNT_TYPES = [
   { value: 'checking', label: 'Corrente', icon: 'building.columns' },
   { value: 'savings', label: 'Poupança', icon: 'banknote' },
-  {
-    value: 'credit_card',
-    label: 'Cartão',
-    icon: 'creditcard',
-    meta: 'fatura e limite, não saldo',
-  },
+  { value: 'credit_card', label: 'Cartão', icon: 'creditcard' },
   { value: 'cash', label: 'Dinheiro', icon: 'wallet.bifold' },
   { value: 'investment', label: 'Investimento', icon: 'chart.line.uptrend.xyaxis' },
 ] as const;
