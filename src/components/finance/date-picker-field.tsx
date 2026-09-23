@@ -1,15 +1,16 @@
 import { useState } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
-import Animated, { LinearTransition } from 'react-native-reanimated';
+import Animated from 'react-native-reanimated';
 import * as Haptics from 'expo-haptics';
 
 import { Calendar } from '@/components/finance/calendar';
 import { ThemedText } from '@/components/themed-text';
 import { GlassBackdrop, supportsLiquidGlass } from '@/components/ui/glass-backdrop';
 import { Icon } from '@/components/ui/icon';
-import { Elevation, Motion, Radius, Space } from '@/design/tokens';
+import { Elevation, Radius, Space } from '@/design/tokens';
 import { useScheme, useTheme } from '@/hooks/use-theme';
 import { brToISO, isValidBRDate, isoToBR } from '@/lib/dates';
+import { transicaoDeLayout } from '@/components/motion/transicao';
 
 interface Props {
   /** Data em dd/mm/aaaa, o formato do formulário. `null` = vazia. */
@@ -61,7 +62,7 @@ export function DatePickerField({
   const iso = value && isValidBRDate(value) ? brToISO(value) : null;
 
   return (
-    <Animated.View layout={LinearTransition.duration(Motion.duration.base)}>
+    <Animated.View layout={transicaoDeLayout}>
       <View
         style={[
           styles.moldura,

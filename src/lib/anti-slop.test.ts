@@ -1040,3 +1040,16 @@ test('nenhuma tela decide "previsto" pelo status', () => {
     `"previsto" sai de estadoDaLinha() (settle-labels.ts), nunca do status:\n${encontrados.join('\n')}`,
   );
 });
+
+/**
+ * Animação de LAYOUT só pelo ponto único (`components/motion/transicao.ts`), que a desliga no
+ * Android: lá a view com `layout=` ficava presa no primeiro quadro, desenhada e tocável na posição
+ * antiga (23/09/2026, `design.md` §5). Uma tela com `LinearTransition` direto traz o defeito de volta.
+ */
+test('LinearTransition só mora em components/motion/transicao.ts', () => {
+  const dono = join(SRC, 'components', 'motion', 'transicao.ts');
+  const achados = walk(SRC).filter(
+    (f) => f !== dono && /\bLinearTransition\b/.test(stripComments(readFileSync(f, 'utf8'))),
+  );
+  assert.deepEqual(achados, []);
+});

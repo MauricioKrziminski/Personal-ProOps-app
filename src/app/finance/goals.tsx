@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
-import Animated, { FadeInDown, LinearTransition } from 'react-native-reanimated';
+import Animated, { FadeInDown } from 'react-native-reanimated';
 import { Stack } from 'expo-router';
 
 import { useBRL } from '@/components/ui/conceal';
@@ -34,6 +34,7 @@ import {
 import { brToISO, formatBRL, isValidBRDate, isoToBR, localISODate } from '@/lib/dates';
 import { confirmDestructive, showItemActions } from '@/lib/item-actions';
 import { useAdaptiveWindow } from '@/hooks/use-adaptive-window';
+import { transicaoDeLayout } from '@/components/motion/transicao';
 
 /**
  * Metas — "quanto falta, e em quanto tempo eu chego?".
@@ -233,7 +234,7 @@ export default function GoalsScreen() {
     return (
       <Animated.View
         key={g.id}
-        layout={LinearTransition.duration(Motion.duration.base)}
+        layout={transicaoDeLayout}
         entering={FadeInDown.duration(Motion.duration.slow).delay(
           Math.min(index * Motion.stagger.step, Motion.stagger.cap)
         )}>

@@ -4,7 +4,7 @@ import {
   StyleSheet,
   View,
 } from 'react-native';
-import Animated, { FadeInDown, LinearTransition } from 'react-native-reanimated';
+import Animated, { FadeInDown } from 'react-native-reanimated';
 import * as Haptics from 'expo-haptics';
 
 import { ThemedText } from '@/components/themed-text';
@@ -23,6 +23,7 @@ import { useAdaptiveWindow } from '@/hooks/use-adaptive-window';
 import { usePurgeNote, useRestoreNote, useNotesList, type Note } from '@/hooks/use-notes';
 import { noteTitle, notePreview } from '@/lib/search';
 import { actionSheet } from '@/components/notes/note-actions';
+import { transicaoDeLayout } from '@/components/motion/transicao';
 
 /**
  * Lixeira.
@@ -169,7 +170,7 @@ export default function TrashScreen() {
           {notes.map((note, index) => (
             <Animated.View
               key={note.id}
-              layout={LinearTransition.duration(Motion.duration.base)}
+              layout={transicaoDeLayout}
               entering={FadeInDown.duration(Motion.duration.slow).delay(
                 Math.min(index * Motion.stagger.step, Motion.stagger.cap)
               )}>

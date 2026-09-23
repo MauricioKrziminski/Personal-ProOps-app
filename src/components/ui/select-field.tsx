@@ -1,6 +1,6 @@
 import { Fragment, useState } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
-import Animated, { FadeIn, LinearTransition } from 'react-native-reanimated';
+import Animated, { FadeIn } from 'react-native-reanimated';
 import * as Haptics from 'expo-haptics';
 
 import { Icon, type IconName } from '@/components/ui/icon';
@@ -8,6 +8,7 @@ import { GlassBackdrop, supportsLiquidGlass } from '@/components/ui/glass-backdr
 import { ThemedText } from '@/components/themed-text';
 import { useScheme, useTheme } from '@/hooks/use-theme';
 import { Elevation, Motion, Radius, Space, Type } from '@/design/tokens';
+import { transicaoDeLayout } from '@/components/motion/transicao';
 
 export type SelectOption = {
   /** `null` é a opção "nenhum" — ela existe se você a incluir na lista. */
@@ -99,7 +100,7 @@ export function SelectField({
     ) : null;
 
   return (
-    <Animated.View layout={LinearTransition.duration(Motion.duration.base)}>
+    <Animated.View layout={transicaoDeLayout}>
       <View
         style={[
           styles.moldura,

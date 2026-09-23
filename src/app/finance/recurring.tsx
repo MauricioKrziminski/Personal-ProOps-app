@@ -1,7 +1,7 @@
 import { useInvalidateFinance } from '@/hooks/use-finance';
 import { useMemo, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Switch, View } from 'react-native';
-import Animated, { FadeIn, FadeInDown, LinearTransition } from 'react-native-reanimated';
+import Animated, { FadeIn, FadeInDown } from 'react-native-reanimated';
 import { Stack, router, useLocalSearchParams } from 'expo-router';
 import { useMutation, useQuery } from '@tanstack/react-query';
 
@@ -45,6 +45,7 @@ import { validRecurringRange } from '@/lib/finance-form';
 import { describeRRule } from '@/lib/rrule-text';
 import { supabase } from '@/lib/supabase';
 import { AccountPicker } from '@/components/finance/account-picker';
+import { transicaoDeLayout } from '@/components/motion/transicao';
 
 /**
  * Recorrentes — "o que vai sair da minha conta todo mês sem eu fazer nada?".
@@ -481,7 +482,7 @@ export default function RecurringScreen() {
     return (
       <Animated.View
         key={r.id}
-        layout={LinearTransition.duration(Motion.duration.base)}
+        layout={transicaoDeLayout}
         entering={FadeInDown.duration(Motion.duration.slow).delay(
           Math.min(index * Motion.stagger.step, Motion.stagger.cap)
         )}>

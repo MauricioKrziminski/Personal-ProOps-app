@@ -1,5 +1,5 @@
 import { StyleSheet, View } from 'react-native';
-import Animated, { FadeOut, LinearTransition } from 'react-native-reanimated';
+import Animated, { FadeOut } from 'react-native-reanimated';
 
 import { ThemedText } from '@/components/themed-text';
 import { CardFace } from '@/components/finance/card-face';
@@ -11,6 +11,7 @@ import type { ThemeColor } from '@/constants/theme';
 import { Motion, Radius, Space } from '@/design/tokens';
 import { useTheme } from '@/hooks/use-theme';
 import type { Tom } from '@/lib/today-sections';
+import { transicaoDeLayout } from '@/components/motion/transicao';
 
 const COR_DA_META: Record<Tom, ThemeColor> = {
   danger: 'danger',
@@ -19,8 +20,7 @@ const COR_DA_META: Record<Tom, ThemeColor> = {
   neutral: 'textSecondary',
 };
 
-/** Uma instância só: `LinearTransition` recriado a cada render remonta a animação. */
-const linear = LinearTransition.duration(Motion.duration.base);
+const linear = transicaoDeLayout;
 
 export interface AgendaItemProps {
   title: string;

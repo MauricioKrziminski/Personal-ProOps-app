@@ -1,7 +1,7 @@
 import { useMemo } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 import { Stack, router } from 'expo-router';
-import Animated, { FadeInDown, LinearTransition } from 'react-native-reanimated';
+import Animated, { FadeInDown } from 'react-native-reanimated';
 
 import { monthTitle } from '@/components/finance/month-picker';
 import { ThemedText } from '@/components/themed-text';
@@ -24,6 +24,7 @@ import {
 import { formatDateBR } from '@/hooks/use-items';
 import { confirmDestructive, showItemActions } from '@/lib/item-actions';
 import { accountLabel } from '@/lib/accounts';
+import { transicaoDeLayout, transicaoDeLayoutRapida } from '@/components/motion/transicao';
 
 /**
  * Importações — "cadê aquele extrato que eu comecei a importar?".
@@ -145,7 +146,7 @@ export default function ImportHistoryScreen() {
 
       {/* A razão nº1 de alguém abrir esta tela. Não pode estar no meio de uma lista cronológica. */}
       {pendente ? (
-        <Animated.View layout={LinearTransition.duration(Motion.duration.base)}>
+        <Animated.View layout={transicaoDeLayout}>
           <Pressable
             accessibilityRole="button"
             accessibilityLabel={`${pendente.pendentes} itens esperando revisão. Retomar.`}
@@ -182,7 +183,7 @@ export default function ImportHistoryScreen() {
             return (
               <Animated.View
                 key={lote.id}
-                layout={LinearTransition.duration(Motion.duration.fast)}
+                layout={transicaoDeLayoutRapida}
                 entering={FadeInDown.duration(Motion.duration.base).delay(
                   Math.min(index * Motion.stagger.step, Motion.stagger.cap),
                 )}>

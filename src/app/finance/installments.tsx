@@ -1,7 +1,7 @@
 import { useMemo, useRef, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { Stack, router, useLocalSearchParams } from 'expo-router';
-import Animated, { FadeInDown, LinearTransition } from 'react-native-reanimated';
+import Animated, { FadeInDown } from 'react-native-reanimated';
 
 import { AccountPicker } from '@/components/finance/account-picker';
 import { CategoryPicker } from '@/components/finance/category-picker';
@@ -52,6 +52,7 @@ import { useVoltarQuandoFechar } from '@/hooks/use-voltar-quando-fechar';
 import { nextPendingInstallment } from '@/lib/installment-progress';
 import { accountLabel } from '@/lib/accounts';
 import { useAdaptiveWindow } from '@/hooks/use-adaptive-window';
+import { transicaoDeLayout } from '@/components/motion/transicao';
 
 /**
  * Parceladas — "o que eu já comprometi nos próximos meses, e quanto falta para acabar?".
@@ -478,7 +479,7 @@ export default function InstallmentsScreen() {
     return (
       <Animated.View
         key={plano.id}
-        layout={LinearTransition.duration(Motion.duration.base)}
+        layout={transicaoDeLayout}
         entering={FadeInDown.duration(Motion.duration.base).delay(
           Math.min(index * Motion.stagger.step, Motion.stagger.cap),
         )}>
@@ -522,7 +523,7 @@ export default function InstallmentsScreen() {
 
         {expandido ? (
           <Animated.View
-            layout={LinearTransition.duration(Motion.duration.base)}
+            layout={transicaoDeLayout}
             entering={FadeInDown.duration(Motion.duration.base)}
             style={styles.parcelas}>
             {parcelas.map((parcela) => {

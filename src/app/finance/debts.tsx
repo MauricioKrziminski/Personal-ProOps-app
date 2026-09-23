@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
-import Animated, { FadeInDown, LinearTransition } from 'react-native-reanimated';
+import Animated, { FadeInDown } from 'react-native-reanimated';
 import { Stack, useLocalSearchParams } from 'expo-router';
 
 import { useBRL } from '@/components/ui/conceal';
@@ -44,6 +44,7 @@ import { debtTerm, financeErrorMessage, simpleDebtValues } from '@/lib/finance-f
 import { confirmDestructive, showItemActions } from '@/lib/item-actions';
 import { AccountPicker } from '@/components/finance/account-picker';
 import { useAdaptiveWindow } from '@/hooks/use-adaptive-window';
+import { transicaoDeLayout } from '@/components/motion/transicao';
 
 /**
  * Dívidas — "quanto disso é juro, e por onde eu começo?".
@@ -313,7 +314,7 @@ export default function DebtsScreen() {
     return (
       <Animated.View
         key={d.id}
-        layout={LinearTransition.duration(Motion.duration.base)}
+        layout={transicaoDeLayout}
         entering={FadeInDown.duration(Motion.duration.slow).delay(
           Math.min(index * Motion.stagger.step, Motion.stagger.cap)
         )}>
@@ -405,7 +406,7 @@ export default function DebtsScreen() {
           )) : (payoff.data ?? []).map((p, i) => (
             <Animated.View
               key={p.debt_id}
-              layout={LinearTransition.duration(Motion.duration.base)}
+              layout={transicaoDeLayout}
               style={styles.ordemLinha}>
               <ThemedText type="smallBold" themeColor="textSecondary" style={tabular}>
                 {i + 1}

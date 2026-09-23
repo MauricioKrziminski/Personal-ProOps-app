@@ -4,7 +4,7 @@ import { useState } from 'react';
 import { Controller, useForm, useWatch } from 'react-hook-form';
 import { StyleSheet, Switch, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import Animated, { FadeIn, LinearTransition } from 'react-native-reanimated';
+import Animated, { FadeIn } from 'react-native-reanimated';
 import { KeyboardAwareScrollView } from 'react-native-keyboard-controller';
 import * as Haptics from 'expo-haptics';
 import { z } from 'zod';
@@ -66,6 +66,7 @@ import {
 } from '@/lib/settle-labels';
 import { confirmDestructive, showItemActions } from '@/lib/item-actions';
 import { AccountPicker } from '@/components/finance/account-picker';
+import { transicaoDeLayout } from '@/components/motion/transicao';
 
 /**
  * Novo/editar lançamento — modal do Stack raiz (Cancelar nativo vem do `_layout.tsx`).
@@ -1200,8 +1201,7 @@ function TransactionForm({
   );
 }
 
-/** Uma instância só: `LinearTransition` recriado a cada render remonta a animação. */
-const linear = LinearTransition.duration(Motion.duration.base);
+const linear = transicaoDeLayout;
 
 /** A mesma ordem nos dois lugares (criar e editar a parcela): muda o default, não a posição. */
 const UNIDADES = [

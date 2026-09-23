@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Switch, View } from 'react-native';
-import Animated, { FadeInDown, LinearTransition } from 'react-native-reanimated';
+import Animated, { FadeInDown } from 'react-native-reanimated';
 import { Stack, router } from 'expo-router';
 import { useQuery } from '@tanstack/react-query';
 
@@ -43,6 +43,7 @@ import { formatBRL } from '@/lib/dates';
 import { showItemActions, type ItemAction } from '@/lib/item-actions';
 import { supabase } from '@/lib/supabase';
 import { useAdaptiveWindow } from '@/hooks/use-adaptive-window';
+import { transicaoDeLayout } from '@/components/motion/transicao';
 
 /**
  * Orçamentos — "quanto ainda posso gastar em cada categoria este mês?".
@@ -313,7 +314,7 @@ export default function BudgetsScreen() {
     return (
       <Animated.View
         key={b.category}
-        layout={LinearTransition.duration(Motion.duration.base)}
+        layout={transicaoDeLayout}
         entering={FadeInDown.duration(Motion.duration.slow).delay(
           Math.min(index * Motion.stagger.step, Motion.stagger.cap)
         )}>

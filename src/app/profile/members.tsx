@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 import { Stack, router } from 'expo-router';
 import * as Haptics from 'expo-haptics';
-import Animated, { FadeInDown, LinearTransition } from 'react-native-reanimated';
+import Animated, { FadeInDown } from 'react-native-reanimated';
 
 import { monthLabel } from '@/components/finance/month-picker';
 import { ThemedText } from '@/components/themed-text';
@@ -25,6 +25,7 @@ import {
 } from '@/hooks/use-finance';
 import { useSession } from '@/hooks/use-session';
 import { confirmDestructive } from '@/lib/item-actions';
+import { transicaoDeLayout } from '@/components/motion/transicao';
 
 /**
  * Pessoas — "quem enxerga o meu financeiro?".
@@ -254,7 +255,7 @@ export default function MembersScreen() {
           ) : null}
 
           {pendentes.length > 0 ? (
-            <Animated.View layout={LinearTransition.duration(Motion.duration.base)}>
+            <Animated.View layout={transicaoDeLayout}>
               <Section title="Convites enviados">
                 {pendentes.map((convite) => (
                   <Row

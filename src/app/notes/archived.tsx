@@ -1,6 +1,6 @@
 import { useMemo } from 'react';
 import { StyleSheet, View } from 'react-native';
-import Animated, { LinearTransition } from 'react-native-reanimated';
+import Animated from 'react-native-reanimated';
 import { router } from 'expo-router';
 import * as Haptics from 'expo-haptics';
 
@@ -14,7 +14,7 @@ import { Row, Section } from '@/components/ui/row';
 import { Screen } from '@/components/ui/screen';
 import { SkeletonRow } from '@/components/ui/skeleton';
 import { useToast } from '@/components/ui/toast';
-import { Motion, Space, tabular } from '@/design/tokens';
+import { Space, tabular } from '@/design/tokens';
 import {
   useNotesList,
   useUpdateFolder,
@@ -26,6 +26,7 @@ import { useArchivedFolders } from '@/hooks/use-archived-folders';
 import { relativeBR } from '@/lib/dates';
 import { noteTitle } from '@/lib/search';
 import { useAdaptiveWindow } from '@/hooks/use-adaptive-window';
+import { transicaoDeLayout } from '@/components/motion/transicao';
 
 /**
  * Arquivadas — notas e pastas que saíram do caminho sem terem sido apagadas.
@@ -114,7 +115,7 @@ export default function ArchivedScreen() {
           {listaPastas.length > 0 ? (
             <Section title="Pastas">
               {listaPastas.map((f) => (
-                <Animated.View key={f.id} layout={LinearTransition.duration(Motion.duration.base)}>
+                <Animated.View key={f.id} layout={transicaoDeLayout}>
                   <Row
                     title={f.name}
                     icon={symbol(f.icon)}
@@ -135,7 +136,7 @@ export default function ArchivedScreen() {
           {listaNotas.length > 0 ? (
             <Section title="Notas">
               {listaNotas.map((n) => (
-                <Animated.View key={n.id} layout={LinearTransition.duration(Motion.duration.base)}>
+                <Animated.View key={n.id} layout={transicaoDeLayout}>
                   <Row
                     title={noteTitle(n.content) || 'Sem título'}
                     subtitle={n.archived_at ? `arquivada ${relativeBR(n.archived_at)}` : undefined}

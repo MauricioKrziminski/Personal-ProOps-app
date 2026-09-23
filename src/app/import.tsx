@@ -2,7 +2,7 @@ import { useCallback, useState } from 'react';
 import { ScrollView, StyleSheet, View } from 'react-native';
 import { Stack, router, useLocalSearchParams } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import Animated, { LinearTransition } from 'react-native-reanimated';
+import Animated from 'react-native-reanimated';
 import * as DocumentPicker from 'expo-document-picker';
 import { File } from 'expo-file-system';
 import * as Haptics from 'expo-haptics';
@@ -27,7 +27,7 @@ import { HeroLabel, SectionHead } from '@/components/ui/section-head';
 import { Skeleton, SkeletonRow } from '@/components/ui/skeleton';
 import { useToast } from '@/components/ui/toast';
 import { useLock } from '@/hooks/use-lock';
-import { Motion, Space, tabular } from '@/design/tokens';
+import { Space, tabular } from '@/design/tokens';
 import { formatDateBR } from '@/hooks/use-items';
 import { useBRL } from '@/components/ui/conceal';
 import { confirmDestructive, showItemActions } from '@/lib/item-actions';
@@ -57,6 +57,7 @@ import {
   type Grupo,
 } from '@/lib/import-preview';
 import { AccountPicker } from '@/components/finance/account-picker';
+import { transicaoDeLayoutRapida } from '@/components/motion/transicao';
 
 /**
  * O MIME curinga está na lista de propósito: banco brasileiro manda MIME errado com frequência, e
@@ -480,7 +481,7 @@ export default function ImportScreen() {
             const ids = itens.map((i) => i.id);
             const todos = ids.every((id) => escolhidos.has(id));
             return (
-              <Animated.View key={grupo} layout={LinearTransition.duration(Motion.duration.fast)} style={styles.bloco}>
+              <Animated.View key={grupo} layout={transicaoDeLayoutRapida} style={styles.bloco}>
                 <SectionHead
                   title={`${TITULO_DO_GRUPO[grupo]} · ${itens.length}`}
                   action={

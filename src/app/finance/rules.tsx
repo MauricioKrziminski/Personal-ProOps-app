@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { ScrollView, StyleSheet, View } from 'react-native';
 import { Stack } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import Animated, { FadeInDown, LinearTransition } from 'react-native-reanimated';
+import Animated, { FadeInDown } from 'react-native-reanimated';
 import * as Haptics from 'expo-haptics';
 
 import { ErrorCard } from '@/components/error-card';
@@ -32,6 +32,7 @@ import {
 } from '@/hooks/use-finance';
 import { AccountPicker } from '@/components/finance/account-picker';
 import { useAdaptiveWindow } from '@/hooks/use-adaptive-window';
+import { transicaoDeLayout } from '@/components/motion/transicao';
 
 /** Postgres: violação de unique. Aqui só pode ser `(workspace_id, match_type, pattern)` da `0017`. */
 const UNIQUE_VIOLATION = '23505';
@@ -204,7 +205,7 @@ export default function RulesScreen() {
       {lista.map((rule, index) => (
         <Animated.View
           key={rule.id}
-          layout={LinearTransition.duration(Motion.duration.base)}
+          layout={transicaoDeLayout}
           entering={FadeInDown.duration(Motion.duration.slow).delay(
             Math.min(index * Motion.stagger.step, Motion.stagger.cap)
           )}

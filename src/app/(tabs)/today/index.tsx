@@ -2,7 +2,7 @@ import { vereditoDoDia } from '@/lib/widget-snapshot';
 import { router, type Href } from 'expo-router';
 import { Fragment, useMemo, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
-import Animated, { FadeOut, LinearTransition } from 'react-native-reanimated';
+import Animated, { FadeOut } from 'react-native-reanimated';
 
 import { ErrorCard } from '@/components/error-card';
 import { AgendaItem } from '@/components/feed/agenda-item';
@@ -53,6 +53,7 @@ import { montarPista } from '@/lib/runway';
 import { settleDone, settleLabel } from '@/lib/settle-labels';
 import { agendaDoDia, iconeDoItem, metaDoItem, type ItemDaAgenda } from '@/lib/today-sections';
 import { diasDoCiclo, ritmoDoDia } from '@/lib/today-spend';
+import { transicaoDeLayout } from '@/components/motion/transicao';
 
 /**
  * A Hoje — "Conversa organizada" (spec 2026-09-17).
@@ -73,8 +74,7 @@ import { diasDoCiclo, ritmoDoDia } from '@/lib/today-spend';
  * dois está em `supabase/tests/da_para_gastar.sql`.
  */
 
-/** Uma instância só: `LinearTransition` recriado a cada render remonta a animação. */
-const linear = LinearTransition.duration(Motion.duration.base);
+const linear = transicaoDeLayout;
 
 /** Bloco que some sem dar tranco no resto (§5: mudança de estado). A entrada é do `Screen`. */
 function Bloco({ children }: { children: React.ReactNode }) {

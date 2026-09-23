@@ -6,7 +6,7 @@ import {
   StyleSheet,
   View,
 } from 'react-native';
-import Animated, { FadeInDown, LinearTransition } from 'react-native-reanimated';
+import Animated, { FadeInDown } from 'react-native-reanimated';
 import * as Haptics from 'expo-haptics';
 
 import { ThemedText } from '@/components/themed-text';
@@ -37,6 +37,7 @@ import { actionSheet, FOLDER_ICONS, notesLabel, symbol } from '@/components/note
 import { ColorPicker } from '@/components/notes/color-picker';
 import { TagPicker } from '@/components/notes/tag-picker';
 import { noteInk } from '@/design/note-colors';
+import { transicaoDeLayout } from '@/components/motion/transicao';
 
 /**
  * Organizar pastas — criar, renomear, trocar ícone, cor, tags, mover, arquivar e apagar.
@@ -354,7 +355,7 @@ export default function FoldersScreen() {
           {arvore.map((folder, index) => (
             <Animated.View
               key={folder.id}
-              layout={LinearTransition.duration(Motion.duration.base)}
+              layout={transicaoDeLayout}
               entering={FadeInDown.duration(Motion.duration.slow).delay(
                 Math.min(index * Motion.stagger.step, Motion.stagger.cap)
               )}>

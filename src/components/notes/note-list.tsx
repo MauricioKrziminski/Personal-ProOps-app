@@ -1,7 +1,6 @@
 import Animated, {
   FadeIn,
   FadeOut,
-  LinearTransition,
   type useAnimatedRef,
 } from 'react-native-reanimated';
 
@@ -9,6 +8,7 @@ import { NoteCard, type NoteCardActions } from '@/components/notes/note-card';
 import { Reorderable } from '@/components/ui/reorderable';
 import { Motion } from '@/design/tokens';
 import type { Note, NoteFolder } from '@/hooks/use-notes';
+import { transicaoDeLayout } from '@/components/motion/transicao';
 
 /**
  * Um ESCOPO de notas arrastáveis — a home usa dois (fixadas e soltas), a tela de uma pasta usa um.
@@ -83,7 +83,7 @@ export function NoteList({
             nos três casos (fixar, arquivar, lixeira). Saída mais rápida que a entrada, também §5.
           */
           <Animated.View
-            layout={LinearTransition.duration(Motion.duration.base)}
+            layout={transicaoDeLayout}
             entering={FadeIn.duration(Motion.duration.base)}
             exiting={FadeOut.duration(Motion.duration.exit)}>
             <NoteCard
