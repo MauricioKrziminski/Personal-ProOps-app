@@ -67,3 +67,21 @@ test('quitada não tem próxima parcela e ainda assim mostra o histórico', () =
     [1, 2, 3],
   );
 });
+
+import { linhaDoTempo } from './debt-history.ts';
+
+test('linha do tempo agrupa por ano e marca paga, estimada, próxima e futura', () => {
+  const anos = linhaDoTempo(
+    [
+      { installment_no: 1, due_date: '2026-11-05', payment_cents: 100, registered: false },
+      { installment_no: 2, due_date: '2026-12-05', payment_cents: 100, registered: true },
+    ],
+    [
+      { installment_no: 3, due_date: '2027-01-05', payment_cents: 100, interest_cents: null },
+      { installment_no: 4, due_date: '2027-02-05', payment_cents: 100, interest_cents: 7 },
+    ],
+  );
+  assert.deepEqual(anos.map((a) => a.ano), ['2026', '2027']);
+  assert.deepEqual(anos[0].itens.map((i) => i.estado), ['estimada', 'paga']);
+  assert.deepEqual(anos[1].itens.map((i) => [i.n, i.estado, i.jurosCents]), [[3, 'proxima', null], [4, 'futura', 7]]);
+});

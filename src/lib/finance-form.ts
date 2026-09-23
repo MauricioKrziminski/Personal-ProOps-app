@@ -1,3 +1,5 @@
+import { addMonthsISO } from './debt-history.ts';
+
 /** The UI asks for installments remaining; the database stores the original total. */
 export function debtTerm(remaining: string, paid: number): number | null {
   if (!Number.isInteger(paid) || paid < 0) throw new Error('Informe parcelas pagas inteiras e não negativas');
@@ -227,4 +229,35 @@ export function nomeDaCompra(tituloDaParcela: string): string {
 export const MAX_PARCELAS = 72;
 export function faixaDeParcelas(travadas: number): { min: number; max: number } {
   return { min: travadas > 0 ? 2 : 1, max: MAX_PARCELAS };
+}
+
+// ── financiamento maleável (23/09/2026) ────────────────────────────────────
+
+/**
+ * Parcela fixa a partir do TOTAL A PAGAR (decisão do dono do produto, 23/09/2026: "total" é a
+ * soma das parcelas, com os juros dentro). O `check` de parcela fixa exige `total = parcela × N`
+ * em centavos inteiros, então a parcela arredonda e o total GRAVADO é `parcela × N` — a tela
+ * mostra esse, não o digitado.
+ */
+export function parcelaDoTotalDoContrato(totalCents: number, n: number): number {
+  if (!Number.isInteger(n) || n <= 0 || totalCents <= 0) return 0;
+  return Math.round(totalCents / n);
+}
+
+/** A data da parcela nº 1 do contrato, dada a próxima em aberto (`pagas + 1`). */
+export function ancoraDoContrato(proximaISO: string, pagas: number): string {
+  return addMonthsISO(proximaISO, -pagas);
+}
+
+/**
+ * A data da parcela `pagas + 1`, no dia de vencimento do contrato (clampado no mês curto) — a
+ * MESMA conta de `private.debt_schedule_for`: `day_in_month(add_months(first_due_date, pagas),
+ * due_day)`. O dia vem à parte porque a âncora pode estar clampada (31/03 com 1 paga ancora em
+ * 28/02), e o 31 tem que voltar em março.
+ */
+export function proximaDoContrato(ancoraISO: string, pagas: number, dia: number): string {
+  const mes = addMonthsISO(`${ancoraISO.slice(0, 7)}-01`, pagas);
+  const [y, m] = mes.split('-').map(Number);
+  const ultimo = new Date(Date.UTC(y, m, 0)).getUTCDate();
+  return `${mes.slice(0, 7)}-${String(Math.min(dia, ultimo)).padStart(2, '0')}`;
 }

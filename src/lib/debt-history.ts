@@ -79,3 +79,49 @@ export function paidInstallments({
   }
   return linhas;
 }
+
+export interface ItemDaLinha {
+  n: number;
+  iso: string;
+  cents: number;
+  jurosCents: number | null;
+  estado: 'paga' | 'estimada' | 'proxima' | 'futura';
+}
+
+/**
+ * O contrato inteiro numa linha só, agrupado por ano: o passado (histórico, com a mesma régua de
+ * `paidInstallments`) e o que falta (o cronograma do banco, cuja 1ª linha é a próxima).
+ */
+export function linhaDoTempo(
+  historico: readonly PaidInstallment[],
+  futuras: readonly {
+    installment_no: number;
+    due_date: string;
+    payment_cents: number;
+    interest_cents: number | null;
+  }[],
+): { ano: string; itens: ItemDaLinha[] }[] {
+  const itens: ItemDaLinha[] = [
+    ...historico.map((p) => ({
+      n: p.installment_no,
+      iso: p.due_date,
+      cents: p.payment_cents,
+      jurosCents: null,
+      estado: p.registered ? ('paga' as const) : ('estimada' as const),
+    })),
+    ...futuras.map((p, i) => ({
+      n: p.installment_no,
+      iso: p.due_date,
+      cents: Number(p.payment_cents),
+      jurosCents: p.interest_cents == null ? null : Number(p.interest_cents),
+      estado: i === 0 ? ('proxima' as const) : ('futura' as const),
+    })),
+  ];
+  const anos: { ano: string; itens: ItemDaLinha[] }[] = [];
+  for (const item of itens) {
+    const ano = item.iso.slice(0, 4);
+    if (anos.at(-1)?.ano !== ano) anos.push({ ano, itens: [] });
+    anos.at(-1)!.itens.push(item);
+  }
+  return anos;
+}

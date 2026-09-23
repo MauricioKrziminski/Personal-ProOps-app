@@ -192,3 +192,24 @@ test('mudar o valor de uma parcela edita a COMPRA; o resto continua no update da
   // lançamento simples não tem compra para editar
   assert.equal(destinoDoSalvar({ id: 'tx' }, { installments: 1, account_id: 'c', valorDaCompraMudou: true }), 'salvar');
 });
+
+// ── financiamento maleável (23/09/2026) ────────────────────────────────────
+import { ancoraDoContrato, parcelaDoTotalDoContrato, proximaDoContrato } from './finance-form.ts';
+
+test('total a pagar vira parcela arredondada; o total gravado é parcela × N', () => {
+  assert.equal(parcelaDoTotalDoContrato(7056000, 48), 147000);
+  assert.equal(parcelaDoTotalDoContrato(7000000, 48), 145833); // 69.999,84 gravado
+  assert.equal(parcelaDoTotalDoContrato(0, 48), 0);
+  assert.equal(parcelaDoTotalDoContrato(100, 0), 0);
+});
+
+test('âncora e próxima parcela fazem ida e volta, inclusive no dia 31', () => {
+  assert.equal(ancoraDoContrato('2026-12-05', 0), '2026-12-05');
+  assert.equal(ancoraDoContrato('2026-10-05', 8), '2026-02-05');
+  assert.equal(proximaDoContrato('2026-02-05', 8, 5), '2026-10-05');
+  // 31/03 com 1 paga: a âncora cai em 28/02, e o dia 31 volta pelo `dia`
+  assert.equal(ancoraDoContrato('2027-03-31', 1), '2027-02-28');
+  assert.equal(proximaDoContrato('2027-02-28', 1, 31), '2027-03-31');
+  assert.equal(proximaDoContrato('2027-01-31', 1, 31), '2027-02-28');
+  assert.equal(proximaDoContrato('2027-01-31', 2, 31), '2027-03-31');
+});
