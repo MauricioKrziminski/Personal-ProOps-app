@@ -20,9 +20,9 @@ import { Icon } from '@/components/ui/icon';
 import { Money } from '@/components/ui/money';
 import { Row, Section } from '@/components/ui/row';
 import { Screen } from '@/components/ui/screen';
-import { HeroLabel, SectionHead } from '@/components/ui/section-head';
+import { HeroLabel } from '@/components/ui/section-head';
 import { Segmented } from '@/components/ui/segmented';
-import { Skeleton, SkeletonRow } from '@/components/ui/skeleton';
+import { Skeleton, SkeletonHero, SkeletonList, SkeletonRow } from '@/components/ui/skeleton';
 import { ProgressBar } from '@/components/ui/sparkline';
 import { useToast } from '@/components/ui/toast';
 import { Motion, Radius, Space, tabular } from '@/design/tokens';
@@ -42,10 +42,9 @@ import {
   useUnarchiveDebt,
   type Debt,
 } from '@/hooks/use-finance';
-import { useTheme } from '@/hooks/use-theme';
 import { useVoltarQuandoFechar } from '@/hooks/use-voltar-quando-fechar';
-import { brToISO, formatBRL, formatNumberBR, isoToBR } from '@/lib/dates';
-import { paidInstallments } from '@/lib/debt-history';
+import { brToISO, formatNumberBR, isoToBR } from '@/lib/dates';
+import { linhaDoTempo, paidInstallments } from '@/lib/debt-history';
 import {
   ancoraDoContrato,
   debtTerm,
@@ -57,6 +56,9 @@ import {
 } from '@/lib/finance-form';
 import { confirmDestructive, showItemActions } from '@/lib/item-actions';
 import { AccountPicker } from '@/components/finance/account-picker';
+import { DebtTimeline } from '@/components/finance/debt-timeline';
+import { HeaderIconButton } from '@/components/ui/app-header';
+import { RingGauge } from '@/components/ui/ring-gauge';
 import { useAdaptiveWindow } from '@/hooks/use-adaptive-window';
 import { transicaoDeLayout } from '@/components/motion/transicao';
 
@@ -162,7 +164,6 @@ export default function DebtsScreen() {
   const { windowClass } = useAdaptiveWindow();
   const tablet = windowClass !== 'compact';
   const params = useLocalSearchParams<{ create?: string; id?: string }>();
-  const theme = useTheme();
   const toast = useToast();
   const debts = useDebts();
   const [estrategia, setEstrategia] = useState<'avalanche' | 'snowball'>('avalanche');
@@ -224,7 +225,6 @@ export default function DebtsScreen() {
         payments: payments.data ?? [],
       })
     : [];
-  const temEstimada = historico.some((p) => !p.registered);
   const pagadoras = (accounts.data ?? []).filter((a) => a.type !== 'credit_card');
 
   const abrirNova = () => setForm({ ...FORM_VAZIO });
@@ -290,7 +290,20 @@ export default function DebtsScreen() {
     ancoraEfetiva && diaDoContrato && form
       ? proximaDoContrato(ancoraEfetiva, form.installmentsPaid, diaDoContrato)
       : null;
+  /** Valor e prazo preenchidos e sem data: o único motivo de o Salvar estar travado — e a tela diz. */
+  const faltaData = Boolean(form?.parcelas) && !ancoraEfetiva && !(form?.id && diaDoContrato) &&
+    (form?.calculationMode === 'fixed_installments' ? parcelaCents > 0 : (form?.remainingCents ?? 0) > 0);
   const rotuloDaData = !form || form.installmentsPaid === 0 ? 'Primeira parcela' : `Próxima parcela (a ${form.installmentsPaid + 1}ª)`;
+  /**
+   * O nome que SERÁ gravado quando o campo fica vazio — o mesmo no placeholder, no subtítulo da
+   * linha "Nome e conta" e no payload (frontend.md: campo com default mostra o default). Vem do
+   * TIPO, e não sempre "Financiamento": aberto pelo "+", o tipo é empréstimo.
+   */
+  const nomeBase = DEBT_KINDS.find((k) => k.value === form?.kind)?.label ?? 'Dívida';
+  let nomePadrao = nomeBase;
+  for (let n = 2; lista.some((d) => d.id !== form?.id && d.name.toLowerCase() === nomePadrao.toLowerCase()); n++) {
+    nomePadrao = `${nomeBase} ${n}`;
+  }
   const escolherData = (br: string) => {
     if (!form) return;
     const iso = brToISO(br);
@@ -299,7 +312,9 @@ export default function DebtsScreen() {
   const mudarPagas = (n: number) => {
     if (!form) return;
     // Pagas além do total assentam no total: é o teto que existe.
-    const teto = totalDeParcelas > 0 ? totalDeParcelas : Infinity;
+    // O teto nunca fica ABAIXO das pagas: digitar "60" passa por "6", e o total não pode arrastar
+    // as pagas junto no meio da digitação (o `onBlur` do total é que assenta, frontend.md).
+    const teto = totalDeParcelas > 0 ? Math.max(totalDeParcelas, form.installmentsPaid) : Infinity;
     setForm({ ...form, installmentsPaid: Math.max(pagamentosLancados, Math.min(n, teto)), historyConfirmed: true });
   };
   const mudarUnidade = (unidade: UnidadeDoValor) => {
@@ -323,17 +338,15 @@ export default function DebtsScreen() {
     (!form.parcelas || Number(form.parcelas) > 0) &&
     (form.kind !== 'financing' || (form.taxa.trim() !== '' && !!form.parcelas)) &&
     Number.isFinite(Number(form.taxa.replace(',', '.'))) && Number(form.taxa.replace(',', '.')) >= 0;
-  const podeSalvar = Boolean(form && validDueDay && (form.calculationMode === 'fixed_installments' ? simpleValues : advancedValid));
+  const podeSalvar = Boolean(form && validDueDay && (!form.id || payments.isSuccess) && (form.calculationMode === 'fixed_installments' ? simpleValues : advancedValid));
 
 
   const salvar = () => {
     if (!form || !podeSalvar) return;
-    let defaultName = 'Financiamento';
-    for (let suffix = 2; lista.some((d) => d.id !== form.id && d.name.toLowerCase() === defaultName.toLowerCase()); suffix++) defaultName = `Financiamento ${suffix}`;
     save.mutate(
       {
         id: form.id,
-        name: form.name.trim() || defaultName,
+        name: form.name.trim() || nomePadrao,
         calculation_mode: form.calculationMode,
         kind: form.kind,
         // sem os dois campos separados a barra de progresso nasce sempre em 0%
@@ -387,16 +400,16 @@ export default function DebtsScreen() {
     archive.mutate(d.id, {
       onSuccess: () =>
         toast({
-          message: `${d.name} arquivada.`,
+          message: `Arquivei "${d.name}".`,
           tone: 'success',
-          action: { label: 'Desfazer', onPress: () => unarchive.mutate(d.id) },
+          action: { label: 'Desfazer', onPress: () => desarquivar(d) },
         }),
       onError: () => toast({ message: `Não deu para arquivar ${d.name}.`, tone: 'error' }),
     });
 
   const desarquivar = (d: Debt) =>
     unarchive.mutate(d.id, {
-      onSuccess: () => toast({ message: `${d.name} voltou para a lista.`, tone: 'success' }),
+      onSuccess: () => toast({ message: `"${d.name}" voltou para a lista.`, tone: 'success' }),
       onError: () => toast({ message: `Não deu para desarquivar ${d.name}.`, tone: 'error' }),
     });
 
@@ -406,11 +419,11 @@ export default function DebtsScreen() {
    * volta ao saldo —, porque é isso que muda o passado da pessoa.
    */
   const excluir = async (d: Debt) => {
-    let consequencia = 'Apaga o financiamento e as parcelas futuras da projeção. Não dá para desfazer.';
+    let consequencia = 'Apaga a dívida e as parcelas futuras da projeção. Não dá para desfazer.';
     try {
       const { count, totalCents } = await pagamentosDaDivida(d.id);
       if (count > 0) {
-        consequencia = `Apaga o financiamento, ${count === 1 ? 'o pagamento já lançado' : `os ${count} pagamentos já lançados`} (${brl(totalCents)}, que ${count === 1 ? 'volta' : 'voltam'} ao saldo das contas) e as parcelas futuras da projeção. Não dá para desfazer.`;
+        consequencia = `Apaga a dívida, ${count === 1 ? 'o pagamento já lançado' : `os ${count} pagamentos já lançados`} (${brl(totalCents)}, que ${count === 1 ? 'volta' : 'voltam'} ao saldo das contas) e as parcelas futuras da projeção. Não dá para desfazer.`;
       }
     } catch {
       /* Sem a contagem, a frase genérica ainda diz o que some. */
@@ -422,7 +435,7 @@ export default function DebtsScreen() {
         excluirDivida.mutate(d.id, {
           onSuccess: () => {
             if (detalheId === d.id) setDetalhe(null);
-            toast({ message: `${d.name} excluída.`, tone: 'success' });
+            toast({ message: `Excluí "${d.name}".`, tone: 'success' });
           },
           onError: (error) =>
             toast({ message: financeErrorMessage(error, `Não deu para excluir ${d.name}.`), tone: 'error' }),
@@ -432,9 +445,10 @@ export default function DebtsScreen() {
   };
 
   /** Uma lista só de ações: o toque longo e o "…" do detalhe leem daqui. */
-  const acoesDaDivida = (d: Debt) =>
+  const acoesDaDivida = (d: Debt, noDetalhe = false) =>
     showItemActions(d.name, [
-      { label: 'Ver as parcelas', onPress: () => setDetalhe(d) },
+      // No detalhe já se está vendo as parcelas: a ação sai, o resto é a MESMA lista.
+      ...(noDetalhe ? [] : [{ label: 'Ver as parcelas', onPress: () => setDetalhe(d) }]),
       {
         label: 'Editar',
         onPress: () => {
@@ -469,7 +483,7 @@ export default function DebtsScreen() {
         )}>
         <Pressable
           accessibilityRole="button"
-          accessibilityLabel={`${d.name}, ${tipo}, deve ${formatBRL(restante)}, ${juros}${parcelas ? `, ${parcelas}` : ''}`}
+          accessibilityLabel={`${d.name}, ${tipo}, deve ${brl(restante)}, ${juros}${parcelas ? `, ${parcelas}` : ''}`}
           onPress={() => setDetalhe(d)}
           onLongPress={() => acoesDaDivida(d)}>
           <Card style={styles.divida}>
@@ -479,7 +493,7 @@ export default function DebtsScreen() {
               </ThemedText>
               <Money cents={restante} variant="ticker" tone="danger" />
             </View>
-            <ProgressBar value={pago} max={original} tone="success" />
+            <ProgressBar value={pago} max={original} tone={restante <= 0 ? 'success' : 'tint'} />
             <ThemedText type="footnote" themeColor="textSecondary">
               {tipo} · {juros}
               {parcelas ? ` · ${parcelas}` : ''}
@@ -492,7 +506,7 @@ export default function DebtsScreen() {
 
   const loading = debts.isLoading ? (
     <>
-      <Skeleton height={120} radius={Radius.lg} />
+      <Skeleton height={120} radius={Radius.md} />
       <SkeletonRow />
       <SkeletonRow />
       <SkeletonRow />
@@ -580,8 +594,9 @@ export default function DebtsScreen() {
   );
 
   const listaArquivadas = arquivadas.isError ? [] : (arquivadas.data ?? []);
-  const secaoArquivadas =
-    listaArquivadas.length > 0 ? (
+  const secaoArquivadas = arquivadas.isError ? (
+    <ErrorBand message="Não deu para carregar as arquivadas." onRetry={arquivadas.refetch} />
+  ) : listaArquivadas.length > 0 ? (
       <Section>
         <Row
           icon="archivebox"
@@ -593,19 +608,16 @@ export default function DebtsScreen() {
         />
         {verArquivadas
           ? listaArquivadas.map((d) => (
-              <Pressable
-                key={d.id}
-                accessibilityRole="button"
-                accessibilityLabel={`${d.name}, arquivada. Toque para desarquivar ou excluir.`}
-                onPress={() => acoesDaArquivada(d)}
-                onLongPress={() => acoesDaArquivada(d)}>
-                <View style={[styles.arquivada, { borderTopColor: theme.separator }]}>
-                  <ThemedText type="default" themeColor="textSecondary" style={styles.dividaNome}>
-                    {d.name}
-                  </ThemedText>
-                  <Money cents={Number(d.remaining_cents)} variant="subhead" tone="textSecondary" />
-                </View>
-              </Pressable>
+              <View key={d.id} style={styles.arquivada}>
+                <Row
+                  title={d.name}
+                  subtitle="arquivada"
+                  chevron={false}
+                  trailing={<Money cents={Number(d.remaining_cents)} variant="subhead" tone="textSecondary" />}
+                  onPress={() => acoesDaArquivada(d)}
+                  accessibilityLabel={`${d.name}, arquivada. Toque para desarquivar ou excluir.`}
+                />
+              </View>
             ))
           : null}
       </Section>
@@ -617,9 +629,9 @@ export default function DebtsScreen() {
       {!debts.isLoading && !debts.isError && lista.length === 0 ? (
         <EmptyState
           icon="creditcard.trianglebadge.exclamationmark"
-          title="Nenhuma dívida cadastrada"
+          title={listaArquivadas.length > 0 ? 'Nenhuma dívida ativa' : 'Nenhuma dívida cadastrada'}
           hint="Informe o valor da parcela e quantas são. Os outros detalhes são opcionais."
-          action={{ label: 'Cadastrar dívida', onPress: abrirNova }}
+          action={{ label: 'Nova dívida', onPress: abrirNova }}
         />
       ) : null}
       {secaoArquivadas}
@@ -655,7 +667,7 @@ export default function DebtsScreen() {
     <Screen
       grouped
       wide={tablet}
-      onRefresh={() => Promise.all([debts.refetch(), payoff.refetch(), accounts.refetch(), ...(detalheId || pagandoId ? [schedule.refetch()] : [])])}>
+      onRefresh={() => Promise.all([debts.refetch(), payoff.refetch(), accounts.refetch(), arquivadas.refetch(), ...(detalheId || pagandoId ? [schedule.refetch()] : [])])}>
       <Stack.Screen
         options={{
           title: 'Dívidas',
@@ -671,34 +683,58 @@ export default function DebtsScreen() {
           <TaskHeader
             title={detalhe?.name ?? 'Dívida'}
             onClose={() => setDetalhe(null)}
+            action={
+              detalhe ? (
+                <HeaderIconButton icon="ellipsis" label="Mais ações" onPress={() => acoesDaDivida(detalhe, true)} />
+              ) : undefined
+            }
           />
 
           <ScrollView contentContainerStyle={styles.sheetBody}>
             {schedule.isLoading ? (
               <>
-                <SkeletonRow />
-                <SkeletonRow />
-                <SkeletonRow />
+                <SkeletonHero />
+                <SkeletonList linhas={6} />
               </>
             ) : null}
 
             {schedule.isError ? (
               <ErrorBand
-                message="Não deu para montar a tabela de amortização."
+                message="Não deu para carregar as parcelas."
                 onRetry={schedule.refetch}
               />
             ) : null}
 
             {proxima && detalhe ? (
               <Card style={styles.proxima}>
-                <ThemedText type="small" themeColor="textSecondary">
-                  Próxima parcela
-                </ThemedText>
-                <View style={styles.valores}>
-                  <Money cents={Number(proxima.payment_cents)} variant="title2" />
-                  <ThemedText type="small" themeColor="textSecondary">
-                    em {isoToBR(proxima.due_date)}
+                <View style={styles.contrato}>
+                  {detalhe.installments ? (
+                    <RingGauge
+                      value={detalhe.installments_paid / detalhe.installments}
+                      size={76}
+                      stroke={7}
+                      accessibilityLabel={`${detalhe.installments_paid} de ${detalhe.installments} parcelas pagas`}>
+                      <ThemedText type="headline" style={tabular}>
+                        {detalhe.installments_paid}
+                      </ThemedText>
+                    </RingGauge>
+                  ) : null}
+                  <View style={styles.contratoTexto}>
+                    <HeroLabel>Falta pagar</HeroLabel>
+                    <Money cents={Number(detalhe.remaining_cents)} variant="money" />
+                    {detalhe.installments ? (
+                      <ThemedText type="small" themeColor="textSecondary" style={tabular}>
+                        {`${detalhe.installments_paid} de ${detalhe.installments} pagas`}
+                      </ThemedText>
+                    ) : null}
+                  </View>
+                </View>
+                {/* Rótulo e valor no MESMO tamanho: em tamanhos diferentes a linha de base desalinhava. */}
+                <View style={styles.proximaLinha}>
+                  <ThemedText type="default" themeColor="textSecondary" style={tabular}>
+                    {`Próxima · ${isoToBR(proxima.due_date)}`}
                   </ThemedText>
+                  <Money cents={Number(proxima.payment_cents)} variant="body" />
                 </View>
                 {detalhe.calculation_mode !== 'fixed_installments' && <View style={styles.valores}>
                   <Money cents={Number(proxima.interest_cents)} variant="subhead" tone="danger" />
@@ -716,11 +752,11 @@ export default function DebtsScreen() {
 
             {!schedule.isLoading && !schedule.isError && !proxima ? (
               <EmptyState
-                icon="tablecells"
+                icon="calendar"
                 title={
                   detalhe && Number(detalhe.remaining_cents) <= 0
                     ? 'Nada em aberto. Dívida quitada.'
-                    : 'Sem tabela de amortização'
+                    : 'Sem parcelas para mostrar'
                 }
                 hint={
                   detalhe && Number(detalhe.remaining_cents) > 0
@@ -742,86 +778,17 @@ export default function DebtsScreen() {
               />
             ) : null}
 
-            {historico.length > 0 && detalhe ? (
-              <View style={styles.tabelaBloco}>
-                <SectionHead
-                  title={`Já pagas · ${historico.length}${detalhe.installments ? ` de ${detalhe.installments}` : ''}`}
-                />
-                <Section>
-                  {historico.map((p) => (
-                    <Row
-                      key={p.installment_no}
-                      icon="checkmark.circle.fill"
-                      chevron={false}
-                      title={`Parcela ${p.installment_no}${detalhe.installments ? ` de ${detalhe.installments}` : ''}`}
-                      subtitle={
-                        p.registered
-                          ? `Paga em ${isoToBR(p.due_date)}`
-                          : `Vencimento estimado · ${isoToBR(p.due_date)}`
-                      }
-                      trailing={<Money cents={p.payment_cents} variant="footnote" tone="textSecondary" />}
-                    />
-                  ))}
-                </Section>
-                {temEstimada ? (
-                  <ThemedText type="footnote" themeColor="textSecondary">
-                    As parcelas sem pagamento registrado vieram da contagem que você informou. O
-                    valor é o da parcela e a data segue a cadência mensal do contrato.
-                  </ThemedText>
-                ) : null}
-              </View>
+            {payments.isError ? (
+              <ErrorBand message="Não deu para carregar os pagamentos." onRetry={payments.refetch} />
             ) : null}
 
-            {(schedule.data ?? []).length > 0 ? (
-              <View style={styles.tabelaBloco}>
-                <SectionHead title="A pagar" />
-                {/* rola dentro do próprio container, nunca empurrando o corpo do sheet */}
-                <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-                  <View>
-                    <View style={styles.tabelaLinha}>
-                      {['nº', 'vencimento', 'parcela', 'juros', 'amortiza', 'saldo'].map((h) => (
-                        <ThemedText
-                          key={h}
-                          type="footnote"
-                          themeColor="textSecondary"
-                          style={[styles.celula, h === 'nº' ? styles.celulaEstreita : null]}>
-                          {h}
-                        </ThemedText>
-                      ))}
-                    </View>
-                    {(schedule.data ?? []).map((p) => (
-                      <View
-                        key={p.installment_no}
-                        style={[styles.tabelaLinha, { borderTopColor: theme.separator }]}>
-                        <ThemedText
-                          type="footnote"
-                          style={[styles.celula, styles.celulaEstreita, tabular]}>
-                          {p.installment_no}
-                        </ThemedText>
-                        <ThemedText type="footnote" style={[styles.celula, tabular]}>
-                          {isoToBR(p.due_date)}
-                        </ThemedText>
-                        <View style={styles.celula}>
-                          <Money cents={Number(p.payment_cents)} variant="footnote" />
-                        </View>
-                        <View style={styles.celula}>
-                          {detalhe?.calculation_mode === 'fixed_installments' ? <ThemedText type="footnote">—</ThemedText> : <Money cents={Number(p.interest_cents)} variant="footnote" tone="danger" />}
-                        </View>
-                        <View style={styles.celula}>
-                          {detalhe?.calculation_mode === 'fixed_installments' ? <ThemedText type="footnote">—</ThemedText> : <Money cents={Number(p.principal_cents)} variant="footnote" />}
-                        </View>
-                        <View style={styles.celula}>
-                          <Money
-                            cents={Number(p.balance_cents)}
-                            variant="footnote"
-                            tone="textSecondary"
-                          />
-                        </View>
-                      </View>
-                    ))}
-                  </View>
-                </ScrollView>
-              </View>
+            {/*
+              Só com os pagamentos E o cronograma respondidos: sem os pagamentos, todo pagamento
+              lançado apareceria como "por volta de" (estimado) e trocaria de rótulo ao chegar.
+            */}
+            {detalhe && payments.isSuccess && !schedule.isLoading &&
+            (historico.length > 0 || (schedule.data ?? []).length > 0) ? (
+              <DebtTimeline anos={linhaDoTempo(historico, schedule.data ?? [])} />
             ) : null}
           </ScrollView>
       </Sheet>
@@ -829,7 +796,7 @@ export default function DebtsScreen() {
       {/* Pagar parcela — sheet com a conta explicada ANTES de confirmar. */}
       <Sheet visible={pagando !== null} onClose={() => setPagando(null)}>
           <TaskHeader
-            title="Pagar {pagando?.name}"
+            title={pagando ? `Pagar ${pagando.name}` : 'Pagar'}
             onClose={() => setPagando(null)}
           />
 
@@ -967,22 +934,30 @@ export default function DebtsScreen() {
                   <QuantityField
                     value={form.installmentsPaid}
                     min={pagamentosLancados}
-                    max={totalDeParcelas > 0 ? totalDeParcelas : 999}
+                    max={totalDeParcelas > 0 ? Math.max(totalDeParcelas, form.installmentsPaid) : 999}
                     onChange={mudarPagas}
                     accessibilityLabel="Parcelas já pagas"
                   />
                 </Field>
-                <Field label={rotuloDaData}>
+                <Field label={rotuloDaData} error={faltaData ? 'Escolha a data' : undefined}>
                   <DatePickerField
                     value={proximaISO ? isoToBR(proximaISO) : null}
                     onChange={escolherData}
                     accessibilityLabel={rotuloDaData}
+                    invalid={faltaData}
                   />
                 </Field>
-                {simpleValues && <Card>
-                  <ThemedText type="small">{`${simpleValues.installments}× de ${brl(parcelaCents)} = ${brl(simpleValues.principal_cents)}`}</ThemedText>
-                  <Money cents={simpleValues.remaining_cents} variant="headline" />
-                  <ThemedText type="caption" themeColor="textSecondary">{`Faltam ${simpleValues.installments - form.installmentsPaid} parcelas. Não é uma simulação de juros.`}</ThemedText>
+                {/* O contrato que VAI ser gravado: com "Total a pagar" a parcela arredonda. */}
+                {simpleValues && <Card style={styles.resumo}>
+                  <ThemedText type="small" style={tabular}>{`${simpleValues.installments}× de ${brl(parcelaCents)} = ${brl(simpleValues.principal_cents)}`}</ThemedText>
+                  {form.installmentsPaid > 0 ? (
+                    <View style={styles.valores}>
+                      <ThemedText type="small" themeColor="textSecondary" style={tabular}>
+                        {`Falta pagar (${simpleValues.installments - form.installmentsPaid} parcelas)`}
+                      </ThemedText>
+                      <Money cents={simpleValues.remaining_cents} variant="headline" />
+                    </View>
+                  ) : null}
                 </Card>}
                 {/*
                   "Nome e conta" era um botão SÓ DE TEXTO ("Adicionar detalhes (opcional)") solto no
@@ -994,7 +969,7 @@ export default function DebtsScreen() {
                   <Row
                     icon="pencil"
                     title="Nome e conta"
-                    subtitle={`${form.name.trim() || 'Financiamento'} · ${pagadoras.find((a) => a.id === form.accountId)?.name ?? 'sem conta'}`}
+                    subtitle={`${form.name.trim() || nomePadrao} · ${pagadoras.find((a) => a.id === form.accountId)?.name ?? 'sem conta'}`}
                     chevron={false}
                     trailing={<Icon name={form.showDetails ? 'chevron.up' : 'chevron.down'} size="sm" color="textSecondary" />}
                     onPress={() => setForm({ ...form, showDetails: !form.showDetails })}
@@ -1007,12 +982,11 @@ export default function DebtsScreen() {
                     escrever. Ele dizia "Financiamento do carro" e o default era "Financiamento":
                     o campo parecia vazio, salvava, e a dívida nascia com outro nome.
                   */}
-                  <Field label="Nome"><TextField value={form.name} onChangeText={(name) => setForm({ ...form, name })} placeholder="Financiamento" /></Field>
-                  <Field label="Conta que paga" hint="Opcional — a parcela fica sem conta se você não escolher.">
+                  <Field label="Nome"><TextField value={form.name} onChangeText={(name) => setForm({ ...form, name })} placeholder={nomePadrao} /></Field>
+                  <Field label="Conta que paga">
                     <AccountPicker accounts={pagadoras} value={form.accountId} onChange={(accountId: string | null) => setForm({ ...form, accountId })} emptyLabel="Não informar" />
                   </Field>
                 </>}
-                <ThemedText type="caption" themeColor="textSecondary">Cadastrar não desconta dinheiro. Registre as parcelas conforme forem pagas.</ThemedText>
               </> : <>
               <Field label="Nome">
                 <TextField
@@ -1109,27 +1083,23 @@ export default function DebtsScreen() {
               <Field label="Valor da parcela" hint="O valor do contrato. A amortização é estimativa Price.">
                 <MoneyField valueCents={form.installmentCents} onChangeCents={(installmentCents) => setForm({ ...form, installmentCents })} />
               </Field>
-              <ThemedText type="small" themeColor="textSecondary">O cronograma é uma estimativa mensal. Cadastrar a dívida não cria prestações pendentes na projeção; registre cada pagamento nesta tela.</ThemedText>
-              <View style={styles.duasColunas}>
-                <View style={styles.coluna}>
-                  <Field label="Parcelas que faltam">
-                    <TextField
-                      value={form.parcelas}
-                      onChangeText={(v) =>
-                        setForm({ ...form, parcelas: v.replace(/\D/g, '').slice(0, 3) })
-                      }
-                      placeholder="12"
-                      keyboardType="number-pad"
-                    />
-                  </Field>
-                </View>
-              </View>
+              <Field label="Parcelas que faltam">
+                <TextField
+                  value={form.parcelas}
+                  onChangeText={(v) =>
+                    setForm({ ...form, parcelas: v.replace(/\D/g, '').slice(0, 3) })
+                  }
+                  placeholder="12"
+                  keyboardType="number-pad"
+                />
+              </Field>
               {form.parcelas !== '' ? (
-                <Field label={rotuloDaData}>
+                <Field label={rotuloDaData} error={faltaData ? 'Escolha a data' : undefined}>
                   <DatePickerField
                     value={proximaISO ? isoToBR(proximaISO) : null}
                     onChange={escolherData}
                     accessibilityLabel={rotuloDaData}
+                    invalid={faltaData}
                   />
                 </Field>
               ) : null}
@@ -1151,10 +1121,13 @@ export default function DebtsScreen() {
                     com default o problema não existe, e a frase logo abaixo diz a conta que saiu
                     disso ("N pagas + M restantes").
                   */}
-                  <TextField value={String(form.installmentsPaid)}
-                    onChangeText={(v) => setForm({ ...form, installmentsPaid: Number(v.replace(/\D/g, '')), historyConfirmed: true })}
-                    placeholder="0" maxLength={3} keyboardType="number-pad"
-                    accessibilityLabel="Parcelas do financiamento já pagas" />
+                  <QuantityField
+                    value={form.installmentsPaid}
+                    min={pagamentosLancados}
+                    max={999}
+                    onChange={(n) => setForm({ ...form, installmentsPaid: Math.max(pagamentosLancados, n), historyConfirmed: true })}
+                    accessibilityLabel="Parcelas do financiamento já pagas"
+                  />
                 </Field>
               )}
               {form.parcelas !== '' && form.historyConfirmed && (
@@ -1202,32 +1175,50 @@ const styles = StyleSheet.create({
   },
   ordemTexto: {
     flex: 1,
-    gap: 2,
+    gap: Space.half,
   },
   divida: {
     gap: Space.sm,
   },
   dividaTopo: {
     flexDirection: 'row',
+    flexWrap: 'wrap',
     alignItems: 'center',
     justifyContent: 'space-between',
     gap: Space.sm,
   },
+  // ⚠️ `flexShrink: 0` + `flexWrap` na linha: dentro de `entering` o texto encolhido não se
+  // remede (design.md §3, o "App bloqueado" pintado como "App").
   dividaNome: {
-    flexShrink: 1,
+    flexShrink: 0,
+    maxWidth: '100%',
   },
   arquivada: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    gap: Space.sm,
-    paddingVertical: Space.md,
-    // a mesma calha do `Row` acima dela
-    paddingHorizontal: Space.lg,
-    borderTopWidth: StyleSheet.hairlineWidth,
+    opacity: 0.6,
   },
   proxima: {
     gap: Space.md,
+  },
+  contrato: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    alignItems: 'center',
+    gap: Space.lg,
+  },
+  proximaLinha: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    flexWrap: 'wrap',
+    gap: Space.sm,
+  },
+  contratoTexto: {
+    flex: 1,
+    minWidth: 160,
+    gap: Space.xs,
+  },
+  resumo: {
+    gap: Space.sm,
   },
   explica: {
     gap: Space.sm,
@@ -1242,34 +1233,10 @@ const styles = StyleSheet.create({
   tabelaBloco: {
     gap: Space.sm,
   },
-  tabelaLinha: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: Space.md,
-    paddingVertical: Space.sm,
-    borderTopWidth: StyleSheet.hairlineWidth,
-    borderTopColor: 'transparent',
-  },
-  /**
-   * `minWidth`, não `width`: a tabela vive num `ScrollView` horizontal, então a célula pode
-   * crescer com o conteúdo em vez de cortá-lo. Com largura fixa, "vencimento" e uma data em
-   * fonte grande viravam "vencimen…" — e uma data pela metade não é dado, é ruído.
-   */
-  celula: {
-    minWidth: 92,
-  },
-  celulaEstreita: {
-    minWidth: 32,
-  },
   sheetBody: {
     gap: Space.xl,
     padding: Space.lg,
     paddingBottom: Space.xxxl,
-  },
-  chips: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: Space.sm,
   },
   taxaInput: {
     paddingRight: Space.xxxl,
@@ -1287,13 +1254,6 @@ const styles = StyleSheet.create({
     gap: Space.sm,
   },
   avisoTexto: {
-    flex: 1,
-  },
-  duasColunas: {
-    flexDirection: 'row',
-    gap: Space.md,
-  },
-  coluna: {
     flex: 1,
   },
 });

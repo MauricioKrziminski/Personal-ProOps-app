@@ -89,6 +89,7 @@ function screen(file: string, options: { tablet?: boolean; debts?: any[]; archiv
     useDeleteDebt: () => mutation('deleteDebt'),
     useArchivedDebts: () => ({ ...query, data: options.archivedDebts ?? [] }),
     useDebtSchedule: () => ({ ...query, data: options.debtSchedule ?? [] }),
+    useDebtPayments: () => ({ ...query, isSuccess: true, data: [] }),
     pagamentosDaDivida: async () => ({ count: 0, totalCents: 0 }),
     useSaveAsset: () => mutation('saveAsset'),
     useArchiveAsset: () => mutation('archiveAsset'),
@@ -522,7 +523,7 @@ test('archived debts have a place to come back from', () => {
   const linha = ui.nodes().find((n) => n.type === 'Row' && n.props.title === 'Arquivadas · 1');
   assert.ok(linha, 'a seção das arquivadas existe');
   ui.interact(() => linha.props.onPress());
-  ui.interact((nodes: any[]) => nodes.find((n) => n.type === 'Pressable' && String(n.props.accessibilityLabel).startsWith('Moto')).props.onPress());
+  ui.interact((nodes: any[]) => nodes.find((n) => n.type === 'Row' && n.props.title === 'Moto').props.onPress());
   assert.deepEqual(ui.actions.map((a: any) => a.label), ['Desarquivar', 'Excluir por completo']);
   ui.interact(() => ui.actions[0].onPress());
   assert.deepEqual(ui.writes.at(-1), { operation: 'unarchiveDebt', value: 'd2' });
@@ -542,6 +543,16 @@ test('delete for good asks with the consequence first, then deletes', async () =
   assert.equal(ui.confirmations.length, 1);
   ui.interact(() => ui.confirmations[0]());
   assert.deepEqual(ui.writes.at(-1), { operation: 'deleteDebt', value: 'd1' });
+});
+
+test('the detail has the "…" with the same actions as the long press', () => {
+  const ui = screen(debtsFile, { create: false, debts: [carro] });
+  ui.interact((nodes: any[]) => nodes.find((n) => n.type === 'Pressable' && n.props.onLongPress).props.onPress());
+  const menu = ui.nodes().find((n) => n.type === 'HeaderIconButton' && n.props.label === 'Mais ações');
+  assert.ok(menu, 'o detalhe tem o "…" no alto');
+  ui.interact(() => menu.props.onPress());
+  // no detalhe "Ver as parcelas" sai: é o que já se está vendo
+  assert.deepEqual(ui.actions.map((a: any) => a.label), ['Editar', 'Arquivar', 'Excluir por completo']);
 });
 
 test('editing an OLD debt without its schedule loaded never invents an anchor', () => {
