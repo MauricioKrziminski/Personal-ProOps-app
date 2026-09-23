@@ -463,7 +463,11 @@ const FORA_DE_PROPOSITO: Record<string, string> = {
 
 test('toda chave de consulta financeira está em FINANCE_KEYS, ou tem motivo escrito', async () => {
   const { readFileSync } = await import('node:fs');
-  const hooks = readFileSync('src/hooks/use-finance.ts', 'utf8');
+  // O Próximo passo conta importações e compras parceladas: importar a fatura ou lançar a
+  // parcelada tem que tirar o passo da Hoje (`import_batches` nem está no realtime).
+  const hooks = ['src/hooks/use-finance.ts', 'src/hooks/use-proximo-passo.ts']
+    .map((f) => readFileSync(f, 'utf8'))
+    .join('\n');
   const invalidation = readFileSync('src/lib/query-invalidation.ts', 'utf8');
 
   const usadas = new Set([...hooks.matchAll(/queryKey: \['([a-z0-9-]+)'/g)].map((m) => m[1]));

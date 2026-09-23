@@ -32,6 +32,9 @@ export const FINANCE_KEYS = [
     (`agent-activity`) mostra o registro ATUAL — editar pelo app tem que atualizar o card.
   */
   ['spendable-path'], ['agent-activity'],
+  // O Próximo passo da Hoje conta importações e compras parceladas: importar a fatura ou lançar
+  // a parcelada tira o passo na hora (`import_batches` nem está na publicação do realtime).
+  ['proximo-passo'],
 ] as const;
 
 export function invalidateKeys(client: QueryClient, keys: readonly (readonly string[])[]) {

@@ -28,10 +28,10 @@ export function useProximoPasso(userId: string | undefined): {
   /** Entram no portão da Hoje: o card nasce com a tela, não aparece depois empurrando o resto. */
   consultas: Consulta[];
 } {
-  useRealtimeInvalidate('import_batches', ['proximo-passo']);
+  // Importação e parcelada chegam por `FINANCE_KEYS` (toda escrita financeira); lembrete e nota
+  // não são financeiros e vêm pelo realtime.
   useRealtimeInvalidate('reminders', ['proximo-passo']);
   useRealtimeInvalidate('notes', ['proximo-passo']);
-  useRealtimeInvalidate('installment_plans', ['proximo-passo']);
   const contas = useAccounts();
   const contagens = useQuery({
     queryKey: ['proximo-passo'],
