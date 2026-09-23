@@ -922,7 +922,7 @@ const styles = StyleSheet.create({
     gap: Space.xs,
   },
   secao: {
-    gap: Space.sm,
+    gap: Space.md,
   },
   serie: {
     gap: Space.sm,

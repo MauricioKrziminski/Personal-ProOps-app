@@ -612,7 +612,7 @@ const styles = StyleSheet.create({
     gap: Space.sm,
   },
   secao: {
-    gap: Space.sm,
+    gap: Space.md,
   },
   meta: {
     gap: Space.sm,

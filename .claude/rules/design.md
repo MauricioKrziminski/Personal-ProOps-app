@@ -312,7 +312,7 @@ pessoa a não ler o sufixo.
 |---|---|---|
 | entre BLOCOS da tela | `Space.xl` (24) | é o `gap` do `Screen`; a tela não repete |
 | calha lateral | `Space.lg` (16) | idem |
-| dentro de um bloco (título + conteúdo) | `Space.sm` (8) | `styles.section` |
+| dentro de um bloco (título + conteúdo) | `Space.md` (12) | `Section` já aplica; em volta de `SectionHead`, o `View` pai (`anti-slop.test.ts`) |
 | entre linhas irmãs de um card | `Space.md` (12) | `Card` e `Row` |
 | entre rótulo e valor colados | `Space.xs` (4) / `half` (2) | par de texto |
 

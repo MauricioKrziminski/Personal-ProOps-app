@@ -279,7 +279,7 @@ export default function FolderScreen() {
             ) : null}
 
             {subpastas.length > 0 ? (
-              <View onLayout={(e) => setTopoSubpastas(e.nativeEvent.layout.y)}>
+              <View style={styles.secao} onLayout={(e) => setTopoSubpastas(e.nativeEvent.layout.y)}>
                 <SectionHead title="Subpastas" inset={false} />
                 <FolderGrid
                   pastas={subpastas}
@@ -301,7 +301,7 @@ export default function FolderScreen() {
             ) : null}
 
             {fixadas.length > 0 ? (
-              <View onLayout={(e) => setTopoFixadas(e.nativeEvent.layout.y)}>
+              <View style={styles.secao} onLayout={(e) => setTopoFixadas(e.nativeEvent.layout.y)}>
                 {/* Mesmo motivo do rótulo de baixo: sozinho ele nomearia a lista inteira, e o
                     alfinete de cada cartão já diz o que a seção diria. */}
                 {soltas.length > 0 ? <SectionHead title="Fixadas" inset={false} /> : null}
@@ -325,7 +325,7 @@ export default function FolderScreen() {
               </View>
             ) : null}
 
-            <View onLayout={(e) => setTopoNotas(e.nativeEvent.layout.y)}>
+            <View style={styles.secao} onLayout={(e) => setTopoNotas(e.nativeEvent.layout.y)}>
               {fixadas.length > 0 && soltas.length > 0 ? (
                 <SectionHead title="Notas" inset={false} />
               ) : null}
@@ -426,6 +426,8 @@ export default function FolderScreen() {
 }
 
 const styles = StyleSheet.create({
+  // Título da seção → conteúdo a `Space.md` (o rótulo encostava na grade e na lista).
+  secao: { gap: Space.md },
   conteudo: {
     gap: Space.xl,
     paddingHorizontal: Space.lg,

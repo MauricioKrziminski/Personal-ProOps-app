@@ -186,7 +186,7 @@ export function Section({
   const items = Children.toArray(children);
 
   return (
-    <View style={[styles.section, heading === 'block' && styles.sectionBloco]}>
+    <View style={styles.section}>
       {title ? (
         heading === 'block' ? (
           <BlockHeader title={title} />
@@ -285,10 +285,10 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
+  /* Título → grupo a `Space.md`, a mesma medida entre cards irmãos (era 6; `anti-slop.test.ts`). */
   section: {
-    gap: Space.xs + 2,
+    gap: Space.md,
   },
-  sectionBloco: { gap: Space.md },
   /** O título do grupo: tinta, 14/600, caixa normal — o mesmo do `SectionHead`. */
   sectionTitle: {
     paddingHorizontal: Space.lg,

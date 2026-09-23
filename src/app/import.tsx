@@ -704,7 +704,7 @@ const styles = StyleSheet.create({
   rodape: {
     paddingHorizontal: Space.lg,
   },
-  sentido: { gap: Space.sm, paddingHorizontal: Space.lg },
+  sentido: { gap: Space.md, paddingHorizontal: Space.lg },
   falha: {
     gap: Space.xs,
   },

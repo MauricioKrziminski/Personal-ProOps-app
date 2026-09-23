@@ -1106,3 +1106,35 @@ test('LinearTransition só mora em components/motion/transicao.ts', () => {
   );
   assert.deepEqual(achados, []);
 });
+
+/*
+  ⚠️ **O título de uma seção fica a `Space.md` do conteúdo — em todo lugar** (23/09/2026). Eram
+  quatro medidas: 0 (o ciclo e as pastas, onde o `SectionHead` morava num `View` sem `gap` e o
+  rótulo encostava no card — a queixa, com print), 6 no `Section`, 8 em Orçamentos, Recorrentes,
+  Metas e no "Tipo" da importação, e 12 nas raízes. Uma medida só, a mesma entre cards irmãos.
+  O `SectionHead` não tem espaço próprio: quem o dá é o `View` em volta, e é ele que este teste lê.
+*/
+test('título de seção fica a Space.md do conteúdo, no Section e em volta de todo SectionHead', () => {
+  const row = readFileSync(join(SRC, 'components/ui/row.tsx'), 'utf8');
+  const fora: string[] = [];
+  if (!/\n  section: \{\s*gap: Space\.md,/.test(row)) fora.push('src/components/ui/row.tsx (Section)');
+  for (const f of walk(SRC).filter((p) => !p.endsWith('section-head.tsx'))) {
+    const texto = readFileSync(f, 'utf8');
+    if (!texto.includes('<SectionHead')) continue;
+    const linhas = texto.split('\n');
+    linhas.forEach((linha, i) => {
+      if (!linha.includes('<SectionHead')) return;
+      // O pai é o primeiro `View` aberto acima (um `Pressable` em volta só do título não conta).
+      let estilo: string | null = null;
+      for (let j = i - 1; j >= Math.max(0, i - 8); j--) {
+        if (!/<(Animated\.)?View\b/.test(linhas[j])) continue;
+        const tag = linhas.slice(j, j + 4).join(' ');
+        estilo = tag.match(/style=\{\[?\s*styles\.(\w+)/)?.[1] ?? '';
+        break;
+      }
+      const ok = estilo && new RegExp(`\\b${estilo}: \\{[^}]*gap: Space\\.md\\b`).test(texto);
+      if (!ok) fora.push(`${f.replace(SRC, 'src')}:${i + 1}`);
+    });
+  }
+  assert.deepEqual(fora, [], 'SectionHead sem gap Space.md no View em volta');
+});

@@ -141,7 +141,7 @@ export default function CycleDetailScreen() {
         : 'O filtro acima mostra o outro lado do período.'}
     />
   ) : grupos.map((g) => (
-    <View key={g.titulo}>
+    <View key={g.titulo} style={styles.grupo}>
       <SectionHead title={g.titulo} />
       <Section>
         {g.linhas.map((l, i) => (
@@ -313,6 +313,8 @@ function destino(l: CycleLine) {
 }
 
 const styles = StyleSheet.create({
+  // Título do grupo → linhas a `Space.md`: sem isto o rótulo encostava no card (23/09/2026).
+  grupo: { gap: Space.md },
   painel: { gap: Space.xs },
   conta: { gap: Space.xs, paddingTop: Space.sm },
   contaLinha: {

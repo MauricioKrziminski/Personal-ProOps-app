@@ -710,7 +710,7 @@ const styles = StyleSheet.create({
     gap: Space.sm,
   },
   secao: {
-    gap: Space.sm,
+    gap: Space.md,
   },
   linha: {
     gap: Space.sm,
