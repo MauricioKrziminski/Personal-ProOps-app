@@ -525,6 +525,21 @@ com o valor 52,49 preenchido e nao consigo mudar a parcela"*. Total e número de
 CONTRATO; quem os edita é `public.update_installment_plan`, pelo sheet "Editar a compra" de
 Parceladas (`/finance/installments?edit=<plano>`).
 
+⚠️ **O VALOR, desde 23/09/2026, também se edita no formulário da parcela — com a unidade DITA.**
+O campo era `readOnly` numa parcela (a pessoa digitava o total num campo que era da parcela), e
+a queixa foi *"eu tento clicar e o campo parece ser desabilitado… tinha que ter a opção de
+colocar o valor de cada parcela"*. Hoje os três lugares que recebem o valor de uma compra
+parcelada — criar/converter em N×, editar a parcela e "Editar a compra" — têm **Cada parcela |
+Total da compra** (`UnidadeDoValor`, `lib/finance-form.ts`, com teste):
+
+- **criando/convertendo** a unidade REINTERPRETA o número ("250 é cada parcela" → total 250·N);
+- **numa compra que existe** ela só troca a RÉGUA do campo: o total é a verdade
+  (`ValorDaCompra`), "cada parcela" vale para as EM ABERTO (`travadoCents + x·abertas`, a mesma
+  conta do `_perguntar_unidade` do agente) e trocar a unidade sem digitar não move um centavo;
+- mudar o valor numa parcela SALVA NA COMPRA (`destinoDoSalvar` → `editarCompra`,
+  `useEditarCompraPelaParcela`): a RPC com o nome da COMPRA (nunca o "(2/10)" da linha) e, em
+  seguida, a data desta parcela — a RPC refaz o calendário quando nada foi pago.
+
 **É o padrão do nicho, e ele vem com uma qualificação que todos repetem** (pesquisado em
 15/09/2026): o Organizze recebe total + parcelas na criação (e põe o resto da divisão na
 PRIMEIRA parcela, onde este repo põe na ÚLTIMA); o Mobills edita com escopo; o **OnBalance

@@ -279,8 +279,10 @@ interface MoneyFieldProps {
   onChangeCents: (cents: number) => void;
   autoFocus?: boolean;
   invalid?: boolean;
-  /** Só leitura: o valor existe mas não é deste formulário (parcela de um plano). */
+  /** Só leitura: o valor existe mas não é mais editável (compra com tudo pago). */
   readOnly?: boolean;
+  /** Quando o campo tem unidade (cada parcela × total), o leitor de tela precisa dizê-la. */
+  accessibilityLabel?: string;
 }
 
 /**
@@ -363,7 +365,14 @@ function Digito({ ch, cor, animar }: { ch: string; cor: string; animar: boolean 
  * piscando logo depois do último dígito. A seleção do input continua presa no fim: com ela no meio
  * de `0,00`, o backspace não muda texto nenhum e o campo trava sem erro.
  */
-export function MoneyField({ valueCents, onChangeCents, autoFocus, invalid, readOnly }: MoneyFieldProps) {
+export function MoneyField({
+  valueCents,
+  onChangeCents,
+  autoFocus,
+  invalid,
+  readOnly,
+  accessibilityLabel = 'Valor em reais',
+}: MoneyFieldProps) {
   const theme = useTheme();
   const reduzido = useReducedMotion();
   const { focar, desfocar, moldura } = useCaixa(invalid);
@@ -438,7 +447,7 @@ export function MoneyField({ valueCents, onChangeCents, autoFocus, invalid, read
         editable={!readOnly}
         caretHidden
         contextMenuHidden
-        accessibilityLabel="Valor em reais"
+        accessibilityLabel={accessibilityLabel}
         style={styles.captura}
       />
     </View>

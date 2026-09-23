@@ -1,6 +1,9 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { debtTerm, validRecurringRange, simpleDebtValues, destinoDoSalvar, podeParcelar, temContrato, faixaDeParcelas } from './finance-form.ts';
+import {
+  debtTerm, validRecurringRange, simpleDebtValues, destinoDoSalvar, podeParcelar, temContrato, faixaDeParcelas,
+  totalDigitado, totalPorParcela, parcelaDoTotal, valorExibido, digitarValor, nomeDaCompra, type Contrato,
+} from './finance-form.ts';
 test('remaining installments are added to already paid, never subtracted twice', () => {
   assert.equal(debtTerm('8', 4), 12);
   assert.equal(debtTerm('', 4), null);
@@ -133,4 +136,59 @@ test('o número de parcelas é faixa aberta de 1 a 72 quando nada foi pago', () 
 test('com parcela paga, "À vista" sai da faixa', () => {
   assert.deepEqual(faixaDeParcelas(1), { min: 2, max: 72 });
   assert.equal(faixaDeParcelas(3).min, 2);
+});
+
+// ── o valor de uma compra parcelada: total ou cada parcela (23/09/2026) ─────────────
+
+test('criando em N×, "parcela" multiplica e "total" fica como digitado', () => {
+  assert.equal(totalDigitado(25000, 'parcela', 12), 300000);
+  assert.equal(totalDigitado(300000, 'total', 12), 300000);
+  // à vista, parcela e total são a mesma coisa
+  assert.equal(totalDigitado(25000, 'parcela', 1), 25000);
+});
+
+const tv: Contrato = { parcelas: 10, travadas: 1, travadoCents: 30000 };
+
+test('numa compra que já existe, "cada parcela" vale para as em aberto e a travada fica', () => {
+  // tv 10× de 300 com a 1ª paga: cada uma das 9 abertas a 250 → 300 + 9×250
+  assert.equal(totalPorParcela(25000, tv), 30000 + 9 * 25000);
+  assert.equal(parcelaDoTotal(300000, tv), 30000);
+});
+
+test('trocar a unidade sem digitar não muda a compra — nem por um centavo', () => {
+  const c: Contrato = { parcelas: 3, travadas: 0, travadoCents: 0 };
+  const v = { totalCents: 1000, parcelaCents: null };
+  // a divisão cairia em 333 (volta 999); a parcela exibida é a de hoje e o total não se mexe
+  assert.equal(valorExibido(v, 'parcela', c, 334, 1000), 334);
+  assert.equal(valorExibido(v, 'total', c, 334, 1000), 1000);
+  assert.equal(v.totalCents, 1000);
+});
+
+test('digitar em "parcela" guarda o que foi digitado e recalcula o total', () => {
+  const v = digitarValor(25000, 'parcela', tv);
+  assert.deepEqual(v, { totalCents: 255000, parcelaCents: 25000 });
+  assert.equal(valorExibido(v, 'parcela', tv, 30000, 300000), 25000);
+  assert.equal(valorExibido(v, 'total', tv, 30000, 300000), 255000);
+  // digitar em "total" esquece a parcela digitada
+  assert.deepEqual(digitarValor(350000, 'total', tv), { totalCents: 350000, parcelaCents: null });
+});
+
+test('com tudo pago, "cada parcela" não alcança nenhuma', () => {
+  const quitada: Contrato = { parcelas: 2, travadas: 2, travadoCents: 20000 };
+  assert.equal(totalPorParcela(99999, quitada), 20000);
+  assert.equal(parcelaDoTotal(20000, quitada), 0);
+});
+
+test('o nome da compra é o da parcela sem o "(k/N)"', () => {
+  assert.equal(nomeDaCompra('tv (2/10)'), 'tv');
+  assert.equal(nomeDaCompra('Controle (mãe) (1/4)'), 'Controle (mãe)');
+  assert.equal(nomeDaCompra('Sem sufixo'), 'Sem sufixo');
+});
+
+test('mudar o valor de uma parcela edita a COMPRA; o resto continua no update da linha', () => {
+  const parcela = { id: 'tx', installment_plan_id: 'p' };
+  assert.equal(destinoDoSalvar(parcela, { installments: 1, account_id: 'c', valorDaCompraMudou: true }), 'editarCompra');
+  assert.equal(destinoDoSalvar(parcela, { installments: 1, account_id: 'c', valorDaCompraMudou: false }), 'salvar');
+  // lançamento simples não tem compra para editar
+  assert.equal(destinoDoSalvar({ id: 'tx' }, { installments: 1, account_id: 'c', valorDaCompraMudou: true }), 'salvar');
 });

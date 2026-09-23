@@ -744,6 +744,37 @@ export function useUpdateInstallmentPlan() {
 }
 
 /**
+ * O valor da compra mudou NO FORMULÁRIO DE UMA PARCELA.
+ *
+ * Duas escritas, em ordem, porque são dois donos: o dinheiro é da COMPRA
+ * (`update_installment_plan`, que só redistribui o que está em aberto) e a data é da PARCELA.
+ * Sem a segunda, a RPC — que reescreve o calendário quando nada foi pago — levaria a data desta
+ * parcela de volta para a do contrato, e a tela teria mostrado uma coisa e gravado outra.
+ */
+export function useEditarCompraPelaParcela() {
+  const invalidate = useInvalidateFinance();
+  const editarCompra = useUpdateInstallmentPlan();
+  return useMutation({
+    mutationFn: async (input: {
+      compra: Parameters<typeof editarCompra.mutateAsync>[0];
+      parcela: { id: string; patch: Partial<Pick<TransactionInput, 'occurred_at' | 'status' | 'due_at' | 'auto_confirm'>> };
+    }) => {
+      await editarCompra.mutateAsync(input.compra);
+      if (Object.keys(input.parcela.patch).length === 0) return;
+      const { error } = await supabase
+        .from('transactions')
+        .update(input.parcela.patch)
+        .eq('id', input.parcela.id)
+        .select('id')
+        .single();
+      // A compra JÁ mudou: quem chama precisa dizer isso, não "não deu para salvar".
+      if (error) throw Object.assign(error, { compraSalva: true });
+    },
+    onSuccess: invalidate,
+  });
+}
+
+/**
  * Um lançamento que já existe vira compra parcelada.
  *
  * ⚠️ **A linha original é ADOTADA como parcela 1 — o `id` não muda.** Quem faz isso é a RPC; o
@@ -2714,6 +2745,8 @@ export interface InstallmentPlanSummary {
    * diz o que a pessoa pode fazer a respeito.
    */
   locked_paid: number;
+  /** Quais são as travadas — o formulário da parcela precisa saber se ELA ainda muda. */
+  locked_ids: string[];
   first_occurred_at: string;
   last_occurred_at: string | null;
   active: boolean;
@@ -2804,6 +2837,7 @@ export function useInstallmentPlans() {
           locked: travadas.length,
           locked_cents: travadas.reduce((soma, p) => soma + p.amount_cents, 0),
           locked_paid: travadas.filter((p) => p.status === 'cleared').length,
+          locked_ids: travadas.map((p) => p.id),
           first_occurred_at: plan.first_occurred_at,
           last_occurred_at: parcels.reduce<string | null>(
             (maior, p) => (maior && maior > p.occurred_at ? maior : p.occurred_at),

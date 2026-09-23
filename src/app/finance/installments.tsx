@@ -32,7 +32,17 @@ import {
 } from '@/hooks/use-finance';
 import { formatBRL, formatDateBR, localISODate } from '@/hooks/use-items';
 import { brToISO, isValidBRDate, isoToBR } from '@/lib/dates';
-import { faixaDeParcelas, financeErrorMessage } from '@/lib/finance-form';
+import {
+  digitarValor,
+  faixaDeParcelas,
+  financeErrorMessage,
+  parcelaDoTotal,
+  totalPorParcela,
+  valorExibido,
+  type Contrato,
+  type UnidadeDoValor,
+} from '@/lib/finance-form';
+import { Segmented } from '@/components/ui/segmented';
 import { QuantityField } from '@/components/ui/quantity-field';
 import { estadoDaLinha } from '@/lib/settle-labels';
 import { useToast } from '@/components/ui/toast';
@@ -79,6 +89,15 @@ interface FormPlano {
   travadas: number;
   travadasPagas: number;
   travadoCents: number;
+  /**
+   * O que o número do Valor é (23/09/2026, *"tinha que ter a opção de colocar o valor de cada
+   * parcela"*). O total continua sendo a verdade; a parcela digitada fica à parte para trocar
+   * a unidade não mexer em centavo nenhum (`ValorDaCompra`).
+   */
+  unidade: UnidadeDoValor;
+  parcelaCents: number | null;
+  /** Como a compra abriu — é o que "cada parcela" mostra antes de qualquer edição. */
+  original: { totalCents: number; installments: number; parcelaCents: number };
 }
 
 function formDoPlano(plano: InstallmentPlanSummary): FormPlano {
@@ -94,8 +113,34 @@ function formDoPlano(plano: InstallmentPlanSummary): FormPlano {
     travadas: plano.locked,
     travadasPagas: plano.locked_paid,
     travadoCents: plano.locked_cents,
+    unidade: 'total',
+    parcelaCents: null,
+    original: {
+      totalCents: plano.total_cents,
+      installments: plano.installments,
+      parcelaCents: plano.installment_cents,
+    },
   };
 }
+
+function contratoDo(form: FormPlano): Contrato {
+  return { parcelas: form.installments, travadas: form.travadas, travadoCents: form.travadoCents };
+}
+
+/** "Cada parcela" hoje: a parcela real enquanto nada mudou; com N trocado, a divisão nova. */
+function valorDoCampo(form: FormPlano): number {
+  const c = contratoDo(form);
+  const hoje =
+    form.installments === form.original.installments
+      ? form.original.parcelaCents
+      : parcelaDoTotal(form.totalCents, c);
+  return valorExibido(form, form.unidade, c, hoje, form.original.totalCents);
+}
+
+const UNIDADES = [
+  { value: 'parcela', label: 'Cada parcela' },
+  { value: 'total', label: 'Total da compra' },
+] as const satisfies readonly { value: UnidadeDoValor; label: string }[];
 /**
  * POR QUE a compra travou, em vez de "já fechadas": parcela paga e fatura paga em parte pedem
  * saídas diferentes (22/09/2026 — a trava da wardogs tinha duas causas possíveis e a dica era a
@@ -707,17 +752,30 @@ export default function InstallmentsScreen() {
             </Field>
 
             <Field
-              label="Valor total"
+              label="Valor"
               error={totalOk ? undefined : 'O total precisa cobrir o que já foi pago e as parcelas em aberto'}
               hint={
-                travado
-                  ? `${brl(form.travadoCents)} em parcela fechada. O resto se divide nas em aberto.`
-                  : 'É o valor da compra inteira, não o da parcela.'
+                form.unidade === 'parcela'
+                  ? `${travado ? `Vale para as ${emAberto} em aberto` : `${form.installments}x`} · total ${brl(form.totalCents)}`
+                  : travado
+                    ? `${brl(form.travadoCents)} em parcela fechada. O resto se divide nas em aberto.`
+                    : undefined
               }>
+              {/* Sempre na tela: sumir no "À vista" subiria o formulário embaixo do "−". */}
+              <Segmented
+                options={UNIDADES}
+                value={form.unidade}
+                onChange={(unidade) => setForm({ ...form, unidade })}
+              />
               <MoneyField
-                valueCents={form.totalCents}
-                onChangeCents={(totalCents) => setForm({ ...form, totalCents })}
+                valueCents={valorDoCampo(form)}
+                onChangeCents={(v) =>
+                  setForm({ ...form, ...digitarValor(v, form.unidade, contratoDo(form)) })
+                }
                 invalid={!totalOk}
+                accessibilityLabel={
+                  form.unidade === 'parcela' ? 'Valor de cada parcela' : 'Valor total da compra'
+                }
               />
             </Field>
 
@@ -766,7 +824,17 @@ export default function InstallmentsScreen() {
                   min={faixaParcelas.min}
                   max={faixaParcelas.max}
                   accessibilityLabel="Número de parcelas"
-                  onChange={(n) => setForm({ ...form, installments: n })}
+                  onChange={(n) =>
+                    setForm({
+                      ...form,
+                      installments: n,
+                      // Quem digitou "cada parcela" continua com aquela parcela: o total segue o N.
+                      totalCents:
+                        form.parcelaCents !== null
+                          ? totalPorParcela(form.parcelaCents, { ...contratoDo(form), parcelas: n })
+                          : form.totalCents,
+                    })
+                  }
                 />
               )}
             </Field>
