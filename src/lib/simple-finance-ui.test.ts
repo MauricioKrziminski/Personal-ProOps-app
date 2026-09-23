@@ -433,19 +433,25 @@ test('E se: Ver resultado depois de Somar não duplica a hipótese já adicionad
   assert.equal(ui.nodes().some((n: any) => n.type === 'Sheet' && n.props.visible), false);
 });
 
-test('new financing saves from the installment value, the count and the first due date', () => {
+test('new financing: Nome and Conta first, the name is required and the typed one is saved', () => {
   const ui = screen(debtsFile);
-  assert.deepEqual(ui.nodes().filter((n) => n.type === 'Field').map((n) => n.props.label), ['Valor', 'Total de parcelas', 'Parcelas já pagas', 'Primeira parcela']);
+  // 23/09/2026: "Nome e conta" era uma linha recolhida no FIM, e o nome caía em "Financiamento 2".
+  assert.deepEqual(ui.nodes().filter((n) => n.type === 'Field').map((n) => n.props.label), ['Nome', 'Conta que paga', 'Valor', 'Total de parcelas', 'Parcelas já pagas', 'Primeira parcela']);
+  assert.equal(ui.nodes().some((n) => n.type === 'Row' && n.props.title === 'Nome e conta'), false);
   assert.equal(ui.button('Salvar').props.disabled, true);
   ui.fill('Valor', 147000);
   ui.fill('Total de parcelas', '48');
   // A data ancora o cronograma: sem ela a projeção chuta quando o dinheiro sai.
   assert.equal(ui.button('Salvar').props.disabled, true);
   ui.fill('Primeira parcela', '05/12/2026');
+  // Tudo preenchido menos o nome: o Salvar segue travado e o campo diz por quê.
+  assert.equal(ui.button('Salvar').props.disabled, true);
+  assert.equal(ui.nodes().find((n) => n.type === 'Field' && n.props.label === 'Nome').props.error, 'Dê um nome');
+  ui.fill('Nome', 'Carro');
   ui.press('Salvar');
   const saved = ui.writes[0].value;
   assert.equal(ui.writes.length, 1);
-  assert.equal(saved.name, 'Financiamento');
+  assert.equal(saved.name, 'Carro');
   assert.equal(saved.kind, 'financing');
   assert.equal(saved.calculation_mode, 'fixed_installments');
   assert.equal(saved.installments, 48);
@@ -461,6 +467,7 @@ test('new financing saves from the installment value, the count and the first du
 
 test('"Total a pagar" divides by the count and saves the contract that the check accepts', () => {
   const ui = screen(debtsFile);
+  ui.fill('Nome', 'Carro');
   ui.interact((nodes) => nodes.find((n) => n.type === 'Segmented' && n.props.options.some((o: any) => o.value === 'total')).props.onChange('total'));
   ui.fill('Valor', 7000000);
   ui.fill('Total de parcelas', '48');
@@ -472,6 +479,7 @@ test('"Total a pagar" divides by the count and saves the contract that the check
 
 test('paid history moves the anchor: the date asked is the NEXT one, and the first is derived', () => {
   const ui = screen(debtsFile);
+  ui.fill('Nome', 'Carro');
   ui.fill('Valor', 147000);
   ui.fill('Total de parcelas', '48');
   ui.fill('Parcelas já pagas', '8');
@@ -485,6 +493,7 @@ test('paid history moves the anchor: the date asked is the NEXT one, and the fir
 
 test('history above the contract total settles on the total instead of blocking (22/09/2026)', () => {
   const ui = screen(debtsFile);
+  ui.fill('Nome', 'Carro');
   ui.fill('Valor', 147000);
   ui.fill('Total de parcelas', '48');
   ui.fill('Parcelas já pagas', '49');

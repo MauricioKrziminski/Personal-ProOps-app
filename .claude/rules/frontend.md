@@ -164,7 +164,9 @@ banco**, e era justamente esse o defeito. O que faltava não era uma coluna, era
   no patrimônio nem informa nada na lista — `net-worth` só olhava o nome.
 - **Campo com default mostra o default no `placeholder`**, nunca um exemplo diferente dele. O nome
   da dívida sugeria "Financiamento do carro" e gravava "Financiamento": o campo parecia vazio,
-  salvava, e a dívida nascia com outro nome.
+  salvava, e a dívida nascia com outro nome. **Desde 23/09/2026 a dívida não tem mais nome
+  padrão**: o "Nome" abre o formulário, é obrigatório ("Dê um nome" quando o resto já está
+  preenchido) e a "Conta que paga" vem logo abaixo, opcional — pedido do dono do produto.
 - **Botão desabilitado sem dizer por quê é o defeito espelho** (§7b do design: erro abaixo do
   campo). Um "Salvar" cinza que não explica é a mesma frustração com outra cara.
 

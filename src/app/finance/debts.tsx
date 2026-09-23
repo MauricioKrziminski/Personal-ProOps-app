@@ -89,7 +89,6 @@ function parseTaxa(texto: string): number {
 
 interface FormState {
   calculationMode: 'amortized' | 'fixed_installments';
-  showDetails: boolean;
   id?: string;
   name: string;
   kind: Debt['kind'];
@@ -127,7 +126,6 @@ const UNIDADES_DA_DIVIDA = [
 
 const FORM_VAZIO: FormState = {
   calculationMode: 'fixed_installments',
-  showDetails: false,
   name: '',
   kind: 'loan',
   remainingCents: 0,
@@ -232,7 +230,6 @@ export default function DebtsScreen() {
     setForm({
       calculationMode: d.calculation_mode,
       // No editar, nome e conta já aparecem: quem abriu o editar veio mudar alguma coisa.
-      showDetails: true,
       unidade: 'parcela',
       valorCents: Number(d.installment_cents ?? 0),
       ancora: d.first_due_date ?? null,
@@ -294,16 +291,6 @@ export default function DebtsScreen() {
   const faltaData = Boolean(form?.parcelas) && !ancoraEfetiva && !(form?.id && diaDoContrato) &&
     (form?.calculationMode === 'fixed_installments' ? parcelaCents > 0 : (form?.remainingCents ?? 0) > 0);
   const rotuloDaData = !form || form.installmentsPaid === 0 ? 'Primeira parcela' : `Próxima parcela (a ${form.installmentsPaid + 1}ª)`;
-  /**
-   * O nome que SERÁ gravado quando o campo fica vazio — o mesmo no placeholder, no subtítulo da
-   * linha "Nome e conta" e no payload (frontend.md: campo com default mostra o default). Vem do
-   * TIPO, e não sempre "Financiamento": aberto pelo "+", o tipo é empréstimo.
-   */
-  const nomeBase = DEBT_KINDS.find((k) => k.value === form?.kind)?.label ?? 'Dívida';
-  let nomePadrao = nomeBase;
-  for (let n = 2; lista.some((d) => d.id !== form?.id && d.name.toLowerCase() === nomePadrao.toLowerCase()); n++) {
-    nomePadrao = `${nomeBase} ${n}`;
-  }
   const escolherData = (br: string) => {
     if (!form) return;
     const iso = brToISO(br);
@@ -333,6 +320,12 @@ export default function DebtsScreen() {
   };
   const nomeOk = (form?.name.trim().length ?? 0) >= 2;
   /**
+   * O nome é obrigatório (23/09/2026: *"ser obrigatório o nome"*) — caía em "Financiamento 2". Com
+   * o resto preenchido e o nome faltando, o campo diz por que o Salvar não liga.
+   */
+  const faltaNome = Boolean(form) && !nomeOk &&
+    (form?.calculationMode === 'fixed_installments' ? Boolean(simpleValues) : (form?.remainingCents ?? 0) > 0);
+  /**
    * Contrato com parcelas TEM dia de vencimento — sem ele o cronograma ancora numa
    * data arbitrária e a projeção de caixa passa a mentir sobre quando o dinheiro sai.
    * Dívida sem parcelas ("devo 500 pro João") não tem cadência e continua sem exigir.
@@ -345,7 +338,7 @@ export default function DebtsScreen() {
     (!form.parcelas || Number(form.parcelas) > 0) &&
     (form.kind !== 'financing' || (form.taxa.trim() !== '' && !!form.parcelas)) &&
     Number.isFinite(Number(form.taxa.replace(',', '.'))) && Number(form.taxa.replace(',', '.')) >= 0;
-  const podeSalvar = Boolean(form && validDueDay && (!form.id || payments.isSuccess) && (form.calculationMode === 'fixed_installments' ? simpleValues : advancedValid));
+  const podeSalvar = Boolean(form && nomeOk && validDueDay && (!form.id || payments.isSuccess) && (form.calculationMode === 'fixed_installments' ? simpleValues : advancedValid));
 
 
   const salvar = () => {
@@ -353,7 +346,7 @@ export default function DebtsScreen() {
     save.mutate(
       {
         id: form.id,
-        name: form.name.trim() || nomePadrao,
+        name: form.name.trim(),
         calculation_mode: form.calculationMode,
         kind: form.kind,
         // sem os dois campos separados a barra de progresso nasce sempre em 0%
@@ -895,6 +888,23 @@ export default function DebtsScreen() {
 
           {form ? (
             <ScrollView contentContainerStyle={styles.sheetBody} keyboardShouldPersistTaps="handled">
+              {/*
+                Nome e conta NO TOPO (23/09/2026, pedido do dono do produto): eram uma linha
+                recolhida no fim do "Parcela fixa", e o nome caía em "Financiamento 2". O nome
+                abre o formulário e é obrigatório; a conta é opcional.
+              */}
+              <Field label="Nome" error={faltaNome ? 'Dê um nome' : undefined}>
+                <TextField
+                  value={form.name}
+                  onChangeText={(name) => setForm({ ...form, name })}
+                  placeholder="Ex.: Carro"
+                  autoFocus={!form.id}
+                  invalid={faltaNome}
+                />
+              </Field>
+              <Field label="Conta que paga">
+                <AccountPicker accounts={pagadoras} value={form.accountId} onChange={(accountId: string | null) => setForm({ ...form, accountId })} emptyLabel="Não informar" />
+              </Field>
               {!form.id && <Segmented
                 options={[{ value: 'fixed_installments', label: 'Parcela fixa' }, { value: 'amortized', label: 'Com juros ao mês' }]}
                 value={form.calculationMode}
@@ -966,43 +976,7 @@ export default function DebtsScreen() {
                     </View>
                   ) : null}
                 </Card>}
-                {/*
-                  "Nome e conta" era um botão SÓ DE TEXTO ("Adicionar detalhes (opcional)") solto no
-                  formulário — não parecia clicável (23/09/2026). É uma linha que abre no lugar e já
-                  diz o que está lá. O caminho rápido continua pedindo só o necessário, e o nome cai
-                  em "Financiamento" quando vazio.
-                */}
-                <Section>
-                  <Row
-                    icon="pencil"
-                    title="Nome e conta"
-                    subtitle={`${form.name.trim() || nomePadrao} · ${pagadoras.find((a) => a.id === form.accountId)?.name ?? 'sem conta'}`}
-                    chevron={false}
-                    trailing={<Icon name={form.showDetails ? 'chevron.up' : 'chevron.down'} size="sm" color="textSecondary" />}
-                    onPress={() => setForm({ ...form, showDetails: !form.showDetails })}
-                    accessibilityState={{ expanded: form.showDetails }}
-                  />
-                </Section>
-                {form.showDetails && <>
-                  {/*
-                    ⚠️ O placeholder mostra o NOME QUE SERÁ GRAVADO, não um exemplo do que
-                    escrever. Ele dizia "Financiamento do carro" e o default era "Financiamento":
-                    o campo parecia vazio, salvava, e a dívida nascia com outro nome.
-                  */}
-                  <Field label="Nome"><TextField value={form.name} onChangeText={(name) => setForm({ ...form, name })} placeholder={nomePadrao} /></Field>
-                  <Field label="Conta que paga">
-                    <AccountPicker accounts={pagadoras} value={form.accountId} onChange={(accountId: string | null) => setForm({ ...form, accountId })} emptyLabel="Não informar" />
-                  </Field>
-                </>}
               </> : <>
-              <Field label="Nome">
-                <TextField
-                  value={form.name}
-                  onChangeText={(name) => setForm({ ...form, name })}
-                  placeholder="Empréstimo do banco"
-                  autoFocus
-                />
-              </Field>
 
               {/*
                 `Chip` é filtro de lista — muitos, ligáveis, resposta imediata. Aqui são cinco
@@ -1142,14 +1116,6 @@ export default function DebtsScreen() {
                   {`${form.installmentsPaid} pagas + ${form.parcelas} restantes = ${Number(form.parcelas) + form.installmentsPaid} parcelas no total.`}
                 </ThemedText>
               )}
-              {/*
-                A conta que paga vem DEPOIS do cronograma: ela estava no meio dos valores,
-                separando "valor da prestação" de "quantas parcelas". Campo longo (uma lista
-                de contas) partindo um grupo curto era o "ordem toda bagunçada" de 09/09/2026.
-              */}
-              <Field label="Conta que paga">
-                <AccountPicker accounts={pagadoras} value={form.accountId} onChange={(accountId: string | null) => setForm({ ...form, accountId })} emptyLabel="Não informar" />
-              </Field>
               </>}
             </ScrollView>
           ) : null}
