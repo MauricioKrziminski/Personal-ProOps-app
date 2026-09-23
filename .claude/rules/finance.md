@@ -118,8 +118,15 @@ ele é **11/08 a 10/09**: recebe, gasta, e no dia 10 paga tudo. Lido de 1 a 31, 
 tela bate com a planilha dele.
 
 `workspaces.cycle_close_day` (`20260911020000`), **null = último dia do mês**, que é
-exatamente o comportamento anterior. Teto de 28 para o dia existir em fevereiro: sem isso o
-ciclo mudaria de tamanho conforme o mês, que é o defeito que ele resolve.
+exatamente o comportamento anterior.
+
+> **Mudou em 23/09/2026: vai até o 31** (`20260923140000`). O teto era 28 "para o dia existir em
+> fevereiro", e a grade do Perfil parava no 28 (*"o mês vai só até o dia 28 em vez de ir até o
+> 31"*). Hoje `cycle_bounds` faz o clamp com `private.day_in_month` — a mesma regra do vencimento
+> do cartão: 29 e 30 fecham no último dia do mês mais curto. Com o clamp, fechar no 31 É fechar no
+> último dia, então **o 31 grava `null`** (o `check` vai até 30) e o `null` acende o 31 na grade.
+> Um valor por significado. `supabase/tests/mes_fecha_ate_o_31.sql` prende as bordas em fevereiro
+> (bissexto e não), nos meses de 30 dias e que todo dia cai em exatamente um ciclo.
 
 **Uma função sabe a regra, e é `private.cycle_bounds(close_day, mes)`.** Dela saem
 `month_lines_for`, `month_summary_for`, `monthly_lines_range` e `month_group` — os quatro
@@ -264,7 +271,7 @@ O que o dono do produto queria da régua "fatura" (*"ver os lançamentos por fat
 ciclo"*) veio da **fatura virar linha**, não de um período novo — o modelo do Organizze, cujo
 "Saldo diário" conta o cartão como uma despesa única "Fatura Mês Ano", pelo vencimento.
 
-Mercado, medido: Finny tem dia configurável **1 a 28** (o mesmo teto daqui); Goodbudget e Lunch
+Mercado, medido: Finny tem dia configurável **1 a 28** (o teto que foi daqui até 23/09/2026); Goodbudget e Lunch
 Money também; **Monarch e Copilot só têm mês civil**; e o **YNAB recusa por decisão de desenho** —
 a resposta deles para quem recebe fora do dia 1 é "orce um mês à frente", para a borda deixar de
 importar.

@@ -148,16 +148,25 @@ async def test_criar_o_mes_e_o_mesmo_que_mudar_o_dia(monkeypatch):
     assert "dia 10" in prep["summary"]
 
 
-@pytest.mark.parametrize("dia", ["0", "29", "31", "banana"])
-def test_dia_fora_de_1_a_28_e_recusado(dia):
-    """29, 30 e 31 não existem em fevereiro — o ciclo mudaria de tamanho."""
+@pytest.mark.parametrize("dia", ["0", "32", "banana"])
+def test_dia_fora_de_1_a_31_e_recusado(dia):
     with pytest.raises(Level1Error):
         resources.validate_fields(_acao(dia))
 
 
-@pytest.mark.parametrize("dia,esperado", [("1", 1), ("28", 28), ("10", 10)])
+@pytest.mark.parametrize("dia,esperado", [("1", 1), ("10", 10), ("28", 28), ("29", 29), ("30", 30)])
 def test_dias_validos_passam(dia, esperado):
+    """Desde a `20260923140000` o mês fecha em qualquer dia: 29 e 30 caem no último dia do mês
+    mais curto (o banco faz o clamp, como no vencimento do cartão)."""
     assert resources.validate_fields(_acao(dia))["cycle_close_day"] == esperado
+
+
+def test_31_e_o_ultimo_dia_do_mes():
+    """Com o clamp, fechar no 31 É fechar no último dia — o `null`. Gravar 31 seria o mesmo
+    significado com dois valores (e o `check` recusa)."""
+    valores = resources.validate_fields(_acao("31"))
+    assert valores["cycle_close_day"] is None
+    assert valores["cycle_close_day_ultimo"] is True
 
 
 # --- o rotativo ------------------------------------------------------------
@@ -368,4 +377,4 @@ async def test_listar_o_mes_responde_qual_e_e_como_mudar(monkeypatch):
     assert r.read_only
     assert "11/08/2026" in r.message and "10/09/2026" in r.message
     assert "dia 10" in r.message
-    assert "1 a 28" in r.message, "diz como mudar"
+    assert "1 a 31" in r.message, "diz como mudar"

@@ -7,7 +7,18 @@ import { Radius, Space, tabular } from '@/design/tokens';
 import { useTheme } from '@/hooks/use-theme';
 
 /**
- * O dia em que o mês FINANCEIRO fecha — a grade de 28 dias + "Último dia do mês".
+ * Linhas de 7, e a última completada com espaços VAZIOS: com `flexWrap` + `flexGrow` os três
+ * últimos dias (29, 30, 31) esticavam para preencher a linha e a grade perdia as colunas.
+ */
+const SEMANAS: (number | null)[][] = Array.from({ length: 5 }, (_, s) =>
+  Array.from({ length: 7 }, (_, i) => {
+    const dia = s * 7 + i + 1;
+    return dia <= 31 ? dia : null;
+  }),
+);
+
+/**
+ * O dia em que o mês FINANCEIRO fecha — a grade de 1 a 31 (o 31 é o último dia do mês).
  *
  * Nasceu dentro do Perfil e saiu de lá quando o onboarding precisou da mesma escolha: a segunda
  * cópia é como as duas divergem, e aqui a divergência seria silenciosa (uma grade aceitando 31,
@@ -28,14 +39,25 @@ import { useTheme } from '@/hooks/use-theme';
  * Explicar isso em texto não resolve; o que resolve é o intervalo aparecer e MUDAR junto com o
  * toque. Por isso a prévia faz parte do componente, e não da tela que o usa.
  *
- * O teto é 28 para o dia existir em fevereiro — sem isso o ciclo mudaria de tamanho conforme o
- * mês, que é justamente o defeito que ele resolve.
+ * ## Até o 31, e o 31 É o "último dia do mês" (23/09/2026)
+ *
+ * O teto era 28 "para o dia existir em fevereiro", e a queixa foi literal: *"o mês vai só até o
+ * dia 28 em vez de ir até o 31"*. Hoje o banco faz o clamp (`private.cycle_bounds`, a mesma regra
+ * do vencimento do cartão): 29 e 30 fecham no último dia do mês mais curto. Com isso, fechar no 31
+ * e fechar no último dia são a MESMA coisa — o 31 grava `null` e o `null` acende o 31. O botão
+ * separado "Último dia do mês" saiu: eram dois controles dizendo a mesma coisa.
+ *
+ * ⚠️ **Vidro só no dia ESCOLHIDO, nunca atrás da grade nem em toda célula.** A grade inteira
+ * tinha um `GlassBackdrop` e as células eram transparentes: no iPhone os números apareciam sobre
+ * uma placa "nada a ver". Vidro em cada uma das 31 células foi medido no simulador (iOS 26, escuro)
+ * e também não serve: lado a lado, o sistema pinta umas escuras e outras claras, sem padrão. A
+ * célula é opaca como no Android, e o vidro marca a escolha — o mesmo desenho do `Calendar`.
  */
 export function CycleDayPicker({
   value,
   onChange,
 }: {
-  /** `null` = último dia do mês, que é o padrão e o comportamento de quem nunca mexeu nisso. */
+  /** `null` = último dia do mês — o padrão, e o que o 31 grava. */
   value: number | null;
   onChange: (dia: number | null) => void;
 }) {
@@ -45,73 +67,60 @@ export function CycleDayPicker({
   return (
     <>
       <View style={styles.grade}>
-        {vidro ? <GlassBackdrop fallbackColor={theme.surface} radius={Radius.sm} /> : null}
-        {Array.from({ length: 28 }, (_, i) => i + 1).map((dia) => {
-          const escolhido = value === dia;
-          return (
-            <Pressable
-              key={dia}
-              accessibilityRole="button"
-              accessibilityState={{ selected: escolhido }}
-              accessibilityLabel={`Fechar o mês no dia ${dia}`}
-              onPress={() => {
-                Haptics.selectionAsync();
-                onChange(dia);
-              }}
-              style={[
-                styles.dia,
-                {
-                  backgroundColor: vidro ? 'transparent' : escolhido ? theme.tintFill : theme.surface,
-                  borderColor: escolhido ? theme.tintFill : theme.cardBorder,
-                },
-              ]}>
-              {vidro && escolhido ? (
-                <GlassBackdrop fallbackColor={theme.tintFill} radius={Radius.sm} tintColor={theme.glassActionTint} />
-              ) : null}
-              <ThemedText
-                type="default"
-                style={[tabular, escolhido ? { color: theme.onTint } : undefined]}>
-                {dia}
-              </ThemedText>
-            </Pressable>
-          );
-        })}
+        {SEMANAS.map((semana, s) => (
+          <View key={s} style={styles.semana}>
+            {semana.map((dia, i) => {
+              if (dia == null) return <View key={`vazio-${i}`} style={styles.vazio} />;
+              const ultimo = dia === 31;
+              const escolhido = ultimo ? value == null : value === dia;
+              return (
+                <Pressable
+                  key={dia}
+                  accessibilityRole="button"
+                  accessibilityState={{ selected: escolhido }}
+                  accessibilityLabel={
+                    ultimo ? 'Fechar o mês no último dia' : `Fechar o mês no dia ${dia}`
+                  }
+                  onPress={() => {
+                    Haptics.selectionAsync();
+                    onChange(ultimo ? null : dia);
+                  }}
+                  style={[
+                    styles.dia,
+                    {
+                      backgroundColor: escolhido
+                        ? vidro
+                          ? 'transparent'
+                          : theme.tintFill
+                        : theme.surface,
+                      borderColor: escolhido ? theme.tintFill : theme.cardBorder,
+                    },
+                  ]}>
+                  {vidro && escolhido ? (
+                    <GlassBackdrop
+                      fallbackColor={theme.tintFill}
+                      radius={Radius.sm}
+                      tintColor={theme.glassActionTint}
+                    />
+                  ) : null}
+                  <ThemedText
+                    type="default"
+                    style={[tabular, escolhido ? { color: theme.onTint } : undefined]}>
+                    {dia}
+                  </ThemedText>
+                </Pressable>
+              );
+            })}
+          </View>
+        ))}
       </View>
-
-      {/*
-        Fora da grade de propósito: "último dia" não é um número entre 1 e 28, é a AUSÊNCIA de
-        escolha (e o padrão). Dentro dela leria como um 29º dia — e o mês nem sempre tem.
-      */}
-      <Pressable
-        accessibilityRole="button"
-        accessibilityState={{ selected: value == null }}
-        onPress={() => {
-          Haptics.selectionAsync();
-          onChange(null);
-        }}
-        style={[
-          styles.ultimo,
-          {
-            backgroundColor: vidro ? 'transparent' : value == null ? theme.tintFill : theme.surface,
-            borderColor: value == null ? theme.tintFill : theme.cardBorder,
-          },
-        ]}>
-        {vidro ? (
-          <GlassBackdrop
-            fallbackColor={value == null ? theme.tintFill : theme.surface}
-            radius={Radius.sm}
-            tintColor={value == null ? theme.glassActionTint : undefined}
-          />
-        ) : null}
-        <ThemedText type="default" style={value == null ? { color: theme.onTint } : undefined}>
-          Último dia do mês
-        </ThemedText>
-      </Pressable>
 
       <ThemedText type="footnote" themeColor="textSecondary" style={[styles.previa, tabular]}>
         {value == null
           ? 'do dia 1 ao último dia de cada mês'
-          : `do dia ${value === 28 ? 1 : value + 1} de um mês ao dia ${value} do seguinte`}
+          : value >= 29
+            ? `até o dia ${value} de cada mês, ou o último dia no mês mais curto`
+            : `do dia ${value + 1} de um mês ao dia ${value} do seguinte`}
       </ThemedText>
     </>
   );
@@ -120,12 +129,14 @@ export function CycleDayPicker({
 const styles = StyleSheet.create({
   /*
     7 colunas, como a semana de um calendário — é a grade que a pessoa já sabe varrer com o
-    olho. `flexBasis` em vez de largura fixa: a calha muda entre 384dp e um tablet, e um número
+    olho. `flex: 1` em vez de largura fixa: a calha muda entre 384dp e um tablet, e um número
     cravado deixaria a última coluna fora ou uma faixa vazia à direita.
   */
   grade: {
+    gap: Space.sm,
+  },
+  semana: {
     flexDirection: 'row',
-    flexWrap: 'wrap',
     gap: Space.sm,
   },
   /*
@@ -134,8 +145,7 @@ const styles = StyleSheet.create({
     o texto.
   */
   dia: {
-    flexBasis: '12%',
-    flexGrow: 1,
+    flex: 1,
     minHeight: 44,
     alignItems: 'center',
     justifyContent: 'center',
@@ -143,16 +153,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderCurve: 'continuous',
   },
-  ultimo: {
-    marginTop: Space.md,
-    minHeight: 44,
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: Space.sm,
-    borderRadius: Radius.sm,
-    borderWidth: 1,
-    borderCurve: 'continuous',
-  },
+  vazio: { flex: 1 },
   previa: {
     marginTop: Space.sm,
   },

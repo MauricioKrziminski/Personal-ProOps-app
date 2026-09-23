@@ -79,6 +79,13 @@ App mobile pessoal de **notas rápidas, lembretes e controle financeiro operado 
   "Criar lembrete" pela nota falha com "Não deu para salvar" (a coluna não existe). O resto do app
   e o agente não dependem dela.
 
+  ⚠️ **PENDENTE em produção: `20260923140000`** (o mês fecha em qualquer dia até o 31 — `check`
+  1..30 e `cycle_bounds` com o clamp do `day_in_month`). Aplicada e conferida no STAGING em
+  23/09/2026 (`supabase/tests/mes_fecha_ate_o_31.sql` verde). **Ordem: migration → agente e app.**
+  O app novo grava 29 e 30 na grade do Perfil e o agente novo aceita "meu mês fecha dia 30"; sem
+  a migration em produção os dois batem no `check` antigo (1..28) e o salvar falha. Até o 30 o
+  resultado das leituras não muda para quem já usa um dia até 28.
+
   ⚠️ **OTA/build do chat exige a revisão nova do agente em produção** (21/09/2026): o app novo
   manda `id` no `POST /internal/chat/conversations` para abrir a conversa na hora, e o agente
   antigo (`extra='forbid'`) recusa com 422 — TODA primeira mensagem falha. Sem migration: é só

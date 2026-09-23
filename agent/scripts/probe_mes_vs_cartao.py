@@ -54,6 +54,8 @@ CASOS: list[tuple[str, str, str | None]] = [
     ("meu periodo financeiro vai do dia 15 ao dia 15", "mes", "cycle_close_day"),
     ("muda meu mes pra fechar no dia 20", "mes", "cycle_close_day"),
     ("meu mes volta a fechar no fim do mes", "mes", "cycle_close_day"),
+    # 29 e 30 passaram a valer em 23/09/2026 (o teto era 28)
+    ("meu mes fecha dia 30", "mes", "cycle_close_day"),
     # --- o ciclo SEM a palavra "ciclo" e sem "mês fecha": é assim que a pessoa
     #     que não sabe o nome da feature fala ---
     ("quero contar do dia 15 ao dia 15", "mes", "cycle_close_day"),

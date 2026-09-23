@@ -25,6 +25,19 @@ daria `ini = 01/02 + 31 = 04/03`. O cartão já resolve isso com `private.day_in
 fevereiro cai no último dia). O agente repete o teto de 28 em `agent/app/tools/resources.py` e
 no prompt.
 
+**Decisão (dono do produto):** a grade vai de 1 a 31, e o 31 É o "último dia do mês" — o botão
+separado saiu, porque os dois diriam a mesma coisa.
+
+**Correção.**
+- Migration `20260923140000`: `check` 1..30 (o 31 grava `null`) e `private.cycle_bounds` com
+  `private.day_in_month` nos dois extremos. `cycle_month_of` não muda (o rótulo já sai certo com o
+  clamp). Revisada pelo agente `migration-reviewer` (aprovada) e aplicada no STAGING.
+- Grade: 1 a 31 em linhas de 7 (a última completada com espaços, senão 29–31 esticavam). As
+  células são opacas, e o vidro fica só no dia escolhido. Vidro em cada uma das 31 foi medido no
+  simulador e deu células pretas e claras ao acaso.
+- Agente: aceita 1 a 31, e o 31 vira "último dia" (`None` + a marca que o `_preparar_mes` já
+  consumia). Mensagens e prompt dizem "1 a 31".
+
 **Auditoria das outras grades de dia.** `Calendar` (1–31, sem contêiner), a grade de meses do
 `MonthSheet` (vidro por célula, certo) e os chips 1–31 + "Último dia" do lembrete: nenhuma
 repete o defeito. Fechamento e vencimento de cartão e vencimento de dívida são campo de texto
@@ -123,4 +136,4 @@ component that hasn't mounted yet" no login do Android.
 | 4 | — (é o `hitTest` nativo; não há o que simular em `node --test`) | iOS: toque no Valor → teclado numérico, borda de foco, "45,99" digitado; também dentro do Sheet de Dívidas ("1.500,00"), e com partida a frio tocando pelo rótulo. Android: "1.234,56" sem o fantasma do input à direita (ele existia antes, com 0,01, e sumiu com o texto na cor da caixa). |
 | 3 | `anti-slop.test.ts` (allowlist com o motivo) | Android 375dp × 1,3: face do cartão "R$ 1.423,00" numa linha (`3-depois-…png`), Hoje, Financeiro (tiles Entra/Sai), Cartões e Lançamentos sem quebra no meio de valor. iOS: Financeiro e face inalterados no tamanho padrão. |
 | 2 | `anti-slop.test.ts` — placeholder de busca até 20 caracteres (falha com o texto antigo) | Android 375dp × 1,3: Lançamentos e Recorrentes numa linha (`2-antes/depois-…png`); digitado "gasolinapq" sem corte nas descendentes. |
-| 1 | | |
+| 1 | `supabase/tests/mes_fecha_ate_o_31.sql` (falhava na definição antiga: "fecha 30 em 2027-02-01: deu … a 2027-03-02"; verde no staging depois da migration), mais as bordas do dia 10 inalteradas; `agent/tests/test_mes_e_rotativo.py` (29/30 passam, 31 = último dia, 0/32 recusados). Regressão no staging: `regua_e_dia_do_fechamento`, `parcela_paga_no_ciclo` e `fluxo_do_financeiro` verdes. `linha_do_tempo` já falhava por dado do staging (ciclo 11/08–10/09, que tem as mesmas bordas antes e depois). | Android 384dp × 1,3, claro e escuro: grade 1–31 em 7 colunas; escolher o 30 gravou `30` e o ciclo corrente virou 31/08–30/09; o 31 gravou `null` ("Último dia do mês", 01/09–30/09) e acende o 31 ao reabrir; workspace devolvido ao dia 10. iOS claro e escuro: sem a placa atrás da grade. Pendente: `probe_mes_vs_cartao.py` (Gemini do staging em 503). |
