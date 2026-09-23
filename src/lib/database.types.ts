@@ -672,6 +672,7 @@ export type Database = {
           calculation_mode: string
           created_at: string
           due_day: number | null
+          first_due_date: string | null
           id: string
           installment_cents: number | null
           installments: number | null
@@ -692,6 +693,7 @@ export type Database = {
           calculation_mode?: string
           created_at?: string
           due_day?: number | null
+          first_due_date?: string | null
           id?: string
           installment_cents?: number | null
           installments?: number | null
@@ -712,6 +714,7 @@ export type Database = {
           calculation_mode?: string
           created_at?: string
           due_day?: number | null
+          first_due_date?: string | null
           id?: string
           installment_cents?: number | null
           installments?: number | null
@@ -2751,6 +2754,7 @@ export type Database = {
           principal_cents: number
         }[]
       }
+      delete_debt: { Args: { p_debt_id: string }; Returns: number }
       expenses_monthly: {
         Args: { months_back?: number }
         Returns: {

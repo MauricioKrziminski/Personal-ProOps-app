@@ -86,6 +86,12 @@ App mobile pessoal de **notas rápidas, lembretes e controle financeiro operado 
   a migration em produção os dois batem no `check` antigo (1..28) e o salvar falha. Até o 30 o
   resultado das leituras não muda para quem já usa um dia até 28.
 
+  ⚠️ **PENDENTE em produção: `20260923160000`** (financiamento maleável — `debts.first_due_date`
+  no cronograma, contrato fixo editável com pagamento lançado, `public.delete_debt`). Aplicada e
+  conferida no STAGING em 23/09/2026 (`supabase/tests/financiamento_maleavel.sql` verde, com o
+  caso de RLS). **Ordem: migration → agente → app.** O app novo lê/grava `first_due_date` e chama
+  `delete_debt`; o agente novo também. Sem ela, salvar um financiamento falha (coluna inexistente).
+
   ⚠️ **OTA/build do chat exige a revisão nova do agente em produção** (21/09/2026): o app novo
   manda `id` no `POST /internal/chat/conversations` para abrir a conversa na hora, e o agente
   antigo (`extra='forbid'`) recusa com 422 — TODA primeira mensagem falha. Sem migration: é só

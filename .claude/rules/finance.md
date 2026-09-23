@@ -22,6 +22,18 @@
   quando o que vem não está coberto. Vale para as 5 telas, as 2 tab bars e o alerta.
   `month` null = limite padrão; linha com `month` sobrescreve aquele mês. **Dois unique parciais** (NULL não colide com NULL no Postgres). `rollover` soma a sobra do mês anterior, um nível só — e **só se o orçamento já existia antes do mês corrente** (`created_at`), senão um orçamento criado hoje ganharia sobra de um mês em que não existia. Status via `_budgets_status`.
 - **`debts`**: dívidas com `interest_rate_monthly` em fração mensal (1,99% a.m. = 0.0199). `debt_schedule` monta a Price; `pay_debt_installment` abate o saldo **já descontando os juros do mês**.
+  - **`first_due_date` é a âncora do CONTRATO** (`20260923160000`): a data da parcela nº 1. A
+    parcela `n` vence em `day_in_month(add_months(first_due_date, n − 1), due_day)`, e
+    `private.debt_schedule_for` usa `greatest(<próxima a partir de hoje>, <parcela pagas+1 do
+    contrato>)` — a carência de 3 meses aparece, e o atrasado continua como sempre. `null` é o
+    comportamento antigo. O app pergunta a PRÓXIMA parcela e grava `first = próxima − pagas`.
+  - **O contrato de parcela fixa se edita mesmo com "Paguei" lançado** (decisão do dono do
+    produto, 23/09/2026): o `check` segura a aritmética; o pagamento anterior à edição vira
+    histórico e não se corrige/apaga mais sozinho.
+  - **Excluir por completo é `public.delete_debt`**: trava a dívida, apaga os pagamentos
+    (`transactions.debt_id`, com um desvio local à transação no `tg_transactions_debt_payment`) e a
+    dívida. Idempotente. Apagar a dívida direto FALHA quando há pagamento: a FK `set null` dispara
+    o trigger, que recusa "desvincular".
 - **`recurring_transactions`**: RRULE + `dtstart` (âncora imutável) + `next_run_at` (próxima ocorrência FUTURA, é o que o app mostra) + `materialized_until` (controle do cron). Materializadas **um ano à frente** pelo `finance-scheduler` como `pending`, com `source='recurring'`. Idempotência pelo unique `(recurring_id, occurred_at)`.
 
   ⚠️ **Era 90 dias até 10/09/2026, e 90 dias fazia a projeção MENTIR** — não "acabar". A parcela
