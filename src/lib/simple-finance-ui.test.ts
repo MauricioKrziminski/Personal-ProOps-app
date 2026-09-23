@@ -6,6 +6,7 @@ import { runInNewContext } from 'node:vm';
 import ts from 'typescript';
 
 import { telaPronta } from './tela-pronta.ts';
+import { ladosDoArrasto } from './arrasto.ts';
 
 const require = createRequire(import.meta.url);
 
@@ -166,7 +167,7 @@ function screen(file: string, options: { tablet?: boolean; debts?: any[]; archiv
       if (name === '@/hooks/use-tela-pronta') return { useTelaPronta: (...consultas: any[]) => { gates.push(consultas); return true; } };
       // Carregado DE VERDADE: ele é a regra que se quer testar, não um arredor da tela.
       if (name === '@/hooks/use-voltar-quando-fechar') return load('src/hooks/use-voltar-quando-fechar.ts');
-      if (name === '@/hooks/use-items') return { localISODate: () => '2026-09-08', formatDateBR: () => '08/09/2026', formatBRL: load('src/lib/dates.ts').formatBRL, useRealtimeInvalidate: () => {}, useTodayReminders: () => ({ ...query, isSuccess: true, data: options.reminders ?? [] }) };
+      if (name === '@/hooks/use-items') return { localISODate: () => '2026-09-08', formatDateBR: () => '08/09/2026', formatBRL: load('src/lib/dates.ts').formatBRL, useRealtimeInvalidate: () => {}, useTodayReminders: () => ({ ...query, isSuccess: true, data: options.reminders ?? [] }), useReminders: () => ({ ...query, isSuccess: true, data: options.reminders ?? [] }), useToggleReminder: () => mutation('toggleReminder'), useDeleteReminder: () => mutation('deleteReminder') };
       if (name === '@/hooks/use-session') return { useSession: () => ({ session: { user: { id: 'user-1' } } }) };
       if (name === '@/hooks/use-profile') return { useProfile: () => ({ ...query, isSuccess: true, data: { display_name: 'Gabriel Almeida', phone: null } }) };
       if (name === '@/hooks/use-proximo-passo') return { useProximoPasso: () => ({ passo: options.proximo ?? null, dispensar: (id: string) => writes.push({ operation: 'dispensarProximo', value: id }), consultas: [] }) };
@@ -183,7 +184,7 @@ function screen(file: string, options: { tablet?: boolean; debts?: any[]; archiv
       };
       // Orçamentos consulta direto (a lista de linhas): o mesmo resultado inerte dos hooks.
       if (name === '@tanstack/react-query') return { useQuery: () => query };
-      if (name === '@/lib/finance-form' || name === '@/lib/dates' || name === '@/lib/forecast-months' || name === '@/lib/month-view' || name === '@/lib/settle-labels' || name === '@/lib/accounts' || name === '@/lib/cycle-label' || name === '@/lib/card-status' || name === '@/lib/today-sections' || name === '@/lib/runway' || name === '@/lib/budget-tight' || name === '@/lib/setup-steps' || name === '@/lib/activity-feed' || name === '@/lib/account-cash' || name === '@/lib/today-spend' || name === '@/lib/anticipation' || name === '@/lib/widget-snapshot' || name === '@/lib/debt-history' || name === '@/lib/import-preview') return load(`src/lib/${name.split('/').at(-1)}.ts`);
+      if (name === '@/lib/finance-form' || name === '@/lib/dates' || name === '@/lib/forecast-months' || name === '@/lib/month-view' || name === '@/lib/settle-labels' || name === '@/lib/accounts' || name === '@/lib/cycle-label' || name === '@/lib/card-status' || name === '@/lib/today-sections' || name === '@/lib/runway' || name === '@/lib/budget-tight' || name === '@/lib/setup-steps' || name === '@/lib/activity-feed' || name === '@/lib/account-cash' || name === '@/lib/today-spend' || name === '@/lib/anticipation' || name === '@/lib/widget-snapshot' || name === '@/lib/debt-history' || name === '@/lib/import-preview' || name === '@/lib/arrasto') return load(`src/lib/${name.split('/').at(-1)}.ts`);
       if (name === '@/hooks/use-debounced') return { useDebounced: (value: unknown) => value };
       if (name === '@/design/category-icons') return { categoryIcon: () => 'circle' };
       if (name === '@/design/adaptive-window') return load('src/design/adaptive-window.ts');
@@ -1108,4 +1109,25 @@ test('Importar: ?conta= que não é da pessoa é ignorado — nada pré-escolhid
   const ui = screen(importFile, { params: { conta: 'de-outra-pessoa' }, forecastAccounts: contasDoImport });
   assert.equal(ui.nodes().find((n: any) => n.type === 'AccountPicker').props.value, null);
   assert.equal(ui.button('Escolher arquivo').props.disabled, true);
+});
+
+/*
+  Arrastar o card para os lados (spec 2026-09-23-arrastar-card): o card declara as ações UMA vez
+  e o `Deslizavel` divide. Os testes leem o que cada card entrega a ele.
+*/
+const ladosDe = (node: any) => {
+  const l = ladosDoArrasto(node.props.acoes);
+  // JSON: o harness roda a tela noutro contexto (vm), e arrays de lá não são `deepStrictEqual` daqui.
+  return JSON.parse(JSON.stringify({ direita: l.direita.map((a: any) => a.label), esquerda: l.esquerda.map((a: any) => a.label), mais: l.mais, pontaDireita: l.pontaDireita?.label ?? null, pontaEsquerda: l.pontaEsquerda?.label ?? null }));
+};
+const deslizaveis = (ui: any) => ui.nodes().filter((n: any) => n.type === 'Deslizavel');
+
+test('Lembretes: arrastar à direita pausa (até o fim, com Desfazer), à esquerda apaga', () => {
+  const ui = screen('src/app/reminders.tsx', { reminders: [{ id: 'r1', title: 'Aluguel', active: true, next_run_at: '2026-10-05T12:00:00Z', recurrence: null }] });
+  const [card] = deslizaveis(ui);
+  assert.ok(card, 'o lembrete está num Deslizavel');
+  assert.deepEqual(ladosDe(card), { direita: ['Pausar'], esquerda: ['Apagar'], mais: false, pontaDireita: 'Pausar', pontaEsquerda: null });
+  // o toque longo continua com todas as ações
+  ui.interact((nodes: any[]) => nodes.find((n) => n.type === 'Row' && n.props.onLongPress).props.onLongPress());
+  assert.deepEqual(JSON.parse(JSON.stringify(ui.actions.map((a: any) => a.label))), ['Editar', 'Pausar', 'Apagar']);
 });

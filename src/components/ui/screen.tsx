@@ -13,8 +13,11 @@ import Animated, {
   useAnimatedStyle,
   useReducedMotion,
   useSharedValue,
+  runOnJS,
 } from 'react-native-reanimated';
 import { KeyboardAwareScrollView } from 'react-native-keyboard-controller';
+
+import { fecharDeslizavelAberto } from '@/components/ui/deslizavel';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Stack } from 'expo-router';
 
@@ -138,8 +141,14 @@ export function Screen({
   const insets = useSafeAreaInsets();
   const headerHeight = useAppHeaderHeight();
   const rolagem = useSharedValue(0);
-  const aoRolar = useAnimatedScrollHandler((e) => {
-    rolagem.set(e.contentOffset.y);
+  const aoRolar = useAnimatedScrollHandler({
+    onScroll: (e) => {
+      rolagem.set(e.contentOffset.y);
+    },
+    // Rolar fecha o card arrastado que estiver aberto (spec 2026-09-23-arrastar-card).
+    onBeginDrag: () => {
+      runOnJS(fecharDeslizavelAberto)();
+    },
   });
 
   const background = grouped ? theme.groupedBackground : theme.background;

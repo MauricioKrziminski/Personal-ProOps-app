@@ -5,6 +5,7 @@ import { ErrorCard } from '@/components/error-card';
 import { ThemedText } from '@/components/themed-text';
 import { HeaderActions } from '@/components/ui/header-actions';
 import { AdaptivePanes } from '@/components/ui/adaptive-panes';
+import { Deslizavel } from '@/components/ui/deslizavel';
 import { EmptyState } from '@/components/ui/empty-state';
 import { Row, Section } from '@/components/ui/row';
 import { Screen } from '@/components/ui/screen';
@@ -19,7 +20,7 @@ import {
   useToggleReminder,
   type Reminder,
 } from '@/hooks/use-items';
-import { showItemActions } from '@/lib/item-actions';
+import { showItemActions, type ItemAction } from '@/lib/item-actions';
 import { describeRRule } from '@/lib/rrule-text';
 
 /**
@@ -42,16 +43,22 @@ export default function RemindersScreen() {
   const active = reminders.filter((r) => r.active);
   const paused = reminders.filter((r) => !r.active);
 
-  const actions = (r: Reminder) => {
-    const pauseLabel = r.active ? 'Pausar' : 'Retomar';
-    const onPause = () =>
+  /** O menu do lembrete, declarado UMA vez: o toque longo e o arrasto leem a mesma lista. */
+  const acoesDoLembrete = (r: Reminder): ItemAction[] => {
+    const alternar = (active: boolean, desfazendo = false) =>
       toggle.mutate(
-        { id: r.id, active: !r.active },
+        { id: r.id, active },
         {
           onSuccess: () =>
-            toast({ message: r.active ? 'Lembrete pausado.' : 'Lembrete retomado.', tone: 'success' }),
+            desfazendo
+              ? undefined
+              : toast({
+                  message: active ? 'Lembrete retomado.' : 'Lembrete pausado.',
+                  tone: 'success',
+                  action: { label: 'Desfazer', onPress: () => alternar(!active, true) },
+                }),
           onError: () => toast({ message: 'Não deu para mudar o lembrete.', tone: 'error' }),
-        }
+        },
       );
     const onDelete = () =>
       remove.mutate(r.id, {
@@ -59,39 +66,52 @@ export default function RemindersScreen() {
         onError: () => toast({ message: 'Não deu para apagar.', tone: 'error' }),
       });
 
-    showItemActions(r.title, [
-      { label: 'Editar', onPress: () => router.push(`/reminder-form?id=${r.id}`) },
-      { label: pauseLabel, onPress: onPause },
-      { label: 'Apagar', destructive: true, onPress: onDelete },
-    ]);
+    return [
+      { label: 'Editar', arrasto: 'fora', onPress: () => router.push(`/reminder-form?id=${r.id}`) },
+      {
+        label: r.active ? 'Pausar' : 'Retomar',
+        arrasto: 'direita',
+        desfaz: true,
+        onPress: () => alternar(!r.active),
+      },
+      { label: 'Apagar', destructive: true, arrasto: 'esquerda', onPress: onDelete },
+    ];
   };
 
   const line = (r: Reminder) => (
-    <Row
-      key={r.id}
-      title={r.title}
-      subtitle={
-        r.recurrence
-          ? `${describeRRule(r.recurrence)} · próximo ${formatDateBR(r.next_run_at)}`
-          : formatDateBR(r.next_run_at)
-      }
-      icon={r.active ? 'bell' : 'bell.slash'}
-      accessibilityLabel={`${r.title}, ${r.active ? 'ativo' : 'pausado'}`}
-      onPress={() => router.push(`/reminder-form?id=${r.id}`)}
-      onLongPress={() => actions(r)}
-    />
+    <Deslizavel key={r.id} titulo={r.title} acoes={acoesDoLembrete(r)}>
+      <Row
+        title={r.title}
+        subtitle={
+          r.recurrence
+            ? `${describeRRule(r.recurrence)} · próximo ${formatDateBR(r.next_run_at)}`
+            : formatDateBR(r.next_run_at)
+        }
+        icon={r.active ? 'bell' : 'bell.slash'}
+        accessibilityLabel={`${r.title}, ${r.active ? 'ativo' : 'pausado'}`}
+        onPress={() => router.push(`/reminder-form?id=${r.id}`)}
+        onLongPress={() => showItemActions(r.title, acoesDoLembrete(r))}
+      />
+    </Deslizavel>
   );
 
-  const activeSection = active.length > 0 ? <Section title="Ativos">{active.map(line)}</Section> : null;
-  const pausedSection = paused.length > 0 ? (
-    <View style={styles.pausedPane}>
-      <Section title="Pausados">{paused.map(line)}</Section>
-      <ThemedText type="small" themeColor="textSecondary" style={styles.hint}>
-        Lembrete pausado não dispara e não gasta mensagem.
-      </ThemedText>
-    </View>
-  ) : null;
-  const list = <>{activeSection}{pausedSection}</>;
+  const activeSection =
+    active.length > 0 ? <Section title="Ativos">{active.map(line)}</Section> : null;
+  const pausedSection =
+    paused.length > 0 ? (
+      <View style={styles.pausedPane}>
+        <Section title="Pausados">{paused.map(line)}</Section>
+        <ThemedText type="small" themeColor="textSecondary" style={styles.hint}>
+          Lembrete pausado não dispara e não gasta mensagem.
+        </ThemedText>
+      </View>
+    ) : null;
+  const list = (
+    <>
+      {activeSection}
+      {pausedSection}
+    </>
+  );
 
   return (
     <Screen grouped wide={tablet} onRefresh={refetch}>
@@ -105,7 +125,9 @@ export default function RemindersScreen() {
           e Regras. Aqui era um botão de bloco no CORPO, e esta era a única tela de lista do app
           sem ação nenhuma no header — mesma intenção, dois lugares diferentes. */}
       <HeaderActions
-        actions={[{ label: 'Novo lembrete', icon: 'plus', onPress: () => router.push('/reminder-form') }]}
+        actions={[
+          { label: 'Novo lembrete', icon: 'plus', onPress: () => router.push('/reminder-form') },
+        ]}
       />
 
       {isError ? <ErrorCard onRetry={refetch} /> : null}
@@ -125,7 +147,9 @@ export default function RemindersScreen() {
           singlePaneContent={list}
           testID="reminders-tablet-workspace"
         />
-      ) : list}
+      ) : (
+        list
+      )}
 
       {!isLoading && !isError && reminders.length === 0 ? (
         <EmptyState
@@ -135,7 +159,6 @@ export default function RemindersScreen() {
           action={{ label: 'Novo lembrete', onPress: () => router.push('/reminder-form') }}
         />
       ) : null}
-
     </Screen>
   );
 }
