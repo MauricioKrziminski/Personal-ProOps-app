@@ -70,6 +70,7 @@ App mobile pessoal de **notas rápidas, lembretes e controle financeiro operado 
   `20260922150000`: importação inteligente (colunas novas em `import_items`, status `uncertain`,
   `finish_import_batch`, fatura do histórico nascendo quitada). ⚠️ **Ordem: migrations → app →
   agente.** O agente novo exige a conta no import (o app antigo a deixava opcional → 422 claro).
+  Seguida nessa ordem no mesmo dia: build de produção no iPhone e agente `agente-00080-4cl`.
 
   ⚠️ **OTA/build do chat exige a revisão nova do agente em produção** (21/09/2026): o app novo
   manda `id` no `POST /internal/chat/conversations` para abrir a conversa na hora, e o agente
