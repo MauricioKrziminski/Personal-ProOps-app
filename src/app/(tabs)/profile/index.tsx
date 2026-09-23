@@ -468,7 +468,7 @@ export default function ProfileScreen() {
             <Button
               label="Pessoas"
               icon="person.2"
-              variant="ghost"
+              variant="secondary"
               size="sm"
               onPress={() => router.push('/profile/members')}
             />

@@ -119,10 +119,36 @@ o primitivo corrige todas as telas.
   recusa desvincular pagamento, então apagar uma dívida com pagamento registrado falha hoje (8).
   A edição não manda `installments_paid` (só no criar) e `tg_debts_calculation_mode` barra o
   contrato de parcela fixa com pagamento registrado (10).
-- **11. Botão só texto**: `ghost` é o par do primário (Cancelar/Salvar, "Reenviar código"). O
-  defeito é o `ghost` sozinho fazendo papel de "abrir mais", como o "Adicionar detalhes
-  (opcional)" de `debts.tsx`.
+- **11. Botão só texto**: ver a seção própria abaixo.
 - **12. Ver mais → Planejamento**: ver a seção própria abaixo.
+
+## 11. Botão só texto, "sem nada atrás"
+
+**Causa raiz, em duas partes.**
+1. **`ghost` sozinho.** A variante `ghost` é texto puro, pensada como o PAR do primário
+   (Cancelar/Salvar). Havia sete usos em que ela aparecia sozinha, sem primário ao lado:
+   - "Adicionar detalhes (opcional)" (dívidas, o print);
+   - "Apagar lançamento";
+   - "Apagar" (lembrete);
+   - "Tirar hipótese" (E se…);
+   - "Pessoas" (Perfil);
+   - "Mais ações" (Recorrentes);
+   - "Dívidas" (lançamento de pagamento);
+   - as saídas das perguntas do Agente.
+2. **No iPhone, o `secondary` também virava texto.** No iOS 26 todo botão usa vidro. O
+   `secondary` ia sem tinta, e o vidro regular sobre um card branco é quase branco. O "Fechar" do
+   "Meu mês" e o "Gerenciar plano" liam como texto solto (visto no simulador).
+
+**Correção.**
+- **Ghosts sozinhos:** viraram `secondary` (pílula cinza). As ações destrutivas usam
+  `secondary` com `tone="danger"`, uma prop nova do `Button`: rótulo vermelho, sem o vermelho
+  cheio do `destructive`.
+- **"Adicionar detalhes":** virou uma linha "Nome e conta" que abre no lugar e já mostra os
+  valores.
+- **Vidro do `secondary`:** ganhou a tinta `glassElementTint` (par claro/escuro em `theme.ts`).
+- **Teste:** `anti-slop.test.ts` prende o `ghost` numa allowlist de arquivos em que ele é o par
+  do primário (as telas de conta, o onboarding e o "Cancelar" das pastas), cada um com o motivo.
+  Conferido: o teste falha quando o `ghost` volta ao lembrete.
 
 ## 12. "Ver mais" do Financeiro: Dívidas e Recorrentes em Planejamento?
 
@@ -150,5 +176,6 @@ component that hasn't mounted yet" no login do Android.
 | 4 | — (é o `hitTest` nativo; não há o que simular em `node --test`) | iOS: toque no Valor → teclado numérico, borda de foco, "45,99" digitado; também dentro do Sheet de Dívidas ("1.500,00"), e com partida a frio tocando pelo rótulo. Android: "1.234,56" sem o fantasma do input à direita (ele existia antes, com 0,01, e sumiu com o texto na cor da caixa). |
 | 3 | `anti-slop.test.ts` (allowlist com o motivo) | Android 375dp × 1,3: face do cartão "R$ 1.423,00" numa linha (`3-depois-…png`), Hoje, Financeiro (tiles Entra/Sai), Cartões e Lançamentos sem quebra no meio de valor. iOS: Financeiro e face inalterados no tamanho padrão. |
 | 2 | `anti-slop.test.ts` — placeholder de busca até 20 caracteres (falha com o texto antigo) | Android 375dp × 1,3: Lançamentos e Recorrentes numa linha (`2-antes/depois-…png`); digitado "gasolinapq" sem corte nas descendentes. |
+| 11 | `anti-slop.test.ts` (ghost só como par do primário; falha com o `ghost` de volta no lembrete) | iOS claro: "Fechar" do Meu mês virou pílula; iOS escuro: "Gerenciar plano" + "Pessoas" pílulas; Android 384dp × 1,3: "Apagar lançamento" em pílula cinza com rótulo vermelho. |
 | 12 | — | Android 384dp × 1,3: Dia a dia (4), Compromissos (3), Planejamento (2), sem quebra de título. |
 | 1 | `supabase/tests/mes_fecha_ate_o_31.sql` (falhava na definição antiga: "fecha 30 em 2027-02-01: deu … a 2027-03-02"; verde no staging depois da migration), mais as bordas do dia 10 inalteradas; `agent/tests/test_mes_e_rotativo.py` (29/30 passam, 31 = último dia, 0/32 recusados). Regressão no staging: `regua_e_dia_do_fechamento`, `parcela_paga_no_ciclo` e `fluxo_do_financeiro` verdes. `linha_do_tempo` já falhava por dado do staging (ciclo 11/08–10/09, que tem as mesmas bordas antes e depois). | Android 384dp × 1,3, claro e escuro: grade 1–31 em 7 colunas; escolher o 30 gravou `30` e o ciclo corrente virou 31/08–30/09; o 31 gravou `null` ("Último dia do mês", 01/09–30/09) e acende o 31 ao reabrir; workspace devolvido ao dia 10. iOS claro e escuro: sem a placa atrás da grade. Pendente: `probe_mes_vs_cartao.py` (Gemini do staging em 503). |

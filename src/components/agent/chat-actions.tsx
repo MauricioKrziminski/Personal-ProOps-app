@@ -140,7 +140,7 @@ export const ChatActions = memo(function ChatActions({ payload, busy, onDecide }
               <Button
                 key={o.id}
                 label={o.label}
-                variant="ghost"
+                variant="secondary"
                 block
                 onPress={() => escolher(o)}
               />

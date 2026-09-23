@@ -607,7 +607,8 @@ function ReminderForm({
             />
             <Button
               label="Apagar"
-              variant="ghost"
+              variant="secondary"
+              tone="danger"
               loading={remove.isPending}
               onPress={onDelete}
             />

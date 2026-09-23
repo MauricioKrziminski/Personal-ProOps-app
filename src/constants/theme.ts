@@ -41,6 +41,9 @@ export const Colors = {
     tintFill: '#0B0B0C',
     glassActionTint: 'rgba(11, 11, 12, 0.68)',
     glassDangerTint: 'rgba(192, 54, 44, 0.76)',
+    // O `secondary` no vidro: sem tinta, o vidro sobre um card branco sumia e o botão virava
+    // texto solto ("botão só de texto, sem nada atrás", 23/09/2026).
+    glassElementTint: 'rgba(221, 220, 215, 0.9)',
     danger: '#C0362C',
     success: '#157A45',
     warning: '#8A5300',
@@ -133,6 +136,7 @@ export const Colors = {
     tintFill: '#F4F4F2',
     glassActionTint: 'rgba(244, 244, 242, 0.74)',
     glassDangerTint: 'rgba(255, 138, 127, 0.74)',
+    glassElementTint: 'rgba(58, 58, 62, 0.72)',
     danger: '#FF8A7F',
     success: '#4CD68A',
     warning: '#F2B356',

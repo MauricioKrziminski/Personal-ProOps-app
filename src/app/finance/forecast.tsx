@@ -1147,7 +1147,8 @@ export default function ForecastScreen() {
           {editando ? (
             <Button
               label="Tirar hipótese"
-              variant="ghost"
+              variant="secondary"
+              tone="danger"
               block
               style={styles.sheetAction}
               onPress={tirarEditando}

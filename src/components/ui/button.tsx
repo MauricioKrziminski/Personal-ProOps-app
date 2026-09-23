@@ -45,6 +45,13 @@ interface ButtonProps {
    * da troca de sessão nasce dele (o círculo de tinta dos vídeos de referência).
    */
   origemDaCortina?: boolean;
+  /**
+   * Só no `secondary`: rótulo em `danger`, para a ação destrutiva que mora no fim de um
+   * formulário ("Apagar lançamento"). Ela precisa PARECER botão — como `ghost`, texto solto,
+   * não parecia clicável —, e o vermelho cheio do `destructive` grita demais ali; a
+   * confirmação continua no action sheet.
+   */
+  tone?: 'danger';
   style?: StyleProp<ViewStyle>;
 }
 
@@ -64,7 +71,7 @@ const CAPSULA = 1.9;
  * |---|---|
  * | `primary` | tinta cheia (`tintFill`: preto no claro, branco no escuro), rótulo em `onTint` |
  * | `secondary` | cinza de elemento, rótulo em tinta — lê igual sobre o papel e sobre card branco |
- * | `ghost` | texto puro, o par do primário (Cancelar/Salvar) |
+ * | `ghost` | texto puro, SÓ como o par do primário (Cancelar/Salvar, "Reenviar código"). Sozinho ele não parece botão — use `secondary` |
  * | `destructive` | vermelho cheio |
  *
  * ## O carregamento
@@ -86,6 +93,7 @@ export function Button({
   disabled = false,
   block = false,
   origemDaCortina = false,
+  tone,
   style,
 }: ButtonProps) {
   const theme = useTheme();
@@ -114,13 +122,21 @@ export function Button({
     ? 'textSecondary'
     : variant === 'primary' || variant === 'destructive'
       ? 'onTint'
-      : 'text';
+      : tone === 'danger'
+        ? 'danger'
+        : 'text';
   // O material é decidido uma vez para todas as variantes. A cor comunica a ação; o
   // GlassView nativo fornece a superfície no iOS 26+.
   const vidro = supportsLiquidGlass() && !disabled;
   const cor = vidro ? 'transparent' : off ? theme.backgroundElement : fill[variant];
   const glassTint =
-    variant === 'primary' ? theme.glassActionTint : variant === 'destructive' ? theme.glassDangerTint : undefined;
+    variant === 'primary'
+      ? theme.glassActionTint
+      : variant === 'destructive'
+        ? theme.glassDangerTint
+        : variant === 'secondary'
+          ? theme.glassElementTint
+          : undefined;
 
   /** 0 = botão, 1 = cápsula carregando. */
   const morph = useSharedValue(loadingVisual ? 1 : 0);

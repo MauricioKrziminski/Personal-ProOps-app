@@ -705,7 +705,7 @@ function TransactionForm({
         {editing?.debt_id ? (
           <Card>
             <ThemedText type="small" themeColor="textSecondary">Pagamento de dívida. Correções de valor recalculam o saldo somente no pagamento mais recente com histórico de amortização.</ThemedText>
-            <Button label="Dívidas" variant="ghost" size="sm" onPress={() => router.push('/finance/debts')} />
+            <Button label="Ver dívidas" icon="arrow.up.right" variant="secondary" size="sm" onPress={() => router.push('/finance/debts')} />
           </Card>
         ) : null}
         {/*
@@ -1188,7 +1188,8 @@ function TransactionForm({
         {editing ? (
           <Button
             label="Apagar lançamento"
-            variant="ghost"
+            variant="secondary"
+            tone="danger"
             onPress={onDelete}
             loading={remove.isPending}
             block

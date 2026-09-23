@@ -385,6 +385,33 @@ test('hint de Field cabe em duas linhas', () => {
 });
 
 /**
+ * Botão `ghost` (texto puro) só onde ele é o PAR do primário (23/09/2026).
+ *
+ * A queixa foi literal: *"botão só de texto, sem nada atrás, está horrível… nem parece
+ * clicável"* — era o "Adicionar detalhes (opcional)" solto num formulário, e havia mais seis
+ * iguais ("Apagar lançamento", "Pessoas", "Mais ações"…). Ao lado do primário ("Cancelar" /
+ * "Salvar", "Reenviar código" sob o código) o texto puro é a convenção das duas plataformas;
+ * sozinho, ele vira `secondary`. Arquivo novo aqui exige dizer QUAL é o primário ao lado.
+ */
+const GHOST_PERMITIDO = new Set([
+  'src/app/catalog.tsx', // o catálogo do design mostra a variante
+  'src/app/forgot-password.tsx', // "Voltar" e "Reenviar código", pares do botão do passo
+  'src/app/import.tsx', // "Marcar todos": ação de cabeçalho da lista da prévia
+  'src/app/link-email.tsx', // "Cancelar"/"Trocar e-mail" e "Reenviar código", pares do passo
+  'src/app/link-phone.tsx', // idem, com o número
+  'src/app/notes/folders.tsx', // "Cancelar" ao lado de "Salvar"
+  'src/app/onboarding.tsx', // "Agora não" sob "Continuar"
+  'src/app/signup.tsx', // "Já tenho conta" sob "Criar conta"; "Reenviar código"
+  'src/components/auth/email-login-screen.tsx', // "Criar conta" sob "Entrar"; links da linha
+  'src/components/login-screen.tsx', // "Voltar"/"Trocar número" e "Reenviar código"
+]);
+
+test('botão ghost só como par do primário', () => {
+  const fora = offenders(/variant="ghost"/).filter((achado) => !GHOST_PERMITIDO.has(achado.split(':')[0]));
+  assert.deepEqual(fora, [], 'ghost sozinho não parece botão: use `secondary` (ou `tone="danger"` para apagar)');
+});
+
+/**
  * Placeholder de BUSCA cabe numa linha (23/09/2026).
  *
  * No Android o `TextInput` de uma linha não liga `singleLine`: o hint QUEBRA como texto comum e

@@ -603,7 +603,7 @@ export default function RecurringScreen() {
                   <Button
                     label="Mais ações"
                     size="sm"
-                    variant="ghost"
+                    variant="secondary"
                     onPress={() => acoes(r)}
                   />
                 </View>
