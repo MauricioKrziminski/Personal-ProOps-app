@@ -511,6 +511,11 @@ Olhando só a cortina, com a trava ligada a cascata tocava inteira por baixo del
   blocos na árvore. Terminada a entrada (ou estourado o teto), o bloco renderiza o estilo final
   explícito — e isso não depende de o Reanimated chegar à tela. Mesma lição da barra de progresso
   que nasce no valor real.
+- ⚠️ **O `Segmented` do Android segue a mesma regra, e com uma volta a mais** (23/09/2026): o
+  polegar ficava preso num quadro do meio (uma bolinha solta, ou esticado sobre as duas células).
+  Trocar só o `style` da MESMA view animada para estilo comum NÃO resolve — a view guarda o que o
+  Reanimated escreveu nela. Parado, o polegar é OUTRA view (`View` comum por `left`); a animada
+  só existe durante a troca.
 
 **A abertura passa pela marca em TODA abertura, com senha ou sem** (pedido do dono do produto,
 17/09/2026). A marca fica no mínimo 0,9 s (`MARCA_MINIMA_MS`) — no Android ela entra também na

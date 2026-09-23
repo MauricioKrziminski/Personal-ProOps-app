@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState } from 'react';
-import { LayoutChangeEvent, Pressable, StyleSheet, View } from 'react-native';
+import { LayoutChangeEvent, Pressable, StyleSheet, Text, View, type TextProps } from 'react-native';
 import Animated, {
   interpolateColor,
+  runOnJS,
   useAnimatedStyle,
   useReducedMotion,
   useSharedValue,
@@ -37,6 +38,20 @@ const TRAS = { duration: 520, dampingRatio: 0.9 };
  * A cor de cada rótulo é função da DISTÂNCIA entre o centro do polegar e o centro da célula, então
  * o texto acende quando o polegar passa por baixo dele. Todos usam o mesmo peso: trocar de face no
  * selecionado mudaria a largura do texto no meio da animação.
+ *
+ * ## O repouso é escrito pelo React
+ *
+ * ⚠️ **Parado, o polegar e os rótulos NÃO são do Reanimated** (23/09/2026). Medido no emulador:
+ * depois de uma troca o polegar ficava preso num quadro do meio — só a tampa esquerda, uma
+ * bolinha solta ao lado de um retângulo de ponta reta, ou esticado por cima das duas células. É a
+ * atualização perdida do Android que `design.md` §5 já registrou nas entradas das raízes.
+ *
+ * ⚠️ **E trocar só o `style` da MESMA view não resolve** — foi a primeira tentativa: a view que
+ * já teve estilo animado continua com os valores que o Reanimated escreveu nela, e o estilo
+ * comum que chega depois não os desfaz (no estresse, 6 de 8 trocas rápidas terminaram
+ * esticadas). Parado é OUTRA view (`PolegarParado`, `View` comum posicionada por `left`); o
+ * polegar animado só existe enquanto `andando`, e a mola de trás — a última a chegar — é quem
+ * desmonta ele e devolve o desenho ao React.
  */
 export function Segmented<T extends string>({ options, value, onChange }: SegmentedProps<T>) {
   const theme = useTheme();
@@ -49,6 +64,12 @@ export function Segmented<T extends string>({ options, value, onChange }: Segmen
   const esquerda = useSharedValue(index);
   const direita = useSharedValue(index + 1);
   const anterior = useRef(index);
+  /**
+   * O índice em que as molas já PARARAM. Diferente do atual = em troca: só aí o desenho é do
+   * Reanimated; parado, é do React (ver o topo). Derivado no render — sem `setState` no efeito.
+   */
+  const [assentado, setAssentado] = useState(index);
+  const andando = !reduzido && index !== assentado;
 
   useEffect(() => {
     const de = anterior.current;
@@ -59,12 +80,18 @@ export function Segmented<T extends string>({ options, value, onChange }: Segmen
       direita.set(index + 1);
       return;
     }
+    // Interrompida por outro toque, a mola devolve `false` e quem assenta é a do toque novo.
+    const alvo = index;
+    const assentou = (fim?: boolean) => {
+      'worklet';
+      if (fim) runOnJS(setAssentado)(alvo);
+    };
     if (index > de) {
       direita.set(withSpring(index + 1, FRENTE));
-      esquerda.set(withSpring(index, TRAS));
+      esquerda.set(withSpring(index, TRAS, assentou));
     } else {
       esquerda.set(withSpring(index, FRENTE));
-      direita.set(withSpring(index + 1, TRAS));
+      direita.set(withSpring(index + 1, TRAS, assentou));
     }
   }, [index, reduzido, esquerda, direita]);
 
@@ -83,14 +110,30 @@ export function Segmented<T extends string>({ options, value, onChange }: Segmen
       onLayout={onLayout}
       style={[styles.track, { backgroundColor: theme.backgroundElement }]}>
       {caixa.celula > 0 ? (
-        <Polegar
-          key={`${caixa.celula}:${caixa.altura}`}
-          celula={caixa.celula}
-          altura={caixa.altura}
-          cor={theme.thumb}
-          esquerda={esquerda}
-          direita={direita}
-        />
+        andando ? (
+          <PolegarAndando
+            key={`${caixa.celula}:${caixa.altura}`}
+            celula={caixa.celula}
+            altura={caixa.altura}
+            cor={theme.thumb}
+            esquerda={esquerda}
+            direita={direita}
+          />
+        ) : (
+          <View
+            pointerEvents="none"
+            style={[
+              styles.parado,
+              {
+                left: FOLGA + index * caixa.celula,
+                width: caixa.celula,
+                height: caixa.altura,
+                borderRadius: caixa.altura / 2,
+                backgroundColor: theme.thumb,
+              },
+            ]}
+          />
+        )
       ) : null}
       {options.map((option, i) => (
         <Celula
@@ -98,6 +141,7 @@ export function Segmented<T extends string>({ options, value, onChange }: Segmen
           label={option.label}
           index={i}
           selected={i === index}
+          andando={andando}
           esquerda={esquerda}
           direita={direita}
           onPress={() => {
@@ -112,14 +156,14 @@ export function Segmented<T extends string>({ options, value, onChange }: Segmen
 }
 
 /**
- * O polegar. Nasce só depois da medida e com as medidas como CONSTANTES — `key` o remonta se elas
- * mudarem (rotação, fonte).
+ * O polegar EM TROCA. Nasce só depois da medida e com as medidas como CONSTANTES — `key` o remonta
+ * se elas mudarem (rotação, fonte). Parado quem desenha é uma `View` comum (ver o topo).
  *
  * ⚠️ **A largura não pode ser valor compartilhado gravado no `onLayout`.** No Android ela chegava
  * à thread de UI antes de o estilo animado existir, o estilo nunca recalculava e o bloco ficava
  * parado na primeira célula. Constante na montagem, não há corrida.
  */
-function Polegar({
+function PolegarAndando({
   celula,
   altura,
   cor,
@@ -165,6 +209,7 @@ function Celula({
   label,
   index,
   selected,
+  andando,
   esquerda,
   direita,
   onPress,
@@ -172,6 +217,7 @@ function Celula({
   label: string;
   index: number;
   selected: boolean;
+  andando: boolean;
   esquerda: { get: () => number };
   direita: { get: () => number };
   onPress: () => void;
@@ -179,12 +225,6 @@ function Celula({
   const theme = useTheme();
   const apagado = theme.textSecondary;
   const aceso = theme.text;
-
-  const cor = useAnimatedStyle(() => {
-    const centro = (esquerda.get() + direita.get()) / 2;
-    const perto = Math.min(1, Math.max(0, 1 - Math.abs(centro - (index + 0.5))));
-    return { color: interpolateColor(perto, [0, 1], [apagado, aceso]) };
-  });
 
   return (
     <Pressable
@@ -199,16 +239,57 @@ function Celula({
         e o Android partia a palavra ("Transferênci/a"). Quebrar a linha mudaria a altura de uma
         célula só. É o que o `UISegmentedControl` do iOS faz: a fonte desce até caber, com piso.
       */}
-      <Animated.Text
-        allowFontScaling
-        numberOfLines={1}
-        adjustsFontSizeToFit
-        minimumFontScale={0.7}
-        android_hyphenationFrequency="none"
-        style={[styles.label, cor]}>
-        {label}
-      </Animated.Text>
+      {/* Parado é `Text` comum, pelo mesmo motivo do polegar (ver o topo). */}
+      {andando ? (
+        <RotuloAndando
+          label={label}
+          index={index}
+          apagado={apagado}
+          aceso={aceso}
+          esquerda={esquerda}
+          direita={direita}
+        />
+      ) : (
+        <Text {...ROTULO} style={[styles.label, { color: selected ? aceso : apagado }]}>
+          {label}
+        </Text>
+      )}
     </Pressable>
+  );
+}
+
+const ROTULO = {
+  allowFontScaling: true,
+  numberOfLines: 1,
+  adjustsFontSizeToFit: true,
+  minimumFontScale: 0.7,
+  android_hyphenationFrequency: 'none',
+} as const satisfies TextProps;
+
+function RotuloAndando({
+  label,
+  index,
+  apagado,
+  aceso,
+  esquerda,
+  direita,
+}: {
+  label: string;
+  index: number;
+  apagado: string;
+  aceso: string;
+  esquerda: { get: () => number };
+  direita: { get: () => number };
+}) {
+  const cor = useAnimatedStyle(() => {
+    const centro = (esquerda.get() + direita.get()) / 2;
+    const perto = Math.min(1, Math.max(0, 1 - Math.abs(centro - (index + 0.5))));
+    return { color: interpolateColor(perto, [0, 1], [apagado, aceso]) };
+  });
+  return (
+    <Animated.Text {...ROTULO} style={[styles.label, cor]}>
+      {label}
+    </Animated.Text>
   );
 }
 
@@ -224,6 +305,11 @@ const styles = StyleSheet.create({
     top: FOLGA,
     left: FOLGA,
     transformOrigin: 'left',
+  },
+  parado: {
+    position: 'absolute',
+    top: FOLGA,
+    borderCurve: 'continuous',
   },
   label: {
     ...Type.subhead,
