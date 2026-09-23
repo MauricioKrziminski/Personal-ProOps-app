@@ -122,7 +122,21 @@ o primitivo corrige todas as telas.
 - **11. Botão só texto**: `ghost` é o par do primário (Cancelar/Salvar, "Reenviar código"). O
   defeito é o `ghost` sozinho fazendo papel de "abrir mais", como o "Adicionar detalhes
   (opcional)" de `debts.tsx`.
-- **12. Ver mais → Planejamento**: resposta com argumento na seção própria.
+- **12. Ver mais → Planejamento**: ver a seção própria abaixo.
+
+## 12. "Ver mais" do Financeiro: Dívidas e Recorrentes em Planejamento?
+
+**Resposta: não estavam no lugar certo, e Parceladas também não.** Parceladas, Recorrentes e
+Dívidas são a mesma coisa para quem usa: o que já está CONTRATADO e sai sozinho todo mês, e que
+a projeção já conta sem ninguém decidir nada. Planejamento é outra natureza: orçamento e meta são
+ESCOLHAS para o futuro. Juntar as três em Dia a dia faria um grupo de sete linhas (a parede que
+o agrupamento existe para evitar). Os apps consolidados separam as duas naturezas: YNAB põe
+agendados junto do registro e "targets" no plano; Monarch e Copilot dão às recorrências uma área
+própria, longe de orçamento e metas.
+
+**Decisão do dono do produto:** grupo novo **Compromissos** (Parceladas, Recorrentes, Dívidas).
+Planejamento fica com Orçamentos e Metas, e Dia a dia com Lançamentos, Contas, Cartões e
+Faturas. Recorrentes ganhou subtítulo ("Salário, aluguel e assinaturas"), como os vizinhos.
 
 Visto e não perseguido (fora do lote): o LogBox "Can't perform a React state update on a
 component that hasn't mounted yet" no login do Android.
@@ -136,4 +150,5 @@ component that hasn't mounted yet" no login do Android.
 | 4 | — (é o `hitTest` nativo; não há o que simular em `node --test`) | iOS: toque no Valor → teclado numérico, borda de foco, "45,99" digitado; também dentro do Sheet de Dívidas ("1.500,00"), e com partida a frio tocando pelo rótulo. Android: "1.234,56" sem o fantasma do input à direita (ele existia antes, com 0,01, e sumiu com o texto na cor da caixa). |
 | 3 | `anti-slop.test.ts` (allowlist com o motivo) | Android 375dp × 1,3: face do cartão "R$ 1.423,00" numa linha (`3-depois-…png`), Hoje, Financeiro (tiles Entra/Sai), Cartões e Lançamentos sem quebra no meio de valor. iOS: Financeiro e face inalterados no tamanho padrão. |
 | 2 | `anti-slop.test.ts` — placeholder de busca até 20 caracteres (falha com o texto antigo) | Android 375dp × 1,3: Lançamentos e Recorrentes numa linha (`2-antes/depois-…png`); digitado "gasolinapq" sem corte nas descendentes. |
+| 12 | — | Android 384dp × 1,3: Dia a dia (4), Compromissos (3), Planejamento (2), sem quebra de título. |
 | 1 | `supabase/tests/mes_fecha_ate_o_31.sql` (falhava na definição antiga: "fecha 30 em 2027-02-01: deu … a 2027-03-02"; verde no staging depois da migration), mais as bordas do dia 10 inalteradas; `agent/tests/test_mes_e_rotativo.py` (29/30 passam, 31 = último dia, 0/32 recusados). Regressão no staging: `regua_e_dia_do_fechamento`, `parcela_paga_no_ciclo` e `fluxo_do_financeiro` verdes. `linha_do_tempo` já falhava por dado do staging (ciclo 11/08–10/09, que tem as mesmas bordas antes e depois). | Android 384dp × 1,3, claro e escuro: grade 1–31 em 7 colunas; escolher o 30 gravou `30` e o ciclo corrente virou 31/08–30/09; o 31 gravou `null` ("Último dia do mês", 01/09–30/09) e acende o 31 ao reabrir; workspace devolvido ao dia 10. iOS claro e escuro: sem a placa atrás da grade. Pendente: `probe_mes_vs_cartao.py` (Gemini do staging em 503). |

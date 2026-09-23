@@ -34,6 +34,13 @@ type ManageItem = {
   href: Href;
 };
 
+/**
+ * ⚠️ **"Compromissos" é o que já está CONTRATADO; "Planejamento" é o que a pessoa ESCOLHE**
+ * (23/09/2026, decisão do dono do produto). Dívidas e Recorrentes moravam em Planejamento e
+ * Parceladas em Dia a dia, e a pergunta foi se não deveriam estar juntas. Deviam: as três saem
+ * sozinhas todo mês e entram na projeção sem ninguém decidir nada — é o bloco "o que eu já devo".
+ * Orçamento e meta são escolhas para o futuro, e é isso que a palavra planejamento quer dizer.
+ */
 const GROUPS: { title: string; items: ManageItem[] }[] = [
   {
     title: 'Dia a dia',
@@ -42,7 +49,14 @@ const GROUPS: { title: string; items: ManageItem[] }[] = [
       { title: 'Contas', subtitle: 'Contas correntes, poupança e dinheiro', icon: 'wallet.pass', href: '/finance/accounts' },
       { title: 'Cartões', subtitle: 'Limite, fechamento e a fatura de cada um', icon: 'creditcard', href: '/finance/cards' },
       { title: 'Faturas', subtitle: 'As que já fecharam e as que estão por vir', icon: 'calendar', href: '/finance/invoices' },
+    ],
+  },
+  {
+    title: 'Compromissos',
+    items: [
       { title: 'Parceladas', subtitle: 'Suas compras parceladas e o que falta pagar', icon: 'creditcard.and.123', href: '/finance/installments' },
+      { title: 'Recorrentes', subtitle: 'Salário, aluguel e assinaturas', icon: 'arrow.triangle.2.circlepath', href: '/finance/recurring' },
+      { title: 'Dívidas', subtitle: 'Empréstimos e financiamentos, com os juros', icon: 'dollarsign.circle', href: '/finance/debts' },
     ],
   },
   {
@@ -50,8 +64,6 @@ const GROUPS: { title: string; items: ManageItem[] }[] = [
     items: [
       { title: 'Orçamentos', icon: 'chart.pie', href: '/finance/budgets' },
       { title: 'Metas', icon: 'target', href: '/finance/goals' },
-      { title: 'Dívidas', subtitle: 'Empréstimos e financiamentos, com os juros', icon: 'dollarsign.circle', href: '/finance/debts' },
-      { title: 'Recorrentes', icon: 'arrow.triangle.2.circlepath', href: '/finance/recurring' },
     ],
   },
   {
