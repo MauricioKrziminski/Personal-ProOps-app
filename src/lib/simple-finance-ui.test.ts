@@ -11,7 +11,7 @@ const require = createRequire(import.meta.url);
 
 // Execute the screen JSX and its event handlers. Native components/query boundaries
 // are inert; state persists across renders so each interaction uses current props.
-function screen(file: string, options: { tablet?: boolean; debts?: any[]; archivedDebts?: any[]; debtSchedule?: any[]; invoiceStatus?: string; create?: boolean; monthLines?: any[]; monthSummary?: any; cycleLines?: any[]; cycleRow?: any; rangeError?: boolean; rangePending?: boolean; rangePendingMonths?: string[]; bills?: any[]; billsError?: boolean; charges?: any[]; reminders?: any[]; budgets?: any[]; setupPassos?: any[]; proximo?: any; activity?: any[]; activityError?: boolean; forecastAccounts?: any[]; anticipation?: any[] | ((pagarEm: string) => any[]) } = {}) {
+function screen(file: string, options: { tablet?: boolean; debts?: any[]; archivedDebts?: any[]; debtSchedule?: any[]; invoiceStatus?: string; create?: boolean; monthLines?: any[]; monthSummary?: any; cycleLines?: any[]; cycleRow?: any; rangeError?: boolean; rangePending?: boolean; rangePendingMonths?: string[]; bills?: any[]; billsError?: boolean; charges?: any[]; reminders?: any[]; budgets?: any[]; setupPassos?: any[]; proximo?: any; activity?: any[]; activityError?: boolean; forecastAccounts?: any[]; anticipation?: any[] | ((pagarEm: string) => any[]); cards?: any[]; params?: Record<string, string>; plan?: string; planPending?: boolean } = {}) {
   const state: any[] = [];
   let cursor = 0;
   let nodes: any[] = [];
@@ -33,6 +33,10 @@ function screen(file: string, options: { tablet?: boolean; debts?: any[]; archiv
     INCOME_CATEGORIES: [],
     ASSET_CLASSES: [{ value: 'investment', label: 'Investimento', icon: 'chart.line.uptrend.xyaxis' }],
     useDebts: () => ({ ...query, data: options.debts ?? [] }),
+    useCardSummary: () => ({ ...query, isSuccess: true, data: options.cards ?? [] }),
+    usePlanStatus: () => options.planPending
+      ? { ...query, isPending: true, data: undefined }
+      : { ...query, isPending: false, isSuccess: true, data: { plan: options.plan ?? 'pro' } },
     useMonthLines: () => ({ ...query, data: options.monthLines ?? [] }),
     useCycleLines: () => ({ ...query, data: options.cycleLines ?? [] }),
     // A tela do ciclo mostra o esqueleto enquanto não tem a série — sem este dublê ela nunca
@@ -144,9 +148,12 @@ function screen(file: string, options: { tablet?: boolean; debts?: any[]; archiv
       if (name === 'expo-haptics') return { selectionAsync() {}, notificationAsync() {}, NotificationFeedbackType: { Success: 'success', Warning: 'warning' } };
       // `back` é navegação como qualquer outra e ENTRA na lista: é o que prende o "fechar um
       // formulário que outra tela abriu devolve para ela" (`useVoltarQuandoFechar`).
-      if (name === 'expo-router') return { Stack: { Screen: 'StackScreen' }, useLocalSearchParams: () => ({ id: 'invoice-1', ...(options.create !== false ? { create: 'financing' } : {}) }), router: { push: (to: any) => navigations.push(to), back: () => navigations.push({ back: true }) } };
+      if (name === 'expo-router') return { Stack: { Screen: 'StackScreen' }, useLocalSearchParams: () => options.params ?? ({ id: 'invoice-1', ...(options.create !== false ? { create: 'financing' } : {}) }), router: { push: (to: any) => navigations.push(to), back: () => navigations.push({ back: true }) } };
       if (name === 'react-native-safe-area-context') return { useSafeAreaInsets: () => ({ bottom: 0 }) };
       if (name === '@/hooks/use-finance') return finance;
+      if (name === '@/hooks/use-lock') return { useLock: () => ({ semTrancar: (fn: () => unknown) => fn() }) };
+      // O voo da Carteira é camada da raiz; aqui só a forma dos hooks, inerte.
+      if (name === '@/components/motion/flight-layer') return { useFlight: () => ({ voar: async () => false }), useFlightAnchor: () => ({ prender: null, aoPosicionar: undefined }), useFlightHidden: () => undefined };
       if (name === '@/hooks/use-adaptive-window') return {
         useAdaptiveWindow: () => ({
           width: options.tablet ? 1280 : 384,
@@ -162,7 +169,7 @@ function screen(file: string, options: { tablet?: boolean; debts?: any[]; archiv
       if (name === '@/hooks/use-items') return { localISODate: () => '2026-09-08', formatDateBR: () => '08/09/2026', formatBRL: load('src/lib/dates.ts').formatBRL, useRealtimeInvalidate: () => {}, useTodayReminders: () => ({ ...query, isSuccess: true, data: options.reminders ?? [] }) };
       if (name === '@/hooks/use-session') return { useSession: () => ({ session: { user: { id: 'user-1' } } }) };
       if (name === '@/hooks/use-profile') return { useProfile: () => ({ ...query, isSuccess: true, data: { display_name: 'Gabriel Almeida', phone: null } }) };
-      if (name === '@/hooks/use-proximo-passo') return { useProximoPasso: () => ({ passo: options.proximo ?? null, dispensar: (id: string) => writes.push({ operation: 'dispensarProximo', value: id }) }) };
+      if (name === '@/hooks/use-proximo-passo') return { useProximoPasso: () => ({ passo: options.proximo ?? null, dispensar: (id: string) => writes.push({ operation: 'dispensarProximo', value: id }), consultas: [] }) };
       if (name === '@/hooks/use-setup-progress') return { useSetupProgress: () => ({ passos: options.setupPassos ?? [], pronto: true, consultas: [] }) };
       if (name === '@/hooks/use-bool-pref') return { useBoolPref: () => [false, () => {}] };
       if (name === '@/hooks/use-agent-activity') return {
@@ -176,7 +183,7 @@ function screen(file: string, options: { tablet?: boolean; debts?: any[]; archiv
       };
       // Orçamentos consulta direto (a lista de linhas): o mesmo resultado inerte dos hooks.
       if (name === '@tanstack/react-query') return { useQuery: () => query };
-      if (name === '@/lib/finance-form' || name === '@/lib/dates' || name === '@/lib/forecast-months' || name === '@/lib/month-view' || name === '@/lib/settle-labels' || name === '@/lib/accounts' || name === '@/lib/cycle-label' || name === '@/lib/card-status' || name === '@/lib/today-sections' || name === '@/lib/runway' || name === '@/lib/budget-tight' || name === '@/lib/setup-steps' || name === '@/lib/activity-feed' || name === '@/lib/account-cash' || name === '@/lib/today-spend' || name === '@/lib/anticipation' || name === '@/lib/widget-snapshot' || name === '@/lib/debt-history') return load(`src/lib/${name.split('/').at(-1)}.ts`);
+      if (name === '@/lib/finance-form' || name === '@/lib/dates' || name === '@/lib/forecast-months' || name === '@/lib/month-view' || name === '@/lib/settle-labels' || name === '@/lib/accounts' || name === '@/lib/cycle-label' || name === '@/lib/card-status' || name === '@/lib/today-sections' || name === '@/lib/runway' || name === '@/lib/budget-tight' || name === '@/lib/setup-steps' || name === '@/lib/activity-feed' || name === '@/lib/account-cash' || name === '@/lib/today-spend' || name === '@/lib/anticipation' || name === '@/lib/widget-snapshot' || name === '@/lib/debt-history' || name === '@/lib/import-preview') return load(`src/lib/${name.split('/').at(-1)}.ts`);
       if (name === '@/hooks/use-debounced') return { useDebounced: (value: unknown) => value };
       if (name === '@/design/category-icons') return { categoryIcon: () => 'circle' };
       if (name === '@/design/adaptive-window') return load('src/design/adaptive-window.ts');
@@ -1048,4 +1055,48 @@ test('Financeiro tablet keeps the cycle, analysis and all management actions', (
   tela.props.overlay.props.onPress();
   assert.deepEqual(ui.actions.map((a) => a.label),
     ['Gasto ou receita', 'Gasto ou receita que se repete', 'Financiamento']);
+});
+
+test('Cartões: "Importar fatura" se alcança com o DEDO (toque longo), não só pelo leitor de tela', () => {
+  const ui = screen('src/app/finance/cards.tsx', { cards: [{ account_id: 'card-1', name: 'Nubank Cartão', invoice_id: 'invoice-1', invoice_total_cents: 10000, unpaid_total_cents: 10000, closing_date: '2026-10-03', due_date: '2026-10-10', overdue_count: 0 }] });
+  const card = ui.nodes().find((n: any) => typeof n.type === 'function' && n.type.name === 'PressCard');
+  assert.ok(card, 'o card do cartão');
+  const tocavel = card.type(card.props);
+  assert.equal(typeof tocavel.props.onLongPress, 'function', 'o card abre as ações no toque longo');
+  tocavel.props.onLongPress();
+  const importar = ui.actions.find((a: any) => a.label === 'Importar fatura');
+  assert.ok(importar, 'Importar fatura entre as ações');
+  importar.onPress();
+  assert.deepEqual(JSON.parse(JSON.stringify(ui.navigations.at(-1))), { pathname: '/import', params: { conta: 'card-1' } });
+});
+
+const importFile = 'src/app/import.tsx';
+const contasDoImport = [{ id: 'card-1', name: 'Nubank Cartão', type: 'credit_card' }, { id: 'conta-1', name: 'Nubank', type: 'checking' }];
+const temTexto = (ui: any, texto: string) => ui.nodes().some((n: any) => n.type === 'ThemedText' && n.props.children === texto);
+
+test('Importar: no Free o aviso do Pro É a etapa — sem conta, sem arquivo, "Ver planos" leva ao paywall', () => {
+  const ui = screen(importFile, { params: {}, plan: 'free', forecastAccounts: contasDoImport });
+  assert.ok(temTexto(ui, 'Importar é do plano Pro'));
+  assert.equal(ui.nodes().some((n: any) => n.type === 'Button' && n.props.label === 'Escolher arquivo'), false, 'nada de botão que nunca liga');
+  assert.equal(ui.nodes().some((n: any) => n.type === 'AccountPicker'), false, 'nada de escolher conta que não leva a lugar nenhum');
+  ui.press('Ver planos');
+  assert.equal(ui.navigations.at(-1), '/paywall');
+});
+
+test('Importar: enquanto o plano carrega, esqueleto — o botão não nasce ligado para o aviso entrar depois', () => {
+  const ui = screen(importFile, { params: {}, planPending: true, forecastAccounts: contasDoImport });
+  assert.equal(ui.nodes().some((n: any) => n.type === 'Button' && n.props.label === 'Escolher arquivo'), false);
+  assert.ok(ui.nodes().some((n: any) => n.type === 'SkeletonRow'));
+});
+
+test('Importar: ?conta= de uma conta da pessoa já nasce escolhida e o arquivo está liberado', () => {
+  const ui = screen(importFile, { params: { conta: 'card-1' }, forecastAccounts: contasDoImport });
+  assert.equal(ui.nodes().find((n: any) => n.type === 'AccountPicker').props.value, 'card-1');
+  assert.equal(ui.button('Escolher arquivo').props.disabled, false);
+});
+
+test('Importar: ?conta= que não é da pessoa é ignorado — nada pré-escolhido, o arquivo espera a conta', () => {
+  const ui = screen(importFile, { params: { conta: 'de-outra-pessoa' }, forecastAccounts: contasDoImport });
+  assert.equal(ui.nodes().find((n: any) => n.type === 'AccountPicker').props.value, null);
+  assert.equal(ui.button('Escolher arquivo').props.disabled, true);
 });

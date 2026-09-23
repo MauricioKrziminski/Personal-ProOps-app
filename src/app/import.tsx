@@ -105,7 +105,7 @@ function traduzErro(err: unknown): FalhaImport {
 
   if (erro.status === 402) {
     return {
-      titulo: 'Importar extrato é do plano Pro',
+      titulo: 'Importar é do plano Pro',
       detalhe: doServidor || 'No Free dá para registrar pelo WhatsApp à vontade.',
     };
   }
@@ -347,7 +347,8 @@ export default function ImportScreen() {
   if (!batchId) {
     return (
       <Screen grouped>
-        <Stack.Screen options={{ title: 'Importar extrato' }} />
+        {/* "Importar", sem "extrato": três caminhos chegam aqui por "Importar fatura". */}
+        <Stack.Screen options={{ title: 'Importar' }} />
 
         {/* O único destaque da etapa: a instrução é o conteúdo da tela. */}
         <Card style={styles.hero}>
@@ -370,17 +371,25 @@ export default function ImportScreen() {
           </Card>
         ) : null}
 
-        {semPro ? (
-          <Card style={styles.falha}>
+        {/*
+          No Free a tela não pede conta nem arquivo que não levariam a lugar nenhum: o aviso É a
+          etapa, e "Ver planos" a ação dela. Enquanto o plano carrega, esqueleto — sem ele o botão
+          nascia ligado e o aviso entrava depois, empurrando a lista para baixo do dedo.
+        */}
+        {plano.isPending ? (
+          <>
+            <SkeletonRow />
+            <SkeletonRow />
+          </>
+        ) : semPro ? (
+          <Card style={styles.aviso}>
             <ThemedText type="smallBold">Importar é do plano Pro</ThemedText>
             <ThemedText type="small" themeColor="textSecondary">
               No Free dá para registrar pelo WhatsApp e pelo agente à vontade.
             </ThemedText>
-            <Button label="Ver planos" variant="secondary" size="sm" onPress={() => router.push('/paywall')} />
+            <Button label="Ver planos" onPress={() => router.push('/paywall')} block />
           </Card>
-        ) : null}
-
-        {accountsQuery.isPending ? (
+        ) : accountsQuery.isPending ? (
           <>
             <SkeletonRow />
             <SkeletonRow />
@@ -405,18 +414,24 @@ export default function ImportScreen() {
           />
         )}
 
-        <Button
-          label={importar.isPending ? 'Lendo o arquivo…' : 'Escolher arquivo'}
-          icon="doc.badge.plus"
-          loading={importar.isPending}
-          disabled={!accountId || semPro}
-          onPress={escolherArquivo}
-          block
-        />
+        {plano.isPending || semPro ? null : (
+          <>
+            <Button
+              label={importar.isPending ? 'Lendo o arquivo…' : 'Escolher arquivo'}
+              icon="doc.badge.plus"
+              loading={importar.isPending}
+              disabled={!accountId}
+              onPress={escolherArquivo}
+              block
+            />
 
-        <ThemedText type="footnote" themeColor="textSecondary" style={styles.rodape}>
-          {accountId ? `Até ${MAX_ITENS} lançamentos por arquivo.` : 'Escolha a conta ou o cartão para continuar.'}
-        </ThemedText>
+            <ThemedText type="footnote" themeColor="textSecondary" style={styles.rodape}>
+              {accountId
+                ? `Até ${MAX_ITENS} lançamentos por arquivo.`
+                : 'Escolha a conta ou o cartão para continuar.'}
+            </ThemedText>
+          </>
+        )}
       </Screen>
     );
   }
@@ -693,6 +708,7 @@ const styles = StyleSheet.create({
   falha: {
     gap: Space.xs,
   },
+  aviso: { gap: Space.md },
   sheetBody: {
     gap: Space.xl,
     paddingVertical: Space.lg,

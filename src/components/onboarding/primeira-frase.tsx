@@ -1,6 +1,6 @@
 import * as Haptics from 'expo-haptics';
 import { useEffect, useState } from 'react';
-import { StyleSheet, View } from 'react-native';
+import { StyleSheet, View, useWindowDimensions } from 'react-native';
 import Animated, { FadeIn, FadeInDown, FadeInUp, FadeOut, useReducedMotion } from 'react-native-reanimated';
 
 import { ThemedText } from '@/components/themed-text';
@@ -8,6 +8,7 @@ import { Chip } from '@/components/finance/chip';
 import { Icon } from '@/components/ui/icon';
 import { Money } from '@/components/ui/money';
 import { HitTarget, Motion, Radius, Space } from '@/design/tokens';
+import { formatBRL } from '@/hooks/use-items';
 import { useTheme } from '@/hooks/use-theme';
 
 type Exemplo = {
@@ -70,14 +71,17 @@ const AUTOPLAY_MS = 1400;
  * "Continuar". Trocar de exemplo troca a cena em cross-fade. Com Reduce Motion, tudo é fade.
  */
 export function PrimeiraFrase() {
-  const [escolhido, setEscolhido] = useState<Exemplo['id'] | null>(null);
+  // `tocou`: o háptico é pontuação de um toque da pessoa (design.md §6) — o autoplay não vibra.
+  const [escolhido, setEscolhido] = useState<{ id: Exemplo['id']; tocou: boolean } | null>(null);
 
   useEffect(() => {
-    const t = setTimeout(() => setEscolhido((atual) => atual ?? 'gasto'), AUTOPLAY_MS);
+    const t = setTimeout(() => setEscolhido((atual) => atual ?? { id: 'gasto', tocou: false }), AUTOPLAY_MS);
     return () => clearTimeout(t);
   }, []);
 
-  const exemplo = EXEMPLOS.find((e) => e.id === escolhido) ?? null;
+  const exemplo = EXEMPLOS.find((e) => e.id === escolhido?.id) ?? null;
+  // O palco é bloco de TEXTO: a altura reservada cresce com a fonte, senão a cena salta ao entrar.
+  const { fontScale } = useWindowDimensions();
 
   return (
     <View style={styles.wrap}>
@@ -86,30 +90,31 @@ export function PrimeiraFrase() {
           <Chip
             key={e.id}
             label={e.frase}
-            selected={escolhido === e.id}
-            onPress={() => {
-              Haptics.selectionAsync();
-              setEscolhido(e.id);
-            }}
+            selected={escolhido?.id === e.id}
+            // O `Chip` já dá o háptico de seleção no toque.
+            onPress={() => setEscolhido({ id: e.id, tocou: true })}
           />
         ))}
       </View>
       {/* A área tem altura mínima: a cena entra sem empurrar o rodapé do passo. */}
-      <View style={styles.palco}>{exemplo ? <Cena key={exemplo.id} exemplo={exemplo} /> : null}</View>
+      <View style={{ minHeight: HitTarget * 4 * Math.max(1, fontScale) }}>
+        {exemplo ? <Cena key={exemplo.id} exemplo={exemplo} tocou={escolhido?.tocou ?? false} /> : null}
+      </View>
     </View>
   );
 }
 
-function Cena({ exemplo }: { exemplo: Exemplo }) {
+function Cena({ exemplo, tocou }: { exemplo: Exemplo; tocou: boolean }) {
   const theme = useTheme();
   const reduzido = useReducedMotion();
   // O cartão "pousa" ~300 ms depois do balão: é aí que vai o háptico, não no toque.
   const pouso = reduzido ? 0 : Motion.duration.base + 120;
 
   useEffect(() => {
+    if (!tocou) return;
     const t = setTimeout(() => Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light), pouso);
     return () => clearTimeout(t);
-  }, [pouso]);
+  }, [pouso, tocou]);
 
   const balaoEntra = reduzido
     ? FadeIn.duration(Motion.duration.base)
@@ -120,18 +125,20 @@ function Cena({ exemplo }: { exemplo: Exemplo }) {
 
   return (
     <Animated.View exiting={FadeOut.duration(Motion.duration.fast)} style={styles.cena}>
+      {/* O balão da pessoa é o MESMO da conversa do Agente (`bubble`/`onBubble`). */}
       <Animated.View
         entering={balaoEntra}
-        style={[styles.balao, { backgroundColor: theme.tintFill }]}
+        style={[styles.balao, { backgroundColor: theme.bubble }]}
+        accessible
         accessibilityLabel={`Você escreve: ${exemplo.frase}`}>
         {/* `flexShrink: 0`: texto dentro de `entering` encolhido não se remede (design.md §3). */}
-        <ThemedText style={[styles.semEncolher, { color: theme.onTint }]}>{exemplo.frase}</ThemedText>
+        <ThemedText style={[styles.semEncolher, { color: theme.onBubble }]}>{exemplo.frase}</ThemedText>
       </Animated.View>
 
       <Animated.View
         entering={cartaoEntra}
         accessible
-        accessibilityLabel={`O app organiza: ${exemplo.tipo}, ${exemplo.titulo}, ${exemplo.apoio}. É um exemplo, nada foi salvo.`}
+        accessibilityLabel={`O app organiza: ${exemplo.tipo}, ${exemplo.titulo}, ${exemplo.apoio}${exemplo.cents != null ? `, ${formatBRL(Math.abs(exemplo.cents))} de saída` : ''}. É um exemplo, nada foi salvo.`}
         style={[styles.cartao, { backgroundColor: theme.surface, borderColor: theme.cardBorder }]}>
         <View style={[styles.selo, { backgroundColor: theme.backgroundElement }]}>
           <Icon name={exemplo.icon} size="md" color="text" />
@@ -158,7 +165,6 @@ function Cena({ exemplo }: { exemplo: Exemplo }) {
 const styles = StyleSheet.create({
   wrap: { gap: Space.lg },
   pilulas: { flexDirection: 'row', flexWrap: 'wrap', gap: Space.sm },
-  palco: { minHeight: HitTarget * 4 },
   cena: { gap: Space.md },
   balao: {
     alignSelf: 'flex-end',
@@ -166,7 +172,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: Space.lg,
     paddingVertical: Space.md,
     borderRadius: Radius.lg,
-    borderBottomRightRadius: Radius.xs,
     borderCurve: 'continuous',
   },
   cartao: {

@@ -23,6 +23,7 @@ import { Motion, Radius, Space, tabular } from '@/design/tokens';
 import { useCardSummary, type CardSummary } from '@/hooks/use-finance';
 import { formatBRL, formatDateBR } from '@/hooks/use-items';
 import { useAdaptiveWindow } from '@/hooks/use-adaptive-window';
+import { showItemActions } from '@/lib/item-actions';
 import {
   diasAte as daysUntil,
   estadoDaFatura as estadoFatura,
@@ -59,12 +60,19 @@ function ErrorBand({ message, onRetry }: { message: string; onRetry: () => void 
 function PressCard({
   onPress,
   accessibilityLabel,
+  titulo,
   acoes = [],
   children,
 }: {
   onPress: () => void;
   accessibilityLabel: string;
-  /** Os botões de DENTRO do card, que o leitor de tela não alcança aninhados. */
+  /** Título do menu do toque longo (o nome do cartão). */
+  titulo: string;
+  /**
+   * As ações do card, declaradas UMA vez: o leitor de tela as recebe como `accessibilityActions`
+   * e o dedo, no toque longo. Só como ação de acessibilidade, "Importar fatura" não existia para
+   * quem enxerga.
+   */
   acoes?: { nome: string; rotulo: string; onPress: () => void }[];
   children: React.ReactNode;
 }) {
@@ -74,6 +82,11 @@ function PressCard({
       accessibilityLabel={accessibilityLabel}
       accessibilityActions={acoes.map((a) => ({ name: a.nome, label: a.rotulo }))}
       onAccessibilityAction={(e) => acoes.find((a) => a.nome === e.nativeEvent.actionName)?.onPress()}
+      onLongPress={
+        acoes.length
+          ? () => showItemActions(titulo, acoes.map((a) => ({ label: a.rotulo, onPress: a.onPress })))
+          : undefined
+      }
       haptic="selection"
       onPress={onPress}>
       <Card style={styles.card}>{children}</Card>
@@ -246,6 +259,7 @@ export default function CardsScreen() {
 
             <PressCard
               onPress={() => irParaFatura(card)}
+              titulo={card.name}
               acoes={[
                 { nome: 'carteira', rotulo: 'Abrir na carteira', onPress: () => abrirNaCarteira(card) },
                 // A fatura do banco entra por aqui, com o cartão já escolhido (23/09/2026: *"meu

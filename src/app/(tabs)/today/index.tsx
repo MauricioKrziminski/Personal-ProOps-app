@@ -230,6 +230,7 @@ export default function TodayScreen() {
   */
   const pronta = useTelaPronta(
     cycle, profile, gasto, bills, noCartao, reminders, budgets, saldos, saiuHoje, saiuNoCiclo, caminho, ...setup.consultas,
+    ...proximo.consultas,
   );
 
   const pay = (id: string, title: string, kind: string | null | undefined) =>

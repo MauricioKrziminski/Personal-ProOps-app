@@ -3,6 +3,7 @@ import { useQuery } from '@tanstack/react-query';
 import { useEffect, useState } from 'react';
 
 import { useAccounts } from '@/hooks/use-finance';
+import type { Consulta } from '@/hooks/use-tela-pronta';
 import { useRealtimeInvalidate } from '@/hooks/use-items';
 import { proximoPasso, type Proximo, type ProximoId } from '@/lib/proximo-passo';
 import { supabase } from '@/lib/supabase';
@@ -24,6 +25,8 @@ async function contar(q: PromiseLike<{ count: number | null; error: unknown }>):
 export function useProximoPasso(userId: string | undefined): {
   passo: Proximo | null;
   dispensar: (id: ProximoId) => void;
+  /** Entram no portão da Hoje: o card nasce com a tela, não aparece depois empurrando o resto. */
+  consultas: Consulta[];
 } {
   useRealtimeInvalidate('import_batches', ['proximo-passo']);
   useRealtimeInvalidate('reminders', ['proximo-passo']);
@@ -44,23 +47,28 @@ export function useProximoPasso(userId: string | undefined): {
   });
 
   const chave = `hoje:proximo-dispensados:${userId ?? ''}`;
-  const [dispensados, setDispensados] = useState<ReadonlySet<ProximoId>>(new Set());
+  // Guardado COM a chave: até a leitura desta chave chegar não há passo — senão um passo já
+  // dispensado aparecia com o cache quente e trocava pelo seguinte logo depois.
+  const [lidos, setLidos] = useState<{ chave: string; ids: ReadonlySet<ProximoId> } | null>(null);
   useEffect(() => {
     let vivo = true;
     AsyncStorage.getItem(chave)
       .then((bruto) => {
-        const lista = bruto ? (JSON.parse(bruto) as ProximoId[]) : [];
-        if (vivo && Array.isArray(lista)) setDispensados(new Set(lista));
+        const lista = bruto ? (JSON.parse(bruto) as unknown) : [];
+        if (vivo) setLidos({ chave, ids: new Set(Array.isArray(lista) ? (lista as ProximoId[]) : []) });
       })
-      .catch(() => undefined);
+      .catch(() => {
+        if (vivo) setLidos({ chave, ids: new Set() });
+      });
     return () => {
       vivo = false;
     };
   }, [chave]);
+  const dispensados = lidos?.chave === chave ? lidos.ids : null;
 
   const cartaoId = contas.data?.find((a) => a.type === 'credit_card')?.id ?? null;
   const passo =
-    contagens.isSuccess && contas.isSuccess
+    contagens.isSuccess && contas.isSuccess && dispensados
       ? proximoPasso(
           {
             cartaoId,
@@ -76,9 +84,10 @@ export function useProximoPasso(userId: string | undefined): {
   return {
     passo,
     dispensar: (id) => {
-      const novo = new Set(dispensados).add(id);
-      setDispensados(novo);
+      const novo = new Set(dispensados ?? []).add(id);
+      setLidos({ chave, ids: novo });
       AsyncStorage.setItem(chave, JSON.stringify([...novo])).catch(() => undefined);
     },
+    consultas: [contagens, contas],
   };
 }

@@ -47,7 +47,7 @@ export function proximoPasso(
       id: 'lembrete',
       aplica: i.lembretes === 0,
       titulo: 'Peça um lembrete',
-      texto: '"Me lembra do aluguel todo dia 5."',
+      texto: '“Me lembra do aluguel todo dia 5.”',
       acao: 'Criar lembrete',
       icon: 'bell',
       href: '/reminder-form',

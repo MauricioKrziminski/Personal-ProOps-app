@@ -320,8 +320,13 @@ function PassoBoasVindas({ entra }: { entra: (a: BaseAnimationBuilder) => BaseAn
             .easing(Motion.easing.out),
         )}
         style={styles.titulo}>
-        <ThemedText type="title">Seu dinheiro,{'\n'}em ordem.</ThemedText>
-        <ThemedText themeColor="textSecondary">Fale do seu jeito. Toque num exemplo.</ThemedText>
+        {/* `flexShrink: 0`: texto dentro de `entering` encolhido não se remede (design.md §3). */}
+        <ThemedText type="title" style={styles.semEncolher}>
+          Seu dinheiro,{'\n'}em ordem.
+        </ThemedText>
+        <ThemedText themeColor="textSecondary" style={styles.semEncolher}>
+          Fale do seu jeito. Toque num exemplo.
+        </ThemedText>
       </Animated.View>
 
       {/*
@@ -617,6 +622,7 @@ const styles = StyleSheet.create({
   },
   cabecalho: { gap: Space.lg },
   titulo: { gap: Space.md },
+  semEncolher: { flexShrink: 0, maxWidth: '100%' },
   /* Geometria fixa: o ícone mora num ladrilho, e ladrilho não cresce com a fonte. */
   cabecalhoIcone: {
     width: 56,

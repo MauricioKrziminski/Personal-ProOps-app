@@ -48,7 +48,9 @@ export function Chip({ label, selected, onPress, count }: ChipProps) {
           tintColor={selected ? theme.glassActionTint : undefined}
         />
       ) : null}
-      <ThemedText type="smallBold" themeColor={selected ? 'onTint' : 'text'}>
+      {/* `flexShrink: 0`: o chip já não encolhe (Pressable), então parado nada muda; dentro de um
+          contêiner com `entering` o rótulo encolhido na medida não se remede (design.md §3). */}
+      <ThemedText type="smallBold" themeColor={selected ? 'onTint' : 'text'} style={styles.rotulo}>
         {label}
       </ThemedText>
       {count != null ? (
@@ -79,6 +81,7 @@ const styles = StyleSheet.create({
     borderRadius: Radius.pill,
     borderWidth: StyleSheet.hairlineWidth,
   },
+  rotulo: { flexShrink: 0 },
   badge: {
     minWidth: 20,
     paddingHorizontal: Space.xs,

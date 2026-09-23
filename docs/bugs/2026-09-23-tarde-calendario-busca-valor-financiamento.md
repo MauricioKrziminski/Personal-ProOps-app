@@ -111,11 +111,44 @@ o primitivo corrige todas as telas.
 
 ## 5–12. Produto (não são bugs de código)
 
-- **5. Onboarding**: pesquisa de referências e direções em aberto. Ver seção própria abaixo
-  quando decidido.
+- **5. Onboarding**: ver a seção própria abaixo.
 - **6–10. Financiamento**: ver a seção própria abaixo.
 - **11. Botão só texto**: ver a seção própria abaixo.
 - **12. Ver mais → Planejamento**: ver a seção própria abaixo.
+
+## 5. Onboarding: "ninguém sabia o que existia no app"
+
+**A queixa:** o pai do dono do produto usou o app e não sabia o que havia nele, nem como
+importar a fatura. O pedido era algo "criativo e moderno".
+
+**A causa concreta, além do onboarding:**
+- Não havia caminho para importar a partir da fatura nem dos Cartões.
+- A importação é do Pro, e o Free só descobria isso no fim, com o 402, depois de escolher a
+  conta e o arquivo.
+
+**A pesquisa decidiu a forma** (spec `docs/superpowers/specs/2026-09-23-onboarding-hibrido-design.md`):
+- Tutorial em cartões na abertura não ensina (NN/g).
+- Tour longo não é concluído (Chameleon).
+- YNAB, Monarch e Revolut apresentam o recurso no lugar, um por vez.
+
+**Decisão do dono do produto: híbrido "2 + 1".**
+1. **"Primeira frase" no passo ① do onboarding.** Três exemplos tocáveis. A frase sobe num
+   balão e o resultado se monta embaixo, marcado "exemplo". Nada é gravado.
+2. **"Próximo passo" na Hoje.** Depois dos Primeiros passos aparece um recurso por vez, escolhido
+   pelo dado real. Cada um pode ser dispensado com "Agora não".
+3. **"Importar fatura" onde a fatura mora.** Está no menu da fatura e no toque longo de cada
+   cartão, com a conta já escolhida. No Free, o aviso do Pro vem ANTES e ocupa a etapa, com
+   "Ver planos".
+
+**O ui-polisher achou seis coisas, todas corrigidas:**
+- O "Importar fatura" dos Cartões só existia para o leitor de tela: o `PressCard` não tinha
+  `onLongPress`.
+- Três hápticos por toque na demonstração.
+- O autoplay vibrava sem ninguém tocar.
+- Um passo dispensado piscava antes de a leitura do aparelho chegar, e o card entrava depois do
+  portão da Hoje, empurrando a tela.
+- O aviso do Pro não tinha estado de carregamento e ficava sobre um botão que nunca liga.
+- Texto dentro de `entering` sem `flexShrink: 0`.
 
 ## 6–10. Financiamento maleável
 
@@ -216,4 +249,5 @@ component that hasn't mounted yet" no login do Android.
 | 11 | `anti-slop.test.ts` (ghost só como par do primário; falha com o `ghost` de volta no lembrete) | iOS claro: "Fechar" do Meu mês virou pílula; iOS escuro: "Gerenciar plano" + "Pessoas" pílulas; Android 384dp × 1,3: "Apagar lançamento" em pílula cinza com rótulo vermelho. |
 | 12 | — | Android 384dp × 1,3: Dia a dia (4), Compromissos (3), Planejamento (2), sem quebra de título. |
 | 6–10 | `supabase/tests/financiamento_maleavel.sql` (âncora a 3 meses, paga adiantada, pagas 1→10, contrato fixo editado com pagamento e o pagamento novo coerente, `delete_debt` idempotente, RLS de outro workspace, privilégio); `finance-form.test.ts` e `debt-history.test.ts` (âncora ida e volta no dia 31, total → parcela, linha do tempo); `simple-finance-ui.test.ts` (criar com data, "Total a pagar" grava parcela × N, pagas movem a âncora, editar dívida antiga sem cronograma não inventa âncora, arquivadas com Desarquivar, excluir só depois do SIM, "…" do detalhe); `pytest` do agente (1107). | Android 384dp × 1,3: criar "Total a pagar" R$ 70.000 / 48× com 1ª em 05/12/2026 → gravou 145833 × 48 e o cronograma começa em 05/12 (out/nov sem linha em "O mês inteiro"); editar a data → 05/01/2027 e o cronograma andou; pagas 0→2 → 3ª em 05/03/2027; com um "Paguei" lançado, pagas 3→4 gravou (saldo 44×); arquivar → toast Desfazer; Arquivadas · N → Desarquivar; excluir por completo → 0 dívidas e 0 pagamentos no banco. Detalhe em linha do tempo no Android (claro/escuro) e iOS (claro/escuro), com o "…". Dados de teste apagados pelo ID. |
+| 5 | `proximo-passo.test.ts` (ordem, sem cartão, dispensado, `null`); `simple-finance-ui.test.ts`: o card só depois dos Primeiros passos, "Importar fatura" alcançável pelo toque longo do cartão (falhava sem o `onLongPress`), aviso do Pro como etapa e esqueleto enquanto o plano carrega (os dois falhavam no código anterior), `?conta=` válido pré-escolhe e inválido é ignorado. | Android 384dp × 1,3: "Primeira frase" em claro e escuro (troca de cena sem salto, "Vamos lá" alcançável rolando), card "Traga a fatura do cartão" na Hoje, toque longo no cartão → "Importar fatura" → tela "Importar" com o Nubank Cartão escolhido, e menu da fatura → idem. O Free foi conferido de verdade: o `dev@` foi passado a `free` por alguns minutos (aviso + "Ver planos" → paywall, claro e escuro) e voltou a `pro`. iOS: toque longo → action sheet com "Importar fatura" → tela com o cartão escolhido. Dados do `dev@` conferidos no fim: plano `pro`, onboarding `true`, nome e ciclo intactos. |
 | 1 | `supabase/tests/mes_fecha_ate_o_31.sql` (falhava na definição antiga: "fecha 30 em 2027-02-01: deu … a 2027-03-02"; verde no staging depois da migration), mais as bordas do dia 10 inalteradas; `agent/tests/test_mes_e_rotativo.py` (29/30 passam, 31 = último dia, 0/32 recusados). Regressão no staging: `regua_e_dia_do_fechamento`, `parcela_paga_no_ciclo` e `fluxo_do_financeiro` verdes. `linha_do_tempo` já falhava por dado do staging (ciclo 11/08–10/09, que tem as mesmas bordas antes e depois). | Android 384dp × 1,3, claro e escuro: grade 1–31 em 7 colunas; escolher o 30 gravou `30` e o ciclo corrente virou 31/08–30/09; o 31 gravou `null` ("Último dia do mês", 01/09–30/09) e acende o 31 ao reabrir; workspace devolvido ao dia 10. iOS claro e escuro: sem a placa atrás da grade. Pendente: `probe_mes_vs_cartao.py` (Gemini do staging em 503). |

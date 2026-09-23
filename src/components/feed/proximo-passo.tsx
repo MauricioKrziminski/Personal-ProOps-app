@@ -70,7 +70,7 @@ export function ProximoPassoCard({
         {passo.texto}
       </ThemedText>
       <View style={styles.acao}>
-        <Button label={passo.acao} icon={passo.icon} variant="secondary" size="sm" onPress={onAbrir} />
+        <Button label={passo.acao} variant="secondary" size="sm" onPress={onAbrir} />
       </View>
     </Animated.View>
   );
