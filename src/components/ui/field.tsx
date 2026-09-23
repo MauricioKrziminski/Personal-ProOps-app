@@ -448,7 +448,8 @@ export function MoneyField({
         caretHidden
         contextMenuHidden
         accessibilityLabel={accessibilityLabel}
-        style={styles.captura}
+        // Na cor da própria caixa: o Android ignora `color: 'transparent'` num input.
+        style={[styles.captura, { color: theme.surface }]}
       />
     </View>
   );
@@ -517,16 +518,20 @@ const styles = StyleSheet.create({
   /**
    * O input de verdade: cobre a caixa inteira, invisível, e é ele que recebe o toque.
    *
-   * ⚠️ A invisibilidade é por OPACIDADE, e diferente por plataforma — a mesma régua do
-   * `OtpInput`. `color: 'transparent'` não esconde o texto no Android (o "0,00" do input saía por
-   * cima dos dígitos, em outra fonte), e opacidade 0 lá faz o input perder o toque; 0,01 mantém a
-   * área ativa sem nada visível.
+   * ⚠️ **A opacidade NUNCA é 0, em plataforma nenhuma** (23/09/2026). No iOS o `hitTest` do
+   * React Native recusa qualquer view com `alpha < 0.01` (`RCTViewComponentView.mm`): com
+   * opacidade 0 o input deixava de existir para o toque, e o campo Valor ficou morto em todas as
+   * telas do iPhone. 0,02 fica acima da fronteira.
+   *
+   * ⚠️ **E o texto dele é pintado na cor da CAIXA, não em `transparent`.** O Android trata a cor
+   * 0 (`transparent`) como "sem cor" e desenha o texto na cor padrão: o valor digitado aparecia
+   * como um "3,56" fantasma à direita dos dígitos, medido no emulador. Na cor da superfície, 2%
+   * dela sobre ela mesma não se vê em plataforma nenhuma.
    */
   captura: {
     ...StyleSheet.absoluteFill,
-    color: 'transparent',
     textAlign: 'right',
     fontSize: Type.money.fontSize,
-    opacity: Platform.OS === 'android' ? 0.01 : 0,
+    opacity: 0.02,
   },
 });
