@@ -70,11 +70,12 @@ export default function RemindersScreen() {
       { label: 'Editar', arrasto: 'fora', onPress: () => router.push(`/reminder-form?id=${r.id}`) },
       {
         label: r.active ? 'Pausar' : 'Retomar',
+        icon: r.active ? 'pause' : 'play',
         arrasto: 'direita',
         desfaz: true,
         onPress: () => alternar(!r.active),
       },
-      { label: 'Apagar', destructive: true, arrasto: 'esquerda', onPress: onDelete },
+      { label: 'Apagar', icon: 'trash', destructive: true, arrasto: 'esquerda', onPress: onDelete },
     ];
   };
 

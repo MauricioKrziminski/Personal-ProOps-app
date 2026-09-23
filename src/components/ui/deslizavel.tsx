@@ -178,7 +178,7 @@ function Painel({
             style={[styles.botao, { backgroundColor: cor.fundo }]}>
             {acao.icon ? <Icon name={acao.icon} size="md" color={cor.tinta} /> : null}
             <ThemedText type="caption" themeColor={cor.tinta} style={styles.rotulo}>
-              {acao.label}
+              {acao.curto ?? acao.label}
             </ThemedText>
           </Pressable>
         );

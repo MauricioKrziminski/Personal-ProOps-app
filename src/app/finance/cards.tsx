@@ -23,7 +23,8 @@ import { Motion, Radius, Space, tabular } from '@/design/tokens';
 import { useCardSummary, type CardSummary } from '@/hooks/use-finance';
 import { formatBRL, formatDateBR } from '@/hooks/use-items';
 import { useAdaptiveWindow } from '@/hooks/use-adaptive-window';
-import { showItemActions } from '@/lib/item-actions';
+import { showItemActions, type ItemAction } from '@/lib/item-actions';
+import { Deslizavel } from '@/components/ui/deslizavel';
 import {
   diasAte as daysUntil,
   estadoDaFatura as estadoFatura,
@@ -73,24 +74,22 @@ function PressCard({
    * e o dedo, no toque longo. Só como ação de acessibilidade, "Importar fatura" não existia para
    * quem enxerga.
    */
-  acoes?: { nome: string; rotulo: string; onPress: () => void }[];
+  acoes?: ItemAction[];
   children: React.ReactNode;
 }) {
   return (
-    <PressableScale
-      accessibilityRole="button"
-      accessibilityLabel={accessibilityLabel}
-      accessibilityActions={acoes.map((a) => ({ name: a.nome, label: a.rotulo }))}
-      onAccessibilityAction={(e) => acoes.find((a) => a.nome === e.nativeEvent.actionName)?.onPress()}
-      onLongPress={
-        acoes.length
-          ? () => showItemActions(titulo, acoes.map((a) => ({ label: a.rotulo, onPress: a.onPress })))
-          : undefined
-      }
-      haptic="selection"
-      onPress={onPress}>
-      <Card style={styles.card}>{children}</Card>
-    </PressableScale>
+    <Deslizavel titulo={titulo} acoes={acoes} forma="card">
+      <PressableScale
+        accessibilityRole="button"
+        accessibilityLabel={accessibilityLabel}
+        accessibilityActions={acoes.map((a) => ({ name: a.label, label: a.label }))}
+        onAccessibilityAction={(e) => acoes.find((a) => a.label === e.nativeEvent.actionName)?.onPress?.()}
+        onLongPress={acoes.length ? () => showItemActions(titulo, acoes) : undefined}
+        haptic="selection"
+        onPress={onPress}>
+        <Card style={styles.card}>{children}</Card>
+      </PressableScale>
+    </Deslizavel>
   );
 }
 
@@ -261,16 +260,20 @@ export default function CardsScreen() {
               onPress={() => irParaFatura(card)}
               titulo={card.name}
               acoes={[
-                { nome: 'carteira', rotulo: 'Abrir na carteira', onPress: () => abrirNaCarteira(card) },
+                // Arrasto: com a fatura fechada, Paguei à direita e Importar à esquerda; aberta,
+                // Importar à direita. A carteira fica sempre à esquerda (spec 2026-09-23).
+                { label: 'Abrir na carteira', curto: 'Carteira', icon: 'creditcard', arrasto: 'esquerda', onPress: () => abrirNaCarteira(card) },
                 // A fatura do banco entra por aqui, com o cartão já escolhido (23/09/2026: *"meu
                 // pai não sabia como importar a fatura"* — não havia caminho a partir do cartão).
                 {
-                  nome: 'importar',
-                  rotulo: 'Importar fatura',
+                  label: 'Importar fatura',
+                  curto: 'Importar',
+                  icon: 'square.and.arrow.down',
+                  arrasto: podePagar && totalFatura > 0 ? 'esquerda' : 'direita',
                   onPress: () => router.push({ pathname: '/import', params: { conta: card.account_id } }),
                 },
                 ...(podePagar && totalFatura > 0
-                  ? [{ nome: 'paguei', rotulo: 'Paguei', onPress: () => irParaFatura(card) }]
+                  ? [{ label: 'Paguei', icon: 'checkmark.circle' as const, arrasto: 'direita' as const, onPress: () => irParaFatura(card) }]
                   : []),
               ]}
               accessibilityLabel={`${card.name}, ${estado ? `fatura ${estado.toLowerCase()}` : 'sem fatura aberta'}, ${formatBRL(totalFatura)}${card.due_date ? `, ${prazoLabel(card.due_date, 'vence')}` : ''}`}>

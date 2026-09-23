@@ -12,7 +12,7 @@ const require = createRequire(import.meta.url);
 
 // Execute the screen JSX and its event handlers. Native components/query boundaries
 // are inert; state persists across renders so each interaction uses current props.
-function screen(file: string, options: { tablet?: boolean; debts?: any[]; archivedDebts?: any[]; debtSchedule?: any[]; invoiceStatus?: string; create?: boolean; monthLines?: any[]; monthSummary?: any; cycleLines?: any[]; cycleRow?: any; rangeError?: boolean; rangePending?: boolean; rangePendingMonths?: string[]; bills?: any[]; billsError?: boolean; charges?: any[]; reminders?: any[]; budgets?: any[]; setupPassos?: any[]; proximo?: any; activity?: any[]; activityError?: boolean; forecastAccounts?: any[]; anticipation?: any[] | ((pagarEm: string) => any[]); cards?: any[]; params?: Record<string, string>; plan?: string; planPending?: boolean; txStatus?: string; recent?: any[]; rules?: any[] } = {}) {
+function screen(file: string, options: { tablet?: boolean; debts?: any[]; archivedDebts?: any[]; debtSchedule?: any[]; invoiceStatus?: string; create?: boolean; monthLines?: any[]; monthSummary?: any; cycleLines?: any[]; cycleRow?: any; rangeError?: boolean; rangePending?: boolean; rangePendingMonths?: string[]; bills?: any[]; billsError?: boolean; charges?: any[]; reminders?: any[]; budgets?: any[]; setupPassos?: any[]; proximo?: any; activity?: any[]; activityError?: boolean; forecastAccounts?: any[]; anticipation?: any[] | ((pagarEm: string) => any[]); cards?: any[]; params?: Record<string, string>; plan?: string; planPending?: boolean; txStatus?: string; recent?: any[]; rules?: any[]; recurring?: any[]; goals?: any[] } = {}) {
   const state: any[] = [];
   let cursor = 0;
   let nodes: any[] = [];
@@ -39,6 +39,8 @@ function screen(file: string, options: { tablet?: boolean; debts?: any[]; archiv
     // Só responde quando o teste dá os lançamentos: respondido e vazio, o Financeiro afirmaria
     // "Ainda não tem movimento", e o teste das bordas falhando depende de ele NÃO afirmar.
     useRules: () => ({ ...query, isSuccess: true, data: options.rules ?? [] }),
+    useRecurringTransactions: () => ({ ...query, isSuccess: true, data: options.recurring ?? [] }),
+    useGoals: () => ({ ...query, isSuccess: true, data: options.goals ?? [] }),
     useRecentTransactions: () => (options.recent ? { ...query, isSuccess: true, data: options.recent } : query),
     usePlanStatus: () => options.planPending
       ? { ...query, isPending: true, data: undefined }
@@ -188,9 +190,10 @@ function screen(file: string, options: { tablet?: boolean; debts?: any[]; archiv
         }),
       };
       // Orçamentos consulta direto (a lista de linhas): o mesmo resultado inerte dos hooks.
-      if (name === '@tanstack/react-query') return { useQuery: () => query };
-      if (name === '@/lib/finance-form' || name === '@/lib/dates' || name === '@/lib/forecast-months' || name === '@/lib/month-view' || name === '@/lib/settle-labels' || name === '@/lib/accounts' || name === '@/lib/cycle-label' || name === '@/lib/card-status' || name === '@/lib/today-sections' || name === '@/lib/runway' || name === '@/lib/budget-tight' || name === '@/lib/setup-steps' || name === '@/lib/activity-feed' || name === '@/lib/account-cash' || name === '@/lib/today-spend' || name === '@/lib/anticipation' || name === '@/lib/widget-snapshot' || name === '@/lib/debt-history' || name === '@/lib/import-preview' || name === '@/lib/arrasto') return load(`src/lib/${name.split('/').at(-1)}.ts`);
+      if (name === '@tanstack/react-query') return { useQuery: () => query, useMutation: () => mutation('mutation'), useQueryClient: () => ({ invalidateQueries: async () => {} }) };
+      if (name === '@/lib/finance-form' || name === '@/lib/dates' || name === '@/lib/forecast-months' || name === '@/lib/month-view' || name === '@/lib/settle-labels' || name === '@/lib/accounts' || name === '@/lib/cycle-label' || name === '@/lib/card-status' || name === '@/lib/today-sections' || name === '@/lib/runway' || name === '@/lib/budget-tight' || name === '@/lib/setup-steps' || name === '@/lib/activity-feed' || name === '@/lib/account-cash' || name === '@/lib/today-spend' || name === '@/lib/anticipation' || name === '@/lib/widget-snapshot' || name === '@/lib/debt-history' || name === '@/lib/import-preview' || name === '@/lib/arrasto' || name === '@/lib/text') return load(`src/lib/${name.split('/').at(-1)}.ts`);
       if (name === '@/hooks/use-debounced') return { useDebounced: (value: unknown) => value };
+      if (name === '@/lib/rrule-text') return { describeRRule: () => 'todo mês' };
       if (name === '@/design/category-icons') return { categoryIcon: () => 'circle' };
       if (name === '@/design/adaptive-window') return load('src/design/adaptive-window.ts');
       // import relativo DENTRO de um módulo puro já carregado (month-view → ./dates.ts)
@@ -546,7 +549,7 @@ test('editing the paid count keeps the contract calendar: the next date follows 
 test('long press on an active debt offers the full set, including delete for good', () => {
   const ui = screen(debtsFile, { create: false, debts: [carro] });
   ui.interact((nodes: any[]) => nodes.find((n) => n.type === 'Pressable' && n.props.onLongPress).props.onLongPress());
-  assert.deepEqual(ui.actions.map((a: any) => a.label), ['Ver as parcelas', 'Editar', 'Arquivar', 'Excluir por completo']);
+  assert.deepEqual(ui.actions.map((a: any) => a.label), ['Pagar parcela', 'Ver as parcelas', 'Editar', 'Arquivar', 'Excluir por completo']);
 });
 
 test('archived debts have a place to come back from', () => {
@@ -1084,7 +1087,9 @@ test('Cartões: "Importar fatura" se alcança com o DEDO (toque longo), não só
   const ui = screen('src/app/finance/cards.tsx', { cards: [{ account_id: 'card-1', name: 'Nubank Cartão', invoice_id: 'invoice-1', invoice_total_cents: 10000, unpaid_total_cents: 10000, closing_date: '2026-10-03', due_date: '2026-10-10', overdue_count: 0 }] });
   const card = ui.nodes().find((n: any) => typeof n.type === 'function' && n.type.name === 'PressCard');
   assert.ok(card, 'o card do cartão');
-  const tocavel = card.type(card.props);
+  // O PressCard devolve o Deslizavel (arrasto) em volta do tocável.
+  const raiz = card.type(card.props);
+  const tocavel = raiz.type === 'Deslizavel' ? raiz.props.children : raiz;
   assert.equal(typeof tocavel.props.onLongPress, 'function', 'o card abre as ações no toque longo');
   tocavel.props.onLongPress();
   const importar = ui.actions.find((a: any) => a.label === 'Importar fatura');
@@ -1130,6 +1135,14 @@ test('Importar: ?conta= que não é da pessoa é ignorado — nada pré-escolhid
 */
 const ladosDe = (node: any) => {
   const l = ladosDoArrasto(node.props.acoes);
+  // Ícone em TODA ação revelada: sem ele, o rótulo fica numa altura e o do "Mais" (que tem ícone)
+  // noutra — medido no Android em 23/09/2026 ("Arquivar" desalinhado de "Mais").
+  const semIcone = [...l.direita, ...l.esquerda].filter((a: any) => !a.icon).map((a: any) => a.label);
+  assert.deepEqual(JSON.parse(JSON.stringify(semIcone)), [], `ação do arrasto sem ícone: ${semIcone.join(', ')}`);
+  // O botão revelado tem 88dp: rótulo de uma palavra, como no WhatsApp ("Apagar a compra inteira"
+  // partia em três linhas). A frase inteira continua no menu; no arrasto vale `curto`.
+  const longos = [...l.direita, ...l.esquerda].map((a: any) => a.curto ?? a.label).filter((t: string) => t.length > 10);
+  assert.deepEqual(JSON.parse(JSON.stringify(longos)), [], `rótulo longo no arrasto: ${longos.join(', ')}`);
   // JSON: o harness roda a tela noutro contexto (vm), e arrays de lá não são `deepStrictEqual` daqui.
   return JSON.parse(JSON.stringify({ direita: l.direita.map((a: any) => a.label), esquerda: l.esquerda.map((a: any) => a.label), mais: l.mais, pontaDireita: l.pontaDireita?.label ?? null, pontaEsquerda: l.pontaEsquerda?.label ?? null }));
 };
@@ -1187,4 +1200,31 @@ test('Regras: a regra arrasta Editar e Apagar', () => {
   const [card] = deslizaveis(ui);
   assert.ok(card, 'a regra está num Deslizavel');
   assert.deepEqual(ladosDe(card), { direita: ['Editar'], esquerda: ['Apagar'], mais: false, pontaDireita: null, pontaEsquerda: null });
+});
+
+test('Dívidas: arrasta Pagar parcela à direita; Arquivar à esquerda vai até o fim (tem Desfazer)', () => {
+  const ui = screen(debtsFile, { create: false, debts: [carro] });
+  assert.deepEqual(ladosDe(deslizaveis(ui)[0]), { direita: ['Pagar parcela'], esquerda: ['Arquivar'], mais: true, pontaDireita: null, pontaEsquerda: 'Arquivar' });
+});
+
+test('Cartões: fatura aberta arrasta Importar fatura; a carteira fica à esquerda', () => {
+  const ui = screen('src/app/finance/cards.tsx', { cards: [{ account_id: 'card-1', name: 'Nubank Cartão', invoice_id: 'invoice-1', invoice_total_cents: 10000, unpaid_total_cents: 10000, closing_date: '2026-10-03', due_date: '2026-10-10', overdue_count: 0 }] });
+  const card = ui.nodes().find((n: any) => typeof n.type === 'function' && n.type.name === 'PressCard');
+  const raiz = card.type(card.props);
+  assert.equal(raiz.type, 'Deslizavel', 'o cartão está num Deslizavel');
+  assert.deepEqual(ladosDe(raiz), { direita: ['Importar fatura'], esquerda: ['Abrir na carteira'], mais: false, pontaDireita: null, pontaEsquerda: null });
+});
+
+test('Recorrentes: arrasta Pausar (até o fim, com Desfazer) e Apagar; o resto no Mais', () => {
+  const ui = screen('src/app/finance/recurring.tsx', { recurring: [{ id: 'rec-1', description: 'Academia', kind: 'expense', amount_cents: 12000, rrule: 'FREQ=MONTHLY;BYMONTHDAY=15', dtstart: '2026-01-15', next_run_at: '2026-10-15T12:00:00Z', active: true, account_id: null, category: 'saúde' }] });
+  const card = deslizaveis(ui)[0];
+  assert.ok(card, 'a série está num Deslizavel');
+  assert.deepEqual(ladosDe(card), { direita: ['Pausar'], esquerda: ['Apagar'], mais: true, pontaDireita: 'Pausar', pontaEsquerda: null });
+});
+
+test('Metas: arrasta Guardar à direita e Arquivar à esquerda', () => {
+  const ui = screen('src/app/finance/goals.tsx', { goals: [{ id: 'g1', name: 'Viagem', target_cents: 500000, saved_cents: 100000, deadline: null, archived: false }] });
+  const card = deslizaveis(ui)[0];
+  assert.ok(card, 'a meta está num Deslizavel');
+  assert.deepEqual(ladosDe(card), { direita: ['Guardar'], esquerda: ['Arquivar'], mais: true, pontaDireita: null, pontaEsquerda: null });
 });

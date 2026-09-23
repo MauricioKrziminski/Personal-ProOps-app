@@ -109,7 +109,7 @@ export default function ImportHistoryScreen() {
       arrasto: 'fora',
       onPress: () => abrir(lote),
     },
-    { label: 'Apagar registro', destructive: true, arrasto: 'esquerda', onPress: () => confirmarApagar(lote) },
+    { label: 'Apagar registro', curto: 'Apagar', icon: 'trash', destructive: true, arrasto: 'esquerda', onPress: () => confirmarApagar(lote) },
   ];
   const acoes = (lote: ImportBatchSummary) => showItemActions(lote.filename ?? 'Extrato', acoesDoLote(lote));
 

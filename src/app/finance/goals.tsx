@@ -216,13 +216,14 @@ export default function GoalsScreen() {
       'A meta sai da lista. O que você guardou fica no histórico.'
     );
 
-  const acoes = (g: Goal) =>
-    showItemActions(g.name, [
-      { label: 'Guardar', onPress: () => abrirAporte(g) },
-      { label: 'Editar', onPress: () => abrirEdicao(g) },
-      { label: 'Ver extrato', onPress: () => setExtrato(g) },
-      { label: 'Arquivar', destructive: true, onPress: () => arquivar(g) },
-    ]);
+  /** O menu da meta, UMA lista para o toque longo e o arrasto. */
+  const acoesDaMeta = (g: Goal): ItemAction[] => [
+    { label: 'Guardar', icon: 'plus.circle', arrasto: 'direita', onPress: () => abrirAporte(g) },
+    { label: 'Editar', onPress: () => abrirEdicao(g) },
+    { label: 'Ver extrato', onPress: () => setExtrato(g) },
+    { label: 'Arquivar', icon: 'archivebox', destructive: true, arrasto: 'esquerda', onPress: () => arquivar(g) },
+  ];
+  const acoes = (g: Goal) => showItemActions(g.name, acoesDaMeta(g));
 
   const cartaoMeta = (g: Goal, index: number) => {
     const saved = Number(g.saved_cents);
@@ -239,6 +240,7 @@ export default function GoalsScreen() {
         entering={FadeInDown.duration(Motion.duration.slow).delay(
           Math.min(index * Motion.stagger.step, Motion.stagger.cap)
         )}>
+        <Deslizavel titulo={g.name} acoes={acoesDaMeta(g)} forma="card">
         <Pressable
           accessibilityRole="button"
           accessibilityLabel={`${g.name}, ${formatBRL(saved)} de ${formatBRL(target)}, ${Math.round(pct * 100)} por cento${concluida ? ', concluída' : `, faltam ${formatBRL(falta)}`}`}
@@ -303,6 +305,7 @@ export default function GoalsScreen() {
             ) : null}
           </Card>
         </Pressable>
+        </Deslizavel>
       </Animated.View>
     );
   };
@@ -509,7 +512,7 @@ export default function GoalsScreen() {
                 {(grupo.itens ?? []).map((c) => {
                   // O aporte só tem "Desfazer": ele vai à esquerda, e o toque longo lê a mesma lista.
                   const acoesDoAporte: ItemAction[] = extrato
-                    ? [{ label: 'Desfazer', destructive: true, arrasto: 'esquerda', onPress: () => desfazerAporte(extrato, Number(c.amount_cents)) }]
+                    ? [{ label: 'Desfazer', icon: 'arrow.uturn.backward', destructive: true, arrasto: 'esquerda', onPress: () => desfazerAporte(extrato, Number(c.amount_cents)) }]
                     : [];
                   return (
                   <Deslizavel key={c.id} titulo={isoToBR(c.occurred_at)} acoes={acoesDoAporte}>

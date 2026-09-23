@@ -54,6 +54,8 @@ const MATERIAL: Record<string, MaterialName> = {
   'pencil.circle': 'edit',
   pills: 'medication',
   pin: 'push_pin',
+  pause: 'pause',
+  play: 'play_arrow',
   'play.circle': 'play_circle',
   shippingbox: 'inventory_2',
   'arrow.down.doc': 'download',

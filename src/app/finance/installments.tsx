@@ -19,6 +19,7 @@ import { Money } from '@/components/ui/money';
 import { Row, Section } from '@/components/ui/row';
 import { AdaptivePanes } from '@/components/ui/adaptive-panes';
 import { Screen } from '@/components/ui/screen';
+import { Deslizavel } from '@/components/ui/deslizavel';
 import { HeroLabel } from '@/components/ui/section-head';
 import { Skeleton, SkeletonRow } from '@/components/ui/skeleton';
 import { BarTrack, ProgressBar } from '@/components/ui/sparkline';
@@ -48,7 +49,7 @@ import { Segmented } from '@/components/ui/segmented';
 import { QuantityField } from '@/components/ui/quantity-field';
 import { estadoDaLinha } from '@/lib/settle-labels';
 import { useToast } from '@/components/ui/toast';
-import { confirmDestructive, showItemActions } from '@/lib/item-actions';
+import { confirmDestructive, showItemActions, type ItemAction } from '@/lib/item-actions';
 import { useTheme } from '@/hooks/use-theme';
 import { useVoltarQuandoFechar } from '@/hooks/use-voltar-quando-fechar';
 import { nextPendingInstallment } from '@/lib/installment-progress';
@@ -301,10 +302,11 @@ export default function InstallmentsScreen() {
   const maiorEhUnico = faixa.filter((f) => f.cents === maiorDaFaixa).length === 1;
   const temFaixa = maiorDaFaixa > 0;
 
-  const acoes = (plano: InstallmentPlanSummary) => {
+  /** O menu da compra, UMA lista para o toque longo e o arrasto. */
+  const acoesDaCompra = (plano: InstallmentPlanSummary): ItemAction[] => {
     const ordenadas = [...plano.parcels].sort((a, b) => (a.installment_no ?? 0) - (b.installment_no ?? 0));
     const primeira = ordenadas[0];
-    showItemActions(plano.title, [
+    return [
       {
         /**
          * ⚠️ **"Editar" aqui edita a COMPRA, não uma parcela** (15/09/2026).
@@ -318,7 +320,9 @@ export default function InstallmentsScreen() {
          * "Ver parcelas" → tocar na parcela → Editar, que é onde essa pergunta faz sentido.
          */
         label: 'Editar a compra',
+        curto: 'Editar',
         icon: 'pencil' as const,
+        arrasto: 'direita',
         onPress: () => setForm(formDoPlano(plano)),
       },
       {
@@ -342,12 +346,15 @@ export default function InstallmentsScreen() {
         : []),
       {
         label: 'Apagar a compra inteira',
+        curto: 'Apagar',
         icon: 'trash' as const,
         destructive: true,
+        arrasto: 'esquerda',
         onPress: () => apagarPlano(plano),
       },
-    ]);
+    ];
   };
+  const acoes = (plano: InstallmentPlanSummary) => showItemActions(plano.title, acoesDaCompra(plano));
 
   /**
    * Apagar o plano some com TODAS as parcelas (cascade em `installment_plan_id`).
@@ -481,6 +488,7 @@ export default function InstallmentsScreen() {
         entering={FadeInDown.duration(Motion.duration.base).delay(
           Math.min(index * Motion.stagger.step, Motion.stagger.cap),
         )}>
+        <Deslizavel titulo={plano.title} acoes={acoesDaCompra(plano)}>
         <Pressable
           accessibilityRole="button"
           accessibilityState={{ expanded: expandido }}
@@ -518,6 +526,7 @@ export default function InstallmentsScreen() {
             </View>
           )}
         </Pressable>
+        </Deslizavel>
 
         {expandido ? (
           <Animated.View

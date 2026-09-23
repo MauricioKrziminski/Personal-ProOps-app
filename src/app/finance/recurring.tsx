@@ -19,6 +19,7 @@ import { DatePickerField } from '@/components/finance/date-picker-field';
 import { Icon } from '@/components/ui/icon';
 import { Money } from '@/components/ui/money';
 import { Screen } from '@/components/ui/screen';
+import { Deslizavel } from '@/components/ui/deslizavel';
 import { HeroLabel, SectionHead } from '@/components/ui/section-head';
 import { Search } from '@/components/ui/search';
 import { Segmented } from '@/components/ui/segmented';
@@ -40,7 +41,7 @@ import { useDebounced } from '@/hooks/use-debounced';
 import { semAcento } from '@/lib/text';
 import { QuantityField } from '@/components/ui/quantity-field';
 import { brToISO, ehUltimoDiaDoMes, fimQueSegueOInicio, isValidBRDate, isoToBR, localDateTime, localISODate } from '@/lib/dates';
-import { confirmDestructive, showItemActions } from '@/lib/item-actions';
+import { confirmDestructive, showItemActions, type ItemAction } from '@/lib/item-actions';
 import { validRecurringRange } from '@/lib/finance-form';
 import { describeRRule } from '@/lib/rrule-text';
 import { supabase } from '@/lib/supabase';
@@ -433,6 +434,8 @@ export default function RecurringScreen() {
           toast({
             message: r.active ? 'Série pausada.' : 'Série retomada.',
             tone: 'success',
+            // Com "Desfazer": é o que deixa pausar valer ao arrastar até o fim (Deslizavel).
+            action: { label: 'Desfazer', onPress: () => toggle.mutate({ id: r.id, active: r.active }) },
           }),
         onError: () => toast({ message: 'Não deu para mudar a série.', tone: 'error' }),
       }
@@ -453,8 +456,8 @@ export default function RecurringScreen() {
       'As ocorrências futuras saem da projeção junto. O histórico e o que está atrasado ficam. Para só parar de gerar, pause a série.'
     );
 
-  const acoes = (r: RecurringTransaction) =>
-    showItemActions(r.description ?? 'Recorrência', [
+  /** O menu da série, UMA lista para o toque (curto e longo) e o arrasto. */
+  const acoesDaSerie = (r: RecurringTransaction): ItemAction[] => [
       {
         label: 'Ver ocorrências',
         onPress: () =>
@@ -470,9 +473,10 @@ export default function RecurringScreen() {
         icon: 'pencil' as const,
         onPress: () => abrirEdicao(r),
       },
-      { label: r.active ? 'Pausar' : 'Retomar', onPress: () => alternar(r) },
-      { label: 'Apagar', destructive: true, onPress: () => apagar(r) },
-    ]);
+      { label: r.active ? 'Pausar' : 'Retomar', icon: r.active ? 'pause' : 'play', arrasto: 'direita', desfaz: true, onPress: () => alternar(r) },
+      { label: 'Apagar', icon: 'trash', destructive: true, arrasto: 'esquerda', onPress: () => apagar(r) },
+    ];
+  const acoes = (r: RecurringTransaction) => showItemActions(r.description ?? 'Recorrência', acoesDaSerie(r));
 
   const cartaoSerie = (r: RecurringTransaction, index: number) => {
     const receita = r.kind === 'income';
@@ -486,6 +490,7 @@ export default function RecurringScreen() {
         entering={FadeInDown.duration(Motion.duration.slow).delay(
           Math.min(index * Motion.stagger.step, Motion.stagger.cap)
         )}>
+        <Deslizavel titulo={r.description ?? 'Recorrência'} acoes={acoesDaSerie(r)} forma="card">
         <Pressable
           accessibilityRole="button"
           accessibilityLabel={`${r.description ?? 'recorrência'}, ${receita ? 'receita' : 'despesa'}, ${quando}, próximo em ${isoToBR(r.next_run_at.slice(0, 10))}${r.active ? '' : ', pausado'}`}
@@ -521,6 +526,7 @@ export default function RecurringScreen() {
             </ThemedText>
           </Card>
         </Pressable>
+        </Deslizavel>
       </Animated.View>
     );
   };

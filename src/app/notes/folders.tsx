@@ -240,9 +240,9 @@ export default function FoldersScreen() {
     { label: 'Renomear ou trocar ícone', onPress: () => startEdit(folder) },
     { label: 'Cor', onPress: () => setPintando(folder) },
     { label: 'Tags', onPress: () => setEtiquetando(folder) },
-    { label: folder.pinned ? 'Desafixar' : 'Fixar', arrasto: 'direita', desfaz: true, onPress: () => fixar(folder) },
+    { label: folder.pinned ? 'Desafixar' : 'Fixar', icon: folder.pinned ? 'pin.slash' : 'pin', arrasto: 'direita', desfaz: true, onPress: () => fixar(folder) },
     { label: 'Mover para dentro de…', onPress: () => moverPara(folder) },
-    { label: 'Arquivar', arrasto: 'esquerda', desfaz: true, onPress: () => arquivar(folder) },
+    { label: 'Arquivar', icon: 'archivebox', arrasto: 'esquerda', desfaz: true, onPress: () => arquivar(folder) },
     { label: 'Apagar', destructive: true, onPress: () => confirmDelete(folder) },
   ];
 

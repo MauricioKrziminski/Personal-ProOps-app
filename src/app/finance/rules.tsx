@@ -155,8 +155,8 @@ export default function RulesScreen() {
   /** O menu da regra, UMA lista para o toque longo e o arrasto. */
   const tituloDaRegra = (rule: CategorizationRule) => `${rule.pattern} → ${rule.category ?? 'sem categoria'}`;
   const acoesDaRegra = (rule: CategorizationRule): ItemAction[] => [
-    { label: 'Editar', arrasto: 'direita', onPress: () => abrir(rule) },
-    { label: 'Apagar', destructive: true, arrasto: 'esquerda', onPress: () => apagar(rule) },
+    { label: 'Editar', icon: 'pencil', arrasto: 'direita', onPress: () => abrir(rule) },
+    { label: 'Apagar', icon: 'trash', destructive: true, arrasto: 'esquerda', onPress: () => apagar(rule) },
   ];
   const acoes = (rule: CategorizationRule) => showItemActions(tituloDaRegra(rule), acoesDaRegra(rule));
 

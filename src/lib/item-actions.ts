@@ -26,6 +26,8 @@ export interface ItemAction {
   arrasto?: 'direita' | 'esquerda' | 'fora';
   /** Pode executar ao arrastar até o fim — só quando a tela oferece "Desfazer" no aviso. */
   desfaz?: boolean;
+  /** Rótulo de uma palavra para o botão do arrasto (88dp); o menu usa `label`, a frase inteira. */
+  curto?: string;
 }
 
 interface SheetRequest {

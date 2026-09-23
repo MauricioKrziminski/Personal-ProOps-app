@@ -20,6 +20,7 @@ import { Icon } from '@/components/ui/icon';
 import { Money } from '@/components/ui/money';
 import { Row, Section } from '@/components/ui/row';
 import { Screen } from '@/components/ui/screen';
+import { Deslizavel } from '@/components/ui/deslizavel';
 import { HeroLabel } from '@/components/ui/section-head';
 import { Segmented } from '@/components/ui/segmented';
 import { Skeleton, SkeletonHero, SkeletonList, SkeletonRow } from '@/components/ui/skeleton';
@@ -54,7 +55,7 @@ import {
   simpleDebtValues,
   type UnidadeDoValor,
 } from '@/lib/finance-form';
-import { confirmDestructive, showItemActions } from '@/lib/item-actions';
+import { confirmDestructive, showItemActions, type ItemAction } from '@/lib/item-actions';
 import { AccountPicker } from '@/components/finance/account-picker';
 import { DebtTimeline } from '@/components/finance/debt-timeline';
 import { HeaderIconButton } from '@/components/ui/app-header';
@@ -445,20 +446,28 @@ export default function DebtsScreen() {
   };
 
   /** Uma lista só de ações: o toque longo e o "…" do detalhe leem daqui. */
-  const acoesDaDivida = (d: Debt, noDetalhe = false) =>
-    showItemActions(d.name, [
-      // No detalhe já se está vendo as parcelas: a ação sai, o resto é a MESMA lista.
-      ...(noDetalhe ? [] : [{ label: 'Ver as parcelas', onPress: () => setDetalhe(d) }]),
-      {
-        label: 'Editar',
-        onPress: () => {
-          setDetalhe(null);
-          abrirEdicao(d);
-        },
+  /**
+   * O menu da dívida, UMA lista para o toque longo, o "…" do detalhe e o arrasto. "Pagar parcela"
+   * é a ação rápida do card (o detalhe tem o caminho dele); Arquivar tem "Desfazer" no aviso, e
+   * por isso vale até o fim.
+   */
+  const listaDaDivida = (d: Debt, noDetalhe = false): ItemAction[] => [
+    ...(noDetalhe || Number(d.remaining_cents) <= 0
+      ? []
+      : [{ label: 'Pagar parcela', curto: 'Pagar', icon: 'banknote' as const, arrasto: 'direita' as const, onPress: () => abrirPagamento(d) }]),
+    // No detalhe já se está vendo as parcelas: a ação sai, o resto é a MESMA lista.
+    ...(noDetalhe ? [] : [{ label: 'Ver as parcelas', onPress: () => setDetalhe(d) }]),
+    {
+      label: 'Editar',
+      onPress: () => {
+        setDetalhe(null);
+        abrirEdicao(d);
       },
-      { label: 'Arquivar', onPress: () => arquivar(d) },
-      { label: 'Excluir por completo', destructive: true, onPress: () => void excluir(d) },
-    ]);
+    },
+    { label: 'Arquivar', icon: 'archivebox', arrasto: 'esquerda', desfaz: true, onPress: () => arquivar(d) },
+    { label: 'Excluir por completo', destructive: true, onPress: () => void excluir(d) },
+  ];
+  const acoesDaDivida = (d: Debt, noDetalhe = false) => showItemActions(d.name, listaDaDivida(d, noDetalhe));
 
   const acoesDaArquivada = (d: Debt) =>
     showItemActions(d.name, [
@@ -481,6 +490,7 @@ export default function DebtsScreen() {
         entering={FadeInDown.duration(Motion.duration.slow).delay(
           Math.min(index * Motion.stagger.step, Motion.stagger.cap)
         )}>
+        <Deslizavel titulo={d.name} acoes={listaDaDivida(d)} forma="card">
         <Pressable
           accessibilityRole="button"
           accessibilityLabel={`${d.name}, ${tipo}, deve ${brl(restante)}, ${juros}${parcelas ? `, ${parcelas}` : ''}`}
@@ -500,6 +510,7 @@ export default function DebtsScreen() {
             </ThemedText>
           </Card>
         </Pressable>
+        </Deslizavel>
       </Animated.View>
     );
   };

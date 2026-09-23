@@ -20,6 +20,7 @@ import { Icon } from '@/components/ui/icon';
 import { Money } from '@/components/ui/money';
 import { AdaptivePanes } from '@/components/ui/adaptive-panes';
 import { Screen } from '@/components/ui/screen';
+import { Deslizavel } from '@/components/ui/deslizavel';
 import { HeroLabel, SectionHead } from '@/components/ui/section-head';
 import { Segmented } from '@/components/ui/segmented';
 import { Skeleton, SkeletonHero, SkeletonList, SkeletonRow } from '@/components/ui/skeleton';
@@ -267,13 +268,14 @@ export default function BudgetsScreen() {
       onError: () => toast({ message: 'Não deu para remover o limite.', tone: 'error' }),
     });
 
-  const acoes = (b: BudgetStatus) => {
+  /** O menu do orçamento, UMA lista para o toque longo e o arrasto (Editar limite à direita). */
+  const acoesDoOrcamento = (b: BudgetStatus): ItemAction[] => {
     const daCategoria = (rows.data ?? []).filter((r) => r.category === b.category);
     const doMes = daCategoria.find((r) => r.month === `${month}-01`);
     const padrao = daCategoria.find((r) => r.month === null);
 
     const acoesDaLinha: ItemAction[] = [
-      { label: 'Editar limite', onPress: () => abrirEdicao(b) },
+      { label: 'Editar limite', curto: 'Editar', icon: 'pencil', arrasto: 'direita', onPress: () => abrirEdicao(b) },
       { label: 'Ver lançamentos', onPress: () => verLancamentos(b.category) },
     ];
 
@@ -297,8 +299,9 @@ export default function BudgetsScreen() {
       }
     }
 
-    showItemActions(b.category, acoesDaLinha);
+    return acoesDaLinha;
   };
+  const acoes = (b: BudgetStatus) => showItemActions(b.category, acoesDoOrcamento(b));
 
   const linhaOrcamento = (b: BudgetStatus, index: number) => {
     const gastoCents = Number(b.spent_cents);
@@ -318,6 +321,7 @@ export default function BudgetsScreen() {
         entering={FadeInDown.duration(Motion.duration.slow).delay(
           Math.min(index * Motion.stagger.step, Motion.stagger.cap)
         )}>
+        <Deslizavel titulo={b.category} acoes={acoesDoOrcamento(b)} forma="card">
         <Pressable
           accessibilityRole="button"
           accessibilityLabel={`${b.category}, gastou ${formatBRL(gastoCents)} de ${formatBRL(limiteCents)}${comprometido > 0 ? `, mais ${formatBRL(comprometido)} comprometidos` : ''}, ${Math.round(pct * 100)} por cento${estourou ? ', estourou' : ''}`}
@@ -409,6 +413,7 @@ export default function BudgetsScreen() {
             ) : null}
           </Card>
         </Pressable>
+        </Deslizavel>
       </Animated.View>
     );
   };
