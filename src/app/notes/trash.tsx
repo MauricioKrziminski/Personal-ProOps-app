@@ -16,6 +16,8 @@ import { EmptyState } from '@/components/ui/empty-state';
 import { Icon } from '@/components/ui/icon';
 import { Row, Section } from '@/components/ui/row';
 import { Screen } from '@/components/ui/screen';
+import { Deslizavel } from '@/components/ui/deslizavel';
+import { showItemActions, type ItemAction } from '@/lib/item-actions';
 import { SkeletonRow } from '@/components/ui/skeleton';
 import { useToast } from '@/components/ui/toast';
 import { Motion, Space } from '@/design/tokens';
@@ -97,20 +99,12 @@ export default function TrashScreen() {
     );
   };
 
-  const showActions = (note: Note) => {
-    Haptics.selectionAsync();
-    actionSheet(
-      {
-        title: noteTitle(note.content) || 'Nota',
-        options: ['Ver conteúdo', 'Apagar de vez'],
-        destructiveIndex: 1,
-      },
-      (index) => {
-        if (index === 0) router.push(`/notes/${note.id}`);
-        if (index === 1) confirmPurge(note);
-      }
-    );
-  };
+  /** O menu da nota na lixeira, UMA lista para o toque longo e o arrasto. */
+  const acoesDaNota = (note: Note): ItemAction[] => [
+    { label: 'Ver conteúdo', arrasto: 'fora', onPress: () => router.push(`/notes/${note.id}`) },
+    { label: 'Apagar de vez', destructive: true, arrasto: 'esquerda', onPress: () => confirmPurge(note) },
+  ];
+  const showActions = (note: Note) => showItemActions(noteTitle(note.content) || 'Nota', acoesDaNota(note));
 
   const confirmEmpty = () => {
     // ponytail: esvazia o que já foi paginado. Com mais de uma página o usuário toca de novo —
@@ -174,6 +168,7 @@ export default function TrashScreen() {
               entering={FadeInDown.duration(Motion.duration.slow).delay(
                 Math.min(index * Motion.stagger.step, Motion.stagger.cap)
               )}>
+              <Deslizavel titulo={noteTitle(note.content) || 'Nota'} acoes={acoesDaNota(note)}>
               <Row
                 title={noteTitle(note.content) || 'Nota sem título'}
                 subtitle={notePreview(note.content) || undefined}
@@ -188,6 +183,7 @@ export default function TrashScreen() {
                 onPress={() => onRestore(note)}
                 onLongPress={() => showActions(note)}
               />
+              </Deslizavel>
             </Animated.View>
           ))}
         </Section>

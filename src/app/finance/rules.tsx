@@ -18,11 +18,12 @@ import { AdaptivePanes } from '@/components/ui/adaptive-panes';
 import { Field, TextField } from '@/components/ui/field';
 import { Row, Section } from '@/components/ui/row';
 import { Screen } from '@/components/ui/screen';
+import { Deslizavel } from '@/components/ui/deslizavel';
 import { HeroLabel } from '@/components/ui/section-head';
 import { SkeletonRow } from '@/components/ui/skeleton';
 import { useToast } from '@/components/ui/toast';
 import { Motion, Space, Type, tabular } from '@/design/tokens';
-import { confirmDestructive, showItemActions } from '@/lib/item-actions';
+import { confirmDestructive, showItemActions, type ItemAction } from '@/lib/item-actions';
 import {
   useAccounts,
   useDeleteRule,
@@ -151,11 +152,13 @@ export default function RulesScreen() {
       'Os lançamentos já categorizados continuam como estão.'
     );
 
-  const acoes = (rule: CategorizationRule) =>
-    showItemActions(`${rule.pattern} → ${rule.category ?? 'sem categoria'}`, [
-      { label: 'Editar', onPress: () => abrir(rule) },
-      { label: 'Apagar', destructive: true, onPress: () => apagar(rule) },
-    ]);
+  /** O menu da regra, UMA lista para o toque longo e o arrasto. */
+  const tituloDaRegra = (rule: CategorizationRule) => `${rule.pattern} → ${rule.category ?? 'sem categoria'}`;
+  const acoesDaRegra = (rule: CategorizationRule): ItemAction[] => [
+    { label: 'Editar', arrasto: 'direita', onPress: () => abrir(rule) },
+    { label: 'Apagar', destructive: true, arrasto: 'esquerda', onPress: () => apagar(rule) },
+  ];
+  const acoes = (rule: CategorizationRule) => showItemActions(tituloDaRegra(rule), acoesDaRegra(rule));
 
   const legenda = (rule: CategorizationRule) => {
     const conta = nomeConta(rule.account_id);
@@ -210,6 +213,7 @@ export default function RulesScreen() {
             Math.min(index * Motion.stagger.step, Motion.stagger.cap)
           )}
         >
+          <Deslizavel titulo={tituloDaRegra(rule)} acoes={acoesDaRegra(rule)}>
           <Row
             title={`${rule.pattern}  →  ${rule.category ?? 'sem categoria'}`}
             subtitle={legenda(rule)}
@@ -219,6 +223,7 @@ export default function RulesScreen() {
             onPress={() => abrir(rule)}
             onLongPress={() => acoes(rule)}
           />
+          </Deslizavel>
         </Animated.View>
       ))}
     </Section>

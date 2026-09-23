@@ -11,6 +11,7 @@ import { EmptyState } from '@/components/ui/empty-state';
 import { Icon } from '@/components/ui/icon';
 import { Row, Section } from '@/components/ui/row';
 import { Screen } from '@/components/ui/screen';
+import { Deslizavel } from '@/components/ui/deslizavel';
 import { SkeletonRow } from '@/components/ui/skeleton';
 import { useToast } from '@/components/ui/toast';
 import { Motion, Space } from '@/design/tokens';
@@ -22,7 +23,7 @@ import {
   type ImportBatchSummary,
 } from '@/hooks/use-finance';
 import { formatDateBR } from '@/hooks/use-items';
-import { confirmDestructive, showItemActions } from '@/lib/item-actions';
+import { confirmDestructive, showItemActions, type ItemAction } from '@/lib/item-actions';
 import { accountLabel } from '@/lib/accounts';
 import { transicaoDeLayout, transicaoDeLayoutRapida } from '@/components/motion/transicao';
 
@@ -101,14 +102,16 @@ export default function ImportHistoryScreen() {
       `Os ${lote.aprovados} lançamentos que você confirmou continuam no financeiro. Só o histórico da importação some.`,
     );
 
-  const acoes = (lote: ImportBatchSummary) =>
-    showItemActions(lote.filename ?? 'Extrato', [
-      {
-        label: lote.pendentes > 0 ? 'Retomar a revisão' : 'Ver os itens',
-        onPress: () => abrir(lote),
-      },
-      { label: 'Apagar registro', destructive: true, onPress: () => confirmarApagar(lote) },
-    ]);
+  /** O menu do lote, UMA lista para o toque longo e o arrasto (abrir é o toque curto). */
+  const acoesDoLote = (lote: ImportBatchSummary): ItemAction[] => [
+    {
+      label: lote.pendentes > 0 ? 'Retomar a revisão' : 'Ver os itens',
+      arrasto: 'fora',
+      onPress: () => abrir(lote),
+    },
+    { label: 'Apagar registro', destructive: true, arrasto: 'esquerda', onPress: () => confirmarApagar(lote) },
+  ];
+  const acoes = (lote: ImportBatchSummary) => showItemActions(lote.filename ?? 'Extrato', acoesDoLote(lote));
 
   return (
     <Screen
@@ -187,6 +190,7 @@ export default function ImportHistoryScreen() {
                 entering={FadeInDown.duration(Motion.duration.base).delay(
                   Math.min(index * Motion.stagger.step, Motion.stagger.cap),
                 )}>
+                <Deslizavel titulo={lote.filename ?? 'Extrato'} acoes={acoesDoLote(lote)}>
                 <Row
                   title={encurta(lote.filename ?? 'Extrato')}
                   subtitle={detalhes.join(' · ')}
@@ -205,6 +209,7 @@ export default function ImportHistoryScreen() {
                   onPress={() => abrir(lote)}
                   onLongPress={() => acoes(lote)}
                 />
+                </Deslizavel>
               </Animated.View>
             );
           })}

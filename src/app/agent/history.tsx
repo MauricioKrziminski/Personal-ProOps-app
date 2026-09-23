@@ -5,6 +5,7 @@ import { StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { ConversationRow } from '@/components/agent/conversation-row';
+import { Deslizavel } from '@/components/ui/deslizavel';
 import { AgentHistoryHeader } from '@/components/agent/agent-history-header';
 import { RenameConversationSheet } from '@/components/agent/rename-conversation-sheet';
 import { ThemedText } from '@/components/themed-text';
@@ -21,7 +22,7 @@ import {
   useRenameAgentConversation,
 } from '@/hooks/use-agent-chat';
 import type { AgentConversation } from '@/lib/agent-api';
-import { confirmDestructive, showItemActions } from '@/lib/item-actions';
+import { confirmDestructive, showItemActions, type ItemAction } from '@/lib/item-actions';
 
 export default function AgentHistoryScreen() {
   const toast = useToast();
@@ -43,20 +44,20 @@ export default function AgentHistoryScreen() {
   const abrir = useCallback((id: string) => router.push(`/agent/${id}`), []);
   const nova = useCallback(() => router.replace('/agent/new'), []);
 
-  const pedirAcao = useCallback(
-    (id: string) => {
-      const conversa = conversas.find((c) => c.id === id);
-      if (!conversa) return;
-      showItemActions(conversa.title, [
+  /** O menu da conversa, UMA lista para o toque longo e o arrasto. */
+  const acoesDaConversa = useCallback(
+    (conversa: AgentConversation): ItemAction[] => [
         {
           label: 'Renomear',
           icon: 'pencil',
+          arrasto: 'direita',
           onPress: () => setRenomeando(conversa),
         },
         {
           label: 'Apagar',
           icon: 'trash',
           destructive: true,
+          arrasto: 'esquerda',
           onPress: () =>
             confirmDestructive(
               'Excluir conversa?',
@@ -71,23 +72,32 @@ export default function AgentHistoryScreen() {
               'O histórico e as confirmações pendentes desta conversa serão apagados.',
             ),
         },
-      ]);
+      ],
+    [excluir, toast],
+  );
+  const pedirAcao = useCallback(
+    (id: string) => {
+      const conversa = conversas.find((c) => c.id === id);
+      if (conversa) showItemActions(conversa.title, acoesDaConversa(conversa));
     },
-    [conversas, excluir, toast],
+    [conversas, acoesDaConversa],
   );
 
   const renderConversa = useCallback(
     ({ item }: { item: AgentConversation }) => (
-      <ConversationRow
-        id={item.id}
-        title={item.title}
-        preview={item.preview ?? null}
-        updatedAt={item.last_message_at}
-        onOpen={abrir}
-        onLongPress={pedirAcao}
-      />
+      // O arrasto fica por FORA da linha `memo`: as props dela continuam estáveis.
+      <Deslizavel titulo={item.title} acoes={acoesDaConversa(item)}>
+        <ConversationRow
+          id={item.id}
+          title={item.title}
+          preview={item.preview ?? null}
+          updatedAt={item.last_message_at}
+          onOpen={abrir}
+          onLongPress={pedirAcao}
+        />
+      </Deslizavel>
     ),
-    [abrir, pedirAcao],
+    [abrir, pedirAcao, acoesDaConversa],
   );
   const atualizar = useCallback(() => {
     setPuxando(true);

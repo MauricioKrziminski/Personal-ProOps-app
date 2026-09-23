@@ -12,7 +12,7 @@ const require = createRequire(import.meta.url);
 
 // Execute the screen JSX and its event handlers. Native components/query boundaries
 // are inert; state persists across renders so each interaction uses current props.
-function screen(file: string, options: { tablet?: boolean; debts?: any[]; archivedDebts?: any[]; debtSchedule?: any[]; invoiceStatus?: string; create?: boolean; monthLines?: any[]; monthSummary?: any; cycleLines?: any[]; cycleRow?: any; rangeError?: boolean; rangePending?: boolean; rangePendingMonths?: string[]; bills?: any[]; billsError?: boolean; charges?: any[]; reminders?: any[]; budgets?: any[]; setupPassos?: any[]; proximo?: any; activity?: any[]; activityError?: boolean; forecastAccounts?: any[]; anticipation?: any[] | ((pagarEm: string) => any[]); cards?: any[]; params?: Record<string, string>; plan?: string; planPending?: boolean; txStatus?: string; recent?: any[] } = {}) {
+function screen(file: string, options: { tablet?: boolean; debts?: any[]; archivedDebts?: any[]; debtSchedule?: any[]; invoiceStatus?: string; create?: boolean; monthLines?: any[]; monthSummary?: any; cycleLines?: any[]; cycleRow?: any; rangeError?: boolean; rangePending?: boolean; rangePendingMonths?: string[]; bills?: any[]; billsError?: boolean; charges?: any[]; reminders?: any[]; budgets?: any[]; setupPassos?: any[]; proximo?: any; activity?: any[]; activityError?: boolean; forecastAccounts?: any[]; anticipation?: any[] | ((pagarEm: string) => any[]); cards?: any[]; params?: Record<string, string>; plan?: string; planPending?: boolean; txStatus?: string; recent?: any[]; rules?: any[] } = {}) {
   const state: any[] = [];
   let cursor = 0;
   let nodes: any[] = [];
@@ -38,6 +38,7 @@ function screen(file: string, options: { tablet?: boolean; debts?: any[]; archiv
     useCardSummary: () => ({ ...query, isSuccess: true, data: options.cards ?? [] }),
     // Só responde quando o teste dá os lançamentos: respondido e vazio, o Financeiro afirmaria
     // "Ainda não tem movimento", e o teste das bordas falhando depende de ele NÃO afirmar.
+    useRules: () => ({ ...query, isSuccess: true, data: options.rules ?? [] }),
     useRecentTransactions: () => (options.recent ? { ...query, isSuccess: true, data: options.recent } : query),
     usePlanStatus: () => options.planPending
       ? { ...query, isPending: true, data: undefined }
@@ -226,7 +227,7 @@ function screen(file: string, options: { tablet?: boolean; debts?: any[]; archiv
         concealText: () => '••••••',
         useBRL: () => (cents: number) => `R$ ${(cents / 100).toFixed(2)}`,
       };
-      if (name === '@/design/tokens') return { Motion: { duration: {}, stagger: {} }, Space: {}, Radius: {}, tabular: {}, Elevation: { light: {}, dark: {} } };
+      if (name === '@/design/tokens') return { Motion: { duration: {}, stagger: {} }, Space: {}, Radius: {}, tabular: {}, Elevation: { light: {}, dark: {} }, Type: new Proxy({}, { get: () => ({}) }) };
       return new Proxy({}, { get: (_, key) => String(key) });
     } });
     return module.exports;
@@ -1172,4 +1173,18 @@ test('Contas: a conta arrasta Editar e Arquivar (Ver extrato é o toque)', () =>
   const [link] = itemLinks(ui);
   assert.ok(link, 'a conta está num ItemLink');
   assert.deepEqual(ladosDoLink(link), { direita: ['Editar'], esquerda: ['Arquivar'], mais: false, pontaDireita: null, pontaEsquerda: null });
+});
+
+test('Projeção: a conta prevista arrasta Paguei à direita e Editar à esquerda', () => {
+  const ui = screen(forecastFile, { forecastAccounts: [{ id: 'conta-1' }], bills: [{ ref_id: 'b1', title: 'Aluguel', kind: 'expense', amount_cents: 180000, due_date: '2026-10-05', overdue: false }] });
+  const card = deslizaveis(ui).find((n: any) => n.props.titulo === 'Aluguel');
+  assert.ok(card, 'a conta prevista está num Deslizavel');
+  assert.deepEqual(ladosDe(card), { direita: ['Paguei'], esquerda: ['Editar'], mais: false, pontaDireita: null, pontaEsquerda: null });
+});
+
+test('Regras: a regra arrasta Editar e Apagar', () => {
+  const ui = screen('src/app/finance/rules.tsx', { rules: [{ id: 'r1', pattern: 'ifood', category: 'restaurante', match_type: 'contains', account_id: null, hits: 3, source: 'user' }] });
+  const [card] = deslizaveis(ui);
+  assert.ok(card, 'a regra está num Deslizavel');
+  assert.deepEqual(ladosDe(card), { direita: ['Editar'], esquerda: ['Apagar'], mais: false, pontaDireita: null, pontaEsquerda: null });
 });

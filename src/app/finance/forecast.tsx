@@ -17,6 +17,7 @@ import { Icon } from '@/components/ui/icon';
 import { Money } from '@/components/ui/money';
 import { Row, Section } from '@/components/ui/row';
 import { Screen } from '@/components/ui/screen';
+import { Deslizavel } from '@/components/ui/deslizavel';
 import { HeroLabel } from '@/components/ui/section-head';
 import { Segmented } from '@/components/ui/segmented';
 import { MonthRuler, useMonthRuler } from '@/components/finance/month-ruler';
@@ -51,7 +52,7 @@ import {
   localISODate,
   somaDias,
 } from '@/lib/dates';
-import { showItemActions } from '@/lib/item-actions';
+import { showItemActions, type ItemAction } from '@/lib/item-actions';
 import {
   agruparHipoteses,
   draftsDoAdiantamento,
@@ -404,9 +405,33 @@ export default function ForecastScreen() {
     const receita = b.kind === 'income';
     const cents = Number(b.amount_cents);
 
+    // Fatura e dívida não têm menu (o toque leva à tela delas); o lançamento avulso tem, e o
+    // arrasto usa a MESMA lista (spec 2026-09-23-arrastar-card).
+    const acoesDoPrevisto: ItemAction[] =
+      fatura || parcelaDeDivida
+        ? []
+        : [
+            {
+              // Um rótulo só para a mesma intenção (design.md §10): o menu de Lançamentos
+              // diz "Paguei", e o cabeçalho do sheet já nomeia o item — repetir o nome
+              // aqui escrevia "Paguei: Aluguel" embaixo de "Aluguel".
+              label: settleLabel(receita ? 'income' : 'expense'),
+              icon: 'checkmark.circle',
+              arrasto: 'direita',
+              onPress: () => pagar(b.ref_id, b.title, b.kind),
+            },
+            {
+              label: 'Editar',
+              icon: 'pencil',
+              arrasto: 'esquerda',
+              onPress: () =>
+                router.push({ pathname: '/finance/transaction-form', params: { id: b.ref_id } }),
+            },
+          ];
+
     return (
+      <Deslizavel key={b.ref_id} titulo={b.title} acoes={acoesDoPrevisto}>
       <Row
-        key={b.ref_id}
         title={b.title}
         subtitle={
           b.overdue
@@ -428,27 +453,7 @@ export default function ForecastScreen() {
               ? () => router.push('/finance/debts')
               : () => router.push({ pathname: '/finance/[txId]', params: { txId: b.ref_id } })
         }
-        onLongPress={
-          fatura || parcelaDeDivida
-            ? undefined
-            : () =>
-                showItemActions(b.title, [
-                  {
-                    // Um rótulo só para a mesma intenção (design.md §10): o menu de Lançamentos
-                    // diz "Paguei", e o cabeçalho do sheet já nomeia o item — repetir o nome
-                    // aqui escrevia "Paguei: Aluguel" embaixo de "Aluguel".
-                    label: settleLabel(receita ? 'income' : 'expense'),
-                    icon: 'checkmark.circle',
-                    onPress: () => pagar(b.ref_id, b.title, b.kind),
-                  },
-                  {
-                    label: 'Editar',
-                    icon: 'pencil',
-                    onPress: () =>
-                      router.push({ pathname: '/finance/transaction-form', params: { id: b.ref_id } }),
-                  },
-                ])
-        }
+        onLongPress={acoesDoPrevisto.length ? () => showItemActions(b.title, acoesDoPrevisto) : undefined}
         // ⚠️ **Só o valor fica na linha — a ação mora no toque e no menu.** Os três botões
         // que ficavam aqui não faziam nada que a própria linha já não fizesse: "Pagar fatura"
         // e "Ver dívida" repetiam literalmente o `onPress` acima, e dar baixa já está no menu
@@ -466,6 +471,7 @@ export default function ForecastScreen() {
           />
         }
       />
+      </Deslizavel>
     );
   };
 

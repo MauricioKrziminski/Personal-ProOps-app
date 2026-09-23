@@ -18,6 +18,7 @@ import { Icon } from '@/components/ui/icon';
 import { Money } from '@/components/ui/money';
 import { Row, Section } from '@/components/ui/row';
 import { Screen } from '@/components/ui/screen';
+import { Deslizavel } from '@/components/ui/deslizavel';
 import { HeroLabel, SectionHead } from '@/components/ui/section-head';
 import { Skeleton, SkeletonRow } from '@/components/ui/skeleton';
 import { ProgressBar } from '@/components/ui/sparkline';
@@ -32,7 +33,7 @@ import {
   type Goal,
 } from '@/hooks/use-finance';
 import { brToISO, formatBRL, isValidBRDate, isoToBR, localISODate } from '@/lib/dates';
-import { confirmDestructive, showItemActions } from '@/lib/item-actions';
+import { confirmDestructive, showItemActions, type ItemAction } from '@/lib/item-actions';
 import { useAdaptiveWindow } from '@/hooks/use-adaptive-window';
 import { transicaoDeLayout } from '@/components/motion/transicao';
 
@@ -505,28 +506,26 @@ export default function GoalsScreen() {
               <Section
                 key={mes}
                 title={`${new Date(Number(mes.slice(0, 4)), Number(mes.slice(5, 7)) - 1, 1).toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' })} · ${brl(grupo.total)}`}>
-                {(grupo.itens ?? []).map((c) => (
+                {(grupo.itens ?? []).map((c) => {
+                  // O aporte só tem "Desfazer": ele vai à esquerda, e o toque longo lê a mesma lista.
+                  const acoesDoAporte: ItemAction[] = extrato
+                    ? [{ label: 'Desfazer', destructive: true, arrasto: 'esquerda', onPress: () => desfazerAporte(extrato, Number(c.amount_cents)) }]
+                    : [];
+                  return (
+                  <Deslizavel key={c.id} titulo={isoToBR(c.occurred_at)} acoes={acoesDoAporte}>
                   <Row
-                    key={c.id}
                     title={isoToBR(c.occurred_at)}
                     subtitle={c.note ?? undefined}
                     chevron={false}
                     accessibilityLabel={`${isoToBR(c.occurred_at)}, ${Number(c.amount_cents) < 0 ? 'retirada' : 'depósito'} de ${formatBRL(Math.abs(Number(c.amount_cents)))}`}
-                    onLongPress={() =>
-                      extrato &&
-                      showItemActions(isoToBR(c.occurred_at), [
-                        {
-                          label: 'Desfazer',
-                          destructive: true,
-                          onPress: () => desfazerAporte(extrato, Number(c.amount_cents)),
-                        },
-                      ])
-                    }
+                    onLongPress={acoesDoAporte.length ? () => showItemActions(isoToBR(c.occurred_at), acoesDoAporte) : undefined}
                     trailing={
                       <Money cents={Number(c.amount_cents)} variant="ticker" tone="auto" signed />
                     }
                   />
-                ))}
+                  </Deslizavel>
+                  );
+                })}
               </Section>
             ))}
 

@@ -19,6 +19,8 @@ import { Field, TextField } from '@/components/ui/field';
 import { Icon } from '@/components/ui/icon';
 import { Row, Section } from '@/components/ui/row';
 import { Screen } from '@/components/ui/screen';
+import { showItemActions, type ItemAction } from '@/lib/item-actions';
+import { Deslizavel } from '@/components/ui/deslizavel';
 import { SkeletonRow } from '@/components/ui/skeleton';
 import { useToast } from '@/components/ui/toast';
 import { HitTarget, Motion, Radius, Space, tabular } from '@/design/tokens';
@@ -216,40 +218,36 @@ export default function FoldersScreen() {
     );
   };
 
-  const showActions = (folder: NoteFolder) => {
-    Haptics.selectionAsync();
-    actionSheet(
+  const fixar = (folder: NoteFolder) => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    updateFolder.mutate(
+      { id: folder.id, pinned: !folder.pinned },
       {
-        title: folder.name,
-        message: notesLabel(folder.notes_count),
-        options: [
-          'Renomear ou trocar ícone',
-          'Cor',
-          'Tags',
-          folder.pinned ? 'Desafixar' : 'Fixar',
-          'Mover para dentro de…',
-          'Arquivar',
-          'Apagar',
-        ],
-        destructiveIndex: 6,
-      },
-      (index) => {
-        if (index === 0) startEdit(folder);
-        if (index === 1) setPintando(folder);
-        if (index === 2) setEtiquetando(folder);
-        if (index === 3) {
-          Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-          updateFolder.mutate(
-            { id: folder.id, pinned: !folder.pinned },
-            { onError: () => toast({ message: 'Não deu para fixar a pasta.', tone: 'error' }) }
-          );
-        }
-        if (index === 4) moverPara(folder);
-        if (index === 5) arquivar(folder);
-        if (index === 6) confirmDelete(folder);
+        // Com "Desfazer": é o que deixa fixar valer ao arrastar até o fim (Deslizavel).
+        onSuccess: () =>
+          toast({
+            message: folder.pinned ? `«${folder.name}» desafixada.` : `«${folder.name}» fixada.`,
+            tone: 'success',
+            action: { label: 'Desfazer', onPress: () => updateFolder.mutate({ id: folder.id, pinned: folder.pinned }) },
+          }),
+        onError: () => toast({ message: 'Não deu para fixar a pasta.', tone: 'error' }),
       }
     );
   };
+
+  /** O menu da pasta, UMA lista para o toque (longo ou curto) e o arrasto. */
+  const acoesDaPasta = (folder: NoteFolder): ItemAction[] => [
+    { label: 'Renomear ou trocar ícone', onPress: () => startEdit(folder) },
+    { label: 'Cor', onPress: () => setPintando(folder) },
+    { label: 'Tags', onPress: () => setEtiquetando(folder) },
+    { label: folder.pinned ? 'Desafixar' : 'Fixar', arrasto: 'direita', desfaz: true, onPress: () => fixar(folder) },
+    { label: 'Mover para dentro de…', onPress: () => moverPara(folder) },
+    { label: 'Arquivar', arrasto: 'esquerda', desfaz: true, onPress: () => arquivar(folder) },
+    { label: 'Apagar', destructive: true, onPress: () => confirmDelete(folder) },
+  ];
+
+  const showActions = (folder: NoteFolder) =>
+    showItemActions(folder.name, acoesDaPasta(folder), notesLabel(folder.notes_count));
 
   /**
    * Em ÁRVORE, não em ordem alfabética plana: sem isto "Trabalho / 2026" apareceria a três telas
@@ -359,6 +357,7 @@ export default function FoldersScreen() {
               entering={FadeInDown.duration(Motion.duration.slow).delay(
                 Math.min(index * Motion.stagger.step, Motion.stagger.cap)
               )}>
+              <Deslizavel titulo={folder.name} acoes={acoesDaPasta(folder)}>
               <Row
                 title={folder.name}
                 icon={symbol(folder.icon)}
@@ -386,6 +385,7 @@ export default function FoldersScreen() {
                 onPress={() => showActions(folder)}
                 onLongPress={() => showActions(folder)}
               />
+              </Deslizavel>
             </Animated.View>
           ))}
         </Section>
