@@ -248,6 +248,13 @@ export default function CardsScreen() {
               onPress={() => irParaFatura(card)}
               acoes={[
                 { nome: 'carteira', rotulo: 'Abrir na carteira', onPress: () => abrirNaCarteira(card) },
+                // A fatura do banco entra por aqui, com o cartão já escolhido (23/09/2026: *"meu
+                // pai não sabia como importar a fatura"* — não havia caminho a partir do cartão).
+                {
+                  nome: 'importar',
+                  rotulo: 'Importar fatura',
+                  onPress: () => router.push({ pathname: '/import', params: { conta: card.account_id } }),
+                },
                 ...(podePagar && totalFatura > 0
                   ? [{ nome: 'paguei', rotulo: 'Paguei', onPress: () => irParaFatura(card) }]
                   : []),

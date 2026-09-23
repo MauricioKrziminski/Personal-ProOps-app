@@ -507,6 +507,12 @@ export default function InvoiceScreen() {
                   onPress: () => router.push('/finance/invoices'),
                 },
                 {
+                  // De onde a fatura mora, com o cartão já escolhido (23/09/2026).
+                  label: 'Importar fatura',
+                  icon: 'square.and.arrow.down',
+                  onPress: () => router.push({ pathname: '/import', params: { conta: fatura.account_id } }),
+                },
+                {
                   label: 'Marcar como paga (sem mexer no saldo)',
                   icon: 'checkmark.circle',
                   disabled: paga,

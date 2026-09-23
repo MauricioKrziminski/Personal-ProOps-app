@@ -41,6 +41,7 @@ import {
   useDeleteTransaction,
   useApplyImportToExisting,
   useImportStatement,
+  usePlanStatus,
   useUpdateImportItem,
   type ImportItem,
 } from '@/hooks/use-finance';
@@ -135,7 +136,8 @@ export default function ImportScreen() {
   const toast = useToast();
   const brl = useBRL();
   const insets = useSafeAreaInsets();
-  const params = useLocalSearchParams<{ batch?: string }>();
+  // `conta`: quem chega pela fatura, pelos Cartões ou pelo Próximo passo já vem com o cartão.
+  const params = useLocalSearchParams<{ batch?: string; conta?: string }>();
 
   const accountsQuery = useAccounts();
   const accounts = accountsQuery.data;
@@ -144,7 +146,21 @@ export default function ImportScreen() {
   const { semTrancar } = useLock();
   const apagarLancamento = useDeleteTransaction();
   const [batchId, setBatchId] = useState<string | undefined>(params.batch);
-  const [accountId, setAccountId] = useState<string | null>(null);
+  /** `undefined` = a pessoa ainda não escolheu nesta tela; aí vale a conta que veio no link. */
+  const [contaEscolhida, setAccountId] = useState<string | null | undefined>(undefined);
+  // Id do link que não é uma conta da pessoa é ignorado — nunca pré-escolhe o que ela não tem.
+  const accountId =
+    contaEscolhida !== undefined
+      ? contaEscolhida
+      : params.conta && (accounts ?? []).some((a) => a.id === params.conta)
+        ? params.conta
+        : null;
+  /**
+   * O aviso do Pro vem ANTES do arquivo (23/09/2026). O 402 só chegava depois de escolher a conta
+   * e o arquivo — o Free descobria no fim que a porta estava fechada.
+   */
+  const plano = usePlanStatus();
+  const semPro = plano.data?.plan === 'free';
   const [falha, setFalha] = useState<FalhaImport | null>(null);
   const [editando, setEditando] = useState<ImportItem | null>(null);
   /** `null` = ainda a seleção sugerida (`selecaoInicial`); tocar numa linha a torna explícita. */
@@ -354,6 +370,16 @@ export default function ImportScreen() {
           </Card>
         ) : null}
 
+        {semPro ? (
+          <Card style={styles.falha}>
+            <ThemedText type="smallBold">Importar é do plano Pro</ThemedText>
+            <ThemedText type="small" themeColor="textSecondary">
+              No Free dá para registrar pelo WhatsApp e pelo agente à vontade.
+            </ThemedText>
+            <Button label="Ver planos" variant="secondary" size="sm" onPress={() => router.push('/paywall')} />
+          </Card>
+        ) : null}
+
         {accountsQuery.isPending ? (
           <>
             <SkeletonRow />
@@ -383,7 +409,7 @@ export default function ImportScreen() {
           label={importar.isPending ? 'Lendo o arquivo…' : 'Escolher arquivo'}
           icon="doc.badge.plus"
           loading={importar.isPending}
-          disabled={!accountId}
+          disabled={!accountId || semPro}
           onPress={escolherArquivo}
           block
         />
