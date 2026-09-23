@@ -100,3 +100,77 @@ test('progresso conta só os itens marcáveis', () => {
   assert.deepEqual(todoProgress(nota), { done: 1, total: 2 });
   assert.deepEqual(todoProgress('sem item nenhum'), { done: 0, total: 0 });
 });
+
+// ── o editor: título em campo próprio (23/09/2026) ─────────────────────────────────
+
+test('separarTitulo: parágrafo e "# título" viram título; lista não', async () => {
+  const { separarTitulo } = await import('./note-blocks.ts');
+  assert.deepEqual(separarTitulo('Compras\n- leite'), { titulo: 'Compras', corpo: '- leite' });
+  assert.deepEqual(separarTitulo('# Reunião de segunda\ntexto'), { titulo: 'Reunião de segunda', corpo: 'texto' });
+  assert.deepEqual(separarTitulo('- [ ] leite\n- [ ] ovos'), { titulo: '', corpo: '- [ ] leite\n- [ ] ovos' });
+  assert.deepEqual(separarTitulo('\nsó corpo'), { titulo: '', corpo: 'só corpo' });
+  assert.deepEqual(separarTitulo('Só título'), { titulo: 'Só título', corpo: '' });
+  assert.deepEqual(separarTitulo(''), { titulo: '', corpo: '' });
+});
+
+test('juntarTitulo desfaz separarTitulo — nada pula de campo ao reabrir', async () => {
+  const { separarTitulo, juntarTitulo } = await import('./note-blocks.ts');
+  const casos: [string, string][] = [
+    ['Compras', '- leite\n- ovos'],
+    ['Só título', ''],
+    ['', '- [ ] leite'],
+    // sem título e corpo em parágrafo: a 1ª linha do corpo NÃO pode virar título ao reabrir
+    ['', 'comprar pão\nleite'],
+    ['', '# seção'],
+    ['', ''],
+    ['Título', '\ncom linha em branco'],
+  ];
+  for (const [titulo, corpo] of casos) {
+    assert.deepEqual(separarTitulo(juntarTitulo(titulo, corpo)), { titulo, corpo }, JSON.stringify([titulo, corpo]));
+  }
+});
+
+test('juntarTitulo nunca deixa quebra de linha entrar no título', async () => {
+  const { juntarTitulo } = await import('./note-blocks.ts');
+  assert.equal(juntarTitulo('linha um\nlinha dois', 'corpo'), 'linha um linha dois\ncorpo');
+});
+
+// ── Enter numa lista continua a lista ──────────────────────────────────────────────
+
+test('Enter depois de um item abre o próximo do mesmo tipo', async () => {
+  const { continuarLista } = await import('./note-blocks.ts');
+  assert.deepEqual(continuarLista('- leite', '- leite\n'), { texto: '- leite\n- ', cursor: 10 });
+  assert.deepEqual(continuarLista('* pão', '* pão\n'), { texto: '* pão\n* ', cursor: 8 });
+  // marcado vira desmarcado: o item novo ainda não foi feito
+  assert.deepEqual(continuarLista('- [x] feito', '- [x] feito\n'), { texto: '- [x] feito\n- [ ] ', cursor: 18 });
+  assert.deepEqual(continuarLista('1. um', '1. um\n'), { texto: '1. um\n2. ', cursor: 9 });
+  assert.deepEqual(continuarLista('9) nove', '9) nove\n'), { texto: '9) nove\n10) ', cursor: 12 });
+  // o recuo é preservado
+  assert.deepEqual(continuarLista('  - sub', '  - sub\n'), { texto: '  - sub\n  - ', cursor: 12 });
+});
+
+test('Enter no meio da nota, no meio de um item, ou com autocorretor junto', async () => {
+  const { continuarLista } = await import('./note-blocks.ts');
+  // no meio do texto: o resto continua depois do marcador novo
+  assert.deepEqual(continuarLista('- a\n- c', '- a\n\n- c'), { texto: '- a\n- \n- c', cursor: 6 });
+  // o Enter cai no meio do item: a metade de baixo ganha o marcador
+  assert.deepEqual(continuarLista('- leite ovos', '- leite\n ovos'), { texto: '- leite\n-  ovos', cursor: 10 });
+  // Gboard confirma a palavra corrigida e o Enter na mesma edição
+  assert.deepEqual(continuarLista('- leit', '- leite\n'), { texto: '- leite\n- ', cursor: 10 });
+});
+
+test('Enter num item vazio sai da lista', async () => {
+  const { continuarLista } = await import('./note-blocks.ts');
+  assert.deepEqual(continuarLista('- leite\n- ', '- leite\n- \n'), { texto: '- leite\n', cursor: 8 });
+  assert.deepEqual(continuarLista('- [ ] ', '- [ ] \n'), { texto: '', cursor: 0 });
+});
+
+test('fora de lista, colando várias linhas ou digitando letra, nada muda', async () => {
+  const { continuarLista } = await import('./note-blocks.ts');
+  assert.equal(continuarLista('texto', 'texto\n'), null);
+  assert.equal(continuarLista('- a', '- a\nb\nc\n'), null);
+  assert.equal(continuarLista('- a', '- ab'), null);
+  assert.equal(continuarLista('- a\n', '- a'), null);
+  // divisória não é lista
+  assert.equal(continuarLista('---', '---\n'), null);
+});

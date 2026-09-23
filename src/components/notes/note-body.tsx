@@ -29,7 +29,8 @@ export function NoteBody({
   onEdit: () => void;
   onToggleLine: (index: number) => void;
 }) {
-  const blocos = noteBlocks(content);
+  // O título mora no campo de cima (`notes/[id].tsx`): aqui é só o corpo.
+  const blocos = noteBlocks(content, { comTitulo: false });
 
   return (
     <Pressable
@@ -40,7 +41,7 @@ export function NoteBody({
       onPress={onEdit}
       style={styles.corpo}>
       {blocos.length === 0 ? (
-        <ThemedText type="subtitle" themeColor="textSecondary">
+        <ThemedText themeColor="textSecondary">
           Escreve alguma coisa…
         </ThemedText>
       ) : (

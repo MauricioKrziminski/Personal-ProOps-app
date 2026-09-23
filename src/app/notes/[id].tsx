@@ -1,6 +1,7 @@
-import { Stack, router, useLocalSearchParams } from 'expo-router';
+import { Stack, router, useLocalSearchParams, useNavigation } from 'expo-router';
+import { usePreventRemove } from 'expo-router/react-navigation';
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { Pressable, StyleSheet, TextInput, View } from 'react-native';
+import { Keyboard, Pressable, StyleSheet, TextInput, View } from 'react-native';
 import Animated, { FadeIn, FadeOut } from 'react-native-reanimated';
 import { KeyboardAwareScrollView, KeyboardStickyView } from 'react-native-keyboard-controller';
 import * as Haptics from 'expo-haptics';
@@ -21,7 +22,7 @@ import { Screen } from '@/components/ui/screen';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useToast } from '@/components/ui/toast';
 import { MaxContentWidth } from '@/constants/theme';
-import { HitTarget, Motion, Radius, Space, Type } from '@/design/tokens';
+import { HitTarget, Motion, Radius, Space, Type, tabular } from '@/design/tokens';
 import {
   useNote,
   useNoteFolders,
@@ -31,17 +32,21 @@ import {
   useTrashNote,
 } from '@/hooks/use-notes';
 import { useScheme, useTheme } from '@/hooks/use-theme';
+import { useNoteReminder } from '@/hooks/use-items';
 import { useAdaptiveWindow } from '@/hooks/use-adaptive-window';
 import { noteInk } from '@/design/note-colors';
-import { relativeBR } from '@/lib/dates';
-import {
-  addTag,
-  noteTitle,
-  removeTag,
-  tagsOf,
-} from '@/lib/search';
+import { horaBR, localISODate, relativeBR, rotuloDoDia } from '@/lib/dates';
+import { addTag, noteTitle, removeTag, tagsOf } from '@/lib/search';
 import { showItemActions } from '@/lib/item-actions';
-import { setBlockKind, lineAt, toggleTodo, type BlockKind } from '@/lib/note-blocks';
+import {
+  continuarLista,
+  juntarTitulo,
+  lineAt,
+  separarTitulo,
+  setBlockKind,
+  toggleTodo,
+  type BlockKind,
+} from '@/lib/note-blocks';
 import { toggleMark, type Mark } from '@/lib/note-inline';
 import { skipReason } from '@/lib/notes-autosave';
 
@@ -59,6 +64,12 @@ import { skipReason } from '@/lib/notes-autosave';
  */
 
 const AUTOSAVE_MS = 800;
+
+/** "Amanhã, 09:00" — quando o lembrete da nota toca, no idioma da agenda. */
+function quandoToca(iso: string): string {
+  const dia = rotuloDoDia(localISODate(new Date(iso)));
+  return `${dia.charAt(0).toUpperCase()}${dia.slice(1)}, ${horaBR(iso)}`;
+}
 
 /** `note_folders.icon` é texto livre no banco; aqui vira nome de SF Symbol com queda para `folder`. */
 function symbol(icon: string | null | undefined): SymbolViewProps['name'] {
@@ -104,7 +115,14 @@ export default function NoteDetailScreen() {
   const trash = useTrashNote();
   const updateNote = useUpdateNote();
 
-  const [content, setContent] = useState('');
+  /**
+   * A nota em duas partes — o TÍTULO, com campo próprio (como no Notes do iPhone), e o CORPO.
+   * O dado continua sendo um `content` só (`juntarTitulo`): primeira linha = título, que é o que o
+   * WhatsApp, a busca e a lista sempre leram.
+   */
+  const [nota, setNota] = useState({ titulo: '', corpo: '' });
+  const content = juntarTitulo(nota.titulo, nota.corpo);
+  const tituloRef = useRef<TextInput>(null);
   /**
    * Nota criada de DENTRO de uma pasta já nasce nela (`/notes/new?folder=<id>`).
    *
@@ -115,7 +133,8 @@ export default function NoteDetailScreen() {
   const [folderId, setFolderId] = useState<string | null>(
     params.id === 'new' ? (params.folder ?? null) : null
   );
-  const [editing, setEditing] = useState(() => params.id === 'new');
+  /** O CORPO em edição. Nota nova começa pelo título (é ele que leva o foco), não pelo corpo. */
+  const [editing, setEditing] = useState(false);
   /** Onde o cursor está, em caracteres. Só a barra de blocos lê — não precisa re-renderizar. */
   const cursorRef = useRef(0);
   const inputRef = useRef<TextInput>(null);
@@ -143,15 +162,28 @@ export default function NoteDetailScreen() {
   const saving = useRef(false);
   const dirty = useRef(false);
   const trashed = useRef(false);
+  /**
+   * O texto de quando a nota foi ABERTA — é para ele que "Descartar edição" volta. O autosave vai
+   * gravando enquanto a pessoa apaga, então o último gravado já é um pedaço da nota.
+   */
+  const aoAbrir = useRef<string | null>(null);
   const latest = useRef({ content, folderId });
   const flashTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     if (hydrated.current || !note.data) return;
     hydrated.current = true;
-    setContent(note.data.content);
+    const partes = separarTitulo(note.data.content);
+    setNota(partes);
     setFolderId(note.data.folder_id);
-    persisted.current = { content: note.data.content, folderId: note.data.folder_id };
+    // O gravado, na forma que o editor vai escrever: "# Título" vira "Título", e uma linha em branco
+    // sobrando no começo some. Sem isto, só ABRIR a nota disparava um autosave — e a nota subia
+    // para o topo da lista, que é ordenada por `updated_at`.
+    persisted.current = {
+      content: juntarTitulo(partes.titulo, partes.corpo),
+      folderId: note.data.folder_id,
+    };
+    aoAbrir.current = persisted.current.content;
   }, [note.data]);
 
   const flashSaved = () => {
@@ -235,6 +267,67 @@ export default function NoteDetailScreen() {
 
   const creating = savedId === null;
   const tags = useMemo(() => tagsOf(content), [content]);
+  const lembrete = useNoteReminder(savedId);
+  const navigation = useNavigation();
+
+  /**
+   * ⚠️ **Nota que ficou VAZIA pergunta antes de sair** (23/09/2026). O autosave se recusa a
+   * esvaziar uma nota que tinha texto (`skipReason` → `would-empty`, a trava contra perda de dado)
+   * — certo, mas calado: a pessoa apagava tudo, saía, e a nota voltava com o texto antigo sem
+   * nenhuma explicação. Agora a saída pergunta: descartar a edição (o texto antigo fica) ou apagar
+   * a nota (lixeira, 30 dias). "Cancelar" continua editando.
+   *
+   * "Tinha texto" é o que o BANCO tem (`note.data`), não o ref do autosave: ref não se lê no render.
+   */
+  const esvaziou = !!savedId && content.trim() === '' && (note.data?.content ?? '').trim() !== '';
+  usePreventRemove(esvaziou, ({ data }) => {
+    if (trashed.current) {
+      navigation.dispatch(data.action);
+      return;
+    }
+    // O foco ainda está num dos campos: com o teclado de pé, ele cobria metade do aviso (e o
+    // "Cancelar" inteiro).
+    Keyboard.dismiss();
+    showItemActions(
+      'A nota ficou vazia',
+      [
+        {
+          label: 'Descartar edição',
+          onPress: () => {
+            const original = aoAbrir.current;
+            if (savedId && original && original !== persisted.current?.content) {
+              save.mutate(
+                { id: savedId, content: original, folder_id: folderId },
+                {
+                  onError: () =>
+                    toast({ message: 'Não deu para desfazer a edição da nota.', tone: 'error' }),
+                }
+              );
+            }
+            navigation.dispatch(data.action);
+          },
+        },
+        {
+          label: 'Apagar nota',
+          destructive: true,
+          onPress: () => {
+            const id = savedId;
+            if (!id) return;
+            trashed.current = true;
+            Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
+            trash.mutate(id, {
+              onError: () => {
+                trashed.current = false;
+                toast({ message: 'Não deu para mandar para a lixeira.', tone: 'error' });
+              },
+            });
+            navigation.dispatch(data.action);
+          },
+        },
+      ],
+      'Descartar volta a nota como estava quando você abriu. Apagar manda para a lixeira.'
+    );
+  });
   const tinta = noteInk(note.data?.color ?? null, scheme);
   const folder = folders.data?.find((f) => f.id === folderId);
 
@@ -277,36 +370,102 @@ export default function NoteDetailScreen() {
     );
   };
 
+  /**
+   * ⚠️ **Com lembrete, a nota oferece "Editar lembrete"** (23/09/2026, *"uma vez que eu criei o
+   * lembrete da nota, a opção tem que mudar"*). O vínculo é `reminders.note_id` (um por nota); a
+   * nota ainda não gravada é gravada ANTES, para o lembrete ter a quem apontar.
+   */
+  const abrirLembrete = async () => {
+    const existente = lembrete.data;
+    if (existente) {
+      router.push({ pathname: '/reminder-form', params: { id: existente.id } });
+      return;
+    }
+    await flushRef.current();
+    const noteId = idRef.current;
+    router.push({
+      pathname: '/reminder-form',
+      params: { title: noteTitle(content), ...(noteId ? { noteId } : {}) },
+    });
+  };
+
   const onMenu = () => {
     Haptics.selectionAsync();
     actionSheet(
       {
         title: noteTitle(content) || 'Nova nota',
-        options: ['Mover para pasta', 'Criar lembrete', 'Mandar para a lixeira'],
+        options: [
+          'Mover para pasta',
+          lembrete.data ? 'Editar lembrete' : 'Criar lembrete',
+          'Mandar para a lixeira',
+        ],
         destructiveIndex: 2,
       },
       (index) => {
         if (index === 0) setPickerOpen(true);
-        if (index === 1) {
-          void flushRef.current();
-          router.push({
-            pathname: '/reminder-form',
-            params: { title: noteTitle(content) },
-          });
-        }
+        if (index === 1) void abrirLembrete();
         if (index === 2) onTrash();
       }
     );
   };
 
-  const startEditing = () => {
-    setSelection({ start: content.length, end: content.length });
-    setEditing(true);
-  };
+  const startEditing = () => irParaOCorpo(nota.corpo.length);
 
   const onToggleLine = (lineIndex: number) => {
     Haptics.selectionAsync();
-    setContent((current) => toggleTodo(current, lineIndex));
+    // O índice é do CORPO: é ele que o `NoteBody` desenha.
+    setNota((n) => ({ ...n, corpo: toggleTodo(n.corpo, lineIndex) }));
+  };
+
+  /** Tag vale para a nota inteira: sai das duas partes; entra no fim do texto, como sempre. */
+  const tirarTag = (tag: string) =>
+    setNota((n) => ({ titulo: removeTag(n.titulo, tag).trim(), corpo: removeTag(n.corpo, tag) }));
+  const porTag = (tag: string) =>
+    setNota((n) =>
+      n.corpo || !n.titulo
+        ? { ...n, corpo: addTag(n.corpo, tag) }
+        : { ...n, titulo: addTag(n.titulo, tag) }
+    );
+
+  /**
+   * O título é UMA linha. Enter vai para o corpo (como no Notes); colar várias linhas deixa a
+   * primeira no título e o resto no começo do corpo.
+   *
+   * ⚠️ **O Enter chega aqui como "\n", não como `onSubmitEditing`** (23/09/2026). Com
+   * `returnKeyType="next"` o Android executa a ação IME "próximo" e move o foco por conta própria,
+   * disputando com o `autoFocus` do corpo: a primeira tecla depois do Enter sumia — um "-" e a
+   * lista inteira deixava de existir. Medido no emulador: "next" perdia o "-", o "\n" não perde.
+   */
+  const mudarTitulo = (texto: string) => {
+    const quebra = texto.indexOf('\n');
+    if (quebra < 0) {
+      setNota((n) => ({ ...n, titulo: texto }));
+      return;
+    }
+    const resto = texto.slice(quebra + 1);
+    setNota((n) => ({
+      titulo: texto.slice(0, quebra),
+      corpo: resto ? (n.corpo ? `${resto}\n${n.corpo}` : resto) : n.corpo,
+    }));
+    irParaOCorpo(0);
+  };
+
+  /** Do título para o corpo, com o cursor onde se pediu (Enter: começo; toque no vazio: fim). */
+  const irParaOCorpo = (onde: number) => {
+    setSelection({ start: onde, end: onde });
+    setEditing(true);
+  };
+
+  /** Enter numa lista continua a lista (`continuarLista`, com teste); o resto é digitação. */
+  const mudarCorpo = (novo: string) => {
+    const lista = continuarLista(nota.corpo, novo);
+    if (!lista) {
+      setNota((n) => ({ ...n, corpo: novo }));
+      return;
+    }
+    setNota((n) => ({ ...n, corpo: lista.texto }));
+    setSelection({ start: lista.cursor, end: lista.cursor });
+    cursorRef.current = lista.cursor;
   };
 
   /**
@@ -345,7 +504,12 @@ export default function NoteDetailScreen() {
               Ela pode ter ido para a lixeira em outro aparelho.
             </ThemedText>
             <View style={styles.errorActions}>
-              <Button label="Tentar de novo" variant="secondary" size="sm" onPress={() => note.refetch()} />
+              <Button
+                label="Tentar de novo"
+                variant="secondary"
+                size="sm"
+                onPress={() => note.refetch()}
+              />
               <Button label="Voltar para as notas" size="sm" onPress={() => router.back()} />
             </View>
           </View>
@@ -363,9 +527,9 @@ export default function NoteDetailScreen() {
    */
   const aplicarBloco = (kind: BlockKind) => {
     Haptics.selectionAsync();
-    setContent((atual) => {
-      const linha = lineAt(atual, cursorRef.current);
-      return linha < 0 ? atual : setBlockKind(atual, linha, kind);
+    setNota((n) => {
+      const linha = lineAt(n.corpo, cursorRef.current);
+      return linha < 0 ? n : { ...n, corpo: setBlockKind(n.corpo, linha, kind) };
     });
     inputRef.current?.focus();
   };
@@ -379,8 +543,8 @@ export default function NoteDetailScreen() {
    */
   const aplicarMarca = (mark: Mark) => {
     Haptics.selectionAsync();
-    const r = toggleMark(content, sel.start, sel.end, mark);
-    setContent(r.text);
+    const r = toggleMark(nota.corpo, sel.start, sel.end, mark);
+    setNota((n) => ({ ...n, corpo: r.text }));
     setSelection(r.selection);
     setSel(r.selection);
     cursorRef.current = r.selection.start;
@@ -426,10 +590,15 @@ export default function NoteDetailScreen() {
               hitSlop={6}
               onPress={() => {
                 Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                setContent((current) => removeTag(current, tag));
+                tirarTag(tag);
               }}
-              style={[styles.tagChip, { backgroundColor: vidro ? 'transparent' : theme.backgroundElement }]}>
-              {vidro ? <GlassBackdrop fallbackColor={theme.backgroundElement} radius={Radius.pill} /> : null}
+              style={[
+                styles.tagChip,
+                { backgroundColor: vidro ? 'transparent' : theme.backgroundElement },
+              ]}>
+              {vidro ? (
+                <GlassBackdrop fallbackColor={theme.backgroundElement} radius={Radius.pill} />
+              ) : null}
               <ThemedText type="footnote">#{tag}</ThemedText>
               <Icon name="xmark" size={12} color="textSecondary" />
             </Pressable>
@@ -469,13 +638,42 @@ export default function NoteDetailScreen() {
               Haptics.selectionAsync();
               setTagPickerOpen(true);
             }}
-            style={[styles.tagChip, { borderWidth: StyleSheet.hairlineWidth, borderColor: theme.separator }]}>
-            {vidro ? <GlassBackdrop fallbackColor={theme.backgroundElement} radius={Radius.pill} /> : null}
+            style={[
+              styles.tagChip,
+              { borderWidth: StyleSheet.hairlineWidth, borderColor: theme.separator },
+            ]}>
+            {vidro ? (
+              <GlassBackdrop fallbackColor={theme.backgroundElement} radius={Radius.pill} />
+            ) : null}
             <Icon name="plus" size={12} color="tint" />
             <ThemedText type="footnote" themeColor="tint">
               tag
             </ThemedText>
           </Pressable>
+
+          {/* O lembrete desta nota, quando existe e ainda vai tocar — tocar abre para editar. */}
+          {lembrete.data?.active ? (
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel={`Lembrete ${quandoToca(lembrete.data.next_run_at)}. Toque para editar.`}
+              hitSlop={6}
+              onPress={() => {
+                Haptics.selectionAsync();
+                void abrirLembrete();
+              }}
+              style={[
+                styles.tagChip,
+                { backgroundColor: vidro ? 'transparent' : theme.backgroundElement },
+              ]}>
+              {vidro ? (
+                <GlassBackdrop fallbackColor={theme.backgroundElement} radius={Radius.pill} />
+              ) : null}
+              <Icon name="bell" size={12} color="textSecondary" />
+              <ThemedText type="footnote" style={tabular}>
+                {quandoToca(lembrete.data.next_run_at)}
+              </ThemedText>
+            </Pressable>
+          ) : null}
 
           {savedFlash ? (
             <Animated.View
@@ -500,37 +698,58 @@ export default function NoteDetailScreen() {
             <Skeleton width="90%" height={Type.body.lineHeight} />
             <Skeleton width="45%" height={Type.body.lineHeight} />
           </View>
-        ) : editing ? (
-          <TextInput
-            ref={inputRef}
-            value={content}
-            onChangeText={setContent}
-            multiline
-            autoFocus
-            scrollEnabled={false}
-            selection={selection}
-            onSelectionChange={(e) => {
-              // O cursor é guardado para a barra de blocos saber em QUE linha aplicar. Sem isto
-              // ela só poderia agir na última linha, e converter um bloco do meio da nota
-              // exigiria descer até o fim e voltar.
-              cursorRef.current = e.nativeEvent.selection.start;
-              setSel(e.nativeEvent.selection);
-              setSelection(undefined);
-            }}
-            onBlur={() => {
-              setEditing(false);
-              void flushRef.current();
-            }}
-            placeholder="Escreve alguma coisa…"
-            placeholderTextColor={theme.textSecondary}
-            accessibilityLabel="Conteúdo da nota"
-            textAlignVertical="top"
-            style={[Type.body, styles.input, { color: theme.text }]}
-          />
         ) : (
-          <NoteBody content={content} onEdit={startEditing} onToggleLine={onToggleLine} />
+          <>
+            {/*
+            O TÍTULO tem campo próprio, grande e forte, como no Notes do iPhone — e o corpo começa
+            embaixo dele (23/09/2026). Uma linha só: Enter desce para o corpo. Na nota nova é ele
+            que leva o foco.
+          */}
+            <TextInput
+              ref={tituloRef}
+              value={nota.titulo}
+              onChangeText={mudarTitulo}
+              multiline
+              onBlur={() => void flushRef.current()}
+              autoFocus={params.id === 'new'}
+              scrollEnabled={false}
+              placeholder="Título"
+              placeholderTextColor={theme.textSecondary}
+              accessibilityLabel="Título da nota"
+              style={[Type.title, styles.titulo, { color: theme.text }]}
+            />
+            {editing ? (
+              <TextInput
+                ref={inputRef}
+                value={nota.corpo}
+                onChangeText={mudarCorpo}
+                multiline
+                autoFocus
+                scrollEnabled={false}
+                selection={selection}
+                onSelectionChange={(e) => {
+                  // O cursor é guardado para a barra de blocos saber em QUE linha aplicar. Sem isto
+                  // ela só poderia agir na última linha, e converter um bloco do meio da nota
+                  // exigiria descer até o fim e voltar.
+                  cursorRef.current = e.nativeEvent.selection.start;
+                  setSel(e.nativeEvent.selection);
+                  setSelection(undefined);
+                }}
+                onBlur={() => {
+                  setEditing(false);
+                  void flushRef.current();
+                }}
+                placeholder="Escreve alguma coisa…"
+                placeholderTextColor={theme.textSecondary}
+                accessibilityLabel="Conteúdo da nota"
+                textAlignVertical="top"
+                style={[Type.body, styles.input, { color: theme.text }]}
+              />
+            ) : (
+              <NoteBody content={nota.corpo} onEdit={startEditing} onToggleLine={onToggleLine} />
+            )}
+          </>
         )}
-
       </KeyboardAwareScrollView>
 
       {/*
@@ -546,7 +765,7 @@ export default function NoteDetailScreen() {
         <KeyboardStickyView>
           <View style={styles.blockBarWrap}>
             <FormatBar
-              content={content}
+              content={nota.corpo}
               selection={sel}
               onMark={aplicarMarca}
               onBlock={aplicarBloco}
@@ -560,11 +779,7 @@ export default function NoteDetailScreen() {
         alvo="nota"
         current={tags}
         onClose={() => setTagPickerOpen(false)}
-        onToggle={(tag) =>
-          setContent((current) =>
-            tagsOf(current).includes(tag) ? removeTag(current, tag) : addTag(current, tag)
-          )
-        }
+        onToggle={(tag) => (tagsOf(content).includes(tag) ? tirarTag(tag) : porTag(tag))}
       />
 
       <ColorPicker
@@ -651,6 +866,10 @@ const styles = StyleSheet.create({
   input: {
     minHeight: 280,
     flexGrow: 1,
+  },
+  /** Sem padding do sistema: o título alinha pela esquerda com o corpo e os chips. */
+  titulo: {
+    padding: 0,
   },
   /**
    * `minHeight` casa com o do `TextInput` da edição: sem isso o corpo "encolhe" no instante em

@@ -97,9 +97,10 @@ export function classify(line: string): { kind: Exclude<BlockKind, 'title'>; tex
  * Substitui `readLines` de `lib/search.ts`, que conhecia só dois tipos (título e checklist) e
  * mandava todo o resto para "parágrafo".
  */
-export function noteBlocks(content: string): NoteBlock[] {
+export function noteBlocks(content: string, { comTitulo = true }: { comTitulo?: boolean } = {}): NoteBlock[] {
   const lines = content.split('\n');
-  const firstFilled = lines.findIndex((l) => l.trim().length > 0);
+  // No editor o título tem campo próprio (`separarTitulo`) e o corpo não promove ninguém.
+  const firstFilled = comTitulo ? lines.findIndex((l) => l.trim().length > 0) : -1;
 
   return lines.flatMap((line, index) => {
     if (line.trim().length === 0) return [];
@@ -173,4 +174,110 @@ export function toggleTodo(content: string, index: number): string {
 export function todoProgress(content: string): { done: number; total: number } {
   const todos = noteBlocks(content).filter((b) => b.kind === 'todo');
   return { done: todos.filter((b) => b.done).length, total: todos.length };
+}
+
+/**
+ * A nota em duas partes para o editor: o TÍTULO, que tem campo próprio, e o CORPO.
+ *
+ * ⚠️ **O dado continua sendo `notes.content`** — primeira linha = título, como o WhatsApp, a
+ * busca e a lista sempre leram (`noteTitle`, `first_line` do agente). Só o EDITOR separa, para o
+ * título ter um espaço seu como no Notes do iPhone (23/09/2026, *"o título tem que ter um espaço
+ * separado, e não a primeira linha sem separação com o conteúdo"*).
+ *
+ * Título é a 1ª linha quando ela é PARÁGRAFO ou `# título` (o agente escreve o título ditado com
+ * `# `). Nota que abre em item marcável, lista ou citação não tem título — a lista de compras não
+ * se chama "leite" (a mesma régua de `noteBlocks`). Uma 1ª linha EM BRANCO é "sem título" dita
+ * pelo próprio texto: é como `juntarTitulo` grava um corpo que começa em parágrafo sem título.
+ */
+export function separarTitulo(content: string): { titulo: string; corpo: string } {
+  const quebra = content.indexOf('\n');
+  const primeira = quebra < 0 ? content : content.slice(0, quebra);
+  const resto = quebra < 0 ? '' : content.slice(quebra + 1);
+  if (primeira.trim() === '') return { titulo: '', corpo: quebra < 0 ? '' : resto };
+  const b = classify(primeira);
+  if (b.kind === 'text') return { titulo: primeira.trim(), corpo: resto };
+  if (b.kind === 'h1') return { titulo: b.text, corpo: resto };
+  return { titulo: '', corpo: content };
+}
+
+/**
+ * O inverso de `separarTitulo`: `separarTitulo(juntarTitulo(t, c))` devolve `{ t, c }`.
+ *
+ * ⚠️ **Sem título e corpo começando em parágrafo, a 1ª linha vai EM BRANCO** ("\nleite"). Sem
+ * ela, reabrir a nota promoveria a primeira linha do corpo a título — o texto pularia de campo
+ * sozinho. A lista e o agente pegam a 1ª linha PREENCHIDA, então continuam mostrando "leite".
+ */
+export function juntarTitulo(titulo: string, corpo: string): string {
+  const t = titulo.replace(/\n/g, ' ').trim();
+  if (t) return corpo ? `${t}\n${corpo}` : t;
+  if (!corpo) return '';
+  const primeira = corpo.split('\n', 1)[0];
+  const viraTitulo = primeira.trim() !== '' && ['text', 'h1'].includes(classify(primeira).kind);
+  return viraTitulo ? `\n${corpo}` : corpo;
+}
+
+const PREFIXO_DE_LISTA = /^(\s*)(?:([-*])\s\[(?: |x|X)\]\s?|([-*])\s+|(\d{1,3})([.)])\s+)/;
+
+/**
+ * Enter numa linha de LISTA continua a lista — e Enter num item VAZIO sai dela (o Notes do
+ * iPhone, o Google Keep e o Bear fazem assim).
+ *
+ * Recebe o texto de ANTES e de DEPOIS de uma edição do `TextInput`. Só age quando a edição
+ * terminou num único "\n" (o Enter; um autocorretor que confirma a palavra junto também cabe):
+ * colar várias linhas não inventa marcador. Devolve o texto novo e onde o cursor fica, ou `null`
+ * quando não há nada a fazer.
+ *
+ * Por diferença de texto e não por `onKeyPress`: no Android o teclado virtual não entrega o
+ * Enter de um campo multilinha como tecla, e o evento não chega.
+ *
+ * ponytail: não renumera os itens seguintes de uma lista numerada quando o Enter cai no meio
+ * dela; o `NoteBody` mostra o número digitado. Renumerar o bloco contíguo resolve, se pedirem.
+ */
+export function continuarLista(
+  antes: string,
+  depois: string,
+): { texto: string; cursor: number } | null {
+  let ini = 0;
+  while (ini < antes.length && antes[ini] === depois[ini]) ini++;
+  let fimA = antes.length;
+  let fimD = depois.length;
+  while (fimA > ini && fimD > ini && antes[fimA - 1] === depois[fimD - 1]) {
+    fimA--;
+    fimD--;
+  }
+  // Um "\n" inserido ao lado de outro "\n" dá o MESMO texto em duas posições; a da esquerda é o
+  // Enter no fim da linha de cima — o caso comum, e o único em que há lista a continuar.
+  while (fimD - ini === 1 && depois[ini] === '\n' && ini > 0 && depois[ini - 1] === '\n') {
+    ini--;
+    fimA--;
+    fimD--;
+  }
+  const inserido = depois.slice(ini, fimD);
+  // Um Enter só, no FIM do que entrou. `antes.slice(ini, fimA)` é o que ele substituiu.
+  if (!inserido.endsWith('\n') || inserido.indexOf('\n') !== inserido.length - 1) return null;
+  if (antes.slice(ini, fimA).includes('\n')) return null;
+
+  const quebra = fimD - 1;
+  const inicioDaLinha = depois.lastIndexOf('\n', quebra - 1) + 1;
+  const linha = depois.slice(inicioDaLinha, quebra);
+  const m = PREFIXO_DE_LISTA.exec(linha);
+  if (!m) return null;
+
+  if (linha.slice(m[0].length).trim() === '') {
+    // Item vazio: o Enter SAI da lista — o marcador some e o cursor fica na linha, agora vazia.
+    return {
+      texto: depois.slice(0, inicioDaLinha) + depois.slice(quebra + 1),
+      cursor: inicioDaLinha,
+    };
+  }
+  const recuo = m[1];
+  const novo = m[2]
+    ? `${recuo}${m[2]} [ ] `
+    : m[3]
+      ? `${recuo}${m[3]} `
+      : `${recuo}${Number(m[4]) + 1}${m[5]} `;
+  return {
+    texto: depois.slice(0, quebra + 1) + novo + depois.slice(quebra + 1),
+    cursor: quebra + 1 + novo.length,
+  };
 }
