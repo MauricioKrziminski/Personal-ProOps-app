@@ -20,6 +20,7 @@ import Animated, {
 
 import { AlertPreferencesSection } from '@/components/profile/alert-preferences-section';
 import { CycleDayPicker } from '@/components/finance/cycle-day-picker';
+import { PrimeiraFrase } from '@/components/onboarding/primeira-frase';
 import { ThemedText } from '@/components/themed-text';
 import { Button } from '@/components/ui/button';
 import { Icon } from '@/components/ui/icon';
@@ -60,24 +61,6 @@ import { supabase } from '@/lib/supabase';
 
 const TOTAL = 4;
 
-/** Cada linha do passo ① é uma promessa do produto — três, porque a quarta ninguém lê. */
-const PROMESSAS = [
-  {
-    icon: 'bubble.left.and.bubble.right' as const,
-    titulo: 'Fale do seu jeito',
-    texto: '“gastei 45 no mercado” já vira lançamento.',
-  },
-  {
-    icon: 'chart.pie' as const,
-    titulo: 'O app organiza',
-    texto: 'Contas, cartões, orçamento e projeção — sem planilha.',
-  },
-  {
-    icon: 'bell.badge' as const,
-    titulo: 'E avisa antes',
-    texto: 'Fatura fechando, orçamento estourando, receita que não caiu.',
-  },
-];
 
 export default function OnboardingScreen() {
   const theme = useTheme();
@@ -338,31 +321,22 @@ function PassoBoasVindas({ entra }: { entra: (a: BaseAnimationBuilder) => BaseAn
         )}
         style={styles.titulo}>
         <ThemedText type="title">Seu dinheiro,{'\n'}em ordem.</ThemedText>
-        <ThemedText themeColor="textSecondary">
-          Três coisas, e o app já vale o primeiro dia.
-        </ThemedText>
+        <ThemedText themeColor="textSecondary">Fale do seu jeito. Toque num exemplo.</ThemedText>
       </Animated.View>
 
-      {PROMESSAS.map((promessa, i) => (
-        <Animated.View
-          key={promessa.titulo}
-          entering={entra(
-            FadeInDown.delay(Motion.stagger.step * (i + 4))
-              .duration(Motion.duration.slow)
-              .easing(Motion.easing.out),
-          )}
-          style={styles.promessa}>
-          <View style={[styles.promessaIcone, { backgroundColor: theme.surface }]}>
-            <Icon name={promessa.icon} size="md" color="tint" />
-          </View>
-          <View style={styles.promessaTexto}>
-            <ThemedText type="headline">{promessa.titulo}</ThemedText>
-            <ThemedText type="footnote" themeColor="textSecondary">
-              {promessa.texto}
-            </ThemedText>
-          </View>
-        </Animated.View>
-      ))}
+      {/*
+        As três promessas que ficavam aqui em texto viraram DEMONSTRAÇÃO (23/09/2026): a pessoa
+        toca num exemplo e vê o que a frase vira. Tutorial em cartões na abertura não ensina
+        (NN/g); o produto funcionando ensina.
+      */}
+      <Animated.View
+        entering={entra(
+          FadeInDown.delay(Motion.stagger.step * 4)
+            .duration(Motion.duration.slow)
+            .easing(Motion.easing.out),
+        )}>
+        <PrimeiraFrase />
+      </Animated.View>
     </>
   );
 }
@@ -643,17 +617,7 @@ const styles = StyleSheet.create({
   },
   cabecalho: { gap: Space.lg },
   titulo: { gap: Space.md },
-  promessa: { flexDirection: 'row', alignItems: 'flex-start', gap: Space.md },
   /* Geometria fixa: o ícone mora num ladrilho, e ladrilho não cresce com a fonte. */
-  promessaIcone: {
-    width: 40,
-    height: 40,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderRadius: Radius.pill,
-    borderCurve: 'continuous',
-  },
-  promessaTexto: { flex: 1, gap: Space.half },
   cabecalhoIcone: {
     width: 56,
     height: 56,
