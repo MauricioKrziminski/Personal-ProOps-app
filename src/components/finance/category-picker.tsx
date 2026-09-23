@@ -93,7 +93,7 @@ export function CategoryPicker({
           <SearchField
             value={busca}
             onChangeText={setBusca}
-            placeholder="Buscar ou criar categoria"
+            placeholder="Buscar ou criar"
             accessibilityLabel="Buscar categoria"
             autoFocus
           />

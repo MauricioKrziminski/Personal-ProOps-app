@@ -663,7 +663,7 @@ export default function RecurringScreen() {
         <Search
           value={busca}
           onChangeText={setBusca}
-          placeholder="Buscar por nome ou categoria"
+          placeholder="Buscar recorrentes"
           accessibilityLabel="Buscar recorrências"
         />
       }>

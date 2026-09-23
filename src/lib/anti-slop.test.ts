@@ -385,6 +385,28 @@ test('hint de Field cabe em duas linhas', () => {
 });
 
 /**
+ * Placeholder de BUSCA cabe numa linha (23/09/2026).
+ *
+ * No Android o `TextInput` de uma linha não liga `singleLine`: o hint QUEBRA como texto comum e
+ * a pílula (altura mínima de 48dp) corta a segunda linha. "Buscar por descrição, lugar ou
+ * categoria" (42 caracteres) saía partido e cortado num Poco X6 Pro sem fonte aumentada, e a
+ * 375dp × 1,3 no emulador. A pílula tem ~280dp de texto a 1,3×, o que dá ~24 caracteres; 20
+ * deixa folga para 360dp. O "o quê" da busca já está no título da tela.
+ */
+test('placeholder de busca cabe em uma linha', () => {
+  const MAX = 20;
+  const longos: string[] = [];
+  for (const file of walk(SRC)) {
+    const code = stripComments(readFileSync(file, 'utf8'));
+    for (const m of code.matchAll(/<(?:Search|SearchField)\b[\s\S]{0,400}?\bplaceholder=\s*\{?\s*(?:'([^']+)'|"([^"]+)")/g)) {
+      const texto = m[1] ?? m[2];
+      if (texto.length > MAX) longos.push(`${file.replace(SRC, 'src')}  ${texto.length} ch: ${texto}`);
+    }
+  }
+  assert.deepEqual(longos, [], `placeholder de busca acima de ${MAX} caracteres quebra e é cortado no Android`);
+});
+
+/**
  * Tamanho de texto não é composto na tela.
  *
  * `...Type.footnote` espalhado num `StyleSheet` de tela é como o helper text

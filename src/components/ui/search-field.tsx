@@ -40,6 +40,10 @@ interface SearchFieldProps {
  * - **O "limpar" só aparece com texto.** Botão que não faz nada é ruído, e ele fica exatamente
  *   onde o X do nativo ficava, para quem já pegou o costume.
  * - **`selectionAsync` ao limpar**: é uma ação do usuário com resultado imediato na lista.
+ * - ⚠️ **O placeholder cabe em UMA linha (até 20 caracteres, preso no `anti-slop.test.ts`).** O
+ *   `TextInput` de uma linha do Android não liga `singleLine`: o hint longo quebra e a pílula
+ *   corta a segunda linha (23/09/2026, num Poco X6 Pro sem fonte aumentada). O título da tela já
+ *   diz o que se busca — o placeholder só diz "busque aqui".
  */
 export const SearchField = forwardRef<TextInput, SearchFieldProps>(function SearchField(
   { value, onChangeText, placeholder, autoFocus = false, accessibilityLabel },

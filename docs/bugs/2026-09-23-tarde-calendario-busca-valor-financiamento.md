@@ -44,6 +44,14 @@ dentro da pílula. A 1,3 a segunda linha ("ou categoria") sai cortada pela borda
 placeholders mais longos do app (42 caracteres) estão justamente numa busca. HIG e Material usam
 placeholder de busca curto ("Buscar…").
 
+**Hipótese testada antes da correção.** Só o placeholder de Lançamentos trocado por "Buscar
+lançamentos", app recarregado a frio: a pílula volta a uma linha, centrada, sem corte.
+
+**Correção.** Placeholder de busca cabe numa linha: "Buscar lançamentos", "Buscar recorrentes" e
+"Buscar ou criar" (categoria). A régua (até 20 caracteres) virou teste no `anti-slop.test.ts`,
+conferido voltando o texto antigo (o teste falha com "42 ch"), e está escrita no `SearchField`. O
+"o quê" da busca já está no título da tela, e o `accessibilityLabel` continua descritivo.
+
 ## 3. O valor da fatura desce e quebra a linha
 
 **Sintoma.** Na face do cartão (Financeiro), o valor da fatura parte em duas linhas.
@@ -114,5 +122,5 @@ component that hasn't mounted yet" no login do Android.
 |---|---|---|
 | 4 | — (é o `hitTest` nativo; não há o que simular em `node --test`) | iOS: toque no Valor → teclado numérico, borda de foco, "45,99" digitado; também dentro do Sheet de Dívidas ("1.500,00"), e com partida a frio tocando pelo rótulo. Android: "1.234,56" sem o fantasma do input à direita (ele existia antes, com 0,01, e sumiu com o texto na cor da caixa). |
 | 3 | `anti-slop.test.ts` (allowlist com o motivo) | Android 375dp × 1,3: face do cartão "R$ 1.423,00" numa linha (`3-depois-…png`), Hoje, Financeiro (tiles Entra/Sai), Cartões e Lançamentos sem quebra no meio de valor. iOS: Financeiro e face inalterados no tamanho padrão. |
-| 2 | | |
+| 2 | `anti-slop.test.ts` — placeholder de busca até 20 caracteres (falha com o texto antigo) | Android 375dp × 1,3: Lançamentos e Recorrentes numa linha (`2-antes/depois-…png`); digitado "gasolinapq" sem corte nas descendentes. |
 | 1 | | |

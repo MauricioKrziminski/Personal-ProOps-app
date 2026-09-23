@@ -412,7 +412,7 @@ export default function TransactionsScreen() {
     <Search
       value={search}
       onChangeText={setSearch}
-      placeholder="Buscar por descrição, lugar ou categoria"
+      placeholder="Buscar lançamentos"
       accessibilityLabel="Buscar lançamentos"
     />
   );
