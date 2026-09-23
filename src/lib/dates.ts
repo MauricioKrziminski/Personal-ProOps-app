@@ -170,6 +170,16 @@ export function localDateTime(brDate: string, hhmm: string): Date | null {
   return new Date(y, m - 1, d, h, min, 0, 0);
 }
 
+/** `HH:MM` → um `Date` de hoje naquela hora — o seletor nativo de hora só entende `Date`. */
+export function horaComoData(hhmm: string, hoje: Date = new Date()): Date {
+  const d = new Date(hoje);
+  if (isValidTime(hhmm)) {
+    const [h, min] = hhmm.split(':').map(Number);
+    d.setHours(h, min, 0, 0);
+  }
+  return d;
+}
+
 /** Date -> `HH:MM` local. */
 export function timeBR(date: Date): string {
   return `${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}`;

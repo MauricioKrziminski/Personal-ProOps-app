@@ -280,3 +280,14 @@ test('fimQueSegueOInicio: o fim anda junto só quando o início passaria dele', 
   // igual ao início é válido
   assert.equal(fimQueSegueOInicio('2026-09-01', '2026-09-20', '2026-09-20'), '2026-09-20');
 });
+
+test('horaComoData e timeBR fecham ida e volta; hora inválida não mexe no relógio', async () => {
+  const { horaComoData, timeBR } = await import('./dates.ts');
+  const base = new Date(2026, 8, 23, 10, 26, 45, 5);
+  assert.equal(timeBR(horaComoData('07:05', base)), '07:05');
+  assert.equal(timeBR(horaComoData('23:59', base)), '23:59');
+  assert.equal(horaComoData('07:05', base).getSeconds(), 0);
+  // apagado no meio da digitação: devolve a hora de agora, nunca um Date inválido
+  assert.equal(timeBR(horaComoData('', base)), '10:26');
+  assert.equal(timeBR(horaComoData('25:00', base)), '10:26');
+});

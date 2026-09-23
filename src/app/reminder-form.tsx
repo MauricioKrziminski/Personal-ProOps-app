@@ -2,20 +2,21 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useState } from 'react';
 import { Controller, useForm, useWatch } from 'react-hook-form';
-import { StyleSheet, View } from 'react-native';
+import { Keyboard, Pressable, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import Animated, { FadeIn, LinearTransition } from 'react-native-reanimated';
+import Animated, { FadeIn } from 'react-native-reanimated';
 import { KeyboardAwareScrollView } from 'react-native-keyboard-controller';
 import * as Haptics from 'expo-haptics';
 import { z } from 'zod';
 
+import { Calendar } from '@/components/finance/calendar';
 import { Chip } from '@/components/finance/chip';
 import { ThemedText } from '@/components/themed-text';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Field, TextField } from '@/components/ui/field';
 import { DatePickerField } from '@/components/finance/date-picker-field';
-import { Icon } from '@/components/ui/icon';
+import { Icon, type IconName } from '@/components/ui/icon';
 import { Screen } from '@/components/ui/screen';
 import { TaskHeader } from '@/components/ui/task-header';
 import { HeroLabel } from '@/components/ui/section-head';
@@ -23,10 +24,12 @@ import { QuantityField } from '@/components/ui/quantity-field';
 import { Segmented } from '@/components/ui/segmented';
 import { SelectField } from '@/components/ui/select-field';
 import { Skeleton } from '@/components/ui/skeleton';
+import { TimePicker } from '@/components/ui/time-picker';
 import { ToastDoModal, useToast } from '@/components/ui/toast';
 import { MaxContentWidth } from '@/constants/theme';
-import { Motion, Space, Type, tabular } from '@/design/tokens';
+import { Elevation, Motion, Radius, Space, Type, tabular } from '@/design/tokens';
 import { useAdaptiveWindow } from '@/hooks/use-adaptive-window';
+import { useScheme, useTheme } from '@/hooks/use-theme';
 import {
   useDeleteReminder,
   useReminder,
@@ -42,16 +45,18 @@ import {
   isoToBR,
   localDateTime,
   localISODate,
+  rotuloDoDia,
   timeBR,
 } from '@/lib/dates';
 import { confirmDestructive } from '@/lib/item-actions';
 import { describeRRule } from '@/lib/rrule-text';
+import { transicaoDeLayout } from '@/components/motion/transicao';
 
 /**
  * Lembrete (criar/editar) — modal do Stack raiz (Cancelar nativo vem do `_layout.tsx`).
  *
- * Data e hora por texto + chips, sem `datetimepicker`: evita dependência nativa (que exigiria
- * rebuild) e mantém as duas telas de formulário com a mesma cara.
+ * "Quando" são duas linhas com o valor à direita: a data abre o `Calendar` no lugar e a hora abre
+ * o seletor do sistema (`TimePicker`). Ver o ⚠️ em `Quando` para o que isso substituiu.
  */
 
 // ── RRULE: leitura e escrita ────────────────────────────────────────────────
@@ -209,8 +214,6 @@ const CHANNELS = [
   { value: 'both', label: 'Os dois' },
 ] as const;
 
-const HOURS = ['08:00', '09:00', '12:00', '18:00', '21:00'];
-
 const schema = z.object({
   title: z.string().refine((v) => v.trim().length > 0, 'Escreve o que você quer lembrar'),
   date: z.string().refine(isValidBRDate, 'Data em dd/mm/aaaa'),
@@ -317,8 +320,7 @@ function ReminderForm({
     return {
       date: isoToBR(localISODate(base)),
       time: timeBR(base),
-      today: isoToBR(localISODate()),
-      tomorrow: isoToBR(localISODate(new Date(Date.now() + 86_400_000))),
+      today: localISODate(),
       openedAt: Date.now(),
     };
   });
@@ -502,71 +504,23 @@ function ReminderForm({
         />
 
         <Card>
-          <View style={styles.block}>
-            <Controller
-              control={control}
-              name="date"
-              render={({ field }) => (
-                <Field label="Quando" error={errors.date?.message}>
-                  {/*
-                    ⚠️ **O chip "Hoje" saiu** (15/09/2026, mesma régua do formulário de
-                    lançamento): o campo já nasce em hoje, então ele nascia aceso repetindo o que
-                    o seletor ao lado mostrava. "Amanhã" leva a um valor que o campo não tem.
-                  */}
-                  <View style={styles.chipRow}>
-                    <Chip
-                      label="Amanhã"
-                      selected={field.value === now.tomorrow}
-                      onPress={() => mudarData(now.tomorrow)}
-                    />
-                    <DatePickerField
-                      value={field.value}
-                      onChange={mudarData}
-                      accessibilityLabel="Data do lembrete"
-                      invalid={!!errors.date}
-                    />
-                  </View>
-                </Field>
-              )}
+          <Field label="Quando" error={errors.date?.message ?? errors.time?.message}>
+            <Quando
+              data={date}
+              hora={time}
+              hoje={now.today}
+              onData={mudarData}
+              onHora={(hhmm) => setValue('time', hhmm, { shouldValidate: true })}
+              invalido={!!errors.date || !!errors.time}
             />
-
-            <Controller
-              control={control}
-              name="time"
-              render={({ field }) => (
-                <Field label="Que horas" error={errors.time?.message}>
-                  <View style={styles.chipRow}>
-                    {HOURS.map((h) => (
-                      <Chip
-                        key={h}
-                        label={h}
-                        selected={field.value === h}
-                        onPress={() => setValue('time', h, { shouldValidate: true })}
-                      />
-                    ))}
-                    <TextField
-                      value={field.value}
-                      onChangeText={field.onChange}
-                      placeholder="HH:MM"
-                      keyboardType="number-pad"
-                      maxLength={5}
-                      accessibilityLabel="Hora do lembrete"
-                      invalid={!!errors.time}
-                      style={styles.timeField}
-                    />
-                  </View>
-                </Field>
-              )}
-            />
-
-            {isPast && !errors.date && !errors.time ? (
-              <Animated.View entering={FadeIn.duration(Motion.duration.base)}>
-                <ThemedText type="small" themeColor="warning">
-                  Esse horário já passou — o lembrete dispara no próximo minuto.
-                </ThemedText>
-              </Animated.View>
-            ) : null}
-          </View>
+          </Field>
+          {isPast && !errors.date && !errors.time ? (
+            <Animated.View entering={FadeIn.duration(Motion.duration.base)}>
+              <ThemedText type="small" themeColor="warning">
+                Esse horário já passou — o lembrete dispara no próximo minuto.
+              </ThemedText>
+            </Animated.View>
+          ) : null}
         </Card>
 
         <Controller
@@ -641,6 +595,149 @@ function ReminderForm({
       </KeyboardAwareScrollView>
       <ToastDoModal />
     </Screen>
+  );
+}
+
+/**
+ * **Quando** — a data e a hora como duas linhas, o valor à direita, o seletor embaixo da linha.
+ *
+ * ⚠️ **Substituiu chips + campos soltos** (23/09/2026). Eram "Amanhã" + um seletor de data numa
+ * fileira com `wrap` (onde o `flex: 1` do valor dava largura ZERO ao texto: a data nem aparecia,
+ * só o ícone) e cinco horas fixas + um `TextField` de `HH:MM` sem máscara — apagado, não voltava a
+ * ser hora nenhuma, porque o teclado numérico do iPhone não tem ":". A queixa foi *"esses chips
+ * com esse campo de input do lado nada a ver"*. Agora a data é o `Calendar` (o mesmo do app
+ * inteiro, no lugar) e a hora é o seletor do sistema — roda no iOS, relógio no Android —, que não
+ * aceita hora inválida. Os chips saíram: o calendário já marca hoje, e um toque escolhe amanhã.
+ *
+ * Uma linha aberta por vez: data e hora abertas juntas empurravam o resto do formulário para
+ * fora da tela.
+ */
+function Quando({
+  data,
+  hora,
+  hoje,
+  onData,
+  onHora,
+  invalido,
+}: {
+  /** dd/mm/aaaa */
+  data: string;
+  /** HH:MM */
+  hora: string;
+  /** ISO de hoje, congelado na abertura do formulário. */
+  hoje: string;
+  onData: (br: string) => void;
+  onHora: (hhmm: string) => void;
+  invalido: boolean;
+}) {
+  const theme = useTheme();
+  const scheme = useScheme();
+  const [aberta, setAberta] = useState<'data' | 'hora' | null>(null);
+  const alternar = (qual: 'data' | 'hora') => {
+    Haptics.selectionAsync();
+    // O título nasce com o foco: sem isto o teclado ficava por cima do calendário e da roda.
+    Keyboard.dismiss();
+    setAberta((atual) => (atual === qual ? null : qual));
+  };
+  const iso = isValidBRDate(data) ? brToISO(data) : null;
+  const rotulo = iso ? rotuloDoDia(iso, hoje) : 'Escolher';
+  const painel = [styles.painel, { borderTopColor: theme.cardBorder }];
+
+  return (
+    <View
+      style={[
+        styles.quando,
+        {
+          backgroundColor: theme.surface,
+          borderColor: invalido ? theme.danger : theme.cardBorder,
+          boxShadow: Elevation[scheme].raised,
+        },
+      ]}>
+      <LinhaDoQuando
+        icone="calendar"
+        rotulo="Data"
+        valor={rotulo.charAt(0).toUpperCase() + rotulo.slice(1)}
+        aberta={aberta === 'data'}
+        onPress={() => alternar('data')}
+      />
+      {aberta === 'data' ? (
+        <View style={painel}>
+          <Calendar
+            value={iso}
+            min={hoje}
+            onChange={(escolhido) => {
+              Haptics.selectionAsync();
+              onData(isoToBR(escolhido));
+              setAberta(null);
+            }}
+          />
+        </View>
+      ) : null}
+      <View style={[styles.divisorQuando, { backgroundColor: theme.separator }]} />
+      <LinhaDoQuando
+        icone="clock"
+        rotulo="Hora"
+        valor={isValidTime(hora) ? hora : 'Escolher'}
+        aberta={aberta === 'hora'}
+        onPress={() => alternar('hora')}
+      />
+      {aberta === 'hora' ? (
+        <TimePicker
+          value={hora}
+          onChange={onHora}
+          onClose={() => setAberta(null)}
+          inlineStyle={painel}
+        />
+      ) : null}
+    </View>
+  );
+}
+
+function LinhaDoQuando({
+  icone,
+  rotulo,
+  valor,
+  aberta,
+  onPress,
+}: {
+  icone: IconName;
+  rotulo: string;
+  valor: string;
+  aberta: boolean;
+  onPress: () => void;
+}) {
+  const theme = useTheme();
+  return (
+    <Pressable
+      onPress={onPress}
+      accessibilityRole="button"
+      accessibilityState={{ expanded: aberta }}
+      accessibilityLabel={`${rotulo}: ${valor}`}
+      accessibilityHint="Toque para mudar">
+      {({ pressed }) => (
+        <View
+          style={[
+            styles.linhaQuando,
+            { backgroundColor: pressed ? theme.backgroundSelected : 'transparent' },
+          ]}>
+          <View
+            style={[
+              styles.ladrilho,
+              {
+                backgroundColor: aberta ? theme.tintFill : theme.backgroundElement,
+                borderColor: aberta ? 'transparent' : theme.cardBorder,
+              },
+            ]}>
+            <Icon name={icone} size="sm" color={aberta ? 'onTint' : 'textSecondary'} />
+          </View>
+          <ThemedText style={styles.cresce}>{rotulo}</ThemedText>
+          <ThemedText type="headline" style={[tabular, styles.valorQuando]}>
+            {valor}
+          </ThemedText>
+          <Icon name={aberta ? 'chevron.up' : 'chevron.down'} size="sm" color="textSecondary" />
+        </View>
+      )}
+    </Pressable>
   );
 }
 
@@ -887,8 +984,7 @@ function RecurrenceEditor({
   );
 }
 
-/** Uma instância só: `LinearTransition` recriado a cada render remonta a animação. */
-const linear = LinearTransition.duration(Motion.duration.base);
+const linear = transicaoDeLayout;
 
 const styles = StyleSheet.create({
   // Replica o padding do `Screen`, que está com `scroll={false}` para o teclado ser
@@ -911,14 +1007,38 @@ const styles = StyleSheet.create({
     gap: Space.sm,
     alignItems: 'center',
   },
-  dateField: {
-    minWidth: 140,
-    textAlign: 'center',
+  quando: {
+    borderRadius: Radius.md,
+    borderCurve: 'continuous',
+    borderWidth: 1,
+    overflow: 'hidden',
   },
-  timeField: {
-    minWidth: 96,
-    textAlign: 'center',
+  linhaQuando: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Space.md,
+    paddingHorizontal: Space.lg,
+    paddingVertical: Space.md,
+    minHeight: 56,
   },
+  /** Caixa de GEOMETRIA: o ícone não cresce com a fonte, o texto ao lado sim (mesma do `SelectField`). */
+  ladrilho: {
+    width: 36,
+    height: 36,
+    borderRadius: Radius.sm,
+    borderCurve: 'continuous',
+    borderWidth: StyleSheet.hairlineWidth,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  cresce: { flex: 1 },
+  /** O valor não cede: "Amanhã" e "10:26" são o dado da linha, o rótulo é que quebra. */
+  valorQuando: { flexShrink: 0 },
+  divisorQuando: {
+    height: StyleSheet.hairlineWidth,
+    marginLeft: Space.lg + 36 + Space.md,
+  },
+  painel: { borderTopWidth: StyleSheet.hairlineWidth, padding: Space.sm },
   alert: {
     gap: Space.sm,
     alignItems: 'flex-start',

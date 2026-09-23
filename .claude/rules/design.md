@@ -166,9 +166,14 @@ sentido"*. Saíram o chip "Hoje" do lançamento e do lembrete (o campo já nasce
 "Nenhuma" das parcelas iniciais — este ganhando o remédio de raiz, que era o campo ter **default**
 (`'0'`) em vez de nascer vazio precisando de um chip para preenchê-lo.
 
-Ficaram "Ontem" e "Amanhã": levam a um valor que o campo não tem, então são atalho, não eco. E os
-presets de hora do lembrete, pelo mesmo motivo — o campo nasce na hora corrente, que não é
-nenhum deles.
+Ficou "Ontem" no lançamento: leva a um valor que o campo não tem, então é atalho, não eco.
+
+> **O lembrete perdeu os chips de data e hora em 23/09/2026** (*"esses chips com esse campo de
+> input do lado nada a ver"*). O "Quando" virou duas linhas — Data e Hora, o valor à direita — e
+> cada uma abre o seu seletor no lugar: o `Calendar` e o `TimePicker` (`components/ui/`, roda do
+> iOS no lugar, relógio Material 3 em diálogo no Android, cores uma a uma nos tokens do app). O
+> campo de `HH:MM` digitado saiu: sem ":" no teclado numérico do iPhone, apagado ele não voltava a
+> ser hora nenhuma. **Escolher uma HORA é `TimePicker`**, como escolher uma data é `Calendar`.
 
 ⚠️ **O glifo mora na LISTA DE OPÇÕES, não na tela.** `ACCOUNT_TYPES`, `DEBT_KINDS` e
 `ASSET_CLASSES` carregam `icon`; o formulário e a linha da lista leem dali. Com o mapa na tela,
@@ -511,6 +516,12 @@ Olhando só a cortina, com a trava ligada a cascata tocava inteira por baixo del
   blocos na árvore. Terminada a entrada (ou estourado o teto), o bloco renderiza o estilo final
   explícito — e isso não depende de o Reanimated chegar à tela. Mesma lição da barra de progresso
   que nasce no valor real.
+- ⚠️ **Animação de LAYOUT (`layout=`) não existe no Android** (23/09/2026). A view com
+  `LinearTransition` ficava PRESA no primeiro quadro — desenhada e tocável na posição e no tamanho
+  antigos quando o conteúdo acima mudava de altura: o `SelectField` por cima do próprio rótulo,
+  a data e o "Já saiu do caixa" por cima da lista de contas, com o toque nas opções sem chegar.
+  O caminho único é `transicaoDeLayout` (`components/motion/transicao.ts`): deslize no iOS,
+  reorganização de uma vez no Android. **Nunca escrever `LinearTransition` numa tela.**
 - ⚠️ **O `Segmented` do Android segue a mesma regra, e com uma volta a mais** (23/09/2026): o
   polegar ficava preso num quadro do meio (uma bolinha solta, ou esticado sobre as duas células).
   Trocar só o `style` da MESMA view animada para estilo comum NÃO resolve — a view guarda o que o
