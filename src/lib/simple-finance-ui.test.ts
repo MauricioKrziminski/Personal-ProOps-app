@@ -11,7 +11,7 @@ const require = createRequire(import.meta.url);
 
 // Execute the screen JSX and its event handlers. Native components/query boundaries
 // are inert; state persists across renders so each interaction uses current props.
-function screen(file: string, options: { tablet?: boolean; debts?: any[]; archivedDebts?: any[]; debtSchedule?: any[]; invoiceStatus?: string; create?: boolean; monthLines?: any[]; monthSummary?: any; cycleLines?: any[]; cycleRow?: any; rangeError?: boolean; rangePending?: boolean; rangePendingMonths?: string[]; bills?: any[]; billsError?: boolean; charges?: any[]; reminders?: any[]; budgets?: any[]; setupPassos?: any[]; activity?: any[]; activityError?: boolean; forecastAccounts?: any[]; anticipation?: any[] | ((pagarEm: string) => any[]) } = {}) {
+function screen(file: string, options: { tablet?: boolean; debts?: any[]; archivedDebts?: any[]; debtSchedule?: any[]; invoiceStatus?: string; create?: boolean; monthLines?: any[]; monthSummary?: any; cycleLines?: any[]; cycleRow?: any; rangeError?: boolean; rangePending?: boolean; rangePendingMonths?: string[]; bills?: any[]; billsError?: boolean; charges?: any[]; reminders?: any[]; budgets?: any[]; setupPassos?: any[]; proximo?: any; activity?: any[]; activityError?: boolean; forecastAccounts?: any[]; anticipation?: any[] | ((pagarEm: string) => any[]) } = {}) {
   const state: any[] = [];
   let cursor = 0;
   let nodes: any[] = [];
@@ -162,6 +162,7 @@ function screen(file: string, options: { tablet?: boolean; debts?: any[]; archiv
       if (name === '@/hooks/use-items') return { localISODate: () => '2026-09-08', formatDateBR: () => '08/09/2026', formatBRL: load('src/lib/dates.ts').formatBRL, useRealtimeInvalidate: () => {}, useTodayReminders: () => ({ ...query, isSuccess: true, data: options.reminders ?? [] }) };
       if (name === '@/hooks/use-session') return { useSession: () => ({ session: { user: { id: 'user-1' } } }) };
       if (name === '@/hooks/use-profile') return { useProfile: () => ({ ...query, isSuccess: true, data: { display_name: 'Gabriel Almeida', phone: null } }) };
+      if (name === '@/hooks/use-proximo-passo') return { useProximoPasso: () => ({ passo: options.proximo ?? null, dispensar: (id: string) => writes.push({ operation: 'dispensarProximo', value: id }) }) };
       if (name === '@/hooks/use-setup-progress') return { useSetupProgress: () => ({ passos: options.setupPassos ?? [], pronto: true, consultas: [] }) };
       if (name === '@/hooks/use-bool-pref') return { useBoolPref: () => [false, () => {}] };
       if (name === '@/hooks/use-agent-activity') return {
@@ -842,6 +843,29 @@ test('Hoje: com os passos todos feitos o card não aparece', () => {
     setupPassos: [{ id: 'whatsapp', titulo: 'Ligar o WhatsApp', feito: true, href: '/link-phone' }],
   });
   assert.ok(!tipos(ui).includes('SetupChecklist'));
+});
+
+const passoImportar = { id: 'importar', titulo: 'Traga a fatura do cartão', texto: 'x', acao: 'Importar fatura', icon: 'square.and.arrow.down', href: '/import?conta=c1' };
+
+test('Hoje: o Próximo passo espera os Primeiros passos acabarem', () => {
+  const ui = screen(hojeFile, {
+    setupPassos: [{ id: 'whatsapp', titulo: 'Ligar o WhatsApp', feito: false, href: '/link-phone' }],
+    proximo: passoImportar,
+  });
+  assert.ok(!tipos(ui).includes('ProximoPassoCard'), 'um card de descoberta por vez');
+});
+
+test('Hoje: com os Primeiros passos feitos aparece o Próximo passo, e ele leva ao lugar', () => {
+  const ui = screen(hojeFile, {
+    setupPassos: [{ id: 'whatsapp', titulo: 'Ligar o WhatsApp', feito: true, href: '/link-phone' }],
+    proximo: passoImportar,
+  });
+  const card = ui.nodes().find((n: any) => n.type === 'ProximoPassoCard');
+  assert.ok(card, 'o card do próximo passo aparece');
+  card.props.onAbrir();
+  assert.equal(ui.navigations.at(-1), '/import?conta=c1');
+  card.props.onDispensar();
+  assert.deepEqual(ui.writes.at(-1), { operation: 'dispensarProximo', value: 'importar' });
 });
 
 test('Hoje: falha nas contas mostra o erro em Agora, e o "Tentar de novo" refaz as contas', () => {

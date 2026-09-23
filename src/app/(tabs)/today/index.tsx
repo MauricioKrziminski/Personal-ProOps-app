@@ -7,6 +7,7 @@ import Animated, { FadeOut } from 'react-native-reanimated';
 import { ErrorCard } from '@/components/error-card';
 import { AgendaItem } from '@/components/feed/agenda-item';
 import { ReminderTimeline } from '@/components/feed/reminder-timeline';
+import { ProximoPassoCard } from '@/components/feed/proximo-passo';
 import { SetupChecklist } from '@/components/feed/setup-checklist';
 import { TodaySignals, type TodaySignal } from '@/components/feed/today-signals';
 import { TodayTabletCanvas } from '@/components/feed/today-tablet-canvas';
@@ -43,6 +44,7 @@ import {
 import { localISODate, useTodayReminders } from '@/hooks/use-items';
 import { useProfile } from '@/hooks/use-profile';
 import { useSession } from '@/hooks/use-session';
+import { useProximoPasso } from '@/hooks/use-proximo-passo';
 import { useSetupProgress } from '@/hooks/use-setup-progress';
 import { useTelaPronta } from '@/hooks/use-tela-pronta';
 import { caixaDasContas, type LinhaDeCaixa } from '@/lib/account-cash';
@@ -107,6 +109,7 @@ export default function TodayScreen() {
   const reminders = useTodayReminders();
   const budgets = useBudgetsStatus();
   const setup = useSetupProgress();
+  const proximo = useProximoPasso(session?.user?.id);
   const [passosEscondidos, esconderPassos] = useBoolPref(`hoje:passos-escondidos:${session?.user?.id ?? ''}`);
   const markPaid = useMarkPaid();
   const caminho = useSpendablePath();
@@ -397,6 +400,23 @@ export default function TodayScreen() {
             passos={setup.passos}
             onOpen={(p) => router.push(p.href)}
             onHide={() => esconderPassos(true)}
+          />
+        </Bloco>
+      ) : null}
+      {/*
+        O Próximo passo espera os Primeiros passos: um card de descoberta por vez (23/09/2026).
+        A projeção não tem dado que diga "já viu" — abrir é o que conta, então tocar dispensa.
+      */}
+      {setup.pronto && !mostrarPassos && proximo.passo ? (
+        <Bloco>
+          <ProximoPassoCard
+            passo={proximo.passo}
+            onAbrir={() => {
+              const passo = proximo.passo!;
+              if (passo.id === 'projecao') proximo.dispensar('projecao');
+              router.push(passo.href as Href);
+            }}
+            onDispensar={() => proximo.dispensar(proximo.passo!.id)}
           />
         </Bloco>
       ) : null}

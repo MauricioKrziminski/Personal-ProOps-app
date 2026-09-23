@@ -319,6 +319,7 @@ function renderToday(bill: { kind: 'invoice' | 'transaction'; ref_id: string }) 
     if (name === '@/hooks/use-items') return { useTodayReminders: () => query, localISODate: () => '2026-09-08', formatDateBR: (s: string) => s, formatBRL: dates.formatBRL };
     if (name === '@/hooks/use-profile') return { useProfile: () => query };
     if (name === '@/hooks/use-setup-progress') return { useSetupProgress: () => ({ passos: [], pronto: true, consultas: [] }) };
+    if (name === '@/hooks/use-proximo-passo') return { useProximoPasso: () => ({ passo: null, dispensar: () => {} }) };
     if (name === '@/hooks/use-bool-pref') return { useBoolPref: () => [false, () => {}] };
     if (name === '@/hooks/use-agent-activity') return { useAgentActivity: () => query };
     // Puros, carregados de verdade pelo mesmo motivo de `dates` e `settle-labels` (abaixo).
