@@ -3,7 +3,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 
-import { MASCARA, montarRetrato, retratoSemSessao, vereditoDoDia } from './widget-snapshot.ts';
+import { MASCARA, montarRetrato, retratoSemSessao, semNulos, vereditoDoDia } from './widget-snapshot.ts';
 
 /** `formatBRL` escreve "R$" + espaço NÃO separável (Intl): compara sem depender disso. */
 const n = (s: string | null) => (s ?? '').replace(/\u00a0/g, ' ');
@@ -77,4 +77,17 @@ test('veredito sem obrigação: por dia só a partir de R$ 1,00', () => {
     '≈ R$ 10 por dia · 3 dias');
   assert.equal(vereditoDoDia({ atrasadoCents: 0, venceHojeCents: 0, livreCents: 50, diasLivres: 3, brl }).texto,
     'Nada vence hoje · 3 dias até entrar');
+});
+
+test('o que vai para o widget do iOS não leva null em nível nenhum', () => {
+  // as preferências do App Group recusam o retrato inteiro por um null só
+  const temNulo = (x: unknown): boolean =>
+    x === null || (typeof x === 'object' && Object.values(x as object).some(temNulo));
+  const semAtraso = montarRetrato({ ...base, contas: base.contas.filter((c) => !c.overdue), cicloAte: null });
+  assert.ok(temNulo(semAtraso), 'o retrato cru tem null (atrasado, compromissos)');
+  assert.ok(!temNulo(semNulos(semAtraso)));
+  assert.ok(!temNulo(semNulos(retratoSemSessao('13:05'))));
+  assert.equal(semNulos(semAtraso).atrasado, undefined);
+  assert.equal(semNulos(semAtraso).livre, semAtraso.livre, 'o resto fica igual');
+  assert.ok(!temNulo(semNulos({ proximas: [{ titulo: null, valor: 'R$ 1' }] })));
 });

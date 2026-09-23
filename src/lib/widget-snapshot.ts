@@ -146,6 +146,19 @@ export function montarRetrato(e: EntradaDoRetrato): Retrato {
   };
 }
 
+/**
+ * O retrato SEM `null` em nível nenhum — é assim que ele pode ir para o widget do iOS.
+ *
+ * ⚠️ O `updateSnapshot` grava nas preferências do App Group, e elas NÃO aceitam `null`: a chamada
+ * lança "Exception in HostFunction" e o retrato não é gravado (medido em 22/09/2026). No iPhone de
+ * produção o widget ficava sem retrato nenhum — "Please adopt containerBackground API" — porque o
+ * retrato real tinha `atrasado: null`; e ao sair da conta o retrato neutro (cheio de `null`) falhava
+ * e o widget seguia mostrando o dinheiro de quem saiu. Campo ausente o widget já trata como vazio.
+ */
+export function semNulos<T>(valor: T): T {
+  return JSON.parse(JSON.stringify(valor, (_chave, v) => (v === null ? undefined : v)));
+}
+
 /** Sem sessão (saiu da conta): o widget não pode seguir mostrando o dinheiro de quem saiu. */
 export function retratoSemSessao(agora: string): Retrato {
   return {

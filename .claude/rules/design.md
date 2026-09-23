@@ -984,5 +984,13 @@ para uma linha e cortava); `minimumScaleFactor` foi medido e devolvido — encol
   (OTA para a nativa errada) fechava o app na abertura — medido no simulador. `try` em volta do
   `require` NÃO serve: o Metro manda o erro ao `reportFatalError` e não relança. Pergunta antes
   (`requireOptionalNativeModule('ExpoWidgets')`, `TurboModuleRegistry.get('AndroidWidget')`).
+- ⚠️ **O retrato vai ao iOS SEM `null`** (`semNulos` em `propsDoWidget`): as preferências do App
+  Group recusam o retrato INTEIRO por um `null` só ("Exception in HostFunction"). No iPhone de
+  produção o widget ficou sem retrato ("Please adopt containerBackground API") e, ao sair da
+  conta, seguia mostrando o dinheiro de quem saiu. E os widgets desenham um estado neutro com
+  fundo quando as props chegam VAZIAS (galeria, ou widget posto antes da 1ª publicação).
+- ⚠️ **O cache é limpo ANTES da troca de usuário** (`SessionProvider aoTrocarDeUsuario`), nunca
+  num `useEffect` da raiz: efeito de pai roda depois dos filhos, e o `clear()` matava as consultas
+  que o sincronizador tinha acabado de criar — o widget ficava "Entre no app" com a pessoa logada.
 - Instalou pacote com plugin de Babel (o `'widget'` do `expo-widgets`)? `expo start --clear`:
   Metro antigo não liga o plugin e o iOS quebra com "2nd argument cannot be cast to String".

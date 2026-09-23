@@ -1,5 +1,5 @@
 import { createNativeQueryFocusHandler } from '@/lib/query-invalidation';
-import { useEffect, useRef } from 'react';
+import { useEffect } from 'react';
 import { MartianMono_400Regular } from '@expo-google-fonts/martian-mono';
 import {
   PlusJakartaSans_400Regular,
@@ -61,6 +61,9 @@ const modalOptions = {
   animation: Platform.OS === 'android' ? ('slide_from_bottom' as const) : undefined,
 };
 
+/** O cache de um usuário não vaza para o próximo — chamado pelo `SessionProvider` ANTES da troca. */
+const limparCache = () => queryClient.clear();
+
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
@@ -98,7 +101,7 @@ export default function RootLayout() {
           a cortina fechada.
         */}
         <CortinaProvider>
-          <SessionProvider>
+          <SessionProvider aoTrocarDeUsuario={limparCache}>
             <AppTree />
           </SessionProvider>
         </CortinaProvider>
@@ -174,15 +177,6 @@ function AppTree() {
 
   const { session, loading } = useSession();
   const pronto = !loading && (fontsLoaded || !!fontError);
-  const previousUser = useRef<string | null | undefined>(undefined);
-  useEffect(() => {
-    if (loading) return;
-    const user = session?.user.id ?? null;
-    if (previousUser.current !== undefined && previousUser.current !== user) {
-      queryClient.clear();
-    }
-    previousUser.current = user;
-  }, [loading, session?.user.id]);
   const barStyle = useBarStyle();
   /**
    * A barra de status segue o TEMA e nada mais.

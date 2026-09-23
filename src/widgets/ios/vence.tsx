@@ -36,6 +36,18 @@ import type { PropsDoWidget } from '@/widgets/props';
 // e quebra com "2nd argument cannot be cast to String". Depois de instalar, `expo start --clear`.
 function Vence(p: PropsDoWidget, env: WidgetEnvironment) {
   'widget';
+  // Sem retrato AINDA (widget adicionado antes de o app publicar, ou a galeria pedindo a prévia):
+  // o expo-widgets chama com props VAZIAS. Ler `p.cor` aqui quebrava o layout, e o erro saía sem
+  // fundo — o iPhone mostrava "Please adopt containerBackground API" (22/09/2026). Cores por NOME
+  // porque não há paleta sem retrato (e hex fora do tema é barrado).
+  if (!p || !p.cor) {
+    return (
+      <VStack alignment="leading" spacing={4} modifiers={[containerBackground('black', 'widget')]}>
+        <Text modifiers={[font({ size: 15, weight: 'semibold' }), foregroundStyle('white')]}>ProOps</Text>
+        <Text modifiers={[font({ size: 12 }), foregroundStyle('gray')]}>Abra o app para ver o seu dia</Text>
+      </VStack>
+    );
+  }
   const grande = env.widgetFamily === 'systemLarge';
   const fundo = [containerBackground(p.cor.fundo, 'widget')];
 

@@ -56,7 +56,20 @@ const doisQuadros = () =>
  * `accept_pending_invites` roda na sessão inicial e em `SIGNED_IN` — uma vez, aqui. Quando cada
  * `useSession()` assinava por conta própria, ele rodava uma vez por tela montada.
  */
-export function SessionProvider({ children }: { children: ReactNode }) {
+export function SessionProvider({
+  children,
+  aoTrocarDeUsuario,
+}: {
+  children: ReactNode;
+  /**
+   * Chamado IMEDIATAMENTE ANTES de a sessão de outro usuário chegar à árvore (é onde a raiz
+   * limpa o cache). ⚠️ Não num `useEffect` da raiz, depois da troca (22/09/2026): efeito de pai
+   * roda DEPOIS dos filhos, e o que montava junto com a sessão nova (o sincronizador dos widgets)
+   * já tinha criado as consultas dele — o `clear()` as descartava por baixo, e ele ficava preso a
+   * consultas mortas até o app reabrir. O widget seguia "Entre no app" com a pessoa logada.
+   */
+  aoTrocarDeUsuario?: () => void;
+}) {
   const cortina = useCortina();
   const [estado, setEstado] = useState<SessaoMostrada>({ session: null, loading: true });
   /** O `user.id` da sessão mostrada (ou já na fila para mostrar). `undefined` = não resolveu. */
@@ -90,6 +103,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
         });
       }
       if (!vivo) return;
+      if (antes !== undefined && antes !== depois) aoTrocarDeUsuario?.();
       setEstado({ session: next, loading: false });
       await doisQuadros();
       // A cobertura desce e a revelação sobe. A capa estática recebe a onda da saída.
@@ -107,7 +121,10 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       fila.current = fila.current
         .then(async () => {
           if (comCortina) await trocar(next, depois, antes);
-          else if (vivo) setEstado({ session: next, loading: false });
+          else if (vivo) {
+            if (antes !== undefined && antes !== depois) aoTrocarDeUsuario?.();
+            setEstado({ session: next, loading: false });
+          }
         })
         .catch(() => {});
     };
@@ -124,7 +141,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       vivo = false;
       assinatura.subscription.unsubscribe();
     };
-  }, [cortina]);
+  }, [cortina, aoTrocarDeUsuario]);
 
   return <SessionContext.Provider value={estado}>{children}</SessionContext.Provider>;
 }

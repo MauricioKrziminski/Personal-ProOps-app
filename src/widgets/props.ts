@@ -1,5 +1,5 @@
 import { Colors } from '@/constants/theme';
-import type { Retrato } from '@/lib/widget-snapshot';
+import { semNulos, type Retrato } from '@/lib/widget-snapshot';
 
 /**
  * O que chega ao widget: o retrato + a PALETA, em hex.
@@ -37,7 +37,8 @@ export function solido(cor: string, fundo: string): `#${string}` {
 export function propsDoWidget(r: Retrato): PropsDoWidget {
   const c = Colors.light;
   const fundo = c.heroSurface;
-  return {
+  // Sem `null`: as preferências do App Group do iOS recusam o retrato inteiro por um `null` só.
+  return semNulos({
     ...r,
     cor: {
       fundo,
@@ -46,5 +47,5 @@ export function propsDoWidget(r: Retrato): PropsDoWidget {
       perigo: solido(c.onHeroDanger, fundo),
       faixa: solido(c.heroChip, fundo),
     },
-  };
+  });
 }
