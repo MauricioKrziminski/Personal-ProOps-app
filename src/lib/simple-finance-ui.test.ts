@@ -556,6 +556,31 @@ test('the detail has the "…" with the same actions as the long press', () => {
   assert.deepEqual(ui.actions.map((a: any) => a.label), ['Editar', 'Arquivar', 'Excluir por completo']);
 });
 
+test('editing the paid count of an OLD debt keeps the date its schedule shows (final review, 23/09/2026)', () => {
+  // A dívida antiga não tem âncora: deduzir uma de `schedule[0]` − pagas levaria a data meses para
+  // a frente quando a pessoa corrige as pagas (5 → 9), e parcelas sumiriam da projeção.
+  const ui = screen(debtsFile, {
+    create: false,
+    debts: [{ ...carro, first_due_date: null, installments_paid: 5, remaining_cents: 147000 * 43 }],
+    debtSchedule: [{ installment_no: 6, due_date: '2026-10-05', payment_cents: 147000, interest_cents: null, principal_cents: null, balance_cents: 0 }],
+  });
+  editar(ui);
+  ui.fill('Parcelas já pagas', '9');
+  const campo = ui.nodes().find((n) => n.type === 'DatePickerField');
+  assert.equal(campo.props.value, '05/10/2026', 'a data mostrada é a do cronograma, não uma deduzida');
+  ui.press('Salvar');
+  assert.equal('first_due_date' in ui.writes[0].value, false, 'sem tocar na data, nada de âncora');
+  assert.equal(ui.writes[0].value.installments_paid, 9);
+});
+
+test('a month-end contract keeps day 31 when the chosen date falls in a short month (final review)', () => {
+  const ui = screen(debtsFile, { create: false, debts: [{ ...carro, due_day: 31, first_due_date: '2026-01-31', installments_paid: 1, remaining_cents: 147000 * 47 }] });
+  editar(ui);
+  ui.fill('Próxima parcela (a 2ª)', '28/02/2026');
+  ui.press('Salvar');
+  assert.equal(ui.writes[0].value.due_day, 31, 'o 28 de fevereiro é o 31 clampado');
+});
+
 test('editing an OLD debt without its schedule loaded never invents an anchor', () => {
   const ui = screen(debtsFile, { create: false, debts: [{ ...carro, first_due_date: null }] });
   editar(ui);

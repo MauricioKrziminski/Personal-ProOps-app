@@ -24,9 +24,16 @@
 - **`debts`**: dívidas com `interest_rate_monthly` em fração mensal (1,99% a.m. = 0.0199). `debt_schedule` monta a Price; `pay_debt_installment` abate o saldo **já descontando os juros do mês**.
   - **`first_due_date` é a âncora do CONTRATO** (`20260923160000`): a data da parcela nº 1. A
     parcela `n` vence em `day_in_month(add_months(first_due_date, n − 1), due_day)`, e
-    `private.debt_schedule_for` usa `greatest(<próxima a partir de hoje>, <parcela pagas+1 do
-    contrato>)` — a carência de 3 meses aparece, e o atrasado continua como sempre. `null` é o
-    comportamento antigo. O app pergunta a PRÓXIMA parcela e grava `first = próxima − pagas`.
+    `private.debt_schedule_for` usa `greatest(<próxima ocorrência do dia a partir de hoje>,
+    <parcela pagas+1 do contrato>)` — a carência de 3 meses aparece, e o atrasado continua como
+    sempre. `null` é o comportamento antigo. O app pergunta a PRÓXIMA parcela e grava
+    `first = próxima − pagas`.
+  - ⚠️ **Com âncora, "já pagou neste ciclo" NÃO empurra nem esconde nada** (`20260923170000`).
+    O ramo do ciclo existe para a dívida sem âncora, que não sabe qual parcela foi paga; com
+    âncora quem sabe é o contrato (o trigger conta cada pagamento). Mantido, ele pulava a 10ª
+    quando a 9ª era paga com atraso dentro do mesmo ciclo — no cronograma (o `greatest` ficava
+    com o mês seguinte) e em "O mês inteiro"/ciclo/"livre" (`debt_paid_in_month` escondia a
+    linha). Os dois lugares perguntam `first_due_date is null` antes de olhar o ciclo.
   - **O contrato de parcela fixa se edita mesmo com "Paguei" lançado** (decisão do dono do
     produto, 23/09/2026): o `check` segura a aritmética; o pagamento anterior à edição vira
     histórico e não se corrige/apaga mais sozinho.

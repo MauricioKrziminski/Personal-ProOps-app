@@ -90,7 +90,15 @@ App mobile pessoal de **notas rápidas, lembretes e controle financeiro operado 
   no cronograma, contrato fixo editável com pagamento lançado, `public.delete_debt`). Aplicada e
   conferida no STAGING em 23/09/2026 (`supabase/tests/financiamento_maleavel.sql` verde, com o
   caso de RLS). **Ordem: migration → agente → app.** O app novo lê/grava `first_due_date` e chama
-  `delete_debt`; o agente novo também. Sem ela, salvar um financiamento falha (coluna inexistente).
+  `delete_debt`; o agente novo também. Sem ela o app novo quebra na LEITURA, não só no salvar: o
+  `select` de `debts` pede `first_due_date`, o PostgREST devolve 400, e a tela Dívidas e o bloco de
+  dívidas do Financeiro não carregam.
+
+  ⚠️ **PENDENTE em produção: `20260923170000`** (a âncora do financiamento sem o ramo "paga no
+  ciclo" — sobe JUNTO com a `20260923160000`, logo depois dela). Aplicada e conferida no STAGING
+  em 23/09/2026 (`financiamento_maleavel.sql` caso 8). Sem ela, um contrato com data da primeira
+  parcela e um pagamento feito no ciclo pula uma parcela no cronograma, na Projeção,
+  em "O mês inteiro", no ciclo e no "livre".
 
   ⚠️ **OTA/build do chat exige a revisão nova do agente em produção** (21/09/2026): o app novo
   manda `id` no `POST /internal/chat/conversations` para abrir a conversa na hora, e o agente

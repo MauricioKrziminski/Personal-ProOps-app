@@ -86,6 +86,35 @@ begin
     raise exception '5: dívida sem pagamento não saiu limpa';
   end if;
 
+  -- 8. Âncora + pagamento ATRASADO feito neste ciclo (revisão final de 23/09/2026): a parcela
+  --    do contrato que vence AINDA neste ciclo não pode ser pulada pelo ramo "pago no ciclo".
+  --    Mês civil, vencimento no último dia do mês (sempre >= hoje): a 3ª venceu no mês passado e
+  --    é paga hoje; a 4ª vence no fim DESTE mês e tem que ser a primeira linha.
+  update public.workspaces set cycle_close_day = null where id = ws;
+  insert into public.debts (workspace_id, user_id, name, kind, calculation_mode, principal_cents,
+    remaining_cents, interest_rate_monthly, installments, installments_paid, installment_cents,
+    due_day, first_due_date)
+  values (ws, u, 'teste maleável 4', 'financing', 'fixed_installments', 120000, 100000, 0, 12, 2,
+    10000, 31, private.day_in_month(private.add_months(current_date, -3), 31))
+  returning id into d2;
+  perform public.pay_debt_installment(d2, 10000, conta, current_date);
+  select * into l from private.debt_schedule_for(d2) order by installment_no limit 1;
+  if l.installment_no <> 4 or l.due_date <> private.day_in_month(current_date, 31) then
+    raise exception '8: primeira linha %ª em %, esperado 4ª em %',
+      l.installment_no, l.due_date, private.day_in_month(current_date, 31);
+  end if;
+  -- ...e as leituras do mês e do ciclo não a escondem por "já pagou neste ciclo" (o pagamento
+  -- de hoje foi da 3ª, não da 4ª).
+  if not exists (select 1 from private.month_lines_for(array[ws], current_date, 'civil')
+                 where origin = 'debt_schedule' and ref_id = d2 and installment_no = 4) then
+    raise exception '8: a 4ª sumiu de month_lines_for';
+  end if;
+  if not exists (select 1 from private.cash_events(array[ws], current_date,
+                   private.day_in_month(current_date, 31))
+                 where origin = 'debt_schedule' and ref_id = d2) then
+    raise exception '8: a 4ª sumiu de cash_events';
+  end if;
+
   -- 7. RLS: quem não é do workspace chama e não apaga nada (a RPC é `security invoker`)
   insert into public.debts (workspace_id, user_id, name, kind, calculation_mode, principal_cents,
     remaining_cents, interest_rate_monthly, installments, installments_paid, installment_cents, due_day)

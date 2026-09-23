@@ -6,6 +6,7 @@ Updates compare the record snapshot in the same SQL statement as the write.
 
 from __future__ import annotations
 
+import calendar
 import re
 from datetime import date, datetime
 from decimal import Decimal, InvalidOperation
@@ -39,7 +40,7 @@ CATALOG = {
         "debts",
         "name",
         "archived",
-        "name kind calculation_mode principal_cents remaining_cents interest_rate_monthly installments installments_paid installment_cents due_day account_id started_at archived first_due_date trashed",
+        "name kind calculation_mode principal_cents remaining_cents interest_rate_monthly installments installments_paid installment_cents due_day account_id started_at archived first_due_date next_due_date trashed",
     ),
     # O MES FINANCEIRO do workspace. Nao tem nome, e linha UNICA e o escopo e o
     # `id`, nao `workspace_id` - por isso `prepare` e `execute` o tratam a parte,
@@ -169,6 +170,7 @@ LABELS = {
     "parent_id": "pasta superior",
     "started_at": "início do contrato",
     "first_due_date": "primeira parcela",
+    "next_due_date": "próxima parcela",
     "paid_at": "data do pagamento",
     "is_default": "conta padrão",
     "trashed": "na lixeira",
@@ -438,7 +440,7 @@ def validate_fields(action: ResourceAction) -> dict:
             if n > 1:
                 _error(f"{LABELS[key]}: valor inválido.")
             value = str(n)
-        elif key in {"started_at", "acquired_at", "deadline", "month", "paid_at", "first_due_date"}:
+        elif key in {"started_at", "acquired_at", "deadline", "month", "paid_at", "first_due_date", "next_due_date"}:
             try:
                 value = date.fromisoformat(value).isoformat()
             except ValueError:
@@ -495,12 +497,10 @@ def validate_fields(action: ResourceAction) -> dict:
                 _error("Nome de pasta deve ter entre 1 e 40 caracteres.")
     # A data da 1ª parcela carrega o dia de vencimento: dita a data, perguntar "que dia
     # vence?" seria perguntar o que a pessoa acabou de dizer.
-    if (
-        action.resource == "debts"
-        and values.get("first_due_date")
-        and values.get("due_day") is None
-    ):
-        values["due_day"] = int(values["first_due_date"][8:10])
+    if action.resource == "debts" and values.get("due_day") is None:
+        data_dita = values.get("next_due_date") or values.get("first_due_date")
+        if data_dita:
+            values["due_day"] = int(data_dita[8:10])
     if action.type != Op.CREATE and "calculation_mode" in values:
         # Mesma regra do trigger `tg_debts_calculation_mode`: dito aqui, o usuário
         # lê o motivo em vez de uma exceção do Postgres.
@@ -551,6 +551,13 @@ def validate_fields(action: ResourceAction) -> dict:
         if action.resource == "reminders":
             values.setdefault("channel", "push")
     return values
+
+
+def _meses_antes(d: date, n: int) -> date:
+    """`n` meses antes, prendendo o dia no último do mês (31/03 − 1 = 28/02)."""
+    total = d.year * 12 + (d.month - 1) - n
+    ano, mes = divmod(total, 12)
+    return date(ano, mes + 1, min(d.day, calendar.monthrange(ano, mes + 1)[1]))
 
 
 def _debt_mode(values: dict) -> tuple[str, ...]:
@@ -865,9 +872,15 @@ async def prepare(ctx: ExecContext, action: ResourceAction) -> dict:
         if action.resource == "debts":
             prepared["calculation_mode"] = old.get("calculation_mode") or "amortized"
             fixa = prepared["calculation_mode"] == "fixed_installments"
-            if fixa and action.type == Op.UPDATE and values.keys() & {
-                "principal_cents", "remaining_cents", "interest_rate_monthly",
+            derivados_ditos = values.keys() & {"principal_cents", "remaining_cents", "interest_rate_monthly"}
+            if fixa and action.type == Op.UPDATE and derivados_ditos and values.keys() & {
+                "installments", "installments_paid", "installment_cents",
             }:
+                # O modelo manda o saldo junto das pagas (é o que se pede no modo com juros); aqui
+                # ele SAI da parcela, então o número dito é descartado e recalculado abaixo.
+                for chave in derivados_ditos:
+                    values.pop(chave)
+            elif fixa and action.type == Op.UPDATE and derivados_ditos:
                 _error(
                     "Esse financiamento usa parcelas fixas: o total e o saldo saem da parcela. "
                     "Me diz o valor da parcela, o número de parcelas ou quantas já foram pagas."
@@ -886,6 +899,19 @@ async def prepare(ctx: ExecContext, action: ResourceAction) -> dict:
                 _derive_fixed_installments(contrato)
                 values["principal_cents"] = contrato["principal_cents"]
                 values["remaining_cents"] = contrato["remaining_cents"]
+            prepared["_pagas_atuais"] = int(old.get("installments_paid") or 0)
+            if action.type == Op.UPDATE and "installments_paid" in values:
+                lancados = await db.fetch(
+                    "select count(*) as n from public.transactions where debt_id = %s and workspace_id = %s",
+                    old["id"],
+                    ctx.workspace_id,
+                )
+                n = int((lancados[0].get("n") if lancados else 0) or 0)
+                if values["installments_paid"] < n:
+                    _error(
+                        f"Já há {n} pagamentos lançados pelo app; as parcelas pagas não "
+                        "podem ficar abaixo disso."
+                    )
             if (
                 not fixa
                 and action.type == Op.UPDATE
@@ -992,6 +1018,14 @@ async def prepare(ctx: ExecContext, action: ResourceAction) -> dict:
         for key in protegidos:
             if key in values and values[key] is None:
                 _error(f"{LABELS[key]} não pode ficar vazio.")
+    # "A próxima vence 05/10" com 8 pagas: a âncora é a 1ª do contrato (05/02). Gravar a próxima
+    # como primeira tiraria 8 meses da projeção (revisão final, 23/09/2026).
+    pagas_atuais = prepared.pop("_pagas_atuais", 0)
+    if action.resource == "debts" and values.get("next_due_date"):
+        proxima = date.fromisoformat(values.pop("next_due_date"))
+        pagas = int(values.get("installments_paid", pagas_atuais) or 0)
+        values["first_due_date"] = _meses_antes(proxima, pagas).isoformat()
+        prepared["proxima_label"] = format_date_br(proxima)
     display = {}
     for key, linked_table in LINKS.items():
         if values.get(key):
@@ -1112,6 +1146,8 @@ async def prepare(ctx: ExecContext, action: ResourceAction) -> dict:
             continue
         if key in derivados:
             continue
+        if key == "first_due_date" and prepared.get("proxima_label"):
+            continue
         if (action.type == Op.CREATE and key == identity and action.name
                 and str(value).strip().casefold() == action.name.strip().casefold()):
             # O nome já está na frase ("criar pasta App"); repetir virava "— nome: app".
@@ -1139,6 +1175,8 @@ async def prepare(ctx: ExecContext, action: ResourceAction) -> dict:
         details.append(
             f"{LABELS.get(key, key)}: {shown if shown is not None else 'não informado'}"
         )
+    if prepared.get("proxima_label"):
+        details.append(f"próxima parcela: {prepared['proxima_label']}")
     prepared["summary"] = f"{verb} {LABELS[action.resource]} {action.name or ''}".rstrip() + (
         " — " + "; ".join(details) if details else ""
     )
@@ -1309,7 +1347,15 @@ async def execute(ctx: ExecContext, action: ResourceAction) -> ToolResult:
     if action.resource == "debts" and proposal.get("purge"):
         # `delete_debt` apaga os pagamentos e a dívida numa transação (o trigger de pagamento
         # tem um desvio só para isso). `ensure_owned` já foi o `workspace_id` do `prepare`.
-        row = await db.fetch_one("select public.delete_debt(%s) as n", proposal["id"])
+        row = await db.fetch_one(
+            "with alvo as (select id from public.debts where id = %s and workspace_id = %s "
+            "and xmin::text = %s for update) select public.delete_debt(alvo.id) as n from alvo",
+            proposal["id"],
+            ctx.workspace_id,
+            proposal["version"],
+        )
+        if row is None:
+            _error("O financiamento mudou depois da pergunta. Me peça de novo para eu conferir.")
         n = int((row or {}).get("n") or 0)
         return ToolResult(
             f"🗑️ Apaguei *{action.name}* de vez"
@@ -1499,5 +1545,5 @@ def prompt_catalogue() -> str:
         + choices
         + "\nApelidos de cor aceitos (o sistema traduz): "
         + ", ".join(f"{k} -> {v}" for k, v in sorted(COLOR_ALIASES.items()))
-        + "\nFinanciamento/dívida tem dois modos: fixed_installments (padrão) precisa só de installment_cents e installments — o total contratual das parcelas, com juros dentro; amortized precisa de principal_cents, remaining_cents e interest_rate_monthly, e só serve quando o usuário tem esses números do contrato. Nunca converta o total das parcelas em principal nem invente taxa.\nData da PRIMEIRA parcela do financiamento: first_due_date=YYYY-MM-DD quando a pessoa disser quando a primeira vence ('a primeira parcela é em dezembro', 'começo a pagar daqui a 3 meses'); o dia de vencimento sai dela.\nFinanciamento: resource_delete ARQUIVA (sai da lista, os pagamentos ficam) e desarquivar é resource_update com archived=false. Apagar DE VEZ, com os pagamentos já lançados ('exclui o financiamento por completo', 'apaga tudo do carro'), é resource_delete com trashed=true.\nConta padrão (onde cai o lançamento que não cita conta): resource_update, resource=accounts, name=nome da conta, campo is_default=true; para tirar, is_default=false. Cartão de crédito não pode ser conta padrão.\nNota na LIXEIRA: resource_delete em notes manda para a lixeira; restaurar (\"tira da lixeira\", \"recupera a nota\") é resource_update com trashed=false; apagar DE VEZ (\"esvazia\", \"apaga definitivo\") é resource_delete com trashed=true.\nORGANIZAR NOTA E PASTA (é o que o usuário faz com o dedo na tela de Notas): fixar no topo é pinned=true (\"fixa a nota do mercado\", \"deixa essa pasta no topo\"); desafixar é pinned=false. Arquivar é archived=true (\"arquiva a nota da reunião\", \"tira a pasta de projetos da tela\") e desarquivar é archived=false — arquivar NÃO é apagar: a nota continua existindo, só sai da tela inicial. Cor é color com um dos oito nomes; se a pessoa falar a cor do dia a dia (azul, verde, rosa, vermelho, amarelo, roxo, cinza), pode mandar a palavra dela que o sistema traduz, e \"tira a cor\" é color vazio. Pasta também tem icon (um dos nomes da lista, ou a palavra em português: maleta, carrinho, casa, avião…) e tags (uma palavra por tag, \"urgente, casa\"); tag acrescenta às que já existem.\n⚠️ NOTA se identifica pelo TRECHO do texto, não por um nome: name = o pedaço que a pessoa citou (\"a nota do mercado\" -> name=mercado). Se casar com mais de uma, o sistema mostra a lista e pergunta qual — nunca escolha por ela.\nMEU MÊS (o período financeiro do usuário — quando o mês dele começa e termina): resource_update, resource=mes, campo cycle_close_day = o dia em que o mês fecha (1 a 31; 29, 30 e 31 caem no último dia do mês mais curto). Para voltar ao último dia do mês ('volta pro normal', 'fecha no fim do mês'), mande cycle_close_day vazio. Serve para: 'meu mês fecha dia 10', 'quero contar do dia 15 ao dia 15', 'qual a data de corte', 'minha virada é no dia 20', 'faz o corte no dia 10', 'prefiro contar a partir do dia 6'.\nATENÇÃO — 'dia N' aparece em quase toda frase e quase nunca é o ciclo. Só é resource=mes quando a frase fala do PERÍODO em si (o mês, o ciclo, o corte, a virada, a contagem, de-quando-a-quando). Contraexemplos que NÃO são resource=mes:\n- 'meu salário cai todo dia 5', 'todo dia 15 pago a academia', 'o aluguel vence dia 10' -> resource=recurring. Isso é um EVENTO que se repete (dinheiro entrando ou saindo), não a régua do mês. A pista é que existe uma coisa (salário, aluguel, academia) acontecendo no dia.\n- 'o cartão fecha dia 7', 'cadastra o Inter que fecha dia 7' -> resource=cards com closing_day. Quem tem fatura é o CARTÃO.\n- 'me lembra dia 20', 'a reunião é dia 20' -> lembrete ou nota, não cadastro.\nNa dúvida entre mes e recurring: se dá para perguntar 'o que acontece nesse dia?' e a resposta é um valor em dinheiro, é recurring.\nADIAR A FATURA AGORA (o rotativo, uma vez): resource_roll, resource=cards, name=nome do cartão, SEM campos. É a fatura VENCIDA que a pessoa não pagou: o saldo dela vai para a próxima, com juros e IOF. Frases: 'joga a fatura do nubank pra próxima', 'adia a fatura do inter', 'não vou conseguir pagar a fatura esse mês', 'deixa a fatura do itaú pro mês que vem', 'empurra essa fatura'.\n⚠️ resource_roll (agir AGORA nesta fatura) é diferente de rotativo_auto (LIGAR a regra para as próximas). 'adia a fatura' é resource_roll; 'deixa a fatura rolar sozinha daqui pra frente' é resource_update com rotativo_auto=true.\n⚠️ Adiar NÃO é pagar nem quitar: 'paguei a fatura' sai dinheiro, 'já tinha pago a fatura' é quitação, e adiar não move dinheiro nenhum — cria dívida nova. Se a pessoa disser que pagou, nunca use resource_roll.\nROTATIVO AUTOMÁTICO do cartão (a REGRA, não o ato de agora): resource_update, resource=cards, name=nome do cartão. rotativo_auto=true faz TODA fatura vencida e não paga, daqui pra frente, ir sozinha para a próxima, com juros e IOF. rotativo_rate_monthly são os juros do rotativo, do jeito que o usuário falar ('15,5%', '12,876', '1,99') — o sistema converte para fração. É a taxa de PARTIDA: assim que chegar a primeira cobrança real, o app passa a usar a que ESTE cartão cobrou. Vazio significa não estimar juros.\nOrçamento mensal existente: target_month=YYYY-MM-01; orçamento padrão: target_month=default.\nPara pagar prestação de dívida existente: resource_pay, resource=debts, name=nome da dívida, campos amount_cents, account_id (nome da conta), paid_at (YYYY-MM-DD). Não editar remaining_cents para registrar pagamento. Ao CRIAR dívida parcelada, installments_paid sai do que o usuário disse, inclusive pela posição: 'estou na 9ª parcela' são 8 pagas, 'tô na terceira' são 2, 'comecei agora' é 0, e um número solto respondendo à pergunta é a quantidade. Deixe vazio só quando a mensagem não disser nada sobre isso — o usuário confirma o cadastro inteiro antes de qualquer gravação, e é ali que ele corrige. Em dívida QUE JÁ EXISTE é o contrário: posição e data não comprovam pagamento; use resource_update com installments_paid e remaining_cents explicitamente informados, e se faltar saldo atual pergunte. Nunca use resource_pay para dar baixa retroativa em várias parcelas ou invente amortização a partir do valor da prestação.\nValor POR EXTENSO é valor: 'trezentos reais' é 30000 centavos, 'mil e quinhentos' é 150000, 'dois mil e quinhentos' é 250000. Áudio transcrito e resposta falada escrevem número assim o tempo todo — deixar o campo vazio porque o número veio em palavras é perder o dado que o usuário acabou de dar."
+        + "\nFinanciamento/dívida tem dois modos: fixed_installments (padrão) precisa só de installment_cents e installments — o total contratual das parcelas, com juros dentro; amortized precisa de principal_cents, remaining_cents e interest_rate_monthly, e só serve quando o usuário tem esses números do contrato. Nunca converta o total das parcelas em principal nem invente taxa.\nData da PRIMEIRA parcela do financiamento: first_due_date=YYYY-MM-DD quando a pessoa disser quando a primeira vence ('a primeira parcela é em dezembro', 'começo a pagar daqui a 3 meses'); o dia de vencimento sai dela.\nFinanciamento: resource_delete ARQUIVA (sai da lista, os pagamentos ficam) e desarquivar é resource_update com archived=false. Apagar DE VEZ, com os pagamentos já lançados ('exclui o financiamento por completo', 'apaga tudo do carro'), é resource_delete com trashed=true.\nConta padrão (onde cai o lançamento que não cita conta): resource_update, resource=accounts, name=nome da conta, campo is_default=true; para tirar, is_default=false. Cartão de crédito não pode ser conta padrão.\nNota na LIXEIRA: resource_delete em notes manda para a lixeira; restaurar (\"tira da lixeira\", \"recupera a nota\") é resource_update com trashed=false; apagar DE VEZ (\"esvazia\", \"apaga definitivo\") é resource_delete com trashed=true.\nORGANIZAR NOTA E PASTA (é o que o usuário faz com o dedo na tela de Notas): fixar no topo é pinned=true (\"fixa a nota do mercado\", \"deixa essa pasta no topo\"); desafixar é pinned=false. Arquivar é archived=true (\"arquiva a nota da reunião\", \"tira a pasta de projetos da tela\") e desarquivar é archived=false — arquivar NÃO é apagar: a nota continua existindo, só sai da tela inicial. Cor é color com um dos oito nomes; se a pessoa falar a cor do dia a dia (azul, verde, rosa, vermelho, amarelo, roxo, cinza), pode mandar a palavra dela que o sistema traduz, e \"tira a cor\" é color vazio. Pasta também tem icon (um dos nomes da lista, ou a palavra em português: maleta, carrinho, casa, avião…) e tags (uma palavra por tag, \"urgente, casa\"); tag acrescenta às que já existem.\n⚠️ NOTA se identifica pelo TRECHO do texto, não por um nome: name = o pedaço que a pessoa citou (\"a nota do mercado\" -> name=mercado). Se casar com mais de uma, o sistema mostra a lista e pergunta qual — nunca escolha por ela.\nMEU MÊS (o período financeiro do usuário — quando o mês dele começa e termina): resource_update, resource=mes, campo cycle_close_day = o dia em que o mês fecha (1 a 31; 29, 30 e 31 caem no último dia do mês mais curto). Para voltar ao último dia do mês ('volta pro normal', 'fecha no fim do mês'), mande cycle_close_day vazio. Serve para: 'meu mês fecha dia 10', 'quero contar do dia 15 ao dia 15', 'qual a data de corte', 'minha virada é no dia 20', 'faz o corte no dia 10', 'prefiro contar a partir do dia 6'.\nATENÇÃO — 'dia N' aparece em quase toda frase e quase nunca é o ciclo. Só é resource=mes quando a frase fala do PERÍODO em si (o mês, o ciclo, o corte, a virada, a contagem, de-quando-a-quando). Contraexemplos que NÃO são resource=mes:\n- 'meu salário cai todo dia 5', 'todo dia 15 pago a academia', 'o aluguel vence dia 10' -> resource=recurring. Isso é um EVENTO que se repete (dinheiro entrando ou saindo), não a régua do mês. A pista é que existe uma coisa (salário, aluguel, academia) acontecendo no dia.\n- 'o cartão fecha dia 7', 'cadastra o Inter que fecha dia 7' -> resource=cards com closing_day. Quem tem fatura é o CARTÃO.\n- 'me lembra dia 20', 'a reunião é dia 20' -> lembrete ou nota, não cadastro.\nNa dúvida entre mes e recurring: se dá para perguntar 'o que acontece nesse dia?' e a resposta é um valor em dinheiro, é recurring.\nADIAR A FATURA AGORA (o rotativo, uma vez): resource_roll, resource=cards, name=nome do cartão, SEM campos. É a fatura VENCIDA que a pessoa não pagou: o saldo dela vai para a próxima, com juros e IOF. Frases: 'joga a fatura do nubank pra próxima', 'adia a fatura do inter', 'não vou conseguir pagar a fatura esse mês', 'deixa a fatura do itaú pro mês que vem', 'empurra essa fatura'.\n⚠️ resource_roll (agir AGORA nesta fatura) é diferente de rotativo_auto (LIGAR a regra para as próximas). 'adia a fatura' é resource_roll; 'deixa a fatura rolar sozinha daqui pra frente' é resource_update com rotativo_auto=true.\n⚠️ Adiar NÃO é pagar nem quitar: 'paguei a fatura' sai dinheiro, 'já tinha pago a fatura' é quitação, e adiar não move dinheiro nenhum — cria dívida nova. Se a pessoa disser que pagou, nunca use resource_roll.\nROTATIVO AUTOMÁTICO do cartão (a REGRA, não o ato de agora): resource_update, resource=cards, name=nome do cartão. rotativo_auto=true faz TODA fatura vencida e não paga, daqui pra frente, ir sozinha para a próxima, com juros e IOF. rotativo_rate_monthly são os juros do rotativo, do jeito que o usuário falar ('15,5%', '12,876', '1,99') — o sistema converte para fração. É a taxa de PARTIDA: assim que chegar a primeira cobrança real, o app passa a usar a que ESTE cartão cobrou. Vazio significa não estimar juros.\nOrçamento mensal existente: target_month=YYYY-MM-01; orçamento padrão: target_month=default.\nPara pagar prestação de dívida existente: resource_pay, resource=debts, name=nome da dívida, campos amount_cents, account_id (nome da conta), paid_at (YYYY-MM-DD). Não editar remaining_cents para registrar pagamento. Ao CRIAR dívida parcelada, installments_paid sai do que o usuário disse, inclusive pela posição: 'estou na 9ª parcela' são 8 pagas, 'tô na terceira' são 2, 'comecei agora' é 0, e um número solto respondendo à pergunta é a quantidade. Deixe vazio só quando a mensagem não disser nada sobre isso — o usuário confirma o cadastro inteiro antes de qualquer gravação, e é ali que ele corrige. Em dívida QUE JÁ EXISTE é o contrário: posição e data não comprovam pagamento. No modo de parcela fixa (o padrão), corrigir as pagas é resource_update só com installments_paid — o saldo sai da parcela; no modo com juros, installments_paid junto com remaining_cents, e se faltar o saldo atual pergunte. Quando a pessoa disser quando vence a PRÓXIMA parcela ('a próxima vence dia 5 de outubro'), use next_due_date; first_due_date é só a PRIMEIRA do contrato. Nunca use resource_pay para dar baixa retroativa em várias parcelas ou invente amortização a partir do valor da prestação.\nValor POR EXTENSO é valor: 'trezentos reais' é 30000 centavos, 'mil e quinhentos' é 150000, 'dois mil e quinhentos' é 250000. Áudio transcrito e resposta falada escrevem número assim o tempo todo — deixar o campo vazio porque o número veio em palavras é perder o dado que o usuário acabou de dar."
     )

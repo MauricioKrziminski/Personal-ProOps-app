@@ -276,20 +276,20 @@ export default function DebtsScreen() {
   /** Pagamento lançado pelo app é fato: dizer menos pagas do que isso é contradição. */
   const pagamentosLancados = form?.id ? (payments.data ?? []).length : 0;
   /**
-   * A âncora que vale: a do formulário, ou — dívida antiga, sem `first_due_date` — a que o
-   * cronograma do banco implica (a próxima dele, andando para trás as pagas de ABERTURA). Sem
-   * cronograma carregado não se inventa nada: o salvar não mexe na data.
+   * ⚠️ **A âncora só existe quando veio do banco ou foi ESCOLHIDA** (revisão final, 23/09/2026).
+   * Deduzir uma âncora da dívida antiga (`schedule[0]` − pagas) parecia inofensivo e não era: o
+   * cronograma antigo desliza com o hoje, e corrigir as pagas de 5 para 9 levava a data quatro
+   * meses para a frente — quatro parcelas sumindo da projeção, sem erro. Na dívida antiga o campo
+   * MOSTRA a próxima do cronograma, e só grava âncora quando a pessoa toca na data.
    */
-  const ancoraEfetiva =
-    form?.ancora ??
-    (form?.id && schedule.data?.[0]
-      ? ancoraDoContrato(schedule.data[0].due_date, form.pagasOriginal)
-      : null);
+  const ancoraEfetiva = form?.ancora ?? null;
   const diaDoContrato = form?.diaVencimento ? Number(form.diaVencimento) : null;
   const proximaISO =
     ancoraEfetiva && diaDoContrato && form
       ? proximaDoContrato(ancoraEfetiva, form.installmentsPaid, diaDoContrato)
-      : null;
+      : form?.id
+        ? (schedule.data?.[0]?.due_date ?? null)
+        : null;
   /** Valor e prazo preenchidos e sem data: o único motivo de o Salvar estar travado — e a tela diz. */
   const faltaData = Boolean(form?.parcelas) && !ancoraEfetiva && !(form?.id && diaDoContrato) &&
     (form?.calculationMode === 'fixed_installments' ? parcelaCents > 0 : (form?.remainingCents ?? 0) > 0);
@@ -307,7 +307,14 @@ export default function DebtsScreen() {
   const escolherData = (br: string) => {
     if (!form) return;
     const iso = brToISO(br);
-    setForm({ ...form, ancora: ancoraDoContrato(iso, form.installmentsPaid), diaVencimento: String(Number(iso.slice(8))) });
+    const dia = Number(iso.slice(8));
+    const [ano, mes] = iso.split('-').map(Number);
+    const ultimoDoMes = new Date(Date.UTC(ano, mes, 0)).getUTCDate();
+    // O último dia de um mês curto (28/02, 30/04) é o dia 31 CLAMPADO: quem já vence no 31 não
+    // pode virar dia 28 para sempre só por ter escolhido a data num mês curto.
+    const atual = Number(form.diaVencimento) || 0;
+    const diaVencimento = dia === ultimoDoMes && atual > dia ? atual : dia;
+    setForm({ ...form, ancora: ancoraDoContrato(iso, form.installmentsPaid), diaVencimento: String(diaVencimento) });
   };
   const mudarPagas = (n: number) => {
     if (!form) return;

@@ -520,10 +520,10 @@ teto de 252):
 
 | app | agente |
 |---|---|
-| "Primeira parcela" / "Próxima parcela" (data) no cadastro e na edição | campo `first_due_date` (YYYY-MM-DD) em `debts`; o `due_day` sai dela quando não foi dito |
-| editar parcela, nº de parcelas e pagas de um contrato FIXO, mesmo com "Paguei" lançado | `resource_update` com `installment_cents` / `installments` / `installments_paid`: principal e saldo são rederivados (`_derive_fixed_installments`); principal, saldo e taxa diretos continuam recusados, porque saem da parcela. A trava "já tem pagamento registrado" caiu nos dois lados (decisão do dono do produto: libera e recalcula) |
+| "Primeira parcela" (cadastro) / "Próxima parcela" (edição) | `first_due_date` no cadastro; na edição, `next_due_date` (campo virtual) vira `first_due_date = próxima − pagas`, como no app. O `due_day` sai da data quando não foi dito |
+| editar parcela, nº de parcelas e pagas de um contrato FIXO, mesmo com "Paguei" lançado | `resource_update` com `installment_cents` / `installments` / `installments_paid`: principal e saldo são rederivados (`_derive_fixed_installments`); principal, saldo e taxa diretos continuam recusados, porque saem da parcela. A trava "já tem pagamento registrado" caiu nos dois lados (decisão do dono do produto: libera e recalcula). O piso das pagas é o número de pagamentos LANÇADOS, nos dois lados — abaixo dele o próximo "Paguei" repetiria um número de parcela |
 | "Arquivadas" + Desarquivar | `resource_update debts archived=false` — a busca por nome de `debts` nunca filtrou `archived` |
-| "Excluir por completo" | `resource_delete debts` com `trashed=true` → `public.delete_debt` (pagamentos + dívida numa transação); a frase do SIM conta os pagamentos e o valor que voltam ao saldo. Sem `trashed`, `resource_delete` continua ARQUIVANDO |
+| "Excluir por completo" | `resource_delete debts` com `trashed=true` → `public.delete_debt` (pagamentos + dívida numa transação), com `workspace_id` e `xmin` conferidos no SIM; a frase conta os pagamentos e o valor que voltam ao saldo. Sem `trashed`, `resource_delete` continua ARQUIVANDO |
 
-**Ordem de deploy:** a migration `20260923160000` vem antes do agente — sem ela `delete_debt` não
+**Ordem de deploy:** as migrations `20260923160000` e `20260923170000` vêm antes do agente — sem ela `delete_debt` não
 existe e o `first_due_date` bate numa coluna que não há.

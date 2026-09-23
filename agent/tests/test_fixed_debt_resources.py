@@ -111,7 +111,7 @@ async def test_delete_de_vez_apaga_pagamentos_e_divida(fixed_debt_with_payment, 
     monkeypatch.setattr(resources.db, "fetch_one", fetch_one)
     fixed_debt_with_payment.target = {"prepared": proposal}
     result = await resources.execute(fixed_debt_with_payment, apagar)
-    assert any("public.delete_debt" in sql and args == ("debt",) for sql, args in chamadas)
+    assert any("public.delete_debt" in sql and args[0] == "debt" for sql, args in chamadas)
     assert "2 pagamentos" in result.message
 
 
@@ -300,3 +300,55 @@ async def test_divida_sem_parcelas_nao_pergunta_vencimento(workspace):
         principal_cents=50000, interest_rate_monthly="0.01",
     ))
     assert proposal["values"].get("due_day") is None
+
+
+# --- revisão final (23/09/2026) -----------------------------------------------------------
+
+
+@pytest.mark.asyncio
+async def test_fixed_debt_paid_with_remaining_as_the_prompt_asks_is_derived_not_refused(fixed_debt):
+    """O prompt manda "installments_paid e remaining_cents" para dívida existente; no modo fixo o
+    saldo SAI da parcela, então o que o modelo mandou é descartado — recusar deixava a correção
+    inalcançável por conversa."""
+    proposal = await resources.prepare(
+        fixed_debt, action("resource_update", installments_paid=12, remaining_cents=1)
+    )
+    assert proposal["values"]["installments_paid"] == 12
+    assert proposal["values"]["remaining_cents"] == 147000 * 36
+
+
+@pytest.mark.asyncio
+async def test_next_due_date_becomes_the_contract_anchor(fixed_debt):
+    """"A próxima vence 05/10" numa dívida com 8 pagas: a âncora é a 1ª (05/02), nunca 05/10 —
+    gravar a próxima como primeira tiraria 8 meses da projeção."""
+    proposal = await resources.prepare(fixed_debt, action("resource_update", next_due_date="2026-10-05"))
+    assert proposal["values"]["first_due_date"] == "2026-02-05"
+    assert proposal["values"]["due_day"] == 5
+    assert "next_due_date" not in proposal["values"]
+    assert "próxima parcela: 05/10/2026" in proposal["summary"]
+    assert "primeira parcela" not in proposal["summary"]
+
+
+@pytest.mark.asyncio
+async def test_paid_count_never_below_registered_payments(fixed_debt_with_payment):
+    """Com 2 pagamentos lançados, dizer "1 paga" faria o próximo "Paguei" repetir o número 2."""
+    with pytest.raises(Level1Error, match="lançados"):
+        await resources.prepare(fixed_debt_with_payment, action("resource_update", installments_paid=1))
+
+
+@pytest.mark.asyncio
+async def test_purge_rechecks_workspace_and_version(fixed_debt_with_payment, monkeypatch):
+    apagar = action("resource_delete", trashed="true")
+    proposal = await resources.prepare(fixed_debt_with_payment, apagar)
+    chamadas = []
+
+    async def fetch_one(sql, *args):
+        chamadas.append((sql, args))
+        return {"n": 2}
+
+    monkeypatch.setattr(resources.db, "fetch_one", fetch_one)
+    fixed_debt_with_payment.target = {"prepared": proposal}
+    await resources.execute(fixed_debt_with_payment, apagar)
+    sql, args = chamadas[0]
+    assert "workspace_id" in sql and "xmin" in sql, "a exclusão reconfere dono e versão"
+    assert args == ("debt", "workspace", "3")
