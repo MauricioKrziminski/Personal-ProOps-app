@@ -5,7 +5,7 @@ import { StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { ConversationRow } from '@/components/agent/conversation-row';
-import { Deslizavel } from '@/components/ui/deslizavel';
+import { Deslizavel, fecharDeslizavelAberto } from '@/components/ui/deslizavel';
 import { AgentHistoryHeader } from '@/components/agent/agent-history-header';
 import { RenameConversationSheet } from '@/components/agent/rename-conversation-sheet';
 import { ThemedText } from '@/components/themed-text';
@@ -110,6 +110,8 @@ export default function AgentHistoryScreen() {
   return (
     <Screen scroll={false} grouped>
       <FlashList
+      // Rolar fecha o card arrastado que estiver aberto (Deslizavel).
+      onScrollBeginDrag={fecharDeslizavelAberto}
         data={conversas}
         // Sob o header translúcido do iOS 26 (`app/_layout.tsx`) quem desce a primeira linha é o
         // próprio scroll; o padrão da RN é `never`, e ela nasceria debaixo da barra.

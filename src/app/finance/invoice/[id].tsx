@@ -23,6 +23,7 @@ import { HeaderMenu } from '@/components/ui/header-actions';
 import { InvoiceDock } from '@/components/finance/invoice-dock';
 import { InvoicePager } from '@/components/finance/invoice-pager';
 import { Screen } from '@/components/ui/screen';
+import { fecharDeslizavelAberto } from '@/components/ui/deslizavel';
 import { Skeleton, SkeletonRow } from '@/components/ui/skeleton';
 import { useToast } from '@/components/ui/toast';
 import { alturaDoCartao } from '@/design/card-geometry';
@@ -524,6 +525,8 @@ export default function InvoiceScreen() {
       />
 
       <FlatList
+      // Rolar fecha o card arrastado que estiver aberto (Deslizavel).
+      onScrollBeginDrag={fecharDeslizavelAberto}
         alwaysBounceVertical
         // O indicador é do GESTO (§6 do design): com `isRefetching` ele girava sozinho ao entrar
         // pela Carteira, que já deixa a fatura carregada e dispara a revalidação das contas.

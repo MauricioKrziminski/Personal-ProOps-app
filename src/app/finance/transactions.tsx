@@ -21,6 +21,7 @@ import { EmptyState } from '@/components/ui/empty-state';
 import { Money } from '@/components/ui/money';
 import { Row } from '@/components/ui/row';
 import { Screen } from '@/components/ui/screen';
+import { fecharDeslizavelAberto } from '@/components/ui/deslizavel';
 import { Segmented } from '@/components/ui/segmented';
 import { Skeleton, SkeletonChart, SkeletonList, SkeletonRow } from '@/components/ui/skeleton';
 import { useToast } from '@/components/ui/toast';
@@ -651,6 +652,8 @@ export default function TransactionsScreen() {
 
   const ledgerList = (
     <SectionList<Transaction, DaySection>
+      // Rolar fecha o card arrastado que estiver aberto (Deslizavel).
+      onScrollBeginDrag={fecharDeslizavelAberto}
           sections={sections}
           keyExtractor={(tx) => tx.id}
           style={styles.listHost}

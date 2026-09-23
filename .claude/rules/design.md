@@ -586,6 +586,19 @@ dela). Cancelou, a abertura revela a trava, que tem o "tentar de novo".
   que fala o idioma de cada plataforma: `ActionSheetIOS` no iOS, diálogo de opções no Android.
   `Alert` cru escrito na tela continua proibido; como **fallback de plataforma dentro do helper**,
   é o certo.
+- **Arrastar o card para os lados, como no WhatsApp** (23/09/2026, spec
+  `2026-09-23-arrastar-card-design.md`). Todo card com menu de toque longo também arrasta: a
+  **direita** é a ação rápida, a **esquerda** é tirar da lista, e **"Mais"** (o menu inteiro)
+  entra por dentro da esquerda quando sobra ação. Caminho ÚNICO: `Deslizavel`
+  (`components/ui/deslizavel.tsx`); a tela só marca as ações que já declara (`ItemAction`):
+  - `arrasto: 'direita' | 'esquerda' | 'fora'` — `fora` repete o toque curto e não chama o "Mais";
+  - `desfaz: true` — arrastar até o fim executa, e a tela mostra toast com "Desfazer". Apagar
+    nunca vai sozinho: ele confirma, como sempre;
+  - `icon` em toda ação revelada e `curto` (uma palavra) quando o rótulo não cabe nos 88dp.
+  O toque longo não muda. `ItemLink` aplica sozinho; os outros cards envolvem com a mesma lista.
+  Grade (pasta em grade) não arrasta: o toque longo já é o arrasto de reordenar.
+  ⚠️ Os botões do painel usam o `Pressable` do **gesture-handler**: o da RN não recebe o toque
+  dentro do `ReanimatedSwipeable` no Android.
 
 ---
 
