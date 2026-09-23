@@ -35,13 +35,91 @@ def action(operation, **values):
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize("values", [
-    {"interest_rate_monthly": "0"}, {"principal_cents": 6000000},
-    {"remaining_cents": 5000000}, {"installment_cents": 140000},
-    {"installments": 36}, {"installments_paid": 9, "remaining_cents": 5733000},
+    {"interest_rate_monthly": "0"}, {"principal_cents": 6000000}, {"remaining_cents": 5000000},
 ])
-async def test_fixed_debt_financial_edits_require_app_review(fixed_debt, values):
+async def test_fixed_debt_derived_numbers_are_never_edited_directly(fixed_debt, values):
+    """Principal, saldo e taxa SAEM da parcela no modo simples — editar um deles direto
+    gravaria um contrato que o `check` recusa (ou, pior, um que ele aceita por acaso)."""
     with pytest.raises(Level1Error, match="parcelas fixas"):
         await resources.prepare(fixed_debt, action("resource_update", **values))
+
+
+# --- financiamento maleável (23/09/2026): o contrato fixo se edita pelo agente -------------
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("values,esperado", [
+    ({"installments_paid": 10}, {"installments_paid": 10, "principal_cents": 147000 * 48, "remaining_cents": 147000 * 38}),
+    ({"installment_cents": 150000}, {"installment_cents": 150000, "principal_cents": 150000 * 48, "remaining_cents": 150000 * 40}),
+    ({"installments": 36}, {"installments": 36, "principal_cents": 147000 * 36, "remaining_cents": 147000 * 28}),
+])
+async def test_fixed_debt_contract_edit_rederives_the_contract(fixed_debt, values, esperado):
+    proposal = await resources.prepare(fixed_debt, action("resource_update", **values))
+    for chave, valor in esperado.items():
+        assert proposal["values"][chave] == valor, chave
+
+
+@pytest.fixture
+def fixed_debt_with_payment(monkeypatch):
+    async def fetch(sql, *args):
+        if "public.debts" in sql:
+            return [{
+                "id": "debt", "row_version": "3", "name": "Carro",
+                "account_id": "bank", "principal_cents": 7056000,
+                "remaining_cents": 5880000, "archived": False,
+                "installments": 48, "installments_paid": 8,
+                "installment_cents": 147000, "interest_rate_monthly": 0,
+                "calculation_mode": "fixed_installments",
+            }]
+        if "public.transactions" in sql:
+            return [{"id": "payment", "n": 2, "total": 294000}]
+        return [{"id": "bank", "name": "Conta corrente", "type": "checking"}]
+
+    monkeypatch.setattr(resources.db, "fetch", fetch)
+    return ExecContext("user", "workspace", None, "America/Sao_Paulo", "carro", "app:1")
+
+
+@pytest.mark.asyncio
+async def test_paid_count_edits_even_with_registered_payments(fixed_debt_with_payment):
+    """Decisão do dono do produto: com "Paguei" lançado o contrato continua editável."""
+    proposal = await resources.prepare(fixed_debt_with_payment, action("resource_update", installments_paid=10))
+    assert proposal["values"]["installments_paid"] == 10
+
+
+def test_first_due_date_sets_the_due_day_when_missing():
+    valores = resources.validate_fields(action(
+        "resource_create", kind="financing", calculation_mode="fixed_installments",
+        installments=12, installment_cents=10000, installments_paid=0, first_due_date="2026-12-05",
+    ))
+    assert valores["first_due_date"] == "2026-12-05"
+    assert valores["due_day"] == 5
+
+
+@pytest.mark.asyncio
+async def test_delete_de_vez_apaga_pagamentos_e_divida(fixed_debt_with_payment, monkeypatch):
+    apagar = action("resource_delete", trashed="true")
+    proposal = await resources.prepare(fixed_debt_with_payment, apagar)
+    assert proposal["purge"] is True
+    assert "DE VEZ" in proposal["summary"] and "2 pagamentos" in proposal["summary"]
+
+    chamadas = []
+
+    async def fetch_one(sql, *args):
+        chamadas.append((sql, args))
+        return {"n": 2}
+
+    monkeypatch.setattr(resources.db, "fetch_one", fetch_one)
+    fixed_debt_with_payment.target = {"prepared": proposal}
+    result = await resources.execute(fixed_debt_with_payment, apagar)
+    assert any("public.delete_debt" in sql and args == ("debt",) for sql, args in chamadas)
+    assert "2 pagamentos" in result.message
+
+
+@pytest.mark.asyncio
+async def test_delete_sem_de_vez_continua_arquivando(fixed_debt):
+    proposal = await resources.prepare(fixed_debt, action("resource_delete"))
+    assert proposal["values"] == {"archived": True}
+    assert not proposal.get("purge")
 
 
 @pytest.mark.asyncio

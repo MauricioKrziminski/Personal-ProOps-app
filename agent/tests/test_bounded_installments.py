@@ -378,11 +378,22 @@ async def test_existing_debt_history_does_not_create_new_payment(monkeypatch):
     escrita.assert_not_awaited()
 
 
-def test_existing_debt_paid_count_requires_explicit_remaining_baseline():
+@pytest.mark.asyncio
+async def test_existing_debt_paid_count_requires_explicit_remaining_baseline(monkeypatch):
+    """No modo COM JUROS o saldo não sai das pagas: mudar a contagem exige o saldo dito.
+    (No modo de parcela fixa ele sai — ver `test_fixed_debt_resources.py`.) A regra desceu
+    do `validate_fields` para o `prepare` em 23/09/2026, porque só lá o modo é conhecido."""
     from app.graph.schemas import ResourceAction
+    from app.tools import resources
     from app.tools.guards import Level1Error
-    from app.tools.resources import validate_fields
 
+    async def fetch(query, *args):
+        return [{"id": PLAN, "name": "carro", "row_version": "7", "calculation_mode": "amortized",
+                 "installments": 48, "installments_paid": 0, "remaining_cents": 7056000}]
+
+    monkeypatch.setattr(db, "fetch", fetch)
+    ctx = ExecContext(user_id=WS, workspace_id=WS, phone="", timezone="America/Sao_Paulo",
+                      texto="8 pagas", source_message_id="x")
     action = ResourceAction(
         type="resource_update",
         resource="debts",
@@ -390,7 +401,7 @@ def test_existing_debt_paid_count_requires_explicit_remaining_baseline():
         fields=[{"name": "installments_paid", "value": "8"}],
     )
     with pytest.raises(Level1Error, match="saldo devedor"):
-        validate_fields(action)
+        await resources.prepare(ctx, action)
 
 
 def test_numeric_bound_precedes_model_date_scope():
@@ -445,12 +456,11 @@ def test_last_installments_cannot_shift_when_tail_was_deleted():
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize("has_payments", [False, True])
-async def test_debt_baseline_correction_only_before_payment_ledger(
+async def test_debt_baseline_correction_with_or_without_payment_ledger(
     monkeypatch, has_payments
 ):
     from app.graph.schemas import ResourceAction
     from app.tools import resources
-    from app.tools.guards import Level1Error
 
     old = {
         "id": PLAN,
@@ -487,13 +497,11 @@ async def test_debt_baseline_correction_only_before_payment_ledger(
             {"name": "remaining_cents", "value": "5000000"},
         ],
     )
-    if has_payments:
-        with pytest.raises(Level1Error, match="pagamentos registrados"):
-            await resources.prepare(ctx, action)
-    else:
-        proposal = await resources.prepare(ctx, action)
-        assert proposal["values"]["installments_paid"] == 8
-        assert proposal["values"]["remaining_cents"] == 5000000
+    # Com ou sem pagamento lançado a correção passa (23/09/2026, decisão do dono do produto:
+    # "libera e recalcula"). Antes, com pagamento, ela era recusada.
+    proposal = await resources.prepare(ctx, action)
+    assert proposal["values"]["installments_paid"] == 8
+    assert proposal["values"]["remaining_cents"] == 5000000
 
 
 @pytest.mark.asyncio

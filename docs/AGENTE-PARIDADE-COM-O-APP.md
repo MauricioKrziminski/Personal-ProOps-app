@@ -511,3 +511,19 @@ contrato novo numa linha ("de 2x para 3x de R$ 34,99 (a última acerta os centav
 `installment_plans`) e renomear a série continuam funcionando, e continuam sendo duas das coisas
 que as pessoas pedem por voz — ao lado, agora, de corrigir o total e de parcelar um lançamento
 avulso.
+
+## Financiamento maleável (23/09/2026)
+
+Spec: `docs/superpowers/specs/2026-09-23-financiamento-maleavel-design.md`. Botões novos no app,
+cada um com o caminho do agente (tudo pelo catálogo de `ResourceAction` — `FinanceAction` segue no
+teto de 252):
+
+| app | agente |
+|---|---|
+| "Primeira parcela" / "Próxima parcela" (data) no cadastro e na edição | campo `first_due_date` (YYYY-MM-DD) em `debts`; o `due_day` sai dela quando não foi dito |
+| editar parcela, nº de parcelas e pagas de um contrato FIXO, mesmo com "Paguei" lançado | `resource_update` com `installment_cents` / `installments` / `installments_paid`: principal e saldo são rederivados (`_derive_fixed_installments`); principal, saldo e taxa diretos continuam recusados, porque saem da parcela. A trava "já tem pagamento registrado" caiu nos dois lados (decisão do dono do produto: libera e recalcula) |
+| "Arquivadas" + Desarquivar | `resource_update debts archived=false` — a busca por nome de `debts` nunca filtrou `archived` |
+| "Excluir por completo" | `resource_delete debts` com `trashed=true` → `public.delete_debt` (pagamentos + dívida numa transação); a frase do SIM conta os pagamentos e o valor que voltam ao saldo. Sem `trashed`, `resource_delete` continua ARQUIVANDO |
+
+**Ordem de deploy:** a migration `20260923160000` vem antes do agente — sem ela `delete_debt` não
+existe e o `first_due_date` bate numa coluna que não há.
