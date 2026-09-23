@@ -62,8 +62,10 @@ Ordem vertical, e o porquê:
    informação da tela que explica por que o produto não fez o que prometeu.
 3. **Título** — `TextInput` sem card, largura total, `autoFocus` só na criação (o `:126` já acerta
    isso). Placeholder *"Ex.: pagar o aluguel"*.
-4. **Quando** — `Card` opaco: chips "Hoje" · "Amanhã" · "Semana que vem" + data, e a linha de
-   horários (`HOURS`, `:45`). O aviso de horário passado (`:179`) continua, sem o emoji.
+4. **Quando** — duas linhas, **Data** e **Hora**, com o valor à direita; cada uma abre o seu
+   seletor no lugar (`Calendar`; roda nativa no iOS, relógio Material 3 no Android — `TimePicker`).
+   Sem chips (23/09/2026: *"esses chips com esse campo… não fazem sentido"*). O aviso de horário
+   passado continua, sem o emoji.
 5. **Repetir** — uma `Row` que mostra a recorrência **em português** via `describeRRule`
    (`src/lib/rrule-text.ts:54`) e abre o `formSheet` de recorrência. Não são mais quatro chips:
    ver `docs/design/lembrete-recorrencia.md`.

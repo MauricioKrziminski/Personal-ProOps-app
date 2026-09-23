@@ -142,6 +142,19 @@ export function destinoDoSalvar(
  */
 export type UnidadeDoValor = 'total' | 'parcela';
 
+/** A mesma ordem nos três lugares (criar, editar a parcela, editar a compra). */
+export const UNIDADES_DO_VALOR = [
+  { value: 'parcela', label: 'Cada parcela' },
+  { value: 'total', label: 'Total da compra' },
+] as const satisfies readonly { value: UnidadeDoValor; label: string }[];
+
+/** Cada parcela em aberto precisa de um centavo — a recusa da RPC, dita antes dela. */
+export function recusaDoValor(travadas: number): string {
+  return travadas > 0
+    ? 'O total precisa cobrir o que já foi pago e sobrar para as parcelas em aberto'
+    : 'Informe o valor';
+}
+
 /** Criando ou convertendo em N×: nada foi pago ainda, "parcela" é cada uma das N. */
 export function totalDigitado(valorCents: number, unidade: UnidadeDoValor, parcelas: number): number {
   return unidade === 'parcela' && parcelas > 1 ? valorCents * parcelas : valorCents;

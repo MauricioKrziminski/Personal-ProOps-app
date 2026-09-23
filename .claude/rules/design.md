@@ -494,8 +494,9 @@ dono do produto). Ela usa `Motion.spring.tab` (1000 ms, `dampingRatio 0.62`), n�
 de percurso, ~10% de ultrapassagem e ~500 ms até assentar. Com `snap` o indicador atravessava as
 cinco abas em **~130 ms** e parava seco — não lia como "rápido", lia como teleporte, e foi a queixa
 "parece que foi de uma vez". Aqui o movimento É a resposta ao toque: ele carrega o ícone e o
-rótulo fazendo crossfade ao longo do caminho. **Não "corrigir" de volta para `snap`**, que
-continua sendo a mola do indicador do `Segmented`.
+rótulo fazendo crossfade ao longo do caminho. **Não "corrigir" de volta para `snap`**. (O
+`Segmented` do Android tem as molas próprias, `segmentoFrente`/`segmentoTras`: duas bordas que
+esticam o polegar.)
 
 A ultrapassagem de uma mola é proporcional à DISTÂNCIA, então ir da primeira à quinta aba jogaria
 o círculo para fora da pílula. O desenho é preso por `folgaDaMola` (`design/tab-pill.ts`) — a

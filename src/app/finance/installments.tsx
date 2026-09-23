@@ -40,6 +40,8 @@ import {
   totalPorParcela,
   valorExibido,
   type Contrato,
+  recusaDoValor,
+  UNIDADES_DO_VALOR,
   type UnidadeDoValor,
 } from '@/lib/finance-form';
 import { Segmented } from '@/components/ui/segmented';
@@ -138,10 +140,6 @@ function valorDoCampo(form: FormPlano): number {
   return valorExibido(form, form.unidade, c, hoje, form.original.totalCents);
 }
 
-const UNIDADES = [
-  { value: 'parcela', label: 'Cada parcela' },
-  { value: 'total', label: 'Total da compra' },
-] as const satisfies readonly { value: UnidadeDoValor; label: string }[];
 /**
  * POR QUE a compra travou, em vez de "já fechadas": parcela paga e fatura paga em parte pedem
  * saídas diferentes (22/09/2026 — a trava da wardogs tinha duas causas possíveis e a dica era a
@@ -754,17 +752,17 @@ export default function InstallmentsScreen() {
 
             <Field
               label="Valor"
-              error={totalOk ? undefined : 'O total precisa cobrir o que já foi pago e as parcelas em aberto'}
+              error={totalOk ? undefined : recusaDoValor(form.travadas)}
               hint={
                 form.unidade === 'parcela'
-                  ? `${travado ? `Vale para as ${emAberto} em aberto` : `${form.installments}x`} · total ${brl(form.totalCents)}`
+                  ? `${travado ? `Vale para as ${emAberto} em aberto` : `${form.installments}x`} · total ${formatBRL(form.totalCents)}`
                   : travado
-                    ? `${brl(form.travadoCents)} em parcela fechada. O resto se divide nas em aberto.`
+                    ? `${formatBRL(form.travadoCents)} em parcela fechada. O resto se divide nas em aberto.`
                     : undefined
               }>
               {/* Sempre na tela: sumir no "À vista" subiria o formulário embaixo do "−". */}
               <Segmented
-                options={UNIDADES}
+                options={UNIDADES_DO_VALOR}
                 value={form.unidade}
                 onChange={(unidade) => setForm({ ...form, unidade })}
               />

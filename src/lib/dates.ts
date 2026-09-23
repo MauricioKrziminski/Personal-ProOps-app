@@ -293,13 +293,16 @@ export function mesCurto(iso: string): string {
   return MESES_CURTOS[Number(iso.slice(5, 7)) - 1];
 }
 
-/** Como a agenda chama um dia: `hoje`, `amanhã`, `ontem` ou a data curta. */
+/**
+ * Como a agenda chama um dia: `hoje`, `amanhã`, `ontem` ou a data curta — com o ano quando não é
+ * o de hoje, senão um lembrete do ano que vem parece deste.
+ */
 export function rotuloDoDia(iso: string, hoje = localISODate()): string {
   const delta = diasAte(iso, hoje);
   if (delta === 0) return 'hoje';
   if (delta === 1) return 'amanhã';
   if (delta === -1) return 'ontem';
-  return diaCurtoBR(iso);
+  return iso.slice(0, 4) === hoje.slice(0, 4) ? diaCurtoBR(iso) : `${diaCurtoBR(iso)} ${iso.slice(0, 4)}`;
 }
 
 /** `HH:MM` local de um timestamp ISO. Vazio ou inválido vira travessão, nunca "NaN:NaN". */

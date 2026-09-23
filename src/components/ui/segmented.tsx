@@ -12,16 +12,14 @@ import Animated, {
 import * as Haptics from 'expo-haptics';
 
 import { Fonts } from '@/constants/theme';
-import { HitTarget, Radius, Space, Type } from '@/design/tokens';
+import { HitTarget, Motion, Radius, Space, Type } from '@/design/tokens';
 import { useTheme } from '@/hooks/use-theme';
 import type { SegmentedProps } from './segmented.types';
 
 /** Folga entre o trilho e o polegar. */
 const FOLGA = 3;
-/** A borda da FRENTE corre com esta mola… */
-const FRENTE = { duration: 300, dampingRatio: 0.84 };
-/** …e a de TRÁS vem com esta, mais lenta: é a diferença que estica o polegar. */
-const TRAS = { duration: 520, dampingRatio: 0.9 };
+const FRENTE = Motion.spring.segmentoFrente;
+const TRAS = Motion.spring.segmentoTras;
 
 /**
  * Controle animado compartilhado pelo Android e web.
@@ -69,6 +67,9 @@ export function Segmented<T extends string>({ options, value, onChange }: Segmen
    * Reanimated; parado, é do React (ver o topo). Derivado no render — sem `setState` no efeito.
    */
   const [assentado, setAssentado] = useState(index);
+  // Com Reduce Motion não há mola para avisar que assentou: o salto é o assentamento. Sem isto,
+  // desligar o Reduce Motion com a tela aberta deixava o polegar animado montado para sempre.
+  if (reduzido && assentado !== index) setAssentado(index);
   const andando = !reduzido && index !== assentado;
 
   useEffect(() => {
@@ -128,7 +129,7 @@ export function Segmented<T extends string>({ options, value, onChange }: Segmen
                 left: FOLGA + index * caixa.celula,
                 width: caixa.celula,
                 height: caixa.altura,
-                borderRadius: caixa.altura / 2,
+                borderRadius: Radius.pill,
                 backgroundColor: theme.thumb,
               },
             ]}

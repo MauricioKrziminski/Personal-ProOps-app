@@ -31,7 +31,7 @@ import {
   useConvertToInstallments,
   useCreateInstallmentPlan,
   useEditarCompraPelaParcela,
-  useInstallmentPlans,
+  useInstallmentPlan,
   useDeleteTransaction,
   useSaveTransaction,
   useSaveTransactionScoped,
@@ -49,8 +49,10 @@ import {
   installmentHistory,
   nomeDaCompra,
   parcelasAbertas,
+  recusaDoValor,
   podeParcelar,
   totalDigitado,
+  UNIDADES_DO_VALOR,
   valorExibido,
   type Contrato,
   type UnidadeDoValor,
@@ -146,8 +148,9 @@ export default function TransactionFormScreen() {
   const query = useTransaction(params.id);
   // A parcela edita o valor da COMPRA: sem o plano (travadas, total) o campo não sabe o que
   // "cada parcela" alcança. Espera junto com a linha, na mesma tela de esqueleto.
-  const planos = useInstallmentPlans();
-  const esperandoPlano = Boolean(query.data?.installment_plan_id) && planos.isPending;
+  const planoId = query.data?.installment_plan_id;
+  const plano = useInstallmentPlan(planoId);
+  const esperandoPlano = Boolean(planoId) && plano.isPending;
 
   if (params.id && (query.isLoading || esperandoPlano)) {
     return (
@@ -166,7 +169,9 @@ export default function TransactionFormScreen() {
   }
 
   // Nunca cair em modo criação por omissão: um id que não resolve é erro, não formulário vazio.
-  if (params.id && (query.isError || !query.data)) {
+  // A compra da parcela também: sem ela o campo Valor não sabe o que "cada parcela" alcança.
+  if (params.id && (query.isError || !query.data || (planoId && plano.isError))) {
+    const semLinha = query.isError || !query.data;
     return (
       <Screen scroll={false}>
         <TaskHeader title="Lançamento" onClose={() => router.back()} />
@@ -174,16 +179,18 @@ export default function TransactionFormScreen() {
           <Card>
             <View style={styles.errorCard}>
             <Icon name="exclamationmark.triangle" size="xl" color="danger" />
-            <ThemedText type="smallBold">Não encontrei esse lançamento</ThemedText>
+            <ThemedText type="smallBold">
+              {semLinha ? 'Não encontrei esse lançamento' : 'Não deu para carregar a compra desta parcela'}
+            </ThemedText>
             <ThemedText type="small" themeColor="textSecondary" style={styles.centered}>
-              Ele pode ter sido apagado em outro aparelho.
+              {semLinha ? 'Ele pode ter sido apagado em outro aparelho.' : 'Pode ter sido a conexão.'}
             </ThemedText>
             <View style={styles.errorActions}>
               <Button
                 label="Tentar de novo"
                 variant="secondary"
                 size="sm"
-                onPress={() => query.refetch()}
+                onPress={() => (semLinha ? query.refetch() : plano.refetch())}
               />
               <Button label="Voltar" size="sm" onPress={() => router.back()} />
             </View>
@@ -201,7 +208,7 @@ export default function TransactionFormScreen() {
   return (
     <TransactionForm
       editing={editing}
-      plano={(planos.data ?? []).find((p) => p.id === editing?.installment_plan_id)}
+      plano={plano.data ?? undefined}
     />
   );
 }
@@ -327,9 +334,7 @@ function TransactionForm({
   /** Cada parcela em aberto precisa de pelo menos um centavo — a mesma recusa da RPC, antes dela. */
   const erroDoValorDaCompra =
     compra && contrato && abertas > 0 && compra.totalCents - contrato.travadoCents < abertas
-      ? contrato.travadas > 0
-        ? 'O total precisa cobrir o que já foi pago e sobrar para as parcelas em aberto'
-        : 'Informe o valor'
+      ? recusaDoValor(contrato.travadas)
       : undefined;
   const dicaDoValorDaCompra = ((): string | undefined => {
     if (!naCompra) return undefined;
@@ -713,7 +718,7 @@ function TransactionForm({
           <Note icon="arrow.triangle.branch">
             {editing.recurring_id
               ? 'Faz parte de uma série. Ao salvar, você escolhe se muda só esta ou as futuras.'
-              : 'É uma parcela. Ao salvar, você escolhe se muda só esta ou as futuras.'}
+              : 'É uma parcela: o valor muda a compra; o resto, você escolhe se vale só para esta ou as futuras.'}
           </Note>
         ) : null}
 
@@ -795,7 +800,7 @@ function TransactionForm({
         {naCompra ? (
           <Field label="Valor" error={erroDoValorDaCompra} hint={dicaDoValorDaCompra}>
             {valorTravado ? null : (
-              <Segmented options={UNIDADES} value={unidade} onChange={setUnidade} />
+              <Segmented options={UNIDADES_DO_VALOR} value={unidade} onChange={setUnidade} />
             )}
             <MoneyField
               valueCents={
@@ -817,13 +822,7 @@ function TransactionForm({
             name="amount_cents"
             render={({ field }) => (
               <Field
-                label={
-                  podeParcelarAqui && installmentCount > 1
-                    ? unidade === 'parcela'
-                      ? 'Valor da parcela'
-                      : 'Valor total'
-                    : 'Valor'
-                }
+                label="Valor"
                 error={errors.amount_cents?.message}>
                 <MoneyField
                   valueCents={field.value}
@@ -957,7 +956,7 @@ function TransactionForm({
                     : `${installmentCount}x de ${formatBRL(Math.floor(amountCents / installmentCount))} — a última fecha os centavos`
                   : undefined
               }>
-              <Segmented options={UNIDADES} value={unidade} onChange={setUnidade} />
+              <Segmented options={UNIDADES_DO_VALOR} value={unidade} onChange={setUnidade} />
             </Field>
           </Animated.View>
         )}
@@ -1202,12 +1201,6 @@ function TransactionForm({
 }
 
 const linear = transicaoDeLayout;
-
-/** A mesma ordem nos dois lugares (criar e editar a parcela): muda o default, não a posição. */
-const UNIDADES = [
-  { value: 'parcela', label: 'Cada parcela' },
-  { value: 'total', label: 'Total da compra' },
-] as const satisfies readonly { value: UnidadeDoValor; label: string }[];
 
 const styles = StyleSheet.create({
   // Replica o padding do `Screen`, que está com `scroll={false}` para o teclado ser

@@ -2764,90 +2764,107 @@ export function useInstallmentPlans() {
   useRealtimeInvalidate('transactions', ['installments']);
   return useQuery({
     queryKey: ['installments', 'plans'],
-    queryFn: async (): Promise<InstallmentPlanSummary[]> => {
-      const { data: plans, error } = await supabase
-        .from('installment_plans')
-        .select('id, merchant, description, category, account_id, total_cents, installments, first_occurred_at')
-        .order('first_occurred_at', { ascending: false })
-        .limit(200);
-      if (error) throw error;
-      if (!plans?.length) return [];
+    queryFn: () => buscarPlanos(),
+  });
+}
 
-      const ids = plans.map((p) => p.id);
-      const rows = await fetchPaged<InstallmentParcel & { installment_plan_id: string | null }>(
-        (from, to) =>
-          supabase
-            .from('transactions')
-            .select('id, installment_plan_id, installment_no, amount_cents, occurred_at, status, invoice_id')
-            .in('installment_plan_id', ids)
-            .order('installment_no')
-            .range(from, to),
-      );
+/**
+ * UMA compra, pelo id — o formulário da parcela. Procurá-la na lista acima (limitada a 200)
+ * deixava a compra antiga de quem tem muitas sem plano, e o valor travado sem dizer por quê.
+ */
+export function useInstallmentPlan(id: string | null | undefined) {
+  useRealtimeInvalidate('installment_plans', ['installments']);
+  useRealtimeInvalidate('transactions', ['installments']);
+  return useQuery({
+    queryKey: ['installments', 'plan', id],
+    enabled: !!id,
+    queryFn: async () => (await buscarPlanos(id!))[0] ?? null,
+  });
+}
 
-      /**
-       * As faturas FECHADAS para efeito de edição. Uma consulta só, e minúscula: a alternativa
-       * era perguntar o status de cada fatura por parcela.
-       */
-      const { data: fechadas, error: erroFaturas } = await supabase
-        .from('card_invoices')
-        .select('id')
-        .or('status.in.(paid,rolled),paid_cents.gt.0');
-      if (erroFaturas) throw erroFaturas;
-      const faturaFechada = new Set((fechadas ?? []).map((f) => f.id));
+async function buscarPlanos(apenas?: string): Promise<InstallmentPlanSummary[]> {
+  const consulta = supabase
+    .from('installment_plans')
+    .select('id, merchant, description, category, account_id, total_cents, installments, first_occurred_at');
+  const { data: plans, error } = await (apenas
+    ? consulta.eq('id', apenas)
+    : consulta.order('first_occurred_at', { ascending: false }).limit(200));
+  if (error) throw error;
+  if (!plans?.length) return [];
 
-      const porPlano = new Map<string, InstallmentParcel[]>();
-      for (const row of rows) {
-        if (!row.installment_plan_id) continue;
-        const lista = porPlano.get(row.installment_plan_id) ?? [];
-        lista.push(row);
-        porPlano.set(row.installment_plan_id, lista);
-      }
+  const ids = plans.map((p) => p.id);
+  const rows = await fetchPaged<InstallmentParcel & { installment_plan_id: string | null }>(
+    (from, to) =>
+      supabase
+        .from('transactions')
+        .select('id, installment_plan_id, installment_no, amount_cents, occurred_at, status, invoice_id')
+        .in('installment_plan_id', ids)
+        .order('installment_no')
+        .range(from, to),
+  );
 
-      return plans.map((plan) => {
-        const parcels = porPlano.get(plan.id) ?? [];
-        const n = Math.max(1, plan.installments);
-        // Derivado da MESMA divisão da RPC, não da parcela 1 (que pode nem ter vindo).
-        const base = Math.floor(plan.total_cents / n);
-        const pago = parcels
-          .filter((p) => p.status === 'cleared')
-          .reduce((soma, p) => soma + p.amount_cents, 0);
-        const travadas = parcels.filter(
-          (p) => p.status === 'cleared' || (p.invoice_id && faturaFechada.has(p.invoice_id)),
-        );
-        const emOrdem = [...parcels].sort(
-          (a, b) => (a.installment_no ?? 0) - (b.installment_no ?? 0),
-        );
-        const proxima = emOrdem.find(
-          (p) => !(p.status === 'cleared' || (p.invoice_id && faturaFechada.has(p.invoice_id))),
-        );
-        return {
-          id: plan.id,
-          title: plan.description || plan.merchant || 'Compra parcelada',
-          description: plan.description,
-          merchant: plan.merchant,
-          category: plan.category,
-          account_id: plan.account_id,
-          total_cents: plan.total_cents,
-          installments: n,
-          paid: parcels.filter((p) => p.status === 'cleared').length,
-          installment_cents: proxima?.amount_cents ?? emOrdem[0]?.amount_cents ?? base,
-          last_installment_cents:
-            emOrdem[emOrdem.length - 1]?.amount_cents ?? plan.total_cents - base * (n - 1),
-          remaining_cents: Math.max(0, plan.total_cents - pago),
-          locked: travadas.length,
-          locked_cents: travadas.reduce((soma, p) => soma + p.amount_cents, 0),
-          locked_paid: travadas.filter((p) => p.status === 'cleared').length,
-          locked_ids: travadas.map((p) => p.id),
-          first_occurred_at: plan.first_occurred_at,
-          last_occurred_at: parcels.reduce<string | null>(
-            (maior, p) => (maior && maior > p.occurred_at ? maior : p.occurred_at),
-            null,
-          ),
-          active: parcels.some((p) => p.status === 'pending'),
-          parcels,
-        };
-      });
-    },
+  /**
+   * As faturas FECHADAS para efeito de edição. Uma consulta só, e minúscula: a alternativa
+   * era perguntar o status de cada fatura por parcela.
+   */
+  const { data: fechadas, error: erroFaturas } = await supabase
+    .from('card_invoices')
+    .select('id')
+    .or('status.in.(paid,rolled),paid_cents.gt.0');
+  if (erroFaturas) throw erroFaturas;
+  const faturaFechada = new Set((fechadas ?? []).map((f) => f.id));
+
+  const porPlano = new Map<string, InstallmentParcel[]>();
+  for (const row of rows) {
+    if (!row.installment_plan_id) continue;
+    const lista = porPlano.get(row.installment_plan_id) ?? [];
+    lista.push(row);
+    porPlano.set(row.installment_plan_id, lista);
+  }
+
+  return plans.map((plan) => {
+    const parcels = porPlano.get(plan.id) ?? [];
+    const n = Math.max(1, plan.installments);
+    // Derivado da MESMA divisão da RPC, não da parcela 1 (que pode nem ter vindo).
+    const base = Math.floor(plan.total_cents / n);
+    const pago = parcels
+      .filter((p) => p.status === 'cleared')
+      .reduce((soma, p) => soma + p.amount_cents, 0);
+    const travadas = parcels.filter(
+      (p) => p.status === 'cleared' || (p.invoice_id && faturaFechada.has(p.invoice_id)),
+    );
+    const emOrdem = [...parcels].sort(
+      (a, b) => (a.installment_no ?? 0) - (b.installment_no ?? 0),
+    );
+    const proxima = emOrdem.find(
+      (p) => !(p.status === 'cleared' || (p.invoice_id && faturaFechada.has(p.invoice_id))),
+    );
+    return {
+      id: plan.id,
+      title: plan.description || plan.merchant || 'Compra parcelada',
+      description: plan.description,
+      merchant: plan.merchant,
+      category: plan.category,
+      account_id: plan.account_id,
+      total_cents: plan.total_cents,
+      installments: n,
+      paid: parcels.filter((p) => p.status === 'cleared').length,
+      installment_cents: proxima?.amount_cents ?? emOrdem[0]?.amount_cents ?? base,
+      last_installment_cents:
+        emOrdem[emOrdem.length - 1]?.amount_cents ?? plan.total_cents - base * (n - 1),
+      remaining_cents: Math.max(0, plan.total_cents - pago),
+      locked: travadas.length,
+      locked_cents: travadas.reduce((soma, p) => soma + p.amount_cents, 0),
+      locked_paid: travadas.filter((p) => p.status === 'cleared').length,
+      locked_ids: travadas.map((p) => p.id),
+      first_occurred_at: plan.first_occurred_at,
+      last_occurred_at: parcels.reduce<string | null>(
+        (maior, p) => (maior && maior > p.occurred_at ? maior : p.occurred_at),
+        null,
+      ),
+      active: parcels.some((p) => p.status === 'pending'),
+      parcels,
+    };
   });
 }
 

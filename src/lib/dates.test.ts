@@ -254,6 +254,7 @@ test('rotuloDoDia usa palavra perto de hoje e a data curta longe', () => {
   assert.equal(rotuloDoDia('2026-09-18', '2026-09-17'), 'amanhã');
   assert.equal(rotuloDoDia('2026-09-16', '2026-09-17'), 'ontem');
   assert.equal(rotuloDoDia('2026-09-19', '2026-09-17'), 'sáb, 19 set');
+  assert.equal(rotuloDoDia('2027-01-05', '2026-09-17'), 'ter, 5 jan 2027');
 });
 
 test('horaBR não inventa hora', () => {

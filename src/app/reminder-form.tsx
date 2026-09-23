@@ -28,6 +28,7 @@ import { TimePicker } from '@/components/ui/time-picker';
 import { ToastDoModal, useToast } from '@/components/ui/toast';
 import { MaxContentWidth } from '@/constants/theme';
 import { Elevation, Motion, Radius, Space, Type, tabular } from '@/design/tokens';
+import { GlassBackdrop, supportsLiquidGlass } from '@/components/ui/glass-backdrop';
 import { useAdaptiveWindow } from '@/hooks/use-adaptive-window';
 import { useScheme, useTheme } from '@/hooks/use-theme';
 import {
@@ -662,21 +663,35 @@ function Quando({
   const iso = isValidBRDate(data) ? brToISO(data) : null;
   const rotulo = iso ? rotuloDoDia(iso, hoje) : 'Escolher';
   const painel = [styles.painel, { borderTopColor: theme.cardBorder }];
+  // Vidro só fechado, como no `SelectField` logo abaixo: aberto, o calendário e a roda precisam
+  // de fundo sólido para serem lidos.
+  const vidro = supportsLiquidGlass() && aberta === null;
+  // O leitor de tela lê por extenso ("quarta-feira, 24 de setembro"), não "Qua, 24 set".
+  const dataFalada = iso
+    ? new Date(`${iso}T12:00:00`).toLocaleDateString('pt-BR', {
+        weekday: 'long',
+        day: 'numeric',
+        month: 'long',
+        ...(iso.slice(0, 4) === hoje.slice(0, 4) ? {} : { year: 'numeric' }),
+      })
+    : undefined;
 
   return (
     <View
       style={[
         styles.quando,
         {
-          backgroundColor: theme.surface,
+          backgroundColor: vidro ? 'transparent' : theme.surface,
           borderColor: invalido ? theme.danger : theme.cardBorder,
-          boxShadow: Elevation[scheme].raised,
+          boxShadow: vidro ? undefined : Elevation[scheme].raised,
         },
       ]}>
+      {vidro ? <GlassBackdrop fallbackColor={theme.surface} radius={Radius.md} /> : null}
       <LinhaDoQuando
         icone="calendar"
         rotulo="Data"
         valor={rotulo.charAt(0).toUpperCase() + rotulo.slice(1)}
+        falado={dataFalada}
         aberta={aberta === 'data'}
         onPress={() => alternar('data')}
       />
@@ -686,7 +701,7 @@ function Quando({
             value={iso}
             min={hoje}
             onChange={(escolhido) => {
-              Haptics.selectionAsync();
+              // O dia já vibra no `Calendar`: um toque, um haptic.
               onData(isoToBR(escolhido));
               setAberta(null);
             }}
@@ -719,12 +734,15 @@ function LinhaDoQuando({
   valor,
   aberta,
   onPress,
+  falado,
 }: {
   icone: IconName;
   rotulo: string;
   valor: string;
   aberta: boolean;
   onPress: () => void;
+  /** O valor como o leitor de tela deve dizer, quando o curto da tela não serve. */
+  falado?: string;
 }) {
   const theme = useTheme();
   return (
@@ -732,7 +750,7 @@ function LinhaDoQuando({
       onPress={onPress}
       accessibilityRole="button"
       accessibilityState={{ expanded: aberta }}
-      accessibilityLabel={`${rotulo}: ${valor}`}
+      accessibilityLabel={`${rotulo}: ${falado ?? valor}`}
       accessibilityHint="Toque para mudar">
       {({ pressed }) => (
         <View

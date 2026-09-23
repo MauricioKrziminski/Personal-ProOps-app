@@ -40,10 +40,12 @@ Criar e editar são **a mesma tela**: `id === 'new'` entra em modo criação.
    caminho até o título.
    Depois de cada autosave, "Salvo" **substitui** o metadado por 1,5 s. Antes ele morava no
    header, e a pílula de vidro do iOS 26 mudava de largura a cada gravação.
-3. **Corpo, modo leitura** — `readLines` (`src/lib/search.ts`) decide o que aparece:
-   - a **primeira linha não vazia é o título**, em `subtitle` (22/600) — a mesma linha que
-     `noteTitle` usa na lista, então a nota se chama igual nos dois lugares. Exceção: se ela for
-     item de checklist, não vira título — promover um to-do a manchete custa a caixinha;
+3. **Título, campo próprio** (23/09/2026) — `TextInput` de uma linha em `Type.title`, acima do
+   corpo, como no Notes do iPhone. O dado continua sendo `content` (primeira linha = título, a
+   mesma que `noteTitle` usa na lista): `separarTitulo`/`juntarTitulo` (`src/lib/note-blocks.ts`)
+   só dividem para o editor. Nota que começa por um item de checklist não tem título — promover um
+   to-do a manchete custa a caixinha.
+4. **Corpo, modo leitura** — `NoteBody` desenha o corpo (sem promover a primeira linha):
    - o resto é `default` (body 17/400), com `Space.sm` entre linhas. Antes eram `ThemedText`
      empilhados sem espaço nenhum, e cinco linhas viravam um bloco;
    - **`#tag` sai do texto exibido**, porque a mesma tag já é chip logo acima. O `content` fica
@@ -52,9 +54,10 @@ Criar e editar são **a mesma tela**: `id === 'new'` entra em modo criação.
    - **linha vazia não vira linha**: o respiro entre parágrafos é o `gap` do container.
    O corpo inteiro é **um** alvo de toque com `flexGrow`, então o branco de uma nota curta é a
    área que abre a edição — antes eram 70% de tela morta.
-4. **Corpo, modo edição** — `TextInput` multiline com o texto **cru** (com `#tag` e com `- [ ]`),
-   cursor no fim. Sem toolbar de formatação: não há markdown rico.
-5. **Checklist inline** — linha que começa com `- [ ]` ou `- [x]` renderiza um toggle na margem.
+5. **Corpo, modo edição** — `TextInput` multiline com o texto **cru** (com `#tag` e com `- [ ]`),
+   cursor no fim. Enter depois de um item de lista abre o próximo do mesmo tipo (numerada
+   incrementa); Enter num item vazio sai da lista (`continuarLista`).
+6. **Checklist inline** — linha que começa com `- [ ]` ou `- [x]` renderiza um toggle na margem.
    Tocar reescreve **aquela linha** do texto (`readLines` devolve o índice no texto ORIGINAL, que
    é o que `toggleChecklistLine` precisa). O toggle é um `Pressable` dentro do corpo: ele ganha o
    gesto, então marcar um item **não** entra em edição.

@@ -22,7 +22,7 @@ import { Screen } from '@/components/ui/screen';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useToast } from '@/components/ui/toast';
 import { MaxContentWidth } from '@/constants/theme';
-import { HitTarget, Motion, Radius, Space, Type, tabular } from '@/design/tokens';
+import { Motion, Radius, Space, Type, tabular } from '@/design/tokens';
 import {
   useNote,
   useNoteFolders,
@@ -64,6 +64,9 @@ import { skipReason } from '@/lib/notes-autosave';
  */
 
 const AUTOSAVE_MS = 800;
+
+/** Chip de 26pt + folga = 44pt de alvo, sem crescer o desenho. */
+const CHIP_SLOP = { top: 9, bottom: 9, left: 6, right: 6 };
 
 /** "Amanhã, 09:00" — quando o lembrete da nota toca, no idioma da agenda. */
 function quandoToca(iso: string): string {
@@ -288,16 +291,37 @@ export default function NoteDetailScreen() {
     // O foco ainda está num dos campos: com o teclado de pé, ele cobria metade do aviso (e o
     // "Cancelar" inteiro).
     Keyboard.dismiss();
+    const apagar = {
+      label: 'Mandar para a lixeira',
+      destructive: true,
+      onPress: () => {
+        trashed.current = true;
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
+        trash.mutate(savedId!, {
+          onError: () => {
+            trashed.current = false;
+            toast({ message: 'Não deu para mandar para a lixeira.', tone: 'error' });
+          },
+        });
+        navigation.dispatch(data.action);
+      },
+    };
+    // Nota criada AGORA não tem "como estava quando abriu" para onde voltar: o que o autosave
+    // guardou é um pedaço do que foi apagado. Sobra a lixeira (ou "Cancelar", que continua).
+    const original = aoAbrir.current;
+    if (!original) {
+      showItemActions('A nota ficou vazia', [apagar], 'Essa nota não tinha nada quando você abriu.');
+      return;
+    }
     showItemActions(
       'A nota ficou vazia',
       [
         {
           label: 'Descartar edição',
           onPress: () => {
-            const original = aoAbrir.current;
-            if (savedId && original && original !== persisted.current?.content) {
+            if (original !== persisted.current?.content) {
               save.mutate(
-                { id: savedId, content: original, folder_id: folderId },
+                { id: savedId!, content: original, folder_id: folderId },
                 {
                   onError: () =>
                     toast({ message: 'Não deu para desfazer a edição da nota.', tone: 'error' }),
@@ -307,25 +331,9 @@ export default function NoteDetailScreen() {
             navigation.dispatch(data.action);
           },
         },
-        {
-          label: 'Apagar nota',
-          destructive: true,
-          onPress: () => {
-            const id = savedId;
-            if (!id) return;
-            trashed.current = true;
-            Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
-            trash.mutate(id, {
-              onError: () => {
-                trashed.current = false;
-                toast({ message: 'Não deu para mandar para a lixeira.', tone: 'error' });
-              },
-            });
-            navigation.dispatch(data.action);
-          },
-        },
+        apagar,
       ],
-      'Descartar volta a nota como estava quando você abriu. Apagar manda para a lixeira.'
+      'Descartar volta a nota como estava quando você abriu. A lixeira guarda por 30 dias.'
     );
   });
   const tinta = noteInk(note.data?.color ?? null, scheme);
@@ -376,17 +384,32 @@ export default function NoteDetailScreen() {
    * nota ainda não gravada é gravada ANTES, para o lembrete ter a quem apontar.
    */
   const abrirLembrete = async () => {
-    const existente = lembrete.data;
+    // Decidir por um "não tem" que ainda não chegou (ou que falhou) abria um SEGUNDO lembrete, que
+    // o banco recusa (um por nota) — e o menu continuava dizendo "Criar". Pergunta de novo antes.
+    let existente = lembrete.data;
+    if (savedId && !lembrete.isSuccess) {
+      const r = await lembrete.refetch();
+      if (r.isError) {
+        toast({ message: 'Não deu para ver o lembrete da nota. Tenta de novo.', tone: 'error' });
+        return;
+      }
+      existente = r.data;
+    }
     if (existente) {
       router.push({ pathname: '/reminder-form', params: { id: existente.id } });
       return;
     }
     await flushRef.current();
     const noteId = idRef.current;
-    router.push({
-      pathname: '/reminder-form',
-      params: { title: noteTitle(content), ...(noteId ? { noteId } : {}) },
-    });
+    // Nota nova ainda vazia não é gravada, e um lembrete sem nota não mostraria o vínculo nunca.
+    if (!noteId) {
+      // Com texto e sem id, o que falhou foi o salvamento — e o `flush` já avisou disso.
+      if (!content.trim()) {
+        toast({ message: 'Escreve alguma coisa na nota antes de criar o lembrete.', tone: 'error' });
+      }
+      return;
+    }
+    router.push({ pathname: '/reminder-form', params: { title: noteTitle(content), noteId } });
   };
 
   const onMenu = () => {
@@ -488,7 +511,7 @@ export default function NoteDetailScreen() {
     { label: 'Mais ações', icon: 'ellipsis.circle' as const, onPress: onMenu },
   ];
 
-  // O título da nota vive no CORPO (decisão de anatomia, ver `ReadBody`). Repeti-lo aqui era o
+  // O título da nota mora no campo de cima (ver o comentário dos estilos). Repeti-lo aqui era o
   // "título duplicado" que o usuário apontou.
   const screenTitle = creating ? 'Nova nota' : 'Nota';
 
@@ -587,7 +610,7 @@ export default function NoteDetailScreen() {
               key={tag}
               accessibilityRole="button"
               accessibilityLabel={`Tag ${tag}. Toque para tirar da nota.`}
-              hitSlop={6}
+              hitSlop={CHIP_SLOP}
               onPress={() => {
                 Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
                 tirarTag(tag);
@@ -615,7 +638,7 @@ export default function NoteDetailScreen() {
               accessibilityLabel={
                 note.data?.color ? `Cor ${note.data.color}. Toque para mudar.` : 'Escolher cor'
               }
-              hitSlop={8}
+              hitSlop={13}
               onPress={() => {
                 Haptics.selectionAsync();
                 setColorOpen(true);
@@ -633,7 +656,7 @@ export default function NoteDetailScreen() {
           <Pressable
             accessibilityRole="button"
             accessibilityLabel="Adicionar tag"
-            hitSlop={6}
+            hitSlop={CHIP_SLOP}
             onPress={() => {
               Haptics.selectionAsync();
               setTagPickerOpen(true);
@@ -656,7 +679,7 @@ export default function NoteDetailScreen() {
             <Pressable
               accessibilityRole="button"
               accessibilityLabel={`Lembrete ${quandoToca(lembrete.data.next_run_at)}. Toque para editar.`}
-              hitSlop={6}
+              hitSlop={CHIP_SLOP}
               onPress={() => {
                 Haptics.selectionAsync();
                 void abrirLembrete();
@@ -671,6 +694,15 @@ export default function NoteDetailScreen() {
               <Icon name="bell" size={12} color="textSecondary" />
               <ThemedText type="footnote" style={tabular}>
                 {quandoToca(lembrete.data.next_run_at)}
+              </ThemedText>
+            </Pressable>
+          ) : lembrete.isError ? (
+            <Pressable
+              accessibilityRole="button"
+              hitSlop={CHIP_SLOP}
+              onPress={() => void lembrete.refetch()}>
+              <ThemedText type="footnote" themeColor="danger">
+                Não deu para ver o lembrete · Tentar de novo
               </ThemedText>
             </Pressable>
           ) : null}
@@ -693,7 +725,7 @@ export default function NoteDetailScreen() {
 
         {note.isLoading ? (
           <View style={styles.loading}>
-            <Skeleton width="70%" height={Type.title2.lineHeight} />
+            <Skeleton width="70%" height={Type.title.lineHeight} />
             <Skeleton width="100%" height={Type.body.lineHeight} />
             <Skeleton width="90%" height={Type.body.lineHeight} />
             <Skeleton width="45%" height={Type.body.lineHeight} />
@@ -812,23 +844,20 @@ export default function NoteDetailScreen() {
 }
 
 /**
- * Modo leitura.
+ * A anatomia é a do Apple Notes: **a primeira linha é o título**, e o header fica com "Nota" e as
+ * ações — repetir o título no header era a mesma frase duas vezes, a 40px de distância.
  *
- * A anatomia é a do Apple Notes e foi decidida com o usuário: **a primeira linha é o título, e
- * ela vive no CORPO** — o header ficou com "Nota" e as ações. Antes as duas coisas apareciam:
- * o header mostrava `noteTitle(content)` e o corpo renderizava todas as linhas, inclusive a
- * primeira. A pessoa lia a mesma frase duas vezes, com 40px de distância.
- *
- * `noteBlocks` (`src/lib/note-blocks.ts`) resolve título, `#tag` e linha vazia — com teste. Aqui só
- * sobra desenho: hierarquia por peso (22/600 no título, 17/400 no corpo), `Space.sm` entre
- * linhas e um alvo de toque que cobre o vazio.
+ * ⚠️ **Desde 23/09/2026 o título tem CAMPO PRÓPRIO** (`Type.title`, acima do corpo), e não é mais
+ * a primeira linha do corpo com outra cara: *"o título tem que ter um espaço separado"*. O dado não
+ * mudou — `separarTitulo`/`juntarTitulo` (`src/lib/note-blocks.ts`, com teste) só dividem o
+ * `content` para o editor. O corpo (`NoteBody`) não promove mais ninguém a título.
  */
 const styles = StyleSheet.create({
   /** Disco de 18 com anel de 1,5 — a mesma relação tinta/borda das amostras do seletor. */
   disco: {
     width: 18,
     height: 18,
-    borderRadius: 9,
+    borderRadius: Radius.pill,
     borderWidth: 1.5,
   },
   body: {
@@ -871,57 +900,10 @@ const styles = StyleSheet.create({
   titulo: {
     padding: 0,
   },
-  /**
-   * `minHeight` casa com o do `TextInput` da edição: sem isso o corpo "encolhe" no instante em
-   * que a nota sai de edição para leitura, e o dedo persegue o texto que se moveu.
-   */
-  readBody: {
-    gap: Space.sm,
-    minHeight: 280,
-    flexGrow: 1,
-  },
-  /** Título respira mais que a distância entre linhas do corpo — é o que o separa do texto. */
-  readTitle: {
-    marginBottom: Space.xs,
-  },
   loading: {
     gap: Space.md,
   },
-  checkLine: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    gap: Space.md,
-  },
-  listLine: { flexDirection: 'row', alignItems: 'flex-start', gap: Space.sm },
-  /** Largura fixa: sem ela "1." e "10." desalinham o texto da lista. */
-  marker: { width: 22, textAlign: 'right', lineHeight: Type.body.lineHeight },
-  quoteLine: { flexDirection: 'row', alignItems: 'stretch', gap: Space.md },
-  quoteBar: { width: 3, borderRadius: Radius.xs },
-  quoteText: { fontStyle: undefined },
-  divider: { height: StyleSheet.hairlineWidth, marginVertical: Space.sm },
   blockBarWrap: { paddingHorizontal: Space.lg, paddingBottom: Space.sm },
-  blockBar: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-around',
-    gap: Space.xs,
-    padding: Space.xs,
-    borderRadius: Radius.pill,
-    borderWidth: StyleSheet.hairlineWidth,
-  },
-  blockButton: {
-    width: HitTarget - 4,
-    height: HitTarget - 8,
-    borderRadius: Radius.pill,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  grow: {
-    flex: 1,
-  },
-  done: {
-    textDecorationLine: 'line-through',
-  },
   errorCard: {
     alignItems: 'center',
     gap: Space.md,

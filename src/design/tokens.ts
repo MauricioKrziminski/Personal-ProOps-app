@@ -125,6 +125,12 @@ export const Motion = {
      */
     tab: { duration: 1000, dampingRatio: 0.62 },
     /**
+     * O polegar do `Segmented` (Android/web) é DUAS bordas: a da frente corre com esta…
+     */
+    segmentoFrente: { duration: 300, dampingRatio: 0.84 },
+    /** …e a de trás vem com esta, mais lenta — é a diferença entre as duas que estica o polegar. */
+    segmentoTras: { duration: 520, dampingRatio: 0.9 },
+    /**
      * Assentar no grid — o azulejo encaixando. Chega firme e sem quique: o Concreto não balança,
      * ele trava no lugar. Usada no loader do botão, na carteira e em tudo que "encaixa".
      */
