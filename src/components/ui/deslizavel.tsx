@@ -20,7 +20,7 @@ import { Icon } from '@/components/ui/icon';
 import { DentroDeArrasto } from '@/components/ui/money';
 import { Radius, Space } from '@/design/tokens';
 import { useTheme } from '@/hooks/use-theme';
-import { BOTAO, cardAberto, fecharCardAberto, ladosDoArrasto, limiarAteOFim, temArrasto } from '@/lib/arrasto';
+import { BOTAO, cardAberto, fecharCardAberto, ladosDoArrasto, passouAteOFim, temArrasto } from '@/lib/arrasto';
 import { showItemActions, type ItemAction } from '@/lib/item-actions';
 
 /** Um card aberto por vez (`cardAberto`, `lib/arrasto.ts`); a lista que começa a rolar fecha o dele. */
@@ -104,10 +104,14 @@ export function Deslizavel({ titulo, acoes, forma = 'linha', fundo = 'surface', 
               )
             : undefined
         }
-        onSwipeableWillOpen={() => {
+        onSwipeableWillOpen={(direcao) => {
           cardAberto.abriu(meu);
-          // Ao soltar: o dedo passou do fim de um lado com ação que se desfaz?
-          pendente.current = passouDireita.get() ? lados.pontaDireita : passouEsquerda.get() ? lados.pontaEsquerda : null;
+          // Ao soltar: o dedo passou do fim DO LADO que abriu, com ação que se desfaz? `right` é o
+          // conteúdo indo para a direita — o painel `direita`.
+          pendente.current =
+            direcao === 'right'
+              ? passouDireita.get() ? lados.pontaDireita : null
+              : passouEsquerda.get() ? lados.pontaEsquerda : null;
           if (!pendente.current) Haptics.selectionAsync();
         }}
         onSwipeableOpen={() => {
@@ -146,7 +150,7 @@ function Painel({
   const theme = useTheme();
   // Cruzou o ponto de "até o fim": marca e dá o toque leve — uma vez por cruzamento.
   useAnimatedReaction(
-    () => largura.get() > 0 && Math.abs(translation.get()) > limiarAteOFim(largura.get(), acoes.length, temPonta),
+    () => passouAteOFim(translation.get(), lado, largura.get(), acoes.length, temPonta),
     (agora, antes) => {
       if (agora === antes) return;
       passou.set(agora);

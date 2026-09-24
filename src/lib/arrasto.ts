@@ -38,6 +38,25 @@ export function limiarAteOFim(largura: number, botoes: number, temPonta: boolean
   return Math.max(largura * 0.55, (botoes + 1) * BOTAO);
 }
 
+/**
+ * O dedo passou do "até o fim" DESTE lado? `translation` positivo = arrastou para a direita.
+ *
+ * O `ReanimatedSwipeable` desenha os DOIS painéis em todo arrasto e os dois leem o mesmo
+ * deslocamento; olhando o valor absoluto, arrastar a nota para a esquerda passava do limiar do
+ * Fixar (o lado direito, mais curto) e fixava em vez de arquivar (revisão final, 23/09/2026).
+ */
+export function passouAteOFim(
+  translation: number,
+  lado: 'direita' | 'esquerda',
+  largura: number,
+  botoes: number,
+  temPonta: boolean,
+): boolean {
+  'worklet';
+  const andou = lado === 'direita' ? translation : -translation;
+  return largura > 0 && andou > limiarAteOFim(largura, botoes, temPonta);
+}
+
 type Fechavel = { close: () => void };
 let aberto: Fechavel | null = null;
 

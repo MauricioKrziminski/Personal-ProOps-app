@@ -237,7 +237,7 @@ export default function NotesScreen() {
               toast({
                 message: note.pinned ? 'Nota desafixada.' : 'Nota fixada.',
                 tone: 'success',
-                action: { label: 'Desfazer', onPress: () => togglePin.mutate({ id: note.id, pinned: note.pinned }) },
+                action: { label: 'Desfazer', onPress: () => togglePin.mutate({ id: note.id, pinned: note.pinned }, { onError: () => toast({ message: 'Não deu para desfazer.', tone: 'error' }) }) },
               }),
             onError: () => toast({ message: 'Não deu para fixar a nota.', tone: 'error' }),
           }
@@ -256,7 +256,7 @@ export default function NotesScreen() {
                 tone: 'success',
                 action: {
                   label: 'Desfazer',
-                  onPress: () => updateNote.mutate({ id: note.id, archived: false }),
+                  onPress: () => updateNote.mutate({ id: note.id, archived: false }, { onError: () => toast({ message: 'Não deu para desfazer.', tone: 'error' }) }),
                 },
               }),
             onError: () => toast({ message: 'Não deu para arquivar a nota.', tone: 'error' }),
@@ -270,7 +270,7 @@ export default function NotesScreen() {
             toast({
               message: 'Nota na lixeira.',
               tone: 'success',
-              action: { label: 'Desfazer', onPress: () => restore.mutate(note.id) },
+              action: { label: 'Desfazer', onPress: () => restore.mutate(note.id, { onError: () => toast({ message: 'Não deu para desfazer.', tone: 'error' }) }) },
             }),
           onError: () => toast({ message: 'Não deu para apagar a nota.', tone: 'error' }),
         });

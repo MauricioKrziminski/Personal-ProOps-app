@@ -210,7 +210,7 @@ export default function FoldersScreen() {
             tone: 'success',
             action: {
               label: 'Desfazer',
-              onPress: () => updateFolder.mutate({ id: folder.id, archived: false }),
+              onPress: () => updateFolder.mutate({ id: folder.id, archived: false }, { onError: () => toast({ message: 'Não deu para desfazer.', tone: 'error' }) }),
             },
           }),
         onError: () => toast({ message: 'Não deu para arquivar a pasta.', tone: 'error' }),
@@ -228,7 +228,7 @@ export default function FoldersScreen() {
           toast({
             message: folder.pinned ? `«${folder.name}» desafixada.` : `«${folder.name}» fixada.`,
             tone: 'success',
-            action: { label: 'Desfazer', onPress: () => updateFolder.mutate({ id: folder.id, pinned: folder.pinned }) },
+            action: { label: 'Desfazer', onPress: () => updateFolder.mutate({ id: folder.id, pinned: folder.pinned }, { onError: () => toast({ message: 'Não deu para desfazer.', tone: 'error' }) }) },
           }),
         onError: () => toast({ message: 'Não deu para fixar a pasta.', tone: 'error' }),
       }

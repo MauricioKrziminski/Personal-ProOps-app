@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 
-import { cardAberto, ladosDoArrasto, limiarAteOFim, temArrasto } from './arrasto.ts';
+import { cardAberto, ladosDoArrasto, limiarAteOFim, passouAteOFim, temArrasto } from './arrasto.ts';
 
 const a = (label: string, extra: Record<string, unknown> = {}) => ({ label, onPress: () => {}, ...extra });
 
@@ -73,4 +73,16 @@ test('card que saiu da tela não engole o primeiro toque da próxima', () => {
   cardAberto.esquecer(a); // perdeu o foco ou desmontou
   assert.equal(a.fechou, 1);
   assert.equal(cardAberto.toqueEmOutro(b), false);
+});
+
+test('até o fim olha o LADO: arrastar à esquerda nunca dispara a ação da direita', () => {
+  // Nota num card de 352dp: Fixar à direita (1 botão), Mais + Arquivar à esquerda (2 botões).
+  // Os dois painéis leem o mesmo deslocamento; sem o lado, −200 "passava" do limiar de Fixar.
+  assert.equal(passouAteOFim(-200, 'direita', 352, 1, true), false);
+  assert.equal(passouAteOFim(-270, 'direita', 352, 1, true), false);
+  assert.equal(passouAteOFim(-270, 'esquerda', 352, 2, true), true);
+  assert.equal(passouAteOFim(-200, 'esquerda', 352, 2, true), false, 'só abre o lado');
+  assert.equal(passouAteOFim(200, 'direita', 352, 1, true), true);
+  assert.equal(passouAteOFim(200, 'esquerda', 352, 2, true), false);
+  assert.equal(passouAteOFim(400, 'direita', 352, 1, false), false, 'sem ponta nunca executa');
 });

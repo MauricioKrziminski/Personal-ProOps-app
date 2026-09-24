@@ -436,7 +436,7 @@ export default function RecurringScreen() {
             message: r.active ? 'Série pausada.' : 'Série retomada.',
             tone: 'success',
             // Com "Desfazer": é o que deixa pausar valer ao arrastar até o fim (Deslizavel).
-            action: { label: 'Desfazer', onPress: () => toggle.mutate({ id: r.id, active: r.active }) },
+            action: { label: 'Desfazer', onPress: () => toggle.mutate({ id: r.id, active: r.active }, { onError: () => toast({ message: 'Não deu para desfazer.', tone: 'error' }) }) },
           }),
         onError: () => toast({ message: 'Não deu para mudar a série.', tone: 'error' }),
       }

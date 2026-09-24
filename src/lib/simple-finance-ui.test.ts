@@ -26,7 +26,10 @@ function screen(file: string, options: { tablet?: boolean; debts?: any[]; archiv
   /** O que cada chamada do portão da tela recebeu — o dublê dele abre sempre, então é por aqui que se confere a COMPOSIÇÃO. */
   const gates: any[][] = [];
   const query = { data: [], isLoading: false, isError: false, isRefetching: false, refetch: async () => {} };
-  const mutation = (operation: string) => ({ isPending: false, reset() {}, mutate(value: any) { writes.push({ operation, value }); } });
+  /** As mesmas escritas de `writes`, com as opções (`onSuccess`/`onError`) — é por aqui que se chama o retorno. */
+  const pedidos: { operation: string; value: any; opts: any }[] = [];
+  const toasts: any[] = [];
+  const mutation = (operation: string) => ({ isPending: false, reset() {}, mutate(value: any, opts?: any) { writes.push({ operation, value }); pedidos.push({ operation, value, opts }); } });
   const animation = { duration: () => animation, delay: () => animation };
   const finance = new Proxy({
     DEBT_KINDS: [{ value: 'financing', label: 'Financiamento' }, { value: 'loan', label: 'Empréstimo' }],
@@ -40,6 +43,7 @@ function screen(file: string, options: { tablet?: boolean; debts?: any[]; archiv
     // "Ainda não tem movimento", e o teste das bordas falhando depende de ele NÃO afirmar.
     useRules: () => ({ ...query, isSuccess: true, data: options.rules ?? [] }),
     useRecurringTransactions: () => ({ ...query, isSuccess: true, data: options.recurring ?? [] }),
+    useToggleRecurring: () => mutation('toggleRecurring'),
     useGoals: () => ({ ...query, isSuccess: true, data: options.goals ?? [] }),
     useRecentTransactions: () => (options.recent ? { ...query, isSuccess: true, data: options.recent } : query),
     usePlanStatus: () => options.planPending
@@ -223,7 +227,7 @@ function screen(file: string, options: { tablet?: boolean; debts?: any[]; archiv
         useMonthRuler: () => ({ view: 'cycle', setView: () => {}, temCiclo: false, cycle: { data: undefined } }),
       };
       if (name === '@/lib/item-actions') return { confirmDestructive: (_title: string, _label: string, callback: () => void) => confirmations.push(callback), showItemActions: (_title: string, entries: any[]) => actions.push(...entries) };
-      if (name === '@/components/ui/toast') return { useToast: () => () => {} };
+      if (name === '@/components/ui/toast') return { useToast: () => (t: any) => toasts.push(t) };
       // O provider de "esconder saldo" só existe dentro da árvore real; aqui o valor aparece.
       if (name === '@/components/ui/conceal') return {
         useConceal: () => ({ concealed: false, toggle: () => {} }),
@@ -279,7 +283,7 @@ function screen(file: string, options: { tablet?: boolean; debts?: any[]; archiv
   const render = () => { cursor = 0; nodes = []; visit(Component()); };
   render();
   return {
-    writes, confirmations, actions, navigations, refetches, gates,
+    writes, pedidos, toasts, confirmations, actions, navigations, refetches, gates,
     drafts: () => forecastDrafts,
     nodes: () => nodes,
     button(label: string) { const node = nodes.find((n) => n.type === 'Button' && n.props.label === label); assert.ok(node, `visible button: ${label}`); return node; },
@@ -1225,6 +1229,16 @@ test('Recorrentes: arrasta Pausar (até o fim, com Desfazer) e Apagar; o resto n
   const card = deslizaveis(ui)[0];
   assert.ok(card, 'a série está num Deslizavel');
   assert.deepEqual(ladosDe(card), { direita: ['Pausar'], esquerda: ['Apagar'], mais: true, pontaDireita: 'Pausar', pontaEsquerda: null });
+  // O Desfazer é a rede do "até o fim": se ele falhar, a pessoa precisa saber (design.md §6).
+  ui.interact(() => card.props.acoes.find((x: any) => x.label === 'Pausar').onPress());
+  ui.interact(() => ui.pedidos.at(-1).opts.onSuccess());
+  const desfazer = ui.toasts.at(-1).action;
+  assert.equal(desfazer?.label, 'Desfazer');
+  ui.interact(() => desfazer.onPress());
+  const volta = ui.pedidos.at(-1);
+  assert.equal(typeof volta.opts?.onError, 'function', 'o Desfazer avisa quando falha');
+  ui.interact(() => volta.opts.onError());
+  assert.equal(ui.toasts.at(-1).tone, 'error');
 });
 
 test('Metas: arrasta Guardar à direita e Arquivar à esquerda', () => {
