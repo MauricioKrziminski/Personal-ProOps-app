@@ -47,6 +47,7 @@ import { estadoDaLinha } from '@/lib/settle-labels';
 import { STATUS_DA_FATURA } from '@/lib/card-status';
 import { accountLabel } from '@/lib/accounts';
 import { AccountPicker } from '@/components/finance/account-picker';
+import { rotuloDaCompra } from '@/lib/data-da-compra';
 
 /**
  * Fatura — "o que tem nesta fatura, e como eu marco como paga?".
@@ -604,7 +605,9 @@ export default function InvoiceScreen() {
                     {({ onLongPress }) => (
                       <Row
                         title={tx.description ?? tx.merchant ?? 'Sem descrição'}
-                        subtitle={[tx.category, parcela, prevista ? 'prevista' : null]
+                        // A parcela mora no dia em que cai nesta fatura; a compra é de antes
+                        // ("Mostre sempre a data do lançamento", 24/09/2026).
+                        subtitle={[tx.category, parcela, rotuloDaCompra(tx), prevista ? 'prevista' : null]
                           .filter(Boolean)
                           .join(' · ')}
                         accessibilityLabel={`${tx.description ?? 'Sem descrição'}, ${formatBRL(tx.amount_cents)}${prevista ? ', parcela prevista' : ''}`}

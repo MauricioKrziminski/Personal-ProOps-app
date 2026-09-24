@@ -23,6 +23,7 @@ import { type CycleLine, type CycleRow, type CycleView, useCycleLines, useCycleM
 import { describeCycle } from '@/lib/cycle-label';
 import { rotaDaLinha } from '@/lib/cycle-routes';
 import { isoToBR, mesmoMes } from '@/lib/dates';
+import { rotuloDaCompra } from '@/lib/data-da-compra';
 
 /**
  * **Por que o ciclo fechou naquele valor** — a tela que justifica o número da home.
@@ -281,7 +282,9 @@ function Linha({ linha }: { linha: CycleLine }) {
             <Row
               key={t.id}
               title={t.description ?? t.merchant ?? 'Compra'}
-              subtitle={`${isoToBR(t.occurred_at).slice(0, 5)}${t.category ? ` · ${t.category}` : ''}`}
+              // A data da COMPRA: a parcela 2 em diante mora no mês em que cai, e a linha dizia a
+              // data dela como se fosse a da compra ("Mostre sempre a data do lançamento").
+              subtitle={[rotuloDaCompra(t) ?? isoToBR(t.occurred_at).slice(0, 5), t.category].filter(Boolean).join(' · ')}
               trailing={<Money cents={Number(t.amount_cents)} variant="footnote" />}
               onPress={() => router.push({ pathname: '/finance/[txId]', params: { txId: t.id } })}
             />

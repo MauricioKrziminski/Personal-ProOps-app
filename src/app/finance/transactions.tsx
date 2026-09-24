@@ -46,6 +46,7 @@ import { useTelaPronta } from '@/hooks/use-tela-pronta';
 import { formatBRL, formatDateBR, localISODate } from '@/hooks/use-items';
 import { mesmoMes } from '@/lib/dates';
 import { confirmDestructive } from '@/lib/item-actions';
+import { rotuloDaCompra } from '@/lib/data-da-compra';
 import { dueInline, estadoDaLinha, settleDone, settleLabel } from '@/lib/settle-labels';
 import { useDebounced } from '@/hooks/use-debounced';
 import { useTheme, useScheme } from '@/hooks/use-theme';
@@ -78,10 +79,10 @@ const KIND_OPTIONS = [
 ] as const satisfies readonly { value: TransactionKind | 'all'; label: string }[];
 
 /**
- * ⚠️ **O filtro é do `status`, e por isso ele NÃO diz "ainda vai acontecer".** Era essa a
- * palavra, e ela virou mentira quando a pílula passou a sair da data: a compra de cartão de
- * ontem é `pending` e JÁ aconteceu. O que o `status` responde é outra coisa — se o dinheiro já
- * se mexeu.
+ * ⚠️ **O filtro é da DATA, a mesma régua da pílula** (`filtroDoEstado`, 24/09/2026). Era do
+ * `status`, e compra de cartão fica `pending` até a fatura ser paga: a compra de ontem nunca
+ * aparecia em "Concluído" (o wardogs). "Concluído" = já aconteceu; "Em aberto" = previsto,
+ * atrasado ou receita que não caiu.
  */
 const STATUS_OPTIONS: { value: 'all' | 'pending' | 'cleared'; label: string }[] = [
   { value: 'all', label: 'Tudo' },
@@ -703,23 +704,21 @@ export default function TransactionsScreen() {
             const estado = estadoDaLinha(tx, hoje);
             const emAberto = tx.status === 'pending';
             /**
-             * ⚠️ **"na fatura de 10/10" NÃO pode sumir junto com a pílula.** Com o antigo
-             * `previsto = status === 'pending'`, a compra de cartão caía no ramo do `dueInline` e
-             * mostrava a data da fatura. Trocando a condição pela pílula, a compra de ontem
-             * perderia a data e ganharia a palavra solta "fatura" — o conserto tiraria a tag
-             * errada e levaria embora o único dado que restava na linha.
-             *
-             * Quem decide a PÍLULA é o estado (data); quem decide o SUBTÍTULO é o `status`, que é
-             * o que responde "esse dinheiro já saiu?".
+             * ⚠️ **A linha diz a data da COMPRA, nunca o vencimento da fatura** (24/09/2026,
+             * decisão do dono do produto: *"Mostre sempre a data do lançamento"*). Escrever
+             * "na fatura de 10/10" numa compra de cartão fazia o vencimento ler como a data do
+             * lançamento. A data é a do cabeçalho do dia; na parcela 2 em diante, que mora no mês
+             * em que cai, a linha acrescenta "compra de 14/09". A fatura continua no detalhe
+             * ("Entra na fatura de …"). Conta a pagar fora do cartão mantém "vence …": ali o
+             * vencimento É a data daquela conta.
              */
             const tituloDaLinha = tx.description || tx.merchant || tx.category || 'Sem descrição';
             const badges = [
               // "parcela 2" some quando o título já diz "(2/10)" — a mesma informação duas vezes.
               tx.installment_no && !/\(\d+\/\d+\)$/.test(tituloDaLinha) ? `parcela ${tx.installment_no}` : null,
-              emAberto
-                ? dueInline(tx.kind, tx.due_at ? formatDateBR(tx.due_at).slice(0, 5) : null, {
-                    onCard: tx.invoice_id !== null,
-                  }).replace(/^previsto( · )?/, '')
+              rotuloDaCompra(tx),
+              emAberto && tx.invoice_id === null
+                ? dueInline(tx.kind, tx.due_at ? formatDateBR(tx.due_at).slice(0, 5) : null).replace(/^previsto( · )?/, '')
                 : null,
             ].filter(Boolean);
             // Transferência não tem sinal na lista global — ela não é entrada nem saída do

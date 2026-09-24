@@ -13,6 +13,7 @@ import { toIlikeTerm } from '@/lib/search';
 import { ACCOUNT_TYPES } from '@/lib/accounts';
 import { adiantaveisNoMes, type Adiantavel, type EscolhaDeAdiantamento } from '@/lib/anticipation';
 import { useRealtimeInvalidate, workspaceId } from '@/hooks/use-items';
+import { filtroDoEstado } from '@/lib/data-da-compra';
 
 // Categorias vivem em @/lib/categories (fonte única, travada por teste contra o
 // prompt do Gemini); reexportadas aqui para não quebrar os imports das telas.
@@ -67,6 +68,12 @@ export type Transaction = Pick<
   kind: TransactionKind;
   source: TransactionSource;
   status: TransactionStatus;
+  /**
+   * A data da COMPRA de uma parcela (`dataDaCompra`, `lib/data-da-compra.ts`): a parcela mora no
+   * mês em que cai, e "Mostre sempre a data do lançamento" (24/09/2026) pede a da compra.
+   * Só leitura — nenhuma escrita espalha a linha lida, então o campo embutido não vira coluna.
+   */
+  installment_plans?: { first_occurred_at: string } | null;
 };
 
 /**
@@ -159,7 +166,7 @@ export type TxSummaryRow = Omit<Fns['transactions_summary']['Returns'][number], 
 };
 
 const TRANSACTION_COLUMNS =
-  'id, kind, amount_cents, currency, category, description, account_id, counterparty_account_id, occurred_at, source, created_at, status, due_at, invoice_id, installment_plan_id, installment_no, merchant, recurring_id, debt_id, auto_confirm, rollover_of_invoice_id';
+  'id, kind, amount_cents, currency, category, description, account_id, counterparty_account_id, occurred_at, source, created_at, status, due_at, invoice_id, installment_plan_id, installment_no, merchant, recurring_id, debt_id, auto_confirm, rollover_of_invoice_id, installment_plans(first_occurred_at)';
 
 export interface TransactionFilters {
   /**
@@ -231,7 +238,12 @@ export function useTransactions(filters: TransactionFilters) {
         .range(pageParam, pageParam + TRANSACTION_PAGE - 1);
       if (filters.kind) query = query.eq('kind', filters.kind);
       if (filters.category) query = query.eq('category', filters.category);
-      if (filters.status) query = query.eq('status', filters.status);
+      // "Em aberto"/"Concluído" na régua da DATA, a mesma da pílula (`filtroDoEstado`).
+      if (filters.status) {
+        const estado = filtroDoEstado(filters.status, localISODate());
+        if (estado.status) query = query.eq('status', estado.status);
+        query = query.or(estado.ou);
+      }
       if (filters.source) query = query.eq('source', filters.source);
       // "Ver ocorrências" de uma recorrente passa por aqui; sem o filtro a tela abriria o mês
       // inteiro sem avisar que ignorou o pedido.

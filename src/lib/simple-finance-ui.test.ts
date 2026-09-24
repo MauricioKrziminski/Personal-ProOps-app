@@ -12,7 +12,7 @@ const require = createRequire(import.meta.url);
 
 // Execute the screen JSX and its event handlers. Native components/query boundaries
 // are inert; state persists across renders so each interaction uses current props.
-function screen(file: string, options: { tablet?: boolean; debts?: any[]; archivedDebts?: any[]; debtSchedule?: any[]; invoiceStatus?: string; create?: boolean; monthLines?: any[]; monthSummary?: any; cycleLines?: any[]; cycleRow?: any; rangeError?: boolean; rangePending?: boolean; rangePendingMonths?: string[]; bills?: any[]; billsError?: boolean; charges?: any[]; reminders?: any[]; budgets?: any[]; setupPassos?: any[]; proximo?: any; activity?: any[]; activityError?: boolean; forecastAccounts?: any[]; anticipation?: any[] | ((pagarEm: string) => any[]); cards?: any[]; params?: Record<string, string>; paymentsError?: boolean; debtPayments?: any[]; importItems?: any[]; importBatch?: any; unmatched?: any[]; forecastMonths?: any[]; categoriasUsadas?: any[]; maisPaginas?: boolean; alerts?: any[]; buscaNotas?: any[]; faturas?: any[]; balances?: any[]; balancesError?: boolean; plan?: string; planPending?: boolean; txStatus?: string; recent?: any[]; rules?: any[]; recurring?: any[]; goals?: any[]; componente?: string; props?: any; folders?: any[]; notes?: any[]; conversations?: any[]; batches?: any[]; plans?: any[]; contributions?: any[] } = {}) {
+function screen(file: string, options: { tablet?: boolean; debts?: any[]; archivedDebts?: any[]; debtSchedule?: any[]; invoiceStatus?: string; create?: boolean; monthLines?: any[]; monthSummary?: any; cycleLines?: any[]; cycleRow?: any; rangeError?: boolean; rangePending?: boolean; rangePendingMonths?: string[]; bills?: any[]; billsError?: boolean; charges?: any[]; reminders?: any[]; budgets?: any[]; setupPassos?: any[]; proximo?: any; activity?: any[]; activityError?: boolean; forecastAccounts?: any[]; anticipation?: any[] | ((pagarEm: string) => any[]); cards?: any[]; params?: Record<string, string>; paymentsError?: boolean; debtPayments?: any[]; importItems?: any[]; importBatch?: any; unmatched?: any[]; forecastMonths?: any[]; categoriasUsadas?: any[]; maisPaginas?: boolean; alerts?: any[]; buscaNotas?: any[]; faturas?: any[]; balances?: any[]; balancesError?: boolean; plan?: string; planPending?: boolean; txStatus?: string; recent?: any[]; rules?: any[]; recurring?: any[]; goals?: any[]; componente?: string; props?: any; folders?: any[]; notes?: any[]; conversations?: any[]; batches?: any[]; plans?: any[]; contributions?: any[]; txs?: any[] } = {}) {
   const state: any[] = [];
   let cursor = 0;
   let nodes: any[] = [];
@@ -105,7 +105,7 @@ function screen(file: string, options: { tablet?: boolean; debts?: any[]; archiv
       ? { ...query, data: undefined, isPending: true, fetchStatus: 'idle', hasNextPage: false, isFetchingNextPage: false, fetchNextPage: () => {}, refetch: async () => { refetches.push('list'); } }
       // Uma linha: com a lista vazia o card do resumo SOME de propósito (card que soma uma lista
       // vazia é eco — design.md §1), e o caminho feliz não teria o que mostrar.
-      : { ...query, data: { pages: [[{ id: 'tx-1', kind: 'expense', amount_cents: 4500, occurred_at: '2026-09-15', description: 'Mercado', category: 'mercado', account_id: null, status: options.txStatus ?? 'cleared' }]], pageParams: [] }, isPending: false, hasNextPage: false, isFetchingNextPage: false, fetchNextPage: () => {}, refetch: async () => { refetches.push('list'); } },
+      : { ...query, data: { pages: [options.txs ?? [{ id: 'tx-1', kind: 'expense', amount_cents: 4500, occurred_at: '2026-09-15', description: 'Mercado', category: 'mercado', account_id: null, status: options.txStatus ?? 'cleared' }]], pageParams: [] }, isPending: false, hasNextPage: false, isFetchingNextPage: false, fetchNextPage: () => {}, refetch: async () => { refetches.push('list'); } },
     useMonthSummary: () => ({ ...query, data: options.monthSummary ?? null }),
     useAccounts: () => ({ ...query, data: options.forecastAccounts ?? [] }),
     useCashFlowForecast: () => ({ ...query, data: [{ day: '2026-09-18', balance_cents: 10000, in_cents: 0, out_cents: 0 }] }),
@@ -222,7 +222,7 @@ function screen(file: string, options: { tablet?: boolean; debts?: any[]; archiv
       };
       // Orçamentos consulta direto (a lista de linhas): o mesmo resultado inerte dos hooks.
       if (name === '@tanstack/react-query') return { useQuery: () => query, useMutation: () => mutation('mutation'), useQueryClient: () => ({ invalidateQueries: async () => {} }) };
-      if (name === '@/lib/finance-form' || name === '@/lib/dates' || name === '@/lib/forecast-months' || name === '@/lib/month-view' || name === '@/lib/settle-labels' || name === '@/lib/accounts' || name === '@/lib/cycle-label' || name === '@/lib/card-status' || name === '@/lib/today-sections' || name === '@/lib/runway' || name === '@/lib/budget-tight' || name === '@/lib/setup-steps' || name === '@/lib/activity-feed' || name === '@/lib/account-cash' || name === '@/lib/today-spend' || name === '@/lib/anticipation' || name === '@/lib/widget-snapshot' || name === '@/lib/debt-history' || name === '@/lib/import-preview' || name === '@/lib/arrasto' || name === '@/lib/text' || name === '@/lib/installment-progress' || name === '@/lib/aos-poucos' || name === '@/lib/categories' || name === '@/lib/categories-merge' || name === '@/lib/alert-history') return load(`src/lib/${name.split('/').at(-1)}.ts`);
+      if (name === '@/lib/finance-form' || name === '@/lib/dates' || name === '@/lib/forecast-months' || name === '@/lib/month-view' || name === '@/lib/settle-labels' || name === '@/lib/accounts' || name === '@/lib/cycle-label' || name === '@/lib/card-status' || name === '@/lib/today-sections' || name === '@/lib/runway' || name === '@/lib/budget-tight' || name === '@/lib/setup-steps' || name === '@/lib/activity-feed' || name === '@/lib/account-cash' || name === '@/lib/today-spend' || name === '@/lib/anticipation' || name === '@/lib/widget-snapshot' || name === '@/lib/debt-history' || name === '@/lib/import-preview' || name === '@/lib/arrasto' || name === '@/lib/text' || name === '@/lib/installment-progress' || name === '@/lib/aos-poucos' || name === '@/lib/categories' || name === '@/lib/categories-merge' || name === '@/lib/alert-history' || name === '@/lib/data-da-compra') return load(`src/lib/${name.split('/').at(-1)}.ts`);
       if (name === '@/hooks/use-debounced') return { useDebounced: (value: unknown) => value };
       if (name === '@/lib/rrule-text') return { describeRRule: () => 'todo mês' };
       if (name === '@/hooks/use-archived-folders') return { useArchivedFolders: () => ({ ...query, isSuccess: true, data: [] }) };
@@ -1765,4 +1765,29 @@ test('Todo filho de ItemLink repassa o onPress que o Link do iOS injeta', () => 
   for (const [comp, arquivo] of [['Row', 'src/components/ui/row.tsx'], ['LedgerRow', 'src/components/ui/ledger-row.tsx']]) {
     assert.match(readFileSync(arquivo, 'utf8'), /\bonPress\b[\s\S]*<Pressable[\s\S]*onPress=\{onPress\}/, `${comp} repassa onPress ao Pressable`);
   }
+});
+
+test('Lançamentos: a linha diz a data da COMPRA, nunca o vencimento da fatura (24/09/2026)', () => {
+  // "o wardogs mostra na data que vai entrar na fatura ao invés de mostrar a data que o
+  // lançamento foi feito de fato" — a linha escrevia "na fatura de 10/10" e nada da compra.
+  const base = { kind: 'expense', amount_cents: 5250, category: 'jogos', account_id: 'c1', status: 'pending', invoice_id: 'f1', source: 'app' };
+  const ui = screen('src/app/finance/transactions.tsx', {
+    txs: [
+      { ...base, id: 'w1', description: 'wardogs (1/2)', occurred_at: '2026-09-14', due_at: '2026-10-10', installment_no: 1, installment_plan_id: 'p', installment_plans: { first_occurred_at: '2026-09-14' } },
+      { ...base, id: 'w2', description: 'wardogs (2/2)', occurred_at: '2026-10-14', due_at: '2026-11-10', installment_no: 2, installment_plan_id: 'p', installment_plans: { first_occurred_at: '2026-09-14' } },
+      { ...base, id: 'b1', description: 'Boleto', occurred_at: '2026-10-08', due_at: '2026-10-08', invoice_id: null, installment_no: null, installment_plans: null },
+    ],
+  });
+  // A linha mora no render prop do `ItemLink`, que o harness não desce sozinho.
+  const legenda = (titulo: string) => {
+    const link = ui.nodes().find((n: any) => n.type === 'ItemLink' && n.props.title === titulo);
+    assert.ok(link, `linha ${titulo}`);
+    return link.props.children({}).props.subtitle as string;
+  };
+  for (const t of ['wardogs (1/2)', 'wardogs (2/2)']) assert.doesNotMatch(legenda(t), /fatura/, t);
+  assert.match(legenda('wardogs (2/2)'), /compra de 14\/09/);
+  assert.doesNotMatch(legenda('wardogs (1/2)'), /compra de/, 'a parcela 1 já está no dia da compra');
+  // Conta a pagar fora do cartão: o vencimento É a data dela.
+  // (o `formatDateBR` do harness é um dublê de data fixa — o que se prende aqui é o rótulo)
+  assert.match(legenda('Boleto'), /^vence /);
 });
