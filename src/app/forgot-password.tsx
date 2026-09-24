@@ -228,9 +228,6 @@ export default function ForgotPasswordScreen() {
           style={styles.step}>
           <View style={styles.copy}>
             <ThemedText type="title">Recuperar senha</ThemedText>
-            <ThemedText type="small" themeColor="textSecondary">
-              Mandamos um código de 6 dígitos para o seu e-mail.
-            </ThemedText>
           </View>
           <Field label="E-mail" error={error ?? undefined}>
             <TextField
@@ -293,9 +290,6 @@ export default function ForgotPasswordScreen() {
           style={styles.step}>
           <View style={styles.copy}>
             <ThemedText type="title">Senha nova</ThemedText>
-            <ThemedText type="small" themeColor="textSecondary">
-              Código validado. Agora escolha a senha que você vai usar para entrar.
-            </ThemedText>
           </View>
           {/* A recusa do servidor é sempre da senha escolhida (igual à antiga, fraca, vazada) ou
               da rede, então mora neste campo — sem ela a tela só vibrava. */}

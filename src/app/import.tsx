@@ -355,8 +355,7 @@ export default function ImportScreen() {
           <Icon name="arrow.down.doc" size="xl" color="tint" />
           <ThemedText type="smallBold">Traga a fatura ou o extrato</ThemedText>
           <ThemedText type="small" themeColor="textSecondary" style={styles.centro}>
-            Em OFX ou CSV, exportado no app do banco. Você vê tudo antes de entrar, e o que já está
-            no app fica de fora.
+            OFX ou CSV do app do banco
           </ThemedText>
         </Card>
 
@@ -384,9 +383,6 @@ export default function ImportScreen() {
         ) : semPro ? (
           <Card style={styles.aviso}>
             <ThemedText type="smallBold">Importar é do plano Pro</ThemedText>
-            <ThemedText type="small" themeColor="textSecondary">
-              No Free dá para registrar pelo WhatsApp e pelo agente à vontade.
-            </ThemedText>
             <Button label="Ver planos" onPress={() => router.push('/paywall')} block />
           </Card>
         ) : accountsQuery.isPending ? (
@@ -398,7 +394,7 @@ export default function ImportScreen() {
           <ErrorCard onRetry={() => void accountsQuery.refetch()} />
         ) : (accounts ?? []).length > 0 ? (
           <View style={styles.bloco}>
-            <SectionHead title="De qual conta ou cartão é o arquivo?" />
+            <SectionHead title="Conta ou cartão" />
             {/*
               ⚠️ Obrigatória desde 22/09/2026: a conta decide o SENTIDO das linhas (numa fatura a
               compra vem positiva) e é contra ela que a prévia procura o que já está lançado.
@@ -428,7 +424,7 @@ export default function ImportScreen() {
             <ThemedText type="footnote" themeColor="textSecondary" style={styles.rodape}>
               {accountId
                 ? `Até ${MAX_ITENS} lançamentos por arquivo.`
-                : 'Escolha a conta ou o cartão para continuar.'}
+                : 'Escolha a conta primeiro'}
             </ThemedText>
           </>
         )}
@@ -513,8 +509,7 @@ export default function ImportScreen() {
           */}
           {!lista.some((i) => i.nature === 'compra' || i.nature === 'receita') ? (
             <Note icon="exclamationmark.triangle">
-              Não consegui classificar as linhas agora. Confira aplicações e transferências entre as
-              suas contas antes de importar.
+              Não classifiquei as linhas. Revise.
             </Note>
           ) : null}
 
@@ -633,9 +628,6 @@ export default function ImportScreen() {
               />
             ))}
           </Section>
-          <ThemedText type="footnote" themeColor="textSecondary" style={styles.rodape}>
-            Na conta e no período do arquivo. Pode não ter caído ainda, ou ter sido lançado duas vezes.
-          </ThemedText>
         </View>
       ) : null}
 
@@ -682,7 +674,7 @@ export default function ImportScreen() {
 /** Só onde a linha pede um cuidado que o título não diz (§7b: menos texto). */
 const EXPLICACAO: Partial<Record<Grupo, string>> = {
   no_app: 'Marcar importa de novo.',
-  fora: 'Não são gasto nem receita. Marque só se quiser lançar.',
+  fora: 'Marque só se quiser lançar.',
 };
 
 const styles = StyleSheet.create({

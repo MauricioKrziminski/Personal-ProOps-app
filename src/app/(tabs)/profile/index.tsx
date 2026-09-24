@@ -392,26 +392,19 @@ export default function ProfileScreen() {
       <Section heading="block" title="Conta">
         <Row
           title="Nome"
-          subtitle={nome ?? 'Ninguém te chama pelo nome ainda'}
+          subtitle={nome ?? 'Não informado'}
           icon="person"
           onPress={() => setNameDraft(nome ?? '')}
         />
         <Row
-          title={emailDaConta ? 'Trocar e-mail da conta' : 'Cadastrar e-mail e senha'}
-          subtitle={
-            emailDaConta ??
-            'Um segundo jeito de entrar — sem depender de continuar com este número'
-          }
+          title={emailDaConta ? 'E-mail' : 'Cadastrar e-mail e senha'}
+          subtitle={emailDaConta ?? 'Segundo jeito de entrar'}
           icon="paperplane"
           onPress={() => router.push('/link-email')}
         />
         <Row
-          title={phone ? 'Trocar número do WhatsApp' : 'Conectar o WhatsApp'}
-          subtitle={
-            phone
-              ? phone
-              : 'Libera o agente e os avisos neste canal depois da confirmação'
-          }
+          title={phone ? 'WhatsApp' : 'Conectar o WhatsApp'}
+          subtitle={phone ? phone : 'Libera o agente e os avisos'}
           icon="bubble.left"
           onPress={() => router.push('/link-phone')}
         />

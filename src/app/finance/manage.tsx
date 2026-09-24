@@ -45,18 +45,18 @@ const GROUPS: { title: string; items: ManageItem[] }[] = [
   {
     title: 'Dia a dia',
     items: [
-      { title: 'Lançamentos', subtitle: 'Tudo que entrou e saiu, com filtros', icon: 'list.bullet', href: '/finance/transactions' },
-      { title: 'Contas', subtitle: 'Contas correntes, poupança e dinheiro', icon: 'wallet.pass', href: '/finance/accounts' },
-      { title: 'Cartões', subtitle: 'Limite, fechamento e a fatura de cada um', icon: 'creditcard', href: '/finance/cards' },
-      { title: 'Faturas', subtitle: 'As que já fecharam e as que estão por vir', icon: 'calendar', href: '/finance/invoices' },
+      { title: 'Lançamentos', icon: 'list.bullet', href: '/finance/transactions' },
+      { title: 'Contas', icon: 'wallet.pass', href: '/finance/accounts' },
+      { title: 'Cartões', icon: 'creditcard', href: '/finance/cards' },
+      { title: 'Faturas', icon: 'calendar', href: '/finance/invoices' },
     ],
   },
   {
     title: 'Compromissos',
     items: [
-      { title: 'Parceladas', subtitle: 'Suas compras parceladas e o que falta pagar', icon: 'creditcard.and.123', href: '/finance/installments' },
-      { title: 'Recorrentes', subtitle: 'Salário, aluguel e assinaturas', icon: 'arrow.triangle.2.circlepath', href: '/finance/recurring' },
-      { title: 'Dívidas', subtitle: 'Empréstimos e financiamentos, com os juros', icon: 'dollarsign.circle', href: '/finance/debts' },
+      { title: 'Parceladas', icon: 'creditcard.and.123', href: '/finance/installments' },
+      { title: 'Recorrentes', icon: 'arrow.triangle.2.circlepath', href: '/finance/recurring' },
+      { title: 'Dívidas', icon: 'dollarsign.circle', href: '/finance/debts' },
     ],
   },
   {
@@ -70,7 +70,7 @@ const GROUPS: { title: string; items: ManageItem[] }[] = [
     title: 'Panorama',
     items: [
       { title: 'Patrimônio', icon: 'building.columns', href: '/finance/net-worth' },
-      { title: 'Relatórios', subtitle: 'Exportar o ano, inclusive para o IR', icon: 'chart.bar', href: '/finance/reports' },
+      { title: 'Relatórios', subtitle: 'Exporta para o IR', icon: 'chart.bar', href: '/finance/reports' },
     ],
   },
   {
@@ -87,7 +87,7 @@ const GROUPS: { title: string; items: ManageItem[] }[] = [
   },
   {
     title: 'Conta',
-    items: [{ title: 'Plano', subtitle: 'Assinatura e quem mais usa com você', icon: 'person.2', href: '/finance/plan' }],
+    items: [{ title: 'Plano', icon: 'person.2', href: '/finance/plan' }],
   },
 ];
 

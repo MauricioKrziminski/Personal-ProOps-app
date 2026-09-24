@@ -28,7 +28,6 @@ import { Deslizavel } from '@/components/ui/deslizavel';
 import {
   diasAte as daysUntil,
   estadoDaFatura as estadoFatura,
-  outrasFaturas,
   prazoLabel,
 } from '@/lib/card-status';
 
@@ -198,7 +197,7 @@ export default function CardsScreen() {
         <Money cents={totalAPagar} variant="money" />
         <ThemedText type="small" themeColor="textSecondary" style={tabular}>
           {proximo?.due_date
-            ? `${proximo.name} ${prazoLabel(proximo.due_date, 'vence')} · ${formatDateBR(proximo.due_date)}`
+            ? `${proximo.name} ${prazoLabel(proximo.due_date, 'vence')}`
             : 'Nenhuma fatura em aberto'}
         </ThemedText>
       </Card>
@@ -215,9 +214,6 @@ export default function CardsScreen() {
         const limite = Number(card.credit_limit_cents ?? 0);
         const livre = Number(card.available_limit_cents ?? 0);
         const pct = limite > 0 ? naoPago / limite : 0;
-        // A barra soma todas as não pagas; o que nem o número grande nem a faixa de atraso mostram
-        // vira uma oração na linha do limite.
-        const outras = outrasFaturas(card, estado);
         const podePagar = estado === 'Fechada' || estado === 'Atrasada';
 
         return (
@@ -318,10 +314,7 @@ export default function CardsScreen() {
                     type="footnote"
                     themeColor={livre < 0 ? 'danger' : 'textSecondary'}
                     style={tabular}>
-                    {livre < 0
-                      ? `${brl(Math.abs(livre))} acima do limite de ${brl(limite)}`
-                      : `${brl(livre)} livre de ${brl(limite)}`}
-                    {outras > 0 ? ` · inclui ${brl(outras)} de outras faturas` : ''}
+                    {livre < 0 ? `${brl(Math.abs(livre))} acima do limite` : `${brl(livre)} livre de ${brl(limite)}`}
                   </ThemedText>
                 </>
               ) : null}
@@ -401,7 +394,7 @@ export default function CardsScreen() {
         </>
       ) : (
         <ThemedText type="small" themeColor="textSecondary">
-          Nenhuma fatura em aberto. Os cartões continuam disponíveis para consultar a carteira.
+          Nenhuma fatura em aberto
         </ThemedText>
       )}
     </Card>

@@ -159,11 +159,11 @@ export default function MembersScreen() {
         <Card>
           <View style={styles.sozinho}>
             <ThemedText type="smallBold">Só você por aqui</ThemedText>
-            <ThemedText type="small" themeColor="textSecondary">
-              {teto <= 1
-                ? 'O Free é para uma pessoa. Um plano pago abre o espaço para mais gente.'
-                : 'Convide pelo telefone — a pessoa entra usando o mesmo número no WhatsApp e vocês compartilham o mesmo financeiro.'}
-            </ThemedText>
+            {teto <= 1 ? (
+              <ThemedText type="small" themeColor="textSecondary">
+                No Free é só você.
+              </ThemedText>
+            ) : null}
             {/* Sem botão aqui de propósito: o "Ver planos" mora embaixo do "Convidar"
                 desabilitado, que é onde a pessoa esbarra no limite. Dois botões com o MESMO
                 rótulo e o MESMO destino na mesma tela é pior que rótulo divergente. */}
@@ -208,7 +208,7 @@ export default function MembersScreen() {
           <View style={styles.bloco}>
             <Field
               label="Convidar alguém"
-              hint="Quem entrar enxerga e lança no mesmo financeiro."
+              hint="Vê e lança tudo no mesmo financeiro"
             >
               <TextField
                 value={telefone}
@@ -230,8 +230,7 @@ export default function MembersScreen() {
             {noLimite ? (
               <>
                 <ThemedText type="footnote" themeColor="textSecondary" style={styles.rodape}>
-                  Seu plano vai até {teto} {teto === 1 ? 'pessoa' : 'pessoas'} — e convite pendente
-                  já ocupa uma vaga.
+                  Até {teto} {teto === 1 ? 'pessoa' : 'pessoas'}; convites contam
                 </ThemedText>
                 <Button
                   label="Ver planos"
@@ -261,10 +260,10 @@ export default function MembersScreen() {
                   <Row
                     key={convite.id}
                     title={telefoneBR(convite.phone)}
-                    subtitle="esperando a pessoa se cadastrar"
+                    subtitle="pendente"
                     icon="paperplane"
                     chevron={false}
-                    accessibilityLabel={`Convite para ${telefoneBR(convite.phone)}, esperando a pessoa se cadastrar`}
+                    accessibilityLabel={`Convite para ${telefoneBR(convite.phone)}, pendente`}
                     onPress={() =>
                       confirmDestructive(
                         'Revogar este convite?',
@@ -286,17 +285,6 @@ export default function MembersScreen() {
           ) : null}
         </>
       ) : null}
-
-      <View style={styles.bloco}>
-        <ThemedText type="footnote" themeColor="textSecondary" style={styles.rodape}>
-          Quem entra vê e lança tudo: não existe acesso só de leitura hoje. Cada lançamento guarda
-          quem lançou, e tirar alguém do espaço não apaga o que essa pessoa lançou.
-        </ThemedText>
-        <ThemedText type="footnote" themeColor="textSecondary" style={styles.rodape}>
-          O telefone das outras pessoas não aparece aqui — cada perfil só é visível para o próprio
-          dono. Remover alguém e renomear o espaço também ainda não existem nesta tela.
-        </ThemedText>
-      </View>
     </>
   );
 

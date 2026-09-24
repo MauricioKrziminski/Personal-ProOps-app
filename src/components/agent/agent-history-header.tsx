@@ -24,9 +24,6 @@ export const AgentHistoryHeader = memo(function AgentHistoryHeader({ onNew }: Pr
         <ThemedText type="title" accessibilityRole="header">
           Conversas
         </ThemedText>
-        <ThemedText type="small" themeColor="textSecondary" style={styles.description}>
-          Comece uma conversa ou retome um assunto.
-        </ThemedText>
       </View>
 
       <PressableScale
@@ -41,9 +38,6 @@ export const AgentHistoryHeader = memo(function AgentHistoryHeader({ onNew }: Pr
         </View>
         <View style={styles.actionCopy}>
           <ThemedText type="headline">Nova conversa</ThemedText>
-          <ThemedText type="small" themeColor="textSecondary">
-            Registros, lembretes e perguntas
-          </ThemedText>
         </View>
         <Icon name="chevron.right" size="sm" color="textSecondary" />
       </PressableScale>
@@ -54,7 +48,6 @@ export const AgentHistoryHeader = memo(function AgentHistoryHeader({ onNew }: Pr
 const styles = StyleSheet.create({
   root: { width: '100%', maxWidth: 620, gap: Space.xxl },
   intro: { gap: Space.sm },
-  description: { maxWidth: 360 },
   action: {
     minHeight: 88,
     borderWidth: 1,

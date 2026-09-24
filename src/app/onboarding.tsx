@@ -363,13 +363,6 @@ function PassoNome({
         entra={entra}
         icone="person.crop.circle"
         titulo="Como te chamo?"
-        /*
-          ⚠️ **Não escrever o EFEITO na tela ("aparece no Bom dia").** A queixa foi literal —
-          *"o cara vai preencher o nome somente para aparecer no bom dia? Horrível isso"* —, e
-          ela está certa: um campo se justifica pelo que ele muda para a pessoa, não por onde o
-          valor é impresso. O que ele muda é o app inteiro parar de falar com um cadastro.
-        */
-        texto="Para o app falar com você, e não com um cadastro."
       />
       <Animated.View
         entering={entra(
@@ -408,7 +401,7 @@ function PassoCiclo({
         entra={entra}
         icone="calendar"
         titulo="Quando fecha o seu mês?"
-        texto="Se você paga tudo num dia só, o seu mês começa no dia seguinte a ele — não no dia 1."
+        texto="Começa no dia seguinte ao pagamento"
       />
       <Animated.View
         entering={entra(
@@ -438,7 +431,7 @@ function PassoAvisos({
         entra={entra}
         icone="bell.badge"
         titulo="Quer que eu te avise?"
-        texto="Só o que muda uma decisão: fatura fechando, orçamento no limite, receita que não caiu."
+        texto="Fatura fechando, orçamento no limite"
       />
       <Animated.View
         entering={entra(
@@ -484,7 +477,7 @@ function Cabecalho({
   entra: (a: BaseAnimationBuilder) => BaseAnimationBuilder;
   icone: Parameters<typeof Icon>[0]['name'];
   titulo: string;
-  texto: string;
+  texto?: string;
 }) {
   const theme = useTheme();
   return (
@@ -502,7 +495,7 @@ function Cabecalho({
         )}
         style={styles.titulo}>
         <ThemedText type="title">{titulo}</ThemedText>
-        <ThemedText themeColor="textSecondary">{texto}</ThemedText>
+        {texto ? <ThemedText themeColor="textSecondary">{texto}</ThemedText> : null}
       </Animated.View>
     </View>
   );

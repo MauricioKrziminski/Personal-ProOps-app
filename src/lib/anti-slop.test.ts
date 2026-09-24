@@ -1152,3 +1152,33 @@ test('Switch de formulário só pelo SwitchRow', () => {
   const fora = offenders(/<Switch\b/).filter((o) => !permitidos.has(o.split(':')[0]));
   assert.deepEqual(fora, [], 'monte o interruptor com <SwitchRow>');
 });
+
+/**
+ * Frase com valor dentro é UM texto, com o `Money` aninhado (23/09/2026). Montada em peças soltas
+ * numa linha `flexWrap` ("R$ 0,00" + "de" + "R$ 30.000,00" + "· faltam" + …), cada peça quebrava
+ * sozinha, o `Money` encolhia para caber (`adjustsFontSizeToFit`) e a linha de base desalinhava —
+ * a queixa foi a tela de Metas a 384dp × fonte 1,3. Aninhado, o texto quebra entre palavras, no
+ * mesmo tamanho.
+ *
+ * Fica de fora a linha "rótulo à esquerda, valor à direita", que não é frase.
+ */
+test('frase com dinheiro não é montada em peças numa linha que quebra', () => {
+  const rotuloEValor = new Set([
+    'src/app/finance/debts.tsx dividaTopo', // nome da dívida | total
+    'src/app/finance/debts.tsx proximaLinha', // "Próxima · data" | valor, mesmo tamanho
+    'src/components/finance/period-summary-card.tsx faixaLinha', // rótulo | valor da faixa
+  ]);
+  const fora: string[] = [];
+  for (const file of walk(SRC).filter((f) => f.endsWith('.tsx'))) {
+    const code = readFileSync(file, 'utf8');
+    for (const m of code.matchAll(/<View style=\{\[?styles\.(\w+)/g)) {
+      const estilo = code.match(new RegExp(`\\n  ${m[1]}: \\{([^}]*)\\}`))?.[1] ?? '';
+      if (!estilo.includes('flexWrap') || !estilo.includes("'row'")) continue;
+      const bloco = code.slice(m.index! + m[0].length, code.indexOf('</View>', m.index!));
+      if (!bloco.includes('<Money') || !bloco.includes('<ThemedText') || bloco.includes('<View')) continue;
+      const chave = `${file.replace(SRC, 'src')} ${m[1]}`;
+      if (!rotuloEValor.has(chave)) fora.push(chave);
+    }
+  }
+  assert.deepEqual(fora, [], 'aninhe o <Money> dentro de um <ThemedText>');
+});

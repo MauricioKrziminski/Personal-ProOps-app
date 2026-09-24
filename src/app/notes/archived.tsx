@@ -14,7 +14,7 @@ import { Row, Section } from '@/components/ui/row';
 import { Screen } from '@/components/ui/screen';
 import { SkeletonRow } from '@/components/ui/skeleton';
 import { useToast } from '@/components/ui/toast';
-import { Space, tabular } from '@/design/tokens';
+import { Space } from '@/design/tokens';
 import {
   useNotesList,
   useUpdateFolder,
@@ -152,13 +152,9 @@ export default function ArchivedScreen() {
 
           {/* A linha de saída: daqui a lixeira é o outro lugar onde há coisa escondida. */}
           <View style={styles.rodape}>
-            <ThemedText type="footnote" themeColor="textSecondary" style={tabular}>
-              Tocar numa linha devolve o item para onde ele estava.
-            </ThemedText>
             <Row
               title="Lixeira"
               icon="trash"
-              subtitle="O que foi apagado, por 30 dias"
               onPress={() => router.push('/notes/trash')}
             />
           </View>
@@ -170,9 +166,6 @@ export default function ArchivedScreen() {
   const tabletContext = (
     <Card style={styles.context}>
       <ThemedText type="subtitle">Arquivo</ThemedText>
-      <ThemedText type="small" themeColor="textSecondary">
-        Itens arquivados ficam fora da biblioteca principal até você decidir trazê-los de volta.
-      </ThemedText>
       <View style={styles.contextStats}>
         <View style={styles.contextStat}>
           <ThemedText type="subtitle">{listaPastas.length}</ThemedText>
@@ -187,9 +180,6 @@ export default function ArchivedScreen() {
           </ThemedText>
         </View>
       </View>
-      <ThemedText type="footnote" themeColor="textSecondary">
-        Toque em uma linha para devolver o item ao lugar onde estava.
-      </ThemedText>
     </Card>
   );
 

@@ -174,10 +174,7 @@ export default function RulesScreen() {
   const faixa = lista.length > 0 ? (
     <View style={styles.faixa}>
       <ThemedText type="small" themeColor="textSecondary">
-        Sua regra ganha da IA. Vale no WhatsApp e na importação de extrato.
-      </ThemedText>
-      <ThemedText type="small" themeColor="textSecondary">
-        Dá para criar por mensagem: “sempre que eu falar ifood, põe em restaurante”.
+        Sua regra ganha da IA.
       </ThemedText>
     </View>
   ) : null;
@@ -197,8 +194,8 @@ export default function RulesScreen() {
         <HeroLabel>O que suas regras já pouparam</HeroLabel>
         <ThemedText style={[Type.title, tabular]}>{totalHits}</ThemedText>
         <ThemedText type="small" themeColor="textSecondary">
-          {totalHits === 1 ? 'lançamento categorizado' : 'lançamentos categorizados'} sem
-          precisar da IA, por {ativas} {ativas === 1 ? 'regra' : 'regras'}.
+          {totalHits === 1 ? 'categorizado' : 'categorizados'} · {ativas}{' '}
+          {ativas === 1 ? 'regra' : 'regras'}
         </ThemedText>
       </Card>
     </Animated.View>
@@ -233,7 +230,7 @@ export default function RulesScreen() {
       icon="text.badge.checkmark"
       title="Nenhuma regra ainda"
       hint={
-        'Crie uma para o que a IA sempre erra — “posto” vira transporte.\nOu manda no WhatsApp: “sempre que eu falar ifood, põe em restaurante”.'
+        'Ex.: “posto” sempre vira transporte.'
       }
       action={{ label: 'Nova regra', onPress: () => abrir() }}
     />
@@ -287,7 +284,6 @@ export default function RulesScreen() {
             <Field
               label="Quando o lançamento contiver"
               error={erroSalvar ?? undefined}
-              hint="Trecho do texto, sem diferenciar maiúscula de minúscula."
             >
               <TextField
                 value={rascunho?.pattern ?? ''}
@@ -312,10 +308,7 @@ export default function RulesScreen() {
             </Field>
 
             {(accounts ?? []).length > 0 ? (
-              <Field
-                label="Só nesta conta"
-                hint="Opcional. Sem conta escolhida, a regra vale em todas."
-              >
+              <Field label="Só nesta conta">
                 <AccountPicker
                   accounts={accounts ?? []}
                   value={rascunho?.accountId ?? null}

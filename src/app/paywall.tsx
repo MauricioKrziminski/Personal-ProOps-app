@@ -35,29 +35,25 @@ import { useTheme } from '@/hooks/use-theme';
 
 interface Motivo {
   titulo: string;
-  linha: string;
+  linha?: string;
 }
 
 const MOTIVOS: Record<string, Motivo> = {
   import: {
     titulo: 'Importar extrato é do Pro',
-    linha: 'Traga o extrato do banco em OFX ou CSV e revise tudo de uma vez.',
   },
   ai_quota: {
     titulo: 'Sua cota de mensagens acabou',
-    linha: 'Planos pagos ampliam quantas mensagens a IA entende por mês.',
   },
   members: {
     titulo: 'Convidar mais gente é do plano pago',
-    linha: 'Mais pessoas no mesmo financeiro, cada lançamento guardando quem lançou.',
   },
   trial_ending: {
     titulo: 'Seu teste grátis está acabando',
-    linha: 'Continue com o plano ou volte para o Free — nada é apagado nos dois casos.',
+    linha: 'Nada é apagado se voltar ao Free',
   },
   plan: {
     titulo: 'Escolha seu plano',
-    linha: 'O Free continua funcionando. Os pagos abrem pessoas, IA e importação.',
   },
 };
 
@@ -89,9 +85,11 @@ export default function PaywallScreen() {
 
       <View style={styles.bloco}>
         <ThemedText type="title">{motivo.titulo}</ThemedText>
-        <ThemedText type="small" themeColor="textSecondary">
-          {motivo.linha}
-        </ThemedText>
+        {motivo.linha ? (
+          <ThemedText type="small" themeColor="textSecondary">
+            {motivo.linha}
+          </ThemedText>
+        ) : null}
       </View>
 
       {plano.isLoading ? (
@@ -173,9 +171,6 @@ export default function PaywallScreen() {
                 <ThemedText type="small" themeColor="textSecondary">
                   {opcao.pitch}
                 </ThemedText>
-                <ThemedText type="small" themeColor={selecionado ? 'tint' : 'textSecondary'}>
-                  {selecionado ? 'Selecionado' : 'Toque para escolher'}
-                </ThemedText>
               </Card>
             </Pressable>
           </Animated.View>
@@ -203,11 +198,7 @@ export default function PaywallScreen() {
           O que o Free continua fazendo é informação para decidir, então subiu
           para o card do plano, ao lado do número que ela qualifica.
         */}
-        <Note icon={naWeb ? 'iphone' : 'clock'}>
-          {naWeb
-            ? 'A compra acontece na App Store ou na Google Play. Por aqui dá para comparar.'
-            : 'A compra pelas lojas ainda não está ligada. Cancelar é um toque, na própria loja.'}
-        </Note>
+        {naWeb ? null : <Note icon="clock">Compra pelas lojas em breve</Note>}
       </View>
       </ScrollView>
     </Screen>

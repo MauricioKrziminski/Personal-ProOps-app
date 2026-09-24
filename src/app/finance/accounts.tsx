@@ -291,7 +291,7 @@ export default function AccountsScreen() {
     const previstoTexto =
       previsto > 0
         ? cartao
-          ? `${brl(previsto)} em parcelas futuras`
+          ? `${brl(previsto)} a vencer`
           : `${brl(previsto)} a receber`
         : null;
 

@@ -265,7 +265,7 @@ export default function FinanceScreen() {
   const lancar = () =>
     showItemActions('Lançar', [
       { label: 'Gasto ou receita', onPress: () => router.push({ pathname: '/finance/transaction-form', params: { month } }) },
-      { label: 'Gasto ou receita que se repete', onPress: () => router.push({ pathname: '/finance/recurring', params: { create: '1' } }) },
+      { label: 'Recorrente', onPress: () => router.push({ pathname: '/finance/recurring', params: { create: '1' } }) },
       { label: 'Financiamento', onPress: () => router.push({ pathname: '/finance/debts', params: { create: 'financing' } }) },
     ]);
 
@@ -449,7 +449,7 @@ export default function FinanceScreen() {
           <Tile
             layout={debts.data?.length ? 'half' : 'wide'}
             icon="ellipsis.circle"
-            label="Tudo o que dá para gerenciar"
+            label="Gerenciar"
             accessibilityLabel="Ver tudo que dá para gerenciar"
             onPress={() => router.push('/finance/manage')}
           />

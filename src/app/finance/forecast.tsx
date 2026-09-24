@@ -650,10 +650,10 @@ export default function ForecastScreen() {
             </View>
             <View style={styles.legenda}>
               <ThemedText type="caption" themeColor="textSecondary">
-                {passado.length > 0 ? '━ o que já caiu na conta' : '━ saldo de hoje'}
+                ━ real
               </ThemedText>
               <ThemedText type="caption" themeColor="textSecondary">
-                ┄ previsto: o real, mais o que entra e sai
+                ┄ previsto
               </ThemedText>
             </View>
             <View style={styles.heroSplit}>
@@ -691,7 +691,7 @@ export default function ForecastScreen() {
           </ThemedText>
           {simulando ? (
             <ThemedText type="caption" themeColor="textSecondary">
-              {hipoteses.length} {hipoteses.length === 1 ? 'hipótese' : 'hipóteses'} · temporário
+              {hipoteses.length} {hipoteses.length === 1 ? 'hipótese' : 'hipóteses'} · nada é salvo
             </ThemedText>
           ) : null}
         </View>
@@ -730,8 +730,7 @@ export default function ForecastScreen() {
         })
       ) : (
         <ThemedText type="small" themeColor="textSecondary">
-          Suponha uma entrada, uma saída ou adiantar parcelas, e veja os meses recalculados
-          como se tivesse acontecido de verdade.
+          Simule uma entrada ou saída.
         </ThemedText>
       )}
       {simulado.isError ? (
@@ -751,11 +750,6 @@ export default function ForecastScreen() {
           <Button label="Limpar" variant="secondary" size="sm" onPress={() => setRascunhos([])} />
         ) : null}
       </View>
-      {simulando ? (
-        <ThemedText type="caption" themeColor="textSecondary">
-          Só muda esta projeção. Nada é salvo.
-        </ThemedText>
-      ) : null}
     </Card>
   ) : null;
 
@@ -894,7 +888,7 @@ export default function ForecastScreen() {
       ) : null}
 
       {modo === 'mes' && !nadaParaProjetar ? (
-        <Section title="Saldo mês a mês, carregando a sobra">
+        <Section title="Saldo mês a mês">
           {mesesInteiros.map((m, iMes) => (
             <View key={m.mes}>
               {/*
@@ -904,7 +898,7 @@ export default function ForecastScreen() {
               */}
               {corte && m.mes > corte && mesesInteiros[iMes - 1]?.mes === corte ? (
                 <ThemedText type="caption" themeColor="textSecondary" style={styles.corte}>
-                  ─── daqui em diante é projetado da regra, não lançamento criado
+                  ─── daqui em diante é estimativa
                 </ThemedText>
               ) : null}
               <Row
@@ -932,11 +926,8 @@ export default function ForecastScreen() {
                     debaixo do número e dizia outra coisa, na mesma tela. Quem detalha o que está
                     dentro do ciclo é a tela do ciclo, que soma exatamente este número.
                   */}
-                  <ThemedText type="small" themeColor="textSecondary" style={tabular}>
-                    entra {brl(m.entra)} · sai {brl(m.sai)}
-                  </ThemedText>
                   <Button
-                    label="Ver tudo que está aqui dentro"
+                    label="Ver o ciclo"
                     variant="secondary"
                     size="sm"
                     onPress={() =>
@@ -952,7 +943,7 @@ export default function ForecastScreen() {
           ))}
           {cicloCortado ? (
             <ThemedText type="footnote" themeColor="textSecondary" style={styles.corte}>
-              {`A projeção para em ${isoToBR(cicloCortado.de)}. O ciclo seguinte entraria pela metade — aumente o horizonte para vê-lo inteiro.`}
+              {`Projeção até ${isoToBR(cicloCortado.de)}. Aumente o horizonte.`}
             </ThemedText>
           ) : null}
         </Section>
@@ -1042,7 +1033,6 @@ export default function ForecastScreen() {
       <Sheet visible={sheetAberto} onClose={() => { setSheetAberto(false); setEditando(null); }}>
         <TaskHeader
           title={editando ? 'Editar hipótese' : 'Nova hipótese'}
-          subtitle={!editando && simulando ? `${hipoteses.length} ${hipoteses.length === 1 ? 'hipótese no cenário' : 'hipóteses no cenário'}` : undefined}
           onClose={() => { setSheetAberto(false); setEditando(null); }}
           action={
             <Button
@@ -1055,7 +1045,7 @@ export default function ForecastScreen() {
         />
 
         <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={styles.sheetCorpo}>
-          <Field label="O que você quer supor?">
+          <Field label="Tipo">
             <Segmented
               options={[
                 { value: 'income', label: 'Entra' },
@@ -1105,7 +1095,7 @@ export default function ForecastScreen() {
             muda o SIGNIFICADO do valor e quais campos existem abaixo. Depois deles, a tela se
             remontaria debaixo do dedo.
           */}
-          <Field label="Acontece uma vez ou todo mês?">
+          <Field label="Frequência">
             <Segmented
               options={[
                 { value: 'total', label: 'Uma vez' },
@@ -1130,7 +1120,7 @@ export default function ForecastScreen() {
             `MonthPicker` já existe para exatamente isto: setas de mês, escolha de ano, uma
             linha só. É o mesmo controle de "Entradas e saídas", então o gesto já é conhecido.
           */}
-          <Field label="A partir de qual mês">
+          <Field label="Mês">
             <MonthPicker month={novoMes ?? currentMonth()} onChange={setNovoMes} />
           </Field>
 

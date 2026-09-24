@@ -311,8 +311,7 @@ export default function InvoicesScreen() {
               ))}
             </View>
             <ThemedText type="small" themeColor="textSecondary" style={tabular}>
-              média de {brl(media)} nas últimas {ultimos.length}{' '}
-              {ultimos.length === 1 ? 'fatura' : 'faturas'}
+              média de {brl(media)} · {ultimos.length} {ultimos.length === 1 ? 'fatura' : 'faturas'}
             </ThemedText>
           </Card>
         </Animated.View>
@@ -324,10 +323,6 @@ export default function InvoicesScreen() {
         <Card>
           <View style={styles.aviso}>
             <ThemedText type="smallBold">Só uma fatura até agora</ThemedText>
-            <ThemedText type="small" themeColor="textSecondary">
-              A comparação entre meses aparece a partir da segunda fatura — com uma só não há o que
-              comparar.
-            </ThemedText>
           </View>
         </Card>
       ) : null}
@@ -356,11 +351,16 @@ export default function InvoicesScreen() {
                     : undefined
                 }>
                 <Row
-                  title={monthTitle(mes)}
-                  subtitle={`${situacao.texto} · vence ${formatDateBR(invoice.due_date)}`}
+                  // Curto para caber ao lado do valor a 384dp × fonte 1,3: o ano já está no título.
+                  title={monthTitle(mes).replace(' de ', ' ')}
+                  subtitle={
+                    /\d{2}\/\d{2}/.test(situacao.texto)
+                      ? situacao.texto.replace(/(\d{2}\/\d{2})\/\d{4}/, '$1')
+                      : `${situacao.texto} · ${formatDateBR(invoice.due_date).slice(0, 5)}`
+                  }
                   icon={situacao.atrasada ? 'exclamationmark.triangle' : 'creditcard'}
                   destructive={situacao.atrasada}
-                  accessibilityLabel={`${monthTitle(mes)}, ${formatBRL(invoice.total_cents)}, ${situacao.texto}`}
+                  accessibilityLabel={`${monthTitle(mes)}, ${formatBRL(invoice.total_cents)}, ${situacao.texto}, vence ${formatDateBR(invoice.due_date)}`}
                   trailing={
                     <Money
                       cents={invoice.total_cents}
@@ -388,8 +388,8 @@ export default function InvoicesScreen() {
           {futuras.map((invoice) => (
             <Row
               key={invoice.id}
-              title={monthTitle(invoice.reference_month.slice(0, 7))}
-              subtitle={`vence ${formatDateBR(invoice.due_date)}`}
+              title={monthTitle(invoice.reference_month.slice(0, 7)).replace(' de ', ' ')}
+              subtitle={`vence ${formatDateBR(invoice.due_date).slice(0, 5)}`}
               icon="calendar"
               trailing={<Money cents={invoice.total_cents} variant="ticker" tone="textSecondary" />}
               onPress={() =>
@@ -416,12 +416,6 @@ export default function InvoicesScreen() {
           title="Nenhuma fatura ainda"
           hint={`A primeira fatura nasce junto com a primeira compra no cartão — manda “almocei 40 no ${atual.name}” no WhatsApp.`}
         />
-      ) : null}
-
-      {lista.length > 0 ? (
-        <ThemedText type="footnote" themeColor="textSecondary" style={styles.rodape}>
-          O total soma as compras da fatura; o pagamento é transferência e não entra na conta.
-        </ThemedText>
       ) : null}
     </>
   );

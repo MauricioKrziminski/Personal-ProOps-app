@@ -2,7 +2,6 @@ import { StyleSheet, View } from 'react-native';
 import { Stack, router } from 'expo-router';
 
 import { ErrorCard } from '@/components/error-card';
-import { ThemedText } from '@/components/themed-text';
 import { HeaderActions } from '@/components/ui/header-actions';
 import { AdaptivePanes } from '@/components/ui/adaptive-panes';
 import { Deslizavel } from '@/components/ui/deslizavel';
@@ -105,9 +104,6 @@ export default function RemindersScreen() {
     paused.length > 0 ? (
       <View style={styles.pausedPane}>
         <Section title="Pausados">{paused.map(line)}</Section>
-        <ThemedText type="small" themeColor="textSecondary" style={styles.hint}>
-          Lembrete pausado não dispara e não gasta mensagem.
-        </ThemedText>
       </View>
     ) : null;
   const list = (
@@ -169,7 +165,4 @@ export default function RemindersScreen() {
 
 const styles = StyleSheet.create({
   pausedPane: { gap: Space.lg, minWidth: 0 },
-  hint: {
-    textAlign: 'center',
-  },
 });

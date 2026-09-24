@@ -7,7 +7,6 @@ import Animated, { FadeInLeft, FadeInRight } from "react-native-reanimated";
 import { AuthScreen } from "@/components/auth/auth-screen";
 import { OtpInput } from "@/components/auth/otp-input";
 import { PhoneField } from "@/components/auth/phone-field";
-import { Note } from "@/components/ui/note";
 import { ThemedText } from "@/components/themed-text";
 import { Button } from "@/components/ui/button";
 import { Field } from "@/components/ui/field";
@@ -196,8 +195,7 @@ export function LoginScreen() {
           <View style={styles.copy}>
             <ThemedText type="title">Entrar com o WhatsApp</ThemedText>
             <ThemedText type="small" themeColor="textSecondary">
-              Use o mesmo número do seu WhatsApp — é por ele que suas notas,
-              lembretes e gastos chegam aqui.
+              Use o número do seu WhatsApp.
             </ThemedText>
           </View>
 
@@ -222,10 +220,6 @@ export function LoginScreen() {
               editable={!busy}
             />
           </Field>
-
-          <Note icon="bubble.left">
-            Você recebe um código de 6 dígitos no WhatsApp. Sem senha.
-          </Note>
         </Animated.View>
       ) : (
         <Animated.View

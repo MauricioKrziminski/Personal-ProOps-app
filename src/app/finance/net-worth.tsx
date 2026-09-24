@@ -79,32 +79,28 @@ const JANELAS = [
 const COMPONENTES: {
   key: 'cash_cents' | 'investments_cents' | 'other_assets_cents' | 'liabilities_cents';
   title: string;
-  subtitle: string;
+  subtitle?: string;
   icon: Parameters<typeof Icon>[0]['name'];
   passivo?: boolean;
 }[] = [
   {
     key: 'cash_cents',
     title: 'Dinheiro em conta',
-    subtitle: 'sem contar o cartão',
     icon: 'wallet.bifold',
   },
   {
     key: 'investments_cents',
     title: 'Investimentos',
-    subtitle: 'investimento, cripto e participação',
     icon: 'chart.line.uptrend.xyaxis',
   },
   {
     key: 'other_assets_cents',
     title: 'Outros bens',
-    subtitle: 'imóvel, veículo, a receber',
     icon: 'house',
   },
   {
     key: 'liabilities_cents',
     title: 'O que eu devo',
-    subtitle: 'fatura aberta e dívidas',
     icon: 'creditcard',
     passivo: true,
   },
@@ -300,11 +296,7 @@ export default function NetWorthScreen() {
           tone={liquido < 0 ? 'danger' : 'text'}
           signed={liquido < 0}
         />
-        {variacao === null ? (
-          <ThemedText type="small" themeColor="textSecondary">
-            A variação aparece quando houver mais de uma foto do seu patrimônio.
-          </ThemedText>
-        ) : (
+        {variacao !== null ? (
           <View style={styles.variacao}>
             <Icon
               name={variacao >= 0 ? 'arrow.up.right' : 'arrow.down.right'}
@@ -321,7 +313,7 @@ export default function NetWorthScreen() {
               em {mesesDeSerie} {mesesDeSerie === 1 ? 'mês' : 'meses'}
             </ThemedText>
           </View>
-        )}
+        ) : null}
       </Card>
     </Animated.View>
   ) : null;
@@ -367,9 +359,6 @@ export default function NetWorthScreen() {
         <Skeleton width="24%" height={16} />
         <Skeleton width="24%" height={16} />
       </View>
-      <ThemedText type="small" themeColor="textSecondary">
-        A linha do zero é a de referência: abaixo dela o patrimônio é negativo.
-      </ThemedText>
     </Card>
   ) : pontos.length > 1 ? (
     <Card style={styles.bloco}>
@@ -391,28 +380,22 @@ export default function NetWorthScreen() {
           />
         </View>
       </View>
-      <ThemedText type="small" themeColor="textSecondary">
-        A linha do zero é a de referência: abaixo dela o patrimônio é negativo.
-      </ThemedText>
     </Card>
   ) : !serie.isLoading ? (
     <Card style={styles.bloco}>
       <ThemedText type="smallBold">A curva ainda não tem história</ThemedText>
       <ThemedText type="small" themeColor="textSecondary">
-        A foto do seu patrimônio é tirada todo dia. A curva aparece a partir do segundo mês —
-        não dá para reconstruir o valor de um bem no passado sem inventar número.
+        A curva aparece no 2º mês.
       </ThemedText>
     </Card>
   ) : null;
 
-  // Os pesos são explicados na mesma escala da nota, sem expor unidade interna do algoritmo.
   const health = saude.isError ? (
     <ErrorBand message="Não deu para calcular sua saúde financeira." onRetry={saude.refetch} />
   ) : saude.data ? (
     <Section title="Saúde financeira">
       <Row
         title="Nota"
-        subtitle="de 0 a 100"
         trailing={
           <ThemedText
             type="subtitle"
@@ -435,22 +418,18 @@ export default function NetWorthScreen() {
       </View>
       <Row
         title="Poupança"
-        subtitle="vale 40 pontos"
         trailing={<ThemedText type="small" style={tabular}>{formatNumberBR(saude.data.savings_rate)}%</ThemedText>}
       />
       <Row
         title="Limites respeitados"
-        subtitle="vale 25 pontos"
         trailing={<ThemedText type="small" style={tabular}>{formatNumberBR(saude.data.budget_adherence)}%</ThemedText>}
       />
       <Row
         title="Reserva"
-        subtitle="vale 20 pontos"
         trailing={<ThemedText type="small" style={tabular}>{formatNumberBR(saude.data.months_of_reserve)} meses</ThemedText>}
       />
       <Row
         title="Quanto da renda vai para dívida"
-        subtitle="vale 15 pontos"
         trailing={<ThemedText type="small" style={tabular}>{formatNumberBR(saude.data.debt_ratio)}%</ThemedText>}
       />
       <Row title="Ver relatórios" icon="chart.bar" onPress={() => router.push('/finance/reports')} />
@@ -467,7 +446,6 @@ export default function NetWorthScreen() {
       <Section>
         <Row
           title="Dívidas"
-          subtitle="financiamentos e empréstimos entram no passivo"
           icon="banknote"
           onPress={() => router.push('/finance/debts')}
         />
@@ -582,7 +560,7 @@ export default function NetWorthScreen() {
                 error={nomeOk && !valorOk ? 'Informe quanto vale hoje' : undefined}
                 hint={
                   form.id
-                    ? 'Valor novo entra como marcação de hoje no histórico. Igual ao anterior, nada é marcado.'
+                    ? 'Vira a marcação de hoje'
                     : undefined
                 }>
                 <MoneyField

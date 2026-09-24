@@ -93,7 +93,7 @@ export default function SearchScreen() {
         <EmptyState
           icon="magnifyingglass"
           title="Procurando o quê?"
-          hint="Digite pelo menos duas letras — busca em notas, lançamentos e lembretes de uma vez."
+          hint="Notas, lançamentos e lembretes"
         />
       ) : null}
 
@@ -178,7 +178,7 @@ export default function SearchScreen() {
         <EmptyState
           icon="magnifyingglass"
           title={`Nada encontrado para «${term}»`}
-          hint="Tente outra palavra — a busca de notas ignora acento, mas não adivinha sinônimo."
+          hint="Tente outra palavra"
         />
       ) : null}
     </Screen>

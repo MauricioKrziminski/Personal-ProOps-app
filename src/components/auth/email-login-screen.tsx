@@ -82,9 +82,6 @@ export function EmailLoginScreen() {
       <View style={styles.step}>
         <View style={styles.copy}>
           <ThemedText type="title">Entrar</ThemedText>
-          <ThemedText type="small" themeColor="textSecondary">
-            Suas notas, lembretes e gastos, organizados num lugar só.
-          </ThemedText>
         </View>
 
         <Field

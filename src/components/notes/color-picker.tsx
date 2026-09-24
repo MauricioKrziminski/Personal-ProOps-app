@@ -84,9 +84,6 @@ export function ColorPicker({
             />
           ))}
         </View>
-        <ThemedText type="footnote" themeColor="textSecondary">
-          A cor marca a nota na lista e o ícone da pasta. Ela não muda mais nada.
-        </ThemedText>
       </View>
     </Sheet>
   );

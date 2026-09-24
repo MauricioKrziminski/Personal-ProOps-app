@@ -534,12 +534,10 @@ export default function DebtsScreen() {
             <HeroLabel>Total devido</HeroLabel>
             <Money cents={totalDevido} variant="money" tone="danger" />
             {jurosAteQuitar > 0 ? (
-              <View style={styles.valores}>
-                <Money cents={jurosAteQuitar} variant="subhead" tone="textSecondary" />
-                <ThemedText type="small" themeColor="textSecondary">
-                  de juros até quitar tudo
-                </ThemedText>
-              </View>
+              <ThemedText type="small" themeColor="textSecondary">
+                <Money cents={jurosAteQuitar} variant="subhead" tone="textSecondary" /> de juros até
+                quitar tudo
+              </ThemedText>
             ) : null}
           </Card>
         </Animated.View>
@@ -744,12 +742,12 @@ export default function DebtsScreen() {
                   </ThemedText>
                   <Money cents={Number(proxima.payment_cents)} variant="body" />
                 </View>
-                {detalhe.calculation_mode !== 'fixed_installments' && <View style={styles.valores}>
-                  <Money cents={Number(proxima.interest_cents)} variant="subhead" tone="danger" />
+                {detalhe.calculation_mode !== 'fixed_installments' && (
                   <ThemedText type="small" themeColor="danger">
-                    disso são juros
+                    <Money cents={Number(proxima.interest_cents)} variant="subhead" tone="danger" /> disso
+                    são juros
                   </ThemedText>
-                </View>}
+                )}
                 <Button
                   label="Paguei esta parcela"
                   block
@@ -821,29 +819,23 @@ export default function DebtsScreen() {
                 /* Superfície de DECISÃO: a conta que explica o pagamento em curso não pode
                    sumir com o "esconder saldo" — é ela que justifica o valor digitado. */
                 <Card style={styles.explica}>
-                  <View style={styles.valores}>
+                  <ThemedText type="small" themeColor="textSecondary">
                     <Money
                       cents={Number(proxima.interest_cents)}
                       variant="subhead"
                       tone="danger"
                       concealable={false}
-                    />
-                    <ThemedText type="small" themeColor="textSecondary">
-                      vão para o juro do mês,
-                    </ThemedText>
+                    />{' '}
+                    vão para o juro do mês,{' '}
                     <Money
                       cents={Math.max(0, pagoCents - Number(proxima.interest_cents))}
                       variant="subhead"
                       concealable={false}
-                    />
-                    <ThemedText type="small" themeColor="textSecondary">
-                      abatem o saldo.
-                    </ThemedText>
-                  </View>
-                  <View style={styles.valores}>
-                    <ThemedText type="small" themeColor="textSecondary">
-                      Fica em
-                    </ThemedText>
+                    />{' '}
+                    abatem o saldo.
+                  </ThemedText>
+                  <ThemedText type="small" themeColor="textSecondary">
+                    Fica em{' '}
                     <Money
                       cents={Math.max(
                         0,
@@ -854,7 +846,7 @@ export default function DebtsScreen() {
                       concealable={false}
                       tone="danger"
                     />
-                  </View>
+                  </ThemedText>
                 </Card>
               ) : null}
 
@@ -976,12 +968,10 @@ export default function DebtsScreen() {
                 {simpleValues && <Card style={styles.resumo}>
                   <ThemedText type="small" style={tabular}>{`${simpleValues.installments}× de ${brl(parcelaCents)} = ${brl(simpleValues.principal_cents)}`}</ThemedText>
                   {form.installmentsPaid > 0 ? (
-                    <View style={styles.valores}>
-                      <ThemedText type="small" themeColor="textSecondary" style={tabular}>
-                        {`Falta pagar (${simpleValues.installments - form.installmentsPaid} parcelas)`}
-                      </ThemedText>
+                    <ThemedText type="small" themeColor="textSecondary" style={tabular}>
+                      {`Falta pagar (${simpleValues.installments - form.installmentsPaid} parcelas) `}
                       <Money cents={simpleValues.remaining_cents} variant="headline" />
-                    </View>
+                    </ThemedText>
                   ) : null}
                 </Card>}
               </> : <>
@@ -1042,20 +1032,12 @@ export default function DebtsScreen() {
               {/* Prévia ao vivo: errar por um fator de 100 aqui não dá erro nenhum, só um total
                   de juros absurdo que ninguém confere. */}
               {fracao > 0 && form.remainingCents > 0 ? (
-                <View style={styles.valores}>
-                  <ThemedText type="small" themeColor="textSecondary">
-                    {taxaLabel(fracao)} dá
-                  </ThemedText>
-                  <Money
-                    cents={Math.round(form.remainingCents * fracao)}
-                    variant="subhead"
-                    tone="danger"
-                  />
-                  <ThemedText type="small" themeColor="textSecondary">
-                    de juros no primeiro mês sobre
-                  </ThemedText>
+                <ThemedText type="small" themeColor="textSecondary">
+                  {taxaLabel(fracao)} dá{' '}
+                  <Money cents={Math.round(form.remainingCents * fracao)} variant="subhead" tone="danger" />{' '}
+                  de juros no primeiro mês sobre{' '}
                   <Money cents={form.remainingCents} variant="subhead" tone="textSecondary" />
-                </View>
+                </ThemedText>
               ) : null}
 
               {fracao > 0.2 ? (

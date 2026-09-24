@@ -4,7 +4,6 @@ import { StyleSheet, View } from 'react-native';
 import { ErrorCard } from '@/components/error-card';
 import { ThemedText } from '@/components/themed-text';
 import { EmptyState } from '@/components/ui/empty-state';
-import { Icon } from '@/components/ui/icon';
 import { Row, Section } from '@/components/ui/row';
 import { Screen } from '@/components/ui/screen';
 import { SkeletonRow } from '@/components/ui/skeleton';
@@ -99,7 +98,7 @@ export default function AlertsScreen() {
         ) : dias.length === 0 ? (
           <EmptyState
             title="Nenhum alerta ainda"
-            hint="Quando você ativar um canal e houver algo importante, o aviso aparece aqui."
+            hint="Os avisos importantes aparecem aqui"
           />
         ) : (
           dias.map(([dia, doDia]) => (
@@ -134,15 +133,6 @@ export default function AlertsScreen() {
             </Section>
           ))
         )}
-
-        {dias.length > 0 ? (
-          <View style={styles.rodape}>
-            <Icon name="bell" size="sm" color="textSecondary" />
-            <ThemedText type="footnote" themeColor="textSecondary" style={styles.shrink}>
-              Se o mesmo aviso sair nos dois canais, ele aparece uma vez só aqui.
-            </ThemedText>
-          </View>
-        ) : null}
       </View>
     </Screen>
   );
@@ -162,13 +152,6 @@ const styles = StyleSheet.create({
     paddingVertical: Space.half,
     borderRadius: Radius.pill,
   },
-  rodape: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: Space.sm,
-    paddingHorizontal: Space.lg,
-  },
-  shrink: { flex: 1, minWidth: 0 },
   tabletReading: {
     width: '100%',
     maxWidth: 800,

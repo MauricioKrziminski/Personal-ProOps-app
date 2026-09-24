@@ -92,7 +92,7 @@ export function AdiantarCampos(p: Props) {
             options={opcoes}
             value={p.item ? p.itemId : null}
             onChange={p.onItem}
-            placeholder="Escolha uma compra, financiamento ou conta"
+            placeholder="Escolher"
           />
         )}
       </Field>
@@ -126,7 +126,7 @@ export function AdiantarCampos(p: Props) {
         <>
           <Field
             label="Valor para pagar"
-            hint={desconto ? 'Sugestão com o desconto dos juros; use o valor que o banco informar.' : undefined}>
+            hint={desconto ? 'Com desconto de juros estimado' : undefined}>
             <MoneyField valueCents={p.valor} onChangeCents={p.onValor} />
           </Field>
           <Note icon="arrow.uturn.backward">

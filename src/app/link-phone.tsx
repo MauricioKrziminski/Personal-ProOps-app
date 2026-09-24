@@ -174,8 +174,8 @@ export default function LinkPhoneScreen() {
             </ThemedText>
             <ThemedText type="small" themeColor="textSecondary">
               {currentPhone
-                ? `Hoje sua conta usa ${displayPhoneBR(currentPhone)}. O novo número só entra depois do código.`
-                : 'Depois do código, o agente reconhece as mensagens enviadas por este número.'}
+                ? `Número atual: ${displayPhoneBR(currentPhone)}`
+                : 'O agente passa a reconhecer este número'}
             </ThemedText>
           </View>
 
@@ -194,12 +194,12 @@ export default function LinkPhoneScreen() {
           </Field>
 
           <Note icon="bubble.left">
-            O código de 6 dígitos chega pelo WhatsApp. Não compartilhe com ninguém.
+            Não compartilhe o código
           </Note>
 
           {currentPhone ? (
             <Note icon="exclamationmark.circle">
-            Confirmações e rascunhos pendentes da conversa anterior serão descartados.
+            Descarta pendências da conversa atual
           </Note>
           ) : null}
         </Animated.View>

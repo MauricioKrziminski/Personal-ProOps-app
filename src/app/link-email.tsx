@@ -221,11 +221,11 @@ export default function LinkEmailScreen() {
             <ThemedText type="title">
               {emailAtual ? 'Trocar o e-mail' : 'Cadastrar e-mail e senha'}
             </ThemedText>
-            <ThemedText type="small" themeColor="textSecondary">
-              {emailAtual
-                ? `Hoje sua conta usa ${emailAtual}. O novo endereço só entra depois do código.`
-                : 'Depois disso você entra pelos dois caminhos — e não fica preso ao WhatsApp se perder o número.'}
-            </ThemedText>
+            {emailAtual ? (
+              <ThemedText type="small" themeColor="textSecondary">
+                E-mail atual: {emailAtual}
+              </ThemedText>
+            ) : null}
           </View>
 
           <Controller
@@ -300,7 +300,7 @@ export default function LinkEmailScreen() {
           />
 
           <Note icon="lock">
-            Seu WhatsApp continua ligado à conta. Isto acrescenta um segundo jeito de entrar.
+            O WhatsApp continua ligado
           </Note>
         </Animated.View>
       ) : (

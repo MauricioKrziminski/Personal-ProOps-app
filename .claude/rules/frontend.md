@@ -191,8 +191,9 @@ parcelas já foram pagas?"). São modos diferentes do mesmo cadastro, não conce
 - O sufixo **"(opcional)" não entra no rótulo** — é explicação, e explicação mora no `hint`
   (§7b). O rótulo diz o que o campo É.
 - **Substantivo, não pergunta**, quando existe um rótulo-substantivo para o mesmo dado em outra
-  tela. Pergunta continua onde ela É a escolha da tela ("É bem ou dívida?", "Acontece uma vez ou
-  todo mês?") — ali não há duplicata para unificar.
+  tela. Pergunta continua onde ela É a escolha da tela ("É bem ou dívida?") — ali não há
+  duplicata para unificar. (O "Acontece uma vez ou todo mês?" do "E se…" virou "Frequência" na
+  limpeza de texto de 23/09/2026.)
 - `"Valor desta parcela"` (a tela de PAGAR) continua diferente de `"Valor da parcela"` (o
   cadastro) **de propósito**: um é quanto está saindo agora, o outro é o contrato.
 

@@ -423,6 +423,15 @@ desliga o encolhimento na chamada.**
 continua sumindo. O padrão para "título + pílula na mesma linha" é `flexWrap: 'wrap'` na linha e
 `flexShrink: 0, maxWidth: '100%'` no título — lado a lado quando cabe, pílula embaixo quando não.
 
+⚠️ **Frase com dinheiro dentro é UM texto, com o `Money` aninhado** (23/09/2026). Montada em
+peças soltas numa linha `flexWrap` — "R$ 0,00" · "de" · "R$ 30.000,00" · "· faltam" · valor —,
+cada peça quebrava sozinha, o `Money` encolhia para caber (`adjustsFontSizeToFit`) e a linha de
+base desalinhava: a tela de Metas a 384dp × fonte 1,3 (*"olha as letras cortando e ficando tudo
+feio quebrando a linha"*). Aninhado (`<ThemedText>…<Money/> de <Money/></ThemedText>`), o texto
+quebra entre palavras e no mesmo tamanho. E frase que ainda quebra deixando uma palavra órfã
+("…em 90 / dias") se ENCURTA: o que a linha repete de outro lugar da tela sai. `anti-slop.test.ts`
+barra a linha em peças; "rótulo à esquerda, valor à direita" não é frase e fica de fora.
+
 **A régua de largura é 384dp, não 448dp.** O emulador padrão (1344px a 480dpi) tem 448dp, mais
 largo que quase todo celular real, e era a única largura em que as telas eram olhadas. Xiaomi e
 Samsung saem de fábrica com "tamanho de exibição" e fonte maiores; a combinação 384dp × fonte 1,3

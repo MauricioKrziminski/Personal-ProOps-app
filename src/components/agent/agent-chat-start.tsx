@@ -22,9 +22,6 @@ export const AgentChatStart = memo(function AgentChatStart({ onSelectPrompt, com
         <ThemedText type="title" accessibilityRole="header">
           Pode falar do seu jeito.
         </ThemedText>
-        <ThemedText type="small" themeColor="textSecondary">
-          Conte o que aconteceu ou pergunte o que precisa saber. O agente ajuda a organizar.
-        </ThemedText>
       </View>
       {composer}
       <AgentPromptList onSelect={onSelectPrompt} />

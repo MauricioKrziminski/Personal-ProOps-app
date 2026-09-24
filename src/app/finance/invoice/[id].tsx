@@ -514,7 +514,7 @@ export default function InvoiceScreen() {
                   onPress: () => router.push({ pathname: '/import', params: { conta: fatura.account_id } }),
                 },
                 {
-                  label: 'Marcar como paga (sem mexer no saldo)',
+                  label: 'Marcar como paga',
                   icon: 'checkmark.circle',
                   disabled: paga,
                   onPress: quitarSemCaixa,

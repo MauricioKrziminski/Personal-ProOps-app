@@ -345,34 +345,24 @@ export default function BudgetsScreen() {
 
             <ProgressBar value={gastoCents + comprometido} max={limiteCents} tone={tom} />
 
-            <View style={styles.valores}>
-              <Money cents={gastoCents} variant="subhead" tone="textSecondary" />
-              <ThemedText type="small" themeColor="textSecondary">
-                de
-              </ThemedText>
+            <ThemedText type="small" themeColor="textSecondary">
+              <Money cents={gastoCents} variant="subhead" tone="textSecondary" /> de{' '}
               <Money cents={limiteCents} variant="subhead" tone="textSecondary" />
               {/*
-                O saldo (`faltam`/`estourou`) só entra AQUI quando não há comprometido. Com
+                O saldo (`faltam`/`estourou`, a linha de baixo) só aparece sem comprometido. Com
                 comprometido, "R$ 1.760,00 de R$ 2.000,00 · estourou em R$ 60,00" se contradiz
                 na mesma linha — a conta só fecha somando um número que está três linhas abaixo.
                 Nesse caso o saldo migra para a frase do comprometido, onde ele faz sentido.
               */}
-              {comprometido === 0 ? (
-                <>
-                  <ThemedText type="small" themeColor="textSecondary">
-                    ·
-                  </ThemedText>
-                  <ThemedText type="small" themeColor={estourou ? 'danger' : 'textSecondary'}>
-                    {estourou ? 'estourou em' : 'faltam'}
-                  </ThemedText>
-                  <Money
-                    cents={Math.abs(sobra)}
-                    variant="subhead"
-                    tone={estourou ? 'danger' : 'textSecondary'}
-                  />
-                </>
-              ) : null}
-            </View>
+            </ThemedText>
+            {/* Linha própria: emendado na de cima, "faltam" ficava no fim e o valor caía sozinho
+                embaixo a 384dp × fonte 1,3 (23/09/2026). */}
+            {comprometido === 0 ? (
+              <ThemedText type="small" themeColor={estourou ? 'danger' : 'textSecondary'}>
+                {estourou ? 'estourou em' : 'faltam'}{' '}
+                <Money cents={Math.abs(sobra)} variant="subhead" tone={estourou ? 'danger' : 'textSecondary'} />
+              </ThemedText>
+            ) : null}
 
             {/*
               O comprometido fica FORA do número de gasto. Somar seria dizer que você gastou um
@@ -392,25 +382,17 @@ export default function BudgetsScreen() {
 
             {/* De onde o limite vem — sem isso o número parece arbitrário. */}
             {Number(b.rollover_cents) > 0 || b.month ? (
-              <View style={styles.origem}>
+              <ThemedText type="footnote" themeColor="textSecondary">
                 {Number(b.rollover_cents) > 0 ? (
                   <>
-                    <Money cents={Number(b.base_limit_cents)} variant="footnote" tone="textSecondary" />
-                    <ThemedText type="footnote" themeColor="textSecondary">
-                      +
-                    </ThemedText>
-                    <Money cents={Number(b.rollover_cents)} variant="footnote" tone="textSecondary" />
-                    <ThemedText type="footnote" themeColor="textSecondary">
-                      que sobrou
-                    </ThemedText>
+                    <Money cents={Number(b.base_limit_cents)} variant="footnote" tone="textSecondary" /> +{' '}
+                    <Money cents={Number(b.rollover_cents)} variant="footnote" tone="textSecondary" /> que
+                    sobrou
                   </>
                 ) : null}
-                {b.month ? (
-                  <ThemedText type="footnote" themeColor="textSecondary">
-                    só este mês
-                  </ThemedText>
-                ) : null}
-              </View>
+                {Number(b.rollover_cents) > 0 && b.month ? ' · ' : null}
+                {b.month ? 'só este mês' : null}
+              </ThemedText>
             ) : null}
           </Card>
         </Pressable>

@@ -161,9 +161,6 @@ export default function ImportHistoryScreen() {
                   {pendente.pendentes} {pendente.pendentes === 1 ? 'item espera' : 'itens esperam'}{' '}
                   revisão
                 </ThemedText>
-                <ThemedText type="small" themeColor="textSecondary">
-                  Toque para retomar de onde parou.
-                </ThemedText>
               </View>
               <Icon name="chevron.right" size="sm" color="textSecondary" />
             </Card>
@@ -233,18 +230,9 @@ export default function ImportHistoryScreen() {
         <EmptyState
           icon="tray"
           title="Nenhuma importação ainda"
-          hint={'Exporte o extrato do banco em OFX ou CSV e traga aqui —\nou manda foto do cupom no WhatsApp, que também vira lançamento.'}
+          hint="OFX ou CSV do app do banco"
           action={{ label: 'Importar agora', onPress: () => router.push('/import') }}
         />
-      ) : null}
-
-      {/* Só com histórico: sem nenhuma importação a nota ficava órfã 200px abaixo do empty
-          state, explicando o "Tentar de novo" de uma linha que não existe na tela. */}
-      {lista.length > 0 ? (
-        <ThemedText type="footnote" themeColor="textSecondary" style={styles.rodape}>
-          Os arquivos não ficam guardados — só os lançamentos que você confirmou. “Tentar de novo”
-          pede o arquivo outra vez.
-        </ThemedText>
       ) : null}
     </Screen>
   );
@@ -265,7 +253,4 @@ const styles = StyleSheet.create({
     gap: Space.xs,
   },
   /* Só o recuo: o TAMANHO vem de `type="footnote"` no próprio texto. */
-  rodape: {
-    paddingHorizontal: Space.lg,
-  },
 });

@@ -32,7 +32,7 @@ import {
   useSaveGoal,
   type Goal,
 } from '@/hooks/use-finance';
-import { brToISO, formatBRL, isValidBRDate, isoToBR, localISODate } from '@/lib/dates';
+import { brToISO, formatBRL, isValidBRDate, isoToBR, mesCurto } from '@/lib/dates';
 import { confirmDestructive, showItemActions, type ItemAction } from '@/lib/item-actions';
 import { useAdaptiveWindow } from '@/hooks/use-adaptive-window';
 import { transicaoDeLayout } from '@/components/motion/transicao';
@@ -70,9 +70,9 @@ function mesesAte(deadlineISO: string): number {
 }
 
 /** `2026-12-31` → `dezembro de 2026`. */
+/** `2027-09-30` → `set/2027`: curto para a linha do card caber inteira a 384dp × fonte 1,3. */
 function mesDoPrazo(deadlineISO: string): string {
-  const [y, m] = deadlineISO.split('-').map(Number);
-  return new Date(y, m - 1, 1).toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' });
+  return `${mesCurto(deadlineISO)}/${deadlineISO.slice(0, 4)}`;
 }
 
 /** Faixa de erro por seção. Seção que falha DIZ que falhou — nunca some. */
@@ -268,36 +268,24 @@ export default function GoalsScreen() {
 
             <ProgressBar value={saved} max={target} tone={concluida ? 'success' : 'tint'} />
 
-            <View style={styles.valores}>
-              <Money cents={saved} variant="subhead" />
-              <ThemedText type="small" themeColor="textSecondary">
-                de
-              </ThemedText>
+            {/* UMA frase, com o valor dentro: em peças soltas num `flexWrap` cada uma quebrava
+                sozinha e o `Money` encolhia para caber, desalinhando a linha (23/09/2026). */}
+            <ThemedText type="small" themeColor="textSecondary">
+              <Money cents={saved} variant="subhead" /> de{' '}
               <Money cents={target} variant="subhead" tone="textSecondary" />
+              {/* "faltam" saiu da linha: a barra e o % já dizem, e ele empurrava o valor para baixo. */}
               {concluida ? (
                 <ThemedText type="small" themeColor="success">
-                  · concluída
+                  {' '}· concluída
                 </ThemedText>
-              ) : (
-                <>
-                  <ThemedText type="small" themeColor="textSecondary">
-                    · faltam
-                  </ThemedText>
-                  <Money cents={falta} variant="subhead" tone="textSecondary" />
-                </>
-              )}
-            </View>
+              ) : null}
+            </ThemedText>
 
             {porMes && g.deadline ? (
-              <View style={styles.valores}>
-                <ThemedText type="footnote" themeColor="textSecondary">
-                  precisa de
-                </ThemedText>
-                <Money cents={porMes} variant="footnote" tone="textSecondary" />
-                <ThemedText type="footnote" themeColor="textSecondary">
-                  por mês para chegar em {mesDoPrazo(g.deadline)}
-                </ThemedText>
-              </View>
+              <ThemedText type="footnote" themeColor="textSecondary">
+                <Money cents={porMes} variant="footnote" tone="textSecondary" />/mês até{' '}
+                {mesDoPrazo(g.deadline)}
+              </ThemedText>
             ) : null}
 
             {!concluida ? (
@@ -341,17 +329,9 @@ export default function GoalsScreen() {
           <Card style={styles.hero}>
             <HeroLabel>Guardado</HeroLabel>
             <Money cents={guardado} variant="money" />
-            <View style={styles.valores}>
-              <ThemedText type="small" themeColor="textSecondary">
-                de
-              </ThemedText>
-              <Money cents={alvo} variant="subhead" tone="textSecondary" />
-              <ThemedText type="small" themeColor="textSecondary" style={tabular}>
-                em {lista.length} {lista.length === 1 ? 'meta' : 'metas'}
-              </ThemedText>
-            </View>
-            <ThemedText type="small" themeColor="textSecondary">
-              Aporte não entra como gasto do mês — o dinheiro só mudou de lugar.
+            <ThemedText type="small" themeColor="textSecondary" style={tabular}>
+              de <Money cents={alvo} variant="subhead" tone="textSecondary" /> em {lista.length}{' '}
+              {lista.length === 1 ? 'meta' : 'metas'}
             </ThemedText>
           </Card>
         </Animated.View>
@@ -443,12 +423,12 @@ export default function GoalsScreen() {
               <Field
                 label="Valor"
                 hint={passaDoGuardado
-                  ? `Guardado nesta meta: ${formatBRL(Number(aporte.saved_cents))}. Retirar vai até esse valor.`
+                  ? `Retira até ${formatBRL(Number(aporte.saved_cents))}`
                   : undefined}>
                 <MoneyField valueCents={aporteCents} onChangeCents={setAporteCents} autoFocus />
               </Field>
 
-              <Field label="Nota" hint="Opcional — “13º”, “sobrou do mês”.">
+              <Field label="Nota">
                 <TextField
                   value={aporteNota}
                   onChangeText={setAporteNota}
@@ -476,8 +456,7 @@ export default function GoalsScreen() {
               </View>
 
               <ThemedText type="small" themeColor="textSecondary">
-                Aporte não entra como gasto do mês — o dinheiro só mudou de lugar. A data é hoje,{' '}
-                {isoToBR(localISODate())}.
+                Não conta como gasto · data de hoje
               </ThemedText>
             </ScrollView>
           ) : null}
@@ -486,7 +465,7 @@ export default function GoalsScreen() {
       {/* Extrato — sheet próprio, lista completa (não o acordeão truncado em 8 linhas). */}
       <Sheet visible={extrato !== null} onClose={() => setExtrato(null)}>
           <TaskHeader
-            title="Extrato de {extrato?.name}"
+            title={extrato ? `Extrato de ${extrato.name}` : 'Extrato'}
             onClose={() => setExtrato(null)}
           />
 
@@ -588,7 +567,7 @@ export default function GoalsScreen() {
 
               <Field
                 label="Prazo"
-                hint="Opcional. Com o prazo eu mostro quanto guardar por mês."
+                hint="Mostra quanto guardar por mês"
                 error={form.deadline && !prazoOk ? 'Data inválida (dd/mm/aaaa)' : undefined}>
                 <DatePickerField
                   value={form.deadline}

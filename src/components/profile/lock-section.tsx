@@ -78,8 +78,7 @@ export function LockSection() {
       {!disponivel ? (
         <View style={styles.aviso}>
           <Note icon="exclamationmark.triangle">
-            Este celular não tem bloqueio de tela. Configure uma senha, padrão ou biometria nos
-            ajustes do aparelho e o bloqueio do app fica disponível.
+            Ative o bloqueio de tela do celular
           </Note>
         </View>
       ) : null}

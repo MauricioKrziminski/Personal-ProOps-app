@@ -130,7 +130,7 @@ export default function ReportsScreen() {
           </View>
         </View>
         <ThemedText type="small" themeColor="textSecondary" style={tabular}>
-          Guardou {formatNumberBR(Number(summary.savings_rate))}% do que entrou · {summary.tx_count}{' '}
+          Guardou {formatNumberBR(Number(summary.savings_rate))}% · {summary.tx_count}{' '}
           {Number(summary.tx_count) === 1 ? 'lançamento' : 'lançamentos'}
         </ThemedText>
       </Card>
@@ -143,8 +143,7 @@ export default function ReportsScreen() {
       style={styles.bloco}
     >
       <ThemedText type="small" themeColor="textSecondary" style={styles.nota}>
-        Contas e bens no último dia do ano — é o que a ficha “Bens e Direitos” da declaração
-        pede. Dívidas e financiamentos entram em outra ficha e não aparecem aqui.
+        Saldos para a ficha Bens e Direitos
       </ThemedText>
       <Section title={`Bens e direitos em 31/12/${ano}`}>
         {(data?.yearEnd ?? []).length > 0 ? (
@@ -186,7 +185,6 @@ export default function ReportsScreen() {
             </View>
             <ProgressBar value={Number(c.total_cents)} max={maiorDespesa} />
             <ThemedText type="small" themeColor="textSecondary" style={tabular}>
-              {Math.round((Number(c.total_cents) / maiorDespesa) * 100)}% do maior ·{' '}
               {c.tx_count} {Number(c.tx_count) === 1 ? 'lançamento' : 'lançamentos'}
             </ThemedText>
           </View>
@@ -222,7 +220,7 @@ export default function ReportsScreen() {
 
   const footnote = !isLoading && !isError && temConteudo ? (
     <ThemedText type="footnote" themeColor="textSecondary" style={styles.rodape}>
-      Só lançamentos confirmados, sem transferências entre suas contas.
+      Só confirmados, sem transferências
     </ThemedText>
   ) : null;
 

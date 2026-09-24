@@ -169,9 +169,6 @@ export default function SignupScreen() {
           style={styles.step}>
           <View style={styles.copy}>
             <ThemedText type="title">Criar conta</ThemedText>
-            <ThemedText type="small" themeColor="textSecondary">
-              O WhatsApp você conecta depois, no Perfil — se quiser.
-            </ThemedText>
           </View>
 
           <Controller

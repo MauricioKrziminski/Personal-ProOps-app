@@ -130,7 +130,7 @@ export default function TrashScreen() {
     <>
       {/* Antes da lista: a pessoa precisa saber o prazo ANTES de decidir se corre. */}
       <ThemedText type="small" themeColor="textSecondary">
-        Notas na lixeira são apagadas de vez depois de 30 dias.
+        Apagadas de vez após 30 dias
       </ThemedText>
 
       {list.isError ? (
@@ -204,18 +204,12 @@ export default function TrashScreen() {
   const tabletContext = (
     <Card style={styles.context}>
       <ThemedText type="subtitle">Recuperação</ThemedText>
-      <ThemedText type="small" themeColor="textSecondary">
-        Restaurar devolve a nota para a biblioteca. Apagar de vez remove o conteúdo sem volta.
-      </ThemedText>
       <View style={styles.contextStat}>
         <ThemedText type="subtitle">{notes.length}</ThemedText>
         <ThemedText type="caption" themeColor="textSecondary">
           {notes.length === 1 ? 'nota carregada' : 'notas carregadas'}
         </ThemedText>
       </View>
-      <ThemedText type="footnote" themeColor="textSecondary">
-        O prazo de cada nota aparece na própria linha.
-      </ThemedText>
     </Card>
   );
 

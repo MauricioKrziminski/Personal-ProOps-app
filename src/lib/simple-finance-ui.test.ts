@@ -1056,7 +1056,7 @@ test('Financeiro: o FAB continua oferecendo as três formas de lançar', () => {
   tela.props.overlay.props.onPress();
   assert.deepEqual(
     ui.actions.map((a) => a.label),
-    ['Gasto ou receita', 'Gasto ou receita que se repete', 'Financiamento']
+    ['Gasto ou receita', 'Recorrente', 'Financiamento']
   );
 });
 
@@ -1080,7 +1080,7 @@ test('Financeiro tablet keeps the cycle, analysis and all management actions', (
   assert.ok(ui.nodes().some((n: any) => n.type === 'Tile' && n.props.label === 'Sai'));
   tela.props.overlay.props.onPress();
   assert.deepEqual(ui.actions.map((a) => a.label),
-    ['Gasto ou receita', 'Gasto ou receita que se repete', 'Financiamento']);
+    ['Gasto ou receita', 'Recorrente', 'Financiamento']);
 });
 
 test('Cartões: "Importar fatura" se alcança com o DEDO (toque longo), não só pelo leitor de tela', () => {

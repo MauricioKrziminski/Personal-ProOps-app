@@ -478,7 +478,7 @@ export default function InstallmentsScreen() {
     );
     const atual = nextPendingInstallment(parcelas, plano.installments);
     const resumo = plano.active
-      ? `${atual} de ${plano.installments} · ${brl(plano.installment_cents)} por mês`
+      ? `${atual} de ${plano.installments} · ${brl(plano.installment_cents)}/mês`
       : `${plano.installments} de ${plano.installments} · quitada`;
 
     return (
@@ -521,7 +521,8 @@ export default function InstallmentsScreen() {
                 tone={plano.active ? 'tint' : 'success'}
               />
               <ThemedText type="small" themeColor="textSecondary" style={tabular}>
-                {[resumo, conta, plano.category].filter(Boolean).join(' · ')}
+                {/* O nome do cartão não parte ao meio ("Nubank / Cartão"): espaço inseparável dentro dele. */}
+                {[resumo, conta?.replace(/ /g, '\u00A0'), plano.category].filter(Boolean).join(' · ')}
               </ThemedText>
             </View>
           )}
@@ -583,11 +584,6 @@ export default function InstallmentsScreen() {
                 </Pressable>
               );
             })}
-            {plano.last_installment_cents !== plano.installment_cents ? (
-              <ThemedText type="footnote" themeColor="textSecondary" style={styles.nota}>
-                A última parcela fecha a conta com os centavos da divisão.
-              </ThemedText>
-            ) : null}
           </Animated.View>
         ) : null}
       </Animated.View>
@@ -621,7 +617,7 @@ export default function InstallmentsScreen() {
         <Money cents={comprometido} variant="money" />
         <ThemedText type="small" themeColor="textSecondary" style={tabular}>
           {comprometido > 0
-            ? `${brl(media)} por mês em média${ultimaParcela ? ` · última parcela em ${monthLabel(ultimaParcela)}` : ''}`
+            ? `${brl(media)}/mês${ultimaParcela ? ` · até ${monthShort(ultimaParcela, true)}` : ''}`
             : 'Nada parcelado em aberto.'}
         </ThemedText>
       </Card>
@@ -678,7 +674,6 @@ export default function InstallmentsScreen() {
         <Section title="Terminadas">
           <Row
             title={verTerminadas ? 'Esconder terminadas' : `Ver ${terminadas.length} terminadas`}
-            subtitle="compras que já foram quitadas"
             icon={verTerminadas ? 'chevron.up' : 'checkmark.circle'}
             chevron={false}
             onPress={() => setVerTerminadas(!verTerminadas)}
@@ -766,7 +761,7 @@ export default function InstallmentsScreen() {
                 form.unidade === 'parcela'
                   ? `${travado ? `Vale para as ${emAberto} em aberto` : `${form.installments}x`} · total ${formatBRL(form.totalCents)}`
                   : travado
-                    ? `${formatBRL(form.travadoCents)} em parcela fechada. O resto se divide nas em aberto.`
+                    ? `${formatBRL(form.travadoCents)} já fechado`
                     : undefined
               }>
               {/* Sempre na tela: sumir no "À vista" subiria o formulário embaixo do "−". */}
@@ -817,8 +812,8 @@ export default function InstallmentsScreen() {
                 travado
                   ? `${motivoDaTrava(form.travadas, form.travadasPagas, form.installments)} — número, data e conta não mudam.`
                   : form.installments === 1
-                    ? `À vista: um lançamento só de ${formatBRL(form.totalCents)}.`
-                    : `${form.installments}x de ${formatBRL(Math.floor(form.totalCents / form.installments))} — a última fecha os centavos.`
+                    ? undefined
+                    : `${form.installments}x de ${formatBRL(Math.floor(form.totalCents / form.installments))}`
               }>
               {travado ? (
                 <TextField
@@ -928,10 +923,6 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: Space.sm,
-  },
-  nota: {
-    paddingHorizontal: Space.xl,
-    paddingTop: Space.xs,
   },
   sheetBody: {
     gap: Space.xl,
