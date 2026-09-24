@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 
-import { BOTAO, abriuOLado, executaAoSoltar, cardAberto, ladosDoArrasto, larguraDoBotao, limiarAteOFim, passouAteOFim, passouHaPouco, temArrasto } from './arrasto.ts';
+import { BOTAO, abriuOLado, executaAoSoltar, cardAberto, ladosDoArrasto, larguraDoBotao, limiarAteOFim, passouAteOFim, passouHaPouco, temArrasto, traducaoNoSoltar } from './arrasto.ts';
 
 const a = (label: string, extra: Record<string, unknown> = {}) => ({ label, onPress: () => {}, ...extra });
 
@@ -102,7 +102,8 @@ test('o botão cresce com a fonte até 1,6× — acima disso o rótulo de uma pa
   assert.equal(larguraDoBotao(0.85), 88, 'fonte menor não encolhe o alvo de toque');
   assert.equal(larguraDoBotao(1.3), 114);
   assert.equal(larguraDoBotao(2), 141);
-  assert.equal(limiarAteOFim(328, 2, true, 114), 342, 'o limiar acompanha a largura do botão');
+  // O limiar acompanha a largura do botão (264 com 88dp), mas a folga encolhe para caber no card.
+  assert.equal(limiarAteOFim(328, 2, true, 114), 228 + 57, 'o limiar acompanha a largura do botão');
 });
 
 test('o ponto de abrir é meio botão, e de um lado só', () => {
@@ -128,4 +129,26 @@ test('ao soltar, vale o deslocamento REAL do soltar — o quadro pode não ter v
   assert.equal(executaAoSoltar({ ...base, passou: false, traducao: 150, desligouEm: 950 }), true, 'a mola desligou há pouco');
   assert.equal(executaAoSoltar({ ...base, temPonta: false, passou: true, traducao: 400 }), false, 'sem ação que se desfaz, nunca');
   assert.equal(executaAoSoltar({ ...base, lado: 'esquerda', botoes: 2, passou: false, traducao: 280 }), false, 'lado errado');
+});
+
+// Medido no emulador (24/09/2026): num arrasto RÁPIDO, ler o deslocamento do card quando o aviso
+// "vai abrir" chega ao JS dava 131 a 355 para o mesmo dedo de 300 — a mola da biblioteca já tinha
+// partido com a velocidade do dedo. O deslocamento vem do DEDO no soltar, mais onde o card estava.
+test('no soltar, o deslocamento é o do dedo mais a posição em que o card já estava', () => {
+  const paineis = { direita: 114, esquerda: 228 };
+  assert.equal(traducaoNoSoltar(null, 280, paineis), 280);
+  assert.equal(traducaoNoSoltar('direita', 150, paineis), 264);
+  assert.equal(traducaoNoSoltar('esquerda', 300, paineis), 72);
+  assert.equal(traducaoNoSoltar('esquerda', -100, paineis), -328);
+});
+
+// Medido no emulador a 384dp × fonte 1,3 (24/09/2026): Mais + Arquivar de 114dp num card de
+// 350dp punham o "até o fim" em 342dp — 98% do card, e arquivar arrastando não acontecia nunca.
+test('até o fim cabe no card: a folga encolhe até meio botão para ficar em 85% da largura', () => {
+  const limiar = limiarAteOFim(350, 2, true, 114);
+  assert.ok(limiar <= 350 * 0.85, `limiar ${limiar} passa de 85% do card`);
+  assert.ok(limiar >= 228 + 57, 'e continua meio botão depois do painel aberto');
+  // Onde o botão inteiro de folga cabe, ele continua (o caso de 328dp com 88dp).
+  assert.equal(limiarAteOFim(328, 2, true, 88), 264);
+  assert.equal(limiarAteOFim(416, 1, true, 88), 416 * 0.55);
 });

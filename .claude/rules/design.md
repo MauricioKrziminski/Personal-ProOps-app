@@ -614,6 +614,12 @@ dela). Cancelou, a abertura revela a trava, que tem o "tentar de novo".
   ⚠️ Os dois painéis leem o MESMO deslocamento: toda conta de "passou do ponto" é por lado
   (`passouAteOFim`, `abriuOLado` em `lib/arrasto.ts`). Pelo valor absoluto, arrastar a nota para
   a esquerda fixava em vez de arquivar.
+  ⚠️ **"Até o fim" é decidido NO SOLTAR, na thread da UI, pelo dedo** (24/09/2026): um gesto
+  que só observa (`Gesture.Manual`, simultâneo ao do arrasto) lê o quanto o dedo andou no próprio
+  evento e soma o painel que já estava aberto (`traducaoNoSoltar`). Ler o deslocamento do card no
+  `onSwipeableWillOpen` pegava a mola já andando, e um valor gravado na UI às vezes chegava ao JS
+  depois do aviso — o arrasto rápido só abria (4 de 6 no emulador; 10 de 10 depois). O limiar
+  cabe em 85% do card (`limiarAteOFim`): a 384dp × fonte 1,3 ele passava da borda.
 
 ---
 

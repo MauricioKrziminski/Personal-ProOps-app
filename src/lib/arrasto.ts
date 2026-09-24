@@ -42,11 +42,17 @@ export function larguraDoBotao(fontScale: number): number {
  * Onde "arrastar até o fim" passa a executar: 55% do card, mas nunca antes do painel inteiro
  * mais um botão de folga. Só com 55%, um card de 328dp com Mais + Arquivar (176dp) arquivava a
  * 4dp de só abrir o lado. Lado sem ponta nunca executa.
+ *
+ * A folga encolhe até MEIO botão para o ponto caber em 85% do card: a 384dp × fonte 1,3, Mais +
+ * Arquivar de 114dp num card de 350dp punham o ponto em 342dp (98%), e arquivar arrastando não
+ * acontecia nunca (medido no emulador em 24/09/2026).
  */
 export function limiarAteOFim(largura: number, botoes: number, temPonta: boolean, botao: number): number {
   'worklet';
   if (!temPonta) return Infinity;
-  return Math.max(largura * 0.55, (botoes + 1) * botao);
+  const painel = botoes * botao;
+  const comFolga = Math.min(painel + botao, Math.max(painel + botao / 2, largura * 0.85));
+  return Math.max(largura * 0.55, comFolga);
 }
 
 /** O dedo passou do ponto de ABRIR deste lado (meio botão) — é onde o toque de seleção vibra. */
@@ -61,6 +67,7 @@ export function abriuOLado(translation: number, lado: 'direita' | 'esquerda', bo
  * `janela` ms ainda vale; desligado há mais, foi a pessoa voltando o dedo antes de soltar.
  */
 export function passouHaPouco(passou: boolean, desligouEm: number, agora: number, janela = 150): boolean {
+  'worklet';
   return passou || (desligouEm > 0 && agora - desligouEm < janela);
 }
 
@@ -87,10 +94,27 @@ export function passouAteOFim(
 }
 
 /**
+ * Onde o card está no instante do soltar: o quanto o DEDO andou (medido no próprio soltar) mais a
+ * posição em que o card já estava — o painel aberto antes do arrasto. Ler o deslocamento do card
+ * depois, quando o aviso "vai abrir" chega ao JS, pega a mola da biblioteca já andando com a
+ * velocidade do dedo: 131 a 355 para o mesmo dedo de 300, e o arrasto rápido às vezes só abria.
+ */
+export function traducaoNoSoltar(
+  abertoAntes: 'direita' | 'esquerda' | null,
+  andou: number,
+  paineis: { direita: number; esquerda: number },
+): number {
+  'worklet';
+  const base = abertoAntes === 'direita' ? paineis.direita : abertoAntes === 'esquerda' ? -paineis.esquerda : 0;
+  return base + andou;
+}
+
+/**
  * Soltou: executa a ação da ponta? Vale o que o QUADRO viu (`passou`, ou desligado há pouco pela
- * mola) OU o deslocamento real no instante do soltar (`traducao`). O "passou" é amostrado uma vez
- * por quadro, e num arrasto que acelera no fim o dedo solta antes de um quadro mostrar a posição
- * final — medido no emulador: quadro em 210dp, soltura em ~280dp, e só abria (24/09/2026).
+ * mola) OU o deslocamento real no instante do soltar (`traducao`, de `traducaoNoSoltar`). O
+ * "passou" é amostrado uma vez por quadro, e num arrasto que acelera no fim o dedo solta antes de
+ * um quadro mostrar a posição final — medido no emulador: quadro em 210dp, soltura em ~280dp, e
+ * só abria (24/09/2026). Roda na thread da UI, no próprio soltar (`Deslizavel`).
  */
 export function executaAoSoltar(p: {
   passou: boolean;
@@ -103,6 +127,7 @@ export function executaAoSoltar(p: {
   temPonta: boolean;
   botao: number;
 }): boolean {
+  'worklet';
   if (!p.temPonta) return false;
   return (
     passouHaPouco(p.passou, p.desligouEm, p.agora) ||

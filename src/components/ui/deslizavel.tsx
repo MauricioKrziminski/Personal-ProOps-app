@@ -1,10 +1,10 @@
 import * as Haptics from 'expo-haptics';
 import { useFocusEffect, useSegments } from 'expo-router';
-import { useCallback, useEffect, useMemo, useRef, type ReactNode } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { Platform, StyleSheet, View, useWindowDimensions } from 'react-native';
 // O `Pressable` do gesture-handler: o da RN, dentro do painel do `ReanimatedSwipeable`, não
 // recebe o toque no Android (o gesto nativo do arrasto fica com ele) — medido no emulador.
-import { Pressable } from 'react-native-gesture-handler';
+import { Gesture, GestureDetector, Pressable, type GestureTouchEvent } from 'react-native-gesture-handler';
 import ReanimatedSwipeable, {
   type SwipeableMethods,
 } from 'react-native-gesture-handler/ReanimatedSwipeable';
@@ -29,6 +29,7 @@ import {
   executaAoSoltar,
   passouAteOFim,
   temArrasto,
+  traducaoNoSoltar,
 } from '@/lib/arrasto';
 import { showItemActions, type ItemAction } from '@/lib/item-actions';
 
@@ -70,12 +71,9 @@ export function Deslizavel({ titulo, acoes, forma = 'linha', fundo = 'surface', 
   const largura = useSharedValue(0);
   const direita = useLado();
   const esquerdaSV = useLado();
-  // O deslocamento do card, o mesmo nos dois painéis: a biblioteca o entrega ao painel, e o
-  // painel o registra aqui para o "soltou" ler o valor real do instante do soltar.
-  const traducao = useRef<SharedValue<number> | null>(null);
-  const registrar = useCallback((t: SharedValue<number>) => {
-    traducao.current = t;
-  }, []);
+  const inicio = useSharedValue(0);
+  const armado = useSharedValue(false);
+  const abertoAntes = useSharedValue<'direita' | 'esquerda' | null>(null);
 
   // Sem ações o gesto fica DESLIGADO, não desmontado: montar e desmontar o arrasto quando as
   // ações chegam (Contas, com a conta carregando) remontava o card inteiro.
@@ -92,15 +90,58 @@ export function Deslizavel({ titulo, acoes, forma = 'linha', fundo = 'surface', 
 
   // Os botões leem a lista MAIS NOVA na hora do toque: o painel só é redesenhado quando o que
   // aparece nele muda (a assinatura), então o `onPress` guardado nele pode ser de outro render.
-  const atual = useRef({ direita: lados.direita, esquerda });
+  const atual = useRef({ direita: lados.direita, esquerda, pontas: lados });
   useEffect(() => {
-    atual.current = { direita: lados.direita, esquerda };
+    atual.current = { direita: lados.direita, esquerda, pontas: lados };
   });
   const tocar = useCallback((acao: ItemAction) => {
     const viva = [...atual.current.direita, ...atual.current.esquerda].find((x) => x.label === acao.label) ?? acao;
     eu.current?.close();
     viva.onPress?.();
   }, []);
+  // Soltou até o fim: o gesto decide na UI (`ladoQueExecuta`) e pede aqui; o efeito lê a ação
+  // MAIS NOVA. Por estado, não por ref: o gesto é montado num `useMemo`, e o React Compiler
+  // recusa ref lida a partir dali.
+  const [pedido, setPedido] = useState<{ lado: 'direita' | 'esquerda' } | null>(null);
+  // Cada pedido executa UMA vez: o efeito roda de novo quando o Fast Refresh o reaplica, e a ação
+  // é destrutiva (arquivar de novo DEPOIS do "Desfazer").
+  const feito = useRef<typeof pedido>(null);
+  useEffect(() => {
+    if (!pedido || feito.current === pedido) return;
+    feito.current = pedido;
+    const { pontas } = atual.current;
+    const ponta = pedido.lado === 'direita' ? pontas.pontaDireita : pontas.pontaEsquerda;
+    if (ponta) tocar(ponta);
+  }, [pedido, tocar]);
+  const nDireita = lados.direita.length;
+  const nEsquerda = esquerda.length;
+  const pontaD = Boolean(lados.pontaDireita);
+  const pontaE = Boolean(lados.pontaEsquerda);
+  const soltura = useMemo<Soltura>(
+    () => ({
+      inicio,
+      armado,
+      abertoAntes,
+      largura,
+      direita,
+      esquerda: esquerdaSV,
+      botoes: { direita: nDireita, esquerda: nEsquerda },
+      ponta: { direita: pontaD, esquerda: pontaE },
+      botao,
+    }),
+    [inicio, armado, abertoAntes, largura, direita, esquerdaSV, nDireita, nEsquerda, pontaD, pontaE, botao],
+  );
+  // Este gesto só observa o dedo: nunca ativa, e corre junto do arrasto da biblioteca.
+  const dedo = useMemo(
+    () =>
+      Gesture.Manual()
+        .onTouchesDown((e) => marcarInicio(soltura, e))
+        .onTouchesUp((e) => {
+          const lado = ladoQueExecuta(soltura, e);
+          if (lado) runOnJS(setPedido)({ lado });
+        }),
+    [soltura],
+  );
   const assinatura = (lista: ItemAction[]) =>
     lista.map((x) => [x.label, x.curto, x.icon, x.destructive, x.desfaz].join('|')).join('¦');
   const chaveDireita = assinatura(lados.direita);
@@ -110,17 +151,17 @@ export function Deslizavel({ titulo, acoes, forma = 'linha', fundo = 'surface', 
 
   const renderDireita = useCallback(
     (_p: SharedValue<number>, translation: SharedValue<number>) => (
-      <Painel lado="direita" acoes={lados.direita} temPonta={pontaDireita} botao={botao} translation={translation} largura={largura} estado={direita} tocar={tocar} registrar={registrar} />
+      <Painel lado="direita" acoes={lados.direita} temPonta={pontaDireita} botao={botao} translation={translation} largura={largura} estado={direita} tocar={tocar} />
     ),
     // eslint-disable-next-line react-hooks/exhaustive-deps -- a assinatura É a dependência da lista
-    [chaveDireita, pontaDireita, botao, largura, direita, tocar, registrar],
+    [chaveDireita, pontaDireita, botao, largura, direita, tocar],
   );
   const renderEsquerda = useCallback(
     (_p: SharedValue<number>, translation: SharedValue<number>) => (
-      <Painel lado="esquerda" acoes={esquerda} temPonta={pontaEsquerda} botao={botao} translation={translation} largura={largura} estado={esquerdaSV} tocar={tocar} registrar={registrar} />
+      <Painel lado="esquerda" acoes={esquerda} temPonta={pontaEsquerda} botao={botao} translation={translation} largura={largura} estado={esquerdaSV} tocar={tocar} />
     ),
     // eslint-disable-next-line react-hooks/exhaustive-deps -- a assinatura É a dependência da lista
-    [chaveEsquerda, pontaEsquerda, botao, largura, esquerdaSV, tocar, registrar],
+    [chaveEsquerda, pontaEsquerda, botao, largura, esquerdaSV, tocar],
   );
 
   return (
@@ -132,6 +173,7 @@ export function Deslizavel({ titulo, acoes, forma = 'linha', fundo = 'surface', 
       <ReanimatedSwipeable
         ref={eu}
         enabled={tem}
+        simultaneousWithExternalGesture={dedo}
         friction={1}
         overshootFriction={1}
         animationOptions={Motion.spring.settle}
@@ -149,29 +191,14 @@ export function Deslizavel({ titulo, acoes, forma = 'linha', fundo = 'surface', 
         renderRightActions={tem && esquerda.length ? renderEsquerda : undefined}
         onSwipeableWillOpen={(direcao) => {
           cardAberto.abriu(meu);
-          // Ao soltar: o dedo passou do fim DO LADO que abriu, com ação que se desfaz? `right` é o
-          // conteúdo indo para a direita — o painel `direita`. Executa JÁ, sem esperar a mola
-          // assentar no painel (no WhatsApp a ação sai ao soltar).
-          const direito = direcao === 'right';
-          const lado = direito ? direita : esquerdaSV;
-          const ponta = direito ? lados.pontaDireita : lados.pontaEsquerda;
-          const executa = executaAoSoltar({
-            passou: lado.passou.get(),
-            desligouEm: lado.desligouEm.get(),
-            agora: Date.now(),
-            // O deslocamento NO SOLTAR: a mola ainda está no primeiro passo, e o quadro pode não
-            // ter visto o fim do arrasto (ver `executaAoSoltar`).
-            traducao: traducao.current?.get() ?? 0,
-            lado: direito ? 'direita' : 'esquerda',
-            largura: largura.get(),
-            botoes: direito ? lados.direita.length : esquerda.length,
-            temPonta: Boolean(ponta),
-            botao,
-          });
-          if (ponta && executa) tocar(ponta);
+          // `right` é o conteúdo indo para a direita — o painel `direita`.
+          abertoAntes.set(direcao === 'right' ? 'direita' : 'esquerda');
         }}
         // Fechando, o card já não é "o aberto": um toque noutro card logo em seguida navega.
-        onSwipeableWillClose={() => cardAberto.fechou(meu)}
+        onSwipeableWillClose={() => {
+          abertoAntes.set(null);
+          cardAberto.fechou(meu);
+        }}
         onSwipeableClose={() => {
           for (const l of [direita, esquerdaSV]) {
             l.passou.set(false);
@@ -179,13 +206,73 @@ export function Deslizavel({ titulo, acoes, forma = 'linha', fundo = 'surface', 
           }
           cardAberto.fechou(meu);
         }}>
-        <DentroDeArrasto.Provider value>{children}</DentroDeArrasto.Provider>
+        <GestureDetector gesture={dedo}>
+          <View collapsable={false}>
+            <DentroDeArrasto.Provider value>{children}</DentroDeArrasto.Provider>
+          </View>
+        </GestureDetector>
       </ReanimatedSwipeable>
     </View>
   );
 }
 
 type Lado = { passou: SharedValue<boolean>; desligouEm: SharedValue<number>; abriu: SharedValue<boolean> };
+
+type Soltura = {
+  inicio: SharedValue<number>;
+  /** Um soltar por toque: sem isto, dois `onTouchesUp` do mesmo toque pediriam a ação duas vezes. */
+  armado: SharedValue<boolean>;
+  abertoAntes: SharedValue<'direita' | 'esquerda' | null>;
+  largura: SharedValue<number>;
+  direita: Lado;
+  esquerda: Lado;
+  botoes: { direita: number; esquerda: number };
+  ponta: { direita: boolean; esquerda: boolean };
+  botao: number;
+};
+
+function marcarInicio(s: Soltura, e: GestureTouchEvent) {
+  'worklet';
+  if (e.numberOfTouches !== 1) return;
+  s.inicio.set(e.changedTouches[0].absoluteX);
+  s.armado.set(true);
+}
+
+/**
+ * Soltou até o fim? Decidido no SOLTAR, na thread da UI, com o quanto o dedo andou no próprio
+ * evento mais o painel que já estava aberto (`traducaoNoSoltar`). Ler o deslocamento do card no
+ * aviso "vai abrir" pegava a mola da biblioteca já andando (131 a 355 para o mesmo dedo de 300),
+ * e um valor gravado na UI às vezes chega ao JS DEPOIS desse aviso — os dois faziam o arrasto
+ * rápido só abrir (medido no emulador em 24/09/2026).
+ *
+ * Worklet de MÓDULO, como os de `reorderable.tsx`: dentro do `useMemo` que monta o gesto o React
+ * Compiler trata o corpo como render.
+ */
+function ladoQueExecuta(s: Soltura, e: GestureTouchEvent): 'direita' | 'esquerda' | null {
+  'worklet';
+  if (!s.armado.get()) return null;
+  s.armado.set(false);
+  const traducao = traducaoNoSoltar(s.abertoAntes.get(), e.changedTouches[0].absoluteX - s.inicio.get(), {
+    direita: s.botoes.direita * s.botao,
+    esquerda: s.botoes.esquerda * s.botao,
+  });
+  const lado = traducao > 0 ? 'direita' : 'esquerda';
+  const estado = s[lado];
+  // O card nem chegou a abrir deste lado neste toque: não foi arrasto.
+  if (!estado.abriu.get()) return null;
+  const executa = executaAoSoltar({
+    passou: estado.passou.get(),
+    desligouEm: estado.desligouEm.get(),
+    agora: Date.now(),
+    traducao,
+    lado,
+    largura: s.largura.get(),
+    botoes: s.botoes[lado],
+    temPonta: s.ponta[lado],
+    botao: s.botao,
+  });
+  return executa ? lado : null;
+}
 
 function useLado(): Lado {
   const passou = useSharedValue(false);
@@ -203,7 +290,6 @@ function Painel({
   largura,
   estado,
   tocar,
-  registrar,
 }: {
   lado: 'direita' | 'esquerda';
   acoes: ItemAction[];
@@ -213,10 +299,8 @@ function Painel({
   largura: SharedValue<number>;
   estado: Lado;
   tocar: (acao: ItemAction) => void;
-  registrar: (t: SharedValue<number>) => void;
 }) {
   const theme = useTheme();
-  useEffect(() => registrar(translation), [registrar, translation]);
   // Um toque por gesto, no idioma do sistema: seleção ao cruzar o ponto de ABRIR, impacto leve
   // ao cruzar o ponto de "até o fim" (é ali que soltar passa a executar). Quem avisa o resultado
   // é o toast da ação, como no menu.

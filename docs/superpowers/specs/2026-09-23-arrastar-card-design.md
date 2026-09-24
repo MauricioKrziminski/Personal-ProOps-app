@@ -39,7 +39,8 @@ Item 5 do lote de 23/09/2026 (noite).
   Motion o assentamento é curto, sem ultrapassagem. Arrastar até o fim executa AO SOLTAR, sem
   esperar a mola assentar.
 - **Fonte grande:** o botão revelado cresce com a fonte até 1,6× (88dp na padrão), e o limiar de
-  "até o fim" acompanha.
+  "até o fim" acompanha. A folga depois do painel encolhe até meio botão para o limiar caber em 85% do
+  card (24/09/2026): a 384dp × fonte 1,3, Mais + Arquivar punham o ponto em 98% do card.
 
 ## Tabela aprovada
 
