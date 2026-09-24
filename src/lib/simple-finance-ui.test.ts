@@ -1156,6 +1156,11 @@ test('Lembretes: arrastar à direita pausa (até o fim, com Desfazer), à esquer
   // o toque longo continua com todas as ações
   ui.interact((nodes: any[]) => nodes.find((n) => n.type === 'Row' && n.props.onLongPress).props.onLongPress());
   assert.deepEqual(JSON.parse(JSON.stringify(ui.actions.map((a: any) => a.label))), ['Editar', 'Pausar', 'Apagar']);
+  // Apagar ficou a um arrasto: ele confirma antes, como em toda outra tela.
+  const apagar = card.props.acoes.find((x: any) => x.label === 'Apagar');
+  ui.interact(() => apagar.onPress());
+  assert.deepEqual(ui.writes, [], 'nada apagado antes da confirmação');
+  assert.equal(ui.confirmations.length, 1);
 });
 
 const itemLinks = (ui: any) => ui.nodes().filter((n: any) => n.type === 'ItemLink');

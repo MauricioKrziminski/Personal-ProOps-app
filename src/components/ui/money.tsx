@@ -1,3 +1,5 @@
+import { createContext, useContext } from 'react';
+
 import { ThemedText } from '@/components/themed-text';
 import { type ThemeColor } from '@/constants/theme';
 import { Type, tabular, type TypeVariant } from '@/design/tokens';
@@ -39,6 +41,12 @@ interface MoneyProps {
 }
 
 /**
+ * Dentro de um card que arrasta (`Deslizavel`) o valor não é selecionável: no Android o arrasto
+ * que começa em cima do número selecionava a palavra, e o toque longo ali é o menu do card.
+ */
+export const DentroDeArrasto = createContext(false);
+
+/**
  * Exibição de dinheiro. Sempre `tabular-nums` — sem isso o valor muda de largura ao animar e a
  * coluna da direita "dança" enquanto a lista rola.
  */
@@ -51,6 +59,7 @@ export function Money({
 }: MoneyProps) {
   const { concealed } = useConceal();
   const oculto = concealable && concealed;
+  const noArrasto = useContext(DentroDeArrasto);
 
   const color: ThemeColor =
     tone === 'auto' ? (cents >= 0 ? 'success' : 'text') : tone === 'plain' ? 'text' : tone;
@@ -63,7 +72,7 @@ export function Money({
       themeColor={color}
       // Oculto não é selecionável: copiar blocos não serve para nada, e copiar o valor real por
       // baixo da máscara derrotaria o propósito.
-      selectable={!oculto}
+      selectable={!oculto && !noArrasto}
       accessibilityLabel={oculto ? 'Valor oculto' : undefined}
       // `flexShrink: 0` desfaz o padrão do `ThemedText`: numa LINHA "rótulo … R$ 1.350,00" quem
       // cede é o rótulo ao lado, não o número.

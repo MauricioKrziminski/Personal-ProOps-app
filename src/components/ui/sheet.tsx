@@ -1,6 +1,7 @@
 import { useIsFocused } from 'expo-router';
 import { createContext, useContext, useEffect } from 'react';
 import { Modal, Platform, Pressable, StyleSheet, View, useWindowDimensions } from 'react-native';
+import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { KeyboardAvoidingView } from 'react-native-keyboard-controller';
 
 import { ToastOutlet } from '@/components/ui/toast';
@@ -85,7 +86,9 @@ export function Sheet({
       transparent={androidTablet}
       supportedOrientations={iosTablet ? ['portrait', 'landscape'] : undefined}
       onRequestClose={onClose}>
-      {androidTablet ? (
+      {/* O `Modal` é outra janela: gesto do gesture-handler (arrastar um card) precisa da raiz aqui dentro. */}
+      <GestureHandlerRootView style={styles.raizDoGesto}>
+        {androidTablet ? (
         <KeyboardAvoidingView
           behavior="padding"
           automaticOffset
@@ -119,12 +122,14 @@ export function Sheet({
           </KeyboardAvoidingView>
           <ToastOutlet />
         </View>
-      )}
+        )}
+      </GestureHandlerRootView>
     </Modal>
   );
 }
 
 const styles = StyleSheet.create({
+  raizDoGesto: { flex: 1 },
   sheet: {
     flex: 1,
   },

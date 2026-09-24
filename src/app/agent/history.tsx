@@ -60,7 +60,7 @@ export default function AgentHistoryScreen() {
           arrasto: 'esquerda',
           onPress: () =>
             confirmDestructive(
-              'Excluir conversa?',
+              'Apagar conversa?',
               'Apagar',
               () =>
                 excluir.mutate(conversa.id, {
@@ -86,7 +86,7 @@ export default function AgentHistoryScreen() {
   const renderConversa = useCallback(
     ({ item }: { item: AgentConversation }) => (
       // O arrasto fica por FORA da linha `memo`: as props dela continuam estáveis.
-      <Deslizavel titulo={item.title} acoes={acoesDaConversa(item)}>
+      <Deslizavel titulo={item.title} acoes={acoesDaConversa(item)} fundo="groupedBackground">
         <ConversationRow
           id={item.id}
           title={item.title}
@@ -110,8 +110,8 @@ export default function AgentHistoryScreen() {
   return (
     <Screen scroll={false} grouped>
       <FlashList
-      // Rolar fecha o card arrastado que estiver aberto (Deslizavel).
-      onScrollBeginDrag={fecharDeslizavelAberto}
+        // Rolar fecha o card arrastado que estiver aberto (Deslizavel).
+        onScrollBeginDrag={fecharDeslizavelAberto}
         data={conversas}
         // Sob o header translúcido do iOS 26 (`app/_layout.tsx`) quem desce a primeira linha é o
         // próprio scroll; o padrão da RN é `never`, e ela nasceria debaixo da barra.

@@ -1,5 +1,6 @@
 import * as Haptics from 'expo-haptics';
-import { useRef, type ReactNode } from 'react';
+import { useFocusEffect } from 'expo-router';
+import { useCallback, useEffect, useMemo, useRef, type ReactNode } from 'react';
 import { Platform, StyleSheet, View } from 'react-native';
 // O `Pressable` do gesture-handler: o da RN, dentro do painel do `ReanimatedSwipeable`, não
 // recebe o toque no Android (o gesto nativo do arrasto fica com ele) — medido no emulador.
@@ -16,26 +17,14 @@ import Animated, {
 
 import { ThemedText } from '@/components/themed-text';
 import { Icon } from '@/components/ui/icon';
+import { DentroDeArrasto } from '@/components/ui/money';
 import { Radius, Space } from '@/design/tokens';
 import { useTheme } from '@/hooks/use-theme';
-import { ladosDoArrasto, temArrasto } from '@/lib/arrasto';
+import { BOTAO, cardAberto, fecharCardAberto, ladosDoArrasto, limiarAteOFim, temArrasto } from '@/lib/arrasto';
 import { showItemActions, type ItemAction } from '@/lib/item-actions';
 
-/** Largura de cada botão revelado: cabe "Arquivar" a 1,3× sem partir a palavra. */
-const BOTAO = 88;
-/** Arrastar além desta fração da largura do card executa a ação da ponta (só com `desfaz`). */
-const ATE_O_FIM = 0.55;
-
-/**
- * O card aberto AGORA — um por vez (spec 2026-09-23-arrastar-card). Abrir outro fecha este, e
- * `fecharDeslizavelAberto` é chamado quando a lista começa a rolar.
- */
-let aberto: SwipeableMethods | null = null;
-
-export function fecharDeslizavelAberto() {
-  aberto?.close();
-  aberto = null;
-}
+/** Um card aberto por vez (`cardAberto`, `lib/arrasto.ts`); a lista que começa a rolar fecha o dele. */
+export const fecharDeslizavelAberto = fecharCardAberto;
 
 type Props = {
   /** Título do menu "Mais" (o mesmo do toque longo). */
@@ -47,6 +36,8 @@ type Props = {
    * por baixo do texto. `card`: o card já é opaco; o recorte segue o canto dele.
    */
   forma?: 'linha' | 'card';
+  /** Fundo da `linha` — o da superfície em volta. Lista chapada sobre a tela usa `groupedBackground`. */
+  fundo?: 'surface' | 'groupedBackground';
   children: ReactNode;
 };
 
@@ -55,9 +46,14 @@ type Props = {
  * lista, com "Mais" (o menu do toque longo) quando sobra ação. É o caminho ÚNICO do arrasto —
  * a tela só marca os lados nas ações que já declara (design.md §6).
  */
-export function Deslizavel({ titulo, acoes, forma = 'linha', children }: Props) {
+export function Deslizavel({ titulo, acoes, forma = 'linha', fundo = 'surface', children }: Props) {
   const theme = useTheme();
   const eu = useRef<SwipeableMethods>(null);
+  // Um objeto estável no registro: o `ref` do gesto só existe enquanto o arrasto está montado.
+  const meu = useMemo(() => ({ close: () => eu.current?.close() }), []);
+  // Saiu da tela (voltar, trocar de aba) ou desmontou: esquece o aberto daqui.
+  useFocusEffect(useCallback(() => () => cardAberto.esquecer(meu), [meu]));
+  useEffect(() => () => cardAberto.esquecer(meu), [meu]);
   const largura = useSharedValue(0);
   const passouDireita = useSharedValue(false);
   const passouEsquerda = useSharedValue(false);
@@ -79,11 +75,7 @@ export function Deslizavel({ titulo, acoes, forma = 'linha', children }: Props) 
     <View
       // Um toque num card com OUTRO aberto só fecha o aberto — não navega no mesmo toque. No
       // próprio card aberto o toque passa: é ele que aperta os botões revelados.
-      onStartShouldSetResponderCapture={() => {
-        if (!aberto || aberto === eu.current) return false;
-        fecharDeslizavelAberto();
-        return true;
-      }}
+      onStartShouldSetResponderCapture={() => cardAberto.toqueEmOutro(meu)}
       onLayout={(e) => largura.set(e.nativeEvent.layout.width)}>
       <ReanimatedSwipeable
         ref={eu}
@@ -97,24 +89,23 @@ export function Deslizavel({ titulo, acoes, forma = 'linha', children }: Props) 
         // No iPhone a borda esquerda é o "voltar" do sistema: o arrasto começa depois dela.
         hitSlop={Platform.OS === 'ios' ? { left: -Space.xl } : undefined}
         containerStyle={forma === 'card' ? styles.recorteCard : undefined}
-        childrenContainerStyle={forma === 'linha' ? { backgroundColor: theme.surface } : undefined}
+        childrenContainerStyle={forma === 'linha' ? { backgroundColor: theme[fundo] } : undefined}
         renderLeftActions={
           lados.direita.length
             ? (_p, translation) => (
-                <Painel lado="direita" acoes={lados.direita} translation={translation} largura={largura} passou={passouDireita} tocar={tocar} />
+                <Painel lado="direita" acoes={lados.direita} temPonta={Boolean(lados.pontaDireita)} translation={translation} largura={largura} passou={passouDireita} tocar={tocar} />
               )
             : undefined
         }
         renderRightActions={
           esquerda.length
             ? (_p, translation) => (
-                <Painel lado="esquerda" acoes={esquerda} translation={translation} largura={largura} passou={passouEsquerda} tocar={tocar} />
+                <Painel lado="esquerda" acoes={esquerda} temPonta={Boolean(lados.pontaEsquerda)} translation={translation} largura={largura} passou={passouEsquerda} tocar={tocar} />
               )
             : undefined
         }
         onSwipeableWillOpen={() => {
-          if (aberto && aberto !== eu.current) aberto.close();
-          aberto = eu.current;
+          cardAberto.abriu(meu);
           // Ao soltar: o dedo passou do fim de um lado com ação que se desfaz?
           pendente.current = passouDireita.get() ? lados.pontaDireita : passouEsquerda.get() ? lados.pontaEsquerda : null;
           if (!pendente.current) Haptics.selectionAsync();
@@ -127,9 +118,9 @@ export function Deslizavel({ titulo, acoes, forma = 'linha', children }: Props) 
         onSwipeableClose={() => {
           passouDireita.set(false);
           passouEsquerda.set(false);
-          if (aberto === eu.current) aberto = null;
+          cardAberto.fechou(meu);
         }}>
-        {children}
+        <DentroDeArrasto.Provider value>{children}</DentroDeArrasto.Provider>
       </ReanimatedSwipeable>
     </View>
   );
@@ -138,6 +129,7 @@ export function Deslizavel({ titulo, acoes, forma = 'linha', children }: Props) 
 function Painel({
   lado,
   acoes,
+  temPonta,
   translation,
   largura,
   passou,
@@ -145,6 +137,7 @@ function Painel({
 }: {
   lado: 'direita' | 'esquerda';
   acoes: ItemAction[];
+  temPonta: boolean;
   translation: SharedValue<number>;
   largura: SharedValue<number>;
   passou: SharedValue<boolean>;
@@ -153,7 +146,7 @@ function Painel({
   const theme = useTheme();
   // Cruzou o ponto de "até o fim": marca e dá o toque leve — uma vez por cruzamento.
   useAnimatedReaction(
-    () => largura.get() > 0 && Math.abs(translation.get()) > largura.get() * ATE_O_FIM,
+    () => largura.get() > 0 && Math.abs(translation.get()) > limiarAteOFim(largura.get(), acoes.length, temPonta),
     (agora, antes) => {
       if (agora === antes) return;
       passou.set(agora);

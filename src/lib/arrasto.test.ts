@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 
-import { ladosDoArrasto, temArrasto } from './arrasto.ts';
+import { cardAberto, ladosDoArrasto, limiarAteOFim, temArrasto } from './arrasto.ts';
 
 const a = (label: string, extra: Record<string, unknown> = {}) => ({ label, onPress: () => {}, ...extra });
 
@@ -41,4 +41,36 @@ test('temArrasto: só quando há algo para mostrar', () => {
   assert.equal(temArrasto([a('Ver', { arrasto: 'fora' })]), false);
   assert.equal(temArrasto([a('Editar', { arrasto: 'direita' })]), true);
   assert.equal(temArrasto([]), false);
+});
+
+test('arrastar até o fim só vale depois do painel inteiro, e só onde há ponta', () => {
+  // Card de 328dp (Android 360) com Mais + Arquivar: 55% dava 180, a 4dp de só abrir o lado.
+  assert.equal(limiarAteOFim(328, 2, true), 264);
+  assert.equal(limiarAteOFim(600, 1, true), 330);
+  assert.equal(limiarAteOFim(328, 2, false), Infinity);
+});
+
+const card = () => {
+  const c = { fechou: 0, close: () => { c.fechou++; } };
+  return c;
+};
+
+test('um aberto por vez: abrir outro fecha o anterior, e o toque em outro só fecha', () => {
+  const a = card();
+  const b = card();
+  cardAberto.abriu(a);
+  cardAberto.abriu(b);
+  assert.equal(a.fechou, 1);
+  assert.equal(cardAberto.toqueEmOutro(a), true, 'toque em outro card com um aberto só fecha');
+  assert.equal(b.fechou, 1);
+  assert.equal(cardAberto.toqueEmOutro(a), false, 'fechado, o próximo toque passa');
+});
+
+test('card que saiu da tela não engole o primeiro toque da próxima', () => {
+  const a = card();
+  const b = card();
+  cardAberto.abriu(a);
+  cardAberto.esquecer(a); // perdeu o foco ou desmontou
+  assert.equal(a.fechou, 1);
+  assert.equal(cardAberto.toqueEmOutro(b), false);
 });

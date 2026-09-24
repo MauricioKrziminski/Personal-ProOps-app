@@ -13,6 +13,7 @@ import { useFolderMenu } from '@/components/notes/use-folder-menu';
 import { TagPicker } from '@/components/notes/tag-picker';
 import { EmptyState } from '@/components/ui/empty-state';
 import { HeaderActions } from '@/components/ui/header-actions';
+import { fecharDeslizavelAberto } from '@/components/ui/deslizavel';
 import { DragScrollView } from '@/components/ui/drag-scroll';
 import { Screen } from '@/components/ui/screen';
 import { SectionHead } from '@/components/ui/section-head';
@@ -253,6 +254,8 @@ export default function FolderScreen() {
 
       <DragScrollView
         ref={scrollRef}
+        // Rolar fecha o card arrastado que estiver aberto (Deslizavel).
+        onScrollBeginDrag={fecharDeslizavelAberto}
         onLayout={(e) => setAlturaVisivel(e.nativeEvent.layout.height)}
         scrollEnabled={!arrastando}
         showsVerticalScrollIndicator={false}

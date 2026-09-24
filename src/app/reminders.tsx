@@ -20,7 +20,7 @@ import {
   useToggleReminder,
   type Reminder,
 } from '@/hooks/use-items';
-import { showItemActions, type ItemAction } from '@/lib/item-actions';
+import { confirmDestructive, showItemActions, type ItemAction } from '@/lib/item-actions';
 import { describeRRule } from '@/lib/rrule-text';
 
 /**
@@ -61,10 +61,13 @@ export default function RemindersScreen() {
         },
       );
     const onDelete = () =>
-      remove.mutate(r.id, {
-        onSuccess: () => toast({ message: 'Lembrete apagado.', tone: 'success' }),
-        onError: () => toast({ message: 'Não deu para apagar.', tone: 'error' }),
-      });
+      confirmDestructive('Apagar este lembrete?', 'Apagar', () =>
+        remove.mutate(r.id, {
+          onSuccess: () => toast({ message: 'Lembrete apagado.', tone: 'success' }),
+          onError: () => toast({ message: 'Não deu para apagar.', tone: 'error' }),
+        }),
+        r.title,
+      );
 
     return [
       { label: 'Editar', arrasto: 'fora', onPress: () => router.push(`/reminder-form?id=${r.id}`) },

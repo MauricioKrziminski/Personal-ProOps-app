@@ -525,8 +525,8 @@ export default function InvoiceScreen() {
       />
 
       <FlatList
-      // Rolar fecha o card arrastado que estiver aberto (Deslizavel).
-      onScrollBeginDrag={fecharDeslizavelAberto}
+        // Rolar fecha o card arrastado que estiver aberto (Deslizavel).
+        onScrollBeginDrag={fecharDeslizavelAberto}
         alwaysBounceVertical
         // O indicador é do GESTO (§6 do design): com `isRefetching` ele girava sozinho ao entrar
         // pela Carteira, que já deixa a fatura carregada e dispara a revalidação das contas.

@@ -19,6 +19,7 @@ import { TextField } from '@/components/ui/field';
 import { GlassBackdrop, supportsLiquidGlass } from '@/components/ui/glass-backdrop';
 import { Icon } from '@/components/ui/icon';
 import { TAB_BAR_SPACE } from '@/components/ui/pill-tab-bar';
+import { fecharDeslizavelAberto } from '@/components/ui/deslizavel';
 import { DragScrollView } from '@/components/ui/drag-scroll';
 import { Screen } from '@/components/ui/screen';
 import { Skeleton, SkeletonList } from '@/components/ui/skeleton';
@@ -392,6 +393,8 @@ export default function NotesScreen() {
   const biblioteca = (
       <DragScrollView
         ref={scrollRef}
+        // Rolar fecha o card arrastado que estiver aberto (Deslizavel).
+        onScrollBeginDrag={fecharDeslizavelAberto}
         style={styles.libraryScroll}
         onLayout={(e) => setAlturaVisivel(e.nativeEvent.layout.height)}
         // ⚠️ É isto que faz o arrasto não brigar com a rolagem: em vez de negociar prioridade
