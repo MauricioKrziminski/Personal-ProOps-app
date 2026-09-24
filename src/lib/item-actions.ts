@@ -131,8 +131,10 @@ export function confirmDestructive(
     return;
   }
 
-  // Duas opções cabem no Alert do Android sem truncar.
-  Alert.alert(title, message, [
+  // Duas opções cabem no Alert do Android sem truncar. Sem mensagem, a pergunta vai no CORPO: o
+  // `Alert` troca mensagem ausente por '' e o Android ainda reserva a área dela — "Sair da
+  // conta?" saía com um vão vazio entre o título e os botões.
+  Alert.alert(message ? title : '', message ?? title, [
     { text: 'Cancelar', style: 'cancel' },
     { text: confirmLabel, style: 'destructive', onPress: onConfirm },
   ]);
