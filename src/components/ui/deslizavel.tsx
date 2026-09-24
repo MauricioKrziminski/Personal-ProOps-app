@@ -2,15 +2,14 @@ import * as Haptics from 'expo-haptics';
 import { useFocusEffect, useSegments } from 'expo-router';
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { Platform, StyleSheet, View, useWindowDimensions } from 'react-native';
-// O `Pressable` do gesture-handler: o da RN, dentro do painel do `ReanimatedSwipeable`, não
-// recebe o toque no Android (o gesto nativo do arrasto fica com ele) — medido no emulador.
-import { Gesture, GestureDetector, Pressable, type GestureTouchEvent } from 'react-native-gesture-handler';
+import { Gesture, GestureDetector, type GestureTouchEvent, type GestureType } from 'react-native-gesture-handler';
 import ReanimatedSwipeable, {
   type SwipeableMethods,
 } from 'react-native-gesture-handler/ReanimatedSwipeable';
 import Animated, {
   runOnJS,
   useAnimatedReaction,
+  useAnimatedStyle,
   useSharedValue,
   type SharedValue,
 } from 'react-native-reanimated';
@@ -100,6 +99,15 @@ export function Deslizavel({ titulo, acoes, forma = 'linha', fundo = 'surface', 
     eu.current?.close();
     viva.onPress?.();
   }, []);
+  // O botão do painel avisa pelo RÓTULO: o toque chega da thread da UI, e a ação (com funções
+  // dentro) não atravessa para lá.
+  const tocarRotulo = useCallback(
+    (label: string) => {
+      const viva = [...atual.current.direita, ...atual.current.esquerda].find((x) => x.label === label);
+      if (viva) tocar(viva);
+    },
+    [tocar],
+  );
   // Soltou até o fim: o gesto decide na UI (`ladoQueExecuta`) e pede aqui; o efeito lê a ação
   // MAIS NOVA. Por estado, não por ref: o gesto é montado num `useMemo`, e o React Compiler
   // recusa ref lida a partir dali.
@@ -152,17 +160,17 @@ export function Deslizavel({ titulo, acoes, forma = 'linha', fundo = 'surface', 
 
   const renderDireita = useCallback(
     (_p: SharedValue<number>, translation: SharedValue<number>) => (
-      <Painel lado="direita" acoes={lados.direita} temPonta={pontaDireita} botao={botao} translation={translation} largura={largura} estado={direita} tocar={tocar} />
+      <Painel lado="direita" acoes={lados.direita} temPonta={pontaDireita} botao={botao} translation={translation} largura={largura} estado={direita} tocar={tocarRotulo} dedo={dedo} />
     ),
     // eslint-disable-next-line react-hooks/exhaustive-deps -- a assinatura É a dependência da lista
-    [chaveDireita, pontaDireita, botao, largura, direita, tocar],
+    [chaveDireita, pontaDireita, botao, largura, direita, tocarRotulo, dedo],
   );
   const renderEsquerda = useCallback(
     (_p: SharedValue<number>, translation: SharedValue<number>) => (
-      <Painel lado="esquerda" acoes={esquerda} temPonta={pontaEsquerda} botao={botao} translation={translation} largura={largura} estado={esquerdaSV} tocar={tocar} />
+      <Painel lado="esquerda" acoes={esquerda} temPonta={pontaEsquerda} botao={botao} translation={translation} largura={largura} estado={esquerdaSV} tocar={tocarRotulo} dedo={dedo} />
     ),
     // eslint-disable-next-line react-hooks/exhaustive-deps -- a assinatura É a dependência da lista
-    [chaveEsquerda, pontaEsquerda, botao, largura, esquerdaSV, tocar],
+    [chaveEsquerda, pontaEsquerda, botao, largura, esquerdaSV, tocarRotulo, dedo],
   );
 
   return (
@@ -294,6 +302,7 @@ function Painel({
   largura,
   estado,
   tocar,
+  dedo,
 }: {
   lado: 'direita' | 'esquerda';
   acoes: ItemAction[];
@@ -302,7 +311,8 @@ function Painel({
   translation: SharedValue<number>;
   largura: SharedValue<number>;
   estado: Lado;
-  tocar: (acao: ItemAction) => void;
+  tocar: (label: string) => void;
+  dedo: GestureType;
 }) {
   const theme = useTheme();
   // Um toque por gesto, no idioma do sistema: seleção ao cruzar o ponto de ABRIR, impacto leve
@@ -337,28 +347,73 @@ function Painel({
             ? { fundo: theme.tintFill, tinta: 'onTint' as const }
             : { fundo: theme.backgroundSelected, tinta: 'text' as const };
         return (
-          <Pressable
-            key={acao.label}
-            accessibilityRole="button"
-            accessibilityLabel={acao.label}
-            onPress={() => tocar(acao)}
-            style={({ pressed }) => [
-              styles.botao,
-              { width: botao, backgroundColor: cor.fundo },
-              pressed && styles.pressionado,
-            ]}>
+          <BotaoDoPainel key={acao.label} label={acao.label} dedo={dedo} tocar={tocar} largura={botao} fundo={cor.fundo}>
             {/* Dois neutros lado a lado ("Mais" e "Arquivar") liam como um bloco só: um fio da cor
-                do fundo separa um botão do outro. É `View`, não borda — o botão nativo do
-                gesture-handler não desenha borda de um lado só no Android. */}
+                do fundo separa um botão do outro. É `View`, não borda. */}
             {i > 0 ? <View style={[styles.fio, { backgroundColor: theme.background }]} /> : null}
             {acao.icon ? <Icon name={acao.icon} size="md" color={cor.tinta} /> : null}
             <ThemedText type="caption" themeColor={cor.tinta} style={styles.rotulo}>
               {acao.curto ?? acao.label}
             </ThemedText>
-          </Pressable>
+          </BotaoDoPainel>
         );
       })}
     </Animated.View>
+  );
+}
+
+/**
+ * Um botão do painel: um `Tap` do gesture-handler SIMULTÂNEO ao gesto que observa o dedo.
+ *
+ * ⚠️ **No iOS o botão não respondia** (24/09/2026, medido no simulador): o `Pressable` do
+ * gesture-handler dentro do painel perdia o toque para o `Gesture.Manual` que envolve o card — sem
+ * ele, o mesmo toque abria o menu. O observador não pode sair (é ele que decide o "até o fim" no
+ * soltar), então o toque do botão declara a relação com ele. No Android o `Pressable` da RN também
+ * não serve: dentro do `ReanimatedSwipeable` o gesto nativo do arrasto fica com o toque. Um
+ * caminho só, nas duas plataformas.
+ */
+function BotaoDoPainel({
+  label,
+  dedo,
+  tocar,
+  largura,
+  fundo,
+  children,
+}: {
+  label: string;
+  dedo: GestureType;
+  tocar: (label: string) => void;
+  largura: number;
+  fundo: string;
+  children: ReactNode;
+}) {
+  const apertado = useSharedValue(0);
+  const toque = useMemo(
+    () =>
+      Gesture.Tap()
+        .simultaneousWithExternalGesture(dedo)
+        .onBegin(() => apertado.set(1))
+        .onFinalize(() => apertado.set(0))
+        .onEnd((_e, deu) => {
+          if (deu) runOnJS(tocar)(label);
+        }),
+    [dedo, apertado, tocar, label],
+  );
+  // Press-in de botão (design.md §5): a opacidade cai enquanto o dedo está em cima.
+  const estilo = useAnimatedStyle(() => ({ opacity: apertado.get() ? 0.7 : 1 }));
+  return (
+    <GestureDetector gesture={toque}>
+      <Animated.View
+        accessible
+        accessibilityRole="button"
+        accessibilityLabel={label}
+        // O leitor de tela ativa pela ação, não pelo gesto.
+        accessibilityActions={[{ name: 'activate' }]}
+        onAccessibilityAction={() => tocar(label)}
+        style={[styles.botao, { width: largura, backgroundColor: fundo }, estilo]}>
+        {children}
+      </Animated.View>
+    </GestureDetector>
   );
 }
 
@@ -372,8 +427,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: Space.xs,
   },
   fio: { position: 'absolute', left: 0, top: 0, bottom: 0, width: 1 },
-  // Press-in de botão (design.md §5): a opacidade cai enquanto o dedo está em cima.
-  pressionado: { opacity: 0.7 },
   // Rótulo não parte palavra nem trunca: centraliza e quebra entre palavras (design.md §3).
   rotulo: { textAlign: 'center', flexShrink: 0, maxWidth: '100%' },
   recorteCard: { borderRadius: Radius.md, borderCurve: 'continuous', overflow: 'hidden' },

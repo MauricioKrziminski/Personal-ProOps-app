@@ -1249,3 +1249,11 @@ test('Placeholder é exemplo ("Ex.: …") ou instrução, nunca dado que parece 
 test('Busca nativa do iOS não esconde a barra de navegação (o "(tabs)" de 24/09/2026)', () => {
   assert.match(readFileSync(join(SRC, 'components/ui/search.ios.tsx'), 'utf8'), /hideNavigationBar=\{false\}/);
 });
+
+test('Botão do painel do arrasto é Tap simultâneo ao observador do dedo (iOS não recebia o toque)', () => {
+  // 24/09/2026: no iPhone o `Pressable` do gesture-handler dentro do painel perdia o toque para o
+  // `Gesture.Manual` que envolve o card. O botão declara a relação com ele.
+  const fonte = readFileSync(join(SRC, 'components/ui/deslizavel.tsx'), 'utf8');
+  assert.match(fonte, /Gesture\.Tap\(\)\s*\.simultaneousWithExternalGesture\(dedo\)/);
+  assert.doesNotMatch(fonte, /<Pressable\b/, 'o painel não volta ao Pressable');
+});
