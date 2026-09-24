@@ -16,7 +16,7 @@ import { TodayTabletCanvas } from '@/components/feed/today-tablet-canvas';
 import { BudgetRings } from '@/components/finance/budget-rings';
 import { CashAccounts } from '@/components/finance/cash-accounts';
 import { ThemedText } from '@/components/themed-text';
-import { AppHeader } from '@/components/ui/app-header';
+import { AppHeader, HeaderIconButton } from '@/components/ui/app-header';
 import { BlockHeader } from '@/components/ui/block-header';
 import { useBRL } from '@/components/ui/conceal';
 import { CountUpMoney } from '@/components/ui/count-up-money';
@@ -86,6 +86,20 @@ function Bloco({ children }: { children: React.ReactNode }) {
     <Animated.View style={styles.bloco} layout={linear} exiting={FadeOut.duration(Motion.duration.exit)}>
       {children}
     </Animated.View>
+  );
+}
+
+/**
+ * O cabeçalho da Hoje, o mesmo no esqueleto e na tela pronta (o botão não surge do nada quando a
+ * tela termina de carregar). A busca global (`/search`) existia sem porta nenhuma no app
+ * (24/09/2026): a Hoje é a raiz, e daqui se procura em lançamentos, notas e lembretes de uma vez.
+ */
+function CabecalhoDaHoje() {
+  return (
+    <AppHeader
+      title="Hoje"
+      action={<HeaderIconButton icon="magnifyingglass" label="Buscar em tudo" onPress={() => router.push('/search')} />}
+    />
   );
 }
 
@@ -324,7 +338,7 @@ export default function TodayScreen() {
 
   if (!pronta) {
     return (
-      <Screen wide={tablet} topBar={<AppHeader title="Hoje" />}>
+      <Screen wide={tablet} topBar={<CabecalhoDaHoje />}>
         <View style={styles.cabecalho}>
           <Skeleton width="28%" height={12} />
           <Skeleton width="60%" height={28} />
@@ -552,7 +566,7 @@ export default function TodayScreen() {
     <Screen
       stagger
       wide={tablet}
-      topBar={<AppHeader title="Hoje" />}
+      topBar={<CabecalhoDaHoje />}
       onRefresh={() =>
         Promise.all([
           gasto.refetch(),
