@@ -364,12 +364,19 @@ export default function ProfileScreen() {
           fica 3-em-linha na fonte normal e passa a 2+1 quando a pessoa aumenta a letra, onde cada
           chip fica largo o bastante para a palavra inteira.
         */}
+        {/* Os três números são DO MÊS, e os dois primeiros só do que chegou pelo WhatsApp
+            (`useAiMonthStats`). Sem dizer isso, "0 lançamentos" num perfil com dezenas de
+            lançamentos lia como defeito (24/09/2026). "no WhatsApp" tem a largura de
+            "lançamentos": a conta da quebra abaixo continua valendo. */}
+        <ThemedText type="caption" themeColor="onHeroMuted">
+          Neste mês
+        </ThemedText>
         <View style={[styles.idStats, { flexWrap: 'wrap' }]}>
           <Stat
             valor={ia.data ? String(ia.data.lancamentos) : '—'}
-            rotulo="lançamentos"
+            rotulo={'lançamentos\nno WhatsApp'}
           />
-          <Stat valor={ia.data ? String(ia.data.notas) : '—'} rotulo="notas" />
+          <Stat valor={ia.data ? String(ia.data.notas) : '—'} rotulo={'notas\nno WhatsApp'} />
           <Stat
             valor={plan.data ? String(plan.data.ai_messages_month) : '—'}
             rotulo={
