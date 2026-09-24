@@ -25,16 +25,21 @@ Item 5 do lote de 23/09/2026 (noite).
 - **Botão revelado** é tocável e tem rótulo de acessibilidade. As mesmas ações continuam
   alcançáveis pelo leitor de tela, no menu.
 - **Voltar do iPhone:** numa tela empurrada, o arrasto para a direita só começa a partir de
-  ~24pt da borda esquerda. Perto da borda, o gesto é o de voltar do sistema.
+  ~24pt da borda esquerda. Perto da borda, o gesto é o de voltar do sistema. Nas raízes de aba
+  (sem voltar) não há zona morta.
 - **Cores:**
   - Apagar é `danger`.
   - Arquivar, Mais e as neutras usam `backgroundElement` com tinta.
   - A ação rápida da direita usa `tintFill`/`onTint`.
   - Nada de cor nova (monocromático, design.md §2b).
-- **Háptico:** seleção ao cruzar o ponto de abrir; impacto leve quando o arrasto até o fim
-  executa. Um por gesto.
+- **Háptico:** seleção ao cruzar o ponto de abrir; impacto leve ao cruzar o ponto de "até o
+  fim" (é ali que soltar passa a executar, como no Mail e no WhatsApp). O resultado vibra pelo
+  toast da ação, como no menu — a tela não soma uma terceira vibração.
 - **Movimento:** o painel segue o dedo e assenta em mola (`Motion.spring.settle`). Com Reduce
-  Motion o assentamento é curto, sem ultrapassagem.
+  Motion o assentamento é curto, sem ultrapassagem. Arrastar até o fim executa AO SOLTAR, sem
+  esperar a mola assentar.
+- **Fonte grande:** o botão revelado cresce com a fonte até 1,6× (88dp na padrão), e o limiar de
+  "até o fim" acompanha.
 
 ## Tabela aprovada
 
@@ -50,7 +55,7 @@ Item 5 do lote de 23/09/2026 (noite).
 | Lembrete | Pausar/Retomar | Apagar | Pausar/Retomar |
 | Conversa do agente | Renomear | Apagar | — |
 | Conta | Editar | Arquivar | — (conta arquivada não tem "Desfazer") |
-| Cartão (Cartões) | Paguei se a fatura fechou; senão Importar fatura | a outra das duas · Abrir na carteira | — |
+| Cartão (Cartões) | Paguei se a fatura fechou (abre a fatura já no pagamento); senão Importar fatura | a outra das duas · Abrir na carteira | — |
 | Dívida | Pagar parcela | Arquivar · Mais | Arquivar (já tem Desfazer) |
 | Compra parcelada | Editar a compra | Apagar a compra · Mais | — |
 | Recorrente | Pausar/Retomar | Apagar · Mais | Pausar/Retomar |

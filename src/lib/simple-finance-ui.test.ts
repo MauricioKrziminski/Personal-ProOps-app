@@ -1224,6 +1224,16 @@ test('Cartões: fatura aberta arrasta Importar fatura; a carteira fica à esquer
   assert.deepEqual(ladosDe(raiz), { direita: ['Importar fatura'], esquerda: ['Abrir na carteira'], mais: false, pontaDireita: null, pontaEsquerda: null });
 });
 
+test('Cartões: "Paguei" abre a fatura já no pagamento, não só a fatura', () => {
+  const ui = screen('src/app/finance/cards.tsx', { cards: [{ account_id: 'card-1', name: 'Nubank Cartão', invoice_id: 'invoice-1', invoice_total_cents: 10000, invoice_open_cents: 10000, unpaid_total_cents: 10000, closing_date: '2026-09-03', due_date: '2026-09-10', overdue_count: 1 }] });
+  const card = ui.nodes().find((n: any) => typeof n.type === 'function' && n.type.name === 'PressCard');
+  const raiz = card.type(card.props);
+  const paguei = raiz.props.acoes.find((x: any) => x.label === 'Paguei');
+  assert.ok(paguei, 'fatura fechada tem Paguei');
+  ui.interact(() => paguei.onPress());
+  assert.deepEqual(JSON.parse(JSON.stringify(ui.navigations.at(-1))), { pathname: '/finance/invoice/[id]', params: { id: 'invoice-1', acao: 'pagar' } });
+});
+
 test('Recorrentes: arrasta Pausar (até o fim, com Desfazer) e Apagar; o resto no Mais', () => {
   const ui = screen('src/app/finance/recurring.tsx', { recurring: [{ id: 'rec-1', description: 'Academia', kind: 'expense', amount_cents: 12000, rrule: 'FREQ=MONTHLY;BYMONTHDAY=15', dtstart: '2026-01-15', next_run_at: '2026-10-15T12:00:00Z', active: true, account_id: null, category: 'saúde' }] });
   const card = deslizaveis(ui)[0];

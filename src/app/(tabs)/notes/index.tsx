@@ -228,7 +228,6 @@ export default function NotesScreen() {
   const acoesDaNota: NoteCardActions = useMemo(
     () => ({
       onPin: (note) => {
-        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
         togglePin.mutate(
           { id: note.id, pinned: !note.pinned },
           {
@@ -246,7 +245,6 @@ export default function NotesScreen() {
       onColor: setPintando,
       onMove: setMovendo,
       onArchive: (note) => {
-        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
         updateNote.mutate(
           { id: note.id, archived: true },
           {
@@ -264,7 +262,6 @@ export default function NotesScreen() {
         );
       },
       onTrash: (note) => {
-        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
         trash.mutate(note.id, {
           onSuccess: () =>
             toast({

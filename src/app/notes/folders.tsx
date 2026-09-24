@@ -219,7 +219,6 @@ export default function FoldersScreen() {
   };
 
   const fixar = (folder: NoteFolder) => {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     updateFolder.mutate(
       { id: folder.id, pinned: !folder.pinned },
       {

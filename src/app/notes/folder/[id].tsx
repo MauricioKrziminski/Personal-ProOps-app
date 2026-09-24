@@ -2,7 +2,6 @@ import { useCallback, useMemo, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 import Animated, { useAnimatedRef } from 'react-native-reanimated';
 import { Stack, router, useLocalSearchParams } from 'expo-router';
-import * as Haptics from 'expo-haptics';
 
 import { Chip } from '@/components/finance/chip';
 import { ColorPicker } from '@/components/notes/color-picker';
@@ -108,7 +107,6 @@ export default function FolderScreen() {
   const acoes: NoteCardActions = useMemo(
     () => ({
       onPin: (note) => {
-        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
         togglePin.mutate(
           { id: note.id, pinned: !note.pinned },
           {

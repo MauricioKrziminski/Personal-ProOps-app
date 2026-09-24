@@ -1,7 +1,7 @@
 import * as Haptics from 'expo-haptics';
-import { useFocusEffect } from 'expo-router';
+import { useFocusEffect, useSegments } from 'expo-router';
 import { useCallback, useEffect, useMemo, useRef, type ReactNode } from 'react';
-import { Platform, StyleSheet, View } from 'react-native';
+import { Platform, StyleSheet, View, useWindowDimensions } from 'react-native';
 // O `Pressable` do gesture-handler: o da RN, dentro do painel do `ReanimatedSwipeable`, não
 // recebe o toque no Android (o gesto nativo do arrasto fica com ele) — medido no emulador.
 import { Pressable } from 'react-native-gesture-handler';
@@ -18,9 +18,18 @@ import Animated, {
 import { ThemedText } from '@/components/themed-text';
 import { Icon } from '@/components/ui/icon';
 import { DentroDeArrasto } from '@/components/ui/money';
-import { Radius, Space } from '@/design/tokens';
+import { Motion, Radius, Space } from '@/design/tokens';
 import { useTheme } from '@/hooks/use-theme';
-import { BOTAO, cardAberto, fecharCardAberto, ladosDoArrasto, passouAteOFim, temArrasto } from '@/lib/arrasto';
+import {
+  abriuOLado,
+  cardAberto,
+  fecharCardAberto,
+  ladosDoArrasto,
+  larguraDoBotao,
+  passouAteOFim,
+  passouHaPouco,
+  temArrasto,
+} from '@/lib/arrasto';
 import { showItemActions, type ItemAction } from '@/lib/item-actions';
 
 /** Um card aberto por vez (`cardAberto`, `lib/arrasto.ts`); a lista que começa a rolar fecha o dele. */
@@ -48,6 +57,10 @@ type Props = {
  */
 export function Deslizavel({ titulo, acoes, forma = 'linha', fundo = 'surface', children }: Props) {
   const theme = useTheme();
+  const { fontScale } = useWindowDimensions();
+  const botao = larguraDoBotao(fontScale);
+  // Tela empurrada tem o "voltar" do iPhone na borda esquerda; raiz de aba (`(tabs)`) não tem.
+  const temVoltar = useSegments()[0] !== '(tabs)';
   const eu = useRef<SwipeableMethods>(null);
   // Um objeto estável no registro: o `ref` do gesto só existe enquanto o arrasto está montado.
   const meu = useMemo(() => ({ close: () => eu.current?.close() }), []);
@@ -55,21 +68,54 @@ export function Deslizavel({ titulo, acoes, forma = 'linha', fundo = 'surface', 
   useFocusEffect(useCallback(() => () => cardAberto.esquecer(meu), [meu]));
   useEffect(() => () => cardAberto.esquecer(meu), [meu]);
   const largura = useSharedValue(0);
-  const passouDireita = useSharedValue(false);
-  const passouEsquerda = useSharedValue(false);
-  /** A ação da ponta decidida AO SOLTAR — depois a mola volta ao painel e o "passou" desliga. */
-  const pendente = useRef<ItemAction | null>(null);
+  const direita = useLado();
+  const esquerdaSV = useLado();
 
-  if (!temArrasto(acoes)) return <>{children}</>;
+  // Sem ações o gesto fica DESLIGADO, não desmontado: montar e desmontar o arrasto quando as
+  // ações chegam (Contas, com a conta carregando) remontava o card inteiro.
+  const tem = temArrasto(acoes);
   const lados = ladosDoArrasto(acoes);
-
-  const tocar = (acao: ItemAction) => {
-    eu.current?.close();
-    acao.onPress?.();
+  const mais: ItemAction = {
+    label: 'Mais ações',
+    curto: 'Mais',
+    icon: 'ellipsis',
+    onPress: () => showItemActions(titulo, acoes),
   };
-  const mais: ItemAction = { label: 'Mais', icon: 'ellipsis', onPress: () => showItemActions(titulo, acoes) };
   // Como no WhatsApp: "Mais" por dentro, a ação de tirar na BORDA — é ela que "até o fim" executa.
   const esquerda = lados.mais ? [mais, ...lados.esquerda] : lados.esquerda;
+
+  // Os botões leem a lista MAIS NOVA na hora do toque: o painel só é redesenhado quando o que
+  // aparece nele muda (a assinatura), então o `onPress` guardado nele pode ser de outro render.
+  const atual = useRef({ direita: lados.direita, esquerda });
+  useEffect(() => {
+    atual.current = { direita: lados.direita, esquerda };
+  });
+  const tocar = useCallback((acao: ItemAction) => {
+    const viva = [...atual.current.direita, ...atual.current.esquerda].find((x) => x.label === acao.label) ?? acao;
+    eu.current?.close();
+    viva.onPress?.();
+  }, []);
+  const assinatura = (lista: ItemAction[]) =>
+    lista.map((x) => [x.label, x.curto, x.icon, x.destructive, x.desfaz].join('|')).join('¦');
+  const chaveDireita = assinatura(lados.direita);
+  const chaveEsquerda = assinatura(esquerda);
+  const pontaDireita = Boolean(lados.pontaDireita);
+  const pontaEsquerda = Boolean(lados.pontaEsquerda);
+
+  const renderDireita = useCallback(
+    (_p: SharedValue<number>, translation: SharedValue<number>) => (
+      <Painel lado="direita" acoes={lados.direita} temPonta={pontaDireita} botao={botao} translation={translation} largura={largura} estado={direita} tocar={tocar} />
+    ),
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- a assinatura É a dependência da lista
+    [chaveDireita, pontaDireita, botao, largura, direita, tocar],
+  );
+  const renderEsquerda = useCallback(
+    (_p: SharedValue<number>, translation: SharedValue<number>) => (
+      <Painel lado="esquerda" acoes={esquerda} temPonta={pontaEsquerda} botao={botao} translation={translation} largura={largura} estado={esquerdaSV} tocar={tocar} />
+    ),
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- a assinatura É a dependência da lista
+    [chaveEsquerda, pontaEsquerda, botao, largura, esquerdaSV, tocar],
+  );
 
   return (
     <View
@@ -79,49 +125,38 @@ export function Deslizavel({ titulo, acoes, forma = 'linha', fundo = 'surface', 
       onLayout={(e) => largura.set(e.nativeEvent.layout.width)}>
       <ReanimatedSwipeable
         ref={eu}
+        enabled={tem}
         friction={1}
         overshootFriction={1}
+        animationOptions={Motion.spring.settle}
         // Passar do painel só onde arrastar até o fim faz algo.
-        overshootLeft={Boolean(lados.pontaDireita)}
-        overshootRight={Boolean(lados.pontaEsquerda)}
-        leftThreshold={BOTAO / 2}
-        rightThreshold={BOTAO / 2}
-        // No iPhone a borda esquerda é o "voltar" do sistema: o arrasto começa depois dela.
-        hitSlop={Platform.OS === 'ios' ? { left: -Space.xl } : undefined}
+        overshootLeft={pontaDireita}
+        overshootRight={pontaEsquerda}
+        leftThreshold={botao / 2}
+        rightThreshold={botao / 2}
+        // No iPhone a borda esquerda de uma tela empurrada é o "voltar" do sistema: ali o arrasto
+        // começa depois dela. Nas raízes de aba não há voltar, e a zona morta só atrapalhava.
+        hitSlop={Platform.OS === 'ios' && temVoltar ? { left: -Space.xl } : undefined}
         containerStyle={forma === 'card' ? styles.recorteCard : undefined}
         childrenContainerStyle={forma === 'linha' ? { backgroundColor: theme[fundo] } : undefined}
-        renderLeftActions={
-          lados.direita.length
-            ? (_p, translation) => (
-                <Painel lado="direita" acoes={lados.direita} temPonta={Boolean(lados.pontaDireita)} translation={translation} largura={largura} passou={passouDireita} tocar={tocar} />
-              )
-            : undefined
-        }
-        renderRightActions={
-          esquerda.length
-            ? (_p, translation) => (
-                <Painel lado="esquerda" acoes={esquerda} temPonta={Boolean(lados.pontaEsquerda)} translation={translation} largura={largura} passou={passouEsquerda} tocar={tocar} />
-              )
-            : undefined
-        }
+        renderLeftActions={tem && lados.direita.length ? renderDireita : undefined}
+        renderRightActions={tem && esquerda.length ? renderEsquerda : undefined}
         onSwipeableWillOpen={(direcao) => {
           cardAberto.abriu(meu);
           // Ao soltar: o dedo passou do fim DO LADO que abriu, com ação que se desfaz? `right` é o
-          // conteúdo indo para a direita — o painel `direita`.
-          pendente.current =
-            direcao === 'right'
-              ? passouDireita.get() ? lados.pontaDireita : null
-              : passouEsquerda.get() ? lados.pontaEsquerda : null;
-          if (!pendente.current) Haptics.selectionAsync();
+          // conteúdo indo para a direita — o painel `direita`. Executa JÁ, sem esperar a mola
+          // assentar no painel (no WhatsApp a ação sai ao soltar).
+          const lado = direcao === 'right' ? direita : esquerdaSV;
+          const ponta = direcao === 'right' ? lados.pontaDireita : lados.pontaEsquerda;
+          if (ponta && passouHaPouco(lado.passou.get(), lado.desligouEm.get(), Date.now())) tocar(ponta);
         }}
-        onSwipeableOpen={() => {
-          const ponta = pendente.current;
-          pendente.current = null;
-          if (ponta) tocar(ponta);
-        }}
+        // Fechando, o card já não é "o aberto": um toque noutro card logo em seguida navega.
+        onSwipeableWillClose={() => cardAberto.fechou(meu)}
         onSwipeableClose={() => {
-          passouDireita.set(false);
-          passouEsquerda.set(false);
+          for (const l of [direita, esquerdaSV]) {
+            l.passou.set(false);
+            l.desligouEm.set(0);
+          }
           cardAberto.fechou(meu);
         }}>
         <DentroDeArrasto.Provider value>{children}</DentroDeArrasto.Provider>
@@ -130,49 +165,81 @@ export function Deslizavel({ titulo, acoes, forma = 'linha', fundo = 'surface', 
   );
 }
 
+type Lado = { passou: SharedValue<boolean>; desligouEm: SharedValue<number>; abriu: SharedValue<boolean> };
+
+function useLado(): Lado {
+  const passou = useSharedValue(false);
+  const desligouEm = useSharedValue(0);
+  const abriu = useSharedValue(false);
+  return useMemo(() => ({ passou, desligouEm, abriu }), [passou, desligouEm, abriu]);
+}
+
 function Painel({
   lado,
   acoes,
   temPonta,
+  botao,
   translation,
   largura,
-  passou,
+  estado,
   tocar,
 }: {
   lado: 'direita' | 'esquerda';
   acoes: ItemAction[];
   temPonta: boolean;
+  botao: number;
   translation: SharedValue<number>;
   largura: SharedValue<number>;
-  passou: SharedValue<boolean>;
+  estado: Lado;
   tocar: (acao: ItemAction) => void;
 }) {
   const theme = useTheme();
-  // Cruzou o ponto de "até o fim": marca e dá o toque leve — uma vez por cruzamento.
+  // Um toque por gesto, no idioma do sistema: seleção ao cruzar o ponto de ABRIR, impacto leve
+  // ao cruzar o ponto de "até o fim" (é ali que soltar passa a executar). Quem avisa o resultado
+  // é o toast da ação, como no menu.
   useAnimatedReaction(
-    () => passouAteOFim(translation.get(), lado, largura.get(), acoes.length, temPonta),
+    () => abriuOLado(translation.get(), lado, botao),
     (agora, antes) => {
-      if (agora === antes) return;
-      passou.set(agora);
+      if (agora === (antes ?? false)) return;
+      estado.abriu.set(agora);
+      if (agora) runOnJS(Haptics.selectionAsync)();
+    },
+  );
+  useAnimatedReaction(
+    () => passouAteOFim(translation.get(), lado, largura.get(), acoes.length, temPonta, botao),
+    (agora, antes) => {
+      if (agora === (antes ?? false)) return;
+      estado.passou.set(agora);
       if (agora) runOnJS(Haptics.impactAsync)(Haptics.ImpactFeedbackStyle.Light);
+      else estado.desligouEm.set(Date.now());
     },
   );
 
   return (
     <Animated.View style={[styles.painel, lado === 'esquerda' && styles.painelEsquerda]}>
-      {acoes.map((acao) => {
+      {acoes.map((acao, i) => {
+        // Vermelho só para o que apaga; Arquivar e "Mais" são neutros (spec do arrasto). O neutro
+        // usa `backgroundSelected`: no escuro o `backgroundElement` quase não se distinguia da linha.
         const cor = acao.destructive
           ? { fundo: theme.dangerSoft, tinta: 'danger' as const }
           : lado === 'direita'
             ? { fundo: theme.tintFill, tinta: 'onTint' as const }
-            : { fundo: theme.backgroundElement, tinta: 'text' as const };
+            : { fundo: theme.backgroundSelected, tinta: 'text' as const };
         return (
           <Pressable
             key={acao.label}
             accessibilityRole="button"
             accessibilityLabel={acao.label}
             onPress={() => tocar(acao)}
-            style={[styles.botao, { backgroundColor: cor.fundo }]}>
+            style={({ pressed }) => [
+              styles.botao,
+              { width: botao, backgroundColor: cor.fundo },
+              pressed && styles.pressionado,
+            ]}>
+            {/* Dois neutros lado a lado ("Mais" e "Arquivar") liam como um bloco só: um fio da cor
+                do fundo separa um botão do outro. É `View`, não borda — o botão nativo do
+                gesture-handler não desenha borda de um lado só no Android. */}
+            {i > 0 ? <View style={[styles.fio, { backgroundColor: theme.background }]} /> : null}
             {acao.icon ? <Icon name={acao.icon} size="md" color={cor.tinta} /> : null}
             <ThemedText type="caption" themeColor={cor.tinta} style={styles.rotulo}>
               {acao.curto ?? acao.label}
@@ -188,12 +255,14 @@ const styles = StyleSheet.create({
   painel: { flexDirection: 'row' },
   painelEsquerda: { justifyContent: 'flex-end' },
   botao: {
-    width: BOTAO,
     alignItems: 'center',
     justifyContent: 'center',
     gap: Space.xs,
     paddingHorizontal: Space.xs,
   },
+  fio: { position: 'absolute', left: 0, top: 0, bottom: 0, width: 1 },
+  // Press-in de botão (design.md §5): a opacidade cai enquanto o dedo está em cima.
+  pressionado: { opacity: 0.7 },
   // Rótulo não parte palavra nem trunca: centraliza e quebra entre palavras (design.md §3).
   rotulo: { textAlign: 'center', flexShrink: 0, maxWidth: '100%' },
   recorteCard: { borderRadius: Radius.md, borderCurve: 'continuous', overflow: 'hidden' },

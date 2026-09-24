@@ -18,7 +18,7 @@ import { Icon } from '@/components/ui/icon';
 import { Money } from '@/components/ui/money';
 import { Row, Section } from '@/components/ui/row';
 import { Screen } from '@/components/ui/screen';
-import { Deslizavel } from '@/components/ui/deslizavel';
+import { Deslizavel, fecharDeslizavelAberto } from '@/components/ui/deslizavel';
 import { HeroLabel, SectionHead } from '@/components/ui/section-head';
 import { Skeleton, SkeletonRow } from '@/components/ui/skeleton';
 import { ProgressBar } from '@/components/ui/sparkline';
@@ -196,12 +196,18 @@ export default function GoalsScreen() {
   };
 
   const desfazerAporte = (goal: Goal, amountCents: number) =>
-    deposit.mutate(
-      { goal, amountCents: -amountCents, note: 'estorno' },
-      {
-        onSuccess: () => toast({ message: 'Depósito desfeito.', tone: 'success' }),
-        onError: () => toast({ message: 'Não deu para desfazer.', tone: 'error' }),
-      }
+    confirmDestructive(
+      'Desfazer este aporte?',
+      'Desfazer',
+      () =>
+        deposit.mutate(
+          { goal, amountCents: -amountCents, note: 'estorno' },
+          {
+            onSuccess: () => toast({ message: 'Depósito desfeito.', tone: 'success' }),
+            onError: () => toast({ message: 'Não deu para desfazer.', tone: 'error' }),
+          }
+        ),
+      `${formatBRL(amountCents)} sai de «${goal.name}».`
     );
 
   const arquivar = (g: Goal) =>
@@ -221,7 +227,7 @@ export default function GoalsScreen() {
     { label: 'Guardar', icon: 'plus.circle', arrasto: 'direita', onPress: () => abrirAporte(g) },
     { label: 'Editar', onPress: () => abrirEdicao(g) },
     { label: 'Ver extrato', onPress: () => setExtrato(g) },
-    { label: 'Arquivar', icon: 'archivebox', destructive: true, arrasto: 'esquerda', onPress: () => arquivar(g) },
+    { label: 'Arquivar', icon: 'archivebox', arrasto: 'esquerda', onPress: () => arquivar(g) },
   ];
   const acoes = (g: Goal) => showItemActions(g.name, acoesDaMeta(g));
 
@@ -469,7 +475,10 @@ export default function GoalsScreen() {
             onClose={() => setExtrato(null)}
           />
 
-          <ScrollView contentContainerStyle={styles.sheetBody}>
+          <ScrollView
+            contentContainerStyle={styles.sheetBody}
+            // Rolar o extrato fecha o aporte arrastado que estiver aberto (Deslizavel).
+            onScrollBeginDrag={fecharDeslizavelAberto}>
             {contribuicoes.isLoading ? (
               <>
                 <SkeletonRow />

@@ -167,12 +167,15 @@ export default function CardsScreen() {
     (c) => c.invoice_id && c.due_date && Number(c.invoice_open_cents ?? c.invoice_total_cents ?? 0) > 0
   );
 
-  const irParaFatura = (card: CardSummary) => {
+  // `pagar`: o "Paguei" chega na fatura já com o pagamento aberto — levar só até a fatura
+  // obrigava a achar o botão de novo, e "Paguei" que não registra nada é rótulo mentindo.
+  const irParaFatura = (card: CardSummary, pagar = false) => {
     if (!card.invoice_id) {
       router.push('/finance/accounts');
       return;
     }
-    router.push({ pathname: '/finance/invoice/[id]', params: { id: card.invoice_id } });
+    const params = pagar ? { id: card.invoice_id, acao: 'pagar' } : { id: card.invoice_id };
+    router.push({ pathname: '/finance/invoice/[id]', params });
   };
 
   const loading = cards.isLoading ? (
@@ -269,7 +272,7 @@ export default function CardsScreen() {
                   onPress: () => router.push({ pathname: '/import', params: { conta: card.account_id } }),
                 },
                 ...(podePagar && totalFatura > 0
-                  ? [{ label: 'Paguei', icon: 'checkmark.circle' as const, arrasto: 'direita' as const, onPress: () => irParaFatura(card) }]
+                  ? [{ label: 'Paguei', icon: 'checkmark.circle' as const, arrasto: 'direita' as const, onPress: () => irParaFatura(card, true) }]
                   : []),
               ]}
               accessibilityLabel={`${card.name}, ${estado ? `fatura ${estado.toLowerCase()}` : 'sem fatura aberta'}, ${formatBRL(totalFatura)}${card.due_date ? `, ${prazoLabel(card.due_date, 'vence')}` : ''}`}>
@@ -324,7 +327,7 @@ export default function CardsScreen() {
                   label="Paguei"
                   variant="secondary"
                   size="sm"
-                  onPress={() => irParaFatura(card)}
+                  onPress={() => irParaFatura(card, true)}
                 />
               ) : null}
             </PressCard>

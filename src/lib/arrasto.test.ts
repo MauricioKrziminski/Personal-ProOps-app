@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 
-import { cardAberto, ladosDoArrasto, limiarAteOFim, passouAteOFim, temArrasto } from './arrasto.ts';
+import { BOTAO, abriuOLado, cardAberto, ladosDoArrasto, larguraDoBotao, limiarAteOFim, passouAteOFim, passouHaPouco, temArrasto } from './arrasto.ts';
 
 const a = (label: string, extra: Record<string, unknown> = {}) => ({ label, onPress: () => {}, ...extra });
 
@@ -45,9 +45,9 @@ test('temArrasto: só quando há algo para mostrar', () => {
 
 test('arrastar até o fim só vale depois do painel inteiro, e só onde há ponta', () => {
   // Card de 328dp (Android 360) com Mais + Arquivar: 55% dava 180, a 4dp de só abrir o lado.
-  assert.equal(limiarAteOFim(328, 2, true), 264);
-  assert.equal(limiarAteOFim(600, 1, true), 330);
-  assert.equal(limiarAteOFim(328, 2, false), Infinity);
+  assert.equal(limiarAteOFim(328, 2, true, BOTAO), 264);
+  assert.equal(limiarAteOFim(600, 1, true, BOTAO), 330);
+  assert.equal(limiarAteOFim(328, 2, false, BOTAO), Infinity);
 });
 
 const card = () => {
@@ -78,11 +78,43 @@ test('card que saiu da tela não engole o primeiro toque da próxima', () => {
 test('até o fim olha o LADO: arrastar à esquerda nunca dispara a ação da direita', () => {
   // Nota num card de 352dp: Fixar à direita (1 botão), Mais + Arquivar à esquerda (2 botões).
   // Os dois painéis leem o mesmo deslocamento; sem o lado, −200 "passava" do limiar de Fixar.
-  assert.equal(passouAteOFim(-200, 'direita', 352, 1, true), false);
-  assert.equal(passouAteOFim(-270, 'direita', 352, 1, true), false);
-  assert.equal(passouAteOFim(-270, 'esquerda', 352, 2, true), true);
-  assert.equal(passouAteOFim(-200, 'esquerda', 352, 2, true), false, 'só abre o lado');
-  assert.equal(passouAteOFim(200, 'direita', 352, 1, true), true);
-  assert.equal(passouAteOFim(200, 'esquerda', 352, 2, true), false);
-  assert.equal(passouAteOFim(400, 'direita', 352, 1, false), false, 'sem ponta nunca executa');
+  assert.equal(passouAteOFim(-200, 'direita', 352, 1, true, BOTAO), false);
+  assert.equal(passouAteOFim(-270, 'direita', 352, 1, true, BOTAO), false);
+  assert.equal(passouAteOFim(-270, 'esquerda', 352, 2, true, BOTAO), true);
+  assert.equal(passouAteOFim(-200, 'esquerda', 352, 2, true, BOTAO), false, 'só abre o lado');
+  assert.equal(passouAteOFim(200, 'direita', 352, 1, true, BOTAO), true);
+  assert.equal(passouAteOFim(200, 'esquerda', 352, 2, true, BOTAO), false);
+  assert.equal(passouAteOFim(400, 'direita', 352, 1, false, BOTAO), false, 'sem ponta nunca executa');
+});
+
+test('a ponta da esquerda é o botão da BORDA (o último), não o primeiro', () => {
+  const lados = ladosDoArrasto([
+    a('Mover', { arrasto: 'esquerda' }),
+    a('Arquivar', { arrasto: 'esquerda', desfaz: true }),
+  ]);
+  assert.equal(lados.pontaEsquerda?.label, 'Arquivar');
+  // A da direita continua sendo a primeira: é ela que fica na borda esquerda da tela.
+  assert.equal(ladosDoArrasto([a('Fixar', { arrasto: 'direita', desfaz: true }), a('Cor', { arrasto: 'direita' })]).pontaDireita?.label, 'Fixar');
+});
+
+test('o botão cresce com a fonte até 1,6× — acima disso o rótulo de uma palavra ainda cabe', () => {
+  assert.equal(larguraDoBotao(1), 88);
+  assert.equal(larguraDoBotao(0.85), 88, 'fonte menor não encolhe o alvo de toque');
+  assert.equal(larguraDoBotao(1.3), 114);
+  assert.equal(larguraDoBotao(2), 141);
+  assert.equal(limiarAteOFim(328, 2, true, 114), 342, 'o limiar acompanha a largura do botão');
+});
+
+test('o ponto de abrir é meio botão, e de um lado só', () => {
+  assert.equal(abriuOLado(50, 'direita', 88), true);
+  assert.equal(abriuOLado(40, 'direita', 88), false);
+  assert.equal(abriuOLado(-50, 'direita', 88), false);
+  assert.equal(abriuOLado(-50, 'esquerda', 88), true);
+});
+
+test('"até o fim" que a mola desligou há instantes ainda vale; de propósito, não', () => {
+  assert.equal(passouHaPouco(true, 0, 1000), true);
+  assert.equal(passouHaPouco(false, 950, 1000), true, 'a mola puxou para dentro no quadro seguinte ao soltar');
+  assert.equal(passouHaPouco(false, 700, 1000), false, 'a pessoa voltou o dedo e segurou antes de soltar');
+  assert.equal(passouHaPouco(false, 0, 1000), false);
 });

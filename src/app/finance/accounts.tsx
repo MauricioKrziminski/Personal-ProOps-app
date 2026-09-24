@@ -321,7 +321,6 @@ export default function AccountsScreen() {
           {
             label: 'Arquivar',
             icon: 'archivebox',
-            destructive: true,
             arrasto: 'esquerda',
             disabled: !conta,
             onPress: () => conta && arquivar(conta),

@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { FlatList, ScrollView, StyleSheet, View, useWindowDimensions } from 'react-native';
 import { MaxContentWidth } from '@/constants/theme';
 import { chartWidthForPane, rootContentMaxWidth } from '@/design/adaptive-window';
@@ -112,7 +112,7 @@ function ErrorBand({ message, onRetry }: { message: string; onRetry: () => void 
 export default function InvoiceScreen() {
   const toast = useToast();
   const insets = useSafeAreaInsets();
-  const { id, via } = useLocalSearchParams<{ id: string; via?: string }>();
+  const { id, via, acao } = useLocalSearchParams<{ id: string; via?: string; acao?: string }>();
   const { width, fontScale } = useWindowDimensions();
   const { windowClass } = useAdaptiveWindow();
   const tablet = windowClass !== 'compact';
@@ -267,6 +267,15 @@ export default function InvoiceScreen() {
     setValorCents(falta);
     setPagando(true);
   };
+
+  // Veio do "Paguei" de Cartões (`acao=pagar`): abre o pagamento assim que a fatura carrega, uma
+  // vez só — voltar do sheet não o reabre.
+  const pagamentoPedido = useRef(acao === 'pagar');
+  useEffect(() => {
+    if (!pagamentoPedido.current || !podePagar || !accounts.data) return;
+    pagamentoPedido.current = false;
+    abrirPagamento();
+  });
 
   const registrar = () => {
     if (!fatura || !payerId || !dataISO) return;

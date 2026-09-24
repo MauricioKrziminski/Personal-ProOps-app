@@ -608,6 +608,12 @@ dela). Cancelou, a abertura revela a trava, que tem o "tentar de novo".
   Grade (pasta em grade) não arrasta: o toque longo já é o arrasto de reordenar.
   ⚠️ Os botões do painel usam o `Pressable` do **gesture-handler**: o da RN não recebe o toque
   dentro do `ReanimatedSwipeable` no Android.
+  ⚠️ **Dentro de um card arrastável o valor NÃO é selecionável** (`DentroDeArrasto`, em
+  `money.tsx`): no Android o arrasto que começava em cima do número selecionava a palavra, e o
+  toque longo ali é o menu do card. Não "devolver" o `selectable`.
+  ⚠️ Os dois painéis leem o MESMO deslocamento: toda conta de "passou do ponto" é por lado
+  (`passouAteOFim`, `abriuOLado` em `lib/arrasto.ts`). Pelo valor absoluto, arrastar a nota para
+  a esquerda fixava em vez de arquivar.
 
 ---
 
