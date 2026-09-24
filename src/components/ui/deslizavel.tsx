@@ -30,6 +30,7 @@ import {
   passouAteOFim,
   temArrasto,
   traducaoNoSoltar,
+  ladoDoSoltar,
 } from '@/lib/arrasto';
 import { showItemActions, type ItemAction } from '@/lib/item-actions';
 
@@ -165,54 +166,56 @@ export function Deslizavel({ titulo, acoes, forma = 'linha', fundo = 'surface', 
   );
 
   return (
-    <View
-      // Um toque num card com OUTRO aberto só fecha o aberto — não navega no mesmo toque. No
-      // próprio card aberto o toque passa: é ele que aperta os botões revelados.
-      onStartShouldSetResponderCapture={() => cardAberto.toqueEmOutro(meu)}
-      onLayout={(e) => largura.set(e.nativeEvent.layout.width)}>
-      <ReanimatedSwipeable
-        ref={eu}
-        enabled={tem}
-        simultaneousWithExternalGesture={dedo}
-        friction={1}
-        overshootFriction={1}
-        animationOptions={Motion.spring.settle}
-        // Passar do painel só onde arrastar até o fim faz algo.
-        overshootLeft={pontaDireita}
-        overshootRight={pontaEsquerda}
-        leftThreshold={botao / 2}
-        rightThreshold={botao / 2}
-        // No iPhone a borda esquerda de uma tela empurrada é o "voltar" do sistema: ali o arrasto
-        // começa depois dela. Nas raízes de aba não há voltar, e a zona morta só atrapalhava.
-        hitSlop={Platform.OS === 'ios' && temVoltar ? { left: -Space.xl } : undefined}
-        containerStyle={forma === 'card' ? styles.recorteCard : undefined}
-        childrenContainerStyle={forma === 'linha' ? { backgroundColor: theme[fundo] } : undefined}
-        renderLeftActions={tem && lados.direita.length ? renderDireita : undefined}
-        renderRightActions={tem && esquerda.length ? renderEsquerda : undefined}
-        onSwipeableWillOpen={(direcao) => {
-          cardAberto.abriu(meu);
-          // `right` é o conteúdo indo para a direita — o painel `direita`.
-          abertoAntes.set(direcao === 'right' ? 'direita' : 'esquerda');
-        }}
-        // Fechando, o card já não é "o aberto": um toque noutro card logo em seguida navega.
-        onSwipeableWillClose={() => {
-          abertoAntes.set(null);
-          cardAberto.fechou(meu);
-        }}
-        onSwipeableClose={() => {
-          for (const l of [direita, esquerdaSV]) {
-            l.passou.set(false);
-            l.desligouEm.set(0);
-          }
-          cardAberto.fechou(meu);
-        }}>
-        <GestureDetector gesture={dedo}>
-          <View collapsable={false}>
-            <DentroDeArrasto.Provider value>{children}</DentroDeArrasto.Provider>
-          </View>
-        </GestureDetector>
-      </ReanimatedSwipeable>
-    </View>
+    // O gesto do soltar mora FORA do arrasto: com o painel aberto a biblioteca põe o conteúdo em
+    // `pointerEvents: 'box-only'`, e preso a ele o gesto deixava de ver o dedo — continuar
+    // arrastando a partir do painel aberto não executava mais.
+    <GestureDetector gesture={dedo}>
+      <View
+        collapsable={false}
+        // Um toque num card com OUTRO aberto só fecha o aberto — não navega no mesmo toque. No
+        // próprio card aberto o toque passa: é ele que aperta os botões revelados.
+        onStartShouldSetResponderCapture={() => cardAberto.toqueEmOutro(meu)}
+        onLayout={(e) => largura.set(e.nativeEvent.layout.width)}>
+        <ReanimatedSwipeable
+          ref={eu}
+          enabled={tem}
+          simultaneousWithExternalGesture={dedo}
+          friction={1}
+          overshootFriction={1}
+          animationOptions={Motion.spring.settle}
+          // Passar do painel só onde arrastar até o fim faz algo.
+          overshootLeft={pontaDireita}
+          overshootRight={pontaEsquerda}
+          leftThreshold={botao / 2}
+          rightThreshold={botao / 2}
+          // No iPhone a borda esquerda de uma tela empurrada é o "voltar" do sistema: ali o arrasto
+          // começa depois dela. Nas raízes de aba não há voltar, e a zona morta só atrapalhava.
+          hitSlop={Platform.OS === 'ios' && temVoltar ? { left: -Space.xl } : undefined}
+          containerStyle={forma === 'card' ? styles.recorteCard : undefined}
+          childrenContainerStyle={forma === 'linha' ? { backgroundColor: theme[fundo] } : undefined}
+          renderLeftActions={tem && lados.direita.length ? renderDireita : undefined}
+          renderRightActions={tem && esquerda.length ? renderEsquerda : undefined}
+          onSwipeableWillOpen={(direcao) => {
+            cardAberto.abriu(meu);
+            // `right` é o conteúdo indo para a direita — o painel `direita`.
+            abertoAntes.set(direcao === 'right' ? 'direita' : 'esquerda');
+          }}
+          // Fechando, o card já não é "o aberto": um toque noutro card logo em seguida navega.
+          onSwipeableWillClose={() => {
+            abertoAntes.set(null);
+            cardAberto.fechou(meu);
+          }}
+          onSwipeableClose={() => {
+            for (const l of [direita, esquerdaSV]) {
+              l.passou.set(false);
+              l.desligouEm.set(0);
+            }
+            cardAberto.fechou(meu);
+          }}>
+          <DentroDeArrasto.Provider value>{children}</DentroDeArrasto.Provider>
+        </ReanimatedSwipeable>
+      </View>
+    </GestureDetector>
   );
 }
 
@@ -256,7 +259,8 @@ function ladoQueExecuta(s: Soltura, e: GestureTouchEvent): 'direita' | 'esquerda
     direita: s.botoes.direita * s.botao,
     esquerda: s.botoes.esquerda * s.botao,
   });
-  const lado = traducao > 0 ? 'direita' : 'esquerda';
+  const lado = ladoDoSoltar(s.abertoAntes.get(), traducao);
+  if (!lado) return null;
   const estado = s[lado];
   // O card nem chegou a abrir deste lado neste toque: não foi arrasto.
   if (!estado.abriu.get()) return null;

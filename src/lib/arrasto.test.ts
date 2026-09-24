@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 
-import { BOTAO, abriuOLado, executaAoSoltar, cardAberto, ladosDoArrasto, larguraDoBotao, limiarAteOFim, passouAteOFim, passouHaPouco, temArrasto, traducaoNoSoltar } from './arrasto.ts';
+import { BOTAO, abriuOLado, executaAoSoltar, cardAberto, ladosDoArrasto, larguraDoBotao, limiarAteOFim, passouAteOFim, passouHaPouco, temArrasto, traducaoNoSoltar, ladoDoSoltar } from './arrasto.ts';
 
 const a = (label: string, extra: Record<string, unknown> = {}) => ({ label, onPress: () => {}, ...extra });
 
@@ -151,4 +151,14 @@ test('até o fim cabe no card: a folga encolhe até meio botão para ficar em 85
   // Onde o botão inteiro de folga cabe, ele continua (o caso de 328dp com 88dp).
   assert.equal(limiarAteOFim(328, 2, true, 88), 264);
   assert.equal(limiarAteOFim(416, 1, true, 88), 416 * 0.55);
+});
+
+// Com um painel aberto, arrastar para o lado OPOSTO só fecha o card (a biblioteca não abre o outro
+// lado). Executar ali seria arquivar com a pessoa vendo só o "Fixar" fechar.
+test('soltar do lado oposto ao painel aberto nunca executa; do mesmo lado, continua valendo', () => {
+  assert.equal(ladoDoSoltar(null, 300), 'direita');
+  assert.equal(ladoDoSoltar(null, -300), 'esquerda');
+  assert.equal(ladoDoSoltar('direita', 250), 'direita');
+  assert.equal(ladoDoSoltar('direita', -300), null);
+  assert.equal(ladoDoSoltar('esquerda', 120), null);
 });

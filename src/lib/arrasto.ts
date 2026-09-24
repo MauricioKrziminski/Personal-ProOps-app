@@ -110,6 +110,20 @@ export function traducaoNoSoltar(
 }
 
 /**
+ * De que lado foi o soltar — ou nenhum. Com um painel aberto, arrastar para o lado OPOSTO só
+ * fecha o card (a biblioteca não abre o outro lado a partir de um aberto), então ali nunca se
+ * executa: seria arquivar com a pessoa vendo só o "Fixar" fechar.
+ */
+export function ladoDoSoltar(
+  abertoAntes: 'direita' | 'esquerda' | null,
+  traducao: number,
+): 'direita' | 'esquerda' | null {
+  'worklet';
+  const lado = traducao > 0 ? 'direita' : 'esquerda';
+  return abertoAntes && abertoAntes !== lado ? null : lado;
+}
+
+/**
  * Soltou: executa a ação da ponta? Vale o que o QUADRO viu (`passou`, ou desligado há pouco pela
  * mola) OU o deslocamento real no instante do soltar (`traducao`, de `traducaoNoSoltar`). O
  * "passou" é amostrado uma vez por quadro, e num arrasto que acelera no fim o dedo solta antes de
