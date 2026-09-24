@@ -1245,3 +1245,7 @@ test('Placeholder é exemplo ("Ex.: …") ou instrução, nunca dado que parece 
   }
   assert.deepEqual(erros, []);
 });
+
+test('Busca nativa do iOS não esconde a barra de navegação (o "(tabs)" de 24/09/2026)', () => {
+  assert.match(readFileSync(join(SRC, 'components/ui/search.ios.tsx'), 'utf8'), /hideNavigationBar=\{false\}/);
+});

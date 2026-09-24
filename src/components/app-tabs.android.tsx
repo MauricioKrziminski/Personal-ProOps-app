@@ -7,13 +7,14 @@ import { PillTabBar, type PillTab } from '@/components/ui/pill-tab-bar';
 import { useBudgetsStatus, useUpcomingBills } from '@/hooks/use-finance';
 import { useTodayReminders } from '@/hooks/use-items';
 import { useTheme } from '@/hooks/use-theme';
+import { ROTULO_DA_ABA } from '@/lib/abas';
 
 const TABS: PillTab[] = [
-  { name: 'today', label: 'Hoje', icon: 'sun.max' },
-  { name: 'notes', label: 'Notas', icon: 'note.text' },
-  { name: 'finance', label: 'Financeiro', icon: 'chart.pie' },
-  { name: 'agent', label: 'Agente', icon: 'bubble.left.and.bubble.right' },
-  { name: 'profile', label: 'Perfil', icon: 'person' },
+  { name: 'today', label: ROTULO_DA_ABA.today, icon: 'sun.max' },
+  { name: 'notes', label: ROTULO_DA_ABA.notes, icon: 'note.text' },
+  { name: 'finance', label: ROTULO_DA_ABA.finance, icon: 'chart.pie' },
+  { name: 'agent', label: ROTULO_DA_ABA.agent, icon: 'bubble.left.and.bubble.right' },
+  { name: 'profile', label: ROTULO_DA_ABA.profile, icon: 'person' },
 ];
 
 /* Indexado pela POSIÇÃO do slot: uma entrada fora de ordem em relação a `TABS` manda a pessoa

@@ -46,6 +46,15 @@ export function Search({
         barra de aparecer na tela raiz.
       */
       placement="stacked"
+      /*
+        ⚠️ **A barra de navegação não some durante a busca** (24/09/2026). Com o padrão (`true`) o
+        `UISearchController` esconde a barra ao focar e a DEVOLVE ao ser desmontado — e voltando
+        pelo gesto da borda com a busca ativa, ele a devolvia à tela de BAIXO: o Financeiro ganhava
+        um header nativo escrito "(tabs)" por cima da faixa da marca. Medido no simulador: com
+        foco, com texto e sem tocar na busca → 1, 1, 0; com `false` → 0, 0. A busca continua fixa
+        sob o título, que é o desenho (design.md §8).
+      */
+      hideNavigationBar={false}
       autoCapitalize="none"
       autoFocus={autoFocus}
       hideWhenScrolling={hideWhenScrolling}

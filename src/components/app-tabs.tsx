@@ -4,15 +4,16 @@ import { Platform } from 'react-native';
 import { useBudgetsStatus, useUpcomingBills } from '@/hooks/use-finance';
 import { useTodayReminders } from '@/hooks/use-items';
 import { useTheme } from '@/hooks/use-theme';
+import { ROTULO_DA_ABA } from '@/lib/abas';
 
 // No iOS 26+ a NativeTabs renderiza a tab bar nativa em Liquid Glass —
 // diretriz central de design do ProOps. SF Symbols no iOS; Material glyphs no Android.
 const TABS = [
-  { name: 'today', label: 'Hoje', sf: { default: 'sun.max', selected: 'sun.max.fill' }, md: 'today' },
-  { name: 'notes', label: 'Notas', sf: { default: 'note.text', selected: 'note.text' }, md: 'description' },
-  { name: 'finance', label: 'Financeiro', sf: { default: 'chart.pie', selected: 'chart.pie.fill' }, md: 'pie_chart' },
-  { name: 'agent', label: 'Agente', sf: { default: 'bubble.left.and.bubble.right', selected: 'bubble.left.and.bubble.right.fill' }, md: 'forum' },
-  { name: 'profile', label: 'Perfil', sf: { default: 'person', selected: 'person.fill' }, md: 'person' },
+  { name: 'today', label: ROTULO_DA_ABA.today, sf: { default: 'sun.max', selected: 'sun.max.fill' }, md: 'today' },
+  { name: 'notes', label: ROTULO_DA_ABA.notes, sf: { default: 'note.text', selected: 'note.text' }, md: 'description' },
+  { name: 'finance', label: ROTULO_DA_ABA.finance, sf: { default: 'chart.pie', selected: 'chart.pie.fill' }, md: 'pie_chart' },
+  { name: 'agent', label: ROTULO_DA_ABA.agent, sf: { default: 'bubble.left.and.bubble.right', selected: 'bubble.left.and.bubble.right.fill' }, md: 'forum' },
+  { name: 'profile', label: ROTULO_DA_ABA.profile, sf: { default: 'person', selected: 'person.fill' }, md: 'person' },
 ] as const;
 
 /**
