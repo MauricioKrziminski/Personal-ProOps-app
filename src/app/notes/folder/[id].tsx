@@ -10,6 +10,7 @@ import { FolderPicker } from '@/components/notes/folder-picker';
 import { NoteList } from '@/components/notes/note-list';
 import { useFolderMenu } from '@/components/notes/use-folder-menu';
 import { TagPicker } from '@/components/notes/tag-picker';
+import { Dica } from '@/components/ui/dica';
 import { EmptyState } from '@/components/ui/empty-state';
 import { HeaderActions } from '@/components/ui/header-actions';
 import { fecharDeslizavelAberto } from '@/components/ui/deslizavel';
@@ -309,6 +310,9 @@ export default function FolderScreen() {
                 />
               </View>
             ) : null}
+
+            {/* A mesma dica da aba Notas: quem guarda tudo em pastas só vê cartões aqui. */}
+            {notes.length > 0 ? <Dica id="lista-arrasto" tela="notas" bico="baixo" /> : null}
 
             {fixadas.length > 0 ? (
               <View style={styles.secao} onLayout={(e) => setTopoFixadas(e.nativeEvent.layout.y)}>

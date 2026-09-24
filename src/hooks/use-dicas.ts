@@ -26,6 +26,11 @@ type DoUsuario = { estado: EstadoDasDicas; guia: boolean };
 
 const porUsuario = new Map<string, DoUsuario>();
 const lidos = new Set<string>();
+/**
+ * Mudanças pedidas ANTES de o disco responder (abrir o app direto num link: o extrato de uma conta,
+ * o guia). Aplicadas por cima do que foi lido — gravar antes apagaria o que já estava encerrado.
+ */
+const pendentes = new Map<string, ((u: DoUsuario) => DoUsuario)[]>();
 /** Quais dicas estão na tela agora, por tela — a da vez só sai entre elas. */
 const montadas = new Map<Tela, Map<DicaId, number>>();
 const ouvintes = new Set<() => void>();
@@ -55,7 +60,12 @@ function ler(userId: string) {
     } catch {
       // Gravado corrompido: começa do zero, que é mostrar as dicas de novo — nunca travar a tela.
     }
-    porUsuario.set(userId, { estado: { encerradas, suspensas: [], forcada: null }, guia });
+    const lido: DoUsuario = { estado: { encerradas, suspensas: [], forcada: null }, guia };
+    const fila = pendentes.get(userId) ?? [];
+    pendentes.delete(userId);
+    const atual = fila.reduce((u, fn) => fn(u), lido);
+    porUsuario.set(userId, atual);
+    if (atual !== lido) gravar(userId, atual);
     avisar();
   };
   AsyncStorage.getItem(PREFIXO + userId)
@@ -63,17 +73,25 @@ function ler(userId: string) {
     .catch(() => guardar(null));
 }
 
+function gravar(userId: string, u: DoUsuario) {
+  AsyncStorage.setItem(PREFIXO + userId, JSON.stringify({ encerradas: u.estado.encerradas, guia: u.guia })).catch(
+    () => {},
+  );
+}
+
 function mudar(fn: (atual: DoUsuario) => DoUsuario) {
   const userId = usuarioAtual;
-  const atual = userId ? porUsuario.get(userId) : undefined;
-  if (!userId || !atual) return;
+  if (!userId) return;
+  const atual = porUsuario.get(userId);
+  if (!atual) {
+    pendentes.set(userId, [...(pendentes.get(userId) ?? []), fn]);
+    return;
+  }
   const novo = fn(atual);
   if (novo === atual) return;
   porUsuario.set(userId, novo);
   avisar();
-  AsyncStorage.setItem(PREFIXO + userId, JSON.stringify({ encerradas: novo.estado.encerradas, guia: novo.guia })).catch(
-    () => {},
-  );
+  gravar(userId, novo);
 }
 
 /** "Entendi": a dica não volta sozinha, e a tela fica quieta nesta visita. */

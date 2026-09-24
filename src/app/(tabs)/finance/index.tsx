@@ -292,6 +292,9 @@ export default function FinanceScreen() {
   const saiuRealizado = Number(ciclo?.saiu_realizado ?? 0);
   const debtsTotal = (debts.data ?? []).reduce((soma, d) => soma + Number(d.remaining_cents), 0);
 
+  /** A curva do herói — e a dica dela, que só existe com ela na tela. */
+  const temCurva = isCurrent && series.length > 1 && chartWidth > 0;
+
   const cycleBlock = (
     <>
       <PeriodBar month={month} onChangeMonth={setMonth} ruler={regua} variant="bare" />
@@ -321,7 +324,7 @@ export default function FinanceScreen() {
             } : undefined}
             chart={heroLoading ? (
               <Skeleton height={88} radius={Radius.sm} tone="hero" />
-            ) : isCurrent && series.length > 1 && chartWidth > 0 ? (
+            ) : temCurva ? (
               <ScrubChart
                 values={series}
                 labels={rotulos}
@@ -352,7 +355,7 @@ export default function FinanceScreen() {
           />
         )}
         {/* Só com a curva na tela: a dica ensina o gesto DELA. */}
-        {!heroError && !heroLoading && isCurrent && series.length > 1 && chartWidth > 0 ? (
+        {!heroError && !heroLoading && temCurva ? (
           <Dica id="fin-grafico" tela="financeiro" />
         ) : null}
       </View>

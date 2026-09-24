@@ -114,7 +114,7 @@ Portão em cada commit: `tsc`, `expo lint` e `npm test` verdes (853/853 no últi
 
 | item | commit | conferido em |
 |---|---|---|
-| 1 — dicas e guia | este lote | s26 (claro; escuro a 384dp × 1,3) e iPhone 17 Pro (escuro): as seis dicas no lugar, uma por tela e por visita; some no "Entendi" e no uso (menu do herói, Carteira, curva, arrasto, extrato da conta); volta pelo "Mostrar"; sobrevive a fechar o app; "Conhecer o app" marca ao abrir o guia |
+| 1 — dicas e guia | `22c0610` e o seguinte | s26 (claro; escuro a 384dp × 1,3) e iPhone 17 Pro (claro e escuro): as seis dicas no lugar, uma por tela e por visita; some no "Entendi" e no uso (menu do herói, Carteira, curva, arrasto, extrato da conta, deslize da fatura); volta pelo "Mostrar"; sobrevive a fechar o app; "Conhecer o app" marca ao abrir o guia. Estado zerado no aparelho (só a chave `dicas:` do `dev@`, apagada pelo nome exato) para ver as seis do começo — inclusive dentro das pastas de Notas, onde a conta de demonstração guarda todas as notas |
 | 2 — botões do arrasto no iOS | `ec08d7e` | simulador: "Mais" abre o menu, "Arquivar" arquiva |
 | 3 — borda e até o fim | `5278f48` | s26 e simulador: canto casado com o card; até o fim aciona a ponta dos dois lados (6/6 medido no banco) |
 | 4 — efeito do WhatsApp | `5278f48` | vídeo quadro a quadro no s26 |
@@ -128,7 +128,17 @@ Portão em cada commit: `tsc`, `expo lint` e `npm test` verdes (853/853 no últi
 acima dele); os números do Perfil não diziam que eram do mês e do WhatsApp (`a7923f3`); a Hoje
 não tinha porta para a busca em tudo (`0b86cb7`); o extrato de uma conta não dizia o saldo dela
 (`c30f3ad`); a dica da lista sumia com o painel aberto e movia os botões sob o dedo (agora some
-ao fechar).
+ao fechar); abrir o app direto num link perdia a mudança pedida antes de o aparelho responder, e
+gravá-la apagaria o que já estava encerrado (fila aplicada por cima da leitura,
+`use-dicas.test.ts`); o toque longo do iOS não encerrava a dica das listas (agora encerra ao
+escolher uma ação — o `Link.Menu` não avisa quando abre); quem guarda todas as notas em pastas não
+via a dica de Notas (ela também está dentro da pasta); três frases deixavam uma palavra sozinha na
+linha no iPhone ou a 384dp × 1,3 e foram encurtadas.
+
+**Consequência declarada para quem já usa:** "Conhecer o app" é o quarto passo dos Primeiros
+passos, então quem tinha os três feitos volta a ver o card em 3/4 — e o Próximo passo espera,
+como sempre, até ele acabar (abrir o guia) ou até o "Agora não". É o anúncio do guia para quem
+já usa o app; guardado no aparelho, como o "Agora não".
 
 **Efeito colateral no staging (conta `dev@`):** os testes de arrastar até o fim mexeram em notas
 de demonstração; `b7e765de` foi restaurada pelo id, e `9772618e`/`adaaaf73` ficaram só com o

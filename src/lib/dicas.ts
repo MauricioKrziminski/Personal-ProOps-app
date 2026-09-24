@@ -19,7 +19,7 @@ export const DICAS = [
     id: 'hoje-contas',
     telas: ['hoje'],
     icone: 'building.columns',
-    texto: 'Toque numa conta para ver o saldo e o extrato dela.',
+    texto: 'Toque numa conta para ver o extrato dela.',
   },
   {
     id: 'fin-pilha',

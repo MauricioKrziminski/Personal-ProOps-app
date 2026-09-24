@@ -1,6 +1,7 @@
 import { Link } from 'expo-router';
 
 import { Deslizavel } from '@/components/ui/deslizavel';
+import { usarDica } from '@/hooks/use-dicas';
 import type { ItemAction } from '@/lib/item-actions';
 import type { ItemLinkProps } from './item-link.types';
 
@@ -42,7 +43,12 @@ function renderAction(action: ItemAction) {
       destructive={action.destructive}
       disabled={action.disabled}
       isOn={action.selected}
-      onPress={() => action.onPress?.()}>
+      onPress={() => {
+        // Segurar e escolher é o que a dica das listas ensina (`lista-arrasto`). O menu do sistema
+        // não avisa quando ABRE; escolher uma ação é o primeiro sinal que chega aqui.
+        usarDica('lista-arrasto');
+        action.onPress?.();
+      }}>
       {action.label}
     </Link.MenuAction>
   );

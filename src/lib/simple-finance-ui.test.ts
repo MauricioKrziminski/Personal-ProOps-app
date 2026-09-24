@@ -182,7 +182,7 @@ function screen(file: string, options: { tablet?: boolean; debts?: any[]; archiv
       };
       if (name === 'react/jsx-runtime') return require(name);
       if (name === 'react-native') return { StyleSheet: { create: (value: unknown) => value }, View: 'View', Pressable: 'Pressable', ScrollView: 'ScrollView', FlatList: 'FlatList', useWindowDimensions: () => ({ width: 384, height: 800 }), Platform: { OS: 'android', select: (o: any) => o.android ?? o.default } };
-      if (name === 'react-native-reanimated') return { default: { View: 'AnimatedView' }, FadeInDown: animation, FadeOut: animation, FadeIn: animation, LinearTransition: animation };
+      if (name === 'react-native-reanimated') return { default: { View: 'AnimatedView' }, FadeInDown: animation, FadeOut: animation, FadeIn: animation, LinearTransition: animation, useAnimatedRef: () => ({ current: null }) };
       if (name === 'expo-haptics') return { selectionAsync() {}, notificationAsync() {}, NotificationFeedbackType: { Success: 'success', Warning: 'warning' } };
       // `back` é navegação como qualquer outra e ENTRA na lista: é o que prende o "fechar um
       // formulário que outra tela abriu devolve para ela" (`useVoltarQuandoFechar`).
@@ -234,6 +234,9 @@ function screen(file: string, options: { tablet?: boolean; debts?: any[]; archiv
       if (name === '@tanstack/react-query') return { useQuery: () => query, useMutation: () => mutation('mutation'), useQueryClient: () => ({ invalidateQueries: async () => {} }) };
       if (name === '@/lib/finance-form' || name === '@/lib/dates' || name === '@/lib/forecast-months' || name === '@/lib/month-view' || name === '@/lib/settle-labels' || name === '@/lib/accounts' || name === '@/lib/cycle-label' || name === '@/lib/card-status' || name === '@/lib/today-sections' || name === '@/lib/runway' || name === '@/lib/budget-tight' || name === '@/lib/setup-steps' || name === '@/lib/activity-feed' || name === '@/lib/account-cash' || name === '@/lib/today-spend' || name === '@/lib/anticipation' || name === '@/lib/widget-snapshot' || name === '@/lib/debt-history' || name === '@/lib/import-preview' || name === '@/lib/arrasto' || name === '@/lib/text' || name === '@/lib/installment-progress' || name === '@/lib/aos-poucos' || name === '@/lib/categories' || name === '@/lib/categories-merge' || name === '@/lib/alert-history' || name === '@/lib/data-da-compra' || name === '@/lib/dicas') return load(`src/lib/${name.split('/').at(-1)}.ts`);
       if (name === '@/hooks/use-debounced') return { useDebounced: (value: unknown) => value };
+      if (name === '@/components/ui/glass-backdrop') return { GlassBackdrop: 'GlassBackdrop', supportsLiquidGlass: () => false };
+      if (name === '@/hooks/use-note-sort') return { SORT_LABEL: {}, useNoteSort: () => ['manual', () => {}] };
+      if (name === '@/components/notes/use-folder-menu') return { useFolderMenu: () => () => {} };
       if (name === '@/lib/rrule-text') return { describeRRule: () => 'todo mês' };
       if (name === '@/hooks/use-archived-folders') return { useArchivedFolders: () => ({ ...query, isSuccess: true, data: [] }) };
       if (name === '@/hooks/use-notes') return new Proxy({
@@ -1861,4 +1864,12 @@ test('Guia: item sem dica só leva à tela, sem acender nada', () => {
   ui.nodes().find((n: any) => n.type === 'Row' && n.props.title === 'Importar fatura ou extrato').props.onPress();
   assert.equal(ui.writes.length, 0);
   assert.equal(ui.navigations.at(-1), '/import');
+});
+
+const notasFile = 'src/app/(tabs)/notes/index.tsx';
+const nota = (id: string, pinned = false) => ({ id, content: `Nota ${id}`, pinned, updated_at: '2026-09-20T12:00:00Z', folder_id: null, color: null });
+
+test('Notas: a dica do arrasto aparece com notas na tela, e some com a lista vazia', () => {
+  assert.deepEqual(dicas(screen(notasFile, { notes: [nota('n1')] })), ['lista-arrasto']);
+  assert.deepEqual(dicas(screen(notasFile, { notes: [] })), []);
 });

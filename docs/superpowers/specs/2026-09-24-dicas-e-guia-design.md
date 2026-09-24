@@ -44,7 +44,7 @@ do inventário:
 | id | tela | frase | some quando |
 |---|---|---|---|
 | `hoje-painel` | Hoje (herói) | "Toque no painel para ver o que fecha o ciclo, a projeção e as metas." | abre o menu do painel |
-| `hoje-contas` | Hoje ("Nas contas") | "Toque numa conta para ver o saldo e o extrato dela." | abre o extrato de uma conta |
+| `hoje-contas` | Hoje ("Nas contas") | "Toque numa conta para ver o extrato dela." (o extrato abre pelo saldo) | abre o extrato de uma conta |
 | `fin-pilha` | Financeiro (pilha de cartões) | "Toque na pilha para ver todos os cartões." | abre a Carteira |
 | `fin-grafico` | Financeiro (gráfico do herói) | "Arraste no gráfico para ver o saldo de cada dia." | arrasta no gráfico |
 | `lista-arrasto` | Lançamentos e Notas (1ª linha) | "Arraste para os lados para as ações rápidas. Segure para ver todas." | arrasta ou segura um card |
